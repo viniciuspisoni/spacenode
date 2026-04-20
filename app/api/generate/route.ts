@@ -3,9 +3,14 @@ import { fal } from '@fal-ai/client'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-fal.config({ credentials: process.env.FAL_KEY })
-
 export async function POST(req: NextRequest) {
+  // Diagnóstico temporário — remover após confirmar funcionamento
+  console.log('[generate] FAL_KEY exists:', !!process.env.FAL_KEY)
+  console.log('[generate] SUPABASE_SERVICE_ROLE_KEY exists:', !!process.env.SUPABASE_SERVICE_ROLE_KEY)
+
+  // Config dentro do handler garante que as env vars já foram carregadas
+  fal.config({ credentials: process.env.FAL_KEY })
+
   const supabase = await createClient()
   const {
     data: { user },
@@ -40,7 +45,13 @@ export async function POST(req: NextRequest) {
     // Compose a rich prompt from all descriptors
     const falPrompt = `${prompt}, ${ambient}, ${style} style, ${lighting} lighting, photorealistic architectural render`
 
+    console.log('[generate] strength:', strength)
+    console.log('[generate] falPrompt:', falPrompt)
+    console.log('[generate] uploading to fal storage...')
+
     inputUrl = await fal.storage.upload(imageFile)
+    console.log('[generate] inputUrl:', inputUrl)
+    console.log('[generate] calling fal-ai/flux/dev/image-to-image...')
 
     const result = await fal.subscribe('fal-ai/flux/dev/image-to-image', {
       input: {
@@ -52,8 +63,10 @@ export async function POST(req: NextRequest) {
       },
     })
 
+    console.log('[generate] fal result raw:', JSON.stringify(result.data))
     const images = (result.data as { images: { url: string }[] }).images
     outputUrl = images[0].url
+    console.log('[generate] outputUrl:', outputUrl)
 
     const admin = createAdminClient()
 
