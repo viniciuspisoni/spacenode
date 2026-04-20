@@ -84,6 +84,8 @@ export default function GenerateClient({ userName, credits: initialCredits }: Pr
   const canGenerate = !!imageFile && !!ambient && !!style && !!lighting && !isLoading && credits > 0
 
   const handleGenerate = async () => {
+    // eslint-disable-next-line no-console
+    console.log('handleGenerate called', { imageFile: !!imageFile, ambient, style, lighting, credits, canGenerate, isLoading })
     if (!canGenerate || !imageFile) return
     setIsLoading(true)
     setError(null)
@@ -270,7 +272,7 @@ export default function GenerateClient({ userName, credits: initialCredits }: Pr
 
             {/* Button */}
             <button
-              onClick={handleGenerate}
+              onClick={() => { console.log('button clicked', { canGenerate, credits, imageFile: !!imageFile }); handleGenerate() }}
               disabled={!canGenerate}
               style={{
                 width: '100%', padding: '15px 24px', borderRadius: 10,
