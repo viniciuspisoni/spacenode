@@ -15,32 +15,37 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
   }
 
-  let imageUrl: string | undefined
+  let inputUrl: string | undefined
   let outputUrl: string | undefined
 
   try {
     const formData = await req.formData()
     const imageFile = formData.get('image') as File | null
-    const prompt = formData.get('prompt') as string | null
+    const prompt   = formData.get('prompt') as string | null
+    const ambient  = formData.get('ambient') as string | null
+    const style    = formData.get('style') as string | null
+    const lighting = formData.get('lighting') as string | null
     const geometryLockRaw = formData.get('geometryLock') as string | null
 
-    if (!imageFile || !prompt) {
+    if (!imageFile || !prompt || !ambient || !style || !lighting) {
       return NextResponse.json(
-        { error: 'Imagem e prompt são obrigatórios' },
+        { error: 'Imagem, prompt, ambient, style e lighting são obrigatórios' },
         { status: 400 }
       )
     }
 
-    const geometryLock = Number(geometryLockRaw ?? 50)
-    // Higher lock → preserve geometry → lower AI strength
-    const strength = (100 - geometryLock) / 100
+    // Higher lock → preserve geometry → lower fal strength
+    const strength = (100 - Number(geometryLockRaw ?? 50)) / 100
 
-    imageUrl = await fal.storage.upload(imageFile)
+    // Compose a rich prompt from all descriptors
+    const falPrompt = `${prompt}, ${ambient}, ${style} style, ${lighting} lighting, photorealistic architectural render`
+
+    inputUrl = await fal.storage.upload(imageFile)
 
     const result = await fal.subscribe('fal-ai/flux/dev/image-to-image', {
       input: {
-        image_url: imageUrl,
-        prompt,
+        image_url: inputUrl,
+        prompt: falPrompt,
         strength,
         num_inference_steps: 28,
         guidance_scale: 3.5,
@@ -54,16 +59,20 @@ export async function POST(req: NextRequest) {
 
     await Promise.all([
       admin.from('renders').insert({
-        user_id: user.id,
-        original_image_url: imageUrl,
-        result_image_url: outputUrl,
+        user_id:    user.id,
+        input_url:  inputUrl,
+        output_url: outputUrl,
         prompt,
-        geometry_lock: geometryLock,
+        ambient,
+        style,
+        lighting,
+        status:     'completed',
+        completed_at: new Date().toISOString(),
       }),
-      admin.rpc('deduct_credit', { p_user_id: user.id }),
+      admin.rpc('consume_credit', { user_id_input: user.id }),
     ])
 
-    return NextResponse.json({ url: outputUrl, originalUrl: imageUrl })
+    return NextResponse.json({ url: outputUrl, originalUrl: inputUrl })
   } catch (err) {
     console.error('[generate] error:', err)
     return NextResponse.json(

@@ -17,6 +17,9 @@ export default function GenerateClient({ userName, credits: initialCredits }: Pr
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [prompt, setPrompt] = useState('')
+  const [ambient, setAmbient] = useState('')
+  const [style, setStyle] = useState('')
+  const [lighting, setLighting] = useState('')
   const [geometryLock, setGeometryLock] = useState(50)
   const [isLoading, setIsLoading] = useState(false)
   const [loadingIdx, setLoadingIdx] = useState(0)
@@ -57,7 +60,7 @@ export default function GenerateClient({ userName, credits: initialCredits }: Pr
   )
 
   const handleGenerate = async () => {
-    if (!imageFile || !prompt.trim() || isLoading || credits <= 0) return
+    if (!imageFile || !prompt.trim() || !ambient || !style || !lighting || isLoading || credits <= 0) return
     setIsLoading(true)
     setError(null)
     setLoadingIdx(0)
@@ -65,6 +68,9 @@ export default function GenerateClient({ userName, credits: initialCredits }: Pr
     const body = new FormData()
     body.append('image', imageFile)
     body.append('prompt', prompt)
+    body.append('ambient', ambient)
+    body.append('style', style)
+    body.append('lighting', lighting)
     body.append('geometryLock', String(geometryLock))
 
     try {
@@ -90,7 +96,7 @@ export default function GenerateClient({ userName, credits: initialCredits }: Pr
     setSliderPos(Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100)))
   }
 
-  const canGenerate = !!imageFile && prompt.trim().length > 0 && !isLoading && credits > 0
+  const canGenerate = !!imageFile && prompt.trim().length > 0 && !!ambient && !!style && !!lighting && !isLoading && credits > 0
 
   return (
     <main style={{ minHeight: '100vh', background: '#0a0a0a', color: '#f5f5f7' }}>
@@ -266,6 +272,52 @@ export default function GenerateClient({ userName, credits: initialCredits }: Pr
                 onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.1)')}
               />
             </div>
+
+            {/* Ambient / Style / Lighting selects */}
+            {(
+              [
+                { id: 'ambient', label: 'Ambiente', value: ambient, set: setAmbient,
+                  options: ['Externo – fachada', 'Interno – sala', 'Interno – cozinha',
+                            'Interno – quarto', 'Área de lazer', 'Comercial'] },
+                { id: 'style', label: 'Estilo', value: style, set: setStyle,
+                  options: ['Contemporâneo', 'Escandinavo', 'Industrial', 'Tropical',
+                            'Minimalista', 'Rústico', 'Biofílico'] },
+                { id: 'lighting', label: 'Iluminação', value: lighting, set: setLighting,
+                  options: ['Natural – manhã', 'Natural – meio-dia', 'Natural – pôr do sol',
+                            'Artificial – quente', 'Artificial – fria', 'Noturna'] },
+              ] as { id: string; label: string; value: string; set: (v: string) => void; options: string[] }[]
+            ).map(({ id, label, value, set, options }) => (
+              <div key={id}>
+                <label
+                  htmlFor={id}
+                  style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', display: 'block', marginBottom: 10 }}
+                >
+                  {label}
+                </label>
+                <select
+                  id={id}
+                  value={value}
+                  onChange={e => set(e.target.value)}
+                  style={{
+                    width: '100%',
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: 10,
+                    padding: '11px 14px',
+                    color: value ? '#f5f5f7' : 'rgba(255,255,255,0.25)',
+                    fontSize: 13,
+                    outline: 'none',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  <option value="" disabled>Selecione…</option>
+                  {options.map(o => (
+                    <option key={o} value={o} style={{ background: '#1a1a1a', color: '#f5f5f7' }}>{o}</option>
+                  ))}
+                </select>
+              </div>
+            ))}
 
             {/* Geometry Lock Slider */}
             <div>
