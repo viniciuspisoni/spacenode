@@ -44,22 +44,18 @@ export async function POST(req: NextRequest) {
     const geometryLock = Number(geometryLockRaw ?? 50)
     const strength = Math.max(0.15, Math.min(0.95, (100 - geometryLock) / 100))
 
-    // Compose a rich prompt from all descriptors
-    const falPrompt = `${prompt}, ${ambient}, ${style} style, ${lighting} lighting, photorealistic architectural render`
-
     console.log('[generate] geometryLock:', geometryLock, '→ strength:', strength)
-    console.log('[generate] falPrompt:', falPrompt)
+    console.log('[generate] prompt:', prompt)
     console.log('[generate] uploading to fal storage...')
 
     inputUrl = await fal.storage.upload(imageFile)
     console.log('[generate] inputUrl:', inputUrl)
-    console.log('[generate] calling fal-ai/flux/dev/image-to-image...')
 
     console.log('[generate] model:', modelId)
     const result = await fal.subscribe(modelId, {
       input: {
         image_url: inputUrl,
-        prompt: falPrompt,
+        prompt,
         strength,
         num_inference_steps: 28,
         guidance_scale: 3.5,

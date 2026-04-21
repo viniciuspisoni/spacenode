@@ -37,8 +37,37 @@ const SELECTS: { id: string; label: string; options: string[] }[] = [
   },
 ]
 
+const AMBIENT_EN: Record<string, string> = {
+  'Externo – fachada': 'exterior building facade',
+  'Interno – sala':    'interior living room',
+  'Interno – cozinha': 'interior kitchen',
+  'Interno – quarto':  'interior bedroom',
+  'Área de lazer':     'outdoor leisure area pool',
+  'Comercial':         'commercial storefront exterior',
+}
+const STYLE_EN: Record<string, string> = {
+  'Contemporâneo': 'contemporary modern',
+  'Escandinavo':   'scandinavian',
+  'Industrial':    'industrial',
+  'Tropical':      'tropical',
+  'Minimalista':   'minimalist',
+  'Rústico':       'rustic',
+  'Biofílico':     'biophilic nature-inspired',
+}
+const LIGHTING_EN: Record<string, string> = {
+  'Natural – manhã':       'soft morning sunlight',
+  'Natural – meio-dia':    'bright midday sun',
+  'Natural – pôr do sol':  'warm golden hour sunset',
+  'Artificial – quente':   'warm interior artificial lighting',
+  'Artificial – fria':     'cool white artificial lighting',
+  'Noturna':               'dramatic night lighting',
+}
+
 function buildPrompt(ambient: string, style: string, lighting: string): string {
-  return `photorealistic architectural render, ${ambient}, ${style} style, ${lighting} lighting, high quality, professional visualization, 8k resolution, detailed materials and textures`
+  const a = AMBIENT_EN[ambient]   ?? ambient
+  const s = STYLE_EN[style]       ?? style
+  const l = LIGHTING_EN[lighting] ?? lighting
+  return `hyperrealistic architectural visualization, ${a}, ${s} architecture, ${l}, photorealistic render, 8K UHD, professional architectural photography, physically based rendering, detailed materials, sharp focus, cinematic composition`
 }
 
 interface Props {
