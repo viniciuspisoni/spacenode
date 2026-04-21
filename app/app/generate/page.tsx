@@ -30,7 +30,7 @@ export default async function GeneratePage() {
       full_name: user.user_metadata?.full_name ?? null,
       credits: DEFAULT_CREDITS,
     })
-    profile = { credits: DEFAULT_CREDITS }
+    profile = { credits: DEFAULT_CREDITS, project_materials: null }
   }
 
   return (
