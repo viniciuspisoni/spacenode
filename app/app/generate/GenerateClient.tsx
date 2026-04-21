@@ -8,6 +8,14 @@ const LOADING_TEXTS = [
   'Ajustando iluminação natural...',
 ]
 
+const MODELS = [
+  { id: 'fal-ai/flux/dev/image-to-image',              label: 'Flux Dev (atual)' },
+  { id: 'fal-ai/flux/krea/image-to-image',             label: 'Flux Krea' },
+  { id: 'fal-ai/flux-control-lora-canny/image-to-image', label: 'Flux Canny (contornos)' },
+  { id: 'fal-ai/flux-control-lora-depth/image-to-image', label: 'Flux Depth (estrutura 3D)' },
+  { id: 'fal-ai/flux-general/image-to-image',          label: 'Flux General' },
+]
+
 const SELECTS: { id: string; label: string; options: string[] }[] = [
   {
     id: 'ambient',
@@ -44,6 +52,7 @@ export default function GenerateClient({ userName, credits: initialCredits }: Pr
   const [ambient, setAmbient] = useState<string>(SELECTS[0].options[0])
   const [style, setStyle] = useState<string>(SELECTS[1].options[0])
   const [lighting, setLighting] = useState<string>(SELECTS[2].options[0])
+  const [model, setModel] = useState(MODELS[0].id)
   const [geometryLock, setGeometryLock] = useState(50)
   const [isLoading, setIsLoading] = useState(false)
   const [loadingIdx, setLoadingIdx] = useState(0)
@@ -98,6 +107,7 @@ export default function GenerateClient({ userName, credits: initialCredits }: Pr
     body.append('style', style)
     body.append('lighting', lighting)
     body.append('geometryLock', String(geometryLock))
+    body.append('model', model)
 
     try {
       const res = await fetch('/api/generate', { method: 'POST', body })
@@ -268,6 +278,23 @@ export default function GenerateClient({ userName, credits: initialCredits }: Pr
                   ? 'Equilíbrio entre fidelidade estrutural e interpretação criativa.'
                   : 'Máxima criatividade da IA. Estrutura pode ser reimaginada.'}
               </p>
+            </div>
+
+            {/* Model selector */}
+            <div>
+              <label htmlFor="model-select" style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', display: 'block', marginBottom: 10 }}>
+                Motor de IA
+              </label>
+              <select
+                id="model-select"
+                value={model}
+                onChange={e => setModel(e.target.value)}
+                style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '11px 14px', color: '#f5f5f7', fontSize: 13, outline: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+              >
+                {MODELS.map(m => (
+                  <option key={m.id} value={m.id} style={{ background: '#1a1a1a', color: '#f5f5f7' }}>{m.label}</option>
+                ))}
+              </select>
             </div>
 
             {/* Button */}

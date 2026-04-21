@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
     const style    = formData.get('style') as string | null
     const lighting = formData.get('lighting') as string | null
     const geometryLockRaw = formData.get('geometryLock') as string | null
+    const modelId = (formData.get('model') as string | null) ?? 'fal-ai/flux/dev/image-to-image'
 
     if (!imageFile || !prompt || !ambient || !style || !lighting) {
       return NextResponse.json(
@@ -54,7 +55,8 @@ export async function POST(req: NextRequest) {
     console.log('[generate] inputUrl:', inputUrl)
     console.log('[generate] calling fal-ai/flux/dev/image-to-image...')
 
-    const result = await fal.subscribe('fal-ai/flux/dev/image-to-image', {
+    console.log('[generate] model:', modelId)
+    const result = await fal.subscribe(modelId, {
       input: {
         image_url: inputUrl,
         prompt: falPrompt,
