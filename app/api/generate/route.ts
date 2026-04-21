@@ -39,13 +39,14 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Higher lock → preserve geometry → lower fal strength
-    const strength = (100 - Number(geometryLockRaw ?? 50)) / 100
+    // Higher lock → preserve geometry → lower strength (floor 0.15, ceiling 0.95)
+    const geometryLock = Number(geometryLockRaw ?? 50)
+    const strength = Math.max(0.15, Math.min(0.95, (100 - geometryLock) / 100))
 
     // Compose a rich prompt from all descriptors
     const falPrompt = `${prompt}, ${ambient}, ${style} style, ${lighting} lighting, photorealistic architectural render`
 
-    console.log('[generate] strength:', strength)
+    console.log('[generate] geometryLock:', geometryLock, '→ strength:', strength)
     console.log('[generate] falPrompt:', falPrompt)
     console.log('[generate] uploading to fal storage...')
 
@@ -86,8 +87,10 @@ export async function POST(req: NextRequest) {
     ])
 
     return NextResponse.json({ url: outputUrl, originalUrl: inputUrl })
-  } catch (err) {
-    console.error('[generate] error:', err)
+  } catch (err: unknown) {
+    const e = err as { status?: number; body?: unknown; message?: string }
+    console.error('[generate] error status:', e?.status)
+    console.error('[generate] error body:', JSON.stringify(e?.body ?? e?.message ?? err))
     return NextResponse.json(
       { error: 'Erro ao gerar render. Tente novamente.' },
       { status: 500 }
