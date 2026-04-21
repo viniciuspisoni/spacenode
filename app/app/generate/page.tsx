@@ -17,7 +17,7 @@ export default async function GeneratePage() {
 
   let { data: profile } = await supabase
     .from('profiles')
-    .select('credits')
+    .select('credits, project_materials')
     .eq('id', user.id)
     .single()
 
@@ -36,7 +36,7 @@ export default async function GeneratePage() {
   return (
     <GenerateClient
       userName={user.user_metadata?.full_name ?? user.email ?? 'Arquiteto'}
-      credits={profile.credits}
+      initialCredits={profile.credits}
     />
   )
 }
