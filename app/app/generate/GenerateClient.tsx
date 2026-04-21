@@ -82,7 +82,7 @@ export default function GenerateClient({ userName, credits: initialCredits }: Pr
   const [style, setStyle] = useState<string>(SELECTS[1].options[0])
   const [lighting, setLighting] = useState<string>(SELECTS[2].options[0])
   const [model, setModel] = useState(MODELS[0].id)
-  const [geometryLock, setGeometryLock] = useState(50)
+  const [geometryLock, setGeometryLock] = useState(30)
   const [isLoading, setIsLoading] = useState(false)
   const [loadingIdx, setLoadingIdx] = useState(0)
   const [result, setResult] = useState<{ url: string; originalUrl: string } | null>(null)

@@ -3,11 +3,12 @@ import { fal } from '@fal-ai/client'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-// Quality boosters appended server-side to every prompt
+// Tells the model to treat the input as a 3D model and convert to a real photo
 const QUALITY_SUFFIX =
-  ', highly detailed architectural visualization, ray-traced reflections, ' +
-  'professional 8k rendering, realistic textures, cinematic lighting, ' +
-  'sharp details, high-end materials, photorealistic'
+  ', convert 3D SketchUp model to real photograph, ' +
+  'photorealistic architectural photography, shot on Canon EOS R5, ' +
+  'real building materials, concrete glass steel, real sunlight shadows, ' +
+  'hyperrealistic, 8K RAW photo, not a render, not CGI, real life photo'
 
 // Note: fal-ai/flux/dev/image-to-image does NOT support negative_prompt.
 // Flux guidance_scale default and recommended value is 3.5 (not SDXL range).
