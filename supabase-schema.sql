@@ -143,3 +143,19 @@ begin
   return false;
 end;
 $$;
+
+-- -------------------------------------------------------------
+-- TABELA: waitlist
+-- Captura emails de leads da landing page
+-- -------------------------------------------------------------
+create table if not exists public.waitlist (
+  id         uuid        default gen_random_uuid() primary key,
+  email      text        not null unique,
+  created_at timestamptz default now()
+);
+
+alter table public.waitlist enable row level security;
+
+-- Apenas inserção pública — leitura só pelo service role
+create policy "Allow public insert" on public.waitlist
+  for insert with check (true);

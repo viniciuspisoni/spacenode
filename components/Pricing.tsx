@@ -1,32 +1,48 @@
 const plans = [
   {
-    tag: "STARTER",
-    title: "para experimentar",
-    price: "R$ 97",
-    unit: "/mês",
+    name: "Starter",
+    credits: 50,
+    price: "89",
+    meter: "16.6%",
     features: [
-      "30 renders por mês",
-      "resolução padrão",
-      "histórico de 30 dias",
-      "suporte por e-mail",
+      "Motor padrão",
+      "Saída até 1K",
+      "Histórico ilimitado",
+      "Suporte por e-mail",
     ],
     cta: "começar com starter",
     featured: false,
+    badge: null,
   },
   {
-    tag: "PRO · RECOMENDADO",
-    title: "para uso profissional",
-    price: "R$ 197",
-    unit: "/mês",
+    name: "Pro",
+    credits: 150,
+    price: "149",
+    meter: "50%",
     features: [
-      "150 renders por mês",
-      "alta resolução",
-      "histórico ilimitado",
-      "suporte prioritário",
-      "early access a novos estilos",
+      "Todos os motores",
+      "Saída até 2K",
+      "Histórico ilimitado",
+      "Suporte por e-mail",
     ],
     cta: "começar com pro",
     featured: true,
+    badge: "recomendado",
+  },
+  {
+    name: "Studio",
+    credits: 500,
+    price: "299",
+    meter: "100%",
+    features: [
+      "Todos os motores",
+      "Saída até 4K",
+      "Histórico ilimitado",
+      "Suporte prioritário",
+    ],
+    cta: "começar com studio",
+    featured: false,
+    badge: null,
   },
 ];
 
@@ -35,177 +51,335 @@ export default function Pricing() {
     <section
       id="planos"
       style={{
-        padding: "120px 40px",
+        padding: "120px 24px",
         borderTop: "0.5px solid var(--color-border)",
+        background: "var(--color-bg)",
       }}
     >
-      <div style={{ maxWidth: 920, margin: "0 auto" }}>
-        <div style={{ textAlign: "center", maxWidth: 600, margin: "0 auto 64px" }}>
-          <span
+      <div style={{ maxWidth: 900, margin: "0 auto" }}>
+        {/* Header */}
+        <div style={{ textAlign: "center", marginBottom: 48 }}>
+          <div
             style={{
-              fontSize: 10,
-              letterSpacing: "0.28em",
-              color: "var(--color-text-tertiary)",
-              textTransform: "uppercase",
-              fontWeight: 500,
-              display: "inline-block",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 10,
               marginBottom: 16,
             }}
           >
-            PLANOS
-          </span>
+            <span
+              style={{
+                display: "block",
+                width: 32,
+                height: 0.5,
+                background: "var(--color-border-strong)",
+              }}
+            />
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 500,
+                letterSpacing: "0.22em",
+                textTransform: "uppercase",
+                color: "var(--color-text-tertiary)",
+              }}
+            >
+              planos
+            </span>
+            <span
+              style={{
+                display: "block",
+                width: 32,
+                height: 0.5,
+                background: "var(--color-border-strong)",
+              }}
+            />
+          </div>
           <h2
             style={{
-              fontSize: "clamp(28px, 5vw, 40px)",
-              fontWeight: 400,
-              letterSpacing: "-0.04em",
-              margin: "0 0 16px",
-              lineHeight: 1.1,
+              fontSize: 28,
+              fontWeight: 500,
+              letterSpacing: "-0.03em",
+              lineHeight: 1.2,
+              marginBottom: 10,
+              color: "var(--color-text-primary)",
             }}
           >
-            comece grátis.
-            <br />
-            cresça conforme precisar.
+            Escolha seu volume de geração
           </h2>
           <p
             style={{
-              fontSize: 15,
+              fontSize: 13,
               color: "var(--color-text-tertiary)",
-              lineHeight: 1.55,
+              letterSpacing: "-0.005em",
+              lineHeight: 1.6,
             }}
           >
-            3 renders grátis para testar. Sem cartão de crédito. Assinatura apenas
-            se fizer sentido.
+            Créditos renovam mensalmente. Cancele quando quiser.
           </p>
         </div>
 
+        {/* Grid */}
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+            gridTemplateColumns: "repeat(3, 1fr)",
             gap: 12,
-            maxWidth: 680,
-            margin: "0 auto",
           }}
         >
           {plans.map((p) => (
             <div
-              key={p.tag}
+              key={p.name}
               style={{
-                border: p.featured
-                  ? "1.5px solid var(--color-text-primary)"
-                  : "0.5px solid var(--color-border-strong)",
-                borderRadius: 16,
-                padding: 32,
                 background: p.featured
                   ? "var(--color-text-primary)"
                   : "var(--color-bg-elevated)",
-                color: p.featured ? "var(--color-bg)" : "var(--color-text-primary)",
-                transition: "all 0.2s",
+                border: `0.5px solid ${p.featured ? "transparent" : "var(--color-border-strong)"}`,
+                borderRadius: 14,
+                padding: "28px 24px 24px",
+                display: "flex",
+                flexDirection: "column",
+                position: "relative",
+                overflow: "hidden",
               }}
             >
+              {/* Badge */}
+              {p.badge && (
+                <span
+                  style={{
+                    position: "absolute",
+                    top: 16,
+                    right: 16,
+                    fontSize: 9,
+                    fontWeight: 500,
+                    letterSpacing: "0.14em",
+                    textTransform: "uppercase",
+                    background: "var(--color-accent-green)",
+                    color: "#fff",
+                    padding: "3px 8px",
+                    borderRadius: 20,
+                  }}
+                >
+                  {p.badge}
+                </span>
+              )}
+
+              {/* Plan name */}
               <p
                 style={{
                   fontSize: 10,
-                  letterSpacing: "0.22em",
+                  fontWeight: 500,
+                  letterSpacing: "0.18em",
                   textTransform: "uppercase",
-                  color: p.featured
-                    ? "var(--color-text-quaternary)"
-                    : "var(--color-text-tertiary)",
-                  fontWeight: 500,
-                  margin: "0 0 8px",
+                  color: p.featured ? "var(--color-bg)" : "var(--color-text-tertiary)",
+                  opacity: p.featured ? 0.45 : 1,
+                  marginBottom: 20,
                 }}
               >
-                {p.tag}
+                {p.name}
               </p>
-              <h3
+
+              {/* Credits */}
+              <div
                 style={{
-                  fontSize: 15,
-                  fontWeight: 500,
-                  margin: "0 0 24px",
-                  letterSpacing: "-0.015em",
+                  display: "flex",
+                  alignItems: "baseline",
+                  gap: 6,
+                  marginBottom: 6,
                 }}
               >
-                {p.title}
-              </h3>
-              <p
-                style={{
-                  fontSize: 40,
-                  fontWeight: 400,
-                  margin: "0 0 4px",
-                  letterSpacing: "-0.04em",
-                }}
-              >
-                {p.price}
                 <span
                   style={{
-                    fontSize: 13,
-                    color: p.featured
-                      ? "var(--color-text-quaternary)"
-                      : "var(--color-text-tertiary)",
-                    fontWeight: 400,
+                    fontSize: 40,
+                    fontWeight: 500,
+                    letterSpacing: "-0.04em",
+                    lineHeight: 1,
+                    color: p.featured ? "var(--color-bg)" : "var(--color-text-primary)",
+                    fontVariantNumeric: "tabular-nums",
                   }}
                 >
-                  {" "}
-                  {p.unit}
+                  {p.credits}
                 </span>
-              </p>
+                <span
+                  style={{
+                    fontSize: 11,
+                    color: p.featured ? "var(--color-bg)" : "var(--color-text-tertiary)",
+                    opacity: p.featured ? 0.4 : 1,
+                    letterSpacing: "-0.005em",
+                  }}
+                >
+                  créditos / mês
+                </span>
+              </div>
+
+              {/* Price */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "baseline",
+                  gap: 4,
+                  marginBottom: 24,
+                  marginTop: 2,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 12,
+                    color: p.featured ? "var(--color-bg)" : "var(--color-text-tertiary)",
+                    opacity: p.featured ? 0.4 : 1,
+                  }}
+                >
+                  R$
+                </span>
+                <span
+                  style={{
+                    fontSize: 22,
+                    fontWeight: 500,
+                    letterSpacing: "-0.03em",
+                    color: p.featured ? "var(--color-bg)" : "var(--color-text-primary)",
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
+                  {p.price}
+                </span>
+                <span
+                  style={{
+                    fontSize: 11,
+                    color: p.featured ? "var(--color-bg)" : "var(--color-text-tertiary)",
+                    opacity: p.featured ? 0.35 : 1,
+                    letterSpacing: "-0.005em",
+                  }}
+                >
+                  /mês
+                </span>
+              </div>
+
+              {/* Meter */}
+              <div style={{ marginBottom: 20 }}>
+                <div
+                  style={{
+                    height: 2,
+                    background: p.featured
+                      ? "rgba(0,0,0,0.12)"
+                      : "var(--color-border-strong)",
+                    borderRadius: 2,
+                    overflow: "hidden",
+                  }}
+                >
+                  <div
+                    style={{
+                      height: "100%",
+                      width: p.meter,
+                      borderRadius: 2,
+                      background: p.featured
+                        ? "var(--color-accent-green)"
+                        : "var(--color-text-primary)",
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div
+                style={{
+                  height: 0.5,
+                  background: p.featured
+                    ? "rgba(0,0,0,0.1)"
+                    : "var(--color-border-strong)",
+                  marginBottom: 20,
+                }}
+              />
+
+              {/* Features */}
               <ul
                 style={{
                   listStyle: "none",
-                  margin: "24px 0",
-                  fontSize: 13,
-                  color: p.featured
-                    ? "var(--color-text-quaternary)"
-                    : "var(--color-text-secondary)",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 10,
+                  marginBottom: 28,
+                  flex: 1,
                 }}
               >
                 {p.features.map((f) => (
                   <li
                     key={f}
                     style={{
-                      padding: "6px 0 6px 22px",
-                      position: "relative",
-                      lineHeight: 1.5,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      fontSize: 12,
+                      color: p.featured ? "var(--color-bg)" : "var(--color-text-primary)",
+                      opacity: p.featured ? 0.75 : 1,
+                      letterSpacing: "-0.005em",
                     }}
                   >
-                    <span
-                      style={{
-                        position: "absolute",
-                        left: 0,
-                        top: 13,
-                        width: 12,
-                        height: 1,
-                        background: p.featured
-                          ? "var(--color-text-tertiary)"
-                          : "var(--color-text-quaternary)",
-                      }}
-                    />
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 14 14"
+                      fill="none"
+                      stroke="var(--color-accent-green)"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      style={{ flexShrink: 0 }}
+                    >
+                      <path d="M2 7l3.5 3.5L12 3.5" />
+                    </svg>
                     {f}
                   </li>
                 ))}
               </ul>
+
+              {/* CTA */}
               <button
                 style={{
                   width: "100%",
-                  padding: 12,
-                  borderRadius: 10,
+                  padding: "11px 16px",
+                  borderRadius: 8,
                   fontSize: 12,
                   fontWeight: 500,
-                  border: p.featured
-                    ? "none"
-                    : "0.5px solid var(--color-text-primary)",
-                  background: p.featured ? "var(--color-bg)" : "transparent",
-                  color: p.featured
-                    ? "var(--color-text-primary)"
-                    : "var(--color-text-primary)",
-                  transition: "all 0.2s",
+                  letterSpacing: "0.01em",
+                  cursor: "pointer",
+                  border: `0.5px solid ${p.featured ? "transparent" : "var(--color-border-strong)"}`,
+                  background: p.featured ? "var(--color-bg)" : "var(--color-surface)",
+                  color: "var(--color-text-primary)",
+                  fontFamily: "inherit",
                 }}
               >
                 {p.cta}
               </button>
             </div>
           ))}
+        </div>
+
+        {/* Footer */}
+        <div style={{ textAlign: "center", marginTop: 32 }}>
+          <p
+            style={{
+              fontSize: 11,
+              color: "var(--color-text-tertiary)",
+              letterSpacing: "-0.005em",
+              lineHeight: 1.7,
+            }}
+          >
+            Cada render consome 1 crédito. Créditos não utilizados não acumulam para o mês
+            seguinte.
+            <br />
+            Dúvidas?{" "}
+            <a
+              href="#"
+              style={{
+                color: "var(--color-text-primary)",
+                textDecoration: "underline",
+                textUnderlineOffset: 3,
+              }}
+            >
+              fale com a gente.
+            </a>
+          </p>
         </div>
       </div>
     </section>
