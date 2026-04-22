@@ -6,7 +6,7 @@ type Pill = { label: string; type: PillType }
 const pill = (label: string, type: PillType): Pill => ({ label, type })
 
 const rows: { criterion: string; desc: string; spn: Pill; vray: Pill; lumion: Pill; manual: Pill }[] = [
-  { criterion: 'Tempo de render',       desc: 'por imagem finalizada',       spn: pill('6 segundos',   'green'), vray: pill('2–8 horas',    'red'),   lumion: pill('10–40 min',   'amber'), manual: pill('4–12 horas',  'red')   },
+  { criterion: 'Tempo de render',       desc: 'por imagem finalizada',       spn: pill('30–60 seg',    'green'), vray: pill('2–8 horas',    'red'),   lumion: pill('10–40 min',   'amber'), manual: pill('4–12 horas',  'red')   },
   { criterion: 'Custo mensal',          desc: 'plano intermediário',         spn: pill('R$149',        'green'), vray: pill('R$1.200+',     'red'),   lumion: pill('R$600+',      'amber'), manual: pill('R$1.500+',    'red')   },
   { criterion: 'Curva de aprendizado',  desc: 'até o primeiro resultado',    spn: pill('Zero',         'green'), vray: pill('Meses',        'red'),   lumion: pill('Semanas',     'amber'), manual: pill('Semanas',     'amber') },
   { criterion: 'Funciona com SketchUp', desc: 'importação direta',           spn: pill('✓',            'check'), vray: pill('✓',            'check'), lumion: pill('✓',           'check'), manual: pill('—',          'dash')  },
