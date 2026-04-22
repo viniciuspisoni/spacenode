@@ -92,8 +92,8 @@ export default function Hero() {
         }}
       >
         A plataforma de visualização arquitetônica feita por arquiteto, para
-        arquitetos brasileiros. Transforme sketches, plantas ou modelagens 3D em
-        imagens de apresentação em 6 segundos.
+        arquitetos. Transforme sketches, plantas ou modelagens 3D em imagens de
+        apresentação em segundos.
       </p>
 
       <form
