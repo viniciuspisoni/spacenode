@@ -37,12 +37,15 @@ const MODES: { id: Mode; label: string; icon: string }[] = [
   { id: 'prancha',  label: 'Prancha de Conceito',   icon: '▦' },
 ]
 
-const FAL_MODELS = [
-  { id: 'nano-banana-pro', name: 'Nano Banana Pro', tag: 'PADRÃO',       wide: false },
-  { id: 'nano-banana',     name: 'Nano Banana',     tag: 'RÁPIDO',       wide: false },
-  { id: 'flux-dev',        name: 'Flux Dev',        tag: 'FLUX',         wide: false },
-  { id: 'flux-krea',       name: 'Flux Krea',       tag: 'CRIATIVO',     wide: false },
-  { id: 'flux-general',    name: 'Flux General',    tag: 'EXPERIMENTAL', wide: true  },
+const SPN_ENGINES = [
+  { id: 'nano-banana-pro', name: 'Pulsar', tag: 'PADRÃO',  desc: 'Rápido e preciso' },
+  { id: 'gpt-image-2',     name: 'Quasar', tag: 'PREMIUM', desc: 'Ultra-realista'   },
+]
+
+const OUTPUT_QUALITIES = [
+  { id: 'hd', label: 'HD',  nodes: 4,  desc: 'rascunho'     },
+  { id: '2k', label: '2K',  nodes: 8,  desc: 'portfólio'    },
+  { id: '4k', label: '4K',  nodes: 20, desc: 'entrega final' },
 ]
 
 const EMPTY_MATERIALS: ProjectMaterials = {
@@ -58,6 +61,20 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
   const [loadingText, setLoadingText] = useState('')
   const [error, setError]             = useState<string | null>(null)
 
+  // ── Dark mode
+  const [isDark, setIsDark] = useState(false)
+  useEffect(() => {
+    setIsDark(document.documentElement.classList.contains('dark'))
+  }, [])
+
+  const toggleTheme = () => {
+    const html = document.documentElement
+    const newDark = !html.classList.contains('dark')
+    html.classList.toggle('dark', newDark)
+    try { localStorage.setItem('theme', newDark ? 'dark' : 'light') } catch (e) {}
+    setIsDark(newDark)
+  }
+
   // ── Modo e opções
   const [mode, setMode]                       = useState<Mode>('externo')
   const [condition, setCondition]             = useState('Diurno')
@@ -70,6 +87,7 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
   const [lightCondition, setLightCondition]   = useState('Diurno')
   const [geometryLock, setGeometryLock]       = useState(85)
   const [selectedModel, setSelectedModel]     = useState('nano-banana-pro')
+  const [outputQuality, setOutputQuality]     = useState('hd')
 
   // ── Materiais do projeto
   const [materiaisAberto, setMateriaisAberto] = useState(false)
@@ -186,12 +204,13 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
     }
   }
 
-const handleBuyCredits = async () => {
+  const handleBuyCredits = async () => {
     const res = await fetch('/api/stripe/checkout', { method: 'POST' })
     const data = await res.json()
     if (data.url) window.location.href = data.url
   }
   const hasMaterials = Object.values(materials).some(v => v && v.trim())
+  const nodeCost     = OUTPUT_QUALITIES.find(q => q.id === outputQuality)?.nodes ?? 4
 
   return (
     <div style={S.main}>
@@ -199,7 +218,30 @@ const handleBuyCredits = async () => {
       <div style={S.controls}>
         <div style={S.topbar}>
           <span style={S.pageTitle}>GERAR</span>
-          <div style={S.credits}><span style={S.creditDot}/><span style={S.creditNum}>{credits}</span><span>créditos</span><button onClick={handleBuyCredits} style={{fontSize:'11px',color:'#86868b',background:'none',border:'none',cursor:'pointer',textDecoration:'underline',marginLeft:'6px'}}>+ comprar</button></div>
+          <div style={{display:'flex', alignItems:'center', gap:10}}>
+            <button
+              onClick={toggleTheme}
+              style={S.themeToggle}
+              title={isDark ? 'Modo claro' : 'Modo escuro'}
+            >
+              {isDark ? (
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+                  <circle cx="12" cy="12" r="5"/>
+                  <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" strokeLinecap="round"/>
+                </svg>
+              ) : (
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+                  <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              )}
+            </button>
+            <div style={S.credits}>
+              <span style={S.creditDot}/>
+              <span style={S.creditNum}>{credits}</span>
+              <span>créditos</span>
+              <button onClick={handleBuyCredits} style={S.buyBtn}>+ comprar</button>
+            </div>
+          </div>
         </div>
 
         {/* Modos */}
@@ -210,8 +252,8 @@ const handleBuyCredits = async () => {
               <div key={m.id}
                 style={mode === m.id ? {...S.modeCard, ...S.modeCardActive} : S.modeCard}
                 onClick={() => setMode(m.id)}>
-                <div style={{...S.modeIcon, ...(mode === m.id ? {color:'#fafafa'} : {})}}>{m.icon}</div>
-                <div style={{...S.modeLabel, ...(mode === m.id ? {color:'#fafafa'} : {})}}>{m.label}</div>
+                <div style={{...S.modeIcon, ...(mode === m.id ? {color:'var(--color-bg)'} : {})}}>{m.icon}</div>
+                <div style={{...S.modeLabel, ...(mode === m.id ? {color:'var(--color-bg)'} : {})}}>{m.label}</div>
               </div>
             ))}
           </div>
@@ -246,9 +288,9 @@ const handleBuyCredits = async () => {
               {hasMaterials && <span style={S.materiaisBadge}>preenchido</span>}
             </div>
             <div style={{display:'flex', alignItems:'center', gap:6}}>
-              {salvando && <span style={{fontSize:9, color:'#86868b'}}>salvando...</span>}
-              {salvoOk  && <span style={{fontSize:9, color:'#30b46c'}}>salvo ✓</span>}
-              <span style={{fontSize:14, color:'#86868b', transform: materiaisAberto ? 'rotate(180deg)' : 'none', display:'inline-block', transition:'transform 0.2s'}}>▾</span>
+              {salvando && <span style={{fontSize:9, color:'var(--color-text-tertiary)'}}>salvando...</span>}
+              {salvoOk  && <span style={{fontSize:9, color:'var(--color-accent-green)'}}>salvo ✓</span>}
+              <span style={{fontSize:14, color:'var(--color-text-tertiary)', transform: materiaisAberto ? 'rotate(180deg)' : 'none', display:'inline-block', transition:'transform 0.2s'}}>▾</span>
             </div>
           </button>
 
@@ -295,12 +337,27 @@ const handleBuyCredits = async () => {
         <div style={S.section}>
           <div style={S.label}>MOTOR DE IA</div>
           <div style={S.motorGrid}>
-            {FAL_MODELS.map(m => (
+            {SPN_ENGINES.map(m => (
               <div key={m.id}
-                style={{...S.motorOpt, ...(m.wide ? S.motorWide : {}), ...(selectedModel === m.id ? S.motorOptActive : {})}}
+                style={{...S.motorOpt, ...(selectedModel === m.id ? S.motorOptActive : {})}}
                 onClick={() => setSelectedModel(m.id)}>
-                <div style={{...S.motorName, ...(selectedModel === m.id ? {color:'#fafafa'} : {})}}>{m.name}</div>
-                <span style={{...S.motorTag, ...(selectedModel === m.id ? {background:'rgba(255,255,255,0.15)',color:'rgba(255,255,255,0.6)'} : {})}}>{m.tag}</span>
+                <div style={{...S.motorName, ...(selectedModel === m.id ? {color:'var(--color-bg)'} : {})}}>{m.name}</div>
+                <span style={{...S.motorTag, ...(selectedModel === m.id ? {background:'rgba(128,128,128,0.25)', color:'var(--color-bg)'} : {})}}>{m.tag}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Qualidade de Saída */}
+        <div style={S.section}>
+          <div style={S.label}>QUALIDADE DE SAÍDA</div>
+          <div style={S.qualityGrid}>
+            {OUTPUT_QUALITIES.map(q => (
+              <div key={q.id}
+                style={{...S.qualityOpt, ...(outputQuality === q.id ? S.qualityOptActive : {})}}
+                onClick={() => setOutputQuality(q.id)}>
+                <div style={{...S.qualityRes, ...(outputQuality === q.id ? {color:'var(--color-bg)'} : {})}}>{q.label}</div>
+                <span style={{...S.motorTag, ...(outputQuality === q.id ? {background:'rgba(128,128,128,0.25)', color:'var(--color-bg)'} : {})}}>{q.nodes} nodes</span>
               </div>
             ))}
           </div>
@@ -311,8 +368,8 @@ const handleBuyCredits = async () => {
         <button style={loading ? {...S.genBtn, opacity:0.7, cursor:'not-allowed'} : S.genBtn} onClick={handleGenerate} disabled={loading}>
           <span>{loading ? loadingText : 'gerar render'}</span>
           <span style={S.genBtnMeta}>
-            <span>~6s · 1 crédito</span>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fafafa" strokeWidth="1.5"><path d="M5 12h14M13 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <span>~6s · {nodeCost} nodes</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-bg)" strokeWidth="1.5"><path d="M5 12h14M13 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </span>
         </button>
       </div>
@@ -325,13 +382,13 @@ const handleBuyCredits = async () => {
         </div>
 
         {!imagePreview && (
-          <div style={isDraggingFile ? {...S.uploadZone, borderColor:'#1a1a1a', background:'#f5f5f5'} : S.uploadZone}
+          <div style={isDraggingFile ? {...S.uploadZone, borderColor:'var(--color-text-primary)', background:'var(--color-surface)'} : S.uploadZone}
             onDragOver={e => { e.preventDefault(); setIsDraggingFile(true) }}
             onDragLeave={() => setIsDraggingFile(false)}
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}>
             <div style={S.uploadIcon}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#86868b" strokeWidth="1.3">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="1.3">
                 <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </div>
@@ -381,10 +438,10 @@ const handleBuyCredits = async () => {
         <div style={S.promptPreview}>
           <div style={S.promptLabel}>PROMPT GERADO</div>
           <div style={S.promptText}>
-            <strong style={{color:'#1a1a1a', fontWeight:500}}>{getPromptLabel()}</strong>
-            {hasMaterials && <span style={{color:'#30b46c', fontSize:10, marginLeft:6}}>+ materiais do projeto</span>}
+            <strong style={{color:'var(--color-text-primary)', fontWeight:500}}>{getPromptLabel()}</strong>
+            {hasMaterials && <span style={{color:'var(--color-accent-green)', fontSize:10, marginLeft:6}}>+ materiais do projeto</span>}
             <br/>
-            <span style={{color:'#86868b'}}>geometry: {geometryLock}% · {FAL_MODELS.find(m => m.id === selectedModel)?.name}</span>
+            <span style={{color:'var(--color-text-tertiary)'}}>geometry: {geometryLock}% · {SPN_ENGINES.find(m => m.id === selectedModel)?.name} · {OUTPUT_QUALITIES.find(q => q.id === outputQuality)?.label}</span>
           </div>
         </div>
       </div>
@@ -402,52 +459,68 @@ function PillGroup({ options, selected, onChange }: { options: string[]; selecte
   )
 }
 
-const pill: React.CSSProperties = { padding:'5px 12px', borderRadius:20, border:'0.5px solid rgba(0,0,0,0.1)', fontSize:11, color:'#86868b', cursor:'pointer', background:'#fafafa', letterSpacing:'-0.005em', fontFamily:'inherit' }
-const pillActive: React.CSSProperties = { background:'#1a1a1a', color:'#fafafa', borderColor:'#1a1a1a' }
+const pill: React.CSSProperties = {
+  padding:'5px 12px', borderRadius:20,
+  border:'0.5px solid var(--color-border-strong)',
+  fontSize:11, color:'var(--color-text-tertiary)',
+  cursor:'pointer', background:'var(--color-bg-elevated)',
+  letterSpacing:'-0.005em', fontFamily:'inherit',
+}
+const pillActive: React.CSSProperties = {
+  background:'var(--color-text-primary)',
+  color:'var(--color-bg)',
+  borderColor:'var(--color-text-primary)',
+}
 
 const S: Record<string, React.CSSProperties> = {
-  main:              { display:'grid', gridTemplateColumns:'390px 1fr', minHeight:'100%', overflow:'hidden' },
-  controls:          { padding:'28px 24px', borderRight:'0.5px solid rgba(0,0,0,0.06)', background:'#ffffff', overflowY:'auto', display:'flex', flexDirection:'column', gap:20 },
-  preview:           { padding:28, background:'#fafafa', display:'flex', flexDirection:'column', gap:18 },
+  main:              { display:'grid', gridTemplateColumns:'480px 1fr', minHeight:'100%', overflow:'hidden' },
+  controls:          { padding:'28px 24px', borderRight:'0.5px solid var(--color-border)', background:'var(--color-bg)', overflowY:'auto', display:'flex', flexDirection:'column', gap:20 },
+  preview:           { padding:28, background:'var(--color-bg)', display:'flex', flexDirection:'column', gap:18 },
   topbar:            { display:'flex', justifyContent:'space-between', alignItems:'center' },
-  pageTitle:         { fontSize:10, letterSpacing:'0.22em', textTransform:'uppercase', color:'#86868b', fontWeight:500 },
-  credits:           { display:'flex', alignItems:'center', gap:6, fontSize:11, color:'#86868b' },
-  creditDot:         { width:5, height:5, borderRadius:'50%', background:'#30b46c', boxShadow:'0 0 5px rgba(48,180,108,0.4)', display:'inline-block' },
-  creditNum:         { color:'#1a1a1a', fontWeight:500, fontSize:12 },
+  pageTitle:         { fontSize:10, letterSpacing:'0.22em', textTransform:'uppercase', color:'var(--color-text-tertiary)', fontWeight:500 },
+  credits:           { display:'flex', alignItems:'center', gap:6, fontSize:11, color:'var(--color-text-tertiary)' },
+  creditDot:         { width:5, height:5, borderRadius:'50%', background:'var(--color-accent-green)', boxShadow:'0 0 5px var(--color-accent-green-glow)', display:'inline-block' },
+  creditNum:         { color:'var(--color-text-primary)', fontWeight:500, fontSize:12 },
+  buyBtn:            { fontSize:'11px', color:'var(--color-text-tertiary)', background:'none', border:'none', cursor:'pointer', textDecoration:'underline', marginLeft:'6px', fontFamily:'inherit' },
+  themeToggle:       { width:28, height:28, borderRadius:'50%', border:'0.5px solid var(--color-border-strong)', background:'var(--color-bg-elevated)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', color:'var(--color-text-tertiary)', padding:0, flexShrink:0 },
   section:           { display:'flex', flexDirection:'column', gap:10 },
-  label:             { fontSize:10, letterSpacing:'0.15em', textTransform:'uppercase', color:'#86868b', fontWeight:500 },
-  divider:           { height:'0.5px', background:'rgba(0,0,0,0.06)' },
+  label:             { fontSize:10, letterSpacing:'0.15em', textTransform:'uppercase', color:'var(--color-text-tertiary)', fontWeight:500 },
+  divider:           { height:'0.5px', background:'var(--color-border)' },
   modesGrid:         { display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 },
-  modeCard:          { border:'0.5px solid rgba(0,0,0,0.08)', borderRadius:10, padding:'12px 10px', cursor:'pointer', textAlign:'center', background:'#fafafa' },
-  modeCardActive:    { borderColor:'#1a1a1a', background:'#1a1a1a' },
-  modeIcon:          { fontSize:16, marginBottom:4, color:'#86868b' },
-  modeLabel:         { fontSize:10, fontWeight:500, color:'#1a1a1a', lineHeight:1.3 },
-  infoNote:          { fontSize:11, color:'#86868b', lineHeight:1.6 },
+  modeCard:          { border:'0.5px solid var(--color-border-strong)', borderRadius:10, padding:'12px 10px', cursor:'pointer', textAlign:'center', background:'var(--color-bg-elevated)' },
+  modeCardActive:    { borderColor:'var(--color-text-primary)', background:'var(--color-text-primary)' },
+  modeIcon:          { fontSize:16, marginBottom:4, color:'var(--color-text-tertiary)' },
+  modeLabel:         { fontSize:10, fontWeight:500, color:'var(--color-text-primary)', lineHeight:1.3 },
+  infoNote:          { fontSize:11, color:'var(--color-text-tertiary)', lineHeight:1.6 },
   collapseBtn:       { display:'flex', justifyContent:'space-between', alignItems:'center', background:'none', border:'none', cursor:'pointer', padding:0, width:'100%', fontFamily:'inherit' },
-  materiaisBadge:    { fontSize:9, letterSpacing:'0.08em', textTransform:'uppercase', background:'rgba(48,180,108,0.1)', color:'#30b46c', padding:'2px 7px', borderRadius:10 },
+  materiaisBadge:    { fontSize:9, letterSpacing:'0.08em', textTransform:'uppercase', background:'rgba(48,180,108,0.12)', color:'var(--color-accent-green)', padding:'2px 7px', borderRadius:10 },
   materiaisGrid:     { display:'flex', flexDirection:'column', gap:10, paddingTop:4 },
   materialField:     { display:'flex', flexDirection:'column', gap:5 },
-  materialLabel:     { fontSize:10, color:'#86868b', letterSpacing:'0.05em' },
-  materialInput:     { padding:'8px 12px', border:'0.5px solid rgba(0,0,0,0.12)', borderRadius:8, fontSize:11, color:'#1a1a1a', background:'#fafafa', fontFamily:'inherit', outline:'none' },
+  materialLabel:     { fontSize:10, color:'var(--color-text-tertiary)', letterSpacing:'0.05em' },
+  materialInput:     { padding:'8px 12px', border:'0.5px solid var(--color-border-strong)', borderRadius:8, fontSize:11, color:'var(--color-text-primary)', background:'var(--color-bg-elevated)', fontFamily:'inherit', outline:'none' },
   sliderRow:         { display:'flex', alignItems:'center', gap:10 },
-  sliderEnd:         { fontSize:11, color:'#86868b' },
-  range:             { flex:1, accentColor:'#1a1a1a', height:3 },
-  sliderVal:         { fontSize:12, fontWeight:500, color:'#1a1a1a', minWidth:34, textAlign:'right' },
+  sliderEnd:         { fontSize:11, color:'var(--color-text-tertiary)' },
+  range:             { flex:1, accentColor:'var(--color-text-primary)', height:3 },
+  sliderVal:         { fontSize:12, fontWeight:500, color:'var(--color-text-primary)', minWidth:34, textAlign:'right' },
   motorGrid:         { display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 },
-  motorOpt:          { border:'0.5px solid rgba(0,0,0,0.08)', borderRadius:8, padding:'8px 10px', cursor:'pointer', background:'#fafafa' },
-  motorOptActive:    { borderColor:'#1a1a1a', background:'#1a1a1a' },
+  motorOpt:          { border:'0.5px solid var(--color-border-strong)', borderRadius:8, padding:'8px 10px', cursor:'pointer', background:'var(--color-bg-elevated)' },
+  motorOptActive:    { borderColor:'var(--color-text-primary)', background:'var(--color-text-primary)' },
   motorWide:         { gridColumn:'span 2' },
-  motorName:         { fontSize:11, fontWeight:500, color:'#1a1a1a', marginBottom:3 },
-  motorTag:          { display:'inline-block', fontSize:9, letterSpacing:'0.08em', textTransform:'uppercase', background:'rgba(0,0,0,0.05)', color:'#86868b', padding:'2px 6px', borderRadius:4 },
-  errorBox:          { fontSize:12, color:'#c0392b', background:'#fff5f5', border:'0.5px solid rgba(192,57,43,0.2)', borderRadius:8, padding:'10px 14px' },
-  genBtn:            { width:'100%', padding:'13px 16px', background:'#1a1a1a', color:'#fafafa', border:'none', borderRadius:10, fontSize:13, fontWeight:500, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'space-between', fontFamily:'inherit' },
-  genBtnMeta:        { display:'flex', alignItems:'center', gap:8, fontSize:11, color:'#86868b' },
-  uploadZone:        { border:'0.5px dashed rgba(0,0,0,0.2)', borderRadius:12, padding:'48px 20px', textAlign:'center', cursor:'pointer', background:'#ffffff', flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:14, minHeight:300 },
-  uploadIcon:        { width:44, height:44, borderRadius:10, background:'rgba(0,0,0,0.04)', display:'flex', alignItems:'center', justifyContent:'center' },
-  uploadTitle:       { fontSize:15, fontWeight:500, color:'#1a1a1a', letterSpacing:'-0.02em' },
-  uploadSub:         { fontSize:12, color:'#86868b', marginTop:4 },
-  uploadBtn:         { padding:'7px 18px', border:'0.5px solid rgba(0,0,0,0.15)', borderRadius:20, fontSize:11, color:'#1a1a1a', background:'#fafafa', cursor:'pointer', fontFamily:'inherit' },
-  compareWrap:       { position:'relative', borderRadius:12, overflow:'hidden', flex:1, minHeight:300, background:'#e8e8e8', userSelect:'none', cursor:'ew-resize' },
+  qualityGrid:       { display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 },
+  qualityOpt:        { border:'0.5px solid var(--color-border-strong)', borderRadius:8, padding:'10px 8px', cursor:'pointer', background:'var(--color-bg-elevated)', textAlign:'center' as const },
+  qualityOptActive:  { borderColor:'var(--color-text-primary)', background:'var(--color-text-primary)' },
+  qualityRes:        { fontSize:14, fontWeight:500, color:'var(--color-text-primary)', marginBottom:4, letterSpacing:'-0.02em' },
+  motorName:         { fontSize:11, fontWeight:500, color:'var(--color-text-primary)', marginBottom:3 },
+  motorTag:          { display:'inline-block', fontSize:9, letterSpacing:'0.08em', textTransform:'uppercase', background:'var(--color-border-strong)', color:'var(--color-text-tertiary)', padding:'2px 6px', borderRadius:4 },
+  errorBox:          { fontSize:12, color:'#c0392b', background:'rgba(192,57,43,0.08)', border:'0.5px solid rgba(192,57,43,0.2)', borderRadius:8, padding:'10px 14px' },
+  genBtn:            { width:'100%', padding:'13px 16px', background:'var(--color-text-primary)', color:'var(--color-bg)', border:'none', borderRadius:10, fontSize:13, fontWeight:500, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'space-between', fontFamily:'inherit' },
+  genBtnMeta:        { display:'flex', alignItems:'center', gap:8, fontSize:11, color:'var(--color-text-tertiary)' },
+  uploadZone:        { border:'0.5px dashed var(--color-border-strong)', borderRadius:12, padding:'48px 20px', textAlign:'center', cursor:'pointer', background:'var(--color-bg-elevated)', flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:14, minHeight:300 },
+  uploadIcon:        { width:44, height:44, borderRadius:10, background:'var(--color-surface)', display:'flex', alignItems:'center', justifyContent:'center' },
+  uploadTitle:       { fontSize:15, fontWeight:500, color:'var(--color-text-primary)', letterSpacing:'-0.02em' },
+  uploadSub:         { fontSize:12, color:'var(--color-text-tertiary)', marginTop:4 },
+  uploadBtn:         { padding:'7px 18px', border:'0.5px solid var(--color-border-strong)', borderRadius:20, fontSize:11, color:'var(--color-text-primary)', background:'var(--color-bg-elevated)', cursor:'pointer', fontFamily:'inherit' },
+  compareWrap:       { position:'relative', borderRadius:12, overflow:'hidden', flex:1, minHeight:300, background:'var(--color-surface)', userSelect:'none', cursor:'ew-resize' },
   compareImg:        { position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', pointerEvents:'none' },
   compareAfterWrap:  { position:'absolute', inset:0 },
   compareHandle:     { position:'absolute', top:0, bottom:0, width:2, background:'#ffffff', transform:'translateX(-50%)', display:'flex', alignItems:'center', justifyContent:'center', pointerEvents:'none' },
@@ -456,10 +529,10 @@ const S: Record<string, React.CSSProperties> = {
   changeImageBtn:    { position:'absolute', top:12, right:14, padding:'5px 12px', border:'0.5px solid rgba(255,255,255,0.4)', borderRadius:20, fontSize:10, color:'#fafafa', background:'rgba(0,0,0,0.35)', cursor:'pointer', fontFamily:'inherit' },
   loadingOverlay:    { position:'absolute', inset:0, background:'rgba(0,0,0,0.35)', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:14 },
   spinner:           { width:28, height:28, borderRadius:'50%', border:'2px solid rgba(255,255,255,0.3)', borderTopColor:'#ffffff', animation:'spin 0.8s linear infinite' },
-  promptPreview:     { background:'#ffffff', border:'0.5px solid rgba(0,0,0,0.06)', borderRadius:10, padding:'14px 16px' },
-  promptLabel:       { fontSize:9, letterSpacing:'0.15em', textTransform:'uppercase', color:'#86868b', fontWeight:500, marginBottom:8 },
-  promptText:        { fontSize:11, color:'#86868b', lineHeight:1.65 },
-  downloadLink:      { fontSize:11, color:'#86868b', textDecoration:'none' },
+  promptPreview:     { background:'var(--color-bg-elevated)', border:'0.5px solid var(--color-border)', borderRadius:10, padding:'14px 16px' },
+  promptLabel:       { fontSize:9, letterSpacing:'0.15em', textTransform:'uppercase', color:'var(--color-text-tertiary)', fontWeight:500, marginBottom:8 },
+  promptText:        { fontSize:11, color:'var(--color-text-tertiary)', lineHeight:1.65 },
+  downloadLink:      { fontSize:11, color:'var(--color-text-tertiary)', textDecoration:'none' },
 }
 
 export default GenerateClient
