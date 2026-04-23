@@ -8,13 +8,15 @@
 -- Estende auth.users com dados do usuário e controle de créditos
 -- -------------------------------------------------------------
 create table if not exists public.profiles (
-  id          uuid        primary key references auth.users (id) on delete cascade,
-  email       text        not null,
-  full_name   text,
-  credits     integer     not null default 3,
-  plan        text        not null default 'free'
-                          check (plan in ('free', 'starter', 'pro')),
-  created_at  timestamptz not null default now()
+  id                      uuid        primary key references auth.users (id) on delete cascade,
+  email                   text        not null,
+  full_name               text,
+  credits                 integer     not null default 3,
+  plan                    text        not null default 'free'
+                                      check (plan in ('free', 'starter', 'pro', 'studio')),
+  stripe_customer_id      text,
+  stripe_subscription_id  text,
+  created_at              timestamptz not null default now()
 );
 
 -- -------------------------------------------------------------
@@ -141,6 +143,29 @@ begin
   end if;
 
   return false;
+end;
+$$;
+
+-- -------------------------------------------------------------
+-- 6. FUNÇÃO: add_credits
+-- Adiciona créditos e atualiza plano do usuário (usada pelo webhook Stripe).
+-- Passa plan_name como NULL para não alterar o plano atual.
+-- -------------------------------------------------------------
+create or replace function public.add_credits(
+  user_id_input uuid,
+  amount        integer,
+  plan_name     text default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.profiles
+     set credits = credits + amount,
+         plan    = coalesce(plan_name, plan)
+   where id = user_id_input;
 end;
 $$;
 

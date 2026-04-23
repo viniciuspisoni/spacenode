@@ -2,6 +2,22 @@
 
 import { useState } from 'react'
 
+async function startCheckout(plan: string, billing: 'monthly' | 'annual') {
+  const res = await fetch('/api/stripe/checkout', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ plan, billing }),
+  })
+
+  if (res.status === 401) {
+    window.location.href = '/login'
+    return
+  }
+
+  const data = await res.json()
+  if (data.url) window.location.href = data.url
+}
+
 const plans = [
   {
     name: 'Starter',
@@ -43,6 +59,13 @@ const plans = [
 
 export function PricingToggle() {
   const [isAnnual, setIsAnnual] = useState(false)
+  const [loading, setLoading] = useState<string | null>(null)
+
+  const handleSelect = async (planName: string) => {
+    setLoading(planName)
+    await startCheckout(planName.toLowerCase(), isAnnual ? 'annual' : 'monthly')
+    setLoading(null)
+  }
 
   return (
     <section style={{ padding: '96px 24px', maxWidth: 960, margin: '0 auto' }}>
@@ -147,15 +170,20 @@ export function PricingToggle() {
               ))}
             </div>
 
-            <button style={{
-              width: '100%', padding: '11px 16px', borderRadius: 8,
-              fontFamily: 'inherit', fontSize: 12, fontWeight: 500, letterSpacing: '0.01em',
-              cursor: 'pointer',
-              background: plan.featured ? '#1a1a1a' : 'rgba(255,255,255,0.06)',
-              color: plan.featured ? '#fafafa' : 'rgba(255,255,255,0.8)',
-              border: plan.featured ? 'none' : '0.5px solid rgba(255,255,255,0.12)',
-            }}>
-              {plan.cta}
+            <button
+              onClick={() => handleSelect(plan.name)}
+              disabled={loading === plan.name.toLowerCase()}
+              style={{
+                width: '100%', padding: '11px 16px', borderRadius: 8,
+                fontFamily: 'inherit', fontSize: 12, fontWeight: 500, letterSpacing: '0.01em',
+                cursor: loading ? 'wait' : 'pointer',
+                background: plan.featured ? '#1a1a1a' : 'rgba(255,255,255,0.06)',
+                color: plan.featured ? '#fafafa' : 'rgba(255,255,255,0.8)',
+                border: plan.featured ? 'none' : '0.5px solid rgba(255,255,255,0.12)',
+                opacity: loading && loading !== plan.name.toLowerCase() ? 0.5 : 1,
+              }}
+            >
+              {loading === plan.name.toLowerCase() ? 'Redirecionando...' : plan.cta}
             </button>
           </div>
         ))}
