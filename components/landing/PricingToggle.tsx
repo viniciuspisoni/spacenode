@@ -306,11 +306,11 @@ export function PricingToggle() {
 
           <div style={{ background: '#f2f2f2', borderRadius: 8, padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' as const, gap: 12 }}>
             {([
-              { label: 'renders / mês',     value: renders },
-              { label: 'nodes / render',    value: qualityCost },
-              { label: 'nodes necessários', value: totalNodes.toLocaleString('pt-BR') },
-              { label: 'plano ideal',       value: recommendedName, green: true },
-            ] as const).map((item, i, arr) => (
+              { label: 'renders / mês',     value: String(renders),                          green: false },
+              { label: 'nodes / render',    value: String(qualityCost),                      green: false },
+              { label: 'nodes necessários', value: totalNodes.toLocaleString('pt-BR'),        green: false },
+              { label: 'plano ideal',       value: recommendedName,                           green: true  },
+            ]).map((item, i, arr) => (
               <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   <span style={{ fontSize: 10, color: '#86868b', letterSpacing: '0.05em', textTransform: 'uppercase' as const }}>{item.label}</span>
