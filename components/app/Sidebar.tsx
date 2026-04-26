@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
+import Logo from '@/components/Logo'
 
 const IconDashboard = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -73,9 +74,9 @@ export default function Sidebar({ userName, userAvatar }: SidebarProps) {
       onMouseLeave={() => setHovered(false)}
     >
       {/* Logo */}
-      <div style={{ padding: '18px 18px 14px', display: 'flex', alignItems: 'center', gap: 10, height: 62, flexShrink: 0 }}>
-        <div style={{ width: 26, height: 26, borderRadius: 6, background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#0a0a0a', letterSpacing: '-0.02em' }}>S</span>
+      <div style={{ padding: '18px 18px 14px', display: 'flex', alignItems: 'center', gap: 12, height: 62, flexShrink: 0, color: '#ffffff' }}>
+        <div style={{ flexShrink: 0, display: 'flex' }}>
+          <Logo size={26} />
         </div>
         <span style={{
           fontSize: 11, fontWeight: 600, color: '#ffffff',
