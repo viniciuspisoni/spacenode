@@ -52,6 +52,29 @@ const EMPTY_MATERIALS: ProjectMaterials = {
   fachada: '', piso: '', esquadrias: '', elementos: '', outros: '',
 }
 
+const IconDashboard = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/>
+    <rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/>
+  </svg>
+)
+const IconHistory = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+    <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>
+  </svg>
+)
+const IconPlans = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>
+  </svg>
+)
+
+const SIDEBAR_NAV = [
+  { label: 'dashboard', active: true,  Icon: IconDashboard },
+  { label: 'histórico', active: false, Icon: IconHistory   },
+  { label: 'planos',    active: false, Icon: IconPlans     },
+]
+
 export function GenerateClient({ initialCredits, userName, initialMaterials }: GenerateClientProps) {
   const supabase = createClient()
 
@@ -228,14 +251,10 @@ export function GenerateClient({ initialCredits, userName, initialMaterials }: G
           <span style={{...S.sidebarLogoText, opacity: sidebarHovered ? 1 : 0}}>Spacenode</span>
         </div>
         <nav style={S.sidebarNav}>
-          {([
-            { label:'dashboard', active:true,  icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg> },
-            { label:'histórico', active:false, icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg> },
-            { label:'planos',    active:false, icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg> },
-          ] as {label:string; active:boolean; icon:React.ReactNode}[]).map(item => (
-            <div key={item.label} style={{...S.sidebarItem, ...(item.active ? S.sidebarItemActive : {})}}>
-              <div style={{...S.sidebarIcon, color: item.active ? '#ffffff' : 'rgba(255,255,255,0.4)'}}>{item.icon}</div>
-              <span style={{...S.sidebarLabel, opacity: sidebarHovered ? 1 : 0}}>{item.label}</span>
+          {SIDEBAR_NAV.map(({ label, active, Icon }) => (
+            <div key={label} style={{...S.sidebarItem, ...(active ? S.sidebarItemActive : {})}}>
+              <div style={{...S.sidebarIcon, color: active ? '#ffffff' : 'rgba(255,255,255,0.4)'}}><Icon /></div>
+              <span style={{...S.sidebarLabel, opacity: sidebarHovered ? 1 : 0}}>{label}</span>
             </div>
           ))}
         </nav>
