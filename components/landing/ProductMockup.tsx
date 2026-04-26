@@ -28,17 +28,17 @@ export function ProductMockup() {
       <div style={{ textAlign: 'center', marginBottom: 56 }}>
         <div style={{
           fontSize: 10, fontWeight: 500, letterSpacing: '0.22em', textTransform: 'uppercase',
-          color: 'rgba(255,255,255,0.4)', marginBottom: 16,
+          color: 'var(--color-text-tertiary)', marginBottom: 16,
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
         }}>
-          <span style={{ display: 'block', width: 32, height: '0.5px', background: 'rgba(255,255,255,0.1)' }} />
+          <span style={{ display: 'block', width: 32, height: '0.5px', background: 'var(--color-border-strong)' }} />
           Interface
-          <span style={{ display: 'block', width: 32, height: '0.5px', background: 'rgba(255,255,255,0.1)' }} />
+          <span style={{ display: 'block', width: 32, height: '0.5px', background: 'var(--color-border-strong)' }} />
         </div>
-        <h2 style={{ fontSize: 28, fontWeight: 500, letterSpacing: '-0.03em', lineHeight: 1.2, marginBottom: 10, color: '#fafafa' }}>
+        <h2 style={{ fontSize: 28, fontWeight: 500, letterSpacing: '-0.03em', lineHeight: 1.2, marginBottom: 10, color: 'var(--color-text-primary)' }}>
           simples como tirar uma foto.
         </h2>
-        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', letterSpacing: '-0.005em', lineHeight: 1.6 }}>
+        <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)', letterSpacing: '-0.005em', lineHeight: 1.6 }}>
           Upload do projeto. Escolha o estilo. Render em segundos.<br />
           Sem plugins, sem curva de aprendizado, sem frustração.
         </p>
