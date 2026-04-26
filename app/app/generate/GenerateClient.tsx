@@ -52,30 +52,7 @@ const EMPTY_MATERIALS: ProjectMaterials = {
   fachada: '', piso: '', esquadrias: '', elementos: '', outros: '',
 }
 
-const IconDashboard = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-    <rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/>
-    <rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/>
-  </svg>
-)
-const IconHistory = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-    <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>
-  </svg>
-)
-const IconPlans = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>
-  </svg>
-)
-
-const SIDEBAR_NAV = [
-  { label: 'dashboard', active: true,  Icon: IconDashboard },
-  { label: 'histórico', active: false, Icon: IconHistory   },
-  { label: 'planos',    active: false, Icon: IconPlans     },
-]
-
-export function GenerateClient({ initialCredits, userName, initialMaterials }: GenerateClientProps) {
+export function GenerateClient({ initialCredits, initialMaterials }: GenerateClientProps) {
   const supabase = createClient()
 
   // ── Estado global
@@ -86,7 +63,6 @@ export function GenerateClient({ initialCredits, userName, initialMaterials }: G
 
   // ── Dark mode
   const [isDark, setIsDark] = useState(false)
-  const [sidebarHovered, setSidebarHovered] = useState(false)
   useEffect(() => {
     setIsDark(document.documentElement.classList.contains('dark'))
   }, [])
@@ -237,40 +213,7 @@ export function GenerateClient({ initialCredits, userName, initialMaterials }: G
   const nodeCost     = OUTPUT_QUALITIES.find(q => q.id === outputQuality)?.nodes ?? 4
 
   return (
-    <div style={S.root}>
-      {/* ── SIDEBAR ── */}
-      <div
-        style={{...S.sidebar, width: sidebarHovered ? 224 : 62}}
-        onMouseEnter={() => setSidebarHovered(true)}
-        onMouseLeave={() => setSidebarHovered(false)}
-      >
-        <div style={S.sidebarLogo}>
-          <div style={S.sidebarLogoMark}>
-            <span style={{fontSize:11, fontWeight:700, color:'#0a0a0a', letterSpacing:'-0.02em'}}>S</span>
-          </div>
-          <span style={{...S.sidebarLogoText, opacity: sidebarHovered ? 1 : 0}}>Spacenode</span>
-        </div>
-        <nav style={S.sidebarNav}>
-          {SIDEBAR_NAV.map(({ label, active, Icon }) => (
-            <div key={label} style={{...S.sidebarItem, ...(active ? S.sidebarItemActive : {})}}>
-              <div style={{...S.sidebarIcon, color: active ? '#ffffff' : 'rgba(255,255,255,0.4)'}}><Icon /></div>
-              <span style={{...S.sidebarLabel, opacity: sidebarHovered ? 1 : 0}}>{label}</span>
-            </div>
-          ))}
-        </nav>
-        <div style={S.sidebarFooter}>
-          <div style={S.sidebarUser}>
-            <span style={S.sidebarUserAvatar}>{(userName ?? 'U')[0].toUpperCase()}</span>
-            <div style={{opacity: sidebarHovered ? 1 : 0, transition:'opacity 0.18s', minWidth:0, overflow:'hidden'}}>
-              <div style={S.sidebarUserName}>{userName}</div>
-              <div style={S.sidebarUserPlan}>Plano Beta</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── MAIN ── */}
-      <div style={S.main}>
+    <div style={S.main}>
       {/* ── CONTROLES ── */}
       <div style={S.controls}>
         <div style={S.topbar}>
@@ -502,7 +445,6 @@ export function GenerateClient({ initialCredits, userName, initialMaterials }: G
           </div>
         </div>
       </div>
-      </div>
     </div>
   )
 }
@@ -531,22 +473,7 @@ const pillActive: React.CSSProperties = {
 }
 
 const S: Record<string, React.CSSProperties> = {
-  root:              { display:'flex', height:'100vh', overflow:'hidden' },
-  sidebar:           { background:'#0a0a0a', display:'flex', flexDirection:'column', flexShrink:0, overflow:'hidden', transition:'width 0.25s cubic-bezier(0.4,0,0.2,1)', borderRight:'0.5px solid rgba(255,255,255,0.06)', zIndex:10 },
-  sidebarLogo:       { padding:'18px 18px 14px', display:'flex', alignItems:'center', gap:10, height:62, flexShrink:0 },
-  sidebarLogoMark:   { width:26, height:26, borderRadius:6, background:'#ffffff', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 },
-  sidebarLogoText:   { fontSize:11, fontWeight:600, color:'#ffffff', letterSpacing:'0.09em', textTransform:'uppercase', whiteSpace:'nowrap', transition:'opacity 0.18s' },
-  sidebarNav:        { flex:1, display:'flex', flexDirection:'column', gap:2, padding:'4px 8px', overflowY:'auto' },
-  sidebarItem:       { display:'flex', alignItems:'center', gap:12, padding:'0 10px', height:52, borderRadius:8, cursor:'pointer', transition:'background 0.15s', flexShrink:0 },
-  sidebarItemActive: { background:'rgba(255,255,255,0.1)' },
-  sidebarIcon:       { flexShrink:0, display:'flex' },
-  sidebarLabel:      { fontSize:12, color:'rgba(255,255,255,0.75)', whiteSpace:'nowrap', transition:'opacity 0.18s', fontWeight:400, letterSpacing:'-0.01em' },
-  sidebarFooter:     { padding:'10px 8px', borderTop:'0.5px solid rgba(255,255,255,0.07)', flexShrink:0 },
-  sidebarUser:       { display:'flex', alignItems:'center', gap:10, padding:'4px 10px', height:52, borderRadius:8 },
-  sidebarUserAvatar: { width:28, height:28, borderRadius:'50%', background:'rgba(255,255,255,0.15)', display:'inline-flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:11, fontWeight:600, color:'#ffffff' },
-  sidebarUserName:   { fontSize:11, color:'#ffffff', fontWeight:500, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' },
-  sidebarUserPlan:   { fontSize:9, letterSpacing:'0.08em', textTransform:'uppercase', color:'rgba(255,255,255,0.35)', marginTop:2 },
-  main:              { display:'grid', gridTemplateColumns:'480px 1fr', flex:1, overflow:'hidden' },
+  main:              { display:'grid', gridTemplateColumns:'480px 1fr', height:'100%', overflow:'hidden' },
   controls:          { padding:'28px 24px', borderRight:'0.5px solid var(--color-border)', background:'var(--color-bg)', overflowY:'auto', display:'flex', flexDirection:'column', gap:20 },
   preview:           { padding:28, background:'var(--color-bg)', display:'flex', flexDirection:'column', gap:18 },
   topbar:            { display:'flex', justifyContent:'space-between', alignItems:'center' },
