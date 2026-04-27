@@ -209,7 +209,7 @@ export default function Pricing() {
                     letterSpacing: "-0.005em",
                   }}
                 >
-                  créditos / mês
+                  nodes / mês
                 </span>
               </div>
 

@@ -89,7 +89,7 @@ export default function Sidebar({ userName, userAvatar }: SidebarProps) {
       </div>
 
       {/* Nav */}
-      <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2, padding: '4px 8px', overflowY: 'auto' as const }}>
+      <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2, padding: '4px 8px', overflow: 'hidden' as const }}>
         {NAV.map(({ label, href, exact, Icon }) => {
           const active = exact ? pathname === href : pathname.startsWith(href)
           return (

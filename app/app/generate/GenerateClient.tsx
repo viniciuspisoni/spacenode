@@ -2,14 +2,60 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
-  Mode, MODE_LABELS, ProjectMaterials,
+  Mode, MODE_LABELS, ProjectMaterials, SceneElements,
   ATM_OPTIONS, BG_OPTIONS, AMB_OPTIONS, LUZ_OPTIONS,
-  PLT_OPTIONS, PERSP_OPTIONS, VEG_OPTIONS,
 } from '@/lib/prompts'
+
+// ── Logo com sinapses para o estado de loading ─────────────────
+function LoadingLogo() {
+  // As 4 interseções internas da grade do logo (viewBox 0 0 22 22)
+  const nodes = [
+    { cx: 7.33,  cy: 7.33,  delay: '0s',    dur: '2.8s' },
+    { cx: 14.67, cy: 7.33,  delay: '0.65s', dur: '3.1s' },
+    { cx: 14.67, cy: 14.67, delay: '1.3s',  dur: '2.6s' },
+    { cx: 7.33,  cy: 14.67, delay: '2.0s',  dur: '3.3s' },
+  ]
+  return (
+    <svg width="52" height="52" viewBox="0 0 22 22" xmlns="http://www.w3.org/2000/svg">
+      {/* Grade */}
+      <g stroke="currentColor" strokeWidth="0.5" opacity="0.3">
+        <line x1="7.33"  y1="1"  x2="7.33"  y2="21" />
+        <line x1="14.67" y1="1"  x2="14.67" y2="21" />
+        <line x1="1"     y1="7.33"  x2="21" y2="7.33"  />
+        <line x1="1"     y1="14.67" x2="21" y2="14.67" />
+      </g>
+      {/* Sinapses nas interseções */}
+      {nodes.map((n, i) => (
+        <circle
+          key={i}
+          cx={n.cx} cy={n.cy} r="1.3"
+          fill="currentColor"
+          style={{
+            transformBox: 'fill-box' as React.CSSProperties['transformBox'],
+            transformOrigin: 'center',
+            animation: `synapse ${n.dur} ease-in-out ${n.delay} infinite`,
+          }}
+        />
+      ))}
+      {/* Letras */}
+      <g fontFamily="var(--font-geist), sans-serif" fontSize="5" fontWeight="400"
+         fill="currentColor" textAnchor="middle" dominantBaseline="central">
+        <text x="3.67"  y="4.17">S</text>
+        <text x="11"    y="4.17">P</text>
+        <text x="18.33" y="4.17">A</text>
+        <text x="3.67"  y="11">C</text>
+        <text x="11"    y="11">E</text>
+        <text x="18.33" y="11">N</text>
+        <text x="3.67"  y="17.83">O</text>
+        <text x="11"    y="17.83">D</text>
+        <text x="18.33" y="17.83">E</text>
+      </g>
+    </svg>
+  )
+}
 
 interface GenerateClientProps {
   initialCredits: number
-  userName: string
   initialMaterials?: ProjectMaterials
 }
 
@@ -25,21 +71,47 @@ const LOADING_TEXTS = [
   'aplicando materiais reais...',
   'ajustando iluminação...',
   'renderizando fotorrealismo...',
+  'aumentando resolução...',
   'finalizando detalhes...',
 ]
 
-const MODES: { id: Mode; label: string; icon: string }[] = [
-  { id: 'externo',  label: 'Fotorrealismo Externo', icon: '☀' },
-  { id: 'interno',  label: 'Ambientes Internos',    icon: '⬛' },
-  { id: 'planta',   label: 'Planta Humanizada',     icon: '⊞' },
-  { id: 'multi',    label: 'Multiperspectiva',      icon: '⊟' },
-  { id: 'paisagem', label: 'Paisagismo',            icon: '✿' },
-  { id: 'prancha',  label: 'Prancha de Conceito',   icon: '▦' },
+function IconExterior() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/>
+      <path d="M9 21V13h6v8"/>
+    </svg>
+  )
+}
+
+function IconInterior() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 9V8a2 2 0 00-2-2H6a2 2 0 00-2 2v1"/>
+      <path d="M2 9a2 2 0 012 2v3h16v-3a2 2 0 012-2"/>
+      <rect x="4" y="14" width="16" height="4" rx="1"/>
+      <path d="M7 18v1.5M17 18v1.5"/>
+    </svg>
+  )
+}
+
+// ── Elementos de cena ─────────────────────────────────────────
+const SCENE_ELEMENTS_DEF: { key: keyof SceneElements; label: string }[] = [
+  { key: 'ambientacao', label: 'Decoração'      },
+  { key: 'pessoas',     label: 'Pessoas'        },
+  { key: 'luzes',       label: 'Luzes Acesas'   },
+  { key: 'carros',      label: 'Carros'         },
+  { key: 'raiosSol',    label: 'Raios de Sol'   },
+]
+
+const MODES: { id: Mode; label: string; Icon: () => React.JSX.Element }[] = [
+  { id: 'externo', label: 'Ambiente Exterior', Icon: IconExterior },
+  { id: 'interno', label: 'Ambiente Interior', Icon: IconInterior },
 ]
 
 const SPN_ENGINES = [
-  { id: 'nano-banana-pro', name: 'Pulsar', tag: 'PADRÃO',  desc: 'Rápido e preciso' },
-  { id: 'gpt-image-2',     name: 'Quasar', tag: 'PREMIUM', desc: 'Ultra-realista'   },
+  { id: 'nano-banana-pro', name: 'Vega',   tag: 'PADRÃO',  desc: 'Fidelidade geométrica' },
+  { id: 'gpt-image-2',     name: 'Quasar', tag: 'PREMIUM', desc: 'Ultra-realista'         },
 ]
 
 const OUTPUT_QUALITIES = [
@@ -49,7 +121,8 @@ const OUTPUT_QUALITIES = [
 ]
 
 const EMPTY_MATERIALS: ProjectMaterials = {
-  fachada: '', piso: '', esquadrias: '', elementos: '', outros: '',
+  fachada: '', piso: '', esquadrias: '', elementos: '',
+  marcenaria: '', bancadas: '', paredes: '', outros: '',
 }
 
 export function GenerateClient({ initialCredits, initialMaterials }: GenerateClientProps) {
@@ -78,16 +151,16 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
   // ── Modo e opções
   const [mode, setMode]                       = useState<Mode>('externo')
   const [condition, setCondition]             = useState('Diurno')
-  const [background, setBackground]           = useState('Urbano Arborizado')
+  const [background, setBackground]           = useState('Preservar original')
   const [ambient, setAmbient]                 = useState('Sala de Estar')
   const [lighting, setLighting]               = useState('Clara e Natural')
-  const [plantType, setPlantType]             = useState('Top View Realista')
-  const [perspective, setPerspective]         = useState('Frontal 1 ponto')
-  const [vegetation, setVegetation]           = useState('Tropical c/ Palmeiras')
-  const [lightCondition, setLightCondition]   = useState('Diurno')
-  const [geometryLock, setGeometryLock]       = useState(85)
   const [selectedModel, setSelectedModel]     = useState('nano-banana-pro')
   const [outputQuality, setOutputQuality]     = useState('hd')
+
+  // ── Elementos de cena
+  const [sceneElements, setSceneElements] = useState<SceneElements>({})
+  const toggleScene = (key: keyof SceneElements) =>
+    setSceneElements(prev => ({ ...prev, [key]: !prev[key] }))
 
   // ── Materiais do projeto
   const [materiaisAberto, setMateriaisAberto] = useState(false)
@@ -158,7 +231,7 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
   // ── Geração
   const handleGenerate = async () => {
     if (!imagePreview) { setError('Faça upload de uma imagem primeiro.'); return }
-    if (credits <= 0)  { setError('Créditos insuficientes.'); return }
+    if (credits <= 0)  { setError('Nodes insuficientes.'); return }
     setError(null); setLoading(true); startLoadingTexts()
     try {
       const res = await fetch('/api/generate', {
@@ -166,9 +239,9 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           imageBase64: imagePreview, mode, condition, background,
-          ambient, lighting, plantType, perspective, vegetation,
-          lightCondition, geometryLock, model: selectedModel,
+          ambient, lighting, model: selectedModel, outputQuality,
           materials: Object.values(materials).some(v => v) ? materials : undefined,
+          sceneElements: Object.values(sceneElements).some(Boolean) ? sceneElements : undefined,
         }),
       })
       const data: GenerateResult = await res.json()
@@ -194,13 +267,9 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
 
   const getPromptLabel = () => {
     switch (mode) {
-      case 'externo':  return `${MODE_LABELS[mode]} · ${condition} · ${background}`
-      case 'interno':  return `${MODE_LABELS[mode]} · ${ambient} · ${lighting}`
-      case 'planta':   return `${MODE_LABELS[mode]} · ${plantType}`
-      case 'multi':    return `${MODE_LABELS[mode]} · ${perspective}`
-      case 'paisagem': return `${MODE_LABELS[mode]} · ${vegetation} · ${lightCondition}`
-      case 'prancha':  return `${MODE_LABELS[mode]} · Premium`
-      default:         return MODE_LABELS[mode]
+      case 'externo': return `${MODE_LABELS[mode]} · ${condition} · ${background}`
+      case 'interno': return `${MODE_LABELS[mode]} · ${ambient} · ${lighting}`
+      default:        return MODE_LABELS[mode]
     }
   }
 
@@ -213,7 +282,7 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
   const nodeCost     = OUTPUT_QUALITIES.find(q => q.id === outputQuality)?.nodes ?? 4
 
   return (
-    <div style={S.main}>
+      <div style={S.main}>
       {/* ── CONTROLES ── */}
       <div style={S.controls}>
         <div style={S.topbar}>
@@ -238,7 +307,7 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
             <div style={S.credits}>
               <span style={S.creditDot}/>
               <span style={S.creditNum}>{credits}</span>
-              <span>créditos</span>
+              <span>nodes</span>
               <button onClick={handleBuyCredits} style={S.buyBtn}>+ comprar</button>
             </div>
           </div>
@@ -246,13 +315,13 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
 
         {/* Modos */}
         <div style={S.section}>
-          <div style={S.label}>MODO DE OUTPUT</div>
+          <div style={S.label}>TIPO DE AMBIENTE</div>
           <div style={S.modesGrid}>
             {MODES.map(m => (
               <div key={m.id}
                 style={mode === m.id ? {...S.modeCard, ...S.modeCardActive} : S.modeCard}
                 onClick={() => setMode(m.id)}>
-                <div style={{...S.modeIcon, ...(mode === m.id ? {color:'var(--color-bg)'} : {})}}>{m.icon}</div>
+                <div style={{...S.modeIcon, ...(mode === m.id ? {color:'var(--color-bg)'} : {})}}><m.Icon /></div>
                 <div style={{...S.modeLabel, ...(mode === m.id ? {color:'var(--color-bg)'} : {})}}>{m.label}</div>
               </div>
             ))}
@@ -270,13 +339,6 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
           <div style={S.section}><div style={S.label}>AMBIENTE</div><PillGroup options={AMB_OPTIONS} selected={ambient} onChange={setAmbient}/></div>
           <div style={S.section}><div style={S.label}>ILUMINAÇÃO</div><PillGroup options={LUZ_OPTIONS} selected={lighting} onChange={setLighting}/></div>
         </>}
-        {mode === 'planta'   && <div style={S.section}><div style={S.label}>TIPO DE PLANTA</div><PillGroup options={PLT_OPTIONS} selected={plantType} onChange={setPlantType}/></div>}
-        {mode === 'multi'    && <div style={S.section}><div style={S.label}>PERSPECTIVA DO INPUT</div><PillGroup options={PERSP_OPTIONS} selected={perspective} onChange={setPerspective}/><p style={S.infoNote}>Gera 4 ângulos: referência, contra-ângulo, aéreo e perspectiva baixa.</p></div>}
-        {mode === 'paisagem' && <>
-          <div style={S.section}><div style={S.label}>TIPO DE VEGETAÇÃO</div><PillGroup options={VEG_OPTIONS} selected={vegetation} onChange={setVegetation}/></div>
-          <div style={S.section}><div style={S.label}>CONDIÇÃO DE LUZ</div><PillGroup options={['Diurno','Nublado']} selected={lightCondition} onChange={setLightCondition}/></div>
-        </>}
-        {mode === 'prancha' && <div style={S.section}><div style={S.label}>TIPO DE PRANCHA</div><PillGroup options={['Prancha Premium']} selected="Prancha Premium" onChange={() => {}}/><p style={S.infoNote}>Hero render + implantação + corte + fachada + axonometria + diagramas.</p></div>}
 
         <div style={S.divider}/>
 
@@ -296,13 +358,19 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
 
           {materiaisAberto && (
             <div style={S.materiaisGrid}>
-              {[
+              {(mode === 'interno' ? [
+                { field: 'piso'       as const, label: 'Piso / Revestimento',    placeholder: 'ex: porcelanato acetinado, piso vinílico amadeirado' },
+                { field: 'marcenaria' as const, label: 'Marcenaria / Mobiliário', placeholder: 'ex: armários em MDF carvalho, painel ripado' },
+                { field: 'bancadas'   as const, label: 'Bancadas / Pedras',      placeholder: 'ex: quartzo branco, granito escovado' },
+                { field: 'paredes'    as const, label: 'Paredes / Teto',         placeholder: 'ex: pintura off-white, forro de gesso com sanca' },
+                { field: 'outros'     as const, label: 'Observações adicionais', placeholder: 'ex: estilo minimalista, paleta neutra' },
+              ] : [
                 { field: 'fachada'    as const, label: 'Revestimento de fachada', placeholder: 'ex: placas cimentícias texturizadas, ACM preto' },
                 { field: 'piso'       as const, label: 'Piso externo / calçada',  placeholder: 'ex: porcelanato 90×90 cinza claro' },
                 { field: 'esquadrias' as const, label: 'Esquadrias / caixilhos',  placeholder: 'ex: alumínio preto fosco' },
                 { field: 'elementos'  as const, label: 'Elementos especiais',     placeholder: 'ex: painel de madeira ipê, brise metálico' },
                 { field: 'outros'     as const, label: 'Observações adicionais',  placeholder: 'ex: estrutura em concreto aparente, laje invertida' },
-              ].map(({ field, label, placeholder }) => (
+              ]).map(({ field, label, placeholder }) => (
                 <div key={field} style={S.materialField}>
                   <div style={S.materialLabel}>{label}</div>
                   <input
@@ -321,17 +389,40 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
 
         <div style={S.divider}/>
 
-        {/* Geometry Lock */}
+        {/* ── ELEMENTOS NA CENA ── */}
         <div style={S.section}>
-          <div style={S.label}>GEOMETRY LOCK</div>
-          <div style={S.sliderRow}>
-            <span style={S.sliderEnd}>Livre</span>
-            <input type="range" min={0} max={100} value={geometryLock} onChange={e => setGeometryLock(Number(e.target.value))} style={S.range}/>
-            <span style={S.sliderEnd}>Fiel</span>
-            <span style={S.sliderVal}>{geometryLock}%</span>
+          <div style={S.label}>ELEMENTOS NA CENA</div>
+          <div style={S.sceneList}>
+            {SCENE_ELEMENTS_DEF.map(el => {
+              const active = !!sceneElements[el.key]
+              return (
+                <button
+                  key={el.key}
+                  onClick={() => toggleScene(el.key)}
+                  style={{
+                    padding: '5px 10px',
+                    borderRadius: 20,
+                    border: `0.5px solid ${active ? 'var(--color-text-primary)' : 'var(--color-border-strong)'}`,
+                    background: active ? 'var(--color-text-primary)' : 'transparent',
+                    color: active ? 'var(--color-bg)' : 'var(--color-text-primary)',
+                    fontSize: 10,
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    letterSpacing: '-0.01em',
+                    transition: 'background 0.15s, border-color 0.15s, color 0.15s',
+                    whiteSpace: 'nowrap' as const,
+                    flexShrink: 0,
+                  }}
+                >
+                  {el.label}
+                </button>
+              )
+            })}
           </div>
-          <p style={S.infoNote}>{geometryLock >= 76 ? 'Apenas materiais e luz mudam' : geometryLock >= 51 ? 'Câmera e proporções travadas' : geometryLock >= 26 ? 'Composição geral mantida' : 'Liberdade criativa'}</p>
         </div>
+
+        <div style={S.divider}/>
 
         {/* Motor */}
         <div style={S.section}>
@@ -427,10 +518,24 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
 
         {loading && imagePreview && (
           <div style={S.compareWrap}>
-            <img src={imagePreview} alt="Input" style={{...S.compareImg, opacity:0.4}}/>
+            <style>{`
+              @keyframes spn-pulse {
+                0%, 100% { opacity: 0.4; transform: scale(1); }
+                50%       { opacity: 1;   transform: scale(1.08); }
+              }
+              @keyframes synapse {
+                0%        { opacity: 0;   transform: scale(0); }
+                8%        { opacity: 1;   transform: scale(1); }
+                28%       { opacity: 0.8; transform: scale(1); }
+                55%, 100% { opacity: 0;   transform: scale(0); }
+              }
+            `}</style>
+            <img src={imagePreview} alt="Input" style={{...S.compareImg, opacity:0.25}}/>
             <div style={S.loadingOverlay}>
-              <div style={S.spinner}/>
-              <span style={{fontSize:12, color:'#fafafa', letterSpacing:'0.05em'}}>{loadingText}</span>
+              <div style={{ animation: 'spn-pulse 2s ease-in-out infinite', color: '#ffffff', display: 'flex' }}>
+                <LoadingLogo />
+              </div>
+              <span style={{fontSize:11, color:'rgba(255,255,255,0.75)', letterSpacing:'0.08em'}}>{loadingText}</span>
             </div>
           </div>
         )}
@@ -441,11 +546,11 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
             <strong style={{color:'var(--color-text-primary)', fontWeight:500}}>{getPromptLabel()}</strong>
             {hasMaterials && <span style={{color:'var(--color-accent-green)', fontSize:10, marginLeft:6}}>+ materiais do projeto</span>}
             <br/>
-            <span style={{color:'var(--color-text-tertiary)'}}>geometry: {geometryLock}% · {SPN_ENGINES.find(m => m.id === selectedModel)?.name} · {OUTPUT_QUALITIES.find(q => q.id === outputQuality)?.label}</span>
+            <span style={{color:'var(--color-text-tertiary)'}}>{SPN_ENGINES.find(m => m.id === selectedModel)?.name} · {OUTPUT_QUALITIES.find(q => q.id === outputQuality)?.label}</span>
           </div>
         </div>
       </div>
-    </div>
+      </div>
   )
 }
 
@@ -473,8 +578,23 @@ const pillActive: React.CSSProperties = {
 }
 
 const S: Record<string, React.CSSProperties> = {
-  main:              { display:'grid', gridTemplateColumns:'480px 1fr', height:'100%', overflow:'hidden' },
-  controls:          { padding:'28px 24px', borderRight:'0.5px solid var(--color-border)', background:'var(--color-bg)', overflowY:'auto', display:'flex', flexDirection:'column', gap:20 },
+  root:              { display:'flex', height:'100vh', overflow:'hidden' },
+  sidebar:           { background:'#0a0a0a', display:'flex', flexDirection:'column', flexShrink:0, overflow:'hidden', transition:'width 0.25s cubic-bezier(0.4,0,0.2,1)', borderRight:'0.5px solid rgba(255,255,255,0.06)', zIndex:10 },
+  sidebarLogo:       { padding:'18px 18px 14px', display:'flex', alignItems:'center', gap:10, height:62, flexShrink:0 },
+  sidebarLogoMark:   { width:26, height:26, borderRadius:6, background:'#ffffff', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 },
+  sidebarLogoText:   { fontSize:11, fontWeight:600, color:'#ffffff', letterSpacing:'0.09em', textTransform:'uppercase', whiteSpace:'nowrap', transition:'opacity 0.18s' },
+  sidebarNav:        { flex:1, display:'flex', flexDirection:'column', gap:2, padding:'4px 8px', overflowY:'auto' },
+  sidebarItem:       { display:'flex', alignItems:'center', gap:12, padding:'0 10px', height:52, borderRadius:8, cursor:'pointer', transition:'background 0.15s', flexShrink:0 },
+  sidebarItemActive: { background:'rgba(255,255,255,0.1)' },
+  sidebarIcon:       { flexShrink:0, display:'flex' },
+  sidebarLabel:      { fontSize:12, color:'rgba(255,255,255,0.75)', whiteSpace:'nowrap', transition:'opacity 0.18s', fontWeight:400, letterSpacing:'-0.01em' },
+  sidebarFooter:     { padding:'10px 8px', borderTop:'0.5px solid rgba(255,255,255,0.07)', flexShrink:0 },
+  sidebarUser:       { display:'flex', alignItems:'center', gap:10, padding:'4px 10px', height:52, borderRadius:8 },
+  sidebarUserAvatar: { width:28, height:28, borderRadius:'50%', background:'rgba(255,255,255,0.15)', display:'inline-flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:11, fontWeight:600, color:'#ffffff' },
+  sidebarUserName:   { fontSize:11, color:'#ffffff', fontWeight:500, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' },
+  sidebarUserPlan:   { fontSize:9, letterSpacing:'0.08em', textTransform:'uppercase', color:'rgba(255,255,255,0.35)', marginTop:2 },
+  main:              { display:'grid', gridTemplateColumns:'480px 1fr', flex:1, overflow:'hidden' },
+  controls:          { padding:'18px 24px', borderRight:'0.5px solid var(--color-border)', background:'var(--color-bg)', overflowY:'auto', display:'flex', flexDirection:'column', gap:14 },
   preview:           { padding:28, background:'var(--color-bg)', display:'flex', flexDirection:'column', gap:18 },
   topbar:            { display:'flex', justifyContent:'space-between', alignItems:'center' },
   pageTitle:         { fontSize:10, letterSpacing:'0.22em', textTransform:'uppercase', color:'var(--color-text-tertiary)', fontWeight:500 },
@@ -483,11 +603,11 @@ const S: Record<string, React.CSSProperties> = {
   creditNum:         { color:'var(--color-text-primary)', fontWeight:500, fontSize:12 },
   buyBtn:            { fontSize:'11px', color:'var(--color-text-tertiary)', background:'none', border:'none', cursor:'pointer', textDecoration:'underline', marginLeft:'6px', fontFamily:'inherit' },
   themeToggle:       { width:28, height:28, borderRadius:'50%', border:'0.5px solid var(--color-border-strong)', background:'var(--color-bg-elevated)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', color:'var(--color-text-tertiary)', padding:0, flexShrink:0 },
-  section:           { display:'flex', flexDirection:'column', gap:10 },
+  section:           { display:'flex', flexDirection:'column', gap:8 },
   label:             { fontSize:10, letterSpacing:'0.15em', textTransform:'uppercase', color:'var(--color-text-tertiary)', fontWeight:500 },
   divider:           { height:'0.5px', background:'var(--color-border)' },
-  modesGrid:         { display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 },
-  modeCard:          { border:'0.5px solid var(--color-border-strong)', borderRadius:10, padding:'12px 10px', cursor:'pointer', textAlign:'center', background:'var(--color-bg-elevated)' },
+  modesGrid:         { display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 },
+  modeCard:          { border:'0.5px solid var(--color-border-strong)', borderRadius:10, padding:'9px 10px', cursor:'pointer', textAlign:'center', background:'var(--color-bg-elevated)' },
   modeCardActive:    { borderColor:'var(--color-text-primary)', background:'var(--color-text-primary)' },
   modeIcon:          { fontSize:16, marginBottom:4, color:'var(--color-text-tertiary)' },
   modeLabel:         { fontSize:10, fontWeight:500, color:'var(--color-text-primary)', lineHeight:1.3 },
@@ -498,16 +618,13 @@ const S: Record<string, React.CSSProperties> = {
   materialField:     { display:'flex', flexDirection:'column', gap:5 },
   materialLabel:     { fontSize:10, color:'var(--color-text-tertiary)', letterSpacing:'0.05em' },
   materialInput:     { padding:'8px 12px', border:'0.5px solid var(--color-border-strong)', borderRadius:8, fontSize:11, color:'var(--color-text-primary)', background:'var(--color-bg-elevated)', fontFamily:'inherit', outline:'none' },
-  sliderRow:         { display:'flex', alignItems:'center', gap:10 },
-  sliderEnd:         { fontSize:11, color:'var(--color-text-tertiary)' },
-  range:             { flex:1, accentColor:'var(--color-text-primary)', height:3 },
-  sliderVal:         { fontSize:12, fontWeight:500, color:'var(--color-text-primary)', minWidth:34, textAlign:'right' },
+  sceneList:         { display:'flex', flexWrap:'nowrap', gap:5 },
   motorGrid:         { display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 },
   motorOpt:          { border:'0.5px solid var(--color-border-strong)', borderRadius:8, padding:'8px 10px', cursor:'pointer', background:'var(--color-bg-elevated)' },
   motorOptActive:    { borderColor:'var(--color-text-primary)', background:'var(--color-text-primary)' },
   motorWide:         { gridColumn:'span 2' },
   qualityGrid:       { display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 },
-  qualityOpt:        { border:'0.5px solid var(--color-border-strong)', borderRadius:8, padding:'10px 8px', cursor:'pointer', background:'var(--color-bg-elevated)', textAlign:'center' as const },
+  qualityOpt:        { border:'0.5px solid var(--color-border-strong)', borderRadius:8, padding:'8px 8px', cursor:'pointer', background:'var(--color-bg-elevated)', textAlign:'center' as const },
   qualityOptActive:  { borderColor:'var(--color-text-primary)', background:'var(--color-text-primary)' },
   qualityRes:        { fontSize:14, fontWeight:500, color:'var(--color-text-primary)', marginBottom:4, letterSpacing:'-0.02em' },
   motorName:         { fontSize:11, fontWeight:500, color:'var(--color-text-primary)', marginBottom:3 },
@@ -527,8 +644,7 @@ const S: Record<string, React.CSSProperties> = {
   compareHandleCircle: { width:32, height:32, borderRadius:'50%', background:'#ffffff', border:'0.5px solid rgba(0,0,0,0.1)', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 2px 8px rgba(0,0,0,0.12)' },
   compareLabel:      { position:'absolute', bottom:12, fontSize:9, letterSpacing:'0.12em', color:'#fafafa', textTransform:'uppercase', fontWeight:500, textShadow:'0 1px 3px rgba(0,0,0,0.5)', pointerEvents:'none' },
   changeImageBtn:    { position:'absolute', top:12, right:14, padding:'5px 12px', border:'0.5px solid rgba(255,255,255,0.4)', borderRadius:20, fontSize:10, color:'#fafafa', background:'rgba(0,0,0,0.35)', cursor:'pointer', fontFamily:'inherit' },
-  loadingOverlay:    { position:'absolute', inset:0, background:'rgba(0,0,0,0.35)', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:14 },
-  spinner:           { width:28, height:28, borderRadius:'50%', border:'2px solid rgba(255,255,255,0.3)', borderTopColor:'#ffffff', animation:'spin 0.8s linear infinite' },
+  loadingOverlay:    { position:'absolute', inset:0, background:'rgba(0,0,0,0.55)', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:18, backdropFilter:'blur(4px)' },
   promptPreview:     { background:'var(--color-bg-elevated)', border:'0.5px solid var(--color-border)', borderRadius:10, padding:'14px 16px' },
   promptLabel:       { fontSize:9, letterSpacing:'0.15em', textTransform:'uppercase', color:'var(--color-text-tertiary)', fontWeight:500, marginBottom:8 },
   promptText:        { fontSize:11, color:'var(--color-text-tertiary)', lineHeight:1.65 },

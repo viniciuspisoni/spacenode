@@ -128,7 +128,7 @@ export function ProductMockup() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 9, color: 'rgba(255,255,255,0.35)' }}>
                   <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#30b46c', boxShadow: '0 0 5px rgba(48,180,108,0.5)', display: 'inline-block' }} />
                   <span style={{ color: '#fafafa', fontWeight: 500, fontSize: 10 }}>47</span>
-                  créditos
+                  nodes
                 </div>
               </div>
 

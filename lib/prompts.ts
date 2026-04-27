@@ -2,11 +2,25 @@
 export type Mode = 'externo' | 'interno' | 'planta' | 'multi' | 'paisagem' | 'prancha'
 
 export interface ProjectMaterials {
+  // exterior
   fachada?:    string  // ex: "placas cimentícias texturizadas, ACM preto"
-  piso?:       string  // ex: "porcelanato 90x90 cinza claro"
+  piso?:       string  // ex: "porcelanato 90x90 cinza claro" | "piso vinílico amadeirado"
   esquadrias?: string  // ex: "alumínio preto fosco"
   elementos?:  string  // ex: "painel de madeira ipê, brise metálico"
+  // interior
+  marcenaria?: string  // ex: "armários em MDF carvalho, painel ripado"
+  bancadas?:   string  // ex: "quartzo branco, granito escovado"
+  paredes?:    string  // ex: "pintura off-white, forro de gesso com sanca"
+  // compartilhado
   outros?:     string  // ex: "estrutura em concreto aparente"
+}
+
+export interface SceneElements {
+  ambientacao?: boolean  // vasos e decoração em vazios
+  pessoas?:     boolean  // adicionar pessoas
+  luzes?:       boolean  // acender iluminação artificial
+  carros?:      boolean  // adicionar veículos
+  raiosSol?:    boolean  // raios de sol / glare
 }
 
 export interface GenerateOptions {
@@ -19,15 +33,32 @@ export interface GenerateOptions {
   perspective?: string
   vegetation?: string
   lightCondition?: string
-  geometryLock: number
   materials?: ProjectMaterials
+  sceneElements?: SceneElements
+  modelType?: 'reference' | 'edit'  // reference = Nano Banana Pro | edit = GPT Image 2
 }
 
 const PHOTO_SUFFIX =
   ', captured with professional architectural camera, Canon R5, 24mm tilt-shift lens, f/4, ISO 100, Hasselblad aesthetic, hyperrealistic, 8K RAW photo, photorealistic architectural photography, not a render, not CGI, real life photo'
 
-// ── Bloco de materiais injetado no prompt ─────────────────────
-function buildMaterialsBlock(materials?: ProjectMaterials): string {
+// ── Prefixos para modelo EDIT (GPT Image 2) — instrução de transformação ──
+const GEO_PREFIX_EXTERIOR_EDIT =
+  'Keep IDENTICAL camera angle, building silhouette, perspective, proportions and composition as the reference image. Do NOT move the camera, do NOT reframe, do NOT change geometry. Apply photorealistic materials and lighting only. '
+
+const GEO_PREFIX_INTERIOR_EDIT =
+  'Keep IDENTICAL camera angle, room layout, furniture positions and all spatial proportions as the reference image. Do NOT move, add or remove any element. Apply photorealistic rendering only. '
+
+// ── Prefixos para modelo REFERENCE (Nano Banana Pro) — descreve o output ─
+// Modelos de referência respondem melhor quando o prompt descreve o resultado
+// desejado (output-first) em vez de instruções de transformação.
+const GEO_PREFIX_EXTERIOR_REF =
+  'Ultra-realistic architectural photograph of the exact building shown in the reference: same camera position, same viewing angle, same facade composition, same window placement, same proportions. '
+
+const GEO_PREFIX_INTERIOR_REF =
+  'Ultra-realistic interior architectural photograph of the exact room shown in the reference: same camera angle, same furniture layout, same spatial proportions, same ceiling height. '
+
+// ── Bloco de materiais EXTERIOR ───────────────────────────────
+function buildExteriorMaterialsBlock(materials?: ProjectMaterials): string {
   if (!materials) return ''
   const lines = [
     materials.fachada    && `facade cladding: ${materials.fachada}`,
@@ -37,53 +68,64 @@ function buildMaterialsBlock(materials?: ProjectMaterials): string {
     materials.outros     && `additional notes: ${materials.outros}`,
   ].filter(Boolean)
   if (lines.length === 0) return ''
-  return (
-    `EXACT PROJECT MATERIALS — reproduce these faithfully: ${lines.join('; ')}. `
-  )
+  return `EXACT PROJECT MATERIALS — apply these faithfully: ${lines.join('; ')}. `
 }
 
-// ── Prefixo de geometry lock ──────────────────────────────────
-function buildGeometryPrefix(geometryLock: number): string {
-  if (geometryLock <= 25) return ''
-  if (geometryLock <= 50)
-    return 'Using the reference image as a base, maintaining the same general composition, building proportions and camera framing. '
-  if (geometryLock <= 75)
-    return 'Transform ONLY the materials, lighting and environment of this exact image. The camera angle, perspective, building geometry, architectural proportions and framing must remain exactly as in the reference image. Do not move the camera, do not change the viewing angle. '
-  return 'GEOMETRY LOCKED: This is a material and lighting transformation ONLY. The camera position, viewing angle, perspective, horizon line, building silhouette, architectural geometry and all proportions must be PIXEL-PERFECT identical to the reference image. Do not reframe, do not rotate, do not zoom. Only surface materials, textures, lighting and background vegetation may change. '
+// ── Bloco de materiais INTERIOR ───────────────────────────────
+// Distingue entre "o que muda" (listado) e "o que preserva" (todo o resto).
+// Isso evita que o modelo troque materiais não especificados (ex: piso).
+function buildInteriorMaterialsBlock(materials?: ProjectMaterials): string {
+  if (!materials) {
+    return 'MATERIALS: Preserve ALL existing materials, finishes, colors and textures exactly as shown in the reference image. Do not substitute or alter any material. '
+  }
+  const lines = [
+    materials.piso       && `floor/flooring: ${materials.piso}`,
+    materials.marcenaria && `cabinetry and millwork: ${materials.marcenaria}`,
+    materials.bancadas   && `countertops and stone surfaces: ${materials.bancadas}`,
+    materials.paredes    && `walls and ceiling finish: ${materials.paredes}`,
+    materials.outros     && `special instructions: ${materials.outros}`,
+  ].filter(Boolean)
+  if (lines.length === 0) {
+    return 'MATERIALS: Preserve ALL existing materials, finishes, colors and textures exactly as shown in the reference image. Do not substitute or alter any material. '
+  }
+  return (
+    `MATERIAL REQUIREMENTS — apply precisely: ${lines.join('; ')}. ` +
+    `CRITICAL: Every surface, finish and texture NOT listed above must be PRESERVED EXACTLY as it appears in the reference image. DO NOT change, substitute or reinterpret any unlisted material, color or finish. `
+  )
 }
 
 const ATM: Record<string, string> = {
   Diurno:      'daytime, blue sky with sun and natural shadows',
   Entardecer:  'golden hour sunset, warm tones, long soft shadows',
-  Noturno:     'night scene, warm white lighting on vegetation and building facade',
+  'Blue Hour':  'blue hour twilight, deep cobalt and indigo sky with scattered dramatic clouds catching the last purple light, warm interior and facade lighting glowing against the cool blue atmosphere, cinematic architectural photography',
   Nublado:     'predominantly cloudy sky, diffuse light, no harsh shadows',
   Chuva:       'rainy atmosphere, wet surfaces, dark cloudy sky, rain streaks',
 }
 
+const BG_PRESERVE = '__preserve__' // sentinel — tratado separadamente em buildPrompt
+
 const BG: Record<string, string> = {
-  'Urbano Arborizado':  'modern Brazilian residential houses with large ipê and jacarandá trees, lush tropical vegetation',
-  'Bairro Planejado':   'gated community contemporary houses, landscaped gardens, coconut palms',
-  'Suburbano c/ Mata':  'suburban houses with Atlantic forest native vegetation, dense greenery',
-  Litorâneo:            'coastal beach houses, abundant coconut palms, restinga vegetation, distant sea',
-  'Bairro Nobre':       'luxury mansions, centenary figueira trees, elaborate landscaping, wide avenues',
-  'Parque Urbano':      'public urban park, large tipuana and oiti trees, lake with aquatic vegetation',
-  Montanha:             'mountain houses on slopes, Atlantic forest, araucárias, light mist',
-  'Cond. Ecológico':    'ecological condominium, native vegetation, natural lakes, flowering ipê trees',
-  'Rural / Sítio':      'rural farmhouses, eucalyptus, cerrado vegetation, open fields',
-  'Vila Residencial':   'colorful colonial and modern houses, flowering ornamental trees',
+  'Preservar original': BG_PRESERVE,
+  'Entorno Neutro':     'clean neutral context: soft overcast sky, minimal flat ground, no competing structures — full focus on the building',
+  'Rua Arborizada':     'Brazilian urban street with mature figueira and tipuana trees casting dappled shade, wide sidewalks, neighboring residential buildings',
+  'Condomínio':         'upscale gated community, contemporary neighboring houses, manicured landscaping, coconut palms and flowering ornamental trees',
+  'Beira-Mar':          'coastal Brazilian setting, coconut palms, restinga vegetation, calm Atlantic ocean stretching to the horizon',
+  'Beira-Rio':          'tranquil riverside setting, calm dark water reflecting the sky, lush native riparian vegetation, light morning mist',
+  'Serra':              'mountain landscape with dense Atlantic forest, araucárias, rolling green hills, soft morning mist in the valleys',
+  'Zona Rural':         'open rural Brazilian landscape, vast cerrado or grassland fields, dirt road, clear blue sky, distant farmhouses',
 }
 
 const AMB: Record<string, string> = {
-  'Sala de Estar':    'living room with sofa, TV rack, large-format porcelain floor, textured walls, natural light through floor-to-ceiling windows',
-  'Cozinha Gourmet':  'kitchen with custom cabinetry, granite countertop, gas cooktop, stainless hood and refrigerator, porcelain floor',
-  'Suíte Master':     'master bedroom with king-size bed, upholstered headboard, built-in wardrobe in wood veneer, wood laminate floor',
-  Banheiro:           'bathroom with frameless glass shower, floating vanity, marble countertop, chrome fixtures, large-format ceramic tiles',
-  'Área de Serviço':  'laundry room with washing machine, utility sink, overhead cabinets, anti-slip porcelain floor',
-  'Home Office':      'home office with solid wood desk, ergonomic chair, built-in bookshelves, wood laminate floor',
-  'Varanda Gourmet':  'gourmet balcony with masonry barbecue, stone countertop, dining table with rattan chairs, composite wood deck',
-  'Sala de Jantar':   'dining room with 6-seat wooden table, upholstered chairs, buffet cabinet, pendant chandelier, porcelain floor',
-  'Quarto Infantil':  "children's bedroom with bed, white lacquer wardrobe, study desk, floating shelves, laminate floor",
-  'Piscina e Lazer':  'outdoor leisure area with masonry pool, mosaic tiles, composite wood deck, sun loungers',
+  'Sala de Estar':    'living room with sofa, TV unit, large windows with natural light',
+  'Cozinha Gourmet':  'gourmet kitchen with custom cabinetry, gas cooktop, stainless range hood and refrigerator',
+  'Suíte Master':     'master bedroom with king-size bed, upholstered headboard and built-in wardrobe',
+  Banheiro:           'bathroom with frameless glass shower, floating vanity and chrome fixtures',
+  'Área de Serviço':  'laundry room with washing machine, utility sink and overhead storage cabinets',
+  'Home Office':      'home office with desk, ergonomic chair and built-in bookshelves',
+  'Varanda Gourmet':  'gourmet balcony with masonry barbecue, dining table and rattan chairs',
+  'Sala de Jantar':   'dining room with 6-seat table, upholstered chairs, buffet cabinet and pendant chandelier',
+  'Quarto Infantil':  "children's bedroom with bed, wardrobe, study desk and floating shelves",
+  'Piscina e Lazer':  'outdoor leisure area with pool and sun loungers',
 }
 
 const LUZ: Record<string, string> = {
@@ -117,34 +159,60 @@ const VEG: Record<string, string> = {
 const PRANCHA_PREMIUM =
   'Ultra-detailed premium architectural presentation board. Swiss grid layout. (1) Hero cinematic render — realistic materials, global illumination, ambient occlusion, depth of field; (2) Humanized site plan; (3) Longitudinal section with human silhouettes; (4) Facade elevation; (5) Exploded axonometric; (6) Bubble diagram. Text in Portuguese. Off-white background, muted earth palette. --ar 9:16 --style raw --v 6'
 
+// ── Bloco de elementos de cena ────────────────────────────────
+function buildSceneElementsBlock(el?: SceneElements): string {
+  if (!el) return ''
+  const parts: string[] = []
+  if (el.ambientacao) parts.push('add decorative elements: place realistic vases, indoor plants and aesthetic objects in empty shelves and vacant spaces')
+  if (el.pessoas)     parts.push('include 1-3 realistic human figures in natural poses and appropriate clothing')
+  if (el.luzes)       parts.push('all artificial lights are ON: ceiling fixtures, pendant lights, floor lamps and LED strips are fully lit and glowing')
+  if (el.carros)      parts.push('add 1-2 modern parked cars in the driveway or street in front of the building')
+  if (el.raiosSol)    parts.push('add cinematic sun rays and lens flare: intense golden sunlight casting visible light beams through windows and open spaces')
+  if (parts.length === 0) return ''
+  return `SCENE ADDITIONS: ${parts.join('; ')}. `
+}
+
 export function buildPrompt(options: GenerateOptions): string {
   const { mode, condition, background, ambient, lighting, plantType,
-          perspective, vegetation, lightCondition, geometryLock, materials } = options
+          perspective, vegetation, lightCondition, materials, sceneElements,
+          modelType = 'edit' } = options
 
-  const geoPrefix  = buildGeometryPrefix(geometryLock)
-  const matBlock   = buildMaterialsBlock(materials)
+  const isRef = modelType === 'reference'
 
   switch (mode) {
     case 'externo': {
-      const atmText = ATM[condition ?? 'Diurno'] ?? ATM['Diurno']
-      const bgText  = BG[background ?? 'Urbano Arborizado'] ?? BG['Urbano Arborizado']
+      const atmText   = ATM[condition ?? 'Diurno'] ?? ATM['Diurno']
+      const bg        = background ?? 'Preservar original'
+      const bgValue   = BG[bg] ?? BG['Preservar original']
+      const matBlock  = buildExteriorMaterialsBlock(materials)
+      const scnBlock  = buildSceneElementsBlock(sceneElements)
+      const geoPrefix = isRef ? GEO_PREFIX_EXTERIOR_REF : GEO_PREFIX_EXTERIOR_EDIT
+
+      const bgInstruction = bgValue === BG_PRESERVE
+        ? `Preserve the existing background, surroundings and landscape exactly as in the reference.`
+        : `Background: ${bgValue}.`
+
       return (
-        geoPrefix + matBlock +
-        `Make this image as a real photograph with all real materials, ultra-realistic 4K, ` +
-        `captured by an architectural photographer. ` +
-        `${atmText}. On the horizon, tropical landscaping with ${bgText}. ` +
+        geoPrefix + matBlock + scnBlock +
+        `Ultra-realistic 4K architectural photography. ` +
+        `${atmText}. ${bgInstruction} ` +
         `Preserve all architectural elements, signage and proportions exactly as shown.` +
         PHOTO_SUFFIX
       )
     }
     case 'interno': {
-      const luzText = LUZ[lighting ?? 'Clara e Natural'] ?? LUZ['Clara e Natural']
-      const ambText = AMB[ambient ?? 'Sala de Estar'] ?? AMB['Sala de Estar']
+      const luzText   = LUZ[lighting ?? 'Clara e Natural'] ?? LUZ['Clara e Natural']
+      const ambText   = AMB[ambient ?? 'Sala de Estar'] ?? AMB['Sala de Estar']
+      const matBlock  = buildInteriorMaterialsBlock(materials)
+      const scnBlock  = buildSceneElementsBlock(sceneElements)
+      const geoPrefix = isRef ? GEO_PREFIX_INTERIOR_REF : GEO_PREFIX_INTERIOR_EDIT
       return (
-        geoPrefix + matBlock +
-        `Transform this 3D preview into an ultra-realistic professional interior photograph in 4K. ` +
-        `${luzText} ${ambText}. ` +
-        `Faithfully reproduce ALL original materials. PRESERVE exactly all proportions, geometry and layout.` +
+        geoPrefix + matBlock + scnBlock +
+        `Professional interior architectural photograph in 4K. ` +
+        `Room: ${ambText}. ` +
+        `Lighting: ${luzText} ` +
+        `Apply photorealistic quality: enhance surface finish, sharpness and light accuracy. ` +
+        `DO NOT alter furniture, layout or any architectural element.` +
         PHOTO_SUFFIX
       )
     }

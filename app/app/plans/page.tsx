@@ -231,7 +231,7 @@ export default function PlansPage() {
 
   return (
     <div style={{
-      height: '100%', overflowY: 'auto', background: '#f2f2f2',
+      flex: 1, height: '100%', overflowY: 'auto', background: '#f2f2f2',
       fontFamily: "'Geist', system-ui, sans-serif", letterSpacing: '-0.011em',
     }}>
       <div style={{ maxWidth: 920, margin: '0 auto', padding: '64px 24px' }}>
