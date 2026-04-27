@@ -39,104 +39,48 @@ export default function Demo() {
             overflow: "hidden",
             cursor: "ew-resize",
             userSelect: "none",
-            background: "#f2f2f7",
+            background: "#f0f0f0",
           }}
         >
-          <div
+          {/* Sketch (before) */}
+          <img
+            src="/demo-sketch.jpg"
+            alt="Sketch SketchUp"
+            draggable={false}
             style={{
               position: "absolute",
               inset: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background: "#f2f2f7",
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              pointerEvents: "none",
             }}
-          >
-            <svg
-              viewBox="0 0 400 225"
-              style={{ width: "55%", opacity: 0.85 }}
-            >
-              <polygon
-                points="80,120 200,60 320,120 320,200 80,200"
-                fill="#ffffff"
-                stroke="#888"
-                strokeWidth="0.8"
-              />
-              <rect
-                x="120"
-                y="140"
-                width="40"
-                height="60"
-                fill="#d4d4d4"
-                stroke="#888"
-                strokeWidth="0.5"
-              />
-              <rect
-                x="240"
-                y="140"
-                width="40"
-                height="60"
-                fill="#d4d4d4"
-                stroke="#888"
-                strokeWidth="0.5"
-              />
-              <rect x="185" y="170" width="30" height="30" fill="#555" />
-            </svg>
-            <span
-              style={{
-                position: "absolute",
-                bottom: 16,
-                left: 16,
-                fontSize: 10,
-                letterSpacing: "0.22em",
-                background: "rgba(255,255,255,0.95)",
-                color: "#1a1a1a",
-                padding: "5px 12px",
-                borderRadius: 20,
-                fontWeight: 500,
-                textTransform: "uppercase",
-              }}
-            >
-              sketch
-            </span>
-          </div>
+          />
 
+          {/* Render (after) — clipped */}
           <div
             style={{
               position: "absolute",
               inset: 0,
-              background:
-                "linear-gradient(135deg, #c9a876 0%, #6b4d2a 100%)",
               clipPath: `inset(0 0 0 ${position}%)`,
             }}
           >
-            <div
+            <img
+              src="/demo-render.jpg"
+              alt="Render fotorrealista"
+              draggable={false}
               style={{
                 position: "absolute",
                 inset: 0,
-                background:
-                  "linear-gradient(135deg, rgba(255,220,160,0.25) 0%, rgba(60,35,15,0.55) 100%)",
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                pointerEvents: "none",
               }}
             />
-            <span
-              style={{
-                position: "absolute",
-                bottom: 16,
-                right: 16,
-                fontSize: 10,
-                letterSpacing: "0.22em",
-                background: "rgba(255,255,255,0.95)",
-                color: "#1a1a1a",
-                padding: "5px 12px",
-                borderRadius: 20,
-                fontWeight: 500,
-                textTransform: "uppercase",
-              }}
-            >
-              render · 6s
-            </span>
           </div>
 
+          {/* Divider line */}
           <div
             style={{
               position: "absolute",
@@ -147,6 +91,7 @@ export default function Demo() {
               background: "#ffffff",
               transform: "translateX(-50%)",
               boxShadow: "0 0 12px rgba(0,0,0,0.15)",
+              pointerEvents: "none",
             }}
           >
             <div
@@ -174,6 +119,44 @@ export default function Demo() {
               </svg>
             </div>
           </div>
+
+          {/* Labels */}
+          <span
+            style={{
+              position: "absolute",
+              bottom: 16,
+              left: 16,
+              fontSize: 10,
+              letterSpacing: "0.22em",
+              background: "rgba(255,255,255,0.92)",
+              color: "#1a1a1a",
+              padding: "5px 12px",
+              borderRadius: 20,
+              fontWeight: 500,
+              textTransform: "uppercase",
+              pointerEvents: "none",
+            }}
+          >
+            sketch
+          </span>
+          <span
+            style={{
+              position: "absolute",
+              bottom: 16,
+              right: 16,
+              fontSize: 10,
+              letterSpacing: "0.22em",
+              background: "rgba(255,255,255,0.92)",
+              color: "#1a1a1a",
+              padding: "5px 12px",
+              borderRadius: 20,
+              fontWeight: 500,
+              textTransform: "uppercase",
+              pointerEvents: "none",
+            }}
+          >
+            render · 6s
+          </span>
         </div>
       </div>
       <p
