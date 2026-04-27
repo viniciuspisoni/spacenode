@@ -37,6 +37,7 @@ export default async function GeneratePage() {
     <GenerateClient
       userName={user.user_metadata?.full_name ?? user.email ?? 'Arquiteto'}
       initialCredits={profile.credits}
+      initialMaterials={profile.project_materials ?? undefined}
     />
   )
 }

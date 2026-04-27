@@ -2,13 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { fal } from '@fal-ai/client'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-
-// Tells the model to treat the input as a 3D model and convert to a real photo
-const QUALITY_SUFFIX =
-  ', convert 3D SketchUp model to real photograph, ' +
-  'photorealistic architectural photography, shot on Canon EOS R5, ' +
-  'real building materials, concrete glass steel, real sunlight shadows, ' +
-  'hyperrealistic, 8K RAW photo, not a render, not CGI, real life photo'
+import { buildGenerationPrompt, type GenerateOptions, type ProjectMaterials } from '@/lib/prompts'
 
 // Note: fal-ai/flux/dev/image-to-image does NOT support negative_prompt.
 // Flux guidance_scale default and recommended value is 3.5 (not SDXL range).
@@ -24,49 +18,67 @@ export async function POST(req: NextRequest) {
   let outputUrl: string | undefined
 
   try {
-    const formData = await req.formData()
-    const imageFile      = formData.get('image')       as File   | null
-    const prompt         = formData.get('prompt')      as string | null
-    const ambient        = formData.get('ambient')     as string | null
-    const style          = formData.get('style')       as string | null
-    const lighting       = formData.get('lighting')    as string | null
-    const geometryLockRaw = formData.get('geometryLock') as string | null
-    const modelId        = (formData.get('model') as string | null)
-                           ?? 'fal-ai/flux/dev/image-to-image'
+    const body = await req.json()
+    const {
+      imageBase64,
+      projectType,
+      segment,
+      environment,
+      lighting,
+      background,
+      sceneElements,
+      geometryLock = 85,
+      model: modelId = 'fal-ai/flux/dev/image-to-image',
+      materials,
+    } = body
 
-    if (!imageFile || !prompt || !ambient || !style || !lighting) {
+    if (!imageBase64 || !projectType) {
       return NextResponse.json(
-        { error: 'Imagem, prompt, ambient, style e lighting são obrigatórios' },
+        { error: 'Imagem e tipo de projeto são obrigatórios' },
         { status: 400 }
       )
     }
 
+    const options: GenerateOptions = {
+      projectType,
+      segment:       segment      ?? 'Residencial',
+      environment:   environment  ?? '',
+      lighting:      lighting     ?? '',
+      background:    background   ?? 'Preservar Original',
+      sceneElements: sceneElements ?? [],
+      geometryLock:  Number(geometryLock),
+      materials:     materials as ProjectMaterials | undefined,
+    }
+
+    const finalPrompt = buildGenerationPrompt(options)
+
     // strength = 1 - (geometryLock / 100), clamped to [0.15, 0.95]
     // Higher strength = more AI transformation. Flux docs: "Higher values are better."
-    const geometryLock = Number(geometryLockRaw ?? 50)
-    const strength = Math.max(0.15, Math.min(0.95, 1 - geometryLock / 100))
+    const strength = Math.max(0.15, Math.min(0.95, 1 - Number(geometryLock) / 100))
 
-    const finalPrompt = prompt + QUALITY_SUFFIX
-
-    // ── Debug: full input to Fal.ai ──
-    const falInput = {
-      image_url:           'WILL_BE_SET_AFTER_UPLOAD',
-      prompt:              finalPrompt,
-      strength,
-      num_inference_steps: 40,
-      guidance_scale:      3.5,   // Flux recommended value — do NOT increase
-    }
     console.log('[generate] model    :', modelId)
     console.log('[generate] lock     :', geometryLock, '→ strength:', strength)
     console.log('[generate] prompt   :', finalPrompt)
     console.log('[generate] params   :', { num_inference_steps: 40, guidance_scale: 3.5 })
 
+    // Convert base64 data URL to File for fal.storage.upload
+    const base64Data = imageBase64.includes(',') ? imageBase64.split(',')[1] : imageBase64
+    const buffer = Buffer.from(base64Data, 'base64')
+    const imageFile = new File([buffer], 'input.jpg', { type: 'image/jpeg' })
+
     inputUrl = await fal.storage.upload(imageFile)
-    falInput.image_url = inputUrl
     console.log('[generate] inputUrl :', inputUrl)
+
+    const falInput = {
+      image_url:           inputUrl,
+      prompt:              finalPrompt,
+      strength,
+      num_inference_steps: 40,
+      guidance_scale:      3.5,   // Flux recommended value — do NOT increase
+    }
     console.log('[generate] FAL INPUT:', JSON.stringify(falInput))
 
-    const result = await fal.subscribe(modelId, { input: { ...falInput, image_url: inputUrl } })
+    const result = await fal.subscribe(modelId, { input: falInput })
 
     console.log('[generate] FAL OUTPUT:', JSON.stringify(result.data))
     const images = (result.data as { images: { url: string }[] }).images
@@ -78,13 +90,26 @@ export async function POST(req: NextRequest) {
     await Promise.all([
       admin.from('renders').insert({
         user_id: user.id, input_url: inputUrl, output_url: outputUrl,
-        prompt, ambient, style, lighting,
+        prompt: finalPrompt,
+        ambient: environment ?? segment ?? projectType,
+        style:   projectType,
+        lighting: lighting ?? 'default',
         status: 'completed', completed_at: new Date().toISOString(),
       }),
       admin.rpc('consume_credit', { user_id_input: user.id }),
     ])
 
-    return NextResponse.json({ url: outputUrl, originalUrl: inputUrl })
+    const { data: profile } = await admin
+      .from('profiles')
+      .select('credits')
+      .eq('id', user.id)
+      .single()
+
+    return NextResponse.json({
+      outputUrl,
+      originalUrl: inputUrl,
+      credits: profile?.credits ?? 0,
+    })
   } catch (err: unknown) {
     const e = err as { status?: number; body?: unknown; message?: string }
     console.error('[generate] ERROR status:', e?.status)
