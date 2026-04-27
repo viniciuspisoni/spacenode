@@ -155,7 +155,7 @@ export default function Demo() {
               pointerEvents: "none",
             }}
           >
-            render · 6s
+            render
           </span>
         </div>
       </div>

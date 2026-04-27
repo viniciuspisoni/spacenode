@@ -368,7 +368,7 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
         <button style={loading ? {...S.genBtn, opacity:0.7, cursor:'not-allowed'} : S.genBtn} onClick={handleGenerate} disabled={loading}>
           <span>{loading ? loadingText : 'gerar render'}</span>
           <span style={S.genBtnMeta}>
-            <span>~6s · {nodeCost} nodes</span>
+            <span>{nodeCost} nodes</span>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-bg)" strokeWidth="1.5"><path d="M5 12h14M13 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </span>
         </button>
