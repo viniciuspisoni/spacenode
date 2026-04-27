@@ -36,6 +36,7 @@ export default async function GeneratePage() {
   return (
     <GenerateClient
       initialCredits={profile.credits}
+      initialMaterials={profile.project_materials ?? undefined}
     />
   )
 }
