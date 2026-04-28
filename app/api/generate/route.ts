@@ -7,6 +7,12 @@ import { buildGenerationPrompt, type GenerateOptions, type ProjectMaterials } fr
 // Note: fal-ai/flux/dev/image-to-image does NOT support negative_prompt.
 // Flux guidance_scale default and recommended value is 3.5 (not SDXL range).
 
+// Maps internal engine IDs (from UI) → actual Fal.ai endpoint strings
+const FAL_ENDPOINT: Record<string, string> = {
+  'nano-banana-pro': 'fal-ai/flux/dev/image-to-image',  // Vega (standard)
+  'gpt-image-2':     'fal-ai/flux/dev/image-to-image',  // Quasar (premium) — update endpoint when available
+}
+
 export async function POST(req: NextRequest) {
   fal.config({ credentials: process.env.FAL_KEY })
 
@@ -28,9 +34,12 @@ export async function POST(req: NextRequest) {
       background,
       sceneElements,
       geometryLock = 85,
-      model: modelId = 'fal-ai/flux/dev/image-to-image',
+      model: engineId = 'nano-banana-pro',
       materials,
     } = body
+
+    // Resolve internal engine ID → Fal.ai endpoint
+    const modelId = FAL_ENDPOINT[engineId] ?? 'fal-ai/flux/dev/image-to-image'
 
     if (!imageBase64 || !projectType) {
       return NextResponse.json(

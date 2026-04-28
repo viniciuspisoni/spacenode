@@ -1,5 +1,5 @@
 'use client'
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   ProjectType, ProjectMaterials,
@@ -64,10 +64,14 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
   const [loadingText, setLoadingText] = useState('')
   const [error,       setError]       = useState<string | null>(null)
 
-  // ── Dark mode — lazy initializer reads DOM only on client, avoids setState-in-effect
-  const [isDark, setIsDark] = useState(() =>
-    typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
-  )
+  // ── Dark mode
+  // Server always renders isDark=false (no document). useLayoutEffect syncs
+  // the correct value on the client before the first paint — no visible flash.
+  const [isDark, setIsDark] = useState(false)
+  useLayoutEffect(() => {
+    setIsDark(document.documentElement.classList.contains('dark'))
+  }, [])
+
   const toggleTheme = () => {
     const html = document.documentElement
     const newDark = !html.classList.contains('dark')
@@ -270,7 +274,7 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
         <div style={S.topbar}>
           <span style={S.pageTitle}>GERAR</span>
           <div style={{display:'flex', alignItems:'center', gap:10}}>
-            <button onClick={toggleTheme} style={S.themeToggle} title={isDark ? 'Modo claro' : 'Modo escuro'}>
+            <button onClick={toggleTheme} style={S.themeToggle} title={isDark ? 'Modo claro' : 'Modo escuro'} suppressHydrationWarning>
               {isDark ? (
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
                   <circle cx="12" cy="12" r="5"/>
