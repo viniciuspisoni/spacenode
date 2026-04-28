@@ -615,7 +615,7 @@ const pillActive: React.CSSProperties = {
 // ── Styles ─────────────────────────────────────────────────────────────────────
 
 const S: Record<string, React.CSSProperties> = {
-  main:              { display:'grid', gridTemplateColumns:'480px 1fr', height:'100%', overflow:'hidden' },
+  main:              { display:'grid', gridTemplateColumns:'480px 1fr', height:'100%', width:'100%', overflow:'hidden' },
   controls:          { padding:'28px 24px', borderRight:'0.5px solid var(--color-border)', background:'var(--color-bg)', overflowY:'auto', display:'flex', flexDirection:'column', gap:20 },
   preview:           { padding:28, background:'var(--color-bg)', display:'flex', flexDirection:'column', gap:18 },
   topbar:            { display:'flex', justifyContent:'space-between', alignItems:'center' },
