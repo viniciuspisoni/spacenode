@@ -6,18 +6,18 @@ import { buildGenerationPrompt, type GenerateOptions, type ProjectMaterials } fr
 
 // ── Engine → Fal.ai endpoint ──────────────────────────────────────────────────
 //
-// Vega  (nano-banana-pro) = Gemini 3 Pro Image — text-to-image
-//   endpoint : fal-ai/nano-banana-pro
-//   image    : NOT sent to API (model generates from scratch based on prompt)
-//   params   : prompt, resolution, num_images, output_format
+// Vega  (nano-banana-pro) = Gemini 3 Pro Image edit
+//   endpoint : fal-ai/nano-banana-pro/edit
+//   image    : REQUIRED via image_urls[] — referência geométrica e angular
+//   params   : prompt, image_urls, resolution (1K/2K/4K), aspect_ratio
 //
-// Quasar (gpt-image-2) = OpenAI GPT Image 2 edit — image editing
+// Quasar (gpt-image-2) = OpenAI GPT Image 2 edit
 //   endpoint : openai/gpt-image-2/edit
-//   image    : REQUIRED — sent as image_urls array
-//   params   : prompt, image_urls, quality, image_size, num_images, output_format
+//   image    : REQUIRED via image_urls[] — edição de imagem
+//   params   : prompt, image_urls, quality (medium/high)
 
 const FAL_ENDPOINT: Record<string, string> = {
-  'nano-banana-pro': 'fal-ai/nano-banana-pro',
+  'nano-banana-pro': 'fal-ai/nano-banana-pro/edit',
   'gpt-image-2':     'openai/gpt-image-2/edit',
 }
 
@@ -63,19 +63,14 @@ export async function POST(req: NextRequest) {
       materials,
     } = body
 
-    if (!projectType) {
-      return NextResponse.json({ error: 'Tipo de projeto é obrigatório' }, { status: 400 })
-    }
-
-    // Quasar REQUIRES an image; Vega is text-to-image (image optional)
-    if (engineId === 'gpt-image-2' && !imageBase64) {
+    if (!imageBase64 || !projectType) {
       return NextResponse.json(
-        { error: 'O motor Quasar requer uma imagem de referência' },
+        { error: 'Imagem e tipo de projeto são obrigatórios' },
         { status: 400 }
       )
     }
 
-    const falEndpoint = FAL_ENDPOINT[engineId] ?? 'fal-ai/nano-banana-pro'
+    const falEndpoint = FAL_ENDPOINT[engineId] ?? 'fal-ai/nano-banana-pro/edit'
 
     // Build the generation prompt from the architectural options
     const options: GenerateOptions = {
@@ -94,40 +89,32 @@ export async function POST(req: NextRequest) {
     console.log('[generate] quality   :', outputQuality)
     console.log('[generate] prompt    :', finalPrompt)
 
+    // Upload da imagem de referência (obrigatória para ambos os motores)
+    const base64Data = imageBase64.includes(',') ? imageBase64.split(',')[1] : imageBase64
+    const buffer     = Buffer.from(base64Data, 'base64')
+    const imageFile  = new File([buffer], 'input.jpg', { type: 'image/jpeg' })
+    inputUrl = await fal.storage.upload(imageFile)
+    console.log('[generate] inputUrl  :', inputUrl)
+
     // ── Build model-specific input ────────────────────────────────────────────
 
     let falInput: Record<string, unknown>
 
     if (engineId === 'gpt-image-2') {
-      // Quasar — image editing: upload image, send as image_urls array
-      const base64Data = imageBase64.includes(',') ? imageBase64.split(',')[1] : imageBase64
-      const buffer     = Buffer.from(base64Data, 'base64')
-      const imageFile  = new File([buffer], 'input.jpg', { type: 'image/jpeg' })
-
-      inputUrl = await fal.storage.upload(imageFile)
-      console.log('[generate] inputUrl  :', inputUrl)
-
+      // Quasar — GPT Image 2 edit
       falInput = {
         prompt:        finalPrompt,
         image_urls:    [inputUrl],
         quality:       quasarQuality(outputQuality as OutputQuality),
-        image_size:    'auto',          // infer from input image
+        image_size:    'auto',   // infere a partir da imagem de entrada
         num_images:    1,
         output_format: 'jpeg',
       }
     } else {
-      // Vega — text-to-image: no image sent to API
-      // If an image was uploaded, store it anyway so the before/after UI works
-      if (imageBase64) {
-        const base64Data = imageBase64.includes(',') ? imageBase64.split(',')[1] : imageBase64
-        const buffer     = Buffer.from(base64Data, 'base64')
-        const imageFile  = new File([buffer], 'input.jpg', { type: 'image/jpeg' })
-        inputUrl = await fal.storage.upload(imageFile)
-        console.log('[generate] inputUrl (ref only):', inputUrl)
-      }
-
+      // Vega — Gemini 3 Pro Image edit
       falInput = {
         prompt:        finalPrompt,
+        image_urls:    [inputUrl],
         resolution:    vegaResolution(outputQuality as OutputQuality),
         num_images:    1,
         output_format: 'jpeg',
