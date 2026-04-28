@@ -7,8 +7,7 @@ import {
 } from '@/lib/prompts'
 
 interface GenerateClientProps {
-  initialCredits:   number
-  userName:         string
+  initialCredits:    number
   initialMaterials?: ProjectMaterials
 }
 
