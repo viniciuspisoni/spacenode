@@ -4,14 +4,38 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { buildGenerationPrompt, type GenerateOptions, type ProjectMaterials } from '@/lib/prompts'
 
-// Note: fal-ai/flux/dev/image-to-image does NOT support negative_prompt.
-// Flux guidance_scale default and recommended value is 3.5 (not SDXL range).
+// ── Engine → Fal.ai endpoint ──────────────────────────────────────────────────
+//
+// Vega  (nano-banana-pro) = Gemini 3 Pro Image — text-to-image
+//   endpoint : fal-ai/nano-banana-pro
+//   image    : NOT sent to API (model generates from scratch based on prompt)
+//   params   : prompt, resolution, num_images, output_format
+//
+// Quasar (gpt-image-2) = OpenAI GPT Image 2 edit — image editing
+//   endpoint : openai/gpt-image-2/edit
+//   image    : REQUIRED — sent as image_urls array
+//   params   : prompt, image_urls, quality, image_size, num_images, output_format
 
-// Maps internal engine IDs (from UI) → actual Fal.ai endpoint strings
 const FAL_ENDPOINT: Record<string, string> = {
-  'nano-banana-pro': 'fal-ai/flux/dev/image-to-image',  // Vega (standard)
-  'gpt-image-2':     'fal-ai/flux/dev/image-to-image',  // Quasar (premium) — update endpoint when available
+  'nano-banana-pro': 'fal-ai/nano-banana-pro',
+  'gpt-image-2':     'openai/gpt-image-2/edit',
 }
+
+type OutputQuality = 'hd' | '2k' | '4k'
+
+// Vega: resolution param
+function vegaResolution(q: OutputQuality): string {
+  if (q === '4k') return '4K'
+  if (q === '2k') return '2K'
+  return '1K'
+}
+
+// Quasar: quality param (HD → medium to save cost; 2K/4K → high)
+function quasarQuality(q: OutputQuality): string {
+  return q === 'hd' ? 'medium' : 'high'
+}
+
+// ── Route ─────────────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
   fal.config({ credentials: process.env.FAL_KEY })
@@ -33,77 +57,106 @@ export async function POST(req: NextRequest) {
       lighting,
       background,
       sceneElements,
-      geometryLock = 85,
+      geometryLock   = 85,
       model: engineId = 'nano-banana-pro',
+      outputQuality   = 'hd',
       materials,
     } = body
 
-    // Resolve internal engine ID → Fal.ai endpoint
-    const modelId = FAL_ENDPOINT[engineId] ?? 'fal-ai/flux/dev/image-to-image'
+    if (!projectType) {
+      return NextResponse.json({ error: 'Tipo de projeto é obrigatório' }, { status: 400 })
+    }
 
-    if (!imageBase64 || !projectType) {
+    // Quasar REQUIRES an image; Vega is text-to-image (image optional)
+    if (engineId === 'gpt-image-2' && !imageBase64) {
       return NextResponse.json(
-        { error: 'Imagem e tipo de projeto são obrigatórios' },
+        { error: 'O motor Quasar requer uma imagem de referência' },
         { status: 400 }
       )
     }
 
+    const falEndpoint = FAL_ENDPOINT[engineId] ?? 'fal-ai/nano-banana-pro'
+
+    // Build the generation prompt from the architectural options
     const options: GenerateOptions = {
       projectType,
-      segment:       segment      ?? 'Residencial',
-      environment:   environment  ?? '',
-      lighting:      lighting     ?? '',
-      background:    background   ?? 'Preservar Original',
+      segment:       segment       ?? 'Residencial',
+      environment:   environment   ?? '',
+      lighting:      lighting      ?? '',
+      background:    background    ?? 'Preservar Original',
       sceneElements: sceneElements ?? [],
       geometryLock:  Number(geometryLock),
       materials:     materials as ProjectMaterials | undefined,
     }
-
     const finalPrompt = buildGenerationPrompt(options)
 
-    // strength = 1 - (geometryLock / 100), clamped to [0.15, 0.95]
-    // Higher strength = more AI transformation. Flux docs: "Higher values are better."
-    const strength = Math.max(0.15, Math.min(0.95, 1 - Number(geometryLock) / 100))
+    console.log('[generate] engine    :', engineId, '→', falEndpoint)
+    console.log('[generate] quality   :', outputQuality)
+    console.log('[generate] prompt    :', finalPrompt)
 
-    console.log('[generate] model    :', modelId)
-    console.log('[generate] lock     :', geometryLock, '→ strength:', strength)
-    console.log('[generate] prompt   :', finalPrompt)
-    console.log('[generate] params   :', { num_inference_steps: 40, guidance_scale: 3.5 })
+    // ── Build model-specific input ────────────────────────────────────────────
 
-    // Convert base64 data URL to File for fal.storage.upload
-    const base64Data = imageBase64.includes(',') ? imageBase64.split(',')[1] : imageBase64
-    const buffer = Buffer.from(base64Data, 'base64')
-    const imageFile = new File([buffer], 'input.jpg', { type: 'image/jpeg' })
+    let falInput: Record<string, unknown>
 
-    inputUrl = await fal.storage.upload(imageFile)
-    console.log('[generate] inputUrl :', inputUrl)
+    if (engineId === 'gpt-image-2') {
+      // Quasar — image editing: upload image, send as image_urls array
+      const base64Data = imageBase64.includes(',') ? imageBase64.split(',')[1] : imageBase64
+      const buffer     = Buffer.from(base64Data, 'base64')
+      const imageFile  = new File([buffer], 'input.jpg', { type: 'image/jpeg' })
 
-    const falInput = {
-      image_url:           inputUrl,
-      prompt:              finalPrompt,
-      strength,
-      num_inference_steps: 40,
-      guidance_scale:      3.5,   // Flux recommended value — do NOT increase
+      inputUrl = await fal.storage.upload(imageFile)
+      console.log('[generate] inputUrl  :', inputUrl)
+
+      falInput = {
+        prompt:        finalPrompt,
+        image_urls:    [inputUrl],
+        quality:       quasarQuality(outputQuality as OutputQuality),
+        image_size:    'auto',          // infer from input image
+        num_images:    1,
+        output_format: 'jpeg',
+      }
+    } else {
+      // Vega — text-to-image: no image sent to API
+      // If an image was uploaded, store it anyway so the before/after UI works
+      if (imageBase64) {
+        const base64Data = imageBase64.includes(',') ? imageBase64.split(',')[1] : imageBase64
+        const buffer     = Buffer.from(base64Data, 'base64')
+        const imageFile  = new File([buffer], 'input.jpg', { type: 'image/jpeg' })
+        inputUrl = await fal.storage.upload(imageFile)
+        console.log('[generate] inputUrl (ref only):', inputUrl)
+      }
+
+      falInput = {
+        prompt:        finalPrompt,
+        resolution:    vegaResolution(outputQuality as OutputQuality),
+        num_images:    1,
+        output_format: 'jpeg',
+      }
     }
-    console.log('[generate] FAL INPUT:', JSON.stringify(falInput))
 
-    const result = await fal.subscribe(modelId, { input: falInput })
+    console.log('[generate] FAL INPUT :', JSON.stringify(falInput))
+
+    const result = await fal.subscribe(falEndpoint, { input: falInput })
 
     console.log('[generate] FAL OUTPUT:', JSON.stringify(result.data))
     const images = (result.data as { images: { url: string }[] }).images
     outputUrl = images[0].url
-    console.log('[generate] same as input?', outputUrl === inputUrl)
-    console.log('[generate] outputUrl:', outputUrl)
+    console.log('[generate] outputUrl :', outputUrl)
+
+    // ── Persist result ────────────────────────────────────────────────────────
 
     const admin = createAdminClient()
     await Promise.all([
       admin.from('renders').insert({
-        user_id: user.id, input_url: inputUrl, output_url: outputUrl,
-        prompt: finalPrompt,
-        ambient: environment ?? segment ?? projectType,
-        style:   projectType,
-        lighting: lighting ?? 'default',
-        status: 'completed', completed_at: new Date().toISOString(),
+        user_id:      user.id,
+        input_url:    inputUrl ?? null,
+        output_url:   outputUrl,
+        prompt:       finalPrompt,
+        ambient:      environment ?? segment ?? projectType,
+        style:        projectType,
+        lighting:     lighting ?? 'default',
+        status:       'completed',
+        completed_at: new Date().toISOString(),
       }),
       admin.rpc('consume_credit', { user_id_input: user.id }),
     ])
@@ -116,9 +169,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       outputUrl,
-      originalUrl: inputUrl,
-      credits: profile?.credits ?? 0,
+      originalUrl: inputUrl ?? null,
+      credits:     profile?.credits ?? 0,
     })
+
   } catch (err: unknown) {
     const e = err as { status?: number; body?: unknown; message?: string }
     console.error('[generate] ERROR status:', e?.status)

@@ -193,7 +193,9 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
 
   // ── Geração
   const handleGenerate = async () => {
-    if (!imagePreview) { setError('Faça upload de uma imagem primeiro.'); return }
+    // Quasar (gpt-image-2) requer imagem; Vega (nano-banana-pro) é texto-para-imagem
+    const requiresImage = selectedModel === 'gpt-image-2'
+    if (requiresImage && !imagePreview) { setError('O motor Quasar requer uma imagem de referência.'); return }
     if (credits < nodeCost) { setError('Créditos insuficientes.'); return }
     setError(null); setLoading(true); startLoadingTexts()
     try {
@@ -210,6 +212,7 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
           sceneElements,
           geometryLock,
           model:         selectedModel,
+          outputQuality,
           materials:     Object.values(materials).some(v => v) ? materials : undefined,
         }),
       })
@@ -465,11 +468,11 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
 
         {/* 12 — Botão Gerar */}
         <button
-          style={loading || !imagePreview || credits < nodeCost
+          style={loading || (selectedModel === 'gpt-image-2' && !imagePreview) || credits < nodeCost
             ? {...S.genBtn, opacity:0.6, cursor:'not-allowed'}
             : S.genBtn}
           onClick={handleGenerate}
-          disabled={loading || !imagePreview || credits < nodeCost}
+          disabled={loading || (selectedModel === 'gpt-image-2' && !imagePreview) || credits < nodeCost}
         >
           <span>{loading ? loadingText : 'gerar render'}</span>
           <span style={S.genBtnMeta}>
