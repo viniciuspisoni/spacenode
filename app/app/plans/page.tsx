@@ -21,12 +21,12 @@ const CheckIcon = () => (
 function PlanCard({
   name, nodes, rendersHD, renders2K, renders4K,
   monthly, annual, annualTotal, featured, badge,
-  features, meterPct, billing, planId, ctaLabel, microcopy,
+  features, meterPct, billing, planId, ctaLabel, microcopy, ctaNote,
 }: {
   name: string; nodes: string; rendersHD: number; renders2K: number; renders4K: number
   monthly: number; annual: number; annualTotal: string; featured?: boolean; badge?: string
   features: string[]; meterPct: number; billing: 'monthly' | 'annual'; planId: string
-  ctaLabel: string; microcopy: string
+  ctaLabel: string; microcopy: string; ctaNote?: string
 }) {
   const [hovered, setHovered] = useState(false)
   const price = billing === 'annual' ? annual : monthly
@@ -187,6 +187,15 @@ function PlanCard({
           {ctaLabel}
         </button>
       </form>
+      {ctaNote && (
+        <p style={{
+          marginTop: 10, fontSize: 10, textAlign: 'center',
+          color: featured ? 'rgba(255,255,255,0.3)' : '#aaa',
+          letterSpacing: '-0.005em', lineHeight: 1.5,
+        }}>
+          {ctaNote}
+        </p>
+      )}
     </div>
   )
 }
@@ -366,7 +375,8 @@ export default function PlansPage() {
             monthly={299} annual={249} annualTotal="2.990"
             features={['Saída até 4K', 'Histórico ilimitado', 'Suporte prioritário']}
             meterPct={100} billing={billing} planId="studio"
-            ctaLabel="Falar com time" microcopy="Para operação intensa"
+            ctaLabel="Assinar Studio" microcopy="Para operação intensa"
+            ctaNote="Precisa de volume maior? Fale com a gente."
           />
         </div>
 
