@@ -1,6 +1,7 @@
 'use client'
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import Logo from '@/components/Logo'
 import {
   ProjectType, ProjectMaterials,
   getSegments, getEnvironments, getLighting, getBackgrounds, getSceneElements,
@@ -18,11 +19,11 @@ interface GenerateResult {
 }
 
 const LOADING_TEXTS = [
-  'analisando geometria...',
-  'aplicando materiais reais...',
-  'ajustando iluminação...',
-  'renderizando fotorrealismo...',
-  'finalizando detalhes...',
+  'analisando geometria…',
+  'refinando materiais…',
+  'ajustando iluminação…',
+  'renderizando fotorrealismo…',
+  'finalizando render…',
 ]
 
 const SPN_ENGINES = [
@@ -93,12 +94,14 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
   const [sceneElements, setSceneElements] = useState<string[]>([])
 
   // ── Parâmetros técnicos
-  const [geometryLock,   setGeometryLock]   = useState(85)
+  const geometryLock = 85
+  const fidelityMode = 'strict' as const
   const [selectedModel,  setSelectedModel]  = useState('nano-banana-pro')
   const [outputQuality,  setOutputQuality]  = useState('hd')
 
   // ── Materiais
   const [materiaisAberto, setMateriaisAberto] = useState(false)
+  const [elemAberto,      setElemAberto]      = useState(false)
   const [materials,       setMaterials]       = useState<ProjectMaterials>(initialMaterials ?? EMPTY_MATERIALS)
   const [salvando,        setSalvando]        = useState(false)
   const [salvoOk,         setSalvoOk]         = useState(false)
@@ -150,7 +153,7 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
     let i = 0; setLoadingText(LOADING_TEXTS[0])
     loadingTimerRef.current = setInterval(() => {
       i = (i + 1) % LOADING_TEXTS.length; setLoadingText(LOADING_TEXTS[i])
-    }, 1800)
+    }, 2200)
   }
   const stopLoadingTexts = () => {
     if (loadingTimerRef.current) clearInterval(loadingTimerRef.current)
@@ -180,6 +183,7 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
   // ── Upload — plain functions; React Compiler handles memoization
   const loadImage = (file: File) => {
     if (!file.type.startsWith('image/')) return
+    if (file.size > 3 * 1024 * 1024) { setError('Imagem muito grande. Máximo 3 MB.'); return }
     setOutputUrl(null); setError(null)
     const reader = new FileReader()
     reader.onload = (e) => setImagePreview(e.target?.result as string)
@@ -209,6 +213,7 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
           background,
           sceneElements,
           geometryLock,
+          fidelityMode,
           model:         selectedModel,
           outputQuality,
           materials:     Object.values(materials).some(v => v) ? materials : undefined,
@@ -255,13 +260,13 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
   const lightingOpts  = getLighting(projectType, segment)
   const backgrounds   = getBackgrounds(projectType)
   const elementsOpts  = getSceneElements(projectType, segment)
-  const bgTitle       = projectType === 'exterior' ? 'BACKGROUND / PAISAGEM' : 'CONTEXTO VISUAL'
+  const bgTitle       = projectType === 'exterior' ? 'ENTORNO' : 'CONTEXTO VISUAL'
   const typeLabel     = projectType === 'exterior' ? 'Fotorrealismo Exterior' : 'Fotorrealismo Interior'
 
   // ── Summary lines
   const summaryLine1 = `${typeLabel} · ${segment} · ${environment}`
   const summaryLine2 = [lighting, background !== 'Preservar Original' ? background : null, sceneElements.join(', ')].filter(Boolean).join(' · ')
-  const summaryLine3 = `${currentEngine?.name} · ${OUTPUT_QUALITIES.find(q => q.id === outputQuality)?.label}`
+  const summaryLine3 = `Alta Fidelidade · ${currentEngine?.name} · ${OUTPUT_QUALITIES.find(q => q.id === outputQuality)?.label}`
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -319,7 +324,43 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
 
         <div style={S.divider}/>
 
-        {/* 2 — Segmento */}
+        {/* 2 — Motor de IA */}
+        <div style={S.section}>
+          <div style={S.label}>MOTOR DE IA</div>
+          <div style={S.motorGrid}>
+            {SPN_ENGINES.map(m => (
+              <div key={m.id}
+                style={{...S.motorOpt, ...(selectedModel === m.id ? S.motorOptActive : {})}}
+                onClick={() => setSelectedModel(m.id)}
+              >
+                <div style={{...S.motorName, ...(selectedModel === m.id ? {color:'var(--color-bg)'} : {})}}>{m.name}</div>
+                <span style={{...S.motorTag, ...(selectedModel === m.id ? {background:'rgba(128,128,128,0.25)', color:'var(--color-bg)'} : {})}}>{m.tag}</span>
+                <div style={{...S.motorDesc, ...(selectedModel === m.id ? {color:'rgba(255,255,255,0.6)'} : {})}}>{m.desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 3 — Qualidade de Saída */}
+        <div style={S.section}>
+          <div style={S.label}>QUALIDADE DE SAÍDA</div>
+          <div style={S.qualityGrid}>
+            {OUTPUT_QUALITIES.map(q => (
+              <div key={q.id}
+                style={{...S.qualityOpt, ...(outputQuality === q.id ? S.qualityOptActive : {})}}
+                onClick={() => setOutputQuality(q.id)}
+              >
+                <div style={{...S.qualityRes, ...(outputQuality === q.id ? {color:'var(--color-bg)'} : {})}}>{q.label}</div>
+                <span style={{...S.motorTag, ...(outputQuality === q.id ? {background:'rgba(128,128,128,0.25)', color:'var(--color-bg)'} : {})}}>{q.nodes} Nodes por imagem</span>
+                <div style={{...S.motorDesc, ...(outputQuality === q.id ? {color:'rgba(255,255,255,0.6)'} : {})}}>{q.desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div style={S.divider}/>
+
+        {/* 4 — Segmento */}
         <div style={S.section}>
           <div style={S.label}>SEGMENTO</div>
           <PillGroup options={segments} selected={segment} onChange={handleSegmentChange}/>
@@ -327,15 +368,15 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
 
         <div style={S.divider}/>
 
-        {/* 3 — Ambiente */}
+        {/* 5 — Espaço */}
         <div style={S.section}>
-          <div style={S.label}>AMBIENTE</div>
+          <div style={S.label}>ESPAÇO</div>
           <PillGroup options={environments} selected={environment} onChange={setEnvironment}/>
         </div>
 
         <div style={S.divider}/>
 
-        {/* 4 — Iluminação */}
+        {/* 6 — Iluminação */}
         <div style={S.section}>
           <div style={S.label}>ILUMINAÇÃO</div>
           <PillGroup options={lightingOpts} selected={lighting} onChange={setLighting}/>
@@ -343,7 +384,7 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
 
         <div style={S.divider}/>
 
-        {/* 5 — Background / Contexto Visual */}
+        {/* 7 — Entorno / Contexto Visual */}
         <div style={S.section}>
           <div style={S.label}>{bgTitle}</div>
           <PillGroup options={backgrounds} selected={background} onChange={setBackground}/>
@@ -351,7 +392,7 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
 
         <div style={S.divider}/>
 
-        {/* 6 — Materiais do Projeto */}
+        {/* 8 — Materiais do Projeto */}
         <div style={S.section}>
           <button style={S.collapseBtn} onClick={() => setMateriaisAberto(!materiaisAberto)}>
             <div style={{display:'flex', alignItems:'center', gap:8}}>
@@ -391,80 +432,46 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
 
         <div style={S.divider}/>
 
-        {/* 7 — Elementos na Cena */}
+        {/* 9 — Avançado */}
         <div style={S.section}>
-          <div style={S.label}>ELEMENTOS NA CENA</div>
-          <MultiPillGroup
-            options={elementsOpts}
-            selected={sceneElements}
-            onToggle={toggleElement}
-          />
-          {sceneElements.length > 0 && (
-            <button
-              style={{...S.buyBtn, fontSize:10, marginTop:4, textDecoration:'none', color:'var(--color-text-tertiary)'}}
-              onClick={() => setSceneElements([])}
-            >
-              limpar seleção
-            </button>
+          <button style={S.collapseBtn} onClick={() => setElemAberto(!elemAberto)}>
+            <div style={{display:'flex', alignItems:'center', gap:8}}>
+              <span style={S.label}>AVANÇADO</span>
+              {sceneElements.length > 0 && <span style={S.materiaisBadge}>{sceneElements.length} elemento{sceneElements.length > 1 ? 's' : ''}</span>}
+            </div>
+            <span style={{fontSize:14, color:'var(--color-text-tertiary)', transform: elemAberto ? 'rotate(180deg)' : 'none', display:'inline-block', transition:'transform 0.2s'}}>▾</span>
+          </button>
+          {elemAberto && (
+            <div style={{display:'flex', flexDirection:'column', gap:10}}>
+              <div style={S.label}>ELEMENTOS NA CENA</div>
+              <MultiPillGroup options={elementsOpts} selected={sceneElements} onToggle={toggleElement}/>
+              {sceneElements.length > 0 && (
+                <button
+                  style={{...S.buyBtn, fontSize:10, marginTop:4, textDecoration:'none', color:'var(--color-text-tertiary)'}}
+                  onClick={() => setSceneElements([])}
+                >
+                  limpar seleção
+                </button>
+              )}
+            </div>
           )}
         </div>
 
         <div style={S.divider}/>
 
-        {/* 8 — Geometry Lock */}
+        {/* 10 — Fidelidade ao Projeto */}
         <div style={S.section}>
           <div style={S.label}>FIDELIDADE AO PROJETO</div>
-          <div style={S.sliderRow}>
-            <span style={S.sliderEnd}>Livre</span>
-            <input type="range" min={0} max={100} value={geometryLock} onChange={e => setGeometryLock(Number(e.target.value))} style={S.range}/>
-            <span style={S.sliderEnd}>Fiel</span>
-            <span style={S.sliderVal}>{geometryLock}%</span>
+          <div style={{display:'flex', alignItems:'center', gap:8, padding:'10px 14px', border:'0.5px solid var(--color-border-strong)', borderRadius:8, background:'var(--color-bg-elevated)'}}>
+            <span style={{width:6, height:6, borderRadius:'50%', background:'var(--color-accent-green)', boxShadow:'0 0 5px var(--color-accent-green-glow)', display:'inline-block', flexShrink:0}}/>
+            <span style={{fontSize:11, color:'var(--color-text-primary)', fontWeight:500}}>✓ Proteção total ativada</span>
           </div>
-          <p style={S.infoNote}>
-            {geometryLock >= 76 ? 'Apenas materiais e luz mudam'
-              : geometryLock >= 51 ? 'Câmera e proporções travadas'
-              : geometryLock >= 26 ? 'Composição geral mantida'
-              : 'Liberdade criativa'}
-          </p>
-        </div>
-
-        {/* 9 — Motor de IA */}
-        <div style={S.section}>
-          <div style={S.label}>MOTOR DE IA</div>
-          <div style={S.motorGrid}>
-            {SPN_ENGINES.map(m => (
-              <div key={m.id}
-                style={{...S.motorOpt, ...(selectedModel === m.id ? S.motorOptActive : {})}}
-                onClick={() => setSelectedModel(m.id)}
-              >
-                <div style={{...S.motorName, ...(selectedModel === m.id ? {color:'var(--color-bg)'} : {})}}>{m.name}</div>
-                <span style={{...S.motorTag, ...(selectedModel === m.id ? {background:'rgba(128,128,128,0.25)', color:'var(--color-bg)'} : {})}}>{m.tag}</span>
-                <div style={{...S.motorDesc, ...(selectedModel === m.id ? {color:'rgba(255,255,255,0.6)'} : {})}}>{m.desc}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* 10 — Qualidade de Saída */}
-        <div style={S.section}>
-          <div style={S.label}>QUALIDADE DE SAÍDA</div>
-          <div style={S.qualityGrid}>
-            {OUTPUT_QUALITIES.map(q => (
-              <div key={q.id}
-                style={{...S.qualityOpt, ...(outputQuality === q.id ? S.qualityOptActive : {})}}
-                onClick={() => setOutputQuality(q.id)}
-              >
-                <div style={{...S.qualityRes, ...(outputQuality === q.id ? {color:'var(--color-bg)'} : {})}}>{q.label}</div>
-                <span style={{...S.motorTag, ...(outputQuality === q.id ? {background:'rgba(128,128,128,0.25)', color:'var(--color-bg)'} : {})}}>{q.nodes} nodes</span>
-                <div style={{...S.motorDesc, ...(outputQuality === q.id ? {color:'rgba(255,255,255,0.6)'} : {})}}>{q.desc}</div>
-              </div>
-            ))}
-          </div>
+          <p style={S.infoNote}>Geometria, câmera, entorno e composição preservados.</p>
         </div>
 
         {error && <div style={S.errorBox}>{error}</div>}
 
-        {/* 12 — Botão Gerar */}
+        {/* 11 — Botão Gerar */}
         <button
           style={loading || !imagePreview || credits < nodeCost
             ? {...S.genBtn, opacity:0.6, cursor:'not-allowed'}
@@ -472,9 +479,9 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
           onClick={handleGenerate}
           disabled={loading || !imagePreview || credits < nodeCost}
         >
-          <span>{loading ? loadingText : 'gerar render'}</span>
+          <span>{loading ? 'gerando…' : 'gerar render'}</span>
           <span style={S.genBtnMeta}>
-            <span>{nodeCost} nodes</span>
+            <span>{nodeCost} Nodes por render</span>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-bg)" strokeWidth="1.5">
               <path d="M5 12h14M13 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
@@ -548,10 +555,15 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
 
         {loading && imagePreview && (
           <div style={S.compareWrap}>
-            <img src={imagePreview} alt="Input" style={{...S.compareImg, opacity:0.4}}/>
+            <img src={imagePreview} alt="Input" style={{...S.compareImg, opacity:0.15, filter:'blur(4px)'}}/>
             <div style={S.loadingOverlay}>
-              <div style={S.spinner}/>
-              <span style={{fontSize:12, color:'#fafafa', letterSpacing:'0.05em'}}>{loadingText}</span>
+              <div style={{color:'#fafafa', animation:'pulse 2s cubic-bezier(0.4,0,0.6,1) infinite'}}>
+                <Logo size={48}/>
+              </div>
+              <div style={{display:'flex', flexDirection:'column', alignItems:'center', gap:8}}>
+                <span style={{fontSize:12, color:'#fafafa', letterSpacing:'0.08em', fontWeight:500}}>{loadingText}</span>
+                <span style={{fontSize:9, color:'rgba(255,255,255,0.4)', letterSpacing:'0.16em', textTransform:'uppercase'}}>processando render</span>
+              </div>
             </div>
           </div>
         )}
@@ -565,7 +577,7 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
             <br/>
             <span style={{color:'var(--color-text-tertiary)'}}>{summaryLine2}</span>
             <br/>
-            <span style={{color:'var(--color-text-tertiary)'}}>fidelidade: {geometryLock}% · {summaryLine3}</span>
+            <span style={{color:'var(--color-text-tertiary)'}}>{summaryLine3}</span>
           </div>
         </div>
       </div>

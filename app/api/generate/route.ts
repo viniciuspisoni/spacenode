@@ -4,6 +4,10 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { buildGenerationPrompt, type GenerateOptions, type ProjectMaterials } from '@/lib/prompts'
 
+fal.config({ credentials: process.env.FAL_KEY })
+
+const FAL_TIMEOUT_MS = 90_000
+
 // ── Engine → Fal.ai endpoint ──────────────────────────────────────────────────
 //
 // Vega  (nano-banana-pro) = Gemini 3 Pro Image edit
@@ -38,8 +42,6 @@ function quasarQuality(q: OutputQuality): string {
 // ── Route ─────────────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
-  fal.config({ credentials: process.env.FAL_KEY })
-
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
@@ -57,10 +59,11 @@ export async function POST(req: NextRequest) {
       lighting,
       background,
       sceneElements,
-      geometryLock   = 85,
+      geometryLock    = 85,
       model: engineId = 'nano-banana-pro',
       outputQuality   = 'hd',
       materials,
+      fidelityMode    = 'strict',
     } = body
 
     if (!imageBase64 || !projectType) {
@@ -82,6 +85,7 @@ export async function POST(req: NextRequest) {
       sceneElements: sceneElements ?? [],
       geometryLock:  Number(geometryLock),
       materials:     materials as ProjectMaterials | undefined,
+      fidelityMode:  fidelityMode  === 'balanced' ? 'balanced' : 'strict',
     }
     const finalPrompt = buildGenerationPrompt(options)
 
@@ -123,7 +127,12 @@ export async function POST(req: NextRequest) {
 
     console.log('[generate] FAL INPUT :', JSON.stringify(falInput))
 
-    const result = await fal.subscribe(falEndpoint, { input: falInput })
+    const result = await Promise.race([
+      fal.subscribe(falEndpoint, { input: falInput }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(Object.assign(new Error('FAL_TIMEOUT'), { isFalTimeout: true })), FAL_TIMEOUT_MS)
+      ),
+    ])
 
     console.log('[generate] FAL OUTPUT:', JSON.stringify(result.data))
     const images = (result.data as { images: { url: string }[] }).images
@@ -133,20 +142,19 @@ export async function POST(req: NextRequest) {
     // ── Persist result ────────────────────────────────────────────────────────
 
     const admin = createAdminClient()
-    await Promise.all([
-      admin.from('renders').insert({
-        user_id:      user.id,
-        input_url:    inputUrl ?? null,
-        output_url:   outputUrl,
-        prompt:       finalPrompt,
-        ambient:      environment ?? segment ?? projectType,
-        style:        projectType,
-        lighting:     lighting ?? 'default',
-        status:       'completed',
-        completed_at: new Date().toISOString(),
-      }),
-      admin.rpc('consume_credit', { user_id_input: user.id }),
-    ])
+    const { error: insertError } = await admin.from('renders').insert({
+      user_id:      user.id,
+      input_url:    inputUrl ?? null,
+      output_url:   outputUrl,
+      prompt:       finalPrompt,
+      ambient:      environment ?? segment ?? projectType,
+      style:        projectType,
+      lighting:     lighting ?? 'default',
+      status:       'completed',
+      completed_at: new Date().toISOString(),
+    })
+    if (insertError) throw Object.assign(new Error('DB_INSERT_FAILED'), { isDbError: true })
+    await admin.rpc('consume_credit', { user_id_input: user.id })
 
     const { data: profile } = await admin
       .from('profiles')
@@ -161,9 +169,16 @@ export async function POST(req: NextRequest) {
     })
 
   } catch (err: unknown) {
-    const e = err as { status?: number; body?: unknown; message?: string }
+    const e = err as { status?: number; body?: unknown; message?: string; isFalTimeout?: boolean; isDbError?: boolean }
     console.error('[generate] ERROR status:', e?.status)
     console.error('[generate] ERROR body  :', JSON.stringify(e?.body ?? e?.message ?? err))
-    return NextResponse.json({ error: 'Erro ao gerar render. Tente novamente.' }, { status: 500 })
+
+    let userMessage = 'Erro ao gerar render. Tente novamente.'
+    if (e?.isFalTimeout)        userMessage = 'Tempo limite excedido. Tente uma qualidade menor.'
+    else if (e?.isDbError)      userMessage = 'Render gerado, mas houve um erro ao salvar. Tente novamente.'
+    else if (e?.status === 422) userMessage = 'Parâmetros inválidos para o motor selecionado.'
+    else if (e?.status === 429) userMessage = 'Limite de requisições atingido. Aguarde alguns segundos.'
+
+    return NextResponse.json({ error: userMessage }, { status: 500 })
   }
 }

@@ -21,6 +21,7 @@ export interface GenerateOptions {
   sceneElements: string[]
   geometryLock:  number
   materials?:    ProjectMaterials
+  fidelityMode?: 'strict' | 'balanced'
 }
 
 // ── Segments ───────────────────────────────────────────────────────────────────
@@ -522,8 +523,26 @@ const SEG_EN: Record<string, string> = {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-const PHOTO_SUFFIX =
-  ', captured with professional architectural camera, Canon R5, 24mm tilt-shift lens, f/4, ISO 100, Hasselblad aesthetic, hyperrealistic, 8K RAW photo, photorealistic architectural photography, not a render, not CGI, real life photo'
+function buildCameraBlock(): string {
+  return ', captured with professional architectural camera, Canon R5, 24mm tilt-shift lens, f/4, ISO 100, Hasselblad aesthetic, hyperrealistic, 8K RAW photo, photorealistic architectural photography, not a render, not CGI, real life photo'
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function buildNegativePrompt(_engineId: string): string {
+  return ''
+}
+
+function buildFidelityBlock(geometryLock: number, fidelityMode?: 'strict' | 'balanced'): string {
+  if (fidelityMode === 'strict') {
+    return 'STRICT FIDELITY MODE: Preserve EXACTLY the camera angle, perspective, horizon line, building silhouette, architectural geometry, all proportions, window and door openings, existing vegetation, surrounding context and overall scene composition. This is a materials and lighting transformation ONLY. Do not reframe, do not rotate, do not zoom, do not add or remove architectural elements. Only surface materials, textures, lighting conditions and sky may change. '
+  }
+  if (geometryLock <= 25) return ''
+  if (geometryLock <= 50)
+    return 'Using the reference image as a base, maintaining the same general composition, building proportions and camera framing. '
+  if (geometryLock <= 75)
+    return 'Transform ONLY the materials, lighting and environment of this exact image. The camera angle, perspective, building geometry, architectural proportions and framing must remain exactly as in the reference image. Do not move the camera, do not change the viewing angle. '
+  return 'GEOMETRY LOCKED: This is a material and lighting transformation ONLY. The camera position, viewing angle, perspective, horizon line, building silhouette, architectural geometry and all proportions must be PIXEL-PERFECT identical to the reference image. Do not reframe, do not rotate, do not zoom. Only surface materials, textures, lighting and background vegetation may change. '
+}
 
 function buildMaterialsBlock(materials?: ProjectMaterials): string {
   if (!materials) return ''
@@ -538,21 +557,12 @@ function buildMaterialsBlock(materials?: ProjectMaterials): string {
   return `EXACT PROJECT MATERIALS — reproduce these faithfully: ${lines.join('; ')}. `
 }
 
-function buildGeometryPrefix(geometryLock: number): string {
-  if (geometryLock <= 25) return ''
-  if (geometryLock <= 50)
-    return 'Using the reference image as a base, maintaining the same general composition, building proportions and camera framing. '
-  if (geometryLock <= 75)
-    return 'Transform ONLY the materials, lighting and environment of this exact image. The camera angle, perspective, building geometry, architectural proportions and framing must remain exactly as in the reference image. Do not move the camera, do not change the viewing angle. '
-  return 'GEOMETRY LOCKED: This is a material and lighting transformation ONLY. The camera position, viewing angle, perspective, horizon line, building silhouette, architectural geometry and all proportions must be PIXEL-PERFECT identical to the reference image. Do not reframe, do not rotate, do not zoom. Only surface materials, textures, lighting and background vegetation may change. '
-}
-
 // ── Main export ────────────────────────────────────────────────────────────────
 
 export function buildGenerationPrompt(options: GenerateOptions): string {
-  const { projectType, segment, environment, lighting, background, sceneElements, geometryLock, materials } = options
+  const { projectType, segment, environment, lighting, background, sceneElements, geometryLock, materials, fidelityMode } = options
 
-  const geoPrefix = buildGeometryPrefix(geometryLock)
+  const geoPrefix = buildFidelityBlock(geometryLock, fidelityMode)
   const matBlock  = buildMaterialsBlock(materials)
   const envDesc   = ENV_EN[environment]  ?? environment
   const lightDesc = LIGHT_EN[lighting]   ?? lighting
@@ -581,7 +591,7 @@ export function buildGenerationPrompt(options: GenerateOptions): string {
       `Lighting: ${lightDesc}. ` +
       bgBlock + elemBlock +
       `Preserve all architectural proportions, geometry and materials exactly as in the reference.` +
-      PHOTO_SUFFIX
+      buildCameraBlock()
     )
   }
   return (
@@ -591,7 +601,7 @@ export function buildGenerationPrompt(options: GenerateOptions): string {
     `Lighting: ${lightDesc}. ` +
     bgBlock + elemBlock +
     `Faithfully reproduce ALL original materials. PRESERVE exactly all proportions, geometry and spatial layout.` +
-    PHOTO_SUFFIX
+    buildCameraBlock()
   )
 }
 
