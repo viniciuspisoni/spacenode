@@ -27,8 +27,8 @@ const LOADING_TEXTS = [
 ]
 
 const SPN_ENGINES = [
-  { id: 'nano-banana-pro', name: 'Vega',   tag: 'PADRÃO',  desc: 'Rápido e eficiente'          },
-  { id: 'gpt-image-2',     name: 'Quasar', tag: 'PREMIUM', desc: 'Mais realismo e refinamento'  },
+  { id: 'nano-banana-pro', name: 'Vega',   desc: 'Nano Banana Pro' },
+  { id: 'gpt-image-2',     name: 'Quasar', desc: 'GPT Image 2'     },
 ]
 
 const OUTPUT_QUALITIES = [
@@ -445,7 +445,6 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
                 onClick={() => setSelectedModel(m.id)}
               >
                 <div style={{...S.motorName, ...(selectedModel === m.id ? {color:'var(--color-bg)'} : {})}}>{m.name}</div>
-                <span style={{...S.motorTag, ...(selectedModel === m.id ? {background:'rgba(128,128,128,0.25)', color:'var(--color-bg)'} : {})}}>{m.tag}</span>
                 <div style={{...S.motorDesc, ...(selectedModel === m.id ? {color:'rgba(255,255,255,0.6)'} : {})}}>{m.desc}</div>
               </div>
             ))}
@@ -462,7 +461,7 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
                 onClick={() => setOutputQuality(q.id)}
               >
                 <div style={{...S.qualityRes, ...(outputQuality === q.id ? {color:'var(--color-bg)'} : {})}}>{q.label}</div>
-                <span style={{...S.motorTag, ...(outputQuality === q.id ? {background:'rgba(128,128,128,0.25)', color:'var(--color-bg)'} : {})}}>{q.nodes} Nodes por imagem</span>
+                <div style={{...S.motorDesc, ...(outputQuality === q.id ? {color:'rgba(255,255,255,0.6)'} : {})}}>{q.nodes} Nodes por imagem</div>
                 <div style={{...S.motorDesc, ...(outputQuality === q.id ? {color:'rgba(255,255,255,0.6)'} : {})}}>{q.desc}</div>
               </div>
             ))}
