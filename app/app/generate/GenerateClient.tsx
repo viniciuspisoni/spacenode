@@ -324,43 +324,7 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
 
         <div style={S.divider}/>
 
-        {/* 2 — Motor de IA */}
-        <div style={S.section}>
-          <div style={S.label}>MOTOR DE IA</div>
-          <div style={S.motorGrid}>
-            {SPN_ENGINES.map(m => (
-              <div key={m.id}
-                style={{...S.motorOpt, ...(selectedModel === m.id ? S.motorOptActive : {})}}
-                onClick={() => setSelectedModel(m.id)}
-              >
-                <div style={{...S.motorName, ...(selectedModel === m.id ? {color:'var(--color-bg)'} : {})}}>{m.name}</div>
-                <span style={{...S.motorTag, ...(selectedModel === m.id ? {background:'rgba(128,128,128,0.25)', color:'var(--color-bg)'} : {})}}>{m.tag}</span>
-                <div style={{...S.motorDesc, ...(selectedModel === m.id ? {color:'rgba(255,255,255,0.6)'} : {})}}>{m.desc}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* 3 — Qualidade de Saída */}
-        <div style={S.section}>
-          <div style={S.label}>QUALIDADE DE SAÍDA</div>
-          <div style={S.qualityGrid}>
-            {OUTPUT_QUALITIES.map(q => (
-              <div key={q.id}
-                style={{...S.qualityOpt, ...(outputQuality === q.id ? S.qualityOptActive : {})}}
-                onClick={() => setOutputQuality(q.id)}
-              >
-                <div style={{...S.qualityRes, ...(outputQuality === q.id ? {color:'var(--color-bg)'} : {})}}>{q.label}</div>
-                <span style={{...S.motorTag, ...(outputQuality === q.id ? {background:'rgba(128,128,128,0.25)', color:'var(--color-bg)'} : {})}}>{q.nodes} Nodes por imagem</span>
-                <div style={{...S.motorDesc, ...(outputQuality === q.id ? {color:'rgba(255,255,255,0.6)'} : {})}}>{q.desc}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div style={S.divider}/>
-
-        {/* 4 — Segmento */}
+        {/* 2 — Segmento */}
         <div style={S.section}>
           <div style={S.label}>SEGMENTO</div>
           <PillGroup options={segments} selected={segment} onChange={handleSegmentChange}/>
@@ -467,6 +431,42 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
             <span style={{fontSize:11, color:'var(--color-text-primary)', fontWeight:500}}>✓ Proteção total ativada</span>
           </div>
           <p style={S.infoNote}>Geometria, câmera, entorno e composição preservados.</p>
+        </div>
+
+        <div style={S.divider}/>
+
+        {/* 11 — Motor de IA */}
+        <div style={S.section}>
+          <div style={S.label}>MOTOR DE IA</div>
+          <div style={S.motorGrid}>
+            {SPN_ENGINES.map(m => (
+              <div key={m.id}
+                style={{...S.motorOpt, ...(selectedModel === m.id ? S.motorOptActive : {})}}
+                onClick={() => setSelectedModel(m.id)}
+              >
+                <div style={{...S.motorName, ...(selectedModel === m.id ? {color:'var(--color-bg)'} : {})}}>{m.name}</div>
+                <span style={{...S.motorTag, ...(selectedModel === m.id ? {background:'rgba(128,128,128,0.25)', color:'var(--color-bg)'} : {})}}>{m.tag}</span>
+                <div style={{...S.motorDesc, ...(selectedModel === m.id ? {color:'rgba(255,255,255,0.6)'} : {})}}>{m.desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 12 — Qualidade de Saída */}
+        <div style={S.section}>
+          <div style={S.label}>QUALIDADE DE SAÍDA</div>
+          <div style={S.qualityGrid}>
+            {OUTPUT_QUALITIES.map(q => (
+              <div key={q.id}
+                style={{...S.qualityOpt, ...(outputQuality === q.id ? S.qualityOptActive : {})}}
+                onClick={() => setOutputQuality(q.id)}
+              >
+                <div style={{...S.qualityRes, ...(outputQuality === q.id ? {color:'var(--color-bg)'} : {})}}>{q.label}</div>
+                <span style={{...S.motorTag, ...(outputQuality === q.id ? {background:'rgba(128,128,128,0.25)', color:'var(--color-bg)'} : {})}}>{q.nodes} Nodes por imagem</span>
+                <div style={{...S.motorDesc, ...(outputQuality === q.id ? {color:'rgba(255,255,255,0.6)'} : {})}}>{q.desc}</div>
+              </div>
+            ))}
+          </div>
         </div>
 
         {error && <div style={S.errorBox}>{error}</div>}
