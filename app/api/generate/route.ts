@@ -27,6 +27,8 @@ const FAL_ENDPOINT: Record<string, string> = {
 
 type OutputQuality = 'hd' | '2k' | '4k'
 
+const NODE_COST: Record<OutputQuality, number> = { hd: 4, '2k': 8, '4k': 20 }
+
 // Vega: resolution param
 function vegaResolution(q: OutputQuality): string {
   if (q === '4k') return '4K'
@@ -72,6 +74,12 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       )
     }
+
+    const quality = outputQuality as OutputQuality
+    if (!(quality in NODE_COST)) {
+      return NextResponse.json({ error: 'Qualidade inválida.' }, { status: 400 })
+    }
+    const nodeCost = NODE_COST[quality]
 
     const falEndpoint = FAL_ENDPOINT[engineId] ?? 'fal-ai/nano-banana-pro/edit'
 
@@ -154,7 +162,7 @@ export async function POST(req: NextRequest) {
       completed_at: new Date().toISOString(),
     })
     if (insertError) throw Object.assign(new Error('DB_INSERT_FAILED'), { isDbError: true })
-    await admin.rpc('consume_credit', { user_id_input: user.id })
+    await admin.rpc('consume_credits', { user_id_input: user.id, amount: nodeCost })
 
     const { data: profile } = await admin
       .from('profiles')

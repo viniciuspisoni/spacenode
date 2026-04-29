@@ -82,7 +82,7 @@ export default async function AppPage() {
               <div style={{ fontSize: 30, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.04em', lineHeight: 1 }}>
                 {credits}
               </div>
-              <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 6 }}>créditos ativos</div>
+              <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 6 }}>Nodes disponíveis</div>
             </div>
 
             <div style={{ padding: '18px 20px', background: 'var(--color-bg-elevated)', border: '0.5px solid var(--color-border-strong)', borderRadius: 12 }}>

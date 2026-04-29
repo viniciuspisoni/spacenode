@@ -198,7 +198,7 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
   // ── Geração
   const handleGenerate = async () => {
     if (!imagePreview) { setError('Faça upload de uma imagem primeiro.'); return }
-    if (credits < nodeCost) { setError('Créditos insuficientes.'); return }
+    if (credits < nodeCost) { setError('Nodes insuficientes.'); return }
     setError(null); setLoading(true); startLoadingTexts()
     try {
       const res = await fetch('/api/generate', {
@@ -295,8 +295,8 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
             <div style={S.credits}>
               <span style={S.creditDot}/>
               <span style={S.creditNum}>{credits}</span>
-              <span>créditos</span>
-              <button onClick={handleBuyCredits} style={S.buyBtn}>+ comprar</button>
+              <span>Nodes</span>
+              <button onClick={handleBuyCredits} style={S.buyBtn}>+ comprar Nodes</button>
             </div>
           </div>
         </div>
