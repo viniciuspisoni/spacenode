@@ -11,6 +11,10 @@ import { ProductMockup } from "@/components/landing/ProductMockup";
 import { ComparisonTable } from "@/components/landing/ComparisonTable";
 import { FAQ } from "@/components/landing/FAQ";
 import { PricingToggle } from "@/components/landing/PricingToggle";
+import { PlatformModules } from "@/components/landing/PlatformModules";
+import { ValueProps } from "@/components/landing/ValueProps";
+import { SocialProof } from "@/components/landing/SocialProof";
+import { MobileCTA } from "@/components/landing/MobileCTA";
 
 const Divider = () => (
   <hr style={{ border: 'none', borderTop: '0.5px solid rgba(255,255,255,0.06)', maxWidth: 960, margin: '0 auto' }} />
@@ -21,12 +25,17 @@ export default function Home() {
     <main>
       <Navbar />
       <Hero />
+      <ValueProps />
       <Divider />
       <Demo />
+      <Divider />
+      <PlatformModules />
       <Divider />
       <HowItWorks />
       <Divider />
       <ProductMockup />
+      <Divider />
+      <SocialProof />
       <Divider />
       <ComparisonTable />
       <Divider />
@@ -38,6 +47,7 @@ export default function Home() {
       <Divider />
       <FinalCTA />
       <Footer />
+      <MobileCTA />
     </main>
   );
 }

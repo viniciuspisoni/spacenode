@@ -294,13 +294,13 @@ export default function PlansPage() {
             fontSize: 36, fontWeight: 500, color: '#1a1a1a',
             letterSpacing: '-0.04em', lineHeight: 1.12, marginBottom: 14,
           }}>
-            Escolha o plano ideal para<br />acelerar seus renders
+            Escolha o plano ideal para<br />sua criação visual
           </h2>
           <p style={{
             fontSize: 14, color: '#86868b', letterSpacing: '-0.01em',
             lineHeight: 1.65, maxWidth: 420, margin: '0 auto 32px',
           }}>
-            Mais Nodes, mais velocidade e acesso aos motores premium da SPACENODE.
+            Mais Nodes, mais velocidade e acesso aos motores premium da SPACENODE. Para arquitetos e designers de interiores.
           </p>
 
           {/* ── Billing toggle ── */}
@@ -535,7 +535,7 @@ export default function PlansPage() {
             fontSize: 26, fontWeight: 500, color: '#fafafa',
             letterSpacing: '-0.03em', lineHeight: 1.2, marginBottom: 32,
           }}>
-            Pronto para acelerar seus renders?
+            Pronto para elevar suas apresentações visuais?
           </h3>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
             <form action="/api/stripe/checkout" method="POST">

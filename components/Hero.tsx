@@ -1,40 +1,11 @@
 "use client";
 
-import { useState } from "react";
-
 export default function Hero() {
-  const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<
-    "idle" | "loading" | "success" | "error"
-  >("idle");
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email.includes("@")) return;
-
-    setStatus("loading");
-    try {
-      const res = await fetch("/api/waitlist", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      if (res.ok) {
-        setStatus("success");
-        setEmail("");
-      } else {
-        setStatus("error");
-      }
-    } catch {
-      setStatus("error");
-    }
-  };
-
   return (
     <section
-      id="waitlist"
+      id="hero"
       style={{
-        padding: "120px 40px 64px",
+        padding: "120px 40px 56px",
         textAlign: "center",
         maxWidth: 880,
         margin: "0 auto",
@@ -75,10 +46,10 @@ export default function Hero() {
           color: "var(--color-text-primary)",
         }}
       >
-        renders fotorrealistas
+        Transforme projetos em apresentações
         <br />
         <span style={{ color: "var(--color-text-tertiary)" }}>
-          em segundos, não dias.
+          visuais de alto impacto.
         </span>
       </h1>
 
@@ -91,83 +62,66 @@ export default function Hero() {
           maxWidth: 560,
         }}
       >
-        A plataforma de visualização arquitetônica feita por arquiteto, para
-        arquitetos. Transforme sketches, plantas ou modelagens 3D em imagens de
-        apresentação em segundos.
+        Crie renders, refine imagens, gere vídeos e impressione clientes em
+        minutos. Para arquitetos e designers de interiores.
       </p>
 
-      <form
-        onSubmit={handleSubmit}
+      {/* CTAs */}
+      <div
         style={{
           display: "flex",
-          gap: 8,
+          gap: 10,
           justifyContent: "center",
-          maxWidth: 480,
-          margin: "0 auto 16px",
+          alignItems: "center",
           flexWrap: "wrap",
+          marginBottom: 22,
         }}
       >
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="seu@email.com"
-          required
-          disabled={status === "loading" || status === "success"}
-          style={{
-            flex: 1,
-            minWidth: 220,
-            padding: "14px 18px",
-            fontSize: 14,
-            borderRadius: 12,
-            border: "0.5px solid var(--color-border-strong)",
-            background: "var(--color-bg-elevated)",
-            color: "var(--color-text-primary)",
-            outline: "none",
-          }}
-        />
-        <button
-          type="submit"
-          disabled={status === "loading" || status === "success"}
+        <a
+          href="/login"
           style={{
             background: "var(--color-text-primary)",
             color: "var(--color-bg)",
             borderRadius: 12,
-            padding: "14px 24px",
-            fontSize: 13,
+            padding: "15px 28px",
+            fontSize: 14,
             fontWeight: 500,
-            whiteSpace: "nowrap",
             display: "inline-flex",
             alignItems: "center",
             gap: 8,
-            transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+            textDecoration: "none",
+            whiteSpace: "nowrap",
+            transition: "opacity 0.2s",
+            letterSpacing: "-0.01em",
           }}
         >
-          {status === "loading"
-            ? "Enviando..."
-            : status === "success"
-              ? "Adicionado ✓"
-              : "Entrar no beta →"}
-        </button>
-      </form>
-
-      {status === "success" && (
-        <p
+          Começar grátis
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M2 6h8M6.5 2.5L10 6l-3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </a>
+        <a
+          href="#como-funciona"
           style={{
-            fontSize: 12,
-            color: "var(--color-accent-green)",
-            margin: "12px 0 0",
+            fontSize: 13,
+            color: "var(--color-text-secondary)",
+            textDecoration: "none",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "15px 22px",
+            borderRadius: 12,
+            border: "0.5px solid var(--color-border-strong)",
+            whiteSpace: "nowrap",
+            letterSpacing: "-0.01em",
+            transition: "border-color 0.2s",
           }}
         >
-          Você está na lista. Em breve você recebe o acesso.
-        </p>
-      )}
-      {status === "error" && (
-        <p style={{ fontSize: 12, color: "#E24B4A", margin: "12px 0 0" }}>
-          Algo deu errado. Tenta de novo?
-        </p>
-      )}
+          Ver demonstração
+        </a>
+      </div>
 
+      {/* Trust line */}
       <div
         style={{
           fontSize: 11,
@@ -175,15 +129,14 @@ export default function Hero() {
           display: "flex",
           justifyContent: "center",
           gap: 14,
-          marginTop: 14,
           flexWrap: "wrap",
         }}
       >
-        <span>3 renders grátis ao entrar</span>
+        <span>3 imagens grátis ao criar conta</span>
         <span>·</span>
         <span>sem cartão de crédito</span>
         <span>·</span>
-        <span>em português</span>
+        <span>para arquitetura e interiores</span>
       </div>
     </section>
   );

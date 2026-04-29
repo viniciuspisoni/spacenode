@@ -58,7 +58,7 @@ export default async function AppPage() {
               Olá, {firstName}
             </h1>
             <p style={{ fontSize: 14, color: 'var(--color-text-tertiary)', letterSpacing: '-0.01em', lineHeight: 1.5 }}>
-              O que vamos renderizar hoje?
+              O que vamos criar hoje?
             </p>
           </div>
           <Link
@@ -93,9 +93,9 @@ export default async function AppPage() {
               highlight
             />
             <StatCard
-              label="Renders totais"
+              label="Imagens geradas"
               value={String(totalRenders)}
-              sub="gerados na plataforma"
+              sub="criadas na plataforma"
             />
             <StatCard
               label="Este mês"
@@ -120,7 +120,7 @@ export default async function AppPage() {
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
               </svg>
-              Novo Render
+              Nova Imagem
             </QuickAction>
             <QuickAction href="/app/history">Histórico</QuickAction>
             <QuickAction href="/app/billing">Comprar Nodes</QuickAction>
@@ -131,7 +131,7 @@ export default async function AppPage() {
         {/* ── 4 · Recent renders ──────────────────────────────────────────────── */}
         <section>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-            <SectionLabel>Renders recentes</SectionLabel>
+            <SectionLabel>Imagens recentes</SectionLabel>
             {totalRenders > 4 && (
               <Link href="/app/history" style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textDecoration: 'none' }}>
                 Ver todos →
@@ -146,9 +146,9 @@ export default async function AppPage() {
               border: '0.5px dashed var(--color-border-strong)',
               borderRadius: 12,
             }}>
-              <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', marginBottom: 10 }}>Nenhum render gerado ainda.</div>
+              <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', marginBottom: 10 }}>Nenhuma imagem criada ainda.</div>
               <Link href="/app/generate" style={{ display: 'inline-block', fontSize: 12, color: 'var(--color-accent-green)', textDecoration: 'none' }}>
-                Criar primeiro render →
+                Criar primeira imagem →
               </Link>
             </div>
           ) : (

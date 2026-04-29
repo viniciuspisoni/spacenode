@@ -53,7 +53,7 @@ export function FAQ() {
           tudo que você precisa saber.
         </h2>
         <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)', letterSpacing: '-0.005em', lineHeight: 1.6 }}>
-          Perguntas reais de arquitetos do beta. Respondidas de forma direta.
+          Perguntas reais de arquitetos e designers de interiores do beta. Respondidas de forma direta.
         </p>
       </div>
 

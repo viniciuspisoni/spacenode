@@ -14,7 +14,7 @@ export default function Gallery() {
     <section
       id="galeria"
       style={{
-        padding: "120px 40px",
+        padding: "80px 40px",
         borderTop: "0.5px solid var(--color-border)",
       }}
     >
@@ -42,7 +42,7 @@ export default function Gallery() {
               lineHeight: 1.1,
             }}
           >
-            imagens feitas por arquitetos reais.
+            visuais feitos por profissionais reais.
           </h2>
           <p
             style={{
@@ -51,7 +51,7 @@ export default function Gallery() {
               lineHeight: 1.55,
             }}
           >
-            Renders gerados na plataforma por usuários do beta. Zero pós-produção.
+            Criados na plataforma por arquitetos e designers do beta. Zero pós-produção.
           </p>
         </div>
 

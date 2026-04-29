@@ -10,21 +10,23 @@ const geist = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "Spacenode · Renders arquitetônicos em segundos com IA",
+  title: "Spacenode · Plataforma visual para arquitetura e interiores",
   description:
-    "A plataforma de visualização arquitetônica feita por arquiteto. Transforme sketches, plantas e modelos 3D em renders premium em segundos.",
+    "A plataforma criativa para arquitetos e designers de interiores. Crie renders, refine imagens e impressione clientes em minutos.",
   keywords: [
     "render arquitetônico",
     "visualização arquitetônica",
     "IA arquitetura",
+    "design de interiores",
+    "apresentação visual",
     "archviz Brasil",
     "Spacenode",
   ],
   authors: [{ name: "Spacenode" }],
   openGraph: {
-    title: "Spacenode · Renders arquitetônicos em segundos",
+    title: "Spacenode · Plataforma visual para arquitetura e interiores",
     description:
-      "Transforme sketches, plantas e modelos 3D em renders premium em segundos. Feito por arquiteto, para arquitetos.",
+      "Crie renders, refine imagens e impressione clientes em minutos. Para arquitetos e designers de interiores.",
     url: "https://spacenode.app",
     siteName: "Spacenode",
     locale: "pt_BR",
@@ -40,9 +42,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Spacenode · Renders arquitetônicos em segundos",
+    title: "Spacenode · Plataforma visual para arquitetura e interiores",
     description:
-      "Transforme sketches em renders premium em segundos. IA para arquitetos.",
+      "Crie renders e assets visuais premium em minutos. Para arquitetos e designers de interiores.",
     images: ["/og-image.png"],
   },
   robots: {

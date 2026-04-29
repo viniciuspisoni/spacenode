@@ -1,13 +1,6 @@
-"use client";
-
 import Logo from "./Logo";
 
 export default function Navbar() {
-  const scrollToWaitlist = () => {
-    const el = document.getElementById("waitlist");
-    if (el) el.scrollIntoView({ behavior: "smooth" });
-  };
-
   return (
     <nav
       style={{
@@ -82,7 +75,7 @@ export default function Navbar() {
 
       <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
         <a
-          href="#entrar"
+          href="/login"
           style={{
             fontSize: 10,
             letterSpacing: "0.18em",
@@ -93,8 +86,8 @@ export default function Navbar() {
         >
           ENTRAR
         </a>
-        <button
-          onClick={scrollToWaitlist}
+        <a
+          href="/login"
           style={{
             background: "var(--color-text-primary)",
             color: "var(--color-bg)",
@@ -102,10 +95,13 @@ export default function Navbar() {
             padding: "9px 16px",
             fontSize: 12,
             fontWeight: 500,
+            textDecoration: "none",
+            display: "inline-flex",
+            alignItems: "center",
           }}
         >
-          Entrar no beta
-        </button>
+          Testar agora
+        </a>
       </div>
 
       <style jsx>{`

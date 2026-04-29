@@ -1,11 +1,4 @@
-"use client";
-
 export default function FinalCTA() {
-  const scrollToWaitlist = () => {
-    const el = document.getElementById("waitlist");
-    if (el) el.scrollIntoView({ behavior: "smooth" });
-  };
-
   return (
     <section
       style={{
@@ -62,30 +55,61 @@ export default function FinalCTA() {
           lineHeight: 1.55,
         }}
       >
-        Junte-se aos arquitetos que já economizam dias de trabalho por semana.
+        Junte-se a arquitetos e designers de interiores que já economizam dias
+        de trabalho por semana.
       </p>
 
-      <button
-        onClick={scrollToWaitlist}
+      <div
         style={{
-          background: "#f5f5f7",
-          color: "#0a0a0a",
-          borderRadius: 12,
-          padding: "15px 28px",
-          fontSize: 13,
-          fontWeight: 500,
-          letterSpacing: "-0.005em",
-          display: "inline-flex",
+          display: "flex",
+          gap: 10,
+          justifyContent: "center",
           alignItems: "center",
-          gap: 8,
-          transition: "transform 0.2s",
+          flexWrap: "wrap",
+          marginBottom: 20,
         }}
       >
-        Entrar no beta →
-      </button>
+        <a
+          href="/login"
+          style={{
+            background: "#f5f5f7",
+            color: "#0a0a0a",
+            borderRadius: 12,
+            padding: "15px 28px",
+            fontSize: 13,
+            fontWeight: 500,
+            letterSpacing: "-0.005em",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            textDecoration: "none",
+            transition: "opacity 0.2s",
+          }}
+        >
+          Começar grátis →
+        </a>
+        <a
+          href="#planos"
+          style={{
+            fontSize: 13,
+            color: "rgba(255,255,255,0.5)",
+            textDecoration: "none",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "15px 22px",
+            borderRadius: 12,
+            border: "0.5px solid rgba(255,255,255,0.1)",
+            letterSpacing: "-0.005em",
+            transition: "border-color 0.2s",
+          }}
+        >
+          Ver planos
+        </a>
+      </div>
 
-      <p style={{ color: "#6e6e73", fontSize: 11, marginTop: 16 }}>
-        3 renders grátis · sem cartão de crédito
+      <p style={{ color: "#6e6e73", fontSize: 11, marginTop: 4 }}>
+        3 imagens grátis · sem cartão de crédito · cancele quando quiser
       </p>
     </section>
   );

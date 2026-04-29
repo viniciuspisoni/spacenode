@@ -7,7 +7,7 @@ const steps = [
   {
     num: "02",
     title: "escolha o estilo",
-    desc: "Estilos curados para arquitetura brasileira. Sem configurações técnicas.",
+    desc: "Estilos curados para arquitetura e interiores. Sem configurações técnicas.",
   },
   {
     num: "03",
@@ -21,7 +21,7 @@ export default function HowItWorks() {
     <section
       id="como-funciona"
       style={{
-        padding: "120px 40px",
+        padding: "80px 40px",
         borderTop: "0.5px solid var(--color-border)",
       }}
     >

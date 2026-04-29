@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation'
 
 const TITLES: Record<string, string> = {
   '/app': 'DASHBOARD',
-  '/app/generate': 'GERAR',
+  '/app/generate': 'RENDERIZAR',
   '/app/history': 'HISTÓRICO',
   '/app/plans': 'PLANOS',
 }
