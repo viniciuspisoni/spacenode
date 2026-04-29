@@ -621,7 +621,7 @@ const pill: React.CSSProperties = {
 const pillActive: React.CSSProperties = {
   background: 'var(--color-text-primary)',
   color: 'var(--color-bg)',
-  borderColor: 'var(--color-text-primary)',
+  border: '0.5px solid var(--color-text-primary)',
 }
 
 // ── Styles ─────────────────────────────────────────────────────────────────────
@@ -642,7 +642,7 @@ const S: Record<string, React.CSSProperties> = {
   divider:           { height:'0.5px', background:'var(--color-border)' },
   typeGrid:          { display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 },
   typeCard:          { border:'0.5px solid var(--color-border-strong)', borderRadius:10, padding:'14px 12px', cursor:'pointer', textAlign:'center', background:'var(--color-bg-elevated)' },
-  typeCardActive:    { borderColor:'var(--color-text-primary)', background:'var(--color-text-primary)' },
+  typeCardActive:    { border:'0.5px solid var(--color-text-primary)', background:'var(--color-text-primary)' },
   typeIcon:          { fontSize:18, marginBottom:5, color:'var(--color-text-tertiary)' },
   typeLabel:         { fontSize:11, fontWeight:500, color:'var(--color-text-primary)', lineHeight:1.3 },
   infoNote:          { fontSize:11, color:'var(--color-text-tertiary)', lineHeight:1.6 },
@@ -658,13 +658,13 @@ const S: Record<string, React.CSSProperties> = {
   sliderVal:         { fontSize:12, fontWeight:500, color:'var(--color-text-primary)', minWidth:34, textAlign:'right' },
   motorGrid:         { display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 },
   motorOpt:          { border:'0.5px solid var(--color-border-strong)', borderRadius:8, padding:'10px 10px', cursor:'pointer', background:'var(--color-bg-elevated)' },
-  motorOptActive:    { borderColor:'var(--color-text-primary)', background:'var(--color-text-primary)' },
+  motorOptActive:    { border:'0.5px solid var(--color-text-primary)', background:'var(--color-text-primary)' },
   motorName:         { fontSize:11, fontWeight:500, color:'var(--color-text-primary)', marginBottom:3 },
   motorTag:          { display:'inline-block', fontSize:9, letterSpacing:'0.08em', textTransform:'uppercase', background:'var(--color-border-strong)', color:'var(--color-text-tertiary)', padding:'2px 6px', borderRadius:4 },
   motorDesc:         { fontSize:10, color:'var(--color-text-tertiary)', marginTop:4 },
   qualityGrid:       { display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 },
   qualityOpt:        { border:'0.5px solid var(--color-border-strong)', borderRadius:8, padding:'10px 8px', cursor:'pointer', background:'var(--color-bg-elevated)', textAlign:'center' as const },
-  qualityOptActive:  { borderColor:'var(--color-text-primary)', background:'var(--color-text-primary)' },
+  qualityOptActive:  { border:'0.5px solid var(--color-text-primary)', background:'var(--color-text-primary)' },
   qualityRes:        { fontSize:14, fontWeight:500, color:'var(--color-text-primary)', marginBottom:4, letterSpacing:'-0.02em' },
   errorBox:          { fontSize:12, color:'#c0392b', background:'rgba(192,57,43,0.08)', border:'0.5px solid rgba(192,57,43,0.2)', borderRadius:8, padding:'10px 14px' },
   genBtn:            { width:'100%', padding:'13px 16px', background:'var(--color-text-primary)', color:'var(--color-bg)', border:'none', borderRadius:10, fontSize:13, fontWeight:500, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'space-between', fontFamily:'inherit' },
