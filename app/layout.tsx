@@ -65,7 +65,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" className={geist.variable} suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{__html: `try{if(localStorage.getItem('theme')==='dark'){document.documentElement.classList.add('dark')}}catch(e){}`}} />
+        <script dangerouslySetInnerHTML={{__html: `try{if(localStorage.getItem('theme')==='light'){document.documentElement.classList.add('light')}}catch(e){}`}} />
       </head>
       <body className="antialiased">{children}</body>
     </html>

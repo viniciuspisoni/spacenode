@@ -39,7 +39,7 @@ export default function Demo() {
             overflow: "hidden",
             cursor: "ew-resize",
             userSelect: "none",
-            background: "#f0f0f0",
+            background: "var(--color-surface)",
           }}
         >
           {/* Sketch (before) */}
@@ -128,8 +128,8 @@ export default function Demo() {
               left: 16,
               fontSize: 10,
               letterSpacing: "0.22em",
-              background: "rgba(255,255,255,0.92)",
-              color: "#1a1a1a",
+              background: "rgba(0,0,0,0.55)",
+              color: "#ffffff",
               padding: "5px 12px",
               borderRadius: 20,
               fontWeight: 500,
@@ -146,8 +146,8 @@ export default function Demo() {
               right: 16,
               fontSize: 10,
               letterSpacing: "0.22em",
-              background: "rgba(255,255,255,0.92)",
-              color: "#1a1a1a",
+              background: "rgba(0,0,0,0.55)",
+              color: "#ffffff",
               padding: "5px 12px",
               borderRadius: 20,
               fontWeight: 500,

@@ -3,24 +3,7 @@
 @theme {
   --font-sans: var(--font-geist), system-ui, -apple-system, sans-serif;
 
-  --color-bg: #fafafa;
-  --color-bg-elevated: #ffffff;
-  --color-surface: #f5f5f7;
-  --color-surface-hover: #e8e8ed;
-
-  --color-text-primary: #1a1a1a;
-  --color-text-secondary: #424245;
-  --color-text-tertiary: #86868b;
-  --color-text-quaternary: #c7c7cc;
-
-  --color-border: rgba(0, 0, 0, 0.06);
-  --color-border-strong: rgba(0, 0, 0, 0.14);
-
-  --color-accent-green: #30b46c;
-  --color-accent-green-glow: rgba(48, 180, 108, 0.5);
-}
-
-html.dark {
+  /* Dark-first defaults */
   --color-bg: #0a0a0a;
   --color-bg-elevated: #111111;
   --color-surface: rgba(255, 255, 255, 0.05);
@@ -36,6 +19,24 @@ html.dark {
 
   --color-accent-green: #30d158;
   --color-accent-green-glow: rgba(48, 209, 88, 0.5);
+}
+
+html.light {
+  --color-bg: #fafafa;
+  --color-bg-elevated: #ffffff;
+  --color-surface: #f5f5f7;
+  --color-surface-hover: #e8e8ed;
+
+  --color-text-primary: #1a1a1a;
+  --color-text-secondary: #424245;
+  --color-text-tertiary: #86868b;
+  --color-text-quaternary: #c7c7cc;
+
+  --color-border: rgba(0, 0, 0, 0.06);
+  --color-border-strong: rgba(0, 0, 0, 0.14);
+
+  --color-accent-green: #30b46c;
+  --color-accent-green-glow: rgba(48, 180, 108, 0.5);
 }
 
 * {
