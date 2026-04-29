@@ -445,7 +445,7 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
                 onClick={() => setSelectedModel(m.id)}
               >
                 <div style={{...S.motorName, ...(selectedModel === m.id ? {color:'var(--color-bg)'} : {})}}>{m.name}</div>
-                <div style={{...S.motorDesc, ...(selectedModel === m.id ? {color:'rgba(255,255,255,0.6)'} : {})}}>{m.desc}</div>
+                <div style={{...S.motorDesc, ...(selectedModel === m.id ? {color:'var(--color-bg)', opacity:0.6} : {})}}>{m.desc}</div>
               </div>
             ))}
           </div>
@@ -461,8 +461,8 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
                 onClick={() => setOutputQuality(q.id)}
               >
                 <div style={{...S.qualityRes, ...(outputQuality === q.id ? {color:'var(--color-bg)'} : {})}}>{q.label}</div>
-                <div style={{...S.motorDesc, ...(outputQuality === q.id ? {color:'rgba(255,255,255,0.6)'} : {})}}>{q.nodes} Nodes por imagem</div>
-                <div style={{...S.motorDesc, ...(outputQuality === q.id ? {color:'rgba(255,255,255,0.6)'} : {})}}>{q.desc}</div>
+                <div style={{...S.motorDesc, ...(outputQuality === q.id ? {color:'var(--color-bg)', opacity:0.6} : {})}}>{q.nodes} Nodes por imagem</div>
+                <div style={{...S.motorDesc, ...(outputQuality === q.id ? {color:'var(--color-bg)', opacity:0.6} : {})}}>{q.desc}</div>
               </div>
             ))}
           </div>
