@@ -48,16 +48,16 @@ export default async function AppPage() {
   const monthRenders = monthResult.count ?? 0
 
   return (
-    <main style={{ flex: 1, overflowY: 'auto', background: 'var(--color-bg)', padding: '44px 40px 64px' }}>
-      <div style={{ maxWidth: 800, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 40 }}>
+    <main style={{ flex: 1, overflowY: 'auto', background: 'var(--color-bg)', padding: '52px 48px 80px' }}>
+      <div style={{ maxWidth: 1000, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 48 }}>
 
         {/* ── 1 · Hero ────────────────────────────────────────────────────────── */}
         <section style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
           <div>
-            <h1 style={{ fontSize: 28, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.03em', marginBottom: 6, lineHeight: 1.2 }}>
+            <h1 style={{ fontSize: 34, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.04em', marginBottom: 8, lineHeight: 1.15 }}>
               Olá, {firstName}
             </h1>
-            <p style={{ fontSize: 14, color: 'var(--color-text-tertiary)', letterSpacing: '-0.01em' }}>
+            <p style={{ fontSize: 14, color: 'var(--color-text-tertiary)', letterSpacing: '-0.01em', lineHeight: 1.5 }}>
               O que vamos renderizar hoje?
             </p>
           </div>
@@ -83,13 +83,14 @@ export default async function AppPage() {
 
         {/* ── 2 · Stats ───────────────────────────────────────────────────────── */}
         <section>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
 
             <StatCard
               label="Nodes disponíveis"
               value={String(credits)}
               sub="para suas gerações"
               accent={credits < 4}
+              highlight
             />
             <StatCard
               label="Renders totais"
@@ -154,26 +155,25 @@ export default async function AppPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {renders.map(r => (
                 <div key={r.id} style={{
-                  display: 'flex', alignItems: 'center', gap: 14,
-                  padding: '12px 16px',
+                  display: 'flex', alignItems: 'center', gap: 16,
+                  padding: '14px 18px',
                   background: 'var(--color-bg-elevated)',
                   border: '0.5px solid var(--color-border-strong)',
                   borderRadius: 10,
-                  transition: 'border-color 0.15s',
                 }}>
-                  <div style={{ width: 64, height: 44, borderRadius: 7, overflow: 'hidden', flexShrink: 0, background: 'var(--color-surface)' }}>
+                  <div style={{ width: 76, height: 52, borderRadius: 7, overflow: 'hidden', flexShrink: 0, background: 'var(--color-surface)' }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={r.output_url} alt={r.ambient} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, letterSpacing: '-0.01em' }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, letterSpacing: '-0.02em' }}>
                       {r.ambient || r.style || 'Render'}
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 3 }}>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4, letterSpacing: '0.01em' }}>
                       {formatDate(r.created_at)}
                     </div>
                   </div>
-                  <Link href="/app/history" style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textDecoration: 'none', flexShrink: 0, padding: '4px 8px', border: '0.5px solid var(--color-border-strong)', borderRadius: 6 }}>
+                  <Link href="/app/history" style={{ fontSize: 11, color: 'var(--color-text-secondary)', textDecoration: 'none', flexShrink: 0, padding: '5px 11px', border: '0.5px solid var(--color-border-strong)', borderRadius: 6, letterSpacing: '-0.01em' }}>
                     ver →
                   </Link>
                 </div>
@@ -229,23 +229,24 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   )
 }
 
-function StatCard({ label, value, sub, accent = false, green = false }: {
-  label: string; value: string; sub: string; accent?: boolean; green?: boolean
+function StatCard({ label, value, sub, accent = false, green = false, highlight = false }: {
+  label: string; value: string; sub: string; accent?: boolean; green?: boolean; highlight?: boolean
 }) {
   return (
     <div style={{
-      padding: '18px 20px',
-      background: 'var(--color-bg-elevated)',
-      border: `0.5px solid ${accent ? 'rgba(192,57,43,0.25)' : 'var(--color-border-strong)'}`,
+      padding: '20px 22px',
+      background: highlight ? 'rgba(48,180,108,0.04)' : 'var(--color-bg-elevated)',
+      border: `0.5px solid ${accent ? 'rgba(192,57,43,0.25)' : highlight ? 'rgba(48,180,108,0.2)' : 'var(--color-border-strong)'}`,
       borderRadius: 12,
+      borderTop: highlight ? '2px solid var(--color-accent-green)' : undefined,
     }}>
-      <div style={{ fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'var(--color-text-tertiary)', marginBottom: 10 }}>
+      <div style={{ fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'var(--color-text-tertiary)', marginBottom: 12 }}>
         {label}
       </div>
-      <div style={{ fontSize: 30, fontWeight: 500, color: green ? 'var(--color-accent-green)' : accent ? '#c0392b' : 'var(--color-text-primary)', letterSpacing: '-0.04em', lineHeight: 1 }}>
+      <div style={{ fontSize: 32, fontWeight: 500, color: green ? 'var(--color-accent-green)' : accent ? '#c0392b' : 'var(--color-text-primary)', letterSpacing: '-0.04em', lineHeight: 1 }}>
         {value}
       </div>
-      <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 6 }}>{sub}</div>
+      <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 8 }}>{sub}</div>
     </div>
   )
 }
