@@ -97,7 +97,7 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
 
   // ── Parâmetros técnicos
   const geometryLock = 85
-  const fidelityMode = 'strict' as const
+  const [fidelityMode,   setFidelityMode]   = useState<'strict' | 'creative'>('strict')
   const [selectedModel,  setSelectedModel]  = useState('nano-banana-pro')
   const [outputQuality,  setOutputQuality]  = useState('hd')
 
@@ -276,7 +276,7 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
   // ── Summary lines
   const summaryLine1 = `${typeLabel} · ${segment} · ${environment}`
   const summaryLine2 = [lighting, background !== 'Preservar Original' ? background : null, sceneElements.join(', ')].filter(Boolean).join(' · ')
-  const summaryLine3 = `Alta Fidelidade · ${currentEngine?.name} · ${OUTPUT_QUALITIES.find(q => q.id === outputQuality)?.label}`
+  const summaryLine3 = `${fidelityMode === 'strict' ? 'Alta Fidelidade' : 'Criativo'} · ${currentEngine?.name} · ${OUTPUT_QUALITIES.find(q => q.id === outputQuality)?.label}`
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -433,14 +433,28 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
 
         <div style={S.divider}/>
 
-        {/* 10 — Fidelidade ao Projeto */}
+        {/* 10 — Modo de Fidelidade */}
         <div style={S.section}>
-          <div style={S.label}>FIDELIDADE AO PROJETO</div>
-          <div style={{display:'flex', alignItems:'center', gap:8, padding:'10px 14px', border:'0.5px solid var(--color-border-strong)', borderRadius:8, background:'var(--color-bg-elevated)'}}>
-            <span style={{width:6, height:6, borderRadius:'50%', background:'var(--color-accent-green)', boxShadow:'0 0 5px var(--color-accent-green-glow)', display:'inline-block', flexShrink:0}}/>
-            <span style={{fontSize:11, color:'var(--color-text-primary)', fontWeight:500}}>✓ Proteção total ativada</span>
+          <div style={S.label}>MODO DE FIDELIDADE</div>
+          <div style={S.motorGrid}>
+            <div
+              style={{...S.motorOpt, ...(fidelityMode === 'strict' ? S.motorOptActive : {})}}
+              onClick={() => setFidelityMode('strict')}
+            >
+              <div style={{...S.motorName, ...(fidelityMode === 'strict' ? {color:'var(--color-bg)'} : {})}}>Fiel ao Projeto</div>
+              <div style={{...S.motorDesc, ...(fidelityMode === 'strict' ? {color:'var(--color-bg)', opacity:0.6} : {})}}>Preserva geometria, câmera, proporções e composição.</div>
+            </div>
+            <div
+              style={{...S.motorOpt, ...(fidelityMode === 'creative' ? S.motorOptActive : {})}}
+              onClick={() => setFidelityMode('creative')}
+            >
+              <div style={{...S.motorName, ...(fidelityMode === 'creative' ? {color:'var(--color-bg)'} : {})}}>Criativo</div>
+              <div style={{...S.motorDesc, ...(fidelityMode === 'creative' ? {color:'var(--color-bg)', opacity:0.6} : {})}}>Permite mais liberdade visual e variações.</div>
+            </div>
           </div>
-          <p style={S.infoNote}>Geometria, câmera, entorno e composição preservados.</p>
+          {fidelityMode === 'strict' && (
+            <p style={S.infoNote}>Geometria, câmera, entorno e composição preservados.</p>
+          )}
         </div>
 
         <div style={S.divider}/>
@@ -561,9 +575,13 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
               </div>
             )}
             <div style={S.postGenPrimary}>
-              <button style={S.actionBtn} onClick={() => handleGenerate()}>
-                Gerar nova variação
-              </button>
+              <div style={{display:'flex', flexDirection:'column', gap:4}}>
+                <button style={S.actionBtn} onClick={() => handleGenerate()}>
+                  <span>Gerar variações</span>
+                  <span style={{fontSize:8, fontWeight:700, letterSpacing:'0.1em', background:'rgba(0,0,0,0.12)', color:'rgba(0,0,0,0.4)', padding:'1px 5px', borderRadius:8, marginLeft:8, flexShrink:0}}>BETA</span>
+                </button>
+                <span style={{fontSize:9, color:'var(--color-text-tertiary)', textAlign:'center' as const, letterSpacing:'0.02em'}}>gera uma nova alternativa com os mesmos parâmetros</span>
+              </div>
               <a
                 href={outputUrl}
                 download="spacenode-render.jpg"

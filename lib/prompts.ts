@@ -21,7 +21,7 @@ export interface GenerateOptions {
   sceneElements: string[]
   geometryLock:  number
   materials?:    ProjectMaterials
-  fidelityMode?: 'strict' | 'balanced'
+  fidelityMode?: 'strict' | 'creative' | 'balanced'
 }
 
 // ── Segments ───────────────────────────────────────────────────────────────────
@@ -532,9 +532,12 @@ function buildNegativePrompt(_engineId: string): string {
   return ''
 }
 
-function buildFidelityBlock(geometryLock: number, fidelityMode?: 'strict' | 'balanced'): string {
+function buildFidelityBlock(geometryLock: number, fidelityMode?: 'strict' | 'creative' | 'balanced'): string {
   if (fidelityMode === 'strict') {
-    return 'STRICT FIDELITY MODE: Preserve EXACTLY the camera angle, perspective, horizon line, building silhouette, architectural geometry, all proportions, window and door openings, existing vegetation, surrounding context and overall scene composition. This is a materials and lighting transformation ONLY. Do not reframe, do not rotate, do not zoom, do not add or remove architectural elements. Only surface materials, textures, lighting conditions and sky may change. '
+    return 'STRICT ARCHITECTURAL PRESERVATION MODE. Use the input image as an exact base. Preserve geometry, structure, proportions, layout, camera angle, perspective, openings, facade rhythm, furniture layout, and architectural language. Do not redesign, reinterpret, simplify, stylize, add, remove, relocate, resize, or change architectural elements. Treat every line and edge as intentional. Only improve materials, lighting, realism, shadows, reflections, vegetation, entourage, and atmosphere. '
+  }
+  if (fidelityMode === 'creative') {
+    return 'CREATIVE VISUALIZATION MODE. Keep the main concept and composition recognizable, but allow moderate visual interpretation to improve atmosphere, materials and presentation quality. '
   }
   if (geometryLock <= 25) return ''
   if (geometryLock <= 50)

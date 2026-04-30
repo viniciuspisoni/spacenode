@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
       sceneElements: sceneElements ?? [],
       geometryLock:  Number(geometryLock),
       materials:     materials as ProjectMaterials | undefined,
-      fidelityMode:  fidelityMode  === 'balanced' ? 'balanced' : 'strict',
+      fidelityMode:  fidelityMode === 'creative' ? 'creative' : fidelityMode === 'balanced' ? 'balanced' : 'strict',
     }
     const finalPrompt = buildGenerationPrompt(options)
 
