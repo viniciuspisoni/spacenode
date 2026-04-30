@@ -2,12 +2,12 @@
 import { useState, useRef, useCallback } from 'react'
 
 const transformations = [
-  { before: '/demo-sketch.jpg', after: '/demo-render.jpg', caption: 'Residencial · Sala de estar' },
-  { before: '/demo-sketch.jpg', after: '/demo-render.jpg', caption: 'Comercial · Recepção' },
-  { before: '/demo-sketch.jpg', after: '/demo-render.jpg', caption: 'Residencial · Área externa' },
-  { before: '/demo-sketch.jpg', after: '/demo-render.jpg', caption: 'Interior · Cozinha' },
-  { before: '/demo-sketch.jpg', after: '/demo-render.jpg', caption: 'Residencial · Quarto master' },
-  { before: '/demo-sketch.jpg', after: '/demo-render.jpg', caption: 'Comercial · Escritório' },
+  { before: '/gallery-banheiro-before.jpg',    after: '/gallery-banheiro-after.jpg',    caption: 'Interior · Banheiro' },
+  { before: '/gallery-comercial-before.jpg',   after: '/gallery-comercial-after.jpg',   caption: 'Comercial · Fachada urbana' },
+  { before: '/gallery-living-before.jpg',      after: '/gallery-living-after.jpg',      caption: 'Interior · Sala de estar' },
+  { before: '/gallery-casa-before.jpg',        after: '/gallery-casa-after.jpg',        caption: 'Residencial · Casa contemporânea' },
+  { before: '/gallery-coworking-before.jpg',   after: '/gallery-coworking-after.jpg',   caption: 'Coworking' },
+  { before: '/gallery-industrial-before.jpg',  after: '/gallery-industrial-after.jpg',  caption: 'Comercial · Interior industrial' },
 ]
 
 function MiniBeforeAfter({ before, after }: { before: string; after: string }) {
