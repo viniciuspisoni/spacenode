@@ -24,10 +24,6 @@ const faqs = [
     a: 'Não. O SpaceNode é 100% web — funciona direto no navegador. Nenhuma instalação, nenhuma GPU dedicada, nenhum espaço em disco. Funciona em qualquer computador, tablet ou celular com acesso à internet.',
   },
   {
-    q: 'Funciona para arquitetura brasileira? Estilos tropicais e rústicos?',
-    a: 'Sim. O SpaceNode foi criado por um arquiteto brasileiro e treinado com referências de arquitetura do Brasil — estilos como Tropical, Rústico BR, Biofílico e Serrano foram desenvolvidos especificamente para o nosso mercado. Nenhuma ferramenta estrangeira entende esse contexto como a gente.',
-  },
-  {
     q: 'Posso cancelar a qualquer momento?',
     a: 'Sim. Sem fidelidade, sem multa. Cancele quando quiser direto no painel e continue com acesso até o fim do período pago. Pagamento processado via Stripe com todos os protocolos de segurança.',
   },
