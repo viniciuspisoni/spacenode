@@ -485,7 +485,7 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
           style={loading || !imagePreview || credits < nodeCost
             ? {...S.genBtn, opacity:0.6, cursor:'not-allowed'}
             : S.genBtn}
-          onClick={handleGenerate}
+          onClick={() => handleGenerate()}
           disabled={loading || !imagePreview || credits < nodeCost}
         >
           <span>{loading ? 'gerando…' : 'gerar render'}</span>
