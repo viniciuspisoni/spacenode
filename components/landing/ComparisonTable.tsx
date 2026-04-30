@@ -18,11 +18,11 @@ const rows: { criterion: string; desc: string; spn: Pill; vray: Pill; lumion: Pi
 
 const pillStyle = (type: PillType): React.CSSProperties => {
   const base: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', padding: '3px 10px', borderRadius: 20, fontSize: 10, fontWeight: 500 }
-  if (type === 'green')  return { ...base, background: 'rgba(26,158,92,0.12)', color: '#1a9e5c' }
-  if (type === 'red')    return { ...base, background: 'rgba(220,50,47,0.1)',  color: '#c0392b' }
-  if (type === 'amber')  return { ...base, background: 'rgba(200,140,0,0.12)', color: '#b8870a' }
-  if (type === 'check')  return { ...base, color: '#1a9e5c', fontSize: 16, padding: 0, background: 'none' }
-  if (type === 'cross')  return { ...base, color: '#c0392b', fontSize: 16, padding: 0, background: 'none' }
+  if (type === 'green')  return { ...base, background: 'rgba(48,180,108,0.12)', color: '#30b46c' }
+  if (type === 'red')    return { ...base, background: 'rgba(220,50,47,0.12)', color: '#e05252' }
+  if (type === 'amber')  return { ...base, background: 'rgba(200,140,0,0.14)', color: '#d4a017' }
+  if (type === 'check')  return { ...base, color: '#30b46c', fontSize: 16, padding: 0, background: 'none' }
+  if (type === 'cross')  return { ...base, color: '#e05252', fontSize: 16, padding: 0, background: 'none' }
   return { ...base, color: 'var(--color-text-quaternary)', fontSize: 16, padding: 0, background: 'none' }
 }
 
@@ -57,7 +57,7 @@ export function ComparisonTable() {
               <th style={{ padding: '20px 20px 16px', textAlign: 'left', width: 220, fontSize: 11, fontWeight: 500, color: 'var(--color-text-tertiary)', background: 'var(--color-surface)', borderBottom: '0.5px solid var(--color-border-strong)' }}>
                 Critério
               </th>
-              <th style={{ padding: '20px 20px 16px', textAlign: 'center', background: '#1a1a1a', borderBottom: '0.5px solid rgba(255,255,255,0.08)' }}>
+              <th style={{ padding: '20px 20px 16px', textAlign: 'center', background: '#1a1a1a', borderBottom: '0.5px solid rgba(255,255,255,0.08)', borderTop: '2px solid var(--color-accent-green)' }}>
                 <span style={{ display: 'block', fontSize: 12, fontWeight: 500, letterSpacing: '0.14em', color: '#fafafa', marginBottom: 4 }}>SPACENODE</span>
                 <span style={{ fontSize: 10, fontWeight: 500, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>Motor de IA</span>
               </th>
@@ -79,7 +79,7 @@ export function ComparisonTable() {
                   <span style={spnPillStyle(row.spn.type)}>{row.spn.label}</span>
                 </td>
                 {[row.vray, row.lumion, row.manual].map((cell, ci) => (
-                  <td key={ci} style={{ padding: '16px 20px', textAlign: 'center', background: ci % 2 === 0 ? 'var(--color-bg-elevated)' : 'var(--color-surface)', borderRight: ci < 2 ? '0.5px solid var(--color-border)' : 'none' }}>
+                  <td key={ci} style={{ padding: '16px 20px', textAlign: 'center', background: ci % 2 === 0 ? 'var(--color-bg-elevated)' : 'var(--color-bg)', borderRight: ci < 2 ? '0.5px solid var(--color-border)' : 'none' }}>
                     <span style={pillStyle(cell.type)}>{cell.label}</span>
                   </td>
                 ))}

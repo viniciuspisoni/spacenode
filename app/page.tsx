@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
 import Demo from "@/components/Demo";
@@ -21,6 +22,11 @@ const Divider = () => (
 )
 
 export default function Home() {
+  // Landing page is always dark — independent of app theme preference
+  useEffect(() => {
+    document.documentElement.classList.remove("light");
+  }, []);
+
   return (
     <main>
       <Navbar />
