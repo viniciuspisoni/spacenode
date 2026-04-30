@@ -15,14 +15,28 @@ export default function Demo() {
   };
 
   return (
-    <section style={{ maxWidth: 880, margin: "20px auto 0", padding: "0 40px" }}>
+    <section style={{ maxWidth: 960, margin: "20px auto 0", padding: "0 32px" }}>
+      {/* Caption */}
+      <p
+        style={{
+          textAlign: "center",
+          fontSize: 13,
+          color: "var(--color-text-secondary)",
+          letterSpacing: "-0.01em",
+          marginBottom: 20,
+        }}
+      >
+        De modelo simples para imagem pronta para apresentação
+      </p>
+
+      {/* Elevated wrapper */}
       <div
         style={{
           background: "var(--color-bg-elevated)",
           borderRadius: 20,
           padding: 12,
           boxShadow:
-            "0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.06)",
+            "0 2px 4px rgba(0,0,0,0.12), 0 16px 48px rgba(0,0,0,0.28), 0 0 0 0.5px rgba(255,255,255,0.06)",
         }}
       >
         <div
@@ -42,7 +56,7 @@ export default function Demo() {
             background: "var(--color-surface)",
           }}
         >
-          {/* Sketch (before) */}
+          {/* Before — visually softened */}
           <img
             src="/demo-sketch.jpg"
             alt="Sketch SketchUp"
@@ -54,10 +68,11 @@ export default function Demo() {
               height: "100%",
               objectFit: "cover",
               pointerEvents: "none",
+              filter: "contrast(0.9) saturate(0.9) brightness(0.95) blur(0.4px)",
             }}
           />
 
-          {/* Render (after) — clipped */}
+          {/* After — crisp and vibrant */}
           <div
             style={{
               position: "absolute",
@@ -76,6 +91,7 @@ export default function Demo() {
                 height: "100%",
                 objectFit: "cover",
                 pointerEvents: "none",
+                filter: "contrast(1.05) saturate(1.05)",
               }}
             />
           </div>
@@ -90,7 +106,7 @@ export default function Demo() {
               width: 2,
               background: "#ffffff",
               transform: "translateX(-50%)",
-              boxShadow: "0 0 12px rgba(0,0,0,0.15)",
+              boxShadow: "0 0 10px rgba(255,255,255,0.5), 0 0 3px rgba(255,255,255,1)",
               pointerEvents: "none",
             }}
           >
@@ -100,11 +116,11 @@ export default function Demo() {
                 top: "50%",
                 left: "50%",
                 transform: "translate(-50%, -50%)",
-                width: 36,
-                height: 36,
+                width: 40,
+                height: 40,
                 borderRadius: "50%",
                 background: "#ffffff",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                boxShadow: "0 0 0 1px rgba(255,255,255,0.2), 0 4px 20px rgba(0,0,0,0.4)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -124,15 +140,12 @@ export default function Demo() {
           <span
             style={{
               position: "absolute",
-              bottom: 16,
-              left: 16,
-              fontSize: 10,
-              letterSpacing: "0.22em",
-              background: "rgba(0,0,0,0.55)",
-              color: "#ffffff",
-              padding: "5px 12px",
-              borderRadius: 20,
-              fontWeight: 500,
+              bottom: 14,
+              left: 14,
+              fontSize: 9,
+              letterSpacing: "0.2em",
+              color: "rgba(255,255,255,0.4)",
+              fontWeight: 600,
               textTransform: "uppercase",
               pointerEvents: "none",
             }}
@@ -142,15 +155,12 @@ export default function Demo() {
           <span
             style={{
               position: "absolute",
-              bottom: 16,
-              right: 16,
-              fontSize: 10,
-              letterSpacing: "0.22em",
-              background: "rgba(0,0,0,0.55)",
-              color: "#ffffff",
-              padding: "5px 12px",
-              borderRadius: 20,
-              fontWeight: 500,
+              bottom: 14,
+              right: 14,
+              fontSize: 9,
+              letterSpacing: "0.2em",
+              color: "rgba(255,255,255,0.85)",
+              fontWeight: 600,
               textTransform: "uppercase",
               pointerEvents: "none",
             }}
@@ -159,17 +169,45 @@ export default function Demo() {
           </span>
         </div>
       </div>
+
+      {/* Drag hint */}
       <p
         style={{
           fontSize: 11,
           color: "var(--color-text-tertiary)",
           textAlign: "center",
-          margin: "14px 0 0",
+          margin: "12px 0 24px",
           letterSpacing: "0.05em",
         }}
       >
         arraste para comparar
       </p>
+
+      {/* CTA */}
+      <div style={{ textAlign: "center" }}>
+        <a
+          href="/login"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            background: "var(--color-text-primary)",
+            color: "var(--color-bg)",
+            borderRadius: 12,
+            padding: "14px 28px",
+            fontSize: 14,
+            fontWeight: 500,
+            textDecoration: "none",
+            letterSpacing: "-0.01em",
+            whiteSpace: "nowrap",
+          }}
+        >
+          Testar com meu projeto
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M2 6h8M6.5 2.5L10 6l-3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </a>
+      </div>
     </section>
   );
 }

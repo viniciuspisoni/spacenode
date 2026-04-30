@@ -81,3 +81,8 @@ a {
   background: var(--color-text-primary);
   color: var(--color-bg);
 }
+
+@keyframes loadProgress {
+  from { width: 0% }
+  to   { width: 88% }
+}

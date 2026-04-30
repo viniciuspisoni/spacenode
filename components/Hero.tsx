@@ -62,8 +62,8 @@ export default function Hero() {
           maxWidth: 560,
         }}
       >
-        Crie renders, refine imagens, gere vídeos e impressione clientes em
-        minutos. Para arquitetos e designers de interiores.
+        A plataforma visual para arquitetos e designers de interiores. Crie
+        imagens, refine renders e apresente projetos em minutos.
       </p>
 
       {/* CTAs */}
@@ -132,11 +132,11 @@ export default function Hero() {
           flexWrap: "wrap",
         }}
       >
-        <span>3 imagens grátis ao criar conta</span>
-        <span>·</span>
-        <span>sem cartão de crédito</span>
-        <span>·</span>
-        <span>para arquitetura e interiores</span>
+        <span>3 imagens grátis</span>
+        <span>•</span>
+        <span>Sem cartão</span>
+        <span>•</span>
+        <span>Sem compromisso</span>
       </div>
     </section>
   );

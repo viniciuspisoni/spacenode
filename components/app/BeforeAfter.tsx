@@ -38,35 +38,39 @@ export default function BeforeAfter({
       }}
       onPointerUp={(e) => e.currentTarget.releasePointerCapture(e.pointerId)}
     >
-      {/* Before — full width, always visible */}
+      {/* Before — visually softened to read as "raw" */}
       <img
         src={beforeUrl}
         alt="antes"
         className="absolute inset-0 w-full h-full object-cover"
+        style={{ filter: 'contrast(0.9) saturate(0.9) brightness(0.95) blur(0.4px)' }}
         draggable={false}
       />
 
-      {/* After — clipped from right */}
+      {/* After — crisp and premium */}
       <img
         src={afterUrl}
         alt="depois"
         className="absolute inset-0 w-full h-full object-cover"
-        style={{ clipPath: `inset(0 ${100 - pos}% 0 0)` }}
+        style={{
+          clipPath: `inset(0 ${100 - pos}% 0 0)`,
+          filter: 'contrast(1.05) saturate(1.05)',
+        }}
         draggable={false}
       />
 
       {/* Divider line */}
       <div
-        className="absolute top-0 bottom-0 w-px bg-white/80 shadow-[0_0_6px_rgba(0,0,0,0.5)]"
+        className="absolute top-0 bottom-0 w-px bg-white shadow-[0_0_10px_rgba(255,255,255,0.6),0_0_3px_rgba(255,255,255,1)]"
         style={{ left: `${pos}%` }}
       >
-        {/* Handle */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white shadow-lg flex items-center justify-center pointer-events-none">
-          <svg width="14" height="10" viewBox="0 0 14 10" fill="none">
+        {/* Handle — larger with glow */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white shadow-[0_0_0_1px_rgba(255,255,255,0.2),0_4px_20px_rgba(0,0,0,0.4)] flex items-center justify-center pointer-events-none">
+          <svg width="16" height="12" viewBox="0 0 16 12" fill="none">
             <path
-              d="M1 5h12M5 1 1 5l4 4M9 1l4 4-4 4"
+              d="M1 6h14M5 2 1 6l4 4M11 2l4 4-4 4"
               stroke="#1a1a1a"
-              strokeWidth="1.5"
+              strokeWidth="1.75"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
@@ -74,11 +78,13 @@ export default function BeforeAfter({
         </div>
       </div>
 
-      {/* Labels */}
-      <span className="absolute top-3 left-3 text-[10px] font-medium uppercase tracking-[0.15em] text-white/80 bg-black/40 backdrop-blur-sm px-2.5 py-1 rounded-full pointer-events-none">
+      {/* ANTES label — bottom-left, low opacity */}
+      <span className="absolute bottom-3 left-3 text-[9px] font-semibold uppercase tracking-[0.2em] text-white/40 pointer-events-none">
         {beforeLabel}
       </span>
-      <span className="absolute top-3 right-3 text-[10px] font-medium uppercase tracking-[0.15em] text-white/80 bg-black/40 backdrop-blur-sm px-2.5 py-1 rounded-full pointer-events-none">
+
+      {/* DEPOIS label — bottom-right, stronger */}
+      <span className="absolute bottom-3 right-3 text-[9px] font-semibold uppercase tracking-[0.2em] text-white/80 pointer-events-none">
         {afterLabel}
       </span>
     </div>
