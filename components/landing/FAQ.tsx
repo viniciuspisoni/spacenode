@@ -25,7 +25,7 @@ const faqs = [
   },
   {
     q: 'Posso cancelar a qualquer momento?',
-    a: 'Sim. Sem fidelidade, sem multa. Cancele quando quiser direto no painel e continue com acesso até o fim do período pago. Pagamento processado via Stripe com todos os protocolos de segurança.',
+    a: 'Depende do plano. No plano mensal, você pode cancelar quando quiser — paga apenas o mês em uso e mantém o acesso até o fim do período. No plano anual, o compromisso é de 12 meses, já que o pagamento é feito de forma antecipada. Em ambos os casos, o cancelamento é feito direto no painel, sem burocracia.',
   },
   {
     q: 'Qual a resolução das imagens geradas?',
