@@ -21,7 +21,7 @@ export default function HowItWorks() {
     <section
       id="como-funciona"
       style={{
-        padding: "80px 40px",
+        padding: "100px 48px",
         borderTop: "0.5px solid var(--color-border)",
       }}
     >
@@ -56,7 +56,7 @@ export default function HowItWorks() {
           <p
             style={{
               fontSize: 15,
-              color: "var(--color-text-tertiary)",
+              color: "var(--color-text-secondary)",
               lineHeight: 1.55,
             }}
           >
@@ -99,7 +99,7 @@ export default function HowItWorks() {
               <p
                 style={{
                   fontSize: 13,
-                  color: "var(--color-text-tertiary)",
+                  color: "var(--color-text-secondary)",
                   lineHeight: 1.6,
                   margin: 0,
                 }}
