@@ -5,7 +5,7 @@ const transformations = [
   { before: '/gallery-banheiro-before.jpg',    after: '/gallery-banheiro-after.jpg',    caption: 'Interior · Banheiro' },
   { before: '/gallery-comercial-before.jpg',   after: '/gallery-comercial-after.jpg',   caption: 'Comercial · Fachada urbana' },
   { before: '/gallery-living-before.jpg',      after: '/gallery-living-after.jpg',      caption: 'Interior · Sala de estar' },
-  { before: '/gallery-casa-before.jpg',        after: '/gallery-casa-after.jpg',        caption: 'Residencial · Casa contemporânea' },
+  { before: '/gallery-casa-after.jpg',          after: '/gallery-casa-before.jpg',        caption: 'Residencial · Casa contemporânea' },
   { before: '/gallery-coworking-before.jpg',   after: '/gallery-coworking-after.jpg',   caption: 'Coworking' },
   { before: '/gallery-industrial-before.jpg',  after: '/gallery-industrial-after.jpg',  caption: 'Comercial · Interior industrial' },
 ]
