@@ -14,7 +14,7 @@ export default function Gallery() {
     <section
       id="galeria"
       style={{
-        padding: "80px 40px",
+        padding: "100px 48px",
         borderTop: "0.5px solid var(--color-border)",
       }}
     >
@@ -47,7 +47,7 @@ export default function Gallery() {
           <p
             style={{
               fontSize: 15,
-              color: "var(--color-text-tertiary)",
+              color: "var(--color-text-secondary)",
               lineHeight: 1.55,
             }}
           >
