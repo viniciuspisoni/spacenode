@@ -77,7 +77,7 @@ function PlanCard({ plan, billing, loading, onSelect }: {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        background: f ? '#1a1a1a' : 'var(--color-surface)',
+        background: f ? '#1a1a1a' : 'var(--color-bg-elevated)',
         border: `0.5px solid ${f ? 'rgba(255,255,255,0.1)' : 'var(--color-border-strong)'}`,
         borderTop: f ? '2px solid #30d158' : '0.5px solid var(--color-border-strong)',
         borderRadius: 14, padding: '28px 24px 24px',
