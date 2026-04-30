@@ -11,7 +11,7 @@ create table if not exists public.profiles (
   id                      uuid        primary key references auth.users (id) on delete cascade,
   email                   text        not null,
   full_name               text,
-  credits                 integer     not null default 3,
+  credits                 integer     not null default 12,
   plan                    text        not null default 'free'
                                       check (plan in ('free', 'starter', 'pro', 'studio')),
   stripe_customer_id      text,
