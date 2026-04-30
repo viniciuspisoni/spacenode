@@ -109,7 +109,7 @@ export default function FinalCTA() {
       </div>
 
       <p style={{ color: "#6e6e73", fontSize: 11, marginTop: 4 }}>
-        3 imagens grátis · sem cartão de crédito · cancele quando quiser
+        12 nodes grátis · sem cartão de crédito · cancele quando quiser
       </p>
     </section>
   );

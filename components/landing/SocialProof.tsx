@@ -1,3 +1,5 @@
+'use client'
+
 const testimonials = [
   {
     initials: 'CM',
@@ -16,15 +18,19 @@ const testimonials = [
 ]
 
 const trustItems = [
-  '3 imagens grátis ao criar conta',
+  '12 nodes grátis ao criar conta',
   'Sem cartão de crédito',
   'Suporte em português',
   'Cancele quando quiser',
 ]
 
+import { useState } from 'react'
+
 export function SocialProof() {
+  const [hovered, setHovered] = useState<string | null>(null)
+
   return (
-    <section style={{ padding: '80px 24px', maxWidth: 960, margin: '0 auto' }}>
+    <section style={{ padding: '100px 24px', maxWidth: 960, margin: '0 auto' }}>
 
       <div style={{ textAlign: 'center', marginBottom: 48 }}>
         <div style={{
@@ -54,11 +60,16 @@ export function SocialProof() {
         {testimonials.map((t) => (
           <div
             key={t.name}
+            onMouseEnter={() => setHovered(t.name)}
+            onMouseLeave={() => setHovered(null)}
             style={{
-              padding: '28px 26px',
-              background: 'var(--color-bg-elevated)',
-              border: '0.5px solid var(--color-border-strong)',
+              padding: '32px 28px',
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid rgba(255,255,255,0.08)',
               borderRadius: 16,
+              transform: hovered === t.name ? 'translateY(-2px)' : 'translateY(0)',
+              boxShadow: hovered === t.name ? '0 8px 32px rgba(0,0,0,0.3)' : 'none',
+              transition: 'transform 0.2s ease, box-shadow 0.2s ease',
             }}
           >
             <p style={{
@@ -105,9 +116,9 @@ export function SocialProof() {
           <div
             key={item}
             style={{
-              padding: '16px 18px',
-              background: 'var(--color-bg-elevated)',
-              borderRight: i < trustItems.length - 1 ? '0.5px solid var(--color-border)' : 'none',
+              padding: '18px 20px',
+              background: 'rgba(255,255,255,0.02)',
+              borderRight: i < trustItems.length - 1 ? '0.5px solid rgba(255,255,255,0.06)' : 'none',
               display: 'flex', alignItems: 'center', gap: 10,
             }}
           >

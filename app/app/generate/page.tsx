@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import GenerateClient from './GenerateClient'
 
-const DEFAULT_CREDITS = 3
+const DEFAULT_CREDITS = 12
 
 export default async function GeneratePage() {
   const supabase = await createClient()

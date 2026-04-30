@@ -31,7 +31,7 @@ export function MobileCTA() {
             letterSpacing: "0.01em",
           }}
         >
-          3 imagens grátis · sem cartão de crédito
+          12 nodes grátis · sem cartão de crédito
         </p>
       </div>
 

@@ -1,11 +1,15 @@
 "use client";
 
+import { useState } from "react";
+
 export default function Hero() {
+  const [primaryHovered, setPrimaryHovered] = useState(false);
+  const [secondaryHovered, setSecondaryHovered] = useState(false);
+
   return (
     <section
-      id="hero"
       style={{
-        padding: "120px 40px 56px",
+        padding: "140px 40px 88px",
         textAlign: "center",
         maxWidth: 880,
         margin: "0 auto",
@@ -18,7 +22,7 @@ export default function Hero() {
           color: "var(--color-text-tertiary)",
           textTransform: "uppercase",
           fontWeight: 500,
-          marginBottom: 24,
+          marginBottom: 28,
           display: "inline-flex",
           alignItems: "center",
           gap: 10,
@@ -38,11 +42,12 @@ export default function Hero() {
 
       <h1
         style={{
-          fontSize: "clamp(32px, 6vw, 56px)",
-          fontWeight: 400,
+          fontSize: "clamp(32px, 6vw, 58px)",
+          fontWeight: 300,
           letterSpacing: "-0.045em",
           lineHeight: 1.05,
-          margin: "24px 0",
+          margin: "28px auto",
+          maxWidth: 660,
           color: "var(--color-text-primary)",
         }}
       >
@@ -57,9 +62,10 @@ export default function Hero() {
         style={{
           fontSize: 17,
           color: "var(--color-text-secondary)",
-          lineHeight: 1.55,
-          margin: "0 auto 40px",
-          maxWidth: 560,
+          lineHeight: 1.6,
+          margin: "0 auto 48px",
+          maxWidth: 520,
+          letterSpacing: "-0.01em",
         }}
       >
         A plataforma visual para arquitetos e designers de interiores. Crie
@@ -74,11 +80,13 @@ export default function Hero() {
           justifyContent: "center",
           alignItems: "center",
           flexWrap: "wrap",
-          marginBottom: 22,
+          marginBottom: 28,
         }}
       >
         <a
           href="/login"
+          onMouseEnter={() => setPrimaryHovered(true)}
+          onMouseLeave={() => setPrimaryHovered(false)}
           style={{
             background: "var(--color-text-primary)",
             color: "var(--color-bg)",
@@ -91,8 +99,10 @@ export default function Hero() {
             gap: 8,
             textDecoration: "none",
             whiteSpace: "nowrap",
-            transition: "opacity 0.2s",
             letterSpacing: "-0.01em",
+            transform: primaryHovered ? "translateY(-1px)" : "translateY(0)",
+            boxShadow: primaryHovered ? "0 8px 24px rgba(0,0,0,0.3)" : "none",
+            transition: "all 0.2s ease",
           }}
         >
           Começar grátis
@@ -102,19 +112,21 @@ export default function Hero() {
         </a>
         <a
           href="#como-funciona"
+          onMouseEnter={() => setSecondaryHovered(true)}
+          onMouseLeave={() => setSecondaryHovered(false)}
           style={{
             fontSize: 13,
-            color: "var(--color-text-secondary)",
+            color: secondaryHovered ? "var(--color-text-primary)" : "var(--color-text-secondary)",
             textDecoration: "none",
             display: "inline-flex",
             alignItems: "center",
             gap: 6,
             padding: "15px 22px",
             borderRadius: 12,
-            border: "0.5px solid var(--color-border-strong)",
+            border: `0.5px solid ${secondaryHovered ? "var(--color-border-strong)" : "var(--color-border)"}`,
             whiteSpace: "nowrap",
             letterSpacing: "-0.01em",
-            transition: "border-color 0.2s",
+            transition: "all 0.2s ease",
           }}
         >
           Ver demonstração
@@ -130,12 +142,13 @@ export default function Hero() {
           justifyContent: "center",
           gap: 14,
           flexWrap: "wrap",
+          letterSpacing: "0.02em",
         }}
       >
-        <span>3 imagens grátis</span>
-        <span>•</span>
+        <span>12 nodes grátis</span>
+        <span style={{ opacity: 0.4 }}>•</span>
         <span>Sem cartão</span>
-        <span>•</span>
+        <span style={{ opacity: 0.4 }}>•</span>
         <span>Sem compromisso</span>
       </div>
     </section>
