@@ -19,11 +19,11 @@ interface GenerateResult {
 }
 
 const LOADING_TEXTS = [
-  'analisando geometria…',
-  'refinando materiais…',
-  'ajustando iluminação…',
-  'renderizando fotorrealismo…',
-  'finalizando render…',
+  'Analisando composição...',
+  'Ajustando iluminação...',
+  'Refinando materiais...',
+  'Aplicando fotorrealismo...',
+  'Gerando versão final...',
 ]
 
 const SPN_ENGINES = [
@@ -60,10 +60,12 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
   const supabase = createClient()
 
   // ── Global state
-  const [credits,     setCredits]     = useState(initialCredits)
-  const [loading,     setLoading]     = useState(false)
-  const [loadingText, setLoadingText] = useState('')
-  const [error,       setError]       = useState<string | null>(null)
+  const [credits,            setCredits]           = useState(initialCredits)
+  const [loading,            setLoading]           = useState(false)
+  const [loadingText,        setLoadingText]       = useState('')
+  const [loadingTextVisible, setLoadingTextVisible] = useState(true)
+  const [generationKey,      setGenerationKey]     = useState(0)
+  const [error,              setError]             = useState<string | null>(null)
 
   // ── Dark mode
   // Server always renders isDark=false (no document). useLayoutEffect syncs
@@ -150,10 +152,18 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
 
   // ── Loading texts
   const startLoadingTexts = () => {
-    let i = 0; setLoadingText(LOADING_TEXTS[0])
+    let i = 0
+    setLoadingText(LOADING_TEXTS[0])
+    setLoadingTextVisible(true)
+    setGenerationKey(k => k + 1)
     loadingTimerRef.current = setInterval(() => {
-      i = (i + 1) % LOADING_TEXTS.length; setLoadingText(LOADING_TEXTS[i])
-    }, 2200)
+      setLoadingTextVisible(false)
+      setTimeout(() => {
+        i = (i + 1) % LOADING_TEXTS.length
+        setLoadingText(LOADING_TEXTS[i])
+        setLoadingTextVisible(true)
+      }, 220)
+    }, 1500)
   }
   const stopLoadingTexts = () => {
     if (loadingTimerRef.current) clearInterval(loadingTimerRef.current)
@@ -196,7 +206,7 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
   }
 
   // ── Geração
-  const handleGenerate = async () => {
+  const handleGenerate = async (qualityOverride?: string) => {
     if (!imagePreview) { setError('Faça upload de uma imagem primeiro.'); return }
     if (credits < nodeCost) { setError('Nodes insuficientes.'); return }
     setError(null); setLoading(true); startLoadingTexts()
@@ -215,7 +225,7 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
           geometryLock,
           fidelityMode,
           model:         selectedModel,
-          outputQuality,
+          outputQuality: qualityOverride ?? outputQuality,
           materials:     Object.values(materials).some(v => v) ? materials : undefined,
         }),
       })
@@ -542,6 +552,39 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
           </div>
         )}
 
+        {/* ── POST-GENERATION ACTIONS ── */}
+        {imagePreview && outputUrl && !loading && (
+          <div style={S.postGen}>
+            {outputQuality === 'hd' && (
+              <div style={S.upsellNote}>
+                Melhore para 2K ou 4K para apresentação profissional
+              </div>
+            )}
+            <div style={S.postGenPrimary}>
+              <button style={S.actionBtn} onClick={() => handleGenerate()}>
+                Gerar nova variação
+              </button>
+              <a
+                href={outputUrl}
+                download="spacenode-render.jpg"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={S.actionBtn}
+              >
+                Baixar imagem
+              </a>
+            </div>
+            <div style={S.postGenSecondary}>
+              <button style={S.actionBtnGhost} onClick={() => handleGenerate('2k')}>
+                Melhorar qualidade (2K / 4K)
+              </button>
+              <a href="/app/history" style={S.actionBtnGhost}>
+                Salvar no histórico
+              </a>
+            </div>
+          </div>
+        )}
+
         {imagePreview && !outputUrl && !loading && (
           <div style={S.compareWrap}>
             <img src={imagePreview} alt="Input" style={S.compareImg}/>
@@ -554,14 +597,25 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
 
         {loading && imagePreview && (
           <div style={S.compareWrap}>
-            <img src={imagePreview} alt="Input" style={{...S.compareImg, opacity:0.15, filter:'blur(4px)'}}/>
+            <img src={imagePreview} alt="Input" style={{...S.compareImg, opacity:0.12, filter:'blur(6px)'}}/>
             <div style={S.loadingOverlay}>
               <div style={{color:'#fafafa', animation:'pulse 2s cubic-bezier(0.4,0,0.6,1) infinite'}}>
-                <Logo size={48}/>
+                <Logo size={40}/>
               </div>
-              <div style={{display:'flex', flexDirection:'column', alignItems:'center', gap:8}}>
-                <span style={{fontSize:12, color:'#fafafa', letterSpacing:'0.08em', fontWeight:500}}>{loadingText}</span>
-                <span style={{fontSize:9, color:'rgba(255,255,255,0.4)', letterSpacing:'0.16em', textTransform:'uppercase'}}>processando render</span>
+              <div style={{display:'flex', flexDirection:'column', alignItems:'center', gap:10}}>
+                <span style={{
+                  fontSize: 12,
+                  color: '#fafafa',
+                  letterSpacing: '0.06em',
+                  fontWeight: 500,
+                  opacity: loadingTextVisible ? 1 : 0,
+                  transition: 'opacity 0.22s ease',
+                }}>
+                  {loadingText}
+                </span>
+                <div style={{width:100, height:1, background:'rgba(255,255,255,0.1)', borderRadius:1, overflow:'hidden'}}>
+                  <div key={generationKey} style={{height:'100%', background:'rgba(255,255,255,0.45)', borderRadius:1, animation:'loadProgress 40s cubic-bezier(0.05,0,0.2,1) forwards'}}/>
+                </div>
               </div>
             </div>
           </div>
@@ -686,6 +740,12 @@ const S: Record<string, React.CSSProperties> = {
   promptLabel:       { fontSize:9, letterSpacing:'0.15em', textTransform:'uppercase', color:'var(--color-text-tertiary)', fontWeight:500, marginBottom:8 },
   promptText:        { fontSize:11, color:'var(--color-text-tertiary)', lineHeight:1.65 },
   downloadLink:      { fontSize:11, color:'var(--color-text-tertiary)', textDecoration:'none' },
+  postGen:           { display:'flex', flexDirection:'column', gap:8 },
+  postGenPrimary:    { display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 },
+  postGenSecondary:  { display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 },
+  actionBtn:         { padding:'11px 16px', background:'var(--color-text-primary)', color:'var(--color-bg)', border:'none', borderRadius:8, fontSize:12, fontWeight:500, cursor:'pointer', fontFamily:'inherit', textAlign:'center' as const, textDecoration:'none', display:'flex', alignItems:'center', justifyContent:'center' },
+  actionBtnGhost:    { padding:'10px 14px', background:'none', border:'0.5px solid var(--color-border-strong)', borderRadius:8, fontSize:11, color:'var(--color-text-tertiary)', cursor:'pointer', fontFamily:'inherit', textAlign:'center' as const, textDecoration:'none', display:'flex', alignItems:'center', justifyContent:'center' },
+  upsellNote:        { fontSize:10, color:'var(--color-text-tertiary)', textAlign:'center' as const, letterSpacing:'0.02em', padding:'7px 14px', background:'var(--color-bg-elevated)', border:'0.5px solid var(--color-border)', borderRadius:6, lineHeight:1.5 },
 }
 
 export default GenerateClient
