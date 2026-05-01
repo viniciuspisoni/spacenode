@@ -11,7 +11,7 @@ const MODELS = [
   {
     id:         'fal-ai/clarity-upscaler',
     label:      'Clarity',
-    desc:       'Realça texturas arquitetônicas',
+    desc:       'Realismo avançado com alta fidelidade de materiais',
     badge:      'RECOMENDADO',
     badgeColor: '#16a34a',
     hasPrompt:  true,
@@ -19,7 +19,7 @@ const MODELS = [
   {
     id:         'fal-ai/aura-sr',
     label:      'AuraSR',
-    desc:       'Ampliação neutra, menor custo',
+    desc:       'Upscale neutro e rápido, ideal para prévias',
     badge:      'RÁPIDO',
     badgeColor: '#65a30d',
     hasPrompt:  false,
@@ -27,7 +27,7 @@ const MODELS = [
   {
     id:         'fal-ai/supir',
     label:      'SUPIR',
-    desc:       'Qualidade máxima, mais lento',
+    desc:       'Máximo nível de detalhe e refinamento visual',
     badge:      'MÁXIMA',
     badgeColor: '#d97706',
     hasPrompt:  true,
@@ -35,7 +35,7 @@ const MODELS = [
   {
     id:         'fal-ai/esrgan',
     label:      'Real-ESRGAN',
-    desc:       'Sem alucinação de textura',
+    desc:       'Upscale técnico com preservação da imagem original',
     badge:      null,
     badgeColor: null,
     hasPrompt:  false,
@@ -147,7 +147,7 @@ export default function UpscaleClient({ initialCredits }: UpscaleClientProps) {
         <div style={{ padding: '24px 24px 16px', borderBottom: '0.5px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em', color: '#ffffff' }}>Upscale</div>
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 3 }}>
-            Amplie resolução com IA — 4 ou 8 Nodes por geração
+            Amplie resolução com IA para apresentação, portfólio e entrega final.
           </div>
         </div>
 
@@ -224,9 +224,12 @@ export default function UpscaleClient({ initialCredits }: UpscaleClientProps) {
 
           {/* Model selector */}
           <div>
-            <label style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', display: 'block', marginBottom: 10 }}>
+            <label style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', display: 'block', marginBottom: 4 }}>
               Modelo
             </label>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', marginBottom: 10 }}>
+              Cada modelo altera como os detalhes são reconstruídos.
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {MODELS.map(m => (
                 <button
