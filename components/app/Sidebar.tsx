@@ -62,7 +62,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     label: 'CRIAR',
     items: [
       { label: 'renderizar', href: '/app/generate', exact: false, Icon: IconGenerate  },
-      { label: 'melhorar',   href: null,            exact: false, Icon: IconEnhance,  badge: 'em breve' },
+      { label: 'melhorar',   href: '/app/upscale',  exact: false, Icon: IconEnhance  },
     ],
   },
   {
