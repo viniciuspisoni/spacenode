@@ -1,3 +1,14 @@
+const VIDEO_ENGINE_LABELS: Record<string, string> = {
+  'fal-ai/kling-video/v2.5-turbo/pro/image-to-video': 'Rápido',
+  'fal-ai/kling-video/v3/pro/image-to-video':          'Cinemático',
+}
+
+export function getVideoDisplayLabel(engineId: string, duration?: string | null): string {
+  const label = VIDEO_ENGINE_LABELS[engineId] ?? 'Animação'
+  const dur   = duration ?? '5s'
+  return `Vídeo ${dur} · ${label}`
+}
+
 const UPSCALE_MODEL_LABELS: Record<string, string> = {
   'fal-ai/clarity-upscaler': 'Alta definição',
   'fal-ai/aura-sr':          'Realce natural',

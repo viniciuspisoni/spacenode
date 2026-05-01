@@ -41,6 +41,12 @@ const IconEnhance = () => (
     <path d="M19 13l.94 2.06L22 16l-2.06.94L19 19l-.94-2.06L16 16l2.06-.94L19 13z"/>
   </svg>
 )
+const IconVideo = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <polygon points="23 7 16 12 23 17 23 7"/>
+    <rect x="1" y="5" width="15" height="14" rx="2"/>
+  </svg>
+)
 
 type NavItem = {
   label: string
@@ -62,7 +68,8 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     label: 'CRIAR',
     items: [
       { label: 'renderizar', href: '/app/generate', exact: false, Icon: IconGenerate  },
-      { label: 'melhorar',   href: '/app/upscale',  exact: false, Icon: IconEnhance  },
+      { label: 'melhorar',   href: '/app/upscale',  exact: false, Icon: IconEnhance   },
+      { label: 'animar',     href: '/app/video',    exact: false, Icon: IconVideo     },
     ],
   },
   {
