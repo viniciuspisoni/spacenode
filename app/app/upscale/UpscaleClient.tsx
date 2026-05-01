@@ -93,9 +93,11 @@ export default function UpscaleClient({ initialCredits }: UpscaleClientProps) {
   const [isDragging,         setIsDragging]         = useState(false)
   const [recommendedModelId, setRecommendedModelId] = useState<string | null>(null)
   const [recommendedReason,  setRecommendedReason]  = useState<string | null>(null)
+  const [isAnalyzing,        setIsAnalyzing]        = useState(false)
 
-  const fileInputRef    = useRef<HTMLInputElement>(null)
-  const loadingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const fileInputRef      = useRef<HTMLInputElement>(null)
+  const loadingTimerRef   = useRef<ReturnType<typeof setInterval> | null>(null)
+  const analyzeTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const activeModel = MODELS.find(m => m.id === selectedModel)!
   const nodeCost = SCALES.find(s => s.value === selectedScale)!.nodes
@@ -106,9 +108,16 @@ export default function UpscaleClient({ initialCredits }: UpscaleClientProps) {
     setImageFile(file)
     setResultUrl(null)
     setError(null)
-    const rec = detectRecommendedModel(file)
-    setRecommendedModelId(rec.model)
-    setRecommendedReason(rec.reason)
+    setRecommendedModelId(null)
+    setRecommendedReason(null)
+    setIsAnalyzing(true)
+    if (analyzeTimerRef.current) clearTimeout(analyzeTimerRef.current)
+    analyzeTimerRef.current = setTimeout(() => {
+      const rec = detectRecommendedModel(file)
+      setRecommendedModelId(rec.model)
+      setRecommendedReason(rec.reason)
+      setIsAnalyzing(false)
+    }, 300)
     const reader = new FileReader()
     reader.onload = (e) => setImagePreview(e.target?.result as string)
     reader.readAsDataURL(file)
@@ -259,8 +268,25 @@ export default function UpscaleClient({ initialCredits }: UpscaleClientProps) {
               Cada modelo altera como os detalhes são reconstruídos.
             </div>
 
-            {/* Recommendation banner — neutral before upload, specific after */}
-            {recommendedModelId === null ? (
+            {/* Recommendation banner — neutral → analyzing → recommendation */}
+            {isAnalyzing ? (
+              <div style={{
+                padding: '8px 10px', borderRadius: 6, marginBottom: 10,
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.07)',
+                display: 'flex', alignItems: 'center', gap: 8,
+              }}>
+                <div style={{
+                  width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                  border: '1.5px solid rgba(255,255,255,0.15)',
+                  borderTop: '1.5px solid rgba(255,255,255,0.5)',
+                  animation: 'spin 0.8s linear infinite',
+                }} />
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
+                  Analisando imagem...
+                </span>
+              </div>
+            ) : recommendedModelId === null ? (
               <div style={{
                 padding: '8px 10px', borderRadius: 6, marginBottom: 10,
                 background: 'rgba(255,255,255,0.03)',
