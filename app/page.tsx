@@ -14,7 +14,6 @@ import { FAQ } from "@/components/landing/FAQ";
 import { PricingToggle } from "@/components/landing/PricingToggle";
 import { PlatformModules } from "@/components/landing/PlatformModules";
 import { ValueProps } from "@/components/landing/ValueProps";
-import { SocialProof } from "@/components/landing/SocialProof";
 import { MobileCTA } from "@/components/landing/MobileCTA";
 
 const Divider = () => (
@@ -40,8 +39,6 @@ export default function Home() {
       <HowItWorks />
       <Divider />
       <ProductMockup />
-      <Divider />
-      <SocialProof />
       <Divider />
       <ComparisonTable />
       <Divider />
