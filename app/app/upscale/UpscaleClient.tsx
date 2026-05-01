@@ -52,6 +52,24 @@ const SCALES = [
   { value: 8, label: '8×', sub: 'Nebula', nodes: 20, locked: true  },
 ]
 
+// Filename + filesize heuristics — no ML, no pixel analysis
+function detectRecommendedModel(file: File): string {
+  const name = file.name.toLowerCase()
+
+  // Technical drawings, CAD exports, floor plans → preserve hard edges
+  const lineHints = ['sketch', 'wireframe', 'line', 'cad', 'schematic',
+    'floor', 'plant', 'planta', 'linework', 'drawing', 'contour', 'diagrama']
+  if (lineHints.some(k => name.includes(k))) return 'fal-ai/esrgan'
+
+  // Low-res previews / drafts → fast neutral upscale
+  const previewHints = ['preview', 'draft', 'rascunho', 'thumb', 'wip', 'test', 'teste', 'low']
+  const isSmallFile  = file.size < 200 * 1024   // < 200 KB usually = compressed preview
+  if (previewHints.some(k => name.includes(k)) || isSmallFile) return 'fal-ai/aura-sr'
+
+  // Default: realistic render → Clarity
+  return 'fal-ai/clarity-upscaler'
+}
+
 const LOADING_TEXTS = [
   'Enviando imagem...',
   'Processando com IA...',
@@ -71,7 +89,8 @@ export default function UpscaleClient({ initialCredits }: UpscaleClientProps) {
   const [resultUrl,    setResultUrl]    = useState<string | null>(null)
   const [credits,      setCredits]      = useState(initialCredits)
   const [error,        setError]        = useState<string | null>(null)
-  const [isDragging,   setIsDragging]   = useState(false)
+  const [isDragging,        setIsDragging]        = useState(false)
+  const [recommendedModelId, setRecommendedModelId] = useState<string>('fal-ai/clarity-upscaler')
 
   const fileInputRef    = useRef<HTMLInputElement>(null)
   const loadingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -85,6 +104,7 @@ export default function UpscaleClient({ initialCredits }: UpscaleClientProps) {
     setImageFile(file)
     setResultUrl(null)
     setError(null)
+    setRecommendedModelId(detectRecommendedModel(file))
     const reader = new FileReader()
     reader.onload = (e) => setImagePreview(e.target?.result as string)
     reader.readAsDataURL(file)
@@ -235,19 +255,26 @@ export default function UpscaleClient({ initialCredits }: UpscaleClientProps) {
               Cada modelo altera como os detalhes são reconstruídos.
             </div>
 
-            {/* Recommendation hint */}
+            {/* Recommendation hint — updates dynamically on image load */}
             <div style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '6px 10px', borderRadius: 6, marginBottom: 10,
+              padding: '7px 10px', borderRadius: 6, marginBottom: 10,
               background: 'rgba(22,163,74,0.07)',
               border: '1px solid rgba(22,163,74,0.16)',
             }}>
-              <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
-                <path d="M6 1l1.09 3.26L10.5 4.5l-2.59 2.09.91 3.41L6 8.25l-2.82 1.75.91-3.41L1.5 4.5l3.41-.24L6 1z" fill="rgba(134,239,172,0.8)"/>
-              </svg>
-              <span style={{ fontSize: 10, color: 'rgba(134,239,172,0.85)' }}>
-                Recomendado para esta imagem: <strong style={{ fontWeight: 600 }}>Clarity</strong>
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                  <path d="M6 1l1.09 3.26L10.5 4.5l-2.59 2.09.91 3.41L6 8.25l-2.82 1.75.91-3.41L1.5 4.5l3.41-.24L6 1z" fill="rgba(134,239,172,0.8)"/>
+                </svg>
+                <span style={{ fontSize: 10, color: 'rgba(134,239,172,0.85)' }}>
+                  Recomendado para esta imagem:{' '}
+                  <strong style={{ fontWeight: 600 }}>
+                    {MODELS.find(m => m.id === recommendedModelId)!.label}
+                  </strong>
+                </span>
+              </div>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', marginTop: 3, paddingLeft: 16 }}>
+                Baseado no tipo de imagem enviada
+              </div>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
