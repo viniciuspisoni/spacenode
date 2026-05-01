@@ -11,7 +11,8 @@ const MODELS = [
   {
     id:         'fal-ai/clarity-upscaler',
     label:      'Clarity',
-    desc:       'Realismo avançado com alta fidelidade de materiais',
+    tag:        'Melhor qualidade geral',
+    desc:       'Realismo avançado com fidelidade precisa de materiais',
     badge:      'RECOMENDADO',
     badgeColor: '#16a34a',
     hasPrompt:  true,
@@ -19,7 +20,8 @@ const MODELS = [
   {
     id:         'fal-ai/aura-sr',
     label:      'AuraSR',
-    desc:       'Upscale neutro e rápido, ideal para prévias',
+    tag:        'Mais rápido',
+    desc:       'Upscale rápido e limpo para prévias',
     badge:      'RÁPIDO',
     badgeColor: '#65a30d',
     hasPrompt:  false,
@@ -27,7 +29,8 @@ const MODELS = [
   {
     id:         'fal-ai/supir',
     label:      'SUPIR',
-    desc:       'Máximo nível de detalhe e refinamento visual',
+    tag:        'Máximo detalhe',
+    desc:       'Máximo refinamento com reconstrução avançada',
     badge:      'MÁXIMA',
     badgeColor: '#d97706',
     hasPrompt:  true,
@@ -35,7 +38,8 @@ const MODELS = [
   {
     id:         'fal-ai/esrgan',
     label:      'Real-ESRGAN',
-    desc:       'Upscale técnico com preservação da imagem original',
+    tag:        'Preserva geometria',
+    desc:       'Preserva a geometria e detalhes originais',
     badge:      null,
     badgeColor: null,
     hasPrompt:  false,
@@ -230,6 +234,22 @@ export default function UpscaleClient({ initialCredits }: UpscaleClientProps) {
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', marginBottom: 10 }}>
               Cada modelo altera como os detalhes são reconstruídos.
             </div>
+
+            {/* Recommendation hint */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '6px 10px', borderRadius: 6, marginBottom: 10,
+              background: 'rgba(22,163,74,0.07)',
+              border: '1px solid rgba(22,163,74,0.16)',
+            }}>
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                <path d="M6 1l1.09 3.26L10.5 4.5l-2.59 2.09.91 3.41L6 8.25l-2.82 1.75.91-3.41L1.5 4.5l3.41-.24L6 1z" fill="rgba(134,239,172,0.8)"/>
+              </svg>
+              <span style={{ fontSize: 10, color: 'rgba(134,239,172,0.85)' }}>
+                Recomendado para esta imagem: <strong style={{ fontWeight: 600 }}>Clarity</strong>
+              </span>
+            </div>
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {MODELS.map(m => (
                 <button
@@ -256,10 +276,15 @@ export default function UpscaleClient({ initialCredits }: UpscaleClientProps) {
                     transition: 'background 0.15s',
                   }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 500, color: selectedModel === m.id ? '#ffffff' : 'rgba(255,255,255,0.6)', letterSpacing: '-0.01em' }}>
-                      {m.label}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 12, fontWeight: 500, color: selectedModel === m.id ? '#ffffff' : 'rgba(255,255,255,0.6)', letterSpacing: '-0.01em' }}>
+                        {m.label}
+                      </span>
+                      <span style={{ fontSize: 9, color: selectedModel === m.id ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.25)', letterSpacing: '0.01em' }}>
+                        {m.tag}
+                      </span>
                     </div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 1 }}>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>
                       {m.desc}
                     </div>
                   </div>
