@@ -91,8 +91,8 @@ export default function UpscaleClient({ initialCredits }: UpscaleClientProps) {
   const [credits,      setCredits]      = useState(initialCredits)
   const [error,        setError]        = useState<string | null>(null)
   const [isDragging,         setIsDragging]         = useState(false)
-  const [recommendedModelId, setRecommendedModelId] = useState<string>('fal-ai/clarity-upscaler')
-  const [recommendedReason,  setRecommendedReason]  = useState<string>('Detectamos um render realista com materiais aplicados')
+  const [recommendedModelId, setRecommendedModelId] = useState<string | null>(null)
+  const [recommendedReason,  setRecommendedReason]  = useState<string | null>(null)
 
   const fileInputRef    = useRef<HTMLInputElement>(null)
   const loadingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -259,48 +259,64 @@ export default function UpscaleClient({ initialCredits }: UpscaleClientProps) {
               Cada modelo altera como os detalhes são reconstruídos.
             </div>
 
-            {/* Recommendation banner — updates dynamically on image load */}
-            <div style={{
-              padding: '8px 10px', borderRadius: 6, marginBottom: 10,
-              background: 'rgba(22,163,74,0.07)',
-              border: '1px solid rgba(22,163,74,0.16)',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <svg width="10" height="10" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0 }}>
-                  <path d="M6 1l1.09 3.26L10.5 4.5l-2.59 2.09.91 3.41L6 8.25l-2.82 1.75.91-3.41L1.5 4.5l3.41-.24L6 1z" fill="rgba(134,239,172,0.8)"/>
-                </svg>
-                <span style={{ fontSize: 10, color: 'rgba(134,239,172,0.9)', fontWeight: 500 }}>
-                  Recomendado:{' '}
-                  <strong style={{ fontWeight: 700 }}>
-                    {MODELS.find(m => m.id === recommendedModelId)!.label}
-                  </strong>
-                </span>
-              </div>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginTop: 4, paddingLeft: 16 }}>
-                {recommendedReason}
-              </div>
-            </div>
-
-            {/* Mismatch hint — only visible when user picked a different model */}
-            {selectedModel !== recommendedModelId && (
+            {/* Recommendation banner — neutral before upload, specific after */}
+            {recommendedModelId === null ? (
               <div style={{
-                display: 'flex', alignItems: 'center', gap: 5,
-                padding: '5px 8px', borderRadius: 5, marginBottom: 10,
+                padding: '8px 10px', borderRadius: 6, marginBottom: 10,
                 background: 'rgba(255,255,255,0.03)',
                 border: '1px solid rgba(255,255,255,0.07)',
               }}>
-                <svg width="9" height="9" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
-                  <circle cx="8" cy="8" r="7" stroke="rgba(255,255,255,0.2)" strokeWidth="1.5"/>
-                  <path d="M8 5v4M8 11v.5" stroke="rgba(255,255,255,0.35)" strokeWidth="1.5" strokeLinecap="round"/>
-                </svg>
-                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>
-                  Recomendamos{' '}
-                  <strong style={{ fontWeight: 600, color: 'rgba(255,255,255,0.45)' }}>
-                    {MODELS.find(m => m.id === recommendedModelId)!.label}
-                  </strong>
-                  {' '}para melhor resultado
-                </span>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>
+                  Envie uma imagem para receber uma recomendação de modelo.
+                </div>
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', marginTop: 3 }}>
+                  A Spacenode sugere o melhor processamento com base no tipo de imagem.
+                </div>
               </div>
+            ) : (
+              <>
+                <div style={{
+                  padding: '8px 10px', borderRadius: 6, marginBottom: 10,
+                  background: 'rgba(22,163,74,0.07)',
+                  border: '1px solid rgba(22,163,74,0.16)',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <svg width="10" height="10" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0 }}>
+                      <path d="M6 1l1.09 3.26L10.5 4.5l-2.59 2.09.91 3.41L6 8.25l-2.82 1.75.91-3.41L1.5 4.5l3.41-.24L6 1z" fill="rgba(134,239,172,0.8)"/>
+                    </svg>
+                    <span style={{ fontSize: 10, color: 'rgba(134,239,172,0.9)', fontWeight: 500 }}>
+                      Recomendado:{' '}
+                      <strong style={{ fontWeight: 700 }}>
+                        {MODELS.find(m => m.id === recommendedModelId)!.label}
+                      </strong>
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginTop: 4, paddingLeft: 16 }}>
+                    {recommendedReason}
+                  </div>
+                </div>
+
+                {selectedModel !== recommendedModelId && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 5,
+                    padding: '5px 8px', borderRadius: 5, marginBottom: 10,
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.07)',
+                  }}>
+                    <svg width="9" height="9" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+                      <circle cx="8" cy="8" r="7" stroke="rgba(255,255,255,0.2)" strokeWidth="1.5"/>
+                      <path d="M8 5v4M8 11v.5" stroke="rgba(255,255,255,0.35)" strokeWidth="1.5" strokeLinecap="round"/>
+                    </svg>
+                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>
+                      Recomendamos{' '}
+                      <strong style={{ fontWeight: 600, color: 'rgba(255,255,255,0.45)' }}>
+                        {MODELS.find(m => m.id === recommendedModelId)!.label}
+                      </strong>
+                      {' '}para melhor resultado
+                    </span>
+                  </div>
+                )}
+              </>
             )}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
