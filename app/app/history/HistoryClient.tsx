@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useLayoutEffect, useMemo, type CSSProperties } from 'react'
+import { getUpscaleDisplayLabel } from '@/lib/renderLabels'
 
 interface Render {
   id: string
@@ -160,12 +161,15 @@ export function HistoryClient({ renders, credits }: Props) {
 function RenderCard({ render }: { render: Render }) {
   const [hovered, setHovered] = useState(false)
 
-  const date    = formatDate(render.created_at)
-  const display = render.output_url ?? render.input_url
-  const quality = qualityLabel(render.cost_credits)
-  const engine  = engineLabel(render.model)
-  const title   = render.ambient || render.lighting || 'Render'
-  const sub     = [render.style === 'exterior' ? 'Exterior' : render.style === 'interior' ? 'Interior' : render.style, render.lighting].filter(Boolean).join(' · ')
+  const date      = formatDate(render.created_at)
+  const display   = render.output_url ?? render.input_url
+  const isUpscale = render.ambient === 'upscale'
+  const quality   = isUpscale ? null : qualityLabel(render.cost_credits)
+  const engine    = isUpscale ? null : engineLabel(render.model)
+  const title     = isUpscale ? 'Upscale' : (render.ambient || render.lighting || 'Render')
+  const sub       = isUpscale
+    ? getUpscaleDisplayLabel(render.style, render.lighting)
+    : [render.style === 'exterior' ? 'Exterior' : render.style === 'interior' ? 'Interior' : render.style, render.lighting].filter(Boolean).join(' · ')
 
   return (
     <div

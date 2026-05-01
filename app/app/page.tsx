@@ -1,12 +1,14 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { getUpscaleDisplayLabel } from '@/lib/renderLabels'
 
 type RecentRender = {
   id: string
   output_url: string
   ambient: string
   style: string
+  lighting?: string
   created_at: string
 }
 
@@ -29,7 +31,7 @@ export default async function AppPage() {
   const [profileResult, recentResult, countResult, monthResult] = await Promise.all([
     supabase.from('profiles').select('credits').eq('id', user.id).single(),
     supabase.from('renders')
-      .select('id, output_url, ambient, style, created_at')
+      .select('id, output_url, ambient, style, lighting, created_at')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(4),
@@ -167,7 +169,9 @@ export default async function AppPage() {
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, letterSpacing: '-0.02em' }}>
-                      {r.ambient || r.style || 'Render'}
+                      {r.ambient === 'upscale'
+                        ? getUpscaleDisplayLabel(r.style, r.lighting)
+                        : (r.ambient || r.style || 'Render')}
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4, letterSpacing: '0.01em' }}>
                       {formatDate(r.created_at)}
