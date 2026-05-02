@@ -69,6 +69,7 @@ export default function VideoClient({ initialCredits }: VideoClientProps) {
   const [resultUrl,        setResultUrl]        = useState<string | null>(null)
   const [credits,          setCredits]          = useState(initialCredits)
   const [error,            setError]            = useState<string | null>(null)
+  const [wasCropped,       setWasCropped]       = useState(false)
   const [isDragging,       setIsDragging]       = useState(false)
 
   const fileInputRef    = useRef<HTMLInputElement>(null)
@@ -90,11 +91,51 @@ export default function VideoClient({ initialCredits }: VideoClientProps) {
   function loadImageFile(file: File) {
     if (!file.type.startsWith('image/')) { setError('Arquivo deve ser uma imagem.'); return }
     if (file.size > 20 * 1024 * 1024)   { setError('Imagem muito grande. Máximo 20 MB.'); return }
-    setImageFile(file)
-    setResultUrl(null)
-    setError(null)
+
     const reader = new FileReader()
-    reader.onload = e => setImagePreview(e.target?.result as string)
+    reader.onload = e => {
+      const src = e.target?.result as string
+      const img = new Image()
+      img.onload = () => {
+        const ratio = img.width / img.height
+        const needsCrop = ratio < 0.4 || ratio > 2.5
+
+        if (!needsCrop) {
+          setImageFile(file)
+          setImagePreview(src)
+          setResultUrl(null)
+          setError(null)
+          setWasCropped(false)
+          return
+        }
+
+        // Center-crop to nearest valid boundary
+        const canvas  = document.createElement('canvas')
+        const ctx     = canvas.getContext('2d')!
+        if (ratio < 0.4) {
+          // Too tall — crop height
+          canvas.width  = img.width
+          canvas.height = Math.round(img.width / 0.4)
+          ctx.drawImage(img, 0, -Math.round((img.height - canvas.height) / 2))
+        } else {
+          // Too wide — crop width
+          canvas.width  = Math.round(img.height * 2.5)
+          canvas.height = img.height
+          ctx.drawImage(img, -Math.round((img.width - canvas.width) / 2), 0)
+        }
+
+        const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.95)
+        canvas.toBlob(blob => {
+          if (!blob) return
+          setImageFile(new File([blob], file.name, { type: 'image/jpeg' }))
+          setImagePreview(croppedDataUrl)
+          setResultUrl(null)
+          setError(null)
+          setWasCropped(true)
+        }, 'image/jpeg', 0.95)
+      }
+      img.src = src
+    }
     reader.readAsDataURL(file)
   }
 
@@ -201,12 +242,19 @@ export default function VideoClient({ initialCredits }: VideoClientProps) {
               )}
             </div>
             {imageFile && !isLoading && (
-              <button
-                onClick={() => { setImageFile(null); setImagePreview(null); setResultUrl(null) }}
-                style={{ marginTop: 8, fontSize: 10, color: 'rgba(255,255,255,0.3)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-              >
-                Trocar imagem
-              </button>
+              <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                {wasCropped ? (
+                  <span style={{ fontSize: 10, color: 'rgba(255,200,50,0.6)' }}>
+                    Recortada automaticamente para proporção compatível
+                  </span>
+                ) : <span />}
+                <button
+                  onClick={() => { setImageFile(null); setImagePreview(null); setResultUrl(null); setWasCropped(false) }}
+                  style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                >
+                  Trocar imagem
+                </button>
+              </div>
             )}
             <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }}
               onChange={e => { const f = e.target.files?.[0]; if (f) loadImageFile(f) }} />

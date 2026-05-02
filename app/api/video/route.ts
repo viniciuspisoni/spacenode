@@ -123,6 +123,19 @@ export async function POST(req: NextRequest) {
     const e = err as { status?: number; body?: unknown; message?: string }
     console.error('[video] ERROR status:', e?.status)
     console.error('[video] ERROR body  :', JSON.stringify(e?.body ?? e?.message ?? err))
+
+    if (e?.status === 422) {
+      const detail = (e.body as { detail?: { msg?: string }[] })?.detail
+      const msg = detail?.[0]?.msg
+      if (msg?.includes('aspect ratio')) {
+        return NextResponse.json(
+          { error: 'Proporção da imagem inválida. Use imagens com proporção entre 0.4 e 2.5 (ex: 16:9, 4:3, quadrado). Imagens muito altas ou muito largas não são aceitas.' },
+          { status: 422 }
+        )
+      }
+      return NextResponse.json({ error: msg ?? 'Parâmetros inválidos.' }, { status: 422 })
+    }
+
     return NextResponse.json({ error: 'Erro ao gerar vídeo. Tente novamente.' }, { status: 500 })
   }
 }
