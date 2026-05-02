@@ -90,11 +90,28 @@ export default function VideoClient({ initialCredits }: VideoClientProps) {
   function loadImageFile(file: File) {
     if (!file.type.startsWith('image/')) { setError('Arquivo deve ser uma imagem.'); return }
     if (file.size > 20 * 1024 * 1024)   { setError('Imagem muito grande. Máximo 20 MB.'); return }
-    setImageFile(file)
-    setResultUrl(null)
-    setError(null)
+
     const reader = new FileReader()
-    reader.onload = e => setImagePreview(e.target?.result as string)
+    reader.onload = e => {
+      const src = e.target?.result as string
+      const img = new Image()
+      img.onload = () => {
+        const ratio = img.width / img.height
+        if (ratio < 0.4 || ratio > 2.5) {
+          setError(
+            `Proporção da imagem inválida (${img.width}×${img.height}). ` +
+            `O modelo exige proporção entre 0.4 e 2.5 (ex: retrato, quadrado, paisagem 16:9). ` +
+            `Imagens muito altas ou muito largas não são aceitas.`
+          )
+          return
+        }
+        setImageFile(file)
+        setResultUrl(null)
+        setError(null)
+        setImagePreview(src)
+      }
+      img.src = src
+    }
     reader.readAsDataURL(file)
   }
 
