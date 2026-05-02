@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useLayoutEffect, useMemo, type CSSProperties } from 'react'
-import { getUpscaleDisplayLabel } from '@/lib/renderLabels'
+import { getUpscaleDisplayLabel, getVideoDisplayLabel } from '@/lib/renderLabels'
 
 interface Render {
   id: string
@@ -162,14 +162,18 @@ function RenderCard({ render }: { render: Render }) {
   const [hovered, setHovered] = useState(false)
 
   const date      = formatDate(render.created_at)
-  const display   = render.output_url ?? render.input_url
   const isUpscale = render.ambient === 'upscale'
-  const quality   = isUpscale ? null : qualityLabel(render.cost_credits)
-  const engine    = isUpscale ? null : engineLabel(render.model)
-  const title     = isUpscale ? 'Upscale' : (render.ambient || render.lighting || 'Render')
+  const isVideo   = render.ambient === 'video'
+  // Vídeo: thumbnail é o input (o MP4 não serve como <img>)
+  const display   = isVideo ? render.input_url : (render.output_url ?? render.input_url)
+  const quality   = (isUpscale || isVideo) ? null : qualityLabel(render.cost_credits)
+  const engine    = (isUpscale || isVideo) ? null : engineLabel(render.model)
+  const title     = isUpscale ? 'Upscale' : isVideo ? 'Animar Render' : (render.ambient || render.lighting || 'Render')
   const sub       = isUpscale
     ? getUpscaleDisplayLabel(render.style, render.lighting)
-    : [render.style === 'exterior' ? 'Exterior' : render.style === 'interior' ? 'Interior' : render.style, render.lighting].filter(Boolean).join(' · ')
+    : isVideo
+      ? getVideoDisplayLabel(render.style, render.lighting)
+      : [render.style === 'exterior' ? 'Exterior' : render.style === 'interior' ? 'Interior' : render.style, render.lighting].filter(Boolean).join(' · ')
 
   return (
     <div
@@ -189,13 +193,24 @@ function RenderCard({ render }: { render: Render }) {
           />
         )}
 
-        {/* Before thumbnail on hover */}
-        {hovered && render.output_url && render.input_url && (
+        {/* Before thumbnail on hover — não mostrar para vídeo */}
+        {hovered && render.output_url && render.input_url && !isVideo && (
           <div style={S.beforeThumb}>
             <img src={render.input_url} alt="antes" draggable={false}
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />
             <span style={S.beforeLabel}>antes</span>
+          </div>
+        )}
+
+        {/* Ícone de play para cards de vídeo */}
+        {isVideo && (
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+            <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="white" style={{ marginLeft: 2 }}>
+                <polygon points="5 3 19 12 5 21 5 3"/>
+              </svg>
+            </div>
           </div>
         )}
 
@@ -210,7 +225,7 @@ function RenderCard({ render }: { render: Render }) {
           <div style={S.hoverActions}>
             <a href={render.output_url} target="_blank" rel="noopener noreferrer"
               style={S.actionBtn} onClick={e => e.stopPropagation()}>
-              Ver →
+              {isVideo ? 'Assistir →' : 'Ver →'}
             </a>
             <a href={render.output_url} download target="_blank" rel="noopener noreferrer"
               style={S.actionBtnGhost} onClick={e => e.stopPropagation()}>
