@@ -3,8 +3,9 @@ import { createClient }      from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { VistaType, DnaOverrides, GenerationMode } from '@/lib/spaces/types'
 import { getDefaultDnaOverrides, getModePreset, applyModeUnlocks } from '@/lib/spaces/dna'
-import { buildVistaPrompt }  from '@/lib/spaces/buildVistaPrompt'
-import { callFalForVista }   from '@/lib/spaces/falAdapter'
+import { buildVistaPrompt }               from '@/lib/spaces/buildVistaPrompt'
+import { callFalForVista, uploadToFalStorage } from '@/lib/spaces/falAdapter'
+import { SPACES_MAX_UPLOAD_BYTES, SPACES_UPLOAD_SIZE_ERROR } from '@/lib/spaces/upload'
 
 // ── POST /api/spaces/[spaceId]/evolve ─────────────────────────────────────────
 
@@ -19,12 +20,13 @@ const VALID_VISTA_TYPES: EvolvableVistaType[] = [
 const EVOLVE_COST_CREDITS = 4
 
 interface EvolveBody {
-  parent_render_id: string
-  vista_type:       EvolvableVistaType
-  generation_mode?: GenerationMode          // default 'coerente'
-  dna_overrides?:   DnaOverrides            // from drawer; computed here if absent
-  geometry_lock?:   number                  // from drawer; derived from mode if absent
-  vista_label?:     string
+  parent_render_id:    string
+  vista_type:          EvolvableVistaType
+  generation_mode?:    GenerationMode          // default 'coerente'
+  dna_overrides?:      DnaOverrides            // from drawer; computed here if absent
+  geometry_lock?:      number                  // from drawer; derived from mode if absent
+  vista_label?:        string
+  input_image_base64?: string                  // optional: user-uploaded draft/wireframe
 }
 
 export async function POST(req: NextRequest, { params }: Params) {
@@ -50,6 +52,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     dna_overrides,
     geometry_lock,
     vista_label,
+    input_image_base64,
   } = body
 
   if (!parent_render_id || !vista_type) {
@@ -88,8 +91,33 @@ export async function POST(req: NextRequest, { params }: Params) {
       { status: 403 },
     )
   }
-  if (!parent.output_url) {
-    return NextResponse.json({ error: 'Vista pai sem imagem de saída' }, { status: 422 })
+
+  // ── 5-a. Resolve FAL input URL ──────────────────────────────────────────────
+  // When the caller provides input_image_base64 (upload flow), validate the
+  // decoded size, upload to fal.storage, and use that URL as FAL input.
+  // Otherwise fall back to parent.output_url (standard evolve flow).
+  const fromUpload = !!input_image_base64
+  let vistaInputUrl: string
+
+  if (fromUpload) {
+    const raw    = input_image_base64!.includes(',')
+      ? input_image_base64!.split(',')[1]
+      : input_image_base64!
+    const buffer = Buffer.from(raw, 'base64')
+    if (buffer.length > SPACES_MAX_UPLOAD_BYTES) {
+      return NextResponse.json({ error: SPACES_UPLOAD_SIZE_ERROR }, { status: 413 })
+    }
+    try {
+      vistaInputUrl = await uploadToFalStorage(input_image_base64!)
+    } catch (err) {
+      console.error('[evolve] upload nova vista:', err)
+      return NextResponse.json({ error: 'Falha no upload da imagem' }, { status: 500 })
+    }
+  } else {
+    if (!parent.output_url) {
+      return NextResponse.json({ error: 'Vista pai sem imagem de saída' }, { status: 422 })
+    }
+    vistaInputUrl = parent.output_url
   }
 
   // ── 5. Resolve overrides and geometry lock ──────────────────────────────────
@@ -111,6 +139,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     overrides:    resolvedOverrides,
     vistaType:    vista_type,
     geometryLock: resolvedLock,
+    fromUpload,
   })
 
   console.log('[evolve] space_id        :', spaceId)
@@ -147,7 +176,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       generation_mode,
       dna_overrides:    resolvedOverrides,
       vista_label:      vista_label ?? null,
-      input_url:        parent.output_url,
+      input_url:        vistaInputUrl,
       prompt:           finalPrompt,
       status:           'processing',
       ambient:          vista_type,
@@ -167,7 +196,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   // ── 9. Call FAL ─────────────────────────────────────────────────────────────
   try {
-    const { outputUrl } = await callFalForVista(parent.output_url, finalPrompt)
+    const { outputUrl } = await callFalForVista(vistaInputUrl, finalPrompt)
 
     console.log('[evolve] output_url:', outputUrl)
 
