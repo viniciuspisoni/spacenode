@@ -21,6 +21,21 @@ function buildGeometryPrefix(geometryLock: number): string {
 const CAMERA_SUFFIX =
   ', captured with professional architectural camera, Canon R5, 24mm tilt-shift lens, f/4, ISO 100, Hasselblad aesthetic, hyperrealistic, 8K RAW photo, photorealistic architectural photography, not a render, not CGI, real life photo'
 
+// ── Multi-image context prefix ────────────────────────────────────────────────
+// Prepended when the FAL call includes the Vista Mestre as a second reference
+// image alongside the parent render (or uploaded draft).
+// Image 1 = Vista Mestre (visual DNA anchor — materials extracted visually)
+// Image 2 = Geometry reference (parent render or user-uploaded wireframe)
+
+const MESTRE_REF_PREFIX =
+  '[REFERENCE IMAGES — READ CAREFULLY]\n' +
+  'Image 1 = Vista Mestre (visual DNA anchor for this project). ' +
+  'Extract ALL surface materials, claddings, textures, colors, finishes and ' +
+  'architectural style from Image 1 EXACTLY. ' +
+  'They define the PROJECT IDENTITY — reproduce them identically in the output.\n' +
+  'Image 2 = Geometry reference. Use its camera angle, spatial composition ' +
+  'and proportions as the structural base.\n\n'
+
 // ── Upload-based angulo prompt ────────────────────────────────────────────────
 // Used when the caller supplies a new wireframe/draft image (input_image_base64)
 // instead of evolving an existing render. The model should render the draft
@@ -102,6 +117,7 @@ export interface BuildVistaPromptOptions {
   vistaType:    Exclude<VistaType, 'mestre'>
   geometryLock: number   // 0–100
   fromUpload?:  boolean  // true when input is a user-uploaded draft (not an existing render)
+  mestreRef?:   boolean  // true when FAL receives Vista Mestre as Image 1 (visual DNA anchor)
 }
 
 export function buildVistaPrompt({
@@ -109,7 +125,8 @@ export function buildVistaPrompt({
   overrides,
   vistaType,
   geometryLock,
-  fromUpload = false,
+  fromUpload  = false,
+  mestreRef   = false,
 }: BuildVistaPromptOptions): string {
   // Apply per-vista geometry-lock cap before building the prefix so that
   // view-changing types (angulo, interior) never receive a contradictory
@@ -119,11 +136,16 @@ export function buildVistaPrompt({
   const geomPrefix = buildGeometryPrefix(effectiveLock)
   const dnaPrefix  = buildDnaPrefix(dna, overrides)  // only includes locked traits
 
+  // When the FAL call includes the Vista Mestre as Image 1, prepend the
+  // multi-image context block so the model knows to extract materials from
+  // Image 1 and use Image 2 only for geometry/composition.
+  const refPrefix = mestreRef ? MESTRE_REF_PREFIX : ''
+
   // Upload-based angulo gets a dedicated prompt: "render this draft realistically"
   // instead of the normal "generate an alternative camera angle" instruction.
   const base = (fromUpload && vistaType === 'angulo')
     ? VISTA_ANGULO_FROM_UPLOAD
     : VISTA_BASE[vistaType]
 
-  return `${geomPrefix}${dnaPrefix}${base}`
+  return `${refPrefix}${geomPrefix}${dnaPrefix}${base}`
 }

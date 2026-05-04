@@ -20,14 +20,24 @@ export async function uploadToFalStorage(base64: string): Promise<string> {
 // ── callFalForVista ───────────────────────────────────────────────────────────
 // Submits an image-edit request to the Vega engine (Gemini 3 Pro Image) and
 // returns the first output URL. Throws on timeout or missing output.
+//
+// mestreUrl — when provided and different from inputUrl, it is placed FIRST in
+// image_urls so the model can extract project materials from the Vista Mestre
+// (visual DNA anchor) before processing the geometry reference image.
 
 export async function callFalForVista(
-  inputUrl: string,
-  prompt:   string,
+  inputUrl:   string,
+  prompt:     string,
+  mestreUrl?: string,
 ): Promise<{ outputUrl: string }> {
+  // mestre first (visual DNA source), then the parent/input (geometry reference)
+  const imageUrls = (mestreUrl && mestreUrl !== inputUrl)
+    ? [mestreUrl, inputUrl]
+    : [inputUrl]
+
   const falInput = {
     prompt,
-    image_urls:    [inputUrl],
+    image_urls:    imageUrls,
     resolution:    '1K'    as const,
     num_images:    1,
     output_format: 'jpeg'  as const,

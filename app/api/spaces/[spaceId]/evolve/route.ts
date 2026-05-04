@@ -71,7 +71,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   // ── 3. Fetch Space (RLS — verifies ownership) ───────────────────────────────
   const { data: space } = await supabase
     .from('spaces')
-    .select('id, project_dna')
+    .select('id, project_dna, anchor_render_id')
     .eq('id', spaceId)
     .single()
   if (!space) return NextResponse.json({ error: 'Space não encontrado' }, { status: 404 })
@@ -120,6 +120,24 @@ export async function POST(req: NextRequest, { params }: Params) {
     vistaInputUrl = parent.output_url
   }
 
+  // ── 4-b. Fetch Vista Mestre URL (visual DNA anchor) ────────────────────────
+  // The Vista Mestre image is included as Image 1 in every FAL call so the
+  // model can extract project materials visually — independent of whether
+  // project_dna text fields are populated. Skipped when the parent IS the
+  // mestre (inputUrl == mestreUrl → callFalForVista de-duplicates automatically).
+  let mestreUrl: string | undefined
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const anchorId = (space as any).anchor_render_id as string | null
+  if (anchorId) {
+    const { data: anchor } = await supabase
+      .from('renders')
+      .select('output_url')
+      .eq('id', anchorId)
+      .eq('space_id', spaceId)
+      .single()
+    if (anchor?.output_url) mestreUrl = anchor.output_url
+  }
+
   // ── 5. Resolve overrides and geometry lock ──────────────────────────────────
   // If drawer sends overrides, trust them (user customised).
   // Otherwise derive from vista_type defaults then apply mode auto-unlocks.
@@ -134,19 +152,25 @@ export async function POST(req: NextRequest, { params }: Params) {
   const dna = space.project_dna as any
 
   // ── 6. Build prompt ─────────────────────────────────────────────────────────
+  // mestreRef=true when the Vista Mestre will be sent as Image 1 alongside the
+  // parent/input (Image 2). The prompt then includes the multi-image context
+  // block so the model extracts materials from Image 1 and geometry from Image 2.
+  const mestreRef = !!(mestreUrl && mestreUrl !== vistaInputUrl)
   const finalPrompt = buildVistaPrompt({
     dna,
     overrides:    resolvedOverrides,
     vistaType:    vista_type,
     geometryLock: resolvedLock,
     fromUpload,
+    mestreRef,
   })
 
   console.log('[evolve] space_id        :', spaceId)
   console.log('[evolve] vista_type      :', vista_type)
   console.log('[evolve] generation_mode :', generation_mode)
   console.log('[evolve] geometry_lock   :', resolvedLock)
-  console.log('[evolve] prompt preview  :', finalPrompt.slice(0, 140))
+  console.log('[evolve] mestre_ref      :', mestreRef, mestreUrl ? `(${mestreUrl.slice(0, 60)}…)` : '(none)')
+  console.log('[evolve] prompt preview  :', finalPrompt.slice(0, 160))
 
   // ── 7. Consume credits BEFORE calling FAL ──────────────────────────────────
   // Awaited synchronously so FAL is never reached when balance is insufficient.
@@ -196,7 +220,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   // ── 9. Call FAL ─────────────────────────────────────────────────────────────
   try {
-    const { outputUrl } = await callFalForVista(vistaInputUrl, finalPrompt)
+    const { outputUrl } = await callFalForVista(vistaInputUrl, finalPrompt, mestreUrl)
 
     console.log('[evolve] output_url:', outputUrl)
 
