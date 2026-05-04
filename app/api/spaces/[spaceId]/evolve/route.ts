@@ -73,14 +73,20 @@ export async function POST(req: NextRequest, { params }: Params) {
     .single()
   if (!space) return NextResponse.json({ error: 'Space não encontrado' }, { status: 404 })
 
-  // ── 4. Fetch parent render (RLS — verifies ownership + output_url) ──────────
+  // ── 4. Fetch parent render (RLS + space ownership) ─────────────────────────
+  // Requires space_id match so a render from another Space cannot be used as
+  // parent here — prevents cross-space lineage corruption (P0 security fix).
   const { data: parent } = await supabase
     .from('renders')
     .select('id, output_url')
     .eq('id', parent_render_id)
+    .eq('space_id', spaceId)
     .single()
   if (!parent) {
-    return NextResponse.json({ error: 'Vista pai não encontrada' }, { status: 404 })
+    return NextResponse.json(
+      { error: 'Parent render does not belong to this Space.' },
+      { status: 403 },
+    )
   }
   if (!parent.output_url) {
     return NextResponse.json({ error: 'Vista pai sem imagem de saída' }, { status: 422 })
@@ -113,8 +119,21 @@ export async function POST(req: NextRequest, { params }: Params) {
   console.log('[evolve] geometry_lock   :', resolvedLock)
   console.log('[evolve] prompt preview  :', finalPrompt.slice(0, 140))
 
-  // ── 7. Pre-insert render with status = 'processing' ────────────────────────
+  // ── 7. Consume credits BEFORE calling FAL ──────────────────────────────────
+  // Awaited synchronously so FAL is never reached when balance is insufficient.
+  // consume_credits is SECURITY DEFINER — safe to call via admin client.
+  // NOTE: if FAL fails after this point, credits are NOT refunded in v1.
+  //       Refund logic is deferred to post-beta (tracked as P1 tech debt).
   const admin = createAdminClient()
+  const { data: credited, error: creditError } = await admin
+    .rpc('consume_credits', { user_id_input: user.id, amount: EVOLVE_COST_CREDITS })
+
+  if (creditError || !credited) {
+    console.warn('[evolve] créditos insuficientes ou erro RPC:', creditError?.message)
+    return NextResponse.json({ error: 'Créditos insuficientes' }, { status: 402 })
+  }
+
+  // ── 8. Pre-insert render with status = 'processing' ────────────────────────
   const { data: newRender, error: insertError } = await admin
     .from('renders')
     .insert({
@@ -143,13 +162,13 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const vistaId = newRender.id
 
-  // ── 8. Call FAL ─────────────────────────────────────────────────────────────
+  // ── 9. Call FAL ─────────────────────────────────────────────────────────────
   try {
     const { outputUrl } = await callFalForVista(parent.output_url, finalPrompt)
 
     console.log('[evolve] output_url:', outputUrl)
 
-    // ── 9. Mark completed ─────────────────────────────────────────────────────
+    // ── 10. Mark completed ────────────────────────────────────────────────────
     await admin
       .from('renders')
       .update({
@@ -158,13 +177,6 @@ export async function POST(req: NextRequest, { params }: Params) {
         completed_at: new Date().toISOString(),
       })
       .eq('id', vistaId)
-
-    // ── 10. Consume credits (non-blocking) ────────────────────────────────────
-    admin
-      .rpc('consume_credits', { user_id_input: user.id, amount: EVOLVE_COST_CREDITS })
-      .then(({ error }) => {
-        if (error) console.error('[evolve] consume_credits error:', error)
-      })
 
     return NextResponse.json({
       vista_id:   vistaId,
@@ -176,7 +188,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const e = err as { message?: string; isFalTimeout?: boolean }
     console.error('[evolve] FAL error:', e?.message)
 
-    // ── 11. Mark failed ───────────────────────────────────────────────────────
+    // ── 11. Mark failed (credits already consumed — refund deferred to post-beta) ─
     await admin
       .from('renders')
       .update({
