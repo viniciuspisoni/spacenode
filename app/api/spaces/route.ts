@@ -3,6 +3,7 @@ import { fal } from '@fal-ai/client'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { SpaceCategory, ProjectDNA } from '@/lib/spaces/types'
+import { SPACES_MAX_UPLOAD_BYTES, SPACES_UPLOAD_SIZE_ERROR } from '@/lib/spaces/upload'
 
 fal.config({ credentials: process.env.FAL_KEY })
 
@@ -71,6 +72,14 @@ export async function POST(req: NextRequest) {
       ? anchor_image_base64.split(',')[1]
       : anchor_image_base64
     const buffer = Buffer.from(base64Data, 'base64')
+
+    // Server-side size guard: validate decoded byte length against the same
+    // constant used by the client, ensuring consistent enforcement regardless
+    // of how the request was made.
+    if (buffer.length > SPACES_MAX_UPLOAD_BYTES) {
+      return NextResponse.json({ error: SPACES_UPLOAD_SIZE_ERROR }, { status: 413 })
+    }
+
     const imageFile = new File([buffer], 'anchor.jpg', { type: 'image/jpeg' })
     anchorUrl = await fal.storage.upload(imageFile)
   } catch (err) {

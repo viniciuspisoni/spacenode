@@ -4,6 +4,10 @@ import { useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import type { SpaceCategory, ProjectDNA } from '@/lib/spaces/types'
+import {
+  SPACES_MAX_UPLOAD_BYTES,
+  SPACES_UPLOAD_SIZE_ERROR,
+} from '@/lib/spaces/upload'
 
 // ── Field helpers ─────────────────────────────────────────────────────────────
 
@@ -67,8 +71,8 @@ export default function NewSpacePage() {
       setError('Selecione um arquivo de imagem.')
       return
     }
-    if (file.size > 10 * 1024 * 1024) {
-      setError('Imagem deve ter menos de 10 MB.')
+    if (file.size > SPACES_MAX_UPLOAD_BYTES) {
+      setError(SPACES_UPLOAD_SIZE_ERROR)
       return
     }
     const reader = new FileReader()
