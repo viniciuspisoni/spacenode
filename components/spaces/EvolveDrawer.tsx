@@ -120,7 +120,8 @@ export function EvolveDrawer({
   // Component unmounts on close (due to `if (!isOpen) return null`) so this
   // runs fresh each time the drawer opens.
   useEffect(() => {
-    setSuggestionsLoading(true)
+    // setSuggestionsLoading is already true from useState(true) — component
+    // remounts on each open (returns null when closed), so no need to reset here.
     fetch(`/api/spaces/${spaceId}/suggestions`)
       .then(r => r.json())
       .then(d => setSuggestions(d.suggestions ?? []))

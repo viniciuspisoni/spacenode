@@ -35,6 +35,7 @@ export default function RenderCanvas({
   const [textIdx, setTextIdx] = useState(0)
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (state !== 'generating') { setTextIdx(0); return }
     const t = setInterval(() => setTextIdx((i) => (i + 1) % LOADING_TEXTS.length), 1400)
     return () => clearInterval(t)

@@ -43,6 +43,7 @@ function formatDate(iso: string) {
 export function HistoryClient({ renders, credits }: Props) {
   const [isDark, setIsDark] = useState(false)
   useLayoutEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsDark(document.documentElement.classList.contains('dark'))
   }, [])
 

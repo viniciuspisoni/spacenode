@@ -72,6 +72,7 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
   // the correct value on the client before the first paint — no visible flash.
   const [isDark, setIsDark] = useState(false)
   useLayoutEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsDark(document.documentElement.classList.contains('dark'))
   }, [])
 

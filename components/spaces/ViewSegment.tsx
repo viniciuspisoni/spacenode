@@ -72,6 +72,7 @@ export function useViewMode(spaceId: string): [ViewMode, (mode: ViewMode) => voi
     try {
       const stored = localStorage.getItem(key)
       if (stored === 'intention' || stored === 'lineage' || stored === 'chronological') {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setMode(stored as ViewMode)
       }
     } catch { /* SSR or privacy mode */ }
