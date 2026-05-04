@@ -47,6 +47,12 @@ const IconVideo = () => (
     <rect x="1" y="5" width="15" height="14" rx="2"/>
   </svg>
 )
+const IconSpaces = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="3"/>
+    <path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/>
+  </svg>
+)
 
 type NavItem = {
   label: string
@@ -68,6 +74,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     label: 'CRIAR',
     items: [
       { label: 'renderizar', href: '/app/generate', exact: false, Icon: IconGenerate  },
+      { label: 'spaces',     href: '/app/spaces',   exact: false, Icon: IconSpaces, badge: 'novo' },
       { label: 'melhorar',   href: '/app/upscale',  exact: false, Icon: IconEnhance   },
       { label: 'animar',     href: '/app/video',    exact: false, Icon: IconVideo     },
     ],
@@ -175,8 +182,8 @@ export default function Sidebar({ userName, userAvatar }: SidebarProps) {
                     <span style={{
                       fontSize: 8, fontWeight: 600, letterSpacing: '0.08em',
                       textTransform: 'uppercase' as const,
-                      color: 'rgba(255,255,255,0.25)',
-                      background: 'rgba(255,255,255,0.06)',
+                      color: '#30b46c',
+                      background: 'rgba(48,180,108,0.18)',
                       padding: '2px 6px', borderRadius: 20,
                       whiteSpace: 'nowrap' as const, flexShrink: 0,
                     }}>
