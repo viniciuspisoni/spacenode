@@ -121,12 +121,15 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   // ── 7. Consume credits BEFORE calling FAL ──────────────────────────────────
   // Awaited synchronously so FAL is never reached when balance is insufficient.
-  // consume_credits is SECURITY DEFINER — safe to call via admin client.
+  // consume_credits validates auth.uid() inside the SECURITY DEFINER function,
+  // so it MUST be called with the user client (supabase) — not the admin client —
+  // to ensure the caller's JWT is present in the session and auth.uid() resolves.
   // NOTE: if FAL fails after this point, credits are NOT refunded in v1.
   //       Refund logic is deferred to post-beta (tracked as P1 tech debt).
-  const admin = createAdminClient()
-  const { data: credited, error: creditError } = await admin
+  const { data: credited, error: creditError } = await supabase
     .rpc('consume_credits', { user_id_input: user.id, amount: EVOLVE_COST_CREDITS })
+
+  const admin = createAdminClient()
 
   if (creditError || !credited) {
     console.warn('[evolve] créditos insuficientes ou erro RPC:', creditError?.message)
