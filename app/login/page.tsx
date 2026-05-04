@@ -44,6 +44,7 @@ export default function LoginPage() {
   }, [])
 
   // Clear feedback when the user edits
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setError(null); setSuccess(null) }, [mode, email, password])
 
   async function handleSubmit(e: React.FormEvent) {

@@ -1,10 +1,15 @@
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
-const geist = Geist({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600"],
+// Geist served from local woff2 — avoids the network fetch that next/font/google
+// performs at build time (fails in offline CI and restricted environments).
+// Source: node_modules/next/dist/esm/next-devtools/server/font/
+const geist = localFont({
+  src: [
+    { path: "../public/fonts/geist-latin.woff2",     weight: "100 900", style: "normal" },
+    { path: "../public/fonts/geist-latin-ext.woff2", weight: "100 900", style: "normal" },
+  ],
   variable: "--font-geist",
   display: "swap",
 });
