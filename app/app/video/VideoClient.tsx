@@ -10,26 +10,33 @@ const ENGINES = [
   {
     id:              'fal-ai/kling-video/v2.5-turbo/pro/image-to-video',
     label:           'Rápido',
-    tag:             'Mais ágil',
-    desc:            'Geração mais rápida, movimento natural, ideal para revisão interna',
+    tag:             'Draft',
+    desc:            'Geração rápida para revisão interna e iteração de movimento',
     badge:           null as string | null,
     badgeColor:      null as string | null,
     nodesByDuration: { '5': 30, '10': 55 } as Record<string, number>,
+    durations:       [{ value: '5', label: '5s' }, { value: '10', label: '10s' }],
   },
   {
-    id:              'fal-ai/kling-video/v3/pro/image-to-video',
+    id:              'fal-ai/veo3.1/image-to-video',
     label:           'Cinemático',
-    tag:             'Melhor qualidade',
-    desc:            'Máxima fidelidade arquitetônica, movimentos premium para entrega final',
+    tag:             'Veo 3.1',
+    desc:            'Qualidade cinematográfica de ponta, controle de câmera premium para entrega',
     badge:           'RECOMENDADO' as string | null,
     badgeColor:      '#16a34a' as string | null,
-    nodesByDuration: { '5': 35, '10': 70 } as Record<string, number>,
+    nodesByDuration: { '4': 70, '6': 100, '8': 135 } as Record<string, number>,
+    durations:       [{ value: '4', label: '4s' }, { value: '6', label: '6s' }, { value: '8', label: '8s' }],
   },
-]
-
-const DURATIONS = [
-  { value: '5',  label: '5s'  },
-  { value: '10', label: '10s' },
+  {
+    id:              'bytedance/seedance-2.0/image-to-video',
+    label:           'Arquitetônico',
+    tag:             'Seedance 2.0',
+    desc:            'Máxima fidelidade de geometria e materiais — ideal para fachadas e interiores',
+    badge:           'NOVO' as string | null,
+    badgeColor:      '#3b82f6' as string | null,
+    nodesByDuration: { '5': 101, '10': 202 } as Record<string, number>,
+    durations:       [{ value: '5', label: '5s' }, { value: '10', label: '10s' }],
+  },
 ]
 
 const MOTION_PRESETS = [
@@ -60,7 +67,7 @@ export default function VideoClient({ initialCredits }: VideoClientProps) {
   const [imageFile,        setImageFile]        = useState<File | null>(null)
   const [imagePreview,     setImagePreview]     = useState<string | null>(null)
   const [selectedEngine,   setSelectedEngine]   = useState(ENGINES[1].id)
-  const [selectedDuration, setSelectedDuration] = useState('5')
+  const [selectedDuration, setSelectedDuration] = useState('8')
   const [selectedMotion,   setSelectedMotion]   = useState('push_in')
   const [customPrompt,     setCustomPrompt]     = useState('')
   const [isLoading,        setIsLoading]        = useState(false)
@@ -77,7 +84,15 @@ export default function VideoClient({ initialCredits }: VideoClientProps) {
   const elapsedInterval = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const activeEngine = ENGINES.find(e => e.id === selectedEngine)!
-  const nodeCost     = activeEngine.nodesByDuration[selectedDuration] ?? 30
+  const nodeCost     = activeEngine.nodesByDuration[selectedDuration] ?? activeEngine.nodesByDuration[activeEngine.durations[0].value]
+
+  // Reset duration if the current value isn't valid for the newly selected engine
+  // (e.g. Kling supports 5/10s, Veo supports 4/6/8s — switching needs a fallback).
+  useEffect(() => {
+    if (!activeEngine.nodesByDuration[selectedDuration]) {
+      setSelectedDuration(activeEngine.durations[activeEngine.durations.length - 1].value)
+    }
+  }, [activeEngine, selectedDuration])
 
   useEffect(() => {
     if (!isLoading) {
@@ -313,7 +328,7 @@ export default function VideoClient({ initialCredits }: VideoClientProps) {
           <div>
             <label style={L}>Duração</label>
             <div style={{ display: 'flex', gap: 8 }}>
-              {DURATIONS.map(d => {
+              {activeEngine.durations.map(d => {
                 const cost    = activeEngine.nodesByDuration[d.value]
                 const active  = selectedDuration === d.value
                 return (

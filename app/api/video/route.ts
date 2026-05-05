@@ -18,12 +18,20 @@ fal.config({ credentials: process.env.FAL_KEY })
 //   Cada request dura < 5s. Elimina dependência de plano Vercel e risco de duplo débito.
 export const maxDuration = 300
 
+// Node costs calibrados para margem ≥70% @ R$5,00/USD (mantém piso >55% até R$7,00/USD).
+// 1 node = R$0,25 ao usuário. Custos Fal:
+//   Kling 2.5 Turbo Pro i2v   : $0,35 (5s) / $0,70 (10s)
+//   Veo 3.1 standard 1080p s/áudio : $0,20/s
+//   Seedance 2.0 standard 1080p   : $0,3024/s
 const ENGINES = {
   'fal-ai/kling-video/v2.5-turbo/pro/image-to-video': {
     nodesByDuration: { '5': 30, '10': 55 } as Record<string, number>,
   },
-  'fal-ai/kling-video/v3/pro/image-to-video': {
-    nodesByDuration: { '5': 35, '10': 70 } as Record<string, number>,
+  'fal-ai/veo3.1/image-to-video': {
+    nodesByDuration: { '4': 70, '6': 100, '8': 135 } as Record<string, number>,
+  },
+  'bytedance/seedance-2.0/image-to-video': {
+    nodesByDuration: { '5': 101, '10': 202 } as Record<string, number>,
   },
 } as const
 
@@ -46,7 +54,10 @@ const MOTION_PROMPTS: Record<string, string> = {
 }
 
 const NEGATIVE_PROMPT =
-  'camera shake, handheld movement, distortion, morphing, warping, geometric artifacts, blurry frames, jitter'
+  'camera shake, handheld movement, distortion, morphing, warping, geometric artifacts, ' +
+  'blurry frames, jitter, melting concrete, liquid glass, deforming windows, rubbery materials, ' +
+  'walls breathing, surfaces shifting, edges bending, materials changing, geometry collapse, ' +
+  'low quality, amateur, cartoon, illustration, oversaturated colors'
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -58,8 +69,8 @@ export async function POST(req: NextRequest) {
   try {
     const formData     = await req.formData()
     const imageFile    = formData.get('image')    as File   | null
-    const engineId     = (formData.get('engine')  as string | null) ?? 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video'
-    const duration     = (formData.get('duration')as string | null) ?? '5'
+    const engineId     = (formData.get('engine')  as string | null) ?? 'fal-ai/veo3.1/image-to-video'
+    const duration     = (formData.get('duration')as string | null) ?? '8'
     const motionPreset = (formData.get('motion')  as string | null) ?? 'push_in'
     const customPrompt = (formData.get('prompt')  as string | null) ?? ''
 
@@ -68,7 +79,8 @@ export async function POST(req: NextRequest) {
     const engine = ENGINES[engineId as keyof typeof ENGINES]
     if (!engine) return NextResponse.json({ error: 'Motor inválido' }, { status: 400 })
 
-    const nodeCost = engine.nodesByDuration[duration] ?? 30
+    const nodeCost = engine.nodesByDuration[duration]
+    if (!nodeCost) return NextResponse.json({ error: 'Duração inválida para este motor' }, { status: 400 })
 
     const admin = createAdminClient()
     const { data: profile } = await admin
@@ -86,7 +98,7 @@ export async function POST(req: NextRequest) {
     const motionText = MOTION_PROMPTS[motionPreset] ?? MOTION_PROMPTS.push_in
     const fullPrompt = [motionText, customPrompt, ARCH_SUFFIX].filter(Boolean).join('. ')
 
-    const falInput = buildFalInput(engineId, inputUrl, duration, fullPrompt)
+    const falInput = buildFalInput(engineId, inputUrl, duration, fullPrompt, motionPreset)
 
     console.log('[video] engine:', engineId)
     console.log('[video] input :', JSON.stringify(falInput))
@@ -143,10 +155,11 @@ export async function POST(req: NextRequest) {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function buildFalInput(
-  engineId: string,
-  imageUrl: string,
-  duration: string,
-  prompt: string,
+  engineId:     string,
+  imageUrl:     string,
+  duration:     string,
+  prompt:       string,
+  motionPreset: string,
 ): Record<string, unknown> {
   if (engineId === 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video') {
     return {
@@ -154,23 +167,39 @@ function buildFalInput(
       prompt,
       duration,
       negative_prompt: NEGATIVE_PROMPT,
-      cfg_scale:       0.5,
+      cfg_scale:       0.75,
     }
   }
-  // Kling v3 Pro — parâmetro renomeado para start_image_url nesta versão
-  return {
-    start_image_url: imageUrl,
-    prompt,
-    duration,
-    generate_audio:  false,
-    negative_prompt: NEGATIVE_PROMPT,
-    cfg_scale:       0.5,
+  if (engineId === 'fal-ai/veo3.1/image-to-video') {
+    return {
+      image_url:       imageUrl,
+      prompt,
+      duration:        `${duration}s`,
+      resolution:      '1080p',
+      aspect_ratio:    'auto',
+      generate_audio:  false,
+      negative_prompt: NEGATIVE_PROMPT,
+    }
   }
+  if (engineId === 'bytedance/seedance-2.0/image-to-video') {
+    // Seedance 2.0 não expõe camera_fixed nem negative_prompt — tudo via prompt.
+    // generate_audio default é true; força false para evitar surpresa de billing.
+    void motionPreset
+    return {
+      image_url:      imageUrl,
+      prompt,
+      duration,
+      resolution:     '1080p',
+      aspect_ratio:   'auto',
+      generate_audio: false,
+    }
+  }
+  throw new Error(`Engine não suportado: ${engineId}`)
 }
 
 function extractVideoUrl(data: unknown): string | null {
   const d = data as Record<string, unknown>
-  // Kling → { video: { url: string } }
+  // Kling, Veo, Seedance → { video: { url: string } }
   if (d?.video && typeof (d.video as Record<string, unknown>).url === 'string') {
     return (d.video as Record<string, unknown>).url as string
   }
