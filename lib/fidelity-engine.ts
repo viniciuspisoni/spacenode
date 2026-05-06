@@ -28,16 +28,19 @@ const USER_PROMPT =
   '  "materiais_aparentes": string,    // materiais visíveis na imagem (concreto, madeira, vidro, ACM, pedra...)\n' +
   '  "camera": string,                 // ângulo, altura, distância aparente da câmera\n' +
   '  "entorno": string,                // contexto visível (rua, vizinhos, vegetação, lote)\n' +
-  '  "elementos_preservar": string[],  // 4-8 itens críticos da arquitetura que NÃO podem mudar\n' +
-  '  "elementos_melhorar": string[]    // 3-6 melhorias visuais permitidas (textura, luz, vegetação, sombra)\n' +
+  '  "elementos_preservar": string[],  // 6-10 itens da imagem que NÃO podem mudar — sempre incluir materiais, texturas, móveis e decoração\n' +
+  '  "elementos_melhorar": string[]    // 0-3 ajustes mínimos de fotorrealismo, OU array vazio se a imagem já estiver realista\n' +
   '}\n\n' +
   'Regras:\n' +
   '- Conte pavimentos olhando linhas de laje, parapeitos e janelas — não chute.\n' +
   '- Se houver casa vizinha, prédio adjacente ou muro vizinho, inclua em "entorno" e em "elementos_preservar".\n' +
-  '- "elementos_preservar" deve sempre conter pelo menos: número de pavimentos, posição das aberturas, ' +
-  'volumetria principal, ângulo da câmera.\n' +
-  '- "elementos_melhorar" só pode listar coisas visuais (realismo de material, qualidade de luz, sombras, ' +
-  'reflexos, vegetação discreta) — NUNCA arquitetura.\n' +
+  '- "elementos_preservar" deve sempre incluir: número de pavimentos, posição das aberturas, volumetria, ' +
+  'ângulo da câmera, MATERIAIS visíveis (piso, parede, teto, fachada), TEXTURAS visíveis (tapete, tecido, ' +
+  'madeira), móveis e elementos decorativos visíveis.\n' +
+  '- "elementos_melhorar" deve ser CONSERVADOR. Em quase todos os casos, use array vazio []. Só liste algo ' +
+  'se a imagem for claramente um esquema 3D sem realismo — e mesmo aí, NUNCA mencione "trocar materiais", ' +
+  '"melhorar texturas" ou "atualizar materiais". Use só coisas como "adicionar sombras suaves", "ajustar ' +
+  'reflexos do vidro existente". A regra de ouro: se em dúvida, deixe vazio.\n' +
   '- Não invente o que não está visível na imagem.'
 
 function fallbackBriefing(): BriefingArquitetonico {
@@ -56,13 +59,12 @@ function fallbackBriefing(): BriefingArquitetonico {
       'volumetria principal',
       'ângulo da câmera',
       'edificações vizinhas se existirem',
+      'todos os materiais e texturas visíveis',
+      'todos os móveis e elementos decorativos',
     ],
-    elementos_melhorar: [
-      'realismo de materiais',
-      'qualidade de iluminação',
-      'sombras e reflexos',
-      'vegetação discreta',
-    ],
+    // Vazio por padrão — fallback conservador. Sem licença implícita pra modelo
+    // reinterpretar materiais.
+    elementos_melhorar: [],
   }
 }
 
