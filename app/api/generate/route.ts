@@ -2,7 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { fal } from '@fal-ai/client'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { buildGenerationPrompt, type GenerateOptions, type ProjectMaterials } from '@/lib/prompts'
+import {
+  buildGenerationPrompt,
+  buildFidelityPrompt,
+  type GenerateOptions,
+  type ProjectMaterials,
+  type BriefingArquitetonico,
+  type FidelityLevel,
+} from '@/lib/prompts'
 
 fal.config({ credentials: process.env.FAL_KEY })
 
@@ -66,9 +73,29 @@ export async function POST(req: NextRequest) {
       outputQuality   = 'hd',
       materials,
       fidelityMode    = 'strict',
-    } = body
+      // novos: vindos do /api/analyze quando o usuário usa Fidelity Engine
+      briefing,                              // BriefingArquitetonico | undefined
+      inputUrl: providedInputUrl,            // string | undefined — evita re-upload
+      fidelityLevel = 'maximum',             // 'maximum' | 'balanced' | 'creative'
+    } = body as {
+      imageBase64?:    string
+      projectType?:    'exterior' | 'interior'
+      segment?:        string
+      environment?:    string
+      lighting?:       string
+      background?:     string
+      sceneElements?:  string[]
+      geometryLock?:   number
+      model?:          string
+      outputQuality?:  string
+      materials?:      ProjectMaterials
+      fidelityMode?:   'strict' | 'balanced'
+      briefing?:       BriefingArquitetonico
+      inputUrl?:       string
+      fidelityLevel?:  FidelityLevel
+    }
 
-    if (!imageBase64 || !projectType) {
+    if ((!imageBase64 && !providedInputUrl) || !projectType) {
       return NextResponse.json(
         { error: 'Imagem e tipo de projeto são obrigatórios' },
         { status: 400 }
@@ -94,19 +121,32 @@ export async function POST(req: NextRequest) {
       geometryLock:  Number(geometryLock),
       materials:     materials as ProjectMaterials | undefined,
       fidelityMode:  fidelityMode  === 'balanced' ? 'balanced' : 'strict',
+      fidelityLevel,
+      briefing,
     }
-    const finalPrompt = buildGenerationPrompt(options)
+
+    // Fidelity Engine: se o cliente mandou briefing, usa o prompt amarrado.
+    // Caso contrário, fallback pro caminho legado (mantém compat 100%).
+    const finalPrompt = briefing
+      ? buildFidelityPrompt(briefing, options, fidelityLevel)
+      : buildGenerationPrompt(options)
 
     console.log('[generate] engine    :', engineId, '→', falEndpoint)
     console.log('[generate] quality   :', outputQuality)
+    console.log('[generate] fidelity  :', briefing ? `engine(${fidelityLevel})` : 'legacy')
     console.log('[generate] prompt    :', finalPrompt)
 
-    // Upload da imagem de referência (obrigatória para ambos os motores)
-    const base64Data = imageBase64.includes(',') ? imageBase64.split(',')[1] : imageBase64
-    const buffer     = Buffer.from(base64Data, 'base64')
-    const imageFile  = new File([buffer], 'input.jpg', { type: 'image/jpeg' })
-    inputUrl = await fal.storage.upload(imageFile)
-    console.log('[generate] inputUrl  :', inputUrl)
+    // Upload da imagem (pula se /api/analyze já fez upload e mandou inputUrl)
+    if (providedInputUrl) {
+      inputUrl = providedInputUrl
+      console.log('[generate] inputUrl  : reused', inputUrl)
+    } else {
+      const base64Data = imageBase64!.includes(',') ? imageBase64!.split(',')[1] : imageBase64!
+      const buffer     = Buffer.from(base64Data, 'base64')
+      const imageFile  = new File([buffer], 'input.jpg', { type: 'image/jpeg' })
+      inputUrl = await fal.storage.upload(imageFile)
+      console.log('[generate] inputUrl  :', inputUrl)
+    }
 
     // ── Build model-specific input ────────────────────────────────────────────
 

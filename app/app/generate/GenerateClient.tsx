@@ -26,6 +26,16 @@ const LOADING_TEXTS = [
   'Gerando versão final...',
 ]
 
+const ANALYZE_TIMEOUT_MS = 8_000
+
+type FidelityLevel = 'maximum' | 'balanced' | 'creative'
+
+const FIDELITY_LEVELS: { id: FidelityLevel; label: string; desc: string }[] = [
+  { id: 'maximum',  label: 'Máxima',     desc: 'Preserva tudo do projeto'           },
+  { id: 'balanced', label: 'Equilibrado',desc: 'Pequenas melhorias permitidas'      },
+  { id: 'creative', label: 'Criativo',   desc: 'Mais liberdade estética'            },
+]
+
 const SPN_ENGINES = [
   { id: 'nano-banana-pro', name: 'Vega',   desc: 'Nano Banana Pro' },
   { id: 'gpt-image-2',     name: 'Quasar', desc: 'GPT Image 2'     },
@@ -99,6 +109,7 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
   // ── Parâmetros técnicos
   const geometryLock = 85
   const fidelityMode = 'strict' as const
+  const [fidelityLevel,  setFidelityLevel]  = useState<FidelityLevel>('maximum')
   const [selectedModel,  setSelectedModel]  = useState('nano-banana-pro')
   const [outputQuality,  setOutputQuality]  = useState('hd')
 
@@ -206,17 +217,44 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
     const file = e.dataTransfer.files[0]; if (file) loadImage(file)
   }
 
+  // ── Fidelity Engine — análise silenciosa antes de gerar.
+  //    Se falhar ou exceder ANALYZE_TIMEOUT_MS, segue sem briefing.
+  const runFidelityAnalysis = async (imageBase64: string) => {
+    try {
+      const ctrl  = new AbortController()
+      const timer = setTimeout(() => ctrl.abort(), ANALYZE_TIMEOUT_MS)
+      const res = await fetch('/api/analyze', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ imageBase64 }),
+        signal:  ctrl.signal,
+      })
+      clearTimeout(timer)
+      if (!res.ok) return null
+      return await res.json() as { inputUrl: string; briefing: unknown }
+    } catch {
+      return null
+    }
+  }
+
   // ── Geração
   const handleGenerate = async (qualityOverride?: string) => {
     if (!imagePreview) { setError('Faça upload de uma imagem primeiro.'); return }
     if (credits < nodeCost) { setError('Nodes insuficientes.'); return }
     setError(null); setLoading(true); startLoadingTexts()
     try {
+      // Fidelity Engine ativo em Máxima e Equilibrado. Em Criativo pula.
+      const useEngine = fidelityLevel !== 'creative'
+      const analysis  = useEngine ? await runFidelityAnalysis(imagePreview) : null
+
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          imageBase64:   imagePreview,
+          imageBase64:   analysis?.inputUrl ? undefined : imagePreview,
+          inputUrl:      analysis?.inputUrl,
+          briefing:      analysis?.briefing,
+          fidelityLevel,
           projectType,
           segment,
           environment,
@@ -277,7 +315,8 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
   // ── Summary lines
   const summaryLine1 = `${typeLabel} · ${segment} · ${environment}`
   const summaryLine2 = [lighting, background !== 'Preservar Original' ? background : null, sceneElements.join(', ')].filter(Boolean).join(' · ')
-  const summaryLine3 = `Alta Fidelidade · ${currentEngine?.name} · ${OUTPUT_QUALITIES.find(q => q.id === outputQuality)?.label}`
+  const fidelityLabel = FIDELITY_LEVELS.find(l => l.id === fidelityLevel)?.label ?? 'Máxima'
+  const summaryLine3  = `Fidelidade ${fidelityLabel} · ${currentEngine?.name} · ${OUTPUT_QUALITIES.find(q => q.id === outputQuality)?.label}`
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -437,11 +476,23 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
         {/* 10 — Fidelidade ao Projeto */}
         <div style={S.section}>
           <div style={S.label}>FIDELIDADE AO PROJETO</div>
-          <div style={{display:'flex', alignItems:'center', gap:8, padding:'10px 14px', border:'0.5px solid var(--color-border-strong)', borderRadius:8, background:'var(--color-bg-elevated)'}}>
-            <span style={{width:6, height:6, borderRadius:'50%', background:'var(--color-accent-green)', boxShadow:'0 0 5px var(--color-accent-green-glow)', display:'inline-block', flexShrink:0}}/>
-            <span style={{fontSize:11, color:'var(--color-text-primary)', fontWeight:500}}>✓ Proteção total ativada</span>
+          <div style={S.fidelityGrid}>
+            {FIDELITY_LEVELS.map(lvl => (
+              <div
+                key={lvl.id}
+                style={{...S.fidelityOpt, ...(fidelityLevel === lvl.id ? S.fidelityOptActive : {})}}
+                onClick={() => setFidelityLevel(lvl.id)}
+              >
+                <div style={{...S.fidelityName, ...(fidelityLevel === lvl.id ? {color:'var(--color-bg)'} : {})}}>{lvl.label}</div>
+                <div style={{...S.motorDesc, ...(fidelityLevel === lvl.id ? {color:'var(--color-bg)', opacity:0.6} : {})}}>{lvl.desc}</div>
+              </div>
+            ))}
           </div>
-          <p style={S.infoNote}>Geometria, câmera, entorno e composição preservados.</p>
+          <p style={S.infoNote}>
+            {fidelityLevel === 'maximum'  && 'Análise prévia da imagem trava geometria, pavimentos, aberturas, câmera e entorno. Nada de redesenho.'}
+            {fidelityLevel === 'balanced' && 'Análise prévia preserva arquitetura e câmera, com pequenas melhorias de composição e ambientação.'}
+            {fidelityLevel === 'creative' && 'Sem análise prévia. Mais liberdade estética — preserva apenas o essencial do projeto.'}
+          </p>
         </div>
 
         <div style={S.divider}/>
@@ -710,6 +761,10 @@ const S: Record<string, React.CSSProperties> = {
   sliderEnd:         { fontSize:11, color:'var(--color-text-tertiary)' },
   range:             { flex:1, accentColor:'var(--color-text-primary)', height:3 },
   sliderVal:         { fontSize:12, fontWeight:500, color:'var(--color-text-primary)', minWidth:34, textAlign:'right' },
+  fidelityGrid:      { display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 },
+  fidelityOpt:       { border:'0.5px solid var(--color-border-strong)', borderRadius:8, padding:'10px 8px', cursor:'pointer', background:'var(--color-bg-elevated)', textAlign:'center' as const },
+  fidelityOptActive: { border:'0.5px solid var(--color-text-primary)', background:'var(--color-text-primary)' },
+  fidelityName:      { fontSize:11, fontWeight:500, color:'var(--color-text-primary)', marginBottom:3 },
   motorGrid:         { display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 },
   motorOpt:          { border:'0.5px solid var(--color-border-strong)', borderRadius:8, padding:'10px 10px', cursor:'pointer', background:'var(--color-bg-elevated)' },
   motorOptActive:    { border:'0.5px solid var(--color-text-primary)', background:'var(--color-text-primary)' },
