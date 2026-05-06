@@ -24,6 +24,7 @@ export interface GenerateOptions {
   fidelityMode?:  'strict' | 'balanced'
   fidelityLevel?: FidelityLevel
   briefing?:      BriefingArquitetonico
+  hasAnchor?:     boolean
 }
 
 // ── Fidelity Engine ────────────────────────────────────────────────────────────
@@ -610,6 +611,23 @@ export function buildNegativePromptForFidelity(level: FidelityLevel): string {
   return `STRICTLY AVOID: ${NEGATIVE_BASE.join(', ')}, no reframe, no zoom, no rotation, no altered silhouette.`
 }
 
+// Quando o cliente envia uma âncora (render anterior do MESMO projeto), ela vai
+// PRIMEIRO em image_urls — Gemini/GPT extrai materiais e atmosfera dela. A
+// imagem de input (geometria) vai segundo. Este bloco diz isso ao modelo.
+function buildAnchorBlock(hasAnchor?: boolean): string {
+  if (!hasAnchor) return ''
+  return (
+    'TWO REFERENCE IMAGES PROVIDED: ' +
+    'Image #1 is the previous render of THIS SAME PROJECT — use it as the source ' +
+    'of materials, textures (rugs, fabrics, wood grain, plants), color palette ' +
+    'and overall atmosphere. Match these EXACTLY. ' +
+    'Image #2 is the geometry source — use it ONLY for architecture, layout, ' +
+    'camera angle and perspective. ' +
+    'Apply the lighting and scene changes requested below to image #1 while ' +
+    'preserving its materials and textures pixel-by-pixel where geometry allows. '
+  )
+}
+
 function fidelityModifier(level: FidelityLevel): string {
   if (level === 'creative') {
     return 'CREATIVE FIDELITY MODE: Preserve volumetry, number of stories, opening positions and overall perspective. Stylistic freedom is allowed on materials, sky, ambient props, vegetation and surroundings. '
@@ -648,8 +666,9 @@ export function buildFidelityPrompt(
   options:   GenerateOptions,
   level:     FidelityLevel = 'maximum',
 ): string {
-  const { projectType, segment, lighting, background, sceneElements, materials } = options
+  const { projectType, segment, lighting, background, sceneElements, materials, hasAnchor } = options
 
+  const anchor     = buildAnchorBlock(hasAnchor)
   const modifier   = fidelityModifier(level)
   const preserve   = preservationBlock(briefing)
   const allow      = transformationBlock(briefing)
@@ -677,6 +696,7 @@ export function buildFidelityPrompt(
     : `Transform this reference into a photorealistic ${segDesc} architectural interior photograph. `
 
   return (
+    anchor +
     modifier +
     preserve +
     matBlock +
@@ -693,8 +713,9 @@ export function buildFidelityPrompt(
 // ── Main export ────────────────────────────────────────────────────────────────
 
 export function buildGenerationPrompt(options: GenerateOptions): string {
-  const { projectType, segment, environment, lighting, background, sceneElements, geometryLock, materials, fidelityMode } = options
+  const { projectType, segment, environment, lighting, background, sceneElements, geometryLock, materials, fidelityMode, hasAnchor } = options
 
+  const anchor    = buildAnchorBlock(hasAnchor)
   const geoPrefix = buildFidelityBlock(geometryLock, fidelityMode)
   const matBlock  = buildMaterialsBlock(materials)
   const envDesc   = ENV_EN[environment]  ?? environment
@@ -718,7 +739,7 @@ export function buildGenerationPrompt(options: GenerateOptions): string {
 
   if (projectType === 'exterior') {
     return (
-      geoPrefix + matBlock +
+      anchor + geoPrefix + matBlock +
       `Transform this 3D model into a photorealistic architectural exterior photograph. ` +
       `${segDesc} architecture. ${envDesc}. ` +
       `Lighting: ${lightDesc}. ` +
@@ -728,7 +749,7 @@ export function buildGenerationPrompt(options: GenerateOptions): string {
     )
   }
   return (
-    geoPrefix + matBlock +
+    anchor + geoPrefix + matBlock +
     `Transform this 3D preview into a photorealistic architectural interior photograph. ` +
     `${segDesc} space. ${envDesc}. ` +
     `Lighting: ${lightDesc}. ` +
