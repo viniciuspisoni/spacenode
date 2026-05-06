@@ -43,21 +43,70 @@ const ARCH_SUFFIX =
   'High-end real estate presentation quality. ' +
   'Sharp focus, no distortion, no warping, no morphing of surfaces or edges.'
 
-const MOTION_PROMPTS: Record<string, string> = {
-  push_in:   'slow camera dolly-in, smooth push toward the facade, steady movement',
-  pull_out:  'slow camera pull-back, reveal full building and surroundings, smooth steady dolly out',
-  pan_right: 'smooth horizontal camera pan from left to right, steady speed',
-  crane_up:  'slow gentle upward crane shot, tilt up revealing roofline and sky',
-  orbit:     'slow orbital camera arc around the building, smooth circular movement',
-  walk_in:   'smooth forward dolly through interior space, steady walking pace',
-  static:    'static locked-off camera, subtle ambient life, no camera movement',
+// Cenas archviz com prompts cinematográficos específicos por tipo de espaço.
+// Cada preset escolhe o movimento de câmera adequado ao ambiente — não é
+// apenas um movimento genérico aplicado a qualquer cena.
+const SCENE_PROMPTS: Record<string, string> = {
+  living:
+    'very slow dolly forward through living room, gentle parallax between foreground furniture and background wall, ' +
+    'soft natural light wash from windows, shallow depth of field on foreground objects, anamorphic cinematic feel, ' +
+    'controlled and restrained motion',
+
+  kitchen:
+    'very slow dolly forward from dining area into kitchen, gentle parallax revealing kitchen island and pendant lights, ' +
+    'soft natural light from windows, shallow depth of field on foreground chairs and table, anamorphic cinematic feel, ' +
+    'controlled and restrained motion',
+
+  bedroom:
+    'slow lateral tracking shot across the bedroom, gentle parallax between foreground elements and bed, ' +
+    'soft warm ambient light, intimate and contemplative atmosphere, shallow depth of field, ' +
+    'anamorphic cinematic feel, controlled and restrained motion',
+
+  facade:
+    'slow gentle crane up from human eye-level, revealing the full architectural elevation against the sky, ' +
+    'golden hour atmospheric light, parallax between foreground landscape and architecture, ' +
+    'cinematic real estate hero shot, controlled and restrained motion',
+
+  terrace:
+    'slow horizontal pan revealing the landscape view from the terrace, ' +
+    'parallax between architectural foreground and distant horizon, golden atmospheric light, ' +
+    'cinematic outdoor reveal, controlled and restrained motion',
+
+  detail:
+    'very slow push-in on architectural detail, gentle focus pull effect, intimate close framing, ' +
+    'shallow depth of field highlighting materials and texture, contemplative pace, ' +
+    'controlled and restrained motion',
+
+  static:
+    'static locked-off camera with no translation or rotation. Subtle environmental life only — ' +
+    'soft natural light shifts, gentle ambient atmosphere, no camera movement whatsoever. ' +
+    'Contemplative architectural composition.',
 }
 
+// Intensidade modula a magnitude do movimento via prompt (modelos respondem
+// a vocabulário de pacing). Default "subtle" porque archviz profissional quer
+// movimento contido — não walkthrough de jogo.
+const INTENSITY_PREFIXES: Record<string, string> = {
+  subtle:     'Barely perceptible motion, ultra slow contemplative pace. ',
+  normal:     '',
+  pronounced: 'Pronounced cinematic motion, more dynamic camera movement, dramatic pacing. ',
+}
+
+// Negative prompt expandido: além dos genéricos archviz, cobre os problemas
+// clássicos de cenas de interior (telas pretas, padrões de palhinha, reflexos
+// em inox/vidro, luminárias finas, padrões de piso/madeira).
+// IMPORTANTE: Seedance 2.0 não aceita negative_prompt — só Kling e Veo se beneficiam.
 const NEGATIVE_PROMPT =
   'camera shake, handheld movement, distortion, morphing, warping, geometric artifacts, ' +
   'blurry frames, jitter, melting concrete, liquid glass, deforming windows, rubbery materials, ' +
   'walls breathing, surfaces shifting, edges bending, materials changing, geometry collapse, ' +
-  'low quality, amateur, cartoon, illustration, oversaturated colors'
+  'low quality, amateur, cartoon, illustration, oversaturated colors, ' +
+  'screen artifacts, black screen flickering, TV display glitch, monitor flicker, ' +
+  'wicker pattern morphing, woven texture warping, basket weave shifting, rattan deformation, ' +
+  'reflection ghosting, shimmer artifacts, mirror surface distortion, stainless steel rippling, ' +
+  'pendant lamp deformation, light fixture morphing, lampshade warping, ' +
+  'floor pattern shifting, wood grain crawling, tile pattern morphing, ' +
+  'text distortion, logo warping, signage glitch'
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -68,11 +117,12 @@ export async function POST(req: NextRequest) {
 
   try {
     const formData     = await req.formData()
-    const imageFile    = formData.get('image')    as File   | null
-    const engineId     = (formData.get('engine')  as string | null) ?? 'fal-ai/veo3.1/image-to-video'
-    const duration     = (formData.get('duration')as string | null) ?? '8'
-    const motionPreset = (formData.get('motion')  as string | null) ?? 'push_in'
-    const customPrompt = (formData.get('prompt')  as string | null) ?? ''
+    const imageFile    = formData.get('image')     as File   | null
+    const engineId     = (formData.get('engine')   as string | null) ?? 'fal-ai/veo3.1/image-to-video'
+    const duration     = (formData.get('duration') as string | null) ?? '8'
+    const scenePreset  = (formData.get('scene')    as string | null) ?? 'living'
+    const intensity    = (formData.get('intensity')as string | null) ?? 'subtle'
+    const customPrompt = (formData.get('prompt')   as string | null) ?? ''
 
     if (!imageFile) return NextResponse.json({ error: 'Imagem obrigatória' }, { status: 400 })
 
@@ -95,10 +145,11 @@ export async function POST(req: NextRequest) {
 
     inputUrl = await fal.storage.upload(imageFile)
 
-    const motionText = MOTION_PROMPTS[motionPreset] ?? MOTION_PROMPTS.push_in
-    const fullPrompt = [motionText, customPrompt, ARCH_SUFFIX].filter(Boolean).join('. ')
+    const sceneText      = SCENE_PROMPTS[scenePreset] ?? SCENE_PROMPTS.living
+    const intensityPrefix = INTENSITY_PREFIXES[intensity] ?? INTENSITY_PREFIXES.subtle
+    const fullPrompt     = [intensityPrefix + sceneText, customPrompt, ARCH_SUFFIX].filter(Boolean).join('. ')
 
-    const falInput = buildFalInput(engineId, inputUrl, duration, fullPrompt, motionPreset)
+    const falInput = buildFalInput(engineId, inputUrl, duration, fullPrompt)
 
     console.log('[video] engine:', engineId)
     console.log('[video] input :', JSON.stringify(falInput))
@@ -155,11 +206,10 @@ export async function POST(req: NextRequest) {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function buildFalInput(
-  engineId:     string,
-  imageUrl:     string,
-  duration:     string,
-  prompt:       string,
-  motionPreset: string,
+  engineId: string,
+  imageUrl: string,
+  duration: string,
+  prompt:   string,
 ): Record<string, unknown> {
   if (engineId === 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video') {
     return {
@@ -184,7 +234,6 @@ function buildFalInput(
   if (engineId === 'bytedance/seedance-2.0/image-to-video') {
     // Seedance 2.0 não expõe camera_fixed nem negative_prompt — tudo via prompt.
     // generate_audio default é true; força false para evitar surpresa de billing.
-    void motionPreset
     return {
       image_url:      imageUrl,
       prompt,

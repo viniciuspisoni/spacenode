@@ -39,14 +39,27 @@ const ENGINES = [
   },
 ]
 
-const MOTION_PRESETS = [
-  { id: 'push_in',   label: 'Aproximar'          },
-  { id: 'pull_out',  label: 'Afastar'            },
-  { id: 'pan_right', label: 'Pan lateral'        },
-  { id: 'crane_up',  label: 'Subir levemente'    },
-  { id: 'orbit',     label: 'Órbita suave'       },
-  { id: 'walk_in',   label: 'Travelling interno' },
-  { id: 'static',    label: 'Câmera estática'    },
+// Presets cinematográficos por tipo de espaço — cada um tem prompt específico
+// no servidor. Diferente do antigo "movimento de câmera", aqui o sistema
+// escolhe o movimento adequado ao ambiente (cozinha → dolly forward + parallax;
+// fachada → crane up + golden hour; etc).
+const SCENE_PRESETS = [
+  { id: 'living',  label: 'Sala'        },
+  { id: 'kitchen', label: 'Cozinha'     },
+  { id: 'bedroom', label: 'Quarto'      },
+  { id: 'facade',  label: 'Fachada'     },
+  { id: 'terrace', label: 'Varanda'     },
+  { id: 'detail',  label: 'Detalhe'     },
+  { id: 'static',  label: 'Câmera fixa' },
+]
+
+// Intensidade modula a magnitude do movimento. Default "Sutil" porque archviz
+// profissional quer câmera contida — não walkthrough. "Marcado" só para
+// quando o cliente pede algo mais dramático.
+const INTENSITIES = [
+  { id: 'subtle',     label: 'Sutil'   },
+  { id: 'normal',     label: 'Normal'  },
+  { id: 'pronounced', label: 'Marcado' },
 ]
 
 const LOADING_TEXTS = [
@@ -67,8 +80,9 @@ export default function VideoClient({ initialCredits }: VideoClientProps) {
   const [imageFile,        setImageFile]        = useState<File | null>(null)
   const [imagePreview,     setImagePreview]     = useState<string | null>(null)
   const [selectedEngine,   setSelectedEngine]   = useState(ENGINES[1].id)
-  const [selectedDuration, setSelectedDuration] = useState('8')
-  const [selectedMotion,   setSelectedMotion]   = useState('push_in')
+  const [selectedDuration,  setSelectedDuration]  = useState('8')
+  const [selectedScene,     setSelectedScene]     = useState('living')
+  const [selectedIntensity, setSelectedIntensity] = useState('subtle')
   const [customPrompt,     setCustomPrompt]     = useState('')
   const [isLoading,        setIsLoading]        = useState(false)
   const [loadingText,      setLoadingText]      = useState(LOADING_TEXTS[0])
@@ -176,11 +190,12 @@ export default function VideoClient({ initialCredits }: VideoClientProps) {
     startLoadingTexts()
 
     const body = new FormData()
-    body.append('image',    imageFile)
-    body.append('engine',   selectedEngine)
-    body.append('duration', selectedDuration)
-    body.append('motion',   selectedMotion)
-    body.append('prompt',   customPrompt)
+    body.append('image',     imageFile)
+    body.append('engine',    selectedEngine)
+    body.append('duration',  selectedDuration)
+    body.append('scene',     selectedScene)
+    body.append('intensity', selectedIntensity)
+    body.append('prompt',    customPrompt)
 
     try {
       const res  = await fetch('/api/video', { method: 'POST', body })
@@ -355,24 +370,47 @@ export default function VideoClient({ initialCredits }: VideoClientProps) {
             </div>
           </div>
 
-          {/* Movimento de câmera */}
+          {/* Tipo de cena */}
           <div>
-            <label style={L}>Movimento de câmera</label>
+            <label style={L}>Tipo de cena</label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {MOTION_PRESETS.map(p => (
+              {SCENE_PRESETS.map(p => (
                 <button
                   key={p.id}
-                  onClick={() => !isLoading && setSelectedMotion(p.id)}
+                  onClick={() => !isLoading && setSelectedScene(p.id)}
                   style={{
                     padding: '6px 12px', borderRadius: 20, fontSize: 11, letterSpacing: '-0.01em',
-                    border: `1px solid ${selectedMotion === p.id ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.09)'}`,
-                    background: selectedMotion === p.id ? 'rgba(255,255,255,0.1)' : 'transparent',
-                    color: selectedMotion === p.id ? '#ffffff' : 'rgba(255,255,255,0.5)',
+                    border: `1px solid ${selectedScene === p.id ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.09)'}`,
+                    background: selectedScene === p.id ? 'rgba(255,255,255,0.1)' : 'transparent',
+                    color: selectedScene === p.id ? '#ffffff' : 'rgba(255,255,255,0.5)',
                     cursor: isLoading ? 'default' : 'pointer',
                     transition: 'all 0.15s',
                   }}
                 >
                   {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Intensidade do movimento */}
+          <div>
+            <label style={L}>Intensidade do movimento</label>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {INTENSITIES.map(i => (
+                <button
+                  key={i.id}
+                  onClick={() => !isLoading && setSelectedIntensity(i.id)}
+                  style={{
+                    flex: 1, padding: '8px 12px', borderRadius: 8, fontSize: 11, letterSpacing: '-0.01em',
+                    border: `1px solid ${selectedIntensity === i.id ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.07)'}`,
+                    background: selectedIntensity === i.id ? 'rgba(255,255,255,0.08)' : 'transparent',
+                    color: selectedIntensity === i.id ? '#ffffff' : 'rgba(255,255,255,0.5)',
+                    cursor: isLoading ? 'default' : 'pointer',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {i.label}
                 </button>
               ))}
             </div>
@@ -483,7 +521,7 @@ export default function VideoClient({ initialCredits }: VideoClientProps) {
             />
             <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.06em' }}>
-                {activeEngine.label} · {selectedDuration}s · {MOTION_PRESETS.find(p => p.id === selectedMotion)?.label}
+                {activeEngine.label} · {selectedDuration}s · {SCENE_PRESETS.find(p => p.id === selectedScene)?.label} · {INTENSITIES.find(i => i.id === selectedIntensity)?.label}
               </div>
               <a
                 href={resultUrl}
