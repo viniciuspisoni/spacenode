@@ -86,27 +86,18 @@ async function compressImage(
   })
 }
 
-// Force-download cross-origin image. O atributo download em <a> é ignorado
-// pelo browser quando a URL é cross-origin (caso do CDN do FAL), então
-// fetchamos a imagem como blob, criamos uma object URL e disparamos o
-// download manualmente.
-async function downloadImage(url: string, filename: string) {
-  try {
-    const response = await fetch(url, { mode: 'cors' })
-    if (!response.ok) throw new Error('FETCH_FAILED')
-    const blob    = await response.blob()
-    const blobUrl = URL.createObjectURL(blob)
-    const a       = document.createElement('a')
-    a.href        = blobUrl
-    a.download    = filename
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000)
-  } catch {
-    // fallback: abre em nova aba se o fetch falhar (ex: CDN sem CORS)
-    window.open(url, '_blank', 'noopener,noreferrer')
-  }
+// Download forçado via proxy do nosso próprio backend. /api/download faz
+// fetch server-side da imagem e devolve com Content-Disposition: attachment,
+// que faz o browser salvar em vez de abrir. Funciona independente de CORS
+// no CDN.
+function downloadImage(url: string, filename: string) {
+  const proxyUrl = `/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`
+  const a = document.createElement('a')
+  a.href = proxyUrl
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
 }
 
 function deriveDefaults(projectType: ProjectType, segment: string) {
