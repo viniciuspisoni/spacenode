@@ -377,102 +377,102 @@ const LIGHT_EN: Record<string, string> = {
   'Clara e Natural':         'extremely bright clean airy interior with abundant natural daylight, global illumination, 5500K',
   'Natural Suave':           'soft natural light filtering through translucent curtains, gentle diffuse shadows, 5000K',
   'Luz de Janela':           'dramatic directional window light with defined shadows, high contrast, 5500K',
-  'Quente e Aconchegante':   'warm incandescent-effect lighting 3000K, cozy amber glow, table lamps and floor lamps',
+  'Quente e Aconchegante':   'warm incandescent-effect 3000K, cozy amber glow, soft pools of warm light',
   'Entardecer Quente':       'warm golden afternoon light streaming through windows at low angle, 3200K, long shadows',
-  'Noturna Aconchegante':    'nighttime with warm 2700K LED fixtures, table lamps, wall sconces, intimate pools of light',
-  'Sofisticada e Cênica':    'dramatic architectural lighting with accent spotlights, LED strips under millwork, 2700K moody atmosphere',
+  'Noturna Aconchegante':    'nighttime warm 2700K ambient illumination, intimate pools of soft light, deep shadows in unlit corners',
+  'Sofisticada e Cênica':    'dramatic moody 2700K atmospheric illumination, layered light with deep contrast and accent highlights',
   'Corporativa Neutra':      'neutral uniform corporate LED panels 4000K, no harsh shadows, professional clean light',
   'Natural Profissional':    'professional natural light from large windows, 5000K clean white, ideal for work',
   'Luz Difusa Uniforme':     'perfectly diffuse uniform illumination 4500K, softbox effect, virtually shadowless',
-  'Escritório Contemporâneo':'contemporary office with ambient LED grid ceiling, task lighting on desks, decorative accent',
+  'Escritório Contemporâneo':'contemporary office ambient 4000K with even ceiling diffusion and soft task-level brightness',
   'Iluminação Técnica':      'precision technical high-efficacy lighting 4000K, industrial, very even distribution',
-  'Noturna Executiva':       'nighttime executive office with warm 3000K task lighting, city lights through windows',
+  'Noturna Executiva':       'nighttime executive ambient 3000K, warm work-zone glow, distant city light reflected through windows',
   'Clara e Produtiva':       'bright productive 5000K, high CRI, minimal glare, uniform task-friendly illumination',
   'Comercial Bem Iluminada': 'bright commercial interior 4000K with display spotlights, high overall luminance',
-  'Varejo Premium':          'premium retail high-CRI spotlights on merchandise, warm ambient LED fill, 3500K',
-  'Showroom Iluminado':      'showroom with dramatic accent track lighting spotting products, dark perimeter, 3500K',
-  'Destaque de Produto':     'tight product spot lighting, moody dark surround for contrast, focused beams',
-  'Iluminação de Loja':      'standard retail LED panel and spotlight combo, bright uniform, 4000K',
-  'Noturna Comercial':       'nighttime commercial with bright storefront lighting, illuminated signage, street light glow',
-  'Luz de Vitrine':          'window display spotlights from above, product-focused tight beams, 3000K warm glow',
+  'Varejo Premium':          'premium retail 3500K high-CRI accent illumination on display areas with warm ambient fill',
+  'Showroom Iluminado':      'showroom 3500K dramatic accent contrast, bright focal zones with darker ambient perimeter',
+  'Destaque de Produto':     'tight focal accent illumination on display areas, moody dark surround for contrast',
+  'Iluminação de Loja':      'bright uniform retail 4000K, even high-CRI distribution',
+  'Noturna Comercial':       'nighttime commercial atmosphere, bright storefront glow, vibrant urban ambient',
+  'Luz de Vitrine':          'window display 3000K warm focal accents from above, product-focused contrast',
   'Cênica e Intimista':      'intimate theatrical candle-effect lighting, warm 2400K amber pools, romantic atmosphere',
-  'Noturna Sofisticada':     'sophisticated dimmable nighttime fixtures 2700K, ambient and decorative accent mix',
-  'Café com Luz Natural':    'morning café light with bright natural sun through windows 5500K, casual warm atmosphere',
-  'Restaurante Premium':     'fine dining warm 2700K ambient with candle supplement, accent spots on tables',
-  'Luz Baixa Decorativa':    'very low-level decorative ambient lighting 2400K, pendant lights, intimate mood',
-  'Premium Aconchegante':    'premium warm indirect lighting 2700K, valence LED strips, wall washers, plush atmosphere',
+  'Noturna Sofisticada':     'sophisticated dim 2700K nighttime ambient, layered accent highlights, refined atmosphere',
+  'Café com Luz Natural':    'morning bright natural daylight 5500K, sun through windows, casual warm atmosphere',
+  'Restaurante Premium':     'fine dining warm 2700K ambient with subtle candlelight glow on table surfaces',
+  'Luz Baixa Decorativa':    'very low-level decorative 2400K ambient, intimate mood, soft warm pools',
+  'Premium Aconchegante':    'premium warm indirect 2700K illumination, plush atmospheric glow, soft graduations',
   'Luz Natural Elegante':    'refined natural light with thin window shadow lines 5500K, elegant and airy',
-  'Noturna Refinada':        'refined nighttime with architectural indirect lighting 2700K, perfectly balanced ambient',
-  'Spa Relaxante':           'spa zen lighting very soft warm 2700K, near candlelight, tranquil, no harsh sources',
-  'Lobby Iluminado':         'hotel lobby grand chandelier lighting, warm ambient 3000K, statement light fixture',
-  'Entardecer de Hotel':     'hotel interior golden hour with warm sunset light streaming through windows 3200K',
+  'Noturna Refinada':        'refined 2700K nighttime indirect architectural illumination, perfectly balanced ambient',
+  'Spa Relaxante':           'spa zen very soft warm 2700K, near-candlelight tranquil quality, no harsh sources',
+  'Lobby Iluminado':         'lobby grand 3000K warm ambient illumination, layered atmospheric brightness',
+  'Entardecer de Hotel':     'interior golden hour 3200K warm sunset light streaming through windows',
   'Clara e Limpa':           'clinical bright white 5500K with high CRI, even illumination, no dark areas, sterile feel',
   'Clínica Neutra':          'neutral clinical LED 4500K uniform ceiling panels, professional healthcare environment',
   'Luz Difusa Suave':        'very soft diffuse light 4000K, therapeutic gentle quality, no harsh shadows',
   'Iluminação Profissional': 'professional precision 4000K high CRI, appropriate for clinical accuracy',
   'Aconchegante e Calma':    'warm calm 3000K indirect lighting, therapeutic, stress-reducing atmosphere',
-  'Saúde Premium':           'premium wellness lighting 3500K, comfortable professional, not harshly clinical',
-  'Clara e Funcional':       'functional clear educational lighting 5000K, anti-glare, even distribution',
-  'Luz Difusa':              'soft diffuse light 4000K, gentle even illumination, calming',
-  'Ambiente Produtivo':      'productive task lighting 4500K, focused, reduces eye strain, clear and bright',
-  'Biblioteca Aconchegante': 'library with warm task lamps on tables, ambient 3000K fill, reading-friendly',
-  'Sala Bem Iluminada':      'well-lit room 4000K, even distribution, no harsh shadows, functional and clean',
+  'Saúde Premium':           'premium wellness 3500K comfortable professional ambient, not harshly clinical',
+  'Clara e Funcional':       'functional clear 5000K, anti-glare, even distribution',
+  'Luz Difusa':              'soft diffuse 4000K, gentle even illumination, calming',
+  'Ambiente Produtivo':      'productive 4500K focused task brightness, reduces eye strain',
+  'Biblioteca Aconchegante': 'library warm 3000K ambient fill with reading-friendly task brightness',
+  'Sala Bem Iluminada':      'well-lit 4000K even distribution, no harsh shadows, functional and clean',
   // Exterior
   'Diurno':                'daytime, blue sky with sun and natural shadows',
   'Entardecer':            'late afternoon, warm golden light, long directional shadows',
   'Golden Hour':           'golden hour, warm amber sunlight at low angle, magical quality, long soft shadows',
   'Blue Hour':             'blue hour twilight, deep indigo blue sky, city lights beginning to glow, glass reflections',
-  'Noturno Iluminado':     'nighttime with architectural facade uplighting, illuminated windows, garden spotlights',
+  'Noturno Iluminado':     'nighttime architectural facade ambient glow, warm interior light visible through openings, soft garden ambient',
   'Nublado':               'overcast diffuse natural daylight, soft evenly distributed cloudy-day light, no harsh shadows, neutral 5500K — outdoors shows an overcast sky with cloud texture; indoors the same light filters through windows in soft even tones',
   'Chuva Leve':            'light rain, wet reflective pavement surfaces, dark cloudy sky, rain streaks visible',
   'Diurno Comercial':      'bright clear commercial daytime, blue sky, optimal visibility for signage and display',
   'Fachada Bem Iluminada': 'perfect architectural photography light, slight overcast, even facade exposure',
-  'Vitrine Noturna':       'nighttime with brightly illuminated store window, neon or LED signs, street lights',
-  'Noturno Comercial':     'nighttime commercial district, multiple light sources, vibrant urban glow, active street',
-  'Shopping Atmosphere':   'shopping center exterior evening atmosphere, bright entrance canopy, ambient pedestrian lighting',
+  'Vitrine Noturna':       'nighttime store window brightly lit from within, contrasting dark surroundings',
+  'Noturno Comercial':     'nighttime commercial district atmosphere, vibrant urban glow, bright active ambient',
+  'Shopping Atmosphere':   'shopping center evening atmosphere, bright entrance illumination, ambient pedestrian glow',
   'Diurno Corporativo':    'crisp bright corporate daytime, sharp blue sky, professional architectural photography',
   'Fachada Profissional':  'even architectural photography light, professional standard, slight overcast for shadow control',
-  'Noturno Executivo':     'corporate nighttime with facade uplighting, dramatic sculptural quality, executive presence',
-  'Luz Urbana':            'urban nighttime mix of street lights, commercial signage glow, vehicle light trails',
+  'Noturno Executivo':     'corporate nighttime facade ambient glow, dramatic sculptural light quality, executive presence',
+  'Luz Urbana':            'urban nighttime ambient mix, commercial signage glow in distance, vibrant city atmosphere',
   'Nublado Sofisticado':   'sophisticated overcast light, even diffuse shadows, high-end architectural photography',
   'Entardecer Premium':    'premium sunset, saturated warm sky gradient, golden light, luxury atmosphere',
-  'Noturno Refinado':      'refined nighttime with warm facade uplighting, subtle garden lighting, exclusive feel',
+  'Noturno Refinado':      'refined nighttime warm facade ambient glow, subtle landscape illumination, exclusive feel',
   'Resort Diurno':         'bright tropical resort daytime, azure sky, vivid tropical vegetation, blue pool water',
   'Luz de Piscina':        'pool area with reflected water light playing on surfaces, tropical afternoon sun',
   'Atmosfera Tropical':    'tropical atmosphere with intense warm sunlight, vibrant lush green vegetation, clear sky',
   'Diurno Claro':          'clear bright daytime, direct sun, strong defined shadows, crisp visibility',
   'Nublado Suave':         'gentle soft overcast, even illumination, no harsh shadows, neutral institutional light',
   'Luz Natural':           'natural light, slightly golden, standard architectural photography, true to color',
-  'Iluminação Urbana':     'urban night with street lights, vehicle light trails, city glow on horizon',
-  'Noturno Institucional': 'nighttime with facade flood lighting, flag pole lights, formal institutional presence',
+  'Iluminação Urbana':     'urban nighttime ambient atmosphere, distant city glow on horizon',
+  'Noturno Institucional': 'nighttime facade flood-lit ambient, formal institutional presence',
   'Diurno Natural':        'natural landscape daylight, even and true to botanical color, 5500K clear sky',
   'Entardecer Suave':      'gentle sunset light, pastel sky tones, warm long soft shadows, tranquil atmosphere',
   'Luz Filtrada':          'soft filtered light through tree canopy, dappled light patterns on ground, 5000K',
-  'Noturno Paisagístico':  'landscape at night with garden uplighting on trees and plants, moonlight silver tone',
+  'Noturno Paisagístico':  'landscape nighttime soft ambient illumination, moonlight silver tone, gentle warm landscape glow',
 }
 
 const BG_EN: Record<string, string> = {
   'Entorno Neutro':    'simple neutral urban context, flat sky gradient, minimal surroundings',
-  'Rua Arborizada':    'tree-lined residential street with large ipê and jacarandá trees, sidewalk, parked cars',
-  'Condomínio':        'gated condominium with neighboring contemporary houses, manicured garden walls, coconut palms',
-  'Bairro Nobre':      'upscale residential neighborhood with luxury mansions, centenary figueira trees, wide avenues',
-  'Zona Urbana':       'urban commercial and residential environment, mid-rise buildings, active street',
-  'Zona Rural':        'rural landscape with open fields, cerrado or pasture vegetation, horizon line',
-  'Beira-Mar':         'coastal beachfront location with ocean visible, coconut palms, restinga vegetation',
-  'Beira-Rio':         'riverside location with wide river visible, riparian vegetation, urban context',
-  'Serra':             'mountainside hillside with dense Atlantic forest, light mist on peaks',
-  'Praça Urbana':      'urban plaza with stone paving, benches, mature shade trees, pedestrians',
-  'Jardim':            'garden setting with planted ornamental beds, green lawn, flowering trees',
-  'Estacionamento':    'parking lot environment with asphalt surface, marked parking spaces, low-rise surroundings',
-  'Calçada Comercial': 'commercial sidewalk with pedestrian traffic, neighboring retail stores, awnings',
+  'Rua Arborizada':    'tree-lined residential street ambient context, leafy mature canopy mood',
+  'Condomínio':        'gated condominium ambient context, calm residential atmosphere',
+  'Bairro Nobre':      'upscale residential neighborhood ambient context, refined affluent atmosphere',
+  'Zona Urbana':       'urban mixed-use ambient context, active mid-density city atmosphere',
+  'Zona Rural':        'rural landscape ambient context, open horizon mood, quiet pastoral atmosphere',
+  'Beira-Mar':         'coastal beachfront ambient context, oceanic atmosphere with sea breeze quality',
+  'Beira-Rio':         'riverside ambient context, calm waterfront atmosphere',
+  'Serra':             'mountainside ambient context, atmospheric haze on distant peaks, forested mood',
+  'Praça Urbana':      'urban plaza ambient context, public square atmosphere',
+  'Jardim':            'garden ambient context, lush greenery atmosphere',
+  'Estacionamento':    'parking area ambient context, neutral functional atmosphere',
+  'Calçada Comercial': 'commercial sidewalk ambient context, urban pedestrian atmosphere',
   'Clean / Neutro':    'clean neutral palette, white or light gray surfaces, minimal background',
-  'Premium':           'premium atmosphere, high-end materials visible in background, marble and brass accents',
-  'Urbano':            'urban loft character with exposed elements, industrial touches in background',
-  'Natural':           'nature-inspired background, wooden elements, plants, organic textures',
-  'Minimalista':       'minimalist background, very few elements, geometric simplicity, monochromatic',
-  'Comercial':         'commercial background with functional elements, shelving, display fixtures',
-  'Corporativo':       'corporate professional background with branded elements, tech equipment',
-  'Aconchegante':      'warm cozy background with soft textiles, throw pillows, indoor plants, warm light',
+  'Premium':           'premium ambient atmosphere, refined high-end mood',
+  'Urbano':            'urban loft ambient atmosphere, industrial character mood',
+  'Natural':           'nature-inspired ambient atmosphere, organic warm mood',
+  'Minimalista':       'minimalist ambient atmosphere, geometric simplicity mood, monochromatic restraint',
+  'Comercial':         'commercial ambient atmosphere, functional retail mood',
+  'Corporativo':       'corporate ambient atmosphere, professional refined mood',
+  'Aconchegante':      'warm cozy ambient atmosphere, soft inviting mood',
 }
 
 const ELEM_EN: Record<string, string> = {
@@ -729,15 +729,21 @@ export function buildFidelityPrompt(
   const segDesc    = SEG_EN[segment]    ?? segment.toLowerCase()
 
   const elemParts = sceneElements.map(e => ELEM_EN[e] ?? e.toLowerCase()).filter(Boolean)
-  const elemBlock = elemParts.length > 0 ? `Scene additions allowed: ${elemParts.join('; ')}. ` : ''
+  // Wrapper enfatiza que isso é ADIÇÃO (não substituição) — protege contra o
+  // modelo trocar móveis/objetos existentes ao tentar incluir os novos.
+  const elemBlock = elemParts.length > 0
+    ? `Scene additions to include where naturally appropriate WITHOUT removing, replacing or restyling any existing element from the reference: ${elemParts.join('; ')}. `
+    : ''
 
   let bgBlock = ''
   if (background && background !== 'Preservar Original') {
     const bgDesc = BG_EN[background] ?? background
     if (bgDesc) {
+      // Wrapper deixa claro que é mood/atmosfera — não pra adicionar carros,
+      // árvores específicas ou prédios fora do que o usuário pediu.
       bgBlock = projectType === 'exterior'
-        ? `Surrounding context (only if compatible with the reference): ${bgDesc}. `
-        : `Spatial context (only if compatible with the reference): ${bgDesc}. `
+        ? `Surrounding context (atmosphere and mood only — do not add or remove specific buildings, vehicles, trees or other objects from the reference): ${bgDesc}. `
+        : `Spatial context (atmosphere and mood only — do not add or remove specific objects from the reference): ${bgDesc}. `
     }
   }
 
@@ -749,6 +755,12 @@ export function buildFidelityPrompt(
     : `${segDesc} architectural interior photograph`
   const intent = `${verb} this reference image as a photorealistic ${kind}. `
 
+  // Wrapper de iluminação: deixa explícito que descrição de luz é ATMOSFERA, não
+  // licença pra adicionar luminárias/lâmpadas/spots ao projeto. Algumas entradas
+  // de LIGHT_EN ainda mencionam "table lamps", "sconces" etc. — esse wrapper
+  // neutraliza esse vazamento até a limpeza completa do dicionário.
+  const lightingLine = `Lighting condition (atmosphere only — do not add or change any lamp, sconce, spot, fixture or any object visible in the reference): ${lightDesc}. `
+
   return (
     anchor +
     refinement +
@@ -756,7 +768,7 @@ export function buildFidelityPrompt(
     preserve +
     matBlock +
     intent +
-    `Lighting: ${lightDesc}. ` +
+    lightingLine +
     bgBlock +
     elemBlock +
     allow +
