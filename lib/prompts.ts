@@ -706,18 +706,22 @@ function transformationBlock(briefing: BriefingArquitetonico, level: FidelityLev
   return `ALLOWED IMPROVEMENTS ONLY (visual quality, not architecture): ${briefing.elementos_melhorar.join('; ')}. `
 }
 
+// briefing é opcional. Quando ausente, o `fidelityModifier` carrega sozinho a
+// instrução de preservação — o modelo já vê a imagem direto e não precisa de
+// uma redescrição textual dos elementos. Quando presente (ex: futuro Spaces
+// Vista Mestre), os PROJECT FACTS adicionam locks específicos.
 export function buildFidelityPrompt(
-  briefing:  BriefingArquitetonico,
   options:   GenerateOptions,
   level:     FidelityLevel = 'maximum',
+  briefing?: BriefingArquitetonico,
 ): string {
   const { projectType, segment, lighting, background, sceneElements, materials, hasAnchor, refinementText } = options
 
   const anchor     = buildAnchorBlock(hasAnchor)
   const refinement = buildRefinementBlock(refinementText, hasAnchor)
   const modifier   = fidelityModifier(level)
-  const preserve   = preservationBlock(briefing)
-  const allow      = transformationBlock(briefing, level)
+  const preserve   = briefing ? preservationBlock(briefing) : ''
+  const allow      = briefing ? transformationBlock(briefing, level) : ''
   const matBlock   = buildMaterialsBlock(materials, level)
   const negative   = buildNegativePromptForFidelity(level)
 

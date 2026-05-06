@@ -27,8 +27,6 @@ const LOADING_TEXTS = [
   'Gerando versão final...',
 ]
 
-const ANALYZE_TIMEOUT_MS = 8_000
-
 type FidelityLevel = 'maximum' | 'balanced' | 'creative'
 
 const FIDELITY_LEVELS: { id: FidelityLevel; label: string; desc: string }[] = [
@@ -232,36 +230,12 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
     const file = e.dataTransfer.files[0]; if (file) loadImage(file)
   }
 
-  // ── Fidelity Engine — análise silenciosa antes de gerar.
-  //    Se falhar ou exceder ANALYZE_TIMEOUT_MS, segue sem briefing.
-  const runFidelityAnalysis = async (imageBase64: string) => {
-    try {
-      const ctrl  = new AbortController()
-      const timer = setTimeout(() => ctrl.abort(), ANALYZE_TIMEOUT_MS)
-      const res = await fetch('/api/analyze', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ imageBase64 }),
-        signal:  ctrl.signal,
-      })
-      clearTimeout(timer)
-      if (!res.ok) return null
-      return await res.json() as { inputUrl: string; briefing: unknown }
-    } catch {
-      return null
-    }
-  }
-
   // ── Geração
   const handleGenerate = async (qualityOverride?: string) => {
     if (!imagePreview) { setError('Faça upload de uma imagem primeiro.'); return }
     if (credits < nodeCost) { setError('Nodes insuficientes.'); return }
     setError(null); setLoading(true); startLoadingTexts()
     try {
-      // Fidelity Engine ativo em Máxima e Equilibrado. Em Criativo pula.
-      const useEngine = fidelityLevel !== 'creative'
-      const analysis  = useEngine ? await runFidelityAnalysis(imagePreview) : null
-
       // Anchor: usa o último output como referência visual de materiais quando
       // o usuário regera a mesma imagem (ex: troca de iluminação) e o toggle
       // estiver ligado.
@@ -271,9 +245,7 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          imageBase64:   analysis?.inputUrl ? undefined : imagePreview,
-          inputUrl:      analysis?.inputUrl,
-          briefing:      analysis?.briefing,
+          imageBase64:   imagePreview,
           fidelityLevel,
           projectType,
           segment,
@@ -515,9 +487,9 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
             ))}
           </div>
           <p style={S.infoNote}>
-            {fidelityLevel === 'maximum'  && 'Análise prévia da imagem trava geometria, pavimentos, aberturas, câmera e entorno. Nada de redesenho.'}
-            {fidelityLevel === 'balanced' && 'Análise prévia preserva arquitetura e câmera, com pequenas melhorias de composição e ambientação.'}
-            {fidelityLevel === 'creative' && 'Sem análise prévia. Mais liberdade estética — preserva apenas o essencial do projeto.'}
+            {fidelityLevel === 'maximum'  && 'Preserva tudo da imagem (materiais, móveis, decoração, câmera). Só altera o que você pedir explicitamente.'}
+            {fidelityLevel === 'balanced' && 'Preserva arquitetura e câmera, com pequenas melhorias de composição e ambientação permitidas.'}
+            {fidelityLevel === 'creative' && 'Mais liberdade estética. Preserva apenas o essencial do projeto.'}
           </p>
         </div>
 
