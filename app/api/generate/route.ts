@@ -3,7 +3,6 @@ import { fal } from '@fal-ai/client'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import {
-  buildGenerationPrompt,
   buildFidelityPrompt,
   type GenerateOptions,
   type ProjectMaterials,
@@ -132,15 +131,14 @@ export async function POST(req: NextRequest) {
       refinementText,
     }
 
-    // Fidelity Engine: se o cliente mandou briefing, usa o prompt amarrado.
-    // Caso contrário, fallback pro caminho legado (mantém compat 100%).
-    const finalPrompt = briefing
-      ? buildFidelityPrompt(briefing, options, fidelityLevel)
-      : buildGenerationPrompt(options)
+    // Sempre usa o prompt builder novo. Briefing é opcional — quando ausente, o
+    // fidelityModifier carrega sozinho a instrução de preservação. O modelo já
+    // vê a imagem direto, redescrever em texto seria redundante.
+    const finalPrompt = buildFidelityPrompt(options, fidelityLevel, briefing)
 
     console.log('[generate] engine    :', engineId, '→', falEndpoint)
     console.log('[generate] quality   :', outputQuality)
-    console.log('[generate] fidelity  :', briefing ? `engine(${fidelityLevel})` : 'legacy')
+    console.log('[generate] fidelity  :', `${fidelityLevel}${briefing ? ' (+briefing)' : ''}`)
     console.log('[generate] anchor    :', hasAnchor ? anchorUrl : 'none')
     console.log('[generate] refine    :', refinementText?.trim() || 'none')
     console.log('[generate] prompt    :', finalPrompt)
