@@ -375,20 +375,20 @@ const ENV_EN: Record<string, string> = {
 const LIGHT_EN: Record<string, string> = {
   // Interior
   'Clara e Natural':         'extremely bright clean airy interior with abundant natural daylight, global illumination, 5500K',
-  'Natural Suave':           'soft natural light filtering through translucent curtains, gentle diffuse shadows, 5000K',
+  'Natural Suave':           'soft diffuse natural daylight 5000K, gentle even shadows, calm airy quality',
   'Luz de Janela':           'dramatic directional window light with defined shadows, high contrast, 5500K',
   'Quente e Aconchegante':   'warm incandescent-effect 3000K, cozy amber glow, soft pools of warm light',
   'Entardecer Quente':       'warm golden afternoon light streaming through windows at low angle, 3200K, long shadows',
   'Noturna Aconchegante':    'nighttime warm 2700K ambient illumination, intimate pools of soft light, deep shadows in unlit corners',
   'Sofisticada e Cênica':    'dramatic moody 2700K atmospheric illumination, layered light with deep contrast and accent highlights',
-  'Corporativa Neutra':      'neutral uniform corporate LED panels 4000K, no harsh shadows, professional clean light',
+  'Corporativa Neutra':      'neutral uniform corporate 4000K ambient, no harsh shadows, professional clean light quality',
   'Natural Profissional':    'professional natural light from large windows, 5000K clean white, ideal for work',
   'Luz Difusa Uniforme':     'perfectly diffuse uniform illumination 4500K, softbox effect, virtually shadowless',
   'Escritório Contemporâneo':'contemporary office ambient 4000K with even ceiling diffusion and soft task-level brightness',
   'Iluminação Técnica':      'precision technical high-efficacy lighting 4000K, industrial, very even distribution',
   'Noturna Executiva':       'nighttime executive ambient 3000K, warm work-zone glow, distant city light reflected through windows',
   'Clara e Produtiva':       'bright productive 5000K, high CRI, minimal glare, uniform task-friendly illumination',
-  'Comercial Bem Iluminada': 'bright commercial interior 4000K with display spotlights, high overall luminance',
+  'Comercial Bem Iluminada': 'bright commercial 4000K ambient with high overall luminance and accent contrast',
   'Varejo Premium':          'premium retail 3500K high-CRI accent illumination on display areas with warm ambient fill',
   'Showroom Iluminado':      'showroom 3500K dramatic accent contrast, bright focal zones with darker ambient perimeter',
   'Destaque de Produto':     'tight focal accent illumination on display areas, moody dark surround for contrast',
@@ -398,7 +398,7 @@ const LIGHT_EN: Record<string, string> = {
   'Cênica e Intimista':      'intimate theatrical candle-effect lighting, warm 2400K amber pools, romantic atmosphere',
   'Noturna Sofisticada':     'sophisticated dim 2700K nighttime ambient, layered accent highlights, refined atmosphere',
   'Café com Luz Natural':    'morning bright natural daylight 5500K, sun through windows, casual warm atmosphere',
-  'Restaurante Premium':     'fine dining warm 2700K ambient with subtle candlelight glow on table surfaces',
+  'Restaurante Premium':     'fine dining warm 2700K ambient with subtle candle-effect warm pools, intimate dining mood',
   'Luz Baixa Decorativa':    'very low-level decorative 2400K ambient, intimate mood, soft warm pools',
   'Premium Aconchegante':    'premium warm indirect 2700K illumination, plush atmospheric glow, soft graduations',
   'Luz Natural Elegante':    'refined natural light with thin window shadow lines 5500K, elegant and airy',
@@ -407,7 +407,7 @@ const LIGHT_EN: Record<string, string> = {
   'Lobby Iluminado':         'lobby grand 3000K warm ambient illumination, layered atmospheric brightness',
   'Entardecer de Hotel':     'interior golden hour 3200K warm sunset light streaming through windows',
   'Clara e Limpa':           'clinical bright white 5500K with high CRI, even illumination, no dark areas, sterile feel',
-  'Clínica Neutra':          'neutral clinical LED 4500K uniform ceiling panels, professional healthcare environment',
+  'Clínica Neutra':          'neutral clinical 4500K uniform ambient, professional healthcare quality, even distribution',
   'Luz Difusa Suave':        'very soft diffuse light 4000K, therapeutic gentle quality, no harsh shadows',
   'Iluminação Profissional': 'professional precision 4000K high CRI, appropriate for clinical accuracy',
   'Aconchegante e Calma':    'warm calm 3000K indirect lighting, therapeutic, stress-reducing atmosphere',
@@ -423,9 +423,9 @@ const LIGHT_EN: Record<string, string> = {
   'Golden Hour':           'golden hour, warm amber sunlight at low angle, magical quality, long soft shadows',
   'Blue Hour':             'blue hour twilight, deep indigo blue sky, city lights beginning to glow, glass reflections',
   'Noturno Iluminado':     'nighttime architectural facade ambient glow, warm interior light visible through openings, soft garden ambient',
-  'Nublado':               'overcast diffuse natural daylight, soft evenly distributed cloudy-day light, no harsh shadows, neutral 5500K — outdoors shows an overcast sky with cloud texture; indoors the same light filters through windows in soft even tones',
+  'Nublado':               'overcast diffuse natural daylight, soft evenly distributed cloudy-day light quality, no harsh shadows, neutral 5500K, soft even atmospheric tones throughout',
   'Chuva Leve':            'light rain, wet reflective pavement surfaces, dark cloudy sky, rain streaks visible',
-  'Diurno Comercial':      'bright clear commercial daytime, blue sky, optimal visibility for signage and display',
+  'Diurno Comercial':      'bright clear commercial daytime, blue sky, high overall visibility',
   'Fachada Bem Iluminada': 'perfect architectural photography light, slight overcast, even facade exposure',
   'Vitrine Noturna':       'nighttime store window brightly lit from within, contrasting dark surroundings',
   'Noturno Comercial':     'nighttime commercial district atmosphere, vibrant urban glow, bright active ambient',
@@ -437,9 +437,9 @@ const LIGHT_EN: Record<string, string> = {
   'Nublado Sofisticado':   'sophisticated overcast light, even diffuse shadows, high-end architectural photography',
   'Entardecer Premium':    'premium sunset, saturated warm sky gradient, golden light, luxury atmosphere',
   'Noturno Refinado':      'refined nighttime warm facade ambient glow, subtle landscape illumination, exclusive feel',
-  'Resort Diurno':         'bright tropical resort daytime, azure sky, vivid tropical vegetation, blue pool water',
-  'Luz de Piscina':        'pool area with reflected water light playing on surfaces, tropical afternoon sun',
-  'Atmosfera Tropical':    'tropical atmosphere with intense warm sunlight, vibrant lush green vegetation, clear sky',
+  'Resort Diurno':         'bright tropical resort daytime atmosphere, azure sky, intense warm sunlight',
+  'Luz de Piscina':        'reflected water light playing on surfaces, bright tropical afternoon sun quality',
+  'Atmosfera Tropical':    'tropical atmosphere, intense warm sunlight, clear vibrant sky',
   'Diurno Claro':          'clear bright daytime, direct sun, strong defined shadows, crisp visibility',
   'Nublado Suave':         'gentle soft overcast, even illumination, no harsh shadows, neutral institutional light',
   'Luz Natural':           'natural light, slightly golden, standard architectural photography, true to color',
@@ -479,8 +479,8 @@ const ELEM_EN: Record<string, string> = {
   'Decoração':              'styled decorative accessories, vases, artwork, throw cushions',
   'Pessoas':                'people in natural relaxed poses, lifestyle photography',
   'Vegetação':              'lush indoor or outdoor plants, tropical greenery',
-  'Luzes Acesas':           'all artificial lights illuminated, warm glowing fixtures',
-  'Raios de Sol':           'visible sun rays streaming through windows, subtle lens flare',
+  'Luzes Acesas':           'turn on the artificial light fixtures already visible in the reference, warm glow from existing fixtures only — DO NOT add new fixtures, lamps, sconces, spots or LEDs',
+  'Raios de Sol':           'subtle visible sun rays streaming through the windows already present in the reference, soft lens flare — DO NOT add new windows, openings or skylights',
   'Pessoas Trabalhando':    'office workers at computers in natural working poses',
   'Computadores':           'computers and monitors on desks with illuminated screens',
   'Mesas de Trabalho':      'workstation desks with office equipment and accessories',
@@ -544,7 +544,18 @@ const SEG_EN: Record<string, string> = {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function buildCameraBlock(): string {
+// Em maximum: bloco neutro. NÃO menciona "not a render, not CGI, real life
+// photo" — quando a entrada já é um render, essa frase é uma ordem ativa pra
+// reinterpretar a imagem (o que muda materiais e finishes). Também evita citar
+// equipamentos específicos (Canon R5, Hasselblad) que empurram estética de
+// revista.
+//
+// Em balanced/creative: bloco completo, faz sentido pros modos onde a
+// reinterpretação fotográfica é desejada.
+function buildCameraBlock(level?: FidelityLevel): string {
+  if (level === 'maximum') {
+    return ', high quality photorealistic image, sharp focus, no compression artifacts'
+  }
   return ', captured with professional architectural camera, Canon R5, 24mm tilt-shift lens, f/4, ISO 100, Hasselblad aesthetic, hyperrealistic, 8K RAW photo, photorealistic architectural photography, not a render, not CGI, real life photo'
 }
 
@@ -729,10 +740,13 @@ export function buildFidelityPrompt(
   const segDesc    = SEG_EN[segment]    ?? segment.toLowerCase()
 
   const elemParts = sceneElements.map(e => ELEM_EN[e] ?? e.toLowerCase()).filter(Boolean)
-  // Wrapper enfatiza que isso é ADIÇÃO (não substituição) — protege contra o
-  // modelo trocar móveis/objetos existentes ao tentar incluir os novos.
+  // Wrapper enfatiza que isso é ADIÇÃO (não substituição) e proíbe explicitamente
+  // criar novos objetos arquitetônicos (janelas, aberturas, luminárias) só pra
+  // justificar o efeito pedido. Isso protege contra ELEM_EN entries como
+  // "Luzes Acesas" e "Raios de Sol" que historicamente faziam o modelo
+  // adicionar fixtures/janelas inexistentes.
   const elemBlock = elemParts.length > 0
-    ? `Scene additions to include where naturally appropriate WITHOUT removing, replacing or restyling any existing element from the reference: ${elemParts.join('; ')}. `
+    ? `Scene additions to include WHERE naturally appropriate WITHOUT removing, replacing or restyling any existing element from the reference, and WITHOUT creating new windows, openings, walls, light fixtures or any architectural element to accommodate the addition: ${elemParts.join('; ')}. `
     : ''
 
   let bgBlock = ''
@@ -773,7 +787,7 @@ export function buildFidelityPrompt(
     elemBlock +
     allow +
     negative +
-    buildCameraBlock()
+    buildCameraBlock(level)
   )
 }
 
