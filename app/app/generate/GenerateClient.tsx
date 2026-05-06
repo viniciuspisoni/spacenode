@@ -54,6 +54,38 @@ const EMPTY_MATERIALS: ProjectMaterials = {
 
 function firstOf(arr: string[]): string { return arr[0] ?? '' }
 
+// ── Compressão de imagem no client ────────────────────────────────────────────
+//
+// Aceita uploads de até 10 MB e devolve um JPEG normalizado em até maxSide px
+// no maior lado. Garante que o payload base64 enviado pro /api/generate fique
+// confortavelmente abaixo do limite de ~4.5 MB da Vercel, independente do que
+// o usuário subir (foto de celular, PNG enorme, render exportado em alta).
+async function compressImage(
+  dataUrl: string,
+  maxSide: number = 2048,
+  quality: number = 0.92,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => {
+      const { width, height } = img
+      const longest = Math.max(width, height)
+      const scale   = longest > maxSide ? maxSide / longest : 1
+      const targetW = Math.round(width * scale)
+      const targetH = Math.round(height * scale)
+      const canvas  = document.createElement('canvas')
+      canvas.width  = targetW
+      canvas.height = targetH
+      const ctx = canvas.getContext('2d')
+      if (!ctx) { reject(new Error('CANVAS_UNSUPPORTED')); return }
+      ctx.drawImage(img, 0, 0, targetW, targetH)
+      resolve(canvas.toDataURL('image/jpeg', quality))
+    }
+    img.onerror = () => reject(new Error('IMAGE_LOAD_FAILED'))
+    img.src = dataUrl
+  })
+}
+
 function deriveDefaults(projectType: ProjectType, segment: string) {
   const envs   = getEnvironments(projectType, segment)
   const lights = getLighting(projectType, segment)
@@ -218,10 +250,18 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
   // ── Upload — plain functions; React Compiler handles memoization
   const loadImage = (file: File) => {
     if (!file.type.startsWith('image/')) return
-    if (file.size > 3 * 1024 * 1024) { setError('Imagem muito grande. Máximo 3 MB.'); return }
+    if (file.size > 10 * 1024 * 1024) { setError('Imagem muito grande. Máximo 10 MB.'); return }
     setOutputUrl(null); setError(null); setUseAnchor(true); setRefinementText('')
     const reader = new FileReader()
-    reader.onload = (e) => setImagePreview(e.target?.result as string)
+    reader.onload = async (e) => {
+      try {
+        const sourceUrl  = e.target?.result as string
+        const compressed = await compressImage(sourceUrl, 2048, 0.92)
+        setImagePreview(compressed)
+      } catch {
+        setError('Não foi possível processar essa imagem. Tente outro arquivo.')
+      }
+    }
     reader.readAsDataURL(file)
   }
 
@@ -623,7 +663,7 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
             </div>
             <div>
               <div style={S.uploadTitle}>arraste sua imagem aqui</div>
-              <div style={S.uploadSub}>SketchUp · Render · 3D · JPG · PNG</div>
+              <div style={S.uploadSub}>SketchUp · Render · 3D · JPG · PNG · até 10 MB</div>
             </div>
             <button style={S.uploadBtn} onClick={e => { e.stopPropagation(); fileInputRef.current?.click() }}>
               escolher arquivo
