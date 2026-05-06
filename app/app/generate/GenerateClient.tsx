@@ -86,6 +86,29 @@ async function compressImage(
   })
 }
 
+// Force-download cross-origin image. O atributo download em <a> é ignorado
+// pelo browser quando a URL é cross-origin (caso do CDN do FAL), então
+// fetchamos a imagem como blob, criamos uma object URL e disparamos o
+// download manualmente.
+async function downloadImage(url: string, filename: string) {
+  try {
+    const response = await fetch(url, { mode: 'cors' })
+    if (!response.ok) throw new Error('FETCH_FAILED')
+    const blob    = await response.blob()
+    const blobUrl = URL.createObjectURL(blob)
+    const a       = document.createElement('a')
+    a.href        = blobUrl
+    a.download    = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000)
+  } catch {
+    // fallback: abre em nova aba se o fetch falhar (ex: CDN sem CORS)
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+}
+
 function deriveDefaults(projectType: ProjectType, segment: string) {
   const envs   = getEnvironments(projectType, segment)
   const lights = getLighting(projectType, segment)
@@ -642,9 +665,12 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
         <div style={S.topbar}>
           <span style={S.pageTitle}>ANTES / DEPOIS</span>
           {outputUrl && (
-            <a href={outputUrl} download="spacenode-render.jpg" target="_blank" rel="noopener noreferrer" style={S.downloadLink}>
+            <button
+              onClick={() => downloadImage(outputUrl, 'spacenode-render.jpg')}
+              style={{...S.downloadLink, background:'none', border:'none', padding:0, cursor:'pointer', fontFamily:'inherit'}}
+            >
               baixar render ↓
-            </a>
+            </button>
           )}
         </div>
 
@@ -703,15 +729,12 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
               <button style={S.actionBtn} onClick={() => handleGenerate()}>
                 Gerar nova variação
               </button>
-              <a
-                href={outputUrl}
-                download="spacenode-render.jpg"
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                onClick={() => downloadImage(outputUrl, 'spacenode-render.jpg')}
                 style={S.actionBtn}
               >
                 Baixar imagem
-              </a>
+              </button>
             </div>
             <div style={S.postGenSecondary}>
               <button style={S.actionBtnGhost} onClick={() => handleGenerate('2k')}>
