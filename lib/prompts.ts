@@ -133,36 +133,36 @@ export const EXTERIOR_ENVIRONMENTS: Record<string, string[]> = {
 
 export const INTERIOR_LIGHTING: Record<string, string[]> = {
   'Residencial': [
-    'Clara e Natural', 'Natural Suave', 'Luz de Janela',
+    'Clara e Natural', 'Natural Suave', 'Luz de Janela', 'Nublado',
     'Quente e Aconchegante', 'Entardecer Quente',
     'Noturna Aconchegante', 'Sofisticada e Cênica',
   ],
   'Corporativo': [
-    'Corporativa Neutra', 'Natural Profissional', 'Luz Difusa Uniforme',
+    'Corporativa Neutra', 'Natural Profissional', 'Luz Difusa Uniforme', 'Nublado',
     'Escritório Contemporâneo', 'Iluminação Técnica',
     'Noturna Executiva', 'Clara e Produtiva',
   ],
   'Comercial': [
-    'Comercial Bem Iluminada', 'Varejo Premium', 'Showroom Iluminado',
+    'Comercial Bem Iluminada', 'Varejo Premium', 'Showroom Iluminado', 'Nublado',
     'Destaque de Produto', 'Iluminação de Loja',
     'Noturna Comercial', 'Luz de Vitrine',
   ],
   'Gastronomia': [
-    'Quente e Aconchegante', 'Cênica e Intimista', 'Entardecer Quente',
+    'Quente e Aconchegante', 'Cênica e Intimista', 'Entardecer Quente', 'Nublado',
     'Noturna Sofisticada', 'Café com Luz Natural',
     'Restaurante Premium', 'Luz Baixa Decorativa',
   ],
   'Hospitalidade': [
-    'Sofisticada e Cênica', 'Premium Aconchegante', 'Luz Natural Elegante',
+    'Sofisticada e Cênica', 'Premium Aconchegante', 'Luz Natural Elegante', 'Nublado',
     'Noturna Refinada', 'Spa Relaxante',
     'Lobby Iluminado', 'Entardecer de Hotel',
   ],
   'Saúde': [
-    'Clara e Limpa', 'Clínica Neutra', 'Luz Difusa Suave',
+    'Clara e Limpa', 'Clínica Neutra', 'Luz Difusa Suave', 'Nublado',
     'Iluminação Profissional', 'Aconchegante e Calma', 'Saúde Premium',
   ],
   'Educação': [
-    'Clara e Funcional', 'Natural Suave', 'Luz Difusa',
+    'Clara e Funcional', 'Natural Suave', 'Luz Difusa', 'Nublado',
     'Ambiente Produtivo', 'Biblioteca Aconchegante', 'Sala Bem Iluminada',
   ],
 }
@@ -422,7 +422,7 @@ const LIGHT_EN: Record<string, string> = {
   'Golden Hour':           'golden hour, warm amber sunlight at low angle, magical quality, long soft shadows',
   'Blue Hour':             'blue hour twilight, deep indigo blue sky, city lights beginning to glow, glass reflections',
   'Noturno Iluminado':     'nighttime with architectural facade uplighting, illuminated windows, garden spotlights',
-  'Nublado':               'overcast sky, perfectly diffuse soft light, no harsh shadows, dramatic cloud texture',
+  'Nublado':               'overcast diffuse natural daylight, soft evenly distributed cloudy-day light, no harsh shadows, neutral 5500K — outdoors shows an overcast sky with cloud texture; indoors the same light filters through windows in soft even tones',
   'Chuva Leve':            'light rain, wet reflective pavement surfaces, dark cloudy sky, rain streaks visible',
   'Diurno Comercial':      'bright clear commercial daytime, blue sky, optimal visibility for signage and display',
   'Fachada Bem Iluminada': 'perfect architectural photography light, slight overcast, even facade exposure',
