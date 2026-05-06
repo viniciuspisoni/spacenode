@@ -78,6 +78,7 @@ export async function POST(req: NextRequest) {
       inputUrl: providedInputUrl,            // string | undefined — evita re-upload
       fidelityLevel = 'maximum',             // 'maximum' | 'balanced' | 'creative'
       anchorUrl,                             // render anterior — âncora visual de materiais
+      refinementText,                        // pedido cirúrgico do usuário (ex: "trocar só o piso")
     } = body as {
       imageBase64?:    string
       projectType?:    'exterior' | 'interior'
@@ -95,6 +96,7 @@ export async function POST(req: NextRequest) {
       inputUrl?:       string
       fidelityLevel?:  FidelityLevel
       anchorUrl?:      string
+      refinementText?: string
     }
 
     if ((!imageBase64 && !providedInputUrl) || !projectType) {
@@ -127,6 +129,7 @@ export async function POST(req: NextRequest) {
       fidelityLevel,
       briefing,
       hasAnchor,
+      refinementText,
     }
 
     // Fidelity Engine: se o cliente mandou briefing, usa o prompt amarrado.
@@ -139,6 +142,7 @@ export async function POST(req: NextRequest) {
     console.log('[generate] quality   :', outputQuality)
     console.log('[generate] fidelity  :', briefing ? `engine(${fidelityLevel})` : 'legacy')
     console.log('[generate] anchor    :', hasAnchor ? anchorUrl : 'none')
+    console.log('[generate] refine    :', refinementText?.trim() || 'none')
     console.log('[generate] prompt    :', finalPrompt)
 
     // Upload da imagem (pula se /api/analyze já fez upload e mandou inputUrl)

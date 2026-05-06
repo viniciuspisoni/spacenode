@@ -22,9 +22,10 @@ export interface GenerateOptions {
   geometryLock:   number
   materials?:     ProjectMaterials
   fidelityMode?:  'strict' | 'balanced'
-  fidelityLevel?: FidelityLevel
-  briefing?:      BriefingArquitetonico
-  hasAnchor?:     boolean
+  fidelityLevel?:  FidelityLevel
+  briefing?:       BriefingArquitetonico
+  hasAnchor?:      boolean
+  refinementText?: string
 }
 
 // ── Fidelity Engine ────────────────────────────────────────────────────────────
@@ -611,6 +612,23 @@ export function buildNegativePromptForFidelity(level: FidelityLevel): string {
   return `STRICTLY AVOID: ${NEGATIVE_BASE.join(', ')}, no reframe, no zoom, no rotation, no altered silhouette.`
 }
 
+// Pedido cirúrgico de alteração entre gerações ("trocar só o piso", "adicionar
+// vegetação na varanda"). Só aplicado quando há âncora — sem âncora, o modelo
+// não tem referência fixa do "tudo o que deve ser preservado".
+function buildRefinementBlock(refinementText?: string, hasAnchor?: boolean): string {
+  const text = refinementText?.trim()
+  if (!text || !hasAnchor) return ''
+  return (
+    `USER REFINEMENT REQUEST: "${text}". ` +
+    `This is the ONLY change the user wants applied to image #1. ` +
+    `Preserve EVERYTHING else from image #1 pixel-by-pixel: all other materials, ` +
+    `textures, lighting, composition, camera angle, perspective, props, vegetation, ` +
+    `furniture and architectural elements must remain identical. ` +
+    `Do not reinterpret, do not improve, do not stylize anything that is not the ` +
+    `refinement request. `
+  )
+}
+
 // Quando o cliente envia uma âncora (render anterior do MESMO projeto), ela vai
 // PRIMEIRO em image_urls — Gemini/GPT extrai materiais e atmosfera dela. A
 // imagem de input (geometria) vai segundo. Este bloco diz isso ao modelo.
@@ -666,9 +684,10 @@ export function buildFidelityPrompt(
   options:   GenerateOptions,
   level:     FidelityLevel = 'maximum',
 ): string {
-  const { projectType, segment, lighting, background, sceneElements, materials, hasAnchor } = options
+  const { projectType, segment, lighting, background, sceneElements, materials, hasAnchor, refinementText } = options
 
   const anchor     = buildAnchorBlock(hasAnchor)
+  const refinement = buildRefinementBlock(refinementText, hasAnchor)
   const modifier   = fidelityModifier(level)
   const preserve   = preservationBlock(briefing)
   const allow      = transformationBlock(briefing)
@@ -697,6 +716,7 @@ export function buildFidelityPrompt(
 
   return (
     anchor +
+    refinement +
     modifier +
     preserve +
     matBlock +
@@ -713,10 +733,11 @@ export function buildFidelityPrompt(
 // ── Main export ────────────────────────────────────────────────────────────────
 
 export function buildGenerationPrompt(options: GenerateOptions): string {
-  const { projectType, segment, environment, lighting, background, sceneElements, geometryLock, materials, fidelityMode, hasAnchor } = options
+  const { projectType, segment, environment, lighting, background, sceneElements, geometryLock, materials, fidelityMode, hasAnchor, refinementText } = options
 
-  const anchor    = buildAnchorBlock(hasAnchor)
-  const geoPrefix = buildFidelityBlock(geometryLock, fidelityMode)
+  const anchor     = buildAnchorBlock(hasAnchor)
+  const refinement = buildRefinementBlock(refinementText, hasAnchor)
+  const geoPrefix  = buildFidelityBlock(geometryLock, fidelityMode)
   const matBlock  = buildMaterialsBlock(materials)
   const envDesc   = ENV_EN[environment]  ?? environment
   const lightDesc = LIGHT_EN[lighting]   ?? lighting
@@ -739,7 +760,7 @@ export function buildGenerationPrompt(options: GenerateOptions): string {
 
   if (projectType === 'exterior') {
     return (
-      anchor + geoPrefix + matBlock +
+      anchor + refinement + geoPrefix + matBlock +
       `Transform this 3D model into a photorealistic architectural exterior photograph. ` +
       `${segDesc} architecture. ${envDesc}. ` +
       `Lighting: ${lightDesc}. ` +
@@ -749,7 +770,7 @@ export function buildGenerationPrompt(options: GenerateOptions): string {
     )
   }
   return (
-    anchor + geoPrefix + matBlock +
+    anchor + refinement + geoPrefix + matBlock +
     `Transform this 3D preview into a photorealistic architectural interior photograph. ` +
     `${segDesc} space. ${envDesc}. ` +
     `Lighting: ${lightDesc}. ` +

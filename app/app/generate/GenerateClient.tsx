@@ -133,6 +133,11 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
   //    Default true; usuário pode desligar pra começar do zero.
   const [useAnchor, setUseAnchor] = useState(true)
 
+  // ── Refinar imagem: pedido cirúrgico pra alterar só uma coisa entre gerações.
+  //    Só faz efeito quando há render anterior (anchor) — sem isso o modelo não
+  //    tem referência fixa do "tudo o que deve ser preservado".
+  const [refinementText, setRefinementText] = useState('')
+
   const fileInputRef         = useRef<HTMLInputElement>(null)
   const compareRef           = useRef<HTMLDivElement>(null)
   const loadingTimerRef      = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -211,7 +216,7 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
   const loadImage = (file: File) => {
     if (!file.type.startsWith('image/')) return
     if (file.size > 3 * 1024 * 1024) { setError('Imagem muito grande. Máximo 3 MB.'); return }
-    setOutputUrl(null); setError(null); setUseAnchor(true)
+    setOutputUrl(null); setError(null); setUseAnchor(true); setRefinementText('')
     const reader = new FileReader()
     reader.onload = (e) => setImagePreview(e.target?.result as string)
     reader.readAsDataURL(file)
@@ -277,11 +282,13 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
           outputQuality: qualityOverride ?? outputQuality,
           materials:     Object.values(materials).some(v => v) ? materials : undefined,
           anchorUrl,
+          refinementText: refinementText.trim() || undefined,
         }),
       })
       const data: GenerateResult = await res.json()
       if (!res.ok || data.error) throw new Error(data.error ?? 'Erro na geração')
       setOutputUrl(data.outputUrl); setCredits(data.credits); setSliderPos(50)
+      if (refinementText.trim()) setRefinementText('')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Erro desconhecido')
     } finally { setLoading(false); stopLoadingTexts() }
@@ -570,6 +577,23 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
           </button>
         )}
 
+        {/* Refinar — só faz sentido com âncora ativa (precisa da #1 como referência) */}
+        {outputUrl && useAnchor && (
+          <div style={S.refineBox}>
+            <div style={S.refineLabel}>REFINAR IMAGEM (opcional)</div>
+            <textarea
+              value={refinementText}
+              onChange={e => setRefinementText(e.target.value)}
+              placeholder="ex: trocar o piso para porcelanato cinza claro, mantendo todo o resto"
+              rows={2}
+              style={S.refineInput}
+            />
+            <div style={S.refineHint}>
+              Deixe em branco pra apenas regerar com novos parâmetros. Preencha pra pedir uma alteração específica.
+            </div>
+          </div>
+        )}
+
         {/* 11 — Botão Gerar */}
         <button
           style={loading || !imagePreview || credits < nodeCost
@@ -578,7 +602,12 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
           onClick={() => handleGenerate()}
           disabled={loading || !imagePreview || credits < nodeCost}
         >
-          <span>{loading ? 'gerando…' : (outputUrl && useAnchor ? 'gerar variação' : 'gerar render')}</span>
+          <span>{loading
+            ? 'gerando…'
+            : (refinementText.trim() && outputUrl && useAnchor
+                ? 'aplicar refinamento'
+                : (outputUrl && useAnchor ? 'gerar variação' : 'gerar render'))
+          }</span>
           <span style={S.genBtnMeta}>
             <span>{nodeCost} Nodes por render</span>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-bg)" strokeWidth="1.5">
@@ -800,6 +829,10 @@ const S: Record<string, React.CSSProperties> = {
   range:             { flex:1, accentColor:'var(--color-text-primary)', height:3 },
   sliderVal:         { fontSize:12, fontWeight:500, color:'var(--color-text-primary)', minWidth:34, textAlign:'right' },
   anchorRow:         { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 14px', border:'0.5px solid var(--color-border-strong)', borderRadius:8, background:'var(--color-bg-elevated)', cursor:'pointer', fontFamily:'inherit', width:'100%' },
+  refineBox:         { display:'flex', flexDirection:'column', gap:6, padding:'12px 14px', border:'0.5px solid var(--color-border-strong)', borderRadius:8, background:'var(--color-bg-elevated)' },
+  refineLabel:       { fontSize:10, letterSpacing:'0.15em', textTransform:'uppercase', color:'var(--color-text-tertiary)', fontWeight:500 },
+  refineInput:       { padding:'8px 10px', border:'0.5px solid var(--color-border-strong)', borderRadius:6, fontSize:11, color:'var(--color-text-primary)', background:'var(--color-bg)', fontFamily:'inherit', outline:'none', resize:'vertical', minHeight:36 },
+  refineHint:        { fontSize:10, color:'var(--color-text-tertiary)', lineHeight:1.5 },
   fidelityGrid:      { display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 },
   fidelityOpt:       { border:'0.5px solid var(--color-border-strong)', borderRadius:8, padding:'10px 8px', cursor:'pointer', background:'var(--color-bg-elevated)', textAlign:'center' as const },
   fidelityOptActive: { border:'0.5px solid var(--color-text-primary)', background:'var(--color-text-primary)' },
