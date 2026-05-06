@@ -77,6 +77,7 @@ export async function POST(req: NextRequest) {
       briefing,                              // BriefingArquitetonico | undefined
       inputUrl: providedInputUrl,            // string | undefined — evita re-upload
       fidelityLevel = 'maximum',             // 'maximum' | 'balanced' | 'creative'
+      anchorUrl,                             // render anterior — âncora visual de materiais
     } = body as {
       imageBase64?:    string
       projectType?:    'exterior' | 'interior'
@@ -93,6 +94,7 @@ export async function POST(req: NextRequest) {
       briefing?:       BriefingArquitetonico
       inputUrl?:       string
       fidelityLevel?:  FidelityLevel
+      anchorUrl?:      string
     }
 
     if ((!imageBase64 && !providedInputUrl) || !projectType) {
@@ -111,6 +113,7 @@ export async function POST(req: NextRequest) {
     const falEndpoint = FAL_ENDPOINT[engineId] ?? 'fal-ai/nano-banana-pro/edit'
 
     // Build the generation prompt from the architectural options
+    const hasAnchor = Boolean(anchorUrl)
     const options: GenerateOptions = {
       projectType,
       segment:       segment       ?? 'Residencial',
@@ -123,6 +126,7 @@ export async function POST(req: NextRequest) {
       fidelityMode:  fidelityMode  === 'balanced' ? 'balanced' : 'strict',
       fidelityLevel,
       briefing,
+      hasAnchor,
     }
 
     // Fidelity Engine: se o cliente mandou briefing, usa o prompt amarrado.
@@ -134,6 +138,7 @@ export async function POST(req: NextRequest) {
     console.log('[generate] engine    :', engineId, '→', falEndpoint)
     console.log('[generate] quality   :', outputQuality)
     console.log('[generate] fidelity  :', briefing ? `engine(${fidelityLevel})` : 'legacy')
+    console.log('[generate] anchor    :', hasAnchor ? anchorUrl : 'none')
     console.log('[generate] prompt    :', finalPrompt)
 
     // Upload da imagem (pula se /api/analyze já fez upload e mandou inputUrl)
@@ -149,6 +154,12 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Build model-specific input ────────────────────────────────────────────
+    // Quando há âncora, ela vai PRIMEIRO em image_urls (mesma convenção do
+    // Spaces /vista) — Gemini extrai materiais/atmosfera dela antes de
+    // processar a geometria do input.
+    const imageUrls = (anchorUrl && anchorUrl !== inputUrl)
+      ? [anchorUrl, inputUrl]
+      : [inputUrl]
 
     let falInput: Record<string, unknown>
 
@@ -156,7 +167,7 @@ export async function POST(req: NextRequest) {
       // Quasar — GPT Image 2 edit
       falInput = {
         prompt:        finalPrompt,
-        image_urls:    [inputUrl],
+        image_urls:    imageUrls,
         quality:       quasarQuality(outputQuality as OutputQuality),
         image_size:    'auto',   // infere a partir da imagem de entrada
         num_images:    1,
@@ -166,7 +177,7 @@ export async function POST(req: NextRequest) {
       // Vega — Gemini 3 Pro Image edit
       falInput = {
         prompt:        finalPrompt,
-        image_urls:    [inputUrl],
+        image_urls:    imageUrls,
         resolution:    vegaResolution(outputQuality as OutputQuality),
         num_images:    1,
         output_format: 'jpeg',
