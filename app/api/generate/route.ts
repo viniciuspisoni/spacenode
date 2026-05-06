@@ -229,6 +229,7 @@ export async function POST(req: NextRequest) {
       outputUrl,
       originalUrl: inputUrl ?? null,
       credits:     profile?.credits ?? 0,
+      prompt:      finalPrompt,
     })
 
   } catch (err: unknown) {

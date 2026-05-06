@@ -565,7 +565,11 @@ function buildFidelityBlock(geometryLock: number, fidelityMode?: 'strict' | 'bal
   return 'GEOMETRY LOCKED: This is a material and lighting transformation ONLY. The camera position, viewing angle, perspective, horizon line, building silhouette, architectural geometry and all proportions must be PIXEL-PERFECT identical to the reference image. Do not reframe, do not rotate, do not zoom. Only surface materials, textures, lighting and background vegetation may change. '
 }
 
-function buildMaterialsBlock(materials?: ProjectMaterials): string {
+// Quando o usuário preenche um campo de materiais, é uma OVERRIDE explícita —
+// substitui o que está visível na imagem de referência. Em maximum o wording é
+// mais forte (reference-vs-override) porque o resto do prompt já manda preservar
+// tudo da imagem.
+function buildMaterialsBlock(materials?: ProjectMaterials, level?: FidelityLevel): string {
   if (!materials) return ''
   const lines = [
     materials.fachada    && `facade cladding: ${materials.fachada}`,
@@ -575,6 +579,14 @@ function buildMaterialsBlock(materials?: ProjectMaterials): string {
     materials.outros     && `additional notes: ${materials.outros}`,
   ].filter(Boolean)
   if (lines.length === 0) return ''
+  if (level === 'maximum') {
+    return (
+      `MATERIAL OVERRIDES — these materials take ABSOLUTE PRIORITY over the reference ` +
+      `image and any other instructions: ${lines.join('; ')}. ` +
+      `Apply these specific materials regardless of what is visible in the reference. ` +
+      `All OTHER materials not listed here must remain identical to the reference. `
+    )
+  }
   return `EXACT PROJECT MATERIALS — reproduce these faithfully: ${lines.join('; ')}. `
 }
 
@@ -653,7 +665,17 @@ function fidelityModifier(level: FidelityLevel): string {
   if (level === 'balanced') {
     return 'BALANCED FIDELITY MODE: Preserve architecture, camera angle, opening positions, number of stories and main volumetry. Light composition tweaks allowed (vegetation, sky, ambient props). Do not redesign the facade. '
   }
-  return 'MAXIMUM FIDELITY MODE: PIXEL-ACCURATE preservation of architecture, geometry, volumetry, number of stories, openings (doors/windows position and size), roofline, perspective, camera angle, framing and surrounding context including neighboring buildings. This is a materials-and-lighting transformation ONLY. Do not reframe, do not rotate, do not zoom, do not redesign anything. Only surface materials, textures, lighting, sky and discreet vegetation may change. '
+  // maximum — preserve EVERYTHING. Lighting and explicit user requests are the only allowed changes.
+  return (
+    'MAXIMUM FIDELITY MODE: This is a LIGHTING-ONLY re-render of the reference image. ' +
+    'Preserve EVERY material, texture, color, surface finish, furniture piece, decorative ' +
+    'object, plant, fabric pattern, rug texture, floor finish, wall finish, ceiling finish ' +
+    'and architectural element pixel-by-pixel from the reference. ' +
+    'Do NOT improve, do NOT stylize, do NOT reinterpret, do NOT enhance any material. ' +
+    'Apply ONLY the lighting condition and the specific scene/material/refinement changes ' +
+    'EXPLICITLY requested below. Anything not explicitly requested must remain identical to ' +
+    'the reference image. '
+  )
 }
 
 function preservationBlock(briefing: BriefingArquitetonico): string {
@@ -674,7 +696,12 @@ function preservationBlock(briefing: BriefingArquitetonico): string {
   )
 }
 
-function transformationBlock(briefing: BriefingArquitetonico): string {
+// Em maximum NÃO emitimos lista de "improvements permitidas" — qualquer item nessa
+// lista vira licença implícita pro modelo reinterpretar materiais. Em maximum só
+// muda o que o usuário pediu explicitamente (luz, scene, materials override,
+// refinement). Em balanced/creative continua emitindo a lista do briefing.
+function transformationBlock(briefing: BriefingArquitetonico, level: FidelityLevel): string {
+  if (level === 'maximum') return ''
   if (briefing.elementos_melhorar.length === 0) return ''
   return `ALLOWED IMPROVEMENTS ONLY (visual quality, not architecture): ${briefing.elementos_melhorar.join('; ')}. `
 }
@@ -690,8 +717,8 @@ export function buildFidelityPrompt(
   const refinement = buildRefinementBlock(refinementText, hasAnchor)
   const modifier   = fidelityModifier(level)
   const preserve   = preservationBlock(briefing)
-  const allow      = transformationBlock(briefing)
-  const matBlock   = buildMaterialsBlock(materials)
+  const allow      = transformationBlock(briefing, level)
+  const matBlock   = buildMaterialsBlock(materials, level)
   const negative   = buildNegativePromptForFidelity(level)
 
   const lightDesc  = LIGHT_EN[lighting] ?? lighting
@@ -710,9 +737,13 @@ export function buildFidelityPrompt(
     }
   }
 
-  const intent = projectType === 'exterior'
-    ? `Transform this reference into a photorealistic ${segDesc} architectural exterior photograph. `
-    : `Transform this reference into a photorealistic ${segDesc} architectural interior photograph. `
+  // Em maximum: "Re-render" — verbo cirúrgico, sem licença implícita pra reinventar.
+  // Em balanced/creative: "Transform" — segue o tom mais permissivo do nível.
+  const verb   = level === 'maximum' ? 'Re-render' : 'Transform'
+  const kind   = projectType === 'exterior'
+    ? `${segDesc} architectural exterior photograph`
+    : `${segDesc} architectural interior photograph`
+  const intent = `${verb} this reference image as a photorealistic ${kind}. `
 
   return (
     anchor +
