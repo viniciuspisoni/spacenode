@@ -13,15 +13,34 @@ export interface ProjectMaterials {
 }
 
 export interface GenerateOptions {
-  projectType:   ProjectType
-  segment:       string
-  environment:   string
-  lighting:      string
-  background:    string
-  sceneElements: string[]
-  geometryLock:  number
-  materials?:    ProjectMaterials
-  fidelityMode?: 'strict' | 'balanced'
+  projectType:    ProjectType
+  segment:        string
+  environment:    string
+  lighting:       string
+  background:     string
+  sceneElements:  string[]
+  geometryLock:   number
+  materials?:     ProjectMaterials
+  fidelityMode?:  'strict' | 'balanced'
+  fidelityLevel?: FidelityLevel
+  briefing?:      BriefingArquitetonico
+}
+
+// ── Fidelity Engine ────────────────────────────────────────────────────────────
+
+export type FidelityLevel = 'maximum' | 'balanced' | 'creative'
+
+export interface BriefingArquitetonico {
+  tipo_projeto:         string   // ex: "fachada residencial contemporânea, sobrado isolado"
+  geometria_principal:  string   // ex: "volume retangular alongado com balanço lateral em concreto"
+  volumes:              string   // ex: "dois volumes sobrepostos, térreo recuado, superior em balanço"
+  pavimentos:           number   // 1, 2, 3...
+  aberturas:            string   // ex: "três janelas verticais no pavimento superior, porta pivotante central"
+  materiais_aparentes:  string   // ex: "concreto aparente, painéis de madeira ripada, vidro laminado"
+  camera:               string   // ex: "frontal levemente em contra-plongée, altura humana, lente normal ~35mm"
+  entorno:              string   // ex: "lote em rua plana, calçada larga, casa vizinha de dois pavimentos à direita"
+  elementos_preservar:  string[] // ["número de pavimentos", "posição de aberturas", "casa vizinha", ...]
+  elementos_melhorar:   string[] // ["realismo de materiais", "vegetação discreta", "iluminação", ...]
 }
 
 // ── Segments ───────────────────────────────────────────────────────────────────
@@ -555,6 +574,120 @@ function buildMaterialsBlock(materials?: ProjectMaterials): string {
   ].filter(Boolean)
   if (lines.length === 0) return ''
   return `EXACT PROJECT MATERIALS — reproduce these faithfully: ${lines.join('; ')}. `
+}
+
+// ── Fidelity Engine prompt builder ─────────────────────────────────────────────
+
+const NEGATIVE_BASE = [
+  'no facade redesign',
+  'no architectural changes',
+  'no added or removed floors',
+  'no added or removed stories',
+  'no repositioned doors or windows',
+  'no resized openings',
+  'no changed roofline',
+  'no different camera angle',
+  'no different perspective',
+  'no warped proportions',
+  'no removed neighboring buildings',
+  'no fantasy elements',
+  'no impossible geometry',
+  'no surreal additions',
+]
+
+export function buildNegativePromptForFidelity(level: FidelityLevel): string {
+  if (level === 'creative') {
+    // ainda preserva volumetria/aberturas/perspectiva, mas relaxa entorno e estilo
+    const relaxed = NEGATIVE_BASE.filter(n =>
+      !n.includes('removed neighboring') && !n.includes('changed roofline')
+    )
+    return `AVOID: ${relaxed.join(', ')}.`
+  }
+  if (level === 'balanced') {
+    return `AVOID: ${NEGATIVE_BASE.join(', ')}.`
+  }
+  // maximum
+  return `STRICTLY AVOID: ${NEGATIVE_BASE.join(', ')}, no reframe, no zoom, no rotation, no altered silhouette.`
+}
+
+function fidelityModifier(level: FidelityLevel): string {
+  if (level === 'creative') {
+    return 'CREATIVE FIDELITY MODE: Preserve volumetry, number of stories, opening positions and overall perspective. Stylistic freedom is allowed on materials, sky, ambient props, vegetation and surroundings. '
+  }
+  if (level === 'balanced') {
+    return 'BALANCED FIDELITY MODE: Preserve architecture, camera angle, opening positions, number of stories and main volumetry. Light composition tweaks allowed (vegetation, sky, ambient props). Do not redesign the facade. '
+  }
+  return 'MAXIMUM FIDELITY MODE: PIXEL-ACCURATE preservation of architecture, geometry, volumetry, number of stories, openings (doors/windows position and size), roofline, perspective, camera angle, framing and surrounding context including neighboring buildings. This is a materials-and-lighting transformation ONLY. Do not reframe, do not rotate, do not zoom, do not redesign anything. Only surface materials, textures, lighting, sky and discreet vegetation may change. '
+}
+
+function preservationBlock(briefing: BriefingArquitetonico): string {
+  const lock = briefing.elementos_preservar.length > 0
+    ? `\nLOCKED ELEMENTS (must be identical to reference): ${briefing.elementos_preservar.join('; ')}.`
+    : ''
+  return (
+    `PROJECT FACTS (from vision analysis — must remain unchanged):\n` +
+    `- Project type: ${briefing.tipo_projeto}\n` +
+    `- Main geometry: ${briefing.geometria_principal}\n` +
+    `- Volumes: ${briefing.volumes}\n` +
+    `- Number of stories: ${briefing.pavimentos} — DO NOT add or remove floors\n` +
+    `- Openings: ${briefing.aberturas} — preserve exact position and proportion of every door and window\n` +
+    `- Visible materials in reference: ${briefing.materiais_aparentes}\n` +
+    `- Camera and perspective: ${briefing.camera} — DO NOT reframe, rotate or zoom\n` +
+    `- Surroundings: ${briefing.entorno} — preserve neighboring buildings if present` +
+    lock + ' '
+  )
+}
+
+function transformationBlock(briefing: BriefingArquitetonico): string {
+  if (briefing.elementos_melhorar.length === 0) return ''
+  return `ALLOWED IMPROVEMENTS ONLY (visual quality, not architecture): ${briefing.elementos_melhorar.join('; ')}. `
+}
+
+export function buildFidelityPrompt(
+  briefing:  BriefingArquitetonico,
+  options:   GenerateOptions,
+  level:     FidelityLevel = 'maximum',
+): string {
+  const { projectType, segment, lighting, background, sceneElements, materials } = options
+
+  const modifier   = fidelityModifier(level)
+  const preserve   = preservationBlock(briefing)
+  const allow      = transformationBlock(briefing)
+  const matBlock   = buildMaterialsBlock(materials)
+  const negative   = buildNegativePromptForFidelity(level)
+
+  const lightDesc  = LIGHT_EN[lighting] ?? lighting
+  const segDesc    = SEG_EN[segment]    ?? segment.toLowerCase()
+
+  const elemParts = sceneElements.map(e => ELEM_EN[e] ?? e.toLowerCase()).filter(Boolean)
+  const elemBlock = elemParts.length > 0 ? `Scene additions allowed: ${elemParts.join('; ')}. ` : ''
+
+  let bgBlock = ''
+  if (background && background !== 'Preservar Original') {
+    const bgDesc = BG_EN[background] ?? background
+    if (bgDesc) {
+      bgBlock = projectType === 'exterior'
+        ? `Surrounding context (only if compatible with the reference): ${bgDesc}. `
+        : `Spatial context (only if compatible with the reference): ${bgDesc}. `
+    }
+  }
+
+  const intent = projectType === 'exterior'
+    ? `Transform this reference into a photorealistic ${segDesc} architectural exterior photograph. `
+    : `Transform this reference into a photorealistic ${segDesc} architectural interior photograph. `
+
+  return (
+    modifier +
+    preserve +
+    matBlock +
+    intent +
+    `Lighting: ${lightDesc}. ` +
+    bgBlock +
+    elemBlock +
+    allow +
+    negative +
+    buildCameraBlock()
+  )
 }
 
 // ── Main export ────────────────────────────────────────────────────────────────
