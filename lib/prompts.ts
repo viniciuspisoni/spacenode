@@ -606,11 +606,14 @@ function buildMaterialsBlock(materials?: ProjectMaterials, level?: FidelityLevel
 const NEGATIVE_BASE = [
   'no facade redesign',
   'no architectural changes',
-  'no added or removed floors',
   'no added or removed stories',
-  'no repositioned doors or windows',
-  'no resized openings',
-  'no changed roofline',
+  'no added doors, windows, arches, niches or any new opening',
+  'no closed, filled or covered existing openings',
+  'no transformed openings — a door must remain a door, a window must remain a window, an arch must remain an arch',
+  'no added or removed walls, partitions, columns or beams',
+  'no altered corridor, hallway, doorway or room boundary',
+  'no repositioned or resized openings',
+  'no changed roofline or ceiling line',
   'no different camera angle',
   'no different perspective',
   'no warped proportions',
@@ -647,6 +650,12 @@ function buildRefinementBlock(refinementText?: string, hasAnchor?: boolean): str
     `Preserve EVERYTHING else from image #1 pixel-by-pixel: all other materials, ` +
     `textures, lighting, composition, camera angle, perspective, props, vegetation, ` +
     `furniture and architectural elements must remain identical. ` +
+    `If the request is to REMOVE an element, remove it cleanly: the result must be the ` +
+    `surrounding wall, floor or ceiling material continuing seamlessly — NEVER replace ` +
+    `the removed element with a different one of the same kind. Removing a door = solid ` +
+    `wall in its place. Removing a window = solid wall. Removing furniture = empty floor. ` +
+    `Never transform one architectural element into another (door into arch, window into ` +
+    `door, opening into different opening). ` +
     `Do not reinterpret, do not improve, do not stylize anything that is not the ` +
     `refinement request. `
   )
@@ -679,10 +688,15 @@ function fidelityModifier(level: FidelityLevel): string {
   // maximum — preserve EVERYTHING. Lighting and explicit user requests are the only allowed changes.
   return (
     'MAXIMUM FIDELITY MODE: This is a LIGHTING-ONLY re-render of the reference image. ' +
+    'Preserve EVERY architectural element pixel-by-pixel from the reference: every wall, ' +
+    'every door, every window, every arch, every niche, every opening (and its absence — ' +
+    'a solid wall must remain a solid wall), every partition, beam, column, frame, ' +
+    'corridor boundary, hallway, doorway, ceiling line and roofline. ' +
     'Preserve EVERY material, texture, color, surface finish, furniture piece, decorative ' +
-    'object, plant, fabric pattern, rug texture, floor finish, wall finish, ceiling finish ' +
-    'and architectural element pixel-by-pixel from the reference. ' +
-    'Do NOT improve, do NOT stylize, do NOT reinterpret, do NOT enhance any material. ' +
+    'object, plant, fabric pattern, rug texture, floor finish, wall finish and ceiling finish ' +
+    'pixel-by-pixel from the reference. ' +
+    'Do NOT add, remove or transform any opening. Do NOT add or remove any wall, partition or ' +
+    'column. Do NOT improve, stylize, reinterpret or enhance any material. ' +
     'Apply ONLY the lighting condition and the specific scene/material/refinement changes ' +
     'EXPLICITLY requested below. Anything not explicitly requested must remain identical to ' +
     'the reference image. '
