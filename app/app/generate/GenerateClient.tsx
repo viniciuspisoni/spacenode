@@ -6,6 +6,11 @@ import {
   ProjectType, ProjectMaterials,
   getSegments, getEnvironments, getLighting, getBackgrounds, getSceneElements,
 } from '@/lib/prompts'
+import {
+  ENGINES, ENGINE_ORDER, DEFAULT_ENGINE, DEFAULT_RESOLUTION,
+  type EngineId, type Resolution,
+  getNodesCost,
+} from '@/lib/engines'
 
 interface GenerateClientProps {
   initialCredits:    number
@@ -35,16 +40,11 @@ const FIDELITY_LEVELS: { id: FidelityLevel; label: string; desc: string }[] = [
   { id: 'creative', label: 'Criativo',   desc: 'Mais liberdade estética'            },
 ]
 
-const SPN_ENGINES = [
-  { id: 'nano-banana-pro', name: 'Vega',   desc: 'Nano Banana Pro' },
-  { id: 'gpt-image-2',     name: 'Quasar', desc: 'GPT Image 2'     },
-]
-
-const OUTPUT_QUALITIES = [
-  { id: 'hd', label: 'HD',  nodes: 4,  desc: 'Rápido para testes'       },
-  { id: '2k', label: '2K',  nodes: 8,  desc: 'Ideal para apresentação'  },
-  { id: '4k', label: '4K',  nodes: 20, desc: 'Máxima definição'         },
-]
+const RESOLUTION_DESC: Record<Resolution, string> = {
+  hd: 'Rápido para testes',
+  '2k': 'Ideal para apresentação',
+  '4k': 'Máxima definição',
+}
 
 const EMPTY_MATERIALS: ProjectMaterials = {
   fachada: '', piso: '', esquadrias: '', elementos: '', outros: '',
@@ -154,9 +154,9 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
   // ── Parâmetros técnicos
   const geometryLock = 85
   const fidelityMode = 'strict' as const
-  const [fidelityLevel,  setFidelityLevel]  = useState<FidelityLevel>('maximum')
-  const [selectedModel,  setSelectedModel]  = useState('nano-banana-pro')
-  const [outputQuality,  setOutputQuality]  = useState('hd')
+  const [fidelityLevel,      setFidelityLevel]      = useState<FidelityLevel>('maximum')
+  const [selectedEngine,     setSelectedEngine]     = useState<EngineId>(DEFAULT_ENGINE)
+  const [selectedResolution, setSelectedResolution] = useState<Resolution>(DEFAULT_RESOLUTION)
 
   // ── Materiais
   const [materiaisAberto, setMateriaisAberto] = useState(false)
@@ -285,7 +285,7 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
   }
 
   // ── Geração
-  const handleGenerate = async (qualityOverride?: string) => {
+  const handleGenerate = async (resolutionOverride?: Resolution) => {
     if (!imagePreview) { setError('Faça upload de uma imagem primeiro.'); return }
     if (credits < nodeCost) { setError('Nodes insuficientes.'); return }
     setError(null); setLoading(true); startLoadingTexts()
@@ -309,8 +309,8 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
           sceneElements,
           geometryLock,
           fidelityMode,
-          model:         selectedModel,
-          outputQuality: qualityOverride ?? outputQuality,
+          engine:        selectedEngine,
+          resolution:    resolutionOverride ?? selectedResolution,
           materials:     Object.values(materials).some(v => v) ? materials : undefined,
           anchorUrl,
           refinementText: refinementText.trim() || undefined,
@@ -352,8 +352,8 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
 
   // ── Computed
   const hasMaterials  = Object.values(materials).some(v => v && v.trim())
-  const nodeCost      = OUTPUT_QUALITIES.find(q => q.id === outputQuality)?.nodes ?? 4
-  const currentEngine = SPN_ENGINES.find(m => m.id === selectedModel)
+  const currentEngine = ENGINES[selectedEngine]
+  const nodeCost      = getNodesCost(selectedEngine, selectedResolution)
   const segments      = getSegments(projectType)
   const environments  = getEnvironments(projectType, segment)
   const lightingOpts  = getLighting(projectType, segment)
@@ -366,7 +366,7 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
   const summaryLine1 = `${typeLabel} · ${segment} · ${environment}`
   const summaryLine2 = [lighting, background !== 'Preservar Original' ? background : null, sceneElements.join(', ')].filter(Boolean).join(' · ')
   const fidelityLabel = FIDELITY_LEVELS.find(l => l.id === fidelityLevel)?.label ?? 'Máxima'
-  const summaryLine3  = `Fidelidade ${fidelityLabel} · ${currentEngine?.name} · ${OUTPUT_QUALITIES.find(q => q.id === outputQuality)?.label}`
+  const summaryLine3  = `Fidelidade ${fidelityLabel} · ${currentEngine.name} · ${selectedResolution.toUpperCase()}`
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -553,15 +553,25 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
         <div style={S.section}>
           <div style={S.label}>MOTOR DE IA</div>
           <div style={S.motorGrid}>
-            {SPN_ENGINES.map(m => (
-              <div key={m.id}
-                style={{...S.motorOpt, ...(selectedModel === m.id ? S.motorOptActive : {})}}
-                onClick={() => setSelectedModel(m.id)}
-              >
-                <div style={{...S.motorName, ...(selectedModel === m.id ? {color:'var(--color-bg)'} : {})}}>{m.name}</div>
-                <div style={{...S.motorDesc, ...(selectedModel === m.id ? {color:'var(--color-bg)', opacity:0.6} : {})}}>{m.desc}</div>
-              </div>
-            ))}
+            {ENGINE_ORDER.map(eid => {
+              const e = ENGINES[eid]
+              const active = selectedEngine === eid
+              return (
+                <div key={eid}
+                  style={{...S.motorOpt, ...(active ? S.motorOptActive : {})}}
+                  onClick={() => {
+                    setSelectedEngine(eid)
+                    // Se a resolução atual não é suportada, cai pra 2K.
+                    if (!e.resolutions.includes(selectedResolution)) {
+                      setSelectedResolution('2k')
+                    }
+                  }}
+                >
+                  <div style={{...S.motorName, ...(active ? {color:'var(--color-bg)'} : {})}}>{e.name}</div>
+                  <div style={{...S.motorDesc, ...(active ? {color:'var(--color-bg)', opacity:0.6} : {})}}>{e.tagline}</div>
+                </div>
+              )
+            })}
           </div>
         </div>
 
@@ -569,16 +579,20 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
         <div style={S.section}>
           <div style={S.label}>QUALIDADE DE SAÍDA</div>
           <div style={S.qualityGrid}>
-            {OUTPUT_QUALITIES.map(q => (
-              <div key={q.id}
-                style={{...S.qualityOpt, ...(outputQuality === q.id ? S.qualityOptActive : {})}}
-                onClick={() => setOutputQuality(q.id)}
-              >
-                <div style={{...S.qualityRes, ...(outputQuality === q.id ? {color:'var(--color-bg)'} : {})}}>{q.label}</div>
-                <div style={{...S.motorDesc, ...(outputQuality === q.id ? {color:'var(--color-bg)', opacity:0.6} : {})}}>{q.nodes} Nodes por imagem</div>
-                <div style={{...S.motorDesc, ...(outputQuality === q.id ? {color:'var(--color-bg)', opacity:0.6} : {})}}>{q.desc}</div>
-              </div>
-            ))}
+            {currentEngine.resolutions.map(res => {
+              const active = selectedResolution === res
+              const cost   = currentEngine.nodes[res]!
+              return (
+                <div key={res}
+                  style={{...S.qualityOpt, ...(active ? S.qualityOptActive : {})}}
+                  onClick={() => setSelectedResolution(res)}
+                >
+                  <div style={{...S.qualityRes, ...(active ? {color:'var(--color-bg)'} : {})}}>{res.toUpperCase()}</div>
+                  <div style={{...S.motorDesc, ...(active ? {color:'var(--color-bg)', opacity:0.6} : {})}}>{cost} Nodes por imagem</div>
+                  <div style={{...S.motorDesc, ...(active ? {color:'var(--color-bg)', opacity:0.6} : {})}}>{RESOLUTION_DESC[res]}</div>
+                </div>
+              )
+            })}
           </div>
         </div>
 
@@ -711,7 +725,7 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
         {/* ── POST-GENERATION ACTIONS ── */}
         {imagePreview && outputUrl && !loading && (
           <div style={S.postGen}>
-            {outputQuality === 'hd' && (
+            {selectedResolution === 'hd' && (
               <div style={S.upsellNote}>
                 Melhore para 2K ou 4K para apresentação profissional
               </div>
@@ -885,7 +899,7 @@ const S: Record<string, React.CSSProperties> = {
   fidelityOpt:       { border:'0.5px solid var(--color-border-strong)', borderRadius:8, padding:'10px 8px', cursor:'pointer', background:'var(--color-bg-elevated)', textAlign:'center' as const },
   fidelityOptActive: { border:'0.5px solid var(--color-text-primary)', background:'var(--color-text-primary)' },
   fidelityName:      { fontSize:11, fontWeight:500, color:'var(--color-text-primary)', marginBottom:3 },
-  motorGrid:         { display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 },
+  motorGrid:         { display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 },
   motorOpt:          { border:'0.5px solid var(--color-border-strong)', borderRadius:8, padding:'10px 10px', cursor:'pointer', background:'var(--color-bg-elevated)' },
   motorOptActive:    { border:'0.5px solid var(--color-text-primary)', background:'var(--color-text-primary)' },
   motorName:         { fontSize:11, fontWeight:500, color:'var(--color-text-primary)', marginBottom:3 },
