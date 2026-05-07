@@ -2,87 +2,113 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
-import React from 'react'
+import type { ReactElement, SVGProps } from 'react'
 import Logo from '@/components/Logo'
+import styles from './Sidebar.module.css'
 
-const IconDashboard = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-    <rect x="3" y="3" width="8" height="8" rx="1.5"/>
-    <rect x="13" y="3" width="8" height="8" rx="1.5"/>
-    <rect x="3" y="13" width="8" height="8" rx="1.5"/>
-    <rect x="13" y="13" width="8" height="8" rx="1.5"/>
+type IconProps = SVGProps<SVGSVGElement>
+type IconComponent = (props: IconProps) => ReactElement
+
+const IconDashboard: IconComponent = props => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.45" {...props}>
+    <rect x="3.5" y="3.5" width="7" height="7" rx="1.6" />
+    <rect x="13.5" y="3.5" width="7" height="7" rx="1.6" />
+    <rect x="3.5" y="13.5" width="7" height="7" rx="1.6" />
+    <rect x="13.5" y="13.5" width="7" height="7" rx="1.6" />
   </svg>
 )
-const IconGenerate = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="3" width="18" height="18" rx="2"/>
-    <circle cx="8.5" cy="8.5" r="1.5"/>
-    <polyline points="21 15 16 10 5 21"/>
+
+const IconGenerate: IconComponent = props => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <rect x="3.5" y="4" width="17" height="16" rx="2.4" />
+    <circle cx="8.5" cy="9" r="1.45" />
+    <path d="m4 17 5.2-5.2c.7-.7 1.8-.7 2.5 0l1.3 1.3" />
+    <path d="m13 13.1 2.2-2.2c.7-.7 1.8-.7 2.5 0L20 13.2" />
   </svg>
 )
-const IconHistory = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-    <circle cx="12" cy="12" r="9"/>
-    <path d="M12 7v5l3 3"/>
+
+const IconHistory: IconComponent = props => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <path d="M4.3 12a7.7 7.7 0 1 0 2.25-5.45" />
+    <path d="M4 6.2v4.2h4.2" />
+    <path d="M12 7.6v4.7l3.1 1.9" />
   </svg>
 )
-const IconPlans = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <polygon points="12 2 2 7 12 12 22 7 12 2"/>
-    <polyline points="2 17 12 22 22 17"/>
-    <polyline points="2 12 12 17 22 12"/>
+
+const IconPlans: IconComponent = props => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <path d="m12 3.4 8 4.1-8 4.1-8-4.1 8-4.1Z" />
+    <path d="m4 12 8 4.1 8-4.1" />
+    <path d="m4 16.6 8 4 8-4" />
   </svg>
 )
-const IconEnhance = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 3l1.88 5.47L19 10l-5.12 1.53L12 17l-1.88-5.47L5 10l5.12-1.53L12 3z"/>
-    <path d="M5 3l.94 2.06L8 6l-2.06.94L5 9l-.94-2.06L2 6l2.06-.94L5 3z"/>
-    <path d="M19 13l.94 2.06L22 16l-2.06.94L19 19l-.94-2.06L16 16l2.06-.94L19 13z"/>
+
+const IconEnhance: IconComponent = props => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <path d="m12 3.5 1.65 4.85L18.5 10l-4.85 1.65L12 16.5l-1.65-4.85L5.5 10l4.85-1.65L12 3.5Z" />
+    <path d="m5 3.6.85 1.9L7.8 6.4 5.85 7.25 5 9.2l-.85-1.95L2.2 6.4l1.95-.9L5 3.6Z" />
+    <path d="m18.8 14.1.75 1.75 1.75.75-1.75.75-.75 1.75-.75-1.75-1.75-.75 1.75-.75.75-1.75Z" />
   </svg>
 )
-const IconVideo = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <polygon points="23 7 16 12 23 17 23 7"/>
-    <rect x="1" y="5" width="15" height="14" rx="2"/>
+
+const IconVideo: IconComponent = props => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <rect x="3.3" y="6.2" width="12.8" height="11.6" rx="2.2" />
+    <path d="m16.1 10.1 4.6-2.7v9.2l-4.6-2.7" />
   </svg>
 )
-const IconSpaces = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="3"/>
-    <path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/>
+
+const IconSpaces: IconComponent = props => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <circle cx="12" cy="12" r="2.8" />
+    <path d="M12 3.2v3" />
+    <path d="M12 17.8v3" />
+    <path d="M3.2 12h3" />
+    <path d="M17.8 12h3" />
+    <path d="m5.8 5.8 2.1 2.1" />
+    <path d="m16.1 16.1 2.1 2.1" />
+    <path d="m5.8 18.2 2.1-2.1" />
+    <path d="m16.1 7.9 2.1-2.1" />
+  </svg>
+)
+
+const IconSignOut: IconComponent = props => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.55" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <path d="M9.4 4.8H6.8a2 2 0 0 0-2 2v10.4a2 2 0 0 0 2 2h2.6" />
+    <path d="M14.6 8.2 18.4 12l-3.8 3.8" />
+    <path d="M18.1 12H9.3" />
   </svg>
 )
 
 type NavItem = {
   label: string
-  href: string | null
+  href: string
   exact?: boolean
-  Icon: () => React.ReactElement
+  Icon: IconComponent
   badge?: string
 }
 
 const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
-    label: 'PRINCIPAL',
+    label: 'Principal',
     items: [
-      { label: 'dashboard',  href: '/app',          exact: true,  Icon: IconDashboard },
-      { label: 'histórico',  href: '/app/history',  exact: false, Icon: IconHistory   },
+      { label: 'Dashboard', href: '/app', exact: true, Icon: IconDashboard },
+      { label: 'Histórico', href: '/app/history', Icon: IconHistory },
     ],
   },
   {
-    label: 'CRIAR',
+    label: 'Criar',
     items: [
-      { label: 'renderizar', href: '/app/generate', exact: false, Icon: IconGenerate  },
-      { label: 'spaces',     href: '/app/spaces',   exact: false, Icon: IconSpaces, badge: 'novo' },
-      { label: 'melhorar',   href: '/app/upscale',  exact: false, Icon: IconEnhance   },
-      { label: 'animar',     href: '/app/video',    exact: false, Icon: IconVideo     },
+      { label: 'Renderizar', href: '/app/generate', Icon: IconGenerate },
+      { label: 'Spaces', href: '/app/spaces', Icon: IconSpaces, badge: 'novo' },
+      { label: 'Melhorar', href: '/app/upscale', Icon: IconEnhance },
+      { label: 'Animar', href: '/app/video', Icon: IconVideo },
     ],
   },
   {
-    label: 'NEGÓCIOS',
+    label: 'Negócios',
     items: [
-      { label: 'planos',     href: '/app/plans',    exact: false, Icon: IconPlans     },
+      { label: 'Planos', href: '/app/plans', Icon: IconPlans },
     ],
   },
 ]
@@ -92,167 +118,84 @@ interface SidebarProps {
   userAvatar: string | null
 }
 
+function cx(...classes: Array<string | false | null | undefined>) {
+  return classes.filter(Boolean).join(' ')
+}
+
 export default function Sidebar({ userName, userAvatar }: SidebarProps) {
   const pathname = usePathname()
-  const [hovered, setHovered] = useState(false)
-
   const initials = userName
     .split(' ')
-    .map(w => w[0])
+    .map(word => word[0])
+    .filter(Boolean)
     .slice(0, 2)
     .join('')
     .toUpperCase()
 
   return (
-    <aside
-      style={{
-        width: hovered ? 224 : 62,
-        transition: 'width 0.25s cubic-bezier(0.4,0,0.2,1)',
-        background: '#0a0a0a',
-        display: 'flex',
-        flexDirection: 'column',
-        flexShrink: 0,
-        overflow: 'hidden',
-        borderRight: '0.5px solid rgba(255,255,255,0.06)',
-        height: '100vh',
-        position: 'sticky',
-        top: 0,
-      }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      {/* Logo */}
-      <div style={{ padding: '18px 18px 14px', display: 'flex', alignItems: 'center', gap: 12, height: 62, flexShrink: 0, color: '#ffffff' }}>
-        <div style={{ flexShrink: 0, display: 'flex' }}>
+    <aside className={styles.sidebar} aria-label="Navegação principal">
+      <div className={styles.brand}>
+        <div className={styles.logoMark} aria-hidden="true">
           <Logo size={34} />
         </div>
-        <span style={{
-          fontSize: 11, fontWeight: 600, color: '#ffffff',
-          letterSpacing: '0.09em', textTransform: 'uppercase' as const,
-          whiteSpace: 'nowrap' as const,
-          opacity: hovered ? 1 : 0, transition: 'opacity 0.18s',
-        }}>
-          Spacenode
-        </span>
+        <div className={styles.brandCopy}>
+          <span className={styles.brandName}>Spacenode</span>
+          <span className={styles.brandMeta}>Studio visual</span>
+        </div>
       </div>
 
-      {/* Nav */}
-      <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0, padding: '4px 8px', overflow: 'hidden' as const }}>
-        {NAV_GROUPS.map((group, gi) => (
-          <div key={group.label} style={{ marginTop: gi === 0 ? 0 : 16 }}>
-            {/* Section label */}
-            <div style={{
-              fontSize: 9, fontWeight: 600, letterSpacing: '0.14em',
-              textTransform: 'uppercase' as const,
-              color: 'rgba(255,255,255,0.2)',
-              padding: '0 10px', height: 20,
-              display: 'flex', alignItems: 'center',
-              whiteSpace: 'nowrap' as const,
-              opacity: hovered ? 1 : 0,
-              transition: 'opacity 0.18s',
-              marginBottom: 2,
-            }}>
-              {group.label}
-            </div>
+      <nav className={styles.nav}>
+        {NAV_GROUPS.map(group => (
+          <section className={styles.group} key={group.label} aria-label={group.label}>
+            <div className={styles.groupLabel}>{group.label}</div>
 
-            {group.items.map(({ label, href, exact, Icon, badge }) => {
-              const active = href
-                ? (exact ? pathname === href : pathname.startsWith(href))
-                : false
-              const disabled = href === null
+            <div className={styles.groupItems}>
+              {group.items.map(({ label, href, exact, Icon, badge }) => {
+                const active = exact ? pathname === href : pathname.startsWith(href)
 
-              const inner = (
-                <>
-                  <div style={{ flexShrink: 0, display: 'flex', color: disabled ? 'rgba(255,255,255,0.2)' : active ? '#ffffff' : 'rgba(255,255,255,0.4)' }}>
-                    <Icon />
-                  </div>
-                  <span style={{
-                    fontSize: 12,
-                    color: disabled ? 'rgba(255,255,255,0.25)' : active ? '#ffffff' : 'rgba(255,255,255,0.75)',
-                    whiteSpace: 'nowrap' as const,
-                    fontWeight: 400,
-                    letterSpacing: '-0.01em',
-                    opacity: hovered ? 1 : 0,
-                    transition: 'opacity 0.18s',
-                    flex: 1,
-                  }}>
-                    {label}
-                  </span>
-                  {badge && hovered && (
-                    <span style={{
-                      fontSize: 8, fontWeight: 600, letterSpacing: '0.08em',
-                      textTransform: 'uppercase' as const,
-                      color: '#30b46c',
-                      background: 'rgba(48,180,108,0.18)',
-                      padding: '2px 6px', borderRadius: 20,
-                      whiteSpace: 'nowrap' as const, flexShrink: 0,
-                    }}>
-                      {badge}
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    className={cx(styles.navItem, active && styles.navItemActive)}
+                    aria-current={active ? 'page' : undefined}
+                    title={label}
+                  >
+                    <span className={styles.activeRail} aria-hidden="true" />
+                    <span className={styles.iconFrame} aria-hidden="true">
+                      <Icon className={styles.icon} focusable="false" />
                     </span>
-                  )}
-                </>
-              )
-
-              const sharedStyle: React.CSSProperties = {
-                display: 'flex', alignItems: 'center', gap: 12,
-                padding: '0 10px', height: 44, borderRadius: 8,
-                textDecoration: 'none', flexShrink: 0,
-                background: active ? 'rgba(255,255,255,0.1)' : 'transparent',
-                transition: 'background 0.15s',
-                cursor: disabled ? 'default' : 'pointer',
-                opacity: disabled ? 0.5 : 1,
-              }
-
-              return href ? (
-                <Link key={href} href={href} style={sharedStyle}>
-                  {inner}
-                </Link>
-              ) : (
-                <div key={label} style={sharedStyle}>
-                  {inner}
-                </div>
-              )
-            })}
-          </div>
+                    <span className={styles.navText}>{label}</span>
+                    {badge && <span className={styles.badge}>{badge}</span>}
+                  </Link>
+                )
+              })}
+            </div>
+          </section>
         ))}
       </nav>
 
-      {/* User */}
-      <div style={{ padding: '10px 8px', borderTop: '0.5px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 10px', height: 52, borderRadius: 8 }}>
+      <div className={styles.footer}>
+        <div className={styles.account}>
           {userAvatar ? (
-            <img
-              src={userAvatar}
-              alt={userName}
-              style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' as const, flexShrink: 0 }}
-            />
+            // eslint-disable-next-line @next/next/no-img-element
+            <img className={styles.avatar} src={userAvatar} alt={userName} />
           ) : (
-            <div style={{
-              width: 28, height: 28, borderRadius: '50%',
-              background: 'rgba(255,255,255,0.15)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexShrink: 0, fontSize: 11, fontWeight: 600, color: '#ffffff',
-            }}>
-              {initials}
+            <div className={styles.initials} aria-hidden="true">
+              {initials || 'SN'}
             </div>
           )}
-          <div style={{ opacity: hovered ? 1 : 0, transition: 'opacity 0.18s', minWidth: 0, overflow: 'hidden', flex: 1 }}>
-            <div style={{ fontSize: 11, color: '#ffffff', fontWeight: 500, whiteSpace: 'nowrap' as const, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {userName}
-            </div>
-            <div style={{ fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>
-              Plano Beta
-            </div>
+
+          <div className={styles.accountCopy}>
+            <span className={styles.userName}>{userName}</span>
+            <span className={styles.plan}>Plano Beta</span>
           </div>
-          <div style={{ opacity: hovered ? 1 : 0, transition: 'opacity 0.18s', flexShrink: 0 }}>
-            <form action="/auth/signout" method="POST">
-              <button type="submit" title="Sair" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'rgba(255,255,255,0.4)', display: 'flex' }}>
-                <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-                  <path d="M5 2H2.5A1.5 1.5 0 0 0 1 3.5v7A1.5 1.5 0 0 0 2.5 12H5M9 10l3-3-3-3M12 7H5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </button>
-            </form>
-          </div>
+
+          <form action="/auth/signout" method="POST" className={styles.signOutForm}>
+            <button className={styles.signOut} type="submit" title="Sair" aria-label="Sair da Spacenode">
+              <IconSignOut className={styles.signOutIcon} focusable="false" aria-hidden="true" />
+            </button>
+          </form>
         </div>
       </div>
     </aside>
