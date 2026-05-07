@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import { ENGINES, ENGINE_ORDER, type Resolution } from '@/lib/engines'
 
 const PLANS_DATA = [
-  { name: 'Starter', nodes: 300 },
-  { name: 'Pro',     nodes: 500 },
-  { name: 'Studio',  nodes: 1000 },
+  { name: 'Starter', nodes:  750 },
+  { name: 'Pro',     nodes: 1800 },
+  { name: 'Studio',  nodes: 3500 },
 ]
 
 async function startCheckout(plan: string, billing: 'monthly' | 'annual') {
@@ -25,42 +26,26 @@ const CheckIcon = () => (
   </svg>
 )
 
+// Renders por plano calculados com a engine padrão de cada resolução:
+// HD → Pulsar (10 nodes), 2K → Vega (20), 4K → Vega (40).
 const plans = [
   {
-    key: 'starter', name: 'Starter', nodes: '300', rendersHD: 75, renders2K: 37, renders4K: 15,
+    key: 'starter', name: 'Starter', nodes: '750', rendersHD: 75, renders2K: 37, renders4K: 18,
     monthly: 89, annual: 75, annualTotal: '890',
-    features: ['Saída até HD', 'Histórico 30 dias', 'Suporte por e-mail'],
-    meterPct: 30, featured: false, badge: '',
+    features: ['Acesso a todas as engines', 'Histórico de 30 dias', 'Suporte por e-mail'],
+    meterPct: 21, featured: false, badge: '',
   },
   {
-    key: 'pro', name: 'Pro', nodes: '500', rendersHD: 125, renders2K: 62, renders4K: 25,
-    monthly: 149, annual: 125, annualTotal: '1.490',
-    features: ['Saída até 2K', 'Histórico ilimitado', 'Suporte por e-mail'],
-    meterPct: 50, featured: true, badge: 'recomendado',
+    key: 'pro', name: 'Pro', nodes: '1.800', rendersHD: 180, renders2K: 90, renders4K: 45,
+    monthly: 199, annual: 167, annualTotal: '1.990',
+    features: ['Acesso a todas as engines', 'Histórico ilimitado', 'Suporte por e-mail'],
+    meterPct: 51, featured: true, badge: 'recomendado',
   },
   {
-    key: 'studio', name: 'Studio', nodes: '1.000', rendersHD: 250, renders2K: 125, renders4K: 50,
-    monthly: 299, annual: 249, annualTotal: '2.990',
-    features: ['Saída até 4K', 'Histórico ilimitado', 'Suporte prioritário'],
+    key: 'studio', name: 'Studio', nodes: '3.500', rendersHD: 350, renders2K: 175, renders4K: 87,
+    monthly: 349, annual: 293, annualTotal: '3.490',
+    features: ['Acesso a todas as engines', 'Histórico ilimitado', 'Suporte prioritário'],
     meterPct: 100, featured: false, badge: '',
-  },
-]
-
-const qualityCards = [
-  {
-    res: 'HD · draft', engine: 'Iteração rápida', cost: 4,
-    desc: 'Conceito, iterações rápidas e apresentações internas. Geração em segundos.',
-    tag: 'rascunho', tagBg: 'rgba(255,255,255,0.06)', tagColor: 'var(--color-text-tertiary)',
-  },
-  {
-    res: '2K · entrega', engine: 'Qualidade profissional', cost: 8,
-    desc: 'Portfólio, aprovação de projeto e apresentação ao cliente. Resultado de entrega.',
-    tag: 'portfólio', tagBg: 'rgba(37,99,235,0.15)', tagColor: '#6b9bff',
-  },
-  {
-    res: '4K · final', engine: 'Máxima fidelidade', cost: 20,
-    desc: 'Entrega final para incorporadoras, impressão e material de marketing de alto impacto.',
-    tag: 'entrega final', tagBg: 'rgba(48,209,88,0.12)', tagColor: '#30d158',
   },
 ]
 
@@ -201,37 +186,55 @@ function PlanCard({ plan, billing, loading, onSelect }: {
   )
 }
 
-function QualityCard({ res, engine, cost, desc, tag, tagBg, tagColor }: typeof qualityCards[0]) {
-  const [hovered, setHovered] = useState(false)
+function ConsumptionTable() {
+  const resolutions: Resolution[] = ['hd', '2k', '4k']
+  const headCellBase = {
+    fontSize: 10, fontWeight: 500,
+    letterSpacing: '0.14em', textTransform: 'uppercase' as const,
+    color: 'var(--color-text-tertiary)',
+    padding: '0 16px 14px', borderBottom: '0.5px solid var(--color-border-strong)',
+  }
+  const bodyCellBase = {
+    padding: '14px 16px', fontSize: 13, color: 'var(--color-text-primary)',
+    fontVariantNumeric: 'tabular-nums' as const,
+    borderBottom: '0.5px solid var(--color-border)',
+  }
   return (
-    <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        background: 'var(--color-bg-elevated)',
-        border: '0.5px solid var(--color-border-strong)',
-        borderRadius: 12, padding: '18px 20px',
-        boxShadow: hovered ? '0 4px 20px rgba(0,0,0,0.3)' : 'none',
-        transform: hovered ? 'translateY(-1px)' : 'translateY(0)',
-        transition: 'box-shadow 0.2s, transform 0.2s',
-      }}
-    >
-      <div style={{ fontSize: 15, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.02em', marginBottom: 4 }}>{res}</div>
-      <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', letterSpacing: '-0.005em', marginBottom: 10 }}>{engine}</div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, marginBottom: 10 }}>
-        <span style={{ fontSize: 26, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.04em', fontVariantNumeric: 'tabular-nums' as const }}>{cost}</span>
-        <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', lineHeight: 1.3 }}>nodes<br />por render</span>
-      </div>
-      <div style={{ height: 0.5, background: 'var(--color-border-strong)', marginBottom: 10 }} />
-      <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', letterSpacing: '-0.005em', lineHeight: 1.55 }}>{desc}</div>
-      <span style={{
-        display: 'inline-block', marginTop: 10, fontSize: 9, fontWeight: 500,
-        letterSpacing: '0.1em', textTransform: 'uppercase' as const,
-        padding: '3px 8px', borderRadius: 20, background: tagBg, color: tagColor,
-      }}>
-        {tag}
-      </span>
-    </div>
+    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <thead>
+        <tr>
+          <th style={{ ...headCellBase, textAlign: 'left' }}>Engine</th>
+          {resolutions.map(r => (
+            <th key={r} style={{ ...headCellBase, textAlign: 'right' }}>{r.toUpperCase()}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {ENGINE_ORDER.map(eid => {
+          const e = ENGINES[eid]
+          return (
+            <tr key={eid}>
+              <td style={{ ...bodyCellBase, textAlign: 'left' }}>
+                <span style={{ fontWeight: 500 }}>{e.name}</span>
+                <span style={{ color: 'var(--color-text-tertiary)', marginLeft: 8, fontSize: 11 }}>
+                  · {e.tagline}
+                </span>
+              </td>
+              {resolutions.map(r => {
+                const cost = e.nodes[r]
+                return (
+                  <td key={r} style={{ ...bodyCellBase, textAlign: 'right' }}>
+                    {cost !== undefined
+                      ? <span><span style={{ fontWeight: 500 }}>{cost}</span> <span style={{ color: 'var(--color-text-tertiary)', fontSize: 11 }}>nodes</span></span>
+                      : <span style={{ color: 'var(--color-text-tertiary)' }}>—</span>}
+                  </td>
+                )
+              })}
+            </tr>
+          )
+        })}
+      </tbody>
+    </table>
   )
 }
 
@@ -239,7 +242,7 @@ export function PricingToggle() {
   const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly')
   const [loading, setLoading] = useState<string | null>(null)
   const [renders, setRenders] = useState(40)
-  const [qualityCost, setQualityCost] = useState(4)
+  const [qualityCost, setQualityCost] = useState(10)
 
   const totalNodes = renders * qualityCost
   const recommended = PLANS_DATA.find(p => p.nodes >= totalNodes) ?? PLANS_DATA[PLANS_DATA.length - 1]
@@ -331,17 +334,21 @@ export function PricingToggle() {
           ))}
         </div>
 
-        {/* Quality table */}
+        {/* Engine × resolution table */}
         <div style={{ marginTop: 40 }}>
           <div style={{
             fontSize: 10, fontWeight: 500, letterSpacing: '0.18em',
             textTransform: 'uppercase' as const, color: 'var(--color-text-tertiary)',
             textAlign: 'center', marginBottom: 16,
           }}>
-            consumo por qualidade
+            consumo por motor de IA
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-            {qualityCards.map(q => <QualityCard key={q.res} {...q} />)}
+          <div style={{
+            background: 'var(--color-bg-elevated)',
+            border: '0.5px solid var(--color-border-strong)',
+            borderRadius: 14, padding: '8px 12px 4px',
+          }}>
+            <ConsumptionTable />
           </div>
         </div>
 
@@ -405,7 +412,7 @@ export function PricingToggle() {
                 Qualidade predominante
               </label>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
-                {[{ label: 'HD', cost: 4 }, { label: '2K', cost: 8 }, { label: '4K', cost: 20 }].map(q => (
+                {[{ label: 'HD', cost: 10 }, { label: '2K', cost: 20 }, { label: '4K', cost: 40 }].map(q => (
                   <button
                     key={q.label}
                     onClick={() => setQualityCost(q.cost)}
