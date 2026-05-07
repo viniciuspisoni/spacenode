@@ -124,7 +124,7 @@ export default function Sidebar({ userName, userAvatar }: SidebarProps) {
       {/* Logo */}
       <div style={{ padding: '18px 18px 14px', display: 'flex', alignItems: 'center', gap: 12, height: 62, flexShrink: 0, color: '#ffffff' }}>
         <div style={{ flexShrink: 0, display: 'flex' }}>
-          <Logo size={26} />
+          <Logo size={34} />
         </div>
         <span style={{
           fontSize: 11, fontWeight: 600, color: '#ffffff',

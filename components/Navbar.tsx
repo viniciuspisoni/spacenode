@@ -18,7 +18,7 @@ export default function Navbar() {
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-        <Logo size={28} />
+        <Logo size={36} />
         <span
           style={{
             fontSize: 11,
