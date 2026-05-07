@@ -44,7 +44,9 @@
   flex: 0 0 auto;
   align-items: center;
   gap: 13px;
-  padding: 18px 18px 14px;
+  /* padding-left 14 centraliza o .logoMark (40px) sobre a coluna dos ícones
+     da nav (.iconFrame em x=22+12=34) — alinhamento óptico com nav icons */
+  padding: 18px 18px 14px 14px;
 }
 
 .logoMark {
