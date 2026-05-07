@@ -134,13 +134,16 @@ export function ProductMockup() {
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 marginBottom: 14,
               }}>
-                <svg width="14" height="14" viewBox="0 0 22 22">
-                  <g stroke="#666" strokeWidth="0.5">
-                    <line x1="7.33" y1="1" x2="7.33" y2="21"/>
-                    <line x1="14.67" y1="1" x2="14.67" y2="21"/>
-                    <line x1="1" y1="7.33" x2="21" y2="7.33"/>
-                    <line x1="1" y1="14.67" x2="21" y2="14.67"/>
+                <svg width="14" height="14" viewBox="0 0 64 64" aria-label="SpaceNode">
+                  <g stroke="#fafafa" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none">
+                    <line x1="16" y1="16" x2="16" y2="48"/>
+                    <line x1="16" y1="16" x2="48" y2="48"/>
+                    <line x1="48" y1="16" x2="48" y2="48"/>
                   </g>
+                  <circle cx="16" cy="16" r="3" fill="#fafafa"/>
+                  <circle cx="48" cy="16" r="3" fill="#fafafa"/>
+                  <circle cx="16" cy="48" r="3" fill="#fafafa"/>
+                  <circle cx="48" cy="48" r="3" fill="#30b46c"/>
                 </svg>
               </div>
 

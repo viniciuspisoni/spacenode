@@ -19,7 +19,7 @@ export default function Quote() {
           }}
         >
           Em cinco minutos apresento três variações para o cliente que antes
-          levavam uma semana. A Spacenode virou parte do meu fluxo.
+          levavam uma semana. A SpaceNode virou parte do meu fluxo.
         </p>
 
         <div
