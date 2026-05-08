@@ -9,12 +9,28 @@ import {
 import {
   ENGINES, ENGINE_ORDER, DEFAULT_ENGINE, DEFAULT_RESOLUTION,
   type EngineId, type Resolution,
-  getNodesCost,
+  getNodesCost, isEngineId, isResolution, isValidCombination,
 } from '@/lib/engines'
 
 interface GenerateClientProps {
   initialCredits:    number
   initialMaterials?: ProjectMaterials
+  initialConfig?:    ProjectConfig | null
+}
+
+// Persisted last-used render config (profiles.project_config — JSONB).
+// Type-strict fields (projectType / fidelityLevel / engine / resolution) are
+// validated on load; free-text taxonomy strings flow through as-is.
+interface ProjectConfig {
+  projectType?:        ProjectType
+  segment?:            string
+  environment?:        string
+  lighting?:           string
+  background?:         string
+  sceneElements?:      string[]
+  fidelityLevel?:      FidelityLevel
+  selectedEngine?:     EngineId
+  selectedResolution?: Resolution
 }
 
 interface GenerateResult {
@@ -146,7 +162,38 @@ function deriveDefaults(projectType: ProjectType, segment: string) {
   }
 }
 
-export function GenerateClient({ initialCredits, initialMaterials }: GenerateClientProps) {
+// Hidrata o estado inicial a partir do project_config persistido. Campos
+// tipo-estrito caem pra default se a string salva for desconhecida (ex: engine
+// removida). Combinação engine×resolução também é checada — saved Vega+HD
+// passou a ser inválido depois de Pricing v2 e quebraria getNodesCost.
+function resolveInitialConfig(cfg: ProjectConfig | null | undefined) {
+  const projectType: ProjectType =
+    cfg?.projectType === 'interior' || cfg?.projectType === 'exterior'
+      ? cfg.projectType : 'exterior'
+  const fidelityLevel: FidelityLevel =
+    cfg?.fidelityLevel === 'balanced' || cfg?.fidelityLevel === 'creative'
+      ? cfg.fidelityLevel : 'maximum'
+  const engine: EngineId = isEngineId(cfg?.selectedEngine) ? cfg.selectedEngine : DEFAULT_ENGINE
+  const rawRes: Resolution = isResolution(cfg?.selectedResolution) ? cfg.selectedResolution : DEFAULT_RESOLUTION
+  const resolution: Resolution = isValidCombination(engine, rawRes) ? rawRes : ENGINES[engine].resolutions[0]
+  const sceneElements: string[] = Array.isArray(cfg?.sceneElements)
+    ? cfg.sceneElements.filter((x): x is string => typeof x === 'string')
+    : []
+  return {
+    projectType,
+    segment:            cfg?.segment     ?? 'Residencial',
+    environment:        cfg?.environment ?? 'Fachada Residencial',
+    lighting:           cfg?.lighting    ?? 'Preservar Original',
+    background:         cfg?.background  ?? 'Preservar Original',
+    sceneElements,
+    fidelityLevel,
+    selectedEngine:     engine,
+    selectedResolution: resolution,
+  }
+}
+
+export function GenerateClient({ initialCredits, initialMaterials, initialConfig }: GenerateClientProps) {
+  const init = resolveInitialConfig(initialConfig)
   const supabase = createClient()
 
   // ── Global state
@@ -175,23 +222,23 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
   }
 
   // ── Tipo e Segmento
-  const [projectType, setProjectType] = useState<ProjectType>('exterior')
-  const [segment,     setSegment]     = useState<string>('Residencial')
+  const [projectType, setProjectType] = useState<ProjectType>(init.projectType)
+  const [segment,     setSegment]     = useState<string>(init.segment)
 
   // ── Ambiente, Iluminação, Background
-  const [environment, setEnvironment] = useState<string>('Fachada Residencial')
-  const [lighting,    setLighting]    = useState<string>('Preservar Original')
-  const [background,  setBackground]  = useState<string>('Preservar Original')
+  const [environment, setEnvironment] = useState<string>(init.environment)
+  const [lighting,    setLighting]    = useState<string>(init.lighting)
+  const [background,  setBackground]  = useState<string>(init.background)
 
   // ── Elementos na Cena (múltipla seleção)
-  const [sceneElements, setSceneElements] = useState<string[]>([])
+  const [sceneElements, setSceneElements] = useState<string[]>(init.sceneElements)
 
   // ── Parâmetros técnicos
   const geometryLock = 85
   const fidelityMode = 'strict' as const
-  const [fidelityLevel,      setFidelityLevel]      = useState<FidelityLevel>('maximum')
-  const [selectedEngine,     setSelectedEngine]     = useState<EngineId>(DEFAULT_ENGINE)
-  const [selectedResolution, setSelectedResolution] = useState<Resolution>(DEFAULT_RESOLUTION)
+  const [fidelityLevel,      setFidelityLevel]      = useState<FidelityLevel>(init.fidelityLevel)
+  const [selectedEngine,     setSelectedEngine]     = useState<EngineId>(init.selectedEngine)
+  const [selectedResolution, setSelectedResolution] = useState<Resolution>(init.selectedResolution)
 
   // ── Materiais
   const [materiaisAberto, setMateriaisAberto] = useState(false)
@@ -291,6 +338,38 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
       finally { setSalvando(false) }
     }, 1500)
   }
+
+  // ── Auto-save da config (debounce 1.5s)
+  // Persiste tipo/segmento/espaço/iluminação/entorno/elementos/fidelidade/
+  // engine/resolução em profiles.project_config para hidratar a próxima visita.
+  // Cascatas de troca (handleProjectTypeChange, handleSegmentChange) entram
+  // como múltiplos setState no mesmo tick — o effect vê só o estado final
+  // depois do batch, então salva uma vez por mudança real.
+  const configSaveTimerRef     = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isFirstConfigSaveRef   = useRef(true)
+  useEffect(() => {
+    // Pula a primeira execução (hidratação inicial — nada mudou de fato).
+    if (isFirstConfigSaveRef.current) {
+      isFirstConfigSaveRef.current = false
+      return
+    }
+    if (configSaveTimerRef.current) clearTimeout(configSaveTimerRef.current)
+    configSaveTimerRef.current = setTimeout(async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+        const config: ProjectConfig = {
+          projectType, segment, environment, lighting, background,
+          sceneElements, fidelityLevel, selectedEngine, selectedResolution,
+        }
+        await supabase.from('profiles').update({ project_config: config }).eq('id', user.id)
+      } catch (e) { console.error('Erro ao salvar config:', e) }
+    }, 1500)
+  }, [
+    projectType, segment, environment, lighting, background,
+    sceneElements, fidelityLevel, selectedEngine, selectedResolution,
+    supabase,
+  ])
 
   // ── Upload — plain functions; React Compiler handles memoization
   const loadImage = (file: File) => {
