@@ -5,9 +5,17 @@
 export type ProjectType = 'exterior' | 'interior'
 
 export interface ProjectMaterials {
+  // Exterior-only (não aparece na UI quando projectType === 'interior')
   fachada?:    string
+  // Compartilhados — mapeados pra termos diferentes em interior vs exterior
   piso?:       string
   esquadrias?: string
+  // Interior-only (não aparece na UI quando projectType === 'exterior')
+  paredes?:    string
+  teto?:       string
+  marcenaria?: string
+  bancadas?:   string
+  // Compartilhados em ambos
   elementos?:  string
   outros?:     string
 }
@@ -132,49 +140,60 @@ export const EXTERIOR_ENVIRONMENTS: Record<string, string[]> = {
 
 // ── Lighting ───────────────────────────────────────────────────────────────────
 
+// 'Preservar Original' é sempre a primeira opção (e default). Em Máxima
+// Fidelidade ela mantém a luz exata da imagem de referência — sem essa opção
+// o usuário era forçado a escolher uma luz mesmo querendo só preservar tudo,
+// e a `lightingLine` injetada empurrava o modelo a acender luminárias.
 export const INTERIOR_LIGHTING: Record<string, string[]> = {
   'Residencial': [
+    'Preservar Original',
     'Clara e Natural', 'Natural Suave', 'Luz de Janela', 'Nublado',
     'Quente e Aconchegante', 'Entardecer Quente',
     'Noturna Aconchegante', 'Sofisticada e Cênica',
   ],
   'Corporativo': [
+    'Preservar Original',
     'Corporativa Neutra', 'Natural Profissional', 'Luz Difusa Uniforme', 'Nublado',
     'Escritório Contemporâneo', 'Iluminação Técnica',
     'Noturna Executiva', 'Clara e Produtiva',
   ],
   'Comercial': [
+    'Preservar Original',
     'Comercial Bem Iluminada', 'Varejo Premium', 'Showroom Iluminado', 'Nublado',
     'Destaque de Produto', 'Iluminação de Loja',
     'Noturna Comercial', 'Luz de Vitrine',
   ],
   'Gastronomia': [
+    'Preservar Original',
     'Quente e Aconchegante', 'Cênica e Intimista', 'Entardecer Quente', 'Nublado',
     'Noturna Sofisticada', 'Café com Luz Natural',
     'Restaurante Premium', 'Luz Baixa Decorativa',
   ],
   'Hospitalidade': [
+    'Preservar Original',
     'Sofisticada e Cênica', 'Premium Aconchegante', 'Luz Natural Elegante', 'Nublado',
     'Noturna Refinada', 'Spa Relaxante',
     'Lobby Iluminado', 'Entardecer de Hotel',
   ],
   'Saúde': [
+    'Preservar Original',
     'Clara e Limpa', 'Clínica Neutra', 'Luz Difusa Suave', 'Nublado',
     'Iluminação Profissional', 'Aconchegante e Calma', 'Saúde Premium',
   ],
   'Educação': [
+    'Preservar Original',
     'Clara e Funcional', 'Natural Suave', 'Luz Difusa', 'Nublado',
     'Ambiente Produtivo', 'Biblioteca Aconchegante', 'Sala Bem Iluminada',
   ],
 }
 
 export const EXTERIOR_LIGHTING: Record<string, string[]> = {
-  'Residencial':   ['Diurno', 'Entardecer', 'Golden Hour', 'Blue Hour', 'Noturno Iluminado', 'Nublado', 'Chuva Leve'],
-  'Comercial':     ['Diurno Comercial', 'Fachada Bem Iluminada', 'Vitrine Noturna', 'Golden Hour', 'Blue Hour', 'Noturno Comercial', 'Shopping Atmosphere'],
-  'Corporativo':   ['Diurno Corporativo', 'Fachada Profissional', 'Blue Hour', 'Noturno Executivo', 'Luz Urbana', 'Nublado Sofisticado'],
-  'Hospitalidade': ['Golden Hour', 'Entardecer Premium', 'Noturno Refinado', 'Resort Diurno', 'Luz de Piscina', 'Blue Hour', 'Atmosfera Tropical'],
-  'Institucional': ['Diurno Claro', 'Nublado Suave', 'Luz Natural', 'Entardecer', 'Iluminação Urbana', 'Noturno Institucional'],
-  'Paisagismo':    ['Diurno Natural', 'Golden Hour', 'Entardecer Suave', 'Luz Filtrada', 'Nublado', 'Noturno Paisagístico', 'Chuva Leve'],
+  'Residencial':   ['Preservar Original', 'Diurno', 'Entardecer', 'Golden Hour', 'Blue Hour', 'Noturno Iluminado', 'Nublado', 'Chuva Leve'],
+  'Comercial':     ['Preservar Original', 'Diurno Comercial', 'Fachada Bem Iluminada', 'Vitrine Noturna', 'Golden Hour', 'Blue Hour', 'Noturno Comercial', 'Shopping Atmosphere'],
+  'Corporativo':   ['Preservar Original', 'Diurno Corporativo', 'Fachada Profissional', 'Blue Hour', 'Noturno Executivo', 'Luz Urbana', 'Nublado Sofisticado'],
+  'Hospitalidade': ['Preservar Original', 'Golden Hour', 'Entardecer Premium', 'Noturno Refinado', 'Resort Diurno', 'Luz de Piscina', 'Blue Hour', 'Atmosfera Tropical'],
+  'Institucional': ['Preservar Original', 'Diurno Claro', 'Nublado Suave', 'Luz Natural', 'Entardecer', 'Iluminação Urbana', 'Noturno Institucional'],
+  'Paisagismo':    ['Preservar Original', 'Diurno Natural', 'Golden Hour', 'Entardecer Suave', 'Luz Filtrada', 'Nublado', 'Noturno Paisagístico', 'Chuva Leve'],
 }
 
 // ── Background / Context ───────────────────────────────────────────────────────
@@ -580,12 +599,35 @@ function buildFidelityBlock(geometryLock: number, fidelityMode?: 'strict' | 'bal
 // substitui o que está visível na imagem de referência. Em maximum o wording é
 // mais forte (reference-vs-override) porque o resto do prompt já manda preservar
 // tudo da imagem.
-function buildMaterialsBlock(materials?: ProjectMaterials, level?: FidelityLevel): string {
+//
+// projectType é load-bearing: o mesmo campo (`piso`, `esquadrias`) vira termo
+// diferente em interior vs exterior, e os campos interior-only (paredes, teto,
+// marcenaria, bancadas) só são emitidos em interior — em exterior não fazem
+// sentido e vazariam pro prompt mesmo se houvesse dado órfão no JSONB.
+function buildMaterialsBlock(
+  materials?:  ProjectMaterials,
+  projectType?: ProjectType,
+  level?:      FidelityLevel,
+): string {
   if (!materials) return ''
+  const isInterior = projectType === 'interior'
   const lines = [
-    materials.fachada    && `facade cladding: ${materials.fachada}`,
-    materials.piso       && `floor and paving: ${materials.piso}`,
-    materials.esquadrias && `window frames and doors: ${materials.esquadrias}`,
+    // Exterior-only
+    !isInterior && materials.fachada    && `facade cladding: ${materials.fachada}`,
+    // Compartilhados (mapeamento por contexto)
+    materials.piso       && (isInterior
+      ? `flooring: ${materials.piso}`
+      : `floor and paving: ${materials.piso}`),
+    materials.esquadrias && (isInterior
+      ? `interior doors and window frames: ${materials.esquadrias}`
+      : `external doors and window frames: ${materials.esquadrias}`),
+    // Interior-only — nomes específicos pra evitar a ambiguidade que fazia
+    // "facade cladding" descrever uma parede de cozinha.
+    isInterior && materials.paredes     && `wall finishes and surface materials: ${materials.paredes}`,
+    isInterior && materials.teto        && `ceiling finish: ${materials.teto}`,
+    isInterior && materials.marcenaria  && `built-in millwork, cabinetry and fitted furniture: ${materials.marcenaria}`,
+    isInterior && materials.bancadas    && `countertops and surfaces: ${materials.bancadas}`,
+    // Compartilhados em ambos
     materials.elementos  && `special architectural elements: ${materials.elementos}`,
     materials.outros     && `additional notes: ${materials.outros}`,
   ].filter(Boolean)
@@ -686,8 +728,11 @@ function fidelityModifier(level: FidelityLevel): string {
     return 'BALANCED FIDELITY MODE: Preserve architecture, camera angle, opening positions, number of stories and main volumetry. Light composition tweaks allowed (vegetation, sky, ambient props). Do not redesign the facade. '
   }
   // maximum — preserve EVERYTHING. Lighting and explicit user requests are the only allowed changes.
+  // Removido "LIGHTING-ONLY" do enunciado: quando o usuário escolhe "Preservar
+  // Original" na iluminação, nem ela muda. A licença pra alterar luz vem do
+  // `lightingLine` adiante, condicionada à escolha do usuário.
   return (
-    'MAXIMUM FIDELITY MODE: This is a LIGHTING-ONLY re-render of the reference image. ' +
+    'MAXIMUM FIDELITY MODE: This is a high-fidelity re-render of the reference image. ' +
     'Preserve EVERY architectural element pixel-by-pixel from the reference: every wall, ' +
     'every door, every window, every arch, every niche, every opening (and its absence — ' +
     'a solid wall must remain a solid wall), every partition, beam, column, frame, ' +
@@ -747,7 +792,7 @@ export function buildFidelityPrompt(
   const modifier   = fidelityModifier(level)
   const preserve   = briefing ? preservationBlock(briefing) : ''
   const allow      = briefing ? transformationBlock(briefing, level) : ''
-  const matBlock   = buildMaterialsBlock(materials, level)
+  const matBlock   = buildMaterialsBlock(materials, projectType, level)
   const negative   = buildNegativePromptForFidelity(level)
 
   const lightDesc  = LIGHT_EN[lighting] ?? lighting
@@ -787,7 +832,15 @@ export function buildFidelityPrompt(
   // licença pra adicionar luminárias/lâmpadas/spots ao projeto. Algumas entradas
   // de LIGHT_EN ainda mencionam "table lamps", "sconces" etc. — esse wrapper
   // neutraliza esse vazamento até a limpeza completa do dicionário.
-  const lightingLine = `Lighting condition (atmosphere only — do not add or change any lamp, sconce, spot, fixture or any object visible in the reference): ${lightDesc}. `
+  //
+  // 'Preservar Original' (ou lighting vazio) ativa um lock afirmativo: não
+  // descreve uma nova luz, manda preservar a luz exata da referência. Sem isso,
+  // o modelo interpreta qualquer descrição de iluminação como permissão pra
+  // mudar o estado das luminárias (acender o que estava apagado, etc.).
+  const preserveLighting = !lighting || lighting === 'Preservar Original'
+  const lightingLine = preserveLighting
+    ? 'Lighting: preserve the existing lighting condition from the reference image EXACTLY. Do NOT change the on/off state of any light fixture (every lamp, sconce, spot, pendant, LED strip and bulb that is OFF in the reference must remain OFF; every one that is ON must remain ON, with the same intensity and color). Do not modify the time of day, daylight direction, shadow pattern or atmospheric mood. '
+    : `Lighting condition (atmosphere only — do not add or change any lamp, sconce, spot, fixture or any object visible in the reference): ${lightDesc}. `
 
   return (
     anchor +
@@ -813,7 +866,7 @@ export function buildGenerationPrompt(options: GenerateOptions): string {
   const anchor     = buildAnchorBlock(hasAnchor)
   const refinement = buildRefinementBlock(refinementText, hasAnchor)
   const geoPrefix  = buildFidelityBlock(geometryLock, fidelityMode)
-  const matBlock  = buildMaterialsBlock(materials)
+  const matBlock  = buildMaterialsBlock(materials, projectType)
   const envDesc   = ENV_EN[environment]  ?? environment
   const lightDesc = LIGHT_EN[lighting]   ?? lighting
   const segDesc   = SEG_EN[segment]      ?? segment.toLowerCase()

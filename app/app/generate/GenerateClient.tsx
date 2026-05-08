@@ -47,8 +47,38 @@ const RESOLUTION_DESC: Record<Resolution, string> = {
 }
 
 const EMPTY_MATERIALS: ProjectMaterials = {
-  fachada: '', piso: '', esquadrias: '', elementos: '', outros: '',
+  fachada: '', piso: '', esquadrias: '',
+  paredes: '', teto: '', marcenaria: '', bancadas: '',
+  elementos: '', outros: '',
 }
+
+// Campos de materiais por tipo de projeto. A lista usada na UI é escolhida em
+// runtime conforme projectType — campos que não fazem sentido no contexto não
+// aparecem (ex: "Revestimento de fachada" some quando o user troca pra interior).
+type MaterialField = {
+  field:       keyof ProjectMaterials
+  label:       string
+  placeholder: string
+}
+
+const MATERIAL_FIELDS_INTERIOR: readonly MaterialField[] = [
+  { field: 'piso',       label: 'Piso',                    placeholder: 'ex: porcelanato 90×90 cinza claro, taco de madeira freijó' },
+  { field: 'paredes',    label: 'Paredes / Revestimentos', placeholder: 'ex: pintura branco fosco, painel ripado de carvalho' },
+  { field: 'teto',       label: 'Teto',                    placeholder: 'ex: gesso liso branco, sanca com fita LED' },
+  { field: 'marcenaria', label: 'Marcenaria',              placeholder: 'ex: armários laqueados off-white, painéis de freijó' },
+  { field: 'bancadas',   label: 'Bancadas',                placeholder: 'ex: quartzo branco 2cm, mármore Calacatta' },
+  { field: 'esquadrias', label: 'Portas e caixilhos',      placeholder: 'ex: portas de correr em alumínio preto fosco' },
+  { field: 'elementos',  label: 'Elementos especiais',     placeholder: 'ex: lareira a gás, pé-direito duplo, escada flutuante' },
+  { field: 'outros',     label: 'Observações adicionais',  placeholder: 'ex: tapete grande na sala, cortinas até o chão' },
+]
+
+const MATERIAL_FIELDS_EXTERIOR: readonly MaterialField[] = [
+  { field: 'fachada',    label: 'Revestimento de fachada', placeholder: 'ex: placas cimentícias texturizadas, ACM preto' },
+  { field: 'piso',       label: 'Piso externo / calçada',  placeholder: 'ex: porcelanato 90×90 cinza claro' },
+  { field: 'esquadrias', label: 'Esquadrias / caixilhos',  placeholder: 'ex: alumínio preto fosco' },
+  { field: 'elementos',  label: 'Elementos especiais',     placeholder: 'ex: painel de madeira ipê, brise metálico' },
+  { field: 'outros',     label: 'Observações adicionais',  placeholder: 'ex: estrutura em concreto aparente, laje invertida' },
+]
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -145,7 +175,7 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
 
   // ── Ambiente, Iluminação, Background
   const [environment, setEnvironment] = useState<string>('Fachada Residencial')
-  const [lighting,    setLighting]    = useState<string>('Diurno')
+  const [lighting,    setLighting]    = useState<string>('Preservar Original')
   const [background,  setBackground]  = useState<string>('Preservar Original')
 
   // ── Elementos na Cena (múltipla seleção)
@@ -351,7 +381,14 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
   }
 
   // ── Computed
-  const hasMaterials  = Object.values(materials).some(v => v && v.trim())
+  // Considera apenas os campos visíveis no projectType atual. Sem isso, um
+  // campo interior-only preenchido (ex: marcenaria) marcava o badge
+  // "preenchido" mesmo depois de trocar pra exterior, onde ele nem aparece.
+  const visibleMaterialFields = projectType === 'interior' ? MATERIAL_FIELDS_INTERIOR : MATERIAL_FIELDS_EXTERIOR
+  const hasMaterials  = visibleMaterialFields.some(({ field }) => {
+    const v = materials[field]
+    return v && v.trim()
+  })
   const currentEngine = ENGINES[selectedEngine]
   const nodeCost      = getNodesCost(selectedEngine, selectedResolution)
   const segments      = getSegments(projectType)
@@ -364,7 +401,11 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
 
   // ── Summary lines
   const summaryLine1 = `${typeLabel} · ${segment} · ${environment}`
-  const summaryLine2 = [lighting, background !== 'Preservar Original' ? background : null, sceneElements.join(', ')].filter(Boolean).join(' · ')
+  const summaryLine2 = [
+    lighting   !== 'Preservar Original' ? lighting   : null,
+    background !== 'Preservar Original' ? background : null,
+    sceneElements.join(', '),
+  ].filter(Boolean).join(' · ')
   const fidelityLabel = FIDELITY_LEVELS.find(l => l.id === fidelityLevel)?.label ?? 'Máxima'
   const summaryLine3  = `Fidelidade ${fidelityLabel} · ${currentEngine.name} · ${selectedResolution.toUpperCase()}`
 
@@ -471,13 +512,7 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
           </button>
           {materiaisAberto && (
             <div style={S.materiaisGrid}>
-              {[
-                { field: 'fachada'    as const, label: 'Revestimento de fachada', placeholder: 'ex: placas cimentícias texturizadas, ACM preto' },
-                { field: 'piso'       as const, label: 'Piso externo / calçada',  placeholder: 'ex: porcelanato 90×90 cinza claro' },
-                { field: 'esquadrias' as const, label: 'Esquadrias / caixilhos',  placeholder: 'ex: alumínio preto fosco' },
-                { field: 'elementos'  as const, label: 'Elementos especiais',     placeholder: 'ex: painel de madeira ipê, brise metálico' },
-                { field: 'outros'     as const, label: 'Observações adicionais',  placeholder: 'ex: estrutura em concreto aparente, laje invertida' },
-              ].map(({ field, label, placeholder }) => (
+              {(projectType === 'interior' ? MATERIAL_FIELDS_INTERIOR : MATERIAL_FIELDS_EXTERIOR).map(({ field, label, placeholder }) => (
                 <div key={field} style={S.materialField}>
                   <div style={S.materialLabel}>{label}</div>
                   <input
