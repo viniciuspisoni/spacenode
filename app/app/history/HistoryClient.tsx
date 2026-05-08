@@ -15,20 +15,23 @@ interface Render {
   status: string
   cost_credits: number
   model?: string | null
+  folder_id?: string | null
   created_at: string
 }
 
-interface SpaceLite {
+interface Folder {
   id: string
   name: string
-  category: string
+  created_at: string
 }
 
 interface Props {
   renders: Render[]
   credits: number
-  spaces: SpaceLite[]
+  folders: Folder[]
 }
+
+type FolderFilter = 'all' | 'none' | string  // string = folder id
 
 function qualityLabel(nodes: number): string | null {
   if (nodes === 4)  return 'HD'
@@ -67,7 +70,7 @@ function buildFilename(r: Render, idx: number): string {
 
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
 
-export function HistoryClient({ renders, credits, spaces }: Props) {
+export function HistoryClient({ renders, credits, folders }: Props) {
   const router = useRouter()
 
   const [isDark, setIsDark] = useState(false)
@@ -84,9 +87,10 @@ export function HistoryClient({ renders, credits, spaces }: Props) {
     setIsDark(newDark)
   }
 
-  const [search,     setSearch]     = useState('')
-  const [typeFilter, setTypeFilter] = useState('all')
-  const [sort,       setSort]       = useState<'desc' | 'asc'>('desc')
+  const [search,        setSearch]        = useState('')
+  const [typeFilter,    setTypeFilter]    = useState('all')
+  const [sort,          setSort]          = useState<'desc' | 'asc'>('desc')
+  const [folderFilter,  setFolderFilter]  = useState<FolderFilter>('all')
 
   // ── Modo de seleção ─────────────────────────────────────────────────────────
   const [selectMode, setSelectMode] = useState(false)
@@ -94,10 +98,23 @@ export function HistoryClient({ renders, credits, spaces }: Props) {
   const [busy,       setBusy]       = useState(false)
   const [moveOpen,   setMoveOpen]   = useState(false)
 
+  // Counts por pasta — pra mostrar nos chips
+  const folderCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    let unfiled = 0
+    for (const r of renders) {
+      if (r.folder_id) counts[r.folder_id] = (counts[r.folder_id] ?? 0) + 1
+      else unfiled += 1
+    }
+    return { counts, unfiled, total: renders.length }
+  }, [renders])
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     return renders
       .filter(r => {
+        if (folderFilter === 'none' && r.folder_id) return false
+        if (folderFilter !== 'all' && folderFilter !== 'none' && r.folder_id !== folderFilter) return false
         if (typeFilter !== 'all' && r.style !== typeFilter) return false
         if (q) return (r.ambient + ' ' + r.lighting + ' ' + r.style + ' ' + r.prompt).toLowerCase().includes(q)
         return true
@@ -106,7 +123,7 @@ export function HistoryClient({ renders, credits, spaces }: Props) {
         const diff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         return sort === 'desc' ? diff : -diff
       })
-  }, [renders, search, typeFilter, sort])
+  }, [renders, search, typeFilter, sort, folderFilter])
 
   const selectedRenders = useMemo(
     () => renders.filter(r => selected.has(r.id)),
@@ -144,7 +161,6 @@ export function HistoryClient({ renders, credits, spaces }: Props) {
         a.click()
         a.remove()
         i++
-        // pequena pausa pra evitar bloqueio agressivo de "muitos downloads"
         if (i < selectedRenders.length) await sleep(350)
       }
     } finally {
@@ -178,14 +194,14 @@ export function HistoryClient({ renders, credits, spaces }: Props) {
     }
   }
 
-  const handleMove = async (spaceId: string | null) => {
+  const handleMove = async (folderId: string | null) => {
     if (selectedRenders.length === 0 || busy) return
     setBusy(true)
     try {
       const res = await fetch('/api/renders/batch', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ ids: [...selected], action: 'move', space_id: spaceId }),
+        body:    JSON.stringify({ ids: [...selected], action: 'move', folder_id: folderId }),
       })
       if (!res.ok) {
         const { error } = await res.json().catch(() => ({ error: 'Falha ao mover' }))
@@ -194,6 +210,51 @@ export function HistoryClient({ renders, credits, spaces }: Props) {
       }
       setMoveOpen(false)
       exitSelectMode()
+      router.refresh()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // ── Pastas: criar e excluir ────────────────────────────────────────────────
+  const createFolder = async (initialName?: string): Promise<Folder | null> => {
+    const name = (initialName ?? window.prompt('Nome da pasta:'))?.trim()
+    if (!name) return null
+    setBusy(true)
+    try {
+      const res = await fetch('/api/folders', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ name }),
+      })
+      if (!res.ok) {
+        const { error } = await res.json().catch(() => ({ error: 'Falha ao criar pasta' }))
+        alert(error || 'Falha ao criar pasta')
+        return null
+      }
+      const { folder } = await res.json()
+      router.refresh()
+      return folder as Folder
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleDeleteFolder = async (folderId: string, folderName: string) => {
+    const inFolder = folderCounts.counts[folderId] ?? 0
+    const msg = inFolder > 0
+      ? `Excluir a pasta "${folderName}"? Os ${inFolder} render${inFolder !== 1 ? 's' : ''} dentro dela ficarão sem pasta (não serão apagados).`
+      : `Excluir a pasta "${folderName}"?`
+    if (!window.confirm(msg)) return
+    setBusy(true)
+    try {
+      const res = await fetch(`/api/folders/${folderId}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const { error } = await res.json().catch(() => ({ error: 'Falha ao excluir pasta' }))
+        alert(error || 'Falha ao excluir pasta')
+        return
+      }
+      if (folderFilter === folderId) setFolderFilter('all')
       router.refresh()
     } finally {
       setBusy(false)
@@ -287,13 +348,51 @@ export function HistoryClient({ renders, credits, spaces }: Props) {
           </div>
         )}
 
+        {/* ── Folder chips ── */}
+        {renders.length > 0 && (
+          <div style={S.chipRow}>
+            <FolderChip
+              active={folderFilter === 'all'}
+              onClick={() => setFolderFilter('all')}
+              label="Todos"
+              count={folderCounts.total}
+            />
+            <FolderChip
+              active={folderFilter === 'none'}
+              onClick={() => setFolderFilter('none')}
+              label="Sem pasta"
+              count={folderCounts.unfiled}
+            />
+            {folders.map(f => (
+              <FolderChip
+                key={f.id}
+                active={folderFilter === f.id}
+                onClick={() => setFolderFilter(f.id)}
+                onDelete={() => handleDeleteFolder(f.id, f.name)}
+                label={f.name}
+                count={folderCounts.counts[f.id] ?? 0}
+              />
+            ))}
+            <button onClick={() => createFolder()} style={S.chipAdd} disabled={busy}>
+              <PlusIcon /> Nova pasta
+            </button>
+          </div>
+        )}
+
         {/* ── Grid / Empty ── */}
         {renders.length === 0 ? (
           <EmptyState />
         ) : filtered.length === 0 ? (
           <div style={{ padding: '48px 0', textAlign: 'center' }}>
-            <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', marginBottom: 10 }}>Nenhum resultado para &ldquo;{search}&rdquo;</div>
-            <button onClick={() => { setSearch(''); setTypeFilter('all') }} style={S.clearFilterBtn}>
+            <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', marginBottom: 10 }}>
+              {search
+                ? <>Nenhum resultado para &ldquo;{search}&rdquo;</>
+                : 'Nada por aqui ainda.'}
+            </div>
+            <button
+              onClick={() => { setSearch(''); setTypeFilter('all'); setFolderFilter('all') }}
+              style={S.clearFilterBtn}
+            >
               Limpar filtros
             </button>
           </div>
@@ -335,15 +434,55 @@ export function HistoryClient({ renders, credits, spaces }: Props) {
         </div>
       )}
 
-      {/* ── Modal mover para Space ── */}
+      {/* ── Modal mover para pasta ── */}
       {moveOpen && (
         <MoveModal
-          spaces={spaces}
+          folders={folders}
           count={selected.size}
           busy={busy}
           onClose={() => setMoveOpen(false)}
           onPick={handleMove}
+          onCreate={async () => {
+            const f = await createFolder()
+            if (f) await handleMove(f.id)
+          }}
         />
+      )}
+    </div>
+  )
+}
+
+// ── FolderChip ─────────────────────────────────────────────────────────────────
+
+function FolderChip({
+  active, onClick, onDelete, label, count,
+}: {
+  active:    boolean
+  onClick:   () => void
+  onDelete?: () => void
+  label:     string
+  count:     number
+}) {
+  const [hover, setHover] = useState(false)
+  return (
+    <div
+      style={{ ...S.chip, ...(active ? S.chipActive : null) }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+    >
+      <button onClick={onClick} style={S.chipBtn}>
+        <span>{label}</span>
+        <span style={S.chipCount}>{count}</span>
+      </button>
+      {onDelete && (active || hover) && (
+        <button
+          onClick={e => { e.stopPropagation(); onDelete() }}
+          style={S.chipDelete}
+          title="Excluir pasta"
+          aria-label="Excluir pasta"
+        >
+          ✕
+        </button>
       )}
     </div>
   )
@@ -480,20 +619,21 @@ function RenderCard({
 // ── Move Modal ─────────────────────────────────────────────────────────────────
 
 function MoveModal({
-  spaces, count, busy, onClose, onPick,
+  folders, count, busy, onClose, onPick, onCreate,
 }: {
-  spaces: SpaceLite[]
+  folders: Folder[]
   count: number
   busy: boolean
   onClose: () => void
-  onPick: (spaceId: string | null) => void
+  onPick: (folderId: string | null) => void
+  onCreate: () => void | Promise<void>
 }) {
   return (
     <div style={S.modalOverlay} onClick={onClose}>
       <div style={S.modal} onClick={e => e.stopPropagation()}>
         <div style={S.modalHeader}>
           <div>
-            <div style={S.modalTitle}>Mover para Space</div>
+            <div style={S.modalTitle}>Mover para pasta</div>
             <div style={S.modalSub}>
               {count} render{count !== 1 ? 's' : ''} selecionado{count !== 1 ? 's' : ''}
             </div>
@@ -502,35 +642,35 @@ function MoveModal({
         </div>
 
         <div style={S.modalBody}>
-          {spaces.length === 0 ? (
-            <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 13 }}>
-              Você ainda não tem Spaces.{' '}
-              <a href="/app/spaces/new" style={{ color: 'var(--color-text-primary)', textDecoration: 'underline' }}>
-                Criar Space
-              </a>
-            </div>
-          ) : (
-            <ul style={S.spaceList}>
-              {spaces.map(s => (
-                <li key={s.id}>
-                  <button
-                    onClick={() => onPick(s.id)}
-                    disabled={busy}
-                    style={S.spaceItem}
-                  >
-                    <FolderIcon />
-                    <span style={{ flex: 1, textAlign: 'left' }}>{s.name}</span>
-                    <span style={S.spaceCat}>{s.category}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
+          <ul style={S.spaceList}>
+            {folders.map(f => (
+              <li key={f.id}>
+                <button
+                  onClick={() => onPick(f.id)}
+                  disabled={busy}
+                  style={S.spaceItem}
+                >
+                  <FolderIcon />
+                  <span style={{ flex: 1, textAlign: 'left' }}>{f.name}</span>
+                </button>
+              </li>
+            ))}
+            <li>
+              <button
+                onClick={() => onCreate()}
+                disabled={busy}
+                style={{ ...S.spaceItem, color: 'var(--color-text-secondary)' }}
+              >
+                <PlusIcon />
+                <span style={{ flex: 1, textAlign: 'left' }}>Nova pasta…</span>
+              </button>
+            </li>
+          </ul>
         </div>
 
         <div style={S.modalFooter}>
           <button onClick={() => onPick(null)} disabled={busy} style={S.modalGhostBtn}>
-            Remover de qualquer Space
+            Tirar da pasta
           </button>
         </div>
       </div>
@@ -610,6 +750,15 @@ function TrashIcon() {
   )
 }
 
+function PlusIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19"/>
+      <line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
+  )
+}
+
 // ── Styles ─────────────────────────────────────────────────────────────────────
 
 const S: Record<string, CSSProperties> = {
@@ -629,13 +778,22 @@ const S: Record<string, CSSProperties> = {
   count:         { fontSize: 11, color: 'var(--color-text-tertiary)', letterSpacing: '-0.01em', paddingBottom: 2 },
   headerGhostBtn:{ background: 'var(--color-bg-elevated)', border: '0.5px solid var(--color-border-strong)', borderRadius: 8, padding: '7px 13px', fontSize: 12, color: 'var(--color-text-secondary)', cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '-0.01em' },
 
-  controls:      { display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap' },
+  controls:      { display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' },
   searchWrap:    { position: 'relative', display: 'flex', alignItems: 'center', flex: 1, minWidth: 180 },
   searchIcon:    { position: 'absolute', left: 11, color: 'var(--color-text-tertiary)', pointerEvents: 'none', flexShrink: 0 },
   searchInput:   { width: '100%', padding: '8px 32px 8px 32px', border: '0.5px solid var(--color-border-strong)', borderRadius: 8, fontSize: 12, color: 'var(--color-text-primary)', background: 'var(--color-bg-elevated)', fontFamily: 'inherit', outline: 'none', letterSpacing: '-0.01em' },
   clearBtn:      { position: 'absolute', right: 10, background: 'none', border: 'none', cursor: 'pointer', fontSize: 10, color: 'var(--color-text-tertiary)', padding: 2 },
   select:        { padding: '8px 12px', border: '0.5px solid var(--color-border-strong)', borderRadius: 8, fontSize: 12, color: 'var(--color-text-secondary)', background: 'var(--color-bg-elevated)', fontFamily: 'inherit', outline: 'none', cursor: 'pointer', letterSpacing: '-0.01em' },
   clearFilterBtn:{ background: 'none', border: '0.5px solid var(--color-border-strong)', borderRadius: 8, padding: '7px 16px', fontSize: 12, color: 'var(--color-text-secondary)', cursor: 'pointer', fontFamily: 'inherit' },
+
+  // ── Folder chips ─
+  chipRow:       { display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 22 },
+  chip:          { display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 4px 4px 12px', borderRadius: 999, background: 'var(--color-bg-elevated)', border: '0.5px solid var(--color-border-strong)', color: 'var(--color-text-secondary)', fontSize: 12, letterSpacing: '-0.01em' },
+  chipActive:    { background: 'var(--color-text-primary)', borderColor: 'var(--color-text-primary)', color: 'var(--color-bg)' },
+  chipBtn:       { display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: '3px 4px 3px 0', font: 'inherit' },
+  chipCount:     { fontSize: 10, opacity: 0.7, fontVariantNumeric: 'tabular-nums' },
+  chipDelete:    { width: 18, height: 18, marginLeft: 2, marginRight: 2, padding: 0, borderRadius: '50%', background: 'rgba(0,0,0,0.18)', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  chipAdd:       { display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 999, background: 'transparent', border: '0.5px dashed var(--color-border-strong)', color: 'var(--color-text-tertiary)', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '-0.01em' },
 
   grid:          { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14 },
 
@@ -681,5 +839,4 @@ const S: Record<string, CSSProperties> = {
 
   spaceList:     { listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 2 },
   spaceItem:     { width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'none', border: 'none', borderRadius: 8, fontSize: 13, color: 'var(--color-text-primary)', cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '-0.01em', textAlign: 'left' },
-  spaceCat:      { fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-text-quaternary)' },
 }
