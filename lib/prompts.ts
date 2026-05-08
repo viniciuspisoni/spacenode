@@ -633,43 +633,32 @@ function buildMaterialsBlock(
   ].filter(Boolean)
   if (lines.length === 0) return ''
   if (level === 'maximum') {
-    return (
-      `MATERIAL OVERRIDES — these materials take ABSOLUTE PRIORITY over the reference ` +
-      `image and any other instructions: ${lines.join('; ')}. ` +
-      `Apply these specific materials regardless of what is visible in the reference. ` +
-      `All OTHER materials not listed here must remain identical to the reference. `
-    )
+    // Removida a frase "All OTHER materials must remain identical" — já dita
+    // 2x antes (fidelityModifier + buildNegativePromptForFidelity).
+    return `MATERIAL OVERRIDES (priority over reference): ${lines.join('; ')}. `
   }
   return `EXACT PROJECT MATERIALS — reproduce these faithfully: ${lines.join('; ')}. `
 }
 
 // ── Fidelity Engine prompt builder ─────────────────────────────────────────────
 
+// 17 itens esparsos consolidados em 6 itens densos. Cada item carrega um vetor
+// completo em vez de fragmentar a mesma proibição em N linhas — modelo de
+// difusão presta menos atenção quando há muitos itens repetitivos competindo.
 const NEGATIVE_BASE = [
-  'no facade redesign',
-  'no architectural changes',
-  'no added or removed stories',
-  'no added doors, windows, arches, niches or any new opening',
-  'no closed, filled or covered existing openings',
-  'no transformed openings — a door must remain a door, a window must remain a window, an arch must remain an arch',
-  'no added or removed walls, partitions, columns or beams',
-  'no altered corridor, hallway, doorway or room boundary',
-  'no repositioned or resized openings',
-  'no changed roofline or ceiling line',
-  'no different camera angle',
-  'no different perspective',
+  'no architectural changes (no added, removed, repositioned or resized walls, partitions, columns, beams, doors, windows, arches, niches, openings, ceiling line, roofline, stories or room boundaries)',
+  'no transformed openings (a door stays a door, a window stays a window, an arch stays an arch)',
+  'no different camera angle, perspective, framing, zoom, rotation or altered silhouette',
   'no warped proportions',
   'no removed neighboring buildings',
-  'no fantasy elements',
-  'no impossible geometry',
-  'no surreal additions',
+  'no fantasy, surreal or impossibly-shaped additions',
 ]
 
-// Negativos específicos pra Máxima Fidelidade — comprimidos pra reduzir
-// saturação do prompt. Cada item agora é uma proibição densa cobrindo um
-// vetor inteiro de drift observado em produção.
+// Negativos específicos pra Máxima — só vetores que NÃO são cobertos por
+// outros blocos. Item antigo de "fixture on/off state" foi removido: já é
+// coberto pela `lightingLine` quando lighting === 'Preservar Original' e,
+// quando o user pediu mudar a luz, esse negativo seria contra-pedido.
 const MAXIMUM_EXTRA_NEGATIVES = [
-  'no changes to the on/off state, intensity or warm glow of any light fixture (lamps, pendants, sconces, spots, LEDs and bulbs that are OFF in the reference must remain OFF — no added bloom, lens flare or lit-fixture appearance)',
   'no recoloring, restaining, repainting or replaced finishes on any wall, ceiling, floor, door, window frame, ceiling fan, light fixture or furniture (no concrete texture replacing painted walls, no industrial finish replacing flat paint)',
   'no altered geometry, hardware or proportions on doors, windows, fans or fixtures',
 ]
@@ -737,36 +726,35 @@ function fidelityModifier(level: FidelityLevel): string {
   if (level === 'balanced') {
     return 'BALANCED FIDELITY MODE: Preserve architecture, camera angle, opening positions, number of stories and main volumetry. Light composition tweaks allowed (vegetation, sky, ambient props). Do not redesign the facade. '
   }
-  // maximum — preserva tudo. Versão enxuta: blocos densos sem repetir
-  // listas exaustivas. Texto longo demais saturava a atenção do modelo e
-  // fazia ele ignorar locks individuais. Lista exaustiva de "every wall,
-  // door, window, arch, niche..." migrou pro NEGATIVE_BASE; aqui fica só
-  // o princípio. Cada frase carrega um vetor distinto: arquitetura,
-  // materiais/cores, mood-not-license, e fechamento.
+  // maximum — princípios apenas. Lista exaustiva de "walls, openings,
+  // partitions, beams, columns..." vive no NEGATIVE_BASE; lista exaustiva
+  // de fixtures vive na lightingLine; lista de finishes vive no
+  // MAXIMUM_EXTRA_NEGATIVES. Aqui só os 4 vetores conceituais.
   return (
-    'MAXIMUM FIDELITY MODE: faithful re-render of the reference image. ' +
-    'Preserve every architectural element pixel-by-pixel: walls, openings, partitions, beams, columns, ceiling line, roofline. ' +
-    'Preserve every material, texture, color and finish exactly as visible — including the exact paint, stain and finish of walls, ceilings, floors, doors, window frames, ceiling fan blades, light fixtures and furniture. ' +
-    'Any context, mood or style descriptor below is ATMOSPHERE ONLY — never license to alter materials, finishes, colors, light fixture states or any visible object. ' +
-    'Apply ONLY changes explicitly requested in the lighting, scene, material override and refinement blocks below. Anything not explicitly listed must remain identical to the reference. '
+    'MAXIMUM FIDELITY MODE — faithful photorealistic re-render of the reference. ' +
+    'Preserve every visible element exactly: architecture, materials, colors, finishes, fixtures, furniture, props. ' +
+    'Context and mood descriptors below are ATMOSPHERE ONLY, never license to alter anything visible. ' +
+    'Apply ONLY changes explicitly requested in the lighting, scene, material or refinement blocks. '
   )
 }
 
+// Lista de fatos da análise prévia. Removidos os "DO NOT" inline (já cobertos
+// pelo NEGATIVE_BASE) e o LOCKED ELEMENTS separado (duplicava PROJECT FACTS).
+// O modelo lê isso como descrição factual da referência — instrução é o
+// header "must remain identical".
 function preservationBlock(briefing: BriefingArquitetonico): string {
-  const lock = briefing.elementos_preservar.length > 0
-    ? `\nLOCKED ELEMENTS (must be identical to reference): ${briefing.elementos_preservar.join('; ')}.`
+  const locked = briefing.elementos_preservar.length > 0
+    ? `\n- Locked elements: ${briefing.elementos_preservar.join('; ')}`
     : ''
   return (
-    `PROJECT FACTS (from vision analysis — must remain unchanged):\n` +
-    `- Project type: ${briefing.tipo_projeto}\n` +
-    `- Main geometry: ${briefing.geometria_principal}\n` +
-    `- Volumes: ${briefing.volumes}\n` +
-    `- Number of stories: ${briefing.pavimentos} — DO NOT add or remove floors\n` +
-    `- Openings: ${briefing.aberturas} — preserve exact position and proportion of every door and window\n` +
-    `- Visible materials in reference: ${briefing.materiais_aparentes}\n` +
-    `- Camera and perspective: ${briefing.camera} — DO NOT reframe, rotate or zoom\n` +
-    `- Surroundings: ${briefing.entorno} — preserve neighboring buildings if present` +
-    lock + ' '
+    `PROJECT FACTS (from vision analysis — must remain identical to the reference):\n` +
+    `- Type: ${briefing.tipo_projeto}\n` +
+    `- Geometry: ${briefing.geometria_principal} | ${briefing.volumes} | ${briefing.pavimentos} stories\n` +
+    `- Openings: ${briefing.aberturas}\n` +
+    `- Visible materials: ${briefing.materiais_aparentes}\n` +
+    `- Camera: ${briefing.camera}\n` +
+    `- Surroundings: ${briefing.entorno}` +
+    locked + '\n'
   )
 }
 
@@ -838,32 +826,27 @@ export function buildFidelityPrompt(
     }
   }
 
-  // Em maximum: intent NEUTRO. "high-end residential architectural interior photograph"
-  // (template antigo) era trigger gigante de clichê de revista — o modelo lia
-  // isso e ligava todos os pendentes, mudava materiais pra "premium" e
-  // ignorava o lock. Versão neutra descreve só o que É (foto da cena exata),
-  // não o que deve PARECER.
-  // Em balanced/creative: mantém o template descritivo — esses níveis querem
-  // a estética arquitetônica mesmo.
+  // Em maximum: intent NEUTRO em 1 frase. "high-end ... architectural
+  // photograph" (template antigo) puxava clichê de revista (pendentes
+  // acesos, materiais premium) e competia com o lock.
+  // Em balanced/creative: template descritivo arquitetônico.
   const kind   = projectType === 'exterior'
     ? `${segDesc} architectural exterior photograph`
     : `${segDesc} architectural interior photograph`
   const intent = level === 'maximum'
-    ? `Render this reference image as a photorealistic photograph of the EXACT scene shown — no magazine-style stylization, no architectural-photography conventions added, no atmospheric "upgrades". The output must look like a faithful photograph taken of the SAME space depicted in the reference. `
+    ? `Render this reference faithfully — photograph the EXACT scene shown, no magazine-style upgrades. `
     : `Transform this reference image as a photorealistic ${kind}. `
 
-  // Wrapper de iluminação: deixa explícito que descrição de luz é ATMOSFERA, não
-  // licença pra adicionar luminárias/lâmpadas/spots ao projeto. Algumas entradas
-  // de LIGHT_EN ainda mencionam "table lamps", "sconces" etc. — esse wrapper
-  // neutraliza esse vazamento até a limpeza completa do dicionário.
+  // 'Preservar Original' ativa lock afirmativo: cada fixture mantém o estado
+  // on/off do input, mesmo time of day, mesmas sombras. Sem essa especificidade
+  // o modelo lia "preserve lighting" como sugestão, não regra.
   //
-  // 'Preservar Original' (ou lighting vazio) ativa um lock afirmativo: não
-  // descreve uma nova luz, manda preservar a luz exata da referência. Sem isso,
-  // o modelo interpreta qualquer descrição de iluminação como permissão pra
-  // mudar o estado das luminárias (acender o que estava apagado, etc.).
+  // Quando lighting != Preservar, o wrapper deixa claro que é descrição de
+  // ATMOSFERA — algumas entradas de LIGHT_EN mencionam "table lamps", "sconces"
+  // e isso virava licença pra adicionar fixtures inexistentes.
   const preserveLighting = !lighting || lighting === 'Preservar Original'
   const lightingLine = preserveLighting
-    ? 'Lighting: preserve the existing lighting condition from the reference image EXACTLY. Do NOT change the on/off state of any light fixture (every lamp, sconce, spot, pendant, LED strip and bulb that is OFF in the reference must remain OFF; every one that is ON must remain ON, with the same intensity and color). Do not modify the time of day, daylight direction, shadow pattern or atmospheric mood. '
+    ? 'Lighting: keep the reference lighting EXACTLY — every fixture stays in the same on/off state, same time of day, same shadow direction. '
     : `Lighting condition (atmosphere only — do not add or change any lamp, sconce, spot, fixture or any object visible in the reference): ${lightDesc}. `
 
   return (
