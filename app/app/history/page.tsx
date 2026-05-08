@@ -8,15 +8,17 @@ export default async function HistoryPage() {
 
   if (!user) redirect('/login')
 
-  const [{ data: profile }, { data: renders }] = await Promise.all([
+  const [{ data: profile }, { data: renders }, { data: spaces }] = await Promise.all([
     supabase.from('profiles').select('credits').eq('id', user.id).single(),
     supabase.from('renders').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(100),
+    supabase.from('spaces').select('id, name, category').eq('user_id', user.id).order('updated_at', { ascending: false }),
   ])
 
   return (
     <HistoryClient
       renders={renders ?? []}
       credits={profile?.credits ?? 0}
+      spaces={spaces ?? []}
     />
   )
 }
