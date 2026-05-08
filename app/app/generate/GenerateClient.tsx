@@ -967,26 +967,26 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
         {imagePreview && outputUrl && !loading && (
           <div style={S.postGen}>
             {selectedResolution === 'hd' && (
-              <div style={S.upsellNote}>
+              <div className="spn-upsell-note">
                 Melhore para 2K ou 4K para apresentação profissional
               </div>
             )}
             <div style={S.postGenPrimary}>
-              <button style={S.actionBtn} onClick={() => handleGenerate()}>
+              <button className="spn-action spn-action--primary" onClick={() => handleGenerate()}>
                 Gerar nova variação
               </button>
               <button
+                className="spn-action spn-action--primary"
                 onClick={() => downloadImage(outputUrl, 'spacenode-render.jpg')}
-                style={S.actionBtn}
               >
                 Baixar imagem
               </button>
             </div>
             <div style={S.postGenSecondary}>
-              <button style={S.actionBtnGhost} onClick={() => handleGenerate('2k')}>
+              <button className="spn-action spn-action--ghost" onClick={() => handleGenerate('2k')}>
                 Melhorar qualidade (2K / 4K)
               </button>
-              <button style={S.actionBtnGhost} onClick={handleNewRender}>
+              <button className="spn-action spn-action--ghost" onClick={handleNewRender}>
                 Iniciar novo render
               </button>
             </div>
@@ -1161,9 +1161,6 @@ const S: Record<string, React.CSSProperties> = {
   postGen:           { display:'flex', flexDirection:'column', gap:8 },
   postGenPrimary:    { display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 },
   postGenSecondary:  { display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 },
-  actionBtn:         { padding:'11px 16px', background:'var(--color-text-primary)', color:'var(--color-bg)', border:'none', borderRadius:8, fontSize:12, fontWeight:500, cursor:'pointer', fontFamily:'inherit', textAlign:'center' as const, textDecoration:'none', display:'flex', alignItems:'center', justifyContent:'center' },
-  actionBtnGhost:    { padding:'10px 14px', background:'none', border:'0.5px solid var(--color-border-strong)', borderRadius:8, fontSize:11, color:'var(--color-text-tertiary)', cursor:'pointer', fontFamily:'inherit', textAlign:'center' as const, textDecoration:'none', display:'flex', alignItems:'center', justifyContent:'center' },
-  upsellNote:        { fontSize:10, color:'var(--color-text-tertiary)', textAlign:'center' as const, letterSpacing:'0.02em', padding:'7px 14px', background:'var(--color-bg-elevated)', border:'0.5px solid var(--color-border)', borderRadius:6, lineHeight:1.5 },
 }
 
 export default GenerateClient
