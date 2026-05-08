@@ -213,10 +213,6 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
   //    tem referência fixa do "tudo o que deve ser preservado".
   const [refinementText, setRefinementText] = useState('')
 
-  // ── Diagnóstico: prompt enviado ao FAL na última geração + toggle de visibilidade
-  const [lastPrompt,    setLastPrompt]    = useState<string | null>(null)
-  const [showPrompt,    setShowPrompt]    = useState(false)
-
   const fileInputRef         = useRef<HTMLInputElement>(null)
   const compareRef           = useRef<HTMLDivElement>(null)
   const loadingTimerRef      = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -349,7 +345,6 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
       const data: GenerateResult = await res.json()
       if (!res.ok || data.error) throw new Error(data.error ?? 'Erro na geração')
       setOutputUrl(data.outputUrl); setCredits(data.credits); setSliderPos(50)
-      if (data.prompt) setLastPrompt(data.prompt)
       if (refinementText.trim()) setRefinementText('')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Erro desconhecido')
@@ -389,8 +384,6 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
     setRefinementText('')
     setUseAnchor(true)
     setError(null)
-    setLastPrompt(null)
-    setShowPrompt(false)
     setSliderPos(50)
   }
 
@@ -852,19 +845,6 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
             <span style={{color:'var(--color-text-tertiary)'}}>{summaryLine3}</span>
           </div>
 
-          {lastPrompt && (
-            <>
-              <button
-                onClick={() => setShowPrompt(v => !v)}
-                style={S.promptToggle}
-              >
-                {showPrompt ? '▾ ocultar prompt completo' : '▸ ver prompt completo'}
-              </button>
-              {showPrompt && (
-                <pre style={S.promptPre}>{lastPrompt}</pre>
-              )}
-            </>
-          )}
         </div>
       </div>
     </div>
@@ -981,8 +961,6 @@ const S: Record<string, React.CSSProperties> = {
   promptPreview:     { background:'var(--color-bg-elevated)', border:'0.5px solid var(--color-border)', borderRadius:10, padding:'14px 16px' },
   promptLabel:       { fontSize:9, letterSpacing:'0.15em', textTransform:'uppercase', color:'var(--color-text-tertiary)', fontWeight:500, marginBottom:8 },
   promptText:        { fontSize:11, color:'var(--color-text-tertiary)', lineHeight:1.65 },
-  promptToggle:      { marginTop:10, padding:0, background:'none', border:'none', color:'var(--color-text-tertiary)', fontSize:10, cursor:'pointer', fontFamily:'inherit', textAlign:'left' as const },
-  promptPre:         { marginTop:8, padding:'10px 12px', background:'var(--color-bg)', border:'0.5px solid var(--color-border)', borderRadius:6, fontSize:10, color:'var(--color-text-primary)', lineHeight:1.55, whiteSpace:'pre-wrap' as const, wordBreak:'break-word' as const, fontFamily:'ui-monospace, SFMono-Regular, Menlo, monospace', maxHeight:280, overflowY:'auto' as const },
   downloadLink:      { fontSize:11, color:'var(--color-text-tertiary)', textDecoration:'none' },
   postGen:           { display:'flex', flexDirection:'column', gap:8 },
   postGenPrimary:    { display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 },
