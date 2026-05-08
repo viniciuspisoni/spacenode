@@ -238,6 +238,13 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
   const [isDraggingSlider,  setIsDraggingSlider]  = useState(false)
   const [isDraggingFile,    setIsDraggingFile]    = useState(false)
 
+  // ── Zoom + pan da imagem comparativa.
+  //    Wheel (com cursor sobre a imagem) zooma com origem no cursor; drag
+  //    passa a fazer pan quando scale > 1; duplo-clique reseta.
+  const [scale,             setScale]             = useState(1)
+  const [pan,               setPan]               = useState({ x: 0, y: 0 })
+  const [isPanning,         setIsPanning]         = useState(false)
+
   // ── Âncora visual: render anterior usado pra manter consistência de
   //    materiais/texturas entre gerações sucessivas do mesmo input.
   //    Default true; usuário pode desligar pra começar do zero.
@@ -252,6 +259,9 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
   const compareRef           = useRef<HTMLDivElement>(null)
   const loadingTimerRef      = useRef<ReturnType<typeof setInterval> | null>(null)
   const isDraggingSliderRef  = useRef(false)
+  const isPanningRef         = useRef(false)
+  const panStartRef          = useRef<{ mouseX: number; mouseY: number; panX: number; panY: number } | null>(null)
+  const zoomStateRef         = useRef({ scale: 1, panX: 0, panY: 0 })
 
   // ── Cascade: projectType → reset segment + children
   const handleProjectTypeChange = (type: ProjectType) => {
@@ -359,6 +369,7 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
     if (!file.type.startsWith('image/')) return
     if (file.size > 10 * 1024 * 1024) { setError('Imagem muito grande. Máximo 10 MB.'); return }
     setOutputUrl(null); setError(null); setUseAnchor(true); setRefinementText('')
+    setScale(1); setPan({ x: 0, y: 0 })
     const reader = new FileReader()
     reader.onload = async (e) => {
       try {
@@ -448,6 +459,7 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
       const data: GenerateResult = await res.json()
       if (!res.ok || data.error) throw new Error(data.error ?? 'Erro na geração')
       setOutputUrl(data.outputUrl); setCredits(data.credits); setSliderPos(50)
+      setScale(1); setPan({ x: 0, y: 0 })
       if (refinementText.trim()) setRefinementText('')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Erro desconhecido')
@@ -472,6 +484,64 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
     }
   }, [])
 
+  // Zoom-state ref espelha o estado pra leituras síncronas dentro dos handlers
+  // de evento (que são bound uma vez, com closure congelada).
+  useEffect(() => { zoomStateRef.current = { scale, panX: pan.x, panY: pan.y } }, [scale, pan])
+  useEffect(() => { isPanningRef.current = isPanning }, [isPanning])
+
+  // ── Wheel zoom (não-passivo pra preventDefault funcionar).
+  // Re-attach quando a comparativa monta/desmonta; nas outras views o
+  // compareRef fica null e o effect só retorna early.
+  useEffect(() => {
+    const el = compareRef.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault()
+      const { scale: s, panX, panY } = zoomStateRef.current
+      const rect = el.getBoundingClientRect()
+      const cx = e.clientX - rect.left
+      const cy = e.clientY - rect.top
+      const newScale = Math.max(1, Math.min(4, s * Math.exp(-e.deltaY * 0.0015)))
+      if (newScale === s) return
+      const ratio = newScale / s
+      // Mantém o ponto sob o cursor estacionário: tx' = cx - (cx - tx) * (s'/s).
+      const newTx = cx - (cx - panX) * ratio
+      const newTy = cy - (cy - panY) * ratio
+      const minTx = rect.width  * (1 - newScale)
+      const minTy = rect.height * (1 - newScale)
+      setScale(newScale)
+      setPan({
+        x: Math.max(minTx, Math.min(0, newTx)),
+        y: Math.max(minTy, Math.min(0, newTy)),
+      })
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [imagePreview, outputUrl])
+
+  // ── Pan: window listeners ativos apenas via ref (sem re-bind a cada render).
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!isPanningRef.current || !compareRef.current || !panStartRef.current) return
+      const { scale: s } = zoomStateRef.current
+      const start = panStartRef.current
+      const rect  = compareRef.current.getBoundingClientRect()
+      const minTx = rect.width  * (1 - s)
+      const minTy = rect.height * (1 - s)
+      setPan({
+        x: Math.max(minTx, Math.min(0, start.panX + (e.clientX - start.mouseX))),
+        y: Math.max(minTy, Math.min(0, start.panY + (e.clientY - start.mouseY))),
+      })
+    }
+    const onUp = () => { setIsPanning(false); panStartRef.current = null }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    return () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+  }, [])
+
   const handleBuyCredits = async () => {
     const res = await fetch('/api/stripe/checkout', { method: 'POST' })
     const data = await res.json()
@@ -488,6 +558,8 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
     setUseAnchor(true)
     setError(null)
     setSliderPos(50)
+    setScale(1)
+    setPan({ x: 0, y: 0 })
   }
 
   // ── Computed
@@ -836,13 +908,48 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
         )}
 
         {imagePreview && outputUrl && (
-          <div ref={compareRef} style={S.compareWrap} onMouseDown={() => setIsDraggingSlider(true)}>
-            <img src={imagePreview} alt="Antes" style={S.compareImg} draggable={false}/>
-            <div style={{...S.compareAfterWrap, clipPath:`inset(0 ${100-sliderPos}% 0 0)`}}>
-              <img src={outputUrl} alt="Depois" style={S.compareImg} draggable={false}/>
+          <div
+            ref={compareRef}
+            style={{
+              ...S.compareWrap,
+              cursor: scale > 1 ? (isPanning ? 'grabbing' : 'grab') : 'ew-resize',
+            }}
+            onMouseDown={(e) => {
+              if (scale > 1) {
+                panStartRef.current = { mouseX: e.clientX, mouseY: e.clientY, panX: pan.x, panY: pan.y }
+                setIsPanning(true)
+              } else {
+                setIsDraggingSlider(true)
+              }
+            }}
+            onDoubleClick={() => { setScale(1); setPan({ x: 0, y: 0 }) }}
+          >
+            {/* Antes — dentro do wrapper transformável */}
+            <div style={{
+              position:'absolute', inset:0,
+              transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
+              transformOrigin:'0 0',
+              pointerEvents:'none',
+            }}>
+              <img src={imagePreview} alt="Antes" style={S.compareImg} draggable={false}/>
             </div>
+            {/* Depois — clip em coords do container, transform aplicado dentro do clip */}
+            <div style={{...S.compareAfterWrap, clipPath:`inset(0 ${100-sliderPos}% 0 0)`, pointerEvents:'none'}}>
+              <div style={{
+                position:'absolute', inset:0,
+                transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
+                transformOrigin:'0 0',
+              }}>
+                <img src={outputUrl} alt="Depois" style={S.compareImg} draggable={false}/>
+              </div>
+            </div>
+            {/* Handle do slider em coords do container; ativa pointerEvents só no círculo
+                pra continuar arrastável quando zoomado (parent passa a iniciar pan). */}
             <div style={{...S.compareHandle, left:`${sliderPos}%`}}>
-              <div style={S.compareHandleCircle}>
+              <div
+                style={{...S.compareHandleCircle, pointerEvents:'auto', cursor:'ew-resize'}}
+                onMouseDown={(e) => { e.stopPropagation(); setIsDraggingSlider(true) }}
+              >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" strokeWidth="2">
                   <path d="M8 5l-5 7 5 7M16 5l5 7-5 7" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
@@ -850,6 +957,9 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
             </div>
             <span style={{...S.compareLabel, left:14}}>ANTES</span>
             <span style={{...S.compareLabel, right:14}}>DEPOIS</span>
+            {scale > 1 && (
+              <div style={S.zoomBadge}>{Math.round(scale * 100)}%</div>
+            )}
           </div>
         )}
 
@@ -1044,6 +1154,7 @@ const S: Record<string, React.CSSProperties> = {
   compareHandleCircle: { width:32, height:32, borderRadius:'50%', background:'#ffffff', border:'0.5px solid rgba(0,0,0,0.1)', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 2px 8px rgba(0,0,0,0.12)' },
   compareLabel:      { position:'absolute', bottom:12, fontSize:9, letterSpacing:'0.12em', color:'#fafafa', textTransform:'uppercase', fontWeight:500, textShadow:'0 1px 3px rgba(0,0,0,0.5)', pointerEvents:'none' },
   changeImageBtn:    { position:'absolute', top:12, right:14, padding:'5px 12px', border:'0.5px solid rgba(255,255,255,0.4)', borderRadius:20, fontSize:10, color:'#fafafa', background:'rgba(0,0,0,0.35)', cursor:'pointer', fontFamily:'inherit' },
+  zoomBadge:         { position:'absolute', top:12, left:14, padding:'3px 9px', fontSize:9, letterSpacing:'0.1em', color:'#fafafa', background:'rgba(0,0,0,0.45)', borderRadius:10, fontWeight:500, pointerEvents:'none' },
   loadingOverlay:    { position:'absolute', inset:0, background:'rgba(0,0,0,0.35)', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:14 },
   spinner:           { width:28, height:28, borderRadius:'50%', border:'2px solid rgba(255,255,255,0.3)', borderTopColor:'#ffffff', animation:'spin 0.8s linear infinite' },
   promptPreview:     { background:'var(--color-bg-elevated)', border:'0.5px solid var(--color-border)', borderRadius:10, padding:'14px 16px' },
