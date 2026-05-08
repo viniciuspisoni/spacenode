@@ -665,6 +665,19 @@ const NEGATIVE_BASE = [
   'no surreal additions',
 ]
 
+// Negativos específicos pra Máxima Fidelidade — cobrem os modos de drift que
+// observamos em produção: cor de ventilador mudando, parede virando "cimento
+// queimado" por causa do contexto "Urbano", luminárias acendendo do nada,
+// porta com proporção diferente. Cada negativo aqui é um caso real.
+const MAXIMUM_EXTRA_NEGATIVES = [
+  'no changes to the on/off state of any light fixture (no newly turned-on or turned-off lamps, pendants, sconces, spots, LEDs or bulbs)',
+  'no added warm glow, bloom, lens flare or lit-fixture appearance unless already present in the reference',
+  'no recolored, restained or repainted walls, ceilings, floors, doors, window frames, ceiling fans, light fixtures or furniture',
+  'no replaced finishes (no concrete texture replacing painted walls, no industrial finish replacing flat paint, no stained wood replacing white-painted surfaces)',
+  'no altered ceiling fan blade color, motor housing color or finish',
+  'no altered door geometry, color, hardware, knob or handle',
+]
+
 export function buildNegativePromptForFidelity(level: FidelityLevel): string {
   if (level === 'creative') {
     // ainda preserva volumetria/aberturas/perspectiva, mas relaxa entorno e estilo
@@ -676,8 +689,9 @@ export function buildNegativePromptForFidelity(level: FidelityLevel): string {
   if (level === 'balanced') {
     return `AVOID: ${NEGATIVE_BASE.join(', ')}.`
   }
-  // maximum
-  return `STRICTLY AVOID: ${NEGATIVE_BASE.join(', ')}, no reframe, no zoom, no rotation, no altered silhouette.`
+  // maximum — base + extras específicos contra drift de cor/material/fixture
+  const all = [...NEGATIVE_BASE, ...MAXIMUM_EXTRA_NEGATIVES]
+  return `STRICTLY AVOID: ${all.join(', ')}, no reframe, no zoom, no rotation, no altered silhouette.`
 }
 
 // Pedido cirúrgico de alteração entre gerações ("trocar só o piso", "adicionar
@@ -727,10 +741,11 @@ function fidelityModifier(level: FidelityLevel): string {
   if (level === 'balanced') {
     return 'BALANCED FIDELITY MODE: Preserve architecture, camera angle, opening positions, number of stories and main volumetry. Light composition tweaks allowed (vegetation, sky, ambient props). Do not redesign the facade. '
   }
-  // maximum — preserve EVERYTHING. Lighting and explicit user requests are the only allowed changes.
-  // Removido "LIGHTING-ONLY" do enunciado: quando o usuário escolhe "Preservar
-  // Original" na iluminação, nem ela muda. A licença pra alterar luz vem do
-  // `lightingLine` adiante, condicionada à escolha do usuário.
+  // maximum — preserve EVERYTHING. Apenas mudanças explicitamente pedidas
+  // (lighting != "Preservar Original", scene elements, material overrides,
+  // refinement) são licenciadas. Frases anteriores como "LIGHTING-ONLY re-render"
+  // ou "Apply ONLY the lighting condition" eram interpretadas pelo modelo como
+  // permissão de alterar luz/cores mesmo quando o usuário pediu preservação.
   return (
     'MAXIMUM FIDELITY MODE: This is a high-fidelity re-render of the reference image. ' +
     'Preserve EVERY architectural element pixel-by-pixel from the reference: every wall, ' +
@@ -739,12 +754,17 @@ function fidelityModifier(level: FidelityLevel): string {
     'corridor boundary, hallway, doorway, ceiling line and roofline. ' +
     'Preserve EVERY material, texture, color, surface finish, furniture piece, decorative ' +
     'object, plant, fabric pattern, rug texture, floor finish, wall finish and ceiling finish ' +
-    'pixel-by-pixel from the reference. ' +
+    'pixel-by-pixel from the reference — including the EXACT colors, paint, stain, varnish ' +
+    'and finish of every wall, ceiling, floor, door, window frame, ceiling fan blade, light ' +
+    'fixture body and piece of furniture. ' +
     'Do NOT add, remove or transform any opening. Do NOT add or remove any wall, partition or ' +
-    'column. Do NOT improve, stylize, reinterpret or enhance any material. ' +
-    'Apply ONLY the lighting condition and the specific scene/material/refinement changes ' +
-    'EXPLICITLY requested below. Anything not explicitly requested must remain identical to ' +
-    'the reference image. '
+    'column. Do NOT improve, stylize, reinterpret, "upgrade" or enhance any material. ' +
+    'Any context, mood or style descriptor below is ATMOSPHERE/MOOD ONLY — it must NOT become ' +
+    'license to alter materials, finishes, colors, light fixture states or any object. ' +
+    'Apply ONLY the changes EXPLICITLY requested in the lighting, scene, material override and ' +
+    'refinement blocks below. Anything not explicitly listed must remain identical to the ' +
+    'reference image, including all materials, all colors, the on/off state of every light ' +
+    'fixture, and every visible object. '
   )
 }
 
@@ -812,11 +832,25 @@ export function buildFidelityPrompt(
   if (background && background !== 'Preservar Original') {
     const bgDesc = BG_EN[background] ?? background
     if (bgDesc) {
-      // Wrapper deixa claro que é mood/atmosfera — não pra adicionar carros,
-      // árvores específicas ou prédios fora do que o usuário pediu.
-      bgBlock = projectType === 'exterior'
-        ? `Surrounding context (atmosphere and mood only — do not add or remove specific buildings, vehicles, trees or other objects from the reference): ${bgDesc}. `
-        : `Spatial context (atmosphere and mood only — do not add or remove specific objects from the reference): ${bgDesc}. `
+      // Em Máxima Fidelidade, contexto vira gatilho clássico de drift: descrições
+      // como "urban loft industrial mood" eram interpretadas pelo modelo como
+      // licença pra trocar paredes por cimento queimado, mudar cor do ventilador,
+      // etc. Wrapper extra-firme avisa explicitamente que é só atmosfera —
+      // tudo o que é VISÍVEL na referência (materiais, cores, fixtures) tem que
+      // permanecer intacto.
+      if (level === 'maximum') {
+        bgBlock = (
+          `Atmospheric mood reference (does NOT alter any visible material, color, ` +
+          `finish, light fixture, fan, door, window or any object — only subtle ambient ` +
+          `quality of the air, light tone and overall feel): ${bgDesc}. `
+        )
+      } else {
+        // Wrapper deixa claro que é mood/atmosfera — não pra adicionar carros,
+        // árvores específicas ou prédios fora do que o usuário pediu.
+        bgBlock = projectType === 'exterior'
+          ? `Surrounding context (atmosphere and mood only — do not add or remove specific buildings, vehicles, trees or other objects from the reference): ${bgDesc}. `
+          : `Spatial context (atmosphere and mood only — do not add or remove specific objects from the reference): ${bgDesc}. `
+      }
     }
   }
 
