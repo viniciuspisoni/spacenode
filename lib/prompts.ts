@@ -665,17 +665,13 @@ const NEGATIVE_BASE = [
   'no surreal additions',
 ]
 
-// Negativos específicos pra Máxima Fidelidade — cobrem os modos de drift que
-// observamos em produção: cor de ventilador mudando, parede virando "cimento
-// queimado" por causa do contexto "Urbano", luminárias acendendo do nada,
-// porta com proporção diferente. Cada negativo aqui é um caso real.
+// Negativos específicos pra Máxima Fidelidade — comprimidos pra reduzir
+// saturação do prompt. Cada item agora é uma proibição densa cobrindo um
+// vetor inteiro de drift observado em produção.
 const MAXIMUM_EXTRA_NEGATIVES = [
-  'no changes to the on/off state of any light fixture (no newly turned-on or turned-off lamps, pendants, sconces, spots, LEDs or bulbs)',
-  'no added warm glow, bloom, lens flare or lit-fixture appearance unless already present in the reference',
-  'no recolored, restained or repainted walls, ceilings, floors, doors, window frames, ceiling fans, light fixtures or furniture',
-  'no replaced finishes (no concrete texture replacing painted walls, no industrial finish replacing flat paint, no stained wood replacing white-painted surfaces)',
-  'no altered ceiling fan blade color, motor housing color or finish',
-  'no altered door geometry, color, hardware, knob or handle',
+  'no changes to the on/off state, intensity or warm glow of any light fixture (lamps, pendants, sconces, spots, LEDs and bulbs that are OFF in the reference must remain OFF — no added bloom, lens flare or lit-fixture appearance)',
+  'no recoloring, restaining, repainting or replaced finishes on any wall, ceiling, floor, door, window frame, ceiling fan, light fixture or furniture (no concrete texture replacing painted walls, no industrial finish replacing flat paint)',
+  'no altered geometry, hardware or proportions on doors, windows, fans or fixtures',
 ]
 
 export function buildNegativePromptForFidelity(level: FidelityLevel): string {
@@ -741,30 +737,18 @@ function fidelityModifier(level: FidelityLevel): string {
   if (level === 'balanced') {
     return 'BALANCED FIDELITY MODE: Preserve architecture, camera angle, opening positions, number of stories and main volumetry. Light composition tweaks allowed (vegetation, sky, ambient props). Do not redesign the facade. '
   }
-  // maximum — preserve EVERYTHING. Apenas mudanças explicitamente pedidas
-  // (lighting != "Preservar Original", scene elements, material overrides,
-  // refinement) são licenciadas. Frases anteriores como "LIGHTING-ONLY re-render"
-  // ou "Apply ONLY the lighting condition" eram interpretadas pelo modelo como
-  // permissão de alterar luz/cores mesmo quando o usuário pediu preservação.
+  // maximum — preserva tudo. Versão enxuta: blocos densos sem repetir
+  // listas exaustivas. Texto longo demais saturava a atenção do modelo e
+  // fazia ele ignorar locks individuais. Lista exaustiva de "every wall,
+  // door, window, arch, niche..." migrou pro NEGATIVE_BASE; aqui fica só
+  // o princípio. Cada frase carrega um vetor distinto: arquitetura,
+  // materiais/cores, mood-not-license, e fechamento.
   return (
-    'MAXIMUM FIDELITY MODE: This is a high-fidelity re-render of the reference image. ' +
-    'Preserve EVERY architectural element pixel-by-pixel from the reference: every wall, ' +
-    'every door, every window, every arch, every niche, every opening (and its absence — ' +
-    'a solid wall must remain a solid wall), every partition, beam, column, frame, ' +
-    'corridor boundary, hallway, doorway, ceiling line and roofline. ' +
-    'Preserve EVERY material, texture, color, surface finish, furniture piece, decorative ' +
-    'object, plant, fabric pattern, rug texture, floor finish, wall finish and ceiling finish ' +
-    'pixel-by-pixel from the reference — including the EXACT colors, paint, stain, varnish ' +
-    'and finish of every wall, ceiling, floor, door, window frame, ceiling fan blade, light ' +
-    'fixture body and piece of furniture. ' +
-    'Do NOT add, remove or transform any opening. Do NOT add or remove any wall, partition or ' +
-    'column. Do NOT improve, stylize, reinterpret, "upgrade" or enhance any material. ' +
-    'Any context, mood or style descriptor below is ATMOSPHERE/MOOD ONLY — it must NOT become ' +
-    'license to alter materials, finishes, colors, light fixture states or any object. ' +
-    'Apply ONLY the changes EXPLICITLY requested in the lighting, scene, material override and ' +
-    'refinement blocks below. Anything not explicitly listed must remain identical to the ' +
-    'reference image, including all materials, all colors, the on/off state of every light ' +
-    'fixture, and every visible object. '
+    'MAXIMUM FIDELITY MODE: faithful re-render of the reference image. ' +
+    'Preserve every architectural element pixel-by-pixel: walls, openings, partitions, beams, columns, ceiling line, roofline. ' +
+    'Preserve every material, texture, color and finish exactly as visible — including the exact paint, stain and finish of walls, ceilings, floors, doors, window frames, ceiling fan blades, light fixtures and furniture. ' +
+    'Any context, mood or style descriptor below is ATMOSPHERE ONLY — never license to alter materials, finishes, colors, light fixture states or any visible object. ' +
+    'Apply ONLY changes explicitly requested in the lighting, scene, material override and refinement blocks below. Anything not explicitly listed must remain identical to the reference. '
   )
 }
 
@@ -854,13 +838,19 @@ export function buildFidelityPrompt(
     }
   }
 
-  // Em maximum: "Re-render" — verbo cirúrgico, sem licença implícita pra reinventar.
-  // Em balanced/creative: "Transform" — segue o tom mais permissivo do nível.
-  const verb   = level === 'maximum' ? 'Re-render' : 'Transform'
+  // Em maximum: intent NEUTRO. "high-end residential architectural interior photograph"
+  // (template antigo) era trigger gigante de clichê de revista — o modelo lia
+  // isso e ligava todos os pendentes, mudava materiais pra "premium" e
+  // ignorava o lock. Versão neutra descreve só o que É (foto da cena exata),
+  // não o que deve PARECER.
+  // Em balanced/creative: mantém o template descritivo — esses níveis querem
+  // a estética arquitetônica mesmo.
   const kind   = projectType === 'exterior'
     ? `${segDesc} architectural exterior photograph`
     : `${segDesc} architectural interior photograph`
-  const intent = `${verb} this reference image as a photorealistic ${kind}. `
+  const intent = level === 'maximum'
+    ? `Render this reference image as a photorealistic photograph of the EXACT scene shown — no magazine-style stylization, no architectural-photography conventions added, no atmospheric "upgrades". The output must look like a faithful photograph taken of the SAME space depicted in the reference. `
+    : `Transform this reference image as a photorealistic ${kind}. `
 
   // Wrapper de iluminação: deixa explícito que descrição de luz é ATMOSFERA, não
   // licença pra adicionar luminárias/lâmpadas/spots ao projeto. Algumas entradas
