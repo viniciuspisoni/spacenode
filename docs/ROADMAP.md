@@ -44,3 +44,10 @@
 - [ ] Render history gallery
 - [ ] User settings / profile page
 - [ ] Error handling improvements (user-facing messages)
+
+---
+
+## Backlog (P2 / não-prioritário)
+
+### Auth
+- [ ] **Sign in with Apple** — alinha com público de arquitetura (skew Apple alto). Bloqueado em: Apple Developer Program ($99/ano, ~24-72h de aprovação), config no Apple Console (App ID + Services ID + private key `.p8` + JWT renovável a cada 6 meses), 1 botão no `/login` (mesmo padrão do Google em [login/page.tsx:82](app/login/page.tsx:82)). Cuidado com email proxy `@privaterelay.appleid.com` — `handle_new_user` salva o relay, comunicação transacional que não passe pelo provider de email da Apple não chega. Reabrir quando: sair do beta pra público amplo, ou conversão de login virar gargalo, ou houver app iOS nativo (App Store exige).
