@@ -986,13 +986,10 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
               <button style={S.actionBtnGhost} onClick={() => handleGenerate('2k')}>
                 Melhorar qualidade (2K / 4K)
               </button>
-              <a href="/app/history" style={S.actionBtnGhost}>
-                Salvar no histórico
-              </a>
+              <button style={S.actionBtnGhost} onClick={handleNewRender}>
+                Iniciar novo render
+              </button>
             </div>
-            <button style={S.actionBtnGhost} onClick={handleNewRender}>
-              Iniciar novo render
-            </button>
           </div>
         )}
 
