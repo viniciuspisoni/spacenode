@@ -7,12 +7,12 @@ import { createAdminClient } from '@/lib/supabase/admin'
 //
 // POST /api/renders/batch
 //   { ids: string[], action: 'delete' }
-//   { ids: string[], action: 'move',   space_id: string | null }
+//   { ids: string[], action: 'move',   folder_id: string | null }
 
 interface BatchBody {
   ids?: unknown
   action?: unknown
-  space_id?: unknown
+  folder_id?: unknown
 }
 
 export async function POST(req: NextRequest) {
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Body inválido' }, { status: 400 })
   }
 
-  const { ids, action, space_id } = body
+  const { ids, action, folder_id } = body
 
   if (!Array.isArray(ids) || ids.length === 0 || !ids.every(id => typeof id === 'string')) {
     return NextResponse.json({ error: 'ids inválidos' }, { status: 400 })
@@ -53,25 +53,25 @@ export async function POST(req: NextRequest) {
   }
 
   if (action === 'move') {
-    if (space_id !== null && typeof space_id !== 'string') {
-      return NextResponse.json({ error: 'space_id inválido' }, { status: 400 })
+    if (folder_id !== null && typeof folder_id !== 'string') {
+      return NextResponse.json({ error: 'folder_id inválido' }, { status: 400 })
     }
 
-    if (typeof space_id === 'string') {
-      const { data: space, error: spaceErr } = await admin
-        .from('spaces')
+    if (typeof folder_id === 'string') {
+      const { data: folder, error: folderErr } = await admin
+        .from('render_folders')
         .select('id')
-        .eq('id', space_id)
+        .eq('id', folder_id)
         .eq('user_id', user.id)
         .single()
-      if (spaceErr || !space) {
-        return NextResponse.json({ error: 'Space não encontrado' }, { status: 404 })
+      if (folderErr || !folder) {
+        return NextResponse.json({ error: 'Pasta não encontrada' }, { status: 404 })
       }
     }
 
     const { error, count } = await admin
       .from('renders')
-      .update({ space_id }, { count: 'exact' })
+      .update({ folder_id }, { count: 'exact' })
       .in('id', ids as string[])
       .eq('user_id', user.id)
 
