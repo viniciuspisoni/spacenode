@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useLayoutEffect, useMemo, useCallback, type CSSProperties } from 'react'
+import { useState, useEffect, useLayoutEffect, useMemo, useCallback, type CSSProperties } from 'react'
 import { useRouter } from 'next/navigation'
 import { getUpscaleDisplayLabel, getVideoDisplayLabel } from '@/lib/renderLabels'
 
@@ -25,10 +25,18 @@ interface Folder {
   created_at: string
 }
 
+interface FolderCounts {
+  counts:  Record<string, number>
+  unfiled: number
+  total:   number
+}
+
 interface Props {
-  renders: Render[]
-  credits: number
-  folders: Folder[]
+  renders:      Render[]       // primeira página, mais recentes primeiro
+  folderCounts: FolderCounts   // contagens reais (server-side) para os chips
+  pageSize:     number         // tamanho da página vinda do server
+  credits:      number
+  folders:      Folder[]
 }
 
 type FolderFilter = 'all' | 'none' | string  // string = folder id
@@ -70,8 +78,51 @@ function buildFilename(r: Render, idx: number): string {
 
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
 
-export function HistoryClient({ renders, credits, folders }: Props) {
+export function HistoryClient({
+  renders: initialRenders,
+  folderCounts,
+  pageSize,
+  credits,
+  folders,
+}: Props) {
   const router = useRouter()
+
+  // ── Paginação "Carregar mais" ───────────────────────────────────────────────
+  // `loaded` é a lista visível: começa com a primeira página vinda do server e
+  // cresce conforme o usuário pede mais. Resetamos para `initialRenders` se as
+  // props mudarem (router.refresh() após excluir/mover, por ex.).
+  const [loaded,      setLoaded]      = useState<Render[]>(initialRenders)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [exhausted,   setExhausted]   = useState(initialRenders.length < pageSize)
+
+  useEffect(() => {
+    setLoaded(initialRenders)
+    setExhausted(initialRenders.length < pageSize)
+  }, [initialRenders, pageSize])
+
+  const hasMore = !exhausted && loaded.length < folderCounts.total
+
+  const loadMore = async () => {
+    if (loadingMore || !hasMore) return
+    const last = loaded[loaded.length - 1]
+    if (!last) return
+    setLoadingMore(true)
+    try {
+      const res = await fetch(`/api/renders/list?cursor=${encodeURIComponent(last.created_at)}`)
+      if (!res.ok) {
+        const { error } = await res.json().catch(() => ({ error: 'Falha ao carregar' }))
+        alert(error || 'Falha ao carregar')
+        return
+      }
+      const { renders: next, pageSize: serverPageSize } = await res.json() as { renders: Render[], pageSize: number }
+      setLoaded(prev => [...prev, ...next])
+      if (next.length < serverPageSize) setExhausted(true)
+    } catch {
+      alert('Falha ao carregar')
+    } finally {
+      setLoadingMore(false)
+    }
+  }
 
   const [isDark, setIsDark] = useState(false)
   useLayoutEffect(() => {
@@ -98,20 +149,9 @@ export function HistoryClient({ renders, credits, folders }: Props) {
   const [busy,       setBusy]       = useState(false)
   const [moveOpen,   setMoveOpen]   = useState(false)
 
-  // Counts por pasta — pra mostrar nos chips
-  const folderCounts = useMemo(() => {
-    const counts: Record<string, number> = {}
-    let unfiled = 0
-    for (const r of renders) {
-      if (r.folder_id) counts[r.folder_id] = (counts[r.folder_id] ?? 0) + 1
-      else unfiled += 1
-    }
-    return { counts, unfiled, total: renders.length }
-  }, [renders])
-
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return renders
+    return loaded
       .filter(r => {
         if (folderFilter === 'none' && r.folder_id) return false
         if (folderFilter !== 'all' && folderFilter !== 'none' && r.folder_id !== folderFilter) return false
@@ -123,11 +163,11 @@ export function HistoryClient({ renders, credits, folders }: Props) {
         const diff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         return sort === 'desc' ? diff : -diff
       })
-  }, [renders, search, typeFilter, sort, folderFilter])
+  }, [loaded, search, typeFilter, sort, folderFilter])
 
   const selectedRenders = useMemo(
-    () => renders.filter(r => selected.has(r.id)),
-    [renders, selected],
+    () => loaded.filter(r => selected.has(r.id)),
+    [loaded, selected],
   )
 
   const enterSelectMode = () => { setSelectMode(true); setSelected(new Set()) }
@@ -291,10 +331,10 @@ export function HistoryClient({ renders, credits, folders }: Props) {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {renders.length > 0 && !selectMode && (
+            {folderCounts.total > 0 && !selectMode && (
               <span style={S.count}>{filtered.length} render{filtered.length !== 1 ? 's' : ''}</span>
             )}
-            {renders.length > 0 && (
+            {folderCounts.total > 0 && (
               selectMode ? (
                 <>
                   <button
@@ -317,7 +357,7 @@ export function HistoryClient({ renders, credits, folders }: Props) {
         </div>
 
         {/* ── Controls ── */}
-        {renders.length > 0 && (
+        {folderCounts.total > 0 && (
           <div style={S.controls}>
             <div style={S.searchWrap}>
               <svg style={S.searchIcon} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
@@ -349,7 +389,7 @@ export function HistoryClient({ renders, credits, folders }: Props) {
         )}
 
         {/* ── Folder chips ── */}
-        {renders.length > 0 && (
+        {folderCounts.total > 0 && (
           <div style={S.chipRow}>
             <FolderChip
               active={folderFilter === 'all'}
@@ -380,34 +420,57 @@ export function HistoryClient({ renders, credits, folders }: Props) {
         )}
 
         {/* ── Grid / Empty ── */}
-        {renders.length === 0 ? (
+        {folderCounts.total === 0 ? (
           <EmptyState />
-        ) : filtered.length === 0 ? (
-          <div style={{ padding: '48px 0', textAlign: 'center' }}>
-            <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', marginBottom: 10 }}>
-              {search
-                ? <>Nenhum resultado para &ldquo;{search}&rdquo;</>
-                : 'Nada por aqui ainda.'}
-            </div>
-            <button
-              onClick={() => { setSearch(''); setTypeFilter('all'); setFolderFilter('all') }}
-              style={S.clearFilterBtn}
-            >
-              Limpar filtros
-            </button>
-          </div>
         ) : (
-          <div style={S.grid}>
-            {filtered.map(r => (
-              <RenderCard
-                key={r.id}
-                render={r}
-                selectMode={selectMode}
-                selected={selected.has(r.id)}
-                onToggle={() => toggleOne(r.id)}
-              />
-            ))}
-          </div>
+          <>
+            {filtered.length === 0 ? (
+              <div style={{ padding: '48px 0', textAlign: 'center' }}>
+                <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', marginBottom: 10 }}>
+                  {hasMore
+                    ? 'Sem resultados nos renders carregados.'
+                    : (search
+                        ? <>Nenhum resultado para &ldquo;{search}&rdquo;</>
+                        : 'Nada por aqui ainda.')}
+                </div>
+                {!hasMore && (
+                  <button
+                    onClick={() => { setSearch(''); setTypeFilter('all'); setFolderFilter('all') }}
+                    style={S.clearFilterBtn}
+                  >
+                    Limpar filtros
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div style={S.grid}>
+                {filtered.map(r => (
+                  <RenderCard
+                    key={r.id}
+                    render={r}
+                    selectMode={selectMode}
+                    selected={selected.has(r.id)}
+                    onToggle={() => toggleOne(r.id)}
+                  />
+                ))}
+              </div>
+            )}
+
+            {hasMore && (
+              <div style={S.loadMoreWrap}>
+                <button
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  style={S.loadMoreBtn}
+                >
+                  {loadingMore ? 'Carregando…' : 'Carregar mais'}
+                </button>
+                <div style={S.loadMoreCount}>
+                  {loaded.length} de {folderCounts.total} carregados
+                </div>
+              </div>
+            )}
+          </>
         )}
 
       </div>
@@ -785,6 +848,11 @@ const S: Record<string, CSSProperties> = {
   clearBtn:      { position: 'absolute', right: 10, background: 'none', border: 'none', cursor: 'pointer', fontSize: 10, color: 'var(--color-text-tertiary)', padding: 2 },
   select:        { padding: '8px 12px', border: '0.5px solid var(--color-border-strong)', borderRadius: 8, fontSize: 12, color: 'var(--color-text-secondary)', background: 'var(--color-bg-elevated)', fontFamily: 'inherit', outline: 'none', cursor: 'pointer', letterSpacing: '-0.01em' },
   clearFilterBtn:{ background: 'none', border: '0.5px solid var(--color-border-strong)', borderRadius: 8, padding: '7px 16px', fontSize: 12, color: 'var(--color-text-secondary)', cursor: 'pointer', fontFamily: 'inherit' },
+
+  // ── Carregar mais ─
+  loadMoreWrap:  { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, marginTop: 28, padding: '8px 0 24px' },
+  loadMoreBtn:   { background: 'var(--color-bg-elevated)', border: '0.5px solid var(--color-border-strong)', borderRadius: 10, padding: '10px 24px', fontSize: 12, color: 'var(--color-text-primary)', cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '-0.01em', fontWeight: 500 },
+  loadMoreCount: { fontSize: 10, color: 'var(--color-text-tertiary)', letterSpacing: '0.01em' },
 
   // ── Folder chips ─
   chipRow:       { display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 22 },
