@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { useLayoutEffect, useState } from 'react'
 import React from 'react'
 import Logo from '@/components/Logo'
 
@@ -95,6 +95,23 @@ interface SidebarProps {
 export default function Sidebar({ userName, userAvatar }: SidebarProps) {
   const pathname = usePathname()
   const [hovered, setHovered] = useState(false)
+
+  // Theme toggle — alterna a classe `html.light` definida em globals.css.
+  // Server SSRs com isLight=false; useLayoutEffect sincroniza antes do paint.
+  // O <script> em app/layout.tsx já aplica a classe correta na primeira render
+  // a partir do localStorage, então não há flash.
+  const [isLight, setIsLight] = useState(false)
+  useLayoutEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setIsLight(document.documentElement.classList.contains('light'))
+  }, [])
+  const toggleTheme = () => {
+    const html = document.documentElement
+    const next = !html.classList.contains('light')
+    html.classList.toggle('light', next)
+    try { localStorage.setItem('theme', next ? 'light' : 'dark') } catch {}
+    setIsLight(next)
+  }
 
   const initials = userName
     .split(' ')
@@ -216,6 +233,49 @@ export default function Sidebar({ userName, userAvatar }: SidebarProps) {
           </div>
         ))}
       </nav>
+
+      {/* Theme toggle */}
+      <div style={{ padding: '4px 8px', flexShrink: 0 }}>
+        <button
+          type="button"
+          onClick={toggleTheme}
+          title={isLight ? 'Modo escuro' : 'Modo claro'}
+          suppressHydrationWarning
+          style={{
+            display: 'flex', alignItems: 'center', gap: 12,
+            padding: '0 10px', height: 40, borderRadius: 8,
+            background: 'transparent', border: 'none',
+            cursor: 'pointer', width: '100%',
+            transition: 'background 0.15s',
+          }}
+        >
+          <div style={{ flexShrink: 0, display: 'flex', color: 'rgba(255,255,255,0.4)' }}>
+            {isLight ? (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <circle cx="12" cy="12" r="5"/>
+                <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" strokeLinecap="round"/>
+              </svg>
+            ) : (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            )}
+          </div>
+          <span style={{
+            fontSize: 12,
+            color: 'rgba(255,255,255,0.75)',
+            whiteSpace: 'nowrap' as const,
+            fontWeight: 400,
+            letterSpacing: '-0.01em',
+            opacity: hovered ? 1 : 0,
+            transition: 'opacity 0.18s',
+            flex: 1,
+            textAlign: 'left' as const,
+          }}>
+            {isLight ? 'modo escuro' : 'modo claro'}
+          </span>
+        </button>
+      </div>
 
       {/* User */}
       <div style={{ padding: '10px 8px', borderTop: '0.5px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>

@@ -1,5 +1,5 @@
 'use client'
-import { useState, useRef, useEffect, useLayoutEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Logo from '@/components/Logo'
 import {
@@ -203,23 +203,6 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
   const [loadingTextVisible, setLoadingTextVisible] = useState(true)
   const [generationKey,      setGenerationKey]     = useState(0)
   const [error,              setError]             = useState<string | null>(null)
-
-  // ── Dark mode
-  // Server always renders isDark=false (no document). useLayoutEffect syncs
-  // the correct value on the client before the first paint — no visible flash.
-  const [isDark, setIsDark] = useState(false)
-  useLayoutEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setIsDark(document.documentElement.classList.contains('dark'))
-  }, [])
-
-  const toggleTheme = () => {
-    const html = document.documentElement
-    const newDark = !html.classList.contains('dark')
-    html.classList.toggle('dark', newDark)
-    try { localStorage.setItem('theme', newDark ? 'dark' : 'light') } catch {}
-    setIsDark(newDark)
-  }
 
   // ── Tipo e Segmento
   const [projectType, setProjectType] = useState<ProjectType>(init.projectType)
@@ -547,25 +530,11 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
         {/* Topbar */}
         <div style={S.topbar}>
           <span style={S.pageTitle}>GERAR</span>
-          <div style={{display:'flex', alignItems:'center', gap:10}}>
-            <button onClick={toggleTheme} style={S.themeToggle} title={isDark ? 'Modo claro' : 'Modo escuro'} suppressHydrationWarning>
-              {isDark ? (
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-                  <circle cx="12" cy="12" r="5"/>
-                  <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" strokeLinecap="round"/>
-                </svg>
-              ) : (
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-                  <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              )}
-            </button>
-            <div style={S.credits}>
-              <span style={S.creditDot}/>
-              <span style={S.creditNum}>{credits}</span>
-              <span>Nodes</span>
-              <button onClick={handleBuyCredits} style={S.buyBtn}>+ comprar Nodes</button>
-            </div>
+          <div style={S.credits}>
+            <span style={S.creditDot}/>
+            <span style={S.creditNum}>{credits}</span>
+            <span>Nodes</span>
+            <button onClick={handleBuyCredits} style={S.buyBtn}>+ comprar Nodes</button>
           </div>
         </div>
 
@@ -1022,7 +991,6 @@ const S: Record<string, React.CSSProperties> = {
   creditDot:         { width:5, height:5, borderRadius:'50%', background:'var(--color-accent-green)', boxShadow:'0 0 5px var(--color-accent-green-glow)', display:'inline-block' },
   creditNum:         { color:'var(--color-text-primary)', fontWeight:500, fontSize:12 },
   buyBtn:            { fontSize:'11px', color:'var(--color-text-tertiary)', background:'none', border:'none', cursor:'pointer', textDecoration:'underline', marginLeft:'6px', fontFamily:'inherit' },
-  themeToggle:       { width:28, height:28, borderRadius:'50%', border:'0.5px solid var(--color-border-strong)', background:'var(--color-bg-elevated)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', color:'var(--color-text-tertiary)', padding:0, flexShrink:0 },
   section:           { display:'flex', flexDirection:'column', gap:10 },
   label:             { fontSize:10, letterSpacing:'0.15em', textTransform:'uppercase', color:'var(--color-text-tertiary)', fontWeight:500 },
   divider:           { height:'0.5px', background:'var(--color-border)' },

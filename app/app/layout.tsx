@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Sidebar from '@/components/app/Sidebar'
-import { ForceDark } from '@/components/app/ForceDark'
 
 export default async function AppLayout({
   children,
@@ -20,7 +19,6 @@ export default async function AppLayout({
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
-      <ForceDark />
       <Sidebar userName={userName} userAvatar={userAvatar} />
       <main style={{ flex: 1, overflow: 'hidden', minHeight: 0, display: 'flex' }}>
         {children}
