@@ -350,6 +350,20 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
     if (data.url) window.location.href = data.url
   }
 
+  // ── Reseta o estado da geração atual pra começar um render do zero
+  //    com nova imagem. Mantém os parâmetros (segmento, ambiente etc.) —
+  //    só limpa o que pertence ao ciclo da imagem atual.
+  const handleNewRender = () => {
+    setImagePreview(null)
+    setOutputUrl(null)
+    setRefinementText('')
+    setUseAnchor(true)
+    setError(null)
+    setLastPrompt(null)
+    setShowPrompt(false)
+    setSliderPos(50)
+  }
+
   // ── Computed
   const hasMaterials  = Object.values(materials).some(v => v && v.trim())
   const currentEngine = ENGINES[selectedEngine]
@@ -749,6 +763,9 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
                 Salvar no histórico
               </a>
             </div>
+            <button style={S.actionBtnGhost} onClick={handleNewRender}>
+              Iniciar novo render
+            </button>
           </div>
         )}
 
