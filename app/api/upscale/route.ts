@@ -71,7 +71,8 @@ export async function POST(req: NextRequest) {
         status:       'completed',
         completed_at: new Date().toISOString(),
       }),
-      admin.rpc('consume_credits', { user_id_input: user.id, amount: nodeCost }),
+      // user-context client → consume_credits valida via auth.uid() guard
+      supabase.rpc('consume_credits', { user_id_input: user.id, amount: nodeCost }),
     ])
 
     return NextResponse.json({ url: outputUrl, originalUrl: inputUrl })
