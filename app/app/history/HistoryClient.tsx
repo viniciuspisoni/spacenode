@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useLayoutEffect, useMemo, useCallback, type CSSProperties } from 'react'
+import { useState, useEffect, useMemo, useCallback, type CSSProperties } from 'react'
 import { useRouter } from 'next/navigation'
 import { getUpscaleDisplayLabel, getVideoDisplayLabel } from '@/lib/renderLabels'
 
@@ -122,20 +122,6 @@ export function HistoryClient({
     } finally {
       setLoadingMore(false)
     }
-  }
-
-  const [isDark, setIsDark] = useState(false)
-  useLayoutEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setIsDark(document.documentElement.classList.contains('dark'))
-  }, [])
-
-  const toggleTheme = () => {
-    const html = document.documentElement
-    const newDark = !html.classList.contains('dark')
-    html.classList.toggle('dark', newDark)
-    try { localStorage.setItem('theme', newDark ? 'dark' : 'light') } catch {}
-    setIsDark(newDark)
   }
 
   const [search,        setSearch]        = useState('')
@@ -309,15 +295,10 @@ export function HistoryClient({
       {/* ── Topbar ── */}
       <div style={S.topbar}>
         <span style={S.pageTitle}>HISTÓRICO</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button onClick={toggleTheme} style={S.themeToggle} title={isDark ? 'Modo claro' : 'Modo escuro'} suppressHydrationWarning>
-            {isDark ? <SunIcon /> : <MoonIcon />}
-          </button>
-          <div style={S.creditsChip}>
-            <span style={S.creditDot} />
-            <span style={S.creditNum}>{credits}</span>
-            <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>nodes</span>
-          </div>
+        <div style={S.creditsChip}>
+          <span style={S.creditDot} />
+          <span style={S.creditNum}>{credits}</span>
+          <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>nodes</span>
         </div>
       </div>
 
@@ -771,23 +752,6 @@ function EmptyState() {
 
 // ── Icons ──────────────────────────────────────────────────────────────────────
 
-function SunIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-      <circle cx="12" cy="12" r="5"/>
-      <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" strokeLinecap="round"/>
-    </svg>
-  )
-}
-
-function MoonIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-      <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-  )
-}
-
 function DownloadIcon() {
   return (
     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -831,7 +795,6 @@ const S: Record<string, CSSProperties> = {
   creditsChip:   { display: 'flex', alignItems: 'center', gap: 6 },
   creditDot:     { width: 5, height: 5, borderRadius: '50%', background: 'var(--color-accent-green)', boxShadow: '0 0 5px var(--color-accent-green-glow)', display: 'inline-block' },
   creditNum:     { color: 'var(--color-text-primary)', fontWeight: 500, fontSize: 12 },
-  themeToggle:   { width: 28, height: 28, borderRadius: '50%', border: '0.5px solid var(--color-border-strong)', background: 'var(--color-bg-elevated)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--color-text-tertiary)', padding: 0, flexShrink: 0 },
 
   content:       { flex: 1, overflowY: 'auto', padding: '36px 36px 64px' },
 
