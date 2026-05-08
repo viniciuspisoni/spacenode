@@ -141,6 +141,18 @@ export function HistoryClient({ renders, credits, folders }: Props) {
     })
   }, [])
 
+  // Atalho: duplo clique num card (fora do modo seleção) entra em modo
+  // seleção já com aquele card marcado.
+  const activateSelectWith = useCallback((id: string) => {
+    setSelectMode(true)
+    setSelected(prev => {
+      if (prev.has(id)) return prev
+      const next = new Set(prev)
+      next.add(id)
+      return next
+    })
+  }, [])
+
   const selectAllVisible = () => setSelected(new Set(filtered.map(r => r.id)))
   const clearSelection   = () => setSelected(new Set())
 
@@ -405,6 +417,7 @@ export function HistoryClient({ renders, credits, folders }: Props) {
                 selectMode={selectMode}
                 selected={selected.has(r.id)}
                 onToggle={() => toggleOne(r.id)}
+                onActivateSelect={() => activateSelectWith(r.id)}
               />
             ))}
           </div>
@@ -491,12 +504,13 @@ function FolderChip({
 // ── RenderCard ─────────────────────────────────────────────────────────────────
 
 function RenderCard({
-  render, selectMode, selected, onToggle,
+  render, selectMode, selected, onToggle, onActivateSelect,
 }: {
   render: Render
   selectMode: boolean
   selected: boolean
   onToggle: () => void
+  onActivateSelect: () => void
 }) {
   const [hovered, setHovered] = useState(false)
 
@@ -514,6 +528,7 @@ function RenderCard({
       : [render.style === 'exterior' ? 'Exterior' : render.style === 'interior' ? 'Interior' : render.style, render.lighting].filter(Boolean).join(' · ')
 
   const handleCardClick = () => { if (selectMode) onToggle() }
+  const handleCardDoubleClick = () => { if (!selectMode) onActivateSelect() }
 
   return (
     <div
@@ -530,6 +545,8 @@ function RenderCard({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onClick={handleCardClick}
+      onDoubleClick={handleCardDoubleClick}
+      title={selectMode ? undefined : 'Duplo clique para selecionar'}
     >
       {/* Image */}
       <div style={S.cardImg}>
@@ -586,13 +603,17 @@ function RenderCard({
 
         {/* Hover overlay actions — desativadas no modo seleção */}
         {hovered && !selectMode && render.output_url && (
-          <div style={S.hoverActions}>
+          <div style={S.hoverActions} onDoubleClick={e => e.stopPropagation()}>
             <a href={render.output_url} target="_blank" rel="noopener noreferrer"
-              style={S.actionBtn} onClick={e => e.stopPropagation()}>
+              style={S.actionBtn}
+              onClick={e => e.stopPropagation()}
+              onDoubleClick={e => e.stopPropagation()}>
               {isVideo ? 'Assistir →' : 'Ver →'}
             </a>
             <a href={render.output_url} download target="_blank" rel="noopener noreferrer"
-              style={S.actionBtnGhost} onClick={e => e.stopPropagation()}>
+              style={S.actionBtnGhost}
+              onClick={e => e.stopPropagation()}
+              onDoubleClick={e => e.stopPropagation()}>
               <DownloadIcon /> baixar
             </a>
           </div>
