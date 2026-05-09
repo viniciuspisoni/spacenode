@@ -11,6 +11,7 @@ import {
   type EngineId, type Resolution,
   getNodesCost, isEngineId, isResolution, isValidCombination,
 } from '@/lib/engines'
+import { EngineIcon } from '@/components/icons/engines'
 
 interface GenerateClientProps {
   initialCredits:    number
@@ -761,6 +762,9 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
               const active = selectedEngine === eid
               return (
                 <div key={eid}
+                  role="button"
+                  aria-pressed={active}
+                  aria-label={`Motor ${e.name} · ${e.tagline}`}
                   style={{...S.motorOpt, ...(active ? S.motorOptActive : {})}}
                   onClick={() => {
                     setSelectedEngine(eid)
@@ -770,8 +774,11 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
                     }
                   }}
                 >
-                  <div style={{...S.motorName, ...(active ? {color:'var(--color-bg)'} : {})}}>{e.name}</div>
-                  <div style={{...S.motorDesc, ...(active ? {color:'var(--color-bg)', opacity:0.6} : {})}}>{e.tagline}</div>
+                  <EngineIcon engine={eid} style={{width:18, height:18, flexShrink:0}} />
+                  <div style={{display:'flex', flexDirection:'column', minWidth:0}}>
+                    <div style={{...S.motorName, ...(active ? {color:'var(--color-bg)'} : {})}}>{e.name}</div>
+                    <div style={{...S.motorDesc, ...(active ? {color:'var(--color-bg)', opacity:0.6} : {})}}>{e.tagline}</div>
+                  </div>
                 </div>
               )
             })}
@@ -1127,8 +1134,8 @@ const S: Record<string, React.CSSProperties> = {
   fidelityOptActive: { border:'0.5px solid var(--color-text-primary)', background:'var(--color-text-primary)' },
   fidelityName:      { fontSize:11, fontWeight:500, color:'var(--color-text-primary)', marginBottom:3 },
   motorGrid:         { display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 },
-  motorOpt:          { border:'0.5px solid var(--color-border-strong)', borderRadius:8, padding:'10px 10px', cursor:'pointer', background:'var(--color-bg-elevated)' },
-  motorOptActive:    { border:'0.5px solid var(--color-text-primary)', background:'var(--color-text-primary)' },
+  motorOpt:          { display:'flex', alignItems:'center', gap:12, border:'0.5px solid var(--color-border-strong)', borderRadius:8, padding:'10px 10px', cursor:'pointer', background:'var(--color-bg-elevated)', color:'var(--color-text-primary)' },
+  motorOptActive:    { border:'0.5px solid var(--color-text-primary)', background:'var(--color-text-primary)', color:'var(--color-bg)' },
   motorName:         { fontSize:11, fontWeight:500, color:'var(--color-text-primary)', marginBottom:3 },
   motorTag:          { display:'inline-block', fontSize:9, letterSpacing:'0.08em', textTransform:'uppercase', background:'var(--color-border-strong)', color:'var(--color-text-tertiary)', padding:'2px 6px', borderRadius:4 },
   motorDesc:         { fontSize:10, color:'var(--color-text-tertiary)', marginTop:4 },
