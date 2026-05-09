@@ -129,6 +129,16 @@ a {
   border-color: var(--color-text-quaternary);
 }
 
+/* Pill buttons — hover suave nos itens inativos */
+.spn-pill {
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+.spn-pill:not(.spn-pill--active):hover {
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border-color: var(--color-border-strong);
+}
+
 .spn-upsell-note {
   font-size: 11px;
   letter-spacing: -0.005em;
