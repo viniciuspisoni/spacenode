@@ -4,6 +4,9 @@
 // Mudanças no schema → atualizar aqui também.
 
 import type { EngineId, Resolution } from '@/lib/engines'
+import type { BriefingArquitetonico } from '@/lib/prompts'
+
+export type { BriefingArquitetonico }
 
 export type SpaceCategory = 'residencial' | 'comercial' | 'conceito'
 
@@ -52,7 +55,26 @@ export interface DnaVerification {
   notes?:  string
 }
 
+// Payload completo armazenado em spaces.dna (jsonb).
+// `visual` é o DNA legível pelo usuário (UI Reveal e DnaPanel).
+// `briefing` é a análise técnica que alimenta o prompt do FAL — mesma stack
+// usada pelo Renderizar pra atingir fotorrealismo de fidelidade máxima.
+export interface SpaceDnaPayload {
+  visual:   ProjectDNA
+  briefing: BriefingArquitetonico
+}
+
 // ── Space ──────────────────────────────────────────────────────
+//
+// `dna` aceita 2 formatos por compatibilidade:
+//   - SpaceDnaPayload (novo, com briefing arquitetônico) — Spaces criados
+//     a partir do follow-up "spaces fidelity fusion"
+//   - ProjectDNA (antigo) — Spaces criados antes desse follow-up. Funcionam
+//     mas perdem o reforço de preservação técnica na geração; basta o usuário
+//     re-extrair o DNA pra upgrade.
+//
+// Sempre passar pela função `getVisualDna` / `getBriefing` (lib/spaces/dna.ts)
+// para ler de forma agnóstica.
 export interface Space {
   id:                string
   user_id:           string
@@ -61,7 +83,7 @@ export interface Space {
   engine:            EngineId
   status:            SpaceStatus
   vista_mestre_url:  string | null
-  dna:               ProjectDNA | null
+  dna:               SpaceDnaPayload | ProjectDNA | null
   dna_extracted_at:  string | null
   locked_at:         string | null
   created_at:        string

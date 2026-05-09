@@ -4,9 +4,15 @@
 //   - Definição do projeto: provider escolhido pra DNA do Spaces.
 //   - FAL é o gateway centralizado de modelos do produto — uma única chave,
 //     um único cliente, e não vincula a Anthropic via API direta.
+//
+// Além do DNA visual (estilo/materiais/paleta/contexto) o módulo também
+// extrai o "briefing arquitetônico" reusando `analyzeImage` do Renderizar.
+// Os dois rodam em paralelo dentro de `extractDnaPayload`.
 
 import { fal } from '@fal-ai/client'
-import type { ProjectDNA, DnaVerification } from './types'
+import { analyzeImage } from '@/lib/fidelity-engine'
+import type { BriefingArquitetonico } from '@/lib/prompts'
+import type { ProjectDNA, DnaVerification, SpaceDnaPayload } from './types'
 
 const FAL_VISION_ENDPOINT = 'fal-ai/any-llm/vision'
 const DNA_MODEL           = 'openai/gpt-4o'
@@ -112,6 +118,46 @@ function parseDna(raw: string): ProjectDNA {
   }
 
   return dna
+}
+
+// ── Extração paralela: DNA visual + briefing arquitetônico ─────
+//
+// Custo: 2 calls de Vision (uma GPT-4o pro DNA visual, outra Claude Sonnet via
+// FAL pelo `analyzeImage` do Renderizar). Ambas baratas — embutidas nos 8
+// nodes da extração.
+
+export async function extractDnaPayload(imageUrl: string): Promise<SpaceDnaPayload> {
+  const [visual, briefing] = await Promise.all([
+    extractDna(imageUrl),
+    analyzeImage(imageUrl),  // tem fallback interno em caso de timeout/erro
+  ])
+  return { visual, briefing }
+}
+
+// ── Helpers de leitura ────────────────────────────────────────
+//
+// Spaces criados antes do follow-up "fidelity fusion" guardam apenas
+// ProjectDNA. Pra evitar quebrar UI ou rotas, sempre ler via estes helpers.
+
+export function getVisualDna(dna: unknown): ProjectDNA | null {
+  if (!dna || typeof dna !== 'object') return null
+  const obj = dna as Record<string, unknown>
+  if ('visual' in obj && obj.visual && typeof obj.visual === 'object') {
+    return obj.visual as ProjectDNA
+  }
+  if ('estilo' in obj && 'paleta' in obj) {
+    return dna as ProjectDNA
+  }
+  return null
+}
+
+export function getBriefingFromDna(dna: unknown): BriefingArquitetonico | null {
+  if (!dna || typeof dna !== 'object') return null
+  const obj = dna as Record<string, unknown>
+  if ('briefing' in obj && obj.briefing && typeof obj.briefing === 'object') {
+    return obj.briefing as BriefingArquitetonico
+  }
+  return null
 }
 
 // ── Verificação pós-geração ───────────────────────────────────

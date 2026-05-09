@@ -6,8 +6,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { verifyDna } from '@/lib/spaces/dna'
-import type { ProjectDNA, Vista } from '@/lib/spaces/types'
+import { verifyDna, getVisualDna } from '@/lib/spaces/dna'
+import type { Vista } from '@/lib/spaces/types'
 
 export async function POST(
   _req:    NextRequest,
@@ -43,13 +43,13 @@ export async function POST(
     .select('dna')
     .eq('id', vista.space_id)
     .single()
-  const dna = spaceRow?.dna as ProjectDNA | undefined
-  if (!dna) {
+  const visualDna = getVisualDna(spaceRow?.dna)
+  if (!visualDna) {
     return NextResponse.json({ error: 'Space sem DNA' }, { status: 409 })
   }
 
   try {
-    const verification = await verifyDna(vista.image_url, dna)
+    const verification = await verifyDna(vista.image_url, visualDna)
 
     await supabase
       .from('vistas')

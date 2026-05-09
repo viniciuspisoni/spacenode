@@ -8,8 +8,9 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ENGINES } from '@/lib/engines'
-import type { Space, Vista, ArchitectIdentity, Axis, Quality, ProjectDNA } from '@/lib/spaces/types'
+import type { Space, Vista, ArchitectIdentity, Axis, Quality } from '@/lib/spaces/types'
 import type { PlanId } from '@/lib/plans'
+import { getVisualDna } from '@/lib/spaces/dna'
 import { getVistaGenerationCost } from '@/lib/spaces/economy'
 import { DnaPanel } from './DnaPanel'
 import { EixosPanel } from './EixosPanel'
@@ -38,7 +39,7 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId }:
   const [error, setError]     = useState<string | null>(null)
 
   const isLocked = space.status === 'locked'
-  const dna      = (space.dna ?? null) as ProjectDNA | null
+  const dna      = getVisualDna(space.dna)
 
   async function handleGenerate(axis: Axis, axisValues: string[], quality: Quality) {
     setError(null)

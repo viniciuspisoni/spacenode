@@ -9,6 +9,7 @@ import type {
   Space, Vista, Pack, PackNarrative, ProjectDNA, ArchitectIdentity,
 } from '@/lib/spaces/types'
 import { getAccentColor } from '@/lib/spaces/identity'
+import { getVisualDna } from '@/lib/spaces/dna'
 
 const NARRATIVES: { id: PackNarrative; label: string; description: string }[] = [
   { id: 'tour',      label: 'Tour',         description: 'Apresentação completa em ordem natural' },
@@ -49,7 +50,7 @@ export function PackEditor({ space, vistas, initialPack, identity }: Props) {
       .finally(() => setCreating(false))
   }, [pack, creating, vistas.length, space.id])
 
-  const dna = (space.dna ?? null) as ProjectDNA | null
+  const dna = getVisualDna(space.dna)
   const accent = getAccentColor(identity, dna)
 
   const orderedIds = pack?.vistas_ordered ?? []

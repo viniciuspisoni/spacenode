@@ -7,10 +7,11 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import type { Space, Vista, ProjectDNA, DnaVerification } from '@/lib/spaces/types'
+import type { Space, Vista, DnaVerification } from '@/lib/spaces/types'
 import { findAxisOption } from '@/lib/spaces/axes'
 import { ENGINES } from '@/lib/engines'
 import { getUpscaleCost } from '@/lib/spaces/economy'
+import { getVisualDna } from '@/lib/spaces/dna'
 
 interface OtherVista {
   id:          string
@@ -42,7 +43,7 @@ export function VistaDetail({ space, vista, others, initialBalance }: Props) {
   const upscaleTarget: '2k' | '4k' = vista.quality === 'hd' ? '2k' : '4k'
   const upscaleCost                = getUpscaleCost(upscaleTarget)
 
-  const dna          = (space.dna ?? null) as ProjectDNA | null
+  const dna          = getVisualDna(space.dna)
   const verification = vista.dna_verification_details as DnaVerification | null
   const dnaPassed    = vista.dna_verified === true
 

@@ -5,7 +5,8 @@
 import { notFound } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getAccentColor } from '@/lib/spaces/identity'
-import type { Pack, Space, Vista, ArchitectIdentity, ProjectDNA } from '@/lib/spaces/types'
+import { getVisualDna } from '@/lib/spaces/dna'
+import type { Pack, Space, Vista, ArchitectIdentity } from '@/lib/spaces/types'
 import { findAxisOption } from '@/lib/spaces/axes'
 
 export const dynamic = 'force-dynamic'
@@ -51,7 +52,7 @@ export default async function PublicPackPage({
     vistas = orderedIds.map(id => map.get(id)).filter(Boolean) as Vista[]
   }
 
-  const dna    = (space.dna ?? null) as ProjectDNA | null
+  const dna    = getVisualDna(space.dna)
   const accent = getAccentColor(identity, dna)
   const officeName    = identity?.name      ?? 'Estúdio'
   const officeContact = identity?.email_contact ?? null

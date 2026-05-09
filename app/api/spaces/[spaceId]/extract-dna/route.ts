@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { extractDna } from '@/lib/spaces/dna'
+import { extractDnaPayload } from '@/lib/spaces/dna'
 import { DNA_EXTRACTION_COST } from '@/lib/spaces/economy'
 
 export async function POST(
@@ -72,14 +72,14 @@ export async function POST(
     debited = true
     void debitData
 
-    // ── Vision API ──────────────────────────────────────────────
-    const dna = await extractDna(space.vista_mestre_url)
+    // ── Vision API: DNA visual + briefing arquitetônico em paralelo ───
+    const payload = await extractDnaPayload(space.vista_mestre_url)
 
     // ── Persistir ───────────────────────────────────────────────
     const { error: updErr } = await supabase
       .from('spaces')
       .update({
-        dna,
+        dna:              payload,
         dna_extracted_at: new Date().toISOString(),
         status:           'dna_extracted',
       })
@@ -90,7 +90,9 @@ export async function POST(
       // Não refunda: usuário recebeu o DNA. Loga pra reprocessar.
     }
 
-    return NextResponse.json({ dna })
+    // Resposta mantém shape compatível com NewSpaceFlow (que lê dna.estilo etc):
+    // exposto só o `visual` na response — briefing é interno.
+    return NextResponse.json({ dna: payload.visual })
 
   } catch (err) {
     if (debited) {
