@@ -1059,11 +1059,19 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
 function PillGroup({ options, selected, onChange }: { options: string[]; selected: string; onChange: (v: string) => void }) {
   return (
     <div style={{display:'flex', flexWrap:'wrap', gap:6}}>
-      {options.map(opt => (
-        <button key={opt} style={selected === opt ? {...pill, ...pillActive} : pill} onClick={() => onChange(opt)}>
-          {opt}
-        </button>
-      ))}
+      {options.map(opt => {
+        const active = selected === opt
+        return (
+          <button
+            key={opt}
+            className={active ? 'spn-pill spn-pill--active' : 'spn-pill'}
+            style={active ? {...pill, ...pillActive} : pill}
+            onClick={() => onChange(opt)}
+          >
+            {opt}
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -1071,11 +1079,19 @@ function PillGroup({ options, selected, onChange }: { options: string[]; selecte
 function MultiPillGroup({ options, selected, onToggle }: { options: string[]; selected: string[]; onToggle: (v: string) => void }) {
   return (
     <div style={{display:'flex', flexWrap:'wrap', gap:6}}>
-      {options.map(opt => (
-        <button key={opt} style={selected.includes(opt) ? {...pill, ...pillActive} : pill} onClick={() => onToggle(opt)}>
-          {opt}
-        </button>
-      ))}
+      {options.map(opt => {
+        const active = selected.includes(opt)
+        return (
+          <button
+            key={opt}
+            className={active ? 'spn-pill spn-pill--active' : 'spn-pill'}
+            style={active ? {...pill, ...pillActive} : pill}
+            onClick={() => onToggle(opt)}
+          >
+            {opt}
+          </button>
+        )
+      })}
     </div>
   )
 }
