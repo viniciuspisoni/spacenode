@@ -774,7 +774,7 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
                     }
                   }}
                 >
-                  <EngineIcon engine={eid} style={{width:18, height:18, flexShrink:0}} />
+                  <EngineIcon engine={eid} style={{width:24, height:24, flexShrink:0}} />
                   <div style={{display:'flex', flexDirection:'column', minWidth:0}}>
                     <div style={{...S.motorName, ...(active ? {color:'var(--color-bg)'} : {})}}>{e.name}</div>
                     <div style={{...S.motorDesc, ...(active ? {color:'var(--color-bg)', opacity:0.6} : {})}}>{e.tagline}</div>
