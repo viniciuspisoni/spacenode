@@ -40,7 +40,7 @@ function daysUntil(date: string): number {
 }
 
 export function BillingClient({ plan, balance, lumens }: BillingClientProps) {
-  const isFree = plan === 'free'
+  const isLumenBlocked = plan === 'free' || plan === 'starter'
   const [billing, setBilling] = useState<BillingCycle>('monthly')
   const [loading, setLoading] = useState<string | null>(null)
   const [error,   setError]   = useState<string | null>(null)
@@ -145,17 +145,17 @@ export function BillingClient({ plan, balance, lumens }: BillingClientProps) {
         {/* ── 3. Lumens ──────────────────────────────────────────────────── */}
         <Section>
           <SectionLabel>lumens · créditos avulsos</SectionLabel>
-          {isFree ? (
+          {isLumenBlocked ? (
             <div style={{
               background: '#fff', borderRadius: 12, padding: '28px 32px',
               border: '0.5px solid rgba(0,0,0,0.07)', boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
               textAlign: 'center',
             }}>
               <p style={{ fontSize: 14, color: '#1a1a1a', marginBottom: 8, fontWeight: 500 }}>
-                Lumens estão disponíveis apenas para assinantes.
+                Lumens disponíveis a partir do plano Pro.
               </p>
               <p style={{ fontSize: 12, color: '#86868b', lineHeight: 1.6 }}>
-                Comece com um plano para liberar a compra de Lumens.
+                Faça upgrade para Pro ou superior para comprar créditos avulsos com validade de 90 dias.
               </p>
             </div>
           ) : (
