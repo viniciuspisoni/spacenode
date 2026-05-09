@@ -95,6 +95,7 @@ interface SidebarProps {
 export default function Sidebar({ userName, userAvatar }: SidebarProps) {
   const pathname = usePathname()
   const [hovered, setHovered] = useState(false)
+  const [hoveredItem, setHoveredItem] = useState<string | null>(null)
 
   // Theme toggle — alterna a classe `html.light` definida em globals.css.
   // Server SSRs com isLight=false; useLayoutEffect sincroniza antes do paint.
@@ -177,20 +178,29 @@ export default function Sidebar({ userName, userAvatar }: SidebarProps) {
                 ? (exact ? pathname === href : pathname.startsWith(href))
                 : false
               const disabled = href === null
+              const itemKey = href || label
+              const isItemHovered = hoveredItem === itemKey
 
               const inner = (
                 <>
-                  <div style={{ flexShrink: 0, display: 'flex', color: disabled ? 'rgba(255,255,255,0.2)' : active ? '#ffffff' : 'rgba(255,255,255,0.4)' }}>
+                  <div style={{
+                    flexShrink: 0, display: 'flex',
+                    color: disabled ? 'rgba(255,255,255,0.2)' : active ? '#ffffff' : isItemHovered ? 'rgba(255,255,255,0.72)' : 'rgba(255,255,255,0.4)',
+                    transition: 'color 0.2s',
+                    transform: isItemHovered && !active ? 'translateY(-0.5px)' : 'translateY(0)',
+                    transitionProperty: 'color, transform',
+                    transitionDuration: '0.2s',
+                  }}>
                     <Icon />
                   </div>
                   <span style={{
                     fontSize: 12,
-                    color: disabled ? 'rgba(255,255,255,0.25)' : active ? '#ffffff' : 'rgba(255,255,255,0.75)',
+                    color: disabled ? 'rgba(255,255,255,0.25)' : active ? '#ffffff' : isItemHovered ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.75)',
                     whiteSpace: 'nowrap' as const,
                     fontWeight: 400,
                     letterSpacing: '-0.01em',
                     opacity: hovered ? 1 : 0,
-                    transition: 'opacity 0.18s',
+                    transition: 'opacity 0.18s, color 0.2s',
                     flex: 1,
                   }}>
                     {label}
@@ -214,18 +224,28 @@ export default function Sidebar({ userName, userAvatar }: SidebarProps) {
                 display: 'flex', alignItems: 'center', gap: 12,
                 padding: '0 10px', height: 44, borderRadius: 8,
                 textDecoration: 'none', flexShrink: 0,
-                background: active ? 'rgba(255,255,255,0.1)' : 'transparent',
-                transition: 'background 0.15s',
+                background: active
+                  ? 'rgba(255,255,255,0.1)'
+                  : isItemHovered
+                    ? 'rgba(255,255,255,0.055)'
+                    : 'transparent',
+                boxShadow: isItemHovered && !active ? 'inset 0 0 0 0.5px rgba(255,255,255,0.08)' : 'none',
+                transition: 'background 0.2s, box-shadow 0.2s',
                 cursor: disabled ? 'default' : 'pointer',
                 opacity: disabled ? 0.5 : 1,
               }
 
+              const hoverHandlers = disabled ? {} : {
+                onMouseEnter: () => setHoveredItem(itemKey),
+                onMouseLeave: () => setHoveredItem(null),
+              }
+
               return href ? (
-                <Link key={href} href={href} style={sharedStyle}>
+                <Link key={href} href={href} style={sharedStyle} {...hoverHandlers}>
                   {inner}
                 </Link>
               ) : (
-                <div key={label} style={sharedStyle}>
+                <div key={label} style={sharedStyle} {...hoverHandlers}>
                   {inner}
                 </div>
               )
@@ -241,15 +261,19 @@ export default function Sidebar({ userName, userAvatar }: SidebarProps) {
           onClick={toggleTheme}
           title={isLight ? 'Modo escuro' : 'Modo claro'}
           suppressHydrationWarning
+          onMouseEnter={() => setHoveredItem('__theme')}
+          onMouseLeave={() => setHoveredItem(null)}
           style={{
             display: 'flex', alignItems: 'center', gap: 12,
             padding: '0 10px', height: 40, borderRadius: 8,
-            background: 'transparent', border: 'none',
+            background: hoveredItem === '__theme' ? 'rgba(255,255,255,0.055)' : 'transparent',
+            boxShadow: hoveredItem === '__theme' ? 'inset 0 0 0 0.5px rgba(255,255,255,0.08)' : 'none',
+            border: 'none',
             cursor: 'pointer', width: '100%',
-            transition: 'background 0.15s',
+            transition: 'background 0.2s, box-shadow 0.2s',
           }}
         >
-          <div style={{ flexShrink: 0, display: 'flex', color: 'rgba(255,255,255,0.4)' }}>
+          <div style={{ flexShrink: 0, display: 'flex', color: hoveredItem === '__theme' ? 'rgba(255,255,255,0.72)' : 'rgba(255,255,255,0.4)', transition: 'color 0.2s' }}>
             {isLight ? (
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <circle cx="12" cy="12" r="5"/>
