@@ -134,22 +134,36 @@ export async function POST(req: NextRequest) {
     const falEndpoint = getFalEndpoint(engine)
 
     // ── Débito atômico antes da chamada Fal.ai ────────────────────────────────
+    //
+    // consume_nodes_v2 debita do plano primeiro, depois de Lumens FIFO. Falha
+    // por exception com SQLSTATE específico — P0001 = saldo insuficiente
+    // (mapeado para 402); resto vira 500.
 
-    const { data: debitOk, error: debitError } = await admin.rpc('consume_nodes', {
+    const { data: debitData, error: debitError } = await admin.rpc('consume_nodes_v2', {
       user_id_input: user.id,
       amount:        nodesToCharge,
     })
     if (debitError) {
-      console.error('[generate] consume_nodes RPC error:', debitError)
+      console.error('[generate] consume_nodes_v2 RPC error:', debitError)
+      if (debitError.code === 'P0001') {
+        return NextResponse.json(
+          { error: `Nodes insuficientes. Necessários: ${nodesToCharge}.` },
+          { status: 402 }
+        )
+      }
       return NextResponse.json({ error: 'Erro ao processar saldo.' }, { status: 500 })
     }
-    if (!debitOk) {
-      return NextResponse.json(
-        { error: `Nodes insuficientes. Necessários: ${nodesToCharge}.` },
-        { status: 402 }
-      )
+    const debit = debitData as {
+      success:            boolean
+      total_debited:      number
+      from_plan:          number
+      from_lumens:        number
+      plan_balance_after: number
     }
     debited = true
+    if (debit.from_lumens > 0) {
+      console.log('[generate] débito misto:', debit.from_plan, 'plano +', debit.from_lumens, 'lumens')
+    }
 
     // ── Geração ──────────────────────────────────────────────────────────────
 
@@ -244,16 +258,21 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    const { data: profile } = await admin
-      .from('profiles')
-      .select('credits')
-      .eq('id', user.id)
+    const { data: balance } = await admin
+      .from('user_node_balance')
+      .select('plan_balance, lumen_balance, total_balance')
+      .eq('user_id', user.id)
       .single()
 
     return NextResponse.json({
       outputUrl,
       originalUrl:  inputUrl ?? null,
-      credits:      profile?.credits ?? 0,
+      // `credits` continua refletindo o saldo do plano (backward compat com
+      // a UI atual em GenerateClient); novos campos detalham plano + Lumens.
+      credits:      balance?.plan_balance  ?? 0,
+      planBalance:  balance?.plan_balance  ?? 0,
+      lumenBalance: balance?.lumen_balance ?? 0,
+      totalBalance: balance?.total_balance ?? 0,
       nodesCharged: nodesToCharge,
       prompt:       finalPrompt,
     })

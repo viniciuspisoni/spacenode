@@ -82,7 +82,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: 'NEGÓCIOS',
     items: [
-      { label: 'planos',     href: '/app/plans',    exact: false, Icon: IconPlans     },
+      { label: 'planos',     href: '/app/billing',  exact: false, Icon: IconPlans     },
     ],
   },
 ]

@@ -125,8 +125,7 @@ export default async function AppPage() {
               Nova Imagem
             </QuickAction>
             <QuickAction href="/app/history">Histórico</QuickAction>
-            <QuickAction href="/app/billing">Comprar Nodes</QuickAction>
-            <QuickAction href="/app/plans">Planos</QuickAction>
+            <QuickAction href="/app/billing">Planos & Lumens</QuickAction>
           </div>
         </section>
 
