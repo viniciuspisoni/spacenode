@@ -26,7 +26,7 @@ export async function POST(
   try {
     const { data: space, error: fetchErr } = await supabase
       .from('spaces')
-      .select('id, status, vista_mestre_url')
+      .select('id, status, vista_mestre_url, source_metadata')
       .eq('id', spaceId)
       .single()
 
@@ -73,7 +73,15 @@ export async function POST(
     void debitData
 
     // ── Vision API: DNA visual + briefing arquitetônico em paralelo ───
-    const payload = await extractDnaPayload(space.vista_mestre_url)
+    // source_metadata vem populado quando o Space foi criado a partir de
+    // uma render (fluxo /api/spaces/from-render). Quando presente:
+    //   - DNA visual usa prompt enriquecido com ground truth de configs
+    //   - briefing técnico é reusado se já estava em config_snapshot
+    //     (economiza 1 call de Vision)
+    const payload = await extractDnaPayload(
+      space.vista_mestre_url,
+      space.source_metadata as Parameters<typeof extractDnaPayload>[1] ?? null,
+    )
 
     // ── Persistir ───────────────────────────────────────────────
     const { error: updErr } = await supabase

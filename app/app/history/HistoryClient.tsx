@@ -556,7 +556,16 @@ function RenderCard({
   onToggle: () => void
   onActivateSelect: () => void
 }) {
+  const router = useRouter()
   const [hovered, setHovered] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+
+  // Fecha menu quando o card sai de hover ou modo seleção é ativado
+  useEffect(() => {
+    if (!hovered || selectMode) setMenuOpen(false)
+  }, [hovered, selectMode])
+
+  const isCreateSpaceEligible = render.ambient !== 'upscale' && render.ambient !== 'video' && !!render.output_url
 
   const date      = formatDate(render.created_at)
   const isUpscale = render.ambient === 'upscale'
@@ -642,6 +651,83 @@ function RenderCard({
           <div style={S.badgeRow}>
             {quality && <span style={S.badge}>{quality}</span>}
             {engine  && <span style={S.badge}>{engine}</span>}
+          </div>
+        )}
+
+        {/* Kebab menu — top-right, on hover, not in select mode */}
+        {hovered && !selectMode && isCreateSpaceEligible && (
+          <div
+            style={{
+              position: 'absolute', top: 8, right: 8, zIndex: 4,
+            }}
+            onClick={e => e.stopPropagation()}
+            onDoubleClick={e => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setMenuOpen(o => !o) }}
+              aria-label="Mais ações"
+              style={{
+                width: 28, height: 28, borderRadius: 6,
+                background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)',
+                border: '0.5px solid rgba(255,255,255,0.18)',
+                color: '#fff', cursor: 'pointer', padding: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <circle cx="12" cy="5"  r="1.6"/>
+                <circle cx="12" cy="12" r="1.6"/>
+                <circle cx="12" cy="19" r="1.6"/>
+              </svg>
+            </button>
+
+            {menuOpen && (
+              <div style={{
+                position: 'absolute', top: 32, right: 0,
+                minWidth: 200, padding: 6,
+                background: '#1a1a1a',
+                border: '0.5px solid rgba(255,255,255,0.14)',
+                borderRadius: 10,
+                boxShadow: '0 12px 36px rgba(0,0,0,0.5)',
+              }}>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setMenuOpen(false)
+                    router.push(`/app/spaces/new/from-render?render_id=${render.id}`)
+                  }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    width: '100%', padding: '8px 10px', borderRadius: 6,
+                    background: 'transparent', border: 'none',
+                    color: '#fafafa', fontSize: 12, textAlign: 'left',
+                    cursor: 'pointer',
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(29,158,117,0.12)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                >
+                  <span style={{
+                    width: 22, height: 22, borderRadius: 6,
+                    background: 'rgba(29,158,117,0.18)', color: '#46d191',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexShrink: 0,
+                  }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="3"/>
+                      <path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/>
+                    </svg>
+                  </span>
+                  <span style={{ flex: 1 }}>
+                    <span style={{ display: 'block', color: '#fafafa', fontWeight: 500 }}>Criar Space</span>
+                    <span style={{ display: 'block', fontSize: 10, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+                      Usa esta render como Vista Mestre
+                    </span>
+                  </span>
+                </button>
+              </div>
+            )}
           </div>
         )}
 

@@ -73,6 +73,9 @@ export interface SpaceDnaPayload {
 //     mas perdem o reforço de preservação técnica na geração; basta o usuário
 //     re-extrair o DNA pra upgrade.
 //
+// `source_render_id` e `source_metadata` ficam preenchidos quando o Space
+// foi criado a partir de uma render (caminho A do New Space). Sempre nullable.
+//
 // Sempre passar pela função `getVisualDna` / `getBriefing` (lib/spaces/dna.ts)
 // para ler de forma agnóstica.
 export interface Space {
@@ -86,6 +89,8 @@ export interface Space {
   dna:               SpaceDnaPayload | ProjectDNA | null
   dna_extracted_at:  string | null
   locked_at:         string | null
+  source_render_id:  string | null
+  source_metadata:   Record<string, unknown> | null
   created_at:        string
   updated_at:        string
 }

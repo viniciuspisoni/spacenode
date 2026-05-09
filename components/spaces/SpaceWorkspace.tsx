@@ -141,6 +141,20 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId }:
                   DNA travado
                 </span>
               )}
+              {space.source_render_id && (
+                <span
+                  title="Vista Mestre vinda do Renderizar — DNA extraído com ground truth das configurações originais"
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                    padding: '5px 11px', borderRadius: 999,
+                    background: 'rgba(70,209,145,0.08)', color: '#46d191',
+                    border: '0.5px solid rgba(70,209,145,0.25)',
+                    fontSize: 10, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase',
+                  }}
+                >
+                  ✦ origem: Renderizar
+                </span>
+              )}
               <span style={{
                 fontSize: 11, color: 'var(--color-text-tertiary)',
                 letterSpacing: '0.04em', textTransform: 'uppercase',

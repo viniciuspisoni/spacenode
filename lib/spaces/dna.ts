@@ -125,13 +125,126 @@ function parseDna(raw: string): ProjectDNA {
 // Custo: 2 calls de Vision (uma GPT-4o pro DNA visual, outra Claude Sonnet via
 // FAL pelo `analyzeImage` do Renderizar). Ambas baratas — embutidas nos 8
 // nodes da extração.
+//
+// Quando `sourceMetadata` é fornecido (Space criado a partir de uma render),
+// o DNA visual é extraído com prompt enriquecido (ground truth de estilo,
+// materiais e ambiente vindo do Renderizar) e o briefing técnico que já foi
+// calculado é reusado — economizando 1 call de Vision.
 
-export async function extractDnaPayload(imageUrl: string): Promise<SpaceDnaPayload> {
+export interface SourceMetadataHint {
+  engine?:           string | null
+  qualidade?:        string | null
+  config_snapshot?:  {
+    projectType?:    string | null
+    segment?:        string | null
+    environment?:    string | null
+    lighting?:       string | null
+    background?:     string | null
+    materials?:      Record<string, string | undefined> | null
+    briefing?:       BriefingArquitetonico | null
+    [k: string]:     unknown
+  } | null
+  [k: string]:       unknown
+}
+
+export async function extractDnaPayload(
+  imageUrl: string,
+  sourceMetadata?: SourceMetadataHint | null,
+): Promise<SpaceDnaPayload> {
+  const cachedBriefing = sourceMetadata?.config_snapshot?.briefing ?? null
+
   const [visual, briefing] = await Promise.all([
-    extractDna(imageUrl),
-    analyzeImage(imageUrl),  // tem fallback interno em caso de timeout/erro
+    extractDnaWithSource(imageUrl, sourceMetadata),
+    cachedBriefing
+      ? Promise.resolve(cachedBriefing)
+      : analyzeImage(imageUrl),
   ])
   return { visual, briefing }
+}
+
+// Versão enriquecida do extractDna — quando há source metadata, usa o
+// ground truth como prefixo do prompt de visão. Cai no extractDna padrão
+// quando não há metadata.
+async function extractDnaWithSource(
+  imageUrl: string,
+  sourceMetadata: SourceMetadataHint | null | undefined,
+): Promise<ProjectDNA> {
+  if (!sourceMetadata?.config_snapshot) {
+    return extractDna(imageUrl)
+  }
+
+  const cs = sourceMetadata.config_snapshot
+  const engine = sourceMetadata.engine ?? 'vega'
+
+  const knownFacts: string[] = []
+  if (cs.projectType) knownFacts.push(`Tipo: ${cs.projectType}`)
+  if (cs.segment)     knownFacts.push(`Segmento: ${cs.segment}`)
+  if (cs.environment) knownFacts.push(`Ambiente: ${cs.environment}`)
+  if (cs.lighting)    knownFacts.push(`Iluminação inicial: ${cs.lighting}`)
+  if (cs.background)  knownFacts.push(`Background: ${cs.background}`)
+
+  const matLines: string[] = []
+  if (cs.materials) {
+    for (const [field, value] of Object.entries(cs.materials)) {
+      if (value && value.trim()) matLines.push(`${field}: ${value}`)
+    }
+  }
+
+  const enrichedSystem = (
+    'Você é um arquiteto sênior. Esta imagem foi gerada pelo Spacenode com ' +
+    `motor "${engine}" e configurações conhecidas (ground truth abaixo). ` +
+    'Use essas configurações como referência confirmada e expanda com o que ' +
+    'a imagem revela. Responda APENAS com JSON.'
+  )
+
+  const factsBlock = knownFacts.length ? `\n${knownFacts.join('\n')}` : ''
+  const matsBlock  = matLines.length   ? `\n\nMateriais especificados:\n${matLines.join('\n')}` : ''
+
+  const enrichedUser = (
+    `[GROUND TRUTH — CONFIGURAÇÕES USADAS PARA GERAR ESTA IMAGEM]${factsBlock}${matsBlock}\n\n` +
+    'Devolva JSON com EXATAMENTE estas chaves:\n' +
+    '{\n' +
+    '  "estilo": { "nome": string, "confianca": number },\n' +
+    '  "materiais": [ { "nome": string, "hex": string } ],\n' +
+    '  "paleta":   string[],\n' +
+    '  "contexto": string[]\n' +
+    '}\n\n' +
+    'Regras:\n' +
+    '- Use o ground truth acima como referência confirmada de estilo e materiais.\n' +
+    '- Confirme cada material citado no ground truth e adicione hex code real ' +
+    'dominante na imagem.\n' +
+    '- Adicione materiais visíveis na imagem que não estão no ground truth.\n' +
+    '- Paleta: 5-6 cores hex dominantes (use tons reais detectados).\n' +
+    '- Contexto: 2-4 tags curtas descrevendo o ambiente.'
+  )
+
+  const result = await Promise.race([
+    fal.subscribe(FAL_VISION_ENDPOINT, {
+      input: {
+        model:         DNA_MODEL,
+        system_prompt: enrichedSystem,
+        prompt:        enrichedUser,
+        image_urls:    [imageUrl],
+        temperature:   0.1,
+        max_tokens:    900,
+      },
+    }),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('DNA_EXTRACT_TIMEOUT')), DNA_TIMEOUT_MS),
+    ),
+  ])
+
+  const output = (result.data as { output?: string })?.output
+  if (!output) {
+    // Fallback gracioso — se falhar a versão enriquecida, cai no padrão.
+    return extractDna(imageUrl)
+  }
+
+  try {
+    return parseDna(output)
+  } catch {
+    return extractDna(imageUrl)
+  }
 }
 
 // ── Helpers de leitura ────────────────────────────────────────
