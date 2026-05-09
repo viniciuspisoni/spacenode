@@ -94,9 +94,9 @@ export async function POST(req: NextRequest) {
   if (!isLumenPackSize(body.id)) {
     return NextResponse.json({ error: 'pack Lumen inválido' }, { status: 400 })
   }
-  if (!profile || profile.plan === 'free') {
+  if (!profile || profile.plan === 'free' || profile.plan === 'starter') {
     return NextResponse.json(
-      { error: 'Lumens disponíveis apenas para usuários com plano ativo' },
+      { error: 'Lumens disponíveis a partir do plano Pro' },
       { status: 403 }
     )
   }
