@@ -1,199 +1,138 @@
-'use client'
+// Card pequeno na grid de listagem de Spaces.
 
 import Link from 'next/link'
-import { useState } from 'react'
-import type { Space } from '@/lib/spaces/types'
+import type { SpaceWithCounts } from '@/lib/spaces/types'
+import { ENGINES } from '@/lib/engines'
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function formatRelativeTime(iso: string | null | undefined): string {
-  if (!iso) return '—'
-  const diff = Date.now() - new Date(iso).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1)  return 'agora mesmo'
-  if (mins < 60) return `há ${mins} min`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `há ${hours}h`
-  const days = Math.floor(hours / 24)
-  return `há ${days}d`
-}
-
-const CATEGORY_LABEL: Record<string, string> = {
+const CATEGORY_LABEL: Record<SpaceWithCounts['category'], string> = {
   residencial: 'Residencial',
   comercial:   'Comercial',
   conceito:    'Conceito',
 }
 
-// ── SpaceCard ─────────────────────────────────────────────────────────────────
-
-interface SpaceCardProps {
-  space: Space & { anchor_url?: string | null }
+const STATUS_LABEL: Record<SpaceWithCounts['status'], string> = {
+  draft:           'Rascunho',
+  dna_extracting:  'Extraindo DNA…',
+  dna_extracted:   'DNA extraído',
+  locked:          'DNA travado',
+  archived:        'Arquivado',
 }
 
-export function SpaceCard({ space }: SpaceCardProps) {
-  const [hovered, setHovered] = useState(false)
-  const vistaCount = space.vista_count ?? 0
+function timeAgo(iso: string | null): string {
+  if (!iso) return '—'
+  const diffMs = Date.now() - new Date(iso).getTime()
+  const min  = Math.floor(diffMs / 60_000)
+  if (min < 1)    return 'agora'
+  if (min < 60)   return `há ${min} min`
+  const hr   = Math.floor(min / 60)
+  if (hr < 24)    return `há ${hr}h`
+  const days = Math.floor(hr / 24)
+  if (days < 30)  return `há ${days}d`
+  return new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'short' }).format(new Date(iso))
+}
+
+export function SpaceCard({ space }: { space: SpaceWithCounts }) {
+  const isLocked   = space.status === 'locked'
+  const engineName = ENGINES[space.engine].name
 
   return (
     <Link
       href={`/app/spaces/${space.id}`}
       style={{
-        display: 'block',
-        background: '#111111',
-        border: `0.5px solid ${hovered ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.08)'}`,
-        borderRadius: 14,
-        overflow: 'hidden',
-        cursor: 'pointer',
-        transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-        position: 'relative' as const,
-        boxShadow: hovered
-          ? 'inset 0 0.5px 0 rgba(255,255,255,0.10), 0 8px 24px rgba(0,0,0,0.5), 0 16px 48px rgba(0,0,0,0.4)'
-          : 'inset 0 0.5px 0 rgba(255,255,255,0.06), 0 1px 2px rgba(0,0,0,0.3)',
-        transform: hovered ? 'translateY(-2px)' : 'translateY(0)',
-        textDecoration: 'none',
+        display:         'flex',
+        flexDirection:   'column',
+        background:      'var(--color-bg-elevated)',
+        border:          '0.5px solid var(--color-border)',
+        borderRadius:    14,
+        overflow:        'hidden',
+        textDecoration:  'none',
+        transition:      'border-color 0.2s, transform 0.2s',
+        color:           'inherit',
       }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
     >
-      {/* Anchor image */}
-      <div style={{ aspectRatio: '16/10', position: 'relative', overflow: 'hidden' }}>
-        {space.anchor_url ? (
+      {/* Vista Mestre thumb */}
+      <div style={{
+        aspectRatio:  '4 / 3',
+        background:   'var(--color-surface)',
+        position:     'relative',
+        overflow:     'hidden',
+      }}>
+        {space.vista_mestre_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={space.anchor_url}
+            src={space.vista_mestre_url}
             alt={space.name}
-            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           />
         ) : (
           <div style={{
-            width: '100%', height: '100%',
-            background: 'linear-gradient(180deg, #2c3a4c 0%, #1a2330 35%, #0e1218 65%, #1c1810 100%)',
-          }} />
+            position: 'absolute', inset: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'var(--color-text-quaternary)',
+            fontSize: 11, letterSpacing: '0.05em', textTransform: 'uppercase',
+          }}>
+            sem vista mestre
+          </div>
         )}
 
-        {/* Vista Mestre badge */}
+        {/* Badge superior — engine + lock */}
         <div style={{
-          position: 'absolute', top: 11, left: 11,
-          background: 'rgba(0,0,0,0.55)',
-          backdropFilter: 'blur(12px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(12px) saturate(180%)',
-          border: '0.5px solid rgba(255,255,255,0.18)',
-          color: '#fff',
-          fontSize: 9,
-          fontWeight: 500,
-          letterSpacing: '0.16em',
-          textTransform: 'uppercase' as const,
-          padding: '4px 9px 4px 8px',
-          borderRadius: 5,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 7,
-          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
+          position: 'absolute', top: 10, left: 10, right: 10,
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8,
         }}>
           <span style={{
-            width: 5, height: 5, borderRadius: '50%',
-            background: '#30b46c',
-            boxShadow: '0 0 0 2.5px rgba(48,180,108,0.25)',
-            flexShrink: 0,
-          }} />
-          Vista Mestre
+            fontSize: 10, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase',
+            padding: '4px 8px', borderRadius: 5,
+            background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)',
+            color: '#fafafa',
+          }}>
+            {engineName}
+          </span>
+          {isLocked && (
+            <span style={{
+              fontSize: 10, fontWeight: 500, letterSpacing: '0.04em',
+              padding: '4px 8px', borderRadius: 5,
+              background: 'rgba(29,158,117,0.18)', color: '#46d191',
+              border: '0.5px solid rgba(29,158,117,0.35)',
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+            }}>
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
+                <rect x="4" y="11" width="16" height="10" rx="1.5"/>
+                <path d="M8 11V8a4 4 0 0 1 8 0v3"/>
+              </svg>
+              DNA travado
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Body */}
+      <div style={{ padding: '14px 16px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div>
+          <div style={{
+            fontSize: 14, fontWeight: 500, color: 'var(--color-text-primary)',
+            letterSpacing: '-0.015em',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {space.name}
+          </div>
+          <div style={{
+            fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4,
+            letterSpacing: '-0.005em',
+          }}>
+            {CATEGORY_LABEL[space.category]} · {space.vista_count ?? 0} vista{(space.vista_count ?? 0) === 1 ? '' : 's'}
+          </div>
         </div>
 
-        {/* Vistas count badge */}
         <div style={{
-          position: 'absolute', top: 11, right: 11,
-          background: 'rgba(0,0,0,0.55)',
-          backdropFilter: 'blur(12px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(12px) saturate(180%)',
-          border: '0.5px solid rgba(255,255,255,0.15)',
-          color: '#fff',
-          fontSize: 10,
-          fontWeight: 500,
-          padding: '4px 9px',
-          borderRadius: 5,
-          fontVariantNumeric: 'tabular-nums',
-          letterSpacing: '-0.005em',
-          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          fontSize: 10, color: 'var(--color-text-quaternary)',
+          letterSpacing: '0.04em', textTransform: 'uppercase',
+          paddingTop: 8, borderTop: '0.5px solid var(--color-border)',
         }}>
-          {vistaCount} {vistaCount === 1 ? 'vista' : 'vistas'}
+          <span>{STATUS_LABEL[space.status]}</span>
+          <span>{timeAgo(space.last_vista_at ?? space.updated_at)}</span>
         </div>
-      </div>
-
-      {/* Card body */}
-      <div style={{ padding: '16px 18px 18px' }}>
-        <div style={{
-          fontSize: 14, fontWeight: 500,
-          color: '#fafafa',
-          marginBottom: 4,
-          letterSpacing: '-0.013em',
-        }}>
-          {space.name}
-        </div>
-        <div style={{
-          fontSize: 11,
-          color: 'rgba(255,255,255,0.42)',
-          display: 'flex',
-          gap: 8,
-          alignItems: 'center',
-          letterSpacing: '-0.005em',
-        }}>
-          <span>{CATEGORY_LABEL[space.category] ?? space.category}</span>
-          <span style={{ width: 2, height: 2, background: 'rgba(255,255,255,0.2)', borderRadius: '50%' }} />
-          <span>atualizado {formatRelativeTime(space.last_vista_at ?? space.updated_at)}</span>
-        </div>
-      </div>
-    </Link>
-  )
-}
-
-// ── NewSpaceCard ───────────────────────────────────────────────────────────────
-
-export function NewSpaceCard() {
-  const [hovered, setHovered] = useState(false)
-
-  return (
-    <Link
-      href="/app/spaces/new"
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: hovered ? 'rgba(48,180,108,0.04)' : 'transparent',
-        border: `0.5px dashed ${hovered ? '#30b46c' : 'rgba(255,255,255,0.12)'}`,
-        borderRadius: 14,
-        color: hovered ? '#30b46c' : 'rgba(255,255,255,0.42)',
-        transition: 'all 0.2s',
-        textAlign: 'center',
-        padding: '36px 24px',
-        cursor: 'pointer',
-        textDecoration: 'none',
-        aspectRatio: '16/10',
-      }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      <div style={{
-        width: 40, height: 40, borderRadius: '50%',
-        background: hovered ? 'rgba(48,180,108,0.14)' : 'rgba(255,255,255,0.04)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        marginBottom: 14,
-        fontSize: 22, fontWeight: 300,
-        boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.06)',
-        transition: 'background 0.2s',
-      }}>
-        +
-      </div>
-      <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 4, letterSpacing: '-0.005em' }}>
-        Novo Space
-      </div>
-      <div style={{
-        fontSize: 10.5,
-        color: hovered ? 'rgba(48,180,108,0.7)' : 'rgba(255,255,255,0.2)',
-        lineHeight: 1.5,
-        letterSpacing: '-0.005em',
-      }}>
-        upload da Vista Mestre
       </div>
     </Link>
   )
