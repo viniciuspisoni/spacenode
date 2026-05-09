@@ -6,7 +6,7 @@ const TITLES: Record<string, string> = {
   '/app': 'DASHBOARD',
   '/app/generate': 'RENDERIZAR',
   '/app/history': 'HISTÓRICO',
-  '/app/plans': 'PLANOS',
+  '/app/billing': 'PLANOS',
 }
 
 interface TopbarProps {
