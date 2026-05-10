@@ -21,13 +21,13 @@ export async function POST(
   // Carrega vista + DNA do Space
   const { data: vistaRow, error: vErr } = await supabase
     .from('vistas')
-    .select('id, image_url, space_id, status, dna_verified, axis')
+    .select('id, image_url, space_id, status, dna_verified, axis, is_edited, edit_mask_coverage')
     .eq('id', vistaId)
     .single()
   if (vErr || !vistaRow) {
     return NextResponse.json({ error: 'Vista não encontrada' }, { status: 404 })
   }
-  const vista = vistaRow as Pick<Vista, 'id' | 'image_url' | 'space_id' | 'status' | 'dna_verified' | 'axis'>
+  const vista = vistaRow as Pick<Vista, 'id' | 'image_url' | 'space_id' | 'status' | 'dna_verified' | 'axis' | 'is_edited' | 'edit_mask_coverage'>
 
   if (vista.status !== 'completed' || !vista.image_url) {
     return NextResponse.json({ error: 'Vista não está pronta' }, { status: 409 })
@@ -49,10 +49,17 @@ export async function POST(
   }
 
   try {
-    // Vistas do eixo Ângulo usam comparação de Contexto relaxada
-    // (categoria ampla apenas) — o enquadramento muda por design.
-    const mode = vista.axis === 'angulo' ? 'angulo_relaxed' : 'standard'
-    const verification = await verifyDna(vista.image_url, visualDna, mode)
+    // Modo de verificação:
+    // - vistas editadas (Retocar) → edit_relaxed (só uma região mudou)
+    // - eixo Ângulo → angulo_relaxed (enquadramento muda por design)
+    // - padrão       → standard
+    const mode = vista.is_edited
+      ? 'edit_relaxed'
+      : vista.axis === 'angulo'
+        ? 'angulo_relaxed'
+        : 'standard'
+    const coverage = typeof vista.edit_mask_coverage === 'number' ? vista.edit_mask_coverage : 0
+    const verification = await verifyDna(vista.image_url, visualDna, mode, coverage)
 
     await supabase
       .from('vistas')

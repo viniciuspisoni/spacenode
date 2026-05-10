@@ -87,6 +87,18 @@ export function VistaCard({ vista }: { vista: Vista }) {
             DNA divergente
           </div>
         )}
+
+        {vista.is_edited && (
+          <div style={{
+            position: 'absolute', bottom: 8, left: 8,
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            padding: '3px 7px', borderRadius: 4,
+            background: 'rgba(70,209,145,0.85)', color: '#042818',
+            fontSize: 9, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase',
+          }}>
+            ✎ editada
+          </div>
+        )}
       </div>
 
       {/* Body */}

@@ -284,18 +284,23 @@ const VERIFY_SYSTEM = (
   'Responda SEMPRE e APENAS com JSON.'
 )
 
-export type VerifyMode = 'standard' | 'angulo_relaxed'
+export type VerifyMode = 'standard' | 'angulo_relaxed' | 'edit_relaxed'
 
 export async function verifyDna(
   variationUrl: string,
   dna:          ProjectDNA,
   mode:         VerifyMode = 'standard',
+  maskCoverage: number = 0,
 ): Promise<DnaVerification> {
   // Pro eixo Ângulo, o ground truth de Contexto da Vista Mestre não bate
   // com a vista gerada (composição/enquadramento mudam por design — é
   // outro ângulo do mesmo projeto). Avaliamos Contexto só por categoria
   // ampla (interno/externo, tipologia). Estilo, Materiais e Paleta seguem
   // com avaliação estrita.
+  //
+  // Pra vistas editadas (Retocar), a área não-mascarada é idêntica à
+  // original — só uma região foi modificada. Threshold por atributo é
+  // ajustado pela cobertura da máscara (área menor → mais tolerante).
   const contextoRule = mode === 'angulo_relaxed'
     ? (
       'IMPORTANTE — esta vista veio do eixo Ângulo (mesmo projeto, ponto de vista diferente). ' +
@@ -305,7 +310,14 @@ export async function verifyDna(
       'de cena (pessoas, veículos, vegetação detalhada). Score alto se a ' +
       'categoria ampla é a mesma.\n\n'
     )
-    : ''
+    : mode === 'edit_relaxed'
+      ? (
+        `IMPORTANTE — esta vista é uma edição localizada (${(maskCoverage * 100).toFixed(0)}% ` +
+        'da imagem foi mascarada e editada). Compare contexto considerando que apenas ' +
+        'uma região foi alterada — espere coerência geral, mas pequenas divergências ' +
+        'localizadas na área editada são esperadas e aceitáveis.\n\n'
+      )
+      : ''
 
   const userPrompt =
     contextoRule +

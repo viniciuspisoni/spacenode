@@ -21,7 +21,7 @@ export type Axis = 'iluminacao' | 'angulo' | 'horario' | 'detalhe'
 
 export type Quality = Resolution // 'hd' | '2k' | '4k'
 
-export type VistaEngine = EngineId | 'clarity'
+export type VistaEngine = EngineId | 'clarity' | 'flux-fill'
 
 export type VistaStatus = 'pending' | 'processing' | 'completed' | 'failed'
 
@@ -125,9 +125,39 @@ export interface Vista {
   // as vistas geradas no mesmo upload em massa.
   source_sketch_url:         string | null
   batch_id:                  string | null
+  // Retocar (modo embebido): cadeia de versões editadas.
+  parent_vista_id:           string | null
+  is_edited:                 boolean
+  edit_prompt:               string | null
+  edit_mask_url:             string | null
+  edit_chain_root_id:        string | null
+  edit_mask_coverage:        number | null
   error_message:             string | null
   created_at:                string
   completed_at:              string | null
+}
+
+// ── Edit (Retocar standalone) ──────────────────────────────────
+export type EditSourceType = 'upload' | 'render' | 'vista' | 'edit'
+
+export interface Edit {
+  id:                string
+  user_id:           string
+  source_image_url:  string
+  result_image_url:  string
+  mask_url:          string | null
+  prompt:            string
+  quality:           Quality
+  nodes_cost:        number
+  engine:            string
+  source_type:       EditSourceType
+  source_id:         string | null
+  mask_coverage:     number | null
+  created_at:        string
+}
+
+export function isEditSourceType(v: unknown): v is EditSourceType {
+  return v === 'upload' || v === 'render' || v === 'vista' || v === 'edit'
 }
 
 // ── Pack ───────────────────────────────────────────────────────

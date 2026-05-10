@@ -9,9 +9,20 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import type { Space, Vista, DnaVerification } from '@/lib/spaces/types'
 import { findAxisOption } from '@/lib/spaces/axes'
-import { ENGINES } from '@/lib/engines'
+import { ENGINES, isEngineId, type EngineId } from '@/lib/engines'
+
+// Helper de nome amigável: motores secundários (clarity, flux-fill) caem
+// no motor do Space pra display ("Vega · Upscale" não faz sentido — o usuário
+// pensa no projeto pelo motor principal).
+function engineDisplayName(engine: string, fallback: EngineId): string {
+  if (isEngineId(engine)) return ENGINES[engine].name
+  if (engine === 'clarity')   return `${ENGINES[fallback].name} · upscale`
+  if (engine === 'flux-fill') return `${ENGINES[fallback].name} · retoque`
+  return ENGINES[fallback].name
+}
 import { getUpscaleCost } from '@/lib/spaces/economy'
 import { getVisualDna } from '@/lib/spaces/dna'
+import { RetocarOverlay } from './RetocarOverlay'
 
 interface OtherVista {
   id:          string
@@ -35,6 +46,7 @@ export function VistaDetail({ space, vista, others, initialBalance }: Props) {
   const [submitting, setSubmitting] = useState<null | 'fav' | 'upscale' | 'delete'>(null)
   const [error, setError]           = useState<string | null>(null)
   const [balance, setBalance]       = useState(initialBalance)
+  const [showRetocar, setShowRetocar] = useState(false)
 
   const opt = vista.axis && vista.axis_value ? findAxisOption(vista.axis, vista.axis_value) : null
   const canUpscale = vista.engine !== 'clarity'
@@ -151,7 +163,7 @@ export function VistaDetail({ space, vista, others, initialBalance }: Props) {
           label={vista.axis_label ?? 'Variação'}
           color={opt?.color ?? '#888'}
           imageUrl={vista.image_url}
-          subLabel={`${ENGINES[vista.engine === 'clarity' ? space.engine : vista.engine]?.name ?? vista.engine} · ${vista.quality.toUpperCase()}`}
+          subLabel={`${engineDisplayName(vista.engine, space.engine)} · ${vista.quality.toUpperCase()}`}
         />
       </div>
 
@@ -200,7 +212,11 @@ export function VistaDetail({ space, vista, others, initialBalance }: Props) {
               fontSize: 11, color: 'var(--color-text-quaternary)', marginTop: 6,
               letterSpacing: '0.02em',
             }}>
-              {vista.engine === 'clarity' ? 'Clarity (upscale)' : ENGINES[vista.engine].name}
+              {vista.engine === 'clarity'
+                ? 'Clarity (upscale)'
+                : vista.engine === 'flux-fill'
+                  ? 'Flux Fill (retoque)'
+                  : ENGINES[vista.engine].name}
               {' · '} {vista.quality.toUpperCase()}
               {' · '} {vista.nodes_cost} nodes
             </div>
@@ -238,6 +254,7 @@ export function VistaDetail({ space, vista, others, initialBalance }: Props) {
           </span>
         )}
 
+        <ActionGhost onClick={() => setShowRetocar(true)}>✎ Retocar</ActionGhost>
         <ActionGhost onClick={() => alert('Em breve.')}>+ Pack</ActionGhost>
         <ActionGhost onClick={handleFavorite} disabled={submitting === 'fav'}>
           {favorited ? '★ Favoritada' : '☆ Favoritar'}
@@ -256,6 +273,16 @@ export function VistaDetail({ space, vista, others, initialBalance }: Props) {
         }}>
           {error}
         </div>
+      )}
+
+      {showRetocar && (
+        <RetocarOverlay
+          space={space}
+          vista={vista}
+          dna={dna}
+          balance={balance}
+          onClose={() => setShowRetocar(false)}
+        />
       )}
 
       {/* Outras variações */}
