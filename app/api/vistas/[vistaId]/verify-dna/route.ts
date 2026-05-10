@@ -21,13 +21,13 @@ export async function POST(
   // Carrega vista + DNA do Space
   const { data: vistaRow, error: vErr } = await supabase
     .from('vistas')
-    .select('id, image_url, space_id, status, dna_verified')
+    .select('id, image_url, space_id, status, dna_verified, axis')
     .eq('id', vistaId)
     .single()
   if (vErr || !vistaRow) {
     return NextResponse.json({ error: 'Vista não encontrada' }, { status: 404 })
   }
-  const vista = vistaRow as Pick<Vista, 'id' | 'image_url' | 'space_id' | 'status' | 'dna_verified'>
+  const vista = vistaRow as Pick<Vista, 'id' | 'image_url' | 'space_id' | 'status' | 'dna_verified' | 'axis'>
 
   if (vista.status !== 'completed' || !vista.image_url) {
     return NextResponse.json({ error: 'Vista não está pronta' }, { status: 409 })
@@ -49,7 +49,10 @@ export async function POST(
   }
 
   try {
-    const verification = await verifyDna(vista.image_url, visualDna)
+    // Vistas do eixo Ângulo usam comparação de Contexto relaxada
+    // (categoria ampla apenas) — o enquadramento muda por design.
+    const mode = vista.axis === 'angulo' ? 'angulo_relaxed' : 'standard'
+    const verification = await verifyDna(vista.image_url, visualDna, mode)
 
     await supabase
       .from('vistas')

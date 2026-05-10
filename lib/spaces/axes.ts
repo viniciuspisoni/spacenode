@@ -1,9 +1,17 @@
 // Eixos exploráveis do Spaces — variáveis que o usuário aplica preservando o DNA.
 //
-// Bloco 1 entrega Iluminação completo (6 opções). Os outros 3 eixos
-// (Ângulo, Horário, Detalhe) ficam como placeholder "em breve" — Sprint 7+.
+// Dois modos de operação:
+//   - parametric    : usuário escolhe valor(es) de uma lista; motor varia o
+//                     atributo mantendo a composição (Iluminação, Horário,
+//                     Detalhe quando entrar).
+//   - sketch_guided : usuário sobe sketches; motor aplica DNA da Vista Mestre
+//                     sobre cada sketch (Ângulo).
+//
+// Bloco 1 entrega Iluminação completo. Sketch-guided estreia com Ângulo.
 
 import type { Axis } from './types'
+
+export type AxisMode = 'parametric' | 'sketch_guided'
 
 export interface AxisOption {
   value:           string  // slug salvo em vistas.axis_value
@@ -11,6 +19,15 @@ export interface AxisOption {
   description:     string  // sub-texto curto
   color:           string  // cor representativa pro card
   promptModifier:  string  // texto que vai pro prompt FAL (em inglês — modelo entende melhor)
+}
+
+export interface AxisConfig {
+  id:           Axis
+  label:        string
+  mode:         AxisMode
+  isAvailable:  boolean
+  // Sugestões de label pra eixos sketch-guided (chips na UI)
+  labelSuggestions?: string[]
 }
 
 export const ILUMINACAO_OPTIONS: AxisOption[] = [
@@ -58,6 +75,16 @@ export const ILUMINACAO_OPTIONS: AxisOption[] = [
   },
 ]
 
+// Sugestões de nomes de ângulo para chips na UI
+export const ANGULO_LABEL_SUGGESTIONS = [
+  'Vista frontal',
+  'Vista lateral',
+  'Vista posterior',
+  'Aérea',
+  'Eye-level',
+  'Detalhe arquitetônico',
+]
+
 export const ANGULO_OPTIONS:  AxisOption[] = []
 export const HORARIO_OPTIONS: AxisOption[] = []
 export const DETALHE_OPTIONS: AxisOption[] = []
@@ -76,10 +103,21 @@ export const AXIS_LABEL: Record<Axis, string> = {
   detalhe:    'Detalhe',
 }
 
+export const AXIS_CONFIG: Record<Axis, AxisConfig> = {
+  iluminacao: { id: 'iluminacao', label: 'Iluminação', mode: 'parametric',    isAvailable: true                                                  },
+  angulo:     { id: 'angulo',     label: 'Ângulo',     mode: 'sketch_guided', isAvailable: true,  labelSuggestions: ANGULO_LABEL_SUGGESTIONS    },
+  horario:    { id: 'horario',    label: 'Horário',    mode: 'parametric',    isAvailable: false                                                 },
+  detalhe:    { id: 'detalhe',    label: 'Detalhe',    mode: 'parametric',    isAvailable: false                                                 },
+}
+
 export function findAxisOption(axis: Axis, value: string): AxisOption | undefined {
   return AXIS_OPTIONS[axis]?.find(o => o.value === value)
 }
 
 export function isAxisAvailable(axis: Axis): boolean {
-  return AXIS_OPTIONS[axis].length > 0
+  return AXIS_CONFIG[axis].isAvailable
+}
+
+export function getAxisMode(axis: Axis): AxisMode {
+  return AXIS_CONFIG[axis].mode
 }

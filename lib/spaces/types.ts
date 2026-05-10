@@ -121,6 +121,10 @@ export interface Vista {
   is_favorited:              boolean
   is_in_pack:                boolean
   source_vista_id:           string | null
+  // Eixo Ângulo: sketch usado como geometry input + id do batch que agrupa
+  // as vistas geradas no mesmo upload em massa.
+  source_sketch_url:         string | null
+  batch_id:                  string | null
   error_message:             string | null
   created_at:                string
   completed_at:              string | null

@@ -16,6 +16,8 @@ import { DnaPanel } from './DnaPanel'
 import { EixosPanel } from './EixosPanel'
 import { VistasGrid } from './VistasGrid'
 import { SynapticLoading } from './SynapticLoading'
+import { BatchProgressOverlay } from './BatchProgressOverlay'
+import type { SketchPayload } from './SketchGuidedEixoBody'
 
 interface Props {
   space:          Space
@@ -31,15 +33,35 @@ interface GenerateMeta {
   quality: Quality
 }
 
+interface BatchMeta {
+  count:   number
+  total:   number
+  quality: Quality
+}
+
+interface ToastState {
+  type:    'success' | 'warning'
+  message: string
+}
+
 export function SpaceWorkspace({ space, initialVistas, initialBalance, planId }: Props) {
   const router = useRouter()
-  const [vistas, setVistas]   = useState<Vista[]>(initialVistas)
-  const [balance, setBalance] = useState<number>(initialBalance)
-  const [meta, setMeta]       = useState<GenerateMeta | null>(null)
-  const [error, setError]     = useState<string | null>(null)
+  const [vistas, setVistas]       = useState<Vista[]>(initialVistas)
+  const [balance, setBalance]     = useState<number>(initialBalance)
+  const [meta, setMeta]           = useState<GenerateMeta | null>(null)
+  const [batchMeta, setBatchMeta] = useState<BatchMeta | null>(null)
+  const [toast, setToast]         = useState<ToastState | null>(null)
+  const [error, setError]         = useState<string | null>(null)
 
   const isLocked = space.status === 'locked'
   const dna      = getVisualDna(space.dna)
+
+  function showToast(t: ToastState) {
+    setToast(t)
+    setTimeout(() => setToast(null), 6000)
+  }
+
+  // ── Geração paramétrica (Iluminação etc.) ──────────────────
 
   async function handleGenerate(axis: Axis, axisValues: string[], quality: Quality) {
     setError(null)
@@ -92,6 +114,78 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId }:
       setError((e as Error).message)
     } finally {
       setMeta(null)
+    }
+  }
+
+  // ── Geração em batch a partir de sketches (Ângulo) ─────────
+
+  async function handleGenerateFromSketches(sketches: SketchPayload[], quality: Quality) {
+    setError(null)
+    const costPer = getVistaGenerationCost(space.engine, quality)
+    const total   = costPer * sketches.length
+    setBatchMeta({ count: sketches.length, total, quality })
+
+    try {
+      const res = await fetch(`/api/spaces/${space.id}/generate-from-sketches`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ sketches, quality }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        if (res.status === 402) throw new Error(data?.message ?? 'Saldo insuficiente')
+        throw new Error(data?.error ?? 'Erro ao gerar')
+      }
+
+      const newVistas = (data.vistas ?? []) as Vista[]
+      const errors    = (data.errors  ?? []) as Array<{ label: string | null; error: string }>
+
+      setVistas(curr => [...newVistas, ...curr])
+      if (data.balance_after?.total_balance != null) {
+        setBalance(data.balance_after.total_balance as number)
+      }
+
+      // Toasts de feedback
+      if (newVistas.length > 0) {
+        showToast({
+          type:    'success',
+          message: `${newVistas.length} variaç${newVistas.length === 1 ? 'ão' : 'ões'} gerada${newVistas.length === 1 ? '' : 's'} com sucesso.`,
+        })
+      }
+      if (errors.length > 0) {
+        const labels = errors.map(e => e.label ?? 'sem nome').join(', ')
+        showToast({
+          type:    'warning',
+          message: `${errors.length} sketch${errors.length === 1 ? '' : 'es'} falhou: ${labels}. Tente novamente.`,
+        })
+      }
+
+      // Fire-and-forget DNA verification (modo angulo_relaxed é decidido server-side
+      // pela rota verify-dna lendo vista.axis)
+      newVistas.forEach(v => {
+        fetch(`/api/vistas/${v.id}/verify-dna`, { method: 'POST' })
+          .then(r => r.ok ? r.json() : null)
+          .then(verifyData => {
+            if (verifyData?.verification) {
+              setVistas(curr => curr.map(x =>
+                x.id === v.id
+                  ? {
+                      ...x,
+                      dna_verified: verifyData.verification.passed,
+                      dna_verification_details: verifyData.verification,
+                    }
+                  : x,
+              ))
+            }
+          })
+          .catch(() => { /* silencioso */ })
+      })
+
+      router.refresh()
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setBatchMeta(null)
     }
   }
 
@@ -232,7 +326,9 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId }:
               defaultQuality={space.engine === 'pulsar' ? 'hd' : '2k'}
               balance={balance}
               planId={planId}
+              spaceId={space.id}
               onGenerate={handleGenerate}
+              onGenerateFromSketches={handleGenerateFromSketches}
             />
             {error && (
               <div style={{
@@ -263,7 +359,7 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId }:
         <section>
           <SectionLabel>Vistas geradas</SectionLabel>
           <div style={{ marginTop: 12 }}>
-            <VistasGrid vistas={vistas} />
+            <VistasGrid vistas={vistas} vistaMestreUrl={space.vista_mestre_url} />
           </div>
         </section>
       </div>
@@ -277,7 +373,38 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId }:
           quality={meta.quality}
         />
       )}
+
+      {batchMeta && (
+        <BatchProgressOverlay
+          spaceName={space.name}
+          batchSize={batchMeta.count}
+          totalNodes={batchMeta.total}
+          engine={space.engine}
+          quality={batchMeta.quality}
+        />
+      )}
+
+      {toast && <Toast toast={toast} />}
     </>
+  )
+}
+
+function Toast({ toast }: { toast: ToastState }) {
+  const colors = toast.type === 'success'
+    ? { bg: 'rgba(29,158,117,0.16)', fg: '#46d191', border: 'rgba(29,158,117,0.45)' }
+    : { bg: 'rgba(186,117,23,0.16)', fg: '#e0a766', border: 'rgba(186,117,23,0.45)' }
+  return (
+    <div style={{
+      position: 'fixed', bottom: 24, right: 24, zIndex: 90,
+      maxWidth: 400, padding: '14px 18px',
+      background: colors.bg, color: colors.fg,
+      border: `0.5px solid ${colors.border}`,
+      borderRadius: 12, backdropFilter: 'blur(12px)',
+      fontSize: 13, letterSpacing: '-0.005em',
+      boxShadow: '0 12px 32px rgba(0,0,0,0.4)',
+    }}>
+      {toast.message}
+    </div>
   )
 }
 

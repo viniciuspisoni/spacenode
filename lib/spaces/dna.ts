@@ -284,11 +284,31 @@ const VERIFY_SYSTEM = (
   'Responda SEMPRE e APENAS com JSON.'
 )
 
+export type VerifyMode = 'standard' | 'angulo_relaxed'
+
 export async function verifyDna(
   variationUrl: string,
   dna:          ProjectDNA,
+  mode:         VerifyMode = 'standard',
 ): Promise<DnaVerification> {
+  // Pro eixo Ângulo, o ground truth de Contexto da Vista Mestre não bate
+  // com a vista gerada (composição/enquadramento mudam por design — é
+  // outro ângulo do mesmo projeto). Avaliamos Contexto só por categoria
+  // ampla (interno/externo, tipologia). Estilo, Materiais e Paleta seguem
+  // com avaliação estrita.
+  const contextoRule = mode === 'angulo_relaxed'
+    ? (
+      'IMPORTANTE — esta vista veio do eixo Ângulo (mesmo projeto, ponto de vista diferente). ' +
+      'Para "contexto", compare APENAS categorias amplas (Externo/Interno, ' +
+      'Residencial/Comercial/Conceito, tipologia geral como casa/apto/escritório). ' +
+      'IGNORE composição específica, enquadramento, ângulo da câmera e elementos ' +
+      'de cena (pessoas, veículos, vegetação detalhada). Score alto se a ' +
+      'categoria ampla é a mesma.\n\n'
+    )
+    : ''
+
   const userPrompt =
+    contextoRule +
     'Compare a imagem com este DNA travado e dê um score 0-1 por atributo:\n\n' +
     `- Estilo: ${dna.estilo.nome}\n` +
     `- Materiais: ${dna.materiais.map(m => m.nome).join(', ')}\n` +

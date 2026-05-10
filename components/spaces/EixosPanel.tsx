@@ -1,64 +1,47 @@
 'use client'
 
-// Painel de Eixos — abas (4) + cards do eixo ativo + quality + action bar.
+// Painel de Eixos — abas (4) + body trocado por mode.
 //
-// Sprint 2 entrega Iluminação completo (6 cards). Os outros 3 eixos
-// existem como aba mas com tooltip "em breve".
+// Iluminação/Horário/Detalhe usam modo parametric (cards selecionáveis).
+// Ângulo usa modo sketch_guided (upload de prints + lista editável).
 
 import { useMemo, useState } from 'react'
 import {
-  AXIS_OPTIONS, AXIS_LABEL, isAxisAvailable, type AxisOption,
+  AXIS_OPTIONS, AXIS_LABEL, AXIS_CONFIG, isAxisAvailable, getAxisMode,
+  type AxisOption,
 } from '@/lib/spaces/axes'
 import { ENGINES, type EngineId, type Resolution } from '@/lib/engines'
 import { getVistaGenerationCost, getAvailableQualities } from '@/lib/spaces/economy'
 import type { Axis, Quality } from '@/lib/spaces/types'
 import type { PlanId } from '@/lib/plans'
 import { InsufficientBalancePanel } from './InsufficientBalancePanel'
+import { SketchGuidedEixoBody, type SketchPayload } from './SketchGuidedEixoBody'
 
 interface Props {
   engine:    EngineId
   defaultQuality?: Quality
   balance:   number
   planId:    PlanId
+  spaceId:   string
   disabled?: boolean
-  onGenerate: (axis: Axis, axisValues: string[], quality: Quality) => Promise<void>
+  onGenerate:             (axis: Axis, axisValues: string[], quality: Quality) => Promise<void>
+  onGenerateFromSketches: (sketches: SketchPayload[], quality: Quality) => Promise<void>
 }
 
 const AXIS_ORDER: Axis[] = ['iluminacao', 'angulo', 'horario', 'detalhe']
 
-export function EixosPanel({ engine, defaultQuality, balance, planId, disabled, onGenerate }: Props) {
+export function EixosPanel({
+  engine, defaultQuality, balance, planId, spaceId, disabled,
+  onGenerate, onGenerateFromSketches,
+}: Props) {
   const [axis, setAxis]         = useState<Axis>('iluminacao')
-  const [selected, setSelected] = useState<Set<string>>(new Set())
   const availableQualities      = getAvailableQualities(engine)
   const initialQuality          = defaultQuality && availableQualities.includes(defaultQuality)
                                   ? defaultQuality
                                   : availableQualities[0]
   const [quality, setQuality]   = useState<Resolution>(initialQuality)
-  const [submitting, setSubmitting] = useState(false)
 
-  const options: AxisOption[]   = AXIS_OPTIONS[axis]
-  const costPer  = useMemo(() => getVistaGenerationCost(engine, quality), [engine, quality])
-  const total    = costPer * selected.size
-  const insufficient = total > balance
-
-  function toggle(value: string) {
-    setSelected(s => {
-      const next = new Set(s)
-      if (next.has(value)) next.delete(value); else next.add(value)
-      return next
-    })
-  }
-
-  async function handleGenerate() {
-    if (selected.size === 0 || submitting || disabled) return
-    setSubmitting(true)
-    try {
-      await onGenerate(axis, Array.from(selected), quality)
-      setSelected(new Set())
-    } finally {
-      setSubmitting(false)
-    }
-  }
+  const mode = getAxisMode(axis)
 
   return (
     <section style={{
@@ -108,7 +91,84 @@ export function EixosPanel({ engine, defaultQuality, balance, planId, disabled, 
         })}
       </div>
 
-      {/* Cards do eixo ativo */}
+      {/* Body conforme mode */}
+      {mode === 'parametric' && (
+        <ParametricEixoBody
+          axis={axis}
+          engine={engine}
+          quality={quality}
+          setQuality={setQuality}
+          availableQualities={availableQualities}
+          balance={balance}
+          planId={planId}
+          disabled={disabled}
+          onGenerate={onGenerate}
+        />
+      )}
+
+      {mode === 'sketch_guided' && (
+        <SketchGuidedEixoBody
+          axis={axis}
+          spaceId={spaceId}
+          engine={engine}
+          quality={quality}
+          setQuality={setQuality}
+          availableQualities={availableQualities}
+          balance={balance}
+          planId={planId}
+          disabled={disabled}
+          onGenerate={onGenerateFromSketches}
+          labelSuggestions={AXIS_CONFIG[axis].labelSuggestions ?? []}
+        />
+      )}
+    </section>
+  )
+}
+
+// ── Body: parametric (Iluminação) ─────────────────────────────
+
+function ParametricEixoBody({
+  axis, engine, quality, setQuality, availableQualities, balance, planId, disabled, onGenerate,
+}: {
+  axis:               Axis
+  engine:             EngineId
+  quality:            Resolution
+  setQuality:         (q: Resolution) => void
+  availableQualities: Quality[]
+  balance:            number
+  planId:             PlanId
+  disabled?:          boolean
+  onGenerate:         (axis: Axis, axisValues: string[], quality: Quality) => Promise<void>
+}) {
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [submitting, setSubmitting] = useState(false)
+  const options: AxisOption[] = AXIS_OPTIONS[axis]
+  const costPer  = useMemo(() => getVistaGenerationCost(engine, quality), [engine, quality])
+  const total    = costPer * selected.size
+  const insufficient = total > balance
+
+  function toggle(value: string) {
+    setSelected(s => {
+      const next = new Set(s)
+      if (next.has(value)) next.delete(value); else next.add(value)
+      return next
+    })
+  }
+
+  async function handleGenerate() {
+    if (selected.size === 0 || submitting || disabled) return
+    setSubmitting(true)
+    try {
+      await onGenerate(axis, Array.from(selected), quality)
+      setSelected(new Set())
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <>
+      {/* Cards do eixo */}
       {options.length > 0 ? (
         <div style={{
           display: 'grid', gap: 10,
@@ -124,9 +184,7 @@ export function EixosPanel({ engine, defaultQuality, balance, planId, disabled, 
                 style={{
                   textAlign: 'left',
                   padding: '14px 16px',
-                  background: isSelected
-                    ? 'rgba(255,255,255,0.03)'
-                    : 'var(--color-bg)',
+                  background: isSelected ? 'rgba(255,255,255,0.03)' : 'var(--color-bg)',
                   border: isSelected
                     ? '1.5px solid var(--color-text-primary)'
                     : '0.5px solid var(--color-border-strong)',
@@ -143,8 +201,7 @@ export function EixosPanel({ engine, defaultQuality, balance, planId, disabled, 
                 <div>
                   <div style={{
                     fontSize: 13, fontWeight: 500,
-                    color: 'var(--color-text-primary)',
-                    letterSpacing: '-0.01em',
+                    color: 'var(--color-text-primary)', letterSpacing: '-0.01em',
                   }}>
                     {opt.label}
                   </div>
@@ -183,50 +240,10 @@ export function EixosPanel({ engine, defaultQuality, balance, planId, disabled, 
         </div>
       )}
 
-      {/* Quality picker (sempre visível) */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 10,
-        paddingTop: 20, borderTop: '0.5px solid var(--color-border)',
-      }}>
-        <span style={{
-          fontSize: 10, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase',
-          color: 'var(--color-text-tertiary)',
-        }}>
-          Qualidade
-        </span>
-        <div style={{
-          display: 'flex', gap: 4, padding: 3,
-          background: 'var(--color-surface)', borderRadius: 8,
-        }}>
-          {(['hd', '2k', '4k'] as Resolution[]).map(q => {
-            const supported = availableQualities.includes(q)
-            const active = quality === q && supported
-            const cost = supported ? getVistaGenerationCost(engine, q) : null
-            return (
-              <button
-                key={q}
-                onClick={() => supported && setQuality(q)}
-                disabled={!supported}
-                title={supported ? `${cost} nodes/vista` : `Não disponível em ${ENGINES[engine].name}`}
-                style={{
-                  padding: '6px 12px', borderRadius: 6,
-                  background: active ? 'var(--color-bg-elevated)' : 'transparent',
-                  color: active
-                    ? 'var(--color-text-primary)'
-                    : supported ? 'var(--color-text-secondary)' : 'var(--color-text-quaternary)',
-                  fontSize: 11, fontWeight: 500, letterSpacing: '0.02em',
-                  cursor: supported ? 'pointer' : 'not-allowed',
-                  boxShadow: active ? 'inset 0 0 0 0.5px var(--color-border-strong)' : 'none',
-                }}
-              >
-                {q.toUpperCase()}
-              </button>
-            )
-          })}
-        </div>
-      </div>
+      {/* Quality picker */}
+      <QualityPicker engine={engine} quality={quality} setQuality={setQuality} availableQualities={availableQualities} />
 
-      {/* Action area — substitui pelo painel de saldo insuficiente quando aplicável */}
+      {/* Action / Insufficient */}
       <div style={{ marginTop: 16 }}>
         {insufficient && selected.size > 0 ? (
           <InsufficientBalancePanel
@@ -272,6 +289,59 @@ export function EixosPanel({ engine, defaultQuality, balance, planId, disabled, 
           </div>
         )}
       </div>
-    </section>
+    </>
+  )
+}
+
+// ── Sub-componentes compartilhados ────────────────────────────
+
+export function QualityPicker({ engine, quality, setQuality, availableQualities }: {
+  engine:             EngineId
+  quality:            Resolution
+  setQuality:         (q: Resolution) => void
+  availableQualities: Quality[]
+}) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 10,
+      paddingTop: 20, borderTop: '0.5px solid var(--color-border)',
+    }}>
+      <span style={{
+        fontSize: 10, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase',
+        color: 'var(--color-text-tertiary)',
+      }}>
+        Qualidade
+      </span>
+      <div style={{
+        display: 'flex', gap: 4, padding: 3,
+        background: 'var(--color-surface)', borderRadius: 8,
+      }}>
+        {(['hd', '2k', '4k'] as Resolution[]).map(q => {
+          const supported = availableQualities.includes(q)
+          const active = quality === q && supported
+          const cost = supported ? getVistaGenerationCost(engine, q) : null
+          return (
+            <button
+              key={q}
+              onClick={() => supported && setQuality(q)}
+              disabled={!supported}
+              title={supported ? `${cost} nodes/vista` : `Não disponível em ${ENGINES[engine].name}`}
+              style={{
+                padding: '6px 12px', borderRadius: 6,
+                background: active ? 'var(--color-bg-elevated)' : 'transparent',
+                color: active
+                  ? 'var(--color-text-primary)'
+                  : supported ? 'var(--color-text-secondary)' : 'var(--color-text-quaternary)',
+                fontSize: 11, fontWeight: 500, letterSpacing: '0.02em',
+                cursor: supported ? 'pointer' : 'not-allowed',
+                boxShadow: active ? 'inset 0 0 0 0.5px var(--color-border-strong)' : 'none',
+              }}
+            >
+              {q.toUpperCase()}
+            </button>
+          )
+        })}
+      </div>
+    </div>
   )
 }

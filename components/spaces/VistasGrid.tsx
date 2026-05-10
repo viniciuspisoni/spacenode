@@ -16,7 +16,12 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: 'detalhe',    label: AXIS_LABEL.detalhe },
 ]
 
-export function VistasGrid({ vistas }: { vistas: Vista[] }) {
+interface Props {
+  vistas:           Vista[]
+  vistaMestreUrl?:  string | null
+}
+
+export function VistasGrid({ vistas, vistaMestreUrl }: Props) {
   const [filter, setFilter] = useState<Filter>('all')
 
   const filtered = useMemo(() => {
@@ -82,7 +87,7 @@ export function VistasGrid({ vistas }: { vistas: Vista[] }) {
       </div>
 
       {/* Grid */}
-      {filtered.length === 0 ? (
+      {filtered.length === 0 && !(filter === 'angulo' && vistaMestreUrl) ? (
         <div style={{
           padding: '40px 20px', textAlign: 'center',
           color: 'var(--color-text-tertiary)', fontSize: 12,
@@ -94,9 +99,61 @@ export function VistasGrid({ vistas }: { vistas: Vista[] }) {
           display: 'grid', gap: 14,
           gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
         }}>
+          {/* Vista Mestre como primeiro card só na aba Ângulo */}
+          {filter === 'angulo' && vistaMestreUrl && (
+            <MestreCard vistaMestreUrl={vistaMestreUrl} />
+          )}
           {filtered.map(v => <VistaCard key={v.id} vista={v} />)}
         </div>
       )}
     </div>
+  )
+}
+
+function MestreCard({ vistaMestreUrl }: { vistaMestreUrl: string }) {
+  return (
+    <a
+      href={vistaMestreUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{
+        display: 'flex', flexDirection: 'column',
+        background: 'var(--color-bg-elevated)',
+        border: '0.5px solid rgba(70,209,145,0.45)',
+        borderRadius: 12, overflow: 'hidden',
+        textDecoration: 'none', color: 'inherit',
+        transition: 'border-color 0.2s, transform 0.2s',
+        position: 'relative',
+      }}
+    >
+      <div style={{ aspectRatio: '4 / 3', position: 'relative', background: 'var(--color-surface)' }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={vistaMestreUrl} alt="Vista Mestre"
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        <div style={{
+          position: 'absolute', top: 8, left: 8,
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          padding: '4px 8px', borderRadius: 5,
+          background: 'rgba(29,158,117,0.85)', backdropFilter: 'blur(8px)',
+          fontSize: 9, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase',
+          color: '#fff',
+        }}>
+          original
+        </div>
+      </div>
+      <div style={{ padding: '10px 12px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+        <div style={{
+          fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary)',
+          letterSpacing: '-0.01em',
+        }}>
+          Vista Mestre
+        </div>
+        <div style={{
+          fontSize: 10, color: 'var(--color-text-quaternary)', letterSpacing: '0.02em',
+        }}>
+          ângulo de origem
+        </div>
+      </div>
+    </a>
   )
 }
