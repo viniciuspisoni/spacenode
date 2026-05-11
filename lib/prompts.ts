@@ -5,23 +5,52 @@
 export type ProjectType = 'exterior' | 'interior'
 
 export interface ProjectMaterials {
+  // Exterior-only (não aparece na UI quando projectType === 'interior')
   fachada?:    string
+  // Compartilhados — mapeados pra termos diferentes em interior vs exterior
   piso?:       string
   esquadrias?: string
+  // Interior-only (não aparece na UI quando projectType === 'exterior')
+  paredes?:    string
+  teto?:       string
+  marcenaria?: string
+  bancadas?:   string
+  // Compartilhados em ambos
   elementos?:  string
   outros?:     string
 }
 
 export interface GenerateOptions {
-  projectType:   ProjectType
-  segment:       string
-  environment:   string
-  lighting:      string
-  background:    string
-  sceneElements: string[]
-  geometryLock:  number
-  materials?:    ProjectMaterials
-  fidelityMode?: 'strict' | 'balanced'
+  projectType:    ProjectType
+  segment:        string
+  environment:    string
+  lighting:       string
+  background:     string
+  sceneElements:  string[]
+  geometryLock:   number
+  materials?:     ProjectMaterials
+  fidelityMode?:  'strict' | 'balanced'
+  fidelityLevel?:  FidelityLevel
+  briefing?:       BriefingArquitetonico
+  hasAnchor?:      boolean
+  refinementText?: string
+}
+
+// ── Fidelity Engine ────────────────────────────────────────────────────────────
+
+export type FidelityLevel = 'maximum' | 'balanced' | 'creative'
+
+export interface BriefingArquitetonico {
+  tipo_projeto:         string   // ex: "fachada residencial contemporânea, sobrado isolado"
+  geometria_principal:  string   // ex: "volume retangular alongado com balanço lateral em concreto"
+  volumes:              string   // ex: "dois volumes sobrepostos, térreo recuado, superior em balanço"
+  pavimentos:           number   // 1, 2, 3...
+  aberturas:            string   // ex: "três janelas verticais no pavimento superior, porta pivotante central"
+  materiais_aparentes:  string   // ex: "concreto aparente, painéis de madeira ripada, vidro laminado"
+  camera:               string   // ex: "frontal levemente em contra-plongée, altura humana, lente normal ~35mm"
+  entorno:              string   // ex: "lote em rua plana, calçada larga, casa vizinha de dois pavimentos à direita"
+  elementos_preservar:  string[] // ["número de pavimentos", "posição de aberturas", "casa vizinha", ...]
+  elementos_melhorar:   string[] // ["realismo de materiais", "vegetação discreta", "iluminação", ...]
 }
 
 // ── Segments ───────────────────────────────────────────────────────────────────
@@ -111,49 +140,60 @@ export const EXTERIOR_ENVIRONMENTS: Record<string, string[]> = {
 
 // ── Lighting ───────────────────────────────────────────────────────────────────
 
+// 'Preservar Original' é sempre a primeira opção (e default). Em Máxima
+// Fidelidade ela mantém a luz exata da imagem de referência — sem essa opção
+// o usuário era forçado a escolher uma luz mesmo querendo só preservar tudo,
+// e a `lightingLine` injetada empurrava o modelo a acender luminárias.
 export const INTERIOR_LIGHTING: Record<string, string[]> = {
   'Residencial': [
-    'Clara e Natural', 'Natural Suave', 'Luz de Janela',
+    'Preservar Original',
+    'Clara e Natural', 'Natural Suave', 'Luz de Janela', 'Nublado',
     'Quente e Aconchegante', 'Entardecer Quente',
     'Noturna Aconchegante', 'Sofisticada e Cênica',
   ],
   'Corporativo': [
-    'Corporativa Neutra', 'Natural Profissional', 'Luz Difusa Uniforme',
+    'Preservar Original',
+    'Corporativa Neutra', 'Natural Profissional', 'Luz Difusa Uniforme', 'Nublado',
     'Escritório Contemporâneo', 'Iluminação Técnica',
     'Noturna Executiva', 'Clara e Produtiva',
   ],
   'Comercial': [
-    'Comercial Bem Iluminada', 'Varejo Premium', 'Showroom Iluminado',
+    'Preservar Original',
+    'Comercial Bem Iluminada', 'Varejo Premium', 'Showroom Iluminado', 'Nublado',
     'Destaque de Produto', 'Iluminação de Loja',
     'Noturna Comercial', 'Luz de Vitrine',
   ],
   'Gastronomia': [
-    'Quente e Aconchegante', 'Cênica e Intimista', 'Entardecer Quente',
+    'Preservar Original',
+    'Quente e Aconchegante', 'Cênica e Intimista', 'Entardecer Quente', 'Nublado',
     'Noturna Sofisticada', 'Café com Luz Natural',
     'Restaurante Premium', 'Luz Baixa Decorativa',
   ],
   'Hospitalidade': [
-    'Sofisticada e Cênica', 'Premium Aconchegante', 'Luz Natural Elegante',
+    'Preservar Original',
+    'Sofisticada e Cênica', 'Premium Aconchegante', 'Luz Natural Elegante', 'Nublado',
     'Noturna Refinada', 'Spa Relaxante',
     'Lobby Iluminado', 'Entardecer de Hotel',
   ],
   'Saúde': [
-    'Clara e Limpa', 'Clínica Neutra', 'Luz Difusa Suave',
+    'Preservar Original',
+    'Clara e Limpa', 'Clínica Neutra', 'Luz Difusa Suave', 'Nublado',
     'Iluminação Profissional', 'Aconchegante e Calma', 'Saúde Premium',
   ],
   'Educação': [
-    'Clara e Funcional', 'Natural Suave', 'Luz Difusa',
+    'Preservar Original',
+    'Clara e Funcional', 'Natural Suave', 'Luz Difusa', 'Nublado',
     'Ambiente Produtivo', 'Biblioteca Aconchegante', 'Sala Bem Iluminada',
   ],
 }
 
 export const EXTERIOR_LIGHTING: Record<string, string[]> = {
-  'Residencial':   ['Diurno', 'Entardecer', 'Golden Hour', 'Blue Hour', 'Noturno Iluminado', 'Nublado', 'Chuva Leve'],
-  'Comercial':     ['Diurno Comercial', 'Fachada Bem Iluminada', 'Vitrine Noturna', 'Golden Hour', 'Blue Hour', 'Noturno Comercial', 'Shopping Atmosphere'],
-  'Corporativo':   ['Diurno Corporativo', 'Fachada Profissional', 'Blue Hour', 'Noturno Executivo', 'Luz Urbana', 'Nublado Sofisticado'],
-  'Hospitalidade': ['Golden Hour', 'Entardecer Premium', 'Noturno Refinado', 'Resort Diurno', 'Luz de Piscina', 'Blue Hour', 'Atmosfera Tropical'],
-  'Institucional': ['Diurno Claro', 'Nublado Suave', 'Luz Natural', 'Entardecer', 'Iluminação Urbana', 'Noturno Institucional'],
-  'Paisagismo':    ['Diurno Natural', 'Golden Hour', 'Entardecer Suave', 'Luz Filtrada', 'Nublado', 'Noturno Paisagístico', 'Chuva Leve'],
+  'Residencial':   ['Preservar Original', 'Diurno', 'Entardecer', 'Golden Hour', 'Blue Hour', 'Noturno Iluminado', 'Nublado', 'Chuva Leve'],
+  'Comercial':     ['Preservar Original', 'Diurno Comercial', 'Fachada Bem Iluminada', 'Vitrine Noturna', 'Golden Hour', 'Blue Hour', 'Noturno Comercial', 'Shopping Atmosphere'],
+  'Corporativo':   ['Preservar Original', 'Diurno Corporativo', 'Fachada Profissional', 'Blue Hour', 'Noturno Executivo', 'Luz Urbana', 'Nublado Sofisticado'],
+  'Hospitalidade': ['Preservar Original', 'Golden Hour', 'Entardecer Premium', 'Noturno Refinado', 'Resort Diurno', 'Luz de Piscina', 'Blue Hour', 'Atmosfera Tropical'],
+  'Institucional': ['Preservar Original', 'Diurno Claro', 'Nublado Suave', 'Luz Natural', 'Entardecer', 'Iluminação Urbana', 'Noturno Institucional'],
+  'Paisagismo':    ['Preservar Original', 'Diurno Natural', 'Golden Hour', 'Entardecer Suave', 'Luz Filtrada', 'Nublado', 'Noturno Paisagístico', 'Chuva Leve'],
 }
 
 // ── Background / Context ───────────────────────────────────────────────────────
@@ -354,112 +394,112 @@ const ENV_EN: Record<string, string> = {
 const LIGHT_EN: Record<string, string> = {
   // Interior
   'Clara e Natural':         'extremely bright clean airy interior with abundant natural daylight, global illumination, 5500K',
-  'Natural Suave':           'soft natural light filtering through translucent curtains, gentle diffuse shadows, 5000K',
+  'Natural Suave':           'soft diffuse natural daylight 5000K, gentle even shadows, calm airy quality',
   'Luz de Janela':           'dramatic directional window light with defined shadows, high contrast, 5500K',
-  'Quente e Aconchegante':   'warm incandescent-effect lighting 3000K, cozy amber glow, table lamps and floor lamps',
+  'Quente e Aconchegante':   'warm incandescent-effect 3000K, cozy amber glow, soft pools of warm light',
   'Entardecer Quente':       'warm golden afternoon light streaming through windows at low angle, 3200K, long shadows',
-  'Noturna Aconchegante':    'nighttime with warm 2700K LED fixtures, table lamps, wall sconces, intimate pools of light',
-  'Sofisticada e Cênica':    'dramatic architectural lighting with accent spotlights, LED strips under millwork, 2700K moody atmosphere',
-  'Corporativa Neutra':      'neutral uniform corporate LED panels 4000K, no harsh shadows, professional clean light',
+  'Noturna Aconchegante':    'nighttime warm 2700K ambient illumination, intimate pools of soft light, deep shadows in unlit corners',
+  'Sofisticada e Cênica':    'dramatic moody 2700K atmospheric illumination, layered light with deep contrast and accent highlights',
+  'Corporativa Neutra':      'neutral uniform corporate 4000K ambient, no harsh shadows, professional clean light quality',
   'Natural Profissional':    'professional natural light from large windows, 5000K clean white, ideal for work',
   'Luz Difusa Uniforme':     'perfectly diffuse uniform illumination 4500K, softbox effect, virtually shadowless',
-  'Escritório Contemporâneo':'contemporary office with ambient LED grid ceiling, task lighting on desks, decorative accent',
+  'Escritório Contemporâneo':'contemporary office ambient 4000K with even ceiling diffusion and soft task-level brightness',
   'Iluminação Técnica':      'precision technical high-efficacy lighting 4000K, industrial, very even distribution',
-  'Noturna Executiva':       'nighttime executive office with warm 3000K task lighting, city lights through windows',
+  'Noturna Executiva':       'nighttime executive ambient 3000K, warm work-zone glow, distant city light reflected through windows',
   'Clara e Produtiva':       'bright productive 5000K, high CRI, minimal glare, uniform task-friendly illumination',
-  'Comercial Bem Iluminada': 'bright commercial interior 4000K with display spotlights, high overall luminance',
-  'Varejo Premium':          'premium retail high-CRI spotlights on merchandise, warm ambient LED fill, 3500K',
-  'Showroom Iluminado':      'showroom with dramatic accent track lighting spotting products, dark perimeter, 3500K',
-  'Destaque de Produto':     'tight product spot lighting, moody dark surround for contrast, focused beams',
-  'Iluminação de Loja':      'standard retail LED panel and spotlight combo, bright uniform, 4000K',
-  'Noturna Comercial':       'nighttime commercial with bright storefront lighting, illuminated signage, street light glow',
-  'Luz de Vitrine':          'window display spotlights from above, product-focused tight beams, 3000K warm glow',
+  'Comercial Bem Iluminada': 'bright commercial 4000K ambient with high overall luminance and accent contrast',
+  'Varejo Premium':          'premium retail 3500K high-CRI accent illumination on display areas with warm ambient fill',
+  'Showroom Iluminado':      'showroom 3500K dramatic accent contrast, bright focal zones with darker ambient perimeter',
+  'Destaque de Produto':     'tight focal accent illumination on display areas, moody dark surround for contrast',
+  'Iluminação de Loja':      'bright uniform retail 4000K, even high-CRI distribution',
+  'Noturna Comercial':       'nighttime commercial atmosphere, bright storefront glow, vibrant urban ambient',
+  'Luz de Vitrine':          'window display 3000K warm focal accents from above, product-focused contrast',
   'Cênica e Intimista':      'intimate theatrical candle-effect lighting, warm 2400K amber pools, romantic atmosphere',
-  'Noturna Sofisticada':     'sophisticated dimmable nighttime fixtures 2700K, ambient and decorative accent mix',
-  'Café com Luz Natural':    'morning café light with bright natural sun through windows 5500K, casual warm atmosphere',
-  'Restaurante Premium':     'fine dining warm 2700K ambient with candle supplement, accent spots on tables',
-  'Luz Baixa Decorativa':    'very low-level decorative ambient lighting 2400K, pendant lights, intimate mood',
-  'Premium Aconchegante':    'premium warm indirect lighting 2700K, valence LED strips, wall washers, plush atmosphere',
+  'Noturna Sofisticada':     'sophisticated dim 2700K nighttime ambient, layered accent highlights, refined atmosphere',
+  'Café com Luz Natural':    'morning bright natural daylight 5500K, sun through windows, casual warm atmosphere',
+  'Restaurante Premium':     'fine dining warm 2700K ambient with subtle candle-effect warm pools, intimate dining mood',
+  'Luz Baixa Decorativa':    'very low-level decorative 2400K ambient, intimate mood, soft warm pools',
+  'Premium Aconchegante':    'premium warm indirect 2700K illumination, plush atmospheric glow, soft graduations',
   'Luz Natural Elegante':    'refined natural light with thin window shadow lines 5500K, elegant and airy',
-  'Noturna Refinada':        'refined nighttime with architectural indirect lighting 2700K, perfectly balanced ambient',
-  'Spa Relaxante':           'spa zen lighting very soft warm 2700K, near candlelight, tranquil, no harsh sources',
-  'Lobby Iluminado':         'hotel lobby grand chandelier lighting, warm ambient 3000K, statement light fixture',
-  'Entardecer de Hotel':     'hotel interior golden hour with warm sunset light streaming through windows 3200K',
+  'Noturna Refinada':        'refined 2700K nighttime indirect architectural illumination, perfectly balanced ambient',
+  'Spa Relaxante':           'spa zen very soft warm 2700K, near-candlelight tranquil quality, no harsh sources',
+  'Lobby Iluminado':         'lobby grand 3000K warm ambient illumination, layered atmospheric brightness',
+  'Entardecer de Hotel':     'interior golden hour 3200K warm sunset light streaming through windows',
   'Clara e Limpa':           'clinical bright white 5500K with high CRI, even illumination, no dark areas, sterile feel',
-  'Clínica Neutra':          'neutral clinical LED 4500K uniform ceiling panels, professional healthcare environment',
+  'Clínica Neutra':          'neutral clinical 4500K uniform ambient, professional healthcare quality, even distribution',
   'Luz Difusa Suave':        'very soft diffuse light 4000K, therapeutic gentle quality, no harsh shadows',
   'Iluminação Profissional': 'professional precision 4000K high CRI, appropriate for clinical accuracy',
   'Aconchegante e Calma':    'warm calm 3000K indirect lighting, therapeutic, stress-reducing atmosphere',
-  'Saúde Premium':           'premium wellness lighting 3500K, comfortable professional, not harshly clinical',
-  'Clara e Funcional':       'functional clear educational lighting 5000K, anti-glare, even distribution',
-  'Luz Difusa':              'soft diffuse light 4000K, gentle even illumination, calming',
-  'Ambiente Produtivo':      'productive task lighting 4500K, focused, reduces eye strain, clear and bright',
-  'Biblioteca Aconchegante': 'library with warm task lamps on tables, ambient 3000K fill, reading-friendly',
-  'Sala Bem Iluminada':      'well-lit room 4000K, even distribution, no harsh shadows, functional and clean',
+  'Saúde Premium':           'premium wellness 3500K comfortable professional ambient, not harshly clinical',
+  'Clara e Funcional':       'functional clear 5000K, anti-glare, even distribution',
+  'Luz Difusa':              'soft diffuse 4000K, gentle even illumination, calming',
+  'Ambiente Produtivo':      'productive 4500K focused task brightness, reduces eye strain',
+  'Biblioteca Aconchegante': 'library warm 3000K ambient fill with reading-friendly task brightness',
+  'Sala Bem Iluminada':      'well-lit 4000K even distribution, no harsh shadows, functional and clean',
   // Exterior
   'Diurno':                'daytime, blue sky with sun and natural shadows',
   'Entardecer':            'late afternoon, warm golden light, long directional shadows',
   'Golden Hour':           'golden hour, warm amber sunlight at low angle, magical quality, long soft shadows',
   'Blue Hour':             'blue hour twilight, deep indigo blue sky, city lights beginning to glow, glass reflections',
-  'Noturno Iluminado':     'nighttime with architectural facade uplighting, illuminated windows, garden spotlights',
-  'Nublado':               'overcast sky, perfectly diffuse soft light, no harsh shadows, dramatic cloud texture',
+  'Noturno Iluminado':     'nighttime architectural facade ambient glow, warm interior light visible through openings, soft garden ambient',
+  'Nublado':               'overcast diffuse natural daylight, soft evenly distributed cloudy-day light quality, no harsh shadows, neutral 5500K, soft even atmospheric tones throughout',
   'Chuva Leve':            'light rain, wet reflective pavement surfaces, dark cloudy sky, rain streaks visible',
-  'Diurno Comercial':      'bright clear commercial daytime, blue sky, optimal visibility for signage and display',
+  'Diurno Comercial':      'bright clear commercial daytime, blue sky, high overall visibility',
   'Fachada Bem Iluminada': 'perfect architectural photography light, slight overcast, even facade exposure',
-  'Vitrine Noturna':       'nighttime with brightly illuminated store window, neon or LED signs, street lights',
-  'Noturno Comercial':     'nighttime commercial district, multiple light sources, vibrant urban glow, active street',
-  'Shopping Atmosphere':   'shopping center exterior evening atmosphere, bright entrance canopy, ambient pedestrian lighting',
+  'Vitrine Noturna':       'nighttime store window brightly lit from within, contrasting dark surroundings',
+  'Noturno Comercial':     'nighttime commercial district atmosphere, vibrant urban glow, bright active ambient',
+  'Shopping Atmosphere':   'shopping center evening atmosphere, bright entrance illumination, ambient pedestrian glow',
   'Diurno Corporativo':    'crisp bright corporate daytime, sharp blue sky, professional architectural photography',
   'Fachada Profissional':  'even architectural photography light, professional standard, slight overcast for shadow control',
-  'Noturno Executivo':     'corporate nighttime with facade uplighting, dramatic sculptural quality, executive presence',
-  'Luz Urbana':            'urban nighttime mix of street lights, commercial signage glow, vehicle light trails',
+  'Noturno Executivo':     'corporate nighttime facade ambient glow, dramatic sculptural light quality, executive presence',
+  'Luz Urbana':            'urban nighttime ambient mix, commercial signage glow in distance, vibrant city atmosphere',
   'Nublado Sofisticado':   'sophisticated overcast light, even diffuse shadows, high-end architectural photography',
   'Entardecer Premium':    'premium sunset, saturated warm sky gradient, golden light, luxury atmosphere',
-  'Noturno Refinado':      'refined nighttime with warm facade uplighting, subtle garden lighting, exclusive feel',
-  'Resort Diurno':         'bright tropical resort daytime, azure sky, vivid tropical vegetation, blue pool water',
-  'Luz de Piscina':        'pool area with reflected water light playing on surfaces, tropical afternoon sun',
-  'Atmosfera Tropical':    'tropical atmosphere with intense warm sunlight, vibrant lush green vegetation, clear sky',
+  'Noturno Refinado':      'refined nighttime warm facade ambient glow, subtle landscape illumination, exclusive feel',
+  'Resort Diurno':         'bright tropical resort daytime atmosphere, azure sky, intense warm sunlight',
+  'Luz de Piscina':        'reflected water light playing on surfaces, bright tropical afternoon sun quality',
+  'Atmosfera Tropical':    'tropical atmosphere, intense warm sunlight, clear vibrant sky',
   'Diurno Claro':          'clear bright daytime, direct sun, strong defined shadows, crisp visibility',
   'Nublado Suave':         'gentle soft overcast, even illumination, no harsh shadows, neutral institutional light',
   'Luz Natural':           'natural light, slightly golden, standard architectural photography, true to color',
-  'Iluminação Urbana':     'urban night with street lights, vehicle light trails, city glow on horizon',
-  'Noturno Institucional': 'nighttime with facade flood lighting, flag pole lights, formal institutional presence',
+  'Iluminação Urbana':     'urban nighttime ambient atmosphere, distant city glow on horizon',
+  'Noturno Institucional': 'nighttime facade flood-lit ambient, formal institutional presence',
   'Diurno Natural':        'natural landscape daylight, even and true to botanical color, 5500K clear sky',
   'Entardecer Suave':      'gentle sunset light, pastel sky tones, warm long soft shadows, tranquil atmosphere',
   'Luz Filtrada':          'soft filtered light through tree canopy, dappled light patterns on ground, 5000K',
-  'Noturno Paisagístico':  'landscape at night with garden uplighting on trees and plants, moonlight silver tone',
+  'Noturno Paisagístico':  'landscape nighttime soft ambient illumination, moonlight silver tone, gentle warm landscape glow',
 }
 
 const BG_EN: Record<string, string> = {
   'Entorno Neutro':    'simple neutral urban context, flat sky gradient, minimal surroundings',
-  'Rua Arborizada':    'tree-lined residential street with large ipê and jacarandá trees, sidewalk, parked cars',
-  'Condomínio':        'gated condominium with neighboring contemporary houses, manicured garden walls, coconut palms',
-  'Bairro Nobre':      'upscale residential neighborhood with luxury mansions, centenary figueira trees, wide avenues',
-  'Zona Urbana':       'urban commercial and residential environment, mid-rise buildings, active street',
-  'Zona Rural':        'rural landscape with open fields, cerrado or pasture vegetation, horizon line',
-  'Beira-Mar':         'coastal beachfront location with ocean visible, coconut palms, restinga vegetation',
-  'Beira-Rio':         'riverside location with wide river visible, riparian vegetation, urban context',
-  'Serra':             'mountainside hillside with dense Atlantic forest, light mist on peaks',
-  'Praça Urbana':      'urban plaza with stone paving, benches, mature shade trees, pedestrians',
-  'Jardim':            'garden setting with planted ornamental beds, green lawn, flowering trees',
-  'Estacionamento':    'parking lot environment with asphalt surface, marked parking spaces, low-rise surroundings',
-  'Calçada Comercial': 'commercial sidewalk with pedestrian traffic, neighboring retail stores, awnings',
+  'Rua Arborizada':    'tree-lined residential street ambient context, leafy mature canopy mood',
+  'Condomínio':        'gated condominium ambient context, calm residential atmosphere',
+  'Bairro Nobre':      'upscale residential neighborhood ambient context, refined affluent atmosphere',
+  'Zona Urbana':       'urban mixed-use ambient context, active mid-density city atmosphere',
+  'Zona Rural':        'rural landscape ambient context, open horizon mood, quiet pastoral atmosphere',
+  'Beira-Mar':         'coastal beachfront ambient context, oceanic atmosphere with sea breeze quality',
+  'Beira-Rio':         'riverside ambient context, calm waterfront atmosphere',
+  'Serra':             'mountainside ambient context, atmospheric haze on distant peaks, forested mood',
+  'Praça Urbana':      'urban plaza ambient context, public square atmosphere',
+  'Jardim':            'garden ambient context, lush greenery atmosphere',
+  'Estacionamento':    'parking area ambient context, neutral functional atmosphere',
+  'Calçada Comercial': 'commercial sidewalk ambient context, urban pedestrian atmosphere',
   'Clean / Neutro':    'clean neutral palette, white or light gray surfaces, minimal background',
-  'Premium':           'premium atmosphere, high-end materials visible in background, marble and brass accents',
-  'Urbano':            'urban loft character with exposed elements, industrial touches in background',
-  'Natural':           'nature-inspired background, wooden elements, plants, organic textures',
-  'Minimalista':       'minimalist background, very few elements, geometric simplicity, monochromatic',
-  'Comercial':         'commercial background with functional elements, shelving, display fixtures',
-  'Corporativo':       'corporate professional background with branded elements, tech equipment',
-  'Aconchegante':      'warm cozy background with soft textiles, throw pillows, indoor plants, warm light',
+  'Premium':           'premium ambient atmosphere, refined high-end mood',
+  'Urbano':            'urban loft ambient atmosphere, industrial character mood',
+  'Natural':           'nature-inspired ambient atmosphere, organic warm mood',
+  'Minimalista':       'minimalist ambient atmosphere, geometric simplicity mood, monochromatic restraint',
+  'Comercial':         'commercial ambient atmosphere, functional retail mood',
+  'Corporativo':       'corporate ambient atmosphere, professional refined mood',
+  'Aconchegante':      'warm cozy ambient atmosphere, soft inviting mood',
 }
 
 const ELEM_EN: Record<string, string> = {
   'Decoração':              'styled decorative accessories, vases, artwork, throw cushions',
   'Pessoas':                'people in natural relaxed poses, lifestyle photography',
   'Vegetação':              'lush indoor or outdoor plants, tropical greenery',
-  'Luzes Acesas':           'all artificial lights illuminated, warm glowing fixtures',
-  'Raios de Sol':           'visible sun rays streaming through windows, subtle lens flare',
+  'Luzes Acesas':           'turn on the artificial light fixtures already visible in the reference, warm glow from existing fixtures only — DO NOT add new fixtures, lamps, sconces, spots or LEDs',
+  'Raios de Sol':           'subtle visible sun rays streaming through the windows already present in the reference, soft lens flare — DO NOT add new windows, openings or skylights',
   'Pessoas Trabalhando':    'office workers at computers in natural working poses',
   'Computadores':           'computers and monitors on desks with illuminated screens',
   'Mesas de Trabalho':      'workstation desks with office equipment and accessories',
@@ -523,7 +563,18 @@ const SEG_EN: Record<string, string> = {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function buildCameraBlock(): string {
+// Em maximum: bloco neutro. NÃO menciona "not a render, not CGI, real life
+// photo" — quando a entrada já é um render, essa frase é uma ordem ativa pra
+// reinterpretar a imagem (o que muda materiais e finishes). Também evita citar
+// equipamentos específicos (Canon R5, Hasselblad) que empurram estética de
+// revista.
+//
+// Em balanced/creative: bloco completo, faz sentido pros modos onde a
+// reinterpretação fotográfica é desejada.
+function buildCameraBlock(level?: FidelityLevel): string {
+  if (level === 'maximum') {
+    return ', high quality photorealistic image, sharp focus, no compression artifacts'
+  }
   return ', captured with professional architectural camera, Canon R5, 24mm tilt-shift lens, f/4, ISO 100, Hasselblad aesthetic, hyperrealistic, 8K RAW photo, photorealistic architectural photography, not a render, not CGI, real life photo'
 }
 
@@ -544,26 +595,285 @@ function buildFidelityBlock(geometryLock: number, fidelityMode?: 'strict' | 'bal
   return 'GEOMETRY LOCKED: This is a material and lighting transformation ONLY. The camera position, viewing angle, perspective, horizon line, building silhouette, architectural geometry and all proportions must be PIXEL-PERFECT identical to the reference image. Do not reframe, do not rotate, do not zoom. Only surface materials, textures, lighting and background vegetation may change. '
 }
 
-function buildMaterialsBlock(materials?: ProjectMaterials): string {
+// Quando o usuário preenche um campo de materiais, é uma OVERRIDE explícita —
+// substitui o que está visível na imagem de referência. Em maximum o wording é
+// mais forte (reference-vs-override) porque o resto do prompt já manda preservar
+// tudo da imagem.
+//
+// projectType é load-bearing: o mesmo campo (`piso`, `esquadrias`) vira termo
+// diferente em interior vs exterior, e os campos interior-only (paredes, teto,
+// marcenaria, bancadas) só são emitidos em interior — em exterior não fazem
+// sentido e vazariam pro prompt mesmo se houvesse dado órfão no JSONB.
+function buildMaterialsBlock(
+  materials?:  ProjectMaterials,
+  projectType?: ProjectType,
+  level?:      FidelityLevel,
+): string {
   if (!materials) return ''
+  const isInterior = projectType === 'interior'
   const lines = [
-    materials.fachada    && `facade cladding: ${materials.fachada}`,
-    materials.piso       && `floor and paving: ${materials.piso}`,
-    materials.esquadrias && `window frames and doors: ${materials.esquadrias}`,
+    // Exterior-only
+    !isInterior && materials.fachada    && `facade cladding: ${materials.fachada}`,
+    // Compartilhados (mapeamento por contexto)
+    materials.piso       && (isInterior
+      ? `flooring: ${materials.piso}`
+      : `floor and paving: ${materials.piso}`),
+    materials.esquadrias && (isInterior
+      ? `interior doors and window frames: ${materials.esquadrias}`
+      : `external doors and window frames: ${materials.esquadrias}`),
+    // Interior-only — nomes específicos pra evitar a ambiguidade que fazia
+    // "facade cladding" descrever uma parede de cozinha.
+    isInterior && materials.paredes     && `wall finishes and surface materials: ${materials.paredes}`,
+    isInterior && materials.teto        && `ceiling finish: ${materials.teto}`,
+    isInterior && materials.marcenaria  && `built-in millwork, cabinetry and fitted furniture: ${materials.marcenaria}`,
+    isInterior && materials.bancadas    && `countertops and surfaces: ${materials.bancadas}`,
+    // Compartilhados em ambos
     materials.elementos  && `special architectural elements: ${materials.elementos}`,
     materials.outros     && `additional notes: ${materials.outros}`,
   ].filter(Boolean)
   if (lines.length === 0) return ''
+  if (level === 'maximum') {
+    // Removida a frase "All OTHER materials must remain identical" — já dita
+    // 2x antes (fidelityModifier + buildNegativePromptForFidelity).
+    return `MATERIAL OVERRIDES (priority over reference): ${lines.join('; ')}. `
+  }
   return `EXACT PROJECT MATERIALS — reproduce these faithfully: ${lines.join('; ')}. `
+}
+
+// ── Fidelity Engine prompt builder ─────────────────────────────────────────────
+
+// 17 itens esparsos consolidados em 6 itens densos. Cada item carrega um vetor
+// completo em vez de fragmentar a mesma proibição em N linhas — modelo de
+// difusão presta menos atenção quando há muitos itens repetitivos competindo.
+const NEGATIVE_BASE = [
+  'no architectural changes (no added, removed, repositioned or resized walls, partitions, columns, beams, doors, windows, arches, niches, openings, ceiling line, roofline, stories or room boundaries)',
+  'no transformed openings (a door stays a door, a window stays a window, an arch stays an arch)',
+  'no different camera angle, perspective, framing, zoom, rotation or altered silhouette',
+  'no warped proportions',
+  'no removed neighboring buildings',
+  'no fantasy, surreal or impossibly-shaped additions',
+]
+
+// Negativos específicos pra Máxima — só vetores que NÃO são cobertos por
+// outros blocos. Item antigo de "fixture on/off state" foi removido: já é
+// coberto pela `lightingLine` quando lighting === 'Preservar Original' e,
+// quando o user pediu mudar a luz, esse negativo seria contra-pedido.
+const MAXIMUM_EXTRA_NEGATIVES = [
+  'no recoloring, restaining, repainting or replaced finishes on any wall, ceiling, floor, door, window frame, ceiling fan, light fixture or furniture (no concrete texture replacing painted walls, no industrial finish replacing flat paint)',
+  'no altered geometry, hardware or proportions on doors, windows, fans or fixtures',
+]
+
+export function buildNegativePromptForFidelity(level: FidelityLevel): string {
+  if (level === 'creative') {
+    // ainda preserva volumetria/aberturas/perspectiva, mas relaxa entorno e estilo
+    const relaxed = NEGATIVE_BASE.filter(n =>
+      !n.includes('removed neighboring') && !n.includes('changed roofline')
+    )
+    return `AVOID: ${relaxed.join(', ')}.`
+  }
+  if (level === 'balanced') {
+    return `AVOID: ${NEGATIVE_BASE.join(', ')}.`
+  }
+  // maximum — base + extras específicos contra drift de cor/material/fixture
+  const all = [...NEGATIVE_BASE, ...MAXIMUM_EXTRA_NEGATIVES]
+  return `STRICTLY AVOID: ${all.join(', ')}, no reframe, no zoom, no rotation, no altered silhouette.`
+}
+
+// Pedido cirúrgico de alteração entre gerações ("trocar só o piso", "adicionar
+// vegetação na varanda"). Só aplicado quando há âncora — sem âncora, o modelo
+// não tem referência fixa do "tudo o que deve ser preservado".
+function buildRefinementBlock(refinementText?: string, hasAnchor?: boolean): string {
+  const text = refinementText?.trim()
+  if (!text || !hasAnchor) return ''
+  return (
+    `USER REFINEMENT REQUEST: "${text}". ` +
+    `This is the ONLY change the user wants applied to image #1. ` +
+    `Preserve EVERYTHING else from image #1 pixel-by-pixel: all other materials, ` +
+    `textures, lighting, composition, camera angle, perspective, props, vegetation, ` +
+    `furniture and architectural elements must remain identical. ` +
+    `If the request is to REMOVE an element, remove it cleanly: the result must be the ` +
+    `surrounding wall, floor or ceiling material continuing seamlessly — NEVER replace ` +
+    `the removed element with a different one of the same kind. Removing a door = solid ` +
+    `wall in its place. Removing a window = solid wall. Removing furniture = empty floor. ` +
+    `Never transform one architectural element into another (door into arch, window into ` +
+    `door, opening into different opening). ` +
+    `Do not reinterpret, do not improve, do not stylize anything that is not the ` +
+    `refinement request. `
+  )
+}
+
+// Quando o cliente envia uma âncora (render anterior do MESMO projeto), ela vai
+// PRIMEIRO em image_urls — Gemini/GPT extrai materiais e atmosfera dela. A
+// imagem de input (geometria) vai segundo. Este bloco diz isso ao modelo.
+function buildAnchorBlock(hasAnchor?: boolean): string {
+  if (!hasAnchor) return ''
+  return (
+    'TWO REFERENCE IMAGES PROVIDED: ' +
+    'Image #1 is the previous render of THIS SAME PROJECT — use it as the source ' +
+    'of materials, textures (rugs, fabrics, wood grain, plants), color palette ' +
+    'and overall atmosphere. Match these EXACTLY. ' +
+    'Image #2 is the geometry source — use it ONLY for architecture, layout, ' +
+    'camera angle and perspective. ' +
+    'Apply the lighting and scene changes requested below to image #1 while ' +
+    'preserving its materials and textures pixel-by-pixel where geometry allows. '
+  )
+}
+
+function fidelityModifier(level: FidelityLevel): string {
+  if (level === 'creative') {
+    return 'CREATIVE FIDELITY MODE: Preserve volumetry, number of stories, opening positions and overall perspective. Stylistic freedom is allowed on materials, sky, ambient props, vegetation and surroundings. '
+  }
+  if (level === 'balanced') {
+    return 'BALANCED FIDELITY MODE: Preserve architecture, camera angle, opening positions, number of stories and main volumetry. Light composition tweaks allowed (vegetation, sky, ambient props). Do not redesign the facade. '
+  }
+  // maximum — princípios apenas. Lista exaustiva de "walls, openings,
+  // partitions, beams, columns..." vive no NEGATIVE_BASE; lista exaustiva
+  // de fixtures vive na lightingLine; lista de finishes vive no
+  // MAXIMUM_EXTRA_NEGATIVES. Aqui só os 4 vetores conceituais.
+  return (
+    'MAXIMUM FIDELITY MODE — faithful photorealistic re-render of the reference. ' +
+    'Preserve every visible element exactly: architecture, materials, colors, finishes, fixtures, furniture, props. ' +
+    'Context and mood descriptors below are ATMOSPHERE ONLY, never license to alter anything visible. ' +
+    'Apply ONLY changes explicitly requested in the lighting, scene, material or refinement blocks. '
+  )
+}
+
+// Lista de fatos da análise prévia. Removidos os "DO NOT" inline (já cobertos
+// pelo NEGATIVE_BASE) e o LOCKED ELEMENTS separado (duplicava PROJECT FACTS).
+// O modelo lê isso como descrição factual da referência — instrução é o
+// header "must remain identical".
+function preservationBlock(briefing: BriefingArquitetonico): string {
+  const locked = briefing.elementos_preservar.length > 0
+    ? `\n- Locked elements: ${briefing.elementos_preservar.join('; ')}`
+    : ''
+  return (
+    `PROJECT FACTS (from vision analysis — must remain identical to the reference):\n` +
+    `- Type: ${briefing.tipo_projeto}\n` +
+    `- Geometry: ${briefing.geometria_principal} | ${briefing.volumes} | ${briefing.pavimentos} stories\n` +
+    `- Openings: ${briefing.aberturas}\n` +
+    `- Visible materials: ${briefing.materiais_aparentes}\n` +
+    `- Camera: ${briefing.camera}\n` +
+    `- Surroundings: ${briefing.entorno}` +
+    locked + '\n'
+  )
+}
+
+// Em maximum NÃO emitimos lista de "improvements permitidas" — qualquer item nessa
+// lista vira licença implícita pro modelo reinterpretar materiais. Em maximum só
+// muda o que o usuário pediu explicitamente (luz, scene, materials override,
+// refinement). Em balanced/creative continua emitindo a lista do briefing.
+function transformationBlock(briefing: BriefingArquitetonico, level: FidelityLevel): string {
+  if (level === 'maximum') return ''
+  if (briefing.elementos_melhorar.length === 0) return ''
+  return `ALLOWED IMPROVEMENTS ONLY (visual quality, not architecture): ${briefing.elementos_melhorar.join('; ')}. `
+}
+
+// briefing é opcional. Quando ausente, o `fidelityModifier` carrega sozinho a
+// instrução de preservação — o modelo já vê a imagem direto e não precisa de
+// uma redescrição textual dos elementos. Quando presente (ex: futuro Spaces
+// Vista Mestre), os PROJECT FACTS adicionam locks específicos.
+export function buildFidelityPrompt(
+  options:   GenerateOptions,
+  level:     FidelityLevel = 'maximum',
+  briefing?: BriefingArquitetonico,
+): string {
+  const { projectType, segment, lighting, background, sceneElements, materials, hasAnchor, refinementText } = options
+
+  const anchor     = buildAnchorBlock(hasAnchor)
+  const refinement = buildRefinementBlock(refinementText, hasAnchor)
+  const modifier   = fidelityModifier(level)
+  const preserve   = briefing ? preservationBlock(briefing) : ''
+  const allow      = briefing ? transformationBlock(briefing, level) : ''
+  const matBlock   = buildMaterialsBlock(materials, projectType, level)
+  const negative   = buildNegativePromptForFidelity(level)
+
+  const lightDesc  = LIGHT_EN[lighting] ?? lighting
+  const segDesc    = SEG_EN[segment]    ?? segment.toLowerCase()
+
+  const elemParts = sceneElements.map(e => ELEM_EN[e] ?? e.toLowerCase()).filter(Boolean)
+  // Wrapper enfatiza que isso é ADIÇÃO (não substituição) e proíbe explicitamente
+  // criar novos objetos arquitetônicos (janelas, aberturas, luminárias) só pra
+  // justificar o efeito pedido. Isso protege contra ELEM_EN entries como
+  // "Luzes Acesas" e "Raios de Sol" que historicamente faziam o modelo
+  // adicionar fixtures/janelas inexistentes.
+  const elemBlock = elemParts.length > 0
+    ? `Scene additions to include WHERE naturally appropriate WITHOUT removing, replacing or restyling any existing element from the reference, and WITHOUT creating new windows, openings, walls, light fixtures or any architectural element to accommodate the addition: ${elemParts.join('; ')}. `
+    : ''
+
+  let bgBlock = ''
+  if (background && background !== 'Preservar Original') {
+    const bgDesc = BG_EN[background] ?? background
+    if (bgDesc) {
+      // Em Máxima Fidelidade, contexto vira gatilho clássico de drift: descrições
+      // como "urban loft industrial mood" eram interpretadas pelo modelo como
+      // licença pra trocar paredes por cimento queimado, mudar cor do ventilador,
+      // etc. Wrapper extra-firme avisa explicitamente que é só atmosfera —
+      // tudo o que é VISÍVEL na referência (materiais, cores, fixtures) tem que
+      // permanecer intacto.
+      if (level === 'maximum') {
+        bgBlock = (
+          `Atmospheric mood reference (does NOT alter any visible material, color, ` +
+          `finish, light fixture, fan, door, window or any object — only subtle ambient ` +
+          `quality of the air, light tone and overall feel): ${bgDesc}. `
+        )
+      } else {
+        // Wrapper deixa claro que é mood/atmosfera — não pra adicionar carros,
+        // árvores específicas ou prédios fora do que o usuário pediu.
+        bgBlock = projectType === 'exterior'
+          ? `Surrounding context (atmosphere and mood only — do not add or remove specific buildings, vehicles, trees or other objects from the reference): ${bgDesc}. `
+          : `Spatial context (atmosphere and mood only — do not add or remove specific objects from the reference): ${bgDesc}. `
+      }
+    }
+  }
+
+  // Em maximum: intent NEUTRO em 1 frase. "high-end ... architectural
+  // photograph" (template antigo) puxava clichê de revista (pendentes
+  // acesos, materiais premium) e competia com o lock.
+  // Em balanced/creative: template descritivo arquitetônico.
+  const kind   = projectType === 'exterior'
+    ? `${segDesc} architectural exterior photograph`
+    : `${segDesc} architectural interior photograph`
+  const intent = level === 'maximum'
+    ? `Render this reference faithfully — photograph the EXACT scene shown, no magazine-style upgrades. `
+    : `Transform this reference image as a photorealistic ${kind}. `
+
+  // 'Preservar Original' ativa lock afirmativo: cada fixture mantém o estado
+  // on/off do input, mesmo time of day, mesmas sombras. Sem essa especificidade
+  // o modelo lia "preserve lighting" como sugestão, não regra.
+  //
+  // Quando lighting != Preservar, o wrapper deixa claro que é descrição de
+  // ATMOSFERA — algumas entradas de LIGHT_EN mencionam "table lamps", "sconces"
+  // e isso virava licença pra adicionar fixtures inexistentes.
+  const preserveLighting = !lighting || lighting === 'Preservar Original'
+  const lightingLine = preserveLighting
+    ? 'Lighting: keep the reference lighting EXACTLY — every fixture stays in the same on/off state, same time of day, same shadow direction. '
+    : `Lighting condition (atmosphere only — do not add or change any lamp, sconce, spot, fixture or any object visible in the reference): ${lightDesc}. `
+
+  return (
+    anchor +
+    refinement +
+    modifier +
+    preserve +
+    matBlock +
+    intent +
+    lightingLine +
+    bgBlock +
+    elemBlock +
+    allow +
+    negative +
+    buildCameraBlock(level)
+  )
 }
 
 // ── Main export ────────────────────────────────────────────────────────────────
 
 export function buildGenerationPrompt(options: GenerateOptions): string {
-  const { projectType, segment, environment, lighting, background, sceneElements, geometryLock, materials, fidelityMode } = options
+  const { projectType, segment, environment, lighting, background, sceneElements, geometryLock, materials, fidelityMode, hasAnchor, refinementText } = options
 
-  const geoPrefix = buildFidelityBlock(geometryLock, fidelityMode)
-  const matBlock  = buildMaterialsBlock(materials)
+  const anchor     = buildAnchorBlock(hasAnchor)
+  const refinement = buildRefinementBlock(refinementText, hasAnchor)
+  const geoPrefix  = buildFidelityBlock(geometryLock, fidelityMode)
+  const matBlock  = buildMaterialsBlock(materials, projectType)
   const envDesc   = ENV_EN[environment]  ?? environment
   const lightDesc = LIGHT_EN[lighting]   ?? lighting
   const segDesc   = SEG_EN[segment]      ?? segment.toLowerCase()
@@ -585,7 +895,7 @@ export function buildGenerationPrompt(options: GenerateOptions): string {
 
   if (projectType === 'exterior') {
     return (
-      geoPrefix + matBlock +
+      anchor + refinement + geoPrefix + matBlock +
       `Transform this 3D model into a photorealistic architectural exterior photograph. ` +
       `${segDesc} architecture. ${envDesc}. ` +
       `Lighting: ${lightDesc}. ` +
@@ -595,7 +905,7 @@ export function buildGenerationPrompt(options: GenerateOptions): string {
     )
   }
   return (
-    geoPrefix + matBlock +
+    anchor + refinement + geoPrefix + matBlock +
     `Transform this 3D preview into a photorealistic architectural interior photograph. ` +
     `${segDesc} space. ${envDesc}. ` +
     `Lighting: ${lightDesc}. ` +

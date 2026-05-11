@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 
@@ -15,7 +15,7 @@ const geist = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Spacenode · Plataforma visual para arquitetura e interiores",
+  title: "SpaceNode · Plataforma visual para arquitetura e interiores",
   description:
     "A plataforma criativa para arquitetos e designers de interiores. Crie renders, refine imagens e impressione clientes em minutos.",
   keywords: [
@@ -25,15 +25,15 @@ export const metadata: Metadata = {
     "design de interiores",
     "apresentação visual",
     "archviz Brasil",
-    "Spacenode",
+    "SpaceNode",
   ],
-  authors: [{ name: "Spacenode" }],
+  authors: [{ name: "SpaceNode" }],
   openGraph: {
-    title: "Spacenode · Plataforma visual para arquitetura e interiores",
+    title: "SpaceNode · Plataforma visual para arquitetura e interiores",
     description:
       "Crie renders, refine imagens e impressione clientes em minutos. Para arquitetos e designers de interiores.",
     url: "https://spacenode.app",
-    siteName: "Spacenode",
+    siteName: "SpaceNode",
     locale: "pt_BR",
     type: "website",
     images: [
@@ -41,13 +41,13 @@ export const metadata: Metadata = {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "Spacenode",
+        alt: "SpaceNode",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Spacenode · Plataforma visual para arquitetura e interiores",
+    title: "SpaceNode · Plataforma visual para arquitetura e interiores",
     description:
       "Crie renders e assets visuais premium em minutos. Para arquitetos e designers de interiores.",
     images: ["/og-image.png"],
@@ -57,9 +57,16 @@ export const metadata: Metadata = {
     follow: true,
   },
   icons: {
-    icon: "/favicon.ico",
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "any" },
+    ],
     apple: "/apple-touch-icon.png",
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#1a1a1a",
 };
 
 export default function RootLayout({

@@ -59,9 +59,10 @@ export function buildDnaPrefix(
   if (lines.length === 0) return ''
 
   return (
-    `[PROJECT DNA — preserve identity across generations]\n` +
+    `[LOCKED PROJECT DNA — NON-NEGOTIABLE CONSTRAINTS]\n` +
     lines.join('\n') +
-    `\nThis image must visually belong to the same project as the reference.\n\n`
+    `\nAll locked traits listed above are FIXED. They must appear in the output EXACTLY as specified. ` +
+    `Do NOT substitute, blend, alter or remove any of them.\n\n`
   )
 }
 

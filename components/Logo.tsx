@@ -1,35 +1,73 @@
-export default function Logo({ size = 22 }: { size?: number }) {
+/**
+ * SpaceNode Logo · Constellation N
+ *
+ * Construído estritamente conforme o Manual da Marca v1.0 (§2.3):
+ *   • Grade 64×64 com margens internas de 16 unidades
+ *   • Quatro nós nos vértices do quadrado central 32×32
+ *   • Três traços formando a letra N (vertical esquerdo, diagonal, vertical direito)
+ *   • Traço 1.5 unidades · raio do nó 3 unidades · linecap/linejoin arredondados
+ *
+ * Variantes (§2.4):
+ *   "default"  → símbolo monocromático (cor herdada via currentColor)
+ *   "accent"   → versão com nó luminoso verde (uso de favicon, app icon)
+ *
+ * Uso:
+ *   <Logo size={20} />                     // herda cor do contexto
+ *   <Logo size={32} variant="accent" />    // nó verde inferior-direito
+ */
+type LogoVariant = "default" | "accent";
+
+interface LogoProps {
+  size?: number;
+  variant?: LogoVariant;
+  className?: string;
+  title?: string;
+}
+
+export default function Logo({
+  size = 22,
+  variant = "default",
+  className,
+  title = "SpaceNode",
+}: LogoProps) {
+  const accentColor = "#30B46C"; // SpaceNode Green (manual §4.1)
+
   return (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 22 22"
+      viewBox="0 0 64 64"
       xmlns="http://www.w3.org/2000/svg"
-      aria-label="Spacenode logo"
+      role="img"
+      aria-label={title}
+      className={className}
     >
-      <g stroke="currentColor" strokeWidth="0.5" opacity="0.3">
-        <line x1="7.33" y1="1" x2="7.33" y2="21" />
-        <line x1="14.67" y1="1" x2="14.67" y2="21" />
-        <line x1="1" y1="7.33" x2="21" y2="7.33" />
-        <line x1="1" y1="14.67" x2="21" y2="14.67" />
-      </g>
+      <title>{title}</title>
+
+      {/* Três traços do N — herdam currentColor */}
       <g
-        fontFamily="var(--font-geist), sans-serif"
-        fontSize="5"
-        fontWeight="400"
-        fill="currentColor"
-        textAnchor="middle"
-        dominantBaseline="central"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
       >
-        <text x="3.67" y="4.17">S</text>
-        <text x="11" y="4.17">P</text>
-        <text x="18.33" y="4.17">A</text>
-        <text x="3.67" y="11">C</text>
-        <text x="11" y="11">E</text>
-        <text x="18.33" y="11">N</text>
-        <text x="3.67" y="17.83">O</text>
-        <text x="11" y="17.83">D</text>
-        <text x="18.33" y="17.83">E</text>
+        <line x1="16" y1="16" x2="16" y2="48" />
+        <line x1="16" y1="16" x2="48" y2="48" />
+        <line x1="48" y1="16" x2="48" y2="48" />
+      </g>
+
+      {/* Quatro nós · raio 3 */}
+      <g fill="currentColor">
+        <circle cx="16" cy="16" r="3" />
+        <circle cx="48" cy="16" r="3" />
+        <circle cx="16" cy="48" r="3" />
+        <circle
+          cx="48"
+          cy="48"
+          r="3"
+          fill={variant === "accent" ? accentColor : "currentColor"}
+        />
       </g>
     </svg>
   );

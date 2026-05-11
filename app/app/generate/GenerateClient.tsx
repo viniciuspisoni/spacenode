@@ -1,20 +1,43 @@
 'use client'
-import { useState, useRef, useEffect, useLayoutEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Logo from '@/components/Logo'
 import {
   ProjectType, ProjectMaterials,
   getSegments, getEnvironments, getLighting, getBackgrounds, getSceneElements,
 } from '@/lib/prompts'
+import {
+  ENGINES, ENGINE_ORDER, DEFAULT_ENGINE, DEFAULT_RESOLUTION,
+  type EngineId, type Resolution,
+  getNodesCost, isEngineId, isResolution, isValidCombination,
+} from '@/lib/engines'
+import { EngineIcon } from '@/components/icons/engines'
 
 interface GenerateClientProps {
   initialCredits:    number
   initialMaterials?: ProjectMaterials
+  initialConfig?:    ProjectConfig | null
+}
+
+// Persisted last-used render config (profiles.project_config — JSONB).
+// Type-strict fields (projectType / fidelityLevel / engine / resolution) are
+// validated on load; free-text taxonomy strings flow through as-is.
+interface ProjectConfig {
+  projectType?:        ProjectType
+  segment?:            string
+  environment?:        string
+  lighting?:           string
+  background?:         string
+  sceneElements?:      string[]
+  fidelityLevel?:      FidelityLevel
+  selectedEngine?:     EngineId
+  selectedResolution?: Resolution
 }
 
 interface GenerateResult {
   outputUrl: string
   credits:   number
+  prompt?:   string
   error?:    string
 }
 
@@ -26,24 +49,108 @@ const LOADING_TEXTS = [
   'Gerando versão final...',
 ]
 
-const SPN_ENGINES = [
-  { id: 'nano-banana-pro', name: 'Vega',   desc: 'Nano Banana Pro' },
-  { id: 'gpt-image-2',     name: 'Quasar', desc: 'GPT Image 2'     },
+// Timeout máximo da análise prévia. Se passar, segue pro /api/generate sem
+// briefing (graceful degradation — geração continua, só sem o lock textual
+// específico de objetos identificados na referência).
+const ANALYZE_TIMEOUT_MS = 8_000
+
+type FidelityLevel = 'maximum' | 'balanced' | 'creative'
+
+const FIDELITY_LEVELS: { id: FidelityLevel; label: string; desc: string }[] = [
+  { id: 'maximum',  label: 'Máxima',     desc: 'Preserva tudo do projeto'           },
+  { id: 'balanced', label: 'Equilibrado',desc: 'Pequenas melhorias permitidas'      },
+  { id: 'creative', label: 'Criativo',   desc: 'Mais liberdade estética'            },
 ]
 
-const OUTPUT_QUALITIES = [
-  { id: 'hd', label: 'HD',  nodes: 4,  desc: 'Rápido para testes'       },
-  { id: '2k', label: '2K',  nodes: 8,  desc: 'Ideal para apresentação'  },
-  { id: '4k', label: '4K',  nodes: 20, desc: 'Máxima definição'         },
-]
+const RESOLUTION_DESC: Record<Resolution, string> = {
+  hd: 'Rápido para testes',
+  '2k': 'Ideal para apresentação',
+  '4k': 'Máxima definição',
+}
 
 const EMPTY_MATERIALS: ProjectMaterials = {
-  fachada: '', piso: '', esquadrias: '', elementos: '', outros: '',
+  fachada: '', piso: '', esquadrias: '',
+  paredes: '', teto: '', marcenaria: '', bancadas: '',
+  elementos: '', outros: '',
 }
+
+// Campos de materiais por tipo de projeto. A lista usada na UI é escolhida em
+// runtime conforme projectType — campos que não fazem sentido no contexto não
+// aparecem (ex: "Revestimento de fachada" some quando o user troca pra interior).
+type MaterialField = {
+  field:       keyof ProjectMaterials
+  label:       string
+  placeholder: string
+}
+
+const MATERIAL_FIELDS_INTERIOR: readonly MaterialField[] = [
+  { field: 'piso',       label: 'Piso',                    placeholder: 'ex: porcelanato 90×90 cinza claro, taco de madeira freijó' },
+  { field: 'paredes',    label: 'Paredes / Revestimentos', placeholder: 'ex: pintura branco fosco, painel ripado de carvalho' },
+  { field: 'teto',       label: 'Teto',                    placeholder: 'ex: gesso liso branco, sanca com fita LED' },
+  { field: 'marcenaria', label: 'Marcenaria',              placeholder: 'ex: armários laqueados off-white, painéis de freijó' },
+  { field: 'bancadas',   label: 'Bancadas',                placeholder: 'ex: quartzo branco 2cm, mármore Calacatta' },
+  { field: 'esquadrias', label: 'Portas e caixilhos',      placeholder: 'ex: portas de correr em alumínio preto fosco' },
+  { field: 'elementos',  label: 'Elementos especiais',     placeholder: 'ex: lareira a gás, pé-direito duplo, escada flutuante' },
+  { field: 'outros',     label: 'Observações adicionais',  placeholder: 'ex: tapete grande na sala, cortinas até o chão' },
+]
+
+const MATERIAL_FIELDS_EXTERIOR: readonly MaterialField[] = [
+  { field: 'fachada',    label: 'Revestimento de fachada', placeholder: 'ex: placas cimentícias texturizadas, ACM preto' },
+  { field: 'piso',       label: 'Piso externo / calçada',  placeholder: 'ex: porcelanato 90×90 cinza claro' },
+  { field: 'esquadrias', label: 'Esquadrias / caixilhos',  placeholder: 'ex: alumínio preto fosco' },
+  { field: 'elementos',  label: 'Elementos especiais',     placeholder: 'ex: painel de madeira ipê, brise metálico' },
+  { field: 'outros',     label: 'Observações adicionais',  placeholder: 'ex: estrutura em concreto aparente, laje invertida' },
+]
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function firstOf(arr: string[]): string { return arr[0] ?? '' }
+
+// ── Compressão de imagem no client ────────────────────────────────────────────
+//
+// Aceita uploads de até 10 MB e devolve um JPEG normalizado em até maxSide px
+// no maior lado. Garante que o payload base64 enviado pro /api/generate fique
+// confortavelmente abaixo do limite de ~4.5 MB da Vercel, independente do que
+// o usuário subir (foto de celular, PNG enorme, render exportado em alta).
+async function compressImage(
+  dataUrl: string,
+  maxSide: number = 2048,
+  quality: number = 0.92,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => {
+      const { width, height } = img
+      const longest = Math.max(width, height)
+      const scale   = longest > maxSide ? maxSide / longest : 1
+      const targetW = Math.round(width * scale)
+      const targetH = Math.round(height * scale)
+      const canvas  = document.createElement('canvas')
+      canvas.width  = targetW
+      canvas.height = targetH
+      const ctx = canvas.getContext('2d')
+      if (!ctx) { reject(new Error('CANVAS_UNSUPPORTED')); return }
+      ctx.drawImage(img, 0, 0, targetW, targetH)
+      resolve(canvas.toDataURL('image/jpeg', quality))
+    }
+    img.onerror = () => reject(new Error('IMAGE_LOAD_FAILED'))
+    img.src = dataUrl
+  })
+}
+
+// Download forçado via proxy do nosso próprio backend. /api/download faz
+// fetch server-side da imagem e devolve com Content-Disposition: attachment,
+// que faz o browser salvar em vez de abrir. Funciona independente de CORS
+// no CDN.
+function downloadImage(url: string, filename: string) {
+  const proxyUrl = `/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`
+  const a = document.createElement('a')
+  a.href = proxyUrl
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+}
 
 function deriveDefaults(projectType: ProjectType, segment: string) {
   const envs   = getEnvironments(projectType, segment)
@@ -56,7 +163,38 @@ function deriveDefaults(projectType: ProjectType, segment: string) {
   }
 }
 
-export function GenerateClient({ initialCredits, initialMaterials }: GenerateClientProps) {
+// Hidrata o estado inicial a partir do project_config persistido. Campos
+// tipo-estrito caem pra default se a string salva for desconhecida (ex: engine
+// removida). Combinação engine×resolução também é checada — saved Vega+HD
+// passou a ser inválido depois de Pricing v2 e quebraria getNodesCost.
+function resolveInitialConfig(cfg: ProjectConfig | null | undefined) {
+  const projectType: ProjectType =
+    cfg?.projectType === 'interior' || cfg?.projectType === 'exterior'
+      ? cfg.projectType : 'exterior'
+  const fidelityLevel: FidelityLevel =
+    cfg?.fidelityLevel === 'balanced' || cfg?.fidelityLevel === 'creative'
+      ? cfg.fidelityLevel : 'maximum'
+  const engine: EngineId = isEngineId(cfg?.selectedEngine) ? cfg.selectedEngine : DEFAULT_ENGINE
+  const rawRes: Resolution = isResolution(cfg?.selectedResolution) ? cfg.selectedResolution : DEFAULT_RESOLUTION
+  const resolution: Resolution = isValidCombination(engine, rawRes) ? rawRes : ENGINES[engine].resolutions[0]
+  const sceneElements: string[] = Array.isArray(cfg?.sceneElements)
+    ? cfg.sceneElements.filter((x): x is string => typeof x === 'string')
+    : []
+  return {
+    projectType,
+    segment:            cfg?.segment     ?? 'Residencial',
+    environment:        cfg?.environment ?? 'Fachada Residencial',
+    lighting:           cfg?.lighting    ?? 'Preservar Original',
+    background:         cfg?.background  ?? 'Preservar Original',
+    sceneElements,
+    fidelityLevel,
+    selectedEngine:     engine,
+    selectedResolution: resolution,
+  }
+}
+
+export function GenerateClient({ initialCredits, initialMaterials, initialConfig }: GenerateClientProps) {
+  const init = resolveInitialConfig(initialConfig)
   const supabase = createClient()
 
   // ── Global state
@@ -67,40 +205,24 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
   const [generationKey,      setGenerationKey]     = useState(0)
   const [error,              setError]             = useState<string | null>(null)
 
-  // ── Dark mode
-  // Server always renders isDark=false (no document). useLayoutEffect syncs
-  // the correct value on the client before the first paint — no visible flash.
-  const [isDark, setIsDark] = useState(false)
-  useLayoutEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setIsDark(document.documentElement.classList.contains('dark'))
-  }, [])
-
-  const toggleTheme = () => {
-    const html = document.documentElement
-    const newDark = !html.classList.contains('dark')
-    html.classList.toggle('dark', newDark)
-    try { localStorage.setItem('theme', newDark ? 'dark' : 'light') } catch {}
-    setIsDark(newDark)
-  }
-
   // ── Tipo e Segmento
-  const [projectType, setProjectType] = useState<ProjectType>('exterior')
-  const [segment,     setSegment]     = useState<string>('Residencial')
+  const [projectType, setProjectType] = useState<ProjectType>(init.projectType)
+  const [segment,     setSegment]     = useState<string>(init.segment)
 
   // ── Ambiente, Iluminação, Background
-  const [environment, setEnvironment] = useState<string>('Fachada Residencial')
-  const [lighting,    setLighting]    = useState<string>('Diurno')
-  const [background,  setBackground]  = useState<string>('Preservar Original')
+  const [environment, setEnvironment] = useState<string>(init.environment)
+  const [lighting,    setLighting]    = useState<string>(init.lighting)
+  const [background,  setBackground]  = useState<string>(init.background)
 
   // ── Elementos na Cena (múltipla seleção)
-  const [sceneElements, setSceneElements] = useState<string[]>([])
+  const [sceneElements, setSceneElements] = useState<string[]>(init.sceneElements)
 
   // ── Parâmetros técnicos
   const geometryLock = 85
   const fidelityMode = 'strict' as const
-  const [selectedModel,  setSelectedModel]  = useState('nano-banana-pro')
-  const [outputQuality,  setOutputQuality]  = useState('hd')
+  const [fidelityLevel,      setFidelityLevel]      = useState<FidelityLevel>(init.fidelityLevel)
+  const [selectedEngine,     setSelectedEngine]     = useState<EngineId>(init.selectedEngine)
+  const [selectedResolution, setSelectedResolution] = useState<Resolution>(init.selectedResolution)
 
   // ── Materiais
   const [materiaisAberto, setMateriaisAberto] = useState(false)
@@ -117,10 +239,30 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
   const [isDraggingSlider,  setIsDraggingSlider]  = useState(false)
   const [isDraggingFile,    setIsDraggingFile]    = useState(false)
 
+  // ── Zoom + pan da imagem comparativa.
+  //    Wheel (com cursor sobre a imagem) zooma com origem no cursor; drag
+  //    passa a fazer pan quando scale > 1; duplo-clique reseta.
+  const [scale,             setScale]             = useState(1)
+  const [pan,               setPan]               = useState({ x: 0, y: 0 })
+  const [isPanning,         setIsPanning]         = useState(false)
+
+  // ── Âncora visual: render anterior usado pra manter consistência de
+  //    materiais/texturas entre gerações sucessivas do mesmo input.
+  //    Default true; usuário pode desligar pra começar do zero.
+  const [useAnchor, setUseAnchor] = useState(true)
+
+  // ── Refinar imagem: pedido cirúrgico pra alterar só uma coisa entre gerações.
+  //    Só faz efeito quando há render anterior (anchor) — sem isso o modelo não
+  //    tem referência fixa do "tudo o que deve ser preservado".
+  const [refinementText, setRefinementText] = useState('')
+
   const fileInputRef         = useRef<HTMLInputElement>(null)
   const compareRef           = useRef<HTMLDivElement>(null)
   const loadingTimerRef      = useRef<ReturnType<typeof setInterval> | null>(null)
   const isDraggingSliderRef  = useRef(false)
+  const isPanningRef         = useRef(false)
+  const panStartRef          = useRef<{ mouseX: number; mouseY: number; panX: number; panY: number } | null>(null)
+  const zoomStateRef         = useRef({ scale: 1, panX: 0, panY: 0 })
 
   // ── Cascade: projectType → reset segment + children
   const handleProjectTypeChange = (type: ProjectType) => {
@@ -191,13 +333,54 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
     }, 1500)
   }
 
+  // ── Auto-save da config (debounce 1.5s)
+  // Persiste tipo/segmento/espaço/iluminação/entorno/elementos/fidelidade/
+  // engine/resolução em profiles.project_config para hidratar a próxima visita.
+  // Cascatas de troca (handleProjectTypeChange, handleSegmentChange) entram
+  // como múltiplos setState no mesmo tick — o effect vê só o estado final
+  // depois do batch, então salva uma vez por mudança real.
+  const configSaveTimerRef     = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isFirstConfigSaveRef   = useRef(true)
+  useEffect(() => {
+    // Pula a primeira execução (hidratação inicial — nada mudou de fato).
+    if (isFirstConfigSaveRef.current) {
+      isFirstConfigSaveRef.current = false
+      return
+    }
+    if (configSaveTimerRef.current) clearTimeout(configSaveTimerRef.current)
+    configSaveTimerRef.current = setTimeout(async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+        const config: ProjectConfig = {
+          projectType, segment, environment, lighting, background,
+          sceneElements, fidelityLevel, selectedEngine, selectedResolution,
+        }
+        await supabase.from('profiles').update({ project_config: config }).eq('id', user.id)
+      } catch (e) { console.error('Erro ao salvar config:', e) }
+    }, 1500)
+  }, [
+    projectType, segment, environment, lighting, background,
+    sceneElements, fidelityLevel, selectedEngine, selectedResolution,
+    supabase,
+  ])
+
   // ── Upload — plain functions; React Compiler handles memoization
   const loadImage = (file: File) => {
     if (!file.type.startsWith('image/')) return
-    if (file.size > 3 * 1024 * 1024) { setError('Imagem muito grande. Máximo 3 MB.'); return }
-    setOutputUrl(null); setError(null)
+    if (file.size > 10 * 1024 * 1024) { setError('Imagem muito grande. Máximo 10 MB.'); return }
+    setOutputUrl(null); setError(null); setUseAnchor(true); setRefinementText('')
+    setScale(1); setPan({ x: 0, y: 0 })
     const reader = new FileReader()
-    reader.onload = (e) => setImagePreview(e.target?.result as string)
+    reader.onload = async (e) => {
+      try {
+        const sourceUrl  = e.target?.result as string
+        const compressed = await compressImage(sourceUrl, 2048, 0.92)
+        setImagePreview(compressed)
+      } catch {
+        setError('Não foi possível processar essa imagem. Tente outro arquivo.')
+      }
+    }
     reader.readAsDataURL(file)
   }
 
@@ -206,17 +389,59 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
     const file = e.dataTransfer.files[0]; if (file) loadImage(file)
   }
 
+  // ── Fidelity Engine — análise prévia da imagem (Claude vision via Fal).
+  // Identifica objetos visíveis no input (cortinas, ventiladores, espelhos,
+  // mobiliário) e devolve `briefing` + `inputUrl` (já no fal.storage).
+  // O briefing entra no prompt como `preservationBlock` com lista textual
+  // de "elementos_preservar", o que protege contra o modelo não-reconhecer
+  // objetos do SketchUp (caso clássico: cortina virando parede de cimento).
+  // Falha/timeout = segue pro /api/generate sem briefing — degradação graciosa.
+  const runFidelityAnalysis = async (imageBase64: string) => {
+    try {
+      const ctrl  = new AbortController()
+      const timer = setTimeout(() => ctrl.abort(), ANALYZE_TIMEOUT_MS)
+      const res = await fetch('/api/analyze', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ imageBase64 }),
+        signal:  ctrl.signal,
+      })
+      clearTimeout(timer)
+      if (!res.ok) return null
+      return await res.json() as { inputUrl: string; briefing: unknown }
+    } catch {
+      return null
+    }
+  }
+
   // ── Geração
-  const handleGenerate = async (qualityOverride?: string) => {
+  const handleGenerate = async (resolutionOverride?: Resolution) => {
     if (!imagePreview) { setError('Faça upload de uma imagem primeiro.'); return }
     if (credits < nodeCost) { setError('Nodes insuficientes.'); return }
     setError(null); setLoading(true); startLoadingTexts()
     try {
+      // Análise prévia ativa só em Máxima Fidelidade. Em Equilibrado e
+      // Criativo o lock textual atrapalharia mais que ajudaria — o usuário
+      // está pedindo liberdade estética. Em Máxima é onde a precisão de
+      // identificar objetos ("cortina cinza à direita") tem mais valor.
+      const useEngine = fidelityLevel === 'maximum'
+      const analysis  = useEngine ? await runFidelityAnalysis(imagePreview) : null
+
+      // Anchor: usa o último output como referência visual de materiais quando
+      // o usuário regera a mesma imagem (ex: troca de iluminação) e o toggle
+      // estiver ligado.
+      const anchorUrl = useAnchor && outputUrl ? outputUrl : undefined
+
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          imageBase64:   imagePreview,
+          // Quando a análise sobe a imagem pro fal.storage, reusa o inputUrl
+          // pra não pagar segundo upload no /api/generate.
+          imageBase64:   analysis?.inputUrl ? undefined : imagePreview,
+          inputUrl:      analysis?.inputUrl,
+          briefing:      analysis?.briefing,
+          fidelityLevel,
           projectType,
           segment,
           environment,
@@ -225,14 +450,18 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
           sceneElements,
           geometryLock,
           fidelityMode,
-          model:         selectedModel,
-          outputQuality: qualityOverride ?? outputQuality,
+          engine:        selectedEngine,
+          resolution:    resolutionOverride ?? selectedResolution,
           materials:     Object.values(materials).some(v => v) ? materials : undefined,
+          anchorUrl,
+          refinementText: refinementText.trim() || undefined,
         }),
       })
       const data: GenerateResult = await res.json()
       if (!res.ok || data.error) throw new Error(data.error ?? 'Erro na geração')
       setOutputUrl(data.outputUrl); setCredits(data.credits); setSliderPos(50)
+      setScale(1); setPan({ x: 0, y: 0 })
+      if (refinementText.trim()) setRefinementText('')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Erro desconhecido')
     } finally { setLoading(false); stopLoadingTexts() }
@@ -256,16 +485,95 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
     }
   }, [])
 
+  // Zoom-state ref espelha o estado pra leituras síncronas dentro dos handlers
+  // de evento (que são bound uma vez, com closure congelada).
+  useEffect(() => { zoomStateRef.current = { scale, panX: pan.x, panY: pan.y } }, [scale, pan])
+  useEffect(() => { isPanningRef.current = isPanning }, [isPanning])
+
+  // ── Wheel zoom (não-passivo pra preventDefault funcionar).
+  // Re-attach quando a comparativa monta/desmonta; nas outras views o
+  // compareRef fica null e o effect só retorna early.
+  useEffect(() => {
+    const el = compareRef.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault()
+      const { scale: s, panX, panY } = zoomStateRef.current
+      const rect = el.getBoundingClientRect()
+      const cx = e.clientX - rect.left
+      const cy = e.clientY - rect.top
+      const newScale = Math.max(1, Math.min(4, s * Math.exp(-e.deltaY * 0.0015)))
+      if (newScale === s) return
+      const ratio = newScale / s
+      // Mantém o ponto sob o cursor estacionário: tx' = cx - (cx - tx) * (s'/s).
+      const newTx = cx - (cx - panX) * ratio
+      const newTy = cy - (cy - panY) * ratio
+      const minTx = rect.width  * (1 - newScale)
+      const minTy = rect.height * (1 - newScale)
+      setScale(newScale)
+      setPan({
+        x: Math.max(minTx, Math.min(0, newTx)),
+        y: Math.max(minTy, Math.min(0, newTy)),
+      })
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [imagePreview, outputUrl])
+
+  // ── Pan: window listeners ativos apenas via ref (sem re-bind a cada render).
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!isPanningRef.current || !compareRef.current || !panStartRef.current) return
+      const { scale: s } = zoomStateRef.current
+      const start = panStartRef.current
+      const rect  = compareRef.current.getBoundingClientRect()
+      const minTx = rect.width  * (1 - s)
+      const minTy = rect.height * (1 - s)
+      setPan({
+        x: Math.max(minTx, Math.min(0, start.panX + (e.clientX - start.mouseX))),
+        y: Math.max(minTy, Math.min(0, start.panY + (e.clientY - start.mouseY))),
+      })
+    }
+    const onUp = () => { setIsPanning(false); panStartRef.current = null }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    return () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+  }, [])
+
   const handleBuyCredits = async () => {
     const res = await fetch('/api/stripe/checkout', { method: 'POST' })
     const data = await res.json()
     if (data.url) window.location.href = data.url
   }
 
+  // ── Reseta o estado da geração atual pra começar um render do zero
+  //    com nova imagem. Mantém os parâmetros (segmento, ambiente etc.) —
+  //    só limpa o que pertence ao ciclo da imagem atual.
+  const handleNewRender = () => {
+    setImagePreview(null)
+    setOutputUrl(null)
+    setRefinementText('')
+    setUseAnchor(true)
+    setError(null)
+    setSliderPos(50)
+    setScale(1)
+    setPan({ x: 0, y: 0 })
+  }
+
   // ── Computed
-  const hasMaterials  = Object.values(materials).some(v => v && v.trim())
-  const nodeCost      = OUTPUT_QUALITIES.find(q => q.id === outputQuality)?.nodes ?? 4
-  const currentEngine = SPN_ENGINES.find(m => m.id === selectedModel)
+  // Considera apenas os campos visíveis no projectType atual. Sem isso, um
+  // campo interior-only preenchido (ex: marcenaria) marcava o badge
+  // "preenchido" mesmo depois de trocar pra exterior, onde ele nem aparece.
+  const visibleMaterialFields = projectType === 'interior' ? MATERIAL_FIELDS_INTERIOR : MATERIAL_FIELDS_EXTERIOR
+  const hasMaterials  = visibleMaterialFields.some(({ field }) => {
+    const v = materials[field]
+    return v && v.trim()
+  })
+  const currentEngine = ENGINES[selectedEngine]
+  const nodeCost      = getNodesCost(selectedEngine, selectedResolution)
   const segments      = getSegments(projectType)
   const environments  = getEnvironments(projectType, segment)
   const lightingOpts  = getLighting(projectType, segment)
@@ -276,8 +584,13 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
 
   // ── Summary lines
   const summaryLine1 = `${typeLabel} · ${segment} · ${environment}`
-  const summaryLine2 = [lighting, background !== 'Preservar Original' ? background : null, sceneElements.join(', ')].filter(Boolean).join(' · ')
-  const summaryLine3 = `Alta Fidelidade · ${currentEngine?.name} · ${OUTPUT_QUALITIES.find(q => q.id === outputQuality)?.label}`
+  const summaryLine2 = [
+    lighting   !== 'Preservar Original' ? lighting   : null,
+    background !== 'Preservar Original' ? background : null,
+    sceneElements.join(', '),
+  ].filter(Boolean).join(' · ')
+  const fidelityLabel = FIDELITY_LEVELS.find(l => l.id === fidelityLevel)?.label ?? 'Máxima'
+  const summaryLine3  = `Fidelidade ${fidelityLabel} · ${currentEngine.name} · ${selectedResolution.toUpperCase()}`
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -290,25 +603,11 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
         {/* Topbar */}
         <div style={S.topbar}>
           <span style={S.pageTitle}>GERAR</span>
-          <div style={{display:'flex', alignItems:'center', gap:10}}>
-            <button onClick={toggleTheme} style={S.themeToggle} title={isDark ? 'Modo claro' : 'Modo escuro'} suppressHydrationWarning>
-              {isDark ? (
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-                  <circle cx="12" cy="12" r="5"/>
-                  <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" strokeLinecap="round"/>
-                </svg>
-              ) : (
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-                  <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              )}
-            </button>
-            <div style={S.credits}>
-              <span style={S.creditDot}/>
-              <span style={S.creditNum}>{credits}</span>
-              <span>Nodes</span>
-              <button onClick={handleBuyCredits} style={S.buyBtn}>+ comprar Nodes</button>
-            </div>
+          <div style={S.credits}>
+            <span style={S.creditDot}/>
+            <span style={S.creditNum}>{credits}</span>
+            <span>Nodes</span>
+            <button onClick={handleBuyCredits} style={S.buyBtn}>+ comprar Nodes</button>
           </div>
         </div>
 
@@ -382,13 +681,7 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
           </button>
           {materiaisAberto && (
             <div style={S.materiaisGrid}>
-              {[
-                { field: 'fachada'    as const, label: 'Revestimento de fachada', placeholder: 'ex: placas cimentícias texturizadas, ACM preto' },
-                { field: 'piso'       as const, label: 'Piso externo / calçada',  placeholder: 'ex: porcelanato 90×90 cinza claro' },
-                { field: 'esquadrias' as const, label: 'Esquadrias / caixilhos',  placeholder: 'ex: alumínio preto fosco' },
-                { field: 'elementos'  as const, label: 'Elementos especiais',     placeholder: 'ex: painel de madeira ipê, brise metálico' },
-                { field: 'outros'     as const, label: 'Observações adicionais',  placeholder: 'ex: estrutura em concreto aparente, laje invertida' },
-              ].map(({ field, label, placeholder }) => (
+              {(projectType === 'interior' ? MATERIAL_FIELDS_INTERIOR : MATERIAL_FIELDS_EXTERIOR).map(({ field, label, placeholder }) => (
                 <div key={field} style={S.materialField}>
                   <div style={S.materialLabel}>{label}</div>
                   <input
@@ -400,7 +693,9 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
                   />
                 </div>
               ))}
-              <p style={S.infoNote}>Use esta seção apenas se quiser reforçar materiais específicos no resultado. Salvo automaticamente.</p>
+              <p style={S.infoNote}>
+                Preencha apenas pra <strong>alterar</strong> materiais específicos. Em branco = preserva todos do original. Salvo automaticamente.
+              </p>
             </div>
           )}
         </div>
@@ -437,11 +732,23 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
         {/* 10 — Fidelidade ao Projeto */}
         <div style={S.section}>
           <div style={S.label}>FIDELIDADE AO PROJETO</div>
-          <div style={{display:'flex', alignItems:'center', gap:8, padding:'10px 14px', border:'0.5px solid var(--color-border-strong)', borderRadius:8, background:'var(--color-bg-elevated)'}}>
-            <span style={{width:6, height:6, borderRadius:'50%', background:'var(--color-accent-green)', boxShadow:'0 0 5px var(--color-accent-green-glow)', display:'inline-block', flexShrink:0}}/>
-            <span style={{fontSize:11, color:'var(--color-text-primary)', fontWeight:500}}>✓ Proteção total ativada</span>
+          <div style={S.fidelityGrid}>
+            {FIDELITY_LEVELS.map(lvl => (
+              <div
+                key={lvl.id}
+                style={{...S.fidelityOpt, ...(fidelityLevel === lvl.id ? S.fidelityOptActive : {})}}
+                onClick={() => setFidelityLevel(lvl.id)}
+              >
+                <div style={{...S.fidelityName, ...(fidelityLevel === lvl.id ? {color:'var(--color-bg)'} : {})}}>{lvl.label}</div>
+                <div style={{...S.motorDesc, ...(fidelityLevel === lvl.id ? {color:'var(--color-bg)', opacity:0.6} : {})}}>{lvl.desc}</div>
+              </div>
+            ))}
           </div>
-          <p style={S.infoNote}>Geometria, câmera, entorno e composição preservados.</p>
+          <p style={S.infoNote}>
+            {fidelityLevel === 'maximum'  && 'Preserva tudo da imagem (materiais, móveis, decoração, câmera). Só altera o que você pedir explicitamente.'}
+            {fidelityLevel === 'balanced' && 'Preserva arquitetura e câmera, com pequenas melhorias de composição e ambientação permitidas.'}
+            {fidelityLevel === 'creative' && 'Mais liberdade estética. Preserva apenas o essencial do projeto.'}
+          </p>
         </div>
 
         <div style={S.divider}/>
@@ -450,15 +757,31 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
         <div style={S.section}>
           <div style={S.label}>MOTOR DE IA</div>
           <div style={S.motorGrid}>
-            {SPN_ENGINES.map(m => (
-              <div key={m.id}
-                style={{...S.motorOpt, ...(selectedModel === m.id ? S.motorOptActive : {})}}
-                onClick={() => setSelectedModel(m.id)}
-              >
-                <div style={{...S.motorName, ...(selectedModel === m.id ? {color:'var(--color-bg)'} : {})}}>{m.name}</div>
-                <div style={{...S.motorDesc, ...(selectedModel === m.id ? {color:'var(--color-bg)', opacity:0.6} : {})}}>{m.desc}</div>
-              </div>
-            ))}
+            {ENGINE_ORDER.map(eid => {
+              const e = ENGINES[eid]
+              const active = selectedEngine === eid
+              return (
+                <div key={eid}
+                  role="button"
+                  aria-pressed={active}
+                  aria-label={`Motor ${e.name} · ${e.tagline}`}
+                  style={{...S.motorOpt, ...(active ? S.motorOptActive : {})}}
+                  onClick={() => {
+                    setSelectedEngine(eid)
+                    // Se a resolução atual não é suportada, cai pra 2K.
+                    if (!e.resolutions.includes(selectedResolution)) {
+                      setSelectedResolution('2k')
+                    }
+                  }}
+                >
+                  <EngineIcon engine={eid} style={{width:24, height:24, flexShrink:0}} />
+                  <div style={{display:'flex', flexDirection:'column', minWidth:0}}>
+                    <div style={{...S.motorName, ...(active ? {color:'var(--color-bg)'} : {})}}>{e.name}</div>
+                    <div style={{...S.motorDesc, ...(active ? {color:'var(--color-bg)', opacity:0.6} : {})}}>{e.tagline}</div>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
 
@@ -466,20 +789,68 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
         <div style={S.section}>
           <div style={S.label}>QUALIDADE DE SAÍDA</div>
           <div style={S.qualityGrid}>
-            {OUTPUT_QUALITIES.map(q => (
-              <div key={q.id}
-                style={{...S.qualityOpt, ...(outputQuality === q.id ? S.qualityOptActive : {})}}
-                onClick={() => setOutputQuality(q.id)}
-              >
-                <div style={{...S.qualityRes, ...(outputQuality === q.id ? {color:'var(--color-bg)'} : {})}}>{q.label}</div>
-                <div style={{...S.motorDesc, ...(outputQuality === q.id ? {color:'var(--color-bg)', opacity:0.6} : {})}}>{q.nodes} Nodes por imagem</div>
-                <div style={{...S.motorDesc, ...(outputQuality === q.id ? {color:'var(--color-bg)', opacity:0.6} : {})}}>{q.desc}</div>
-              </div>
-            ))}
+            {currentEngine.resolutions.map(res => {
+              const active = selectedResolution === res
+              const cost   = currentEngine.nodes[res]!
+              return (
+                <div key={res}
+                  style={{...S.qualityOpt, ...(active ? S.qualityOptActive : {})}}
+                  onClick={() => setSelectedResolution(res)}
+                >
+                  <div style={{...S.qualityRes, ...(active ? {color:'var(--color-bg)'} : {})}}>{res.toUpperCase()}</div>
+                  <div style={{...S.motorDesc, ...(active ? {color:'var(--color-bg)', opacity:0.6} : {})}}>{cost} Nodes por imagem</div>
+                  <div style={{...S.motorDesc, ...(active ? {color:'var(--color-bg)', opacity:0.6} : {})}}>{RESOLUTION_DESC[res]}</div>
+                </div>
+              )
+            })}
           </div>
         </div>
 
         {error && <div style={S.errorBox}>{error}</div>}
+
+        {/* Anchor toggle — só aparece depois da primeira geração */}
+        {outputUrl && (
+          <button
+            style={S.anchorRow}
+            onClick={() => setUseAnchor(v => !v)}
+            title={useAnchor
+              ? 'Desligar pra gerar do zero, sem ancorar nos materiais do render anterior'
+              : 'Ligar pra manter os materiais e texturas do render anterior'}
+          >
+            <span style={{display:'flex', alignItems:'center', gap:8}}>
+              <span style={{
+                width:14, height:14, borderRadius:4,
+                border:'0.5px solid var(--color-border-strong)',
+                background: useAnchor ? 'var(--color-text-primary)' : 'var(--color-bg-elevated)',
+                display:'flex', alignItems:'center', justifyContent:'center',
+                color:'var(--color-bg)', fontSize:9, fontWeight:600,
+              }}>{useAnchor ? '✓' : ''}</span>
+              <span style={{fontSize:11, color:'var(--color-text-primary)', fontWeight:500}}>
+                Manter materiais do render anterior
+              </span>
+            </span>
+            <span style={{fontSize:10, color:'var(--color-text-tertiary)'}}>
+              {useAnchor ? 'ancorado' : 'do zero'}
+            </span>
+          </button>
+        )}
+
+        {/* Refinar — só faz sentido com âncora ativa (precisa da #1 como referência) */}
+        {outputUrl && useAnchor && (
+          <div style={S.refineBox}>
+            <div style={S.refineLabel}>REFINAR IMAGEM (opcional)</div>
+            <textarea
+              value={refinementText}
+              onChange={e => setRefinementText(e.target.value)}
+              placeholder="ex: trocar o piso para porcelanato cinza claro, mantendo todo o resto"
+              rows={2}
+              style={S.refineInput}
+            />
+            <div style={S.refineHint}>
+              Deixe em branco pra apenas regerar com novos parâmetros. Preencha pra pedir uma alteração específica.
+            </div>
+          </div>
+        )}
 
         {/* 11 — Botão Gerar */}
         <button
@@ -489,7 +860,12 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
           onClick={() => handleGenerate()}
           disabled={loading || !imagePreview || credits < nodeCost}
         >
-          <span>{loading ? 'gerando…' : 'gerar render'}</span>
+          <span>{loading
+            ? 'gerando…'
+            : (refinementText.trim() && outputUrl && useAnchor
+                ? 'aplicar refinamento'
+                : (outputUrl && useAnchor ? 'gerar variação' : 'gerar render'))
+          }</span>
           <span style={S.genBtnMeta}>
             <span>{nodeCost} Nodes por render</span>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-bg)" strokeWidth="1.5">
@@ -504,9 +880,12 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
         <div style={S.topbar}>
           <span style={S.pageTitle}>ANTES / DEPOIS</span>
           {outputUrl && (
-            <a href={outputUrl} download="spacenode-render.jpg" target="_blank" rel="noopener noreferrer" style={S.downloadLink}>
+            <button
+              onClick={() => downloadImage(outputUrl, 'spacenode-render.jpg')}
+              style={{...S.downloadLink, background:'none', border:'none', padding:0, cursor:'pointer', fontFamily:'inherit'}}
+            >
               baixar render ↓
-            </a>
+            </button>
           )}
         </div>
 
@@ -525,7 +904,7 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
             </div>
             <div>
               <div style={S.uploadTitle}>arraste sua imagem aqui</div>
-              <div style={S.uploadSub}>SketchUp · Render · 3D · JPG · PNG</div>
+              <div style={S.uploadSub}>SketchUp · Render · 3D · JPG · PNG · até 10 MB</div>
             </div>
             <button style={S.uploadBtn} onClick={e => { e.stopPropagation(); fileInputRef.current?.click() }}>
               escolher arquivo
@@ -536,13 +915,48 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
         )}
 
         {imagePreview && outputUrl && (
-          <div ref={compareRef} style={S.compareWrap} onMouseDown={() => setIsDraggingSlider(true)}>
-            <img src={imagePreview} alt="Antes" style={S.compareImg} draggable={false}/>
-            <div style={{...S.compareAfterWrap, clipPath:`inset(0 ${100-sliderPos}% 0 0)`}}>
-              <img src={outputUrl} alt="Depois" style={S.compareImg} draggable={false}/>
+          <div
+            ref={compareRef}
+            style={{
+              ...S.compareWrap,
+              cursor: scale > 1 ? (isPanning ? 'grabbing' : 'grab') : 'ew-resize',
+            }}
+            onMouseDown={(e) => {
+              if (scale > 1) {
+                panStartRef.current = { mouseX: e.clientX, mouseY: e.clientY, panX: pan.x, panY: pan.y }
+                setIsPanning(true)
+              } else {
+                setIsDraggingSlider(true)
+              }
+            }}
+            onDoubleClick={() => { setScale(1); setPan({ x: 0, y: 0 }) }}
+          >
+            {/* Antes — dentro do wrapper transformável */}
+            <div style={{
+              position:'absolute', inset:0,
+              transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
+              transformOrigin:'0 0',
+              pointerEvents:'none',
+            }}>
+              <img src={imagePreview} alt="Antes" style={S.compareImg} draggable={false}/>
             </div>
+            {/* Depois — clip em coords do container, transform aplicado dentro do clip */}
+            <div style={{...S.compareAfterWrap, clipPath:`inset(0 ${100-sliderPos}% 0 0)`, pointerEvents:'none'}}>
+              <div style={{
+                position:'absolute', inset:0,
+                transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
+                transformOrigin:'0 0',
+              }}>
+                <img src={outputUrl} alt="Depois" style={S.compareImg} draggable={false}/>
+              </div>
+            </div>
+            {/* Handle do slider em coords do container; ativa pointerEvents só no círculo
+                pra continuar arrastável quando zoomado (parent passa a iniciar pan). */}
             <div style={{...S.compareHandle, left:`${sliderPos}%`}}>
-              <div style={S.compareHandleCircle}>
+              <div
+                style={{...S.compareHandleCircle, pointerEvents:'auto', cursor:'ew-resize'}}
+                onMouseDown={(e) => { e.stopPropagation(); setIsDraggingSlider(true) }}
+              >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" strokeWidth="2">
                   <path d="M8 5l-5 7 5 7M16 5l5 7-5 7" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
@@ -550,38 +964,38 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
             </div>
             <span style={{...S.compareLabel, left:14}}>ANTES</span>
             <span style={{...S.compareLabel, right:14}}>DEPOIS</span>
+            {scale > 1 && (
+              <div style={S.zoomBadge}>{Math.round(scale * 100)}%</div>
+            )}
           </div>
         )}
 
         {/* ── POST-GENERATION ACTIONS ── */}
         {imagePreview && outputUrl && !loading && (
           <div style={S.postGen}>
-            {outputQuality === 'hd' && (
-              <div style={S.upsellNote}>
+            {selectedResolution === 'hd' && (
+              <div className="spn-upsell-note">
                 Melhore para 2K ou 4K para apresentação profissional
               </div>
             )}
             <div style={S.postGenPrimary}>
-              <button style={S.actionBtn} onClick={() => handleGenerate()}>
+              <button className="spn-action spn-action--primary" onClick={() => handleGenerate()}>
                 Gerar nova variação
               </button>
-              <a
-                href={outputUrl}
-                download="spacenode-render.jpg"
-                target="_blank"
-                rel="noopener noreferrer"
-                style={S.actionBtn}
+              <button
+                className="spn-action spn-action--primary"
+                onClick={() => downloadImage(outputUrl, 'spacenode-render.jpg')}
               >
                 Baixar imagem
-              </a>
+              </button>
             </div>
             <div style={S.postGenSecondary}>
-              <button style={S.actionBtnGhost} onClick={() => handleGenerate('2k')}>
+              <button className="spn-action spn-action--ghost" onClick={() => handleGenerate('2k')}>
                 Melhorar qualidade (2K / 4K)
               </button>
-              <a href="/app/history" style={S.actionBtnGhost}>
-                Salvar no histórico
-              </a>
+              <button className="spn-action spn-action--ghost" onClick={handleNewRender}>
+                Iniciar novo render
+              </button>
             </div>
           </div>
         )}
@@ -633,6 +1047,7 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
             <br/>
             <span style={{color:'var(--color-text-tertiary)'}}>{summaryLine3}</span>
           </div>
+
         </div>
       </div>
     </div>
@@ -644,11 +1059,19 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
 function PillGroup({ options, selected, onChange }: { options: string[]; selected: string; onChange: (v: string) => void }) {
   return (
     <div style={{display:'flex', flexWrap:'wrap', gap:6}}>
-      {options.map(opt => (
-        <button key={opt} style={selected === opt ? {...pill, ...pillActive} : pill} onClick={() => onChange(opt)}>
-          {opt}
-        </button>
-      ))}
+      {options.map(opt => {
+        const active = selected === opt
+        return (
+          <button
+            key={opt}
+            className={active ? 'spn-pill spn-pill--active' : 'spn-pill'}
+            style={active ? {...pill, ...pillActive} : pill}
+            onClick={() => onChange(opt)}
+          >
+            {opt}
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -656,11 +1079,19 @@ function PillGroup({ options, selected, onChange }: { options: string[]; selecte
 function MultiPillGroup({ options, selected, onToggle }: { options: string[]; selected: string[]; onToggle: (v: string) => void }) {
   return (
     <div style={{display:'flex', flexWrap:'wrap', gap:6}}>
-      {options.map(opt => (
-        <button key={opt} style={selected.includes(opt) ? {...pill, ...pillActive} : pill} onClick={() => onToggle(opt)}>
-          {opt}
-        </button>
-      ))}
+      {options.map(opt => {
+        const active = selected.includes(opt)
+        return (
+          <button
+            key={opt}
+            className={active ? 'spn-pill spn-pill--active' : 'spn-pill'}
+            style={active ? {...pill, ...pillActive} : pill}
+            onClick={() => onToggle(opt)}
+          >
+            {opt}
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -690,7 +1121,6 @@ const S: Record<string, React.CSSProperties> = {
   creditDot:         { width:5, height:5, borderRadius:'50%', background:'var(--color-accent-green)', boxShadow:'0 0 5px var(--color-accent-green-glow)', display:'inline-block' },
   creditNum:         { color:'var(--color-text-primary)', fontWeight:500, fontSize:12 },
   buyBtn:            { fontSize:'11px', color:'var(--color-text-tertiary)', background:'none', border:'none', cursor:'pointer', textDecoration:'underline', marginLeft:'6px', fontFamily:'inherit' },
-  themeToggle:       { width:28, height:28, borderRadius:'50%', border:'0.5px solid var(--color-border-strong)', background:'var(--color-bg-elevated)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', color:'var(--color-text-tertiary)', padding:0, flexShrink:0 },
   section:           { display:'flex', flexDirection:'column', gap:10 },
   label:             { fontSize:10, letterSpacing:'0.15em', textTransform:'uppercase', color:'var(--color-text-tertiary)', fontWeight:500 },
   divider:           { height:'0.5px', background:'var(--color-border)' },
@@ -710,9 +1140,18 @@ const S: Record<string, React.CSSProperties> = {
   sliderEnd:         { fontSize:11, color:'var(--color-text-tertiary)' },
   range:             { flex:1, accentColor:'var(--color-text-primary)', height:3 },
   sliderVal:         { fontSize:12, fontWeight:500, color:'var(--color-text-primary)', minWidth:34, textAlign:'right' },
-  motorGrid:         { display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 },
-  motorOpt:          { border:'0.5px solid var(--color-border-strong)', borderRadius:8, padding:'10px 10px', cursor:'pointer', background:'var(--color-bg-elevated)' },
-  motorOptActive:    { border:'0.5px solid var(--color-text-primary)', background:'var(--color-text-primary)' },
+  anchorRow:         { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 14px', border:'0.5px solid var(--color-border-strong)', borderRadius:8, background:'var(--color-bg-elevated)', cursor:'pointer', fontFamily:'inherit', width:'100%' },
+  refineBox:         { display:'flex', flexDirection:'column', gap:6, padding:'12px 14px', border:'0.5px solid var(--color-border-strong)', borderRadius:8, background:'var(--color-bg-elevated)' },
+  refineLabel:       { fontSize:10, letterSpacing:'0.15em', textTransform:'uppercase', color:'var(--color-text-tertiary)', fontWeight:500 },
+  refineInput:       { padding:'8px 10px', border:'0.5px solid var(--color-border-strong)', borderRadius:6, fontSize:11, color:'var(--color-text-primary)', background:'var(--color-bg)', fontFamily:'inherit', outline:'none', resize:'vertical', minHeight:36 },
+  refineHint:        { fontSize:10, color:'var(--color-text-tertiary)', lineHeight:1.5 },
+  fidelityGrid:      { display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 },
+  fidelityOpt:       { border:'0.5px solid var(--color-border-strong)', borderRadius:8, padding:'10px 8px', cursor:'pointer', background:'var(--color-bg-elevated)', textAlign:'center' as const },
+  fidelityOptActive: { border:'0.5px solid var(--color-text-primary)', background:'var(--color-text-primary)' },
+  fidelityName:      { fontSize:11, fontWeight:500, color:'var(--color-text-primary)', marginBottom:3 },
+  motorGrid:         { display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 },
+  motorOpt:          { display:'flex', alignItems:'center', gap:12, border:'0.5px solid var(--color-border-strong)', borderRadius:8, padding:'10px 10px', cursor:'pointer', background:'var(--color-bg-elevated)', color:'var(--color-text-primary)' },
+  motorOptActive:    { border:'0.5px solid var(--color-text-primary)', background:'var(--color-text-primary)', color:'var(--color-bg)' },
   motorName:         { fontSize:11, fontWeight:500, color:'var(--color-text-primary)', marginBottom:3 },
   motorTag:          { display:'inline-block', fontSize:9, letterSpacing:'0.08em', textTransform:'uppercase', background:'var(--color-border-strong)', color:'var(--color-text-tertiary)', padding:'2px 6px', borderRadius:4 },
   motorDesc:         { fontSize:10, color:'var(--color-text-tertiary)', marginTop:4 },
@@ -729,12 +1168,13 @@ const S: Record<string, React.CSSProperties> = {
   uploadSub:         { fontSize:12, color:'var(--color-text-tertiary)', marginTop:4 },
   uploadBtn:         { padding:'7px 18px', border:'0.5px solid var(--color-border-strong)', borderRadius:20, fontSize:11, color:'var(--color-text-primary)', background:'var(--color-bg-elevated)', cursor:'pointer', fontFamily:'inherit' },
   compareWrap:       { position:'relative', borderRadius:12, overflow:'hidden', flex:1, minHeight:300, background:'var(--color-surface)', userSelect:'none', cursor:'ew-resize' },
-  compareImg:        { position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', pointerEvents:'none' },
+  compareImg:        { position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'contain', pointerEvents:'none' },
   compareAfterWrap:  { position:'absolute', inset:0 },
   compareHandle:     { position:'absolute', top:0, bottom:0, width:2, background:'#ffffff', transform:'translateX(-50%)', display:'flex', alignItems:'center', justifyContent:'center', pointerEvents:'none' },
   compareHandleCircle: { width:32, height:32, borderRadius:'50%', background:'#ffffff', border:'0.5px solid rgba(0,0,0,0.1)', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 2px 8px rgba(0,0,0,0.12)' },
   compareLabel:      { position:'absolute', bottom:12, fontSize:9, letterSpacing:'0.12em', color:'#fafafa', textTransform:'uppercase', fontWeight:500, textShadow:'0 1px 3px rgba(0,0,0,0.5)', pointerEvents:'none' },
   changeImageBtn:    { position:'absolute', top:12, right:14, padding:'5px 12px', border:'0.5px solid rgba(255,255,255,0.4)', borderRadius:20, fontSize:10, color:'#fafafa', background:'rgba(0,0,0,0.35)', cursor:'pointer', fontFamily:'inherit' },
+  zoomBadge:         { position:'absolute', top:12, left:14, padding:'3px 9px', fontSize:9, letterSpacing:'0.1em', color:'#fafafa', background:'rgba(0,0,0,0.45)', borderRadius:10, fontWeight:500, pointerEvents:'none' },
   loadingOverlay:    { position:'absolute', inset:0, background:'rgba(0,0,0,0.35)', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:14 },
   spinner:           { width:28, height:28, borderRadius:'50%', border:'2px solid rgba(255,255,255,0.3)', borderTopColor:'#ffffff', animation:'spin 0.8s linear infinite' },
   promptPreview:     { background:'var(--color-bg-elevated)', border:'0.5px solid var(--color-border)', borderRadius:10, padding:'14px 16px' },
@@ -744,9 +1184,6 @@ const S: Record<string, React.CSSProperties> = {
   postGen:           { display:'flex', flexDirection:'column', gap:8 },
   postGenPrimary:    { display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 },
   postGenSecondary:  { display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 },
-  actionBtn:         { padding:'11px 16px', background:'var(--color-text-primary)', color:'var(--color-bg)', border:'none', borderRadius:8, fontSize:12, fontWeight:500, cursor:'pointer', fontFamily:'inherit', textAlign:'center' as const, textDecoration:'none', display:'flex', alignItems:'center', justifyContent:'center' },
-  actionBtnGhost:    { padding:'10px 14px', background:'none', border:'0.5px solid var(--color-border-strong)', borderRadius:8, fontSize:11, color:'var(--color-text-tertiary)', cursor:'pointer', fontFamily:'inherit', textAlign:'center' as const, textDecoration:'none', display:'flex', alignItems:'center', justifyContent:'center' },
-  upsellNote:        { fontSize:10, color:'var(--color-text-tertiary)', textAlign:'center' as const, letterSpacing:'0.02em', padding:'7px 14px', background:'var(--color-bg-elevated)', border:'0.5px solid var(--color-border)', borderRadius:6, lineHeight:1.5 },
 }
 
 export default GenerateClient

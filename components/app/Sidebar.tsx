@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { useLayoutEffect, useState } from 'react'
 import React from 'react'
 import Logo from '@/components/Logo'
 
@@ -60,6 +60,7 @@ type NavItem = {
   exact?: boolean
   Icon: () => React.ReactElement
   badge?: string
+  badgeTone?: 'green' | 'muted'
 }
 
 const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
@@ -74,15 +75,15 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     label: 'CRIAR',
     items: [
       { label: 'renderizar', href: '/app/generate', exact: false, Icon: IconGenerate  },
-      { label: 'spaces',     href: '/app/spaces',   exact: false, Icon: IconSpaces, badge: 'novo' },
+      { label: 'spaces',     href: null,            exact: false, Icon: IconSpaces, badge: 'em breve', badgeTone: 'muted' },
       { label: 'melhorar',   href: '/app/upscale',  exact: false, Icon: IconEnhance   },
-      { label: 'animar',     href: '/app/video',    exact: false, Icon: IconVideo     },
+      { label: 'animar',     href: null,            exact: false, Icon: IconVideo, badge: 'em breve', badgeTone: 'muted' },
     ],
   },
   {
     label: 'NEGÓCIOS',
     items: [
-      { label: 'planos',     href: '/app/plans',    exact: false, Icon: IconPlans     },
+      { label: 'planos',     href: '/app/billing',  exact: false, Icon: IconPlans     },
     ],
   },
 ]
@@ -95,6 +96,24 @@ interface SidebarProps {
 export default function Sidebar({ userName, userAvatar }: SidebarProps) {
   const pathname = usePathname()
   const [hovered, setHovered] = useState(false)
+  const [hoveredItem, setHoveredItem] = useState<string | null>(null)
+
+  // Theme toggle — alterna a classe `html.light` definida em globals.css.
+  // Server SSRs com isLight=false; useLayoutEffect sincroniza antes do paint.
+  // O <script> em app/layout.tsx já aplica a classe correta na primeira render
+  // a partir do localStorage, então não há flash.
+  const [isLight, setIsLight] = useState(false)
+  useLayoutEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setIsLight(document.documentElement.classList.contains('light'))
+  }, [])
+  const toggleTheme = () => {
+    const html = document.documentElement
+    const next = !html.classList.contains('light')
+    html.classList.toggle('light', next)
+    try { localStorage.setItem('theme', next ? 'light' : 'dark') } catch {}
+    setIsLight(next)
+  }
 
   const initials = userName
     .split(' ')
@@ -122,9 +141,9 @@ export default function Sidebar({ userName, userAvatar }: SidebarProps) {
       onMouseLeave={() => setHovered(false)}
     >
       {/* Logo */}
-      <div style={{ padding: '18px 18px 14px', display: 'flex', alignItems: 'center', gap: 12, height: 62, flexShrink: 0, color: '#ffffff' }}>
+      <div style={{ padding: '18px 18px 14px 10px', display: 'flex', alignItems: 'center', gap: 12, height: 62, flexShrink: 0, color: '#ffffff' }}>
         <div style={{ flexShrink: 0, display: 'flex' }}>
-          <Logo size={26} />
+          <Logo size={34} />
         </div>
         <span style={{
           fontSize: 11, fontWeight: 600, color: '#ffffff',
@@ -155,25 +174,34 @@ export default function Sidebar({ userName, userAvatar }: SidebarProps) {
               {group.label}
             </div>
 
-            {group.items.map(({ label, href, exact, Icon, badge }) => {
+            {group.items.map(({ label, href, exact, Icon, badge, badgeTone }) => {
               const active = href
                 ? (exact ? pathname === href : pathname.startsWith(href))
                 : false
               const disabled = href === null
+              const itemKey = href || label
+              const isItemHovered = hoveredItem === itemKey
 
               const inner = (
                 <>
-                  <div style={{ flexShrink: 0, display: 'flex', color: disabled ? 'rgba(255,255,255,0.2)' : active ? '#ffffff' : 'rgba(255,255,255,0.4)' }}>
+                  <div style={{
+                    flexShrink: 0, display: 'flex',
+                    color: disabled ? 'rgba(255,255,255,0.2)' : active ? '#ffffff' : isItemHovered ? 'rgba(255,255,255,0.72)' : 'rgba(255,255,255,0.4)',
+                    transition: 'color 0.2s',
+                    transform: isItemHovered && !active ? 'translateY(-0.5px)' : 'translateY(0)',
+                    transitionProperty: 'color, transform',
+                    transitionDuration: '0.2s',
+                  }}>
                     <Icon />
                   </div>
                   <span style={{
                     fontSize: 12,
-                    color: disabled ? 'rgba(255,255,255,0.25)' : active ? '#ffffff' : 'rgba(255,255,255,0.75)',
+                    color: disabled ? 'rgba(255,255,255,0.25)' : active ? '#ffffff' : isItemHovered ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.75)',
                     whiteSpace: 'nowrap' as const,
                     fontWeight: 400,
                     letterSpacing: '-0.01em',
                     opacity: hovered ? 1 : 0,
-                    transition: 'opacity 0.18s',
+                    transition: 'opacity 0.18s, color 0.2s',
                     flex: 1,
                   }}>
                     {label}
@@ -182,8 +210,8 @@ export default function Sidebar({ userName, userAvatar }: SidebarProps) {
                     <span style={{
                       fontSize: 8, fontWeight: 600, letterSpacing: '0.08em',
                       textTransform: 'uppercase' as const,
-                      color: '#30b46c',
-                      background: 'rgba(48,180,108,0.18)',
+                      color: badgeTone === 'muted' ? 'rgba(255,255,255,0.42)' : '#30b46c',
+                      background: badgeTone === 'muted' ? 'rgba(255,255,255,0.06)' : 'rgba(48,180,108,0.18)',
                       padding: '2px 6px', borderRadius: 20,
                       whiteSpace: 'nowrap' as const, flexShrink: 0,
                     }}>
@@ -197,18 +225,28 @@ export default function Sidebar({ userName, userAvatar }: SidebarProps) {
                 display: 'flex', alignItems: 'center', gap: 12,
                 padding: '0 10px', height: 44, borderRadius: 8,
                 textDecoration: 'none', flexShrink: 0,
-                background: active ? 'rgba(255,255,255,0.1)' : 'transparent',
-                transition: 'background 0.15s',
+                background: active
+                  ? 'rgba(255,255,255,0.1)'
+                  : isItemHovered
+                    ? 'rgba(255,255,255,0.055)'
+                    : 'transparent',
+                boxShadow: isItemHovered && !active ? 'inset 0 0 0 0.5px rgba(255,255,255,0.08)' : 'none',
+                transition: 'background 0.2s, box-shadow 0.2s',
                 cursor: disabled ? 'default' : 'pointer',
                 opacity: disabled ? 0.5 : 1,
               }
 
+              const hoverHandlers = disabled ? {} : {
+                onMouseEnter: () => setHoveredItem(itemKey),
+                onMouseLeave: () => setHoveredItem(null),
+              }
+
               return href ? (
-                <Link key={href} href={href} style={sharedStyle}>
+                <Link key={href} href={href} style={sharedStyle} {...hoverHandlers}>
                   {inner}
                 </Link>
               ) : (
-                <div key={label} style={sharedStyle}>
+                <div key={label} style={sharedStyle} {...hoverHandlers}>
                   {inner}
                 </div>
               )
@@ -216,6 +254,53 @@ export default function Sidebar({ userName, userAvatar }: SidebarProps) {
           </div>
         ))}
       </nav>
+
+      {/* Theme toggle */}
+      <div style={{ padding: '4px 8px', flexShrink: 0 }}>
+        <button
+          type="button"
+          onClick={toggleTheme}
+          title={isLight ? 'Modo escuro' : 'Modo claro'}
+          suppressHydrationWarning
+          onMouseEnter={() => setHoveredItem('__theme')}
+          onMouseLeave={() => setHoveredItem(null)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 12,
+            padding: '0 10px', height: 40, borderRadius: 8,
+            background: hoveredItem === '__theme' ? 'rgba(255,255,255,0.055)' : 'transparent',
+            boxShadow: hoveredItem === '__theme' ? 'inset 0 0 0 0.5px rgba(255,255,255,0.08)' : 'none',
+            border: 'none',
+            cursor: 'pointer', width: '100%',
+            transition: 'background 0.2s, box-shadow 0.2s',
+          }}
+        >
+          <div style={{ flexShrink: 0, display: 'flex', color: hoveredItem === '__theme' ? 'rgba(255,255,255,0.72)' : 'rgba(255,255,255,0.4)', transition: 'color 0.2s' }}>
+            {isLight ? (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <circle cx="12" cy="12" r="5"/>
+                <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" strokeLinecap="round"/>
+              </svg>
+            ) : (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            )}
+          </div>
+          <span style={{
+            fontSize: 12,
+            color: 'rgba(255,255,255,0.75)',
+            whiteSpace: 'nowrap' as const,
+            fontWeight: 400,
+            letterSpacing: '-0.01em',
+            opacity: hovered ? 1 : 0,
+            transition: 'opacity 0.18s',
+            flex: 1,
+            textAlign: 'left' as const,
+          }}>
+            {isLight ? 'modo escuro' : 'modo claro'}
+          </span>
+        </button>
+      </div>
 
       {/* User */}
       <div style={{ padding: '10px 8px', borderTop: '0.5px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>

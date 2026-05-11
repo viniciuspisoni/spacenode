@@ -1,18 +1,52 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import { ENGINES, ENGINE_ORDER, type Resolution } from '@/lib/engines'
+import { PLANS, recommendPlan, type PaidPlanId, type BillingCycle } from '@/lib/plans'
+import { LUMEN_PACKS } from '@/lib/lumens'
 
-const PLANS_DATA = [
-  { name: 'Starter', nodes: 300 },
-  { name: 'Pro',     nodes: 500 },
-  { name: 'Studio',  nodes: 1000 },
-]
+// UI-specific data por plano: features, badge, breakdown de renders.
+// Renders calculados com engine padrão por resolução: HD→Pulsar (10 nodes),
+// 2K→Vega (20), 4K→Vega (40). meterPct é proporcional ao maior plano (Office=100%).
+interface PlanDisplay {
+  rendersHD: number
+  renders2K: number
+  renders4K: number
+  monthlyAnnualLabel: string
+  meterPct: number
+  featured: boolean
+  badge: string
+  features: string[]
+}
 
-async function startCheckout(plan: string, billing: 'monthly' | 'annual') {
+const PLAN_DISPLAY: Record<PaidPlanId, PlanDisplay> = {
+  starter: {
+    rendersHD: 75,  renders2K: 37,  renders4K: 18,
+    monthlyAnnualLabel: '890', meterPct: 9, featured: false, badge: '',
+    features: ['Acesso a todas as engines', 'Histórico de 30 dias', 'Suporte por e-mail'],
+  },
+  pro: {
+    rendersHD: 180, renders2K: 90,  renders4K: 45,
+    monthlyAnnualLabel: '1.990', meterPct: 23, featured: true, badge: 'recomendado',
+    features: ['Acesso a todas as engines', 'Histórico ilimitado', 'Suporte por e-mail'],
+  },
+  studio: {
+    rendersHD: 350, renders2K: 175, renders4K: 87,
+    monthlyAnnualLabel: '3.490', meterPct: 44, featured: false, badge: '',
+    features: ['Acesso a todas as engines', 'Histórico ilimitado', 'Suporte prioritário'],
+  },
+  office: {
+    rendersHD: 800, renders2K: 400, renders4K: 200,
+    monthlyAnnualLabel: '6.990', meterPct: 100, featured: false, badge: '',
+    features: ['Acesso a todas as engines', 'Histórico ilimitado', 'Suporte prioritário', 'Lumens disponíveis (avulsos)'],
+  },
+}
+
+async function startCheckout(id: PaidPlanId, billing: BillingCycle) {
   const res = await fetch('/api/stripe/checkout', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ plan, billing }),
+    body: JSON.stringify({ type: 'plan', id, billing }),
   })
   if (res.status === 401) { window.location.href = '/login'; return }
   const data = await res.json()
@@ -25,52 +59,17 @@ const CheckIcon = () => (
   </svg>
 )
 
-const plans = [
-  {
-    key: 'starter', name: 'Starter', nodes: '300', rendersHD: 75, renders2K: 37, renders4K: 15,
-    monthly: 89, annual: 75, annualTotal: '890',
-    features: ['Saída até HD', 'Histórico 30 dias', 'Suporte por e-mail'],
-    meterPct: 30, featured: false, badge: '',
-  },
-  {
-    key: 'pro', name: 'Pro', nodes: '500', rendersHD: 125, renders2K: 62, renders4K: 25,
-    monthly: 149, annual: 125, annualTotal: '1.490',
-    features: ['Saída até 2K', 'Histórico ilimitado', 'Suporte por e-mail'],
-    meterPct: 50, featured: true, badge: 'recomendado',
-  },
-  {
-    key: 'studio', name: 'Studio', nodes: '1.000', rendersHD: 250, renders2K: 125, renders4K: 50,
-    monthly: 299, annual: 249, annualTotal: '2.990',
-    features: ['Saída até 4K', 'Histórico ilimitado', 'Suporte prioritário'],
-    meterPct: 100, featured: false, badge: '',
-  },
-]
-
-const qualityCards = [
-  {
-    res: 'HD · draft', engine: 'Iteração rápida', cost: 4,
-    desc: 'Conceito, iterações rápidas e apresentações internas. Geração em segundos.',
-    tag: 'rascunho', tagBg: 'rgba(255,255,255,0.06)', tagColor: 'var(--color-text-tertiary)',
-  },
-  {
-    res: '2K · entrega', engine: 'Qualidade profissional', cost: 8,
-    desc: 'Portfólio, aprovação de projeto e apresentação ao cliente. Resultado de entrega.',
-    tag: 'portfólio', tagBg: 'rgba(37,99,235,0.15)', tagColor: '#6b9bff',
-  },
-  {
-    res: '4K · final', engine: 'Máxima fidelidade', cost: 20,
-    desc: 'Entrega final para incorporadoras, impressão e material de marketing de alto impacto.',
-    tag: 'entrega final', tagBg: 'rgba(48,209,88,0.12)', tagColor: '#30d158',
-  },
-]
-
-function PlanCard({ plan, billing, loading, onSelect }: {
-  plan: typeof plans[0]; billing: 'monthly' | 'annual'
-  loading: string | null; onSelect: (key: string) => void
+function PlanCard({ planId, billing, loading, onSelect }: {
+  planId: PaidPlanId
+  billing: BillingCycle
+  loading: string | null
+  onSelect: (id: PaidPlanId) => void
 }) {
+  const plan = PLANS.find(p => p.id === planId)!
+  const d = PLAN_DISPLAY[planId]
   const [hovered, setHovered] = useState(false)
-  const price = billing === 'annual' ? plan.annual : plan.monthly
-  const f = plan.featured
+  const price = billing === 'annual' ? plan.annualMonthlyPrice : plan.monthlyPrice
+  const f = d.featured
 
   return (
     <div
@@ -88,7 +87,7 @@ function PlanCard({ plan, billing, loading, onSelect }: {
         transition: 'box-shadow 0.2s, transform 0.2s',
       }}
     >
-      {plan.badge && (
+      {d.badge && (
         <div style={{
           position: 'absolute', top: 16, right: 16,
           fontSize: 9, fontWeight: 500, letterSpacing: '0.14em',
@@ -97,7 +96,7 @@ function PlanCard({ plan, billing, loading, onSelect }: {
           padding: '3px 8px', borderRadius: 20,
           border: '0.5px solid rgba(48,209,88,0.25)',
         }}>
-          {plan.badge}
+          {d.badge}
         </div>
       )}
 
@@ -117,7 +116,7 @@ function PlanCard({ plan, billing, loading, onSelect }: {
           letterSpacing: '-0.04em', lineHeight: 1,
           fontVariantNumeric: 'tabular-nums' as const,
         }}>
-          {plan.nodes}
+          {plan.nodes.toLocaleString('pt-BR')}
         </span>
         <span style={{ fontSize: 11, color: f ? 'rgba(255,255,255,0.35)' : 'var(--color-text-tertiary)', letterSpacing: '-0.005em' }}>
           nodes / mês
@@ -129,11 +128,11 @@ function PlanCard({ plan, billing, loading, onSelect }: {
         lineHeight: 1.55,
         color: f ? 'rgba(255,255,255,0.28)' : 'var(--color-text-tertiary)',
       }}>
-        <span style={{ color: f ? 'rgba(255,255,255,0.75)' : 'var(--color-text-primary)', fontWeight: 500 }}>{plan.rendersHD} renders HD</span>
+        <span style={{ color: f ? 'rgba(255,255,255,0.75)' : 'var(--color-text-primary)', fontWeight: 500 }}>{d.rendersHD} renders HD</span>
         &nbsp;·&nbsp;
-        <span style={{ color: f ? 'rgba(255,255,255,0.75)' : 'var(--color-text-primary)', fontWeight: 500 }}>{plan.renders2K} renders 2K</span>
+        <span style={{ color: f ? 'rgba(255,255,255,0.75)' : 'var(--color-text-primary)', fontWeight: 500 }}>{d.renders2K} renders 2K</span>
         &nbsp;·&nbsp;
-        <span style={{ color: f ? 'rgba(255,255,255,0.75)' : 'var(--color-text-primary)', fontWeight: 500 }}>{plan.renders4K} renders 4K</span>
+        <span style={{ color: f ? 'rgba(255,255,255,0.75)' : 'var(--color-text-primary)', fontWeight: 500 }}>{d.renders4K} renders 4K</span>
       </p>
 
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: billing === 'annual' ? 6 : 20 }}>
@@ -150,7 +149,7 @@ function PlanCard({ plan, billing, loading, onSelect }: {
 
       {billing === 'annual' && (
         <p style={{ fontSize: 10, letterSpacing: '-0.005em', marginBottom: 20, color: f ? 'rgba(255,255,255,0.3)' : 'var(--color-text-tertiary)' }}>
-          R$ {plan.annualTotal} cobrado anualmente
+          R$ {d.monthlyAnnualLabel} cobrado anualmente
         </p>
       )}
 
@@ -162,7 +161,7 @@ function PlanCard({ plan, billing, loading, onSelect }: {
           <div style={{
             height: '100%', borderRadius: 2,
             background: f ? '#30d158' : 'var(--color-text-primary)',
-            width: `${plan.meterPct}%`,
+            width: `${d.meterPct}%`,
           }} />
         </div>
       </div>
@@ -170,7 +169,7 @@ function PlanCard({ plan, billing, loading, onSelect }: {
       <div style={{ height: 0.5, background: f ? 'rgba(255,255,255,0.08)' : 'var(--color-border-strong)', marginBottom: 20 }} />
 
       <ul style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 28, flex: 1, listStyle: 'none', padding: 0 }}>
-        {plan.features.map(feat => (
+        {d.features.map(feat => (
           <li key={feat} style={{
             display: 'flex', alignItems: 'center', gap: 10,
             fontSize: 12, letterSpacing: '-0.005em',
@@ -183,8 +182,8 @@ function PlanCard({ plan, billing, loading, onSelect }: {
       </ul>
 
       <button
-        onClick={() => onSelect(plan.key)}
-        disabled={!!loading}
+        onClick={() => onSelect(plan.id)}
+        disabled={loading !== null}
         style={{
           width: '100%', padding: '11px 16px', borderRadius: 8,
           fontFamily: 'inherit', fontSize: 12, fontWeight: 500, letterSpacing: '0.01em',
@@ -192,62 +191,86 @@ function PlanCard({ plan, billing, loading, onSelect }: {
           border: f ? 'none' : '0.5px solid var(--color-border-strong)',
           background: f ? 'var(--color-text-primary)' : 'var(--color-surface)',
           color: f ? 'var(--color-bg)' : 'var(--color-text-primary)',
-          opacity: loading && loading !== plan.key ? 0.5 : 1,
+          opacity: loading && loading !== plan.id ? 0.5 : 1,
         }}
       >
-        {loading === plan.key ? 'Redirecionando...' : `começar com ${plan.name.toLowerCase()}`}
+        {loading === plan.id ? 'Redirecionando...' : `começar com ${plan.name.toLowerCase()}`}
       </button>
     </div>
   )
 }
 
-function QualityCard({ res, engine, cost, desc, tag, tagBg, tagColor }: typeof qualityCards[0]) {
-  const [hovered, setHovered] = useState(false)
+function ConsumptionTable() {
+  const resolutions: Resolution[] = ['hd', '2k', '4k']
+  const headCellBase = {
+    fontSize: 10, fontWeight: 500,
+    letterSpacing: '0.14em', textTransform: 'uppercase' as const,
+    color: 'var(--color-text-tertiary)',
+    padding: '0 16px 14px', borderBottom: '0.5px solid var(--color-border-strong)',
+  }
+  const bodyCellBase = {
+    padding: '14px 16px', fontSize: 13, color: 'var(--color-text-primary)',
+    fontVariantNumeric: 'tabular-nums' as const,
+    borderBottom: '0.5px solid var(--color-border)',
+  }
   return (
-    <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        background: 'var(--color-bg-elevated)',
-        border: '0.5px solid var(--color-border-strong)',
-        borderRadius: 12, padding: '18px 20px',
-        boxShadow: hovered ? '0 4px 20px rgba(0,0,0,0.3)' : 'none',
-        transform: hovered ? 'translateY(-1px)' : 'translateY(0)',
-        transition: 'box-shadow 0.2s, transform 0.2s',
-      }}
-    >
-      <div style={{ fontSize: 15, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.02em', marginBottom: 4 }}>{res}</div>
-      <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', letterSpacing: '-0.005em', marginBottom: 10 }}>{engine}</div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, marginBottom: 10 }}>
-        <span style={{ fontSize: 26, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.04em', fontVariantNumeric: 'tabular-nums' as const }}>{cost}</span>
-        <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', lineHeight: 1.3 }}>nodes<br />por render</span>
-      </div>
-      <div style={{ height: 0.5, background: 'var(--color-border-strong)', marginBottom: 10 }} />
-      <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', letterSpacing: '-0.005em', lineHeight: 1.55 }}>{desc}</div>
-      <span style={{
-        display: 'inline-block', marginTop: 10, fontSize: 9, fontWeight: 500,
-        letterSpacing: '0.1em', textTransform: 'uppercase' as const,
-        padding: '3px 8px', borderRadius: 20, background: tagBg, color: tagColor,
-      }}>
-        {tag}
-      </span>
-    </div>
+    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <thead>
+        <tr>
+          <th style={{ ...headCellBase, textAlign: 'left' }}>Engine</th>
+          {resolutions.map(r => (
+            <th key={r} style={{ ...headCellBase, textAlign: 'right' }}>{r.toUpperCase()}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {ENGINE_ORDER.map(eid => {
+          const e = ENGINES[eid]
+          return (
+            <tr key={eid}>
+              <td style={{ ...bodyCellBase, textAlign: 'left' }}>
+                <span style={{ fontWeight: 500 }}>{e.name}</span>
+                <span style={{ color: 'var(--color-text-tertiary)', marginLeft: 8, fontSize: 11 }}>
+                  · {e.tagline}
+                </span>
+              </td>
+              {resolutions.map(r => {
+                const cost = e.nodes[r]
+                return (
+                  <td key={r} style={{ ...bodyCellBase, textAlign: 'right' }}>
+                    {cost !== undefined
+                      ? <span><span style={{ fontWeight: 500 }}>{cost}</span> <span style={{ color: 'var(--color-text-tertiary)', fontSize: 11 }}>nodes</span></span>
+                      : <span style={{ color: 'var(--color-text-tertiary)' }}>—</span>}
+                  </td>
+                )
+              })}
+            </tr>
+          )
+        })}
+      </tbody>
+    </table>
   )
 }
 
+const TOP_PLAN_NODES = PLANS[PLANS.length - 1].nodes
+
 export function PricingToggle() {
-  const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly')
-  const [loading, setLoading] = useState<string | null>(null)
-  const [renders, setRenders] = useState(40)
-  const [qualityCost, setQualityCost] = useState(4)
+  const [billing, setBilling]         = useState<BillingCycle>('monthly')
+  const [loading, setLoading]         = useState<string | null>(null)
+  const [renders, setRenders]         = useState(40)
+  const [qualityCost, setQualityCost] = useState(10)
 
-  const totalNodes = renders * qualityCost
-  const recommended = PLANS_DATA.find(p => p.nodes >= totalNodes) ?? PLANS_DATA[PLANS_DATA.length - 1]
-  const recommendedName = totalNodes > PLANS_DATA[PLANS_DATA.length - 1].nodes ? 'Studio+' : recommended.name
+  const totalNodes      = renders * qualityCost
+  const recommended     = recommendPlan(totalNodes)
+  const overflow        = totalNodes > TOP_PLAN_NODES
+  const overflowAmount  = overflow ? totalNodes - TOP_PLAN_NODES : 0
+  const suggestedLumen  = overflow
+    ? (LUMEN_PACKS.find(p => p.nodes >= overflowAmount) ?? LUMEN_PACKS[LUMEN_PACKS.length - 1])
+    : null
 
-  const handleSelect = async (key: string) => {
-    setLoading(key)
-    await startCheckout(key, billing)
+  const handleSelect = async (id: PaidPlanId) => {
+    setLoading(id)
+    await startCheckout(id, billing)
     setLoading(null)
   }
 
@@ -257,7 +280,7 @@ export function PricingToggle() {
 
   return (
     <section id="planos" style={{ padding: '96px 24px', background: 'var(--color-bg)' }}>
-      <div style={{ maxWidth: 920, margin: '0 auto' }}>
+      <div style={{ maxWidth: 1100, margin: '0 auto' }}>
 
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 48 }}>
@@ -324,24 +347,32 @@ export function PricingToggle() {
           </div>
         </div>
 
-        {/* Plan cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, alignItems: 'start' }}>
-          {plans.map(plan => (
-            <PlanCard key={plan.key} plan={plan} billing={billing} loading={loading} onSelect={handleSelect} />
+        {/* Plan cards: 4 colunas em desktop, auto-fit em telas menores */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          gap: 12, alignItems: 'start',
+        }}>
+          {PLANS.map(p => (
+            <PlanCard key={p.id} planId={p.id} billing={billing} loading={loading} onSelect={handleSelect} />
           ))}
         </div>
 
-        {/* Quality table */}
+        {/* Engine × resolution table */}
         <div style={{ marginTop: 40 }}>
           <div style={{
             fontSize: 10, fontWeight: 500, letterSpacing: '0.18em',
             textTransform: 'uppercase' as const, color: 'var(--color-text-tertiary)',
             textAlign: 'center', marginBottom: 16,
           }}>
-            consumo por qualidade
+            consumo por motor de IA
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-            {qualityCards.map(q => <QualityCard key={q.res} {...q} />)}
+          <div style={{
+            background: 'var(--color-bg-elevated)',
+            border: '0.5px solid var(--color-border-strong)',
+            borderRadius: 14, padding: '8px 12px 4px',
+          }}>
+            <ConsumptionTable />
           </div>
         </div>
 
@@ -372,7 +403,9 @@ export function PricingToggle() {
               padding: '8px 14px', borderRadius: 8,
               fontSize: 12, fontWeight: 500, letterSpacing: '-0.01em', whiteSpace: 'nowrap' as const,
             }}>
-              Plano recomendado:&nbsp;<span style={{ color: '#30d158', fontWeight: 400 }}>{recommendedName}</span>
+              {overflow
+                ? <>Sugestão:&nbsp;<span style={{ color: '#30d158', fontWeight: 400 }}>{recommended.name} + {suggestedLumen!.name}</span></>
+                : <>Plano recomendado:&nbsp;<span style={{ color: '#30d158', fontWeight: 400 }}>{recommended.name}</span></>}
             </div>
           </div>
 
@@ -405,7 +438,7 @@ export function PricingToggle() {
                 Qualidade predominante
               </label>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
-                {[{ label: 'HD', cost: 4 }, { label: '2K', cost: 8 }, { label: '4K', cost: 20 }].map(q => (
+                {[{ label: 'HD', cost: 10 }, { label: '2K', cost: 20 }, { label: '4K', cost: 40 }].map(q => (
                   <button
                     key={q.label}
                     onClick={() => setQualityCost(q.cost)}
@@ -433,10 +466,10 @@ export function PricingToggle() {
             flexWrap: 'wrap' as const, gap: 12,
           }}>
             {([
-              { label: 'renders / mês',     value: String(renders),                   green: false },
-              { label: 'nodes / render',    value: String(qualityCost),               green: false },
-              { label: 'nodes necessários', value: totalNodes.toLocaleString('pt-BR'), green: false },
-              { label: 'plano ideal',       value: recommendedName,                    green: true  },
+              { label: 'renders / mês',     value: String(renders),                                       green: false },
+              { label: 'nodes / render',    value: String(qualityCost),                                   green: false },
+              { label: 'nodes necessários', value: totalNodes.toLocaleString('pt-BR'),                    green: false },
+              { label: 'plano ideal',       value: overflow ? `${recommended.name} + ${suggestedLumen!.name}` : recommended.name, green: true },
             ]).map((item, i, arr) => (
               <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -463,6 +496,7 @@ export function PricingToggle() {
         <div style={{ textAlign: 'center', marginTop: 32 }}>
           <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', letterSpacing: '-0.005em', lineHeight: 1.7 }}>
             Nodes renovam mensalmente e não acumulam para o mês seguinte.<br />
+            Lumens (créditos avulsos) ficam disponíveis após assinar um plano.<br />
             Dúvidas?{' '}
             <a href="mailto:contato@spacenode.app" style={{ color: 'var(--color-text-primary)', textDecoration: 'underline', textUnderlineOffset: 3 }}>
               fale com a gente.
