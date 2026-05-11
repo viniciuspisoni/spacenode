@@ -104,6 +104,7 @@ export default function VideoClient({ initialCredits }: VideoClientProps) {
   // (e.g. Kling supports 5/10s, Veo supports 4/6/8s — switching needs a fallback).
   useEffect(() => {
     if (!activeEngine.nodesByDuration[selectedDuration]) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: ajusta selectedDuration quando troca de engine torna o valor atual inválido
       setSelectedDuration(activeEngine.durations[activeEngine.durations.length - 1].value)
     }
   }, [activeEngine, selectedDuration])

@@ -96,6 +96,10 @@ export function HistoryClient({
   const [exhausted,   setExhausted]   = useState(initialRenders.length < pageSize)
 
   useEffect(() => {
+    // Intencional: sincroniza a lista visível com props vindas do server após
+    // router.refresh() (ex.: depois de excluir/mover renders). O "cascading
+    // render" que a regra alerta é exatamente o efeito desejado aqui.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoaded(initialRenders)
     setExhausted(initialRenders.length < pageSize)
   }, [initialRenders, pageSize])
