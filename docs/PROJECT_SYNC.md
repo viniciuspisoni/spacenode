@@ -32,16 +32,19 @@
 | Planos / créditos (Stripe) | Em produção |
 | Animate (animação de imagem) | Desativado temporariamente (até beta) |
 | SPACES MVP | **Em produção em `main` desde 2026-05-11 (PR [#53](https://github.com/viniciuspisoni/spacenode/pull/53), merge `27c6790`).** Oculto no menu (`badge: 'em breve'`, `href: null`) até o beta. |
-| SPACES Engine v2 | Próxima feature de produto (depois de quitar os 4 erros de lint pré-existentes em `main`) |
+| SPACES Engine v2 | **Próxima sprint.** Base técnica pronta — lint zerado em `main` após PR [#55](https://github.com/viniciuspisoni/spacenode/pull/55). |
 
 ### Branch atual
 
-- **Trunk:** `main` em `27c6790` (`Merge pull request #53 from viniciuspisoni/feature/spaces-mvp`).
-- **PR #53:** [feat: SPACES MVP — visual project evolution](https://github.com/viniciuspisoni/spacenode/pull/53) — **MERGED** em `2026-05-11T17:21:49Z` com merge commit (parents preservados, não squash).
-- **Reconciliação:** antes do merge, o commit `731d3b2` em `feature/spaces-mvp` mergeou `origin/main` para reconciliar divergências entre a feature (foco em segurança/release) e a evolução paralela do SPACES em `main` (que já tinha o MVP via PR #5 + features extras via PR #7 e commits `75e5a5b`/`536ff6d`).
-- **Deploy de produção:** ✅ Vercel `success` em `2026-05-11T17:22:29Z`. Canônica: **[spacenode.app](https://spacenode.app)** (`HTTP 200`, HTML servindo Geist local + meta viewport).
+- **Trunk:** `main` em `3e383aa` (`fix(lint): clear 4 pre-existing react-hooks errors in main (#55)`).
+- **Últimos merges em `main`:**
+  - **PR [#55](https://github.com/viniciuspisoni/spacenode/pull/55):** `fix(lint)` — 4 erros pré-existentes zerados via squash em `2026-05-11T18:18:13Z` (commit `3e383aa`). Lint local agora **0 errors**.
+  - **PR [#54](https://github.com/viniciuspisoni/spacenode/pull/54):** `docs: sync to main state after PR #53 merge` — squash em `2026-05-11T17:44:45Z` (commit `63b135b`).
+  - **PR [#53](https://github.com/viniciuspisoni/spacenode/pull/53):** `feat: SPACES MVP — visual project evolution` — merge commit em `2026-05-11T17:21:49Z` (commit `27c6790`, parents preservados, não squash).
+- **Reconciliação prévia ao PR #53:** o commit `731d3b2` em `feature/spaces-mvp` mergeou `origin/main` para reconciliar divergências entre a feature (foco em segurança/release) e a evolução paralela do SPACES em `main` (que já tinha o MVP via PR #5 + features extras via PR #7 e commits `75e5a5b`/`536ff6d`).
+- **Deploy de produção:** ✅ Vercel `success` no HEAD atual `3e383aa` em `2026-05-11T18:18:54Z`. Canônica: **[spacenode.app](https://spacenode.app)** (`HTTP 200`, HTML servindo Geist local + meta viewport).
 - **Code review (Codex):** aprovou SPACES MVP, schema v2 e RPC `consume_credits` no PR #53.
-- **Branch `feature/spaces-mvp`:** mergeada; pode ser deletada quando o usuário autorizar. Worktrees temporários (`spaces-mvp-docs`, `docs-sync-update`) podem ser removidos.
+- **Branches mergeadas (passíveis de deleção):** `feature/spaces-mvp`, `docs/sync-update`, `fix/main-lint-errors`.
 
 ---
 
@@ -165,37 +168,32 @@ Ambas estão **em `main`** (chegaram via PR #5 antes do merge do PR #53; os arqu
 
 ## 7. Pendências
 
-### Prioridade: 4 erros de lint pré-existentes em `main`
+### Próxima sprint de produto
 
-Identificados durante a validação do PR #53. **Não foram introduzidos pelo PR** — já existiam em `main` (vieram via PRs anteriores de produto). Vercel não bloqueia por eles, mas ESLint local sai com exit code 1, o que polui validações automatizadas.
-
-- [ ] `app/app/billing/BillingClient.tsx:52` — `react-hooks/immutability` (uso indevido de setState em valor imutável)
-- [ ] `app/app/billing/BillingClient.tsx:58` — mesma regra, outra chamada
-- [ ] `app/app/history/HistoryClient.tsx:99` — `react-hooks/set-state-in-effect` (setState síncrono dentro de useEffect)
-- [ ] `app/app/video/VideoClient.tsx:107` — mesma regra
-
-**Bloqueia o início de SPACES Engine v2.** Resolver primeiro, depois retomar roadmap de produto.
+- [ ] **Iniciar SPACES Engine v2** — DNA mais rico, embeddings de coerência, regeneração de Vistas, sugestões automáticas. **Sem bloqueio técnico** (lint zerado via PR #55).
 
 ### Operacionais (não-bloqueantes)
 
 - [ ] Investigar `spawn EPERM` no build local Windows + worktrees do Claude Code (workaround atual: usar `--webpack` e caminho explícito do binário do Next).
 - [ ] Reativar `/animate` e `/spaces` no menu principal quando entrarem em beta público (hoje escondidos via `badge: 'em breve'` muted + `href: null` em `components/app/Sidebar.tsx`).
-- [ ] Considerar deletar a branch remota `feature/spaces-mvp` (já mergeada).
-- [ ] Remover worktrees temporários `spaces-mvp-docs` e `docs-sync-update` quando os docs forem aceitos em `main`.
+- [ ] Deletar branches remotas mergeadas: `feature/spaces-mvp`, `docs/sync-update`, `fix/main-lint-errors`.
+- [ ] Remover worktrees locais temporários: `spaces-mvp-docs`, `docs-sync-update`, `fix-lint-errors`, `docs-sync-after-lint-fix` (depois deste PR mergear).
 
-### Pós-quitação dos lint errors
+### Histórico recente — concluído
 
-- [ ] Iniciar **SPACES Engine v2** (DNA mais rico, embeddings de coerência, regeneração de Vistas, sugestões automáticas).
+- [x] **PR [#55](https://github.com/viniciuspisoni/spacenode/pull/55)** (`3e383aa`, 2026-05-11) — 4 erros de lint pré-existentes em `main` zerados de forma cirúrgica, sem mudança de comportamento de produto:
+  - `BillingClient.tsx:52,58` — `window.location.href = r.url` → `window.location.assign(r.url)`.
+  - `HistoryClient.tsx:99` — `eslint-disable-next-line react-hooks/set-state-in-effect` com justificativa (sincronização intencional com props do server após `router.refresh()`).
+  - `VideoClient.tsx:107` — mesmo tratamento (ajuste de `selectedDuration` ao trocar de engine).
 
 ---
 
 ## 8. Roadmap próximo
 
-1. **Agora:** corrigir os 4 erros de lint pré-existentes em `main` (`BillingClient`, `HistoryClient`, `VideoClient`). Pequenos PRs, um por arquivo, sem mexer em produto.
-2. **Próxima feature:** SPACES Engine v2 — refino do modelo de DNA, coerência semântica entre Vistas, sugestões automáticas, regeneração.
-3. **Liberação do beta SPACES:** reativar link no menu (`href: '/app/spaces'`, badge `novo`) e restaurar `page.tsx` da implementação completa quando produto autorizar.
-4. **Depois:** vídeo e storytelling visual (capability já no roadmap de produto).
-5. **Contínuo:** melhorias de UX na landing e no fluxo de geração (sempre incrementais, sem redesigns).
+1. **Agora — próxima sprint:** SPACES Engine v2 — refino do modelo de DNA, coerência semântica entre Vistas, sugestões automáticas, regeneração. Base técnica pronta.
+2. **Liberação do beta SPACES:** reativar link no menu (`href: '/app/spaces'`, badge `novo`) e restaurar `page.tsx` da implementação completa quando produto autorizar.
+3. **Depois:** vídeo e storytelling visual (capability já no roadmap de produto).
+4. **Contínuo:** melhorias de UX na landing e no fluxo de geração (sempre incrementais, sem redesigns).
 
 ---
 
