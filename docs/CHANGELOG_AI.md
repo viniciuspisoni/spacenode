@@ -7,6 +7,54 @@
 
 ---
 
+## 2026-05-11 (depois do PR #53/#54) — PR #55 mergeado: base técnica de lint zerada
+
+- **Agente responsável:** Claude Code
+- **Branch:** `fix/main-lint-errors` (mergeada via squash; pode ser deletada)
+- **PR:** [#55 — fix(lint): clear 4 pre-existing react-hooks errors in main](https://github.com/viniciuspisoni/spacenode/pull/55) — **MERGED**
+
+### Commit em `main`
+
+| Commit | Descrição |
+|---|---|
+| `3e383aad3ef0a3fd3c4f2a384538e06668c3fd16` | `fix(lint): clear 4 pre-existing react-hooks errors in main (#55)` |
+
+### Resumo da entrega
+
+Correção cirúrgica dos 4 erros de ESLint pré-existentes em `main` (identificados durante a validação do PR #53). **Zero mudança de comportamento de produto.** Diff total: 3 arquivos, +7 / −2.
+
+- `app/app/billing/BillingClient.tsx:52` e `:58` — `react-hooks/immutability`: `window.location.href = r.url` → `window.location.assign(r.url)` (equivalente per MDN — ambos disparam navegação com a mesma entrada de histórico; o método não é flagrado como mutação de variável externa).
+- `app/app/history/HistoryClient.tsx:99` — `react-hooks/set-state-in-effect`: `eslint-disable-next-line` com justificativa (sincronização intencional da lista visível com props do server após `router.refresh()` — o "cascading render" alertado é exatamente o efeito desejado).
+- `app/app/video/VideoClient.tsx:107` — mesma regra, mesmo tratamento (ajuste intencional de `selectedDuration` ao trocar de engine, quando Kling 5/10s ↔ Veo 4/6/8s tornam o valor atual inválido).
+
+Refatoração para `render-time setState` (padrão recomendado pelas React docs) foi explicitamente descartada nesta task — opção "A" do plano, escolhida para garantir zero mudança de runtime behavior.
+
+### Validações feitas
+
+- [x] `npx tsc --noEmit`: **0 erros**.
+- [x] `npm run lint`: **0 errors** (era 4), 19 warnings (todos pré-existentes `<img>`, fora do escopo).
+- [x] `next build --webpack`: **clean**, todas as 24 rotas geradas.
+- [x] PR mergeado via squash em `2026-05-11T18:18:13Z` → commit `3e383aa`.
+- [x] Deploy de produção Vercel: `success` em `2026-05-11T18:18:54Z` (~41s).
+- [x] `https://spacenode.app` respondendo `HTTP 200`, `Age: 0` (resposta fresca pós-deploy), `Content-Length: 121045` (mesmo tamanho dos deploys anteriores — mudança não afeta o HTML servido).
+- [x] `package.json` / `package-lock.json`: **não tocados** (sem diff).
+- [x] Workspace principal `C:\Users\Pisoni\spacenode`: **não tocado** (WIP de `+sharp` preservado).
+
+### Estado consolidado após o merge
+
+- **Trunk:** `main` em `3e383aa`.
+- **Lint:** **0 errors**, 19 warnings (pré-existentes `<img>`).
+- **Produção:** [spacenode.app](https://spacenode.app), deploy `success`.
+- **Base técnica:** pronta para iniciar SPACES Engine v2 sem bloqueio.
+
+### Pendências
+
+- [ ] **Iniciar SPACES Engine v2** — próxima sprint de produto.
+- [ ] Deletar branches remotas mergeadas: `feature/spaces-mvp`, `docs/sync-update`, `fix/main-lint-errors`.
+- [ ] Remover worktrees locais temporários quando seguro: `spaces-mvp-docs`, `docs-sync-update`, `fix-lint-errors`, `docs-sync-after-lint-fix` (depois deste PR de docs mergear).
+
+---
+
 ## 2026-05-11 (final do dia) — PR #53 mergeado em `main` + deploy de produção
 
 - **Agente responsável:** Claude Code (reconciliação + merge) + Codex (review prévio, sem mudanças neste passo)
