@@ -49,13 +49,13 @@ export function BillingClient({ plan, balance, lumens }: BillingClientProps) {
     setLoading(`plan-${id}`); setError(null)
     const r = await startCheckout({ type: 'plan', id, billing })
     if (r.error) { setError(r.error); setLoading(null); return }
-    if (r.url) window.location.href = r.url
+    if (r.url) window.location.assign(r.url)
   }
   const handleLumen = async (id: LumenPackSize) => {
     setLoading(`lumen-${id}`); setError(null)
     const r = await startCheckout({ type: 'lumen', id })
     if (r.error) { setError(r.error); setLoading(null); return }
-    if (r.url) window.location.href = r.url
+    if (r.url) window.location.assign(r.url)
   }
 
   return (
