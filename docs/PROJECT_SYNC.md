@@ -31,15 +31,17 @@
 | Landing page | Em produção |
 | Planos / créditos (Stripe) | Em produção |
 | Animate (animação de imagem) | Desativado temporariamente (até beta) |
-| SPACES MVP | **Implementado em `feature/spaces-mvp`, aguardando CI + merge.** Pode permanecer oculto no menu de produção até o beta. |
-| SPACES Engine v2 | Próxima sprint (após merge do MVP) |
+| SPACES MVP | **Em produção em `main` desde 2026-05-11 (PR [#53](https://github.com/viniciuspisoni/spacenode/pull/53), merge `27c6790`).** Oculto no menu (`badge: 'em breve'`, `href: null`) até o beta. |
+| SPACES Engine v2 | Próxima feature de produto (depois de quitar os 4 erros de lint pré-existentes em `main`) |
 
-### Branch ativa
+### Branch atual
 
-- **`feature/spaces-mvp`** — publicada em `origin`, HEAD em `0158581`.
-- **PR:** a abrir contra `main`.
-- **Code review (Codex):** aprovado — código, schema SPACES e RPC `consume_credits` revisados.
-- **Pendência operacional:** validar build em CI/Vercel. Build local está falhando intermitentemente com `spawn EPERM` (issue do ambiente Windows + worktrees do Claude Code, não regressão de código).
+- **Trunk:** `main` em `27c6790` (`Merge pull request #53 from viniciuspisoni/feature/spaces-mvp`).
+- **PR #53:** [feat: SPACES MVP — visual project evolution](https://github.com/viniciuspisoni/spacenode/pull/53) — **MERGED** em `2026-05-11T17:21:49Z` com merge commit (parents preservados, não squash).
+- **Reconciliação:** antes do merge, o commit `731d3b2` em `feature/spaces-mvp` mergeou `origin/main` para reconciliar divergências entre a feature (foco em segurança/release) e a evolução paralela do SPACES em `main` (que já tinha o MVP via PR #5 + features extras via PR #7 e commits `75e5a5b`/`536ff6d`).
+- **Deploy de produção:** ✅ Vercel `success` em `2026-05-11T17:22:29Z`. Canônica: **[spacenode.app](https://spacenode.app)** (`HTTP 200`, HTML servindo Geist local + meta viewport).
+- **Code review (Codex):** aprovou SPACES MVP, schema v2 e RPC `consume_credits` no PR #53.
+- **Branch `feature/spaces-mvp`:** mergeada; pode ser deletada quando o usuário autorizar. Worktrees temporários (`spaces-mvp-docs`, `docs-sync-update`) podem ser removidos.
 
 ---
 
@@ -56,11 +58,11 @@
 
 ## 4. SPACES MVP — detalhes da entrega
 
-> Branch `feature/spaces-mvp`, commit anchor `5a08034` (`feat(spaces): add SPACES MVP — Dias 1–7 completos`), com refinamentos posteriores até `0158581`.
+> **Em produção em `main`** desde 2026-05-11 (PR [#53](https://github.com/viniciuspisoni/spacenode/pull/53), merge commit `27c6790`). O código vivo combina o trabalho de `feature/spaces-mvp` (foco em segurança/release/docs) com a evolução paralela em `main` (features adicionais: upload de ângulo, Vista Mestre como âncora, fix de prompts).
 
 ### Visibilidade em produção
 
-O código do SPACES MVP está **implementado e validado** em `feature/spaces-mvp`. Após o merge em `main`, a feature **pode permanecer oculta no menu principal de produção** (via flag de visibilidade, mesmo padrão usado hoje para `/animate`) até a liberação do beta. A presença do código não bloqueia nem altera fluxos existentes — Spaces fica acessível apenas para uso interno e testes até a abertura oficial.
+O código do SPACES MVP está **em produção em `main`**, mas o item **"spaces" na sidebar permanece com `badge: 'em breve'` muted e `href: null`** — escondido até a liberação do beta público (mesmo padrão de `/animate`). Os routes `/app/spaces`, `/app/spaces/new` e `/app/spaces/[spaceId]` são stubs ("Em breve" / redirect) introduzidos pelo PR #51 (`0460689`). Reativar para o beta é trocar `href: null` por `'/app/spaces'` em `components/app/Sidebar.tsx`, ajustar o badge, e restaurar as três `page.tsx` da implementação completa (presente no histórico via merge).
 
 ### Conceito
 
@@ -83,25 +85,33 @@ O **SPACES** é a evolução do projeto único de geração: cada Space é um **
 - **`coerente`** — preserva DNA do projeto, gera variações que pertencem ao mesmo conjunto.
 - **`explorar`** — permite override do DNA (`dna_overrides`) para variações mais livres.
 
-### Segurança aplicada (commits `e8fb699` + `d71b541` + `0158581`)
+### Recursos avançados presentes em `main` (além do MVP de Dias 1–7)
 
-- P0 créditos: `consume_credits` chamada **antes** do FAL para evitar geração sem débito.
-- P0 segurança: RPC `consume_credits` blindado.
+- **Upload de ângulo** (PR #7, commit `b2c3ed3`) — usuário envia rascunho/wireframe e o SPACES renderiza com o DNA do projeto. Limite **10 MB** validado client/server via constante única `SPACES_MAX_UPLOAD_BYTES` (`lib/spaces/upload.ts`).
+- **Vista Mestre como âncora visual** (commit `536ff6d`) — `callFalForVista(inputUrl, prompt, mestreUrl)` injeta a Vista Mestre em toda chamada FAL para coerência entre Vistas. De-duplicação automática quando `inputUrl == mestreUrl`.
+- **Fix de prompts em ângulo** (commit `75e5a5b`) — trava materiais e remove conflito de `geometry_lock` no modo `ângulo`.
+
+### Segurança aplicada (presente em `main` hoje)
+
+- **P0 créditos:** `consume_credits` chamada **antes** do FAL em `evolve/route.ts` (comentário explícito na linha do RPC). Não há refund automático se o FAL falhar depois — refund é tech debt P1 pós-beta.
+- **`parent_render_id` protegido por `spaceId`:** todo lookup do parent usa `.eq('id', parent_render_id).eq('space_id', spaceId)` — impede um render de outro Space ser usado como pai.
+- **RPC `consume_credits` blindada:**
   - Guard de `amount` (rejeita NULL, 0 e negativos).
   - Guard `auth.uid()` (rejeita JWT ausente ou divergente de `user_id_input`).
   - `REVOKE EXECUTE FROM PUBLIC, anon` + `GRANT TO authenticated`.
-  - Em `evolve/route.ts`, troca de `admin.rpc` para `supabase.rpc` para que `auth.uid()` resolva.
-- Upload de imagem padronizado em **10 MB** via constante única.
+  - Em `evolve/route.ts`, chamada via `supabase.rpc` (não `admin.rpc`) para que `auth.uid()` resolva.
+- **Upload de imagem:** **10 MB** validado via constante única `SPACES_MAX_UPLOAD_BYTES` (`lib/spaces/upload.ts`), import compartilhado client/server.
 
-### Commits da entrega (em ordem cronológica)
+### Merge para `main`
 
-| Commit | Descrição |
+| Item | Valor |
 |---|---|
-| `5a08034` | `feat(spaces): add SPACES MVP — Dias 1–7 completos` |
-| `e8fb699` | `fix(spaces/evolve): corrigir P0 segurança + P0 créditos antes do FAL` |
-| `d71b541` | `fix(spaces/upload): padronizar limite de 10 MB em constante única` |
-| `0070f65` | `chore(release-checks): lint, font, ESLint ignore, consume_credits migration` |
-| `0158581` | `fix(rpc): harden consume_credits — amount guard + auth.uid() + REVOKE/GRANT` |
+| PR | [#53 — feat: SPACES MVP — visual project evolution](https://github.com/viniciuspisoni/spacenode/pull/53) |
+| Merge commit | `27c6790f12668f0c30504134105d300155e92c7c` |
+| Mergeado em | `2026-05-11T17:21:49Z` |
+| Estratégia | merge commit (preserva os dois parents — reconciliação `731d3b2` ↔ `0460689`) |
+| Deploy de produção | ✅ Vercel `success` em `2026-05-11T17:22:29Z` |
+| URL canônica | [https://spacenode.app](https://spacenode.app) |
 
 ---
 
@@ -120,7 +130,7 @@ O **SPACES** é a evolução do projeto único de geração: cada Space é um **
 
 ### Migrations da entrega
 
-Ambas estão **em `feature/spaces-mvp`** e foram **aplicadas em produção em 2026-05-03** (idempotentes — `IF NOT EXISTS` / `CREATE OR REPLACE`). Os arquivos estão commitados para versionamento e provisionamento de novos ambientes; **não rodar `supabase db push`** contra produção.
+Ambas estão **em `main`** (chegaram via PR #5 antes do merge do PR #53; os arquivos em `feature/spaces-mvp` eram byte-idênticos) e foram **aplicadas em produção em 2026-05-03** (idempotentes — `IF NOT EXISTS` / `CREATE OR REPLACE`). Os arquivos estão commitados para versionamento e provisionamento de novos ambientes; **não rodar `supabase db push`** contra produção.
 
 1. **`supabase/migrations/20260503000000_create_spaces_v2.sql`**
    - Cria tabela `spaces`.
@@ -134,10 +144,10 @@ Ambas estão **em `feature/spaces-mvp`** e foram **aplicadas em produção em 20
    - `REVOKE EXECUTE FROM PUBLIC, anon` + `GRANT TO authenticated`.
    - Retorna `false` em qualquer falha; caller mapeia para HTTP 402.
 
-### Validação pendente
+### Status das migrations
 
-- **Staging:** confirmar que as duas migrations rodam limpas e que `spaces_with_counts` é criada corretamente.
-- **Produção:** já aplicado em 2026-05-03 (sem rollback necessário até agora).
+- **Produção:** aplicadas em 2026-05-03; sem rollback necessário até agora.
+- **Staging:** não houve passo intermediário; preview deploy do Vercel (PR #53) validou o build com Supabase de produção sem migration adicional.
 
 ---
 
@@ -155,30 +165,37 @@ Ambas estão **em `feature/spaces-mvp`** e foram **aplicadas em produção em 20
 
 ## 7. Pendências
 
-### Bloqueantes do merge
+### Prioridade: 4 erros de lint pré-existentes em `main`
 
-- [ ] **Abrir PR** `feature/spaces-mvp` → `main`.
-- [ ] **CI verde** (lint + tsc + build) em GitHub Actions.
-- [ ] **Build limpo na Vercel** (preview deploy do PR).
-- [ ] Confirmar migrations em **staging** se houver ambiente intermediário; caso contrário, validar diretamente no preview Vercel apontando para o Supabase de produção (migrations já aplicadas).
+Identificados durante a validação do PR #53. **Não foram introduzidos pelo PR** — já existiam em `main` (vieram via PRs anteriores de produto). Vercel não bloqueia por eles, mas ESLint local sai com exit code 1, o que polui validações automatizadas.
+
+- [ ] `app/app/billing/BillingClient.tsx:52` — `react-hooks/immutability` (uso indevido de setState em valor imutável)
+- [ ] `app/app/billing/BillingClient.tsx:58` — mesma regra, outra chamada
+- [ ] `app/app/history/HistoryClient.tsx:99` — `react-hooks/set-state-in-effect` (setState síncrono dentro de useEffect)
+- [ ] `app/app/video/VideoClient.tsx:107` — mesma regra
+
+**Bloqueia o início de SPACES Engine v2.** Resolver primeiro, depois retomar roadmap de produto.
 
 ### Operacionais (não-bloqueantes)
 
 - [ ] Investigar `spawn EPERM` no build local Windows + worktrees do Claude Code (workaround atual: usar `--webpack` e caminho explícito do binário do Next).
-- [ ] Reativar `/animate` e `/spaces` no menu principal quando entrarem em beta público (hoje estão escondidos via flag — commit `0460689` em `main`).
+- [ ] Reativar `/animate` e `/spaces` no menu principal quando entrarem em beta público (hoje escondidos via `badge: 'em breve'` muted + `href: null` em `components/app/Sidebar.tsx`).
+- [ ] Considerar deletar a branch remota `feature/spaces-mvp` (já mergeada).
+- [ ] Remover worktrees temporários `spaces-mvp-docs` e `docs-sync-update` quando os docs forem aceitos em `main`.
 
-### Pós-merge
+### Pós-quitação dos lint errors
 
-- [ ] Iniciar **SPACES Engine v2** (DNA mais rico, embeddings de coerência, regeneração de Vistas).
+- [ ] Iniciar **SPACES Engine v2** (DNA mais rico, embeddings de coerência, regeneração de Vistas, sugestões automáticas).
 
 ---
 
 ## 8. Roadmap próximo
 
-1. **Agora:** PR + CI + merge de `feature/spaces-mvp` em `main`.
-2. **Próxima sprint:** SPACES Engine v2 — refino do modelo de DNA, coerência semântica entre Vistas, sugestões automáticas.
-3. **Depois:** Vídeo e storytelling visual (capability já no roadmap de produto).
-4. **Contínuo:** melhorias de UX na landing e no fluxo de geração (sempre incrementais, sem redesigns).
+1. **Agora:** corrigir os 4 erros de lint pré-existentes em `main` (`BillingClient`, `HistoryClient`, `VideoClient`). Pequenos PRs, um por arquivo, sem mexer em produto.
+2. **Próxima feature:** SPACES Engine v2 — refino do modelo de DNA, coerência semântica entre Vistas, sugestões automáticas, regeneração.
+3. **Liberação do beta SPACES:** reativar link no menu (`href: '/app/spaces'`, badge `novo`) e restaurar `page.tsx` da implementação completa quando produto autorizar.
+4. **Depois:** vídeo e storytelling visual (capability já no roadmap de produto).
+5. **Contínuo:** melhorias de UX na landing e no fluxo de geração (sempre incrementais, sem redesigns).
 
 ---
 

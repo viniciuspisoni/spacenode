@@ -7,6 +7,73 @@
 
 ---
 
+## 2026-05-11 (final do dia) — PR #53 mergeado em `main` + deploy de produção
+
+- **Agente responsável:** Claude Code (reconciliação + merge) + Codex (review prévio, sem mudanças neste passo)
+- **Branch:** `feature/spaces-mvp` (mergeada em `main`; pode ser deletada)
+- **PR:** [#53 — feat: SPACES MVP — visual project evolution](https://github.com/viniciuspisoni/spacenode/pull/53) — **MERGED**
+
+### Commits relevantes
+
+| Commit | Descrição |
+|---|---|
+| `731d3b2` | `Merge origin/main into feature/spaces-mvp` (reconciliação prévia ao merge do PR) |
+| `27c6790` | `Merge pull request #53 from viniciuspisoni/feature/spaces-mvp` (HEAD atual em `main`) |
+
+### Resumo da entrega
+
+PR #53 foi mergeado em `main` com estratégia de **merge commit** (parents preservados, não squash). Antes disso foi necessária uma reconciliação porque `main` evoluiu em paralelo com SPACES (PR #5 trouxe o mesmo MVP, depois PR #7 adicionou upload de ângulo, depois commits `75e5a5b`/`536ff6d` adicionaram Vista Mestre como âncora e fixes de prompts) além de ~25 features de UI/UX.
+
+**Reconciliação `731d3b2` — 13 conflitos resolvidos, todos pegando `main`:**
+
+- 9 arquivos SPACES (api/lib/components + 3 page.tsx): main tinha implementação **mais avançada** (upload de ângulo, Vista Mestre âncora, fix de prompts) **e** todas as guards de segurança que `feature/spaces-mvp` trazia. Os 3 `page.tsx` viraram stubs hide-until-beta via PR #51.
+- 4 arquivos globais (`Sidebar.tsx`, `app/layout.tsx`, `GenerateClient.tsx`, `HistoryClient.tsx`): main tinha o UI/UX mais recente — sistema `badgeTone`, theme toggle migrado para sidebar, pastas/seleção múltipla/paginação no histórico, import de `Viewport` no layout.
+
+Migrations da entrega (já em produção desde 2026-05-03, idempotentes, byte-idênticas nas duas branches):
+- `supabase/migrations/20260503000000_create_spaces_v2.sql`
+- `supabase/migrations/20260503000001_create_consume_credits_rpc.sql`
+
+### Estado em produção após o merge
+
+- **Trunk:** `main` em `27c6790`.
+- **Deploy:** Vercel `success` em `2026-05-11T17:22:29Z` (~40s após o merge).
+- **URL canônica:** [https://spacenode.app](https://spacenode.app) — `HTTP 200`, HTML servindo Geist local + meta viewport.
+- **SPACES no menu:** **oculto** (`badge: 'em breve'` muted + `href: null` em `components/app/Sidebar.tsx`). Pages `/app/spaces*` retornam stubs "Em breve" / redirect. Implementação completa preservada nos demais arquivos.
+
+### Capacidades SPACES presentes em `main` hoje
+
+- Upload de ângulo (rascunho do usuário renderizado com DNA do projeto, limite 10 MB).
+- Vista Mestre como âncora visual em toda chamada FAL (coerência entre Vistas).
+- `parent_render_id` validado com `.eq('space_id', spaceId)` — impede cross-space.
+- `consume_credits` chamado **antes** do FAL (P0 créditos).
+- `consume_credits` via `supabase.rpc` (não `admin.rpc`) — `auth.uid()` resolve para SECURITY DEFINER.
+- RPC `consume_credits` blindada: guard de `amount > 0`, guard `auth.uid() = user_id_input`, `REVOKE EXECUTE FROM PUBLIC, anon` + `GRANT TO authenticated`.
+- Upload `SPACES_MAX_UPLOAD_BYTES` (10 MB) via constante única client/server.
+
+### Validações feitas
+
+- [x] Validação local pós-reconciliação: `tsc --noEmit` = **0 erros**; `next build --webpack` = **clean** (24 páginas geradas, único warning é `metadataBase`); `npm run lint` = **0 erros introduzidos** pelo merge.
+- [x] Vercel preview (PR pré-merge) = ✅ pass.
+- [x] PR mergeado às `2026-05-11T17:21:49Z` via `gh pr merge --merge`.
+- [x] Deploy de produção Vercel = `success` às `2026-05-11T17:22:29Z`.
+- [x] Verificação direta: `HEAD https://spacenode.app` → `HTTP 200`, conteúdo fresco pós-deploy.
+- [x] `package.json` / `package-lock.json` **não tocados** em nenhum passo (preserva WIP do `sharp` no workspace principal).
+- [x] Workspace principal `C:\Users\Pisoni\spacenode` **não foi tocado** — todo o trabalho ficou em worktrees dedicados (`spaces-mvp-docs`, depois `docs-sync-update`).
+
+### Pendências
+
+- [ ] **Corrigir os 4 erros de lint pré-existentes em `main`** — bloqueiam o início de SPACES Engine v2 conforme combinado:
+  - `app/app/billing/BillingClient.tsx:52` — `react-hooks/immutability`
+  - `app/app/billing/BillingClient.tsx:58` — `react-hooks/immutability`
+  - `app/app/history/HistoryClient.tsx:99` — `react-hooks/set-state-in-effect`
+  - `app/app/video/VideoClient.tsx:107` — `react-hooks/set-state-in-effect`
+- [ ] **Depois disso:** iniciar **SPACES Engine v2**.
+- [ ] Reativar `/spaces` e `/animate` no menu principal quando autorizado o beta público.
+- [ ] Deletar branch remota `feature/spaces-mvp` (já mergeada).
+- [ ] Remover worktrees temporários `spaces-mvp-docs` e `docs-sync-update`.
+
+---
+
 ## 2026-05-11 — SPACES MVP consolidado em `feature/spaces-mvp`
 
 - **Agente responsável:** Claude Code (implementação) + Codex (review)
