@@ -7,10 +7,15 @@
 // Adding a new mode? Extend EditMode in types.ts, add an entry to
 // EDIT_MODE_LABELS, and add a case here.
 
-import { callObjectRemoval, OBJECT_REMOVAL_ENDPOINT } from './object-removal'
-import { callFluxFill,      FLUX_FILL_ENDPOINT      } from './flux-fill'
-import { callFluxInpaint,   FLUX_INPAINT_ENDPOINT   } from './flux-inpaint'
+import { callFluxFill,           FLUX_FILL_ENDPOINT         } from './flux-fill'
+import { callFluxInpaint,        FLUX_INPAINT_ENDPOINT      } from './flux-inpaint'
+import { callFluxFillForRemoval, FLUX_FILL_REMOVAL_ENDPOINT } from './flux-fill-removal'
 import type { EditMode, EngineDescriptor } from './types'
+
+// NOTE: object-removal.ts still lives in this folder for future fallback /
+// debug, but it's no longer wired into the router — its output quality on
+// photorealistic architectural renders is unusable. See flux-fill-removal.ts
+// for the full rationale.
 
 /**
  * Pick the engine descriptor for a given edit mode. The caller invokes
@@ -22,9 +27,9 @@ export function selectEngine(mode: EditMode): EngineDescriptor {
     case 'remove':
       return {
         mode,
-        endpoint:    OBJECT_REMOVAL_ENDPOINT,
-        call:        callObjectRemoval,
-        description: 'Specialized object/person removal with context-aware fill',
+        endpoint:    FLUX_FILL_REMOVAL_ENDPOINT,
+        call:        callFluxFillForRemoval,
+        description: 'Flux Pro Fill with strict removal prompt — preserves source quality',
       }
 
     case 'texture':
