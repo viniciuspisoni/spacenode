@@ -63,14 +63,6 @@ type NavItem = {
   badgeTone?: 'green' | 'muted'
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SPACES production gate — see app/app/spaces/page.tsx for full context.
-// In production (spacenode.app), keep "em breve" muted badge and disable link.
-// In preview/local/development, show "preview" green badge with clickable link.
-// REMOVING THIS GATE WILL EXPOSE SPACES IN PRODUCTION.
-// ─────────────────────────────────────────────────────────────────────────────
-const SPACES_HIDDEN = process.env.NEXT_PUBLIC_VERCEL_ENV === 'production'
-
 const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: 'PRINCIPAL',
@@ -83,14 +75,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     label: 'CRIAR',
     items: [
       { label: 'renderizar', href: '/app/generate', exact: false, Icon: IconGenerate  },
-      {
-        label: 'spaces',
-        href:  SPACES_HIDDEN ? null      : '/app/spaces',
-        exact: false,
-        Icon:  IconSpaces,
-        badge: SPACES_HIDDEN ? 'em breve' : 'preview',
-        badgeTone: SPACES_HIDDEN ? 'muted' : 'green',
-      },
+      { label: 'spaces',     href: null,            exact: false, Icon: IconSpaces, badge: 'em breve', badgeTone: 'muted' },
       { label: 'melhorar',   href: '/app/upscale',  exact: false, Icon: IconEnhance   },
       { label: 'animar',     href: null,            exact: false, Icon: IconVideo, badge: 'em breve', badgeTone: 'muted' },
     ],
