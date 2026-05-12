@@ -26,7 +26,11 @@ import {
 } from './types'
 
 export const OBJECT_REMOVAL_ENDPOINT = 'fal-ai/object-removal/mask'
-const TIMEOUT_MS = 90_000
+// Cold-start of this model can take >90s on FAL. 180s gives headroom
+// without making the user wait forever in the bad case. Phase D will add
+// automatic retry on RetouchTimeoutError so a single slow call doesn't
+// surface as a hard error to the user.
+const TIMEOUT_MS = 180_000
 
 interface FalObjectRemovalOutput {
   images?: { url?: string }[]

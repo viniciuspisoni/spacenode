@@ -28,7 +28,9 @@ import {
 } from './types'
 
 export const FLUX_INPAINT_ENDPOINT = 'fal-ai/flux-general/inpainting'
-const TIMEOUT_MS = 90_000
+// Flux dev inpaint with ip_adapter / control_loras can be slower than the
+// Pro variant. 120s buffer in case the user's image is large.
+const TIMEOUT_MS = 120_000
 
 // Strength controls preservation vs regeneration inside the mask (0-1).
 // - replace: lower (0.85) — keep some structural cues from the original area
