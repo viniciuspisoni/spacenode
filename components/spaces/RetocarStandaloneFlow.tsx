@@ -395,7 +395,8 @@ function EditingStep(props: {
             ref={canvasRef}
             imageUrl={sourceUrl}
             onMaskChange={setCoverage}
-            initialBrush={brush}
+            brush={brush}
+            onBrushChange={setBrush}
           />
         </div>
 

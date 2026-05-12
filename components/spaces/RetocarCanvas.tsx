@@ -37,11 +37,14 @@ export interface RetocarCanvasHandle {
 interface Props {
   imageUrl:      string
   onMaskChange?: (coverage: number) => void
-  initialBrush?: number
+  /** Controlled brush size in display-space pixels. The parent owns the state. */
+  brush:          number
+  /** Called by keyboard shortcuts ([, ]) so the parent can update its state. */
+  onBrushChange:  (next: number) => void
 }
 
 export const RetocarCanvas = forwardRef<RetocarCanvasHandle, Props>(function RetocarCanvas(
-  { imageUrl, onMaskChange, initialBrush = 40 },
+  { imageUrl, onMaskChange, brush, onBrushChange },
   ref,
 ) {
   const wrapperRef = useRef<HTMLDivElement | null>(null)
@@ -51,9 +54,13 @@ export const RetocarCanvas = forwardRef<RetocarCanvasHandle, Props>(function Ret
   const [imgEl, setImgEl] = useState<HTMLImageElement | null>(null)
   const [size, setSize]   = useState<{ w: number; h: number }>({ w: 0, h: 0 })
   const [naturalSize, setNaturalSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 })
-  const [brush, setBrush] = useState(initialBrush)
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null)
   const [isPainting, setIsPainting] = useState(false)
+
+  // Mirror brush in a ref so the keydown listener always reads the latest value
+  // without needing to re-bind on every brush change.
+  const brushRef = useRef(brush)
+  useEffect(() => { brushRef.current = brush }, [brush])
 
   const strokesRef = useRef<Stroke[]>([])
   const currentStrokeRef = useRef<Stroke | null>(null)
@@ -209,10 +216,10 @@ export const RetocarCanvas = forwardRef<RetocarCanvasHandle, Props>(function Ret
         }
       }
       if (e.key === '[') {
-        setBrush(b => Math.max(BRUSH_MIN, b - 5))
+        onBrushChange(Math.max(BRUSH_MIN, brushRef.current - 5))
       }
       if (e.key === ']') {
-        setBrush(b => Math.min(BRUSH_MAX, b + 5))
+        onBrushChange(Math.min(BRUSH_MAX, brushRef.current + 5))
       }
     }
     window.addEventListener('keydown', onKey)

@@ -162,7 +162,8 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
                   ref={canvasRef}
                   imageUrl={vista.image_url}
                   onMaskChange={setCoverage}
-                  initialBrush={brush}
+                  brush={brush}
+                  onBrushChange={setBrush}
                 />
               </div>
 
