@@ -38,6 +38,9 @@ export type {
 } from './orchestrate'
 export { runRetouchWithGuard } from './orchestrate'
 
+// Server-side helper: retry an engine call once if it times out (cold start).
+export { callWithTimeoutRetry } from './retry-on-timeout'
+
 // Re-export endpoint constants for telemetry / tests. Do NOT use these to
 // dispatch — use selectEngine() instead.
 export { OBJECT_REMOVAL_ENDPOINT } from './object-removal'

@@ -12,7 +12,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isQuality, type Quality, type Space, type Vista, type ProjectDNA } from '@/lib/spaces/types'
 import { getEditCost } from '@/lib/spaces/edit-economy'
-import { selectEngine, type EditMode } from '@/lib/spaces/engines'
+import { selectEngine, callWithTimeoutRetry, type EditMode } from '@/lib/spaces/engines'
 import { getVisualDna } from '@/lib/spaces/dna'
 
 const VALID_MODES: EditMode[] = ['remove', 'texture', 'replace', 'add']
@@ -204,7 +204,8 @@ export async function POST(
     // relax the constraint via migration so each row stores the actual engine.
     const engine = selectEngine(mode)
     const finalPrompt = mode === 'remove' ? '' : buildEmbeddedPrompt({ userPrompt: prompt, dna })
-    const out = await engine.call({
+    // callWithTimeoutRetry retries once on RetouchTimeoutError (cold start).
+    const out = await callWithTimeoutRetry(engine, {
       imageUrl:     vista.image_url,
       maskUrl,
       prompt:       finalPrompt,

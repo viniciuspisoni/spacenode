@@ -10,7 +10,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isQuality, isEditSourceType, type Quality } from '@/lib/spaces/types'
 import { getEditCost } from '@/lib/spaces/edit-economy'
-import { selectEngine, type EditMode } from '@/lib/spaces/engines'
+import { selectEngine, callWithTimeoutRetry, type EditMode } from '@/lib/spaces/engines'
 
 const VALID_MODES: EditMode[] = ['remove', 'texture', 'replace', 'add']
 function isEditMode(v: unknown): v is EditMode {
@@ -132,7 +132,9 @@ export async function POST(req: NextRequest) {
     // the tab they picked.
     const engine    = selectEngine(mode)
     const finalPrompt = mode === 'remove' ? '' : STANDALONE_PROMPT(prompt, quality)
-    const out = await engine.call({
+    // callWithTimeoutRetry retries once on RetouchTimeoutError (cold start).
+    // Other errors propagate immediately.
+    const out = await callWithTimeoutRetry(engine, {
       imageUrl:     sourceUrl,
       maskUrl,
       prompt:       finalPrompt,
