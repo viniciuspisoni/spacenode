@@ -12,14 +12,23 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isQuality, type Quality, type Space, type Vista, type ProjectDNA } from '@/lib/spaces/types'
 import { getEditCost } from '@/lib/spaces/edit-economy'
-import { callFluxFill } from '@/lib/spaces/flux-fill'
+import { selectEngine, type EditMode } from '@/lib/spaces/engines'
 import { getVisualDna } from '@/lib/spaces/dna'
 
+const VALID_MODES: EditMode[] = ['remove', 'texture', 'replace', 'add']
+function isEditMode(v: unknown): v is EditMode {
+  return typeof v === 'string' && (VALID_MODES as string[]).includes(v)
+}
+
 interface EditBody {
-  mask_url?:       unknown
-  prompt?:         unknown
-  quality?:        unknown
-  mask_coverage?:  unknown
+  mask_url?:            unknown
+  prompt?:              unknown
+  quality?:             unknown
+  mask_coverage?:       unknown
+  /** New (Phase C): intentional edit mode picked from the UI tabs. */
+  mode?:                unknown
+  /** New (Phase C): optional reference image URL for 'replace' mode. */
+  reference_image_url?: unknown
 }
 
 function buildEmbeddedPrompt(args: {
@@ -71,13 +80,23 @@ export async function POST(
   const body = await req.json().catch(() => null) as EditBody | null
   if (!body) return NextResponse.json({ error: 'Body inválido' }, { status: 400 })
 
-  const maskUrl = typeof body.mask_url === 'string' ? body.mask_url : null
-  const prompt  = typeof body.prompt   === 'string' ? body.prompt.trim() : ''
+  const maskUrl      = typeof body.mask_url === 'string' ? body.mask_url : null
+  const prompt       = typeof body.prompt   === 'string' ? body.prompt.trim() : ''
+  const referenceUrl = typeof body.reference_image_url === 'string' ? body.reference_image_url : undefined
+
+  // Mode defaults to 'texture' to preserve legacy clients that don't send it.
+  const mode: EditMode = isEditMode(body.mode) ? body.mode : 'texture'
 
   if (!maskUrl) return NextResponse.json({ error: 'mask_url obrigatório' }, { status: 400 })
-  if (!prompt)  return NextResponse.json({ error: 'prompt obrigatório'   }, { status: 400 })
+  // 'remove' doesn't need a prompt — the model fills with surrounding context.
+  if (mode !== 'remove' && !prompt) {
+    return NextResponse.json({ error: 'prompt obrigatório' }, { status: 400 })
+  }
   if (!isQuality(body.quality)) {
     return NextResponse.json({ error: 'quality inválida' }, { status: 400 })
+  }
+  if (body.mode !== undefined && !isEditMode(body.mode)) {
+    return NextResponse.json({ error: 'mode inválido' }, { status: 400 })
   }
   const quality:      Quality = body.quality
   const maskCoverage          = typeof body.mask_coverage === 'number'
@@ -174,13 +193,25 @@ export async function POST(
     if (insErr || !row) throw new Error('insert_failed: ' + (insErr?.message ?? '?'))
     newVistaId = row.id as string
 
-    // Chamada Flux Fill
-    const finalPrompt = buildEmbeddedPrompt({ userPrompt: prompt, dna })
-    const out = await callFluxFill({
-      imageUrl: vista.image_url,
+    // Route to the right engine for the picked mode (Phase C). 'remove' uses
+    // the specialized object-removal model and ignores the prompt; the other
+    // modes go through Flux Pro Fill / Flux dev inpaint with the DNA-enriched
+    // wrapper. The router decision is invisible to the user.
+    //
+    // NOTE: `vistas.engine` has a CHECK constraint that doesn't yet include
+    // the new endpoint ids. For now we keep persisting 'flux-fill' so the
+    // insert succeeds; out.endpoint is logged for telemetry. Phase D will
+    // relax the constraint via migration so each row stores the actual engine.
+    const engine = selectEngine(mode)
+    const finalPrompt = mode === 'remove' ? '' : buildEmbeddedPrompt({ userPrompt: prompt, dna })
+    const out = await engine.call({
+      imageUrl:     vista.image_url,
       maskUrl,
-      prompt:   finalPrompt,
+      prompt:       finalPrompt,
+      referenceUrl: mode === 'replace' ? referenceUrl : undefined,
+      quality,
     })
+    console.log('[vista.edit] mode=%s endpoint=%s prompt_len=%d', mode, out.endpoint, finalPrompt.length)
 
     const { error: updErr } = await admin
       .from('vistas')

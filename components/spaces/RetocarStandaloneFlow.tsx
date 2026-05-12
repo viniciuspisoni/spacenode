@@ -9,8 +9,10 @@ import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { RetocarCanvas, type RetocarCanvasHandle, BRUSH_MIN, BRUSH_MAX } from './RetocarCanvas'
 import { RetocarImportModal } from './RetocarImportModal'
+import { RetocarModeTabs } from './RetocarModeTabs'
 import { getEditCost, LARGE_MASK_THRESHOLD } from '@/lib/spaces/edit-economy'
 import type { Quality, EditSourceType } from '@/lib/spaces/types'
+import { EDIT_MODE_LABELS, type EditMode } from '@/lib/spaces/engines'
 
 type Step = 'empty' | 'editing' | 'result'
 
@@ -31,6 +33,9 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
   const [brush, setBrush]             = useState(40)
   const [prompt, setPrompt]           = useState('')
   const [quality, setQuality]         = useState<Quality>('2k')
+  // Edit intention. 'texture' = legacy behaviour (Flux Pro Fill). User can
+  // pick a different tab; the router decides which FAL endpoint to call.
+  const [mode, setMode]               = useState<EditMode>('texture')
   const [balance, setBalance]         = useState(initialBalance)
   const [submitting, setSubmitting]   = useState(false)
   const [validating, setValidating]   = useState(false)
@@ -89,6 +94,12 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
       setError('Pinte a área que quer editar antes de gerar.')
       return
     }
+    // 'remove' doesn't need a prompt — the model fills from surroundings.
+    // For every other mode, the user must describe what they want.
+    if (mode !== 'remove' && !prompt.trim()) {
+      setError('Descreva o que você quer nessa área antes de gerar.')
+      return
+    }
     if (balanceShort) {
       setError(`Saldo insuficiente. Necessários ${cost} nodes.`)
       return
@@ -109,18 +120,20 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
       const maskData = await maskRes.json()
       if (!maskRes.ok) throw new Error(maskData?.error ?? 'Erro ao salvar máscara')
 
-      // Chama edit
+      // Chama edit. `mode` is forwarded so the API routes to the right engine.
+      // Prompt is sent even for 'remove' (server ignores it for that mode).
       const res = await fetch('/api/edits', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           source_image_url: sourceUrl,
           mask_url:         maskData.url,
-          prompt:           prompt.trim() || 'edit the masked area',
+          prompt:           mode === 'remove' ? '' : prompt.trim(),
           quality,
           source_type:      sourceType,
           source_id:        sourceId,
           mask_coverage:    maskCoverage,
+          mode,
         }),
       })
       const data = await res.json()
@@ -228,6 +241,8 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
           setPrompt={setPrompt}
           quality={quality}
           setQuality={setQuality}
+          mode={mode}
+          setMode={setMode}
           balance={balance}
           balanceShort={balanceShort}
           cost={cost}
@@ -366,6 +381,8 @@ function EditingStep(props: {
   setPrompt:    (v: string) => void
   quality:      Quality
   setQuality:   (q: Quality) => void
+  mode:         EditMode
+  setMode:      (m: EditMode) => void
   balance:      number
   balanceShort: boolean
   cost:         number
@@ -377,11 +394,16 @@ function EditingStep(props: {
 }) {
   const {
     sourceUrl, canvasRef, coverage, setCoverage, brush, setBrush,
-    prompt, setPrompt, quality, setQuality, balance, balanceShort,
+    prompt, setPrompt, quality, setQuality, mode, setMode,
+    balance, balanceShort,
     cost, submitting, validating, error, onGenerate, onStartOver,
   } = props
 
-  const largeMask = coverage > LARGE_MASK_THRESHOLD
+  const largeMask  = coverage > LARGE_MASK_THRESHOLD
+  const modeMeta   = EDIT_MODE_LABELS[mode]
+  const isRemove   = mode === 'remove'
+  // 'remove' is happy without a prompt; other modes require text before submit.
+  const disabledBtn = coverage === 0 || balanceShort || submitting || (!isRemove && !prompt.trim())
 
   return (
     <div style={{
@@ -406,17 +428,26 @@ function EditingStep(props: {
           borderRadius: 12, padding: 16,
           display: 'flex', flexDirection: 'column', gap: 12,
         }}>
+          {/* Mode tabs — picks the architectural intention. Router maps it
+              to the right FAL endpoint behind the scenes. */}
+          <RetocarModeTabs mode={mode} onModeChange={setMode} disabled={submitting} />
+
           <div style={{
-            fontSize: 10, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase',
-            color: 'var(--color-text-tertiary)',
+            fontSize: 11, color: 'var(--color-text-tertiary)', letterSpacing: '-0.005em',
+            marginTop: -4,
           }}>
-            Prompt
+            {modeMeta.description}
           </div>
+
           <textarea
             value={prompt}
             onChange={e => setPrompt(e.target.value)}
-            placeholder="O que você quer nessa área? Ex: paredes brancas com textura suave"
+            placeholder={isRemove
+              ? 'Não precisa de prompt — o motor preenche com o entorno automaticamente.'
+              : modeMeta.promptPlaceholder
+            }
             rows={2}
+            disabled={isRemove}
             style={{
               width: '100%', padding: '10px 14px',
               background: 'var(--color-bg)',
@@ -424,6 +455,8 @@ function EditingStep(props: {
               borderRadius: 8, color: 'var(--color-text-primary)',
               fontSize: 13, letterSpacing: '-0.005em',
               fontFamily: 'inherit', resize: 'vertical', outline: 'none',
+              opacity: isRemove ? 0.55 : 1,
+              cursor: isRemove ? 'not-allowed' : 'text',
             }}
           />
 
@@ -453,21 +486,21 @@ function EditingStep(props: {
             </div>
             <button
               onClick={onGenerate}
-              disabled={coverage === 0 || balanceShort || submitting}
+              disabled={disabledBtn}
               className="spn-action"
               style={{
                 width: 'auto', minWidth: 220, padding: '12px 22px',
                 background: '#1D9E75', color: '#042818',
                 border: '0.5px solid rgba(0,0,0,0.18)',
-                opacity: coverage === 0 || balanceShort ? 0.5 : 1,
-                boxShadow: coverage > 0 && !balanceShort
+                opacity: disabledBtn ? 0.5 : 1,
+                boxShadow: !disabledBtn
                   ? 'inset 0 1px 0 rgba(255,255,255,0.18), 0 8px 24px rgba(29,158,117,0.18)'
                   : 'none',
               }}
             >
               {submitting
                 ? (validating ? 'Validando…' : 'Editando…')
-                : `Editar · ${cost} nodes →`}
+                : `${modeMeta.label} · ${cost} nodes →`}
             </button>
           </div>
         </div>

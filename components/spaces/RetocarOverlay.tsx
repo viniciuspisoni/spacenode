@@ -9,8 +9,10 @@
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { RetocarCanvas, type RetocarCanvasHandle, BRUSH_MIN, BRUSH_MAX } from './RetocarCanvas'
+import { RetocarModeTabs } from './RetocarModeTabs'
 import { getEditCost, LARGE_MASK_THRESHOLD } from '@/lib/spaces/edit-economy'
 import type { Quality, Space, Vista, ProjectDNA } from '@/lib/spaces/types'
+import { EDIT_MODE_LABELS, type EditMode } from '@/lib/spaces/engines'
 
 interface Props {
   space:    Space
@@ -28,6 +30,8 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
   const [coverage, setCoverage]     = useState(0)
   const [prompt, setPrompt]         = useState('')
   const [quality, setQuality]       = useState<Quality>(vista.quality)
+  // Edit intention. Same contract as RetocarStandaloneFlow.
+  const [mode, setMode]             = useState<EditMode>('texture')
   const [submitting, setSubmitting] = useState(false)
   const [validating, setValidating] = useState(false)
   const [error, setError]           = useState<string | null>(null)
@@ -37,13 +41,20 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
   const [driftWarning, setDriftWarning] = useState<number | null>(null)
   const [stage, setStage]           = useState<'editing' | 'result'>('editing')
 
-  const cost = getEditCost(quality)
+  const cost        = getEditCost(quality)
   const balanceShort = balance < cost
-  const largeMask = coverage > LARGE_MASK_THRESHOLD
+  const largeMask    = coverage > LARGE_MASK_THRESHOLD
+  const modeMeta    = EDIT_MODE_LABELS[mode]
+  const isRemove    = mode === 'remove'
+  const disabledBtn = coverage === 0 || balanceShort || submitting || (!isRemove && !prompt.trim())
 
   async function handleGenerate() {
     if (!canvasRef.current?.hasMask()) {
       setError('Pinte a área que quer editar antes de gerar.')
+      return
+    }
+    if (!isRemove && !prompt.trim()) {
+      setError('Descreva o que você quer nessa área antes de gerar.')
       return
     }
     if (balanceShort) {
@@ -67,15 +78,16 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
       const maskData = await maskRes.json()
       if (!maskRes.ok) throw new Error(maskData?.error ?? 'Erro ao salvar máscara')
 
-      // Chama edit embebido
+      // Chama edit embebido. `mode` é encaminhado pro router server-side.
       const res = await fetch(`/api/spaces/${space.id}/vistas/${vista.id}/edit`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({
           mask_url:      maskData.url,
-          prompt:        prompt.trim() || 'edit the masked area',
+          prompt:        isRemove ? '' : prompt.trim(),
           quality,
           mask_coverage: maskCoverage,
+          mode,
         }),
       })
       const data = await res.json()
@@ -173,11 +185,23 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
                 borderRadius: 12, padding: 14,
                 display: 'flex', flexDirection: 'column', gap: 10,
               }}>
+                <RetocarModeTabs mode={mode} onModeChange={setMode} disabled={submitting} />
+
+                <div style={{
+                  fontSize: 11, color: 'var(--color-text-tertiary)', letterSpacing: '-0.005em',
+                }}>
+                  {modeMeta.description}
+                </div>
+
                 <textarea
                   value={prompt}
                   onChange={e => setPrompt(e.target.value)}
-                  placeholder="O que você quer nessa área? O motor já conhece o estilo do projeto."
+                  placeholder={isRemove
+                    ? 'Não precisa de prompt — o motor preenche com o entorno automaticamente.'
+                    : `${modeMeta.promptPlaceholder} · O motor já conhece o estilo do projeto.`
+                  }
                   rows={2}
+                  disabled={isRemove}
                   style={{
                     width: '100%', padding: '10px 14px',
                     background: 'var(--color-bg)',
@@ -185,6 +209,8 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
                     borderRadius: 8, color: 'var(--color-text-primary)',
                     fontSize: 13, letterSpacing: '-0.005em',
                     fontFamily: 'inherit', resize: 'vertical', outline: 'none',
+                    opacity: isRemove ? 0.55 : 1,
+                    cursor: isRemove ? 'not-allowed' : 'text',
                   }}
                 />
                 {error && (
@@ -206,21 +232,21 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
                   </div>
                   <button
                     onClick={handleGenerate}
-                    disabled={coverage === 0 || balanceShort || submitting}
+                    disabled={disabledBtn}
                     className="spn-action"
                     style={{
                       width: 'auto', minWidth: 200, padding: '11px 22px',
                       background: '#1D9E75', color: '#042818',
                       border: '0.5px solid rgba(0,0,0,0.18)',
-                      opacity: coverage === 0 || balanceShort ? 0.5 : 1,
-                      boxShadow: coverage > 0 && !balanceShort
+                      opacity: disabledBtn ? 0.5 : 1,
+                      boxShadow: !disabledBtn
                         ? 'inset 0 1px 0 rgba(255,255,255,0.18), 0 8px 24px rgba(29,158,117,0.18)'
                         : 'none',
                     }}
                   >
                     {submitting
                       ? (validating ? 'Validando…' : 'Editando…')
-                      : `Editar · ${cost} nodes →`}
+                      : `${modeMeta.label} · ${cost} nodes →`}
                   </button>
                 </div>
               </div>

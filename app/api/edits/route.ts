@@ -10,8 +10,16 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isQuality, isEditSourceType, type Quality } from '@/lib/spaces/types'
 import { getEditCost } from '@/lib/spaces/edit-economy'
-import { callFluxFill } from '@/lib/spaces/flux-fill'
+import { selectEngine, type EditMode } from '@/lib/spaces/engines'
 
+const VALID_MODES: EditMode[] = ['remove', 'texture', 'replace', 'add']
+function isEditMode(v: unknown): v is EditMode {
+  return typeof v === 'string' && (VALID_MODES as string[]).includes(v)
+}
+
+// Mask-constraint prompt wrapper. Applied for modes that consume the prompt
+// (texture, replace, add). The `remove` mode ignores the prompt entirely
+// (object-removal model doesn't use one), so we don't wrap it.
 const STANDALONE_PROMPT = (userPrompt: string, _quality: Quality) => [
   'Edit only the masked area of this image. Do not modify any pixels outside the mask.',
   '',
@@ -25,13 +33,17 @@ const STANDALONE_PROMPT = (userPrompt: string, _quality: Quality) => [
 ].join('\n')
 
 interface EditBody {
-  source_image_url?: unknown
-  mask_url?:         unknown
-  prompt?:           unknown
-  quality?:          unknown
-  source_type?:      unknown
-  source_id?:        unknown
-  mask_coverage?:    unknown
+  source_image_url?:    unknown
+  mask_url?:            unknown
+  prompt?:              unknown
+  quality?:             unknown
+  source_type?:         unknown
+  source_id?:           unknown
+  mask_coverage?:       unknown
+  /** New (Phase C): intentional edit mode picked from the UI tabs. */
+  mode?:                unknown
+  /** New (Phase C): optional reference image URL for 'replace' mode. */
+  reference_image_url?: unknown
 }
 
 export async function POST(req: NextRequest) {
@@ -42,14 +54,20 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null) as EditBody | null
   if (!body) return NextResponse.json({ error: 'Body inválido' }, { status: 400 })
 
-  const sourceUrl = typeof body.source_image_url === 'string' ? body.source_image_url : null
-  const maskUrl   = typeof body.mask_url === 'string' ? body.mask_url : null
-  const prompt    = typeof body.prompt === 'string' ? body.prompt.trim() : ''
+  const sourceUrl    = typeof body.source_image_url === 'string' ? body.source_image_url : null
+  const maskUrl      = typeof body.mask_url === 'string' ? body.mask_url : null
+  const prompt       = typeof body.prompt === 'string' ? body.prompt.trim() : ''
+  const referenceUrl = typeof body.reference_image_url === 'string' ? body.reference_image_url : undefined
+
+  // Mode defaults to 'texture' to preserve legacy clients that don't send it.
+  const mode: EditMode = isEditMode(body.mode) ? body.mode : 'texture'
 
   if (!sourceUrl || !maskUrl) {
     return NextResponse.json({ error: 'source_image_url e mask_url obrigatórios' }, { status: 400 })
   }
-  if (!prompt) {
+  // 'remove' doesn't need a prompt — the model fills with surrounding context.
+  // Every other mode requires the user to describe what they want.
+  if (mode !== 'remove' && !prompt) {
     return NextResponse.json({ error: 'prompt obrigatório' }, { status: 400 })
   }
   if (!isQuality(body.quality)) {
@@ -57,6 +75,9 @@ export async function POST(req: NextRequest) {
   }
   if (!isEditSourceType(body.source_type)) {
     return NextResponse.json({ error: 'source_type inválido' }, { status: 400 })
+  }
+  if (body.mode !== undefined && !isEditMode(body.mode)) {
+    return NextResponse.json({ error: 'mode inválido' }, { status: 400 })
   }
   const quality:      Quality = body.quality
   const sourceType            = body.source_type
@@ -104,14 +125,23 @@ export async function POST(req: NextRequest) {
     }
     debited = true
 
-    // Chamada Flux Fill
-    const out = await callFluxFill({
-      imageUrl: sourceUrl,
+    // Route to the right engine for the picked mode (Phase C). 'remove' uses
+    // the specialized object-removal model and ignores the prompt; the other
+    // modes use Flux Pro Fill / Flux dev inpaint with the mask-constraint
+    // wrapper. The router decision is invisible to the user — they only see
+    // the tab they picked.
+    const engine    = selectEngine(mode)
+    const finalPrompt = mode === 'remove' ? '' : STANDALONE_PROMPT(prompt, quality)
+    const out = await engine.call({
+      imageUrl:     sourceUrl,
       maskUrl,
-      prompt:   STANDALONE_PROMPT(prompt, quality),
+      prompt:       finalPrompt,
+      referenceUrl: mode === 'replace' ? referenceUrl : undefined,
+      quality,
     })
 
-    // Persistir
+    // Persistir. We log the actual FAL endpoint that ran (the `edits` table
+    // doesn't constrain `engine`, so this is free-form telemetry).
     const { data: row, error: insErr } = await admin
       .from('edits')
       .insert({
@@ -122,7 +152,7 @@ export async function POST(req: NextRequest) {
         prompt,
         quality,
         nodes_cost:        cost,
-        engine:            'flux-fill',
+        engine:            out.endpoint,
         source_type:       sourceType,
         source_id:         sourceId,
         mask_coverage:     maskCoverage,
