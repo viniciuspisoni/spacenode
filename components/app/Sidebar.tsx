@@ -242,7 +242,22 @@ export default function Sidebar({ userName, userAvatar }: SidebarProps) {
               }
 
               return href ? (
-                <Link key={href} href={href} style={sharedStyle} {...hoverHandlers}>
+                <Link
+                  key={href}
+                  href={href}
+                  style={sharedStyle}
+                  {...hoverHandlers}
+                  onClick={(e) => {
+                    // Same-route click: o Next não desmonta a página, então o
+                    // estado local persiste. Dispara um evento global pra que
+                    // a página corrente possa resetar (ex: UpscaleClient zera
+                    // imagem/resultado pra começar um novo upscale).
+                    if (active) {
+                      e.preventDefault()
+                      window.dispatchEvent(new CustomEvent('spn:reset-route'))
+                    }
+                  }}
+                >
                   {inner}
                 </Link>
               ) : (
