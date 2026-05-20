@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import BeforeAfter from '@/components/app/BeforeAfter'
 
 interface UpscaleClientProps {
@@ -79,6 +79,20 @@ const LOADING_TEXTS = [
   'Finalizando...',
 ]
 
+// Download forçado via proxy do nosso próprio backend. /api/download faz
+// fetch server-side da imagem e devolve com Content-Disposition: attachment,
+// que faz o browser salvar em vez de abrir. Funciona independente de CORS
+// no CDN.
+function downloadImage(url: string, filename: string) {
+  const proxyUrl = `/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`
+  const a = document.createElement('a')
+  a.href = proxyUrl
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+}
+
 export default function UpscaleClient({ initialCredits }: UpscaleClientProps) {
   const [imageFile,    setImageFile]    = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
@@ -135,6 +149,31 @@ export default function UpscaleClient({ initialCredits }: UpscaleClientProps) {
   function stopLoadingTexts() {
     if (loadingTimerRef.current) clearInterval(loadingTimerRef.current)
   }
+
+  function handleNewUpscale() {
+    if (analyzeTimerRef.current) clearTimeout(analyzeTimerRef.current)
+    stopLoadingTexts()
+    setImageFile(null)
+    setImagePreview(null)
+    setDescription('')
+    setResultUrl(null)
+    setError(null)
+    setIsLoading(false)
+    setRecommendedModelId(null)
+    setRecommendedReason(null)
+    setIsAnalyzing(false)
+  }
+
+  // Reset state quando o usuário clica em "melhorar" no sidebar estando já
+  // nessa rota. O Link em Sidebar.tsx detecta same-route click e dispara o
+  // evento — aqui só ouvimos e zeramos. Setters são estáveis, então listener
+  // não precisa re-bind.
+  useEffect(() => {
+    const onReset = () => handleNewUpscale()
+    window.addEventListener('spn:reset-route', onReset)
+    return () => window.removeEventListener('spn:reset-route', onReset)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function handleSubmit() {
     if (!imageFile || credits < nodeCost || isLoading) return
@@ -554,32 +593,42 @@ export default function UpscaleClient({ initialCredits }: UpscaleClientProps) {
               beforeLabel="ORIGINAL"
               afterLabel="UPSCALE"
             />
-            <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.06em' }}>
-                Arraste para comparar · {selectedScale}× via {activeModel.label}
-              </div>
-              <a
-                href={resultUrl}
-                download
-                target="_blank"
-                rel="noopener noreferrer"
+            <div style={{ marginTop: 12, textAlign: 'center', fontSize: 10, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.06em' }}>
+              Arraste para comparar · {selectedScale}× via {activeModel.label}
+            </div>
+            <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <button
+                onClick={() => downloadImage(resultUrl, `spacenode-upscale-${selectedScale}x.jpg`)}
                 style={{
-                  fontSize: 11, fontWeight: 500,
-                  color: 'rgba(255,255,255,0.6)',
-                  textDecoration: 'none',
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  padding: '6px 12px', borderRadius: 6,
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  transition: 'border-color 0.15s',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  padding: '12px 20px', borderRadius: 8, border: 'none',
+                  background: 'rgba(255,255,255,0.92)', color: '#0a0a0a',
+                  fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em',
+                  cursor: 'pointer', fontFamily: 'inherit',
+                  transition: 'background 0.15s, opacity 0.15s',
                 }}
               >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                   <polyline points="7 10 12 15 17 10"/>
                   <line x1="12" y1="15" x2="12" y2="3"/>
                 </svg>
-                Baixar
-              </a>
+                Baixar imagem
+              </button>
+              <button
+                onClick={handleNewUpscale}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  padding: '12px 20px', borderRadius: 8,
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  background: 'transparent', color: 'rgba(255,255,255,0.75)',
+                  fontSize: 13, fontWeight: 500, letterSpacing: '-0.01em',
+                  cursor: 'pointer', fontFamily: 'inherit',
+                  transition: 'background 0.15s, color 0.15s, border-color 0.15s',
+                }}
+              >
+                Nova imagem
+              </button>
             </div>
           </div>
         )}
