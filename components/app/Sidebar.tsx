@@ -34,6 +34,12 @@ const IconPlans = () => (
     <polyline points="2 12 12 17 22 12"/>
   </svg>
 )
+const IconAccount = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="8" r="4"/>
+    <path d="M4 21a8 8 0 0 1 16 0"/>
+  </svg>
+)
 const IconEnhance = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 3l1.88 5.47L19 10l-5.12 1.53L12 17l-1.88-5.47L5 10l5.12-1.53L12 3z"/>
@@ -83,7 +89,8 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: 'NEGÓCIOS',
     items: [
-      { label: 'planos',     href: '/app/billing',  exact: false, Icon: IconPlans     },
+      { label: 'planos',     href: '/app/billing',     exact: false, Icon: IconPlans   },
+      { label: 'conta',      href: '/update-password', exact: false, Icon: IconAccount },
     ],
   },
 ]
