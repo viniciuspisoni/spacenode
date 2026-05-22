@@ -568,7 +568,7 @@ function RenderCard({
   const display   = isVideo ? render.input_url : (render.output_url ?? render.input_url)
   const quality   = (isUpscale || isVideo) ? null : qualityLabel(render.cost_credits)
   const engine    = (isUpscale || isVideo) ? null : engineLabel(render.model)
-  const title     = isUpscale ? 'Upscale' : isVideo ? 'Animar Render' : (render.ambient || render.lighting || 'Render')
+  const title     = isUpscale ? 'Upscale' : isVideo ? 'Animação' : (render.ambient || render.lighting || 'Render')
   const sub       = isUpscale
     ? getUpscaleDisplayLabel(render.style, render.lighting)
     : isVideo

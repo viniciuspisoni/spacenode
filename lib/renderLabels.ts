@@ -5,10 +5,19 @@ const VIDEO_ENGINE_LABELS: Record<string, string> = {
   'bytedance/seedance-2.0/image-to-video':                'Arquitetônico',
 }
 
-export function getVideoDisplayLabel(engineId: string, duration?: string | null): string {
+// motionLabel é opcional — o histórico legado (renders sem coluna de motion)
+// só passa engineId + duration. Renders novos podem incluir o label do
+// movimento para exibição enriquecida.
+export function getVideoDisplayLabel(
+  engineId:    string,
+  duration?:   string | null,
+  motionLabel?:string | null,
+): string {
   const label = VIDEO_ENGINE_LABELS[engineId] ?? 'Animação'
   const dur   = duration ?? '5s'
-  return `Vídeo ${dur} · ${label}`
+  const parts = [`Vídeo ${dur}`, label]
+  if (motionLabel) parts.push(motionLabel)
+  return parts.join(' · ')
 }
 
 const UPSCALE_MODEL_LABELS: Record<string, string> = {
