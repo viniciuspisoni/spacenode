@@ -144,7 +144,7 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
       }}>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.01em' }}>
-            Retocar vista · {space.name}
+            Editar vista · {space.name}
           </div>
           <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
             {vista.axis_label ?? 'Vista'} · {vista.quality.toUpperCase()}

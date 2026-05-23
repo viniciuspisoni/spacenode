@@ -1,4 +1,4 @@
-// /app/retocar — Retocar standalone.
+// /app/editar — Retocar standalone (renamed user-facing path).
 
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'

@@ -204,7 +204,7 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
       }}>
         <Link href="/app">Workspace</Link>
         <span style={{ opacity: 0.35, fontSize: 9 }}>›</span>
-        <span style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>Retocar</span>
+        <span style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>Editar</span>
         {step === 'editing' && (
           <>
             <span style={{ opacity: 0.35, fontSize: 9 }}>›</span>
@@ -293,7 +293,7 @@ function EmptyStep({ onUpload, onImport, fileInputRef, onFilePicked, error }: {
           fontSize: 26, fontWeight: 500, color: 'var(--color-text-primary)',
           letterSpacing: '-0.03em', lineHeight: 1.1, marginBottom: 8,
         }}>
-          Retocar
+          Editar
         </h1>
         <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)', letterSpacing: '-0.005em' }}>
           Edite áreas específicas de qualquer imagem. Pinte a máscara, descreva o que quer
@@ -655,7 +655,7 @@ function ResultStep({ sourceUrl, resultUrl, prompt, coverage, driftWarning, onEd
             ✦ Editar de novo
           </button>
           <a
-            href={resultUrl} download="retocar-result.jpg" target="_blank" rel="noopener noreferrer"
+            href={resultUrl} download="editar-result.jpg" target="_blank" rel="noopener noreferrer"
             className="spn-action spn-action--primary"
             style={{ width: 'auto', padding: '10px 18px', fontSize: 12, textDecoration: 'none' }}
           >

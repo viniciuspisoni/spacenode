@@ -334,7 +334,7 @@ export function HistoryClient({
             <h1 style={S.headerTitle}>Histórico</h1>
             <p style={S.headerSub}>
               {historyTab === 'renders' && 'Seus renders salvos e prontos para reutilizar.'}
-              {historyTab === 'edits'   && 'Edições localizadas geradas com Retocar.'}
+              {historyTab === 'edits'   && 'Edições localizadas geradas no Editar.'}
               {historyTab === 'vistas'  && 'Vistas geradas dentro dos seus Spaces.'}
             </p>
           </div>
@@ -613,7 +613,7 @@ function EditsTabView() {
   if ((items ?? []).length === 0) return (
     <TabEmpty
       message="Sem edições ainda."
-      action={{ href: '/app/retocar', label: 'Abrir Retocar →' }}
+      action={{ href: '/app/editar', label: 'Abrir Editar →' }}
     />
   )
 
@@ -625,7 +625,7 @@ function EditsTabView() {
       {items!.map(it => (
         <Link
           key={it.id}
-          href={`/app/retocar?source=${encodeURIComponent(it.result_image_url)}&source_type=edit&source_id=${it.id}`}
+          href={`/app/editar?source=${encodeURIComponent(it.result_image_url)}&source_type=edit&source_id=${it.id}`}
           style={{
             background: 'var(--color-bg-elevated)',
             border: '0.5px solid var(--color-border)',
