@@ -50,11 +50,6 @@ const LOADING_TEXTS = [
   'Gerando versão final...',
 ]
 
-// Timeout máximo da análise prévia. Se passar, segue pro /api/generate sem
-// briefing (graceful degradation — geração continua, só sem o lock textual
-// específico de objetos identificados na referência).
-const ANALYZE_TIMEOUT_MS = 8_000
-
 type FidelityLevel = 'maximum' | 'balanced' | 'creative'
 
 const FIDELITY_LEVELS: { id: FidelityLevel; label: string; desc: string }[] = [
@@ -393,44 +388,12 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
     const file = e.dataTransfer.files[0]; if (file) loadImage(file)
   }
 
-  // ── Fidelity Engine — análise prévia da imagem (Claude vision via Fal).
-  // Identifica objetos visíveis no input (cortinas, ventiladores, espelhos,
-  // mobiliário) e devolve `briefing` + `inputUrl` (já no fal.storage).
-  // O briefing entra no prompt como `preservationBlock` com lista textual
-  // de "elementos_preservar", o que protege contra o modelo não-reconhecer
-  // objetos do SketchUp (caso clássico: cortina virando parede de cimento).
-  // Falha/timeout = segue pro /api/generate sem briefing — degradação graciosa.
-  const runFidelityAnalysis = async (imageBase64: string) => {
-    try {
-      const ctrl  = new AbortController()
-      const timer = setTimeout(() => ctrl.abort(), ANALYZE_TIMEOUT_MS)
-      const res = await fetch('/api/analyze', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ imageBase64 }),
-        signal:  ctrl.signal,
-      })
-      clearTimeout(timer)
-      if (!res.ok) return null
-      return await res.json() as { inputUrl: string; briefing: unknown }
-    } catch {
-      return null
-    }
-  }
-
   // ── Geração
   const handleGenerate = async (resolutionOverride?: Resolution) => {
     if (!imagePreview) { setError('Faça upload de uma imagem primeiro.'); return }
     if (credits < nodeCost) { setError('Nodes insuficientes.'); return }
     setError(null); setLoading(true); startLoadingTexts()
     try {
-      // Análise prévia ativa só em Máxima Fidelidade. Em Equilibrado e
-      // Criativo o lock textual atrapalharia mais que ajudaria — o usuário
-      // está pedindo liberdade estética. Em Máxima é onde a precisão de
-      // identificar objetos ("cortina cinza à direita") tem mais valor.
-      const useEngine = fidelityLevel === 'maximum'
-      const analysis  = useEngine ? await runFidelityAnalysis(imagePreview) : null
-
       // Anchor: usa o último output como referência visual de materiais quando
       // o usuário regera a mesma imagem (ex: troca de iluminação) e o toggle
       // estiver ligado.
@@ -440,11 +403,7 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          // Quando a análise sobe a imagem pro fal.storage, reusa o inputUrl
-          // pra não pagar segundo upload no /api/generate.
-          imageBase64:   analysis?.inputUrl ? undefined : imagePreview,
-          inputUrl:      analysis?.inputUrl,
-          briefing:      analysis?.briefing,
+          imageBase64:   imagePreview,
           fidelityLevel,
           projectType,
           segment,

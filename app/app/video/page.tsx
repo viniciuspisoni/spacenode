@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import VideoClient from './VideoClient'
+import AnimateClient from './AnimateClient'
 
 export default async function VideoPage() {
   const supabase = await createClient()
@@ -13,5 +13,5 @@ export default async function VideoPage() {
     .eq('id', user.id)
     .single()
 
-  return <VideoClient initialCredits={profile?.credits ?? 0} />
+  return <AnimateClient initialCredits={profile?.credits ?? 0} />
 }
