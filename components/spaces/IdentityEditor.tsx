@@ -224,7 +224,7 @@ export function IdentityEditor({ initialIdentity, planName, whiteLabelAllowed }:
         </Field>
 
         <Field label="Nome do escritório *">
-          <Input value={name} onChange={setName} placeholder="Ex: Estúdio Muda" />
+          <Input value={name} onChange={setName} placeholder="" />
         </Field>
 
         <Field label="Subtítulo (opcional)">
