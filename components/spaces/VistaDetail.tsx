@@ -254,7 +254,7 @@ export function VistaDetail({ space, vista, others, initialBalance }: Props) {
           </span>
         )}
 
-        <ActionGhost onClick={() => setShowRetocar(true)}>✎ Retocar</ActionGhost>
+        <ActionGhost onClick={() => setShowRetocar(true)}>✎ Editar</ActionGhost>
         <ActionGhost onClick={() => alert('Em breve.')}>+ Pack</ActionGhost>
         <ActionGhost onClick={handleFavorite} disabled={submitting === 'fav'}>
           {favorited ? '★ Favoritada' : '☆ Favoritar'}
