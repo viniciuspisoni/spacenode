@@ -338,6 +338,7 @@ export function IdentityEditor({ initialIdentity, planName, whiteLabelAllowed }:
         display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap',
       }}>
         <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+          {/* eslint-disable-next-line react-hooks/purity -- transient toast fade; re-render driven by setSavedAt elsewhere */}
           {savedAt && (Date.now() - savedAt) < 8000 ? '✓ Identidade salva.' : ''}
         </div>
         <div style={{ display: 'flex', gap: 8 }}>

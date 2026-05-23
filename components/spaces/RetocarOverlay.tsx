@@ -6,7 +6,7 @@
 // Difere do standalone: prompt simplificado, contexto enriquecido server-side,
 // cria nova vista no Space (com is_edited + parent_vista_id + edit_chain_root_id).
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { RetocarCanvas, type RetocarCanvasHandle, BRUSH_MIN, BRUSH_MAX } from './RetocarCanvas'
 import { RetocarModeTabs } from './RetocarModeTabs'
@@ -412,7 +412,17 @@ function ResultPane({ beforeUrl, afterUrl, prompt, driftWarning, onAccept, onRed
 }) {
   const [sliderPos, setSliderPos] = useState(50)
   const ref = useRef<HTMLDivElement | null>(null)
+  const [containerWidth, setContainerWidth] = useState<number | null>(null)
   const [dragging, setDragging] = useState(false)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const observer = new ResizeObserver(() => {
+      setContainerWidth(el.getBoundingClientRect().width)
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
   function move(clientX: number) {
     const r = ref.current?.getBoundingClientRect()
     if (!r) return
@@ -449,7 +459,7 @@ function ResultPane({ beforeUrl, afterUrl, prompt, driftWarning, onAccept, onRed
         <div style={{ position: 'absolute', inset: 0, width: `${sliderPos}%`, overflow: 'hidden' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={beforeUrl} alt="antes"
-            style={{ position: 'absolute', inset: 0, height: '100%', objectFit: 'contain', width: ref.current?.getBoundingClientRect().width ?? '100%' }} draggable={false} />
+            style={{ position: 'absolute', inset: 0, height: '100%', objectFit: 'contain', width: containerWidth ?? '100%' }} draggable={false} />
         </div>
         <div style={{
           position: 'absolute', top: 0, bottom: 0, left: `${sliderPos}%`,

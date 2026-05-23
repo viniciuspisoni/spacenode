@@ -601,6 +601,7 @@ function EditsTabView() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true)
     fetch('/api/edits')
       .then(r => r.ok ? r.json() : null)
@@ -667,6 +668,7 @@ function VistasTabView() {
 
   useEffect(() => {
     const sb = createClient()
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true)
     sb.from('vistas')
       .select('*')
@@ -681,6 +683,7 @@ function VistasTabView() {
   }, [])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (items !== null) setLoading(false)
   }, [items])
 
@@ -794,6 +797,7 @@ function RenderCard({
 
   // Fecha menu quando o card sai de hover ou modo seleção é ativado
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!hovered || selectMode) setMenuOpen(false)
   }, [hovered, selectMode])
 

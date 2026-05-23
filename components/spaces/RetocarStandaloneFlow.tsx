@@ -5,7 +5,7 @@
 //   editing → canvas + brush + prompt + quality + action
 //   result  → slider compare antes/depois + Salvar/Descartar/Editar de novo
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { RetocarCanvas, type RetocarCanvasHandle, BRUSH_MIN, BRUSH_MAX } from './RetocarCanvas'
 import { RetocarImportModal } from './RetocarImportModal'
@@ -671,7 +671,18 @@ function BeforeAfterSlider({ beforeUrl, afterUrl, pos, setPos }: {
   beforeUrl: string; afterUrl: string; pos: number; setPos: (n: number) => void
 }) {
   const ref = useRef<HTMLDivElement | null>(null)
+  const [containerWidth, setContainerWidth] = useState<number | null>(null)
   const [dragging, setDragging] = useState(false)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const observer = new ResizeObserver(() => {
+      setContainerWidth(el.getBoundingClientRect().width)
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
 
   function move(clientX: number) {
     const r = ref.current?.getBoundingClientRect()
@@ -699,7 +710,7 @@ function BeforeAfterSlider({ beforeUrl, afterUrl, pos, setPos }: {
       <div style={{ position: 'absolute', inset: 0, width: `${pos}%`, overflow: 'hidden' }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={beforeUrl} alt="antes"
-          style={{ position: 'absolute', inset: 0, height: '100%', objectFit: 'contain', width: ref.current ? ref.current.getBoundingClientRect().width : '100%' }} draggable={false} />
+          style={{ position: 'absolute', inset: 0, height: '100%', objectFit: 'contain', width: containerWidth ?? '100%' }} draggable={false} />
       </div>
       {/* Cortina */}
       <div style={{
