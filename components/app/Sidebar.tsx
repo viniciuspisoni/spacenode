@@ -104,7 +104,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     label: 'NEGÓCIOS',
     items: [
       { label: 'planos',     href: '/app/billing',     exact: false, Icon: IconPlans   },
-      { label: 'conta',      href: '/update-password', exact: false, Icon: IconAccount },
+      { label: 'conta',      href: '/app/conta',       exact: false, Icon: IconAccount },
     ],
   },
   {
