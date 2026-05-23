@@ -36,6 +36,7 @@ interface ProjectConfig {
 
 interface GenerateResult {
   outputUrl: string
+  renderId?: string | null
   credits:   number
   prompt?:   string
   error?:    string
@@ -230,6 +231,9 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
   // ── Imagem e resultado
   const [imagePreview,      setImagePreview]      = useState<string | null>(null)
   const [outputUrl,         setOutputUrl]         = useState<string | null>(null)
+  // Id da última render persistida — usado pelo CTA "Criar Space" pra
+  // ligar o Space novo à render como Vista Mestre.
+  const [lastRenderId,      setLastRenderId]      = useState<string | null>(null)
   const [sliderPos,         setSliderPos]         = useState(50)
   const [isDraggingSlider,  setIsDraggingSlider]  = useState(false)
   const [isDraggingFile,    setIsDraggingFile]    = useState(false)
@@ -419,6 +423,7 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
       const data: GenerateResult = await res.json()
       if (!res.ok || data.error) throw new Error(data.error ?? 'Erro na geração')
       setOutputUrl(data.outputUrl); setCredits(data.credits); setSliderPos(50)
+      setLastRenderId(data.renderId ?? null)
       setScale(1); setPan({ x: 0, y: 0 })
       if (refinementText.trim()) setRefinementText('')
     } catch (err: unknown) {
@@ -937,6 +942,27 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
                 Melhore para 2K ou 4K para apresentação profissional
               </div>
             )}
+
+            {/* CTA Spaces — induz o próximo passo natural após a render. */}
+            {lastRenderId && (
+              <a
+                href={`/app/spaces/new/from-render?render_id=${lastRenderId}`}
+                className="render-to-space-cta"
+              >
+                <span className="render-to-space-cta__icon" aria-hidden="true">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/>
+                  </svg>
+                </span>
+                <span className="render-to-space-cta__body">
+                  <span className="render-to-space-cta__title">Criar Space a partir desta render</span>
+                  <span className="render-to-space-cta__sub">Trave o DNA e gere variações coerentes — iluminação, ângulo, horário</span>
+                </span>
+                <span className="render-to-space-cta__arrow" aria-hidden="true">→</span>
+              </a>
+            )}
+
             <div style={S.postGenPrimary}>
               <button className="spn-action spn-action--primary" onClick={() => handleGenerate()}>
                 Gerar nova variação
@@ -956,6 +982,84 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
                 Iniciar novo render
               </button>
             </div>
+
+            <style jsx>{`
+              .render-to-space-cta {
+                display: flex;
+                align-items: center;
+                gap: 14px;
+                padding: 14px 18px;
+                border-radius: 12px;
+                background: linear-gradient(135deg, rgba(29,158,117,0.12) 0%, rgba(29,158,117,0.04) 100%);
+                border: 0.5px solid rgba(29,158,117,0.35);
+                color: var(--color-text-primary);
+                text-decoration: none;
+                transition: transform 0.18s, border-color 0.18s, background 0.18s, box-shadow 0.18s;
+                position: relative;
+                overflow: hidden;
+              }
+              .render-to-space-cta::before {
+                content: '';
+                position: absolute;
+                inset: 0;
+                background: radial-gradient(circle at 100% 50%, rgba(70,209,145,0.18) 0%, transparent 60%);
+                opacity: 0;
+                transition: opacity 0.25s;
+                pointer-events: none;
+              }
+              .render-to-space-cta:hover {
+                transform: translateY(-1px);
+                border-color: rgba(29,158,117,0.6);
+                box-shadow: 0 8px 24px rgba(29,158,117,0.18);
+              }
+              .render-to-space-cta:hover::before { opacity: 1; }
+              .render-to-space-cta__icon {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 36px;
+                height: 36px;
+                flex-shrink: 0;
+                border-radius: 10px;
+                background: rgba(29,158,117,0.18);
+                color: #46d191;
+              }
+              .render-to-space-cta__body {
+                display: flex;
+                flex-direction: column;
+                gap: 3px;
+                flex: 1;
+                min-width: 0;
+              }
+              .render-to-space-cta__title {
+                font-size: 13px;
+                font-weight: 500;
+                color: var(--color-text-primary);
+                letter-spacing: -0.01em;
+              }
+              .render-to-space-cta__sub {
+                font-size: 11px;
+                color: var(--color-text-tertiary);
+                letter-spacing: -0.005em;
+                line-height: 1.45;
+              }
+              .render-to-space-cta__arrow {
+                color: #46d191;
+                font-size: 16px;
+                flex-shrink: 0;
+                transition: transform 0.18s;
+              }
+              .render-to-space-cta:hover .render-to-space-cta__arrow {
+                transform: translateX(3px);
+              }
+              @media (prefers-reduced-motion: reduce) {
+                .render-to-space-cta,
+                .render-to-space-cta__arrow,
+                .render-to-space-cta::before { transition: none; animation: none; }
+                .render-to-space-cta:hover { transform: none; }
+                .render-to-space-cta:hover .render-to-space-cta__arrow { transform: none; }
+              }
+            `}</style>
           </div>
         )}
 

@@ -3,7 +3,7 @@
 > Fonte única de verdade para alinhamento entre agentes (Claude Code, Codex, ChatGPT, Gemini).
 > Toda decisão, estado e pendência do projeto deve partir daqui.
 >
-> **Última atualização:** 2026-05-11
+> **Última atualização:** 2026-05-23
 > **Mantido por:** Vinicius Pisoni + agentes de IA
 
 ---
@@ -30,13 +30,16 @@
 | Login + signup (email/senha + OAuth) | Em produção |
 | Landing page | Em produção |
 | Planos / créditos (Stripe) | Em produção |
-| Animate (animação de imagem) | Desativado temporariamente (até beta) |
-| SPACES MVP | **Em produção em `main` desde 2026-05-11 (PR [#53](https://github.com/viniciuspisoni/spacenode/pull/53), merge `27c6790`).** Oculto no menu (`badge: 'em breve'`, `href: null`) até o beta. |
-| SPACES Engine v2 | **Próxima sprint.** Base técnica pronta — lint zerado em `main` após PR [#55](https://github.com/viniciuspisoni/spacenode/pull/55). |
+| Animate v2 (redesign 3 modos) | Em produção em `main` desde PR [#63](https://github.com/viniciuspisoni/spacenode/pull/63) |
+| SPACES MVP (v1) | **Obsoleto em `main`.** Código v1 (PR [#53](https://github.com/viniciuspisoni/spacenode/pull/53)) é incompatível com schema v2 aplicado no banco em 9/maio. Item escondido na sidebar via PR [#51](https://github.com/viniciuspisoni/spacenode/pull/51); páginas top-level são stubs. |
+| SPACES v2 (DNA + Vistas + Packs + Retocar) | **PR [#64](https://github.com/viniciuspisoni/spacenode/pull/64) aberto em 2026-05-23, aguardando review/merge.** Vercel preview ✅ pass. Sincroniza código ao schema vivo. |
 
 ### Branch atual
 
-- **Trunk:** `main` em `3e383aa` (`fix(lint): clear 4 pre-existing react-hooks errors in main (#55)`).
+- **Trunk:** `main` em `ae883ca` (`feat(animar): redesign module with 3 modes, presets and provider adapters (#63)`).
+- **PR aberto:** [#64 — SPACES v2 — DNA + Vistas + Packs + Retocar](https://github.com/viniciuspisoni/spacenode/pull/64) na branch `claude/spaces-edicao-localizada` (22 commits ahead). Vercel preview ✅ pass.
+
+#### Histórico anterior
 - **Últimos merges em `main`:**
   - **PR [#55](https://github.com/viniciuspisoni/spacenode/pull/55):** `fix(lint)` — 4 erros pré-existentes zerados via squash em `2026-05-11T18:18:13Z` (commit `3e383aa`). Lint local agora **0 errors**.
   - **PR [#54](https://github.com/viniciuspisoni/spacenode/pull/54):** `docs: sync to main state after PR #53 merge` — squash em `2026-05-11T17:44:45Z` (commit `63b135b`).

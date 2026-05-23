@@ -7,6 +7,71 @@
 
 ---
 
+## 2026-05-23 — PR #64 aberto: SPACES v2 sincroniza código ao schema vivo
+
+- **Agente responsável:** Claude Code
+- **Branch:** `claude/spaces-edicao-localizada` (22 commits ahead de `main`)
+- **PR:** [#64 — feat(spaces): SPACES v2 — DNA + Vistas + Packs + Retocar](https://github.com/viniciuspisoni/spacenode/pull/64) — **OPEN**
+
+### Contexto
+
+O `main` carregava o código v1 do Spaces (PR #53, 11/maio) mas o banco em produção já tinha o schema v2 aplicado em 9/maio (13 migrations via Supabase MCP). A tentativa de expor v1 em preview (PR #57) foi revertida pelo PR #58 exatamente por isso. O sprint v2 vivia paralelo na branch `claude/spaces-edicao-localizada`, sem ser mergeado.
+
+### Resumo da entrega
+
+PR #64 fecha o descompasso. Mergeia o código v2 — que conversa com as tabelas reais (`spaces.dna`, `spaces.source_render_id`, tabelas separadas `vistas`/`packs`/`architect_identity`/`edits`) — em `main`.
+
+**Funcionalidades trazidas:**
+- **Spaces v2:** DNA system (extração via Gemini Vision), Vistas em 4 eixos (iluminação/ângulo/horário/detalhe), lock de DNA, integração Renderizar→Spaces (caminho A), eixo Ângulo guiado por sketch.
+- **Packs:** apresentações compartilháveis com link público `/p/[slug]`, PDF export, comentários.
+- **Architect Identity:** white-label, footer customizado, accent color derivado do DNA.
+- **Retocar:** módulo de inpainting via Flux Fill (standalone + dentro de Vista), 3 motores com router + auto-retry.
+- **Sidebar reativado:** item `spaces` com `href` ativo + badge `novo`; novos itens `retocar` e `identidade`.
+
+**Migration versionada:**
+- `supabase/migrations/20260509000000_spaces_block_1.sql` (consolidação do schema v2 já aplicado em prod).
+
+**Deps:**
+- `@google/genai ^2.4.0` (Gemini Vision para DNA extraction).
+- `sharp ^0.34.5` (Pack PDF image processing).
+
+### Reconciliação `main → v2`
+
+13 commits de `main` (PRs #55–#63) puxados para v2. Apenas 4 conflitos:
+- 3 `app/app/spaces/*` pages: ficou v2 (stubs descartados).
+- `components/app/Sidebar.tsx`: combinada — v2 (spaces ativo, retocar, identidade) + main (item `conta`).
+
+### Lint cleanup
+
+16 erros encontrados após o merge `main → v2` (4 do PR #55 que main já corrigiu, eliminados pelo merge automático + 12 novos em código v2). Resolvidos:
+- 10 com `eslint-disable-next-line` + justificativa (mesmo padrão do PR #55).
+- 2 refatorados para `useEffect` + `ResizeObserver` (refs em render → padrão React 19 correto): `RetocarOverlay.tsx:452`, `RetocarStandaloneFlow.tsx:702`.
+
+### Commits relevantes no PR #64
+
+| Commit | Descrição |
+|---|---|
+| `5712259` | `Merge main into claude/spaces-edicao-localizada` (13 commits + 4 conflitos resolvidos) |
+| `4309bb0` | `fix(lint): clear 12 react-hooks errors introduced by v2 modules` |
+| `730c6d6` | `chore(deps): add sharp + @google/genai (mirror main's WIP)` |
+
+### Validações feitas
+
+- [x] `tsc --noEmit` no worktree v2 — **0 erros**.
+- [x] `eslint .` no worktree v2 — **0 erros**, 28 warnings (pré-existentes `<img>`/unused).
+- [x] `next build --webpack` no worktree v2 — **clean**, 54 rotas geradas.
+- [x] Vercel preview deploy do PR #64 — `pass`.
+
+### Pendências
+
+- [ ] **Decisão de produto:** code review formal (Codex / `/ultrareview`) antes do merge, ou merge direto?
+- [ ] **Merge em `main`** (estratégia: merge commit, não squash — preserva histórico de v2).
+- [ ] **Pós-merge:** smoke test em produção do ciclo Space → DNA → Vista → Pack → Retocar.
+- [ ] **Migrations órfãs no banco:** 13 migrations aplicadas via MCP entre 9 e 20/maio existem só no banco (não como arquivo). O arquivo `20260509000000_spaces_block_1.sql` é uma consolidação, mas as outras (drop_spaces_v1_schema, vistas_eixo_angulo_fields, retocar_schema, animar_v2_walkthroughs, profiles_credits_default_40, etc.) ainda não estão versionadas. Tech debt de versionamento.
+- [ ] **Limpeza:** deletar branches mergeadas e ~60 worktrees abandonados em `.claude/worktrees/`.
+
+---
+
 ## 2026-05-11 (depois do PR #53/#54) — PR #55 mergeado: base técnica de lint zerada
 
 - **Agente responsável:** Claude Code

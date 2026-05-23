@@ -1,178 +1,122 @@
 'use client'
 
-import { useState } from 'react'
-import type { Vista, VistaType } from '@/lib/spaces/types'
+import Link from 'next/link'
+import type { Vista } from '@/lib/spaces/types'
+import { findAxisOption } from '@/lib/spaces/axes'
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function formatRelativeTime(iso: string | null | undefined): string {
-  if (!iso) return '—'
+function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1)  return 'agora mesmo'
-  if (mins < 60) return `há ${mins} min`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `há ${hours}h`
-  const days = Math.floor(hours / 24)
-  return `há ${days}d`
+  const min = Math.floor(diff / 60_000)
+  if (min < 1)  return 'agora'
+  if (min < 60) return `${min}min`
+  const hr = Math.floor(min / 60)
+  if (hr < 24)  return `${hr}h`
+  const d = Math.floor(hr / 24)
+  return `${d}d`
 }
 
-const VISTA_TYPE_LABEL: Record<VistaType, string> = {
-  mestre:     'Vista Mestre',
-  iluminacao: 'Iluminação',
-  material:   'Material',
-  angulo:     'Ângulo',
-  detalhe:    'Detalhe',
-  interior:   'Interior',
-}
-
-const MODE_LABEL: Record<string, string> = {
-  coerente: 'Coerente',
-  explorar: 'Explorar',
-}
-
-// ── VistaCard ─────────────────────────────────────────────────────────────────
-
-interface VistaCardProps {
-  vista:    Vista
-  onEvolve?: (vista: Vista) => void
-  onClick?:  (vista: Vista) => void
-}
-
-export function VistaCard({ vista, onEvolve, onClick }: VistaCardProps) {
-  const [hovered, setHovered] = useState(false)
-  const [btnHovered, setBtnHovered] = useState(false)
-
-  const typeLabel = VISTA_TYPE_LABEL[vista.vista_type] ?? vista.vista_type
-  const modeLabel = MODE_LABEL[vista.generation_mode] ?? vista.generation_mode
-  const isCoerente = vista.generation_mode === 'coerente'
+export function VistaCard({ vista }: { vista: Vista }) {
+  const opt = vista.axis && vista.axis_value ? findAxisOption(vista.axis, vista.axis_value) : null
+  const isProcessing = vista.status === 'processing' || vista.status === 'pending'
+  const isFailed     = vista.status === 'failed'
 
   return (
-    <div
-      onClick={() => onClick?.(vista)}
+    <Link
+      href={`/app/spaces/${vista.space_id}/vistas/${vista.id}`}
       style={{
-        background: '#111111',
-        border: `0.5px solid ${hovered ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.08)'}`,
-        borderRadius: 12,
-        overflow: 'hidden',
-        transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-        boxShadow: hovered
-          ? 'inset 0 0.5px 0 rgba(255,255,255,0.08), 0 8px 24px rgba(0,0,0,0.4)'
-          : 'inset 0 0.5px 0 rgba(255,255,255,0.04)',
-        transform: hovered ? 'translateY(-1px)' : 'translateY(0)',
-        cursor: onClick ? 'pointer' : 'default',
+        display: 'flex', flexDirection: 'column',
+        background: 'var(--color-bg-elevated)',
+        border: '0.5px solid var(--color-border)',
+        borderRadius: 12, overflow: 'hidden',
+        textDecoration: 'none', color: 'inherit',
+        transition: 'border-color 0.2s, transform 0.2s',
+        position: 'relative',
       }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
     >
       {/* Image */}
-      <div style={{ aspectRatio: '16/10', position: 'relative', overflow: 'hidden' }}>
-        {vista.output_url ? (
+      <div style={{ aspectRatio: '4 / 3', background: 'var(--color-surface)', position: 'relative' }}>
+        {vista.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={vista.output_url}
-            alt={vista.vista_label ?? typeLabel}
-            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-          />
+          <img src={vista.image_url} alt={vista.axis_label ?? ''}
+               style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : (
-          /* Pending / no output */
           <div style={{
-            width: '100%', height: '100%',
-            background: '#181818',
+            position: 'absolute', inset: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'var(--color-text-quaternary)', fontSize: 11,
           }}>
-            <div style={{
-              width: 32, height: 32, borderRadius: '50%',
-              background: 'rgba(255,255,255,0.04)',
-              border: '0.5px solid rgba(255,255,255,0.1)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-                stroke="rgba(255,255,255,0.28)" strokeWidth="1.5" strokeLinecap="round">
-                <circle cx="12" cy="12" r="9"/>
-                <polyline points="12 7 12 12 15 15"/>
-              </svg>
-            </div>
+            {isProcessing ? 'Gerando…' : isFailed ? 'Falhou' : '—'}
           </div>
         )}
 
-        {/* Vista type badge — top-left */}
-        <div style={{
-          position: 'absolute', top: 10, left: 10,
-          background: 'rgba(0,0,0,0.55)',
-          backdropFilter: 'blur(10px)',
-          border: '0.5px solid rgba(255,255,255,0.15)',
-          color: '#fff',
-          fontSize: 9, fontWeight: 500,
-          letterSpacing: '0.14em', textTransform: 'uppercase' as const,
-          padding: '3px 8px',
-          borderRadius: 4,
-        }}>
-          {typeLabel}
-        </div>
+        {/* Color badge (axis) */}
+        {opt && (
+          <div style={{
+            position: 'absolute', top: 8, left: 8,
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '4px 8px', borderRadius: 5,
+            background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)',
+          }}>
+            <span style={{ width: 8, height: 8, borderRadius: 999, background: opt.color }} />
+            <span style={{ fontSize: 10, color: '#fff', letterSpacing: '0.02em' }}>
+              {opt.label}
+            </span>
+          </div>
+        )}
 
-        {/* Mode badge — top-right */}
-        <div style={{
-          position: 'absolute', top: 10, right: 10,
-          background: isCoerente ? 'rgba(48,180,108,0.18)' : 'rgba(99,102,241,0.18)',
-          border: `0.5px solid ${isCoerente ? 'rgba(48,180,108,0.3)' : 'rgba(99,102,241,0.3)'}`,
-          color: isCoerente ? '#30b46c' : '#818cf8',
-          fontSize: 9, fontWeight: 500,
-          letterSpacing: '0.14em', textTransform: 'uppercase' as const,
-          padding: '3px 8px',
-          borderRadius: 4,
-        }}>
-          {modeLabel}
-        </div>
+        {vista.is_favorited && (
+          <div style={{
+            position: 'absolute', top: 8, right: 8,
+            width: 24, height: 24, borderRadius: 999,
+            background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#FFD25E',
+          }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.39 7.34H22l-6.18 4.49 2.39 7.34L12 16.69 5.79 21.17l2.39-7.34L2 9.34h7.61z"/></svg>
+          </div>
+        )}
+
+        {vista.dna_verified === false && (
+          <div style={{
+            position: 'absolute', bottom: 8, right: 8,
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            padding: '3px 7px', borderRadius: 4,
+            background: 'rgba(186,117,23,0.85)', color: '#fff',
+            fontSize: 9, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase',
+          }}>
+            DNA divergente
+          </div>
+        )}
+
+        {vista.is_edited && (
+          <div style={{
+            position: 'absolute', bottom: 8, left: 8,
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            padding: '3px 7px', borderRadius: 4,
+            background: 'rgba(70,209,145,0.85)', color: '#042818',
+            fontSize: 9, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase',
+          }}>
+            ✎ editada
+          </div>
+        )}
       </div>
 
       {/* Body */}
-      <div style={{ padding: '12px 14px 14px' }}>
+      <div style={{ padding: '10px 12px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
         <div style={{
-          fontSize: 12.5, fontWeight: 500,
-          color: '#fafafa',
-          marginBottom: 8,
-          letterSpacing: '-0.013em',
-          lineHeight: 1.35,
-          overflow: 'hidden',
-          whiteSpace: 'nowrap',
-          textOverflow: 'ellipsis',
+          fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary)',
+          letterSpacing: '-0.01em',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
-          {vista.vista_label ?? typeLabel}
+          {vista.axis_label ?? 'Vista'}
         </div>
-
         <div style={{
-          display: 'flex', alignItems: 'center',
-          justifyContent: 'space-between', gap: 8,
+          fontSize: 10, color: 'var(--color-text-quaternary)',
+          letterSpacing: '0.02em', flexShrink: 0,
         }}>
-          <span style={{
-            fontSize: 10.5, color: 'rgba(255,255,255,0.32)',
-            letterSpacing: '-0.005em',
-          }}>
-            {formatRelativeTime(vista.created_at)}
-          </span>
-
-          <button
-            onClick={e => { e.stopPropagation(); onEvolve?.(vista) }}
-            onMouseEnter={() => setBtnHovered(true)}
-            onMouseLeave={() => setBtnHovered(false)}
-            style={{
-              fontSize: 10.5, fontWeight: 500,
-              color: btnHovered ? '#fafafa' : 'rgba(255,255,255,0.52)',
-              background: btnHovered ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.05)',
-              border: '0.5px solid rgba(255,255,255,0.1)',
-              borderRadius: 5,
-              padding: '4px 9px',
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              letterSpacing: '-0.005em',
-              transition: 'all 0.15s',
-            }}
-          >
-            Evoluir
-          </button>
+          {timeAgo(vista.created_at)} · {vista.quality.toUpperCase()}
         </div>
       </div>
-    </div>
+    </Link>
   )
 }
