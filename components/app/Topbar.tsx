@@ -15,7 +15,7 @@ interface TopbarProps {
 
 export default function Topbar({ credits }: TopbarProps) {
   const pathname = usePathname()
-  const title = TITLES[pathname] ?? 'SPACENODE'
+  const title = TITLES[pathname] ?? 'spacenode'
 
   return (
     <div className="flex items-center justify-between mb-10">

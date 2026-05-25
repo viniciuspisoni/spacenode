@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { getUpscaleDisplayLabel } from '@/lib/renderLabels'
+import { getRenderTitle } from '@/lib/render-display'
 
 type RecentRender = {
   id: string
@@ -56,9 +56,19 @@ export default async function AppPage() {
         {/* ── 1 · Hero ────────────────────────────────────────────────────────── */}
         <section style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
           <div>
-            <h1 style={{ fontSize: 34, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.04em', marginBottom: 8, lineHeight: 1.15 }}>
-              Olá, {firstName}
-            </h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+              <h1 style={{ fontSize: 34, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.04em', lineHeight: 1.15, margin: 0 }}>
+                Olá, {firstName}
+              </h1>
+              <span style={{
+                fontSize: 12, fontWeight: 500, color: '#30b46c',
+                background: 'rgba(48,180,108,0.12)',
+                padding: '4px 10px', borderRadius: 999,
+                letterSpacing: '-0.01em', lineHeight: 1, flexShrink: 0,
+              }}>
+                Beta
+              </span>
+            </div>
             <p style={{ fontSize: 14, color: 'var(--color-text-tertiary)', letterSpacing: '-0.01em', lineHeight: 1.5 }}>
               O que vamos criar hoje?
             </p>
@@ -79,13 +89,13 @@ export default async function AppPage() {
               <circle cx="8.5" cy="8.5" r="1.5"/>
               <polyline points="21 15 16 10 5 21"/>
             </svg>
-            Novo Render
+            Nova Vista
           </Link>
         </section>
 
         {/* ── 2 · Stats ───────────────────────────────────────────────────────── */}
         <section>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
 
             <StatCard
               label="Nodes disponíveis"
@@ -104,12 +114,6 @@ export default async function AppPage() {
               value={String(monthRenders)}
               sub="renders no período"
             />
-            <StatCard
-              label="Plano atual"
-              value="Beta"
-              sub="acesso antecipado"
-              green
-            />
 
           </div>
         </section>
@@ -118,12 +122,6 @@ export default async function AppPage() {
         <section>
           <SectionLabel>Ações rápidas</SectionLabel>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
-            <QuickAction href="/app/generate" primary>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-              </svg>
-              Nova Imagem
-            </QuickAction>
             <QuickAction href="/app/history">Histórico</QuickAction>
             <QuickAction href="/app/billing">Planos & Lumens</QuickAction>
           </div>
@@ -168,9 +166,7 @@ export default async function AppPage() {
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, letterSpacing: '-0.02em' }}>
-                      {r.ambient === 'upscale'
-                        ? getUpscaleDisplayLabel(r.style, r.lighting)
-                        : (r.ambient || r.style || 'Render')}
+                      {getRenderTitle(r)}
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4, letterSpacing: '0.01em' }}>
                       {formatDate(r.created_at)}

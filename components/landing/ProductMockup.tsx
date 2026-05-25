@@ -134,7 +134,7 @@ export function ProductMockup() {
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 marginBottom: 14,
               }}>
-                <svg width="14" height="14" viewBox="0 0 64 64" aria-label="SpaceNode">
+                <svg width="14" height="14" viewBox="0 0 64 64" aria-label="spacenode">
                   <g stroke="#fafafa" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none">
                     <line x1="16" y1="16" x2="16" y2="48"/>
                     <line x1="16" y1="16" x2="48" y2="48"/>

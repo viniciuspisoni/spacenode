@@ -58,7 +58,7 @@ export function ComparisonTable() {
                 Critério
               </th>
               <th style={{ padding: '20px 20px 16px', textAlign: 'center', background: '#1a1a1a', borderBottom: '0.5px solid rgba(255,255,255,0.08)', borderTop: '2px solid var(--color-accent-green)' }}>
-                <span style={{ display: 'block', fontSize: 12, fontWeight: 500, letterSpacing: '0.14em', color: '#fafafa', marginBottom: 4 }}>SPACENODE</span>
+                <span style={{ display: 'block', fontSize: 13, fontWeight: 400, letterSpacing: '-0.01em', color: '#fafafa', marginBottom: 4 }}>spacenode</span>
                 <span style={{ fontSize: 10, fontWeight: 500, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>Motor de IA</span>
               </th>
               {['V-Ray / Corona', 'Lumion / Enscape', 'Pós-produção manual'].map(h => (

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useLayoutEffect, useState } from 'react'
+import { useState } from 'react'
 import React from 'react'
 import { ConstellationN } from '@/components/brand'
 import { AvatarComConsumo } from './AvatarComConsumo'
@@ -57,8 +57,10 @@ const IconSpaces = () => (
 )
 const IconIdentity = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-    <circle cx="12" cy="7" r="4"/>
+    <rect x="2" y="3" width="20" height="14" rx="2"/>
+    <path d="M8 21h8M12 17v4"/>
+    <circle cx="9" cy="10" r="2"/>
+    <path d="M13 10h4M13 13h3"/>
   </svg>
 )
 const IconRetocar = () => (
@@ -74,36 +76,32 @@ type NavItem = {
   exact?: boolean
   Icon: () => React.ReactElement
   badge?: string
+  badgeTone?: 'green' | 'muted'
 }
 
 const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
-    label: 'PRINCIPAL',
+    label: 'PROJETOS',
     items: [
       { label: 'dashboard',  href: '/app',          exact: true,  Icon: IconDashboard },
+      { label: 'spaces',     href: '/app/spaces',   exact: false, Icon: IconSpaces    },
       { label: 'histórico',  href: '/app/history',  exact: false, Icon: IconHistory   },
     ],
   },
   {
-    label: 'CRIAR',
+    label: 'FERRAMENTAS',
     items: [
       { label: 'renderizar', href: '/app/generate', exact: false, Icon: IconGenerate  },
-      { label: 'spaces',     href: '/app/spaces',   exact: false, Icon: IconSpaces, badge: 'novo' },
-      { label: 'melhorar',   href: '/app/upscale',  exact: false, Icon: IconEnhance   },
-      { label: 'retocar',    href: '/app/retocar',  exact: false, Icon: IconRetocar, badge: 'novo' },
-      { label: 'animar',     href: '/app/video',    exact: false, Icon: IconVideo     },
+      { label: 'ampliar',    href: '/app/upscale',  exact: false, Icon: IconEnhance   },
+      { label: 'retocar',    href: '/app/retocar',  exact: false, Icon: IconRetocar, badge: 'novo', badgeTone: 'green' },
+      { label: 'animar',     href: null,            exact: false, Icon: IconVideo,  badge: 'em breve', badgeTone: 'muted' },
     ],
   },
   {
-    label: 'NEGÓCIOS',
+    label: 'ESCRITÓRIO',
     items: [
+      { label: 'identidade', href: null,            exact: false, Icon: IconIdentity, badge: 'em breve', badgeTone: 'muted' },
       { label: 'planos',     href: '/app/billing',  exact: false, Icon: IconPlans     },
-    ],
-  },
-  {
-    label: 'CONFIG',
-    items: [
-      { label: 'identidade', href: '/app/settings/identity', exact: false, Icon: IconIdentity },
     ],
   },
 ]
@@ -124,23 +122,6 @@ export default function Sidebar({
   const pathname = usePathname()
   const [hovered, setHovered] = useState(false)
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
-
-  // Theme toggle — alterna a classe `html.light` definida em globals.css.
-  // Server SSRs com isLight=false; useLayoutEffect sincroniza antes do paint.
-  // O <script> em app/layout.tsx já aplica a classe correta na primeira render
-  // a partir do localStorage, então não há flash.
-  const [isLight, setIsLight] = useState(false)
-  useLayoutEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setIsLight(document.documentElement.classList.contains('light'))
-  }, [])
-  const toggleTheme = () => {
-    const html = document.documentElement
-    const next = !html.classList.contains('light')
-    html.classList.toggle('light', next)
-    try { localStorage.setItem('theme', next ? 'light' : 'dark') } catch {}
-    setIsLight(next)
-  }
 
   return (
     <aside
@@ -179,7 +160,6 @@ export default function Sidebar({
       <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0, padding: '4px 8px', overflow: 'hidden' as const }}>
         {NAV_GROUPS.map((group, gi) => (
           <div key={group.label} style={{ marginTop: gi === 0 ? 0 : 16 }}>
-            {/* Section label */}
             <div style={{
               fontSize: 9, fontWeight: 600, letterSpacing: '0.14em',
               textTransform: 'uppercase' as const,
@@ -194,13 +174,17 @@ export default function Sidebar({
               {group.label}
             </div>
 
-            {group.items.map(({ label, href, exact, Icon, badge }) => {
+            {group.items.map(({ label, href, exact, Icon, badge, badgeTone }) => {
               const active = href
                 ? (exact ? pathname === href : pathname.startsWith(href))
                 : false
               const disabled = href === null
               const itemKey = href || label
               const isItemHovered = hoveredItem === itemKey
+
+              const badgeColor = badgeTone === 'muted'
+                ? { color: 'rgba(255,255,255,0.3)', bg: 'rgba(255,255,255,0.06)' }
+                : { color: '#30b46c', bg: 'rgba(48,180,108,0.18)' }
 
               const inner = (
                 <>
@@ -230,8 +214,8 @@ export default function Sidebar({
                     <span style={{
                       fontSize: 8, fontWeight: 600, letterSpacing: '0.08em',
                       textTransform: 'uppercase' as const,
-                      color: '#30b46c',
-                      background: 'rgba(48,180,108,0.18)',
+                      color: badgeColor.color,
+                      background: badgeColor.bg,
                       padding: '2px 6px', borderRadius: 20,
                       whiteSpace: 'nowrap' as const, flexShrink: 0,
                     }}>
@@ -274,53 +258,6 @@ export default function Sidebar({
           </div>
         ))}
       </nav>
-
-      {/* Theme toggle */}
-      <div style={{ padding: '4px 8px', flexShrink: 0 }}>
-        <button
-          type="button"
-          onClick={toggleTheme}
-          title={isLight ? 'Modo escuro' : 'Modo claro'}
-          suppressHydrationWarning
-          onMouseEnter={() => setHoveredItem('__theme')}
-          onMouseLeave={() => setHoveredItem(null)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 12,
-            padding: '0 10px', height: 40, borderRadius: 8,
-            background: hoveredItem === '__theme' ? 'rgba(255,255,255,0.055)' : 'transparent',
-            boxShadow: hoveredItem === '__theme' ? 'inset 0 0 0 0.5px rgba(255,255,255,0.08)' : 'none',
-            border: 'none',
-            cursor: 'pointer', width: '100%',
-            transition: 'background 0.2s, box-shadow 0.2s',
-          }}
-        >
-          <div style={{ flexShrink: 0, display: 'flex', color: hoveredItem === '__theme' ? 'rgba(255,255,255,0.72)' : 'rgba(255,255,255,0.4)', transition: 'color 0.2s' }}>
-            {isLight ? (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <circle cx="12" cy="12" r="5"/>
-                <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" strokeLinecap="round"/>
-              </svg>
-            ) : (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            )}
-          </div>
-          <span style={{
-            fontSize: 12,
-            color: 'rgba(255,255,255,0.75)',
-            whiteSpace: 'nowrap' as const,
-            fontWeight: 400,
-            letterSpacing: '-0.01em',
-            opacity: hovered ? 1 : 0,
-            transition: 'opacity 0.18s',
-            flex: 1,
-            textAlign: 'left' as const,
-          }}>
-            {isLight ? 'modo escuro' : 'modo claro'}
-          </span>
-        </button>
-      </div>
 
       {/* User com anel de consumo */}
       <div style={{ padding: '10px 8px', borderTop: '0.5px solid rgba(255,255,255,0.07)', flexShrink: 0, position: 'relative' }}>

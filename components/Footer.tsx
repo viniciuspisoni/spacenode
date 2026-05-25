@@ -15,12 +15,12 @@ export default function Footer() {
     >
       <span
         style={{
-          fontSize: 10,
-          letterSpacing: "0.22em",
-          fontWeight: 500,
+          fontSize: 11,
+          letterSpacing: "-0.01em",
+          fontWeight: 400,
         }}
       >
-        SPACENODE · 2026
+        spacenode · 2026
       </span>
 
       <div
