@@ -4,7 +4,7 @@ const testimonials = [
   {
     initials: 'CM',
     quote:
-      'Em cinco minutos apresento três variações para o cliente que antes levavam uma semana. A Spacenode virou parte do meu fluxo.',
+      'Em cinco minutos apresento três variações para o cliente que antes levavam uma semana. A SpaceNode virou parte do meu fluxo.',
     name: 'Camila Mendes',
     role: 'ARQUITETA · PORTO ALEGRE · RS',
   },

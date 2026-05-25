@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useLayoutEffect, useState } from 'react'
 import React from 'react'
-import Logo from '@/components/Logo'
+import { ConstellationN } from '@/components/brand'
 import { AvatarComConsumo } from './AvatarComConsumo'
 import type { PlanId } from '@/lib/plans'
 
@@ -163,15 +163,15 @@ export default function Sidebar({
       {/* Logo */}
       <div style={{ padding: '18px 18px 14px 10px', display: 'flex', alignItems: 'center', gap: 12, height: 62, flexShrink: 0, color: '#ffffff' }}>
         <div style={{ flexShrink: 0, display: 'flex' }}>
-          <Logo size={34} />
+          <ConstellationN size={22} />
         </div>
         <span style={{
-          fontSize: 11, fontWeight: 600, color: '#ffffff',
-          letterSpacing: '0.09em', textTransform: 'uppercase' as const,
+          fontSize: 12, fontWeight: 500, color: '#ffffff',
+          letterSpacing: '-0.025em',
           whiteSpace: 'nowrap' as const,
           opacity: hovered ? 1 : 0, transition: 'opacity 0.18s',
         }}>
-          Spacenode
+          spacenode
         </span>
       </div>
 

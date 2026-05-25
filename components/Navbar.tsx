@@ -1,4 +1,4 @@
-import Logo from "./Logo";
+import { Brandmark } from './brand';
 
 export default function Navbar() {
   return (
@@ -17,18 +17,8 @@ export default function Navbar() {
         borderBottom: "0.5px solid var(--color-border)",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-        <Logo size={36} />
-        <span
-          style={{
-            fontSize: 11,
-            fontWeight: 500,
-            letterSpacing: "0.22em",
-            color: "var(--color-text-primary)",
-          }}
-        >
-          SPACENODE
-        </span>
+      <div style={{ display: "flex", alignItems: "center" }}>
+        <Brandmark size={24} />
       </div>
 
       <div style={{ display: "flex", gap: 36 }} className="nav-links">

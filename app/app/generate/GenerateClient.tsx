@@ -1,7 +1,7 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import Logo from '@/components/Logo'
+import { ConstellationN } from '@/components/brand'
 import {
   ProjectType, ProjectMaterials,
   getSegments, getEnvironments, getLighting, getBackgrounds, getSceneElements,
@@ -1118,8 +1118,8 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
           <div style={S.compareWrap}>
             <img src={imagePreview} alt="Input" style={{...S.compareImg, opacity:0.12, filter:'blur(6px)'}}/>
             <div style={S.loadingOverlay}>
-              <div style={{color:'#fafafa', animation:'pulse 2s cubic-bezier(0.4,0,0.6,1) infinite'}}>
-                <Logo size={40}/>
+              <div className="constellation-loading" style={{color:'#fafafa'}}>
+                <ConstellationN size={40} />
               </div>
               <div style={{display:'flex', flexDirection:'column', alignItems:'center', gap:10}}>
                 <span style={{

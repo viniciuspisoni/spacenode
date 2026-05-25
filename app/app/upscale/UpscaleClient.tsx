@@ -296,7 +296,7 @@ export default function UpscaleClient({ initialCredits }: UpscaleClientProps) {
                   Envie uma imagem para receber uma recomendação de modelo.
                 </div>
                 <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', marginTop: 3 }}>
-                  A Spacenode sugere o melhor processamento com base no tipo de imagem.
+                  A SpaceNode sugere o melhor processamento com base no tipo de imagem.
                 </div>
               </div>
             ) : (

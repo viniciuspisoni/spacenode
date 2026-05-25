@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import Logo from '@/components/Logo'
+import { Brandmark } from '@/components/brand'
 
 type Mode = 'login' | 'signup'
 
@@ -118,11 +118,8 @@ export default function LoginPage() {
       }}>
 
         {/* Brand lockup */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 44, color: '#ffffff' }}>
-          <Logo size={30} />
-          <span style={{ fontSize: 12, fontWeight: 500, letterSpacing: '0.2em', textTransform: 'uppercase' as const, color: '#ffffff' }}>
-            Spacenode
-          </span>
+        <div style={{ marginBottom: 44, color: '#ffffff' }}>
+          <Brandmark size={28} />
         </div>
 
         {/* Mode toggle */}

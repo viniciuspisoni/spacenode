@@ -135,7 +135,7 @@ export default function Gallery() {
           <p style={{
             fontSize: 15, color: 'var(--color-text-secondary)', lineHeight: 1.55,
           }}>
-            Gerados na Spacenode por arquitetos e designers. Sem pós-produção.
+            Gerados na SpaceNode por arquitetos e designers. Sem pós-produção.
           </p>
         </div>
 

@@ -191,7 +191,7 @@ async function extractDnaWithSource(
   }
 
   const enrichedSystem = (
-    'Você é um arquiteto sênior. Esta imagem foi gerada pelo Spacenode com ' +
+    'Você é um arquiteto sênior. Esta imagem foi gerada pelo SpaceNode com ' +
     `motor "${engine}" e configurações conhecidas (ground truth abaixo). ` +
     'Use essas configurações como referência confirmada e expanda com o que ' +
     'a imagem revela. Responda APENAS com JSON.'
