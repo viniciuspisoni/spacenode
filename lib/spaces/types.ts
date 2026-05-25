@@ -1,5 +1,13 @@
 // lib/spaces/types.ts
 
+// Quality mirrors Resolution from engines.ts so the Retocar layer can use
+// the same type without importing from the generate-focused engines module.
+export type Quality = 'hd' | '2k' | '4k'
+
+export function isQuality(v: unknown): v is Quality {
+  return v === 'hd' || v === '2k' || v === '4k'
+}
+
 export type VistaType =
   | 'mestre'
   | 'iluminacao'
