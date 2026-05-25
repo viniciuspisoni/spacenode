@@ -133,7 +133,7 @@ export default function Sidebar({
   return (
     <aside
       style={{
-        width: hovered ? 224 : 62,
+        width: hovered ? 264 : 72,
         transition: 'width 0.25s cubic-bezier(0.4,0,0.2,1)',
         background: '#0a0a0a',
         display: 'flex',
@@ -149,9 +149,9 @@ export default function Sidebar({
       onMouseLeave={() => setHovered(false)}
     >
       {/* Logo */}
-      <div style={{ padding: '18px 18px 14px 10px', display: 'flex', alignItems: 'center', gap: 12, height: 62, flexShrink: 0, color: '#ffffff' }}>
+      <div style={{ padding: '20px 20px 16px 14px', display: 'flex', alignItems: 'center', gap: 12, height: 72, flexShrink: 0, color: '#ffffff' }}>
         <div style={{ flexShrink: 0, display: 'flex' }}>
-          <ConstellationN size={28} />
+          <ConstellationN size={34} />
         </div>
         <span style={{
           fontSize: 12, fontWeight: 500, color: '#ffffff',
@@ -164,11 +164,11 @@ export default function Sidebar({
       </div>
 
       {/* Nav */}
-      <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0, padding: '4px 8px', overflow: 'hidden' as const }}>
+      <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0, padding: '4px 10px', overflow: 'hidden' as const }}>
         {NAV_GROUPS.map((group, gi) => (
           <div key={group.label} style={{ marginTop: gi === 0 ? 0 : 16 }}>
             <div style={{
-              fontSize: 9, fontWeight: 600, letterSpacing: '0.14em',
+              fontSize: 10, fontWeight: 600, letterSpacing: '0.14em',
               textTransform: 'uppercase' as const,
               color: 'rgba(255,255,255,0.2)',
               padding: '0 10px', height: 20,
@@ -206,7 +206,7 @@ export default function Sidebar({
                     <Icon />
                   </div>
                   <span style={{
-                    fontSize: 12,
+                    fontSize: 13,
                     color: disabled ? 'rgba(255,255,255,0.25)' : active ? '#ffffff' : isItemHovered ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.75)',
                     whiteSpace: 'nowrap' as const,
                     fontWeight: 400,
@@ -234,7 +234,7 @@ export default function Sidebar({
 
               const sharedStyle: React.CSSProperties = {
                 display: 'flex', alignItems: 'center', gap: 12,
-                padding: '0 10px', height: 44, borderRadius: 8,
+                padding: '0 12px', height: 50, borderRadius: 9,
                 textDecoration: 'none', flexShrink: 0,
                 background: active
                   ? 'rgba(255,255,255,0.1)'
