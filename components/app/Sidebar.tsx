@@ -151,7 +151,7 @@ export default function Sidebar({
       {/* Logo */}
       <div style={{ padding: '18px 18px 14px 10px', display: 'flex', alignItems: 'center', gap: 12, height: 62, flexShrink: 0, color: '#ffffff' }}>
         <div style={{ flexShrink: 0, display: 'flex' }}>
-          <ConstellationN size={22} />
+          <ConstellationN size={28} />
         </div>
         <span style={{
           fontSize: 12, fontWeight: 500, color: '#ffffff',
