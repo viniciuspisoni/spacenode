@@ -18,7 +18,7 @@ export default function Navbar() {
       }}
     >
       <div style={{ display: "flex", alignItems: "center" }}>
-        <Brandmark size={24} />
+        <Brandmark size={32} />
       </div>
 
       <div style={{ display: "flex", gap: 36 }} className="nav-links">
