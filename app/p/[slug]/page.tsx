@@ -28,6 +28,7 @@ export default async function PublicPackPage({
   if (!packRow) notFound()
 
   const pack = packRow as Pack
+  // eslint-disable-next-line react-hooks/purity -- Server Component runs once per request; Date.now() is OK here
   if (pack.expires_at && new Date(pack.expires_at).getTime() < Date.now()) {
     notFound()
   }

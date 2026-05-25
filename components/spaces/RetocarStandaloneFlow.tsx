@@ -5,7 +5,7 @@
 //   editing → canvas + brush + prompt + quality + action
 //   result  → slider compare antes/depois + Salvar/Descartar/Editar de novo
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { RetocarCanvas, type RetocarCanvasHandle, BRUSH_MIN, BRUSH_MAX } from './RetocarCanvas'
 import { RetocarImportModal } from './RetocarImportModal'
@@ -204,7 +204,7 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
       }}>
         <Link href="/app">Workspace</Link>
         <span style={{ opacity: 0.35, fontSize: 9 }}>›</span>
-        <span style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>Retocar</span>
+        <span style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>Editar</span>
         {step === 'editing' && (
           <>
             <span style={{ opacity: 0.35, fontSize: 9 }}>›</span>
@@ -293,7 +293,7 @@ function EmptyStep({ onUpload, onImport, fileInputRef, onFilePicked, error }: {
           fontSize: 26, fontWeight: 500, color: 'var(--color-text-primary)',
           letterSpacing: '-0.03em', lineHeight: 1.1, marginBottom: 8,
         }}>
-          Retocar
+          Editar
         </h1>
         <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)', letterSpacing: '-0.005em' }}>
           Edite áreas específicas de qualquer imagem. Pinte a máscara, descreva o que quer
@@ -655,7 +655,7 @@ function ResultStep({ sourceUrl, resultUrl, prompt, coverage, driftWarning, onEd
             ✦ Editar de novo
           </button>
           <a
-            href={resultUrl} download="retocar-result.jpg" target="_blank" rel="noopener noreferrer"
+            href={resultUrl} download="editar-result.jpg" target="_blank" rel="noopener noreferrer"
             className="spn-action spn-action--primary"
             style={{ width: 'auto', padding: '10px 18px', fontSize: 12, textDecoration: 'none' }}
           >
@@ -671,7 +671,18 @@ function BeforeAfterSlider({ beforeUrl, afterUrl, pos, setPos }: {
   beforeUrl: string; afterUrl: string; pos: number; setPos: (n: number) => void
 }) {
   const ref = useRef<HTMLDivElement | null>(null)
+  const [containerWidth, setContainerWidth] = useState<number | null>(null)
   const [dragging, setDragging] = useState(false)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const observer = new ResizeObserver(() => {
+      setContainerWidth(el.getBoundingClientRect().width)
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
 
   function move(clientX: number) {
     const r = ref.current?.getBoundingClientRect()
@@ -699,7 +710,7 @@ function BeforeAfterSlider({ beforeUrl, afterUrl, pos, setPos }: {
       <div style={{ position: 'absolute', inset: 0, width: `${pos}%`, overflow: 'hidden' }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={beforeUrl} alt="antes"
-          style={{ position: 'absolute', inset: 0, height: '100%', objectFit: 'contain', width: ref.current ? ref.current.getBoundingClientRect().width : '100%' }} draggable={false} />
+          style={{ position: 'absolute', inset: 0, height: '100%', objectFit: 'contain', width: containerWidth ?? '100%' }} draggable={false} />
       </div>
       {/* Cortina */}
       <div style={{

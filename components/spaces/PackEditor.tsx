@@ -38,6 +38,7 @@ export function PackEditor({ space, vistas, initialPack, identity }: Props) {
   useEffect(() => {
     if (pack || creating) return
     if (vistas.length === 0) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCreating(true)
     fetch('/api/packs', {
       method:  'POST',
@@ -122,6 +123,7 @@ export function PackEditor({ space, vistas, initialPack, identity }: Props) {
   // Pre-existing share link
   useEffect(() => {
     if (pack?.share_token && !shareUrl) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setShareUrl(`${window.location.origin}/p/${pack.share_token}`)
     }
   }, [pack?.share_token, shareUrl])

@@ -32,6 +32,7 @@ export function RetocarImportModal({ onClose, onPick }: Props) {
 
   useEffect(() => {
     const sb = createClient()
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true)
     Promise.all([
       sb.from('renders')

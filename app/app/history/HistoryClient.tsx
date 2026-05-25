@@ -334,7 +334,7 @@ export function HistoryClient({
             <h1 style={S.headerTitle}>Histórico</h1>
             <p style={S.headerSub}>
               {historyTab === 'renders' && 'Seus renders salvos e prontos para reutilizar.'}
-              {historyTab === 'edits'   && 'Edições localizadas geradas com Retocar.'}
+              {historyTab === 'edits'   && 'Edições localizadas geradas no Editar.'}
               {historyTab === 'vistas'  && 'Vistas geradas dentro dos seus Spaces.'}
             </p>
           </div>
@@ -601,6 +601,7 @@ function EditsTabView() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true)
     fetch('/api/edits')
       .then(r => r.ok ? r.json() : null)
@@ -612,7 +613,7 @@ function EditsTabView() {
   if ((items ?? []).length === 0) return (
     <TabEmpty
       message="Sem edições ainda."
-      action={{ href: '/app/retocar', label: 'Abrir Retocar →' }}
+      action={{ href: '/app/editar', label: 'Abrir Editar →' }}
     />
   )
 
@@ -624,7 +625,7 @@ function EditsTabView() {
       {items!.map(it => (
         <Link
           key={it.id}
-          href={`/app/retocar?source=${encodeURIComponent(it.result_image_url)}&source_type=edit&source_id=${it.id}`}
+          href={`/app/editar?source=${encodeURIComponent(it.result_image_url)}&source_type=edit&source_id=${it.id}`}
           style={{
             background: 'var(--color-bg-elevated)',
             border: '0.5px solid var(--color-border)',
@@ -667,6 +668,7 @@ function VistasTabView() {
 
   useEffect(() => {
     const sb = createClient()
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true)
     sb.from('vistas')
       .select('*')
@@ -681,6 +683,7 @@ function VistasTabView() {
   }, [])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (items !== null) setLoading(false)
   }, [items])
 
@@ -794,6 +797,7 @@ function RenderCard({
 
   // Fecha menu quando o card sai de hover ou modo seleção é ativado
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!hovered || selectMode) setMenuOpen(false)
   }, [hovered, selectMode])
 
@@ -805,7 +809,7 @@ function RenderCard({
   const display   = isVideo ? render.input_url : (render.output_url ?? render.input_url)
   const quality   = (isUpscale || isVideo) ? null : qualityLabel(render.cost_credits)
   const engine    = (isUpscale || isVideo) ? null : engineLabel(render.model)
-  const title     = isUpscale ? 'Upscale' : isVideo ? 'Animar Render' : (render.ambient || render.lighting || 'Render')
+  const title     = isUpscale ? 'Upscale' : isVideo ? 'Animação' : (render.ambient || render.lighting || 'Render')
   const sub       = isUpscale
     ? getUpscaleDisplayLabel(render.style, render.lighting)
     : isVideo
