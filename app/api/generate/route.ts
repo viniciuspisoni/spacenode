@@ -236,23 +236,48 @@ export async function POST(req: NextRequest) {
     // recebeu o output e foi cobrado corretamente. Logamos pra reprocessar
     // o histórico manualmente.
 
-    const { error: insertError } = await admin.from('renders').insert({
-      user_id:       user.id,
-      input_url:     inputUrl ?? null,
-      output_url:    outputUrl,
-      prompt:        finalPrompt,
-      ambient:       environment ?? segment ?? projectType,
-      style:         projectType,
-      lighting:      lighting ?? 'default',
-      engine,
-      resolution,
-      nodes_charged: nodesToCharge,
-      status:        'completed',
-      completed_at:  new Date().toISOString(),
-    })
-    if (insertError) {
+    // Snapshot completo pra integração Spaces ← Renderizar.
+    // Usado quando o usuário cria um Space a partir desta render
+    // (alimenta DNA enriquecido + economiza re-extração de briefing).
+    // Comportamento do Renderizar não muda — campo é só persistido.
+    const configSnapshot = {
+      projectType,
+      segment:       segment       ?? null,
+      environment:   environment   ?? null,
+      lighting:      lighting      ?? null,
+      background:    background    ?? null,
+      sceneElements: sceneElements ?? [],
+      geometryLock:  Number(geometryLock),
+      fidelityMode:  fidelityMode  === 'balanced' ? 'balanced' : 'strict',
+      fidelityLevel,
+      materials:     materials     ?? null,
+      briefing:      briefing      ?? null,
+    }
+
+    const insertResult = await admin
+      .from('renders')
+      .insert({
+        user_id:         user.id,
+        input_url:       inputUrl ?? null,
+        output_url:      outputUrl,
+        prompt:          finalPrompt,
+        ambient:         environment ?? segment ?? projectType,
+        style:           projectType,
+        lighting:        lighting ?? 'default',
+        engine,
+        resolution,
+        nodes_charged:   nodesToCharge,
+        status:          'completed',
+        completed_at:    new Date().toISOString(),
+        config_snapshot: configSnapshot,
+      })
+      .select('id')
+      .single()
+
+    const renderId = insertResult.data?.id ?? null
+    if (insertResult.error) {
       console.error('[generate] DB INSERT FALHOU (imagem gerada e debitada — investigar):', {
-        error:   insertError,
+        error:   insertResult.error,
         userId:  user.id,
         outputUrl,
       })
@@ -266,6 +291,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       outputUrl,
+      renderId,
       originalUrl:  inputUrl ?? null,
       // `credits` continua refletindo o saldo do plano (backward compat com
       // a UI atual em GenerateClient); novos campos detalham plano + Lumens.

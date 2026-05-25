@@ -2,7 +2,12 @@
 
 import { useState, useEffect, useMemo, useCallback, type CSSProperties } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { getUpscaleDisplayLabel, getVideoDisplayLabel } from '@/lib/renderLabels'
+import { createClient } from '@/lib/supabase/client'
+import type { Edit, Vista } from '@/lib/spaces/types'
+
+type HistoryTab = 'renders' | 'edits' | 'vistas'
 
 interface Render {
   id: string
@@ -132,6 +137,9 @@ export function HistoryClient({
   const [typeFilter,    setTypeFilter]    = useState('all')
   const [sort,          setSort]          = useState<'desc' | 'asc'>('desc')
   const [folderFilter,  setFolderFilter]  = useState<FolderFilter>('all')
+
+  // ── Tabs do histórico ──────────────────────────────────────────────────────
+  const [historyTab, setHistoryTab] = useState<HistoryTab>('renders')
 
   // ── Modo de seleção ─────────────────────────────────────────────────────────
   const [selectMode, setSelectMode] = useState(false)
@@ -324,14 +332,18 @@ export function HistoryClient({
         <div style={S.header}>
           <div>
             <h1 style={S.headerTitle}>Histórico</h1>
-            <p style={S.headerSub}>Seus renders salvos e prontos para reutilizar.</p>
+            <p style={S.headerSub}>
+              {historyTab === 'renders' && 'Seus renders salvos e prontos para reutilizar.'}
+              {historyTab === 'edits'   && 'Edições localizadas geradas com Retocar.'}
+              {historyTab === 'vistas'  && 'Vistas geradas dentro dos seus Spaces.'}
+            </p>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {folderCounts.total > 0 && !selectMode && (
+            {historyTab === 'renders' && folderCounts.total > 0 && !selectMode && (
               <span style={S.count}>{filtered.length} render{filtered.length !== 1 ? 's' : ''}</span>
             )}
-            {folderCounts.total > 0 && (
+            {historyTab === 'renders' && folderCounts.total > 0 && (
               selectMode ? (
                 <>
                   <button
@@ -353,8 +365,41 @@ export function HistoryClient({
           </div>
         </div>
 
-        {/* ── Controls ── */}
-        {folderCounts.total > 0 && (
+        {/* ── Tabs (Renders / Edições / Vistas) ── */}
+        <div style={{
+          display: 'flex', gap: 4, padding: 4,
+          background: 'var(--color-surface)', borderRadius: 10,
+          marginBottom: 16, maxWidth: 480,
+        }}>
+          {(['renders', 'edits', 'vistas'] as HistoryTab[]).map(t => {
+            const active = historyTab === t
+            const label = t === 'renders' ? 'Renders' : t === 'edits' ? 'Edições' : 'Vistas'
+            return (
+              <button
+                key={t}
+                onClick={() => setHistoryTab(t)}
+                style={{
+                  flex: 1, padding: '8px 12px', borderRadius: 7,
+                  background: active ? 'var(--color-bg-elevated)' : 'transparent',
+                  color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                  fontSize: 12, fontWeight: 500, letterSpacing: '-0.005em',
+                  cursor: 'pointer',
+                  boxShadow: active ? 'inset 0 0 0 0.5px var(--color-border-strong)' : 'none',
+                  border: 'none',
+                }}
+              >
+                {label}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* ── Tabs alternativas: Edições + Vistas ── */}
+        {historyTab === 'edits'  && <EditsTabView  />}
+        {historyTab === 'vistas' && <VistasTabView />}
+
+        {/* ── Controls (só renderiza na tab Renders) ── */}
+        {historyTab === 'renders' && folderCounts.total > 0 && (
           <div style={S.controls}>
             <div style={S.searchWrap}>
               <svg style={S.searchIcon} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
@@ -385,8 +430,8 @@ export function HistoryClient({
           </div>
         )}
 
-        {/* ── Folder chips ── */}
-        {folderCounts.total > 0 && (
+        {/* ── Folder chips (só na tab Renders) ── */}
+        {historyTab === 'renders' && folderCounts.total > 0 && (
           <div style={S.chipRow}>
             <FolderChip
               active={folderFilter === 'all'}
@@ -416,10 +461,10 @@ export function HistoryClient({
           </div>
         )}
 
-        {/* ── Grid / Empty ── */}
-        {folderCounts.total === 0 ? (
+        {/* ── Grid / Empty (só na tab Renders) ── */}
+        {historyTab === 'renders' && folderCounts.total === 0 ? (
           <EmptyState />
-        ) : (
+        ) : historyTab === 'renders' ? (
           <>
             {filtered.length === 0 ? (
               <div style={{ padding: '48px 0', textAlign: 'center' }}>
@@ -469,7 +514,7 @@ export function HistoryClient({
               </div>
             )}
           </>
-        )}
+        ) : null}
 
       </div>
 
@@ -549,6 +594,189 @@ function FolderChip({
   )
 }
 
+// ── EditsTabView ───────────────────────────────────────────────────────────────
+
+function EditsTabView() {
+  const [items, setItems] = useState<Edit[] | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    setLoading(true)
+    fetch('/api/edits')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setItems((d?.edits ?? []) as Edit[]))
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading)             return <TabLoading />
+  if ((items ?? []).length === 0) return (
+    <TabEmpty
+      message="Sem edições ainda."
+      action={{ href: '/app/retocar', label: 'Abrir Retocar →' }}
+    />
+  )
+
+  return (
+    <div style={{
+      display: 'grid', gap: 14,
+      gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+    }}>
+      {items!.map(it => (
+        <Link
+          key={it.id}
+          href={`/app/retocar?source=${encodeURIComponent(it.result_image_url)}&source_type=edit&source_id=${it.id}`}
+          style={{
+            background: 'var(--color-bg-elevated)',
+            border: '0.5px solid var(--color-border)',
+            borderRadius: 12, overflow: 'hidden',
+            textDecoration: 'none', color: 'inherit',
+            display: 'block',
+          }}
+        >
+          <div style={{ aspectRatio: '4 / 3', background: 'var(--color-surface)' }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={it.result_image_url} alt={it.prompt}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          </div>
+          <div style={{ padding: '10px 12px 12px' }}>
+            <div style={{
+              fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary)',
+              letterSpacing: '-0.005em',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {it.prompt}
+            </div>
+            <div style={{
+              fontSize: 10, color: 'var(--color-text-quaternary)',
+              letterSpacing: '0.02em', marginTop: 4,
+            }}>
+              {it.quality.toUpperCase()} · {new Date(it.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+            </div>
+          </div>
+        </Link>
+      ))}
+    </div>
+  )
+}
+
+// ── VistasTabView ──────────────────────────────────────────────────────────────
+
+function VistasTabView() {
+  const [items, setItems] = useState<Vista[] | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const sb = createClient()
+    setLoading(true)
+    sb.from('vistas')
+      .select('*')
+      .eq('status', 'completed')
+      .not('image_url', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(60)
+      .then(({ data }) => setItems((data ?? []) as Vista[]))
+      .then(undefined, () => setItems([]))
+      // .finally(() => setLoading(false))  -- supabase-js 2.x query doesn't have finally
+    // Workaround pra setLoading sem finally: marca terminado quando items mudam
+  }, [])
+
+  useEffect(() => {
+    if (items !== null) setLoading(false)
+  }, [items])
+
+  if (loading)                       return <TabLoading />
+  if ((items ?? []).length === 0)    return (
+    <TabEmpty
+      message="Sem vistas geradas em Spaces ainda."
+      action={{ href: '/app/spaces', label: 'Abrir Spaces →' }}
+    />
+  )
+
+  return (
+    <div style={{
+      display: 'grid', gap: 14,
+      gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+    }}>
+      {items!.map(v => (
+        <Link
+          key={v.id}
+          href={`/app/spaces/${v.space_id}/vistas/${v.id}`}
+          style={{
+            background: 'var(--color-bg-elevated)',
+            border: '0.5px solid var(--color-border)',
+            borderRadius: 12, overflow: 'hidden',
+            textDecoration: 'none', color: 'inherit',
+            display: 'block', position: 'relative',
+          }}
+        >
+          <div style={{ aspectRatio: '4 / 3', background: 'var(--color-surface)' }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={v.image_url!} alt={v.axis_label ?? ''}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            {v.is_edited && (
+              <div style={{
+                position: 'absolute', top: 8, right: 8,
+                padding: '3px 8px', borderRadius: 4,
+                background: 'rgba(70,209,145,0.85)', color: '#042818',
+                fontSize: 9, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase',
+              }}>
+                editada
+              </div>
+            )}
+          </div>
+          <div style={{ padding: '10px 12px 12px' }}>
+            <div style={{
+              fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary)',
+              letterSpacing: '-0.005em',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {v.axis_label ?? 'Vista'}
+            </div>
+            <div style={{
+              fontSize: 10, color: 'var(--color-text-quaternary)',
+              letterSpacing: '0.02em', marginTop: 4,
+            }}>
+              {v.quality.toUpperCase()} · {new Date(v.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+            </div>
+          </div>
+        </Link>
+      ))}
+    </div>
+  )
+}
+
+function TabLoading() {
+  return (
+    <div style={{ padding: 48, textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 12 }}>
+      carregando…
+    </div>
+  )
+}
+
+function TabEmpty({ message, action }: { message: string; action?: { href: string; label: string } }) {
+  return (
+    <div style={{
+      padding: '48px 24px', textAlign: 'center',
+      background: 'var(--color-bg-elevated)',
+      border: '0.5px dashed var(--color-border-strong)',
+      borderRadius: 14,
+    }}>
+      <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 12 }}>
+        {message}
+      </div>
+      {action && (
+        <Link href={action.href} style={{
+          display: 'inline-block', padding: '10px 18px', borderRadius: 10,
+          background: 'var(--color-text-primary)', color: 'var(--color-bg)',
+          fontSize: 13, fontWeight: 500,
+        }}>
+          {action.label}
+        </Link>
+      )}
+    </div>
+  )
+}
+
 // ── RenderCard ─────────────────────────────────────────────────────────────────
 
 function RenderCard({
@@ -560,7 +788,16 @@ function RenderCard({
   onToggle: () => void
   onActivateSelect: () => void
 }) {
+  const router = useRouter()
   const [hovered, setHovered] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+
+  // Fecha menu quando o card sai de hover ou modo seleção é ativado
+  useEffect(() => {
+    if (!hovered || selectMode) setMenuOpen(false)
+  }, [hovered, selectMode])
+
+  const isCreateSpaceEligible = render.ambient !== 'upscale' && render.ambient !== 'video' && !!render.output_url
 
   const date      = formatDate(render.created_at)
   const isUpscale = render.ambient === 'upscale'
@@ -646,6 +883,83 @@ function RenderCard({
           <div style={S.badgeRow}>
             {quality && <span style={S.badge}>{quality}</span>}
             {engine  && <span style={S.badge}>{engine}</span>}
+          </div>
+        )}
+
+        {/* Kebab menu — top-right, on hover, not in select mode */}
+        {hovered && !selectMode && isCreateSpaceEligible && (
+          <div
+            style={{
+              position: 'absolute', top: 8, right: 8, zIndex: 4,
+            }}
+            onClick={e => e.stopPropagation()}
+            onDoubleClick={e => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setMenuOpen(o => !o) }}
+              aria-label="Mais ações"
+              style={{
+                width: 28, height: 28, borderRadius: 6,
+                background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)',
+                border: '0.5px solid rgba(255,255,255,0.18)',
+                color: '#fff', cursor: 'pointer', padding: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <circle cx="12" cy="5"  r="1.6"/>
+                <circle cx="12" cy="12" r="1.6"/>
+                <circle cx="12" cy="19" r="1.6"/>
+              </svg>
+            </button>
+
+            {menuOpen && (
+              <div style={{
+                position: 'absolute', top: 32, right: 0,
+                minWidth: 200, padding: 6,
+                background: '#1a1a1a',
+                border: '0.5px solid rgba(255,255,255,0.14)',
+                borderRadius: 10,
+                boxShadow: '0 12px 36px rgba(0,0,0,0.5)',
+              }}>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setMenuOpen(false)
+                    router.push(`/app/spaces/new/from-render?render_id=${render.id}`)
+                  }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    width: '100%', padding: '8px 10px', borderRadius: 6,
+                    background: 'transparent', border: 'none',
+                    color: '#fafafa', fontSize: 12, textAlign: 'left',
+                    cursor: 'pointer',
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(29,158,117,0.12)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                >
+                  <span style={{
+                    width: 22, height: 22, borderRadius: 6,
+                    background: 'rgba(29,158,117,0.18)', color: '#46d191',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexShrink: 0,
+                  }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="3"/>
+                      <path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/>
+                    </svg>
+                  </span>
+                  <span style={{ flex: 1 }}>
+                    <span style={{ display: 'block', color: '#fafafa', fontWeight: 500 }}>Criar Space</span>
+                    <span style={{ display: 'block', fontSize: 10, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+                      Usa esta render como Vista Mestre
+                    </span>
+                  </span>
+                </button>
+              </div>
+            )}
           </div>
         )}
 

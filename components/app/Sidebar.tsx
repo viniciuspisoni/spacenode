@@ -5,6 +5,8 @@ import { usePathname } from 'next/navigation'
 import { useLayoutEffect, useState } from 'react'
 import React from 'react'
 import Logo from '@/components/Logo'
+import { AvatarComConsumo } from './AvatarComConsumo'
+import type { PlanId } from '@/lib/plans'
 
 const IconDashboard = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -53,6 +55,18 @@ const IconSpaces = () => (
     <path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/>
   </svg>
 )
+const IconIdentity = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+    <circle cx="12" cy="7" r="4"/>
+  </svg>
+)
+const IconRetocar = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 20h9"/>
+    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+  </svg>
+)
 
 type NavItem = {
   label: string
@@ -60,7 +74,6 @@ type NavItem = {
   exact?: boolean
   Icon: () => React.ReactElement
   badge?: string
-  badgeTone?: 'green' | 'muted'
 }
 
 const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
@@ -75,9 +88,10 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     label: 'CRIAR',
     items: [
       { label: 'renderizar', href: '/app/generate', exact: false, Icon: IconGenerate  },
-      { label: 'spaces',     href: null,            exact: false, Icon: IconSpaces, badge: 'em breve', badgeTone: 'muted' },
+      { label: 'spaces',     href: '/app/spaces',   exact: false, Icon: IconSpaces, badge: 'novo' },
       { label: 'melhorar',   href: '/app/upscale',  exact: false, Icon: IconEnhance   },
-      { label: 'animar',     href: null,            exact: false, Icon: IconVideo, badge: 'em breve', badgeTone: 'muted' },
+      { label: 'retocar',    href: '/app/retocar',  exact: false, Icon: IconRetocar, badge: 'novo' },
+      { label: 'animar',     href: '/app/video',    exact: false, Icon: IconVideo     },
     ],
   },
   {
@@ -86,14 +100,27 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { label: 'planos',     href: '/app/billing',  exact: false, Icon: IconPlans     },
     ],
   },
+  {
+    label: 'CONFIG',
+    items: [
+      { label: 'identidade', href: '/app/settings/identity', exact: false, Icon: IconIdentity },
+    ],
+  },
 ]
 
 interface SidebarProps {
   userName: string
   userAvatar: string | null
+  planBalance: number
+  planTotal: number
+  lumenBalance: number
+  planId: PlanId
 }
 
-export default function Sidebar({ userName, userAvatar }: SidebarProps) {
+export default function Sidebar({
+  userName, userAvatar,
+  planBalance, planTotal, lumenBalance, planId,
+}: SidebarProps) {
   const pathname = usePathname()
   const [hovered, setHovered] = useState(false)
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
@@ -114,13 +141,6 @@ export default function Sidebar({ userName, userAvatar }: SidebarProps) {
     try { localStorage.setItem('theme', next ? 'light' : 'dark') } catch {}
     setIsLight(next)
   }
-
-  const initials = userName
-    .split(' ')
-    .map(w => w[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase()
 
   return (
     <aside
@@ -174,7 +194,7 @@ export default function Sidebar({ userName, userAvatar }: SidebarProps) {
               {group.label}
             </div>
 
-            {group.items.map(({ label, href, exact, Icon, badge, badgeTone }) => {
+            {group.items.map(({ label, href, exact, Icon, badge }) => {
               const active = href
                 ? (exact ? pathname === href : pathname.startsWith(href))
                 : false
@@ -210,8 +230,8 @@ export default function Sidebar({ userName, userAvatar }: SidebarProps) {
                     <span style={{
                       fontSize: 8, fontWeight: 600, letterSpacing: '0.08em',
                       textTransform: 'uppercase' as const,
-                      color: badgeTone === 'muted' ? 'rgba(255,255,255,0.42)' : '#30b46c',
-                      background: badgeTone === 'muted' ? 'rgba(255,255,255,0.06)' : 'rgba(48,180,108,0.18)',
+                      color: '#30b46c',
+                      background: 'rgba(48,180,108,0.18)',
                       padding: '2px 6px', borderRadius: 20,
                       whiteSpace: 'nowrap' as const, flexShrink: 0,
                     }}>
@@ -302,42 +322,29 @@ export default function Sidebar({ userName, userAvatar }: SidebarProps) {
         </button>
       </div>
 
-      {/* User */}
-      <div style={{ padding: '10px 8px', borderTop: '0.5px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 10px', height: 52, borderRadius: 8 }}>
-          {userAvatar ? (
-            <img
-              src={userAvatar}
-              alt={userName}
-              style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' as const, flexShrink: 0 }}
-            />
-          ) : (
-            <div style={{
-              width: 28, height: 28, borderRadius: '50%',
-              background: 'rgba(255,255,255,0.15)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexShrink: 0, fontSize: 11, fontWeight: 600, color: '#ffffff',
-            }}>
-              {initials}
-            </div>
-          )}
-          <div style={{ opacity: hovered ? 1 : 0, transition: 'opacity 0.18s', minWidth: 0, overflow: 'hidden', flex: 1 }}>
-            <div style={{ fontSize: 11, color: '#ffffff', fontWeight: 500, whiteSpace: 'nowrap' as const, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {userName}
-            </div>
-            <div style={{ fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>
-              Plano Beta
-            </div>
-          </div>
-          <div style={{ opacity: hovered ? 1 : 0, transition: 'opacity 0.18s', flexShrink: 0 }}>
-            <form action="/auth/signout" method="POST">
-              <button type="submit" title="Sair" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'rgba(255,255,255,0.4)', display: 'flex' }}>
-                <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-                  <path d="M5 2H2.5A1.5 1.5 0 0 0 1 3.5v7A1.5 1.5 0 0 0 2.5 12H5M9 10l3-3-3-3M12 7H5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </button>
-            </form>
-          </div>
+      {/* User com anel de consumo */}
+      <div style={{ padding: '10px 8px', borderTop: '0.5px solid rgba(255,255,255,0.07)', flexShrink: 0, position: 'relative' }}>
+        <AvatarComConsumo
+          userName={userName}
+          userAvatar={userAvatar}
+          expanded={hovered}
+          initialPlanBalance={planBalance}
+          initialPlanTotal={planTotal}
+          initialLumenBalance={lumenBalance}
+          initialPlanId={planId}
+        />
+        <div style={{
+          position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)',
+          opacity: hovered ? 1 : 0, transition: 'opacity 0.18s',
+          pointerEvents: hovered ? 'auto' : 'none',
+        }}>
+          <form action="/auth/signout" method="POST">
+            <button type="submit" title="Sair" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'rgba(255,255,255,0.4)', display: 'flex' }}>
+              <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+                <path d="M5 2H2.5A1.5 1.5 0 0 0 1 3.5v7A1.5 1.5 0 0 0 2.5 12H5M9 10l3-3-3-3M12 7H5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+          </form>
         </div>
       </div>
     </aside>

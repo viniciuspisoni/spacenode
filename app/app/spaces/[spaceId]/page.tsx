@@ -1,5 +1,52 @@
-import { redirect } from 'next/navigation'
+// /app/spaces/[spaceId] — Space em uso.
+// Server Component: busca Space, vistas e identity do usuário; renderiza
+// SpaceWorkspace (client) com tudo necessário pra geração + galeria.
 
-export default function SpacePage() {
-  redirect('/app/spaces')
+import { createClient } from '@/lib/supabase/server'
+import { notFound, redirect } from 'next/navigation'
+import { SpaceWorkspace } from '@/components/spaces/SpaceWorkspace'
+import type { Space, Vista, ArchitectIdentity } from '@/lib/spaces/types'
+import type { PlanId } from '@/lib/plans'
+
+export default async function SpacePage({
+  params,
+}: {
+  params: Promise<{ spaceId: string }>
+}) {
+  const { spaceId } = await params
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const [spaceRes, vistasRes, balanceRes, identityRes, profRes] = await Promise.all([
+    supabase.from('spaces').select('*').eq('id', spaceId).single(),
+    supabase.from('vistas')
+      .select('*')
+      .eq('space_id', spaceId)
+      .order('created_at', { ascending: false })
+      .limit(60),
+    supabase.from('user_node_balance').select('total_balance').eq('user_id', user.id).single(),
+    supabase.from('architect_identity').select('*').eq('user_id', user.id).maybeSingle(),
+    supabase.from('profiles').select('plan').eq('id', user.id).single(),
+  ])
+
+  if (spaceRes.error || !spaceRes.data) notFound()
+
+  const space    = spaceRes.data as Space
+  const vistas   = (vistasRes.data ?? []) as Vista[]
+  const balance  = balanceRes.data?.total_balance ?? 0
+  const identity = (identityRes.data ?? null) as ArchitectIdentity | null
+  const planId   = (profRes.data?.plan as PlanId | undefined) ?? 'free'
+
+  return (
+    <main style={{ flex: 1, overflowY: 'auto', background: 'var(--color-bg)' }}>
+      <SpaceWorkspace
+        space={space}
+        initialVistas={vistas}
+        initialBalance={balance}
+        identity={identity}
+        planId={planId}
+      />
+    </main>
+  )
 }
