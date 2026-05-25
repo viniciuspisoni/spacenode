@@ -19,8 +19,8 @@ interface Props {
 }
 
 // Mode order is intentional: workflow goes from "destructive" (remove) to
-// "transformative" (texture) to "constructive" (replace, add).
-const MODE_ORDER: EditMode[] = ['remove', 'texture', 'replace', 'add']
+// "transformative" (material) to "constructive" (replace, add).
+const MODE_ORDER: EditMode[] = ['remove', 'material', 'replace', 'add']
 
 // Per-mode SVG icons — kept inline to avoid asset overhead.
 function ModeIcon({ mode }: { mode: EditMode }) {
@@ -43,7 +43,7 @@ function ModeIcon({ mode }: { mode: EditMode }) {
           <path d="M10 11v6M14 11v6" />
         </svg>
       )
-    case 'texture':
+    case 'material':
       return (
         <svg {...props}>
           <circle cx="13.5" cy="6.5" r="2.5" />

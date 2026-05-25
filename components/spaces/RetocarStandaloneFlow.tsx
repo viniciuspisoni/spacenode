@@ -33,9 +33,9 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
   const [brush, setBrush]             = useState(40)
   const [prompt, setPrompt]           = useState('')
   const [quality, setQuality]         = useState<Quality>('2k')
-  // Edit intention. 'texture' = legacy behaviour (Flux Pro Fill). User can
-  // pick a different tab; the router decides which FAL endpoint to call.
-  const [mode, setMode]               = useState<EditMode>('texture')
+  // Edit intention. Default is 'material' (Google NB2/NB Pro, Flux fallback).
+  // User can pick a different tab; the router decides which FAL endpoint to call.
+  const [mode, setMode]               = useState<EditMode>('material')
   const [balance, setBalance]         = useState(initialBalance)
   const [submitting, setSubmitting]   = useState(false)
   const [validating, setValidating]   = useState(false)

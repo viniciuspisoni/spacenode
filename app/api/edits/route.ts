@@ -12,13 +12,13 @@ import { isQuality, isEditSourceType, type Quality } from '@/lib/spaces/types'
 import { getEditCost } from '@/lib/spaces/edit-economy'
 import { selectEngine, callWithTimeoutRetry, type EditMode } from '@/lib/spaces/engines'
 
-const VALID_MODES: EditMode[] = ['remove', 'texture', 'replace', 'add']
+const VALID_MODES: EditMode[] = ['remove', 'material', 'replace', 'add']
 function isEditMode(v: unknown): v is EditMode {
   return typeof v === 'string' && (VALID_MODES as string[]).includes(v)
 }
 
 // Mask-constraint prompt wrapper. Applied for modes that consume the prompt
-// (texture, replace, add). The `remove` mode ignores the prompt entirely
+// (material, replace, add). The `remove` mode ignores the prompt entirely
 // (object-removal model doesn't use one), so we don't wrap it.
 const STANDALONE_PROMPT = (userPrompt: string, _quality: Quality) => [
   'Edit only the masked area of this image. Do not modify any pixels outside the mask.',
@@ -59,8 +59,8 @@ export async function POST(req: NextRequest) {
   const prompt       = typeof body.prompt === 'string' ? body.prompt.trim() : ''
   const referenceUrl = typeof body.reference_image_url === 'string' ? body.reference_image_url : undefined
 
-  // Mode defaults to 'texture' to preserve legacy clients that don't send it.
-  const mode: EditMode = isEditMode(body.mode) ? body.mode : 'texture'
+  // Mode defaults to 'material' (legacy clients that don't send mode get material swap behaviour).
+  const mode: EditMode = isEditMode(body.mode) ? body.mode : 'material'
 
   if (!sourceUrl || !maskUrl) {
     return NextResponse.json({ error: 'source_image_url e mask_url obrigatórios' }, { status: 400 })
@@ -130,7 +130,7 @@ export async function POST(req: NextRequest) {
     // modes use Flux Pro Fill / Flux dev inpaint with the mask-constraint
     // wrapper. The router decision is invisible to the user — they only see
     // the tab they picked.
-    const engine    = selectEngine(mode)
+    const engine    = selectEngine(mode, quality)
     const finalPrompt = mode === 'remove' ? '' : STANDALONE_PROMPT(prompt, quality)
     // callWithTimeoutRetry retries once on RetouchTimeoutError (cold start).
     // Other errors propagate immediately.

@@ -31,7 +31,7 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
   const [prompt, setPrompt]         = useState('')
   const [quality, setQuality]       = useState<Quality>(vista.quality)
   // Edit intention. Same contract as RetocarStandaloneFlow.
-  const [mode, setMode]             = useState<EditMode>('texture')
+  const [mode, setMode]             = useState<EditMode>('material')
   const [submitting, setSubmitting] = useState(false)
   const [validating, setValidating] = useState(false)
   const [error, setError]           = useState<string | null>(null)

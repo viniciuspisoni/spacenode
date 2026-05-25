@@ -15,7 +15,7 @@ import { getEditCost } from '@/lib/spaces/edit-economy'
 import { selectEngine, callWithTimeoutRetry, type EditMode } from '@/lib/spaces/engines'
 import { getVisualDna } from '@/lib/spaces/dna'
 
-const VALID_MODES: EditMode[] = ['remove', 'texture', 'replace', 'add']
+const VALID_MODES: EditMode[] = ['remove', 'material', 'replace', 'add']
 function isEditMode(v: unknown): v is EditMode {
   return typeof v === 'string' && (VALID_MODES as string[]).includes(v)
 }
@@ -84,8 +84,8 @@ export async function POST(
   const prompt       = typeof body.prompt   === 'string' ? body.prompt.trim() : ''
   const referenceUrl = typeof body.reference_image_url === 'string' ? body.reference_image_url : undefined
 
-  // Mode defaults to 'texture' to preserve legacy clients that don't send it.
-  const mode: EditMode = isEditMode(body.mode) ? body.mode : 'texture'
+  // Mode defaults to 'material' (legacy clients that don't send mode).
+  const mode: EditMode = isEditMode(body.mode) ? body.mode : 'material'
 
   if (!maskUrl) return NextResponse.json({ error: 'mask_url obrigatório' }, { status: 400 })
   // 'remove' doesn't need a prompt — the model fills with surrounding context.
@@ -202,7 +202,7 @@ export async function POST(
     // the new endpoint ids. For now we keep persisting 'flux-fill' so the
     // insert succeeds; out.endpoint is logged for telemetry. Phase D will
     // relax the constraint via migration so each row stores the actual engine.
-    const engine = selectEngine(mode)
+    const engine = selectEngine(mode, quality)
     const finalPrompt = mode === 'remove' ? '' : buildEmbeddedPrompt({ userPrompt: prompt, dna })
     // callWithTimeoutRetry retries once on RetouchTimeoutError (cold start).
     const out = await callWithTimeoutRetry(engine, {
