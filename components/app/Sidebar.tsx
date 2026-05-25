@@ -63,16 +63,16 @@ const IconIdentity = () => (
     <path d="M13 10h4M13 13h3"/>
   </svg>
 )
+const IconAccount = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="8" r="4"/>
+    <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+  </svg>
+)
 const IconRetocar = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 20h9"/>
     <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-  </svg>
-)
-const IconAccount = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="8" r="4"/>
-    <path d="M4 21a8 8 0 0 1 16 0"/>
   </svg>
 )
 
@@ -82,6 +82,7 @@ type NavItem = {
   exact?: boolean
   Icon: () => React.ReactElement
   badge?: string
+  badgeTone?: 'green' | 'muted'
 }
 
 const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
@@ -97,17 +98,17 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     label: 'FERRAMENTAS',
     items: [
       { label: 'renderizar', href: '/app/generate', exact: false, Icon: IconGenerate  },
-      { label: 'spaces',     href: '/app/spaces',   exact: false, Icon: IconSpaces, badge: 'novo' },
-      { label: 'melhorar',   href: '/app/upscale',  exact: false, Icon: IconEnhance   },
-      { label: 'editar',     href: '/app/editar',   exact: false, Icon: IconRetocar, badge: 'novo' },
+      { label: 'ampliar',    href: '/app/upscale',  exact: false, Icon: IconEnhance   },
+      { label: 'editar',     href: '/app/editar',   exact: false, Icon: IconRetocar, badge: 'novo', badgeTone: 'green' },
       { label: 'animar',     href: '/app/video',    exact: false, Icon: IconVideo     },
     ],
   },
   {
     label: 'ESCRITÓRIO',
     items: [
-      { label: 'planos',     href: '/app/billing',     exact: false, Icon: IconPlans   },
-      { label: 'conta',      href: '/app/conta',       exact: false, Icon: IconAccount },
+      { label: 'identidade', href: '/app/settings/identity', exact: false, Icon: IconIdentity },
+      { label: 'conta',      href: '/app/conta',             exact: false, Icon: IconAccount  },
+      { label: 'planos',     href: '/app/billing',           exact: false, Icon: IconPlans    },
     ],
   },
 ]
@@ -180,7 +181,7 @@ export default function Sidebar({
               {group.label}
             </div>
 
-            {group.items.map(({ label, href, exact, Icon, badge }) => {
+            {group.items.map(({ label, href, exact, Icon, badge, badgeTone }) => {
               const active = href
                 ? (exact ? pathname === href : pathname.startsWith(href))
                 : false
@@ -188,7 +189,9 @@ export default function Sidebar({
               const itemKey = href || label
               const isItemHovered = hoveredItem === itemKey
 
-
+              const badgeColor = badgeTone === 'muted'
+                ? { color: 'rgba(255,255,255,0.3)', bg: 'rgba(255,255,255,0.06)' }
+                : { color: '#30b46c', bg: 'rgba(48,180,108,0.18)' }
 
               const inner = (
                 <>
@@ -218,8 +221,8 @@ export default function Sidebar({
                     <span style={{
                       fontSize: 8, fontWeight: 600, letterSpacing: '0.08em',
                       textTransform: 'uppercase' as const,
-                      color: '#30b46c',
-                      background: 'rgba(48,180,108,0.18)',
+                      color: badgeColor.color,
+                      background: badgeColor.bg,
                       padding: '2px 6px', borderRadius: 20,
                       whiteSpace: 'nowrap' as const, flexShrink: 0,
                     }}>
