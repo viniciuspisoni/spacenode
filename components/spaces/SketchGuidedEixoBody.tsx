@@ -15,8 +15,50 @@ import { InsufficientBalancePanel } from './InsufficientBalancePanel'
 import { QualityPicker } from './EixosPanel'
 
 const MAX_SKETCHES = 10
-const MAX_BYTES    = 10 * 1024 * 1024
+const MAX_BYTES    = 25 * 1024 * 1024
 const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp']
+
+// Vercel serverless functions têm limite de ~4.5MB no body. Comprimimos
+// no client antes de enviar pra evitar 413 Content Too Large.
+const COMPRESS_THRESHOLD = 4 * 1024 * 1024
+const MAX_DIMENSION      = 2400
+const JPEG_QUALITY       = 0.85
+
+function scaleToFit(w: number, h: number, maxDim: number) {
+  if (w <= maxDim && h <= maxDim) return { width: w, height: h }
+  const ratio = w > h ? maxDim / w : maxDim / h
+  return { width: Math.round(w * ratio), height: Math.round(h * ratio) }
+}
+
+function loadImage(file: File): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload  = () => { URL.revokeObjectURL(url); resolve(img) }
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Falha ao decodificar imagem')) }
+    img.src = url
+  })
+}
+
+async function compressIfNeeded(file: File): Promise<File> {
+  if (file.size <= COMPRESS_THRESHOLD) return file
+  const img = await loadImage(file)
+  const { width, height } = scaleToFit(img.width, img.height, MAX_DIMENSION)
+  const canvas = document.createElement('canvas')
+  canvas.width  = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return file
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, width, height)
+  ctx.drawImage(img, 0, 0, width, height)
+  const blob = await new Promise<Blob | null>(resolve =>
+    canvas.toBlob(b => resolve(b), 'image/jpeg', JPEG_QUALITY),
+  )
+  if (!blob) return file
+  const newName = file.name.replace(/\.[^.]+$/, '') + '.jpg'
+  return new File([blob], newName, { type: 'image/jpeg' })
+}
 
 export interface SketchPayload {
   url:    string
@@ -75,8 +117,9 @@ export function SketchGuidedEixoBody({
 
   async function uploadOne(item: SketchItem): Promise<void> {
     try {
+      const compressed = await compressIfNeeded(item.file)
       const fd = new FormData()
-      fd.append('file', item.file)
+      fd.append('file', compressed)
       const res = await fetch(`/api/spaces/${spaceId}/upload-sketch`, {
         method: 'POST',
         body:   fd,
@@ -114,7 +157,7 @@ export function SketchGuidedEixoBody({
         continue
       }
       if (f.size > MAX_BYTES) {
-        setError(`"${f.name}" é maior que 10 MB.`)
+        setError(`"${f.name}" é maior que 25 MB.`)
         continue
       }
       accepted.push({
@@ -287,7 +330,7 @@ export function SketchGuidedEixoBody({
               Arraste sketches aqui ou clique pra upload
             </span>
             <span style={{ fontSize: 11 }}>
-              JPG, PNG ou WebP até 10MB · até {MAX_SKETCHES} sketches
+              JPG, PNG ou WebP · até {MAX_SKETCHES} sketches
             </span>
           </>
         )}
@@ -444,10 +487,13 @@ function SketchListItem({ item, isLast, onLabelChange, onRemove, onRetry }: {
 }) {
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 12,
-      padding: '10px 12px',
+      display: 'flex', flexDirection: 'column',
       borderBottom: isLast ? 'none' : '0.5px solid var(--color-border)',
       background: item.status === 'failed' ? 'rgba(163,45,45,0.06)' : 'transparent',
+    }}>
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 12,
+      padding: '10px 12px',
     }}>
       {/* Thumbnail */}
       <div style={{
@@ -534,6 +580,15 @@ function SketchListItem({ item, isLast, onLabelChange, onRemove, onRetry }: {
           <line x1="6" y1="18" x2="18" y2="6"/>
         </svg>
       </button>
+    </div>
+    {item.status === 'failed' && item.error && (
+      <div style={{
+        padding: '0 12px 10px 84px',
+        fontSize: 11, color: '#e57373', lineHeight: 1.4,
+      }}>
+        {item.error}
+      </div>
+    )}
     </div>
   )
 }
