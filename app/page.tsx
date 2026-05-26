@@ -15,7 +15,6 @@ import { PricingToggle } from "@/components/landing/PricingToggle";
 import { PlatformModules } from "@/components/landing/PlatformModules";
 import { ValueProps } from "@/components/landing/ValueProps";
 import { MobileCTA } from "@/components/landing/MobileCTA";
-import { SocialProof } from "@/components/landing/SocialProof";
 
 const Divider = () => (
   <hr style={{ border: 'none', borderTop: '0.5px solid rgba(255,255,255,0.06)', maxWidth: 960, margin: '0 auto', width: 'calc(100% - 40px)' }} />
@@ -44,8 +43,6 @@ export default function Home() {
       <ComparisonTable />
       <Divider />
       <Gallery />
-      <Divider />
-      <SocialProof />
       <Divider />
       <PricingToggle />
       <Divider />
