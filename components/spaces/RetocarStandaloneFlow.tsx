@@ -148,19 +148,24 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
         setBalance(data.balance_after.total_balance as number)
       }
 
-      // Validação pixel-a-pixel client-side fora da máscara
+      // Validação pixel-a-pixel client-side fora da máscara.
+      // Wrapped in its own try/catch so a canvas SecurityError (cross-origin CORS)
+      // never blocks the user from seeing an already-successful edit result.
       setValidating(true)
       try {
         const v = await canvasRef.current.validateOutsideMaskPreservation(outputUrl)
         if (!v.ok) {
           setDriftWarning(v.drift)
         }
+      } catch (valErr) {
+        console.warn('[retocar] pixel validation skipped:', (valErr as Error).message)
       } finally {
         setValidating(false)
       }
 
       setStep('result')
     } catch (e) {
+      console.error('[retocar] handleGenerate error:', e)
       setError((e as Error).message)
     } finally {
       setSubmitting(false)

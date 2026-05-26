@@ -1,5 +1,11 @@
 import React from 'react'
 
+const IconSpaces = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="3"/>
+    <path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/>
+  </svg>
+)
 const IconRender = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
     <rect x="3" y="3" width="18" height="18" rx="2"/>
@@ -45,32 +51,38 @@ type Module = {
 
 const MODULES: Module[] = [
   {
+    Icon: IconSpaces,
+    name: 'spaces',
+    desc: 'Cada projeto, um Space. A Vista Mestre define o DNA visual — variações geradas preservam proporções, geometria e identidade do projeto.',
+    status: 'active',
+  },
+  {
     Icon: IconRender,
-    name: 'Renderizar Imagem',
+    name: 'renderizar',
     desc: 'Transforme sketches e modelos 3D em imagens fotorrealistas em segundos. Sem plugins, sem GPU.',
     status: 'active',
   },
   {
     Icon: IconEnhance,
-    name: 'Melhorar Imagem',
+    name: 'ampliar',
     desc: 'Faça upload de um render existente e refine realismo, iluminação e materiais com IA.',
-    status: 'soon',
+    status: 'active',
   },
   {
     Icon: IconEdit,
-    name: 'Editar Imagem',
+    name: 'editar',
     desc: 'Altere sofás, fachadas, cores e materiais diretamente na imagem, sem re-renderizar.',
-    status: 'soon',
+    status: 'active',
   },
   {
     Icon: IconVideo,
-    name: 'Gerar Vídeo',
+    name: 'animar',
     desc: 'Anime renders estáticos para walkthroughs e apresentações cinematográficas ao cliente.',
-    status: 'soon',
+    status: 'active',
   },
   {
     Icon: IconText,
-    name: 'Texto para Imagem',
+    name: 'texto para imagem',
     desc: 'Gere conceitos visuais completos a partir de uma descrição em texto. Do briefing à imagem.',
     status: 'soon',
   },

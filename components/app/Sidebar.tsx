@@ -149,13 +149,13 @@ export default function Sidebar({
       onMouseLeave={() => setHovered(false)}
     >
       {/* Logo */}
-      <div style={{ padding: '20px 20px 16px 14px', display: 'flex', alignItems: 'center', gap: 12, height: 72, flexShrink: 0, color: '#ffffff' }}>
+      <div style={{ padding: '20px 20px 16px 16px', display: 'flex', alignItems: 'center', gap: 12, height: 72, flexShrink: 0, color: '#ffffff' }}>
         <div style={{ flexShrink: 0, display: 'flex' }}>
           <ConstellationN size={34} />
         </div>
         <span style={{
-          fontSize: 12, fontWeight: 500, color: '#ffffff',
-          letterSpacing: '-0.025em',
+          fontSize: 14, fontWeight: 500, color: '#ffffff',
+          letterSpacing: '-0.03em',
           whiteSpace: 'nowrap' as const,
           opacity: hovered ? 1 : 0, transition: 'opacity 0.18s',
         }}>
@@ -166,17 +166,17 @@ export default function Sidebar({
       {/* Nav */}
       <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0, padding: '4px 10px', overflow: 'hidden' as const }}>
         {NAV_GROUPS.map((group, gi) => (
-          <div key={group.label} style={{ marginTop: gi === 0 ? 0 : 16 }}>
+          <div key={group.label} style={{ marginTop: gi === 0 ? 0 : 20 }}>
             <div style={{
-              fontSize: 10, fontWeight: 600, letterSpacing: '0.14em',
+              fontSize: 11, fontWeight: 600, letterSpacing: '0.13em',
               textTransform: 'uppercase' as const,
-              color: 'rgba(255,255,255,0.2)',
-              padding: '0 10px', height: 20,
+              color: 'rgba(255,255,255,0.28)',
+              padding: '0 10px', height: 22,
               display: 'flex', alignItems: 'center',
               whiteSpace: 'nowrap' as const,
               opacity: hovered ? 1 : 0,
               transition: 'opacity 0.18s',
-              marginBottom: 2,
+              marginBottom: 4,
             }}>
               {group.label}
             </div>
@@ -206,10 +206,10 @@ export default function Sidebar({
                     <Icon />
                   </div>
                   <span style={{
-                    fontSize: 13,
+                    fontSize: 14,
                     color: disabled ? 'rgba(255,255,255,0.25)' : active ? '#ffffff' : isItemHovered ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.75)',
                     whiteSpace: 'nowrap' as const,
-                    fontWeight: 400,
+                    fontWeight: active ? 600 : 500,
                     letterSpacing: '-0.01em',
                     opacity: hovered ? 1 : 0,
                     transition: 'opacity 0.18s, color 0.2s',
@@ -234,10 +234,10 @@ export default function Sidebar({
 
               const sharedStyle: React.CSSProperties = {
                 display: 'flex', alignItems: 'center', gap: 12,
-                padding: '0 12px', height: 50, borderRadius: 9,
+                padding: '0 12px', height: 42, borderRadius: 9,
                 textDecoration: 'none', flexShrink: 0,
                 background: active
-                  ? 'rgba(255,255,255,0.1)'
+                  ? 'rgba(255,255,255,0.13)'
                   : isItemHovered
                     ? 'rgba(255,255,255,0.055)'
                     : 'transparent',

@@ -4,6 +4,10 @@ import { useState } from 'react'
 
 const faqs = [
   {
+    q: 'O que é um Space?',
+    a: 'Um Space é o seu projeto no SpaceNode. Você define a Vista Mestre — a referência visual e geométrica do projeto — e todas as variações geradas a partir daí preservam proporções, layout e identidade original. É o que diferencia o SpaceNode de ferramentas genéricas de IA: seu projeto tem memória.',
+  },
+  {
     q: 'Funciona com arquivos do SketchUp?',
     a: 'Sim. Você pode enviar um print de tela, exportação de imagem ou foto do modelo diretamente do SketchUp — sem necessidade de plugin ou integração. O SpaceNode também aceita imagens do Revit, ArchiCAD, Blender e qualquer modelador 3D. Se você consegue visualizar na tela, consegue gerar o render.',
   },

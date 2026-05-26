@@ -1,75 +1,68 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import BeforeAfter from '@/components/app/BeforeAfter'
+import { RetocarImportModal } from '@/components/spaces/RetocarImportModal'
+
+async function urlToFile(url: string): Promise<File> {
+  const res = await fetch(url)
+  if (!res.ok) throw new Error('Não foi possível importar a imagem')
+  const blob = await res.blob()
+  const ext = blob.type.split('/')[1] || 'jpg'
+  return new File([blob], `historico.${ext}`, { type: blob.type })
+}
 
 interface UpscaleClientProps {
   initialCredits: number
 }
 
-const MODELS = [
+// ── Product modes (abstract from raw model IDs) ───────────────────────────────
+const UPSCALE_MODES = [
   {
-    id:         'fal-ai/clarity-upscaler',
-    label:      'Clarity',
-    tag:        'Melhor qualidade geral',
-    desc:       'Realismo avançado com fidelidade precisa de materiais',
-    badge:      'RECOMENDADO',
-    badgeColor: '#16a34a',
-    hasPrompt:  true,
+    id:       'fidelity',
+    label:    'Alta Fidelidade',
+    desc:     'Preserva geometria, materiais e detalhes originais. Ideal para renders realistas.',
+    provider: 'fal',
+    model:    'fal-ai/clarity-upscaler',
+    nodes:    null as number | null, // scale-based
+    disabled: false,
+    badge:    null as string | null,
   },
   {
-    id:         'fal-ai/aura-sr',
-    label:      'AuraSR',
-    tag:        'Mais rápido',
-    desc:       'Upscale rápido e limpo para prévias',
-    badge:      'RÁPIDO',
-    badgeColor: '#65a30d',
-    hasPrompt:  false,
+    id:       'premium',
+    label:    'Premium',
+    desc:     'Mais detalhe visual e acabamento comercial para portfólio e apresentação.',
+    provider: 'magnific',
+    model:    'magnific',
+    nodes:    20,
+    disabled: false,
+    badge:    null as string | null,
   },
   {
-    id:         'fal-ai/supir',
-    label:      'SUPIR',
-    tag:        'Máximo detalhe',
-    desc:       'Máximo refinamento com reconstrução avançada',
-    badge:      'MÁXIMA',
-    badgeColor: '#d97706',
-    hasPrompt:  true,
-  },
-  {
-    id:         'fal-ai/esrgan',
-    label:      'Real-ESRGAN',
-    tag:        'Preserva geometria',
-    desc:       'Preserva a geometria e detalhes originais',
-    badge:      null,
-    badgeColor: null,
-    hasPrompt:  false,
+    id:       'ultra',
+    label:    'Ultra',
+    desc:     'Máxima reconstrução de detalhes para entrega final, prancha e impressão.',
+    provider: 'fal',
+    model:    'fal-ai/supir',
+    nodes:    20,
+    disabled: false,
+    badge:    null as string | null,
   },
 ] as const
 
 const SCALES = [
-  { value: 2, label: '2×', sub: '~4K', nodes: 4,  locked: false },
-  { value: 4, label: '4×', sub: '~8K', nodes: 8,  locked: false },
-  { value: 8, label: '8×', sub: 'Nebula', nodes: 20, locked: true  },
+  { value: 2, label: '2×', sub: '~4K',     nodes: 4,  locked: false },
+  { value: 4, label: '4×', sub: '~8K',     nodes: 8,  locked: false },
+  { value: 8, label: '8×', sub: 'até 16K', nodes: 20, locked: true  },
 ]
 
-interface Recommendation { model: string; reason: string }
-
-// Filename + filesize heuristics — no ML, no pixel analysis
-function detectRecommendedModel(file: File): Recommendation {
-  const name = file.name.toLowerCase()
-
-  const lineHints = ['sketch', 'wireframe', 'line', 'cad', 'schematic',
-    'floor', 'plant', 'planta', 'linework', 'drawing', 'contour', 'diagrama']
-  if (lineHints.some(k => name.includes(k)))
-    return { model: 'fal-ai/esrgan', reason: 'Detectamos linhas e geometria técnica' }
-
-  const previewHints = ['preview', 'draft', 'rascunho', 'thumb', 'wip', 'test', 'teste', 'low']
-  const isSmallFile  = file.size < 200 * 1024
-  if (previewHints.some(k => name.includes(k)) || isSmallFile)
-    return { model: 'fal-ai/aura-sr', reason: 'Detectamos uma imagem leve / prévia' }
-
-  return { model: 'fal-ai/clarity-upscaler', reason: 'Detectamos um render realista com materiais aplicados' }
-}
+const OBJECTIVES = [
+  { id: 'client',    label: 'Apresentação para cliente' },
+  { id: 'portfolio', label: 'Portfólio / Instagram'     },
+  { id: 'print',     label: 'Impressão / prancha'       },
+  { id: 'recover',   label: 'Recuperar imagem baixa'    },
+  { id: 'final',     label: 'Entrega final premium'     },
+]
 
 const LOADING_TEXTS = [
   'Enviando imagem...',
@@ -79,62 +72,93 @@ const LOADING_TEXTS = [
   'Finalizando...',
 ]
 
-// Download forçado via proxy do nosso próprio backend. /api/download faz
-// fetch server-side da imagem e devolve com Content-Disposition: attachment,
-// que faz o browser salvar em vez de abrir. Funciona independente de CORS
-// no CDN.
-function downloadImage(url: string, filename: string) {
-  const proxyUrl = `/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`
-  const a = document.createElement('a')
-  a.href = proxyUrl
-  a.download = filename
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
+function detectRecommendedMode(file: File): { modeId: string; reason: string } {
+  const name = file.name.toLowerCase()
+  const lineHints = ['sketch', 'wireframe', 'line', 'cad', 'schematic',
+    'floor', 'planta', 'linework', 'drawing', 'diagrama']
+  if (lineHints.some(k => name.includes(k)))
+    return { modeId: 'fidelity', reason: 'Ideal para renders com linhas técnicas e geometria definida.' }
+
+  const previewHints = ['preview', 'draft', 'rascunho', 'thumb', 'wip', 'test', 'teste', 'low']
+  if (previewHints.some(k => name.includes(k)) || file.size < 200 * 1024)
+    return { modeId: 'fidelity', reason: 'Detectamos uma imagem leve — Alta Fidelidade já resolve bem.' }
+
+  return { modeId: 'fidelity', reason: 'Ideal para renders com materiais, texturas e geometria definidos.' }
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 export default function UpscaleClient({ initialCredits }: UpscaleClientProps) {
-  const [imageFile,    setImageFile]    = useState<File | null>(null)
-  const [imagePreview, setImagePreview] = useState<string | null>(null)
-  const [description,  setDescription]  = useState('')
-  const [selectedModel, setSelectedModel] = useState<string>('fal-ai/clarity-upscaler')
-  const [selectedScale, setSelectedScale] = useState(4)
-  const [isLoading,    setIsLoading]    = useState(false)
-  const [loadingText,  setLoadingText]  = useState(LOADING_TEXTS[0])
-  const [resultUrl,    setResultUrl]    = useState<string | null>(null)
-  const [credits,      setCredits]      = useState(initialCredits)
-  const [error,        setError]        = useState<string | null>(null)
-  const [isDragging,         setIsDragging]         = useState(false)
-  const [recommendedModelId, setRecommendedModelId] = useState<string | null>(null)
+  const [imageFile,       setImageFile]       = useState<File | null>(null)
+  const [imagePreview,    setImagePreview]    = useState<string | null>(null)
+  const [imageDimensions, setImageDimensions] = useState<{ w: number; h: number } | null>(null)
+  const [isDragging,      setIsDragging]      = useState(false)
+
+  const [selectedModeId,    setSelectedModeId]    = useState<string>('fidelity')
+  const [selectedScale,     setSelectedScale]     = useState(4)
+  const [selectedObjective, setSelectedObjective] = useState<string | null>(null)
+
+  const [recommendedModeId, setRecommendedModeId] = useState<string | null>(null)
   const [recommendedReason,  setRecommendedReason]  = useState<string | null>(null)
   const [isAnalyzing,        setIsAnalyzing]        = useState(false)
 
-  const fileInputRef      = useRef<HTMLInputElement>(null)
-  const loadingTimerRef   = useRef<ReturnType<typeof setInterval> | null>(null)
-  const analyzeTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [showAdvanced,       setShowAdvanced]       = useState(false)
+  const [preserveGeometry,   setPreserveGeometry]   = useState(true)
+  const [reduceNoise,        setReduceNoise]        = useState(false)
+  const [sharpen,            setSharpen]            = useState(false)
+  const [enrichTextures,     setEnrichTextures]     = useState(false)
+  const [recreationStrength, setRecreationStrength] = useState<'low' | 'medium' | 'high'>('low')
 
-  const activeModel = MODELS.find(m => m.id === selectedModel)!
-  const nodeCost = SCALES.find(s => s.value === selectedScale)!.nodes
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [isImporting,     setIsImporting]     = useState(false)
+
+  const [isLoading,   setIsLoading]   = useState(false)
+  const [loadingText, setLoadingText] = useState(LOADING_TEXTS[0])
+  const [resultUrl,   setResultUrl]   = useState<string | null>(null)
+  const [credits,     setCredits]     = useState(initialCredits)
+  const [error,       setError]       = useState<string | null>(null)
+
+  const fileInputRef    = useRef<HTMLInputElement>(null)
+  const loadingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const analyzeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const activeMode = UPSCALE_MODES.find(m => m.id === selectedModeId)!
+  const nodeCost   = activeMode.nodes ?? SCALES.find(s => s.value === selectedScale)!.nodes
+  const canSubmit  = !!imageFile && credits >= nodeCost && !isLoading
 
   function loadImageFile(file: File) {
     if (!file.type.startsWith('image/')) { setError('Arquivo deve ser uma imagem.'); return }
-    if (file.size > 20 * 1024 * 1024) { setError('Imagem muito grande. Máximo 20 MB.'); return }
+    if (file.size > 20 * 1024 * 1024)   { setError('Imagem muito grande. Máximo 20 MB.'); return }
+
     setImageFile(file)
     setResultUrl(null)
     setError(null)
-    setRecommendedModelId(null)
+    setRecommendedModeId(null)
     setRecommendedReason(null)
+    setImageDimensions(null)
     setIsAnalyzing(true)
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string
+      setImagePreview(dataUrl)
+      const img = new Image()
+      img.onload = () => setImageDimensions({ w: img.naturalWidth, h: img.naturalHeight })
+      img.src = dataUrl
+    }
+    reader.readAsDataURL(file)
+
     if (analyzeTimerRef.current) clearTimeout(analyzeTimerRef.current)
     analyzeTimerRef.current = setTimeout(() => {
-      const rec = detectRecommendedModel(file)
-      setRecommendedModelId(rec.model)
+      const rec = detectRecommendedMode(file)
+      setRecommendedModeId(rec.modeId)
       setRecommendedReason(rec.reason)
+      setSelectedModeId(rec.modeId)
       setIsAnalyzing(false)
-    }, 300)
-    const reader = new FileReader()
-    reader.onload = (e) => setImagePreview(e.target?.result as string)
-    reader.readAsDataURL(file)
+    }, 400)
   }
 
   function startLoadingTexts() {
@@ -150,53 +174,51 @@ export default function UpscaleClient({ initialCredits }: UpscaleClientProps) {
     if (loadingTimerRef.current) clearInterval(loadingTimerRef.current)
   }
 
-  function handleNewUpscale() {
-    if (analyzeTimerRef.current) clearTimeout(analyzeTimerRef.current)
-    stopLoadingTexts()
-    setImageFile(null)
-    setImagePreview(null)
-    setDescription('')
-    setResultUrl(null)
+  async function handleImportPick(picked: { url: string }) {
+    setShowImportModal(false)
+    setIsImporting(true)
     setError(null)
-    setIsLoading(false)
-    setRecommendedModelId(null)
-    setRecommendedReason(null)
-    setIsAnalyzing(false)
+    try {
+      const file = await urlToFile(picked.url)
+      loadImageFile(file)
+    } catch {
+      setError('Não foi possível importar a imagem do histórico.')
+    } finally {
+      setIsImporting(false)
+    }
   }
 
-  // Reset state quando o usuário clica em "melhorar" no sidebar estando já
-  // nessa rota. O Link em Sidebar.tsx detecta same-route click e dispara o
-  // evento — aqui só ouvimos e zeramos. Setters são estáveis, então listener
-  // não precisa re-bind.
-  useEffect(() => {
-    const onReset = () => handleNewUpscale()
-    window.addEventListener('spn:reset-route', onReset)
-    return () => window.removeEventListener('spn:reset-route', onReset)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  function resetImage() {
+    setImageFile(null)
+    setImagePreview(null)
+    setResultUrl(null)
+    setRecommendedModeId(null)
+    setRecommendedReason(null)
+    setImageDimensions(null)
+  }
 
   async function handleSubmit() {
-    if (!imageFile || credits < nodeCost || isLoading) return
+    if (!imageFile || !canSubmit) return
     setIsLoading(true)
     setError(null)
     setResultUrl(null)
     startLoadingTexts()
 
     const formData = new FormData()
-    formData.append('image',       imageFile)
-    formData.append('model',       selectedModel)
-    formData.append('scale',       String(selectedScale))
-    formData.append('description', description)
+    formData.append('image',              imageFile)
+    formData.append('model',              activeMode.model)
+    formData.append('scale',              String(selectedScale))
+    formData.append('preserveGeometry',   String(preserveGeometry))
+    formData.append('recreationStrength', recreationStrength)
+    if (imageDimensions) {
+      formData.append('imageWidth',  String(imageDimensions.w))
+      formData.append('imageHeight', String(imageDimensions.h))
+    }
 
     try {
       const res  = await fetch('/api/upscale', { method: 'POST', body: formData })
       const data = await res.json()
-
-      if (!res.ok) {
-        setError(data.error ?? 'Erro desconhecido')
-        return
-      }
-
+      if (!res.ok) { setError(data.error ?? 'Erro desconhecido'); return }
       setResultUrl(data.url)
       setCredits(c => c - nodeCost)
     } catch {
@@ -207,64 +229,49 @@ export default function UpscaleClient({ initialCredits }: UpscaleClientProps) {
     }
   }
 
+  const ext = imageFile?.name.split('.').pop()?.toUpperCase() ?? ''
+
   return (
     <div style={{ display: 'flex', width: '100%', height: '100%', overflow: 'hidden', background: '#0a0a0a', color: '#ffffff' }}>
+      <style>{`
+        @keyframes spin   { to { transform: rotate(360deg); } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+      `}</style>
 
-      {/* ── Left panel ─────────────────────────────────────────────────────── */}
-      <div style={{
-        width: 420,
-        flexShrink: 0,
-        display: 'flex',
-        flexDirection: 'column',
-        borderRight: '0.5px solid rgba(255,255,255,0.07)',
-        overflow: 'hidden',
-      }}>
-        {/* Header */}
+      {/* ── Left panel ──────────────────────────────────────────────────────── */}
+      <div style={{ width: 420, flexShrink: 0, display: 'flex', flexDirection: 'column', borderRight: '0.5px solid rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+
         <div style={{ padding: '24px 24px 16px', borderBottom: '0.5px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em', color: '#ffffff' }}>Upscale</div>
+          <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em', color: '#ffffff' }}>Ampliar imagem</div>
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 3 }}>
-            Amplie resolução com IA para apresentação, portfólio e entrega final.
+            Aumente a resolução e a nitidez para apresentação, portfólio e entrega final.
           </div>
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 24 }}>
 
-          {/* Upload zone */}
+          {/* Upload */}
           <div>
-            <label style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', display: 'block', marginBottom: 10 }}>
+            <label style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.35)', display: 'block', marginBottom: 10 }}>
               Imagem
             </label>
             <div
               onClick={() => fileInputRef.current?.click()}
               onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
               onDragLeave={() => setIsDragging(false)}
-              onDrop={(e) => {
-                e.preventDefault()
-                setIsDragging(false)
-                const file = e.dataTransfer.files[0]
-                if (file) loadImageFile(file)
-              }}
+              onDrop={(e) => { e.preventDefault(); setIsDragging(false); const f = e.dataTransfer.files[0]; if (f) loadImageFile(f) }}
               style={{
                 border: `1.5px dashed ${isDragging ? 'rgba(255,255,255,0.4)' : imageFile ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.12)'}`,
-                borderRadius: 10,
-                padding: imageFile ? 0 : '28px 20px',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                transition: 'border-color 0.15s, background 0.15s',
+                borderRadius: 10, overflow: 'hidden', cursor: 'pointer',
+                transition: 'border-color 0.15s',
                 background: isDragging ? 'rgba(255,255,255,0.04)' : 'transparent',
-                overflow: 'hidden',
                 minHeight: imageFile ? 0 : 120,
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                padding: imageFile ? 0 : '28px 20px',
               }}
             >
               {imageFile ? (
-                <img
-                  src={imagePreview!}
-                  alt="preview"
-                  style={{ width: '100%', display: 'block', borderRadius: 8, maxHeight: 220, objectFit: 'cover' }}
-                />
+                <img src={imagePreview!} alt="preview" style={{ width: '100%', display: 'block', maxHeight: 200, objectFit: 'cover' }} />
               ) : (
                 <>
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" strokeLinecap="round">
@@ -272,263 +279,241 @@ export default function UpscaleClient({ initialCredits }: UpscaleClientProps) {
                     <polyline points="17 8 12 3 7 8"/>
                     <line x1="12" y1="3" x2="12" y2="15"/>
                   </svg>
-                  <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 10 }}>
-                    Arraste ou clique para enviar
-                  </span>
-                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', marginTop: 4 }}>
-                    PNG, JPG, WEBP — até 20 MB
-                  </span>
+                  <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 10 }}>Arraste ou clique para enviar</span>
+                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', marginTop: 4 }}>PNG, JPG, WEBP — até 20 MB</span>
                 </>
               )}
             </div>
+
             {imageFile && (
-              <button
-                onClick={(e) => { e.stopPropagation(); setImageFile(null); setImagePreview(null); setResultUrl(null) }}
-                style={{ marginTop: 8, fontSize: 10, color: 'rgba(255,255,255,0.3)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-              >
-                Trocar imagem
-              </button>
+              <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', display: 'flex', gap: 8 }}>
+                  {imageDimensions && <span>{imageDimensions.w}×{imageDimensions.h}px</span>}
+                  {ext && <span>{ext}</span>}
+                  <span>{formatFileSize(imageFile.size)}</span>
+                </div>
+                <button onClick={(e) => { e.stopPropagation(); resetImage() }}
+                  style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                  Trocar imagem
+                </button>
+              </div>
             )}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              style={{ display: 'none' }}
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) loadImageFile(f) }}
-            />
+
+            <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }}
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) loadImageFile(f) }} />
+
+            {/* Import from history */}
+            <button
+              onClick={() => setShowImportModal(true)}
+              disabled={isImporting}
+              style={{
+                marginTop: 10, width: '100%', padding: '8px 0', borderRadius: 7,
+                border: '1px solid rgba(255,255,255,0.08)',
+                background: 'transparent',
+                fontSize: 11, color: 'rgba(255,255,255,0.4)',
+                cursor: isImporting ? 'wait' : 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                transition: 'border-color 0.15s, color 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.18)'; e.currentTarget.style.color = 'rgba(255,255,255,0.65)' }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = 'rgba(255,255,255,0.4)' }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                <circle cx="12" cy="12" r="9"/>
+                <path d="M12 7v5l3 3"/>
+              </svg>
+              {isImporting ? 'Importando…' : 'Importar do histórico'}
+            </button>
           </div>
 
-          {/* Model selector */}
-          <div>
-            <label style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', display: 'block', marginBottom: 4 }}>
-              Modelo
-            </label>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', marginBottom: 10 }}>
-              Cada modelo altera como os detalhes são reconstruídos.
+          {/* Recommendation banner */}
+          {isAnalyzing ? (
+            <div style={{ padding: '8px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.15)', borderTop: '1.5px solid rgba(255,255,255,0.5)', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
+              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>Analisando imagem...</span>
             </div>
-
-            {/* Recommendation banner — neutral → analyzing → recommendation */}
-            {isAnalyzing ? (
-              <div style={{
-                padding: '8px 10px', borderRadius: 6, marginBottom: 10,
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.07)',
-                display: 'flex', alignItems: 'center', gap: 8,
-              }}>
-                <div style={{
-                  width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-                  border: '1.5px solid rgba(255,255,255,0.15)',
-                  borderTop: '1.5px solid rgba(255,255,255,0.5)',
-                  animation: 'spin 0.8s linear infinite',
-                }} />
-                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
-                  Analisando imagem...
+          ) : !imageFile ? (
+            <div style={{ padding: '10px 12px', borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 }}>
+                Envie uma imagem para a SpaceNode analisar e recomendar o melhor modo de ampliação.
+              </div>
+            </div>
+          ) : recommendedModeId ? (
+            <div style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(22,163,74,0.07)', border: '1px solid rgba(22,163,74,0.16)', animation: 'fadeIn 0.2s ease' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <svg width="10" height="10" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0 }}>
+                  <path d="M6 1l1.09 3.26L10.5 4.5l-2.59 2.09.91 3.41L6 8.25l-2.82 1.75.91-3.41L1.5 4.5l3.41-.24L6 1z" fill="rgba(134,239,172,0.85)"/>
+                </svg>
+                <span style={{ fontSize: 10, color: 'rgba(134,239,172,0.9)', fontWeight: 500 }}>
+                  Recomendado: <strong style={{ fontWeight: 700 }}>{UPSCALE_MODES.find(m => m.id === recommendedModeId)?.label}</strong>
                 </span>
               </div>
-            ) : recommendedModelId === null ? (
-              <div style={{
-                padding: '8px 10px', borderRadius: 6, marginBottom: 10,
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.07)',
-              }}>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>
-                  Envie uma imagem para receber uma recomendação de modelo.
-                </div>
-                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', marginTop: 3 }}>
-                  A SpaceNode sugere o melhor processamento com base no tipo de imagem.
-                </div>
-              </div>
-            ) : (
-              <>
-                <div style={{
-                  padding: '8px 10px', borderRadius: 6, marginBottom: 10,
-                  background: 'rgba(22,163,74,0.07)',
-                  border: '1px solid rgba(22,163,74,0.16)',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <svg width="10" height="10" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0 }}>
-                      <path d="M6 1l1.09 3.26L10.5 4.5l-2.59 2.09.91 3.41L6 8.25l-2.82 1.75.91-3.41L1.5 4.5l3.41-.24L6 1z" fill="rgba(134,239,172,0.8)"/>
-                    </svg>
-                    <span style={{ fontSize: 10, color: 'rgba(134,239,172,0.9)', fontWeight: 500 }}>
-                      Recomendado:{' '}
-                      <strong style={{ fontWeight: 700 }}>
-                        {MODELS.find(m => m.id === recommendedModelId)!.label}
-                      </strong>
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginTop: 4, paddingLeft: 16 }}>
-                    {recommendedReason}
-                  </div>
-                </div>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginTop: 4, paddingLeft: 16 }}>{recommendedReason}</div>
+            </div>
+          ) : null}
 
-                {selectedModel !== recommendedModelId && (
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 5,
-                    padding: '5px 8px', borderRadius: 5, marginBottom: 10,
-                    background: 'rgba(255,255,255,0.03)',
-                    border: '1px solid rgba(255,255,255,0.07)',
-                  }}>
-                    <svg width="9" height="9" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
-                      <circle cx="8" cy="8" r="7" stroke="rgba(255,255,255,0.2)" strokeWidth="1.5"/>
-                      <path d="M8 5v4M8 11v.5" stroke="rgba(255,255,255,0.35)" strokeWidth="1.5" strokeLinecap="round"/>
-                    </svg>
-                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>
-                      Recomendamos{' '}
-                      <strong style={{ fontWeight: 600, color: 'rgba(255,255,255,0.45)' }}>
-                        {MODELS.find(m => m.id === recommendedModelId)!.label}
-                      </strong>
-                      {' '}para melhor resultado
-                    </span>
-                  </div>
-                )}
-              </>
-            )}
-
+          {/* Mode selector */}
+          <div>
+            <label style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.35)', display: 'block', marginBottom: 10 }}>
+              Modo
+            </label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {MODELS.map(m => (
-                <button
-                  key={m.id}
-                  onClick={() => setSelectedModel(m.id)}
+              {UPSCALE_MODES.map(mode => {
+                const isSelected    = selectedModeId === mode.id
+                const isRecommended = recommendedModeId === mode.id && !!imageFile
+                return (
+                  <button key={mode.id} onClick={() => setSelectedModeId(mode.id)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '10px 12px', borderRadius: 8,
+                      border: `1px solid ${isSelected ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.07)'}`,
+                      background: isSelected ? 'rgba(255,255,255,0.06)' : 'transparent',
+                      cursor: 'pointer', textAlign: 'left', width: '100%',
+                      transition: 'border-color 0.15s, background 0.15s',
+                    }}
+                  >
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: isSelected ? '#ffffff' : 'rgba(255,255,255,0.2)', transition: 'background 0.15s' }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' as const }}>
+                        <span style={{ fontSize: 12, fontWeight: 500, color: isSelected ? '#ffffff' : 'rgba(255,255,255,0.6)', letterSpacing: '-0.01em' }}>{mode.label}</span>
+                        {isRecommended && (
+                          <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'rgba(134,239,172,0.8)', background: 'rgba(22,163,74,0.15)', border: '1px solid rgba(22,163,74,0.3)', padding: '1px 5px', borderRadius: 20 }}>
+                            Recomendado
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>{mode.desc}</div>
+                    </div>
+                    {mode.nodes && (
+                      <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', flexShrink: 0 }}>{mode.nodes} nodes</span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Objective */}
+          <div>
+            <label style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.35)', display: 'block', marginBottom: 10 }}>
+              Objetivo
+            </label>
+            <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 6 }}>
+              {OBJECTIVES.map(obj => (
+                <button key={obj.id} onClick={() => setSelectedObjective(selectedObjective === obj.id ? null : obj.id)}
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    padding: '10px 12px',
-                    borderRadius: 8,
-                    border: `1px solid ${selectedModel === m.id ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.07)'}`,
-                    background: selectedModel === m.id ? 'rgba(255,255,255,0.06)' : 'transparent',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    transition: 'border-color 0.15s, background 0.15s',
-                    width: '100%',
+                    padding: '6px 10px', borderRadius: 6,
+                    border: `1px solid ${selectedObjective === obj.id ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.08)'}`,
+                    background: selectedObjective === obj.id ? 'rgba(255,255,255,0.08)' : 'transparent',
+                    fontSize: 11, color: selectedObjective === obj.id ? '#ffffff' : 'rgba(255,255,255,0.45)',
+                    cursor: 'pointer', transition: 'all 0.15s',
                   }}
                 >
-                  <div style={{
-                    width: 8, height: 8, borderRadius: '50%',
-                    background: selectedModel === m.id ? '#ffffff' : 'rgba(255,255,255,0.2)',
-                    flexShrink: 0,
-                    transition: 'background 0.15s',
-                  }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontSize: 12, fontWeight: 500, color: selectedModel === m.id ? '#ffffff' : 'rgba(255,255,255,0.6)', letterSpacing: '-0.01em' }}>
-                        {m.label}
-                      </span>
-                      <span style={{ fontSize: 9, color: selectedModel === m.id ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.25)', letterSpacing: '0.01em' }}>
-                        {m.tag}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>
-                      {m.desc}
-                    </div>
-                  </div>
-                  {m.badge && (
-                    <span style={{
-                      fontSize: 8, fontWeight: 700, letterSpacing: '0.08em',
-                      textTransform: 'uppercase',
-                      color: m.badgeColor ?? 'rgba(255,255,255,0.4)',
-                      background: `${m.badgeColor ?? 'rgba(255,255,255,0.1)'}22`,
-                      border: `1px solid ${m.badgeColor ?? 'rgba(255,255,255,0.1)'}44`,
-                      padding: '2px 6px', borderRadius: 20,
-                      flexShrink: 0,
-                    }}>
-                      {m.badge}
-                    </span>
-                  )}
+                  {obj.label}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Scale selector */}
+          {/* Scale */}
           <div>
-            <label style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', display: 'block', marginBottom: 10 }}>
+            <label style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.35)', display: 'block', marginBottom: 10 }}>
               Escala
             </label>
             <div style={{ display: 'flex', gap: 8 }}>
               {SCALES.map(s => (
-                <button
-                  key={s.value}
-                  onClick={() => !s.locked && setSelectedScale(s.value)}
-                  disabled={s.locked}
-                  title={s.locked ? 'Disponível no plano Nebula' : undefined}
+                <button key={s.value} onClick={() => !s.locked && setSelectedScale(s.value)} disabled={s.locked}
+                  title={s.locked ? 'Em breve' : undefined}
                   style={{
-                    flex: 1,
-                    padding: '10px 8px',
-                    borderRadius: 8,
+                    flex: 1, padding: '10px 8px', borderRadius: 8,
                     border: `1px solid ${!s.locked && selectedScale === s.value ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.07)'}`,
                     background: !s.locked && selectedScale === s.value ? 'rgba(255,255,255,0.08)' : 'transparent',
                     cursor: s.locked ? 'not-allowed' : 'pointer',
-                    opacity: s.locked ? 0.4 : 1,
-                    textAlign: 'center',
-                    transition: 'border-color 0.15s, background 0.15s',
-                    position: 'relative',
+                    opacity: s.locked ? 0.4 : 1, textAlign: 'center', transition: 'all 0.15s', position: 'relative',
                   }}
                 >
-                  <div style={{ fontSize: 14, fontWeight: 600, color: !s.locked && selectedScale === s.value ? '#ffffff' : 'rgba(255,255,255,0.5)', letterSpacing: '-0.01em' }}>
-                    {s.label}
-                  </div>
-                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginTop: 2, letterSpacing: '0.04em' }}>
-                    {s.nodes} Nodes
-                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: !s.locked && selectedScale === s.value ? '#ffffff' : 'rgba(255,255,255,0.5)', letterSpacing: '-0.01em' }}>{s.label}</div>
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginTop: 2, letterSpacing: '0.04em' }}>{s.sub}</div>
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', marginTop: 1 }}>{s.nodes} nodes</div>
                   {s.locked && (
                     <div style={{ position: 'absolute', top: 4, right: 6 }}>
                       <svg width="9" height="9" viewBox="0 0 14 16" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" strokeLinecap="round">
-                        <rect x="2" y="7" width="10" height="8" rx="1.5"/>
-                        <path d="M5 7V5a2 2 0 0 1 4 0v2"/>
+                        <rect x="2" y="7" width="10" height="8" rx="1.5"/><path d="M5 7V5a2 2 0 0 1 4 0v2"/>
                       </svg>
                     </div>
                   )}
                 </button>
               ))}
+              <button disabled title="Em breve"
+                style={{ flex: 1, padding: '10px 8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.07)', background: 'transparent', cursor: 'not-allowed', opacity: 0.35, textAlign: 'center', position: 'relative' }}
+              >
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.5)', letterSpacing: '-0.01em' }}>Ultra</div>
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginTop: 2, letterSpacing: '0.04em' }}>até 16K</div>
+                <div style={{ position: 'absolute', top: 4, right: 6 }}>
+                  <svg width="9" height="9" viewBox="0 0 14 16" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" strokeLinecap="round">
+                    <rect x="2" y="7" width="10" height="8" rx="1.5"/><path d="M5 7V5a2 2 0 0 1 4 0v2"/>
+                  </svg>
+                </div>
+              </button>
             </div>
           </div>
 
-          {/* Description (conditional on model support) */}
-          {activeModel.hasPrompt && (
-            <div>
-              <label style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', display: 'block', marginBottom: 10 }}>
-                Descrição <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, opacity: 0.6 }}>(opcional)</span>
-              </label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Ex: fachada residencial contemporânea, concreto aparente, madeira ipê..."
-                rows={3}
-                style={{
-                  width: '100%',
-                  background: 'rgba(255,255,255,0.04)',
-                  border: '1px solid rgba(255,255,255,0.09)',
-                  borderRadius: 8,
-                  padding: '10px 12px',
-                  fontSize: 12,
-                  color: '#ffffff',
-                  resize: 'none',
-                  outline: 'none',
-                  fontFamily: 'inherit',
-                  lineHeight: 1.5,
-                  boxSizing: 'border-box',
-                }}
-              />
-            </div>
-          )}
+          {/* Advanced settings */}
+          <div>
+            <button onClick={() => setShowAdvanced(v => !v)}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'rgba(255,255,255,0.35)', fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const }}
+            >
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
+                style={{ transform: showAdvanced ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>
+                <polyline points="4 2 8 6 4 10"/>
+              </svg>
+              Ajustes avançados
+            </button>
 
-          {/* Error */}
+            {showAdvanced && (
+              <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 12, animation: 'fadeIn 0.15s ease' }}>
+                {([
+                  { label: 'Preservar geometria', value: preserveGeometry, set: setPreserveGeometry },
+                  { label: 'Reduzir ruído',        value: reduceNoise,      set: setReduceNoise      },
+                  { label: 'Aumentar nitidez',     value: sharpen,          set: setSharpen          },
+                  { label: 'Enriquecer texturas',  value: enrichTextures,   set: setEnrichTextures   },
+                ] as { label: string; value: boolean; set: (v: boolean) => void }[]).map(({ label, value, set }) => (
+                  <div key={label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>{label}</span>
+                    <div onClick={() => set(!value)}
+                      style={{ width: 32, height: 18, borderRadius: 9, background: value ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.1)', position: 'relative', cursor: 'pointer', transition: 'background 0.15s', flexShrink: 0 }}>
+                      <div style={{ position: 'absolute', top: 2, left: value ? 16 : 2, width: 14, height: 14, borderRadius: 7, background: value ? '#0a0a0a' : 'rgba(255,255,255,0.5)', transition: 'left 0.15s, background 0.15s' }} />
+                    </div>
+                  </div>
+                ))}
+                <div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>Força da recriação</div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {(['low', 'medium', 'high'] as const).map(v => (
+                      <button key={v} onClick={() => setRecreationStrength(v)} style={{
+                        flex: 1, padding: '6px 0', borderRadius: 6, fontSize: 10,
+                        border: `1px solid ${recreationStrength === v ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.08)'}`,
+                        background: recreationStrength === v ? 'rgba(255,255,255,0.08)' : 'transparent',
+                        color: recreationStrength === v ? '#ffffff' : 'rgba(255,255,255,0.4)',
+                        cursor: 'pointer', transition: 'all 0.15s',
+                      }}>
+                        {v === 'low' ? 'Baixa' : v === 'medium' ? 'Média' : 'Alta'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
           {error && (
-            <div style={{
-              padding: '10px 12px',
-              borderRadius: 8,
-              background: 'rgba(239,68,68,0.08)',
-              border: '1px solid rgba(239,68,68,0.2)',
-              fontSize: 11,
-              color: '#fca5a5',
-            }}>
+            <div style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', fontSize: 11, color: '#fca5a5' }}>
               {error}
             </div>
           )}
         </div>
 
-        {/* Footer: credits + submit */}
+        {/* Footer */}
         <div style={{ padding: '16px 24px', borderTop: '0.5px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>
@@ -538,26 +523,13 @@ export default function UpscaleClient({ initialCredits }: UpscaleClientProps) {
               Saldo: <span style={{ color: credits > 0 ? 'rgba(255,255,255,0.7)' : '#f87171', fontWeight: 500 }}>{credits} Nodes</span>
             </div>
           </div>
-
-          <button
-            onClick={handleSubmit}
-            disabled={!imageFile || credits < nodeCost || isLoading}
+          <button onClick={handleSubmit} disabled={!canSubmit}
             style={{
-              width: '100%',
-              padding: '12px 20px',
-              borderRadius: 8,
-              border: 'none',
-              background: !imageFile || credits < nodeCost || isLoading
-                ? 'rgba(255,255,255,0.07)'
-                : 'rgba(255,255,255,0.92)',
-              color: !imageFile || credits < nodeCost || isLoading
-                ? 'rgba(255,255,255,0.25)'
-                : '#0a0a0a',
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: !imageFile || credits < nodeCost || isLoading ? 'not-allowed' : 'pointer',
-              transition: 'background 0.15s, color 0.15s',
-              letterSpacing: '-0.01em',
+              width: '100%', padding: '12px 20px', borderRadius: 8, border: 'none',
+              background: canSubmit ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.07)',
+              color: canSubmit ? '#0a0a0a' : 'rgba(255,255,255,0.25)',
+              fontSize: 13, fontWeight: 600, cursor: canSubmit ? 'pointer' : 'not-allowed',
+              transition: 'background 0.15s, color 0.15s', letterSpacing: '-0.01em',
             }}
           >
             {isLoading ? loadingText : credits < nodeCost ? 'Sem Nodes' : 'Ampliar Imagem'}
@@ -565,88 +537,70 @@ export default function UpscaleClient({ initialCredits }: UpscaleClientProps) {
         </div>
       </div>
 
-      {/* ── Right panel ────────────────────────────────────────────────────── */}
+      {/* ── Right panel ─────────────────────────────────────────────────────── */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, overflow: 'hidden' }}>
 
-        {/* Loading overlay */}
         {isLoading && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-            <div style={{
-              width: 40, height: 40, borderRadius: '50%',
-              border: '2px solid rgba(255,255,255,0.1)',
-              borderTop: '2px solid rgba(255,255,255,0.7)',
-              animation: 'spin 0.9s linear infinite',
-            }} />
-            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.02em' }}>
-              {loadingText}
-            </div>
+            <div style={{ width: 40, height: 40, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.1)', borderTop: '2px solid rgba(255,255,255,0.7)', animation: 'spin 0.9s linear infinite' }} />
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.02em' }}>{loadingText}</div>
           </div>
         )}
 
-        {/* Before/After result */}
         {!isLoading && resultUrl && imagePreview && (
-          <div style={{ width: '100%', maxWidth: 760 }}>
-            <BeforeAfter
-              beforeUrl={imagePreview}
-              afterUrl={resultUrl}
-              beforeLabel="ORIGINAL"
-              afterLabel="UPSCALE"
-            />
-            <div style={{ marginTop: 12, textAlign: 'center', fontSize: 10, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.06em' }}>
-              Arraste para comparar · {selectedScale}× via {activeModel.label}
-            </div>
-            <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <button
-                onClick={() => downloadImage(resultUrl, `spacenode-upscale-${selectedScale}x.jpg`)}
-                style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  padding: '12px 20px', borderRadius: 8, border: 'none',
-                  background: 'rgba(255,255,255,0.92)', color: '#0a0a0a',
-                  fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em',
-                  cursor: 'pointer', fontFamily: 'inherit',
-                  transition: 'background 0.15s, opacity 0.15s',
-                }}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                  <polyline points="7 10 12 15 17 10"/>
-                  <line x1="12" y1="15" x2="12" y2="3"/>
-                </svg>
-                Baixar imagem
-              </button>
-              <button
-                onClick={handleNewUpscale}
-                style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  padding: '12px 20px', borderRadius: 8,
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  background: 'transparent', color: 'rgba(255,255,255,0.75)',
-                  fontSize: 13, fontWeight: 500, letterSpacing: '-0.01em',
-                  cursor: 'pointer', fontFamily: 'inherit',
-                  transition: 'background 0.15s, color 0.15s, border-color 0.15s',
-                }}
-              >
-                Nova imagem
-              </button>
+          <div style={{ width: '100%', maxWidth: 760, animation: 'fadeIn 0.3s ease' }}>
+            <BeforeAfter beforeUrl={imagePreview} afterUrl={resultUrl} beforeLabel="ORIGINAL" afterLabel="AMPLIADO" />
+            <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' as const }}>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.04em' }}>
+                Arraste para comparar · {selectedScale}× · {activeMode.label}
+                {imageDimensions && <span> · {imageDimensions.w * selectedScale}×{imageDimensions.h * selectedScale}px</span>}
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <a href={resultUrl} download target="_blank" rel="noopener noreferrer"
+                  style={{ fontSize: 11, fontWeight: 500, color: 'rgba(255,255,255,0.7)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.04)' }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                  Baixar imagem
+                </a>
+                <button disabled title="Em breve"
+                  style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', background: 'none', border: '1px solid rgba(255,255,255,0.07)', padding: '7px 14px', borderRadius: 6, cursor: 'not-allowed' }}
+                >
+                  Usar no Spaces
+                </button>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Empty state */}
         {!isLoading && !resultUrl && (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, opacity: 0.25 }}>
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round">
-              <rect x="3" y="3" width="18" height="18" rx="2"/>
-              <path d="M3 9h18M9 21V9"/>
-              <path d="M15 13l3 3-3 3"/>
-            </svg>
-            <div style={{ fontSize: 12, letterSpacing: '0.02em' }}>
-              O resultado aparecerá aqui
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, animation: 'fadeIn 0.2s ease' }}>
+            <div style={{ opacity: 0.16 }}>
+              <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="0.8" strokeLinecap="round">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <path d="M3 9h18M9 21V9"/>
+                <path d="M15 13l3 3-3 3"/>
+              </svg>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', fontWeight: 500, letterSpacing: '-0.01em' }}>O resultado aparecerá aqui</div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)', marginTop: 5, lineHeight: 1.5 }}>
+                Envie uma imagem para comparar antes/depois em alta resolução.
+              </div>
             </div>
           </div>
         )}
       </div>
+
+      {showImportModal && (
+        <RetocarImportModal
+          onClose={() => setShowImportModal(false)}
+          onPick={handleImportPick}
+        />
+      )}
     </div>
   )
 }

@@ -86,7 +86,7 @@ export function AvatarComConsumo({
         onClick={() => setOpen(o => !o)}
         style={{
           display: 'flex', alignItems: 'center', gap: 10,
-          padding: '4px 10px', height: 52, borderRadius: 8,
+          padding: '4px 10px', height: 56, borderRadius: 8,
           background: 'transparent', width: '100%', textAlign: 'left',
         }}
       >
@@ -98,13 +98,13 @@ export function AvatarComConsumo({
         />
         <div style={{ opacity: expanded ? 1 : 0, transition: 'opacity 0.18s', minWidth: 0, overflow: 'hidden', flex: 1 }}>
           <div style={{
-            fontSize: 11, color: '#ffffff', fontWeight: 500,
+            fontSize: 13, color: '#ffffff', fontWeight: 600,
             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
           }}>
             {userName}
           </div>
           <div style={{
-            fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase',
+            fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase',
             color: 'rgba(255,255,255,0.5)', marginTop: 2,
             display: 'flex', alignItems: 'center', gap: 6,
           }}>

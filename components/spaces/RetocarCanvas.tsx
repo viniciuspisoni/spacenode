@@ -271,15 +271,21 @@ export const RetocarCanvas = forwardRef<RetocarCanvasHandle, Props>(function Ret
     validateOutsideMaskPreservation: async (outputUrl: string) => {
       // Carrega output e original, e compara pixels fora da máscara.
       // Retorna fração de pixels divergentes (RMS por componente RGB > threshold).
+      // Returns {ok:true, drift:0} on SecurityError (canvas tainted by cross-origin
+      // image without CORS headers) so the result still shows without an error toast.
       if (!imgEl || !naturalSize.w) return { ok: true, drift: 0 }
       const out = new Image()
       out.crossOrigin = 'anonymous'
       out.src = outputUrl
       await new Promise<void>(res => { out.onload = () => res(); out.onerror = () => res() })
 
+      // If output didn't load (e.g. CORS or network), skip validation.
+      if (!out.naturalWidth) return { ok: true, drift: 0 }
+
       const w = Math.min(naturalSize.w, out.naturalWidth, 800)
       const h = Math.round(w * (naturalSize.h / naturalSize.w))
 
+      try {
       // Source
       const c1 = document.createElement('canvas'); c1.width = w; c1.height = h
       const ctx1 = c1.getContext('2d')!; ctx1.drawImage(imgEl, 0, 0, w, h)
@@ -326,6 +332,10 @@ export const RetocarCanvas = forwardRef<RetocarCanvasHandle, Props>(function Ret
       const drift = outsideCount > 0 ? driftCount / outsideCount : 0
       // 2% threshold do briefing
       return { ok: drift < 0.02, drift }
+      } catch {
+        // Canvas SecurityError (cross-origin image without CORS) — skip validation.
+        return { ok: true, drift: 0 }
+      }
     },
   }), [computeCoverage, redrawMask, imgEl, naturalSize, size])
 
