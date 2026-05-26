@@ -279,7 +279,7 @@ export function PricingToggle() {
   }, [])
 
   return (
-    <section id="planos" style={{ padding: '96px 24px', background: 'var(--color-bg)' }}>
+    <section id="planos" className="spn-pricing" style={{ background: 'var(--color-bg)' }}>
       <div style={{ maxWidth: 1100, margin: '0 auto' }}>
 
         {/* Header */}
@@ -348,11 +348,14 @@ export function PricingToggle() {
         </div>
 
         {/* Plan cards: 4 colunas em desktop, auto-fit em telas menores */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: 12, alignItems: 'start',
-        }}>
+        <div
+          className="spn-pricing-grid"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: 12, alignItems: 'start',
+          }}
+        >
           {PLANS.map(p => (
             <PlanCard key={p.id} planId={p.id} billing={billing} loading={loading} onSelect={handleSelect} />
           ))}
@@ -367,22 +370,28 @@ export function PricingToggle() {
           }}>
             consumo por motor de IA
           </div>
-          <div style={{
-            background: 'var(--color-bg-elevated)',
-            border: '0.5px solid var(--color-border-strong)',
-            borderRadius: 14, padding: '8px 12px 4px',
-          }}>
+          <div
+            className="spn-pricing-engines"
+            style={{
+              background: 'var(--color-bg-elevated)',
+              border: '0.5px solid var(--color-border-strong)',
+              borderRadius: 14, padding: '8px 12px 4px',
+            }}
+          >
             <ConsumptionTable />
           </div>
         </div>
 
         {/* Calculator */}
-        <div style={{
-          marginTop: 40,
-          background: 'var(--color-bg-elevated)',
-          border: '0.5px solid var(--color-border-strong)',
-          borderRadius: 14, padding: '28px 32px',
-        }}>
+        <div
+          className="spn-pricing-calc"
+          style={{
+            marginTop: 40,
+            background: 'var(--color-bg-elevated)',
+            border: '0.5px solid var(--color-border-strong)',
+            borderRadius: 14, padding: '28px 32px',
+          }}
+        >
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             marginBottom: 24, flexWrap: 'wrap' as const, gap: 12,
@@ -409,7 +418,7 @@ export function PricingToggle() {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
+          <div className="spn-pricing-calc-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
             <div>
               <label style={{
                 display: 'block', fontSize: 10, fontWeight: 500, letterSpacing: '0.14em',
@@ -460,11 +469,14 @@ export function PricingToggle() {
           </div>
 
           {/* Result strip */}
-          <div style={{
-            background: 'var(--color-surface)', borderRadius: 8, padding: '14px 16px',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            flexWrap: 'wrap' as const, gap: 12,
-          }}>
+          <div
+            className="spn-pricing-result"
+            style={{
+              background: 'var(--color-surface)', borderRadius: 8, padding: '14px 16px',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              flexWrap: 'wrap' as const, gap: 12,
+            }}
+          >
             {([
               { label: 'renders / mês',     value: String(renders),                                       green: false },
               { label: 'nodes / render',    value: String(qualityCost),                                   green: false },
@@ -505,6 +517,48 @@ export function PricingToggle() {
         </div>
 
       </div>
+
+      <style jsx>{`
+        .spn-pricing {
+          padding: 96px 24px;
+        }
+        .spn-pricing-engines {
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+        }
+
+        @media (max-width: 768px) {
+          .spn-pricing {
+            padding: 72px 20px !important;
+          }
+          .spn-pricing-grid {
+            grid-template-columns: 1fr !important;
+            gap: 12px !important;
+          }
+          .spn-pricing-calc {
+            padding: 22px 20px !important;
+          }
+          .spn-pricing-calc-grid {
+            grid-template-columns: 1fr !important;
+            gap: 22px !important;
+          }
+          .spn-pricing-result {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 0 !important;
+          }
+          .spn-pricing-result > div {
+            width: 100%;
+            justify-content: space-between !important;
+            padding: 10px 4px;
+            border-bottom: 0.5px solid var(--color-border);
+          }
+          .spn-pricing-result > div:last-child { border-bottom: none; }
+          .spn-pricing-result > div > div:not(:first-child) {
+            display: none !important;
+          }
+        }
+      `}</style>
     </section>
   )
 }

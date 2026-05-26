@@ -41,18 +41,18 @@ export function FAQ() {
   const [open, setOpen] = useState<number | null>(null)
 
   return (
-    <section style={{ padding: '96px 24px', maxWidth: 960, margin: '0 auto' }}>
+    <section className="spn-faq">
 
-      <div style={{ textAlign: 'center', marginBottom: 56 }}>
+      <div className="spn-faq-head">
         <div style={{ fontSize: 10, fontWeight: 500, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'var(--color-text-tertiary)', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
           <span style={{ display: 'block', width: 32, height: '0.5px', background: 'var(--color-border-strong)' }} />
           Dúvidas frequentes
           <span style={{ display: 'block', width: 32, height: '0.5px', background: 'var(--color-border-strong)' }} />
         </div>
-        <h2 style={{ fontSize: 28, fontWeight: 500, letterSpacing: '-0.03em', lineHeight: 1.2, marginBottom: 10, color: 'var(--color-text-primary)' }}>
+        <h2 className="spn-faq-title">
           tudo que você precisa saber.
         </h2>
-        <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)', letterSpacing: '-0.005em', lineHeight: 1.6 }}>
+        <p className="spn-faq-sub">
           Perguntas reais de arquitetos e designers de interiores do beta. Respondidas de forma direta.
         </p>
       </div>
@@ -64,19 +64,20 @@ export function FAQ() {
             <div key={i} style={{ borderBottom: i < faqs.length - 1 ? '0.5px solid var(--color-border)' : 'none' }}>
               <button
                 onClick={() => setOpen(isOpen ? null : i)}
+                className="spn-faq-q"
                 style={{
                   width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '20px 24px', cursor: 'pointer', gap: 16,
+                  cursor: 'pointer', gap: 16,
                   background: isOpen ? 'var(--color-surface)' : 'var(--color-bg-elevated)',
                   border: 'none', textAlign: 'left',
                   transition: 'background 0.15s',
                 }}
               >
-                <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.01em', lineHeight: 1.4 }}>
+                <span className="spn-faq-q-text">
                   {faq.q}
                 </span>
                 <span style={{
-                  width: 20, height: 20, flexShrink: 0,
+                  width: 22, height: 22, flexShrink: 0,
                   border: `0.5px solid ${isOpen ? 'transparent' : 'var(--color-border-strong)'}`,
                   borderRadius: '50%',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -84,18 +85,18 @@ export function FAQ() {
                   transform: isOpen ? 'rotate(45deg)' : 'rotate(0deg)',
                   transition: 'transform 0.25s ease, background 0.15s',
                 }}>
-                  <svg viewBox="0 0 24 24" fill="none" width="10" height="10">
+                  <svg viewBox="0 0 24 24" fill="none" width="11" height="11">
                     <path d="M12 5v14M5 12h14" stroke="var(--color-text-secondary)" strokeWidth="1.8" strokeLinecap="round"/>
                   </svg>
                 </span>
               </button>
 
               <div style={{
-                maxHeight: isOpen ? 300 : 0,
+                maxHeight: isOpen ? 400 : 0,
                 overflow: 'hidden',
                 transition: 'max-height 0.35s cubic-bezier(0.4,0,0.2,1)',
               }}>
-                <p style={{ padding: '0 24px 22px', fontSize: 13, color: 'var(--color-text-secondary)', lineHeight: 1.7, letterSpacing: '-0.005em' }}>
+                <p className="spn-faq-a">
                   {faq.a}
                 </p>
               </div>
@@ -103,6 +104,72 @@ export function FAQ() {
           )
         })}
       </div>
+
+      <style jsx>{`
+        .spn-faq {
+          padding: 96px 24px;
+          max-width: 960px;
+          margin: 0 auto;
+        }
+        .spn-faq-head {
+          text-align: center;
+          margin-bottom: 56px;
+        }
+        .spn-faq-title {
+          font-size: 28px;
+          font-weight: 500;
+          letter-spacing: -0.03em;
+          line-height: 1.2;
+          margin: 0 0 10px;
+          color: var(--color-text-primary);
+        }
+        .spn-faq-sub {
+          font-size: 14px;
+          color: var(--color-text-tertiary);
+          letter-spacing: -0.005em;
+          line-height: 1.6;
+          margin: 0;
+        }
+        .spn-faq-q {
+          padding: 20px 24px;
+          min-height: 64px;
+        }
+        .spn-faq-q-text {
+          font-size: 13.5px;
+          font-weight: 500;
+          color: var(--color-text-primary);
+          letter-spacing: -0.01em;
+          line-height: 1.4;
+        }
+        .spn-faq-a {
+          padding: 0 24px 22px;
+          font-size: 13.5px;
+          color: var(--color-text-secondary);
+          line-height: 1.65;
+          letter-spacing: -0.005em;
+          margin: 0;
+        }
+
+        @media (max-width: 768px) {
+          .spn-faq {
+            padding: 72px 20px;
+          }
+          .spn-faq-head {
+            margin-bottom: 32px;
+          }
+          .spn-faq-title { font-size: 24px; }
+          .spn-faq-sub  { font-size: 13px; }
+          .spn-faq-q {
+            padding: 18px 18px;
+          }
+          .spn-faq-q-text { font-size: 14px; }
+          .spn-faq-a {
+            padding: 0 18px 20px;
+            font-size: 13.5px;
+            line-height: 1.6;
+          }
+        }
+      `}</style>
     </section>
   )
 }

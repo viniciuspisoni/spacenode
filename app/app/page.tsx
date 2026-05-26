@@ -181,38 +181,6 @@ export default async function AppPage() {
           )}
         </section>
 
-        {/* ── 5 · Insight card ────────────────────────────────────────────────── */}
-        <section>
-          <div style={{
-            display: 'flex', gap: 16, alignItems: 'flex-start',
-            padding: '20px 22px',
-            background: 'var(--color-bg-elevated)',
-            border: '0.5px solid var(--color-border-strong)',
-            borderRadius: 12,
-          }}>
-            <div style={{
-              width: 34, height: 34, borderRadius: 9, flexShrink: 0,
-              background: 'rgba(48,180,108,0.10)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: 'var(--color-accent-green)',
-            }}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10"/>
-                <line x1="12" y1="8" x2="12" y2="12"/>
-                <line x1="12" y1="16" x2="12.01" y2="16"/>
-              </svg>
-            </div>
-            <div>
-              <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: 6, letterSpacing: '-0.01em' }}>
-                Dica para melhores resultados
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', lineHeight: 1.7 }}>
-                Use imagens de SketchUp com iluminação neutra e sem sombras pesadas. <strong style={{ color: 'var(--color-text-secondary)', fontWeight: 500 }}>Vega</strong> preserva a geometria com alta fidelidade; <strong style={{ color: 'var(--color-text-secondary)', fontWeight: 500 }}>Quasar</strong> entrega mais realismo fotográfico.
-              </div>
-            </div>
-          </div>
-        </section>
-
       </div>
     </main>
   )

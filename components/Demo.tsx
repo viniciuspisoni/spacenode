@@ -15,8 +15,7 @@ export default function Demo() {
   };
 
   return (
-    <section style={{ maxWidth: 960, margin: "20px auto 0", padding: "0 32px" }}>
-      {/* Caption */}
+    <section className="spn-demo">
       <p
         style={{
           textAlign: "center",
@@ -29,7 +28,6 @@ export default function Demo() {
         De modelo simples para imagem pronta para apresentação
       </p>
 
-      {/* Elevated wrapper */}
       <div
         style={{
           background: "var(--color-bg-elevated)",
@@ -46,9 +44,9 @@ export default function Demo() {
           onMouseUp={() => (isDragging.current = false)}
           onMouseLeave={() => (isDragging.current = false)}
           onTouchMove={(e) => handleMove(e.touches[0].clientX)}
+          className="spn-demo-frame"
           style={{
             position: "relative",
-            aspectRatio: "16/9",
             borderRadius: 14,
             overflow: "hidden",
             cursor: "ew-resize",
@@ -56,7 +54,6 @@ export default function Demo() {
             background: "var(--color-surface)",
           }}
         >
-          {/* Before — visually softened */}
           <img
             src="/demo-sketch.jpg"
             alt="Sketch SketchUp"
@@ -72,7 +69,6 @@ export default function Demo() {
             }}
           />
 
-          {/* After — crisp and vibrant */}
           <div
             style={{
               position: "absolute",
@@ -96,7 +92,6 @@ export default function Demo() {
             />
           </div>
 
-          {/* Divider line */}
           <div
             style={{
               position: "absolute",
@@ -136,7 +131,6 @@ export default function Demo() {
             </div>
           </div>
 
-          {/* Labels */}
           <span
             style={{
               position: "absolute",
@@ -170,7 +164,6 @@ export default function Demo() {
         </div>
       </div>
 
-      {/* Drag hint */}
       <p
         style={{
           fontSize: 11,
@@ -183,18 +176,18 @@ export default function Demo() {
         arraste para comparar
       </p>
 
-      {/* CTA */}
       <div style={{ textAlign: "center" }}>
         <a
           href="/login"
+          className="spn-demo-cta"
           style={{
             display: "inline-flex",
             alignItems: "center",
+            justifyContent: "center",
             gap: 8,
             background: "var(--color-text-primary)",
             color: "var(--color-bg)",
             borderRadius: 12,
-            padding: "14px 28px",
             fontSize: 14,
             fontWeight: 500,
             textDecoration: "none",
@@ -208,6 +201,37 @@ export default function Demo() {
           </svg>
         </a>
       </div>
+
+      <style jsx>{`
+        .spn-demo {
+          max-width: 960px;
+          margin: 20px auto 0;
+          padding: 0 32px;
+        }
+        .spn-demo-frame {
+          aspect-ratio: 16 / 9;
+        }
+        .spn-demo-cta {
+          padding: 14px 28px;
+          min-height: 52px;
+        }
+
+        @media (max-width: 768px) {
+          .spn-demo {
+            padding: 0 20px;
+          }
+          .spn-demo-frame {
+            aspect-ratio: 4 / 3;
+            border-radius: 12px;
+          }
+          .spn-demo-cta {
+            width: 100%;
+            padding: 16px 24px;
+            font-size: 15px;
+            min-height: 54px;
+          }
+        }
+      `}</style>
     </section>
   );
 }

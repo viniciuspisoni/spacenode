@@ -75,11 +75,49 @@ const IconRetocar = () => (
     <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
   </svg>
 )
+const IconHumanizedPlan = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="1.5"/>
+    <path d="M3 11h7M14 11h7M10 3v8M10 15v6"/>
+    <circle cx="16.5" cy="16.5" r="1.5"/>
+  </svg>
+)
+const IconIsometric = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 2L3 7v10l9 5 9-5V7l-9-5z"/>
+    <path d="M3 7l9 5 9-5M12 12v10"/>
+  </svg>
+)
+const IconBoard = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="1.5"/>
+    <rect x="6" y="6" width="6" height="5" rx="0.8"/>
+    <rect x="14" y="6" width="4" height="5" rx="0.8"/>
+    <path d="M6 14h12M6 17h8"/>
+  </svg>
+)
+const IconProjects = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
+    <path d="M3 11h18"/>
+  </svg>
+)
+const IconMoodboard = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="9"/>
+    <circle cx="12" cy="6.5" r="1.4" fill="currentColor" stroke="none"/>
+    <circle cx="17" cy="10" r="1.4" fill="currentColor" stroke="none"/>
+    <circle cx="16" cy="15.5" r="1.4" fill="currentColor" stroke="none"/>
+    <circle cx="8" cy="15.5" r="1.4" fill="currentColor" stroke="none"/>
+    <circle cx="7" cy="10" r="1.4" fill="currentColor" stroke="none"/>
+  </svg>
+)
 
 type NavItem = {
   label: string
   href: string | null
   exact?: boolean
+  match?: (pathname: string) => boolean
   Icon: () => React.ReactElement
   badge?: string
   badgeTone?: 'green' | 'muted'
@@ -89,18 +127,28 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: 'PROJETOS',
     items: [
-      { label: 'dashboard',  href: '/app',          exact: true,  Icon: IconDashboard },
-      { label: 'spaces',     href: '/app/spaces',   exact: false, Icon: IconSpaces    },
-      { label: 'histórico',  href: '/app/history',  exact: false, Icon: IconHistory   },
+      { label: 'meus projetos', href: '/app/spaces',   exact: false, match: (p) => p.startsWith('/app/spaces') && !p.startsWith('/app/spaces/new'), Icon: IconProjects },
+      { label: 'dashboard',     href: '/app',          exact: true,  Icon: IconDashboard },
+      { label: 'histórico',     href: '/app/history',  exact: false, Icon: IconHistory   },
     ],
   },
   {
-    label: 'FERRAMENTAS',
+    label: 'CRIAR',
     items: [
-      { label: 'renderizar', href: '/app/generate', exact: false, Icon: IconGenerate  },
-      { label: 'ampliar',    href: '/app/upscale',  exact: false, Icon: IconEnhance   },
-      { label: 'editar',     href: '/app/editar',   exact: false, Icon: IconRetocar, badge: 'novo', badgeTone: 'green' },
-      { label: 'animar',     href: '/app/video',    exact: false, Icon: IconVideo     },
+      { label: 'renderizar', href: '/app/generate',    exact: false, Icon: IconGenerate  },
+      { label: 'spaces',     href: '/app/spaces/new',  exact: true,  Icon: IconSpaces    },
+      { label: 'editar',     href: '/app/editar',      exact: false, Icon: IconRetocar, badge: 'novo', badgeTone: 'green' },
+      { label: 'ampliar',    href: '/app/upscale',     exact: false, Icon: IconEnhance   },
+      { label: 'animar',     href: '/app/video',       exact: false, Icon: IconVideo     },
+    ],
+  },
+  {
+    label: 'APRESENTAR',
+    items: [
+      { label: 'planta humanizada', href: '/app/apresentar/planta-humanizada', exact: false, Icon: IconHumanizedPlan, badge: 'novo',    badgeTone: 'green' },
+      { label: 'isométricas',       href: '/app/apresentar/isometricas',       exact: false, Icon: IconIsometric,     badge: 'novo',    badgeTone: 'green' },
+      { label: 'prancha ia',        href: '/app/apresentar/prancha',           exact: false, Icon: IconBoard,         badge: 'beta',    badgeTone: 'green' },
+      { label: 'moodboard',         href: '/app/apresentar/moodboard',         exact: false, Icon: IconMoodboard,     badge: 'novo',    badgeTone: 'green' },
     ],
   },
   {
@@ -181,9 +229,9 @@ export default function Sidebar({
               {group.label}
             </div>
 
-            {group.items.map(({ label, href, exact, Icon, badge, badgeTone }) => {
+            {group.items.map(({ label, href, exact, match, Icon, badge, badgeTone }) => {
               const active = href
-                ? (exact ? pathname === href : pathname.startsWith(href))
+                ? (match ? match(pathname) : exact ? pathname === href : pathname.startsWith(href))
                 : false
               const disabled = href === null
               const itemKey = href || label

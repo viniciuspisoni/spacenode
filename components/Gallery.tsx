@@ -109,13 +109,10 @@ export default function Gallery() {
   const [hoveredCard, setHoveredCard] = useState<number | null>(null)
 
   return (
-    <section
-      id="galeria"
-      style={{ padding: '100px 48px', borderTop: '0.5px solid var(--color-border)' }}
-    >
+    <section id="galeria" className="spn-gallery">
       <div style={{ maxWidth: 960, margin: '0 auto' }}>
 
-        <div style={{ textAlign: 'center', maxWidth: 600, margin: '0 auto 64px' }}>
+        <div className="spn-gallery-head">
           <div style={{
             fontSize: 10, fontWeight: 500, letterSpacing: '0.22em',
             textTransform: 'uppercase' as const, color: 'var(--color-text-tertiary)',
@@ -125,30 +122,21 @@ export default function Gallery() {
             Galeria
             <span style={{ display: 'block', width: 32, height: '0.5px', background: 'var(--color-border-strong)' }} />
           </div>
-          <h2 style={{
-            fontSize: 'clamp(24px, 4.5vw, 38px)', fontWeight: 400,
-            letterSpacing: '-0.04em', margin: '0 0 16px', lineHeight: 1.15,
-            color: 'var(--color-text-primary)',
-          }}>
+          <h2 className="spn-gallery-title">
             Projetos reais. Resultados reais.
           </h2>
-          <p style={{
-            fontSize: 15, color: 'var(--color-text-secondary)', lineHeight: 1.55,
-          }}>
+          <p className="spn-gallery-sub">
             Gerados na SpaceNode por arquitetos e designers. Sem pós-produção.
           </p>
         </div>
 
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-          gap: 16,
-        }}>
+        <div className="spn-gallery-grid">
           {transformations.map((t, i) => (
             <div
               key={i}
               onMouseEnter={() => setHoveredCard(i)}
               onMouseLeave={() => setHoveredCard(null)}
+              className="spn-gallery-card"
               style={{
                 background: 'rgba(255,255,255,0.03)',
                 border: '1px solid rgba(255,255,255,0.08)',
@@ -160,12 +148,7 @@ export default function Gallery() {
               }}
             >
               <MiniBeforeAfter before={t.before} after={t.after} />
-              <div style={{
-                padding: '12px 16px',
-                fontSize: 11, color: 'var(--color-text-tertiary)',
-                letterSpacing: '-0.005em',
-                borderTop: '0.5px solid rgba(255,255,255,0.06)',
-              }}>
+              <div className="spn-gallery-caption">
                 {t.caption}
               </div>
             </div>
@@ -173,6 +156,66 @@ export default function Gallery() {
         </div>
 
       </div>
+
+      <style jsx>{`
+        .spn-gallery {
+          padding: 100px 48px;
+          border-top: 0.5px solid var(--color-border);
+        }
+        .spn-gallery-head {
+          text-align: center;
+          max-width: 600px;
+          margin: 0 auto 64px;
+        }
+        .spn-gallery-title {
+          font-size: clamp(24px, 4.5vw, 38px);
+          font-weight: 400;
+          letter-spacing: -0.04em;
+          margin: 0 0 16px;
+          line-height: 1.15;
+          color: var(--color-text-primary);
+        }
+        .spn-gallery-sub {
+          font-size: 15px;
+          color: var(--color-text-secondary);
+          line-height: 1.55;
+        }
+        .spn-gallery-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+          gap: 16px;
+        }
+        .spn-gallery-caption {
+          padding: 12px 16px;
+          font-size: 11px;
+          color: var(--color-text-tertiary);
+          letter-spacing: -0.005em;
+          border-top: 0.5px solid rgba(255,255,255,0.06);
+        }
+
+        @media (max-width: 768px) {
+          .spn-gallery {
+            padding: 72px 20px;
+          }
+          .spn-gallery-head {
+            margin: 0 auto 36px;
+          }
+          .spn-gallery-title {
+            font-size: 24px;
+          }
+          .spn-gallery-sub {
+            font-size: 14px;
+          }
+          .spn-gallery-grid {
+            grid-template-columns: 1fr;
+            gap: 14px;
+          }
+          .spn-gallery-caption {
+            padding: 12px 14px;
+            font-size: 12px;
+          }
+        }
+      `}</style>
     </section>
   )
 }

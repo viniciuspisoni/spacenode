@@ -90,111 +90,203 @@ const MODULES: Module[] = [
 
 export function PlatformModules() {
   return (
-    <section style={{ padding: '96px 24px', maxWidth: 960, margin: '0 auto' }}>
+    <section className="spn-modules">
 
-      <div style={{ textAlign: 'center', marginBottom: 56 }}>
-        <div style={{
-          fontSize: 10, fontWeight: 500, letterSpacing: '0.22em',
-          textTransform: 'uppercase' as const, color: 'var(--color-text-tertiary)',
-          marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-        }}>
+      <div className="spn-modules-head">
+        <div className="spn-modules-eyebrow">
           <span style={{ display: 'block', width: 32, height: '0.5px', background: 'var(--color-border-strong)' }} />
           Plataforma
           <span style={{ display: 'block', width: 32, height: '0.5px', background: 'var(--color-border-strong)' }} />
         </div>
-        <h2 style={{
-          fontSize: 28, fontWeight: 500, letterSpacing: '-0.03em',
-          lineHeight: 1.2, marginBottom: 10, color: 'var(--color-text-primary)',
-        }}>
+        <h2 className="spn-modules-title">
           Tudo que seu projeto precisa para impressionar.
         </h2>
-        <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)', letterSpacing: '-0.005em', lineHeight: 1.6 }}>
+        <p className="spn-modules-sub">
           Um ecossistema visual completo para arquitetura e interiores — em constante expansão.
         </p>
       </div>
 
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-        gap: 12,
-      }}>
+      <div className="spn-modules-grid">
         {MODULES.map(({ Icon, name, desc, status }) => {
           const active = status === 'active'
           return (
             <div
               key={name}
+              className="spn-module-card"
               style={{
-                padding: '24px 22px',
                 background: active ? 'var(--color-bg-elevated)' : 'transparent',
                 border: `0.5px solid ${active ? 'var(--color-border-strong)' : 'var(--color-border)'}`,
                 borderTop: active ? '2px solid var(--color-accent-green)' : '0.5px solid var(--color-border)',
-                borderRadius: 14,
-                opacity: active ? 1 : 0.55,
-                transition: 'opacity 0.2s',
-                position: 'relative' as const,
+                opacity: active ? 1 : 0.6,
               }}
             >
-              {/* Icon */}
-              <div style={{
-                width: 36, height: 36, borderRadius: 9, marginBottom: 16,
-                background: active ? 'rgba(48,180,108,0.10)' : 'var(--color-surface)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: active ? 'var(--color-accent-green)' : 'var(--color-text-tertiary)',
-              }}>
+              <div
+                className="spn-module-icon"
+                style={{
+                  background: active ? 'rgba(48,180,108,0.10)' : 'var(--color-surface)',
+                  color: active ? 'var(--color-accent-green)' : 'var(--color-text-tertiary)',
+                }}
+              >
                 <Icon />
               </div>
 
-              {/* Name + badge */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <span style={{
-                  fontSize: 13, fontWeight: 500, letterSpacing: '-0.01em',
-                  color: 'var(--color-text-primary)',
-                }}>
-                  {name}
-                </span>
-                {!active && (
-                  <span style={{
-                    fontSize: 8, fontWeight: 600, letterSpacing: '0.1em',
-                    textTransform: 'uppercase' as const,
-                    color: 'var(--color-text-tertiary)',
-                    background: 'var(--color-surface)',
-                    border: '0.5px solid var(--color-border-strong)',
-                    padding: '2px 7px', borderRadius: 20,
-                  }}>
-                    em breve
-                  </span>
-                )}
+              <div className="spn-module-meta">
+                <div className="spn-module-name-row">
+                  <span className="spn-module-name">{name}</span>
+                  {!active && (
+                    <span className="spn-module-badge">em breve</span>
+                  )}
+                </div>
+                <p className="spn-module-desc">{desc}</p>
               </div>
-
-              {/* Description */}
-              <p style={{
-                fontSize: 12, color: 'var(--color-text-tertiary)',
-                lineHeight: 1.65, margin: 0, letterSpacing: '-0.005em',
-              }}>
-                {desc}
-              </p>
             </div>
           )
         })}
       </div>
 
-      {/* Inline CTA */}
-      <div style={{ textAlign: 'center', marginTop: 40 }}>
+      <div className="spn-modules-cta">
         <a
           href="/login"
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 8,
-            fontSize: 13, fontWeight: 500, letterSpacing: '-0.01em',
+            fontSize: 14, fontWeight: 500, letterSpacing: '-0.01em',
             color: 'var(--color-accent-green)', textDecoration: 'none',
           }}
         >
-          Comece com Renderizar Imagem, gratuitamente
+          Comece com Renderizar, gratuitamente
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
             <path d="M2 6h8M6.5 2.5L10 6l-3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </a>
       </div>
 
+      <style jsx>{`
+        .spn-modules {
+          padding: 96px 24px;
+          max-width: 960px;
+          margin: 0 auto;
+        }
+        .spn-modules-head {
+          text-align: center;
+          margin-bottom: 56px;
+        }
+        .spn-modules-eyebrow {
+          font-size: 10px; font-weight: 500;
+          letter-spacing: 0.22em;
+          text-transform: uppercase;
+          color: var(--color-text-tertiary);
+          margin-bottom: 16px;
+          display: flex; align-items: center; justify-content: center;
+          gap: 10px;
+        }
+        .spn-modules-title {
+          font-size: 28px;
+          font-weight: 500;
+          letter-spacing: -0.03em;
+          line-height: 1.2;
+          margin: 0 0 10px;
+          color: var(--color-text-primary);
+        }
+        .spn-modules-sub {
+          font-size: 14px;
+          color: var(--color-text-tertiary);
+          letter-spacing: -0.005em;
+          line-height: 1.6;
+          margin: 0;
+        }
+        .spn-modules-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+          gap: 12px;
+        }
+        .spn-module-card {
+          padding: 24px 22px;
+          border-radius: 14px;
+          transition: opacity 0.2s;
+          position: relative;
+          display: flex;
+          flex-direction: column;
+        }
+        .spn-module-icon {
+          width: 36px; height: 36px;
+          border-radius: 9px;
+          margin-bottom: 16px;
+          display: flex; align-items: center; justify-content: center;
+        }
+        .spn-module-name-row {
+          display: flex; align-items: center; gap: 8px;
+          margin-bottom: 8px;
+        }
+        .spn-module-name {
+          font-size: 14px;
+          font-weight: 500;
+          letter-spacing: -0.01em;
+          color: var(--color-text-primary);
+        }
+        .spn-module-badge {
+          font-size: 8px; font-weight: 600;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+          color: var(--color-text-tertiary);
+          background: var(--color-surface);
+          border: 0.5px solid var(--color-border-strong);
+          padding: 2px 7px;
+          border-radius: 20px;
+        }
+        .spn-module-desc {
+          font-size: 13px;
+          color: var(--color-text-tertiary);
+          line-height: 1.6;
+          margin: 0;
+          letter-spacing: -0.005em;
+        }
+        .spn-modules-cta {
+          text-align: center;
+          margin-top: 40px;
+        }
+
+        @media (max-width: 768px) {
+          .spn-modules {
+            padding: 72px 20px;
+          }
+          .spn-modules-head {
+            margin-bottom: 36px;
+          }
+          .spn-modules-title {
+            font-size: 24px;
+          }
+          .spn-modules-sub {
+            font-size: 13px;
+          }
+          .spn-modules-grid {
+            grid-template-columns: 1fr;
+            gap: 10px;
+          }
+          .spn-module-card {
+            padding: 18px 18px;
+            flex-direction: row;
+            gap: 16px;
+          }
+          .spn-module-icon {
+            margin-bottom: 0;
+            flex-shrink: 0;
+          }
+          .spn-module-meta {
+            flex: 1;
+            min-width: 0;
+          }
+          .spn-module-name-row {
+            margin-bottom: 4px;
+          }
+          .spn-module-desc {
+            font-size: 12.5px;
+            line-height: 1.5;
+          }
+          .spn-modules-cta {
+            margin-top: 28px;
+          }
+        }
+      `}</style>
     </section>
   )
 }
