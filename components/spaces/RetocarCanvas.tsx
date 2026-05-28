@@ -21,9 +21,12 @@ import {
 const BRUSH_MIN = 10
 const BRUSH_MAX = 200
 
+export type MaskTool = 'brush' | 'eraser'
+
 interface Stroke {
   points: { x: number; y: number }[]
   size:   number
+  tool:   MaskTool
 }
 
 export interface RetocarCanvasHandle {
@@ -31,6 +34,8 @@ export interface RetocarCanvasHandle {
   getMaskCoverage:      () => number
   clearMask:            () => void
   hasMask:              () => boolean
+  /** Inverte a máscara (área pintada vira não pintada e vice-versa). */
+  invertMask:           () => void
   validateOutsideMaskPreservation: (outputUrl: string) => Promise<{ ok: boolean; drift: number }>
 }
 
@@ -41,10 +46,22 @@ interface Props {
   brush:          number
   /** Called by keyboard shortcuts ([, ]) so the parent can update its state. */
   onBrushChange:  (next: number) => void
+  /** Mask tool — paint (default) or erase. Optional for backwards-compat. */
+  tool?:          MaskTool
+  /** Hide the mask overlay (keeps the strokes in memory). Default: visible. */
+  maskVisible?:   boolean
+  /** When true, blocks pointer events and shows an overlay (generation in flight). */
+  loading?:       boolean
+  /** Optional message shown in the loading overlay. */
+  loadingMessage?: string
 }
 
 export const RetocarCanvas = forwardRef<RetocarCanvasHandle, Props>(function RetocarCanvas(
-  { imageUrl, onMaskChange, brush, onBrushChange },
+  {
+    imageUrl, onMaskChange, brush, onBrushChange,
+    tool = 'brush', maskVisible = true,
+    loading = false, loadingMessage = 'Aplicando edição com IA…',
+  },
   ref,
 ) {
   const wrapperRef = useRef<HTMLDivElement | null>(null)
@@ -56,11 +73,15 @@ export const RetocarCanvas = forwardRef<RetocarCanvasHandle, Props>(function Ret
   const [naturalSize, setNaturalSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 })
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null)
   const [isPainting, setIsPainting] = useState(false)
+  /** Modo invertido — a máscara renderiza como negativo (preserve fora vira edit). */
+  const [inverted, setInverted] = useState(false)
 
   // Mirror brush in a ref so the keydown listener always reads the latest value
   // without needing to re-bind on every brush change.
   const brushRef = useRef(brush)
   useEffect(() => { brushRef.current = brush }, [brush])
+  const toolRef = useRef<MaskTool>(tool)
+  useEffect(() => { toolRef.current = tool }, [tool])
 
   const strokesRef = useRef<Stroke[]>([])
   const currentStrokeRef = useRef<Stroke | null>(null)
@@ -98,24 +119,38 @@ export const RetocarCanvas = forwardRef<RetocarCanvasHandle, Props>(function Ret
   }, [measure])
 
   // ── Redraw mask canvas ────────────────────────────────────────
+  // When `inverted` is true, fill the entire canvas first and treat brush
+  // strokes as erasures (so the painted area becomes the preserved region).
+  // Eraser strokes always remove (regardless of inverted mode) so the user
+  // can undo from either side.
   const redrawMask = useCallback(() => {
     const cv = maskCanvasRef.current
     if (!cv || !size.w || !size.h) return
     const ctx = cv.getContext('2d')
     if (!ctx) return
     ctx.clearRect(0, 0, cv.width, cv.height)
-    ctx.fillStyle = 'rgba(232,75,75,0.5)'
-    ctx.strokeStyle = 'rgba(232,75,75,0.5)'
-    ctx.lineCap = 'round'
-    ctx.lineJoin = 'round'
+    ctx.globalCompositeOperation = 'source-over'
+    const overlay = 'rgba(232,75,75,0.5)'
+
+    if (inverted) {
+      ctx.fillStyle = overlay
+      ctx.fillRect(0, 0, cv.width, cv.height)
+    }
+
     for (const stroke of strokesRef.current) {
+      // Brush in normal mode paints; eraser (or brush in inverted mode) cuts.
+      const cuts = stroke.tool === 'eraser' ? !inverted : inverted
+      ctx.globalCompositeOperation = cuts ? 'destination-out' : 'source-over'
+      ctx.fillStyle = cuts ? 'rgba(0,0,0,1)' : overlay
+      ctx.strokeStyle = cuts ? 'rgba(0,0,0,1)' : overlay
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
       ctx.lineWidth = stroke.size
       ctx.beginPath()
       const [p0, ...rest] = stroke.points
       if (!p0) continue
       ctx.moveTo(p0.x, p0.y)
       if (rest.length === 0) {
-        // dot
         ctx.arc(p0.x, p0.y, stroke.size / 2, 0, Math.PI * 2)
         ctx.fill()
       } else {
@@ -123,7 +158,9 @@ export const RetocarCanvas = forwardRef<RetocarCanvasHandle, Props>(function Ret
         ctx.stroke()
       }
     }
-  }, [size])
+    // Restore normal composite for subsequent draws / native paints.
+    ctx.globalCompositeOperation = 'source-over'
+  }, [size, inverted])
 
   // ── Draw image ────────────────────────────────────────────────
   useEffect(() => {
@@ -144,6 +181,9 @@ export const RetocarCanvas = forwardRef<RetocarCanvasHandle, Props>(function Ret
     redrawMask()
   }, [size, redrawMask])
 
+  // Redesenha quando o modo invertido muda (sem alterar dimensões).
+  useEffect(() => { redrawMask() }, [inverted, redrawMask])
+
   // ── Pointer events ────────────────────────────────────────────
   function relativePoint(e: React.PointerEvent | PointerEvent) {
     const cv = maskCanvasRef.current!
@@ -154,7 +194,7 @@ export const RetocarCanvas = forwardRef<RetocarCanvasHandle, Props>(function Ret
   function startStroke(e: React.PointerEvent) {
     if (!size.w) return
     const p = relativePoint(e)
-    const stroke: Stroke = { points: [p], size: brush }
+    const stroke: Stroke = { points: [p], size: brush, tool: toolRef.current }
     currentStrokeRef.current = stroke
     strokesRef.current = [...strokesRef.current, stroke]
     setIsPainting(true)
@@ -183,6 +223,8 @@ export const RetocarCanvas = forwardRef<RetocarCanvasHandle, Props>(function Ret
   }
 
   // ── Coverage ──────────────────────────────────────────────────
+  // Reads alpha from the live mask canvas — automatically reflects inverted
+  // state, eraser strokes, and any other transformation already rendered.
   const computeCoverage = useCallback((): number => {
     const cv = maskCanvasRef.current
     if (!cv || !cv.width) return 0
@@ -233,27 +275,43 @@ export const RetocarCanvas = forwardRef<RetocarCanvasHandle, Props>(function Ret
     hasMask:         () => strokesRef.current.length > 0,
     clearMask: () => {
       strokesRef.current = []
+      setInverted(false)
       redrawMask()
       notifyCoverage()
     },
+    invertMask: () => {
+      setInverted(v => !v)
+      // notifyCoverage runs on the next paint; React state update is async.
+      requestAnimationFrame(notifyCoverage)
+    },
     getMaskBlob: async () => {
-      if (strokesRef.current.length === 0 || !naturalSize.w) return null
-      // Renderiza máscara em natural resolution (escalando os pontos).
+      if (strokesRef.current.length === 0 && !inverted) return null
+      if (!naturalSize.w) return null
+      // Renders the mask in natural resolution. Same compositing rules as
+      // redrawMask but exports a B/W PNG (white = edit, black = preserve).
       const off = document.createElement('canvas')
       off.width = naturalSize.w
       off.height = naturalSize.h
       const ctx = off.getContext('2d')
       if (!ctx) return null
+
       ctx.fillStyle = '#000'
       ctx.fillRect(0, 0, off.width, off.height)
-      ctx.fillStyle = '#fff'
-      ctx.strokeStyle = '#fff'
+      if (inverted) {
+        ctx.fillStyle = '#fff'
+        ctx.fillRect(0, 0, off.width, off.height)
+      }
+
       ctx.lineCap = 'round'
       ctx.lineJoin = 'round'
       const sx = naturalSize.w / size.w
       const sy = naturalSize.h / size.h
       for (const stroke of strokesRef.current) {
-        ctx.lineWidth = stroke.size * sx  // brush scaled
+        const cuts = stroke.tool === 'eraser' ? !inverted : inverted
+        ctx.globalCompositeOperation = cuts ? 'destination-out' : 'source-over'
+        ctx.fillStyle = cuts ? 'rgba(0,0,0,1)' : '#fff'
+        ctx.strokeStyle = cuts ? 'rgba(0,0,0,1)' : '#fff'
+        ctx.lineWidth = stroke.size * sx
         ctx.beginPath()
         const [p0, ...rest] = stroke.points
         if (!p0) continue
@@ -266,7 +324,18 @@ export const RetocarCanvas = forwardRef<RetocarCanvasHandle, Props>(function Ret
           ctx.stroke()
         }
       }
-      return await new Promise<Blob | null>((res) => off.toBlob(b => res(b), 'image/png'))
+      ctx.globalCompositeOperation = 'source-over'
+      // Composite onto a black background so the eraser cuts read as black
+      // (destination-out leaves transparent pixels otherwise).
+      const finalCv = document.createElement('canvas')
+      finalCv.width  = off.width
+      finalCv.height = off.height
+      const finalCtx = finalCv.getContext('2d')
+      if (!finalCtx) return null
+      finalCtx.fillStyle = '#000'
+      finalCtx.fillRect(0, 0, off.width, off.height)
+      finalCtx.drawImage(off, 0, 0)
+      return await new Promise<Blob | null>((res) => finalCv.toBlob(b => res(b), 'image/png'))
     },
     validateOutsideMaskPreservation: async (outputUrl: string) => {
       // Carrega output e original, e compara pixels fora da máscara.
@@ -296,14 +365,18 @@ export const RetocarCanvas = forwardRef<RetocarCanvasHandle, Props>(function Ret
       const ctx2 = c2.getContext('2d')!; ctx2.drawImage(out, 0, 0, w, h)
       const d2 = ctx2.getImageData(0, 0, w, h).data
 
-      // Mask scaled
+      // Mask scaled (respeita inverted/eraser via mesma lógica do redrawMask).
       const cm = document.createElement('canvas'); cm.width = w; cm.height = h
       const ctxm = cm.getContext('2d')!
       ctxm.fillStyle = '#000'; ctxm.fillRect(0, 0, w, h)
-      ctxm.fillStyle = '#fff'; ctxm.strokeStyle = '#fff'
+      if (inverted) { ctxm.fillStyle = '#fff'; ctxm.fillRect(0, 0, w, h) }
       ctxm.lineCap = 'round'; ctxm.lineJoin = 'round'
       const sx = w / size.w; const sy = h / size.h
       for (const stroke of strokesRef.current) {
+        const cuts = stroke.tool === 'eraser' ? !inverted : inverted
+        ctxm.globalCompositeOperation = cuts ? 'destination-out' : 'source-over'
+        ctxm.fillStyle = cuts ? 'rgba(0,0,0,1)' : '#fff'
+        ctxm.strokeStyle = cuts ? 'rgba(0,0,0,1)' : '#fff'
         ctxm.lineWidth = stroke.size * sx
         ctxm.beginPath()
         const [p0, ...rest] = stroke.points
@@ -312,6 +385,7 @@ export const RetocarCanvas = forwardRef<RetocarCanvasHandle, Props>(function Ret
         if (rest.length === 0) { ctxm.arc(p0.x * sx, p0.y * sy, (stroke.size * sx) / 2, 0, Math.PI * 2); ctxm.fill() }
         else { for (const p of rest) ctxm.lineTo(p.x * sx, p.y * sy); ctxm.stroke() }
       }
+      ctxm.globalCompositeOperation = 'source-over'
       const dm = ctxm.getImageData(0, 0, w, h).data
 
       // Compara fora da máscara (mask alpha == 0 means outside)
@@ -337,7 +411,7 @@ export const RetocarCanvas = forwardRef<RetocarCanvasHandle, Props>(function Ret
         return { ok: true, drift: 0 }
       }
     },
-  }), [computeCoverage, redrawMask, imgEl, naturalSize, size])
+  }), [computeCoverage, redrawMask, imgEl, naturalSize, size, inverted])
 
   // ── Render ─────────────────────────────────────────────────────
 
@@ -367,10 +441,15 @@ export const RetocarCanvas = forwardRef<RetocarCanvasHandle, Props>(function Ret
             onPointerMove={moveStroke}
             onPointerUp={endStroke}
             onPointerLeave={leaveCanvas}
-            style={{ position: 'absolute', inset: 0, touchAction: 'none' }}
+            style={{
+              position: 'absolute', inset: 0, touchAction: 'none',
+              opacity: maskVisible ? 1 : 0.05,
+              transition: 'opacity 0.18s',
+              pointerEvents: loading ? 'none' : 'auto',
+            }}
           />
           {/* Cursor preview */}
-          {cursor && !isPainting && (
+          {cursor && !isPainting && !loading && (
             <div style={{
               position: 'absolute',
               left: cursor.x - brush / 2,
@@ -381,6 +460,24 @@ export const RetocarCanvas = forwardRef<RetocarCanvasHandle, Props>(function Ret
               boxShadow: '0 0 0 1px rgba(0,0,0,0.4)',
               pointerEvents: 'none',
             }} />
+          )}
+          {loading && (
+            <div style={{
+              position: 'absolute', inset: 0,
+              background: 'rgba(10,10,10,0.62)',
+              backdropFilter: 'blur(4px)',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              gap: 12, color: 'var(--color-text-primary)',
+              fontSize: 13, letterSpacing: '-0.005em',
+            }}>
+              <svg width="32" height="32" viewBox="0 0 32 32" className="constellation-loading">
+                <circle cx="16" cy="16" r="3" fill="currentColor" />
+                <circle cx="16" cy="48" r="3" fill="currentColor" />
+                <circle cx="48" cy="48" r="3" fill="currentColor" />
+                <circle cx="48" cy="16" r="3" fill="currentColor" />
+              </svg>
+              <span>{loadingMessage}</span>
+            </div>
           )}
         </div>
       )}

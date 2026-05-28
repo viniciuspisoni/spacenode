@@ -1,20 +1,50 @@
 'use client'
 
-// Fluxo standalone da Retocar:
+// Fluxo standalone do modo Editar do Spacenode.
 //   empty   → upload da imagem (ou Importar do histórico)
-//   editing → canvas + brush + prompt + quality + action
-//   result  → slider compare antes/depois + Salvar/Descartar/Editar de novo
+//   editing → canvas + brush + prompt + qualidade + ação + fidelidade
+//   result  → slider antes/depois + Salvar / Descartar / Editar de novo
+//
+// O painel direito concentra todas as opções da geração — ferramentas de
+// máscara, fidelidade do projeto, resolução final, custo em nodes e o botão
+// principal de gerar. O painel inferior do canvas mantém só o seletor de
+// ação (RetocarModeTabs) e o campo de prompt.
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { RetocarCanvas, type RetocarCanvasHandle, BRUSH_MIN, BRUSH_MAX } from './RetocarCanvas'
+import { RetocarCanvas, type RetocarCanvasHandle, type MaskTool, BRUSH_MIN, BRUSH_MAX } from './RetocarCanvas'
 import { RetocarImportModal } from './RetocarImportModal'
 import { RetocarModeTabs } from './RetocarModeTabs'
+import { PromptAssistant } from './PromptAssistant'
 import { getEditCost, LARGE_MASK_THRESHOLD } from '@/lib/spaces/edit-economy'
 import type { Quality, EditSourceType } from '@/lib/spaces/types'
 import { EDIT_MODE_LABELS, type EditMode } from '@/lib/spaces/engines'
+import { FIDELITY_LABELS, type FidelityMode } from '@/lib/spaces/edit-prompts'
 
 type Step = 'empty' | 'editing' | 'result'
+
+/** Versão local na sessão. O id é um uuid criado no client (sem persistência). */
+export interface EditVersion {
+  id:         string
+  url:        string
+  isOriginal: boolean
+  /** Label visível na strip ("Original" / "V1 · concreto cinza"). */
+  label:      string
+  prompt:     string
+  mode:       EditMode | null
+  cost:       number
+  createdAt:  number
+}
+
+function newId(): string {
+  return Math.random().toString(36).slice(2, 10)
+}
+
+function buildVersionLabel(args: { index: number; prompt: string; mode: EditMode | null }): string {
+  const { index, prompt, mode } = args
+  const summary = prompt.trim().slice(0, 28) || (mode ? EDIT_MODE_LABELS[mode].label.toLowerCase() : '')
+  return summary ? `V${index} · ${summary}` : `V${index}`
+}
 
 interface Props {
   initialBalance: number
@@ -29,13 +59,21 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
   const [sourceType, setSourceType]   = useState<EditSourceType>('upload')
   const [sourceId, setSourceId]       = useState<string | null>(null)
   const [resultUrl, setResultUrl]     = useState<string | null>(null)
+  /** Local-session version history. Original + each successful generation.
+      Not persisted across reloads (edits are in the DB anyway). */
+  const [versions, setVersions]       = useState<EditVersion[]>([])
+  const [activeVersionId, setActiveVersionId] = useState<string | null>(null)
   const [coverage, setCoverage]       = useState(0)
   const [brush, setBrush]             = useState(40)
+  const [tool, setTool]               = useState<MaskTool>('brush')
+  const [maskVisible, setMaskVisible] = useState(true)
   const [prompt, setPrompt]           = useState('')
   const [quality, setQuality]         = useState<Quality>('2k')
-  // Edit intention. Default is 'material' (Google NB2/NB Pro, Flux fallback).
-  // User can pick a different tab; the router decides which FAL endpoint to call.
+  // Edit intention. Default 'material'. Router decides the engine.
   const [mode, setMode]               = useState<EditMode>('material')
+  // Project fidelity — how strictly to preserve geometry/scale/lighting.
+  // 'max' is the safe default for real architectural work.
+  const [fidelity, setFidelity]       = useState<FidelityMode>('max')
   const [balance, setBalance]         = useState(initialBalance)
   const [submitting, setSubmitting]   = useState(false)
   const [validating, setValidating]   = useState(false)
@@ -58,6 +96,15 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
     return data.url as string
   }
 
+  function resetVersionsWithOriginal(url: string) {
+    const orig: EditVersion = {
+      id: newId(), url, isOriginal: true, label: 'Original',
+      prompt: '', mode: null, cost: 0, createdAt: Date.now(),
+    }
+    setVersions([orig])
+    setActiveVersionId(orig.id)
+  }
+
   async function onFilePicked(f: File | null) {
     if (!f) return
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(f.type)) {
@@ -74,6 +121,7 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
       setSourceUrl(url)
       setSourceType('upload')
       setSourceId(null)
+      resetVersionsWithOriginal(url)
       setStep('editing')
     } catch (e) {
       setError((e as Error).message)
@@ -84,6 +132,7 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
     setSourceUrl(picked.url)
     setSourceType(picked.type)
     setSourceId(picked.id)
+    resetVersionsWithOriginal(picked.url)
     setShowImport(false)
     setStep('editing')
   }
@@ -95,7 +144,6 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
       return
     }
     // 'remove' doesn't need a prompt — the model fills from surroundings.
-    // For every other mode, the user must describe what they want.
     if (mode !== 'remove' && !prompt.trim()) {
       setError('Descreva o que você quer nessa área antes de gerar.')
       return
@@ -120,8 +168,6 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
       const maskData = await maskRes.json()
       if (!maskRes.ok) throw new Error(maskData?.error ?? 'Erro ao salvar máscara')
 
-      // Chama edit. `mode` is forwarded so the API routes to the right engine.
-      // Prompt is sent even for 'remove' (server ignores it for that mode).
       const res = await fetch('/api/edits', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -134,6 +180,7 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
           source_id:        sourceId,
           mask_coverage:    maskCoverage,
           mode,
+          fidelity_mode:    fidelity,
         }),
       })
       const data = await res.json()
@@ -147,6 +194,17 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
       if (data.balance_after?.total_balance != null) {
         setBalance(data.balance_after.total_balance as number)
       }
+      // Append new version to the local history.
+      setVersions(prev => {
+        const idx = prev.filter(v => !v.isOriginal).length + 1
+        const v: EditVersion = {
+          id: newId(), url: outputUrl, isOriginal: false,
+          label: buildVersionLabel({ index: idx, prompt, mode }),
+          prompt, mode, cost, createdAt: Date.now(),
+        }
+        setActiveVersionId(v.id)
+        return [...prev, v]
+      })
 
       // Validação pixel-a-pixel client-side fora da máscara.
       // Wrapped in its own try/catch so a canvas SecurityError (cross-origin CORS)
@@ -195,7 +253,39 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
     setResultUrl(null)
     setDriftWarning(null)
     setPrompt('')
+    setVersions([])
+    setActiveVersionId(null)
     setStep('empty')
+  }
+
+  /** Use a version as the new editing base (replaces source, clears mask & prompt). */
+  function useVersionAsBase(v: EditVersion) {
+    setSourceUrl(v.url)
+    setSourceType('edit')
+    setSourceId(null)
+    setResultUrl(null)
+    setDriftWarning(null)
+    setPrompt('')
+    setActiveVersionId(v.id)
+    if (canvasRef.current) canvasRef.current.clearMask()
+    setStep('editing')
+  }
+
+  /** View a previously generated version in the result view (compared with Original). */
+  function viewVersion(v: EditVersion) {
+    setActiveVersionId(v.id)
+    if (v.isOriginal) {
+      setResultUrl(null)
+      setStep('editing')
+    } else {
+      const original = versions.find(x => x.isOriginal)
+      if (original) {
+        setSourceUrl(original.url)
+        setSourceType(original.isOriginal ? sourceType : 'edit')
+      }
+      setResultUrl(v.url)
+      setStep('result')
+    }
   }
 
   return (
@@ -242,18 +332,28 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
           setCoverage={setCoverage}
           brush={brush}
           setBrush={setBrush}
+          tool={tool}
+          setTool={setTool}
+          maskVisible={maskVisible}
+          setMaskVisible={setMaskVisible}
           prompt={prompt}
           setPrompt={setPrompt}
           quality={quality}
           setQuality={setQuality}
           mode={mode}
           setMode={setMode}
+          fidelity={fidelity}
+          setFidelity={setFidelity}
           balance={balance}
           balanceShort={balanceShort}
           cost={cost}
           submitting={submitting}
           validating={validating}
           error={error}
+          versions={versions}
+          activeVersionId={activeVersionId}
+          onPickVersion={viewVersion}
+          onUseVersionAsBase={useVersionAsBase}
           onGenerate={handleGenerate}
           onStartOver={startOver}
         />
@@ -266,6 +366,10 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
           prompt={prompt}
           coverage={coverage}
           driftWarning={driftWarning}
+          versions={versions}
+          activeVersionId={activeVersionId}
+          onPickVersion={viewVersion}
+          onUseVersionAsBase={useVersionAsBase}
           onEditAgain={editAgainOnResult}
           onDiscard={discardResult}
         />
@@ -301,8 +405,9 @@ function EmptyStep({ onUpload, onImport, fileInputRef, onFilePicked, error }: {
           Editar
         </h1>
         <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)', letterSpacing: '-0.005em' }}>
-          Edite áreas específicas de qualquer imagem. Pinte a máscara, descreva o que quer
-          naquela região, o resto fica intacto.
+          Pós-produção arquitetônica assistida por IA. Pinte a área que quer
+          alterar, descreva a mudança e a imagem fora da máscara permanece
+          intacta.
         </p>
       </div>
 
@@ -341,10 +446,10 @@ function EmptyStep({ onUpload, onImport, fileInputRef, onFilePicked, error }: {
           <line x1="12" y1="3" x2="12" y2="15"/>
         </svg>
         <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-text-secondary)', letterSpacing: '-0.01em' }}>
-          Suba uma imagem ou arraste aqui
+          Envie uma imagem ou arraste aqui
         </div>
         <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
-          JPG, PNG ou WebP até 10MB
+          JPG, PNG ou WebP até 10 MB
         </div>
         <button
           onClick={(e) => { e.stopPropagation(); onImport() }}
@@ -382,48 +487,67 @@ function EditingStep(props: {
   setCoverage:  (v: number) => void
   brush:        number
   setBrush:     (v: number) => void
+  tool:         MaskTool
+  setTool:      (t: MaskTool) => void
+  maskVisible:  boolean
+  setMaskVisible: (v: boolean) => void
   prompt:       string
   setPrompt:    (v: string) => void
   quality:      Quality
   setQuality:   (q: Quality) => void
   mode:         EditMode
   setMode:      (m: EditMode) => void
+  fidelity:     FidelityMode
+  setFidelity:  (f: FidelityMode) => void
   balance:      number
   balanceShort: boolean
   cost:         number
   submitting:   boolean
   validating:   boolean
   error:        string | null
+  versions:        EditVersion[]
+  activeVersionId: string | null
+  onPickVersion:   (v: EditVersion) => void
+  onUseVersionAsBase: (v: EditVersion) => void
   onGenerate:   () => void
   onStartOver:  () => void
 }) {
   const {
     sourceUrl, canvasRef, coverage, setCoverage, brush, setBrush,
+    tool, setTool, maskVisible, setMaskVisible,
     prompt, setPrompt, quality, setQuality, mode, setMode,
-    balance, balanceShort,
-    cost, submitting, validating, error, onGenerate, onStartOver,
+    fidelity, setFidelity, balance, balanceShort,
+    cost, submitting, validating, error,
+    versions, activeVersionId, onPickVersion, onUseVersionAsBase,
+    onGenerate, onStartOver,
   } = props
 
-  const largeMask  = coverage > LARGE_MASK_THRESHOLD
-  const modeMeta   = EDIT_MODE_LABELS[mode]
-  const isRemove   = mode === 'remove'
-  // 'remove' is happy without a prompt; other modes require text before submit.
+  const largeMask   = coverage > LARGE_MASK_THRESHOLD
+  const modeMeta    = EDIT_MODE_LABELS[mode]
+  const isRemove    = mode === 'remove'
   const disabledBtn = coverage === 0 || balanceShort || submitting || (!isRemove && !prompt.trim())
 
+  // Contextual hint for the mask state.
+  let maskHint: string
+  if (coverage === 0)            maskHint = 'Pinte a área que deseja editar.'
+  else if (!isRemove && !prompt) maskHint = 'Descreva a alteração ou escolha um preset.'
+  else                            maskHint = `Área mascarada: ${(coverage * 100).toFixed(1)}%`
+
   return (
-    <div style={{
-      display: 'grid', gap: 18,
-      gridTemplateColumns: 'minmax(0, 1fr) 280px',
-    }}>
-      {/* Canvas + prompt */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-        <div style={{ height: 'calc(100vh - 360px)', minHeight: 420 }}>
+    <div className="spn-editar-grid">
+      {/* Canvas + ação + prompt */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ height: 'calc(100vh - 380px)', minHeight: 420 }}>
           <RetocarCanvas
             ref={canvasRef}
             imageUrl={sourceUrl}
             onMaskChange={setCoverage}
             brush={brush}
             onBrushChange={setBrush}
+            tool={tool}
+            maskVisible={maskVisible}
+            loading={submitting}
+            loadingMessage={validating ? 'Validando preservação fora da máscara…' : 'Aplicando edição com IA…'}
           />
         </div>
 
@@ -433,36 +557,22 @@ function EditingStep(props: {
           borderRadius: 12, padding: 16,
           display: 'flex', flexDirection: 'column', gap: 12,
         }}>
-          {/* Mode tabs — picks the architectural intention. Router maps it
-              to the right FAL endpoint behind the scenes. */}
+          {/* Mode tabs — picks the architectural intention. */}
           <RetocarModeTabs mode={mode} onModeChange={setMode} disabled={submitting} />
 
           <div style={{
             fontSize: 11, color: 'var(--color-text-tertiary)', letterSpacing: '-0.005em',
-            marginTop: -4,
+            marginTop: -2,
           }}>
             {modeMeta.description}
           </div>
 
-          <textarea
+          {/* Prompt Assistant — textarea + chips + presets contextualizados ao modo. */}
+          <PromptAssistant
+            mode={mode}
             value={prompt}
-            onChange={e => setPrompt(e.target.value)}
-            placeholder={isRemove
-              ? 'Não precisa de prompt — o motor preenche com o entorno automaticamente.'
-              : modeMeta.promptPlaceholder
-            }
-            rows={2}
-            disabled={isRemove}
-            style={{
-              width: '100%', padding: '10px 14px',
-              background: 'var(--color-bg)',
-              border: '0.5px solid var(--color-border-strong)',
-              borderRadius: 8, color: 'var(--color-text-primary)',
-              fontSize: 13, letterSpacing: '-0.005em',
-              fontFamily: 'inherit', resize: 'vertical', outline: 'none',
-              opacity: isRemove ? 0.55 : 1,
-              cursor: isRemove ? 'not-allowed' : 'text',
-            }}
+            onChange={setPrompt}
+            disabled={submitting}
           />
 
           {error && (
@@ -476,124 +586,116 @@ function EditingStep(props: {
           )}
 
           <div style={{
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            gap: 12, flexWrap: 'wrap',
+            fontSize: 11, color: 'var(--color-text-tertiary)',
+            display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
           }}>
-            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
-              {coverage > 0
-                ? <>área mascarada: {(coverage * 100).toFixed(1)}%</>
-                : 'pinte a área a editar'}
-              {largeMask && (
-                <span style={{ color: '#e0a766', marginLeft: 10 }}>
-                  ⚠ Área grande pode comprometer coerência
-                </span>
-              )}
-            </div>
-            <button
-              onClick={onGenerate}
-              disabled={disabledBtn}
-              className="spn-action"
-              style={{
-                width: 'auto', minWidth: 220, padding: '12px 22px',
-                background: '#1D9E75', color: '#042818',
-                border: '0.5px solid rgba(0,0,0,0.18)',
-                opacity: disabledBtn ? 0.5 : 1,
-                boxShadow: !disabledBtn
-                  ? 'inset 0 1px 0 rgba(255,255,255,0.18), 0 8px 24px rgba(29,158,117,0.18)'
-                  : 'none',
-              }}
-            >
-              {submitting
-                ? (validating ? 'Validando…' : 'Editando…')
-                : `${modeMeta.label} · ${cost} nodes →`}
-            </button>
+            <span>{maskHint}</span>
+            {largeMask && (
+              <span style={{ color: '#e0a766' }}>
+                ⚠ Área grande pode comprometer coerência
+              </span>
+            )}
           </div>
         </div>
+
+        {versions.length > 1 && (
+          <VersionStrip
+            versions={versions}
+            activeId={activeVersionId}
+            onPick={onPickVersion}
+            onUseAsBase={onUseVersionAsBase}
+          />
+        )}
       </div>
 
-      {/* Painel lateral */}
+      {/* Painel lateral direito */}
       <aside style={{
         background: 'var(--color-bg-elevated)',
         border: '0.5px solid var(--color-border)',
         borderRadius: 12, padding: 16,
-        display: 'flex', flexDirection: 'column', gap: 14,
+        display: 'flex', flexDirection: 'column', gap: 16,
         alignSelf: 'start',
+        position: 'sticky', top: 24,
       }}>
-        <PanelLabel>Ferramentas</PanelLabel>
-
-        <div>
-          <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 6, display: 'flex', justifyContent: 'space-between' }}>
-            <span>Tamanho do brush</span>
-            <span style={{ color: 'var(--color-text-secondary)' }}>{brush}px</span>
-          </div>
-          <input
-            type="range"
-            min={BRUSH_MIN} max={BRUSH_MAX}
-            value={brush}
-            onChange={e => setBrush(Number(e.target.value))}
-            style={{ width: '100%', accentColor: '#1D9E75' }}
+        {/* Ferramentas de máscara */}
+        <PanelSection label="Ferramentas">
+          <MaskToolbar
+            brush={brush}
+            setBrush={setBrush}
+            tool={tool}
+            setTool={setTool}
+            maskVisible={maskVisible}
+            setMaskVisible={setMaskVisible}
+            onClear={() => canvasRef.current?.clearMask()}
+            onInvert={() => canvasRef.current?.invertMask()}
+            disabled={submitting}
           />
-          <div style={{ fontSize: 10, color: 'var(--color-text-quaternary)', marginTop: 4 }}>
-            atalhos [ ]
-          </div>
-        </div>
+        </PanelSection>
 
-        <button
-          onClick={() => canvasRef.current?.clearMask()}
-          className="spn-action spn-action--ghost"
-          style={{ width: '100%', padding: '9px 14px', fontSize: 12 }}
-        >
-          Limpar máscara
-        </button>
+        {/* Preservação do projeto */}
+        <PanelSection label="Preservação do projeto">
+          <FidelityControl value={fidelity} onChange={setFidelity} disabled={submitting} />
+        </PanelSection>
 
-        <div style={{
-          fontSize: 10, color: 'var(--color-text-quaternary)', lineHeight: 1.55,
-          padding: 10, background: 'var(--color-bg)', borderRadius: 8,
-        }}>
-          atalhos:<br/>
-          Cmd/Ctrl+Z desfazer · [ ] tamanho do brush
-        </div>
-
-        <div style={{ borderTop: '0.5px solid var(--color-border)', paddingTop: 14 }}>
-          <PanelLabel>Qualidade</PanelLabel>
-          <div style={{
-            display: 'flex', gap: 4, padding: 3, marginTop: 8,
-            background: 'var(--color-surface)', borderRadius: 8,
+        {/* Resolução final */}
+        <PanelSection label="Resolução final">
+          <ResolutionControl value={quality} onChange={setQuality} disabled={submitting} />
+          <p style={{
+            fontSize: 10, color: 'var(--color-text-quaternary)',
+            lineHeight: 1.5, marginTop: 6,
           }}>
-            {(['hd', '2k', '4k'] as Quality[]).map(q => {
-              const active = q === quality
-              return (
-                <button
-                  key={q}
-                  onClick={() => setQuality(q)}
-                  style={{
-                    flex: 1, padding: '6px 0', borderRadius: 6,
-                    background: active ? 'var(--color-bg-elevated)' : 'transparent',
-                    color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                    fontSize: 11, fontWeight: 500, letterSpacing: '0.02em',
-                    cursor: 'pointer',
-                    boxShadow: active ? 'inset 0 0 0 0.5px var(--color-border-strong)' : 'none',
-                  }}
-                >
-                  {q.toUpperCase()}
-                </button>
-              )
-            })}
-          </div>
-        </div>
+            Para finalização em alta resolução, envie o resultado para Ampliar.
+          </p>
+        </PanelSection>
 
-        <div style={{ borderTop: '0.5px solid var(--color-border)', paddingTop: 14 }}>
-          <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
-            Saldo: <span style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>{balance}</span> nodes
+        {/* Saldo + ação principal */}
+        <div style={{
+          marginTop: 'auto', paddingTop: 14,
+          borderTop: '0.5px solid var(--color-border)',
+          display: 'flex', flexDirection: 'column', gap: 10,
+        }}>
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+            fontSize: 11, color: 'var(--color-text-tertiary)',
+          }}>
+            <span>Saldo</span>
+            <span style={{
+              color: balanceShort ? '#e57373' : 'var(--color-text-primary)',
+              fontWeight: 500,
+            }}>
+              {balance} nodes
+            </span>
           </div>
           <button
-            onClick={onStartOver}
+            onClick={onGenerate}
+            disabled={disabledBtn}
+            className="spn-action"
             style={{
-              marginTop: 10, fontSize: 11, color: 'var(--color-text-tertiary)',
-              background: 'none', cursor: 'pointer', textDecoration: 'underline',
+              background: '#1D9E75', color: '#042818',
+              border: '0.5px solid rgba(0,0,0,0.18)',
+              opacity: disabledBtn ? 0.5 : 1,
+              cursor: disabledBtn ? 'not-allowed' : 'pointer',
+              boxShadow: !disabledBtn
+                ? 'inset 0 1px 0 rgba(255,255,255,0.18), 0 8px 24px rgba(29,158,117,0.22)'
+                : 'none',
+              padding: '13px 16px',
             }}
           >
-            Trocar imagem
+            {submitting
+              ? (validating ? 'Validando…' : 'Aplicando edição com IA…')
+              : `${modeMeta.ctaVerb} — ${cost} nodes`}
+          </button>
+          <button
+            onClick={onStartOver}
+            disabled={submitting}
+            style={{
+              fontSize: 11, color: 'var(--color-text-tertiary)',
+              background: 'none', cursor: submitting ? 'not-allowed' : 'pointer',
+              textDecoration: 'underline', padding: '4px 0',
+              opacity: submitting ? 0.4 : 1,
+            }}
+          >
+            Trocar imagem original
           </button>
         </div>
       </aside>
@@ -601,14 +703,326 @@ function EditingStep(props: {
   )
 }
 
+// ── Painel: ferramentas de máscara ──────────────────────────
+// (exported so the /dev sandbox can mount them in isolation)
+
+export function MaskToolbar({
+  brush, setBrush, tool, setTool, maskVisible, setMaskVisible,
+  onClear, onInvert, disabled,
+}: {
+  brush:          number
+  setBrush:       (v: number) => void
+  tool:           MaskTool
+  setTool:        (t: MaskTool) => void
+  maskVisible:    boolean
+  setMaskVisible: (v: boolean) => void
+  onClear:        () => void
+  onInvert:       () => void
+  disabled:       boolean
+}) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {/* Brush / eraser toggle */}
+      <div style={{
+        display: 'flex', gap: 3, padding: 3,
+        background: 'var(--color-surface)', borderRadius: 8,
+      }}>
+        <ToolToggle
+          active={tool === 'brush'}
+          disabled={disabled}
+          onClick={() => setTool('brush')}
+          label="Pincel"
+          icon={<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21l3-3 9.5-9.5a2.1 2.1 0 0 0-3-3L3 15v6z"/><line x1="11" y1="6" x2="18" y2="13"/></svg>}
+        />
+        <ToolToggle
+          active={tool === 'eraser'}
+          disabled={disabled}
+          onClick={() => setTool('eraser')}
+          label="Borracha"
+          icon={<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 20H7l-4-4 11-11 9 9-3 6z"/><line x1="9" y1="9" x2="17" y2="17"/></svg>}
+        />
+      </div>
+
+      {/* Brush size slider */}
+      <div>
+        <div style={{
+          fontSize: 11, color: 'var(--color-text-tertiary)',
+          marginBottom: 6, display: 'flex', justifyContent: 'space-between',
+        }}>
+          <span>Tamanho do {tool === 'eraser' ? 'apagador' : 'pincel'}</span>
+          <span style={{ color: 'var(--color-text-secondary)' }}>{brush}px</span>
+        </div>
+        <input
+          type="range"
+          min={BRUSH_MIN} max={BRUSH_MAX}
+          value={brush}
+          onChange={e => setBrush(Number(e.target.value))}
+          disabled={disabled}
+          style={{ width: '100%', accentColor: '#1D9E75' }}
+        />
+      </div>
+
+      {/* Ver/ocultar + inverter — botões secundários inline */}
+      <div style={{ display: 'flex', gap: 6 }}>
+        <SecondaryAction
+          disabled={disabled}
+          onClick={() => setMaskVisible(!maskVisible)}
+          title={maskVisible ? 'Ocultar máscara' : 'Mostrar máscara'}
+        >
+          {maskVisible ? 'Ocultar' : 'Mostrar'}
+        </SecondaryAction>
+        <SecondaryAction
+          disabled={disabled}
+          onClick={onInvert}
+          title="Inverter máscara"
+        >
+          Inverter
+        </SecondaryAction>
+      </div>
+
+      <button
+        onClick={onClear}
+        disabled={disabled}
+        className="spn-action spn-action--ghost"
+        style={{ width: '100%', padding: '8px 14px', fontSize: 12 }}
+      >
+        Limpar máscara
+      </button>
+
+      {/* Recursos futuros — placeholders visuais, ainda não funcionais */}
+      <ComingSoon disabled={disabled} />
+
+      <div style={{
+        fontSize: 10, color: 'var(--color-text-quaternary)', lineHeight: 1.55,
+      }}>
+        Atalhos: <kbd style={kbdStyle}>Cmd/Ctrl+Z</kbd> desfazer ·{' '}
+        <kbd style={kbdStyle}>[</kbd> <kbd style={kbdStyle}>]</kbd> ajusta pincel
+      </div>
+    </div>
+  )
+}
+
+function ToolToggle({ active, disabled, onClick, label, icon }: {
+  active:   boolean
+  disabled: boolean
+  onClick:  () => void
+  label:    string
+  icon:     React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      style={{
+        flex: 1, padding: '7px 4px', borderRadius: 6,
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+        background: active ? 'var(--color-bg-elevated)' : 'transparent',
+        color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+        fontSize: 11, fontWeight: active ? 500 : 400,
+        letterSpacing: '-0.005em',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        boxShadow: active ? 'inset 0 0 0 0.5px var(--color-border-strong)' : 'none',
+        opacity: disabled && !active ? 0.5 : 1,
+        fontFamily: 'inherit',
+      }}
+    >
+      {icon}
+      <span>{label}</span>
+    </button>
+  )
+}
+
+function SecondaryAction({ children, onClick, disabled, title }: {
+  children: React.ReactNode
+  onClick:  () => void
+  disabled: boolean
+  title?:   string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      style={{
+        flex: 1,
+        padding: '7px 10px',
+        background: 'var(--color-bg)',
+        border: '0.5px solid var(--color-border-strong)',
+        borderRadius: 7,
+        color: 'var(--color-text-secondary)',
+        fontSize: 11, letterSpacing: '-0.005em',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.5 : 1,
+        fontFamily: 'inherit',
+      }}
+    >
+      {children}
+    </button>
+  )
+}
+
+function ComingSoon({ disabled }: { disabled: boolean }) {
+  const items = [
+    'Suavizar borda',
+    'Expandir máscara',
+    'Reduzir máscara',
+    'Selecionar parede',
+    'Selecionar piso',
+    'Selecionar céu',
+    'Selecionar vegetação',
+  ]
+  return (
+    <details style={{ width: '100%' }}>
+      <summary style={{
+        listStyle: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
+        fontSize: 10, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase',
+        color: 'var(--color-text-quaternary)',
+        padding: '4px 0', userSelect: 'none',
+        display: 'flex', alignItems: 'center', gap: 6,
+      }}>
+        <svg width="9" height="9" viewBox="0 0 12 12" fill="currentColor"><path d="M2 4l4 4 4-4z" /></svg>
+        Em breve
+      </summary>
+      <div style={{
+        display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 6,
+      }}>
+        {items.map(it => (
+          <span
+            key={it}
+            style={{
+              padding: '4px 8px',
+              fontSize: 10,
+              color: 'var(--color-text-quaternary)',
+              background: 'var(--color-bg)',
+              border: '0.5px dashed var(--color-border)',
+              borderRadius: 6,
+              letterSpacing: '-0.005em',
+              cursor: 'not-allowed',
+            }}
+          >
+            {it}
+          </span>
+        ))}
+      </div>
+    </details>
+  )
+}
+
+// ── Painel: controle de fidelidade ───────────────────────────
+
+export function FidelityControl({ value, onChange, disabled }: {
+  value:    FidelityMode
+  onChange: (v: FidelityMode) => void
+  disabled: boolean
+}) {
+  const meta = FIDELITY_LABELS[value]
+  const options: FidelityMode[] = ['max', 'balanced', 'creative']
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{
+        display: 'flex', gap: 3, padding: 3,
+        background: 'var(--color-surface)', borderRadius: 8,
+      }}>
+        {options.map(o => {
+          const active = o === value
+          const short  = o === 'max' ? 'Máxima' : o === 'balanced' ? 'Equilibrado' : 'Criativo'
+          return (
+            <button
+              key={o}
+              type="button"
+              disabled={disabled}
+              onClick={() => onChange(o)}
+              style={{
+                flex: 1, padding: '7px 4px', borderRadius: 6,
+                background: active ? 'var(--color-bg-elevated)' : 'transparent',
+                color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                fontSize: 11, fontWeight: active ? 500 : 400,
+                letterSpacing: '-0.005em',
+                cursor: disabled ? 'not-allowed' : 'pointer',
+                boxShadow: active ? 'inset 0 0 0 0.5px var(--color-border-strong)' : 'none',
+                opacity: disabled && !active ? 0.5 : 1,
+                fontFamily: 'inherit',
+              }}
+            >
+              {short}
+            </button>
+          )
+        })}
+      </div>
+      <p style={{
+        fontSize: 10, color: 'var(--color-text-quaternary)',
+        lineHeight: 1.55,
+      }}>
+        {meta.description}
+      </p>
+    </div>
+  )
+}
+
+// ── Painel: controle de resolução final ─────────────────────
+
+export function ResolutionControl({ value, onChange, disabled }: {
+  value:    Quality
+  onChange: (q: Quality) => void
+  disabled: boolean
+}) {
+  const options: { id: Quality; label: string }[] = [
+    { id: 'hd', label: 'Manter atual' },
+    { id: '2k', label: '2K' },
+    { id: '4k', label: '4K' },
+  ]
+  return (
+    <div style={{
+      display: 'flex', gap: 3, padding: 3,
+      background: 'var(--color-surface)', borderRadius: 8,
+    }}>
+      {options.map(o => {
+        const active = o.id === value
+        return (
+          <button
+            key={o.id}
+            type="button"
+            disabled={disabled}
+            onClick={() => onChange(o.id)}
+            style={{
+              flex: 1, padding: '7px 4px', borderRadius: 6,
+              background: active ? 'var(--color-bg-elevated)' : 'transparent',
+              color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+              fontSize: 11, fontWeight: active ? 500 : 400,
+              letterSpacing: '-0.005em',
+              cursor: disabled ? 'not-allowed' : 'pointer',
+              boxShadow: active ? 'inset 0 0 0 0.5px var(--color-border-strong)' : 'none',
+              opacity: disabled && !active ? 0.5 : 1,
+              fontFamily: 'inherit',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {o.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 // ── Step: result ─────────────────────────────────────────────
 
-function ResultStep({ sourceUrl, resultUrl, prompt, coverage, driftWarning, onEditAgain, onDiscard }: {
+function ResultStep({
+  sourceUrl, resultUrl, prompt, coverage, driftWarning,
+  versions, activeVersionId, onPickVersion, onUseVersionAsBase,
+  onEditAgain, onDiscard,
+}: {
   sourceUrl:    string
   resultUrl:    string
   prompt:       string
   coverage:     number
   driftWarning: number | null
+  versions:        EditVersion[]
+  activeVersionId: string | null
+  onPickVersion:   (v: EditVersion) => void
+  onUseVersionAsBase: (v: EditVersion) => void
   onEditAgain:  () => void
   onDiscard:    () => void
 }) {
@@ -623,8 +1037,10 @@ function ResultStep({ sourceUrl, resultUrl, prompt, coverage, driftWarning, onEd
           Resultado
         </h2>
         <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>
-          Prompt: <span style={{ color: 'var(--color-text-secondary)' }}>&quot;{prompt}&quot;</span>
-          <span style={{ marginLeft: 12 }}>· área editada: {(coverage * 100).toFixed(1)}%</span>
+          {prompt && (
+            <>Prompt: <span style={{ color: 'var(--color-text-secondary)' }}>&quot;{prompt}&quot;</span></>
+          )}
+          <span style={{ marginLeft: prompt ? 12 : 0 }}>· área editada: {(coverage * 100).toFixed(1)}%</span>
         </div>
       </div>
 
@@ -645,6 +1061,17 @@ function ResultStep({ sourceUrl, resultUrl, prompt, coverage, driftWarning, onEd
         pos={sliderPos}
         setPos={setSliderPos}
       />
+
+      {versions.length > 1 && (
+        <div style={{ marginTop: 14 }}>
+          <VersionStrip
+            versions={versions}
+            activeId={activeVersionId}
+            onPick={onPickVersion}
+            onUseAsBase={onUseVersionAsBase}
+          />
+        </div>
+      )}
 
       <div style={{
         marginTop: 18, display: 'flex', gap: 10, justifyContent: 'space-between',
@@ -746,7 +1173,142 @@ function BeforeAfterSlider({ beforeUrl, afterUrl, pos, setPos }: {
   )
 }
 
-function PanelLabel({ children }: { children: React.ReactNode }) {
+// ── Version strip ───────────────────────────────────────────
+// Lista compacta horizontal das versões geradas na sessão. A versão ativa
+// aparece com anel verde; click na thumb visualiza ela no comparador.
+// Hover na thumb expõe um botão "Editar a partir" pra recomeçar com ela.
+
+export function VersionStrip({ versions, activeId, onPick, onUseAsBase }: {
+  versions:    EditVersion[]
+  activeId:    string | null
+  onPick:      (v: EditVersion) => void
+  onUseAsBase: (v: EditVersion) => void
+}) {
+  return (
+    <div style={{
+      background: 'var(--color-bg-elevated)',
+      border: '0.5px solid var(--color-border)',
+      borderRadius: 12, padding: 12,
+    }}>
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+        marginBottom: 8,
+      }}>
+        <PanelLabel>Histórico de versões</PanelLabel>
+        <span style={{ fontSize: 10, color: 'var(--color-text-quaternary)' }}>
+          {versions.length} {versions.length === 1 ? 'versão' : 'versões'}
+        </span>
+      </div>
+      <div style={{
+        display: 'flex', gap: 10, overflowX: 'auto',
+        paddingBottom: 4,
+        scrollbarWidth: 'thin',
+      }}>
+        {versions.map(v => (
+          <VersionThumb
+            key={v.id}
+            version={v}
+            active={v.id === activeId}
+            onPick={() => onPick(v)}
+            onUseAsBase={() => onUseAsBase(v)}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function VersionThumb({ version, active, onPick, onUseAsBase }: {
+  version:     EditVersion
+  active:      boolean
+  onPick:      () => void
+  onUseAsBase: () => void
+}) {
+  const [hover, setHover] = useState(false)
+  return (
+    <div
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        position: 'relative',
+        flex: '0 0 auto',
+        width: 96,
+        display: 'flex', flexDirection: 'column', gap: 5,
+      }}
+    >
+      <button
+        type="button"
+        onClick={onPick}
+        title={version.label}
+        style={{
+          position: 'relative', width: 96, height: 72,
+          padding: 0, borderRadius: 8, overflow: 'hidden',
+          background: 'var(--color-bg)',
+          border: active ? '1.5px solid #1D9E75' : '0.5px solid var(--color-border-strong)',
+          cursor: 'pointer',
+          boxShadow: active ? '0 0 0 2px rgba(29,158,117,0.18)' : 'none',
+        }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={version.url}
+          alt={version.label}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        />
+        {version.isOriginal && (
+          <span style={{
+            position: 'absolute', top: 4, left: 4,
+            padding: '2px 6px', borderRadius: 4,
+            background: 'rgba(0,0,0,0.6)',
+            fontSize: 8, fontWeight: 600, letterSpacing: '0.08em',
+            color: '#fff', textTransform: 'uppercase',
+          }}>
+            Original
+          </span>
+        )}
+        {!version.isOriginal && hover && (
+          <button
+            type="button"
+            onClick={e => { e.stopPropagation(); onUseAsBase() }}
+            style={{
+              position: 'absolute', inset: 0,
+              background: 'rgba(10,10,10,0.78)',
+              color: 'var(--color-text-primary)',
+              fontSize: 10, fontWeight: 500, letterSpacing: '-0.005em',
+              cursor: 'pointer', border: 'none',
+            }}
+          >
+            Editar a partir
+          </button>
+        )}
+      </button>
+      <div style={{
+        fontSize: 10, color: active ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
+        fontWeight: active ? 500 : 400,
+        letterSpacing: '-0.005em',
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>
+        {version.label}
+      </div>
+    </div>
+  )
+}
+
+// ── Helpers de painel ────────────────────────────────────────
+
+export function PanelSection({ label, children }: {
+  label:    string
+  children: React.ReactNode
+}) {
+  return (
+    <section style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <PanelLabel>{label}</PanelLabel>
+      {children}
+    </section>
+  )
+}
+
+export function PanelLabel({ children }: { children: React.ReactNode }) {
   return (
     <div style={{
       fontSize: 10, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase',
@@ -755,4 +1317,16 @@ function PanelLabel({ children }: { children: React.ReactNode }) {
       {children}
     </div>
   )
+}
+
+const kbdStyle: React.CSSProperties = {
+  display: 'inline-block',
+  padding: '0 4px',
+  fontFamily: 'inherit',
+  fontSize: 9,
+  color: 'var(--color-text-tertiary)',
+  background: 'var(--color-surface)',
+  border: '0.5px solid var(--color-border)',
+  borderRadius: 3,
+  letterSpacing: 0,
 }

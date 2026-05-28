@@ -10,27 +10,12 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isQuality, isEditSourceType, type Quality } from '@/lib/spaces/types'
 import { getEditCost } from '@/lib/spaces/edit-economy'
-import { selectEngine, callWithTimeoutRetry, type EditMode } from '@/lib/spaces/engines'
-
-const VALID_MODES: EditMode[] = ['remove', 'material', 'replace', 'add']
-function isEditMode(v: unknown): v is EditMode {
-  return typeof v === 'string' && (VALID_MODES as string[]).includes(v)
-}
-
-// Mask-constraint prompt wrapper. Applied for modes that consume the prompt
-// (material, replace, add). The `remove` mode ignores the prompt entirely
-// (object-removal model doesn't use one), so we don't wrap it.
-const STANDALONE_PROMPT = (userPrompt: string, _quality: Quality) => [
-  'Edit only the masked area of this image. Do not modify any pixels outside the mask.',
-  '',
-  `USER REQUEST: ${userPrompt}`,
-  '',
-  'Maintain visual coherence with the rest of the image. Match lighting, perspective, scale, and material rendering style of unmasked areas.',
-  '',
-  'IMPORTANT: do not modify anything outside the masked area. The output must be pixel-identical to the input outside the mask boundaries.',
-  '',
-  'Output: photorealistic edit.',
-].join('\n')
+import { selectEngine, callWithTimeoutRetry, isEditMode, type EditMode } from '@/lib/spaces/engines'
+import {
+  composeStandaloneFinalPrompt,
+  isFidelityMode,
+  type FidelityMode,
+} from '@/lib/spaces/edit-prompts'
 
 interface EditBody {
   source_image_url?:    unknown
@@ -40,10 +25,12 @@ interface EditBody {
   source_type?:         unknown
   source_id?:           unknown
   mask_coverage?:       unknown
-  /** New (Phase C): intentional edit mode picked from the UI tabs. */
+  /** Phase C: intentional edit mode picked from the UI tabs. */
   mode?:                unknown
-  /** New (Phase C): optional reference image URL for 'replace' mode. */
+  /** Phase C: optional reference image URL for 'replace' mode. */
   reference_image_url?: unknown
+  /** v2: how strictly to preserve geometry/lighting (max | balanced | creative). */
+  fidelity_mode?:       unknown
 }
 
 export async function POST(req: NextRequest) {
@@ -62,6 +49,10 @@ export async function POST(req: NextRequest) {
   // Mode defaults to 'material' (legacy clients that don't send mode get material swap behaviour).
   const mode: EditMode = isEditMode(body.mode) ? body.mode : 'material'
 
+  // Fidelity defaults to 'max' — the safer default for architectural work.
+  // Legacy clients that don't send fidelity_mode get the strict-preservation prompt.
+  const fidelity: FidelityMode = isFidelityMode(body.fidelity_mode) ? body.fidelity_mode : 'max'
+
   if (!sourceUrl || !maskUrl) {
     return NextResponse.json({ error: 'source_image_url e mask_url obrigatórios' }, { status: 400 })
   }
@@ -78,6 +69,9 @@ export async function POST(req: NextRequest) {
   }
   if (body.mode !== undefined && !isEditMode(body.mode)) {
     return NextResponse.json({ error: 'mode inválido' }, { status: 400 })
+  }
+  if (body.fidelity_mode !== undefined && !isFidelityMode(body.fidelity_mode)) {
+    return NextResponse.json({ error: 'fidelity_mode inválido' }, { status: 400 })
   }
   const quality:      Quality = body.quality
   const sourceType            = body.source_type
@@ -130,8 +124,8 @@ export async function POST(req: NextRequest) {
     // modes use Flux Pro Fill / Flux dev inpaint with the mask-constraint
     // wrapper. The router decision is invisible to the user — they only see
     // the tab they picked.
-    const engine    = selectEngine(mode, quality)
-    const finalPrompt = mode === 'remove' ? '' : STANDALONE_PROMPT(prompt, quality)
+    const engine      = selectEngine(mode, quality)
+    const finalPrompt = composeStandaloneFinalPrompt({ userPrompt: prompt, mode, fidelity })
     // callWithTimeoutRetry retries once on RetouchTimeoutError (cold start).
     // Other errors propagate immediately.
     const out = await callWithTimeoutRetry(engine, {

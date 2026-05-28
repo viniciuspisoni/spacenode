@@ -47,8 +47,13 @@ export function selectEngine(mode: EditMode, quality: Quality = 'hd'): EngineDes
 
     case 'material':
     case 'replace':
-    case 'add': {
+    case 'add':
+    case 'fix':
+    case 'lighting':
+    case 'landscape': {
       const google = selectGeminiEngine(quality)
+      // Texture/material swap → Flux Pro Fill fallback (best at material work).
+      // Everything else → Flux general inpaint as the safety net.
       const fluxFallback: RetouchEngine = mode === 'material' ? callFluxFill : callFluxInpaint
 
       return {

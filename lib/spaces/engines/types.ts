@@ -12,35 +12,76 @@ import type { Quality } from '../types'
 
 // ── User-facing intention ─────────────────────────────────────────────────────
 
-export type EditMode = 'remove' | 'material' | 'replace' | 'add'
+export type EditMode =
+  | 'remove'
+  | 'material'
+  | 'replace'
+  | 'add'
+  | 'fix'
+  | 'lighting'
+  | 'landscape'
+
+export const VALID_EDIT_MODES: EditMode[] = [
+  'remove', 'material', 'replace', 'add', 'fix', 'lighting', 'landscape',
+]
+
+export function isEditMode(v: unknown): v is EditMode {
+  return typeof v === 'string' && (VALID_EDIT_MODES as string[]).includes(v)
+}
 
 export interface EditModeMeta {
   label:             string
+  /** Curta — usada em tooltips e descrição abaixo das tabs. */
   description:       string
+  /** Placeholder do textarea quando esse modo está ativo. */
   promptPlaceholder: string
+  /** Ação no botão de gerar (verbo). */
+  ctaVerb:           string
 }
 
 export const EDIT_MODE_LABELS: Record<EditMode, EditModeMeta> = {
   remove: {
     label:             'Remover',
-    description:       'Apagar objeto ou pessoa, preencher com o entorno',
-    promptPlaceholder: 'Ex: remover pessoa em primeiro plano',
+    description:       'Apague objetos, pessoas, carros ou elementos indesejados.',
+    promptPlaceholder: 'Ex: remover o carro selecionado e reconstruir o fundo de forma natural',
+    ctaVerb:           'Gerar remoção',
   },
   // Renamed from 'texture' → 'material' (user-visible label and route key).
   material: {
     label:             'Trocar material',
-    description:       'Mudar material, cor ou acabamento da área mascarada',
-    promptPlaceholder: 'Ex: paredes em concreto aparente pigmentado de cinza',
+    description:       'Altere revestimentos, pisos, paredes, fachadas e acabamentos.',
+    promptPlaceholder: 'Ex: trocar a parede selecionada por concreto aparente cinza claro',
+    ctaVerb:           'Gerar troca de material',
   },
   replace: {
     label:             'Substituir',
-    description:       'Trocar elemento por outro (móvel, luminária, etc.)',
-    promptPlaceholder: 'Ex: cadeira de madeira clara estilo Wegner',
+    description:       'Troque objetos mantendo escala, perspectiva e iluminação.',
+    promptPlaceholder: 'Ex: substituir a cadeira selecionada por uma poltrona de couro caramelo',
+    ctaVerb:           'Gerar substituição',
   },
   add: {
     label:             'Adicionar',
-    description:       'Inserir um novo elemento na cena',
-    promptPlaceholder: 'Ex: planta tropical em vaso de concreto',
+    description:       'Insira elementos realistas na área selecionada.',
+    promptPlaceholder: 'Ex: adicionar vegetação tropical realista na área selecionada',
+    ctaVerb:           'Gerar adição',
+  },
+  fix: {
+    label:             'Corrigir detalhes',
+    description:       'Corrija artefatos, distorções, manchas ou falhas da imagem.',
+    promptPlaceholder: 'Ex: corrigir deformações e artefatos mantendo a imagem natural',
+    ctaVerb:           'Gerar correção',
+  },
+  lighting: {
+    label:             'Iluminação',
+    description:       'Ajuste luz, sombras, temperatura e atmosfera da cena.',
+    promptPlaceholder: 'Ex: adicionar iluminação quente indireta nas áreas selecionadas',
+    ctaVerb:           'Gerar iluminação',
+  },
+  landscape: {
+    label:             'Paisagismo',
+    description:       'Adicione ou refine jardins, vegetação e áreas externas.',
+    promptPlaceholder: 'Ex: criar jardim minimalista com vegetação baixa e pedras naturais',
+    ctaVerb:           'Gerar paisagismo',
   },
 }
 

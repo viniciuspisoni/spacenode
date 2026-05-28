@@ -182,3 +182,44 @@ a {
   width: 0;
   height: 0;
 }
+
+/* Modo Editar — layout do step `editing`. Desktop: canvas + sidebar 296px.
+   Tablet/mobile: colapsa em uma coluna, sidebar vai pra baixo do canvas. */
+.spn-editar-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) 296px;
+}
+@media (max-width: 899px) {
+  .spn-editar-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Modo Editar — tabs das 7 ações arquitetônicas. Grid 7 colunas no desktop,
+   quebra em linhas em tablet, scroll horizontal em mobile. */
+.spn-retocar-tabs {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  padding: 3px;
+  background: var(--color-surface);
+  border-radius: 12px;
+  border: 0.5px solid var(--color-border);
+}
+@media (max-width: 899px) {
+  .spn-retocar-tabs {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+@media (max-width: 599px) {
+  .spn-retocar-tabs {
+    grid-template-columns: repeat(7, 96px);
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+  .spn-retocar-tabs::-webkit-scrollbar {
+    display: none;
+  }
+}

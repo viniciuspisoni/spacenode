@@ -15,6 +15,8 @@ export type {
 
 export {
   EDIT_MODE_LABELS,
+  VALID_EDIT_MODES,
+  isEditMode,
   RetouchTimeoutError,
   RetouchNoOutputError,
 } from './types'

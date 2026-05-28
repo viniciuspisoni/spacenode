@@ -10,62 +10,28 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { isQuality, type Quality, type Space, type Vista, type ProjectDNA } from '@/lib/spaces/types'
+import { isQuality, type Quality, type Space, type Vista } from '@/lib/spaces/types'
 import { getEditCost } from '@/lib/spaces/edit-economy'
-import { selectEngine, callWithTimeoutRetry, type EditMode } from '@/lib/spaces/engines'
+import { selectEngine, callWithTimeoutRetry, isEditMode, type EditMode } from '@/lib/spaces/engines'
 import { getVisualDna } from '@/lib/spaces/dna'
-
-const VALID_MODES: EditMode[] = ['remove', 'material', 'replace', 'add']
-function isEditMode(v: unknown): v is EditMode {
-  return typeof v === 'string' && (VALID_MODES as string[]).includes(v)
-}
+import {
+  composeEmbeddedFinalPrompt,
+  isFidelityMode,
+  type FidelityMode,
+  type EmbeddedDnaContext,
+} from '@/lib/spaces/edit-prompts'
 
 interface EditBody {
   mask_url?:            unknown
   prompt?:              unknown
   quality?:             unknown
   mask_coverage?:       unknown
-  /** New (Phase C): intentional edit mode picked from the UI tabs. */
+  /** Phase C: intentional edit mode picked from the UI tabs. */
   mode?:                unknown
-  /** New (Phase C): optional reference image URL for 'replace' mode. */
+  /** Phase C: optional reference image URL for 'replace' mode. */
   reference_image_url?: unknown
-}
-
-function buildEmbeddedPrompt(args: {
-  userPrompt: string
-  dna:        ProjectDNA | null
-}): string {
-  const { userPrompt, dna } = args
-
-  const dnaLines: string[] = []
-  if (dna) {
-    dnaLines.push(`- Style: ${dna.estilo.nome}`)
-    if (dna.materiais.length > 0) {
-      dnaLines.push(`- Materials present: ${dna.materiais.map(m => `${m.nome} (${m.hex})`).join(', ')}`)
-    }
-    if (dna.paleta.length > 0) {
-      dnaLines.push(`- Color palette: ${dna.paleta.join(', ')}`)
-    }
-    if (dna.contexto.length > 0) {
-      dnaLines.push(`- Mood/context: ${dna.contexto.join(', ')}`)
-    }
-  }
-  const dnaBlock = dnaLines.length > 0
-    ? `PROJECT CONTEXT (preserve consistency with these):\n${dnaLines.join('\n')}\n\n`
-    : ''
-
-  return [
-    'Edit only the masked area of this architectural image. Do not modify any pixels outside the mask.',
-    '',
-    `USER REQUEST: ${userPrompt}`,
-    '',
-    dnaBlock +
-    'Maintain visual coherence with the rest of the image. Match lighting, perspective, scale, and material rendering style of unmasked areas.',
-    '',
-    'IMPORTANT: do not modify anything outside the masked area. The output must be pixel-identical to the input outside the mask boundaries.',
-    '',
-    'Output: photorealistic architectural rendering.',
-  ].join('\n')
+  /** v2: how strictly to preserve geometry/lighting (max | balanced | creative). */
+  fidelity_mode?:       unknown
 }
 
 export async function POST(
@@ -87,6 +53,9 @@ export async function POST(
   // Mode defaults to 'material' (legacy clients that don't send mode).
   const mode: EditMode = isEditMode(body.mode) ? body.mode : 'material'
 
+  // Fidelity defaults to 'max' — the safer default for architectural work.
+  const fidelity: FidelityMode = isFidelityMode(body.fidelity_mode) ? body.fidelity_mode : 'max'
+
   if (!maskUrl) return NextResponse.json({ error: 'mask_url obrigatório' }, { status: 400 })
   // 'remove' doesn't need a prompt — the model fills with surrounding context.
   if (mode !== 'remove' && !prompt) {
@@ -97,6 +66,9 @@ export async function POST(
   }
   if (body.mode !== undefined && !isEditMode(body.mode)) {
     return NextResponse.json({ error: 'mode inválido' }, { status: 400 })
+  }
+  if (body.fidelity_mode !== undefined && !isFidelityMode(body.fidelity_mode)) {
+    return NextResponse.json({ error: 'fidelity_mode inválido' }, { status: 400 })
   }
   const quality:      Quality = body.quality
   const maskCoverage          = typeof body.mask_coverage === 'number'
@@ -203,7 +175,18 @@ export async function POST(
     // insert succeeds; out.endpoint is logged for telemetry. Phase D will
     // relax the constraint via migration so each row stores the actual engine.
     const engine = selectEngine(mode, quality)
-    const finalPrompt = mode === 'remove' ? '' : buildEmbeddedPrompt({ userPrompt: prompt, dna })
+    const dnaContext: EmbeddedDnaContext | null = dna ? {
+      estiloNome: dna.estilo.nome,
+      materiais:  dna.materiais,
+      paleta:     dna.paleta,
+      contexto:   dna.contexto,
+    } : null
+    const finalPrompt = composeEmbeddedFinalPrompt({
+      userPrompt: prompt,
+      mode,
+      fidelity,
+      dna:        dnaContext,
+    })
     // callWithTimeoutRetry retries once on RetouchTimeoutError (cold start).
     const out = await callWithTimeoutRetry(engine, {
       imageUrl:     vista.image_url,

@@ -43,6 +43,16 @@ export const GUARD_THRESHOLDS: Record<EditMode, GuardThresholds> = {
   // into the mask boundary — give them more headroom.
   replace: { ok: 0.04, warning: 0.10, retry: 0.10 },
   add:     { ok: 0.04, warning: 0.10, retry: 0.10 },
+
+  // Fixing artifacts is surgical — the user wants tiny corrections only.
+  fix:     { ok: 0.02, warning: 0.05, retry: 0.05 },
+
+  // Lighting changes by definition radiate beyond the painted mask (shadows,
+  // ambient bounce, color temperature shifts). Drift is expected and desired.
+  lighting:  { ok: 0.15, warning: 0.30, retry: 0.40 },
+
+  // Landscape edits add organic shapes whose edges blend with the surroundings.
+  landscape: { ok: 0.05, warning: 0.12, retry: 0.15 },
 }
 
 // ── Verdict ───────────────────────────────────────────────────────────────────
@@ -63,10 +73,13 @@ export function evaluateGuard(drift: number, mode: EditMode): GuardVerdict {
 // many retries burns nodes for no gain.
 
 export const MAX_RETRIES_PER_MODE: Record<EditMode, number> = {
-  material: 1,
-  remove:  1,
-  replace: 1,
-  add:     1,
+  material:  1,
+  remove:    1,
+  replace:   1,
+  add:       1,
+  fix:       1,
+  lighting:  1,
+  landscape: 1,
 }
 
 // ── Prompt tightening ────────────────────────────────────────────────────────
@@ -95,6 +108,23 @@ const CONSTRAINT_PREFIX: Record<EditMode, string> = {
     'Do not alter the surrounding geometry, lighting, or architecture. ' +
     'The new element must fit fully within the mask, with edges blending ' +
     'into the surroundings without modifying them. ',
+
+  fix:
+    'STRICT MASK CONSTRAINT: only repair pixels inside the painted mask. ' +
+    'Preserve the original architecture, geometry, and composition. ' +
+    'Do not introduce new elements — only fix artifacts, distortions, or noise. ',
+
+  lighting:
+    'LIGHTING-FOCUSED EDIT: re-light the painted area while preserving all ' +
+    'geometry, materials, and architectural elements. Sympathetic falloff into ' +
+    'adjacent areas (shadows, ambient bounce) is allowed and expected, but do ' +
+    'not move, recolor, or replace any solid surface outside the mask. ',
+
+  landscape:
+    'STRICT MASK CONSTRAINT: only add vegetation or landscape elements inside ' +
+    'the painted mask. Do not alter the building, architecture, or any ' +
+    'man-made structure outside the mask. New plants should fit the scale, ' +
+    'perspective, and lighting of the surrounding context. ',
 }
 
 export function buildRetryPrompt(originalPrompt: string, mode: EditMode): string {
