@@ -145,10 +145,10 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: 'APRESENTAR',
     items: [
-      { label: 'planta humanizada', href: null, exact: false, Icon: IconHumanizedPlan, badge: 'em breve', badgeTone: 'muted' },
-      { label: 'isométricas',       href: null, exact: false, Icon: IconIsometric,     badge: 'em breve', badgeTone: 'muted' },
-      { label: 'prancha ia',        href: null, exact: false, Icon: IconBoard,         badge: 'em breve', badgeTone: 'muted' },
-      { label: 'moodboard',         href: null, exact: false, Icon: IconMoodboard,     badge: 'em breve', badgeTone: 'muted' },
+      { label: 'planta humanizada', href: '/app/apresentar/planta-humanizada', exact: false, Icon: IconHumanizedPlan, badge: 'novo', badgeTone: 'green' },
+      { label: 'isométricas',       href: '/app/apresentar/isometricas',       exact: false, Icon: IconIsometric,     badge: 'novo', badgeTone: 'green' },
+      { label: 'prancha ia',        href: '/app/apresentar/prancha',           exact: false, Icon: IconBoard,         badge: 'beta', badgeTone: 'green' },
+      { label: 'moodboard',         href: '/app/apresentar/moodboard',         exact: false, Icon: IconMoodboard,     badge: 'novo', badgeTone: 'green' },
     ],
   },
   {
