@@ -1,229 +1,181 @@
+// POST /api/upscale — módulo Ampliar v2 (abas Resolução e Aprimorar).
+//
+// Contrato (FormData):
+//   - image:        File (obrigatório)
+//   - tab:          'resolution' | 'enhance'
+//   - modeId:       'fidelity' | 'recover' | 'denoise' | 'deblur' | 'restore' | 'smart'
+//   - scale:        'none' | '2x' | '4x' | '8x' | 'ultra'
+//   - objectiveId?: 'client' | 'portfolio' | 'print' | 'recover' | 'final'
+//   - imageWidth?:  number  (origem; usado para custo por megapixel)
+//   - imageHeight?: number
+//
+// Custo: computeUpscaleCost — único ponto de verdade.
+// Débito: consume_nodes_v2 com refund_nodes em falha pós-débito.
+// Histórico: insere em `renders` com upscale_meta jsonb completo.
+
 import { NextRequest, NextResponse } from 'next/server'
 import { fal } from '@fal-ai/client'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import {
+  computeUpscaleCost,
+  finalProvider,
+  megapixelsFromDimensions,
+  runUpscalePipeline,
+  type ModeId,
+  type Scale,
+  type UpscaleTab,
+} from '@/lib/upscale'
 
 export const maxDuration = 300
 
 fal.config({ credentials: process.env.FAL_KEY })
 
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+const VALID_TABS:   UpscaleTab[] = ['resolution', 'enhance']
+const VALID_MODES:  ModeId[]     = ['fidelity', 'recover', 'denoise', 'deblur', 'restore', 'smart']
+const VALID_SCALES: Scale[]      = ['none', '2x', '4x', '8x', 'ultra']
 
-// fal-based modes: cost derived from scale
-const SCALE_COST: Record<number, number> = { 2: 4, 4: 8, 8: 20 }
-// Magnific: fixed cost regardless of scale
-const MODEL_COST: Record<string, number> = { magnific: 20 }
+// Constraint: aba × modo precisam combinar para evitar requisições inválidas.
+const ALLOWED_MODES_BY_TAB: Record<UpscaleTab, ModeId[]> = {
+  resolution: ['fidelity', 'recover'],
+  enhance:    ['denoise', 'deblur', 'restore', 'smart'],
+}
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
-  let inputUrl: string | undefined
-  let outputUrl: string | undefined
+  // ── Parse + validação ──────────────────────────────────────────────────────
+  const form = await req.formData()
+  const imageFile   = form.get('image')        as File   | null
+  const tab         = (form.get('tab')         as string | null) ?? 'resolution'
+  const modeId      = (form.get('modeId')      as string | null) ?? 'fidelity'
+  const scale       = (form.get('scale')       as string | null) ?? '4x'
+  const objectiveId = (form.get('objectiveId') as string | null) ?? null
+  const widthRaw    =  form.get('imageWidth')  as string | null
+  const heightRaw   =  form.get('imageHeight') as string | null
+
+  if (!imageFile) {
+    return NextResponse.json({ error: 'Imagem obrigatória' }, { status: 400 })
+  }
+  if (!VALID_TABS.includes(tab as UpscaleTab)) {
+    return NextResponse.json({ error: 'tab inválido' }, { status: 400 })
+  }
+  if (!VALID_MODES.includes(modeId as ModeId)) {
+    return NextResponse.json({ error: 'modeId inválido' }, { status: 400 })
+  }
+  if (!VALID_SCALES.includes(scale as Scale)) {
+    return NextResponse.json({ error: 'scale inválido' }, { status: 400 })
+  }
+  if (!ALLOWED_MODES_BY_TAB[tab as UpscaleTab].includes(modeId as ModeId)) {
+    return NextResponse.json({ error: 'combinação tab/modo inválida' }, { status: 400 })
+  }
+
+  const tabT    = tab    as UpscaleTab
+  const modeT   = modeId as ModeId
+  const scaleT  = scale  as Scale
+  const width   = widthRaw  ? Number(widthRaw)  : null
+  const height  = heightRaw ? Number(heightRaw) : null
+
+  // ── Custo ──────────────────────────────────────────────────────────────────
+  const cost = computeUpscaleCost({
+    tab:        tabT,
+    modeId:     modeT,
+    scale:      scaleT,
+    megapixels: megapixelsFromDimensions(width, height),
+  }).total
+
+  // ── Débito (com refund em falha) ───────────────────────────────────────────
+  const admin = createAdminClient()
+  let debited = false
+  let inputUrl:  string | undefined
 
   try {
-    const formData           = await req.formData()
-    const imageFile          = formData.get('image')               as File   | null
-    const modelId            = (formData.get('model')              as string | null) ?? 'fal-ai/clarity-upscaler'
-    const scaleRaw           = (formData.get('scale')              as string | null) ?? '4'
-    const description        = (formData.get('description')        as string | null) ?? ''
-    const preserveGeometry   = (formData.get('preserveGeometry')   as string | null) === 'true'
-    const recreationStrength = (formData.get('recreationStrength') as string | null) ?? 'low'
+    const { error: debitErr } = await admin.rpc('consume_nodes_v2', {
+      user_id_input: user.id,
+      amount:        cost,
+    })
+    if (debitErr) {
+      if (debitErr.code === 'P0001') {
+        return NextResponse.json(
+          { error: 'insufficient_balance', required: cost, message: 'Saldo insuficiente' },
+          { status: 402 },
+        )
+      }
+      console.error('[upscale] consume_nodes_v2 RPC error:', debitErr)
+      return NextResponse.json({ error: 'Erro ao processar saldo' }, { status: 500 })
+    }
+    debited = true
 
-    if (!imageFile) {
-      return NextResponse.json({ error: 'Imagem obrigatória' }, { status: 400 })
+    // ── Upload da imagem para FAL ──────────────────────────────────────────
+    inputUrl = await fal.storage.upload(imageFile)
+
+    console.log('[upscale] tab=%s mode=%s scale=%s mp=%s', tabT, modeT, scaleT, megapixelsFromDimensions(width, height))
+
+    // ── Pipeline ────────────────────────────────────────────────────────────
+    const result = await runUpscalePipeline({
+      tab:             tabT,
+      modeId:          modeT,
+      scale:           scaleT,
+      objectiveId:     objectiveId as never,
+      imageUrl:        inputUrl,
+      inputDimensions: width && height ? { width, height } : null,
+    })
+
+    const outputUrl   = result.outputUrl
+    const usedProvider = finalProvider(result) ?? modeT
+
+    // ── Histórico ───────────────────────────────────────────────────────────
+    // Mantemos o padrão legado em ambient/style/lighting para compatibilidade
+    // com a UI de histórico atual; o detalhe rico vai em upscale_meta.
+    const styleKey = `upscale:${usedProvider}`
+    const lighting = scaleT === 'none' ? 'none' : scaleT
+
+    const upscaleMeta = {
+      tab:              tabT,
+      mode_id:          modeT,
+      objective_id:     objectiveId,
+      scale:            scaleT,
+      steps:            result.steps,
+      input_dimensions:  width && height ? { width, height } : null,
+      total_duration_ms: result.totalDurationMs,
     }
 
-    const scale    = Number(scaleRaw)
-    const nodeCost = MODEL_COST[modelId] ?? SCALE_COST[scale] ?? 8
+    await admin.from('renders').insert({
+      user_id:      user.id,
+      input_url:    inputUrl,
+      output_url:   outputUrl,
+      prompt:       `ampliar ${tabT}/${modeT} ${scaleT}`,
+      ambient:      'upscale',
+      style:        styleKey,
+      lighting,
+      status:       'completed',
+      completed_at: new Date().toISOString(),
+      upscale_meta: upscaleMeta,
+    } as never)
 
-    const admin = createAdminClient()
-    const { data: profile } = await admin
-      .from('profiles')
-      .select('credits')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile || profile.credits < nodeCost) {
-      return NextResponse.json({ error: 'Créditos insuficientes' }, { status: 402 })
-    }
-
-    // ── Route to provider ─────────────────────────────────────────────────────
-    if (modelId === 'magnific') {
-      inputUrl  = await fal.storage.upload(imageFile)
-      outputUrl = await upscaleWithMagnific(inputUrl, scale, preserveGeometry, recreationStrength)
-    } else {
-      // fal.ai models: clarity, supir, aura-sr, esrgan
-      inputUrl = await fal.storage.upload(imageFile)
-      const falInput = buildFalInput(modelId, inputUrl, scale, description, preserveGeometry, recreationStrength)
-
-      console.log('[upscale] model :', modelId)
-      console.log('[upscale] scale :', scale)
-      console.log('[upscale] input :', JSON.stringify(falInput))
-
-      const result = await fal.subscribe(modelId, { input: falInput })
-
-      console.log('[upscale] output:', JSON.stringify(result.data))
-
-      outputUrl = extractOutputUrl(modelId, result.data) ?? undefined
-      if (!outputUrl) throw new Error('Modelo não retornou imagem')
-    }
-
-    console.log('[upscale] outputUrl:', outputUrl)
-
-    await Promise.all([
-      admin.from('renders').insert({
-        user_id:      user.id,
-        input_url:    inputUrl,
-        output_url:   outputUrl,
-        prompt:       description || `upscale ${scale}x`,
-        ambient:      'upscale',
-        style:        modelId,
-        lighting:     `${scale}x`,
-        status:       'completed',
-        completed_at: new Date().toISOString(),
-      }),
-      supabase.rpc('consume_credits', { user_id_input: user.id, amount: nodeCost }),
-    ])
-
-    return NextResponse.json({ url: outputUrl, originalUrl: inputUrl })
+    return NextResponse.json({
+      url:         outputUrl,
+      originalUrl: inputUrl,
+      provider:    usedProvider,
+      durationMs:  result.totalDurationMs,
+    })
 
   } catch (err: unknown) {
     const e = err as { status?: number; body?: unknown; message?: string }
     console.error('[upscale] ERROR status:', e?.status)
     console.error('[upscale] ERROR body  :', JSON.stringify(e?.body ?? e?.message ?? err))
-    return NextResponse.json({ error: 'Erro ao fazer upscale. Tente novamente.' }, { status: 500 })
-  }
-}
 
-// ── Magnific ──────────────────────────────────────────────────────────────────
-
-const MAGNIFIC_BASE = 'https://api.magnific.com/v1/ai/image-upscaler-precision-v2'
-
-const MAGNIFIC_PARAMS: Record<string, { sharpen: number; ultra_detail: number; smart_grain: number }> = {
-  low:    { sharpen: 10, ultra_detail: 25, smart_grain: 5  },
-  medium: { sharpen: 18, ultra_detail: 40, smart_grain: 8  },
-  high:   { sharpen: 28, ultra_detail: 60, smart_grain: 12 },
-}
-
-async function upscaleWithMagnific(
-  imageUrl: string,
-  scale: number,
-  preserveGeometry: boolean,
-  recreationStrength: string,
-): Promise<string> {
-  const apiKey = process.env.MAGNIFIC_API_KEY
-  if (!apiKey) throw new Error('MAGNIFIC_API_KEY não configurado')
-
-  const params = MAGNIFIC_PARAMS[recreationStrength] ?? MAGNIFIC_PARAMS.low
-
-  const submitRes = await fetch(MAGNIFIC_BASE, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json', 'x-magnific-api-key': apiKey },
-    body: JSON.stringify({
-      image:        imageUrl,
-      scale_factor: Math.min(scale, 16),
-      flavor:       preserveGeometry ? 'photo' : 'sublime',
-      sharpen:      params.sharpen,
-      smart_grain:  params.smart_grain,
-      ultra_detail: params.ultra_detail,
-    }),
-  })
-
-  if (!submitRes.ok) {
-    const body = await submitRes.text()
-    throw new Error(`Magnific submit failed ${submitRes.status}: ${body}`)
-  }
-
-  const { data: submitData } = await submitRes.json() as { data: { task_id: string } }
-  const taskId = submitData.task_id
-  console.log('[magnific] task_id:', taskId)
-
-  // Poll up to 25× every 5s = ~125s
-  for (let i = 0; i < 25; i++) {
-    await sleep(5000)
-    const pollRes = await fetch(`${MAGNIFIC_BASE}/${taskId}`, {
-      headers: { 'x-magnific-api-key': apiKey },
-    })
-    const { data } = await pollRes.json() as { data: { status: string; generated: string[] } }
-    console.log(`[magnific] poll ${i + 1}: ${data.status}`)
-
-    if (data.status === 'COMPLETED' && data.generated?.[0]) return data.generated[0]
-    if (data.status === 'FAILED') throw new Error('Magnific: task falhou')
-  }
-
-  throw new Error('Magnific: timeout após 125s')
-}
-
-// ── fal.ai helpers ────────────────────────────────────────────────────────────
-
-const CREATIVITY: Record<string, number> = { low: 0.15, medium: 0.35, high: 0.6 }
-
-function buildFalInput(
-  modelId: string,
-  imageUrl: string,
-  scale: number,
-  description: string,
-  preserveGeometry = true,
-  recreationStrength = 'low',
-): Record<string, unknown> {
-  switch (modelId) {
-    case 'fal-ai/clarity-upscaler':
-      return {
-        image_url:           imageUrl,
-        scale_factor:        scale,
-        prompt:              description || 'architectural render, building facade, photorealistic',
-        creativity:          CREATIVITY[recreationStrength] ?? 0.15,
-        resemblance:         preserveGeometry ? 0.92 : 0.80,
-        dynamic:             6,
-        num_inference_steps: 20,
+    if (debited) {
+      try {
+        await admin.rpc('refund_nodes', { user_id_input: user.id, amount: cost })
+        console.warn('[upscale] refund executado:', cost, 'nodes →', user.id)
+      } catch (refundErr) {
+        console.error('[upscale] FALHA NO REFUND (CRÍTICO):', refundErr)
       }
+    }
 
-    case 'fal-ai/supir':
-      return {
-        image_url:    imageUrl,
-        scale:        scale,
-        prompt:       description || 'architectural render, high resolution, sharp details',
-        face_restore: false,
-      }
-
-    case 'fal-ai/aura-sr':
-      return {
-        image_url:         imageUrl,
-        upscaling_factor:  scale,
-        overlapping_tiles: true,
-      }
-
-    case 'fal-ai/esrgan':
-      return {
-        image_url: imageUrl,
-        scale:     scale,
-      }
-
-    default:
-      return { image_url: imageUrl, scale }
+    return NextResponse.json({ error: 'Erro ao processar imagem. Tente novamente.' }, { status: 500 })
   }
-}
-
-function extractOutputUrl(modelId: string, data: unknown): string | null {
-  const d = data as Record<string, unknown>
-
-  // Clarity, SUPIR, ESRGAN → { image: { url: string } }
-  if (d?.image && typeof (d.image as Record<string, unknown>).url === 'string') {
-    return (d.image as Record<string, unknown>).url as string
-  }
-
-  // AuraSR → { output_image_url: string }
-  if (typeof d?.output_image_url === 'string') {
-    return d.output_image_url as string
-  }
-
-  // Fallback → { images: [{ url }] }
-  if (Array.isArray(d?.images) && d.images[0]?.url) {
-    return d.images[0].url as string
-  }
-
-  console.warn('[upscale] extractOutputUrl: estrutura desconhecida', JSON.stringify(data))
-  return null
 }

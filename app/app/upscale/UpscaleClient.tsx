@@ -1,8 +1,113 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import BeforeAfter from '@/components/app/BeforeAfter'
 import { RetocarImportModal } from '@/components/spaces/RetocarImportModal'
+import {
+  computeUpscaleCost,
+  megapixelsFromDimensions,
+  OBJECTIVE_PRESETS,
+  analyzeFile,
+  type UpscaleTab,
+  type ModeId,
+  type Scale,
+  type ObjectiveId,
+} from '@/lib/upscale'
+
+// ── Tipagem da UI (labels sem nomes técnicos de modelo) ───────────────────────
+
+interface ModeDef {
+  id:       ModeId
+  label:    string
+  desc:     string
+}
+
+const RESOLUTION_MODES: ModeDef[] = [
+  {
+    id:    'fidelity',
+    label: 'Alta Fidelidade',
+    desc:  'Preserva geometria, materiais, iluminação e detalhes originais. Ideal para renders realistas, portfólio e apresentação.',
+  },
+  {
+    id:    'recover',
+    label: 'Recuperar Imagem Baixa',
+    desc:  'Melhora imagens compactadas, antigas ou com baixa nitidez. Pode reconstruir pequenos detalhes.',
+  },
+]
+
+const ENHANCE_MODES: ModeDef[] = [
+  {
+    id:    'denoise',
+    label: 'Limpar Ruído',
+    desc:  'Remove granulação e limpa imperfeições visuais.',
+  },
+  {
+    id:    'deblur',
+    label: 'Corrigir Desfoque',
+    desc:  'Recupera nitidez e melhora imagens levemente borradas.',
+  },
+  {
+    id:    'restore',
+    label: 'Restaurar Imagem',
+    desc:  'Restaura imagens degradadas, corrigindo danos e melhorando a aparência geral.',
+  },
+  {
+    id:    'smart',
+    label: 'Melhoria Inteligente',
+    desc:  'Refina a imagem preservando o máximo possível do original.',
+  },
+]
+
+interface ScaleDef {
+  value: Scale
+  label: string
+  sub:   string
+  locked?: boolean
+}
+
+const RESOLUTION_SCALES: ScaleDef[] = [
+  { value: '2x',    label: '2×',    sub: '~4K'      },
+  { value: '4x',    label: '4×',    sub: '~8K'      },
+  { value: '8x',    label: '8×',    sub: 'até 16K'  },
+  { value: 'ultra', label: 'Ultra', sub: 'até 16K', locked: true },
+]
+
+// Smart usa 2x/4x; denoise/deblur/restore ficam em 'none'.
+const SMART_SCALES: ScaleDef[] = [
+  { value: '2x', label: '2×', sub: 'discreto' },
+  { value: '4x', label: '4×', sub: 'forte'    },
+]
+
+interface ObjectiveDef {
+  id:    ObjectiveId
+  label: string
+}
+
+const OBJECTIVES: ObjectiveDef[] = [
+  { id: 'client',    label: 'Apresentação para cliente' },
+  { id: 'portfolio', label: 'Portfólio / Instagram'     },
+  { id: 'print',     label: 'Impressão / prancha'       },
+  { id: 'recover',   label: 'Recuperar imagem baixa'    },
+  { id: 'final',     label: 'Entrega final premium'     },
+]
+
+const LOADING_TEXTS_RESOLUTION = [
+  'Enviando imagem...',
+  'Processando com IA...',
+  'Ampliando resolução...',
+  'Realçando texturas...',
+  'Finalizando...',
+]
+
+const LOADING_TEXTS_ENHANCE = [
+  'Enviando imagem...',
+  'Analisando detalhes...',
+  'Aprimorando qualidade...',
+  'Limpando imperfeições...',
+  'Finalizando...',
+]
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 async function urlToFile(url: string): Promise<File> {
   const res = await fetch(url)
@@ -12,111 +117,50 @@ async function urlToFile(url: string): Promise<File> {
   return new File([blob], `historico.${ext}`, { type: blob.type })
 }
 
-interface UpscaleClientProps {
-  initialCredits: number
-}
-
-// ── Product modes (abstract from raw model IDs) ───────────────────────────────
-const UPSCALE_MODES = [
-  {
-    id:       'fidelity',
-    label:    'Alta Fidelidade',
-    desc:     'Preserva geometria, materiais e detalhes originais. Ideal para renders realistas.',
-    provider: 'fal',
-    model:    'fal-ai/clarity-upscaler',
-    nodes:    null as number | null, // scale-based
-    disabled: false,
-    badge:    null as string | null,
-  },
-  {
-    id:       'premium',
-    label:    'Premium',
-    desc:     'Mais detalhe visual e acabamento comercial para portfólio e apresentação.',
-    provider: 'magnific',
-    model:    'magnific',
-    nodes:    20,
-    disabled: false,
-    badge:    null as string | null,
-  },
-  {
-    id:       'ultra',
-    label:    'Ultra',
-    desc:     'Máxima reconstrução de detalhes para entrega final, prancha e impressão.',
-    provider: 'fal',
-    model:    'fal-ai/supir',
-    nodes:    20,
-    disabled: false,
-    badge:    null as string | null,
-  },
-] as const
-
-const SCALES = [
-  { value: 2, label: '2×', sub: '~4K',     nodes: 4,  locked: false },
-  { value: 4, label: '4×', sub: '~8K',     nodes: 8,  locked: false },
-  { value: 8, label: '8×', sub: 'até 16K', nodes: 20, locked: true  },
-]
-
-const OBJECTIVES = [
-  { id: 'client',    label: 'Apresentação para cliente' },
-  { id: 'portfolio', label: 'Portfólio / Instagram'     },
-  { id: 'print',     label: 'Impressão / prancha'       },
-  { id: 'recover',   label: 'Recuperar imagem baixa'    },
-  { id: 'final',     label: 'Entrega final premium'     },
-]
-
-const LOADING_TEXTS = [
-  'Enviando imagem...',
-  'Processando com IA...',
-  'Ampliando resolução...',
-  'Realçando texturas...',
-  'Finalizando...',
-]
-
-function detectRecommendedMode(file: File): { modeId: string; reason: string } {
-  const name = file.name.toLowerCase()
-  const lineHints = ['sketch', 'wireframe', 'line', 'cad', 'schematic',
-    'floor', 'planta', 'linework', 'drawing', 'diagrama']
-  if (lineHints.some(k => name.includes(k)))
-    return { modeId: 'fidelity', reason: 'Ideal para renders com linhas técnicas e geometria definida.' }
-
-  const previewHints = ['preview', 'draft', 'rascunho', 'thumb', 'wip', 'test', 'teste', 'low']
-  if (previewHints.some(k => name.includes(k)) || file.size < 200 * 1024)
-    return { modeId: 'fidelity', reason: 'Detectamos uma imagem leve — Alta Fidelidade já resolve bem.' }
-
-  return { modeId: 'fidelity', reason: 'Ideal para renders com materiais, texturas e geometria definidos.' }
-}
-
 function formatFileSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+function defaultModeForTab(tab: UpscaleTab): ModeId {
+  return tab === 'resolution' ? 'fidelity' : 'restore'
+}
+
+function defaultScaleForMode(tab: UpscaleTab, modeId: ModeId): Scale {
+  if (tab === 'resolution') return '4x'
+  return modeId === 'smart' ? '2x' : 'none'
+}
+
+// ── Componente ───────────────────────────────────────────────────────────────
+
+interface UpscaleClientProps {
+  initialCredits: number
+}
+
 export default function UpscaleClient({ initialCredits }: UpscaleClientProps) {
+  // Image state
   const [imageFile,       setImageFile]       = useState<File | null>(null)
   const [imagePreview,    setImagePreview]    = useState<string | null>(null)
   const [imageDimensions, setImageDimensions] = useState<{ w: number; h: number } | null>(null)
   const [isDragging,      setIsDragging]      = useState(false)
 
-  const [selectedModeId,    setSelectedModeId]    = useState<string>('fidelity')
-  const [selectedScale,     setSelectedScale]     = useState(4)
-  const [selectedObjective, setSelectedObjective] = useState<string | null>(null)
+  // Tab + mode + scale + objective
+  const [tab,              setTab]              = useState<UpscaleTab>('resolution')
+  const [selectedModeId,   setSelectedModeId]   = useState<ModeId>('fidelity')
+  const [selectedScale,    setSelectedScale]    = useState<Scale>('4x')
+  const [selectedObjective, setSelectedObjective] = useState<ObjectiveId | null>(null)
 
-  const [recommendedModeId, setRecommendedModeId] = useState<string | null>(null)
-  const [recommendedReason,  setRecommendedReason]  = useState<string | null>(null)
-  const [isAnalyzing,        setIsAnalyzing]        = useState(false)
+  // Recommendation
+  const [recommended, setRecommended] = useState<{ modeId: ModeId; reason: string } | null>(null)
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
 
-  const [showAdvanced,       setShowAdvanced]       = useState(false)
-  const [preserveGeometry,   setPreserveGeometry]   = useState(true)
-  const [reduceNoise,        setReduceNoise]        = useState(false)
-  const [sharpen,            setSharpen]            = useState(false)
-  const [enrichTextures,     setEnrichTextures]     = useState(false)
-  const [recreationStrength, setRecreationStrength] = useState<'low' | 'medium' | 'high'>('low')
-
+  // Import modal
   const [showImportModal, setShowImportModal] = useState(false)
   const [isImporting,     setIsImporting]     = useState(false)
 
+  // Submit
   const [isLoading,   setIsLoading]   = useState(false)
-  const [loadingText, setLoadingText] = useState(LOADING_TEXTS[0])
+  const [loadingText, setLoadingText] = useState(LOADING_TEXTS_RESOLUTION[0])
   const [resultUrl,   setResultUrl]   = useState<string | null>(null)
   const [credits,     setCredits]     = useState(initialCredits)
   const [error,       setError]       = useState<string | null>(null)
@@ -125,9 +169,70 @@ export default function UpscaleClient({ initialCredits }: UpscaleClientProps) {
   const loadingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const analyzeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const activeMode = UPSCALE_MODES.find(m => m.id === selectedModeId)!
-  const nodeCost   = activeMode.nodes ?? SCALES.find(s => s.value === selectedScale)!.nodes
-  const canSubmit  = !!imageFile && credits >= nodeCost && !isLoading
+  // ── Derivações ─────────────────────────────────────────────────────────────
+
+  const modes = tab === 'resolution' ? RESOLUTION_MODES : ENHANCE_MODES
+  const activeMode = useMemo(
+    () => modes.find(m => m.id === selectedModeId) ?? modes[0],
+    [modes, selectedModeId],
+  )
+
+  // Aba Aprimorar: escolha de escala depende do modo.
+  //   - denoise / deblur / restore → fixo em 'none' (sem aumento)
+  //   - smart                     → escolha entre 2× e 4×
+  // Aba Resolução: sempre o conjunto completo (2/4/8/ultra).
+  const availableScales: ScaleDef[] = useMemo(() => {
+    if (tab === 'resolution') return RESOLUTION_SCALES
+    if (selectedModeId === 'smart') return SMART_SCALES
+    return [{ value: 'none', label: 'Sem aumento', sub: 'resolução original' }]
+  }, [tab, selectedModeId])
+
+  const megapixels = useMemo(
+    () => megapixelsFromDimensions(imageDimensions?.w, imageDimensions?.h),
+    [imageDimensions],
+  )
+
+  const costBreakdown = useMemo(
+    () => computeUpscaleCost({
+      tab,
+      modeId:     selectedModeId,
+      scale:      selectedScale,
+      megapixels,
+    }),
+    [tab, selectedModeId, selectedScale, megapixels],
+  )
+
+  const nodeCost  = costBreakdown.total
+  const canSubmit = !!imageFile && credits >= nodeCost && !isLoading
+
+  // ── Handlers ───────────────────────────────────────────────────────────────
+
+  function applyTab(next: UpscaleTab) {
+    if (next === tab) return
+    setTab(next)
+    const nextMode  = defaultModeForTab(next)
+    const nextScale = defaultScaleForMode(next, nextMode)
+    setSelectedModeId(nextMode)
+    setSelectedScale(nextScale)
+    setSelectedObjective(null)
+  }
+
+  function applyMode(next: ModeId) {
+    setSelectedModeId(next)
+    // Reajusta escala se ficou incompatível ao trocar de modo dentro de Aprimorar.
+    if (tab === 'enhance') {
+      setSelectedScale(defaultScaleForMode('enhance', next))
+    }
+  }
+
+  function applyObjective(id: ObjectiveId) {
+    const preset = OBJECTIVE_PRESETS[id]
+    setSelectedObjective(selectedObjective === id ? null : id)
+    if (selectedObjective === id) return
+    if (preset.tab !== tab) setTab(preset.tab)
+    setSelectedModeId(preset.modeId)
+    setSelectedScale(preset.scale)
+  }
 
   function loadImageFile(file: File) {
     if (!file.type.startsWith('image/')) { setError('Arquivo deve ser uma imagem.'); return }
@@ -136,8 +241,7 @@ export default function UpscaleClient({ initialCredits }: UpscaleClientProps) {
     setImageFile(file)
     setResultUrl(null)
     setError(null)
-    setRecommendedModeId(null)
-    setRecommendedReason(null)
+    setRecommended(null)
     setImageDimensions(null)
     setIsAnalyzing(true)
 
@@ -153,20 +257,23 @@ export default function UpscaleClient({ initialCredits }: UpscaleClientProps) {
 
     if (analyzeTimerRef.current) clearTimeout(analyzeTimerRef.current)
     analyzeTimerRef.current = setTimeout(() => {
-      const rec = detectRecommendedMode(file)
-      setRecommendedModeId(rec.modeId)
-      setRecommendedReason(rec.reason)
+      const rec = analyzeFile({ fileName: file.name, fileSize: file.size })
+      setRecommended({ modeId: rec.modeId, reason: rec.reason })
+      // Aplica a recomendação como ponto de partida.
+      if (rec.tab !== tab) setTab(rec.tab)
       setSelectedModeId(rec.modeId)
+      setSelectedScale(rec.scale)
       setIsAnalyzing(false)
     }, 400)
   }
 
   function startLoadingTexts() {
+    const list = tab === 'resolution' ? LOADING_TEXTS_RESOLUTION : LOADING_TEXTS_ENHANCE
     let i = 0
-    setLoadingText(LOADING_TEXTS[0])
+    setLoadingText(list[0])
     loadingTimerRef.current = setInterval(() => {
-      i = (i + 1) % LOADING_TEXTS.length
-      setLoadingText(LOADING_TEXTS[i])
+      i = (i + 1) % list.length
+      setLoadingText(list[i])
     }, 1800)
   }
 
@@ -192,8 +299,7 @@ export default function UpscaleClient({ initialCredits }: UpscaleClientProps) {
     setImageFile(null)
     setImagePreview(null)
     setResultUrl(null)
-    setRecommendedModeId(null)
-    setRecommendedReason(null)
+    setRecommended(null)
     setImageDimensions(null)
   }
 
@@ -205,11 +311,11 @@ export default function UpscaleClient({ initialCredits }: UpscaleClientProps) {
     startLoadingTexts()
 
     const formData = new FormData()
-    formData.append('image',              imageFile)
-    formData.append('model',              activeMode.model)
-    formData.append('scale',              String(selectedScale))
-    formData.append('preserveGeometry',   String(preserveGeometry))
-    formData.append('recreationStrength', recreationStrength)
+    formData.append('image',  imageFile)
+    formData.append('tab',    tab)
+    formData.append('modeId', selectedModeId)
+    formData.append('scale',  selectedScale)
+    if (selectedObjective) formData.append('objectiveId', selectedObjective)
     if (imageDimensions) {
       formData.append('imageWidth',  String(imageDimensions.w))
       formData.append('imageHeight', String(imageDimensions.h))
@@ -231,6 +337,17 @@ export default function UpscaleClient({ initialCredits }: UpscaleClientProps) {
 
   const ext = imageFile?.name.split('.').pop()?.toUpperCase() ?? ''
 
+  // ── Texto do resultado (resolução final) ───────────────────────────────────
+  const factorOut = (() => {
+    switch (selectedScale) {
+      case '2x':    return 2
+      case '4x':    return 4
+      case '8x':    return 8
+      case 'ultra': return 8
+      default:      return 1
+    }
+  })()
+
   return (
     <div style={{ display: 'flex', width: '100%', height: '100%', overflow: 'hidden', background: '#0a0a0a', color: '#ffffff' }}>
       <style>{`
@@ -241,10 +358,40 @@ export default function UpscaleClient({ initialCredits }: UpscaleClientProps) {
       {/* ── Left panel ──────────────────────────────────────────────────────── */}
       <div style={{ width: 420, flexShrink: 0, display: 'flex', flexDirection: 'column', borderRight: '0.5px solid rgba(255,255,255,0.07)', overflow: 'hidden' }}>
 
-        <div style={{ padding: '24px 24px 16px', borderBottom: '0.5px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>
+        <div style={{ padding: '24px 24px 0', flexShrink: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em', color: '#ffffff' }}>Ampliar imagem</div>
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 3 }}>
-            Aumente a resolução e a nitidez para apresentação, portfólio e entrega final.
+            Aumente a resolução ou aprimore a qualidade da imagem.
+          </div>
+
+          {/* Tabs */}
+          <div style={{ marginTop: 16, display: 'flex', gap: 2, borderBottom: '0.5px solid rgba(255,255,255,0.07)' }}>
+            {([
+              { id: 'resolution', label: 'Resolução' },
+              { id: 'enhance',    label: 'Aprimorar' },
+            ] as { id: UpscaleTab; label: string }[]).map(t => {
+              const active = tab === t.id
+              return (
+                <button key={t.id} onClick={() => applyTab(t.id)}
+                  style={{
+                    flex: 1, background: 'none', border: 'none',
+                    padding: '10px 0 12px', cursor: 'pointer',
+                    color: active ? '#ffffff' : 'rgba(255,255,255,0.4)',
+                    fontSize: 12, fontWeight: 500, letterSpacing: '-0.01em',
+                    position: 'relative',
+                    transition: 'color 0.15s',
+                  }}
+                >
+                  {t.label}
+                  {active && (
+                    <span style={{
+                      position: 'absolute', bottom: -0.5, left: 0, right: 0,
+                      height: 1.5, background: '#ffffff', borderRadius: 2,
+                    }} />
+                  )}
+                </button>
+              )
+            })}
           </div>
         </div>
 
@@ -302,7 +449,6 @@ export default function UpscaleClient({ initialCredits }: UpscaleClientProps) {
             <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }}
               onChange={(e) => { const f = e.target.files?.[0]; if (f) loadImageFile(f) }} />
 
-            {/* Import from history */}
             <button
               onClick={() => setShowImportModal(true)}
               disabled={isImporting}
@@ -335,20 +481,20 @@ export default function UpscaleClient({ initialCredits }: UpscaleClientProps) {
           ) : !imageFile ? (
             <div style={{ padding: '10px 12px', borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 }}>
-                Envie uma imagem para a SpaceNode analisar e recomendar o melhor modo de ampliação.
+                Envie uma imagem para a SpaceNode analisar e sugerir o melhor caminho.
               </div>
             </div>
-          ) : recommendedModeId ? (
+          ) : recommended ? (
             <div style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(22,163,74,0.07)', border: '1px solid rgba(22,163,74,0.16)', animation: 'fadeIn 0.2s ease' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <svg width="10" height="10" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0 }}>
                   <path d="M6 1l1.09 3.26L10.5 4.5l-2.59 2.09.91 3.41L6 8.25l-2.82 1.75.91-3.41L1.5 4.5l3.41-.24L6 1z" fill="rgba(134,239,172,0.85)"/>
                 </svg>
                 <span style={{ fontSize: 10, color: 'rgba(134,239,172,0.9)', fontWeight: 500 }}>
-                  Recomendado: <strong style={{ fontWeight: 700 }}>{UPSCALE_MODES.find(m => m.id === recommendedModeId)?.label}</strong>
+                  Recomendado: <strong style={{ fontWeight: 700 }}>{modes.find(m => m.id === recommended.modeId)?.label ?? 'Alta Fidelidade'}</strong>
                 </span>
               </div>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginTop: 4, paddingLeft: 16 }}>{recommendedReason}</div>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginTop: 4, paddingLeft: 16 }}>{recommended.reason}</div>
             </div>
           ) : null}
 
@@ -358,11 +504,11 @@ export default function UpscaleClient({ initialCredits }: UpscaleClientProps) {
               Modo
             </label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {UPSCALE_MODES.map(mode => {
+              {modes.map(mode => {
                 const isSelected    = selectedModeId === mode.id
-                const isRecommended = recommendedModeId === mode.id && !!imageFile
+                const isRecommended = recommended?.modeId === mode.id && !!imageFile
                 return (
-                  <button key={mode.id} onClick={() => setSelectedModeId(mode.id)}
+                  <button key={mode.id} onClick={() => applyMode(mode.id)}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 10,
                       padding: '10px 12px', borderRadius: 8,
@@ -384,126 +530,69 @@ export default function UpscaleClient({ initialCredits }: UpscaleClientProps) {
                       </div>
                       <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>{mode.desc}</div>
                     </div>
-                    {mode.nodes && (
-                      <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', flexShrink: 0 }}>{mode.nodes} nodes</span>
-                    )}
                   </button>
                 )
               })}
             </div>
           </div>
 
-          {/* Objective */}
-          <div>
-            <label style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.35)', display: 'block', marginBottom: 10 }}>
-              Objetivo
-            </label>
-            <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 6 }}>
-              {OBJECTIVES.map(obj => (
-                <button key={obj.id} onClick={() => setSelectedObjective(selectedObjective === obj.id ? null : obj.id)}
-                  style={{
-                    padding: '6px 10px', borderRadius: 6,
-                    border: `1px solid ${selectedObjective === obj.id ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.08)'}`,
-                    background: selectedObjective === obj.id ? 'rgba(255,255,255,0.08)' : 'transparent',
-                    fontSize: 11, color: selectedObjective === obj.id ? '#ffffff' : 'rgba(255,255,255,0.45)',
-                    cursor: 'pointer', transition: 'all 0.15s',
-                  }}
-                >
-                  {obj.label}
-                </button>
-              ))}
+          {/* Objective (only on Resolução) */}
+          {tab === 'resolution' && (
+            <div>
+              <label style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.35)', display: 'block', marginBottom: 10 }}>
+                Objetivo
+              </label>
+              <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 6 }}>
+                {OBJECTIVES.map(obj => (
+                  <button key={obj.id} onClick={() => applyObjective(obj.id)}
+                    style={{
+                      padding: '6px 10px', borderRadius: 6,
+                      border: `1px solid ${selectedObjective === obj.id ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.08)'}`,
+                      background: selectedObjective === obj.id ? 'rgba(255,255,255,0.08)' : 'transparent',
+                      fontSize: 11, color: selectedObjective === obj.id ? '#ffffff' : 'rgba(255,255,255,0.45)',
+                      cursor: 'pointer', transition: 'all 0.15s',
+                    }}
+                  >
+                    {obj.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Scale */}
           <div>
             <label style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.35)', display: 'block', marginBottom: 10 }}>
-              Escala
+              {tab === 'resolution' ? 'Escala' : 'Tamanho final'}
             </label>
             <div style={{ display: 'flex', gap: 8 }}>
-              {SCALES.map(s => (
-                <button key={s.value} onClick={() => !s.locked && setSelectedScale(s.value)} disabled={s.locked}
-                  title={s.locked ? 'Em breve' : undefined}
-                  style={{
-                    flex: 1, padding: '10px 8px', borderRadius: 8,
-                    border: `1px solid ${!s.locked && selectedScale === s.value ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.07)'}`,
-                    background: !s.locked && selectedScale === s.value ? 'rgba(255,255,255,0.08)' : 'transparent',
-                    cursor: s.locked ? 'not-allowed' : 'pointer',
-                    opacity: s.locked ? 0.4 : 1, textAlign: 'center', transition: 'all 0.15s', position: 'relative',
-                  }}
-                >
-                  <div style={{ fontSize: 14, fontWeight: 600, color: !s.locked && selectedScale === s.value ? '#ffffff' : 'rgba(255,255,255,0.5)', letterSpacing: '-0.01em' }}>{s.label}</div>
-                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginTop: 2, letterSpacing: '0.04em' }}>{s.sub}</div>
-                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', marginTop: 1 }}>{s.nodes} nodes</div>
-                  {s.locked && (
-                    <div style={{ position: 'absolute', top: 4, right: 6 }}>
-                      <svg width="9" height="9" viewBox="0 0 14 16" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" strokeLinecap="round">
-                        <rect x="2" y="7" width="10" height="8" rx="1.5"/><path d="M5 7V5a2 2 0 0 1 4 0v2"/>
-                      </svg>
-                    </div>
-                  )}
-                </button>
-              ))}
-              <button disabled title="Em breve"
-                style={{ flex: 1, padding: '10px 8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.07)', background: 'transparent', cursor: 'not-allowed', opacity: 0.35, textAlign: 'center', position: 'relative' }}
-              >
-                <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.5)', letterSpacing: '-0.01em' }}>Ultra</div>
-                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginTop: 2, letterSpacing: '0.04em' }}>até 16K</div>
-                <div style={{ position: 'absolute', top: 4, right: 6 }}>
-                  <svg width="9" height="9" viewBox="0 0 14 16" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" strokeLinecap="round">
-                    <rect x="2" y="7" width="10" height="8" rx="1.5"/><path d="M5 7V5a2 2 0 0 1 4 0v2"/>
-                  </svg>
-                </div>
-              </button>
+              {availableScales.map(s => {
+                const isSelected = selectedScale === s.value
+                const locked     = !!s.locked
+                return (
+                  <button key={s.value} onClick={() => !locked && setSelectedScale(s.value)} disabled={locked}
+                    title={locked ? 'Em breve' : undefined}
+                    style={{
+                      flex: 1, padding: '10px 8px', borderRadius: 8,
+                      border: `1px solid ${!locked && isSelected ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.07)'}`,
+                      background: !locked && isSelected ? 'rgba(255,255,255,0.08)' : 'transparent',
+                      cursor: locked ? 'not-allowed' : 'pointer',
+                      opacity: locked ? 0.4 : 1, textAlign: 'center', transition: 'all 0.15s', position: 'relative',
+                    }}
+                  >
+                    <div style={{ fontSize: 14, fontWeight: 600, color: !locked && isSelected ? '#ffffff' : 'rgba(255,255,255,0.5)', letterSpacing: '-0.01em' }}>{s.label}</div>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginTop: 2, letterSpacing: '0.04em' }}>{s.sub}</div>
+                    {locked && (
+                      <div style={{ position: 'absolute', top: 4, right: 6 }}>
+                        <svg width="9" height="9" viewBox="0 0 14 16" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" strokeLinecap="round">
+                          <rect x="2" y="7" width="10" height="8" rx="1.5"/><path d="M5 7V5a2 2 0 0 1 4 0v2"/>
+                        </svg>
+                      </div>
+                    )}
+                  </button>
+                )
+              })}
             </div>
-          </div>
-
-          {/* Advanced settings */}
-          <div>
-            <button onClick={() => setShowAdvanced(v => !v)}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'rgba(255,255,255,0.35)', fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const }}
-            >
-              <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
-                style={{ transform: showAdvanced ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>
-                <polyline points="4 2 8 6 4 10"/>
-              </svg>
-              Ajustes avançados
-            </button>
-
-            {showAdvanced && (
-              <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 12, animation: 'fadeIn 0.15s ease' }}>
-                {([
-                  { label: 'Preservar geometria', value: preserveGeometry, set: setPreserveGeometry },
-                  { label: 'Reduzir ruído',        value: reduceNoise,      set: setReduceNoise      },
-                  { label: 'Aumentar nitidez',     value: sharpen,          set: setSharpen          },
-                  { label: 'Enriquecer texturas',  value: enrichTextures,   set: setEnrichTextures   },
-                ] as { label: string; value: boolean; set: (v: boolean) => void }[]).map(({ label, value, set }) => (
-                  <div key={label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>{label}</span>
-                    <div onClick={() => set(!value)}
-                      style={{ width: 32, height: 18, borderRadius: 9, background: value ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.1)', position: 'relative', cursor: 'pointer', transition: 'background 0.15s', flexShrink: 0 }}>
-                      <div style={{ position: 'absolute', top: 2, left: value ? 16 : 2, width: 14, height: 14, borderRadius: 7, background: value ? '#0a0a0a' : 'rgba(255,255,255,0.5)', transition: 'left 0.15s, background 0.15s' }} />
-                    </div>
-                  </div>
-                ))}
-                <div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>Força da recriação</div>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    {(['low', 'medium', 'high'] as const).map(v => (
-                      <button key={v} onClick={() => setRecreationStrength(v)} style={{
-                        flex: 1, padding: '6px 0', borderRadius: 6, fontSize: 10,
-                        border: `1px solid ${recreationStrength === v ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.08)'}`,
-                        background: recreationStrength === v ? 'rgba(255,255,255,0.08)' : 'transparent',
-                        color: recreationStrength === v ? '#ffffff' : 'rgba(255,255,255,0.4)',
-                        cursor: 'pointer', transition: 'all 0.15s',
-                      }}>
-                        {v === 'low' ? 'Baixa' : v === 'medium' ? 'Média' : 'Alta'}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
 
           {error && (
@@ -532,7 +621,7 @@ export default function UpscaleClient({ initialCredits }: UpscaleClientProps) {
               transition: 'background 0.15s, color 0.15s', letterSpacing: '-0.01em',
             }}
           >
-            {isLoading ? loadingText : credits < nodeCost ? 'Sem Nodes' : 'Ampliar Imagem'}
+            {isLoading ? loadingText : credits < nodeCost ? 'Sem Nodes' : tab === 'resolution' ? 'Ampliar Imagem' : 'Aprimorar Imagem'}
           </button>
         </div>
       </div>
@@ -549,11 +638,11 @@ export default function UpscaleClient({ initialCredits }: UpscaleClientProps) {
 
         {!isLoading && resultUrl && imagePreview && (
           <div style={{ width: '100%', maxWidth: 760, animation: 'fadeIn 0.3s ease' }}>
-            <BeforeAfter beforeUrl={imagePreview} afterUrl={resultUrl} beforeLabel="ORIGINAL" afterLabel="AMPLIADO" />
+            <BeforeAfter beforeUrl={imagePreview} afterUrl={resultUrl} beforeLabel="ORIGINAL" afterLabel={tab === 'resolution' ? 'AMPLIADO' : 'APRIMORADO'} />
             <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' as const }}>
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.04em' }}>
-                Arraste para comparar · {selectedScale}× · {activeMode.label}
-                {imageDimensions && <span> · {imageDimensions.w * selectedScale}×{imageDimensions.h * selectedScale}px</span>}
+                Arraste para comparar · {selectedScale === 'none' ? 'sem aumento' : `${factorOut}×`} · {activeMode.label}
+                {imageDimensions && factorOut > 1 && <span> · {imageDimensions.w * factorOut}×{imageDimensions.h * factorOut}px</span>}
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <a href={resultUrl} download target="_blank" rel="noopener noreferrer"

@@ -20,15 +20,38 @@ export function getVideoDisplayLabel(
   return parts.join(' · ')
 }
 
-const UPSCALE_MODEL_LABELS: Record<string, string> = {
-  'fal-ai/clarity-upscaler': 'Alta definição',
-  'fal-ai/aura-sr':          'Realce natural',
-  'fal-ai/supir':            'Máximo detalhe',
-  'fal-ai/esrgan':           'Geometria original',
+// Labels do histórico. Aceitamos dois shapes para compat:
+//   - Novo (v2):  style = `upscale:<provider>`  (topaz, clarity, nafnet-*, photo-restoration)
+//   - Legado:     style = `fal-ai/<modelo>`     (clarity-upscaler, supir, etc.)
+//                 style = `magnific`            (já descontinuado mas pode existir no histórico)
+const UPSCALE_PROVIDER_LABELS: Record<string, string> = {
+  // v2 — keys = style do banco
+  'upscale:topaz':             'Alta Fidelidade',
+  'upscale:clarity':           'Recuperar / Melhoria Inteligente',
+  'upscale:nafnet-denoise':    'Limpar Ruído',
+  'upscale:nafnet-deblur':     'Corrigir Desfoque',
+  'upscale:photo-restoration': 'Restaurar Imagem',
+
+  // Legado — mantido para histórico antigo continuar legível
+  'fal-ai/clarity-upscaler':   'Alta definição',
+  'fal-ai/aura-sr':            'Realce natural',
+  'fal-ai/supir':              'Máximo detalhe',
+  'fal-ai/esrgan':             'Geometria original',
+  'magnific':                  'Premium (legado)',
 }
 
 export function getUpscaleDisplayLabel(modelId: string, scale?: string | null): string {
-  const label      = UPSCALE_MODEL_LABELS[modelId] ?? 'Alta definição'
-  const multiplier = scale ? scale.replace('x', '×') : '4×'
-  return `Upscale ${multiplier} · ${label}`
+  const label = UPSCALE_PROVIDER_LABELS[modelId] ?? 'Alta definição'
+
+  // Escala pode vir como '2x' / '4x' / '8x' / 'ultra' / 'none' / '4'/'4x'
+  // ou null. Formatamos pra exibição amigável.
+  let scaleLabel: string
+  if (!scale)                  scaleLabel = '4×'
+  else if (scale === 'none')   scaleLabel = 'sem aumento'
+  else if (scale === 'ultra')  scaleLabel = 'Ultra'
+  else                         scaleLabel = scale.replace('x', '×')
+
+  return scale === 'none'
+    ? `Aprimorar · ${label}`
+    : `Upscale ${scaleLabel} · ${label}`
 }
