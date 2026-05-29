@@ -17,6 +17,8 @@ interface GenerateClientProps {
   initialCredits:    number
   initialMaterials?: ProjectMaterials
   initialConfig?:    ProjectConfig | null
+  /** URL https de uma render existente a pré-carregar como input (ex.: "Reutilizar" no dashboard). */
+  initialSourceUrl?: string
 }
 
 // Persisted last-used render config (profiles.project_config — JSONB).
@@ -189,7 +191,7 @@ function resolveInitialConfig(cfg: ProjectConfig | null | undefined) {
   }
 }
 
-export function GenerateClient({ initialCredits, initialMaterials, initialConfig }: GenerateClientProps) {
+export function GenerateClient({ initialCredits, initialMaterials, initialConfig, initialSourceUrl }: GenerateClientProps) {
   const init = resolveInitialConfig(initialConfig)
   const supabase = createClient()
 
@@ -387,6 +389,29 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
     e.preventDefault(); setIsDraggingFile(false)
     const file = e.dataTransfer.files[0]; if (file) loadImage(file)
   }
+
+  // ── Pré-carga via ?source= (ex.: "Reutilizar" no dashboard). Busca a imagem
+  //    hospedada (fal.media), converte em File e roda pelo mesmo loadImage do
+  //    upload — passando pelo blob evitamos taint de canvas/CORS. Roda 1x.
+  const sourceLoadedRef = useRef(false)
+  useEffect(() => {
+    if (sourceLoadedRef.current || !initialSourceUrl || imagePreview) return
+    if (!/^https:\/\//i.test(initialSourceUrl)) return
+    sourceLoadedRef.current = true
+    ;(async () => {
+      try {
+        const res = await fetch(initialSourceUrl)
+        if (!res.ok) throw new Error()
+        const blob = await res.blob()
+        if (!blob.type.startsWith('image/')) throw new Error()
+        const ext = blob.type.split('/')[1] || 'jpg'
+        loadImage(new File([blob], `reutilizar.${ext}`, { type: blob.type }))
+      } catch {
+        setError('Não foi possível carregar a imagem selecionada.')
+      }
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSourceUrl])
 
   // ── Geração
   const handleGenerate = async (resolutionOverride?: Resolution) => {

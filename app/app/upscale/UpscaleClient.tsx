@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useMemo } from 'react'
+import { useState, useRef, useMemo, useEffect } from 'react'
 import BeforeAfter from '@/components/app/BeforeAfter'
 import { RetocarImportModal } from '@/components/spaces/RetocarImportModal'
 import {
@@ -135,9 +135,11 @@ function defaultScaleForMode(tab: UpscaleTab, modeId: ModeId): Scale {
 
 interface UpscaleClientProps {
   initialCredits: number
+  /** URL https de uma render existente a pré-carregar como input (ex.: "Ampliar" no dashboard). */
+  sourceUrl?: string
 }
 
-export default function UpscaleClient({ initialCredits }: UpscaleClientProps) {
+export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClientProps) {
   // Image state
   const [imageFile,       setImageFile]       = useState<File | null>(null)
   const [imagePreview,    setImagePreview]    = useState<string | null>(null)
@@ -294,6 +296,21 @@ export default function UpscaleClient({ initialCredits }: UpscaleClientProps) {
       setIsImporting(false)
     }
   }
+
+  // Pré-carga via ?source= (ex.: "Ampliar" no dashboard). Mesmo caminho do
+  // "importar do histórico": URL hospedada → File → loadImageFile. Roda 1x.
+  const sourcePreloadedRef = useRef(false)
+  useEffect(() => {
+    if (sourcePreloadedRef.current || !sourceUrl || imageFile) return
+    if (!/^https:\/\//i.test(sourceUrl)) return
+    sourcePreloadedRef.current = true
+    setIsImporting(true)
+    urlToFile(sourceUrl)
+      .then(file => loadImageFile(file))
+      .catch(() => setError('Não foi possível carregar a imagem selecionada.'))
+      .finally(() => setIsImporting(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceUrl])
 
   function resetImage() {
     setImageFile(null)

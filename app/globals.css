@@ -223,3 +223,329 @@ a {
     display: none;
   }
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   Dashboard (/app) — superfícies premium, grids responsivos e hovers discretos.
+   Server Component: toda a interatividade é CSS (:hover), sem JS de cliente.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* CTA do header */
+.spn-dash-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 20px;
+  background: var(--color-text-primary);
+  color: var(--color-bg);
+  border-radius: 11px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  flex-shrink: 0;
+  transition: opacity 180ms ease, transform 120ms ease;
+}
+.spn-dash-cta:hover { opacity: 0.88; }
+.spn-dash-cta:active { transform: scale(0.985); }
+
+/* ── Bloco "Criar nova visualização" ── */
+.spn-dash-create-grid {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr 1fr;
+  gap: 14px;
+}
+
+.spn-dash-create-primary,
+.spn-dash-create-tile {
+  position: relative;
+  text-decoration: none;
+  background: var(--color-bg-elevated);
+  border: 0.5px solid rgba(255, 255, 255, 0.09);
+  border-radius: 16px;
+  overflow: hidden;
+  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
+}
+.spn-dash-create-primary:hover,
+.spn-dash-create-tile:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.16);
+  background: #131313;
+}
+
+.spn-dash-create-primary {
+  grid-row: span 2;
+  padding: 24px;
+  min-height: 236px;
+}
+.spn-dash-create-primary-glow {
+  position: absolute;
+  top: -40px;
+  right: -40px;
+  width: 220px;
+  height: 220px;
+  background: radial-gradient(circle, rgba(48, 209, 88, 0.10) 0%, rgba(48, 209, 88, 0) 70%);
+  pointer-events: none;
+}
+
+.spn-dash-create-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  min-height: 112px;
+}
+
+.spn-dash-create-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 0.5px solid rgba(255, 255, 255, 0.07);
+  color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: color 180ms ease, background 180ms ease;
+}
+.spn-dash-create-tile:hover .spn-dash-create-icon { color: var(--color-text-primary); }
+.spn-dash-create-icon--accent {
+  background: rgba(48, 209, 88, 0.12);
+  border-color: rgba(48, 209, 88, 0.22);
+  color: var(--color-accent-green);
+}
+
+.spn-dash-create-uploadhint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 0.5px solid var(--color-border);
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  letter-spacing: -0.01em;
+}
+.spn-dash-create-arrow {
+  margin-left: auto;
+  color: var(--color-text-secondary);
+  transition: transform 180ms ease, color 180ms ease;
+}
+.spn-dash-create-primary:hover .spn-dash-create-arrow {
+  transform: translateX(3px);
+  color: var(--color-accent-green);
+}
+
+@media (max-width: 1024px) {
+  .spn-dash-create-grid { grid-template-columns: 1fr 1fr; }
+  .spn-dash-create-primary { grid-row: auto; grid-column: 1 / -1; min-height: 0; }
+}
+@media (max-width: 560px) {
+  .spn-dash-create-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Métricas ── */
+.spn-dash-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+@media (max-width: 1024px) { .spn-dash-metrics-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 520px)  { .spn-dash-metrics-grid { grid-template-columns: 1fr; } }
+
+.spn-dash-stat {
+  padding: 20px 22px;
+  background: var(--color-bg-elevated);
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  transition: border-color 180ms ease;
+}
+.spn-dash-stat:hover { border-color: rgba(255, 255, 255, 0.14); }
+.spn-dash-stat-label {
+  font-size: 10px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+  margin-bottom: 14px;
+}
+.spn-dash-stat-value {
+  font-size: 30px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+.spn-dash-stat-sub {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  margin-top: 9px;
+  letter-spacing: -0.01em;
+}
+
+.spn-dash-usage-track {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.spn-dash-usage-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--color-accent-green), rgba(48, 209, 88, 0.7));
+  transition: width 400ms ease;
+}
+
+/* ── Imagens recentes ── */
+.spn-dash-recent-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
+  gap: 16px;
+}
+
+.spn-dash-recent-card {
+  background: var(--color-bg-elevated);
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  overflow: hidden;
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+.spn-dash-recent-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.32);
+}
+
+.spn-dash-recent-thumb {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background: var(--color-surface);
+  overflow: hidden;
+}
+.spn-dash-recent-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 320ms ease;
+}
+.spn-dash-recent-card:hover .spn-dash-recent-thumb img { transform: scale(1.04); }
+
+.spn-dash-recent-tags {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: flex;
+  gap: 5px;
+  z-index: 2;
+}
+.spn-dash-recent-tag {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.5);
+  color: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(6px);
+}
+.spn-dash-recent-tag--muted { color: rgba(255, 255, 255, 0.6); }
+
+.spn-dash-recent-play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.spn-dash-recent-actions {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 28px 12px 12px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0));
+  opacity: 0;
+  transform: translateY(6px);
+  pointer-events: none;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+.spn-dash-recent-card:hover .spn-dash-recent-actions,
+.spn-dash-recent-card:focus-within .spn-dash-recent-actions {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.spn-dash-recent-act {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 11px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  color: #fafafa;
+  background: rgba(255, 255, 255, 0.14);
+  border: 0.5px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(8px);
+  transition: background 160ms ease, color 160ms ease;
+}
+.spn-dash-recent-act:hover { background: rgba(255, 255, 255, 0.24); }
+.spn-dash-recent-act--primary {
+  background: rgba(255, 255, 255, 0.95);
+  color: #111;
+  border-color: transparent;
+}
+.spn-dash-recent-act--primary:hover { background: #fff; }
+.spn-dash-recent-act--icon {
+  margin-left: auto;
+  padding: 6px;
+  width: 28px;
+  height: 28px;
+}
+
+.spn-dash-recent-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 13px 15px;
+}
+.spn-dash-recent-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.spn-dash-recent-date {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spn-dash-create-primary,
+  .spn-dash-create-tile,
+  .spn-dash-recent-card,
+  .spn-dash-recent-thumb img,
+  .spn-dash-recent-actions,
+  .spn-dash-create-arrow { transition: none; transform: none; }
+}

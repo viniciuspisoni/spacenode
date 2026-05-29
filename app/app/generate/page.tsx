@@ -5,7 +5,12 @@ import GenerateClient from './GenerateClient'
 
 const DEFAULT_CREDITS = 12
 
-export default async function GeneratePage() {
+export default async function GeneratePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ source?: string }>
+}) {
+  const sp = await searchParams
   const supabase = await createClient()
   const {
     data: { user },
@@ -38,6 +43,7 @@ export default async function GeneratePage() {
       initialCredits={profile.credits}
       initialMaterials={profile.project_materials ?? undefined}
       initialConfig={profile.project_config ?? undefined}
+      initialSourceUrl={sp.source}
     />
   )
 }

@@ -218,7 +218,7 @@ export default function Sidebar({
             <div style={{
               fontSize: 11, fontWeight: 600, letterSpacing: '0.13em',
               textTransform: 'uppercase' as const,
-              color: 'rgba(255,255,255,0.28)',
+              color: 'rgba(255,255,255,0.34)',
               padding: '0 10px', height: 22,
               display: 'flex', alignItems: 'center',
               whiteSpace: 'nowrap' as const,
@@ -243,9 +243,16 @@ export default function Sidebar({
 
               const inner = (
                 <>
+                  {active && (
+                    <span aria-hidden style={{
+                      position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)',
+                      width: 3, height: 18, borderRadius: 999,
+                      background: 'var(--color-accent-green)',
+                    }} />
+                  )}
                   <div style={{
                     flexShrink: 0, display: 'flex',
-                    color: disabled ? 'rgba(255,255,255,0.2)' : active ? '#ffffff' : isItemHovered ? 'rgba(255,255,255,0.72)' : 'rgba(255,255,255,0.4)',
+                    color: disabled ? 'rgba(255,255,255,0.2)' : active ? '#ffffff' : isItemHovered ? 'rgba(255,255,255,0.72)' : 'rgba(255,255,255,0.5)',
                     transition: 'color 0.2s',
                     transform: isItemHovered && !active ? 'translateY(-0.5px)' : 'translateY(0)',
                     transitionProperty: 'color, transform',
@@ -281,15 +288,20 @@ export default function Sidebar({
               )
 
               const sharedStyle: React.CSSProperties = {
+                position: 'relative',
                 display: 'flex', alignItems: 'center', gap: 12,
                 padding: '0 12px', height: 38, borderRadius: 9,
                 textDecoration: 'none', flexShrink: 0,
                 background: active
-                  ? 'rgba(255,255,255,0.13)'
+                  ? 'rgba(255,255,255,0.06)'
                   : isItemHovered
                     ? 'rgba(255,255,255,0.055)'
                     : 'transparent',
-                boxShadow: isItemHovered && !active ? 'inset 0 0 0 0.5px rgba(255,255,255,0.08)' : 'none',
+                boxShadow: active
+                  ? 'inset 0 0 0 0.5px rgba(255,255,255,0.07)'
+                  : isItemHovered
+                    ? 'inset 0 0 0 0.5px rgba(255,255,255,0.08)'
+                    : 'none',
                 transition: 'background 0.2s, box-shadow 0.2s',
                 cursor: disabled ? 'default' : 'pointer',
                 opacity: disabled ? 0.5 : 1,

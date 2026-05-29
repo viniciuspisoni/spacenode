@@ -2,7 +2,12 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import UpscaleClient from './UpscaleClient'
 
-export default async function UpscalePage() {
+export default async function UpscalePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ source?: string }>
+}) {
+  const sp = await searchParams
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -13,5 +18,5 @@ export default async function UpscalePage() {
     .eq('id', user.id)
     .single()
 
-  return <UpscaleClient initialCredits={profile?.credits ?? 0} />
+  return <UpscaleClient initialCredits={profile?.credits ?? 0} sourceUrl={sp.source} />
 }
