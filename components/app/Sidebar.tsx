@@ -202,8 +202,8 @@ export default function Sidebar({
           <ConstellationN size={42} />
         </div>
         <span style={{
-          fontSize: 14, fontWeight: 500, color: '#ffffff',
-          letterSpacing: '-0.03em',
+          fontSize: 18, fontWeight: 500, color: '#ffffff',
+          letterSpacing: '-0.035em',
           whiteSpace: 'nowrap' as const,
           opacity: hovered ? 1 : 0, transition: 'opacity 0.18s',
         }}>
