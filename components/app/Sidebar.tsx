@@ -216,7 +216,7 @@ export default function Sidebar({
         {NAV_GROUPS.map((group, gi) => (
           <div key={group.label} style={{ marginTop: gi === 0 ? 0 : 14 }}>
             <div style={{
-              fontSize: 11, fontWeight: 600, letterSpacing: '0.13em',
+              fontSize: 11, fontWeight: 500, letterSpacing: '0.13em',
               textTransform: 'uppercase' as const,
               color: 'rgba(255,255,255,0.34)',
               padding: '0 10px', height: 22,
@@ -264,7 +264,7 @@ export default function Sidebar({
                     fontSize: 14,
                     color: disabled ? 'rgba(255,255,255,0.25)' : active ? '#ffffff' : isItemHovered ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.75)',
                     whiteSpace: 'nowrap' as const,
-                    fontWeight: active ? 600 : 500,
+                    fontWeight: active ? 500 : 400,
                     letterSpacing: '-0.01em',
                     opacity: hovered ? 1 : 0,
                     transition: 'opacity 0.18s, color 0.2s',
