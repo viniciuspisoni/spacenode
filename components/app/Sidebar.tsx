@@ -197,9 +197,9 @@ export default function Sidebar({
       onMouseLeave={() => setHovered(false)}
     >
       {/* Logo */}
-      <div style={{ padding: '20px 20px 16px 16px', display: 'flex', alignItems: 'center', gap: 12, height: 72, flexShrink: 0, color: '#ffffff' }}>
+      <div style={{ padding: '15px 20px 15px 14px', display: 'flex', alignItems: 'center', gap: 12, height: 72, flexShrink: 0, color: '#ffffff' }}>
         <div style={{ flexShrink: 0, display: 'flex' }}>
-          <ConstellationN size={34} />
+          <ConstellationN size={42} />
         </div>
         <span style={{
           fontSize: 14, fontWeight: 500, color: '#ffffff',

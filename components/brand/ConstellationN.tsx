@@ -23,6 +23,7 @@ export function ConstellationN({
       role={ariaHidden ? undefined : 'img'}
       aria-label={ariaHidden ? undefined : 'spacenode'}
       aria-hidden={ariaHidden}
+      shapeRendering="geometricPrecision"
     >
       <g
         stroke={color}
