@@ -48,8 +48,8 @@ export default function Navbar() {
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12 }}>
           <ConstellationN size={48} aria-hidden />
           <span style={{
-            fontSize: 18, fontWeight: 500,
-            letterSpacing: '-0.035em',
+            fontSize: 23, fontWeight: 500,
+            letterSpacing: '-0.025em',
             lineHeight: 1,
             userSelect: 'none',
           }}>
