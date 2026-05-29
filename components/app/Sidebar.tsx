@@ -212,7 +212,7 @@ export default function Sidebar({
       </div>
 
       {/* Nav */}
-      <nav className="spn-sidebar-nav" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0, padding: '2px 10px 8px' }}>
+      <nav className="spn-sidebar-nav" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0, padding: '2px 15px 8px' }}>
         {NAV_GROUPS.map((group, gi) => (
           <div key={group.label} style={{ marginTop: gi === 0 ? 0 : 14 }}>
             <div style={{
