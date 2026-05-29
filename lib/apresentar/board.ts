@@ -1,19 +1,18 @@
 // ── Apresentar · Carousel copy generator ─────────────────────────────────────
 //
-// Gera título, captions e fechamento para o carrossel Instagram via Claude 3.5
-// Sonnet (acessado por fal-ai/any-llm — mesma rota usada em lib/fidelity-engine).
+// Gera título, captions e fechamento para o carrossel Instagram via Gemini
+// direto (gemini-2.5-flash, texto puro). Migrado do gateway FAL any-llm
+// (claude-3.5-sonnet morto lá com 400). Ver lib/gemini.ts.
 //
-// O Claude NÃO vê as imagens nesta versão — recebe só metadados (vista_label,
+// O modelo NÃO vê as imagens nesta versão — recebe só metadados (vista_label,
 // engine, style, ambient do registro `renders`) + contexto do projeto.
 // Isso é mais rápido, barato e produz copy melhor calibrada ao briefing do
 // estúdio. Vision multi-imagem pode entrar em v2 se valer a pena.
 
-import { fal } from '@fal-ai/client'
+import { geminiTextJson } from '@/lib/gemini'
 import type { CarouselStyle, CarouselGeneratedCopy } from './config'
 
-const FAL_LLM_ENDPOINT = 'fal-ai/any-llm'
-const FAL_LLM_MODEL    = 'anthropic/claude-3.5-sonnet'
-const LLM_TIMEOUT_MS   = 15_000
+const LLM_TIMEOUT_MS = 15_000
 
 // ── Tipos públicos ───────────────────────────────────────────────────────────
 
@@ -142,27 +141,14 @@ export async function generateCarouselCopy(input: CarouselCopyInput): Promise<Ca
   const fb = fallbackCopy(input)
 
   try {
-    const result = await Promise.race([
-      fal.subscribe(FAL_LLM_ENDPOINT, {
-        input: {
-          model:         FAL_LLM_MODEL,
-          system_prompt: SYSTEM_PROMPT,
-          prompt:        buildUserPrompt(input),
-          temperature:   0.5,
-          max_tokens:    700,
-        },
-      }),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('LLM_TIMEOUT')), LLM_TIMEOUT_MS)
-      ),
-    ])
-
-    const output = (result.data as { output?: string })?.output
-    if (!output) {
-      console.warn('[apresentar/board] LLM retornou output vazio — usando fallback')
-      return fb
-    }
-
+    // Helper lança em erro/timeout/vazio → cai no fallback.
+    const output = await geminiTextJson({
+      system:      SYSTEM_PROMPT,
+      user:        buildUserPrompt(input),
+      temperature: 0.5,
+      maxTokens:   700,
+      timeoutMs:   LLM_TIMEOUT_MS,
+    })
     return parseGeneratedCopy(output, input.slides.length, fb)
   } catch (err) {
     console.error('[apresentar/board] copy generation falhou:', (err as Error).message)

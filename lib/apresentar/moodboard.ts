@@ -2,13 +2,14 @@
 //
 // Analisa uma imagem de referência (opcional) + presets do usuário e devolve
 // um MoodboardResult estruturado (paleta de cores, materiais sugeridos,
-// conceito editorial e tags). Usa Claude 3.5 Sonnet via fal-ai/any-llm/vision
-// quando há imagem, ou /any-llm (text-only) quando não há.
+// conceito editorial e tags). Usa Gemini direto (gemini-2.5-flash) — visão
+// quando há imagem de referência, texto puro quando não há. Migrado do gateway
+// FAL any-llm (claude-3.5-sonnet morto lá com 400). Ver lib/gemini.ts.
 //
 // O LLM NÃO inventa códigos hex aleatoriamente — recebe instruções rígidas
 // pra extrair cores reais da imagem ou da paleta solicitada.
 
-import { fal } from '@fal-ai/client'
+import { geminiVisionJson, geminiTextJson } from '@/lib/gemini'
 import {
   MOODBOARD_MATERIAL_CATEGORIES,
   type MoodboardResult,
@@ -20,10 +21,7 @@ import {
   type MoodboardSwatch,
 } from './config'
 
-const FAL_VISION_ENDPOINT = 'fal-ai/any-llm/vision'
-const FAL_TEXT_ENDPOINT   = 'fal-ai/any-llm'
-const FAL_MODEL           = 'anthropic/claude-3.5-sonnet'
-const LLM_TIMEOUT_MS      = 18_000
+const LLM_TIMEOUT_MS = 18_000
 
 // ── Input ────────────────────────────────────────────────────────────────────
 
@@ -219,33 +217,24 @@ export async function generateMoodboardContent(input: MoodboardContentInput): Pr
   const hasImage = !!input.referenceUrl
 
   try {
-    const result = await Promise.race([
-      fal.subscribe(hasImage ? FAL_VISION_ENDPOINT : FAL_TEXT_ENDPOINT, {
-        input: hasImage ? {
-          model:         FAL_MODEL,
-          system_prompt: SYSTEM_PROMPT,
-          prompt:        buildUserPrompt(input, true),
-          image_urls:    [input.referenceUrl!],
-          temperature:   0.4,
-          max_tokens:    1100,
-        } : {
-          model:         FAL_MODEL,
-          system_prompt: SYSTEM_PROMPT,
-          prompt:        buildUserPrompt(input, false),
-          temperature:   0.5,
-          max_tokens:    1100,
-        },
-      }),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('LLM_TIMEOUT')), LLM_TIMEOUT_MS)
-      ),
-    ])
-
-    const output = (result.data as { output?: string })?.output
-    if (!output) {
-      console.warn('[apresentar/moodboard] LLM retornou output vazio — usando fallback')
-      return fb
-    }
+    // Visão quando há referência (extrai cores reais da imagem), texto puro
+    // quando não há. Helpers lançam em erro/timeout/vazio → cai no fallback.
+    const output = hasImage
+      ? await geminiVisionJson({
+          system:      SYSTEM_PROMPT,
+          user:        buildUserPrompt(input, true),
+          imageUrl:    input.referenceUrl!,
+          temperature: 0.4,
+          maxTokens:   1100,
+          timeoutMs:   LLM_TIMEOUT_MS,
+        })
+      : await geminiTextJson({
+          system:      SYSTEM_PROMPT,
+          user:        buildUserPrompt(input, false),
+          temperature: 0.5,
+          maxTokens:   1100,
+          timeoutMs:   LLM_TIMEOUT_MS,
+        })
     return parseResult(output, input, fb)
   } catch (err) {
     console.error('[apresentar/moodboard] geração falhou:', (err as Error).message)

@@ -1,15 +1,18 @@
 // lib/fidelity-engine.ts
 //
-// Analisa a imagem de referência com Claude 3.5 Sonnet (via fal any-llm/vision)
-// e retorna um briefing arquitetônico estruturado, usado depois pra montar o
+// Analisa a imagem de referência com Gemini Vision (gemini-2.5-flash, direto) e
+// retorna um briefing arquitetônico estruturado, usado depois pra montar o
 // prompt de geração com fidelidade máxima ao projeto original.
+//
+// Antes via gateway FAL `any-llm/vision` (claude-3.5-sonnet, depois gpt-4o) —
+// migrado pro Gemini direto porque o gateway ficou instável e o claude morreu
+// lá (400). Ver lib/gemini.ts. analyzeImage continua à prova de falha:
+// qualquer erro cai no fallbackBriefing (não derruba o caller).
 
-import { fal } from '@fal-ai/client'
+import { geminiVisionJson } from '@/lib/gemini'
 import type { BriefingArquitetonico } from '@/lib/prompts'
 
-const FAL_VISION_ENDPOINT = 'fal-ai/any-llm/vision'
-const FAL_VISION_MODEL    = 'anthropic/claude-3.5-sonnet'
-const VISION_TIMEOUT_MS   = 12_000
+const VISION_TIMEOUT_MS = 20_000
 
 const SYSTEM_PROMPT =
   'Você é um arquiteto sênior especializado em análise técnica de imagens de projeto ' +
@@ -99,28 +102,12 @@ function parseBriefing(raw: string): BriefingArquitetonico {
 
 export async function analyzeImage(imageUrl: string): Promise<BriefingArquitetonico> {
   try {
-    const result = await Promise.race([
-      fal.subscribe(FAL_VISION_ENDPOINT, {
-        input: {
-          model:         FAL_VISION_MODEL,
-          system_prompt: SYSTEM_PROMPT,
-          prompt:        USER_PROMPT,
-          image_urls:    [imageUrl],
-          temperature:   0.1,
-          max_tokens:    900,
-        },
-      }),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('VISION_TIMEOUT')), VISION_TIMEOUT_MS)
-      ),
-    ])
-
-    const output = (result.data as { output?: string })?.output
-    if (!output) {
-      console.warn('[fidelity-engine] vision retornou output vazio')
-      return fallbackBriefing()
-    }
-
+    const output = await geminiVisionJson({
+      system:    SYSTEM_PROMPT,
+      user:      USER_PROMPT,
+      imageUrl,
+      timeoutMs: VISION_TIMEOUT_MS,
+    })
     return parseBriefing(output)
   } catch (err) {
     console.error('[fidelity-engine] análise falhou:', (err as Error).message)

@@ -1,22 +1,19 @@
-// Extração e verificação de DNA via OpenAI Vision (GPT-4o) através do FAL.
+// Extração e verificação de DNA via Gemini Vision (gemini-2.5-flash, direto).
 //
-// Por que GPT-4o:
-//   - Definição do projeto: provider escolhido pra DNA do Spaces.
-//   - FAL é o gateway centralizado de modelos do produto — uma única chave,
-//     um único cliente, e não vincula a Anthropic via API direta.
+// Antes via gateway FAL `any-llm/vision` (gpt-4o) — migrado pro Gemini direto
+// porque o gateway ficou instável (claude-3.5-sonnet morto com 400, gpt-4o
+// lento/truncando). Ver lib/gemini.ts pro racional completo.
 //
 // Além do DNA visual (estilo/materiais/paleta/contexto) o módulo também
 // extrai o "briefing arquitetônico" reusando `analyzeImage` do Renderizar.
 // Os dois rodam em paralelo dentro de `extractDnaPayload`.
 
-import { fal } from '@fal-ai/client'
+import { geminiVisionJson } from '@/lib/gemini'
 import { analyzeImage } from '@/lib/fidelity-engine'
 import type { BriefingArquitetonico } from '@/lib/prompts'
 import type { ProjectDNA, DnaVerification, SpaceDnaPayload } from './types'
 
-const FAL_VISION_ENDPOINT = 'fal-ai/any-llm/vision'
-const DNA_MODEL           = 'openai/gpt-4o'
-const DNA_TIMEOUT_MS      = 30_000
+const DNA_TIMEOUT_MS = 30_000
 
 // ── Extração ──────────────────────────────────────────────────
 
@@ -48,26 +45,35 @@ const EXTRACT_USER = (
   '- Não invente o que não está visível.'
 )
 
+// Uma chamada de visão Gemini. Lança em erro/timeout/output vazio. Centraliza
+// o input pra extração base e enriquecida não divergirem.
+async function callDnaVisionOnce(
+  system:   string,
+  user:     string,
+  imageUrl: string,
+): Promise<string> {
+  return geminiVisionJson({ system, user, imageUrl, timeoutMs: DNA_TIMEOUT_MS })
+}
+
+// Mesmo com Gemini direto, uma retry absorve qualquer blip transiente (timeout,
+// 5xx, output vazio) antes de propagar — sem isso, um único soluço virava
+// "Falha na análise da Vista Mestre" pro usuário, mesmo com a request seguinte
+// voltando em segundos.
+async function callDnaVisionResilient(
+  system:   string,
+  user:     string,
+  imageUrl: string,
+): Promise<string> {
+  try {
+    return await callDnaVisionOnce(system, user, imageUrl)
+  } catch (err) {
+    console.warn('[dna] vision attempt 1 failed, retrying:', (err as Error).message)
+    return callDnaVisionOnce(system, user, imageUrl)
+  }
+}
+
 export async function extractDna(imageUrl: string): Promise<ProjectDNA> {
-  const result = await Promise.race([
-    fal.subscribe(FAL_VISION_ENDPOINT, {
-      input: {
-        model:         DNA_MODEL,
-        system_prompt: EXTRACT_SYSTEM,
-        prompt:        EXTRACT_USER,
-        image_urls:    [imageUrl],
-        temperature:   0.1,
-        max_tokens:    900,
-      },
-    }),
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('DNA_EXTRACT_TIMEOUT')), DNA_TIMEOUT_MS)
-    ),
-  ])
-
-  const output = (result.data as { output?: string })?.output
-  if (!output) throw new Error('Vision API returned empty output')
-
+  const output = await callDnaVisionResilient(EXTRACT_SYSTEM, EXTRACT_USER, imageUrl)
   return parseDna(output)
 }
 
@@ -218,25 +224,16 @@ async function extractDnaWithSource(
     '- Contexto: 2-4 tags curtas descrevendo o ambiente.'
   )
 
-  const result = await Promise.race([
-    fal.subscribe(FAL_VISION_ENDPOINT, {
-      input: {
-        model:         DNA_MODEL,
-        system_prompt: enrichedSystem,
-        prompt:        enrichedUser,
-        image_urls:    [imageUrl],
-        temperature:   0.1,
-        max_tokens:    900,
-      },
-    }),
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('DNA_EXTRACT_TIMEOUT')), DNA_TIMEOUT_MS),
-    ),
-  ])
-
-  const output = (result.data as { output?: string })?.output
-  if (!output) {
-    // Fallback gracioso — se falhar a versão enriquecida, cai no padrão.
+  // Enriquecida é best-effort: na MENOR falha (erro/timeout/output vazio do
+  // gateway, ou JSON inválido depois) cai no extrator base — que tem retry
+  // próprio e é a metade comprovadamente confiável. Antes, só o parseDna estava
+  // protegido; a chamada FAL crua propagava e derrubava a rota inteira com
+  // "Falha na análise da Vista Mestre", mesmo com o fallback funcional ao lado.
+  let output: string
+  try {
+    output = await callDnaVisionOnce(enrichedSystem, enrichedUser, imageUrl)
+  } catch (err) {
+    console.warn('[dna] enriched extraction failed, falling back to base:', (err as Error).message)
     return extractDna(imageUrl)
   }
 
@@ -337,25 +334,9 @@ export async function verifyDna(
     '  "notes": string         // 1 frase com observação se algo desviou; vazio se tudo ok\n' +
     '}'
 
-  const result = await Promise.race([
-    fal.subscribe(FAL_VISION_ENDPOINT, {
-      input: {
-        model:         DNA_MODEL,
-        system_prompt: VERIFY_SYSTEM,
-        prompt:        userPrompt,
-        image_urls:    [variationUrl],
-        temperature:   0.1,
-        max_tokens:    500,
-      },
-    }),
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('DNA_VERIFY_TIMEOUT')), DNA_TIMEOUT_MS)
-    ),
-  ])
-
-  const output = (result.data as { output?: string })?.output
-  if (!output) throw new Error('Vision API returned empty output')
-
+  // Mesma via resiliente do Gemini (retry embutido). verifyDna roda após cada
+  // variação — um blip aqui mostraria warning amber indevido.
+  const output = await callDnaVisionResilient(VERIFY_SYSTEM, userPrompt, variationUrl)
   return parseVerification(output)
 }
 
