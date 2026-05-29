@@ -563,17 +563,31 @@ const SEG_EN: Record<string, string> = {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-// Em maximum: bloco neutro. NÃO menciona "not a render, not CGI, real life
-// photo" — quando a entrada já é um render, essa frase é uma ordem ativa pra
-// reinterpretar a imagem (o que muda materiais e finishes). Também evita citar
-// equipamentos específicos (Canon R5, Hasselblad) que empurram estética de
-// revista.
+// Em maximum o bloco depende de ter âncora — são dois casos de uso opostos:
+//
+// COM âncora (variação a partir de um render que JÁ é fotorealista): bloco
+// neutro. NÃO menciona "not a render, not CGI, real life photo" — quando a
+// entrada já é um render real, essa frase é ordem ativa pra reinterpretar a
+// imagem (muda materiais e finishes). Também evita citar equipamentos
+// específicos (Canon R5, Hasselblad) que empurram estética de revista.
+//
+// SEM âncora (primeira render a partir de modelo 3D/SketchUp): a entrada É um
+// CGI chapado — converter pra foto é exatamente o objetivo, e não há material
+// "real" pra sofrer drift. Aqui o push fotográfico é seguro e necessário.
+// A cláusula de segurança ("keep every material, color and finish exactly as
+// shown") separa os dois eixos: renderização física + luz real viram
+// fotográficas, mas QUAIS materiais/cores estão onde não muda — isso, somado
+// aos NEGATIVE/MAXIMUM_EXTRA_NEGATIVES, neutraliza o drift que motivou remover
+// "not CGI" do caso com âncora.
 //
 // Em balanced/creative: bloco completo, faz sentido pros modos onde a
 // reinterpretação fotográfica é desejada.
-function buildCameraBlock(level?: FidelityLevel): string {
+function buildCameraBlock(level?: FidelityLevel, hasAnchor?: boolean): string {
   if (level === 'maximum') {
-    return ', high quality photorealistic image, sharp focus, no compression artifacts'
+    if (hasAnchor) {
+      return ', high quality photorealistic image, sharp focus, no compression artifacts'
+    }
+    return ', photorealistic architectural photograph of this exact scene — render the surfaces with real-world physically-based materials and natural micro-texture, realistic light transport with soft natural shadows, ambient occlusion and global illumination, accurate reflections and refraction on glass and water, true-to-life sky and vegetation, subtle depth of field, sharp focus. It must read as a real DSLR photograph, NOT a flat CGI / 3D / SketchUp render. Keep every material, color and finish exactly as shown — only their real-world rendering and lighting become photographic, never the design.'
   }
   return ', captured with professional architectural camera, Canon R5, 24mm tilt-shift lens, f/4, ISO 100, Hasselblad aesthetic, hyperrealistic, 8K RAW photo, photorealistic architectural photography, not a render, not CGI, real life photo'
 }
@@ -826,15 +840,21 @@ export function buildFidelityPrompt(
     }
   }
 
-  // Em maximum: intent NEUTRO em 1 frase. "high-end ... architectural
-  // photograph" (template antigo) puxava clichê de revista (pendentes
-  // acesos, materiais premium) e competia com o lock.
+  // Em maximum o intent depende de ter âncora (ver buildCameraBlock):
+  //  - COM âncora: a entrada já é um render real → intent NEUTRO em 1 frase,
+  //    pra não puxar clichê de revista (pendentes acesos, materiais premium)
+  //    nem competir com o lock.
+  //  - SEM âncora: a entrada é modelo 3D/SketchUp → o objetivo declarado é
+  //    converter CGI→foto. Frame explícito de "re-render fotográfico do MESMO
+  //    prédio", separando realismo de superfície/luz de qualquer redesign.
   // Em balanced/creative: template descritivo arquitetônico.
   const kind   = projectType === 'exterior'
     ? `${segDesc} architectural exterior photograph`
     : `${segDesc} architectural interior photograph`
   const intent = level === 'maximum'
-    ? `Render this reference faithfully — photograph the EXACT scene shown, no magazine-style upgrades. `
+    ? (hasAnchor
+        ? `Render this reference faithfully — photograph the EXACT scene shown, no magazine-style upgrades. `
+        : `This reference is a raw 3D / CAD / SketchUp model. Re-render it into a real photograph of the SAME ${projectType === 'exterior' ? 'building' : 'space'}: convert the flat CGI shading into real-world photographic materials and light, while keeping the exact design, geometry, layout, materials, colors and finishes shown. Photorealism of surfaces and light ONLY — never a redesign. `)
     : `Transform this reference image as a photorealistic ${kind}. `
 
   // 'Preservar Original' ativa lock afirmativo: cada fixture mantém o estado
@@ -845,9 +865,19 @@ export function buildFidelityPrompt(
   // ATMOSFERA — algumas entradas de LIGHT_EN mencionam "table lamps", "sconces"
   // e isso virava licença pra adicionar fixtures inexistentes.
   const preserveLighting = !lighting || lighting === 'Preservar Original'
-  const lightingLine = preserveLighting
-    ? 'Lighting: keep the reference lighting EXACTLY — every fixture stays in the same on/off state, same time of day, same shadow direction. '
-    : `Lighting condition (atmosphere only — do not add or change any lamp, sconce, spot, fixture or any object visible in the reference): ${lightDesc}. `
+  let lightingLine: string
+  if (!preserveLighting) {
+    lightingLine = `Lighting condition (atmosphere only — do not add or change any lamp, sconce, spot, fixture or any object visible in the reference): ${lightDesc}. `
+  } else if (level === 'maximum' && !hasAnchor) {
+    // Modelo 3D chapado: "Preservar Original" não pode significar herdar a luz
+    // ambiente sem sombra do SketchUp (= cara de render). Mantém horário,
+    // direção do sol e brilho geral, mas troca o shading uniforme do CAD por
+    // luz fotográfica real. Sem isso, os outros blocos pedem foto mas a luz
+    // continua de CGI.
+    lightingLine = 'Lighting: keep the same time of day, sun direction and overall brightness as the reference, but replace the flat uniform CAD/3D shading with realistic photographic lighting — soft natural shadows, ambient occlusion and global illumination. Do not add or switch on any lamp, sconce, spot or fixture that is not already lit in the reference. '
+  } else {
+    lightingLine = 'Lighting: keep the reference lighting EXACTLY — every fixture stays in the same on/off state, same time of day, same shadow direction. '
+  }
 
   return (
     anchor +
@@ -861,7 +891,7 @@ export function buildFidelityPrompt(
     elemBlock +
     allow +
     negative +
-    buildCameraBlock(level)
+    buildCameraBlock(level, hasAnchor)
   )
 }
 
