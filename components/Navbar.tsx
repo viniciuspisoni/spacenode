@@ -228,7 +228,7 @@ export default function Navbar() {
               textAlign: 'center',
             }}
           >
-            12 nodes grátis · sem cartão de crédito
+            40 nodes grátis · sem cartão de crédito
           </p>
         </div>
       </div>

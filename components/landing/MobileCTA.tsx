@@ -56,7 +56,7 @@ export function MobileCTA() {
             letterSpacing: "0.01em",
           }}
         >
-          12 nodes grátis · sem cartão de crédito
+          40 nodes grátis · sem cartão de crédito
         </p>
       </div>
 

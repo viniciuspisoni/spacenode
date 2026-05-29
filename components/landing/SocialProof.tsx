@@ -18,7 +18,7 @@ const testimonials = [
 ]
 
 const trustItems = [
-  '12 nodes grátis ao criar conta',
+  '40 nodes grátis ao criar conta',
   'Sem cartão de crédito',
   'Suporte em português',
   'Cancele quando quiser',
