@@ -212,9 +212,9 @@ export default function Sidebar({
       </div>
 
       {/* Nav */}
-      <nav className="spn-sidebar-nav" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0, padding: '4px 10px 12px' }}>
+      <nav className="spn-sidebar-nav" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0, padding: '2px 10px 8px' }}>
         {NAV_GROUPS.map((group, gi) => (
-          <div key={group.label} style={{ marginTop: gi === 0 ? 0 : 20 }}>
+          <div key={group.label} style={{ marginTop: gi === 0 ? 0 : 14 }}>
             <div style={{
               fontSize: 11, fontWeight: 600, letterSpacing: '0.13em',
               textTransform: 'uppercase' as const,
@@ -224,7 +224,7 @@ export default function Sidebar({
               whiteSpace: 'nowrap' as const,
               opacity: hovered ? 1 : 0,
               transition: 'opacity 0.18s',
-              marginBottom: 4,
+              marginBottom: 2,
             }}>
               {group.label}
             </div>
@@ -282,7 +282,7 @@ export default function Sidebar({
 
               const sharedStyle: React.CSSProperties = {
                 display: 'flex', alignItems: 'center', gap: 12,
-                padding: '0 12px', height: 42, borderRadius: 9,
+                padding: '0 12px', height: 38, borderRadius: 9,
                 textDecoration: 'none', flexShrink: 0,
                 background: active
                   ? 'rgba(255,255,255,0.13)'
