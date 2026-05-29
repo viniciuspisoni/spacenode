@@ -46,7 +46,7 @@ export default function Navbar() {
         className="spn-nav"
       >
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12 }}>
-          <ConstellationN size={42} aria-hidden />
+          <ConstellationN size={48} aria-hidden />
           <span style={{
             fontSize: 18, fontWeight: 500,
             letterSpacing: '-0.035em',
