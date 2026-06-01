@@ -47,6 +47,11 @@ const EXTRACT_USER = (
 
 // Uma chamada de visão Gemini. Lança em erro/timeout/output vazio. Centraliza
 // o input pra extração base e enriquecida não divergirem.
+//
+// A resiliência a blip transiente (503 "high demand", 429, timeout) agora mora
+// no geminiVisionJson — backoff exponencial em lib/gemini.ts. Antes era um retry
+// imediato aqui que, num pico de demanda, repetia contra o mesmo overload e
+// ainda derrubava tudo com "Falha na análise da Vista Mestre".
 async function callDnaVisionOnce(
   system:   string,
   user:     string,
@@ -55,25 +60,8 @@ async function callDnaVisionOnce(
   return geminiVisionJson({ system, user, imageUrl, timeoutMs: DNA_TIMEOUT_MS })
 }
 
-// Mesmo com Gemini direto, uma retry absorve qualquer blip transiente (timeout,
-// 5xx, output vazio) antes de propagar — sem isso, um único soluço virava
-// "Falha na análise da Vista Mestre" pro usuário, mesmo com a request seguinte
-// voltando em segundos.
-async function callDnaVisionResilient(
-  system:   string,
-  user:     string,
-  imageUrl: string,
-): Promise<string> {
-  try {
-    return await callDnaVisionOnce(system, user, imageUrl)
-  } catch (err) {
-    console.warn('[dna] vision attempt 1 failed, retrying:', (err as Error).message)
-    return callDnaVisionOnce(system, user, imageUrl)
-  }
-}
-
 export async function extractDna(imageUrl: string): Promise<ProjectDNA> {
-  const output = await callDnaVisionResilient(EXTRACT_SYSTEM, EXTRACT_USER, imageUrl)
+  const output = await callDnaVisionOnce(EXTRACT_SYSTEM, EXTRACT_USER, imageUrl)
   return parseDna(output)
 }
 
@@ -334,9 +322,9 @@ export async function verifyDna(
     '  "notes": string         // 1 frase com observação se algo desviou; vazio se tudo ok\n' +
     '}'
 
-  // Mesma via resiliente do Gemini (retry embutido). verifyDna roda após cada
-  // variação — um blip aqui mostraria warning amber indevido.
-  const output = await callDnaVisionResilient(VERIFY_SYSTEM, userPrompt, variationUrl)
+  // Retry transiente embutido no geminiVisionJson (backoff). verifyDna roda após
+  // cada variação — um blip aqui mostraria warning amber indevido.
+  const output = await callDnaVisionOnce(VERIFY_SYSTEM, userPrompt, variationUrl)
   return parseVerification(output)
 }
 
