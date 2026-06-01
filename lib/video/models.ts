@@ -54,6 +54,21 @@ export interface VideoModel {
 }
 
 // ── Modelos via Fal ──────────────────────────────────────────────────────────
+//
+// Política de preço (revisão 2026-06-01). costInNodes é calibrado para manter
+// margem ≥ 50% no PIOR caso de receita por node — o plano Office anual
+// (R$ 0,0729/node = annualMonthlyPrice 583 ÷ 8000 nodes). Câmbio de trabalho
+// R$ 5,40/US$ (spot ~5,04 + buffer p/ spread, IOF e volatilidade; o BRL bateu
+// 5,72 nos últimos 12 meses). Áudio fica desligado na rota, então o Veo entra
+// no tier US$ 0,20/s. Resultado: ~56-58% de margem no piso e 70%+ nos planos
+// com node mais caro, segurando >50% mesmo se o dólar for à máxima recente.
+//
+// Custo real fal.ai (1080p, image-to-video, confirmado em 2026-06-01):
+//   Kling 2.5 Turbo Pro  US$ 0,07/s   (5s=0,35 · 10s=0,70)
+//   Veo 3.1              US$ 0,20/s   (4s=0,80 · 6s=1,20 · 8s=1,60)
+//   Seedance 2.0         US$ 0,682/s  (1080p) → margem negativa, oculto (ver abaixo)
+//
+// Ao mudar custo do provider, resolução, áudio ou câmbio, recalibre aqui.
 
 const KLING_25_TURBO_PRO: VideoModel = {
   id:                    'fal-ai/kling-video/v2.5-turbo/pro/image-to-video',
@@ -67,7 +82,7 @@ const KLING_25_TURBO_PRO: VideoModel = {
   supportedDurations:    ['5', '10'],
   supportedAspectRatios: ['auto'],
   supportedResolutions:  ['1080p'],
-  costInNodes:           { '5': 30, '10': 55 },
+  costInNodes:           { '5': 60, '10': 120 },   // US$0,07/s · ~57% margem no piso
   estimatedGenerationMs: 90_000,
   recommendedFor:        ['interior', 'social', 'motion'],
   isAvailable:           true,
@@ -86,7 +101,7 @@ const VEO_31: VideoModel = {
   supportedDurations:    ['4', '6', '8'],
   supportedAspectRatios: ['auto', '16:9', '9:16'],
   supportedResolutions:  ['1080p'],
-  costInNodes:           { '4': 70, '6': 100, '8': 135 },
+  costInNodes:           { '4': 140, '6': 210, '8': 280 },   // US$0,20/s · ~58% margem no piso
   estimatedGenerationMs: 180_000,
   recommendedFor:        ['interior', 'exterior', 'facade', 'commercial', 'highFidelity'],
   isAvailable:           true,
@@ -110,7 +125,12 @@ const SEEDANCE_20: VideoModel = {
   estimatedGenerationMs: 150_000,
   recommendedFor:        ['facade', 'exterior', 'highFidelity'],
   safetyNotes:           'Seedance 2.0 não expõe negative_prompt nem camera_fixed — tudo via prompt.',
-  isAvailable:           true,
+  // OCULTO (2026-06-01): a 1080p o fal.ai cobra US$ 0,682/s — 3,4× o Veo — o que
+  // deixa a margem negativa em qualquer plano. Mantido no registro (histórico de
+  // renders antigos resolve o label), mas fora do VIDEO_MODEL_ORDER e com
+  // isAvailable=false (a rota /api/video também recusa). Reativar só com o tier
+  // Fast/720p (US$ 0,2419/s) ou reprecificando como ultra-premium (~320 nodes/5s).
+  isAvailable:           false,
   isBeta:                false,
   badge:                 { label: 'FIDELIDADE', tone: 'blue' },
 }
@@ -174,8 +194,8 @@ export const DEFAULT_VIDEO_MODEL_ID = VEO_31.id
 // Ordem de exibição. Disponíveis primeiro, placeholders depois.
 export const VIDEO_MODEL_ORDER: string[] = [
   VEO_31.id,
-  SEEDANCE_20.id,
   KLING_25_TURBO_PRO.id,
+  // SEEDANCE_20 omitido do catálogo visível — ver nota de "OCULTO" no modelo.
   GOOGLE_FLOW_PLACEHOLDER.id,
   GEMINI_OMNI_PLACEHOLDER.id,
 ]
