@@ -38,7 +38,12 @@ const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504])
 let _client: GoogleGenAI | null = null
 function client(): GoogleGenAI {
   if (!_client) {
-    const apiKey = process.env.GEMINI_API_KEY
+    // .trim() sanitiza a chave: tira espaço/newline E o BOM (U+FEFF) — em JS o
+    // trim() já remove U+FEFF. Valores de env podem chegar sujos: salvar a key
+    // via pipe do PowerShell prepende um BOM, e como o SDK põe a chave num header
+    // HTTP, esse BOM quebrava TODA chamada com "Cannot convert argument to a
+    // ByteString ... value of 65279" (não é transiente nem quota — falha 100%).
+    const apiKey = process.env.GEMINI_API_KEY?.trim()
     if (!apiKey) throw new Error('GEMINI_API_KEY não configurada')
     _client = new GoogleGenAI({ apiKey })
   }
