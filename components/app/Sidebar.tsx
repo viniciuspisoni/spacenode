@@ -69,6 +69,13 @@ const IconAccount = () => (
     <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
   </svg>
 )
+const IconTeam = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="9" cy="8" r="3"/>
+    <path d="M3.5 20c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/>
+    <path d="M16 5.6a2.6 2.6 0 0 1 0 4.8M17.5 20c0-2.3-1-4-2.6-4.9"/>
+  </svg>
+)
 const IconRetocar = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 20h9"/>
@@ -154,6 +161,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: 'ESCRITÓRIO',
     items: [
+      { label: 'equipe',     href: '/app/equipe',            exact: false, Icon: IconTeam, badge: 'novo', badgeTone: 'green' },
       { label: 'identidade', href: '/app/settings/identity', exact: false, Icon: IconIdentity },
       { label: 'conta',      href: '/app/conta',             exact: false, Icon: IconAccount  },
       { label: 'planos',     href: '/app/billing',           exact: false, Icon: IconPlans    },
