@@ -47,11 +47,12 @@ export function TeamManager({ members, invites }: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [link, setLink] = useState<string | null>(null)
+  const [emailed, setEmailed] = useState(false)
   const [copied, setCopied] = useState(false)
 
   async function createInvite(e: React.FormEvent) {
     e.preventDefault()
-    setBusy(true); setError(null); setLink(null); setCopied(false)
+    setBusy(true); setError(null); setLink(null); setEmailed(false); setCopied(false)
     try {
       const res = await fetch('/api/workspaces/invites', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -60,6 +61,7 @@ export function TeamManager({ members, invites }: Props) {
       const json = await res.json().catch(() => ({}))
       if (!res.ok) { setError(json.error ?? 'Falha ao criar convite.'); return }
       setLink(json.url as string)
+      setEmailed(Boolean(json.emailed))
       setEmail('')
       router.refresh()
     } finally {
@@ -111,8 +113,10 @@ export function TeamManager({ members, invites }: Props) {
 
         {link && (
           <div style={{ marginTop: 14 }}>
-            <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginBottom: 8 }}>
-              Link gerado — envie para a pessoa (WhatsApp, email…). Só o email convidado consegue aceitar.
+            <div style={{ fontSize: 12, color: emailed ? 'var(--color-accent-green)' : 'var(--color-text-tertiary)', marginBottom: 8 }}>
+              {emailed
+                ? '✓ Convite enviado por email. O link abaixo também funciona, se quiser enviar manualmente.'
+                : 'Link gerado — envie para a pessoa (WhatsApp, email…). Só o email convidado consegue aceitar.'}
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <input readOnly value={link} style={{ ...inputStyle, fontSize: 12, color: 'var(--color-text-secondary)' }} />

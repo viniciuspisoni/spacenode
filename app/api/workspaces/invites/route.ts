@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getActiveWorkspace } from '@/lib/workspaces/context'
+import { sendInviteEmail } from '@/lib/email/send-invite-email'
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
 
@@ -59,5 +60,6 @@ export async function POST(req: NextRequest) {
   }
 
   const url = `${req.nextUrl.origin}/app/equipe/convite/${token}`
-  return NextResponse.json({ invite, url })
+  const emailResult = await sendInviteEmail({ to: email, inviteUrl: url, workspaceName: ws.name, role })
+  return NextResponse.json({ invite, url, emailed: emailResult.sent })
 }
