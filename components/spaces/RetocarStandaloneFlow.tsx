@@ -21,7 +21,7 @@ import type { Quality, EditSourceType } from '@/lib/spaces/types'
 import { EDIT_MODE_LABELS, type EditMode } from '@/lib/spaces/engines'
 import { FIDELITY_LABELS, type FidelityMode } from '@/lib/spaces/edit-prompts'
 import { MAX_EDIT_REFERENCES, SURFACE_SEGMENTATION_ENABLED, type EditReferenceImage, type EditReferenceRole } from '@/lib/spaces/edit-router'
-import { ReferencesPanel, suggestPromptForRole, type RefMenuKind } from './RetocarReferences'
+import { ReferencesPanel, suggestPromptForRole, downscaleImageForUpload, type RefMenuKind } from './RetocarReferences'
 import { ReferenceFocusModal, type NormCrop } from './ReferenceFocusModal'
 
 // Debug: mostra a imagem REJEITADA pelo quality gate (sem salvar). Só dev/staging.
@@ -267,15 +267,21 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
       setError('Formato de referência não suportado (JPG, PNG, WebP).'); return
     }
-    if (file.size > 8 * 1024 * 1024) { setError('Referência maior que 8 MB.'); return }
+    if (file.size > 40 * 1024 * 1024) { setError('Imagem muito grande (máx 40 MB).'); return }
     setError(null)
     try {
+      // Reduz no browser (limite ~4.5MB de body da Vercel) sem perder fidelidade.
+      const blob = await downscaleImageForUpload(file)
       const fd = new FormData()
-      fd.append('file', file)
+      fd.append('file', new File([blob], 'reference.jpg', { type: blob.type || 'image/jpeg' }))
       fd.append('role', role)
       const res = await fetch('/api/edits/references/upload', { method: 'POST', body: fd })
+      if (!res.ok) {
+        let msg = res.status === 413 ? 'Imagem muito grande para enviar.' : 'Erro ao enviar referência'
+        try { const d = await res.json(); msg = d?.error ?? msg } catch { /* resposta não-JSON */ }
+        throw new Error(msg)
+      }
       const data = await res.json()
-      if (!res.ok) throw new Error(data?.error ?? 'Erro ao enviar referência')
       addReference(data.reference as EditReferenceImage)
     } catch (e) {
       setError((e as Error).message)

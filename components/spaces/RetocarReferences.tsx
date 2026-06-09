@@ -58,6 +58,29 @@ function fileNameFromUrl(url: string): string {
   return last.length > 30 ? `${last.slice(0, 14)}…${last.slice(-12)}` : last
 }
 
+/** Reduz a imagem NO BROWSER antes do upload: o limite de body das funções da
+ *  Vercel é ~4.5MB, e texturas de alta-res (≥2k px PBR) passam disso → 413. 2000px
+ *  é mais que suficiente pro IP-adapter, então downscale + JPEG mantém fidelidade
+ *  e fica bem abaixo do limite. Fallback: devolve o arquivo original se algo falhar. */
+export async function downscaleImageForUpload(file: File, maxDim = 2000, quality = 0.9): Promise<Blob> {
+  try {
+    const img = await createImageBitmap(file)
+    const { width, height } = img
+    const scale = Math.min(1, maxDim / Math.max(width, height))
+    // Já pequeno o bastante (e leve)? não mexe.
+    if (scale >= 1 && file.size <= 3.8 * 1024 * 1024) { img.close?.(); return file }
+    const w = Math.max(1, Math.round(width * scale)), h = Math.max(1, Math.round(height * scale))
+    const canvas = document.createElement('canvas')
+    canvas.width = w; canvas.height = h
+    const ctx = canvas.getContext('2d')
+    if (!ctx) { img.close?.(); return file }
+    ctx.drawImage(img, 0, 0, w, h)
+    img.close?.()
+    const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/jpeg', quality))
+    return blob && blob.size < file.size ? blob : file
+  } catch { return file }
+}
+
 export function ReferencesPanel({ references, onAdd, onRemove, onClearAll, primaryRole, disabled }: {
   references:   EditReferenceImage[]
   onAdd:        (kind: RefMenuKind) => void
