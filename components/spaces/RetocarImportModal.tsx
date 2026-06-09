@@ -21,9 +21,11 @@ interface RenderRow {
 interface Props {
   onClose: () => void
   onPick:  (picked: { url: string; type: EditSourceType; id: string | null }) => void
+  /** Título do modal (default: histórico). Reutilizado como seletor de referência. */
+  title?:  string
 }
 
-export function RetocarImportModal({ onClose, onPick }: Props) {
+export function RetocarImportModal({ onClose, onPick, title }: Props) {
   const [tab, setTab] = useState<Tab>('renders')
   const [renders, setRenders] = useState<RenderRow[] | null>(null)
   const [vistas, setVistas]   = useState<Vista[] | null>(null)
@@ -85,7 +87,7 @@ export function RetocarImportModal({ onClose, onPick }: Props) {
             fontSize: 15, fontWeight: 500, color: 'var(--color-text-primary)',
             letterSpacing: '-0.015em',
           }}>
-            Importar do histórico
+            {title ?? 'Importar do histórico'}
           </h2>
           <button onClick={onClose} style={{
             width: 30, height: 30, borderRadius: 6, background: 'transparent',
