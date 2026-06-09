@@ -50,7 +50,7 @@ export const EDIT_MODE_LABELS: Record<EditMode, EditModeMeta> = {
   material: {
     label:             'Trocar material',
     description:       'Altere revestimentos, pisos, paredes, fachadas e acabamentos.',
-    promptPlaceholder: 'Ex: trocar a parede selecionada por concreto aparente cinza claro',
+    promptPlaceholder: 'Ex: aplicar concreto aparente cinza claro na superfície selecionada (piso, parede…)',
     ctaVerb:           'Gerar troca de material',
   },
   replace: {
@@ -87,6 +87,12 @@ export const EDIT_MODE_LABELS: Record<EditMode, EditModeMeta> = {
 
 // ── Engine input/output ───────────────────────────────────────────────────────
 
+/** Referência visual passada ao provider (textura, objeto, imagem do projeto). */
+export interface RetouchReference {
+  url:  string
+  role: string
+}
+
 export interface RetouchInput {
   imageUrl:       string
   maskUrl:        string
@@ -94,6 +100,8 @@ export interface RetouchInput {
   referenceUrl?:  string
   quality:        Quality
   seed?:          number
+  /** Referências visuais adicionais (multi-imagem). */
+  references?:    RetouchReference[]
 }
 
 export interface RetouchOutput {

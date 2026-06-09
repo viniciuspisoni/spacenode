@@ -46,3 +46,16 @@ export { callWithTimeoutRetry } from './retry-on-timeout'
 // Endpoint constants for telemetry / tests.
 export { FLUX_FILL_ENDPOINT, FLUX_FILL_REMOVAL_ENDPOINT, FLUX_INPAINT_ENDPOINT } from './router'
 export { NB2_ENDPOINT, NB_PRO_ENDPOINT } from './gemini-edit'
+
+// editRouter v1 — dispatch de EditEndpoint → engine concreto + engines novos.
+export type { EndpointEngine } from './endpoint-dispatch'
+export { dispatchEndpoint } from './endpoint-dispatch'
+export { FLUX_KONTEXT_LORA_INPAINT_ENDPOINT } from './flux-kontext-lora-inpaint'
+export { NANO_BANANA_EDIT_ENDPOINT }          from './nano-banana-edit'
+export { FLUX_PRO_KONTEXT_ENDPOINT }          from './flux-pro-kontext'
+export { GEMINI_3_PRO_EDIT_ENDPOINT }         from './gemini-3-pro-edit'
+export { VERTEX_IMAGEN_EDIT_ENDPOINT }        from './vertex-imagen-edit'
+
+// Camada de SUPERFÍCIE (segmentação SAM2, Fase 1).
+export { callSam2Segment, SAM2_IMAGE_ENDPOINT } from './sam2-segment'
+export type { SamPoint, SamBox } from './sam2-segment'

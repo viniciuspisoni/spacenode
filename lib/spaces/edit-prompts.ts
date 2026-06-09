@@ -13,6 +13,7 @@
 // the constraints by sending a hand-crafted prompt.
 
 import type { EditMode } from './engines'
+import type { EditReferenceImage } from './edit-router'
 
 // ── FidelityMode ──────────────────────────────────────────────────────────────
 
@@ -155,4 +156,112 @@ export function composeEmbeddedFinalPrompt(args: {
     '',
     'Output: photorealistic architectural rendering.',
   ].join('\n')
+}
+
+// ── Router prompt composer (editRouter v1) ──────────────────────────────────────
+// O editRouter pode mandar a edição para endpoints COM máscara (inpaint /
+// 2-imagens) ou SEM máscara (Flux Pro Kontext, edição por instrução). A
+// linguagem do prompt precisa casar com isso, e 'remove' precisa de uma
+// instrução de remoção real (o endpoint de inpaint USA o prompt).
+
+const REMOVAL_INSTRUCTION = [
+  'Completely remove the selected object or artifact inside the masked area.',
+  'Fill the removed area naturally using the surrounding architecture, materials,',
+  'lighting, shadows, perspective, and texture. Preserve all unmasked regions exactly.',
+  'Do not leave traces, ghosting, blur, duplicated objects, or visible seams.',
+].join(' ')
+
+function buildMaterialInstruction(userPrompt: string): string {
+  return [
+    `Change the material of the SELECTED (masked) surface to: ${userPrompt}.`,
+    'The selection marks the exact surface to edit. Apply the new material uniformly across the WHOLE selected region, following its plane, perspective, texture scale, direction and lighting, so it reads as one continuous real surface.',
+    'CRITICAL — preserve the surface EXISTING lighting exactly: keep the sunlit areas bright, the shadowed corners shadowed, and every highlight, reflection and light gradient already on the surface. The new material must INHERIT the scene light, never a flat or even illumination.',
+    'Edit ONLY the surface inside the selection. Do NOT apply the material to any other surface, even if a similar-looking floor, wall, ceiling or facade appears elsewhere in the image.',
+    'Keep everything else identical: do not change furniture, rugs, windows, walls, lighting, structure, camera or any other surface.',
+    'The result must clearly show the new material with realistic, high-resolution architectural texture.',
+  ].join(' ')
+}
+
+// ── Cláusula de referência (por papel) ──────────────────────────────────────────
+// Anexada ao prompt quando há imagens de referência. Prioriza o caso central da
+// feature: consistência entre imagens do mesmo projeto (vista mestre, etc.).
+function buildReferenceClause(references: EditReferenceImage[]): string {
+  if (references.length === 0) return ''
+  const roles = new Set(references.map(r => r.role))
+
+  if (roles.has('consistency_reference') || roles.has('project_render')) {
+    return 'Use the attached reference image as the visual source for the selected object. Focus specifically on the object/element shown in the reference image. Recreate the selected masked region in the current image so it matches the reference object’s species, size, shape, density, color, and visual character. Preserve the current image perspective, lighting, scale, and all unmasked regions.'
+  }
+  if (roles.has('restore_reference') || roles.has('original_image')) {
+    return 'Use the attached image as the original reference. Restore the selected region so it matches the reference. Preserve the architecture, perspective, lighting and all unmasked regions.'
+  }
+  if (roles.has('material_texture')) {
+    return 'Use the attached image only as a material/texture reference. Apply this material uniformly across the WHOLE selected (masked) surface, following its plane, perspective and texture scale. PRESERVE the surface existing lighting exactly — bright where the scene is bright, shadowed in the corners, keeping every highlight and gradient; the material inherits the scene light, never a flat illumination. Edit ONLY the surface inside the selection — do NOT apply it to any other similar-looking surface elsewhere in the image. Keep everything else identical (furniture, rugs, windows, walls, lighting, other surfaces).'
+  }
+  if (roles.has('object_reference')) {
+    return 'Use the attached image as the object design reference. Replace only the selected object with one similar to the reference. Preserve perspective, lighting, scale and all unmasked areas.'
+  }
+  if (roles.has('person_reference')) {
+    return 'Use the attached image as a reference for the person in the masked area. Preserve perspective, lighting, scale and all unmasked areas.'
+  }
+  if (roles.has('lighting_reference')) {
+    return 'Use the attached image as a lighting/atmosphere reference for the masked area. Preserve geometry and all unmasked regions.'
+  }
+  if (roles.has('landscape_reference')) {
+    return 'Use the attached image as a landscaping/vegetation reference for the masked area. Preserve architecture, perspective and all unmasked regions.'
+  }
+  if (roles.has('style_reference')) {
+    return 'Use the attached image as a style reference for the masked area. Preserve geometry, perspective and all unmasked regions.'
+  }
+  return 'Use the attached image(s) as visual reference for the masked area. Preserve perspective, lighting and all unmasked regions.'
+}
+
+function buildDnaContextBlock(dna: EmbeddedDnaContext): string {
+  const lines: string[] = [`- Style: ${dna.estiloNome}`]
+  if (dna.materiais.length > 0) lines.push(`- Materials: ${dna.materiais.map(m => m.nome).join(', ')}`)
+  if (dna.paleta.length > 0)    lines.push(`- Color palette: ${dna.paleta.join(', ')}`)
+  if (dna.contexto.length > 0)  lines.push(`- Mood/context: ${dna.contexto.join(', ')}`)
+  return `PROJECT CONTEXT (preserve consistency with these):\n${lines.join('\n')}\n\n`
+}
+
+export function composeRouterPrompt(args: {
+  userPrompt:  string
+  mode:        EditMode
+  fidelity:    FidelityMode
+  /** true = endpoint consome a máscara; false = edita por instrução (Kontext). */
+  usesMask:    boolean
+  /** Modo embebido (Spaces): contexto de DNA do projeto, se houver. */
+  dna?:        EmbeddedDnaContext | null
+  /** Referências visuais anexadas (cláusula por papel é apensada ao final). */
+  references?: EditReferenceImage[]
+}): string {
+  const { userPrompt, mode, fidelity, usesMask, dna, references } = args
+  const refClause = buildReferenceClause(references ?? [])
+
+  let base: string
+  if (mode === 'remove') {
+    base = [REMOVAL_INSTRUCTION, '', buildFidelityClause(fidelity)].join('\n')
+  } else if (mode === 'material') {
+    base = [buildMaterialInstruction(userPrompt), '', buildFidelityClause(fidelity)].join('\n')
+  } else if (usesMask) {
+    // Reusa os composers existentes: embebido (com DNA) ou standalone.
+    base = dna
+      ? composeEmbeddedFinalPrompt({ userPrompt, mode, fidelity, dna })
+      : composeStandaloneFinalPrompt({ userPrompt, mode, fidelity })
+  } else {
+    // Endpoint por instrução (Flux Pro Kontext) — sem linguagem de "área mascarada".
+    const dnaBlock = dna ? buildDnaContextBlock(dna) : ''
+    base = [
+      'Edit this architectural image following the instruction below.',
+      '',
+      `INSTRUCTION: ${userPrompt}`,
+      '',
+      buildFidelityClause(fidelity),
+      '',
+      dnaBlock +
+      'Preserve the overall composition, perspective, camera angle, and architectural geometry. Output: photorealistic architectural rendering.',
+    ].join('\n')
+  }
+
+  return refClause ? `${base}\n\n${refClause}` : base
 }

@@ -16,10 +16,17 @@ import { RetocarCanvas, type RetocarCanvasHandle, type MaskTool, BRUSH_MIN, BRUS
 import { RetocarImportModal } from './RetocarImportModal'
 import { RetocarModeTabs } from './RetocarModeTabs'
 import { PromptAssistant } from './PromptAssistant'
-import { getEditCost, LARGE_MASK_THRESHOLD } from '@/lib/spaces/edit-economy'
+import { LARGE_MASK_THRESHOLD } from '@/lib/spaces/edit-economy'
 import type { Quality, EditSourceType } from '@/lib/spaces/types'
 import { EDIT_MODE_LABELS, type EditMode } from '@/lib/spaces/engines'
 import { FIDELITY_LABELS, type FidelityMode } from '@/lib/spaces/edit-prompts'
+import { MAX_EDIT_REFERENCES, SURFACE_SEGMENTATION_ENABLED, type EditReferenceImage, type EditReferenceRole } from '@/lib/spaces/edit-router'
+import { ReferencesPanel, suggestPromptForRole, type RefMenuKind } from './RetocarReferences'
+import { ReferenceFocusModal, type NormCrop } from './ReferenceFocusModal'
+
+// Debug: mostra a imagem REJEITADA pelo quality gate (sem salvar). Só dev/staging.
+const SHOW_REJECTED_DEBUG =
+  process.env.NODE_ENV !== 'production' || process.env.NEXT_PUBLIC_EDIT_DEBUG === '1'
 
 type Step = 'empty' | 'editing' | 'result'
 
@@ -44,6 +51,14 @@ function buildVersionLabel(args: { index: number; prompt: string; mode: EditMode
   const { index, prompt, mode } = args
   const summary = prompt.trim().slice(0, 28) || (mode ? EDIT_MODE_LABELS[mode].label.toLowerCase() : '')
   return summary ? `V${index} · ${summary}` : `V${index}`
+}
+
+/** Resultado do preview de rota (/api/edits/preview) — o que a UI mostra. */
+interface RoutePreview {
+  costNodes:   number
+  isFreeFix:   boolean
+  label:       string
+  explanation: string
 }
 
 interface Props {
@@ -80,9 +95,67 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
   const [error, setError]             = useState<string | null>(null)
   const [showImport, setShowImport]   = useState(false)
   const [driftWarning, setDriftWarning] = useState<number | null>(null)
+  // editRouter v1: modo premium (opt-in explícito; nunca automático) + rota e
+  // custo calculados no servidor ANTES de gerar (sem consumir nodes pra prever).
+  const [premium, setPremium]           = useState(false)
+  const [routePreview, setRoutePreview] = useState<RoutePreview | null>(null)
+  // Quality gate: edição rejeitada por não preservar fora da máscara.
+  const [qualityGate, setQualityGate]   = useState<{ message: string; resultUrl?: string; drift?: number } | null>(null)
+  // Camada de SUPERFÍCIE (Fase 1): confirmação antes de aplicar na superfície inteira.
+  const [segmenting, setSegmenting]     = useState(false)
+  const [segConfirm, setSegConfirm]     = useState<
+    { previewUrl: string; surfaceMaskUrl: string; blobMaskUrl: string; surfaceCoverage: number; blobCoverage: number; surfaceCost: number } | null
+  >(null)
+  // Referências visuais da edição (V1).
+  const [references, setReferences]     = useState<EditReferenceImage[]>([])
+  const [refPicker, setRefPicker]       = useState<{ role: EditReferenceRole } | null>(null)
+  // Reference focus (V1.1): imagem do projeto escolhida, aguardando recorte.
+  const [refFocus, setRefFocus]         = useState<
+    { url: string; role: EditReferenceRole; sourceType: EditSourceType; sourceId: string | null } | null
+  >(null)
+  const pendingUploadRoleRef            = useRef<EditReferenceRole | null>(null)
+  const refFileInputRef                 = useRef<HTMLInputElement | null>(null)
 
-  const cost = getEditCost(quality)
-  const balanceShort = balance < cost
+  // Custo vem da rota (editRouter), não mais de getEditCost(quality).
+  const cost = routePreview?.costNodes ?? 0
+  const balanceShort = !routePreview?.isFreeFix && balance < cost
+
+  // Preview de rota/custo (debounced) sempre que algo que afeta a cobrança muda.
+  // Só consulta quando há máscara; sem máscara, limpa (botão volta ao verbo base).
+  // setState fica dentro do setTimeout (não síncrono no corpo do efeito).
+  useEffect(() => {
+    if (step !== 'editing' || !sourceUrl) return
+    const handle = setTimeout(async () => {
+      if (coverage <= 0) { setRoutePreview(null); return }
+      try {
+        const res = await fetch('/api/edits/preview', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({
+            has_mask:      true,
+            mask_coverage: coverage,
+            prompt:        mode === 'remove' ? '' : prompt.trim(),
+            quality,
+            source_type:   sourceType,
+            source_id:     sourceId,
+            mode,
+            fidelity_mode: fidelity,
+            premium,
+            references:    references.map(r => ({ url: r.url, role: r.role, source: r.source, note: r.note })),
+          }),
+        })
+        if (!res.ok) return
+        const d = await res.json()
+        setRoutePreview({
+          costNodes:   d.cost_nodes ?? 0,
+          isFreeFix:   !!d.is_free_fix,
+          label:       d.label ?? '',
+          explanation: d.explanation ?? '',
+        })
+      } catch { /* preview é best-effort; o servidor reavalia ao gerar */ }
+    }, 350)
+    return () => clearTimeout(handle)
+  }, [step, sourceUrl, sourceType, sourceId, mode, quality, fidelity, premium, coverage, prompt, references])
 
   // ── upload da imagem ─────────────────────────────────────────
   async function uploadSourceFile(file: File) {
@@ -103,6 +176,7 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
     }
     setVersions([orig])
     setActiveVersionId(orig.id)
+    setReferences([])
   }
 
   async function onFilePicked(f: File | null) {
@@ -137,6 +211,119 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
     setStep('editing')
   }
 
+  // ── referências da edição ────────────────────────────────────
+  // 1 referência ATIVA por papel: anexar uma nova do mesmo papel SUBSTITUI a
+  // anterior (não acumula) — senão a antiga ficava em references[0] e o engine
+  // usava ela silenciosamente.
+  function addReference(ref: EditReferenceImage) {
+    setReferences(prev => {
+      const sameRoleIdx = prev.findIndex(r => r.role === ref.role)
+      if (sameRoleIdx >= 0) { const next = [...prev]; next[sameRoleIdx] = ref; return next }
+      if (prev.length >= MAX_EDIT_REFERENCES) return prev
+      return [...prev, ref]
+    })
+    const suggestion = suggestPromptForRole(ref.role)
+    if (suggestion) setPrompt(p => (p.trim() ? p : suggestion))
+  }
+
+  function removeReference(id: string) {
+    setReferences(prev => prev.filter(r => r.id !== id))
+  }
+  function clearAllReferences() { setReferences([]) }
+
+  // Papel principal da ferramenta (o que o engine usa como references[0]) +
+  // ordenação do payload pra garantir que ele vá pra frente (item 4).
+  const primaryRefRole: EditReferenceRole | null =
+    mode === 'material' ? 'material_texture'
+    : (mode === 'replace' || mode === 'add') ? 'object_reference'
+    : null
+  function payloadReferences() {
+    const ordered = primaryRefRole
+      ? [...references.filter(r => r.role === primaryRefRole), ...references.filter(r => r.role !== primaryRefRole)]
+      : references
+    return ordered.map(r => ({ url: r.url, role: r.role, source: r.source, note: r.note }))
+  }
+
+  function handleAddReferenceKind(kind: RefMenuKind) {
+    setError(null)
+    if (kind === 'original') {
+      if (!sourceUrl) { setError('Abra uma imagem antes de usar como referência.'); return }
+      addReference({ id: `original:${sourceUrl}`, url: sourceUrl, role: 'original_image', source: 'original' })
+      return
+    }
+    if (kind === 'project_render') { setRefPicker({ role: 'project_render' }); return }
+    if (kind === 'vista_mestre')   { setRefPicker({ role: 'consistency_reference' }); return }
+    // tipos por upload
+    pendingUploadRoleRef.current =
+      kind === 'material' ? 'material_texture' :
+      kind === 'object'   ? 'object_reference' : 'custom'
+    refFileInputRef.current?.click()
+  }
+
+  async function onRefFilePicked(file: File | null) {
+    const role = pendingUploadRoleRef.current
+    pendingUploadRoleRef.current = null
+    if (!file || !role) return
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setError('Formato de referência não suportado (JPG, PNG, WebP).'); return
+    }
+    if (file.size > 8 * 1024 * 1024) { setError('Referência maior que 8 MB.'); return }
+    setError(null)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('role', role)
+      const res = await fetch('/api/edits/references/upload', { method: 'POST', body: fd })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error ?? 'Erro ao enviar referência')
+      addReference(data.reference as EditReferenceImage)
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }
+
+  // Imagem do projeto escolhida → abre o seletor de FOCO (recorte do elemento).
+  function onReferencePicked(picked: { url: string; type: EditSourceType; id: string | null }) {
+    const role = refPicker?.role ?? 'project_render'
+    setRefPicker(null)
+    setRefFocus({ url: picked.url, role, sourceType: picked.type, sourceId: picked.id })
+  }
+
+  async function onFocusConfirm(crop: NormCrop | null) {
+    const f = refFocus
+    setRefFocus(null)
+    if (!f) return
+    try {
+      if (crop) {
+        // Recorta só o elemento da referência (server-side).
+        const res = await fetch('/api/edits/references/crop', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ source_url: f.url, ...crop, role: f.role }),
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data?.error ?? 'Erro ao recortar referência')
+        addReference(data.reference as EditReferenceImage)
+        return
+      }
+      // Imagem inteira: valida via from-project (render/vista) ou usa a URL direta.
+      if ((f.sourceType === 'render' || f.sourceType === 'vista') && f.sourceId) {
+        const res = await fetch('/api/edits/references/from-project', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ image_id: f.sourceId, source_type: f.sourceType, role: f.role }),
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data?.error ?? 'Erro ao usar imagem do projeto')
+        addReference(data.reference as EditReferenceImage)
+      } else {
+        addReference({ id: `project:${f.url}`, url: f.url, role: f.role, source: 'project' })
+      }
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }
+
   // ── gerar edit ───────────────────────────────────────────────
   async function handleGenerate() {
     if (!canvasRef.current?.hasMask()) {
@@ -154,26 +341,78 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
     }
     setError(null)
     setDriftWarning(null)
+    setQualityGate(null)
+    setSegConfirm(null)
     setSubmitting(true)
+
+    // 1) Upload do blob pintado.
+    let blobMaskUrl: string
+    let maskCoverage: number
     try {
       const blob = await canvasRef.current.getMaskBlob()
       if (!blob) throw new Error('Falha ao gerar máscara')
-      const maskCoverage = canvasRef.current.getMaskCoverage()
-
-      // Upload máscara
+      maskCoverage = canvasRef.current.getMaskCoverage()
       const fd = new FormData()
       fd.append('file', new File([blob], 'mask.png', { type: 'image/png' }))
       fd.append('kind', 'mask')
       const maskRes = await fetch('/api/edits/upload-asset', { method: 'POST', body: fd })
       const maskData = await maskRes.json()
       if (!maskRes.ok) throw new Error(maskData?.error ?? 'Erro ao salvar máscara')
+      blobMaskUrl = maskData.url
+    } catch (e) {
+      console.error('[retocar] handleGenerate error:', e)
+      setError((e as Error).message)
+      setSubmitting(false)
+      return
+    }
 
+    // 2) Camada de SUPERFÍCIE (Fase 1): só material. Segmenta e, se estender além
+    //    do pintado, pede confirmação. Best-effort: qualquer falha cai no blob.
+    if (SURFACE_SEGMENTATION_ENABLED && mode === 'material' && sourceUrl) {
+      setSegmenting(true)
+      try {
+        const segRes = await fetch('/api/edits/segment', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ image_url: sourceUrl, mask_url: blobMaskUrl }),
+        })
+        if (segRes.ok) {
+          const seg = await segRes.json()
+          const extended = !seg.used_fallback && seg.surface_coverage > maskCoverage * 1.15
+          if (extended) {
+            let surfaceCost = cost
+            try {
+              const pv = await fetch('/api/edits/preview', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ has_mask: true, mask_coverage: seg.surface_coverage, prompt: prompt.trim(), quality, source_type: sourceType, source_id: sourceId, mode, premium, references: payloadReferences() }),
+              })
+              if (pv.ok) { const d = await pv.json(); surfaceCost = d.cost_nodes ?? cost }
+            } catch { /* mantém o custo atual */ }
+            setSegmenting(false)
+            setSubmitting(false)
+            setSegConfirm({ previewUrl: seg.preview_url, surfaceMaskUrl: seg.surface_mask_url, blobMaskUrl, surfaceCoverage: seg.surface_coverage, blobCoverage: maskCoverage, surfaceCost })
+            return
+          }
+        }
+      } catch { /* best-effort: cai no blob */ }
+      setSegmenting(false)
+    }
+
+    // 3) Sem segmentação (ou não estendeu) → gera com o blob pintado.
+    await runGenerate(blobMaskUrl, maskCoverage)
+  }
+
+  // Geração com a máscara escolhida (blob pintado OU superfície segmentada).
+  async function runGenerate(maskUrl: string, maskCoverage: number) {
+    setSubmitting(true)
+    try {
       const res = await fetch('/api/edits', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           source_image_url: sourceUrl,
-          mask_url:         maskData.url,
+          mask_url:         maskUrl,
           prompt:           mode === 'remove' ? '' : prompt.trim(),
           quality,
           source_type:      sourceType,
@@ -181,9 +420,20 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
           mask_coverage:    maskCoverage,
           mode,
           fidelity_mode:    fidelity,
+          premium,
+          references:       payloadReferences(),
         }),
       })
       const data = await res.json()
+      // Quality gate (HTTP 200, mas rejeitado): não consumiu nodes, não criou
+      // versão. Mostra mensagem + opções, mantém o usuário no editor.
+      if (data?.rejected) {
+        if (data.balance_after?.total_balance != null) {
+          setBalance(data.balance_after.total_balance as number)
+        }
+        setQualityGate({ message: data.message ?? 'A edição não preservou bem a imagem.', resultUrl: data.result_url, drift: data.out_of_mask_delta })
+        return
+      }
       if (!res.ok) {
         if (res.status === 402) throw new Error(data?.message ?? 'Saldo insuficiente')
         throw new Error(data?.error ?? 'Erro na edição')
@@ -194,13 +444,15 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
       if (data.balance_after?.total_balance != null) {
         setBalance(data.balance_after.total_balance as number)
       }
+      // Custo realmente cobrado (a rota é reavaliada no servidor).
+      const chargedCost = (data.routing?.cost_nodes as number | undefined) ?? cost
       // Append new version to the local history.
       setVersions(prev => {
         const idx = prev.filter(v => !v.isOriginal).length + 1
         const v: EditVersion = {
           id: newId(), url: outputUrl, isOriginal: false,
           label: buildVersionLabel({ index: idx, prompt, mode }),
-          prompt, mode, cost, createdAt: Date.now(),
+          prompt, mode, cost: chargedCost, createdAt: Date.now(),
         }
         setActiveVersionId(v.id)
         return [...prev, v]
@@ -211,8 +463,8 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
       // never blocks the user from seeing an already-successful edit result.
       setValidating(true)
       try {
-        const v = await canvasRef.current.validateOutsideMaskPreservation(outputUrl)
-        if (!v.ok) {
+        const v = await canvasRef.current?.validateOutsideMaskPreservation(outputUrl)
+        if (v && !v.ok) {
           setDriftWarning(v.drift)
         }
       } catch (valErr) {
@@ -228,6 +480,19 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
     } finally {
       setSubmitting(false)
     }
+  }
+
+  function confirmSurface() {
+    if (!segConfirm) return
+    const { surfaceMaskUrl, surfaceCoverage } = segConfirm
+    setSegConfirm(null)
+    void runGenerate(surfaceMaskUrl, surfaceCoverage)
+  }
+  function useBlobOnly() {
+    if (!segConfirm) return
+    const { blobMaskUrl, blobCoverage } = segConfirm
+    setSegConfirm(null)
+    void runGenerate(blobMaskUrl, blobCoverage)
   }
 
   function discardResult() {
@@ -344,11 +609,21 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
           setMode={setMode}
           fidelity={fidelity}
           setFidelity={setFidelity}
+          premium={premium}
+          setPremium={setPremium}
+          routePreview={routePreview}
+          qualityGate={qualityGate}
+          onDismissGate={() => setQualityGate(null)}
+          onTryAdvanced={() => { setPremium(true); setQualityGate(null) }}
+          references={references}
+          onAddReference={handleAddReferenceKind}
+          onRemoveReference={removeReference}
+          onClearReferences={clearAllReferences}
           balance={balance}
           balanceShort={balanceShort}
-          cost={cost}
           submitting={submitting}
           validating={validating}
+          segmenting={segmenting}
           error={error}
           versions={versions}
           activeVersionId={activeVersionId}
@@ -375,11 +650,75 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
         />
       )}
 
+      {/* input oculto p/ upload de referência */}
+      <input
+        ref={refFileInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        onChange={e => { onRefFilePicked(e.target.files?.[0] ?? null); e.target.value = '' }}
+        style={{ display: 'none' }}
+      />
+
       {showImport && (
         <RetocarImportModal
           onClose={() => setShowImport(false)}
           onPick={onImportPicked}
         />
+      )}
+
+      {refPicker && (
+        <RetocarImportModal
+          title="Usar imagem do projeto como referência"
+          onClose={() => setRefPicker(null)}
+          onPick={onReferencePicked}
+        />
+      )}
+
+      {refFocus && (
+        <ReferenceFocusModal
+          imageUrl={refFocus.url}
+          onConfirm={onFocusConfirm}
+          onClose={() => setRefFocus(null)}
+        />
+      )}
+
+      {/* Camada de SUPERFÍCIE (Fase 1): confirmação antes de aplicar na superfície inteira */}
+      {segConfirm && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 115,
+          background: 'rgba(0,0,0,0.74)', backdropFilter: 'blur(6px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+        }}>
+          <div style={{
+            background: 'var(--color-bg-elevated)', border: '0.5px solid var(--color-border-strong)',
+            borderRadius: 14, padding: 18, maxWidth: 760, width: '100%',
+            display: 'flex', flexDirection: 'column', gap: 12, maxHeight: '90vh', overflowY: 'auto',
+          }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+              Detectamos a superfície inteira
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+              Em vez de aplicar só no que você pintou, dá pra aplicar o material em <strong>toda a superfície destacada em verde</strong> — até onde ela termina de verdade — preservando o resto da cena (móveis, tapete, paredes).
+            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={segConfirm.previewUrl} alt="superfície detectada"
+              style={{ width: '100%', maxHeight: 360, objectFit: 'contain', borderRadius: 8, border: '0.5px solid var(--color-border)' }} />
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 2 }}>
+              <button type="button" onClick={confirmSurface} className="spn-action"
+                style={{ flex: 1, minWidth: 220, width: 'auto', padding: '11px 18px', background: '#1D9E75', color: '#042818', border: '0.5px solid rgba(0,0,0,0.18)' }}>
+                Aplicar na superfície — {segConfirm.surfaceCost} nodes
+              </button>
+              <button type="button" onClick={useBlobOnly} className="spn-action spn-action--ghost"
+                style={{ width: 'auto', padding: '11px 16px', fontSize: 12 }}>
+                Usar só o que pintei
+              </button>
+              <button type="button" onClick={() => { setSegConfirm(null); setSubmitting(false) }} className="spn-action spn-action--ghost"
+                style={{ width: 'auto', padding: '11px 14px', fontSize: 12 }}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
@@ -499,11 +838,21 @@ function EditingStep(props: {
   setMode:      (m: EditMode) => void
   fidelity:     FidelityMode
   setFidelity:  (f: FidelityMode) => void
+  premium:      boolean
+  setPremium:   (v: boolean) => void
+  routePreview: RoutePreview | null
+  qualityGate:   { message: string; resultUrl?: string; drift?: number } | null
+  onDismissGate: () => void
+  onTryAdvanced: () => void
+  references:        EditReferenceImage[]
+  onAddReference:    (kind: RefMenuKind) => void
+  onRemoveReference: (id: string) => void
+  onClearReferences: () => void
   balance:      number
   balanceShort: boolean
-  cost:         number
   submitting:   boolean
   validating:   boolean
+  segmenting:   boolean
   error:        string | null
   versions:        EditVersion[]
   activeVersionId: string | null
@@ -516,8 +865,11 @@ function EditingStep(props: {
     sourceUrl, canvasRef, coverage, setCoverage, brush, setBrush,
     tool, setTool, maskVisible, setMaskVisible,
     prompt, setPrompt, quality, setQuality, mode, setMode,
-    fidelity, setFidelity, balance, balanceShort,
-    cost, submitting, validating, error,
+    fidelity, setFidelity, premium, setPremium, routePreview,
+    qualityGate, onDismissGate, onTryAdvanced,
+    references, onAddReference, onRemoveReference, onClearReferences,
+    balance, balanceShort,
+    submitting, validating, segmenting, error,
     versions, activeVersionId, onPickVersion, onUseVersionAsBase,
     onGenerate, onStartOver,
   } = props
@@ -547,7 +899,7 @@ function EditingStep(props: {
             tool={tool}
             maskVisible={maskVisible}
             loading={submitting}
-            loadingMessage={validating ? 'Validando preservação fora da máscara…' : 'Aplicando edição com IA…'}
+            loadingMessage={segmenting ? 'Detectando superfície…' : validating ? 'Validando preservação fora da máscara…' : 'Aplicando edição com IA…'}
           />
         </div>
 
@@ -582,6 +934,51 @@ function EditingStep(props: {
               color: '#e57373', fontSize: 13,
             }}>
               {error}
+            </div>
+          )}
+
+          {qualityGate && (
+            <div style={{
+              padding: '12px 14px', borderRadius: 8,
+              background: 'rgba(186,117,23,0.12)', border: '0.5px solid rgba(186,117,23,0.35)',
+              color: '#e0a766', fontSize: 12.5, lineHeight: 1.5,
+              display: 'flex', flexDirection: 'column', gap: 8,
+            }}>
+              <span style={{ fontWeight: 500 }}>A edição foi rejeitada para preservar sua imagem.</span>
+              <span style={{ fontSize: 11, color: '#1D9E75' }}>Nenhum node foi consumido.</span>
+              {references.length > 0 && (
+                <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+                  Dica: aumente um pouco a máscara ao redor do objeto para dar mais contexto à referência.
+                </span>
+              )}
+              {qualityGate.resultUrl && SHOW_REJECTED_DEBUG && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <span style={{ fontSize: 10, color: 'var(--color-text-quaternary)', letterSpacing: '0.04em' }}>
+                    DEBUG · resultado rejeitado{qualityGate.drift != null ? ` · ${(qualityGate.drift * 100).toFixed(0)}% fora da máscara` : ''}
+                  </span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={qualityGate.resultUrl} alt="rejeitado (debug)"
+                    style={{ width: '100%', maxHeight: 200, objectFit: 'contain', borderRadius: 6, border: '0.5px solid var(--color-border)' }} />
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
+                <button
+                  type="button"
+                  onClick={onDismissGate}
+                  className="spn-action spn-action--ghost"
+                  style={{ width: 'auto', padding: '7px 14px', fontSize: 12 }}
+                >
+                  Tentar novamente
+                </button>
+                <button
+                  type="button"
+                  onClick={onTryAdvanced}
+                  className="spn-action spn-action--ghost"
+                  style={{ width: 'auto', padding: '7px 14px', fontSize: 12 }}
+                >
+                  Tentar modo avançado
+                </button>
+              </div>
             </div>
           )}
 
@@ -648,6 +1045,21 @@ function EditingStep(props: {
           </p>
         </PanelSection>
 
+        {/* Modo premium — opt-in explícito (nunca automático) */}
+        <PanelSection label="Qualidade">
+          <PremiumToggle value={premium} onChange={setPremium} disabled={submitting} />
+        </PanelSection>
+
+        {/* Referências da edição (V1) */}
+        <ReferencesPanel
+          references={references}
+          onAdd={onAddReference}
+          onRemove={onRemoveReference}
+          onClearAll={onClearReferences}
+          primaryRole={mode === 'material' ? 'material_texture' : mode === 'replace' || mode === 'add' ? 'object_reference' : null}
+          disabled={submitting}
+        />
+
         {/* Saldo + ação principal */}
         <div style={{
           marginTop: 'auto', paddingTop: 14,
@@ -682,9 +1094,17 @@ function EditingStep(props: {
             }}
           >
             {submitting
-              ? (validating ? 'Validando…' : 'Aplicando edição com IA…')
-              : `${modeMeta.ctaVerb} — ${cost} nodes`}
+              ? (segmenting ? 'Detectando superfície…' : validating ? 'Validando…' : 'Aplicando edição com IA…')
+              : (routePreview?.label ?? modeMeta.ctaVerb)}
           </button>
+          {!submitting && routePreview?.explanation && (
+            <p style={{
+              fontSize: 10.5, color: routePreview.isFreeFix ? '#1D9E75' : 'var(--color-text-tertiary)',
+              lineHeight: 1.5, textAlign: 'center', margin: 0,
+            }}>
+              {routePreview.explanation}
+            </p>
+          )}
           <button
             onClick={onStartOver}
             disabled={submitting}
@@ -1003,6 +1423,45 @@ export function ResolutionControl({ value, onChange, disabled }: {
           </button>
         )
       })}
+    </div>
+  )
+}
+
+// ── Painel: toggle de modo premium (opt-in) ─────────────────
+
+function PremiumToggle({ value, onChange, disabled }: {
+  value:    boolean
+  onChange: (v: boolean) => void
+  disabled: boolean
+}) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => onChange(!value)}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '9px 12px', borderRadius: 8,
+          background: value ? 'rgba(29,158,117,0.12)' : 'var(--color-surface)',
+          border: value ? '0.5px solid rgba(29,158,117,0.5)' : '0.5px solid var(--color-border-strong)',
+          color: 'var(--color-text-primary)', fontSize: 12, fontFamily: 'inherit',
+          cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1,
+          letterSpacing: '-0.005em',
+        }}
+      >
+        <span>Modelo premium</span>
+        <span style={{
+          fontSize: 10, fontWeight: 600, letterSpacing: '0.06em',
+          color: value ? '#1D9E75' : 'var(--color-text-quaternary)',
+        }}>
+          {value ? 'ATIVADO' : 'DESATIVADO'}
+        </span>
+      </button>
+      <p style={{ fontSize: 10, color: 'var(--color-text-quaternary)', lineHeight: 1.55 }}>
+        Para prompts complexos. Usa o modelo de máxima qualidade (5–6 nodes). A
+        edição padrão escolhe o modelo mais econômico automaticamente.
+      </p>
     </div>
   )
 }

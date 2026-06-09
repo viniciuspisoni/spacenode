@@ -36,10 +36,11 @@ export { FLUX_FILL_ENDPOINT as FLUX_FILL_REMOVAL_ENDPOINT }
  *   - Forbid changes outside the mask (reinforces what mask_url already says).
  */
 const REMOVAL_PROMPT = [
-  'Fill the masked area seamlessly with the surrounding context.',
-  'Match the existing texture, color, lighting and material of the nearby unmasked pixels — grass, wall, sky, ground, foliage, pavement, glass, concrete, whatever is adjacent at each edge of the mask.',
+  'Completely remove the selected object or artifact inside the masked area.',
+  'Fill the removed area naturally using the surrounding architecture, materials, lighting, shadows, perspective and texture — grass, wall, sky, ground, foliage, pavement, glass, concrete, whatever is adjacent at each edge of the mask.',
   'Continue the patterns, lines and gradients that pass through the boundary of the mask so the seam is invisible.',
   'Do NOT add any new objects, people, vehicles, furniture, signs, plants, lamps or architectural elements.',
+  'Do not leave traces, ghosting, blur, duplicated objects, or visible seams.',
   'Do NOT alter anything outside the mask. The output must be pixel-identical to the input outside the masked region.',
   'The result must look as if the masked area never contained anything — just the natural background continuing without interruption.',
   'Preserve the photorealistic quality of the source image.',

@@ -1,0 +1,527 @@
+// editRouter — roteamento inteligente de edições da Retocar.
+//
+// Decide TRÊS coisas a partir do contexto da edição, ANTES de consumir
+// qualquer node:
+//   1. endpoint  → qual provider/modelo atende melhor essa edição
+//   2. costNodes → quanto cobrar (0 a 6), diferenciando correção, edição
+//                  localizada, média, ampla e premium
+//   3. isFreeFix → se a edição entra na cota de correção grátis
+//
+// Princípios (ver pedido de produto):
+//   - Correção barata e justa: corrigir o que a IA errou não deve doer.
+//   - Premium nunca é automático: só quando o usuário liga explicitamente
+//     (userSelectedPremium). Prompt complexo sem premium usa o melhor modelo
+//     NÃO-premium e sugere o upgrade — nunca escala sozinho.
+//   - Função PURA e sem efeitos colaterais: não toca em saldo, banco ou rede.
+//     Quem chama é responsável por consumir nodes e registrar a tentativa.
+//
+// Este arquivo é deliberadamente SEM imports (autocontido) para ser fácil de
+// testar e portar. As pontes para o vocabulário do código existente
+// (EditMode 'fix'/'landscape', Quality 'hd'/'2k'/'4k', PlanId 'starter'/'office')
+// ficam em edit-router-adapters.ts.
+
+// ── Vocabulário público (conforme spec de produto) ─────────────────────────────
+
+export type EditTool =
+  | 'remove'
+  | 'material'
+  | 'replace'
+  | 'add'
+  | 'fix_detail'
+  | 'lighting'
+  | 'landscaping'
+
+export type PreservationMode = 'max' | 'balanced' | 'creative'
+
+export type OutputResolution = 'current' | '2K' | '4K'
+
+export type UserPlan = 'free' | 'start' | 'pro' | 'studio' | 'beta'
+
+export type EditEndpoint =
+  | 'vertex/imagen-edit'
+  | 'fal-ai/flux-kontext-lora/inpaint'
+  | 'fal-ai/flux-pro/v1/fill'
+  | 'fal-ai/nano-banana/edit'
+  | 'fal-ai/flux-pro/kontext'
+  | 'fal-ai/gemini-3-pro-image-preview/edit'
+  | 'google/gemini-3.1-flash-image'
+
+export type EditProvider = 'fal' | 'vertex' | 'google'
+
+// ── Referências visuais da edição ───────────────────────────────────────────────
+
+export type EditReferenceRole =
+  | 'material_texture'
+  | 'object_reference'
+  | 'person_reference'
+  | 'style_reference'
+  | 'lighting_reference'
+  | 'landscape_reference'
+  | 'original_image'
+  | 'project_render'
+  | 'consistency_reference'
+  | 'restore_reference'
+  | 'custom'
+
+export type EditReferenceSource = 'upload' | 'project' | 'original'
+
+export interface EditReferenceImage {
+  id:      string
+  url:     string
+  role:    EditReferenceRole
+  source:  EditReferenceSource
+  note?:   string
+}
+
+export const VALID_EDIT_REFERENCE_ROLES: EditReferenceRole[] = [
+  'material_texture', 'object_reference', 'person_reference', 'style_reference',
+  'lighting_reference', 'landscape_reference', 'original_image', 'project_render',
+  'consistency_reference', 'restore_reference', 'custom',
+]
+
+export function isEditReferenceRole(v: unknown): v is EditReferenceRole {
+  return typeof v === 'string' && (VALID_EDIT_REFERENCE_ROLES as string[]).includes(v)
+}
+
+/** Máximo de referências por edição (spec). */
+export const MAX_EDIT_REFERENCES = 3
+
+export interface EditRoutingInput {
+  tool:                  EditTool
+  prompt:                string
+  hasMask:               boolean
+  /** Fração 0–1 da imagem coberta pela máscara. */
+  maskAreaRatio:         number
+  /** Megapixels da imagem de origem (largura*altura/1e6). */
+  imageMegapixels:       number
+  outputResolution:      OutputResolution
+  preservationMode:      PreservationMode
+  isGeneratedBySpacenode: boolean
+  /** Quantas correções grátis ESTA imagem já consumiu. */
+  freeFixesUsedForImage: number
+  /** Correções grátis que o usuário já usou no mês. */
+  monthlyFreeFixesUsed:  number
+  /** Teto mensal de correções grátis do usuário (definido pelo plano). */
+  monthlyFreeFixesLimit: number
+  userPlan:              UserPlan
+  /** Usuário ligou explicitamente o modo premium. */
+  userSelectedPremium?:  boolean
+  /** Referências visuais anexadas (texturas, objetos, imagens do projeto). */
+  references?:           EditReferenceImage[]
+}
+
+export interface EditRoutingResult {
+  endpoint:           EditEndpoint
+  costNodes:          number
+  isFreeFix:          boolean
+  shouldUseCrop:      boolean
+  /** Teto de MP a enviar no crop (a imagem é reduzida se passar disso). */
+  maxCropMegapixels?: number
+  /** Explicação curta da decisão (telemetria / logs / debug). */
+  reason:             string
+}
+
+// ── Tabela de custo dos nodes (regras de cobrança da spec) ─────────────────────
+
+export const NODE_COST = {
+  /** Correção grátis. */
+  freeFix:      0,
+  /** Correção rápida paga (cota grátis esgotada). */
+  quickFix:     1,
+  /** Edição localizada simples. */
+  localized:    2,
+  /** Edição de área média. */
+  medium:       3,
+  /** Edição global / avançada (contextual, iluminação, paisagismo). */
+  global:       4,
+  /** Edição premium (Gemini 3 Pro). */
+  premium:      5,
+  /** Premium em caso pesado (4K, área grande ou sem máscara). */
+  premiumHeavy: 6,
+} as const
+
+// ── Custo real estimado por endpoint (telemetria de margem) ────────────────────
+// `per_image`: custo fixo por imagem. `per_mp`: custo por megapixel processado.
+// Mantido aqui pra calcular provider_cost_usd ao registrar a tentativa e vigiar
+// a margem (regra do projeto: margem-piso ≥ 50% — ver lib/video/models.ts).
+
+export const ENDPOINT_COST_USD: Record<
+  EditEndpoint,
+  { kind: 'per_image' | 'per_mp'; usd: number }
+> = {
+  'vertex/imagen-edit':                     { kind: 'per_image', usd: 0.020 },
+  'fal-ai/flux-kontext-lora/inpaint':       { kind: 'per_mp',    usd: 0.035 },
+  // Flux Pro Fill — motor de remoção dedicado (limpa + reconstrói o fundo).
+  'fal-ai/flux-pro/v1/fill':                { kind: 'per_image', usd: 0.040 },
+  'fal-ai/nano-banana/edit':                { kind: 'per_image', usd: 0.039 },
+  'fal-ai/flux-pro/kontext':                { kind: 'per_image', usd: 0.040 },
+  'fal-ai/gemini-3-pro-image-preview/edit': { kind: 'per_image', usd: 0.150 },
+  // Reservado: alternativa Google rápida/barata para edições simples. Hoje a
+  // rota padrão usa nano-banana/edit; este fica disponível para tuning futuro
+  // (ex.: caminho sem máscara mais barato). Assumimos custo ~ nano-banana.
+  'google/gemini-3.1-flash-image':          { kind: 'per_image', usd: 0.039 },
+}
+
+// ── Flags / limiares ───────────────────────────────────────────────────────────
+
+// Vertex Imagen Edit ainda NÃO está integrado (prioridade #7). Enquanto false,
+// quick fixes baratos com máscara usam fal-ai/flux-kontext-lora/inpaint.
+// Quando o engine Vertex estiver pronto, basta ligar aqui.
+export const VERTEX_IMAGEN_ENABLED = false
+
+/** Camada de SUPERFÍCIE (segmentação SAM2, Fase 1) — atrás de flag, OFF por
+ *  padrão. Liga com NEXT_PUBLIC_EDIT_SURFACE_SEGMENTATION=1 (lida no cliente pra
+ *  decidir o pré-passo de segmentação E no servidor pra gatear o endpoint). */
+export const SURFACE_SEGMENTATION_ENABLED =
+  process.env.NEXT_PUBLIC_EDIT_SURFACE_SEGMENTATION === '1'
+
+/** Ferramentas elegíveis à camada de superfície (V1 = só material, com e sem
+ *  referência — escopo decidido pelo dono). 'replace' (instância de objeto) fica
+ *  pra V1.1: lá a máscara é do OBJETO sob o seed, não da superfície/plano. */
+export function surfaceSegmentationEligible(tool: EditTool): boolean {
+  return tool === 'material'
+}
+
+/** Máscara "pequena": correção / edição localizada. Também é o teto da grátis. */
+export const SMALL_MASK_MAX_RATIO = 0.15
+/** Acima disso a edição é "ampla/global". 15–40% é "média". */
+export const LARGE_MASK_MIN_RATIO = 0.40
+
+// ── classifyPromptComplexity ───────────────────────────────────────────────────
+// Heurística inicial (PT-BR + EN). Substituível por um classificador LLM depois
+// (o projeto já usa Gemini direto para análise de texto — ver lib/gemini.ts).
+//
+// 'simple'   → ação única e local ("remover o carro", "limpar a mancha")
+// 'moderate' → pedido com algum detalhe ou 1 conjunção
+// 'complex'  → transformação de estilo/cena, múltiplas instruções, "nova proposta"
+
+export type PromptComplexity = 'simple' | 'moderate' | 'complex'
+
+// Sinais de transformação ampla de estilo/cena ou "recomeçar do zero".
+const COMPLEX_KEYWORDS = [
+  'estilo', 'style', 'transform', 'transforme', 'transformar', 'reimagin',
+  'redesenh', 'reformul', 'reconfigur', 'nova proposta', 'do zero', 'reforma',
+  'completament', 'inteir', 'toda a cena', 'todo o ambiente', 'ambiente inteiro',
+  'mobiliar', 'mobíli', 'mobili', 'decorar', 'decoração', 'layout', 'planta',
+  'dia para noite', 'noite para dia', 'day to night', 'redesign', 'restyle',
+  'cena completa', 'render do zero',
+]
+
+// Conjunções / separadores que indicam múltiplas instruções no mesmo prompt.
+const INSTRUCTION_SEPARATORS = [
+  ' e ', ' and ', ' também ', ' além ', ' depois ', ' então ', ' then ',
+  ' plus ', ';',
+]
+
+export function classifyPromptComplexity(prompt: string): PromptComplexity {
+  const text = (prompt ?? '').trim().toLowerCase()
+  if (text.length === 0) return 'simple'
+
+  const wordCount = text.split(/\s+/).filter(Boolean).length
+
+  let score = 0
+
+  // 1) Tamanho do pedido.
+  if (wordCount > 30) score += 2
+  else if (wordCount > 16) score += 1
+
+  // 2) Múltiplas instruções (conjunções + vírgulas).
+  let separators = 0
+  for (const sep of INSTRUCTION_SEPARATORS) {
+    separators += countOccurrences(text, sep)
+  }
+  separators += countOccurrences(text, ',')
+  if (separators >= 3) score += 2
+  else if (separators >= 1) score += 1
+
+  // 3) Palavras de transformação ampla de estilo/cena.
+  if (COMPLEX_KEYWORDS.some(k => text.includes(k))) score += 2
+
+  if (score >= 3) return 'complex'
+  if (score >= 1) return 'moderate'
+  return 'simple'
+}
+
+function countOccurrences(haystack: string, needle: string): number {
+  if (!needle) return 0
+  let count = 0
+  let idx = haystack.indexOf(needle)
+  while (idx !== -1) {
+    count += 1
+    idx = haystack.indexOf(needle, idx + needle.length)
+  }
+  return count
+}
+
+// ── routeEdit ───────────────────────────────────────────────────────────────────
+
+export function routeEdit(input: EditRoutingInput): EditRoutingResult {
+  const complexity = classifyPromptComplexity(input.prompt)
+  const isComplex = complexity === 'complex'
+
+  const is4K = input.outputResolution === '4K'
+
+  const area = clamp(input.maskAreaRatio, 0, 1)
+  const hasMask = input.hasMask === true
+  const smallMask = hasMask && area <= SMALL_MASK_MAX_RATIO
+  const largeMask = hasMask && area >= LARGE_MASK_MIN_RATIO
+  // (área média = hasMask && !smallMask && !largeMask — é o fall-through do tier 6)
+
+  const isFixTool = input.tool === 'remove' || input.tool === 'fix_detail'
+  const isGlobalTool = input.tool === 'lighting' || input.tool === 'landscaping'
+
+  // Referências visuais → preferir editor multi-imagem (nano-banana/gemini).
+  const refs = input.references ?? []
+  const hasRefs = refs.length > 0
+
+  // ── 1) PREMIUM — só com opt-in explícito. Nunca fallback automático. ──
+  if (input.userSelectedPremium === true) {
+    const heavy = is4K || largeMask || !hasMask
+    return {
+      endpoint:      'fal-ai/gemini-3-pro-image-preview/edit',
+      costNodes:     heavy ? NODE_COST.premiumHeavy : NODE_COST.premium,
+      isFreeFix:     false,
+      shouldUseCrop: false,
+      reason:        'Modo premium selecionado pelo usuário — Gemini 3 Pro (máxima qualidade).',
+    }
+  }
+
+  // ── 2) CORREÇÃO GRÁTIS — todas as condições obrigatórias. ──
+  // (gerada pelo Spacenode + remove/fix_detail + máscara ≤15% + ainda não usou
+  //  grátis nesta imagem + dentro do teto mensal + não-4K + prompt não complexo)
+  const freeEligible =
+    input.isGeneratedBySpacenode === true &&
+    isFixTool &&
+    hasMask &&
+    area <= SMALL_MASK_MAX_RATIO &&
+    input.freeFixesUsedForImage <= 0 &&
+    input.monthlyFreeFixesUsed < input.monthlyFreeFixesLimit &&
+    !is4K &&
+    !isComplex
+
+  if (freeEligible) {
+    const endpoint = maskedToolEndpoint(input.tool, hasRefs)
+    return {
+      endpoint,
+      costNodes:         NODE_COST.freeFix,
+      isFreeFix:         true,
+      shouldUseCrop:     cropEligible(endpoint),
+      maxCropMegapixels: cropCap(endpoint, input),
+      reason:            'Pequena correção com máscara em imagem do Spacenode — dentro da cota grátis.',
+    }
+  }
+
+  // ── 3) EDIÇÃO AMPLA / CONTEXTUAL / SEM MÁSCARA / PROMPT COMPLEXO → avançada ──
+  // Iluminação, paisagismo, máscara grande, sem máscara, ou prompt complexo
+  // (mas SEM premium automático). Modelo contextual que preserva qualidade.
+  if (isGlobalTool || largeMask || !hasMask || isComplex) {
+    const reason = isComplex
+      ? 'Prompt complexo — modelo avançado (Flux Pro Kontext). Para casos muito complexos, ative o modo premium.'
+      : 'Edição ampla/contextual — modelo avançado para preservar qualidade.'
+    // Com máscara + referências, usa o editor multi-imagem (Kontext é single-image
+    // e ignoraria as referências).
+    const endpoint: EditEndpoint = (hasMask && hasRefs) ? 'fal-ai/nano-banana/edit' : 'fal-ai/flux-pro/kontext'
+    return {
+      endpoint,
+      costNodes:     NODE_COST.global,
+      isFreeFix:     false,
+      shouldUseCrop: false,
+      reason,
+    }
+  }
+
+  // Daqui pra frente: TEM máscara, área pequena ou média, ferramenta local,
+  // prompt não complexo, sem premium.
+
+  // ── 4) CORREÇÃO RÁPIDA PAGA (1 node) ──
+  // Mesma natureza da grátis (remove/fix_detail + máscara pequena + imagem do
+  // Spacenode + não-4K), mas a cota grátis acabou (já usou nesta imagem ou
+  // estourou o teto mensal). Cobra simbólico de 1 node no endpoint barato.
+  if (smallMask && isFixTool && input.isGeneratedBySpacenode === true && !is4K) {
+    const endpoint = maskedToolEndpoint(input.tool, hasRefs)
+    return {
+      endpoint,
+      costNodes:         NODE_COST.quickFix,
+      isFreeFix:         false,
+      shouldUseCrop:     cropEligible(endpoint),
+      maxCropMegapixels: cropCap(endpoint, input),
+      reason:            'Correção rápida com máscara (cota grátis já utilizada).',
+    }
+  }
+
+  // ── 5) EDIÇÃO LOCALIZADA SIMPLES (2 nodes) ──
+  // Máscara pequena, qualquer ferramenta local (material/replace/add e também
+  // remove/fix_detail em imagem não-Spacenode ou 4K). Inpaint com crop.
+  if (smallMask) {
+    const endpoint = maskedToolEndpoint(input.tool, hasRefs)
+    return {
+      endpoint,
+      costNodes:         NODE_COST.localized,
+      isFreeFix:         false,
+      shouldUseCrop:     cropEligible(endpoint),
+      maxCropMegapixels: cropCap(endpoint, input),
+      reason:            'Edição localizada usando modo econômico.',
+    }
+  }
+
+  // ── 6) EDIÇÃO MÉDIA (3 nodes) ──
+  // Máscara média (15–40%). MESMA decisão de endpoint que a localizada
+  // (maskedToolEndpoint): material/add COM referência → inpaint ANCORADO na
+  // máscara; remove → fill; resto → nano-banana. Antes cravava nano-banana e
+  // ignorava as referências, então o surface-anchoring não aplicava nesse tier.
+  const mediumEndpoint = maskedToolEndpoint(input.tool, hasRefs)
+  return {
+    endpoint:          mediumEndpoint,
+    costNodes:         NODE_COST.medium,
+    isFreeFix:         false,
+    shouldUseCrop:     cropEligible(mediumEndpoint),
+    maxCropMegapixels: cropCap(mediumEndpoint, input),
+    reason:            'Edição de área média usando modelo padrão.',
+  }
+}
+
+// ── Helpers de endpoint / crop ──────────────────────────────────────────────────
+
+/** Inpaint barato (por MP) para ferramentas de DETALHE/material pequeno com
+ *  máscara (Vertex quando ligado). NÃO usado para remoção — ver maskedToolEndpoint. */
+function quickFixEndpoint(): EditEndpoint {
+  return VERTEX_IMAGEN_ENABLED
+    ? 'vertex/imagen-edit'
+    : 'fal-ai/flux-kontext-lora/inpaint'
+}
+
+/** Motor de FILL dedicado para REMOÇÃO (limpa a área e reconstrói o fundo). */
+const REMOVE_FILL_ENDPOINT: EditEndpoint = 'fal-ai/flux-pro/v1/fill'
+
+/**
+ * Endpoint para tiers COM máscara, por ferramenta (item #6).
+ * flux-kontext-lora/inpaint é reference-guided (exige reference_image_url): ótimo
+ * para correções sutis e 'replace' (que usa uma referência real), mas reproduzia
+ * a origem em remoção e troca de material. Por isso:
+ *   - 'remove'                       → motor de FILL dedicado (limpa + reconstrói);
+ *   - 'material'/'add' COM referência → inpaint ANCORADO flux-kontext-lora: a
+ *     máscara é restrição RÍGIDA de pixels (edita só ali, NUNCA outra superfície
+ *     "parecida" — surface targeting), e a referência guia o material/objeto;
+ *   - 'material'/'add' SEM referência → editor forte por instrução (nano-banana);
+ *   - 'fix_detail' COM referência (consistência entre imagens) → nano-banana;
+ *     sem referência → inpaint flux-kontext-lora. 'replace' usa a
+ *     reference_image_url real do flux-kontext-lora, então fica no inpaint.
+ * Fill e nano-banana são per-image (cropEligible=false) → mandam a imagem INTEIRA
+ * (mais contexto) e o pipeline recompõe pra preservar tudo fora da máscara.
+ */
+function maskedToolEndpoint(tool: EditTool, hasReferences: boolean): EditEndpoint {
+  if (tool === 'remove') return REMOVE_FILL_ENDPOINT
+  // material/add COM referência (textura/objeto) → inpaint ANCORADO na máscara.
+  // O nano-banana é solto e aplicava o material em OUTRA superfície parecida; o
+  // flux-kontext-lora/inpaint edita SÓ os pixels da máscara (âncora espacial forte)
+  // e usa a referência como reference_image_url.
+  if ((tool === 'material' || tool === 'add') && hasReferences) return quickFixEndpoint()
+  if (tool === 'material' || tool === 'add') return 'fal-ai/nano-banana/edit'
+  // fix_detail COM referência (consistência/restauração entre imagens) → editor
+  // multi-imagem; sem referência → inpaint sutil. 'replace' usa a
+  // reference_image_url real do flux-kontext-lora, então fica no inpaint.
+  if (tool === 'fix_detail' && hasReferences) return 'fal-ai/nano-banana/edit'
+  return quickFixEndpoint()
+}
+
+/** Crop só compensa em endpoints sensíveis a área (custo por MP / por imagem pequena). */
+function cropEligible(endpoint: EditEndpoint): boolean {
+  return endpoint === 'fal-ai/flux-kontext-lora/inpaint'
+    || endpoint === 'vertex/imagen-edit'
+}
+
+/**
+ * Teto de MP a enviar no crop. O flux-kontext-lora cobra por MP, então limitar
+ * a área enviada controla o custo direto. O crop real (bbox+padding) é reduzido
+ * para no máximo esse valor antes de ir ao endpoint.
+ */
+function cropCap(endpoint: EditEndpoint, input: EditRoutingInput): number | undefined {
+  if (!cropEligible(endpoint)) return undefined
+  // material/replace querem mais DENSIDADE de pixel na superfície (realismo da
+  // textura) → teto maior; demais ferramentas mantêm o teto econômico.
+  const surfaceTool = input.tool === 'material' || input.tool === 'replace'
+  const ceiling = input.outputResolution === '2K'
+    ? (surfaceTool ? 3.0 : 2.5)
+    : (surfaceTool ? 2.0 : 1.5)
+  // Nunca pedimos mais MP do que a própria imagem tem.
+  return round2(Math.min(ceiling, Math.max(0.25, input.imageMegapixels || ceiling)))
+}
+
+// ── Utilitários de apresentação (UI) ────────────────────────────────────────────
+// Mantêm EditRoutingResult fiel à spec e ainda dão à UI o rótulo do botão e a
+// microcópia da cobrança, derivados do resultado.
+
+/** Rótulo do botão de gerar. Não expõe endpoint técnico ao usuário. */
+export function editButtonLabel(result: EditRoutingResult): string {
+  if (result.isFreeFix) return 'Corrigir grátis'
+
+  const n = result.costNodes
+  const unit = n === 1 ? 'node' : 'nodes'
+
+  if (result.endpoint === 'fal-ai/gemini-3-pro-image-preview/edit') {
+    return `Gerar premium — ${n} ${unit}`
+  }
+  if (n === 1) return `Corrigir — ${n} ${unit}`
+  if (n >= 4) return `Gerar edição avançada — ${n} ${unit}`
+  return `Gerar edição — ${n} ${unit}`
+}
+
+/** Microcópia explicando a cobrança (mensagens definidas no pedido de produto). */
+export function editChargeExplanation(result: EditRoutingResult): string {
+  if (result.isFreeFix) {
+    return 'Pequena correção com máscara. Esta edição será gratuita.'
+  }
+  if (result.endpoint === 'fal-ai/gemini-3-pro-image-preview/edit') {
+    return 'Edição premium. Modelo de máxima qualidade para prompts complexos.'
+  }
+  if (result.costNodes >= 4) {
+    return 'Edição ampla. Será usado um modelo avançado para preservar qualidade.'
+  }
+  if (result.costNodes === 1) {
+    return 'Correção rápida com máscara.'
+  }
+  return 'Edição localizada usando modo econômico.'
+}
+
+// ── Utilitários para registrar a tentativa (image_edit_attempts) ────────────────
+
+/** Provider derivado do endpoint, para a coluna `provider`. */
+export function endpointProvider(endpoint: EditEndpoint): EditProvider {
+  if (endpoint.startsWith('vertex/')) return 'vertex'
+  if (endpoint.startsWith('google/')) return 'google'
+  return 'fal'
+}
+
+/**
+ * Ferramentas "criativas" (mudam conteúdo): recompor com borda SUAVE (feather),
+ * pra o novo material/objeto se fundir ao entorno em vez de virar um recorte
+ * literal da máscara pintada. remove/fix_detail preservam com borda DURA.
+ */
+export function isBlendTool(tool: EditTool): boolean {
+  return tool === 'material' || tool === 'replace' || tool === 'add'
+}
+
+/** Custo USD estimado do provider, para `provider_cost_usd` / margem. */
+export function estimateProviderCostUsd(
+  endpoint: EditEndpoint,
+  megapixels: number,
+): number {
+  const c = ENDPOINT_COST_USD[endpoint]
+  const usd = c.kind === 'per_mp' ? c.usd * Math.max(1, megapixels || 1) : c.usd
+  return round4(usd)
+}
+
+// ── Math helpers ────────────────────────────────────────────────────────────────
+
+function clamp(v: number, lo: number, hi: number): number {
+  if (Number.isNaN(v)) return lo
+  return Math.min(hi, Math.max(lo, v))
+}
+
+function round2(v: number): number {
+  return Math.round(v * 100) / 100
+}
+
+function round4(v: number): number {
+  return Math.round(v * 10000) / 10000
+}
