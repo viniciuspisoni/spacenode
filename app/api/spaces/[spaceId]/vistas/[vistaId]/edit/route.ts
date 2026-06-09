@@ -205,7 +205,7 @@ export async function POST(
   try {
     // ── 4) Débito atômico (pula se grátis) ──
     if (routing.costNodes > 0) {
-      const { error: debitErr } = await admin.rpc('consume_nodes_v2', {
+      const { error: debitErr } = await admin.rpc('consume_workspace_nodes', {
         user_id_input: user.id,
         amount:        routing.costNodes,
       })
@@ -273,7 +273,7 @@ export async function POST(
     const gateLimit = isBlendTool(tool) ? BLEND_OUT_OF_MASK_GATE : OUT_OF_MASK_GATE
     if (run.outOfMaskDelta != null && run.outOfMaskDelta > gateLimit) {
       if (debited) {
-        try { await admin.rpc('refund_nodes', { user_id_input: user.id, amount: routing.costNodes }) }
+        try { await admin.rpc('refund_workspace_nodes', { user_id_input: user.id, amount: routing.costNodes }) }
         catch (refundErr) { console.error('[vista.edit] gate refund failed:', refundErr) }
       }
       if (newVistaId) {
@@ -382,7 +382,7 @@ export async function POST(
     })
   } catch (err) {
     if (debited) {
-      try { await admin.rpc('refund_nodes', { user_id_input: user.id, amount: routing.costNodes }) }
+      try { await admin.rpc('refund_workspace_nodes', { user_id_input: user.id, amount: routing.costNodes }) }
       catch (refundErr) { console.error('[vista.edit] refund failed:', refundErr) }
     }
     if (newVistaId) {

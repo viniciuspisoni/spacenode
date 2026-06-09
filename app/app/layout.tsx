@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Sidebar from '@/components/app/Sidebar'
 import { getPlanById, type PlanId } from '@/lib/plans'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { getPayerId } from '@/lib/workspaces/context'
 
 export default async function AppLayout({
   children,
@@ -18,17 +20,20 @@ export default async function AppLayout({
   const userName   = user.user_metadata.full_name ?? user.email ?? 'usuário'
   const userAvatar = user.user_metadata.avatar_url ?? null
 
-  // Saldo + plano (usa view + profiles)
+  // Saldo + plano da "bolsa": dono do workspace ativo (individual = ele mesmo).
+  // Lê via service-role porque o membro não enxerga o saldo do dono pelo RLS.
+  const payerId = (await getPayerId(supabase, user.id)) ?? user.id
+  const admin = createAdminClient()
   const [balRes, profRes] = await Promise.all([
-    supabase
+    admin
       .from('user_node_balance')
       .select('plan_balance, lumen_balance')
-      .eq('user_id', user.id)
+      .eq('user_id', payerId)
       .single(),
-    supabase
+    admin
       .from('profiles')
       .select('plan')
-      .eq('id', user.id)
+      .eq('id', payerId)
       .single(),
   ])
 

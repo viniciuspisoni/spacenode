@@ -47,7 +47,7 @@ export async function POST(
       .eq('id', spaceId)
 
     // ── Débito atômico ──────────────────────────────────────────
-    const { data: debitData, error: debitErr } = await admin.rpc('consume_nodes_v2', {
+    const { data: debitData, error: debitErr } = await admin.rpc('consume_workspace_nodes', {
       user_id_input: user.id,
       amount:        DNA_EXTRACTION_COST,
     })
@@ -105,7 +105,7 @@ export async function POST(
   } catch (err) {
     if (debited) {
       try {
-        await admin.rpc('refund_nodes', {
+        await admin.rpc('refund_workspace_nodes', {
           user_id_input: user.id,
           amount:        DNA_EXTRACTION_COST,
         })

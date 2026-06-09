@@ -147,8 +147,8 @@ export async function POST(req: NextRequest) {
         status:       'completed',
         completed_at: new Date().toISOString(),
       }),
-      // user-context client → consume_credits valida via auth.uid() guard
-      supabase.rpc('consume_credits', { user_id_input: user.id, amount: nodeCost }),
+      // bolsa do escritório: cobra o dono do workspace ativo (individual = ele mesmo)
+      admin.rpc('consume_workspace_nodes', { user_id_input: user.id, amount: nodeCost }),
     ])
 
     return NextResponse.json({ url: outputUrl, inputUrl })

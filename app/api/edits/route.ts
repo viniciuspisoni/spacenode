@@ -192,7 +192,7 @@ export async function POST(req: NextRequest) {
   try {
     // ── 4) Débito atômico (pula se grátis) ──
     if (routing.costNodes > 0) {
-      const { error: debitErr } = await admin.rpc('consume_nodes_v2', {
+      const { error: debitErr } = await admin.rpc('consume_workspace_nodes', {
         user_id_input: user.id,
         amount:        routing.costNodes,
       })
@@ -231,7 +231,7 @@ export async function POST(req: NextRequest) {
     const gateLimit = isBlendTool(tool) ? BLEND_OUT_OF_MASK_GATE : OUT_OF_MASK_GATE
     if (run.outOfMaskDelta != null && run.outOfMaskDelta > gateLimit) {
       if (debited) {
-        try { await admin.rpc('refund_nodes', { user_id_input: user.id, amount: routing.costNodes }) }
+        try { await admin.rpc('refund_workspace_nodes', { user_id_input: user.id, amount: routing.costNodes }) }
         catch (refundErr) { console.error('[edits] gate refund failed:', refundErr) }
       }
       if (attemptId) {
@@ -328,7 +328,7 @@ export async function POST(req: NextRequest) {
     })
   } catch (err) {
     if (debited) {
-      try { await admin.rpc('refund_nodes', { user_id_input: user.id, amount: routing.costNodes }) }
+      try { await admin.rpc('refund_workspace_nodes', { user_id_input: user.id, amount: routing.costNodes }) }
       catch (refundErr) { console.error('[edits] refund failed:', refundErr) }
     }
     await failAttempt((err as Error).message)

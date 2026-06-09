@@ -50,7 +50,7 @@ export async function POST(
   let newId: string | null = null
 
   try {
-    const { error: debitErr } = await admin.rpc('consume_nodes_v2', {
+    const { error: debitErr } = await admin.rpc('consume_workspace_nodes', {
       user_id_input: user.id,
       amount:        cost,
     })
@@ -130,7 +130,7 @@ export async function POST(
     })
   } catch (err) {
     if (debited) {
-      try { await admin.rpc('refund_nodes', { user_id_input: user.id, amount: cost }) }
+      try { await admin.rpc('refund_workspace_nodes', { user_id_input: user.id, amount: cost }) }
       catch (e) { console.error('[upscale] refund failed:', e) }
     }
     if (newId) {

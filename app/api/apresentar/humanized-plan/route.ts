@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
     const falEndpoint = getFalEndpoint(engine)
 
     // ── Débito atômico ────────────────────────────────────────────────────────
-    const { error: debitError } = await admin.rpc('consume_nodes_v2', {
+    const { error: debitError } = await admin.rpc('consume_workspace_nodes', {
       user_id_input: user.id,
       amount:        nodesToCharge,
     })
@@ -197,7 +197,7 @@ export async function POST(req: NextRequest) {
     // ── Refund best-effort ────────────────────────────────────────────────────
     if (debited && nodesToCharge > 0) {
       try {
-        await admin.rpc('refund_nodes', { user_id_input: user.id, amount: nodesToCharge })
+        await admin.rpc('refund_workspace_nodes', { user_id_input: user.id, amount: nodesToCharge })
         console.warn('[apresentar/humanized-plan] Refund:', nodesToCharge, 'nodes →', user.id)
       } catch (refundErr) {
         console.error('[apresentar/humanized-plan] FALHA NO REFUND:', { err: refundErr, userId: user.id, amount: nodesToCharge })
