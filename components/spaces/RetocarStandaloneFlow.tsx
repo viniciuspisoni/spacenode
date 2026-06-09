@@ -410,7 +410,7 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
   }
 
   // Geração com a máscara escolhida (blob pintado OU superfície segmentada).
-  async function runGenerate(maskUrl: string, maskCoverage: number) {
+  async function runGenerate(maskUrl: string, maskCoverage: number, fromSurface = false) {
     setSubmitting(true)
     try {
       const res = await fetch('/api/edits', {
@@ -467,16 +467,20 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
       // Validação pixel-a-pixel client-side fora da máscara.
       // Wrapped in its own try/catch so a canvas SecurityError (cross-origin CORS)
       // never blocks the user from seeing an already-successful edit result.
-      setValidating(true)
-      try {
-        const v = await canvasRef.current?.validateOutsideMaskPreservation(outputUrl)
-        if (v && !v.ok) {
-          setDriftWarning(v.drift)
+      // Pulada quando a SUPERFÍCIE (segmentação) foi usada: a edição estende além
+      // do blob pintado, então validar contra ele acusaria drift falso-positivo.
+      if (!fromSurface) {
+        setValidating(true)
+        try {
+          const v = await canvasRef.current?.validateOutsideMaskPreservation(outputUrl)
+          if (v && !v.ok) {
+            setDriftWarning(v.drift)
+          }
+        } catch (valErr) {
+          console.warn('[retocar] pixel validation skipped:', (valErr as Error).message)
+        } finally {
+          setValidating(false)
         }
-      } catch (valErr) {
-        console.warn('[retocar] pixel validation skipped:', (valErr as Error).message)
-      } finally {
-        setValidating(false)
       }
 
       setStep('result')
@@ -492,7 +496,7 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
     if (!segConfirm) return
     const { surfaceMaskUrl, surfaceCoverage } = segConfirm
     setSegConfirm(null)
-    void runGenerate(surfaceMaskUrl, surfaceCoverage)
+    void runGenerate(surfaceMaskUrl, surfaceCoverage, true)
   }
   function useBlobOnly() {
     if (!segConfirm) return
@@ -704,7 +708,7 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
               Detectamos a superfície inteira
             </div>
             <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
-              Em vez de aplicar só no que você pintou, dá pra aplicar o material em <strong>toda a superfície destacada em verde</strong> — até onde ela termina de verdade — preservando o resto da cena (móveis, tapete, paredes).
+              Em vez de aplicar só no que você pintou, dá pra aplicar o material em <strong>toda a superfície destacada em verde</strong> — até onde ela termina de verdade. <strong>Confira que só a superfície ficou em verde</strong>: se pegou tapete, cama ou móveis (porque o pincel passou por cima deles), use <strong>“Usar só o que pintei”</strong> e pinte de novo evitando os objetos.
             </div>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={segConfirm.previewUrl} alt="superfície detectada"

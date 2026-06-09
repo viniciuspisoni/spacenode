@@ -192,7 +192,7 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
   }
 
   // Geração com a máscara escolhida (blob pintado OU superfície segmentada).
-  async function runGenerate(maskUrl: string, maskCoverage: number) {
+  async function runGenerate(maskUrl: string, maskCoverage: number, fromSurface = false) {
     setSubmitting(true)
     try {
       const res = await fetch(`/api/spaces/${space.id}/vistas/${vista.id}/edit`, {
@@ -220,12 +220,17 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
       const newVista = data.vista as { id: string; image_url: string }
       setResultUrl(newVista.image_url)
       setResultVistaId(newVista.id)
-      setValidating(true)
-      try {
-        const v = await canvasRef.current?.validateOutsideMaskPreservation(newVista.image_url)
-        if (v && !v.ok) setDriftWarning(v.drift)
-      } finally {
-        setValidating(false)
+      // Quando a SUPERFÍCIE (segmentação) foi usada, a edição estende ALÉM do que
+      // o usuário pintou — então validar contra o blob pintado acusaria drift
+      // falso-positivo. Só valida quando foi o blob.
+      if (!fromSurface) {
+        setValidating(true)
+        try {
+          const v = await canvasRef.current?.validateOutsideMaskPreservation(newVista.image_url)
+          if (v && !v.ok) setDriftWarning(v.drift)
+        } finally {
+          setValidating(false)
+        }
       }
       setStage('result')
     } catch (e) {
@@ -239,7 +244,7 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
     if (!segConfirm) return
     const { surfaceMaskUrl, surfaceCoverage } = segConfirm
     setSegConfirm(null)
-    void runGenerate(surfaceMaskUrl, surfaceCoverage)
+    void runGenerate(surfaceMaskUrl, surfaceCoverage, true)
   }
   function useBlobOnly() {
     if (!segConfirm) return
@@ -746,7 +751,7 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
               Detectamos a superfície inteira
             </div>
             <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
-              Em vez de aplicar só no que você pintou, dá pra aplicar o material em <strong>toda a superfície destacada em verde</strong> — até onde ela termina de verdade — preservando o resto da cena (móveis, tapete, paredes).
+              Em vez de aplicar só no que você pintou, dá pra aplicar o material em <strong>toda a superfície destacada em verde</strong> — até onde ela termina de verdade. <strong>Confira que só a superfície ficou em verde</strong>: se pegou tapete, cama ou móveis (porque o pincel passou por cima deles), use <strong>“Usar só o que pintei”</strong> e pinte de novo evitando os objetos.
             </div>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={segConfirm.previewUrl} alt="superfície detectada"

@@ -187,18 +187,16 @@ export async function refineSurfaceMask(samMaskBuf: Buffer, blobMaskBuf: Buffer)
   if (samRatio > 0.75 || samRatio < 1e-4 || overlap < 0.30 || samC < 0.6 * blobC) {
     return { mask: blobMaskBuf, usedFallback: true, surfaceRatio: blobRatio }
   }
-  const [samFull, blobFull] = await Promise.all([
-    sharp(samMaskBuf).resize(W, H, { fit: 'fill' }).greyscale().toBuffer(),
-    sharp(blobMaskBuf).resize(W, H, { fit: 'fill' }).greyscale().toBuffer(),
-  ])
+  const samFull = await sharp(samMaskBuf).resize(W, H, { fit: 'fill' }).greyscale().toBuffer()
   const sigma = Math.max(1, Math.round(Math.min(W, H) * 0.004))
-  // blur + threshold ACIMA de 128 = close (fecha buracos/ripas) + leve ERODE da
-  // borda externa → o material não vaza pra parede/rodapé/tapete vizinho (queixa
-  // de "bordas"). 145 é um erode suave (~1-2px) que não come a área pintada.
-  const union = await sharp(samFull)
-    .composite([{ input: blobFull, blend: 'lighten' }])
-    .blur(sigma).threshold(145).png().toBuffer()
-  return { mask: union, usedFallback: false, surfaceRatio: samRatio }
+  // USA A MÁSCARA DO SAM SOZINHA — ela já é a superfície com os OBJETOS POR CIMA
+  // excluídos (tapete, cama, móveis). NÃO unir com o blob pintado: se o usuário
+  // pintou por cima do tapete, a união REINCLUÍA o tapete (bug "tapete"). O SAM
+  // segmenta a partir do seed pintado, então a área pintada já está coberta.
+  // blur+threshold(145) = close (fecha ripas/buracos pequenos) + ERODE leve da
+  // borda externa → o material não vaza pra parede/rodapé/tapete vizinho.
+  const refined = await sharp(samFull).blur(sigma).threshold(145).png().toBuffer()
+  return { mask: refined, usedFallback: false, surfaceRatio: samRatio }
 }
 
 // Para detectar a bbox sem varrer milhões de pixels, reduzimos a máscara para
