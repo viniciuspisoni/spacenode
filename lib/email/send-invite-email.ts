@@ -28,19 +28,43 @@ export async function sendInviteEmail(args: SendInviteArgs): Promise<{ sent: boo
   const url = escapeHtml(args.inviteUrl)
 
   const html = `
-  <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:480px;margin:0 auto;padding:8px;">
-    <h2 style="font-size:18px;color:#111;margin:0 0 12px;">Convite para ${ws}</h2>
-    <p style="font-size:14px;color:#444;line-height:1.6;margin:0 0 20px;">
-      Você foi convidado para participar do workspace <b>${ws}</b> no Spacenode como <b>${roleLabel}</b>.
-    </p>
-    <a href="${url}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:11px 20px;border-radius:8px;font-size:14px;font-weight:600;">
-      Aceitar convite
-    </a>
-    <p style="font-size:12px;color:#888;line-height:1.6;margin:20px 0 0;">
-      Ou copie e cole este link no navegador:<br>
-      <span style="color:#555;word-break:break-all;">${url}</span>
-    </p>
-  </div>`
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0;padding:0;background:#f4f4f5;">
+    <tr>
+      <td align="center" style="padding:32px 16px;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+        <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background:#ffffff;border:1px solid #e7e7ea;border-radius:16px;overflow:hidden;">
+          <tr>
+            <td style="background:#0a0a0a;padding:22px 28px;">
+              <span style="color:#ffffff;font-size:20px;font-weight:600;letter-spacing:-0.02em;">spacenode</span><span style="display:inline-block;width:5px;height:5px;border-radius:1px;background:#30b46c;margin-left:3px;vertical-align:baseline;"></span>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:34px 28px 28px;">
+              <h1 style="margin:0 0 12px;font-size:21px;font-weight:600;color:#111111;letter-spacing:-0.02em;">Convite para ${ws}</h1>
+              <p style="margin:0 0 26px;font-size:14px;line-height:1.65;color:#52525b;">
+                Você foi convidado para participar do workspace <b style="color:#111111;">${ws}</b> no Spacenode como <b style="color:#111111;">${roleLabel}</b>.
+              </p>
+              <table role="presentation" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="border-radius:9px;background:#30b46c;">
+                    <a href="${url}" style="display:inline-block;padding:12px 26px;font-size:14px;font-weight:600;color:#06140d;text-decoration:none;border-radius:9px;">Aceitar convite</a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:26px 0 0;font-size:12px;line-height:1.65;color:#a1a1aa;">
+                Só o email convidado consegue aceitar. Problemas com o botão? Copie e cole:<br>
+                <span style="color:#71717a;word-break:break-all;">${url}</span>
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:18px 28px;border-top:1px solid #e7e7ea;background:#fafafa;">
+              <span style="font-size:11px;color:#a1a1aa;">Spacenode · O hub criativo para arquitetos e designers de interiores</span>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>`
 
   try {
     const res = await fetch('https://api.resend.com/emails', {

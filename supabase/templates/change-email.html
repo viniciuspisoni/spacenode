@@ -1,0 +1,46 @@
+<!--
+  Template Supabase Auth → "Change Email Address".
+  Cole em: Supabase Dashboard → Authentication → Email Templates → "Change Email Address".
+  Variáveis: {{ .ConfirmationURL }} e {{ .NewEmail }}
+-->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0;padding:0;background:#f4f4f5;">
+  <tr>
+    <td align="center" style="padding:32px 16px;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+      <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background:#ffffff;border:1px solid #e7e7ea;border-radius:16px;overflow:hidden;">
+        <tr>
+          <td style="background:#0a0a0a;padding:22px 28px;">
+            <span style="color:#ffffff;font-size:20px;font-weight:600;letter-spacing:-0.02em;">spacenode</span>
+            <span style="display:inline-block;width:5px;height:5px;border-radius:1px;background:#30b46c;margin-left:3px;vertical-align:baseline;"></span>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:34px 28px 28px;">
+            <h1 style="margin:0 0 12px;font-size:21px;font-weight:600;color:#111111;letter-spacing:-0.02em;">Confirme seu novo email</h1>
+            <p style="margin:0 0 26px;font-size:14px;line-height:1.65;color:#52525b;">
+              Confirme a troca do email da sua conta Spacenode para <b style="color:#111111;">{{ .NewEmail }}</b>.
+            </p>
+            <table role="presentation" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="border-radius:9px;background:#30b46c;">
+                  <a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:12px 26px;font-size:14px;font-weight:600;color:#06140d;text-decoration:none;border-radius:9px;">
+                    Confirmar novo email
+                  </a>
+                </td>
+              </tr>
+            </table>
+            <p style="margin:26px 0 0;font-size:12px;line-height:1.65;color:#a1a1aa;">
+              Se você não pediu esta troca, ignore este email — sua conta segue com o email atual.<br>
+              Problemas com o botão? Copie e cole este link:<br>
+              <span style="color:#71717a;word-break:break-all;">{{ .ConfirmationURL }}</span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:18px 28px;border-top:1px solid #e7e7ea;background:#fafafa;">
+            <span style="font-size:11px;color:#a1a1aa;">Spacenode · O hub criativo para arquitetos e designers de interiores</span>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>

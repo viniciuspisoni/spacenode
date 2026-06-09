@@ -1,0 +1,46 @@
+<!--
+  Template Supabase Auth → "Magic Link".
+  Cole em: Supabase Dashboard → Authentication → Email Templates → "Magic Link".
+  Variável usada: {{ .ConfirmationURL }}
+-->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0;padding:0;background:#f4f4f5;">
+  <tr>
+    <td align="center" style="padding:32px 16px;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+      <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background:#ffffff;border:1px solid #e7e7ea;border-radius:16px;overflow:hidden;">
+        <tr>
+          <td style="background:#0a0a0a;padding:22px 28px;">
+            <span style="color:#ffffff;font-size:20px;font-weight:600;letter-spacing:-0.02em;">spacenode</span>
+            <span style="display:inline-block;width:5px;height:5px;border-radius:1px;background:#30b46c;margin-left:3px;vertical-align:baseline;"></span>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:34px 28px 28px;">
+            <h1 style="margin:0 0 12px;font-size:21px;font-weight:600;color:#111111;letter-spacing:-0.02em;">Seu link de acesso</h1>
+            <p style="margin:0 0 26px;font-size:14px;line-height:1.65;color:#52525b;">
+              Use o botão abaixo para entrar no Spacenode. O link é válido por tempo limitado e só pode ser usado uma vez.
+            </p>
+            <table role="presentation" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="border-radius:9px;background:#30b46c;">
+                  <a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:12px 26px;font-size:14px;font-weight:600;color:#06140d;text-decoration:none;border-radius:9px;">
+                    Entrar no Spacenode
+                  </a>
+                </td>
+              </tr>
+            </table>
+            <p style="margin:26px 0 0;font-size:12px;line-height:1.65;color:#a1a1aa;">
+              Se você não pediu este acesso, é só ignorar este email.<br>
+              Problemas com o botão? Copie e cole este link:<br>
+              <span style="color:#71717a;word-break:break-all;">{{ .ConfirmationURL }}</span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:18px 28px;border-top:1px solid #e7e7ea;background:#fafafa;">
+            <span style="font-size:11px;color:#a1a1aa;">Spacenode · O hub criativo para arquitetos e designers de interiores</span>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
