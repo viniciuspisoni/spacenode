@@ -15,7 +15,8 @@ import { callNanoBananaEdit }         from './nano-banana-edit'
 import { callFluxProKontext }         from './flux-pro-kontext'
 import { callGemini3ProEdit }         from './gemini-3-pro-edit'
 import { callVertexImagenEdit }       from './vertex-imagen-edit'
-import { callNanoBanana2 }            from './gemini-edit'
+import { callNanoBanana2Masked, callNanoBanana2Instruct }     from './nano-banana-2-edit'
+import { callNanoBananaProMasked, callNanoBananaProInstruct } from './nano-banana-pro-edit'
 
 export interface EndpointEngine {
   call:     RetouchEngine
@@ -31,8 +32,13 @@ const DISPATCH: Record<EditEndpoint, EndpointEngine> = {
   'fal-ai/nano-banana/edit':                { call: callNanoBananaEdit,         usesMask: true },
   'fal-ai/flux-pro/kontext':                { call: callFluxProKontext,         usesMask: false },
   'fal-ai/gemini-3-pro-image-preview/edit': { call: callGemini3ProEdit,         usesMask: true },
-  // Reservado (o router não o seleciona por padrão). NB2 é o Gemini 3.1 Flash.
-  'google/gemini-3.1-flash-image':          { call: callNanoBanana2,            usesMask: true },
+  // ── Google-first ──
+  // Mascarados: máscara como 2ª imagem; o pipeline recompõe e o gate valida.
+  'fal-ai/nano-banana-2/edit':              { call: callNanoBanana2Masked,      usesMask: true },
+  'fal-ai/nano-banana-pro/edit':            { call: callNanoBananaProMasked,    usesMask: true },
+  // Instrução (edição conversacional, SEM máscara) dos mesmos modelos.
+  'google/gemini-3.1-flash-image':          { call: callNanoBanana2Instruct,    usesMask: false },
+  'google/gemini-3-pro-image':              { call: callNanoBananaProInstruct,  usesMask: false },
 }
 
 export function dispatchEndpoint(endpoint: EditEndpoint): EndpointEngine {

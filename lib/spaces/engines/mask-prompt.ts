@@ -49,3 +49,17 @@ export function buildTwoImageMaskPrompt(userPrompt: string, references?: Retouch
   }
   return lines.join('\n')
 }
+
+/** Prompt do modo INSTRUÇÃO (edição conversacional, SEM máscara): explica as
+ *  imagens (origem + referências) e delega as regras de preservação ao prompt
+ *  já normalizado pelo servidor (composeRouterPrompt). */
+export function buildInstructPrompt(finalPrompt: string, references?: RetouchReference[]): string {
+  const refs = references ?? []
+  if (refs.length === 0) return finalPrompt
+  const lines = ['Multi-image edit request.', 'Image 1: source architectural photo — EDIT THIS IMAGE.']
+  refs.forEach((r, i) => {
+    lines.push(`Image ${i + 2}: ${describeReferenceRole(r.role)} — guidance only, do NOT edit or copy its framing.`)
+  })
+  lines.push('', finalPrompt)
+  return lines.join('\n')
+}
