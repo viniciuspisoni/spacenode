@@ -165,6 +165,31 @@ export async function geminiVisionJson(opts: GeminiVisionOpts): Promise<string> 
   )
 }
 
+export interface GeminiMultiVisionOpts {
+  system:       string
+  user:         string
+  /** Múltiplas imagens, na ordem citada no prompt (ex.: original, editada, referência). */
+  imageUrls:    string[]
+  temperature?: number
+  maxTokens?:   number
+  timeoutMs?:   number
+}
+
+// Visão multi-imagem (ex.: comparar original × resultado × referência no quality
+// gate semântico do Editar). Mesmo contrato/retry do geminiVisionJson.
+export async function geminiMultiVisionJson(opts: GeminiMultiVisionOpts): Promise<string> {
+  const imageParts = await Promise.all(
+    opts.imageUrls.map(url => withTimeout(fetchImagePart(url), IMAGE_FETCH_TIMEOUT_MS)),
+  )
+  return generateWithRetry(
+    opts.system,
+    [createPartFromText(opts.user), ...imageParts],
+    opts.temperature ?? 0.1,
+    opts.maxTokens ?? DEFAULT_MAX_TOKENS,
+    opts.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+  )
+}
+
 export interface GeminiTextOpts {
   system:       string
   user:         string

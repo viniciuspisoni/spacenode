@@ -21,6 +21,9 @@ import {
   normalizeMaskToImage,
   fullRegion,
   measureOutOfMaskDrift,
+  measureInMaskChange,
+  dilateMask,
+  assertMaskMatchesImage,
   padForInpaintAspect,
   unpadInpaintResult,
   ASPECT_LIMITED_ENDPOINTS,
@@ -48,6 +51,10 @@ export interface RunEditArgs {
   usesMask:     boolean
   /** material/replace/add: borda suave na recomposição (blend). */
   softEdges?:   boolean
+  /** Semântica p/ Vertex Imagen (removal → INPAINT_REMOVAL). */
+  intentHint?:  'removal' | 'insertion'
+  /** Remoção: dilata levemente a máscara (cobre borda do objeto + sombra rente). */
+  dilateForRemoval?: boolean
   engine:       RetouchEngine
   uploadResult: (buffer: Buffer, kind: UploadKind) => Promise<string>
 }
@@ -59,10 +66,16 @@ export interface RunEditResult {
   endpoint:       string
   /** Fração 0–1 de pixels fora da máscara que mudaram. null se não-aplicável (sem máscara). */
   outOfMaskDelta: number | null
+  /** Fração 0–1 de pixels DENTRO da máscara que mudaram (detecção de no-op).
+   *  null se não-aplicável (sem máscara). */
+  inMaskDelta:    number | null
 }
 
 export async function runEdit(args: RunEditArgs): Promise<RunEditResult> {
-  const { sourceUrl, maskUrl, prompt, quality, referenceUrl, references, routing, usesMask, softEdges, engine, uploadResult } = args
+  const {
+    sourceUrl, maskUrl, prompt, quality, referenceUrl, references, routing,
+    usesMask, softEdges, intentHint, dilateForRemoval, engine, uploadResult,
+  } = args
 
   // callWithTimeoutRetry espera um EngineDescriptor (usa só .call e .endpoint).
   const descriptor: EngineDescriptor = {
@@ -82,10 +95,11 @@ export async function runEdit(args: RunEditArgs): Promise<RunEditResult> {
       quality,
       referenceUrl,
       references,
+      intentHint,
     })
     const buf = await fetchImageBuffer(out.imageUrl)
     const resultUrl = await uploadResult(buf, 'result')
-    return { resultUrl, usedCrop: false, cropMegapixels: null, endpoint: out.endpoint, outOfMaskDelta: null }
+    return { resultUrl, usedCrop: false, cropMegapixels: null, endpoint: out.endpoint, outOfMaskDelta: null, inMaskDelta: null }
   }
 
   // ── Edições COM máscara: precisamos da imagem + máscara alinhada ──
@@ -93,7 +107,13 @@ export async function runEdit(args: RunEditArgs): Promise<RunEditResult> {
     fetchImageBuffer(sourceUrl),
     fetchImageBuffer(maskUrl),
   ])
-  const maskBuf = await normalizeMaskToImage(maskRaw, imgBuf)
+  // Proporção divergente = máscara de OUTRA imagem → erro claro antes de gastar
+  // provider (a rota converte em resposta amigável e estorna).
+  await assertMaskMatchesImage(maskRaw, imgBuf)
+  let maskBuf = await normalizeMaskToImage(maskRaw, imgBuf)
+  // Remoção: dilata levemente (borda do objeto + sombra rente entram na área
+  // reconstruída; o recompose usa a máscara dilatada).
+  if (dilateForRemoval) maskBuf = await dilateMask(maskBuf)
 
   // ── Caminho com CROP (endpoints de inpaint sensíveis a MP) ──
   if (routing.shouldUseCrop) {
@@ -124,6 +144,7 @@ export async function runEdit(args: RunEditArgs): Promise<RunEditResult> {
         quality,
         referenceUrl,
         references,
+        intentHint,
       })
       let editedCropBuf = await fetchImageBuffer(out.imageUrl)
       if (pad) editedCropBuf = await unpadInpaintResult(editedCropBuf, pad)
@@ -134,11 +155,16 @@ export async function runEdit(args: RunEditArgs): Promise<RunEditResult> {
         region:           plan.region,
         softEdges,
       })
-      const outOfMaskDelta = await measureOutOfMaskDrift({
-        originalBuffer: imgBuf, resultBuffer: finalBuf, maskBuffer: maskBuf, softEdges,
-      })
+      const [outOfMaskDelta, inMaskDelta] = await Promise.all([
+        measureOutOfMaskDrift({
+          originalBuffer: imgBuf, resultBuffer: finalBuf, maskBuffer: maskBuf, softEdges,
+        }),
+        measureInMaskChange({
+          originalBuffer: imgBuf, resultBuffer: finalBuf, maskBuffer: maskBuf,
+        }),
+      ])
       const resultUrl = await uploadResult(finalBuf, 'result')
-      return { resultUrl, usedCrop: true, cropMegapixels: plan.outMegapixels, endpoint: out.endpoint, outOfMaskDelta }
+      return { resultUrl, usedCrop: true, cropMegapixels: plan.outMegapixels, endpoint: out.endpoint, outOfMaskDelta, inMaskDelta }
     }
     // Sem área branca → cai pro caminho de imagem inteira (com recompose).
   }
@@ -152,6 +178,7 @@ export async function runEdit(args: RunEditArgs): Promise<RunEditResult> {
     quality,
     referenceUrl,
     references,
+    intentHint,
   })
   const providerBuf = await fetchImageBuffer(out.imageUrl)
   const region = await fullRegion(imgBuf)
@@ -162,9 +189,14 @@ export async function runEdit(args: RunEditArgs): Promise<RunEditResult> {
     region,
     softEdges,
   })
-  const outOfMaskDelta = await measureOutOfMaskDrift({
-    originalBuffer: imgBuf, resultBuffer: finalBuf, maskBuffer: maskBuf, softEdges,
-  })
+  const [outOfMaskDelta, inMaskDelta] = await Promise.all([
+    measureOutOfMaskDrift({
+      originalBuffer: imgBuf, resultBuffer: finalBuf, maskBuffer: maskBuf, softEdges,
+    }),
+    measureInMaskChange({
+      originalBuffer: imgBuf, resultBuffer: finalBuf, maskBuffer: maskBuf,
+    }),
+  ])
   const resultUrl = await uploadResult(finalBuf, 'result')
-  return { resultUrl, usedCrop: false, cropMegapixels: null, endpoint: out.endpoint, outOfMaskDelta }
+  return { resultUrl, usedCrop: false, cropMegapixels: null, endpoint: out.endpoint, outOfMaskDelta, inMaskDelta }
 }

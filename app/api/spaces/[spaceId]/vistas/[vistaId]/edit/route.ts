@@ -24,9 +24,9 @@ import {
   estimateProviderCostUsd,
   editButtonLabel,
   editChargeExplanation,
-  isBlendTool,
 } from '@/lib/spaces/edit-router'
 import { editToolFromMode } from '@/lib/spaces/edit-router-adapters'
+import { isEditIntent, modeFromIntent } from '@/lib/spaces/edit-intents'
 import {
   buildRoutingContext,
   uploadEditAsset,
@@ -34,9 +34,13 @@ import {
   parseReferences,
   persistReferences,
   referenceRoles,
+  measureServerMaskCoverage,
+  insertAttemptResilient,
+  updateAttemptResilient,
   type EditRequestParams,
 } from '@/lib/spaces/edit-route-helpers'
-import { runEdit, OUT_OF_MASK_GATE, BLEND_OUT_OF_MASK_GATE } from '@/lib/spaces/edit-pipeline'
+import { runGatedEdit } from '@/lib/spaces/edit-gate'
+import { MaskImageMismatchError } from '@/lib/spaces/edit-crop'
 import { getVisualDna } from '@/lib/spaces/dna'
 
 // sharp (crop/recompose) exige runtime Node.
@@ -53,7 +57,12 @@ interface EditBody {
   premium?:             unknown
   image_megapixels?:    unknown
   references?:          unknown
+  /** Google-first: intenção escolhida na UI (telemetria; deriva o mode se ausente). */
+  edit_intent?:         unknown
 }
+
+/** Modos conversacionais: a edição pode rodar SEM máscara (instrução). */
+const NO_MASK_MODES: EditMode[] = ['style', 'variation', 'lighting', 'landscape']
 
 export async function POST(
   req:     NextRequest,
@@ -72,10 +81,16 @@ export async function POST(
   const referenceUrl = typeof body.reference_image_url === 'string' ? body.reference_image_url : undefined
   const premium      = body.premium === true
 
-  const mode: EditMode = isEditMode(body.mode) ? body.mode : 'material'
+  const intent = isEditIntent(body.edit_intent) ? body.edit_intent : null
+  const mode: EditMode = isEditMode(body.mode)
+    ? body.mode
+    : intent ? modeFromIntent(intent) : 'material'
   const fidelity: FidelityMode = isFidelityMode(body.fidelity_mode) ? body.fidelity_mode : 'max'
 
-  if (!maskUrl) return NextResponse.json({ error: 'mask_url obrigatório' }, { status: 400 })
+  // Máscara obrigatória, EXCETO nos modos conversacionais (instrução).
+  if (!maskUrl && !NO_MASK_MODES.includes(mode)) {
+    return NextResponse.json({ error: 'mask_url obrigatório' }, { status: 400 })
+  }
   if (mode !== 'remove' && !prompt) {
     return NextResponse.json({ error: 'prompt obrigatório' }, { status: 400 })
   }
@@ -118,16 +133,20 @@ export async function POST(
   const admin = createAdminClient()
 
   // ── 1) Contexto + rota (sem tocar em saldo) ──
+  // Cobertura medida no SERVIDOR (o valor do cliente é estimativa de preview).
+  const serverCoverage = await measureServerMaskCoverage(maskUrl)
+  const effectiveCoverage = serverCoverage ?? maskCoverage
+
   const references = parseReferences(body.references)
   const params: EditRequestParams = {
-    mode, prompt, hasMask: !!maskUrl, maskCoverage, quality, fidelity,
+    mode, prompt, hasMask: !!maskUrl, maskCoverage: effectiveCoverage, quality, fidelity,
     premium, imageMegapixels, sourceType: 'vista', sourceId: vistaId, references,
   }
   const ctx     = await buildRoutingContext(admin, user.id, params)
   const routing = routeEdit(ctx.input)
   logEditRoute(routing, ctx.input) // dev/staging only
 
-  const { call: engine, usesMask } = dispatchEndpoint(routing.endpoint)
+  const { usesMask } = dispatchEndpoint(routing.endpoint)
   const dnaContext: EmbeddedDnaContext | null = dna ? {
     estiloNome: dna.estilo.nome,
     materiais:  dna.materiais,
@@ -159,32 +178,32 @@ export async function POST(
     }
   }
 
-  // ── 3) Registra a tentativa (status 'processing') ──
-  const { data: attempt } = await admin
-    .from('image_edit_attempts')
-    .insert({
-      user_id:           user.id,
-      source_image_id:   vistaId,
-      project_id:        spaceId,
-      tool,
-      prompt,
-      endpoint:          routing.endpoint,
-      provider,
-      cost_nodes:        routing.costNodes,
-      provider_cost_usd: providerCostUsd,
-      is_free_fix:       routing.isFreeFix,
-      has_mask:          !!maskUrl,
-      mask_area_ratio:   maskCoverage,
-      used_crop:         false,
-      output_resolution: ctx.input.outputResolution,
-      preservation_mode: fidelity,
-      reference_count:   references.length,
-      reference_roles:   referenceRoles(references),
-      status:            'processing',
-    })
-    .select('id')
-    .single()
-  const attemptId: string | null = attempt?.id ?? null
+  // ── 3) Registra a tentativa (status 'processing') — insert resiliente ──
+  const attemptBaseRow = {
+    user_id:           user.id,
+    source_image_id:   vistaId,
+    project_id:        spaceId,
+    tool,
+    prompt,
+    endpoint:          routing.endpoint,
+    provider,
+    cost_nodes:        routing.costNodes,
+    provider_cost_usd: providerCostUsd,
+    is_free_fix:       routing.isFreeFix,
+    has_mask:          !!maskUrl,
+    mask_area_ratio:   effectiveCoverage,
+    used_crop:         false,
+    output_resolution: ctx.input.outputResolution,
+    preservation_mode: fidelity,
+    reference_count:   references.length,
+    reference_roles:   referenceRoles(references),
+    status:            'processing',
+  }
+  const attemptId = await insertAttemptResilient(
+    admin,
+    { ...attemptBaseRow, edit_intent: intent, quality_mode: premium ? 'premium' : 'quick' },
+    attemptBaseRow,
+  )
 
   if (references.length > 0) {
     await persistReferences(admin, {
@@ -243,7 +262,7 @@ export async function POST(
         edit_prompt:            prompt,
         edit_mask_url:          maskUrl,
         edit_chain_root_id:     chainRoot,
-        edit_mask_coverage:     maskCoverage,
+        edit_mask_coverage:     effectiveCoverage,
         generated_by_spacenode: true,
         source_tool:            tool,
       })
@@ -252,26 +271,23 @@ export async function POST(
     if (insErr || !row) throw new Error('insert_failed: ' + (insErr?.message ?? '?'))
     newVistaId = row.id as string
 
-    // ── 6) Executa (crop quando aplicável) + re-hospeda no Supabase ──
-    const run = await runEdit({
+    // ── 6) Executa com quality gate AMPLIADO + retry automático grátis ──
+    const gated = await runGatedEdit({
       sourceUrl:    vista.image_url,
       maskUrl,
-      prompt:       finalPrompt,
+      finalPrompt,
+      userPrompt:   prompt,
       quality,
       referenceUrl: mode === 'replace' ? referenceUrl : undefined,
       references:   references.map(r => ({ url: r.url, role: r.role })),
       routing,
-      usesMask,
-      softEdges:    isBlendTool(tool),
-      engine,
+      tool,
       uploadResult: (buf, kind) => uploadEditAsset(admin, user.id, buf, kind),
     })
+    const run = gated.run
 
-    // ── Quality gate: drift fora da máscara acima do limite → rejeita ──
-    // Não cobra, não consome cota grátis, não conta como edição. A vista nova
-    // vira 'failed'; a tentativa, 'rejected_quality_gate'. Blend usa limite tolerante.
-    const gateLimit = isBlendTool(tool) ? BLEND_OUT_OF_MASK_GATE : OUT_OF_MASK_GATE
-    if (run.outOfMaskDelta != null && run.outOfMaskDelta > gateLimit) {
+    // ── Reprovado mesmo após o retry → estorna, registra, vista 'failed'. ──
+    if (gated.rejected) {
       if (debited) {
         try { await admin.rpc('refund_workspace_nodes', { user_id_input: user.id, amount: routing.costNodes }) }
         catch (refundErr) { console.error('[vista.edit] gate refund failed:', refundErr) }
@@ -279,18 +295,31 @@ export async function POST(
       if (newVistaId) {
         await admin.from('vistas').update({
           status:        'failed',
-          error_message: `quality_gate: out_of_mask_delta=${(run.outOfMaskDelta * 100).toFixed(1)}%`,
+          error_message: (gated.gateReason ?? 'quality_gate').slice(0, 500),
         }).eq('id', newVistaId)
       }
-      if (attemptId) {
-        await admin.from('image_edit_attempts').update({
-          status:          'rejected_quality_gate',
-          used_crop:       run.usedCrop,
-          crop_megapixels: run.cropMegapixels,
-          error_message:   `quality_gate: out_of_mask_delta=${(run.outOfMaskDelta * 100).toFixed(1)}%`,
-          completed_at:    new Date().toISOString(),
-        }).eq('id', attemptId)
+      const rejectedStatus = gated.rejectionKind === 'no_change'
+        ? 'rejected_no_change'
+        : 'rejected_quality_gate'
+      const rejectBase = {
+        status:          'rejected_quality_gate',
+        used_crop:       run.usedCrop,
+        crop_megapixels: run.cropMegapixels,
+        error_message:   (gated.gateReason ?? 'quality_gate').slice(0, 500),
+        completed_at:    new Date().toISOString(),
       }
+      await updateAttemptResilient(
+        admin, attemptId,
+        {
+          ...rejectBase,
+          status:            rejectedStatus,
+          gate_reason:       gated.gateReason,
+          auto_retry_count:  gated.autoRetryCount,
+          in_mask_delta:     run.inMaskDelta,
+          out_of_mask_delta: run.outOfMaskDelta,
+        },
+        rejectBase,
+      )
       const { data: balGate } = await admin
         .from('user_node_balance')
         .select('plan_balance, lumen_balance, total_balance')
@@ -298,10 +327,13 @@ export async function POST(
         .single()
       return NextResponse.json({
         rejected:          true,
-        reason:            'quality_gate',
-        message:           'A edição não preservou bem a imagem. Tente ajustar a máscara ou usar o modo avançado.',
+        reason:            gated.rejectionKind ?? 'quality_gate',
+        message:           gated.rejectionKind === 'no_change'
+          ? 'A edição não produziu mudança perceptível na área selecionada. Você não foi cobrado — tente reformular o pedido ou usar o modo premium.'
+          : 'A edição não preservou bem a imagem, mesmo após uma nova tentativa automática. Você não foi cobrado — ajuste a máscara ou tente o modo premium.',
         result_url:        run.resultUrl,
         out_of_mask_delta: run.outOfMaskDelta,
+        auto_retried:      gated.autoRetryCount > 0,
         balance_after:     balGate ?? null,
       })
     }
@@ -317,18 +349,24 @@ export async function POST(
       })
       .eq('id', newVistaId)
 
-    if (attemptId) {
-      await admin
-        .from('image_edit_attempts')
-        .update({
-          status:          'completed',
-          result_image_id: newVistaId,
-          used_crop:       run.usedCrop,
-          crop_megapixels: run.cropMegapixels,
-          completed_at:    new Date().toISOString(),
-        })
-        .eq('id', attemptId)
+    const completeBase = {
+      status:          'completed',
+      result_image_id: newVistaId,
+      endpoint:        gated.usedEndpoint,
+      used_crop:       run.usedCrop,
+      crop_megapixels: run.cropMegapixels,
+      completed_at:    new Date().toISOString(),
     }
+    await updateAttemptResilient(
+      admin, attemptId,
+      {
+        ...completeBase,
+        auto_retry_count:  gated.autoRetryCount,
+        in_mask_delta:     run.inMaskDelta,
+        out_of_mask_delta: run.outOfMaskDelta,
+      },
+      completeBase,
+    )
 
     // Correção grátis consumida → marca na vista de ORIGEM.
     if (routing.isFreeFix && ctx.sourceTable && ctx.sourceId) {
@@ -372,11 +410,12 @@ export async function POST(
       },
       // Sem endpoint técnico — só o que a UI mostra.
       routing: {
-        cost_nodes:  routing.costNodes,
-        is_free_fix: routing.isFreeFix,
-        used_crop:   run.usedCrop,
-        label:       editButtonLabel(routing),
-        explanation: editChargeExplanation(routing),
+        cost_nodes:   routing.costNodes,
+        is_free_fix:  routing.isFreeFix,
+        used_crop:    run.usedCrop,
+        auto_retried: gated.autoRetryCount > 0,
+        label:        editButtonLabel(routing),
+        explanation:  editChargeExplanation(routing),
       },
       balance_after: balAfter ?? null,
     })
@@ -393,6 +432,15 @@ export async function POST(
     }
     await failAttempt((err as Error).message)
     console.error('[vista.edit] error:', (err as Error).message)
+    if (err instanceof MaskImageMismatchError) {
+      return NextResponse.json(
+        {
+          error:   'mask_image_mismatch',
+          message: 'A seleção não corresponde à imagem atual. Refaça a seleção sobre esta imagem. Você não foi cobrado.',
+        },
+        { status: 422 },
+      )
+    }
     return NextResponse.json({ error: 'Falha na edição' }, { status: 500 })
   }
 }
