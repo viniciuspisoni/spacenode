@@ -1,20 +1,23 @@
 'use client'
 
-// Fluxo standalone do modo Editar do Spacenode.
+// Fluxo standalone do modo Editar do Spacenode (intenção-primeiro).
 //   empty   → upload da imagem (ou Importar do histórico)
-//   editing → canvas + brush + prompt + qualidade + ação + fidelidade
+//   intent  → "O que você quer fazer?" — 8 intenções (EditIntentPicker)
+//   editing → canvas + brush + prompt + qualidade; a interface se adapta à
+//             intenção (máscara obrigatória/opcional, referências explícitas,
+//             toggle de geometria, botões "Edição rápida"/"Edição premium")
 //   result  → slider antes/depois + Salvar / Descartar / Editar de novo
 //
-// O painel direito concentra todas as opções da geração — ferramentas de
-// máscara, fidelidade do projeto, resolução final, custo em nodes e o botão
-// principal de gerar. O painel inferior do canvas mantém só o seletor de
-// ação (RetocarModeTabs) e o campo de prompt.
+// O painel direito concentra as opções da geração — ferramentas de máscara,
+// preservação, resolução final, referências, custo em nodes e os botões de
+// gerar (rápida/premium — premium nunca é automático).
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { RetocarCanvas, type RetocarCanvasHandle, type MaskTool, BRUSH_MIN, BRUSH_MAX } from './RetocarCanvas'
 import { RetocarImportModal } from './RetocarImportModal'
-import { RetocarModeTabs } from './RetocarModeTabs'
+import { EditIntentPicker, ActiveIntentChip } from './EditIntentPicker'
+import { EDIT_INTENTS, type EditIntent, type EditIntentMeta } from '@/lib/spaces/edit-intents'
 import { PromptAssistant } from './PromptAssistant'
 import { LARGE_MASK_THRESHOLD } from '@/lib/spaces/edit-economy'
 import type { Quality, EditSourceType } from '@/lib/spaces/types'
@@ -23,6 +26,7 @@ import { FIDELITY_LABELS, type FidelityMode } from '@/lib/spaces/edit-prompts'
 import { MAX_EDIT_REFERENCES, SURFACE_SEGMENTATION_ENABLED, type EditReferenceImage, type EditReferenceRole } from '@/lib/spaces/edit-router'
 import { ReferencesPanel, suggestPromptForRole, downscaleImageForUpload, type RefMenuKind } from './RetocarReferences'
 import { ReferenceFocusModal, type NormCrop } from './ReferenceFocusModal'
+import { SurfaceSelectModal, SurfaceSelectionBar, type SurfaceSelection } from './SurfaceSelectModal'
 
 // Debug: mostra a imagem REJEITADA pelo quality gate (sem salvar). Só dev/staging.
 const SHOW_REJECTED_DEBUG =
@@ -84,10 +88,13 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
   const [maskVisible, setMaskVisible] = useState(true)
   const [prompt, setPrompt]           = useState('')
   const [quality, setQuality]         = useState<Quality>('2k')
-  // Edit intention. Default 'material'. Router decides the engine.
+  // Intenção-primeiro (Google-first): o usuário escolhe O QUE quer fazer antes
+  // do prompt; o mode (vocabulário API/DB) deriva da intenção.
+  const [intent, setIntent]           = useState<EditIntent | null>(null)
   const [mode, setMode]               = useState<EditMode>('material')
   // Project fidelity — how strictly to preserve geometry/scale/lighting.
-  // 'max' is the safe default for real architectural work.
+  // 'max' is the safe default for real architectural work. Controlado pelo
+  // toggle "Preservar geometria, perspectiva e iluminação original".
   const [fidelity, setFidelity]       = useState<FidelityMode>('max')
   const [balance, setBalance]         = useState(initialBalance)
   const [submitting, setSubmitting]   = useState(false)
@@ -95,17 +102,22 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
   const [error, setError]             = useState<string | null>(null)
   const [showImport, setShowImport]   = useState(false)
   const [driftWarning, setDriftWarning] = useState<number | null>(null)
-  // editRouter v1: modo premium (opt-in explícito; nunca automático) + rota e
-  // custo calculados no servidor ANTES de gerar (sem consumir nodes pra prever).
-  const [premium, setPremium]           = useState(false)
-  const [routePreview, setRoutePreview] = useState<RoutePreview | null>(null)
+  // Rota/custo calculados no servidor ANTES de gerar (sem consumir nodes).
+  // routePreview = "Edição rápida"; premiumPreview = "Edição premium" (os dois
+  // botões mostram o preço; premium NUNCA é automático — só pelo botão).
+  const [routePreview, setRoutePreview]     = useState<RoutePreview | null>(null)
+  const [premiumPreview, setPremiumPreview] = useState<RoutePreview | null>(null)
   // Quality gate: edição rejeitada por não preservar fora da máscara.
   const [qualityGate, setQualityGate]   = useState<{ message: string; resultUrl?: string; drift?: number } | null>(null)
   // Camada de SUPERFÍCIE (Fase 1): confirmação antes de aplicar na superfície inteira.
   const [segmenting, setSegmenting]     = useState(false)
   const [segConfirm, setSegConfirm]     = useState<
-    { previewUrl: string; surfaceMaskUrl: string; blobMaskUrl: string; surfaceCoverage: number; blobCoverage: number; surfaceCost: number } | null
+    { previewUrl: string; surfaceMaskUrl: string; blobMaskUrl: string; surfaceCoverage: number; blobCoverage: number; surfaceCost: number; premiumSel: boolean } | null
   >(null)
+  // Camada de SUPERFÍCIE V2 (clique-primeiro): seleção ativa + modal de seleção.
+  // Quando surfaceSel existe, a geração usa ESSA máscara (o pincel é ignorado).
+  const [surfaceSel, setSurfaceSel]       = useState<SurfaceSelection | null>(null)
+  const [surfacePicker, setSurfacePicker] = useState<{ initial: SurfaceSelection | null } | null>(null)
   // Referências visuais da edição (V1).
   const [references, setReferences]     = useState<EditReferenceImage[]>([])
   const [refPicker, setRefPicker]       = useState<{ role: EditReferenceRole } | null>(null)
@@ -119,43 +131,84 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
   // Custo vem da rota (editRouter), não mais de getEditCost(quality).
   const cost = routePreview?.costNodes ?? 0
   const balanceShort = !routePreview?.isFreeFix && balance < cost
+  const premiumShort = balance < (premiumPreview?.costNodes ?? 0)
+
+  // A intenção ativa define máscara obrigatória/opcional, referências, toggle.
+  const intentMeta: EditIntentMeta | null = intent ? EDIT_INTENTS[intent] : null
+  const maskRequired = intentMeta ? intentMeta.maskRequirement === 'required' : true
 
   // Preview de rota/custo (debounced) sempre que algo que afeta a cobrança muda.
-  // Só consulta quando há máscara; sem máscara, limpa (botão volta ao verbo base).
+  // Busca os DOIS preços (rápida e premium) para os dois botões. Sem máscara,
+  // só consulta quando a intenção permite edição da imagem inteira. A seleção
+  // de SUPERFÍCIE (clique) tem prioridade sobre o pincel na cobertura.
   // setState fica dentro do setTimeout (não síncrono no corpo do efeito).
+  const effectiveCoverage = surfaceSel ? surfaceSel.coverage : coverage
   useEffect(() => {
-    if (step !== 'editing' || !sourceUrl) return
+    if (step !== 'editing' || !sourceUrl || !intent) return
+    const allowNoMask = EDIT_INTENTS[intent].maskRequirement !== 'required'
     const handle = setTimeout(async () => {
-      if (coverage <= 0) { setRoutePreview(null); return }
-      try {
-        const res = await fetch('/api/edits/preview', {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({
-            has_mask:      true,
-            mask_coverage: coverage,
-            prompt:        mode === 'remove' ? '' : prompt.trim(),
-            quality,
-            source_type:   sourceType,
-            source_id:     sourceId,
-            mode,
-            fidelity_mode: fidelity,
-            premium,
-            references:    references.map(r => ({ url: r.url, role: r.role, source: r.source, note: r.note })),
-          }),
-        })
-        if (!res.ok) return
-        const d = await res.json()
-        setRoutePreview({
-          costNodes:   d.cost_nodes ?? 0,
-          isFreeFix:   !!d.is_free_fix,
-          label:       d.label ?? '',
-          explanation: d.explanation ?? '',
-        })
-      } catch { /* preview é best-effort; o servidor reavalia ao gerar */ }
+      const hasMask = effectiveCoverage > 0
+      if (!hasMask && !allowNoMask) { setRoutePreview(null); setPremiumPreview(null); return }
+      const fetchOne = async (premiumFlag: boolean): Promise<RoutePreview | null> => {
+        try {
+          const res = await fetch('/api/edits/preview', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({
+              has_mask:      hasMask,
+              mask_coverage: hasMask ? effectiveCoverage : 0,
+              prompt:        mode === 'remove' ? '' : prompt.trim(),
+              quality,
+              source_type:   sourceType,
+              source_id:     sourceId,
+              mode,
+              fidelity_mode: fidelity,
+              premium:       premiumFlag,
+              references:    references.map(r => ({ url: r.url, role: r.role, source: r.source, note: r.note })),
+            }),
+          })
+          if (!res.ok) return null
+          const d = await res.json()
+          return {
+            costNodes:   d.cost_nodes ?? 0,
+            isFreeFix:   !!d.is_free_fix,
+            label:       d.label ?? '',
+            explanation: d.explanation ?? '',
+          }
+        } catch { return null /* preview é best-effort; o servidor reavalia ao gerar */ }
+      }
+      const [quick, prem] = await Promise.all([fetchOne(false), fetchOne(true)])
+      if (quick) setRoutePreview(quick)
+      if (prem)  setPremiumPreview(prem)
     }, 350)
     return () => clearTimeout(handle)
-  }, [step, sourceUrl, sourceType, sourceId, mode, quality, fidelity, premium, coverage, prompt, references])
+  }, [step, sourceUrl, sourceType, sourceId, intent, mode, quality, fidelity, effectiveCoverage, prompt, references])
+
+  // ── intenção ─────────────────────────────────────────────────
+  function pickIntent(i: EditIntent) {
+    const meta = EDIT_INTENTS[i]
+    setIntent(i)
+    setMode(meta.mode)
+    setFidelity('max') // toggle "Preservar geometria…" nasce LIGADO
+    setError(null)
+    setQualityGate(null)
+    setRoutePreview(null)
+    setPremiumPreview(null)
+    setSurfaceSel(null)
+    // Trocar material abre CLIQUE-primeiro: seleciona a superfície com 1 clique
+    // (o pincel continua disponível em "Prefiro pintar com o pincel").
+    if (i === 'swap_material' && SURFACE_SEGMENTATION_ENABLED) {
+      setSurfacePicker({ initial: null })
+    }
+  }
+
+  function changeIntent() {
+    setIntent(null)
+    setError(null)
+    setQualityGate(null)
+    setSurfaceSel(null)
+    setSurfacePicker(null)
+  }
 
   // ── upload da imagem ─────────────────────────────────────────
   async function uploadSourceFile(file: File) {
@@ -177,6 +230,8 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
     setVersions([orig])
     setActiveVersionId(orig.id)
     setReferences([])
+    setSurfaceSel(null)
+    setSurfacePicker(null)
   }
 
   async function onFilePicked(f: File | null) {
@@ -331,9 +386,12 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
   }
 
   // ── gerar edit ───────────────────────────────────────────────
-  async function handleGenerate() {
-    if (!canvasRef.current?.hasMask()) {
-      setError('Pinte a área que quer editar antes de gerar.')
+  // `premiumSel` vem do botão clicado ("Edição rápida" ou "Edição premium") —
+  // premium nunca é automático.
+  async function handleGenerate(premiumSel: boolean) {
+    const hasMaskPainted = !!canvasRef.current?.hasMask()
+    if (maskRequired && !hasMaskPainted && !surfaceSel) {
+      setError('Selecione a superfície (1 clique) ou pinte a área que quer editar.')
       return
     }
     // 'remove' doesn't need a prompt — the model fills from surroundings.
@@ -341,8 +399,9 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
       setError('Descreva o que você quer nessa área antes de gerar.')
       return
     }
-    if (balanceShort) {
-      setError(`Saldo insuficiente. Necessários ${cost} nodes.`)
+    const requiredNodes = premiumSel ? (premiumPreview?.costNodes ?? 0) : cost
+    if (premiumSel ? premiumShort : balanceShort) {
+      setError(`Saldo insuficiente. Necessários ${requiredNodes} nodes.`)
       return
     }
     setError(null)
@@ -351,13 +410,28 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
     setSegConfirm(null)
     setSubmitting(true)
 
+    // Seleção de SUPERFÍCIE por clique ativa → a máscara JÁ é a superfície:
+    // gera direto (sem upload de blob nem pré-passo de segmentação).
+    if (surfaceSel) {
+      await runGenerate(surfaceSel.maskUrl, surfaceSel.coverage, true, premiumSel)
+      return
+    }
+
+    // Intenções sem máscara obrigatória e nada pintado → edição da imagem inteira.
+    if (!hasMaskPainted) {
+      await runGenerate(null, 0, false, premiumSel)
+      return
+    }
+
     // 1) Upload do blob pintado.
     let blobMaskUrl: string
     let maskCoverage: number
     try {
-      const blob = await canvasRef.current.getMaskBlob()
+      const canvas = canvasRef.current
+      if (!canvas) throw new Error('Canvas indisponível')
+      const blob = await canvas.getMaskBlob()
       if (!blob) throw new Error('Falha ao gerar máscara')
-      maskCoverage = canvasRef.current.getMaskCoverage()
+      maskCoverage = canvas.getMaskCoverage()
       const fd = new FormData()
       fd.append('file', new File([blob], 'mask.png', { type: 'image/png' }))
       fd.append('kind', 'mask')
@@ -386,18 +460,18 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
           const seg = await segRes.json()
           const extended = !seg.used_fallback && seg.surface_coverage > maskCoverage * 1.15
           if (extended) {
-            let surfaceCost = cost
+            let surfaceCost = premiumSel ? (premiumPreview?.costNodes ?? cost) : cost
             try {
               const pv = await fetch('/api/edits/preview', {
                 method:  'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body:    JSON.stringify({ has_mask: true, mask_coverage: seg.surface_coverage, prompt: prompt.trim(), quality, source_type: sourceType, source_id: sourceId, mode, premium, references: payloadReferences() }),
+                body:    JSON.stringify({ has_mask: true, mask_coverage: seg.surface_coverage, prompt: prompt.trim(), quality, source_type: sourceType, source_id: sourceId, mode, premium: premiumSel, references: payloadReferences() }),
               })
-              if (pv.ok) { const d = await pv.json(); surfaceCost = d.cost_nodes ?? cost }
+              if (pv.ok) { const d = await pv.json(); surfaceCost = d.cost_nodes ?? surfaceCost }
             } catch { /* mantém o custo atual */ }
             setSegmenting(false)
             setSubmitting(false)
-            setSegConfirm({ previewUrl: seg.preview_url, surfaceMaskUrl: seg.surface_mask_url, blobMaskUrl, surfaceCoverage: seg.surface_coverage, blobCoverage: maskCoverage, surfaceCost })
+            setSegConfirm({ previewUrl: seg.preview_url, surfaceMaskUrl: seg.surface_mask_url, blobMaskUrl, surfaceCoverage: seg.surface_coverage, blobCoverage: maskCoverage, surfaceCost, premiumSel })
             return
           }
         }
@@ -406,11 +480,12 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
     }
 
     // 3) Sem segmentação (ou não estendeu) → gera com o blob pintado.
-    await runGenerate(blobMaskUrl, maskCoverage)
+    await runGenerate(blobMaskUrl, maskCoverage, false, premiumSel)
   }
 
-  // Geração com a máscara escolhida (blob pintado OU superfície segmentada).
-  async function runGenerate(maskUrl: string, maskCoverage: number, fromSurface = false) {
+  // Geração com a máscara escolhida (blob pintado, superfície segmentada, ou
+  // NENHUMA — edição conversacional da imagem inteira).
+  async function runGenerate(maskUrl: string | null, maskCoverage: number, fromSurface = false, premiumSel = false) {
     setSubmitting(true)
     try {
       const res = await fetch('/api/edits', {
@@ -418,15 +493,16 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           source_image_url: sourceUrl,
-          mask_url:         maskUrl,
+          mask_url:         maskUrl ?? undefined,
           prompt:           mode === 'remove' ? '' : prompt.trim(),
           quality,
           source_type:      sourceType,
           source_id:        sourceId,
           mask_coverage:    maskCoverage,
           mode,
+          edit_intent:      intent,
           fidelity_mode:    fidelity,
-          premium,
+          premium:          premiumSel,
           references:       payloadReferences(),
         }),
       })
@@ -469,7 +545,8 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
       // never blocks the user from seeing an already-successful edit result.
       // Pulada quando a SUPERFÍCIE (segmentação) foi usada: a edição estende além
       // do blob pintado, então validar contra ele acusaria drift falso-positivo.
-      if (!fromSurface) {
+      // Também pulada na edição SEM máscara (imagem inteira — não há "fora").
+      if (!fromSurface && maskUrl) {
         setValidating(true)
         try {
           const v = await canvasRef.current?.validateOutsideMaskPreservation(outputUrl)
@@ -494,15 +571,15 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
 
   function confirmSurface() {
     if (!segConfirm) return
-    const { surfaceMaskUrl, surfaceCoverage } = segConfirm
+    const { surfaceMaskUrl, surfaceCoverage, premiumSel } = segConfirm
     setSegConfirm(null)
-    void runGenerate(surfaceMaskUrl, surfaceCoverage, true)
+    void runGenerate(surfaceMaskUrl, surfaceCoverage, true, premiumSel)
   }
   function useBlobOnly() {
     if (!segConfirm) return
-    const { blobMaskUrl, blobCoverage } = segConfirm
+    const { blobMaskUrl, blobCoverage, premiumSel } = segConfirm
     setSegConfirm(null)
-    void runGenerate(blobMaskUrl, blobCoverage)
+    void runGenerate(blobMaskUrl, blobCoverage, false, premiumSel)
   }
 
   function discardResult() {
@@ -519,6 +596,10 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
     setResultUrl(null)
     setDriftWarning(null)
     setPrompt('')
+    // Limpa referências da edição anterior — senão a textura antiga continuava
+    // ativa nas gerações seguintes (achado P1-4 da auditoria).
+    setReferences([])
+    setSurfaceSel(null) // seleção de superfície era da imagem anterior
     if (canvasRef.current) canvasRef.current.clearMask()
     setStep('editing')
   }
@@ -530,6 +611,8 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
     setPrompt('')
     setVersions([])
     setActiveVersionId(null)
+    setSurfaceSel(null)
+    setSurfacePicker(null)
     setStep('empty')
   }
 
@@ -541,6 +624,8 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
     setResultUrl(null)
     setDriftWarning(null)
     setPrompt('')
+    setReferences([]) // referência da edição anterior não vale pra nova base
+    setSurfaceSel(null)
     setActiveVersionId(v.id)
     if (canvasRef.current) canvasRef.current.clearMask()
     setStep('editing')
@@ -599,7 +684,15 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
         />
       )}
 
-      {step === 'editing' && sourceUrl && (
+      {step === 'editing' && sourceUrl && !intent && (
+        <IntentStep
+          sourceUrl={sourceUrl}
+          onPick={pickIntent}
+          onStartOver={startOver}
+        />
+      )}
+
+      {step === 'editing' && sourceUrl && intent && intentMeta && (
         <EditingStep
           sourceUrl={sourceUrl}
           canvasRef={canvasRef}
@@ -616,21 +709,26 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
           quality={quality}
           setQuality={setQuality}
           mode={mode}
-          setMode={setMode}
+          intent={intent}
+          intentMeta={intentMeta}
+          onChangeIntent={changeIntent}
           fidelity={fidelity}
           setFidelity={setFidelity}
-          premium={premium}
-          setPremium={setPremium}
           routePreview={routePreview}
+          premiumPreview={premiumPreview}
           qualityGate={qualityGate}
           onDismissGate={() => setQualityGate(null)}
-          onTryAdvanced={() => { setPremium(true); setQualityGate(null) }}
+          onTryPremium={() => { setQualityGate(null); void handleGenerate(true) }}
           references={references}
           onAddReference={handleAddReferenceKind}
           onRemoveReference={removeReference}
           onClearReferences={clearAllReferences}
+          surfaceSel={surfaceSel}
+          onOpenSurfacePicker={() => setSurfacePicker({ initial: surfaceSel })}
+          onClearSurface={() => setSurfaceSel(null)}
           balance={balance}
           balanceShort={balanceShort}
+          premiumShort={premiumShort}
           submitting={submitting}
           validating={validating}
           segmenting={segmenting}
@@ -718,6 +816,18 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
                 style={{ flex: 1, minWidth: 220, width: 'auto', padding: '11px 18px', background: '#1D9E75', color: '#042818', border: '0.5px solid rgba(0,0,0,0.18)' }}>
                 Aplicar na superfície — {segConfirm.surfaceCost} nodes
               </button>
+              <button type="button"
+                onClick={() => {
+                  // Caminho 2: a detecção saiu ~90% certa → refina por cliques em
+                  // vez de aceitar/recusar. Confirmou no modal → vira surfaceSel e
+                  // o usuário gera de novo (o preço já reflete a nova área).
+                  setSurfacePicker({ initial: { maskUrl: segConfirm.surfaceMaskUrl, previewUrl: segConfirm.previewUrl, coverage: segConfirm.surfaceCoverage } })
+                  setSegConfirm(null)
+                }}
+                className="spn-action spn-action--ghost"
+                style={{ width: 'auto', padding: '11px 16px', fontSize: 12 }}>
+                Refinar seleção
+              </button>
               <button type="button" onClick={useBlobOnly} className="spn-action spn-action--ghost"
                 style={{ width: 'auto', padding: '11px 16px', fontSize: 12 }}>
                 Usar só o que pintei
@@ -729,6 +839,17 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Seleção de SUPERFÍCIE por clique (V2 — clique-primeiro no Trocar material) */}
+      {surfacePicker && sourceUrl && (
+        <SurfaceSelectModal
+          imageUrl={sourceUrl}
+          initial={surfacePicker.initial}
+          onConfirm={sel => { setSurfaceSel(sel); setSurfacePicker(null) }}
+          onUseBrush={() => setSurfacePicker(null)}
+          onClose={() => setSurfacePicker(null)}
+        />
       )}
     </div>
   )
@@ -827,6 +948,51 @@ function EmptyStep({ onUpload, onImport, fileInputRef, onFilePicked, error }: {
   )
 }
 
+// ── Step: intenção (intenção-primeiro) ───────────────────────
+
+function IntentStep({ sourceUrl, onPick, onStartOver }: {
+  sourceUrl:   string
+  onPick:      (i: EditIntent) => void
+  onStartOver: () => void
+}) {
+  return (
+    <div style={{ maxWidth: 980, margin: '0 auto' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 22, flexWrap: 'wrap' }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={sourceUrl}
+          alt="imagem selecionada"
+          style={{
+            width: 96, height: 72, objectFit: 'cover', borderRadius: 8,
+            border: '0.5px solid var(--color-border-strong)',
+          }}
+        />
+        <div style={{ flex: 1, minWidth: 220 }}>
+          <h2 style={{
+            fontSize: 20, fontWeight: 500, color: 'var(--color-text-primary)',
+            letterSpacing: '-0.02em', marginBottom: 4,
+          }}>
+            O que você quer fazer nesta imagem?
+          </h2>
+          <p style={{ fontSize: 12.5, color: 'var(--color-text-tertiary)', letterSpacing: '-0.005em' }}>
+            Escolha o tipo de edição — a interface se adapta ao que você precisa.
+          </p>
+        </div>
+        <button
+          onClick={onStartOver}
+          style={{
+            fontSize: 11, color: 'var(--color-text-tertiary)', background: 'none',
+            cursor: 'pointer', textDecoration: 'underline', padding: '4px 0',
+          }}
+        >
+          Trocar imagem
+        </button>
+      </div>
+      <EditIntentPicker onPick={onPick} />
+    </div>
+  )
+}
+
 // ── Step: editing ────────────────────────────────────────────
 
 function EditingStep(props: {
@@ -845,21 +1011,26 @@ function EditingStep(props: {
   quality:      Quality
   setQuality:   (q: Quality) => void
   mode:         EditMode
-  setMode:      (m: EditMode) => void
+  intent:       EditIntent
+  intentMeta:   EditIntentMeta
+  onChangeIntent: () => void
   fidelity:     FidelityMode
   setFidelity:  (f: FidelityMode) => void
-  premium:      boolean
-  setPremium:   (v: boolean) => void
-  routePreview: RoutePreview | null
+  routePreview:   RoutePreview | null
+  premiumPreview: RoutePreview | null
   qualityGate:   { message: string; resultUrl?: string; drift?: number } | null
   onDismissGate: () => void
-  onTryAdvanced: () => void
+  onTryPremium:  () => void
   references:        EditReferenceImage[]
   onAddReference:    (kind: RefMenuKind) => void
   onRemoveReference: (id: string) => void
   onClearReferences: () => void
+  surfaceSel:          SurfaceSelection | null
+  onOpenSurfacePicker: () => void
+  onClearSurface:      () => void
   balance:      number
   balanceShort: boolean
+  premiumShort: boolean
   submitting:   boolean
   validating:   boolean
   segmenting:   boolean
@@ -868,32 +1039,48 @@ function EditingStep(props: {
   activeVersionId: string | null
   onPickVersion:   (v: EditVersion) => void
   onUseVersionAsBase: (v: EditVersion) => void
-  onGenerate:   () => void
+  onGenerate:   (premium: boolean) => void
   onStartOver:  () => void
 }) {
   const {
     sourceUrl, canvasRef, coverage, setCoverage, brush, setBrush,
     tool, setTool, maskVisible, setMaskVisible,
-    prompt, setPrompt, quality, setQuality, mode, setMode,
-    fidelity, setFidelity, premium, setPremium, routePreview,
-    qualityGate, onDismissGate, onTryAdvanced,
+    prompt, setPrompt, quality, setQuality, mode,
+    intent, intentMeta, onChangeIntent,
+    fidelity, setFidelity, routePreview, premiumPreview,
+    qualityGate, onDismissGate, onTryPremium,
     references, onAddReference, onRemoveReference, onClearReferences,
-    balance, balanceShort,
+    surfaceSel, onOpenSurfacePicker, onClearSurface,
+    balance, balanceShort, premiumShort,
     submitting, validating, segmenting, error,
     versions, activeVersionId, onPickVersion, onUseVersionAsBase,
     onGenerate, onStartOver,
   } = props
 
-  const largeMask   = coverage > LARGE_MASK_THRESHOLD
-  const modeMeta    = EDIT_MODE_LABELS[mode]
-  const isRemove    = mode === 'remove'
-  const disabledBtn = coverage === 0 || balanceShort || submitting || (!isRemove && !prompt.trim())
+  const largeMask    = coverage > LARGE_MASK_THRESHOLD && !surfaceSel
+  const modeMeta     = EDIT_MODE_LABELS[mode]
+  const isRemove     = mode === 'remove'
+  const maskRequired = intentMeta.maskRequirement === 'required'
+  const hasSelection = coverage > 0 || !!surfaceSel
+  const disabledBtn  = (maskRequired && !hasSelection) || balanceShort || submitting || (!isRemove && !prompt.trim())
+  const disabledPremium = (maskRequired && !hasSelection) || premiumShort || submitting || (!isRemove && !prompt.trim())
+  // Seleção por clique disponível só pro Trocar material (escopo V1 da camada
+  // de superfície) e atrás da flag de segmentação.
+  const showSurfaceBar = intent === 'swap_material' && SURFACE_SEGMENTATION_ENABLED
 
   // Contextual hint for the mask state.
   let maskHint: string
-  if (coverage === 0)            maskHint = 'Pinte a área que deseja editar.'
-  else if (!isRemove && !prompt) maskHint = 'Descreva a alteração ou escolha um preset.'
-  else                            maskHint = `Área mascarada: ${(coverage * 100).toFixed(1)}%`
+  if (surfaceSel) {
+    maskHint = `Superfície selecionada: ${(surfaceSel.coverage * 100).toFixed(1)}% da imagem.`
+  } else if (coverage === 0) {
+    maskHint = maskRequired
+      ? (showSurfaceBar ? 'Selecione a superfície (1 clique) ou pinte com o pincel.' : 'Pinte a área que deseja editar.')
+      : 'Sem seleção, a edição considera a imagem inteira. Pinte uma área para limitar.'
+  } else if (!isRemove && !prompt) {
+    maskHint = 'Descreva a alteração ou escolha um preset.'
+  } else {
+    maskHint = `Área mascarada: ${(coverage * 100).toFixed(1)}%`
+  }
 
   return (
     <div className="spn-editar-grid">
@@ -919,15 +1106,38 @@ function EditingStep(props: {
           borderRadius: 12, padding: 16,
           display: 'flex', flexDirection: 'column', gap: 12,
         }}>
-          {/* Mode tabs — picks the architectural intention. */}
-          <RetocarModeTabs mode={mode} onModeChange={setMode} disabled={submitting} />
+          {/* Intenção ativa — escolhida ANTES do prompt (intenção-primeiro). */}
+          <ActiveIntentChip intent={intent} onChange={onChangeIntent} disabled={submitting} />
 
           <div style={{
             fontSize: 11, color: 'var(--color-text-tertiary)', letterSpacing: '-0.005em',
-            marginTop: -2,
+            marginTop: -2, lineHeight: 1.5,
           }}>
-            {modeMeta.description}
+            {intentMeta.helper}
           </div>
+
+          {/* Trocar material: seleção de superfície por CLIQUE (pincel = fallback). */}
+          {showSurfaceBar && (
+            <SurfaceSelectionBar
+              selection={surfaceSel}
+              onOpen={onOpenSurfacePicker}
+              onClear={onClearSurface}
+              disabled={submitting}
+            />
+          )}
+
+          {/* Editar com referência: campos EXPLÍCITOS (principal / referência /
+              vista relacionada) — a referência nunca é confundida com a imagem
+              que será editada. */}
+          {intentMeta.explicitReference && (
+            <ExplicitReferenceFields
+              sourceUrl={sourceUrl}
+              references={references}
+              onAddReference={onAddReference}
+              onRemoveReference={onRemoveReference}
+              disabled={submitting}
+            />
+          )}
 
           {/* Prompt Assistant — textarea + chips + presets contextualizados ao modo. */}
           <PromptAssistant
@@ -982,11 +1192,11 @@ function EditingStep(props: {
                 </button>
                 <button
                   type="button"
-                  onClick={onTryAdvanced}
+                  onClick={onTryPremium}
                   className="spn-action spn-action--ghost"
                   style={{ width: 'auto', padding: '7px 14px', fontSize: 12 }}
                 >
-                  Tentar modo avançado
+                  Tentar com edição premium
                 </button>
               </div>
             </div>
@@ -1039,10 +1249,16 @@ function EditingStep(props: {
           />
         </PanelSection>
 
-        {/* Preservação do projeto */}
-        <PanelSection label="Preservação do projeto">
-          <FidelityControl value={fidelity} onChange={setFidelity} disabled={submitting} />
-        </PanelSection>
+        {/* Preservação — toggle simples (ON = máxima fidelidade) */}
+        {intentMeta.geometryToggle && (
+          <PanelSection label="Preservação do projeto">
+            <GeometryToggle
+              value={fidelity === 'max'}
+              onChange={on => setFidelity(on ? 'max' : 'balanced')}
+              disabled={submitting}
+            />
+          </PanelSection>
+        )}
 
         {/* Resolução final */}
         <PanelSection label="Resolução final">
@@ -1053,11 +1269,6 @@ function EditingStep(props: {
           }}>
             Para finalização em alta resolução, envie o resultado para Ampliar.
           </p>
-        </PanelSection>
-
-        {/* Modo premium — opt-in explícito (nunca automático) */}
-        <PanelSection label="Qualidade">
-          <PremiumToggle value={premium} onChange={setPremium} disabled={submitting} />
         </PanelSection>
 
         {/* Referências da edição (V1) */}
@@ -1088,8 +1299,9 @@ function EditingStep(props: {
               {balance} nodes
             </span>
           </div>
+          {/* Edição rápida (Google padrão) — botão principal */}
           <button
-            onClick={onGenerate}
+            onClick={() => onGenerate(false)}
             disabled={disabledBtn}
             className="spn-action"
             style={{
@@ -1105,7 +1317,25 @@ function EditingStep(props: {
           >
             {submitting
               ? (segmenting ? 'Detectando superfície…' : validating ? 'Validando…' : 'Aplicando edição com IA…')
-              : (routePreview?.label ?? modeMeta.ctaVerb)}
+              : (routePreview
+                  ? (routePreview.isFreeFix ? routePreview.label : `Edição rápida — ${routePreview.costNodes} ${routePreview.costNodes === 1 ? 'node' : 'nodes'}`)
+                  : modeMeta.ctaVerb)}
+          </button>
+          {/* Edição premium — opt-in explícito, nunca automático */}
+          <button
+            onClick={() => onGenerate(true)}
+            disabled={disabledPremium}
+            className="spn-action spn-action--ghost"
+            title="Modelo de máxima qualidade para pedidos complexos."
+            style={{
+              padding: '11px 16px', fontSize: 12,
+              opacity: disabledPremium ? 0.5 : 1,
+              cursor: disabledPremium ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {premiumPreview
+              ? `✦ Edição premium — ${premiumPreview.costNodes} nodes`
+              : '✦ Edição premium'}
           </button>
           {!submitting && routePreview?.explanation && (
             <p style={{
@@ -1437,9 +1667,10 @@ export function ResolutionControl({ value, onChange, disabled }: {
   )
 }
 
-// ── Painel: toggle de modo premium (opt-in) ─────────────────
+// ── Painel: toggle de preservação de geometria ──────────────
+// Liga/desliga a cláusula estrita: ON → fidelity 'max'; OFF → 'balanced'.
 
-function PremiumToggle({ value, onChange, disabled }: {
+export function GeometryToggle({ value, onChange, disabled }: {
   value:    boolean
   onChange: (v: boolean) => void
   disabled: boolean
@@ -1451,26 +1682,147 @@ function PremiumToggle({ value, onChange, disabled }: {
         disabled={disabled}
         onClick={() => onChange(!value)}
         style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
           padding: '9px 12px', borderRadius: 8,
           background: value ? 'rgba(29,158,117,0.12)' : 'var(--color-surface)',
           border: value ? '0.5px solid rgba(29,158,117,0.5)' : '0.5px solid var(--color-border-strong)',
           color: 'var(--color-text-primary)', fontSize: 12, fontFamily: 'inherit',
           cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1,
-          letterSpacing: '-0.005em',
+          letterSpacing: '-0.005em', textAlign: 'left',
         }}
       >
-        <span>Modelo premium</span>
+        <span>Preservar geometria, perspectiva e iluminação original</span>
         <span style={{
-          fontSize: 10, fontWeight: 600, letterSpacing: '0.06em',
+          fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', whiteSpace: 'nowrap',
           color: value ? '#1D9E75' : 'var(--color-text-quaternary)',
         }}>
           {value ? 'ATIVADO' : 'DESATIVADO'}
         </span>
       </button>
       <p style={{ fontSize: 10, color: 'var(--color-text-quaternary)', lineHeight: 1.55 }}>
-        Para prompts complexos. Usa o modelo de máxima qualidade (5–6 nodes). A
-        edição padrão escolhe o modelo mais econômico automaticamente.
+        Recomendado para projetos reais. Desligado, o modelo ganha liberdade para
+        pequenas adaptações dentro da área editada.
+      </p>
+    </div>
+  )
+}
+
+// ── Editar com referência: campos explícitos ─────────────────
+// Imagem principal (a que SERÁ editada) / Imagem de referência (guia, nunca
+// editada) / Vista relacionada do projeto (opcional, consistência).
+
+function ExplicitReferenceFields({ sourceUrl, references, onAddReference, onRemoveReference, disabled }: {
+  sourceUrl:         string
+  references:        EditReferenceImage[]
+  onAddReference:    (kind: RefMenuKind) => void
+  onRemoveReference: (id: string) => void
+  disabled:          boolean
+}) {
+  const objectRef  = references.find(r => r.role === 'object_reference')
+  const projectRef = references.find(r => r.role === 'project_render' || r.role === 'consistency_reference')
+
+  const fieldStyle: React.CSSProperties = {
+    flex: 1, minWidth: 180,
+    display: 'flex', flexDirection: 'column', gap: 6,
+    padding: 10, borderRadius: 10,
+    background: 'var(--color-surface)',
+    border: '0.5px solid var(--color-border)',
+  }
+  const labelStyle: React.CSSProperties = {
+    fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase',
+    color: 'var(--color-text-quaternary)',
+  }
+  const thumbStyle: React.CSSProperties = {
+    width: '100%', height: 74, objectFit: 'cover', borderRadius: 7,
+    border: '0.5px solid var(--color-border-strong)',
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {/* Imagem principal */}
+        <div style={fieldStyle}>
+          <span style={labelStyle}>Imagem principal</span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={sourceUrl} alt="imagem principal" style={thumbStyle} />
+          <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>
+            É esta imagem que será editada.
+          </span>
+        </div>
+
+        {/* Imagem de referência */}
+        <div style={fieldStyle}>
+          <span style={labelStyle}>Imagem de referência</span>
+          {objectRef ? (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={objectRef.url} alt="referência" style={thumbStyle} />
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => onRemoveReference(objectRef.id)}
+                style={{
+                  fontSize: 10, color: 'var(--color-text-tertiary)', background: 'none',
+                  textDecoration: 'underline', cursor: 'pointer', padding: 0, textAlign: 'left',
+                  fontFamily: 'inherit',
+                }}
+              >
+                Remover referência
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => onAddReference('object')}
+              className="spn-action spn-action--ghost"
+              style={{ width: '100%', padding: '18px 10px', fontSize: 11 }}
+            >
+              + Adicionar referência
+            </button>
+          )}
+        </div>
+
+        {/* Vista relacionada (opcional) */}
+        <div style={fieldStyle}>
+          <span style={labelStyle}>Vista relacionada · opcional</span>
+          {projectRef ? (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={projectRef.url} alt="vista relacionada" style={thumbStyle} />
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => onRemoveReference(projectRef.id)}
+                style={{
+                  fontSize: 10, color: 'var(--color-text-tertiary)', background: 'none',
+                  textDecoration: 'underline', cursor: 'pointer', padding: 0, textAlign: 'left',
+                  fontFamily: 'inherit',
+                }}
+              >
+                Remover vista
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => onAddReference('project_render')}
+              className="spn-action spn-action--ghost"
+              style={{ width: '100%', padding: '18px 10px', fontSize: 11 }}
+            >
+              + Vista do projeto
+            </button>
+          )}
+        </div>
+      </div>
+      <p style={{
+        fontSize: 10.5, color: 'var(--color-text-tertiary)', lineHeight: 1.5, margin: 0,
+        padding: '7px 10px', borderRadius: 7,
+        background: 'rgba(29,158,117,0.06)', border: '0.5px solid rgba(29,158,117,0.22)',
+      }}>
+        A referência não será editada — ela serve apenas como guia visual para a
+        área selecionada na imagem principal.
       </p>
     </div>
   )
