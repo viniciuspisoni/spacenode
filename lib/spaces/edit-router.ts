@@ -166,6 +166,11 @@ export const NODE_COST = {
   premiumHeavy: 6,
 } as const
 
+/** Desconto de 1 node para edições roteadas ao Vertex Imagen (inpaint preciso,
+ *  ~$0.02/img vs $0.045 do NB2). Repassamos parte da economia ao usuário.
+ *  Não se aplica aos tiers freeFix/quickFix (já no piso de 0/1). */
+export const VERTEX_NODE_DISCOUNT = 1
+
 // ── Custo real estimado por endpoint (telemetria de margem) ────────────────────
 // `per_image`: custo fixo por imagem. `per_mp`: custo por megapixel processado.
 // Mantido aqui pra calcular provider_cost_usd ao registrar a tentativa e vigiar
@@ -371,6 +376,9 @@ function decideGoogleFirst(input: EditRoutingInput): RoutingDecision {
 
   // COM máscara: endpoint mask-aware sempre.
   const endpoint = maskedGoogleEndpoint(input.tool, hasRefs)
+  // Vertex Imagen custa ~$0.02/img vs $0.045 do NB2 — desconto de 1 node nos
+  // tiers pagos (localized/medium/global). freeFix e quickFix já estão no piso.
+  const vDisc = endpoint === 'vertex/imagen-edit' ? VERTEX_NODE_DISCOUNT : 0
   const decision = (costNodes: number, isFreeFix: boolean, reason: string): RoutingDecision => ({
     endpoint,
     costNodes,
@@ -397,23 +405,24 @@ function decideGoogleFirst(input: EditRoutingInput): RoutingDecision {
 
   // ── 4) AMPLA / CONTEXTUAL / COMPLEXA (máscara respeitada, modelo padrão). ──
   if (isGlobalTool || largeMask || isComplex) {
-    return decision(NODE_COST.global, false,
+    return decision(Math.max(1, NODE_COST.global - vDisc), false,
       isComplex
         ? 'Pedido complexo — modelo avançado, mantendo a edição restrita à área selecionada.'
         : 'Edição ampla/contextual na área selecionada — modelo avançado.')
   }
 
   // ── 5) CORREÇÃO RÁPIDA PAGA (1 node). ──
+  // Já no piso — desconto não se aplica (evita cobrar 0 node em edição paga).
   if (smallMask && isFixTool && input.isGeneratedBySpacenode === true && !is4K) {
     return decision(NODE_COST.quickFix, false,
       'Correção rápida com máscara (cota grátis já utilizada).')
   }
 
-  // ── 6) LOCALIZADA (2) / MÉDIA (3). ──
+  // ── 6) LOCALIZADA (2→1 Vertex) / MÉDIA (3→2 Vertex). ──
   if (smallMask) {
-    return decision(NODE_COST.localized, false, 'Edição localizada usando modo econômico.')
+    return decision(Math.max(1, NODE_COST.localized - vDisc), false, 'Edição localizada usando modo econômico.')
   }
-  return decision(NODE_COST.medium, false, 'Edição de área média usando modelo padrão.')
+  return decision(Math.max(1, NODE_COST.medium - vDisc), false, 'Edição de área média usando modelo padrão.')
 }
 
 /** Endpoint mask-aware Google-first por ferramenta. Vertex (máscara REAL em
