@@ -26,9 +26,9 @@ import {
   estimateProviderCostUsd,
   editButtonLabel,
   editChargeExplanation,
-  isBlendTool,
 } from '@/lib/spaces/edit-router'
 import { editToolFromMode } from '@/lib/spaces/edit-router-adapters'
+import { isEditIntent, modeFromIntent } from '@/lib/spaces/edit-intents'
 import {
   buildRoutingContext,
   uploadEditAsset,
@@ -36,9 +36,13 @@ import {
   parseReferences,
   persistReferences,
   referenceRoles,
+  measureServerMaskCoverage,
+  insertAttemptResilient,
+  updateAttemptResilient,
   type EditRequestParams,
 } from '@/lib/spaces/edit-route-helpers'
-import { runEdit, OUT_OF_MASK_GATE, BLEND_OUT_OF_MASK_GATE } from '@/lib/spaces/edit-pipeline'
+import { runGatedEdit } from '@/lib/spaces/edit-gate'
+import { MaskImageMismatchError } from '@/lib/spaces/edit-crop'
 
 // sharp (crop/recompose) exige runtime Node.
 export const runtime = 'nodejs'
@@ -62,6 +66,8 @@ interface EditBody {
   image_megapixels?:    unknown
   /** Referências visuais: [{ url, role, source, note? }]. */
   references?:          unknown
+  /** Google-first: intenção escolhida na UI (telemetria; deriva o mode se ausente). */
+  edit_intent?:         unknown
 }
 
 export async function POST(req: NextRequest) {
@@ -78,7 +84,10 @@ export async function POST(req: NextRequest) {
   const referenceUrl = typeof body.reference_image_url === 'string' ? body.reference_image_url : undefined
   const premium      = body.premium === true
 
-  const mode: EditMode = isEditMode(body.mode) ? body.mode : 'material'
+  const intent = isEditIntent(body.edit_intent) ? body.edit_intent : null
+  const mode: EditMode = isEditMode(body.mode)
+    ? body.mode
+    : intent ? modeFromIntent(intent) : 'material'
   const fidelity: FidelityMode = isFidelityMode(body.fidelity_mode) ? body.fidelity_mode : 'max'
 
   if (!sourceUrl) {
@@ -113,15 +122,26 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient()
 
   // ── 1) Contexto + rota (sem tocar em saldo) ──
+  // Cobertura da máscara medida no SERVIDOR: o valor do cliente é só estimativa
+  // de preview — cobrança/cota grátis usam a fração branca real (P1-5).
+  const serverCoverage = await measureServerMaskCoverage(maskUrl)
+  if (serverCoverage != null && maskCoverage != null && Math.abs(serverCoverage - maskCoverage) > 0.10) {
+    console.warn(
+      '[edits] mask_coverage divergente: cliente=%s servidor=%s',
+      maskCoverage.toFixed(3), serverCoverage.toFixed(3),
+    )
+  }
+  const effectiveCoverage = serverCoverage ?? maskCoverage
+
   const params: EditRequestParams = {
-    mode, prompt, hasMask: !!maskUrl, maskCoverage, quality, fidelity,
+    mode, prompt, hasMask: !!maskUrl, maskCoverage: effectiveCoverage, quality, fidelity,
     premium, imageMegapixels, sourceType, sourceId, references,
   }
   const ctx     = await buildRoutingContext(admin, user.id, params)
   const routing = routeEdit(ctx.input)
   logEditRoute(routing, ctx.input) // dev/staging only
 
-  const { call: engine, usesMask } = dispatchEndpoint(routing.endpoint)
+  const { usesMask } = dispatchEndpoint(routing.endpoint)
   const finalPrompt      = composeRouterPrompt({ userPrompt: prompt, mode, fidelity, usesMask, references })
   const tool             = editToolFromMode(mode)
   const provider         = endpointProvider(routing.endpoint)
@@ -148,31 +168,33 @@ export async function POST(req: NextRequest) {
   }
 
   // ── 3) Registra a tentativa (status 'processing') ──
-  const { data: attempt } = await admin
-    .from('image_edit_attempts')
-    .insert({
-      user_id:           user.id,
-      source_image_id:   sourceImageId,
-      project_id:        null,
-      tool,
-      prompt,
-      endpoint:          routing.endpoint,
-      provider,
-      cost_nodes:        routing.costNodes,
-      provider_cost_usd: providerCostUsd,
-      is_free_fix:       routing.isFreeFix,
-      has_mask:          !!maskUrl,
-      mask_area_ratio:   maskCoverage,
-      used_crop:         false,
-      output_resolution: ctx.input.outputResolution,
-      preservation_mode: fidelity,
-      reference_count:   references.length,
-      reference_roles:   referenceRoles(references),
-      status:            'processing',
-    })
-    .select('id')
-    .single()
-  const attemptId: string | null = attempt?.id ?? null
+  // Insert resiliente: tenta com as colunas novas (migration 20260610000000);
+  // schema antigo cai na forma legada — a edição nunca quebra por telemetria.
+  const attemptBaseRow = {
+    user_id:           user.id,
+    source_image_id:   sourceImageId,
+    project_id:        null,
+    tool,
+    prompt,
+    endpoint:          routing.endpoint,
+    provider,
+    cost_nodes:        routing.costNodes,
+    provider_cost_usd: providerCostUsd,
+    is_free_fix:       routing.isFreeFix,
+    has_mask:          !!maskUrl,
+    mask_area_ratio:   effectiveCoverage,
+    used_crop:         false,
+    output_resolution: ctx.input.outputResolution,
+    preservation_mode: fidelity,
+    reference_count:   references.length,
+    reference_roles:   referenceRoles(references),
+    status:            'processing',
+  }
+  const attemptId = await insertAttemptResilient(
+    admin,
+    { ...attemptBaseRow, edit_intent: intent, quality_mode: premium ? 'premium' : 'quick' },
+    attemptBaseRow,
+  )
 
   if (references.length > 0) {
     await persistReferences(admin, {
@@ -192,7 +214,7 @@ export async function POST(req: NextRequest) {
   try {
     // ── 4) Débito atômico (pula se grátis) ──
     if (routing.costNodes > 0) {
-      const { error: debitErr } = await admin.rpc('consume_nodes_v2', {
+      const { error: debitErr } = await admin.rpc('consume_workspace_nodes', {
         user_id_input: user.id,
         amount:        routing.costNodes,
       })
@@ -209,40 +231,51 @@ export async function POST(req: NextRequest) {
       debited = true
     }
 
-    // ── 5) Executa (crop quando aplicável) + re-hospeda no Supabase ──
-    const run = await runEdit({
+    // ── 5) Executa com quality gate AMPLIADO + retry automático grátis ──
+    // (drift fora da máscara, no-op dentro da máscara, gate semântico por flag;
+    //  reprovou → 1 retry com prompt restritivo, sem novo débito.)
+    const gated = await runGatedEdit({
       sourceUrl,
       maskUrl,
-      prompt:       finalPrompt,
+      finalPrompt,
+      userPrompt:   prompt,
       quality,
       referenceUrl: mode === 'replace' ? referenceUrl : undefined,
       references:   references.map(r => ({ url: r.url, role: r.role })),
       routing,
-      usesMask,
-      softEdges:    isBlendTool(tool),
-      engine,
+      tool,
       uploadResult: (buf, kind) => uploadEditAsset(admin, user.id, buf, kind),
     })
+    const run = gated.run
 
-    // ── Quality gate: drift fora da máscara acima do limite → rejeita ──
-    // Não cobra, não consome cota grátis, não conta como edição. Devolve o
-    // preview pra UI mostrar e oferecer "tentar de novo / modo avançado".
-    // Blend (material/replace/add) usa limite tolerante (confia no modelo).
-    const gateLimit = isBlendTool(tool) ? BLEND_OUT_OF_MASK_GATE : OUT_OF_MASK_GATE
-    if (run.outOfMaskDelta != null && run.outOfMaskDelta > gateLimit) {
+    // ── Reprovado mesmo após o retry → estorna, registra o motivo, devolve. ──
+    if (gated.rejected) {
       if (debited) {
-        try { await admin.rpc('refund_nodes', { user_id_input: user.id, amount: routing.costNodes }) }
+        try { await admin.rpc('refund_workspace_nodes', { user_id_input: user.id, amount: routing.costNodes }) }
         catch (refundErr) { console.error('[edits] gate refund failed:', refundErr) }
       }
-      if (attemptId) {
-        await admin.from('image_edit_attempts').update({
-          status:          'rejected_quality_gate',
-          used_crop:       run.usedCrop,
-          crop_megapixels: run.cropMegapixels,
-          error_message:   `quality_gate: out_of_mask_delta=${(run.outOfMaskDelta * 100).toFixed(1)}%`,
-          completed_at:    new Date().toISOString(),
-        }).eq('id', attemptId)
+      const rejectedStatus = gated.rejectionKind === 'no_change'
+        ? 'rejected_no_change'
+        : 'rejected_quality_gate'
+      const rejectBase = {
+        status:          'rejected_quality_gate',
+        used_crop:       run.usedCrop,
+        crop_megapixels: run.cropMegapixels,
+        error_message:   (gated.gateReason ?? 'quality_gate').slice(0, 500),
+        completed_at:    new Date().toISOString(),
       }
+      await updateAttemptResilient(
+        admin, attemptId,
+        {
+          ...rejectBase,
+          status:            rejectedStatus,
+          gate_reason:       gated.gateReason,
+          auto_retry_count:  gated.autoRetryCount,
+          in_mask_delta:     run.inMaskDelta,
+          out_of_mask_delta: run.outOfMaskDelta,
+        },
+        rejectBase,
+      )
       const { data: balGate } = await admin
         .from('user_node_balance')
         .select('plan_balance, lumen_balance, total_balance')
@@ -250,10 +283,13 @@ export async function POST(req: NextRequest) {
         .single()
       return NextResponse.json({
         rejected:          true,
-        reason:            'quality_gate',
-        message:           'A edição não preservou bem a imagem. Tente ajustar a máscara ou usar o modo avançado.',
+        reason:            gated.rejectionKind ?? 'quality_gate',
+        message:           gated.rejectionKind === 'no_change'
+          ? 'A edição não produziu mudança perceptível na área selecionada. Você não foi cobrado — tente reformular o pedido ou usar o modo premium.'
+          : 'A edição não preservou bem a imagem, mesmo após uma nova tentativa automática. Você não foi cobrado — ajuste a máscara ou tente o modo premium.',
         result_url:        run.resultUrl,
         out_of_mask_delta: run.outOfMaskDelta,
+        auto_retried:      gated.autoRetryCount > 0,
         balance_after:     balGate ?? null,
       })
     }
@@ -272,23 +308,29 @@ export async function POST(req: NextRequest) {
         engine:           run.endpoint,
         source_type:      sourceType,
         source_id:        sourceImageId,
-        mask_coverage:    maskCoverage,
+        mask_coverage:    effectiveCoverage,
       })
       .select('*')
       .single()
 
-    if (attemptId) {
-      await admin
-        .from('image_edit_attempts')
-        .update({
-          status:          'completed',
-          result_image_id: row?.id ?? null,
-          used_crop:       run.usedCrop,
-          crop_megapixels: run.cropMegapixels,
-          completed_at:    new Date().toISOString(),
-        })
-        .eq('id', attemptId)
+    const completeBase = {
+      status:          'completed',
+      result_image_id: row?.id ?? null,
+      endpoint:        gated.usedEndpoint,
+      used_crop:       run.usedCrop,
+      crop_megapixels: run.cropMegapixels,
+      completed_at:    new Date().toISOString(),
     }
+    await updateAttemptResilient(
+      admin, attemptId,
+      {
+        ...completeBase,
+        auto_retry_count:  gated.autoRetryCount,
+        in_mask_delta:     run.inMaskDelta,
+        out_of_mask_delta: run.outOfMaskDelta,
+      },
+      completeBase,
+    )
 
     // Correção grátis consumida → marca na imagem de origem.
     if (routing.isFreeFix && ctx.sourceTable && ctx.sourceId) {
@@ -318,21 +360,32 @@ export async function POST(req: NextRequest) {
       result_url: run.resultUrl,
       // Sem endpoint técnico — só o que a UI mostra ao usuário.
       routing: {
-        cost_nodes:  routing.costNodes,
-        is_free_fix: routing.isFreeFix,
-        used_crop:   run.usedCrop,
-        label:       editButtonLabel(routing),
-        explanation: editChargeExplanation(routing),
+        cost_nodes:   routing.costNodes,
+        is_free_fix:  routing.isFreeFix,
+        used_crop:    run.usedCrop,
+        auto_retried: gated.autoRetryCount > 0,
+        label:        editButtonLabel(routing),
+        explanation:  editChargeExplanation(routing),
       },
       balance_after: balAfter ?? null,
     })
   } catch (err) {
     if (debited) {
-      try { await admin.rpc('refund_nodes', { user_id_input: user.id, amount: routing.costNodes }) }
+      try { await admin.rpc('refund_workspace_nodes', { user_id_input: user.id, amount: routing.costNodes }) }
       catch (refundErr) { console.error('[edits] refund failed:', refundErr) }
     }
     await failAttempt((err as Error).message)
     console.error('[edits] error:', (err as Error).message)
+    // Máscara de outra imagem (proporção divergente) → mensagem acionável.
+    if (err instanceof MaskImageMismatchError) {
+      return NextResponse.json(
+        {
+          error:   'mask_image_mismatch',
+          message: 'A seleção não corresponde à imagem atual. Refaça a seleção sobre esta imagem. Você não foi cobrado.',
+        },
+        { status: 422 },
+      )
+    }
     return NextResponse.json({ error: 'Falha na edição' }, { status: 500 })
   }
 }

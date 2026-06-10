@@ -139,7 +139,7 @@ export async function POST(req: NextRequest) {
     // por exception com SQLSTATE específico — P0001 = saldo insuficiente
     // (mapeado para 402); resto vira 500.
 
-    const { data: debitData, error: debitError } = await admin.rpc('consume_nodes_v2', {
+    const { data: debitData, error: debitError } = await admin.rpc('consume_workspace_nodes', {
       user_id_input: user.id,
       amount:        nodesToCharge,
     })
@@ -307,7 +307,7 @@ export async function POST(req: NextRequest) {
     // ── Refund best-effort em qualquer falha pós-débito ───────────────────────
     if (debited && nodesToCharge > 0) {
       try {
-        await admin.rpc('refund_nodes', { user_id_input: user.id, amount: nodesToCharge })
+        await admin.rpc('refund_workspace_nodes', { user_id_input: user.id, amount: nodesToCharge })
         console.warn('[generate] Refund executado:', nodesToCharge, 'nodes para', user.id)
       } catch (refundErr) {
         console.error('[generate] FALHA NO REFUND (CRÍTICO):', {

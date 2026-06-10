@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
 
     // ── Débito atômico ────────────────────────────────────────────────────────
     if (nodesToCharge > 0) {
-      const { error: debitError } = await admin.rpc('consume_nodes_v2', {
+      const { error: debitError } = await admin.rpc('consume_workspace_nodes', {
         user_id_input: user.id,
         amount:        nodesToCharge,
       })
@@ -172,7 +172,7 @@ export async function POST(req: NextRequest) {
   } catch (err: unknown) {
     if (debited && nodesToCharge > 0) {
       try {
-        await admin.rpc('refund_nodes', { user_id_input: user.id, amount: nodesToCharge })
+        await admin.rpc('refund_workspace_nodes', { user_id_input: user.id, amount: nodesToCharge })
         console.warn('[apresentar/board] Refund:', nodesToCharge, 'nodes →', user.id)
       } catch (refundErr) {
         console.error('[apresentar/board] FALHA NO REFUND:', { err: refundErr, userId: user.id, amount: nodesToCharge })

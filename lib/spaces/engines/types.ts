@@ -20,9 +20,12 @@ export type EditMode =
   | 'fix'
   | 'lighting'
   | 'landscape'
+  | 'style'
+  | 'variation'
 
 export const VALID_EDIT_MODES: EditMode[] = [
   'remove', 'material', 'replace', 'add', 'fix', 'lighting', 'landscape',
+  'style', 'variation',
 ]
 
 export function isEditMode(v: unknown): v is EditMode {
@@ -83,6 +86,18 @@ export const EDIT_MODE_LABELS: Record<EditMode, EditModeMeta> = {
     promptPlaceholder: 'Ex: criar jardim minimalista com vegetação baixa e pedras naturais',
     ctaVerb:           'Gerar paisagismo',
   },
+  style: {
+    label:             'Ajustar estilo',
+    description:       'Refine acabamento e atmosfera sem mudar a arquitetura.',
+    promptPlaceholder: 'Ex: tornar o ambiente mais escandinavo, tons claros e madeira natural',
+    ctaVerb:           'Gerar ajuste de estilo',
+  },
+  variation: {
+    label:             'Variação controlada',
+    description:       'Crie uma variação fiel preservando geometria e composição.',
+    promptPlaceholder: 'Ex: variar a decoração mantendo o layout, a câmera e a paleta',
+    ctaVerb:           'Gerar variação',
+  },
 }
 
 // ── Engine input/output ───────────────────────────────────────────────────────
@@ -102,6 +117,9 @@ export interface RetouchInput {
   seed?:          number
   /** Referências visuais adicionais (multi-imagem). */
   references?:    RetouchReference[]
+  /** Semântica da edição mascarada (Vertex Imagen precisa escolher o editMode:
+   *  'removal' → INPAINT_REMOVAL; 'insertion' → INPAINT_INSERTION). */
+  intentHint?:    'removal' | 'insertion'
 }
 
 export interface RetouchOutput {

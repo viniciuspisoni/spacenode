@@ -224,6 +224,32 @@ function buildDnaContextBlock(dna: EmbeddedDnaContext): string {
   return `PROJECT CONTEXT (preserve consistency with these):\n${lines.join('\n')}\n\n`
 }
 
+// ── Normalização universal (spec Google-first) ──────────────────────────────────
+// Cláusulas SEMPRE presentes, em qualquer rota/modo — o coração do
+// "normalizedPrompt" da spec. Mantidas curtas e absolutas: os modelos Google
+// respondem melhor a regras diretas do que a parágrafos.
+
+const UNIVERSAL_PRESERVATION_CLAUSES = [
+  'NON-NEGOTIABLE RULES:',
+  '- Preserve the existing architectural geometry.',
+  '- Preserve the camera, perspective, proportions and layout.',
+  '- Change ONLY what was explicitly requested.',
+  '- Maintain photorealistic architectural realism.',
+  '- Do not modify unselected areas.',
+  '- Do not add elements that were not requested.',
+].join('\n')
+
+/** Introdução específica das intenções conversacionais novas. */
+function instructIntro(mode: EditMode): string {
+  if (mode === 'variation') {
+    return 'Create a CONTROLLED VARIATION of this architectural image. Keep the structure, camera and layout identical; vary only what the instruction asks.'
+  }
+  if (mode === 'style') {
+    return 'Refine the STYLE and atmosphere of this architectural image. The architecture itself must remain identical.'
+  }
+  return 'Edit this architectural image following the instruction below.'
+}
+
 export function composeRouterPrompt(args: {
   userPrompt:  string
   mode:        EditMode
@@ -249,10 +275,10 @@ export function composeRouterPrompt(args: {
       ? composeEmbeddedFinalPrompt({ userPrompt, mode, fidelity, dna })
       : composeStandaloneFinalPrompt({ userPrompt, mode, fidelity })
   } else {
-    // Endpoint por instrução (Flux Pro Kontext) — sem linguagem de "área mascarada".
+    // Endpoint por instrução (edição conversacional) — sem linguagem de máscara.
     const dnaBlock = dna ? buildDnaContextBlock(dna) : ''
     base = [
-      'Edit this architectural image following the instruction below.',
+      instructIntro(mode),
       '',
       `INSTRUCTION: ${userPrompt}`,
       '',
@@ -263,5 +289,26 @@ export function composeRouterPrompt(args: {
     ].join('\n')
   }
 
-  return refClause ? `${base}\n\n${refClause}` : base
+  const withRefs = refClause ? `${base}\n\n${refClause}` : base
+  return `${withRefs}\n\n${UNIVERSAL_PRESERVATION_CLAUSES}`
+}
+
+/** Alias da spec: o "normalizedPrompt" do edit-router É o composeRouterPrompt
+ *  (composto no SERVIDOR — o cliente não consegue rebaixar as cláusulas). */
+export const normalizeEditPrompt = composeRouterPrompt
+
+// ── Retry automático do quality gate ───────────────────────────────────────────
+// Prompt mais restritivo para a 2ª tentativa (grátis). Prefixa restrições com
+// prioridade máxima sem perder a intenção original do usuário.
+
+export function buildStrictRetryPrompt(finalPrompt: string, gateReason: string | null): string {
+  const constraint = [
+    `STRICT RETRY — the previous attempt failed automatic validation${gateReason ? ` (${gateReason})` : ''}.`,
+    'Follow these constraints with MAXIMUM priority:',
+    '- Apply the requested change CLEARLY and COMPLETELY inside the selected area.',
+    '- Do NOT change a single pixel outside the selected area.',
+    '- Preserve geometry, camera, perspective, proportions, lighting direction and layout exactly.',
+    '- No artifacts, no added objects, no style drift.',
+  ].join('\n')
+  return `${constraint}\n\n${finalPrompt}`
 }

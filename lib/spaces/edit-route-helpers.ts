@@ -19,6 +19,7 @@ import {
 } from './edit-router'
 import { editToolFromMode, resolutionFromQuality } from './edit-router-adapters'
 import { monthlyFreeFixLimit, specUserPlanFromPlanId } from './edit-free-fix'
+import { fetchImageBuffer, maskWhiteRatio } from './edit-crop'
 
 type Admin = SupabaseClient
 
@@ -120,6 +121,60 @@ export async function buildRoutingContext(
 function sanitizeMp(mp: number | null): number {
   if (mp == null || !Number.isFinite(mp) || mp <= 0) return 2 // fallback ~2 MP
   return Math.min(64, mp)
+}
+
+/**
+ * Cobertura REAL da máscara medida no SERVIDOR (fração branca). O
+ * `mask_coverage` do cliente vira só estimativa de preview — a cobrança/cota
+ * grátis usa este valor (achado P1-5: o valor do cliente decidia o tier).
+ * Best-effort: falha de download → null (a rota cai no valor do cliente).
+ */
+export async function measureServerMaskCoverage(maskUrl: string | null): Promise<number | null> {
+  if (!maskUrl) return null
+  try {
+    const buf = await fetchImageBuffer(maskUrl)
+    return await maskWhiteRatio(buf)
+  } catch (err) {
+    console.warn('[edits] server mask coverage indisponível:', (err as Error).message)
+    return null
+  }
+}
+
+// ── Escrita RESILIENTE em image_edit_attempts ────────────────────────────────────
+// A migration 20260610000000 adiciona colunas/valores novos (edit_intent,
+// quality_mode, auto_retry_count, gate_reason, in/out_mask_delta, tool
+// style/variation, status rejected_no_change). O código tenta gravar a forma
+// COMPLETA e, se o schema ainda não tiver a migration, cai para a forma legada —
+// a edição nunca quebra por telemetria.
+
+export async function insertAttemptResilient(
+  admin: Admin,
+  preferredRow: Record<string, unknown>,
+  legacyRow:    Record<string, unknown>,
+): Promise<string | null> {
+  const first = await admin.from('image_edit_attempts').insert(preferredRow).select('id').single()
+  if (!first.error) return (first.data?.id as string) ?? null
+  const second = await admin.from('image_edit_attempts').insert(legacyRow).select('id').single()
+  if (second.error) {
+    console.warn('[edits] attempt insert falhou (telemetria perdida):', second.error.message)
+    return null
+  }
+  return (second.data?.id as string) ?? null
+}
+
+export async function updateAttemptResilient(
+  admin:     Admin,
+  attemptId: string | null,
+  preferred: Record<string, unknown>,
+  legacy:    Record<string, unknown>,
+): Promise<void> {
+  if (!attemptId) return
+  const first = await admin.from('image_edit_attempts').update(preferred).eq('id', attemptId)
+  if (!first.error) return
+  const second = await admin.from('image_edit_attempts').update(legacy).eq('id', attemptId)
+  if (second.error) {
+    console.warn('[edits] attempt update falhou:', second.error.message)
+  }
 }
 
 // ── Upload de resultado / crops pro Storage ──────────────────────────────────────

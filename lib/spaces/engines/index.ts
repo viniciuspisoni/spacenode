@@ -54,8 +54,15 @@ export { FLUX_KONTEXT_LORA_INPAINT_ENDPOINT } from './flux-kontext-lora-inpaint'
 export { NANO_BANANA_EDIT_ENDPOINT }          from './nano-banana-edit'
 export { FLUX_PRO_KONTEXT_ENDPOINT }          from './flux-pro-kontext'
 export { GEMINI_3_PRO_EDIT_ENDPOINT }         from './gemini-3-pro-edit'
-export { VERTEX_IMAGEN_EDIT_ENDPOINT }        from './vertex-imagen-edit'
+export { VERTEX_IMAGEN_EDIT_ENDPOINT, VERTEX_IMAGEN_MODEL } from './vertex-imagen-edit'
+
+// Google-first: Nano Banana 2 (Gemini 3.1 Flash Image) e Pro (Gemini 3 Pro Image).
+export { NANO_BANANA_2_EDIT_ENDPOINT }   from './nano-banana-2-edit'
+export { NANO_BANANA_PRO_EDIT_ENDPOINT } from './nano-banana-pro-edit'
 
 // Camada de SUPERFÍCIE (segmentação SAM2, Fase 1).
 export { callSam2Segment, SAM2_IMAGE_ENDPOINT } from './sam2-segment'
 export type { SamPoint, SamBox } from './sam2-segment'
+
+// Camada de SUPERFÍCIE V2 — segmentação semântica por texto (evf-sam) p/ excluir objetos.
+export { callEvfSam, EVF_SAM_ENDPOINT, SURFACE_OBJECTS_PROMPT } from './evf-sam-segment'

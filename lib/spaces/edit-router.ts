@@ -30,6 +30,8 @@ export type EditTool =
   | 'fix_detail'
   | 'lighting'
   | 'landscaping'
+  | 'style'
+  | 'variation'
 
 export type PreservationMode = 'max' | 'balanced' | 'creative'
 
@@ -44,7 +46,14 @@ export type EditEndpoint =
   | 'fal-ai/nano-banana/edit'
   | 'fal-ai/flux-pro/kontext'
   | 'fal-ai/gemini-3-pro-image-preview/edit'
+  // Google-first: Nano Banana 2 (Gemini 3.1 Flash Image) e Nano Banana Pro
+  // (Gemini 3 Pro Image) MASCARADOS (máscara como 2ª imagem + recompose).
+  | 'fal-ai/nano-banana-2/edit'
+  | 'fal-ai/nano-banana-pro/edit'
+  // Modo INSTRUÇÃO (edição conversacional, SEM máscara) dos mesmos modelos —
+  // ids internos; chamam os endpoints FAL acima sem enviar a máscara.
   | 'google/gemini-3.1-flash-image'
+  | 'google/gemini-3-pro-image'
 
 export type EditProvider = 'fal' | 'vertex' | 'google'
 
@@ -119,6 +128,23 @@ export interface EditRoutingResult {
   maxCropMegapixels?: number
   /** Explicação curta da decisão (telemetria / logs / debug). */
   reason:             string
+  /** Política de retry automático do quality gate (sempre grátis). */
+  retryPolicy:        EditRetryPolicy
+}
+
+/**
+ * Retry automático quando o quality gate reprova (drift fora da máscara,
+ * resultado sem alteração perceptível, ou avaliação semântica negativa):
+ *   - 1 tentativa extra com prompt mais restritivo, SEM nova cobrança;
+ *   - se `fallback` existe (Flux atrás de EDIT_FLUX_FALLBACK=1), o retry roda
+ *     no engine fallback; senão, repete o mesmo endpoint.
+ */
+export interface EditRetryPolicy {
+  maxAutoRetries: number
+  /** Retry nunca debita nodes (cobrança única na primeira tentativa). */
+  freeRetry:      true
+  /** Rota completa do fallback (null = retry no mesmo endpoint). */
+  fallback:       EditRoutingResult | null
 }
 
 // ── Tabela de custo dos nodes (regras de cobrança da spec) ─────────────────────
@@ -140,6 +166,11 @@ export const NODE_COST = {
   premiumHeavy: 6,
 } as const
 
+/** Desconto de 1 node para edições roteadas ao Vertex Imagen (inpaint preciso,
+ *  ~$0.02/img vs $0.045 do NB2). Repassamos parte da economia ao usuário.
+ *  Não se aplica aos tiers freeFix/quickFix (já no piso de 0/1). */
+export const VERTEX_NODE_DISCOUNT = 1
+
 // ── Custo real estimado por endpoint (telemetria de margem) ────────────────────
 // `per_image`: custo fixo por imagem. `per_mp`: custo por megapixel processado.
 // Mantido aqui pra calcular provider_cost_usd ao registrar a tentativa e vigiar
@@ -156,18 +187,42 @@ export const ENDPOINT_COST_USD: Record<
   'fal-ai/nano-banana/edit':                { kind: 'per_image', usd: 0.039 },
   'fal-ai/flux-pro/kontext':                { kind: 'per_image', usd: 0.040 },
   'fal-ai/gemini-3-pro-image-preview/edit': { kind: 'per_image', usd: 0.150 },
-  // Reservado: alternativa Google rápida/barata para edições simples. Hoje a
-  // rota padrão usa nano-banana/edit; este fica disponível para tuning futuro
-  // (ex.: caminho sem máscara mais barato). Assumimos custo ~ nano-banana.
-  'google/gemini-3.1-flash-image':          { kind: 'per_image', usd: 0.039 },
+  // Google-first: Nano Banana 2 (Gemini 3.1 Flash Image) — motor padrão da
+  // edição rápida; estimativa conservadora, vigiar provider_cost_usd.
+  'fal-ai/nano-banana-2/edit':              { kind: 'per_image', usd: 0.045 },
+  // Nano Banana Pro (Gemini 3 Pro Image) — motor premium (5–6 nodes).
+  'fal-ai/nano-banana-pro/edit':            { kind: 'per_image', usd: 0.150 },
+  // Modo instrução (sem máscara) dos mesmos modelos — mesmo custo por imagem.
+  'google/gemini-3.1-flash-image':          { kind: 'per_image', usd: 0.045 },
+  'google/gemini-3-pro-image':              { kind: 'per_image', usd: 0.150 },
 }
 
 // ── Flags / limiares ───────────────────────────────────────────────────────────
+// Lidas POR CHAMADA (funções, não consts) para permitir rollback sem rebuild de
+// módulo e para o smoke test exercitar os dois caminhos no mesmo processo.
 
-// Vertex Imagen Edit ainda NÃO está integrado (prioridade #7). Enquanto false,
-// quick fixes baratos com máscara usam fal-ai/flux-kontext-lora/inpaint.
-// Quando o engine Vertex estiver pronto, basta ligar aqui.
-export const VERTEX_IMAGEN_ENABLED = false
+/** Google-first (Gemini/Nano Banana como motor principal) — DEFAULT ON.
+ *  `EDIT_GOOGLE_FIRST=0` volta o roteamento EXATAMENTE ao legado (Flux). */
+export function googleFirstEnabled(): boolean {
+  return process.env.EDIT_GOOGLE_FIRST !== '0'
+}
+
+/** Flux como fallback OCULTO do retry automático do quality gate.
+ *  DEFAULT OFF — liga com EDIT_FLUX_FALLBACK=1. Nunca aparece na rota primária
+ *  quando Google-first está ligado. */
+export function fluxFallbackEnabled(): boolean {
+  return process.env.EDIT_FLUX_FALLBACK === '1'
+}
+
+/** Vertex Imagen masked editing (inpaint preciso, ~US$0.020/img). DEFAULT OFF —
+ *  liga com VERTEX_IMAGEN_ENABLED=1 após provisionar GOOGLE_VERTEX_PROJECT /
+ *  GOOGLE_VERTEX_LOCATION / GOOGLE_VERTEX_CREDENTIALS_JSON. */
+export function vertexImagenEnabled(): boolean {
+  return process.env.VERTEX_IMAGEN_ENABLED === '1'
+}
+
+/** @deprecated compat — preferir vertexImagenEnabled() (env-driven). */
+export const VERTEX_IMAGEN_ENABLED = process.env.VERTEX_IMAGEN_ENABLED === '1'
 
 /** Camada de SUPERFÍCIE (segmentação SAM2, Fase 1) — atrás de flag, OFF por
  *  padrão. Liga com NEXT_PUBLIC_EDIT_SURFACE_SEGMENTATION=1 (lida no cliente pra
@@ -255,7 +310,167 @@ function countOccurrences(haystack: string, needle: string): number {
 
 // ── routeEdit ───────────────────────────────────────────────────────────────────
 
+/** Decisão de rota SEM a retryPolicy (anexada pelo routeEdit público). */
+type RoutingDecision = Omit<EditRoutingResult, 'retryPolicy'>
+
 export function routeEdit(input: EditRoutingInput): EditRoutingResult {
+  const decision = googleFirstEnabled()
+    ? decideGoogleFirst(input)
+    : decideLegacy(input)
+  return withRetryPolicy(decision, input)
+}
+
+// ── Google-first (Gemini/Nano Banana principal; Flux só fallback por flag) ─────
+//
+// Regras:
+//   - Premium NUNCA é automático (igual ao legado): só com userSelectedPremium.
+//   - COM máscara, o endpoint é SEMPRE mask-aware — a máscara nunca é descartada
+//     por prompt "complexo" ou área grande (corrige o P0 da auditoria: o legado
+//     mandava pro Flux Pro Kontext, que ignora a máscara e pula o quality gate).
+//   - SEM máscara: edição conversacional por instrução (Gemini 3.1 Flash Image;
+//     premium → Gemini 3 Pro Image).
+//   - Vertex Imagen (inpaint com máscara REAL em pixels) entra quando ligado,
+//     para ferramentas de inpaint SEM referência (referência → multi-imagem NB).
+//   - Tiers de cobrança 0–6 idênticos ao legado (justos e já validados).
+
+function decideGoogleFirst(input: EditRoutingInput): RoutingDecision {
+  const complexity = classifyPromptComplexity(input.prompt)
+  const isComplex = complexity === 'complex'
+  const is4K = input.outputResolution === '4K'
+
+  const area = clamp(input.maskAreaRatio, 0, 1)
+  const hasMask = input.hasMask === true
+  const smallMask = hasMask && area <= SMALL_MASK_MAX_RATIO
+  const largeMask = hasMask && area >= LARGE_MASK_MIN_RATIO
+
+  const isFixTool = input.tool === 'remove' || input.tool === 'fix_detail'
+  const isGlobalTool =
+    input.tool === 'lighting' || input.tool === 'landscaping' ||
+    input.tool === 'style' || input.tool === 'variation'
+
+  const refs = input.references ?? []
+  const hasRefs = refs.length > 0
+
+  // ── 1) PREMIUM — só com opt-in explícito. ──
+  if (input.userSelectedPremium === true) {
+    const heavy = is4K || largeMask || !hasMask
+    return {
+      endpoint:      hasMask ? 'fal-ai/nano-banana-pro/edit' : 'google/gemini-3-pro-image',
+      costNodes:     heavy ? NODE_COST.premiumHeavy : NODE_COST.premium,
+      isFreeFix:     false,
+      shouldUseCrop: false,
+      reason:        'Modo premium selecionado pelo usuário — Gemini 3 Pro Image (máxima qualidade).',
+    }
+  }
+
+  // ── 2) SEM máscara → edição conversacional por instrução. ──
+  if (!hasMask) {
+    return {
+      endpoint:      'google/gemini-3.1-flash-image',
+      costNodes:     NODE_COST.global,
+      isFreeFix:     false,
+      shouldUseCrop: false,
+      reason:        'Edição conversacional da imagem inteira — modelo padrão Google.',
+    }
+  }
+
+  // COM máscara: endpoint mask-aware sempre.
+  const endpoint = maskedGoogleEndpoint(input.tool, hasRefs)
+  // Vertex Imagen custa ~$0.02/img vs $0.045 do NB2 — desconto de 1 node nos
+  // tiers pagos (localized/medium/global). freeFix e quickFix já estão no piso.
+  const vDisc = endpoint === 'vertex/imagen-edit' ? VERTEX_NODE_DISCOUNT : 0
+  const decision = (costNodes: number, isFreeFix: boolean, reason: string): RoutingDecision => ({
+    endpoint,
+    costNodes,
+    isFreeFix,
+    shouldUseCrop:     cropEligible(endpoint),
+    maxCropMegapixels: cropCap(endpoint, input),
+    reason,
+  })
+
+  // ── 3) CORREÇÃO GRÁTIS — mesmas condições do legado. ──
+  const freeEligible =
+    input.isGeneratedBySpacenode === true &&
+    isFixTool &&
+    area <= SMALL_MASK_MAX_RATIO &&
+    input.freeFixesUsedForImage <= 0 &&
+    input.monthlyFreeFixesUsed < input.monthlyFreeFixesLimit &&
+    !is4K &&
+    !isComplex
+
+  if (freeEligible) {
+    return decision(NODE_COST.freeFix, true,
+      'Pequena correção com máscara em imagem do Spacenode — dentro da cota grátis.')
+  }
+
+  // ── 4) AMPLA / CONTEXTUAL / COMPLEXA (máscara respeitada, modelo padrão). ──
+  if (isGlobalTool || largeMask || isComplex) {
+    return decision(Math.max(1, NODE_COST.global - vDisc), false,
+      isComplex
+        ? 'Pedido complexo — modelo avançado, mantendo a edição restrita à área selecionada.'
+        : 'Edição ampla/contextual na área selecionada — modelo avançado.')
+  }
+
+  // ── 5) CORREÇÃO RÁPIDA PAGA (1 node). ──
+  // Já no piso — desconto não se aplica (evita cobrar 0 node em edição paga).
+  if (smallMask && isFixTool && input.isGeneratedBySpacenode === true && !is4K) {
+    return decision(NODE_COST.quickFix, false,
+      'Correção rápida com máscara (cota grátis já utilizada).')
+  }
+
+  // ── 6) LOCALIZADA (2→1 Vertex) / MÉDIA (3→2 Vertex). ──
+  if (smallMask) {
+    return decision(Math.max(1, NODE_COST.localized - vDisc), false, 'Edição localizada usando modo econômico.')
+  }
+  return decision(Math.max(1, NODE_COST.medium - vDisc), false, 'Edição de área média usando modelo padrão.')
+}
+
+/** Endpoint mask-aware Google-first por ferramenta. Vertex (máscara REAL em
+ *  pixels) para inpaint sem referência quando ligado; senão Nano Banana 2
+ *  (máscara como 2ª imagem; o pipeline recompõe e o gate valida). Referências
+ *  vão sempre pro NB2 (multi-imagem). */
+function maskedGoogleEndpoint(tool: EditTool, hasReferences: boolean): EditEndpoint {
+  const vertexTool =
+    tool === 'remove' || tool === 'add' || tool === 'material' || tool === 'fix_detail'
+  if (!hasReferences && vertexTool && vertexImagenEnabled()) return 'vertex/imagen-edit'
+  return 'fal-ai/nano-banana-2/edit'
+}
+
+// ── Retry automático (quality gate) ────────────────────────────────────────────
+
+/** Anexa a retryPolicy: 1 retry grátis com prompt mais restritivo; com
+ *  EDIT_FLUX_FALLBACK=1 o retry roda no engine Flux equivalente. */
+function withRetryPolicy(decision: RoutingDecision, input: EditRoutingInput): EditRoutingResult {
+  const fallbackEndpoint = fluxFallbackEnabled() ? fluxFallbackFor(decision.endpoint, input) : null
+  const fallback: EditRoutingResult | null = fallbackEndpoint
+    ? {
+        endpoint:          fallbackEndpoint,
+        costNodes:         decision.costNodes,
+        isFreeFix:         decision.isFreeFix,
+        shouldUseCrop:     cropEligible(fallbackEndpoint),
+        maxCropMegapixels: cropCap(fallbackEndpoint, input),
+        reason:            'Fallback Flux do retry automático do quality gate (flag EDIT_FLUX_FALLBACK).',
+        retryPolicy:       { maxAutoRetries: 0, freeRetry: true, fallback: null },
+      }
+    : null
+  return { ...decision, retryPolicy: { maxAutoRetries: 1, freeRetry: true, fallback } }
+}
+
+/** Engine Flux equivalente para o retry (só usado atrás de flag). */
+function fluxFallbackFor(endpoint: EditEndpoint, input: EditRoutingInput): EditEndpoint | null {
+  // Já é Flux (caminho legado) → não há fallback distinto.
+  if (endpoint.startsWith('fal-ai/flux')) return null
+  // Instrução (sem máscara) → Kontext.
+  if (endpoint === 'google/gemini-3.1-flash-image' || endpoint === 'google/gemini-3-pro-image') {
+    return 'fal-ai/flux-pro/kontext'
+  }
+  // Mascarados → fill (remoção) ou inpaint ancorado.
+  return input.tool === 'remove' ? 'fal-ai/flux-pro/v1/fill' : 'fal-ai/flux-kontext-lora/inpaint'
+}
+
+// ── Roteamento LEGADO (Flux) — preservado para rollback via EDIT_GOOGLE_FIRST=0 ──
+
+function decideLegacy(input: EditRoutingInput): RoutingDecision {
   const complexity = classifyPromptComplexity(input.prompt)
   const isComplex = complexity === 'complex'
 
@@ -268,7 +483,9 @@ export function routeEdit(input: EditRoutingInput): EditRoutingResult {
   // (área média = hasMask && !smallMask && !largeMask — é o fall-through do tier 6)
 
   const isFixTool = input.tool === 'remove' || input.tool === 'fix_detail'
-  const isGlobalTool = input.tool === 'lighting' || input.tool === 'landscaping'
+  const isGlobalTool =
+    input.tool === 'lighting' || input.tool === 'landscaping' ||
+    input.tool === 'style' || input.tool === 'variation'
 
   // Referências visuais → preferir editor multi-imagem (nano-banana/gemini).
   const refs = input.references ?? []
@@ -300,7 +517,7 @@ export function routeEdit(input: EditRoutingInput): EditRoutingResult {
     !isComplex
 
   if (freeEligible) {
-    const endpoint = maskedToolEndpoint(input.tool, hasRefs)
+    const endpoint = maskedToolEndpoint(input.tool, refs)
     return {
       endpoint,
       costNodes:         NODE_COST.freeFix,
@@ -338,7 +555,7 @@ export function routeEdit(input: EditRoutingInput): EditRoutingResult {
   // Spacenode + não-4K), mas a cota grátis acabou (já usou nesta imagem ou
   // estourou o teto mensal). Cobra simbólico de 1 node no endpoint barato.
   if (smallMask && isFixTool && input.isGeneratedBySpacenode === true && !is4K) {
-    const endpoint = maskedToolEndpoint(input.tool, hasRefs)
+    const endpoint = maskedToolEndpoint(input.tool, refs)
     return {
       endpoint,
       costNodes:         NODE_COST.quickFix,
@@ -353,7 +570,7 @@ export function routeEdit(input: EditRoutingInput): EditRoutingResult {
   // Máscara pequena, qualquer ferramenta local (material/replace/add e também
   // remove/fix_detail em imagem não-Spacenode ou 4K). Inpaint com crop.
   if (smallMask) {
-    const endpoint = maskedToolEndpoint(input.tool, hasRefs)
+    const endpoint = maskedToolEndpoint(input.tool, refs)
     return {
       endpoint,
       costNodes:         NODE_COST.localized,
@@ -369,7 +586,7 @@ export function routeEdit(input: EditRoutingInput): EditRoutingResult {
   // (maskedToolEndpoint): material/add COM referência → inpaint ANCORADO na
   // máscara; remove → fill; resto → nano-banana. Antes cravava nano-banana e
   // ignorava as referências, então o surface-anchoring não aplicava nesse tier.
-  const mediumEndpoint = maskedToolEndpoint(input.tool, hasRefs)
+  const mediumEndpoint = maskedToolEndpoint(input.tool, refs)
   return {
     endpoint:          mediumEndpoint,
     costNodes:         NODE_COST.medium,
@@ -385,7 +602,7 @@ export function routeEdit(input: EditRoutingInput): EditRoutingResult {
 /** Inpaint barato (por MP) para ferramentas de DETALHE/material pequeno com
  *  máscara (Vertex quando ligado). NÃO usado para remoção — ver maskedToolEndpoint. */
 function quickFixEndpoint(): EditEndpoint {
-  return VERTEX_IMAGEN_ENABLED
+  return vertexImagenEnabled()
     ? 'vertex/imagen-edit'
     : 'fal-ai/flux-kontext-lora/inpaint'
 }
@@ -409,18 +626,25 @@ const REMOVE_FILL_ENDPOINT: EditEndpoint = 'fal-ai/flux-pro/v1/fill'
  * Fill e nano-banana são per-image (cropEligible=false) → mandam a imagem INTEIRA
  * (mais contexto) e o pipeline recompõe pra preservar tudo fora da máscara.
  */
-function maskedToolEndpoint(tool: EditTool, hasReferences: boolean): EditEndpoint {
+function maskedToolEndpoint(tool: EditTool, references: EditReferenceImage[]): EditEndpoint {
   if (tool === 'remove') return REMOVE_FILL_ENDPOINT
-  // material/add COM referência (textura/objeto) → inpaint ANCORADO na máscara.
+  // Só referência de ANCORAGEM (textura de material / objeto) liga o inpaint
+  // ancorado — outras referências (imagem original, estilo, consistência…)
+  // viravam reference_image_url do flux-kontext-lora e o modelo REPRODUZIA a
+  // superfície antiga (achado P1-4 da auditoria).
+  const hasAnchorRef = references.some(
+    r => r.role === 'material_texture' || r.role === 'object_reference',
+  )
+  // material/add COM referência de ancoragem → inpaint ANCORADO na máscara.
   // O nano-banana é solto e aplicava o material em OUTRA superfície parecida; o
   // flux-kontext-lora/inpaint edita SÓ os pixels da máscara (âncora espacial forte)
   // e usa a referência como reference_image_url.
-  if ((tool === 'material' || tool === 'add') && hasReferences) return quickFixEndpoint()
+  if ((tool === 'material' || tool === 'add') && hasAnchorRef) return quickFixEndpoint()
   if (tool === 'material' || tool === 'add') return 'fal-ai/nano-banana/edit'
   // fix_detail COM referência (consistência/restauração entre imagens) → editor
   // multi-imagem; sem referência → inpaint sutil. 'replace' usa a
   // reference_image_url real do flux-kontext-lora, então fica no inpaint.
-  if (tool === 'fix_detail' && hasReferences) return 'fal-ai/nano-banana/edit'
+  if (tool === 'fix_detail' && references.length > 0) return 'fal-ai/nano-banana/edit'
   return quickFixEndpoint()
 }
 
@@ -451,6 +675,13 @@ function cropCap(endpoint: EditEndpoint, input: EditRoutingInput): number | unde
 // Mantêm EditRoutingResult fiel à spec e ainda dão à UI o rótulo do botão e a
 // microcópia da cobrança, derivados do resultado.
 
+/** Endpoints do tier PREMIUM (Gemini 3 Pro Image / Nano Banana Pro). */
+export function isPremiumEditEndpoint(endpoint: EditEndpoint): boolean {
+  return endpoint === 'fal-ai/gemini-3-pro-image-preview/edit'
+    || endpoint === 'fal-ai/nano-banana-pro/edit'
+    || endpoint === 'google/gemini-3-pro-image'
+}
+
 /** Rótulo do botão de gerar. Não expõe endpoint técnico ao usuário. */
 export function editButtonLabel(result: EditRoutingResult): string {
   if (result.isFreeFix) return 'Corrigir grátis'
@@ -458,7 +689,7 @@ export function editButtonLabel(result: EditRoutingResult): string {
   const n = result.costNodes
   const unit = n === 1 ? 'node' : 'nodes'
 
-  if (result.endpoint === 'fal-ai/gemini-3-pro-image-preview/edit') {
+  if (isPremiumEditEndpoint(result.endpoint)) {
     return `Gerar premium — ${n} ${unit}`
   }
   if (n === 1) return `Corrigir — ${n} ${unit}`
@@ -471,7 +702,7 @@ export function editChargeExplanation(result: EditRoutingResult): string {
   if (result.isFreeFix) {
     return 'Pequena correção com máscara. Esta edição será gratuita.'
   }
-  if (result.endpoint === 'fal-ai/gemini-3-pro-image-preview/edit') {
+  if (isPremiumEditEndpoint(result.endpoint)) {
     return 'Edição premium. Modelo de máxima qualidade para prompts complexos.'
   }
   if (result.costNodes >= 4) {

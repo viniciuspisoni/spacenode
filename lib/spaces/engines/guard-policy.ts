@@ -53,6 +53,11 @@ export const GUARD_THRESHOLDS: Record<EditMode, GuardThresholds> = {
 
   // Landscape edits add organic shapes whose edges blend with the surroundings.
   landscape: { ok: 0.05, warning: 0.12, retry: 0.15 },
+
+  // Style/variation are whole-image instruction edits — drift outside a mask is
+  // expected (when a mask exists at all), so thresholds mirror lighting.
+  style:     { ok: 0.15, warning: 0.30, retry: 0.40 },
+  variation: { ok: 0.15, warning: 0.30, retry: 0.40 },
 }
 
 // ── Verdict ───────────────────────────────────────────────────────────────────
@@ -80,6 +85,8 @@ export const MAX_RETRIES_PER_MODE: Record<EditMode, number> = {
   fix:       1,
   lighting:  1,
   landscape: 1,
+  style:     1,
+  variation: 1,
 }
 
 // ── Prompt tightening ────────────────────────────────────────────────────────
@@ -125,6 +132,18 @@ const CONSTRAINT_PREFIX: Record<EditMode, string> = {
     'the painted mask. Do not alter the building, architecture, or any ' +
     'man-made structure outside the mask. New plants should fit the scale, ' +
     'perspective, and lighting of the surrounding context. ',
+
+  style:
+    'STRICT PRESERVATION CONSTRAINT: refine style, finishes and atmosphere ' +
+    'ONLY. Keep the existing geometry, walls, openings, furniture layout, ' +
+    'camera angle, perspective and proportions exactly as they are. Do not ' +
+    'add or remove architectural elements. ',
+
+  variation:
+    'STRICT PRESERVATION CONSTRAINT: produce a controlled variation. Keep the ' +
+    'existing geometry, camera angle, perspective, proportions and layout ' +
+    'exactly as they are. Vary only what was explicitly requested. Do not add ' +
+    'elements that were not requested. ',
 }
 
 export function buildRetryPrompt(originalPrompt: string, mode: EditMode): string {

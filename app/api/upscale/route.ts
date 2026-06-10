@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
   let inputUrl:  string | undefined
 
   try {
-    const { error: debitErr } = await admin.rpc('consume_nodes_v2', {
+    const { error: debitErr } = await admin.rpc('consume_workspace_nodes', {
       user_id_input: user.id,
       amount:        cost,
     })
@@ -169,7 +169,7 @@ export async function POST(req: NextRequest) {
 
     if (debited) {
       try {
-        await admin.rpc('refund_nodes', { user_id_input: user.id, amount: cost })
+        await admin.rpc('refund_workspace_nodes', { user_id_input: user.id, amount: cost })
         console.warn('[upscale] refund executado:', cost, 'nodes →', user.id)
       } catch (refundErr) {
         console.error('[upscale] FALHA NO REFUND (CRÍTICO):', refundErr)

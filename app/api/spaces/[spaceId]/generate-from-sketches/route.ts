@@ -216,7 +216,7 @@ async function generateOne(args: {
 
   try {
     // 1) débito
-    const { error: debitErr } = await admin.rpc('consume_nodes_v2', {
+    const { error: debitErr } = await admin.rpc('consume_workspace_nodes', {
       user_id_input: userId,
       amount:        costPerVista,
     })
@@ -302,7 +302,7 @@ async function generateOne(args: {
   } catch (err) {
     if (debited) {
       try {
-        await admin.rpc('refund_nodes', { user_id_input: userId, amount: costPerVista })
+        await admin.rpc('refund_workspace_nodes', { user_id_input: userId, amount: costPerVista })
       } catch (refundErr) {
         console.error('[spaces.angulo] FALHA NO REFUND:', refundErr)
       }

@@ -158,6 +158,35 @@ export async function samplePointsFromMask(maskBuf: Buffer, maxPoints = 6): Prom
   return picks
 }
 
+/** Subtrai a máscara de OBJETOS da de SUPERFÍCIE (V2): o material não vai em
+ *  tapete/cama/móveis mesmo que o pincel tenha passado por cima. Dilata os objetos
+ *  (blur+threshold baixo) pra matar halo na borda. Devolve {mask, surfaceRatio,
+ *  removedRatio}. Sanidade fica no chamador (se removeu demais -> manter a original). */
+export async function subtractObjectsFromSurface(
+  surfaceBuf: Buffer,
+  objectsBuf: Buffer,
+  dilatePx = 4,
+): Promise<{ mask: Buffer; surfaceRatio: number; removedRatio: number }> {
+  const meta = await sharp(surfaceBuf).metadata()
+  const W = meta.width ?? 0, H = meta.height ?? 0
+  if (!W || !H) return { mask: surfaceBuf, surfaceRatio: 0, removedRatio: 0 }
+  const [surf, objDil] = await Promise.all([
+    sharp(surfaceBuf).resize(W, H, { fit: 'fill' }).greyscale().raw().toBuffer(),
+    // blur + threshold BAIXO = dilata o branco (expande os objetos alguns px).
+    sharp(objectsBuf).resize(W, H, { fit: 'fill' }).greyscale().blur(Math.max(1, dilatePx)).threshold(60).raw().toBuffer(),
+  ])
+  const out = Buffer.alloc(surf.length)
+  let surfC = 0, keptC = 0
+  for (let i = 0; i < surf.length; i++) {
+    const inSurf = surf[i] > 127
+    if (inSurf) surfC++
+    if (inSurf && objDil[i] <= 127) { out[i] = 255; keptC++ } else { out[i] = 0 }
+  }
+  const total = surf.length || 1
+  const mask = await sharp(out, { raw: { width: W, height: H, channels: 1 } }).png().toBuffer()
+  return { mask, surfaceRatio: keptC / total, removedRatio: surfC > 0 ? (surfC - keptC) / surfC : 0 }
+}
+
 export interface SurfaceRefineResult { mask: Buffer; usedFallback: boolean; surfaceRatio: number }
 
 /** Sanitiza a máscara do SAM2 vs o blob: fallback DURO pro blob se o SAM for
@@ -197,6 +226,64 @@ export async function refineSurfaceMask(samMaskBuf: Buffer, blobMaskBuf: Buffer)
   // borda externa → o material não vaza pra parede/rodapé/tapete vizinho.
   const refined = await sharp(samFull).blur(sigma).threshold(145).png().toBuffer()
   return { mask: refined, usedFallback: false, surfaceRatio: samRatio }
+}
+
+/** Fração da área branca do BLOB coberta por uma máscara (0–1). Usado pra escolher
+ *  a superfície semântica (evf floor/wall) que casa com o que o usuário pintou. */
+export async function blobCoverageByMask(maskBuf: Buffer, blobBuf: Buffer): Promise<number> {
+  const meta = await sharp(blobBuf).metadata()
+  const W = meta.width ?? 0, H = meta.height ?? 0
+  if (!W || !H) return 0
+  const S = 256, sc = Math.max(W, H) / S
+  const sw = Math.max(1, Math.round(W / sc)), sh = Math.max(1, Math.round(H / sc))
+  const [m, b] = await Promise.all([
+    sharp(maskBuf).resize(sw, sh, { fit: 'fill' }).greyscale().raw().toBuffer(),
+    sharp(blobBuf).resize(sw, sh, { fit: 'fill' }).greyscale().raw().toBuffer(),
+  ])
+  let blobC = 0, both = 0
+  for (let i = 0; i < b.length; i++) { if (b[i] > 127) { blobC++; if (m[i] > 127) both++ } }
+  return blobC > 0 ? both / blobC : 0
+}
+
+/** União de duas máscaras (branco = qualquer uma). Usada no refinamento por
+ *  cliques ("+ adicionar área"): base ∪ região do SAM. O close final é NEUTRO
+ *  (threshold 128) — só suaviza a emenda entre as regiões, sem erodir (o
+ *  threshold 145 do closeErodeMask re-encolheria a máscara a cada clique). */
+export async function unionMasks(aBuf: Buffer, bBuf: Buffer): Promise<Buffer> {
+  const meta = await sharp(aBuf).metadata()
+  const W = meta.width ?? 0, H = meta.height ?? 0
+  if (!W || !H) return aBuf
+  const [a, b] = await Promise.all([
+    sharp(aBuf).greyscale().raw().toBuffer(),
+    sharp(bBuf).resize(W, H, { fit: 'fill' }).greyscale().raw().toBuffer(),
+  ])
+  const out = Buffer.alloc(a.length)
+  for (let i = 0; i < a.length; i++) out[i] = (a[i] > 127 || b[i] > 127) ? 255 : 0
+  const sigma = Math.max(1, Math.round(Math.min(W, H) * 0.003))
+  return sharp(out, { raw: { width: W, height: H, channels: 1 } })
+    .blur(sigma).threshold(128).png().toBuffer()
+}
+
+/** close (fecha buracos) + erode leve (afasta a borda) numa máscara — pra limpar a
+ *  saída do evf-sam antes de usar como máscara de superfície. */
+export async function closeErodeMask(maskBuf: Buffer): Promise<Buffer> {
+  const meta = await sharp(maskBuf).metadata()
+  const W = meta.width ?? 0, H = meta.height ?? 0
+  if (!W || !H) return maskBuf
+  const sigma = Math.max(1, Math.round(Math.min(W, H) * 0.004))
+  return sharp(maskBuf).resize(W, H, { fit: 'fill' }).greyscale().blur(sigma).threshold(145).png().toBuffer()
+}
+
+/** Fração branca de uma máscara (0–1). */
+export async function maskWhiteRatio(maskBuf: Buffer): Promise<number> {
+  const meta = await sharp(maskBuf).metadata()
+  const W = meta.width ?? 0, H = meta.height ?? 0
+  if (!W || !H) return 0
+  const S = 256, sc = Math.max(W, H) / S
+  const sw = Math.max(1, Math.round(W / sc)), sh = Math.max(1, Math.round(H / sc))
+  const raw = await sharp(maskBuf).resize(sw, sh, { fit: 'fill' }).greyscale().raw().toBuffer()
+  let c = 0; for (let i = 0; i < raw.length; i++) if (raw[i] > 127) c++
+  return raw.length ? c / raw.length : 0
 }
 
 // Para detectar a bbox sem varrer milhões de pixels, reduzimos a máscara para
@@ -427,6 +514,96 @@ export async function measureOutOfMaskDrift(args: {
     ) drift++
   }
   return outside > 0 ? drift / outside : 0
+}
+
+/**
+ * Mede a fração de pixels DENTRO da máscara que mudaram (mesma técnica do
+ * drift, condição invertida). Detecta o "no-op": o provider devolveu a imagem
+ * ~idêntica (ou aplicou a edição FORA da área e o recompose descartou) — nesse
+ * caso o usuário não deve ser cobrado (achado P1-6 da auditoria).
+ */
+export async function measureInMaskChange(args: {
+  originalBuffer: Buffer
+  resultBuffer:   Buffer
+  maskBuffer:     Buffer
+}): Promise<number> {
+  const { originalBuffer, resultBuffer, maskBuffer } = args
+  const meta = await sharp(originalBuffer).metadata()
+  const W = meta.width ?? 0
+  const H = meta.height ?? 0
+  if (W === 0 || H === 0) return 0
+
+  const scale = Math.min(1, 512 / Math.max(W, H))
+  const w = Math.max(1, Math.round(W * scale))
+  const h = Math.max(1, Math.round(H * scale))
+
+  const [o, r, m] = await Promise.all([
+    sharp(originalBuffer).resize(w, h, { fit: 'fill' }).removeAlpha().raw().toBuffer(),
+    sharp(resultBuffer).resize(w, h, { fit: 'fill' }).removeAlpha().raw().toBuffer(),
+    sharp(maskBuffer).resize(w, h, { fit: 'fill' }).greyscale().raw().toBuffer(),
+  ])
+
+  const THRESHOLD = 12
+  let inside = 0
+  let changed = 0
+  for (let p = 0; p < m.length; p++) {
+    if (m[p] <= 127) continue // fora da máscara
+    inside++
+    const i = p * 3
+    if (
+      Math.abs(o[i]     - r[i])     > THRESHOLD ||
+      Math.abs(o[i + 1] - r[i + 1]) > THRESHOLD ||
+      Math.abs(o[i + 2] - r[i + 2]) > THRESHOLD
+    ) changed++
+  }
+  return inside > 0 ? changed / inside : 0
+}
+
+/**
+ * Dilatação LEVE da máscara (blur + threshold baixo = expande o branco).
+ * Usada na REMOÇÃO: cobre a borda do objeto e a sombra rente, que o pincel
+ * normalmente não pega — o provider reconstrói a área toda e o recompose usa a
+ * máscara dilatada (a reconstrução entra inteira no resultado).
+ */
+export async function dilateMask(maskBuf: Buffer, ratio = 0.006): Promise<Buffer> {
+  const meta = await sharp(maskBuf).metadata()
+  const W = meta.width ?? 0
+  const H = meta.height ?? 0
+  if (!W || !H) return maskBuf
+  const sigma = Math.max(1, Math.round(Math.min(W, H) * ratio))
+  // blur espalha o branco; threshold BAIXO mantém a borda espalhada como branco.
+  return sharp(maskBuf).greyscale().blur(sigma).threshold(60).png().toBuffer()
+}
+
+/** Tolerância de divergência de PROPORÇÃO entre máscara e imagem (3%). Dimensões
+ *  diferentes com a MESMA proporção são normais (downscale) e são normalizadas;
+ *  proporção diferente = máscara de OUTRA imagem → erro claro, sem cobrança. */
+const MASK_ASPECT_TOLERANCE = 0.03
+
+export class MaskImageMismatchError extends Error {
+  readonly isMaskMismatch = true
+  constructor(detail: string) {
+    super(`mask_image_mismatch: ${detail}`)
+    this.name = 'MaskImageMismatchError'
+  }
+}
+
+/** Valida a compatibilidade máscara×imagem ANTES de editar (spec: "validar se a
+ *  máscara tem a mesma dimensão da imagem-base antes de enviar"). */
+export async function assertMaskMatchesImage(maskBuf: Buffer, imageBuf: Buffer): Promise<void> {
+  const [mm, im] = await Promise.all([sharp(maskBuf).metadata(), sharp(imageBuf).metadata()])
+  const mw = mm.width ?? 0, mh = mm.height ?? 0
+  const iw = im.width ?? 0, ih = im.height ?? 0
+  if (!mw || !mh || !iw || !ih) throw new MaskImageMismatchError('dimensões ilegíveis')
+  const maskAspect = mw / mh
+  const imageAspect = iw / ih
+  const diff = Math.abs(maskAspect - imageAspect) / imageAspect
+  if (diff > MASK_ASPECT_TOLERANCE) {
+    throw new MaskImageMismatchError(
+      `máscara ${mw}x${mh} (aspecto ${maskAspect.toFixed(3)}) não corresponde à imagem ` +
+      `${iw}x${ih} (aspecto ${imageAspect.toFixed(3)})`,
+    )
+  }
 }
 
 function clampInt(v: number, lo: number, hi: number): number {

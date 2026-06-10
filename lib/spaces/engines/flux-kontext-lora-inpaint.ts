@@ -35,12 +35,18 @@ interface FalInpaintOutput {
 export const callFluxKontextLoraInpaint: RetouchEngine = async (
   input: RetouchInput,
 ): Promise<RetouchOutput> => {
+  // Referência de ANCORAGEM selecionada por PAPEL (textura/objeto) — não mais
+  // references[0] cego: anexar só "imagem original"/"estilo" fazia o modelo
+  // REPRODUZIR a superfície antiga (achado P1-4 da auditoria).
+  const anchorRef = (input.references ?? []).find(
+    r => r.role === 'material_texture' || r.role === 'object_reference',
+  )
   const falInput: Record<string, unknown> = {
     image_url:           input.imageUrl,
     mask_url:            input.maskUrl,
-    // Obrigatório no schema. Usa a referência anexada (1ª) ou a do 'replace';
+    // Obrigatório no schema. Usa a referência de ancoragem ou a do 'replace';
     // senão a própria imagem (auto-referência preserva estilo/contexto).
-    reference_image_url: input.references?.[0]?.url ?? input.referenceUrl ?? input.imageUrl,
+    reference_image_url: anchorRef?.url ?? input.referenceUrl ?? input.imageUrl,
     prompt:              input.prompt,
     num_images:          1,
     num_inference_steps: 30,

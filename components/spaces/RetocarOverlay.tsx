@@ -9,7 +9,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { RetocarCanvas, type RetocarCanvasHandle, BRUSH_MIN, BRUSH_MAX } from './RetocarCanvas'
-import { RetocarModeTabs } from './RetocarModeTabs'
+import { EditIntentPicker, ActiveIntentChip } from './EditIntentPicker'
+import { EDIT_INTENTS, type EditIntent, type EditIntentMeta } from '@/lib/spaces/edit-intents'
 import { LARGE_MASK_THRESHOLD } from '@/lib/spaces/edit-economy'
 import type { Quality, Space, Vista, ProjectDNA, EditSourceType } from '@/lib/spaces/types'
 import { EDIT_MODE_LABELS, type EditMode } from '@/lib/spaces/engines'
@@ -17,6 +18,7 @@ import { MAX_EDIT_REFERENCES, SURFACE_SEGMENTATION_ENABLED, type EditReferenceIm
 import { ReferencesPanel, suggestPromptForRole, downscaleImageForUpload, type RefMenuKind } from './RetocarReferences'
 import { ReferenceFocusModal, type NormCrop } from './ReferenceFocusModal'
 import { RetocarImportModal } from './RetocarImportModal'
+import { SurfaceSelectModal, SurfaceSelectionBar, type SurfaceSelection } from './SurfaceSelectModal'
 
 // Debug: mostra a imagem REJEITADA pelo quality gate (sem salvar) pra julgar se
 // foi catastrófica ou um resultado aceitável. Só dev/staging.
@@ -39,7 +41,8 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
   const [coverage, setCoverage]     = useState(0)
   const [prompt, setPrompt]         = useState('')
   const [quality, setQuality]       = useState<Quality>(vista.quality)
-  // Edit intention. Same contract as RetocarStandaloneFlow.
+  // Intenção-primeiro: o usuário escolhe o tipo de edição antes do prompt.
+  const [intent, setIntent]         = useState<EditIntent | null>(null)
   const [mode, setMode]             = useState<EditMode>('material')
   const [submitting, setSubmitting] = useState(false)
   const [validating, setValidating] = useState(false)
@@ -49,15 +52,18 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
   const [resultVistaId, setResultVistaId] = useState<string | null>(null)
   const [driftWarning, setDriftWarning] = useState<number | null>(null)
   const [stage, setStage]           = useState<'editing' | 'result'>('editing')
-  // editRouter v1: pricing/preview + premium + referências (paridade com standalone).
-  const [premium, setPremium]           = useState(false)
-  const [routePreview, setRoutePreview] = useState<{ costNodes: number; isFreeFix: boolean; label: string; explanation: string } | null>(null)
+  // editRouter: pricing/preview dos DOIS botões (rápida/premium) + referências.
+  const [routePreview, setRoutePreview]     = useState<{ costNodes: number; isFreeFix: boolean; label: string; explanation: string } | null>(null)
+  const [premiumPreview, setPremiumPreview] = useState<{ costNodes: number; isFreeFix: boolean; label: string; explanation: string } | null>(null)
   const [qualityGate, setQualityGate]   = useState<{ message: string; resultUrl?: string; drift?: number } | null>(null)
   // Camada de SUPERFÍCIE (Fase 1): confirmação antes de aplicar na superfície inteira.
   const [segmenting, setSegmenting]     = useState(false)
   const [segConfirm, setSegConfirm]     = useState<
-    { previewUrl: string; surfaceMaskUrl: string; blobMaskUrl: string; surfaceCoverage: number; blobCoverage: number; surfaceCost: number } | null
+    { previewUrl: string; surfaceMaskUrl: string; blobMaskUrl: string; surfaceCoverage: number; blobCoverage: number; surfaceCost: number; premiumSel: boolean } | null
   >(null)
+  // Camada de SUPERFÍCIE V2 (clique-primeiro): seleção ativa + modal.
+  const [surfaceSel, setSurfaceSel]       = useState<SurfaceSelection | null>(null)
+  const [surfacePicker, setSurfacePicker] = useState<{ initial: SurfaceSelection | null } | null>(null)
   const [references, setReferences]     = useState<EditReferenceImage[]>([])
   const [refPicker, setRefPicker]       = useState<{ role: EditReferenceRole } | null>(null)
   const [refFocus, setRefFocus]         = useState<
@@ -66,12 +72,32 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
   const pendingUploadRoleRef            = useRef<EditReferenceRole | null>(null)
   const refFileInputRef                 = useRef<HTMLInputElement | null>(null)
 
-  const cost        = routePreview?.costNodes ?? 0
+  const cost         = routePreview?.costNodes ?? 0
   const balanceShort = !routePreview?.isFreeFix && balance < cost
+  const premiumShort = balance < (premiumPreview?.costNodes ?? 0)
   const largeMask    = coverage > LARGE_MASK_THRESHOLD
-  const modeMeta    = EDIT_MODE_LABELS[mode]
-  const isRemove    = mode === 'remove'
-  const disabledBtn = coverage === 0 || balanceShort || submitting || (!isRemove && !prompt.trim())
+  const modeMeta     = EDIT_MODE_LABELS[mode]
+  const isRemove     = mode === 'remove'
+  const intentMeta: EditIntentMeta | null = intent ? EDIT_INTENTS[intent] : null
+  const maskRequired = intentMeta ? intentMeta.maskRequirement === 'required' : true
+  const hasSelection = coverage > 0 || !!surfaceSel
+  const disabledBtn  = (maskRequired && !hasSelection) || balanceShort || submitting || (!isRemove && !prompt.trim())
+  const disabledPremium = (maskRequired && !hasSelection) || premiumShort || submitting || (!isRemove && !prompt.trim())
+  const showSurfaceBar = intent === 'swap_material' && SURFACE_SEGMENTATION_ENABLED
+
+  function pickIntent(i: EditIntent) {
+    setIntent(i)
+    setMode(EDIT_INTENTS[i].mode)
+    setError(null)
+    setQualityGate(null)
+    setRoutePreview(null)
+    setPremiumPreview(null)
+    setSurfaceSel(null)
+    // Trocar material abre CLIQUE-primeiro (pincel continua como fallback).
+    if (i === 'swap_material' && SURFACE_SEGMENTATION_ENABLED) {
+      setSurfacePicker({ initial: null })
+    }
+  }
 
   // Papel "principal" da ferramenta atual (o engine consome references[0]); a
   // ordenação garante que a textura/objeto certo vá pra frente (item 4).
@@ -86,46 +112,58 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
     return ordered.map(r => ({ url: r.url, role: r.role, source: r.source, note: r.note }))
   }
 
-  // Preview de rota/custo (editRouter) — debounced. Source = a vista editada.
+  // Preview de rota/custo (editRouter) — debounced, DOIS preços (rápida e
+  // premium). Source = a vista editada. Sem máscara, só quando a intenção
+  // permite edição da imagem inteira.
+  const effectiveCoverage = surfaceSel ? surfaceSel.coverage : coverage
   useEffect(() => {
-    if (stage !== 'editing') return
+    if (stage !== 'editing' || !intent) return
+    const allowNoMask = EDIT_INTENTS[intent].maskRequirement !== 'required'
     const handle = setTimeout(async () => {
-      if (coverage <= 0) { setRoutePreview(null); return }
-      try {
-        const res = await fetch('/api/edits/preview', {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({
-            has_mask:      true,
-            mask_coverage: coverage,
-            prompt:        mode === 'remove' ? '' : prompt.trim(),
-            quality,
-            source_type:   'vista',
-            source_id:     vista.id,
-            mode,
-            premium,
-            references:    references.map(r => ({ url: r.url, role: r.role, source: r.source, note: r.note })),
-          }),
-        })
-        if (!res.ok) return
-        const d = await res.json()
-        setRoutePreview({ costNodes: d.cost_nodes ?? 0, isFreeFix: !!d.is_free_fix, label: d.label ?? '', explanation: d.explanation ?? '' })
-      } catch { /* best-effort */ }
+      const hasMask = effectiveCoverage > 0
+      if (!hasMask && !allowNoMask) { setRoutePreview(null); setPremiumPreview(null); return }
+      const fetchOne = async (premiumFlag: boolean) => {
+        try {
+          const res = await fetch('/api/edits/preview', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({
+              has_mask:      hasMask,
+              mask_coverage: hasMask ? effectiveCoverage : 0,
+              prompt:        mode === 'remove' ? '' : prompt.trim(),
+              quality,
+              source_type:   'vista',
+              source_id:     vista.id,
+              mode,
+              premium:       premiumFlag,
+              references:    references.map(r => ({ url: r.url, role: r.role, source: r.source, note: r.note })),
+            }),
+          })
+          if (!res.ok) return null
+          const d = await res.json()
+          return { costNodes: d.cost_nodes ?? 0, isFreeFix: !!d.is_free_fix, label: d.label ?? '', explanation: d.explanation ?? '' }
+        } catch { return null /* best-effort */ }
+      }
+      const [quick, prem] = await Promise.all([fetchOne(false), fetchOne(true)])
+      if (quick) setRoutePreview(quick)
+      if (prem)  setPremiumPreview(prem)
     }, 350)
     return () => clearTimeout(handle)
-  }, [stage, coverage, prompt, quality, mode, premium, references, vista.id])
+  }, [stage, intent, effectiveCoverage, prompt, quality, mode, references, vista.id])
 
-  async function handleGenerate() {
-    if (!canvasRef.current?.hasMask()) {
-      setError('Pinte a área que quer editar antes de gerar.')
+  async function handleGenerate(premiumSel: boolean) {
+    const hasMaskPainted = !!canvasRef.current?.hasMask()
+    if (maskRequired && !hasMaskPainted && !surfaceSel) {
+      setError('Selecione a superfície (1 clique) ou pinte a área que quer editar.')
       return
     }
     if (!isRemove && !prompt.trim()) {
       setError('Descreva o que você quer nessa área antes de gerar.')
       return
     }
-    if (balanceShort) {
-      setError(`Saldo insuficiente. Necessários ${cost} nodes.`)
+    const requiredNodes = premiumSel ? (premiumPreview?.costNodes ?? 0) : cost
+    if (premiumSel ? premiumShort : balanceShort) {
+      setError(`Saldo insuficiente. Necessários ${requiredNodes} nodes.`)
       return
     }
     setError(null)
@@ -134,13 +172,27 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
     setSegConfirm(null)
     setSubmitting(true)
 
+    // Seleção de SUPERFÍCIE por clique ativa → a máscara JÁ é a superfície.
+    if (surfaceSel) {
+      await runGenerate(surfaceSel.maskUrl, surfaceSel.coverage, true, premiumSel)
+      return
+    }
+
+    // Intenções sem máscara obrigatória e nada pintado → edição da imagem inteira.
+    if (!hasMaskPainted) {
+      await runGenerate(null, 0, false, premiumSel)
+      return
+    }
+
     // 1) Upload do blob pintado.
     let blobMaskUrl: string
     let maskCoverage: number
     try {
-      const blob = await canvasRef.current.getMaskBlob()
+      const canvas = canvasRef.current
+      if (!canvas) throw new Error('Canvas indisponível')
+      const blob = await canvas.getMaskBlob()
       if (!blob) throw new Error('Falha ao gerar máscara')
-      maskCoverage = canvasRef.current.getMaskCoverage()
+      maskCoverage = canvas.getMaskCoverage()
       const fd = new FormData()
       fd.append('file', new File([blob], 'mask.png', { type: 'image/png' }))
       fd.append('kind', 'mask')
@@ -168,18 +220,18 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
           const seg = await segRes.json()
           const extended = !seg.used_fallback && seg.surface_coverage > maskCoverage * 1.15
           if (extended) {
-            let surfaceCost = cost
+            let surfaceCost = premiumSel ? (premiumPreview?.costNodes ?? cost) : cost
             try {
               const pv = await fetch('/api/edits/preview', {
                 method:  'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body:    JSON.stringify({ has_mask: true, mask_coverage: seg.surface_coverage, prompt: prompt.trim(), quality, source_type: 'vista', source_id: vista.id, mode, premium, references: payloadReferences() }),
+                body:    JSON.stringify({ has_mask: true, mask_coverage: seg.surface_coverage, prompt: prompt.trim(), quality, source_type: 'vista', source_id: vista.id, mode, premium: premiumSel, references: payloadReferences() }),
               })
-              if (pv.ok) { const d = await pv.json(); surfaceCost = d.cost_nodes ?? cost }
+              if (pv.ok) { const d = await pv.json(); surfaceCost = d.cost_nodes ?? surfaceCost }
             } catch { /* mantém o custo atual */ }
             setSegmenting(false)
             setSubmitting(false)
-            setSegConfirm({ previewUrl: seg.preview_url, surfaceMaskUrl: seg.surface_mask_url, blobMaskUrl, surfaceCoverage: seg.surface_coverage, blobCoverage: maskCoverage, surfaceCost })
+            setSegConfirm({ previewUrl: seg.preview_url, surfaceMaskUrl: seg.surface_mask_url, blobMaskUrl, surfaceCoverage: seg.surface_coverage, blobCoverage: maskCoverage, surfaceCost, premiumSel })
             return
           }
         }
@@ -188,23 +240,25 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
     }
 
     // 3) Sem segmentação (ou não estendeu) → gera com o blob pintado.
-    await runGenerate(blobMaskUrl, maskCoverage)
+    await runGenerate(blobMaskUrl, maskCoverage, false, premiumSel)
   }
 
-  // Geração com a máscara escolhida (blob pintado OU superfície segmentada).
-  async function runGenerate(maskUrl: string, maskCoverage: number, fromSurface = false) {
+  // Geração com a máscara escolhida (blob pintado, superfície segmentada, ou
+  // NENHUMA — edição conversacional da vista inteira).
+  async function runGenerate(maskUrl: string | null, maskCoverage: number, fromSurface = false, premiumSel = false) {
     setSubmitting(true)
     try {
       const res = await fetch(`/api/spaces/${space.id}/vistas/${vista.id}/edit`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({
-          mask_url:      maskUrl,
+          mask_url:      maskUrl ?? undefined,
           prompt:        isRemove ? '' : prompt.trim(),
           quality,
           mask_coverage: maskCoverage,
           mode,
-          premium,
+          edit_intent:   intent,
+          premium:       premiumSel,
           references:    payloadReferences(),
         }),
       })
@@ -222,8 +276,8 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
       setResultVistaId(newVista.id)
       // Quando a SUPERFÍCIE (segmentação) foi usada, a edição estende ALÉM do que
       // o usuário pintou — então validar contra o blob pintado acusaria drift
-      // falso-positivo. Só valida quando foi o blob.
-      if (!fromSurface) {
+      // falso-positivo. Só valida quando foi o blob (e existe máscara).
+      if (!fromSurface && maskUrl) {
         setValidating(true)
         try {
           const v = await canvasRef.current?.validateOutsideMaskPreservation(newVista.image_url)
@@ -242,15 +296,15 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
 
   function confirmSurface() {
     if (!segConfirm) return
-    const { surfaceMaskUrl, surfaceCoverage } = segConfirm
+    const { surfaceMaskUrl, surfaceCoverage, premiumSel } = segConfirm
     setSegConfirm(null)
-    void runGenerate(surfaceMaskUrl, surfaceCoverage, true)
+    void runGenerate(surfaceMaskUrl, surfaceCoverage, true, premiumSel)
   }
   function useBlobOnly() {
     if (!segConfirm) return
-    const { blobMaskUrl, blobCoverage } = segConfirm
+    const { blobMaskUrl, blobCoverage, premiumSel } = segConfirm
     setSegConfirm(null)
-    void runGenerate(blobMaskUrl, blobCoverage)
+    void runGenerate(blobMaskUrl, blobCoverage, false, premiumSel)
   }
 
   function acceptAsVersion() {
@@ -401,7 +455,21 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
       }}>
         {/* Canvas + prompt */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minHeight: 0 }}>
-          {stage === 'editing' && vista.image_url && (
+          {stage === 'editing' && !intent && (
+            <div style={{ overflowY: 'auto', paddingRight: 4 }}>
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 15, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.015em', marginBottom: 4 }}>
+                  O que você quer fazer nesta vista?
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>
+                  Escolha o tipo de edição — a interface se adapta ao que você precisa.
+                </div>
+              </div>
+              <EditIntentPicker onPick={pickIntent} compact />
+            </div>
+          )}
+
+          {stage === 'editing' && intent && intentMeta && vista.image_url && (
             <>
               <div style={{ flex: 1, minHeight: 0 }}>
                 <RetocarCanvas
@@ -419,13 +487,24 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
                 borderRadius: 12, padding: 14,
                 display: 'flex', flexDirection: 'column', gap: 10,
               }}>
-                <RetocarModeTabs mode={mode} onModeChange={setMode} disabled={submitting} />
+                <ActiveIntentChip intent={intent} onChange={() => { setIntent(null); setQualityGate(null); setError(null) }} disabled={submitting} />
 
                 <div style={{
                   fontSize: 11, color: 'var(--color-text-tertiary)', letterSpacing: '-0.005em',
+                  lineHeight: 1.5,
                 }}>
-                  {modeMeta.description}
+                  {intentMeta.helper}
                 </div>
+
+                {/* Trocar material: seleção de superfície por CLIQUE (pincel = fallback). */}
+                {showSurfaceBar && (
+                  <SurfaceSelectionBar
+                    selection={surfaceSel}
+                    onOpen={() => setSurfacePicker({ initial: surfaceSel })}
+                    onClear={() => setSurfaceSel(null)}
+                    disabled={submitting}
+                  />
+                )}
 
                 {(mode === 'material' || mode === 'replace' || mode === 'add') && (
                   <div style={{
@@ -494,8 +573,8 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
                     <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
                       <button type="button" onClick={() => setQualityGate(null)} className="spn-action spn-action--ghost"
                         style={{ width: 'auto', padding: '6px 12px', fontSize: 11 }}>Tentar novamente</button>
-                      <button type="button" onClick={() => { setPremium(true); setQualityGate(null) }} className="spn-action spn-action--ghost"
-                        style={{ width: 'auto', padding: '6px 12px', fontSize: 11 }}>Tentar modo avançado</button>
+                      <button type="button" onClick={() => { setQualityGate(null); void handleGenerate(true) }} className="spn-action spn-action--ghost"
+                        style={{ width: 'auto', padding: '6px 12px', fontSize: 11 }}>Tentar com edição premium</button>
                     </div>
                   </div>
                 )}
@@ -504,27 +583,49 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
                   gap: 10, flexWrap: 'wrap',
                 }}>
                   <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
-                    {coverage > 0 ? <>área: {(coverage * 100).toFixed(1)}%</> : 'pinte a área a editar'}
-                    {largeMask && <span style={{ color: '#e0a766', marginLeft: 10 }}>⚠ área grande</span>}
+                    {surfaceSel
+                      ? <>superfície: {(surfaceSel.coverage * 100).toFixed(1)}%</>
+                      : coverage > 0
+                        ? <>área: {(coverage * 100).toFixed(1)}%</>
+                        : (maskRequired
+                            ? (showSurfaceBar ? 'selecione a superfície ou pinte' : 'pinte a área a editar')
+                            : 'sem seleção = vista inteira')}
+                    {largeMask && !surfaceSel && <span style={{ color: '#e0a766', marginLeft: 10 }}>⚠ área grande</span>}
                   </div>
-                  <button
-                    onClick={handleGenerate}
-                    disabled={disabledBtn}
-                    className="spn-action"
-                    style={{
-                      width: 'auto', minWidth: 200, padding: '11px 22px',
-                      background: '#1D9E75', color: '#042818',
-                      border: '0.5px solid rgba(0,0,0,0.18)',
-                      opacity: disabledBtn ? 0.5 : 1,
-                      boxShadow: !disabledBtn
-                        ? 'inset 0 1px 0 rgba(255,255,255,0.18), 0 8px 24px rgba(29,158,117,0.18)'
-                        : 'none',
-                    }}
-                  >
-                    {submitting
-                      ? (segmenting ? 'Detectando superfície…' : validating ? 'Validando…' : 'Editando…')
-                      : (routePreview?.label ?? `${modeMeta.label} →`)}
-                  </button>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button
+                      onClick={() => handleGenerate(true)}
+                      disabled={disabledPremium}
+                      className="spn-action spn-action--ghost"
+                      title="Modelo de máxima qualidade para pedidos complexos."
+                      style={{
+                        width: 'auto', padding: '11px 16px', fontSize: 12,
+                        opacity: disabledPremium ? 0.5 : 1,
+                      }}
+                    >
+                      {premiumPreview ? `✦ Premium — ${premiumPreview.costNodes} nodes` : '✦ Premium'}
+                    </button>
+                    <button
+                      onClick={() => handleGenerate(false)}
+                      disabled={disabledBtn}
+                      className="spn-action"
+                      style={{
+                        width: 'auto', minWidth: 180, padding: '11px 22px',
+                        background: '#1D9E75', color: '#042818',
+                        border: '0.5px solid rgba(0,0,0,0.18)',
+                        opacity: disabledBtn ? 0.5 : 1,
+                        boxShadow: !disabledBtn
+                          ? 'inset 0 1px 0 rgba(255,255,255,0.18), 0 8px 24px rgba(29,158,117,0.18)'
+                          : 'none',
+                      }}
+                    >
+                      {submitting
+                        ? (segmenting ? 'Detectando superfície…' : validating ? 'Validando…' : 'Editando…')
+                        : (routePreview
+                            ? (routePreview.isFreeFix ? routePreview.label : `Edição rápida — ${routePreview.costNodes} ${routePreview.costNodes === 1 ? 'node' : 'nodes'}`)
+                            : `${modeMeta.label} →`)}
+                    </button>
+                  </div>
                 </div>
               </div>
             </>
@@ -553,7 +654,7 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
         }}>
           <PanelLabel>Ferramentas</PanelLabel>
 
-          {stage === 'editing' && (
+          {stage === 'editing' && intent && (
             <>
               <div>
                 <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 6, display: 'flex', justifyContent: 'space-between' }}>
@@ -596,29 +697,6 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
                     )
                   })}
                 </div>
-              </div>
-
-              {/* Modo premium */}
-              <div style={{ borderTop: '0.5px solid var(--color-border)', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <PanelLabel>Qualidade premium</PanelLabel>
-                <button
-                  type="button"
-                  onClick={() => setPremium(!premium)}
-                  disabled={submitting}
-                  style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '8px 11px', borderRadius: 8,
-                    background: premium ? 'rgba(29,158,117,0.12)' : 'var(--color-surface)',
-                    border: premium ? '0.5px solid rgba(29,158,117,0.5)' : '0.5px solid var(--color-border-strong)',
-                    color: 'var(--color-text-primary)', fontSize: 11.5, fontFamily: 'inherit',
-                    cursor: submitting ? 'not-allowed' : 'pointer',
-                  }}
-                >
-                  <span>Modelo premium</span>
-                  <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.06em', color: premium ? '#1D9E75' : 'var(--color-text-quaternary)' }}>
-                    {premium ? 'ATIVADO' : 'DESATIVADO'}
-                  </span>
-                </button>
               </div>
 
               {/* Referências da edição */}
@@ -761,6 +839,16 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
                 style={{ flex: 1, minWidth: 220, width: 'auto', padding: '11px 18px', background: '#1D9E75', color: '#042818', border: '0.5px solid rgba(0,0,0,0.18)' }}>
                 Aplicar na superfície — {segConfirm.surfaceCost} nodes
               </button>
+              <button type="button"
+                onClick={() => {
+                  // Refina a detecção por cliques em vez de aceitar/recusar.
+                  setSurfacePicker({ initial: { maskUrl: segConfirm.surfaceMaskUrl, previewUrl: segConfirm.previewUrl, coverage: segConfirm.surfaceCoverage } })
+                  setSegConfirm(null)
+                }}
+                className="spn-action spn-action--ghost"
+                style={{ width: 'auto', padding: '11px 16px', fontSize: 12 }}>
+                Refinar seleção
+              </button>
               <button type="button" onClick={useBlobOnly} className="spn-action spn-action--ghost"
                 style={{ width: 'auto', padding: '11px 16px', fontSize: 12 }}>
                 Usar só o que pintei
@@ -772,6 +860,17 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Seleção de SUPERFÍCIE por clique (V2 — clique-primeiro no Trocar material) */}
+      {surfacePicker && vista.image_url && (
+        <SurfaceSelectModal
+          imageUrl={vista.image_url}
+          initial={surfacePicker.initial}
+          onConfirm={sel => { setSurfaceSel(sel); setSurfacePicker(null) }}
+          onUseBrush={() => setSurfacePicker(null)}
+          onClose={() => setSurfacePicker(null)}
+        />
       )}
     </div>
   )

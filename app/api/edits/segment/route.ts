@@ -1,10 +1,19 @@
-// POST /api/edits/segment — Camada de SUPERFÍCIE (Fase 1, atrás de flag).
+// POST /api/edits/segment — Camada de SUPERFÍCIE (atrás de flag).
 //
-// Recebe a imagem-fonte + o blob pintado e usa o SAM2 (fal-ai/sam2/image) pra
-// segmentar a SUPERFÍCIE inteira (piso/parede), refinando com fallback DURO pro
-// blob quando o SAM falha. Devolve a máscara da superfície (pra usar como
-// mask_url no generate, SE o usuário confirmar) + um overlay de preview. NÃO gera
-// edição — só prepara a máscara. Gated por SURFACE_SEGMENTATION_ENABLED.
+// QUATRO modos (todos devolvem máscara de superfície + preview verde; NÃO geram
+// edição — só preparam a máscara). Gated por SURFACE_SEGMENTATION_ENABLED.
+//
+//   1. SEMÂNTICO  { image_url, semantic: 'floor'|'wall' }
+//      Atalhos "Piso"/"Parede" do seletor por clique — evf-sam por texto
+//      (já exclui objetos por cima: tapete, cama, móveis).
+//   2. CLIQUE     { image_url, points: [{x,y}] }   (coords em px da imagem)
+//      Clique direto na superfície — SAM2 com point prompt.
+//   3. REFINO     { image_url, base_mask_url, points: [{x,y}], op: 'add'|'subtract' }
+//      "+ adicionar área" / "− remover área" sobre a seleção atual: SAM2 segmenta
+//      a região do clique e ela é UNIDA à base ou SUBTRAÍDA dela.
+//   4. BLOB       { image_url, mask_url }  (legado — pincel)
+//      O blob pintado vira seeds; tenta a superfície semântica que melhor cobre
+//      o blob e cai pro SAM2 com fallback duro pro próprio blob.
 
 import { NextRequest, NextResponse } from 'next/server'
 import sharp from 'sharp'
@@ -12,19 +21,45 @@ import { fal } from '@fal-ai/client'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { SURFACE_SEGMENTATION_ENABLED } from '@/lib/spaces/edit-router'
-import { callSam2Segment } from '@/lib/spaces/engines'
+import { callSam2Segment, callEvfSam } from '@/lib/spaces/engines'
 import {
   fetchImageBuffer,
   normalizeMaskToImage,
   samplePointsFromMask,
   refineSurfaceMask,
+  blobCoverageByMask,
+  closeErodeMask,
+  unionMasks,
+  subtractObjectsFromSurface,
+  maskWhiteRatio,
 } from '@/lib/spaces/edit-crop'
 import { uploadEditAsset } from '@/lib/spaces/edit-route-helpers'
 
 fal.config({ credentials: process.env.FAL_KEY })
 export const runtime = 'nodejs'
 
-interface Body { image_url?: unknown; mask_url?: unknown }
+interface Body {
+  image_url?:     unknown
+  mask_url?:      unknown
+  semantic?:      unknown
+  points?:        unknown
+  base_mask_url?: unknown
+  op?:            unknown
+}
+
+interface ClickPoint { x: number; y: number }
+
+function parsePoints(raw: unknown): ClickPoint[] {
+  if (!Array.isArray(raw)) return []
+  const out: ClickPoint[] = []
+  for (const item of raw.slice(0, 12)) {
+    const p = item as { x?: unknown; y?: unknown }
+    if (typeof p.x === 'number' && typeof p.y === 'number' && Number.isFinite(p.x) && Number.isFinite(p.y)) {
+      out.push({ x: Math.max(0, Math.round(p.x)), y: Math.max(0, Math.round(p.y)) })
+    }
+  }
+  return out
+}
 
 export async function POST(req: NextRequest) {
   if (!SURFACE_SEGMENTATION_ENABLED) {
@@ -35,29 +70,95 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
   const body = await req.json().catch(() => null) as Body | null
-  const imageUrl = typeof body?.image_url === 'string' ? body.image_url : null
-  const maskUrl  = typeof body?.mask_url === 'string'  ? body.mask_url  : null
-  if (!imageUrl || !maskUrl) {
-    return NextResponse.json({ error: 'image_url e mask_url obrigatórios' }, { status: 400 })
+  const imageUrl    = typeof body?.image_url === 'string' ? body.image_url : null
+  const maskUrl     = typeof body?.mask_url === 'string'  ? body.mask_url  : null
+  const semantic    = body?.semantic === 'floor' || body?.semantic === 'wall' ? body.semantic : null
+  const baseMaskUrl = typeof body?.base_mask_url === 'string' ? body.base_mask_url : null
+  const op          = body?.op === 'add' || body?.op === 'subtract' ? body.op : null
+  const clickPoints = parsePoints(body?.points)
+
+  if (!imageUrl || (!maskUrl && !semantic && clickPoints.length === 0)) {
+    return NextResponse.json(
+      { error: 'image_url + (mask_url | semantic | points) obrigatórios' },
+      { status: 400 },
+    )
   }
 
   const admin = createAdminClient()
   try {
-    const [imgBuf, blobRaw] = await Promise.all([fetchImageBuffer(imageUrl), fetchImageBuffer(maskUrl)])
-    const blobBuf = await normalizeMaskToImage(blobRaw, imgBuf)
+    const imgBuf = await fetchImageBuffer(imageUrl)
 
-    const points = await samplePointsFromMask(blobBuf)
-    if (points.length === 0) {
-      return NextResponse.json({ error: 'Máscara vazia' }, { status: 400 })
+    let mask: Buffer
+    let usedFallback = false
+    let source = 'sam'
+    let pointCount = clickPoints.length
+
+    if (semantic) {
+      // ── 1) SEMÂNTICO: "Piso" / "Parede" em um clique. ──
+      const r = await callEvfSam({ imageUrl, prompt: semantic })
+      const buf = await normalizeMaskToImage(await fetchImageBuffer(r.maskUrl), imgBuf)
+      mask = await closeErodeMask(buf)
+      source = `evf:${semantic}`
+    } else if (baseMaskUrl && op && clickPoints.length > 0) {
+      // ── 3) REFINO: adiciona/remove a região clicada da seleção atual. ──
+      const base = await normalizeMaskToImage(await fetchImageBuffer(baseMaskUrl), imgBuf)
+      const { maskUrl: samUrl } = await callSam2Segment({
+        imageUrl,
+        points: clickPoints.map(p => ({ x: p.x, y: p.y, label: 1 as const })),
+      })
+      const region = await normalizeMaskToImage(await fetchImageBuffer(samUrl), imgBuf)
+      if (op === 'add') {
+        mask = await unionMasks(base, await closeErodeMask(region))
+      } else {
+        // Dilata levemente a região antes de subtrair (mata halo na borda).
+        mask = (await subtractObjectsFromSurface(base, region, 3)).mask
+      }
+      source = `refine:${op}`
+    } else if (clickPoints.length > 0) {
+      // ── 2) CLIQUE: seleção inicial direto na superfície. ──
+      const { maskUrl: samUrl } = await callSam2Segment({
+        imageUrl,
+        points: clickPoints.map(p => ({ x: p.x, y: p.y, label: 1 as const })),
+      })
+      const region = await normalizeMaskToImage(await fetchImageBuffer(samUrl), imgBuf)
+      mask = await closeErodeMask(region)
+      source = 'sam:points'
+    } else {
+      // ── 4) BLOB (legado — pincel): seeds do blob + melhor superfície. ──
+      const blobBuf = await normalizeMaskToImage(await fetchImageBuffer(maskUrl as string), imgBuf)
+      const points = await samplePointsFromMask(blobBuf)
+      if (points.length === 0) {
+        return NextResponse.json({ error: 'Máscara vazia' }, { status: 400 })
+      }
+      pointCount = points.length
+
+      // Tenta a SUPERFÍCIE SEMÂNTICA (evf-sam floor/wall) que melhor cobre o
+      // blob pintado; cai pro SAM2 (point seeds) com fallback duro pro blob.
+      const evf = (await Promise.all(['floor', 'wall'].map(async (s) => {
+        try {
+          const r = await callEvfSam({ imageUrl, prompt: s })
+          const buf = await fetchImageBuffer(r.maskUrl)
+          return { s, buf, cov: await blobCoverageByMask(buf, blobBuf) }
+        } catch { return null }
+      }))).filter((x): x is { s: string; buf: Buffer; cov: number } => !!x)
+      const bestEvf = evf.sort((a, b) => b.cov - a.cov)[0]
+
+      if (bestEvf && bestEvf.cov >= 0.5) {
+        mask = await closeErodeMask(bestEvf.buf)
+        source = `evf:${bestEvf.s}`
+      } else {
+        const { maskUrl: samUrl } = await callSam2Segment({
+          imageUrl,
+          points: points.map(p => ({ x: p.x, y: p.y, label: 1 as const })),
+        })
+        const samBuf = await fetchImageBuffer(samUrl)
+        const refined = await refineSurfaceMask(samBuf, blobBuf)
+        mask = refined.mask
+        usedFallback = refined.usedFallback
+      }
     }
 
-    const { maskUrl: samUrl } = await callSam2Segment({
-      imageUrl,
-      points: points.map(p => ({ x: p.x, y: p.y, label: 1 as const })),
-    })
-    const samBuf = await fetchImageBuffer(samUrl)
-    const { mask, usedFallback, surfaceRatio } = await refineSurfaceMask(samBuf, blobBuf)
-
+    const surfaceRatio = await maskWhiteRatio(mask)
     const surfaceMaskUrl = await uploadEditAsset(admin, user.id, mask, 'crop-mask')
 
     // Overlay de preview: render com a superfície detectada tingida (verde Spacenode).
@@ -81,7 +182,8 @@ export async function POST(req: NextRequest) {
       preview_url:      previewUrl,
       surface_coverage: surfaceRatio,
       used_fallback:    usedFallback,
-      point_count:      points.length,
+      surface_source:   source,
+      point_count:      pointCount,
     })
   } catch (e) {
     console.error('[edits.segment]', (e as Error).message)
