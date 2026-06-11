@@ -425,14 +425,16 @@ function decideGoogleFirst(input: EditRoutingInput): RoutingDecision {
   return decision(Math.max(1, NODE_COST.medium - vDisc), false, 'Edição de área média usando modelo padrão.')
 }
 
-/** Endpoint mask-aware Google-first por ferramenta. Vertex (máscara REAL em
- *  pixels) para inpaint sem referência quando ligado; senão Nano Banana 2
- *  (máscara como 2ª imagem; o pipeline recompõe e o gate valida). Referências
- *  vão sempre pro NB2 (multi-imagem). */
-function maskedGoogleEndpoint(tool: EditTool, hasReferences: boolean): EditEndpoint {
+/** Endpoint mask-aware Google-first por ferramenta.
+ *  Vertex Imagen (inpaint com máscara REAL em pixels) é o motor padrão para
+ *  todas as ferramentas de inpaint (remove/add/material/fix_detail), com ou sem
+ *  referência — material_texture → REFERENCE_TYPE_STYLE, object_reference →
+ *  REFERENCE_TYPE_SUBJECT (ver vertex-imagen-edit.ts). Nano Banana 2 fica como
+ *  fallback quando Vertex está desligado ou para ferramentas fora do escopo. */
+function maskedGoogleEndpoint(tool: EditTool, _hasReferences: boolean): EditEndpoint {
   const vertexTool =
     tool === 'remove' || tool === 'add' || tool === 'material' || tool === 'fix_detail'
-  if (!hasReferences && vertexTool && vertexImagenEnabled()) return 'vertex/imagen-edit'
+  if (vertexTool && vertexImagenEnabled()) return 'vertex/imagen-edit'
   return 'fal-ai/nano-banana-2/edit'
 }
 

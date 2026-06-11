@@ -29,6 +29,16 @@ export const VERTEX_IMAGEN_EDIT_ENDPOINT = 'vertex/imagen-edit'
 export const VERTEX_IMAGEN_MODEL = 'imagen-3.0-capability-001'
 const TIMEOUT_MS = 120_000
 
+/** Mapeamento de papel de referência → tipo Vertex Imagen.
+ *  material_texture guia o ESTILO do material aplicado na máscara;
+ *  object_reference guia o OBJETO inserido na máscara.
+ *  Outros papéis (consistency, style, original…) não são passados ao Vertex
+ *  (Imagen não tem análogo estável para eles — omitir é mais seguro que inventar). */
+const VERTEX_REF_TYPE: Record<string, string> = {
+  material_texture: 'REFERENCE_TYPE_STYLE',
+  object_reference: 'REFERENCE_TYPE_SUBJECT',
+}
+
 let _client: GoogleGenAI | null = null
 function client(): GoogleGenAI {
   if (_client) return _client
@@ -79,14 +89,27 @@ export const callVertexImagenEdit: RetouchEngine = async (
     )
   }
 
-  const [img, mask] = await Promise.all([
+  // Referências compatíveis: material_texture → STYLE, object_reference → SUBJECT.
+  // Buscamos em paralelo com a imagem principal para não adicionar latência serial.
+  const compatibleRefs = (input.references ?? [])
+    .filter(r => VERTEX_REF_TYPE[r.role])
+    .slice(0, 2) // Vertex aceita no máximo 1 por tipo; limitar a 2 total.
+
+  const [img, mask, ...refImgs] = await Promise.all([
     fetchBase64(input.imageUrl),
     fetchBase64(input.maskUrl),
+    ...compatibleRefs.map(r => fetchBase64(r.url)),
   ])
 
   const editMode = input.intentHint === 'removal'
     ? 'EDIT_MODE_INPAINT_REMOVAL'
     : 'EDIT_MODE_INPAINT_INSERTION'
+
+  const extraReferenceImages = compatibleRefs.map((ref, i) => ({
+    referenceType:  VERTEX_REF_TYPE[ref.role],
+    referenceId:    i + 3,
+    referenceImage: { imageBytes: refImgs[i].bytes, mimeType: refImgs[i].mime },
+  }))
 
   const request: Record<string, unknown> = {
     model:  VERTEX_IMAGEN_MODEL,
@@ -107,6 +130,7 @@ export const callVertexImagenEdit: RetouchEngine = async (
           maskDilation: 0.01,
         },
       },
+      ...extraReferenceImages,
     ],
     config: {
       editMode,
