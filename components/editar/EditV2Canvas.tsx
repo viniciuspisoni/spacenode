@@ -32,15 +32,26 @@ interface Stroke {
 }
 
 export interface EditV2CanvasHandle {
+  /** Máscara FINAL: camada de superfície (se houver) + traços − borracha. */
   exportMaskBlob(): Promise<Blob | null>
+  /** Só os traços do usuário (semente para a detecção de superfície). */
+  exportStrokesBlob(): Promise<Blob | null>
+  /** Remove só os traços, preservando a camada de superfície. */
+  clearStrokes(): void
   clearSelection(): void
   hasSelection(): boolean
 }
 
 interface Props {
   imageUrl: string
+  /** Máscara de SUPERFÍCIE detectada (PNG P&B no Storage) — vira camada-base
+   *  da seleção; o pincel ADICIONA por cima e a borracha SUBTRAI dela. */
+  baseMaskUrl?: string | null
   /** Chamado ao fim de cada traço com a fração 0–1 coberta pela seleção. */
   onCoverageChange?: (coverage: number) => void
+  /** Chamado quando o usuário usa "Limpar seleção" (o dono da camada-base
+   *  precisa descartá-la também). */
+  onClearedBase?: () => void
   disabled?: boolean
 }
 
@@ -50,15 +61,18 @@ const BRUSH_MIN = 8
 const BRUSH_MAX = 120
 
 export const EditV2Canvas = forwardRef<EditV2CanvasHandle, Props>(
-  function EditV2Canvas({ imageUrl, onCoverageChange, disabled }, ref) {
+  function EditV2Canvas({ imageUrl, baseMaskUrl, onCoverageChange, onClearedBase, disabled }, ref) {
     const containerRef = useRef<HTMLDivElement | null>(null)
     const canvasRef = useRef<HTMLCanvasElement | null>(null)
     const imgRef = useRef<HTMLImageElement | null>(null)
+    /** Camada de superfície como BRANCO-sobre-transparente (offscreen). */
+    const baseLayerRef = useRef<HTMLCanvasElement | null>(null)
     const strokesRef = useRef<Stroke[]>([])
     const activeStrokeRef = useRef<Stroke | null>(null)
     const panDragRef = useRef<{ startX: number; startY: number; panX: number; panY: number } | null>(null)
     const cursorRef = useRef<{ x: number; y: number } | null>(null)
     const rafRef = useRef<number>(0)
+    const scheduleRedrawRef = useRef<(() => void) | null>(null)
 
     const [tool, setTool] = useState<Tool>('brush')
     const [brushSize, setBrushSize] = useState(36) // px de TELA (convertido ao pintar)
@@ -85,6 +99,54 @@ export const EditV2Canvas = forwardRef<EditV2CanvasHandle, Props>(
         imgRef.current = null
       }
     }, [imageUrl])
+
+    // ── Camada de superfície (máscara P&B → branco-sobre-transparente) ───────
+    useEffect(() => {
+      baseLayerRef.current = null
+      if (!baseMaskUrl) {
+        scheduleRedrawRef.current?.()
+        return
+      }
+      let cancelled = false
+      const img = new Image()
+      // Saída do /segment mora no Storage do Supabase (CORS liberado) — o
+      // getImageData da conversão exige crossOrigin.
+      img.crossOrigin = 'anonymous'
+      img.onload = () => {
+        if (cancelled) return
+        try {
+          const c = document.createElement('canvas')
+          c.width = img.naturalWidth
+          c.height = img.naturalHeight
+          const ctx = c.getContext('2d')
+          if (!ctx) return
+          ctx.drawImage(img, 0, 0)
+          const id = ctx.getImageData(0, 0, c.width, c.height)
+          const d = id.data
+          for (let i = 0; i < d.length; i += 4) {
+            const lum = d[i] // máscara é P&B: r ≈ luminância
+            d[i] = 255
+            d[i + 1] = 255
+            d[i + 2] = 255
+            d[i + 3] = lum > 110 ? 255 : 0
+          }
+          ctx.putImageData(id, 0, 0)
+          baseLayerRef.current = c
+        } catch {
+          // CORS/taint inesperado: degrada para traços literais, sem quebrar.
+          baseLayerRef.current = null
+          console.warn('[EditV2Canvas] camada de superfície indisponível (CORS)')
+        }
+        scheduleRedrawRef.current?.()
+      }
+      img.onerror = () => {
+        baseLayerRef.current = null
+      }
+      img.src = baseMaskUrl
+      return () => {
+        cancelled = true
+      }
+    }, [baseMaskUrl])
 
     // ── Geometria: fit + zoom + pan ───────────────────────────────────────────
     const getTransform = useCallback(() => {
@@ -139,17 +201,27 @@ export const EditV2Canvas = forwardRef<EditV2CanvasHandle, Props>(
         img.naturalHeight * t.scale,
       )
 
-      // Camada de seleção: replay dos traços em canvas temporário (na escala
-      // de exibição) → tinge de verde → compõe com transparência.
+      // Camada de seleção: superfície detectada (se houver) + replay dos traços
+      // em canvas temporário (na escala de exibição) → tinge de verde → compõe.
       const all = activeStrokeRef.current
         ? [...strokesRef.current, activeStrokeRef.current]
         : strokesRef.current
-      if (all.length > 0) {
+      const base = baseLayerRef.current
+      if (all.length > 0 || base) {
         const layer = document.createElement('canvas')
         layer.width = canvas.width
         layer.height = canvas.height
         const lctx = layer.getContext('2d')
         if (lctx) {
+          if (base) {
+            lctx.drawImage(
+              base,
+              t.offsetX,
+              t.offsetY,
+              img.naturalWidth * t.scale,
+              img.naturalHeight * t.scale,
+            )
+          }
           lctx.lineCap = 'round'
           lctx.lineJoin = 'round'
           for (const s of all) {
@@ -205,6 +277,7 @@ export const EditV2Canvas = forwardRef<EditV2CanvasHandle, Props>(
       cancelAnimationFrame(rafRef.current)
       rafRef.current = requestAnimationFrame(redraw)
     }, [redraw])
+    scheduleRedrawRef.current = scheduleRedraw
 
     // resize: só recalcula o bitmap — traços normalizados não deslocam.
     useEffect(() => {
@@ -254,10 +327,12 @@ export const EditV2Canvas = forwardRef<EditV2CanvasHandle, Props>(
       return () => canvas.removeEventListener('wheel', onWheel)
     }, [getTransform, scheduleRedraw])
 
-    // ── Cobertura (raster pequeno dos traços) ────────────────────────────────
+    // ── Cobertura (raster pequeno: superfície + traços − borracha) ───────────
     const computeCoverage = useCallback(() => {
       const img = imgRef.current
-      if (!img || strokesRef.current.length === 0) return 0
+      if (!img) return 0
+      const base = baseLayerRef.current
+      if (strokesRef.current.length === 0 && !base) return 0
       const W = 256
       const H = Math.max(1, Math.round((img.naturalHeight / img.naturalWidth) * W))
       const c = document.createElement('canvas')
@@ -265,6 +340,7 @@ export const EditV2Canvas = forwardRef<EditV2CanvasHandle, Props>(
       c.height = H
       const ctx = c.getContext('2d')
       if (!ctx) return 0
+      if (base) ctx.drawImage(base, 0, 0, W, H)
       ctx.lineCap = 'round'
       ctx.lineJoin = 'round'
       for (const s of strokesRef.current) {
@@ -351,29 +427,19 @@ export const EditV2Canvas = forwardRef<EditV2CanvasHandle, Props>(
     }
 
     // ── API imperativa ────────────────────────────────────────────────────────
-    useImperativeHandle(ref, () => ({
-      hasSelection: () => strokesRef.current.length > 0 && computeCoverage() > 0,
-      clearSelection: () => {
-        strokesRef.current = []
-        activeStrokeRef.current = null
-        forceTick(n => n + 1)
-        onCoverageChange?.(0)
-        scheduleRedraw()
-      },
-      async exportMaskBlob() {
+    useImperativeHandle(ref, () => {
+      /** Renderiza a seleção (branco/transparente) na resolução natural. */
+      const renderLayer = (includeBase: boolean): HTMLCanvasElement | null => {
         const img = imgRef.current
-        if (!img || strokesRef.current.length === 0) return null
-        const c = document.createElement('canvas')
-        c.width = img.naturalWidth
-        c.height = img.naturalHeight
-        const ctx = c.getContext('2d')
-        if (!ctx) return null
-        // camada de traços (branco / borracha recorta) sobre fundo PRETO
+        if (!img) return null
+        const base = baseLayerRef.current
+        if (strokesRef.current.length === 0 && !(includeBase && base)) return null
         const layer = document.createElement('canvas')
-        layer.width = c.width
-        layer.height = c.height
+        layer.width = img.naturalWidth
+        layer.height = img.naturalHeight
         const l = layer.getContext('2d')
         if (!l) return null
+        if (includeBase && base) l.drawImage(base, 0, 0, layer.width, layer.height)
         l.lineCap = 'round'
         l.lineJoin = 'round'
         for (const s of strokesRef.current) {
@@ -383,22 +449,55 @@ export const EditV2Canvas = forwardRef<EditV2CanvasHandle, Props>(
           l.lineWidth = s.sizeImagePx
           if (s.points.length === 1) {
             l.beginPath()
-            l.arc(s.points[0].x * c.width, s.points[0].y * c.height, s.sizeImagePx / 2, 0, Math.PI * 2)
+            l.arc(s.points[0].x * layer.width, s.points[0].y * layer.height, s.sizeImagePx / 2, 0, Math.PI * 2)
             l.fill()
           } else {
             l.beginPath()
             s.points.forEach((p, i) =>
-              i === 0 ? l.moveTo(p.x * c.width, p.y * c.height) : l.lineTo(p.x * c.width, p.y * c.height),
+              i === 0
+                ? l.moveTo(p.x * layer.width, p.y * layer.height)
+                : l.lineTo(p.x * layer.width, p.y * layer.height),
             )
             l.stroke()
           }
         }
+        return layer
+      }
+
+      const toMaskBlob = (layer: HTMLCanvasElement | null): Promise<Blob | null> => {
+        if (!layer) return Promise.resolve(null)
+        const c = document.createElement('canvas')
+        c.width = layer.width
+        c.height = layer.height
+        const ctx = c.getContext('2d')
+        if (!ctx) return Promise.resolve(null)
         ctx.fillStyle = '#000000'
         ctx.fillRect(0, 0, c.width, c.height)
         ctx.drawImage(layer, 0, 0)
         return new Promise<Blob | null>(resolve => c.toBlob(resolve, 'image/png'))
-      },
-    }), [computeCoverage, onCoverageChange, scheduleRedraw])
+      }
+
+      return {
+        hasSelection: () => computeCoverage() > 0,
+        clearStrokes: () => {
+          strokesRef.current = []
+          activeStrokeRef.current = null
+          forceTick(n => n + 1)
+          scheduleRedraw()
+        },
+        clearSelection: () => {
+          strokesRef.current = []
+          activeStrokeRef.current = null
+          baseLayerRef.current = null
+          forceTick(n => n + 1)
+          onClearedBase?.()
+          onCoverageChange?.(0)
+          scheduleRedraw()
+        },
+        exportMaskBlob: () => toMaskBlob(renderLayer(true)),
+        exportStrokesBlob: () => toMaskBlob(renderLayer(false)),
+      }
+    }, [computeCoverage, onClearedBase, onCoverageChange, scheduleRedraw])
 
     const pillStyle = (active: boolean): React.CSSProperties => ({
       padding: '5px 12px',
@@ -462,7 +561,9 @@ export const EditV2Canvas = forwardRef<EditV2CanvasHandle, Props>(
             onClick={() => {
               strokesRef.current = []
               activeStrokeRef.current = null
+              baseLayerRef.current = null
               forceTick(n => n + 1)
+              onClearedBase?.()
               onCoverageChange?.(0)
               scheduleRedraw()
             }}

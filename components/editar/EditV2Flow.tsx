@@ -106,6 +106,11 @@ export function EditV2Flow({ initialBalance }: { initialBalance: number }) {
   const [notice, setNotice] = useState<string | null>(null)
   const [result, setResult] = useState<ResultState | null>(null)
   const [importOpen, setImportOpen] = useState(false)
+  /** Seleção por superfície (Trocar material): a marcação do usuário é
+   *  SEMENTE; o sistema expande para a superfície coerente via /api/edits/segment
+   *  (SAM2 — custo da casa, mesma política do v1). */
+  const [surface, setSurface] = useState<{ url: string; coverage: number; usedFallback: boolean } | null>(null)
+  const [detecting, setDetecting] = useState(false)
 
   const canvasRef = useRef<EditV2CanvasHandle | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -162,11 +167,55 @@ export function EditV2Flow({ initialBalance }: { initialBalance: number }) {
     setReferenceUrl(null)
     setInstruction('')
     setCoverage(0)
+    setSurface(null)
     setError(null)
     setNotice(null)
     setImportOpen(false)
     setStep('edit')
   }, [])
+
+  /** Detecção de superfície: rabisco → semente → superfície inteira coerente.
+   *  Em falha, degrada para a marcação literal (nunca trava o usuário). */
+  const detectSurface = useCallback(async () => {
+    if (!sourceUrl || detecting || busy) return
+    const seed = await canvasRef.current?.exportMaskBlob()
+    if (!seed) {
+      setError('Faça uma marcação na superfície antes de detectar.')
+      return
+    }
+    setDetecting(true)
+    setError(null)
+    setNotice(null)
+    try {
+      const seedUrl = await uploadFile(new File([seed], 'seed.png', { type: 'image/png' }), 'mask')
+      const res = await fetch('/api/edits/segment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image_url: sourceUrl, mask_url: seedUrl }),
+      })
+      const json = await res.json().catch(() => null)
+      if (!res.ok || !json?.surface_mask_url) {
+        setNotice('Não foi possível detectar a superfície agora — sua marcação será usada como está.')
+        return
+      }
+      setSurface({
+        url: json.surface_mask_url,
+        coverage: typeof json.surface_coverage === 'number' ? json.surface_coverage : 0,
+        usedFallback: json.used_fallback === true,
+      })
+      // A superfície vira a camada-base; os rabiscos-semente saem de cena e o
+      // pincel/borracha passam a REFINAR a superfície.
+      canvasRef.current?.clearStrokes()
+      if (typeof json.surface_coverage === 'number') setCoverage(json.surface_coverage)
+      if (json.used_fallback === true) {
+        setNotice('Não foi possível expandir além da sua marcação — ela será usada como está.')
+      }
+    } catch {
+      setNotice('Não foi possível detectar a superfície agora — sua marcação será usada como está.')
+    } finally {
+      setDetecting(false)
+    }
+  }, [busy, detecting, sourceUrl, uploadFile])
 
   const handlePickSource = useCallback(
     async (file: File) => {
@@ -300,6 +349,7 @@ export function EditV2Flow({ initialBalance }: { initialBalance: number }) {
     setInstruction('')
     setReferenceUrl(null)
     setCoverage(0)
+    setSurface(null)
     setResult(null)
     setNotice('Editando a partir do resultado.')
     setStep('edit')
@@ -477,18 +527,51 @@ export function EditV2Flow({ initialBalance }: { initialBalance: number }) {
             <EditV2Canvas
               ref={canvasRef}
               imageUrl={sourceUrl}
+              baseMaskUrl={surface?.url ?? null}
               onCoverageChange={setCoverage}
+              onClearedBase={() => setSurface(null)}
               disabled={busy === 'generate'}
             />
           )}
           <div style={{ marginTop: 12, fontSize: 12.5, color: 'var(--color-text-secondary)' }}>
-            {typeDef.maskHint}
+            {intent === 'swap_material' && surface
+              ? 'Superfície detectada. Ajuste com o pincel (adicionar) ou a borracha (remover) se precisar.'
+              : typeDef.maskHint}
             {hasSelection && (
               <span style={{ color: 'var(--color-text-tertiary)' }}>
                 {' '}· área selecionada: {(coverage * 100).toFixed(1)}%
               </span>
             )}
           </div>
+          {intent === 'swap_material' && hasSelection && busy !== 'generate' && (
+            <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+              <button
+                type="button"
+                onClick={detectSurface}
+                disabled={detecting}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: 8,
+                  fontSize: 12.5,
+                  border: '0.5px solid var(--color-border-strong)',
+                  background: 'transparent',
+                  color: detecting ? 'var(--color-text-tertiary)' : 'var(--color-accent-green)',
+                  cursor: detecting ? 'default' : 'pointer',
+                }}
+              >
+                {detecting
+                  ? 'Detectando a superfície…'
+                  : surface
+                    ? 'Detectar novamente'
+                    : 'Detectar superfície inteira'}
+              </button>
+              {!surface && !detecting && (
+                <span style={{ fontSize: 11.5, color: 'var(--color-text-quaternary)' }}>
+                  Sua marcação indica a superfície — o sistema completa a seleção até os limites.
+                </span>
+              )}
+            </div>
+          )}
           {softWarning && (
             <div style={{ marginTop: 6, fontSize: 12, color: 'var(--color-text-tertiary)' }}>
               {softWarning}
@@ -544,6 +627,9 @@ export function EditV2Flow({ initialBalance }: { initialBalance: number }) {
                     onClick={() => {
                       setIntent(t.id)
                       setError(null)
+                      // Superfície detectada é específica do Trocar material:
+                      // ao mudar de tipo, a seleção recomeça limpa.
+                      if (surface) canvasRef.current?.clearSelection()
                     }}
                     style={{
                       textAlign: 'left',
