@@ -12,6 +12,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { EditV2Canvas, type EditV2CanvasHandle } from './EditV2Canvas'
+import { EditV2ImportModal } from './EditV2ImportModal'
 
 // ── Tipos do contrato público da API v2 (espelho mínimo) ─────────────────────
 type EditIntent = 'swap_material' | 'remove_element' | 'insert_element' | 'adjust_atmosphere' | 'fix_image'
@@ -104,6 +105,7 @@ export function EditV2Flow({ initialBalance }: { initialBalance: number }) {
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [result, setResult] = useState<ResultState | null>(null)
+  const [importOpen, setImportOpen] = useState(false)
 
   const canvasRef = useRef<EditV2CanvasHandle | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -132,6 +134,26 @@ export function EditV2Flow({ initialBalance }: { initialBalance: number }) {
     return json.url as string
   }, [])
 
+  /** Define a imagem de trabalho (upload ou histórico) e entra na edição. */
+  const applySource = useCallback(async (url: string) => {
+    const dims = await new Promise<{ w: number; h: number } | null>(resolve => {
+      const img = new Image()
+      img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight })
+      img.onerror = () => resolve(null)
+      img.src = url
+    })
+    setSourceUrl(url)
+    setSourceDims(dims)
+    setResult(null)
+    setReferenceUrl(null)
+    setInstruction('')
+    setCoverage(0)
+    setError(null)
+    setNotice(null)
+    setImportOpen(false)
+    setStep('edit')
+  }, [])
+
   const handlePickSource = useCallback(
     async (file: File) => {
       setError(null)
@@ -145,27 +167,14 @@ export function EditV2Flow({ initialBalance }: { initialBalance: number }) {
       }
       setBusy('upload')
       try {
-        const url = await uploadFile(file, 'source')
-        const dims = await new Promise<{ w: number; h: number } | null>(resolve => {
-          const img = new Image()
-          img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight })
-          img.onerror = () => resolve(null)
-          img.src = url
-        })
-        setSourceUrl(url)
-        setSourceDims(dims)
-        setResult(null)
-        setReferenceUrl(null)
-        setInstruction('')
-        setCoverage(0)
-        setStep('edit')
+        await applySource(await uploadFile(file, 'source'))
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Erro ao enviar imagem')
       } finally {
         setBusy(null)
       }
     },
-    [uploadFile],
+    [applySource, uploadFile],
   )
 
   // ── Custo estimado (dry-run server-side; debounce; custo zero) ───────────
@@ -358,6 +367,23 @@ export function EditV2Flow({ initialBalance }: { initialBalance: number }) {
             </div>
           </div>
         </div>
+        <div style={{ marginTop: 14, textAlign: 'center' }}>
+          <button
+            type="button"
+            onClick={() => setImportOpen(true)}
+            style={{
+              fontSize: 13,
+              color: 'var(--color-text-secondary)',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              textDecoration: 'underline',
+              textUnderlineOffset: 3,
+            }}
+          >
+            ou importar do histórico
+          </button>
+        </div>
         {error && (
           <div style={{ marginTop: 14, fontSize: 13, color: 'var(--color-text-secondary)' }}>{error}</div>
         )}
@@ -372,6 +398,7 @@ export function EditV2Flow({ initialBalance }: { initialBalance: number }) {
             e.currentTarget.value = ''
           }}
         />
+        <EditV2ImportModal open={importOpen} onClose={() => setImportOpen(false)} onSelect={url => void applySource(url)} />
       </div>
     )
   }
@@ -707,21 +734,34 @@ export function EditV2Flow({ initialBalance }: { initialBalance: number }) {
             <div style={{ marginTop: 8, fontSize: 11, color: 'var(--color-text-quaternary)', textAlign: 'center' }}>
               Geometria, câmera e proporções são preservadas · fase de testes: nodes não são debitados
             </div>
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              style={{
-                marginTop: 10,
-                width: '100%',
-                fontSize: 12,
-                color: 'var(--color-text-tertiary)',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              Trocar imagem
-            </button>
+            <div style={{ marginTop: 10, display: 'flex', justifyContent: 'center', gap: 16 }}>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                style={{
+                  fontSize: 12,
+                  color: 'var(--color-text-tertiary)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                Enviar nova imagem
+              </button>
+              <button
+                type="button"
+                onClick={() => setImportOpen(true)}
+                style={{
+                  fontSize: 12,
+                  color: 'var(--color-text-tertiary)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                Importar do histórico
+              </button>
+            </div>
             <input
               ref={fileInputRef}
               type="file"
@@ -736,6 +776,7 @@ export function EditV2Flow({ initialBalance }: { initialBalance: number }) {
           </div>
         </aside>
       </div>
+      <EditV2ImportModal open={importOpen} onClose={() => setImportOpen(false)} onSelect={url => void applySource(url)} />
     </div>
   )
 }

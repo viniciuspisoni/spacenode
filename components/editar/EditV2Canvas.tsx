@@ -73,8 +73,9 @@ export const EditV2Canvas = forwardRef<EditV2CanvasHandle, Props>(
       strokesRef.current = []
       panRef.current = { x: 0, y: 0 }
       setZoom(1)
+      // Sem crossOrigin: nunca lemos pixels da IMAGEM (cobertura/export usam só
+      // os traços), e exigir CORS quebraria o load de fontes como o CDN da FAL.
       const img = new Image()
-      img.crossOrigin = 'anonymous'
       img.onload = () => {
         imgRef.current = img
         setImageReady(true)
