@@ -32,6 +32,17 @@ const TIMEOUT_MS: Record<GeminiImageModel, number> = {
   'gemini-3-pro-image': 150_000,
 }
 
+/** ID canônico (telemetria/pricing) → ID exposto na API hoje. A validação de
+ *  ambiente (2026-06-12, listagem oficial de modelos da chave do projeto)
+ *  mostrou apenas as variantes -preview; o alias sem sufixo pode não resolver.
+ *  Override por env quando o GA chegar — sem deploy de código. */
+const API_MODEL_NAME: Record<GeminiImageModel, string> = {
+  'gemini-3.1-flash-image':
+    process.env.GEMINI_FLASH_IMAGE_MODEL?.trim() || 'gemini-3.1-flash-image-preview',
+  'gemini-3-pro-image':
+    process.env.GEMINI_PRO_IMAGE_MODEL?.trim() || 'gemini-3-pro-image-preview',
+}
+
 let _client: GoogleGenAI | null = null
 function client(): GoogleGenAI {
   if (_client) return _client
@@ -74,7 +85,7 @@ export async function geminiImageEditV2(input: GeminiImageEditOpts): Promise<Pro
 
   const response = await Promise.race([
     client().models.generateContent({
-      model: input.model,
+      model: API_MODEL_NAME[input.model],
       contents: [createPartFromText(input.prompt), ...imageParts],
       config: {
         responseModalities: [Modality.IMAGE, Modality.TEXT],

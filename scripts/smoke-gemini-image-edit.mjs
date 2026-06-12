@@ -34,7 +34,11 @@ function loadEnvLocal() {
 loadEnvLocal()
 
 const API_KEY = process.env.GEMINI_API_KEY?.trim()
-const MODEL = USE_PRO ? 'gemini-3-pro-image' : 'gemini-3.1-flash-image'
+// IDs como expostos na API hoje (validação de 2026-06-12 listou só as variantes
+// -preview para esta chave) — mesmos defaults do provider lib/edit-v2.
+const MODEL = USE_PRO
+  ? (process.env.GEMINI_PRO_IMAGE_MODEL?.trim() || 'gemini-3-pro-image-preview')
+  : (process.env.GEMINI_FLASH_IMAGE_MODEL?.trim() || 'gemini-3.1-flash-image-preview')
 const COST_USD = USE_PRO ? 0.134 : 0.067 // 1K, preço oficial Google (06/2026)
 
 const IMAGE_PATH = process.env.SMOKE_IMAGE || path.join(ROOT, '_v2_before.jpg')
