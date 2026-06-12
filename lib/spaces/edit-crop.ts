@@ -611,6 +611,9 @@ export async function assertMaskMatchesImage(maskBuf: Buffer, imageBuf: Buffer):
   const mw = mm.width ?? 0, mh = mm.height ?? 0
   const iw = im.width ?? 0, ih = im.height ?? 0
   if (!mw || !mh || !iw || !ih) throw new MaskImageMismatchError('dimensões ilegíveis')
+  // Máscara 1×1 é sentinela de "editar imagem inteira" (gerada automaticamente pelo
+  // route para swap_material sem pincel) — normalização posterior a expande.
+  if (mw === 1 && mh === 1) return
   const maskAspect = mw / mh
   const imageAspect = iw / ih
   const diff = Math.abs(maskAspect - imageAspect) / imageAspect

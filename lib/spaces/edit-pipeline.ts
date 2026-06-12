@@ -177,9 +177,15 @@ export async function runEdit(args: RunEditArgs): Promise<RunEditResult> {
 
   // ── Caminho de IMAGEM INTEIRA com máscara (nano-banana/edit, gemini-3-pro) ──
   // Recompõe o output do provider sobre a original p/ preservar fora da máscara.
+  //
+  // Se a máscara foi normalizada (ex: sentinela 1×1 → full-size), re-hospeda o
+  // buffer normalizado para que o provider (FAL) busque a versão correta.
+  const engineMaskUrl = maskBuf !== maskRaw
+    ? await uploadResult(maskBuf, 'crop-mask')
+    : maskUrl
   const out = await callWithTimeoutRetry(descriptor, {
     imageUrl: sourceUrl,
-    maskUrl,
+    maskUrl:  engineMaskUrl,
     prompt,
     quality,
     referenceUrl,
