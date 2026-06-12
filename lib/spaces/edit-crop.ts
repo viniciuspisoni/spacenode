@@ -482,7 +482,7 @@ export async function resizeToSource(outputBuf: Buffer, sourceBuf: Buffer): Prom
     return outputBuf
   }
   return sharp(outputBuf)
-    .resize(src.width, src.height, { fit: 'fill' })
+    .resize(src.width, src.height, { fit: 'cover', position: 'centre' })
     .toBuffer()
 }
 

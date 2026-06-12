@@ -36,9 +36,10 @@ const DISPATCH: Record<EditEndpoint, EndpointEngine> = {
   // Mascarados: máscara como 2ª imagem; o pipeline recompõe e o gate valida.
   'fal-ai/nano-banana-2/edit':              { call: callNanoBanana2Masked,      usesMask: true },
   'fal-ai/nano-banana-pro/edit':            { call: callNanoBananaProMasked,    usesMask: true },
-  // Instrução (edição conversacional, SEM máscara) dos mesmos modelos.
-  'google/gemini-3.1-flash-image':          { call: callNanoBanana2Instruct,    usesMask: false },
-  'google/gemini-3-pro-image':              { call: callNanoBananaProInstruct,  usesMask: false },
+  // Instrução (edição conversacional, SEM máscara) — Flux Pro Kontext preserva
+  // a composição original; nano-banana sem máscara regenera a cena do zero.
+  'google/gemini-3.1-flash-image':          { call: callFluxProKontext,         usesMask: false },
+  'google/gemini-3-pro-image':              { call: callFluxProKontext,         usesMask: false },
 }
 
 export function dispatchEndpoint(endpoint: EditEndpoint): EndpointEngine {

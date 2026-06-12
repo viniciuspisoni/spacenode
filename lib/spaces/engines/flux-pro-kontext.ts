@@ -19,6 +19,7 @@ import {
   RetouchNoOutputError,
   RetouchTimeoutError,
 } from './types'
+import { buildInstructPrompt } from './mask-prompt'
 
 export const FLUX_PRO_KONTEXT_ENDPOINT = 'fal-ai/flux-pro/kontext'
 const TIMEOUT_MS = 120_000
@@ -32,7 +33,7 @@ export const callFluxProKontext: RetouchEngine = async (
   input: RetouchInput,
 ): Promise<RetouchOutput> => {
   const falInput: Record<string, unknown> = {
-    prompt:           input.prompt,
+    prompt:           buildInstructPrompt(input.prompt, input.references),
     image_url:        input.imageUrl,
     guidance_scale:   3.5,
     num_images:       1,
