@@ -470,6 +470,22 @@ export async function fullRegion(buffer: Buffer): Promise<CropRegion> {
   return { left: 0, top: 0, width: m.width ?? 0, height: m.height ?? 0 }
 }
 
+/** Redimensiona outputBuf para as mesmas dimensões de sourceBuf.
+ *  No-op se já coincidirem. Usado no caminho sem máscara (instruct) para
+ *  preservar a proporção original quando o modelo retorna tamanho diferente. */
+export async function resizeToSource(outputBuf: Buffer, sourceBuf: Buffer): Promise<Buffer> {
+  const [src, out] = await Promise.all([
+    sharp(sourceBuf).metadata(),
+    sharp(outputBuf).metadata(),
+  ])
+  if (!src.width || !src.height || (src.width === out.width && src.height === out.height)) {
+    return outputBuf
+  }
+  return sharp(outputBuf)
+    .resize(src.width, src.height, { fit: 'fill' })
+    .toBuffer()
+}
+
 /**
  * Mede a fração de pixels FORA da máscara que mudaram (RMS por componente RGB
  * acima de THRESHOLD). Espelha a validação client-side, mas autoritativa no
