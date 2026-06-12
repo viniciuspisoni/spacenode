@@ -164,8 +164,12 @@ export async function runEditV2(input: EditV2RunInput): Promise<EditV2RunResult>
     // Proporção divergente >3% = máscara de outra imagem → erro claro, sem custo.
     await assertMaskMatchesImage(rawMask, sourceBuf)
     maskBuf = await normalizeMaskToImage(rawMask, sourceBuf)
-    // Remoção: dilatação leve cobre borda/sombra rente do objeto.
-    if (intent === 'remove_element') maskBuf = await dilateMask(maskBuf)
+    // Ajuda automática (entrada permissiva): dilatação leve cobre borda/sombra
+    // rente — o usuário não precisa pintar com precisão cirúrgica. Remoção E
+    // correção (artefatos raramente têm contorno exato).
+    if (intent === 'remove_element' || intent === 'fix_image') {
+      maskBuf = await dilateMask(maskBuf)
+    }
     maskCoverage = await maskWhiteRatio(maskBuf)
     if (maskCoverage <= 0) {
       throw new EditV2InputError('A seleção está vazia. Pinte a área que deseja editar.')
@@ -239,7 +243,11 @@ export async function runEditV2(input: EditV2RunInput): Promise<EditV2RunResult>
         originalBuffer: sourceBuf,
         resultBuffer: resultBuf,
         maskBuffer: maskBuf,
-        softEdges,
+        // Tolerância de borda na MEDIÇÃO para todos os tipos (política
+        // 2026-06-12): o blur expande a zona "interna" do gate e absorve a
+        // banda de dilatação/feather que nós mesmos criamos. A recomposição
+        // continua dura para remove/fix — só a régua ganha folga na borda.
+        softEdges: true,
       }),
       measureInMaskChange({
         originalBuffer: sourceBuf,

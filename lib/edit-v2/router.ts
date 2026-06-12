@@ -44,17 +44,25 @@ import type {
   NormalizedInstructionV2,
 } from './types'
 
-// Limiar de no-op (mudança mínima dentro da seleção) — herdado do v1, validado
-// em produção; abaixo disso o resultado é rejeitado como "nada mudou" e não cobra.
-const NO_CHANGE_FLOOR = 0.01
+// Política de gates (revisada 2026-06-12 por direção do fundador): PERMISSIVO
+// na entrada, rigoroso só no RESULTADO. O gate existe para pegar falha
+// catastrófica (re-render da cena, vazamento grosseiro) — não para punir a
+// banda legítima de borda (dilatação ~1% que nós mesmos pedimos ao provider +
+// feather da recomposição). Com recompose, o drift real medido em produção é
+// ~0,01% — estes tetos são backstop, não régua fina.
 
-// Drift máximo fora da seleção. Tipos de "blend" (material/inserção) precisam
-// de folga para a banda do feather da recomposição; remoção/correção são duros.
-// Preservação Padrão relaxa uma faixa — nunca além de 12%.
-const GATE_STRICT = 0.02
-const GATE_BLEND = 0.08
-const GATE_STANDARD_STRICT = 0.08
-const GATE_STANDARD_BLEND = 0.12
+// Abaixo disso dentro da seleção = "nada mudou" → rejeita sem cobrar.
+const NO_CHANGE_FLOOR = 0.005
+
+// Drift máximo fora da seleção (fração de pixels).
+const GATE_STRICT = 0.05          // remove/fix · Preservação Máxima  (era 0.02)
+const GATE_BLEND = 0.1            // material/insert · Máxima         (era 0.08)
+const GATE_STANDARD_STRICT = 0.1  // remove/fix · Padrão              (era 0.08)
+const GATE_STANDARD_BLEND = 0.15  // material/insert · Padrão         (era 0.12)
+
+/** Seleção "praticamente vazia": abaixo disto não há o que editar (≈0,02% da
+ *  imagem). Acima disto a UI AVISA, mas nunca bloqueia. */
+export const MIN_USABLE_MASK_RATIO = 0.0002
 
 function gateThresholds(input: EditRouteInputV2): EditGateThresholdsV2 {
   const blend = input.editIntent === 'swap_material' || input.editIntent === 'insert_element'
@@ -204,8 +212,12 @@ export function routeEditV2(opts: RouteEditV2Opts): EditRouteResultV2 {
   return result
 }
 
-/** Validação de pré-condições de produto (a UI também valida; isto é a defesa
- *  do servidor). Retorna mensagem PT amigável ou null quando ok. */
+/** Validação de pré-condições — REGRA (fundador, 2026-06-12): bloquear MENOS,
+ *  avisar MAIS. Bloqueia apenas: sem imagem (a rota cuida), sem seleção em
+ *  tipo que exige, seleção praticamente vazia, ou pedido sem nenhum sinal
+ *  (sem texto E sem referência num tipo guiado por instrução). Seleção
+ *  pequena/imperfeita NUNCA bloqueia — vira aviso na UI; quem protege o
+ *  resultado é o gate pós-geração. Retorna mensagem PT ou null. */
 export function validateEditRequestV2(input: EditRouteInputV2, instructionPt: string): string | null {
   const needsMask = input.editIntent === 'remove_element' ||
     input.editIntent === 'insert_element' ||
@@ -217,10 +229,15 @@ export function validateEditRequestV2(input: EditRouteInputV2, instructionPt: st
     input.editIntent === 'insert_element' ||
     input.editIntent === 'adjust_atmosphere'
   if (needsInstruction && !instructionPt.trim() && !input.hasReferenceImage) {
-    return 'Descreva o que você quer nesta edição.'
+    return 'Descreva a alteração ou anexe uma referência.'
   }
-  if (input.hasMask && input.maskAreaRatio !== undefined && input.maskAreaRatio !== null && input.maskAreaRatio <= 0) {
-    return 'A seleção está vazia. Pinte a área que deseja editar.'
+  if (
+    input.hasMask &&
+    input.maskAreaRatio !== undefined &&
+    input.maskAreaRatio !== null &&
+    input.maskAreaRatio < MIN_USABLE_MASK_RATIO
+  ) {
+    return 'A seleção está praticamente vazia. Pinte a área que deseja editar.'
   }
   return null
 }

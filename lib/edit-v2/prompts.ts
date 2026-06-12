@@ -33,7 +33,7 @@ export const BASE_EDIT_PROMPT =
 // Instrução por tipo
 // ---------------------------------------------------------------------------
 
-function intentInstruction(intent: EditIntentV2, instructionEn: string, hasMask: boolean): string {
+function intentInstruction(intent: EditIntentV2, instructionEn: string): string {
   const request = instructionEn.trim()
   switch (intent) {
     case 'swap_material':
@@ -166,7 +166,7 @@ export function composeEditPromptV2(opts: ComposePromptOpts): string {
   const parts: string[] = []
   parts.push(imageRolesContract({ hasMask: opts.hasMask, references: opts.references }))
   parts.push(BASE_EDIT_PROMPT)
-  parts.push(intentInstruction(opts.intent, opts.normalized.instructionEn, opts.hasMask))
+  parts.push(intentInstruction(opts.intent, opts.normalized.instructionEn))
   parts.push(preservationClause(opts.preservationMode, opts.normalized.requiresStrictGeometry))
   parts.push(intensityClause(opts.intensityMode))
   if (opts.hasMask) {

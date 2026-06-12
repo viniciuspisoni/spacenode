@@ -46,7 +46,7 @@ const EDIT_TYPES: EditTypeDef[] = [
     label: 'Remover elemento',
     desc: 'Objetos, móveis, pessoas, vegetação.',
     maskRule: 'required',
-    maskHint: 'Selecione o objeto inteiro, com uma pequena margem. Se o objeto tiver luz ou reflexo, inclua o brilho na seleção.',
+    maskHint: 'Para melhorar o resultado, selecione o objeto inteiro com pequena margem. Se houver brilho ou reflexo, inclua também essa área na seleção.',
     placeholder: 'Opcional — ex.: remover a cadeira',
     refKind: null,
   },
@@ -113,7 +113,12 @@ export function EditV2Flow({ initialBalance }: { initialBalance: number }) {
 
   const typeDef = EDIT_TYPES.find(t => t.id === intent)!
   const needsMask = typeDef.maskRule === 'required'
-  const hasSelection = coverage > 0
+  // Política (2026-06-12): bloquear MENOS, avisar MAIS. Bloqueia só seleção
+  // PRATICAMENTE VAZIA (<0,02% da imagem); pequena/imperfeita gera aviso e o
+  // gate pós-resultado protege — rejeição não cobra.
+  const MIN_USABLE = 0.0002
+  const SMALL_WARN = 0.004
+  const hasSelection = coverage >= MIN_USABLE
   const needsInstruction =
     (intent === 'swap_material' || intent === 'insert_element' || intent === 'adjust_atmosphere') &&
     !referenceUrl
@@ -122,6 +127,15 @@ export function EditV2Flow({ initialBalance }: { initialBalance: number }) {
     busy === null &&
     (!needsMask || hasSelection) &&
     (!needsInstruction || instruction.trim().length > 0)
+
+  /** Avisos não-bloqueantes — orientação, nunca trava. */
+  const softWarning = (() => {
+    if (!hasSelection) return null
+    if (coverage < SMALL_WARN) {
+      return 'A seleção está pequena, mas você ainda pode gerar. Para melhorar o resultado, aumente um pouco a margem.'
+    }
+    return null
+  })()
 
   // ── Upload da imagem principal ───────────────────────────────────────────
   const uploadFile = useCallback(async (file: File, kind: 'source' | 'mask') => {
@@ -475,6 +489,11 @@ export function EditV2Flow({ initialBalance }: { initialBalance: number }) {
               </span>
             )}
           </div>
+          {softWarning && (
+            <div style={{ marginTop: 6, fontSize: 12, color: 'var(--color-text-tertiary)' }}>
+              {softWarning}
+            </div>
+          )}
           {busy === 'generate' && (
             <div
               style={{

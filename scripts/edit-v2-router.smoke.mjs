@@ -97,16 +97,18 @@ check('econômica capa 4K→2K', resolveOutputResolution({ outputResolution: '4K
 
 // ── Gates por preservação ────────────────────────────────────────────────────
 r = route({ editIntent: 'remove_element', preservationMode: 'maximum' })
-check('gate máxima/remove 2%', r.loggingData.gateThresholds.outOfMask, 0.02)
+check('gate máxima/remove 5%', r.loggingData.gateThresholds.outOfMask, 0.05)
 r = route({ preservationMode: 'maximum' })
-check('gate máxima/material 8%', r.loggingData.gateThresholds.outOfMask, 0.08)
+check('gate máxima/material 10%', r.loggingData.gateThresholds.outOfMask, 0.1)
 r = route({ editIntent: 'remove_element', preservationMode: 'standard' })
-check('gate padrão/remove 8%', r.loggingData.gateThresholds.outOfMask, 0.08)
+check('gate padrão/remove 10%', r.loggingData.gateThresholds.outOfMask, 0.1)
 
 // ── Validações de produto ────────────────────────────────────────────────────
 check('remove sem máscara → erro', validateEditRequestV2(input({ editIntent: 'remove_element', hasMask: false }), 'x'), 'Selecione a área da imagem antes de gerar.')
-check('material sem texto/ref → erro', validateEditRequestV2(input({}), ' '), 'Descreva o que você quer nesta edição.')
+check('material sem texto/ref → erro', validateEditRequestV2(input({}), ' '), 'Descreva a alteração ou anexe uma referência.')
 check('atmosfera com texto → ok', validateEditRequestV2(input({ editIntent: 'adjust_atmosphere', hasMask: false }), 'fim de tarde'), null)
+check('seleção praticamente vazia → erro', validateEditRequestV2(input({ editIntent: 'remove_element', maskAreaRatio: 0.0001 }), 'x'), 'A seleção está praticamente vazia. Pinte a área que deseja editar.')
+check('seleção pequena (0,1%) → PERMITE (aviso é da UI)', validateEditRequestV2(input({ editIntent: 'remove_element', maskAreaRatio: 0.001 }), 'x'), null)
 
 // ── Prompt: âncoras essenciais ───────────────────────────────────────────────
 r = route({ hasReferenceImage: true, referenceKind: 'material' }, FLAGS, [{ kind: 'material', url: 'https://x/t.jpg' }])
