@@ -391,7 +391,7 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
   async function handleGenerate(premiumSel: boolean) {
     const hasMaskPainted = !!canvasRef.current?.hasMask()
     if (maskRequired && !hasMaskPainted && !surfaceSel) {
-      setError('Selecione a superfície (1 clique) ou pinte a área que quer editar.')
+      setError('Pinte a área que deseja editar.')
       return
     }
     // 'remove' doesn't need a prompt — the model fills from surroundings.
@@ -1074,7 +1074,7 @@ function EditingStep(props: {
     maskHint = `Superfície selecionada: ${(surfaceSel.coverage * 100).toFixed(1)}% da imagem.`
   } else if (coverage === 0) {
     maskHint = maskRequired
-      ? (showSurfaceBar ? 'Selecione a superfície (1 clique) ou pinte com o pincel.' : 'Pinte a área que deseja editar.')
+      ? 'Pinte a área que deseja editar.'
       : 'Sem seleção, a edição considera a imagem inteira. Pinte uma área para limitar.'
   } else if (!isRemove && !prompt) {
     maskHint = 'Descreva a alteração ou escolha um preset.'

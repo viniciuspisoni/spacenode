@@ -154,7 +154,7 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
   async function handleGenerate(premiumSel: boolean) {
     const hasMaskPainted = !!canvasRef.current?.hasMask()
     if (maskRequired && !hasMaskPainted && !surfaceSel) {
-      setError('Selecione a superfície (1 clique) ou pinte a área que quer editar.')
+      setError('Pinte a área que deseja editar.')
       return
     }
     if (!isRemove && !prompt.trim()) {
@@ -588,7 +588,7 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
                       : coverage > 0
                         ? <>área: {(coverage * 100).toFixed(1)}%</>
                         : (maskRequired
-                            ? (showSurfaceBar ? 'selecione a superfície ou pinte' : 'pinte a área a editar')
+                            ? 'pinte a área a editar'
                             : 'sem seleção = vista inteira')}
                     {largeMask && !surfaceSel && <span style={{ color: '#e0a766', marginLeft: 10 }}>⚠ área grande</span>}
                   </div>
