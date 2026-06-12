@@ -9,8 +9,11 @@
 // Envs (local E Vercel — ver memória project_vercel_env_parity):
 //   GOOGLE_VERTEX_PROJECT           — id do projeto GCP
 //   GOOGLE_VERTEX_LOCATION          — região (default us-central1)
-//   GOOGLE_VERTEX_CREDENTIALS_JSON  — JSON inteiro da service account
-//                                     (papel mínimo: Vertex AI User)
+//   Credencial (UMA das duas formas):
+//     GOOGLE_VERTEX_CREDENTIALS_JSON — JSON inteiro da service account numa env
+//                                      (única opção viável na Vercel)
+//     GOOGLE_APPLICATION_CREDENTIALS — caminho do arquivo da SA (padrão ADC do
+//                                      Google; o SDK lê sozinho — bom p/ local)
 // Gate: VERTEX_IMAGEN_ENABLED=1 (lib/edit-v2/flags.ts).
 //
 // Adaptado do engine v1 (lib/spaces/engines/vertex-imagen-edit.ts) com o
@@ -40,18 +43,22 @@ function client(): GoogleGenAI {
   const project = process.env.GOOGLE_VERTEX_PROJECT?.trim()
   const location = process.env.GOOGLE_VERTEX_LOCATION?.trim() || 'us-central1'
   const credsJson = process.env.GOOGLE_VERTEX_CREDENTIALS_JSON?.trim()
-  if (!project || !credsJson) {
+  const adcPath = process.env.GOOGLE_APPLICATION_CREDENTIALS?.trim()
+  if (!project || (!credsJson && !adcPath)) {
     throw new EditV2ProviderError(
       'vertex-imagen',
       'config',
-      'GOOGLE_VERTEX_PROJECT e GOOGLE_VERTEX_CREDENTIALS_JSON são obrigatórias com VERTEX_IMAGEN_ENABLED=1.',
+      'Com VERTEX_IMAGEN_ENABLED=1 são obrigatórias GOOGLE_VERTEX_PROJECT e uma credencial: ' +
+      'GOOGLE_VERTEX_CREDENTIALS_JSON (inline) ou GOOGLE_APPLICATION_CREDENTIALS (caminho ADC).',
     )
   }
   _client = new GoogleGenAI({
     vertexai: true,
     project,
     location,
-    googleAuthOptions: { credentials: JSON.parse(credsJson) },
+    // Com JSON inline, injeta explicitamente; com ADC, omitir googleAuthOptions
+    // faz o google-auth-library ler GOOGLE_APPLICATION_CREDENTIALS sozinho.
+    ...(credsJson ? { googleAuthOptions: { credentials: JSON.parse(credsJson) } } : {}),
   })
   return _client
 }

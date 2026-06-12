@@ -74,10 +74,16 @@ console.log(`\n   (informativo) SA do experimento em Downloads: ${existsSync(exp
 // Estrutura da credencial (booleanos derivados; nada é impresso do conteúdo)
 // ---------------------------------------------------------------------------
 let credsObj = null
+let credsSource = null
 if (V_CREDS) {
-  console.log('\nB) ESTRUTURA DE GOOGLE_VERTEX_CREDENTIALS_JSON (derivado, sem expor conteúdo)')
+  credsSource = 'GOOGLE_VERTEX_CREDENTIALS_JSON (inline)'
+} else if (ADC_PATH && existsSync(ADC_PATH)) {
+  credsSource = 'GOOGLE_APPLICATION_CREDENTIALS (arquivo ADC)'
+}
+if (credsSource) {
+  console.log(`\nB) ESTRUTURA DA CREDENCIAL — fonte: ${credsSource} (derivado, sem expor conteúdo)`)
   try {
-    credsObj = JSON.parse(V_CREDS)
+    credsObj = JSON.parse(V_CREDS ?? readFileSync(ADC_PATH, 'utf8'))
     const okType = credsObj?.type === 'service_account'
     const hasProj = typeof credsObj?.project_id === 'string' && credsObj.project_id.length > 0
     const hasKey = typeof credsObj?.private_key === 'string' && credsObj.private_key.includes('PRIVATE KEY')
@@ -126,12 +132,12 @@ if (V_PROJECT && credsObj) {
       googleAuthOptions: { credentials: credsObj },
     })
     const hasEdit = typeof v.models?.editImage === 'function'
-    console.log(`   Provider vertex-imagen: client construído ✔ · models.editImage ${hasEdit ? '✔' : '✖ (SDK sem editImage)'}`)
+    console.log(`   Provider vertex-imagen: client construído ✔ (credencial: ${credsSource}) · models.editImage ${hasEdit ? '✔' : '✖ (SDK sem editImage)'}`)
   } catch (e) {
     console.log(`   Provider vertex-imagen: ✖ falha ao construir client (${String(e?.message).slice(0, 100)})`)
   }
 } else {
-  console.log(`   Provider vertex-imagen: ✖ não inicializável — falta ${[!V_PROJECT && 'GOOGLE_VERTEX_PROJECT', !V_CREDS && 'GOOGLE_VERTEX_CREDENTIALS_JSON'].filter(Boolean).join(' e ')}`)
+  console.log(`   Provider vertex-imagen: ✖ não inicializável — falta ${[!V_PROJECT && 'GOOGLE_VERTEX_PROJECT', !credsObj && 'credencial (GOOGLE_VERTEX_CREDENTIALS_JSON ou GOOGLE_APPLICATION_CREDENTIALS)'].filter(Boolean).join(' e ')}`)
 }
 
 // ---------------------------------------------------------------------------
@@ -194,21 +200,34 @@ if (OFFLINE) {
       const okTok = Boolean(token?.token)
       console.log(`   D3. Service account autentica (OAuth): ${okTok ? '✔ token obtido (não exibido)' : '✖ sem token'}`)
 
-      // D4: com o token, o modelo Imagen capability está visível no projeto/região? (GET — grátis)
+      // D4: com o token, sonda de metadata dos modelos Imagen (GET — grátis).
+      // IMPORTANTE: GET de publisher model nem sempre é suportado mesmo quando o
+      // :predict funciona — por isso sondamos TAMBÉM um controle que sabidamente
+      // funciona neste projeto (imagen-3.0-generate-001 gerou imagem em 10/06).
       if (okTok) {
-        const url = `https://${V_LOCATION}-aiplatform.googleapis.com/v1/projects/${V_PROJECT}/locations/${V_LOCATION}/publishers/google/models/imagen-3.0-capability-001`
-        const res = await fetch(url, {
-          headers: { Authorization: `Bearer ${token.token}` },
-          signal: AbortSignal.timeout(15000),
-        })
-        if (res.ok) {
-          console.log('   D4. imagen-3.0-capability-001 visível no projeto/região: ✔ (metadata ok — pronto p/ smoke pago)')
-        } else if (res.status === 403) {
-          console.log('   D4. imagen-3.0-capability-001: ✖ HTTP 403 — sem permissão (papel Vertex AI User?) ou modelo não habilitado')
-        } else if (res.status === 404) {
-          console.log(`   D4. imagen-3.0-capability-001: ✖ HTTP 404 — não disponível em ${V_LOCATION} p/ este projeto`)
-        } else {
-          console.log(`   D4. imagen-3.0-capability-001: ✖ HTTP ${res.status}`)
+        const probe = async modelId => {
+          const url = `https://${V_LOCATION}-aiplatform.googleapis.com/v1/projects/${V_PROJECT}/locations/${V_LOCATION}/publishers/google/models/${modelId}`
+          try {
+            const res = await fetch(url, {
+              headers: { Authorization: `Bearer ${token.token}` },
+              signal: AbortSignal.timeout(15000),
+            })
+            return res.status
+          } catch { return 0 }
+        }
+        const target = await probe('imagen-3.0-capability-001')
+        const control = await probe('imagen-3.0-generate-001')
+        console.log(`   D4. GET metadata — alvo imagen-3.0-capability-001: HTTP ${target || 'erro de rede'} · controle imagen-3.0-generate-001: HTTP ${control || 'erro de rede'}`)
+        if (target === 200) {
+          console.log('       → capability visível: pronto para o smoke pago.')
+        } else if (target === 404 && control === 404) {
+          console.log('       → 404 NOS DOIS (inclusive no controle que JÁ FUNCIONOU via :predict em 10/06):')
+          console.log('         a sonda GET não é conclusiva p/ publisher models — o smoke pago é o teste')
+          console.log('         definitivo (e um eventual 404 no :predict não é cobrado).')
+        } else if (target === 404) {
+          console.log('       → controle OK e alvo 404: capability provavelmente NÃO habilitado p/ o projeto/região (allowlist?).')
+        } else if (target === 403) {
+          console.log('       → 403: papel da service account insuficiente p/ este modelo (conferir Vertex AI User).')
         }
       }
     } catch (e) {

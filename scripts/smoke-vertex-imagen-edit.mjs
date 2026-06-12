@@ -37,6 +37,9 @@ loadEnvLocal()
 const PROJECT = process.env.GOOGLE_VERTEX_PROJECT?.trim()
 const LOCATION = process.env.GOOGLE_VERTEX_LOCATION?.trim() || 'us-central1'
 const CREDS = process.env.GOOGLE_VERTEX_CREDENTIALS_JSON?.trim()
+const ADC_PATH = process.env.GOOGLE_APPLICATION_CREDENTIALS?.trim()
+const ADC_OK = Boolean(ADC_PATH && existsSync(ADC_PATH))
+const HAS_CRED = Boolean(CREDS) || ADC_OK
 
 const IMAGE_PATH = process.env.SMOKE_IMAGE || path.join(ROOT, '_v2_before.jpg')
 const MASK_PATH = process.env.SMOKE_MASK || path.join(ROOT, '_smoke_mask.png')
@@ -56,7 +59,9 @@ function preflight() {
 1) VARIÁVEIS NECESSÁRIAS (.env.local; valores nunca são exibidos)
    GOOGLE_VERTEX_PROJECT ............ ${ok(PROJECT)}
    GOOGLE_VERTEX_LOCATION ........... ${LOCATION} ${process.env.GOOGLE_VERTEX_LOCATION ? '(definida)' : '(default)'}
-   GOOGLE_VERTEX_CREDENTIALS_JSON ... ${ok(CREDS)}
+   Credencial (uma das duas):
+     GOOGLE_VERTEX_CREDENTIALS_JSON  ${ok(CREDS)}
+     GOOGLE_APPLICATION_CREDENTIALS  ${ADC_PATH ? (ADC_OK ? '✔ (arquivo existe)' : '✖ definida mas arquivo NÃO existe') : '✖ AUSENTE'}
 
 2) PERMISSÕES NECESSÁRIAS
    Service account com papel mínimo "Vertex AI User" (roles/aiplatform.user)
@@ -115,8 +120,8 @@ async function run() {
     console.log('  node scripts/smoke-vertex-imagen-edit.mjs --approve-paid-call')
     process.exit(0)
   }
-  if (!PROJECT || !CREDS) {
-    console.error('✖ Envs GOOGLE_VERTEX_* ausentes — provisione antes (docs/EDIT-V2-GCP-SETUP.md).')
+  if (!PROJECT || !HAS_CRED) {
+    console.error('✖ Faltam GOOGLE_VERTEX_PROJECT e/ou credencial (JSON inline ou GOOGLE_APPLICATION_CREDENTIALS) — ver docs/EDIT-V2-GCP-SETUP.md.')
     process.exit(1)
   }
   if (!existsSync(IMAGE_PATH)) {
@@ -127,11 +132,12 @@ async function run() {
 
   const { GoogleGenAI, RawReferenceImage, MaskReferenceImage, MaskReferenceMode, EditMode } =
     await import('@google/genai')
+  // JSON inline → injeta; só ADC → o SDK lê GOOGLE_APPLICATION_CREDENTIALS sozinho.
   const client = new GoogleGenAI({
     vertexai: true,
     project: PROJECT,
     location: LOCATION,
-    googleAuthOptions: { credentials: JSON.parse(CREDS) },
+    ...(CREDS ? { googleAuthOptions: { credentials: JSON.parse(CREDS) } } : {}),
   })
 
   const raw = new RawReferenceImage()
