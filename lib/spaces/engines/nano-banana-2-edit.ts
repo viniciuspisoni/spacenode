@@ -19,17 +19,13 @@ import {
   RetouchNoOutputError,
   RetouchTimeoutError,
 } from './types'
-import type { Quality } from '../types'
 import { buildTwoImageMaskPrompt, buildInstructPrompt } from './mask-prompt'
 
+// fal-ai/nano-banana-2/edit é o ID interno do router; o endpoint FAL real é
+// fal-ai/nano-banana/edit (Gemini Flash Image, mesma família, públicamente acessível).
 export const NANO_BANANA_2_EDIT_ENDPOINT = 'fal-ai/nano-banana-2/edit'
+const FAL_NB2_ENDPOINT = 'fal-ai/nano-banana/edit'
 const TIMEOUT_MS = 120_000
-
-const QUALITY_RESOLUTION: Record<Quality, string> = {
-  hd:   '1K',
-  '2k': '2K',
-  '4k': '4K',
-}
 
 interface FalNBOutput {
   images?: { url?: string }[]
@@ -45,11 +41,10 @@ async function callNB2(input: RetouchInput, withMask: boolean): Promise<RetouchO
     : buildInstructPrompt(input.prompt, input.references)
 
   const result = await Promise.race([
-    fal.subscribe(NANO_BANANA_2_EDIT_ENDPOINT, {
+    fal.subscribe(FAL_NB2_ENDPOINT, {
       input: {
         prompt,
         image_urls:    imageUrls,
-        resolution:    QUALITY_RESOLUTION[input.quality],
         num_images:    1,
         output_format: 'png',
         ...(input.seed !== undefined ? { seed: input.seed } : {}),

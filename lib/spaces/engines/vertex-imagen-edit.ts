@@ -16,7 +16,14 @@
 // O resultado volta como data URL (base64); o pipeline baixa via
 // fetchImageBuffer (fetch suporta data:) e re-hospeda no Supabase.
 
-import { GoogleGenAI } from '@google/genai'
+import {
+  GoogleGenAI,
+  MaskReferenceMode,
+  RawReferenceImage,
+  MaskReferenceImage,
+  StyleReferenceImage,
+  SubjectReferenceImage,
+} from '@google/genai'
 import {
   type RetouchEngine,
   type RetouchInput,
@@ -29,14 +36,14 @@ export const VERTEX_IMAGEN_EDIT_ENDPOINT = 'vertex/imagen-edit'
 export const VERTEX_IMAGEN_MODEL = 'imagen-3.0-capability-001'
 const TIMEOUT_MS = 120_000
 
-/** Mapeamento de papel de referência → tipo Vertex Imagen.
- *  material_texture guia o ESTILO do material aplicado na máscara;
- *  object_reference guia o OBJETO inserido na máscara.
- *  Outros papéis (consistency, style, original…) não são passados ao Vertex
- *  (Imagen não tem análogo estável para eles — omitir é mais seguro que inventar). */
-const VERTEX_REF_TYPE: Record<string, string> = {
-  material_texture: 'REFERENCE_TYPE_STYLE',
-  object_reference: 'REFERENCE_TYPE_SUBJECT',
+/** Mapeamento de papel de referência → classe SDK do Vertex Imagen.
+ *  material_texture (textura) → StyleReferenceImage (REFERENCE_TYPE_STYLE).
+ *  object_reference (objeto)  → SubjectReferenceImage (REFERENCE_TYPE_SUBJECT).
+ *  Outros papéis: omitidos — Vertex Imagen não tem análogo estável. */
+type RefClass = typeof StyleReferenceImage | typeof SubjectReferenceImage
+const VERTEX_REF_CLASS: Record<string, RefClass> = {
+  material_texture: StyleReferenceImage,
+  object_reference: SubjectReferenceImage,
 }
 
 let _client: GoogleGenAI | null = null
@@ -92,7 +99,7 @@ export const callVertexImagenEdit: RetouchEngine = async (
   // Referências compatíveis: material_texture → STYLE, object_reference → SUBJECT.
   // Buscamos em paralelo com a imagem principal para não adicionar latência serial.
   const compatibleRefs = (input.references ?? [])
-    .filter(r => VERTEX_REF_TYPE[r.role])
+    .filter(r => VERTEX_REF_CLASS[r.role])
     .slice(0, 2) // Vertex aceita no máximo 1 por tipo; limitar a 2 total.
 
   const [img, mask, ...refImgs] = await Promise.all([
@@ -105,36 +112,33 @@ export const callVertexImagenEdit: RetouchEngine = async (
     ? 'EDIT_MODE_INPAINT_REMOVAL'
     : 'EDIT_MODE_INPAINT_INSERTION'
 
-  const extraReferenceImages = compatibleRefs.map((ref, i) => ({
-    referenceType:  VERTEX_REF_TYPE[ref.role],
-    referenceId:    i + 3,
-    referenceImage: { imageBytes: refImgs[i].bytes, mimeType: refImgs[i].mime },
-  }))
+  // O SDK chama .toReferenceImageAPI() em cada elemento — precisam ser instâncias
+  // das classes SDK, não plain objects.
+  const rawRef = new RawReferenceImage()
+  rawRef.referenceId    = 1
+  rawRef.referenceImage = { imageBytes: img.bytes, mimeType: img.mime }
+
+  const maskRef = new MaskReferenceImage()
+  maskRef.referenceId    = 2
+  maskRef.referenceImage = { imageBytes: mask.bytes, mimeType: mask.mime }
+  // Dilatação leve — cobre borda do objeto/sombra.
+  maskRef.config = { maskMode: MaskReferenceMode.MASK_MODE_USER_PROVIDED, maskDilation: 0.01 }
+
+  const extraRefs = compatibleRefs.map((ref, i) => {
+    const RefClass = VERTEX_REF_CLASS[ref.role]
+    const r = new RefClass()
+    r.referenceId    = i + 3
+    r.referenceImage = { imageBytes: refImgs[i].bytes, mimeType: refImgs[i].mime }
+    return r
+  })
 
   const request: Record<string, unknown> = {
-    model:  VERTEX_IMAGEN_MODEL,
-    prompt: input.prompt,
-    referenceImages: [
-      {
-        referenceType: 'REFERENCE_TYPE_RAW',
-        referenceId:   1,
-        referenceImage: { imageBytes: img.bytes, mimeType: img.mime },
-      },
-      {
-        referenceType: 'REFERENCE_TYPE_MASK',
-        referenceId:   2,
-        referenceImage: { imageBytes: mask.bytes, mimeType: mask.mime },
-        maskImageConfig: {
-          maskMode:     'MASK_MODE_USER_PROVIDED',
-          // Dilatação leve (fração do lado) — cobre a borda do objeto/sombra.
-          maskDilation: 0.01,
-        },
-      },
-      ...extraReferenceImages,
-    ],
+    model:           VERTEX_IMAGEN_MODEL,
+    prompt:          input.prompt,
+    referenceImages: [rawRef, maskRef, ...extraRefs],
     config: {
       editMode,
-      numberOfImages: 1,
+      numberOfImages:   1,
       includeRaiReason: true,
       ...(input.seed !== undefined ? { seed: input.seed } : {}),
     },

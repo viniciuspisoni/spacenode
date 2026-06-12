@@ -16,7 +16,10 @@ import {
 import type { Quality } from '../types'
 import { buildTwoImageMaskPrompt, buildInstructPrompt } from './mask-prompt'
 
+// fal-ai/nano-banana-pro/edit é o ID interno do router; o endpoint FAL real é
+// fal-ai/gemini-3-pro-image-preview/edit (Gemini 3 Pro Image).
 export const NANO_BANANA_PRO_EDIT_ENDPOINT = 'fal-ai/nano-banana-pro/edit'
+const FAL_NB_PRO_ENDPOINT = 'fal-ai/gemini-3-pro-image-preview/edit'
 const TIMEOUT_MS = 150_000
 
 const QUALITY_RESOLUTION: Record<Quality, string> = {
@@ -39,7 +42,7 @@ async function callNBPro(input: RetouchInput, withMask: boolean): Promise<Retouc
     : buildInstructPrompt(input.prompt, input.references)
 
   const result = await Promise.race([
-    fal.subscribe(NANO_BANANA_PRO_EDIT_ENDPOINT, {
+    fal.subscribe(FAL_NB_PRO_ENDPOINT, {
       input: {
         prompt,
         image_urls:    imageUrls,
