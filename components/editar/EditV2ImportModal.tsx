@@ -2,17 +2,26 @@
 
 // EditV2ImportModal — importar imagem do histórico para o novo Editar.
 //
-// Fontes: Renders (GET /api/renders/list) e Edições (GET /api/edits) — via
-// APIs existentes, sem consultar o banco direto do client (diferença
-// deliberada vs o modal v1). Seleção devolve só a URL; o fluxo decide o resto.
+// Fontes (independente do provider que gerou a imagem — FAL antiga, Google
+// nova, upload: para o usuário é só uma imagem do projeto):
+//   Renders → GET /api/renders/list (coluna real: OUTPUT_URL — a tabela
+//             renders não tem image_url; lição do bug 2026-06-12)
+//   Vistas  → consulta RLS client-side (não existe API de listagem; mesmo
+//             padrão comprovado do modal v1)
+//   Edições → GET /api/edits (result_image_url)
+//
+// Mapeamento de URL é TOLERANTE (output_url ?? image_url ?? result_image_url
+// ?? result_url ?? public_url) — nunca filtramos por provider/modelo/CDN.
 
 import { useEffect, useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
 
-type Tab = 'renders' | 'edits'
+type Tab = 'renders' | 'vistas' | 'edits'
 
 interface Item {
   id: string
   url: string
+  label: string
   createdAt: string
 }
 
@@ -22,9 +31,29 @@ interface Props {
   onSelect: (url: string) => void
 }
 
+/** Primeira URL plausível entre os nomes de coluna usados pelas superfícies
+ *  do produto, em ordem de prevalência. */
+function pickUrl(row: Record<string, unknown>): string | null {
+  for (const key of ['output_url', 'image_url', 'result_image_url', 'result_url', 'public_url']) {
+    const v = row[key]
+    if (typeof v === 'string' && v.length > 0) return v
+  }
+  return null
+}
+
+const EMPTY_COPY: Record<Tab, string> = {
+  renders: 'Nenhum render concluído ainda. Gere uma imagem no Renderizar — ou envie um arquivo.',
+  vistas: 'Nenhuma vista gerada em Spaces ainda.',
+  edits: 'Nenhuma edição anterior ainda.',
+}
+
 export function EditV2ImportModal({ open, onClose, onSelect }: Props) {
   const [tab, setTab] = useState<Tab>('renders')
-  const [items, setItems] = useState<Record<Tab, Item[] | null>>({ renders: null, edits: null })
+  const [items, setItems] = useState<Record<Tab, Item[] | null>>({
+    renders: null,
+    vistas: null,
+    edits: null,
+  })
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -33,31 +62,56 @@ export function EditV2ImportModal({ open, onClose, onSelect }: Props) {
     ;(async () => {
       try {
         setError(null)
+        let list: Item[] = []
+
         if (tab === 'renders') {
           const res = await fetch(`/api/renders/list?cursor=${encodeURIComponent(new Date().toISOString())}`)
           const json = await res.json()
           if (!res.ok) throw new Error(json?.error)
-          const list: Item[] = (json.renders ?? [])
-            .filter((r: { image_url?: string }) => typeof r.image_url === 'string' && r.image_url)
-            .map((r: { id: string; image_url: string; created_at: string }) => ({
-              id: r.id,
-              url: r.image_url,
-              createdAt: r.created_at,
+          list = (json.renders ?? [])
+            // upscales/vídeos também moram em renders — não são base de edição
+            .filter((r: { ambient?: string | null }) => r.ambient !== 'upscale' && r.ambient !== 'video')
+            .map((r: Record<string, unknown>) => ({
+              id: String(r.id),
+              url: pickUrl(r),
+              label: String(r.ambient ?? r.style ?? 'Render'),
+              createdAt: String(r.created_at ?? ''),
             }))
-          if (!cancelled) setItems(prev => ({ ...prev, renders: list }))
+            .filter((i: Item & { url: string | null }): i is Item => Boolean(i.url))
+        } else if (tab === 'vistas') {
+          // Sem API de listagem de vistas — consulta RLS direta (padrão do v1).
+          const sb = createClient()
+          const { data, error: qErr } = await sb
+            .from('vistas')
+            .select('id, image_url, axis_label, created_at')
+            .eq('status', 'completed')
+            .not('image_url', 'is', null)
+            .order('created_at', { ascending: false })
+            .limit(60)
+          if (qErr) throw qErr
+          list = (data ?? [])
+            .map(v => ({
+              id: String(v.id),
+              url: pickUrl(v as Record<string, unknown>),
+              label: String(v.axis_label ?? 'Vista'),
+              createdAt: String(v.created_at ?? ''),
+            }))
+            .filter((i): i is Item => Boolean(i.url))
         } else {
           const res = await fetch('/api/edits')
           const json = await res.json()
           if (!res.ok) throw new Error(json?.error)
-          const list: Item[] = (json.edits ?? [])
-            .filter((e: { result_image_url?: string }) => typeof e.result_image_url === 'string' && e.result_image_url)
-            .map((e: { id: string; result_image_url: string; created_at: string }) => ({
-              id: e.id,
-              url: e.result_image_url,
-              createdAt: e.created_at,
+          list = (json.edits ?? [])
+            .map((e: Record<string, unknown>) => ({
+              id: String(e.id),
+              url: pickUrl(e),
+              label: typeof e.prompt === 'string' && e.prompt ? e.prompt.slice(0, 40) : 'Edição',
+              createdAt: String(e.created_at ?? ''),
             }))
-          if (!cancelled) setItems(prev => ({ ...prev, edits: list }))
+            .filter((i: Item & { url: string | null }): i is Item => Boolean(i.url))
         }
+
+        if (!cancelled) setItems(prev => ({ ...prev, [tab]: list }))
       } catch {
         if (!cancelled) setError('Não foi possível carregar o histórico.')
       }
@@ -80,6 +134,8 @@ export function EditV2ImportModal({ open, onClose, onSelect }: Props) {
     cursor: 'pointer',
   })
 
+  const count = (t: Tab) => (items[t] !== null ? ` (${items[t]!.length})` : '')
+
   return (
     <div
       onClick={onClose}
@@ -96,7 +152,7 @@ export function EditV2ImportModal({ open, onClose, onSelect }: Props) {
       <div
         onClick={e => e.stopPropagation()}
         style={{
-          width: 'min(860px, 100%)',
+          width: 'min(880px, 100%)',
           maxHeight: '78vh',
           display: 'flex',
           flexDirection: 'column',
@@ -117,10 +173,13 @@ export function EditV2ImportModal({ open, onClose, onSelect }: Props) {
         >
           <span style={{ fontSize: 14.5, fontWeight: 600, marginRight: 10 }}>Importar do histórico</span>
           <button type="button" style={tabBtn(tab === 'renders')} onClick={() => setTab('renders')}>
-            Renders
+            Renders{count('renders')}
+          </button>
+          <button type="button" style={tabBtn(tab === 'vistas')} onClick={() => setTab('vistas')}>
+            Vistas{count('vistas')}
           </button>
           <button type="button" style={tabBtn(tab === 'edits')} onClick={() => setTab('edits')}>
-            Edições
+            Edições{count('edits')}
           </button>
           <div style={{ flex: 1 }} />
           <button
@@ -151,7 +210,7 @@ export function EditV2ImportModal({ open, onClose, onSelect }: Props) {
           )}
           {!error && current !== null && current.length === 0 && (
             <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', padding: 24, textAlign: 'center' }}>
-              {tab === 'renders' ? 'Nenhum render no histórico ainda.' : 'Nenhuma edição no histórico ainda.'}
+              {EMPTY_COPY[tab]}
             </div>
           )}
           {!error && current && current.length > 0 && (
@@ -167,7 +226,7 @@ export function EditV2ImportModal({ open, onClose, onSelect }: Props) {
                   key={item.id}
                   type="button"
                   onClick={() => onSelect(item.url)}
-                  title={new Date(item.createdAt).toLocaleDateString('pt-BR')}
+                  title={`${item.label} · ${item.createdAt ? new Date(item.createdAt).toLocaleDateString('pt-BR') : ''}`}
                   style={{
                     position: 'relative',
                     aspectRatio: '4 / 3',
