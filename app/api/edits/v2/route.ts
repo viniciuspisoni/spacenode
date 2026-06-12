@@ -70,6 +70,9 @@ interface BodyV2 {
   /** true → para ANTES do provider: valida, normaliza, roteia e simula a
    *  cobrança, sem nenhuma chamada paga. Modo de teste da Fase 2. */
   dry_run?: unknown
+  /** Só com dry_run: trata a edição como SE houvesse seleção — permite à UI
+   *  mostrar o custo estimado antes de o usuário pintar a máscara. */
+  assume_mask?: unknown
 }
 
 function parseReferencesV2(raw: unknown): EditReferenceV2[] {
@@ -179,12 +182,13 @@ export async function POST(req: Request) {
     })
 
     // ── Roteamento puro ──────────────────────────────────────────────────────
+    const assumeMask = body.dry_run === true && body.assume_mask === true
     const routeInput: EditRouteInputV2 = {
       editIntent: intent,
       qualityMode: quality,
       preservationMode: preservation,
       intensityMode: intensity,
-      hasMask: Boolean(maskUrl),
+      hasMask: Boolean(maskUrl) || assumeMask,
       maskAreaRatio: maskCoverage,
       hasReferenceImage: references.length > 0,
       referenceKind: references[0]?.kind ?? null,
