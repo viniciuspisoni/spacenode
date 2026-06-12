@@ -17,6 +17,13 @@ export {
   type SemanticGateOpts,
   type SemanticGateReason,
 } from './semantic-gate'
+export {
+  runEditV2,
+  assertSafeImageUrl,
+  EditV2InputError,
+  type EditV2RunInput,
+  type EditV2RunResult,
+} from './pipeline'
 export { vertexImagenEditV2, VERTEX_IMAGEN_MODEL_V2 } from './providers/vertex-imagen'
 export {
   geminiImageEditV2,

@@ -5,16 +5,23 @@
 // Sem classifier por keywords (a fonte de roteamento errático do v1 morreu);
 // a intenção vem da escolha explícita do usuário, e nuances vêm do normalizador.
 //
-// Matriz de roteamento (Econômica):
+// Matriz de roteamento (Econômica) — POR EVIDÊNCIA (mini-batch pago de
+// 2026-06-12, 3 casos limpos; decisão do fundador na mesma data):
 //   fix_image / remove_element  → Vertex Imagen (máscara real) quando ligado e
 //                                 sem referência; senão Gemini Flash mascarado.
-//   swap_material sem ref+mask  → Vertex Imagen (insertion).
-//   swap_material com ref       → Gemini Flash (multi-imagem; máscara como mapa).
-//   swap_material sem máscara   → Gemini Flash (instrução, imagem inteira).
-//   insert_element com ref      → Gemini Flash (multi-imagem).
-//   insert_element sem ref      → Vertex Imagen (insertion) quando ligado.
+//                                 Vertex é imbatível em "reconstruir o que
+//                                 deveria estar ali" (caso 2: reparo impecável).
+//   swap_material (QUALQUER)    → Gemini Flash. O mini-batch provou o Vertex
+//                                 fraco para TRANSFORMAR material (caso 3: só
+//                                 esquentou o tom). Recompose garante o resto.
+//   insert_element              → Gemini Flash (com ou sem referência — Vertex
+//                                 insertion não foi validado p/ inserção real).
 //   adjust_atmosphere           → Gemini Flash (instrução; máscara opcional).
 // Alta precisão: SEMPRE gemini-3-pro-image (mascarado ou instrução).
+// Caso especial documentado: REMOÇÃO DE OBJETO LUMINOSO/reflexivo — o brilho
+// projetado fora da máscara força o modelo a "explicar" a luz reinventando um
+// emissor (caso 1 do mini-batch). Tratamento: UX/normalizador orientam a
+// selecionar objeto + brilho/reflexo inteiros (Fase 5).
 //
 // Fallback de retry: vertex → gemini-flash; gemini → gemini (prompt restritivo).
 // FAL nunca aparece aqui — só como rota de emergência por flag, fora do router.
@@ -91,25 +98,24 @@ function chooseEconomic(input: EditRouteInputV2, flags: EditV2Flags): ModelChoic
       return { ...gemini, reason: `${input.editIntent}: Gemini mascarado (Vertex indisponível ou referência presente)` }
 
     case 'swap_material':
+      // Evidência (mini-batch 2026-06-12, caso 3): Vertex insertion é conservador
+      // demais para TRANSFORMAR material — nunca rotear material para Vertex.
       if (!input.hasMask) {
         return { ...gemini, reason: 'swap_material sem seleção: instrução na imagem inteira (Gemini)' }
       }
       if (input.hasReferenceImage) {
         return { ...gemini, reason: 'swap_material com referência de material: multi-imagem (Gemini)' }
       }
-      if (vertexEligible(input, flags)) {
-        return { ...vertex, reason: 'swap_material sem referência: inpaint insertion (Vertex)' }
-      }
-      return { ...gemini, reason: 'swap_material: Gemini mascarado (Vertex indisponível)' }
+      return { ...gemini, reason: 'swap_material: re-síntese de material (Gemini) + recompose' }
 
     case 'insert_element':
-      if (input.hasReferenceImage) {
-        return { ...gemini, reason: 'insert_element com referência de objeto: multi-imagem (Gemini)' }
+      // Inserção real não validada no Vertex — Gemini por segurança (decisão 2026-06-12).
+      return {
+        ...gemini,
+        reason: input.hasReferenceImage
+          ? 'insert_element com referência de objeto: multi-imagem (Gemini)'
+          : 'insert_element: inserção por re-síntese (Gemini) + recompose',
       }
-      if (vertexEligible(input, flags)) {
-        return { ...vertex, reason: 'insert_element sem referência: inpaint insertion (Vertex)' }
-      }
-      return { ...gemini, reason: 'insert_element: Gemini mascarado (Vertex indisponível)' }
 
     case 'adjust_atmosphere':
       return {
