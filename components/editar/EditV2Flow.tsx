@@ -198,15 +198,39 @@ export function EditV2Flow({ initialBalance }: { initialBalance: number }) {
         setNotice('Não foi possível detectar a superfície agora — sua marcação será usada como está.')
         return
       }
+
+      // Refino edge-aware (local, sem custo): a borda da superfície adere aos
+      // contornos visuais — encontros de materiais, móveis, marcenaria.
+      // Best-effort: em falha, a máscara do segment serve como está.
+      let surfaceUrl: string = json.surface_mask_url
+      let surfaceCoverage: number =
+        typeof json.surface_coverage === 'number' ? json.surface_coverage : 0
+      if (json.used_fallback !== true) {
+        try {
+          const ref = await fetch('/api/edits/v2/refine-mask', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image_url: sourceUrl, mask_url: surfaceUrl }),
+          })
+          const refined = await ref.json().catch(() => null)
+          if (ref.ok && typeof refined?.mask_url === 'string' && refined.mask_url) {
+            surfaceUrl = refined.mask_url
+            if (typeof refined.coverage === 'number') surfaceCoverage = refined.coverage
+          }
+        } catch {
+          /* segue com a máscara do segment */
+        }
+      }
+
       setSurface({
-        url: json.surface_mask_url,
-        coverage: typeof json.surface_coverage === 'number' ? json.surface_coverage : 0,
+        url: surfaceUrl,
+        coverage: surfaceCoverage,
         usedFallback: json.used_fallback === true,
       })
       // A superfície vira a camada-base; os rabiscos-semente saem de cena e o
       // pincel/borracha passam a REFINAR a superfície.
       canvasRef.current?.clearStrokes()
-      if (typeof json.surface_coverage === 'number') setCoverage(json.surface_coverage)
+      setCoverage(surfaceCoverage)
       if (json.used_fallback === true) {
         setNotice('Não foi possível expandir além da sua marcação — ela será usada como está.')
       }
