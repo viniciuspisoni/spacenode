@@ -109,8 +109,11 @@ export function EditV2Flow({ initialBalance }: { initialBalance: number }) {
   /** Seleção por superfície (Trocar material): a marcação do usuário é
    *  SEMENTE; o sistema expande para a superfície coerente via /api/edits/segment
    *  (SAM2 — custo da casa, mesma política do v1). */
-  const [surface, setSurface] = useState<{ url: string; coverage: number; usedFallback: boolean } | null>(null)
+  const [surface, setSurface] = useState<{ url: string; coverage: number; usedFallback: boolean; label: string | null } | null>(null)
   const [detecting, setDetecting] = useState(false)
+  /** Trocar material: 'region' = seleção por intenção (padrão); 'manual' =
+   *  pincel/máscara exato (opção secundária). */
+  const [materialMode, setMaterialMode] = useState<'region' | 'manual'>('region')
 
   const canvasRef = useRef<EditV2CanvasHandle | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -168,78 +171,64 @@ export function EditV2Flow({ initialBalance }: { initialBalance: number }) {
     setInstruction('')
     setCoverage(0)
     setSurface(null)
+    setMaterialMode('region')
     setError(null)
     setNotice(null)
     setImportOpen(false)
     setStep('edit')
   }, [])
 
-  /** Detecção de superfície: rabisco → semente → superfície inteira coerente.
-   *  Em falha, degrada para a marcação literal (nunca trava o usuário). */
-  const detectSurface = useCallback(async () => {
+  /** Seleção por intenção (Trocar material): a região marcada + a instrução são
+   *  interpretadas no backend, que identifica o elemento arquitetônico e devolve
+   *  a máscara da superfície. Em falha, degrada para a marcação como está. */
+  const detectArea = useCallback(async () => {
     if (!sourceUrl || detecting || busy) return
-    const seed = await canvasRef.current?.exportMaskBlob()
-    if (!seed) {
-      setError('Faça uma marcação na superfície antes de detectar.')
+    const region = await canvasRef.current?.exportMaskBlob()
+    if (!region) {
+      setError('Circule a região que deseja alterar antes de detectar.')
       return
     }
     setDetecting(true)
     setError(null)
     setNotice(null)
     try {
-      const seedUrl = await uploadFile(new File([seed], 'seed.png', { type: 'image/png' }), 'mask')
-      const res = await fetch('/api/edits/segment', {
+      const regionUrl = await uploadFile(new File([region], 'region.png', { type: 'image/png' }), 'mask')
+      const res = await fetch('/api/edits/v2/detect-surface', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image_url: sourceUrl, mask_url: seedUrl }),
+        body: JSON.stringify({
+          image_url: sourceUrl,
+          region_mask_url: regionUrl,
+          instruction: instruction.trim(),
+        }),
       })
       const json = await res.json().catch(() => null)
       if (!res.ok || !json?.surface_mask_url) {
-        setNotice('Não foi possível detectar a superfície agora — sua marcação será usada como está.')
+        setNotice('Não foi possível detectar a área agora — sua marcação será usada como está.')
         return
       }
 
-      // Refino edge-aware (local, sem custo): a borda da superfície adere aos
-      // contornos visuais — encontros de materiais, móveis, marcenaria.
-      // Best-effort: em falha, a máscara do segment serve como está.
-      let surfaceUrl: string = json.surface_mask_url
-      let surfaceCoverage: number =
-        typeof json.surface_coverage === 'number' ? json.surface_coverage : 0
-      if (json.used_fallback !== true) {
-        try {
-          const ref = await fetch('/api/edits/v2/refine-mask', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ image_url: sourceUrl, mask_url: surfaceUrl }),
-          })
-          const refined = await ref.json().catch(() => null)
-          if (ref.ok && typeof refined?.mask_url === 'string' && refined.mask_url) {
-            surfaceUrl = refined.mask_url
-            if (typeof refined.coverage === 'number') surfaceCoverage = refined.coverage
-          }
-        } catch {
-          /* segue com a máscara do segment */
-        }
-      }
-
+      const interp = json.interpretation ?? {}
+      const label = [interp.element_type, interp.location].filter(Boolean).join(' · ') || null
       setSurface({
-        url: surfaceUrl,
-        coverage: surfaceCoverage,
+        url: json.surface_mask_url,
+        coverage: typeof json.surface_coverage === 'number' ? json.surface_coverage : 0,
         usedFallback: json.used_fallback === true,
+        label,
       })
-      // A superfície vira a camada-base; os rabiscos-semente saem de cena e o
-      // pincel/borracha passam a REFINAR a superfície.
+      // A superfície detectada vira a camada-base; a marcação-semente sai de
+      // cena e o pincel/borracha passam a REFINAR a seleção.
       canvasRef.current?.clearStrokes()
-      setCoverage(surfaceCoverage)
+      if (typeof json.surface_coverage === 'number') setCoverage(json.surface_coverage)
       if (json.used_fallback === true) {
-        setNotice('Não foi possível expandir além da sua marcação — ela será usada como está.')
+        setNotice('Não foi possível identificar a superfície com precisão — sua marcação será usada como está. Ajuste com o pincel se precisar.')
       }
     } catch {
-      setNotice('Não foi possível detectar a superfície agora — sua marcação será usada como está.')
+      setNotice('Não foi possível detectar a área agora — sua marcação será usada como está.')
     } finally {
       setDetecting(false)
     }
-  }, [busy, detecting, sourceUrl, uploadFile])
+  }, [busy, detecting, instruction, sourceUrl, uploadFile])
 
   const handlePickSource = useCallback(
     async (file: File) => {
@@ -374,6 +363,7 @@ export function EditV2Flow({ initialBalance }: { initialBalance: number }) {
     setReferenceUrl(null)
     setCoverage(0)
     setSurface(null)
+    setMaterialMode('region')
     setResult(null)
     setNotice('Editando a partir do resultado.')
     setStep('edit')
@@ -559,19 +549,21 @@ export function EditV2Flow({ initialBalance }: { initialBalance: number }) {
           )}
           <div style={{ marginTop: 12, fontSize: 12.5, color: 'var(--color-text-secondary)' }}>
             {intent === 'swap_material' && surface
-              ? 'Superfície detectada. Ajuste com o pincel (adicionar) ou a borracha (remover) se precisar.'
-              : typeDef.maskHint}
+              ? `${surface.label ? `Detectado: ${surface.label}. ` : 'Área detectada. '}Ajuste com o pincel (adicionar) ou a borracha (remover) se precisar.`
+              : intent === 'swap_material' && materialMode === 'region'
+                ? 'Circule a superfície que deseja alterar. Não precisa pintar com precisão.'
+                : typeDef.maskHint}
             {hasSelection && (
               <span style={{ color: 'var(--color-text-tertiary)' }}>
                 {' '}· área selecionada: {(coverage * 100).toFixed(1)}%
               </span>
             )}
           </div>
-          {intent === 'swap_material' && hasSelection && busy !== 'generate' && (
-            <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+          {intent === 'swap_material' && materialMode === 'region' && hasSelection && busy !== 'generate' && (
+            <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <button
                 type="button"
-                onClick={detectSurface}
+                onClick={detectArea}
                 disabled={detecting}
                 style={{
                   padding: '6px 14px',
@@ -583,17 +575,40 @@ export function EditV2Flow({ initialBalance }: { initialBalance: number }) {
                   cursor: detecting ? 'default' : 'pointer',
                 }}
               >
-                {detecting
-                  ? 'Detectando a superfície…'
-                  : surface
-                    ? 'Detectar novamente'
-                    : 'Detectar superfície inteira'}
+                {detecting ? 'Detectando a área…' : surface ? 'Detectar novamente' : 'Detectar área'}
               </button>
-              {!surface && !detecting && (
+              {!detecting && (
                 <span style={{ fontSize: 11.5, color: 'var(--color-text-quaternary)' }}>
-                  Sua marcação indica a superfície — o sistema completa a seleção até os limites.
+                  {surface
+                    ? 'Ou gere usando a seleção atual.'
+                    : 'O sistema identifica a superfície a partir da região + instrução. Ou gere usando a marcação como está.'}
                 </span>
               )}
+            </div>
+          )}
+          {intent === 'swap_material' && busy !== 'generate' && (
+            <div style={{ marginTop: 8 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  canvasRef.current?.clearSelection()
+                  setSurface(null)
+                  setMaterialMode(m => (m === 'region' ? 'manual' : 'region'))
+                  setNotice(null)
+                }}
+                style={{
+                  fontSize: 11.5,
+                  color: 'var(--color-text-tertiary)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                  textUnderlineOffset: 3,
+                  padding: 0,
+                }}
+              >
+                {materialMode === 'region' ? 'Pintar manualmente' : 'Voltar para circular região'}
+              </button>
             </div>
           )}
           {softWarning && (
@@ -651,6 +666,7 @@ export function EditV2Flow({ initialBalance }: { initialBalance: number }) {
                     onClick={() => {
                       setIntent(t.id)
                       setError(null)
+                      setMaterialMode('region')
                       // Superfície detectada é específica do Trocar material:
                       // ao mudar de tipo, a seleção recomeça limpa.
                       if (surface) canvasRef.current?.clearSelection()
