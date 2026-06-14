@@ -35,7 +35,11 @@ const MODEL = process.env.GEMINI_SEGMENT_MODEL?.trim() || 'gemini-2.5-flash'
 // Tetos explícitos (qualidade alta da máscara, custo limitado):
 const MAX_OUTPUT_TOKENS = 8192
 const THINKING_BUDGET = 1024
-const TIMEOUT_MS = 30_000
+// GERAÇÃO DE MÁSCARA é lenta (gemini "desenha" o mapa de probabilidade — não é
+// texto/box, que sai em ~5s). O teste de 2026-06-12 estourou os 30s antigos
+// (timeout, não erro de alvo). 75s acomoda a máscara; cabe no maxDuration=120
+// da rota. Override por env.
+const TIMEOUT_MS = Number(process.env.GEMINI_SEGMENT_TIMEOUT_MS) || 75_000
 // Estimativa conservadora p/ telemetria (output grande c/ máscara base64 +
 // thinking). O teste pago fecha o número real.
 const COST_USD = 0.02
