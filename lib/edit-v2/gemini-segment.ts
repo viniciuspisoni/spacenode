@@ -1,15 +1,15 @@
 // lib/edit-v2/gemini-segment.ts
 //
-// Segmentação de alvo por Gemini Vision (motor PRIMÁRIO do Trocar material v2).
-// Uma única chamada recebe imagem + overlay verde da região + instrução PT e
-// devolve, em JSON: label/descrição/localização + box_2d + mask (PNG base64) +
-// confidence + exclusões + uma frase EN (reaproveitada pelo fallback evf-sam,
-// evitando uma 2ª chamada ao Gemini).
+// Detecção de alvo por Gemini Vision (caminho B — Trocar material v2). O Gemini
+// resolve "O QUE é o alvo" RÁPIDO: recebe imagem + overlay verde da região +
+// instrução PT e devolve, em JSON, apenas BOX + metadados (label, descrição,
+// localização, box_2d, confidence, exclusões, target_phrase_en). NÃO pede
+// máscara em pixels — gerar máscara pelo Gemini é lento (>30s, teste de
+// 2026-06-12); a máscara fina fica por conta do SAM2 dentro da box.
 //
-// Isolado em lib/edit-v2 com @google/genai direto (NÃO usa lib/gemini.ts, que
-// fixa thinkingBudget:0 — segmentação se beneficia de algum "thinking"). Tetos
-// EXPLÍCITOS de custo: thinkingBudget e maxOutputTokens limitados (qualidade
-// alta o bastante p/ a máscara, sem resposta ilimitada).
+// Isolado em lib/edit-v2 com @google/genai direto (NÃO usa lib/gemini.ts).
+// Tetos EXPLÍCITOS de custo: maxOutputTokens e thinkingBudget pequenos (a
+// saída é JSON curto, sem base64). Box-only sai em ~5s.
 
 import { GoogleGenAI, createPartFromBase64, createPartFromText } from '@google/genai'
 
@@ -21,8 +21,6 @@ export interface GeminiSegmentResult {
   targetPhraseEn: string
   /** box_2d cru [ymin, xmin, ymax, xmax] 0–1000, ou null. */
   box2d: number[] | null
-  /** PNG base64 da máscara dentro da box, ou null. */
-  maskBase64: string | null
   /** 0–1; baixa confiança → o chamador cai p/ fallback. */
   confidence: number
   exclusions: string[]
@@ -32,19 +30,15 @@ export interface GeminiSegmentResult {
 }
 
 const MODEL = process.env.GEMINI_SEGMENT_MODEL?.trim() || 'gemini-2.5-flash'
-// Tetos explícitos (qualidade alta da máscara, custo limitado):
-const MAX_OUTPUT_TOKENS = 8192
-const THINKING_BUDGET = 1024
-// GERAÇÃO DE MÁSCARA é lenta (gemini "desenha" o mapa de probabilidade — não é
-// texto/box, que sai em ~5s). O teste de 2026-06-12 estourou os 30s antigos
-// (timeout, não erro de alvo). 75s acomoda a máscara; cabe no maxDuration=120
-// da rota. Override por env.
-const TIMEOUT_MS = Number(process.env.GEMINI_SEGMENT_TIMEOUT_MS) || 75_000
-// Estimativa conservadora p/ telemetria (output grande c/ máscara base64 +
-// thinking). O teste pago fecha o número real.
-const COST_USD = 0.02
+// Tetos explícitos. Box + metadados = JSON curto → tokens baixos. Box-only é
+// rápido (~5s), ao contrário da geração de máscara (>30s). Timeout enxuto.
+const MAX_OUTPUT_TOKENS = 1024
+const THINKING_BUDGET = 512
+const TIMEOUT_MS = Number(process.env.GEMINI_SEGMENT_TIMEOUT_MS) || 25_000
+// Box-only: saída pequena → custo baixo. O teste pago fecha o número real.
+const COST_USD = 0.0015
 
-const SYSTEM = `You are the target segmenter of an architectural image editor for
+const SYSTEM = `You are the target detector of an architectural image editor for
 architects and interior designers. You receive: (1) an interior/architectural photo,
 (2) the SAME photo with a GREEN highlight over the region the user roughly circled,
 and (3) the user's edit instruction in Portuguese.
@@ -52,8 +46,9 @@ and (3) the user's edit instruction in Portuguese.
 Identify the SINGLE architectural surface/element the user wants to change material on
 — the dominant surface under/near the green region, guided by the instruction (a wall,
 the floor, a set of wood panels, a countertop, the ceiling, a cabinetry run). Return its
-tight segmentation. Exclude objects sitting ON or IN FRONT of it (rug, bed, sofa, chairs,
-lamp, plants, frames). Output JSON only, no prose.`
+TIGHT bounding box (box_2d) and a concise label. Do NOT return a pixel mask. List the
+objects sitting ON or IN FRONT of it that must be excluded (rug, bed, sofa, chairs, lamp,
+plants, frames). Output JSON only, no prose.`
 
 let _client: GoogleGenAI | null = null
 function client(): GoogleGenAI {
@@ -79,7 +74,6 @@ interface SegLlmOutput {
   location?: unknown
   target_phrase_en?: unknown
   box_2d?: unknown
-  mask?: unknown
   confidence?: unknown
   exclusions?: unknown
 }
@@ -111,7 +105,7 @@ export interface GeminiSegmentOpts {
 export async function geminiSegmentTarget(opts: GeminiSegmentOpts): Promise<GeminiSegmentResult> {
   const empty: GeminiSegmentResult = {
     label: '', description: '', location: '', targetPhraseEn: 'the highlighted surface',
-    box2d: null, maskBase64: null, confidence: 0, exclusions: [],
+    box2d: null, confidence: 0, exclusions: [],
     used: false, durationMs: 0, costUsdEstimated: 0,
   }
   if (!opts.enabled) return empty
@@ -130,8 +124,7 @@ export async function geminiSegmentTarget(opts: GeminiSegmentOpts): Promise<Gemi
         description: 'string — short PT',
         location: 'string — short PT (ex.: parede esquerda)',
         target_phrase_en: 'string — concise EN phrase naming the element',
-        box_2d: '[ymin, xmin, ymax, xmax] integers normalized 0-1000',
-        mask: 'base64 PNG probability mask covering the element INSIDE box_2d',
+        box_2d: '[ymin, xmin, ymax, xmax] integers normalized 0-1000 (TIGHT box of the element)',
         confidence: 'number 0-1',
         exclusions: 'string[] EN objects on top to exclude',
       },
@@ -175,7 +168,6 @@ export async function geminiSegmentTarget(opts: GeminiSegmentOpts): Promise<Gemi
           ? item.target_phrase_en.trim()
           : (typeof item.label === 'string' && item.label.trim() ? item.label.trim() : empty.targetPhraseEn),
       box2d: Array.isArray(item.box_2d) ? (item.box_2d as number[]) : null,
-      maskBase64: typeof item.mask === 'string' && item.mask.length > 0 ? item.mask : null,
       confidence,
       exclusions,
       used: true,

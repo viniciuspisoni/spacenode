@@ -1,17 +1,18 @@
 // POST /api/edits/v2/detect-surface — SELEÇÃO POR INTENÇÃO (Trocar material v2).
 //
 // A marcação do usuário é REGIÃO APROXIMADA (âncora), não máscara final.
-// Prioridade de motores (Gemini-first; evf-sam vira fallback):
-//   1. GEMINI VISION: imagem + overlay da região + instrução → box_2d + mask
-//      (PNG base64) + label/confidence/exclusões. Rasteriza a mask full-res.
-//   2. Se só veio box (ou mask ruim) → SAM2 dentro da box.
-//   3. Fallback evf-sam(target_phrase_en) — reusa a frase do MESMO Gemini.
-//   4. Fallback final: a própria região marcada.
-//   Em todos: ancora por COMPONENTE CONEXO à região + refino edge-aware.
+// CAMINHO B (Gemini box + SAM2 dentro da box):
+//   1. GEMINI VISION (rápido, box-only): imagem + overlay da região + instrução
+//      → box_2d + label/location/confidence/exclusões. Gemini resolve "O QUE".
+//   2. box → pixels reais → SAM2 roda DENTRO da box. SAM resolve "quais pixels".
+//   3. Componente conexo tocando a região (âncora) + exclusões + refino edge-aware.
+//   4. Fallback evf-sam(target_phrase_en) se o Gemini falhar/baixa confiança.
+//   5. Fallback final: a própria região marcada.
+//   (Gemini mask direto fica como experimento futuro — gerar máscara é lento.)
 //
-// Custo da casa (~US$0,013–0,03/detecção, Gemini com máscara + thinking
-// limitados). NÃO debita Nodes. Flag-gated, allowlist SSRF, best-effort.
-// /api/edits/segment e o v1 ficam intocados — só reusa libs compartilhadas.
+// Custo da casa (~US$0,003–0,012/detecção: Gemini box + SAM2 ± exclusões).
+// NÃO debita Nodes. Flag-gated, allowlist SSRF, best-effort. /api/edits/segment
+// e o v1 ficam intocados — só reusa libs compartilhadas.
 
 import { NextResponse } from 'next/server'
 import sharp from 'sharp'
@@ -29,7 +30,7 @@ import { editV2Enabled, normalizerEnabled } from '@/lib/edit-v2/flags'
 import { assertSafeImageUrl, EditV2InputError } from '@/lib/edit-v2/pipeline'
 import { refineSurfaceMaskV2 } from '@/lib/edit-v2/mask-refine'
 import { geminiSegmentTarget } from '@/lib/edit-v2/gemini-segment'
-import { parseBoxNorm, rasterizeBoxMask, boxToPixels } from '@/lib/edit-v2/gemini-mask-raster'
+import { parseBoxNorm, boxToPixels } from '@/lib/edit-v2/gemini-mask-raster'
 import {
   expandedRegionMask,
   intersectMasks,
@@ -43,9 +44,6 @@ export const maxDuration = 120
 const MIN_REGION_RATIO = 0.0002      // região praticamente vazia → 400
 const REGION_MARGIN = 0.12           // expansão da bbox (só no fallback de segurança)
 const MIN_CONFIDENCE = 0.45          // abaixo disto, descarta o Gemini → fallback
-// Acima disto, a "superfície conectada" provavelmente engoliu a cena toda →
-// recua para a região local, mais seguro.
-const MAX_SURFACE_RATIO = 0.65
 
 interface Body {
   image_url?: unknown
@@ -120,50 +118,41 @@ export async function POST(req: Request) {
     let policy = ''
     let segMs = 0
 
-    // 1. GEMINI MASK DIRETO: rasteriza a máscara na box e ancora por componente.
-    if (seg.confidence >= MIN_CONFIDENCE && seg.maskBase64 && seg.box2d) {
-      const box = parseBoxNorm(seg.box2d)
-      if (box) {
-        const gmask = await rasterizeBoxMask({ maskBase64: seg.maskBase64, box, width: W, height: H })
-        if (gmask) {
-          const cc = await keepComponentsOverlappingRegion(gmask, region)
-          if (cc && cc.coverage >= MIN_REGION_RATIO && cc.coverage <= MAX_SURFACE_RATIO) {
-            candidate = cc.mask
-            policy = 'gemini-mask'
-          } else if (cc && cc.coverage > MAX_SURFACE_RATIO) {
-            candidate = await intersectMasks(gmask, expanded)
-            policy = 'gemini-mask-too-big->local'
-            usedFallback = true
-          }
-        }
-      }
-    }
-
-    // 2. GEMINI BOX + SAM2 dentro da box (quando há box mas a mask não serviu).
-    if (!candidate && seg.confidence >= MIN_CONFIDENCE && seg.box2d) {
+    // 1. PRIMÁRIO (caminho B): GEMINI BOX → SAM2 DENTRO da box. Gemini diz O QUE
+    //    e ONDE (box); SAM2 dá os pixels. Exclusões em PARALELO com o SAM2 (não
+    //    somam cold boots). Ancora por componente conexo tocando a região.
+    if (seg.confidence >= MIN_CONFIDENCE && seg.box2d) {
       const box = parseBoxNorm(seg.box2d)
       const px = box ? boxToPixels(box, W, H) : null
       if (px) {
         try {
           const segStart = Date.now()
-          const sam = await callSam2Segment({
-            imageUrl,
-            points: [{ x: px.left + px.width / 2, y: px.top + px.height / 2, label: 1 }],
-            box: { x_min: px.left, y_min: px.top, x_max: px.left + px.width, y_max: px.top + px.height },
-          })
+          const [sam, excl] = await Promise.all([
+            callSam2Segment({
+              imageUrl,
+              points: [{ x: px.left + px.width / 2, y: px.top + px.height / 2, label: 1 }],
+              box: { x_min: px.left, y_min: px.top, x_max: px.left + px.width, y_max: px.top + px.height },
+            }),
+            seg.exclusions.length > 0
+              ? callEvfSam({ imageUrl, prompt: seg.exclusions.join(', ') }).catch(() => null)
+              : Promise.resolve(null),
+          ])
           segMs = Date.now() - segStart
           const samMask = await normalizeMaskToImage(await fetchImageBuffer(sam.maskUrl), imageBuffer)
           const cc = await keepComponentsOverlappingRegion(samMask, region)
           candidate = cc?.mask ?? (await intersectMasks(samMask, expanded))
           policy = cc ? 'gemini-box-sam2' : 'gemini-box-sam2-local'
-          usedFallback = true
+          if (excl) {
+            const exclMask = await normalizeMaskToImage(await fetchImageBuffer(excl.maskUrl), imageBuffer)
+            candidate = (await subtractObjectsFromSurface(candidate, exclMask)).mask
+          }
         } catch {
-          /* cai p/ evf */
+          /* SAM2 falhou → cai p/ evf */
         }
       }
     }
 
-    // 3. FALLBACK evf-sam(alvo) — reusa a frase do MESMO Gemini (sem 2ª chamada
+    // 2. FALLBACK evf-sam(alvo) — reusa a frase do MESMO Gemini (sem 2ª chamada
     //    de visão). Exclusões em paralelo p/ não somar cold boots.
     if (!candidate) {
       let exclMask: Buffer | null = null
