@@ -1,21 +1,20 @@
 // POST /api/edits/v2/detect-surface — SELEÇÃO POR INTENÇÃO (Trocar material v2).
 //
-// A marcação do usuário é REGIÃO APROXIMADA, não máscara final. Pipeline:
-//   1. interpreta imagem + região (overlay verde) + instrução (Gemini) → alvo
-//      estruturado { target_phrase_en, element_type, location, exclusions };
-//   2. evf-sam(target_phrase_en) → máscara semântica do elemento;
-//   3. restringe à região expandida (não pega material parecido em outra parte);
-//   4. se cobre mal a região → fallback SAM2 (box = bbox do traço);
-//   5. subtrai exclusões (objetos sobre a superfície), se houver;
-//   6. refina a borda (guided filter, edge-aware);
-//   7. devolve a máscara P&B (o canvas tinge de verde sozinho) + interpretação.
+// A marcação do usuário é REGIÃO APROXIMADA (âncora), não máscara final.
+// Prioridade de motores (Gemini-first; evf-sam vira fallback):
+//   1. GEMINI VISION: imagem + overlay da região + instrução → box_2d + mask
+//      (PNG base64) + label/confidence/exclusões. Rasteriza a mask full-res.
+//   2. Se só veio box (ou mask ruim) → SAM2 dentro da box.
+//   3. Fallback evf-sam(target_phrase_en) — reusa a frase do MESMO Gemini.
+//   4. Fallback final: a própria região marcada.
+//   Em todos: ancora por COMPONENTE CONEXO à região + refino edge-aware.
 //
-// Custo da casa (~US$0,006–0,012/detecção): Gemini + 1–2 chamadas de
-// segmentação. NÃO debita Nodes, NÃO cobra. Flag-gated, allowlist SSRF,
-// best-effort (sempre devolve algo utilizável). /api/edits/segment e o v1
-// ficam intocados — só reusa funções de lib compartilhadas.
+// Custo da casa (~US$0,013–0,03/detecção, Gemini com máscara + thinking
+// limitados). NÃO debita Nodes. Flag-gated, allowlist SSRF, best-effort.
+// /api/edits/segment e o v1 ficam intocados — só reusa libs compartilhadas.
 
 import { NextResponse } from 'next/server'
+import sharp from 'sharp'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { callEvfSam, callSam2Segment } from '@/lib/spaces/engines'
@@ -29,13 +28,12 @@ import { uploadEditAsset } from '@/lib/spaces/edit-route-helpers'
 import { editV2Enabled, normalizerEnabled } from '@/lib/edit-v2/flags'
 import { assertSafeImageUrl, EditV2InputError } from '@/lib/edit-v2/pipeline'
 import { refineSurfaceMaskV2 } from '@/lib/edit-v2/mask-refine'
-import { interpretSelection } from '@/lib/edit-v2/interpret-selection'
+import { geminiSegmentTarget } from '@/lib/edit-v2/gemini-segment'
+import { parseBoxNorm, rasterizeBoxMask, boxToPixels } from '@/lib/edit-v2/gemini-mask-raster'
 import {
   expandedRegionMask,
   intersectMasks,
   keepComponentsOverlappingRegion,
-  regionBoundingBoxNorm,
-  regionCenterPx,
   regionOverlay,
 } from '@/lib/edit-v2/mask-ops'
 
@@ -44,8 +42,9 @@ export const maxDuration = 120
 
 const MIN_REGION_RATIO = 0.0002      // região praticamente vazia → 400
 const REGION_MARGIN = 0.12           // expansão da bbox (só no fallback de segurança)
-// Acima disto, a "superfície conectada" provavelmente engoliu a cena toda
-// (evf-sam genérico demais) → recua para a região local, mais seguro.
+const MIN_CONFIDENCE = 0.45          // abaixo disto, descarta o Gemini → fallback
+// Acima disto, a "superfície conectada" provavelmente engoliu a cena toda →
+// recua para a região local, mais seguro.
 const MAX_SURFACE_RATIO = 0.65
 
 interface Body {
@@ -100,79 +99,96 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Circule a região que deseja alterar.' }, { status: 400 })
     }
 
-    // 1. Interpretação (Gemini): imagem + overlay da região + instrução → alvo.
+    const W = (await sharp(imageBuffer).metadata()).width ?? 0
+    const H = (await sharp(imageBuffer).metadata()).height ?? 0
+
+    // Overlay verde da região (entrada visual do Gemini).
     const overlayBuf = await regionOverlay(imageBuffer, region)
     const overlayUrl = await uploadEditAsset(admin, userId, overlayBuf, 'crop-mask')
-    const intent = await interpretSelection({
+
+    // GEMINI VISION (motor primário): box_2d + mask + label/confidence/exclusões.
+    const seg = await geminiSegmentTarget({
       imageUrl,
       regionOverlayUrl: overlayUrl,
       instructionPt: instruction,
-      enabled: normalizerEnabled(), // mesma flag das camadas invisíveis
+      enabled: normalizerEnabled(),
     })
 
     const expanded = await expandedRegionMask(region, REGION_MARGIN) // só p/ fallback
     let candidate: Buffer | null = null
     let usedFallback = false
-    let policy = 'connected'
-
-    // 2. evf-sam(alvo) + (paralelo) evf-sam(exclusões) — paralelizar mantém a
-    //    latência ≈ 1 chamada mesmo subtraindo objetos (ver diagnóstico).
-    let evfMask: Buffer | null = null
-    let exclMask: Buffer | null = null
+    let policy = ''
     let segMs = 0
-    try {
-      const segStart = Date.now()
-      const [evf, excl] = await Promise.all([
-        callEvfSam({ imageUrl, prompt: intent.targetPhraseEn }),
-        intent.exclusions.length > 0
-          ? callEvfSam({ imageUrl, prompt: intent.exclusions.join(', ') }).catch(() => null)
-          : Promise.resolve(null),
-      ])
-      segMs = Date.now() - segStart
-      evfMask = await normalizeMaskToImage(await fetchImageBuffer(evf.maskUrl), imageBuffer)
-      if (excl) exclMask = await normalizeMaskToImage(await fetchImageBuffer(excl.maskUrl), imageBuffer)
-    } catch {
-      evfMask = null
-    }
 
-    // 3. POLÍTICA NOVA: superfície inteira CONECTADA à região (não região+margem).
-    if (evfMask) {
-      const cc = await keepComponentsOverlappingRegion(evfMask, region)
-      if (cc && cc.coverage >= MIN_REGION_RATIO && cc.coverage <= MAX_SURFACE_RATIO) {
-        candidate = cc.mask
-      } else if (cc && cc.coverage > MAX_SURFACE_RATIO) {
-        // Superfície conectada engoliu a cena → recua p/ a região local.
-        candidate = await intersectMasks(evfMask, expanded)
-        usedFallback = true
-        policy = 'connected-too-big->local'
+    // 1. GEMINI MASK DIRETO: rasteriza a máscara na box e ancora por componente.
+    if (seg.confidence >= MIN_CONFIDENCE && seg.maskBase64 && seg.box2d) {
+      const box = parseBoxNorm(seg.box2d)
+      if (box) {
+        const gmask = await rasterizeBoxMask({ maskBase64: seg.maskBase64, box, width: W, height: H })
+        if (gmask) {
+          const cc = await keepComponentsOverlappingRegion(gmask, region)
+          if (cc && cc.coverage >= MIN_REGION_RATIO && cc.coverage <= MAX_SURFACE_RATIO) {
+            candidate = cc.mask
+            policy = 'gemini-mask'
+          } else if (cc && cc.coverage > MAX_SURFACE_RATIO) {
+            candidate = await intersectMasks(gmask, expanded)
+            policy = 'gemini-mask-too-big->local'
+            usedFallback = true
+          }
+        }
       }
     }
 
-    // 4. Fallback SAM2 (box+ponto do traço) quando o evf-sam não casou com a região.
+    // 2. GEMINI BOX + SAM2 dentro da box (quando há box mas a mask não serviu).
+    if (!candidate && seg.confidence >= MIN_CONFIDENCE && seg.box2d) {
+      const box = parseBoxNorm(seg.box2d)
+      const px = box ? boxToPixels(box, W, H) : null
+      if (px) {
+        try {
+          const segStart = Date.now()
+          const sam = await callSam2Segment({
+            imageUrl,
+            points: [{ x: px.left + px.width / 2, y: px.top + px.height / 2, label: 1 }],
+            box: { x_min: px.left, y_min: px.top, x_max: px.left + px.width, y_max: px.top + px.height },
+          })
+          segMs = Date.now() - segStart
+          const samMask = await normalizeMaskToImage(await fetchImageBuffer(sam.maskUrl), imageBuffer)
+          const cc = await keepComponentsOverlappingRegion(samMask, region)
+          candidate = cc?.mask ?? (await intersectMasks(samMask, expanded))
+          policy = cc ? 'gemini-box-sam2' : 'gemini-box-sam2-local'
+          usedFallback = true
+        } catch {
+          /* cai p/ evf */
+        }
+      }
+    }
+
+    // 3. FALLBACK evf-sam(alvo) — reusa a frase do MESMO Gemini (sem 2ª chamada
+    //    de visão). Exclusões em paralelo p/ não somar cold boots.
     if (!candidate) {
+      let exclMask: Buffer | null = null
       try {
-        const box = await regionBoundingBoxNorm(region)
-        const center = await regionCenterPx(region)
-        const sam = await callSam2Segment({
-          imageUrl,
-          points: center ? [{ x: center.x, y: center.y, label: 1 }] : [],
-          box: box ?? undefined,
-        })
-        const samMask = await normalizeMaskToImage(await fetchImageBuffer(sam.maskUrl), imageBuffer)
-        const ccSam = await keepComponentsOverlappingRegion(samMask, region)
-        candidate = ccSam?.mask ?? (await intersectMasks(samMask, expanded))
-        policy = ccSam ? 'sam2-connected' : 'sam2-local'
+        const segStart = Date.now()
+        const [evf, excl] = await Promise.all([
+          callEvfSam({ imageUrl, prompt: seg.targetPhraseEn }),
+          seg.exclusions.length > 0
+            ? callEvfSam({ imageUrl, prompt: seg.exclusions.join(', ') }).catch(() => null)
+            : Promise.resolve(null),
+        ])
+        segMs = Date.now() - segStart
+        const evfMask = await normalizeMaskToImage(await fetchImageBuffer(evf.maskUrl), imageBuffer)
+        if (excl) exclMask = await normalizeMaskToImage(await fetchImageBuffer(excl.maskUrl), imageBuffer)
+        const cc = await keepComponentsOverlappingRegion(evfMask, region)
+        candidate = cc?.mask ?? (await intersectMasks(evfMask, expanded))
+        policy = cc ? 'evf-connected' : 'evf-local'
       } catch {
         candidate = await intersectMasks(region, expanded)
         policy = 'region-only'
       }
       usedFallback = true
-    }
-
-    // 5. Exclusões: subtrai objetos sobre a superfície (sem chamada extra — a
-    //    máscara de exclusão já veio em paralelo no passo 2).
-    if (exclMask) {
-      candidate = (await subtractObjectsFromSurface(candidate, exclMask)).mask
+      // Exclusões só no caminho evf (no caminho Gemini a própria máscara já as
+      // exclui — o prompt instrui a segmentar a superfície, não os objetos).
+      if (exclMask) candidate = (await subtractObjectsFromSurface(candidate, exclMask)).mask
     }
 
     // 6. Refino edge-aware (local, grátis).
@@ -190,19 +206,20 @@ export async function POST(req: Request) {
 
     const surfaceMaskUrl = await uploadEditAsset(admin, userId, finalMask, 'crop-mask')
     console.log(
-      `[edit-v2/detect-surface] user=${userId} em ${Date.now() - t0}ms · alvo="${intent.targetPhraseEn}" ` +
-      `policy=${policy} excl=${intent.exclusions.length} cov=${coverage.toFixed(4)} fallback=${usedFallback} ` +
-      `gemini=${intent.durationMs}ms/$${intent.costUsdEstimated} segMs=${segMs}`,
+      `[edit-v2/detect-surface] user=${userId} em ${Date.now() - t0}ms · alvo="${seg.targetPhraseEn}" ` +
+      `policy=${policy} conf=${seg.confidence.toFixed(2)} excl=${seg.exclusions.length} cov=${coverage.toFixed(4)} ` +
+      `fallback=${usedFallback} gemini=${seg.durationMs}ms/$${seg.costUsdEstimated} segMs=${segMs}`,
     )
 
     return NextResponse.json({
       surface_mask_url: surfaceMaskUrl,
       surface_coverage: coverage,
       used_fallback: usedFallback,
+      confidence: seg.confidence,
       interpretation: {
-        element_type: intent.elementType,
-        location: intent.location,
-        surface: intent.surface,
+        element_type: seg.label,
+        location: seg.location,
+        surface: seg.description,
       },
     })
   } catch (err) {
