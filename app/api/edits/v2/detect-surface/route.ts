@@ -30,8 +30,9 @@ import { editV2Enabled, normalizerEnabled } from '@/lib/edit-v2/flags'
 import { assertSafeImageUrl, EditV2InputError } from '@/lib/edit-v2/pipeline'
 import { refineSurfaceMaskV2 } from '@/lib/edit-v2/mask-refine'
 import { geminiSegmentTarget } from '@/lib/edit-v2/gemini-segment'
-import { parseBoxNorm, boxToPixels } from '@/lib/edit-v2/gemini-mask-raster'
+import { parseBoxNorm, boxToPixels, boxFillMask } from '@/lib/edit-v2/gemini-mask-raster'
 import {
+  completeSurfaceMask,
   expandedRegionMask,
   intersectMasks,
   keepComponentsOverlappingRegion,
@@ -115,16 +116,20 @@ export async function POST(req: Request) {
     const expanded = await expandedRegionMask(region, REGION_MARGIN) // só p/ fallback
     let candidate: Buffer | null = null
     let usedFallback = false
+    let finalizedPrimary = false // primário já refina + completa internamente
     let policy = ''
     let segMs = 0
+    let holeBefore = 0
+    let holeAfter = 0
 
-    // 1. PRIMÁRIO (caminho B): GEMINI BOX → SAM2 DENTRO da box. Gemini diz O QUE
-    //    e ONDE (box); SAM2 dá os pixels. Exclusões em PARALELO com o SAM2 (não
-    //    somam cold boots). Ancora por componente conexo tocando a região.
+    // 1. PRIMÁRIO (caminho B): GEMINI BOX → SAM2 DENTRO da box → SURFACE
+    //    COMPLETION. Gemini diz O QUE/ONDE (box); SAM2 dá os pixels; a completion
+    //    preenche faixas/ilhas internas (close + fill) limitada pela box e pelas
+    //    exclusões. Exclusões em PARALELO com o SAM2 (não somam cold boots).
     if (seg.confidence >= MIN_CONFIDENCE && seg.box2d) {
       const box = parseBoxNorm(seg.box2d)
       const px = box ? boxToPixels(box, W, H) : null
-      if (px) {
+      if (box && px) {
         try {
           const segStart = Date.now()
           const [sam, excl] = await Promise.all([
@@ -139,13 +144,24 @@ export async function POST(req: Request) {
           ])
           segMs = Date.now() - segStart
           const samMask = await normalizeMaskToImage(await fetchImageBuffer(sam.maskUrl), imageBuffer)
+          const exclMask = excl
+            ? await normalizeMaskToImage(await fetchImageBuffer(excl.maskUrl), imageBuffer)
+            : null
           const cc = await keepComponentsOverlappingRegion(samMask, region)
-          candidate = cc?.mask ?? (await intersectMasks(samMask, expanded))
-          policy = cc ? 'gemini-box-sam2' : 'gemini-box-sam2-local'
-          if (excl) {
-            const exclMask = await normalizeMaskToImage(await fetchImageBuffer(excl.maskUrl), imageBuffer)
-            candidate = (await subtractObjectsFromSurface(candidate, exclMask)).mask
-          }
+          const anchored = cc?.mask ?? (await intersectMasks(samMask, expanded))
+          // refino de borda (precisão do contorno externo) ANTES de completar
+          const refinedBase = await refineSurfaceMaskV2({ imageBuffer, maskBuffer: anchored })
+          // surface completion: preenche interior limitado pela box + exclusões
+          const boxMask = await boxFillMask(box, W, H)
+          const comp = await completeSurfaceMask(refinedBase.mask, {
+            boxMaskBuf: boxMask,
+            exclusionBuf: exclMask,
+          })
+          candidate = comp.mask
+          holeBefore = comp.holeRatioBefore
+          holeAfter = comp.holeRatioAfter
+          policy = cc ? 'gemini-box-sam2-complete' : 'gemini-box-sam2-local-complete'
+          finalizedPrimary = true
         } catch {
           /* SAM2 falhou → cai p/ evf */
         }
@@ -180,10 +196,18 @@ export async function POST(req: Request) {
       if (exclMask) candidate = (await subtractObjectsFromSurface(candidate, exclMask)).mask
     }
 
-    // 6. Refino edge-aware (local, grátis).
-    const refined = await refineSurfaceMaskV2({ imageBuffer, maskBuffer: candidate })
-    let finalMask = refined.mask
-    let coverage = refined.coverage
+    // Refino edge-aware (só nos caminhos de fallback; o primário já refinou
+    // ANTES da completion, p/ o guided filter não reabrir os seams preenchidos).
+    let finalMask: Buffer
+    let coverage: number
+    if (finalizedPrimary && candidate) {
+      finalMask = candidate
+      coverage = await maskWhiteRatio(candidate)
+    } else {
+      const refined = await refineSurfaceMaskV2({ imageBuffer, maskBuffer: candidate as Buffer })
+      finalMask = refined.mask
+      coverage = refined.coverage
+    }
 
     // Guard-rail final: máscara vazia → usa a região marcada como está.
     if (!coverage || coverage < MIN_REGION_RATIO) {
@@ -197,6 +221,7 @@ export async function POST(req: Request) {
     console.log(
       `[edit-v2/detect-surface] user=${userId} em ${Date.now() - t0}ms · alvo="${seg.targetPhraseEn}" ` +
       `policy=${policy} conf=${seg.confidence.toFixed(2)} excl=${seg.exclusions.length} cov=${coverage.toFixed(4)} ` +
+      `holeRatio=${holeBefore.toFixed(3)}->${holeAfter.toFixed(3)} ` +
       `fallback=${usedFallback} gemini=${seg.durationMs}ms/$${seg.costUsdEstimated} segMs=${segMs}`,
     )
 

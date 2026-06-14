@@ -9,6 +9,7 @@
 import sharp from 'sharp'
 import { detectMaskBoundingBox } from '@/lib/spaces/edit-crop'
 import { keepRegionComponents } from './connected-components'
+import { close, fillInteriorHoles, interiorHoleRatio, countWhite } from './mask-morphology'
 
 /** Interseção binária (branco = branco em AMBAS). Alinha dims pela 1ª. */
 export async function intersectMasks(aBuf: Buffer, bBuf: Buffer): Promise<Buffer> {
@@ -144,6 +145,65 @@ export async function keepComponentsOverlappingRegion(
     .png()
     .toBuffer()
   return { mask, coverage: keptPixels / (w * h), componentCount, keptCount }
+}
+
+/** SURFACE COMPLETION: preenche o interior da superfície-alvo (faixas/ilhas
+ *  internas) SEM crescer a borda cegamente. close (bridge de seams) +
+ *  fillInteriorHoles (tampa buracos fechados), depois RE-SUBTRAI exclusões
+ *  (objetos sobre a superfície voltam a ser buraco) e CLIPA à box (limite
+ *  arquitetônico do Gemini). Retorna a máscara completa + métricas de cobertura
+ *  (holeRatio antes/depois). 100% local. */
+export async function completeSurfaceMask(
+  maskBuf: Buffer,
+  opts: {
+    boxMaskBuf?: Buffer | null
+    exclusionBuf?: Buffer | null
+    maxWidth?: number
+    closeRatio?: number
+  } = {},
+): Promise<{ mask: Buffer; holeRatioBefore: number; holeRatioAfter: number; coverageGain: number }> {
+  const meta = await sharp(maskBuf).metadata()
+  const W = meta.width ?? 0
+  const H = meta.height ?? 0
+  if (!W || !H) return { mask: maskBuf, holeRatioBefore: 0, holeRatioAfter: 0, coverageGain: 0 }
+
+  const maxWidth = opts.maxWidth ?? 768
+  const w = Math.min(maxWidth, W)
+  const h = Math.max(1, Math.round((H / W) * w))
+  // close generoso o bastante p/ unir faixas de painel (seams/sombra), mas
+  // simétrico (não cresce a borda externa convexa).
+  const r = Math.max(2, Math.round(Math.min(w, h) * (opts.closeRatio ?? 0.02)))
+
+  const [maskRaw, boxRaw, exclRaw] = await Promise.all([
+    sharp(maskBuf).resize(w, h, { fit: 'fill' }).greyscale().raw().toBuffer(),
+    opts.boxMaskBuf
+      ? sharp(opts.boxMaskBuf).resize(w, h, { fit: 'fill' }).greyscale().raw().toBuffer()
+      : Promise.resolve(null),
+    opts.exclusionBuf
+      ? sharp(opts.exclusionBuf).resize(w, h, { fit: 'fill' }).greyscale().raw().toBuffer()
+      : Promise.resolve(null),
+  ])
+
+  const src = new Uint8Array(maskRaw)
+  const holeRatioBefore = interiorHoleRatio(src, w, h)
+
+  // 1) close (bridge faixas) → 2) fill buracos internos
+  const out = fillInteriorHoles(close(src, w, h, r), w, h)
+
+  // 3) clip à box (close não pode vazar além do limite do Gemini)
+  if (boxRaw) for (let i = 0; i < out.length; i++) if (boxRaw[i] <= 127) out[i] = 0
+  // 4) re-subtrai exclusões (objetos sobre a superfície voltam a ser buraco)
+  if (exclRaw) for (let i = 0; i < out.length; i++) if (exclRaw[i] > 127) out[i] = 0
+
+  const holeRatioAfter = interiorHoleRatio(out, w, h)
+  const coverageGain = (countWhite(out) - countWhite(src)) / (w * h)
+
+  const mask = await sharp(Buffer.from(out), { raw: { width: w, height: h, channels: 1 } })
+    .resize(W, H, { fit: 'fill' })
+    .threshold(128)
+    .png()
+    .toBuffer()
+  return { mask, holeRatioBefore, holeRatioAfter, coverageGain }
 }
 
 /** Imagem com a região do usuário tingida de verde — entrada visual para o
