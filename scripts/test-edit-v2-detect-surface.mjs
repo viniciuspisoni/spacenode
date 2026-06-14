@@ -21,8 +21,9 @@ const TEST_USER = '00000000-0000-4000-8000-0000000000ec'
 const BASE_URL = process.env.EDIT_V2_TEST_BASE ?? 'http://localhost:3000'
 const IMG = path.join(ROOT, '_batch_base.jpg')
 
-// Região aproximada (fração 0–1) sobre os painéis de madeira (parede esquerda).
-const REGION = { x0: 0.20, y0: 0.40, x1: 0.37, y1: 0.62 }
+// Região PEQUENA (fração 0–1) sobre um pedaço dos painéis (parede esquerda) —
+// valida se a política de componente conexo EXPANDE p/ a parede inteira.
+const REGION = { x0: 0.27, y0: 0.47, x1: 0.33, y1: 0.57 }
 const INSTRUCTION = 'trocar os painéis por madeira clara'
 
 function loadEnv() {

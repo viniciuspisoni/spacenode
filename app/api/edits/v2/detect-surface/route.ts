@@ -119,13 +119,16 @@ export async function POST(req: Request) {
     //    latência ≈ 1 chamada mesmo subtraindo objetos (ver diagnóstico).
     let evfMask: Buffer | null = null
     let exclMask: Buffer | null = null
+    let segMs = 0
     try {
+      const segStart = Date.now()
       const [evf, excl] = await Promise.all([
         callEvfSam({ imageUrl, prompt: intent.targetPhraseEn }),
         intent.exclusions.length > 0
           ? callEvfSam({ imageUrl, prompt: intent.exclusions.join(', ') }).catch(() => null)
           : Promise.resolve(null),
       ])
+      segMs = Date.now() - segStart
       evfMask = await normalizeMaskToImage(await fetchImageBuffer(evf.maskUrl), imageBuffer)
       if (excl) exclMask = await normalizeMaskToImage(await fetchImageBuffer(excl.maskUrl), imageBuffer)
     } catch {
@@ -189,7 +192,7 @@ export async function POST(req: Request) {
     console.log(
       `[edit-v2/detect-surface] user=${userId} em ${Date.now() - t0}ms · alvo="${intent.targetPhraseEn}" ` +
       `policy=${policy} excl=${intent.exclusions.length} cov=${coverage.toFixed(4)} fallback=${usedFallback} ` +
-      `gemini=${intent.durationMs}ms/$${intent.costUsdEstimated}`,
+      `gemini=${intent.durationMs}ms/$${intent.costUsdEstimated} segMs=${segMs}`,
     )
 
     return NextResponse.json({
