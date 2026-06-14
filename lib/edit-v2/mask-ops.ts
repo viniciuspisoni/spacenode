@@ -8,6 +8,7 @@
 
 import sharp from 'sharp'
 import { detectMaskBoundingBox } from '@/lib/spaces/edit-crop'
+import { keepRegionComponents } from './connected-components'
 
 /** Interseção binária (branco = branco em AMBAS). Alinha dims pela 1ª. */
 export async function intersectMasks(aBuf: Buffer, bBuf: Buffer): Promise<Buffer> {
@@ -96,6 +97,53 @@ export async function overlapRatio(candidateBuf: Buffer, regionBuf: Buffer): Pro
     }
   }
   return reg > 0 ? both / reg : 0
+}
+
+/** POLÍTICA "superfície inteira conectada à região": mantém os componentes
+ *  conexos da máscara candidata que TOCAM a região marcada — expande para a
+ *  superfície contígua inteira (mesmo que o traço cubra só parte dela) e
+ *  exclui material parecido DESCONECTADO (parede oposta). Retorna null se nada
+ *  tocar a região (o chamador faz fallback). 100% local. */
+export async function keepComponentsOverlappingRegion(
+  candidateBuf: Buffer,
+  regionBuf: Buffer,
+  opts: { maxWidth?: number; closeSigmaRatio?: number; regionDilateRatio?: number } = {},
+): Promise<{ mask: Buffer; coverage: number; componentCount: number; keptCount: number } | null> {
+  const meta = await sharp(candidateBuf).metadata()
+  const W = meta.width ?? 0
+  const H = meta.height ?? 0
+  if (!W || !H) return null
+
+  const maxWidth = opts.maxWidth ?? 768
+  const w = Math.min(maxWidth, W)
+  const h = Math.max(1, Math.round((H / W) * w))
+
+  // Candidata: leve close (blur+threshold) para pontes finas (sombra entre
+  // ripas) não fragmentarem a superfície em vários componentes.
+  const closeSigma = Math.max(1, Math.round(Math.min(w, h) * (opts.closeSigmaRatio ?? 0.006)))
+  // Região: leve dilatação para uma marca PERTO (não exatamente sobre) a
+  // superfície ainda ancorar o componente certo.
+  const regionDilate = Math.max(1, Math.round(Math.min(w, h) * (opts.regionDilateRatio ?? 0.01)))
+
+  const [candRaw, regRaw] = await Promise.all([
+    sharp(candidateBuf).resize(w, h, { fit: 'fill' }).greyscale().blur(closeSigma).threshold(110).raw().toBuffer(),
+    sharp(regionBuf).resize(w, h, { fit: 'fill' }).greyscale().blur(regionDilate).threshold(40).raw().toBuffer(),
+  ])
+
+  const { out, componentCount, keptCount, keptPixels } = keepRegionComponents(
+    new Uint8Array(candRaw),
+    new Uint8Array(regRaw),
+    w,
+    h,
+  )
+  if (keptCount === 0 || keptPixels === 0) return null
+
+  const mask = await sharp(Buffer.from(out), { raw: { width: w, height: h, channels: 1 } })
+    .resize(W, H, { fit: 'fill' })
+    .threshold(128)
+    .png()
+    .toBuffer()
+  return { mask, coverage: keptPixels / (w * h), componentCount, keptCount }
 }
 
 /** Imagem com a região do usuário tingida de verde — entrada visual para o

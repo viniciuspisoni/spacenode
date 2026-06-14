@@ -33,7 +33,7 @@ import { interpretSelection } from '@/lib/edit-v2/interpret-selection'
 import {
   expandedRegionMask,
   intersectMasks,
-  overlapRatio,
+  keepComponentsOverlappingRegion,
   regionBoundingBoxNorm,
   regionCenterPx,
   regionOverlay,
@@ -43,8 +43,10 @@ export const runtime = 'nodejs'
 export const maxDuration = 120
 
 const MIN_REGION_RATIO = 0.0002      // região praticamente vazia → 400
-const POOR_COVERAGE = 0.15           // evf-sam cobriu mal a região → SAM2 fallback
-const REGION_MARGIN = 0.12           // expansão da bbox do traço
+const REGION_MARGIN = 0.12           // expansão da bbox (só no fallback de segurança)
+// Acima disto, a "superfície conectada" provavelmente engoliu a cena toda
+// (evf-sam genérico demais) → recua para a região local, mais seguro.
+const MAX_SURFACE_RATIO = 0.65
 
 interface Body {
   image_url?: unknown
@@ -108,22 +110,43 @@ export async function POST(req: Request) {
       enabled: normalizerEnabled(), // mesma flag das camadas invisíveis
     })
 
-    // 2–3. evf-sam(alvo) ∩ região expandida.
-    const expanded = await expandedRegionMask(region, REGION_MARGIN)
-    let candidate: Buffer
+    const expanded = await expandedRegionMask(region, REGION_MARGIN) // só p/ fallback
+    let candidate: Buffer | null = null
     let usedFallback = false
+    let policy = 'connected'
+
+    // 2. evf-sam(alvo) + (paralelo) evf-sam(exclusões) — paralelizar mantém a
+    //    latência ≈ 1 chamada mesmo subtraindo objetos (ver diagnóstico).
+    let evfMask: Buffer | null = null
+    let exclMask: Buffer | null = null
     try {
-      const evf = await callEvfSam({ imageUrl, prompt: intent.targetPhraseEn })
-      const evfMask = await normalizeMaskToImage(await fetchImageBuffer(evf.maskUrl), imageBuffer)
-      candidate = await intersectMasks(evfMask, expanded)
+      const [evf, excl] = await Promise.all([
+        callEvfSam({ imageUrl, prompt: intent.targetPhraseEn }),
+        intent.exclusions.length > 0
+          ? callEvfSam({ imageUrl, prompt: intent.exclusions.join(', ') }).catch(() => null)
+          : Promise.resolve(null),
+      ])
+      evfMask = await normalizeMaskToImage(await fetchImageBuffer(evf.maskUrl), imageBuffer)
+      if (excl) exclMask = await normalizeMaskToImage(await fetchImageBuffer(excl.maskUrl), imageBuffer)
     } catch {
-      candidate = await intersectMasks(region, expanded) // degrada p/ o próprio traço
-      usedFallback = true
+      evfMask = null
     }
 
-    // 4. Cobertura ruim → SAM2 (box do traço). Exclusivo com a subtração (custo).
-    const cov = await overlapRatio(candidate, region)
-    if (cov < POOR_COVERAGE) {
+    // 3. POLÍTICA NOVA: superfície inteira CONECTADA à região (não região+margem).
+    if (evfMask) {
+      const cc = await keepComponentsOverlappingRegion(evfMask, region)
+      if (cc && cc.coverage >= MIN_REGION_RATIO && cc.coverage <= MAX_SURFACE_RATIO) {
+        candidate = cc.mask
+      } else if (cc && cc.coverage > MAX_SURFACE_RATIO) {
+        // Superfície conectada engoliu a cena → recua p/ a região local.
+        candidate = await intersectMasks(evfMask, expanded)
+        usedFallback = true
+        policy = 'connected-too-big->local'
+      }
+    }
+
+    // 4. Fallback SAM2 (box+ponto do traço) quando o evf-sam não casou com a região.
+    if (!candidate) {
       try {
         const box = await regionBoundingBoxNorm(region)
         const center = await regionCenterPx(region)
@@ -133,21 +156,20 @@ export async function POST(req: Request) {
           box: box ?? undefined,
         })
         const samMask = await normalizeMaskToImage(await fetchImageBuffer(sam.maskUrl), imageBuffer)
-        candidate = await intersectMasks(samMask, expanded)
-        usedFallback = true
+        const ccSam = await keepComponentsOverlappingRegion(samMask, region)
+        candidate = ccSam?.mask ?? (await intersectMasks(samMask, expanded))
+        policy = ccSam ? 'sam2-connected' : 'sam2-local'
       } catch {
         candidate = await intersectMasks(region, expanded)
-        usedFallback = true
+        policy = 'region-only'
       }
-    } else if (intent.exclusions.length > 0) {
-      // 5. Subtrai objetos sobre a superfície (1 chamada evf-sam adicional).
-      try {
-        const excl = await callEvfSam({ imageUrl, prompt: intent.exclusions.join(', ') })
-        const exclMask = await normalizeMaskToImage(await fetchImageBuffer(excl.maskUrl), imageBuffer)
-        candidate = (await subtractObjectsFromSurface(candidate, exclMask)).mask
-      } catch {
-        /* segue sem subtração */
-      }
+      usedFallback = true
+    }
+
+    // 5. Exclusões: subtrai objetos sobre a superfície (sem chamada extra — a
+    //    máscara de exclusão já veio em paralelo no passo 2).
+    if (exclMask) {
+      candidate = (await subtractObjectsFromSurface(candidate, exclMask)).mask
     }
 
     // 6. Refino edge-aware (local, grátis).
@@ -160,12 +182,13 @@ export async function POST(req: Request) {
       finalMask = await intersectMasks(region, expanded)
       coverage = await maskWhiteRatio(finalMask)
       usedFallback = true
+      policy = 'region-only'
     }
 
     const surfaceMaskUrl = await uploadEditAsset(admin, userId, finalMask, 'crop-mask')
     console.log(
       `[edit-v2/detect-surface] user=${userId} em ${Date.now() - t0}ms · alvo="${intent.targetPhraseEn}" ` +
-      `excl=${intent.exclusions.length} cov=${coverage.toFixed(4)} fallback=${usedFallback} ` +
+      `policy=${policy} excl=${intent.exclusions.length} cov=${coverage.toFixed(4)} fallback=${usedFallback} ` +
       `gemini=${intent.durationMs}ms/$${intent.costUsdEstimated}`,
     )
 
