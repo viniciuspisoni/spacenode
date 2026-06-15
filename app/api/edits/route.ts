@@ -43,6 +43,7 @@ import {
 } from '@/lib/spaces/edit-route-helpers'
 import { runGatedEdit } from '@/lib/spaces/edit-gate'
 import { MaskImageMismatchError } from '@/lib/spaces/edit-crop'
+import sharp from 'sharp'
 
 // sharp (crop/recompose) exige runtime Node.
 export const runtime = 'nodejs'
@@ -79,7 +80,7 @@ export async function POST(req: NextRequest) {
   if (!body) return NextResponse.json({ error: 'Body inválido' }, { status: 400 })
 
   const sourceUrl    = typeof body.source_image_url === 'string' ? body.source_image_url : null
-  const maskUrl      = typeof body.mask_url === 'string' ? body.mask_url : null
+  let maskUrl        = typeof body.mask_url === 'string' ? body.mask_url : null
   const prompt       = typeof body.prompt === 'string' ? body.prompt.trim() : ''
   const referenceUrl = typeof body.reference_image_url === 'string' ? body.reference_image_url : undefined
   const premium      = body.premium === true
@@ -120,6 +121,18 @@ export async function POST(req: NextRequest) {
   const references            = parseReferences(body.references)
 
   const admin = createAdminClient()
+
+  // swap_material com referências visuais mas sem máscara pintada → gera máscara
+  // branca automática (1×1 px, normalizada pelo pipeline). Assim o nano-banana
+  // recebe o formato correto: [source, mask, texture] e usa a textura visualmente.
+  if (!maskUrl && mode === 'material' && references.length > 0) {
+    try {
+      const whitePng = await sharp(Buffer.alloc(1, 255), {
+        raw: { width: 1, height: 1, channels: 1 },
+      }).png().toBuffer()
+      maskUrl = await uploadEditAsset(admin, user.id, whitePng, 'crop-mask')
+    } catch { /* não bloqueia — segue sem máscara */ }
+  }
 
   // ── 1) Contexto + rota (sem tocar em saldo) ──
   // Cobertura da máscara medida no SERVIDOR: o valor do cliente é só estimativa

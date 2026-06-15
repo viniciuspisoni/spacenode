@@ -26,6 +26,7 @@ import {
   assertMaskMatchesImage,
   padForInpaintAspect,
   unpadInpaintResult,
+  resizeToSource,
   ASPECT_LIMITED_ENDPOINTS,
 } from './edit-crop'
 
@@ -85,19 +86,24 @@ export async function runEdit(args: RunEditArgs): Promise<RunEditResult> {
     description: routing.endpoint,
   }
 
-  // ── Endpoints SEM máscara (Flux Pro Kontext) — edição por instrução ──
-  // Não há "fora da máscara" a preservar; re-hospeda o output como veio.
+  // ── Endpoints SEM máscara (Flux Pro Kontext, Gemini instruct) — edição por instrução ──
+  // Não há "fora da máscara" a preservar. Buscamos o buffer fonte em paralelo com
+  // a chamada ao provider para redimensionar o output às dimensões originais.
   if (!usesMask || !maskUrl) {
-    const out = await callWithTimeoutRetry(descriptor, {
-      imageUrl: sourceUrl,
-      maskUrl:  maskUrl ?? sourceUrl,
-      prompt,
-      quality,
-      referenceUrl,
-      references,
-      intentHint,
-    })
-    const buf = await fetchImageBuffer(out.imageUrl)
+    const [out, srcBuf] = await Promise.all([
+      callWithTimeoutRetry(descriptor, {
+        imageUrl: sourceUrl,
+        maskUrl:  maskUrl ?? sourceUrl,
+        prompt,
+        quality,
+        referenceUrl,
+        references,
+        intentHint,
+      }),
+      fetchImageBuffer(sourceUrl),
+    ])
+    const rawBuf = await fetchImageBuffer(out.imageUrl)
+    const buf = await resizeToSource(rawBuf, srcBuf)
     const resultUrl = await uploadResult(buf, 'result')
     return { resultUrl, usedCrop: false, cropMegapixels: null, endpoint: out.endpoint, outOfMaskDelta: null, inMaskDelta: null }
   }
@@ -171,9 +177,15 @@ export async function runEdit(args: RunEditArgs): Promise<RunEditResult> {
 
   // ── Caminho de IMAGEM INTEIRA com máscara (nano-banana/edit, gemini-3-pro) ──
   // Recompõe o output do provider sobre a original p/ preservar fora da máscara.
+  //
+  // Se a máscara foi normalizada (ex: sentinela 1×1 → full-size), re-hospeda o
+  // buffer normalizado para que o provider (FAL) busque a versão correta.
+  const engineMaskUrl = maskBuf !== maskRaw
+    ? await uploadResult(maskBuf, 'crop-mask')
+    : maskUrl
   const out = await callWithTimeoutRetry(descriptor, {
     imageUrl: sourceUrl,
-    maskUrl,
+    maskUrl:  engineMaskUrl,
     prompt,
     quality,
     referenceUrl,

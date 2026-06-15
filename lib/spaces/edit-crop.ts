@@ -470,6 +470,22 @@ export async function fullRegion(buffer: Buffer): Promise<CropRegion> {
   return { left: 0, top: 0, width: m.width ?? 0, height: m.height ?? 0 }
 }
 
+/** Redimensiona outputBuf para as mesmas dimensões de sourceBuf.
+ *  No-op se já coincidirem. Usado no caminho sem máscara (instruct) para
+ *  preservar a proporção original quando o modelo retorna tamanho diferente. */
+export async function resizeToSource(outputBuf: Buffer, sourceBuf: Buffer): Promise<Buffer> {
+  const [src, out] = await Promise.all([
+    sharp(sourceBuf).metadata(),
+    sharp(outputBuf).metadata(),
+  ])
+  if (!src.width || !src.height || (src.width === out.width && src.height === out.height)) {
+    return outputBuf
+  }
+  return sharp(outputBuf)
+    .resize(src.width, src.height, { fit: 'cover', position: 'centre' })
+    .toBuffer()
+}
+
 /**
  * Mede a fração de pixels FORA da máscara que mudaram (RMS por componente RGB
  * acima de THRESHOLD). Espelha a validação client-side, mas autoritativa no
@@ -595,6 +611,9 @@ export async function assertMaskMatchesImage(maskBuf: Buffer, imageBuf: Buffer):
   const mw = mm.width ?? 0, mh = mm.height ?? 0
   const iw = im.width ?? 0, ih = im.height ?? 0
   if (!mw || !mh || !iw || !ih) throw new MaskImageMismatchError('dimensões ilegíveis')
+  // Máscara 1×1 é sentinela de "editar imagem inteira" (gerada automaticamente pelo
+  // route para swap_material sem pincel) — normalização posterior a expande.
+  if (mw === 1 && mh === 1) return
   const maskAspect = mw / mh
   const imageAspect = iw / ih
   const diff = Math.abs(maskAspect - imageAspect) / imageAspect
