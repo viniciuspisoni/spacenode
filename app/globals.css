@@ -196,6 +196,19 @@ a {
   }
 }
 
+/* Finalizar — editor de composição. Desktop: canvas + painel 320px.
+   Tablet/mobile: colapsa em uma coluna (painel abaixo do canvas). */
+.spn-finalizar-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) 320px;
+}
+@media (max-width: 899px) {
+  .spn-finalizar-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /* Modo Editar — tabs das 7 ações arquitetônicas. Grid 7 colunas no desktop,
    quebra em linhas em tablet, scroll horizontal em mobile. */
 .spn-retocar-tabs {
