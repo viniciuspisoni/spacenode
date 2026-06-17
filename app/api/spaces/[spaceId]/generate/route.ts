@@ -33,7 +33,20 @@ import {
 
 fal.config({ credentials: process.env.FAL_KEY })
 
-const FAL_TIMEOUT_MS = 90_000
+// A Vercel mata a função no maxDuration. As vistas geram em paralelo
+// (Promise.allSettled), então o cap precisa cobrir a vista mais lenta — não a
+// soma. 300s dá folga sobre o maior FAL_TIMEOUT_MS abaixo.
+export const maxDuration = 300
+
+// Timeout da chamada FAL por motor (espelha o /api/generate do Renderizar).
+// Vega (Nano Banana Pro) e Quasar (GPT Image 2) passam de 90s com frequência,
+// independente do tamanho da imagem. Pulsar (Nano Banana 2) é rápido. 90s flat
+// fazia a geração falhar com "tempo limite excedido" mesmo em imagem pequena.
+const FAL_TIMEOUT_MS: Record<EngineId, number> = {
+  vega:   180_000,
+  pulsar:  90_000,
+  quasar: 180_000,
+}
 
 // ── FAL params por engine (espelha generate.ts do Renderizar) ─
 
@@ -329,7 +342,7 @@ async function generateOne(args: {
     const result = await Promise.race([
       fal.subscribe(falEndpoint, { input: falInput }),
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(Object.assign(new Error('FAL_TIMEOUT'), { isFalTimeout: true })), FAL_TIMEOUT_MS),
+        setTimeout(() => reject(Object.assign(new Error('FAL_TIMEOUT'), { isFalTimeout: true })), FAL_TIMEOUT_MS[engine]),
       ),
     ])
     const images = (result.data as { images: { url: string }[] }).images
