@@ -5,6 +5,8 @@
 
 import type { EngineId, Resolution } from '@/lib/engines'
 import type { BriefingArquitetonico } from '@/lib/prompts'
+import type { SpacesMode, SpacesPreservationLevel } from './preservation'
+import type { PreservationCheck } from './preserve-validate'
 
 export type { BriefingArquitetonico }
 
@@ -133,6 +135,22 @@ export interface Vista {
   edit_chain_root_id:        string | null
   edit_mask_coverage:        number | null
   error_message:             string | null
+  // Preserve V2 (flag NEXT_PUBLIC_SPACES_PRESERVE_V2): provenance source→generated
+  // + intenção/preservação. Sempre nullable — caminho legado não preenche.
+  source_image_url?:         string | null
+  source_width?:             number | null
+  source_height?:            number | null
+  source_aspect_ratio?:      number | null
+  source_hash?:              string | null
+  generated_width?:          number | null
+  generated_height?:         number | null
+  aspect_ratio?:             string | null
+  spaces_mode?:              SpacesMode | null
+  preservation_level?:       SpacesPreservationLevel | null
+  provider?:                 string | null
+  model?:                    string | null
+  preservation_warning?:     boolean | null
+  preservation_check?:       PreservationCheck | null
   created_at:                string
   completed_at:              string | null
 }
