@@ -30,6 +30,14 @@ import {
   type ProjectMaterials,
   type BriefingArquitetonico,
 } from '@/lib/prompts'
+import { spacesPreserveV2Enabled, visionPreservationCheckEnabled } from '@/lib/spaces/preserve-flags'
+import {
+  modeForAxis, levelForAxis,
+  type SpacesMode, type SpacesPreservationLevel,
+} from '@/lib/spaces/preservation'
+import { buildSpacesPreservePrompt } from '@/lib/spaces/preserve-prompt'
+import { computeSourceMeta, aspectRatioLabel, type SourceMeta } from '@/lib/spaces/source-meta'
+import { validateGeneration, checkArchitecturalPreservation } from '@/lib/spaces/preserve-validate'
 
 fal.config({ credentials: process.env.FAL_KEY })
 
@@ -212,11 +220,22 @@ export async function POST(
     )
   }
 
+  // ── Preserve V2 (flag-gated) ─────────────────────────────────
+  // A imagem upada é a autoridade do projeto: computamos a provenance da fonte
+  // UMA vez (não por vista) e a injetamos em cada geração. Best-effort — nunca
+  // derruba a geração. Com a flag off, nada disso roda e o caminho é idêntico
+  // ao anterior.
+  const preserveV2 = spacesPreserveV2Enabled()
+  const sourceMeta: SourceMeta | null = preserveV2
+    ? await computeSourceMeta(space.vista_mestre_url!)
+    : null
+
   // ── Geração paralela (uma transação independente por vista) ──
   const tasks = axisValues.map(axisValue =>
     generateOne({
       admin, userId: user.id, space, projectType, segment, materials, briefing,
       engine, quality, axis, axisValue, costPerVista, falEndpoint,
+      preserveV2, sourceMeta, dna: visualDna,
     })
   )
 
@@ -258,10 +277,14 @@ async function generateOne(args: {
   axisValue:    string
   costPerVista: number
   falEndpoint:  string
+  preserveV2:   boolean
+  sourceMeta:   SourceMeta | null
+  dna:          ProjectDNA | null
 }) {
   const {
     admin, userId, space, projectType, segment, materials, briefing,
     engine, quality, axis, axisValue, costPerVista, falEndpoint,
+    preserveV2, sourceMeta, dna,
   } = args
 
   let debited = false
@@ -279,54 +302,77 @@ async function generateOne(args: {
     }
     debited = true
 
+    // Intenção da ação (Preserve V2): modo + nível. Computado cedo pra registrar
+    // na row pendente também (audita até vistas que falharem).
+    const opt   = findAxisOption(axis, axisValue)!
+    const mode:  SpacesMode | null              = preserveV2 ? modeForAxis(axis)  : null
+    const level: SpacesPreservationLevel | null = preserveV2 ? levelForAxis(axis) : null
+
     // 2) row pendente
-    const opt = findAxisOption(axis, axisValue)!
+    const insertRow: Record<string, unknown> = {
+      space_id:    space.id,
+      user_id:     userId,
+      status:      'processing',
+      engine,
+      quality,
+      axis,
+      axis_value:  axisValue,
+      axis_label:  opt.label,
+      nodes_cost:  costPerVista,
+    }
+    if (preserveV2) {
+      insertRow.spaces_mode         = mode
+      insertRow.preservation_level  = level
+      insertRow.provider            = 'fal'
+      insertRow.model               = falEndpoint
+      insertRow.source_image_url    = sourceMeta?.url ?? space.vista_mestre_url
+      insertRow.source_width        = sourceMeta?.width ?? null
+      insertRow.source_height       = sourceMeta?.height ?? null
+      insertRow.source_aspect_ratio = sourceMeta?.aspectRatio ?? null
+      insertRow.source_hash         = sourceMeta?.hash ?? null
+    }
     const { data: row, error: insErr } = await admin
       .from('vistas')
-      .insert({
-        space_id:    space.id,
-        user_id:     userId,
-        status:      'processing',
-        engine,
-        quality,
-        axis,
-        axis_value:  axisValue,
-        axis_label:  opt.label,
-        nodes_cost:  costPerVista,
-      })
+      .insert(insertRow)
       .select('id')
       .single()
     if (insErr || !row) throw new Error('insert_failed: ' + (insErr?.message ?? '?'))
     vistaId = row.id as string
 
-    // 3) Monta GenerateOptions usando a stack do Renderizar
+    // 3) Prompt
     //
-    // - lighting: passamos o `promptModifier` em inglês direto. O `LIGHT_EN`
-    //   do prompts.ts tem fallback que usa o valor literal quando a chave
-    //   não é encontrada — perfeito pro nosso caso.
-    // - geometryLock 85: padrão maximum-fidelity do Renderizar
-    // - background 'Preservar Original': trava entorno da Vista Mestre
-    // - hasAnchor: false — passamos só 1 imagem (a Vista Mestre é input e DNA
-    //   ao mesmo tempo). O briefing + fidelityModifier carregam a preservação.
-    const options: GenerateOptions = {
-      projectType,
-      segment,
-      environment:    '',                       // não usado em buildFidelityPrompt
-      lighting:       opt.promptModifier,       // axis_value mapeado pra inglês
-      background:     'Preservar Original',
-      sceneElements:  [],
-      geometryLock:   85,
-      materials,
-      fidelityMode:   'strict',
-      fidelityLevel:  'maximum',
-      briefing:       briefing ?? undefined,
-      hasAnchor:      false,
-      refinementText: undefined,
+    // Preserve V2: builder PRÓPRIO do Spaces — a imagem upada é a autoridade, o
+    // prompt manda PRESERVAR e mudar só o atributo pedido (ver
+    // lib/spaces/preserve-prompt.ts). NÃO usa a moldura "isto é uma maquete 3D,
+    // re-renderize em foto" nem MATERIAL OVERRIDES do caminho do Renderizar.
+    //
+    // Legado (flag off): mantém exatamente a stack do Renderizar de antes.
+    let finalPrompt: string
+    if (preserveV2 && mode && level) {
+      finalPrompt = buildSpacesPreservePrompt({
+        level, mode, userIntent: opt.promptModifier, briefing, dna,
+      })
+    } else {
+      const options: GenerateOptions = {
+        projectType,
+        segment,
+        environment:    '',
+        lighting:       opt.promptModifier,
+        background:     'Preservar Original',
+        sceneElements:  [],
+        geometryLock:   85,
+        materials,
+        fidelityMode:   'strict',
+        fidelityLevel:  'maximum',
+        briefing:       briefing ?? undefined,
+        hasAnchor:      false,
+        refinementText: undefined,
+      }
+      finalPrompt = buildFidelityPrompt(options, 'maximum', briefing ?? undefined)
     }
 
-    const finalPrompt = buildFidelityPrompt(options, 'maximum', briefing ?? undefined)
-
-    // 4) FAL call
+    // 4) FAL call — sempre image-to-image/edit: a Vista Mestre vai como
+    // image_urls (referência). Nunca text-to-image puro.
     const falInput = {
       prompt:     finalPrompt,
       image_urls: [space.vista_mestre_url!],
@@ -336,7 +382,7 @@ async function generateOne(args: {
     console.log('[spaces.generate] engine    :', engine, '→', falEndpoint)
     console.log('[spaces.generate] quality   :', quality, '→', costPerVista, 'nodes')
     console.log('[spaces.generate] axis      :', axis, '/', axisValue)
-    console.log('[spaces.generate] briefing  :', briefing ? 'yes' : 'fallback (no briefing)')
+    console.log('[spaces.generate] preserveV2:', preserveV2, preserveV2 ? `(${mode}/${level})` : '')
     console.log('[spaces.generate] prompt    :', finalPrompt)
 
     const result = await Promise.race([
@@ -345,19 +391,53 @@ async function generateOne(args: {
         setTimeout(() => reject(Object.assign(new Error('FAL_TIMEOUT'), { isFalTimeout: true })), FAL_TIMEOUT_MS[engine]),
       ),
     ])
-    const images = (result.data as { images: { url: string }[] }).images
+    const images = (result.data as { images: { url: string; width?: number; height?: number }[] }).images
     const outputUrl = images?.[0]?.url
     if (!outputUrl) throw new Error('fal_no_output')
+    const genW = images?.[0]?.width  ?? null
+    const genH = images?.[0]?.height ?? null
 
-    // 5) Persistir completed
+    // 5) Persistir completed (+ metadados/validação de preservação no V2)
+    const updateRow: Record<string, unknown> = {
+      image_url:    outputUrl,
+      prompt:       finalPrompt,
+      status:       'completed',
+      completed_at: new Date().toISOString(),
+    }
+
+    let preservationWarning = false
+    let check: Awaited<ReturnType<typeof checkArchitecturalPreservation>> = null
+    if (preserveV2) {
+      const genAspect = genW && genH ? genW / genH : null
+      const validation = validateGeneration({
+        sourceUrl:       sourceMeta?.url ?? space.vista_mestre_url!,
+        generatedUrl:    outputUrl,
+        sourceAspect:    sourceMeta?.aspectRatio ?? null,
+        generatedAspect: genAspect,
+      })
+      if (validation.issues.length) {
+        console.warn('[spaces.generate] validação preserve:', validation.issues.join(', '))
+      }
+      preservationWarning = !validation.ok
+
+      // Checagem opcional por visão (source × generated), killável. Best-effort.
+      if (level && visionPreservationCheckEnabled()) {
+        check = await checkArchitecturalPreservation(
+          sourceMeta?.url ?? space.vista_mestre_url!, outputUrl, level,
+        )
+        if (check?.warning) preservationWarning = true
+      }
+
+      updateRow.generated_width      = genW
+      updateRow.generated_height     = genH
+      updateRow.aspect_ratio         = aspectRatioLabel(genAspect) ?? aspectRatioLabel(sourceMeta?.aspectRatio ?? null)
+      updateRow.preservation_warning = preservationWarning
+      updateRow.preservation_check   = check
+    }
+
     const { error: updErr } = await admin
       .from('vistas')
-      .update({
-        image_url:    outputUrl,
-        prompt:       finalPrompt,
-        status:       'completed',
-        completed_at: new Date().toISOString(),
-      })
+      .update(updateRow)
       .eq('id', vistaId)
     if (updErr) {
       console.error('[spaces.generate] DB update FALHOU (imagem ok, persistência não):', updErr)
@@ -374,6 +454,15 @@ async function generateOne(args: {
       axis_label: opt.label,
       nodes_cost: costPerVista,
       status:     'completed',
+      ...(preserveV2 ? {
+        spaces_mode:          mode,
+        preservation_level:   level,
+        source_image_url:     sourceMeta?.url ?? space.vista_mestre_url,
+        source_aspect_ratio:  sourceMeta?.aspectRatio ?? null,
+        aspect_ratio:         updateRow.aspect_ratio as string | null,
+        preservation_warning: preservationWarning,
+        preservation_check:   check,
+      } : {}),
     }
 
   } catch (err) {

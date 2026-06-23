@@ -14,8 +14,24 @@ import { ENGINES, type EngineId, type Resolution } from '@/lib/engines'
 import { getVistaGenerationCost, getAvailableQualities } from '@/lib/spaces/economy'
 import type { Axis, Quality } from '@/lib/spaces/types'
 import type { PlanId } from '@/lib/plans'
+import { spacesPreserveV2Enabled } from '@/lib/spaces/preserve-flags'
 import { InsufficientBalancePanel } from './InsufficientBalancePanel'
 import { SketchGuidedEixoBody, type SketchPayload } from './SketchGuidedEixoBody'
+
+// Labels/descrições arquitetônicos (Preserve V2). Deixam claro que cada eixo é
+// uma VARIAÇÃO CONTROLADA do projeto, não geração livre. Só usados com a flag.
+const PRESERVE_AXIS_LABEL: Record<Axis, string> = {
+  iluminacao: 'Luz',
+  angulo:     'Câmera',
+  horario:    'Clima',
+  detalhe:    'Detalhe',
+}
+const PRESERVE_AXIS_DESC: Record<Axis, string> = {
+  iluminacao: 'Altera iluminação e atmosfera mantendo câmera, geometria e arquitetura.',
+  angulo:     'Cria uma nova vista preservando o DNA arquitetônico do projeto.',
+  horario:    'Altera céu, luz e atmosfera sem mudar fachada, volumetria ou implantação.',
+  detalhe:    'Aproxima ou enfatiza uma região do projeto sem alterar sua arquitetura.',
+}
 
 interface Props {
   engine:    EngineId
@@ -41,7 +57,8 @@ export function EixosPanel({
                                   : availableQualities[0]
   const [quality, setQuality]   = useState<Resolution>(initialQuality)
 
-  const mode = getAxisMode(axis)
+  const mode       = getAxisMode(axis)
+  const preserveV2 = spacesPreserveV2Enabled()
 
   return (
     <section style={{
@@ -76,7 +93,7 @@ export function EixosPanel({
                 transition: 'background 0.15s, color 0.15s',
               }}
             >
-              {AXIS_LABEL[a]}
+              {preserveV2 ? PRESERVE_AXIS_LABEL[a] : AXIS_LABEL[a]}
               {!avail && (
                 <span style={{
                   marginLeft: 6, fontSize: 9,
@@ -90,6 +107,16 @@ export function EixosPanel({
           )
         })}
       </div>
+
+      {/* Descrição arquitetônica do eixo ativo (Preserve V2) */}
+      {preserveV2 && (
+        <p style={{
+          fontSize: 12, color: 'var(--color-text-tertiary)',
+          lineHeight: 1.5, margin: '0 0 20px', letterSpacing: '-0.005em',
+        }}>
+          {PRESERVE_AXIS_DESC[axis]}
+        </p>
+      )}
 
       {/* Body conforme mode */}
       {mode === 'parametric' && (
@@ -120,6 +147,19 @@ export function EixosPanel({
           onGenerate={onGenerateFromSketches}
           labelSuggestions={AXIS_CONFIG[axis].labelSuggestions ?? []}
         />
+      )}
+
+      {/* Microcopy de preservação (Preserve V2) */}
+      {preserveV2 && (
+        <p style={{
+          marginTop: 18, paddingTop: 16,
+          borderTop: '0.5px solid var(--color-border)',
+          fontSize: 11, color: 'var(--color-text-quaternary)',
+          lineHeight: 1.5, letterSpacing: '-0.005em',
+        }}>
+          O Spaces preserva o projeto original. Para mudanças estruturais, use uma
+          ferramenta de edição específica.
+        </p>
       )}
     </section>
   )
