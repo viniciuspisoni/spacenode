@@ -482,15 +482,16 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
                     onClick={() => { setAction(a.id); setError(null); if (!a.ref) setReferenceUrl(null) }}
                     style={{
                       display: 'flex', flexDirection: 'row', gap: 8, alignItems: 'center',
-                      padding: '10px 12px', borderRadius: 10, textAlign: 'left',
+                      padding: '11px 12px', borderRadius: 10, textAlign: 'left',
                       border: `0.5px solid ${active ? 'var(--color-border-strong)' : 'var(--color-border)'}`,
-                      background: active ? 'var(--color-surface-hover)' : 'transparent',
+                      // Cada card tem superfície própria (não depende de hover): leitura imediata.
+                      background: active ? 'var(--color-surface-hover)' : 'var(--color-surface)',
                       color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                       cursor: 'pointer',
                     }}
                   >
-                    <span style={{ display: 'inline-flex', color: active ? 'var(--color-accent-green)' : 'var(--color-text-tertiary)' }}><a.Icon size={17} /></span>
-                    <span style={{ fontSize: 13, fontWeight: 500 }}>{a.short}</span>
+                    <span style={{ display: 'inline-flex', color: active ? 'var(--color-accent-green)' : 'var(--color-text-secondary)' }}><a.Icon size={18} /></span>
+                    <span style={{ fontSize: 13.5, fontWeight: 500 }}>{a.short}</span>
                   </button>
                 )
               })}
@@ -554,15 +555,15 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
             </div>
           </div>
 
-          {/* Custo + CTA */}
+          {/* CTA (topo) + Custo + preservação — CTA sempre visível no painel */}
           <div style={{ ...card, position: 'sticky', bottom: 12 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
-              <span style={{ fontSize: 12.5, color: 'var(--color-text-secondary)' }}>Custo estimado</span>
-              <span style={{ fontSize: 14, fontWeight: 600 }}>{cost !== null ? `${cost} nodes` : '—'}</span>
-            </div>
             <button type="button" className="edv3-cta" disabled={!canGenerate} onClick={handleGenerate}>
               {busy === 'generate' ? 'Gerando…' : 'Aplicar edição'}
             </button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 10 }}>
+              <span style={{ fontSize: 12.5, color: 'var(--color-text-secondary)' }}>Custo estimado</span>
+              <span style={{ fontSize: 14, fontWeight: 600 }}>{cost !== null ? `${cost} nodes` : '—'}</span>
+            </div>
             <div style={{ marginTop: 8, fontSize: 11, color: 'var(--color-text-quaternary)', textAlign: 'center' }}>
               Geometria, câmera e proporções são preservadas
             </div>
