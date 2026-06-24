@@ -29,6 +29,7 @@ type Intensity = 'subtle' | 'standard' | 'strong'
 interface ActionDef {
   id: Action
   label: string
+  short: string
   Icon: typeof IconRemove
   desc: string
   hint: string
@@ -41,6 +42,7 @@ const ACTIONS: ActionDef[] = [
   {
     id: 'remove',
     label: 'Remover',
+    short: 'Remover',
     Icon: IconRemove,
     desc: 'Objetos, móveis ou elementos que você quer tirar da cena.',
     hint: 'Selecione o objeto inteiro — inclua sombras e reflexos próximos.',
@@ -50,6 +52,7 @@ const ACTIONS: ActionDef[] = [
   {
     id: 'swap_material',
     label: 'Trocar material',
+    short: 'Material',
     Icon: IconMaterial,
     desc: 'Parede, piso, painel, bancada, marcenaria, pedra, madeira ou metal.',
     hint: 'Contorne a superfície que vai receber o novo material.',
@@ -60,6 +63,7 @@ const ACTIONS: ActionDef[] = [
   {
     id: 'insert_element',
     label: 'Inserir elemento',
+    short: 'Inserir',
     Icon: IconInsert,
     desc: 'Vegetação, mobiliário e detalhes que você quer acrescentar.',
     hint: 'Marque o lugar onde o elemento será inserido.',
@@ -70,6 +74,7 @@ const ACTIONS: ActionDef[] = [
   {
     id: 'refine_area',
     label: 'Refinar área',
+    short: 'Refinar',
     Icon: IconRefine,
     desc: 'Corrigir falhas, artefatos e pequenas imperfeições de uma região.',
     hint: 'Marque a área pequena que precisa de ajuste.',
@@ -322,11 +327,11 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
     background: 'var(--color-bg-elevated)',
     padding: 16,
   }
+  // Títulos do painel em caixa-baixa amigável (não eyebrow técnico).
   const sectionLabel: React.CSSProperties = {
-    fontSize: 11,
-    letterSpacing: '0.08em',
-    textTransform: 'uppercase',
-    color: 'var(--color-text-tertiary)',
+    fontSize: 12.5,
+    fontWeight: 500,
+    color: 'var(--color-text-secondary)',
     marginBottom: 10,
   }
   const segBtn = (active: boolean, disabled = false): React.CSSProperties => ({
@@ -340,8 +345,8 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
     cursor: disabled ? 'not-allowed' : 'pointer',
   })
   const railBtn = (active: boolean, disabled = false): React.CSSProperties => ({
-    width: 38,
-    height: 38,
+    width: 34,
+    height: 34,
     display: 'grid',
     placeItems: 'center',
     borderRadius: 10,
@@ -394,11 +399,11 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
 
   // ════════════════════════════ WORK ════════════════════════════
   return (
-    <div style={{ maxWidth: 1320, margin: '0 auto', padding: '24px 24px 40px' }}>
+    <div style={{ maxWidth: 1360, margin: '0 auto', padding: '14px 20px 24px' }}>
       <style>{EDV3_CSS}</style>
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 16, gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 12, gap: 12 }}>
         <h1 style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.02em' }}>Editar</h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <span style={{ fontSize: 12.5, color: 'var(--color-text-tertiary)' }}>Saldo: {initialBalance} nodes</span>
@@ -429,8 +434,8 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
           </button>
         </div>
 
-        {/* ── Zona 2: canvas ── */}
-        <div style={{ ...card, display: 'flex', flexDirection: 'column', minHeight: 560 }}>
+        {/* ── Zona 2: canvas (protagonista) ── */}
+        <div style={{ ...card, padding: 12, display: 'flex', flexDirection: 'column', minHeight: 'min(76vh, 780px)' }}>
           <EditV3Canvas
             ref={canvasRef}
             imageUrl={sourceUrl}
@@ -466,7 +471,7 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
         <aside className="edv3-panel" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {/* Ação */}
           <div style={card}>
-            <div style={sectionLabel}>Ação</div>
+            <div style={sectionLabel}>O que deseja fazer</div>
             <div className="edv3-actions">
               {ACTIONS.map(a => {
                 const active = a.id === action
@@ -476,16 +481,16 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
                     type="button"
                     onClick={() => { setAction(a.id); setError(null); if (!a.ref) setReferenceUrl(null) }}
                     style={{
-                      display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start',
-                      padding: '11px 12px', borderRadius: 10, textAlign: 'left',
+                      display: 'flex', flexDirection: 'row', gap: 8, alignItems: 'center',
+                      padding: '10px 12px', borderRadius: 10, textAlign: 'left',
                       border: `0.5px solid ${active ? 'var(--color-border-strong)' : 'var(--color-border)'}`,
                       background: active ? 'var(--color-surface-hover)' : 'transparent',
                       color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                       cursor: 'pointer',
                     }}
                   >
-                    <span style={{ color: active ? 'var(--color-accent-green)' : 'var(--color-text-tertiary)' }}><a.Icon size={18} /></span>
-                    <span style={{ fontSize: 13, fontWeight: 500 }}>{a.label}</span>
+                    <span style={{ display: 'inline-flex', color: active ? 'var(--color-accent-green)' : 'var(--color-text-tertiary)' }}><a.Icon size={17} /></span>
+                    <span style={{ fontSize: 13, fontWeight: 500 }}>{a.short}</span>
                   </button>
                 )
               })}
@@ -525,9 +530,9 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
             )}
           </div>
 
-          {/* Controles */}
+          {/* Ajustes */}
           <div style={card}>
-            <div style={sectionLabel}>Controles</div>
+            <div style={sectionLabel}>Ajustes</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
                 <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 6 }}>Preservação</div>
@@ -544,13 +549,8 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
                   <button type="button" style={segBtn(intensity === 'strong')} onClick={() => setIntensity('strong')}>Forte</button>
                 </div>
               </div>
-              <div>
-                <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 6 }}>Qualidade</div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <button type="button" style={segBtn(true)}>Padrão</button>
-                  <button type="button" style={segBtn(false, true)} disabled title="Em validação">Alta precisão</button>
-                </div>
-              </div>
+              {/* Qualidade/Alta precisão: oculto até o Gemini Pro ser validado
+                  (evita opção desabilitada na UI). Reativar quando liberado. */}
             </div>
           </div>
 
@@ -608,7 +608,7 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
 
 // CSS local (namespace .edv3-*) — não toca globals.css.
 const EDV3_CSS = `
-.edv3-grid { display:grid; grid-template-columns: 50px minmax(0,1fr) 340px; gap:14px; align-items:start; }
+.edv3-grid { display:grid; grid-template-columns: 46px minmax(0,1fr) 300px; gap:14px; align-items:start; }
 .edv3-rail-sep { width:24px; height:1px; background:var(--color-border); margin:4px 0; }
 .edv3-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
 .edv3-link { display:inline-flex; align-items:center; gap:5px; font-size:12.5px; color:var(--color-text-secondary); background:none; border:none; cursor:pointer; padding:0; }
@@ -620,7 +620,7 @@ const EDV3_CSS = `
 .edv3-cta:active:not(:disabled) { transform:scale(0.985); }
 .edv3-cta:disabled { opacity:0.4; cursor:not-allowed; }
 @media (max-width: 980px) {
-  .edv3-grid { grid-template-columns: 50px minmax(0,1fr); }
+  .edv3-grid { grid-template-columns: 46px minmax(0,1fr); }
   .edv3-panel { grid-column: 1 / -1; }
 }
 @media (max-width: 620px) {
