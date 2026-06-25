@@ -33,6 +33,7 @@ import {
   resolveResolution,
   modelCostUsd,
   MODEL_FOR_QUALITY,
+  marginAt,
 } from '@/lib/edit-v3/pricing'
 import { runEditV3, EditV3GenerationError } from '@/lib/edit-v3/pipeline'
 import { assertSafeImageUrl, EditV3InputError } from '@/lib/edit-v3/ssrf'
@@ -327,10 +328,13 @@ export async function POST(req: Request) {
       mask_coverage: run.metrics.maskCoverage,
       completed_at: new Date().toISOString(),
     })
+    const ps = run.stages.provider
     console.log(
       `[edit-v3] done user=${userId} action=${action} provider=${run.provider} model=${run.model} ` +
-      `fallback=${run.usedFallback} charged=${charged} nodes=${nodes} ` +
-      `outDrift=${run.metrics.outOfMaskDelta} inDelta=${run.metrics.inMaskDelta} dur=${run.stages.provider.durationMs}ms`,
+      `res=${resolution} fallback=${run.usedFallback} charged=${charged} nodes=${nodes} ` +
+      `tokens=${ps.totalTokens}(out ${ps.outputTokens}) realUsd=${ps.realCostUsd != null ? ps.realCostUsd.toFixed(4) : 'n/a'} ` +
+      `marginReal=${ps.realCostUsd != null ? Math.round(marginAt(nodes, ps.realCostUsd) * 100) + '%' : 'n/a'} ` +
+      `outDrift=${run.metrics.outOfMaskDelta} inDelta=${run.metrics.inMaskDelta} dur=${ps.durationMs}ms`,
     )
 
     return NextResponse.json({
@@ -340,7 +344,23 @@ export async function POST(req: Request) {
       charge: { simulated: !chargeOn, debited: charged },
       output: run.outputDims,
       ...(debug
-        ? { debug: { ...debugBlock, used_fallback: run.usedFallback, request_id: run.requestId, metrics: run.metrics, job_id: jobId } }
+        ? {
+            debug: {
+              ...debugBlock,
+              used_fallback: run.usedFallback,
+              request_id: run.requestId,
+              metrics: run.metrics,
+              job_id: jobId,
+              cost: {
+                resolution,
+                est_provider_usd: providerCostUsd,
+                real_output_usd: ps.realCostUsd,
+                tokens: { prompt: ps.promptTokens, output: ps.outputTokens, total: ps.totalTokens },
+                nodes,
+                margin_real: ps.realCostUsd != null ? marginAt(nodes, ps.realCostUsd) : null,
+              },
+            },
+          }
         : {}),
     })
   } catch (err) {

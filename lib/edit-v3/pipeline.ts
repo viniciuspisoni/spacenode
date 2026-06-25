@@ -28,6 +28,7 @@ import {
 } from '@/lib/ai/google/editImage'
 import { editImageWithFal, FalEditError } from '@/lib/ai/fal/editImage'
 import { buildEditPrompt } from './buildEditPrompt'
+import { outputImageCostUsd } from './pricing'
 import { assertSafeImageUrl, EditV3InputError } from './ssrf'
 import type {
   EditV3Action,
@@ -144,7 +145,16 @@ export interface EditV3RunResult {
     inMaskDelta: number | null
     maskCoverage: number | null
   }
-  stages: { provider: { durationMs: number } }
+  stages: {
+    provider: {
+      durationMs: number
+      promptTokens: number | null
+      outputTokens: number | null
+      totalTokens: number | null
+      /** Custo USD real dos tokens de SAÍDA (Google); null no fallback FAL. */
+      realCostUsd: number | null
+    }
+  }
   outputDims: { width: number; height: number } | null
 }
 
@@ -235,6 +245,9 @@ export async function runEditV3(input: EditV3RunInput): Promise<EditV3RunResult>
   let requestId: string | null
   let imageRef: string
   let usedFallback = false
+  let promptTokens: number | null = null
+  let outputTokens: number | null = null
+  let totalTokens: number | null = null
   try {
     const out = await editImageWithGoogle({
       imageUrl: request.sourceImageUrl,
@@ -248,6 +261,9 @@ export async function runEditV3(input: EditV3RunInput): Promise<EditV3RunResult>
     model = out.model
     requestId = out.requestId
     imageRef = out.imageRef
+    promptTokens = out.promptTokens
+    outputTokens = out.outputTokens
+    totalTokens = out.totalTokens
   } catch (googleErr) {
     if (!(input.falFallback && googleErr instanceof GoogleEditError)) {
       throw googleErr
@@ -270,7 +286,17 @@ export async function runEditV3(input: EditV3RunInput): Promise<EditV3RunResult>
       throw new EditV3GenerationError(`Google e fallback FAL falharam (${fe}).`)
     }
   }
-  const providerStage = { durationMs: Date.now() - providerStart }
+  const realCostUsd =
+    provider === 'google' && model !== 'nano-banana' && outputTokens != null
+      ? outputImageCostUsd(model, outputTokens)
+      : null
+  const providerStage = {
+    durationMs: Date.now() - providerStart,
+    promptTokens,
+    outputTokens,
+    totalTokens,
+    realCostUsd,
+  }
 
   const editedBuf = await fetchImageBuffer(imageRef)
 

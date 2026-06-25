@@ -85,6 +85,11 @@ export interface GoogleEditImageOutput {
   apiModel: string
   requestId: string | null
   durationMs: number
+  /** Tokens REAIS da resposta (ground-truth de custo). Entrada (texto+imagens),
+   *  saída (imagem gerada) e total. */
+  promptTokens: number | null
+  outputTokens: number | null
+  totalTokens: number | null
 }
 
 /** Edita a imagem via Gemini Image. Lança GoogleEditError em qualquer falha. */
@@ -128,6 +133,7 @@ export async function editImageWithGoogle(input: GoogleEditImageInput): Promise<
     throw new GoogleEditError('no_output', `${input.model} não devolveu imagem.`)
   }
   const mime = inline.mimeType && inline.mimeType.startsWith('image/') ? inline.mimeType : 'image/png'
+  const usage = response.usageMetadata
 
   return {
     imageRef: `data:${mime};base64,${inline.data}`,
@@ -136,5 +142,8 @@ export async function editImageWithGoogle(input: GoogleEditImageInput): Promise<
     apiModel,
     requestId: response.responseId ?? null,
     durationMs: Date.now() - startedAt,
+    promptTokens: usage?.promptTokenCount ?? null,
+    outputTokens: usage?.candidatesTokenCount ?? null,
+    totalTokens: usage?.totalTokenCount ?? null,
   }
 }
