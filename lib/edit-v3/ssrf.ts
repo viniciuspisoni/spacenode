@@ -6,8 +6,6 @@
 // fallback FAL está ligado (imagens de histórico/legado). Próprio do V3 (não
 // reusa o assertSafeImageUrl do v2, que carrega fal.media legado por padrão).
 
-import { editV3FalFallbackEnabled } from './flags'
-
 export class EditV3InputError extends Error {
   constructor(message: string) {
     super(message)
@@ -37,7 +35,9 @@ export function assertSafeImageUrl(url: string): void {
   }
   const host = parsed.hostname.toLowerCase()
   const sb = supabaseHost()
-  const falAllowed = editV3FalFallbackEnabled() && (host === 'fal.media' || host.endsWith('.fal.media'))
+  // fal.media = CDN do histórico de renders do produto (imagens legítimas) — é
+  // de onde vêm os imports do histórico. Permitido SEMPRE, igual v1/v2.
+  const falAllowed = host === 'fal.media' || host.endsWith('.fal.media')
   if ((sb && host === sb) || falAllowed) return
   throw new EditV3InputError('Origem de imagem não permitida.')
 }

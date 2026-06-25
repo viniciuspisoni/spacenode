@@ -64,12 +64,15 @@ export interface EditV3Request {
   references: EditV3Reference[]
 }
 
-/** Quais ações EXIGEM seleção (todas, no V3: a edição altera só a área marcada). */
+/** Quais ações EXIGEM seleção. remove/swap_material/refine_area aceitam edição
+ *  por INSTRUÇÃO (sem máscara; ex.: "retirar o tapete"); insert_element exige
+ *  âncora de POSIÇÃO (sem máscara não há onde inserir). O kill-switch
+ *  EDIT_V3_NO_MASK=0 reverte tudo para "exige seleção" (ver flags). */
 export const REQUIRES_MASK: Record<EditV3Action, boolean> = {
-  remove: true,
-  swap_material: true,
+  remove: false,
+  swap_material: false,
   insert_element: true,
-  refine_area: true,
+  refine_area: false,
 }
 
 /** Papel de referência aceito por ação (null = ação não usa referência). */

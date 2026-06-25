@@ -26,6 +26,7 @@ import {
   editV3FalFallbackEnabled,
   editV3AllowHighPrecision,
   editV3DebugAllowed,
+  editV3NoMaskEnabled,
 } from '@/lib/edit-v3/flags'
 import {
   nodesForAction,
@@ -141,9 +142,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Alta precisão ainda não está disponível.' }, { status: 403 })
   }
 
-  // Toda ação do V3 exige seleção (a edição altera só a área marcada).
-  if (REQUIRES_MASK[action] && !maskUrl && !dryRun) {
+  // Seleção exigida? insert_element sempre; demais só se o no-mask estiver OFF.
+  const maskRequired = REQUIRES_MASK[action] || !editV3NoMaskEnabled()
+  if (maskRequired && !maskUrl && !dryRun) {
     return NextResponse.json({ error: 'Selecione a área que deseja alterar.' }, { status: 400 })
+  }
+  // Sem máscara, ainda precisa de um pedido claro (texto ou referência).
+  if (!maskRequired && !maskUrl && !instruction && references.length === 0 && !dryRun) {
+    return NextResponse.json({ error: 'Descreva o que deseja alterar ou selecione uma área.' }, { status: 400 })
   }
 
   const chargeOn = editV3ChargeEnabled()
@@ -261,7 +267,9 @@ export async function POST(req: Request) {
       console.log(`[edit-v3] rejected user=${userId} action=${action} reasons=${run.rejectReasons.join(',')}`)
       return NextResponse.json({
         rejected: true,
-        reasons: ['A edição alterou áreas fora da seleção ou não aplicou o pedido e foi descartada.'],
+        reasons: [maskUrl
+          ? 'A edição alterou áreas fora da seleção ou não aplicou o pedido e foi descartada.'
+          : 'A edição não aplicou o pedido como esperado e foi descartada.'],
         message: 'Nenhum node foi consumido. Refazer é grátis.',
         nodes_cost: nodes,
         charge: { simulated: !chargeOn, debited: false },

@@ -15,6 +15,14 @@ export function editV3UiEnabled(): boolean {
   return process.env.NEXT_PUBLIC_EDIT_V3 === '1'
 }
 
+/** Permite editar SEM máscara (por instrução; ex.: "retirar o tapete") nas ações
+ *  remove/swap_material/refine_area. Default LIGADO. EDIT_V3_NO_MASK=0 reverte
+ *  para o comportamento "toda ação exige seleção" (kill-switch). insert_element
+ *  exige máscara independentemente desta flag. */
+export function editV3NoMaskEnabled(): boolean {
+  return process.env.EDIT_V3_NO_MASK !== '0'
+}
+
 /** Cobrança REAL de nodes no sucesso. FAIL-SAFE: default DESLIGADO — só cobra
  *  com EDIT_V3_CHARGE=1 EXPLÍCITO. Env ausente ou qualquer outro valor (0, etc.)
  *  → NÃO debita (cobrança simulada). Garante que nenhum node seja cobrado por
