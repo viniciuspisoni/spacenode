@@ -22,7 +22,21 @@ import {
 
 fal.config({ credentials: process.env.FAL_KEY })
 
-const FAL_TIMEOUT_MS = 90_000
+// A Vercel mata a função no maxDuration. Precisa cobrir o maior FAL_TIMEOUT_MS
+// abaixo com folga, senão a geração lenta morre antes da nossa race e o usuário
+// recebe um 504 opaco em vez da mensagem tratada (+ refund).
+export const maxDuration = 300
+
+// Timeout da chamada FAL por motor. Vega (Nano Banana Pro) e Quasar (GPT Image 2)
+// são modelos de alta fidelidade e passam de 90s com frequência — independente do
+// tamanho da imagem, sobretudo em 4K. Pulsar (Nano Banana 2) é rápido. O cap de 90s
+// era curto demais pro Vega e fazia a geração falhar com "tente uma resolução menor"
+// mesmo com imagem pequena. (O resto do código usa 150s pra esse mesmo endpoint.)
+const FAL_TIMEOUT_MS: Record<EngineId, number> = {
+  vega:   180_000,
+  pulsar:  90_000,
+  quasar: 180_000,
+}
 
 // ── Mapping de resolução interna → param da Fal.ai por engine ────────────────
 //
@@ -221,7 +235,7 @@ export async function POST(req: NextRequest) {
     const result = await Promise.race([
       fal.subscribe(falEndpoint, { input: falInput }),
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(Object.assign(new Error('FAL_TIMEOUT'), { isFalTimeout: true })), FAL_TIMEOUT_MS)
+        setTimeout(() => reject(Object.assign(new Error('FAL_TIMEOUT'), { isFalTimeout: true })), FAL_TIMEOUT_MS[engine])
       ),
     ])
 
@@ -323,7 +337,7 @@ export async function POST(req: NextRequest) {
     console.error('[generate] ERROR body  :', JSON.stringify(e?.body ?? e?.message ?? err))
 
     let userMessage = 'Erro ao gerar render. Tente novamente.'
-    if (e?.isFalTimeout)        userMessage = 'Tempo limite excedido. Tente uma resolução menor.'
+    if (e?.isFalTimeout)        userMessage = 'A geração demorou mais que o esperado. Tente novamente.'
     else if (e?.status === 422) userMessage = 'Parâmetros inválidos para o motor selecionado.'
     else if (e?.status === 429) userMessage = 'Limite de requisições atingido. Aguarde alguns segundos.'
 

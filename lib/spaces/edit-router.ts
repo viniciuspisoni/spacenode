@@ -431,10 +431,13 @@ function decideGoogleFirst(input: EditRoutingInput): RoutingDecision {
  *  referência — material_texture → REFERENCE_TYPE_STYLE, object_reference →
  *  REFERENCE_TYPE_SUBJECT (ver vertex-imagen-edit.ts). Nano Banana 2 fica como
  *  fallback quando Vertex está desligado ou para ferramentas fora do escopo. */
-function maskedGoogleEndpoint(tool: EditTool, _hasReferences: boolean): EditEndpoint {
+function maskedGoogleEndpoint(tool: EditTool, hasReferences: boolean): EditEndpoint {
   const vertexTool =
     tool === 'remove' || tool === 'add' || tool === 'material' || tool === 'fix_detail'
-  if (vertexTool && vertexImagenEnabled()) return 'vertex/imagen-edit'
+  // Com referências visuais → nano-banana (formato multi-imagem: source + mask + ref).
+  // Sem referências → Vertex Imagen (inpaint preciso, US$0.020/img).
+  if (vertexTool && vertexImagenEnabled() && !hasReferences) return 'vertex/imagen-edit'
+  if (tool === 'material' || tool === 'add') return 'fal-ai/nano-banana/edit'
   return 'fal-ai/nano-banana-2/edit'
 }
 

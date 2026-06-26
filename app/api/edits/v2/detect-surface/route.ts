@@ -26,7 +26,7 @@ import {
   subtractObjectsFromSurface,
 } from '@/lib/spaces/edit-crop'
 import { uploadEditAsset } from '@/lib/spaces/edit-route-helpers'
-import { editV2Enabled, normalizerEnabled } from '@/lib/edit-v2/flags'
+import { editV2Enabled, normalizerEnabled, surfaceAssistEnabled } from '@/lib/edit-v2/flags'
 import { assertSafeImageUrl, EditV2InputError } from '@/lib/edit-v2/pipeline'
 import { refineSurfaceMaskV2 } from '@/lib/edit-v2/mask-refine'
 import { geminiSegmentTarget } from '@/lib/edit-v2/gemini-segment'
@@ -53,7 +53,10 @@ interface Body {
 }
 
 export async function POST(req: Request) {
-  if (!editV2Enabled()) {
+  // A detecção automática de superfície é ASSIST OPCIONAL, congelada como
+  // laboratório técnico. No Editar Clean a seleção manual é sempre a base; esta
+  // rota só responde com EDIT_V2_SURFACE_ASSIST=1 (default DESLIGADO).
+  if (!editV2Enabled() || !surfaceAssistEnabled()) {
     return NextResponse.json({ error: 'Não disponível.' }, { status: 404 })
   }
 

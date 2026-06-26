@@ -140,6 +140,48 @@ const CONTENT_INTENTS: ReadonlySet<EditIntentV2> = new Set([
 // remoção/correção usam borda dura (preservação pixel-perfeita).
 const BLEND_INTENTS: ReadonlySet<EditIntentV2> = new Set(['swap_material', 'insert_element'])
 
+// Limite do bucket de resultado (space-mestres) = 15 MB. Alvo conservador, com
+// folga para metadados/encoding.
+const STORAGE_MAX_BYTES = 14 * 1024 * 1024
+
+/** Re-encoda o resultado (PNG lossless da recomposição) para JPEG de alta
+ *  qualidade ANTES do upload, garantindo arquivo abaixo do limite do bucket.
+ *  Os gates de pixel já mediram no buffer lossless (ordem: validar lossless →
+ *  entregar comprimido), então isto NÃO afeta drift/preservação — é só o
+ *  formato de ENTREGA. keepMetadata preserva o ICC (cor consistente no
+ *  antes/depois). Degradação progressiva (qualidade → dimensão) só dispara em
+ *  imagens enormes/muito texturizadas (ex.: painel ripado) que ainda passem do
+ *  limite mesmo em JPEG — render arquitetônico típico fica em ~2–6 MB. */
+async function encodeResultForStorage(buf: Buffer): Promise<Buffer> {
+  const sharp = (await import('sharp')).default
+
+  // 1) Qualidade decrescente na resolução cheia.
+  for (const quality of [92, 86, 80, 72]) {
+    const out = await sharp(buf).jpeg({ quality, mozjpeg: true }).keepMetadata().toBuffer()
+    if (out.length <= STORAGE_MAX_BYTES) return out
+  }
+
+  // 2) Ainda acima do limite: reduz a dimensão progressivamente (mantém aspecto).
+  const meta = await sharp(buf).metadata()
+  let width = meta.width ?? 0
+  for (let i = 0; i < 6 && width > 1; i++) {
+    width = Math.round(width * 0.85)
+    const out = await sharp(buf)
+      .resize({ width })
+      .jpeg({ quality: 82, mozjpeg: true })
+      .keepMetadata()
+      .toBuffer()
+    if (out.length <= STORAGE_MAX_BYTES) return out
+  }
+
+  // 3) Piso de segurança (não deve ser alcançado por imagens reais).
+  return sharp(buf)
+    .resize({ width: Math.max(1, width) })
+    .jpeg({ quality: 60, mozjpeg: true })
+    .keepMetadata()
+    .toBuffer()
+}
+
 // ---------------------------------------------------------------------------
 // Execução
 // ---------------------------------------------------------------------------
@@ -275,8 +317,12 @@ export async function runEditV2(input: EditV2RunInput): Promise<EditV2RunResult>
     reasons.push('no_change')
   }
 
-  // 5. Upload do resultado (mesmo rejeitado — vira preview de depuração)
-  const resultUrl = await input.uploadAsset(resultBuf, 'result')
+  // 5. Upload do resultado (mesmo rejeitado — vira preview de depuração).
+  //    Re-encode p/ JPEG alta qualidade abaixo do limite do bucket: o PNG
+  //    lossless da recomposição (render texturizado) pode passar de 15 MB e
+  //    estourar o upload. Feito DEPOIS dos gates — não afeta drift/preservação.
+  const storageBuf = await encodeResultForStorage(resultBuf)
+  const resultUrl = await input.uploadAsset(storageBuf, 'result')
 
   // 6. Gate semântico (best-effort; telemetria separada; sem retry na Fase 2)
   const gate = await evaluateEditSemantics({
@@ -289,7 +335,7 @@ export async function runEditV2(input: EditV2RunInput): Promise<EditV2RunResult>
   })
   if (!gate.skipped && !gate.pass) reasons.push(...gate.reasons)
 
-  const outMeta = await sharp(resultBuf).metadata()
+  const outMeta = await sharp(storageBuf).metadata()
 
   return {
     resultUrl,

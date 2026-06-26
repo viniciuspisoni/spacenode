@@ -31,7 +31,7 @@ export const MODEL_COST_USD: Record<EditV3Model, Record<EditV3Resolution, number
   //   2K = $0,12 MEDIDO (2 amostras reais 2026-06-25: ~1960 tokens de saída ≈
   //   $0,116–0,119 + entrada) → 18 nodes. 1K e 4K = ESTIMATIVAS (não amostradas)
   //   — calibrar com edições reais nessas resoluções (token-log).
-  'gemini-3.1-flash-image': { '1K': 0.067, '2K': 0.12, '4K': 0.15 },
+  'gemini-3.1-flash-image': { '1K': 0.067, '2K': 0.12, '4K': 0.168 },
   // gemini-3-pro-image: $120/1M tokens (ESTIMATIVA, não amostrado).
   'gemini-3-pro-image': { '1K': 0.134, '2K': 0.134, '4K': 0.24 },
   // fallback FAL nano-banana/edit (per-image; a resolução segue a imagem).

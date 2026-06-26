@@ -191,6 +191,24 @@ function resolveInitialConfig(cfg: ProjectConfig | null | undefined) {
   }
 }
 
+function ProjectTypeGlyph({ type }: { type: ProjectType }) {
+  if (type === 'exterior') {
+    return (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="12" cy="12" r="3.4" stroke="currentColor" strokeWidth="1.55" />
+        <path d="M12 3.8v2.1M12 18.1v2.1M20.2 12h-2.1M5.9 12H3.8M17.8 6.2l-1.5 1.5M7.7 16.3l-1.5 1.5M17.8 17.8l-1.5-1.5M7.7 7.7 6.2 6.2" stroke="currentColor" strokeWidth="1.55" strokeLinecap="round" />
+      </svg>
+    )
+  }
+
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="5.3" y="5.3" width="13.4" height="13.4" rx="3" stroke="currentColor" strokeWidth="1.45" />
+      <rect x="8.2" y="8.2" width="7.6" height="7.6" rx="1.8" fill="currentColor" opacity="0.9" />
+    </svg>
+  )
+}
+
 export function GenerateClient({ initialCredits, initialMaterials, initialConfig, initialSourceUrl }: GenerateClientProps) {
   const init = resolveInitialConfig(initialConfig)
   const supabase = createClient()
@@ -584,10 +602,10 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div style={S.main}>
+    <div className="spn-generate-shell" style={S.main}>
 
       {/* ── CONTROLES ── */}
-      <div style={S.controls}>
+      <div className="spn-generate-controls" style={S.controls}>
 
         {/* Topbar */}
         <div style={S.topbar}>
@@ -604,20 +622,26 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
         <div style={S.section}>
           <div style={S.label}>TIPO DE PROJETO</div>
           <div style={S.typeGrid}>
-            {(['exterior', 'interior'] as const).map(type => (
-              <div
-                key={type}
-                style={projectType === type ? {...S.typeCard, ...S.typeCardActive} : S.typeCard}
-                onClick={() => handleProjectTypeChange(type)}
-              >
-                <div style={{...S.typeIcon, ...(projectType === type ? {color:'var(--color-bg)'} : {})}}>
-                  {type === 'exterior' ? '☀' : '⬛'}
-                </div>
-                <div style={{...S.typeLabel, ...(projectType === type ? {color:'var(--color-bg)'} : {})}}>
-                  {type === 'exterior' ? 'Ambiente Exterior' : 'Ambiente Interior'}
-                </div>
-              </div>
-            ))}
+            {(['exterior', 'interior'] as const).map(type => {
+              const active = projectType === type
+              return (
+                <button
+                  key={type}
+                  type="button"
+                  className={active ? 'spn-type-card spn-type-card--active' : 'spn-type-card'}
+                  aria-pressed={active}
+                  style={active ? {...S.typeCard, ...S.typeCardActive} : S.typeCard}
+                  onClick={() => handleProjectTypeChange(type)}
+                >
+                  <span style={{...S.typeIcon, ...(active ? S.typeIconActive : {})}}>
+                    <ProjectTypeGlyph type={type} />
+                  </span>
+                  <span style={{...S.typeLabel, ...(active ? {color:'var(--color-bg)'} : {})}}>
+                    {type === 'exterior' ? 'Ambiente Exterior' : 'Ambiente Interior'}
+                  </span>
+                </button>
+              )
+            })}
           </div>
         </div>
 
@@ -763,7 +787,7 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
                     }
                   }}
                 >
-                  <EngineIcon engine={eid} style={{width:24, height:24, flexShrink:0}} />
+                  <EngineIcon engine={eid} style={{width:22, height:22, flexShrink:0}} />
                   <div style={{display:'flex', flexDirection:'column', minWidth:0}}>
                     <div style={{...S.motorName, ...(active ? {color:'var(--color-bg)'} : {})}}>{e.name}</div>
                     <div style={{...S.motorDesc, ...(active ? {color:'var(--color-bg)', opacity:0.6} : {})}}>{e.tagline}</div>
@@ -865,7 +889,7 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
       </div>
 
       {/* ── PREVIEW ── */}
-      <div style={S.preview}>
+      <div className="spn-generate-preview" style={S.preview}>
         <div style={S.topbar}>
           <span style={S.pageTitle}>ANTES / DEPOIS</span>
           {outputUrl && (
@@ -880,6 +904,7 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
 
         {!imagePreview && (
           <div
+            className={isDraggingFile ? 'spn-upload-zone spn-upload-zone--dragging' : 'spn-upload-zone'}
             style={isDraggingFile ? {...S.uploadZone, borderColor:'var(--color-text-primary)', background:'var(--color-surface)'} : S.uploadZone}
             onDragOver={e => { e.preventDefault(); setIsDraggingFile(true) }}
             onDragLeave={() => setIsDraggingFile(false)}
@@ -1185,88 +1210,91 @@ function MultiPillGroup({ options, selected, onToggle }: { options: string[]; se
 }
 
 const pill: React.CSSProperties = {
-  padding: '5px 12px', borderRadius: 20,
-  border: '0.5px solid var(--color-border-strong)',
-  fontSize: 11, color: 'var(--color-text-tertiary)',
-  cursor: 'pointer', background: 'var(--color-bg-elevated)',
+  padding: '6px 13px', borderRadius: 999,
+  border: '0.5px solid rgba(255,255,255,0.11)',
+  fontSize: 11, color: 'rgba(245,245,247,0.56)',
+  cursor: 'pointer', background: 'rgba(255,255,255,0.025)',
   letterSpacing: '-0.005em', fontFamily: 'inherit',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)',
 }
 const pillActive: React.CSSProperties = {
-  background: 'var(--color-text-primary)',
+  background: '#f4f4f1',
   color: 'var(--color-bg)',
-  border: '0.5px solid var(--color-text-primary)',
+  border: '0.5px solid rgba(255,255,255,0.92)',
+  boxShadow: '0 8px 22px rgba(255,255,255,0.08)',
 }
 
 // ── Styles ─────────────────────────────────────────────────────────────────────
 
 const S: Record<string, React.CSSProperties> = {
-  main:              { display:'grid', gridTemplateColumns:'480px 1fr', height:'100%', width:'100%', overflow:'hidden' },
-  controls:          { padding:'28px 24px', borderRight:'0.5px solid var(--color-border)', background:'var(--color-bg)', overflowY:'auto', display:'flex', flexDirection:'column', gap:20 },
-  preview:           { padding:28, background:'var(--color-bg)', display:'flex', flexDirection:'column', gap:18 },
+  main:              { display:'grid', gridTemplateColumns:'minmax(430px, 500px) minmax(0, 1fr)', height:'100%', width:'100%', overflow:'hidden', background:'#050505' },
+  controls:          { padding:'28px 24px 30px', borderRight:'0.5px solid rgba(255,255,255,0.06)', background:'linear-gradient(180deg, #090909 0%, #070707 100%)', overflowY:'auto', display:'flex', flexDirection:'column', gap:18 },
+  preview:           { padding:'28px 28px 24px', background:'linear-gradient(180deg, #070707 0%, #050505 100%)', display:'flex', flexDirection:'column', gap:18, minWidth:0 },
   topbar:            { display:'flex', justifyContent:'space-between', alignItems:'center' },
-  pageTitle:         { fontSize:10, letterSpacing:'0.22em', textTransform:'uppercase', color:'var(--color-text-tertiary)', fontWeight:500 },
-  credits:           { display:'flex', alignItems:'center', gap:6, fontSize:11, color:'var(--color-text-tertiary)' },
-  creditDot:         { width:5, height:5, borderRadius:'50%', background:'var(--color-accent-green)', boxShadow:'0 0 5px var(--color-accent-green-glow)', display:'inline-block' },
-  creditNum:         { color:'var(--color-text-primary)', fontWeight:500, fontSize:12 },
-  buyBtn:            { fontSize:'11px', color:'var(--color-text-tertiary)', background:'none', border:'none', cursor:'pointer', textDecoration:'underline', marginLeft:'6px', fontFamily:'inherit' },
-  section:           { display:'flex', flexDirection:'column', gap:10 },
-  label:             { fontSize:10, letterSpacing:'0.15em', textTransform:'uppercase', color:'var(--color-text-tertiary)', fontWeight:500 },
-  divider:           { height:'0.5px', background:'var(--color-border)' },
-  typeGrid:          { display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 },
-  typeCard:          { border:'0.5px solid var(--color-border-strong)', borderRadius:10, padding:'14px 12px', cursor:'pointer', textAlign:'center', background:'var(--color-bg-elevated)' },
-  typeCardActive:    { border:'0.5px solid var(--color-text-primary)', background:'var(--color-text-primary)' },
-  typeIcon:          { fontSize:18, marginBottom:5, color:'var(--color-text-tertiary)' },
-  typeLabel:         { fontSize:11, fontWeight:500, color:'var(--color-text-primary)', lineHeight:1.3 },
+  pageTitle:         { fontSize:10, letterSpacing:'0.24em', textTransform:'uppercase', color:'rgba(245,245,247,0.36)', fontWeight:600 },
+  credits:           { display:'flex', alignItems:'center', gap:7, fontSize:11, color:'rgba(245,245,247,0.55)', padding:'7px 9px', border:'0.5px solid rgba(255,255,255,0.08)', borderRadius:999, background:'rgba(255,255,255,0.025)' },
+  creditDot:         { width:5, height:5, borderRadius:'50%', background:'var(--color-accent-green)', boxShadow:'0 0 9px var(--color-accent-green-glow)', display:'inline-block' },
+  creditNum:         { color:'var(--color-text-primary)', fontWeight:650, fontSize:12 },
+  buyBtn:            { fontSize:'11px', color:'rgba(245,245,247,0.48)', background:'none', border:'none', cursor:'pointer', textDecoration:'none', marginLeft:'4px', fontFamily:'inherit' },
+  section:           { display:'flex', flexDirection:'column', gap:11 },
+  label:             { fontSize:10, letterSpacing:'0.17em', textTransform:'uppercase', color:'rgba(245,245,247,0.36)', fontWeight:600 },
+  divider:           { height:'0.5px', background:'rgba(255,255,255,0.055)' },
+  typeGrid:          { display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 },
+  typeCard:          { border:'0.5px solid rgba(255,255,255,0.10)', borderRadius:14, padding:'13px 12px', minHeight:78, cursor:'pointer', textAlign:'center', background:'linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.018))', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:8, transition:'transform 0.18s ease, border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease' },
+  typeCardActive:    { border:'0.5px solid rgba(255,255,255,0.92)', background:'#f4f4f1', boxShadow:'0 16px 34px rgba(255,255,255,0.08)' },
+  typeIcon:          { width:30, height:30, borderRadius:10, color:'rgba(245,245,247,0.58)', background:'rgba(255,255,255,0.05)', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'inset 0 0 0 0.5px rgba(255,255,255,0.07)' },
+  typeIconActive:    { color:'var(--color-bg)', background:'rgba(0,0,0,0.06)', boxShadow:'none' },
+  typeLabel:         { fontSize:11, fontWeight:560, color:'var(--color-text-primary)', lineHeight:1.3 },
   infoNote:          { fontSize:11, color:'var(--color-text-tertiary)', lineHeight:1.6 },
   collapseBtn:       { display:'flex', justifyContent:'space-between', alignItems:'center', background:'none', border:'none', cursor:'pointer', padding:0, width:'100%', fontFamily:'inherit' },
   materiaisBadge:    { fontSize:9, letterSpacing:'0.08em', textTransform:'uppercase', background:'rgba(48,180,108,0.12)', color:'var(--color-accent-green)', padding:'2px 7px', borderRadius:10 },
   materiaisGrid:     { display:'flex', flexDirection:'column', gap:10, paddingTop:4 },
   materialField:     { display:'flex', flexDirection:'column', gap:5 },
   materialLabel:     { fontSize:10, color:'var(--color-text-tertiary)', letterSpacing:'0.05em' },
-  materialInput:     { padding:'8px 12px', border:'0.5px solid var(--color-border-strong)', borderRadius:8, fontSize:11, color:'var(--color-text-primary)', background:'var(--color-bg-elevated)', fontFamily:'inherit', outline:'none' },
+  materialInput:     { padding:'9px 12px', border:'0.5px solid rgba(255,255,255,0.11)', borderRadius:10, fontSize:11, color:'var(--color-text-primary)', background:'rgba(255,255,255,0.035)', fontFamily:'inherit', outline:'none' },
   sliderRow:         { display:'flex', alignItems:'center', gap:10 },
   sliderEnd:         { fontSize:11, color:'var(--color-text-tertiary)' },
   range:             { flex:1, accentColor:'var(--color-text-primary)', height:3 },
   sliderVal:         { fontSize:12, fontWeight:500, color:'var(--color-text-primary)', minWidth:34, textAlign:'right' },
-  anchorRow:         { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 14px', border:'0.5px solid var(--color-border-strong)', borderRadius:8, background:'var(--color-bg-elevated)', cursor:'pointer', fontFamily:'inherit', width:'100%' },
-  refineBox:         { display:'flex', flexDirection:'column', gap:6, padding:'12px 14px', border:'0.5px solid var(--color-border-strong)', borderRadius:8, background:'var(--color-bg-elevated)' },
+  anchorRow:         { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'11px 14px', border:'0.5px solid rgba(255,255,255,0.11)', borderRadius:12, background:'rgba(255,255,255,0.035)', cursor:'pointer', fontFamily:'inherit', width:'100%' },
+  refineBox:         { display:'flex', flexDirection:'column', gap:7, padding:'13px 14px', border:'0.5px solid rgba(255,255,255,0.11)', borderRadius:12, background:'rgba(255,255,255,0.035)' },
   refineLabel:       { fontSize:10, letterSpacing:'0.15em', textTransform:'uppercase', color:'var(--color-text-tertiary)', fontWeight:500 },
-  refineInput:       { padding:'8px 10px', border:'0.5px solid var(--color-border-strong)', borderRadius:6, fontSize:11, color:'var(--color-text-primary)', background:'var(--color-bg)', fontFamily:'inherit', outline:'none', resize:'vertical', minHeight:36 },
+  refineInput:       { padding:'9px 11px', border:'0.5px solid rgba(255,255,255,0.10)', borderRadius:9, fontSize:11, color:'var(--color-text-primary)', background:'rgba(0,0,0,0.28)', fontFamily:'inherit', outline:'none', resize:'vertical', minHeight:38 },
   refineHint:        { fontSize:10, color:'var(--color-text-tertiary)', lineHeight:1.5 },
-  fidelityGrid:      { display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 },
-  fidelityOpt:       { border:'0.5px solid var(--color-border-strong)', borderRadius:8, padding:'10px 8px', cursor:'pointer', background:'var(--color-bg-elevated)', textAlign:'center' as const },
-  fidelityOptActive: { border:'0.5px solid var(--color-text-primary)', background:'var(--color-text-primary)' },
-  fidelityName:      { fontSize:11, fontWeight:500, color:'var(--color-text-primary)', marginBottom:3 },
-  motorGrid:         { display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 },
-  motorOpt:          { display:'flex', alignItems:'center', gap:12, border:'0.5px solid var(--color-border-strong)', borderRadius:8, padding:'10px 10px', cursor:'pointer', background:'var(--color-bg-elevated)', color:'var(--color-text-primary)' },
-  motorOptActive:    { border:'0.5px solid var(--color-text-primary)', background:'var(--color-text-primary)', color:'var(--color-bg)' },
-  motorName:         { fontSize:11, fontWeight:500, color:'var(--color-text-primary)', marginBottom:3 },
+  fidelityGrid:      { display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:7 },
+  fidelityOpt:       { border:'0.5px solid rgba(255,255,255,0.10)', borderRadius:12, padding:'11px 9px', cursor:'pointer', background:'rgba(255,255,255,0.03)', textAlign:'center' as const, transition:'background 0.18s ease, border-color 0.18s ease' },
+  fidelityOptActive: { border:'0.5px solid rgba(255,255,255,0.92)', background:'#f4f4f1' },
+  fidelityName:      { fontSize:11, fontWeight:560, color:'var(--color-text-primary)', marginBottom:3 },
+  motorGrid:         { display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:7 },
+  motorOpt:          { display:'flex', alignItems:'center', gap:10, border:'0.5px solid rgba(255,255,255,0.10)', borderRadius:12, padding:'11px 10px', cursor:'pointer', background:'rgba(255,255,255,0.03)', color:'var(--color-text-primary)', transition:'background 0.18s ease, border-color 0.18s ease' },
+  motorOptActive:    { border:'0.5px solid rgba(255,255,255,0.92)', background:'#f4f4f1', color:'var(--color-bg)' },
+  motorName:         { fontSize:11, fontWeight:560, color:'var(--color-text-primary)', marginBottom:3 },
   motorTag:          { display:'inline-block', fontSize:9, letterSpacing:'0.08em', textTransform:'uppercase', background:'var(--color-border-strong)', color:'var(--color-text-tertiary)', padding:'2px 6px', borderRadius:4 },
   motorDesc:         { fontSize:10, color:'var(--color-text-tertiary)', marginTop:4 },
-  qualityGrid:       { display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 },
-  qualityOpt:        { border:'0.5px solid var(--color-border-strong)', borderRadius:8, padding:'10px 8px', cursor:'pointer', background:'var(--color-bg-elevated)', textAlign:'center' as const },
-  qualityOptActive:  { border:'0.5px solid var(--color-text-primary)', background:'var(--color-text-primary)' },
+  qualityGrid:       { display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:7 },
+  qualityOpt:        { border:'0.5px solid rgba(255,255,255,0.10)', borderRadius:12, padding:'11px 8px', cursor:'pointer', background:'rgba(255,255,255,0.03)', textAlign:'center' as const, transition:'background 0.18s ease, border-color 0.18s ease' },
+  qualityOptActive:  { border:'0.5px solid rgba(255,255,255,0.92)', background:'#f4f4f1' },
   qualityRes:        { fontSize:14, fontWeight:500, color:'var(--color-text-primary)', marginBottom:4, letterSpacing:'-0.02em' },
-  errorBox:          { fontSize:12, color:'#c0392b', background:'rgba(192,57,43,0.08)', border:'0.5px solid rgba(192,57,43,0.2)', borderRadius:8, padding:'10px 14px' },
-  genBtn:            { width:'100%', padding:'13px 16px', background:'var(--color-text-primary)', color:'var(--color-bg)', border:'none', borderRadius:10, fontSize:13, fontWeight:500, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'space-between', fontFamily:'inherit' },
+  errorBox:          { fontSize:12, color:'#ff8a7a', background:'rgba(255,92,72,0.08)', border:'0.5px solid rgba(255,92,72,0.22)', borderRadius:12, padding:'10px 14px' },
+  genBtn:            { width:'100%', padding:'14px 17px', background:'#f4f4f1', color:'var(--color-bg)', border:'none', borderRadius:12, fontSize:13, fontWeight:650, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'space-between', fontFamily:'inherit', boxShadow:'0 14px 34px rgba(255,255,255,0.10)', transition:'opacity 0.18s ease, transform 0.12s ease' },
   genBtnMeta:        { display:'flex', alignItems:'center', gap:8, fontSize:11, color:'var(--color-text-tertiary)' },
-  uploadZone:        { border:'0.5px dashed var(--color-border-strong)', borderRadius:12, padding:'48px 20px', textAlign:'center', cursor:'pointer', background:'var(--color-bg-elevated)', flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:14, minHeight:300 },
-  uploadIcon:        { width:44, height:44, borderRadius:10, background:'var(--color-surface)', display:'flex', alignItems:'center', justifyContent:'center' },
+  uploadZone:        { border:'0.5px dashed rgba(255,255,255,0.16)', borderRadius:18, padding:'50px 20px', textAlign:'center', cursor:'pointer', background:'linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.018))', flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:14, minHeight:300, boxShadow:'inset 0 1px 0 rgba(255,255,255,0.035), 0 20px 50px rgba(0,0,0,0.22)', transition:'background 0.18s ease, border-color 0.18s ease, transform 0.18s ease' },
+  uploadIcon:        { width:44, height:44, borderRadius:14, background:'rgba(255,255,255,0.055)', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'inset 0 0 0 0.5px rgba(255,255,255,0.08)' },
   uploadTitle:       { fontSize:15, fontWeight:500, color:'var(--color-text-primary)', letterSpacing:'-0.02em' },
   uploadSub:         { fontSize:12, color:'var(--color-text-tertiary)', marginTop:4 },
-  uploadBtn:         { padding:'7px 18px', border:'0.5px solid var(--color-border-strong)', borderRadius:20, fontSize:11, color:'var(--color-text-primary)', background:'var(--color-bg-elevated)', cursor:'pointer', fontFamily:'inherit' },
-  compareWrap:       { position:'relative', borderRadius:12, overflow:'hidden', flex:1, minHeight:300, background:'var(--color-surface)', userSelect:'none', cursor:'ew-resize' },
+  uploadBtn:         { padding:'8px 18px', border:'0.5px solid rgba(255,255,255,0.14)', borderRadius:999, fontSize:11, color:'var(--color-text-primary)', background:'rgba(255,255,255,0.04)', cursor:'pointer', fontFamily:'inherit' },
+  compareWrap:       { position:'relative', borderRadius:18, overflow:'hidden', flex:1, minHeight:300, background:'rgba(255,255,255,0.035)', border:'0.5px solid rgba(255,255,255,0.08)', boxShadow:'0 22px 60px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.03)', userSelect:'none', cursor:'ew-resize' },
   compareImg:        { position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'contain', pointerEvents:'none' },
   compareAfterWrap:  { position:'absolute', inset:0 },
   compareHandle:     { position:'absolute', top:0, bottom:0, width:2, background:'#ffffff', transform:'translateX(-50%)', display:'flex', alignItems:'center', justifyContent:'center', pointerEvents:'none' },
-  compareHandleCircle: { width:32, height:32, borderRadius:'50%', background:'#ffffff', border:'0.5px solid rgba(0,0,0,0.1)', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 2px 8px rgba(0,0,0,0.12)' },
+  compareHandleCircle: { width:34, height:34, borderRadius:'50%', background:'#ffffff', border:'0.5px solid rgba(0,0,0,0.1)', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 8px 22px rgba(0,0,0,0.26)' },
   compareLabel:      { position:'absolute', bottom:12, fontSize:9, letterSpacing:'0.12em', color:'#fafafa', textTransform:'uppercase', fontWeight:500, textShadow:'0 1px 3px rgba(0,0,0,0.5)', pointerEvents:'none' },
-  changeImageBtn:    { position:'absolute', top:12, right:14, padding:'5px 12px', border:'0.5px solid rgba(255,255,255,0.4)', borderRadius:20, fontSize:10, color:'#fafafa', background:'rgba(0,0,0,0.35)', cursor:'pointer', fontFamily:'inherit' },
+  changeImageBtn:    { position:'absolute', top:12, right:14, padding:'6px 12px', border:'0.5px solid rgba(255,255,255,0.28)', borderRadius:999, fontSize:10, color:'#fafafa', background:'rgba(0,0,0,0.38)', cursor:'pointer', fontFamily:'inherit', backdropFilter:'blur(10px)' },
   zoomBadge:         { position:'absolute', top:12, left:14, padding:'3px 9px', fontSize:9, letterSpacing:'0.1em', color:'#fafafa', background:'rgba(0,0,0,0.45)', borderRadius:10, fontWeight:500, pointerEvents:'none' },
   loadingOverlay:    { position:'absolute', inset:0, background:'rgba(0,0,0,0.35)', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:14 },
   spinner:           { width:28, height:28, borderRadius:'50%', border:'2px solid rgba(255,255,255,0.3)', borderTopColor:'#ffffff', animation:'spin 0.8s linear infinite' },
-  promptPreview:     { background:'var(--color-bg-elevated)', border:'0.5px solid var(--color-border)', borderRadius:10, padding:'14px 16px' },
-  promptLabel:       { fontSize:9, letterSpacing:'0.15em', textTransform:'uppercase', color:'var(--color-text-tertiary)', fontWeight:500, marginBottom:8 },
+  promptPreview:     { background:'rgba(255,255,255,0.028)', border:'0.5px solid rgba(255,255,255,0.075)', borderRadius:16, padding:'15px 17px', boxShadow:'inset 0 1px 0 rgba(255,255,255,0.025)' },
+  promptLabel:       { fontSize:9, letterSpacing:'0.16em', textTransform:'uppercase', color:'rgba(245,245,247,0.34)', fontWeight:600, marginBottom:8 },
   promptText:        { fontSize:11, color:'var(--color-text-tertiary)', lineHeight:1.65 },
   downloadLink:      { fontSize:11, color:'var(--color-text-tertiary)', textDecoration:'none' },
   postGen:           { display:'flex', flexDirection:'column', gap:8 },
