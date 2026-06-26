@@ -169,6 +169,9 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   },
 ]
 
+const SIDEBAR_COLLAPSED = 76
+const SIDEBAR_EXPANDED = 276
+
 interface SidebarProps {
   userName: string
   userAvatar: string | null
@@ -189,28 +192,54 @@ export default function Sidebar({
   return (
     <aside
       style={{
-        width: hovered ? 264 : 72,
-        transition: 'width 0.25s cubic-bezier(0.4,0,0.2,1)',
-        background: '#0a0a0a',
+        width: hovered ? SIDEBAR_EXPANDED : SIDEBAR_COLLAPSED,
+        transition: 'width 0.28s cubic-bezier(0.22,1,0.36,1), box-shadow 0.28s ease',
+        background: 'linear-gradient(180deg, #101011 0%, #090909 100%)',
         display: 'flex',
         flexDirection: 'column',
         flexShrink: 0,
         overflow: 'hidden',
-        borderRight: '0.5px solid rgba(255,255,255,0.06)',
-        height: '100vh',
+        border: '0.5px solid rgba(255,255,255,0.08)',
+        borderRadius: 18,
+        height: 'calc(100vh - 12px)',
+        margin: 6,
         position: 'sticky',
-        top: 0,
+        top: 6,
+        boxShadow: hovered
+          ? '0 24px 70px rgba(0,0,0,0.46), inset 0 1px 0 rgba(255,255,255,0.04)'
+          : '0 18px 44px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,0.04)',
+        zIndex: 20,
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
       {/* Logo */}
-      <div style={{ padding: '12px 20px 12px 12px', display: 'flex', alignItems: 'center', gap: 12, height: 72, flexShrink: 0, color: '#ffffff' }}>
-        <div style={{ flexShrink: 0, display: 'flex' }}>
-          <ConstellationN size={48} />
+      <div style={{
+        padding: hovered ? '10px 16px 10px 11px' : '10px 9px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: hovered ? 'flex-start' : 'center',
+        gap: 12,
+        height: 68,
+        flexShrink: 0,
+        color: '#ffffff',
+      }}>
+        <div style={{
+          width: 52,
+          height: 52,
+          flexShrink: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: 15,
+          background: hovered ? 'rgba(255,255,255,0.035)' : 'transparent',
+          boxShadow: hovered ? 'inset 0 0 0 0.5px rgba(255,255,255,0.07)' : 'none',
+          transition: 'background 0.22s ease, box-shadow 0.22s ease',
+        }}>
+          <ConstellationN size={hovered ? 40 : 36} />
         </div>
         <span style={{
-          fontSize: 23, fontWeight: 500, color: '#ffffff',
+          fontSize: 22, fontWeight: 550, color: '#ffffff',
           letterSpacing: '-0.025em',
           whiteSpace: 'nowrap' as const,
           opacity: hovered ? 1 : 0, transition: 'opacity 0.18s',
@@ -220,19 +249,29 @@ export default function Sidebar({
       </div>
 
       {/* Nav */}
-      <nav className="spn-sidebar-nav" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0, padding: '2px 15px 8px' }}>
+      <nav
+        className="spn-sidebar-nav"
+        style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 0,
+          padding: hovered ? '4px 12px 10px' : '4px 9px 10px',
+        }}
+      >
         {NAV_GROUPS.map((group, gi) => (
-          <div key={group.label} style={{ marginTop: gi === 0 ? 0 : 14 }}>
+          <div key={group.label} style={{ marginTop: hovered ? (gi === 0 ? 0 : 13) : (gi === 0 ? 0 : 10) }}>
             <div style={{
               fontSize: 11, fontWeight: 500, letterSpacing: '0.13em',
               textTransform: 'uppercase' as const,
               color: 'rgba(255,255,255,0.34)',
-              padding: '0 10px', height: 22,
+              padding: hovered ? '0 10px' : 0,
+              height: hovered ? 22 : 8,
               display: 'flex', alignItems: 'center',
               whiteSpace: 'nowrap' as const,
               opacity: hovered ? 1 : 0,
-              transition: 'opacity 0.18s',
-              marginBottom: 2,
+              transition: 'opacity 0.18s, height 0.22s ease',
+              marginBottom: hovered ? 2 : 0,
             }}>
               {group.label}
             </div>
@@ -254,25 +293,39 @@ export default function Sidebar({
                   {active && (
                     <span aria-hidden style={{
                       position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)',
-                      width: 3, height: 18, borderRadius: 999,
+                      width: 3, height: hovered ? 20 : 22, borderRadius: 999,
                       background: 'var(--color-accent-green)',
+                      boxShadow: '0 0 12px var(--color-accent-green-glow)',
                     }} />
                   )}
                   <div style={{
-                    flexShrink: 0, display: 'flex',
-                    color: disabled ? 'rgba(255,255,255,0.2)' : active ? '#ffffff' : isItemHovered ? 'rgba(255,255,255,0.72)' : 'rgba(255,255,255,0.5)',
-                    transition: 'color 0.2s',
+                    width: 30,
+                    height: 30,
+                    borderRadius: 10,
+                    flexShrink: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: disabled ? 'rgba(255,255,255,0.2)' : active ? '#ffffff' : isItemHovered ? 'rgba(255,255,255,0.78)' : 'rgba(255,255,255,0.52)',
+                    background: active
+                      ? 'rgba(255,255,255,0.105)'
+                      : isItemHovered
+                        ? 'rgba(255,255,255,0.06)'
+                        : 'transparent',
+                    boxShadow: active ? 'inset 0 0 0 0.5px rgba(255,255,255,0.10)' : 'none',
                     transform: isItemHovered && !active ? 'translateY(-0.5px)' : 'translateY(0)',
-                    transitionProperty: 'color, transform',
+                    transitionProperty: 'color, transform, background, box-shadow',
                     transitionDuration: '0.2s',
                   }}>
-                    <Icon />
+                    <span style={{ display: 'flex', transform: 'scale(0.92)' }}>
+                      <Icon />
+                    </span>
                   </div>
                   <span style={{
-                    fontSize: 14,
+                    fontSize: 13,
                     color: disabled ? 'rgba(255,255,255,0.25)' : active ? '#ffffff' : isItemHovered ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.75)',
                     whiteSpace: 'nowrap' as const,
-                    fontWeight: active ? 500 : 400,
+                    fontWeight: active ? 560 : 430,
                     letterSpacing: '-0.01em',
                     opacity: hovered ? 1 : 0,
                     transition: 'opacity 0.18s, color 0.2s',
@@ -286,7 +339,7 @@ export default function Sidebar({
                       textTransform: 'uppercase' as const,
                       color: badgeColor.color,
                       background: badgeColor.bg,
-                      padding: '2px 6px', borderRadius: 20,
+                      padding: '2px 6px', borderRadius: 7,
                       whiteSpace: 'nowrap' as const, flexShrink: 0,
                     }}>
                       {badge}
@@ -297,20 +350,20 @@ export default function Sidebar({
 
               const sharedStyle: React.CSSProperties = {
                 position: 'relative',
-                display: 'flex', alignItems: 'center', gap: 12,
-                padding: '0 12px', height: 38, borderRadius: 9,
+                display: 'flex', alignItems: 'center', justifyContent: hovered ? 'flex-start' : 'center', gap: hovered ? 10 : 0,
+                padding: hovered ? '0 10px' : 0, height: 38, borderRadius: 12,
                 textDecoration: 'none', flexShrink: 0,
                 background: active
-                  ? 'rgba(255,255,255,0.06)'
+                  ? 'rgba(255,255,255,0.075)'
                   : isItemHovered
-                    ? 'rgba(255,255,255,0.055)'
+                    ? 'rgba(255,255,255,0.045)'
                     : 'transparent',
                 boxShadow: active
-                  ? 'inset 0 0 0 0.5px rgba(255,255,255,0.07)'
+                  ? 'inset 0 0 0 0.5px rgba(255,255,255,0.10)'
                   : isItemHovered
-                    ? 'inset 0 0 0 0.5px rgba(255,255,255,0.08)'
+                    ? 'inset 0 0 0 0.5px rgba(255,255,255,0.07)'
                     : 'none',
-                transition: 'background 0.2s, box-shadow 0.2s',
+                transition: 'background 0.2s, box-shadow 0.2s, transform 0.2s',
                 cursor: disabled ? 'default' : 'pointer',
                 opacity: disabled ? 0.5 : 1,
               }
@@ -335,7 +388,12 @@ export default function Sidebar({
       </nav>
 
       {/* User com anel de consumo */}
-      <div style={{ padding: '10px 8px', borderTop: '0.5px solid rgba(255,255,255,0.07)', flexShrink: 0, position: 'relative' }}>
+      <div style={{
+        padding: hovered ? '10px 10px 12px' : '10px 8px 12px',
+        borderTop: '0.5px solid rgba(255,255,255,0.07)',
+        flexShrink: 0,
+        position: 'relative',
+      }}>
         <AvatarComConsumo
           userName={userName}
           userAvatar={userAvatar}

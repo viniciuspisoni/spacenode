@@ -85,9 +85,16 @@ export function AvatarComConsumo({
       <button
         onClick={() => setOpen(o => !o)}
         style={{
-          display: 'flex', alignItems: 'center', gap: 10,
-          padding: '4px 10px', height: 56, borderRadius: 8,
-          background: 'transparent', width: '100%', textAlign: 'left',
+          display: 'flex', alignItems: 'center', justifyContent: expanded ? 'flex-start' : 'center', gap: 10,
+          padding: expanded ? '5px 10px' : '5px 0',
+          height: 56,
+          borderRadius: 14,
+          background: expanded ? 'rgba(255,255,255,0.045)' : 'transparent',
+          border: expanded ? '0.5px solid rgba(255,255,255,0.07)' : '0.5px solid transparent',
+          boxShadow: expanded ? 'inset 0 1px 0 rgba(255,255,255,0.03)' : 'none',
+          width: '100%',
+          textAlign: 'left',
+          transition: 'background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease',
         }}
       >
         <AvatarRing

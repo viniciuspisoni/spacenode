@@ -22,6 +22,7 @@ function engineDisplayName(engine: string, fallback: EngineId): string {
 }
 import { getUpscaleCost } from '@/lib/spaces/economy'
 import { getVisualDna } from '@/lib/spaces/dna'
+import { spacesPreserveV2Enabled } from '@/lib/spaces/preserve-flags'
 import { RetocarOverlay } from './RetocarOverlay'
 
 interface OtherVista {
@@ -149,23 +150,16 @@ export function VistaDetail({ space, vista, others, initialBalance }: Props) {
         {space.name}
       </Link>
 
-      {/* Comparação side-by-side */}
-      <div style={{
-        display: 'grid', gap: 14,
-        gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
-      }}>
-        <ComparisonCard
-          label="Vista Mestre"
-          color="#1D9E75"
-          imageUrl={space.vista_mestre_url}
-        />
-        <ComparisonCard
-          label={vista.axis_label ?? 'Variação'}
-          color={opt?.color ?? '#888'}
-          imageUrl={vista.image_url}
-          subLabel={`${engineDisplayName(vista.engine, space.engine)} · ${vista.quality.toUpperCase()}`}
-        />
-      </div>
+      {/* Comparação Antes/Depois */}
+      <ComparisonSection
+        mestreUrl={space.vista_mestre_url}
+        variationUrl={vista.image_url}
+        variationLabel={vista.axis_label ?? 'Variação'}
+        variationColor={opt?.color ?? '#888'}
+        variationSub={`${engineDisplayName(vista.engine, space.engine)} · ${vista.quality.toUpperCase()}`}
+        preserveV2={spacesPreserveV2Enabled()}
+        preservationWarning={vista.preservation_warning === true}
+      />
 
       {/* DNA preservation panel */}
       {dna && verification && (
@@ -334,6 +328,115 @@ export function VistaDetail({ space, vista, others, initialBalance }: Props) {
 }
 
 // ── Sub ───────────────────────────────────────────────────────
+
+// Comparação Antes/Depois. Flag off → grid lado-a-lado clássico (comportamento
+// anterior). Flag on → mesmo grid + toggle "Lado a lado / Sobrepor" (alterna uma
+// imagem única entre Antes e Depois) + selo deixando claro que a ORIGINAL foi
+// preservada (nunca sobrescrita) e, se houver, aviso de preservação.
+function ComparisonSection({
+  mestreUrl, variationUrl, variationLabel, variationColor, variationSub,
+  preserveV2, preservationWarning,
+}: {
+  mestreUrl:           string | null
+  variationUrl:        string | null
+  variationLabel:      string
+  variationColor:      string
+  variationSub:        string
+  preserveV2:          boolean
+  preservationWarning: boolean
+}) {
+  const [mode, setMode] = useState<'split' | 'flip'>('split')
+  const [side, setSide] = useState<'antes' | 'depois'>('depois')
+
+  const grid = (
+    <div style={{
+      display: 'grid', gap: 14,
+      gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
+    }}>
+      <ComparisonCard label="Vista Mestre" color="#1D9E75" imageUrl={mestreUrl} subLabel={preserveV2 ? 'original' : undefined} />
+      <ComparisonCard label={variationLabel} color={variationColor} imageUrl={variationUrl} subLabel={variationSub} />
+    </div>
+  )
+
+  if (!preserveV2) return grid
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {/* Barra: toggle de modo + selo "original preservada" */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--color-surface)', borderRadius: 9 }}>
+          {(['split', 'flip'] as const).map(m => (
+            <button
+              key={m}
+              onClick={() => setMode(m)}
+              style={{
+                padding: '6px 12px', borderRadius: 6, fontSize: 11, fontWeight: 500,
+                cursor: 'pointer', letterSpacing: '-0.005em',
+                background: mode === m ? 'var(--color-bg-elevated)' : 'transparent',
+                color: mode === m ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
+                boxShadow: mode === m ? 'inset 0 0 0 0.5px var(--color-border-strong)' : 'none',
+              }}
+            >
+              {m === 'split' ? 'Lado a lado' : 'Sobrepor'}
+            </button>
+          ))}
+        </div>
+        <span
+          title="A Vista Mestre original nunca é sobrescrita — cada variação é salva separadamente."
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '5px 11px', borderRadius: 999,
+            background: 'rgba(29,158,117,0.12)', color: '#46d191',
+            border: '0.5px solid rgba(70,209,145,0.25)',
+            fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase',
+          }}
+        >
+          ✦ original preservada
+        </span>
+      </div>
+
+      {mode === 'split' ? grid : (
+        <div>
+          {/* Imagem única que alterna Antes/Depois */}
+          <ComparisonCard
+            label={side === 'antes' ? 'Antes · Vista Mestre' : `Depois · ${variationLabel}`}
+            color={side === 'antes' ? '#1D9E75' : variationColor}
+            imageUrl={side === 'antes' ? mestreUrl : variationUrl}
+            subLabel={side === 'depois' ? variationSub : 'original'}
+          />
+          <div style={{ display: 'flex', gap: 4, padding: 4, marginTop: 10, background: 'var(--color-surface)', borderRadius: 9, width: 'fit-content' }}>
+            {(['antes', 'depois'] as const).map(s => (
+              <button
+                key={s}
+                onClick={() => setSide(s)}
+                style={{
+                  padding: '6px 16px', borderRadius: 6, fontSize: 11, fontWeight: 500,
+                  cursor: 'pointer', textTransform: 'capitalize',
+                  background: side === s ? 'var(--color-bg-elevated)' : 'transparent',
+                  color: side === s ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
+                  boxShadow: side === s ? 'inset 0 0 0 0.5px var(--color-border-strong)' : 'none',
+                }}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {preservationWarning && (
+        <div style={{
+          padding: '10px 14px', borderRadius: 8,
+          background: 'rgba(186,117,23,0.12)', border: '0.5px solid rgba(186,117,23,0.3)',
+          color: '#e0a766', fontSize: 12, lineHeight: 1.5,
+        }}>
+          Possível alteração além do solicitado nesta variação — registrada para auditoria.
+          Compare com a Vista Mestre acima; se necessário, gere novamente.
+        </div>
+      )}
+    </div>
+  )
+}
 
 function ComparisonCard({ label, color, imageUrl, subLabel }: {
   label:    string

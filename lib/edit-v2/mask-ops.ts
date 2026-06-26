@@ -1,0 +1,228 @@
+// lib/edit-v2/mask-ops.ts
+//
+// Operações puras de máscara para a SELEÇÃO POR INTENÇÃO (Trocar material v2).
+// A região marcada pelo usuário é APROXIMADA — estas funções a transformam em
+// restrição espacial e combinam com a máscara semântica do evf-sam/SAM2.
+// 100% local (sharp). Sem rede, sem custo. Não toca no v1 (só reusa, por
+// import read-only, detectMaskBoundingBox de edit-crop).
+
+import sharp from 'sharp'
+import { detectMaskBoundingBox } from '@/lib/spaces/edit-crop'
+import { keepRegionComponents } from './connected-components'
+import { close, fillInteriorHoles, interiorHoleRatio, countWhite } from './mask-morphology'
+
+/** Interseção binária (branco = branco em AMBAS). Alinha dims pela 1ª. */
+export async function intersectMasks(aBuf: Buffer, bBuf: Buffer): Promise<Buffer> {
+  const m = await sharp(aBuf).metadata()
+  const W = m.width ?? 0
+  const H = m.height ?? 0
+  if (!W || !H) return aBuf
+  const [a, b] = await Promise.all([
+    sharp(aBuf).greyscale().raw().toBuffer(),
+    sharp(bBuf).resize(W, H, { fit: 'fill' }).greyscale().raw().toBuffer(),
+  ])
+  const out = Buffer.alloc(a.length)
+  for (let i = 0; i < a.length; i++) out[i] = a[i] > 127 && b[i] > 127 ? 255 : 0
+  return sharp(out, { raw: { width: W, height: H, channels: 1 } }).png().toBuffer()
+}
+
+/** Região permitida = bounding box do traço EXPANDIDO por uma margem (fração do
+ *  maior lado da bbox). Generoso o bastante para o traço aproximado cobrir a
+ *  superfície inteira que ele toca, mas ainda excluindo material parecido em
+ *  outra parte da imagem (parede oposta, etc.). Retângulo preenchido (branco). */
+export async function expandedRegionMask(regionBuf: Buffer, marginRatio = 0.12): Promise<Buffer> {
+  const meta = await sharp(regionBuf).metadata()
+  const W = meta.width ?? 0
+  const H = meta.height ?? 0
+  if (!W || !H) return regionBuf
+  const bbox = await detectMaskBoundingBox(regionBuf)
+  if (!bbox) return regionBuf
+  const margin = Math.round(Math.max(bbox.width, bbox.height) * marginRatio)
+  const x0 = Math.max(0, bbox.left - margin)
+  const y0 = Math.max(0, bbox.top - margin)
+  const x1 = Math.min(W, bbox.left + bbox.width + margin)
+  const y1 = Math.min(H, bbox.top + bbox.height + margin)
+  const svg = Buffer.from(
+    `<svg width="${W}" height="${H}"><rect width="${W}" height="${H}" fill="black"/>` +
+    `<rect x="${x0}" y="${y0}" width="${x1 - x0}" height="${y1 - y0}" fill="white"/></svg>`,
+  )
+  return sharp(svg).png().toBuffer()
+}
+
+/** bbox normalizado (0–1) do traço — vira box_prompt do SAM2 no fallback. */
+export async function regionBoundingBoxNorm(
+  regionBuf: Buffer,
+): Promise<{ x_min: number; y_min: number; x_max: number; y_max: number } | null> {
+  const meta = await sharp(regionBuf).metadata()
+  const W = meta.width ?? 0
+  const H = meta.height ?? 0
+  if (!W || !H) return null
+  const bbox = await detectMaskBoundingBox(regionBuf)
+  if (!bbox) return null
+  return {
+    x_min: bbox.left,
+    y_min: bbox.top,
+    x_max: bbox.left + bbox.width,
+    y_max: bbox.top + bbox.height,
+  }
+}
+
+/** Centro do traço em px (ponto-semente para o SAM2). */
+export async function regionCenterPx(regionBuf: Buffer): Promise<{ x: number; y: number } | null> {
+  const bbox = await detectMaskBoundingBox(regionBuf)
+  if (!bbox) return null
+  return { x: Math.round(bbox.left + bbox.width / 2), y: Math.round(bbox.top + bbox.height / 2) }
+}
+
+/** Fração da área branca de `regionBuf` que também está branca em `candidateBuf`.
+ *  Usado para decidir se o candidato cobre bem a região (senão, fallback). */
+export async function overlapRatio(candidateBuf: Buffer, regionBuf: Buffer): Promise<number> {
+  const meta = await sharp(regionBuf).metadata()
+  const W = meta.width ?? 0
+  const H = meta.height ?? 0
+  if (!W || !H) return 0
+  const S = 256
+  const sc = Math.max(W, H) / S
+  const sw = Math.max(1, Math.round(W / sc))
+  const sh = Math.max(1, Math.round(H / sc))
+  const [c, r] = await Promise.all([
+    sharp(candidateBuf).resize(sw, sh, { fit: 'fill' }).greyscale().raw().toBuffer(),
+    sharp(regionBuf).resize(sw, sh, { fit: 'fill' }).greyscale().raw().toBuffer(),
+  ])
+  let reg = 0
+  let both = 0
+  for (let i = 0; i < r.length; i++) {
+    if (r[i] > 127) {
+      reg++
+      if (c[i] > 127) both++
+    }
+  }
+  return reg > 0 ? both / reg : 0
+}
+
+/** POLÍTICA "superfície inteira conectada à região": mantém os componentes
+ *  conexos da máscara candidata que TOCAM a região marcada — expande para a
+ *  superfície contígua inteira (mesmo que o traço cubra só parte dela) e
+ *  exclui material parecido DESCONECTADO (parede oposta). Retorna null se nada
+ *  tocar a região (o chamador faz fallback). 100% local. */
+export async function keepComponentsOverlappingRegion(
+  candidateBuf: Buffer,
+  regionBuf: Buffer,
+  opts: { maxWidth?: number; closeSigmaRatio?: number; regionDilateRatio?: number } = {},
+): Promise<{ mask: Buffer; coverage: number; componentCount: number; keptCount: number } | null> {
+  const meta = await sharp(candidateBuf).metadata()
+  const W = meta.width ?? 0
+  const H = meta.height ?? 0
+  if (!W || !H) return null
+
+  const maxWidth = opts.maxWidth ?? 768
+  const w = Math.min(maxWidth, W)
+  const h = Math.max(1, Math.round((H / W) * w))
+
+  // Candidata: leve close (blur+threshold) para pontes finas (sombra entre
+  // ripas) não fragmentarem a superfície em vários componentes.
+  const closeSigma = Math.max(1, Math.round(Math.min(w, h) * (opts.closeSigmaRatio ?? 0.006)))
+  // Região: leve dilatação para uma marca PERTO (não exatamente sobre) a
+  // superfície ainda ancorar o componente certo.
+  const regionDilate = Math.max(1, Math.round(Math.min(w, h) * (opts.regionDilateRatio ?? 0.01)))
+
+  const [candRaw, regRaw] = await Promise.all([
+    sharp(candidateBuf).resize(w, h, { fit: 'fill' }).greyscale().blur(closeSigma).threshold(110).raw().toBuffer(),
+    sharp(regionBuf).resize(w, h, { fit: 'fill' }).greyscale().blur(regionDilate).threshold(40).raw().toBuffer(),
+  ])
+
+  const { out, componentCount, keptCount, keptPixels } = keepRegionComponents(
+    new Uint8Array(candRaw),
+    new Uint8Array(regRaw),
+    w,
+    h,
+  )
+  if (keptCount === 0 || keptPixels === 0) return null
+
+  const mask = await sharp(Buffer.from(out), { raw: { width: w, height: h, channels: 1 } })
+    .resize(W, H, { fit: 'fill' })
+    .threshold(128)
+    .png()
+    .toBuffer()
+  return { mask, coverage: keptPixels / (w * h), componentCount, keptCount }
+}
+
+/** SURFACE COMPLETION: preenche o interior da superfície-alvo (faixas/ilhas
+ *  internas) SEM crescer a borda cegamente. close (bridge de seams) +
+ *  fillInteriorHoles (tampa buracos fechados), depois RE-SUBTRAI exclusões
+ *  (objetos sobre a superfície voltam a ser buraco) e CLIPA à box (limite
+ *  arquitetônico do Gemini). Retorna a máscara completa + métricas de cobertura
+ *  (holeRatio antes/depois). 100% local. */
+export async function completeSurfaceMask(
+  maskBuf: Buffer,
+  opts: {
+    boxMaskBuf?: Buffer | null
+    exclusionBuf?: Buffer | null
+    maxWidth?: number
+    closeRatio?: number
+  } = {},
+): Promise<{ mask: Buffer; holeRatioBefore: number; holeRatioAfter: number; coverageGain: number }> {
+  const meta = await sharp(maskBuf).metadata()
+  const W = meta.width ?? 0
+  const H = meta.height ?? 0
+  if (!W || !H) return { mask: maskBuf, holeRatioBefore: 0, holeRatioAfter: 0, coverageGain: 0 }
+
+  const maxWidth = opts.maxWidth ?? 768
+  const w = Math.min(maxWidth, W)
+  const h = Math.max(1, Math.round((H / W) * w))
+  // close generoso o bastante p/ unir faixas de painel (seams/sombra), mas
+  // simétrico (não cresce a borda externa convexa).
+  const r = Math.max(2, Math.round(Math.min(w, h) * (opts.closeRatio ?? 0.02)))
+
+  const [maskRaw, boxRaw, exclRaw] = await Promise.all([
+    sharp(maskBuf).resize(w, h, { fit: 'fill' }).greyscale().raw().toBuffer(),
+    opts.boxMaskBuf
+      ? sharp(opts.boxMaskBuf).resize(w, h, { fit: 'fill' }).greyscale().raw().toBuffer()
+      : Promise.resolve(null),
+    opts.exclusionBuf
+      ? sharp(opts.exclusionBuf).resize(w, h, { fit: 'fill' }).greyscale().raw().toBuffer()
+      : Promise.resolve(null),
+  ])
+
+  const src = new Uint8Array(maskRaw)
+  const holeRatioBefore = interiorHoleRatio(src, w, h)
+
+  // 1) close (bridge faixas) → 2) fill buracos internos
+  const out = fillInteriorHoles(close(src, w, h, r), w, h)
+
+  // 3) clip à box (close não pode vazar além do limite do Gemini)
+  if (boxRaw) for (let i = 0; i < out.length; i++) if (boxRaw[i] <= 127) out[i] = 0
+  // 4) re-subtrai exclusões (objetos sobre a superfície voltam a ser buraco)
+  if (exclRaw) for (let i = 0; i < out.length; i++) if (exclRaw[i] > 127) out[i] = 0
+
+  const holeRatioAfter = interiorHoleRatio(out, w, h)
+  const coverageGain = (countWhite(out) - countWhite(src)) / (w * h)
+
+  const mask = await sharp(Buffer.from(out), { raw: { width: w, height: h, channels: 1 } })
+    .resize(W, H, { fit: 'fill' })
+    .threshold(128)
+    .png()
+    .toBuffer()
+  return { mask, holeRatioBefore, holeRatioAfter, coverageGain }
+}
+
+/** Imagem com a região do usuário tingida de verde — entrada visual para o
+ *  Gemini "ver" o que foi circulado. */
+export async function regionOverlay(imageBuf: Buffer, regionBuf: Buffer): Promise<Buffer> {
+  const meta = await sharp(imageBuf).metadata()
+  const W = meta.width ?? 0
+  const H = meta.height ?? 0
+  if (!W || !H) return imageBuf
+  const reg = await sharp(regionBuf).resize(W, H, { fit: 'fill' }).greyscale().raw().toBuffer()
+  const rgba = Buffer.alloc(W * H * 4)
+  for (let i = 0; i < reg.length; i++) {
+    const on = reg[i] > 127
+    const j = i * 4
+    rgba[j] = 48
+    rgba[j + 1] = 209
+    rgba[j + 2] = 88
+    rgba[j + 3] = on ? 150 : 0
+  }
+  const overlay = await sharp(rgba, { raw: { width: W, height: H, channels: 4 } }).png().toBuffer()
+  return sharp(imageBuf).composite([{ input: overlay }]).png().toBuffer()
+}
