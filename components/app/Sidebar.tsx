@@ -82,6 +82,13 @@ const IconRetocar = () => (
     <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
   </svg>
 )
+const IconFinalizar = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2"/>
+    <path d="M3 14l5-4 4 3 3-2 6 4"/>
+    <path d="M14.5 3.5L20 9"/>
+  </svg>
+)
 const IconHumanizedPlan = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <rect x="3" y="3" width="18" height="18" rx="1.5"/>
@@ -147,6 +154,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { label: 'editar',     href: '/app/editar',      exact: false, Icon: IconRetocar, badge: 'novo', badgeTone: 'green' },
       { label: 'ampliar',    href: '/app/upscale',     exact: false, Icon: IconEnhance   },
       { label: 'animar',     href: '/app/video',       exact: false, Icon: IconVideo     },
+      { label: 'finalizar',  href: '/app/finalizar',   exact: false, Icon: IconFinalizar, badge: 'novo', badgeTone: 'green' },
     ],
   },
   {
