@@ -253,6 +253,7 @@ export default function Sidebar({
         className="spn-sidebar-nav"
         style={{
           flex: 1,
+          minHeight: 0,
           display: 'flex',
           flexDirection: 'column',
           gap: 0,
@@ -329,7 +330,8 @@ export default function Sidebar({
                     letterSpacing: '-0.01em',
                     opacity: hovered ? 1 : 0,
                     transition: 'opacity 0.18s, color 0.2s',
-                    flex: 1,
+                    flex: hovered ? 1 : '0 0 0px',
+                    overflow: 'hidden',
                   }}>
                     {label}
                   </span>
