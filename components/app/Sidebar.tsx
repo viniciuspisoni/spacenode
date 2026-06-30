@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import React from 'react'
 import { ConstellationN, Logo } from '@/components/brand'
 import { AvatarComConsumo } from './AvatarComConsumo'
@@ -127,17 +127,6 @@ const IconMoodboard = () => (
   </svg>
 )
 
-const ChevronCollapse = () => (
-  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M13 7l-5 5 5 5"/><path d="M19 7l-5 5 5 5"/>
-  </svg>
-)
-const ChevronExpand = () => (
-  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M11 7l5 5-5 5"/><path d="M5 7l5 5-5 5"/>
-  </svg>
-)
-
 type NavItem = {
   label: string
   href: string | null
@@ -207,24 +196,9 @@ export default function Sidebar({
   const pathname = usePathname()
   const [hovered, setHovered] = useState(false)
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
-  const [togHover, setTogHover] = useState(false)
 
-  // Colapso manual e persistido. Padrão: expandido no desktop, colapsado
-  // abaixo de 1024px. O usuário controla via botão — sem colapso por hover.
-  const [collapsed, setCollapsed] = useState(false)
-  useEffect(() => {
-    const saved = localStorage.getItem('spn-sidebar-collapsed')
-    if (saved !== null) setCollapsed(saved === '1')
-    else setCollapsed(!window.matchMedia('(min-width: 1024px)').matches)
-  }, [])
-
-  const setCollapsedPersist = (next: boolean) => {
-    setCollapsed(next)
-    try { localStorage.setItem('spn-sidebar-collapsed', next ? '1' : '0') } catch {}
-  }
-
-  // Recolhida é a preferência fixada; o cursor sobre a sidebar abre em preview.
-  const expanded = !collapsed || hovered
+  // Sem botões: rail por padrão; abre quando o cursor se aproxima da sidebar.
+  const expanded = hovered
 
   return (
     <aside
@@ -256,9 +230,8 @@ export default function Sidebar({
         flexShrink: 0,
         display: 'flex',
         alignItems: 'center',
-        justifyContent: expanded ? 'space-between' : 'center',
+        justifyContent: expanded ? 'flex-start' : 'center',
         paddingLeft: expanded ? 20 : 0,
-        paddingRight: expanded ? 12 : 0,
         color: '#ffffff',
         transition: 'padding 0.28s cubic-bezier(0.22,1,0.36,1)',
       }}>
@@ -287,30 +260,6 @@ export default function Sidebar({
         }}>
           <Logo symbolSize={42} color="#ffffff" />
         </div>
-
-        {/* Toggle fixar/recolher — visível quando expandida (fixa ou em preview
-            por hover). Recolher fixa o rail; durante o preview, fixa aberta.
-            A expansão em si é por aproximação do cursor, sem botão no rail. */}
-        {expanded && (
-          <button
-            type="button"
-            onClick={() => setCollapsedPersist(!collapsed)}
-            onMouseEnter={() => setTogHover(true)}
-            onMouseLeave={() => setTogHover(false)}
-            title={collapsed ? 'Fixar menu aberto' : 'Recolher menu'}
-            aria-label={collapsed ? 'Fixar menu aberto' : 'Recolher menu'}
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: 30, height: 30, borderRadius: 9, border: 'none', padding: 0,
-              cursor: 'pointer', flexShrink: 0,
-              background: togHover ? 'rgba(255,255,255,0.07)' : 'transparent',
-              color: togHover ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.42)',
-              transition: 'background 0.18s, color 0.18s',
-            }}
-          >
-            {collapsed ? <ChevronExpand /> : <ChevronCollapse />}
-          </button>
-        )}
       </div>
 
       {/* Nav */}
