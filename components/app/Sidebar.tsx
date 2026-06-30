@@ -223,7 +223,8 @@ export default function Sidebar({
     try { localStorage.setItem('spn-sidebar-collapsed', next ? '1' : '0') } catch {}
   }
 
-  const expanded = !collapsed
+  // Recolhida é a preferência fixada; o cursor sobre a sidebar abre em preview.
+  const expanded = !collapsed || hovered
 
   return (
     <aside
@@ -287,15 +288,17 @@ export default function Sidebar({
           <Logo symbolSize={42} color="#ffffff" />
         </div>
 
-        {/* Botão recolher (expandido) */}
+        {/* Toggle fixar/recolher — visível quando expandida (fixa ou em preview
+            por hover). Recolher fixa o rail; durante o preview, fixa aberta.
+            A expansão em si é por aproximação do cursor, sem botão no rail. */}
         {expanded && (
           <button
             type="button"
-            onClick={() => setCollapsedPersist(true)}
+            onClick={() => setCollapsedPersist(!collapsed)}
             onMouseEnter={() => setTogHover(true)}
             onMouseLeave={() => setTogHover(false)}
-            title="Recolher menu"
-            aria-label="Recolher menu"
+            title={collapsed ? 'Fixar menu aberto' : 'Recolher menu'}
+            aria-label={collapsed ? 'Fixar menu aberto' : 'Recolher menu'}
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               width: 30, height: 30, borderRadius: 9, border: 'none', padding: 0,
@@ -305,32 +308,7 @@ export default function Sidebar({
               transition: 'background 0.18s, color 0.18s',
             }}
           >
-            <ChevronCollapse />
-          </button>
-        )}
-
-        {/* Botão expandir (colapsado) — aparece ao passar o mouse no rail */}
-        {!expanded && (
-          <button
-            type="button"
-            onClick={() => setCollapsedPersist(false)}
-            onMouseEnter={() => setTogHover(true)}
-            onMouseLeave={() => setTogHover(false)}
-            title="Expandir menu"
-            aria-label="Expandir menu"
-            style={{
-              position: 'absolute', top: 7, right: 7,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: 28, height: 28, borderRadius: 8, border: 'none', padding: 0,
-              cursor: 'pointer',
-              background: togHover ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.05)',
-              color: togHover ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.5)',
-              opacity: hovered ? 1 : 0,
-              pointerEvents: hovered ? 'auto' : 'none',
-              transition: 'opacity 0.16s ease, background 0.18s, color 0.18s',
-            }}
-          >
-            <ChevronExpand />
+            {collapsed ? <ChevronExpand /> : <ChevronCollapse />}
           </button>
         )}
       </div>
