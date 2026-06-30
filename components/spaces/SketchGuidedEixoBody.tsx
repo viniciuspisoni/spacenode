@@ -253,6 +253,14 @@ export function SketchGuidedEixoBody({
           Suba prints de sketch dos ângulos que você quer renderizar
         </div>
         <div style={{
+          fontSize: 11, color: 'var(--color-text-secondary)',
+          lineHeight: 1.5, marginBottom: 6,
+        }}>
+          O print que você enviar é a <strong style={{ color: 'var(--color-text-primary)', fontWeight: 600 }}>base geométrica</strong> da
+          geração — geometria, enquadramento e perspectiva são preservados. O DNA do projeto
+          entra só como referência estética (materiais, luz e acabamento).
+        </div>
+        <div style={{
           fontSize: 11, color: 'var(--color-text-tertiary)',
           display: 'inline-flex', alignItems: 'center', gap: 6,
         }}>
