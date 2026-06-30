@@ -342,10 +342,11 @@ export async function POST(
     await admin
       .from('vistas')
       .update({
-        image_url:    run.resultUrl,
-        prompt:       finalPrompt,
-        status:       'completed',
-        completed_at: new Date().toISOString(),
+        image_url:      run.resultUrl,
+        prompt:         finalPrompt,
+        fal_request_id: run.requestId,
+        status:         'completed',
+        completed_at:   new Date().toISOString(),
       })
       .eq('id', newVistaId)
 

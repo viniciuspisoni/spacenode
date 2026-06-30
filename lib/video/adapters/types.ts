@@ -20,6 +20,7 @@ export interface VideoGenerationResult {
   outputUrl:    string
   thumbnailUrl?: string
   metadata?:   Record<string, unknown>   // payload bruto do provider, para debug
+  requestId?:  string | null             // id do request fal — rastreabilidade
 }
 
 export interface VideoAdapter {

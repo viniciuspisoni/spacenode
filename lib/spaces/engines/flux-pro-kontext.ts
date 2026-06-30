@@ -53,5 +53,5 @@ export const callFluxProKontext: RetouchEngine = async (
   const url  = data.images?.[0]?.url ?? data.image?.url
   if (!url) throw new RetouchNoOutputError(FLUX_PRO_KONTEXT_ENDPOINT)
 
-  return { imageUrl: url, endpoint: FLUX_PRO_KONTEXT_ENDPOINT }
+  return { imageUrl: url, endpoint: FLUX_PRO_KONTEXT_ENDPOINT, requestId: (result as { requestId?: string }).requestId ?? null }
 }

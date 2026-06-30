@@ -85,5 +85,5 @@ export const callObjectRemoval: RetouchEngine = async (
   const url  = data.images?.[0]?.url ?? data.image?.url
   if (!url) throw new RetouchNoOutputError(OBJECT_REMOVAL_ENDPOINT)
 
-  return { imageUrl: url, endpoint: OBJECT_REMOVAL_ENDPOINT }
+  return { imageUrl: url, endpoint: OBJECT_REMOVAL_ENDPOINT, requestId: (result as { requestId?: string }).requestId ?? null }
 }

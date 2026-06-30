@@ -125,6 +125,9 @@ export interface RetouchInput {
 export interface RetouchOutput {
   imageUrl: string
   endpoint: string
+  /** ID do request no provider (fal.ai) — rastreabilidade. null p/ engines
+   *  sem id de request (ex: Vertex). Propagado até renders/edits/vistas.fal_request_id. */
+  requestId?: string | null
 }
 
 export type RetouchEngine = (input: RetouchInput) => Promise<RetouchOutput>

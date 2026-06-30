@@ -319,6 +319,7 @@ export async function POST(req: NextRequest) {
         quality,
         nodes_cost:       routing.costNodes,
         engine:           run.endpoint,
+        fal_request_id:   run.requestId,
         source_type:      sourceType,
         source_id:        sourceImageId,
         mask_coverage:    effectiveCoverage,

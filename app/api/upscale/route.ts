@@ -125,6 +125,9 @@ export async function POST(req: NextRequest) {
 
     const outputUrl   = result.outputUrl
     const usedProvider = finalProvider(result) ?? modeT
+    // Rastreabilidade: id do request fal do último step concluído (o que produziu
+    // o output). O detalhe por step também vai em upscale_meta.steps[].requestId.
+    const falRequestId = [...result.steps].reverse().find(s => s.status === 'completed')?.requestId ?? null
 
     // ── Histórico ───────────────────────────────────────────────────────────
     // Mantemos o padrão legado em ambient/style/lighting para compatibilidade
@@ -150,6 +153,7 @@ export async function POST(req: NextRequest) {
       ambient:      'upscale',
       style:        styleKey,
       lighting,
+      fal_request_id: falRequestId,
       status:       'completed',
       completed_at: new Date().toISOString(),
       upscale_meta: upscaleMeta,

@@ -108,13 +108,15 @@ export async function POST(
     const data    = result.data as { image?: { url?: string }; images?: { url?: string }[] }
     const outUrl  = data.image?.url ?? data.images?.[0]?.url
     if (!outUrl) throw new Error('clarity_no_output')
+    const falRequestId = (result as { requestId?: string }).requestId ?? null
 
     const { error: updErr } = await admin
       .from('vistas')
       .update({
-        image_url:    outUrl,
-        status:       'completed',
-        completed_at: new Date().toISOString(),
+        image_url:      outUrl,
+        fal_request_id: falRequestId,
+        status:         'completed',
+        completed_at:   new Date().toISOString(),
       })
       .eq('id', newId)
     if (updErr) console.error('[upscale] update failed:', updErr)

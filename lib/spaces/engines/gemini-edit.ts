@@ -92,7 +92,7 @@ async function callNB(
   const url  = data.images?.[0]?.url
   if (!url) throw new RetouchNoOutputError(endpoint)
 
-  return { imageUrl: url, endpoint }
+  return { imageUrl: url, endpoint, requestId: (result as { requestId?: string }).requestId ?? null }
 }
 
 // ── callNanoBanana2 ───────────────────────────────────────────────────────────

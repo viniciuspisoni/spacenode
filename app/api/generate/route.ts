@@ -242,7 +242,10 @@ export async function POST(req: NextRequest) {
     console.log('[generate] FAL OUTPUT :', JSON.stringify(result.data))
     const images = (result.data as { images: { url: string }[] }).images
     outputUrl = images[0].url
-    console.log('[generate] outputUrl  :', outputUrl)
+    // Rastreabilidade: o id do request da fal liga esta linha à entrada no
+    // painel da fal.ai (cruzar quem gerou o quê). Ver coluna renders.fal_request_id.
+    const falRequestId = (result as { requestId?: string }).requestId ?? null
+    console.log('[generate] outputUrl  :', outputUrl, '| fal req:', falRequestId)
 
     // ── Persistência ─────────────────────────────────────────────────────────
     //
@@ -281,6 +284,7 @@ export async function POST(req: NextRequest) {
         engine,
         resolution,
         nodes_charged:   nodesToCharge,
+        fal_request_id:  falRequestId,
         status:          'completed',
         completed_at:    new Date().toISOString(),
         config_snapshot: configSnapshot,

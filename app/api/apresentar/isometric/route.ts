@@ -116,7 +116,8 @@ export async function POST(req: NextRequest) {
     const images = (result.data as { images: { url: string }[] }).images
     outputUrl = images?.[0]?.url
     if (!outputUrl) throw new Error('Fal não retornou imagem')
-    console.log('[apresentar/isometric] outputUrl :', outputUrl)
+    const falRequestId = (result as { requestId?: string }).requestId ?? null
+    console.log('[apresentar/isometric] outputUrl :', outputUrl, '| fal req:', falRequestId)
 
     // ── Persistência ──────────────────────────────────────────────────────────
     const configSnapshot = {
@@ -140,6 +141,7 @@ export async function POST(req: NextRequest) {
         engine,
         resolution,
         nodes_charged:   nodesToCharge,
+        fal_request_id:  falRequestId,
         status:          'completed',
         completed_at:    new Date().toISOString(),
         config_snapshot: configSnapshot,

@@ -158,5 +158,6 @@ export const callVertexImagenEdit: RetouchEngine = async (
   return {
     imageUrl: `data:${mime};base64,${image.imageBytes}`,
     endpoint: VERTEX_IMAGEN_EDIT_ENDPOINT,
+    requestId: null, // Vertex não expõe id de request no formato da fal
   }
 }

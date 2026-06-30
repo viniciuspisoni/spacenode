@@ -65,6 +65,8 @@ export interface RunEditResult {
   usedCrop:       boolean
   cropMegapixels: number | null
   endpoint:       string
+  /** ID do request no provider (fal) — rastreabilidade. null se indisponível. */
+  requestId:      string | null
   /** Fração 0–1 de pixels fora da máscara que mudaram. null se não-aplicável (sem máscara). */
   outOfMaskDelta: number | null
   /** Fração 0–1 de pixels DENTRO da máscara que mudaram (detecção de no-op).
@@ -105,7 +107,7 @@ export async function runEdit(args: RunEditArgs): Promise<RunEditResult> {
     const rawBuf = await fetchImageBuffer(out.imageUrl)
     const buf = await resizeToSource(rawBuf, srcBuf)
     const resultUrl = await uploadResult(buf, 'result')
-    return { resultUrl, usedCrop: false, cropMegapixels: null, endpoint: out.endpoint, outOfMaskDelta: null, inMaskDelta: null }
+    return { resultUrl, usedCrop: false, cropMegapixels: null, endpoint: out.endpoint, requestId: out.requestId ?? null, outOfMaskDelta: null, inMaskDelta: null }
   }
 
   // ── Edições COM máscara: precisamos da imagem + máscara alinhada ──
@@ -170,7 +172,7 @@ export async function runEdit(args: RunEditArgs): Promise<RunEditResult> {
         }),
       ])
       const resultUrl = await uploadResult(finalBuf, 'result')
-      return { resultUrl, usedCrop: true, cropMegapixels: plan.outMegapixels, endpoint: out.endpoint, outOfMaskDelta, inMaskDelta }
+      return { resultUrl, usedCrop: true, cropMegapixels: plan.outMegapixels, endpoint: out.endpoint, requestId: out.requestId ?? null, outOfMaskDelta, inMaskDelta }
     }
     // Sem área branca → cai pro caminho de imagem inteira (com recompose).
   }
@@ -210,5 +212,5 @@ export async function runEdit(args: RunEditArgs): Promise<RunEditResult> {
     }),
   ])
   const resultUrl = await uploadResult(finalBuf, 'result')
-  return { resultUrl, usedCrop: false, cropMegapixels: null, endpoint: out.endpoint, outOfMaskDelta, inMaskDelta }
+  return { resultUrl, usedCrop: false, cropMegapixels: null, endpoint: out.endpoint, requestId: out.requestId ?? null, outOfMaskDelta, inMaskDelta }
 }

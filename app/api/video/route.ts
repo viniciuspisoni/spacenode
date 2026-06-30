@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
 
     // ── Chama o adapter ──────────────────────────────────────────────────────
     const adapter = getAdapterForModel(engineId)
-    const { outputUrl } = await adapter.generate({
+    const { outputUrl, requestId: falRequestId } = await adapter.generate({
       modelId:        engineId,
       imageUrl:       inputUrl,
       endImageUrl,
@@ -144,6 +144,7 @@ export async function POST(req: NextRequest) {
         style:        engineId,
         lighting:     `${duration}s`,
         cost_credits: nodeCost,
+        fal_request_id: falRequestId ?? null,
         status:       'completed',
         completed_at: new Date().toISOString(),
       }),

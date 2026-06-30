@@ -59,7 +59,7 @@ async function callNB2(input: RetouchInput, withMask: boolean): Promise<RetouchO
   const url  = data.images?.[0]?.url
   if (!url) throw new RetouchNoOutputError(NANO_BANANA_2_EDIT_ENDPOINT)
 
-  return { imageUrl: url, endpoint: NANO_BANANA_2_EDIT_ENDPOINT }
+  return { imageUrl: url, endpoint: NANO_BANANA_2_EDIT_ENDPOINT, requestId: (result as { requestId?: string }).requestId ?? null }
 }
 
 export const callNanoBanana2Masked: RetouchEngine = (input) => callNB2(input, true)

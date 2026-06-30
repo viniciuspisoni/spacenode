@@ -47,5 +47,5 @@ export const callNanoBananaEdit: RetouchEngine = async (
   const url  = data.images?.[0]?.url
   if (!url) throw new RetouchNoOutputError(NANO_BANANA_EDIT_ENDPOINT)
 
-  return { imageUrl: url, endpoint: NANO_BANANA_EDIT_ENDPOINT }
+  return { imageUrl: url, endpoint: NANO_BANANA_EDIT_ENDPOINT, requestId: (result as { requestId?: string }).requestId ?? null }
 }

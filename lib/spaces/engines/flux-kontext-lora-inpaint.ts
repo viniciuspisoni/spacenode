@@ -86,5 +86,5 @@ export const callFluxKontextLoraInpaint: RetouchEngine = async (
   const url  = data.images?.[0]?.url ?? data.image?.url
   if (!url) throw new RetouchNoOutputError(FLUX_KONTEXT_LORA_INPAINT_ENDPOINT)
 
-  return { imageUrl: url, endpoint: FLUX_KONTEXT_LORA_INPAINT_ENDPOINT }
+  return { imageUrl: url, endpoint: FLUX_KONTEXT_LORA_INPAINT_ENDPOINT, requestId: (result as { requestId?: string }).requestId ?? null }
 }

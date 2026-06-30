@@ -396,13 +396,16 @@ async function generateOne(args: {
     if (!outputUrl) throw new Error('fal_no_output')
     const genW = images?.[0]?.width  ?? null
     const genH = images?.[0]?.height ?? null
+    // Rastreabilidade: liga esta vista à entrada no painel da fal.ai. Ver vistas.fal_request_id.
+    const falRequestId = (result as { requestId?: string }).requestId ?? null
 
     // 5) Persistir completed (+ metadados/validação de preservação no V2)
     const updateRow: Record<string, unknown> = {
-      image_url:    outputUrl,
-      prompt:       finalPrompt,
-      status:       'completed',
-      completed_at: new Date().toISOString(),
+      image_url:      outputUrl,
+      prompt:         finalPrompt,
+      fal_request_id: falRequestId,
+      status:         'completed',
+      completed_at:   new Date().toISOString(),
     }
 
     let preservationWarning = false
