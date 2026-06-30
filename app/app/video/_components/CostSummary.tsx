@@ -52,7 +52,7 @@ export default function CostSummary({
         <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.40)' }}>
           Saldo:{' '}
           <span style={{
-            color: credits > 0 ? 'rgba(255,255,255,0.75)' : '#f87171',
+            color: credits > 0 ? 'rgba(255,255,255,0.75)' : 'var(--color-error)',
             fontWeight: 500,
           }}>
             {credits} Nodes

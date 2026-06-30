@@ -28,7 +28,6 @@ const monthStart = () => {
 
 const RECENT_LIMIT = 8
 
-// Ferramenta que originou a render — vira o chip do card.
 function renderTool(r: RecentRender): 'Renderizar' | 'Ampliar' | 'Animar' {
   if (r.ambient === 'upscale') return 'Ampliar'
   if (r.ambient === 'video')   return 'Animar'
@@ -91,111 +90,93 @@ export default async function AppPage() {
   const lowNodes   = availableNodes < 10
 
   return (
-    <main style={{ flex: 1, overflowY: 'auto', background: 'var(--color-bg)', padding: '40px 40px 88px' }}>
-      <div style={{ maxWidth: 1240, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 38 }}>
+    <main style={{ flex: 1, overflowY: 'auto', background: 'var(--color-bg)', padding: '0 32px 88px' }}>
+      <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 36 }}>
 
-        {/* ── 1 · Header ──────────────────────────────────────────────────────── */}
-        <section style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 18 }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-              <h1 style={{ fontSize: 34, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.04em', lineHeight: 1.1, margin: 0 }}>
-                Olá, {firstName}
-              </h1>
-              <span style={{
-                fontSize: 10, fontWeight: 600, color: 'var(--color-accent-green)',
-                background: 'rgba(48,209,88,0.10)',
-                border: '0.5px solid rgba(48,209,88,0.20)',
-                padding: '3px 8px', borderRadius: 999,
-                letterSpacing: '0.04em', textTransform: 'uppercase', lineHeight: 1, flexShrink: 0,
-              }}>
-                Beta
-              </span>
-            </div>
-            <p style={{ fontSize: 15, color: 'var(--color-text-secondary)', letterSpacing: '-0.015em', lineHeight: 1.5, maxWidth: 460 }}>
-              Transforme seus projetos em imagens de apresentação.
-            </p>
-          </div>
-          <Link href="/app/generate" className="spn-dash-cta">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2"/>
+        {/* ── 1 · Hero ──────────────────────────────────────────────────────── */}
+        <div className="spn-dash-hero">
+          <h1 className="spn-dash-hero-greeting">Olá, {firstName}</h1>
+          <p className="spn-dash-hero-sub">
+            Seu atelier de visualização arquitetônica.
+          </p>
+          <Link href="/app/generate" className="spn-dash-hero-cta">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2.5"/>
               <circle cx="8.5" cy="8.5" r="1.5"/>
               <polyline points="21 15 16 10 5 21"/>
             </svg>
-            Criar imagem
+            Nova renderização
           </Link>
-        </section>
+        </div>
 
-        {/* ── 2 · Criar nova visualização ─────────────────────────────────────── */}
-        <section>
-          <SectionLabel>Criar nova visualização</SectionLabel>
-          <div className="spn-dash-create-grid" style={{ marginTop: 14 }}>
+        {/* ── 2 · Ferramentas ───────────────────────────────────────────────── */}
+        <div className="spn-dash-tools">
+          <ToolCard href="/app/generate"                     label="Renderizar" Icon={IconRender}  bg="var(--color-accent-green-bg)"   color="var(--color-accent-green)" />
+          <ToolCard href="/app/spaces/new"                   label="Spaces"     Icon={IconSpaces}  bg="rgba(255,255,255,0.06)"          color="rgba(255,255,255,0.58)" />
+          <ToolCard href="/app/editar"                       label="Editar"     Icon={IconEdit}    bg="rgba(255,255,255,0.06)"          color="rgba(255,255,255,0.58)" />
+          <ToolCard href="/app/upscale"                      label="Ampliar"    Icon={IconUpscale} bg="rgba(255,255,255,0.06)"          color="rgba(255,255,255,0.58)" />
+          <ToolCard href="/app/video"                        label="Animar"     Icon={IconVideo}   bg="rgba(255,255,255,0.06)"          color="rgba(255,255,255,0.58)" />
+          <ToolCard href="/app/apresentar/planta-humanizada" label="Planta"     Icon={IconPlan}    bg="rgba(255,255,255,0.06)"          color="rgba(255,255,255,0.58)" />
+          <ToolCard href="/app/history"                      label="Histórico"  Icon={IconHistory} bg="rgba(255,255,255,0.04)"          color="rgba(255,255,255,0.30)" />
+        </div>
 
-            {/* Card primário — Renderizar */}
-            <Link href="/app/generate" className="spn-dash-create-primary">
-              <div className="spn-dash-create-primary-glow" />
-              <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', height: '100%', gap: 18 }}>
-                <div className="spn-dash-create-icon spn-dash-create-icon--accent">
-                  <IconRender size={22} />
+        {/* ── 3 · Stats ─────────────────────────────────────────────────────── */}
+        <div className="spn-dash-stats-row">
+          <div className="spn-dash-stat" style={lowNodes ? { borderTop: `2px solid var(--color-error-border)` } : undefined}>
+            <div className="spn-dash-stat-label">Nodes disponíveis</div>
+            <div className="spn-dash-stat-value" style={lowNodes ? { color: 'var(--color-error)' } : undefined}>
+              {availableNodes}
+            </div>
+            <div className="spn-dash-stat-sub">
+              {lumenBalance > 0 ? `${planBalance} do plano · ${lumenBalance} avulsos` : 'para suas gerações'}
+            </div>
+          </div>
+
+          <div className="spn-dash-stat">
+            <div className="spn-dash-stat-label">Imagens geradas</div>
+            <div className="spn-dash-stat-value">{totalRenders}</div>
+            <div className="spn-dash-stat-sub">no total da conta</div>
+          </div>
+
+          <div className="spn-dash-stat">
+            <div className="spn-dash-stat-label">Este mês</div>
+            <div className="spn-dash-stat-value">{monthRenders}</div>
+            <div className="spn-dash-stat-sub">criadas neste período</div>
+          </div>
+
+          <div className="spn-dash-stat">
+            <div className="spn-dash-stat-label">Plano atual</div>
+            <div className="spn-dash-stat-value" style={{ fontSize: 20, letterSpacing: '-0.02em', paddingTop: 3 }}>
+              {planName}
+            </div>
+            {planTotal > 0 ? (
+              <>
+                <div className="spn-dash-usage-track">
+                  <div className="spn-dash-usage-fill" style={{ width: `${Math.round(usageRatio * 100)}%` }} />
                 </div>
-                <div style={{ marginTop: 'auto' }}>
-                  <div style={{ fontSize: 19, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.03em', marginBottom: 6 }}>
-                    Renderizar
-                  </div>
-                  <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', lineHeight: 1.55, maxWidth: 260 }}>
-                    Envie um croqui, modelo 3D ou foto e gere uma imagem fotorrealista.
-                  </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
+                  <span className="spn-dash-stat-sub" style={{ marginTop: 0 }}>{planUsed}/{planTotal} nodes</span>
+                  <Link href="/app/billing" style={{ fontSize: 10, color: 'var(--color-text-tertiary)', textDecoration: 'none', letterSpacing: '-0.01em' }}>
+                    Gerenciar →
+                  </Link>
                 </div>
-                <div className="spn-dash-create-uploadhint">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 16V4M7 9l5-5 5 5"/><path d="M5 20h14"/>
-                  </svg>
-                  Arraste uma imagem ou comece agora
-                  <span className="spn-dash-create-arrow" aria-hidden>→</span>
-                </div>
+              </>
+            ) : (
+              <div style={{ marginTop: 6 }}>
+                <Link href="/app/billing" style={{ fontSize: 11, color: 'var(--color-accent-green)', textDecoration: 'none', fontWeight: 500, letterSpacing: '-0.01em' }}>
+                  Ver planos →
+                </Link>
               </div>
-            </Link>
-
-            {/* Tiles secundários */}
-            <CreateTile href="/app/spaces/new" title="Spaces" desc="Múltiplas vistas do mesmo projeto" Icon={IconSpaces} />
-            <CreateTile href="/app/editar"     title="Editar"  desc="Ajustes e correções localizadas"   Icon={IconEdit} />
-            <CreateTile href="/app/upscale"    title="Ampliar" desc="Aumente a resolução até 4K"          Icon={IconUpscale} />
-            <CreateTile href="/app/video"      title="Animar"  desc="Transforme a imagem em vídeo"        Icon={IconVideo} />
+            )}
           </div>
-        </section>
+        </div>
 
-        {/* ── 3 · Métricas ────────────────────────────────────────────────────── */}
-        <section>
-          <div className="spn-dash-metrics-grid">
-            <StatCard
-              label="Nodes disponíveis"
-              value={String(availableNodes)}
-              sub={lumenBalance > 0 ? `${planBalance} do plano · ${lumenBalance} avulsos` : 'para suas gerações'}
-              tone={lowNodes ? 'low' : 'accent'}
-            />
-            <StatCard
-              label="Imagens geradas"
-              value={String(totalRenders)}
-              sub="no total da sua conta"
-            />
-            <StatCard
-              label="Este mês"
-              value={String(monthRenders)}
-              sub="criadas neste período"
-            />
-            <PlanCard
-              planName={planName}
-              isPaid={planTotal > 0}
-              used={planUsed}
-              total={planTotal}
-              ratio={usageRatio}
-            />
-          </div>
-        </section>
-
-        {/* ── 4 · Imagens recentes ────────────────────────────────────────────── */}
+        {/* ── 4 · Imagens recentes ──────────────────────────────────────────── */}
         <section>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 16 }}>
-            <SectionLabel>Imagens recentes</SectionLabel>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              Recentes
+            </div>
             {totalRenders > renders.length && (
               <Link href="/app/history" style={{ fontSize: 12, color: 'var(--color-text-tertiary)', textDecoration: 'none', letterSpacing: '-0.01em' }}>
                 Ver todos →
@@ -205,34 +186,49 @@ export default async function AppPage() {
 
           {renders.length === 0 ? (
             <div style={{
-              padding: '64px 24px', textAlign: 'center',
+              padding: '72px 24px', textAlign: 'center',
               background: 'var(--color-bg-elevated)',
               border: '0.5px dashed var(--color-border-strong)',
-              borderRadius: 16,
+              borderRadius: 'var(--radius-xl)',
             }}>
-              <div style={{ fontSize: 14, color: 'var(--color-text-secondary)', marginBottom: 12, letterSpacing: '-0.01em' }}>
-                Nenhuma imagem criada ainda.
+              <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-text-secondary)', marginBottom: 8, letterSpacing: '-0.015em' }}>
+                Nenhuma renderização ainda.
               </div>
-              <Link href="/app/generate" style={{
-                display: 'inline-flex', alignItems: 'center', gap: 8,
-                padding: '10px 18px', borderRadius: 10,
-                background: 'var(--color-text-primary)', color: 'var(--color-bg)',
-                fontSize: 13, fontWeight: 500, textDecoration: 'none', letterSpacing: '-0.01em',
-              }}>
-                Criar primeira imagem →
+              <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginBottom: 24, letterSpacing: '-0.005em' }}>
+                Envie uma referência e gere a primeira visualização do seu projeto.
+              </div>
+              <Link href="/app/generate" className="spn-btn-primary" style={{ borderRadius: 'var(--radius-full)' }}>
+                Começar com uma renderização
               </Link>
             </div>
           ) : (
             <div className="spn-dash-recent-grid">
-              {renders.map(r => (
-                <RecentCard key={r.id} render={r} />
-              ))}
+              {renders.map(r => <RecentCard key={r.id} render={r} />)}
             </div>
           )}
         </section>
 
       </div>
     </main>
+  )
+}
+
+// ── Tool card ──────────────────────────────────────────────────────────────────
+
+function ToolCard({ href, label, Icon, bg, color }: {
+  href: string
+  label: string
+  Icon: (p: { size?: number; color?: string }) => React.ReactElement
+  bg: string
+  color: string
+}) {
+  return (
+    <Link href={href} className="spn-dash-tool">
+      <div className="spn-dash-tool-icon" style={{ background: bg }}>
+        <Icon size={24} color={color} />
+      </div>
+      <span className="spn-dash-tool-label">{label}</span>
+    </Link>
   )
 }
 
@@ -254,13 +250,10 @@ function RecentCard({ render: r }: { render: RecentRender }) {
           // eslint-disable-next-line @next/next/no-img-element
           <img src={display} alt={getRenderTitle(r)} />
         )}
-
-        {/* chip ferramenta + qualidade */}
         <div className="spn-dash-recent-tags">
           <span className="spn-dash-recent-tag">{tool}</span>
           {q && <span className="spn-dash-recent-tag spn-dash-recent-tag--muted">{q}</span>}
         </div>
-
         {isVideo && (
           <div className="spn-dash-recent-play" aria-hidden>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="white" style={{ marginLeft: 2 }}>
@@ -268,20 +261,18 @@ function RecentCard({ render: r }: { render: RecentRender }) {
             </svg>
           </div>
         )}
-
-        {/* overlay de ações (revelado no hover via CSS) */}
         {display && (
           <div className="spn-dash-recent-actions">
             <a className="spn-dash-recent-act spn-dash-recent-act--primary" href={display} target="_blank" rel="noopener noreferrer">
               Abrir
             </a>
             {reusable && (
-              <Link className="spn-dash-recent-act" href={`/app/generate?source=${encodeURIComponent(out)}`} title="Reutilizar em uma nova geração">
+              <Link className="spn-dash-recent-act" href={`/app/generate?source=${encodeURIComponent(out)}`} title="Reutilizar">
                 Reutilizar
               </Link>
             )}
             {reusable && (
-              <Link className="spn-dash-recent-act" href={`/app/upscale?source=${encodeURIComponent(out)}`} title="Ampliar a resolução">
+              <Link className="spn-dash-recent-act" href={`/app/upscale?source=${encodeURIComponent(out)}`} title="Ampliar">
                 Ampliar
               </Link>
             )}
@@ -295,7 +286,6 @@ function RecentCard({ render: r }: { render: RecentRender }) {
           </div>
         )}
       </div>
-
       <div className="spn-dash-recent-meta">
         <div className="spn-dash-recent-title">{getRenderTitle(r)}</div>
         <div className="spn-dash-recent-date">{formatDate(r.created_at)}</div>
@@ -304,128 +294,65 @@ function RecentCard({ render: r }: { render: RecentRender }) {
   )
 }
 
-// ── Sub-components ─────────────────────────────────────────────────────────────
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-      {children}
-    </div>
-  )
-}
-
-function CreateTile({ href, title, desc, Icon }: {
-  href: string; title: string; desc: string; Icon: (p: { size?: number }) => React.ReactElement
-}) {
-  return (
-    <Link href={href} className="spn-dash-create-tile">
-      <div className="spn-dash-create-icon">
-        <Icon size={18} />
-      </div>
-      <div>
-        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.02em', marginBottom: 3 }}>
-          {title}
-        </div>
-        <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', lineHeight: 1.45 }}>
-          {desc}
-        </div>
-      </div>
-    </Link>
-  )
-}
-
-function StatCard({ label, value, sub, tone = 'default' }: {
-  label: string; value: string; sub?: string; tone?: 'default' | 'accent' | 'low'
-}) {
-  const valueColor =
-    tone === 'low'    ? '#e0584a'
-    : tone === 'accent' ? 'var(--color-text-primary)'
-    : 'var(--color-text-primary)'
-  return (
-    <div className="spn-dash-stat" style={{
-      borderTop: tone === 'accent' ? '2px solid var(--color-accent-green)'
-               : tone === 'low'    ? '2px solid rgba(224,88,74,0.55)'
-               : undefined,
-    }}>
-      <div className="spn-dash-stat-label">{label}</div>
-      <div className="spn-dash-stat-value" style={{ color: valueColor }}>{value}</div>
-      {sub && <div className="spn-dash-stat-sub">{sub}</div>}
-    </div>
-  )
-}
-
-function PlanCard({ planName, isPaid, used, total, ratio }: {
-  planName: string; isPaid: boolean; used: number; total: number; ratio: number
-}) {
-  return (
-    <div className="spn-dash-stat">
-      <div className="spn-dash-stat-label">Plano atual</div>
-      <div className="spn-dash-stat-value">{planName}</div>
-      {isPaid ? (
-        <div style={{ marginTop: 10 }}>
-          <div className="spn-dash-usage-track">
-            <div className="spn-dash-usage-fill" style={{ width: `${Math.round(ratio * 100)}%` }} />
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
-            <span className="spn-dash-stat-sub" style={{ marginTop: 0 }}>{used} de {total} nodes</span>
-            <Link href="/app/billing" style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textDecoration: 'none' }}>
-              Gerenciar →
-            </Link>
-          </div>
-        </div>
-      ) : (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
-          <span className="spn-dash-stat-sub" style={{ marginTop: 0 }}>acesso antecipado</span>
-          <Link href="/app/billing" style={{ fontSize: 11, color: 'var(--color-accent-green)', textDecoration: 'none', fontWeight: 500 }}>
-            Ver planos →
-          </Link>
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ── Icons ──────────────────────────────────────────────────────────────────────
 
-function IconRender({ size = 18 }: { size?: number }) {
+function IconRender({ size = 20, color = 'currentColor' }: { size?: number; color?: string }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3" width="18" height="18" rx="2"/>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2.5"/>
       <circle cx="8.5" cy="8.5" r="1.5"/>
       <polyline points="21 15 16 10 5 21"/>
     </svg>
   )
 }
-function IconSpaces({ size = 18 }: { size?: number }) {
+function IconSpaces({ size = 20, color = 'currentColor' }: { size?: number; color?: string }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="3"/>
-      <path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="2" width="9" height="9" rx="2"/>
+      <rect x="13" y="2" width="9" height="9" rx="2"/>
+      <rect x="2" y="13" width="9" height="9" rx="2"/>
+      <rect x="13" y="13" width="9" height="9" rx="2"/>
     </svg>
   )
 }
-function IconEdit({ size = 18 }: { size?: number }) {
+function IconEdit({ size = 20, color = 'currentColor' }: { size?: number; color?: string }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 20h9"/>
       <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
     </svg>
   )
 }
-function IconUpscale({ size = 18 }: { size?: number }) {
+function IconUpscale({ size = 20, color = 'currentColor' }: { size?: number; color?: string }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 3l1.88 5.47L19 10l-5.12 1.53L12 17l-1.88-5.47L5 10l5.12-1.53L12 3z"/>
       <path d="M5 3l.94 2.06L8 6l-2.06.94L5 9l-.94-2.06L2 6l2.06-.94L5 3z"/>
       <path d="M19 13l.94 2.06L22 16l-2.06.94L19 19l-.94-2.06L16 16l2.06-.94L19 13z"/>
     </svg>
   )
 }
-function IconVideo({ size = 18 }: { size?: number }) {
+function IconVideo({ size = 20, color = 'currentColor' }: { size?: number; color?: string }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
       <polygon points="23 7 16 12 23 17 23 7"/>
-      <rect x="1" y="5" width="15" height="14" rx="2"/>
+      <rect x="1" y="5" width="15" height="14" rx="2.5"/>
+    </svg>
+  )
+}
+function IconPlan({ size = 20, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2"/>
+      <path d="M3 9h18M9 21V9"/>
+    </svg>
+  )
+}
+function IconHistory({ size = 20, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9"/>
+      <path d="M12 7v5l3 3"/>
     </svg>
   )
 }

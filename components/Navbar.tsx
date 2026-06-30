@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ConstellationN } from './brand';
+import { Logo } from './brand';
 
 const LINKS = [
   { href: '#como-funciona', label: 'COMO FUNCIONA' },
@@ -45,17 +45,7 @@ export default function Navbar() {
         }}
         className="spn-nav"
       >
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12 }}>
-          <ConstellationN size={48} aria-hidden />
-          <span style={{
-            fontSize: 23, fontWeight: 500,
-            letterSpacing: '-0.025em',
-            lineHeight: 1,
-            userSelect: 'none',
-          }}>
-            spacenode
-          </span>
-        </div>
+        <Logo symbolSize={48} />
 
         <div style={{ display: 'flex', gap: 36 }} className="nav-links">
           {LINKS.map(l => (

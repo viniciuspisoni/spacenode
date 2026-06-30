@@ -720,7 +720,7 @@ function VistasTabView() {
               <div style={{
                 position: 'absolute', top: 8, right: 8,
                 padding: '3px 8px', borderRadius: 4,
-                background: 'rgba(70,209,145,0.85)', color: '#042818',
+                background: 'var(--color-accent-green)', color: '#000',
                 fontSize: 9, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase',
               }}>
                 editada
@@ -946,7 +946,7 @@ function RenderCard({
                 >
                   <span style={{
                     width: 22, height: 22, borderRadius: 6,
-                    background: 'rgba(29,158,117,0.18)', color: '#46d191',
+                    background: 'var(--color-accent-green-bg)', color: 'var(--color-accent-green)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     flexShrink: 0,
                   }}>
@@ -1186,7 +1186,7 @@ const S: Record<string, CSSProperties> = {
   checkboxOn:    { background: 'var(--color-text-primary)', borderColor: 'var(--color-text-primary)', color: 'var(--color-bg)' },
 
   hoverActions:  { position: 'absolute', bottom: 10, right: 10, display: 'flex', gap: 6 },
-  actionBtn:     { display: 'inline-flex', alignItems: 'center', padding: '5px 13px', background: 'rgba(255,255,255,0.92)', borderRadius: 7, fontSize: 11, color: '#111', fontWeight: 500, textDecoration: 'none', fontFamily: 'inherit', letterSpacing: '-0.01em' },
+  actionBtn:     { display: 'inline-flex', alignItems: 'center', padding: '5px 13px', background: 'rgba(255,255,255,0.92)', borderRadius: 7, fontSize: 11, color: '#0a0a0a', fontWeight: 500, textDecoration: 'none', fontFamily: 'inherit', letterSpacing: '-0.01em' },
   actionBtnGhost:{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 11px', background: 'rgba(0,0,0,0.5)', border: '0.5px solid rgba(255,255,255,0.25)', borderRadius: 7, fontSize: 10, color: '#fafafa', textDecoration: 'none', backdropFilter: 'blur(4px)', fontFamily: 'inherit' },
 
   beforeThumb:   { position: 'absolute', top: 10, left: 10, width: 72, height: 54, borderRadius: 6, overflow: 'hidden', border: '1.5px solid rgba(255,255,255,0.6)', boxShadow: '0 2px 8px rgba(0,0,0,0.4)' },
@@ -1198,7 +1198,7 @@ const S: Record<string, CSSProperties> = {
   actionBarCount:{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.01em', paddingLeft: 4 },
   actionPrimary: { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'var(--color-text-primary)', color: 'var(--color-bg)', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '-0.01em' },
   actionSecondary:{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'var(--color-bg)', color: 'var(--color-text-primary)', border: '0.5px solid var(--color-border-strong)', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '-0.01em' },
-  actionDanger:  { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'var(--color-bg)', color: '#e0584a', border: '0.5px solid rgba(224,88,74,0.4)', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '-0.01em' },
+  actionDanger:  { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'var(--color-bg)', color: 'var(--color-error)', border: '0.5px solid var(--color-error-border)', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '-0.01em' },
 
   // ── Modal ─
   modalOverlay:  { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 24, backdropFilter: 'blur(2px)' },

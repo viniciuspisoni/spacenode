@@ -145,7 +145,7 @@ function OriginCard({
         <span style={{
           position: 'absolute', top: 12, right: 12,
           fontSize: 9, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase',
-          color: '#46d191', background: 'rgba(29,158,117,0.18)',
+          color: 'var(--color-accent-green)', background: 'var(--color-accent-green-bg)',
           padding: '4px 8px', borderRadius: 4,
         }}>
           ✦ recomendado
@@ -155,8 +155,8 @@ function OriginCard({
       <span style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         width: 44, height: 44, borderRadius: 11,
-        background: recommended ? 'rgba(29,158,117,0.18)' : 'var(--color-surface)',
-        color: recommended ? '#46d191' : 'var(--color-text-secondary)',
+        background: recommended ? 'var(--color-accent-green-bg)' : 'var(--color-surface)',
+        color: recommended ? 'var(--color-accent-green)' : 'var(--color-text-secondary)',
       }}>
         {icon}
       </span>
@@ -183,12 +183,12 @@ function OriginCard({
       }}>
         <span style={{
           fontSize: 10, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase',
-          color: recommended ? '#46d191' : 'var(--color-text-quaternary)',
+          color: recommended ? 'var(--color-accent-green)' : 'var(--color-text-quaternary)',
         }}>
           {disabled && disabledLabel ? disabledLabel : footer}
         </span>
         <span style={{
-          color: recommended ? '#46d191' : 'var(--color-text-secondary)',
+          color: recommended ? 'var(--color-accent-green)' : 'var(--color-text-secondary)',
           fontSize: 14,
         }}>→</span>
       </div>

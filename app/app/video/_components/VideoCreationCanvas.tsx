@@ -211,9 +211,9 @@ export default function VideoCreationCanvas({
       <div style={{ maxWidth: 420, textAlign: 'center' }}>
         <div style={{
           width: 44, height: 44, borderRadius: 12, margin: '0 auto 16px',
-          background: 'rgba(239,68,68,0.10)',
-          border:     '1px solid rgba(239,68,68,0.25)',
-          color:      '#fca5a5',
+          background: 'var(--color-error-bg)',
+          border:     '0.5px solid var(--color-error-border)',
+          color:      'var(--color-error)',
           display:    'flex', alignItems: 'center', justifyContent: 'center',
         }}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">

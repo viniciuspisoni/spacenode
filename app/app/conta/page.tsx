@@ -113,9 +113,9 @@ export default async function ContaPage() {
               type="submit"
               style={{
                 ...linkButtonStyle,
-                background: 'rgba(220,50,47,0.06)',
-                borderColor: 'rgba(220,50,47,0.22)',
-                color: '#e07570',
+                background: 'var(--color-error-bg)',
+                borderColor: 'var(--color-error-border)',
+                color: 'var(--color-error)',
                 cursor: 'pointer',
               }}
             >

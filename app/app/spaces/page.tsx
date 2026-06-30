@@ -55,16 +55,7 @@ export default async function SpacesPage() {
             </p>
           </div>
 
-          <Link
-            href="/app/spaces/new"
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 8,
-              padding: '12px 20px',
-              background: 'var(--color-text-primary)', color: 'var(--color-bg)',
-              borderRadius: 10, fontSize: 13, fontWeight: 500,
-              letterSpacing: '-0.005em', flexShrink: 0,
-            }}
-          >
+          <Link href="/app/spaces/new" className="spn-btn-primary" style={{ flexShrink: 0 }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <line x1="12" y1="5" x2="12" y2="19"/>
               <line x1="5" y1="12" x2="19" y2="12"/>
@@ -101,10 +92,10 @@ function EmptyState() {
     }}>
       <div style={{
         width: 52, height: 52, borderRadius: '50%',
-        background: 'rgba(29,158,117,0.10)',
-        border: '0.5px solid rgba(29,158,117,0.25)',
+        background: 'var(--color-accent-green-bg)',
+        border: '0.5px solid var(--color-accent-green-border)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        marginBottom: 20, color: '#46d191',
+        marginBottom: 20, color: 'var(--color-accent-green)',
       }}>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="12" cy="12" r="3"/>
@@ -128,11 +119,10 @@ function EmptyState() {
         href="/app/spaces/new"
         style={{
           display: 'inline-flex', alignItems: 'center', gap: 8,
-          padding: '12px 22px',
-          background: '#1D9E75', color: '#042818',
-          borderRadius: 10, fontSize: 13, fontWeight: 600,
-          letterSpacing: '-0.005em',
-          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18), 0 8px 24px rgba(29,158,117,0.18)',
+          padding: '11px 22px',
+          background: 'var(--color-text-primary)', color: 'var(--color-bg)',
+          borderRadius: 'var(--radius-md)', fontSize: 13, fontWeight: 500,
+          letterSpacing: '-0.005em', textDecoration: 'none',
         }}
       >
         Criar primeiro Space

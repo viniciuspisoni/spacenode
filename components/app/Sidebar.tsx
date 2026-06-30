@@ -2,9 +2,9 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import React from 'react'
-import { ConstellationN } from '@/components/brand'
+import { ConstellationN, Logo } from '@/components/brand'
 import { AvatarComConsumo } from './AvatarComConsumo'
 import type { PlanId } from '@/lib/plans'
 
@@ -197,63 +197,81 @@ export default function Sidebar({
   const [hovered, setHovered] = useState(false)
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
 
+  // Desktop (>= 1024px): sidebar permanece expandida por padrão — estável,
+  // sem colapso por hover. Abaixo disso, colapsa e expande sob hover (compacto).
+  // Default true: app é desktop-first, evita flash de colapso no SSR em desktop.
+  const [isDesktop, setIsDesktop] = useState(true)
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)')
+    const update = () => setIsDesktop(mq.matches)
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [])
+
+  // Estado visual expandido: fixo no desktop; sob hover em telas menores.
+  const expanded = isDesktop || hovered
+
   return (
     <aside
       style={{
-        width: hovered ? SIDEBAR_EXPANDED : SIDEBAR_COLLAPSED,
+        width: expanded ? SIDEBAR_EXPANDED : SIDEBAR_COLLAPSED,
         transition: 'width 0.28s cubic-bezier(0.22,1,0.36,1), box-shadow 0.28s ease',
         background: 'linear-gradient(180deg, #101011 0%, #090909 100%)',
         display: 'flex',
         flexDirection: 'column',
         flexShrink: 0,
         overflow: 'hidden',
-        border: '0.5px solid rgba(255,255,255,0.08)',
+        border: '0.5px solid rgba(255,255,255,0.07)',
         borderRadius: 18,
         height: 'calc(100vh - 12px)',
         margin: 6,
         position: 'sticky',
         top: 6,
-        boxShadow: hovered
-          ? '0 24px 70px rgba(0,0,0,0.46), inset 0 1px 0 rgba(255,255,255,0.04)'
-          : '0 18px 44px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,0.04)',
+        boxShadow: '0 8px 30px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.03)',
         zIndex: 20,
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      {/* Logo */}
+      {/* Logo — wordmark horizontal limpo (igual à LP) quando expandido,
+          símbolo "N" isolado quando colapsado/mobile. */}
       <div style={{
-        padding: hovered ? '10px 16px 10px 11px' : '10px 9px',
+        position: 'relative',
+        height: 66,
+        flexShrink: 0,
         display: 'flex',
         alignItems: 'center',
-        justifyContent: hovered ? 'flex-start' : 'center',
-        gap: 12,
-        height: 68,
-        flexShrink: 0,
+        justifyContent: expanded ? 'flex-start' : 'center',
+        paddingLeft: expanded ? 22 : 0,
         color: '#ffffff',
+        transition: 'padding 0.28s cubic-bezier(0.22,1,0.36,1)',
       }}>
-        <div style={{
-          width: 52,
-          height: 52,
-          flexShrink: 0,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          borderRadius: 15,
-          background: hovered ? 'rgba(255,255,255,0.035)' : 'transparent',
-          boxShadow: hovered ? 'inset 0 0 0 0.5px rgba(255,255,255,0.07)' : 'none',
-          transition: 'background 0.22s ease, box-shadow 0.22s ease',
-        }}>
-          <ConstellationN size={hovered ? 40 : 36} />
+        {/* Símbolo isolado — visível só colapsado */}
+        <div
+          aria-hidden
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: expanded ? 0 : 1,
+            transition: 'opacity 0.16s ease',
+            pointerEvents: 'none',
+          }}
+        >
+          <ConstellationN size={34} aria-hidden />
         </div>
-        <span style={{
-          fontSize: 22, fontWeight: 550, color: '#ffffff',
-          letterSpacing: '-0.025em',
-          whiteSpace: 'nowrap' as const,
-          opacity: hovered ? 1 : 0, transition: 'opacity 0.18s',
+
+        {/* Lockup horizontal compartilhado com a landing page — visível só expandido */}
+        <div style={{
+          opacity: expanded ? 1 : 0,
+          transition: 'opacity 0.2s ease 0.04s',
+          whiteSpace: 'nowrap',
         }}>
-          spacenode
-        </span>
+          <Logo symbolSize={30} color="#ffffff" />
+        </div>
       </div>
 
       {/* Nav */}
@@ -265,22 +283,22 @@ export default function Sidebar({
           display: 'flex',
           flexDirection: 'column',
           gap: 0,
-          padding: hovered ? '4px 12px 10px' : '4px 9px 10px',
+          padding: expanded ? '4px 12px 10px' : '4px 9px 10px',
         }}
       >
         {NAV_GROUPS.map((group, gi) => (
-          <div key={group.label} style={{ marginTop: hovered ? (gi === 0 ? 0 : 13) : (gi === 0 ? 0 : 10) }}>
+          <div key={group.label} style={{ marginTop: expanded ? (gi === 0 ? 0 : 13) : (gi === 0 ? 0 : 10) }}>
             <div style={{
               fontSize: 11, fontWeight: 500, letterSpacing: '0.13em',
               textTransform: 'uppercase' as const,
               color: 'rgba(255,255,255,0.34)',
-              padding: hovered ? '0 10px' : 0,
-              height: hovered ? 22 : 8,
+              padding: expanded ? '0 10px' : 0,
+              height: expanded ? 22 : 8,
               display: 'flex', alignItems: 'center',
               whiteSpace: 'nowrap' as const,
-              opacity: hovered ? 1 : 0,
+              opacity: expanded ? 1 : 0,
               transition: 'opacity 0.18s, height 0.22s ease',
-              marginBottom: hovered ? 2 : 0,
+              marginBottom: expanded ? 2 : 0,
             }}>
               {group.label}
             </div>
@@ -302,7 +320,7 @@ export default function Sidebar({
                   {active && (
                     <span aria-hidden style={{
                       position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)',
-                      width: 3, height: hovered ? 20 : 22, borderRadius: 999,
+                      width: 3, height: expanded ? 20 : 22, borderRadius: 999,
                       background: 'var(--color-accent-green)',
                       boxShadow: '0 0 12px var(--color-accent-green-glow)',
                     }} />
@@ -336,14 +354,14 @@ export default function Sidebar({
                     whiteSpace: 'nowrap' as const,
                     fontWeight: active ? 560 : 430,
                     letterSpacing: '-0.01em',
-                    opacity: hovered ? 1 : 0,
+                    opacity: expanded ? 1 : 0,
                     transition: 'opacity 0.18s, color 0.2s',
-                    flex: hovered ? 1 : '0 0 0px',
+                    flex: expanded ? 1 : '0 0 0px',
                     overflow: 'hidden',
                   }}>
                     {label}
                   </span>
-                  {badge && hovered && (
+                  {badge && expanded && (
                     <span style={{
                       fontSize: 8, fontWeight: 600, letterSpacing: '0.08em',
                       textTransform: 'uppercase' as const,
@@ -360,8 +378,8 @@ export default function Sidebar({
 
               const sharedStyle: React.CSSProperties = {
                 position: 'relative',
-                display: 'flex', alignItems: 'center', justifyContent: hovered ? 'flex-start' : 'center', gap: hovered ? 10 : 0,
-                padding: hovered ? '0 10px' : 0, height: 38, borderRadius: 12,
+                display: 'flex', alignItems: 'center', justifyContent: expanded ? 'flex-start' : 'center', gap: expanded ? 10 : 0,
+                padding: expanded ? '0 10px' : 0, height: 38, borderRadius: 12,
                 textDecoration: 'none', flexShrink: 0,
                 background: active
                   ? 'rgba(255,255,255,0.075)'
@@ -399,7 +417,7 @@ export default function Sidebar({
 
       {/* User com anel de consumo */}
       <div style={{
-        padding: hovered ? '10px 10px 12px' : '10px 8px 12px',
+        padding: expanded ? '10px 10px 12px' : '10px 8px 12px',
         borderTop: '0.5px solid rgba(255,255,255,0.07)',
         flexShrink: 0,
         position: 'relative',
@@ -407,7 +425,7 @@ export default function Sidebar({
         <AvatarComConsumo
           userName={userName}
           userAvatar={userAvatar}
-          expanded={hovered}
+          expanded={expanded}
           initialPlanBalance={planBalance}
           initialPlanTotal={planTotal}
           initialLumenBalance={lumenBalance}
@@ -415,8 +433,8 @@ export default function Sidebar({
         />
         <div style={{
           position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)',
-          opacity: hovered ? 1 : 0, transition: 'opacity 0.18s',
-          pointerEvents: hovered ? 'auto' : 'none',
+          opacity: expanded ? 1 : 0, transition: 'opacity 0.18s',
+          pointerEvents: expanded ? 'auto' : 'none',
         }}>
           <form action="/auth/signout" method="POST">
             <button type="submit" title="Sair" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'rgba(255,255,255,0.4)', display: 'flex' }}>

@@ -609,12 +609,12 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
 
         {/* Topbar */}
         <div style={S.topbar}>
-          <span style={S.pageTitle}>GERAR</span>
+          <span style={S.pageTitle}>RENDERIZAR</span>
           <div style={S.credits}>
             <span style={S.creditDot}/>
             <span style={S.creditNum}>{credits}</span>
-            <span>Nodes</span>
-            <button onClick={handleBuyCredits} style={S.buyBtn}>+ comprar Nodes</button>
+            <span>nodes</span>
+            <button onClick={handleBuyCredits} style={S.buyBtn}>Recarregar</button>
           </div>
         </div>
 
@@ -1071,8 +1071,8 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
                 height: 36px;
                 flex-shrink: 0;
                 border-radius: 10px;
-                background: rgba(29,158,117,0.18);
-                color: #46d191;
+                background: var(--color-accent-green-bg);
+                color: var(--color-accent-green);
               }
               .render-to-space-cta__body {
                 display: flex;
@@ -1094,7 +1094,7 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
                 line-height: 1.45;
               }
               .render-to-space-cta__arrow {
-                color: #46d191;
+                color: var(--color-accent-green);
                 font-size: 16px;
                 flex-shrink: 0;
                 transition: transform 0.18s;

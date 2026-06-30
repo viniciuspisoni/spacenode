@@ -38,15 +38,15 @@ export function SpaceCard({ space }: { space: SpaceWithCounts }) {
   return (
     <Link
       href={`/app/spaces/${space.id}`}
+      className="spn-space-card"
       style={{
         display:         'flex',
         flexDirection:   'column',
         background:      'var(--color-bg-elevated)',
         border:          '0.5px solid var(--color-border)',
-        borderRadius:    14,
+        borderRadius:    'var(--radius-lg)',
         overflow:        'hidden',
         textDecoration:  'none',
-        transition:      'border-color 0.2s, transform 0.2s',
         color:           'inherit',
       }}
     >
@@ -84,7 +84,7 @@ export function SpaceCard({ space }: { space: SpaceWithCounts }) {
             fontSize: 10, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase',
             padding: '4px 8px', borderRadius: 5,
             background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)',
-            color: '#fafafa',
+            color: 'rgba(255,255,255,0.88)',
           }}>
             {engineName}
           </span>
@@ -92,8 +92,8 @@ export function SpaceCard({ space }: { space: SpaceWithCounts }) {
             <span style={{
               fontSize: 10, fontWeight: 500, letterSpacing: '0.04em',
               padding: '4px 8px', borderRadius: 5,
-              background: 'rgba(29,158,117,0.18)', color: '#46d191',
-              border: '0.5px solid rgba(29,158,117,0.35)',
+              background: 'var(--color-accent-green-bg)', color: 'var(--color-accent-green)',
+              border: '0.5px solid var(--color-accent-green-border)',
               display: 'inline-flex', alignItems: 'center', gap: 4,
             }}>
               <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">

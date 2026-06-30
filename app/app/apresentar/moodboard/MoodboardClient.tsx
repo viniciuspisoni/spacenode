@@ -376,7 +376,7 @@ export default function MoodboardClient({ initialCredits, studioName: initialStu
           )}
 
           {error && (
-            <div style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', fontSize: 11, color: '#fca5a5' }}>
+            <div style={{ padding: '10px 12px', borderRadius: 8, background: 'var(--color-error-bg)', border: '0.5px solid var(--color-error-border)', fontSize: 11, color: 'var(--color-error)' }}>
               {error}
             </div>
           )}
@@ -389,7 +389,7 @@ export default function MoodboardClient({ initialCredits, studioName: initialStu
               Custo: <span style={{ color: 'rgba(255,255,255,0.75)', fontWeight: 500 }}>{nodeCost} Nodes</span>
             </div>
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
-              Saldo: <span style={{ color: credits > 0 ? 'rgba(255,255,255,0.75)' : '#f87171', fontWeight: 500 }}>{credits} Nodes</span>
+              Saldo: <span style={{ color: credits > 0 ? 'rgba(255,255,255,0.75)' : 'var(--color-error)', fontWeight: 500 }}>{credits} Nodes</span>
             </div>
           </div>
           <button onClick={handleSubmit} disabled={!canSubmit}

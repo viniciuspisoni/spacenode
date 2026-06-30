@@ -1,12 +1,20 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
+import Link from 'next/link'
 
 const TITLES: Record<string, string> = {
-  '/app': 'DASHBOARD',
-  '/app/generate': 'RENDERIZAR',
-  '/app/history': 'HISTÓRICO',
-  '/app/billing': 'PLANOS',
+  '/app':                             'Dashboard',
+  '/app/generate':                    'Renderizar',
+  '/app/history':                     'Histórico',
+  '/app/billing':                     'Planos',
+  '/app/spaces':                      'Spaces',
+  '/app/editar':                      'Editar',
+  '/app/upscale':                     'Ampliar',
+  '/app/video':                       'Animar',
+  '/app/conta':                       'Conta',
+  '/app/equipe':                      'Equipe',
+  '/app/settings/identity':           'Identidade',
 }
 
 interface TopbarProps {
@@ -16,22 +24,66 @@ interface TopbarProps {
 export default function Topbar({ credits }: TopbarProps) {
   const pathname = usePathname()
   const title = TITLES[pathname] ?? 'spacenode'
+  const lowNodes = credits < 10
 
   return (
-    <div className="flex items-center justify-between mb-10">
-      <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-[#86868b] m-0">
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 40,
+      paddingBottom: 20,
+      borderBottom: '0.5px solid var(--color-border)',
+    }}>
+      <p style={{
+        fontSize: 11,
+        fontWeight: 500,
+        letterSpacing: '0.12em',
+        textTransform: 'uppercase',
+        color: 'var(--color-text-tertiary)',
+        margin: 0,
+      }}>
         {title}
       </p>
-      <div className="flex items-center gap-2 text-[11px] text-[#86868b] tracking-[-0.005em]">
-        <span
-          className="w-[5px] h-[5px] rounded-full bg-[#30b46c] shrink-0"
-          style={{ boxShadow: '0 0 6px rgba(48,180,108,0.4)' }}
-        />
-        <span className="text-[12px] font-medium text-[#1a1a1a] tabular-nums">
+      <Link href="/app/billing" style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 7,
+        textDecoration: 'none',
+        padding: '5px 11px',
+        borderRadius: 'var(--radius-sm)',
+        border: `0.5px solid ${lowNodes ? 'var(--color-error-border)' : 'var(--color-border)'}`,
+        background: lowNodes ? 'var(--color-error-bg)' : 'var(--color-surface)',
+        transition: 'background var(--duration-fast) ease, border-color var(--duration-fast) ease',
+      }}>
+        <span style={{
+          width: 5,
+          height: 5,
+          borderRadius: '50%',
+          background: lowNodes ? 'var(--color-error)' : 'var(--color-accent-green)',
+          boxShadow: lowNodes
+            ? '0 0 6px var(--color-error-border)'
+            : '0 0 6px var(--color-accent-green-glow)',
+          flexShrink: 0,
+          display: 'inline-block',
+        }} />
+        <span style={{
+          fontSize: 12,
+          fontWeight: 500,
+          color: lowNodes ? 'var(--color-error)' : 'var(--color-text-primary)',
+          fontVariantNumeric: 'tabular-nums',
+          letterSpacing: '-0.01em',
+        }}>
           {credits}
         </span>
-        <span>nodes</span>
-      </div>
+        <span style={{
+          fontSize: 11,
+          color: 'var(--color-text-tertiary)',
+          letterSpacing: '-0.005em',
+        }}>
+          nodes
+        </span>
+      </Link>
     </div>
   )
 }

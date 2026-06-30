@@ -209,7 +209,7 @@ export default function RenderPicker({ minSelection, maxSelection, initialSelect
           )}
 
           {error && (
-            <div style={{ padding: 14, borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', fontSize: 12, color: '#fca5a5', marginBottom: 16 }}>
+            <div style={{ padding: 14, borderRadius: 8, background: 'var(--color-error-bg)', border: '0.5px solid var(--color-error-border)', fontSize: 12, color: 'var(--color-error)', marginBottom: 16 }}>
               {error}
             </div>
           )}

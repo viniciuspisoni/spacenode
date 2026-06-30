@@ -147,8 +147,8 @@ export default function LoginPage() {
         {error && (
           <div style={{
             width: '100%', padding: '11px 14px', borderRadius: 9, marginBottom: 16,
-            background: 'rgba(220,50,47,0.08)', border: '0.5px solid rgba(220,50,47,0.25)',
-            fontSize: 13, color: '#e05252', letterSpacing: '-0.01em', lineHeight: 1.5,
+            background: 'var(--color-error-bg)', border: '0.5px solid var(--color-error-border)',
+            fontSize: 13, color: 'var(--color-error)', letterSpacing: '-0.01em', lineHeight: 1.5,
           }}>
             {error}
           </div>
@@ -158,8 +158,8 @@ export default function LoginPage() {
         {success && (
           <div style={{
             width: '100%', padding: '11px 14px', borderRadius: 9, marginBottom: 16,
-            background: 'rgba(48,180,108,0.1)', border: '0.5px solid rgba(48,180,108,0.3)',
-            fontSize: 13, color: '#30b46c', letterSpacing: '-0.01em', lineHeight: 1.5,
+            background: 'var(--color-accent-green-bg)', border: '0.5px solid var(--color-accent-green-border)',
+            fontSize: 13, color: 'var(--color-accent-green)', letterSpacing: '-0.01em', lineHeight: 1.5,
           }}>
             {success}
           </div>
