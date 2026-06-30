@@ -204,7 +204,7 @@ export default function Sidebar({
     <aside
       style={{
         width: expanded ? SIDEBAR_EXPANDED : SIDEBAR_COLLAPSED,
-        transition: 'width 0.28s cubic-bezier(0.22,1,0.36,1), box-shadow 0.28s ease',
+        transition: 'width 0.5s cubic-bezier(0.4,0,0.2,1), box-shadow 0.45s ease',
         background: 'linear-gradient(180deg, #101011 0%, #090909 100%)',
         display: 'flex',
         flexDirection: 'column',
@@ -233,7 +233,7 @@ export default function Sidebar({
         justifyContent: expanded ? 'flex-start' : 'center',
         paddingLeft: expanded ? 20 : 0,
         color: '#ffffff',
-        transition: 'padding 0.28s cubic-bezier(0.22,1,0.36,1)',
+        transition: 'padding 0.5s cubic-bezier(0.4,0,0.2,1)',
       }}>
         {/* Símbolo isolado — visível só colapsado */}
         <div
@@ -245,7 +245,7 @@ export default function Sidebar({
             alignItems: 'center',
             justifyContent: 'center',
             opacity: expanded ? 0 : 1,
-            transition: 'opacity 0.16s ease',
+            transition: 'opacity 0.3s ease',
             pointerEvents: 'none',
           }}
         >
@@ -255,7 +255,7 @@ export default function Sidebar({
         {/* Lockup horizontal compartilhado com a landing page — visível só expandido */}
         <div style={{
           opacity: expanded ? 1 : 0,
-          transition: 'opacity 0.2s ease 0.04s',
+          transition: 'opacity 0.34s ease 0.12s',
           whiteSpace: 'nowrap',
         }}>
           <Logo symbolSize={42} color="#ffffff" />
@@ -285,7 +285,7 @@ export default function Sidebar({
               display: 'flex', alignItems: 'center',
               whiteSpace: 'nowrap' as const,
               opacity: expanded ? 1 : 0,
-              transition: 'opacity 0.18s, height 0.22s ease',
+              transition: 'opacity 0.3s ease 0.1s, height 0.34s ease',
               marginBottom: expanded ? 2 : 0,
             }}>
               {group.label}
@@ -343,7 +343,7 @@ export default function Sidebar({
                     fontWeight: active ? 560 : 430,
                     letterSpacing: '-0.01em',
                     opacity: expanded ? 1 : 0,
-                    transition: 'opacity 0.18s, color 0.2s',
+                    transition: 'opacity 0.3s ease 0.08s, color 0.2s',
                     flex: expanded ? 1 : '0 0 0px',
                     overflow: 'hidden',
                   }}>
@@ -421,7 +421,7 @@ export default function Sidebar({
         />
         <div style={{
           position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)',
-          opacity: expanded ? 1 : 0, transition: 'opacity 0.18s',
+          opacity: expanded ? 1 : 0, transition: 'opacity 0.3s ease',
           pointerEvents: expanded ? 'auto' : 'none',
         }}>
           <form action="/auth/signout" method="POST">
