@@ -151,25 +151,25 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     items: [
       { label: 'renderizar', href: '/app/generate',    exact: false, Icon: IconGenerate  },
       { label: 'spaces',     href: '/app/spaces/new',  exact: true,  Icon: IconSpaces    },
-      { label: 'editar',     href: '/app/editar',      exact: false, Icon: IconRetocar, badge: 'novo', badgeTone: 'green' },
+      { label: 'editar',     href: '/app/editar',      exact: false, Icon: IconRetocar   },
       { label: 'ampliar',    href: '/app/upscale',     exact: false, Icon: IconEnhance   },
       { label: 'animar',     href: '/app/video',       exact: false, Icon: IconVideo     },
-      { label: 'finalizar',  href: '/app/finalizar',   exact: false, Icon: IconFinalizar, badge: 'novo', badgeTone: 'green' },
+      { label: 'finalizar',  href: '/app/finalizar',   exact: false, Icon: IconFinalizar },
     ],
   },
   {
     label: 'APRESENTAR',
     items: [
-      { label: 'planta humanizada', href: '/app/apresentar/planta-humanizada', exact: false, Icon: IconHumanizedPlan, badge: 'novo', badgeTone: 'green' },
-      { label: 'isométricas',       href: '/app/apresentar/isometricas',       exact: false, Icon: IconIsometric,     badge: 'novo', badgeTone: 'green' },
-      { label: 'prancha ia',        href: '/app/apresentar/prancha',           exact: false, Icon: IconBoard,         badge: 'beta', badgeTone: 'green' },
-      { label: 'moodboard',         href: '/app/apresentar/moodboard',         exact: false, Icon: IconMoodboard,     badge: 'novo', badgeTone: 'green' },
+      { label: 'planta humanizada', href: '/app/apresentar/planta-humanizada', exact: false, Icon: IconHumanizedPlan },
+      { label: 'isométricas',       href: '/app/apresentar/isometricas',       exact: false, Icon: IconIsometric    },
+      { label: 'prancha ia',        href: '/app/apresentar/prancha',           exact: false, Icon: IconBoard        },
+      { label: 'moodboard',         href: '/app/apresentar/moodboard',         exact: false, Icon: IconMoodboard    },
     ],
   },
   {
     label: 'ESCRITÓRIO',
     items: [
-      { label: 'equipe',     href: '/app/equipe',            exact: false, Icon: IconTeam, badge: 'novo', badgeTone: 'green' },
+      { label: 'equipe',     href: '/app/equipe',            exact: false, Icon: IconTeam      },
       { label: 'identidade', href: '/app/settings/identity', exact: false, Icon: IconIdentity },
       { label: 'conta',      href: '/app/conta',             exact: false, Icon: IconAccount  },
       { label: 'planos',     href: '/app/billing',           exact: false, Icon: IconPlans    },
