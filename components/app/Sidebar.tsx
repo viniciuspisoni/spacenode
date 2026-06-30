@@ -127,6 +127,17 @@ const IconMoodboard = () => (
   </svg>
 )
 
+const ChevronCollapse = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M13 7l-5 5 5 5"/><path d="M19 7l-5 5 5 5"/>
+  </svg>
+)
+const ChevronExpand = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M11 7l5 5-5 5"/><path d="M5 7l5 5-5 5"/>
+  </svg>
+)
+
 type NavItem = {
   label: string
   href: string | null
@@ -196,21 +207,23 @@ export default function Sidebar({
   const pathname = usePathname()
   const [hovered, setHovered] = useState(false)
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
+  const [togHover, setTogHover] = useState(false)
 
-  // Desktop (>= 1024px): sidebar permanece expandida por padrão — estável,
-  // sem colapso por hover. Abaixo disso, colapsa e expande sob hover (compacto).
-  // Default true: app é desktop-first, evita flash de colapso no SSR em desktop.
-  const [isDesktop, setIsDesktop] = useState(true)
+  // Colapso manual e persistido. Padrão: expandido no desktop, colapsado
+  // abaixo de 1024px. O usuário controla via botão — sem colapso por hover.
+  const [collapsed, setCollapsed] = useState(false)
   useEffect(() => {
-    const mq = window.matchMedia('(min-width: 1024px)')
-    const update = () => setIsDesktop(mq.matches)
-    update()
-    mq.addEventListener('change', update)
-    return () => mq.removeEventListener('change', update)
+    const saved = localStorage.getItem('spn-sidebar-collapsed')
+    if (saved !== null) setCollapsed(saved === '1')
+    else setCollapsed(!window.matchMedia('(min-width: 1024px)').matches)
   }, [])
 
-  // Estado visual expandido: fixo no desktop; sob hover em telas menores.
-  const expanded = isDesktop || hovered
+  const setCollapsedPersist = (next: boolean) => {
+    setCollapsed(next)
+    try { localStorage.setItem('spn-sidebar-collapsed', next ? '1' : '0') } catch {}
+  }
+
+  const expanded = !collapsed
 
   return (
     <aside
@@ -235,15 +248,16 @@ export default function Sidebar({
       onMouseLeave={() => setHovered(false)}
     >
       {/* Logo — wordmark horizontal limpo (igual à LP) quando expandido,
-          símbolo "N" isolado quando colapsado/mobile. */}
+          símbolo "N" isolado quando colapsado. Botão para recolher/expandir. */}
       <div style={{
         position: 'relative',
         height: 78,
         flexShrink: 0,
         display: 'flex',
         alignItems: 'center',
-        justifyContent: expanded ? 'flex-start' : 'center',
+        justifyContent: expanded ? 'space-between' : 'center',
         paddingLeft: expanded ? 20 : 0,
+        paddingRight: expanded ? 12 : 0,
         color: '#ffffff',
         transition: 'padding 0.28s cubic-bezier(0.22,1,0.36,1)',
       }}>
@@ -272,6 +286,53 @@ export default function Sidebar({
         }}>
           <Logo symbolSize={42} color="#ffffff" />
         </div>
+
+        {/* Botão recolher (expandido) */}
+        {expanded && (
+          <button
+            type="button"
+            onClick={() => setCollapsedPersist(true)}
+            onMouseEnter={() => setTogHover(true)}
+            onMouseLeave={() => setTogHover(false)}
+            title="Recolher menu"
+            aria-label="Recolher menu"
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 30, height: 30, borderRadius: 9, border: 'none', padding: 0,
+              cursor: 'pointer', flexShrink: 0,
+              background: togHover ? 'rgba(255,255,255,0.07)' : 'transparent',
+              color: togHover ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.42)',
+              transition: 'background 0.18s, color 0.18s',
+            }}
+          >
+            <ChevronCollapse />
+          </button>
+        )}
+
+        {/* Botão expandir (colapsado) — aparece ao passar o mouse no rail */}
+        {!expanded && (
+          <button
+            type="button"
+            onClick={() => setCollapsedPersist(false)}
+            onMouseEnter={() => setTogHover(true)}
+            onMouseLeave={() => setTogHover(false)}
+            title="Expandir menu"
+            aria-label="Expandir menu"
+            style={{
+              position: 'absolute', top: 7, right: 7,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 28, height: 28, borderRadius: 8, border: 'none', padding: 0,
+              cursor: 'pointer',
+              background: togHover ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.05)',
+              color: togHover ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.5)',
+              opacity: hovered ? 1 : 0,
+              pointerEvents: hovered ? 'auto' : 'none',
+              transition: 'opacity 0.16s ease, background 0.18s, color 0.18s',
+            }}
+          >
+            <ChevronExpand />
+          </button>
+        )}
       </div>
 
       {/* Nav */}
