@@ -291,9 +291,9 @@ export default function Sidebar({
         {NAV_GROUPS.map((group, gi) => (
           <div key={group.label} style={{ marginTop: expanded ? (gi === 0 ? 0 : 13) : (gi === 0 ? 0 : 10) }}>
             <div style={{
-              fontSize: 11, fontWeight: 500, letterSpacing: '0.13em',
+              fontSize: 10, fontWeight: 500, letterSpacing: '0.16em',
               textTransform: 'uppercase' as const,
-              color: 'rgba(255,255,255,0.34)',
+              color: 'rgba(255,255,255,0.30)',
               padding: expanded ? '0 10px' : 0,
               height: expanded ? 22 : 8,
               display: 'flex', alignItems: 'center',
@@ -352,10 +352,10 @@ export default function Sidebar({
                   </div>
                   <span style={{
                     fontSize: 13,
-                    color: disabled ? 'rgba(255,255,255,0.25)' : active ? '#ffffff' : isItemHovered ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.75)',
+                    color: disabled ? 'rgba(255,255,255,0.25)' : active ? '#ffffff' : isItemHovered ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.72)',
                     whiteSpace: 'nowrap' as const,
-                    fontWeight: active ? 560 : 430,
-                    letterSpacing: '-0.01em',
+                    fontWeight: active ? 540 : 450,
+                    letterSpacing: '-0.012em',
                     opacity: expanded ? 1 : 0,
                     transition: 'opacity 0.3s ease 0.08s, color 0.2s',
                     flex: expanded ? 1 : '0 0 0px',
