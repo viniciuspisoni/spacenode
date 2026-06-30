@@ -6,9 +6,15 @@
 //
 // Pipeline por sketch:
 //   debit → row pendente em vistas (axis='angulo', source_sketch_url, batch_id)
-//     → call FAL com dual-reference [Vista Mestre, sketch] e prompt enriquecido
+//     → call FAL com dual-reference [sketch (base geométrica), Vista Mestre (estética)]
+//       e prompt que trava a geometria do print do usuário
 //     → update row para completed.
 // Refund best-effort em qualquer falha pós-débito.
+//
+// IMPORTANTE (fix 2026-06-30): o print do usuário (sketch) é a AUTORIDADE
+// geométrica e entra como Image #1. A Vista Mestre é só referência estética
+// (materiais/luz/acabamento) e entra como Image #2. Antes a ordem era invertida
+// e o motor reproduzia a imagem original do projeto ignorando o print enviado.
 //
 // DNA verification roda em modo 'angulo_relaxed' (Contexto comparado por
 // categoria ampla) — disparado pelo cliente após receber a resposta.
@@ -251,16 +257,21 @@ async function generateOne(args: {
     // 3) Prompt dual-reference
     const prompt = buildAnguloPrompt(dna, briefing, sketch.label, quality)
 
-    // image_urls: [#1 Vista Mestre = style ref, #2 sketch = geometry source]
+    // image_urls (ORDEM IMPORTA): [#1 print do usuário = base geométrica,
+    // #2 Vista Mestre = referência estética]. A primeira imagem é a âncora de
+    // geometria/composição pros motores de edição da FAL — por isso o print
+    // tem que vir PRIMEIRO. Inverter isso fazia o motor copiar a estrutura da
+    // Vista Mestre (imagem original do projeto) e ignorar o print enviado.
     const falInput = {
       prompt,
-      image_urls: [space.vista_mestre_url!, sketch.url],
+      image_urls: [sketch.url, space.vista_mestre_url!],
       ...falParamsForEngine(engine, quality),
     }
 
-    console.log('[spaces.angulo] engine    :', engine, '→', falEndpoint)
-    console.log('[spaces.angulo] sketch    :', sketch.url, 'label=', sketch.label)
-    console.log('[spaces.angulo] batch_id  :', batchId)
+    console.log('[spaces.angulo] engine                       :', engine, '→', falEndpoint)
+    console.log('[spaces.angulo] base geométrica (image #1)    :', sketch.url, 'label=', sketch.label)
+    console.log('[spaces.angulo] ref estética   (image #2)     :', space.vista_mestre_url)
+    console.log('[spaces.angulo] batch_id                      :', batchId)
 
     const result = await Promise.race([
       fal.subscribe(falEndpoint, { input: falInput }),
@@ -336,7 +347,7 @@ function buildAnguloPrompt(
   // manter coerência conceitual com o resto do projeto.
   const facts = briefing
     ? (
-      `\nPROJECT FACTS (from reference Vista Mestre — must match in output):\n` +
+      `\nPROJECT AESTHETIC DNA (from the project — apply as finish/materials ONLY, never as geometry):\n` +
       `- Style of project: ${briefing.tipo_projeto}\n` +
       `- Visible materials: ${briefing.materiais_aparentes}\n` +
       `- Surroundings/context: ${briefing.entorno}\n`
@@ -344,20 +355,24 @@ function buildAnguloPrompt(
     : ''
 
   return [
-    `Render this architectural sketch as a photorealistic image matching the reference style and materials.`,
+    `Turn the user's uploaded view (Image #1) into a photorealistic architectural render. Image #1 is the ABSOLUTE GEOMETRIC AUTHORITY of this generation.`,
     ``,
     `TWO REFERENCE IMAGES PROVIDED:`,
-    `Image #1 is the Vista Mestre — use it as the source of materials, textures, color palette, mood and lighting. Match these EXACTLY.`,
-    `Image #2 is the sketch — use it ONLY for architecture, layout, geometry, opening positions, camera angle and perspective. Do not invent or remove any architectural element shown in the sketch.`,
+    `Image #1 — THE USER'S VIEW (geometric authority). Preserve EXACTLY its geometry, framing, perspective, camera angle, composition, volumes, proportions and every opening (windows, doors, voids, recesses). Do NOT move, add, remove, redraw, simplify or reinterpret any structural element. Do NOT change the point of view. The result must align element-by-element with Image #1.`,
+    `Image #2 — THE PROJECT'S VISTA MESTRE (aesthetic reference ONLY). Use it solely as the source of materials, textures, color palette, finish, mood and lighting style. Do NOT borrow geometry, camera angle, composition, framing or layout from Image #2.`,
+    ``,
+    `APPLY ONLY: realism, materials, lighting, finish and texture — on top of the exact geometry of Image #1.`,
     ``,
     `STYLE: ${styleLine}`,
     `MATERIALS: ${materialsLine}`,
     `PALETTE: ${paletteLine}`,
     `MOOD / CONTEXT: ${moodLine}`,
-    `LIGHTING: match the lighting conditions of Image #1 (Vista Mestre) — same time of day, same shadow direction, same atmosphere.${labelLine}`,
+    `LIGHTING: photorealistic and coherent with the project's atmosphere shown in Image #2 — natural light, plausible shadows, no flat or illustrative look.${labelLine}`,
     facts,
-    `The output should look as if it were photographed at the same time, same conditions and same materials as the Vista Mestre — only from a different viewpoint defined by the sketch.`,
+    `The output must look like a real photograph of the SAME structure shown in Image #1, finished with the materials and atmosphere of the project (Image #2). It is the user's view made real — not a re-composition of the Vista Mestre.`,
     ``,
-    `Output: photorealistic architectural rendering, ${quality.toUpperCase()} quality, no stylization, no illustration, no cartoon. Preserve every architectural element shown in the sketch exactly.`,
+    `NEGATIVE: do not reproduce Image #2's viewpoint, layout or composition; do not deform, straighten or simplify the geometry of Image #1; no stylization, no illustration, no cartoon, no invented or relocated architecture.`,
+    ``,
+    `Output: photorealistic architectural rendering, ${quality.toUpperCase()} quality. Preserve every architectural element and opening shown in Image #1 exactly.`,
   ].join('\n')
 }
