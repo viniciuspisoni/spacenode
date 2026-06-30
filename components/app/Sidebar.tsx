@@ -330,21 +330,12 @@ export default function Sidebar({
                   <div style={{
                     width: 30,
                     height: 30,
-                    borderRadius: 10,
                     flexShrink: 0,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    color: disabled ? 'rgba(255,255,255,0.2)' : active ? '#ffffff' : isItemHovered ? 'rgba(255,255,255,0.78)' : 'rgba(255,255,255,0.52)',
-                    background: active
-                      ? 'rgba(255,255,255,0.105)'
-                      : isItemHovered
-                        ? 'rgba(255,255,255,0.06)'
-                        : 'transparent',
-                    boxShadow: active ? 'inset 0 0 0 0.5px rgba(255,255,255,0.10)' : 'none',
-                    transform: isItemHovered && !active ? 'translateY(-0.5px)' : 'translateY(0)',
-                    transitionProperty: 'color, transform, background, box-shadow',
-                    transitionDuration: '0.2s',
+                    color: disabled ? 'rgba(255,255,255,0.2)' : active ? '#ffffff' : isItemHovered ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.55)',
+                    transition: 'color 0.2s',
                   }}>
                     <span style={{ display: 'flex', transform: 'scale(0.92)' }}>
                       <Icon />
@@ -384,16 +375,12 @@ export default function Sidebar({
                 padding: expanded ? '0 10px' : 0, height: 38, borderRadius: 12,
                 textDecoration: 'none', flexShrink: 0,
                 background: active
-                  ? 'rgba(255,255,255,0.075)'
+                  ? 'rgba(255,255,255,0.06)'
                   : isItemHovered
-                    ? 'rgba(255,255,255,0.045)'
+                    ? 'rgba(255,255,255,0.035)'
                     : 'transparent',
-                boxShadow: active
-                  ? 'inset 0 0 0 0.5px rgba(255,255,255,0.10)'
-                  : isItemHovered
-                    ? 'inset 0 0 0 0.5px rgba(255,255,255,0.07)'
-                    : 'none',
-                transition: 'background 0.2s, box-shadow 0.2s, transform 0.2s',
+                boxShadow: 'none',
+                transition: 'background 0.18s ease',
                 cursor: disabled ? 'default' : 'pointer',
                 opacity: disabled ? 0.5 : 1,
               }
