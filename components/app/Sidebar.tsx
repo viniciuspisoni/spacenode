@@ -245,7 +245,8 @@ export default function Sidebar({
             alignItems: 'center',
             justifyContent: 'center',
             opacity: expanded ? 0 : 1,
-            transition: 'opacity 0.3s ease',
+            // Abrir: some rápido. Fechar: entra depois que o lockup já saiu.
+            transition: expanded ? 'opacity 0.18s ease' : 'opacity 0.26s ease 0.18s',
             pointerEvents: 'none',
           }}
         >
@@ -255,7 +256,8 @@ export default function Sidebar({
         {/* Lockup horizontal compartilhado com a landing page — visível só expandido */}
         <div style={{
           opacity: expanded ? 1 : 0,
-          transition: 'opacity 0.34s ease 0.12s',
+          // Abrir: entra depois que o N já saiu. Fechar: some rápido.
+          transition: expanded ? 'opacity 0.34s ease 0.16s' : 'opacity 0.16s ease',
           whiteSpace: 'nowrap',
         }}>
           <Logo symbolSize={42} color="#ffffff" />
