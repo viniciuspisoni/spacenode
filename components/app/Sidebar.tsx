@@ -264,6 +264,18 @@ export default function Sidebar({
         </div>
       </div>
 
+      {/* Hairline sob o logo — estrutura discreta (estilo header premium) */}
+      <div
+        aria-hidden
+        style={{
+          height: 0.5,
+          background: 'rgba(255,255,255,0.07)',
+          margin: expanded ? '0 16px' : '0 14px',
+          flexShrink: 0,
+          transition: 'margin 0.5s cubic-bezier(0.4,0,0.2,1)',
+        }}
+      />
+
       {/* Nav */}
       <nav
         className="spn-sidebar-nav"
