@@ -238,12 +238,12 @@ export default function Sidebar({
           símbolo "N" isolado quando colapsado/mobile. */}
       <div style={{
         position: 'relative',
-        height: 66,
+        height: 78,
         flexShrink: 0,
         display: 'flex',
         alignItems: 'center',
         justifyContent: expanded ? 'flex-start' : 'center',
-        paddingLeft: expanded ? 22 : 0,
+        paddingLeft: expanded ? 20 : 0,
         color: '#ffffff',
         transition: 'padding 0.28s cubic-bezier(0.22,1,0.36,1)',
       }}>
@@ -261,7 +261,7 @@ export default function Sidebar({
             pointerEvents: 'none',
           }}
         >
-          <ConstellationN size={34} aria-hidden />
+          <ConstellationN size={44} aria-hidden />
         </div>
 
         {/* Lockup horizontal compartilhado com a landing page — visível só expandido */}
@@ -270,7 +270,7 @@ export default function Sidebar({
           transition: 'opacity 0.2s ease 0.04s',
           whiteSpace: 'nowrap',
         }}>
-          <Logo symbolSize={30} color="#ffffff" />
+          <Logo symbolSize={42} color="#ffffff" />
         </div>
       </div>
 
