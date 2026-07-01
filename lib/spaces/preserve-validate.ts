@@ -22,6 +22,9 @@ export interface GenerationValidationInput {
   generatedUrl:     string | null | undefined
   sourceAspect:     number | null
   generatedAspect:  number | null
+  // Detalhe (crop): fechar o enquadramento muda o aspect ratio de propósito —
+  // medimos, mas não tratamos como divergência.
+  allowFramingChange?: boolean
 }
 
 export interface GenerationValidation {
@@ -48,7 +51,7 @@ export function validateGeneration(input: GenerationValidationInput): Generation
   if (input.sourceAspect && input.generatedAspect) {
     const rel = Math.abs(input.sourceAspect - input.generatedAspect) / input.sourceAspect
     aspectPreserved = rel <= ASPECT_TOLERANCE
-    if (!aspectPreserved) issues.push('aspect_ratio_divergente')
+    if (!aspectPreserved && !input.allowFramingChange) issues.push('aspect_ratio_divergente')
   }
 
   return { ok: issues.length === 0, issues, aspectPreserved }
@@ -80,12 +83,18 @@ const CHECK_SYSTEM =
 
 // O que pode legitimamente mudar depende do nível: em STRICT a câmera deve ser
 // preservada; em ARCH a câmera pode mudar (nova vista do mesmo prédio), então
-// não penalizamos divergência de câmera/enquadramento.
-function checkUserPrompt(level: SpacesPreservationLevel): string {
-  const cameraRule = level === 'STRICT_SOURCE_LOCK'
-    ? 'A câmera/enquadramento DEVE ser preservada — penalize se mudou.'
-    : 'A câmera PODE mudar (é uma nova vista do mesmo projeto) — NÃO penalize ' +
-      'mudança de câmera/enquadramento; foque em ser o mesmo edifício.'
+// não penalizamos divergência de câmera/enquadramento. No Detalhe (crop) o
+// enquadramento FECHA de propósito — não penalizamos o recorte, só redesenho.
+function checkUserPrompt(level: SpacesPreservationLevel, cropExpected: boolean): string {
+  const cameraRule = cropExpected
+    ? 'A imagem #2 é um RECORTE/aproximação (crop/zoom) da MESMA vista — um ' +
+      'enquadramento mais FECHADO é esperado e correto. NÃO penalize crop, zoom ' +
+      'ou enquadramento mais fechado. Penalize SOMENTE se a arquitetura, os ' +
+      'materiais, as proporções, as aberturas ou o estilo mudaram (virou outro projeto).'
+    : level === 'STRICT_SOURCE_LOCK'
+      ? 'A câmera/enquadramento DEVE ser preservada — penalize se mudou.'
+      : 'A câmera PODE mudar (é uma nova vista do mesmo projeto) — NÃO penalize ' +
+        'mudança de câmera/enquadramento; foque em ser o mesmo edifício.'
 
   return (
     'Compare a imagem #2 (gerada) com a #1 (original). ' + cameraRule + '\n\n' +
@@ -111,11 +120,12 @@ export async function checkArchitecturalPreservation(
   sourceUrl:    string,
   generatedUrl: string,
   level:        SpacesPreservationLevel,
+  opts?:        { cropExpected?: boolean },
 ): Promise<PreservationCheck | null> {
   try {
     const raw = await geminiMultiVisionJson({
       system:   CHECK_SYSTEM,
-      user:     checkUserPrompt(level),
+      user:     checkUserPrompt(level, opts?.cropExpected ?? false),
       imageUrls: [sourceUrl, generatedUrl],
       timeoutMs: 30_000,
     })

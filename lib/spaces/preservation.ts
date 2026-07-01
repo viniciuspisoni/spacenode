@@ -84,6 +84,14 @@ export function levelForMode(mode: SpacesMode): SpacesPreservationLevel {
   return mode === 'camera' ? 'ARCHITECTURAL_DNA_LOCK' : 'STRICT_SOURCE_LOCK'
 }
 
+// Detalhe é o único modo STRICT que ainda permite o enquadramento FECHAR (crop/
+// zoom da MESMA vista). Geometria, materiais, proporções e estilo continuam
+// travados — só o recorte aproxima. Consumido pelo prompt builder e pelas
+// validações (que não devem penalizar um crop como se fosse violação).
+export function modeAllowsCloserCrop(mode: SpacesMode): boolean {
+  return mode === 'detalhe'
+}
+
 export function levelForAxis(axis: Axis): SpacesPreservationLevel {
   return levelForMode(modeForAxis(axis))
 }

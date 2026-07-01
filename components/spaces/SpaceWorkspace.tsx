@@ -10,7 +10,8 @@ import Link from 'next/link'
 import { ENGINES } from '@/lib/engines'
 import type { Space, Vista, ArchitectIdentity, Axis, Quality } from '@/lib/spaces/types'
 import type { PlanId } from '@/lib/plans'
-import { getVisualDna } from '@/lib/spaces/dna'
+import { getVisualDna, getBriefingFromDna } from '@/lib/spaces/dna'
+import { detalheContextFor } from '@/lib/spaces/axes'
 import { getVistaGenerationCost } from '@/lib/spaces/economy'
 import { DnaPanel } from './DnaPanel'
 import { EixosPanel } from './EixosPanel'
@@ -55,6 +56,9 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId }:
 
   const isLocked = space.status === 'locked'
   const dna      = getVisualDna(space.dna)
+  // Contexto pra adaptar os cards do eixo Detalhe (corporativo / residencial /
+  // exterior / default), a partir da categoria + briefing arquitetônico.
+  const detalheContext = detalheContextFor(space.category, getBriefingFromDna(space.dna))
 
   function showToast(t: ToastState) {
     setToast(t)
@@ -327,6 +331,7 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId }:
               balance={balance}
               planId={planId}
               spaceId={space.id}
+              detalheContext={detalheContext}
               onGenerate={handleGenerate}
               onGenerateFromSketches={handleGenerateFromSketches}
             />

@@ -7,14 +7,10 @@ import { VistaCard } from './VistaCard'
 
 type Filter = 'all' | 'favorited' | Axis
 
-const FILTERS: { id: Filter; label: string }[] = [
-  { id: 'all',        label: 'Todas' },
-  { id: 'favorited',  label: 'Favoritas' },
-  { id: 'iluminacao', label: AXIS_LABEL.iluminacao },
-  { id: 'angulo',     label: AXIS_LABEL.angulo },
-  { id: 'horario',    label: AXIS_LABEL.horario },
-  { id: 'detalhe',    label: AXIS_LABEL.detalhe },
-]
+// Ordem dos filtros de eixo no MVP. Clima (horario) fica fora — só apareceria
+// se houvesse vistas legadas desse eixo (não há). Cada chip de eixo só é exibido
+// quando há vistas dele, pra não poluir a galeria com filtros vazios.
+const AXIS_FILTER_ORDER: Axis[] = ['iluminacao', 'angulo', 'detalhe', 'horario']
 
 interface Props {
   vistas:           Vista[]
@@ -23,6 +19,17 @@ interface Props {
 
 export function VistasGrid({ vistas, vistaMestreUrl }: Props) {
   const [filter, setFilter] = useState<Filter>('all')
+
+  const filters = useMemo<{ id: Filter; label: string }[]>(() => {
+    const axisFilters = AXIS_FILTER_ORDER
+      .filter(a => vistas.some(v => v.axis === a))
+      .map(a => ({ id: a as Filter, label: AXIS_LABEL[a] }))
+    return [
+      { id: 'all',       label: 'Todas' },
+      { id: 'favorited', label: 'Favoritas' },
+      ...axisFilters,
+    ]
+  }, [vistas])
 
   const filtered = useMemo(() => {
     if (filter === 'all')       return vistas
@@ -61,7 +68,7 @@ export function VistasGrid({ vistas, vistaMestreUrl }: Props) {
       <div style={{
         display: 'flex', gap: 6, marginBottom: 18, flexWrap: 'wrap',
       }}>
-        {FILTERS.map(f => {
+        {filters.map(f => {
           const active = f.id === filter
           return (
             <button

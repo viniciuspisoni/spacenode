@@ -269,7 +269,7 @@ const VERIFY_SYSTEM = (
   'Responda SEMPRE e APENAS com JSON.'
 )
 
-export type VerifyMode = 'standard' | 'angulo_relaxed' | 'edit_relaxed'
+export type VerifyMode = 'standard' | 'angulo_relaxed' | 'edit_relaxed' | 'detalhe_relaxed'
 
 export async function verifyDna(
   variationUrl: string,
@@ -286,6 +286,11 @@ export async function verifyDna(
   // Pra vistas editadas (Retocar), a área não-mascarada é idêntica à
   // original — só uma região foi modificada. Threshold por atributo é
   // ajustado pela cobertura da máscara (área menor → mais tolerante).
+  //
+  // Pro eixo Detalhe, a vista é um RECORTE aproximado de UMA região — mostra só
+  // parte dos materiais/paleta do projeto. Avaliar materiais/paleta contra o DNA
+  // COMPLETO marcaria falso "DNA divergente" (o que está fora do enquadramento
+  // não é ausência): avaliamos só o que está VISÍVEL no recorte.
   const contextoRule = mode === 'angulo_relaxed'
     ? (
       'IMPORTANTE — esta vista veio do eixo Ângulo (mesmo projeto, ponto de vista diferente). ' +
@@ -295,6 +300,17 @@ export async function verifyDna(
       'de cena (pessoas, veículos, vegetação detalhada). Score alto se a ' +
       'categoria ampla é a mesma.\n\n'
     )
+    : mode === 'detalhe_relaxed'
+      ? (
+        'IMPORTANTE — esta vista é um RECORTE aproximado (crop/zoom) da vista mestre, ' +
+        'focado em UMA região do projeto, então mostra apenas PARTE dos materiais e ' +
+        'da paleta do projeto. Para "materiais" e "paleta", avalie SOMENTE o que está ' +
+        'VISÍVEL no recorte: score alto se o que aparece é coerente com o DNA; NÃO ' +
+        'penalize materiais ou cores do DNA que apenas ficaram fora do enquadramento. ' +
+        'Para "contexto", compare só categorias amplas (Interno/Externo, tipologia) e ' +
+        'ignore composição/enquadramento. "Estilo" permanece estrito — se a linguagem ' +
+        'arquitetônica mudou, penalize.\n\n'
+      )
     : mode === 'edit_relaxed'
       ? (
         `IMPORTANTE — esta vista é uma edição localizada (${(maskCoverage * 100).toFixed(0)}% ` +

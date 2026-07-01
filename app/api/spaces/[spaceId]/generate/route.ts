@@ -32,7 +32,7 @@ import {
 } from '@/lib/prompts'
 import { spacesPreserveV2Enabled, visionPreservationCheckEnabled } from '@/lib/spaces/preserve-flags'
 import {
-  modeForAxis, levelForAxis,
+  modeForAxis, levelForAxis, modeAllowsCloserCrop,
   type SpacesMode, type SpacesPreservationLevel,
 } from '@/lib/spaces/preservation'
 import { buildSpacesPreservePrompt } from '@/lib/spaces/preserve-prompt'
@@ -156,6 +156,17 @@ export async function POST(
     if (!findAxisOption(axis, v)) {
       return NextResponse.json({ error: `Opção inválida: ${axis}/${v}` }, { status: 400 })
     }
+  }
+
+  // Detalhe (recorte) depende estruturalmente do prompt builder do Preserve V2
+  // (mode='detalhe' + crop preservado). Sem a flag, cair no prompt legado
+  // (maquete 3D → foto) desvirtua o recorte e não grava os metadados. Espelha o
+  // gate da UI (EixosPanel) como defesa no servidor.
+  if (axis === 'detalhe' && !spacesPreserveV2Enabled()) {
+    return NextResponse.json(
+      { error: 'O módulo Detalhe requer o Preserve V2 habilitado.' },
+      { status: 409 },
+    )
   }
 
   if (!isQuality(body.quality) || !isResolution(body.quality)) {
@@ -411,12 +422,16 @@ async function generateOne(args: {
     let preservationWarning = false
     let check: Awaited<ReturnType<typeof checkArchitecturalPreservation>> = null
     if (preserveV2) {
+      // Detalhe (crop) fecha o enquadramento de propósito — aspect/câmera mudam
+      // legitimamente, então as validações não tratam isso como violação.
+      const cropExpected = mode ? modeAllowsCloserCrop(mode) : false
       const genAspect = genW && genH ? genW / genH : null
       const validation = validateGeneration({
-        sourceUrl:       sourceMeta?.url ?? space.vista_mestre_url!,
-        generatedUrl:    outputUrl,
-        sourceAspect:    sourceMeta?.aspectRatio ?? null,
-        generatedAspect: genAspect,
+        sourceUrl:          sourceMeta?.url ?? space.vista_mestre_url!,
+        generatedUrl:       outputUrl,
+        sourceAspect:       sourceMeta?.aspectRatio ?? null,
+        generatedAspect:    genAspect,
+        allowFramingChange: cropExpected,
       })
       if (validation.issues.length) {
         console.warn('[spaces.generate] validação preserve:', validation.issues.join(', '))
@@ -427,6 +442,7 @@ async function generateOne(args: {
       if (level && visionPreservationCheckEnabled()) {
         check = await checkArchitecturalPreservation(
           sourceMeta?.url ?? space.vista_mestre_url!, outputUrl, level,
+          { cropExpected },
         )
         if (check?.warning) preservationWarning = true
       }
