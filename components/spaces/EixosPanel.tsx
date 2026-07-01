@@ -1,13 +1,15 @@
 'use client'
 
-// Painel de Eixos — abas (4) + body trocado por mode.
+// Painel de Eixos — abas do MVP (Luz · Câmera · Detalhe) + body trocado por mode.
 //
-// Iluminação/Horário/Detalhe usam modo parametric (cards selecionáveis).
-// Ângulo usa modo sketch_guided (upload de prints + lista editável).
+// Luz (iluminacao) e Detalhe usam modo parametric (cards selecionáveis).
+// Câmera (angulo) usa modo sketch_guided (upload de prints + lista editável).
+// Clima (horario) fica fora das abas no MVP.
 
 import { useMemo, useState } from 'react'
 import {
   AXIS_OPTIONS, AXIS_LABEL, AXIS_CONFIG, isAxisAvailable, getAxisMode,
+  detalheOptionsForContext, type DetalheContext,
   type AxisOption,
 } from '@/lib/spaces/axes'
 import { ENGINES, type EngineId, type Resolution } from '@/lib/engines'
@@ -17,6 +19,7 @@ import type { PlanId } from '@/lib/plans'
 import { spacesPreserveV2Enabled } from '@/lib/spaces/preserve-flags'
 import { InsufficientBalancePanel } from './InsufficientBalancePanel'
 import { SketchGuidedEixoBody, type SketchPayload } from './SketchGuidedEixoBody'
+import { DetailIcon } from './DetailIcons'
 
 // Labels/descrições arquitetônicos (Preserve V2). Deixam claro que cada eixo é
 // uma VARIAÇÃO CONTROLADA do projeto, não geração livre. Só usados com a flag.
@@ -28,9 +31,19 @@ const PRESERVE_AXIS_LABEL: Record<Axis, string> = {
 }
 const PRESERVE_AXIS_DESC: Record<Axis, string> = {
   iluminacao: 'Altera iluminação e atmosfera mantendo câmera, geometria e arquitetura.',
-  angulo:     'Cria uma nova vista preservando o DNA arquitetônico do projeto.',
+  angulo:     'Explora novos enquadramentos mantendo geometria, materiais e DNA do projeto.',
   horario:    'Altera céu, luz e atmosfera sem mudar fachada, volumetria ou implantação.',
-  detalhe:    'Aproxima ou enfatiza uma região do projeto sem alterar sua arquitetura.',
+  detalhe:    'Gera recortes aproximados do projeto preservando materiais, estilo, paleta e linguagem da vista mestre.',
+}
+
+// Substantivo da seleção por eixo paramétrico — o texto auxiliar muda conforme o
+// módulo (Luz fala em "variações", Detalhe em "recortes").
+const SELECTION_NOUN: Partial<Record<Axis, { one: string; many: string; prompt: string }>> = {
+  iluminacao: { one: 'variação', many: 'variações', prompt: 'selecione variações pra gerar' },
+  detalhe:    { one: 'recorte',  many: 'recortes',  prompt: 'selecione um recorte pra gerar' },
+}
+function selectionNoun(axis: Axis) {
+  return SELECTION_NOUN[axis] ?? SELECTION_NOUN.iluminacao!
 }
 
 interface Props {
@@ -39,15 +52,18 @@ interface Props {
   balance:   number
   planId:    PlanId
   spaceId:   string
+  detalheContext: DetalheContext
   disabled?: boolean
   onGenerate:             (axis: Axis, axisValues: string[], quality: Quality) => Promise<void>
   onGenerateFromSketches: (sketches: SketchPayload[], quality: Quality) => Promise<void>
 }
 
-const AXIS_ORDER: Axis[] = ['iluminacao', 'angulo', 'horario', 'detalhe']
+// MVP: só Luz, Câmera e Detalhe aparecem como módulos principais. Clima (horario)
+// fica fora das abas — condições como Nublado/Blue hour vivem dentro de Luz.
+const AXIS_ORDER: Axis[] = ['iluminacao', 'angulo', 'detalhe']
 
 export function EixosPanel({
-  engine, defaultQuality, balance, planId, spaceId, disabled,
+  engine, defaultQuality, balance, planId, spaceId, detalheContext, disabled,
   onGenerate, onGenerateFromSketches,
 }: Props) {
   const [axis, setAxis]         = useState<Axis>('iluminacao')
@@ -66,14 +82,16 @@ export function EixosPanel({
       border: '0.5px solid var(--color-border)',
       borderRadius: 14, padding: 24,
     }}>
-      {/* Tabs dos 4 eixos */}
+      {/* Tabs dos módulos (MVP: Luz · Câmera · Detalhe) */}
       <div style={{
         display: 'flex', gap: 4, padding: 4,
         background: 'var(--color-surface)', borderRadius: 10,
         marginBottom: 24,
       }}>
         {AXIS_ORDER.map(a => {
-          const avail = isAxisAvailable(a)
+          // Detalhe depende do prompt builder do Preserve V2 (crop preservado).
+          // Sem a flag, o eixo fica "em breve" em vez de cair no prompt legado.
+          const avail = isAxisAvailable(a) && (a !== 'detalhe' || preserveV2)
           const active = a === axis
           return (
             <button
@@ -122,6 +140,7 @@ export function EixosPanel({
       {mode === 'parametric' && (
         <ParametricEixoBody
           axis={axis}
+          options={axis === 'detalhe' ? detalheOptionsForContext(detalheContext) : AXIS_OPTIONS[axis]}
           engine={engine}
           quality={quality}
           setQuality={setQuality}
@@ -168,9 +187,10 @@ export function EixosPanel({
 // ── Body: parametric (Iluminação) ─────────────────────────────
 
 function ParametricEixoBody({
-  axis, engine, quality, setQuality, availableQualities, balance, planId, disabled, onGenerate,
+  axis, options, engine, quality, setQuality, availableQualities, balance, planId, disabled, onGenerate,
 }: {
   axis:               Axis
+  options:            AxisOption[]
   engine:             EngineId
   quality:            Resolution
   setQuality:         (q: Resolution) => void
@@ -182,7 +202,7 @@ function ParametricEixoBody({
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [submitting, setSubmitting] = useState(false)
-  const options: AxisOption[] = AXIS_OPTIONS[axis]
+  const noun     = selectionNoun(axis)
   const costPer  = useMemo(() => getVistaGenerationCost(engine, quality), [engine, quality])
   const total    = costPer * selected.size
   const insufficient = total > balance
@@ -224,9 +244,9 @@ function ParametricEixoBody({
                 style={{
                   textAlign: 'left',
                   padding: '14px 16px',
-                  background: isSelected ? 'rgba(255,255,255,0.03)' : 'var(--color-bg)',
+                  background: isSelected ? 'var(--color-accent-green-bg)' : 'var(--color-bg)',
                   border: isSelected
-                    ? '1.5px solid var(--color-text-primary)'
+                    ? '1.5px solid var(--color-accent-green)'
                     : '0.5px solid var(--color-border-strong)',
                   borderRadius: 10,
                   display: 'flex', flexDirection: 'column', gap: 10,
@@ -234,10 +254,22 @@ function ParametricEixoBody({
                   transition: 'background 0.15s, border-color 0.15s',
                 }}
               >
-                <span style={{
-                  width: 36, height: 24, borderRadius: 5,
-                  background: opt.color, flexShrink: 0,
-                }} />
+                {opt.icon ? (
+                  <span style={{
+                    width: 36, height: 24, borderRadius: 5, flexShrink: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: 'var(--color-surface)',
+                    border: '0.5px solid var(--color-border)',
+                    color: isSelected ? 'var(--color-accent-green)' : 'var(--color-text-secondary)',
+                  }}>
+                    <DetailIcon name={opt.icon} />
+                  </span>
+                ) : (
+                  <span style={{
+                    width: 36, height: 24, borderRadius: 5,
+                    background: opt.color, flexShrink: 0,
+                  }} />
+                )}
                 <div>
                   <div style={{
                     fontSize: 13, fontWeight: 500,
@@ -256,7 +288,7 @@ function ParametricEixoBody({
                   <span style={{
                     position: 'absolute', top: 10, right: 10,
                     width: 20, height: 20, borderRadius: 999,
-                    background: 'var(--color-text-primary)', color: 'var(--color-bg)',
+                    background: 'var(--color-accent-green)', color: 'var(--color-bg)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
@@ -305,10 +337,10 @@ function ParametricEixoBody({
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
               {selected.size > 0
                 ? <>
-                    <span style={{ color: 'var(--color-text-secondary)' }}>{selected.size} variaç{selected.size === 1 ? 'ão' : 'ões'}</span>
+                    <span style={{ color: 'var(--color-text-secondary)' }}>{selected.size} {selected.size === 1 ? noun.one : noun.many}</span>
                     <span style={{ marginLeft: 8 }}>· {costPer} nodes cada</span>
                   </>
-                : 'selecione variações pra gerar'}
+                : noun.prompt}
             </div>
             <button
               onClick={handleGenerate}

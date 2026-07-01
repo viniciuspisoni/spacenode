@@ -51,13 +51,17 @@ export async function POST(
   try {
     // Modo de verificação:
     // - vistas editadas (Retocar) → edit_relaxed (só uma região mudou)
-    // - eixo Ângulo → angulo_relaxed (enquadramento muda por design)
+    // - eixo Ângulo → angulo_relaxed (nova vista: enquadramento muda por design)
+    // - eixo Detalhe → detalhe_relaxed (recorte mostra só parte dos materiais/
+    //   paleta; avaliar só o que está visível, senão dá falso "DNA divergente")
     // - padrão       → standard
     const mode = vista.is_edited
       ? 'edit_relaxed'
       : vista.axis === 'angulo'
         ? 'angulo_relaxed'
-        : 'standard'
+        : vista.axis === 'detalhe'
+          ? 'detalhe_relaxed'
+          : 'standard'
     const coverage = typeof vista.edit_mask_coverage === 'number' ? vista.edit_mask_coverage : 0
     const verification = await verifyDna(vista.image_url, visualDna, mode, coverage)
 

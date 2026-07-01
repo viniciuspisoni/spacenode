@@ -15,7 +15,7 @@
 
 import type { BriefingArquitetonico } from '@/lib/prompts'
 import type { ProjectDNA } from './types'
-import type { SpacesMode, SpacesPreservationLevel } from './preservation'
+import { modeAllowsCloserCrop, type SpacesMode, type SpacesPreservationLevel } from './preservation'
 
 export interface SpacesPromptInput {
   level:     SpacesPreservationLevel
@@ -44,10 +44,15 @@ const ROLE_BLOCK =
 // são travados, exceto o material que o usuário pediu pra trocar (modo
 // material).
 function sourceLockBlock(level: SpacesPreservationLevel, mode: SpacesMode): string {
-  const preserveCamera = level === 'STRICT_SOURCE_LOCK'
+  // Detalhe é STRICT mas pode FECHAR o enquadramento (crop). Por isso a câmera
+  // não entra na lista de travas — mas a cláusula abaixo deixa claro que é um
+  // recorte da MESMA vista, não uma câmera nova.
+  const closerCrop     = modeAllowsCloserCrop(mode)
+  const preserveCamera = level === 'STRICT_SOURCE_LOCK' && !closerCrop
 
   const items = [
     'geometry', 'volumetry', 'proportions', 'scale', 'wall positions',
+    'ceilings and ceiling design (forros): height, plane, coffers and detailing',
     'openings (windows and doors): their count, size, shape, position and rhythm',
     'window and door frames (esquadrias)',
     'facade rhythm and composition',
@@ -66,6 +71,18 @@ function sourceLockBlock(level: SpacesPreservationLevel, mode: SpacesMode): stri
     'SOURCE LOCK: The user-provided image is the authority of the project. ' +
     'Preserve the following rigorously, pixel-faithful to the reference:\n- ' +
     items.join(';\n- ') + '.\n'
+
+  // Detalhe: o recorte aproxima, mas continua sendo a MESMA vista do MESMO
+  // projeto — nunca uma câmera nova nem um redesenho.
+  if (closerCrop) {
+    return head +
+      'CLOSER CROP: The framing may move CLOSER to crop/zoom into a specific ' +
+      'region of THIS SAME view — keeping the same perspective, the same lens ' +
+      'character, the same architecture and the same materials. This is a tighter ' +
+      'crop of the existing scene: never a new camera angle, never a new viewpoint, ' +
+      'never a relayout. Everything that remains in frame must match the reference ' +
+      'exactly. '
+  }
 
   // Em ARCH/EXPLORATION a câmera pode mudar, mas tem que continuar sendo o
   // MESMO edifício — não outro projeto "inspirado" na referência.
@@ -114,7 +131,7 @@ const MODE_INTENT: Record<SpacesMode, string> = {
   luz:      'Change ONLY the lighting: light direction, intensity, exposure, sky and overall atmosphere.',
   clima:    'Change ONLY the weather and atmosphere: sky, clouds, light quality and mood. Architecture stays identical.',
   material: 'Change ONLY the single material/surface the user specified. Every other surface keeps its current material.',
-  detalhe:  'Bring the reading closer to a specific region of the project to emphasise a detail, WITHOUT redrawing or relayouting anything.',
+  detalhe:  'Create a closer architectural crop focused on the specified region, derived from the master image. Keep the exact same design language, materials, color palette, lighting logic, architectural style and proportions. Do not redesign, do not relayout, do not change any architecture — the result must look like another image from the SAME project presentation, not a different project.',
   cena:     'Adjust ONLY the requested context/surroundings/vegetation, with restraint, without redesigning the project.',
   camera:   'Produce a new viewpoint of this SAME building, keeping its architectural DNA intact.',
 }
@@ -134,7 +151,10 @@ function userIntentBlock(mode: SpacesMode, userIntent: string): string {
 // Constraints fortes. A trava de câmera é condicional ao modo: em luz/clima/
 // material/detalhe a câmera NÃO pode mudar; em camera (nova vista) ela pode.
 function negativeBlock(level: SpacesPreservationLevel, mode: SpacesMode): string {
-  const lockCamera = level === 'STRICT_SOURCE_LOCK'
+  const closerCrop = modeAllowsCloserCrop(mode)
+  // Detalhe pode fechar o enquadramento, então NÃO travamos a câmera nele — mas
+  // proibimos inventar um ângulo/ponto-de-vista novo ou relayout.
+  const lockCamera = level === 'STRICT_SOURCE_LOCK' && !closerCrop
 
   const base = [
     'do not redesign the architecture',
@@ -147,6 +167,7 @@ function negativeBlock(level: SpacesPreservationLevel, mode: SpacesMode): string
       : 'do not change window/door frames (esquadrias)',
     'do not change the roof profile or roof slope',
     'do not change the architectural style',
+    'do not distort or warp the perspective',
     'do not turn the image into concept art',
     'do not add decorative elements that were not requested',
     'do not create surreal, neon, fantasy or generic-AI atmosphere',
@@ -158,6 +179,10 @@ function negativeBlock(level: SpacesPreservationLevel, mode: SpacesMode): string
   ]
   if (lockCamera) {
     base.push('do not change the camera, viewing angle, perspective or framing')
+  }
+  if (closerCrop) {
+    base.push('do not invent a new camera angle, a new perspective or a new viewpoint — only crop closer into the existing view')
+    base.push('do not relayout, rearrange or redesign the scene')
   }
   if (mode !== 'material') {
     base.push('do not recolor, repaint, restain or replace any existing finish or material')
