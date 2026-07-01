@@ -80,6 +80,12 @@ const PATHS: Record<DetailIconKey, React.ReactNode> = {
       <path d="M12 14.5c0-3-2-5-5-5 0 3 2 5 5 5Z" />
     </>
   ),
+  vase: (
+    <>
+      <path d="M8.5 3h7" />
+      <path d="M9.5 3c0 2.6-2 3.6-2 7a4.5 4.5 0 0 0 9 0c0-3.4-2-4.4-2-7" />
+    </>
+  ),
 }
 
 export function DetailIcon({ name, size = 15 }: { name: DetailIconKey; size?: number }) {
