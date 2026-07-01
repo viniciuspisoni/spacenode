@@ -166,6 +166,7 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
   const [resultUrl,   setResultUrl]   = useState<string | null>(null)
   const [credits,     setCredits]     = useState(initialCredits)
   const [error,       setError]       = useState<string | null>(null)
+  const [isDownloading, setIsDownloading] = useState(false)
 
   const fileInputRef    = useRef<HTMLInputElement>(null)
   const loadingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -318,6 +319,33 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
     setResultUrl(null)
     setRecommended(null)
     setImageDimensions(null)
+    setError(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  // Baixa a imagem de fato (o atributo `download` é ignorado em URLs cross-origin,
+  // então buscamos o blob e disparamos o download via object URL).
+  async function handleDownload() {
+    if (!resultUrl || isDownloading) return
+    setIsDownloading(true)
+    try {
+      const res  = await fetch(resultUrl)
+      if (!res.ok) throw new Error('fetch failed')
+      const blob = await res.blob()
+      const objectUrl = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = objectUrl
+      a.download = `spacenode-ampliado.${blob.type.split('/')[1] || 'jpg'}`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(objectUrl)
+    } catch {
+      // Fallback: abre em nova aba se o download direto falhar.
+      window.open(resultUrl, '_blank', 'noopener,noreferrer')
+    } finally {
+      setIsDownloading(false)
+    }
   }
 
   async function handleSubmit() {
@@ -662,21 +690,36 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
                 {imageDimensions && factorOut > 1 && <span> · {imageDimensions.w * factorOut}×{imageDimensions.h * factorOut}px</span>}
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
-                <a href={resultUrl} download target="_blank" rel="noopener noreferrer"
-                  style={{ fontSize: 11, fontWeight: 500, color: 'rgba(255,255,255,0.7)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.04)' }}
+                <button onClick={handleDownload} disabled={isDownloading}
+                  style={{ fontSize: 11, fontWeight: 500, color: 'rgba(255,255,255,0.7)', display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.04)', cursor: isDownloading ? 'wait' : 'pointer' }}
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                     <polyline points="7 10 12 15 17 10"/>
                     <line x1="12" y1="15" x2="12" y2="3"/>
                   </svg>
-                  Baixar imagem
-                </a>
-                <button disabled title="Em breve"
-                  style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', background: 'none', border: '1px solid rgba(255,255,255,0.07)', padding: '7px 14px', borderRadius: 6, cursor: 'not-allowed' }}
-                >
-                  Usar no Spaces
+                  {isDownloading ? 'Baixando…' : 'Baixar imagem'}
                 </button>
+                <button onClick={resetImage}
+                  style={{ fontSize: 11, fontWeight: 500, color: 'rgba(255,255,255,0.7)', display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.04)', cursor: 'pointer' }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 21v-5h5"/>
+                    <path d="M21 3v5h-5"/>
+                    <path d="M21 8a9 9 0 0 0-15-3.5L3 8"/>
+                    <path d="M3 16a9 9 0 0 0 15 3.5l3-3.5"/>
+                  </svg>
+                  Ampliar nova imagem
+                </button>
+                <a href={`/app/spaces/new/upload?source=${encodeURIComponent(resultUrl)}`}
+                  style={{ fontSize: 11, fontWeight: 500, color: 'rgba(255,255,255,0.7)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.04)' }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/>
+                    <path d="M3 9h18M9 21V9"/>
+                  </svg>
+                  Usar no Spaces
+                </a>
               </div>
             </div>
           </div>
