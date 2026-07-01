@@ -5,7 +5,7 @@ import { getRenderTitle } from '@/lib/render-display'
 import { getPlanById, type PlanId } from '@/lib/plans'
 import {
   IconGenerate, IconSpaces, IconRetocar, IconEnhance,
-  IconVideo, IconHumanizedPlan, IconHistory,
+  IconVideo, IconHumanizedPlan, IconMoodboard,
 } from '@/components/app/sidebar-icons'
 
 type RecentRender = {
@@ -21,6 +21,15 @@ type RecentRender = {
   created_at: string
 }
 
+type RecentSpace = {
+  id: string
+  name: string
+  category: string
+  vista_mestre_url: string | null
+  vista_count: number
+  updated_at: string
+}
+
 function formatDate(iso: string): string {
   return new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'short' }).format(new Date(iso))
 }
@@ -31,6 +40,7 @@ const monthStart = () => {
 }
 
 const RECENT_LIMIT = 8
+const PROJECT_LIMIT = 3
 
 function renderTool(r: RecentRender): 'Renderizar' | 'Ampliar' | 'Animar' {
   if (r.ambient === 'upscale') return 'Ampliar'
@@ -53,6 +63,30 @@ function buildFilename(r: RecentRender): string {
   return `spacenode-${base}.${ext}`
 }
 
+const CATEGORY_LABEL: Record<string, string> = {
+  residencial: 'Residencial',
+  comercial:   'Comercial',
+  conceito:    'Conceito',
+}
+
+// Módulos do atelier. Verde funcional só no Renderizar (CTA de geração);
+// os demais ficam neutros para não virar rainbow palette.
+const MODULES: {
+  href: string
+  label: string
+  desc: string
+  Icon: (p: { size?: number }) => React.ReactElement
+  green?: boolean
+}[] = [
+  { href: '/app/generate',                     label: 'Renderizar', desc: 'Imagem fotorrealista a partir da sua referência.',   Icon: IconGenerate, green: true },
+  { href: '/app/spaces/new',                   label: 'Spaces',     desc: 'Novas vistas mantendo o DNA do projeto.',            Icon: IconSpaces },
+  { href: '/app/editar',                       label: 'Editar',     desc: 'Ajuste áreas específicas sem perder a geometria.',   Icon: IconRetocar },
+  { href: '/app/upscale',                      label: 'Ampliar',    desc: 'Aumente resolução e acabamento.',                    Icon: IconEnhance },
+  { href: '/app/video',                        label: 'Animar',     desc: 'Vídeos de apresentação do projeto.',                 Icon: IconVideo },
+  { href: '/app/apresentar/planta-humanizada', label: 'Planta',     desc: 'Humanize plantas com materiais reais.',              Icon: IconHumanizedPlan },
+  { href: '/app/apresentar/moodboard',         label: 'Moodboard',  desc: 'Atmosfera, paleta e referências em um só lugar.',    Icon: IconMoodboard },
+]
+
 export default async function AppPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -60,7 +94,7 @@ export default async function AppPage() {
 
   const firstName = (user.user_metadata.full_name ?? user.email ?? 'usuário').split(' ')[0]
 
-  const [profileResult, balanceResult, recentResult, countResult, monthResult] = await Promise.all([
+  const [profileResult, balanceResult, recentResult, countResult, monthResult, spacesResult] = await Promise.all([
     supabase.from('profiles').select('plan').eq('id', user.id).single(),
     supabase.from('user_node_balance').select('plan_balance, lumen_balance').eq('user_id', user.id).single(),
     supabase.from('renders')
@@ -75,6 +109,11 @@ export default async function AppPage() {
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id)
       .gte('created_at', monthStart()),
+    supabase.from('spaces_with_counts')
+      .select('id, name, category, vista_mestre_url, vista_count, updated_at', { count: 'exact' })
+      .neq('status', 'archived')
+      .order('updated_at', { ascending: false })
+      .limit(PROJECT_LIMIT),
   ])
 
   const planId       = (profileResult.data?.plan as PlanId | undefined) ?? 'free'
@@ -88,6 +127,8 @@ export default async function AppPage() {
   const renders      = (recentResult.data ?? []) as RecentRender[]
   const totalRenders = countResult.count ?? 0
   const monthRenders = monthResult.count ?? 0
+  const spaces       = (spacesResult.data ?? []) as RecentSpace[]
+  const totalSpaces  = spacesResult.count ?? spaces.length
 
   const planUsed   = planTotal > 0 ? Math.max(0, planTotal - planBalance) : 0
   const usageRatio = planTotal > 0 ? Math.min(1, Math.max(0, planUsed / planTotal)) : 0
@@ -95,38 +136,50 @@ export default async function AppPage() {
 
   return (
     <main style={{ flex: 1, overflowY: 'auto', background: 'var(--color-bg)', padding: '0 32px 88px' }}>
-      <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 36 }}>
+      <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 34 }}>
 
-        {/* ── 1 · Hero ──────────────────────────────────────────────────────── */}
-        <div className="spn-dash-hero">
-          <h1 className="spn-dash-hero-greeting">Olá, {firstName}</h1>
-          <p className="spn-dash-hero-sub">
-            Seu atelier de visualização arquitetônica.
-          </p>
-          <Link href="/app/generate" className="spn-dash-hero-cta">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2.5"/>
-              <circle cx="8.5" cy="8.5" r="1.5"/>
-              <polyline points="21 15 16 10 5 21"/>
-            </svg>
-            Nova renderização
-          </Link>
-        </div>
+        {/* ── 1 · Topo: saudação + CTA principal ───────────────────────────── */}
+        <header className="spn-dash-head">
+          <div>
+            <h1 className="spn-dash-head-greeting">Olá, {firstName}</h1>
+            <p className="spn-dash-head-sub">Seu atelier de visualização arquitetônica.</p>
+          </div>
+          <div className="spn-dash-head-actions">
+            <Link href="/app/spaces/new" className="spn-dash-cta">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              Novo projeto
+            </Link>
+          </div>
+        </header>
 
-        {/* ── 2 · Ferramentas ───────────────────────────────────────────────── */}
-        <div className="spn-dash-tools">
-          <ToolCard href="/app/generate"                     label="Renderizar" Icon={IconGenerate}     bg="var(--color-accent-green-bg)"   color="var(--color-accent-green)" />
-          <ToolCard href="/app/spaces/new"                   label="Spaces"     Icon={IconSpaces}       bg="rgba(255,255,255,0.06)"          color="rgba(255,255,255,0.58)" />
-          <ToolCard href="/app/editar"                       label="Editar"     Icon={IconRetocar}      bg="rgba(255,255,255,0.06)"          color="rgba(255,255,255,0.58)" />
-          <ToolCard href="/app/upscale"                      label="Ampliar"    Icon={IconEnhance}      bg="rgba(255,255,255,0.06)"          color="rgba(255,255,255,0.58)" />
-          <ToolCard href="/app/video"                        label="Animar"     Icon={IconVideo}        bg="rgba(255,255,255,0.06)"          color="rgba(255,255,255,0.58)" />
-          <ToolCard href="/app/apresentar/planta-humanizada" label="Planta"     Icon={IconHumanizedPlan} bg="rgba(255,255,255,0.06)"          color="rgba(255,255,255,0.58)" />
-          <ToolCard href="/app/history"                      label="Histórico"  Icon={IconHistory}      bg="rgba(255,255,255,0.04)"          color="rgba(255,255,255,0.30)" />
-        </div>
+        {/* ── 2 · Projetos: continuidade ou primeiro passo ──────────────────── */}
+        {spaces.length === 0 ? (
+          <StartBlock />
+        ) : (
+          <section>
+            <div className="spn-dash-section-head">
+              <div className="spn-dash-section-label">Continuar de onde parou</div>
+              <Link href="/app/spaces" className="spn-dash-section-link">Todos os projetos →</Link>
+            </div>
+            <div className="spn-dash-projects">
+              {spaces.map(s => <ProjectCard key={s.id} space={s} />)}
+              <Link href="/app/spaces/new" className="spn-dash-project-new">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                  <line x1="12" y1="5" x2="12" y2="19"/>
+                  <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                <span>Novo projeto</span>
+              </Link>
+            </div>
+          </section>
+        )}
 
-        {/* ── 3 · Stats ─────────────────────────────────────────────────────── */}
+        {/* ── 3 · Métricas discretas ────────────────────────────────────────── */}
         <div className="spn-dash-stats-row">
-          <div className="spn-dash-stat" style={lowNodes ? { borderTop: `2px solid var(--color-error-border)` } : undefined}>
+          <div className="spn-dash-stat" style={lowNodes ? { boxShadow: 'inset 0 2px 0 var(--color-error-border)' } : undefined}>
             <div className="spn-dash-stat-label">Nodes disponíveis</div>
             <div className="spn-dash-stat-value" style={lowNodes ? { color: 'var(--color-error)' } : undefined}>
               {availableNodes}
@@ -134,6 +187,12 @@ export default async function AppPage() {
             <div className="spn-dash-stat-sub">
               {lumenBalance > 0 ? `${planBalance} do plano · ${lumenBalance} avulsos` : 'para suas gerações'}
             </div>
+          </div>
+
+          <div className="spn-dash-stat">
+            <div className="spn-dash-stat-label">Projetos ativos</div>
+            <div className="spn-dash-stat-value">{totalSpaces}</div>
+            <div className="spn-dash-stat-sub">no seu atelier</div>
           </div>
 
           <div className="spn-dash-stat">
@@ -148,9 +207,9 @@ export default async function AppPage() {
             <div className="spn-dash-stat-sub">criadas neste período</div>
           </div>
 
-          <div className="spn-dash-stat">
+          <div className="spn-dash-stat spn-dash-stat--plan">
             <div className="spn-dash-stat-label">Plano atual</div>
-            <div className="spn-dash-stat-value" style={{ fontSize: 20, letterSpacing: '-0.02em', paddingTop: 3 }}>
+            <div className="spn-dash-stat-value" style={{ fontSize: 18, letterSpacing: '-0.02em', paddingTop: 3 }}>
               {planName}
             </div>
             {planTotal > 0 ? (
@@ -175,34 +234,54 @@ export default async function AppPage() {
           </div>
         </div>
 
-        {/* ── 4 · Imagens recentes ──────────────────────────────────────────── */}
+        {/* ── 4 · Módulos do atelier ────────────────────────────────────────── */}
         <section>
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 16 }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-              Recentes
-            </div>
-            {totalRenders > renders.length && (
-              <Link href="/app/history" style={{ fontSize: 12, color: 'var(--color-text-tertiary)', textDecoration: 'none', letterSpacing: '-0.01em' }}>
-                Ver todos →
+          <div className="spn-dash-section-head">
+            <div className="spn-dash-section-label">Ferramentas</div>
+          </div>
+          <div className="spn-dash-modules">
+            {MODULES.map(m => (
+              <Link key={m.href} href={m.href} className="spn-dash-module">
+                <div
+                  className="spn-dash-module-icon"
+                  style={m.green
+                    ? { background: 'var(--color-accent-green-bg)', color: 'var(--color-accent-green)' }
+                    : { background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.58)' }}
+                >
+                  <m.Icon size={19} />
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div className="spn-dash-module-name">{m.label}</div>
+                  <div className="spn-dash-module-desc">{m.desc}</div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        {/* ── 5 · Imagens recentes ──────────────────────────────────────────── */}
+        <section>
+          <div className="spn-dash-section-head">
+            <div className="spn-dash-section-label">Recentes</div>
+            {totalRenders > 0 && (
+              <Link href="/app/history" className="spn-dash-section-link">
+                {totalRenders > renders.length ? 'Ver todas →' : 'Histórico →'}
               </Link>
             )}
           </div>
 
           {renders.length === 0 ? (
-            <div style={{
-              padding: '72px 24px', textAlign: 'center',
-              background: 'var(--color-bg-elevated)',
-              border: '0.5px dashed var(--color-border-strong)',
-              borderRadius: 'var(--radius-xl)',
-            }}>
-              <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-text-secondary)', marginBottom: 8, letterSpacing: '-0.015em' }}>
-                Nenhuma renderização ainda.
+            <div className="spn-dash-recent-empty">
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-secondary)', letterSpacing: '-0.01em' }}>
+                  Nenhuma imagem gerada ainda.
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginTop: 4, letterSpacing: '-0.005em' }}>
+                  Crie um projeto ou envie uma referência para gerar a primeira visualização.
+                </div>
               </div>
-              <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginBottom: 24, letterSpacing: '-0.005em' }}>
-                Envie uma referência e gere a primeira visualização do seu projeto.
-              </div>
-              <Link href="/app/generate" className="spn-btn-primary" style={{ borderRadius: 'var(--radius-full)' }}>
-                Começar com uma renderização
+              <Link href="/app/generate" className="spn-btn-ghost" style={{ flexShrink: 0, borderRadius: 'var(--radius-full)' }}>
+                Criar primeira visualização
               </Link>
             </div>
           ) : (
@@ -217,21 +296,78 @@ export default async function AppPage() {
   )
 }
 
-// ── Tool card ──────────────────────────────────────────────────────────────────
+// ── Empty state de projetos — primeiro passo do atelier ───────────────────────
 
-function ToolCard({ href, label, Icon, bg, color }: {
-  href: string
-  label: string
-  Icon: (p: { size?: number }) => React.ReactElement
-  bg: string
-  color: string
-}) {
+function StartBlock() {
   return (
-    <Link href={href} className="spn-dash-tool">
-      <div className="spn-dash-tool-icon" style={{ background: bg, color }}>
-        <Icon size={24} />
+    <section className="spn-dash-start">
+      <h2 className="spn-dash-start-title">Comece seu primeiro projeto</h2>
+      <p className="spn-dash-start-sub">
+        Envie um print, modelo, planta ou referência para gerar a primeira visualização.
+      </p>
+      <div className="spn-dash-start-actions">
+        <Link href="/app/spaces/new" className="spn-dash-cta">Criar novo projeto</Link>
+        <Link href="/app/generate" className="spn-btn-ghost" style={{ borderRadius: 'var(--radius-full)' }}>
+          Renderizar imagem avulsa
+        </Link>
       </div>
-      <span className="spn-dash-tool-label">{label}</span>
+      <div className="spn-dash-steps">
+        <div className="spn-dash-step">
+          <div className="spn-dash-step-num">01</div>
+          <div className="spn-dash-step-title">Envie a referência</div>
+          <div className="spn-dash-step-desc">Print, modelo 3D, planta ou foto do espaço.</div>
+        </div>
+        <div className="spn-dash-step">
+          <div className="spn-dash-step-num">02</div>
+          <div className="spn-dash-step-title">Escolha o tipo de visualização</div>
+          <div className="spn-dash-step-desc">Ambiente, estilo e enquadramento sob seu controle.</div>
+        </div>
+        <div className="spn-dash-step">
+          <div className="spn-dash-step-num">03</div>
+          <div className="spn-dash-step-title">Gere variações coerentes</div>
+          <div className="spn-dash-step-desc">Toda vista preserva o DNA do projeto.</div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// ── Project card ───────────────────────────────────────────────────────────────
+
+function ProjectCard({ space: s }: { space: RecentSpace }) {
+  const vistas = s.vista_count
+  return (
+    <Link href={`/app/spaces/${s.id}`} className="spn-dash-project">
+      <div className="spn-dash-project-thumb">
+        {s.vista_mestre_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={s.vista_mestre_url} alt={s.name} />
+        ) : (
+          <div className="spn-dash-project-thumb-empty" aria-hidden>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2.5"/>
+              <circle cx="8.5" cy="8.5" r="1.5"/>
+              <polyline points="21 15 16 10 5 21"/>
+            </svg>
+          </div>
+        )}
+        <div className="spn-dash-project-open" aria-hidden>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="7" y1="17" x2="17" y2="7"/>
+            <polyline points="7 7 17 7 17 17"/>
+          </svg>
+        </div>
+      </div>
+      <div className="spn-dash-project-body">
+        <div className="spn-dash-project-name">{s.name}</div>
+        <div className="spn-dash-project-meta">
+          <span>{CATEGORY_LABEL[s.category] ?? s.category}</span>
+          <span aria-hidden style={{ opacity: 0.5 }}>·</span>
+          <span>{vistas} {vistas === 1 ? 'vista' : 'vistas'}</span>
+          <span aria-hidden style={{ opacity: 0.5 }}>·</span>
+          <span>atualizado {formatDate(s.updated_at)}</span>
+        </div>
+      </div>
     </Link>
   )
 }
