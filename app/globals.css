@@ -783,3 +783,210 @@ a {
   .spn-dash-recent-thumb img,
   .spn-dash-recent-actions { transition: none; transform: none; }
 }
+
+/* ── Biblioteca de projetos (/app/spaces) ──────────────────────── */
+
+/* Ações rápidas sobre a capa — invisíveis até o hover do card */
+.spn-proj-actions {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.62) 100%);
+  opacity: 0;
+  transition: opacity var(--duration-base) ease;
+  pointer-events: none;
+}
+.spn-space-card:hover .spn-proj-actions,
+.spn-space-card:focus-within .spn-proj-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.spn-proj-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  font-family: inherit;
+  cursor: pointer;
+  text-decoration: none;
+  border: 0.5px solid rgba(255, 255, 255, 0.16);
+  background: rgba(20, 20, 21, 0.78);
+  color: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(10px);
+  transition: background var(--duration-fast) ease, border-color var(--duration-fast) ease;
+}
+.spn-proj-action:hover {
+  background: rgba(38, 38, 40, 0.88);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+.spn-proj-action--primary {
+  background: rgba(245, 245, 247, 0.94);
+  color: #0a0a0a;
+  border-color: transparent;
+}
+.spn-proj-action--primary:hover {
+  background: #ffffff;
+  border-color: transparent;
+}
+
+/* Botão kebab (menu do card) — aparece junto com as ações */
+.spn-proj-kebab {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-xs);
+  border: 0.5px solid rgba(255, 255, 255, 0.14);
+  background: rgba(20, 20, 21, 0.72);
+  color: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--duration-base) ease, background var(--duration-fast) ease;
+}
+.spn-space-card:hover .spn-proj-kebab,
+.spn-space-card:focus-within .spn-proj-kebab,
+.spn-proj-kebab[data-open='true'] {
+  opacity: 1;
+}
+.spn-proj-kebab:hover { background: rgba(38, 38, 40, 0.9); }
+
+/* Dropdown do kebab */
+.spn-proj-menu {
+  position: absolute;
+  top: 42px;
+  right: 10px;
+  z-index: 30;
+  min-width: 150px;
+  padding: 5px;
+  border-radius: var(--radius-sm);
+  border: 0.5px solid var(--color-border-strong);
+  background: var(--color-bg-elevated);
+  backdrop-filter: blur(16px);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+}
+.spn-proj-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-xs);
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 12px;
+  letter-spacing: -0.005em;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--duration-fast) ease, color var(--duration-fast) ease;
+}
+.spn-proj-menu-item:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+.spn-proj-menu-item--danger:hover {
+  background: var(--color-error-bg);
+  color: var(--color-error);
+}
+
+/* Busca da biblioteca */
+.spn-proj-search {
+  width: 100%;
+  max-width: 320px;
+  padding: 9px 12px 9px 34px;
+  border-radius: var(--radius-sm);
+  border: 0.5px solid var(--color-border-strong);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+  font-family: inherit;
+  font-size: 13px;
+  letter-spacing: -0.005em;
+  outline: none;
+  transition: border-color var(--duration-fast) ease;
+}
+.spn-proj-search::placeholder { color: var(--color-text-tertiary); }
+.spn-proj-search:focus { border-color: rgba(255, 255, 255, 0.28); }
+
+/* Select de ordenação */
+.spn-proj-sort {
+  padding: 9px 30px 9px 12px;
+  border-radius: var(--radius-sm);
+  border: 0.5px solid var(--color-border-strong);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-secondary);
+  font-family: inherit;
+  font-size: 12px;
+  letter-spacing: -0.005em;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  transition: border-color var(--duration-fast) ease;
+}
+.spn-proj-sort:focus { border-color: rgba(255, 255, 255, 0.28); }
+
+/* Pills de filtro da biblioteca */
+.spn-proj-filter {
+  padding: 6px 13px;
+  border-radius: var(--radius-full);
+  border: 0.5px solid var(--color-border);
+  background: none;
+  font-family: inherit;
+  font-size: 12px;
+  letter-spacing: -0.005em;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--duration-fast) ease, background var(--duration-fast) ease, border-color var(--duration-fast) ease;
+}
+.spn-proj-filter:hover {
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border-color: var(--color-border-strong);
+}
+.spn-proj-filter--active {
+  color: var(--color-text-primary);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--color-border-strong);
+}
+
+/* Skeleton shimmer — loading da biblioteca */
+.spn-skeleton {
+  position: relative;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.045);
+  border-radius: var(--radius-sm);
+}
+.spn-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+  animation: spn-shimmer 1.6s infinite;
+}
+@keyframes spn-shimmer {
+  100% { transform: translateX(100%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spn-skeleton::after { animation: none; }
+  .spn-proj-actions,
+  .spn-proj-kebab,
+  .spn-proj-filter { transition: none; }
+}

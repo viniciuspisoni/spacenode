@@ -207,7 +207,7 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId }:
           fontSize: 12, color: 'var(--color-text-tertiary)',
           letterSpacing: '-0.005em',
         }}>
-          <Link href="/app/spaces" style={{ color: 'inherit' }}>Spaces</Link>
+          <Link href="/app/spaces" style={{ color: 'inherit' }}>Meus projetos</Link>
           <span style={{ opacity: 0.35, fontSize: 9 }}>›</span>
           <span style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>{space.name}</span>
         </div>
@@ -229,7 +229,8 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId }:
                 <span style={{
                   display: 'inline-flex', alignItems: 'center', gap: 6,
                   padding: '5px 11px', borderRadius: 999,
-                  background: 'rgba(29,158,117,0.14)', color: '#46d191',
+                  background: 'var(--color-accent-green-bg)', color: 'var(--color-accent-green)',
+                  border: '0.5px solid var(--color-accent-green-border)',
                   fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase',
                 }}>
                   <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
@@ -245,8 +246,8 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId }:
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: 6,
                     padding: '5px 11px', borderRadius: 999,
-                    background: 'rgba(70,209,145,0.08)', color: '#46d191',
-                    border: '0.5px solid rgba(70,209,145,0.25)',
+                    background: 'var(--color-accent-green-bg)', color: 'var(--color-accent-green)',
+                    border: '0.5px solid var(--color-accent-green-border)',
                     fontSize: 10, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase',
                   }}
                 >
@@ -302,6 +303,22 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId }:
             }}>
               vista mestre
             </div>
+            {/* Placeholder — troca de Vista Mestre ainda não tem backend
+                (exigiria re-extração de DNA); ação preparada, desabilitada. */}
+            <button
+              type="button"
+              disabled
+              title="Em breve — trocar a Vista Mestre vai re-extrair o DNA do projeto"
+              style={{
+                position: 'absolute', top: 14, right: 14,
+                fontSize: 10, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase',
+                color: 'rgba(255,255,255,0.55)', background: 'rgba(0,0,0,0.5)',
+                backdropFilter: 'blur(8px)', border: '0.5px solid rgba(255,255,255,0.14)',
+                padding: '5px 10px', borderRadius: 4, cursor: 'not-allowed',
+              }}
+            >
+              Trocar Vista Mestre
+            </button>
           </div>
         )}
 
@@ -338,8 +355,8 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId }:
             {error && (
               <div style={{
                 marginTop: 12, padding: '10px 14px', borderRadius: 8,
-                background: 'rgba(163,45,45,0.12)', border: '0.5px solid rgba(163,45,45,0.3)',
-                color: '#e57373', fontSize: 13,
+                background: 'var(--color-error-bg)', border: '0.5px solid var(--color-error-border)',
+                color: 'var(--color-error)', fontSize: 13,
               }}>
                 {error}
               </div>
