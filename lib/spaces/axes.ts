@@ -17,7 +17,7 @@ export type AxisMode = 'parametric' | 'sketch_guided'
 // representativa" como a luz tem, então o card mostra um ícone neutro.
 export type DetailIconKey =
   | 'layers' | 'bulb' | 'sofa' | 'frame' | 'focus' | 'grid'
-  | 'counter' | 'bed' | 'door' | 'building' | 'plant'
+  | 'counter' | 'bed' | 'door' | 'building' | 'plant' | 'vase'
 
 export interface AxisOption {
   value:           string  // slug salvo em vistas.axis_value
@@ -132,6 +132,12 @@ const DETAIL_CARD: Record<string, AxisOption> = {
     color: '#8A8276',
     promptModifier: 'a closer crop of the main furniture and the composition of the room',
   },
+  decoracao: {
+    value: 'decoracao', label: 'Decoração', icon: 'vase',
+    description: 'Objetos, arte, vasos e composição de estilo do ambiente.',
+    color: '#8A8276',
+    promptModifier: 'a closer crop of the decorative styling already present in the scene: objects, art, vases and accessories',
+  },
   parede_destaque: {
     value: 'parede_destaque', label: 'Parede de destaque', icon: 'frame',
     description: 'Recorte de painéis, arte, textura ou elemento focal.',
@@ -234,9 +240,9 @@ const DETAIL_CARD: Record<string, AxisOption> = {
 }
 
 const DETALHE_BY_CONTEXT: Record<DetalheContext, string[]> = {
-  default:     ['materialidade', 'iluminacao_detalhe', 'mobiliario', 'parede_destaque', 'area_principal', 'encontro_materiais'],
-  corporativo: ['mesa_executiva', 'lounge', 'divisorias_vidro', 'materialidade', 'iluminacao_detalhe', 'parede_destaque'],
-  residencial: ['estar', 'cozinha_bancada', 'marcenaria', 'cabeceira', 'iluminacao_detalhe', 'materialidade'],
+  default:     ['materialidade', 'iluminacao_detalhe', 'mobiliario', 'decoracao', 'parede_destaque', 'area_principal', 'encontro_materiais'],
+  corporativo: ['mesa_executiva', 'lounge', 'divisorias_vidro', 'iluminacao_detalhe', 'materialidade', 'decoracao', 'parede_destaque'],
+  residencial: ['estar', 'cozinha_bancada', 'marcenaria', 'cabeceira', 'iluminacao_detalhe', 'decoracao', 'materialidade'],
   exterior:    ['acesso', 'fachada', 'paisagismo', 'varanda', 'brises_esquadrias', 'materialidade_externa'],
 }
 
@@ -248,19 +254,22 @@ export function detalheOptionsForContext(ctx: DetalheContext): AxisOption[] {
   return DETALHE_BY_CONTEXT[ctx].map(slug => DETAIL_CARD[slug])
 }
 
-// Resolve o contexto a partir da categoria + briefing arquitetônico. Exterior
-// (fachada/áreas externas/implantação) ganha prioridade sobre a categoria —
-// mesma heurística do inferProjectType da rota de geração.
+// Resolve o contexto a partir do TIPO DO PROJETO + categoria.
+//
+// ⚠️ Só o `tipo_projeto` decide interior×exterior — NUNCA o `entorno`. O entorno
+// descreve o que se vê pela janela (vista, paisagem urbana, jardim, rua), então
+// um ambiente INTERNO com vista cairia errado em "exterior" (bug real: um
+// escritório com "vista panorâmica de uma paisagem urbana" virava exterior).
+// Exterior só quando o PROJETO em si é externo: fachada, implantação, terreno,
+// complexo/torres, área de lazer externa.
 export function detalheContextFor(
   category: 'residencial' | 'comercial' | 'conceito',
   briefing?: BriefingArquitetonico | null,
 ): DetalheContext {
-  const blob = (
-    (briefing?.tipo_projeto ?? '') + ' ' + (briefing?.entorno ?? '')
-  ).toLowerCase()
-  if (/fachada|exterior|facade|terreno|rua|jardim|quintal|implanta|paisag|varanda/.test(blob)) {
-    return 'exterior'
-  }
+  const tipo = (briefing?.tipo_projeto ?? '').toLowerCase()
+  const exteriorSubject =
+    /\bfachada|facade|implanta|\bterreno|\blotes?\b|loteamento|condom[íi]nio|complexo|\btorres?\b|\bedif[íi]cios\b|\bextern[ao]s?\b|\bexterior|volumetria|paisagism|[áa]rea\s+de\s+lazer/.test(tipo)
+  if (exteriorSubject)            return 'exterior'
   if (category === 'comercial')   return 'corporativo'
   if (category === 'residencial') return 'residencial'
   return 'default'
