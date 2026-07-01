@@ -3,6 +3,10 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { getRenderTitle } from '@/lib/render-display'
 import { getPlanById, type PlanId } from '@/lib/plans'
+import {
+  IconGenerate, IconSpaces, IconRetocar, IconEnhance,
+  IconVideo, IconHumanizedPlan, IconHistory,
+} from '@/components/app/sidebar-icons'
 
 type RecentRender = {
   id: string
@@ -111,13 +115,13 @@ export default async function AppPage() {
 
         {/* ── 2 · Ferramentas ───────────────────────────────────────────────── */}
         <div className="spn-dash-tools">
-          <ToolCard href="/app/generate"                     label="Renderizar" Icon={IconRender}  bg="var(--color-accent-green-bg)"   color="var(--color-accent-green)" />
-          <ToolCard href="/app/spaces/new"                   label="Spaces"     Icon={IconSpaces}  bg="rgba(255,255,255,0.06)"          color="rgba(255,255,255,0.58)" />
-          <ToolCard href="/app/editar"                       label="Editar"     Icon={IconEdit}    bg="rgba(255,255,255,0.06)"          color="rgba(255,255,255,0.58)" />
-          <ToolCard href="/app/upscale"                      label="Ampliar"    Icon={IconUpscale} bg="rgba(255,255,255,0.06)"          color="rgba(255,255,255,0.58)" />
-          <ToolCard href="/app/video"                        label="Animar"     Icon={IconVideo}   bg="rgba(255,255,255,0.06)"          color="rgba(255,255,255,0.58)" />
-          <ToolCard href="/app/apresentar/planta-humanizada" label="Planta"     Icon={IconPlan}    bg="rgba(255,255,255,0.06)"          color="rgba(255,255,255,0.58)" />
-          <ToolCard href="/app/history"                      label="Histórico"  Icon={IconHistory} bg="rgba(255,255,255,0.04)"          color="rgba(255,255,255,0.30)" />
+          <ToolCard href="/app/generate"                     label="Renderizar" Icon={IconGenerate}     bg="var(--color-accent-green-bg)"   color="var(--color-accent-green)" />
+          <ToolCard href="/app/spaces/new"                   label="Spaces"     Icon={IconSpaces}       bg="rgba(255,255,255,0.06)"          color="rgba(255,255,255,0.58)" />
+          <ToolCard href="/app/editar"                       label="Editar"     Icon={IconRetocar}      bg="rgba(255,255,255,0.06)"          color="rgba(255,255,255,0.58)" />
+          <ToolCard href="/app/upscale"                      label="Ampliar"    Icon={IconEnhance}      bg="rgba(255,255,255,0.06)"          color="rgba(255,255,255,0.58)" />
+          <ToolCard href="/app/video"                        label="Animar"     Icon={IconVideo}        bg="rgba(255,255,255,0.06)"          color="rgba(255,255,255,0.58)" />
+          <ToolCard href="/app/apresentar/planta-humanizada" label="Planta"     Icon={IconHumanizedPlan} bg="rgba(255,255,255,0.06)"          color="rgba(255,255,255,0.58)" />
+          <ToolCard href="/app/history"                      label="Histórico"  Icon={IconHistory}      bg="rgba(255,255,255,0.04)"          color="rgba(255,255,255,0.30)" />
         </div>
 
         {/* ── 3 · Stats ─────────────────────────────────────────────────────── */}
@@ -218,14 +222,14 @@ export default async function AppPage() {
 function ToolCard({ href, label, Icon, bg, color }: {
   href: string
   label: string
-  Icon: (p: { size?: number; color?: string }) => React.ReactElement
+  Icon: (p: { size?: number }) => React.ReactElement
   bg: string
   color: string
 }) {
   return (
     <Link href={href} className="spn-dash-tool">
-      <div className="spn-dash-tool-icon" style={{ background: bg }}>
-        <Icon size={24} color={color} />
+      <div className="spn-dash-tool-icon" style={{ background: bg, color }}>
+        <Icon size={24} />
       </div>
       <span className="spn-dash-tool-label">{label}</span>
     </Link>
@@ -291,68 +295,5 @@ function RecentCard({ render: r }: { render: RecentRender }) {
         <div className="spn-dash-recent-date">{formatDate(r.created_at)}</div>
       </div>
     </div>
-  )
-}
-
-// ── Icons ──────────────────────────────────────────────────────────────────────
-
-function IconRender({ size = 20, color = 'currentColor' }: { size?: number; color?: string }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3" width="18" height="18" rx="2.5"/>
-      <circle cx="8.5" cy="8.5" r="1.5"/>
-      <polyline points="21 15 16 10 5 21"/>
-    </svg>
-  )
-}
-function IconSpaces({ size = 20, color = 'currentColor' }: { size?: number; color?: string }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="2" y="2" width="9" height="9" rx="2"/>
-      <rect x="13" y="2" width="9" height="9" rx="2"/>
-      <rect x="2" y="13" width="9" height="9" rx="2"/>
-      <rect x="13" y="13" width="9" height="9" rx="2"/>
-    </svg>
-  )
-}
-function IconEdit({ size = 20, color = 'currentColor' }: { size?: number; color?: string }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 20h9"/>
-      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-    </svg>
-  )
-}
-function IconUpscale({ size = 20, color = 'currentColor' }: { size?: number; color?: string }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 3l1.88 5.47L19 10l-5.12 1.53L12 17l-1.88-5.47L5 10l5.12-1.53L12 3z"/>
-      <path d="M5 3l.94 2.06L8 6l-2.06.94L5 9l-.94-2.06L2 6l2.06-.94L5 3z"/>
-      <path d="M19 13l.94 2.06L22 16l-2.06.94L19 19l-.94-2.06L16 16l2.06-.94L19 13z"/>
-    </svg>
-  )
-}
-function IconVideo({ size = 20, color = 'currentColor' }: { size?: number; color?: string }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <polygon points="23 7 16 12 23 17 23 7"/>
-      <rect x="1" y="5" width="15" height="14" rx="2.5"/>
-    </svg>
-  )
-}
-function IconPlan({ size = 20, color = 'currentColor' }: { size?: number; color?: string }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3" width="18" height="18" rx="2"/>
-      <path d="M3 9h18M9 21V9"/>
-    </svg>
-  )
-}
-function IconHistory({ size = 20, color = 'currentColor' }: { size?: number; color?: string }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="9"/>
-      <path d="M12 7v5l3 3"/>
-    </svg>
   )
 }
