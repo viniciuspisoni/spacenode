@@ -232,12 +232,15 @@ export async function POST(req: NextRequest) {
 
     console.log('[generate] FAL INPUT  :', JSON.stringify(falInput))
 
+    const generationStartedAt = Date.now()
     const result = await Promise.race([
       fal.subscribe(falEndpoint, { input: falInput }),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(Object.assign(new Error('FAL_TIMEOUT'), { isFalTimeout: true })), FAL_TIMEOUT_MS[engine])
       ),
     ])
+
+    const generationDurationMs = Date.now() - generationStartedAt
 
     console.log('[generate] FAL OUTPUT :', JSON.stringify(result.data))
     const images = (result.data as { images: { url: string }[] }).images
@@ -271,26 +274,56 @@ export async function POST(req: NextRequest) {
       briefing:      briefing      ?? null,
     }
 
-    const insertResult = await admin
-      .from('renders')
-      .insert({
-        user_id:         user.id,
-        input_url:       inputUrl ?? null,
-        output_url:      outputUrl,
-        prompt:          finalPrompt,
-        ambient:         environment ?? segment ?? projectType,
-        style:           projectType,
-        lighting:        lighting ?? 'default',
+    const baseRow = {
+      user_id:         user.id,
+      input_url:       inputUrl ?? null,
+      output_url:      outputUrl,
+      prompt:          finalPrompt,
+      ambient:         environment ?? segment ?? projectType,
+      style:           projectType,
+      lighting:        lighting ?? 'default',
+      engine,
+      resolution,
+      nodes_charged:   nodesToCharge,
+      fal_request_id:  falRequestId,
+      status:          'completed',
+      completed_at:    new Date().toISOString(),
+      config_snapshot: configSnapshot,
+    }
+
+    // Arquivo técnico do Histórico (migration 20260701000000): duração, prompt
+    // original do usuário e log da chamada ao provider. Insert resiliente —
+    // se a migration ainda não tiver sido aplicada (coluna inexistente),
+    // regrava só com as colunas base para nunca perder o registro.
+    const extendedRow = {
+      ...baseRow,
+      user_prompt:  refinementText?.trim() || null,
+      duration_ms:  generationDurationMs,
+      retry_count:  0,
+      generation_log: {
+        provider:    'fal',
+        endpoint:    falEndpoint,
+        request_id:  falRequestId,
         engine,
         resolution,
-        nodes_charged:   nodesToCharge,
-        fal_request_id:  falRequestId,
-        status:          'completed',
-        completed_at:    new Date().toISOString(),
-        config_snapshot: configSnapshot,
-      })
+        parameters:  falParamsForEngine(engine, resolution),
+        anchor_used: hasAnchor,
+        image_count: imageUrls.length,
+        duration_ms: generationDurationMs,
+        nodes_charged: nodesToCharge,
+      },
+    }
+
+    let insertResult = await admin
+      .from('renders')
+      .insert(extendedRow)
       .select('id')
       .single()
+
+    if (insertResult.error && (insertResult.error.code === 'PGRST204' || insertResult.error.code === '42703')) {
+      console.warn('[generate] colunas de metadados ausentes — regravando com colunas base:', insertResult.error.message)
+      insertResult = await admin.from('renders').insert(baseRow).select('id').single()
+    }
 
     const renderId = insertResult.data?.id ?? null
     if (insertResult.error) {
@@ -318,7 +351,8 @@ export async function POST(req: NextRequest) {
       lumenBalance: balance?.lumen_balance ?? 0,
       totalBalance: balance?.total_balance ?? 0,
       nodesCharged: nodesToCharge,
-      prompt:       finalPrompt,
+      // O prompt final (buildFidelityPrompt) é proprietário e o GenerateClient
+      // nunca o consumia — não viaja mais na resposta.
     })
 
   } catch (err: unknown) {

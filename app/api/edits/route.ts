@@ -29,6 +29,7 @@ import {
 } from '@/lib/spaces/edit-router'
 import { editToolFromMode } from '@/lib/spaces/edit-router-adapters'
 import { isEditIntent, modeFromIntent } from '@/lib/spaces/edit-intents'
+import { engineDisplayLabel } from '@/lib/history/generation-detail'
 import {
   buildRoutingContext,
   uploadEditAsset,
@@ -370,7 +371,11 @@ export async function POST(req: NextRequest) {
       .single()
 
     return NextResponse.json({
-      edit:       row ?? null,
+      // Linha redigida: engine sai como label de produto e o request id do
+      // provider não viaja (mesma regra do GET e do /api/history/detail).
+      edit: row
+        ? { ...row, engine: engineDisplayLabel(row.engine), fal_request_id: undefined }
+        : null,
       result_url: run.resultUrl,
       // Sem endpoint técnico — só o que a UI mostra ao usuário.
       routing: {
@@ -409,13 +414,18 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
+  // Projeção explícita: sem fal_request_id/generation_log. engine guarda o
+  // endpoint do provider — sai daqui como label de produto (mesma redação do
+  // /api/history/detail). Consumidores: tab Edições do Histórico e
+  // EditV2ImportModal (usa result_image_url).
   const { data, error } = await supabase
     .from('edits')
-    .select('*')
+    .select('id, user_id, source_image_url, result_image_url, mask_url, prompt, quality, nodes_cost, engine, source_type, source_id, mask_coverage, created_at')
     .order('created_at', { ascending: false })
     .limit(60)
   if (error) {
     return NextResponse.json({ error: 'Erro ao listar edições' }, { status: 500 })
   }
-  return NextResponse.json({ edits: data ?? [] })
+  const edits = (data ?? []).map(e => ({ ...e, engine: engineDisplayLabel(e.engine) }))
+  return NextResponse.json({ edits })
 }

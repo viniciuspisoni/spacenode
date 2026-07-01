@@ -145,7 +145,10 @@ export async function POST(req: NextRequest) {
       total_duration_ms: result.totalDurationMs,
     }
 
-    await admin.from('renders').insert({
+    // nodes_charged: o Histórico ("Detalhes da geração") lê daqui o custo real.
+    // duration_ms: idem para tempo de geração (coluna da migration 20260701;
+    // se ainda não aplicada, o insert cai no fallback sem ela).
+    const upscaleRow = {
       user_id:      user.id,
       input_url:    inputUrl,
       output_url:   outputUrl,
@@ -153,11 +156,19 @@ export async function POST(req: NextRequest) {
       ambient:      'upscale',
       style:        styleKey,
       lighting,
+      nodes_charged: cost,
       fal_request_id: falRequestId,
       status:       'completed',
       completed_at: new Date().toISOString(),
       upscale_meta: upscaleMeta,
+    }
+    const ins = await admin.from('renders').insert({
+      ...upscaleRow,
+      duration_ms: result.totalDurationMs ?? null,
     } as never)
+    if (ins.error && (ins.error.code === 'PGRST204' || ins.error.code === '42703')) {
+      await admin.from('renders').insert(upscaleRow as never)
+    }
 
     return NextResponse.json({
       url:         outputUrl,

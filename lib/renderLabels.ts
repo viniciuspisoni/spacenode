@@ -5,6 +5,16 @@ const VIDEO_ENGINE_LABELS: Record<string, string> = {
   'bytedance/seedance-2.0/image-to-video':                'Arquitetônico',
 }
 
+const VIDEO_LABEL_VALUES = new Set(Object.values(VIDEO_ENGINE_LABELS))
+
+// Endpoint do provider → label de produto (null se desconhecido). Usado na
+// redação server-side do Histórico: o browser do usuário comum recebe a label,
+// nunca o endpoint.
+export function videoEngineLabel(engineId: string | null | undefined): string | null {
+  if (!engineId) return null
+  return VIDEO_ENGINE_LABELS[engineId] ?? null
+}
+
 // motionLabel é opcional — o histórico legado (renders sem coluna de motion)
 // só passa engineId + duration. Renders novos podem incluir o label do
 // movimento para exibição enriquecida.
@@ -13,7 +23,10 @@ export function getVideoDisplayLabel(
   duration?:   string | null,
   motionLabel?:string | null,
 ): string {
-  const label = VIDEO_ENGINE_LABELS[engineId] ?? 'Animação'
+  // Aceita o endpoint cru OU a label já traduzida (linhas redigidas
+  // server-side chegam ao client com a label no lugar do endpoint).
+  const label = VIDEO_ENGINE_LABELS[engineId]
+    ?? (VIDEO_LABEL_VALUES.has(engineId) ? engineId : 'Animação')
   const dur   = duration ?? '5s'
   const parts = [`Vídeo ${dur}`, label]
   if (motionLabel) parts.push(motionLabel)
@@ -40,8 +53,19 @@ const UPSCALE_PROVIDER_LABELS: Record<string, string> = {
   'magnific':                  'Premium (legado)',
 }
 
+const UPSCALE_LABEL_VALUES = new Set(Object.values(UPSCALE_PROVIDER_LABELS))
+
+// Style de upscale → label de produto (null se desconhecido). Usado na redação
+// server-side do Histórico para linhas legadas cujo style é endpoint 'fal-ai/*'.
+export function upscaleProviderLabel(styleKey: string | null | undefined): string | null {
+  if (!styleKey) return null
+  return UPSCALE_PROVIDER_LABELS[styleKey] ?? null
+}
+
 export function getUpscaleDisplayLabel(modelId: string, scale?: string | null): string {
-  const label = UPSCALE_PROVIDER_LABELS[modelId] ?? 'Alta definição'
+  // Aceita o style cru OU a label já traduzida (linhas redigidas server-side).
+  const label = UPSCALE_PROVIDER_LABELS[modelId]
+    ?? (UPSCALE_LABEL_VALUES.has(modelId) ? modelId : 'Alta definição')
 
   // Escala pode vir como '2x' / '4x' / '8x' / 'ultra' / 'none' / '4'/'4x'
   // ou null. Formatamos pra exibição amigável.

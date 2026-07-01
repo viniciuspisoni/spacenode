@@ -5,29 +5,57 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { getUpscaleDisplayLabel, getVideoDisplayLabel } from '@/lib/renderLabels'
 import { createClient } from '@/lib/supabase/client'
-import type { Edit, Vista } from '@/lib/spaces/types'
+import { GenerationDetailDrawer } from '@/components/history/GenerationDetailDrawer'
+import { authorInitials, type GenerationKind } from '@/lib/history/generation-detail'
+import type { Edit } from '@/lib/spaces/types'
 
 type HistoryTab = 'renders' | 'edits' | 'vistas'
 
+// Espelho de RENDER_LIST_COLUMNS (lib/history/redact.ts): a listagem NÃO
+// carrega prompt/fal_request_id/config_snapshot — o prompt final é
+// proprietário e não chega ao browser. Detalhes ricos vêm do drawer.
 interface Render {
   id: string
+  user_id?: string | null
   input_url: string
   output_url: string | null
-  prompt: string
   ambient: string
   style: string
   lighting: string
   status: string
   cost_credits: number
+  nodes_charged?: number | null
+  resolution?: string | null
+  engine?: string | null
   model?: string | null
   folder_id?: string | null
   created_at: string
 }
 
+// Perfil resumido para o chip "Gerado por" (autoria na grid).
+export interface AuthorInfo {
+  name:  string | null
+  email: string | null
+}
+
+// parent_id null = pasta de topo (ex.: cliente); preenchido = subpasta (ex.:
+// projeto do cliente). Hierarquia limitada a 2 níveis — ver /api/folders.
 interface Folder {
   id: string
   name: string
+  parent_id: string | null
   created_at: string
+}
+
+// Contagem "cheia" de uma pasta de topo: renders direto nela + renders de
+// todas as suas subpastas. Dá pro usuário uma visão do volume total do
+// cliente sem precisar abrir cada subpasta.
+function aggregateFolderCount(folderId: string, folders: Folder[], counts: Record<string, number>): number {
+  const own = counts[folderId] ?? 0
+  const childrenSum = folders
+    .filter(f => f.parent_id === folderId)
+    .reduce((sum, child) => sum + (counts[child.id] ?? 0), 0)
+  return own + childrenSum
 }
 
 interface FolderCounts {
@@ -37,11 +65,13 @@ interface FolderCounts {
 }
 
 interface Props {
-  renders:      Render[]       // primeira página, mais recentes primeiro
-  folderCounts: FolderCounts   // contagens reais (server-side) para os chips
-  pageSize:     number         // tamanho da página vinda do server
-  credits:      number
-  folders:      Folder[]
+  renders:       Render[]       // primeira página, mais recentes primeiro
+  folderCounts:  FolderCounts   // contagens reais (server-side) para os chips
+  pageSize:      number         // tamanho da página vinda do server
+  credits:       number
+  folders:       Folder[]
+  authors:       Record<string, AuthorInfo>  // user_id → perfil (autoria/equipes)
+  currentUserId: string
 }
 
 type FolderFilter = 'all' | 'none' | string  // string = folder id
@@ -55,9 +85,28 @@ function qualityLabel(nodes: number): string | null {
 
 function engineLabel(model: string | null | undefined): string | null {
   if (!model) return null
-  if (model.includes('nano-banana') || model.includes('vega')) return 'Vega'
-  if (model.includes('gpt-image')   || model.includes('quasar')) return 'Quasar'
+  if (model.includes('nano-banana-pro') || model.includes('vega'))   return 'Vega'
+  if (model.includes('gpt-image')       || model.includes('quasar')) return 'Quasar'
+  if (model.includes('nano-banana')     || model.includes('pulsar')) return 'Pulsar'
   return null
+}
+
+// Renders gravados pelo fluxo atual usam nodes_charged/engine; os antigos,
+// cost_credits/model. Lê os dois para o histórico nunca quebrar.
+function renderNodes(r: Render): number {
+  return r.nodes_charged ?? r.cost_credits ?? 0
+}
+
+function renderEngineRaw(r: Render): string | null {
+  return r.engine ?? r.model ?? null
+}
+
+// Módulo de origem derivado do ambient (renders concentram Renderizar,
+// Ampliar e Animar na mesma tabela).
+function renderModule(r: Render): 'render' | 'upscale' | 'video' {
+  if (r.ambient === 'upscale') return 'upscale'
+  if (r.ambient === 'video')   return 'video'
+  return 'render'
 }
 
 function formatDate(iso: string) {
@@ -72,7 +121,8 @@ function inferExtension(url: string, isVideo: boolean): string {
 
 function buildFilename(r: Render, idx: number): string {
   const isVideo = r.ambient === 'video'
-  const url = (isVideo ? r.input_url : r.output_url) ?? ''
+  // Vídeo: o arquivo gerado fica em output_url (input_url é a imagem base).
+  const url = (isVideo ? (r.output_url ?? r.input_url) : r.output_url) ?? ''
   const ext = inferExtension(url, isVideo)
   const base = (r.ambient || r.style || 'render')
     .toLowerCase()
@@ -89,6 +139,8 @@ export function HistoryClient({
   pageSize,
   credits,
   folders,
+  authors,
+  currentUserId,
 }: Props) {
   const router = useRouter()
 
@@ -138,8 +190,19 @@ export function HistoryClient({
   const [sort,          setSort]          = useState<'desc' | 'asc'>('desc')
   const [folderFilter,  setFolderFilter]  = useState<FolderFilter>('all')
 
+  // Filtros técnicos do arquivo do projeto. Módulo/engine/autor já ativos;
+  // TODO(filters): resolução, status e período seguem o mesmo padrão — basta
+  // adicionar o estado + cláusula no `filtered` + <select> nos controls.
+  const [moduleFilter, setModuleFilter] = useState<'all' | 'render' | 'upscale' | 'video'>('all')
+  const [engineFilter, setEngineFilter] = useState('all')
+  const [authorFilter, setAuthorFilter] = useState('all')
+
   // ── Tabs do histórico ──────────────────────────────────────────────────────
   const [historyTab, setHistoryTab] = useState<HistoryTab>('renders')
+
+  // ── Painel "Detalhes da geração" ───────────────────────────────────────────
+  const [detail, setDetail] = useState<{ kind: GenerationKind; id: string } | null>(null)
+  const openDetail = useCallback((kind: GenerationKind, id: string) => setDetail({ kind, id }), [])
 
   // ── Modo de seleção ─────────────────────────────────────────────────────────
   const [selectMode, setSelectMode] = useState(false)
@@ -154,14 +217,41 @@ export function HistoryClient({
         if (folderFilter === 'none' && r.folder_id) return false
         if (folderFilter !== 'all' && folderFilter !== 'none' && r.folder_id !== folderFilter) return false
         if (typeFilter !== 'all' && r.style !== typeFilter) return false
-        if (q) return (r.ambient + ' ' + r.lighting + ' ' + r.style + ' ' + r.prompt).toLowerCase().includes(q)
+        if (moduleFilter !== 'all' && renderModule(r) !== moduleFilter) return false
+        if (engineFilter !== 'all' && engineLabel(renderEngineRaw(r)) !== engineFilter) return false
+        if (authorFilter !== 'all' && r.user_id !== authorFilter) return false
+        if (q) return (r.ambient + ' ' + r.lighting + ' ' + r.style).toLowerCase().includes(q)
         return true
       })
       .sort((a, b) => {
         const diff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         return sort === 'desc' ? diff : -diff
       })
-  }, [loaded, search, typeFilter, sort, folderFilter])
+  }, [loaded, search, typeFilter, sort, folderFilter, moduleFilter, engineFilter, authorFilter])
+
+  // Autores distintos entre os renders carregados — o filtro por autor só
+  // aparece quando o projeto tem mais de um (cenário de equipes).
+  const distinctAuthors = useMemo(() => {
+    const ids = new Set<string>()
+    for (const r of loaded) if (r.user_id) ids.add(r.user_id)
+    return Array.from(ids)
+  }, [loaded])
+
+  // ── Hierarquia de pastas (1 nível: pasta do cliente > subpasta de projeto) ──
+  const topFolders = useMemo(() => folders.filter(f => !f.parent_id), [folders])
+  const subfoldersByParent = useMemo(() => {
+    const map: Record<string, Folder[]> = {}
+    for (const f of folders) {
+      if (f.parent_id) (map[f.parent_id] ??= []).push(f)
+    }
+    return map
+  }, [folders])
+  const activeFolder = useMemo(() => folders.find(f => f.id === folderFilter) ?? null, [folders, folderFilter])
+  // Pasta de topo cujas subpastas devem aparecer na segunda fileira: a
+  // própria (se o filtro ativo é uma pasta de topo) ou a pasta-mãe (se o
+  // filtro ativo é uma subpasta) — assim clicar num chip de topo "entra"
+  // nele, e o chip da pasta-mãe continua visível/clicável pra "subir" de novo.
+  const expandedParentId = activeFolder ? (activeFolder.parent_id ?? activeFolder.id) : null
 
   const selectedRenders = useMemo(
     () => loaded.filter(r => selected.has(r.id)),
@@ -202,7 +292,8 @@ export function HistoryClient({
       let i = 0
       for (const r of selectedRenders) {
         const isVideo = r.ambient === 'video'
-        const target  = isVideo ? r.input_url : r.output_url
+        // Vídeo gerado mora em output_url; input_url é a foto base.
+        const target  = isVideo ? (r.output_url ?? r.input_url) : r.output_url
         if (!target) continue
         const a = document.createElement('a')
         a.href = `/api/download?url=${encodeURIComponent(target)}&filename=${encodeURIComponent(buildFilename(r, i))}`
@@ -267,19 +358,22 @@ export function HistoryClient({
   }
 
   // ── Pastas: criar e excluir ────────────────────────────────────────────────
-  const createFolder = async (initialName?: string): Promise<Folder | null> => {
-    const name = (initialName ?? window.prompt('Nome da pasta:'))?.trim()
+  // parentId presente = cria SUBpasta dentro dela; ausente = pasta de topo.
+  const createFolder = async (initialName?: string, parentId?: string | null): Promise<Folder | null> => {
+    const isSubfolder = parentId != null
+    const name = (initialName ?? window.prompt(isSubfolder ? 'Nome da subpasta:' : 'Nome da pasta:'))?.trim()
     if (!name) return null
     setBusy(true)
     try {
       const res = await fetch('/api/folders', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ name }),
+        body:    JSON.stringify(isSubfolder ? { name, parent_id: parentId } : { name }),
       })
       if (!res.ok) {
-        const { error } = await res.json().catch(() => ({ error: 'Falha ao criar pasta' }))
-        alert(error || 'Falha ao criar pasta')
+        const fallback = isSubfolder ? 'Falha ao criar subpasta' : 'Falha ao criar pasta'
+        const { error } = await res.json().catch(() => ({ error: fallback }))
+        alert(error || fallback)
         return null
       }
       const { folder } = await res.json()
@@ -291,10 +385,17 @@ export function HistoryClient({
   }
 
   const handleDeleteFolder = async (folderId: string, folderName: string) => {
-    const inFolder = folderCounts.counts[folderId] ?? 0
-    const msg = inFolder > 0
-      ? `Excluir a pasta "${folderName}"? Os ${inFolder} render${inFolder !== 1 ? 's' : ''} dentro dela ficarão sem pasta (não serão apagados).`
-      : `Excluir a pasta "${folderName}"?`
+    // Subpastas são excluídas em cascata pelo banco (ON DELETE CASCADE) —
+    // avisamos disso quando a pasta tem filhas. Renders nunca são apagados,
+    // só ficam sem pasta.
+    const childIds     = (subfoldersByParent[folderId] ?? []).map(c => c.id)
+    const directCount   = folderCounts.counts[folderId] ?? 0
+    const cascadeCount  = directCount + childIds.reduce((sum, id) => sum + (folderCounts.counts[id] ?? 0), 0)
+    const msg = childIds.length > 0
+      ? `Excluir a pasta "${folderName}" e ${childIds.length} subpasta${childIds.length !== 1 ? 's' : ''}? ${cascadeCount} render${cascadeCount !== 1 ? 's' : ''} dentro delas ficará${cascadeCount !== 1 ? 'ão' : ''} sem pasta (não serão apagados).`
+      : directCount > 0
+        ? `Excluir a pasta "${folderName}"? Os ${directCount} render${directCount !== 1 ? 's' : ''} dentro dela ficarão sem pasta (não serão apagados).`
+        : `Excluir a pasta "${folderName}"?`
     if (!window.confirm(msg)) return
     setBusy(true)
     try {
@@ -304,7 +405,7 @@ export function HistoryClient({
         alert(error || 'Falha ao excluir pasta')
         return
       }
-      if (folderFilter === folderId) setFolderFilter('all')
+      if (folderFilter === folderId || childIds.includes(folderFilter)) setFolderFilter('all')
       router.refresh()
     } finally {
       setBusy(false)
@@ -395,8 +496,8 @@ export function HistoryClient({
         </div>
 
         {/* ── Tabs alternativas: Edições + Vistas ── */}
-        {historyTab === 'edits'  && <EditsTabView  />}
-        {historyTab === 'vistas' && <VistasTabView />}
+        {historyTab === 'edits'  && <EditsTabView  authors={authors} onOpenDetail={openDetail} />}
+        {historyTab === 'vistas' && <VistasTabView authors={authors} onOpenDetail={openDetail} />}
 
         {/* ── Controls (só renderiza na tab Renders) ── */}
         {historyTab === 'renders' && folderCounts.total > 0 && (
@@ -423,6 +524,32 @@ export function HistoryClient({
               <option value="interior">Interior</option>
             </select>
 
+            <select value={moduleFilter} onChange={e => setModuleFilter(e.target.value as typeof moduleFilter)} style={S.select}>
+              <option value="all">Todos os módulos</option>
+              <option value="render">Renderizar</option>
+              <option value="upscale">Ampliar</option>
+              <option value="video">Animar</option>
+            </select>
+
+            <select value={engineFilter} onChange={e => setEngineFilter(e.target.value)} style={S.select}>
+              <option value="all">Todas as engines</option>
+              <option value="Vega">Vega</option>
+              <option value="Quasar">Quasar</option>
+              <option value="Pulsar">Pulsar</option>
+            </select>
+
+            {distinctAuthors.length > 1 && (
+              <select value={authorFilter} onChange={e => setAuthorFilter(e.target.value)} style={S.select}>
+                <option value="all">Todos os autores</option>
+                {distinctAuthors.map(uid => (
+                  <option key={uid} value={uid}>
+                    {authors[uid]?.name || authors[uid]?.email || 'Autor não registrado'}
+                    {uid === currentUserId ? ' (você)' : ''}
+                  </option>
+                ))}
+              </select>
+            )}
+
             <select value={sort} onChange={e => setSort(e.target.value as 'desc' | 'asc')} style={S.select}>
               <option value="desc">Mais recentes</option>
               <option value="asc">Mais antigos</option>
@@ -430,9 +557,10 @@ export function HistoryClient({
           </div>
         )}
 
-        {/* ── Folder chips (só na tab Renders) ── */}
+        {/* ── Folder chips (só na tab Renders) — pastas de topo, contagem agregada
+             (inclui subpastas) ── */}
         {historyTab === 'renders' && folderCounts.total > 0 && (
-          <div style={S.chipRow}>
+          <div style={{ ...S.chipRow, marginBottom: expandedParentId ? 10 : S.chipRow.marginBottom }}>
             <FolderChip
               active={folderFilter === 'all'}
               onClick={() => setFolderFilter('all')}
@@ -445,18 +573,43 @@ export function HistoryClient({
               label="Sem pasta"
               count={folderCounts.unfiled}
             />
-            {folders.map(f => (
+            {topFolders.map(f => (
               <FolderChip
                 key={f.id}
                 active={folderFilter === f.id}
+                expanded={expandedParentId === f.id}
                 onClick={() => setFolderFilter(f.id)}
                 onDelete={() => handleDeleteFolder(f.id, f.name)}
                 label={f.name}
-                count={folderCounts.counts[f.id] ?? 0}
+                count={aggregateFolderCount(f.id, folders, folderCounts.counts)}
               />
             ))}
             <button onClick={() => createFolder()} style={S.chipAdd} disabled={busy}>
               <PlusIcon /> Nova pasta
+            </button>
+          </div>
+        )}
+
+        {/* ── Subpastas da pasta de topo ativa — organiza projetos dentro do
+             cliente. Só aparece quando o filtro atual é essa pasta (ou uma
+             das subpastas dela). ── */}
+        {historyTab === 'renders' && expandedParentId && (
+          <div style={S.subchipRow}>
+            <span style={S.subchipHint}>
+              Subpastas de {topFolders.find(f => f.id === expandedParentId)?.name}
+            </span>
+            {(subfoldersByParent[expandedParentId] ?? []).map(sf => (
+              <FolderChip
+                key={sf.id}
+                active={folderFilter === sf.id}
+                onClick={() => setFolderFilter(sf.id)}
+                onDelete={() => handleDeleteFolder(sf.id, sf.name)}
+                label={sf.name}
+                count={folderCounts.counts[sf.id] ?? 0}
+              />
+            ))}
+            <button onClick={() => createFolder(undefined, expandedParentId)} style={S.chipAdd} disabled={busy}>
+              <PlusIcon /> Nova subpasta
             </button>
           </div>
         )}
@@ -490,10 +643,12 @@ export function HistoryClient({
                   <RenderCard
                     key={r.id}
                     render={r}
+                    author={r.user_id ? authors[r.user_id] ?? null : null}
                     selectMode={selectMode}
                     selected={selected.has(r.id)}
                     onToggle={() => toggleOne(r.id)}
                     onActivateSelect={() => activateSelectWith(r.id)}
+                    onOpenDetail={() => openDetail('render', r.id)}
                   />
                 ))}
               </div>
@@ -540,6 +695,15 @@ export function HistoryClient({
         </div>
       )}
 
+      {/* ── Painel "Detalhes da geração" ── */}
+      {detail && (
+        <GenerationDetailDrawer
+          kind={detail.kind}
+          id={detail.id}
+          onClose={() => setDetail(null)}
+        />
+      )}
+
       {/* ── Modal mover para pasta ── */}
       {moveOpen && (
         <MoveModal
@@ -558,12 +722,39 @@ export function HistoryClient({
   )
 }
 
+// ── AuthorChip ─────────────────────────────────────────────────────────────────
+//
+// Indicação discreta de autoria na thumb (cenário de equipes: mais de um
+// usuário gerando no mesmo projeto/escritório). Iniciais + tooltip nativo.
+
+function AuthorChip({ author }: { author: AuthorInfo | null }) {
+  const name = author?.name || author?.email || null
+  return (
+    <span
+      title={name ? `Gerado por ${name}` : 'Autor não registrado'}
+      style={{
+        position: 'absolute', bottom: 8, left: 8, zIndex: 2,
+        width: 20, height: 20, borderRadius: '50%',
+        background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
+        border: '0.5px solid rgba(255,255,255,0.22)',
+        color: 'rgba(255,255,255,0.85)',
+        fontSize: 7.5, fontWeight: 600, letterSpacing: '0.04em',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        userSelect: 'none',
+      }}
+    >
+      {name ? authorInitials({ name: author!.name, email: author!.email }) : '—'}
+    </span>
+  )
+}
+
 // ── FolderChip ─────────────────────────────────────────────────────────────────
 
 function FolderChip({
-  active, onClick, onDelete, label, count,
+  active, expanded, onClick, onDelete, label, count,
 }: {
   active:    boolean
+  expanded?: boolean  // pasta de topo cujas subpastas estão visíveis abaixo (sem ser a seleção exata)
   onClick:   () => void
   onDelete?: () => void
   label:     string
@@ -572,7 +763,7 @@ function FolderChip({
   const [hover, setHover] = useState(false)
   return (
     <div
-      style={{ ...S.chip, ...(active ? S.chipActive : null) }}
+      style={{ ...S.chip, ...(expanded && !active ? S.chipExpanded : null), ...(active ? S.chipActive : null) }}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
@@ -596,7 +787,12 @@ function FolderChip({
 
 // ── EditsTabView ───────────────────────────────────────────────────────────────
 
-function EditsTabView() {
+function EditsTabView({
+  authors, onOpenDetail,
+}: {
+  authors: Record<string, AuthorInfo>
+  onOpenDetail: (kind: GenerationKind, id: string) => void
+}) {
   const [items, setItems] = useState<Edit[] | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -623,21 +819,26 @@ function EditsTabView() {
       gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
     }}>
       {items!.map(it => (
-        <Link
+        <div
           key={it.id}
-          href={`/app/editar?source=${encodeURIComponent(it.result_image_url)}&source_type=edit&source_id=${it.id}`}
+          role="button"
+          tabIndex={0}
+          onClick={() => onOpenDetail('edit', it.id)}
+          onKeyDown={e => { if (e.key === 'Enter') onOpenDetail('edit', it.id) }}
+          title="Ver detalhes da geração"
           style={{
             background: 'var(--color-bg-elevated)',
             border: '0.5px solid var(--color-border)',
             borderRadius: 12, overflow: 'hidden',
-            textDecoration: 'none', color: 'inherit',
+            color: 'inherit', cursor: 'pointer',
             display: 'block',
           }}
         >
-          <div style={{ aspectRatio: '4 / 3', background: 'var(--color-surface)' }}>
+          <div style={{ aspectRatio: '4 / 3', background: 'var(--color-surface)', position: 'relative' }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={it.result_image_url} alt={it.prompt}
               style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <AuthorChip author={it.user_id ? authors[it.user_id] ?? null : null} />
           </div>
           <div style={{ padding: '10px 12px 12px' }}>
             <div style={{
@@ -654,7 +855,7 @@ function EditsTabView() {
               {it.quality.toUpperCase()} · {new Date(it.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
             </div>
           </div>
-        </Link>
+        </div>
       ))}
     </div>
   )
@@ -662,8 +863,28 @@ function EditsTabView() {
 
 // ── VistasTabView ──────────────────────────────────────────────────────────────
 
-function VistasTabView() {
-  const [items, setItems] = useState<Vista[] | null>(null)
+// Subconjunto de Vista que a grid usa. A projeção é EXPLÍCITA de propósito:
+// select('*') entregaria ao browser prompt final proprietário, fal_request_id,
+// model/provider e preservation_check — exatamente o que /api/history/detail
+// redige. A lista só carrega o que renderiza.
+interface VistaListItem {
+  id:         string
+  space_id:   string
+  user_id:    string
+  image_url:  string | null
+  axis_label: string | null
+  quality:    string
+  is_edited:  boolean
+  created_at: string
+}
+
+function VistasTabView({
+  authors, onOpenDetail,
+}: {
+  authors: Record<string, AuthorInfo>
+  onOpenDetail: (kind: GenerationKind, id: string) => void
+}) {
+  const [items, setItems] = useState<VistaListItem[] | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -671,12 +892,12 @@ function VistasTabView() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true)
     sb.from('vistas')
-      .select('*')
+      .select('id, space_id, user_id, image_url, axis_label, quality, is_edited, created_at')
       .eq('status', 'completed')
       .not('image_url', 'is', null)
       .order('created_at', { ascending: false })
       .limit(60)
-      .then(({ data }) => setItems((data ?? []) as Vista[]))
+      .then(({ data }) => setItems((data ?? []) as VistaListItem[]))
       .then(undefined, () => setItems([]))
       // .finally(() => setLoading(false))  -- supabase-js 2.x query doesn't have finally
     // Workaround pra setLoading sem finally: marca terminado quando items mudam
@@ -701,21 +922,26 @@ function VistasTabView() {
       gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
     }}>
       {items!.map(v => (
-        <Link
+        <div
           key={v.id}
-          href={`/app/spaces/${v.space_id}/vistas/${v.id}`}
+          role="button"
+          tabIndex={0}
+          onClick={() => onOpenDetail('vista', v.id)}
+          onKeyDown={e => { if (e.key === 'Enter') onOpenDetail('vista', v.id) }}
+          title="Ver detalhes da geração"
           style={{
             background: 'var(--color-bg-elevated)',
             border: '0.5px solid var(--color-border)',
             borderRadius: 12, overflow: 'hidden',
-            textDecoration: 'none', color: 'inherit',
+            color: 'inherit', cursor: 'pointer',
             display: 'block', position: 'relative',
           }}
         >
-          <div style={{ aspectRatio: '4 / 3', background: 'var(--color-surface)' }}>
+          <div style={{ aspectRatio: '4 / 3', background: 'var(--color-surface)', position: 'relative' }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={v.image_url!} alt={v.axis_label ?? ''}
               style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <AuthorChip author={v.user_id ? authors[v.user_id] ?? null : null} />
             {v.is_edited && (
               <div style={{
                 position: 'absolute', top: 8, right: 8,
@@ -742,7 +968,7 @@ function VistasTabView() {
               {v.quality.toUpperCase()} · {new Date(v.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
             </div>
           </div>
-        </Link>
+        </div>
       ))}
     </div>
   )
@@ -783,13 +1009,15 @@ function TabEmpty({ message, action }: { message: string; action?: { href: strin
 // ── RenderCard ─────────────────────────────────────────────────────────────────
 
 function RenderCard({
-  render, selectMode, selected, onToggle, onActivateSelect,
+  render, author, selectMode, selected, onToggle, onActivateSelect, onOpenDetail,
 }: {
   render: Render
+  author: AuthorInfo | null
   selectMode: boolean
   selected: boolean
   onToggle: () => void
   onActivateSelect: () => void
+  onOpenDetail: () => void
 }) {
   const router = useRouter()
   const [hovered, setHovered] = useState(false)
@@ -807,8 +1035,9 @@ function RenderCard({
   const isUpscale = render.ambient === 'upscale'
   const isVideo   = render.ambient === 'video'
   const display   = isVideo ? render.input_url : (render.output_url ?? render.input_url)
-  const quality   = (isUpscale || isVideo) ? null : qualityLabel(render.cost_credits)
-  const engine    = (isUpscale || isVideo) ? null : engineLabel(render.model)
+  const nodes     = renderNodes(render)
+  const quality   = (isUpscale || isVideo) ? null : qualityLabel(nodes)
+  const engine    = (isUpscale || isVideo) ? null : engineLabel(renderEngineRaw(render))
   const title     = isUpscale ? 'Upscale' : isVideo ? 'Animação' : (render.ambient || render.lighting || 'Render')
   const sub       = isUpscale
     ? getUpscaleDisplayLabel(render.style, render.lighting)
@@ -816,14 +1045,17 @@ function RenderCard({
       ? getVideoDisplayLabel(render.style, render.lighting)
       : [render.style === 'exterior' ? 'Exterior' : render.style === 'interior' ? 'Interior' : render.style, render.lighting].filter(Boolean).join(' · ')
 
-  const handleCardClick = () => { if (selectMode) onToggle() }
-  const handleCardDoubleClick = () => { if (!selectMode) onActivateSelect() }
+  // Clique simples abre o painel "Detalhes da geração"; no modo seleção,
+  // alterna o checkbox. Entrar em seleção não depende mais de duplo clique
+  // (conflitava com o clique simples abrindo o painel) — agora é o checkbox
+  // que aparece no hover, canto superior esquerdo (mesmo padrão do Google/Apple Fotos).
+  const handleCardClick = () => { if (selectMode) onToggle(); else onOpenDetail() }
 
   return (
     <div
       style={{
         ...S.card,
-        cursor:    selectMode ? 'pointer' : 'default',
+        cursor:    'pointer',
         boxShadow: selected
           ? '0 0 0 2px var(--color-text-primary), 0 8px 32px rgba(0,0,0,0.28)'
           : hovered
@@ -834,8 +1066,7 @@ function RenderCard({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onClick={handleCardClick}
-      onDoubleClick={handleCardDoubleClick}
-      title={selectMode ? undefined : 'Duplo clique para selecionar'}
+      title={selectMode ? undefined : 'Ver detalhes da geração'}
     >
       {/* Image */}
       <div style={S.cardImg}>
@@ -850,7 +1081,8 @@ function RenderCard({
           />
         )}
 
-        {/* Before thumbnail on hover — não mostrar para vídeo nem em modo seleção */}
+        {/* Before thumbnail on hover — não mostrar para vídeo nem em modo seleção.
+            Deslocado pra direita pra não sobrepor o checkbox de seleção (hover). */}
         {hovered && !selectMode && render.output_url && render.input_url && !isVideo && (
           <div style={S.beforeThumb}>
             <img src={render.input_url} alt="antes" draggable={false}
@@ -871,8 +1103,11 @@ function RenderCard({
           </div>
         )}
 
-        {/* Checkbox de seleção */}
-        {selectMode && (
+        {/* Checkbox de seleção — sempre visível em modo seleção; fora dele,
+            aparece no hover como atalho pra entrar em seleção já marcando
+            este card (substitui o antigo duplo clique, que conflitava com
+            o clique simples abrindo o painel de detalhes). */}
+        {selectMode ? (
           <div style={{ ...S.checkbox, ...(selected ? S.checkboxOn : null) }}>
             {selected && (
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
@@ -880,6 +1115,14 @@ function RenderCard({
               </svg>
             )}
           </div>
+        ) : hovered && (
+          <button
+            type="button"
+            onClick={e => { e.stopPropagation(); onActivateSelect() }}
+            aria-label="Selecionar"
+            title="Selecionar"
+            style={S.hoverCheckbox}
+          />
         )}
 
         {/* Badges */}
@@ -890,6 +1133,9 @@ function RenderCard({
           </div>
         )}
 
+        {/* Autoria — discreto, canto inferior esquerdo */}
+        {!selectMode && <AuthorChip author={author} />}
+
         {/* Kebab menu — top-right, on hover, not in select mode */}
         {hovered && !selectMode && isCreateSpaceEligible && (
           <div
@@ -897,7 +1143,6 @@ function RenderCard({
               position: 'absolute', top: 8, right: 8, zIndex: 4,
             }}
             onClick={e => e.stopPropagation()}
-            onDoubleClick={e => e.stopPropagation()}
           >
             <button
               type="button"
@@ -969,17 +1214,15 @@ function RenderCard({
 
         {/* Hover overlay actions — desativadas no modo seleção */}
         {hovered && !selectMode && render.output_url && (
-          <div style={S.hoverActions} onDoubleClick={e => e.stopPropagation()}>
+          <div style={S.hoverActions}>
             <a href={render.output_url} target="_blank" rel="noopener noreferrer"
               style={S.actionBtn}
-              onClick={e => e.stopPropagation()}
-              onDoubleClick={e => e.stopPropagation()}>
+              onClick={e => e.stopPropagation()}>
               {isVideo ? 'Assistir →' : 'Ver →'}
             </a>
             <a href={render.output_url} download target="_blank" rel="noopener noreferrer"
               style={S.actionBtnGhost}
-              onClick={e => e.stopPropagation()}
-              onDoubleClick={e => e.stopPropagation()}>
+              onClick={e => e.stopPropagation()}>
               <DownloadIcon /> baixar
             </a>
           </div>
@@ -994,8 +1237,8 @@ function RenderCard({
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3, flexShrink: 0 }}>
           <span style={S.metaDate}>{date}</span>
-          {render.cost_credits > 0 && (
-            <span style={S.metaNodes}>{render.cost_credits} node{render.cost_credits !== 1 ? 's' : ''}</span>
+          {nodes > 0 && (
+            <span style={S.metaNodes}>{nodes} node{nodes !== 1 ? 's' : ''}</span>
           )}
         </div>
       </div>
@@ -1030,7 +1273,9 @@ function MoveModal({
 
         <div style={S.modalBody}>
           <ul style={S.spaceList}>
-            {folders.map(f => (
+            {/* Pastas de topo com subpastas indentadas logo abaixo — deixa
+                claro em qual cliente/projeto cada subpasta vive. */}
+            {folders.filter(f => !f.parent_id).map(f => (
               <li key={f.id}>
                 <button
                   onClick={() => onPick(f.id)}
@@ -1040,6 +1285,17 @@ function MoveModal({
                   <FolderIcon />
                   <span style={{ flex: 1, textAlign: 'left' }}>{f.name}</span>
                 </button>
+                {folders.filter(sf => sf.parent_id === f.id).map(sf => (
+                  <button
+                    key={sf.id}
+                    onClick={() => onPick(sf.id)}
+                    disabled={busy}
+                    style={S.spaceItemSub}
+                  >
+                    <FolderIcon />
+                    <span style={{ flex: 1, textAlign: 'left' }}>{sf.name}</span>
+                  </button>
+                ))}
               </li>
             ))}
             <li>
@@ -1164,6 +1420,13 @@ const S: Record<string, CSSProperties> = {
   chipRow:       { display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 22 },
   chip:          { display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 4px 4px 12px', borderRadius: 999, background: 'var(--color-bg-elevated)', border: '0.5px solid var(--color-border-strong)', color: 'var(--color-text-secondary)', fontSize: 12, letterSpacing: '-0.01em' },
   chipActive:    { background: 'var(--color-text-primary)', borderColor: 'var(--color-text-primary)', color: 'var(--color-bg)' },
+  // Pasta de topo "aberta" (subpastas visíveis abaixo) sem ser a seleção
+  // exata — realce sutil, sem usar verde (reservado pra estados funcionais).
+  chipExpanded:  { borderColor: 'var(--color-text-tertiary)', background: 'var(--color-surface-hover)' },
+
+  // ── Fileira de subpastas (dentro da pasta de topo ativa) ─
+  subchipRow:    { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginBottom: 22, paddingLeft: 14, borderLeft: '2px solid var(--color-border)' },
+  subchipHint:   { fontSize: 10, color: 'var(--color-text-quaternary)', letterSpacing: '0.02em', marginRight: 2 },
   chipBtn:       { display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: '3px 4px 3px 0', font: 'inherit' },
   chipCount:     { fontSize: 10, opacity: 0.7, fontVariantNumeric: 'tabular-nums' },
   chipDelete:    { width: 18, height: 18, marginLeft: 2, marginRight: 2, padding: 0, borderRadius: '50%', background: 'rgba(0,0,0,0.18)', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
@@ -1184,12 +1447,17 @@ const S: Record<string, CSSProperties> = {
 
   checkbox:      { position: 'absolute', top: 10, left: 10, width: 22, height: 22, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.85)', background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' },
   checkboxOn:    { background: 'var(--color-text-primary)', borderColor: 'var(--color-text-primary)', color: 'var(--color-bg)' },
+  // Mesma posição/tamanho do checkbox de seleção — aparece só no hover, fora
+  // do modo seleção, como atalho pra entrar em seleção (ver RenderCard).
+  hoverCheckbox: { position: 'absolute', top: 10, left: 10, zIndex: 3, width: 22, height: 22, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.85)', background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(4px)', cursor: 'pointer', padding: 0, boxShadow: '0 1px 3px rgba(0,0,0,0.3)' },
 
   hoverActions:  { position: 'absolute', bottom: 10, right: 10, display: 'flex', gap: 6 },
   actionBtn:     { display: 'inline-flex', alignItems: 'center', padding: '5px 13px', background: 'rgba(255,255,255,0.92)', borderRadius: 7, fontSize: 11, color: '#0a0a0a', fontWeight: 500, textDecoration: 'none', fontFamily: 'inherit', letterSpacing: '-0.01em' },
   actionBtnGhost:{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 11px', background: 'rgba(0,0,0,0.5)', border: '0.5px solid rgba(255,255,255,0.25)', borderRadius: 7, fontSize: 10, color: '#fafafa', textDecoration: 'none', backdropFilter: 'blur(4px)', fontFamily: 'inherit' },
 
-  beforeThumb:   { position: 'absolute', top: 10, left: 10, width: 72, height: 54, borderRadius: 6, overflow: 'hidden', border: '1.5px solid rgba(255,255,255,0.6)', boxShadow: '0 2px 8px rgba(0,0,0,0.4)' },
+  // left:40 (não 10) pra não sobrepor o checkbox de hover, que ocupa o
+  // mesmo canto superior esquerdo.
+  beforeThumb:   { position: 'absolute', top: 10, left: 40, width: 72, height: 54, borderRadius: 6, overflow: 'hidden', border: '1.5px solid rgba(255,255,255,0.6)', boxShadow: '0 2px 8px rgba(0,0,0,0.4)' },
   beforeLabel:   { position: 'absolute', bottom: 3, left: 0, right: 0, textAlign: 'center', fontSize: 8, color: '#fff', fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', textShadow: '0 1px 2px rgba(0,0,0,0.8)' },
 
   // ── Action bar (modo seleção) ─
@@ -1213,4 +1481,6 @@ const S: Record<string, CSSProperties> = {
 
   spaceList:     { listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 2 },
   spaceItem:     { width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'none', border: 'none', borderRadius: 8, fontSize: 13, color: 'var(--color-text-primary)', cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '-0.01em', textAlign: 'left' },
+  // Subpasta dentro da lista de mover — indentada, cor mais suave.
+  spaceItemSub:  { width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px 8px 30px', background: 'none', border: 'none', borderRadius: 8, fontSize: 12, color: 'var(--color-text-secondary)', cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '-0.01em', textAlign: 'left' },
 }
