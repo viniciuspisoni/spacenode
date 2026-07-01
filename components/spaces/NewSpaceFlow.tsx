@@ -21,6 +21,49 @@ import { DnaPanel } from './DnaPanel'
 
 type Step = 'form' | 'upload' | 'analyzing' | 'reveal'
 
+// Reduz uma imagem hospedada a um File adequado à Vista Mestre.
+// O DNA é extraído por visão, então não precisamos da resolução cheia (que em
+// ampliações 8×/Ultra passa dos 15 MB aceitos pelo upload). Limitamos o maior
+// lado a MAX_DIM e reexportamos em JPEG. Imagens já pequenas passam sem reencode.
+const MASTER_MAX_DIM = 2560
+
+async function sourceUrlToMasterFile(url: string): Promise<File | null> {
+  const res = await fetch(url)
+  if (!res.ok) return null
+  const blob = await res.blob()
+
+  const bitmap = await createImageBitmap(blob).catch(() => null)
+  if (!bitmap) return null
+
+  const { width, height } = bitmap
+  const longest = Math.max(width, height)
+
+  // Já dentro do limite de dimensão e de tamanho → mantém o original.
+  if (longest <= MASTER_MAX_DIM && blob.size <= 14 * 1024 * 1024) {
+    bitmap.close?.()
+    const type = ['image/jpeg', 'image/png', 'image/webp'].includes(blob.type) ? blob.type : 'image/jpeg'
+    return new File([blob], `ampliada.${type.split('/')[1]}`, { type })
+  }
+
+  const scale = Math.min(1, MASTER_MAX_DIM / longest)
+  const w = Math.round(width * scale)
+  const h = Math.round(height * scale)
+
+  const canvas = document.createElement('canvas')
+  canvas.width = w
+  canvas.height = h
+  const ctx = canvas.getContext('2d')
+  if (!ctx) { bitmap.close?.(); return null }
+  ctx.drawImage(bitmap, 0, 0, w, h)
+  bitmap.close?.()
+
+  const outBlob: Blob | null = await new Promise(resolve =>
+    canvas.toBlob(b => resolve(b), 'image/jpeg', 0.92),
+  )
+  if (!outBlob) return null
+  return new File([outBlob], 'ampliada.jpg', { type: 'image/jpeg' })
+}
+
 const CATEGORIES: { id: SpaceCategory; label: string; description: string; defaultEngine: EngineId; icon: React.ReactNode }[] = [
   {
     id: 'residencial', label: 'Residencial',
@@ -44,9 +87,11 @@ const CATEGORIES: { id: SpaceCategory; label: string; description: string; defau
 
 interface NewSpaceFlowProps {
   initialBalance: number
+  /** URL https de uma imagem a pré-carregar como Vista Mestre (ex.: "Usar no Spaces" após Ampliar). */
+  sourceUrl?: string
 }
 
-export function NewSpaceFlow({ initialBalance }: NewSpaceFlowProps) {
+export function NewSpaceFlow({ initialBalance, sourceUrl }: NewSpaceFlowProps) {
   const router = useRouter()
   const [step, setStep] = useState<Step>('form')
 
@@ -181,6 +226,26 @@ export function NewSpaceFlow({ initialBalance }: NewSpaceFlowProps) {
   useEffect(() => {
     return () => { if (previewUrl) URL.revokeObjectURL(previewUrl) }
   }, [previewUrl])
+
+  // Pré-carga via ?source= (ex.: "Usar no Spaces" após Ampliar). URL hospedada
+  // → File → preview. Confia no próprio output (sem checar limite de tamanho).
+  const sourcePreloadedRef = useRef(false)
+  useEffect(() => {
+    if (sourcePreloadedRef.current || !sourceUrl) return
+    if (!/^https:\/\//i.test(sourceUrl)) return
+    sourcePreloadedRef.current = true
+    ;(async () => {
+      try {
+        const f = await sourceUrlToMasterFile(sourceUrl)
+        if (!f) return
+        setFile(f)
+        setPreviewUrl(URL.createObjectURL(f))
+      } catch {
+        // Silencioso: o usuário ainda pode subir a imagem manualmente.
+      }
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceUrl])
 
   // ── Render ─────────────────────────────────────────────────────
 
