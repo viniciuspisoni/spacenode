@@ -1261,3 +1261,85 @@ a {
   .spn-proj-kebab,
   .spn-proj-filter { transition: none; }
 }
+
+/* ── Seletor de aparência — cápsula de vidro (dark: fumê; light: vidro claro) ──
+   Fallback: fundo mais opaco quando backdrop-filter não é suportado. */
+.spn-theme-seg {
+  /* vidro fumê (dark) */
+  --seg-glass: rgba(18, 18, 19, 0.62);
+  --seg-glass-blur: rgba(18, 18, 19, 0.34);
+  --seg-reflex: rgba(255, 255, 255, 0.07);
+  --seg-active-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.05));
+  --seg-active-ring: rgba(255, 255, 255, 0.14);
+  --seg-active-shadow: 0 1px 5px rgba(0, 0, 0, 0.35);
+
+  position: relative;
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--seg-glass);
+  border: 0.5px solid var(--color-border-strong);
+  box-shadow: inset 0 1px 0 var(--seg-reflex), var(--shadow-sm);
+  isolation: isolate;
+}
+html.light .spn-theme-seg {
+  /* vidro claro (light) */
+  --seg-glass: rgba(255, 255, 255, 0.72);
+  --seg-glass-blur: rgba(255, 255, 255, 0.48);
+  --seg-reflex: rgba(255, 255, 255, 0.75);
+  --seg-active-bg: linear-gradient(180deg, #ffffff, #f3f3f1);
+  --seg-active-ring: rgba(0, 0, 0, 0.09);
+  --seg-active-shadow: 0 1px 4px rgba(0, 0, 0, 0.10);
+}
+@supports ((backdrop-filter: blur(14px)) or (-webkit-backdrop-filter: blur(14px))) {
+  .spn-theme-seg {
+    background: var(--seg-glass-blur);
+    -webkit-backdrop-filter: blur(14px) saturate(1.25);
+    backdrop-filter: blur(14px) saturate(1.25);
+  }
+}
+
+.spn-theme-seg-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  transition: color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+}
+.spn-theme-seg-btn--compact { padding: 5px 10px; }
+.spn-theme-seg-btn--full    { padding: 6px 14px; }
+
+.spn-theme-seg-btn:hover:not([aria-checked='true']) {
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+}
+
+/* Peça de vidro encaixada — estado ativo */
+.spn-theme-seg-btn[aria-checked='true'] {
+  color: var(--color-text-primary);
+  background: var(--seg-active-bg);
+  box-shadow:
+    inset 0 1px 0 var(--seg-reflex),
+    0 0 0 0.5px var(--seg-active-ring),
+    var(--seg-active-shadow);
+}
+
+.spn-theme-seg-btn:focus-visible {
+  outline: 1.5px solid var(--color-border-focus);
+  outline-offset: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spn-theme-seg-btn { transition: none; }
+}
