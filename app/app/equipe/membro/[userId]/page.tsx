@@ -119,7 +119,7 @@ export default async function MembroPage({
                 border: '0.5px solid var(--color-border)',
                 borderRadius: 12, overflow: 'hidden',
               }}>
-                <div style={{ position: 'relative', aspectRatio: '1 / 1', background: 'rgba(255,255,255,0.03)' }}>
+                <div style={{ position: 'relative', aspectRatio: '1 / 1', background: 'var(--color-surface)' }}>
                   {g.url
                     ? <img src={g.url} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                     : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: 'var(--color-text-tertiary)' }}>sem imagem</div>}
@@ -160,7 +160,7 @@ function Chip({ href, active, label }: { href: string; active: boolean; label: s
     <Link href={href} style={{
       padding: '6px 12px', borderRadius: 999, fontSize: 12, textDecoration: 'none',
       whiteSpace: 'nowrap',
-      background: active ? 'var(--color-accent-green)' : 'rgba(255,255,255,0.04)',
+      background: active ? 'var(--color-accent-green)' : 'var(--color-surface)',
       color: active ? '#06140d' : 'var(--color-text-secondary)',
       border: active ? 'none' : '0.5px solid var(--color-border-strong)',
       fontWeight: active ? 600 : 400,

@@ -54,28 +54,28 @@ export default function FidelityModeSelector({ value, onChange, disabled }: Prop
                 borderRadius:  9,
                 textAlign:     'left',
                 width:         '100%',
-                border:        `1px solid ${active ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.07)'}`,
-                background:    active ? 'rgba(255,255,255,0.06)' : 'transparent',
+                border:        `1px solid ${active ? 'var(--color-border-focus)' : 'var(--color-border)'}`,
+                background:    active ? 'var(--color-surface)' : 'transparent',
                 cursor:        disabled ? 'not-allowed' : 'pointer',
                 transition:    'border-color 0.15s, background 0.15s',
               }}
             >
               <div style={{
                 width: 8, height: 8, borderRadius: '50%', flexShrink: 0, marginTop: 5,
-                background: active ? '#ffffff' : 'rgba(255,255,255,0.2)',
+                background: active ? 'var(--color-text-primary)' : 'var(--color-text-quaternary)',
               }} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{
                   fontSize:      12.5,
                   fontWeight:    500,
                   letterSpacing: '-0.01em',
-                  color:         active ? '#ffffff' : 'rgba(255,255,255,0.7)',
+                  color:         active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                 }}>
                   {m.label}
                 </div>
                 <div style={{
                   fontSize: 10.5,
-                  color:    'rgba(255,255,255,0.38)',
+                  color:    'var(--color-text-tertiary)',
                   marginTop:3,
                   lineHeight: 1.4,
                 }}>
@@ -94,7 +94,7 @@ const Label = ({ children }: { children: React.ReactNode }) => (
   <div style={{
     fontSize:    10, fontWeight: 600, letterSpacing: '0.1em',
     textTransform:'uppercase' as const,
-    color:       'rgba(255,255,255,0.40)',
+    color:       'var(--color-text-tertiary)',
     marginBottom: 10,
   }}>
     {children}

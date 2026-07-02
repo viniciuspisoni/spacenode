@@ -44,7 +44,7 @@ export default async function AppLayout({
   const lumenBalance = balRes.data?.lumen_balance ?? 0
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#050505' }}>
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--color-bg)' }}>
       <Sidebar
         userName={userName}
         userAvatar={userAvatar}
@@ -53,7 +53,7 @@ export default async function AppLayout({
         lumenBalance={lumenBalance}
         planId={planId}
       />
-      <main style={{ flex: 1, overflow: 'hidden', minHeight: 0, display: 'flex', background: '#050505' }}>
+      <main style={{ flex: 1, overflow: 'hidden', minHeight: 0, display: 'flex', background: 'var(--color-bg)' }}>
         {children}
       </main>
     </div>

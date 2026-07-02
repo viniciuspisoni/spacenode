@@ -161,7 +161,7 @@ export default function MoodboardClient({ initialCredits, studioName: initialStu
   }
 
   return (
-    <div style={{ display: 'flex', width: '100%', height: '100%', overflow: 'hidden', background: '#0a0a0a', color: '#ffffff' }}>
+    <div style={{ display: 'flex', width: '100%', height: '100%', overflow: 'hidden', background: 'var(--color-bg)', color: 'var(--color-text-primary)' }}>
       <style>{`
         @keyframes spin   { to { transform: rotate(360deg); } }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
@@ -171,18 +171,18 @@ export default function MoodboardClient({ initialCredits, studioName: initialStu
       <div style={{
         width: 420, flexShrink: 0,
         display: 'flex', flexDirection: 'column',
-        borderRight: '0.5px solid rgba(255,255,255,0.07)',
+        borderRight: '0.5px solid var(--color-border)',
         overflow: 'hidden',
       }}>
 
         {/* Header */}
-        <div style={{ padding: '24px 24px 16px', borderBottom: '0.5px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>
+        <div style={{ padding: '24px 24px 16px', borderBottom: '0.5px solid var(--color-border)', flexShrink: 0 }}>
           <Breadcrumb />
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em', color: '#ffffff' }}>{TOOL.name}</div>
+            <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--color-text-primary)' }}>{TOOL.name}</div>
             <Pill tone="green">novo</Pill>
           </div>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 4, lineHeight: 1.5 }}>
+          <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4, lineHeight: 1.5 }}>
             Crie paletas, materiais e conceitos visuais para apresentar seus projetos.
           </div>
         </div>
@@ -198,10 +198,10 @@ export default function MoodboardClient({ initialCredits, studioName: initialStu
               onDragLeave={() => setIsDragging(false)}
               onDrop={(e) => { e.preventDefault(); setIsDragging(false); const f = e.dataTransfer.files[0]; if (f) loadImageFile(f) }}
               style={{
-                border: `1.5px dashed ${isDragging ? 'rgba(255,255,255,0.4)' : imageFile ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.12)'}`,
+                border: `1.5px dashed ${isDragging ? 'var(--color-border-focus)' : imageFile ? 'var(--color-border-strong)' : 'var(--color-border-strong)'}`,
                 borderRadius: 10, overflow: 'hidden', cursor: 'pointer',
                 transition: 'border-color 0.15s, background 0.15s',
-                background: isDragging ? 'rgba(255,255,255,0.04)' : 'transparent',
+                background: isDragging ? 'var(--color-surface)' : 'transparent',
                 minHeight: imageFile ? 0 : 110,
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                 padding: imageFile ? 0 : '22px 18px',
@@ -209,29 +209,29 @@ export default function MoodboardClient({ initialCredits, studioName: initialStu
             >
               {imageFile && imagePreview ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
-                <img src={imagePreview} alt="referência" style={{ width: '100%', display: 'block', maxHeight: 200, objectFit: 'cover', background: '#0a0a0a' }} />
+                <img src={imagePreview} alt="referência" style={{ width: '100%', display: 'block', maxHeight: 200, objectFit: 'cover', background: 'var(--color-preview-bg)' }} />
               ) : (
                 <>
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" strokeLinecap="round">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-quaternary)" strokeWidth="1.5" strokeLinecap="round">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                     <polyline points="17 8 12 3 7 8"/>
                     <line x1="12" y1="3" x2="12" y2="15"/>
                   </svg>
-                  <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 9 }}>
+                  <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 9 }}>
                     Arraste imagem ou render de referência
                   </span>
-                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', marginTop: 4 }}>PNG, JPG, WEBP — até 20 MB</span>
+                  <span style={{ fontSize: 10, color: 'var(--color-text-quaternary)', marginTop: 4 }}>PNG, JPG, WEBP — até 20 MB</span>
                 </>
               )}
             </div>
 
             {imageFile && (
               <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>
+                <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>
                   {formatFileSize(imageFile.size)}
                 </div>
                 <button onClick={(e) => { e.stopPropagation(); resetImage() }}
-                  style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                  style={{ fontSize: 10, color: 'var(--color-text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                   Trocar imagem
                 </button>
               </div>
@@ -250,16 +250,16 @@ export default function MoodboardClient({ initialCredits, studioName: initialStu
               placeholder="Ex.: Cobertura Itaim"
               style={{
                 width: '100%', padding: '10px 12px', borderRadius: 8,
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                color: '#ffffff', fontSize: 12,
+                background: 'var(--color-input)',
+                border: '1px solid var(--color-input-border)',
+                color: 'var(--color-text-primary)', fontSize: 12,
                 letterSpacing: '-0.01em', outline: 'none',
                 transition: 'border-color 0.15s, background 0.15s',
               }}
-              onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.22)' }}
-              onBlur={(e)  => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)' }}
+              onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-border-focus)' }}
+              onBlur={(e)  => { e.currentTarget.style.borderColor = 'var(--color-input-border)' }}
             />
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.28)', marginTop: 6 }}>
+            <div style={{ fontSize: 10, color: 'var(--color-text-quaternary)', marginTop: 6 }}>
               Aparece no rodapé do moodboard.
             </div>
           </Section>
@@ -300,15 +300,15 @@ export default function MoodboardClient({ initialCredits, studioName: initialStu
                   <button key={l.id} onClick={() => setLevel(l.id)}
                     style={{
                       flex: 1, padding: '10px 8px', borderRadius: 8,
-                      border: `1px solid ${selected ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.07)'}`,
-                      background: selected ? 'rgba(255,255,255,0.08)' : 'transparent',
+                      border: `1px solid ${selected ? 'var(--color-border-focus)' : 'var(--color-border)'}`,
+                      background: selected ? 'var(--color-surface-hover)' : 'transparent',
                       cursor: 'pointer', textAlign: 'center', transition: 'all 0.15s',
                     }}
                   >
-                    <div style={{ fontSize: 12, fontWeight: 600, color: selected ? '#ffffff' : 'rgba(255,255,255,0.55)', letterSpacing: '-0.01em' }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: selected ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', letterSpacing: '-0.01em' }}>
                       {l.label}
                     </div>
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginTop: 3, lineHeight: 1.3 }}>
+                    <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', marginTop: 3, lineHeight: 1.3 }}>
                       {l.desc}
                     </div>
                   </button>
@@ -327,20 +327,20 @@ export default function MoodboardClient({ initialCredits, studioName: initialStu
                     style={{
                       display: 'flex', alignItems: 'center', gap: 10,
                       padding: '10px 12px', borderRadius: 8,
-                      border: `1px solid ${sel ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.07)'}`,
-                      background: sel ? 'rgba(255,255,255,0.06)' : 'transparent',
+                      border: `1px solid ${sel ? 'var(--color-border-strong)' : 'var(--color-border)'}`,
+                      background: sel ? 'var(--color-surface)' : 'transparent',
                       cursor: 'pointer', textAlign: 'left', width: '100%',
                       transition: 'border-color 0.15s, background 0.15s',
                     }}>
                     <div style={{
                       width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-                      background: sel ? '#ffffff' : 'rgba(255,255,255,0.2)',
+                      background: sel ? 'var(--color-text-primary)' : 'var(--color-text-quaternary)',
                     }} />
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 12, fontWeight: 500, color: sel ? '#fff' : 'rgba(255,255,255,0.65)' }}>
+                      <div style={{ fontSize: 12, fontWeight: 500, color: sel ? 'var(--color-text-primary)' : 'var(--color-text-secondary)' }}>
                         {f.label}
                       </div>
-                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.32)', marginTop: 2 }}>
+                      <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
                         {f.desc}
                       </div>
                     </div>
@@ -354,21 +354,21 @@ export default function MoodboardClient({ initialCredits, studioName: initialStu
           {studioName ? (
             <div style={{
               padding: '8px 12px', borderRadius: 8,
-              background: 'rgba(48,180,108,0.06)',
-              border: '1px solid rgba(48,180,108,0.18)',
-              fontSize: 10, color: 'rgba(134,239,172,0.85)', lineHeight: 1.5,
+              background: 'var(--color-accent-green-bg)',
+              border: '1px solid var(--color-accent-green-border)',
+              fontSize: 10, color: 'var(--color-accent-green)', lineHeight: 1.5,
             }}>
               <strong style={{ fontWeight: 600 }}>{studioName}</strong> aparecerá no cabeçalho do moodboard.
             </div>
           ) : (
             <div style={{
               padding: '8px 12px', borderRadius: 8,
-              background: 'rgba(255,255,255,0.03)',
-              border: '1px solid rgba(255,255,255,0.08)',
-              fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5,
+              background: 'var(--color-surface)',
+              border: '1px solid var(--color-border)',
+              fontSize: 10, color: 'var(--color-text-tertiary)', lineHeight: 1.5,
             }}>
               Configure sua{' '}
-              <Link href="/app/settings/identity" style={{ color: 'rgba(255,255,255,0.8)', textDecoration: 'underline' }}>
+              <Link href="/app/settings/identity" style={{ color: 'var(--color-text-secondary)', textDecoration: 'underline' }}>
                 identidade
               </Link>{' '}
               para aparecer no cabeçalho.
@@ -383,20 +383,20 @@ export default function MoodboardClient({ initialCredits, studioName: initialStu
         </div>
 
         {/* Footer */}
-        <div style={{ padding: '16px 24px', borderTop: '0.5px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>
+        <div style={{ padding: '16px 24px', borderTop: '0.5px solid var(--color-border)', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
-              Custo: <span style={{ color: 'rgba(255,255,255,0.75)', fontWeight: 500 }}>{nodeCost} Nodes</span>
+            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+              Custo: <span style={{ color: 'var(--color-text-secondary)', fontWeight: 500 }}>{nodeCost} Nodes</span>
             </div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
-              Saldo: <span style={{ color: credits > 0 ? 'rgba(255,255,255,0.75)' : 'var(--color-error)', fontWeight: 500 }}>{credits} Nodes</span>
+            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+              Saldo: <span style={{ color: credits > 0 ? 'var(--color-text-secondary)' : 'var(--color-error)', fontWeight: 500 }}>{credits} Nodes</span>
             </div>
           </div>
           <button onClick={handleSubmit} disabled={!canSubmit}
             style={{
               width: '100%', padding: '12px 20px', borderRadius: 8, border: 'none',
-              background: canSubmit ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.07)',
-              color: canSubmit ? '#0a0a0a' : 'rgba(255,255,255,0.25)',
+              background: canSubmit ? 'var(--color-inverse)' : 'var(--color-surface-hover)',
+              color: canSubmit ? 'var(--color-inverse-foreground)' : 'var(--color-text-quaternary)',
               fontSize: 13, fontWeight: 600, cursor: canSubmit ? 'pointer' : 'not-allowed',
               transition: 'background 0.15s, color 0.15s', letterSpacing: '-0.01em',
             }}
@@ -420,8 +420,8 @@ export default function MoodboardClient({ initialCredits, studioName: initialStu
 
         {isLoading && (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
-            <div style={{ width: 40, height: 40, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.1)', borderTop: '2px solid rgba(255,255,255,0.7)', animation: 'spin 0.9s linear infinite' }} />
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', letterSpacing: '0.02em' }}>{loadingText}</div>
+            <div style={{ width: 40, height: 40, borderRadius: '50%', border: '2px solid var(--color-border-strong)', borderTop: '2px solid var(--color-text-secondary)', animation: 'spin 0.9s linear infinite' }} />
+            <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', letterSpacing: '0.02em' }}>{loadingText}</div>
           </div>
         )}
 
@@ -470,20 +470,20 @@ function ResultView({
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' as const }}>
           <div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>
+            <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>
               Moodboard · {formatSpec.label}
             </div>
-            <h2 style={{ fontSize: 24, fontWeight: 500, color: '#ffffff', letterSpacing: '-0.03em', margin: 0 }}>
+            <h2 style={{ fontSize: 24, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.03em', margin: 0 }}>
               {result.title}
             </h2>
             <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' as const }}>
               {result.tags.map((t) => (
                 <span key={t} style={{
                   fontSize: 10, fontWeight: 500,
-                  color: 'rgba(255,255,255,0.65)',
+                  color: 'var(--color-text-secondary)',
                   padding: '3px 9px', borderRadius: 999,
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '0.5px solid rgba(255,255,255,0.12)',
+                  background: 'var(--color-chip)',
+                  border: '0.5px solid var(--color-border-strong)',
                   letterSpacing: '0.01em',
                 }}>
                   {t}
@@ -495,14 +495,14 @@ function ResultView({
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 8,
               padding: '10px 18px', borderRadius: 8,
-              background: '#fff', color: '#0a0a0a',
+              background: 'var(--color-inverse)', color: 'var(--color-inverse-foreground)',
               fontSize: 12, fontWeight: 600, border: 'none',
               cursor: isExporting ? 'wait' : 'pointer', letterSpacing: '-0.01em',
               opacity: isExporting ? 0.7 : 1, flexShrink: 0,
             }}>
             {isExporting ? (
               <>
-                <span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: '50%', border: '1.5px solid rgba(10,10,10,0.2)', borderTop: '1.5px solid #0a0a0a', animation: 'spin 0.8s linear infinite' }} />
+                <span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: '50%', border: '1.5px solid color-mix(in srgb, var(--color-inverse-foreground) 20%, transparent)', borderTop: '1.5px solid var(--color-inverse-foreground)', animation: 'spin 0.8s linear infinite' }} />
                 Exportando…
               </>
             ) : (
@@ -525,7 +525,7 @@ function ResultView({
           maxHeight: '70vh',
           margin: '0 auto',
           borderRadius: 12, overflow: 'hidden',
-          border: '0.5px solid rgba(255,255,255,0.12)',
+          border: '0.5px solid var(--color-border-strong)',
           background: '#1a1612',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
@@ -547,13 +547,13 @@ function ResultView({
                   <div style={{
                     width: 32, height: 32, borderRadius: 6, flexShrink: 0,
                     background: s.hex,
-                    border: '0.5px solid rgba(255,255,255,0.12)',
+                    border: '0.5px solid var(--color-border-strong)',
                   }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, color: '#ffffff', fontWeight: 500, letterSpacing: '-0.01em' }}>
+                    <div style={{ fontSize: 12, color: 'var(--color-text-primary)', fontWeight: 500, letterSpacing: '-0.01em' }}>
                       {s.name}
                     </div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', marginTop: 2 }}>
+                    <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', marginTop: 2 }}>
                       {s.hex.toUpperCase()}
                     </div>
                   </div>
@@ -564,7 +564,7 @@ function ResultView({
 
           {/* Conceito */}
           <Panel title="Conceito">
-            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.78)', lineHeight: 1.65, margin: 0, letterSpacing: '-0.005em' }}>
+            <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', lineHeight: 1.65, margin: 0, letterSpacing: '-0.005em' }}>
               {result.concept}
             </p>
           </Panel>
@@ -576,18 +576,18 @@ function ResultView({
             {result.materials.map((m, i) => (
               <div key={`${m.category}-${i}`} style={{
                 padding: '12px 14px',
-                background: 'rgba(255,255,255,0.025)',
-                border: '0.5px solid rgba(255,255,255,0.08)',
+                background: 'var(--color-surface-subtle)',
+                border: '0.5px solid var(--color-border)',
                 borderRadius: 10,
               }}>
-                <div style={{ fontSize: 9, fontWeight: 600, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 6 }}>
+                <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--color-text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 6 }}>
                   {m.category}
                 </div>
-                <div style={{ fontSize: 12.5, color: '#ffffff', fontWeight: 500, letterSpacing: '-0.01em', marginBottom: m.note ? 4 : 0 }}>
+                <div style={{ fontSize: 12.5, color: 'var(--color-text-primary)', fontWeight: 500, letterSpacing: '-0.01em', marginBottom: m.note ? 4 : 0 }}>
                   {m.name}
                 </div>
                 {m.note && (
-                  <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.42)', lineHeight: 1.45 }}>
+                  <div style={{ fontSize: 10.5, color: 'var(--color-text-tertiary)', lineHeight: 1.45 }}>
                     {m.note}
                   </div>
                 )}
@@ -616,10 +616,10 @@ function EmptyState() {
         </svg>
       </div>
       <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', fontWeight: 500, letterSpacing: '-0.01em' }}>
+        <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', fontWeight: 500, letterSpacing: '-0.01em' }}>
           Seu moodboard aparecerá aqui
         </div>
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', marginTop: 5, lineHeight: 1.5, maxWidth: 340 }}>
+        <div style={{ fontSize: 11, color: 'var(--color-text-quaternary)', marginTop: 5, lineHeight: 1.5, maxWidth: 340 }}>
           Envie uma referência ou descreva o conceito e escolha ambiente, estilo, paleta e nível.
         </div>
       </div>
@@ -631,12 +631,12 @@ function EmptyState() {
 
 function Breadcrumb() {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.04em', textTransform: 'uppercase' as const }}>
-      <Link href="/app/apresentar" style={{ color: 'rgba(255,255,255,0.35)', textDecoration: 'none' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: 'var(--color-text-tertiary)', letterSpacing: '0.04em', textTransform: 'uppercase' as const }}>
+      <Link href="/app/apresentar" style={{ color: 'var(--color-text-tertiary)', textDecoration: 'none' }}>
         Apresentar
       </Link>
       <span>›</span>
-      <span style={{ color: 'rgba(255,255,255,0.6)' }}>Moodboard</span>
+      <span style={{ color: 'var(--color-text-secondary)' }}>Moodboard</span>
     </div>
   )
 }
@@ -644,7 +644,7 @@ function Breadcrumb() {
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.35)', display: 'block', marginBottom: 10 }}>
+      <label style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 10 }}>
         {label}
       </label>
       {children}
@@ -653,8 +653,8 @@ function Section({ label, children }: { label: string; children: React.ReactNode
 }
 
 function Pill({ tone = 'green', children }: { tone?: 'green' | 'muted'; children: React.ReactNode }) {
-  const color = tone === 'green' ? '#30b46c' : 'rgba(255,255,255,0.4)'
-  const bg    = tone === 'green' ? 'rgba(48,180,108,0.16)' : 'rgba(255,255,255,0.06)'
+  const color = tone === 'green' ? 'var(--color-accent-green)' : 'var(--color-text-tertiary)'
+  const bg    = tone === 'green' ? 'var(--color-accent-green-bg)' : 'var(--color-chip)'
   return (
     <span style={{
       fontSize: 8, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' as const,
@@ -678,9 +678,9 @@ function PillRow<T extends string>({ items, selected, onSelect }: {
           <button key={it.id} onClick={() => onSelect(it.id)}
             style={{
               padding: '6px 11px', borderRadius: 6,
-              border: `1px solid ${isSel ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.08)'}`,
-              background: isSel ? 'rgba(255,255,255,0.08)' : 'transparent',
-              fontSize: 11, color: isSel ? '#ffffff' : 'rgba(255,255,255,0.5)',
+              border: `1px solid ${isSel ? 'var(--color-border-focus)' : 'var(--color-border)'}`,
+              background: isSel ? 'var(--color-surface-hover)' : 'transparent',
+              fontSize: 11, color: isSel ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
               cursor: 'pointer', transition: 'all 0.15s',
             }}
           >
@@ -696,11 +696,11 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
   return (
     <div style={{
       padding: '18px 20px',
-      background: 'rgba(255,255,255,0.02)',
-      border: '0.5px solid rgba(255,255,255,0.08)',
+      background: 'var(--color-surface-subtle)',
+      border: '0.5px solid var(--color-border)',
       borderRadius: 12,
     }}>
-      <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', marginBottom: 14 }}>
+      <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-text-tertiary)', marginBottom: 14 }}>
         {title}
       </div>
       {children}

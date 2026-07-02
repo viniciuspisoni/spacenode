@@ -51,12 +51,12 @@ export default function VideoPromptBox({
         disabled={disabled}
         style={{
           width:        '100%',
-          background:   'rgba(255,255,255,0.04)',
-          border:       '1px solid rgba(255,255,255,0.09)',
+          background:   'var(--color-input)',
+          border:       '1px solid var(--color-input-border)',
           borderRadius: 8,
           padding:      '10px 12px',
           fontSize:     12,
-          color:        '#ffffff',
+          color:        'var(--color-text-primary)',
           resize:       'none',
           outline:      'none',
           fontFamily:   'inherit',
@@ -73,7 +73,7 @@ const Label = ({ children }: { children: React.ReactNode }) => (
   <div style={{
     fontSize:    10, fontWeight: 600, letterSpacing: '0.1em',
     textTransform:'uppercase' as const,
-    color:       'rgba(255,255,255,0.40)',
+    color:       'var(--color-text-tertiary)',
   }}>
     {children}
   </div>

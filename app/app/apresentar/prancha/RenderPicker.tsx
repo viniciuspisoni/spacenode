@@ -139,7 +139,7 @@ export default function RenderPicker({ minSelection, maxSelection, initialSelect
       onClick={onClose}
       style={{
         position: 'fixed', inset: 0, zIndex: 100,
-        background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)',
+        background: 'var(--color-scrim-strong)', backdropFilter: 'blur(6px)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         padding: 24,
         animation: 'pickerFadeIn 0.18s ease',
@@ -154,8 +154,8 @@ export default function RenderPicker({ minSelection, maxSelection, initialSelect
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%', maxWidth: 1100, maxHeight: '90vh',
-          background: '#0a0a0a', color: '#fff',
-          borderRadius: 14, border: '0.5px solid rgba(255,255,255,0.12)',
+          background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)',
+          borderRadius: 14, border: '0.5px solid var(--color-border-strong)',
           display: 'flex', flexDirection: 'column', overflow: 'hidden',
           animation: 'pickerScaleIn 0.2s ease',
         }}
@@ -164,31 +164,31 @@ export default function RenderPicker({ minSelection, maxSelection, initialSelect
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '20px 24px',
-          borderBottom: '0.5px solid rgba(255,255,255,0.08)',
+          borderBottom: '0.5px solid var(--color-border)',
           flexShrink: 0,
         }}>
           <div>
             <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em' }}>
               Selecionar imagens do histórico
             </div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 3 }}>
+            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 3 }}>
               Escolha de {minSelection} a {maxSelection} imagens. A ordem da seleção será a ordem do carrossel.
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{
               fontSize: 11, fontWeight: 500,
-              color: selectedIds.length >= minSelection ? '#30b46c' : 'rgba(255,255,255,0.5)',
+              color: selectedIds.length >= minSelection ? 'var(--color-accent-green)' : 'var(--color-text-tertiary)',
               padding: '6px 12px', borderRadius: 999,
-              background: selectedIds.length >= minSelection ? 'rgba(48,180,108,0.12)' : 'rgba(255,255,255,0.06)',
-              border: `0.5px solid ${selectedIds.length >= minSelection ? 'rgba(48,180,108,0.3)' : 'rgba(255,255,255,0.1)'}`,
+              background: selectedIds.length >= minSelection ? 'var(--color-accent-green-bg)' : 'var(--color-chip)',
+              border: `0.5px solid ${selectedIds.length >= minSelection ? 'var(--color-accent-green-border)' : 'var(--color-border-strong)'}`,
             }}>
               {selectedIds.length} / {maxSelection}
             </div>
             <button onClick={onClose}
               style={{
                 background: 'none', border: 'none', cursor: 'pointer',
-                color: 'rgba(255,255,255,0.5)', padding: 4,
+                color: 'var(--color-text-tertiary)', padding: 4,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
@@ -201,7 +201,7 @@ export default function RenderPicker({ minSelection, maxSelection, initialSelect
         {/* Grid */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
           {renders.length === 0 && !loading && !error && (
-            <div style={{ padding: '60px 0', textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>
+            <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 13 }}>
               Você ainda não tem imagens no histórico.
               <br />
               <span style={{ fontSize: 11 }}>Gere alguns renders primeiro para montar uma prancha.</span>
@@ -229,8 +229,8 @@ export default function RenderPicker({ minSelection, maxSelection, initialSelect
                   style={{
                     position: 'relative', cursor: blocked ? 'not-allowed' : 'pointer',
                     borderRadius: 8, overflow: 'hidden',
-                    border: isSel ? '2px solid #fff' : '0.5px solid rgba(255,255,255,0.1)',
-                    background: '#111',
+                    border: isSel ? '2px solid var(--color-text-primary)' : '0.5px solid var(--color-border-strong)',
+                    background: 'var(--color-preview-bg)',
                     aspectRatio: '4 / 3',
                     transition: 'border-color 0.15s, transform 0.15s',
                     opacity: blocked ? 0.4 : 1,
@@ -275,12 +275,12 @@ export default function RenderPicker({ minSelection, maxSelection, initialSelect
           <div ref={loadMoreRef} style={{ height: 1 }} />
 
           {loading && (
-            <div style={{ padding: '20px 0', textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>
+            <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 11 }}>
               Carregando…
             </div>
           )}
           {!hasMore && renders.length > 0 && (
-            <div style={{ padding: '20px 0', textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 10 }}>
+            <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 10 }}>
               Fim do histórico.
             </div>
           )}
@@ -289,11 +289,11 @@ export default function RenderPicker({ minSelection, maxSelection, initialSelect
         {/* Footer */}
         <div style={{
           padding: '16px 24px',
-          borderTop: '0.5px solid rgba(255,255,255,0.08)',
+          borderTop: '0.5px solid var(--color-border)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           flexShrink: 0,
         }}>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
+          <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
             {selectedIds.length < minSelection
               ? `Selecione mais ${minSelection - selectedIds.length} imagem${minSelection - selectedIds.length === 1 ? '' : 'ns'}.`
               : `${selectedIds.length} imagem${selectedIds.length === 1 ? '' : 'ns'} selecionada${selectedIds.length === 1 ? '' : 's'}.`}
@@ -302,8 +302,8 @@ export default function RenderPicker({ minSelection, maxSelection, initialSelect
             <button onClick={onClose}
               style={{
                 padding: '9px 16px', borderRadius: 8,
-                background: 'transparent', border: '1px solid rgba(255,255,255,0.15)',
-                color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: 500,
+                background: 'transparent', border: '1px solid var(--color-border-strong)',
+                color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 500,
                 cursor: 'pointer', letterSpacing: '-0.01em',
               }}>
               Cancelar
@@ -311,8 +311,8 @@ export default function RenderPicker({ minSelection, maxSelection, initialSelect
             <button onClick={handleConfirm} disabled={!canConfirm}
               style={{
                 padding: '9px 18px', borderRadius: 8, border: 'none',
-                background: canConfirm ? '#fff' : 'rgba(255,255,255,0.08)',
-                color:      canConfirm ? '#0a0a0a' : 'rgba(255,255,255,0.3)',
+                background: canConfirm ? 'var(--color-inverse)' : 'var(--color-surface-hover)',
+                color:      canConfirm ? 'var(--color-inverse-foreground)' : 'var(--color-text-tertiary)',
                 fontSize: 12, fontWeight: 600,
                 cursor: canConfirm ? 'pointer' : 'not-allowed',
                 letterSpacing: '-0.01em',

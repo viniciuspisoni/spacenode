@@ -131,7 +131,7 @@ export default function IsometricasClient({ initialCredits }: Props) {
   }
 
   return (
-    <div style={{ display: 'flex', width: '100%', height: '100%', overflow: 'hidden', background: '#0a0a0a', color: '#ffffff' }}>
+    <div style={{ display: 'flex', width: '100%', height: '100%', overflow: 'hidden', background: 'var(--color-bg)', color: 'var(--color-text-primary)' }}>
       <style>{`
         @keyframes spin   { to { transform: rotate(360deg); } }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
@@ -141,18 +141,18 @@ export default function IsometricasClient({ initialCredits }: Props) {
       <div style={{
         width: 420, flexShrink: 0,
         display: 'flex', flexDirection: 'column',
-        borderRight: '0.5px solid rgba(255,255,255,0.07)',
+        borderRight: '0.5px solid var(--color-border)',
         overflow: 'hidden',
       }}>
 
         {/* Header */}
-        <div style={{ padding: '24px 24px 16px', borderBottom: '0.5px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>
+        <div style={{ padding: '24px 24px 16px', borderBottom: '0.5px solid var(--color-border)', flexShrink: 0 }}>
           <Breadcrumb />
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em', color: '#ffffff' }}>{TOOL.name}</div>
+            <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--color-text-primary)' }}>{TOOL.name}</div>
             <Pill tone="green">novo</Pill>
           </div>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 4, lineHeight: 1.5 }}>
+          <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4, lineHeight: 1.5 }}>
             {TOOL.longDesc}
           </div>
         </div>
@@ -168,40 +168,40 @@ export default function IsometricasClient({ initialCredits }: Props) {
               onDragLeave={() => setIsDragging(false)}
               onDrop={(e) => { e.preventDefault(); setIsDragging(false); const f = e.dataTransfer.files[0]; if (f) loadImageFile(f) }}
               style={{
-                border: `1.5px dashed ${isDragging ? 'rgba(255,255,255,0.4)' : imageFile ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.12)'}`,
+                border: `1.5px dashed ${isDragging ? 'var(--color-border-focus)' : imageFile ? 'var(--color-border-strong)' : 'var(--color-border-strong)'}`,
                 borderRadius: 10, overflow: 'hidden', cursor: 'pointer',
                 transition: 'border-color 0.15s, background 0.15s',
-                background: isDragging ? 'rgba(255,255,255,0.04)' : 'transparent',
+                background: isDragging ? 'var(--color-surface)' : 'transparent',
                 minHeight: imageFile ? 0 : 130,
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                 padding: imageFile ? 0 : '28px 20px',
               }}
             >
               {imageFile && imagePreview ? (
-                <img src={imagePreview} alt="preview" style={{ width: '100%', display: 'block', maxHeight: 220, objectFit: 'contain', background: '#0a0a0a' }} />
+                <img src={imagePreview} alt="preview" style={{ width: '100%', display: 'block', maxHeight: 220, objectFit: 'contain', background: 'var(--color-preview-bg)' }} />
               ) : (
                 <>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" strokeLinecap="round">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-quaternary)" strokeWidth="1.5" strokeLinecap="round">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                     <polyline points="17 8 12 3 7 8"/>
                     <line x1="12" y1="3" x2="12" y2="15"/>
                   </svg>
-                  <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 10 }}>
+                  <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 10 }}>
                     Envie um screenshot ou vista do modelo
                   </span>
-                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', marginTop: 4 }}>PNG, JPG, WEBP — até 20 MB</span>
+                  <span style={{ fontSize: 10, color: 'var(--color-text-quaternary)', marginTop: 4 }}>PNG, JPG, WEBP — até 20 MB</span>
                 </>
               )}
             </div>
 
             {imageFile && (
               <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', display: 'flex', gap: 8 }}>
+                <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', display: 'flex', gap: 8 }}>
                   {imageDimensions && <span>{imageDimensions.w}×{imageDimensions.h}px</span>}
                   <span>{formatFileSize(imageFile.size)}</span>
                 </div>
                 <button onClick={(e) => { e.stopPropagation(); resetImage() }}
-                  style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                  style={{ fontSize: 10, color: 'var(--color-text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                   Trocar imagem
                 </button>
               </div>
@@ -214,11 +214,11 @@ export default function IsometricasClient({ initialCredits }: Props) {
           {/* Hint */}
           <div style={{
             padding: '10px 12px', borderRadius: 8,
-            background: 'rgba(255,255,255,0.03)',
-            border: '1px solid rgba(255,255,255,0.08)',
+            background: 'var(--color-surface)',
+            border: '1px solid var(--color-border)',
           }}>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', lineHeight: 1.5 }}>
-              <strong style={{ fontWeight: 600, color: 'rgba(255,255,255,0.75)' }}>Dica de fidelidade:</strong>{' '}
+            <div style={{ fontSize: 10, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+              <strong style={{ fontWeight: 600, color: 'var(--color-text-secondary)' }}>Dica de fidelidade:</strong>{' '}
               para resultado mais fiel, envie uma vista em câmera paralela ou isométrica
               exportada do SketchUp/Revit.
             </div>
@@ -259,20 +259,20 @@ export default function IsometricasClient({ initialCredits }: Props) {
         </div>
 
         {/* Footer */}
-        <div style={{ padding: '16px 24px', borderTop: '0.5px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>
+        <div style={{ padding: '16px 24px', borderTop: '0.5px solid var(--color-border)', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
-              Custo: <span style={{ color: 'rgba(255,255,255,0.75)', fontWeight: 500 }}>{nodeCost} Nodes</span>
+            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+              Custo: <span style={{ color: 'var(--color-text-secondary)', fontWeight: 500 }}>{nodeCost} Nodes</span>
             </div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
-              Saldo: <span style={{ color: credits > 0 ? 'rgba(255,255,255,0.75)' : 'var(--color-error)', fontWeight: 500 }}>{credits} Nodes</span>
+            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+              Saldo: <span style={{ color: credits > 0 ? 'var(--color-text-secondary)' : 'var(--color-error)', fontWeight: 500 }}>{credits} Nodes</span>
             </div>
           </div>
           <button onClick={handleSubmit} disabled={!canSubmit}
             style={{
               width: '100%', padding: '12px 20px', borderRadius: 8, border: 'none',
-              background: canSubmit ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.07)',
-              color: canSubmit ? '#0a0a0a' : 'rgba(255,255,255,0.25)',
+              background: canSubmit ? 'var(--color-inverse)' : 'var(--color-surface-hover)',
+              color: canSubmit ? 'var(--color-inverse-foreground)' : 'var(--color-text-quaternary)',
               fontSize: 13, fontWeight: 600, cursor: canSubmit ? 'pointer' : 'not-allowed',
               transition: 'background 0.15s, color 0.15s', letterSpacing: '-0.01em',
             }}
@@ -287,22 +287,22 @@ export default function IsometricasClient({ initialCredits }: Props) {
 
         {isLoading && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-            <div style={{ width: 40, height: 40, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.1)', borderTop: '2px solid rgba(255,255,255,0.7)', animation: 'spin 0.9s linear infinite' }} />
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', letterSpacing: '0.02em' }}>{loadingText}</div>
+            <div style={{ width: 40, height: 40, borderRadius: '50%', border: '2px solid var(--color-border-strong)', borderTop: '2px solid var(--color-text-secondary)', animation: 'spin 0.9s linear infinite' }} />
+            <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', letterSpacing: '0.02em' }}>{loadingText}</div>
           </div>
         )}
 
         {!isLoading && resultUrl && (
           <div style={{ width: '100%', maxWidth: 760, animation: 'fadeIn 0.3s ease' }}>
-            <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--color-border)' }}>
               <img src={resultUrl} alt="Isométrica" style={{ width: '100%', display: 'block' }} />
             </div>
             <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' as const }}>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.04em' }}>
+              <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', letterSpacing: '0.04em' }}>
                 Isométrica · {ISOMETRIC_TYPES.find(t => t.id === type)?.label} · {ISOMETRIC_STYLES.find(s => s.id === style)?.label}
               </div>
               <a href={resultUrl} download target="_blank" rel="noopener noreferrer"
-                style={{ fontSize: 11, fontWeight: 500, color: 'rgba(255,255,255,0.7)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.04)' }}
+                style={{ fontSize: 11, fontWeight: 500, color: 'var(--color-text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 6, border: '1px solid var(--color-border-strong)', background: 'var(--color-surface)' }}
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -324,10 +324,10 @@ export default function IsometricasClient({ initialCredits }: Props) {
               </svg>
             </div>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', fontWeight: 500, letterSpacing: '-0.01em' }}>
+              <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', fontWeight: 500, letterSpacing: '-0.01em' }}>
                 Sua isométrica aparecerá aqui
               </div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', marginTop: 5, lineHeight: 1.5, maxWidth: 320 }}>
+              <div style={{ fontSize: 11, color: 'var(--color-text-quaternary)', marginTop: 5, lineHeight: 1.5, maxWidth: 320 }}>
                 Envie uma vista do seu modelo, escolha o tipo e o estilo de apresentação.
               </div>
             </div>
@@ -342,12 +342,12 @@ export default function IsometricasClient({ initialCredits }: Props) {
 
 function Breadcrumb() {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.04em', textTransform: 'uppercase' as const }}>
-      <Link href="/app/apresentar" style={{ color: 'rgba(255,255,255,0.35)', textDecoration: 'none' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: 'var(--color-text-tertiary)', letterSpacing: '0.04em', textTransform: 'uppercase' as const }}>
+      <Link href="/app/apresentar" style={{ color: 'var(--color-text-tertiary)', textDecoration: 'none' }}>
         Apresentar
       </Link>
       <span>›</span>
-      <span style={{ color: 'rgba(255,255,255,0.6)' }}>Isométricas</span>
+      <span style={{ color: 'var(--color-text-secondary)' }}>Isométricas</span>
     </div>
   )
 }
@@ -355,7 +355,7 @@ function Breadcrumb() {
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.35)', display: 'block', marginBottom: 10 }}>
+      <label style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 10 }}>
         {label}
       </label>
       {children}
@@ -364,8 +364,8 @@ function Section({ label, children }: { label: string; children: React.ReactNode
 }
 
 function Pill({ tone = 'green', children }: { tone?: 'green' | 'muted'; children: React.ReactNode }) {
-  const color = tone === 'green' ? '#30b46c' : 'rgba(255,255,255,0.4)'
-  const bg    = tone === 'green' ? 'rgba(48,180,108,0.16)' : 'rgba(255,255,255,0.06)'
+  const color = tone === 'green' ? 'var(--color-accent-green)' : 'var(--color-text-tertiary)'
+  const bg    = tone === 'green' ? 'var(--color-accent-green-bg)' : 'var(--color-chip)'
   return (
     <span style={{
       fontSize: 8, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' as const,
@@ -389,9 +389,9 @@ function PillRow<T extends string>({ items, selected, onSelect }: {
           <button key={it.id} onClick={() => onSelect(it.id)}
             style={{
               padding: '6px 11px', borderRadius: 6,
-              border: `1px solid ${isSel ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.08)'}`,
-              background: isSel ? 'rgba(255,255,255,0.08)' : 'transparent',
-              fontSize: 11, color: isSel ? '#ffffff' : 'rgba(255,255,255,0.5)',
+              border: `1px solid ${isSel ? 'var(--color-border-focus)' : 'var(--color-border)'}`,
+              background: isSel ? 'var(--color-surface-hover)' : 'transparent',
+              fontSize: 11, color: isSel ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
               cursor: 'pointer', transition: 'all 0.15s',
             }}
           >
@@ -417,22 +417,22 @@ function CardList<T extends string>({ items, selected, onSelect }: {
             style={{
               display: 'flex', alignItems: 'center', gap: 10,
               padding: '10px 12px', borderRadius: 8,
-              border: `1px solid ${isSel ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.07)'}`,
-              background: isSel ? 'rgba(255,255,255,0.06)' : 'transparent',
+              border: `1px solid ${isSel ? 'var(--color-border-strong)' : 'var(--color-border)'}`,
+              background: isSel ? 'var(--color-surface)' : 'transparent',
               cursor: 'pointer', textAlign: 'left', width: '100%',
               transition: 'border-color 0.15s, background 0.15s',
             }}
           >
             <div style={{
               width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-              background: isSel ? '#ffffff' : 'rgba(255,255,255,0.2)',
+              background: isSel ? 'var(--color-text-primary)' : 'var(--color-text-quaternary)',
               transition: 'background 0.15s',
             }} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 12, fontWeight: 500, color: isSel ? '#ffffff' : 'rgba(255,255,255,0.65)', letterSpacing: '-0.01em' }}>
+              <div style={{ fontSize: 12, fontWeight: 500, color: isSel ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', letterSpacing: '-0.01em' }}>
                 {it.label}
               </div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.32)', marginTop: 2 }}>
+              <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
                 {it.desc}
               </div>
             </div>

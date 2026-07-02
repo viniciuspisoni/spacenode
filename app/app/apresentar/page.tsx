@@ -13,9 +13,9 @@ export const metadata = {
 }
 
 const STATUS_TONE: Record<ApresentarStatus, { label: string; color: string; bg: string; border: string }> = {
-  'novo':     { label: 'Novo',     color: '#30b46c',                  bg: 'rgba(48,180,108,0.14)',  border: 'rgba(48,180,108,0.28)' },
-  'beta':     { label: 'Beta',     color: '#f5a524',                  bg: 'rgba(245,165,36,0.14)',  border: 'rgba(245,165,36,0.28)' },
-  'em-breve': { label: 'Em breve', color: 'var(--color-text-tertiary)', bg: 'rgba(255,255,255,0.05)', border: 'var(--color-border-strong)' },
+  'novo':     { label: 'Novo',     color: 'var(--color-accent-green)',  bg: 'var(--color-accent-green-bg)', border: 'var(--color-accent-green-border)' },
+  'beta':     { label: 'Beta',     color: 'var(--color-warning)',       bg: 'var(--color-warning-bg)',      border: 'var(--color-warning-border)' },
+  'em-breve': { label: 'Em breve', color: 'var(--color-text-tertiary)', bg: 'var(--color-chip)',            border: 'var(--color-border-strong)' },
 }
 
 function ToolIcon({ id }: { id: ApresentarTool['id'] }) {
@@ -79,8 +79,8 @@ export default async function ApresentarHubPage() {
               Apresentar
             </h1>
             <span style={{
-              fontSize: 11, fontWeight: 500, color: '#30b46c',
-              background: 'rgba(48,180,108,0.12)',
+              fontSize: 11, fontWeight: 500, color: 'var(--color-accent-green)',
+              background: 'var(--color-accent-green-bg)',
               padding: '4px 10px', borderRadius: 999,
               letterSpacing: '-0.01em', lineHeight: 1, flexShrink: 0,
             }}>
@@ -117,8 +117,8 @@ export default async function ApresentarHubPage() {
         }}>
           <div style={{
             width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-            background: 'rgba(48,180,108,0.10)',
-            color: '#30b46c',
+            background: 'var(--color-accent-green-bg)',
+            color: 'var(--color-accent-green)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -171,7 +171,7 @@ function ToolCard({ tool }: { tool: ApresentarTool }) {
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
         <div style={{
           width: 40, height: 40, borderRadius: 10, flexShrink: 0,
-          background: 'rgba(255,255,255,0.04)',
+          background: 'var(--color-surface)',
           border: '0.5px solid var(--color-border-strong)',
           color: 'var(--color-text-primary)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',

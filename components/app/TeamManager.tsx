@@ -26,7 +26,7 @@ const heading: React.CSSProperties = {
 }
 const inputStyle: React.CSSProperties = {
   flex: 1, minWidth: 0, padding: '9px 12px', borderRadius: 8,
-  background: 'rgba(255,255,255,0.04)', border: '0.5px solid var(--color-border-strong)',
+  background: 'var(--color-surface)', border: '0.5px solid var(--color-border-strong)',
   color: 'var(--color-text-primary)', fontSize: 13, outline: 'none',
 }
 const btn: React.CSSProperties = {
@@ -36,7 +36,7 @@ const btn: React.CSSProperties = {
 }
 const ghostBtn: React.CSSProperties = {
   padding: '6px 10px', borderRadius: 7,
-  background: 'rgba(255,255,255,0.04)', border: '0.5px solid var(--color-border-strong)',
+  background: 'var(--color-surface)', border: '0.5px solid var(--color-border-strong)',
   color: 'var(--color-text-secondary)', fontSize: 11.5, fontWeight: 500, cursor: 'pointer',
 }
 
@@ -125,7 +125,7 @@ export function TeamManager({ members, invites }: Props) {
           </div>
         )}
 
-        {error && <p style={{ marginTop: 12, fontSize: 12.5, color: '#e07570' }}>{error}</p>}
+        {error && <p style={{ marginTop: 12, fontSize: 12.5, color: 'var(--color-error)' }}>{error}</p>}
       </div>
 
       {/* Convites pendentes */}
@@ -165,7 +165,7 @@ export function TeamManager({ members, invites }: Props) {
                   <option value="admin">admin</option>
                 </select>
                 <button onClick={() => post(`/api/workspaces/members/${m.userId}`, { action: 'remove' })}
-                  style={{ ...ghostBtn, color: '#e07570', borderColor: 'rgba(220,50,47,0.25)' }}>
+                  style={{ ...ghostBtn, color: 'var(--color-error)', borderColor: 'var(--color-error-border)' }}>
                   remover
                 </button>
               </div>

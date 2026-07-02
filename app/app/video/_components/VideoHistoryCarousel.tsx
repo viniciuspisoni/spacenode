@@ -46,7 +46,7 @@ export default function VideoHistoryCarousel({ onReuse }: Props) {
 
   return (
     <div style={{
-      borderTop:  '0.5px solid rgba(255,255,255,0.07)',
+      borderTop:  '0.5px solid var(--color-border)',
       padding:    '14px 28px 16px',
       flexShrink: 0,
     }}>
@@ -61,11 +61,11 @@ export default function VideoHistoryCarousel({ onReuse }: Props) {
           fontWeight:    600,
           letterSpacing: '0.12em',
           textTransform: 'uppercase' as const,
-          color:         'rgba(255,255,255,0.40)',
+          color:         'var(--color-text-tertiary)',
         }}>
           Seus últimos vídeos
         </div>
-        <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.30)' }}>
+        <div style={{ fontSize: 10.5, color: 'var(--color-text-tertiary)' }}>
           Clique para reutilizar a configuração
         </div>
       </div>
@@ -131,8 +131,8 @@ function HistoryCard({
         height:       106,
         borderRadius: 8,
         overflow:     'hidden',
-        background:   '#111',
-        border:       `1px solid ${hovered ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.07)'}`,
+        background:   'var(--color-preview-bg)',
+        border:       `1px solid ${hovered ? 'var(--color-border-strong)' : 'var(--color-border)'}`,
         transition:   'border-color 0.15s',
       }}>
         {item.output_url && !failed ? (
@@ -158,7 +158,7 @@ function HistoryCard({
           <div style={{
             width: '100%', height: '100%',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: 'rgba(255,255,255,0.30)',
+            color: 'var(--color-text-tertiary)',
             fontSize: 10,
           }}>
             {failed ? 'Falhou' : 'Sem vídeo'}
@@ -167,7 +167,7 @@ function HistoryCard({
         <div style={{
           position: 'absolute', top: 6, right: 6,
           padding: '2px 6px', borderRadius: 4,
-          background: 'rgba(0,0,0,0.6)',
+          background: 'var(--color-scrim)',
           color: 'rgba(255,255,255,0.85)',
           fontSize: 9.5,
           fontWeight: 600,
@@ -180,7 +180,7 @@ function HistoryCard({
 
       <div style={{
         fontSize:      11,
-        color:         'rgba(255,255,255,0.65)',
+        color:         'var(--color-text-secondary)',
         letterSpacing: '-0.01em',
         whiteSpace:    'nowrap',
         overflow:      'hidden',
@@ -191,7 +191,7 @@ function HistoryCard({
       </div>
       <div style={{
         fontSize:      10,
-        color:         'rgba(255,255,255,0.32)',
+        color:         'var(--color-text-tertiary)',
         letterSpacing: '0.02em',
       }}>
         {item.cost_credits} nodes · {formatRelative(item.created_at)}

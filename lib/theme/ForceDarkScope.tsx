@@ -1,0 +1,23 @@
+'use client'
+
+import { useEffect } from 'react'
+
+// Mantém a página atual sempre dark (ex.: landing) e, ao sair dela por
+// navegação client-side, restaura o tema escolhido pelo usuário — a mesma
+// resolução do script anti-flash do layout raiz.
+export default function ForceDarkScope() {
+  useEffect(() => {
+    document.documentElement.classList.remove('light')
+    return () => {
+      try {
+        const t = localStorage.getItem('theme')
+        const light =
+          t === 'light' ||
+          ((t === null || t === 'system') &&
+            window.matchMedia('(prefers-color-scheme: light)').matches)
+        document.documentElement.classList.toggle('light', light)
+      } catch {}
+    }
+  }, [])
+  return null
+}

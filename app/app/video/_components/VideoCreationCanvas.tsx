@@ -94,7 +94,7 @@ export default function VideoCreationCanvas({
             left:         12,
             padding:      '4px 10px',
             borderRadius: 20,
-            background:   'rgba(0,0,0,0.65)',
+            background:   'var(--color-scrim)',
             border:       '0.5px solid rgba(255,255,255,0.18)',
             color:        'rgba(255,255,255,0.85)',
             fontSize:     10,
@@ -114,7 +114,7 @@ export default function VideoCreationCanvas({
               right:        12,
               padding:      '5px 10px',
               borderRadius: 6,
-              background:   'rgba(0,0,0,0.6)',
+              background:   'var(--color-scrim)',
               border:       '0.5px solid rgba(255,255,255,0.15)',
               color:        'rgba(255,255,255,0.75)',
               fontSize:     11,
@@ -141,7 +141,7 @@ export default function VideoCreationCanvas({
           <div style={{
             marginTop:  10,
             fontSize:   11,
-            color:      'rgba(255,255,255,0.40)',
+            color:      'var(--color-text-tertiary)',
             textAlign:  'center',
           }}>
             {state.analysisError} Você pode configurar manualmente no painel ao lado.
@@ -222,10 +222,10 @@ export default function VideoCreationCanvas({
             <line x1="12" y1="16" x2="12.01" y2="16"/>
           </svg>
         </div>
-        <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.85)', marginBottom: 8 }}>
+        <div style={{ fontSize: 14, color: 'var(--color-text-primary)', marginBottom: 8 }}>
           Não conseguimos gerar o vídeo
         </div>
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', lineHeight: 1.55 }}>
+        <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', lineHeight: 1.55 }}>
           {state.error ?? 'Erro desconhecido. Tente novamente.'}
         </div>
         <button
@@ -234,9 +234,9 @@ export default function VideoCreationCanvas({
           style={{
             marginTop:   18,
             padding:     '8px 16px',
-            background:  'rgba(255,255,255,0.10)',
-            border:      '1px solid rgba(255,255,255,0.18)',
-            color:       'rgba(255,255,255,0.85)',
+            background:  'var(--color-surface-hover)',
+            border:      '1px solid var(--color-border-strong)',
+            color:       'var(--color-text-primary)',
             borderRadius:8,
             fontSize:    12,
             cursor:      'pointer',

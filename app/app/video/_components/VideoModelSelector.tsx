@@ -21,7 +21,7 @@ interface Props {
 const TONE_COLORS = {
   green: { fg: '#86efac', border: 'rgba(34,197,94,0.3)' },
   blue:  { fg: '#93c5fd', border: 'rgba(59,130,246,0.3)' },
-  muted: { fg: 'rgba(255,255,255,0.4)', border: 'rgba(255,255,255,0.15)' },
+  muted: { fg: 'var(--color-text-tertiary)', border: 'var(--color-border-strong)' },
 }
 
 export default function VideoModelSelector({
@@ -40,10 +40,10 @@ export default function VideoModelSelector({
           padding:       '8px 10px',
           borderRadius:  6,
           marginBottom:  10,
-          background:    'rgba(255,255,255,0.03)',
-          border:        '1px solid rgba(255,255,255,0.07)',
+          background:    'var(--color-surface-subtle)',
+          border:        '1px solid var(--color-border)',
           fontSize:      11,
-          color:         'rgba(255,255,255,0.5)',
+          color:         'var(--color-text-tertiary)',
           letterSpacing: '-0.005em',
         }}>
           Escolha automática recomendada após o upload da imagem.
@@ -110,8 +110,8 @@ function ModelRow({
         borderRadius:  9,
         textAlign:     'left',
         width:         '100%',
-        border:        `1px solid ${active ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.07)'}`,
-        background:    active ? 'rgba(255,255,255,0.06)' : 'transparent',
+        border:        `1px solid ${active ? 'var(--color-border-focus)' : 'var(--color-border)'}`,
+        background:    active ? 'var(--color-surface)' : 'transparent',
         cursor:        (disabled || unavailable) ? 'not-allowed' : 'pointer',
         opacity:       unavailable ? 0.45 : 1,
         transition:    'border-color 0.15s, background 0.15s',
@@ -119,7 +119,7 @@ function ModelRow({
     >
       <div style={{
         width:      8, height: 8, borderRadius: '50%', flexShrink: 0, marginTop: 5,
-        background: active ? '#ffffff' : 'rgba(255,255,255,0.2)',
+        background: active ? 'var(--color-text-primary)' : 'var(--color-text-quaternary)',
       }} />
 
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -128,13 +128,13 @@ function ModelRow({
             fontSize:      12.5,
             fontWeight:    500,
             letterSpacing: '-0.01em',
-            color:         active ? '#ffffff' : 'rgba(255,255,255,0.7)',
+            color:         active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
           }}>
             {model.label}
           </span>
           <span style={{
             fontSize: 9,
-            color:    active ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.28)',
+            color:    active ? 'var(--color-text-tertiary)' : 'var(--color-text-quaternary)',
           }}>
             {model.tag}
           </span>
@@ -153,7 +153,7 @@ function ModelRow({
         </div>
         <div style={{
           fontSize:   10.5,
-          color:      'rgba(255,255,255,0.38)',
+          color:      'var(--color-text-tertiary)',
           marginTop:  3,
           lineHeight: 1.4,
         }}>
@@ -164,8 +164,8 @@ function ModelRow({
       {model.badge && (
         <span style={{
           fontSize: 8, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase',
-          color:      tone?.fg ?? 'rgba(255,255,255,0.4)',
-          border:     `1px solid ${tone?.border ?? 'rgba(255,255,255,0.15)'}`,
+          color:      tone?.fg ?? 'var(--color-text-tertiary)',
+          border:     `1px solid ${tone?.border ?? 'var(--color-border-strong)'}`,
           padding:    '2px 6px', borderRadius: 20,
           flexShrink: 0,
           marginTop:  4,
@@ -181,7 +181,7 @@ const Label = ({ children }: { children: React.ReactNode }) => (
   <div style={{
     fontSize:    10, fontWeight: 600, letterSpacing: '0.1em',
     textTransform:'uppercase' as const,
-    color:       'rgba(255,255,255,0.40)',
+    color:       'var(--color-text-tertiary)',
     marginBottom: 10,
   }}>
     {children}

@@ -6,6 +6,7 @@ import { useState } from 'react'
 import React from 'react'
 import { ConstellationN, Logo } from '@/components/brand'
 import { AvatarComConsumo } from './AvatarComConsumo'
+import ThemeSelector from './ThemeSelector'
 import type { PlanId } from '@/lib/plans'
 import {
   IconProjects, IconDashboard, IconHistory,
@@ -92,18 +93,18 @@ export default function Sidebar({
       style={{
         width: expanded ? SIDEBAR_EXPANDED : SIDEBAR_COLLAPSED,
         transition: 'width 0.5s cubic-bezier(0.4,0,0.2,1), box-shadow 0.45s ease',
-        background: 'linear-gradient(180deg, #101011 0%, #090909 100%)',
+        background: 'linear-gradient(180deg, var(--color-bg-elevated) 0%, var(--color-sidebar) 100%)',
         display: 'flex',
         flexDirection: 'column',
         flexShrink: 0,
         overflow: 'hidden',
-        border: '0.5px solid rgba(255,255,255,0.07)',
+        border: '0.5px solid var(--color-border)',
         borderRadius: 18,
         height: 'calc(100vh - 12px)',
         margin: 6,
         position: 'sticky',
         top: 6,
-        boxShadow: '0 8px 30px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.03)',
+        boxShadow: 'var(--shadow-md)',
         zIndex: 20,
       }}
       onMouseEnter={() => setHovered(true)}
@@ -119,7 +120,7 @@ export default function Sidebar({
         alignItems: 'center',
         justifyContent: expanded ? 'flex-start' : 'center',
         paddingLeft: expanded ? 20 : 0,
-        color: '#ffffff',
+        color: 'var(--color-sidebar-foreground)',
         transition: 'padding 0.5s cubic-bezier(0.4,0,0.2,1)',
       }}>
         {/* Símbolo isolado — visível só colapsado */}
@@ -147,7 +148,7 @@ export default function Sidebar({
           transition: expanded ? 'opacity 0.34s ease 0.16s' : 'opacity 0.16s ease',
           whiteSpace: 'nowrap',
         }}>
-          <Logo symbolSize={42} color="#ffffff" />
+          <Logo symbolSize={42} color="currentColor" />
         </div>
       </div>
 
@@ -156,7 +157,7 @@ export default function Sidebar({
         aria-hidden
         style={{
           height: 0.5,
-          background: 'rgba(255,255,255,0.11)',
+          background: 'var(--color-border-strong)',
           margin: expanded ? '0 16px' : '0 14px',
           flexShrink: 0,
           transition: 'margin 0.5s cubic-bezier(0.4,0,0.2,1)',
@@ -180,7 +181,7 @@ export default function Sidebar({
             {gi > 0 && (
               <div aria-hidden style={{
                 height: 0.5,
-                background: 'rgba(255,255,255,0.10)',
+                background: 'var(--color-border-strong)',
                 margin: expanded ? '0 10px 13px' : '0 14px 12px',
                 flexShrink: 0,
               }} />
@@ -188,7 +189,7 @@ export default function Sidebar({
             <div style={{
               fontSize: 10, fontWeight: 500, letterSpacing: '0.16em',
               textTransform: 'uppercase' as const,
-              color: 'rgba(255,255,255,0.30)',
+              color: 'var(--color-text-tertiary)',
               padding: expanded ? '0 10px' : 0,
               height: expanded ? 22 : 8,
               display: 'flex', alignItems: 'center',
@@ -209,8 +210,8 @@ export default function Sidebar({
               const isItemHovered = hoveredItem === itemKey
 
               const badgeColor = badgeTone === 'muted'
-                ? { color: 'rgba(255,255,255,0.3)', bg: 'rgba(255,255,255,0.06)' }
-                : { color: '#30b46c', bg: 'rgba(48,180,108,0.18)' }
+                ? { color: 'var(--color-text-tertiary)', bg: 'var(--color-chip)' }
+                : { color: 'var(--color-accent-green)', bg: 'var(--color-accent-green-bg)' }
 
               const inner = (
                 <>
@@ -229,7 +230,7 @@ export default function Sidebar({
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    color: disabled ? 'rgba(255,255,255,0.2)' : active ? '#ffffff' : isItemHovered ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.55)',
+                    color: disabled ? 'var(--color-text-quaternary)' : active || isItemHovered ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                     transition: 'color 0.2s',
                   }}>
                     <span style={{ display: 'flex', transform: 'scale(0.92)' }}>
@@ -238,7 +239,7 @@ export default function Sidebar({
                   </div>
                   <span style={{
                     fontSize: 13,
-                    color: disabled ? 'rgba(255,255,255,0.25)' : active ? '#ffffff' : isItemHovered ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.72)',
+                    color: disabled ? 'var(--color-text-quaternary)' : active || isItemHovered ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                     whiteSpace: 'nowrap' as const,
                     fontWeight: active ? 540 : 450,
                     letterSpacing: '-0.012em',
@@ -270,9 +271,9 @@ export default function Sidebar({
                 padding: expanded ? '0 10px' : 0, height: 38, borderRadius: 12,
                 textDecoration: 'none', flexShrink: 0,
                 background: active
-                  ? 'rgba(255,255,255,0.06)'
+                  ? 'var(--color-surface-hover)'
                   : isItemHovered
-                    ? 'rgba(255,255,255,0.035)'
+                    ? 'var(--color-surface)'
                     : 'transparent',
                 boxShadow: 'none',
                 transition: 'background 0.18s ease',
@@ -299,10 +300,24 @@ export default function Sidebar({
         ))}
       </nav>
 
+      {/* Aparência — visível quando expandida */}
+      <div style={{
+        padding: expanded ? '8px 12px' : '8px 0 0',
+        display: 'flex',
+        justifyContent: 'center',
+        opacity: expanded ? 1 : 0,
+        height: expanded ? 'auto' : 0,
+        overflow: 'hidden',
+        transition: 'opacity 0.3s ease 0.08s',
+        flexShrink: 0,
+      }}>
+        <ThemeSelector variant="compact" />
+      </div>
+
       {/* User com anel de consumo */}
       <div style={{
         padding: expanded ? '10px 10px 12px' : '10px 8px 12px',
-        borderTop: '0.5px solid rgba(255,255,255,0.07)',
+        borderTop: '0.5px solid var(--color-border)',
         flexShrink: 0,
         position: 'relative',
       }}>
@@ -321,7 +336,7 @@ export default function Sidebar({
           pointerEvents: expanded ? 'auto' : 'none',
         }}>
           <form action="/auth/signout" method="POST">
-            <button type="submit" title="Sair" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'rgba(255,255,255,0.4)', display: 'flex' }}>
+            <button type="submit" title="Sair" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--color-text-tertiary)', display: 'flex' }}>
               <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
                 <path d="M5 2H2.5A1.5 1.5 0 0 0 1 3.5v7A1.5 1.5 0 0 0 2.5 12H5M9 10l3-3-3-3M12 7H5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>

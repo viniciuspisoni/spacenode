@@ -89,20 +89,20 @@ export default function VideoGenerationTimeline({ preview, modelId, elapsed }: P
         <div style={{
           height:     4,
           width:      '100%',
-          background: 'rgba(255,255,255,0.05)',
+          background: 'var(--color-surface)',
           borderRadius: 2,
           overflow:   'hidden',
         }}>
           <div style={{
             height:     '100%',
             width:      `${Math.round(progress * 100)}%`,
-            background: 'rgba(255,255,255,0.55)',
+            background: 'var(--color-text-secondary)',
             transition: 'width 0.4s linear',
           }} />
         </div>
         <div style={{
           fontSize:   10.5,
-          color:      'rgba(255,255,255,0.35)',
+          color:      'var(--color-text-tertiary)',
           marginTop:  10,
           textAlign:  'center',
           letterSpacing: '0.01em',

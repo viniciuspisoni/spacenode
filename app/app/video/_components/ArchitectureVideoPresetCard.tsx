@@ -22,8 +22,8 @@ export default function ArchitectureVideoPresetCard({ motion, active, onClick, c
         textAlign:     'left',
         padding:       compact ? '10px 12px' : '12px 14px',
         borderRadius:  10,
-        border:        `1px solid ${active ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.07)'}`,
-        background:    active ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.02)',
+        border:        `1px solid ${active ? 'var(--color-border-focus)' : 'var(--color-border)'}`,
+        background:    active ? 'var(--color-surface-hover)' : 'var(--color-surface-subtle)',
         cursor:        'pointer',
         transition:    'border-color 0.15s, background 0.15s',
         display:       'flex',
@@ -38,14 +38,14 @@ export default function ArchitectureVideoPresetCard({ motion, active, onClick, c
           fontSize:      12,
           fontWeight:    500,
           letterSpacing: '-0.01em',
-          color:         active ? '#ffffff' : 'rgba(255,255,255,0.72)',
+          color:         active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
         }}>
           {motion.label}
         </span>
       </div>
       <div style={{
         fontSize:   10.5,
-        color:      'rgba(255,255,255,0.38)',
+        color:      'var(--color-text-tertiary)',
         lineHeight: 1.45,
       }}>
         {motion.description}
@@ -56,7 +56,7 @@ export default function ArchitectureVideoPresetCard({ motion, active, onClick, c
 
 // Glyph minimalista representando o movimento — abstrato, não literal.
 function MotionGlyph({ motionId, active }: { motionId: string; active: boolean }) {
-  const stroke = active ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.40)'
+  const stroke = active ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)'
   const size   = 16
   switch (motionId) {
     case 'dolly-in-soft':

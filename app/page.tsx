@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import ForceDarkScope from "@/lib/theme/ForceDarkScope";
 import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
 import Demo from "@/components/Demo";
@@ -21,13 +21,12 @@ const Divider = () => (
 )
 
 export default function Home() {
-  // Landing page is always dark — independent of app theme preference
-  useEffect(() => {
-    document.documentElement.classList.remove("light");
-  }, []);
-
   return (
     <main>
+      {/* Landing é sempre dark. O script do layout raiz já ignora a preferência
+          light na rota "/" (anti-flash pré-paint); ForceDarkScope cobre a
+          navegação client-side e restaura o tema do usuário ao sair. */}
+      <ForceDarkScope />
       <Navbar />
       <Hero />
       <ValueProps />

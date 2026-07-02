@@ -246,7 +246,7 @@ export default async function AppPage() {
                   className="spn-dash-module-icon"
                   style={m.green
                     ? { background: 'var(--color-accent-green-bg)', color: 'var(--color-accent-green)' }
-                    : { background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.58)' }}
+                    : { background: 'var(--color-surface)', color: 'var(--color-text-secondary)' }}
                 >
                   <m.Icon size={19} />
                 </div>

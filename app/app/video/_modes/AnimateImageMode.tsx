@@ -58,20 +58,20 @@ export default function AnimateImageMode({ state, dispatch, nodeCost, onGenerate
           <div style={{
             padding:      '11px 12px',
             borderRadius: 10,
-            background:   'rgba(255,255,255,0.04)',
-            border:       '1px solid rgba(255,255,255,0.10)',
+            background:   'var(--color-surface)',
+            border:       '1px solid var(--color-border-strong)',
           }}>
             <div style={{
               fontSize:      12.5,
               fontWeight:    500,
-              color:         '#ffffff',
+              color:         'var(--color-text-primary)',
               letterSpacing: '-0.01em',
             }}>
               {motion.label}
             </div>
             <div style={{
               fontSize:   10.5,
-              color:      'rgba(255,255,255,0.40)',
+              color:      'var(--color-text-tertiary)',
               marginTop:  3,
               lineHeight: 1.45,
             }}>
@@ -83,7 +83,7 @@ export default function AnimateImageMode({ state, dispatch, nodeCost, onGenerate
               style={{
                 marginTop:  10,
                 fontSize:   10.5,
-                color:      'rgba(255,255,255,0.55)',
+                color:      'var(--color-text-secondary)',
                 background: 'none',
                 border:     'none',
                 cursor:     'pointer',
@@ -115,7 +115,7 @@ export default function AnimateImageMode({ state, dispatch, nodeCost, onGenerate
             {state.analysis.fidelityNotes.slice(0, 3).map((note, i) => (
               <li key={i} style={{
                 fontSize:   11,
-                color:      'rgba(255,255,255,0.55)',
+                color:      'var(--color-text-secondary)',
                 lineHeight: 1.5,
                 paddingLeft: 12,
                 position:   'relative',
@@ -139,7 +139,7 @@ const Label = ({ children }: { children: React.ReactNode }) => (
   <div style={{
     fontSize:    10, fontWeight: 600, letterSpacing: '0.1em',
     textTransform:'uppercase' as const,
-    color:       'rgba(255,255,255,0.40)',
+    color:       'var(--color-text-tertiary)',
     marginBottom: 10,
   }}>
     {children}

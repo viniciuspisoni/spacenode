@@ -128,7 +128,7 @@ const Label = ({ children }: { children: React.ReactNode }) => (
   <div style={{
     fontSize:    10, fontWeight: 600, letterSpacing: '0.1em',
     textTransform:'uppercase' as const,
-    color:       'rgba(255,255,255,0.40)',
+    color:       'var(--color-text-tertiary)',
     marginBottom: 10,
   }}>
     {children}

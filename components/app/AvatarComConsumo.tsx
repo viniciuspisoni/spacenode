@@ -89,8 +89,8 @@ export function AvatarComConsumo({
           padding: expanded ? '5px 10px' : '5px 0',
           height: 56,
           borderRadius: 14,
-          background: expanded ? 'rgba(255,255,255,0.045)' : 'transparent',
-          border: expanded ? '0.5px solid rgba(255,255,255,0.07)' : '0.5px solid transparent',
+          background: expanded ? 'var(--color-surface)' : 'transparent',
+          border: expanded ? '0.5px solid var(--color-border)' : '0.5px solid transparent',
           boxShadow: expanded ? 'inset 0 1px 0 rgba(255,255,255,0.03)' : 'none',
           width: '100%',
           textAlign: 'left',
@@ -107,14 +107,14 @@ export function AvatarComConsumo({
         />
         <div style={{ opacity: expanded ? 1 : 0, transition: 'opacity 0.18s', minWidth: 0, overflow: 'hidden', flex: 1 }}>
           <div style={{
-            fontSize: 13, color: '#ffffff', fontWeight: 600,
+            fontSize: 13, color: 'var(--color-text-primary)', fontWeight: 600,
             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
           }}>
             {userName}
           </div>
           <div style={{
             fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase',
-            color: 'rgba(255,255,255,0.5)', marginTop: 2,
+            color: 'var(--color-text-tertiary)', marginTop: 2,
             display: 'flex', alignItems: 'center', gap: 6,
           }}>
             <span>{planBalance + lumenBalance} nodes</span>
@@ -164,14 +164,14 @@ function AvatarRing({ state, ratio, arcLen, beta, userAvatar, initials }: {
           /* Beta: anel verde sutil e decorativo — não há cota mensal pra medir. */
           <circle cx="21" cy="21" r={RADIUS}
             fill="none"
-            stroke="rgba(48,209,88,0.45)"
+            stroke="var(--color-accent-green-glow)"
             strokeWidth="2.5" />
         ) : (
           <>
             {/* track */}
             <circle cx="21" cy="21" r={RADIUS}
               fill="none"
-              stroke="rgba(255,255,255,0.12)"
+              stroke="var(--color-surface-hover)"
               strokeWidth="3" />
             {/* arc */}
             <circle cx="21" cy="21" r={RADIUS}
@@ -198,7 +198,7 @@ function AvatarRing({ state, ratio, arcLen, beta, userAvatar, initials }: {
       </svg>
       <div style={{
         position: 'absolute', inset: 5, borderRadius: '50%',
-        background: '#1a1a1a',
+        background: 'var(--color-surface-hover)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         overflow: 'hidden',
       }}>
@@ -207,7 +207,7 @@ function AvatarRing({ state, ratio, arcLen, beta, userAvatar, initials }: {
           <img src={userAvatar} alt=""
                style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : (
-          <span style={{ fontSize: 12, fontWeight: 500, color: '#fff', letterSpacing: '0.02em' }}>
+          <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '0.02em' }}>
             {initials}
           </span>
         )}
@@ -275,26 +275,26 @@ function BalancePopover({ planId, planBalance, planTotal, lumenBalance, state, d
     <div style={{
       position: 'absolute', bottom: 56, left: 0,
       width: 248, padding: 16, zIndex: 50,
-      background: '#161616',
-      border: '0.5px solid rgba(255,255,255,0.12)',
+      background: 'var(--color-bg-elevated)',
+      border: '0.5px solid var(--color-border-strong)',
       borderRadius: 14,
-      boxShadow: '0 24px 60px rgba(0,0,0,0.5)',
+      boxShadow: 'var(--shadow-xl)',
       display: 'flex', flexDirection: 'column', gap: 14,
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <div style={{
             fontSize: 9, fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase',
-            color: 'rgba(255,255,255,0.4)',
+            color: 'var(--color-text-tertiary)',
           }}>
             Plano {planName}
           </div>
           <div style={{
-            fontSize: 22, fontWeight: 500, color: '#fff', letterSpacing: '-0.02em', marginTop: 4,
+            fontSize: 22, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.02em', marginTop: 4,
           }}>
-            {planBalance + lumenBalance} <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>nodes</span>
+            {planBalance + lumenBalance} <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', fontWeight: 400 }}>nodes</span>
           </div>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>
+          <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>
             {isBeta
               ? <>Acesso antecipado{lumenBalance > 0 && <> · {lumenBalance} avulsos</>}</>
               : <>{planBalance} de {planTotal} do plano{lumenBalance > 0 && <> · {lumenBalance} avulsos</>}</>}
@@ -312,7 +312,7 @@ function BalancePopover({ planId, planBalance, planTotal, lumenBalance, state, d
       {/* Sparkline 7 dias */}
       <Sparkline days={usageDays} />
 
-      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
+      <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.5 }}>
         {daysUntilEmpty !== null
           ? <>No ritmo atual, zera em ~{daysUntilEmpty} dia{daysUntilEmpty === 1 ? '' : 's'}.</>
           : 'Sem consumo recente registrado.'}
@@ -323,8 +323,8 @@ function BalancePopover({ planId, planBalance, planTotal, lumenBalance, state, d
           onClick={() => { alert('Disponível em agosto.'); }}
           style={{
             flex: 1, padding: '9px 12px', borderRadius: 8,
-            background: '#1f1f1f', color: '#bbb',
-            border: '0.5px solid rgba(255,255,255,0.12)',
+            background: 'var(--color-surface-hover)', color: 'var(--color-text-secondary)',
+            border: '0.5px solid var(--color-border-strong)',
             fontSize: 11, fontWeight: 500,
           }}
         >
@@ -348,7 +348,7 @@ function BalancePopover({ planId, planBalance, planTotal, lumenBalance, state, d
 
 function Sparkline({ days }: { days: { day: string; nodes: number }[] }) {
   if (days.length === 0) return (
-    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', padding: '10px 0' }}>
+    <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', padding: '10px 0' }}>
       Sem consumo nos últimos 7 dias.
     </div>
   )
@@ -366,7 +366,7 @@ function Sparkline({ days }: { days: { day: string; nodes: number }[] }) {
             <div key={i} style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
               <div style={{
                 width: '100%', height: `${Math.max(h, 4)}%`,
-                background: isToday ? '#46d191' : 'rgba(255,255,255,0.18)',
+                background: isToday ? 'var(--color-accent-green)' : 'var(--color-surface-hover)',
                 borderRadius: 2,
                 transition: 'height 0.4s',
               }} title={`${d.day}: ${d.nodes} nodes`} />
@@ -376,7 +376,7 @@ function Sparkline({ days }: { days: { day: string; nodes: number }[] }) {
       </div>
       <div style={{
         display: 'flex', justifyContent: 'space-between',
-        fontSize: 9, color: 'rgba(255,255,255,0.3)', marginTop: 6,
+        fontSize: 9, color: 'var(--color-text-tertiary)', marginTop: 6,
       }}>
         <span>7d atrás</span>
         <span>hoje</span>

@@ -42,14 +42,14 @@ export default function AnimateHeader({ mode, onChange }: Props) {
         <div style={{
           fontSize:    18,
           fontWeight:  500,
-          color:       '#ffffff',
+          color:       'var(--color-text-primary)',
           letterSpacing: '-0.02em',
         }}>
           Animar projeto
         </div>
         <div style={{
           fontSize:      12,
-          color:         'rgba(255,255,255,0.45)',
+          color:         'var(--color-text-tertiary)',
           marginTop:     3,
           letterSpacing: '-0.005em',
         }}>
@@ -62,8 +62,8 @@ export default function AnimateHeader({ mode, onChange }: Props) {
         display:    'flex',
         gap:        4,
         padding:    3,
-        background: 'rgba(255,255,255,0.04)',
-        border:     '0.5px solid rgba(255,255,255,0.07)',
+        background: 'var(--color-surface)',
+        border:     '0.5px solid var(--color-border)',
         borderRadius: 10,
         width:      'fit-content',
       }}>
@@ -82,8 +82,8 @@ export default function AnimateHeader({ mode, onChange }: Props) {
                 letterSpacing:'-0.01em',
                 borderRadius: 8,
                 border:       'none',
-                background:   active ? 'rgba(255,255,255,0.10)' : 'transparent',
-                color:        active ? '#ffffff' : 'rgba(255,255,255,0.55)',
+                background:   active ? 'var(--color-surface-hover)' : 'transparent',
+                color:        active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                 cursor:       'pointer',
                 transition:   'background 0.15s, color 0.15s',
               }}

@@ -28,27 +28,27 @@ export default function VideoSettingsPanel({
       flexShrink:     0,
       display:        'flex',
       flexDirection:  'column',
-      borderLeft:     '0.5px solid rgba(255,255,255,0.07)',
+      borderLeft:     '0.5px solid var(--color-border)',
       overflow:       'hidden',
-      background:     '#0a0a0a',
+      background:     'var(--color-bg)',
     }}>
       <div style={{
         padding:    '20px 24px 16px',
-        borderBottom: '0.5px solid rgba(255,255,255,0.07)',
+        borderBottom: '0.5px solid var(--color-border)',
         flexShrink: 0,
       }}>
         <div style={{
           fontSize: 13,
           fontWeight: 600,
           letterSpacing: '-0.01em',
-          color: '#ffffff',
+          color: 'var(--color-text-primary)',
         }}>
           {title}
         </div>
         {subtitle && (
           <div style={{
             fontSize: 11,
-            color: 'rgba(255,255,255,0.40)',
+            color: 'var(--color-text-tertiary)',
             marginTop: 4,
             lineHeight: 1.5,
           }}>

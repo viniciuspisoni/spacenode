@@ -44,7 +44,7 @@ export default function ReferenceFrameUploader({
         <div style={{
           fontSize: 10, fontWeight: 600, letterSpacing: '0.1em',
           textTransform: 'uppercase' as const,
-          color: 'rgba(255,255,255,0.40)',
+          color: 'var(--color-text-tertiary)',
           marginBottom: 8,
         }}>
           {label}
@@ -64,9 +64,9 @@ export default function ReferenceFrameUploader({
         }}
         style={{
           border: `1.5px dashed ${
-            isDragging      ? 'rgba(255,255,255,0.4)' :
-            preview         ? 'rgba(255,255,255,0.18)' :
-                              'rgba(255,255,255,0.10)'
+            isDragging      ? 'var(--color-border-focus)' :
+            preview         ? 'var(--color-border-strong)' :
+                              'var(--color-border)'
           }`,
           borderRadius:   10,
           overflow:       'hidden',
@@ -76,7 +76,7 @@ export default function ReferenceFrameUploader({
           alignItems:     'center',
           justifyContent: 'center',
           cursor:         disabled ? 'default' : 'pointer',
-          background:     isDragging ? 'rgba(255,255,255,0.04)' : 'transparent',
+          background:     isDragging ? 'var(--color-surface)' : 'transparent',
           transition:     'border-color 0.15s, background 0.15s',
           minHeight:      preview ? 0 : baseMinHeight,
         }}
@@ -96,16 +96,16 @@ export default function ReferenceFrameUploader({
         ) : (
           <>
             <svg width={compact ? 18 : 22} height={compact ? 18 : 22} viewBox="0 0 24 24"
-              fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" strokeLinecap="round">
+              fill="none" stroke="var(--color-text-quaternary)" strokeWidth="1.5" strokeLinecap="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
               <polyline points="17 8 12 3 7 8"/>
               <line x1="12" y1="3" x2="12" y2="15"/>
             </svg>
-            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 8 }}>
+            <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 8 }}>
               {hint ?? 'Arraste ou clique para enviar'}
             </span>
             {!compact && (
-              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.22)', marginTop: 4 }}>
+              <span style={{ fontSize: 10, color: 'var(--color-text-quaternary)', marginTop: 4 }}>
                 PNG, JPG, WEBP — até 20 MB
               </span>
             )}
@@ -129,7 +129,7 @@ export default function ReferenceFrameUploader({
               onClick={e => { e.stopPropagation(); onClear() }}
               style={{
                 fontSize: 10,
-                color:    'rgba(255,255,255,0.3)',
+                color:    'var(--color-text-tertiary)',
                 background: 'none', border: 'none',
                 cursor:   'pointer', padding: 0,
               }}

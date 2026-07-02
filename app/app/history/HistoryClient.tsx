@@ -735,7 +735,7 @@ function AuthorChip({ author }: { author: AuthorInfo | null }) {
       style={{
         position: 'absolute', bottom: 8, left: 8, zIndex: 2,
         width: 20, height: 20, borderRadius: '50%',
-        background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
+        background: 'var(--color-scrim)', backdropFilter: 'blur(4px)',
         border: '0.5px solid rgba(255,255,255,0.22)',
         color: 'rgba(255,255,255,0.85)',
         fontSize: 7.5, fontWeight: 600, letterSpacing: '0.04em',
@@ -1057,10 +1057,10 @@ function RenderCard({
         ...S.card,
         cursor:    'pointer',
         boxShadow: selected
-          ? '0 0 0 2px var(--color-text-primary), 0 8px 32px rgba(0,0,0,0.28)'
+          ? '0 0 0 2px var(--color-text-primary), var(--shadow-md)'
           : hovered
-            ? '0 8px 32px rgba(0,0,0,0.28)'
-            : '0 1px 4px rgba(0,0,0,0.12)',
+            ? 'var(--shadow-md)'
+            : 'var(--shadow-sm)',
         transform: hovered && !selectMode ? 'translateY(-3px)' : 'translateY(0)',
       }}
       onMouseEnter={() => setHovered(true)}
@@ -1095,7 +1095,7 @@ function RenderCard({
         {/* Ícone de play para cards de vídeo */}
         {isVideo && !selectMode && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-            <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--color-scrim)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="white" style={{ marginLeft: 2 }}>
                 <polygon points="5 3 19 12 5 21 5 3"/>
               </svg>
@@ -1150,7 +1150,7 @@ function RenderCard({
               aria-label="Mais ações"
               style={{
                 width: 28, height: 28, borderRadius: 6,
-                background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)',
+                background: 'var(--color-scrim)', backdropFilter: 'blur(8px)',
                 border: '0.5px solid rgba(255,255,255,0.18)',
                 color: '#fff', cursor: 'pointer', padding: 0,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1167,10 +1167,10 @@ function RenderCard({
               <div style={{
                 position: 'absolute', top: 32, right: 0,
                 minWidth: 200, padding: 6,
-                background: '#1a1a1a',
-                border: '0.5px solid rgba(255,255,255,0.14)',
+                background: 'var(--color-bg-elevated)',
+                border: '0.5px solid var(--color-border-strong)',
                 borderRadius: 10,
-                boxShadow: '0 12px 36px rgba(0,0,0,0.5)',
+                boxShadow: 'var(--shadow-lg)',
               }}>
                 <button
                   type="button"
@@ -1183,10 +1183,10 @@ function RenderCard({
                     display: 'flex', alignItems: 'center', gap: 10,
                     width: '100%', padding: '8px 10px', borderRadius: 6,
                     background: 'transparent', border: 'none',
-                    color: '#fafafa', fontSize: 12, textAlign: 'left',
+                    color: 'var(--color-text-primary)', fontSize: 12, textAlign: 'left',
                     cursor: 'pointer',
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(29,158,117,0.12)'}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-accent-green-bg)'}
                   onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                 >
                   <span style={{
@@ -1201,8 +1201,8 @@ function RenderCard({
                     </svg>
                   </span>
                   <span style={{ flex: 1 }}>
-                    <span style={{ display: 'block', color: '#fafafa', fontWeight: 500 }}>Criar Space</span>
-                    <span style={{ display: 'block', fontSize: 10, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+                    <span style={{ display: 'block', color: 'var(--color-text-primary)', fontWeight: 500 }}>Criar Space</span>
+                    <span style={{ display: 'block', fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
                       Usa esta render como Vista Mestre
                     </span>
                   </span>
@@ -1443,7 +1443,7 @@ const S: Record<string, CSSProperties> = {
   metaNodes:     { fontSize: 9, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-quaternary)', whiteSpace: 'nowrap' },
 
   badgeRow:      { position: 'absolute', top: 10, right: 10, display: 'flex', gap: 5 },
-  badge:         { fontSize: 9, letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 500, padding: '3px 7px', borderRadius: 5, background: 'rgba(0,0,0,0.45)', color: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)' },
+  badge:         { fontSize: 9, letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 500, padding: '3px 7px', borderRadius: 5, background: 'var(--color-scrim)', color: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)' },
 
   checkbox:      { position: 'absolute', top: 10, left: 10, width: 22, height: 22, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.85)', background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' },
   checkboxOn:    { background: 'var(--color-text-primary)', borderColor: 'var(--color-text-primary)', color: 'var(--color-bg)' },
@@ -1453,7 +1453,7 @@ const S: Record<string, CSSProperties> = {
 
   hoverActions:  { position: 'absolute', bottom: 10, right: 10, display: 'flex', gap: 6 },
   actionBtn:     { display: 'inline-flex', alignItems: 'center', padding: '5px 13px', background: 'rgba(255,255,255,0.92)', borderRadius: 7, fontSize: 11, color: '#0a0a0a', fontWeight: 500, textDecoration: 'none', fontFamily: 'inherit', letterSpacing: '-0.01em' },
-  actionBtnGhost:{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 11px', background: 'rgba(0,0,0,0.5)', border: '0.5px solid rgba(255,255,255,0.25)', borderRadius: 7, fontSize: 10, color: '#fafafa', textDecoration: 'none', backdropFilter: 'blur(4px)', fontFamily: 'inherit' },
+  actionBtnGhost:{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 11px', background: 'var(--color-scrim)', border: '0.5px solid rgba(255,255,255,0.25)', borderRadius: 7, fontSize: 10, color: '#fafafa', textDecoration: 'none', backdropFilter: 'blur(4px)', fontFamily: 'inherit' },
 
   // left:40 (não 10) pra não sobrepor o checkbox de hover, que ocupa o
   // mesmo canto superior esquerdo.
@@ -1462,15 +1462,15 @@ const S: Record<string, CSSProperties> = {
 
   // ── Action bar (modo seleção) ─
   actionBar:     { position: 'fixed', bottom: 18, left: 0, right: 0, display: 'flex', justifyContent: 'center', pointerEvents: 'none', zIndex: 50 },
-  actionBarInner:{ display: 'flex', alignItems: 'center', gap: 16, padding: '10px 14px', background: 'var(--color-bg-elevated)', border: '0.5px solid var(--color-border-strong)', borderRadius: 12, boxShadow: '0 12px 40px rgba(0,0,0,0.45)', pointerEvents: 'auto', backdropFilter: 'blur(12px)' },
+  actionBarInner:{ display: 'flex', alignItems: 'center', gap: 16, padding: '10px 14px', background: 'var(--color-bg-elevated)', border: '0.5px solid var(--color-border-strong)', borderRadius: 12, boxShadow: 'var(--shadow-lg)', pointerEvents: 'auto', backdropFilter: 'blur(12px)' },
   actionBarCount:{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.01em', paddingLeft: 4 },
   actionPrimary: { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'var(--color-text-primary)', color: 'var(--color-bg)', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '-0.01em' },
   actionSecondary:{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'var(--color-bg)', color: 'var(--color-text-primary)', border: '0.5px solid var(--color-border-strong)', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '-0.01em' },
   actionDanger:  { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'var(--color-bg)', color: 'var(--color-error)', border: '0.5px solid var(--color-error-border)', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '-0.01em' },
 
   // ── Modal ─
-  modalOverlay:  { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 24, backdropFilter: 'blur(2px)' },
-  modal:         { width: '100%', maxWidth: 440, maxHeight: '80vh', background: 'var(--color-bg-elevated)', border: '0.5px solid var(--color-border-strong)', borderRadius: 14, display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.5)' },
+  modalOverlay:  { position: 'fixed', inset: 0, background: 'var(--color-scrim)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 24, backdropFilter: 'blur(2px)' },
+  modal:         { width: '100%', maxWidth: 440, maxHeight: '80vh', background: 'var(--color-bg-elevated)', border: '0.5px solid var(--color-border-strong)', borderRadius: 14, display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: 'var(--shadow-xl)' },
   modalHeader:   { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '18px 20px 14px', borderBottom: '0.5px solid var(--color-border)' },
   modalTitle:    { fontSize: 15, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.02em', marginBottom: 3 },
   modalSub:      { fontSize: 11, color: 'var(--color-text-tertiary)', letterSpacing: '-0.01em' },

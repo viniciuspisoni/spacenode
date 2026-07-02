@@ -66,9 +66,9 @@ export default function CameraMotionPresets({
               borderRadius:  20,
               fontSize:      10.5,
               letterSpacing: '-0.005em',
-              border:        `1px solid ${activeGroup === gid ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.07)'}`,
-              background:    activeGroup === gid ? 'rgba(255,255,255,0.09)' : 'transparent',
-              color:         activeGroup === gid ? '#ffffff' : 'rgba(255,255,255,0.50)',
+              border:        `1px solid ${activeGroup === gid ? 'var(--color-border-focus)' : 'var(--color-border)'}`,
+              background:    activeGroup === gid ? 'var(--color-surface-hover)' : 'transparent',
+              color:         activeGroup === gid ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
               cursor:        'pointer',
               transition:    'all 0.15s',
             }}
@@ -106,11 +106,11 @@ function GroupSection({
         fontWeight:     600,
         letterSpacing:  '0.1em',
         textTransform:  'uppercase' as const,
-        color:          'rgba(255,255,255,0.40)',
+        color:          'var(--color-text-tertiary)',
         marginBottom:   8,
       }}>
         {group.label}
-        <span style={{ marginLeft: 8, color: 'rgba(255,255,255,0.25)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
+        <span style={{ marginLeft: 8, color: 'var(--color-text-quaternary)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
           {group.description}
         </span>
       </div>

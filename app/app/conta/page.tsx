@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getPlanById, type PlanId } from '@/lib/plans'
+import ThemeSelector from '@/components/app/ThemeSelector'
 
 export const dynamic = 'force-dynamic'
 
@@ -87,6 +88,17 @@ export default async function ContaPage() {
           >
             Gerenciar plano →
           </Link>
+        </Section>
+
+        {/* Aparência */}
+        <Section title="Aparência">
+          <p style={{
+            fontSize: 13, color: 'var(--color-text-tertiary)',
+            lineHeight: 1.6, letterSpacing: '-0.005em', marginBottom: 14,
+          }}>
+            Tema da interface. &ldquo;Sistema&rdquo; acompanha a preferência do seu dispositivo.
+          </p>
+          <ThemeSelector variant="full" />
         </Section>
 
         {/* Segurança */}
@@ -177,7 +189,7 @@ const linkButtonStyle: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 8,
   marginTop: 16,
   padding: '10px 16px',
-  background: 'rgba(255,255,255,0.04)',
+  background: 'var(--color-surface)',
   border: '0.5px solid var(--color-border-strong)',
   borderRadius: 9,
   fontSize: 12.5, fontWeight: 500,

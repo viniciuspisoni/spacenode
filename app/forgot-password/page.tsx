@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Brandmark } from '@/components/brand'
@@ -16,10 +16,6 @@ export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState<string | null>(null)
   const [sent,    setSent]    = useState(false)
-
-  useEffect(() => {
-    document.documentElement.classList.remove('light')
-  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -42,26 +38,26 @@ export default function ForgotPasswordPage() {
 
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: '13px 16px',
-    background: 'rgba(255,255,255,0.04)',
-    border: '0.5px solid rgba(255,255,255,0.1)',
-    borderRadius: 10, fontSize: 14, color: '#ffffff',
+    background: 'var(--color-input)',
+    border: '0.5px solid var(--color-input-border)',
+    borderRadius: 10, fontSize: 14, color: 'var(--color-text-primary)',
     outline: 'none', letterSpacing: '-0.01em',
     transition: 'border-color 0.15s',
   }
 
   return (
     <main style={{
-      minHeight: '100vh', background: '#0a0a0a',
+      minHeight: '100vh', background: 'var(--color-bg)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       padding: '40px 24px', position: 'relative', overflow: 'hidden',
     }}>
 
-      <style>{`.spn-input::placeholder { color: rgba(255,255,255,0.22); }`}</style>
+      <style>{`.spn-input::placeholder { color: var(--color-text-quaternary); }`}</style>
 
       {/* Ambient glow */}
       <div style={{
         position: 'fixed', inset: 0,
-        background: 'radial-gradient(ellipse 70% 50% at 50% 40%, rgba(255,255,255,0.025) 0%, transparent 70%)',
+        background: 'radial-gradient(ellipse 70% 50% at 50% 40%, var(--color-surface-subtle) 0%, transparent 70%)',
         pointerEvents: 'none',
       }} />
 
@@ -72,18 +68,18 @@ export default function ForgotPasswordPage() {
       }}>
 
         {/* Brand lockup */}
-        <div style={{ marginBottom: 44, color: '#ffffff' }}>
+        <div style={{ marginBottom: 44, color: 'var(--color-text-primary)' }}>
           <Brandmark size={28} />
         </div>
 
         <h1 style={{
-          fontSize: 22, fontWeight: 500, color: '#ffffff',
+          fontSize: 22, fontWeight: 500, color: 'var(--color-text-primary)',
           marginBottom: 8, letterSpacing: '-0.02em',
         }}>
           {sent ? 'Email enviado' : 'Recuperar acesso'}
         </h1>
         <p style={{
-          fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 28,
+          fontSize: 13, color: 'var(--color-text-tertiary)', marginBottom: 28,
           textAlign: 'center', lineHeight: 1.5, letterSpacing: '-0.005em',
         }}>
           {sent
@@ -94,8 +90,8 @@ export default function ForgotPasswordPage() {
         {error && (
           <div style={{
             width: '100%', padding: '11px 14px', borderRadius: 9, marginBottom: 16,
-            background: 'rgba(220,50,47,0.08)', border: '0.5px solid rgba(220,50,47,0.25)',
-            fontSize: 13, color: '#e05252', letterSpacing: '-0.01em', lineHeight: 1.5,
+            background: 'var(--color-error-bg)', border: '0.5px solid var(--color-error-border)',
+            fontSize: 13, color: 'var(--color-error)', letterSpacing: '-0.01em', lineHeight: 1.5,
           }}>
             {error}
           </div>
@@ -112,8 +108,8 @@ export default function ForgotPasswordPage() {
               required
               autoComplete="email"
               style={inputStyle}
-              onFocus={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.25)' }}
-              onBlur={e  => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'  }}
+              onFocus={e => { e.currentTarget.style.borderColor = 'var(--color-border-focus)' }}
+              onBlur={e  => { e.currentTarget.style.borderColor = 'var(--color-input-border)'  }}
             />
 
             <button
@@ -121,10 +117,10 @@ export default function ForgotPasswordPage() {
               disabled={loading}
               style={{
                 width: '100%', padding: '14px 24px', marginTop: 2,
-                background: loading ? 'rgba(255,255,255,0.1)' : '#ffffff',
+                background: loading ? 'var(--color-surface-hover)' : 'var(--color-inverse)',
                 border: 'none', borderRadius: 10,
                 fontSize: 14, fontWeight: 500, letterSpacing: '-0.01em',
-                color: loading ? 'rgba(0,0,0,0.4)' : '#0a0a0a',
+                color: loading ? 'var(--color-text-tertiary)' : 'var(--color-inverse-foreground)',
                 cursor: loading ? 'default' : 'pointer',
                 transition: 'all 0.15s ease',
               }}
@@ -135,7 +131,7 @@ export default function ForgotPasswordPage() {
         )}
 
         <Link href="/login" style={{
-          marginTop: 24, fontSize: 12, color: 'rgba(255,255,255,0.4)',
+          marginTop: 24, fontSize: 12, color: 'var(--color-text-tertiary)',
           textDecoration: 'none', letterSpacing: '-0.01em',
         }}>
           ← Voltar para login

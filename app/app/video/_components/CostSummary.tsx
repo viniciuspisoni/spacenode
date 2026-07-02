@@ -31,7 +31,7 @@ export default function CostSummary({
   return (
     <div style={{
       padding:    '16px 24px',
-      borderTop:  '0.5px solid rgba(255,255,255,0.07)',
+      borderTop:  '0.5px solid var(--color-border)',
       flexShrink: 0,
     }}>
       <div style={{
@@ -40,19 +40,19 @@ export default function CostSummary({
         justifyContent: 'space-between',
         marginBottom:   12,
       }}>
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.40)' }}>
+        <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
           {ready ? (
-            <>Custo: <span style={{ color: 'rgba(255,255,255,0.75)', fontWeight: 500 }}>{nodeCost} Nodes</span></>
+            <>Custo: <span style={{ color: 'var(--color-text-secondary)', fontWeight: 500 }}>{nodeCost} Nodes</span></>
           ) : (
-            <span style={{ color: 'rgba(255,255,255,0.40)' }}>
+            <span style={{ color: 'var(--color-text-tertiary)' }}>
               Custo calculado após configuração
             </span>
           )}
         </div>
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.40)' }}>
+        <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
           Saldo:{' '}
           <span style={{
-            color: credits > 0 ? 'rgba(255,255,255,0.75)' : 'var(--color-error)',
+            color: credits > 0 ? 'var(--color-text-secondary)' : 'var(--color-error)',
             fontWeight: 500,
           }}>
             {credits} Nodes
@@ -70,8 +70,8 @@ export default function CostSummary({
           padding:       '13px 20px',
           borderRadius:  9,
           border:        'none',
-          background:    canSubmit ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.07)',
-          color:         canSubmit ? '#0a0a0a' : 'rgba(255,255,255,0.30)',
+          background:    canSubmit ? 'var(--color-inverse)' : 'var(--color-surface)',
+          color:         canSubmit ? 'var(--color-inverse-foreground)' : 'var(--color-text-tertiary)',
           fontSize:      13,
           fontWeight:    600,
           letterSpacing: '-0.01em',
@@ -85,7 +85,7 @@ export default function CostSummary({
       {!ready && (
         <div style={{
           fontSize:  10,
-          color:     'rgba(255,255,255,0.30)',
+          color:     'var(--color-text-tertiary)',
           marginTop: 8,
           textAlign: 'center',
         }}>

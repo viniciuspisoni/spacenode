@@ -39,10 +39,6 @@ export default function LoginPage() {
   const [error,         setError]         = useState<string | null>(null)
   const [success,       setSuccess]       = useState<string | null>(null)
 
-  useEffect(() => {
-    document.documentElement.classList.remove('light')
-  }, [])
-
   // Clear feedback when the user edits
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setError(null); setSuccess(null) }, [mode, email, password])
@@ -87,27 +83,27 @@ export default function LoginPage() {
 
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: '13px 16px',
-    background: 'rgba(255,255,255,0.04)',
-    border: '0.5px solid rgba(255,255,255,0.1)',
-    borderRadius: 10, fontSize: 14, color: '#ffffff',
+    background: 'var(--color-input)',
+    border: '0.5px solid var(--color-input-border)',
+    borderRadius: 10, fontSize: 14, color: 'var(--color-text-primary)',
     outline: 'none', letterSpacing: '-0.01em',
     transition: 'border-color 0.15s',
   }
 
   return (
     <main style={{
-      minHeight: '100vh', background: '#0a0a0a',
+      minHeight: '100vh', background: 'var(--color-bg)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       padding: '40px 24px', position: 'relative', overflow: 'hidden',
     }}>
 
       {/* Placeholder color for dark inputs */}
-      <style>{`.spn-input::placeholder { color: rgba(255,255,255,0.22); }`}</style>
+      <style>{`.spn-input::placeholder { color: var(--color-text-quaternary); }`}</style>
 
       {/* Ambient glow */}
       <div style={{
         position: 'fixed', inset: 0,
-        background: 'radial-gradient(ellipse 70% 50% at 50% 40%, rgba(255,255,255,0.025) 0%, transparent 70%)',
+        background: 'radial-gradient(ellipse 70% 50% at 50% 40%, var(--color-surface-subtle) 0%, transparent 70%)',
         pointerEvents: 'none',
       }} />
 
@@ -118,15 +114,15 @@ export default function LoginPage() {
       }}>
 
         {/* Brand lockup */}
-        <div style={{ marginBottom: 44, color: '#ffffff' }}>
+        <div style={{ marginBottom: 44, color: 'var(--color-text-primary)' }}>
           <Brandmark size={28} />
         </div>
 
         {/* Mode toggle */}
         <div style={{
           display: 'flex', width: '100%', marginBottom: 28,
-          background: 'rgba(255,255,255,0.04)',
-          border: '0.5px solid rgba(255,255,255,0.08)',
+          background: 'var(--color-surface)',
+          border: '0.5px solid var(--color-border)',
           borderRadius: 10, padding: 3,
         }}>
           {(['login', 'signup'] as const).map(m => (
@@ -134,8 +130,8 @@ export default function LoginPage() {
               flex: 1, padding: '9px 0', borderRadius: 8,
               fontSize: 13, fontWeight: 500, letterSpacing: '-0.01em',
               cursor: 'pointer', border: 'none',
-              background: mode === m ? 'rgba(255,255,255,0.1)' : 'transparent',
-              color: mode === m ? '#ffffff' : 'rgba(255,255,255,0.32)',
+              background: mode === m ? 'var(--color-surface-hover)' : 'transparent',
+              color: mode === m ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
               transition: 'all 0.15s ease',
             }}>
               {m === 'login' ? 'Entrar' : 'Criar conta'}
@@ -177,8 +173,8 @@ export default function LoginPage() {
               required
               autoComplete="email"
               style={inputStyle}
-              onFocus={e  => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.25)' }}
-              onBlur={e   => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'  }}
+              onFocus={e  => { e.currentTarget.style.borderColor = 'var(--color-border-focus)' }}
+              onBlur={e   => { e.currentTarget.style.borderColor = 'var(--color-input-border)'  }}
             />
             <input
               className="spn-input"
@@ -190,8 +186,8 @@ export default function LoginPage() {
               minLength={6}
               autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
               style={inputStyle}
-              onFocus={e  => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.25)' }}
-              onBlur={e   => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'  }}
+              onFocus={e  => { e.currentTarget.style.borderColor = 'var(--color-border-focus)' }}
+              onBlur={e   => { e.currentTarget.style.borderColor = 'var(--color-input-border)'  }}
             />
 
             <button
@@ -201,13 +197,13 @@ export default function LoginPage() {
               onMouseLeave={() => setSubmitHovered(false)}
               style={{
                 width: '100%', padding: '14px 24px', marginTop: 2,
-                background: loading ? 'rgba(255,255,255,0.1)' : submitHovered ? 'rgba(255,255,255,0.95)' : '#ffffff',
+                background: loading ? 'var(--color-surface-hover)' : submitHovered ? 'var(--color-inverse-hover)' : 'var(--color-inverse)',
                 border: 'none', borderRadius: 10,
                 fontSize: 14, fontWeight: 500, letterSpacing: '-0.01em',
-                color: loading ? 'rgba(0,0,0,0.4)' : '#0a0a0a',
+                color: loading ? 'var(--color-text-tertiary)' : 'var(--color-inverse-foreground)',
                 cursor: loading ? 'default' : 'pointer',
                 transform: submitHovered && !loading ? 'translateY(-1px)' : 'translateY(0)',
-                boxShadow: submitHovered && !loading ? '0 8px 24px rgba(0,0,0,0.4)' : 'none',
+                boxShadow: submitHovered && !loading ? 'var(--shadow-md)' : 'none',
                 transition: 'all 0.15s ease',
               }}
             >
@@ -217,7 +213,7 @@ export default function LoginPage() {
             {mode === 'login' && (
               <div style={{ textAlign: 'right', marginTop: 2 }}>
                 <a href="/forgot-password" style={{
-                  fontSize: 11, color: 'rgba(255,255,255,0.22)',
+                  fontSize: 11, color: 'var(--color-text-quaternary)',
                   letterSpacing: '-0.005em', textDecoration: 'none',
                 }}>
                   Esqueci minha senha
@@ -232,9 +228,9 @@ export default function LoginPage() {
           width: '100%', display: 'flex', alignItems: 'center', gap: 12,
           margin: '24px 0 12px',
         }}>
-          <div style={{ flex: 1, height: '0.5px', background: 'rgba(255,255,255,0.07)' }} />
-          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', letterSpacing: '0.06em', textTransform: 'uppercase' as const }}>ou</span>
-          <div style={{ flex: 1, height: '0.5px', background: 'rgba(255,255,255,0.07)' }} />
+          <div style={{ flex: 1, height: '0.5px', background: 'var(--color-border)' }} />
+          <span style={{ fontSize: 10, color: 'var(--color-text-quaternary)', letterSpacing: '0.06em', textTransform: 'uppercase' as const }}>ou</span>
+          <div style={{ flex: 1, height: '0.5px', background: 'var(--color-border)' }} />
         </div>
 
         {/* Google button */}
@@ -247,13 +243,13 @@ export default function LoginPage() {
             width: '100%', marginBottom: 36,
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
             padding: '14px 24px',
-            background: googleHovered ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.04)',
-            border: `0.5px solid ${googleHovered ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.1)'}`,
+            background: googleHovered ? 'var(--color-surface-hover)' : 'var(--color-surface)',
+            border: `0.5px solid ${googleHovered ? 'var(--color-border-focus)' : 'var(--color-border-strong)'}`,
             borderRadius: 10, fontSize: 14, fontWeight: 500, letterSpacing: '-0.01em',
-            color: googleLoading ? 'rgba(255,255,255,0.35)' : '#ffffff',
+            color: googleLoading ? 'var(--color-text-tertiary)' : 'var(--color-text-primary)',
             cursor: googleLoading ? 'default' : 'pointer',
             transform: googleHovered && !googleLoading ? 'translateY(-1px)' : 'translateY(0)',
-            boxShadow: googleHovered && !googleLoading ? '0 8px 24px rgba(0,0,0,0.4)' : 'none',
+            boxShadow: googleHovered && !googleLoading ? 'var(--shadow-md)' : 'none',
             transition: 'all 0.2s ease',
           }}
         >
@@ -264,7 +260,7 @@ export default function LoginPage() {
         {/* Trust signals */}
         <div style={{
           display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center',
-          gap: 8, fontSize: 10, color: 'rgba(255,255,255,0.18)', letterSpacing: '0.02em',
+          gap: 8, fontSize: 10, color: 'var(--color-text-quaternary)', letterSpacing: '0.02em',
         }}>
           {(['40 nodes grátis', 'Sem cartão', 'Suporte em português'] as const).map((item, i, arr) => (
             <span key={item} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

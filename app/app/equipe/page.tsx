@@ -211,7 +211,7 @@ export default async function EquipePage() {
         {isSolo && (
           <div style={{
             marginTop: 18, padding: '16px 20px',
-            background: 'rgba(255,255,255,0.025)',
+            background: 'var(--color-surface-subtle)',
             border: '0.5px dashed var(--color-border-strong)',
             borderRadius: 12,
             fontSize: 12.5, color: 'var(--color-text-tertiary)', lineHeight: 1.6,
@@ -265,7 +265,7 @@ function Avatar({ name }: { name: string }) {
   return (
     <div style={{
       width: 30, height: 30, borderRadius: 8, flexShrink: 0,
-      background: 'rgba(255,255,255,0.06)',
+      background: 'var(--color-surface)',
       border: '0.5px solid var(--color-border-strong)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       fontSize: 13, fontWeight: 600, color: 'var(--color-text-secondary)',

@@ -118,8 +118,8 @@ export default function AnimateClient({ initialCredits }: AnimateClientProps) {
       width:      '100%',
       height:     '100%',
       overflow:   'hidden',
-      background: '#0a0a0a',
-      color:      '#ffffff',
+      background: 'var(--color-bg)',
+      color:      'var(--color-text-primary)',
     }}>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 

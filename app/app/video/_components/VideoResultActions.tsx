@@ -42,7 +42,7 @@ export default function VideoResultActions({
           width:        '100%',
           borderRadius: 12,
           display:      'block',
-          background:   '#111',
+          background:   'var(--color-preview-bg)',
         }}
       />
 
@@ -55,7 +55,7 @@ export default function VideoResultActions({
       }}>
         <div style={{
           fontSize: 11,
-          color:    'rgba(255,255,255,0.35)',
+          color:    'var(--color-text-tertiary)',
           letterSpacing: '0.04em',
         }}>
           {model?.label ?? 'Animação'} · {result.duration}s
@@ -104,14 +104,14 @@ const baseBtn: React.CSSProperties = {
 
 const primaryBtn: React.CSSProperties = {
   ...baseBtn,
-  background: 'rgba(255,255,255,0.92)',
-  color:      '#0a0a0a',
-  border:     '1px solid rgba(255,255,255,0.92)',
+  background: 'var(--color-inverse)',
+  color:      'var(--color-inverse-foreground)',
+  border:     '1px solid var(--color-inverse)',
 }
 
 const ghostBtn: React.CSSProperties = {
   ...baseBtn,
   background: 'transparent',
-  color:      'rgba(255,255,255,0.65)',
-  border:     '1px solid rgba(255,255,255,0.12)',
+  color:      'var(--color-text-secondary)',
+  border:     '1px solid var(--color-border-strong)',
 }

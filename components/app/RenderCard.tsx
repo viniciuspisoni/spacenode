@@ -15,8 +15,8 @@ export default function RenderCard({ render }: { render: RenderJob }) {
           style={{ textShadow: '0 1px 2px rgba(0,0,0,0.35)' }}
         >
           <span
-            className="w-[5px] h-[5px] rounded-full bg-[#30d158] shrink-0"
-            style={{ boxShadow: '0 0 4px rgba(48,209,88,0.6)' }}
+            className="w-[5px] h-[5px] rounded-full bg-[var(--color-accent-green)] shrink-0"
+            style={{ boxShadow: '0 0 4px var(--color-accent-green-glow)' }}
           />
           pronto
         </span>
@@ -25,14 +25,14 @@ export default function RenderCard({ render }: { render: RenderJob }) {
       {/* Meta — no background, just text on page surface */}
       <div className="flex items-baseline justify-between pt-3 px-1">
         <div className="min-w-0 mr-2">
-          <p className="text-[13px] font-medium text-[#1a1a1a] tracking-[-0.015em] truncate">
+          <p className="text-[13px] font-medium text-[var(--color-text-primary)] tracking-[-0.015em] truncate">
             {render.title}
           </p>
-          <p className="text-[11px] text-[#86868b] mt-0.5 tracking-[-0.005em]">
+          <p className="text-[11px] text-[var(--color-text-tertiary)] mt-0.5 tracking-[-0.005em]">
             {render.subtitle}
           </p>
         </div>
-        <span className="text-[10px] text-[#c7c7cc] tracking-[0.05em] tabular-nums shrink-0">
+        <span className="text-[10px] text-[var(--color-text-quaternary)] tracking-[0.05em] tabular-nums shrink-0">
           {render.dateLabel}
         </span>
       </div>

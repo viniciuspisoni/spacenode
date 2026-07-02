@@ -25,8 +25,8 @@ export default function EmptyAnimateState({ onPick, isDragging }: Props) {
         marginTop:      8,
         padding:        '48px 32px',
         borderRadius:   16,
-        border:         `1.5px dashed ${isDragging ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.10)'}`,
-        background:     isDragging ? 'rgba(255,255,255,0.04)' : 'transparent',
+        border:         `1.5px dashed ${isDragging ? 'var(--color-border-focus)' : 'var(--color-border)'}`,
+        background:     isDragging ? 'var(--color-surface)' : 'transparent',
         color:          'inherit',
         cursor:         'pointer',
         transition:     'border-color 0.18s, background 0.18s',
@@ -34,10 +34,10 @@ export default function EmptyAnimateState({ onPick, isDragging }: Props) {
     >
       <div style={{
         width:        58, height: 58, borderRadius: 16,
-        background:   'rgba(255,255,255,0.05)',
-        border:       '0.5px solid rgba(255,255,255,0.10)',
+        background:   'var(--color-surface)',
+        border:       '0.5px solid var(--color-border-strong)',
         display:      'flex', alignItems: 'center', justifyContent: 'center',
-        color:        'rgba(255,255,255,0.55)',
+        color:        'var(--color-text-secondary)',
       }}>
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           <polygon points="23 7 16 12 23 17 23 7"/>
@@ -49,14 +49,14 @@ export default function EmptyAnimateState({ onPick, isDragging }: Props) {
         <div style={{
           fontSize:   15,
           fontWeight: 500,
-          color:      'rgba(255,255,255,0.85)',
+          color:      'var(--color-text-primary)',
           letterSpacing: '-0.01em',
         }}>
           Comece pela imagem do projeto
         </div>
         <div style={{
           fontSize:      12.5,
-          color:         'rgba(255,255,255,0.40)',
+          color:         'var(--color-text-tertiary)',
           marginTop:     8,
           lineHeight:    1.55,
           letterSpacing: '-0.005em',
@@ -66,7 +66,7 @@ export default function EmptyAnimateState({ onPick, isDragging }: Props) {
         </div>
         <div style={{
           fontSize:  10.5,
-          color:     'rgba(255,255,255,0.25)',
+          color:     'var(--color-text-quaternary)',
           marginTop: 14,
           letterSpacing: '0.04em',
         }}>
@@ -80,8 +80,8 @@ export default function EmptyAnimateState({ onPick, isDragging }: Props) {
         gap:        6,
         padding:    '8px 16px',
         borderRadius: 8,
-        background: 'rgba(255,255,255,0.92)',
-        color:      '#0a0a0a',
+        background: 'var(--color-inverse)',
+        color:      'var(--color-inverse-foreground)',
         fontSize:   12.5,
         fontWeight: 600,
         letterSpacing: '-0.01em',

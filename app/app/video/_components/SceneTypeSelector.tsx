@@ -30,9 +30,9 @@ export default function SceneTypeSelector({ value, onChange, disabled }: Props) 
                 borderRadius:  20,
                 fontSize:      11,
                 letterSpacing: '-0.005em',
-                border:        `1px solid ${active ? 'rgba(255,255,255,0.30)' : 'rgba(255,255,255,0.09)'}`,
-                background:    active ? 'rgba(255,255,255,0.10)' : 'transparent',
-                color:         active ? '#ffffff' : 'rgba(255,255,255,0.50)',
+                border:        `1px solid ${active ? 'var(--color-border-focus)' : 'var(--color-border)'}`,
+                background:    active ? 'var(--color-surface-hover)' : 'transparent',
+                color:         active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                 cursor:        disabled ? 'not-allowed' : 'pointer',
                 transition:    'all 0.15s',
               }}
@@ -50,7 +50,7 @@ const Label = ({ children }: { children: React.ReactNode }) => (
   <div style={{
     fontSize:    10, fontWeight: 600, letterSpacing: '0.1em',
     textTransform:'uppercase' as const,
-    color:       'rgba(255,255,255,0.40)',
+    color:       'var(--color-text-tertiary)',
     marginBottom: 10,
   }}>
     {children}

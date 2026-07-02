@@ -33,8 +33,8 @@ export default function DurationSelector({ modelId, value, onChange, disabled }:
                 padding:      '10px 8px',
                 borderRadius: 8,
                 textAlign:    'center',
-                border:       `1px solid ${active ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.07)'}`,
-                background:   active ? 'rgba(255,255,255,0.08)' : 'transparent',
+                border:       `1px solid ${active ? 'var(--color-border-focus)' : 'var(--color-border)'}`,
+                background:   active ? 'var(--color-surface-hover)' : 'transparent',
                 cursor:       disabled ? 'not-allowed' : 'pointer',
                 transition:   'border-color 0.15s, background 0.15s',
               }}
@@ -43,13 +43,13 @@ export default function DurationSelector({ modelId, value, onChange, disabled }:
                 fontSize:      14,
                 fontWeight:    600,
                 letterSpacing: '-0.01em',
-                color:         active ? '#ffffff' : 'rgba(255,255,255,0.55)',
+                color:         active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
               }}>
                 {d}s
               </div>
               <div style={{
                 fontSize:      9,
-                color:         'rgba(255,255,255,0.32)',
+                color:         'var(--color-text-tertiary)',
                 marginTop:     2,
                 letterSpacing: '0.04em',
               }}>
@@ -67,7 +67,7 @@ const Label = ({ children }: { children: React.ReactNode }) => (
   <div style={{
     fontSize:    10, fontWeight: 600, letterSpacing: '0.1em',
     textTransform:'uppercase' as const,
-    color:       'rgba(255,255,255,0.40)',
+    color:       'var(--color-text-tertiary)',
     marginBottom: 10,
   }}>
     {children}
