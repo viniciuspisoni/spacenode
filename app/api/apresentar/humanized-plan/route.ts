@@ -56,6 +56,8 @@ export async function POST(req: NextRequest) {
     const style       = formData.get('style')       as string | null
     const level       = formData.get('level')       as string | null
     const optionsRaw  = formData.get('options')     as string | null
+    const additionalInstructionsRaw = formData.get('additionalInstructions') as string | null
+    const additionalInstructions    = additionalInstructionsRaw?.trim().slice(0, 400) || null
 
     // ── Validações ────────────────────────────────────────────────────────────
     if (!imageFile) {
@@ -109,6 +111,7 @@ export async function POST(req: NextRequest) {
       style:       style       as HumanizedPlanStyle,
       level:       level       as HumanizedPlanLevel,
       options,
+      additionalInstructions,
     })
 
     inputUrl = await fal.storage.upload(imageFile)
@@ -149,6 +152,7 @@ export async function POST(req: NextRequest) {
       style,
       level,
       options,
+      additionalInstructions,
     }
 
     const insertResult = await admin

@@ -61,10 +61,11 @@ export interface HumanizedPlanPromptInput {
   style:       HumanizedPlanStyle
   level:       HumanizedPlanLevel
   options:     HumanizedPlanOptions
+  additionalInstructions?: string | null
 }
 
 export function buildHumanizedPlanPrompt(input: HumanizedPlanPromptInput): string {
-  const { projectType, style, level, options } = input
+  const { projectType, style, level, options, additionalInstructions } = input
 
   const optionLines = OPTION_FRAGMENTS
     .filter(({ key }) => options[key])
@@ -85,6 +86,9 @@ export function buildHumanizedPlanPrompt(input: HumanizedPlanPromptInput): strin
     `LEVEL: ${LEVEL_DIRECTIVE[level]}`,
     '',
     optionLines ? `OPTIONS:\n${optionLines}` : 'OPTIONS: minimal additions only.',
+    ...(additionalInstructions?.trim()
+      ? ['', `ADDITIONAL USER INSTRUCTIONS (complement the settings above, do not override structural fidelity):\n${additionalInstructions.trim()}`]
+      : []),
     '',
     `Output: a single high-quality top-down humanized floor plan, ready for client presentation.`,
   ].join('\n')

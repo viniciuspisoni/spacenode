@@ -44,6 +44,8 @@ export default function PlantaHumanizadaClient({ initialCredits }: Props) {
   const [style,       setStyle]       = useState<HumanizedPlanStyle>('imobiliario_premium')
   const [level,       setLevel]       = useState<HumanizedPlanLevel>('equilibrado')
   const [options,     setOptions]     = useState<HumanizedPlanOptions>(HUMANIZED_PLAN_DEFAULT_OPTIONS)
+  const [additionalInstructions, setAdditionalInstructions] = useState('')
+  const [advancedOpen, setAdvancedOpen] = useState(false)
 
   // Generation state
   const [isLoading,   setIsLoading]   = useState(false)
@@ -115,6 +117,9 @@ export default function PlantaHumanizadaClient({ initialCredits }: Props) {
     formData.append('style',       style)
     formData.append('level',       level)
     formData.append('options',     JSON.stringify(options))
+    if (additionalInstructions.trim()) {
+      formData.append('additionalInstructions', additionalInstructions.trim())
+    }
 
     try {
       const res  = await fetch('/api/apresentar/humanized-plan', { method: 'POST', body: formData })
@@ -218,15 +223,6 @@ export default function PlantaHumanizadaClient({ initialCredits }: Props) {
               onChange={(e) => { const f = e.target.files?.[0]; if (f) loadImageFile(f) }} />
           </Section>
 
-          {/* Project type */}
-          <Section label="Tipo de projeto">
-            <PillRow
-              items={HUMANIZED_PLAN_PROJECT_TYPES}
-              selected={projectType}
-              onSelect={(id) => setProjectType(id as HumanizedPlanProjectType)}
-            />
-          </Section>
-
           {/* Style */}
           <Section label="Estilo visual">
             <CardList
@@ -262,17 +258,66 @@ export default function PlantaHumanizadaClient({ initialCredits }: Props) {
             </div>
           </Section>
 
-          {/* Options */}
-          <Section label="Opções adicionais">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <Toggle label="Adicionar mobiliário"        value={options.addFurniture}       onChange={() => toggleOption('addFurniture')} />
-              <Toggle label="Adicionar vegetação"         value={options.addVegetation}      onChange={() => toggleOption('addVegetation')} />
-              <Toggle label="Aplicar texturas de piso"    value={options.applyFloorTextures} onChange={() => toggleOption('applyFloorTextures')} />
-              <Toggle label="Adicionar sombras suaves"    value={options.addSoftShadows}     onChange={() => toggleOption('addSoftShadows')} />
-              <Toggle label="Preservar linhas técnicas"   value={options.preserveLines}      onChange={() => toggleOption('preserveLines')} />
-              <Toggle label="Adicionar nomes dos ambientes" value={options.addRoomLabels}    onChange={() => toggleOption('addRoomLabels')} />
-            </div>
-          </Section>
+          {/* Advanced settings */}
+          <div>
+            <button
+              onClick={() => setAdvancedOpen((v) => !v)}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+              }}
+            >
+              <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-text-tertiary)' }}>
+                Ajustes avançados
+              </span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="2" strokeLinecap="round"
+                style={{ transform: advancedOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </button>
+
+            {advancedOpen && (
+              <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeIn 0.15s ease' }}>
+                <Section label="Tipo de projeto">
+                  <PillRow
+                    items={HUMANIZED_PLAN_PROJECT_TYPES}
+                    selected={projectType}
+                    onSelect={(id) => setProjectType(id as HumanizedPlanProjectType)}
+                  />
+                </Section>
+
+                <Section label="Opções adicionais">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <Toggle label="Adicionar mobiliário"        value={options.addFurniture}       onChange={() => toggleOption('addFurniture')} />
+                    <Toggle label="Adicionar vegetação"         value={options.addVegetation}      onChange={() => toggleOption('addVegetation')} />
+                    <Toggle label="Aplicar texturas de piso"    value={options.applyFloorTextures} onChange={() => toggleOption('applyFloorTextures')} />
+                    <Toggle label="Adicionar sombras suaves"    value={options.addSoftShadows}     onChange={() => toggleOption('addSoftShadows')} />
+                    <Toggle label="Preservar linhas técnicas"   value={options.preserveLines}      onChange={() => toggleOption('preserveLines')} />
+                    <Toggle label="Adicionar nomes dos ambientes" value={options.addRoomLabels}    onChange={() => toggleOption('addRoomLabels')} />
+                  </div>
+                </Section>
+
+                <Section label="Instruções adicionais">
+                  <textarea
+                    value={additionalInstructions}
+                    onChange={(e) => setAdditionalInstructions(e.target.value.slice(0, 400))}
+                    placeholder="Ex: usar mobiliário contemporâneo, manter nomes dos ambientes grandes, evitar vegetação, destacar áreas molhadas..."
+                    rows={3}
+                    style={{
+                      width: '100%', resize: 'none', maxHeight: 90,
+                      padding: '9px 11px', borderRadius: 8,
+                      border: '1px solid var(--color-border)', background: 'transparent',
+                      color: 'var(--color-text-primary)', fontSize: 11.5, lineHeight: 1.5,
+                      fontFamily: 'inherit', outline: 'none',
+                    }}
+                  />
+                  <div style={{ textAlign: 'right', fontSize: 9, color: 'var(--color-text-quaternary)', marginTop: 4 }}>
+                    {additionalInstructions.length}/400
+                  </div>
+                </Section>
+              </div>
+            )}
+          </div>
 
           {/* Fidelity note */}
           <div style={{
