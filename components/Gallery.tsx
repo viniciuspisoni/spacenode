@@ -37,8 +37,10 @@ function MiniBeforeAfter({ before, after }: { before: string; after: string }) {
     >
       <img
         src={before}
-        alt="antes"
+        alt="imagem base"
         draggable={false}
+        loading="lazy"
+        decoding="async"
         style={{
           position: 'absolute', inset: 0,
           width: '100%', height: '100%', objectFit: 'cover',
@@ -48,12 +50,14 @@ function MiniBeforeAfter({ before, after }: { before: string; after: string }) {
       />
       <img
         src={after}
-        alt="depois"
+        alt="resultado"
         draggable={false}
+        loading="lazy"
+        decoding="async"
         style={{
           position: 'absolute', inset: 0,
           width: '100%', height: '100%', objectFit: 'cover',
-          clipPath: `inset(0 ${100 - pos}% 0 0)`,
+          clipPath: `inset(0 0 0 ${pos}%)`,
           filter: 'contrast(1.05) saturate(1.05)',
           pointerEvents: 'none',
         }}
@@ -89,7 +93,7 @@ function MiniBeforeAfter({ before, after }: { before: string; after: string }) {
         textTransform: 'uppercase' as const,
         color: 'rgba(255,255,255,0.32)', pointerEvents: 'none',
       }}>
-        antes
+        base
       </span>
       <span style={{
         position: 'absolute', bottom: 10, right: 10,
@@ -99,7 +103,7 @@ function MiniBeforeAfter({ before, after }: { before: string; after: string }) {
         textShadow: '0 0 8px rgba(255,255,255,0.25)',
         pointerEvents: 'none',
       }}>
-        depois
+        resultado
       </span>
     </div>
   )
@@ -113,17 +117,8 @@ export default function Gallery() {
       <div style={{ maxWidth: 960, margin: '0 auto' }}>
 
         <div className="spn-gallery-head">
-          <div style={{
-            fontSize: 10, fontWeight: 500, letterSpacing: '0.22em',
-            textTransform: 'uppercase' as const, color: 'var(--color-text-tertiary)',
-            marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-          }}>
-            <span style={{ display: 'block', width: 32, height: '0.5px', background: 'var(--color-border-strong)' }} />
-            Galeria
-            <span style={{ display: 'block', width: 32, height: '0.5px', background: 'var(--color-border-strong)' }} />
-          </div>
           <h2 className="spn-gallery-title">
-            Projetos reais. Resultados reais.
+            projetos reais. resultados reais.
           </h2>
           <p className="spn-gallery-sub">
             Gerados na SpaceNode por arquitetos e designers. Sem pós-produção.
@@ -139,7 +134,7 @@ export default function Gallery() {
               className="spn-gallery-card"
               style={{
                 background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.08)',
+                border: '0.5px solid rgba(255,255,255,0.08)',
                 borderRadius: 14,
                 overflow: 'hidden',
                 transform: hoveredCard === i ? 'translateY(-2px)' : 'translateY(0)',
@@ -159,20 +154,19 @@ export default function Gallery() {
 
       <style jsx>{`
         .spn-gallery {
-          padding: 100px 48px;
-          border-top: 0.5px solid var(--color-border);
+          padding: 24px 48px 100px;
         }
         .spn-gallery-head {
           text-align: center;
           max-width: 600px;
-          margin: 0 auto 64px;
+          margin: 0 auto 40px;
         }
         .spn-gallery-title {
-          font-size: clamp(24px, 4.5vw, 38px);
-          font-weight: 400;
-          letter-spacing: -0.04em;
-          margin: 0 0 16px;
-          line-height: 1.15;
+          font-size: 22px;
+          font-weight: 500;
+          letter-spacing: -0.025em;
+          margin: 0 0 10px;
+          line-height: 1.2;
           color: var(--color-text-primary);
         }
         .spn-gallery-sub {
@@ -195,13 +189,13 @@ export default function Gallery() {
 
         @media (max-width: 768px) {
           .spn-gallery {
-            padding: 72px 20px;
+            padding: 16px 20px 72px;
           }
           .spn-gallery-head {
-            margin: 0 auto 36px;
+            margin: 0 auto 28px;
           }
           .spn-gallery-title {
-            font-size: 24px;
+            font-size: 20px;
           }
           .spn-gallery-sub {
             font-size: 14px;

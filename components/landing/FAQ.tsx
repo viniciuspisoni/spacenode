@@ -4,36 +4,44 @@ import { useState } from 'react'
 
 const faqs = [
   {
-    q: 'O que é um Space?',
-    a: 'Um Space é o seu projeto no SpaceNode. Você define a Vista Mestre — a referência visual e geométrica do projeto — e todas as variações geradas a partir daí preservam proporções, layout e identidade original. É o que diferencia o SpaceNode de ferramentas genéricas de IA: seu projeto tem memória.',
+    q: 'O que é a SpaceNode?',
+    a: 'Uma plataforma de visualização arquitetônica com IA para arquitetos e designers de interiores. Ela transforma estudos, modelos e imagens base em visualizações fotorrealistas — preservando a intenção do projeto, do estudo ao material de apresentação.',
   },
   {
-    q: 'Funciona com arquivos do SketchUp?',
-    a: 'Sim. Você pode enviar um print de tela, exportação de imagem ou foto do modelo diretamente do SketchUp — sem necessidade de plugin ou integração. O SpaceNode também aceita imagens do Revit, ArchiCAD, Blender e qualquer modelador 3D. Se você consegue visualizar na tela, consegue gerar o render.',
+    q: 'A SpaceNode substitui SketchUp, Revit, Enscape ou Lumion?',
+    a: 'Não. Ela complementa o fluxo de trabalho: você continua projetando nas ferramentas que já usa e utiliza a SpaceNode para acelerar visualizações, estudos de atmosfera, variações e imagens de apresentação. É 100% web — sem plugin, sem instalação e sem GPU dedicada.',
   },
   {
-    q: 'A IA altera meu projeto? Proporções e geometria são preservadas?',
-    a: 'Esse é o nosso diferencial técnico. O Geometry Lock é um controle exclusivo que define o quanto a IA respeita a geometria original. Com 100% de lock, ela transforma apenas a aparência — materiais, iluminação, fotorrealismo — sem alterar proporções, layout ou composição. Você decide o equilíbrio entre fidelidade e criatividade.',
+    q: 'A IA altera o meu projeto?',
+    a: 'A plataforma é construída para preservar geometria, proporções, perspectiva e composição. Como toda ferramenta de IA, o resultado pode pedir ajustes — mas o objetivo é respeitar o projeto original e reduzir reinterpretações indesejadas, não criar uma imagem apenas "parecida".',
   },
   {
-    q: 'Posso usar as imagens geradas em apresentações para clientes?',
-    a: 'Sim, todos os direitos são seus. Imagens geradas no SpaceNode podem ser usadas livremente em apresentações, portfólios, redes sociais, sites e entregas ao cliente. Planos Pro e Studio incluem saída em alta resolução (até 4K) para impressão.',
+    q: 'Posso usar imagens do SketchUp como base?',
+    a: 'Sim. Prints de tela, exportações de imagem, estudos volumétricos, fotos e referências funcionam como imagem base — do SketchUp, Revit, ArchiCAD, Blender ou qualquer modelador. Quanto mais clara a imagem de origem, maior o controle sobre o resultado.',
   },
   {
-    q: 'O que é um node? Quantos nodes um render consome?',
-    a: 'Nodes são a unidade de consumo do SpaceNode. Um render HD consome 4 nodes, um render 2K consome 8 nodes e um render 4K consome 20 nodes. Os nodes renovam mensalmente e não acumulam para o mês seguinte.',
+    q: 'O que são Nodes?',
+    a: 'Nodes são os créditos de uso da SpaceNode. Cada geração, edição ou ampliação consome nodes conforme o motor e a resolução escolhidos — um render HD parte de 10 nodes; 2K, de 15; 4K, de 25. Os nodes renovam mensalmente e não acumulam para o mês seguinte.',
   },
   {
-    q: 'Preciso instalar algum programa ou plugin?',
-    a: 'Não. O SpaceNode é 100% web — funciona direto no navegador. Nenhuma instalação, nenhuma GPU dedicada, nenhum espaço em disco. Funciona em qualquer computador, tablet ou celular com acesso à internet.',
+    q: 'Consigo usar as imagens com clientes?',
+    a: 'Sim, os direitos das imagens geradas são seus. Use em apresentações comerciais, portfólio, redes sociais, sites e materiais de apoio ao projeto — incluindo saída em alta resolução (até 4K) para impressão.',
   },
   {
-    q: 'Posso cancelar a qualquer momento?',
-    a: 'Depende do plano. No plano mensal, você pode cancelar quando quiser — paga apenas o mês em uso e mantém o acesso até o fim do período. No plano anual, o compromisso é de 12 meses, já que o pagamento é feito de forma antecipada. Em ambos os casos, o cancelamento é feito direto no painel, sem burocracia.',
+    q: 'Funciona para interiores e exteriores?',
+    a: 'Sim. Projetos residenciais, comerciais e corporativos; interiores, fachadas, paisagismo e estudos de materialidade. Se é visualização arquitetônica, é caso de uso da plataforma.',
   },
   {
-    q: 'Qual a resolução das imagens geradas?',
-    a: 'Depende do plano. Starter gera até HD, Pro até 2K (ideal para apresentações e redes sociais) e Studio até 4K, pronto para impressão e materiais de alto impacto.',
+    q: 'Preciso saber criar prompts avançados?',
+    a: 'Não. A interface orienta com escolhas de arquitetura — tipo de ambiente, iluminação, câmera, atmosfera e nível de fidelidade. O objetivo é eliminar a dependência de prompts longos e genéricos.',
+  },
+  {
+    q: 'Posso cancelar quando quiser?',
+    a: 'No plano mensal, sim — você paga apenas o mês em uso e mantém o acesso até o fim do período. No plano anual, o compromisso é de 12 meses, já que o pagamento é antecipado. Em ambos os casos, tudo é feito direto no painel, sem burocracia.',
+  },
+  {
+    q: 'A SpaceNode é indicada para escritórios?',
+    a: 'Sim. Os planos Studio e Office foram desenhados para equipes com volume: mais nodes por mês, Lumens avulsos para picos de demanda e suporte prioritário — velocidade e consistência visual em todas as etapas do projeto.',
   },
 ]
 
@@ -41,7 +49,7 @@ export function FAQ() {
   const [open, setOpen] = useState<number | null>(null)
 
   return (
-    <section className="spn-faq">
+    <section id="faq" className="spn-faq">
 
       <div className="spn-faq-head">
         <div style={{ fontSize: 10, fontWeight: 500, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'var(--color-text-tertiary)', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
@@ -50,10 +58,10 @@ export function FAQ() {
           <span style={{ display: 'block', width: 32, height: '0.5px', background: 'var(--color-border-strong)' }} />
         </div>
         <h2 className="spn-faq-title">
-          tudo que você precisa saber.
+          perguntas de quem projeta.
         </h2>
         <p className="spn-faq-sub">
-          Perguntas reais de arquitetos e designers de interiores do beta. Respondidas de forma direta.
+          As dúvidas reais de arquitetos e designers antes de assinar — respondidas de forma direta.
         </p>
       </div>
 

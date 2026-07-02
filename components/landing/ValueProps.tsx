@@ -1,21 +1,19 @@
-import React from 'react'
-
 const PROPS = [
   {
-    metric: 'Mais velocidade',
-    desc: 'De dias para segundos. Entregue variações antes do fim da reunião.',
+    metric: 'Geometria preservada',
+    desc: 'Construída para respeitar proporções, perspectiva e composição do projeto.',
   },
   {
-    metric: 'Mais impacto visual',
-    desc: 'Fotorrealismo de alto padrão que eleva a percepção do seu projeto.',
+    metric: 'Coerência de projeto',
+    desc: 'Cada imagem pertence ao mesmo projeto. Luz e ângulo variam — a identidade, não.',
   },
   {
-    metric: 'Mais aprovação',
-    desc: 'Clientes que visualizam decidem mais rápido e com mais confiança.',
+    metric: 'Controle profissional',
+    desc: 'Motor, resolução, atmosfera e materialidade sob seu comando, sem prompts.',
   },
   {
-    metric: 'Menos retrabalho',
-    desc: 'Itere visualmente antes de executar. Mude antes de construir.',
+    metric: 'Do estudo à apresentação',
+    desc: 'Estudos volumétricos viram material de apresentação sem sair da plataforma.',
   },
 ]
 
@@ -43,7 +41,7 @@ export function ValueProps() {
 
       <style jsx>{`
         .spn-value-props {
-          padding: 52px 40px 0;
+          padding: 52px 40px 64px;
           max-width: 880px;
           margin: 0 auto;
         }
@@ -64,7 +62,7 @@ export function ValueProps() {
 
         @media (max-width: 768px) {
           .spn-value-props {
-            padding: 40px 20px 0;
+            padding: 40px 20px 48px;
           }
           .spn-value-grid {
             grid-template-columns: 1fr 1fr;

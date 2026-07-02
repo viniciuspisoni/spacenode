@@ -23,22 +23,22 @@ const PLAN_DISPLAY: Record<PaidPlanId, PlanDisplay> = {
   starter: {
     rendersHD: 75,  renders2K: 37,  renders4K: 18,
     monthlyAnnualLabel: '890', meterPct: 9, featured: false, badge: '',
-    features: ['Acesso a todas as engines', 'Histórico de 30 dias', 'Suporte por e-mail'],
+    features: ['Acesso a todos os motores', 'Renders em HD, 2K e 4K', 'Suporte por e-mail'],
   },
   pro: {
     rendersHD: 180, renders2K: 90,  renders4K: 45,
     monthlyAnnualLabel: '1.990', meterPct: 23, featured: true, badge: 'recomendado',
-    features: ['Acesso a todas as engines', 'Histórico ilimitado', 'Suporte por e-mail'],
+    features: ['Acesso a todos os motores', 'Lumens avulsos disponíveis', 'Suporte por e-mail'],
   },
   studio: {
     rendersHD: 350, renders2K: 175, renders4K: 87,
     monthlyAnnualLabel: '3.490', meterPct: 44, featured: false, badge: '',
-    features: ['Acesso a todas as engines', 'Histórico ilimitado', 'Suporte prioritário'],
+    features: ['Acesso a todos os motores', 'Lumens avulsos disponíveis', 'Suporte prioritário'],
   },
   office: {
     rendersHD: 800, renders2K: 400, renders4K: 200,
     monthlyAnnualLabel: '6.990', meterPct: 100, featured: false, badge: '',
-    features: ['Acesso a todas as engines', 'Histórico ilimitado', 'Suporte prioritário', 'Lumens disponíveis (avulsos)'],
+    features: ['Acesso a todos os motores', 'Lumens avulsos disponíveis', 'Suporte prioritário'],
   },
 }
 
@@ -49,12 +49,13 @@ async function startCheckout(id: PaidPlanId, billing: BillingCycle) {
     body: JSON.stringify({ type: 'plan', id, billing }),
   })
   if (res.status === 401) { window.location.href = '/login'; return }
+  if (!res.ok) return
   const data = await res.json()
   if (data.url) window.location.href = data.url
 }
 
 const CheckIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, color: '#30d158' }}>
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, color: 'var(--color-accent-green)' }}>
     <path d="M2 7l3.5 3.5L12 3.5"/>
   </svg>
 )
@@ -92,7 +93,7 @@ function PlanCard({ planId, billing, loading, onSelect }: {
           position: 'absolute', top: 16, right: 16,
           fontSize: 9, fontWeight: 500, letterSpacing: '0.14em',
           textTransform: 'uppercase' as const,
-          background: 'rgba(48,209,88,0.15)', color: '#30d158',
+          background: 'rgba(48,209,88,0.15)', color: 'var(--color-accent-green)',
           padding: '3px 8px', borderRadius: 20,
           border: '0.5px solid rgba(48,209,88,0.25)',
         }}>
@@ -109,12 +110,34 @@ function PlanCard({ planId, billing, loading, onSelect }: {
         {plan.name}
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, marginBottom: 3 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, marginBottom: 3 }}>
+        <span style={{ fontSize: 15, fontWeight: 500, color: f ? 'rgba(255,255,255,0.5)' : 'var(--color-text-tertiary)' }}>R$</span>
         <span style={{
           fontSize: 42, fontWeight: 500,
           color: f ? '#fafafa' : 'var(--color-text-primary)',
           letterSpacing: '-0.04em', lineHeight: 1,
           fontVariantNumeric: 'tabular-nums' as const,
+        }}>
+          {price}
+        </span>
+        <span style={{ fontSize: 13, color: f ? 'rgba(255,255,255,0.4)' : 'var(--color-text-tertiary)', letterSpacing: '-0.005em' }}>
+          /mês
+        </span>
+      </div>
+
+      {billing === 'annual' ? (
+        <p style={{ fontSize: 10.5, letterSpacing: '-0.005em', marginBottom: 14, color: f ? 'rgba(255,255,255,0.3)' : 'var(--color-text-tertiary)' }}>
+          R$ {d.monthlyAnnualLabel} cobrado anualmente
+        </p>
+      ) : (
+        <div style={{ marginBottom: 14 }} />
+      )}
+
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 14 }}>
+        <span style={{
+          fontSize: 15, fontWeight: 500,
+          color: f ? 'rgba(255,255,255,0.7)' : 'var(--color-text-primary)',
+          letterSpacing: '-0.01em', fontVariantNumeric: 'tabular-nums' as const,
         }}>
           {plan.nodes.toLocaleString('pt-BR')}
         </span>
@@ -124,7 +147,7 @@ function PlanCard({ planId, billing, loading, onSelect }: {
       </div>
 
       <p style={{
-        fontSize: 10.5, letterSpacing: '-0.005em', marginBottom: 14,
+        fontSize: 10.5, letterSpacing: '-0.005em', marginBottom: 20,
         lineHeight: 1.55,
         color: f ? 'rgba(255,255,255,0.28)' : 'var(--color-text-tertiary)',
       }}>
@@ -135,24 +158,6 @@ function PlanCard({ planId, billing, loading, onSelect }: {
         <span style={{ color: f ? 'rgba(255,255,255,0.75)' : 'var(--color-text-primary)', fontWeight: 500 }}>{d.renders4K} renders 4K</span>
       </p>
 
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: billing === 'annual' ? 6 : 20 }}>
-        <span style={{ fontSize: 12, fontWeight: 400, color: f ? 'rgba(255,255,255,0.35)' : 'var(--color-text-tertiary)' }}>R$</span>
-        <span style={{
-          fontSize: 22, fontWeight: 500,
-          color: f ? '#fafafa' : 'var(--color-text-primary)',
-          letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' as const,
-        }}>
-          {price}
-        </span>
-        <span style={{ fontSize: 11, color: f ? 'rgba(255,255,255,0.3)' : 'var(--color-text-tertiary)', letterSpacing: '-0.005em' }}>/mês</span>
-      </div>
-
-      {billing === 'annual' && (
-        <p style={{ fontSize: 10, letterSpacing: '-0.005em', marginBottom: 20, color: f ? 'rgba(255,255,255,0.3)' : 'var(--color-text-tertiary)' }}>
-          R$ {d.monthlyAnnualLabel} cobrado anualmente
-        </p>
-      )}
-
       <div style={{ marginBottom: 20 }}>
         <div style={{
           height: 2, borderRadius: 2, overflow: 'hidden',
@@ -160,7 +165,7 @@ function PlanCard({ planId, billing, loading, onSelect }: {
         }}>
           <div style={{
             height: '100%', borderRadius: 2,
-            background: f ? '#30d158' : 'var(--color-text-primary)',
+            background: f ? 'var(--color-accent-green)' : 'var(--color-text-primary)',
             width: `${d.meterPct}%`,
           }} />
         </div>
@@ -194,7 +199,7 @@ function PlanCard({ planId, billing, loading, onSelect }: {
           opacity: loading && loading !== plan.id ? 0.5 : 1,
         }}
       >
-        {loading === plan.id ? 'Redirecionando...' : `começar com ${plan.name.toLowerCase()}`}
+        {loading === plan.id ? 'Redirecionando...' : plan.cta}
       </button>
     </div>
   )
@@ -217,18 +222,20 @@ function ConsumptionTable() {
     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
       <thead>
         <tr>
-          <th style={{ ...headCellBase, textAlign: 'left' }}>Engine</th>
+          <th style={{ ...headCellBase, textAlign: 'left' }}>Motor</th>
           {resolutions.map(r => (
             <th key={r} style={{ ...headCellBase, textAlign: 'right' }}>{r.toUpperCase()}</th>
           ))}
         </tr>
       </thead>
       <tbody>
-        {ENGINE_ORDER.map(eid => {
+        {ENGINE_ORDER.map((eid, idx) => {
           const e = ENGINES[eid]
+          const isLast = idx === ENGINE_ORDER.length - 1
+          const cellStyle = isLast ? { ...bodyCellBase, borderBottom: 'none' } : bodyCellBase
           return (
             <tr key={eid}>
-              <td style={{ ...bodyCellBase, textAlign: 'left' }}>
+              <td style={{ ...cellStyle, textAlign: 'left' }}>
                 <span style={{ fontWeight: 500 }}>{e.name}</span>
                 <span style={{ color: 'var(--color-text-tertiary)', marginLeft: 8, fontSize: 11 }}>
                   · {e.tagline}
@@ -237,7 +244,7 @@ function ConsumptionTable() {
               {resolutions.map(r => {
                 const cost = e.nodes[r]
                 return (
-                  <td key={r} style={{ ...bodyCellBase, textAlign: 'right' }}>
+                  <td key={r} style={{ ...cellStyle, textAlign: 'right' }}>
                     {cost !== undefined
                       ? <span><span style={{ fontWeight: 500 }}>{cost}</span> <span style={{ color: 'var(--color-text-tertiary)', fontSize: 11 }}>nodes</span></span>
                       : <span style={{ color: 'var(--color-text-tertiary)' }}>—</span>}
@@ -270,8 +277,11 @@ export function PricingToggle() {
 
   const handleSelect = async (id: PaidPlanId) => {
     setLoading(id)
-    await startCheckout(id, billing)
-    setLoading(null)
+    try {
+      await startCheckout(id, billing)
+    } finally {
+      setLoading(null)
+    }
   }
 
   const handleRenders = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -293,14 +303,13 @@ export function PricingToggle() {
             planos
             <span style={{ display: 'block', width: 32, height: 0.5, background: 'var(--color-border-strong)', flexShrink: 0 }} />
           </div>
-          <h2 style={{
-            fontSize: 28, fontWeight: 500, color: 'var(--color-text-primary)',
-            letterSpacing: '-0.03em', lineHeight: 1.2, marginBottom: 10,
-          }}>
-            Escolha seu volume de geração
+          <h2 className="spn-pricing-title">
+            escolha seu volume de geração.
           </h2>
-          <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)', letterSpacing: '-0.005em', lineHeight: 1.6 }}>
-            Nodes renovam mensalmente. Cancele quando quiser.
+          <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)', letterSpacing: '-0.005em', lineHeight: 1.6, maxWidth: 520, margin: '0 auto' }}>
+            Nodes são os créditos usados para gerar, editar ou ampliar imagens
+            na plataforma. Renovam todo mês — e no plano mensal você cancela
+            quando quiser.
           </p>
 
           {/* Billing toggle */}
@@ -337,7 +346,7 @@ export function PricingToggle() {
               <span style={{
                 fontSize: 9, fontWeight: 500, letterSpacing: '0.08em',
                 textTransform: 'uppercase' as const,
-                background: 'rgba(48,209,88,0.15)', color: '#30d158',
+                background: 'rgba(48,209,88,0.15)', color: 'var(--color-accent-green)',
                 padding: '2px 7px', borderRadius: 20,
                 border: '0.5px solid rgba(48,209,88,0.25)',
               }}>
@@ -360,6 +369,18 @@ export function PricingToggle() {
             <PlanCard key={p.id} planId={p.id} billing={billing} loading={loading} onSelect={handleSelect} />
           ))}
         </div>
+
+        {/* Risk-reduction microcopy */}
+        <p style={{
+          textAlign: 'center', marginTop: 20,
+          fontSize: 12, color: 'var(--color-text-tertiary)', letterSpacing: '-0.005em',
+        }}>
+          Ainda em dúvida?{' '}
+          <a href="/login" style={{ color: 'var(--color-text-primary)', textDecoration: 'underline', textUnderlineOffset: 3 }}>
+            Comece grátis com 40 nodes
+          </a>
+          {' '}— assine quando o volume pedir.
+        </p>
 
         {/* Engine × resolution table */}
         <div style={{ marginTop: 40 }}>
@@ -413,8 +434,8 @@ export function PricingToggle() {
               fontSize: 12, fontWeight: 500, letterSpacing: '-0.01em', whiteSpace: 'nowrap' as const,
             }}>
               {overflow
-                ? <>Sugestão:&nbsp;<span style={{ color: '#30d158', fontWeight: 400 }}>{recommended.name} + {suggestedLumen!.name}</span></>
-                : <>Plano recomendado:&nbsp;<span style={{ color: '#30d158', fontWeight: 400 }}>{recommended.name}</span></>}
+                ? <>Sugestão:&nbsp;<span style={{ color: 'var(--color-accent-green)', fontWeight: 400 }}>{recommended.name} + {suggestedLumen!.name}</span></>
+                : <>Plano recomendado:&nbsp;<span style={{ color: 'var(--color-accent-green)', fontWeight: 400 }}>{recommended.name}</span></>}
             </div>
           </div>
 
@@ -432,7 +453,7 @@ export function PricingToggle() {
               <input
                 type="range" min="5" max="200" step="5" value={renders}
                 onChange={handleRenders}
-                style={{ width: '100%', marginBottom: 8, cursor: 'pointer', accentColor: '#30d158' }}
+                style={{ width: '100%', marginBottom: 8, cursor: 'pointer', accentColor: 'var(--color-accent-green)' }}
               />
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--color-text-tertiary)' }}>
                 <span>5</span><span>200+</span>
@@ -491,7 +512,7 @@ export function PricingToggle() {
                   <span style={{
                     fontSize: 16, fontWeight: 500, letterSpacing: '-0.03em',
                     fontVariantNumeric: 'tabular-nums' as const,
-                    color: item.green ? '#30d158' : 'var(--color-text-primary)',
+                    color: item.green ? 'var(--color-accent-green)' : 'var(--color-text-primary)',
                   }}>
                     {item.value}
                   </span>
@@ -508,7 +529,7 @@ export function PricingToggle() {
         <div style={{ textAlign: 'center', marginTop: 32 }}>
           <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', letterSpacing: '-0.005em', lineHeight: 1.7 }}>
             Nodes renovam mensalmente e não acumulam para o mês seguinte.<br />
-            Lumens (créditos avulsos) ficam disponíveis após assinar um plano.<br />
+            Lumens (créditos avulsos) ficam disponíveis a partir do plano Pro.<br />
             Dúvidas?{' '}
             <a href="mailto:contato@spacenode.app" style={{ color: 'var(--color-text-primary)', textDecoration: 'underline', textUnderlineOffset: 3 }}>
               fale com a gente.
@@ -522,6 +543,14 @@ export function PricingToggle() {
         .spn-pricing {
           padding: 96px 24px;
         }
+        .spn-pricing-title {
+          font-size: 28px;
+          font-weight: 500;
+          color: var(--color-text-primary);
+          letter-spacing: -0.03em;
+          line-height: 1.2;
+          margin-bottom: 10px;
+        }
         .spn-pricing-engines {
           overflow-x: auto;
           -webkit-overflow-scrolling: touch;
@@ -530,6 +559,9 @@ export function PricingToggle() {
         @media (max-width: 768px) {
           .spn-pricing {
             padding: 72px 20px !important;
+          }
+          .spn-pricing-title {
+            font-size: 24px;
           }
           .spn-pricing-grid {
             grid-template-columns: 1fr !important;

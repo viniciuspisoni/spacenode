@@ -9,6 +9,8 @@ import Gallery from "@/components/Gallery";
 import FinalCTA from "@/components/FinalCTA";
 import Footer from "@/components/Footer";
 import { ProductMockup } from "@/components/landing/ProductMockup";
+import { ProblemSolution } from "@/components/landing/ProblemSolution";
+import { ForWho } from "@/components/landing/ForWho";
 import { ComparisonTable } from "@/components/landing/ComparisonTable";
 import { FAQ } from "@/components/landing/FAQ";
 import { PricingToggle } from "@/components/landing/PricingToggle";
@@ -31,17 +33,20 @@ export default function Home() {
       <Hero />
       <ValueProps />
       <Divider />
-      <Demo />
+      <ProductMockup />
       <Divider />
-      <PlatformModules />
+      <ProblemSolution />
       <Divider />
       <HowItWorks />
       <Divider />
-      <ProductMockup />
+      <PlatformModules />
+      <Divider />
+      <Demo />
+      <Gallery />
+      <Divider />
+      <ForWho />
       <Divider />
       <ComparisonTable />
-      <Divider />
-      <Gallery />
       <Divider />
       <PricingToggle />
       <Divider />

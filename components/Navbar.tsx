@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react';
 import { Logo } from './brand';
 
 const LINKS = [
+  { href: '#produto',       label: 'PRODUTO'       },
   { href: '#como-funciona', label: 'COMO FUNCIONA' },
-  { href: '#galeria',       label: 'GALERIA'       },
-  { href: '#planos',        label: 'PLANOS'        },
+  { href: '#planos',        label: 'PREÇOS'        },
+  { href: '#faq',           label: 'FAQ'           },
 ];
 
 export default function Navbar() {
@@ -55,7 +56,7 @@ export default function Navbar() {
               style={{
                 fontSize: 10,
                 letterSpacing: '0.18em',
-                color: 'var(--color-text-tertiary)',
+                color: 'var(--color-text-secondary)',
                 textTransform: 'uppercase',
                 fontWeight: 500,
                 transition: 'color 0.2s',
@@ -66,34 +67,12 @@ export default function Navbar() {
           ))}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }} className="nav-actions">
-          <a
-            href="/login"
-            style={{
-              fontSize: 10,
-              letterSpacing: '0.18em',
-              color: 'var(--color-text-tertiary)',
-              textTransform: 'uppercase',
-              fontWeight: 500,
-            }}
-          >
-            ENTRAR
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }} className="nav-actions">
+          <a href="/login" className="nav-pill nav-pill-ghost">
+            Entrar
           </a>
-          <a
-            href="/login"
-            style={{
-              background: 'var(--color-text-primary)',
-              color: 'var(--color-bg)',
-              borderRadius: 8,
-              padding: '9px 16px',
-              fontSize: 12,
-              fontWeight: 500,
-              textDecoration: 'none',
-              display: 'inline-flex',
-              alignItems: 'center',
-            }}
-          >
-            Testar agora
+          <a href="/login" className="nav-pill nav-pill-cta">
+            Começar agora
           </a>
         </div>
 
@@ -167,23 +146,9 @@ export default function Navbar() {
             <a
               href="/login"
               onClick={() => setOpen(false)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-                background: 'var(--color-text-primary)',
-                color: 'var(--color-bg)',
-                borderRadius: 12,
-                padding: '16px 24px',
-                fontSize: 15,
-                fontWeight: 500,
-                textDecoration: 'none',
-                letterSpacing: '-0.01em',
-                minHeight: 52,
-              }}
+              className="drawer-cta drawer-cta-primary"
             >
-              Testar agora
+              Começar agora
               <svg width="14" height="14" viewBox="0 0 12 12" fill="none">
                 <path d="M2 6h8M6.5 2.5L10 6l-3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
@@ -191,19 +156,7 @@ export default function Navbar() {
             <a
               href="/login"
               onClick={() => setOpen(false)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: '15px 24px',
-                fontSize: 14,
-                color: 'var(--color-text-secondary)',
-                textDecoration: 'none',
-                letterSpacing: '-0.01em',
-                border: '0.5px solid var(--color-border-strong)',
-                borderRadius: 12,
-                minHeight: 52,
-              }}
+              className="drawer-cta drawer-cta-ghost"
             >
               Já tenho conta
             </a>
@@ -227,6 +180,73 @@ export default function Navbar() {
         .spn-nav { padding: 18px 40px; }
         .nav-burger { display: none !important; }
 
+        .nav-pill {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 34px;
+          padding: 0 16px;
+          border-radius: var(--radius-full);
+          font-size: 12px;
+          font-weight: 500;
+          letter-spacing: -0.01em;
+          text-decoration: none;
+          transition:
+            transform var(--duration-base) cubic-bezier(0.21, 0.6, 0.35, 1),
+            background-color var(--duration-base) ease,
+            border-color var(--duration-base) ease,
+            box-shadow var(--duration-base) ease,
+            color var(--duration-base) ease;
+        }
+        .nav-pill:focus-visible {
+          /* landing é sempre dark; --color-border-focus (0.28) não atinge os 3:1 do WCAG 1.4.11 */
+          outline: 2px solid rgba(255, 255, 255, 0.75);
+          outline-offset: 2px;
+        }
+
+        /* "Entrar" — vidro escuro discreto */
+        .nav-pill-ghost {
+          color: var(--color-text-secondary);
+          background: rgba(255, 255, 255, 0.055);
+          border: 0.5px solid rgba(255, 255, 255, 0.1);
+          -webkit-backdrop-filter: blur(12px);
+          backdrop-filter: blur(12px);
+          box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.08);
+        }
+        .nav-pill-ghost:hover {
+          color: var(--color-text-primary);
+          background: rgba(255, 255, 255, 0.085);
+          border-color: rgba(255, 255, 255, 0.16);
+          transform: translateY(-1px);
+        }
+
+        /* "Começar agora" — vidro branco, CTA principal */
+        .nav-pill-cta {
+          color: #0b0b0c;
+          background: linear-gradient(180deg, #ffffff 0%, #ececf0 100%);
+          border: 0.5px solid rgba(255, 255, 255, 0.65);
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.95),
+            0 1px 2px rgba(0, 0, 0, 0.35),
+            0 6px 18px -8px rgba(0, 0, 0, 0.5);
+        }
+        .nav-pill-cta:hover {
+          color: #0b0b0c;
+          transform: translateY(-1px);
+          background: linear-gradient(180deg, #ffffff 0%, #f2f2f6 100%);
+          box-shadow:
+            inset 0 1px 0 #ffffff,
+            0 2px 4px rgba(0, 0, 0, 0.35),
+            0 10px 24px -8px rgba(0, 0, 0, 0.55);
+        }
+        /* depois dos :hover para vencer o empate de especificidade na cascata */
+        .nav-pill:active { transform: translateY(0); }
+
+        @media (prefers-reduced-motion: reduce) {
+          .nav-pill { transition: none; }
+          .nav-pill:hover { transform: none; }
+        }
+
         @media (max-width: 768px) {
           .spn-nav { padding: 14px 20px; }
           .nav-links, .nav-actions { display: none !important; }
@@ -236,15 +256,17 @@ export default function Navbar() {
         .nav-drawer {
           position: fixed;
           inset: 0;
-          z-index: 60;
+          z-index: 45; /* below the sticky nav (50) so the close toggle stays clickable */
           background: var(--color-bg);
           opacity: 0;
+          visibility: hidden;
           pointer-events: none;
-          transition: opacity 0.18s ease;
+          transition: opacity var(--duration-base) ease, visibility var(--duration-base) ease;
           overflow-y: auto;
         }
         .nav-drawer.is-open {
           opacity: 1;
+          visibility: visible;
           pointer-events: auto;
         }
         .nav-drawer-inner {
@@ -256,6 +278,43 @@ export default function Navbar() {
         @media (min-width: 769px) {
           .nav-drawer { display: none; }
         }
+
+        .drawer-cta {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          min-height: 52px;
+          padding: 15px 24px;
+          border-radius: var(--radius-md);
+          font-size: 15px;
+          font-weight: 500;
+          letter-spacing: -0.01em;
+          text-decoration: none;
+        }
+        .drawer-cta:focus-visible {
+          outline: 2px solid rgba(255, 255, 255, 0.75);
+          outline-offset: 2px;
+        }
+        .drawer-cta-primary {
+          color: #0b0b0c;
+          background: linear-gradient(180deg, #ffffff 0%, #ececf0 100%);
+          border: 0.5px solid rgba(255, 255, 255, 0.65);
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.95),
+            0 1px 2px rgba(0, 0, 0, 0.35);
+        }
+        .drawer-cta-primary:hover { color: #0b0b0c; }
+        .drawer-cta-ghost {
+          font-size: 14px;
+          color: var(--color-text-secondary);
+          background: rgba(255, 255, 255, 0.05);
+          border: 0.5px solid rgba(255, 255, 255, 0.1);
+          -webkit-backdrop-filter: blur(12px);
+          backdrop-filter: blur(12px);
+          box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.08);
+        }
+        .drawer-cta-ghost:hover { color: var(--color-text-primary); }
 
         a:hover { color: var(--color-text-primary); }
       `}</style>

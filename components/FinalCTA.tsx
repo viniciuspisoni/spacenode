@@ -5,7 +5,7 @@ export default function FinalCTA() {
         style={{
           fontSize: 10,
           letterSpacing: "0.28em",
-          color: "#6e6e73",
+          color: "var(--color-text-tertiary)",
           textTransform: "uppercase",
           fontWeight: 500,
           marginBottom: 20,
@@ -19,20 +19,22 @@ export default function FinalCTA() {
             width: 5,
             height: 5,
             borderRadius: "50%",
-            background: "#30d158",
-            boxShadow: "0 0 8px rgba(48,209,88,0.5)",
+            background: "var(--color-accent-green)",
+            boxShadow: "0 0 8px var(--color-accent-green-glow)",
           }}
         />
         PRÓXIMO PROJETO
       </span>
 
       <h2 className="spn-final-title">
-        comece em 30 segundos.
+        apresente melhor seus projetos,{" "}
+        <br className="spn-final-br" />
+        sem perder o controle sobre eles.
       </h2>
 
       <p className="spn-final-sub">
-        Junte-se a arquitetos e designers de interiores que já economizam dias
-        de trabalho por semana.
+        Comece com uma imagem base e veja o que muda no fluxo de visualização
+        do seu escritório.
       </p>
 
       <div className="spn-final-ctas">
@@ -40,8 +42,8 @@ export default function FinalCTA() {
           href="/login"
           className="spn-final-primary"
           style={{
-            background: "#f5f5f7",
-            color: "#0a0a0a",
+            background: "var(--color-text-primary)",
+            color: "var(--color-bg)",
             borderRadius: 12,
             fontWeight: 500,
             letterSpacing: "-0.005em",
@@ -53,20 +55,20 @@ export default function FinalCTA() {
             transition: "opacity 0.2s",
           }}
         >
-          Começar grátis →
+          Começar agora →
         </a>
         <a
           href="#planos"
           className="spn-final-secondary"
           style={{
-            color: "rgba(255,255,255,0.5)",
+            color: "var(--color-text-secondary)",
             textDecoration: "none",
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
             gap: 6,
             borderRadius: 12,
-            border: "0.5px solid rgba(255,255,255,0.1)",
+            border: "0.5px solid var(--color-border)",
             letterSpacing: "-0.005em",
             transition: "border-color 0.2s",
           }}
@@ -75,27 +77,27 @@ export default function FinalCTA() {
         </a>
       </div>
 
-      <p style={{ color: "#6e6e73", fontSize: 11, marginTop: 4 }}>
-        40 nodes grátis · sem cartão de crédito · cancele quando quiser
+      <p style={{ color: "var(--color-text-tertiary)", fontSize: 11, marginTop: 4 }}>
+        40 nodes grátis · sem cartão de crédito · sem compromisso
       </p>
 
       <style jsx>{`
         .spn-final {
           padding: 140px 40px;
-          background: #0a0a0a;
-          color: #fff;
+          background: var(--color-bg);
+          color: var(--color-text-primary);
           text-align: center;
         }
         .spn-final-title {
-          color: #f5f5f7;
-          font-size: clamp(32px, 5.5vw, 48px);
+          color: var(--color-text-primary);
+          font-size: clamp(28px, 4.5vw, 42px);
           font-weight: 400;
           letter-spacing: -0.04em;
           margin: 20px 0;
-          line-height: 1.1;
+          line-height: 1.15;
         }
         .spn-final-sub {
-          color: #86868b;
+          color: var(--color-text-secondary);
           font-size: 15px;
           max-width: 480px;
           margin: 0 auto 36px;
@@ -124,8 +126,11 @@ export default function FinalCTA() {
           .spn-final {
             padding: 80px 20px 200px;
           }
+          .spn-final-br {
+            display: none;
+          }
           .spn-final-title {
-            font-size: 30px;
+            font-size: 26px;
             margin: 18px 0;
           }
           .spn-final-sub {

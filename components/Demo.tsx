@@ -16,17 +16,33 @@ export default function Demo() {
 
   return (
     <section className="spn-demo">
-      <p
-        style={{
-          textAlign: "center",
-          fontSize: 13,
-          color: "var(--color-text-secondary)",
-          letterSpacing: "-0.01em",
-          marginBottom: 20,
-        }}
-      >
-        De modelo simples para imagem pronta para apresentação
-      </p>
+      <div className="spn-demo-head">
+        <div
+          style={{
+            fontSize: 10,
+            fontWeight: 500,
+            letterSpacing: "0.22em",
+            textTransform: "uppercase",
+            color: "var(--color-text-tertiary)",
+            marginBottom: 16,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 10,
+          }}
+        >
+          <span style={{ display: "block", width: 32, height: "0.5px", background: "var(--color-border-strong)" }} />
+          Prova visual
+          <span style={{ display: "block", width: 32, height: "0.5px", background: "var(--color-border-strong)" }} />
+        </div>
+        <h2 className="spn-demo-title">
+          a mesma geometria, pronta para apresentar.
+        </h2>
+        <p className="spn-demo-sub">
+          Modelo SketchUp e resultado, lado a lado. Compare a estrutura: nada
+          foi reinterpretado.
+        </p>
+      </div>
 
       <div
         style={{
@@ -43,7 +59,9 @@ export default function Demo() {
           onMouseDown={() => (isDragging.current = true)}
           onMouseUp={() => (isDragging.current = false)}
           onMouseLeave={() => (isDragging.current = false)}
-          onTouchMove={(e) => handleMove(e.touches[0].clientX)}
+          onTouchStart={() => (isDragging.current = true)}
+          onTouchEnd={() => (isDragging.current = false)}
+          onTouchMove={(e) => isDragging.current && handleMove(e.touches[0].clientX)}
           className="spn-demo-frame"
           style={{
             position: "relative",
@@ -52,11 +70,12 @@ export default function Demo() {
             cursor: "ew-resize",
             userSelect: "none",
             background: "var(--color-surface)",
+            touchAction: "pan-y",
           }}
         >
           <img
             src="/demo-sketch.jpg"
-            alt="Sketch SketchUp"
+            alt="Imagem base — modelo SketchUp"
             draggable={false}
             style={{
               position: "absolute",
@@ -78,7 +97,7 @@ export default function Demo() {
           >
             <img
               src="/demo-render.jpg"
-              alt="Render fotorrealista"
+              alt="Resultado SpaceNode — render fotorrealista"
               draggable={false}
               style={{
                 position: "absolute",
@@ -144,7 +163,7 @@ export default function Demo() {
               pointerEvents: "none",
             }}
           >
-            sketch
+            imagem base
           </span>
           <span
             style={{
@@ -159,7 +178,7 @@ export default function Demo() {
               pointerEvents: "none",
             }}
           >
-            render
+            resultado
           </span>
         </div>
       </div>
@@ -205,8 +224,28 @@ export default function Demo() {
       <style jsx>{`
         .spn-demo {
           max-width: 960px;
-          margin: 20px auto 0;
-          padding: 0 32px;
+          margin: 0 auto;
+          padding: 96px 32px 48px;
+        }
+        .spn-demo-head {
+          text-align: center;
+          max-width: 600px;
+          margin: 0 auto 40px;
+        }
+        .spn-demo-title {
+          font-size: 28px;
+          font-weight: 500;
+          letter-spacing: -0.03em;
+          line-height: 1.2;
+          margin: 0 0 10px;
+          color: var(--color-text-primary);
+        }
+        .spn-demo-sub {
+          font-size: 14px;
+          color: var(--color-text-tertiary);
+          letter-spacing: -0.005em;
+          line-height: 1.6;
+          margin: 0;
         }
         .spn-demo-frame {
           aspect-ratio: 16 / 9;
@@ -218,7 +257,16 @@ export default function Demo() {
 
         @media (max-width: 768px) {
           .spn-demo {
-            padding: 0 20px;
+            padding: 72px 20px 40px;
+          }
+          .spn-demo-head {
+            margin: 0 auto 28px;
+          }
+          .spn-demo-title {
+            font-size: 24px;
+          }
+          .spn-demo-sub {
+            font-size: 13px;
           }
           .spn-demo-frame {
             aspect-ratio: 4 / 3;

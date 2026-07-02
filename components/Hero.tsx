@@ -34,15 +34,16 @@ export default function Hero() {
       </span>
 
       <h1 className="spn-hero-title">
-        Transforme projetos em apresentações{" "}
+        Visualização arquitetônica{" "}
         <span style={{ color: "var(--color-text-tertiary)" }}>
-          visuais de alto impacto.
+          que respeita seu projeto.
         </span>
       </h1>
 
       <p className="spn-hero-sub">
-        A plataforma visual para arquitetos e designers de interiores. Crie
-        imagens, refine renders e apresente projetos em minutos.
+        Renderize imagens fotorrealistas a partir de modelos, prints e
+        referências — preservando geometria, proporções e intenção
+        arquitetônica.
       </p>
 
       {/* CTAs */}
@@ -69,7 +70,7 @@ export default function Hero() {
             transition: "all 0.2s ease",
           }}
         >
-          Começar grátis
+          Começar agora
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
             <path d="M2 6h8M6.5 2.5L10 6l-3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
@@ -93,11 +94,21 @@ export default function Hero() {
             transition: "all 0.2s ease",
           }}
         >
-          Ver demonstração
+          Ver como funciona
         </a>
       </div>
 
-      {/* Trust line */}
+      {/* Trust lines */}
+      <p
+        style={{
+          fontSize: 12,
+          color: "var(--color-text-secondary)",
+          margin: "0 0 10px",
+          letterSpacing: "-0.005em",
+        }}
+      >
+        Feita por arquiteto, para arquitetos e designers de interiores.
+      </p>
       <div
         style={{
           fontSize: 11,

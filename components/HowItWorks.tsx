@@ -2,17 +2,17 @@ const steps = [
   {
     num: "01",
     title: "envie seu projeto",
-    desc: "Foto, sketch, modelagem 3D ou croqui. O que você tiver em mãos.",
+    desc: "Prints do SketchUp, imagens base, estudos volumétricos ou referências. O que você tiver em mãos.",
   },
   {
     num: "02",
-    title: "escolha o estilo",
-    desc: "Estilos curados para arquitetura e interiores. Sem configurações técnicas.",
+    title: "defina a intenção",
+    desc: "Atmosfera, enquadramento, iluminação, materiais e nível de fidelidade. Escolhas de arquiteto, não prompts.",
   },
   {
     num: "03",
-    title: "receba em segundos",
-    desc: "Imagem pronta para apresentar ao cliente. Baixe e use.",
+    title: "gere, refine e apresente",
+    desc: "Imagens coerentes para testar alternativas e apresentar ao cliente — no mesmo projeto.",
   },
 ];
 
@@ -21,26 +21,30 @@ export default function HowItWorks() {
     <section id="como-funciona" className="spn-hiw">
       <div className="spn-hiw-inner">
         <div className="spn-hiw-head">
-          <span
+          <div
             style={{
               fontSize: 10,
-              letterSpacing: "0.28em",
-              color: "var(--color-text-tertiary)",
-              textTransform: "uppercase",
               fontWeight: 500,
-              display: "inline-block",
+              letterSpacing: "0.22em",
+              textTransform: "uppercase",
+              color: "var(--color-text-tertiary)",
               marginBottom: 16,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 10,
             }}
           >
-            FLUXO
-          </span>
+            <span style={{ display: "block", width: 32, height: "0.5px", background: "var(--color-border-strong)" }} />
+            Fluxo
+            <span style={{ display: "block", width: 32, height: "0.5px", background: "var(--color-border-strong)" }} />
+          </div>
           <h2 className="spn-hiw-title">
-            três passos.
-            <br />
-            sem curva de aprendizado.
+            três passos. do estudo à apresentação.
           </h2>
           <p className="spn-hiw-sub">
-            Sem prompts complexos. Sem plugins. Sem configurações técnicas.
+            Sem prompts complexos. Sem plugins. Escolhas de arquitetura, não de
+            tecnologia.
           </p>
         </div>
 
@@ -58,7 +62,6 @@ export default function HowItWorks() {
       <style jsx>{`
         .spn-hiw {
           padding: 100px 48px;
-          border-top: 0.5px solid var(--color-border);
         }
         .spn-hiw-inner {
           max-width: 920px;
@@ -70,16 +73,19 @@ export default function HowItWorks() {
           margin: 0 auto 64px;
         }
         .spn-hiw-title {
-          font-size: clamp(28px, 5vw, 40px);
-          font-weight: 400;
-          letter-spacing: -0.04em;
-          margin: 0 0 16px;
-          line-height: 1.1;
+          font-size: 28px;
+          font-weight: 500;
+          letter-spacing: -0.03em;
+          margin: 0 0 10px;
+          line-height: 1.2;
+          color: var(--color-text-primary);
         }
         .spn-hiw-sub {
-          font-size: 15px;
-          color: var(--color-text-secondary);
-          line-height: 1.55;
+          font-size: 14px;
+          color: var(--color-text-tertiary);
+          letter-spacing: -0.005em;
+          line-height: 1.6;
+          margin: 0;
         }
         .spn-hiw-grid {
           display: grid;
@@ -116,11 +122,10 @@ export default function HowItWorks() {
             margin: 0 auto 40px;
           }
           .spn-hiw-title {
-            font-size: 28px;
-            letter-spacing: -0.035em;
+            font-size: 24px;
           }
           .spn-hiw-sub {
-            font-size: 14px;
+            font-size: 13px;
           }
           .spn-hiw-grid {
             grid-template-columns: 1fr;
@@ -136,7 +141,6 @@ export default function HowItWorks() {
           .spn-hiw-num {
             font-size: 11px;
             margin-bottom: 10px;
-            color: var(--color-accent-green);
           }
           .spn-hiw-step-title {
             font-size: 17px;

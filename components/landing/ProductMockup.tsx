@@ -1,70 +1,326 @@
-// ── Icon set (matches Sidebar.tsx) ────────────────────────────────────────────
+import React from 'react'
 
-const IconDashboard = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-    <rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/>
-    <rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/>
-  </svg>
-)
-const IconHistory = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-    <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>
-  </svg>
-)
-const IconGenerate = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
-    <polyline points="21 15 16 10 5 21"/>
-  </svg>
-)
-const IconEnhance = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 3l1.88 5.47L19 10l-5.12 1.53L12 17l-1.88-5.47L5 10l5.12-1.53L12 3z"/>
-    <path d="M5 3l.94 2.06L8 6l-2.06.94L5 9l-.94-2.06L2 6l2.06-.94L5 3z"/>
-  </svg>
-)
-const IconPlans = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <polygon points="12 2 2 7 12 12 22 7 12 2"/>
-    <polyline points="2 17 12 22 22 17"/>
-    <polyline points="2 12 12 17 22 12"/>
+// ── Ícones — mesmo desenho de components/app/sidebar-icons.tsx, em escala
+//    de mockup (viewBox 24×24, stroke 1.5, terminações arredondadas) ─────────
+
+type IconProps = { size?: number }
+
+const SVG = ({ size = 11, children }: IconProps & { children: React.ReactNode }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    shapeRendering="geometricPrecision"
+  >
+    {children}
   </svg>
 )
 
-function Chips({ items, selected }: { items: string[]; selected: string }) {
+const IconProjects = (p: IconProps = {}) => (
+  <SVG {...p}>
+    <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h3.8a1.5 1.5 0 0 1 1.06.44L10.6 8H19.5A1.5 1.5 0 0 1 21 9.5V18a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18V7.5z" />
+  </SVG>
+)
+const IconDashboard = (p: IconProps = {}) => (
+  <SVG {...p}>
+    <rect x="3.5" y="3.5" width="7" height="7" rx="1.6" />
+    <rect x="13.5" y="3.5" width="7" height="7" rx="1.6" />
+    <rect x="3.5" y="13.5" width="7" height="7" rx="1.6" />
+    <rect x="13.5" y="13.5" width="7" height="7" rx="1.6" />
+  </SVG>
+)
+const IconHistory = (p: IconProps = {}) => (
+  <SVG {...p}>
+    <path d="M3.2 12a8.8 8.8 0 1 0 2.7-6.3" />
+    <path d="M3 4.5V8h3.5" />
+    <path d="M12 7.8v4.4l3 1.9" />
+  </SVG>
+)
+const IconGenerate = (p: IconProps = {}) => (
+  <SVG {...p}>
+    <rect x="3" y="3" width="18" height="18" rx="2.6" />
+    <circle cx="8.4" cy="8.4" r="1.5" />
+    <path d="M21 14.5l-4.6-4-7.4 7" />
+  </SVG>
+)
+const IconSpaces = (p: IconProps = {}) => (
+  <SVG {...p}>
+    <rect x="8" y="3" width="13" height="13" rx="2.2" />
+    <path d="M16 21H5.2A2.2 2.2 0 0 1 3 18.8V8" />
+  </SVG>
+)
+const IconRetocar = (p: IconProps = {}) => (
+  <SVG {...p}>
+    <path d="M12.5 20H21" />
+    <path d="M16.4 3.6a2.1 2.1 0 0 1 3 3L7.2 18.8l-4 1 1-4L16.4 3.6z" />
+  </SVG>
+)
+const IconEnhance = (p: IconProps = {}) => (
+  <SVG {...p}>
+    <path d="M8 3.5H4.5a1 1 0 0 0-1 1V8" />
+    <path d="M16 3.5h3.5a1 1 0 0 1 1 1V8" />
+    <path d="M20.5 16v3.5a1 1 0 0 1-1 1H16" />
+    <path d="M3.5 16v3.5a1 1 0 0 0 1 1H8" />
+    <path d="M9.5 12h5M12 9.5v5" />
+  </SVG>
+)
+const IconVideo = (p: IconProps = {}) => (
+  <SVG {...p}>
+    <rect x="2.5" y="5.5" width="13.5" height="13" rx="2.4" />
+    <path d="M16 10l5.5-3.2v10.4L16 14" />
+  </SVG>
+)
+const IconFinalizar = (p: IconProps = {}) => (
+  <SVG {...p}>
+    <rect x="3" y="3" width="18" height="18" rx="2.6" />
+    <path d="M8 12.2l2.8 2.8L16.5 9" />
+  </SVG>
+)
+
+// Marca — ConstellationN original, monocromático (a versão com nó de acento
+// verde foi aposentada; traço mais grosso que o oficial só pela legibilidade
+// nesta escala de miniatura)
+const Logo = ({ size = 14 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 64 64" aria-label="spacenode">
+    <g stroke="#fafafa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none">
+      <line x1="16" y1="16" x2="16" y2="48"/>
+      <line x1="16" y1="16" x2="48" y2="48"/>
+      <line x1="48" y1="16" x2="48" y2="48"/>
+    </g>
+    <circle cx="16" cy="16" r="4" fill="#fafafa"/>
+    <circle cx="16" cy="48" r="4" fill="#fafafa"/>
+    <circle cx="48" cy="48" r="4" fill="#fafafa"/>
+    <circle cx="48" cy="16" r="4" fill="#fafafa"/>
+  </svg>
+)
+
+// ── Bits compartilhados ────────────────────────────────────────────────────────
+
+const hairline = '0.5px solid rgba(255,255,255,0.07)'
+
+function GreenDot({ size = 5 }: { size?: number }) {
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-      {items.map(p => (
-        <span key={p} style={{
-          padding: '3px 9px', borderRadius: 20, fontSize: 8.5, whiteSpace: 'nowrap',
-          border: `0.5px solid ${p === selected ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.1)'}`,
-          color: p === selected ? '#fafafa' : 'rgba(255,255,255,0.35)',
-          background: p === selected ? 'rgba(255,255,255,0.1)' : 'transparent',
-        }}>{p}</span>
-      ))}
-    </div>
+    <span style={{
+      width: size, height: size, borderRadius: '50%', display: 'inline-block', flexShrink: 0,
+      background: 'var(--color-accent-green)',
+    }} />
   )
 }
 
 function SectionLabel({ children }: { children: string }) {
   return (
     <div style={{
-      fontSize: 7.5, fontWeight: 600, letterSpacing: '0.14em',
-      textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.28)',
-      marginBottom: 5,
+      fontSize: 7.5, fontWeight: 600, letterSpacing: '0.12em',
+      textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.32)',
     }}>
       {children}
     </div>
   )
 }
 
-// ── Desktop mockup (unchanged behavior) ────────────────────────────────────────
+// ── Dados do mockup ────────────────────────────────────────────────────────────
+
+const NAV_SECTIONS: { label: string; items: { Icon: (p?: IconProps) => React.ReactElement; label: string; active?: boolean }[] }[] = [
+  {
+    label: 'PROJETOS',
+    items: [
+      { Icon: IconProjects,  label: 'Meus projetos', active: true },
+      { Icon: IconDashboard, label: 'Dashboard' },
+      { Icon: IconHistory,   label: 'Histórico' },
+    ],
+  },
+  {
+    label: 'CRIAR',
+    items: [
+      { Icon: IconGenerate,  label: 'Renderizar' },
+      { Icon: IconSpaces,    label: 'Spaces' },
+      { Icon: IconRetocar,   label: 'Editar' },
+      { Icon: IconEnhance,   label: 'Ampliar' },
+      { Icon: IconVideo,     label: 'Animar' },
+      { Icon: IconFinalizar, label: 'Finalizar' },
+    ],
+  },
+]
+
+const DNA_ITEMS = [
+  { label: 'Estilo',    value: 'Contemporâneo' },
+  { label: 'Materiais', value: '6 detectados' },
+  { label: 'Paleta',    value: '5 cores' },
+  { label: 'Contexto',  value: 'Serra · Golden hour' },
+]
+
+const FILTER_PILLS = ['Todas', 'Favoritas', 'Iluminação', 'Detalhe']
+
+const VISTAS = [
+  { src: '/gallery-living-after.jpg',   badge: 'Sala de estar',  dot: '#d4a35a', meta: '2h · 2K' },
+  { src: '/gallery-banheiro-after.jpg', badge: 'Banheiro suíte', dot: '#8fb7d4', meta: '1h · 2K' },
+]
+
+// ── Miniaturas dos blocos da tela "Space em uso" ───────────────────────────────
+
+function DnaStrip() {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+      {DNA_ITEMS.map(it => (
+        <div key={it.label} style={{
+          display: 'flex', alignItems: 'center', gap: 7,
+          padding: '7px 9px',
+          background: 'rgba(255,255,255,0.03)',
+          border: hairline, borderRadius: 7,
+          minWidth: 0,
+        }}>
+          <svg width="9" height="9" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0 }}>
+            <path d="M2 6.2l2.6 2.6L10 3.4" stroke="var(--color-accent-green)" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 6.5, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', marginBottom: 2 }}>
+              {it.label}
+            </div>
+            <div style={{ fontSize: 8.5, fontWeight: 500, color: 'rgba(255,255,255,0.8)', letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {it.value}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function VistaMiniCard({ v }: { v: typeof VISTAS[number] }) {
+  return (
+    <div style={{
+      background: 'rgba(255,255,255,0.02)',
+      border: hairline, borderRadius: 8, overflow: 'hidden',
+    }}>
+      <div style={{ position: 'relative', aspectRatio: '4 / 3', background: 'rgba(255,255,255,0.03)' }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={v.src} alt={v.badge} loading="lazy" decoding="async" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+        <span style={{
+          position: 'absolute', top: 6, left: 6,
+          display: 'inline-flex', alignItems: 'center', gap: 4,
+          padding: '2px 6px', borderRadius: 4,
+          background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)',
+          fontSize: 7, color: '#fff', letterSpacing: '0.02em',
+        }}>
+          <span style={{ width: 5, height: 5, borderRadius: 999, background: v.dot, display: 'inline-block' }} />
+          {v.badge}
+        </span>
+      </div>
+      <div style={{ padding: '6px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
+        <span style={{ fontSize: 8, fontWeight: 500, color: 'rgba(255,255,255,0.8)', letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {v.badge}
+        </span>
+        <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.02em', flexShrink: 0 }}>
+          {v.meta}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function VistaProcessingCard() {
+  return (
+    <div style={{
+      background: 'rgba(255,255,255,0.02)',
+      border: hairline, borderRadius: 8, overflow: 'hidden',
+    }}>
+      <div style={{
+        aspectRatio: '4 / 3', background: 'rgba(255,255,255,0.03)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: 'rgba(255,255,255,0.35)', fontSize: 8,
+      }}>
+        Gerando…
+      </div>
+      <div style={{ padding: '6px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
+        <span style={{ fontSize: 8, fontWeight: 500, color: 'rgba(255,255,255,0.8)', letterSpacing: '-0.01em' }}>
+          Noturno
+        </span>
+        <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.02em', flexShrink: 0 }}>
+          agora · 4K
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function VistaMestreBanner({ compact = false }: { compact?: boolean }) {
+  return (
+    <div style={{
+      position: 'relative', borderRadius: compact ? 10 : 9, overflow: 'hidden',
+      aspectRatio: compact ? '16 / 9' : '32 / 9',
+      background: 'rgba(255,255,255,0.03)', border: hairline,
+    }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/demo-render.jpg" alt="Vista Mestre" loading="lazy" decoding="async" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+      <span style={{
+        position: 'absolute', top: 8, left: 8,
+        fontSize: 6.5, fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase',
+        color: '#fff', background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)',
+        padding: '3px 7px', borderRadius: 3,
+      }}>
+        vista mestre
+      </span>
+      {!compact && (
+        <span style={{
+          position: 'absolute', top: 8, right: 8,
+          fontSize: 6.5, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase',
+          color: 'rgba(255,255,255,0.55)', background: 'rgba(0,0,0,0.5)',
+          backdropFilter: 'blur(6px)', border: '0.5px solid rgba(255,255,255,0.14)',
+          padding: '3px 7px', borderRadius: 3,
+        }}>
+          Trocar Vista Mestre
+        </span>
+      )}
+    </div>
+  )
+}
+
+function DnaChip({ small = false }: { small?: boolean }) {
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+      padding: small ? '2px 7px' : '3px 8px', borderRadius: 999,
+      background: 'rgba(48,209,88,0.09)', color: 'var(--color-accent-green)',
+      border: '0.5px solid rgba(48,209,88,0.22)',
+      fontSize: small ? 6.5 : 7, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase',
+      whiteSpace: 'nowrap' as const,
+    }}>
+      <svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
+        <rect x="4" y="11" width="16" height="10" rx="1.5"/>
+        <path d="M8 11V8a4 4 0 0 1 8 0v3"/>
+      </svg>
+      DNA travado
+    </span>
+  )
+}
+
+function BalanceBadge() {
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      padding: '5px 9px', borderRadius: 6,
+      background: 'rgba(255,255,255,0.03)', border: '0.5px solid rgba(255,255,255,0.12)',
+      fontSize: 8, letterSpacing: '-0.005em', whiteSpace: 'nowrap' as const,
+    }}>
+      <GreenDot size={4} />
+      <span style={{ color: '#fafafa', fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}>1.240</span>
+      <span style={{ color: 'rgba(255,255,255,0.35)' }}>nodes</span>
+    </span>
+  )
+}
+
+// ── Desktop — shell do app: sidebar flutuante + tela "Space em uso" ───────────
 
 function DesktopMockup() {
   return (
     <div style={{ perspective: 1400 }}>
       <div style={{
-        background: '#111',
+        background: '#0a0a0a',
         border: '0.5px solid rgba(255,255,255,0.1)',
         borderRadius: 12,
         overflow: 'hidden',
@@ -73,9 +329,10 @@ function DesktopMockup() {
         transformOrigin: 'center top',
       }}>
 
+        {/* Browser chrome */}
         <div style={{
           background: '#0d0d0d',
-          borderBottom: '0.5px solid rgba(255,255,255,0.06)',
+          borderBottom: hairline,
           padding: '9px 14px',
           display: 'flex', alignItems: 'center', gap: 10,
         }}>
@@ -88,213 +345,168 @@ function DesktopMockup() {
             flex: 1, background: 'rgba(255,255,255,0.06)', borderRadius: 5,
             padding: '4px 12px', fontSize: 10, color: 'rgba(255,255,255,0.3)', textAlign: 'center',
           }}>
-            spacenode.app/gerar
+            spacenode.app/app/spaces
           </div>
           <div style={{ width: 48 }} />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '56px 316px 1fr', minHeight: 530 }}>
+        {/* App shell: sidebar flutuante + conteúdo */}
+        <div style={{ display: 'flex', minHeight: 520, background: '#0a0a0a' }}>
 
+          {/* Sidebar — card arredondado com gradiente, como no app */}
           <div style={{
-            background: '#0a0a0a',
-            borderRight: '0.5px solid rgba(255,255,255,0.06)',
-            display: 'flex', flexDirection: 'column', alignItems: 'center',
-            padding: '14px 0', gap: 2,
-          }}>
-            <div style={{
-              width: 26, height: 26, borderRadius: 6,
-              background: 'rgba(255,255,255,0.06)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              marginBottom: 14,
-            }}>
-              <svg width="14" height="14" viewBox="0 0 64 64" aria-label="spacenode">
-                <g stroke="#fafafa" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none">
-                  <line x1="16" y1="16" x2="16" y2="48"/>
-                  <line x1="16" y1="16" x2="48" y2="48"/>
-                  <line x1="48" y1="16" x2="48" y2="48"/>
-                </g>
-                <circle cx="16" cy="16" r="3" fill="#fafafa"/>
-                <circle cx="48" cy="16" r="3" fill="#fafafa"/>
-                <circle cx="16" cy="48" r="3" fill="#fafafa"/>
-                <circle cx="48" cy="48" r="3" fill="#30b46c"/>
-              </svg>
-            </div>
-
-            {[
-              { Icon: IconDashboard, active: false },
-              { Icon: IconHistory,   active: false },
-              { Icon: IconGenerate,  active: true  },
-              { Icon: IconEnhance,   active: false },
-              { Icon: IconPlans,     active: false },
-            ].map(({ Icon, active }, i) => (
-              <div key={i} style={{
-                width: 38, height: 38, borderRadius: 8,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: active ? '#ffffff' : 'rgba(255,255,255,0.3)',
-                background: active ? 'rgba(255,255,255,0.1)' : 'transparent',
-              }}>
-                <Icon />
-              </div>
-            ))}
-
-            <div style={{ marginTop: 'auto' }}>
-              <div style={{
-                width: 28, height: 28, borderRadius: '50%',
-                background: 'rgba(255,255,255,0.12)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 9, fontWeight: 600, color: '#ffffff',
-              }}>VP</div>
-            </div>
-          </div>
-
-          <div style={{
-            background: '#0d0d0d',
-            borderRight: '0.5px solid rgba(255,255,255,0.06)',
-            padding: '13px 14px',
-            display: 'flex', flexDirection: 'column', gap: 12,
+            width: 158, flexShrink: 0,
+            margin: 5,
+            background: 'linear-gradient(180deg, #121212 0%, #0c0c0c 100%)',
+            border: hairline,
+            borderRadius: 12,
+            display: 'flex', flexDirection: 'column',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.35)',
             overflow: 'hidden',
           }}>
-
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)' }}>GERAR</span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 8.5 }}>
-                <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#30b46c', display: 'inline-block' }} />
-                <span style={{ color: '#fafafa', fontWeight: 500 }}>4</span>
-                <span style={{ color: 'rgba(255,255,255,0.3)' }}>Nodes</span>
-                <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: 8 }}>+ comprar</span>
-              </div>
+            {/* Logo */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '14px 13px 11px' }}>
+              <Logo size={16} />
+              <span style={{ fontSize: 10.5, color: '#fafafa', fontWeight: 500, letterSpacing: '-0.02em' }}>spacenode</span>
             </div>
+            <div style={{ height: 0.5, background: 'rgba(255,255,255,0.1)', margin: '0 10px 8px' }} />
 
-            <div>
-              <SectionLabel>Tipo de projeto</SectionLabel>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5 }}>
-                {[
-                  { label: 'Ambiente Exterior', icon: '✦', sel: true  },
-                  { label: 'Ambiente Interior', icon: '▪', sel: false },
-                ].map(({ label, icon, sel }) => (
-                  <div key={label} style={{
-                    border: `0.5px solid ${sel ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.08)'}`,
-                    borderRadius: 8, padding: '10px 8px',
-                    background: sel ? '#fafafa' : 'rgba(255,255,255,0.03)',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
+            {/* Nav */}
+            <div style={{ padding: '0 7px', display: 'flex', flexDirection: 'column' }}>
+              {NAV_SECTIONS.map((section, gi) => (
+                <div key={section.label}>
+                  {gi > 0 && <div style={{ height: 0.5, background: 'rgba(255,255,255,0.08)', margin: '8px 7px' }} />}
+                  <div style={{
+                    fontSize: 6.5, fontWeight: 500, letterSpacing: '0.16em',
+                    color: 'rgba(255,255,255,0.28)', padding: '4px 7px 3px',
                   }}>
-                    <span style={{ fontSize: 12, color: sel ? '#0a0a0a' : 'rgba(255,255,255,0.3)' }}>{icon}</span>
-                    <span style={{ fontSize: 8.5, fontWeight: 500, color: sel ? '#0a0a0a' : 'rgba(255,255,255,0.4)', textAlign: 'center', lineHeight: 1.3 }}>{label}</span>
+                    {section.label}
                   </div>
-                ))}
+                  {section.items.map(({ Icon, label, active }) => (
+                    <div key={label} style={{
+                      position: 'relative',
+                      display: 'flex', alignItems: 'center', gap: 7,
+                      padding: '0 7px', height: 24, borderRadius: 8,
+                      color: active ? '#fafafa' : 'rgba(255,255,255,0.5)',
+                      background: active ? 'rgba(255,255,255,0.07)' : 'transparent',
+                    }}>
+                      {active && (
+                        <span style={{
+                          position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)',
+                          width: 2, height: 13, borderRadius: 999,
+                          background: 'var(--color-accent-green)',
+                          boxShadow: '0 0 8px rgba(48,209,88,0.45)',
+                        }} />
+                      )}
+                      <Icon />
+                      <span style={{ fontSize: 8.5, fontWeight: active ? 500 : 400, letterSpacing: '-0.01em' }}>{label}</span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+
+            {/* User — avatar com anel de consumo */}
+            <div style={{ marginTop: 'auto', borderTop: hairline, padding: '9px 10px', display: 'flex', alignItems: 'center', gap: 7 }}>
+              <div style={{
+                width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
+                background: 'conic-gradient(var(--color-accent-green) 0deg 248deg, rgba(255,255,255,0.12) 248deg 360deg)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <div style={{
+                  width: 19, height: 19, borderRadius: '50%',
+                  background: '#161616',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 6.5, fontWeight: 600, color: '#fff',
+                }}>VP</div>
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 8, fontWeight: 500, color: 'rgba(255,255,255,0.85)', letterSpacing: '-0.01em' }}>Vinicius</div>
+                <div style={{ fontSize: 6.5, color: 'rgba(255,255,255,0.35)' }}>Pro · 1.240 nodes</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Conteúdo — tela "Space em uso" */}
+          <div style={{ flex: 1, minWidth: 0, padding: '14px 16px 14px 11px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+            {/* Breadcrumb */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 8, color: 'rgba(255,255,255,0.35)' }}>
+              <span>Meus projetos</span>
+              <span style={{ opacity: 0.4, fontSize: 6.5 }}>›</span>
+              <span style={{ color: '#fafafa', fontWeight: 500 }}>Residência Horizonte</span>
+            </div>
+
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 10 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
+                <div style={{ fontSize: 14.5, fontWeight: 500, color: '#fafafa', letterSpacing: '-0.03em', lineHeight: 1.1 }}>
+                  Residência Horizonte
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <DnaChip />
+                  <span style={{ fontSize: 7.5, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                    Vega · Residencial
+                  </span>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                <BalanceBadge />
+                <span style={{
+                  padding: '5px 10px', borderRadius: 6,
+                  background: 'rgba(255,255,255,0.03)', border: '0.5px solid rgba(255,255,255,0.12)',
+                  fontSize: 8, fontWeight: 500, color: 'rgba(255,255,255,0.6)', whiteSpace: 'nowrap',
+                }}>
+                  Pack →
+                </span>
               </div>
             </div>
 
-            <div>
-              <SectionLabel>Segmento</SectionLabel>
-              <Chips
-                selected="Residencial"
-                items={['Residencial','Comercial','Corporativo','Hospitalidade','Institucional','Paisagismo']}
-              />
+            {/* Vista Mestre banner */}
+            <VistaMestreBanner />
+
+            {/* DNA strip */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              <SectionLabel>DNA do projeto</SectionLabel>
+              <DnaStrip />
             </div>
 
-            <div>
-              <SectionLabel>Espaço</SectionLabel>
-              <Chips
-                selected="Fachada Residencial"
-                items={['Fachada Residencial','Casa Térrea','Sobrado','Casa Contemporânea','Casa em Condomínio','Edifício Residencial','Área de Piscina','Jardim Residencial']}
-              />
-            </div>
+            {/* Vistas geradas */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <SectionLabel>Vistas geradas</SectionLabel>
+                <span style={{ fontSize: 7.5, color: 'rgba(255,255,255,0.3)' }}>DNA preservado em cada variação</span>
+              </div>
 
-            <div>
-              <SectionLabel>Iluminação</SectionLabel>
-              <Chips
-                selected="Diurno"
-                items={['Diurno','Entardecer','Golden Hour','Blue Hour','Noturno Iluminado','Nublado','Chuva Leve']}
-              />
-            </div>
+              {/* Filter pills */}
+              <div style={{ display: 'flex', gap: 4 }}>
+                {FILTER_PILLS.map((f, i) => (
+                  <span key={f} style={{
+                    padding: '3px 9px', borderRadius: 999, fontSize: 7.5,
+                    fontWeight: i === 0 ? 500 : 400, whiteSpace: 'nowrap',
+                    background: i === 0 ? '#fafafa' : 'transparent',
+                    color: i === 0 ? '#0a0a0a' : 'rgba(255,255,255,0.4)',
+                    border: `0.5px solid ${i === 0 ? '#fafafa' : 'rgba(255,255,255,0.14)'}`,
+                  }}>
+                    {f}
+                  </span>
+                ))}
+              </div>
 
-            <div>
-              <SectionLabel>Entorno</SectionLabel>
-              <Chips
-                selected="Preservar Original"
-                items={['Preservar Original','Entorno Neutro','Rua Arborizada','Condomínio','Bairro Nobre','Zona Urbana','Zona Rural','Beira-Mar','Serra','Praça Urbana']}
-              />
-            </div>
-
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '7px 10px',
-              background: 'rgba(255,255,255,0.03)',
-              border: '0.5px solid rgba(255,255,255,0.07)',
-              borderRadius: 7,
-            }}>
-              <span style={{ fontSize: 8, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)' }}>
-                Materiais do projeto
-              </span>
-              <span style={{
-                fontSize: 7.5, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase',
-                background: 'rgba(48,180,108,0.15)', color: '#30b46c',
-                padding: '2px 7px', borderRadius: 20,
-              }}>Preenchido</span>
-            </div>
-
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '7px 10px',
-              background: 'rgba(255,255,255,0.02)',
-              border: '0.5px solid rgba(255,255,255,0.06)',
-              borderRadius: 7,
-            }}>
-              <span style={{ fontSize: 8, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.25)' }}>Avançado</span>
-              <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.25)', lineHeight: 1 }}>+</span>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 7 }}>
+                {VISTAS.map(v => <VistaMiniCard key={v.badge} v={v} />)}
+                <VistaProcessingCard />
+              </div>
             </div>
 
           </div>
-
-          <div style={{ background: '#0a0a0a', padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ fontSize: 8.5, fontWeight: 600, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.28)' }}>
-              ANTES / DEPOIS
-            </div>
-
-            <div style={{
-              border: '0.5px dashed rgba(255,255,255,0.12)',
-              borderRadius: 10, display: 'flex', flexDirection: 'column',
-              alignItems: 'center', justifyContent: 'center', gap: 9,
-              flex: 1, background: 'rgba(255,255,255,0.02)', textAlign: 'center',
-              padding: '20px 16px', minHeight: 240,
-            }}>
-              <div style={{ width: 36, height: 36, borderRadius: 9, background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" width="16" height="16" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
-                </svg>
-              </div>
-              <div style={{ fontSize: 11, fontWeight: 500, color: 'rgba(255,255,255,0.6)', letterSpacing: '-0.02em' }}>arraste sua imagem aqui</div>
-              <div style={{ fontSize: 8.5, color: 'rgba(255,255,255,0.22)', marginTop: -4 }}>SketchUp · Render · 3D · JPG · PNG</div>
-              <div style={{ padding: '4px 13px', border: '0.5px solid rgba(255,255,255,0.14)', borderRadius: 20, fontSize: 8.5, color: 'rgba(255,255,255,0.5)', background: 'rgba(255,255,255,0.04)' }}>
-                escolher arquivo
-              </div>
-            </div>
-
-            <div style={{ background: 'rgba(255,255,255,0.03)', border: '0.5px solid rgba(255,255,255,0.06)', borderRadius: 9, padding: '10px 12px' }}>
-              <div style={{ fontSize: 7.5, fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.22)', marginBottom: 8 }}>
-                RESUMO DA GERAÇÃO
-              </div>
-              <div style={{ fontSize: 9.5, fontWeight: 500, color: 'rgba(255,255,255,0.7)', marginBottom: 4, letterSpacing: '-0.01em' }}>
-                Fotorrealismo Exterior · Residencial · Fachada Residencial
-                <span style={{ marginLeft: 4, fontSize: 8, color: 'rgba(255,255,255,0.3)', fontWeight: 400 }}>+ materiais</span>
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {['Diurno', 'Alta Fidelidade · Vega · HD'].map((t, i) => (
-                  <span key={i} style={{ fontSize: 8.5, color: 'rgba(255,255,255,0.4)', letterSpacing: '-0.005em' }}>{t}</span>
-                ))}
-              </div>
-            </div>
-
-          </div>
-
         </div>
       </div>
     </div>
   )
 }
 
-// ── Mobile mockup — phone shell with the actual app interface ─────────────────
+// ── Mobile — shell de telefone com a mesma tela ────────────────────────────────
 
 function MobileMockup() {
   return (
@@ -311,176 +523,75 @@ function MobileMockup() {
         background: '#0a0a0a',
         borderRadius: 22,
         overflow: 'hidden',
-        border: '0.5px solid rgba(255,255,255,0.06)',
+        border: hairline,
       }}>
-        {/* Status bar */}
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '11px 18px 6px',
-          fontSize: 11,
-          color: 'rgba(255,255,255,0.8)',
-          fontWeight: 600,
-          fontVariantNumeric: 'tabular-nums',
-        }}>
-          <span>9:41</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <svg width="14" height="9" viewBox="0 0 14 9" fill="none">
-              <rect x="0.5" y="2" width="3" height="6" rx="0.5" fill="rgba(255,255,255,0.85)"/>
-              <rect x="4.5" y="0.5" width="3" height="8" rx="0.5" fill="rgba(255,255,255,0.85)"/>
-              <rect x="8.5" y="2.5" width="3" height="6" rx="0.5" fill="rgba(255,255,255,0.5)"/>
-              <rect x="12.5" y="4" width="3" height="5" rx="0.5" fill="rgba(255,255,255,0.3)"/>
-            </svg>
-            <svg width="16" height="10" viewBox="0 0 16 10" fill="none">
-              <rect x="0.5" y="0.5" width="13" height="9" rx="2" stroke="rgba(255,255,255,0.6)" strokeWidth="0.7" fill="none"/>
-              <rect x="2" y="2" width="9" height="6" rx="0.5" fill="rgba(255,255,255,0.85)"/>
-              <rect x="14" y="3.5" width="1.5" height="3" rx="0.5" fill="rgba(255,255,255,0.5)"/>
-            </svg>
-          </div>
-        </div>
-
         {/* App header */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '12px 18px',
-          borderBottom: '0.5px solid rgba(255,255,255,0.06)',
+          padding: '14px 16px 12px',
+          borderBottom: hairline,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <svg width="18" height="18" viewBox="0 0 64 64" aria-label="spacenode">
-              <g stroke="#fafafa" strokeWidth="2" strokeLinecap="round" fill="none">
-                <line x1="16" y1="16" x2="16" y2="48"/>
-                <line x1="16" y1="16" x2="48" y2="48"/>
-                <line x1="48" y1="16" x2="48" y2="48"/>
-              </g>
-              <circle cx="16" cy="16" r="4" fill="#fafafa"/>
-              <circle cx="48" cy="16" r="4" fill="#fafafa"/>
-              <circle cx="16" cy="48" r="4" fill="#fafafa"/>
-              <circle cx="48" cy="48" r="4" fill="#30b46c"/>
-            </svg>
+            <Logo size={17} />
             <span style={{ fontSize: 13, color: '#fafafa', fontWeight: 500, letterSpacing: '-0.02em' }}>spacenode</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#30b46c' }} />
-            <span style={{ fontSize: 11, color: '#fafafa', fontWeight: 500 }}>4</span>
+            <GreenDot />
+            <span style={{ fontSize: 11, color: '#fafafa', fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}>1.240</span>
             <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>nodes</span>
           </div>
         </div>
 
-        {/* Preview area */}
-        <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ padding: '12px 14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+          {/* Breadcrumb + header */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 9, color: 'rgba(255,255,255,0.35)' }}>
+            <span>Meus projetos</span>
+            <span style={{ opacity: 0.4, fontSize: 7 }}>›</span>
+            <span style={{ color: '#fafafa', fontWeight: 500 }}>Residência Horizonte</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <span style={{ fontSize: 14, color: '#fafafa', fontWeight: 500, letterSpacing: '-0.02em' }}>
+              Residência Horizonte
+            </span>
+            <DnaChip small />
+          </div>
+
+          {/* Vista Mestre */}
+          <VistaMestreBanner compact />
+
+          {/* Meta */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+              Vega · Residencial
+            </span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 8.5, color: 'var(--color-accent-green)' }}>
+              <GreenDot size={4} /> DNA preservado
+            </span>
+          </div>
+
+          <div style={{ height: 0.5, background: 'rgba(255,255,255,0.07)' }} />
+
+          {/* Vistas */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <SectionLabel>Vistas geradas</SectionLabel>
+            <span style={{ fontSize: 7.5, color: 'rgba(255,255,255,0.3)' }}>2 de 3 concluídas</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            {VISTAS.map(v => <VistaMiniCard key={v.badge} v={v} />)}
+          </div>
+
+          {/* CTA */}
           <div style={{
-            border: '0.5px dashed rgba(255,255,255,0.15)',
-            borderRadius: 10,
-            background: 'rgba(255,255,255,0.02)',
-            aspectRatio: '4 / 3',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 10,
-            textAlign: 'center',
-            padding: '20px 16px',
-          }}>
-            <div style={{
-              width: 40, height: 40, borderRadius: 10,
-              background: 'rgba(255,255,255,0.06)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.45)" width="18" height="18" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
-              </svg>
-            </div>
-            <div style={{ fontSize: 12, fontWeight: 500, color: 'rgba(255,255,255,0.75)', letterSpacing: '-0.01em' }}>
-              envie sua imagem
-            </div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>
-              SketchUp · Foto · 3D · JPG · PNG
-            </div>
-          </div>
-
-          {/* Quick chips */}
-          <div>
-            <div style={{
-              fontSize: 8, fontWeight: 600, letterSpacing: '0.16em',
-              textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)',
-              marginBottom: 8,
-            }}>
-              Espaço
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-              {[
-                { label: 'Fachada', sel: true },
-                { label: 'Sala', sel: false },
-                { label: 'Cozinha', sel: false },
-                { label: 'Banheiro', sel: false },
-              ].map(c => (
-                <span key={c.label} style={{
-                  padding: '5px 11px',
-                  borderRadius: 20,
-                  fontSize: 10,
-                  whiteSpace: 'nowrap',
-                  border: `0.5px solid ${c.sel ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.1)'}`,
-                  color: c.sel ? '#fafafa' : 'rgba(255,255,255,0.4)',
-                  background: c.sel ? 'rgba(255,255,255,0.1)' : 'transparent',
-                }}>
-                  {c.label}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <div style={{
-              fontSize: 8, fontWeight: 600, letterSpacing: '0.16em',
-              textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)',
-              marginBottom: 8,
-            }}>
-              Iluminação
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-              {[
-                { label: 'Diurno', sel: true },
-                { label: 'Golden Hour', sel: false },
-                { label: 'Noturno', sel: false },
-              ].map(c => (
-                <span key={c.label} style={{
-                  padding: '5px 11px',
-                  borderRadius: 20,
-                  fontSize: 10,
-                  whiteSpace: 'nowrap',
-                  border: `0.5px solid ${c.sel ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.1)'}`,
-                  color: c.sel ? '#fafafa' : 'rgba(255,255,255,0.4)',
-                  background: c.sel ? 'rgba(255,255,255,0.1)' : 'transparent',
-                }}>
-                  {c.label}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          {/* Generate button */}
-          <div style={{
-            marginTop: 4,
+            marginTop: 2,
             background: '#fafafa',
             color: '#0a0a0a',
             borderRadius: 10,
-            padding: '12px 14px',
+            padding: '11px 14px',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            fontSize: 13, fontWeight: 500, letterSpacing: '-0.01em',
+            fontSize: 12.5, fontWeight: 500, letterSpacing: '-0.01em',
           }}>
-            Gerar imagem
-            <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
-              <path d="M2 6h8M6.5 2.5L10 6l-3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </div>
-
-          {/* Cost line */}
-          <div style={{
-            textAlign: 'center',
-            fontSize: 9.5,
-            color: 'rgba(255,255,255,0.4)',
-            letterSpacing: '-0.005em',
-          }}>
-            Custo · 4 nodes · HD · 30s
+            Gerar variações
           </div>
         </div>
       </div>
@@ -492,19 +603,21 @@ function MobileMockup() {
 
 export function ProductMockup() {
   return (
-    <section className="spn-mockup">
+    <section id="produto" className="spn-mockup">
 
       <div className="spn-mockup-head">
         <div className="spn-mockup-eyebrow">
           <span style={{ display: 'block', width: 32, height: '0.5px', background: 'var(--color-border-strong)' }} />
-          Interface
+          O produto
           <span style={{ display: 'block', width: 32, height: '0.5px', background: 'var(--color-border-strong)' }} />
         </div>
         <h2 className="spn-mockup-title">
-          simples como tirar uma foto.
+          um espaço de trabalho, não um gerador de imagens.
         </h2>
         <p className="spn-mockup-sub">
-          Upload do projeto. Configure o ambiente. Render em segundos. Sem plugins, sem curva de aprendizado.
+          Cada projeto vira um Space: a Vista Mestre define o DNA — estilo,
+          materiais, paleta e contexto — e cada variação preserva geometria e
+          identidade. Motor, resolução e consumo sempre visíveis.
         </p>
       </div>
 
@@ -543,7 +656,8 @@ export function ProductMockup() {
           color: var(--color-text-tertiary);
           letter-spacing: -0.005em;
           line-height: 1.6;
-          margin: 0;
+          margin: 0 auto;
+          max-width: 580px;
         }
         .spn-mockup-desktop { display: block; }
         .spn-mockup-mobile { display: none; }

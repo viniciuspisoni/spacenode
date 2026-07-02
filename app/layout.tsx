@@ -16,23 +16,24 @@ const geist = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "SpaceNode · Plataforma visual para arquitetura e interiores",
+  title: "SpaceNode · Visualização arquitetônica com IA que respeita seu projeto",
   description:
-    "A plataforma criativa para arquitetos e designers de interiores. Crie renders, refine imagens e impressione clientes em minutos.",
+    "Renderize projetos reais preservando geometria, proporções e perspectiva. Visualização arquitetônica com IA para arquitetos e designers de interiores — do estudo ao material de apresentação.",
   keywords: [
-    "render arquitetônico",
+    "render arquitetura",
+    "IA para arquitetura",
     "visualização arquitetônica",
-    "IA arquitetura",
+    "render para arquitetos",
+    "renderização com IA",
+    "arquitetura e interiores",
     "design de interiores",
-    "apresentação visual",
-    "archviz Brasil",
     "SpaceNode",
   ],
   authors: [{ name: "SpaceNode" }],
   openGraph: {
-    title: "SpaceNode · Plataforma visual para arquitetura e interiores",
+    title: "SpaceNode · Visualização arquitetônica que respeita seu projeto",
     description:
-      "Crie renders, refine imagens e impressione clientes em minutos. Para arquitetos e designers de interiores.",
+      "Renderize projetos reais preservando geometria, proporções e perspectiva. Para arquitetos e designers de interiores.",
     url: "https://spacenode.app",
     siteName: "SpaceNode",
     locale: "pt_BR",
@@ -40,9 +41,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "SpaceNode · Plataforma visual para arquitetura e interiores",
+    title: "SpaceNode · Visualização arquitetônica que respeita seu projeto",
     description:
-      "Crie renders e assets visuais premium em minutos. Para arquitetos e designers de interiores.",
+      "Renderize projetos reais preservando geometria, proporções e perspectiva. Para arquitetos e designers de interiores.",
   },
   robots: {
     index: true,
