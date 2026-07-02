@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import Link from 'next/link'
 import {
   APRESENTAR_TOOLS,
   HUMANIZED_PLAN_PROJECT_TYPES,
@@ -382,9 +381,7 @@ export default function PlantaHumanizadaClient({ initialCredits }: Props) {
 function Breadcrumb() {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: 'var(--color-text-tertiary)', letterSpacing: '0.04em', textTransform: 'uppercase' as const }}>
-      <Link href="/app/apresentar" style={{ color: 'var(--color-text-tertiary)', textDecoration: 'none' }}>
-        Apresentar
-      </Link>
+      <span>Criar</span>
       <span>›</span>
       <span style={{ color: 'var(--color-text-secondary)' }}>Planta Humanizada</span>
     </div>

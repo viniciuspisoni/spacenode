@@ -5,8 +5,9 @@ import { getRenderTitle } from '@/lib/render-display'
 import { getPlanById, type PlanId } from '@/lib/plans'
 import {
   IconGenerate, IconSpaces, IconRetocar, IconEnhance,
-  IconVideo, IconHumanizedPlan, IconMoodboard,
+  IconVideo, IconFinalizar, IconHumanizedPlan, IconIsometric, IconBoard, IconMoodboard,
 } from '@/components/app/sidebar-icons'
+import { getEnabledModules, type SidebarModule } from '@/lib/nav/modules-config'
 
 type RecentRender = {
   id: string
@@ -71,21 +72,47 @@ const CATEGORY_LABEL: Record<string, string> = {
 
 // Módulos do atelier. Verde funcional só no Renderizar (CTA de geração);
 // os demais ficam neutros para não virar rainbow palette.
+// Lista de módulos vem de lib/nav/modules-config — a mesma fonte que a sidebar,
+// então desativar um módulo lá some com ele daqui também.
+const MODULE_ICON: Record<SidebarModule['iconKey'], (p: { size?: number }) => React.ReactElement> = {
+  generate:      IconGenerate,
+  spaces:        IconSpaces,
+  retocar:       IconRetocar,
+  enhance:       IconEnhance,
+  video:         IconVideo,
+  finalizar:     IconFinalizar,
+  humanizedPlan: IconHumanizedPlan,
+  isometric:     IconIsometric,
+  board:         IconBoard,
+  moodboard:     IconMoodboard,
+}
+
+const MODULE_DESC: Record<string, string> = {
+  renderizar:        'Imagem fotorrealista a partir da sua referência.',
+  spaces:            'Novas vistas mantendo o DNA do projeto.',
+  editar:            'Ajuste áreas específicas sem perder a geometria.',
+  ampliar:           'Aumente resolução e acabamento.',
+  animar:            'Vídeos de apresentação do projeto.',
+  finalizar:         'Camadas, ajustes finais e exportação.',
+  planta_humanizada: 'Humanize plantas com materiais reais.',
+  isometricas:       'Vistas isométricas premium do projeto.',
+  prancha_ia:        'Monte carrosséis e pranchas automaticamente.',
+  moodboard:         'Atmosfera, paleta e referências em um só lugar.',
+}
+
 const MODULES: {
   href: string
   label: string
   desc: string
   Icon: (p: { size?: number }) => React.ReactElement
   green?: boolean
-}[] = [
-  { href: '/app/generate',                     label: 'Renderizar', desc: 'Imagem fotorrealista a partir da sua referência.',   Icon: IconGenerate, green: true },
-  { href: '/app/spaces/new',                   label: 'Spaces',     desc: 'Novas vistas mantendo o DNA do projeto.',            Icon: IconSpaces },
-  { href: '/app/editar',                       label: 'Editar',     desc: 'Ajuste áreas específicas sem perder a geometria.',   Icon: IconRetocar },
-  { href: '/app/upscale',                      label: 'Ampliar',    desc: 'Aumente resolução e acabamento.',                    Icon: IconEnhance },
-  { href: '/app/video',                        label: 'Animar',     desc: 'Vídeos de apresentação do projeto.',                 Icon: IconVideo },
-  { href: '/app/apresentar/planta-humanizada', label: 'Planta',     desc: 'Humanize plantas com materiais reais.',              Icon: IconHumanizedPlan },
-  { href: '/app/apresentar/moodboard',         label: 'Moodboard',  desc: 'Atmosfera, paleta e referências em um só lugar.',    Icon: IconMoodboard },
-]
+}[] = getEnabledModules('criar').map((m) => ({
+  href: m.href,
+  label: m.label,
+  desc: MODULE_DESC[m.id] ?? '',
+  Icon: MODULE_ICON[m.iconKey],
+  green: m.id === 'renderizar',
+}))
 
 export default async function AppPage() {
   const supabase = await createClient()

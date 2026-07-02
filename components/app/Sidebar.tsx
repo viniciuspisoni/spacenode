@@ -14,6 +14,7 @@ import {
   IconHumanizedPlan, IconIsometric, IconBoard, IconMoodboard,
   IconTeam, IconIdentity, IconAccount, IconPlans,
 } from './sidebar-icons'
+import { getEnabledModules, type SidebarModule } from '@/lib/nav/modules-config'
 
 type NavItem = {
   label: string
@@ -24,6 +25,31 @@ type NavItem = {
   badge?: string
   badgeTone?: 'green' | 'muted'
 }
+
+const MODULE_ICON: Record<SidebarModule['iconKey'], () => React.ReactElement> = {
+  generate:      IconGenerate,
+  spaces:        IconSpaces,
+  retocar:       IconRetocar,
+  enhance:       IconEnhance,
+  video:         IconVideo,
+  finalizar:     IconFinalizar,
+  humanizedPlan: IconHumanizedPlan,
+  isometric:     IconIsometric,
+  board:         IconBoard,
+  moodboard:     IconMoodboard,
+}
+
+function toNavItem(m: SidebarModule): NavItem {
+  return {
+    label: m.label,
+    href: m.href,
+    exact: m.href === '/app/spaces/new',
+    Icon: MODULE_ICON[m.iconKey],
+  }
+}
+
+const criarItems      = getEnabledModules('criar').map(toNavItem)
+const apresentarItems = getEnabledModules('apresentar').map(toNavItem)
 
 const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
@@ -36,24 +62,12 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   },
   {
     label: 'CRIAR',
-    items: [
-      { label: 'Renderizar', href: '/app/generate',    exact: false, Icon: IconGenerate  },
-      { label: 'Spaces',     href: '/app/spaces/new',  exact: true,  Icon: IconSpaces    },
-      { label: 'Editar',     href: '/app/editar',      exact: false, Icon: IconRetocar   },
-      { label: 'Ampliar',    href: '/app/upscale',     exact: false, Icon: IconEnhance   },
-      { label: 'Animar',     href: '/app/video',       exact: false, Icon: IconVideo     },
-      { label: 'Finalizar',  href: '/app/finalizar',   exact: false, Icon: IconFinalizar },
-    ],
+    items: criarItems,
   },
-  {
+  ...(apresentarItems.length > 0 ? [{
     label: 'APRESENTAR',
-    items: [
-      { label: 'Planta humanizada', href: '/app/apresentar/planta-humanizada', exact: false, Icon: IconHumanizedPlan },
-      { label: 'Isométricas',       href: '/app/apresentar/isometricas',       exact: false, Icon: IconIsometric    },
-      { label: 'Prancha IA',        href: '/app/apresentar/prancha',           exact: false, Icon: IconBoard        },
-      { label: 'Moodboard',         href: '/app/apresentar/moodboard',         exact: false, Icon: IconMoodboard    },
-    ],
-  },
+    items: apresentarItems,
+  }] : []),
   {
     label: 'ESCRITÓRIO',
     items: [
