@@ -39,7 +39,7 @@ export default function FinalCTA() {
 
       <div className="spn-final-ctas">
         <a
-          href="/login"
+          href="/login?mode=signup"
           className="spn-final-primary"
           style={{
             background: "var(--color-text-primary)",

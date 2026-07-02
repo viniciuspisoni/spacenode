@@ -197,7 +197,7 @@ export default function Demo() {
 
       <div style={{ textAlign: "center" }}>
         <a
-          href="/login"
+          href="/login?mode=signup"
           className="spn-demo-cta"
           style={{
             display: "inline-flex",

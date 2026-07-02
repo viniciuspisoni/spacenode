@@ -48,7 +48,7 @@ async function startCheckout(id: PaidPlanId, billing: BillingCycle) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ type: 'plan', id, billing }),
   })
-  if (res.status === 401) { window.location.href = '/login'; return }
+  if (res.status === 401) { window.location.href = '/login?mode=signup'; return }
   if (!res.ok) return
   const data = await res.json()
   if (data.url) window.location.href = data.url
@@ -376,7 +376,7 @@ export function PricingToggle() {
           fontSize: 12, color: 'var(--color-text-tertiary)', letterSpacing: '-0.005em',
         }}>
           Ainda em dúvida?{' '}
-          <a href="/login" style={{ color: 'var(--color-text-primary)', textDecoration: 'underline', textUnderlineOffset: 3 }}>
+          <a href="/login?mode=signup" style={{ color: 'var(--color-text-primary)', textDecoration: 'underline', textUnderlineOffset: 3 }}>
             Comece grátis com 40 nodes
           </a>
           {' '}— assine quando o volume pedir.

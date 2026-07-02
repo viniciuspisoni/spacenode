@@ -49,7 +49,7 @@ export default function Hero() {
       {/* CTAs */}
       <div className="spn-hero-ctas">
         <a
-          href="/login"
+          href="/login?mode=signup"
           onMouseEnter={() => setPrimaryHovered(true)}
           onMouseLeave={() => setPrimaryHovered(false)}
           className="spn-hero-cta-primary"

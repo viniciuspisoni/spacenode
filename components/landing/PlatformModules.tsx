@@ -152,7 +152,7 @@ export function PlatformModules() {
       </div>
 
       <div className="spn-modules-cta">
-        <a href="/login" className="spn-modules-cta-btn">
+        <a href="/login?mode=signup" className="spn-modules-cta-btn">
           Começar agora — 40 nodes grátis
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
             <path d="M2 6h8M6.5 2.5L10 6l-3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>

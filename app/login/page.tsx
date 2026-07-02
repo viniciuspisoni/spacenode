@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Brandmark } from '@/components/brand'
 
@@ -27,9 +27,18 @@ function translateError(msg: string): string {
 }
 
 export default function LoginPage() {
-  const router = useRouter()
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
+  )
+}
 
-  const [mode,          setMode]          = useState<Mode>('login')
+function LoginForm() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  const [mode,          setMode]          = useState<Mode>(searchParams.get('mode') === 'signup' ? 'signup' : 'login')
   const [email,         setEmail]         = useState('')
   const [password,      setPassword]      = useState('')
   const [loading,       setLoading]       = useState(false)

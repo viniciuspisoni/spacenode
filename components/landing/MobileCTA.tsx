@@ -23,7 +23,7 @@ export function MobileCTA() {
         aria-hidden={!visible}
       >
         <a
-          href="/login"
+          href="/login?mode=signup"
           style={{
             display: "flex",
             alignItems: "center",

@@ -71,7 +71,7 @@ export default function Navbar() {
           <a href="/login" className="nav-pill nav-pill-ghost">
             Entrar
           </a>
-          <a href="/login" className="nav-pill nav-pill-cta">
+          <a href="/login?mode=signup" className="nav-pill nav-pill-cta">
             Começar agora
           </a>
         </div>
@@ -144,7 +144,7 @@ export default function Navbar() {
 
           <div style={{ marginTop: 32, display: 'flex', flexDirection: 'column', gap: 12 }}>
             <a
-              href="/login"
+              href="/login?mode=signup"
               onClick={() => setOpen(false)}
               className="drawer-cta drawer-cta-primary"
             >
