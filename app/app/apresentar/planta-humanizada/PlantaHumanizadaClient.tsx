@@ -322,11 +322,11 @@ export default function PlantaHumanizadaClient({ initialCredits }: Props) {
           {/* Fidelity note */}
           <div style={{
             padding: '10px 12px', borderRadius: 8,
-            background: 'var(--color-accent-green-bg)',
-            border: '1px solid var(--color-accent-green-border)',
+            background: 'var(--color-surface)',
+            border: '0.5px solid var(--color-border)',
           }}>
-            <div style={{ fontSize: 10, color: 'var(--color-accent-green)', lineHeight: 1.5 }}>
-              <strong style={{ fontWeight: 600 }}>Fidelidade:</strong> paredes, aberturas e proporções
+            <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', lineHeight: 1.5 }}>
+              <strong style={{ fontWeight: 600, color: 'var(--color-accent-green)' }}>Fidelidade:</strong> paredes, aberturas e proporções
               são preservadas sempre que possível.
             </div>
           </div>
