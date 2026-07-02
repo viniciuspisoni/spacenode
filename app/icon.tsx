@@ -25,7 +25,7 @@ export default function Icon() {
           <circle cx="16" cy="16" r="4" fill="#FAFAFA" />
           <circle cx="16" cy="48" r="4" fill="#FAFAFA" />
           <circle cx="48" cy="48" r="4" fill="#FAFAFA" />
-          <circle cx="48" cy="16" r="4" fill="#30B46C" />
+          <circle cx="48" cy="16" r="4" fill="#FAFAFA" />
         </svg>
       </div>
     ),

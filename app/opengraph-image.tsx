@@ -30,7 +30,7 @@ export default function OgImage() {
             <circle cx="16" cy="16" r="3" fill="#FAFAFA" />
             <circle cx="16" cy="48" r="3" fill="#FAFAFA" />
             <circle cx="48" cy="48" r="3" fill="#FAFAFA" />
-            <circle cx="48" cy="16" r="3" fill="#30B46C" />
+            <circle cx="48" cy="16" r="3" fill="#FAFAFA" />
           </svg>
           <span style={{ fontSize: 44, fontWeight: 500, color: '#FAFAFA', letterSpacing: '-0.025em' }}>
             spacenode
