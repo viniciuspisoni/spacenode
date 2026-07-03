@@ -4,6 +4,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { signRow } from '@/lib/storage/signed'
 
 export async function GET(
   _req:    NextRequest,
@@ -22,7 +24,8 @@ export async function GET(
   if (error || !data) {
     return NextResponse.json({ error: 'Vista não encontrada' }, { status: 404 })
   }
-  return NextResponse.json({ vista: data })
+  const vista = await signRow(createAdminClient(), data, ['image_url', 'source_sketch_url', 'edit_mask_url', 'source_image_url'])
+  return NextResponse.json({ vista })
 }
 
 export async function DELETE(

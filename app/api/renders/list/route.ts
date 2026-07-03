@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { signRows } from '@/lib/storage/signed'
 import { RENDER_LIST_COLUMNS, sanitizeRenderListRow } from '@/lib/history/redact'
 
 // GET /api/renders/list?cursor={ISO}
@@ -33,5 +35,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Falha ao carregar' }, { status: 500 })
   }
 
-  return NextResponse.json({ renders: (data ?? []).map(sanitizeRenderListRow), pageSize: PAGE_SIZE })
+  // Assina input/output (Supabase-hosted é assinado; FAL passa direto — hoje são
+  // FAL, mas fica pronto pro B3/re-hospedagem sem novo wiring).
+  const renders = await signRows(createAdminClient(), (data ?? []).map(sanitizeRenderListRow), ['input_url', 'output_url'])
+  return NextResponse.json({ renders, pageSize: PAGE_SIZE })
 }

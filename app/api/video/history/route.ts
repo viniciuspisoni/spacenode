@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { signRows } from '@/lib/storage/signed'
 
 // GET /api/video/history?limit=N
 // Retorna os últimos vídeos do usuário (renders com ambient='video').
@@ -34,5 +36,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Falha ao carregar histórico' }, { status: 500 })
   }
 
-  return NextResponse.json({ videos: data ?? [] })
+  const videos = await signRows(createAdminClient(), data ?? [], ['input_url', 'output_url'])
+  return NextResponse.json({ videos })
 }
