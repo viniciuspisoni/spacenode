@@ -8,6 +8,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { removeOwnedStorageObjects, collectUrls } from '@/lib/storage/cleanup'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -84,6 +86,14 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
+  // Busca as URLs de storage do projeto ANTES de apagar a linha (scoped por user).
+  const { data: proj } = await supabase
+    .from('finalize_projects')
+    .select('base_image_url, thumbnail_url, document')
+    .eq('id', id)
+    .eq('user_id', user.id)
+    .single()
+
   const { error } = await supabase
     .from('finalize_projects')
     .delete()
@@ -94,5 +104,20 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     console.error('[finalizar.projects.delete]', error)
     return NextResponse.json({ error: 'Erro ao excluir composição' }, { status: 500 })
   }
+
+  // Higiene de storage (best-effort): remove só arquivos criados pela própria
+  // ferramenta Finalizar (namespace `${user.id}/finalizar/`) — nunca um asset
+  // reaproveitado de outra feature (ex.: base_image_url que aponta pra um render
+  // ou uma edição em `${user.id}/retocar/…`). Roda DEPOIS do delete: uma falha
+  // aqui não desfaz a exclusão da composição.
+  if (proj) {
+    const admin = createAdminClient()
+    await removeOwnedStorageObjects(
+      admin,
+      [proj.base_image_url, proj.thumbnail_url, ...collectUrls(proj.document)],
+      { userId: user.id, keyPrefix: `${user.id}/finalizar/` },
+    )
+  }
+
   return NextResponse.json({ ok: true })
 }
