@@ -34,7 +34,7 @@ supabase-schema.sql              ← Full database schema
 NEXT_PUBLIC_SUPABASE_URL=https://nucyyqmurhnakhldshwr.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_...
 SUPABASE_SERVICE_ROLE_KEY=sb_secret_...
-FAL_KEY=173d400b-...:99611ea83ff5e1252a5900805039e739
+FAL_KEY=<set-in-env>
 ```
 
 ## Generation Engine Config (`route.ts`)
