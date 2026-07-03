@@ -15,6 +15,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { signStorageUrl } from '@/lib/storage/signed'
 
 const ALLOWED_LOGO_MIME = ['image/jpeg', 'image/png', 'image/svg+xml', 'image/webp']
 const MAX_LOGO_BYTES    = 2 * 1024 * 1024
@@ -29,7 +30,11 @@ export async function GET() {
     .select('*')
     .eq('user_id', user.id)
     .maybeSingle()
-  return NextResponse.json({ identity: data ?? null })
+  // Assina logo_url (architect-identity vira bucket privado; no-op enquanto público).
+  const identity = data
+    ? { ...data, logo_url: await signStorageUrl(createAdminClient(), data.logo_url as string | null) }
+    : null
+  return NextResponse.json({ identity })
 }
 
 export async function PUT(req: NextRequest) {
@@ -104,5 +109,6 @@ export async function PUT(req: NextRequest) {
     console.error('[identity.put] upsert failed:', error)
     return NextResponse.json({ error: 'Erro ao salvar identidade' }, { status: 500 })
   }
-  return NextResponse.json({ identity: data })
+  const identity = { ...data, logo_url: await signStorageUrl(admin, data.logo_url as string | null) }
+  return NextResponse.json({ identity })
 }

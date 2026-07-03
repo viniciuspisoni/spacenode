@@ -2,8 +2,10 @@
 // Server Component: só auth. NÃO busca saldo/Nodes (a ferramenta é gratuita).
 
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { FinalizeEditor } from '@/components/finalizar/FinalizeEditor'
+import { signRows } from '@/lib/storage/signed'
 import type { FinalizeProjectSummary } from '@/lib/finalizar/types'
 
 export default async function FinalizarPage({
@@ -22,7 +24,8 @@ export default async function FinalizarPage({
     .order('updated_at', { ascending: false })
     .limit(120)
 
-  const savedProjects = (data ?? []) as FinalizeProjectSummary[]
+  // Assina thumbnail_url antes de passar pro client (bucket privado após o flip).
+  const savedProjects = (await signRows(createAdminClient(), data ?? [], ['thumbnail_url'])) as FinalizeProjectSummary[]
 
   return (
     <div style={{ flex: 1, minHeight: 0, display: 'flex', background: 'var(--color-bg)' }}>

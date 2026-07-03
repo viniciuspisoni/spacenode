@@ -6,6 +6,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { signRows, signStorageUrl } from '@/lib/storage/signed'
 
 interface CreateBody {
   name?: string
@@ -32,7 +34,9 @@ export async function GET() {
     console.error('[finalizar.projects.list]', error)
     return NextResponse.json({ error: 'Erro ao listar composições' }, { status: 500 })
   }
-  return NextResponse.json({ projects: data ?? [] })
+  // Assina thumbnail_url de cada composição (space-mestres vira privado; no-op enquanto público).
+  const projects = await signRows(createAdminClient(), data ?? [], ['thumbnail_url'])
+  return NextResponse.json({ projects })
 }
 
 export async function POST(req: NextRequest) {
@@ -67,5 +71,6 @@ export async function POST(req: NextRequest) {
     console.error('[finalizar.projects.create]', error)
     return NextResponse.json({ error: 'Erro ao salvar composição' }, { status: 500 })
   }
-  return NextResponse.json({ project: data }, { status: 201 })
+  const project = { ...data, thumbnail_url: await signStorageUrl(createAdminClient(), data.thumbnail_url) }
+  return NextResponse.json({ project }, { status: 201 })
 }

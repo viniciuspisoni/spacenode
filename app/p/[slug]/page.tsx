@@ -6,11 +6,17 @@ import { notFound } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getAccentColor } from '@/lib/spaces/identity'
 import { getVisualDna } from '@/lib/spaces/dna'
+import { signStorageUrl } from '@/lib/storage/signed'
 import type { Pack, Space, Vista, ArchitectIdentity } from '@/lib/spaces/types'
 import { findAxisOption } from '@/lib/spaces/axes'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
+
+// Pack público servido a anônimos: TTL longo pra a signed URL sobreviver a
+// recarregamentos/compartilhamento (a página é force-dynamic → re-assina a cada
+// request de qualquer forma). No-op enquanto os buckets forem públicos.
+const PACK_SIGN_TTL = 60 * 60 * 24 // 24h
 
 export default async function PublicPackPage({
   params,
@@ -39,8 +45,11 @@ export default async function PublicPackPage({
   ])
   if (!spaceRes.data) notFound()
 
-  const space    = spaceRes.data    as Space
-  const identity = (identityRes.data ?? null) as ArchitectIdentity | null
+  const space       = spaceRes.data as Space
+  const identityRaw = (identityRes.data ?? null) as ArchitectIdentity | null
+  const identity: ArchitectIdentity | null = identityRaw
+    ? { ...identityRaw, logo_url: await signStorageUrl(admin, identityRaw.logo_url, PACK_SIGN_TTL) }
+    : null
 
   const orderedIds = (pack.vistas_ordered ?? []) as string[]
   let vistas: Vista[] = []
@@ -52,6 +61,10 @@ export default async function PublicPackPage({
     const map = new Map((vistasRows ?? []).map(v => [v.id, v as Vista]))
     vistas = orderedIds.map(id => map.get(id)).filter(Boolean) as Vista[]
   }
+  // Assina image_url de cada vista (Supabase-hosted é assinado; FAL passa direto).
+  vistas = await Promise.all(
+    vistas.map(async v => ({ ...v, image_url: await signStorageUrl(admin, v.image_url, PACK_SIGN_TTL) })),
+  ) as Vista[]
 
   const dna    = getVisualDna(space.dna)
   const accent = getAccentColor(identity, dna)

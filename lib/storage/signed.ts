@@ -49,6 +49,53 @@ export async function signStorageUrls(
   return Promise.all(urls.map(u => signStorageUrl(admin, u, ttlSeconds)))
 }
 
+/** Devolve uma cópia de `row` com os campos `fields` assinados (no-op nos campos
+ *  que não são de bucket privado, ausentes ou não-string). Uso típico no ponto
+ *  de emissão de uma rota/detalhe: `await signRow(admin, vista, ['image_url'])`. */
+export async function signRow<T extends Record<string, unknown>>(
+  admin: SupabaseClient,
+  row: T,
+  fields: ReadonlyArray<keyof T>,
+  ttlSeconds = DEFAULT_TTL_SECONDS,
+): Promise<T> {
+  const patch: Record<string, unknown> = {}
+  await Promise.all(fields.map(async (f) => {
+    const v = row[f]
+    if (typeof v === 'string') patch[f as string] = await signStorageUrl(admin, v, ttlSeconds)
+  }))
+  return { ...row, ...patch }
+}
+
+/** signRow para uma lista (arrays de linhas). Preserva a ordem. */
+export async function signRows<T extends Record<string, unknown>>(
+  admin: SupabaseClient,
+  rows: T[],
+  fields: ReadonlyArray<keyof T>,
+  ttlSeconds = DEFAULT_TTL_SECONDS,
+): Promise<T[]> {
+  return Promise.all(rows.map(r => signRow(admin, r, fields, ttlSeconds)))
+}
+
+/** Deep-sign: percorre um valor jsonb e assina TODA string que for URL de bucket
+ *  privado (no-op no resto — nomes de camada, números, etc.). Devolve uma cópia.
+ *  Para o `document` do Finalizar (layers[].url / layers[].maskUrl aninhados),
+ *  onde signRow (raso) não alcança. */
+export async function signDeep(
+  admin: SupabaseClient,
+  value: unknown,
+  ttlSeconds = DEFAULT_TTL_SECONDS,
+): Promise<unknown> {
+  if (typeof value === 'string') return signStorageUrl(admin, value, ttlSeconds)
+  if (Array.isArray(value)) return Promise.all(value.map(v => signDeep(admin, v, ttlSeconds)))
+  if (value && typeof value === 'object') {
+    const entries = await Promise.all(
+      Object.entries(value).map(async ([k, v]) => [k, await signDeep(admin, v, ttlSeconds)] as const),
+    )
+    return Object.fromEntries(entries)
+  }
+  return value
+}
+
 /** Assina direto por bucket+key (quando você já tem a chave, não a URL). */
 export async function signStorageKey(
   admin: SupabaseClient,
