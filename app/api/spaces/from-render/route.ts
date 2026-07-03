@@ -12,8 +12,10 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { isEngineId, type EngineId } from '@/lib/engines'
 import { isSpaceCategory } from '@/lib/spaces/types'
+import { signRow } from '@/lib/storage/signed'
 
 interface FromRenderBody {
   render_id?:       unknown
@@ -110,5 +112,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Erro ao criar Space' }, { status: 500 })
   }
 
-  return NextResponse.json({ space }, { status: 201 })
+  // vista_mestre_url aqui é a output_url da render (FAL hoje → no-op; pronto p/ B3).
+  const signedSpace = await signRow(createAdminClient(), space, ['vista_mestre_url'])
+  return NextResponse.json({ space: signedSpace }, { status: 201 })
 }

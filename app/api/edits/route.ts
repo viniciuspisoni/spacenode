@@ -44,6 +44,7 @@ import {
 } from '@/lib/spaces/edit-route-helpers'
 import { runGatedEdit } from '@/lib/spaces/edit-gate'
 import { MaskImageMismatchError } from '@/lib/spaces/edit-crop'
+import { signRow, signRows, signStorageUrl } from '@/lib/storage/signed'
 import sharp from 'sharp'
 
 // sharp (crop/recompose) exige runtime Node.
@@ -370,13 +371,19 @@ export async function POST(req: NextRequest) {
       .eq('user_id', user.id)
       .single()
 
+    const signedEdit = row
+      ? await signRow(
+          admin,
+          { ...row, engine: engineDisplayLabel(row.engine), fal_request_id: undefined },
+          ['source_image_url', 'result_image_url', 'mask_url'],
+        )
+      : null
     return NextResponse.json({
       // Linha redigida: engine sai como label de produto e o request id do
       // provider não viaja (mesma regra do GET e do /api/history/detail).
-      edit: row
-        ? { ...row, engine: engineDisplayLabel(row.engine), fal_request_id: undefined }
-        : null,
-      result_url: run.resultUrl,
+      // URLs de imagem assinadas (space-mestres vira privado; no-op enquanto público).
+      edit: signedEdit,
+      result_url: await signStorageUrl(admin, run.resultUrl),
       // Sem endpoint técnico — só o que a UI mostra ao usuário.
       routing: {
         cost_nodes:   routing.costNodes,
@@ -426,6 +433,10 @@ export async function GET() {
   if (error) {
     return NextResponse.json({ error: 'Erro ao listar edições' }, { status: 500 })
   }
-  const edits = (data ?? []).map(e => ({ ...e, engine: engineDisplayLabel(e.engine) }))
+  const edits = await signRows(
+    createAdminClient(),
+    (data ?? []).map(e => ({ ...e, engine: engineDisplayLabel(e.engine) })),
+    ['source_image_url', 'result_image_url', 'mask_url'],
+  )
   return NextResponse.json({ edits })
 }

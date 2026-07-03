@@ -4,6 +4,14 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { isInternalStaff } from '@/lib/auth/privileged'
 import { engineDisplayLabel } from '@/lib/history/generation-detail'
 import { videoEngineLabel, upscaleProviderLabel } from '@/lib/renderLabels'
+import { signRow } from '@/lib/storage/signed'
+
+// Todas as colunas de URL de imagem possíveis nas 3 tabelas (render/edit/vista).
+// signRow ignora as ausentes/null, então a mesma lista serve pros 3 kinds.
+const URL_FIELDS = [
+  'output_url', 'input_url', 'source_image_url', 'result_image_url',
+  'mask_url', 'image_url', 'source_sketch_url', 'edit_mask_url',
+] as const
 
 // ── Detalhes da geração (Histórico) ────────────────────────────────────────────
 //
@@ -151,12 +159,17 @@ export async function GET(req: NextRequest) {
   const folderRow    = folderRes.data as { id: string; name: string } | null
   const spaceRow     = spaceRes.data  as { id: string; name: string; dna: unknown } | null
 
+  // Assina as URLs de imagem da linha (após a redação). FAL passa direto;
+  // Supabase-hosted vira signed URL. Cobre render/edit/vista com a mesma lista.
+  const displayRow = privileged ? row : redactRowForUser(kind, row as Record<string, unknown>)
+  const signedRow  = await signRow(admin, displayRow as Record<string, unknown>, URL_FIELDS)
+
   // Objetos de contexto SEM uuids internos: a UI usa apenas nome/email/labels
   // (author.id reintroduziria o user_id que a redação acabou de remover).
   return NextResponse.json({
     kind,
     viewer: { privileged },
-    row: privileged ? row : redactRowForUser(kind, row as Record<string, unknown>),
+    row: signedRow,
     author: authorRow
       ? { name: authorRow.full_name, email: authorRow.email }
       : null,

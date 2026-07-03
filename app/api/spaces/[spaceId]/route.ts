@@ -7,6 +7,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { signRow } from '@/lib/storage/signed'
 
 export async function GET(
   _req:    NextRequest,
@@ -27,7 +29,8 @@ export async function GET(
     return NextResponse.json({ error: 'Space não encontrado' }, { status: 404 })
   }
 
-  return NextResponse.json({ space: data })
+  const space = await signRow(createAdminClient(), data, ['vista_mestre_url'])
+  return NextResponse.json({ space })
 }
 
 // Renomear e/ou desarquivar. Body: { name?: string, action?: 'unarchive' }.

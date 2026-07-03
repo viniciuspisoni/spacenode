@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isEditReferenceRole } from '@/lib/spaces/edit-router'
+import { signStorageUrl } from '@/lib/storage/signed'
 
 export const runtime = 'nodejs'
 
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     reference: {
       id:              imageId,
-      url,
+      url:             await signStorageUrl(admin, url),
       role:            body.role,
       source:          'project',
       source_image_id: imageId,
