@@ -3,8 +3,10 @@
 // pack existente (ou cria draft sob demanda no client se não houver).
 
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { notFound, redirect } from 'next/navigation'
 import { PackEditor } from '@/components/spaces/PackEditor'
+import { signStorageUrl, signRows } from '@/lib/storage/signed'
 import type { Space, Vista, Pack, ArchitectIdentity } from '@/lib/spaces/types'
 
 export default async function PackPage({
@@ -37,10 +39,17 @@ export default async function PackPage({
 
   if (spaceRes.error || !spaceRes.data) notFound()
 
-  const space    = spaceRes.data as Space
-  const vistas   = (vistasRes.data ?? []) as Vista[]
+  // Assina URLs de Storage server-side antes de passar pro client (buckets
+  // privados após o flip; no-op enquanto públicos / FAL).
+  const admin    = createAdminClient()
+  const spaceRaw = spaceRes.data as Space
+  const space: Space = { ...spaceRaw, vista_mestre_url: await signStorageUrl(admin, spaceRaw.vista_mestre_url) }
+  const vistas   = (await signRows(admin, vistasRes.data ?? [], ['image_url'])) as Vista[]
   const pack     = (packRes.data ?? null) as Pack | null
-  const identity = (identityRes.data ?? null) as ArchitectIdentity | null
+  const identityRaw = (identityRes.data ?? null) as ArchitectIdentity | null
+  const identity: ArchitectIdentity | null = identityRaw
+    ? { ...identityRaw, logo_url: await signStorageUrl(admin, identityRaw.logo_url) }
+    : null
 
   return (
     <main style={{ flex: 1, overflowY: 'auto', background: 'var(--color-bg)' }}>

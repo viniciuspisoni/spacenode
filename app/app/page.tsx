@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { signRows } from '@/lib/storage/signed'
 import { getRenderTitle } from '@/lib/render-display'
 import { getPlanById, type PlanId } from '@/lib/plans'
 import {
@@ -151,10 +153,13 @@ export default async function AppPage() {
   const lumenBalance = balanceResult.data?.lumen_balance ?? 0
   const availableNodes = planBalance + lumenBalance
 
-  const renders      = (recentResult.data ?? []) as RecentRender[]
+  // Assina URLs de Storage (space-mestres) antes de passar pro client (bucket
+  // privado após o flip). Renders são FAL hoje → no-op, mas embrulhamos igual.
+  const admin        = createAdminClient()
+  const renders      = (await signRows(admin, recentResult.data ?? [], ['output_url', 'input_url'])) as RecentRender[]
   const totalRenders = countResult.count ?? 0
   const monthRenders = monthResult.count ?? 0
-  const spaces       = (spacesResult.data ?? []) as RecentSpace[]
+  const spaces       = (await signRows(admin, spacesResult.data ?? [], ['vista_mestre_url'])) as RecentSpace[]
   const totalSpaces  = spacesResult.count ?? spaces.length
 
   const planUsed   = planTotal > 0 ? Math.max(0, planTotal - planBalance) : 0

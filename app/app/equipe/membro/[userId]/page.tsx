@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { signRows } from '@/lib/storage/signed'
 import { getActiveWorkspace } from '@/lib/workspaces/context'
 
 export const dynamic = 'force-dynamic'
@@ -72,7 +73,9 @@ export default async function MembroPage({
   ])
 
   const projects = (projectsRes.data ?? []) as { id: string; name: string }[]
-  const gens = (gensRes.data ?? []) as Gen[]
+  // Assina a coluna `url` (aliased pela view) antes de renderizar o <img>
+  // (buckets privados após o flip; no-op enquanto públicos / FAL).
+  const gens = (await signRows(admin, (gensRes.data ?? []) as Gen[], ['url'])) as Gen[]
   const base = `/app/equipe/membro/${userId}`
 
   return (

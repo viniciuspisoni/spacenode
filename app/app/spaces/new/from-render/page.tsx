@@ -3,7 +3,9 @@
 //   - Com ?render_id  → tela de config (nome + categoria + motor herdado) + extração
 
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
+import { signStorageUrl, signRows } from '@/lib/storage/signed'
 import { FromRenderFlow, type RenderGalleryItem } from '@/components/spaces/FromRenderFlow'
 
 export default async function FromRenderPage({
@@ -40,9 +42,15 @@ export default async function FromRenderPage({
       : Promise.resolve({ data: null, error: null }),
   ])
 
-  const gallery     = (galleryRes.data ?? []) as RenderGalleryItem[]
+  // Assina output_url server-side antes de passar pro client (bucket privado
+  // após o flip). Renders são FAL hoje → no-op, mas embrulhamos igual.
+  const admin       = createAdminClient()
+  const gallery     = (await signRows(admin, galleryRes.data ?? [], ['output_url'])) as RenderGalleryItem[]
   const balance     = balanceRes.data?.total_balance ?? 0
-  const preselected = (preselectedRes.data ?? null) as RenderGalleryItem | null
+  const preselectedRaw = (preselectedRes.data ?? null) as RenderGalleryItem | null
+  const preselected: RenderGalleryItem | null = preselectedRaw
+    ? { ...preselectedRaw, output_url: (await signStorageUrl(admin, preselectedRaw.output_url)) ?? preselectedRaw.output_url }
+    : null
 
   return (
     <main style={{ flex: 1, overflowY: 'auto', background: 'var(--color-bg)' }}>

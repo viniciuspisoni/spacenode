@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { RENDER_LIST_COLUMNS, sanitizeRenderListRow } from '@/lib/history/redact'
+import { signRows } from '@/lib/storage/signed'
 import { HistoryClient } from './HistoryClient'
 
 const PAGE_SIZE = 60
@@ -49,6 +50,10 @@ export default async function HistoryPage() {
     .select('id, full_name, email')
     .in('id', authorIds)
 
+  // Assina input_url/output_url server-side antes de passar pro client (bucket
+  // privado após o flip). Renders são FAL hoje → no-op, mas embrulhamos igual.
+  const signedRenders = await signRows(admin, renders ?? [], ['input_url', 'output_url'])
+
   const authors: Record<string, { name: string | null; email: string | null }> = {}
   for (const a of authorRows ?? []) {
     authors[a.id] = { name: a.full_name ?? null, email: a.email ?? null }
@@ -56,7 +61,7 @@ export default async function HistoryPage() {
 
   return (
     <HistoryClient
-      renders={(renders ?? []).map(sanitizeRenderListRow)}
+      renders={signedRenders.map(sanitizeRenderListRow)}
       folderCounts={{ counts, unfiled, total }}
       pageSize={PAGE_SIZE}
       credits={profile?.credits ?? 0}

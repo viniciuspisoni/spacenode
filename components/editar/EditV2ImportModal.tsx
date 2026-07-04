@@ -14,6 +14,7 @@
 // ?? result_url ?? public_url) — nunca filtramos por provider/modelo/CDN.
 
 import { useEffect, useState } from 'react'
+import { toMediaProxyUrl } from '@/lib/storage/media-url'
 import { createClient } from '@/lib/supabase/client'
 
 type Tab = 'renders' | 'vistas' | 'edits'
@@ -240,7 +241,7 @@ export function EditV2ImportModal({ open, onClose, onSelect }: Props) {
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={item.url}
+                    src={toMediaProxyUrl(item.url) ?? item.url}
                     alt=""
                     loading="lazy"
                     style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}

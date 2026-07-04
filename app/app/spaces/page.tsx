@@ -5,7 +5,9 @@
 // sob RLS, e delega busca/filtros/ordenação/ações pro ProjectsLibrary.
 
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
+import { signRows } from '@/lib/storage/signed'
 import type { SpaceWithCounts } from '@/lib/spaces/types'
 import { ProjectsLibrary, ProjectsLoadError } from '@/components/spaces/ProjectsLibrary'
 
@@ -19,7 +21,8 @@ export default async function SpacesPage() {
     .select('*')
     .order('updated_at', { ascending: false })
 
-  const spaces = (rows ?? []) as SpaceWithCounts[]
+  // Assina vista_mestre_url antes de passar pro client (bucket privado após o flip).
+  const spaces = (await signRows(createAdminClient(), rows ?? [], ['vista_mestre_url'])) as SpaceWithCounts[]
 
   return (
     <main style={{ flex: 1, overflowY: 'auto', background: 'var(--color-bg)', padding: '40px 48px 80px' }}>

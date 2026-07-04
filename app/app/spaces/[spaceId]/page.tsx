@@ -3,8 +3,10 @@
 // SpaceWorkspace (client) com tudo necessário pra geração + galeria.
 
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { notFound, redirect } from 'next/navigation'
 import { SpaceWorkspace } from '@/components/spaces/SpaceWorkspace'
+import { signStorageUrl, signRows } from '@/lib/storage/signed'
 import type { Space, Vista, ArchitectIdentity } from '@/lib/spaces/types'
 import type { PlanId } from '@/lib/plans'
 
@@ -32,10 +34,17 @@ export default async function SpacePage({
 
   if (spaceRes.error || !spaceRes.data) notFound()
 
-  const space    = spaceRes.data as Space
-  const vistas   = (vistasRes.data ?? []) as Vista[]
+  // Assina URLs de Storage server-side antes de passar pro client (buckets
+  // privados após o flip; no-op enquanto públicos / FAL).
+  const admin    = createAdminClient()
+  const spaceRaw = spaceRes.data as Space
+  const space: Space = { ...spaceRaw, vista_mestre_url: await signStorageUrl(admin, spaceRaw.vista_mestre_url) }
+  const vistas   = (await signRows(admin, vistasRes.data ?? [], ['image_url', 'source_sketch_url', 'edit_mask_url', 'source_image_url'])) as Vista[]
   const balance  = balanceRes.data?.total_balance ?? 0
-  const identity = (identityRes.data ?? null) as ArchitectIdentity | null
+  const identityRaw = (identityRes.data ?? null) as ArchitectIdentity | null
+  const identity: ArchitectIdentity | null = identityRaw
+    ? { ...identityRaw, logo_url: await signStorageUrl(admin, identityRaw.logo_url) }
+    : null
   const planId   = (profRes.data?.plan as PlanId | undefined) ?? 'free'
 
   return (

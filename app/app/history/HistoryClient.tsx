@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { getUpscaleDisplayLabel, getVideoDisplayLabel } from '@/lib/renderLabels'
 import { createClient } from '@/lib/supabase/client'
+import { toMediaProxyUrl } from '@/lib/storage/media-url'
 import { GenerationDetailDrawer } from '@/components/history/GenerationDetailDrawer'
 import { authorInitials, type GenerationKind } from '@/lib/history/generation-detail'
 import type { Edit } from '@/lib/spaces/types'
@@ -939,7 +940,7 @@ function VistasTabView({
         >
           <div style={{ aspectRatio: '4 / 3', background: 'var(--color-surface)', position: 'relative' }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={v.image_url!} alt={v.axis_label ?? ''}
+            <img src={toMediaProxyUrl(v.image_url) ?? undefined} alt={v.axis_label ?? ''}
               style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             <AuthorChip author={v.user_id ? authors[v.user_id] ?? null : null} />
             {v.is_edited && (

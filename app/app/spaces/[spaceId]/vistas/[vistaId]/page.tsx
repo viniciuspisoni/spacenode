@@ -1,8 +1,10 @@
 // /app/spaces/[spaceId]/vistas/[vistaId] — detalhe da vista.
 
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { notFound, redirect } from 'next/navigation'
 import { VistaDetail } from '@/components/spaces/VistaDetail'
+import { signStorageUrl, signRows } from '@/lib/storage/signed'
 import type { Space, Vista } from '@/lib/spaces/types'
 
 export default async function VistaDetailPage({
@@ -31,9 +33,20 @@ export default async function VistaDetailPage({
   if (vistaRes.error || !vistaRes.data) notFound()
   if (spaceRes.error || !spaceRes.data) notFound()
 
-  const space   = spaceRes.data  as Space
-  const vista   = vistaRes.data  as Vista
-  const others  = (otherRes.data ?? []) as Pick<Vista, 'id' | 'image_url' | 'axis' | 'axis_value' | 'axis_label' | 'quality'>[]
+  // Assina URLs de Storage server-side antes de passar pro client (buckets
+  // privados após o flip; no-op enquanto públicos / FAL).
+  const admin    = createAdminClient()
+  const spaceRaw = spaceRes.data as Space
+  const space: Space = { ...spaceRaw, vista_mestre_url: await signStorageUrl(admin, spaceRaw.vista_mestre_url) }
+  const vistaRaw = vistaRes.data as Vista
+  const vista: Vista = {
+    ...vistaRaw,
+    image_url:         await signStorageUrl(admin, vistaRaw.image_url),
+    source_sketch_url: await signStorageUrl(admin, vistaRaw.source_sketch_url),
+    edit_mask_url:     await signStorageUrl(admin, vistaRaw.edit_mask_url),
+    source_image_url:  await signStorageUrl(admin, vistaRaw.source_image_url),
+  }
+  const others  = (await signRows(admin, otherRes.data ?? [], ['image_url'])) as Pick<Vista, 'id' | 'image_url' | 'axis' | 'axis_value' | 'axis_label' | 'quality'>[]
   const balance = balanceRes.data?.total_balance ?? 0
 
   return (

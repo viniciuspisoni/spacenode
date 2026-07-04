@@ -17,9 +17,17 @@
 --      mas recomendado antes do flip, pra outputs novos já nascerem no bucket.
 --   4. Testar em STAGING com o bucket já privado: cada tela que mostra imagem
 --      privada + a página pública do pack (logado e deslogado).
---   5. SÓ ENTÃO aplicar esta migration em produção. Ter o rollback pronto.
+--   5. SÓ ENTÃO aplicar esta migration em produção **E**, no MESMO passo, setar
+--      a env `STORAGE_PRIVATE=1` na Vercel (+ redeploy). Essa flag liga a
+--      assinatura no lib/storage/signed.ts — sem ela, todo o wiring é no-op e as
+--      URLs públicas param de funcionar (403). Aplicar a migration SEM a flag =
+--      imagens quebradas; setar a flag SEM a migration = signed URLs de bucket
+--      público (funcionam, mas desnecessário). Fazer os dois juntos.
+--   6. Rollback = reverter esta migration (SQL abaixo) **E** remover/zerar
+--      STORAGE_PRIVATE na Vercel.
 --
 -- ── ROLLBACK (reverte pra público na hora) ──────────────────────────────────
+--   (+ na Vercel: remover a env STORAGE_PRIVATE / setar != '1', e redeploy)
 --   UPDATE storage.buckets SET public = true
 --   WHERE id IN ('space-mestres','architect-identity');
 --   DROP POLICY IF EXISTS "space_mestres_user_select"      ON storage.objects;

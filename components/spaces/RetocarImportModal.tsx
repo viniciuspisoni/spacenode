@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { toMediaProxyUrl } from '@/lib/storage/media-url'
 import type { EditSourceType, Edit, Vista } from '@/lib/spaces/types'
 
 type Tab = 'renders' | 'vistas' | 'edits'
@@ -217,7 +218,7 @@ function GalleryGrid({ items, empty, onPick }: {
         >
           <div style={{ aspectRatio: '4 / 3', background: 'var(--color-surface)' }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={it.url} alt={it.label}
+            <img src={toMediaProxyUrl(it.url) ?? it.url} alt={it.label}
               style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           </div>
           <div style={{

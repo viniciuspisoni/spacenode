@@ -14,6 +14,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { toMediaProxyUrl } from '@/lib/storage/media-url'
 
 type Tab = 'renders' | 'vistas' | 'edits'
 
@@ -119,7 +120,7 @@ export function FinalizeImportModal({ open, purpose, onClose, onSelect }: Props)
   const count = (t: Tab) => (items[t] !== null ? ` (${items[t]!.length})` : '')
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(0,0,0,0.6)', display: 'grid', placeItems: 'center', padding: 24 }}>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'var(--color-scrim)', display: 'grid', placeItems: 'center', padding: 24 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ width: 'min(880px, 100%)', maxHeight: '78vh', display: 'flex', flexDirection: 'column', background: 'var(--color-bg-elevated)', border: '0.5px solid var(--color-border-strong)', borderRadius: 16, overflow: 'hidden' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 18px', borderBottom: '0.5px solid var(--color-border)' }}>
           <span style={{ fontSize: 14.5, fontWeight: 600, marginRight: 10 }}>
@@ -146,7 +147,7 @@ export function FinalizeImportModal({ open, purpose, onClose, onSelect }: Props)
                 <button key={item.id} type="button" onClick={() => onSelect(item.url)} title={`${item.label} · ${item.createdAt ? new Date(item.createdAt).toLocaleDateString('pt-BR') : ''}`}
                   style={{ position: 'relative', aspectRatio: '4 / 3', borderRadius: 10, overflow: 'hidden', border: '0.5px solid var(--color-border)', background: 'var(--color-surface)', cursor: 'pointer', padding: 0 }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={item.url} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                  <img src={toMediaProxyUrl(item.url) ?? item.url} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                 </button>
               ))}
             </div>

@@ -21,6 +21,16 @@ export const PRIVATE_BUCKETS = new Set(['space-mestres', 'architect-identity', '
 
 const DEFAULT_TTL_SECONDS = 60 * 60 // 1h
 
+/** Flag de ativação do B2. Enquanto `STORAGE_PRIVATE !== '1'` a assinatura é um
+ *  NO-OP TOTAL: todo o wiring de emissão devolve a URL pública original, sem
+ *  tocar em nada — produção fica idêntica. No flip, aplica-se a migration de
+ *  privatização E seta-se STORAGE_PRIVATE=1 (na Vercel) no MESMO passo. Assim o
+ *  wiring pode ser mergeado/deployado ANTES do flip sem efeito algum, e sem o
+ *  risco de persistir signed URLs (que expiram) em dados round-trip. */
+function privateStorageActive(): boolean {
+  return process.env.STORAGE_PRIVATE === '1'
+}
+
 /** Assina uma URL do Storage se ela apontar pra um bucket privado nosso; senão
  *  devolve a URL original (FAL/externas passam direto). Best-effort: em erro
  *  devolve a original pra não quebrar a UI. */
@@ -30,6 +40,7 @@ export async function signStorageUrl(
   ttlSeconds = DEFAULT_TTL_SECONDS,
 ): Promise<string | null> {
   if (!url) return url ?? null
+  if (!privateStorageActive()) return url // inerte até o flip (STORAGE_PRIVATE=1)
   const parsed = parseSupabaseStoragePath(url)
   if (!parsed || !PRIVATE_BUCKETS.has(parsed.bucket)) return url
   const { data, error } = await admin.storage.from(parsed.bucket).createSignedUrl(parsed.key, ttlSeconds)
