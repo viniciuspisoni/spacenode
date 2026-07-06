@@ -18,6 +18,7 @@ import { fal } from '@fal-ai/client'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { refundNodes } from '@/lib/billing/refund-nodes'
+import sharp from 'sharp'
 import {
   computeUpscaleCost,
   finalProvider,
@@ -76,8 +77,23 @@ export async function POST(req: NextRequest) {
   const tabT    = tab    as UpscaleTab
   const modeT   = modeId as ModeId
   const scaleT  = scale  as Scale
-  const width   = widthRaw  ? Number(widthRaw)  : null
-  const height  = heightRaw ? Number(heightRaw) : null
+
+  // Dimensões REAIS medidas no servidor (AL-5): o custo do upscale é por
+  // megapixel; confiar no imageWidth/imageHeight do cliente permitia
+  // subdeclarar as dimensões pra pagar o piso enquanto envia uma imagem grande
+  // (custo real alto). sharp mede a origem; o client só é fallback se o decode
+  // falhar (caso raro — aí o provider provavelmente também falharia).
+  let width:  number | null = null
+  let height: number | null = null
+  try {
+    const meta = await sharp(Buffer.from(await imageFile.arrayBuffer())).metadata()
+    width  = meta.width  ?? null
+    height = meta.height ?? null
+  } catch {
+    console.warn('[upscale] sharp metadata falhou — usando dims do cliente (fallback)')
+    width  = widthRaw  ? Number(widthRaw)  : null
+    height = heightRaw ? Number(heightRaw) : null
+  }
 
   // ── Custo ──────────────────────────────────────────────────────────────────
   const cost = computeUpscaleCost({

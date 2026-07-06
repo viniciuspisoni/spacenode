@@ -41,11 +41,21 @@ export async function POST(
       return NextResponse.json({ error: 'Space não permite re-extração' }, { status: 409 })
     }
 
-    // Marca extracting (evita double-submit)
-    await supabase
+    // Guard ATÔMICO contra double-submit (AL-6): só a PRIMEIRA requisição
+    // consegue transicionar pra 'dna_extracting'. Se 0 linhas (outra já está
+    // extraindo), retorna 409 SEM debitar. Antes o UPDATE era INCONDICIONAL e
+    // duas requisições concorrentes passavam pela leitura acima e debitavam
+    // 8 nodes CADA.
+    const { data: claimed } = await supabase
       .from('spaces')
       .update({ status: 'dna_extracting' })
       .eq('id', spaceId)
+      .neq('status', 'dna_extracting')
+      .select('id')
+      .maybeSingle()
+    if (!claimed) {
+      return NextResponse.json({ error: 'Extração de DNA já em andamento.' }, { status: 409 })
+    }
 
     // ── Débito atômico ──────────────────────────────────────────
     const { data: debitData, error: debitErr } = await admin.rpc('consume_workspace_nodes', {
