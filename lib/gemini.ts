@@ -19,6 +19,7 @@
 //     "Falha na análise da Vista Mestre" pro usuário.
 
 import { GoogleGenAI, createPartFromBase64, createPartFromText, type Part } from '@google/genai'
+import { fetchStorageBytes } from '@/lib/storage/fetch'
 
 export const GEMINI_MODEL = 'gemini-2.5-flash'
 const DEFAULT_TIMEOUT_MS     = 30_000
@@ -80,12 +81,12 @@ function isRetryable(err: unknown): boolean {
 // Baixa a imagem e devolve um Part inline (base64) — formato que o Gemini exige.
 // Defaulta pra image/jpeg quando o content-type não é uma imagem.
 async function fetchImagePart(imageUrl: string): Promise<Part> {
-  const res = await fetch(imageUrl)
-  if (!res.ok) throw new Error(`image fetch ${res.status}`)
-  const ct = res.headers.get('content-type')?.split(';')[0]?.trim()
+  // fetchStorageBytes: baixa via storage API se for bucket privado nosso (após o
+  // flip); senão fetch HTTP. Inerte enquanto STORAGE_PRIVATE != '1'.
+  const { buffer, contentType } = await fetchStorageBytes(imageUrl)
+  const ct = contentType.split(';')[0]?.trim()
   const mimeType = ct && ct.startsWith('image/') ? ct : 'image/jpeg'
-  const buf = Buffer.from(await res.arrayBuffer())
-  return createPartFromBase64(buf.toString('base64'), mimeType)
+  return createPartFromBase64(buffer.toString('base64'), mimeType)
 }
 
 async function generate(

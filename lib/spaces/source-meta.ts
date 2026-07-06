@@ -12,6 +12,7 @@
 
 import sharp from 'sharp'
 import { createHash } from 'crypto'
+import { fetchStorageBuffer } from '@/lib/storage/fetch'
 
 export interface SourceMeta {
   url:          string
@@ -33,9 +34,9 @@ export async function computeSourceMeta(url: string): Promise<SourceMeta> {
     const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS)
     let buf: Buffer
     try {
-      const res = await fetch(url, { signal: ctrl.signal })
-      if (!res.ok) return emptyMeta(url)
-      buf = Buffer.from(await res.arrayBuffer())
+      // Via storage API se bucket privado nosso (após o flip); senão fetch HTTP
+      // com o mesmo timeout. Falha cai no catch externo → emptyMeta (best-effort).
+      buf = await fetchStorageBuffer(url, ctrl.signal)
     } finally {
       clearTimeout(timer)
     }

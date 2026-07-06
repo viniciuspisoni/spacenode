@@ -13,6 +13,7 @@
 // sharp só roda no servidor (a rota /api/edits é Route Handler Node).
 
 import sharp from 'sharp'
+import { fetchStorageBuffer } from '@/lib/storage/fetch'
 
 export interface CropRegion {
   left:   number
@@ -31,11 +32,10 @@ export interface CropPlan {
   outMegapixels:  number
 }
 
-/** Baixa uma imagem (URL pública) como Buffer. */
+/** Baixa uma imagem como Buffer. Via storage API se for bucket privado nosso
+ *  (após o flip); senão fetch HTTP. Inerte enquanto STORAGE_PRIVATE != '1'. */
 export async function fetchImageBuffer(url: string): Promise<Buffer> {
-  const res = await fetch(url)
-  if (!res.ok) throw new Error(`fetch image failed (${res.status}) ${url}`)
-  return Buffer.from(await res.arrayBuffer())
+  return fetchStorageBuffer(url)
 }
 
 /** Megapixels da imagem (largura*altura/1e6). */

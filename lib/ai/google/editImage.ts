@@ -15,6 +15,7 @@
 // Ordem das imagens: [principal] → [máscara?] → [referências...].
 
 import { GoogleGenAI, Modality, createPartFromBase64, createPartFromText, type Part } from '@google/genai'
+import { fetchStorageBytes } from '@/lib/storage/fetch'
 
 export type GoogleImageModel = 'gemini-3.1-flash-image' | 'gemini-3-pro-image'
 export type GoogleImageResolution = '1K' | '2K' | '4K'
@@ -58,14 +59,16 @@ function client(): GoogleGenAI {
 }
 
 async function fetchImagePart(url: string): Promise<Part> {
-  const res = await fetch(url)
-  if (!res.ok) {
-    throw new GoogleEditError('api', `falha ao buscar imagem (${res.status})`)
+  let buffer: Buffer
+  let contentType: string
+  try {
+    ({ buffer, contentType } = await fetchStorageBytes(url))
+  } catch (e) {
+    throw new GoogleEditError('api', `falha ao buscar imagem: ${(e as Error).message}`)
   }
-  const ct = res.headers.get('content-type')?.split(';')[0]?.trim()
+  const ct = contentType.split(';')[0]?.trim()
   const mime = ct && ct.startsWith('image/') ? ct : 'image/jpeg'
-  const buf = Buffer.from(await res.arrayBuffer())
-  return createPartFromBase64(buf.toString('base64'), mime)
+  return createPartFromBase64(buffer.toString('base64'), mime)
 }
 
 export interface GoogleEditImageInput {
