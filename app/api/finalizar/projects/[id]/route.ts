@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { removeOwnedStorageObjects, collectUrls } from '@/lib/storage/cleanup'
-import { signStorageUrl, signDeep } from '@/lib/storage/signed'
+import { mediaProxyUrl, mediaProxyDeep } from '@/lib/storage/signed'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -38,13 +38,14 @@ export async function GET(_req: NextRequest, { params }: Params) {
     .single()
 
   if (error || !data) return NextResponse.json({ error: 'Composição não encontrada' }, { status: 404 })
-  // Assina base/thumbnail + as URLs aninhadas no document (layers[].url/maskUrl).
-  const admin = createAdminClient()
+  // Editor round-trip: usa URL de PROXY (estável) em base/thumbnail + nas URLs
+  // aninhadas no document (layers[].url/maskUrl), NÃO signed URL (que expiraria e
+  // seria persistida no save-back). O proxy é estável e re-resolve o acesso.
   const project = {
     ...data,
-    base_image_url: await signStorageUrl(admin, data.base_image_url),
-    thumbnail_url:  await signStorageUrl(admin, data.thumbnail_url),
-    document:       await signDeep(admin, data.document),
+    base_image_url: mediaProxyUrl(data.base_image_url),
+    thumbnail_url:  mediaProxyUrl(data.thumbnail_url),
+    document:       mediaProxyDeep(data.document),
   }
   return NextResponse.json({ project })
 }
@@ -86,7 +87,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     console.error('[finalizar.projects.update]', error)
     return NextResponse.json({ error: 'Erro ao salvar composição' }, { status: 500 })
   }
-  const project = { ...data, thumbnail_url: await signStorageUrl(createAdminClient(), data.thumbnail_url) }
+  const project = { ...data, thumbnail_url: mediaProxyUrl(data.thumbnail_url) }
   return NextResponse.json({ project })
 }
 

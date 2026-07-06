@@ -107,6 +107,29 @@ export async function signDeep(
   return value
 }
 
+/** Converte URL pública de bucket privado no proxy `/api/media` (STABLE +
+ *  displayable). Pro caso ROUND-TRIP (uploads e o editor do Finalizar): gravar
+ *  uma signed URL (que expira) quebraria no save-back; a URL do proxy é estável
+ *  e re-resolve o acesso a cada request. Síncrono (só transforma string). Gated
+ *  por STORAGE_PRIVATE → no-op enquanto off. */
+export function mediaProxyUrl(url: string | null | undefined): string | null {
+  if (!url) return url ?? null
+  if (!privateStorageActive()) return url
+  const parsed = parseSupabaseStoragePath(url)
+  if (!parsed || !PRIVATE_BUCKETS.has(parsed.bucket)) return url
+  return `/api/media?bucket=${encodeURIComponent(parsed.bucket)}&key=${encodeURIComponent(parsed.key)}`
+}
+
+/** mediaProxyUrl recursivo num valor jsonb (o `document` do Finalizar). Síncrono. */
+export function mediaProxyDeep(value: unknown): unknown {
+  if (typeof value === 'string') return mediaProxyUrl(value)
+  if (Array.isArray(value)) return value.map(mediaProxyDeep)
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, mediaProxyDeep(v)]))
+  }
+  return value
+}
+
 /** Assina direto por bucket+key (quando você já tem a chave, não a URL). */
 export async function signStorageKey(
   admin: SupabaseClient,
