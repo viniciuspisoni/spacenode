@@ -44,6 +44,7 @@ import {
 } from '@/lib/spaces/edit-route-helpers'
 import { runGatedEdit } from '@/lib/spaces/edit-gate'
 import { MaskImageMismatchError } from '@/lib/spaces/edit-crop'
+import { refundNodes } from '@/lib/billing/refund-nodes'
 import { signRow, signRows, signStorageUrl } from '@/lib/storage/signed'
 import sharp from 'sharp'
 
@@ -266,8 +267,7 @@ export async function POST(req: NextRequest) {
     // ── Reprovado mesmo após o retry → estorna, registra o motivo, devolve. ──
     if (gated.rejected) {
       if (debited) {
-        try { await admin.rpc('refund_workspace_nodes', { user_id_input: user.id, amount: routing.costNodes }) }
-        catch (refundErr) { console.error('[edits] gate refund failed:', refundErr) }
+        await refundNodes(admin, user.id, routing.costNodes, { module: 'edits' })
       }
       const rejectedStatus = gated.rejectionKind === 'no_change'
         ? 'rejected_no_change'
@@ -397,8 +397,7 @@ export async function POST(req: NextRequest) {
     })
   } catch (err) {
     if (debited) {
-      try { await admin.rpc('refund_workspace_nodes', { user_id_input: user.id, amount: routing.costNodes }) }
-      catch (refundErr) { console.error('[edits] refund failed:', refundErr) }
+      await refundNodes(admin, user.id, routing.costNodes, { module: 'edits' })
     }
     await failAttempt((err as Error).message)
     console.error('[edits] error:', (err as Error).message)

@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { refundNodes } from '@/lib/billing/refund-nodes'
 import { isQuality, type Quality, type Space, type Vista } from '@/lib/spaces/types'
 import { isEditMode, dispatchEndpoint, type EditMode } from '@/lib/spaces/engines'
 import {
@@ -289,8 +290,7 @@ export async function POST(
     // ── Reprovado mesmo após o retry → estorna, registra, vista 'failed'. ──
     if (gated.rejected) {
       if (debited) {
-        try { await admin.rpc('refund_workspace_nodes', { user_id_input: user.id, amount: routing.costNodes }) }
-        catch (refundErr) { console.error('[vista.edit] gate refund failed:', refundErr) }
+        await refundNodes(admin, user.id, routing.costNodes, { module: 'vistas/edit' })
       }
       if (newVistaId) {
         await admin.from('vistas').update({
@@ -422,8 +422,7 @@ export async function POST(
     })
   } catch (err) {
     if (debited) {
-      try { await admin.rpc('refund_workspace_nodes', { user_id_input: user.id, amount: routing.costNodes }) }
-      catch (refundErr) { console.error('[vista.edit] refund failed:', refundErr) }
+      await refundNodes(admin, user.id, routing.costNodes, { module: 'vistas/edit' })
     }
     if (newVistaId) {
       await admin

@@ -18,6 +18,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { fal } from '@fal-ai/client'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { refundNodes } from '@/lib/billing/refund-nodes'
 import { ENGINES, isResolution, type EngineId, type Resolution } from '@/lib/engines'
 import { getVistaGenerationCost, supportsQuality } from '@/lib/spaces/economy'
 import { findAxisOption } from '@/lib/spaces/axes'
@@ -486,11 +487,7 @@ async function generateOne(args: {
 
   } catch (err) {
     if (debited) {
-      try {
-        await admin.rpc('refund_workspace_nodes', { user_id_input: userId, amount: costPerVista })
-      } catch (refundErr) {
-        console.error('[spaces.generate] FALHA NO REFUND:', refundErr)
-      }
+      await refundNodes(admin, userId, costPerVista, { module: 'spaces/generate', jobTable: 'vistas' })
     }
     if (vistaId) {
       await admin

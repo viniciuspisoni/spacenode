@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { fal } from '@fal-ai/client'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { refundNodes } from '@/lib/billing/refund-nodes'
 import { APRESENTAR_TOOLS } from '@/lib/apresentar/config'
 import { buildHumanizedPlanPrompt } from '@/lib/apresentar/prompts'
 import { getFalEndpoint, getNodesCost, type EngineId, type Resolution } from '@/lib/engines'
@@ -202,12 +203,7 @@ export async function POST(req: NextRequest) {
   } catch (err: unknown) {
     // ── Refund best-effort ────────────────────────────────────────────────────
     if (debited && nodesToCharge > 0) {
-      try {
-        await admin.rpc('refund_workspace_nodes', { user_id_input: user.id, amount: nodesToCharge })
-        console.warn('[apresentar/humanized-plan] Refund:', nodesToCharge, 'nodes →', user.id)
-      } catch (refundErr) {
-        console.error('[apresentar/humanized-plan] FALHA NO REFUND:', { err: refundErr, userId: user.id, amount: nodesToCharge })
-      }
+      await refundNodes(admin, user.id, nodesToCharge, { module: 'apresentar/humanized-plan' })
     }
 
     const e = err as { status?: number; body?: unknown; message?: string; isFalTimeout?: boolean }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { refundNodes } from '@/lib/billing/refund-nodes'
 import { APRESENTAR_TOOLS, CAROUSEL_STYLES, type CarouselStyle } from '@/lib/apresentar/config'
 import { generateCarouselCopy, type SlideImageMeta } from '@/lib/apresentar/board'
 
@@ -171,12 +172,7 @@ export async function POST(req: NextRequest) {
 
   } catch (err: unknown) {
     if (debited && nodesToCharge > 0) {
-      try {
-        await admin.rpc('refund_workspace_nodes', { user_id_input: user.id, amount: nodesToCharge })
-        console.warn('[apresentar/board] Refund:', nodesToCharge, 'nodes →', user.id)
-      } catch (refundErr) {
-        console.error('[apresentar/board] FALHA NO REFUND:', { err: refundErr, userId: user.id, amount: nodesToCharge })
-      }
+      await refundNodes(admin, user.id, nodesToCharge, { module: 'apresentar/board' })
     }
 
     const e = err as { status?: number; body?: unknown; message?: string }

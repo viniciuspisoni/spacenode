@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { fal } from '@fal-ai/client'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { refundNodes } from '@/lib/billing/refund-nodes'
 import {
   buildFidelityPrompt,
   type GenerateOptions,
@@ -358,16 +359,7 @@ export async function POST(req: NextRequest) {
   } catch (err: unknown) {
     // ── Refund best-effort em qualquer falha pós-débito ───────────────────────
     if (debited && nodesToCharge > 0) {
-      try {
-        await admin.rpc('refund_workspace_nodes', { user_id_input: user.id, amount: nodesToCharge })
-        console.warn('[generate] Refund executado:', nodesToCharge, 'nodes para', user.id)
-      } catch (refundErr) {
-        console.error('[generate] FALHA NO REFUND (CRÍTICO):', {
-          err:    refundErr,
-          userId: user.id,
-          amount: nodesToCharge,
-        })
-      }
+      await refundNodes(admin, user.id, nodesToCharge, { module: 'generate', jobTable: 'renders' })
     }
 
     const e = err as { status?: number; body?: unknown; message?: string; isFalTimeout?: boolean }

@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { refundNodes } from '@/lib/billing/refund-nodes'
 import { extractDnaPayload } from '@/lib/spaces/dna'
 import { DNA_EXTRACTION_COST } from '@/lib/spaces/economy'
 
@@ -104,15 +105,7 @@ export async function POST(
 
   } catch (err) {
     if (debited) {
-      try {
-        await admin.rpc('refund_workspace_nodes', {
-          user_id_input: user.id,
-          amount:        DNA_EXTRACTION_COST,
-        })
-        console.warn(`[extract-dna] refund executado: ${DNA_EXTRACTION_COST} nodes para ${user.id}`)
-      } catch (refundErr) {
-        console.error('[extract-dna] FALHA NO REFUND (CRÍTICO):', refundErr)
-      }
+      await refundNodes(admin, user.id, DNA_EXTRACTION_COST, { module: 'extract-dna', jobTable: 'spaces', jobId: spaceId })
     }
 
     // Reverte status pra draft

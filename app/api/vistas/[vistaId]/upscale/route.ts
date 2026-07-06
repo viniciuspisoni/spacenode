@@ -8,6 +8,7 @@ import { fal } from '@fal-ai/client'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getUpscaleCost } from '@/lib/spaces/economy'
+import { refundNodes } from '@/lib/billing/refund-nodes'
 
 fal.config({ credentials: process.env.FAL_KEY })
 
@@ -132,8 +133,7 @@ export async function POST(
     })
   } catch (err) {
     if (debited) {
-      try { await admin.rpc('refund_workspace_nodes', { user_id_input: user.id, amount: cost }) }
-      catch (e) { console.error('[upscale] refund failed:', e) }
+      await refundNodes(admin, user.id, cost, { module: 'vistas/upscale', jobTable: 'vistas' })
     }
     if (newId) {
       await admin.from('vistas').update({

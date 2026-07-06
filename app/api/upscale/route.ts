@@ -17,6 +17,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { fal } from '@fal-ai/client'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { refundNodes } from '@/lib/billing/refund-nodes'
 import {
   computeUpscaleCost,
   finalProvider,
@@ -183,12 +184,7 @@ export async function POST(req: NextRequest) {
     console.error('[upscale] ERROR body  :', JSON.stringify(e?.body ?? e?.message ?? err))
 
     if (debited) {
-      try {
-        await admin.rpc('refund_workspace_nodes', { user_id_input: user.id, amount: cost })
-        console.warn('[upscale] refund executado:', cost, 'nodes →', user.id)
-      } catch (refundErr) {
-        console.error('[upscale] FALHA NO REFUND (CRÍTICO):', refundErr)
-      }
+      await refundNodes(admin, user.id, cost, { module: 'upscale' })
     }
 
     return NextResponse.json({ error: 'Erro ao processar imagem. Tente novamente.' }, { status: 500 })

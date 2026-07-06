@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { fal } from '@fal-ai/client'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { refundNodes } from '@/lib/billing/refund-nodes'
 import { requireVideoModel, getNodeCost } from '@/lib/video/models'
 import { buildArchitectureVideoPrompt, buildPromptFromLegacyInput, type FidelityMode } from '@/lib/video/promptBuilder'
 import { isSceneTypeId, type SceneTypeId } from '@/lib/video/scenes'
@@ -175,21 +176,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ url: outputUrl, inputUrl })
 
   } catch (err: unknown) {
-    // ── Refund best-effort em qualquer falha pós-débito (checa {error}) ───────
-    // Diferente do try/catch de outras rotas, aqui checamos o {error} da RPC:
-    // admin.rpc não lança em falha lógica, então um refund falho seria invisível.
+    // ── Refund VERIFICADO em qualquer falha pós-débito (helper checa {error}) ──
     if (debited && nodesToCharge > 0) {
-      const { error: refundError } = await admin.rpc('refund_workspace_nodes', {
-        user_id_input: user.id,
-        amount:        nodesToCharge,
-      })
-      if (refundError) {
-        console.error('[video] FALHA NO REFUND (CRÍTICO):', {
-          error: refundError, userId: user.id, amount: nodesToCharge,
-        })
-      } else {
-        console.warn('[video] Refund executado:', nodesToCharge, 'nodes para', user.id)
-      }
+      await refundNodes(admin, user.id, nodesToCharge, { module: 'video', jobTable: 'renders' })
     }
 
     const e = err as { status?: number; body?: unknown; message?: string }
