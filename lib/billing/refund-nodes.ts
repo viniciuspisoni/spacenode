@@ -51,6 +51,21 @@ export async function refundNodes(
       })
       return false
     }
+    // Livro-razão (best-effort; INERTE até a migration node_ledger existir). O
+    // UNIQUE(kind, job_table, job_id) previne registrar o mesmo refund 2×.
+    const { error: ledgerErr } = await admin.from('node_ledger').insert({
+      user_id:   userId,
+      delta:     amount,            // refund = crédito positivo
+      kind:      'refund',
+      source:    ctx.module,
+      job_table: ctx.jobTable ?? null,
+      job_id:    ctx.jobId ?? null,
+    })
+    // 42P01 = tabela ainda não criada; 23505 = duplicata (refund já registrado).
+    // Ambos esperados/inócuos — nunca afetam o refund em si.
+    if (ledgerErr && ledgerErr.code !== '42P01' && ledgerErr.code !== '23505') {
+      console.warn('[refund] node_ledger insert falhou (não crítico):', ledgerErr.message)
+    }
     return true
   } catch (e) {
     console.error('[refund] FALHA NO REFUND (exceção — nodes presos):', {
