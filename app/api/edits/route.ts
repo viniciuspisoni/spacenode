@@ -425,9 +425,13 @@ export async function GET() {
   // endpoint do provider — sai daqui como label de produto (mesma redação do
   // /api/history/detail). Consumidores: tab Edições do Histórico e
   // EditV2ImportModal (usa result_image_url).
+  // Defesa em profundidade: filtra explicitamente por user_id em vez de confiar
+  // só na RLS da tabela `edits` (cuja DDL/policy não está versionada no repo —
+  // CR-3 da auditoria 2026-07-03). Mesmo padrão de renders/list e folders/[id].
   const { data, error } = await supabase
     .from('edits')
     .select('id, user_id, source_image_url, result_image_url, mask_url, prompt, quality, nodes_cost, engine, source_type, source_id, mask_coverage, created_at')
+    .eq('user_id', user.id)
     .order('created_at', { ascending: false })
     .limit(60)
   if (error) {

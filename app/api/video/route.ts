@@ -37,7 +37,12 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
-  let inputUrl: string | undefined
+  const admin = createAdminClient()
+
+  // Estado pra refund: só refunda se o débito já passou (padrão do /api/generate).
+  let debited       = false
+  let nodesToCharge = 0
+  let inputUrl:    string | undefined
   let endImageUrl: string | undefined
 
   try {
@@ -67,24 +72,33 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `Modelo ${model.label} indisponível` }, { status: 400 })
     }
 
-    let nodeCost: number
     try {
-      nodeCost = getNodeCost(engineId, duration)
+      nodesToCharge = getNodeCost(engineId, duration)
     } catch {
       return NextResponse.json({ error: 'Duração inválida para este motor' }, { status: 400 })
     }
 
-    // ── Checa saldo ──────────────────────────────────────────────────────────
-    const admin = createAdminClient()
-    const { data: profile } = await admin
-      .from('profiles')
-      .select('credits')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile || profile.credits < nodeCost) {
-      return NextResponse.json({ error: 'Créditos insuficientes' }, { status: 402 })
+    // ── Débito atômico ANTES da geração (padrão do /api/generate) ─────────────
+    // consume_workspace_nodes cobra a bolsa do PAGADOR (dono do workspace) e é a
+    // autoridade de saldo — sem pré-check no `profiles.credits` do membro (que
+    // ignorava Lumens e a bolsa do escritório). P0001 = saldo insuficiente → 402;
+    // qualquer outro erro → 500. Nada é gerado sem débito confirmado: o vídeo
+    // (item mais caro) nunca sai de graça por corrida nem por erro de RPC engolido.
+    const { error: debitError } = await admin.rpc('consume_workspace_nodes', {
+      user_id_input: user.id,
+      amount:        nodesToCharge,
+    })
+    if (debitError) {
+      console.error('[video] consume_workspace_nodes RPC error:', debitError)
+      if (debitError.code === 'P0001') {
+        return NextResponse.json(
+          { error: `Nodes insuficientes. Necessários: ${nodesToCharge}.` },
+          { status: 402 },
+        )
+      }
+      return NextResponse.json({ error: 'Erro ao processar saldo.' }, { status: 500 })
     }
+    debited = true
 
     // ── Upload da(s) imagem(ns) ──────────────────────────────────────────────
     inputUrl = await fal.storage.upload(imageFile)
@@ -134,27 +148,50 @@ export async function POST(req: NextRequest) {
 
     // TODO: copy output video to permanent Supabase Storage before public production release.
     // Currently output_url is a CDN link with no documented retention SLA.
-    await Promise.all([
-      admin.from('renders').insert({
-        user_id:      user.id,
-        input_url:    inputUrl,
-        output_url:   outputUrl,
-        prompt:       built.prompt,
-        ambient:      'video',
-        style:        engineId,
-        lighting:     `${duration}s`,
-        cost_credits: nodeCost,
-        fal_request_id: falRequestId ?? null,
-        status:       'completed',
-        completed_at: new Date().toISOString(),
-      }),
-      // bolsa do escritório: cobra o dono do workspace ativo (individual = ele mesmo)
-      admin.rpc('consume_workspace_nodes', { user_id_input: user.id, amount: nodeCost }),
-    ])
+    //
+    // O débito já ocorreu ANTES da geração. Se o INSERT falhar, NÃO refundamos
+    // (o usuário recebeu o vídeo e foi cobrado corretamente) — só logamos pra
+    // reprocessar o histórico manualmente.
+    const { error: insertError } = await admin.from('renders').insert({
+      user_id:        user.id,
+      input_url:      inputUrl,
+      output_url:     outputUrl,
+      prompt:         built.prompt,
+      ambient:        'video',
+      style:          engineId,
+      lighting:       `${duration}s`,
+      nodes_charged:  nodesToCharge,
+      cost_credits:   nodesToCharge,
+      fal_request_id: falRequestId ?? null,
+      status:         'completed',
+      completed_at:   new Date().toISOString(),
+    })
+    if (insertError) {
+      console.error('[video] DB INSERT FALHOU (vídeo gerado e debitado — investigar):', {
+        error: insertError, userId: user.id, outputUrl,
+      })
+    }
 
     return NextResponse.json({ url: outputUrl, inputUrl })
 
   } catch (err: unknown) {
+    // ── Refund best-effort em qualquer falha pós-débito (checa {error}) ───────
+    // Diferente do try/catch de outras rotas, aqui checamos o {error} da RPC:
+    // admin.rpc não lança em falha lógica, então um refund falho seria invisível.
+    if (debited && nodesToCharge > 0) {
+      const { error: refundError } = await admin.rpc('refund_workspace_nodes', {
+        user_id_input: user.id,
+        amount:        nodesToCharge,
+      })
+      if (refundError) {
+        console.error('[video] FALHA NO REFUND (CRÍTICO):', {
+          error: refundError, userId: user.id, amount: nodesToCharge,
+        })
+      } else {
+        console.warn('[video] Refund executado:', nodesToCharge, 'nodes para', user.id)
+      }
+    }
+
     const e = err as { status?: number; body?: unknown; message?: string }
     console.error('[video] ERROR status:', e?.status)
     console.error('[video] ERROR body  :', JSON.stringify(e?.body ?? e?.message ?? err))
