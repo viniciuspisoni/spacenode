@@ -257,7 +257,12 @@ export async function POST(
 
   for (const r of results) {
     if (r.status === 'fulfilled') vistas.push(r.value)
-    else errors.push(r.reason?.message ?? String(r.reason))
+    else {
+      // Não vaza mensagem crua (Postgres/FAL) pro cliente — loga o detalhe e
+      // devolve mensagem genérica (AL-9).
+      console.error('[spaces.generate] vista falhou:', r.reason?.message ?? r.reason)
+      errors.push('Falha ao gerar uma das vistas. Tente novamente.')
+    }
   }
 
   const { data: balAfter } = await admin

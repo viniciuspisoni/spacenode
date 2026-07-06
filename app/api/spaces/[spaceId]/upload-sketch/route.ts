@@ -67,10 +67,7 @@ export async function POST(
 
   if (uploadErr) {
     console.error('[upload-sketch] storage upload failed:', uploadErr)
-    return NextResponse.json(
-      { error: `Erro ao salvar sketch: ${uploadErr.message}` },
-      { status: 500 },
-    )
+    return NextResponse.json({ error: 'Erro ao salvar sketch.' }, { status: 500 })
   }
 
   const { data: { publicUrl } } = admin.storage.from('space-mestres').getPublicUrl(key)

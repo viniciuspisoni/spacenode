@@ -175,10 +175,12 @@ export async function POST(
       if (r.status === 'fulfilled') vistas.push(r.value)
       else {
         const sk = chunk[idx]
+        // Não vaza mensagem crua pro cliente — loga o detalhe, devolve genérico (AL-9).
+        console.error('[spaces.angulo] sketch falhou:', sk.label, r.reason instanceof Error ? r.reason.message : r.reason)
         errors.push({
           sketch_url: sk.url,
           label:      sk.label,
-          error:      (r.reason instanceof Error ? r.reason.message : String(r.reason)),
+          error:      'Falha ao gerar. Tente novamente.',
         })
       }
     })

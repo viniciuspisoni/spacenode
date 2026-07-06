@@ -23,6 +23,12 @@ import {
 
 fal.config({ credentials: process.env.FAL_KEY })
 
+// AL-9: logs verbosos (prompt proprietário, URLs de imagem do cliente, payload
+// FAL) só em dev — em produção não vazam pros logs da Vercel.
+const devLog = (...args: unknown[]) => {
+  if (process.env.NODE_ENV !== 'production') console.log(...args)
+}
+
 // A Vercel mata a função no maxDuration. Precisa cobrir o maior FAL_TIMEOUT_MS
 // abaixo com folga, senão a geração lenta morre antes da nossa race e o usuário
 // recebe um 504 opaco em vez da mensagem tratada (+ refund).
@@ -204,19 +210,19 @@ export async function POST(req: NextRequest) {
     console.log('[generate] engine     :', engine, '→', falEndpoint)
     console.log('[generate] resolution :', resolution, '→', nodesToCharge, 'nodes')
     console.log('[generate] fidelity   :', `${fidelityLevel}${briefing ? ' (+briefing)' : ''}`)
-    console.log('[generate] anchor     :', hasAnchor ? anchorUrl : 'none')
-    console.log('[generate] refine     :', refinementText?.trim() || 'none')
-    console.log('[generate] prompt     :', finalPrompt)
+    devLog('[generate] anchor     :', hasAnchor ? anchorUrl : 'none')
+    devLog('[generate] refine     :', refinementText?.trim() || 'none')
+    devLog('[generate] prompt     :', finalPrompt)
 
     if (providedInputUrl) {
       inputUrl = providedInputUrl
-      console.log('[generate] inputUrl   : reused', inputUrl)
+      devLog('[generate] inputUrl   : reused', inputUrl)
     } else {
       const base64Data = imageBase64!.includes(',') ? imageBase64!.split(',')[1] : imageBase64!
       const buffer     = Buffer.from(base64Data, 'base64')
       const imageFile  = new File([buffer], 'input.jpg', { type: 'image/jpeg' })
       inputUrl = await fal.storage.upload(imageFile)
-      console.log('[generate] inputUrl   :', inputUrl)
+      devLog('[generate] inputUrl   :', inputUrl)
     }
 
     // Anchor vai PRIMEIRO em image_urls — Gemini/NB2/GPT Image extraem
@@ -231,7 +237,7 @@ export async function POST(req: NextRequest) {
       ...falParamsForEngine(engine, resolution),
     }
 
-    console.log('[generate] FAL INPUT  :', JSON.stringify(falInput))
+    devLog('[generate] FAL INPUT  :', JSON.stringify(falInput))
 
     const generationStartedAt = Date.now()
     const result = await Promise.race([
@@ -243,13 +249,13 @@ export async function POST(req: NextRequest) {
 
     const generationDurationMs = Date.now() - generationStartedAt
 
-    console.log('[generate] FAL OUTPUT :', JSON.stringify(result.data))
+    devLog('[generate] FAL OUTPUT :', JSON.stringify(result.data))
     const images = (result.data as { images: { url: string }[] }).images
     outputUrl = images[0].url
     // Rastreabilidade: o id do request da fal liga esta linha à entrada no
     // painel da fal.ai (cruzar quem gerou o quê). Ver coluna renders.fal_request_id.
     const falRequestId = (result as { requestId?: string }).requestId ?? null
-    console.log('[generate] outputUrl  :', outputUrl, '| fal req:', falRequestId)
+    devLog('[generate] outputUrl  :', outputUrl, '| fal req:', falRequestId)
 
     // ── Persistência ─────────────────────────────────────────────────────────
     //
