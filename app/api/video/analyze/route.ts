@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { fal } from '@fal-ai/client'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { rateLimit } from '@/lib/rate-limit'
 import { analyzeVideoReferenceImage } from '@/lib/video/analyzeReference'
 
 fal.config({ credentials: process.env.FAL_KEY })
@@ -16,6 +18,9 @@ export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+
+  const rl = await rateLimit(createAdminClient(), `video-analyze:${user.id}`, 60, 60)
+  if (!rl.allowed) return NextResponse.json({ error: 'Muitas requisições. Aguarde um momento.' }, { status: 429 })
 
   try {
     const formData = await req.formData()

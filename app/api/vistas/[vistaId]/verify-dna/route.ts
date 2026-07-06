@@ -6,6 +6,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { rateLimit } from '@/lib/rate-limit'
 import { verifyDna, getVisualDna } from '@/lib/spaces/dna'
 import type { Vista } from '@/lib/spaces/types'
 
@@ -17,6 +19,10 @@ export async function POST(
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+
+  // Rate limit (AL-2): Vision grátis, disparado fire-and-forget por geração.
+  const rl = await rateLimit(createAdminClient(), `verify-dna:${user.id}`, 60, 60)
+  if (!rl.allowed) return NextResponse.json({ error: 'Muitas requisições.' }, { status: 429 })
 
   // Carrega vista + DNA do Space
   const { data: vistaRow, error: vErr } = await supabase

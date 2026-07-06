@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { fal } from '@fal-ai/client'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { rateLimit } from '@/lib/rate-limit'
 import { analyzeImage } from '@/lib/fidelity-engine'
 
 fal.config({ credentials: process.env.FAL_KEY })
@@ -17,6 +19,11 @@ export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+
+  // Rate limit (AL-2): endpoint grátis (custo Vision por request). Inerte até a
+  // migration 20260703160000; fail-open.
+  const rl = await rateLimit(createAdminClient(), `analyze:${user.id}`, 60, 60)
+  if (!rl.allowed) return NextResponse.json({ error: 'Muitas requisições. Aguarde um momento.' }, { status: 429 })
 
   try {
     const { imageBase64 } = await req.json()

@@ -20,6 +20,7 @@ import sharp from 'sharp'
 import { fal } from '@fal-ai/client'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { rateLimit } from '@/lib/rate-limit'
 import { SURFACE_SEGMENTATION_ENABLED } from '@/lib/spaces/edit-router'
 import { callSam2Segment, callEvfSam } from '@/lib/spaces/engines'
 import {
@@ -68,6 +69,10 @@ export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+
+  // Rate limit (AL-2): SAM2/evf-sam grátis (custo FAL por request).
+  const rl = await rateLimit(createAdminClient(), `segment:${user.id}`, 60, 60)
+  if (!rl.allowed) return NextResponse.json({ error: 'Muitas requisições. Aguarde um momento.' }, { status: 429 })
 
   const body = await req.json().catch(() => null) as Body | null
   const imageUrl    = typeof body?.image_url === 'string' ? body.image_url : null

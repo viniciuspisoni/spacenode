@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { rateLimit } from '@/lib/rate-limit'
 import { isQuality, isEditSourceType, type Quality, type EditSourceType } from '@/lib/spaces/types'
 import { isEditMode, type EditMode } from '@/lib/spaces/engines'
 import { isFidelityMode, type FidelityMode } from '@/lib/spaces/edit-prompts'
@@ -36,6 +37,11 @@ export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+
+  // Rate limit (AL-2): preview é debounced-frequente (sem IA), limite alto — só
+  // corta loop abusivo, não o uso normal do editor.
+  const rl = await rateLimit(createAdminClient(), `edit-preview:${user.id}`, 180, 60)
+  if (!rl.allowed) return NextResponse.json({ error: 'Muitas requisições.' }, { status: 429 })
 
   const body = await req.json().catch(() => null) as PreviewBody | null
   if (!body) return NextResponse.json({ error: 'Body inválido' }, { status: 400 })
