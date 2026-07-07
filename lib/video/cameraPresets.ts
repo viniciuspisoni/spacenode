@@ -11,6 +11,7 @@ import type { SceneArchetype } from './scenes'
 
 export type CameraMotionId =
   | 'dolly-in-soft'
+  | 'dolly-out-soft'
   | 'lateral-tracking'
   | 'orbit-soft'
   | 'vertical-pan'
@@ -29,7 +30,10 @@ export type CameraMotionId =
   | 'lighting-reveal'
   | 'golden-hour'
 
-export type CameraIntensity = 'subtle' | 'normal' | 'pronounced'
+// 4 níveis de intensidade expostos na UI como Sutil / Moderado /
+// Cinematográfico / Dinâmico. 'cinematic' fica entre normal e pronounced —
+// movimento com linguagem de cinema, mas ainda contido para archviz.
+export type CameraIntensity = 'subtle' | 'normal' | 'cinematic' | 'pronounced'
 
 export interface CameraMotion {
   id:                    CameraMotionId
@@ -58,6 +62,20 @@ export const CAMERA_MOTIONS: Record<CameraMotionId, CameraMotion> = {
     recommendedAspectRatio: '16:9',
     intensityHint:          'subtle',
     group:                  'interior',
+  },
+
+  'dolly-out-soft': {
+    id:                     'dolly-out-soft',
+    label:                  'Afastamento suave',
+    description:            'Câmera recua devagar, revelando o ambiente por inteiro.',
+    promptFragment:
+      'very slow dolly backward pulling away from the scene, gradually revealing the full space, ' +
+      'gentle parallax between foreground and background, controlled and restrained motion',
+    recommendedFor:         ['interior', 'facade', 'commercial'],
+    recommendedDuration:    '8',
+    recommendedAspectRatio: '16:9',
+    intensityHint:          'subtle',
+    group:                  'generic',
   },
 
   'lateral-tracking': {
@@ -353,11 +371,33 @@ export const CAMERA_GROUPS: Record<CameraMotion['group'], { label: string; descr
     description: 'Movimentos versáteis',
     motionIds: [
       'orbit-soft',
+      'dolly-out-soft',
       'lateral-tracking',
       'vertical-pan',
     ],
   },
 }
+
+// ── Lista curada da superfície principal ─────────────────────────────────────
+// Um movimento por intenção, com linguagem acessível para arquitetos —
+// nada de jargão de cinema. O catálogo completo (18 movimentos agrupados)
+// continua disponível nos Ajustes avançados.
+
+export interface SimpleMotionChoice {
+  id:          CameraMotionId
+  label:       string          // pode divergir do label do catálogo (linguagem simplificada)
+  description: string
+}
+
+export const SIMPLE_MOTION_CHOICES: SimpleMotionChoice[] = [
+  { id: 'dolly-in-soft',      label: 'Aproximação suave',           description: 'A câmera avança devagar em direção ao ambiente.' },
+  { id: 'dolly-out-soft',     label: 'Afastamento suave',           description: 'A câmera recua, revelando o espaço por inteiro.' },
+  { id: 'horizontal-pan',     label: 'Panorâmica lateral',          description: 'Giro suave revelando a composição ampla.' },
+  { id: 'vertical-pan',       label: 'Movimento vertical',          description: 'Do chão ao teto, destacando a verticalidade.' },
+  { id: 'lateral-tracking',   label: 'Travelling leve',             description: 'A câmera desliza em paralelo ao ambiente.' },
+  { id: 'dolly-in-cinematic', label: 'Profundidade cinematográfica', description: 'Aproximação marcada, com ritmo de cinema.' },
+  { id: 'static-ambient',     label: 'Câmera quase estática',       description: 'Sem deslocamento — só a luz e o ambiente respiram.' },
+]
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 

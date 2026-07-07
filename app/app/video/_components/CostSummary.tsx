@@ -1,59 +1,73 @@
 'use client'
 
-// Resumo de custo + saldo + botão de geração — rodapé fixo do painel
-// direito. Implementa a regra do brief:
-//   - Se ainda não há imagem (modelo escolhido?), mostrar
-//     "Custo calculado após configuração"
-//   - Caso contrário, mostrar custo real
+// Rodapé fixo do painel: custo, saldo, estimativa de tempo e o CTA.
+// O custo aparece assim que a configuração existe (motor + duração já
+// têm default) — transparência antes do clique, sem surpresa.
 
 interface Props {
   nodeCost:      number
   credits:       number
-  ready:         boolean        // tem imagem + modelo escolhido
+  ready:         boolean        // tem imagem carregada
   isLoading:     boolean
   isAnalyzing:   boolean
-  disabledHint?: string         // ex: "Carregue uma imagem primeiro"
+  estimateLabel?: string        // ex: "2–4 min"
   onSubmit:      () => void
 }
 
 export default function CostSummary({
-  nodeCost, credits, ready, isLoading, isAnalyzing, disabledHint, onSubmit,
+  nodeCost, credits, ready, isLoading, isAnalyzing, estimateLabel, onSubmit,
 }: Props) {
-  const insufficient = ready && credits < nodeCost
+  const insufficient = credits < nodeCost
   const canSubmit    = ready && !insufficient && !isLoading && !isAnalyzing
 
-  const buttonLabel = isLoading       ? 'Gerando vídeo…'
-                    : isAnalyzing     ? 'Analisando imagem…'
-                    : insufficient    ? 'Saldo insuficiente'
-                    : !ready          ? 'Carregue uma imagem'
-                    :                   'Animar projeto'
+  const buttonLabel = isLoading    ? 'Gerando vídeo…'
+                    : isAnalyzing  ? 'Analisando imagem…'
+                    : !ready       ? 'Envie uma imagem para começar'
+                    : insufficient ? 'Saldo insuficiente'
+                    :                'Gerar vídeo'
 
   return (
     <div style={{
-      padding:    '16px 24px',
+      padding:    '14px 24px 16px',
       borderTop:  '0.5px solid var(--color-border)',
       flexShrink: 0,
+      background: 'var(--color-bg)',
     }}>
       <div style={{
         display:        'flex',
-        alignItems:     'center',
+        alignItems:     'baseline',
+        justifyContent: 'space-between',
+        marginBottom:   4,
+      }}>
+        <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+          Custo desta geração
+        </div>
+        <div style={{
+          fontSize:      13,
+          fontWeight:    600,
+          letterSpacing: '-0.01em',
+          color:         'var(--color-text-primary)',
+          fontVariantNumeric: 'tabular-nums',
+        }}>
+          {nodeCost} <span style={{ fontSize: 10.5, fontWeight: 500, color: 'var(--color-text-secondary)' }}>Nodes</span>
+        </div>
+      </div>
+
+      <div style={{
+        display:        'flex',
+        alignItems:     'baseline',
         justifyContent: 'space-between',
         marginBottom:   12,
       }}>
-        <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
-          {ready ? (
-            <>Custo: <span style={{ color: 'var(--color-text-secondary)', fontWeight: 500 }}>{nodeCost} Nodes</span></>
-          ) : (
-            <span style={{ color: 'var(--color-text-tertiary)' }}>
-              Custo calculado após configuração
-            </span>
-          )}
+        <div style={{ fontSize: 10.5, color: 'var(--color-text-tertiary)' }}>
+          {estimateLabel ? `Fica pronto em ~${estimateLabel}` : 'Geração em poucos minutos'}
         </div>
-        <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+        <div style={{ fontSize: 10.5, color: 'var(--color-text-tertiary)' }}>
           Saldo:{' '}
           <span style={{
-            color: credits > 0 ? 'var(--color-text-secondary)' : 'var(--color-error)',
+            color: insufficient ? 'var(--color-error)' : 'var(--color-text-secondary)',
             fontWeight: 500,
+            fontVariantNumeric: 'tabular-nums',
           }}>
             {credits} Nodes
           </span>
@@ -64,7 +78,6 @@ export default function CostSummary({
         type="button"
         onClick={onSubmit}
         disabled={!canSubmit}
-        title={!canSubmit && disabledHint ? disabledHint : undefined}
         style={{
           width:         '100%',
           padding:       '13px 20px',
@@ -82,14 +95,24 @@ export default function CostSummary({
         {buttonLabel}
       </button>
 
-      {!ready && (
+      {insufficient && (
+        <div style={{
+          fontSize:  10.5,
+          color:     'var(--color-error)',
+          marginTop: 8,
+          textAlign: 'center',
+        }}>
+          Faltam {nodeCost - credits} Nodes para esta configuração.
+        </div>
+      )}
+      {!insufficient && !ready && (
         <div style={{
           fontSize:  10,
           color:     'var(--color-text-tertiary)',
           marginTop: 8,
           textAlign: 'center',
         }}>
-          A SpaceNode sugere modelo, câmera e duração após receber a imagem.
+          O vídeo preserva geometria, materiais e mobiliário do projeto.
         </div>
       )}
     </div>

@@ -20,6 +20,7 @@ export interface BuildVideoPromptInput {
   atmosphere?:   string                   // ex: "golden hour", "morning light"
   duration?:     string                   // só usado para tunar pacing textual
   hasEndFrame?:  boolean
+  avoidPeople?:  boolean                  // reforça cena sem pessoas (prompt + negative)
 }
 
 export interface BuiltVideoPrompt {
@@ -58,8 +59,19 @@ const FIDELITY_DIRECTIVES: Record<FidelityMode, string> = {
 const INTENSITY_PREFIXES: Record<CameraIntensity, string> = {
   subtle:     'Barely perceptible motion, ultra slow contemplative pace.',
   normal:     '',
+  cinematic:
+    'Elegant cinematic camera language, smooth confident movement with anamorphic depth, ' +
+    'deliberate film-like pacing, still controlled and restrained.',
   pronounced: 'Pronounced cinematic motion, more dynamic camera movement, dramatic pacing.',
 }
+
+// Diretiva opcional — cena sem pessoas (comum em archviz comercial).
+const AVOID_PEOPLE_DIRECTIVE =
+  'The scene must remain unpopulated: no people, no human figures, no silhouettes, ' +
+  'no reflections of people.'
+
+const AVOID_PEOPLE_NEGATIVE =
+  'people, person, human figures, crowds, silhouettes of people, walking people, hands'
 
 // Negative prompt expandido — cobre artefatos clássicos de archviz + interior.
 // Note: Seedance 2.0 ignora negative_prompt. O adapter decide se passa adiante.
@@ -130,6 +142,11 @@ export function buildArchitectureVideoPrompt(input: BuildVideoPromptInput): Buil
   // 8. Preservação arquitetônica (sempre)
   parts.push(FIDELITY_DIRECTIVES[fidelityMode])
 
+  // 8b. Sem pessoas (opcional)
+  if (input.avoidPeople) {
+    parts.push(AVOID_PEOPLE_DIRECTIVE)
+  }
+
   // 9. Sufixo arch (sempre)
   parts.push(ARCH_SUFFIX)
 
@@ -142,7 +159,9 @@ export function buildArchitectureVideoPrompt(input: BuildVideoPromptInput): Buil
 
   return {
     prompt,
-    negativePrompt: NEGATIVE_PROMPT,
+    negativePrompt: input.avoidPeople
+      ? `${NEGATIVE_PROMPT}, ${AVOID_PEOPLE_NEGATIVE}`
+      : NEGATIVE_PROMPT,
   }
 }
 

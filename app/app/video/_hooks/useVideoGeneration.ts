@@ -1,17 +1,19 @@
 'use client'
 
 // Hook que dispara a geração de vídeo via /api/video.
-// Envia todos os parâmetros novos (cameraMotion, fidelity, atmosphere,
-// endImage, aspectRatio) — o endpoint aceita opcionalmente e degrada
-// para o caminho legacy se faltarem.
+// Envia a configuração completa do fluxo novo (preset, movimento resolvido,
+// formato explícito, intensidade, fidelidade, atmosfera, sem-pessoas,
+// frame final). O endpoint aceita tudo opcionalmente e degrada para o
+// caminho legacy se faltarem campos.
 
 import { useCallback } from 'react'
-import { CAMERA_MOTIONS } from '@/lib/video/cameraPresets'
-import type { AnimateState, AnimateDispatch } from './useAnimateState'
+import { resolveMotion, type AnimateState, type AnimateDispatch } from './useAnimateState'
 
 interface GenerateResponse {
-  url:      string
-  inputUrl: string
+  url:       string
+  inputUrl:  string
+  credits?:  number   // saldo real pós-débito (quando o servidor informa)
+  error?:    string
 }
 
 export function useVideoGeneration(
@@ -24,6 +26,8 @@ export function useVideoGeneration(
 
     dispatch({ type: 'startGenerating' })
 
+    const motion = resolveMotion(state)
+
     try {
       const body = new FormData()
       body.append('image',        state.imageFile)
@@ -32,17 +36,19 @@ export function useVideoGeneration(
       body.append('scene',        state.sceneType)
       body.append('intensity',    state.intensity)
       body.append('prompt',       state.userPrompt)
-      body.append('cameraMotion', state.cameraMotion)
+      body.append('cameraMotion', motion.id)
       body.append('fidelity',     state.fidelityMode)
+      body.append('videoType',    state.videoType)
+      // Formato agora é escolha explícita do usuário — 'auto' mantém a
+      // proporção da imagem. (Antes era derivado do preset de movimento,
+      // o que podia gerar um 9:16 inesperado.)
+      body.append('aspectRatio',  state.aspectRatio)
+      if (state.avoidPeople)  body.append('avoidPeople', '1')
       if (state.atmosphere)   body.append('atmosphere', state.atmosphere)
       if (state.endImageFile) body.append('endImage',   state.endImageFile)
-      const motion = CAMERA_MOTIONS[state.cameraMotion]
-      if (motion?.recommendedAspectRatio) {
-        body.append('aspectRatio', motion.recommendedAspectRatio)
-      }
 
       const res = await fetch('/api/video', { method: 'POST', body })
-      const data = (await res.json()) as GenerateResponse & { error?: string }
+      const data = (await res.json()) as GenerateResponse
 
       if (!res.ok || !data.url) {
         dispatch({ type: 'generationError', message: data.error ?? 'Erro ao gerar vídeo.' })
@@ -52,15 +58,22 @@ export function useVideoGeneration(
       dispatch({
         type:   'generationSuccess',
         result: {
-          outputUrl: data.url,
-          inputUrl:  data.inputUrl,
-          modelId:   state.modelId,
-          duration:  state.duration,
-          motionId:  state.cameraMotion,
-          sceneType: state.sceneType,
-          createdAt: Date.now(),
+          outputUrl:    data.url,
+          inputUrl:     data.inputUrl,
+          modelId:      state.modelId,
+          duration:     state.duration,
+          aspectRatio:  state.aspectRatio,
+          intensity:    state.intensity,
+          videoType:    state.videoType,
+          motionId:     motion.id,
+          sceneType:    state.sceneType,
+          nodesCharged: nodeCost,
+          createdAt:    Date.now(),
         },
-        newCredits: Math.max(0, state.credits - nodeCost),
+        // Prefere o saldo real informado pelo servidor; senão estima local.
+        newCredits: typeof data.credits === 'number'
+          ? data.credits
+          : Math.max(0, state.credits - nodeCost),
       })
     } catch (err) {
       console.error('[useVideoGeneration] falhou:', err)

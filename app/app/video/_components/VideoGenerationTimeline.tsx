@@ -21,12 +21,13 @@ function formatElapsed(s: number) {
 }
 
 interface Props {
-  preview:  string | null
-  modelId:  string
-  elapsed:  number
+  preview:    string | null
+  modelId:    string
+  elapsed:    number
+  configLine?: string   // ex: "Movimento Cinematográfico · Aproximação suave · 16:9 · 8s"
 }
 
-export default function VideoGenerationTimeline({ preview, modelId, elapsed }: Props) {
+export default function VideoGenerationTimeline({ preview, modelId, elapsed, configLine }: Props) {
   const model = getVideoModel(modelId)
   const estimatedMs = model?.estimatedGenerationMs ?? 180_000
   const progress = Math.min(0.97, (elapsed * 1000) / estimatedMs)
@@ -100,10 +101,24 @@ export default function VideoGenerationTimeline({ preview, modelId, elapsed }: P
             transition: 'width 0.4s linear',
           }} />
         </div>
+        {configLine && (
+          <div style={{
+            fontSize:      10.5,
+            color:         'var(--color-text-secondary)',
+            marginTop:     10,
+            textAlign:     'center',
+            letterSpacing: '-0.005em',
+            whiteSpace:    'nowrap',
+            overflow:      'hidden',
+            textOverflow:  'ellipsis',
+          }}>
+            {configLine}
+          </div>
+        )}
         <div style={{
           fontSize:   10.5,
           color:      'var(--color-text-tertiary)',
-          marginTop:  10,
+          marginTop:  configLine ? 6 : 10,
           textAlign:  'center',
           letterSpacing: '0.01em',
         }}>

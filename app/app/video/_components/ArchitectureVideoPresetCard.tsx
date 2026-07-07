@@ -55,7 +55,9 @@ export default function ArchitectureVideoPresetCard({ motion, active, onClick, c
 }
 
 // Glyph minimalista representando o movimento — abstrato, não literal.
-function MotionGlyph({ motionId, active }: { motionId: string; active: boolean }) {
+// Exportado: o MotionSelector (lista curada da superfície principal) usa
+// os mesmos glyphs para manter a linguagem visual única.
+export function MotionGlyph({ motionId, active }: { motionId: string; active: boolean }) {
   const stroke = active ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)'
   const size   = 16
   switch (motionId) {
@@ -65,6 +67,12 @@ function MotionGlyph({ motionId, active }: { motionId: string; active: boolean }
       return (
         <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
           <path d="M2 8 L13 8 M9 4 L13 8 L9 12" stroke={stroke} strokeWidth="1.4" strokeLinecap="round"/>
+        </svg>
+      )
+    case 'dolly-out-soft':
+      return (
+        <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+          <path d="M14 8 L3 8 M7 4 L3 8 L7 12" stroke={stroke} strokeWidth="1.4" strokeLinecap="round"/>
         </svg>
       )
     case 'lateral-tracking':

@@ -8,6 +8,17 @@
 import { useEffect, useState } from 'react'
 import { getVideoModel } from '@/lib/video/models'
 import { getCameraMotion } from '@/lib/video/cameraPresets'
+import { getVideoTypePreset } from '@/lib/video/videoPresets'
+
+// Configuração de produto persistida no config_snapshot (gerações novas).
+// Vídeos antigos não têm — a UI degrada para motor + duração.
+export interface VideoHistorySettings {
+  video_type:    string | null
+  camera_motion: string | null
+  aspect_ratio:  string | null
+  duration:      string | null
+  intensity:     string | null
+}
 
 export interface VideoHistoryItem {
   id:            string
@@ -18,6 +29,7 @@ export interface VideoHistoryItem {
   cost_credits:  number
   status:        string
   created_at:    string
+  settings:      VideoHistorySettings | null
 }
 
 interface Props {
@@ -101,10 +113,10 @@ function HistoryCard({
   onLeave: () => void
   onClick: () => void
 }) {
-  const model    = getVideoModel(item.style)
-  const motionId = undefined // motion não está persistido hoje (legado)
-  const motion   = motionId ? getCameraMotion(motionId) : undefined
-  const failed   = item.status === 'failed' || !item.output_url
+  const model  = getVideoModel(item.style)
+  const preset = item.settings?.video_type ? getVideoTypePreset(item.settings.video_type) : undefined
+  const motion = item.settings?.camera_motion ? getCameraMotion(item.settings.camera_motion) : undefined
+  const failed = item.status === 'failed' || !item.output_url
 
   return (
     <button
@@ -186,7 +198,7 @@ function HistoryCard({
         overflow:      'hidden',
         textOverflow:  'ellipsis',
       }}>
-        {model?.label ?? 'Animação'}
+        {preset?.label ?? model?.label ?? 'Animação'}
         {motion ? ` · ${motion.label}` : ''}
       </div>
       <div style={{

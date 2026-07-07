@@ -30,6 +30,10 @@ interface Props {
   open: boolean
   onClose: () => void
   onSelect: (url: string) => void
+  /** Inclui resultados do Ampliar na aba Renders (útil quando o destino é
+   *  vídeo/composição, onde a versão ampliada é a melhor base). Default off —
+   *  no Editar a imagem ampliada não é base de edição. */
+  includeUpscales?: boolean
 }
 
 /** Primeira URL plausível entre os nomes de coluna usados pelas superfícies
@@ -48,7 +52,7 @@ const EMPTY_COPY: Record<Tab, string> = {
   edits: 'Nenhuma edição anterior ainda.',
 }
 
-export function EditV2ImportModal({ open, onClose, onSelect }: Props) {
+export function EditV2ImportModal({ open, onClose, onSelect, includeUpscales }: Props) {
   const [tab, setTab] = useState<Tab>('renders')
   const [items, setItems] = useState<Record<Tab, Item[] | null>>({
     renders: null,
@@ -70,12 +74,14 @@ export function EditV2ImportModal({ open, onClose, onSelect }: Props) {
           const json = await res.json()
           if (!res.ok) throw new Error(json?.error)
           list = (json.renders ?? [])
-            // upscales/vídeos também moram em renders — não são base de edição
-            .filter((r: { ambient?: string | null }) => r.ambient !== 'upscale' && r.ambient !== 'video')
+            // vídeos também moram em renders — nunca são base de imagem.
+            // upscales entram só quando o chamador pede (includeUpscales).
+            .filter((r: { ambient?: string | null }) =>
+              r.ambient !== 'video' && (includeUpscales || r.ambient !== 'upscale'))
             .map((r: Record<string, unknown>) => ({
               id: String(r.id),
               url: pickUrl(r),
-              label: String(r.ambient ?? r.style ?? 'Render'),
+              label: r.ambient === 'upscale' ? 'Ampliada' : String(r.ambient ?? r.style ?? 'Render'),
               createdAt: String(r.created_at ?? ''),
             }))
             .filter((i: Item & { url: string | null }): i is Item => Boolean(i.url))
@@ -120,7 +126,7 @@ export function EditV2ImportModal({ open, onClose, onSelect }: Props) {
     return () => {
       cancelled = true
     }
-  }, [open, tab, items])
+  }, [open, tab, items, includeUpscales])
 
   if (!open) return null
   const current = items[tab]

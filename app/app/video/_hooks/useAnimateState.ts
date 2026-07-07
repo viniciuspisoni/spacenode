@@ -1,24 +1,42 @@
 'use client'
 
-// Estado compartilhado entre os 3 modos do AnimateClient. Mantemos tudo
-// em um único hook para evitar prop drilling e Context boilerplate.
-// Os 3 modos consomem o mesmo state — mudar de modo só altera quais
-// affordances aparecem no painel direito; a imagem e os parâmetros
-// continuam preenchidos.
+// Estado único do módulo Animar (fluxo single-page orientado a presets).
+//
+// Modelo mental:
+//   1. usuário envia a imagem base;
+//   2. escolhe o TIPO DE VÍDEO (preset de arquitetura) — que aplica defaults
+//      de motor, movimento, duração, formato e intensidade;
+//   3. ajusta o que quiser (movimento, formato, duração, intensidade, direção
+//      criativa) — escolhas explícitas NUNCA são sobrescritas pela análise;
+//   4. Ajustes avançados guardam o resto (fidelidade, cena, atmosfera,
+//      frame final, catálogo completo de movimentos, motor).
+//
+// A análise automática (quando a flag estiver ligada) contribui com:
+// tipo de cena detectado, prompt sugerido, notas de preservação e o
+// movimento usado quando "Automático" está selecionado.
 
-import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
+import { useEffect, useReducer, useRef } from 'react'
 import {
-  DEFAULT_VIDEO_MODEL_ID,
   getNodeCost,
   requireVideoModel,
   type VideoModel,
 } from '@/lib/video/models'
 import { SCENE_TYPES, type SceneTypeId } from '@/lib/video/scenes'
-import { CAMERA_MOTIONS, type CameraIntensity, type CameraMotionId } from '@/lib/video/cameraPresets'
+import {
+  CAMERA_MOTIONS,
+  type CameraIntensity,
+  type CameraMotion,
+  type CameraMotionId,
+} from '@/lib/video/cameraPresets'
+import {
+  DEFAULT_VIDEO_TYPE,
+  VIDEO_TYPE_PRESETS,
+  resolvePresetDefaults,
+  type MotionChoice,
+  type VideoTypeId,
+} from '@/lib/video/videoPresets'
 import type { FidelityMode } from '@/lib/video/promptBuilder'
 import type { VideoReferenceAnalysis } from '@/lib/video/analyzeReference'
-
-export type AnimateMode = 'animate' | 'camera' | 'guided'
 
 export type GenerationStatus =
   | 'idle'
@@ -33,14 +51,16 @@ export interface GenerationResult {
   inputUrl:     string
   modelId:      string
   duration:     string
+  aspectRatio:  string
+  intensity:    CameraIntensity
+  videoType:    VideoTypeId
   motionId?:    CameraMotionId
   sceneType?:   SceneTypeId
+  nodesCharged: number
   createdAt:    number
 }
 
 export interface AnimateState {
-  mode:             AnimateMode
-
   // Mídia
   imageFile:        File   | null
   imagePreview:     string | null
@@ -54,13 +74,16 @@ export interface AnimateState {
   analysisError:    string | null
 
   // Parâmetros
+  videoType:        VideoTypeId
   modelId:          string
   duration:         string
+  aspectRatio:      string           // 'auto' = manter proporção original
   sceneType:        SceneTypeId
-  cameraMotion:     CameraMotionId
+  motionChoice:     MotionChoice     // 'auto' | CameraMotionId explícito
   intensity:        CameraIntensity
   fidelityMode:     FidelityMode
   atmosphere:       string
+  avoidPeople:      boolean
   userPrompt:       string
 
   // Geração
@@ -74,19 +97,21 @@ export interface AnimateState {
 }
 
 type Action =
-  | { type: 'setMode';            mode: AnimateMode }
   | { type: 'setImage';           file: File | null; preview: string | null; wasCropped: boolean }
   | { type: 'setEndImage';        file: File | null; preview: string | null }
   | { type: 'startAnalyzing' }
   | { type: 'analysisDone';       analysis: VideoReferenceAnalysis; inputUrl: string }
   | { type: 'analysisFailed';     message: string }
+  | { type: 'applyPreset';        videoType: VideoTypeId }
   | { type: 'setModel';           modelId: string }
   | { type: 'setDuration';        duration: string }
+  | { type: 'setAspectRatio';     aspectRatio: string }
   | { type: 'setScene';           sceneType: SceneTypeId }
-  | { type: 'setCameraMotion';   motionId: CameraMotionId }
+  | { type: 'setMotionChoice';    motionChoice: MotionChoice }
   | { type: 'setIntensity';       intensity: CameraIntensity }
   | { type: 'setFidelity';        fidelityMode: FidelityMode }
   | { type: 'setAtmosphere';      atmosphere: string }
+  | { type: 'setAvoidPeople';     avoidPeople: boolean }
   | { type: 'setUserPrompt';      userPrompt: string }
   | { type: 'startGenerating' }
   | { type: 'generationSuccess'; result: GenerationResult; newCredits: number }
@@ -97,10 +122,9 @@ type Action =
   | { type: 'setCredits';         credits: number }
 
 function initialState(credits: number): AnimateState {
-  const model  = requireVideoModel(DEFAULT_VIDEO_MODEL_ID)
-  const motion = CAMERA_MOTIONS['dolly-in-soft']
+  const preset   = VIDEO_TYPE_PRESETS[DEFAULT_VIDEO_TYPE]
+  const defaults = resolvePresetDefaults(preset)
   return {
-    mode:            'animate',
     imageFile:       null,
     imagePreview:    null,
     imageWasCropped: false,
@@ -109,13 +133,16 @@ function initialState(credits: number): AnimateState {
     cachedInputUrl:  null,
     analysis:        null,
     analysisError:   null,
-    modelId:         model.id,
-    duration:        model.supportedDurations[model.supportedDurations.length - 1],
+    videoType:       preset.id,
+    modelId:         defaults.modelId,
+    duration:        defaults.duration,
+    aspectRatio:     defaults.aspectRatio,
     sceneType:       'living',
-    cameraMotion:    motion.id,
-    intensity:       'subtle',
-    fidelityMode:    'max',
+    motionChoice:    defaults.motionId,
+    intensity:       defaults.intensity,
+    fidelityMode:    defaults.fidelityMode,
     atmosphere:      '',
+    avoidPeople:     false,
     userPrompt:      '',
     status:          'idle',
     elapsed:         0,
@@ -127,9 +154,6 @@ function initialState(credits: number): AnimateState {
 
 function reducer(state: AnimateState, action: Action): AnimateState {
   switch (action.type) {
-    case 'setMode':
-      return { ...state, mode: action.mode }
-
     case 'setImage':
       return {
         ...state,
@@ -141,7 +165,7 @@ function reducer(state: AnimateState, action: Action): AnimateState {
         analysisError:   null,
         result:          null,
         error:           null,
-        status:          action.file ? 'idle' : 'idle',
+        status:          'idle',
       }
 
     case 'setEndImage':
@@ -156,41 +180,60 @@ function reducer(state: AnimateState, action: Action): AnimateState {
 
     case 'analysisDone': {
       const a = action.analysis
+      // A análise informa (cena, prompt sugerido, notas) mas não sobrescreve
+      // escolhas do usuário: o preset é dono de motor/duração/formato; o
+      // movimento sugerido só é usado quando 'Automático' está selecionado
+      // (resolvido na geração); o prompt sugerido vira botão "Usar sugestão".
       return {
         ...state,
         status:         'ready',
         analysis:       a,
         cachedInputUrl: action.inputUrl,
-        // Aplica sugestões só onde o usuário ainda não tocou.
         sceneType:      a.sceneType,
-        cameraMotion:   a.suggestedCameraMotion,
-        modelId:        a.suggestedModelId,
-        duration:       a.suggestedDuration,
-        // Prompt só sobrescreve se está vazio
-        userPrompt:     state.userPrompt || a.suggestedPrompt,
       }
     }
 
     case 'analysisFailed':
       return { ...state, status: 'ready', analysisError: action.message }
 
+    case 'applyPreset': {
+      const preset   = VIDEO_TYPE_PRESETS[action.videoType]
+      const defaults = resolvePresetDefaults(preset)
+      return {
+        ...state,
+        videoType:    preset.id,
+        modelId:      defaults.modelId,
+        duration:     defaults.duration,
+        aspectRatio:  defaults.aspectRatio,
+        motionChoice: defaults.motionId,
+        intensity:    defaults.intensity,
+        fidelityMode: defaults.fidelityMode,
+      }
+    }
+
     case 'setModel': {
       const m = requireVideoModel(action.modelId)
-      // Se a duração atual não é suportada pelo novo modelo, ajusta.
-      const dur = m.supportedDurations.includes(state.duration)
+      // Se a duração/formato atuais não são suportados pelo novo motor, ajusta.
+      const duration = m.supportedDurations.includes(state.duration)
         ? state.duration
         : m.supportedDurations[m.supportedDurations.length - 1]
-      return { ...state, modelId: action.modelId, duration: dur }
+      const aspectRatio = m.supportedAspectRatios.includes(state.aspectRatio)
+        ? state.aspectRatio
+        : 'auto'
+      return { ...state, modelId: action.modelId, duration, aspectRatio }
     }
 
     case 'setDuration':
       return { ...state, duration: action.duration }
 
+    case 'setAspectRatio':
+      return { ...state, aspectRatio: action.aspectRatio }
+
     case 'setScene':
       return { ...state, sceneType: action.sceneType }
 
-    case 'setCameraMotion':
-      return { ...state, cameraMotion: action.motionId }
+    case 'setMotionChoice':
+      return { ...state, motionChoice: action.motionChoice }
 
     case 'setIntensity':
       return { ...state, intensity: action.intensity }
@@ -200,6 +243,9 @@ function reducer(state: AnimateState, action: Action): AnimateState {
 
     case 'setAtmosphere':
       return { ...state, atmosphere: action.atmosphere }
+
+    case 'setAvoidPeople':
+      return { ...state, avoidPeople: action.avoidPeople }
 
     case 'setUserPrompt':
       return { ...state, userPrompt: action.userPrompt }
@@ -235,6 +281,24 @@ function reducer(state: AnimateState, action: Action): AnimateState {
   }
 }
 
+// ── Resolução do movimento "Automático" ──────────────────────────────────────
+// Ordem: escolha explícita → sugestão da análise → default do preset →
+// default do tipo de cena. Sempre devolve um movimento concreto.
+
+export function resolveMotion(state: AnimateState): CameraMotion {
+  if (state.motionChoice !== 'auto') {
+    return CAMERA_MOTIONS[state.motionChoice]
+  }
+  if (state.analysis?.suggestedCameraMotion) {
+    return CAMERA_MOTIONS[state.analysis.suggestedCameraMotion]
+  }
+  const presetMotion = VIDEO_TYPE_PRESETS[state.videoType].defaults.motionId
+  if (presetMotion !== 'auto') {
+    return CAMERA_MOTIONS[presetMotion]
+  }
+  return CAMERA_MOTIONS[SCENE_TYPES[state.sceneType].defaultMotionId as CameraMotionId]
+}
+
 // ── Hook principal ──────────────────────────────────────────────────────────
 
 export function useAnimateState(initialCredits: number) {
@@ -253,6 +317,7 @@ export function useAnimateState(initialCredits: number) {
 
   // Derivados úteis
   const model: VideoModel = requireVideoModel(state.modelId)
+  const resolvedMotion    = resolveMotion(state)
   const nodeCost = (() => {
     try { return getNodeCost(state.modelId, state.duration) }
     catch { return 0 }
@@ -267,6 +332,7 @@ export function useAnimateState(initialCredits: number) {
     state,
     dispatch,
     model,
+    resolvedMotion,
     nodeCost,
     canGenerate,
   }

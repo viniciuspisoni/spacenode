@@ -158,9 +158,9 @@ function PresetGrid({
                 position: 'absolute', top: 6, right: 6,
                 fontSize: 8, fontWeight: 700, letterSpacing: '0.08em',
                 textTransform: 'uppercase',
-                color: '#86efac',
-                background: 'rgba(20,30,25,0.85)',
-                border: '1px solid rgba(134,239,172,0.25)',
+                color: 'var(--color-accent-green)',
+                background: 'var(--color-accent-green-bg)',
+                border: '1px solid var(--color-accent-green-border)',
                 padding: '2px 6px', borderRadius: 20,
               }}>
                 Sugerido
