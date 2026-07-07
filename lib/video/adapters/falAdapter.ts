@@ -93,6 +93,7 @@ export const falAdapter: VideoAdapter = {
 
     return {
       outputUrl,
+      provider:  'fal',
       metadata:  result.data as Record<string, unknown>,
       requestId: (result as { requestId?: string }).requestId ?? null,
     }

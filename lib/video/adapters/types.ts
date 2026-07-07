@@ -14,13 +14,15 @@ export interface VideoGenerationRequest {
   aspectRatio?:    string                // 'auto', '16:9', '9:16', '1:1'
   resolution?:     string                // '1080p'
   generateAudio?:  boolean               // default false
+  userId?:         string                // p/ adapters que re-hospedam output no Storage
 }
 
 export interface VideoGenerationResult {
   outputUrl:    string
   thumbnailUrl?: string
+  provider?:   string                    // quem gerou de fato ('fal' | 'vertex') — log/telemetria
   metadata?:   Record<string, unknown>   // payload bruto do provider, para debug
-  requestId?:  string | null             // id do request fal — rastreabilidade
+  requestId?:  string | null             // id do request/operation — rastreabilidade
 }
 
 export interface VideoAdapter {
