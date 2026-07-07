@@ -14,7 +14,10 @@
 
 import { VIDEO_FLAGS } from './flags'
 
-export type VideoProviderId = 'fal' | 'google' | 'omni'
+// 'vertex' não tem modelo próprio no catálogo: é um provider alternativo do
+// MESMO Veo "Cinemático" (conta GCP do dono), selecionado pelo facade dos
+// adapters quando VERTEX_VEO_ENABLED=1. Catálogo, presets e preço não mudam.
+export type VideoProviderId = 'fal' | 'google' | 'omni' | 'vertex'
 
 export type VideoInputKind =
   | 'image'        // imagem inicial obrigatória

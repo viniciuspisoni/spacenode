@@ -146,9 +146,10 @@ export async function POST(req: NextRequest) {
         })
 
     // ── Chama o adapter ──────────────────────────────────────────────────────
+    // (Veo pode sair via fal OU via Vertex na conta GCP — ver adapters/index.)
     const generationStartedAt = Date.now()
     const adapter = getAdapterForModel(engineId)
-    const { outputUrl, requestId: falRequestId } = await adapter.generate({
+    const { outputUrl, requestId: falRequestId, provider: usedProvider } = await adapter.generate({
       modelId:        engineId,
       imageUrl:       inputUrl,
       endImageUrl,
@@ -158,6 +159,7 @@ export async function POST(req: NextRequest) {
       aspectRatio,
       resolution,
       generateAudio:  false,
+      userId:         user.id,
     })
     const generationDurationMs = Date.now() - generationStartedAt
 
@@ -207,7 +209,7 @@ export async function POST(req: NextRequest) {
       duration_ms:  generationDurationMs,
       retry_count:  0,
       generation_log: {
-        provider:      'fal',
+        provider:      usedProvider ?? 'fal',
         endpoint:      engineId,
         request_id:    falRequestId ?? null,
         parameters:    { duration, aspect_ratio: aspectRatio ?? 'auto', resolution: resolution ?? '1080p', generate_audio: false },
