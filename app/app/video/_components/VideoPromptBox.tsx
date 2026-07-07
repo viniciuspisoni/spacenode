@@ -1,8 +1,9 @@
 'use client'
 
-// Caixa de prompt do usuário — agora chamada "Direção da cena" no copy.
-// Inclui dica didática como placeholder e botão opcional "Usar sugestão"
-// quando há prompt sugerido pela análise.
+// Direção criativa — campo opcional de texto livre. Complementa (nunca
+// substitui) as diretivas de preservação injetadas pelo promptBuilder.
+// Quando a análise da imagem sugere uma direção, aparece o botão
+// "Usar sugestão".
 
 interface Props {
   value:           string
@@ -22,7 +23,7 @@ export default function VideoPromptBox({
         marginBottom: 8,
       }}>
         <Label>
-          Direção da cena
+          Direção criativa
           <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, opacity: 0.55, marginLeft: 6 }}>
             (opcional)
           </span>
@@ -32,7 +33,7 @@ export default function VideoPromptBox({
             type="button"
             onClick={onUseSuggestion}
             style={{
-              fontSize: 10, color: '#86efac',
+              fontSize: 10, color: 'var(--color-accent-green)',
               background: 'none', border: 'none',
               padding: 0, cursor: 'pointer',
               letterSpacing: '-0.005em',
@@ -46,7 +47,7 @@ export default function VideoPromptBox({
       <textarea
         value={value}
         onChange={e => !disabled && onChange(e.target.value)}
-        placeholder="Ex: câmera avançando lentamente pela sala, mantendo geometria, materiais e iluminação originais."
+        placeholder="Ex: câmera entrando lentamente na sala, com movimento suave e cinematográfico, preservando materiais e mobiliário."
         rows={3}
         disabled={disabled}
         style={{

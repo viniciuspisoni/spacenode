@@ -15,6 +15,9 @@
 // completos e a UI exibe fallbacks ("Não registrado") em vez de quebrar.
 
 import { getVideoDisplayLabel } from '@/lib/renderLabels'
+import { getCameraMotion } from '@/lib/video/cameraPresets'
+import { getSceneType } from '@/lib/video/scenes'
+import { getVideoTypePreset } from '@/lib/video/videoPresets'
 
 export type GenerationKind = 'render' | 'edit' | 'vista'
 
@@ -206,6 +209,52 @@ export function scaleDisplayLabel(scale: string | null | undefined): string | nu
   return scale.replace('x', '×')
 }
 
+// ── Animar (config_snapshot module: 'animar') ──────────────────────────────────
+// Ids de produto → labels PT. Ids desconhecidos retornam null ("Não registrado").
+
+const VIDEO_INTENSITY_LABELS: Record<string, string> = {
+  subtle:     'Sutil',
+  normal:     'Moderado',
+  cinematic:  'Cinematográfico',
+  pronounced: 'Dinâmico',
+}
+
+const VIDEO_FIDELITY_LABELS: Record<string, string> = {
+  max:      'Máxima fidelidade',
+  balanced: 'Equilíbrio',
+  creative: 'Mais liberdade',
+}
+
+export function videoTypeDisplayLabel(id: string | null): string | null {
+  if (!id) return null
+  return getVideoTypePreset(id)?.label ?? null
+}
+
+export function cameraMotionDisplayLabel(id: string | null): string | null {
+  if (!id) return null
+  return getCameraMotion(id)?.label ?? null
+}
+
+export function videoFormatDisplayLabel(aspectRatio: string | null): string | null {
+  if (!aspectRatio) return null
+  return aspectRatio === 'auto' ? 'Original' : aspectRatio
+}
+
+export function videoIntensityDisplayLabel(id: string | null): string | null {
+  if (!id) return null
+  return VIDEO_INTENSITY_LABELS[id] ?? null
+}
+
+export function videoSceneDisplayLabel(id: string | null): string | null {
+  if (!id) return null
+  return getSceneType(id)?.label ?? null
+}
+
+export function videoFidelityDisplayLabel(id: string | null): string | null {
+  if (!id) return null
+  return VIDEO_FIDELITY_LABELS[id] ?? null
+}
+
 const SPACES_MODE_LABELS: Record<string, string> = {
   luz:      'Luz',
   clima:    'Clima',
@@ -341,6 +390,8 @@ function normalizeRender(res: DetailResponse): GenerationDetail {
     }
   } else if (isVideo) {
     // ── Animar — style = engine de vídeo, lighting = duração.
+    // Gerações novas trazem config_snapshot (module: 'animar') com a
+    // configuração de produto; antigas caem no par Configuração/Duração.
     moduleLabel = 'Animar'
     title       = 'Animação'
     engine      = null
@@ -350,6 +401,19 @@ function normalizeRender(res: DetailResponse): GenerationDetail {
       { label: 'Configuração', value: getVideoDisplayLabel(str(r.style) ?? '', str(r.lighting)) },
       { label: 'Duração',      value: str(r.lighting) },
     )
+    if (cs?.module === 'animar') {
+      config.push(
+        { label: 'Tipo de vídeo', value: videoTypeDisplayLabel(str(cs.video_type)) },
+        { label: 'Movimento',     value: cameraMotionDisplayLabel(str(cs.camera_motion)) },
+        { label: 'Formato',       value: videoFormatDisplayLabel(str(cs.aspect_ratio)) },
+        { label: 'Intensidade',   value: videoIntensityDisplayLabel(str(cs.intensity)) },
+        { label: 'Cena',          value: videoSceneDisplayLabel(str(cs.scene_type)), advanced: true },
+        { label: 'Fidelidade',    value: videoFidelityDisplayLabel(str(cs.fidelity)), advanced: true },
+      )
+      if (cs.avoid_people === true) {
+        config.push({ label: 'Sem pessoas', value: 'Sim', advanced: true })
+      }
+    }
   } else {
     // ── Renderizar
     moduleLabel = 'Renderizar'

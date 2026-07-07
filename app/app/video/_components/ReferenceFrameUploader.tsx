@@ -119,7 +119,7 @@ export default function ReferenceFrameUploader({
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           {wasCropped ? (
-            <span style={{ fontSize: 10, color: 'rgba(255,200,50,0.65)' }}>
+            <span style={{ fontSize: 10, color: 'var(--color-warning)' }}>
               Recortada automaticamente
             </span>
           ) : <span />}

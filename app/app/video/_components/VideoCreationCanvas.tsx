@@ -1,12 +1,12 @@
 'use client'
 
-// Canvas grande à esquerda. Renderiza um dos 5 estados:
-//   empty       → EmptyAnimateState (convite ao upload)
-//   uploaded    → preview estático com badge "Pronto para animar"
+// Canvas grande à esquerda. Renderiza um dos estados:
+//   empty       → EmptyAnimateState (proposta de valor + upload)
+//   uploaded    → preview com badge e nota de preservação
 //   analyzing   → AnalyzingOverlay
 //   generating  → VideoGenerationTimeline
-//   success     → VideoResultActions
-//   error       → mensagem de erro com botão "Tentar novamente"
+//   success     → VideoResultActions (tela de resultado premium)
+//   error       → mensagem clara com ação de retry
 
 import EmptyAnimateState from './EmptyAnimateState'
 import AnalyzingOverlay from './AnalyzingOverlay'
@@ -18,25 +18,27 @@ import type { AnimateState } from '../_hooks/useAnimateState'
 
 interface Props {
   state:              AnimateState
+  configLine:         string   // resumo curto da config p/ estados de espera
   onImagePicked:      (file: File, preview: string, wasCropped: boolean) => void
   onImageError:       (message: string) => void
+  onPickFromHistory:  () => void
   onClearImage:       () => void
   onGenerateAgain:    () => void
-  onTryAnotherMotion: () => void
+  onAdjust:           () => void
   onUseAsReference:   () => void
-  onImprovePrompt:    () => void
   onClearError:       () => void
 }
 
 export default function VideoCreationCanvas({
   state,
+  configLine,
   onImagePicked,
   onImageError,
+  onPickFromHistory,
   onClearImage,
   onGenerateAgain,
-  onTryAnotherMotion,
+  onAdjust,
   onUseAsReference,
-  onImprovePrompt,
   onClearError,
 }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -60,6 +62,7 @@ export default function VideoCreationCanvas({
       <EmptyAnimateState
         isDragging={isDragging}
         onPick={() => fileInputRef.current?.click()}
+        onPickFromHistory={onPickFromHistory}
       />
       <input
         ref={fileInputRef}
@@ -80,13 +83,19 @@ export default function VideoCreationCanvas({
       padding:     '24px 28px 40px',
       overflow:    'auto',
     }}>
-      <div style={{ width: '100%', maxWidth: 720 }}>
-        <div style={{ position: 'relative', borderRadius: 12, overflow: 'hidden' }}>
+      <div style={{ width: '100%', maxWidth: 760 }}>
+        <div style={{
+          position:     'relative',
+          borderRadius: 14,
+          overflow:     'hidden',
+          border:       '0.5px solid var(--color-border)',
+          background:   'var(--color-preview-bg)',
+        }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={state.imagePreview!}
-            alt="preview"
-            style={{ width: '100%', display: 'block', maxHeight: 460, objectFit: 'cover' }}
+            alt="Imagem base do projeto"
+            style={{ width: '100%', display: 'block', maxHeight: 480, objectFit: 'contain' }}
           />
           <div style={{
             position:     'absolute',
@@ -103,43 +112,64 @@ export default function VideoCreationCanvas({
             textTransform:'uppercase',
             backdropFilter: 'blur(8px)',
           }}>
-            {state.analysis ? 'Sugestões aplicadas' : 'Imagem carregada'}
+            {state.analysis ? 'Imagem analisada' : 'Pronto para gerar'}
           </div>
-          <button
-            type="button"
-            onClick={onClearImage}
-            style={{
-              position:     'absolute',
-              top:          12,
-              right:        12,
-              padding:      '5px 10px',
-              borderRadius: 6,
-              background:   'var(--color-scrim)',
-              border:       '0.5px solid rgba(255,255,255,0.15)',
-              color:        'rgba(255,255,255,0.75)',
-              fontSize:     11,
-              cursor:       'pointer',
-              backdropFilter: 'blur(8px)',
-            }}
-          >
-            Trocar imagem
-          </button>
+          <div style={{
+            position: 'absolute',
+            top:      12,
+            right:    12,
+            display:  'flex',
+            gap:      6,
+          }}>
+            <button
+              type="button"
+              onClick={onPickFromHistory}
+              style={overlayChipStyle}
+            >
+              Do histórico
+            </button>
+            <button
+              type="button"
+              onClick={onClearImage}
+              style={overlayChipStyle}
+            >
+              Trocar imagem
+            </button>
+          </div>
+        </div>
+
+        <div style={{
+          marginTop:      12,
+          display:        'flex',
+          alignItems:     'center',
+          justifyContent: 'center',
+          gap:            6,
+          fontSize:       11,
+          color:          'var(--color-text-tertiary)',
+          textAlign:      'center',
+        }}>
+          <svg width="11" height="11" viewBox="0 0 16 16" fill="none"
+            stroke="var(--color-accent-green-dim)" strokeWidth="1.8"
+            strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+            <path d="M3 8.5 L6.5 12 L13 4.5"/>
+          </svg>
+          Composição, materiais e mobiliário serão preservados no vídeo.
         </div>
 
         {state.imageWasCropped && (
           <div style={{
-            marginTop:  10,
+            marginTop:  8,
             fontSize:   11,
-            color:      'rgba(255,200,50,0.7)',
+            color:      'var(--color-warning)',
             textAlign:  'center',
           }}>
-            Imagem foi recortada para uma proporção compatível com os modelos de vídeo.
+            A imagem foi recortada para uma proporção compatível com os motores de vídeo.
           </div>
         )}
 
         {state.analysisError && (
           <div style={{
-            marginTop:  10,
+            marginTop:  8,
             fontSize:   11,
             color:      'var(--color-text-tertiary)',
             textAlign:  'center',
@@ -177,6 +207,7 @@ export default function VideoCreationCanvas({
         preview={state.imagePreview}
         modelId={state.modelId}
         elapsed={state.elapsed}
+        configLine={configLine}
       />
     </div>
   )
@@ -193,9 +224,8 @@ export default function VideoCreationCanvas({
       <VideoResultActions
         result={state.result}
         onGenerateAgain={onGenerateAgain}
-        onTryAnotherMotion={onTryAnotherMotion}
+        onAdjust={onAdjust}
         onUseAsReference={onUseAsReference}
-        onImprovePrompt={onImprovePrompt}
       />
     </div>
   )
@@ -228,6 +258,9 @@ export default function VideoCreationCanvas({
         <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', lineHeight: 1.55 }}>
           {state.error ?? 'Erro desconhecido. Tente novamente.'}
         </div>
+        <div style={{ fontSize: 11, color: 'var(--color-text-quaternary)', marginTop: 8 }}>
+          Se houve cobrança, os Nodes são devolvidos automaticamente.
+        </div>
         <button
           type="button"
           onClick={onClearError}
@@ -254,4 +287,15 @@ export default function VideoCreationCanvas({
   if (state.status === 'analyzing')  return renderAnalyzing()
   if (state.imageFile)               return renderUploaded()
   return renderEmpty()
+}
+
+const overlayChipStyle: React.CSSProperties = {
+  padding:      '5px 10px',
+  borderRadius: 6,
+  background:   'var(--color-scrim)',
+  border:       '0.5px solid rgba(255,255,255,0.15)',
+  color:        'rgba(255,255,255,0.75)',
+  fontSize:     11,
+  cursor:       'pointer',
+  backdropFilter: 'blur(8px)',
 }

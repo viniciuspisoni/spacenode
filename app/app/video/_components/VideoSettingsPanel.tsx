@@ -1,35 +1,32 @@
 'use client'
 
-// Container do painel direito. Cabeçalho + área rolável de configurações
-// (slot recebido como children, varia por modo) + rodapé com custo e
-// botão. Mantém a estrutura visual consistente entre os 3 modos.
+// Frame do painel de configuração (coluna direita no desktop; empilha
+// abaixo do canvas no mobile — ver .spn-animar-panel em globals.css).
+// Cabeçalho + área rolável (children) + rodapé fixo com custo e CTA.
 
 import CostSummary from './CostSummary'
 
 interface Props {
-  title:        string
-  subtitle?:    string
-  nodeCost:     number
-  credits:      number
-  ready:        boolean
-  isLoading:    boolean
-  isAnalyzing:  boolean
-  disabledHint?:string
-  onSubmit:     () => void
-  children:     React.ReactNode
+  title:         string
+  subtitle?:     string
+  nodeCost:      number
+  credits:       number
+  ready:         boolean
+  isLoading:     boolean
+  isAnalyzing:   boolean
+  estimateLabel?: string
+  onSubmit:      () => void
+  children:      React.ReactNode
 }
 
 export default function VideoSettingsPanel({
-  title, subtitle, nodeCost, credits, ready, isLoading, isAnalyzing, disabledHint, onSubmit, children,
+  title, subtitle, nodeCost, credits, ready, isLoading, isAnalyzing, estimateLabel, onSubmit, children,
 }: Props) {
+  // overflow fica na classe (.spn-animar-panel) p/ a media query mobile vencer
   return (
-    <aside style={{
-      width:          420,
-      flexShrink:     0,
+    <aside className="spn-animar-panel" style={{
       display:        'flex',
       flexDirection:  'column',
-      borderLeft:     '0.5px solid var(--color-border)',
-      overflow:       'hidden',
       background:     'var(--color-bg)',
     }}>
       <div style={{
@@ -60,10 +57,10 @@ export default function VideoSettingsPanel({
       <div style={{
         flex:           1,
         overflowY:      'auto',
-        padding:        '20px 24px',
+        padding:        '20px 24px 24px',
         display:        'flex',
         flexDirection:  'column',
-        gap:            22,
+        gap:            24,
       }}>
         {children}
       </div>
@@ -74,7 +71,7 @@ export default function VideoSettingsPanel({
         ready={ready}
         isLoading={isLoading}
         isAnalyzing={isAnalyzing}
-        disabledHint={disabledHint}
+        estimateLabel={estimateLabel}
         onSubmit={onSubmit}
       />
     </aside>

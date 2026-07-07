@@ -7,6 +7,7 @@ import { requireVideoModel, getNodeCost } from '@/lib/video/models'
 import { buildArchitectureVideoPrompt, buildPromptFromLegacyInput, type FidelityMode } from '@/lib/video/promptBuilder'
 import { isSceneTypeId, type SceneTypeId } from '@/lib/video/scenes'
 import { isCameraMotionId, type CameraMotionId, type CameraIntensity } from '@/lib/video/cameraPresets'
+import { isVideoTypeId } from '@/lib/video/videoPresets'
 import { getAdapterForModel } from '@/lib/video/adapters'
 
 fal.config({ credentials: process.env.FAL_KEY })
@@ -29,7 +30,7 @@ function pickFidelity(raw: string | null): FidelityMode {
 }
 
 function pickIntensity(raw: string | null): CameraIntensity {
-  if (raw === 'normal' || raw === 'pronounced') return raw
+  if (raw === 'normal' || raw === 'cinematic' || raw === 'pronounced') return raw
   return 'subtle'
 }
 
@@ -62,8 +63,12 @@ export async function POST(req: NextRequest) {
     const cameraMotion = (formData.get('cameraMotion') as string | null) ?? ''
     const fidelityRaw  = (formData.get('fidelity')    as string | null)
     const atmosphere   = (formData.get('atmosphere')  as string | null) ?? ''
-    const aspectRatio  = (formData.get('aspectRatio') as string | null) ?? undefined
+    const aspectRatioRaw = (formData.get('aspectRatio') as string | null) ?? undefined
     const resolution   = (formData.get('resolution')  as string | null) ?? undefined
+    // ── Campos do fluxo por presets (2026-07) ────────────────────────────────
+    const avoidPeople  = (formData.get('avoidPeople') as string | null) === '1'
+    const videoTypeRaw = (formData.get('videoType')   as string | null) ?? ''
+    const videoType    = isVideoTypeId(videoTypeRaw) ? videoTypeRaw : null
 
     if (!imageFile) return NextResponse.json({ error: 'Imagem obrigatória' }, { status: 400 })
 
@@ -78,6 +83,12 @@ export async function POST(req: NextRequest) {
     } catch {
       return NextResponse.json({ error: 'Duração inválida para este motor' }, { status: 400 })
     }
+
+    // Formato: clamp ao que o motor suporta — nunca repassa valor que o
+    // provider recusaria (evita 422 + refund por request malformado).
+    const aspectRatio = aspectRatioRaw && model.supportedAspectRatios.includes(aspectRatioRaw)
+      ? aspectRatioRaw
+      : undefined
 
     // ── Débito atômico ANTES da geração (padrão do /api/generate) ─────────────
     // consume_workspace_nodes cobra a bolsa do PAGADOR (dono do workspace) e é a
@@ -126,6 +137,7 @@ export async function POST(req: NextRequest) {
           atmosphere,
           duration,
           hasEndFrame: !!endImageUrl,
+          avoidPeople,
         })
       : buildPromptFromLegacyInput({
           scene:        sceneRaw,
@@ -134,6 +146,7 @@ export async function POST(req: NextRequest) {
         })
 
     // ── Chama o adapter ──────────────────────────────────────────────────────
+    const generationStartedAt = Date.now()
     const adapter = getAdapterForModel(engineId)
     const { outputUrl, requestId: falRequestId } = await adapter.generate({
       modelId:        engineId,
@@ -146,6 +159,7 @@ export async function POST(req: NextRequest) {
       resolution,
       generateAudio:  false,
     })
+    const generationDurationMs = Date.now() - generationStartedAt
 
     // TODO: copy output video to permanent Supabase Storage before public production release.
     // Currently output_url is a CDN link with no documented retention SLA.
@@ -153,7 +167,12 @@ export async function POST(req: NextRequest) {
     // O débito já ocorreu ANTES da geração. Se o INSERT falhar, NÃO refundamos
     // (o usuário recebeu o vídeo e foi cobrado corretamente) — só logamos pra
     // reprocessar o histórico manualmente.
-    const { error: insertError } = await admin.from('renders').insert({
+    //
+    // config_snapshot = configuração em nível de produto (Histórico/Reutilizar).
+    // generation_log  = arquivo técnico (admin) — migration 20260701, insert
+    // resiliente no padrão do /api/generate: se a coluna ainda não existir,
+    // regrava só com as colunas base para nunca perder o registro.
+    const baseRow = {
       user_id:        user.id,
       input_url:      inputUrl,
       output_url:     outputUrl,
@@ -166,14 +185,61 @@ export async function POST(req: NextRequest) {
       fal_request_id: falRequestId ?? null,
       status:         'completed',
       completed_at:   new Date().toISOString(),
-    })
-    if (insertError) {
+      config_snapshot: {
+        module:        'animar',
+        video_type:    videoType,
+        camera_motion: motionId ?? null,
+        scene_type:    sceneType ?? null,
+        intensity,
+        fidelity,
+        aspect_ratio:  aspectRatio ?? 'auto',
+        duration,
+        engine:        engineId,
+        atmosphere:    atmosphere || null,
+        avoid_people:  avoidPeople,
+        has_end_frame: !!endImageUrl,
+      },
+    }
+
+    const extendedRow = {
+      ...baseRow,
+      user_prompt:  userPrompt.trim() || null,
+      duration_ms:  generationDurationMs,
+      retry_count:  0,
+      generation_log: {
+        provider:      'fal',
+        endpoint:      engineId,
+        request_id:    falRequestId ?? null,
+        parameters:    { duration, aspect_ratio: aspectRatio ?? 'auto', resolution: resolution ?? '1080p', generate_audio: false },
+        duration_ms:   generationDurationMs,
+        nodes_charged: nodesToCharge,
+      },
+    }
+
+    let insertResult = await admin.from('renders').insert(extendedRow).select('id').single()
+    if (insertResult.error && (insertResult.error.code === 'PGRST204' || insertResult.error.code === '42703')) {
+      console.warn('[video] colunas de metadados ausentes — regravando com colunas base:', insertResult.error.message)
+      insertResult = await admin.from('renders').insert(baseRow).select('id').single()
+    }
+    if (insertResult.error) {
       console.error('[video] DB INSERT FALHOU (vídeo gerado e debitado — investigar):', {
-        error: insertError, userId: user.id, outputUrl,
+        error: insertResult.error, userId: user.id, outputUrl,
       })
     }
 
-    return NextResponse.json({ url: outputUrl, inputUrl })
+    // Saldo real pós-débito — a UI atualiza sem estimar (mesma view do /api/generate).
+    const { data: balance } = await admin
+      .from('user_node_balance')
+      .select('plan_balance')
+      .eq('user_id', user.id)
+      .single()
+
+    return NextResponse.json({
+      url:          outputUrl,
+      inputUrl,
+      credits:      balance?.plan_balance ?? undefined,
+      nodesCharged: nodesToCharge,
+    })
 
   } catch (err: unknown) {
     // ── Refund VERIFICADO em qualquer falha pós-débito (helper checa {error}) ──

@@ -19,7 +19,7 @@ interface Props {
 }
 
 const TONE_COLORS = {
-  green: { fg: '#86efac', border: 'rgba(34,197,94,0.3)' },
+  green: { fg: 'var(--color-accent-green)', border: 'var(--color-accent-green-border)' },
   blue:  { fg: '#93c5fd', border: 'rgba(59,130,246,0.3)' },
   muted: { fg: 'var(--color-text-tertiary)', border: 'var(--color-border-strong)' },
 }
@@ -33,7 +33,7 @@ export default function VideoModelSelector({
 }: Props) {
   return (
     <div>
-      <Label>Modelo</Label>
+      <Label>Motor de geração</Label>
 
       {showRecommendBanner && (
         <div style={{
@@ -55,10 +55,10 @@ export default function VideoModelSelector({
           padding:       '8px 10px',
           borderRadius:  6,
           marginBottom:  10,
-          background:    'rgba(134,239,172,0.06)',
-          border:        '1px solid rgba(134,239,172,0.15)',
+          background:    'var(--color-accent-green-bg)',
+          border:        '1px solid var(--color-accent-green-border)',
           fontSize:      11,
-          color:         '#86efac',
+          color:         'var(--color-accent-green)',
           letterSpacing: '-0.005em',
         }}>
           Sugerido com base na imagem: {VIDEO_MODELS[recommendedId]?.label}
@@ -142,9 +142,9 @@ function ModelRow({
             <span style={{
               fontSize: 8, fontWeight: 700, letterSpacing: '0.08em',
               textTransform: 'uppercase',
-              color: '#86efac',
-              background: 'rgba(134,239,172,0.10)',
-              border: '1px solid rgba(134,239,172,0.25)',
+              color: 'var(--color-accent-green)',
+              background: 'var(--color-accent-green-bg)',
+              border: '1px solid var(--color-accent-green-border)',
               padding: '2px 6px', borderRadius: 20,
             }}>
               Sugerido
