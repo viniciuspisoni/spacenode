@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { EditV2Canvas, type EditV2CanvasHandle } from './EditV2Canvas'
 import { EditV2ImportModal } from './EditV2ImportModal'
+import { uploadDirect } from '@/lib/storage/direct-upload-client'
 
 // ── Tipos do contrato público da API v2 (espelho mínimo) ─────────────────────
 type EditIntent = 'swap_material' | 'remove_element' | 'insert_element' | 'adjust_atmosphere' | 'fix_image'
@@ -147,13 +148,9 @@ export function EditV2Flow({ initialBalance }: { initialBalance: number }) {
 
   // ── Upload da imagem principal ───────────────────────────────────────────
   const uploadFile = useCallback(async (file: File, kind: 'source' | 'mask') => {
-    const fd = new FormData()
-    fd.append('file', file)
-    fd.append('kind', kind)
-    const res = await fetch('/api/edits/upload-asset', { method: 'POST', body: fd })
-    const json = await res.json().catch(() => null)
-    if (!res.ok || !json?.url) throw new Error(json?.error ?? 'Erro ao enviar imagem')
-    return json.url as string
+    const { url } = await uploadDirect(file, 'retocar-asset', { kind })
+    if (!url) throw new Error('Erro ao enviar imagem')
+    return url
   }, [])
 
   /** Define a imagem de trabalho (upload ou histórico) e entra na edição. */

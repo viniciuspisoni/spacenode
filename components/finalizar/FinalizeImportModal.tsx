@@ -7,7 +7,7 @@
 //   Renders → GET /api/renders/list (coluna real: output_url)
 //   Vistas  → consulta RLS client-side (não existe API de listagem)
 //   Edições → GET /api/edits (result_image_url)
-//   Arquivo → upload local (POST /api/finalizar/upload, kind=source)
+//   Arquivo → upload direto browser→Storage (uploadDirect, área finalizar-asset)
 //
 // Mapeamento de URL TOLERANTE (lição do bug 2026-06-12). Clonado do
 // EditV2ImportModal — que vive na branch do edit-v2, não na main.
@@ -15,6 +15,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toMediaProxyUrl } from '@/lib/storage/media-url'
+import { uploadDirect } from '@/lib/storage/direct-upload-client'
 
 type Tab = 'renders' | 'vistas' | 'edits'
 
@@ -101,13 +102,9 @@ export function FinalizeImportModal({ open, purpose, onClose, onSelect }: Props)
   async function handleFile(file: File) {
     try {
       setUploading(true)
-      const fd = new FormData()
-      fd.append('file', file)
-      fd.append('kind', 'source')
-      const res = await fetch('/api/finalizar/upload', { method: 'POST', body: fd })
-      const json = await res.json().catch(() => null)
-      if (!res.ok || !json?.url) throw new Error(json?.error ?? 'Falha no upload')
-      onSelect(json.url as string)
+      const { url } = await uploadDirect(file, 'finalizar-asset', { kind: 'source' })
+      if (!url) throw new Error('Falha no upload')
+      onSelect(url)
     } catch {
       setError('Não foi possível enviar a imagem.')
     } finally {

@@ -19,6 +19,7 @@ import { ReferencesPanel, suggestPromptForRole, downscaleImageForUpload, type Re
 import { ReferenceFocusModal, type NormCrop } from './ReferenceFocusModal'
 import { RetocarImportModal } from './RetocarImportModal'
 import { SurfaceSelectModal, SurfaceSelectionBar, type SurfaceSelection } from './SurfaceSelectModal'
+import { uploadDirect } from '@/lib/storage/direct-upload-client'
 
 // Debug: mostra a imagem REJEITADA pelo quality gate (sem salvar) pra julgar se
 // foi catastrófica ou um resultado aceitável. Só dev/staging.
@@ -193,13 +194,13 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
       const blob = await canvas.getMaskBlob()
       if (!blob) throw new Error('Falha ao gerar máscara')
       maskCoverage = canvas.getMaskCoverage()
-      const fd = new FormData()
-      fd.append('file', new File([blob], 'mask.png', { type: 'image/png' }))
-      fd.append('kind', 'mask')
-      const maskRes = await fetch('/api/edits/upload-asset', { method: 'POST', body: fd })
-      const maskData = await maskRes.json()
-      if (!maskRes.ok) throw new Error(maskData?.error ?? 'Erro ao salvar máscara')
-      blobMaskUrl = maskData.url
+      const { url: maskUrl } = await uploadDirect(
+        new File([blob], 'mask.png', { type: 'image/png' }),
+        'retocar-asset',
+        { kind: 'mask' },
+      )
+      if (!maskUrl) throw new Error('Erro ao salvar máscara')
+      blobMaskUrl = maskUrl
     } catch (e) {
       setError((e as Error).message)
       setSubmitting(false)
@@ -368,19 +369,14 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
     if (file.size > 40 * 1024 * 1024) { setError('Imagem muito grande (máx 40 MB).'); return }
     setError(null)
     try {
-      // Reduz no browser (limite ~4.5MB de body da Vercel) sem perder fidelidade.
+      // Reduz no browser antes do upload direto (área retocar-reference: 8 MB).
       const blob = await downscaleImageForUpload(file)
-      const fd = new FormData()
-      fd.append('file', new File([blob], 'reference.jpg', { type: blob.type || 'image/jpeg' }))
-      fd.append('role', role)
-      const res = await fetch('/api/edits/references/upload', { method: 'POST', body: fd })
-      if (!res.ok) {
-        let msg = res.status === 413 ? 'Imagem muito grande para enviar.' : 'Erro ao enviar referência'
-        try { const d = await res.json(); msg = d?.error ?? msg } catch { /* resposta não-JSON */ }
-        throw new Error(msg)
-      }
-      const data = await res.json()
-      addReference(data.reference as EditReferenceImage)
+      const { url } = await uploadDirect(
+        new File([blob], 'reference.jpg', { type: blob.type || 'image/jpeg' }),
+        'retocar-reference',
+      )
+      if (!url) throw new Error('Erro ao enviar referência')
+      addReference({ id: url, url, role, source: 'upload' })
     } catch (e) { setError((e as Error).message) }
   }
 

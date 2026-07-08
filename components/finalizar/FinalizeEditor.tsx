@@ -17,6 +17,7 @@ import { BrushToolbar } from './BrushToolbar'
 import { BeforeAfterToggle } from './BeforeAfterToggle'
 import { ExportDialog } from './ExportDialog'
 import { FinalizeImportModal } from './FinalizeImportModal'
+import { uploadDirect } from '@/lib/storage/direct-upload-client'
 
 interface Props {
   initialProject?: FinalizeProject | null
@@ -173,15 +174,12 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
     return () => window.removeEventListener('keydown', onKey)
   }, [refreshHistory])
 
-  // ── Upload helper ────────────────────────────────────────────────────────────
+  // ── Upload helper (direto browser → Storage; ver direct-upload-client) ──────
   async function uploadBlob(blob: Blob, kind: 'mask' | 'thumb', filename: string): Promise<string> {
-    const fd = new FormData()
-    fd.append('file', new File([blob], filename, { type: blob.type || 'image/png' }))
-    fd.append('kind', kind)
-    const res = await fetch('/api/finalizar/upload', { method: 'POST', body: fd })
-    const json = await res.json().catch(() => null)
-    if (!res.ok || !json?.url) throw new Error(json?.error ?? 'Falha no upload')
-    return json.url as string
+    const file = new File([blob], filename, { type: blob.type || 'image/png' })
+    const { url } = await uploadDirect(file, 'finalizar-asset', { kind })
+    if (!url) throw new Error('Falha no upload')
+    return url
   }
 
   // ── Salvar ───────────────────────────────────────────────────────────────────
@@ -245,13 +243,20 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
     downloadBlob(blob, exportFilename(name, format))
     if (projectId) {
       try {
-        const fd = new FormData()
-        fd.append('file', new File([blob], `export.${format}`, { type: blob.type }))
-        fd.append('project_id', projectId)
-        fd.append('format', format)
-        fd.append('width', String(composition.width))
-        fd.append('height', String(composition.height))
-        await fetch('/api/finalizar/export', { method: 'POST', body: fd })
+        // Sobe o composto direto pro Storage; a rota só valida a key e registra.
+        const file = new File([blob], `export.${format}`, { type: blob.type })
+        const { key } = await uploadDirect(file, 'finalizar-export', {}, { confirm: false })
+        await fetch('/api/finalizar/export', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            key,
+            project_id: projectId,
+            format,
+            width: composition.width,
+            height: composition.height,
+          }),
+        })
       } catch { /* registro é best-effort */ }
     }
   }, [composition, name, projectId])
