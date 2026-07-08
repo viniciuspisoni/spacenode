@@ -27,8 +27,12 @@ import type { VideoAdapter, VideoGenerationRequest, VideoGenerationResult } from
 
 export const DEFAULT_VERTEX_VEO_MODEL = 'veo-3.1-generate-001'
 
+// Smoke 2026-07-07: 4s@720p levou 213s no Vertex — bem mais lento que o fal.
+// 260s deixa ~35s de folga dentro do maxDuration de 300s da rota (submit +
+// re-hospedagem). Se 8s@1080p estourar isto em uso real, o caminho certo é a
+// evolução p/ fila + polling no cliente (ver comentário em app/api/video).
 const POLL_INTERVAL_MS = 10_000
-const MAX_WAIT_MS      = 240_000   // rota tem maxDuration 300s; sobra p/ upload
+const MAX_WAIT_MS      = 260_000
 const STORAGE_BUCKET   = 'space-mestres'
 
 function enabled(): boolean {
