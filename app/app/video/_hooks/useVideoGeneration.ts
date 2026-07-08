@@ -8,6 +8,8 @@
 
 import { useCallback } from 'react'
 import { resolveMotion, type AnimateState, type AnimateDispatch } from './useAnimateState'
+import { uploadDirect } from '@/lib/storage/direct-upload-client'
+import { jsonOrNull } from '@/lib/http/fetch-json'
 
 interface GenerateResponse {
   url:       string
@@ -29,26 +31,38 @@ export function useVideoGeneration(
     const motion = resolveMotion(state)
 
     try {
-      const body = new FormData()
-      body.append('image',        state.imageFile)
-      body.append('engine',       state.modelId)
-      body.append('duration',     state.duration)
-      body.append('scene',        state.sceneType)
-      body.append('intensity',    state.intensity)
-      body.append('prompt',       state.userPrompt)
-      body.append('cameraMotion', motion.id)
-      body.append('fidelity',     state.fidelityMode)
-      body.append('videoType',    state.videoType)
-      // Formato agora é escolha explícita do usuário — 'auto' mantém a
-      // proporção da imagem. (Antes era derivado do preset de movimento,
-      // o que podia gerar um 9:16 inesperado.)
-      body.append('aspectRatio',  state.aspectRatio)
-      if (state.avoidPeople)  body.append('avoidPeople', '1')
-      if (state.atmosphere)   body.append('atmosphere', state.atmosphere)
-      if (state.endImageFile) body.append('endImage',   state.endImageFile)
+      // Imagens sobem direto pro Storage (sem passar pela Vercel — teto de
+      // 4,5 MB de body não se aplica); a rota recebe as keys.
+      const { key: sourceKey } = await uploadDirect(state.imageFile, 'animar-source', {}, { confirm: false })
+      let endKey: string | undefined
+      if (state.endImageFile) {
+        const end = await uploadDirect(state.endImageFile, 'animar-source', {}, { confirm: false })
+        endKey = end.key
+      }
 
-      const res = await fetch('/api/video', { method: 'POST', body })
-      const data = (await res.json()) as GenerateResponse
+      const res = await fetch('/api/video', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sourceKey,
+          engine:       state.modelId,
+          duration:     state.duration,
+          scene:        state.sceneType,
+          intensity:    state.intensity,
+          prompt:       state.userPrompt,
+          cameraMotion: motion.id,
+          fidelity:     state.fidelityMode,
+          videoType:    state.videoType,
+          // Formato agora é escolha explícita do usuário — 'auto' mantém a
+          // proporção da imagem. (Antes era derivado do preset de movimento,
+          // o que podia gerar um 9:16 inesperado.)
+          aspectRatio:  state.aspectRatio,
+          ...(state.avoidPeople ? { avoidPeople: '1' } : {}),
+          ...(state.atmosphere ? { atmosphere: state.atmosphere } : {}),
+          ...(endKey ? { endKey } : {}),
+        }),
+      })
+      const data = ((await jsonOrNull(res)) ?? {}) as unknown as GenerateResponse
 
       if (!res.ok || !data.url) {
         dispatch({ type: 'generationError', message: data.error ?? 'Erro ao gerar vídeo.' })
@@ -77,7 +91,10 @@ export function useVideoGeneration(
       })
     } catch (err) {
       console.error('[useVideoGeneration] falhou:', err)
-      dispatch({ type: 'generationError', message: 'Falha de conexão. Tente novamente.' })
+      dispatch({
+        type:    'generationError',
+        message: err instanceof Error && err.message ? err.message : 'Falha de conexão. Tente novamente.',
+      })
     }
   }, [state, dispatch, nodeCost])
 

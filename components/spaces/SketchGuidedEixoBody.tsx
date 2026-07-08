@@ -13,13 +13,14 @@ import type { Axis, Quality } from '@/lib/spaces/types'
 import type { PlanId } from '@/lib/plans'
 import { InsufficientBalancePanel } from './InsufficientBalancePanel'
 import { QualityPicker } from './EixosPanel'
+import { uploadDirect } from '@/lib/storage/direct-upload-client'
 
 const MAX_SKETCHES = 10
 const MAX_BYTES    = 25 * 1024 * 1024
 const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp']
 
-// Vercel serverless functions têm limite de ~4.5MB no body. Comprimimos
-// no client antes de enviar pra evitar 413 Content Too Large.
+// O upload vai direto pro Storage (teto da área: 10 MB), mas sketch é material
+// de trabalho — comprimir acima de 4 MB economiza banda e acelera o batch.
 const COMPRESS_THRESHOLD = 4 * 1024 * 1024
 const MAX_DIMENSION      = 2400
 const JPEG_QUALITY       = 0.85
@@ -118,18 +119,13 @@ export function SketchGuidedEixoBody({
   async function uploadOne(item: SketchItem): Promise<void> {
     try {
       const compressed = await compressIfNeeded(item.file)
-      const fd = new FormData()
-      fd.append('file', compressed)
-      const res = await fetch(`/api/spaces/${spaceId}/upload-sketch`, {
-        method: 'POST',
-        body:   fd,
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data?.error ?? 'Erro no upload')
+      // Direto browser → Storage (sem passar pela Vercel; ver direct-upload-client)
+      const { url } = await uploadDirect(compressed, 'spaces-sketch', { spaceId })
+      if (!url) throw new Error('Erro no upload')
 
       setItems(curr => curr.map(c =>
         c.localId === item.localId
-          ? { ...c, remoteUrl: data.url as string, status: 'uploaded' as const }
+          ? { ...c, remoteUrl: url, status: 'uploaded' as const }
           : c,
       ))
     } catch (e) {

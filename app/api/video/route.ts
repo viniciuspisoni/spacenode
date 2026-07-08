@@ -9,6 +9,7 @@ import { isSceneTypeId, type SceneTypeId } from '@/lib/video/scenes'
 import { isCameraMotionId, type CameraMotionId, type CameraIntensity } from '@/lib/video/cameraPresets'
 import { isVideoTypeId } from '@/lib/video/videoPresets'
 import { getAdapterForModel } from '@/lib/video/adapters'
+import { DIRECT_UPLOAD_AREAS, downloadDirectUpload } from '@/lib/storage/direct-upload'
 
 fal.config({ credentials: process.env.FAL_KEY })
 
@@ -48,29 +49,46 @@ export async function POST(req: NextRequest) {
   let endImageUrl: string | undefined
 
   try {
-    const formData = await req.formData()
+    // Body JSON — as imagens já subiram DIRETO pro Storage (uploadDirect, área
+    // animar-source; o binário não passa pela Vercel, teto de 4,5 MB não se aplica).
+    const body = await req.json().catch(() => null)
+    const str = (k: string): string | null => (typeof body?.[k] === 'string' ? body[k] : null)
 
-    // ── Campos atuais (compatibilidade total) ────────────────────────────────
-    const imageFile    = formData.get('image')        as File   | null
-    const engineId     = (formData.get('engine')      as string | null) ?? DEFAULT_ENGINE_ID
-    const duration     = (formData.get('duration')    as string | null) ?? '8'
-    const sceneRaw     = (formData.get('scene')       as string | null) ?? 'living'
-    const intensityRaw = (formData.get('intensity')   as string | null)
-    const userPrompt   = (formData.get('prompt')      as string | null) ?? ''
+    const sourceKey    = str('sourceKey') ?? ''
+    const engineId     = str('engine')      ?? DEFAULT_ENGINE_ID
+    const duration     = str('duration')    ?? '8'
+    const sceneRaw     = str('scene')       ?? 'living'
+    const intensityRaw = str('intensity')
+    const userPrompt   = str('prompt')      ?? ''
 
     // ── Campos novos opcionais (UI v2) ───────────────────────────────────────
-    const endImage     = formData.get('endImage')     as File   | null
-    const cameraMotion = (formData.get('cameraMotion') as string | null) ?? ''
-    const fidelityRaw  = (formData.get('fidelity')    as string | null)
-    const atmosphere   = (formData.get('atmosphere')  as string | null) ?? ''
-    const aspectRatioRaw = (formData.get('aspectRatio') as string | null) ?? undefined
-    const resolution   = (formData.get('resolution')  as string | null) ?? undefined
+    const endKey       = str('endKey')
+    const cameraMotion = str('cameraMotion') ?? ''
+    const fidelityRaw  = str('fidelity')
+    const atmosphere   = str('atmosphere')  ?? ''
+    const aspectRatioRaw = str('aspectRatio') ?? undefined
+    const resolution   = str('resolution')  ?? undefined
     // ── Campos do fluxo por presets (2026-07) ────────────────────────────────
-    const avoidPeople  = (formData.get('avoidPeople') as string | null) === '1'
-    const videoTypeRaw = (formData.get('videoType')   as string | null) ?? ''
+    const avoidPeople  = str('avoidPeople') === '1'
+    const videoTypeRaw = str('videoType')   ?? ''
     const videoType    = isVideoTypeId(videoTypeRaw) ? videoTypeRaw : null
 
-    if (!imageFile) return NextResponse.json({ error: 'Imagem obrigatória' }, { status: 400 })
+    if (!sourceKey) return NextResponse.json({ error: 'Imagem obrigatória' }, { status: 400 })
+
+    // ── Baixa os uploads diretos (valida dono/área/limites) ──────────────────
+    const src = await downloadDirectUpload(
+      admin, DIRECT_UPLOAD_AREAS['animar-source'], user.id, {}, sourceKey,
+    )
+    if (!src.ok) return NextResponse.json({ error: src.message }, { status: src.status })
+
+    let end: { buffer: Buffer; mime: string } | null = null
+    if (endKey) {
+      const d = await downloadDirectUpload(
+        admin, DIRECT_UPLOAD_AREAS['animar-source'], user.id, {}, endKey,
+      )
+      if (!d.ok) return NextResponse.json({ error: d.message }, { status: d.status })
+      end = d
+    }
 
     // ── Resolve modelo + custo ───────────────────────────────────────────────
     const model = requireVideoModel(engineId)
@@ -112,10 +130,14 @@ export async function POST(req: NextRequest) {
     }
     debited = true
 
-    // ── Upload da(s) imagem(ns) ──────────────────────────────────────────────
-    inputUrl = await fal.storage.upload(imageFile)
-    if (endImage) {
-      endImageUrl = await fal.storage.upload(endImage)
+    // ── Upload da(s) imagem(ns) pra FAL (buffers já baixados do Storage) ─────
+    inputUrl = await fal.storage.upload(
+      new File([new Uint8Array(src.buffer)], sourceKey.split('/').pop() ?? 'source.jpg', { type: src.mime }),
+    )
+    if (end && endKey) {
+      endImageUrl = await fal.storage.upload(
+        new File([new Uint8Array(end.buffer)], endKey.split('/').pop() ?? 'end.jpg', { type: end.mime }),
+      )
     }
 
     // ── Constrói prompt ──────────────────────────────────────────────────────
