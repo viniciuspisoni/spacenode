@@ -13,6 +13,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
 import { ENGINES, ENGINE_ORDER, type EngineId } from '@/lib/engines'
 import { EngineIcon } from '@/components/icons/engines'
 import type { SpaceCategory, ProjectDNA } from '@/lib/spaces/types'
@@ -20,6 +21,16 @@ import { DNA_EXTRACTION_COST } from '@/lib/spaces/economy'
 import { DnaPanel } from './DnaPanel'
 
 type Step = 'form' | 'upload' | 'analyzing' | 'reveal'
+
+// Parse defensivo: respostas de infraestrutura (413/502 da Vercel etc.) vêm em
+// texto puro — um res.json() cru vazaria "Unexpected token…" pro usuário.
+async function jsonOrNull(res: Response): Promise<Record<string, unknown> | null> {
+  try { return await res.json() } catch { return null }
+}
+
+function errMsg(data: Record<string, unknown> | null, fallback: string): string {
+  return typeof data?.error === 'string' ? data.error : fallback
+}
 
 // Reduz uma imagem hospedada a um File adequado à Vista Mestre.
 // O DNA é extraído por visão, então não precisamos da resolução cheia (que em
@@ -137,9 +148,10 @@ export function NewSpaceFlow({ initialBalance, sourceUrl }: NewSpaceFlowProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: name.trim(), category, engine }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data?.error ?? 'Erro ao criar Space')
-      setSpaceId(data.space.id as string)
+      const data = await jsonOrNull(res)
+      const space = data?.space as { id?: string } | undefined
+      if (!res.ok || typeof space?.id !== 'string') throw new Error(errMsg(data, 'Erro ao criar Space'))
+      setSpaceId(space.id)
       setStep('upload')
     } catch (e) {
       setError((e as Error).message)
@@ -159,26 +171,53 @@ export function NewSpaceFlow({ initialBalance, sourceUrl }: NewSpaceFlowProps) {
     setStep('analyzing')
 
     try {
-      // 1. upload Vista Mestre
-      const fd = new FormData()
-      fd.append('file', file)
-      const uploadRes = await fetch(`/api/spaces/${spaceId}/upload-vista-mestre`, {
-        method: 'POST',
-        body:   fd,
+      // 1. signed upload URL — o arquivo vai direto pro Storage, sem passar
+      //    pela Vercel (Functions rejeitam corpo > 4,5 MB com 413 texto puro)
+      const signRes = await fetch(`/api/spaces/${spaceId}/upload-vista-mestre/sign`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ contentType: file.type, sizeBytes: file.size }),
       })
-      const uploadData = await uploadRes.json()
-      if (!uploadRes.ok) throw new Error(uploadData?.error ?? 'Erro ao salvar imagem')
-      setVistaMestreUrl(uploadData.url as string)
+      const signData = await jsonOrNull(signRes)
+      const bucket = signData?.bucket
+      const key    = signData?.key
+      const token  = signData?.token
+      if (!signRes.ok || typeof bucket !== 'string' || typeof key !== 'string' || typeof token !== 'string') {
+        throw new Error(errMsg(signData, 'Erro ao preparar upload'))
+      }
 
-      // 2. extract DNA (debits 8 nodes)
+      // 2. PUT direto browser → Supabase Storage
+      const supabase = createClient()
+      const { error: uploadErr } = await supabase.storage
+        .from(bucket)
+        .uploadToSignedUrl(key, token, file, { contentType: file.type })
+      if (uploadErr) {
+        throw new Error('Erro ao enviar a imagem. Verifique a conexão e tente novamente.')
+      }
+
+      // 3. confirma o upload e grava a referência no Space
+      const confirmRes = await fetch(`/api/spaces/${spaceId}/upload-vista-mestre/confirm`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ key }),
+      })
+      const confirmData = await jsonOrNull(confirmRes)
+      const url = confirmData?.url
+      if (!confirmRes.ok || typeof url !== 'string') {
+        throw new Error(errMsg(confirmData, 'Erro ao salvar imagem'))
+      }
+      setVistaMestreUrl(url)
+
+      // 4. extract DNA (debits 8 nodes)
       const dnaRes = await fetch(`/api/spaces/${spaceId}/extract-dna`, { method: 'POST' })
-      const dnaData = await dnaRes.json()
+      const dnaData = await jsonOrNull(dnaRes)
       if (!dnaRes.ok) {
         if (dnaRes.status === 402) {
-          throw new Error(dnaData?.message ?? 'Saldo insuficiente')
+          throw new Error(typeof dnaData?.message === 'string' ? dnaData.message : 'Saldo insuficiente')
         }
-        throw new Error(dnaData?.error ?? 'Falha na análise')
+        throw new Error(errMsg(dnaData, 'Falha na análise'))
       }
+      if (!dnaData?.dna) throw new Error('Falha na análise')
 
       setDna(dnaData.dna as ProjectDNA)
       setStep('reveal')
@@ -196,8 +235,8 @@ export function NewSpaceFlow({ initialBalance, sourceUrl }: NewSpaceFlowProps) {
     setSubmitting(true)
     try {
       const res = await fetch(`/api/spaces/${spaceId}/lock`, { method: 'POST' })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data?.error ?? 'Erro ao travar Space')
+      const data = await jsonOrNull(res)
+      if (!res.ok) throw new Error(errMsg(data, 'Erro ao travar Space'))
       router.push(`/app/spaces/${spaceId}`)
     } catch (e) {
       setError((e as Error).message)
