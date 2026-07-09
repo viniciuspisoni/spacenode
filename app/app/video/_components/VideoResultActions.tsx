@@ -23,6 +23,13 @@ function formatLabel(aspectRatio: string): string {
   return aspectRatio === 'auto' ? 'Original' : aspectRatio
 }
 
+// Download pelo proxy /api/download (Content-Disposition: attachment). Link
+// direto pro CDN abriria uma aba fora do site — o atributo download de <a>
+// é ignorado em URLs cross-origin.
+function downloadHref(url: string): string {
+  return `/api/download?url=${encodeURIComponent(url)}&filename=spacenode-animacao.mp4`
+}
+
 interface Props {
   result:           GenerationResult
   onGenerateAgain:  () => void
@@ -202,13 +209,11 @@ export default function VideoResultActions({
                 </div>
                 <div style={{ fontSize: 11.5, color: 'var(--color-text-tertiary)', maxWidth: 340, lineHeight: 1.55 }}>
                   O vídeo foi gerado normalmente. Extensões ou a proteção de
-                  rastreamento podem impedir o player embutido — abra em uma
-                  nova aba ou baixe o arquivo.
+                  rastreamento podem impedir o player embutido — baixe o
+                  arquivo para assistir.
                 </div>
                 <a
-                  href={result.outputUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  href={downloadHref(result.outputUrl)}
                   style={{
                     fontSize:      11.5,
                     fontWeight:    500,
@@ -220,7 +225,7 @@ export default function VideoResultActions({
                     border:        '1px solid var(--color-border-strong)',
                   }}
                 >
-                  Abrir vídeo em nova aba
+                  Baixar o vídeo
                 </a>
               </div>
             )}
@@ -288,10 +293,7 @@ export default function VideoResultActions({
       }}>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <a
-            href={result.outputUrl}
-            download
-            target="_blank"
-            rel="noopener noreferrer"
+            href={downloadHref(result.outputUrl)}
             style={primaryBtn}
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">

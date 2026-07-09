@@ -301,7 +301,9 @@ export default function IsometricasClient({ initialCredits }: Props) {
               <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', letterSpacing: '0.04em' }}>
                 Isométrica · {ISOMETRIC_TYPES.find(t => t.id === type)?.label} · {ISOMETRIC_STYLES.find(s => s.id === style)?.label}
               </div>
-              <a href={resultUrl} download target="_blank" rel="noopener noreferrer"
+              {/* Proxy /api/download força attachment — o atributo download é
+                  ignorado cross-origin e abriria a imagem fora do site. */}
+              <a href={`/api/download?url=${encodeURIComponent(resultUrl)}&filename=spacenode-isometrica.jpg`}
                 style={{ fontSize: 11, fontWeight: 500, color: 'var(--color-text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 6, border: '1px solid var(--color-border-strong)', background: 'var(--color-surface)' }}
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
