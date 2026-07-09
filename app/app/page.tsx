@@ -39,8 +39,7 @@ const CATEGORY_LABEL: Record<string, string> = {
   conceito:    'Conceito',
 }
 
-// Módulos do atelier. Verde funcional só no Renderizar (CTA de geração);
-// os demais ficam neutros para não virar rainbow palette.
+// Módulos do atelier, todos neutros (monocromático).
 // Lista de módulos vem de lib/nav/modules-config — a mesma fonte que a sidebar,
 // então desativar um módulo lá some com ele daqui também.
 const MODULE_ICON: Record<SidebarModule['iconKey'], (p: { size?: number }) => React.ReactElement> = {
@@ -74,13 +73,11 @@ const MODULES: {
   label: string
   desc: string
   Icon: (p: { size?: number }) => React.ReactElement
-  green?: boolean
 }[] = getEnabledModules('criar').map((m) => ({
   href: m.href,
   label: m.label,
   desc: MODULE_DESC[m.id] ?? '',
   Icon: MODULE_ICON[m.iconKey],
-  green: m.id === 'renderizar',
 }))
 
 export default async function AppPage() {
@@ -243,9 +240,7 @@ export default async function AppPage() {
               <Link key={m.href} href={m.href} className="spn-dash-module">
                 <div
                   className="spn-dash-module-icon"
-                  style={m.green
-                    ? { background: 'var(--color-accent-green-bg)', color: 'var(--color-accent-green)' }
-                    : { background: 'var(--color-surface)', color: 'var(--color-text-secondary)' }}
+                  style={{ background: 'var(--color-surface)', color: 'var(--color-text-secondary)' }}
                 >
                   <m.Icon size={19} />
                 </div>
