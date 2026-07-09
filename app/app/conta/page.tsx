@@ -5,6 +5,8 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { getPayerBalance } from '@/lib/workspaces/balance'
 import { getPlanById, type PlanId } from '@/lib/plans'
 import ThemeSelector from '@/components/app/ThemeSelector'
 
@@ -15,23 +17,20 @@ export default async function ContaPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [profileRes, balanceRes] = await Promise.all([
-    supabase.from('profiles').select('full_name, plan, credits').eq('id', user.id).single(),
-    supabase
-      .from('user_node_balance')
-      .select('plan_balance, lumen_balance, total_balance')
-      .eq('user_id', user.id)
-      .single(),
+  // Nome é do próprio usuário; plano/saldo são da bolsa (dono do workspace).
+  const [profileRes, balance] = await Promise.all([
+    supabase.from('profiles').select('full_name').eq('id', user.id).single(),
+    getPayerBalance(createAdminClient(), user.id),
   ])
 
-  const planId    = (profileRes.data?.plan as PlanId | undefined) ?? 'free'
+  const planId    = (balance.planId as PlanId) ?? 'free'
   const plan      = getPlanById(planId)
   const planName  = plan?.name ?? (planId === 'free' ? 'Beta' : planId)
   const fullName  = profileRes.data?.full_name ?? null
   const email     = user.email ?? ''
-  const planNodes  = balanceRes.data?.plan_balance  ?? profileRes.data?.credits ?? 0
-  const lumenNodes = balanceRes.data?.lumen_balance ?? 0
-  const totalNodes = balanceRes.data?.total_balance ?? planNodes + lumenNodes
+  const planNodes  = balance.planBalance
+  const lumenNodes = balance.lumenBalance
+  const totalNodes = balance.totalBalance
 
   // Detecta provider — usado pra customizar mensagem de senha.
   // Se identidade for só Google, mensagem fica "definir senha" em vez de "alterar".
@@ -78,6 +77,15 @@ export default async function ContaPage() {
 
         {/* Plano e saldo */}
         <Section title="Plano e saldo">
+          {balance.pooled && (
+            <p style={{
+              fontSize: 12.5, color: 'var(--color-text-tertiary)',
+              lineHeight: 1.6, letterSpacing: '-0.005em', marginBottom: 12,
+            }}>
+              Você faz parte de um workspace — o plano e o saldo abaixo são da conta
+              principal, compartilhados por toda a equipe.
+            </p>
+          )}
           <Field label="Plano atual" value={planName} />
           <Field label="Nodes do plano" value={`${planNodes} disponíveis`} />
           {lumenNodes > 0 && <Field label="Lumens" value={`${lumenNodes} avulsos`} />}

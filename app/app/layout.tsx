@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import Sidebar from '@/components/app/Sidebar'
 import { getPlanById, type PlanId } from '@/lib/plans'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { getPayerId } from '@/lib/workspaces/context'
+import { getPayerBalance } from '@/lib/workspaces/balance'
 
 export default async function AppLayout({
   children,
@@ -22,26 +22,13 @@ export default async function AppLayout({
 
   // Saldo + plano da "bolsa": dono do workspace ativo (individual = ele mesmo).
   // Lê via service-role porque o membro não enxerga o saldo do dono pelo RLS.
-  const payerId = (await getPayerId(supabase, user.id)) ?? user.id
-  const admin = createAdminClient()
-  const [balRes, profRes] = await Promise.all([
-    admin
-      .from('user_node_balance')
-      .select('plan_balance, lumen_balance')
-      .eq('user_id', payerId)
-      .single(),
-    admin
-      .from('profiles')
-      .select('plan')
-      .eq('id', payerId)
-      .single(),
-  ])
+  const balance = await getPayerBalance(createAdminClient(), user.id)
 
-  const planId      = (profRes.data?.plan as PlanId | undefined) ?? 'free'
+  const planId      = (balance.planId as PlanId) ?? 'free'
   const plan        = getPlanById(planId)
   const planTotal   = plan?.nodes ?? 0
-  const planBalance = balRes.data?.plan_balance ?? 0
-  const lumenBalance = balRes.data?.lumen_balance ?? 0
+  const planBalance = balance.planBalance
+  const lumenBalance = balance.lumenBalance
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--color-bg)' }}>

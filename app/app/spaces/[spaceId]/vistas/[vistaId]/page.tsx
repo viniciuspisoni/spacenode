@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { notFound, redirect } from 'next/navigation'
 import { VistaDetail } from '@/components/spaces/VistaDetail'
 import { signStorageUrl, signRows } from '@/lib/storage/signed'
+import { getPayerBalance } from '@/lib/workspaces/balance'
 import type { Space, Vista } from '@/lib/spaces/types'
 
 export default async function VistaDetailPage({
@@ -17,7 +18,8 @@ export default async function VistaDetailPage({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [spaceRes, vistaRes, otherRes, balanceRes] = await Promise.all([
+  const admin = createAdminClient()
+  const [spaceRes, vistaRes, otherRes, payerBalance] = await Promise.all([
     supabase.from('spaces').select('*').eq('id', spaceId).single(),
     supabase.from('vistas').select('*').eq('id', vistaId).single(),
     supabase.from('vistas')
@@ -27,7 +29,8 @@ export default async function VistaDetailPage({
       .eq('status', 'completed')
       .order('created_at', { ascending: false })
       .limit(5),
-    supabase.from('user_node_balance').select('total_balance').eq('user_id', user.id).single(),
+    // Saldo da bolsa (dono do workspace) — é dele que a geração debita.
+    getPayerBalance(admin, user.id),
   ])
 
   if (vistaRes.error || !vistaRes.data) notFound()
@@ -35,7 +38,6 @@ export default async function VistaDetailPage({
 
   // Assina URLs de Storage server-side antes de passar pro client (buckets
   // privados após o flip; no-op enquanto públicos / FAL).
-  const admin    = createAdminClient()
   const spaceRaw = spaceRes.data as Space
   const space: Space = { ...spaceRaw, vista_mestre_url: await signStorageUrl(admin, spaceRaw.vista_mestre_url) }
   const vistaRaw = vistaRes.data as Vista
@@ -47,7 +49,7 @@ export default async function VistaDetailPage({
     source_image_url:  await signStorageUrl(admin, vistaRaw.source_image_url),
   }
   const others  = (await signRows(admin, otherRes.data ?? [], ['image_url'])) as Pick<Vista, 'id' | 'image_url' | 'axis' | 'axis_value' | 'axis_label' | 'quality'>[]
-  const balance = balanceRes.data?.total_balance ?? 0
+  const balance = payerBalance.totalBalance
 
   return (
     <main style={{ flex: 1, overflowY: 'auto', background: 'var(--color-bg)' }}>

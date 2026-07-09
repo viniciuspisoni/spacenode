@@ -18,6 +18,8 @@ interface BillingClientProps {
   plan:    string
   balance: { plan: number; lumen: number; total: number }
   lumens:  LumenPackRow[]
+  /** true = saldo exibido é a bolsa do workspace (membro de escritório). */
+  pooled?: boolean
 }
 
 type CheckoutPayload =
@@ -39,7 +41,7 @@ function daysUntil(date: string): number {
   return Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)))
 }
 
-export function BillingClient({ plan, balance, lumens }: BillingClientProps) {
+export function BillingClient({ plan, balance, lumens, pooled }: BillingClientProps) {
   const isLumenBlocked = plan === 'free' || plan === 'starter'
   const [billing, setBilling] = useState<BillingCycle>('monthly')
   const [loading, setLoading] = useState<string | null>(null)
@@ -77,6 +79,15 @@ export function BillingClient({ plan, balance, lumens }: BillingClientProps) {
             <BalanceItem label="Lumens"  value={balance.lumen} detail={`${lumens.length} pack${lumens.length === 1 ? '' : 's'} ativo${lumens.length === 1 ? '' : 's'}`} />
             <BalanceItem label="Total disponível" value={balance.total} detail="nodes" green />
           </div>
+          {pooled && (
+            <p style={{
+              fontSize: 12.5, color: 'var(--color-text-tertiary)',
+              lineHeight: 1.6, letterSpacing: '-0.005em', marginTop: 12,
+            }}>
+              Você faz parte de um workspace — este é o saldo da conta principal,
+              compartilhado por toda a equipe.
+            </p>
+          )}
         </Section>
 
         {/* ── 2. Plano ───────────────────────────────────────────────────── */}

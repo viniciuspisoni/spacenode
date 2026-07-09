@@ -24,6 +24,7 @@ import { fal } from '@fal-ai/client'
 import { randomUUID } from 'crypto'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getPayerId } from '@/lib/workspaces/context'
 import { refundNodes } from '@/lib/billing/refund-nodes'
 import { ENGINES, isResolution, type EngineId, type Resolution } from '@/lib/engines'
 import { getVistaGenerationCost, supportsQuality } from '@/lib/spaces/economy'
@@ -138,10 +139,13 @@ export async function POST(
   const batchId      = randomUUID()
 
   // Pré-checagem de saldo
+  // Saldo é da bolsa: pré-check usa o PAGADOR (dono do workspace), o mesmo
+  // que consume_workspace_nodes debita — senão membro é barrado à toa.
+  const payerId = (await getPayerId(admin, user.id)) ?? user.id
   const { data: bal } = await admin
     .from('user_node_balance')
     .select('total_balance')
-    .eq('user_id', user.id)
+    .eq('user_id', payerId)
     .single()
   const available = bal?.total_balance ?? 0
   if (available < totalCost) {
@@ -189,7 +193,7 @@ export async function POST(
   const { data: balAfter } = await admin
     .from('user_node_balance')
     .select('plan_balance, lumen_balance, total_balance')
-    .eq('user_id', user.id)
+    .eq('user_id', payerId)
     .single()
 
   return NextResponse.json({

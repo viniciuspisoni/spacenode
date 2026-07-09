@@ -17,6 +17,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getPayerId } from '@/lib/workspaces/context'
 import { isQuality, isEditSourceType, type Quality } from '@/lib/spaces/types'
 import { isEditMode, dispatchEndpoint, type EditMode } from '@/lib/spaces/engines'
 import { composeRouterPrompt, isFidelityMode, type FidelityMode } from '@/lib/spaces/edit-prompts'
@@ -125,6 +126,10 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminClient()
 
+  // Saldo é da bolsa: pré-check e leituras usam o PAGADOR (dono do workspace),
+  // o mesmo que consume_workspace_nodes debita — senão membro é barrado à toa.
+  const payerId = (await getPayerId(admin, user.id)) ?? user.id
+
   // swap_material com referências visuais mas sem máscara pintada → gera máscara
   // branca automática (1×1 px, normalizada pelo pipeline). Assim o nano-banana
   // recebe o formato correto: [source, mask, texture] e usa a textura visualmente.
@@ -168,7 +173,7 @@ export async function POST(req: NextRequest) {
     const { data: bal } = await admin
       .from('user_node_balance')
       .select('total_balance')
-      .eq('user_id', user.id)
+      .eq('user_id', payerId)
       .single()
     if ((bal?.total_balance ?? 0) < routing.costNodes) {
       return NextResponse.json(
@@ -294,7 +299,7 @@ export async function POST(req: NextRequest) {
       const { data: balGate } = await admin
         .from('user_node_balance')
         .select('plan_balance, lumen_balance, total_balance')
-        .eq('user_id', user.id)
+        .eq('user_id', payerId)
         .single()
       return NextResponse.json({
         rejected:          true,
@@ -368,7 +373,7 @@ export async function POST(req: NextRequest) {
     const { data: balAfter } = await admin
       .from('user_node_balance')
       .select('plan_balance, lumen_balance, total_balance')
-      .eq('user_id', user.id)
+      .eq('user_id', payerId)
       .single()
 
     const signedEdit = row

@@ -2,6 +2,8 @@
 // Mesma UI/comportamento do fluxo original — só mudou a rota.
 
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { getPayerBalance } from '@/lib/workspaces/balance'
 import { redirect } from 'next/navigation'
 import { NewSpaceFlow } from '@/components/spaces/NewSpaceFlow'
 
@@ -15,13 +17,10 @@ export default async function NewSpaceUploadPage({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: balanceRow } = await supabase
-    .from('user_node_balance')
-    .select('total_balance')
-    .eq('user_id', user.id)
-    .single()
+  // Saldo da bolsa (dono do workspace) — é dele que a geração debita.
+  const payerBalance = await getPayerBalance(createAdminClient(), user.id)
 
-  const balance = balanceRow?.total_balance ?? 0
+  const balance = payerBalance.totalBalance
   const sourceUrl = sp.source && /^https:\/\//i.test(sp.source) ? sp.source : undefined
 
   return (

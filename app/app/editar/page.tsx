@@ -10,6 +10,8 @@
 // Rollback = remover a flag (cai para o editor anterior). Nada é removido.
 
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { getPayerBalance } from '@/lib/workspaces/balance'
 import { redirect } from 'next/navigation'
 import { RetocarStandaloneFlow } from '@/components/spaces/RetocarStandaloneFlow'
 import { EditV2Flow } from '@/components/editar/EditV2Flow'
@@ -21,13 +23,10 @@ export default async function RetocarPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: balanceRow } = await supabase
-    .from('user_node_balance')
-    .select('total_balance')
-    .eq('user_id', user.id)
-    .single()
+  // Saldo da bolsa (dono do workspace) — é dele que a edição debita.
+  const payerBalance = await getPayerBalance(createAdminClient(), user.id)
 
-  const balance = balanceRow?.total_balance ?? 0
+  const balance = payerBalance.totalBalance
   const useV3 = process.env.NEXT_PUBLIC_EDIT_V3 === '1'
   const useClean = process.env.NEXT_PUBLIC_EDIT_V2_CLEAN === '1'
   const useV2 = process.env.NEXT_PUBLIC_EDIT_V2 === '1'
