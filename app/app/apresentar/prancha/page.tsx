@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { getPayerBalance } from '@/lib/workspaces/balance'
 import PranchaClient from './PranchaClient'
 
 export const metadata = {
@@ -11,17 +13,9 @@ export default async function PranchaPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [balRes, profRes, identityRes] = await Promise.all([
-    supabase
-      .from('user_node_balance')
-      .select('plan_balance, lumen_balance')
-      .eq('user_id', user.id)
-      .single(),
-    supabase
-      .from('profiles')
-      .select('credits')
-      .eq('id', user.id)
-      .single(),
+  // Saldo da bolsa (dono do workspace) — é dele que a geração debita.
+  const [balance, identityRes] = await Promise.all([
+    getPayerBalance(createAdminClient(), user.id),
     supabase
       .from('architect_identity')
       .select('name')
@@ -29,16 +23,11 @@ export default async function PranchaPage() {
       .maybeSingle(),
   ])
 
-  const totalNodes =
-    (balRes.data?.plan_balance ?? 0) +
-    (balRes.data?.lumen_balance ?? 0)
-
-  const initialCredits = totalNodes > 0 ? totalNodes : (profRes.data?.credits ?? 0)
-  const studioName     = identityRes.data?.name?.trim() || null
+  const studioName = identityRes.data?.name?.trim() || null
 
   return (
     <PranchaClient
-      initialCredits={initialCredits}
+      initialCredits={balance.totalBalance}
       studioName={studioName}
     />
   )

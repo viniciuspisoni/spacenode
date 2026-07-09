@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { signRows } from '@/lib/storage/signed'
 import { getRenderTitle } from '@/lib/render-display'
 import { getPlanById, type PlanId } from '@/lib/plans'
+import { getPayerBalance } from '@/lib/workspaces/balance'
 import {
   IconGenerate, IconSpaces, IconRetocar, IconEnhance,
   IconVideo, IconFinalizar, IconHumanizedPlan, IconIsometric, IconBoard, IconMoodboard,
@@ -123,9 +124,10 @@ export default async function AppPage() {
 
   const firstName = (user.user_metadata.full_name ?? user.email ?? 'usuário').split(' ')[0]
 
-  const [profileResult, balanceResult, recentResult, countResult, monthResult, spacesResult] = await Promise.all([
-    supabase.from('profiles').select('plan').eq('id', user.id).single(),
-    supabase.from('user_node_balance').select('plan_balance, lumen_balance').eq('user_id', user.id).single(),
+  const admin = createAdminClient()
+  const [payerBalance, recentResult, countResult, monthResult, spacesResult] = await Promise.all([
+    // Saldo/plano da bolsa (dono do workspace) — é dele que a geração debita.
+    getPayerBalance(admin, user.id),
     supabase.from('renders')
       .select('id, output_url, input_url, ambient, style, lighting, model, cost_credits, status, created_at')
       .eq('user_id', user.id)
@@ -145,17 +147,16 @@ export default async function AppPage() {
       .limit(PROJECT_LIMIT),
   ])
 
-  const planId       = (profileResult.data?.plan as PlanId | undefined) ?? 'free'
+  const planId       = (payerBalance.planId as PlanId) ?? 'free'
   const plan         = getPlanById(planId)
   const planName     = plan?.name ?? 'Beta'
   const planTotal    = plan?.nodes ?? 0
-  const planBalance  = balanceResult.data?.plan_balance ?? 0
-  const lumenBalance = balanceResult.data?.lumen_balance ?? 0
+  const planBalance  = payerBalance.planBalance
+  const lumenBalance = payerBalance.lumenBalance
   const availableNodes = planBalance + lumenBalance
 
   // Assina URLs de Storage (space-mestres) antes de passar pro client (bucket
   // privado após o flip). Renders são FAL hoje → no-op, mas embrulhamos igual.
-  const admin        = createAdminClient()
   const renders      = (await signRows(admin, recentResult.data ?? [], ['output_url', 'input_url'])) as RecentRender[]
   const totalRenders = countResult.count ?? 0
   const monthRenders = monthResult.count ?? 0

@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getPlanById } from '@/lib/plans'
 import { getBalanceState } from '@/lib/spaces/balance'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { getPayerId } from '@/lib/workspaces/context'
+import { getPayerBalance } from '@/lib/workspaces/balance'
 
 export async function GET() {
   const supabase = await createClient()
@@ -13,30 +13,19 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
   // Mostra a "bolsa": saldo do dono do workspace ativo (individual = ele mesmo).
-  const payerId = (await getPayerId(supabase, user.id)) ?? user.id
-  const admin = createAdminClient()
-  const [balRes, profRes] = await Promise.all([
-    admin.from('user_node_balance')
-      .select('plan_balance, lumen_balance, total_balance, active_lumen_packs')
-      .eq('user_id', payerId).single(),
-    admin.from('profiles').select('plan').eq('id', payerId).single(),
-  ])
+  const balance = await getPayerBalance(createAdminClient(), user.id)
 
-  const planId = profRes.data?.plan as string | undefined
-  const plan   = planId ? getPlanById(planId as Parameters<typeof getPlanById>[0]) : undefined
+  const plan   = getPlanById(balance.planId as Parameters<typeof getPlanById>[0])
   const planTotal = plan?.nodes ?? 0
-
-  const total = balRes.data?.total_balance ?? 0
-  const planBalance = balRes.data?.plan_balance ?? 0
-  const state = getBalanceState(planBalance, planTotal)
+  const state = getBalanceState(balance.planBalance, planTotal)
 
   return NextResponse.json({
-    plan_balance:        planBalance,
+    plan_balance:        balance.planBalance,
     plan_total:          planTotal,
-    lumen_balance:       balRes.data?.lumen_balance ?? 0,
-    active_lumen_packs:  balRes.data?.active_lumen_packs ?? 0,
-    total_balance:       total,
-    plan_id:             planId ?? 'free',
+    lumen_balance:       balance.lumenBalance,
+    active_lumen_packs:  balance.activeLumenPacks,
+    total_balance:       balance.totalBalance,
+    plan_id:             balance.planId,
     state,
   })
 }

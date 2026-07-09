@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { getPayerBalance } from '@/lib/workspaces/balance'
 import PlantaHumanizadaClient from './PlantaHumanizadaClient'
 
 export const metadata = {
@@ -11,25 +13,8 @@ export default async function PlantaHumanizadaPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [balRes, profRes] = await Promise.all([
-    supabase
-      .from('user_node_balance')
-      .select('plan_balance, lumen_balance')
-      .eq('user_id', user.id)
-      .single(),
-    supabase
-      .from('profiles')
-      .select('credits')
-      .eq('id', user.id)
-      .single(),
-  ])
+  // Saldo da bolsa (dono do workspace) — é dele que a geração debita.
+  const balance = await getPayerBalance(createAdminClient(), user.id)
 
-  const totalNodes =
-    (balRes.data?.plan_balance ?? 0) +
-    (balRes.data?.lumen_balance ?? 0)
-
-  // Fallback to legacy credits if balance view returned nothing
-  const initialCredits = totalNodes > 0 ? totalNodes : (profRes.data?.credits ?? 0)
-
-  return <PlantaHumanizadaClient initialCredits={initialCredits} />
+  return <PlantaHumanizadaClient initialCredits={balance.totalBalance} />
 }
