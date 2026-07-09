@@ -46,6 +46,14 @@ function selectionNoun(axis: Axis) {
   return SELECTION_NOUN[axis] ?? SELECTION_NOUN.iluminacao!
 }
 
+// Multi-DNA: vista com DNA próprio extraído, selecionável como referência
+// da geração (imagem + DNA). A seleção vale por lote — default Vista Mestre.
+export interface DnaReferenceOption {
+  id:        string
+  image_url: string
+  label:     string
+}
+
 interface Props {
   engine:    EngineId
   defaultQuality?: Quality
@@ -53,9 +61,11 @@ interface Props {
   planId:    PlanId
   spaceId:   string
   detalheContext: DetalheContext
+  vistaMestreUrl: string | null
+  references:     DnaReferenceOption[]
   disabled?: boolean
-  onGenerate:             (axis: Axis, axisValues: string[], quality: Quality) => Promise<void>
-  onGenerateFromSketches: (sketches: SketchPayload[], quality: Quality) => Promise<void>
+  onGenerate:             (axis: Axis, axisValues: string[], quality: Quality, referenceVistaId: string | null) => Promise<void>
+  onGenerateFromSketches: (sketches: SketchPayload[], quality: Quality, referenceVistaId: string | null) => Promise<void>
 }
 
 // MVP: só Luz, Câmera e Detalhe aparecem como módulos principais. Clima (horario)
@@ -63,7 +73,8 @@ interface Props {
 const AXIS_ORDER: Axis[] = ['iluminacao', 'angulo', 'detalhe']
 
 export function EixosPanel({
-  engine, defaultQuality, balance, planId, spaceId, detalheContext, disabled,
+  engine, defaultQuality, balance, planId, spaceId, detalheContext,
+  vistaMestreUrl, references, disabled,
   onGenerate, onGenerateFromSketches,
 }: Props) {
   const [axis, setAxis]         = useState<Axis>('iluminacao')
@@ -72,6 +83,14 @@ export function EixosPanel({
                                   ? defaultQuality
                                   : availableQualities[0]
   const [quality, setQuality]   = useState<Resolution>(initialQuality)
+
+  // Referência da geração (multi-DNA): null = Vista Mestre (default histórico).
+  // Seleção por lote — não persiste no Space. Derivada no render: se a vista
+  // selecionada sumiu da lista (foi descartada), volta pro default sem efeito.
+  const [referenceId, setReferenceId] = useState<string | null>(null)
+  const activeReferenceId = referenceId && references.some(r => r.id === referenceId)
+    ? referenceId
+    : null
 
   const mode       = getAxisMode(axis)
   const preserveV2 = spacesPreserveV2Enabled()
@@ -136,6 +155,18 @@ export function EixosPanel({
         </p>
       )}
 
+      {/* Referência da geração (multi-DNA) — só aparece quando existe pelo
+          menos uma vista com DNA próprio extraído; senão a UI fica idêntica
+          ao comportamento histórico (Vista Mestre implícita). */}
+      {references.length > 0 && (
+        <ReferencePicker
+          vistaMestreUrl={vistaMestreUrl}
+          references={references}
+          referenceId={activeReferenceId}
+          setReferenceId={setReferenceId}
+        />
+      )}
+
       {/* Body conforme mode */}
       {mode === 'parametric' && (
         <ParametricEixoBody
@@ -148,7 +179,7 @@ export function EixosPanel({
           balance={balance}
           planId={planId}
           disabled={disabled}
-          onGenerate={onGenerate}
+          onGenerate={(a, values, q) => onGenerate(a, values, q, activeReferenceId)}
         />
       )}
 
@@ -163,7 +194,7 @@ export function EixosPanel({
           balance={balance}
           planId={planId}
           disabled={disabled}
-          onGenerate={onGenerateFromSketches}
+          onGenerate={(sketches, q) => onGenerateFromSketches(sketches, q, activeReferenceId)}
           labelSuggestions={AXIS_CONFIG[axis].labelSuggestions ?? []}
         />
       )}
@@ -181,6 +212,94 @@ export function EixosPanel({
         </p>
       )}
     </section>
+  )
+}
+
+// ── Referência da geração (multi-DNA) ─────────────────────────
+//
+// Thumbnails: Vista Mestre (default) + vistas com DNA extraído. A selecionada
+// vira a autoridade de imagem + DNA do próximo lote gerado.
+
+function ReferencePicker({
+  vistaMestreUrl, references, referenceId, setReferenceId,
+}: {
+  vistaMestreUrl: string | null
+  references:     DnaReferenceOption[]
+  referenceId:    string | null
+  setReferenceId: (id: string | null) => void
+}) {
+  return (
+    <div style={{ marginBottom: 22 }}>
+      <div style={{
+        fontSize: 10, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase',
+        color: 'var(--color-text-tertiary)', marginBottom: 10,
+      }}>
+        Referência do DNA
+      </div>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <ReferenceThumb
+          label="Vista Mestre"
+          imageUrl={vistaMestreUrl}
+          active={referenceId === null}
+          onClick={() => setReferenceId(null)}
+        />
+        {references.map(r => (
+          <ReferenceThumb
+            key={r.id}
+            label={r.label}
+            imageUrl={r.image_url}
+            active={referenceId === r.id}
+            onClick={() => setReferenceId(r.id)}
+          />
+        ))}
+      </div>
+      <p style={{
+        fontSize: 11, color: 'var(--color-text-quaternary)',
+        margin: '10px 0 0', lineHeight: 1.5, letterSpacing: '-0.005em',
+      }}>
+        A imagem selecionada é a autoridade de DNA e de imagem das próximas
+        variações. Extraia o DNA de uma vista (na tela da vista) pra usá-la aqui.
+      </p>
+    </div>
+  )
+}
+
+function ReferenceThumb({ label, imageUrl, active, onClick }: {
+  label:    string
+  imageUrl: string | null
+  active:   boolean
+  onClick:  () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={label}
+      style={{
+        width: 108, padding: 0, overflow: 'hidden',
+        background: active ? 'var(--color-accent-green-bg)' : 'var(--color-bg)',
+        border: active
+          ? '1.5px solid var(--color-accent-green)'
+          : '0.5px solid var(--color-border-strong)',
+        borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+        transition: 'background 0.15s, border-color 0.15s',
+      }}
+    >
+      <div style={{ aspectRatio: '4 / 3', background: 'var(--color-surface)' }}>
+        {imageUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={imageUrl} alt={label}
+               style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+        )}
+      </div>
+      <div style={{
+        padding: '6px 8px', fontSize: 10, fontWeight: 500,
+        color: active ? 'var(--color-accent-green)' : 'var(--color-text-secondary)',
+        letterSpacing: '-0.005em',
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>
+        {active ? '✓ ' : ''}{label}
+      </div>
+    </button>
   )
 }
 

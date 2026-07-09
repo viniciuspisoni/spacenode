@@ -20,7 +20,7 @@ function engineDisplayName(engine: string, fallback: EngineId): string {
   if (engine === 'flux-fill') return `${ENGINES[fallback].name} · retoque`
   return ENGINES[fallback].name
 }
-import { getUpscaleCost } from '@/lib/spaces/economy'
+import { getUpscaleCost, DNA_EXTRACTION_COST } from '@/lib/spaces/economy'
 import { getVisualDna } from '@/lib/spaces/dna'
 import { spacesPreserveV2Enabled } from '@/lib/spaces/preserve-flags'
 import { RetocarOverlay } from './RetocarOverlay'
@@ -44,10 +44,13 @@ interface Props {
 export function VistaDetail({ space, vista, others, initialBalance }: Props) {
   const router = useRouter()
   const [favorited, setFavorited]   = useState(vista.is_favorited)
-  const [submitting, setSubmitting] = useState<null | 'fav' | 'upscale' | 'delete'>(null)
+  const [submitting, setSubmitting] = useState<null | 'fav' | 'upscale' | 'delete' | 'dna'>(null)
   const [error, setError]           = useState<string | null>(null)
   const [balance, setBalance]       = useState(initialBalance)
   const [showRetocar, setShowRetocar] = useState(false)
+  // Multi-DNA: vista com DNA próprio extraído vira referência selecionável
+  // no painel de geração do Space.
+  const [isDnaReference, setIsDnaReference] = useState(Boolean(vista.dna))
 
   const opt = vista.axis && vista.axis_value ? findAxisOption(vista.axis, vista.axis_value) : null
   const canUpscale = vista.engine !== 'clarity'
@@ -95,6 +98,31 @@ export function VistaDetail({ space, vista, others, initialBalance }: Props) {
       }
       setBalance(b => b - upscaleCost)
       router.push(`/app/spaces/${space.id}/vistas/${data.vista.id}`)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setSubmitting(null)
+    }
+  }
+
+  async function handleExtractDna() {
+    if (isDnaReference || vista.status !== 'completed') return
+    if (balance < DNA_EXTRACTION_COST) {
+      setError(`Saldo insuficiente. Necessários ${DNA_EXTRACTION_COST} nodes.`)
+      return
+    }
+    setSubmitting('dna')
+    setError(null)
+    try {
+      const res = await fetch(`/api/vistas/${vista.id}/extract-dna`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) {
+        if (res.status === 402) throw new Error(data?.message ?? 'Saldo insuficiente')
+        throw new Error(data?.error ?? 'Erro na extração de DNA')
+      }
+      setBalance(b => b - DNA_EXTRACTION_COST)
+      setIsDnaReference(true)
+      router.refresh()
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -249,6 +277,28 @@ export function VistaDetail({ space, vista, others, initialBalance }: Props) {
         )}
 
         <ActionGhost onClick={() => setShowRetocar(true)}>✎ Editar</ActionGhost>
+        {vista.status === 'completed' && (
+          isDnaReference ? (
+            <span
+              title="Esta vista tem DNA próprio extraído — selecione-a como referência no painel de geração do Space."
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '10px 16px', borderRadius: 10,
+                background: 'var(--color-accent-green-bg)', color: 'var(--color-accent-green)',
+                border: '0.5px solid var(--color-accent-green-border)',
+                fontSize: 12, fontWeight: 500, letterSpacing: '-0.005em',
+              }}
+            >
+              ◈ Referência de DNA
+            </span>
+          ) : (
+            <ActionGhost onClick={handleExtractDna} disabled={submitting === 'dna'}>
+              {submitting === 'dna'
+                ? 'Extraindo DNA…'
+                : `◈ Extrair DNA · ${DNA_EXTRACTION_COST} nodes`}
+            </ActionGhost>
+          )
+        )}
         <ActionGhost onClick={() => alert('Em breve.')}>+ Pack</ActionGhost>
         <ActionGhost onClick={handleFavorite} disabled={submitting === 'fav'}>
           {favorited ? '★ Favoritada' : '☆ Favoritar'}

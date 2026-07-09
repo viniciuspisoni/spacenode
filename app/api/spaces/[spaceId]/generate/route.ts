@@ -2,7 +2,9 @@
 //
 // Gera 1+ variações para um Space travado, reusando a stack do Renderizar
 // (`buildFidelityPrompt` + briefing arquitetônico). Princípios:
-//   - Vista Mestre é a única referência de imagem (image_urls = [mestre]).
+//   - A fonte é única (image_urls = [fonte]): a Vista Mestre por padrão, ou —
+//     multi-DNA — uma vista-referência escolhida via reference_vista_id
+//     (imagem + DNA + briefing dela substituem os do Space nesta geração).
 //   - briefing arquitetônico (extraído junto do DNA) entra no prompt
 //     pra travar geometria/aberturas/câmera/entorno.
 //   - DNA visual reforça materiais (via `materials` derivados).
@@ -124,9 +126,21 @@ function materialsFromDna(dna: ProjectDNA | null): ProjectMaterials | undefined 
 // ── Route ─────────────────────────────────────────────────────
 
 interface GenerateBody {
-  axis?:        unknown
-  axis_values?: unknown
-  quality?:     unknown
+  axis?:               unknown
+  axis_values?:        unknown
+  quality?:            unknown
+  /** Multi-DNA: vista-referência (com DNA extraído) que substitui a Vista
+   *  Mestre como autoridade de imagem + DNA desta geração. Opcional. */
+  reference_vista_id?: unknown
+}
+
+// Campos mínimos da vista-referência usados na geração.
+interface ReferenceVista {
+  id:        string
+  space_id:  string
+  status:    string
+  image_url: string | null
+  dna:       unknown
 }
 
 export async function POST(
@@ -176,6 +190,14 @@ export async function POST(
   }
   const quality = body.quality
 
+  const referenceVistaId =
+    body.reference_vista_id === undefined || body.reference_vista_id === null
+      ? null
+      : (typeof body.reference_vista_id === 'string' ? body.reference_vista_id : undefined)
+  if (referenceVistaId === undefined) {
+    return NextResponse.json({ error: 'reference_vista_id inválido' }, { status: 400 })
+  }
+
   // Carrega Space (RLS valida posse)
   const { data: spaceRow, error: spaceErr } = await supabase
     .from('spaces')
@@ -199,8 +221,33 @@ export async function POST(
     )
   }
 
-  const visualDna = getVisualDna(space.dna)
-  const briefing  = getBriefingFromDna(space.dna)
+  // ── Referência selecionável (multi-DNA) ──────────────────────
+  // Sem reference_vista_id o comportamento é o histórico: Vista Mestre como
+  // fonte + DNA do Space. Com ele, a vista-referência (que teve DNA extraído
+  // via /api/vistas/[id]/extract-dna) vira a autoridade de imagem E de DNA.
+  let referenceVista: ReferenceVista | null = null
+  if (referenceVistaId) {
+    const { data: refRow } = await supabase
+      .from('vistas')
+      .select('id, space_id, status, image_url, dna')
+      .eq('id', referenceVistaId)
+      .single()
+    if (!refRow || refRow.space_id !== spaceId) {
+      return NextResponse.json({ error: 'Referência não encontrada neste Space' }, { status: 404 })
+    }
+    if (refRow.status !== 'completed' || !refRow.image_url) {
+      return NextResponse.json({ error: 'Referência não está pronta' }, { status: 409 })
+    }
+    if (!refRow.dna) {
+      return NextResponse.json({ error: 'Referência sem DNA extraído' }, { status: 409 })
+    }
+    referenceVista = refRow as ReferenceVista
+  }
+
+  const sourceUrl = referenceVista?.image_url ?? space.vista_mestre_url!
+  const dnaSource = referenceVista?.dna ?? space.dna
+  const visualDna = getVisualDna(dnaSource)
+  const briefing  = getBriefingFromDna(dnaSource)
   if (!visualDna) {
     return NextResponse.json({ error: 'Space sem DNA' }, { status: 409 })
   }
@@ -237,13 +284,13 @@ export async function POST(
   }
 
   // ── Preserve V2 (flag-gated) ─────────────────────────────────
-  // A imagem upada é a autoridade do projeto: computamos a provenance da fonte
-  // UMA vez (não por vista) e a injetamos em cada geração. Best-effort — nunca
-  // derruba a geração. Com a flag off, nada disso roda e o caminho é idêntico
-  // ao anterior.
+  // A fonte selecionada (Vista Mestre ou vista-referência) é a autoridade:
+  // computamos a provenance UMA vez (não por vista) e a injetamos em cada
+  // geração. Best-effort — nunca derruba a geração. Com a flag off, nada
+  // disso roda e o caminho é idêntico ao anterior.
   const preserveV2 = spacesPreserveV2Enabled()
   const sourceMeta: SourceMeta | null = preserveV2
-    ? await computeSourceMeta(space.vista_mestre_url!)
+    ? await computeSourceMeta(sourceUrl)
     : null
 
   // ── Geração paralela (uma transação independente por vista) ──
@@ -252,6 +299,7 @@ export async function POST(
       admin, userId: user.id, space, projectType, segment, materials, briefing,
       engine, quality, axis, axisValue, costPerVista, falEndpoint,
       preserveV2, sourceMeta, dna: visualDna,
+      sourceUrl, referenceVistaId,
     })
   )
 
@@ -301,11 +349,15 @@ async function generateOne(args: {
   preserveV2:   boolean
   sourceMeta:   SourceMeta | null
   dna:          ProjectDNA | null
+  // Multi-DNA: fonte da geração (Vista Mestre ou vista-referência) + id da
+  // referência pra gravar a provenance na row.
+  sourceUrl:        string
+  referenceVistaId: string | null
 }) {
   const {
     admin, userId, space, projectType, segment, materials, briefing,
     engine, quality, axis, axisValue, costPerVista, falEndpoint,
-    preserveV2, sourceMeta, dna,
+    preserveV2, sourceMeta, dna, sourceUrl, referenceVistaId,
   } = args
 
   let debited = false
@@ -346,11 +398,16 @@ async function generateOne(args: {
       insertRow.preservation_level  = level
       insertRow.provider            = 'fal'
       insertRow.model               = falEndpoint
-      insertRow.source_image_url    = sourceMeta?.url ?? space.vista_mestre_url
+      insertRow.source_image_url    = sourceMeta?.url ?? sourceUrl
       insertRow.source_width        = sourceMeta?.width ?? null
       insertRow.source_height       = sourceMeta?.height ?? null
       insertRow.source_aspect_ratio = sourceMeta?.aspectRatio ?? null
       insertRow.source_hash         = sourceMeta?.hash ?? null
+    }
+    // Provenance multi-DNA — só preenche quando o usuário selecionou uma
+    // referência (caminho legado segue sem tocar na coluna).
+    if (referenceVistaId) {
+      insertRow.reference_vista_id = referenceVistaId
     }
     const { data: row, error: insErr } = await admin
       .from('vistas')
@@ -392,17 +449,18 @@ async function generateOne(args: {
       finalPrompt = buildFidelityPrompt(options, 'maximum', briefing ?? undefined)
     }
 
-    // 4) FAL call — sempre image-to-image/edit: a Vista Mestre vai como
-    // image_urls (referência). Nunca text-to-image puro.
+    // 4) FAL call — sempre image-to-image/edit: a fonte selecionada (Vista
+    // Mestre ou vista-referência) vai como image_urls. Nunca text-to-image puro.
     const falInput = {
       prompt:     finalPrompt,
-      image_urls: [space.vista_mestre_url!],
+      image_urls: [sourceUrl],
       ...falParamsForEngine(engine, quality),
     }
 
     console.log('[spaces.generate] engine    :', engine, '→', falEndpoint)
     console.log('[spaces.generate] quality   :', quality, '→', costPerVista, 'nodes')
     console.log('[spaces.generate] axis      :', axis, '/', axisValue)
+    console.log('[spaces.generate] referência:', referenceVistaId ?? 'vista mestre')
     console.log('[spaces.generate] preserveV2:', preserveV2, preserveV2 ? `(${mode}/${level})` : '')
     console.log('[spaces.generate] prompt    :', finalPrompt)
 
@@ -437,7 +495,7 @@ async function generateOne(args: {
       const cropExpected = mode ? modeAllowsCloserCrop(mode) : false
       const genAspect = genW && genH ? genW / genH : null
       const validation = validateGeneration({
-        sourceUrl:          sourceMeta?.url ?? space.vista_mestre_url!,
+        sourceUrl:          sourceMeta?.url ?? sourceUrl,
         generatedUrl:       outputUrl,
         sourceAspect:       sourceMeta?.aspectRatio ?? null,
         generatedAspect:    genAspect,
@@ -451,7 +509,7 @@ async function generateOne(args: {
       // Checagem opcional por visão (source × generated), killável. Best-effort.
       if (level && visionPreservationCheckEnabled()) {
         check = await checkArchitecturalPreservation(
-          sourceMeta?.url ?? space.vista_mestre_url!, outputUrl, level,
+          sourceMeta?.url ?? sourceUrl, outputUrl, level,
           { cropExpected },
         )
         if (check?.warning) preservationWarning = true
@@ -483,10 +541,11 @@ async function generateOne(args: {
       axis_label: opt.label,
       nodes_cost: costPerVista,
       status:     'completed',
+      reference_vista_id: referenceVistaId,
       ...(preserveV2 ? {
         spaces_mode:          mode,
         preservation_level:   level,
-        source_image_url:     sourceMeta?.url ?? space.vista_mestre_url,
+        source_image_url:     sourceMeta?.url ?? sourceUrl,
         source_aspect_ratio:  sourceMeta?.aspectRatio ?? null,
         aspect_ratio:         updateRow.aspect_ratio as string | null,
         preservation_warning: preservationWarning,
