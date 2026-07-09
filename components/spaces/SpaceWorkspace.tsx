@@ -60,6 +60,12 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId }:
   // exterior / default), a partir da categoria + briefing arquitetônico.
   const detalheContext = detalheContextFor(space.category, getBriefingFromDna(space.dna))
 
+  // Multi-DNA: vistas com DNA próprio extraído viram referências selecionáveis
+  // no painel de geração (a Vista Mestre segue sendo o default).
+  const dnaReferences = vistas
+    .filter(v => v.status === 'completed' && !!v.image_url && !!v.dna)
+    .map(v => ({ id: v.id, image_url: v.image_url!, label: v.axis_label ?? 'Vista' }))
+
   function showToast(t: ToastState) {
     setToast(t)
     setTimeout(() => setToast(null), 6000)
@@ -67,7 +73,7 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId }:
 
   // ── Geração paramétrica (Iluminação etc.) ──────────────────
 
-  async function handleGenerate(axis: Axis, axisValues: string[], quality: Quality) {
+  async function handleGenerate(axis: Axis, axisValues: string[], quality: Quality, referenceVistaId: string | null) {
     setError(null)
     const costPer = getVistaGenerationCost(space.engine, quality)
     const total   = costPer * axisValues.length
@@ -77,7 +83,12 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId }:
       const res = await fetch(`/api/spaces/${space.id}/generate`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ axis, axis_values: axisValues, quality }),
+        body:    JSON.stringify({
+          axis,
+          axis_values: axisValues,
+          quality,
+          ...(referenceVistaId ? { reference_vista_id: referenceVistaId } : {}),
+        }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -123,7 +134,7 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId }:
 
   // ── Geração em batch a partir de sketches (Ângulo) ─────────
 
-  async function handleGenerateFromSketches(sketches: SketchPayload[], quality: Quality) {
+  async function handleGenerateFromSketches(sketches: SketchPayload[], quality: Quality, referenceVistaId: string | null) {
     setError(null)
     const costPer = getVistaGenerationCost(space.engine, quality)
     const total   = costPer * sketches.length
@@ -133,7 +144,11 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId }:
       const res = await fetch(`/api/spaces/${space.id}/generate-from-sketches`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ sketches, quality }),
+        body:    JSON.stringify({
+          sketches,
+          quality,
+          ...(referenceVistaId ? { reference_vista_id: referenceVistaId } : {}),
+        }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -349,6 +364,8 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId }:
               planId={planId}
               spaceId={space.id}
               detalheContext={detalheContext}
+              vistaMestreUrl={space.vista_mestre_url}
+              references={dnaReferences}
               onGenerate={handleGenerate}
               onGenerateFromSketches={handleGenerateFromSketches}
             />

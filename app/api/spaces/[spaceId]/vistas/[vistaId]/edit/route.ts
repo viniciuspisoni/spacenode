@@ -130,7 +130,18 @@ export async function POST(
     return NextResponse.json({ error: 'Vista não está pronta' }, { status: 409 })
   }
 
-  const dna   = getVisualDna(space.dna)
+  // Multi-DNA: vista gerada a partir de uma referência herda o DNA dela no
+  // prompt de edição (foi o que a geração usou); fallback pro DNA do Space.
+  let referenceDna: unknown = null
+  if (vista.reference_vista_id) {
+    const { data: refRow } = await supabase
+      .from('vistas')
+      .select('dna')
+      .eq('id', vista.reference_vista_id)
+      .maybeSingle()
+    referenceDna = refRow?.dna ?? null
+  }
+  const dna   = getVisualDna(referenceDna) ?? getVisualDna(space.dna)
   const admin = createAdminClient()
 
   // ── 1) Contexto + rota (sem tocar em saldo) ──

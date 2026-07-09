@@ -123,6 +123,13 @@ export interface Vista {
   is_favorited:              boolean
   is_in_pack:                boolean
   source_vista_id:           string | null
+  // Multi-DNA: vista com `dna` extraído vira referência selecionável na geração;
+  // `reference_vista_id` grava de qual referência esta vista partiu (NULL =
+  // Vista Mestre). Opcionais — rows anteriores à migration 20260709 não têm.
+  dna?:                      SpaceDnaPayload | null
+  dna_extracted_at?:         string | null
+  dna_extracting?:           boolean
+  reference_vista_id?:       string | null
   // Eixo Ângulo: sketch usado como geometry input + id do batch que agrupa
   // as vistas geradas no mesmo upload em massa.
   source_sketch_url:         string | null
