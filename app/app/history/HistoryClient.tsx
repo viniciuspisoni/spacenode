@@ -120,7 +120,7 @@ function inferExtension(url: string, isVideo: boolean): string {
   return m ? m[1].toLowerCase() : 'jpg'
 }
 
-function buildFilename(r: Render, idx: number): string {
+function buildFilename(r: Render, suffix: string | number): string {
   const isVideo = r.ambient === 'video'
   // Vídeo: o arquivo gerado fica em output_url (input_url é a imagem base).
   const url = (isVideo ? (r.output_url ?? r.input_url) : r.output_url) ?? ''
@@ -129,7 +129,16 @@ function buildFilename(r: Render, idx: number): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '') || 'render'
-  return `spacenode-${base}-${idx + 1}.${ext}`
+  return `spacenode-${base}-${suffix}.${ext}`
+}
+
+// Download de um único render pelo proxy /api/download (Content-Disposition:
+// attachment) — baixa direto, sem abrir aba nova nem sair do site.
+function downloadHref(r: Render): string | null {
+  const isVideo = r.ambient === 'video'
+  const target  = isVideo ? (r.output_url ?? r.input_url) : r.output_url
+  if (!target) return null
+  return `/api/download?url=${encodeURIComponent(target)}&filename=${encodeURIComponent(buildFilename(r, r.id.slice(0, 8)))}`
 }
 
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
@@ -297,7 +306,7 @@ export function HistoryClient({
         const target  = isVideo ? (r.output_url ?? r.input_url) : r.output_url
         if (!target) continue
         const a = document.createElement('a')
-        a.href = `/api/download?url=${encodeURIComponent(target)}&filename=${encodeURIComponent(buildFilename(r, i))}`
+        a.href = `/api/download?url=${encodeURIComponent(target)}&filename=${encodeURIComponent(buildFilename(r, i + 1))}`
         a.rel = 'noopener'
         document.body.appendChild(a)
         a.click()
@@ -1213,15 +1222,18 @@ function RenderCard({
           </div>
         )}
 
-        {/* Hover overlay actions — desativadas no modo seleção */}
+        {/* Hover overlay actions — desativadas no modo seleção. "Ver" abre o
+            painel de detalhes (mesmo destino do clique no card — é o que o
+            tooltip do card promete); o download passa pelo proxy /api/download.
+            Nenhuma das duas ações navega pra fora do site. */}
         {hovered && !selectMode && render.output_url && (
           <div style={S.hoverActions}>
-            <a href={render.output_url} target="_blank" rel="noopener noreferrer"
+            <button type="button"
               style={S.actionBtn}
-              onClick={e => e.stopPropagation()}>
+              onClick={e => { e.stopPropagation(); onOpenDetail() }}>
               {isVideo ? 'Assistir →' : 'Ver →'}
-            </a>
-            <a href={render.output_url} download target="_blank" rel="noopener noreferrer"
+            </button>
+            <a href={downloadHref(render) ?? undefined}
               style={S.actionBtnGhost}
               onClick={e => e.stopPropagation()}>
               <DownloadIcon /> baixar
@@ -1453,7 +1465,7 @@ const S: Record<string, CSSProperties> = {
   hoverCheckbox: { position: 'absolute', top: 10, left: 10, zIndex: 3, width: 22, height: 22, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.85)', background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(4px)', cursor: 'pointer', padding: 0, boxShadow: '0 1px 3px rgba(0,0,0,0.3)' },
 
   hoverActions:  { position: 'absolute', bottom: 10, right: 10, display: 'flex', gap: 6 },
-  actionBtn:     { display: 'inline-flex', alignItems: 'center', padding: '5px 13px', background: 'rgba(255,255,255,0.92)', borderRadius: 7, fontSize: 11, color: '#0a0a0a', fontWeight: 500, textDecoration: 'none', fontFamily: 'inherit', letterSpacing: '-0.01em' },
+  actionBtn:     { display: 'inline-flex', alignItems: 'center', padding: '5px 13px', background: 'rgba(255,255,255,0.92)', border: 'none', borderRadius: 7, fontSize: 11, color: '#0a0a0a', fontWeight: 500, textDecoration: 'none', fontFamily: 'inherit', letterSpacing: '-0.01em', cursor: 'pointer' },
   actionBtnGhost:{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 11px', background: 'var(--color-scrim)', border: '0.5px solid rgba(255,255,255,0.25)', borderRadius: 7, fontSize: 10, color: '#fafafa', textDecoration: 'none', backdropFilter: 'blur(4px)', fontFamily: 'inherit' },
 
   // left:40 (não 10) pra não sobrepor o checkbox de hover, que ocupa o
