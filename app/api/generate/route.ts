@@ -21,6 +21,7 @@ import {
   isResolution,
   isValidCombination,
 } from '@/lib/engines'
+import { generateImage } from '@/lib/ai/image-provider'
 
 fal.config({ credentials: process.env.FAL_KEY })
 
@@ -240,23 +241,24 @@ export async function POST(req: NextRequest) {
 
     devLog('[generate] FAL INPUT  :', JSON.stringify(falInput))
 
-    const generationStartedAt = Date.now()
-    const result = await Promise.race([
-      fal.subscribe(falEndpoint, { input: falInput }),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(Object.assign(new Error('FAL_TIMEOUT'), { isFalTimeout: true })), FAL_TIMEOUT_MS[engine])
-      ),
-    ])
+    // Camada única de provider (lib/ai/image-provider): GCP/Vertex primário
+    // quando IMAGE_PROVIDER_PRIMARY=gcp, fallback FAL transparente. Saída GCP
+    // é re-hospedada no Storage; saída FAL continua sendo a URL da CDN.
+    const gen = await generateImage({
+      falEndpoint,
+      falInput,
+      timeoutMs: FAL_TIMEOUT_MS[engine],
+      context:   'generate',
+      deliver:   { kind: 'url', userId: user.id, area: 'renders' },
+    })
 
-    const generationDurationMs = Date.now() - generationStartedAt
+    const generationDurationMs = gen.latencyMs
 
-    devLog('[generate] FAL OUTPUT :', JSON.stringify(result.data))
-    const images = (result.data as { images: { url: string }[] }).images
-    outputUrl = images[0].url
-    // Rastreabilidade: o id do request da fal liga esta linha à entrada no
-    // painel da fal.ai (cruzar quem gerou o quê). Ver coluna renders.fal_request_id.
-    const falRequestId = (result as { requestId?: string }).requestId ?? null
-    devLog('[generate] outputUrl  :', outputUrl, '| fal req:', falRequestId)
+    outputUrl = gen.images[0].url
+    // Rastreabilidade: id do request no provider (requestId da fal ou
+    // responseId do Vertex). Ver coluna renders.fal_request_id.
+    const falRequestId = gen.requestId
+    devLog('[generate] outputUrl  :', outputUrl, '| provider:', gen.provider, '| req:', falRequestId)
 
     // ── Persistência ─────────────────────────────────────────────────────────
     //
@@ -309,9 +311,12 @@ export async function POST(req: NextRequest) {
       duration_ms:  generationDurationMs,
       retry_count:  0,
       generation_log: {
-        provider:    'fal',
-        endpoint:    falEndpoint,
-        request_id:  falRequestId,
+        provider:       gen.provider,
+        provider_model: gen.providerModel,
+        fallback_used:  gen.fallbackUsed,
+        provider_error: gen.errorMessage,
+        endpoint:       falEndpoint,
+        request_id:     falRequestId,
         engine,
         resolution,
         parameters:  falParamsForEngine(engine, resolution),

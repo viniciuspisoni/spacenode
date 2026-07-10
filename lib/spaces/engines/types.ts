@@ -128,6 +128,13 @@ export interface RetouchOutput {
   /** ID do request no provider (fal.ai) — rastreabilidade. null p/ engines
    *  sem id de request (ex: Vertex). Propagado até renders/edits/vistas.fal_request_id. */
   requestId?: string | null
+  /** Provider que gerou de fato ('gcp' | 'fal') + observabilidade da camada
+   *  lib/ai/image-provider (fallback, modelo real, latência). Opcionais —
+   *  engines fora da família Google não preenchem. */
+  provider?: 'gcp' | 'fal'
+  providerModel?: string
+  fallbackUsed?: boolean
+  latencyMs?: number
 }
 
 export type RetouchEngine = (input: RetouchInput) => Promise<RetouchOutput>
