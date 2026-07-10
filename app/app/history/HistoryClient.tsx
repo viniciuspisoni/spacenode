@@ -10,7 +10,7 @@ import { GenerationDetailDrawer } from '@/components/history/GenerationDetailDra
 import { authorInitials, type GenerationKind } from '@/lib/history/generation-detail'
 import type { Edit } from '@/lib/spaces/types'
 
-type HistoryTab = 'renders' | 'edits' | 'vistas'
+type HistoryTab = 'renders' | 'edits' | 'vistas' | 'finalizar'
 
 // Espelho de RENDER_LIST_COLUMNS (lib/history/redact.ts): a listagem NÃO
 // carrega prompt/fal_request_id/config_snapshot — o prompt final é
@@ -444,9 +444,10 @@ export function HistoryClient({
           <div>
             <h1 style={S.headerTitle}>Histórico</h1>
             <p style={S.headerSub}>
-              {historyTab === 'renders' && 'Seus renders salvos e prontos para reutilizar.'}
-              {historyTab === 'edits'   && 'Edições localizadas geradas no Editar.'}
-              {historyTab === 'vistas'  && 'Vistas geradas dentro dos seus Spaces.'}
+              {historyTab === 'renders'   && 'Seus renders salvos e prontos para reutilizar.'}
+              {historyTab === 'edits'     && 'Edições localizadas geradas no Editar.'}
+              {historyTab === 'vistas'    && 'Vistas geradas dentro dos seus Spaces.'}
+              {historyTab === 'finalizar' && 'Versões exportadas dos seus projetos do Finalizar.'}
             </p>
           </div>
 
@@ -476,15 +477,15 @@ export function HistoryClient({
           </div>
         </div>
 
-        {/* ── Tabs (Renders / Edições / Vistas) ── */}
+        {/* ── Tabs (Renders / Edições / Vistas / Finalizar) ── */}
         <div style={{
           display: 'flex', gap: 4, padding: 4,
           background: 'var(--color-surface)', borderRadius: 10,
-          marginBottom: 16, maxWidth: 480,
+          marginBottom: 16, maxWidth: 560,
         }}>
-          {(['renders', 'edits', 'vistas'] as HistoryTab[]).map(t => {
+          {(['renders', 'edits', 'vistas', 'finalizar'] as HistoryTab[]).map(t => {
             const active = historyTab === t
-            const label = t === 'renders' ? 'Renders' : t === 'edits' ? 'Edições' : 'Vistas'
+            const label = t === 'renders' ? 'Renders' : t === 'edits' ? 'Edições' : t === 'vistas' ? 'Vistas' : 'Finalizar'
             return (
               <button
                 key={t}
@@ -505,9 +506,10 @@ export function HistoryClient({
           })}
         </div>
 
-        {/* ── Tabs alternativas: Edições + Vistas ── */}
-        {historyTab === 'edits'  && <EditsTabView  authors={authors} onOpenDetail={openDetail} />}
-        {historyTab === 'vistas' && <VistasTabView authors={authors} onOpenDetail={openDetail} />}
+        {/* ── Tabs alternativas: Edições + Vistas + Finalizar ── */}
+        {historyTab === 'edits'     && <EditsTabView  authors={authors} onOpenDetail={openDetail} />}
+        {historyTab === 'vistas'    && <VistasTabView authors={authors} onOpenDetail={openDetail} />}
+        {historyTab === 'finalizar' && <FinalizarTabView />}
 
         {/* ── Controls (só renderiza na tab Renders) ── */}
         {historyTab === 'renders' && folderCounts.total > 0 && (
@@ -980,6 +982,121 @@ function VistasTabView({
           </div>
         </div>
       ))}
+    </div>
+  )
+}
+
+// ── FinalizarTabView ───────────────────────────────────────────────────────────
+
+// Versões exportadas do Finalizar (finalize_exports, RLS = só as próprias).
+// Clique abre o projeto no editor; o ícone abre o arquivo exportado.
+interface FinalizeExportItem {
+  id:         string
+  project_id: string | null
+  png_url:    string
+  format:     string
+  width:      number | null
+  height:     number | null
+  created_at: string
+  finalize_projects: { name: string } | null
+}
+
+function FinalizarTabView() {
+  const router = useRouter()
+  const [items, setItems] = useState<FinalizeExportItem[] | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const sb = createClient()
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoading(true)
+    sb.from('finalize_exports')
+      .select('id, project_id, png_url, format, width, height, created_at, finalize_projects(name)')
+      .order('created_at', { ascending: false })
+      .limit(60)
+      .then(({ data }) => setItems((data ?? []) as unknown as FinalizeExportItem[]))
+      .then(undefined, () => setItems([]))
+  }, [])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (items !== null) setLoading(false)
+  }, [items])
+
+  if (loading)                    return <TabLoading />
+  if ((items ?? []).length === 0) return (
+    <TabEmpty
+      message="Sem versões exportadas ainda — no Finalizar, exporte com “Salvar como versão no projeto”."
+      action={{ href: '/app/finalizar', label: 'Abrir Finalizar →' }}
+    />
+  )
+
+  return (
+    <div style={{
+      display: 'grid', gap: 14,
+      gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+    }}>
+      {items!.map(x => {
+        const projectName = x.finalize_projects?.name ?? 'Projeto do Finalizar'
+        const openProject = () => { if (x.project_id) router.push(`/app/finalizar/${x.project_id}`) }
+        return (
+          <div
+            key={x.id}
+            role="button"
+            tabIndex={0}
+            onClick={openProject}
+            onKeyDown={e => { if (e.key === 'Enter') openProject() }}
+            title={x.project_id ? 'Abrir o projeto no Finalizar' : 'Exportação avulsa'}
+            style={{
+              background: 'var(--color-bg-elevated)',
+              border: '0.5px solid var(--color-border)',
+              borderRadius: 12, overflow: 'hidden',
+              color: 'inherit', cursor: x.project_id ? 'pointer' : 'default',
+              display: 'block', position: 'relative',
+            }}
+          >
+            <div style={{ aspectRatio: '4 / 3', background: 'var(--color-surface)', position: 'relative' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={toMediaProxyUrl(x.png_url) ?? undefined} alt={projectName}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <button
+                type="button"
+                title="Abrir o arquivo exportado"
+                onClick={e => { e.stopPropagation(); window.open(x.png_url, '_blank', 'noopener') }}
+                style={{
+                  position: 'absolute', top: 8, right: 8,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  width: 26, height: 26, borderRadius: 7, border: 'none',
+                  background: 'var(--color-scrim)', color: '#ffffff', cursor: 'pointer',
+                }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                  <polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
+                </svg>
+              </button>
+            </div>
+            <div style={{ padding: '10px 12px 12px' }}>
+              <div style={{
+                fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary)',
+                letterSpacing: '-0.005em',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>
+                {projectName}
+              </div>
+              <div style={{
+                fontSize: 10, color: 'var(--color-text-quaternary)',
+                letterSpacing: '0.02em', marginTop: 4,
+              }}>
+                {x.format.toUpperCase()}
+                {x.width && x.height ? ` · ${x.width}×${x.height}` : ''}
+                {' · '}
+                {new Date(x.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+              </div>
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
