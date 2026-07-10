@@ -20,7 +20,6 @@
 // categoria ampla) — disparado pelo cliente após receber a resposta.
 
 import { NextRequest, NextResponse } from 'next/server'
-import { fal } from '@fal-ai/client'
 import { randomUUID } from 'crypto'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -30,8 +29,7 @@ import { ENGINES, isResolution, type EngineId, type Resolution } from '@/lib/eng
 import { getVistaGenerationCost, supportsQuality } from '@/lib/spaces/economy'
 import { getVisualDna, getBriefingFromDna } from '@/lib/spaces/dna'
 import { isQuality, type ProjectDNA, type Space } from '@/lib/spaces/types'
-
-fal.config({ credentials: process.env.FAL_KEY })
+import { generateImage } from '@/lib/ai/image-provider'
 
 const FAL_TIMEOUT_MS = 120_000
 const MAX_SKETCHES   = 10
@@ -338,24 +336,29 @@ async function generateOne(args: {
     console.log('[spaces.angulo] ref estética   (image #2)     :', aestheticRefUrl, referenceVistaId ? `(vista ${referenceVistaId})` : '(vista mestre)')
     console.log('[spaces.angulo] batch_id                      :', batchId)
 
-    const result = await Promise.race([
-      fal.subscribe(falEndpoint, { input: falInput }),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(Object.assign(new Error('FAL_TIMEOUT'), { isFalTimeout: true })), FAL_TIMEOUT_MS),
-      ),
-    ])
-    const images = (result.data as { images: { url: string }[] }).images
-    const outputUrl = images?.[0]?.url
-    if (!outputUrl) throw new Error('fal_no_output')
+    // Camada única de provider (lib/ai/image-provider): GCP/Vertex primário
+    // quando ligado por env, fallback FAL transparente.
+    const gen = await generateImage({
+      falEndpoint,
+      falInput,
+      timeoutMs: FAL_TIMEOUT_MS,
+      context:   'spaces.angulo',
+      deliver:   { kind: 'url', userId, area: 'vistas' },
+    })
+    const outputUrl = gen.images[0]?.url
+    if (!outputUrl) throw new Error('provider_no_output')
 
     // 4) Persistir
     const { error: updErr } = await admin
       .from('vistas')
       .update({
-        image_url:    outputUrl,
+        image_url:      outputUrl,
         prompt,
-        status:       'completed',
-        completed_at: new Date().toISOString(),
+        fal_request_id: gen.requestId,
+        provider:       gen.provider,
+        model:          gen.providerModel,
+        status:         'completed',
+        completed_at:   new Date().toISOString(),
       })
       .eq('id', vistaId)
     if (updErr) {

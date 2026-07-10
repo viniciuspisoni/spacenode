@@ -1,6 +1,6 @@
 // Google Gemini image-edit providers for Retocar.
 //
-// Two wrappers around the Nano Banana endpoints on Fal.ai:
+// Two wrappers around the Nano Banana endpoints (Gemini Image family):
 //
 //   callNanoBanana2  — fal-ai/nano-banana-2/edit   (Gemini 3.1 Flash Image)
 //                      Used for 'hd' quality (Rápido). Faster, lower cost.
@@ -13,12 +13,9 @@
 // in the prompt. The mask PNG is the standard B/W output from RetocarCanvas:
 // WHITE = area to edit, BLACK = area to preserve.
 //
-// NOTE: when Google Imagen inpainting ships on Fal.ai (or via Vertex AI
-// direct integration), replace or augment these functions for the 'remove'
-// and 'material' modes. The current Flux fallback acts as the safety net
-// until the Imagen endpoint is validated for architectural photorealism.
+// Geração via lib/ai/image-provider: GCP/Vertex primário (quando ligado por
+// env) com fallback FAL byte-idêntico ao comportamento anterior.
 
-import { fal } from '@fal-ai/client'
 import {
   type RetouchEngine,
   type RetouchInput,
@@ -27,6 +24,11 @@ import {
   RetouchTimeoutError,
 } from './types'
 import type { Quality } from '../types'
+import {
+  generateImage,
+  ImageProviderNoOutputError,
+  ImageProviderTimeoutError,
+} from '@/lib/ai/image-provider'
 
 export const NB2_ENDPOINT    = 'fal-ai/nano-banana-2/edit'
 export const NB_PRO_ENDPOINT = 'fal-ai/nano-banana-pro/edit'
@@ -37,10 +39,6 @@ const QUALITY_RESOLUTION: Record<Quality, string> = {
   hd:  '1K',
   '2k': '2K',
   '4k': '4K',
-}
-
-interface FalNBOutput {
-  images?: { url?: string }[]
 }
 
 // ── Prompt builder ────────────────────────────────────────────────────────────
@@ -70,29 +68,42 @@ async function callNB(
   endpoint: string,
   input:    RetouchInput,
 ): Promise<RetouchOutput> {
-  const resolution = QUALITY_RESOLUTION[input.quality]
+  const falInput = {
+    prompt:        buildMaskedPrompt(input.prompt),
+    image_urls:    [input.imageUrl, input.maskUrl],
+    resolution:    QUALITY_RESOLUTION[input.quality],
+    num_images:    1,
+    output_format: 'jpeg',
+    ...(input.seed !== undefined ? { seed: input.seed } : {}),
+  }
 
-  const result = await Promise.race([
-    fal.subscribe(endpoint, {
-      input: {
-        prompt:        buildMaskedPrompt(input.prompt),
-        image_urls:    [input.imageUrl, input.maskUrl],
-        resolution,
-        num_images:    1,
-        output_format: 'jpeg',
-        ...(input.seed !== undefined ? { seed: input.seed } : {}),
-      } as unknown as never,
-    }),
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new RetouchTimeoutError(endpoint)), TIMEOUT_MS)
-    ),
-  ])
+  let gen
+  try {
+    gen = await generateImage({
+      falEndpoint: endpoint,
+      falInput,
+      timeoutMs:   TIMEOUT_MS,
+      context:     `retocar/${endpoint === NB2_ENDPOINT ? 'nb2' : 'nbpro'}`,
+      deliver:     { kind: 'dataUrl' },
+    })
+  } catch (err) {
+    if (err instanceof ImageProviderTimeoutError) throw new RetouchTimeoutError(endpoint)
+    if (err instanceof ImageProviderNoOutputError) throw new RetouchNoOutputError(endpoint)
+    throw err
+  }
 
-  const data = result.data as FalNBOutput
-  const url  = data.images?.[0]?.url
+  const url = gen.images[0]?.url
   if (!url) throw new RetouchNoOutputError(endpoint)
 
-  return { imageUrl: url, endpoint, requestId: (result as { requestId?: string }).requestId ?? null }
+  return {
+    imageUrl:      url,
+    endpoint,
+    requestId:     gen.requestId,
+    provider:      gen.provider,
+    providerModel: gen.providerModel,
+    fallbackUsed:  gen.fallbackUsed,
+    latencyMs:     gen.latencyMs,
+  }
 }
 
 // ── callNanoBanana2 ───────────────────────────────────────────────────────────

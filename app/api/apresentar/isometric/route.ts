@@ -7,6 +7,7 @@ import { refundNodes } from '@/lib/billing/refund-nodes'
 import { APRESENTAR_TOOLS } from '@/lib/apresentar/config'
 import { buildIsometricPrompt } from '@/lib/apresentar/prompts'
 import { getFalEndpoint, getNodesCost, type EngineId, type Resolution } from '@/lib/engines'
+import { generateImage } from '@/lib/ai/image-provider'
 import type {
   IsometricOrigin,
   IsometricType,
@@ -108,18 +109,20 @@ export async function POST(req: NextRequest) {
       output_format: 'jpeg',
     }
 
-    const result = await Promise.race([
-      fal.subscribe(falEndpoint, { input: falInput }),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(Object.assign(new Error('FAL_TIMEOUT'), { isFalTimeout: true })), FAL_TIMEOUT_MS)
-      ),
-    ])
+    // Camada única de provider (lib/ai/image-provider): GCP/Vertex primário
+    // quando ligado por env, fallback FAL transparente.
+    const gen = await generateImage({
+      falEndpoint,
+      falInput,
+      timeoutMs: FAL_TIMEOUT_MS,
+      context:   'apresentar/isometric',
+      deliver:   { kind: 'url', userId: user.id, area: 'apresentar' },
+    })
 
-    const images = (result.data as { images: { url: string }[] }).images
-    outputUrl = images?.[0]?.url
-    if (!outputUrl) throw new Error('Fal não retornou imagem')
-    const falRequestId = (result as { requestId?: string }).requestId ?? null
-    console.log('[apresentar/isometric] outputUrl :', outputUrl, '| fal req:', falRequestId)
+    outputUrl = gen.images[0]?.url
+    if (!outputUrl) throw new Error('Provider não retornou imagem')
+    const falRequestId = gen.requestId
+    console.log('[apresentar/isometric] outputUrl :', outputUrl, '| provider:', gen.provider, '| req:', falRequestId)
 
     // ── Persistência ──────────────────────────────────────────────────────────
     const configSnapshot = {
@@ -128,6 +131,13 @@ export async function POST(req: NextRequest) {
       origin,
       type,
       style,
+      generation: {
+        provider:       gen.provider,
+        provider_model: gen.providerModel,
+        fallback_used:  gen.fallbackUsed,
+        provider_error: gen.errorMessage,
+        latency_ms:     gen.latencyMs,
+      },
     }
 
     const insertResult = await admin

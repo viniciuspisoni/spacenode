@@ -17,7 +17,6 @@
 // best-effort em qualquer falha pós-débito.
 
 import { NextRequest, NextResponse } from 'next/server'
-import { fal } from '@fal-ai/client'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getPayerId } from '@/lib/workspaces/context'
@@ -42,8 +41,7 @@ import {
 import { buildSpacesPreservePrompt } from '@/lib/spaces/preserve-prompt'
 import { computeSourceMeta, aspectRatioLabel, type SourceMeta } from '@/lib/spaces/source-meta'
 import { validateGeneration, checkArchitecturalPreservation } from '@/lib/spaces/preserve-validate'
-
-fal.config({ credentials: process.env.FAL_KEY })
+import { generateImage } from '@/lib/ai/image-provider'
 
 // A Vercel mata a função no maxDuration. As vistas geram em paralelo
 // (Promise.allSettled), então o cap precisa cobrir a vista mais lenta — não a
@@ -464,19 +462,23 @@ async function generateOne(args: {
     console.log('[spaces.generate] preserveV2:', preserveV2, preserveV2 ? `(${mode}/${level})` : '')
     console.log('[spaces.generate] prompt    :', finalPrompt)
 
-    const result = await Promise.race([
-      fal.subscribe(falEndpoint, { input: falInput }),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(Object.assign(new Error('FAL_TIMEOUT'), { isFalTimeout: true })), FAL_TIMEOUT_MS[engine]),
-      ),
-    ])
-    const images = (result.data as { images: { url: string; width?: number; height?: number }[] }).images
-    const outputUrl = images?.[0]?.url
-    if (!outputUrl) throw new Error('fal_no_output')
-    const genW = images?.[0]?.width  ?? null
-    const genH = images?.[0]?.height ?? null
-    // Rastreabilidade: liga esta vista à entrada no painel da fal.ai. Ver vistas.fal_request_id.
-    const falRequestId = (result as { requestId?: string }).requestId ?? null
+    // Camada única de provider (lib/ai/image-provider): GCP/Vertex primário
+    // quando ligado por env, fallback FAL transparente. width/height vêm do
+    // provider (FAL devolve na resposta; GCP mede via parse do header) — o
+    // Preserve V2 usa nas validações de aspecto.
+    const gen = await generateImage({
+      falEndpoint,
+      falInput,
+      timeoutMs: FAL_TIMEOUT_MS[engine],
+      context:   'spaces.generate',
+      deliver:   { kind: 'url', userId, area: 'vistas' },
+    })
+    const outputUrl = gen.images[0]?.url
+    if (!outputUrl) throw new Error('provider_no_output')
+    const genW = gen.images[0]?.width  ?? null
+    const genH = gen.images[0]?.height ?? null
+    // Rastreabilidade: id do request no provider (fal ou Vertex). Ver vistas.fal_request_id.
+    const falRequestId = gen.requestId
 
     // 5) Persistir completed (+ metadados/validação de preservação no V2)
     const updateRow: Record<string, unknown> = {
@@ -515,6 +517,10 @@ async function generateOne(args: {
         if (check?.warning) preservationWarning = true
       }
 
+      // Provider/modelo REAIS (a row pendente registrou a intenção 'fal';
+      // aqui gravamos quem gerou de fato — gcp ou fal via fallback).
+      updateRow.provider             = gen.provider
+      updateRow.model                = gen.providerModel
       updateRow.generated_width      = genW
       updateRow.generated_height     = genH
       updateRow.aspect_ratio         = aspectRatioLabel(genAspect) ?? aspectRatioLabel(sourceMeta?.aspectRatio ?? null)
