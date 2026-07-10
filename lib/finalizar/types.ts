@@ -145,6 +145,10 @@ export interface LocalAdjustment {
   /** Refino por pincel por cima da forma (adiciona/subtrai). */
   strokes: MaskStroke[]
   values: LocalAdjustValues
+  /** Suavização da borda da máscara inteira, em px da imagem (0 = off). */
+  feather: number
+  /** 0..100 — intensidade máxima da máscara (teto do efeito). */
+  density: number
 }
 
 /** Máximo de ajustes locais por documento (limite de texturas do motor). */
@@ -199,6 +203,9 @@ export interface ElementLayer {
   maskStrokes: MaskStroke[]
   /** Máscara rasterizada persistida (PNG branco=visível) — legado v1/baked. */
   maskUrl: string | null
+  /** Correspondência de cor automática com a base (gain/offset pré-computados;
+   *  amount 0..100). null = desligada. */
+  colorMatch: { gain: [number, number, number]; offset: [number, number, number]; amount: number } | null
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -250,6 +257,18 @@ export interface ProjectVersion {
   summary: string
 }
 
+/** Marco nomeado do trabalho, persistido no projeto ("Versão cliente" etc.).
+ *  O doc interno tem snapshots: [] (sem aninhamento). */
+export interface DocSnapshot {
+  id: string
+  name: string
+  createdAt: string
+  doc: FinalizeDoc
+}
+
+/** Máximo de snapshots por projeto (controle do tamanho do jsonb). */
+export const MAX_SNAPSHOTS = 8
+
 export interface FinalizeDoc {
   version: 2
   /** Dimensões naturais da imagem base. */
@@ -270,6 +289,9 @@ export interface FinalizeDoc {
   locals: LocalAdjustment[]
   elements: ElementLayer[]
   versions: ProjectVersion[]
+  /** 0..100 — intensidade GLOBAL do tratamento (mistura com a cena crua). */
+  treatmentAmount: number
+  snapshots: DocSnapshot[]
 }
 
 /** Projeto Finalizar persistido (linha de finalize_projects). */

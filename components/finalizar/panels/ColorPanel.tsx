@@ -25,9 +25,13 @@ export interface ColorPanelProps {
   histogram: { luma: Uint32Array; max: number } | null
   onMatchReference: (file: File) => Promise<void>
   matchBusy: boolean
+  /** Copiar/colar o tratamento completo entre projetos (consistência entre vistas). */
+  onCopyTreatment: () => void
+  onPasteTreatment: () => void
+  pasteAvailable: boolean
 }
 
-type SectionKey = 'curve' | 'hsl' | 'grading' | 'match'
+type SectionKey = 'treatment' | 'curve' | 'hsl' | 'grading' | 'match'
 type GradeZone = 'shadows' | 'midtones' | 'highlights'
 
 const GRADE_ZONES: { id: GradeZone; label: string; hueDefault: number }[] = [
@@ -49,9 +53,13 @@ function withGradeWheel(grading: ColorGrading, zone: GradeZone, partial: Partial
 }
 
 export function ColorPanel(props: ColorPanelProps): React.ReactElement {
-  const { doc, patch, histogram, onMatchReference, matchBusy } = props
+  const {
+    doc, patch, histogram, onMatchReference, matchBusy,
+    onCopyTreatment, onPasteTreatment, pasteAvailable,
+  } = props
 
   const [open, setOpen] = useState<Record<SectionKey, boolean>>({
+    treatment: true,
     curve: true,
     hsl: false,
     grading: false,
@@ -69,6 +77,29 @@ export function ColorPanel(props: ColorPanelProps): React.ReactElement {
 
   return (
     <div>
+      {/* ── 0. Tratamento (intensidade global + consistência entre vistas) ── */}
+      <Section title="Tratamento" open={open.treatment} onToggle={() => toggle('treatment')}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <SliderRow
+            label="Intensidade" value={doc.treatmentAmount} min={0} max={100} defaultValue={100}
+            format={(v) => `${v}%`}
+            title="Esvanece todo o tratamento tonal em direção à imagem original"
+            onChange={(v) => patch('Intensidade do tratamento', (d) => ({ ...d, treatmentAmount: v }), 'treatment.amount')}
+          />
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <Chip onClick={onCopyTreatment} title="Copia luz, cor, curva, HSL, grading e vinheta para usar em outra imagem">
+              Copiar tratamento
+            </Chip>
+            <Chip onClick={onPasteTreatment} disabled={!pasteAvailable} title={pasteAvailable ? 'Aplica o tratamento copiado nesta imagem' : 'Copie um tratamento em outra imagem primeiro'}>
+              Colar tratamento
+            </Chip>
+          </div>
+          <p style={{ fontSize: 11, color: 'var(--color-text-quaternary)', lineHeight: 1.5, margin: 0 }}>
+            Use copiar/colar para manter a mesma atmosfera entre as imagens do projeto.
+          </p>
+        </div>
+      </Section>
+
       {/* ── 1. Curva de luminosidade ─────────────────────────────────────── */}
       <Section title="Curva de luminosidade" open={open.curve} onToggle={() => toggle('curve')}>
         <CurveEditor

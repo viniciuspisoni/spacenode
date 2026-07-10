@@ -7,6 +7,7 @@ import {
   HSL_BANDS,
   MAX_ELEMENTS,
   MAX_LOCAL_ADJUSTMENTS,
+  MAX_SNAPSHOTS,
   type Adjustments,
   type BlendMode,
   type ColorGrading,
@@ -88,6 +89,8 @@ export function newLocalAdjustment(shape: MaskShape, name: string): LocalAdjustm
     shape,
     strokes: [],
     values: defaultLocalValues(),
+    feather: 0,
+    density: 100,
   }
 }
 
@@ -113,6 +116,7 @@ export function newElementLayer({ url, name, category = 'imagem', width = 1 }: N
     maskFill: 'full',
     maskStrokes: [],
     maskUrl: null,
+    colorMatch: null,
   }
 }
 
@@ -134,6 +138,8 @@ export function createDocument(baseUrl: string, width: number, height: number): 
     locals: [],
     elements: [],
     versions: [],
+    treatmentAmount: 100,
+    snapshots: [],
   }
 }
 
@@ -278,6 +284,8 @@ function sanitizeLocal(raw: unknown, i: number): LocalAdjustment {
     shape: sanitizeShape(l.shape),
     strokes: sanitizeStrokes(l.strokes),
     values: sanitizeLocalValues(l.values),
+    feather: num(l.feather, 0, 0, 250),
+    density: num(l.density, 100, 0, 100),
   }
 }
 
@@ -298,6 +306,11 @@ const ELEMENT_CATEGORY_IDS: ElementCategory[] = ['imagem', 'ceu', 'vegetacao', '
 function sanitizeElement(raw: unknown, i: number): ElementLayer | null {
   const e = (raw ?? {}) as Partial<ElementLayer>
   if (typeof e.url !== 'string' || !e.url) return null
+  const cm = e.colorMatch
+  const tri = (arr: unknown, fb: number, lo: number, hi: number): [number, number, number] => {
+    const a = Array.isArray(arr) ? arr : []
+    return [num(a[0], fb, lo, hi), num(a[1], fb, lo, hi), num(a[2], fb, lo, hi)]
+  }
   return {
     id: typeof e.id === 'string' ? e.id : makeId('e'),
     name: typeof e.name === 'string' && e.name.trim() ? e.name : `Elemento ${i + 1}`,
@@ -311,6 +324,13 @@ function sanitizeElement(raw: unknown, i: number): ElementLayer | null {
     maskFill: e.maskFill === 'empty' ? 'empty' : 'full',
     maskStrokes: sanitizeStrokes(e.maskStrokes),
     maskUrl: typeof e.maskUrl === 'string' ? e.maskUrl : null,
+    colorMatch: cm && typeof cm === 'object' && Array.isArray((cm as { gain?: unknown }).gain)
+      ? {
+          gain: tri((cm as { gain: unknown }).gain, 1, 0.25, 4),
+          offset: tri((cm as { offset?: unknown }).offset, 0, -0.5, 0.5),
+          amount: num((cm as { amount?: unknown }).amount, 70, 0, 100),
+        }
+      : null,
   }
 }
 
@@ -428,6 +448,7 @@ export function migrateV1(v1: LegacyCompositionV1): FinalizeDoc {
       maskFill: l.maskFill === 'empty' ? 'empty' : 'full',
       maskStrokes: [],
       maskUrl: typeof l.maskUrl === 'string' ? l.maskUrl : null,
+      colorMatch: null,
     }))
   return doc
 }
@@ -474,7 +495,31 @@ export function deserializeDocument(raw: unknown): FinalizeDoc | null {
       ? d.elements.map(sanitizeElement).filter((e): e is ElementLayer => e !== null).slice(0, MAX_ELEMENTS)
       : [],
     versions: sanitizeVersions(d.versions),
+    treatmentAmount: num(d.treatmentAmount, 100, 0, 100),
+    snapshots: sanitizeSnapshots(d.snapshots),
   }
+}
+
+/** Snapshots: cada um carrega um doc completo com snapshots INTERNOS zerados
+ *  (sem recursão). Inválidos são descartados. */
+function sanitizeSnapshots(raw: unknown): FinalizeDoc['snapshots'] {
+  if (!Array.isArray(raw)) return []
+  const out: FinalizeDoc['snapshots'] = []
+  for (const s of raw.slice(0, MAX_SNAPSHOTS)) {
+    if (!s || typeof s !== 'object') continue
+    const snap = s as { id?: unknown; name?: unknown; createdAt?: unknown; doc?: unknown }
+    if (typeof snap.name !== 'string' || !snap.doc || typeof snap.doc !== 'object') continue
+    const innerRaw = { ...(snap.doc as Record<string, unknown>), snapshots: [] }
+    const inner = deserializeDocument(innerRaw)
+    if (!inner) continue
+    out.push({
+      id: typeof snap.id === 'string' ? snap.id : makeId('s'),
+      name: snap.name.slice(0, 60),
+      createdAt: typeof snap.createdAt === 'string' ? snap.createdAt : new Date(0).toISOString(),
+      doc: inner,
+    })
+  }
+  return out
 }
 
 /** Documento para gravar — passa pelo sanitizador (garante shape canônico). */

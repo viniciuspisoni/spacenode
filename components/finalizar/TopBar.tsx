@@ -4,6 +4,7 @@
 // salvamento, desfazer/refazer, antes/depois, zoom, painéis e exportar.
 
 import { IconBtn, Divider, kbdStyle } from './ui'
+import type { CompareMode } from './CanvasViewport'
 
 export type SaveStatus = 'none' | 'dirty' | 'saving' | 'saved' | 'autosaved' | 'error'
 
@@ -18,6 +19,8 @@ interface Props {
   onRedo: () => void
   compare: boolean
   onCompare: (down: boolean) => void
+  compareMode: CompareMode
+  onCompareMode: (m: CompareMode) => void
   zoomPct: number
   onZoomIn: () => void
   onZoomOut: () => void
@@ -112,6 +115,28 @@ export function TopBar(p: Props) {
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 3v18" /></svg>
         {p.compare ? 'Antes' : 'Comparar'}
       </button>
+
+      {/* comparação persistente: divisor / lado a lado */}
+      <IconBtn
+        onClick={() => p.onCompareMode(p.compareMode === 'split' ? 'none' : 'split')}
+        title="Comparar com divisor arrastável"
+        active={p.compareMode === 'split'}
+        size={32}
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="4" width="18" height="16" rx="2" /><path d="M12 2v20" strokeDasharray="3 2.5" />
+        </svg>
+      </IconBtn>
+      <IconBtn
+        onClick={() => p.onCompareMode(p.compareMode === 'side' ? 'none' : 'side')}
+        title="Comparar lado a lado (zoom sincronizado)"
+        active={p.compareMode === 'side'}
+        size={32}
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="5" width="8" height="14" rx="1.5" /><rect x="13" y="5" width="8" height="14" rx="1.5" />
+        </svg>
+      </IconBtn>
 
       <Divider vertical />
 

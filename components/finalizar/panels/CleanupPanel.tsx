@@ -155,7 +155,9 @@ export function CleanupPanel(props: CleanupPanelProps) {
                 ? 'Pinte a área primeiro'
                 : insufficient
                   ? 'Saldo insuficiente'
-                  : preview?.label ?? (mode === 'remove' ? 'Remover' : 'Corrigir')}
+                  : messageKind === 'error'
+                    ? 'Tentar novamente'
+                    : preview?.label ?? (mode === 'remove' ? 'Remover' : 'Corrigir')}
           </button>
 
           {message && (
