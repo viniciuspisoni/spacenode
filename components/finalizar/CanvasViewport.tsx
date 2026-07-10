@@ -42,6 +42,11 @@ export interface BrushSettings {
 
 export type StrokeTarget = { kind: 'local'; id: string } | { kind: 'element'; id: string } | { kind: 'cleanup' }
 
+/** Comparação persistente além do "segurar": divisor arrastável ou lado a lado. */
+export type CompareMode = 'none' | 'split' | 'side'
+
+export type MaskOverlayColor = 'green' | 'red' | 'white'
+
 export interface CanvasViewportHandle {
   fit(): void
   zoomBy(factor: number): void
@@ -64,7 +69,9 @@ interface Props {
   /** elements: true = pincel de máscara do elemento; false = transformar. */
   elementMaskMode: boolean
   compare: boolean
+  compareMode: CompareMode
   showMaskOverlay: boolean
+  maskOverlayColor: MaskOverlayColor
   cleanupStrokes: MaskStroke[]
   wbPicking: boolean
   onZoomChange: (pct: number) => void
@@ -80,6 +87,7 @@ interface Props {
 }
 
 type DragState =
+  | { kind: 'split'; pointerId: number }
   | { kind: 'pan'; pointerId: number; startX: number; startY: number; panX: number; panY: number }
   | { kind: 'stroke'; pointerId: number; target: StrokeTarget; stroke: LiveStroke }
   | { kind: 'shape'; pointerId: number; localId: string; shapeKind: 'linear' | 'radial'; start: { x: number; y: number } }
@@ -91,7 +99,7 @@ type DragState =
 export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function CanvasViewport(props, ref) {
   const {
     doc, tool, activeLocalId, activeElementId, brush, maskInteraction, elementMaskMode,
-    compare, showMaskOverlay, cleanupStrokes, wbPicking,
+    compare, compareMode, showMaskOverlay, maskOverlayColor, cleanupStrokes, wbPicking,
     onZoomChange, onStrokeCommit, onShapeChange, onElementChange, onCropChange,
     onPickWb, onSelectElement, onError,
   } = props
@@ -111,6 +119,8 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
 
   const zoomRef = useRef(1)
   const panRef = useRef({ x: 0, y: 0 })
+  /** Posição do divisor de comparação (fração 0..1 da largura da tela). */
+  const splitRef = useRef(0.5)
   const dragRef = useRef<DragState | null>(null)
   const cursorRef = useRef<{ x: number; y: number } | null>(null)
   const spaceRef = useRef(false)
@@ -250,25 +260,78 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
     const dw = v.vis.w * d.width * v.s
     const dh = v.vis.h * d.height * v.s
 
-    if (p.compare && baseImgRef.current) {
-      const img = baseImgRef.current
+    const img = baseImgRef.current
+    const drawView = (src: CanvasImageSource, srcW: number, srcH: number, clip?: { x: number; w: number }) => {
+      ctx.save()
+      if (clip) {
+        ctx.beginPath()
+        ctx.rect(clip.x, 0, clip.w, screen.height)
+        ctx.clip()
+      }
       ctx.drawImage(
-        img,
-        v.vis.x * img.naturalWidth, v.vis.y * img.naturalHeight,
-        v.vis.w * img.naturalWidth, v.vis.h * img.naturalHeight,
+        src,
+        v.vis.x * srcW, v.vis.y * srcH, v.vis.w * srcW, v.vis.h * srcH,
         v.ox, v.oy, dw, dh,
       )
-    } else {
-      ctx.drawImage(
-        glCanvas,
-        v.vis.x * glCanvas.width, v.vis.y * glCanvas.height,
-        v.vis.w * glCanvas.width, v.vis.h * glCanvas.height,
-        v.ox, v.oy, dw, dh,
-      )
+      ctx.restore()
+    }
+    const compareLabel = (text: string, x: number, align: 'left' | 'right') => {
+      ctx.font = `${11 * devicePixelRatio}px ${getComputedStyle(document.body).fontFamily}`
+      const padX = 8 * devicePixelRatio
+      const tw = ctx.measureText(text).width
+      const bx = align === 'left' ? x : x - tw - padX * 2
+      ctx.fillStyle = 'rgba(0,0,0,0.55)'
+      ctx.beginPath()
+      ctx.roundRect(bx, 10 * devicePixelRatio, tw + padX * 2, 20 * devicePixelRatio, 6 * devicePixelRatio)
+      ctx.fill()
+      ctx.fillStyle = '#ffffff'
+      ctx.fillText(text, bx + padX, 24 * devicePixelRatio)
     }
 
-    // ── overlays ──
-    if (!p.compare) {
+    if (p.compare && img) {
+      // segurar: mostra o "antes" em tela cheia
+      drawView(img, img.naturalWidth, img.naturalHeight)
+    } else if (p.compareMode === 'split' && img) {
+      drawView(glCanvas, glCanvas.width, glCanvas.height)
+      const sx = splitRef.current * screen.width
+      drawView(img, img.naturalWidth, img.naturalHeight, { x: 0, w: sx })
+      // divisor + alça
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)'
+      ctx.lineWidth = 1.5 * devicePixelRatio
+      ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, screen.height); ctx.stroke()
+      ctx.fillStyle = '#ffffff'
+      ctx.strokeStyle = 'rgba(0,0,0,0.35)'
+      ctx.beginPath(); ctx.arc(sx, screen.height / 2, 8 * devicePixelRatio, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
+      compareLabel('Antes', 10 * devicePixelRatio, 'left')
+      compareLabel('Depois', screen.width - 10 * devicePixelRatio, 'right')
+    } else if (p.compareMode === 'side' && img) {
+      // duas metades com fit próprio; zoom/pan compartilhados
+      const gap = 6 * devicePixelRatio
+      const halfW = (screen.width - gap) / 2
+      const visW = v.vis.w * d.width
+      const visH = v.vis.h * d.height
+      const margin = 24 * devicePixelRatio
+      const fit = Math.min((halfW - margin) / visW, (screen.height - margin) / visH)
+      const s = Math.max(0.001, fit * zoomRef.current)
+      const dw2 = visW * s
+      const dh2 = visH * s
+      const oy2 = (screen.height - dh2) / 2 + panRef.current.y
+      const drawHalf = (src: CanvasImageSource, srcW: number, srcH: number, x0: number, label: string) => {
+        const ox2 = x0 + (halfW - dw2) / 2 + panRef.current.x
+        ctx.save()
+        ctx.beginPath(); ctx.rect(x0, 0, halfW, screen.height); ctx.clip()
+        ctx.drawImage(src, v.vis.x * srcW, v.vis.y * srcH, v.vis.w * srcW, v.vis.h * srcH, ox2, oy2, dw2, dh2)
+        ctx.restore()
+        compareLabel(label, x0 + 10 * devicePixelRatio, 'left')
+      }
+      drawHalf(img, img.naturalWidth, img.naturalHeight, 0, 'Antes')
+      drawHalf(glCanvas, glCanvas.width, glCanvas.height, halfW + gap, 'Depois')
+    } else {
+      drawView(glCanvas, glCanvas.width, glCanvas.height)
+    }
+
+    // ── overlays (fora dos modos de comparação) ──
+    if (!p.compare && p.compareMode === 'none') {
       if (p.tool === 'masks' && p.showMaskOverlay && p.activeLocalId) {
         const local = d.locals.find((l) => l.id === p.activeLocalId)
         if (local) drawMaskOverlay(ctx, v, local)
@@ -297,7 +360,7 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
   // overlays dependem de props de UI
   useEffect(() => {
     scheduleDraw()
-  }, [tool, activeLocalId, activeElementId, compare, showMaskOverlay, cleanupStrokes, elementMaskMode, wbPicking, brush, scheduleDraw])
+  }, [tool, activeLocalId, activeElementId, compare, compareMode, showMaskOverlay, maskOverlayColor, cleanupStrokes, elementMaskMode, wbPicking, brush, scheduleDraw])
 
   // resize
   useEffect(() => {
@@ -380,21 +443,22 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
     if (!renderer) return
     const mw = Math.max(2, Math.round(d.width * MASK_SCALE))
     const mh = Math.max(2, Math.round(d.height * MASK_SCALE))
-    const key = `${local.id}|${JSON.stringify(local.shape)}|${local.strokes.length}|${local.invert}|${mw}`
+    const overlayColor = propsRef.current.maskOverlayColor
+    const key = `${local.id}|${JSON.stringify(local.shape)}|${local.strokes.length}|${local.invert}|${local.feather}|${mw}|${overlayColor}`
     let tint = maskTintCache.current?.key === key ? maskTintCache.current.canvas : null
     if (!tint) {
       const analytic = local.shape.kind === 'linear' || local.shape.kind === 'radial' || local.shape.kind === 'luminosity'
         ? analyticShapeCanvas(local, mw, mh)
         : null
       const solved = renderer.masks.solvedLocalMaskPng(local, d.width, d.height, analytic)
-      // branco=selecionado → verde translúcido
+      // branco=selecionado → cor de visualização translúcida
       tint = document.createElement('canvas')
       tint.width = solved.width
       tint.height = solved.height
       const tctx = tint.getContext('2d')!
       tctx.drawImage(solved, 0, 0)
       tctx.globalCompositeOperation = 'multiply'
-      tctx.fillStyle = accentGreen()
+      tctx.fillStyle = overlayColor === 'red' ? '#e0584a' : overlayColor === 'white' ? '#ffffff' : accentGreen()
       tctx.fillRect(0, 0, tint.width, tint.height)
       // preto (não selecionado) vira transparente
       const id = tctx.getImageData(0, 0, tint.width, tint.height)
@@ -426,6 +490,7 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
       id: '__cleanup__', name: '', enabled: true, invert: false,
       shape: { kind: 'brush' }, strokes: propsRef.current.cleanupStrokes,
       values: { exposure: 0, contrast: 0, highlights: 0, shadows: 0, temperature: 0, tint: 0, saturation: 0, clarity: 0, sharpness: 0 },
+      feather: 0, density: 100,
     }
     const rg = renderer.masks.localMask(pseudo, d.width, d.height, live)
     // R (add) → vermelho translúcido de aviso
@@ -699,6 +764,21 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
     }
     if (e.button !== 0 || p.compare) return
 
+    // Modos de comparação são de VISUALIZAÇÃO: divisor arrastável + pan.
+    if (p.compareMode === 'split') {
+      const sx = splitRef.current * screen.width
+      if (Math.abs(px - sx) < 14 * devicePixelRatio) {
+        dragRef.current = { kind: 'split', pointerId: e.pointerId }
+        return
+      }
+      dragRef.current = { kind: 'pan', pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, panX: panRef.current.x, panY: panRef.current.y }
+      return
+    }
+    if (p.compareMode === 'side') {
+      dragRef.current = { kind: 'pan', pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, panX: panRef.current.x, panY: panRef.current.y }
+      return
+    }
+
     if (p.wbPicking) {
       const pt = toImage(e.clientX, e.clientY)
       const img = baseImgRef.current
@@ -811,6 +891,11 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
     }
 
     switch (drag.kind) {
+      case 'split': {
+        const px = (e.clientX - rect.left) * (screen.width / rect.width)
+        splitRef.current = Math.max(0.05, Math.min(0.95, px / screen.width))
+        break
+      }
       case 'pan': {
         const dpr = screen.width / rect.width
         panRef.current = { x: drag.panX + (e.clientX - drag.startX) * dpr, y: drag.panY + (e.clientY - drag.startY) * dpr }
@@ -980,17 +1065,22 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
 
   // ── Cursor CSS ───────────────────────────────────────────────────────────
 
-  const painting =
+  const painting = compareMode === 'none' && (
     (tool === 'masks' && activeLocalId && maskInteraction === 'brush')
     || tool === 'cleanup'
     || (tool === 'elements' && activeElementId && elementMaskMode)
-  const cursorStyle = wbPicking
-    ? 'crosshair'
-    : painting
-      ? 'none'
-      : tool === 'geometry'
+  )
+  const cursorStyle = compareMode === 'split'
+    ? 'col-resize'
+    : compareMode === 'side'
+      ? 'default'
+      : wbPicking
         ? 'crosshair'
-        : 'default'
+        : painting
+          ? 'none'
+          : tool === 'geometry'
+            ? 'crosshair'
+            : 'default'
 
   return (
     <div

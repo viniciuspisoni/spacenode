@@ -18,22 +18,29 @@ import {
 import { makeId } from '@/lib/finalizar/composition'
 import { Chip, Section, SliderRow } from '@/components/finalizar/ui'
 
+/** Correções de um clique orientadas a arquitetura (o editor executa). */
+export type QuickFix =
+  | 'janelas' | 'interior-exterior' | 'estouradas' | 'materiais' | 'luz-artificial'
+
 export interface AdjustPanelProps {
   doc: FinalizeDoc
   patch: (label: string, updater: (d: FinalizeDoc) => FinalizeDoc, coalesceKey?: string) => void
   histogram: { luma: Uint32Array; max: number } | null
   wbPicking: boolean
   onToggleWbPick: () => void
+  onQuickFix: (kind: QuickFix) => void
+  quickFixDisabled: boolean
 }
 
 const column: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 7 }
 
-export function AdjustPanel({ doc, patch, histogram, wbPicking, onToggleWbPick }: AdjustPanelProps): React.ReactElement {
+export function AdjustPanel({ doc, patch, histogram, wbPicking, onToggleWbPick, onQuickFix, quickFixDisabled }: AdjustPanelProps): React.ReactElement {
   const [open, setOpen] = useState({
-    presets: true,
+    rapidas: true,
+    presets: false,
     luz: true,
     cor: true,
-    presenca: true,
+    presenca: false,
     efeitos: false,
   })
   const toggle = (k: keyof typeof open) => setOpen((o) => ({ ...o, [k]: !o[k] }))
@@ -123,6 +130,32 @@ export function AdjustPanel({ doc, patch, histogram, wbPicking, onToggleWbPick }
           </svg>
         </div>
       )}
+
+      <Section title="Correções rápidas" open={open.rapidas} onToggle={() => toggle('rapidas')}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          <Chip onClick={() => onQuickFix('janelas')} disabled={quickFixDisabled} title="Cria uma máscara das áreas mais claras e recupera janelas estouradas">
+            Recuperar janelas
+          </Chip>
+          <Chip onClick={() => onQuickFix('interior-exterior')} disabled={quickFixDisabled} title="Abre as sombras internas e segura os realces externos com duas máscaras de luminosidade">
+            Equilibrar interior/exterior
+          </Chip>
+          <Chip onClick={() => onQuickFix('estouradas')} title="Reduz realces e brancos globalmente">
+            Reduzir estouradas
+          </Chip>
+          <Chip onClick={() => onQuickFix('materiais')} title="Realça materiais e texturas (clareza + nitidez)">
+            Realçar materiais
+          </Chip>
+          <Chip onClick={() => onQuickFix('luz-artificial')} title="Suaviza o brilho quente de luz artificial">
+            Suavizar luz artificial
+          </Chip>
+          <Chip active={wbPicking} onClick={onToggleWbPick} title="Clique em um ponto neutro (cinza/branco) da imagem">
+            Corrigir dominante
+          </Chip>
+        </div>
+        <p style={{ fontSize: 11, color: 'var(--color-text-quaternary)', marginTop: 8, lineHeight: 1.5 }}>
+          Pontos de partida ajustáveis — tudo continua editável nas seções abaixo e em Máscaras.
+        </p>
+      </Section>
 
       <Section title="Predefinições" open={open.presets} onToggle={() => toggle('presets')}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>

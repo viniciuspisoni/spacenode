@@ -11,7 +11,7 @@ import {
 } from '@/lib/finalizar/types'
 import { makeId } from '@/lib/finalizar/composition'
 import type { BrushSettings } from '../CanvasViewport'
-import { Chip, Section, Seg, SliderRow } from '../ui'
+import { ActiveDot, Chip, Section, Seg, SliderRow } from '../ui'
 
 export interface ElementsPanelProps {
   doc: FinalizeDoc
@@ -23,12 +23,14 @@ export interface ElementsPanelProps {
   onElementMaskMode: (b: boolean) => void
   brush: BrushSettings
   onBrush: (b: BrushSettings) => void
+  /** Calcula gain/offset do elemento vs base e grava em colorMatch (editor). */
+  onAutoColorMatch: (id: string) => void
 }
 
 export function ElementsPanel(props: ElementsPanelProps) {
   const {
     doc, patch, activeElementId, onSelectElement, onAddElement,
-    elementMaskMode, onElementMaskMode, brush, onBrush,
+    elementMaskMode, onElementMaskMode, brush, onBrush, onAutoColorMatch,
   } = props
   const [openList, setOpenList] = useState(true)
   const [openProps, setOpenProps] = useState(true)
@@ -84,10 +86,20 @@ export function ElementsPanel(props: ElementsPanelProps) {
         }
       >
         {ordered.length === 0 && (
-          <p style={{ fontSize: 11.5, color: 'var(--color-text-quaternary)', lineHeight: 1.55 }}>
-            Adicione céu, vegetação, pessoas, veículos, overlays ou seu logo.
-            A imagem base fica sempre protegida no fundo.
-          </p>
+          <div style={{ padding: '6px 2px' }}>
+            <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.55, margin: 0 }}>
+              Componha por cima do render: céu, vegetação, pessoas, veículos,
+              overlays de luz ou seu logo — de outra geração, do histórico ou de upload.
+            </p>
+            <ul style={{ margin: '10px 0 0', paddingLeft: 16, fontSize: 11.5, color: 'var(--color-text-tertiary)', lineHeight: 1.7 }}>
+              <li>Mover, redimensionar e rotacionar direto no canvas</li>
+              <li>Mesclagem, opacidade e máscara por pincel</li>
+              <li>Cor ajustada automaticamente ao fundo</li>
+            </ul>
+            <p style={{ fontSize: 11, color: 'var(--color-text-quaternary)', lineHeight: 1.5, marginTop: 10 }}>
+              A imagem base fica sempre protegida no fundo.
+            </p>
+          </div>
         )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {ordered.map((el, visualIdx) => {
@@ -101,11 +113,11 @@ export function ElementsPanel(props: ElementsPanelProps) {
                 style={{
                   display: 'flex', alignItems: 'center', gap: 7, padding: '6px 8px',
                   borderRadius: 9, cursor: 'pointer',
-                  border: `0.5px solid ${isActive ? 'var(--color-border-strong)' : 'var(--color-border)'}`,
+                  border: `1px solid ${isActive ? 'var(--color-border-focus)' : 'var(--color-border)'}`,
                   background: isActive ? 'var(--color-surface)' : 'transparent',
-                  boxShadow: isActive ? 'inset 3px 0 0 0 var(--color-accent-green)' : 'none',
                 }}
               >
+                <ActiveDot on={isActive} />
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); patchEl(el.visible ? `Ocultar ${el.name}` : `Mostrar ${el.name}`, el.id, (x) => ({ ...x, visible: !x.visible })) }}
@@ -198,6 +210,19 @@ export function ElementsPanel(props: ElementsPanelProps) {
             />
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               <Chip
+                active={Boolean(active.colorMatch)}
+                onClick={() => {
+                  if (active.colorMatch) {
+                    patchEl('Remover ajuste de cor do elemento', active.id, (x) => ({ ...x, colorMatch: null }))
+                  } else {
+                    onAutoColorMatch(active.id)
+                  }
+                }}
+                title={active.colorMatch ? 'Remove a correspondência de cor com o fundo' : 'Aproxima a cor do elemento à da imagem base'}
+              >
+                {active.colorMatch ? 'Cor ajustada ✓' : 'Ajustar cor ao fundo'}
+              </Chip>
+              <Chip
                 active={active.transform.flipH}
                 onClick={() => patchEl('Espelhar horizontal', active.id, (x) => ({ ...x, transform: { ...x.transform, flipH: !x.transform.flipH } }))}
                 title="Espelhar horizontalmente"
@@ -219,6 +244,14 @@ export function ElementsPanel(props: ElementsPanelProps) {
                 Rotação 0°
               </Chip>
             </div>
+            {active.colorMatch && (
+              <SliderRow
+                label="Cor ao fundo" value={active.colorMatch.amount} min={0} max={100} defaultValue={70}
+                format={(v) => `${v}%`}
+                title="Intensidade da correspondência de cor com a base"
+                onChange={(v) => patchEl('Intensidade da cor ao fundo', active.id, (x) => (x.colorMatch ? { ...x, colorMatch: { ...x.colorMatch, amount: v } } : x), `el.${active.id}.cmatch`)}
+              />
+            )}
           </div>
         </Section>
       )}

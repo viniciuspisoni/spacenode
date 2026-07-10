@@ -330,6 +330,10 @@ export class FinalizeRenderer {
         gl.uniform1f(this.u(p, 'uOpacity'), el.opacity)
         gl.uniform1i(this.u(p, 'uBlend'), BLEND_INDEX[el.blendMode] ?? 0)
         gl.uniform1f(this.u(p, 'uAspect'), aspect)
+        const cm = el.colorMatch
+        gl.uniform3f(this.u(p, 'uElemGain'), cm?.gain[0] ?? 1, cm?.gain[1] ?? 1, cm?.gain[2] ?? 1)
+        gl.uniform3f(this.u(p, 'uElemOffset'), cm?.offset[0] ?? 0, cm?.offset[1] ?? 0, cm?.offset[2] ?? 0)
+        gl.uniform1f(this.u(p, 'uElemMatch'), cm ? cm.amount / 100 : 0)
         this.draw()
         cur = next
       }
@@ -443,6 +447,7 @@ export class FinalizeRenderer {
         Math.max(0.02, v.feather / 100),
         v.amount !== 0 ? 1 : 0,
       )
+      gl.uniform1f(this.u(p, 'uTreatment'), doc.treatmentAmount / 100)
       this.draw()
     }
     return true
@@ -474,6 +479,7 @@ export class FinalizeRenderer {
         case 'luminosity': mode = 4; p0 = [s.min, s.max, Math.max(0.01, s.smooth), 0]; break
       }
     }
+    p1[1] = l.density / 100 // densidade (teto do efeito da máscara)
 
     // Textura de traços (R=add, G=erase) — só quando há traços/bake/live.
     let tex = this.dummyTex!

@@ -15,11 +15,11 @@ import { useRouter } from 'next/navigation'
 import {
   type CropRect, type ElementTransform, type FinalizeDoc, type FinalizeProject,
   type FinalizeProjectSummary, type MaskShape, type MaskStroke,
-  MAX_ELEMENTS, MAX_LOCAL_ADJUSTMENTS,
+  MAX_ELEMENTS, MAX_LOCAL_ADJUSTMENTS, MAX_SNAPSHOTS,
 } from '@/lib/finalizar/types'
 import {
   compactStroke, createDocument, deserializeDocument, isGeometryIdentity,
-  newElementLayer, newLocalAdjustment, serializeDocument,
+  makeId, newElementLayer, newLocalAdjustment, serializeDocument,
 } from '@/lib/finalizar/composition'
 import { DocHistory } from '@/lib/finalizar/history'
 import {
@@ -28,12 +28,16 @@ import {
 import { computeColorMatch, displayToSource, imageStats, solveNeutral, type Histogram } from '@/lib/finalizar/engine/color-math'
 import { estimateStrokeCoverage, strokesMaskPngCanvas } from '@/lib/finalizar/engine/masks'
 import { uploadDirect } from '@/lib/storage/direct-upload-client'
-import { CanvasViewport, type BrushSettings, type CanvasViewportHandle, type StrokeTarget } from './CanvasViewport'
+import {
+  CanvasViewport,
+  type BrushSettings, type CanvasViewportHandle, type CompareMode,
+  type MaskOverlayColor, type StrokeTarget,
+} from './CanvasViewport'
 import { TopBar, StatusStrip, type SaveStatus } from './TopBar'
 import { ToolRail, type EditorTool } from './ToolRail'
 import { ExportDialog, type ExportOptions } from './ExportDialog'
 import { FinalizeImportModal } from './FinalizeImportModal'
-import { AdjustPanel } from './panels/AdjustPanel'
+import { AdjustPanel, type QuickFix } from './panels/AdjustPanel'
 import { ColorPanel } from './panels/ColorPanel'
 import { MasksPanel, type QuickMask } from './panels/MasksPanel'
 import { CleanupPanel, type CleanupPreview } from './panels/CleanupPanel'
@@ -54,10 +58,12 @@ const PANEL_TITLE: Record<EditorTool, string> = {
   cleanup: 'Limpeza (IA)',
   geometry: 'Geometria',
   elements: 'Elementos',
-  history: 'Histórico',
+  history: 'Histórico e versões',
 }
 
 const AUTOSAVE_DELAY = 3500
+const TREATMENT_CLIPBOARD_KEY = 'spn-finalizar-treatment-v1'
+const PANEL_WIDTH_KEY = 'spn-finalizar-panel-w'
 
 /** URLs assinadas do Storage expiram — persiste sempre a forma pública
  *  (estável; o proxy de mídia resolve o acesso quando o bucket for privado). */
@@ -98,7 +104,20 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
   // ── UI ─────────────────────────────────────────────────────────────────────
   const [tool, setTool] = useState<EditorTool>('adjust')
   const [panelsOpen, setPanelsOpen] = useState(true)
+  const [panelWidth, setPanelWidth] = useState(312)
+  const panelWidthRef = useRef(panelWidth)
+  useEffect(() => { panelWidthRef.current = panelWidth }, [panelWidth])
+  useEffect(() => {
+    try {
+      const saved = Number(window.localStorage.getItem(PANEL_WIDTH_KEY))
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- leitura única do localStorage no cliente
+      if (Number.isFinite(saved) && saved >= 264 && saved <= 480) setPanelWidth(saved)
+    } catch { /* sem storage */ }
+  }, [])
   const [compare, setCompare] = useState(false)
+  const [compareMode, setCompareMode] = useState<CompareMode>('none')
+  const [maskOverlayColor, setMaskOverlayColor] = useState<MaskOverlayColor>('green')
+  const [pasteAvailable, setPasteAvailable] = useState(false)
   const [zoomPct, setZoomPct] = useState(100)
   const [activeLocalId, setActiveLocalId] = useState<string | null>(null)
   const [activeElementId, setActiveElementId] = useState<string | null>(null)
@@ -363,6 +382,164 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
   }, [patch])
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // Correções rápidas de arquitetura (combinações reais de máscaras + ajustes)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  const onQuickFix = useCallback((kind: QuickFix) => {
+    const cur = docRef.current
+    if (!cur) return
+    switch (kind) {
+      case 'janelas':
+        void onAddLocal('windows')
+        return
+      case 'interior-exterior': {
+        if (cur.locals.length > MAX_LOCAL_ADJUSTMENTS - 2) {
+          setError(`Sem espaço para 2 novas máscaras (limite de ${MAX_LOCAL_ADJUSTMENTS}).`)
+          return
+        }
+        const sombras = newLocalAdjustment({ kind: 'luminosity', min: 0, max: 0.35, smooth: 0.15 }, 'Interior (sombras)')
+        sombras.values.shadows = 30
+        sombras.values.exposure = 8
+        const realces = newLocalAdjustment({ kind: 'luminosity', min: 0.7, max: 1, smooth: 0.12 }, 'Exterior (realces)')
+        realces.values.highlights = -25
+        patch('Equilibrar interior/exterior', (d) => ({ ...d, locals: [...d.locals, sombras, realces] }))
+        setActiveLocalId(sombras.id)
+        return
+      }
+      case 'estouradas':
+        patch('Reduzir estouradas', (d) => ({
+          ...d,
+          adjust: {
+            ...d.adjust,
+            highlights: Math.max(-100, d.adjust.highlights - 35),
+            whites: Math.max(-100, d.adjust.whites - 15),
+          },
+        }))
+        return
+      case 'materiais':
+        patch('Realçar materiais', (d) => ({
+          ...d,
+          adjust: {
+            ...d.adjust,
+            clarity: Math.min(100, d.adjust.clarity + 18),
+            sharpen: Math.min(100, d.adjust.sharpen + 12),
+          },
+        }))
+        return
+      case 'luz-artificial':
+        patch('Suavizar luz artificial', (d) => ({
+          ...d,
+          adjust: {
+            ...d.adjust,
+            temperature: Math.max(-100, d.adjust.temperature - 8),
+            highlights: Math.max(-100, d.adjust.highlights - 12),
+          },
+        }))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [patch])
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Tratamento: copiar/colar entre projetos (consistência entre vistas)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  const onCopyTreatment = useCallback(() => {
+    const d = docRef.current
+    if (!d) return
+    try {
+      window.localStorage.setItem(TREATMENT_CLIPBOARD_KEY, JSON.stringify({
+        adjust: d.adjust, vignette: d.vignette, curve: d.curve,
+        hsl: d.hsl, grading: d.grading, treatmentAmount: d.treatmentAmount,
+      }))
+      setPasteAvailable(true)
+    } catch {
+      setError('Não foi possível copiar o tratamento (armazenamento local indisponível).')
+    }
+  }, [])
+
+  const onPasteTreatment = useCallback(() => {
+    try {
+      const raw = window.localStorage.getItem(TREATMENT_CLIPBOARD_KEY)
+      if (!raw) return
+      const t = JSON.parse(raw) as Record<string, unknown>
+      patch('Colar tratamento', (d) => {
+        // O sanitizador do documento garante shape/limites do que veio do storage.
+        const merged = deserializeDocument({ ...d, ...t, snapshots: d.snapshots, versions: d.versions })
+        return merged ?? d
+      })
+    } catch {
+      setError('O tratamento copiado é inválido.')
+    }
+  }, [patch])
+
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- leitura única do localStorage no cliente
+      setPasteAvailable(Boolean(window.localStorage.getItem(TREATMENT_CLIPBOARD_KEY)))
+    } catch { /* sem storage */ }
+  }, [])
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Elementos: correspondência automática de cor com a base
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  const onAutoColorMatch = useCallback(async (id: string) => {
+    const cur = docRef.current
+    const el = cur?.elements.find((e) => e.id === id)
+    const baseImg = viewportRef.current?.baseImage()
+    if (!el || !baseImg) return
+    try {
+      const elImg = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const img = new Image()
+        img.crossOrigin = 'anonymous'
+        img.onload = () => resolve(img)
+        img.onerror = () => reject(new Error('Não foi possível carregar o elemento.'))
+        img.src = el.url
+      })
+      const m = computeColorMatch(
+        imageStats(elImg, elImg.naturalWidth, elImg.naturalHeight),
+        imageStats(baseImg, baseImg.naturalWidth, baseImg.naturalHeight),
+      )
+      patch('Ajustar cor do elemento ao fundo', (d) => ({
+        ...d,
+        elements: d.elements.map((e) => (e.id === id ? { ...e, colorMatch: { gain: m.gain, offset: m.offset, amount: 70 } } : e)),
+      }))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Falha ao analisar o elemento.')
+    }
+  }, [patch])
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Snapshots (marcos nomeados persistidos no documento)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  const onSaveSnapshot = useCallback((sname: string) => {
+    patch(`Snapshot: ${sname}`, (d) => {
+      if (d.snapshots.length >= MAX_SNAPSHOTS) return d
+      const inner: FinalizeDoc = { ...d, snapshots: [] }
+      return {
+        ...d,
+        snapshots: [...d.snapshots, { id: makeId('s'), name: sname, createdAt: new Date().toISOString(), doc: inner }],
+      }
+    })
+  }, [patch])
+
+  const onRestoreSnapshot = useCallback((id: string) => {
+    const s = docRef.current?.snapshots.find((x) => x.id === id)
+    if (!s) return
+    patch(`Restaurar snapshot: ${s.name}`, (d) => ({
+      ...s.doc,
+      // snapshots e versões acompanham o PROJETO, não o marco restaurado
+      snapshots: d.snapshots,
+      versions: d.versions,
+    }))
+  }, [patch])
+
+  const onDeleteSnapshot = useCallback((id: string) => {
+    patch('Remover snapshot', (d) => ({ ...d, snapshots: d.snapshots.filter((x) => x.id !== id) }))
+  }, [patch])
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // Correspondência de cor
   // ═══════════════════════════════════════════════════════════════════════════
 
@@ -484,34 +661,36 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
           }))
       const maskCanvas = strokesMaskPngCanvas(mappedStrokes, cur.width, cur.height)
       const maskBlob = await new Promise<Blob | null>((r) => maskCanvas.toBlob(r, 'image/png'))
-      if (!maskBlob) throw new Error('Falha ao gerar a máscara.')
-      const fd = new FormData()
-      fd.append('file', new File([maskBlob], 'mask.png', { type: 'image/png' }))
-      fd.append('kind', 'mask')
-      const maskRes = await fetch('/api/edits/upload-asset', { method: 'POST', body: fd })
-      const maskJson = await maskRes.json().catch(() => null)
-      if (!maskRes.ok || typeof maskJson?.url !== 'string') {
-        throw new Error(maskJson?.error ?? 'Falha ao enviar a máscara.')
+      if (!maskBlob) throw new Error('Falha ao gerar a máscara neste navegador. Tente novamente.')
+      // Upload DIRETO browser→Storage (rotas da Vercel rejeitam corpo >4,5MB —
+      // era a causa do "Falha ao enviar a máscara" em imagens grandes).
+      let maskUrl: string
+      try {
+        const up = await uploadDirect(maskBlob, 'retocar-asset', { kind: 'mask' })
+        if (!up.url) throw new Error('sem URL')
+        maskUrl = up.url
+      } catch (e) {
+        throw new Error(`Falha ao enviar a máscara (${e instanceof Error ? e.message : 'conexão'}). Sua seleção foi mantida — toque em Tentar novamente.`)
       }
 
       // 2. imagem fonte: precisa ser URL absoluta alcançável pelo servidor
       let sourceUrl = cur.baseUrl
       if (sourceUrl.startsWith('/')) {
         const baseImg = viewportRef.current?.baseImage()
-        if (!baseImg) throw new Error('Imagem base indisponível.')
+        if (!baseImg) throw new Error('Imagem base indisponível. Recarregue a página.')
         const c = document.createElement('canvas')
         c.width = baseImg.naturalWidth
         c.height = baseImg.naturalHeight
         c.getContext('2d')?.drawImage(baseImg, 0, 0)
         const blob = await new Promise<Blob | null>((r) => c.toBlob(r, 'image/png'))
-        if (!blob) throw new Error('Falha ao preparar a imagem.')
-        const sfd = new FormData()
-        sfd.append('file', new File([blob], 'source.png', { type: 'image/png' }))
-        sfd.append('kind', 'source')
-        const sres = await fetch('/api/edits/upload-asset', { method: 'POST', body: sfd })
-        const sjson = await sres.json().catch(() => null)
-        if (!sres.ok || typeof sjson?.url !== 'string') throw new Error('Falha ao preparar a imagem.')
-        sourceUrl = sjson.url
+        if (!blob) throw new Error('Falha ao preparar a imagem (CORS). Recarregue a página.')
+        try {
+          const up = await uploadDirect(blob, 'retocar-asset', { kind: 'source' })
+          if (!up.url) throw new Error('sem URL')
+          sourceUrl = up.url
+        } catch (e) {
+          throw new Error(`Falha ao preparar a imagem (${e instanceof Error ? e.message : 'conexão'}). Sua seleção foi mantida — toque em Tentar novamente.`)
+        }
       }
 
       // 3. execução — o servidor debita e reembolsa em falha/rejeição
@@ -521,7 +700,7 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           source_image_url: sourceUrl,
-          mask_url: maskJson.url,
+          mask_url: maskUrl,
           prompt: cleanupMode === 'fix' ? cleanupPrompt.trim() : '',
           mode: cleanupMode === 'remove' ? 'remove' : 'fix',
           quality: 'hd',
@@ -891,6 +1070,8 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
         onRedo={redo}
         compare={compare}
         onCompare={setCompare}
+        compareMode={compareMode}
+        onCompareMode={setCompareMode}
         zoomPct={zoomPct}
         onZoomIn={() => viewportRef.current?.zoomBy(1.25)}
         onZoomOut={() => viewportRef.current?.zoomBy(1 / 1.25)}
@@ -916,7 +1097,9 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
           maskInteraction={maskInteraction}
           elementMaskMode={elementMaskMode}
           compare={compare}
+          compareMode={compareMode}
           showMaskOverlay={showMaskOverlay && tool === 'masks'}
+          maskOverlayColor={maskOverlayColor}
           cleanupStrokes={cleanupStrokes}
           wbPicking={wbPicking}
           onZoomChange={setZoomPct}
@@ -931,8 +1114,35 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
         />
 
         {panelsOpen && (
+          <div
+            className="spn-panel-resizer"
+            onPointerDown={(e) => {
+              const startX = e.clientX
+              const startW = panelWidth
+              const el = e.currentTarget
+              el.setPointerCapture(e.pointerId)
+              el.dataset.dragging = '1'
+              const move = (ev: PointerEvent) => {
+                const w = Math.max(264, Math.min(480, startW + (startX - ev.clientX)))
+                setPanelWidth(w)
+              }
+              const up = () => {
+                delete el.dataset.dragging
+                el.removeEventListener('pointermove', move)
+                el.removeEventListener('pointerup', up)
+                try {
+                  window.localStorage.setItem(PANEL_WIDTH_KEY, String(panelWidthRef.current))
+                } catch { /* sem storage */ }
+              }
+              el.addEventListener('pointermove', move)
+              el.addEventListener('pointerup', up)
+            }}
+            title="Arraste para redimensionar o painel"
+          />
+        )}
+        {panelsOpen && (
           <aside style={{
-            width: 312, flexShrink: 0, display: 'flex', flexDirection: 'column',
+            width: panelWidth, flexShrink: 0, display: 'flex', flexDirection: 'column',
             borderLeft: '0.5px solid var(--color-border)', background: 'var(--color-bg)',
             minHeight: 0,
           }}>
@@ -951,6 +1161,8 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
                   histogram={histogram}
                   wbPicking={wbPicking}
                   onToggleWbPick={() => setWbPicking((v) => !v)}
+                  onQuickFix={onQuickFix}
+                  quickFixDisabled={doc.locals.length >= MAX_LOCAL_ADJUSTMENTS}
                 />
               )}
               {tool === 'color' && (
@@ -960,6 +1172,9 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
                   histogram={histogram}
                   onMatchReference={onMatchReference}
                   matchBusy={matchBusy}
+                  onCopyTreatment={onCopyTreatment}
+                  onPasteTreatment={onPasteTreatment}
+                  pasteAvailable={pasteAvailable}
                 />
               )}
               {tool === 'masks' && (
@@ -974,6 +1189,8 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
                   onMaskInteraction={setMaskInteraction}
                   showMaskOverlay={showMaskOverlay}
                   onToggleOverlay={() => setShowMaskOverlay((v) => !v)}
+                  maskOverlayColor={maskOverlayColor}
+                  onMaskOverlayColor={setMaskOverlayColor}
                   onAddLocal={(k) => void onAddLocal(k)}
                   skyBusy={skyBusy}
                 />
@@ -1009,6 +1226,7 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
                   onElementMaskMode={setElementMaskMode}
                   brush={brush}
                   onBrush={setBrush}
+                  onAutoColorMatch={(id) => void onAutoColorMatch(id)}
                 />
               )}
               {tool === 'history' && (
@@ -1016,6 +1234,11 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
                   steps={historyUi.steps}
                   onJump={(i) => applyHistoryDoc(historyRef.current.jumpTo(i))}
                   versions={doc.versions}
+                  snapshots={doc.snapshots}
+                  onSaveSnapshot={onSaveSnapshot}
+                  onRestoreSnapshot={onRestoreSnapshot}
+                  onDeleteSnapshot={onDeleteSnapshot}
+                  snapshotsFull={doc.snapshots.length >= MAX_SNAPSHOTS}
                 />
               )}
             </div>

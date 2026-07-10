@@ -94,6 +94,9 @@ uniform vec2 uFlip;          // 1 ou -1
 uniform float uOpacity;
 uniform int uBlend;          // 0 normal 1 multiply 2 screen 3 overlay 4 soft 5 lighten 6 darken
 uniform float uAspect;       // aspect do canvas (w/h) p/ rotação sem distorção
+uniform vec3 uElemGain;      // correspondência de cor automática com a base
+uniform vec3 uElemOffset;
+uniform float uElemMatch;    // 0..1
 in vec2 vUv;
 out vec4 outColor;
 
@@ -124,6 +127,9 @@ void main() {
     return;
   }
   vec4 el = texture(uElem, local);
+  if (uElemMatch > 0.001) {
+    el.rgb = mix(el.rgb, clamp(el.rgb * uElemGain + uElemOffset, 0.0, 1.0), uElemMatch);
+  }
   float m = texture(uElemMask, vUv).r;
   float a = el.a * uOpacity * m;
   vec3 blended = blendPix(dst.rgb, el.rgb, uBlend);
@@ -190,7 +196,8 @@ float maskValue${i}(vec2 uv, float sceneLuma) {
   vec2 rg = texture(uLocalTex${i}, uv).rg;
   float base = uLocalMode[${i}] == 1 ? 0.0 : analyticMask(uLocalMode[${i}], uLocalP0[${i}], uLocalP1[${i}], sceneLuma, uv);
   float m = clamp(base + rg.r, 0.0, 1.0) * (1.0 - rg.g);
-  return mix(m, 1.0 - m, uLocalInvert[${i}]);
+  m = mix(m, 1.0 - m, uLocalInvert[${i}]);
+  return m * uLocalP1[${i}].y; // densidade (teto do efeito)
 }
 `).join('\n')
   return cases
@@ -384,6 +391,7 @@ uniform sampler2D uFine;    // blur fino
 uniform sampler2D uCoarse;  // blur grosso (1/4 res, upsample bilinear)
 uniform vec4 uDetail;       // sharpen 0..1, nr 0..1, clarity -1..1, detailActive
 uniform vec4 uVignette;     // amount -1..1, size 0..1, feather 0..1, active
+uniform float uTreatment;   // 0..1 — intensidade global (mistura com a cena)
 
 ${maskUniformDecls()}
 ${maskValueFn()}
@@ -438,6 +446,12 @@ ${Array.from({ length: N }, (_, i) => `    {
     float feather = max(uVignette.z, 0.02);
     float v = smoothstep(start, start + feather, dist);
     c *= 1.0 + uVignette.x * v * 0.85;
+  }
+
+  // Intensidade global do tratamento: 100% = resultado; 0% = cena crua
+  // (geometria e elementos preservados — só o tratamento tonal esvanece).
+  if (uTreatment < 0.999) {
+    c = mix(texture(uScene, vUv).rgb, c, uTreatment);
   }
 
   outColor = vec4(clamp(c, 0.0, 1.0), src.a);

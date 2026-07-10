@@ -142,7 +142,7 @@ export class MaskRasterizer {
     const w = Math.max(2, Math.round(imgW * MASK_SCALE))
     const h = Math.max(2, Math.round(imgH * MASK_SCALE))
     const baked = local.shape.kind === 'sky' ? local.shape.bakedUrl ?? '' : ''
-    const key = `${w}x${h}|${baked}|${this.strokesKey(local.strokes)}|${live ? `live${live.points.length}:${live.erase ? 1 : 0}` : ''}`
+    const key = `${w}x${h}|${baked}|${local.feather}|${this.strokesKey(local.strokes)}|${live ? `live${live.points.length}:${live.erase ? 1 : 0}` : ''}`
     const cacheId = `local:${local.id}`
     const hit = this.cache.get(cacheId)
     if (hit && hit.key === key) return hit.canvas
@@ -163,7 +163,19 @@ export class MaskRasterizer {
     for (const s of local.strokes) applyStroke(addCtx, eraseCtx, s, w, h, scale)
     if (live && live.points.length > 0) applyStroke(addCtx, eraseCtx, live, w, h, scale)
 
-    const out = combineRG(add, erase)
+    let out = combineRG(add, erase)
+    // Feather da máscara inteira (pincel/céu): blur dos canais R/G.
+    const featherPx = local.feather * MASK_SCALE
+    if (featherPx > 0.5) {
+      const blurred = makeCanvas(w, h)
+      const bctx = blurred.getContext('2d')!
+      bctx.fillStyle = '#000000'
+      bctx.fillRect(0, 0, w, h)
+      bctx.filter = `blur(${featherPx.toFixed(1)}px)`
+      bctx.drawImage(out, 0, 0)
+      bctx.filter = 'none'
+      out = blurred
+    }
     this.cache.set(cacheId, { key, canvas: out })
     return out
   }

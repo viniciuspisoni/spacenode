@@ -1,10 +1,12 @@
 'use client'
 
 // components/finalizar/ui.tsx — primitivos visuais do editor Finalizar.
-// Segue o design system: tokens CSS, hairline 0.5px, verde só funcional,
-// sliders nativos com accent verde e leitura tabular-nums.
+//
+// Direção visual: interface NEUTRA (pretos/brancos/cinzas) com verde em ~2% —
+// apenas estado ativo real, sucesso e ação prioritária. Sliders profissionais
+// (trilho cinza, knob claro; verde só em hover/foco/arraste — ver .spn-slider).
 
-import { useId } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 
 export const panelCard: React.CSSProperties = {
   border: '0.5px solid var(--color-border)',
@@ -45,6 +47,25 @@ interface SliderRowProps {
 export function SliderRow({ label, value, min, max, step = 1, onChange, defaultValue = 0, format, disabled, title }: SliderRowProps) {
   const id = useId()
   const changed = value !== defaultValue
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+  const inputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    if (editing) inputRef.current?.select()
+  }, [editing])
+
+  const commitDraft = () => {
+    setEditing(false)
+    const n = Number(draft.replace(',', '.'))
+    if (!Number.isFinite(n)) return
+    onChange(Math.max(min, Math.min(max, n)))
+  }
+
+  // preenchimento do trilho (fração percorrida) — cinza, nunca verde
+  const pct = Math.max(0, Math.min(100, ((value - min) / Math.max(1e-6, max - min)) * 100))
+  const trackBg = `linear-gradient(to right, var(--color-text-quaternary) 0%, var(--color-text-quaternary) ${pct}%, var(--color-surface-hover) ${pct}%, var(--color-surface-hover) 100%)`
+
   return (
     <div
       title={title}
@@ -58,34 +79,68 @@ export function SliderRow({ label, value, min, max, step = 1, onChange, defaultV
         onDoubleClick={() => onChange(defaultValue)}
         title={title ?? 'Duplo-clique para redefinir'}
         style={{
-          fontSize: 12, color: changed ? 'var(--color-text-secondary)' : 'var(--color-text-tertiary)',
-          width: 88, flexShrink: 0, cursor: 'default', userSelect: 'none',
+          display: 'flex', alignItems: 'center', gap: 5,
+          fontSize: 12, color: changed ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+          width: 92, flexShrink: 0, cursor: 'default', userSelect: 'none',
           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
         }}
       >
+        {/* indicador discreto de parâmetro alterado */}
+        <span style={{
+          width: 4, height: 4, borderRadius: 999, flexShrink: 0,
+          background: changed ? 'var(--color-text-tertiary)' : 'transparent',
+        }} />
         {label}
       </label>
       <input
         id={id}
         type="range"
+        className="spn-slider"
         min={min}
         max={max}
         step={step}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        style={{ flex: 1, minWidth: 40, accentColor: 'var(--color-accent-green)', height: 14 }}
+        style={{ flex: 1, minWidth: 40, background: trackBg }}
       />
-      <span style={{
-        width: 38, textAlign: 'right', fontSize: 11.5, fontVariantNumeric: 'tabular-nums',
-        color: changed ? 'var(--color-text-secondary)' : 'var(--color-text-quaternary)', flexShrink: 0,
-      }}>
-        {format ? format(value) : `${value > 0 ? '+' : ''}${value}`}
-      </span>
+      {editing ? (
+        <input
+          ref={inputRef}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commitDraft}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commitDraft()
+            if (e.key === 'Escape') setEditing(false)
+            e.stopPropagation()
+          }}
+          inputMode="numeric"
+          style={{
+            width: 40, fontSize: 11.5, textAlign: 'right', padding: '1px 3px',
+            borderRadius: 5, border: '1px solid var(--color-input-border)',
+            background: 'var(--color-input)', color: 'var(--color-text-primary)',
+            outline: 'none', fontVariantNumeric: 'tabular-nums', flexShrink: 0,
+          }}
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => { setDraft(String(value)); setEditing(true) }}
+          title="Clique para digitar o valor"
+          style={{
+            width: 40, textAlign: 'right', fontSize: 11.5, fontVariantNumeric: 'tabular-nums',
+            color: changed ? 'var(--color-text-secondary)' : 'var(--color-text-quaternary)',
+            flexShrink: 0, background: 'transparent', border: 'none', cursor: 'text', padding: 0,
+          }}
+        >
+          {format ? format(value) : `${value > 0 ? '+' : ''}${value}`}
+        </button>
+      )}
     </div>
   )
 }
 
-// ── Segmentado ───────────────────────────────────────────────────────────────
+// ── Segmentado (neutro; sem verde) ───────────────────────────────────────────
 
 interface SegProps<T extends string> {
   options: { id: T; label: string; title?: string }[]
@@ -110,9 +165,9 @@ export function Seg<T extends string>({ options, value, onChange }: SegProps<T>)
             style={{
               padding: '5px 12px', borderRadius: 7, fontSize: 12,
               fontWeight: active ? 500 : 400,
-              border: `0.5px solid ${active ? 'var(--color-accent-green-border)' : 'transparent'}`,
-              background: active ? 'var(--color-accent-green-bg)' : 'transparent',
-              color: active ? 'var(--color-accent-green)' : 'var(--color-text-secondary)',
+              border: `1px solid ${active ? 'var(--color-border-focus)' : 'transparent'}`,
+              background: active ? 'var(--color-surface-hover)' : 'transparent',
+              color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
               cursor: 'pointer',
               transition: 'background var(--duration-fast), color var(--duration-fast)',
             }}
@@ -125,7 +180,7 @@ export function Seg<T extends string>({ options, value, onChange }: SegProps<T>)
   )
 }
 
-// ── Chip / IconBtn ───────────────────────────────────────────────────────────
+// ── Chip / IconBtn (neutros) ─────────────────────────────────────────────────
 
 interface ChipProps {
   active?: boolean
@@ -176,17 +231,29 @@ export function IconBtn({ onClick, title, active, disabled, children, size = 30 
       style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         width: size, height: size, borderRadius: 8, flexShrink: 0,
-        border: `0.5px solid ${active ? 'var(--color-accent-green-border)' : 'transparent'}`,
-        background: active ? 'var(--color-accent-green-bg)' : 'transparent',
+        border: `1px solid ${active ? 'var(--color-border-focus)' : 'transparent'}`,
+        background: active ? 'var(--color-surface-hover)' : 'transparent',
         color: disabled
           ? 'var(--color-text-quaternary)'
-          : active ? 'var(--color-accent-green)' : 'var(--color-text-secondary)',
+          : active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
         cursor: disabled ? 'default' : 'pointer',
         transition: 'background var(--duration-fast), color var(--duration-fast)',
       }}
     >
       {children}
     </button>
+  )
+}
+
+/** Nó verde pequeno — ÚNICO marcador verde de seleção (cards/listas). */
+export function ActiveDot({ on }: { on: boolean }) {
+  return (
+    <span style={{
+      width: 6, height: 6, borderRadius: 999, flexShrink: 0,
+      background: on ? 'var(--color-accent-green)' : 'transparent',
+      border: on ? 'none' : '1px solid var(--color-border)',
+      transition: 'background var(--duration-fast)',
+    }} />
   )
 }
 
@@ -215,7 +282,7 @@ export function Section({ title, children, open, onToggle, right }: SectionProps
         onClick={onToggle}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle() } }}
         style={{
-          display: 'flex', alignItems: 'center', gap: 8, padding: '11px 14px',
+          display: 'flex', alignItems: 'center', gap: 8, padding: '12px 14px',
           cursor: 'pointer', userSelect: 'none',
         }}
       >
@@ -232,7 +299,7 @@ export function Section({ title, children, open, onToggle, right }: SectionProps
         <span style={{ ...sectionLabel, flex: 1 }}>{title}</span>
         {right}
       </div>
-      {open && <div style={{ padding: '2px 14px 14px' }}>{children}</div>}
+      {open && <div style={{ padding: '4px 14px 16px' }}>{children}</div>}
     </div>
   )
 }

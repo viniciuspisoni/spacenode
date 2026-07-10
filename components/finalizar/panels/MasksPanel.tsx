@@ -4,8 +4,9 @@
 // local), luminosidade (janelas estouradas / sombras). Nada aqui usa Nodes.
 
 import { MAX_LOCAL_ADJUSTMENTS, type FinalizeDoc, type LocalAdjustment } from '@/lib/finalizar/types'
-import type { BrushSettings } from '../CanvasViewport'
-import { Chip, Section, SliderRow, Seg } from '../ui'
+import { makeId } from '@/lib/finalizar/composition'
+import type { BrushSettings, MaskOverlayColor } from '../CanvasViewport'
+import { ActiveDot, Chip, Section, SliderRow, Seg } from '../ui'
 import { useState } from 'react'
 
 export type QuickMask = 'brush' | 'linear' | 'radial' | 'sky' | 'windows' | 'shadows'
@@ -21,6 +22,8 @@ export interface MasksPanelProps {
   onMaskInteraction: (m: 'brush' | 'shape') => void
   showMaskOverlay: boolean
   onToggleOverlay: () => void
+  maskOverlayColor: MaskOverlayColor
+  onMaskOverlayColor: (c: MaskOverlayColor) => void
   /** Criação fica no editor (céu precisa do viewport). */
   onAddLocal: (kind: QuickMask) => void
   skyBusy: boolean
@@ -34,7 +37,8 @@ const KIND_LABEL: Record<string, string> = {
 export function MasksPanel(props: MasksPanelProps) {
   const {
     doc, patch, activeLocalId, onSelectLocal, brush, onBrush,
-    maskInteraction, onMaskInteraction, showMaskOverlay, onToggleOverlay, onAddLocal, skyBusy,
+    maskInteraction, onMaskInteraction, showMaskOverlay, onToggleOverlay,
+    maskOverlayColor, onMaskOverlayColor, onAddLocal, skyBusy,
   } = props
   const [openList, setOpenList] = useState(true)
   const [openBrush, setOpenBrush] = useState(true)
@@ -85,11 +89,11 @@ export function MasksPanel(props: MasksPanelProps) {
                   style={{
                     display: 'flex', alignItems: 'center', gap: 8, padding: '7px 9px',
                     borderRadius: 9, cursor: 'pointer',
-                    border: `0.5px solid ${isActive ? 'var(--color-border-strong)' : 'var(--color-border)'}`,
+                    border: `1px solid ${isActive ? 'var(--color-border-focus)' : 'var(--color-border)'}`,
                     background: isActive ? 'var(--color-surface)' : 'transparent',
-                    boxShadow: isActive ? 'inset 3px 0 0 0 var(--color-accent-green)' : 'none',
                   }}
                 >
+                  <ActiveDot on={isActive} />
                   <button
                     type="button"
                     onClick={(e) => {
@@ -180,14 +184,49 @@ export function MasksPanel(props: MasksPanelProps) {
               format={(v) => `${v}%`} onChange={(v) => onBrush({ ...brush, hardness: v / 100 })} />
             <SliderRow label="Fluxo" value={Math.round(brush.flow * 100)} min={5} max={100} defaultValue={100}
               format={(v) => `${v}%`} onChange={(v) => onBrush({ ...brush, flow: v / 100 })} />
+            {(active.shape.kind === 'brush' || active.shape.kind === 'sky') && (
+              <SliderRow label="Suavizar borda" value={active.feather} min={0} max={150}
+                format={(v) => `${v}`}
+                title="Suaviza a borda de toda a máscara"
+                onChange={(v) => patchLocal('Suavizar borda da máscara', active.id, (l) => ({ ...l, feather: v }), `local.${active.id}.feather`)} />
+            )}
+            <SliderRow label="Densidade" value={active.density} min={0} max={100} defaultValue={100}
+              format={(v) => `${v}%`}
+              title="Teto de intensidade do efeito da máscara"
+              onChange={(v) => patchLocal('Densidade da máscara', active.id, (l) => ({ ...l, density: v }), `local.${active.id}.density`)} />
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
-              <Chip active={showMaskOverlay} onClick={onToggleOverlay} title="Ver a área da máscara em verde">Ver máscara</Chip>
+              <Chip active={showMaskOverlay} onClick={onToggleOverlay} title="Ver a área da máscara colorida sobre a imagem">Ver máscara</Chip>
               <Chip
                 active={active.invert}
                 onClick={() => patchLocal(`Inverter ${active.name}`, active.id, (l) => ({ ...l, invert: !l.invert }))}
                 title="Inverte a área afetada"
               >
                 Inverter
+              </Chip>
+              <Chip
+                onClick={() => {
+                  if (full) return
+                  patch(`Duplicar ${active.name}`, (d) => {
+                    const idx = d.locals.findIndex((l) => l.id === active.id)
+                    if (idx < 0 || d.locals.length >= MAX_LOCAL_ADJUSTMENTS) return d
+                    const src = d.locals[idx]
+                    const copy: LocalAdjustment = {
+                      ...src,
+                      id: makeId('m'),
+                      name: `${src.name} (cópia)`,
+                      strokes: src.strokes.map((s) => ({ ...s, points: [...s.points] })),
+                      values: { ...src.values },
+                      shape: { ...src.shape },
+                    }
+                    const arr = [...d.locals]
+                    arr.splice(idx + 1, 0, copy)
+                    return { ...d, locals: arr }
+                  })
+                }}
+                disabled={full}
+                title={full ? `Limite de ${MAX_LOCAL_ADJUSTMENTS} máscaras` : 'Duplica esta máscara com os mesmos ajustes'}
+              >
+                Duplicar
               </Chip>
               <Chip
                 onClick={() => patchLocal(`Limpar traços de ${active.name}`, active.id, (l) => ({ ...l, strokes: [] }))}
@@ -197,6 +236,16 @@ export function MasksPanel(props: MasksPanelProps) {
                 Limpar traços
               </Chip>
             </div>
+            {showMaskOverlay && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                <span style={{ fontSize: 11, color: 'var(--color-text-quaternary)' }}>Cor da visualização</span>
+                {([['green', 'Verde'], ['red', 'Vermelho'], ['white', 'Branco']] as [MaskOverlayColor, string][]).map(([c, label]) => (
+                  <Chip key={c} active={maskOverlayColor === c} onClick={() => onMaskOverlayColor(c)} title={label}>
+                    {label}
+                  </Chip>
+                ))}
+              </div>
+            )}
           </div>
         </Section>
       )}

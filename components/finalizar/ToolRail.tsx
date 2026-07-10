@@ -67,18 +67,24 @@ export function ToolRail({ tool, onTool }: Props) {
             key={t.id}
             type="button"
             onClick={() => onTool(t.id)}
-            title={`${t.label} (${t.shortcut})`}
+            title={`${t.label} — tecla ${t.shortcut}`}
             aria-pressed={active}
             style={{
+              position: 'relative',
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
               width: 52, padding: '8px 0 6px', borderRadius: 10,
-              border: `0.5px solid ${active ? 'var(--color-accent-green-border)' : 'transparent'}`,
-              background: active ? 'var(--color-accent-green-bg)' : 'transparent',
-              color: active ? 'var(--color-accent-green)' : 'var(--color-text-tertiary)',
+              border: '0.5px solid transparent',
+              background: active ? 'var(--color-surface-hover)' : 'transparent',
+              color: active ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
               cursor: 'pointer',
               transition: 'background var(--duration-fast), color var(--duration-fast)',
             }}
           >
+            {/* estado ativo: linha lateral verde de 2px — único verde do trilho */}
+            <span style={{
+              position: 'absolute', left: 0, top: 8, bottom: 6, width: 2, borderRadius: 2,
+              background: active ? 'var(--color-accent-green)' : 'transparent',
+            }} />
             {t.icon}
             <span style={{ fontSize: 9, fontWeight: active ? 600 : 500, letterSpacing: '0.02em' }}>{t.label}</span>
           </button>
