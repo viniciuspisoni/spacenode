@@ -6,7 +6,12 @@
 // O download em si já aconteceu no cliente — isto é best-effort (histórico).
 // NÃO consome Nodes.
 //
-// Body JSON: { key: string, project_id?: string, format?: 'png'|'jpg', width?, height? }
+// Body JSON: { key: string, project_id?: string, format?: 'png'|'jpg'|'webp', width?, height? }
+//
+// NOTA webp: o CHECK de finalize_exports.format só aceita 'png'/'jpg' até a
+// migration 20260710 ser aplicada — o insert de webp falha e é registrado como
+// warn (best-effort); o arquivo em si sobe normalmente e a versão fica no
+// document do projeto.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
@@ -23,7 +28,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null)
   const key = typeof body?.key === 'string' ? body.key : ''
   const projectId = typeof body?.project_id === 'string' && body.project_id ? body.project_id : null
-  const format = body?.format === 'jpg' ? 'jpg' : 'png'
+  const format = body?.format === 'jpg' || body?.format === 'webp' ? body.format : 'png'
   const width = Number(body?.width) || null
   const height = Number(body?.height) || null
 
