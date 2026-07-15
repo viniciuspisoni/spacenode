@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getPayerBalance } from '@/lib/workspaces/balance'
 import { getPlanById, type PlanId } from '@/lib/plans'
+import { SUPPORT_EMAIL, SUPPORT_PHONE_DISPLAY, supportWhatsAppUrl } from '@/lib/support'
 import ThemeSelector from '@/components/app/ThemeSelector'
 
 export const dynamic = 'force-dynamic'
@@ -118,6 +119,26 @@ export default async function ContaPage() {
           >
             {onlyGoogle ? 'Definir senha para acesso por email →' : 'Alterar senha →'}
           </Link>
+        </Section>
+
+        {/* Suporte */}
+        <Section title="Suporte">
+          <p style={{
+            fontSize: 13, color: 'var(--color-text-tertiary)',
+            lineHeight: 1.6, letterSpacing: '-0.005em',
+          }}>
+            Precisa de ajuda? Fale com a gente — atendimento em português.
+          </p>
+          <Field label="WhatsApp" value={SUPPORT_PHONE_DISPLAY} />
+          <Field label="E-mail" value={SUPPORT_EMAIL} />
+          <a
+            href={supportWhatsAppUrl('Olá! Preciso de ajuda com a minha conta SPACENODE.')}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={linkButtonStyle}
+          >
+            Chamar no WhatsApp →
+          </a>
         </Section>
 
         {/* Sair */}

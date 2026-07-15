@@ -249,7 +249,7 @@ function LoginForm() {
           onMouseEnter={() => setGoogleHovered(true)}
           onMouseLeave={() => setGoogleHovered(false)}
           style={{
-            width: '100%', marginBottom: 36,
+            width: '100%', marginBottom: 20,
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
             padding: '14px 24px',
             background: googleHovered ? 'var(--color-surface-hover)' : 'var(--color-surface)',
@@ -265,6 +265,22 @@ function LoginForm() {
           <GoogleIcon />
           {googleLoading ? 'Redirecionando...' : 'Continuar com Google'}
         </button>
+
+        {/* Aceite legal — vínculo de concordância no cadastro/login */}
+        <p style={{
+          fontSize: 11, color: 'var(--color-text-quaternary)',
+          textAlign: 'center', lineHeight: 1.6, letterSpacing: '-0.005em',
+          margin: '0 0 20px',
+        }}>
+          Ao continuar, você concorda com os{' '}
+          <a href="/termos" style={{ color: 'var(--color-text-tertiary)', textDecoration: 'underline', textUnderlineOffset: 2 }}>
+            Termos de Uso
+          </a>
+          {' '}e a{' '}
+          <a href="/privacidade" style={{ color: 'var(--color-text-tertiary)', textDecoration: 'underline', textUnderlineOffset: 2 }}>
+            Política de Privacidade
+          </a>.
+        </p>
 
         {/* Trust signals */}
         <div style={{
