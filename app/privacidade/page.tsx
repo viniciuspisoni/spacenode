@@ -5,13 +5,10 @@
 // Stripe (pagamentos), zero analytics/pixel de terceiros hoje (cookies só
 // essenciais + tema em localStorage). Se algum tracker for adicionado no
 // futuro, a cláusula 7 PRECISA ser atualizada junto.
-//
-// TODO(dono): quando houver PJ, identificar razão social + CNPJ na cláusula 1.
-
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { LegalShell, LegalSection, P, UL, LI, Strong } from '@/components/legal/LegalShell'
-import { SUPPORT_EMAIL, SUPPORT_PHONE_DISPLAY, SUPPORT_WHATSAPP_URL } from '@/lib/support'
+import { LEGAL_CNPJ, LEGAL_NAME, SUPPORT_EMAIL, SUPPORT_PHONE_DISPLAY, SUPPORT_WHATSAPP_URL } from '@/lib/support'
 
 export const metadata: Metadata = {
   title: 'Política de Privacidade · SpaceNode',
@@ -39,7 +36,8 @@ export default function PrivacidadePage() {
     >
       <LegalSection n={1} title="Quem somos">
         <P>
-          Esta Política descreve como a SPACENODE (&ldquo;nós&rdquo;), plataforma de visualização
+          Esta Política descreve como a <Strong>{LEGAL_NAME}</Strong>, inscrita no CNPJ sob o nº{' '}
+          {LEGAL_CNPJ} (&ldquo;SPACENODE&rdquo;, &ldquo;nós&rdquo;), operadora da plataforma de visualização
           arquitetônica com inteligência artificial disponível em spacenode.app, trata dados pessoais na
           qualidade de <Strong>controladora</Strong>, em conformidade com a Lei Geral de Proteção de Dados —
           LGPD (Lei nº 13.709/2018) e o Marco Civil da Internet (Lei nº 12.965/2014).

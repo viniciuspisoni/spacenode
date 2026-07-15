@@ -6,6 +6,11 @@
 
 export const SUPPORT_EMAIL = 'contato@spacenode.app'
 
+// Identificação legal da empresa (Decreto 7.962/2013 exige nome empresarial e
+// CNPJ visíveis em site de comércio eletrônico — exibidos nos rodapés).
+export const LEGAL_NAME = 'SPACENODE TECNOLOGIA LTDA'
+export const LEGAL_CNPJ = '68.031.117/0001-76'
+
 // Número oficial de contato/suporte (atende por WhatsApp).
 export const SUPPORT_PHONE_DISPLAY = '+55 51 98212-7288'
 // A conta de WhatsApp é registrada no formato antigo, SEM o 9º dígito —
