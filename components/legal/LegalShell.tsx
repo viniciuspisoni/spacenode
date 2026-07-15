@@ -7,7 +7,7 @@
 
 import Link from 'next/link'
 import { Brandmark } from '@/components/brand'
-import { SUPPORT_EMAIL, SUPPORT_PHONE_DISPLAY, SUPPORT_WHATSAPP_URL } from '@/lib/support'
+import { LEGAL_CNPJ, LEGAL_NAME, SUPPORT_EMAIL, SUPPORT_PHONE_DISPLAY, SUPPORT_WHATSAPP_URL } from '@/lib/support'
 
 export function LegalShell({
   title,
@@ -74,7 +74,7 @@ export function LegalShell({
           </a>
         </nav>
         <p style={{ fontSize: 11, color: 'var(--color-text-quaternary)', marginTop: 16, letterSpacing: '-0.005em' }}>
-          spacenode · 2026
+          spacenode · 2026 · {LEGAL_NAME} · CNPJ {LEGAL_CNPJ}
         </p>
       </article>
     </main>

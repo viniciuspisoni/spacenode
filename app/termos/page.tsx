@@ -6,13 +6,13 @@
 // indenização por conteúdo de terceiros (7), limitação de responsabilidade
 // (14) e arrependimento nos termos do CDC (6).
 //
-// TODO(dono): quando houver PJ, inserir razão social + CNPJ na cláusula 1 e
-// a comarca da sede na cláusula 17 — hoje o texto usa formulações neutras.
+// TODO(dono): se quiser fixar a comarca do foro (cláusula 17), trocar
+// "comarca da sede" pela cidade registrada no CNPJ.
 
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { LegalShell, LegalSection, P, UL, LI, Callout, Strong } from '@/components/legal/LegalShell'
-import { SUPPORT_EMAIL, SUPPORT_PHONE_DISPLAY, SUPPORT_WHATSAPP_URL } from '@/lib/support'
+import { LEGAL_CNPJ, LEGAL_NAME, SUPPORT_EMAIL, SUPPORT_PHONE_DISPLAY, SUPPORT_WHATSAPP_URL } from '@/lib/support'
 
 export const metadata: Metadata = {
   title: 'Termos de Uso · SpaceNode',
@@ -41,7 +41,9 @@ export default function TermosPage() {
       <LegalSection n={1} title="Aceitação">
         <P>
           Estes Termos de Uso (&ldquo;Termos&rdquo;) regulam o acesso e o uso da plataforma SPACENODE
-          (&ldquo;Plataforma&rdquo;, &ldquo;nós&rdquo;), disponível em spacenode.app. Ao criar uma conta,
+          (&ldquo;Plataforma&rdquo;), disponível em spacenode.app e operada por{' '}
+          <Strong>{LEGAL_NAME}</Strong>, inscrita no CNPJ sob o nº {LEGAL_CNPJ}
+          (&ldquo;SPACENODE&rdquo;, &ldquo;nós&rdquo;). Ao criar uma conta,
           acessar ou usar a Plataforma, você (&ldquo;Usuário&rdquo;) declara que leu, compreendeu e aceita
           integralmente estes Termos e a{' '}
           <Link href="/privacidade" style={{ color: 'var(--color-text-primary)', textUnderlineOffset: 3 }}>
@@ -293,7 +295,7 @@ export default function TermosPage() {
         <P>
           Estes Termos são regidos pelas leis da República Federativa do Brasil. Para relações de consumo,
           fica assegurado o foro do domicílio do Usuário. Nos demais casos, fica eleito o foro da comarca da
-          sede da SPACENODE, com renúncia expressa a qualquer outro, por mais privilegiado que seja.
+          sede da {LEGAL_NAME}, com renúncia expressa a qualquer outro, por mais privilegiado que seja.
         </P>
       </LegalSection>
 
