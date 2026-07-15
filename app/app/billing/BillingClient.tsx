@@ -59,6 +59,17 @@ export function BillingClient({ plan, balance, lumens, pooled }: BillingClientPr
     if (r.error) { setError(r.error); setLoading(null); return }
     if (r.url) window.location.assign(r.url)
   }
+  // Billing Portal do Stripe — trocar cartão, ver faturas, cancelar.
+  // Só para o pagador (membro de workspace não tem assinatura própria).
+  const handlePortal = async () => {
+    setLoading('portal'); setError(null)
+    const res = await fetch('/api/stripe/portal', { method: 'POST' })
+    if (res.status === 401) { window.location.href = '/login'; return }
+    const r = await res.json() as { url?: string; error?: string }
+    if (r.error) { setError(r.error); setLoading(null); return }
+    if (r.url) window.location.assign(r.url)
+  }
+  const canManage = plan !== 'free' && !pooled
 
   return (
     <div style={{
@@ -98,6 +109,20 @@ export function BillingClient({ plan, balance, lumens, pooled }: BillingClientPr
             <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
               Plano atual: <strong style={{ color: 'var(--color-text-primary)' }}>{plan === 'free' ? 'Gratuito' : capitalize(plan)}</strong>
             </span>
+            {canManage && (
+              <button
+                onClick={handlePortal}
+                disabled={loading === 'portal'}
+                style={{
+                  background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                  fontSize: 11, color: 'var(--color-text-secondary)',
+                  textDecoration: 'underline', textUnderlineOffset: 2,
+                  letterSpacing: '-0.005em', fontFamily: 'inherit',
+                }}
+              >
+                {loading === 'portal' ? 'Abrindo…' : 'Gerenciar assinatura →'}
+              </button>
+            )}
           </div>
           <div style={{
             display: 'grid',
