@@ -550,10 +550,10 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
     }
   }, [])
 
-  const handleBuyCredits = async () => {
-    const res = await fetch('/api/stripe/checkout', { method: 'POST' })
-    const data = await res.json()
-    if (data.url) window.location.href = data.url
+  // A compra (plano ou Lumen) acontece no billing — a rota de checkout exige
+  // payload tipado, então chamar direto daqui era um 400 silencioso.
+  const handleBuyCredits = () => {
+    window.location.href = '/app/billing'
   }
 
   // ── Reseta o estado da geração atual pra começar um render do zero

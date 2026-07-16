@@ -27,6 +27,8 @@ interface Props {
   initialBalance: number
   identity:       ArchitectIdentity | null
   planId:         PlanId
+  /** Saldo vem de um workspace — compras são do dono, não do membro. */
+  pooled:         boolean
 }
 
 interface GenerateMeta {
@@ -46,7 +48,7 @@ interface ToastState {
   message: string
 }
 
-export function SpaceWorkspace({ space, initialVistas, initialBalance, planId }: Props) {
+export function SpaceWorkspace({ space, initialVistas, initialBalance, planId, pooled }: Props) {
   const router = useRouter()
   const [vistas, setVistas]       = useState<Vista[]>(initialVistas)
   const [balance, setBalance]     = useState<number>(initialBalance)
@@ -374,6 +376,7 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId }:
               defaultQuality={space.engine === 'pulsar' ? 'hd' : '2k'}
               balance={balance}
               planId={planId}
+              pooled={pooled}
               spaceId={space.id}
               detalheContext={detalheContext}
               vistaMestreUrl={space.vista_mestre_url}

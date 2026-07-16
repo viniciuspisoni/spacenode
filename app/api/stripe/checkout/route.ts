@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { createClient } from '@/lib/supabase/server'
 import {
+  ANNUAL_BILLING_ENABLED,
   isPaidPlanId,
   getPlanById,
   getStripePriceId,
@@ -20,6 +21,35 @@ export const dynamic = 'force-dynamic'
 interface PlanCheckoutBody  { type: 'plan';  id: PaidPlanId;    billing: BillingCycle }
 interface LumenCheckoutBody { type: 'lumen'; id: LumenPackSize }
 type CheckoutBody = PlanCheckoutBody | LumenCheckoutBody
+
+// IDs gravados no profile podem ficar órfãos (ex.: objetos de modo teste após
+// a virada pra live) — validar antes de reusar evita "No such customer" → 500.
+// Só `resource_missing` conta como órfão: um erro transitório do Stripe não
+// pode desligar a guarda anti-cobrança-dupla nem derrubar o reuso do customer
+// em silêncio — relançado, vira 500 e o usuário tenta de novo.
+function isResourceMissing(err: unknown): boolean {
+  return err instanceof Stripe.errors.StripeError && err.code === 'resource_missing'
+}
+
+async function customerExists(stripe: Stripe, id: string): Promise<boolean> {
+  try {
+    const customer = await stripe.customers.retrieve(id)
+    return !(customer as Stripe.DeletedCustomer).deleted
+  } catch (err) {
+    if (isResourceMissing(err)) return false
+    throw err
+  }
+}
+
+async function hasActiveSubscription(stripe: Stripe, id: string): Promise<boolean> {
+  try {
+    const sub = await stripe.subscriptions.retrieve(id)
+    return sub.status !== 'canceled' && sub.status !== 'incomplete_expired'
+  } catch (err) {
+    if (isResourceMissing(err)) return false
+    throw err
+  }
+}
 
 export async function POST(req: NextRequest) {
   const stripe   = new Stripe(process.env.STRIPE_SECRET_KEY!)
@@ -44,15 +74,20 @@ export async function POST(req: NextRequest) {
   // no Stripe quando o user faz uma segunda compra.
   const { data: profile } = await supabase
     .from('profiles')
-    .select('plan, stripe_customer_id')
+    .select('plan, stripe_customer_id, stripe_subscription_id')
     .eq('id', user.id)
     .single()
+
+  const reusableCustomerId =
+    profile?.stripe_customer_id && (await customerExists(stripe, profile.stripe_customer_id))
+      ? profile.stripe_customer_id
+      : null
 
   const customerArgs: Pick<
     Stripe.Checkout.SessionCreateParams,
     'customer' | 'customer_email'
-  > = profile?.stripe_customer_id
-    ? { customer: profile.stripe_customer_id }
+  > = reusableCustomerId
+    ? { customer: reusableCustomerId }
     : { customer_email: user.email ?? undefined }
 
   const successBase = `${process.env.NEXT_PUBLIC_APP_URL}/app/billing`
@@ -64,6 +99,37 @@ export async function POST(req: NextRequest) {
     }
     if (body.billing !== 'monthly' && body.billing !== 'annual') {
       return NextResponse.json({ error: 'billing inválido' }, { status: 400 })
+    }
+    if (body.billing === 'annual' && !ANNUAL_BILLING_ENABLED) {
+      return NextResponse.json(
+        { error: 'O ciclo anual está temporariamente indisponível — assine o plano mensal.' },
+        { status: 400 }
+      )
+    }
+    // Uma assinatura por conta: sem guarda, um segundo checkout criaria uma
+    // segunda assinatura no Stripe e o usuário pagaria os dois planos.
+    // O ID persistido chega via webhook (pode atrasar), então quando há
+    // customer reusável a fonte de verdade é o próprio Stripe.
+    let alreadySubscribed =
+      Boolean(profile?.stripe_subscription_id) &&
+      (await hasActiveSubscription(stripe, profile!.stripe_subscription_id!))
+    if (!alreadySubscribed && reusableCustomerId) {
+      const subs = await stripe.subscriptions.list({
+        customer: reusableCustomerId,
+        status:   'active',
+        limit:    1,
+      })
+      alreadySubscribed = subs.data.length > 0
+    }
+    if (alreadySubscribed) {
+      return NextResponse.json(
+        {
+          error:
+            'Você já tem uma assinatura ativa. Pra trocar de plano sem cobrança ' +
+            'duplicada, fale com o suporte — o ajuste é feito na hora.',
+        },
+        { status: 409 }
+      )
     }
     const plan    = getPlanById(body.id)!
     const priceId = getStripePriceId(plan.id, body.billing)

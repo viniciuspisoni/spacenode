@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { ENGINES, ENGINE_ORDER, type Resolution } from '@/lib/engines'
-import { PLANS, recommendPlan, type PaidPlanId, type BillingCycle } from '@/lib/plans'
+import { ANNUAL_BILLING_ENABLED, PLANS, recommendPlan, type PaidPlanId, type BillingCycle } from '@/lib/plans'
 import { LUMEN_PACKS } from '@/lib/lumens'
 import { SUPPORT_EMAIL, supportWhatsAppUrl } from '@/lib/support'
 
@@ -50,6 +50,8 @@ async function startCheckout(id: PaidPlanId, billing: BillingCycle) {
     body: JSON.stringify({ type: 'plan', id, billing }),
   })
   if (res.status === 401) { window.location.href = '/login?mode=signup'; return }
+  // Já assinante (guarda anti-cobrança-dupla) — plano se gerencia no billing.
+  if (res.status === 409) { window.location.href = '/app/billing'; return }
   if (!res.ok) return
   const data = await res.json()
   if (data.url) window.location.href = data.url
@@ -313,7 +315,8 @@ export function PricingToggle() {
             quando quiser.
           </p>
 
-          {/* Billing toggle */}
+          {/* Billing toggle — some junto com a pausa do ciclo anual */}
+          {ANNUAL_BILLING_ENABLED && (
           <div style={{
             display: 'inline-flex', alignItems: 'center', marginTop: 24,
             background: 'var(--color-bg-elevated)',
@@ -355,6 +358,7 @@ export function PricingToggle() {
               </span>
             </button>
           </div>
+          )}
         </div>
 
         {/* Plan cards: 4 colunas em desktop, auto-fit em telas menores */}

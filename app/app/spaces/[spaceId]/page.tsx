@@ -56,6 +56,7 @@ export default async function SpacePage({
         initialBalance={balance}
         identity={identity}
         planId={planId}
+        pooled={payerBalance.pooled}
       />
     </main>
   )

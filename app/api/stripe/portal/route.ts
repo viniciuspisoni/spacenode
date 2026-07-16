@@ -39,11 +39,28 @@ export async function POST() {
 
   const configuration = process.env.STRIPE_PORTAL_CONFIG_ID
 
-  const session = await stripe.billingPortal.sessions.create({
-    customer:   profile.stripe_customer_id,
-    return_url: `${process.env.NEXT_PUBLIC_APP_URL}/app/billing`,
-    ...(configuration ? { configuration } : {}),
-  })
-
-  return NextResponse.json({ url: session.url })
+  try {
+    const session = await stripe.billingPortal.sessions.create({
+      customer:   profile.stripe_customer_id,
+      return_url: `${process.env.NEXT_PUBLIC_APP_URL}/app/billing`,
+      ...(configuration ? { configuration } : {}),
+    })
+    return NextResponse.json({ url: session.url })
+  } catch (err) {
+    // customer_id órfão (ex.: objeto de modo teste após a virada pra live).
+    // `resource_missing` em outro param (ex.: configuration inválida) é erro
+    // de operação, não estado do usuário — estoura como 500 e aparece no log.
+    if (
+      err instanceof Stripe.errors.StripeError &&
+      err.code === 'resource_missing' &&
+      err.param === 'customer'
+    ) {
+      console.warn('[stripe portal] customer órfão no profile:', profile.stripe_customer_id)
+      return NextResponse.json(
+        { error: 'Nenhuma assinatura encontrada nesta conta' },
+        { status: 404 }
+      )
+    }
+    throw err
+  }
 }
