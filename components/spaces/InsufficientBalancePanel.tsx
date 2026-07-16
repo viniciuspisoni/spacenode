@@ -18,28 +18,42 @@ interface Props {
   costPer:      number
   total:        number
   available:    number
+  /** Plano do PAGADOR (dono do workspace, quando pooled). */
   currentPlan:  PlanId
+  /** Saldo compartilhado de workspace — quem compra/gerencia é o dono. */
+  pooled:       boolean
   onReduceTo:   (count: number) => void
 }
 
-export function InsufficientBalancePanel({ count, costPer, total, available, currentPlan, onReduceTo }: Props) {
+export function InsufficientBalancePanel({ count, costPer, total, available, currentPlan, pooled, onReduceTo }: Props) {
   const [submittingAvulso, setSubmittingAvulso] = useState(false)
+  const [avulsoError, setAvulsoError] = useState<string | null>(null)
   const missing  = Math.max(0, total - available)
   const fitCount = costPer > 0 ? Math.floor(available / costPer) : 0
   const recommended = recommendPlan(total)
   const currentPlanObj = getPlanById(currentPlan)
-  const upgradeNeeded  = recommended.nodes > (currentPlanObj?.nodes ?? 0)
+  const upgradeNeeded  = !pooled && recommended.nodes > (currentPlanObj?.nodes ?? 0)
+  // Espelha a regra da rota de checkout: Lumens só a partir do Pro — e a rota
+  // valida o plano do COMPRADOR, então membro pooled não compra por aqui.
+  const lumenAvailable = !pooled && currentPlan !== 'free' && currentPlan !== 'starter'
 
   async function handleAvulso() {
     setSubmittingAvulso(true)
+    setAvulsoError(null)
     try {
-      const res = await fetch('/api/billing/avulso-checkout', { method: 'POST' })
-      const data = await res.json()
-      if (data?.error === 'available_in_august') {
-        alert('A compra avulsa de Lumens estará disponível em agosto.')
-      } else if (data?.url) {
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'lumen', id: 500 }),
+      })
+      const data = (await res.json()) as { url?: string; error?: string }
+      if (data.url) {
         window.location.href = data.url
+        return
       }
+      setAvulsoError(data.error ?? 'Não foi possível iniciar a compra. Tente pelo Billing.')
+    } catch {
+      setAvulsoError('Não foi possível iniciar a compra. Tente pelo Billing.')
     } finally {
       setSubmittingAvulso(false)
     }
@@ -104,58 +118,77 @@ export function InsufficientBalancePanel({ count, costPer, total, available, cur
         </div>
       </div>
 
-      {/* Opções: Avulso (recommended) + Upgrade */}
+      {/* Opções: Avulso (Pro+) e/ou Upgrade — a primeira visível leva o badge */}
       <div style={{
         display: 'grid', gap: 10,
         gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
       }}>
-        <div style={{
-          padding: '14px 16px', borderRadius: 10,
-          background: 'var(--color-bg-elevated)',
-          border: '1.5px solid var(--color-text-primary)',
-          display: 'flex', flexDirection: 'column', gap: 10,
-          position: 'relative',
-        }}>
-          <span style={{
-            position: 'absolute', top: -9, left: 14,
-            fontSize: 9, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase',
-            background: 'var(--color-text-primary)', color: 'var(--color-bg)',
-            padding: '3px 7px', borderRadius: 4,
-          }}>
-            Recomendado
-          </span>
-          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.01em' }}>
-            Pacote avulso
-          </div>
-          <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.55 }}>
-            500 nodes por R$ 89, válidos 90 dias. Sem mexer no seu plano.
-          </div>
-          <button
-            onClick={handleAvulso}
-            disabled={submittingAvulso}
-            className="spn-action spn-action--primary"
-            style={{ width: '100%', padding: '9px 14px', fontSize: 12 }}
-          >
-            {submittingAvulso ? '…' : 'Comprar pacote · R$ 89'}
-          </button>
-          <div className="spn-upsell-note" style={{ fontSize: 10, padding: 0 }}>
-            disponível em agosto
-          </div>
-        </div>
-
-        {upgradeNeeded && (
+        {lumenAvailable && (
           <div style={{
             padding: '14px 16px', borderRadius: 10,
             background: 'var(--color-bg-elevated)',
-            border: '0.5px solid var(--color-border-strong)',
+            border: '1.5px solid var(--color-text-primary)',
             display: 'flex', flexDirection: 'column', gap: 10,
+            position: 'relative',
           }}>
+            <span style={{
+              position: 'absolute', top: -9, left: 14,
+              fontSize: 9, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase',
+              background: 'var(--color-text-primary)', color: 'var(--color-bg)',
+              padding: '3px 7px', borderRadius: 4,
+            }}>
+              Recomendado
+            </span>
             <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.01em' }}>
-              Upgrade {recommended.name}
+              Pacote avulso
             </div>
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.55 }}>
-              {recommended.nodes} nodes/mês por R$ {recommended.monthlyPrice}/mês.
-              Vale se você gera muito mais do que cabe no plano atual.
+              500 nodes por R$ 89, válidos 90 dias. Sem mexer no seu plano.
+            </div>
+            <button
+              onClick={handleAvulso}
+              disabled={submittingAvulso}
+              className="spn-action spn-action--primary"
+              style={{ width: '100%', padding: '9px 14px', fontSize: 12 }}
+            >
+              {submittingAvulso ? '…' : 'Comprar pacote · R$ 89'}
+            </button>
+            {avulsoError && (
+              <div style={{ fontSize: 10.5, color: 'var(--color-error)', lineHeight: 1.5 }}>
+                {avulsoError}
+              </div>
+            )}
+          </div>
+        )}
+
+        {(upgradeNeeded || !lumenAvailable) && (
+          <div style={{
+            padding: '14px 16px', borderRadius: 10,
+            background: 'var(--color-bg-elevated)',
+            border: lumenAvailable ? '0.5px solid var(--color-border-strong)' : '1.5px solid var(--color-text-primary)',
+            display: 'flex', flexDirection: 'column', gap: 10,
+            position: 'relative',
+          }}>
+            {!lumenAvailable && (
+              <span style={{
+                position: 'absolute', top: -9, left: 14,
+                fontSize: 9, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase',
+                background: 'var(--color-text-primary)', color: 'var(--color-bg)',
+                padding: '3px 7px', borderRadius: 4,
+              }}>
+                Recomendado
+              </span>
+            )}
+            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.01em' }}>
+              {upgradeNeeded ? `Upgrade ${recommended.name}` : 'Mais nodes'}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.55 }}>
+              {upgradeNeeded
+                ? `${recommended.nodes} nodes/mês por R$ ${recommended.monthlyPrice}/mês.
+                   Vale se você gera muito mais do que cabe no plano atual.`
+                : pooled
+                ? 'Este saldo é do workspace — o plano e os pacotes são gerenciados pelo dono da conta.'
+                : 'Veja os planos — pacotes avulsos ficam disponíveis a partir do Pro.'}
             </div>
             <Link
               href="/app/billing"

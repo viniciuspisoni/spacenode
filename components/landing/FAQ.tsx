@@ -40,7 +40,7 @@ const faqs: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: 'Posso cancelar quando quiser?',
-    a: 'No plano mensal, sim — você paga apenas o mês em uso e mantém o acesso até o fim do período. No plano anual, o compromisso é de 12 meses, já que o pagamento é antecipado. Em ambos os casos, tudo é feito direto no painel, sem burocracia.',
+    a: 'Sim — a assinatura é mensal: você paga apenas o mês em uso e mantém o acesso até o fim do período. O cancelamento é feito direto no painel, sem burocracia.',
   },
   {
     q: 'A SpaceNode é indicada para escritórios?',

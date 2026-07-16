@@ -59,6 +59,7 @@ interface Props {
   defaultQuality?: Quality
   balance:   number
   planId:    PlanId
+  pooled:    boolean
   spaceId:   string
   detalheContext: DetalheContext
   vistaMestreUrl: string | null
@@ -73,7 +74,7 @@ interface Props {
 const AXIS_ORDER: Axis[] = ['iluminacao', 'angulo', 'detalhe']
 
 export function EixosPanel({
-  engine, defaultQuality, balance, planId, spaceId, detalheContext,
+  engine, defaultQuality, balance, planId, pooled, spaceId, detalheContext,
   vistaMestreUrl, references, disabled,
   onGenerate, onGenerateFromSketches,
 }: Props) {
@@ -178,6 +179,7 @@ export function EixosPanel({
           availableQualities={availableQualities}
           balance={balance}
           planId={planId}
+          pooled={pooled}
           disabled={disabled}
           onGenerate={(a, values, q) => onGenerate(a, values, q, activeReferenceId)}
         />
@@ -193,6 +195,7 @@ export function EixosPanel({
           availableQualities={availableQualities}
           balance={balance}
           planId={planId}
+          pooled={pooled}
           disabled={disabled}
           onGenerate={(sketches, q) => onGenerateFromSketches(sketches, q, activeReferenceId)}
           labelSuggestions={AXIS_CONFIG[axis].labelSuggestions ?? []}
@@ -306,7 +309,7 @@ function ReferenceThumb({ label, imageUrl, active, onClick }: {
 // ── Body: parametric (Iluminação) ─────────────────────────────
 
 function ParametricEixoBody({
-  axis, options, engine, quality, setQuality, availableQualities, balance, planId, disabled, onGenerate,
+  axis, options, engine, quality, setQuality, availableQualities, balance, planId, pooled, disabled, onGenerate,
 }: {
   axis:               Axis
   options:            AxisOption[]
@@ -316,6 +319,7 @@ function ParametricEixoBody({
   availableQualities: Quality[]
   balance:            number
   planId:             PlanId
+  pooled:             boolean
   disabled?:          boolean
   onGenerate:         (axis: Axis, axisValues: string[], quality: Quality) => Promise<void>
 }) {
@@ -443,6 +447,7 @@ function ParametricEixoBody({
             total={total}
             available={balance}
             currentPlan={planId}
+            pooled={pooled}
             onReduceTo={(n) => {
               const arr = Array.from(selected).slice(0, n)
               setSelected(new Set(arr))

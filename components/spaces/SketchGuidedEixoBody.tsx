@@ -85,6 +85,7 @@ interface Props {
   availableQualities: Quality[]
   balance:            number
   planId:             PlanId
+  pooled:             boolean
   disabled?:          boolean
   onGenerate:         (sketches: SketchPayload[], quality: Quality) => Promise<void>
   labelSuggestions:   string[]
@@ -92,7 +93,7 @@ interface Props {
 
 export function SketchGuidedEixoBody({
   axis, spaceId, engine, quality, setQuality, availableQualities,
-  balance, planId, disabled, onGenerate, labelSuggestions,
+  balance, planId, pooled, disabled, onGenerate, labelSuggestions,
 }: Props) {
   void axis
   const [items, setItems] = useState<SketchItem[]>([])
@@ -430,6 +431,7 @@ export function SketchGuidedEixoBody({
             total={total}
             available={balance}
             currentPlan={planId}
+            pooled={pooled}
             onReduceTo={(n) => {
               // Mantém os primeiros N sketches uploadados
               setItems(curr => {

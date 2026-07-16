@@ -54,8 +54,12 @@ export async function POST(req: NextRequest) {
       if (subscriptionId) updates.stripe_subscription_id = subscriptionId
 
       const { error } = await supabase.from('profiles').update(updates).eq('id', userId)
-      if (error) console.error('[stripe webhook] plan activation falhou:', error)
-      else       console.log(`[stripe webhook] plano ${planId} ativado p/ user ${userId} (${nodesToAdd} nodes)`)
+      if (error) {
+        console.error('[stripe webhook] plan activation falhou:', error)
+        // 500 → Stripe retenta a entrega; o update é idempotente (valores absolutos)
+        return NextResponse.json({ error: 'db' }, { status: 500 })
+      }
+      console.log(`[stripe webhook] plano ${planId} ativado p/ user ${userId} (${nodesToAdd} nodes)`)
     } else if (productType === 'lumen') {
       const packSize = parseInt(session.metadata?.pack_size ?? '0', 10)
       if (![500, 1500, 4000].includes(packSize)) {
@@ -68,8 +72,12 @@ export async function POST(req: NextRequest) {
         pack_size_input:         packSize,
         stripe_session_id_input: session.id,
       })
-      if (rpcErr) console.error('[stripe webhook] add_lumen_pack falhou:', rpcErr)
-      else        console.log(`[stripe webhook] lumen ${packSize} adicionado p/ user ${userId}`)
+      if (rpcErr) {
+        console.error('[stripe webhook] add_lumen_pack falhou:', rpcErr)
+        // 500 → Stripe retenta; a RPC é idempotente por stripe_session_id
+        return NextResponse.json({ error: 'db' }, { status: 500 })
+      }
+      console.log(`[stripe webhook] lumen ${packSize} adicionado p/ user ${userId}`)
 
       // Persiste customer_id se for primeira compra do user
       if (customerId) {
@@ -88,7 +96,11 @@ export async function POST(req: NextRequest) {
     if (invoice.billing_reason === 'subscription_cycle') {
       const lineItem    = invoice.lines.data[0]
       const priceField  = lineItem?.pricing?.price_details?.price
-      const priceId     = typeof priceField === 'string' ? priceField : priceField?.id
+      // Fallback pro formato pré-Basil (`lines.data[].price`) — o endpoint é
+      // criado sem api_version pinada, então o shape segue o default da conta.
+      const legacyPrice = (lineItem as unknown as { price?: { id?: string } | null })?.price
+      const priceId     =
+        (typeof priceField === 'string' ? priceField : priceField?.id) ?? legacyPrice?.id
 
       if (!priceId) {
         console.warn('[stripe webhook] invoice.paid sem price_id resolvível:', invoice.id)
@@ -114,8 +126,11 @@ export async function POST(req: NextRequest) {
       }
 
       const { error } = await filtered
-      if (error) console.error('[stripe webhook] renovação falhou:', error)
-      else       console.log(`[stripe webhook] renovação aplicada (${match.plan.id} → ${match.plan.nodes} nodes)`)
+      if (error) {
+        console.error('[stripe webhook] renovação falhou:', error)
+        return NextResponse.json({ error: 'db' }, { status: 500 })
+      }
+      console.log(`[stripe webhook] renovação aplicada (${match.plan.id} → ${match.plan.nodes} nodes)`)
     }
   }
 
@@ -136,8 +151,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ received: true })
     }
     const { error } = await q
-    if (error) console.error('[stripe webhook] cancelamento falhou:', error)
-    else       console.log(`[stripe webhook] plano cancelado (sub ${subscriptionId})`)
+    if (error) {
+      console.error('[stripe webhook] cancelamento falhou:', error)
+      return NextResponse.json({ error: 'db' }, { status: 500 })
+    }
+    console.log(`[stripe webhook] plano cancelado (sub ${subscriptionId})`)
   }
 
   return NextResponse.json({ received: true })

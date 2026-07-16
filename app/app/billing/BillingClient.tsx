@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { PLANS, type PaidPlanId, type BillingCycle } from '@/lib/plans'
+import { ANNUAL_BILLING_ENABLED, PLANS, type PaidPlanId, type BillingCycle } from '@/lib/plans'
 import { LUMEN_PACKS, LUMEN_VALIDITY_DAYS, type LumenPackSize } from '@/lib/lumens'
 
 export interface LumenPackRow {
@@ -105,7 +105,7 @@ export function BillingClient({ plan, balance, lumens, pooled }: BillingClientPr
         <Section>
           <SectionLabel>plano</SectionLabel>
           <div style={{ display: 'flex', gap: 8, marginBottom: 18, alignItems: 'center', flexWrap: 'wrap' }}>
-            <BillingToggle billing={billing} setBilling={setBilling} />
+            {ANNUAL_BILLING_ENABLED && <BillingToggle billing={billing} setBilling={setBilling} />}
             <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
               Plano atual: <strong style={{ color: 'var(--color-text-primary)' }}>{plan === 'free' ? 'Gratuito' : capitalize(plan)}</strong>
             </span>

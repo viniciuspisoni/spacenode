@@ -9,6 +9,15 @@ export type PlanId       = 'free' | 'starter' | 'pro' | 'studio' | 'office'
 export type PaidPlanId   = Exclude<PlanId, 'free'>
 export type BillingCycle = 'monthly' | 'annual'
 
+/**
+ * Venda do ciclo anual PAUSADA para o go-live: a reposição mensal de nodes
+ * de uma assinatura anual ainda não existe (o webhook só recarrega em
+ * `invoice.paid` com billing_reason=subscription_cycle, que numa assinatura
+ * anual dispara 1× por ano — mas a UI e os Termos prometem nodes/mês).
+ * Religar apenas quando houver mecanismo de recarga mensal para anuais.
+ */
+export const ANNUAL_BILLING_ENABLED = false
+
 export interface Plan {
   id: PaidPlanId
   name: string
