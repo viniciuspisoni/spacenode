@@ -16,7 +16,7 @@ export interface SidebarModule {
   label:   string
   href:    string
   section: ModuleSection
-  iconKey: 'generate' | 'spaces' | 'retocar' | 'enhance' | 'video' | 'finalizar' | 'humanizedPlan' | 'isometric' | 'board' | 'moodboard'
+  iconKey: 'generate' | 'spaces' | 'retocar' | 'enhance' | 'video' | 'finalizar' | 'humanizedPlan' | 'blocos3d' | 'isometric' | 'board' | 'moodboard'
   enabled: boolean
   beta?:   boolean
 }
@@ -29,6 +29,7 @@ export const SIDEBAR_MODULES: SidebarModule[] = [
   { id: 'animar',           label: 'Animar',           href: '/app/video',                         section: 'criar',      iconKey: 'video',         enabled: true },
   { id: 'finalizar',        label: 'Finalizar',        href: '/app/finalizar',                     section: 'criar',      iconKey: 'finalizar',     enabled: true },
   { id: 'planta_humanizada',label: 'Planta humanizada',href: '/app/apresentar/planta-humanizada',  section: 'criar',      iconKey: 'humanizedPlan', enabled: true },
+  { id: 'blocos_3d',        label: 'Blocos 3D',        href: '/app/blocos-3d',                     section: 'criar',      iconKey: 'blocos3d',      enabled: true, beta: true },
 
   { id: 'isometricas',      label: 'Isométricas',      href: '/app/apresentar/isometricas',        section: 'apresentar', iconKey: 'isometric',     enabled: false },
   { id: 'prancha_ia',       label: 'Prancha IA',       href: '/app/apresentar/prancha',            section: 'apresentar', iconKey: 'board',         enabled: false },

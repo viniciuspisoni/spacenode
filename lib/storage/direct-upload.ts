@@ -113,6 +113,13 @@ export const DIRECT_UPLOAD_AREAS = {
     allowedMime: () => IMAGE_MIME,
     dir: () => 'animar/source',
   },
+  // Imagem de origem do Blocos 3D (consumida por /api/blocos3d).
+  'blocos3d-source': {
+    bucket: 'space-mestres',
+    maxBytes: 15 * 1024 * 1024,
+    allowedMime: () => IMAGE_MIME,
+    dir: () => 'blocos3d/source',
+  },
 } satisfies Record<string, DirectUploadArea>
 
 export type DirectUploadAreaId = keyof typeof DIRECT_UPLOAD_AREAS
