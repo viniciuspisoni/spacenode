@@ -7,7 +7,12 @@ import { engineAvailable } from '@/lib/blocos3d/provider'
 import type { Blocos3DQuality } from '@/lib/blocos3d/types'
 import Blocos3DClient from './Blocos3DClient'
 
-export default async function Blocos3DPage() {
+export default async function Blocos3DPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ job?: string }>
+}) {
+  const sp = await searchParams
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -24,6 +29,7 @@ export default async function Blocos3DPage() {
     <Blocos3DClient
       initialCredits={balance.planBalance}
       engineAvailability={engineAvailability}
+      initialJobId={typeof sp.job === 'string' ? sp.job : undefined}
     />
   )
 }

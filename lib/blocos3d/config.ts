@@ -22,11 +22,11 @@
 // nodes_mínimos ≈ custo_US$ × 148; cobramos acima disso.
 //
 // Custo real por geração (fal; conferir no dashboard antes de mudar):
-//   tripo3d/tripo/v2.5 (HD + PBR)      US$ 0,40       → piso  59 nodes
+//   tripo3d/tripo/v2.5 (HD + PBR)      US$ 0,40       → piso 59 nodes
 //   fal-ai/hyper3d/rodin (high+hyper)  US$ 0,40–0,80  → piso 118 nodes
-//   fal-ai/meshy/v5/multi-image-to-3d  ~US$ 0,50–0,80 → piso 130 nodes
-//     (preço fal p/ Meshy não publicado na pesquisa — nodes calibrados pro
-//      teto de US$ 0,88 no piso; ajustar após a primeira fatura.)
+//   fal-ai/meshy/v5/multi-image-to-3d  US$ 0,40       → piso 59 nodes
+//     (confirmado na fatura fal em 2026-07-17 — recalibrado de 130 pra 95
+//      nodes; o prêmio sobre o Padrão paga os formatos extras + quad.)
 //
 // Histórico de motores (jobs antigos resolvem pelo engine persistido na linha):
 //   draft/Rascunho: fal-ai/trellis (US$ 0,02) — removido do catálogo na
@@ -97,7 +97,7 @@ export const BLOCOS3D_ENGINES: Record<Blocos3DQuality, Blocos3DEngine> = {
     features:    ['Malha quad', 'Materiais PBR', 'Prompt de materiais', 'Até 4 ângulos', '~4 min'],
     supportsTexturePrompt: true,
     maxImages:   4,
-    costInNodes: 130,          // ~US$ 0,50–0,80 · margem ≥50% até US$ 0,88
+    costInNodes: 95,           // US$ 0,40 (fatura fal) · ~69% margem no piso
     estimatedMs: 240_000,
     badge:       { label: 'TODOS OS FORMATOS', tone: 'blue' },
   },
