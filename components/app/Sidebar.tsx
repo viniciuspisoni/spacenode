@@ -12,8 +12,9 @@ import {
   IconProjects, IconDashboard, IconHistory,
   IconGenerate, IconSpaces, IconRetocar, IconEnhance, IconVideo, IconFinalizar,
   IconHumanizedPlan, IconBlocos3D, IconIsometric, IconBoard, IconMoodboard,
-  IconTeam, IconIdentity, IconAccount, IconPlans,
+  IconTeam, IconIdentity, IconAccount, IconPlans, IconGuide,
 } from './sidebar-icons'
+import { TOUR_START_EVENT } from './WelcomeTour'
 import { getEnabledModules, type SidebarModule } from '@/lib/nav/modules-config'
 
 type NavItem = {
@@ -24,6 +25,17 @@ type NavItem = {
   Icon: () => React.ReactElement
   badge?: string
   badgeTone?: 'green' | 'muted'
+  onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void
+}
+
+// "Como usar": reabre o tour de boas-vindas. Já no /app, dispara na hora (evento
+// ouvido pelo WelcomeTour) em vez de navegar; de outras rotas, o Link segue o
+// href /app#tour e o tour abre ao chegar no dashboard.
+function startTourClick(e: React.MouseEvent<HTMLAnchorElement>) {
+  if (window.location.pathname === '/app') {
+    e.preventDefault()
+    window.dispatchEvent(new Event(TOUR_START_EVENT))
+  }
 }
 
 const MODULE_ICON: Record<SidebarModule['iconKey'], () => React.ReactElement> = {
@@ -76,6 +88,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { label: 'Identidade', href: '/app/settings/identity', exact: false, Icon: IconIdentity },
       { label: 'Conta',      href: '/app/conta',             exact: false, Icon: IconAccount  },
       { label: 'Planos',     href: '/app/billing',           exact: false, Icon: IconPlans    },
+      { label: 'Como usar',  href: '/app#tour',              exact: false, match: () => false, Icon: IconGuide, onClick: startTourClick },
     ],
   },
 ]
@@ -216,7 +229,7 @@ export default function Sidebar({
               {group.label}
             </div>
 
-            {group.items.map(({ label, href, exact, match, Icon, badge, badgeTone }) => {
+            {group.items.map(({ label, href, exact, match, Icon, badge, badgeTone, onClick }) => {
               const active = href
                 ? (match ? match(pathname) : exact ? pathname === href : pathname.startsWith(href))
                 : false
@@ -302,7 +315,7 @@ export default function Sidebar({
               }
 
               return href ? (
-                <Link key={href} href={href} style={sharedStyle} {...hoverHandlers}>
+                <Link key={href} href={href} style={sharedStyle} onClick={onClick} {...hoverHandlers}>
                   {inner}
                 </Link>
               ) : (
