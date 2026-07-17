@@ -25,7 +25,7 @@
 //   tripo3d/tripo/v2.5 (HD + PBR)      US$ 0,40       → piso 59 nodes
 //   fal-ai/hyper3d/rodin (high+hyper)  US$ 0,40–0,80  → piso 118 nodes
 //   fal-ai/meshy/v5/multi-image-to-3d  US$ 0,40       → piso 59 nodes
-//     (confirmado na fatura fal em 2026-07-17 — recalibrado de 130 pra 95
+//     (confirmado na fatura fal em 2026-07-17 — recalibrado de 130 pra 100
 //      nodes; o prêmio sobre o Padrão paga os formatos extras + quad.)
 //
 // Histórico de motores (jobs antigos resolvem pelo engine persistido na linha):
@@ -97,7 +97,7 @@ export const BLOCOS3D_ENGINES: Record<Blocos3DQuality, Blocos3DEngine> = {
     features:    ['Malha quad', 'Materiais PBR', 'Prompt de materiais', 'Até 4 ângulos', '~4 min'],
     supportsTexturePrompt: true,
     maxImages:   4,
-    costInNodes: 95,           // US$ 0,40 (fatura fal) · ~69% margem no piso
+    costInNodes: 100,          // US$ 0,40 (fatura fal) · ~70% margem no piso
     estimatedMs: 240_000,
     badge:       { label: 'TODOS OS FORMATOS', tone: 'blue' },
   },
