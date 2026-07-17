@@ -9,13 +9,17 @@
 // extração de URLs é DEFENSIVA: varre o result atrás de arquivos por extensão.
 
 import { fal } from '@fal-ai/client'
-import type { ModelFormat, ProviderTaskState } from './types'
+import type { Blocos3DOptions, ModelFormat, ProviderTaskState } from './types'
 import type { Blocos3DEngine } from './config'
 
 fal.config({ credentials: process.env.FAL_KEY })
 
 /** Monta o input por endpoint (nomes de campo diferem entre os modelos). */
-function buildInput(engine: Blocos3DEngine, imageUrl: string): Record<string, unknown> {
+function buildInput(
+  engine: Blocos3DEngine,
+  imageUrl: string,
+  options: Blocos3DOptions,
+): Record<string, unknown> {
   switch (engine.engine) {
     case 'fal-ai/trellis':
       return { image_url: imageUrl }
@@ -32,14 +36,28 @@ function buildInput(engine: Blocos3DEngine, imageUrl: string): Record<string, un
         // Escala real do objeto embutida no modelo — relevante pra maquete.
         auto_size: true,
       }
+    case 'fal-ai/hyper3d/rodin':
+      return {
+        input_image_urls:     [imageUrl],
+        geometry_file_format: 'glb',
+        material:             'PBR',
+        quality:              'high',
+        use_hyper:            true,
+        tier:                 'Regular',
+        ...(options.texturePrompt ? { prompt: options.texturePrompt } : {}),
+      }
     default:
       return { image_url: imageUrl }
   }
 }
 
-export async function createFalTask(engine: Blocos3DEngine, imageUrl: string): Promise<string> {
+export async function createFalTask(
+  engine: Blocos3DEngine,
+  imageUrl: string,
+  options: Blocos3DOptions,
+): Promise<string> {
   const { request_id } = await fal.queue.submit(engine.engine, {
-    input: buildInput(engine, imageUrl),
+    input: buildInput(engine, imageUrl, options),
   })
   if (!request_id) throw new Error('fal.queue.submit sem request_id')
   return request_id

@@ -30,7 +30,7 @@ interface Blocos3DAdapter {
 const ADAPTERS: Record<Blocos3DProvider, Blocos3DAdapter> = {
   fal: {
     isAvailable: () => !!process.env.FAL_KEY,
-    create: (engine, imageUrl) => createFalTask(engine, imageUrl),
+    create: (engine, imageUrl, options) => createFalTask(engine, imageUrl, options),
     get:    (engineId, taskId) => getFalTask(engineId, taskId),
   },
   meshy: {

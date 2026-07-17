@@ -22,14 +22,17 @@
 // de mudar):
 //   fal-ai/trellis                 US$ 0,02          → piso  3 nodes
 //   tripo3d/tripo/v2.5 (HD + PBR)  US$ 0,40          → piso 59 nodes
-//   Meshy image-to-3d texturizado  US$ 0,40–0,60     → piso 89 nodes
-//     (Meshy: créditos ~US$ 0,02, task 20–30 créditos; exige plano Pro ativo)
+//   fal-ai/hyper3d/rodin (high)    US$ 0,40–0,80     → piso 118 nodes
 //
-// Histórico de motores do tier Padrão:
-//   fal-ai/hunyuan3d-v21 (US$ 0,15, textured 3× o white mesh) — testado
-//   2026-07-17 com sofá real: geometria boa, TEXTURA CHAPADA em tecido
-//   (feedback do fundador). Substituído pelo Tripo v2.5 HD. Jobs antigos
-//   continuam resolvendo pelo engine persistido na linha.
+// Histórico de motores (jobs antigos resolvem pelo engine persistido na linha):
+//   Padrão: fal-ai/hunyuan3d-v21 (US$ 0,15) — testado 2026-07-17 com sofá
+//   real: geometria boa, TEXTURA CHAPADA em tecido (feedback do fundador).
+//   Substituído pelo Tripo v2.5 HD.
+//   Alta: era Meshy (todos os formatos + quad; exige plano Pro US$ 20/mês) —
+//   trocado pelo Rodin via fal na caça por realismo de textura, sem vendor
+//   novo. Se o Rodin aprovar, o Meshy fica dispensado; o adapter continua em
+//   lib/blocos3d/meshy.ts pra reativação com MESHY_API_KEY se precisarmos
+//   dos formatos FBX/OBJ/USDZ nativos.
 
 import type { Blocos3DOptions, Blocos3DProvider, Blocos3DQuality } from './types'
 
@@ -79,15 +82,15 @@ export const BLOCOS3D_ENGINES: Record<Blocos3DQuality, Blocos3DEngine> = {
   high: {
     id:          'high',
     label:       'Alta',
-    description: 'Máxima qualidade com todos os formatos de arquivo e malha quad editável.',
-    provider:    'meshy',
-    engine:      'meshy/image-to-3d',
-    formats:     ['GLB', 'FBX', 'OBJ', 'USDZ'],
-    features:    ['PBR 2K', 'Malha quad', 'Prompt de materiais', '~4 min'],
+    description: 'Detalhe máximo de geometria e textura — o motor mais forte para peças-herói.',
+    provider:    'fal',
+    engine:      'fal-ai/hyper3d/rodin',
+    formats:     ['GLB'],
+    features:    ['Detalhe máximo', 'Materiais PBR', 'Prompt de materiais', '~3 min'],
     supportsTexturePrompt: true,
-    costInNodes: 120,          // US$ 0,40–0,60 · margem 63–75% no piso
-    estimatedMs: 240_000,
-    badge:       { label: 'TODOS OS FORMATOS', tone: 'blue' },
+    costInNodes: 120,          // US$ 0,40–0,80 (quality high) · margem 51–75% no piso
+    estimatedMs: 180_000,
+    badge:       { label: 'MÁXIMO DETALHE', tone: 'blue' },
   },
 }
 
