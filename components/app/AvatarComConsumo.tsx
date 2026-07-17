@@ -92,7 +92,7 @@ export function AvatarComConsumo({
           background: expanded ? 'var(--color-surface)' : 'transparent',
           border: expanded ? '0.5px solid var(--color-border)' : '0.5px solid transparent',
           boxShadow: expanded ? 'inset 0 1px 0 rgba(255,255,255,0.03)' : 'none',
-          width: '100%',
+          width: expanded ? '100%' : 42,
           textAlign: 'left',
           transition: 'background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease',
         }}
