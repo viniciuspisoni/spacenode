@@ -51,6 +51,11 @@ function collectUrls(value: unknown, out: string[]): void {
 
 function extractOutputs(result: unknown): { modelUrls: Partial<Record<ModelFormat, string>>; thumbnailUrl: string | null } {
   const urls: string[] = []
+  // Preferência explícita ANTES do scan first-wins: o Hunyuan v2.1 entrega o
+  // GLB com PBR num campo separado (model_glb_pbr) DEPOIS do model_glb — sem
+  // isto, o tier vendido como "Materiais PBR" serviria sempre o mesh sem PBR.
+  const pbrUrl = ((result as Record<string, unknown> | null)?.model_glb_pbr as { url?: unknown } | undefined)?.url
+  if (typeof pbrUrl === 'string' && pbrUrl.startsWith('http')) urls.push(pbrUrl)
   collectUrls(result, urls)
 
   const modelUrls: Partial<Record<ModelFormat, string>> = {}
@@ -74,7 +79,9 @@ export async function getFalTask(engineId: string, requestId: string): Promise<P
     return { status: 'processing', progress: null, modelUrls: {}, thumbnailUrl: null, errorMessage: null }
   }
 
-  // COMPLETED: o result é quem revela sucesso × falha (falha lança aqui).
+  // COMPLETED: o result é quem revela sucesso × falha (falha do MODELO lança
+  // aqui com 4xx). Erro transitório (rede sem status, 429, 5xx) NÃO é terminal
+  // — rethrow deixa o poll da rota manter o job em processing e tentar de novo.
   try {
     const { data } = await fal.queue.result(engineId, { requestId })
     const { modelUrls, thumbnailUrl } = extractOutputs(data)
@@ -87,6 +94,10 @@ export async function getFalTask(engineId: string, requestId: string): Promise<P
     return { status: 'succeeded', progress: 100, modelUrls, thumbnailUrl, errorMessage: null }
   } catch (err) {
     const e = err as { status?: number; body?: { detail?: unknown }; message?: string }
+    const transient =
+      e?.status === undefined || e.status === 404 || e.status === 429 || e.status >= 500
+    if (transient) throw err
+
     const detail = e?.body?.detail
     const msg = Array.isArray(detail)
       ? (detail[0] as { msg?: string })?.msg

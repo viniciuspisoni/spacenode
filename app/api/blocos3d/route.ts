@@ -120,20 +120,30 @@ export async function POST(req: NextRequest) {
     }
 
     // Saldo real pós-débito da BOLSA (dono do workspace) — é dela que saiu.
-    const payerId = (await getPayerId(admin, user.id)) ?? user.id
-    const { data: balance } = await admin
-      .from('user_node_balance')
-      .select('plan_balance')
-      .eq('user_id', payerId)
-      .single()
+    // Best-effort em try próprio: com o job já inserido, uma exceção aqui NÃO
+    // pode cair no catch de refund (o job está vivo — estornar agora abriria
+    // double-refund quando o poll falhasse, ou geração de graça no sucesso).
+    let credits: number | undefined
+    try {
+      const payerId = (await getPayerId(admin, user.id)) ?? user.id
+      const { data: balance } = await admin
+        .from('user_node_balance')
+        .select('plan_balance')
+        .eq('user_id', payerId)
+        .single()
+      credits = balance?.plan_balance ?? undefined
+    } catch (e) {
+      console.warn('[blocos3d] leitura de saldo pós-débito falhou (não crítico):', (e as Error)?.message)
+    }
 
     return NextResponse.json({
       jobId:        job.id,
       nodesCharged: nodesToCharge,
-      credits:      balance?.plan_balance ?? undefined,
+      credits,
     })
   } catch (err: unknown) {
-    // ── Refund VERIFICADO em qualquer falha pós-débito ─────────────────────────
+    // ── Refund VERIFICADO em falha pós-débito e PRÉ-registro do job ────────────
+    // (depois do insert, quem estorna é exclusivamente o failJob do poll.)
     await refundNodes(admin, user.id, nodesToCharge, { module: 'blocos3d', jobTable: 'blocos3d_jobs' })
 
     if (err instanceof MeshyError) {
@@ -175,8 +185,12 @@ export async function GET(req: NextRequest) {
   }
 
   const admin = createAdminClient()
+  // Listagem sem URLs de modelo (o strip só renderiza thumbnails); o detalhe
+  // completo vem do GET /api/blocos3d/[jobId] quando o job é selecionado.
   const jobs = await Promise.all(
-    ((data ?? []) as unknown as Blocos3DJobRow[]).map(row => toJobView(admin, row)),
+    ((data ?? []) as unknown as Blocos3DJobRow[]).map(row =>
+      toJobView(admin, row, { includeModelUrls: false }),
+    ),
   )
   return NextResponse.json({ jobs })
 }

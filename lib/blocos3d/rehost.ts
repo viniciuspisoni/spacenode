@@ -60,9 +60,12 @@ async function rehostOne(
       console.error('[blocos3d-rehost] tamanho fora do limite:', buf.byteLength, key)
       return null
     }
+    // upsert: keys são determinísticas por job/formato — dois polls concorrentes
+    // gravam os MESMOS bytes; sem upsert o perdedor ficaria com key nula e
+    // poderia vencer o claim do job com model_*_key = NULL (perda do modelo).
     const { error } = await admin.storage.from(BUCKET).upload(key, buf, {
       contentType,
-      upsert: false,
+      upsert: true,
     })
     if (error) {
       console.error('[blocos3d-rehost] upload falhou:', error.message, key)
@@ -94,13 +97,17 @@ export async function rehostProviderOutputs(
 ): Promise<RehostedModel> {
   const base = `${opts.userId}/blocos3d/${opts.jobId}`
 
+  // Extensão/MIME da thumbnail seguem a URL do provider (nem sempre é PNG).
+  const thumbExt = opts.thumbnailUrl?.match(/\.(png|jpe?g|webp)(\?|$)/i)?.[1]?.toLowerCase() ?? 'png'
+  const thumbMime = thumbExt === 'webp' ? 'image/webp' : thumbExt === 'png' ? 'image/png' : 'image/jpeg'
+
   const formats = (Object.keys(FORMAT_MIME) as ModelFormat[]).filter(f => opts.modelUrls[f])
   const [modelResults, thumbnailKey] = await Promise.all([
     Promise.all(formats.map(f =>
       rehostOne(admin, opts.modelUrls[f]!, `${base}/modelo.${f}`, FORMAT_MIME[f]).then(k => [f, k] as const),
     )),
     opts.thumbnailUrl
-      ? rehostOne(admin, opts.thumbnailUrl, `${base}/thumbnail.png`, 'image/png')
+      ? rehostOne(admin, opts.thumbnailUrl, `${base}/thumbnail.${thumbExt.replace('jpeg', 'jpg')}`, thumbMime)
       : Promise.resolve(null),
   ])
 

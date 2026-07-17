@@ -13,6 +13,12 @@
 -- Os arquivos ficam em `{user_id}/blocos3d/...` — as policies owner-scoped do
 -- bucket (migration 20260703130000) já cobrem esse prefixo.
 --
+-- Por que tabela própria e NÃO `renders` (deliberado, precedente edit_v3_jobs):
+-- o output é um MODELO 3D, não imagem — o histórico global e o dashboard
+-- renderizam <img src=output_url> e quebrariam com um .glb. O módulo tem
+-- histórico próprio na página. Follow-up possível: espelhar a thumbnail em
+-- `renders` na conclusão pra aparecer no histórico unificado.
+--
 -- ROLLBACK:
 --   DROP TABLE IF EXISTS public.blocos3d_jobs;
 --   (allowlist de MIME: reverter manualmente se necessário — é só aditivo.)

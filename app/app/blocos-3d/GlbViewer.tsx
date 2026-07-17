@@ -44,7 +44,9 @@ export default function GlbViewer({ url }: GlbViewerProps) {
 
     // Iluminação de estúdio neutra via IBL — PBR fica legível sem HDR externo.
     const pmrem = new THREE.PMREMGenerator(renderer)
-    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
+    const roomEnv = new RoomEnvironment()
+    const envTarget = pmrem.fromScene(roomEnv, 0.04)
+    scene.environment = envTarget.texture
 
     const camera = new THREE.PerspectiveCamera(40, 1, 0.01, 1000)
 
@@ -115,6 +117,10 @@ export default function GlbViewer({ url }: GlbViewerProps) {
       cancelAnimationFrame(raf)
       observer.disconnect()
       controls.dispose()
+      // O render target do fromScene não é liberado pelo pmrem.dispose() —
+      // sem isto, cada troca de modelo vaza memória de GPU.
+      envTarget.dispose()
+      roomEnv.dispose()
       pmrem.dispose()
       scene.traverse((obj) => {
         const mesh = obj as THREE.Mesh

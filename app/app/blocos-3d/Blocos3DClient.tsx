@@ -16,9 +16,13 @@ import dynamic from 'next/dynamic'
 import { RetocarImportModal } from '@/components/spaces/RetocarImportModal'
 import { uploadDirect } from '@/lib/storage/direct-upload-client'
 import { jsonOrNull, errMsg } from '@/lib/http/fetch-json'
+import { urlToFile } from '@/lib/http/url-to-file'
+import { downloadBlob } from '@/lib/apresentar/svg-to-png'
 import {
   BLOCOS3D_ENGINES,
   BLOCOS3D_QUALITY_ORDER,
+  BLOCOS3D_SOURCE_MAX_BYTES,
+  BLOCOS3D_SOURCE_MAX_MB,
   DEFAULT_BLOCOS3D_QUALITY,
   TEXTURE_PROMPT_MAX_LEN,
 } from '@/lib/blocos3d/config'
@@ -59,12 +63,52 @@ function displayProgress(job: Blocos3DJobView, now: number): number {
   return Math.min(92, Math.round((elapsed / estimated) * 100))
 }
 
-async function urlToFile(url: string): Promise<File> {
-  const res = await fetch(url)
-  if (!res.ok) throw new Error('Não foi possível importar a imagem')
-  const blob = await res.blob()
-  const ext = blob.type.split('/')[1] || 'jpg'
-  return new File([blob], `historico.${ext}`, { type: blob.type })
+/** Glifo do módulo (cubo) — um só desenho pro dropzone, empty state e
+ *  fallback do histórico. */
+function CubeGlyph({ size, strokeWidth = 1.5 }: { size: number; strokeWidth?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3l7.5 4.2v9.6L12 21l-7.5-4.2V7.2L12 3z" />
+      <path d="M4.5 7.2L12 11.4l7.5-4.2M12 11.4V21" />
+    </svg>
+  )
+}
+
+/** Painel de progresso com ticker próprio de 1s — isola o re-render da barra
+ *  sintetizada (sem ele, a árvore inteira do módulo re-renderizaria a cada
+ *  segundo durante toda a geração). */
+function ProcessingPanel({ job }: { job: Blocos3DJobView }) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [])
+  const shownProgress = displayProgress(job, now)
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18, animation: 'fadeIn 0.2s ease' }}>
+      {job.inputUrl && (
+        <img src={job.inputUrl} alt="origem"
+          style={{ width: 130, height: 130, objectFit: 'cover', borderRadius: 12, border: '0.5px solid var(--color-border)', opacity: 0.85 }} />
+      )}
+      <div style={{ width: 260 }}>
+        <div style={{ height: 3, borderRadius: 99, background: 'var(--color-surface-hover)', overflow: 'hidden' }}>
+          <div style={{
+            height: '100%', borderRadius: 99, background: 'var(--color-text-primary)',
+            width: `${Math.max(4, shownProgress)}%`, transition: 'width 0.6s ease',
+          }} />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
+          <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{progressLabel(shownProgress, job.quality)}</span>
+          <span style={{ fontSize: 11, color: 'var(--color-text-quaternary)' }}>{shownProgress}%</span>
+        </div>
+      </div>
+      <div style={{ fontSize: 10, color: 'var(--color-text-quaternary)', textAlign: 'center', lineHeight: 1.6, maxWidth: 300 }}>
+        A geração leva {formatMinutes(BLOCOS3D_ENGINES[job.quality]?.estimatedMs ?? 120_000)}. Pode navegar pelo app — o bloco continua sendo gerado e fica no histórico.
+      </div>
+    </div>
+  )
 }
 
 interface Blocos3DClientProps {
@@ -98,9 +142,6 @@ export default function Blocos3DClient({ initialCredits, engineAvailability }: B
 
   const [showImportModal, setShowImportModal] = useState(false)
   const [isImporting,     setIsImporting]     = useState(false)
-
-  // Tick de 1s pra barra sintetizada avançar entre polls.
-  const [now, setNow] = useState(() => Date.now())
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const pollRef      = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -170,18 +211,11 @@ export default function Blocos3DClient({ initialCredits, engineAvailability }: B
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [job?.id, job?.status])
 
-  // Ticker da barra sintetizada — só roda enquanto há job em processamento.
-  useEffect(() => {
-    if (job?.status !== 'processing') return
-    const t = setInterval(() => setNow(Date.now()), 1000)
-    return () => clearInterval(t)
-  }, [job?.status])
-
   // ── Entrada de imagem ──────────────────────────────────────────────────────
 
   function loadImageFile(file: File) {
     if (!file.type.startsWith('image/')) { setError('Arquivo deve ser uma imagem.'); return }
-    if (file.size > 15 * 1024 * 1024)    { setError('Imagem muito grande. Máximo 15 MB.'); return }
+    if (file.size > BLOCOS3D_SOURCE_MAX_BYTES) { setError(`Imagem muito grande. Máximo ${BLOCOS3D_SOURCE_MAX_MB} MB.`); return }
     setImageFile(file)
     setError(null)
     const reader = new FileReader()
@@ -265,17 +299,21 @@ export default function Blocos3DClient({ initialCredits, engineAvailability }: B
     if (!url || downloading) return
     setDownloading(format)
     try {
-      const res = await fetch(url)
-      if (!res.ok) throw new Error('fetch failed')
-      const blob = await res.blob()
-      const objectUrl = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = objectUrl
-      a.download = `spacenode-bloco3d.${format}`
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      URL.revokeObjectURL(objectUrl)
+      const filename = `spacenode-bloco3d.${format}`
+      if (url.includes('/storage/v1/object/sign/')) {
+        // Signed URL do nosso Storage: o param download dispara o attachment
+        // direto no browser — sem bufferizar dezenas de MB em memória.
+        const a = document.createElement('a')
+        a.href = `${url}${url.includes('?') ? '&' : '?'}download=${encodeURIComponent(filename)}`
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+      } else {
+        // Fallback (URL do provider, cross-origin sem attachment garantido).
+        const res = await fetch(url)
+        if (!res.ok) throw new Error('fetch failed')
+        downloadBlob(await res.blob(), filename)
+      }
     } catch {
       window.open(url, '_blank', 'noopener,noreferrer')
     } finally {
@@ -283,13 +321,26 @@ export default function Blocos3DClient({ initialCredits, engineAvailability }: B
     }
   }
 
-  function selectHistoryJob(item: Blocos3DJobView) {
+  async function selectHistoryJob(item: Blocos3DJobView) {
     setError(null)
     setJob(item)
+    // A listagem vem sem URLs de modelo (assinar 4 modelos × N linhas a cada
+    // load seria caro à toa) — busca o detalhe completo ao selecionar.
+    if (item.status === 'completed' && !item.modelUrls.glb) {
+      try {
+        const res = await fetch(`/api/blocos3d/${item.id}`)
+        const data = await jsonOrNull(res)
+        if (res.ok && data?.job) {
+          const fresh = data.job as Blocos3DJobView
+          setJob(cur => (cur?.id === item.id ? fresh : cur))
+        }
+      } catch {
+        // O painel de carregamento segue até uma nova seleção.
+      }
+    }
   }
 
   const glbUrl = job?.status === 'completed' ? job.modelUrls.glb ?? null : null
-  const shownProgress = job?.status === 'processing' ? displayProgress(job, now) : 0
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -336,12 +387,11 @@ export default function Blocos3DClient({ initialCredits, engineAvailability }: B
                 <img src={imagePreview} alt="preview" style={{ width: '100%', display: 'block', maxHeight: 200, objectFit: 'cover' }} />
               ) : (
                 <>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-quaternary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 3l7.5 4.2v9.6L12 21l-7.5-4.2V7.2L12 3z" />
-                    <path d="M4.5 7.2L12 11.4l7.5-4.2M12 11.4V21" />
-                  </svg>
+                  <span style={{ display: 'flex', color: 'var(--color-text-quaternary)' }}>
+                    <CubeGlyph size={24} />
+                  </span>
                   <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 10 }}>Arraste ou clique para enviar</span>
-                  <span style={{ fontSize: 10, color: 'var(--color-text-quaternary)', marginTop: 4 }}>PNG, JPG, WEBP — até 15 MB</span>
+                  <span style={{ fontSize: 10, color: 'var(--color-text-quaternary)', marginTop: 4 }}>PNG, JPG, WEBP — até {BLOCOS3D_SOURCE_MAX_MB} MB</span>
                 </>
               )}
             </div>
@@ -509,27 +559,13 @@ export default function Blocos3DClient({ initialCredits, engineAvailability }: B
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', alignItems: 'stretch', justifyContent: 'center', padding: 32 }}>
 
           {/* Em processamento */}
-          {job?.status === 'processing' && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18, animation: 'fadeIn 0.2s ease' }}>
-              {job.inputUrl && (
-                <img src={job.inputUrl} alt="origem"
-                  style={{ width: 130, height: 130, objectFit: 'cover', borderRadius: 12, border: '0.5px solid var(--color-border)', opacity: 0.85 }} />
-              )}
-              <div style={{ width: 260 }}>
-                <div style={{ height: 3, borderRadius: 99, background: 'var(--color-surface-hover)', overflow: 'hidden' }}>
-                  <div style={{
-                    height: '100%', borderRadius: 99, background: 'var(--color-text-primary)',
-                    width: `${Math.max(4, shownProgress)}%`, transition: 'width 0.6s ease',
-                  }} />
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
-                  <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{progressLabel(shownProgress, job.quality)}</span>
-                  <span style={{ fontSize: 11, color: 'var(--color-text-quaternary)' }}>{shownProgress}%</span>
-                </div>
-              </div>
-              <div style={{ fontSize: 10, color: 'var(--color-text-quaternary)', textAlign: 'center', lineHeight: 1.6, maxWidth: 300 }}>
-                A geração leva {formatMinutes(BLOCOS3D_ENGINES[job.quality]?.estimatedMs ?? 120_000)}. Pode navegar pelo app — o bloco continua sendo gerado e fica no histórico.
-              </div>
+          {job?.status === 'processing' && <ProcessingPanel job={job} />}
+
+          {/* Concluído aguardando URLs do detalhe (seleção vinda da listagem) */}
+          {job?.status === 'completed' && !glbUrl && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 32, height: 32, borderRadius: '50%', border: '2px solid var(--color-border-strong)', borderTop: '2px solid var(--color-text-secondary)', animation: 'spin 0.9s linear infinite' }} />
+              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Abrindo o bloco…</span>
             </div>
           )}
 
@@ -613,10 +649,7 @@ export default function Blocos3DClient({ initialCredits, engineAvailability }: B
           {!job && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, animation: 'fadeIn 0.2s ease' }}>
               <div style={{ opacity: 0.16 }}>
-                <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="0.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 3l7.5 4.2v9.6L12 21l-7.5-4.2V7.2L12 3z" />
-                  <path d="M4.5 7.2L12 11.4l7.5-4.2M12 11.4V21" />
-                </svg>
+                <CubeGlyph size={56} strokeWidth={0.8} />
               </div>
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', fontWeight: 500, letterSpacing: '-0.01em' }}>O bloco 3D aparecerá aqui</div>
@@ -653,10 +686,8 @@ export default function Blocos3DClient({ initialCredits, engineAvailability }: B
                     {thumb ? (
                       <img src={thumb} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                     ) : (
-                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-quaternary)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M12 3l7.5 4.2v9.6L12 21l-7.5-4.2V7.2L12 3z" />
-                        </svg>
+                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-quaternary)' }}>
+                        <CubeGlyph size={20} strokeWidth={1.2} />
                       </div>
                     )}
                     {item.status === 'processing' && (

@@ -101,9 +101,10 @@ export function getBlocos3DEngine(quality: Blocos3DQuality): Blocos3DEngine {
   return BLOCOS3D_ENGINES[quality]
 }
 
-export function getBlocos3DCost(quality: Blocos3DQuality): number {
-  return BLOCOS3D_ENGINES[quality].costInNodes
-}
+/** Limite da imagem de origem — fonte única pro client (checagem + label) e
+ *  pra área blocos3d-source do upload direto (lib/storage/direct-upload.ts). */
+export const BLOCOS3D_SOURCE_MAX_BYTES = 15 * 1024 * 1024
+export const BLOCOS3D_SOURCE_MAX_MB = 15
 
 /** Normaliza o body da request pra um Blocos3DOptions válido (null = inválido). */
 export function normalizeBlocos3DOptions(body: Record<string, unknown> | null): Blocos3DOptions | null {

@@ -15,6 +15,7 @@ import {
 } from '@/lib/upscale'
 import { uploadDirect } from '@/lib/storage/direct-upload-client'
 import { jsonOrNull, errMsg } from '@/lib/http/fetch-json'
+import { urlToFile } from '@/lib/http/url-to-file'
 
 // ── Tipagem da UI (labels sem nomes técnicos de modelo) ───────────────────────
 
@@ -110,14 +111,6 @@ const LOADING_TEXTS_ENHANCE = [
 ]
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-async function urlToFile(url: string): Promise<File> {
-  const res = await fetch(url)
-  if (!res.ok) throw new Error('Não foi possível importar a imagem')
-  const blob = await res.blob()
-  const ext = blob.type.split('/')[1] || 'jpg'
-  return new File([blob], `historico.${ext}`, { type: blob.type })
-}
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`

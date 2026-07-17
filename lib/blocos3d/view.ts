@@ -51,8 +51,19 @@ function providerUrl(row: Blocos3DJobRow, field: string): string | null {
   return typeof v === 'string' ? v : null
 }
 
-export async function toJobView(admin: SupabaseClient, row: Blocos3DJobRow): Promise<Blocos3DJobView> {
-  const formats = Object.keys(MODEL_KEY_FIELDS) as ModelFormat[]
+export async function toJobView(
+  admin: SupabaseClient,
+  row: Blocos3DJobRow,
+  opts: {
+    /** false = não assina/emite as URLs de modelo — pra listagens (o strip do
+     *  histórico só usa thumbnail/input; assinar 4 modelos × N linhas a cada
+     *  load seria dezenas de idas ao Storage por URLs que expiram sem uso).
+     *  O detalhe completo vem do GET /api/blocos3d/[jobId] na seleção. */
+    includeModelUrls?: boolean
+  } = {},
+): Promise<Blocos3DJobView> {
+  const includeModels = opts.includeModelUrls !== false
+  const formats = includeModels ? (Object.keys(MODEL_KEY_FIELDS) as ModelFormat[]) : []
 
   const [inputUrl, thumbFromKey, ...modelSigned] = await Promise.all([
     signStorageUrl(admin, row.input_image_url),
