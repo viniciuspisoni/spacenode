@@ -71,7 +71,6 @@ export const BLOCOS3D_ENGINES: Record<Blocos3DQuality, Blocos3DEngine> = {
     maxImages:   4,
     costInNodes: 70,           // US$ 0,40 (texture HD) · ~58% margem no piso
     estimatedMs: 150_000,
-    badge:       { label: 'RECOMENDADO', tone: 'green' },
   },
   high: {
     id:          'high',
