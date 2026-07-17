@@ -8,10 +8,11 @@
 // o webhook endpoint é recriado (o whsec_ só existe na resposta de criação —
 // rotacionar é a única forma de recuperá-lo após uma falha parcial de envs).
 //
-// USO (PowerShell, na raiz do repo, com `npx vercel whoami` autenticado):
-//   $env:STRIPE_LIVE_SECRET_KEY = "sk_live_…"   # do Dashboard, modo live
+// USO (qualquer terminal, na raiz do repo, com `npx vercel whoami` autenticado):
 //   node scripts/stripe-live-setup.mjs
-//   Remove-Item Env:STRIPE_LIVE_SECRET_KEY
+//   → o script pede a chave live (sk_live_…) num prompt de input OCULTO.
+//   Alternativa: definir a env STRIPE_LIVE_SECRET_KEY antes de rodar.
+//   Windows sem terminal: clique duplo em scripts\stripe-live-setup.cmd.
 //
 // O script NUNCA imprime segredos e NÃO altera o .env.local (dev fica em teste).
 // Valores espelham lib/plans.ts e lib/lumens.ts — se a tabela de preços mudar,
@@ -23,9 +24,47 @@ import { createRequire } from 'module'
 const require = createRequire(import.meta.url)
 const Stripe = require('stripe')
 
-const KEY = process.env.STRIPE_LIVE_SECRET_KEY
+// Prompt de segredo sem eco: a chave não fica no histórico de nenhum shell
+// nem aparece na tela — cai direto na memória do processo.
+function promptSecret(question) {
+  return new Promise((resolve, reject) => {
+    if (!process.stdin.isTTY) {
+      reject(new Error('sem terminal interativo'))
+      return
+    }
+    process.stdout.write(question)
+    process.stdin.setRawMode(true)
+    process.stdin.resume()
+    process.stdin.setEncoding('utf8')
+    let value = ''
+    const onData = (chunk) => {
+      for (const ch of chunk) {
+        if (ch === '\u0003' /* Ctrl+C */) { process.stdout.write('\n'); process.exit(1) }
+        if (ch === '\r' || ch === '\n') {
+          process.stdin.setRawMode(false)
+          process.stdin.pause()
+          process.stdin.off('data', onData)
+          process.stdout.write('\n')
+          resolve(value.trim())
+          return
+        }
+        if (ch === '\u0008' || ch === '\u007f' /* backspace/DEL */) value = value.slice(0, -1)
+        else value += ch
+      }
+    }
+    process.stdin.on('data', onData)
+  })
+}
+
+let KEY = process.env.STRIPE_LIVE_SECRET_KEY
+if (!KEY) {
+  KEY = await promptSecret(
+    'Cole a chave LIVE do Stripe (sk_live_…) e aperte Enter — o que você colar fica oculto: '
+  ).catch(() => null)
+}
 if (!KEY || !/^(sk|rk)_live_/.test(KEY)) {
-  console.error('✗ Defina STRIPE_LIVE_SECRET_KEY com uma chave LIVE (sk_live_…). Abortando.')
+  console.error('✗ Preciso de uma chave LIVE (sk_live_…) — cole no prompt ou defina STRIPE_LIVE_SECRET_KEY.')
+  console.error('  (Chave de TESTE não serve: pegue a live no Dashboard com o seletor fora de "Ambiente de teste".)')
   process.exit(1)
 }
 const stripe = new Stripe(KEY)
