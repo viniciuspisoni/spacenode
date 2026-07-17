@@ -105,11 +105,11 @@ function ProcessingPanel({ job }: { job: Blocos3DJobView }) {
           }} />
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
-          <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{progressLabel(shownProgress)}</span>
-          <span style={{ fontSize: 11, color: 'var(--color-text-quaternary)' }}>{shownProgress}%</span>
+          <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{progressLabel(shownProgress)}</span>
+          <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{shownProgress}%</span>
         </div>
       </div>
-      <div style={{ fontSize: 10, color: 'var(--color-text-quaternary)', textAlign: 'center', lineHeight: 1.6, maxWidth: 300 }}>
+      <div style={{ fontSize: 10.5, color: 'var(--color-text-tertiary)', textAlign: 'center', lineHeight: 1.6, maxWidth: 300 }}>
         A geração leva {formatMinutes(BLOCOS3D_ENGINES[job.quality]?.estimatedMs ?? 150_000)}. Pode navegar pelo app — o bloco continua sendo gerado e fica no histórico.
       </div>
     </div>
@@ -414,7 +414,7 @@ export default function Blocos3DClient({ initialCredits, engineAvailability }: B
               <CubeGlyph size={isFront ? 22 : 14} strokeWidth={isFront ? 1.5 : 1.3} />
             </span>
             {isFront && (
-              <span style={{ fontSize: 10, color: 'var(--color-text-quaternary)', marginTop: 6 }}>
+              <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 6 }}>
                 Arraste ou clique — até {BLOCOS3D_SOURCE_MAX_MB} MB
               </span>
             )}
@@ -423,7 +423,7 @@ export default function Blocos3DClient({ initialCredits, engineAvailability }: B
         <span style={{
           position: 'absolute', left: 6, bottom: 5,
           fontSize: 8.5, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' as const,
-          color: preview ? 'var(--color-text-primary)' : 'var(--color-text-quaternary)',
+          color: preview ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
           background: preview ? 'color-mix(in srgb, var(--color-bg) 72%, transparent)' : 'transparent',
           padding: preview ? '2px 6px' : 0, borderRadius: 5,
         }}>
@@ -447,7 +447,7 @@ export default function Blocos3DClient({ initialCredits, engineAvailability }: B
 
         <div style={{ padding: '24px 24px 0', flexShrink: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em' }}>Blocos 3D</div>
-          <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 3 }}>
+          <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 3 }}>
             Transforme fotos de um objeto em um modelo 3D pronto para suas cenas e maquetes.
           </div>
         </div>
@@ -456,7 +456,7 @@ export default function Blocos3DClient({ initialCredits, engineAvailability }: B
 
           {/* Upload multiview */}
           <div>
-            <label style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 10 }}>
+            <label style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-text-secondary)', display: 'block', marginBottom: 10 }}>
               Ângulos do objeto
             </label>
 
@@ -469,7 +469,7 @@ export default function Blocos3DClient({ initialCredits, engineAvailability }: B
               onChange={(e) => { const f = e.target.files?.[0]; if (f) loadImageFile(f, activeSlotRef.current); e.target.value = '' }} />
 
             <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 9.5, color: 'var(--color-text-quaternary)' }}>
+              <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>
                 {imageCount === 0 ? 'A frente é obrigatória' : imageCount === 1 ? '1 ângulo' : `${imageCount} ângulos`}
                 {imageCount >= 1 && ' · mais ângulos = mais fidelidade'}
               </span>
@@ -501,14 +501,14 @@ export default function Blocos3DClient({ initialCredits, engineAvailability }: B
               </svg>
               {isImporting ? 'Importando…' : 'Importar do histórico (frente)'}
             </button>
-            <div style={{ fontSize: 9, color: 'var(--color-text-quaternary)', marginTop: 8, lineHeight: 1.5 }}>
+            <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 8, lineHeight: 1.5 }}>
               Funciona melhor com um objeto único em destaque — mobiliário, luminária, elemento de fachada — sobre fundo limpo.
             </div>
           </div>
 
           {/* Qualidade / motor */}
           <div>
-            <label style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 10 }}>
+            <label style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-text-secondary)', display: 'block', marginBottom: 10 }}>
               Qualidade
             </label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -545,13 +545,13 @@ export default function Blocos3DClient({ initialCredits, engineAvailability }: B
                           </span>
                         )}
                       </div>
-                      <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 }}>{e.description}</div>
+                      <div style={{ fontSize: 10.5, color: 'var(--color-text-secondary)', marginTop: 2, lineHeight: 1.45 }}>{e.description}</div>
                       <div style={{ display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap' as const }}>
                         {[...e.formats, ...e.features].map(tag => (
                           <span key={tag} style={{
-                            fontSize: 8.5, color: 'var(--color-text-tertiary)',
-                            background: 'var(--color-chip)', border: '1px solid var(--color-border)',
-                            padding: '1.5px 6px', borderRadius: 5, letterSpacing: '0.02em', whiteSpace: 'nowrap' as const,
+                            fontSize: 9.5, color: 'var(--color-text-secondary)',
+                            background: 'var(--color-chip)', border: '1px solid var(--color-border-strong)',
+                            padding: '2px 7px', borderRadius: 5, letterSpacing: '0.02em', whiteSpace: 'nowrap' as const,
                           }}>
                             {tag}
                           </span>
@@ -571,7 +571,7 @@ export default function Blocos3DClient({ initialCredits, engineAvailability }: B
           {/* Prompt de materiais (só em motor que suporta) */}
           {engine.supportsTexturePrompt && (
             <div>
-              <label style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 10 }}>
+              <label style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-text-secondary)', display: 'block', marginBottom: 10 }}>
                 Materiais (opcional)
               </label>
               <textarea
@@ -587,7 +587,7 @@ export default function Blocos3DClient({ initialCredits, engineAvailability }: B
                   outline: 'none', fontFamily: 'inherit',
                 }}
               />
-              <div style={{ fontSize: 9, color: 'var(--color-text-quaternary)', marginTop: 4 }}>
+              <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 4 }}>
                 Guia a texturização do modelo. Deixe vazio para seguir fielmente as fotos.
               </div>
             </div>
@@ -603,12 +603,12 @@ export default function Blocos3DClient({ initialCredits, engineAvailability }: B
         {/* Rodapé */}
         <div style={{ padding: '16px 24px', borderTop: '0.5px solid var(--color-border)', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
-              Custo: <span style={{ color: 'var(--color-text-secondary)', fontWeight: 500 }}>{nodeCost} Nodes</span>
-              <span style={{ color: 'var(--color-text-quaternary)' }}> · {formatMinutes(engine.estimatedMs)}</span>
+            <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>
+              Custo: <span style={{ color: 'var(--color-text-primary)', fontWeight: 600 }}>{nodeCost} Nodes</span>
+              <span style={{ color: 'var(--color-text-tertiary)' }}> · {formatMinutes(engine.estimatedMs)}</span>
             </div>
-            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
-              Saldo: <span style={{ color: credits > 0 ? 'var(--color-text-secondary)' : 'var(--color-error)', fontWeight: 500 }}>{credits} Nodes</span>
+            <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>
+              Saldo: <span style={{ color: credits > 0 ? 'var(--color-text-primary)' : 'var(--color-error)', fontWeight: 600 }}>{credits} Nodes</span>
             </div>
           </div>
           <button onClick={handleSubmit} disabled={!canSubmit}
@@ -652,7 +652,7 @@ export default function Blocos3DClient({ initialCredits, engineAvailability }: B
                 <GlbViewer url={glbUrl} />
               </div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' as const, flexShrink: 0 }}>
-                <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', letterSpacing: '0.04em' }}>
+                <div style={{ fontSize: 10.5, color: 'var(--color-text-secondary)', letterSpacing: '0.04em' }}>
                   Arraste para orbitar · scroll para zoom · {BLOCOS3D_ENGINES[job.quality]?.label ?? ''}
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' as const }}>
@@ -701,7 +701,7 @@ export default function Blocos3DClient({ initialCredits, engineAvailability }: B
               </div>
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', fontWeight: 500 }}>A geração não foi concluída</div>
-                <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 5, maxWidth: 320, lineHeight: 1.5 }}>
+                <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 5, maxWidth: 320, lineHeight: 1.5 }}>
                   {job.errorMessage ?? 'Falha no processamento.'} Os nodes foram estornados — tente novamente com outras fotos ou qualidade.
                 </div>
               </div>
@@ -724,8 +724,8 @@ export default function Blocos3DClient({ initialCredits, engineAvailability }: B
                 <CubeGlyph size={56} strokeWidth={0.8} />
               </div>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', fontWeight: 500, letterSpacing: '-0.01em' }}>O bloco 3D aparecerá aqui</div>
-                <div style={{ fontSize: 11, color: 'var(--color-text-quaternary)', marginTop: 5, lineHeight: 1.5, maxWidth: 300 }}>
+                <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', fontWeight: 500, letterSpacing: '-0.01em' }}>O bloco 3D aparecerá aqui</div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 5, lineHeight: 1.5, maxWidth: 300 }}>
                   Envie até 4 ângulos de um objeto para gerar um modelo 3D navegável — download em GLB, e todos os formatos no Premium.
                 </div>
               </div>
@@ -736,7 +736,7 @@ export default function Blocos3DClient({ initialCredits, engineAvailability }: B
         {/* Histórico do módulo */}
         {history.length > 0 && (
           <div style={{ flexShrink: 0, borderTop: '0.5px solid var(--color-border)', padding: '12px 24px 14px' }}>
-            <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-text-tertiary)', marginBottom: 10 }}>
+            <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-text-secondary)', marginBottom: 10 }}>
               Blocos recentes
             </div>
             <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>

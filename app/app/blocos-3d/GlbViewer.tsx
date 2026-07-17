@@ -151,7 +151,7 @@ export default function GlbViewer({ url }: GlbViewerProps) {
             borderTop: '2px solid var(--color-text-secondary)',
             animation: 'spin 0.9s linear infinite',
           }} />
-          <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Carregando modelo 3D…</span>
+          <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>Carregando modelo 3D…</span>
         </div>
       )}
       {phase === 'error' && (
