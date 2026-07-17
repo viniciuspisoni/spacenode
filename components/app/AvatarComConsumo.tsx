@@ -86,9 +86,9 @@ export function AvatarComConsumo({
         onClick={() => setOpen(o => !o)}
         style={{
           display: 'flex', alignItems: 'center', justifyContent: expanded ? 'flex-start' : 'center', gap: 10,
-          padding: expanded ? '5px 10px' : '5px 0',
-          height: 56,
-          borderRadius: 14,
+          padding: expanded ? '0 10px' : 0,
+          height: 38,
+          borderRadius: 12,
           background: expanded ? 'var(--color-surface)' : 'transparent',
           border: expanded ? '0.5px solid var(--color-border)' : '0.5px solid transparent',
           boxShadow: expanded ? 'inset 0 1px 0 rgba(255,255,255,0.03)' : 'none',
