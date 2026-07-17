@@ -21,7 +21,9 @@
 // Custo real por geração (verificado 2026-07-17; conferir no dashboard antes
 // de mudar):
 //   fal-ai/trellis                 US$ 0,02          → piso  3 nodes
-//   fal-ai/hunyuan3d-v21 (PBR)     US$ 0,05          → piso  8 nodes
+//   fal-ai/hunyuan3d-v21 (PBR)     US$ 0,15          → piso 23 nodes
+//     (endpoint US$ 0,05 base; textured_mesh cobra 3× o mesh branco — doc do
+//      próprio SDK. Margem no piso com 25 nodes: ~56%.)
 //   Meshy image-to-3d texturizado  US$ 0,40–0,60     → piso 89 nodes
 //     (Meshy: créditos ~US$ 0,02, task 20–30 créditos; exige plano Pro ativo)
 
@@ -66,7 +68,7 @@ export const BLOCOS3D_ENGINES: Record<Blocos3DQuality, Blocos3DEngine> = {
     formats:     ['GLB'],
     features:    ['Materiais PBR', '~2 min'],
     supportsTexturePrompt: false,
-    costInNodes: 25,           // US$ 0,05 · ~85% margem no piso
+    costInNodes: 25,           // US$ 0,15 (textured 3×) · ~56% margem no piso
     estimatedMs: 120_000,
     badge:       { label: 'RECOMENDADO', tone: 'green' },
   },
