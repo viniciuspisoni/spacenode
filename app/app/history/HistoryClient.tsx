@@ -9,8 +9,10 @@ import { toMediaProxyUrl } from '@/lib/storage/media-url'
 import { GenerationDetailDrawer } from '@/components/history/GenerationDetailDrawer'
 import { authorInitials, type GenerationKind } from '@/lib/history/generation-detail'
 import type { Edit } from '@/lib/spaces/types'
+import { BLOCOS3D_ENGINES } from '@/lib/blocos3d/config'
+import type { Blocos3DJobView } from '@/lib/blocos3d/types'
 
-type HistoryTab = 'renders' | 'edits' | 'vistas' | 'finalizar'
+type HistoryTab = 'renders' | 'edits' | 'vistas' | 'finalizar' | 'blocos3d'
 
 // Espelho de RENDER_LIST_COLUMNS (lib/history/redact.ts): a listagem NÃO
 // carrega prompt/fal_request_id/config_snapshot — o prompt final é
@@ -448,6 +450,7 @@ export function HistoryClient({
               {historyTab === 'edits'     && 'Edições localizadas geradas no Editar.'}
               {historyTab === 'vistas'    && 'Vistas geradas dentro dos seus Spaces.'}
               {historyTab === 'finalizar' && 'Versões exportadas dos seus projetos do Finalizar.'}
+              {historyTab === 'blocos3d'  && 'Modelos 3D gerados no Blocos 3D.'}
             </p>
           </div>
 
@@ -477,15 +480,15 @@ export function HistoryClient({
           </div>
         </div>
 
-        {/* ── Tabs (Renders / Edições / Vistas / Finalizar) ── */}
+        {/* ── Tabs (Renders / Edições / Vistas / Finalizar / Blocos 3D) ── */}
         <div style={{
           display: 'flex', gap: 4, padding: 4,
           background: 'var(--color-surface)', borderRadius: 10,
-          marginBottom: 16, maxWidth: 560,
+          marginBottom: 16, maxWidth: 680,
         }}>
-          {(['renders', 'edits', 'vistas', 'finalizar'] as HistoryTab[]).map(t => {
+          {(['renders', 'edits', 'vistas', 'finalizar', 'blocos3d'] as HistoryTab[]).map(t => {
             const active = historyTab === t
-            const label = t === 'renders' ? 'Renders' : t === 'edits' ? 'Edições' : t === 'vistas' ? 'Vistas' : 'Finalizar'
+            const label = t === 'renders' ? 'Renders' : t === 'edits' ? 'Edições' : t === 'vistas' ? 'Vistas' : t === 'finalizar' ? 'Finalizar' : 'Blocos 3D'
             return (
               <button
                 key={t}
@@ -506,10 +509,11 @@ export function HistoryClient({
           })}
         </div>
 
-        {/* ── Tabs alternativas: Edições + Vistas + Finalizar ── */}
+        {/* ── Tabs alternativas: Edições + Vistas + Finalizar + Blocos 3D ── */}
         {historyTab === 'edits'     && <EditsTabView  authors={authors} onOpenDetail={openDetail} />}
         {historyTab === 'vistas'    && <VistasTabView authors={authors} onOpenDetail={openDetail} />}
         {historyTab === 'finalizar' && <FinalizarTabView />}
+        {historyTab === 'blocos3d'  && <Blocos3DTabView />}
 
         {/* ── Controls (só renderiza na tab Renders) ── */}
         {historyTab === 'renders' && folderCounts.total > 0 && (
@@ -1095,6 +1099,116 @@ function FinalizarTabView() {
               </div>
             </div>
           </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ── Blocos3DTabView ────────────────────────────────────────────────────────────
+//
+// Blocos 3D vivem em tabela própria (blocos3d_jobs — o output é modelo, não
+// imagem), então a aba busca do endpoint do módulo. Clique abre o bloco no
+// próprio módulo via deep-link (?job=), onde estão o viewer e os downloads.
+
+function Blocos3DTabView() {
+  const [items, setItems] = useState<Blocos3DJobView[] | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoading(true)
+    fetch('/api/blocos3d?limit=50')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setItems((d?.jobs ?? []) as Blocos3DJobView[]))
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) return <TabLoading />
+  if ((items ?? []).length === 0) return (
+    <TabEmpty
+      message="Sem blocos 3D ainda."
+      action={{ href: '/app/blocos-3d', label: 'Abrir Blocos 3D →' }}
+    />
+  )
+
+  return (
+    <div style={{
+      display: 'grid', gap: 14,
+      gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+    }}>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      {items!.map(it => {
+        const thumb = it.thumbnailUrl ?? it.inputUrl
+        const engineLabel = BLOCOS3D_ENGINES[it.quality]?.label ?? it.quality
+        return (
+          <Link
+            key={it.id}
+            href={`/app/blocos-3d?job=${it.id}`}
+            title={it.status === 'failed' ? 'Falhou (estornado)' : it.status === 'processing' ? 'Gerando…' : 'Abrir bloco 3D'}
+            style={{
+              background: 'var(--color-bg-elevated)',
+              border: '0.5px solid var(--color-border)',
+              borderRadius: 12, overflow: 'hidden',
+              color: 'inherit', cursor: 'pointer',
+              display: 'block', textDecoration: 'none',
+              opacity: it.status === 'failed' ? 0.55 : 1,
+            }}
+          >
+            <div style={{ aspectRatio: '4 / 3', background: 'var(--color-surface)', position: 'relative' }}>
+              {thumb ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={thumb} alt="Bloco 3D"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-quaternary)' }}>
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 3l7.5 4.2v9.6L12 21l-7.5-4.2V7.2L12 3z" />
+                    <path d="M4.5 7.2L12 11.4l7.5-4.2M12 11.4V21" />
+                  </svg>
+                </div>
+              )}
+              {it.status === 'processing' && (
+                <div style={{
+                  position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'color-mix(in srgb, var(--color-bg) 55%, transparent)',
+                }}>
+                  <div style={{
+                    width: 18, height: 18, borderRadius: '50%',
+                    border: '2px solid var(--color-border-strong)',
+                    borderTop: '2px solid var(--color-text-primary)',
+                    animation: 'spin 0.9s linear infinite',
+                  }} />
+                </div>
+              )}
+              {/* Selo 3D — diferencia dos cards de imagem das outras abas. */}
+              <span style={{
+                position: 'absolute', top: 8, right: 8,
+                fontSize: 8, fontWeight: 700, letterSpacing: '0.08em',
+                color: 'rgba(255,255,255,0.9)', background: 'var(--color-scrim)',
+                backdropFilter: 'blur(4px)', border: '0.5px solid rgba(255,255,255,0.22)',
+                padding: '2px 6px', borderRadius: 6,
+              }}>
+                3D
+              </span>
+            </div>
+            <div style={{ padding: '10px 12px 12px' }}>
+              <div style={{
+                fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary)',
+                letterSpacing: '-0.005em',
+              }}>
+                {engineLabel}
+                {it.status === 'processing' && ' · gerando…'}
+                {it.status === 'failed' && ' · falhou'}
+              </div>
+              <div style={{
+                fontSize: 10, color: 'var(--color-text-tertiary)',
+                letterSpacing: '0.02em', marginTop: 4,
+              }}>
+                {it.nodesCost} nodes · {new Date(it.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+              </div>
+            </div>
+          </Link>
         )
       })}
     </div>

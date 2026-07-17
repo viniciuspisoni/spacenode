@@ -123,9 +123,11 @@ interface Blocos3DClientProps {
   initialCredits: number
   /** Disponibilidade real por tier (server checa as keys dos providers). */
   engineAvailability: Record<Blocos3DQuality, boolean>
+  /** Deep-link (?job=) vindo do Histórico — abre este job selecionado. */
+  initialJobId?: string
 }
 
-export default function Blocos3DClient({ initialCredits, engineAvailability }: Blocos3DClientProps) {
+export default function Blocos3DClient({ initialCredits, engineAvailability, initialJobId }: Blocos3DClientProps) {
   // Entrada — multiview por posição
   const [slotFiles,    setSlotFiles]    = useState<SlotFiles>({})
   const [slotPreviews, setSlotPreviews] = useState<SlotPreviews>({})
@@ -180,6 +182,16 @@ export default function Blocos3DClient({ initialCredits, engineAvailability }: B
     let cancelled = false
     // Defere pro próximo tick: nada de setState síncrono no corpo do effect.
     const t = setTimeout(async () => {
+      // Deep-link do Histórico (?job=): abre o job pedido com detalhe completo.
+      if (initialJobId) {
+        try {
+          const res = await fetch(`/api/blocos3d/${initialJobId}`)
+          const data = await jsonOrNull(res)
+          if (!cancelled && res.ok && data?.job) setJob(data.job as Blocos3DJobView)
+        } catch {
+          // Job inválido/alheio — segue pro fluxo normal.
+        }
+      }
       const jobs = await refreshHistory()
       if (cancelled) return
       // Retomada: adota o processing mais recente (só se nada selecionado).
@@ -187,7 +199,7 @@ export default function Blocos3DClient({ initialCredits, engineAvailability }: B
       if (processing) setJob(cur => cur ?? processing)
     }, 0)
     return () => { cancelled = true; clearTimeout(t) }
-  }, [refreshHistory])
+  }, [refreshHistory, initialJobId])
 
   // ── Polling do job ativo ───────────────────────────────────────────────────
 
