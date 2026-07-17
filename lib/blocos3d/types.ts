@@ -3,13 +3,28 @@
 // Tipos compartilhados do módulo Blocos 3D (imagem → modelo 3D).
 // Importado tanto no server (rotas/providers) quanto no client (UI).
 
-/** Nível de qualidade exposto na UI — cada um mapeia pra um motor no catálogo
- *  (lib/blocos3d/config.ts), com provider, parâmetros e custo próprios. */
-export type Blocos3DQuality = 'draft' | 'standard' | 'high'
+/** Tier exposto na UI — cada um mapeia pra um motor no catálogo
+ *  (lib/blocos3d/config.ts), com provider, parâmetros e custo próprios.
+ *  ('draft' saiu do catálogo em 2026-07-17 mas segue válido no banco pra
+ *  linhas históricas.) */
+export type Blocos3DQuality = 'standard' | 'high' | 'premium'
 
 export type Blocos3DProvider = 'fal' | 'meshy'
 
 export type Blocos3DJobStatus = 'processing' | 'completed' | 'failed'
+
+/** Posições do multiview. 'front' é obrigatória; as demais refinam o modelo.
+ *  Posicional porque o Tripo multiview exige saber qual ângulo é qual —
+ *  Rodin/Meshy recebem como lista e ignoram a semântica. */
+export type ViewPosition = 'front' | 'left' | 'back' | 'right'
+
+/** Conjunto de imagens por posição (File no client, key/URL no server). */
+export type PositionedImages<T = string> = {
+  front:  T
+  left?:  T
+  back?:  T
+  right?: T
+}
 
 /** Opções da geração (validadas na rota; guardadas no jsonb `options`). */
 export interface Blocos3DOptions {

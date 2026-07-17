@@ -1,11 +1,11 @@
-// /api/blocos3d — módulo Blocos 3D (imagem → modelo 3D; providers fal + Meshy).
+// /api/blocos3d — módulo Blocos 3D (imagem → modelo 3D; motores via fal).
 //
 // POST — cria o job (padrão fila + polling, a evolução recomendada no /api/video):
-//   1. valida body { sourceKey, quality, texturePrompt? } (a imagem já subiu
-//      DIRETO pro Storage via uploadDirect, área blocos3d-source; o binário
-//      não passa pela Vercel)
+//   1. valida body { sourceKeys: { front, left?, back?, right? }, quality,
+//      texturePrompt? } (as imagens já subiram DIRETO pro Storage via
+//      uploadDirect, área blocos3d-source; o binário não passa pela Vercel)
 //   2. débito atômico ANTES da geração (consume_workspace_nodes; P0001 → 402)
-//   3. cria a task no provider do motor com signed URL de TTL curto da imagem
+//   3. cria a task no provider do motor com signed URLs de TTL curto
 //   4. insere blocos3d_jobs e devolve { jobId } — request dura poucos segundos;
 //      o acompanhamento é via GET /api/blocos3d/[jobId]
 //
@@ -18,15 +18,22 @@ import { getPayerId } from '@/lib/workspaces/context'
 import { refundNodes } from '@/lib/billing/refund-nodes'
 import { DIRECT_UPLOAD_AREAS, verifyDirectUpload } from '@/lib/storage/direct-upload'
 import { signStorageKey } from '@/lib/storage/signed'
-import { getBlocos3DEngine, normalizeBlocos3DOptions } from '@/lib/blocos3d/config'
+import {
+  getBlocos3DEngine,
+  normalizeBlocos3DOptions,
+  normalizeSourceKeys,
+  countImages,
+  VIEW_POSITION_ORDER,
+} from '@/lib/blocos3d/config'
 import { createProviderTask, engineAvailable } from '@/lib/blocos3d/provider'
 import { MeshyError } from '@/lib/blocos3d/meshy'
 import { BLOCOS3D_JOB_COLUMNS, toJobView, type Blocos3DJobRow } from '@/lib/blocos3d/view'
+import type { PositionedImages } from '@/lib/blocos3d/types'
 
 export const maxDuration = 60
 
-// TTL da signed URL que o provider usa pra baixar a imagem de origem. Curto de
-// propósito: o download acontece na criação da task.
+// TTL das signed URLs que o provider usa pra baixar as imagens de origem.
+// Curto de propósito: o download acontece na criação da task.
 const SOURCE_SIGNED_TTL_SECONDS = 60 * 60
 
 const DEFAULT_LIMIT = 20
@@ -40,11 +47,11 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient()
 
   const body = await req.json().catch(() => null) as Record<string, unknown> | null
-  const sourceKey = typeof body?.sourceKey === 'string' ? body.sourceKey : ''
+  const sourceKeys = normalizeSourceKeys(body)
   const options = normalizeBlocos3DOptions(body)
 
-  if (!sourceKey) return NextResponse.json({ error: 'Imagem obrigatória' }, { status: 400 })
-  if (!options)   return NextResponse.json({ error: 'Opções inválidas' }, { status: 400 })
+  if (!sourceKeys) return NextResponse.json({ error: 'Imagem da frente obrigatória' }, { status: 400 })
+  if (!options)    return NextResponse.json({ error: 'Opções inválidas' }, { status: 400 })
 
   const engine = getBlocos3DEngine(options.quality)
   if (!engineAvailable(engine)) {
@@ -53,11 +60,24 @@ export async function POST(req: NextRequest) {
       { status: 503 },
     )
   }
+  if (countImages(sourceKeys) > engine.maxImages) {
+    return NextResponse.json(
+      { error: `O motor ${engine.label} aceita até ${engine.maxImages} ângulos.` },
+      { status: 400 },
+    )
+  }
 
-  // ── Origem: valida o upload direto (dono/área/limites) sem baixar o binário ─
+  // ── Origem: valida cada upload direto (dono/área/limites) sem baixar ───────
   const area = DIRECT_UPLOAD_AREAS['blocos3d-source']
-  const src = await verifyDirectUpload(admin, area, user.id, {}, sourceKey)
-  if (!src.ok) return NextResponse.json({ error: src.message }, { status: src.status })
+  const positions = VIEW_POSITION_ORDER.filter(p => sourceKeys[p])
+  const verified = await Promise.all(
+    positions.map(async p => ({ p, res: await verifyDirectUpload(admin, area, user.id, {}, sourceKeys[p]!) })),
+  )
+  const bad = verified.find(v => !v.res.ok)
+  if (bad && !bad.res.ok) {
+    return NextResponse.json({ error: bad.res.message }, { status: bad.res.status })
+  }
+  const frontPublicUrl = (verified[0].res as { ok: true; url: string }).url
 
   const nodesToCharge = engine.costInNodes
 
@@ -81,13 +101,20 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // ── Signed URL da origem pro provider baixar ─────────────────────────────
+    // ── Signed URLs das origens pro provider baixar ──────────────────────────
     // signStorageKey (sem gate): funciona com o bucket público OU privado.
-    const signedSourceUrl = await signStorageKey(admin, area.bucket, sourceKey, SOURCE_SIGNED_TTL_SECONDS)
-    if (!signedSourceUrl) throw new Error('Falha ao assinar a imagem de origem')
+    const signedEntries = await Promise.all(
+      positions.map(async p => {
+        const url = await signStorageKey(admin, area.bucket, sourceKeys[p]!, SOURCE_SIGNED_TTL_SECONDS)
+        if (!url) throw new Error(`Falha ao assinar a imagem (${p})`)
+        return [p, url] as const
+      }),
+    )
+    const signedImages = Object.fromEntries(signedEntries) as unknown as PositionedImages<string>
 
     // ── Cria a task no provider do motor ─────────────────────────────────────
-    const taskId = await createProviderTask(engine, signedSourceUrl, options)
+    // engineId = endpoint efetivo (Tripo troca pra multiview conforme imagens).
+    const { taskId, engineId } = await createProviderTask(engine, signedImages, options)
 
     // ── Persiste o job ───────────────────────────────────────────────────────
     const { data: job, error: insertError } = await admin
@@ -96,12 +123,14 @@ export async function POST(req: NextRequest) {
         user_id:          user.id,
         status:           'processing',
         provider:         engine.provider,
-        engine:           engine.engine,
+        engine:           engineId,
         provider_task_id: taskId,
-        input_image_url:  src.url,
+        input_image_url:  frontPublicUrl,
         quality:          options.quality,
         options: {
           texture_prompt: options.texturePrompt ?? null,
+          source_keys:    sourceKeys,
+          image_count:    positions.length,
         },
         nodes_cost: nodesToCharge,
         charged:    true,
@@ -114,7 +143,7 @@ export async function POST(req: NextRequest) {
       // (a geração vai concluir no provider, mas o usuário não paga por algo
       // que não consegue ver).
       console.error('[blocos3d] DB INSERT FALHOU (task criada no provider — investigar):', {
-        error: insertError, userId: user.id, engine: engine.engine, taskId,
+        error: insertError, userId: user.id, engine: engineId, taskId,
       })
       throw new Error('Falha ao registrar o job')
     }
@@ -148,8 +177,6 @@ export async function POST(req: NextRequest) {
 
     if (err instanceof MeshyError) {
       console.error('[blocos3d] Meshy error:', err.status, err.message)
-      // 402 da Meshy = créditos DO PROVIDER esgotados — problema nosso, não do
-      // usuário. Mensagem genérica + log pra alertar operação.
       return NextResponse.json(
         { error: 'Serviço de geração 3D indisponível no momento. Tente novamente em instantes.' },
         { status: 502 },

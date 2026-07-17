@@ -5,40 +5,63 @@
 // COMPLETED; result entrega os arquivos. Uma task que falhou aparece como
 // COMPLETED no status e o result() lança — tratamos como failed.
 //
+// Multiview: cada motor recebe os ângulos do seu jeito —
+//   Tripo  → endpoint DIFERENTE (multiview-to-3d) com campos posicionais
+//   Rodin  → input_image_urls[] + condition_mode 'fuse'
+//   Meshy  → image_urls[]
+// resolveFalEngineId decide o endpoint efetivo; a rota persiste o id
+// retornado pelo submit — o poll SEMPRE consulta o endpoint que gerou.
+//
 // Os schemas de output variam por endpoint (model_mesh, model_glb, …), então a
 // extração de URLs é DEFENSIVA: varre o result atrás de arquivos por extensão.
 
 import { fal } from '@fal-ai/client'
-import type { Blocos3DOptions, ModelFormat, ProviderTaskState } from './types'
-import type { Blocos3DEngine } from './config'
+import type { Blocos3DOptions, ModelFormat, PositionedImages, ProviderTaskState } from './types'
+import { countImages, listImages, type Blocos3DEngine } from './config'
 
 fal.config({ credentials: process.env.FAL_KEY })
 
+/** Endpoint efetivo pro conjunto de imagens (Tripo troca pra multiview). */
+export function resolveFalEngineId(engine: Blocos3DEngine, images: PositionedImages<string>): string {
+  if (engine.engine === 'tripo3d/tripo/v2.5/image-to-3d' && countImages(images) > 1) {
+    return 'tripo3d/tripo/v2.5/multiview-to-3d'
+  }
+  return engine.engine
+}
+
+// Parâmetros comuns do Tripo (single e multiview compartilham).
+// texture_alignment original_image: fidelidade à foto de referência
+// (feedback 2026-07-17); auto_size: escala real embutida — relevante pra maquete.
+const TRIPO_COMMON = {
+  texture:           'HD',
+  pbr:               true,
+  texture_alignment: 'original_image',
+  auto_size:         true,
+} as const
+
 /** Monta o input por endpoint (nomes de campo diferem entre os modelos). */
 function buildInput(
-  engine: Blocos3DEngine,
-  imageUrl: string,
+  engineId: string,
+  images: PositionedImages<string>,
   options: Blocos3DOptions,
 ): Record<string, unknown> {
-  switch (engine.engine) {
-    case 'fal-ai/trellis':
-      return { image_url: imageUrl }
-    case 'fal-ai/hunyuan3d-v21':
-      return { input_image_url: imageUrl, textured_mesh: true }
+  switch (engineId) {
     case 'tripo3d/tripo/v2.5/image-to-3d':
+      return { image_url: images.front, ...TRIPO_COMMON }
+
+    case 'tripo3d/tripo/v2.5/multiview-to-3d':
       return {
-        image_url: imageUrl,
-        texture:   'HD',
-        pbr:       true,
-        // Fidelidade à foto de referência (feedback 2026-07-17: textura tem
-        // que respeitar o material real do objeto, não estilizar).
-        texture_alignment: 'original_image',
-        // Escala real do objeto embutida no modelo — relevante pra maquete.
-        auto_size: true,
+        front_image_url: images.front,
+        ...(images.left  ? { left_image_url:  images.left }  : {}),
+        ...(images.back  ? { back_image_url:  images.back }  : {}),
+        ...(images.right ? { right_image_url: images.right } : {}),
+        ...TRIPO_COMMON,
       }
+
     case 'fal-ai/hyper3d/rodin':
       return {
-        input_image_urls:     [imageUrl],
+        input_image_urls:     listImages(images),
+        ...(countImages(images) > 1 ? { condition_mode: 'fuse' } : {}),
         geometry_file_format: 'glb',
         material:             'PBR',
         quality:              'high',
@@ -46,21 +69,37 @@ function buildInput(
         tier:                 'Regular',
         ...(options.texturePrompt ? { prompt: options.texturePrompt } : {}),
       }
+
+    case 'fal-ai/meshy/v5/multi-image-to-3d':
+      return {
+        image_urls:     listImages(images),
+        topology:       'quad',       // diferencial do tier: malha editável
+        symmetry_mode:  'auto',
+        should_remesh:  true,
+        should_texture: true,
+        enable_pbr:     true,
+        ...(options.texturePrompt ? { texture_prompt: options.texturePrompt } : {}),
+      }
+
+    // Motores históricos (jobs antigos) e fallback.
+    case 'fal-ai/hunyuan3d-v21':
+      return { input_image_url: images.front, textured_mesh: true }
     default:
-      return { image_url: imageUrl }
+      return { image_url: images.front }
   }
 }
 
 export async function createFalTask(
   engine: Blocos3DEngine,
-  imageUrl: string,
+  images: PositionedImages<string>,
   options: Blocos3DOptions,
-): Promise<string> {
-  const { request_id } = await fal.queue.submit(engine.engine, {
-    input: buildInput(engine, imageUrl, options),
+): Promise<{ taskId: string; engineId: string }> {
+  const engineId = resolveFalEngineId(engine, images)
+  const { request_id } = await fal.queue.submit(engineId, {
+    input: buildInput(engineId, images, options),
   })
   if (!request_id) throw new Error('fal.queue.submit sem request_id')
-  return request_id
+  return { taskId: request_id, engineId }
 }
 
 const MODEL_EXT_RE = /\.(glb|fbx|obj|usdz)(\?|$)/i

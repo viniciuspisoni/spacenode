@@ -8,8 +8,11 @@
 // Ao montar, adota o job processing mais recente (a geração sobrevive a
 // reload/troca de página).
 //
-// Progresso: Meshy reporta % real; os motores fal não — quando o job vem com
-// progress 0, a barra é sintetizada pela estimativa do motor (capada em 92%).
+// Multiview: 4 slots posicionais (Frente obrigatória + Esquerda/Trás/Direita)
+// — o Tripo exige saber qual ângulo é qual; Rodin/Meshy recebem como lista.
+//
+// Progresso: os motores fal não reportam % — quando o job vem com progress 0,
+// a barra é sintetizada pela estimativa do motor (capada em 92%).
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
@@ -25,8 +28,10 @@ import {
   BLOCOS3D_SOURCE_MAX_MB,
   DEFAULT_BLOCOS3D_QUALITY,
   TEXTURE_PROMPT_MAX_LEN,
+  VIEW_POSITION_LABEL,
+  VIEW_POSITION_ORDER,
 } from '@/lib/blocos3d/config'
-import type { Blocos3DJobView, Blocos3DQuality, ModelFormat } from '@/lib/blocos3d/types'
+import type { Blocos3DJobView, Blocos3DQuality, ModelFormat, ViewPosition } from '@/lib/blocos3d/types'
 
 const GlbViewer = dynamic(() => import('./GlbViewer'), { ssr: false })
 
@@ -40,11 +45,11 @@ const FORMAT_LABEL: Record<ModelFormat, string> = {
 }
 const FORMAT_ORDER: ModelFormat[] = ['glb', 'fbx', 'obj', 'usdz']
 
-function progressLabel(progress: number, quality: Blocos3DQuality): string {
-  if (progress < 15) return 'Analisando a imagem…'
+function progressLabel(progress: number): string {
+  if (progress < 15) return 'Analisando as imagens…'
   if (progress < 45) return 'Gerando a geometria…'
   if (progress < 70) return 'Refinando a malha…'
-  if (progress < 95) return quality === 'draft' ? 'Otimizando o modelo…' : 'Aplicando texturas…'
+  if (progress < 95) return 'Aplicando texturas…'
   return 'Finalizando…'
 }
 
@@ -57,14 +62,14 @@ function formatMinutes(ms: number): string {
  *  pelo tempo decorrido vs estimativa do motor (nunca fecha sozinha). */
 function displayProgress(job: Blocos3DJobView, now: number): number {
   if (job.progress > 0) return job.progress
-  const estimated = BLOCOS3D_ENGINES[job.quality]?.estimatedMs ?? 120_000
+  const estimated = BLOCOS3D_ENGINES[job.quality]?.estimatedMs ?? 150_000
   const elapsed = now - new Date(job.createdAt).getTime()
   if (!Number.isFinite(elapsed) || elapsed <= 0) return 2
   return Math.min(92, Math.round((elapsed / estimated) * 100))
 }
 
-/** Glifo do módulo (cubo) — um só desenho pro dropzone, empty state e
- *  fallback do histórico. */
+/** Glifo do módulo (cubo) — um só desenho pro empty state, slots e fallback
+ *  do histórico. */
 function CubeGlyph({ size, strokeWidth = 1.5 }: { size: number; strokeWidth?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -100,16 +105,19 @@ function ProcessingPanel({ job }: { job: Blocos3DJobView }) {
           }} />
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
-          <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{progressLabel(shownProgress, job.quality)}</span>
+          <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{progressLabel(shownProgress)}</span>
           <span style={{ fontSize: 11, color: 'var(--color-text-quaternary)' }}>{shownProgress}%</span>
         </div>
       </div>
       <div style={{ fontSize: 10, color: 'var(--color-text-quaternary)', textAlign: 'center', lineHeight: 1.6, maxWidth: 300 }}>
-        A geração leva {formatMinutes(BLOCOS3D_ENGINES[job.quality]?.estimatedMs ?? 120_000)}. Pode navegar pelo app — o bloco continua sendo gerado e fica no histórico.
+        A geração leva {formatMinutes(BLOCOS3D_ENGINES[job.quality]?.estimatedMs ?? 150_000)}. Pode navegar pelo app — o bloco continua sendo gerado e fica no histórico.
       </div>
     </div>
   )
 }
+
+type SlotFiles    = Partial<Record<ViewPosition, File>>
+type SlotPreviews = Partial<Record<ViewPosition, string>>
 
 interface Blocos3DClientProps {
   initialCredits: number
@@ -118,10 +126,10 @@ interface Blocos3DClientProps {
 }
 
 export default function Blocos3DClient({ initialCredits, engineAvailability }: Blocos3DClientProps) {
-  // Entrada
-  const [imageFile,    setImageFile]    = useState<File | null>(null)
-  const [imagePreview, setImagePreview] = useState<string | null>(null)
-  const [isDragging,   setIsDragging]   = useState(false)
+  // Entrada — multiview por posição
+  const [slotFiles,    setSlotFiles]    = useState<SlotFiles>({})
+  const [slotPreviews, setSlotPreviews] = useState<SlotPreviews>({})
+  const [dragSlot,     setDragSlot]     = useState<ViewPosition | null>(null)
 
   // Opções
   const [quality, setQuality] = useState<Blocos3DQuality>(
@@ -143,13 +151,15 @@ export default function Blocos3DClient({ initialCredits, engineAvailability }: B
   const [showImportModal, setShowImportModal] = useState(false)
   const [isImporting,     setIsImporting]     = useState(false)
 
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const pollRef      = useRef<ReturnType<typeof setInterval> | null>(null)
+  const fileInputRef  = useRef<HTMLInputElement>(null)
+  const activeSlotRef = useRef<ViewPosition>('front')
+  const pollRef       = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const engine   = BLOCOS3D_ENGINES[quality]
   const nodeCost = engine.costInNodes
+  const imageCount = VIEW_POSITION_ORDER.filter(p => slotFiles[p]).length
   const isGenerating = isSubmitting || job?.status === 'processing'
-  const canSubmit = !!imageFile && credits >= nodeCost && !isGenerating && engineAvailability[quality]
+  const canSubmit = !!slotFiles.front && credits >= nodeCost && !isGenerating && engineAvailability[quality]
 
   // ── Histórico + retomada de job em andamento ───────────────────────────────
 
@@ -211,23 +221,33 @@ export default function Blocos3DClient({ initialCredits, engineAvailability }: B
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [job?.id, job?.status])
 
-  // ── Entrada de imagem ──────────────────────────────────────────────────────
+  // ── Entrada de imagens ─────────────────────────────────────────────────────
 
-  function loadImageFile(file: File) {
+  function loadImageFile(file: File, pos: ViewPosition) {
     if (!file.type.startsWith('image/')) { setError('Arquivo deve ser uma imagem.'); return }
     if (file.size > BLOCOS3D_SOURCE_MAX_BYTES) { setError(`Imagem muito grande. Máximo ${BLOCOS3D_SOURCE_MAX_MB} MB.`); return }
-    setImageFile(file)
     setError(null)
+    setSlotFiles(cur => ({ ...cur, [pos]: file }))
     const reader = new FileReader()
-    reader.onload = (e) => setImagePreview((e.target?.result as string) ?? null)
+    reader.onload = (e) => setSlotPreviews(cur => ({ ...cur, [pos]: (e.target?.result as string) ?? undefined }))
     reader.readAsDataURL(file)
   }
 
+  function removeSlot(pos: ViewPosition) {
+    setSlotFiles(cur => { const next = { ...cur }; delete next[pos]; return next })
+    setSlotPreviews(cur => { const next = { ...cur }; delete next[pos]; return next })
+  }
+
   function resetInput() {
-    setImageFile(null)
-    setImagePreview(null)
+    setSlotFiles({})
+    setSlotPreviews({})
     setError(null)
     if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  function openPicker(pos: ViewPosition) {
+    activeSlotRef.current = pos
+    fileInputRef.current?.click()
   }
 
   async function handleImportPick(picked: { url: string }) {
@@ -235,7 +255,7 @@ export default function Blocos3DClient({ initialCredits, engineAvailability }: B
     setIsImporting(true)
     setError(null)
     try {
-      loadImageFile(await urlToFile(picked.url))
+      loadImageFile(await urlToFile(picked.url), 'front')
     } catch {
       setError('Não foi possível importar a imagem do histórico.')
     } finally {
@@ -246,17 +266,24 @@ export default function Blocos3DClient({ initialCredits, engineAvailability }: B
   // ── Submissão ──────────────────────────────────────────────────────────────
 
   async function handleSubmit() {
-    if (!imageFile || !canSubmit) return
+    if (!slotFiles.front || !canSubmit) return
     setIsSubmitting(true)
     setError(null)
     try {
-      const { key: sourceKey } = await uploadDirect(imageFile, 'blocos3d-source', {}, { confirm: false })
+      // Todos os ângulos sobem DIRETO pro Storage, em paralelo.
+      const entries = await Promise.all(
+        VIEW_POSITION_ORDER.filter(p => slotFiles[p]).map(async p => {
+          const { key } = await uploadDirect(slotFiles[p]!, 'blocos3d-source', {}, { confirm: false })
+          return [p, key] as const
+        }),
+      )
+      const sourceKeys = Object.fromEntries(entries)
 
       const res = await fetch('/api/blocos3d', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sourceKey,
+          sourceKeys,
           quality,
           ...(texturePrompt.trim() && engine.supportsTexturePrompt ? { texturePrompt: texturePrompt.trim() } : {}),
         }),
@@ -277,7 +304,7 @@ export default function Blocos3DClient({ initialCredits, engineAvailability }: B
         status:       'processing',
         progress:     0,
         quality,
-        inputUrl:     imagePreview,
+        inputUrl:     slotPreviews.front ?? null,
         thumbnailUrl: null,
         modelUrls:    {},
         nodesCost:    nodeCost,
@@ -342,6 +369,70 @@ export default function Blocos3DClient({ initialCredits, engineAvailability }: B
 
   const glbUrl = job?.status === 'completed' ? job.modelUrls.glb ?? null : null
 
+  // ── Slot de upload ─────────────────────────────────────────────────────────
+
+  function renderSlot(pos: ViewPosition, style: React.CSSProperties) {
+    const preview = slotPreviews[pos]
+    const isFront = pos === 'front'
+    const isDrag  = dragSlot === pos
+    return (
+      <div key={pos}
+        onClick={() => openPicker(pos)}
+        onDragOver={(e) => { e.preventDefault(); setDragSlot(pos) }}
+        onDragLeave={() => setDragSlot(null)}
+        onDrop={(e) => { e.preventDefault(); setDragSlot(null); const f = e.dataTransfer.files[0]; if (f) loadImageFile(f, pos) }}
+        style={{
+          position: 'relative',
+          border: `1.5px dashed ${isDrag ? 'var(--color-border-focus)' : preview ? 'var(--color-border-strong)' : 'var(--color-border)'}`,
+          borderRadius: 10, overflow: 'hidden', cursor: 'pointer',
+          background: isDrag ? 'var(--color-surface)' : 'var(--color-upload-area)',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          transition: 'border-color 0.15s',
+          ...style,
+        }}
+      >
+        {preview ? (
+          <>
+            <img src={preview} alt={VIEW_POSITION_LABEL[pos]} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+            <button
+              onClick={(e) => { e.stopPropagation(); removeSlot(pos) }}
+              title="Remover"
+              style={{
+                position: 'absolute', top: 5, right: 5, width: 18, height: 18,
+                borderRadius: '50%', border: 'none', cursor: 'pointer',
+                background: 'color-mix(in srgb, var(--color-bg) 78%, transparent)',
+                color: 'var(--color-text-secondary)', fontSize: 10, lineHeight: 1,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              ✕
+            </button>
+          </>
+        ) : (
+          <>
+            <span style={{ display: 'flex', color: 'var(--color-text-quaternary)' }}>
+              <CubeGlyph size={isFront ? 22 : 14} strokeWidth={isFront ? 1.5 : 1.3} />
+            </span>
+            {isFront && (
+              <span style={{ fontSize: 10, color: 'var(--color-text-quaternary)', marginTop: 6 }}>
+                Arraste ou clique — até {BLOCOS3D_SOURCE_MAX_MB} MB
+              </span>
+            )}
+          </>
+        )}
+        <span style={{
+          position: 'absolute', left: 6, bottom: 5,
+          fontSize: 8.5, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' as const,
+          color: preview ? 'var(--color-text-primary)' : 'var(--color-text-quaternary)',
+          background: preview ? 'color-mix(in srgb, var(--color-bg) 72%, transparent)' : 'transparent',
+          padding: preview ? '2px 6px' : 0, borderRadius: 5,
+        }}>
+          {VIEW_POSITION_LABEL[pos]}{isFront ? '' : ' · opcional'}
+        </span>
+      </div>
+    )
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
@@ -357,57 +448,38 @@ export default function Blocos3DClient({ initialCredits, engineAvailability }: B
         <div style={{ padding: '24px 24px 0', flexShrink: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em' }}>Blocos 3D</div>
           <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 3 }}>
-            Transforme uma imagem em um modelo 3D pronto para suas cenas e maquetes.
+            Transforme fotos de um objeto em um modelo 3D pronto para suas cenas e maquetes.
           </div>
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 24 }}>
 
-          {/* Upload */}
+          {/* Upload multiview */}
           <div>
             <label style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 10 }}>
-              Imagem de referência
+              Ângulos do objeto
             </label>
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
-              onDragLeave={() => setIsDragging(false)}
-              onDrop={(e) => { e.preventDefault(); setIsDragging(false); const f = e.dataTransfer.files[0]; if (f) loadImageFile(f) }}
-              style={{
-                border: `1.5px dashed ${isDragging ? 'var(--color-border-focus)' : 'var(--color-border-strong)'}`,
-                borderRadius: 10, overflow: 'hidden', cursor: 'pointer',
-                transition: 'border-color 0.15s',
-                background: isDragging ? 'var(--color-surface)' : 'var(--color-upload-area)',
-                minHeight: imageFile ? 0 : 120,
-                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                padding: imageFile ? 0 : '28px 20px',
-              }}
-            >
-              {imageFile && imagePreview ? (
-                <img src={imagePreview} alt="preview" style={{ width: '100%', display: 'block', maxHeight: 200, objectFit: 'cover' }} />
-              ) : (
-                <>
-                  <span style={{ display: 'flex', color: 'var(--color-text-quaternary)' }}>
-                    <CubeGlyph size={24} />
-                  </span>
-                  <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 10 }}>Arraste ou clique para enviar</span>
-                  <span style={{ fontSize: 10, color: 'var(--color-text-quaternary)', marginTop: 4 }}>PNG, JPG, WEBP — até {BLOCOS3D_SOURCE_MAX_MB} MB</span>
-                </>
-              )}
+
+            {renderSlot('front', { width: '100%', height: 128, marginBottom: 8 })}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              {(['left', 'back', 'right'] as ViewPosition[]).map(pos => renderSlot(pos, { height: 72 }))}
             </div>
 
-            {imageFile && (
-              <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, maxWidth: 240 }}>{imageFile.name}</span>
-                <button onClick={(e) => { e.stopPropagation(); resetInput() }}
-                  style={{ fontSize: 10, color: 'var(--color-text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0 }}>
-                  Trocar imagem
-                </button>
-              </div>
-            )}
-
             <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }}
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) loadImageFile(f) }} />
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) loadImageFile(f, activeSlotRef.current); e.target.value = '' }} />
+
+            <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 9.5, color: 'var(--color-text-quaternary)' }}>
+                {imageCount === 0 ? 'A frente é obrigatória' : imageCount === 1 ? '1 ângulo' : `${imageCount} ângulos`}
+                {imageCount >= 1 && ' · mais ângulos = mais fidelidade'}
+              </span>
+              {imageCount > 0 && (
+                <button onClick={resetInput}
+                  style={{ fontSize: 10, color: 'var(--color-text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                  Limpar tudo
+                </button>
+              )}
+            </div>
 
             <button
               onClick={() => setShowImportModal(true)}
@@ -427,7 +499,7 @@ export default function Blocos3DClient({ initialCredits, engineAvailability }: B
                 <circle cx="12" cy="12" r="9"/>
                 <path d="M12 7v5l3 3"/>
               </svg>
-              {isImporting ? 'Importando…' : 'Importar do histórico'}
+              {isImporting ? 'Importando…' : 'Importar do histórico (frente)'}
             </button>
             <div style={{ fontSize: 9, color: 'var(--color-text-quaternary)', marginTop: 8, lineHeight: 1.5 }}>
               Funciona melhor com um objeto único em destaque — mobiliário, luminária, elemento de fachada — sobre fundo limpo.
@@ -505,7 +577,7 @@ export default function Blocos3DClient({ initialCredits, engineAvailability }: B
               <textarea
                 value={texturePrompt}
                 onChange={e => setTexturePrompt(e.target.value.slice(0, TEXTURE_PROMPT_MAX_LEN))}
-                placeholder="Descreva os materiais em inglês — ex: brushed brass frame, walnut wood top, matte black leather seat"
+                placeholder="Descreva os materiais em inglês — ex: cream boucle fabric, soft nubby wool texture, visible weave detail"
                 rows={2}
                 style={{
                   width: '100%', resize: 'vertical', minHeight: 52, maxHeight: 120,
@@ -516,7 +588,7 @@ export default function Blocos3DClient({ initialCredits, engineAvailability }: B
                 }}
               />
               <div style={{ fontSize: 9, color: 'var(--color-text-quaternary)', marginTop: 4 }}>
-                Guia a texturização do modelo. Deixe vazio para seguir fielmente a imagem.
+                Guia a texturização do modelo. Deixe vazio para seguir fielmente as fotos.
               </div>
             </div>
           )}
@@ -630,7 +702,7 @@ export default function Blocos3DClient({ initialCredits, engineAvailability }: B
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', fontWeight: 500 }}>A geração não foi concluída</div>
                 <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 5, maxWidth: 320, lineHeight: 1.5 }}>
-                  {job.errorMessage ?? 'Falha no processamento.'} Os nodes foram estornados — tente novamente com outra imagem ou qualidade.
+                  {job.errorMessage ?? 'Falha no processamento.'} Os nodes foram estornados — tente novamente com outras fotos ou qualidade.
                 </div>
               </div>
               <button onClick={() => setJob(null)}
@@ -654,7 +726,7 @@ export default function Blocos3DClient({ initialCredits, engineAvailability }: B
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', fontWeight: 500, letterSpacing: '-0.01em' }}>O bloco 3D aparecerá aqui</div>
                 <div style={{ fontSize: 11, color: 'var(--color-text-quaternary)', marginTop: 5, lineHeight: 1.5, maxWidth: 300 }}>
-                  Envie a imagem de um objeto para gerar um modelo 3D navegável, com download em GLB — e FBX, OBJ e USDZ na qualidade Alta.
+                  Envie até 4 ângulos de um objeto para gerar um modelo 3D navegável — download em GLB, e todos os formatos no Premium.
                 </div>
               </div>
             </div>
@@ -705,7 +777,7 @@ export default function Blocos3DClient({ initialCredits, engineAvailability }: B
 
       {showImportModal && (
         <RetocarImportModal
-          title="Importar imagem"
+          title="Importar imagem (frente)"
           onClose={() => setShowImportModal(false)}
           onPick={handleImportPick}
         />

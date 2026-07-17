@@ -9,7 +9,7 @@
 // compilação, não fallback silencioso.
 
 import type { Blocos3DEngine } from './config'
-import type { Blocos3DOptions, Blocos3DProvider, ProviderTaskState } from './types'
+import type { Blocos3DOptions, Blocos3DProvider, PositionedImages, ProviderTaskState } from './types'
 import { createFalTask, getFalTask } from './fal'
 import { createMeshyTask, getMeshyTask, meshyConfigured } from './meshy'
 
@@ -21,22 +21,34 @@ export class TaskGoneError extends Error {
   }
 }
 
+export interface CreatedTask {
+  taskId:   string
+  /** Endpoint efetivamente usado (Tripo troca pra multiview conforme as
+   *  imagens) — persistir no job pro poll consultar o endpoint certo. */
+  engineId: string
+}
+
 interface Blocos3DAdapter {
   isAvailable(): boolean
-  create(engine: Blocos3DEngine, imageUrl: string, options: Blocos3DOptions): Promise<string>
+  create(engine: Blocos3DEngine, images: PositionedImages<string>, options: Blocos3DOptions): Promise<CreatedTask>
   get(engineId: string, providerTaskId: string): Promise<ProviderTaskState>
 }
 
 const ADAPTERS: Record<Blocos3DProvider, Blocos3DAdapter> = {
   fal: {
     isAvailable: () => !!process.env.FAL_KEY,
-    create: (engine, imageUrl, options) => createFalTask(engine, imageUrl, options),
+    create: (engine, images, options) => createFalTask(engine, images, options),
     get:    (engineId, taskId) => getFalTask(engineId, taskId),
   },
+  // Meshy API direta — fora do catálogo (o tier Premium usa Meshy VIA fal);
+  // mantido pra reativação com MESHY_API_KEY. Single-image: usa a frente.
   meshy: {
     isAvailable: meshyConfigured,
-    create: (_engine, imageUrl, options) => createMeshyTask(imageUrl, options),
-    get:    (_engineId, taskId) => getMeshyTask(taskId),
+    create: async (engine, images, options) => ({
+      taskId:   await createMeshyTask(images.front, options),
+      engineId: engine.engine,
+    }),
+    get: (_engineId, taskId) => getMeshyTask(taskId),
   },
 }
 
@@ -48,10 +60,10 @@ export function engineAvailable(engine: Blocos3DEngine): boolean {
 
 export async function createProviderTask(
   engine: Blocos3DEngine,
-  imageUrl: string,
+  images: PositionedImages<string>,
   options: Blocos3DOptions,
-): Promise<string> {
-  return ADAPTERS[engine.provider].create(engine, imageUrl, options)
+): Promise<CreatedTask> {
+  return ADAPTERS[engine.provider].create(engine, images, options)
 }
 
 /** Consulta pela identidade persistida no job (provider + engine do banco) —
