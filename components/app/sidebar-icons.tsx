@@ -164,3 +164,11 @@ export const IconPlans = (p: IconProps = {}) => (
     <path d="M3 16.4l9 4.4 9-4.4" />
   </SVG>
 )
+
+// ── AJUDA ─────────────────────────────────────────────────
+export const IconGuide = (p: IconProps = {}) => (
+  <SVG {...p}>
+    <circle cx="12" cy="12" r="8.6" />
+    <path d="M15.4 8.6l-1.9 4.6-4.9 2.2 1.9-4.6 4.9-2.2z" />
+  </SVG>
+)

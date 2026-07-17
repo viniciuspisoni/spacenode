@@ -1438,3 +1438,138 @@ html.light .spn-theme-seg {
 @media (prefers-reduced-motion: reduce) {
   .spn-theme-seg-btn { transition: none; }
 }
+
+/* ── Tour de boas-vindas (driver.js · popoverClass "spn-tour") ────────────────
+   Sobrescreve o tema default da lib com os tokens semânticos — o popover segue
+   claro/escuro automaticamente. Verde só no botão de ação principal (Avançar /
+   CTA final); o resto é neutro, bordas de 0.5px, Geist herdada de --font-sans. */
+
+.driver-popover.spn-tour {
+  background: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+  border: 0.5px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  padding: 18px;
+  min-width: 0;
+  max-width: min(340px, calc(100vw - 24px));
+  font-family: var(--font-sans);
+  letter-spacing: -0.011em;
+}
+
+/* Cartão flutuante limpo, sem seta */
+.spn-tour .driver-popover-arrow { display: none; }
+
+.spn-tour .driver-popover-title {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.014em;
+  line-height: 1.35;
+  color: var(--color-text-primary);
+  padding-right: 24px; /* respiro pro × */
+}
+
+.spn-tour .driver-popover-description {
+  margin-top: 6px;
+  font-size: 12.5px;
+  font-weight: 400;
+  line-height: 1.6;
+  letter-spacing: -0.005em;
+  color: var(--color-text-secondary);
+}
+
+.spn-tour .driver-popover-close-btn {
+  width: 30px;
+  height: 30px;
+  top: 8px;
+  right: 8px;
+  font-size: 17px;
+  font-weight: 400;
+  color: var(--color-text-tertiary);
+  border-radius: var(--radius-sm);
+}
+.spn-tour .driver-popover-close-btn:hover,
+.spn-tour .driver-popover-close-btn:focus {
+  color: var(--color-text-primary);
+}
+
+.spn-tour .driver-popover-footer {
+  margin-top: 16px;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.spn-tour .driver-popover-progress-text {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+}
+
+.spn-tour .driver-popover-navigation-btns {
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.spn-tour .driver-popover-navigation-btns button + button { margin-left: 0; }
+
+.spn-tour .driver-popover-footer-btn {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  line-height: 1;
+  padding: 8px 14px;
+  border-radius: var(--radius-full);
+  text-shadow: none;
+  transition: background var(--duration-fast) ease, color var(--duration-fast) ease,
+              border-color var(--duration-fast) ease, opacity var(--duration-fast) ease;
+}
+
+/* Voltar — fantasma, borda fina */
+.spn-tour .driver-popover-prev-btn {
+  background: transparent;
+  color: var(--color-text-secondary);
+  border: 0.5px solid var(--color-border-strong);
+}
+.spn-tour .driver-popover-prev-btn:hover,
+.spn-tour .driver-popover-prev-btn:focus {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+/* Avançar / CTA final — verde: ação principal */
+.spn-tour .driver-popover-next-btn,
+.spn-tour .driver-popover-done-btn {
+  background: var(--color-accent-green);
+  color: #08140c;
+  border: 0.5px solid var(--color-accent-green);
+  font-weight: 600;
+}
+.spn-tour .driver-popover-next-btn:hover,
+.spn-tour .driver-popover-next-btn:focus,
+.spn-tour .driver-popover-done-btn:hover,
+.spn-tour .driver-popover-done-btn:focus {
+  background: var(--color-accent-green);
+  opacity: 0.88;
+}
+
+.spn-tour .driver-popover-btn-disabled { opacity: 0.35; }
+
+/* Pular tour — texto discreto, injetado via onPopoverRender */
+.spn-tour .spn-tour-skip {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 450;
+  letter-spacing: -0.005em;
+  color: var(--color-text-tertiary);
+  background: transparent;
+  border: none;
+  padding: 8px 6px;
+  margin-right: auto; /* isola o pular à esquerda dos botões de navegação */
+  cursor: pointer;
+  transition: color var(--duration-fast) ease;
+}
+.spn-tour .spn-tour-skip:hover { color: var(--color-text-primary); }
