@@ -11,7 +11,7 @@ import type { PlanId } from '@/lib/plans'
 import {
   IconProjects, IconDashboard, IconHistory,
   IconGenerate, IconSpaces, IconRetocar, IconEnhance, IconVideo, IconFinalizar,
-  IconHumanizedPlan, IconIsometric, IconBoard, IconMoodboard,
+  IconHumanizedPlan, IconBlocos3D, IconIsometric, IconBoard, IconMoodboard,
   IconTeam, IconIdentity, IconAccount, IconPlans,
 } from './sidebar-icons'
 import { getEnabledModules, type SidebarModule } from '@/lib/nav/modules-config'
@@ -34,6 +34,7 @@ const MODULE_ICON: Record<SidebarModule['iconKey'], () => React.ReactElement> = 
   video:         IconVideo,
   finalizar:     IconFinalizar,
   humanizedPlan: IconHumanizedPlan,
+  blocos3d:      IconBlocos3D,
   isometric:     IconIsometric,
   board:         IconBoard,
   moodboard:     IconMoodboard,

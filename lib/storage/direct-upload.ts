@@ -16,6 +16,7 @@
 // Cliente: use uploadDirect() de lib/storage/direct-upload-client.ts.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { BLOCOS3D_SOURCE_MAX_BYTES } from '@/lib/blocos3d/config'
 
 type Params = Record<string, string>
 
@@ -112,6 +113,13 @@ export const DIRECT_UPLOAD_AREAS = {
     maxBytes: 15 * 1024 * 1024,
     allowedMime: () => IMAGE_MIME,
     dir: () => 'animar/source',
+  },
+  // Imagem de origem do Blocos 3D (consumida por /api/blocos3d).
+  'blocos3d-source': {
+    bucket: 'space-mestres',
+    maxBytes: BLOCOS3D_SOURCE_MAX_BYTES,
+    allowedMime: () => IMAGE_MIME,
+    dir: () => 'blocos3d/source',
   },
 } satisfies Record<string, DirectUploadArea>
 
