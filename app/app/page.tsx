@@ -71,11 +71,13 @@ const MODULE_DESC: Record<string, string> = {
 }
 
 const MODULES: {
+  id: string
   href: string
   label: string
   desc: string
   Icon: (p: { size?: number }) => React.ReactElement
 }[] = getEnabledModules('criar').map((m) => ({
+  id: m.id,
   href: m.href,
   label: m.label,
   desc: MODULE_DESC[m.id] ?? '',
@@ -157,7 +159,7 @@ export default async function AppPage() {
         {spaces.length === 0 ? (
           <StartBlock />
         ) : (
-          <section>
+          <section data-tour="projetos">
             <div className="spn-dash-section-head">
               <div className="spn-dash-section-label">Continuar de onde parou</div>
               <Link href="/app/spaces" className="spn-dash-section-link">Todos os projetos →</Link>
@@ -177,7 +179,7 @@ export default async function AppPage() {
 
         {/* ── 3 · Métricas discretas ────────────────────────────────────────── */}
         <div className="spn-dash-stats-row">
-          <div className="spn-dash-stat" style={lowNodes ? { boxShadow: 'inset 0 2px 0 var(--color-error-border)' } : undefined}>
+          <div className="spn-dash-stat" data-tour="nodes" style={lowNodes ? { boxShadow: 'inset 0 2px 0 var(--color-error-border)' } : undefined}>
             <div className="spn-dash-stat-label">Nodes disponíveis</div>
             <div className="spn-dash-stat-value" style={lowNodes ? { color: 'var(--color-error)' } : undefined}>
               {availableNodes}
@@ -233,13 +235,18 @@ export default async function AppPage() {
         </div>
 
         {/* ── 4 · Módulos do atelier ────────────────────────────────────────── */}
-        <section>
+        <section data-tour="criar">
           <div className="spn-dash-section-head">
             <div className="spn-dash-section-label">Ferramentas</div>
           </div>
           <div className="spn-dash-modules">
             {MODULES.map(m => (
-              <Link key={m.href} href={m.href} className="spn-dash-module">
+              <Link
+                key={m.href}
+                href={m.href}
+                className="spn-dash-module"
+                data-tour={m.id === 'planta_humanizada' ? 'apresentar' : undefined}
+              >
                 <div
                   className="spn-dash-module-icon"
                   style={{ background: 'var(--color-surface)', color: 'var(--color-text-secondary)' }}
@@ -256,7 +263,7 @@ export default async function AppPage() {
         </section>
 
         {/* ── 5 · Imagens recentes ──────────────────────────────────────────── */}
-        <section>
+        <section data-tour="historico">
           <div className="spn-dash-section-head">
             <div className="spn-dash-section-label">Recentes</div>
             {totalRenders > 0 && (
@@ -296,7 +303,7 @@ export default async function AppPage() {
 
 function StartBlock() {
   return (
-    <section className="spn-dash-start">
+    <section className="spn-dash-start" data-tour="projetos">
       <h2 className="spn-dash-start-title">Comece seu primeiro projeto</h2>
       <p className="spn-dash-start-sub">
         Envie um print, modelo, planta ou referência para gerar a primeira visualização.
