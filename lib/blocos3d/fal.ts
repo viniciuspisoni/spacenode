@@ -21,6 +21,17 @@ function buildInput(engine: Blocos3DEngine, imageUrl: string): Record<string, un
       return { image_url: imageUrl }
     case 'fal-ai/hunyuan3d-v21':
       return { input_image_url: imageUrl, textured_mesh: true }
+    case 'tripo3d/tripo/v2.5/image-to-3d':
+      return {
+        image_url: imageUrl,
+        texture:   'HD',
+        pbr:       true,
+        // Fidelidade à foto de referência (feedback 2026-07-17: textura tem
+        // que respeitar o material real do objeto, não estilizar).
+        texture_alignment: 'original_image',
+        // Escala real do objeto embutida no modelo — relevante pra maquete.
+        auto_size: true,
+      }
     default:
       return { image_url: imageUrl }
   }
@@ -51,11 +62,15 @@ function collectUrls(value: unknown, out: string[]): void {
 
 function extractOutputs(result: unknown): { modelUrls: Partial<Record<ModelFormat, string>>; thumbnailUrl: string | null } {
   const urls: string[] = []
-  // Preferência explícita ANTES do scan first-wins: o Hunyuan v2.1 entrega o
-  // GLB com PBR num campo separado (model_glb_pbr) DEPOIS do model_glb — sem
-  // isto, o tier vendido como "Materiais PBR" serviria sempre o mesh sem PBR.
-  const pbrUrl = ((result as Record<string, unknown> | null)?.model_glb_pbr as { url?: unknown } | undefined)?.url
-  if (typeof pbrUrl === 'string' && pbrUrl.startsWith('http')) urls.push(pbrUrl)
+  // Preferência explícita ANTES do scan first-wins: os providers entregam o
+  // GLB com PBR num campo separado que vem DEPOIS do mesh básico no objeto
+  // (Hunyuan: model_glb_pbr; Tripo: pbr_model) — sem isto, o tier vendido
+  // como "Materiais PBR" serviria sempre o mesh sem PBR.
+  const root = result as Record<string, unknown> | null
+  for (const field of ['model_glb_pbr', 'pbr_model'] as const) {
+    const url = (root?.[field] as { url?: unknown } | undefined)?.url
+    if (typeof url === 'string' && url.startsWith('http')) { urls.push(url); break }
+  }
   collectUrls(result, urls)
 
   const modelUrls: Partial<Record<ModelFormat, string>> = {}

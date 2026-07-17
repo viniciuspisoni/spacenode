@@ -21,11 +21,15 @@
 // Custo real por geração (verificado 2026-07-17; conferir no dashboard antes
 // de mudar):
 //   fal-ai/trellis                 US$ 0,02          → piso  3 nodes
-//   fal-ai/hunyuan3d-v21 (PBR)     US$ 0,15          → piso 23 nodes
-//     (endpoint US$ 0,05 base; textured_mesh cobra 3× o mesh branco — doc do
-//      próprio SDK. Margem no piso com 25 nodes: ~56%.)
+//   tripo3d/tripo/v2.5 (HD + PBR)  US$ 0,40          → piso 59 nodes
 //   Meshy image-to-3d texturizado  US$ 0,40–0,60     → piso 89 nodes
 //     (Meshy: créditos ~US$ 0,02, task 20–30 créditos; exige plano Pro ativo)
+//
+// Histórico de motores do tier Padrão:
+//   fal-ai/hunyuan3d-v21 (US$ 0,15, textured 3× o white mesh) — testado
+//   2026-07-17 com sofá real: geometria boa, TEXTURA CHAPADA em tecido
+//   (feedback do fundador). Substituído pelo Tripo v2.5 HD. Jobs antigos
+//   continuam resolvendo pelo engine persistido na linha.
 
 import type { Blocos3DOptions, Blocos3DProvider, Blocos3DQuality } from './types'
 
@@ -62,14 +66,14 @@ export const BLOCOS3D_ENGINES: Record<Blocos3DQuality, Blocos3DEngine> = {
   standard: {
     id:          'standard',
     label:       'Padrão',
-    description: 'Modelo texturizado com materiais PBR — pronto pra compor cenas.',
+    description: 'Textura HD fiel à imagem, com materiais PBR — pronto pra compor cenas.',
     provider:    'fal',
-    engine:      'fal-ai/hunyuan3d-v21',
+    engine:      'tripo3d/tripo/v2.5/image-to-3d',
     formats:     ['GLB'],
-    features:    ['Materiais PBR', '~2 min'],
+    features:    ['Textura HD', 'Materiais PBR', '~2 min'],
     supportsTexturePrompt: false,
-    costInNodes: 25,           // US$ 0,15 (textured 3×) · ~56% margem no piso
-    estimatedMs: 120_000,
+    costInNodes: 70,           // US$ 0,40 (texture HD) · ~58% margem no piso
+    estimatedMs: 150_000,
     badge:       { label: 'RECOMENDADO', tone: 'green' },
   },
   high: {
