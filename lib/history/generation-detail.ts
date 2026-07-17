@@ -93,11 +93,40 @@ export function engineDisplayLabel(raw: string | null | undefined): string | nul
   if (v.includes('nano-banana-pro') || v.includes('vega'))   return 'Vega'
   if (v.includes('gpt-image')       || v.includes('quasar')) return 'Quasar'
   if (v.includes('nano-banana')     || v.includes('pulsar')) return 'Pulsar'
+  // Editar V3 grava o modelo Google cru (gemini-*-image); mesmos motores das
+  // labels acima: Flash = Pulsar, Pro = Vega.
+  if (v.includes('gemini') && v.includes('pro'))             return 'Vega'
+  if (v.includes('gemini'))                                  return 'Pulsar'
   if (v.includes('clarity'))                                 return 'Clarity'
   if (v.includes('flux'))                                    return 'Flux'
   // Valor desconhecido = provavelmente endpoint interno → não vira label de
   // produto. (Admin vê o valor cru no Diagnóstico técnico.)
   return null
+}
+
+// ── Editar V3 (edit_v3_jobs) no vocabulário do Histórico ───────────────────────
+//
+// O V3 persiste em tabela própria; o Histórico e o painel de detalhes falam o
+// vocabulário de `edits`. Estes helpers são o único ponto de tradução.
+
+/** Labels PT das ações do V3 — viram título quando não há instrução escrita. */
+const EDIT_V3_ACTION_TITLES: Record<string, string> = {
+  remove:         'Remover elemento',
+  swap_material:  'Trocar material',
+  insert_element: 'Inserir elemento',
+  refine_area:    'Refinar área',
+}
+
+/** Título/instrução exibível de um job do V3 (nunca vazio — o card depende). */
+export function editV3DisplayPrompt(j: { instruction?: unknown; prompt?: unknown; action_type?: unknown }): string {
+  const text = [j.instruction, j.prompt]
+    .find((v): v is string => typeof v === 'string' && v.trim() !== '')
+  return text?.trim() ?? EDIT_V3_ACTION_TITLES[String(j.action_type)] ?? 'Edição'
+}
+
+/** quality exibível de um job do V3 (o card faz .toUpperCase() → "PADRÃO"/"ALTA"). */
+export function editV3QualityLabel(qualityMode: unknown): string {
+  return qualityMode === 'high' ? 'alta' : 'padrão'
 }
 
 export function resolutionDisplayLabel(raw: string | null | undefined, nodes?: number | null): string | null {

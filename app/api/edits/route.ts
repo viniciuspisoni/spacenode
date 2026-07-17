@@ -30,7 +30,7 @@ import {
 } from '@/lib/spaces/edit-router'
 import { editToolFromMode } from '@/lib/spaces/edit-router-adapters'
 import { isEditIntent, modeFromIntent } from '@/lib/spaces/edit-intents'
-import { engineDisplayLabel } from '@/lib/history/generation-detail'
+import { engineDisplayLabel, editV3DisplayPrompt, editV3QualityLabel } from '@/lib/history/generation-detail'
 import {
   buildRoutingContext,
   uploadEditAsset,
@@ -427,23 +427,65 @@ export async function GET() {
 
   // Projeção explícita: sem fal_request_id/generation_log. engine guarda o
   // endpoint do provider — sai daqui como label de produto (mesma redação do
-  // /api/history/detail). Consumidores: tab Edições do Histórico e
-  // EditV2ImportModal (usa result_image_url).
+  // /api/history/detail). Consumidores: tab Edições do Histórico e os modais
+  // de importação (Finalizar/Retocar/EditV2 — usam result_image_url).
   // Defesa em profundidade: filtra explicitamente por user_id em vez de confiar
   // só na RLS da tabela `edits` (cuja DDL/policy não está versionada no repo —
   // CR-3 da auditoria 2026-07-03). Mesmo padrão de renders/list e folders/[id].
-  const { data, error } = await supabase
-    .from('edits')
-    .select('id, user_id, source_image_url, result_image_url, mask_url, prompt, quality, nodes_cost, engine, source_type, source_id, mask_coverage, created_at')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
-    .limit(60)
-  if (error) {
+  //
+  // DUAS fontes: `edits` (editor v1) e `edit_v3_jobs` (Editar V3, editor padrão
+  // em produção desde 2026-06-25). Sem a segunda, tudo que o V3 gera fica
+  // invisível no Histórico — bug reportado por usuária em 2026-07-17. Jobs
+  // rejeitados/falhos ficam de fora: não foram cobrados e o resultado foi
+  // descartado.
+  const [v1Res, v3Res] = await Promise.all([
+    supabase
+      .from('edits')
+      .select('id, user_id, source_image_url, result_image_url, mask_url, prompt, quality, nodes_cost, engine, source_type, source_id, mask_coverage, created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(60),
+    supabase
+      .from('edit_v3_jobs')
+      .select('id, user_id, action_type, source_image_url, result_image_url, mask_url, prompt, instruction, quality_mode, nodes_cost, model, mask_coverage, created_at')
+      .eq('user_id', user.id)
+      .eq('status', 'completed')
+      .not('result_image_url', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(60),
+  ])
+  if (v1Res.error) {
     return NextResponse.json({ error: 'Erro ao listar edições' }, { status: 500 })
   }
+  // A fonte nova não derruba o histórico inteiro (ex.: ambiente sem a tabela).
+  if (v3Res.error) console.error('[edits] GET edit_v3_jobs:', v3Res.error.message)
+
+  const v1Rows = (v1Res.data ?? []).map(e => ({ ...e, engine: engineDisplayLabel(e.engine) }))
+  // Normaliza o job do V3 pro shape `Edit` que a UI já consome. model nunca
+  // viaja cru — vira a mesma label de produto do resto do Histórico.
+  const v3Rows = (v3Res.data ?? []).map(j => ({
+    id:               j.id,
+    user_id:          j.user_id,
+    source_image_url: j.source_image_url,
+    result_image_url: j.result_image_url,
+    mask_url:         j.mask_url,
+    prompt:           editV3DisplayPrompt(j),
+    quality:          editV3QualityLabel(j.quality_mode),
+    nodes_cost:       j.nodes_cost,
+    engine:           engineDisplayLabel(j.model),
+    source_type:      null,
+    source_id:        null,
+    mask_coverage:    j.mask_coverage,
+    created_at:       j.created_at,
+  }))
+  // Timestamps ISO do PostgREST (sempre UTC) — ordenação lexicográfica basta.
+  const merged = [...v1Rows, ...v3Rows]
+    .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
+    .slice(0, 60)
+
   const edits = await signRows(
     createAdminClient(),
-    (data ?? []).map(e => ({ ...e, engine: engineDisplayLabel(e.engine) })),
+    merged,
     ['source_image_url', 'result_image_url', 'mask_url'],
   )
   return NextResponse.json({ edits })
