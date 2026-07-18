@@ -15,6 +15,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { EditV3Canvas, type EditV3CanvasHandle, type EditV3Tool } from './EditV3Canvas'
 import { BeforeAfter } from './BeforeAfter'
 import { EditV2ImportModal } from '@/components/editar/EditV2ImportModal'
+import { consumeHandoff } from '@/components/nodi/actions-bus'
 import { uploadDirect } from '@/lib/storage/direct-upload-client'
 import {
   IconLasso, IconPolygon, IconBrush, IconEraser, IconHand,
@@ -111,6 +112,14 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
   const [sourceDims, setSourceDims] = useState<{ w: number; h: number } | null>(null)
   const [action, setAction] = useState<Action>('swap_material')
   const [instruction, setInstruction] = useState('')
+
+  // Handoff do Nodi (ação confirmada no painel): pré-preenche a instrução.
+  useEffect(() => {
+    const handoff = consumeHandoff('editar')
+    if (!handoff?.prompt) return
+    const raf = requestAnimationFrame(() => setInstruction(handoff.prompt!))
+    return () => cancelAnimationFrame(raf)
+  }, [])
   const [quality] = useState<'standard' | 'high'>('standard') // Alta precisão: gated
   const [referenceUrl, setReferenceUrl] = useState<string | null>(null)
   const [coverage, setCoverage] = useState(0)
