@@ -1,8 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { ANNUAL_BILLING_ENABLED, PLANS, type PaidPlanId, type BillingCycle } from '@/lib/plans'
 import { LUMEN_PACKS, LUMEN_VALIDITY_DAYS, type LumenPackSize } from '@/lib/lumens'
+import { track } from '@/lib/analytics/track'
 
 export interface LumenPackRow {
   id:              string
@@ -27,6 +29,9 @@ type CheckoutPayload =
   | { type: 'lumen'; id: LumenPackSize }
 
 async function startCheckout(payload: CheckoutPayload): Promise<{ url?: string; error?: string }> {
+  // Página já exige sessão (redirect server-side em page.tsx) — checkout_started
+  // aqui é sempre um usuário autenticado de fato iniciando o checkout.
+  if (payload.type === 'plan') track('checkout_started', { plan: payload.id, billing: payload.billing })
   const res = await fetch('/api/stripe/checkout', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -34,6 +39,17 @@ async function startCheckout(payload: CheckoutPayload): Promise<{ url?: string; 
   })
   if (res.status === 401) { window.location.href = '/login'; return {} }
   return await res.json() as { url?: string; error?: string }
+}
+
+// subscription_created: dispara quando o Stripe redireciona de volta com sucesso.
+function CheckoutSuccessTracker() {
+  const searchParams = useSearchParams()
+  useEffect(() => {
+    if (searchParams.get('success') === 'true' || searchParams.get('lumen_success') === 'true') {
+      track('subscription_created', {}, { once: true, key: 'subscription_created' })
+    }
+  }, [searchParams])
+  return null
 }
 
 function daysUntil(date: string): number {
@@ -76,6 +92,7 @@ export function BillingClient({ plan, balance, lumens, pooled }: BillingClientPr
       flex: 1, height: '100%', overflowY: 'auto', background: 'var(--color-bg)',
       fontFamily: "'Geist', system-ui, sans-serif", letterSpacing: '-0.011em',
     }}>
+      <Suspense fallback={null}><CheckoutSuccessTracker /></Suspense>
       <div style={{ maxWidth: 960, margin: '0 auto', padding: '64px 32px 96px' }}>
 
         {/* ── 1. Saldo atual ─────────────────────────────────────────────── */}

@@ -5,6 +5,8 @@ import { ENGINES, ENGINE_ORDER, type Resolution } from '@/lib/engines'
 import { ANNUAL_BILLING_ENABLED, PLANS, recommendPlan, type PaidPlanId, type BillingCycle } from '@/lib/plans'
 import { LUMEN_PACKS } from '@/lib/lumens'
 import { SUPPORT_EMAIL, supportWhatsAppUrl } from '@/lib/support'
+import { createClient } from '@/lib/supabase/client'
+import { track } from '@/lib/analytics/track'
 
 // UI-specific data por plano: features, badge, breakdown de renders.
 // Renders calculados com engine padrão por resolução: HD→Pulsar (10 nodes),
@@ -44,12 +46,23 @@ const PLAN_DISPLAY: Record<PaidPlanId, PlanDisplay> = {
 }
 
 async function startCheckout(id: PaidPlanId, billing: BillingCycle) {
+  // Deslogado nunca deve chamar /api/stripe/checkout (isso sempre retorna 401)
+  // — manda direto pro cadastro preservando o plano escolhido na URL.
+  const supabase = createClient()
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) {
+    window.location.href = `/login?mode=signup&plan=${id}`
+    return
+  }
+
+  track('checkout_started', { plan: id, billing })
+
   const res = await fetch('/api/stripe/checkout', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ type: 'plan', id, billing }),
   })
-  if (res.status === 401) { window.location.href = '/login?mode=signup'; return }
+  if (res.status === 401) { window.location.href = `/login?mode=signup&plan=${id}`; return }
   // Já assinante (guarda anti-cobrança-dupla) — plano se gerencia no billing.
   if (res.status === 409) { window.location.href = '/app/billing'; return }
   if (!res.ok) return

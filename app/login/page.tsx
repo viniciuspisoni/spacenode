@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useTheme } from '@/lib/theme/ThemeProvider'
 import { Brandmark } from '@/components/brand'
+import { track } from '@/lib/analytics/track'
 
 type Mode = 'login' | 'signup'
 
@@ -63,6 +64,8 @@ const GoogleIcon = () => (
   </svg>
 )
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
 function translateError(msg: string): string {
   if (msg.includes('Invalid login credentials'))       return 'Email ou senha incorretos.'
   if (msg.includes('Email not confirmed'))             return 'Confirme seu email antes de entrar.'
@@ -94,6 +97,10 @@ function LoginForm() {
   const [submitHovered, setSubmitHovered] = useState(false)
   const [error,         setError]         = useState<string | null>(null)
   const [success,       setSuccess]       = useState<string | null>(null)
+  const [emailError,    setEmailError]    = useState<string | null>(null)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
+
+  const plan = searchParams.get('plan')
 
   const { resolvedTheme } = useTheme()
   const googleBtnRef = useRef<HTMLDivElement>(null)
@@ -106,7 +113,12 @@ function LoginForm() {
   // autofill (extensões/Chrome) dispara input nos campos logo após o load e
   // apagaria o banner de erro vindo por ?error= antes do usuário ler.
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { setError(null); setSuccess(null) }, [mode])
+  useEffect(() => { setError(null); setSuccess(null); setEmailError(null); setPasswordError(null) }, [mode])
+
+  // signup_started: entrada no modo cadastro (inclui chegada direta via ?mode=signup).
+  useEffect(() => {
+    if (mode === 'signup') track('signup_started', { plan: plan ?? undefined }, { once: true, key: 'signup_started' })
+  }, [mode, plan])
 
   // Feedback de falha vindo por redirect (POST /auth/google ou /auth/callback)
   useEffect(() => {
@@ -203,9 +215,28 @@ function LoginForm() {
     }
   }, [googleFallback, resolvedTheme])
 
+  // Validação client-side — não depende só do `required`/`minLength` nativo
+  // do browser (o form usa noValidate), mensagem clara perto do campo.
+  function validate(): boolean {
+    const trimmedEmail = email.trim()
+    let nextEmailError:    string | null = null
+    let nextPasswordError: string | null = null
+
+    if (!trimmedEmail)                          nextEmailError = 'Preencha seu e-mail e senha para continuar.'
+    else if (!EMAIL_RE.test(trimmedEmail))       nextEmailError = 'Informe um e-mail válido.'
+
+    if (!password)                                        nextPasswordError = 'Preencha seu e-mail e senha para continuar.'
+    else if (mode === 'signup' && password.length < 6)     nextPasswordError = 'A senha precisa ter pelo menos 6 caracteres.'
+
+    setEmailError(nextEmailError)
+    setPasswordError(nextPasswordError)
+    return !nextEmailError && !nextPasswordError
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
+    if (!validate()) return
     setLoading(true)
 
     const supabase = createClient()
@@ -224,8 +255,10 @@ function LoginForm() {
         setError(translateError(error.message))
         setLoading(false)
       } else if (data.session) {
+        track('signup_completed', { plan: plan ?? undefined }, { once: true, key: 'signup_completed' })
         router.push('/app')
       } else {
+        track('signup_completed', { plan: plan ?? undefined }, { once: true, key: 'signup_completed' })
         setSuccess('Verifique seu email para confirmar o cadastro.')
         setLoading(false)
       }
@@ -274,9 +307,27 @@ function LoginForm() {
       }}>
 
         {/* Brand lockup */}
-        <div style={{ marginBottom: 44, color: 'var(--color-text-primary)' }}>
+        <div style={{ marginBottom: mode === 'signup' ? 20 : 44, color: 'var(--color-text-primary)' }}>
           <Brandmark size={28} />
         </div>
+
+        {/* Promessa de conversão — só no cadastro, reforça a landing sem poluir o login */}
+        {mode === 'signup' && (
+          <div style={{ textAlign: 'center', marginBottom: 24 }}>
+            <h1 style={{
+              fontSize: 19, fontWeight: 500, letterSpacing: '-0.02em',
+              color: 'var(--color-text-primary)', margin: '0 0 6px',
+            }}>
+              Comece com 40 nodes grátis
+            </h1>
+            <p style={{
+              fontSize: 12.5, color: 'var(--color-text-tertiary)',
+              letterSpacing: '-0.005em', lineHeight: 1.5, margin: 0,
+            }}>
+              Teste a SpaceNode em um projeto real — sem cartão de crédito.
+            </p>
+          </div>
+        )}
 
         {/* Mode toggle */}
         <div style={{
@@ -323,32 +374,46 @@ function LoginForm() {
 
         {/* Form */}
         {!success && (
-          <form onSubmit={handleSubmit} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <input
-              className="spn-input"
-              type="email"
-              placeholder="seu@email.com"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-              style={inputStyle}
-              onFocus={e  => { e.currentTarget.style.borderColor = 'var(--color-border-focus)' }}
-              onBlur={e   => { e.currentTarget.style.borderColor = 'var(--color-input-border)'  }}
-            />
-            <input
-              className="spn-input"
-              type="password"
-              placeholder={mode === 'signup' ? 'Senha (mín. 6 caracteres)' : 'Senha'}
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              required
-              minLength={6}
-              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-              style={inputStyle}
-              onFocus={e  => { e.currentTarget.style.borderColor = 'var(--color-border-focus)' }}
-              onBlur={e   => { e.currentTarget.style.borderColor = 'var(--color-input-border)'  }}
-            />
+          <form onSubmit={handleSubmit} noValidate style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div>
+              <input
+                className="spn-input"
+                type="email"
+                placeholder="seu@email.com"
+                value={email}
+                onChange={e => { setEmail(e.target.value); if (emailError) setEmailError(null) }}
+                required
+                autoComplete="email"
+                style={{ ...inputStyle, borderColor: emailError ? 'var(--color-error-border)' : 'var(--color-input-border)' }}
+                onFocus={e  => { e.currentTarget.style.borderColor = 'var(--color-border-focus)' }}
+                onBlur={e   => { e.currentTarget.style.borderColor = emailError ? 'var(--color-error-border)' : 'var(--color-input-border)' }}
+              />
+              {emailError && (
+                <p style={{ margin: '6px 2px 0', fontSize: 11.5, color: 'var(--color-error)', letterSpacing: '-0.005em' }}>
+                  {emailError}
+                </p>
+              )}
+            </div>
+            <div>
+              <input
+                className="spn-input"
+                type="password"
+                placeholder={mode === 'signup' ? 'Senha (mín. 6 caracteres)' : 'Senha'}
+                value={password}
+                onChange={e => { setPassword(e.target.value); if (passwordError) setPasswordError(null) }}
+                required
+                minLength={6}
+                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                style={{ ...inputStyle, borderColor: passwordError ? 'var(--color-error-border)' : 'var(--color-input-border)' }}
+                onFocus={e  => { e.currentTarget.style.borderColor = 'var(--color-border-focus)' }}
+                onBlur={e   => { e.currentTarget.style.borderColor = passwordError ? 'var(--color-error-border)' : 'var(--color-input-border)' }}
+              />
+              {passwordError && (
+                <p style={{ margin: '6px 2px 0', fontSize: 11.5, color: 'var(--color-error)', letterSpacing: '-0.005em' }}>
+                  {passwordError}
+                </p>
+              )}
+            </div>
 
             <button
               type="submit"

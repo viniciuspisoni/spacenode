@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { ThemeProvider } from "@/lib/theme/ThemeProvider";
+import { AnalyticsListener } from "@/components/analytics/AnalyticsListener";
 import "./globals.css";
 
 // Geist served from local woff2 — avoids the network fetch that next/font/google
@@ -66,7 +67,10 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{__html: `try{var t=localStorage.getItem('theme');var light=t==='light'||((t===null||t==='system')&&window.matchMedia('(prefers-color-scheme: light)').matches);if(location.pathname==='/')light=false;document.documentElement.classList.toggle('light',light)}catch(e){}`}} />
       </head>
       <body className="antialiased">
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <AnalyticsListener />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );
