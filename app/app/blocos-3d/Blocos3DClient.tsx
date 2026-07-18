@@ -16,7 +16,6 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
-import { RetocarImportModal } from '@/components/spaces/RetocarImportModal'
 import { uploadDirect } from '@/lib/storage/direct-upload-client'
 import { jsonOrNull, errMsg } from '@/lib/http/fetch-json'
 import { urlToFile } from '@/lib/http/url-to-file'
@@ -150,9 +149,6 @@ export default function Blocos3DClient({ initialCredits, engineAvailability, ini
   const [error,        setError]        = useState<string | null>(null)
   const [downloading,  setDownloading]  = useState<ModelFormat | null>(null)
 
-  const [showImportModal, setShowImportModal] = useState(false)
-  const [isImporting,     setIsImporting]     = useState(false)
-
   const fileInputRef  = useRef<HTMLInputElement>(null)
   const activeSlotRef = useRef<ViewPosition>('front')
   const pollRef       = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -260,19 +256,6 @@ export default function Blocos3DClient({ initialCredits, engineAvailability, ini
   function openPicker(pos: ViewPosition) {
     activeSlotRef.current = pos
     fileInputRef.current?.click()
-  }
-
-  async function handleImportPick(picked: { url: string }) {
-    setShowImportModal(false)
-    setIsImporting(true)
-    setError(null)
-    try {
-      loadImageFile(await urlToFile(picked.url), 'front')
-    } catch {
-      setError('Não foi possível importar a imagem do histórico.')
-    } finally {
-      setIsImporting(false)
-    }
   }
 
   // ── Submissão ──────────────────────────────────────────────────────────────
@@ -493,26 +476,6 @@ export default function Blocos3DClient({ initialCredits, engineAvailability, ini
               )}
             </div>
 
-            <button
-              onClick={() => setShowImportModal(true)}
-              disabled={isImporting}
-              style={{
-                marginTop: 10, width: '100%', padding: '8px 0', borderRadius: 7,
-                border: '1px solid var(--color-border)', background: 'transparent',
-                fontSize: 11, color: 'var(--color-text-tertiary)',
-                cursor: isImporting ? 'wait' : 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                transition: 'border-color 0.15s, color 0.15s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--color-border-strong)'; e.currentTarget.style.color = 'var(--color-text-secondary)' }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.color = 'var(--color-text-tertiary)' }}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                <circle cx="12" cy="12" r="9"/>
-                <path d="M12 7v5l3 3"/>
-              </svg>
-              {isImporting ? 'Importando…' : 'Importar do histórico (frente)'}
-            </button>
             <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 8, lineHeight: 1.5 }}>
               Funciona melhor com um objeto único em destaque — mobiliário, luminária, elemento de fachada — sobre fundo limpo.
             </div>
@@ -786,14 +749,6 @@ export default function Blocos3DClient({ initialCredits, engineAvailability, ini
           </div>
         )}
       </div>
-
-      {showImportModal && (
-        <RetocarImportModal
-          title="Importar imagem (frente)"
-          onClose={() => setShowImportModal(false)}
-          onPick={handleImportPick}
-        />
-      )}
     </div>
   )
 }
