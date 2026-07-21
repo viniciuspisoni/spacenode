@@ -290,6 +290,10 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
     })
   }, [pending, context.route, historyTurns, append])
 
+  // ref-mais-recente: sendV2 dispara confirmProposal (declarada depois) sem
+  // problema de ordem nem dependência circular de useCallback
+  const confirmRef = useRef<((msgId: string, a: SupervisedAction) => void) | null>(null)
+
   // ── V2 (copiloto): pergunta livre com contexto + anexo → envelope com cards
   const sendV2 = useCallback(async (message: string) => {
     if (pending) return
@@ -311,7 +315,14 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
     }
     setOffline(false)
     const answer = res.data.answer
-    append({ id: newId(), role: 'nodi', kind: 'v2', text: answer.text, v2: answer })
+    const msgId = newId()
+    append({ id: msgId, role: 'nodi', kind: 'v2', text: answer.text, v2: answer })
+    // Autopiloto: ações SEM custo (navegar/preencher/configurar) executam
+    // sozinhas — gasto de nodes continua passando pelos limites do servidor.
+    const free = answer.proposals?.find(p => !p.executable && (p.type === 'navigate' || p.type === 'fill_prompt' || p.type === 'apply_settings'))
+    if (settings?.mode === 'autopiloto' && free) {
+      window.setTimeout(() => confirmRef.current?.(msgId, free), 400)
+    }
     // chamado preparado pelo copiloto entra direto no fluxo de revisão da V1
     if (answer.ticketDraft) {
       append(
@@ -401,6 +412,8 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
     }
     append({ id: newId(), role: 'nodi', kind: 'notice', tone: 'warning', text: 'Não encontrei a rota dessa ação — nada foi executado.' })
   }, [runExecutable, markDone, context.route, context.moduleId, router, onClose, append])
+
+  useEffect(() => { confirmRef.current = confirmProposal }, [confirmProposal])
 
   /** Usar um prompt sugerido no módulo alvo (o clique é a confirmação). */
   const usePrompt = useCallback((suggestion: PromptSuggestion) => {
@@ -668,14 +681,16 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
     // "sim"/"pode"/"confirma" digitado com uma execução pendente → executa
     // (confirmação por texto, sem precisar do clique)
     if (CONFIRM_RE.test(q)) {
-      const pendingExec = [...messages].reverse().find(
-        m => !m.done && m.v2?.proposals?.some(p => p.executable && p.intentToken),
-      )
-      const action = pendingExec?.v2?.proposals?.find(p => p.executable && p.intentToken)
-      if (pendingExec && action) {
+      // "sim" confirma a proposta pendente mais recente — executável (gera) ou
+      // simples (navegar/preencher). Autonomia por texto, sem caçar botão.
+      const pendingMsg = [...messages].reverse().find(m => !m.done && m.v2?.proposals?.length)
+      const action = pendingMsg?.v2?.proposals?.find(p => p.executable && p.intentToken)
+        ?? pendingMsg?.v2?.proposals?.[0]
+      if (pendingMsg && action) {
         setInput('')
         append({ id: newId(), role: 'user', kind: 'text', text: q })
-        void runExecutable(pendingExec.id, action)
+        if (action.executable && action.intentToken) void runExecutable(pendingMsg.id, action)
+        else confirmProposal(pendingMsg.id, action)
         return
       }
     }

@@ -29,6 +29,10 @@ const CATEGORIES: TicketCategory[] = ['generation_failed', 'unexpected_result', 
 let actionSeq = 0
 const actionId = () => `a${Date.now().toString(36)}${(actionSeq++).toString(36)}`
 
+function moduleHref(moduleId: string): string | null {
+  return getEnabledModules().find(m => m.id === moduleId)?.href ?? null
+}
+
 /** Rotas internas que uma proposta de navegação pode apontar. */
 export function allowedRoutes(): Set<string> {
   return new Set([
@@ -257,10 +261,14 @@ export const actionTools: NodiTool[] = [
       const label = clampText(String(args.rotulo), 80)
 
       if (tipo === 'navigate') {
-        const rota = String(args.rota ?? '')
-        if (!allowedRoutes().has(rota)) return { output: { erro: `rota fora da lista permitida: ${rota}` } }
+        // aceita module_id OU rota — o modelo não precisa decorar hrefs
+        const fromModule = args.module_id ? moduleHref(String(args.module_id)) : null
+        const rota = fromModule ?? String(args.rota ?? '')
+        if (!allowedRoutes().has(rota)) {
+          return { output: { erro: `rota inválida — use module_id (${MODULE_IDS.join('|')}) ou uma destas rotas: ${[...allowedRoutes()].join(', ')}` } }
+        }
         const action: SupervisedAction = { id: actionId(), type: 'navigate', label, href: rota }
-        return { output: { acao_proposta: tipo }, artifact: { proposals: [action] } }
+        return { output: { acao_proposta: tipo, rota }, artifact: { proposals: [action] } }
       }
 
       const moduleId = args.module_id as string | undefined
