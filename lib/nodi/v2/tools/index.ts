@@ -13,7 +13,7 @@ export function buildToolset(caps: NodiV2Capabilities): NodiTool[] {
   if (caps.multimodal) tools.push(...visionTools)
   for (const tool of actionTools) {
     if (tool.name === 'propor_acao' && !caps.actions) continue
-    if (tool.name === 'propor_memoria' && !caps.memory) continue
+    if ((tool.name === 'propor_memoria' || tool.name === 'propor_plano_projeto') && !caps.memory) continue
     tools.push(tool)
   }
   return tools

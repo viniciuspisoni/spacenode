@@ -7,7 +7,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { clampText, sanitizeUserText } from '../redact'
-import type { ProjectMemory } from './types'
+import type { ProjectMemory, ProjectPlan, ProjectPlanStep } from './types'
 
 const MAX_DECISIONS = 12
 
@@ -18,6 +18,33 @@ interface MemoryRow {
   main_image: string | null
   locked_elements: string | null
   decisions: unknown
+  plan?: unknown
+}
+
+const MODULE_IDS = ['renderizar', 'spaces', 'editar', 'ampliar', 'animar', 'finalizar', 'planta_humanizada']
+
+/** Valida o Plano do Projeto vindo do modelo/painel — nada passa cru. */
+export function sanitizePlan(raw: unknown): ProjectPlan | undefined {
+  const p = (raw && typeof raw === 'object' ? raw : null) as { objective?: unknown; steps?: unknown } | null
+  if (!p || typeof p.objective !== 'string' || !p.objective.trim()) return undefined
+  const steps: ProjectPlanStep[] = (Array.isArray(p.steps) ? p.steps : [])
+    .slice(0, 10)
+    .map((s, i) => {
+      const o = s as Record<string, unknown>
+      const moduleId = MODULE_IDS.includes(o.moduleId as string) ? (o.moduleId as string) : 'renderizar'
+      return {
+        order: i + 1,
+        moduleId,
+        moduleLabel: typeof o.moduleLabel === 'string' && o.moduleLabel ? clampText(o.moduleLabel, 40) : moduleId,
+        goal: clampText(String(o.goal ?? ''), 200),
+        status: o.status === 'feita' ? 'feita' as const : 'pendente' as const,
+        estimatedNodes: typeof o.estimatedNodes === 'number' && Number.isFinite(o.estimatedNodes)
+          ? Math.max(0, Math.round(o.estimatedNodes)) : undefined,
+      }
+    })
+    .filter(s => s.goal)
+  if (!steps.length) return undefined
+  return { objective: clampText(p.objective, 300), steps, updatedAt: new Date().toISOString() }
 }
 
 function rowToMemory(row: MemoryRow): ProjectMemory {
@@ -31,6 +58,7 @@ function rowToMemory(row: MemoryRow): ProjectMemory {
     mainImage: row.main_image ?? undefined,
     lockedElements: row.locked_elements ?? undefined,
     decisions: decisions.length ? decisions : undefined,
+    plan: sanitizePlan(row.plan),
   }
 }
 
@@ -54,12 +82,14 @@ export function sanitizeMemoryPatch(patch: unknown): ProjectMemory {
       .slice(0, MAX_DECISIONS)
     if (decisions.length) out.decisions = decisions
   }
+  const plan = sanitizePlan(p.plan)
+  if (plan) out.plan = plan
   return out
 }
 
 export function memoryPatchIsEmpty(patch: ProjectMemory): boolean {
   return !patch.style && !patch.materials && !patch.lighting && !patch.mainImage &&
-    !patch.lockedElements && !(patch.decisions && patch.decisions.length)
+    !patch.lockedElements && !(patch.decisions && patch.decisions.length) && !patch.plan
 }
 
 export async function readProjectMemory(
@@ -69,7 +99,7 @@ export async function readProjectMemory(
 ): Promise<ProjectMemory | null> {
   const { data, error } = await supabase
     .from('nodi_project_memory')
-    .select('style, materials, lighting, main_image, locked_elements, decisions')
+    .select('style, materials, lighting, main_image, locked_elements, decisions, plan')
     .eq('user_id', userId)
     .eq('space_id', spaceId)
     .maybeSingle()
@@ -100,13 +130,14 @@ export async function saveProjectMemory(
     main_image: patch.mainImage ?? current?.mainImage ?? null,
     locked_elements: patch.lockedElements ?? current?.lockedElements ?? null,
     decisions,
+    plan: patch.plan ?? current?.plan ?? null,
     updated_at: new Date().toISOString(),
   }
 
   const { data, error } = await supabase
     .from('nodi_project_memory')
     .upsert(row, { onConflict: 'user_id,space_id' })
-    .select('style, materials, lighting, main_image, locked_elements, decisions')
+    .select('style, materials, lighting, main_image, locked_elements, decisions, plan')
     .single()
   if (error) {
     if (error.code === '42P01') {

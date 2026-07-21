@@ -10,7 +10,11 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { isNodiEnabled } from '@/lib/nodi/flags'
 import { capabilitiesFor, isNodiV2EnabledFor } from '@/lib/nodi/v2/flags'
 import { deriveNodiContext } from '@/lib/nodi/context'
+import { listRecentGenerations } from '@/lib/nodi/diagnostics'
 import { getFaqIndex, getSuggestions } from '@/lib/nodi/knowledge'
+import { computeNextBestAction } from '@/lib/nodi/v4/next-action'
+import { readSettings } from '@/lib/nodi/v4/settings'
+import { getPayerBalance } from '@/lib/workspaces/balance'
 
 export async function GET(req: Request) {
   if (!isNodiEnabled()) {
@@ -26,7 +30,26 @@ export async function GET(req: Request) {
 
   // V2 (copiloto) por usuário: flag geral + gate de internos. O painel decide
   // o endpoint (chat V2 × ask V1) por estas capacidades — nunca por env no client.
-  const v2Allowed = await isNodiV2EnabledFor(createAdminClient(), user)
+  const admin = createAdminClient()
+  const v2Allowed = await isNodiV2EnabledFor(admin, user)
+
+  // V4: próxima melhor ação (determinística) + modo de autonomia do usuário.
+  let nextAction = null
+  let settings = null
+  if (v2Allowed) {
+    settings = await readSettings(supabase, user.id)
+    try {
+      const [recent, payer] = await Promise.all([
+        listRecentGenerations(supabase, user.id, 8),
+        getPayerBalance(admin, user.id).catch(() => null),
+      ])
+      nextAction = computeNextBestAction({
+        recent,
+        balance: payer?.totalBalance ?? null,
+        moduleId: context.moduleId,
+      })
+    } catch {} // sugestão é açúcar — nunca derruba o bootstrap
+  }
 
   return NextResponse.json({
     moduleId: context.moduleId,
@@ -34,5 +57,7 @@ export async function GET(req: Request) {
     suggestions: getSuggestions(context.moduleId, 3),
     faq: getFaqIndex(),
     capabilities: capabilitiesFor(v2Allowed),
+    nextAction,
+    settings,
   })
 }

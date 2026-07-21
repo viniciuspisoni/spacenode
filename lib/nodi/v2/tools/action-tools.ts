@@ -340,6 +340,66 @@ export const actionTools: NodiTool[] = [
     },
   },
   {
+    name: 'propor_plano_projeto',
+    description: 'Propõe salvar/atualizar o PLANO DO PROJETO (objetivo + etapas ordenadas com módulo, meta e status). O usuário confirma no painel; o plano fica persistente no projeto e você deve consultá-lo (consultar_memoria_projeto) antes de sugerir passos.',
+    spec: {
+      space_id: { ...ID_SPEC, required: false },
+      motivo: { type: 'string', required: true, maxLen: 200 },
+      objetivo: { type: 'string', required: true, maxLen: 300 },
+    },
+    schemaOverride: {
+      type: 'object',
+      properties: {
+        space_id: { type: 'string' },
+        motivo: { type: 'string' },
+        objetivo: { type: 'string' },
+        etapas: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              module_id: { type: 'string', enum: [...MODULE_IDS] },
+              meta: { type: 'string' },
+              status: { type: 'string', enum: ['pendente', 'feita'] },
+            },
+            required: ['module_id', 'meta'],
+          },
+        },
+      },
+      required: ['motivo', 'objetivo', 'etapas'],
+    },
+    handler: async (args, ctx) => {
+      if (!ctx.capabilities.memory) return { output: { erro: 'memória de projeto desativada neste ambiente' } }
+      const spaceId = (args.space_id as string) ?? ctx.request.nodi.projectId
+      if (!spaceId) return { output: { erro: 'nenhum projeto aberto — plano é por projeto' } }
+      const rawSteps = Array.isArray(args.etapas) ? args.etapas.slice(0, 10) : []
+      const steps = rawSteps.map((raw, i) => {
+        const o = raw as Record<string, unknown>
+        const moduleId = MODULE_IDS.includes(o.module_id as (typeof MODULE_IDS)[number]) ? String(o.module_id) : 'renderizar'
+        const settings: Record<string, string> = {}
+        return {
+          order: i + 1,
+          moduleId,
+          moduleLabel: moduleLabel(moduleId),
+          goal: clampText(String(o.meta ?? ''), 200),
+          status: (o.status === 'feita' ? 'feita' : 'pendente') as 'feita' | 'pendente',
+          estimatedNodes: estimateCost(moduleId, settings) ?? undefined,
+        }
+      }).filter(s => s.goal)
+      if (!steps.length) return { output: { erro: 'nenhuma etapa válida' } }
+      return {
+        output: { plano_proposto: { etapas: steps.length } },
+        artifact: {
+          memoryProposal: {
+            spaceId,
+            patch: { plan: { objective: clampText(String(args.objetivo), 300), steps } },
+            reason: clampText(String(args.motivo), 200),
+          },
+        },
+      }
+    },
+  },
+  {
     name: 'propor_memoria',
     description: 'Propõe salvar na memória do projeto uma decisão APROVADA pelo usuário (estilo, materiais, iluminação, imagem principal, elementos que não podem mudar). O usuário confirma no painel.',
     spec: {
