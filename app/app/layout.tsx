@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Sidebar from '@/components/app/Sidebar'
 import WelcomeTour from '@/components/app/WelcomeTour'
+import AttributionBinder from '@/components/marketing/AttributionBinder'
 import NodiRoot from '@/components/nodi/NodiRoot'
 import { isNodiEnabled } from '@/lib/nodi/flags'
 import { getPlanById, type PlanId } from '@/lib/plans'
@@ -60,6 +61,9 @@ export default async function AppLayout({
         {children}
       </main>
       <WelcomeTour needsOnboarding={needsOnboarding} />
+      {/* Vincula a atribuição de campanha (cookie first-party) ao cadastro —
+          uma única vez por navegador, best-effort. */}
+      <AttributionBinder />
       {/* Nodi (assistente) — ativação gradual via NODI_ENABLED, lido no servidor */}
       {isNodiEnabled() && <NodiRoot />}
     </div>
