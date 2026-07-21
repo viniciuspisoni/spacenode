@@ -20,7 +20,7 @@ function engineDisplayName(engine: string, fallback: EngineId): string {
   if (engine === 'flux-fill') return `${ENGINES[fallback].name} · retoque`
   return ENGINES[fallback].name
 }
-import { getUpscaleCost } from '@/lib/spaces/economy'
+import { getUpscaleCost, DNA_EXTRACTION_COST } from '@/lib/spaces/economy'
 import { getVisualDna } from '@/lib/spaces/dna'
 import { spacesPreserveV2Enabled } from '@/lib/spaces/preserve-flags'
 import { RetocarOverlay } from './RetocarOverlay'
@@ -44,10 +44,15 @@ interface Props {
 export function VistaDetail({ space, vista, others, initialBalance }: Props) {
   const router = useRouter()
   const [favorited, setFavorited]   = useState(vista.is_favorited)
-  const [submitting, setSubmitting] = useState<null | 'fav' | 'upscale' | 'delete'>(null)
+  const [submitting, setSubmitting] = useState<null | 'fav' | 'upscale' | 'delete' | 'dna' | 'promote'>(null)
   const [error, setError]           = useState<string | null>(null)
   const [balance, setBalance]       = useState(initialBalance)
   const [showRetocar, setShowRetocar] = useState(false)
+  // Multi-DNA: vista com DNA próprio extraído vira referência selecionável
+  // no painel de geração do Space.
+  const [isDnaReference, setIsDnaReference] = useState(Boolean(vista.dna))
+  // Trocar Vista Mestre: esta vista já é a mestre atual do Space?
+  const [isCurrentMestre, setIsCurrentMestre] = useState(space.vista_mestre_vista_id === vista.id)
 
   const opt = vista.axis && vista.axis_value ? findAxisOption(vista.axis, vista.axis_value) : null
   const canUpscale = vista.engine !== 'clarity'
@@ -95,6 +100,74 @@ export function VistaDetail({ space, vista, others, initialBalance }: Props) {
       }
       setBalance(b => b - upscaleCost)
       router.push(`/app/spaces/${space.id}/vistas/${data.vista.id}`)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setSubmitting(null)
+    }
+  }
+
+  async function handleExtractDna() {
+    if (isDnaReference || vista.status !== 'completed') return
+    if (balance < DNA_EXTRACTION_COST) {
+      setError(`Saldo insuficiente. Necessários ${DNA_EXTRACTION_COST} nodes.`)
+      return
+    }
+    setSubmitting('dna')
+    setError(null)
+    try {
+      const res = await fetch(`/api/vistas/${vista.id}/extract-dna`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) {
+        if (res.status === 402) throw new Error(data?.message ?? 'Saldo insuficiente')
+        throw new Error(data?.error ?? 'Erro na extração de DNA')
+      }
+      setBalance(b => b - DNA_EXTRACTION_COST)
+      setIsDnaReference(true)
+      router.refresh()
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setSubmitting(null)
+    }
+  }
+
+  async function handlePromoteMestre() {
+    if (isCurrentMestre || vista.status !== 'completed') return
+    const needsExtract = !isDnaReference
+    if (needsExtract && balance < DNA_EXTRACTION_COST) {
+      setError(`Saldo insuficiente pra extração de DNA. Necessários ${DNA_EXTRACTION_COST} nodes.`)
+      return
+    }
+    const confirmMsg = needsExtract
+      ? `Definir esta vista como Vista Mestre? O DNA dela será extraído primeiro (${DNA_EXTRACTION_COST} nodes) e a mestre atual vai pro histórico do projeto.`
+      : 'Definir esta vista como Vista Mestre? A mestre atual vai pro histórico do projeto.'
+    if (!confirm(confirmMsg)) return
+
+    setSubmitting('promote')
+    setError(null)
+    try {
+      if (needsExtract) {
+        const res = await fetch(`/api/vistas/${vista.id}/extract-dna`, { method: 'POST' })
+        const data = await res.json()
+        if (!res.ok) {
+          if (res.status === 402) throw new Error(data?.message ?? 'Saldo insuficiente')
+          throw new Error(data?.error ?? 'Erro na extração de DNA')
+        }
+        setBalance(b => b - DNA_EXTRACTION_COST)
+        setIsDnaReference(true)
+      }
+
+      const res = await fetch(`/api/spaces/${space.id}/promote-vista-mestre`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ vista_id: vista.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.message ?? data?.error ?? 'Erro ao trocar a Vista Mestre')
+
+      setIsCurrentMestre(true)
+      router.refresh()
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -249,6 +322,52 @@ export function VistaDetail({ space, vista, others, initialBalance }: Props) {
         )}
 
         <ActionGhost onClick={() => setShowRetocar(true)}>✎ Editar</ActionGhost>
+        {vista.status === 'completed' && (
+          isDnaReference ? (
+            <span
+              title="Esta vista tem DNA próprio extraído — selecione-a como referência no painel de geração do Space."
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '10px 16px', borderRadius: 10,
+                background: 'var(--color-accent-green-bg)', color: 'var(--color-accent-green)',
+                border: '0.5px solid var(--color-accent-green-border)',
+                fontSize: 12, fontWeight: 500, letterSpacing: '-0.005em',
+              }}
+            >
+              ◈ Referência de DNA
+            </span>
+          ) : (
+            <ActionGhost onClick={handleExtractDna} disabled={submitting === 'dna'}>
+              {submitting === 'dna'
+                ? 'Extraindo DNA…'
+                : `◈ Extrair DNA · ${DNA_EXTRACTION_COST} nodes`}
+            </ActionGhost>
+          )
+        )}
+        {vista.status === 'completed' && (
+          isCurrentMestre ? (
+            <span
+              title="Esta vista é a Vista Mestre atual do projeto."
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '10px 16px', borderRadius: 10,
+                background: 'var(--color-accent-green-bg)', color: 'var(--color-accent-green)',
+                border: '0.5px solid var(--color-accent-green-border)',
+                fontSize: 12, fontWeight: 500, letterSpacing: '-0.005em',
+              }}
+            >
+              ★ Vista Mestre atual
+            </span>
+          ) : (
+            <ActionGhost onClick={handlePromoteMestre} disabled={submitting === 'promote'}>
+              {submitting === 'promote'
+                ? 'Trocando…'
+                : isDnaReference
+                  ? '★ Definir como Vista Mestre'
+                  : `★ Definir como Vista Mestre · ${DNA_EXTRACTION_COST} nodes`}
+            </ActionGhost>
+          )
+        )}
         <ActionGhost onClick={() => alert('Em breve.')}>+ Pack</ActionGhost>
         <ActionGhost onClick={handleFavorite} disabled={submitting === 'fav'}>
           {favorited ? '★ Favoritada' : '☆ Favoritar'}

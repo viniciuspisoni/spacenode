@@ -99,6 +99,14 @@ export const IconHumanizedPlan = (p: IconProps = {}) => (
   </SVG>
 )
 
+export const IconBlocos3D = (p: IconProps = {}) => (
+  <SVG {...p}>
+    <path d="M9.6 7.6l6.2 3.6v7.2L9.6 22l-6.2-3.6v-7.2l6.2-3.6z" />
+    <path d="M3.4 11.2l6.2 3.6 6.2-3.6M9.6 14.8V22" />
+    <path d="M18.6 3.6V9M15.9 6.3h5.4" />
+  </SVG>
+)
+
 export const IconIsometric = (p: IconProps = {}) => (
   <SVG {...p}>
     <path d="M12 2.6l8.6 4.95v8.9L12 21.4l-8.6-4.95v-8.9L12 2.6z" />
@@ -154,5 +162,13 @@ export const IconPlans = (p: IconProps = {}) => (
     <path d="M12 2.8l9 4.4-9 4.4-9-4.4 9-4.4z" />
     <path d="M3 12l9 4.4 9-4.4" />
     <path d="M3 16.4l9 4.4 9-4.4" />
+  </SVG>
+)
+
+// ── AJUDA ─────────────────────────────────────────────────
+export const IconGuide = (p: IconProps = {}) => (
+  <SVG {...p}>
+    <circle cx="12" cy="12" r="8.6" />
+    <path d="M15.4 8.6l-1.9 4.6-4.9 2.2 1.9-4.6 4.9-2.2z" />
   </SVG>
 )

@@ -21,9 +21,21 @@ function supabaseHost(): string {
   }
 }
 
-/** Deriva { bucket, key } de uma URL pública do Storage DO PRÓPRIO projeto.
+/** Deriva { bucket, key } de uma URL pública do Storage DO PRÓPRIO projeto,
+ *  ou de uma URL RELATIVA do proxy de mídia (`/api/media?bucket=…&key=…`) —
+ *  forma persistida nos documents do Finalizar para round-trip estável.
  *  Retorna null para URLs de outros hosts (FAL, externas) ou fora do padrão. */
 export function parseSupabaseStoragePath(url: string): { bucket: string; key: string } | null {
+  // Proxy de mídia relativo (persistido em documents após o flip de privacidade).
+  if (url.startsWith('/api/media?')) {
+    try {
+      const params = new URLSearchParams(url.slice(url.indexOf('?') + 1))
+      const bucket = params.get('bucket')
+      const key = params.get('key')
+      if (bucket && key) return { bucket, key }
+    } catch { /* segue para o parse absoluto */ }
+    return null
+  }
   let u: URL
   try { u = new URL(url) } catch { return null }
   const host = supabaseHost()
@@ -39,11 +51,11 @@ export function parseSupabaseStoragePath(url: string): { bucket: string; key: st
   return { bucket, key }
 }
 
-/** Coleta recursivamente todas as strings http(s) de um valor jsonb (o `document`
- *  do Finalizar, etc.) — pra achar URLs de camadas/máscaras aninhadas. */
+/** Coleta recursivamente todas as URLs de um valor jsonb (o `document` do
+ *  Finalizar, etc.) — http(s) absolutas e as relativas do proxy de mídia. */
 export function collectUrls(value: unknown, out: string[] = []): string[] {
   if (typeof value === 'string') {
-    if (value.startsWith('http://') || value.startsWith('https://')) out.push(value)
+    if (value.startsWith('http://') || value.startsWith('https://') || value.startsWith('/api/media?')) out.push(value)
   } else if (Array.isArray(value)) {
     for (const v of value) collectUrls(v, out)
   } else if (value && typeof value === 'object') {

@@ -19,18 +19,9 @@ import { EngineIcon } from '@/components/icons/engines'
 import type { SpaceCategory, ProjectDNA } from '@/lib/spaces/types'
 import { DNA_EXTRACTION_COST } from '@/lib/spaces/economy'
 import { DnaPanel } from './DnaPanel'
+import { jsonOrNull, errMsg } from '@/lib/http/fetch-json'
 
 type Step = 'form' | 'upload' | 'analyzing' | 'reveal'
-
-// Parse defensivo: respostas de infraestrutura (413/502 da Vercel etc.) vêm em
-// texto puro — um res.json() cru vazaria "Unexpected token…" pro usuário.
-async function jsonOrNull(res: Response): Promise<Record<string, unknown> | null> {
-  try { return await res.json() } catch { return null }
-}
-
-function errMsg(data: Record<string, unknown> | null, fallback: string): string {
-  return typeof data?.error === 'string' ? data.error : fallback
-}
 
 // Reduz uma imagem hospedada a um File adequado à Vista Mestre.
 // O DNA é extraído por visão, então não precisamos da resolução cheia (que em

@@ -12,6 +12,7 @@ import {
   getNodesCost, isEngineId, isResolution, isValidCombination,
 } from '@/lib/engines'
 import { EngineIcon } from '@/components/icons/engines'
+import { consumeHandoff } from '@/components/nodi/actions-bus'
 
 interface GenerateClientProps {
   initialCredits:    number
@@ -274,6 +275,29 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
   //    Só faz efeito quando há render anterior (anchor) — sem isso o modelo não
   //    tem referência fixa do "tudo o que deve ser preservado".
   const [refinementText, setRefinementText] = useState('')
+
+  // ── Handoff do Nodi (ação confirmada no painel): pré-preenche engine,
+  //    resolução e direção de refino. Aplicado pós-mount via rAF (sem mismatch
+  //    de hidratação, sem setState síncrono em effect). O clique que gasta
+  //    nodes continua sendo o botão Gerar.
+  useEffect(() => {
+    const handoff = consumeHandoff('renderizar')
+    if (!handoff) return
+    const raf = requestAnimationFrame(() => {
+      const engine = handoff.settings?.engine
+      const resolution = handoff.settings?.resolution
+      if (isEngineId(engine)) {
+        setSelectedEngine(engine)
+        setSelectedResolution(
+          isResolution(resolution) && isValidCombination(engine, resolution)
+            ? resolution
+            : ENGINES[engine].resolutions[0],
+        )
+      }
+      if (handoff.prompt) setRefinementText(handoff.prompt)
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [])
 
   const fileInputRef         = useRef<HTMLInputElement>(null)
   const compareRef           = useRef<HTMLDivElement>(null)
@@ -550,10 +574,10 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
     }
   }, [])
 
-  const handleBuyCredits = async () => {
-    const res = await fetch('/api/stripe/checkout', { method: 'POST' })
-    const data = await res.json()
-    if (data.url) window.location.href = data.url
+  // A compra (plano ou Lumen) acontece no billing — a rota de checkout exige
+  // payload tipado, então chamar direto daqui era um 400 silencioso.
+  const handleBuyCredits = () => {
+    window.location.href = '/app/billing'
   }
 
   // ── Reseta o estado da geração atual pra começar um render do zero

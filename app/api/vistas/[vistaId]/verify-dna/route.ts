@@ -27,13 +27,13 @@ export async function POST(
   // Carrega vista + DNA do Space
   const { data: vistaRow, error: vErr } = await supabase
     .from('vistas')
-    .select('id, image_url, space_id, status, dna_verified, axis, is_edited, edit_mask_coverage')
+    .select('id, image_url, space_id, status, dna_verified, axis, is_edited, edit_mask_coverage, reference_vista_id')
     .eq('id', vistaId)
     .single()
   if (vErr || !vistaRow) {
     return NextResponse.json({ error: 'Vista não encontrada' }, { status: 404 })
   }
-  const vista = vistaRow as Pick<Vista, 'id' | 'image_url' | 'space_id' | 'status' | 'dna_verified' | 'axis' | 'is_edited' | 'edit_mask_coverage'>
+  const vista = vistaRow as Pick<Vista, 'id' | 'image_url' | 'space_id' | 'status' | 'dna_verified' | 'axis' | 'is_edited' | 'edit_mask_coverage' | 'reference_vista_id'>
 
   if (vista.status !== 'completed' || !vista.image_url) {
     return NextResponse.json({ error: 'Vista não está pronta' }, { status: 409 })
@@ -44,12 +44,25 @@ export async function POST(
     return NextResponse.json({ alreadyVerified: true })
   }
 
+  // Multi-DNA: vista gerada a partir de uma referência é verificada contra o
+  // DNA DELA (foi o que a geração usou), não o do Space. Fallback pro DNA do
+  // Space se a referência sumiu (ON DELETE SET NULL) ou perdeu o dna.
+  let referenceDna: unknown = null
+  if (vista.reference_vista_id) {
+    const { data: refRow } = await supabase
+      .from('vistas')
+      .select('dna')
+      .eq('id', vista.reference_vista_id)
+      .maybeSingle()
+    referenceDna = refRow?.dna ?? null
+  }
+
   const { data: spaceRow } = await supabase
     .from('spaces')
     .select('dna')
     .eq('id', vista.space_id)
     .single()
-  const visualDna = getVisualDna(spaceRow?.dna)
+  const visualDna = getVisualDna(referenceDna) ?? getVisualDna(spaceRow?.dna)
   if (!visualDna) {
     return NextResponse.json({ error: 'Space sem DNA' }, { status: 409 })
   }

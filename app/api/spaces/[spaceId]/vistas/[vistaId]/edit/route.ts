@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getPayerId } from '@/lib/workspaces/context'
 import { refundNodes } from '@/lib/billing/refund-nodes'
 import { isQuality, type Quality, type Space, type Vista } from '@/lib/spaces/types'
 import { isEditMode, dispatchEndpoint, type EditMode } from '@/lib/spaces/engines'
@@ -130,8 +131,23 @@ export async function POST(
     return NextResponse.json({ error: 'Vista não está pronta' }, { status: 409 })
   }
 
-  const dna   = getVisualDna(space.dna)
+  // Multi-DNA: vista gerada a partir de uma referência herda o DNA dela no
+  // prompt de edição (foi o que a geração usou); fallback pro DNA do Space.
+  let referenceDna: unknown = null
+  if (vista.reference_vista_id) {
+    const { data: refRow } = await supabase
+      .from('vistas')
+      .select('dna')
+      .eq('id', vista.reference_vista_id)
+      .maybeSingle()
+    referenceDna = refRow?.dna ?? null
+  }
+  const dna   = getVisualDna(referenceDna) ?? getVisualDna(space.dna)
   const admin = createAdminClient()
+
+  // Saldo é da bolsa: pré-check e leituras usam o PAGADOR (dono do workspace),
+  // o mesmo que consume_workspace_nodes debita — senão membro é barrado à toa.
+  const payerId = (await getPayerId(admin, user.id)) ?? user.id
 
   // ── 1) Contexto + rota (sem tocar em saldo) ──
   // Cobertura medida no SERVIDOR (o valor do cliente é estimativa de preview).
@@ -164,7 +180,7 @@ export async function POST(
     const { data: bal } = await admin
       .from('user_node_balance')
       .select('total_balance')
-      .eq('user_id', user.id)
+      .eq('user_id', payerId)
       .single()
     if ((bal?.total_balance ?? 0) < routing.costNodes) {
       return NextResponse.json(
@@ -323,7 +339,7 @@ export async function POST(
       const { data: balGate } = await admin
         .from('user_node_balance')
         .select('plan_balance, lumen_balance, total_balance')
-        .eq('user_id', user.id)
+        .eq('user_id', payerId)
         .single()
       return NextResponse.json({
         rejected:          true,
@@ -388,7 +404,7 @@ export async function POST(
     const { data: balAfter } = await admin
       .from('user_node_balance')
       .select('plan_balance, lumen_balance, total_balance')
-      .eq('user_id', user.id)
+      .eq('user_id', payerId)
       .single()
 
     return NextResponse.json({

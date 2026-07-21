@@ -20,6 +20,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { EditV2Canvas, type EditV2CanvasHandle } from './EditV2Canvas'
 import { EditV2ImportModal } from './EditV2ImportModal'
+import { uploadDirect } from '@/lib/storage/direct-upload-client'
 
 // ── Modos do Clean (mapeiam para os intents do contrato v2) ──────────────────
 // "Remover / corrigir" → remove_element neste MVP (fix_image segue no código,
@@ -129,13 +130,9 @@ export function EditCleanFlow({ initialBalance }: { initialBalance: number }) {
 
   // ── Upload ────────────────────────────────────────────────────────────────
   const uploadFile = useCallback(async (file: File, kind: 'source' | 'mask') => {
-    const fd = new FormData()
-    fd.append('file', file)
-    fd.append('kind', kind)
-    const res = await fetch('/api/edits/upload-asset', { method: 'POST', body: fd })
-    const json = await res.json().catch(() => null)
-    if (!res.ok || !json?.url) throw new Error(json?.error ?? 'Erro ao enviar imagem')
-    return json.url as string
+    const { url } = await uploadDirect(file, 'retocar-asset', { kind })
+    if (!url) throw new Error('Erro ao enviar imagem')
+    return url
   }, [])
 
   /** Define a imagem de trabalho (upload ou histórico) e entra na edição. */

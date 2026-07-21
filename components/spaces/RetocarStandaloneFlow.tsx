@@ -27,6 +27,7 @@ import { MAX_EDIT_REFERENCES, SURFACE_SEGMENTATION_ENABLED, type EditReferenceIm
 import { ReferencesPanel, suggestPromptForRole, downscaleImageForUpload, type RefMenuKind } from './RetocarReferences'
 import { ReferenceFocusModal, type NormCrop } from './ReferenceFocusModal'
 import { SurfaceSelectModal, SurfaceSelectionBar, type SurfaceSelection } from './SurfaceSelectModal'
+import { uploadDirect } from '@/lib/storage/direct-upload-client'
 
 // Debug: mostra a imagem REJEITADA pelo quality gate (sem salvar). Só dev/staging.
 const SHOW_REJECTED_DEBUG =
@@ -210,16 +211,12 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
     setSurfacePicker(null)
   }
 
-  // ── upload da imagem ─────────────────────────────────────────
+  // ── upload da imagem (direto browser → Storage) ──────────────
   async function uploadSourceFile(file: File) {
     setError(null)
-    const fd = new FormData()
-    fd.append('file', file)
-    fd.append('kind', 'source')
-    const res = await fetch('/api/edits/upload-asset', { method: 'POST', body: fd })
-    const data = await res.json()
-    if (!res.ok) throw new Error(data?.error ?? 'Erro ao salvar imagem')
-    return data.url as string
+    const { url } = await uploadDirect(file, 'retocar-asset', { kind: 'source' })
+    if (!url) throw new Error('Erro ao salvar imagem')
+    return url
   }
 
   function resetVersionsWithOriginal(url: string) {
@@ -325,19 +322,14 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
     if (file.size > 40 * 1024 * 1024) { setError('Imagem muito grande (máx 40 MB).'); return }
     setError(null)
     try {
-      // Reduz no browser (limite ~4.5MB de body da Vercel) sem perder fidelidade.
+      // Reduz no browser antes do upload direto (área retocar-reference: 8 MB).
       const blob = await downscaleImageForUpload(file)
-      const fd = new FormData()
-      fd.append('file', new File([blob], 'reference.jpg', { type: blob.type || 'image/jpeg' }))
-      fd.append('role', role)
-      const res = await fetch('/api/edits/references/upload', { method: 'POST', body: fd })
-      if (!res.ok) {
-        let msg = res.status === 413 ? 'Imagem muito grande para enviar.' : 'Erro ao enviar referência'
-        try { const d = await res.json(); msg = d?.error ?? msg } catch { /* resposta não-JSON */ }
-        throw new Error(msg)
-      }
-      const data = await res.json()
-      addReference(data.reference as EditReferenceImage)
+      const { url } = await uploadDirect(
+        new File([blob], 'reference.jpg', { type: blob.type || 'image/jpeg' }),
+        'retocar-reference',
+      )
+      if (!url) throw new Error('Erro ao enviar referência')
+      addReference({ id: url, url, role, source: 'upload' })
     } catch (e) {
       setError((e as Error).message)
     }
@@ -432,13 +424,13 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
       const blob = await canvas.getMaskBlob()
       if (!blob) throw new Error('Falha ao gerar máscara')
       maskCoverage = canvas.getMaskCoverage()
-      const fd = new FormData()
-      fd.append('file', new File([blob], 'mask.png', { type: 'image/png' }))
-      fd.append('kind', 'mask')
-      const maskRes = await fetch('/api/edits/upload-asset', { method: 'POST', body: fd })
-      const maskData = await maskRes.json()
-      if (!maskRes.ok) throw new Error(maskData?.error ?? 'Erro ao salvar máscara')
-      blobMaskUrl = maskData.url
+      const { url: maskUrl } = await uploadDirect(
+        new File([blob], 'mask.png', { type: 'image/png' }),
+        'retocar-asset',
+        { kind: 'mask' },
+      )
+      if (!maskUrl) throw new Error('Erro ao salvar máscara')
+      blobMaskUrl = maskUrl
     } catch (e) {
       console.error('[retocar] handleGenerate error:', e)
       setError((e as Error).message)

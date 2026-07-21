@@ -1,14 +1,17 @@
+import { LEGAL_CNPJ, LEGAL_NAME, SUPPORT_EMAIL, SUPPORT_WHATSAPP_URL } from '@/lib/support'
+
 export default function Footer() {
   return (
     <footer className="spn-footer">
       <span className="spn-footer-brand">
-        spacenode · 2026
+        spacenode · 2026 · {LEGAL_NAME} · CNPJ {LEGAL_CNPJ}
       </span>
 
       <div className="spn-footer-links">
         <a href="/termos">TERMOS</a>
         <a href="/privacidade">PRIVACIDADE</a>
-        <a href="mailto:contato@spacenode.app">CONTATO</a>
+        <a href={`mailto:${SUPPORT_EMAIL}`}>CONTATO</a>
+        <a href={SUPPORT_WHATSAPP_URL} target="_blank" rel="noopener noreferrer">WHATSAPP</a>
         <a href="https://instagram.com/spacenode.app" target="_blank" rel="noopener noreferrer">INSTAGRAM</a>
       </div>
 

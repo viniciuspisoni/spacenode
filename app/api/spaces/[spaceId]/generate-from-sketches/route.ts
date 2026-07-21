@@ -20,17 +20,16 @@
 // categoria ampla) — disparado pelo cliente após receber a resposta.
 
 import { NextRequest, NextResponse } from 'next/server'
-import { fal } from '@fal-ai/client'
 import { randomUUID } from 'crypto'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getPayerId } from '@/lib/workspaces/context'
 import { refundNodes } from '@/lib/billing/refund-nodes'
 import { ENGINES, isResolution, type EngineId, type Resolution } from '@/lib/engines'
 import { getVistaGenerationCost, supportsQuality } from '@/lib/spaces/economy'
 import { getVisualDna, getBriefingFromDna } from '@/lib/spaces/dna'
 import { isQuality, type ProjectDNA, type Space } from '@/lib/spaces/types'
-
-fal.config({ credentials: process.env.FAL_KEY })
+import { generateImage } from '@/lib/ai/image-provider'
 
 const FAL_TIMEOUT_MS = 120_000
 const MAX_SKETCHES   = 10
@@ -44,6 +43,18 @@ interface IncomingSketch {
 interface GenerateBody {
   sketches?: unknown
   quality?:  unknown
+  /** Multi-DNA: vista-referência (com DNA extraído) que substitui a Vista
+   *  Mestre como referência estética (Image #2) + DNA do prompt. Opcional. */
+  reference_vista_id?: unknown
+}
+
+// Campos mínimos da vista-referência usados na geração.
+interface ReferenceVista {
+  id:        string
+  space_id:  string
+  status:    string
+  image_url: string | null
+  dna:       unknown
 }
 
 function falParamsForEngine(engine: EngineId, q: Resolution): Record<string, unknown> {
@@ -102,6 +113,14 @@ export async function POST(
   }
   const quality = body.quality
 
+  const referenceVistaId =
+    body.reference_vista_id === undefined || body.reference_vista_id === null
+      ? null
+      : (typeof body.reference_vista_id === 'string' ? body.reference_vista_id : undefined)
+  if (referenceVistaId === undefined) {
+    return NextResponse.json({ error: 'reference_vista_id inválido' }, { status: 400 })
+  }
+
   // Carrega Space (RLS valida posse)
   const { data: spaceRow, error: spaceErr } = await supabase
     .from('spaces')
@@ -125,8 +144,33 @@ export async function POST(
     )
   }
 
-  const visualDna = getVisualDna(space.dna)
-  const briefing  = getBriefingFromDna(space.dna)
+  // ── Referência selecionável (multi-DNA) ──────────────────────
+  // Sem reference_vista_id: Vista Mestre como referência estética + DNA do
+  // Space (comportamento histórico). Com ele, a vista-referência assume os dois
+  // papéis. O sketch do usuário segue sendo a autoridade GEOMÉTRICA (Image #1).
+  let referenceVista: ReferenceVista | null = null
+  if (referenceVistaId) {
+    const { data: refRow } = await supabase
+      .from('vistas')
+      .select('id, space_id, status, image_url, dna')
+      .eq('id', referenceVistaId)
+      .single()
+    if (!refRow || refRow.space_id !== spaceId) {
+      return NextResponse.json({ error: 'Referência não encontrada neste Space' }, { status: 404 })
+    }
+    if (refRow.status !== 'completed' || !refRow.image_url) {
+      return NextResponse.json({ error: 'Referência não está pronta' }, { status: 409 })
+    }
+    if (!refRow.dna) {
+      return NextResponse.json({ error: 'Referência sem DNA extraído' }, { status: 409 })
+    }
+    referenceVista = refRow as ReferenceVista
+  }
+
+  const aestheticRefUrl = referenceVista?.image_url ?? space.vista_mestre_url!
+  const dnaSource       = referenceVista?.dna ?? space.dna
+  const visualDna = getVisualDna(dnaSource)
+  const briefing  = getBriefingFromDna(dnaSource)
   if (!visualDna) {
     return NextResponse.json({ error: 'Space sem DNA' }, { status: 409 })
   }
@@ -138,10 +182,13 @@ export async function POST(
   const batchId      = randomUUID()
 
   // Pré-checagem de saldo
+  // Saldo é da bolsa: pré-check usa o PAGADOR (dono do workspace), o mesmo
+  // que consume_workspace_nodes debita — senão membro é barrado à toa.
+  const payerId = (await getPayerId(admin, user.id)) ?? user.id
   const { data: bal } = await admin
     .from('user_node_balance')
     .select('total_balance')
-    .eq('user_id', user.id)
+    .eq('user_id', payerId)
     .single()
   const available = bal?.total_balance ?? 0
   if (available < totalCost) {
@@ -168,6 +215,7 @@ export async function POST(
       generateOne({
         admin, userId: user.id, space, dna: visualDna, briefing,
         engine, quality, sketch: sk, costPerVista, falEndpoint, batchId,
+        aestheticRefUrl, referenceVistaId,
       })
     )
     const settled = await Promise.allSettled(tasks)
@@ -189,7 +237,7 @@ export async function POST(
   const { data: balAfter } = await admin
     .from('user_node_balance')
     .select('plan_balance, lumen_balance, total_balance')
-    .eq('user_id', user.id)
+    .eq('user_id', payerId)
     .single()
 
   return NextResponse.json({
@@ -214,10 +262,15 @@ async function generateOne(args: {
   costPerVista: number
   falEndpoint:  string
   batchId:      string
+  // Multi-DNA: referência estética (Vista Mestre ou vista-referência) + id da
+  // referência pra gravar a provenance na row.
+  aestheticRefUrl:  string
+  referenceVistaId: string | null
 }) {
   const {
     admin, userId, space, dna, briefing, engine, quality,
     sketch, costPerVista, falEndpoint, batchId,
+    aestheticRefUrl, referenceVistaId,
   } = args
 
   let debited = false
@@ -237,21 +290,27 @@ async function generateOne(args: {
 
     // 2) row pendente
     const axisLabel = sketch.label ?? 'Ângulo'
+    const insertRow: Record<string, unknown> = {
+      space_id:          space.id,
+      user_id:           userId,
+      status:            'processing',
+      engine,
+      quality,
+      axis:              'angulo',
+      axis_value:        null, // sem slug — é guiado por sketch, não por valor
+      axis_label:        axisLabel,
+      nodes_cost:        costPerVista,
+      source_sketch_url: sketch.url,
+      batch_id:          batchId,
+    }
+    // Provenance multi-DNA — só preenche quando o usuário selecionou uma
+    // referência (caminho legado segue sem tocar na coluna).
+    if (referenceVistaId) {
+      insertRow.reference_vista_id = referenceVistaId
+    }
     const { data: row, error: insErr } = await admin
       .from('vistas')
-      .insert({
-        space_id:          space.id,
-        user_id:           userId,
-        status:            'processing',
-        engine,
-        quality,
-        axis:              'angulo',
-        axis_value:        null, // sem slug — é guiado por sketch, não por valor
-        axis_label:        axisLabel,
-        nodes_cost:        costPerVista,
-        source_sketch_url: sketch.url,
-        batch_id:          batchId,
-      })
+      .insert(insertRow)
       .select('id')
       .single()
     if (insErr || !row) throw new Error('insert_failed: ' + (insErr?.message ?? '?'))
@@ -261,39 +320,45 @@ async function generateOne(args: {
     const prompt = buildAnguloPrompt(dna, briefing, sketch.label, quality)
 
     // image_urls (ORDEM IMPORTA): [#1 print do usuário = base geométrica,
-    // #2 Vista Mestre = referência estética]. A primeira imagem é a âncora de
-    // geometria/composição pros motores de edição da FAL — por isso o print
-    // tem que vir PRIMEIRO. Inverter isso fazia o motor copiar a estrutura da
-    // Vista Mestre (imagem original do projeto) e ignorar o print enviado.
+    // #2 referência do projeto (Vista Mestre ou vista-referência) = referência
+    // estética]. A primeira imagem é a âncora de geometria/composição pros
+    // motores de edição da FAL — por isso o print tem que vir PRIMEIRO.
+    // Inverter isso fazia o motor copiar a estrutura da referência (imagem
+    // original do projeto) e ignorar o print enviado.
     const falInput = {
       prompt,
-      image_urls: [sketch.url, space.vista_mestre_url!],
+      image_urls: [sketch.url, aestheticRefUrl],
       ...falParamsForEngine(engine, quality),
     }
 
     console.log('[spaces.angulo] engine                       :', engine, '→', falEndpoint)
     console.log('[spaces.angulo] base geométrica (image #1)    :', sketch.url, 'label=', sketch.label)
-    console.log('[spaces.angulo] ref estética   (image #2)     :', space.vista_mestre_url)
+    console.log('[spaces.angulo] ref estética   (image #2)     :', aestheticRefUrl, referenceVistaId ? `(vista ${referenceVistaId})` : '(vista mestre)')
     console.log('[spaces.angulo] batch_id                      :', batchId)
 
-    const result = await Promise.race([
-      fal.subscribe(falEndpoint, { input: falInput }),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(Object.assign(new Error('FAL_TIMEOUT'), { isFalTimeout: true })), FAL_TIMEOUT_MS),
-      ),
-    ])
-    const images = (result.data as { images: { url: string }[] }).images
-    const outputUrl = images?.[0]?.url
-    if (!outputUrl) throw new Error('fal_no_output')
+    // Camada única de provider (lib/ai/image-provider): GCP/Vertex primário
+    // quando ligado por env, fallback FAL transparente.
+    const gen = await generateImage({
+      falEndpoint,
+      falInput,
+      timeoutMs: FAL_TIMEOUT_MS,
+      context:   'spaces.angulo',
+      deliver:   { kind: 'url', userId, area: 'vistas' },
+    })
+    const outputUrl = gen.images[0]?.url
+    if (!outputUrl) throw new Error('provider_no_output')
 
     // 4) Persistir
     const { error: updErr } = await admin
       .from('vistas')
       .update({
-        image_url:    outputUrl,
+        image_url:      outputUrl,
         prompt,
-        status:       'completed',
-        completed_at: new Date().toISOString(),
+        fal_request_id: gen.requestId,
+        provider:       gen.provider,
+        model:          gen.providerModel,
+        status:         'completed',
+        completed_at:   new Date().toISOString(),
       })
       .eq('id', vistaId)
     if (updErr) {
@@ -312,6 +377,7 @@ async function generateOne(args: {
       status:     'completed',
       source_sketch_url: sketch.url,
       batch_id:   batchId,
+      reference_vista_id: referenceVistaId,
     }
   } catch (err) {
     if (debited) {
@@ -358,7 +424,7 @@ function buildAnguloPrompt(
     ``,
     `TWO REFERENCE IMAGES PROVIDED:`,
     `Image #1 — THE USER'S VIEW (geometric authority). Preserve EXACTLY its geometry, framing, perspective, camera angle, composition, volumes, proportions and every opening (windows, doors, voids, recesses). Do NOT move, add, remove, redraw, simplify or reinterpret any structural element. Do NOT change the point of view. The result must align element-by-element with Image #1.`,
-    `Image #2 — THE PROJECT'S VISTA MESTRE (aesthetic reference ONLY). Use it solely as the source of materials, textures, color palette, finish, mood and lighting style. Do NOT borrow geometry, camera angle, composition, framing or layout from Image #2.`,
+    `Image #2 — THE PROJECT'S REFERENCE IMAGE (aesthetic reference ONLY). Use it solely as the source of materials, textures, color palette, finish, mood and lighting style. Do NOT borrow geometry, camera angle, composition, framing or layout from Image #2.`,
     ``,
     `APPLY ONLY: realism, materials, lighting, finish and texture — on top of the exact geometry of Image #1.`,
     ``,
@@ -368,7 +434,7 @@ function buildAnguloPrompt(
     `MOOD / CONTEXT: ${moodLine}`,
     `LIGHTING: photorealistic and coherent with the project's atmosphere shown in Image #2 — natural light, plausible shadows, no flat or illustrative look.${labelLine}`,
     facts,
-    `The output must look like a real photograph of the SAME structure shown in Image #1, finished with the materials and atmosphere of the project (Image #2). It is the user's view made real — not a re-composition of the Vista Mestre.`,
+    `The output must look like a real photograph of the SAME structure shown in Image #1, finished with the materials and atmosphere of the project (Image #2). It is the user's view made real — not a re-composition of Image #2.`,
     ``,
     `NEGATIVE: do not reproduce Image #2's viewpoint, layout or composition; do not deform, straighten or simplify the geometry of Image #1; no stylization, no illustration, no cartoon, no invented or relocated architecture.`,
     ``,

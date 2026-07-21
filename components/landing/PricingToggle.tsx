@@ -2,8 +2,9 @@
 
 import { useState, useCallback } from 'react'
 import { ENGINES, ENGINE_ORDER, type Resolution } from '@/lib/engines'
-import { PLANS, recommendPlan, type PaidPlanId, type BillingCycle } from '@/lib/plans'
+import { ANNUAL_BILLING_ENABLED, PLANS, recommendPlan, type PaidPlanId, type BillingCycle } from '@/lib/plans'
 import { LUMEN_PACKS } from '@/lib/lumens'
+import { SUPPORT_EMAIL, supportWhatsAppUrl } from '@/lib/support'
 
 // UI-specific data por plano: features, badge, breakdown de renders.
 // Renders calculados com engine padrão por resolução: HD→Pulsar (10 nodes),
@@ -49,6 +50,8 @@ async function startCheckout(id: PaidPlanId, billing: BillingCycle) {
     body: JSON.stringify({ type: 'plan', id, billing }),
   })
   if (res.status === 401) { window.location.href = '/login?mode=signup'; return }
+  // Já assinante (guarda anti-cobrança-dupla) — plano se gerencia no billing.
+  if (res.status === 409) { window.location.href = '/app/billing'; return }
   if (!res.ok) return
   const data = await res.json()
   if (data.url) window.location.href = data.url
@@ -312,7 +315,8 @@ export function PricingToggle() {
             quando quiser.
           </p>
 
-          {/* Billing toggle */}
+          {/* Billing toggle — some junto com a pausa do ciclo anual */}
+          {ANNUAL_BILLING_ENABLED && (
           <div style={{
             display: 'inline-flex', alignItems: 'center', marginTop: 24,
             background: 'var(--color-bg-elevated)',
@@ -354,6 +358,7 @@ export function PricingToggle() {
               </span>
             </button>
           </div>
+          )}
         </div>
 
         {/* Plan cards: 4 colunas em desktop, auto-fit em telas menores */}
@@ -531,9 +536,18 @@ export function PricingToggle() {
             Nodes renovam mensalmente e não acumulam para o mês seguinte.<br />
             Lumens (créditos avulsos) ficam disponíveis a partir do plano Pro.<br />
             Dúvidas?{' '}
-            <a href="mailto:contato@spacenode.app" style={{ color: 'var(--color-text-primary)', textDecoration: 'underline', textUnderlineOffset: 3 }}>
-              fale com a gente.
+            <a
+              href={supportWhatsAppUrl('Olá! Tenho uma dúvida sobre os planos da SPACENODE.')}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: 'var(--color-text-primary)', textDecoration: 'underline', textUnderlineOffset: 3 }}
+            >
+              chame no WhatsApp
             </a>
+            {' '}ou escreva para{' '}
+            <a href={`mailto:${SUPPORT_EMAIL}`} style={{ color: 'var(--color-text-primary)', textDecoration: 'underline', textUnderlineOffset: 3 }}>
+              {SUPPORT_EMAIL}
+            </a>.
           </p>
         </div>
 

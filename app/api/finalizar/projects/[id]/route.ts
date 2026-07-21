@@ -22,6 +22,9 @@ interface UpdateBody {
   height?: number
   document?: unknown
   thumbnail_url?: string | null
+  /** Pré-condição opcional: updated_at visto pelo cliente. Se o registro já
+   *  mudou (outra aba), o PUT devolve 409 em vez de sobrescrever. */
+  expected_updated_at?: string
 }
 
 export async function GET(_req: NextRequest, { params }: Params) {
@@ -75,17 +78,31 @@ export async function PUT(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Nada para atualizar' }, { status: 400 })
   }
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('finalize_projects')
     .update(patch)
     .eq('id', id)
     .eq('user_id', user.id)
+  if (typeof body.expected_updated_at === 'string' && body.expected_updated_at) {
+    query = query.eq('updated_at', body.expected_updated_at)
+  }
+  const { data, error } = await query
     .select('id, name, thumbnail_url, updated_at')
-    .single()
+    .maybeSingle()
 
-  if (error || !data) {
+  if (error) {
     console.error('[finalizar.projects.update]', error)
     return NextResponse.json({ error: 'Erro ao salvar composição' }, { status: 500 })
+  }
+  if (!data) {
+    // Pré-condição falhou (registro mudou em outra aba) ou id inexistente.
+    if (typeof body.expected_updated_at === 'string' && body.expected_updated_at) {
+      return NextResponse.json(
+        { error: 'O projeto foi alterado em outra aba — recarregue para continuar.' },
+        { status: 409 },
+      )
+    }
+    return NextResponse.json({ error: 'Composição não encontrada' }, { status: 404 })
   }
   const project = { ...data, thumbnail_url: mediaProxyUrl(data.thumbnail_url) }
   return NextResponse.json({ project })

@@ -319,17 +319,18 @@ function BalancePopover({ planId, planBalance, planTotal, lumenBalance, state, d
       </div>
 
       <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
-        <button
-          onClick={() => { alert('Disponível em agosto.'); }}
+        <Link
+          href="/app/billing"
+          onClick={onClose}
           style={{
             flex: 1, padding: '9px 12px', borderRadius: 8,
             background: 'var(--color-surface-hover)', color: 'var(--color-text-secondary)',
             border: '0.5px solid var(--color-border-strong)',
-            fontSize: 11, fontWeight: 500,
+            fontSize: 11, fontWeight: 500, textAlign: 'center',
           }}
         >
           Comprar avulso
-        </button>
+        </Link>
         <Link
           href="/app/billing"
           onClick={onClose}

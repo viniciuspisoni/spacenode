@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isInternalStaff } from '@/lib/auth/privileged'
-import { engineDisplayLabel } from '@/lib/history/generation-detail'
+import { engineDisplayLabel, editV3DisplayPrompt, editV3QualityLabel } from '@/lib/history/generation-detail'
 import { videoEngineLabel, upscaleProviderLabel } from '@/lib/renderLabels'
 import { signRow } from '@/lib/storage/signed'
 
@@ -87,9 +87,52 @@ function redactRowForUser(kind: string, row: Record<string, unknown>): Record<st
     // edits.prompt é a instrução escrita pelo USUÁRIO — permanece.
     // engine guarda o endpoint do provider: entrega só a label de produto.
     r.engine = engineDisplayLabel(typeof r.engine === 'string' ? r.engine : null)
+    // Campos técnicos do Editar V3 (edit_v3_jobs) — nunca p/ usuário comum.
+    // Nas linhas do editor v1 eles nem existem (deletes são no-op).
+    delete r.provider
+    delete r.action_type
+    delete r.preservation_mode
+    delete r.intensity_mode
+    delete r.charged
+    delete r.in_mask_delta
+    delete r.out_of_mask_delta
   }
 
   return r
+}
+
+// Editar V3 persiste em edit_v3_jobs com colunas próprias; o painel fala o
+// vocabulário de `edits`. Mapeia o que o painel exibe e mantém os técnicos na
+// linha — redactRowForUser decide o que o usuário comum vê (admin vê tudo).
+function editV3RowToEditShape(j: Record<string, unknown>): Record<string, unknown> {
+  return {
+    id:               j.id,
+    user_id:          j.user_id,
+    source_image_url: j.source_image_url,
+    result_image_url: j.result_image_url,
+    mask_url:         j.mask_url,
+    prompt:           editV3DisplayPrompt(j),
+    quality:          editV3QualityLabel(j.quality_mode),
+    nodes_cost:       j.nodes_cost,
+    engine:           j.model,          // cru aqui; a redação converte p/ label
+    source_type:      null,
+    source_id:        null,
+    mask_coverage:    j.mask_coverage,
+    reference_count:  j.reference_count,
+    status:           j.status,
+    created_at:       j.created_at,
+    completed_at:     j.completed_at,
+    // Técnicos (admin/Diagnóstico; redigidos p/ usuário comum):
+    provider:          j.provider,
+    fal_request_id:    j.request_id,
+    error_message:     j.error_message,
+    action_type:       j.action_type,
+    preservation_mode: j.preservation_mode,
+    intensity_mode:    j.intensity_mode,
+    charged:           j.charged,
+    in_mask_delta:     j.in_mask_delta,
+    out_of_mask_delta: j.out_of_mask_delta,
+  }
 }
 
 export async function GET(req: NextRequest) {
@@ -107,10 +150,22 @@ export async function GET(req: NextRequest) {
 
   const admin = createAdminClient()
 
-  const { data: row, error } = await admin.from(table).select('*').eq('id', id).maybeSingle()
+  let { data: row, error } = await admin.from(table).select('*').eq('id', id).maybeSingle()
   if (error) {
     console.error('[history/detail] erro ao buscar geração:', error)
     return NextResponse.json({ error: 'Erro ao carregar detalhes' }, { status: 500 })
+  }
+  // kind 'edit' cobre dois storages: `edits` (editor v1) e `edit_v3_jobs`
+  // (Editar V3, padrão em produção). Id ausente na primeira → tenta a segunda,
+  // já traduzida pro vocabulário do painel. Sem workspace_id no V3 → segue
+  // valendo a regra abaixo: só o dono acessa.
+  if (!row && kind === 'edit') {
+    const v3 = await admin.from('edit_v3_jobs').select('*').eq('id', id).maybeSingle()
+    if (v3.error) {
+      console.error('[history/detail] erro ao buscar edit_v3_jobs:', v3.error)
+      return NextResponse.json({ error: 'Erro ao carregar detalhes' }, { status: 500 })
+    }
+    if (v3.data) row = editV3RowToEditShape(v3.data as Record<string, unknown>)
   }
   if (!row) return NextResponse.json({ error: 'Geração não encontrada' }, { status: 404 })
 

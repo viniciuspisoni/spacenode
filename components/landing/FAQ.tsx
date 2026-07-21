@@ -1,8 +1,11 @@
 'use client'
 
 import { useState } from 'react'
+import { SUPPORT_EMAIL, SUPPORT_PHONE_DISPLAY, supportWhatsAppUrl } from '@/lib/support'
 
-const faqs = [
+const faqLink = { color: 'var(--color-text-primary)', textDecoration: 'underline', textUnderlineOffset: 3 } as const
+
+const faqs: { q: string; a: React.ReactNode }[] = [
   {
     q: 'O que é a SpaceNode?',
     a: 'Uma plataforma de visualização arquitetônica com IA para arquitetos e designers de interiores. Ela transforma estudos, modelos e imagens base em visualizações fotorrealistas — preservando a intenção do projeto, do estudo ao material de apresentação.',
@@ -37,11 +40,30 @@ const faqs = [
   },
   {
     q: 'Posso cancelar quando quiser?',
-    a: 'No plano mensal, sim — você paga apenas o mês em uso e mantém o acesso até o fim do período. No plano anual, o compromisso é de 12 meses, já que o pagamento é antecipado. Em ambos os casos, tudo é feito direto no painel, sem burocracia.',
+    a: 'Sim — a assinatura é mensal: você paga apenas o mês em uso e mantém o acesso até o fim do período. O cancelamento é feito direto no painel, sem burocracia.',
   },
   {
     q: 'A SpaceNode é indicada para escritórios?',
     a: 'Sim. Os planos Studio e Office foram desenhados para equipes com volume: mais nodes por mês, Lumens avulsos para picos de demanda e suporte prioritário — velocidade e consistência visual em todas as etapas do projeto.',
+  },
+  {
+    q: 'Como falo com o suporte?',
+    a: (
+      <>
+        Pelo WhatsApp{' '}
+        <a
+          href={supportWhatsAppUrl('Olá! Vim do site da SpaceNode e tenho uma dúvida.')}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={faqLink}
+        >
+          {SUPPORT_PHONE_DISPLAY}
+        </a>
+        {' '}ou pelo e-mail{' '}
+        <a href={`mailto:${SUPPORT_EMAIL}`} style={faqLink}>{SUPPORT_EMAIL}</a>
+        {' '}— atendimento em português.
+      </>
+    ),
   },
 ]
 

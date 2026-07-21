@@ -7,6 +7,7 @@
 import { useCallback } from 'react'
 import type { VideoReferenceAnalysis } from '@/lib/video/analyzeReference'
 import type { AnimateDispatch } from './useAnimateState'
+import { uploadDirect } from '@/lib/storage/direct-upload-client'
 
 interface AnalyzeResponse {
   inputUrl: string
@@ -17,9 +18,13 @@ export function useReferenceAnalysis(dispatch: AnimateDispatch) {
   const analyze = useCallback(async (imageFile: File) => {
     dispatch({ type: 'startAnalyzing' })
     try {
-      const body = new FormData()
-      body.append('image', imageFile)
-      const res = await fetch('/api/video/analyze', { method: 'POST', body })
+      // Imagem sobe direto pro Storage (sem Vercel); a rota recebe só a key.
+      const { key: sourceKey } = await uploadDirect(imageFile, 'animar-source', {}, { confirm: false })
+      const res = await fetch('/api/video/analyze', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ sourceKey }),
+      })
 
       if (!res.ok) {
         dispatch({ type: 'analysisFailed', message: 'Análise indisponível agora.' })

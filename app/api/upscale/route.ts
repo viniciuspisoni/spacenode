@@ -1,12 +1,13 @@
 // POST /api/upscale — módulo Ampliar v2 (abas Resolução e Aprimorar).
 //
-// Contrato (FormData):
-//   - image:        File (obrigatório)
+// Contrato (JSON — a imagem sobe DIRETO pro Storage via uploadDirect, área
+// upscale-source; o binário não passa pela Vercel, teto de 4,5 MB não se aplica):
+//   - sourceKey:    string (key do upload direto, obrigatório)
 //   - tab:          'resolution' | 'enhance'
 //   - modeId:       'fidelity' | 'recover' | 'denoise' | 'deblur' | 'restore' | 'smart'
 //   - scale:        'none' | '2x' | '4x' | '8x' | 'ultra'
 //   - objectiveId?: 'client' | 'portfolio' | 'print' | 'recover' | 'final'
-//   - imageWidth?:  number  (origem; usado para custo por megapixel)
+//   - imageWidth?:  number  (origem; fallback se o decode server-side falhar)
 //   - imageHeight?: number
 //
 // Custo: computeUpscaleCost — único ponto de verdade.
@@ -18,6 +19,7 @@ import { fal } from '@fal-ai/client'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { refundNodes } from '@/lib/billing/refund-nodes'
+import { DIRECT_UPLOAD_AREAS, downloadDirectUpload } from '@/lib/storage/direct-upload'
 import sharp from 'sharp'
 import {
   computeUpscaleCost,
@@ -49,16 +51,16 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
   // ── Parse + validação ──────────────────────────────────────────────────────
-  const form = await req.formData()
-  const imageFile   = form.get('image')        as File   | null
-  const tab         = (form.get('tab')         as string | null) ?? 'resolution'
-  const modeId      = (form.get('modeId')      as string | null) ?? 'fidelity'
-  const scale       = (form.get('scale')       as string | null) ?? '4x'
-  const objectiveId = (form.get('objectiveId') as string | null) ?? null
-  const widthRaw    =  form.get('imageWidth')  as string | null
-  const heightRaw   =  form.get('imageHeight') as string | null
+  const body = await req.json().catch(() => null)
+  const sourceKey   = typeof body?.sourceKey   === 'string' ? body.sourceKey   : ''
+  const tab         = typeof body?.tab         === 'string' ? body.tab         : 'resolution'
+  const modeId      = typeof body?.modeId      === 'string' ? body.modeId      : 'fidelity'
+  const scale       = typeof body?.scale       === 'string' ? body.scale       : '4x'
+  const objectiveId = typeof body?.objectiveId === 'string' ? body.objectiveId : null
+  const widthRaw    = body?.imageWidth  != null ? String(body.imageWidth)  : null
+  const heightRaw   = body?.imageHeight != null ? String(body.imageHeight) : null
 
-  if (!imageFile) {
+  if (!sourceKey) {
     return NextResponse.json({ error: 'Imagem obrigatória' }, { status: 400 })
   }
   if (!VALID_TABS.includes(tab as UpscaleTab)) {
@@ -78,6 +80,13 @@ export async function POST(req: NextRequest) {
   const modeT   = modeId as ModeId
   const scaleT  = scale  as Scale
 
+  // ── Origem: baixa o upload direto do Storage (valida dono/área/limites) ────
+  const admin = createAdminClient()
+  const src = await downloadDirectUpload(
+    admin, DIRECT_UPLOAD_AREAS['upscale-source'], user.id, {}, sourceKey,
+  )
+  if (!src.ok) return NextResponse.json({ error: src.message }, { status: src.status })
+
   // Dimensões REAIS medidas no servidor (AL-5): o custo do upscale é por
   // megapixel; confiar no imageWidth/imageHeight do cliente permitia
   // subdeclarar as dimensões pra pagar o piso enquanto envia uma imagem grande
@@ -86,7 +95,7 @@ export async function POST(req: NextRequest) {
   let width:  number | null = null
   let height: number | null = null
   try {
-    const meta = await sharp(Buffer.from(await imageFile.arrayBuffer())).metadata()
+    const meta = await sharp(src.buffer).metadata()
     width  = meta.width  ?? null
     height = meta.height ?? null
   } catch {
@@ -104,7 +113,6 @@ export async function POST(req: NextRequest) {
   }).total
 
   // ── Débito (com refund em falha) ───────────────────────────────────────────
-  const admin = createAdminClient()
   let debited = false
   let inputUrl:  string | undefined
 
@@ -125,8 +133,10 @@ export async function POST(req: NextRequest) {
     }
     debited = true
 
-    // ── Upload da imagem para FAL ──────────────────────────────────────────
-    inputUrl = await fal.storage.upload(imageFile)
+    // ── Upload da imagem para FAL (buffer já baixado do nosso Storage) ─────
+    inputUrl = await fal.storage.upload(
+      new File([new Uint8Array(src.buffer)], sourceKey.split('/').pop() ?? 'source.jpg', { type: src.mime }),
+    )
 
     console.log('[upscale] tab=%s mode=%s scale=%s mp=%s', tabT, modeT, scaleT, megapixelsFromDimensions(width, height))
 

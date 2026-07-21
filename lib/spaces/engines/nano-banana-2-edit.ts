@@ -10,8 +10,10 @@
 //
 // Referências entram como imagens extras com descrição por papel no prompt.
 // output_format png: o resultado entra no recompose lossless sem re-encode JPEG.
+//
+// Geração via lib/ai/image-provider: GCP/Vertex primário (quando ligado por
+// env) com fallback FAL byte-idêntico ao comportamento anterior.
 
-import { fal } from '@fal-ai/client'
 import {
   type RetouchEngine,
   type RetouchInput,
@@ -20,16 +22,17 @@ import {
   RetouchTimeoutError,
 } from './types'
 import { buildTwoImageMaskPrompt, buildInstructPrompt } from './mask-prompt'
+import {
+  generateImage,
+  ImageProviderNoOutputError,
+  ImageProviderTimeoutError,
+} from '@/lib/ai/image-provider'
 
 // fal-ai/nano-banana-2/edit é o ID interno do router; o endpoint FAL real é
 // fal-ai/nano-banana/edit (Gemini Flash Image, mesma família, públicamente acessível).
 export const NANO_BANANA_2_EDIT_ENDPOINT = 'fal-ai/nano-banana-2/edit'
 const FAL_NB2_ENDPOINT = 'fal-ai/nano-banana/edit'
 const TIMEOUT_MS = 120_000
-
-interface FalNBOutput {
-  images?: { url?: string }[]
-}
 
 async function callNB2(input: RetouchInput, withMask: boolean): Promise<RetouchOutput> {
   const refUrls = (input.references ?? []).map(r => r.url)
@@ -40,26 +43,41 @@ async function callNB2(input: RetouchInput, withMask: boolean): Promise<RetouchO
     ? buildTwoImageMaskPrompt(input.prompt, input.references)
     : buildInstructPrompt(input.prompt, input.references)
 
-  const result = await Promise.race([
-    fal.subscribe(FAL_NB2_ENDPOINT, {
-      input: {
-        prompt,
-        image_urls:    imageUrls,
-        num_images:    1,
-        output_format: 'png',
-        ...(input.seed !== undefined ? { seed: input.seed } : {}),
-      } as unknown as never,
-    }),
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new RetouchTimeoutError(NANO_BANANA_2_EDIT_ENDPOINT)), TIMEOUT_MS),
-    ),
-  ])
+  const falInput = {
+    prompt,
+    image_urls:    imageUrls,
+    num_images:    1,
+    output_format: 'png',
+    ...(input.seed !== undefined ? { seed: input.seed } : {}),
+  }
 
-  const data = result.data as FalNBOutput
-  const url  = data.images?.[0]?.url
+  let gen
+  try {
+    gen = await generateImage({
+      falEndpoint: FAL_NB2_ENDPOINT,
+      falInput,
+      timeoutMs:   TIMEOUT_MS,
+      context:     withMask ? 'editar/nb2-masked' : 'editar/nb2-instruct',
+      deliver:     { kind: 'dataUrl' },
+    })
+  } catch (err) {
+    if (err instanceof ImageProviderTimeoutError) throw new RetouchTimeoutError(NANO_BANANA_2_EDIT_ENDPOINT)
+    if (err instanceof ImageProviderNoOutputError) throw new RetouchNoOutputError(NANO_BANANA_2_EDIT_ENDPOINT)
+    throw err
+  }
+
+  const url = gen.images[0]?.url
   if (!url) throw new RetouchNoOutputError(NANO_BANANA_2_EDIT_ENDPOINT)
 
-  return { imageUrl: url, endpoint: NANO_BANANA_2_EDIT_ENDPOINT, requestId: (result as { requestId?: string }).requestId ?? null }
+  return {
+    imageUrl:      url,
+    endpoint:      NANO_BANANA_2_EDIT_ENDPOINT,
+    requestId:     gen.requestId,
+    provider:      gen.provider,
+    providerModel: gen.providerModel,
+    fallbackUsed:  gen.fallbackUsed,
+    latencyMs:     gen.latencyMs,
+  }
 }
 
 export const callNanoBanana2Masked: RetouchEngine = (input) => callNB2(input, true)

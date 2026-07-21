@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { getPayerBalance } from '@/lib/workspaces/balance'
 import AnimateClient from './AnimateClient'
 
 export default async function VideoPage() {
@@ -7,11 +9,8 @@ export default async function VideoPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('credits')
-    .eq('id', user.id)
-    .single()
+  // Saldo da bolsa (dono do workspace) — é dele que a geração debita.
+  const balance = await getPayerBalance(createAdminClient(), user.id)
 
-  return <AnimateClient initialCredits={profile?.credits ?? 0} />
+  return <AnimateClient initialCredits={balance.planBalance} />
 }

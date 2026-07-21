@@ -93,8 +93,26 @@ export interface Space {
   locked_at:         string | null
   source_render_id:  string | null
   source_metadata:   Record<string, unknown> | null
+  // Trocar Vista Mestre: histórico append-only das mestres substituídas e
+  // ponteiro pra vista atualmente promovida (NULL = mestre original do
+  // upload/render). Opcionais — rows anteriores à migration 20260709200000.
+  vista_mestre_history?:  VistaMestreHistoryEntry[] | null
+  vista_mestre_vista_id?: string | null
   created_at:        string
   updated_at:        string
+}
+
+// Entrada do histórico de Vista Mestre — snapshot completo da mestre
+// substituída (permite "restaurar" sem perda no futuro).
+export interface VistaMestreHistoryEntry {
+  url:                   string | null
+  dna:                   SpaceDnaPayload | ProjectDNA | null
+  dna_extracted_at:      string | null
+  source_render_id:      string | null
+  source_metadata:       Record<string, unknown> | null
+  vista_mestre_vista_id: string | null
+  replaced_at:           string
+  replaced_by_vista_id:  string
 }
 
 // View spaces_with_counts adiciona estes campos.
@@ -123,6 +141,13 @@ export interface Vista {
   is_favorited:              boolean
   is_in_pack:                boolean
   source_vista_id:           string | null
+  // Multi-DNA: vista com `dna` extraído vira referência selecionável na geração;
+  // `reference_vista_id` grava de qual referência esta vista partiu (NULL =
+  // Vista Mestre). Opcionais — rows anteriores à migration 20260709 não têm.
+  dna?:                      SpaceDnaPayload | null
+  dna_extracted_at?:         string | null
+  dna_extracting?:           boolean
+  reference_vista_id?:       string | null
   // Eixo Ângulo: sketch usado como geometry input + id do batch que agrupa
   // as vistas geradas no mesmo upload em massa.
   source_sketch_url:         string | null

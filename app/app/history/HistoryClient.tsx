@@ -9,8 +9,10 @@ import { toMediaProxyUrl } from '@/lib/storage/media-url'
 import { GenerationDetailDrawer } from '@/components/history/GenerationDetailDrawer'
 import { authorInitials, type GenerationKind } from '@/lib/history/generation-detail'
 import type { Edit } from '@/lib/spaces/types'
+import { BLOCOS3D_ENGINES } from '@/lib/blocos3d/config'
+import type { Blocos3DJobView } from '@/lib/blocos3d/types'
 
-type HistoryTab = 'renders' | 'edits' | 'vistas'
+type HistoryTab = 'renders' | 'edits' | 'vistas' | 'finalizar' | 'blocos3d'
 
 // Espelho de RENDER_LIST_COLUMNS (lib/history/redact.ts): a listagem NÃO
 // carrega prompt/fal_request_id/config_snapshot — o prompt final é
@@ -120,7 +122,7 @@ function inferExtension(url: string, isVideo: boolean): string {
   return m ? m[1].toLowerCase() : 'jpg'
 }
 
-function buildFilename(r: Render, idx: number): string {
+function buildFilename(r: Render, suffix: string | number): string {
   const isVideo = r.ambient === 'video'
   // Vídeo: o arquivo gerado fica em output_url (input_url é a imagem base).
   const url = (isVideo ? (r.output_url ?? r.input_url) : r.output_url) ?? ''
@@ -129,7 +131,16 @@ function buildFilename(r: Render, idx: number): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '') || 'render'
-  return `spacenode-${base}-${idx + 1}.${ext}`
+  return `spacenode-${base}-${suffix}.${ext}`
+}
+
+// Download de um único render pelo proxy /api/download (Content-Disposition:
+// attachment) — baixa direto, sem abrir aba nova nem sair do site.
+function downloadHref(r: Render): string | null {
+  const isVideo = r.ambient === 'video'
+  const target  = isVideo ? (r.output_url ?? r.input_url) : r.output_url
+  if (!target) return null
+  return `/api/download?url=${encodeURIComponent(target)}&filename=${encodeURIComponent(buildFilename(r, r.id.slice(0, 8)))}`
 }
 
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
@@ -297,7 +308,7 @@ export function HistoryClient({
         const target  = isVideo ? (r.output_url ?? r.input_url) : r.output_url
         if (!target) continue
         const a = document.createElement('a')
-        a.href = `/api/download?url=${encodeURIComponent(target)}&filename=${encodeURIComponent(buildFilename(r, i))}`
+        a.href = `/api/download?url=${encodeURIComponent(target)}&filename=${encodeURIComponent(buildFilename(r, i + 1))}`
         a.rel = 'noopener'
         document.body.appendChild(a)
         a.click()
@@ -435,9 +446,11 @@ export function HistoryClient({
           <div>
             <h1 style={S.headerTitle}>Histórico</h1>
             <p style={S.headerSub}>
-              {historyTab === 'renders' && 'Seus renders salvos e prontos para reutilizar.'}
-              {historyTab === 'edits'   && 'Edições localizadas geradas no Editar.'}
-              {historyTab === 'vistas'  && 'Vistas geradas dentro dos seus Spaces.'}
+              {historyTab === 'renders'   && 'Seus renders salvos e prontos para reutilizar.'}
+              {historyTab === 'edits'     && 'Edições localizadas geradas no Editar.'}
+              {historyTab === 'vistas'    && 'Vistas geradas dentro dos seus Spaces.'}
+              {historyTab === 'finalizar' && 'Versões exportadas dos seus projetos do Finalizar.'}
+              {historyTab === 'blocos3d'  && 'Modelos 3D gerados no Blocos 3D.'}
             </p>
           </div>
 
@@ -467,15 +480,15 @@ export function HistoryClient({
           </div>
         </div>
 
-        {/* ── Tabs (Renders / Edições / Vistas) ── */}
+        {/* ── Tabs (Renders / Edições / Vistas / Finalizar / Blocos 3D) ── */}
         <div style={{
           display: 'flex', gap: 4, padding: 4,
           background: 'var(--color-surface)', borderRadius: 10,
-          marginBottom: 16, maxWidth: 480,
+          marginBottom: 16, maxWidth: 680,
         }}>
-          {(['renders', 'edits', 'vistas'] as HistoryTab[]).map(t => {
+          {(['renders', 'edits', 'vistas', 'finalizar', 'blocos3d'] as HistoryTab[]).map(t => {
             const active = historyTab === t
-            const label = t === 'renders' ? 'Renders' : t === 'edits' ? 'Edições' : 'Vistas'
+            const label = t === 'renders' ? 'Renders' : t === 'edits' ? 'Edições' : t === 'vistas' ? 'Vistas' : t === 'finalizar' ? 'Finalizar' : 'Blocos 3D'
             return (
               <button
                 key={t}
@@ -496,9 +509,11 @@ export function HistoryClient({
           })}
         </div>
 
-        {/* ── Tabs alternativas: Edições + Vistas ── */}
-        {historyTab === 'edits'  && <EditsTabView  authors={authors} onOpenDetail={openDetail} />}
-        {historyTab === 'vistas' && <VistasTabView authors={authors} onOpenDetail={openDetail} />}
+        {/* ── Tabs alternativas: Edições + Vistas + Finalizar + Blocos 3D ── */}
+        {historyTab === 'edits'     && <EditsTabView  authors={authors} onOpenDetail={openDetail} />}
+        {historyTab === 'vistas'    && <VistasTabView authors={authors} onOpenDetail={openDetail} />}
+        {historyTab === 'finalizar' && <FinalizarTabView />}
+        {historyTab === 'blocos3d'  && <Blocos3DTabView />}
 
         {/* ── Controls (só renderiza na tab Renders) ── */}
         {historyTab === 'renders' && folderCounts.total > 0 && (
@@ -975,6 +990,231 @@ function VistasTabView({
   )
 }
 
+// ── FinalizarTabView ───────────────────────────────────────────────────────────
+
+// Versões exportadas do Finalizar (finalize_exports, RLS = só as próprias).
+// Clique abre o projeto no editor; o ícone abre o arquivo exportado.
+interface FinalizeExportItem {
+  id:         string
+  project_id: string | null
+  png_url:    string
+  format:     string
+  width:      number | null
+  height:     number | null
+  created_at: string
+  finalize_projects: { name: string } | null
+}
+
+function FinalizarTabView() {
+  const router = useRouter()
+  const [items, setItems] = useState<FinalizeExportItem[] | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const sb = createClient()
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoading(true)
+    sb.from('finalize_exports')
+      .select('id, project_id, png_url, format, width, height, created_at, finalize_projects(name)')
+      .order('created_at', { ascending: false })
+      .limit(60)
+      .then(({ data }) => setItems((data ?? []) as unknown as FinalizeExportItem[]))
+      .then(undefined, () => setItems([]))
+  }, [])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (items !== null) setLoading(false)
+  }, [items])
+
+  if (loading)                    return <TabLoading />
+  if ((items ?? []).length === 0) return (
+    <TabEmpty
+      message="Sem versões exportadas ainda — no Finalizar, exporte com “Salvar como versão no projeto”."
+      action={{ href: '/app/finalizar', label: 'Abrir Finalizar →' }}
+    />
+  )
+
+  return (
+    <div style={{
+      display: 'grid', gap: 14,
+      gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+    }}>
+      {items!.map(x => {
+        const projectName = x.finalize_projects?.name ?? 'Projeto do Finalizar'
+        const openProject = () => { if (x.project_id) router.push(`/app/finalizar/${x.project_id}`) }
+        return (
+          <div
+            key={x.id}
+            role="button"
+            tabIndex={0}
+            onClick={openProject}
+            onKeyDown={e => { if (e.key === 'Enter') openProject() }}
+            title={x.project_id ? 'Abrir o projeto no Finalizar' : 'Exportação avulsa'}
+            style={{
+              background: 'var(--color-bg-elevated)',
+              border: '0.5px solid var(--color-border)',
+              borderRadius: 12, overflow: 'hidden',
+              color: 'inherit', cursor: x.project_id ? 'pointer' : 'default',
+              display: 'block', position: 'relative',
+            }}
+          >
+            <div style={{ aspectRatio: '4 / 3', background: 'var(--color-surface)', position: 'relative' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={toMediaProxyUrl(x.png_url) ?? undefined} alt={projectName}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <button
+                type="button"
+                title="Abrir o arquivo exportado"
+                onClick={e => { e.stopPropagation(); window.open(x.png_url, '_blank', 'noopener') }}
+                style={{
+                  position: 'absolute', top: 8, right: 8,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  width: 26, height: 26, borderRadius: 7, border: 'none',
+                  background: 'var(--color-scrim)', color: '#ffffff', cursor: 'pointer',
+                }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                  <polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
+                </svg>
+              </button>
+            </div>
+            <div style={{ padding: '10px 12px 12px' }}>
+              <div style={{
+                fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary)',
+                letterSpacing: '-0.005em',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>
+                {projectName}
+              </div>
+              <div style={{
+                fontSize: 10, color: 'var(--color-text-quaternary)',
+                letterSpacing: '0.02em', marginTop: 4,
+              }}>
+                {x.format.toUpperCase()}
+                {x.width && x.height ? ` · ${x.width}×${x.height}` : ''}
+                {' · '}
+                {new Date(x.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+              </div>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ── Blocos3DTabView ────────────────────────────────────────────────────────────
+//
+// Blocos 3D vivem em tabela própria (blocos3d_jobs — o output é modelo, não
+// imagem), então a aba busca do endpoint do módulo. Clique abre o bloco no
+// próprio módulo via deep-link (?job=), onde estão o viewer e os downloads.
+
+function Blocos3DTabView() {
+  const [items, setItems] = useState<Blocos3DJobView[] | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoading(true)
+    fetch('/api/blocos3d?limit=50')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setItems((d?.jobs ?? []) as Blocos3DJobView[]))
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) return <TabLoading />
+  if ((items ?? []).length === 0) return (
+    <TabEmpty
+      message="Sem blocos 3D ainda."
+      action={{ href: '/app/blocos-3d', label: 'Abrir Blocos 3D →' }}
+    />
+  )
+
+  return (
+    <div style={{
+      display: 'grid', gap: 14,
+      gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+    }}>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      {items!.map(it => {
+        const thumb = it.thumbnailUrl ?? it.inputUrl
+        const engineLabel = BLOCOS3D_ENGINES[it.quality]?.label ?? it.quality
+        return (
+          <Link
+            key={it.id}
+            href={`/app/blocos-3d?job=${it.id}`}
+            title={it.status === 'failed' ? 'Falhou (estornado)' : it.status === 'processing' ? 'Gerando…' : 'Abrir bloco 3D'}
+            style={{
+              background: 'var(--color-bg-elevated)',
+              border: '0.5px solid var(--color-border)',
+              borderRadius: 12, overflow: 'hidden',
+              color: 'inherit', cursor: 'pointer',
+              display: 'block', textDecoration: 'none',
+              opacity: it.status === 'failed' ? 0.55 : 1,
+            }}
+          >
+            <div style={{ aspectRatio: '4 / 3', background: 'var(--color-surface)', position: 'relative' }}>
+              {thumb ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={thumb} alt="Bloco 3D"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-quaternary)' }}>
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 3l7.5 4.2v9.6L12 21l-7.5-4.2V7.2L12 3z" />
+                    <path d="M4.5 7.2L12 11.4l7.5-4.2M12 11.4V21" />
+                  </svg>
+                </div>
+              )}
+              {it.status === 'processing' && (
+                <div style={{
+                  position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'color-mix(in srgb, var(--color-bg) 55%, transparent)',
+                }}>
+                  <div style={{
+                    width: 18, height: 18, borderRadius: '50%',
+                    border: '2px solid var(--color-border-strong)',
+                    borderTop: '2px solid var(--color-text-primary)',
+                    animation: 'spin 0.9s linear infinite',
+                  }} />
+                </div>
+              )}
+              {/* Selo 3D — diferencia dos cards de imagem das outras abas. */}
+              <span style={{
+                position: 'absolute', top: 8, right: 8,
+                fontSize: 8, fontWeight: 700, letterSpacing: '0.08em',
+                color: 'rgba(255,255,255,0.9)', background: 'var(--color-scrim)',
+                backdropFilter: 'blur(4px)', border: '0.5px solid rgba(255,255,255,0.22)',
+                padding: '2px 6px', borderRadius: 6,
+              }}>
+                3D
+              </span>
+            </div>
+            <div style={{ padding: '10px 12px 12px' }}>
+              <div style={{
+                fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary)',
+                letterSpacing: '-0.005em',
+              }}>
+                {engineLabel}
+                {it.status === 'processing' && ' · gerando…'}
+                {it.status === 'failed' && ' · falhou'}
+              </div>
+              <div style={{
+                fontSize: 10, color: 'var(--color-text-tertiary)',
+                letterSpacing: '0.02em', marginTop: 4,
+              }}>
+                {it.nodesCost} nodes · {new Date(it.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+              </div>
+            </div>
+          </Link>
+        )
+      })}
+    </div>
+  )
+}
+
 function TabLoading() {
   return (
     <div style={{ padding: 48, textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 12 }}>
@@ -1213,15 +1453,18 @@ function RenderCard({
           </div>
         )}
 
-        {/* Hover overlay actions — desativadas no modo seleção */}
+        {/* Hover overlay actions — desativadas no modo seleção. "Ver" abre o
+            painel de detalhes (mesmo destino do clique no card — é o que o
+            tooltip do card promete); o download passa pelo proxy /api/download.
+            Nenhuma das duas ações navega pra fora do site. */}
         {hovered && !selectMode && render.output_url && (
           <div style={S.hoverActions}>
-            <a href={render.output_url} target="_blank" rel="noopener noreferrer"
+            <button type="button"
               style={S.actionBtn}
-              onClick={e => e.stopPropagation()}>
+              onClick={e => { e.stopPropagation(); onOpenDetail() }}>
               {isVideo ? 'Assistir →' : 'Ver →'}
-            </a>
-            <a href={render.output_url} download target="_blank" rel="noopener noreferrer"
+            </button>
+            <a href={downloadHref(render) ?? undefined}
               style={S.actionBtnGhost}
               onClick={e => e.stopPropagation()}>
               <DownloadIcon /> baixar
@@ -1453,7 +1696,7 @@ const S: Record<string, CSSProperties> = {
   hoverCheckbox: { position: 'absolute', top: 10, left: 10, zIndex: 3, width: 22, height: 22, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.85)', background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(4px)', cursor: 'pointer', padding: 0, boxShadow: '0 1px 3px rgba(0,0,0,0.3)' },
 
   hoverActions:  { position: 'absolute', bottom: 10, right: 10, display: 'flex', gap: 6 },
-  actionBtn:     { display: 'inline-flex', alignItems: 'center', padding: '5px 13px', background: 'rgba(255,255,255,0.92)', borderRadius: 7, fontSize: 11, color: '#0a0a0a', fontWeight: 500, textDecoration: 'none', fontFamily: 'inherit', letterSpacing: '-0.01em' },
+  actionBtn:     { display: 'inline-flex', alignItems: 'center', padding: '5px 13px', background: 'rgba(255,255,255,0.92)', border: 'none', borderRadius: 7, fontSize: 11, color: '#0a0a0a', fontWeight: 500, textDecoration: 'none', fontFamily: 'inherit', letterSpacing: '-0.01em', cursor: 'pointer' },
   actionBtnGhost:{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 11px', background: 'var(--color-scrim)', border: '0.5px solid rgba(255,255,255,0.25)', borderRadius: 7, fontSize: 10, color: '#fafafa', textDecoration: 'none', backdropFilter: 'blur(4px)', fontFamily: 'inherit' },
 
   // left:40 (não 10) pra não sobrepor o checkbox de hover, que ocupa o

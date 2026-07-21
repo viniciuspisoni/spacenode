@@ -1,11 +1,58 @@
 'use client'
 
-import { Suspense, useState, useEffect } from 'react'
+import { Suspense, useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useTheme } from '@/lib/theme/ThemeProvider'
 import { Brandmark } from '@/components/brand'
 
 type Mode = 'login' | 'signup'
+
+// ── Login com Google via GIS (botão oficial + signInWithIdToken) ───────────────
+// O botão do Google Identity Services roda inteiro entre spacenode.app e
+// accounts.google.com (ux_mode: 'redirect' → POST em /auth/google), sem expor o
+// domínio *.supabase.co na tela de consentimento. Sem NEXT_PUBLIC_GOOGLE_CLIENT_ID
+// (ou se o script do Google falhar), cai no fluxo antigo via signInWithOAuth.
+
+const GSI_SRC = 'https://accounts.google.com/gsi/client'
+
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: {
+          initialize: (config: Record<string, unknown>) => void
+          renderButton: (el: HTMLElement, options: Record<string, unknown>) => void
+        }
+      }
+    }
+  }
+}
+
+// Singleton do carregamento: uma única Promise compartilhada por todas as
+// execuções (StrictMode/re-runs). No erro, remove a tag e reseta a Promise —
+// nunca sobra uma tag "morta" cujos eventos já dispararam pendurando await.
+let gsiScriptPromise: Promise<void> | null = null
+
+function loadGsiScript(): Promise<void> {
+  if (window.google?.accounts?.id) return Promise.resolve()
+  if (!gsiScriptPromise) {
+    gsiScriptPromise = new Promise((resolve, reject) => {
+      const script = document.createElement('script')
+      script.src = GSI_SRC
+      script.async = true
+      script.defer = true
+      script.addEventListener('load', () => resolve(), { once: true })
+      script.addEventListener('error', () => {
+        gsiScriptPromise = null
+        script.remove()
+        reject(new Error('gsi script'))
+      }, { once: true })
+      document.head.appendChild(script)
+    })
+  }
+  return gsiScriptPromise
+}
 
 const GoogleIcon = () => (
   <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{ flexShrink: 0 }}>
@@ -48,9 +95,113 @@ function LoginForm() {
   const [error,         setError]         = useState<string | null>(null)
   const [success,       setSuccess]       = useState<string | null>(null)
 
-  // Clear feedback when the user edits
+  const { resolvedTheme } = useTheme()
+  const googleBtnRef = useRef<HTMLDivElement>(null)
+  const nonceFetchRef = useRef<Promise<string> | null>(null)
+  const googleReadyRef = useRef(false)
+  const [googleReady,    setGoogleReady]    = useState(false)
+  const [googleFallback, setGoogleFallback] = useState(!process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID)
+
+  // Clear feedback ao alternar Entrar/Criar conta. Não limpar por email/password:
+  // autofill (extensões/Chrome) dispara input nos campos logo após o load e
+  // apagaria o banner de erro vindo por ?error= antes do usuário ler.
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { setError(null); setSuccess(null) }, [mode, email, password])
+  useEffect(() => { setError(null); setSuccess(null) }, [mode])
+
+  // Feedback de falha vindo por redirect (POST /auth/google ou /auth/callback)
+  useEffect(() => {
+    const err = searchParams.get('error')
+    if (err === 'google') setError('Não foi possível entrar com o Google. Tente novamente.')
+    else if (err)         setError('Não foi possível concluir a autenticação. Tente novamente.')
+  }, [searchParams])
+
+  // Monta o botão oficial do Google (re-renderiza quando o tema resolve/muda).
+  // O nonce é mintado UMA vez por carga da página (ref compartilhada): re-runs
+  // por tema/StrictMode reusam o mesmo hash — cada GET remintaria o cookie e o
+  // botão já renderizado ficaria com hash de um nonce sobrescrito.
+  useEffect(() => {
+    if (googleFallback) return
+    let cancelled = false
+    const timers: number[] = []
+
+    async function mountGoogleButton() {
+      try {
+        nonceFetchRef.current ??= fetch('/auth/google', { cache: 'no-store' })
+          .then(res => {
+            if (!res.ok) throw new Error('nonce')
+            return res.json() as Promise<{ nonce: string }>
+          })
+          .then(data => data.nonce)
+        const nonce = await nonceFetchRef.current.catch((err: unknown) => {
+          nonceFetchRef.current = null // permite nova tentativa num próximo run
+          throw err
+        })
+
+        let gsiTimeout: number | undefined
+        await Promise.race([
+          loadGsiScript(),
+          new Promise<never>((_, reject) => {
+            gsiTimeout = window.setTimeout(() => reject(new Error('gsi timeout')), 10_000)
+            timers.push(gsiTimeout)
+          }),
+        ])
+        window.clearTimeout(gsiTimeout) // a race já venceu — sem rejection órfã aos 10s
+
+        const el = googleBtnRef.current
+        if (cancelled || !el || !window.google) return
+
+        window.google.accounts.id.initialize({
+          client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!,
+          ux_mode: 'redirect',
+          login_uri: `${window.location.origin}/auth/google`,
+          nonce,
+          use_fedcm_for_prompt: true,
+          itp_support: true,
+        })
+        if (googleReadyRef.current) {
+          // Re-render (troca de tema): volta o skeleton enquanto o novo iframe pinta
+          googleReadyRef.current = false
+          setGoogleReady(false)
+        }
+        el.innerHTML = ''
+        window.google.accounts.id.renderButton(el, {
+          type: 'standard',
+          theme: resolvedTheme === 'light' ? 'outline' : 'filled_black',
+          size: 'large',
+          text: 'continue_with',
+          shape: 'rectangular',
+          logo_alignment: 'left',
+          width: Math.min(el.offsetWidth || 380, 400),
+          locale: 'pt-BR',
+        })
+
+        // Só tira o skeleton quando o iframe do botão realmente pintar (em rede
+        // lenta o renderButton retorna com o iframe ainda vazio), com teto de 3s.
+        const markReady = () => {
+          if (cancelled) return
+          googleReadyRef.current = true
+          setGoogleReady(true)
+        }
+        const iframe = el.querySelector('iframe')
+        if (iframe) {
+          iframe.addEventListener('load', markReady, { once: true })
+          timers.push(window.setTimeout(markReady, 3000))
+        } else {
+          markReady()
+        }
+      } catch {
+        // Nunca rebaixar um botão que já funciona (ex.: refetch falhou na troca
+        // de tema) — o fallback expõe o domínio supabase.co no consent.
+        if (!cancelled && !googleReadyRef.current) setGoogleFallback(true)
+      }
+    }
+
+    mountGoogleButton()
+    return () => {
+      cancelled = true
+      timers.forEach(t => window.clearTimeout(t))
+    }
+  }, [googleFallback, resolvedTheme])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -242,29 +393,65 @@ function LoginForm() {
           <div style={{ flex: 1, height: '0.5px', background: 'var(--color-border)' }} />
         </div>
 
-        {/* Google button */}
-        <button
-          onClick={signInWithGoogle}
-          disabled={googleLoading}
-          onMouseEnter={() => setGoogleHovered(true)}
-          onMouseLeave={() => setGoogleHovered(false)}
-          style={{
-            width: '100%', marginBottom: 36,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
-            padding: '14px 24px',
-            background: googleHovered ? 'var(--color-surface-hover)' : 'var(--color-surface)',
-            border: `0.5px solid ${googleHovered ? 'var(--color-border-focus)' : 'var(--color-border-strong)'}`,
-            borderRadius: 10, fontSize: 14, fontWeight: 500, letterSpacing: '-0.01em',
-            color: googleLoading ? 'var(--color-text-tertiary)' : 'var(--color-text-primary)',
-            cursor: googleLoading ? 'default' : 'pointer',
-            transform: googleHovered && !googleLoading ? 'translateY(-1px)' : 'translateY(0)',
-            boxShadow: googleHovered && !googleLoading ? 'var(--shadow-md)' : 'none',
-            transition: 'all 0.2s ease',
-          }}
-        >
-          <GoogleIcon />
-          {googleLoading ? 'Redirecionando...' : 'Continuar com Google'}
-        </button>
+        {/* Google button — GIS oficial; fallback signInWithOAuth se GIS indisponível */}
+        {!googleFallback ? (
+          <div style={{ width: '100%', marginBottom: 20, minHeight: 44, position: 'relative' }}>
+            <div ref={googleBtnRef} style={{ display: 'flex', justifyContent: 'center' }} />
+            {!googleReady && (
+              <div style={{
+                position: 'absolute', inset: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
+                background: 'var(--color-surface)',
+                border: '0.5px solid var(--color-border-strong)',
+                borderRadius: 10, fontSize: 14, fontWeight: 500, letterSpacing: '-0.01em',
+                color: 'var(--color-text-tertiary)',
+                pointerEvents: 'none',
+              }}>
+                <GoogleIcon />
+                Continuar com Google
+              </div>
+            )}
+          </div>
+        ) : (
+          <button
+            onClick={signInWithGoogle}
+            disabled={googleLoading}
+            onMouseEnter={() => setGoogleHovered(true)}
+            onMouseLeave={() => setGoogleHovered(false)}
+            style={{
+              width: '100%', marginBottom: 20,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
+              padding: '14px 24px',
+              background: googleHovered ? 'var(--color-surface-hover)' : 'var(--color-surface)',
+              border: `0.5px solid ${googleHovered ? 'var(--color-border-focus)' : 'var(--color-border-strong)'}`,
+              borderRadius: 10, fontSize: 14, fontWeight: 500, letterSpacing: '-0.01em',
+              color: googleLoading ? 'var(--color-text-tertiary)' : 'var(--color-text-primary)',
+              cursor: googleLoading ? 'default' : 'pointer',
+              transform: googleHovered && !googleLoading ? 'translateY(-1px)' : 'translateY(0)',
+              boxShadow: googleHovered && !googleLoading ? 'var(--shadow-md)' : 'none',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <GoogleIcon />
+            {googleLoading ? 'Redirecionando...' : 'Continuar com Google'}
+          </button>
+        )}
+
+        {/* Aceite legal — vínculo de concordância no cadastro/login */}
+        <p style={{
+          fontSize: 11, color: 'var(--color-text-quaternary)',
+          textAlign: 'center', lineHeight: 1.6, letterSpacing: '-0.005em',
+          margin: '0 0 20px',
+        }}>
+          Ao continuar, você concorda com os{' '}
+          <a href="/termos" style={{ color: 'var(--color-text-tertiary)', textDecoration: 'underline', textUnderlineOffset: 2 }}>
+            Termos de Uso
+          </a>
+          {' '}e a{' '}
+          <a href="/privacidade" style={{ color: 'var(--color-text-tertiary)', textDecoration: 'underline', textUnderlineOffset: 2 }}>
+            Política de Privacidade
+          </a>.
+        </p>
 
         {/* Trust signals */}
         <div style={{

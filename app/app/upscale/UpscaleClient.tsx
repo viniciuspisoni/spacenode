@@ -13,6 +13,9 @@ import {
   type Scale,
   type ObjectiveId,
 } from '@/lib/upscale'
+import { uploadDirect } from '@/lib/storage/direct-upload-client'
+import { jsonOrNull, errMsg } from '@/lib/http/fetch-json'
+import { urlToFile } from '@/lib/http/url-to-file'
 
 // ── Tipagem da UI (labels sem nomes técnicos de modelo) ───────────────────────
 
@@ -108,14 +111,6 @@ const LOADING_TEXTS_ENHANCE = [
 ]
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-async function urlToFile(url: string): Promise<File> {
-  const res = await fetch(url)
-  if (!res.ok) throw new Error('Não foi possível importar a imagem')
-  const blob = await res.blob()
-  const ext = blob.type.split('/')[1] || 'jpg'
-  return new File([blob], `historico.${ext}`, { type: blob.type })
-}
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
@@ -355,25 +350,28 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
     setResultUrl(null)
     startLoadingTexts()
 
-    const formData = new FormData()
-    formData.append('image',  imageFile)
-    formData.append('tab',    tab)
-    formData.append('modeId', selectedModeId)
-    formData.append('scale',  selectedScale)
-    if (selectedObjective) formData.append('objectiveId', selectedObjective)
-    if (imageDimensions) {
-      formData.append('imageWidth',  String(imageDimensions.w))
-      formData.append('imageHeight', String(imageDimensions.h))
-    }
-
     try {
-      const res  = await fetch('/api/upscale', { method: 'POST', body: formData })
-      const data = await res.json()
-      if (!res.ok) { setError(data.error ?? 'Erro desconhecido'); return }
-      setResultUrl(data.url)
+      // Imagem sobe direto pro Storage (sem passar pela Vercel); a rota recebe a key.
+      const { key: sourceKey } = await uploadDirect(imageFile, 'upscale-source', {}, { confirm: false })
+
+      const res = await fetch('/api/upscale', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sourceKey,
+          tab,
+          modeId: selectedModeId,
+          scale:  selectedScale,
+          ...(selectedObjective ? { objectiveId: selectedObjective } : {}),
+          ...(imageDimensions ? { imageWidth: imageDimensions.w, imageHeight: imageDimensions.h } : {}),
+        }),
+      })
+      const data = await jsonOrNull(res)
+      if (!res.ok) { setError(errMsg(data, 'Erro desconhecido')); return }
+      setResultUrl(data?.url as string)
       setCredits(c => c - nodeCost)
-    } catch {
-      setError('Falha de conexão. Tente novamente.')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Falha de conexão. Tente novamente.')
     } finally {
       stopLoadingTexts()
       setIsLoading(false)

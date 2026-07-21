@@ -4,14 +4,16 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { rateLimit } from '@/lib/rate-limit'
 import { analyzeVideoReferenceImage } from '@/lib/video/analyzeReference'
+import { DIRECT_UPLOAD_AREAS, downloadDirectUpload } from '@/lib/storage/direct-upload'
 
 fal.config({ credentials: process.env.FAL_KEY })
 
 // Endpoint dedicado de análise da imagem do projeto para o módulo Animar.
-// - Faz upload da imagem pra fal.storage uma única vez.
-// - Chama analyzeVideoReferenceImage (que reusa o fidelity-engine).
-// - Devolve { inputUrl, analysis }. O cliente passa o inputUrl pro
-//   /api/video pra evitar segundo upload.
+// - Body JSON { sourceKey }: a imagem já subiu DIRETO pro Storage (uploadDirect,
+//   área animar-source — o binário não passa pela Vercel).
+// - Baixa o objeto, sobe pra fal.storage e chama analyzeVideoReferenceImage
+//   (que reusa o fidelity-engine).
+// - Devolve { inputUrl, analysis }.
 // - NÃO consome Nodes. NÃO persiste em renders.
 
 export async function POST(req: NextRequest) {
@@ -19,17 +21,25 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
-  const rl = await rateLimit(createAdminClient(), `video-analyze:${user.id}`, 60, 60)
+  const admin = createAdminClient()
+  const rl = await rateLimit(admin, `video-analyze:${user.id}`, 60, 60)
   if (!rl.allowed) return NextResponse.json({ error: 'Muitas requisições. Aguarde um momento.' }, { status: 429 })
 
   try {
-    const formData = await req.formData()
-    const imageFile = formData.get('image') as File | null
-    if (!imageFile) {
+    const body = await req.json().catch(() => null)
+    const sourceKey = typeof body?.sourceKey === 'string' ? body.sourceKey : ''
+    if (!sourceKey) {
       return NextResponse.json({ error: 'Imagem obrigatória' }, { status: 400 })
     }
 
-    const inputUrl = await fal.storage.upload(imageFile)
+    const src = await downloadDirectUpload(
+      admin, DIRECT_UPLOAD_AREAS['animar-source'], user.id, {}, sourceKey,
+    )
+    if (!src.ok) return NextResponse.json({ error: src.message }, { status: src.status })
+
+    const inputUrl = await fal.storage.upload(
+      new File([new Uint8Array(src.buffer)], sourceKey.split('/').pop() ?? 'source.jpg', { type: src.mime }),
+    )
     console.log('[video/analyze] inputUrl:', inputUrl)
 
     const analysis = await analyzeVideoReferenceImage(inputUrl)

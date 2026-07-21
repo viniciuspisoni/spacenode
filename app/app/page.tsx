@@ -3,26 +3,14 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { signRows } from '@/lib/storage/signed'
-import { getRenderTitle } from '@/lib/render-display'
 import { getPlanById, type PlanId } from '@/lib/plans'
+import { getPayerBalance } from '@/lib/workspaces/balance'
 import {
   IconGenerate, IconSpaces, IconRetocar, IconEnhance,
-  IconVideo, IconFinalizar, IconHumanizedPlan, IconIsometric, IconBoard, IconMoodboard,
+  IconVideo, IconFinalizar, IconHumanizedPlan, IconBlocos3D, IconIsometric, IconBoard, IconMoodboard,
 } from '@/components/app/sidebar-icons'
 import { getEnabledModules, type SidebarModule } from '@/lib/nav/modules-config'
-
-type RecentRender = {
-  id: string
-  output_url: string | null
-  input_url: string | null
-  ambient: string
-  style: string
-  lighting?: string | null
-  model?: string | null
-  cost_credits?: number | null
-  status?: string | null
-  created_at: string
-}
+import { RecentCard, type RecentRender } from './_components/RecentCard'
 
 type RecentSpace = {
   id: string
@@ -45,27 +33,6 @@ const monthStart = () => {
 const RECENT_LIMIT = 8
 const PROJECT_LIMIT = 3
 
-function renderTool(r: RecentRender): 'Renderizar' | 'Ampliar' | 'Animar' {
-  if (r.ambient === 'upscale') return 'Ampliar'
-  if (r.ambient === 'video')   return 'Animar'
-  return 'Renderizar'
-}
-
-function quality(nodes?: number | null): string | null {
-  if (nodes === 4)  return 'HD'
-  if (nodes === 8)  return '2K'
-  if (nodes === 20) return '4K'
-  return null
-}
-
-function buildFilename(r: RecentRender): string {
-  const base = (r.ambient || r.style || 'render')
-    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'render'
-  const url = r.output_url ?? ''
-  const ext = url.match(/\.(jpe?g|png|webp)(?:\?|$)/i)?.[1]?.toLowerCase() ?? 'jpg'
-  return `spacenode-${base}.${ext}`
-}
-
 const CATEGORY_LABEL: Record<string, string> = {
   residencial: 'Residencial',
   comercial:   'Comercial',
@@ -83,6 +50,7 @@ const MODULE_ICON: Record<SidebarModule['iconKey'], (p: { size?: number }) => Re
   video:         IconVideo,
   finalizar:     IconFinalizar,
   humanizedPlan: IconHumanizedPlan,
+  blocos3d:      IconBlocos3D,
   isometric:     IconIsometric,
   board:         IconBoard,
   moodboard:     IconMoodboard,
@@ -96,17 +64,20 @@ const MODULE_DESC: Record<string, string> = {
   animar:            'Vídeos de apresentação do projeto.',
   finalizar:         'Camadas, ajustes finais e exportação.',
   planta_humanizada: 'Humanize plantas com materiais reais.',
+  blocos_3d:         'Modelos 3D a partir de uma imagem.',
   isometricas:       'Vistas isométricas premium do projeto.',
   prancha_ia:        'Monte carrosséis e pranchas automaticamente.',
   moodboard:         'Atmosfera, paleta e referências em um só lugar.',
 }
 
 const MODULES: {
+  id: string
   href: string
   label: string
   desc: string
   Icon: (p: { size?: number }) => React.ReactElement
 }[] = getEnabledModules('criar').map((m) => ({
+  id: m.id,
   href: m.href,
   label: m.label,
   desc: MODULE_DESC[m.id] ?? '',
@@ -120,9 +91,10 @@ export default async function AppPage() {
 
   const firstName = (user.user_metadata.full_name ?? user.email ?? 'usuário').split(' ')[0]
 
-  const [profileResult, balanceResult, recentResult, countResult, monthResult, spacesResult] = await Promise.all([
-    supabase.from('profiles').select('plan').eq('id', user.id).single(),
-    supabase.from('user_node_balance').select('plan_balance, lumen_balance').eq('user_id', user.id).single(),
+  const admin = createAdminClient()
+  const [payerBalance, recentResult, countResult, monthResult, spacesResult] = await Promise.all([
+    // Saldo/plano da bolsa (dono do workspace) — é dele que a geração debita.
+    getPayerBalance(admin, user.id),
     supabase.from('renders')
       .select('id, output_url, input_url, ambient, style, lighting, model, cost_credits, status, created_at')
       .eq('user_id', user.id)
@@ -142,17 +114,16 @@ export default async function AppPage() {
       .limit(PROJECT_LIMIT),
   ])
 
-  const planId       = (profileResult.data?.plan as PlanId | undefined) ?? 'free'
+  const planId       = (payerBalance.planId as PlanId) ?? 'free'
   const plan         = getPlanById(planId)
   const planName     = plan?.name ?? 'Beta'
   const planTotal    = plan?.nodes ?? 0
-  const planBalance  = balanceResult.data?.plan_balance ?? 0
-  const lumenBalance = balanceResult.data?.lumen_balance ?? 0
+  const planBalance  = payerBalance.planBalance
+  const lumenBalance = payerBalance.lumenBalance
   const availableNodes = planBalance + lumenBalance
 
   // Assina URLs de Storage (space-mestres) antes de passar pro client (bucket
   // privado após o flip). Renders são FAL hoje → no-op, mas embrulhamos igual.
-  const admin        = createAdminClient()
   const renders      = (await signRows(admin, recentResult.data ?? [], ['output_url', 'input_url'])) as RecentRender[]
   const totalRenders = countResult.count ?? 0
   const monthRenders = monthResult.count ?? 0
@@ -188,7 +159,7 @@ export default async function AppPage() {
         {spaces.length === 0 ? (
           <StartBlock />
         ) : (
-          <section>
+          <section data-tour="projetos">
             <div className="spn-dash-section-head">
               <div className="spn-dash-section-label">Continuar de onde parou</div>
               <Link href="/app/spaces" className="spn-dash-section-link">Todos os projetos →</Link>
@@ -208,7 +179,7 @@ export default async function AppPage() {
 
         {/* ── 3 · Métricas discretas ────────────────────────────────────────── */}
         <div className="spn-dash-stats-row">
-          <div className="spn-dash-stat" style={lowNodes ? { boxShadow: 'inset 0 2px 0 var(--color-error-border)' } : undefined}>
+          <div className="spn-dash-stat" data-tour="nodes" style={lowNodes ? { boxShadow: 'inset 0 2px 0 var(--color-error-border)' } : undefined}>
             <div className="spn-dash-stat-label">Nodes disponíveis</div>
             <div className="spn-dash-stat-value" style={lowNodes ? { color: 'var(--color-error)' } : undefined}>
               {availableNodes}
@@ -264,13 +235,18 @@ export default async function AppPage() {
         </div>
 
         {/* ── 4 · Módulos do atelier ────────────────────────────────────────── */}
-        <section>
+        <section data-tour="criar">
           <div className="spn-dash-section-head">
             <div className="spn-dash-section-label">Ferramentas</div>
           </div>
           <div className="spn-dash-modules">
             {MODULES.map(m => (
-              <Link key={m.href} href={m.href} className="spn-dash-module">
+              <Link
+                key={m.href}
+                href={m.href}
+                className="spn-dash-module"
+                data-tour={m.id === 'planta_humanizada' ? 'apresentar' : undefined}
+              >
                 <div
                   className="spn-dash-module-icon"
                   style={{ background: 'var(--color-surface)', color: 'var(--color-text-secondary)' }}
@@ -287,7 +263,7 @@ export default async function AppPage() {
         </section>
 
         {/* ── 5 · Imagens recentes ──────────────────────────────────────────── */}
-        <section>
+        <section data-tour="historico">
           <div className="spn-dash-section-head">
             <div className="spn-dash-section-label">Recentes</div>
             {totalRenders > 0 && (
@@ -327,7 +303,7 @@ export default async function AppPage() {
 
 function StartBlock() {
   return (
-    <section className="spn-dash-start">
+    <section className="spn-dash-start" data-tour="projetos">
       <h2 className="spn-dash-start-title">Comece seu primeiro projeto</h2>
       <p className="spn-dash-start-sub">
         Envie um print, modelo, planta ou referência para gerar a primeira visualização.
@@ -399,64 +375,5 @@ function ProjectCard({ space: s }: { space: RecentSpace }) {
   )
 }
 
-// ── Recent card ────────────────────────────────────────────────────────────────
-
-function RecentCard({ render: r }: { render: RecentRender }) {
-  const isVideo   = r.ambient === 'video'
-  const isUpscale = r.ambient === 'upscale'
-  const display   = isVideo ? (r.input_url ?? r.output_url) : (r.output_url ?? r.input_url)
-  const tool      = renderTool(r)
-  const q         = isUpscale || isVideo ? null : quality(r.cost_credits)
-  const reusable  = !isVideo && !isUpscale && !!r.output_url
-  const out       = r.output_url ?? ''
-
-  return (
-    <div className="spn-dash-recent-card">
-      <div className="spn-dash-recent-thumb">
-        {display && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={display} alt={getRenderTitle(r)} />
-        )}
-        <div className="spn-dash-recent-tags">
-          <span className="spn-dash-recent-tag">{tool}</span>
-          {q && <span className="spn-dash-recent-tag spn-dash-recent-tag--muted">{q}</span>}
-        </div>
-        {isVideo && (
-          <div className="spn-dash-recent-play" aria-hidden>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="white" style={{ marginLeft: 2 }}>
-              <polygon points="5 3 19 12 5 21 5 3"/>
-            </svg>
-          </div>
-        )}
-        {display && (
-          <div className="spn-dash-recent-actions">
-            <a className="spn-dash-recent-act spn-dash-recent-act--primary" href={display} target="_blank" rel="noopener noreferrer">
-              Abrir
-            </a>
-            {reusable && (
-              <Link className="spn-dash-recent-act" href={`/app/generate?source=${encodeURIComponent(out)}`} title="Reutilizar">
-                Reutilizar
-              </Link>
-            )}
-            {reusable && (
-              <Link className="spn-dash-recent-act" href={`/app/upscale?source=${encodeURIComponent(out)}`} title="Ampliar">
-                Ampliar
-              </Link>
-            )}
-            {r.output_url && (
-              <a className="spn-dash-recent-act spn-dash-recent-act--icon" href={`/api/download?url=${encodeURIComponent(r.output_url)}&filename=${encodeURIComponent(buildFilename(r))}`} title="Baixar" aria-label="Baixar">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
-                </svg>
-              </a>
-            )}
-          </div>
-        )}
-      </div>
-      <div className="spn-dash-recent-meta">
-        <div className="spn-dash-recent-title">{getRenderTitle(r)}</div>
-        <div className="spn-dash-recent-date">{formatDate(r.created_at)}</div>
-      </div>
-    </div>
-  )
-}
+// Card de "Recentes" extraído pra ./_components/RecentCard (client component —
+// o "Ver detalhes" abre o painel de detalhes da geração, o mesmo do Histórico).

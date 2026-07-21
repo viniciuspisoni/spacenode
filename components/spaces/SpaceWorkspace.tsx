@@ -18,6 +18,7 @@ import { EixosPanel } from './EixosPanel'
 import { VistasGrid } from './VistasGrid'
 import { SynapticLoading } from './SynapticLoading'
 import { BatchProgressOverlay } from './BatchProgressOverlay'
+import { TrocarVistaMestreModal } from './TrocarVistaMestreModal'
 import type { SketchPayload } from './SketchGuidedEixoBody'
 
 interface Props {
@@ -26,6 +27,8 @@ interface Props {
   initialBalance: number
   identity:       ArchitectIdentity | null
   planId:         PlanId
+  /** Saldo vem de um workspace — compras são do dono, não do membro. */
+  pooled:         boolean
 }
 
 interface GenerateMeta {
@@ -45,7 +48,7 @@ interface ToastState {
   message: string
 }
 
-export function SpaceWorkspace({ space, initialVistas, initialBalance, planId }: Props) {
+export function SpaceWorkspace({ space, initialVistas, initialBalance, planId, pooled }: Props) {
   const router = useRouter()
   const [vistas, setVistas]       = useState<Vista[]>(initialVistas)
   const [balance, setBalance]     = useState<number>(initialBalance)
@@ -53,12 +56,23 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId }:
   const [batchMeta, setBatchMeta] = useState<BatchMeta | null>(null)
   const [toast, setToast]         = useState<ToastState | null>(null)
   const [error, setError]         = useState<string | null>(null)
+  const [showTrocarMestre, setShowTrocarMestre] = useState(false)
 
   const isLocked = space.status === 'locked'
   const dna      = getVisualDna(space.dna)
   // Contexto pra adaptar os cards do eixo Detalhe (corporativo / residencial /
   // exterior / default), a partir da categoria + briefing arquitetônico.
   const detalheContext = detalheContextFor(space.category, getBriefingFromDna(space.dna))
+
+  // Multi-DNA: vistas com DNA próprio extraído viram referências selecionáveis
+  // no painel de geração (a Vista Mestre segue sendo o default). A vista que
+  // JÁ é a mestre atual sai da lista (senão apareceria duplicada no seletor).
+  const dnaReferences = vistas
+    .filter(v => v.status === 'completed' && !!v.image_url && !!v.dna)
+    .filter(v => v.id !== space.vista_mestre_vista_id)
+    .map(v => ({ id: v.id, image_url: v.image_url!, label: v.axis_label ?? 'Vista' }))
+
+  const hasCompletedVistas = vistas.some(v => v.status === 'completed' && !!v.image_url)
 
   function showToast(t: ToastState) {
     setToast(t)
@@ -67,7 +81,7 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId }:
 
   // ── Geração paramétrica (Iluminação etc.) ──────────────────
 
-  async function handleGenerate(axis: Axis, axisValues: string[], quality: Quality) {
+  async function handleGenerate(axis: Axis, axisValues: string[], quality: Quality, referenceVistaId: string | null) {
     setError(null)
     const costPer = getVistaGenerationCost(space.engine, quality)
     const total   = costPer * axisValues.length
@@ -77,7 +91,12 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId }:
       const res = await fetch(`/api/spaces/${space.id}/generate`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ axis, axis_values: axisValues, quality }),
+        body:    JSON.stringify({
+          axis,
+          axis_values: axisValues,
+          quality,
+          ...(referenceVistaId ? { reference_vista_id: referenceVistaId } : {}),
+        }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -123,7 +142,7 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId }:
 
   // ── Geração em batch a partir de sketches (Ângulo) ─────────
 
-  async function handleGenerateFromSketches(sketches: SketchPayload[], quality: Quality) {
+  async function handleGenerateFromSketches(sketches: SketchPayload[], quality: Quality, referenceVistaId: string | null) {
     setError(null)
     const costPer = getVistaGenerationCost(space.engine, quality)
     const total   = costPer * sketches.length
@@ -133,7 +152,11 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId }:
       const res = await fetch(`/api/spaces/${space.id}/generate-from-sketches`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ sketches, quality }),
+        body:    JSON.stringify({
+          sketches,
+          quality,
+          ...(referenceVistaId ? { reference_vista_id: referenceVistaId } : {}),
+        }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -303,18 +326,24 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId }:
             }}>
               vista mestre
             </div>
-            {/* Placeholder — troca de Vista Mestre ainda não tem backend
-                (exigiria re-extração de DNA); ação preparada, desabilitada. */}
+            {/* Promove uma vista gerada a nova Vista Mestre (imagem + DNA);
+                a mestre atual vai pro histórico do Space. Requer ao menos uma
+                vista concluída pra ter o que promover. */}
             <button
               type="button"
-              disabled
-              title="Em breve — trocar a Vista Mestre vai re-extrair o DNA do projeto"
+              disabled={!hasCompletedVistas}
+              onClick={() => hasCompletedVistas && setShowTrocarMestre(true)}
+              title={hasCompletedVistas
+                ? 'Promover uma vista gerada a nova Vista Mestre do projeto'
+                : 'Gere vistas primeiro — a troca promove uma vista existente'}
               style={{
                 position: 'absolute', top: 14, right: 14,
                 fontSize: 10, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase',
-                color: 'rgba(255,255,255,0.55)', background: 'rgba(0,0,0,0.5)',
+                color: hasCompletedVistas ? '#fff' : 'rgba(255,255,255,0.55)',
+                background: 'rgba(0,0,0,0.5)',
                 backdropFilter: 'blur(8px)', border: '0.5px solid rgba(255,255,255,0.14)',
-                padding: '5px 10px', borderRadius: 4, cursor: 'not-allowed',
+                padding: '5px 10px', borderRadius: 4,
+                cursor: hasCompletedVistas ? 'pointer' : 'not-allowed',
               }}
             >
               Trocar Vista Mestre
@@ -347,8 +376,11 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId }:
               defaultQuality={space.engine === 'pulsar' ? 'hd' : '2k'}
               balance={balance}
               planId={planId}
+              pooled={pooled}
               spaceId={space.id}
               detalheContext={detalheContext}
+              vistaMestreUrl={space.vista_mestre_url}
+              references={dnaReferences}
               onGenerate={handleGenerate}
               onGenerateFromSketches={handleGenerateFromSketches}
             />
@@ -403,6 +435,22 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId }:
           totalNodes={batchMeta.total}
           engine={space.engine}
           quality={batchMeta.quality}
+        />
+      )}
+
+      {showTrocarMestre && (
+        <TrocarVistaMestreModal
+          spaceId={space.id}
+          currentMestreId={space.vista_mestre_vista_id ?? null}
+          vistas={vistas}
+          balance={balance}
+          onBalanceSpent={nodes => setBalance(b => b - nodes)}
+          onPromoted={() => {
+            setShowTrocarMestre(false)
+            showToast({ type: 'success', message: 'Vista Mestre trocada — a anterior ficou no histórico do projeto.' })
+            router.refresh()
+          }}
+          onClose={() => setShowTrocarMestre(false)}
         />
       )}
 
