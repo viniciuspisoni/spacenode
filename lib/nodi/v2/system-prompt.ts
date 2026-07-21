@@ -36,6 +36,7 @@ export function wrapUntrusted(label: string, payload: string): string {
 /** Bloco de comportamento do modo de autonomia (V4), anexado ao system prompt. */
 export function modeBlock(mode: 'consultor' | 'copiloto' | 'autopiloto'): string {
   const common =
+    '\n\nAÇÃO NO MESMO TURNO: se você oferecer uma ação ("posso te direcionar", "posso preparar"), chame propor_acao NESTE turno — o painel mostra o botão de confirmar. NUNCA prometa executar num turno futuro: sem a proposta emitida, o "sim" do usuário não tem o que confirmar. Para navegar, use module_id (a rota é resolvida sozinha).' +
     '\n\nMEMÓRIA E CONTEXTO: NUNCA pergunte algo que o contexto da sessão, a memória do projeto ou o histórico já respondem — consulte as tools primeiro. Considere estilo, materiais, iluminação, elementos travados, decisões aprovadas e o Plano do Projeto (consultar_memoria_projeto) antes de recomendar. Estruture recomendações como: o que identifiquei → ação recomendada → por quê → custo em nodes → precisa de aprovação?'
   switch (mode) {
     case 'consultor':
