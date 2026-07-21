@@ -344,10 +344,12 @@ export default function Sidebar({
 
       {/* User com anel de consumo */}
       <div style={{
-        padding: expanded ? '10px 10px 12px' : '10px 8px 12px',
+        padding: expanded ? '10px 10px 12px' : '10px 0 12px',
         borderTop: '0.5px solid var(--color-border)',
         flexShrink: 0,
         position: 'relative',
+        display: 'flex',
+        justifyContent: 'center',
       }}>
         <AvatarComConsumo
           userName={userName}
