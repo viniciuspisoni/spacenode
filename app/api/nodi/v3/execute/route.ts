@@ -12,8 +12,11 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { rateLimit } from '@/lib/rate-limit'
 import { isNodiEnabled } from '@/lib/nodi/flags'
-import { isNodiV2EnabledFor, isNodiV3ExecuteEnabled } from '@/lib/nodi/v2/flags'
+import { isNodiMultimodalEnabled, isNodiV2EnabledFor, isNodiV3ExecuteEnabled } from '@/lib/nodi/v2/flags'
 import { verifyIntent } from '@/lib/nodi/v3/intents'
+import { executeRenderIntent } from '@/lib/nodi/v4/executor'
+import { runAutoReview } from '@/lib/nodi/v4/review'
+import { readSettings } from '@/lib/nodi/v4/settings'
 import { logNodiEvent } from '@/lib/nodi/telemetry'
 
 export const maxDuration = 300 // a geração roda dentro deste request (como no /api/generate)
@@ -46,48 +49,41 @@ export async function POST(req: Request) {
     )
   }
 
-  // Chamada interna com a sessão do usuário (cookies do request repassados).
-  const origin = new URL(req.url).origin
-  const upstream = await fetch(`${origin}/api/generate`, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      cookie: req.headers.get('cookie') ?? '',
-    },
-    body: JSON.stringify({
-      inputUrl: intent.params.inputUrl,
-      anchorUrl: intent.params.anchorUrl,
-      projectType: intent.params.projectType,
-      engine: intent.params.engine,
-      resolution: intent.params.resolution,
-      refinementText: intent.params.refinementText,
-    }),
-  }).catch(() => null)
+  // Executor compartilhado (mesma mecânica do autopiloto): chamada interna
+  // com a sessão do usuário — débito/estorno/histórico do pipeline existente.
+  const result = await executeRenderIntent(new URL(req.url).origin, req.headers.get('cookie') ?? '', intent)
 
-  if (!upstream) {
-    return NextResponse.json({ error: 'Não consegui falar com o gerador agora. Nada foi debitado.' }, { status: 502 })
-  }
-
-  const payload = await upstream.json().catch(() => null) as
-    | { outputUrl?: string; renderRecord?: { id?: string }; error?: string; message?: string }
-    | null
-
-  if (!upstream.ok || !payload?.outputUrl) {
-    // o /api/generate já estorna em falha pós-débito; só repassamos a mensagem amigável
-    const error = payload?.message ?? payload?.error ?? 'A geração falhou. Se houve débito, os nodes foram estornados.'
+  if (!result.ok || !result.outputUrl) {
     void logNodiEvent(admin, { userId: user.id, event: 'v3_executed', meta: { kind: 'render', count: 0 } })
-    return NextResponse.json({ error }, { status: upstream.status >= 400 && upstream.status < 500 ? upstream.status : 502 })
+    return NextResponse.json({ error: result.error }, { status: result.status ?? 502 })
   }
 
   void logNodiEvent(admin, {
     userId: user.id,
     event: 'v3_executed',
-    meta: { kind: 'render', cost: intent.cost, count: 1 },
+    meta: { kind: 'render', cost: intent.cost, auto: false, count: 1 },
   })
 
+  // V4: avaliação visual automática (original × resultado) + decisão — não
+  // bloqueia o sucesso da execução se falhar.
+  let review: { summary: string; decision: string; reason: string; findings: unknown[] } | null = null
+  const settings = await readSettings(supabase, user.id)
+  if (settings.autoReview && isNodiMultimodalEnabled()) {
+    const r = await runAutoReview(intent.params.inputUrl, result.outputUrl, 30_000)
+    if (r) {
+      review = {
+        summary: r.report.summary,
+        decision: r.outcome.decision,
+        reason: r.outcome.reason,
+        findings: r.report.findings,
+      }
+    }
+  }
+
   return NextResponse.json({
-    outputUrl: payload.outputUrl,
-    renderId: payload.renderRecord?.id ?? null,
+    outputUrl: result.outputUrl,
+    renderId: result.renderId ?? null,
     cost: intent.cost,
+    review,
   })
 }
