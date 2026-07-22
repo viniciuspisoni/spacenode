@@ -1,0 +1,318 @@
+// lib/spaces/generation.ts
+//
+// Executor de UMA vista do Spaces — pipeline único compartilhado pelas rotas
+// de geração (generate e generate-from-sketches). Cada vista é uma transação
+// independente:
+//
+//   débito (consume_workspace_nodes)
+//     → row pendente em `vistas` com a provenance COMPLETA das referências
+//     → prompt único (lib/spaces/reference-prompt) com papéis explícitos
+//     → chamada ao provider (image_urls: [#1 geometria, #2 identidade?])
+//     → validação do output contra a REFERÊNCIA GEOMÉTRICA (aspecto + visão)
+//     → update pra completed (metadados + resultado das validações)
+//   refund best-effort + row 'failed' em qualquer erro pós-débito.
+//
+// Princípios do fluxo Referência → Ação → Gerar:
+//   - A referência geométrica escolhida é SEMPRE a Image #1 (âncora dos
+//     motores de edição). A Vista Mestre nunca sobrescreve a geometria dela.
+//   - A validação pós-geração compara com a referência geométrica — não com a
+//     Vista Mestre — porque é o enquadramento DELA que precisa sobreviver.
+//   - Logs registram a origem de cada referência e os parâmetros enviados.
+
+import type { createAdminClient } from '@/lib/supabase/admin'
+import { refundNodes } from '@/lib/billing/refund-nodes'
+import type { EngineId, Resolution } from '@/lib/engines'
+import type { BriefingArquitetonico } from '@/lib/prompts'
+import type { Axis, GenerationAction, ProjectDNA, Space } from './types'
+import {
+  levelForGeneration, modeForAction, modeAllowsCloserCrop,
+  type SpacesMode, type SpacesPreservationLevel,
+} from './preservation'
+import { imageUrlsFor, hasIdentityImage, type ReferenceSet } from './references'
+import { buildGenerationPrompt } from './reference-prompt'
+import { aspectRatioLabel, type SourceMeta } from './source-meta'
+import { validateGeneration, checkArchitecturalPreservation } from './preserve-validate'
+import { visionPreservationCheckEnabled } from './preserve-flags'
+import { generateImage } from '@/lib/ai/image-provider'
+
+// Timeout da chamada ao provider por motor (espelha o /api/generate do
+// Renderizar). Vega (Nano Banana Pro) e Quasar (GPT Image 2) passam de 90s com
+// frequência; Pulsar (Nano Banana 2) é rápido.
+export const FAL_TIMEOUT_MS: Record<EngineId, number> = {
+  vega:   180_000,
+  pulsar:  90_000,
+  quasar: 180_000,
+}
+
+// Params do provider por engine (espelha generate.ts do Renderizar).
+export function falParamsForEngine(engine: EngineId, q: Resolution): Record<string, unknown> {
+  if (engine === 'quasar') {
+    return {
+      quality:       q === '4k' ? 'high' : 'medium',
+      image_size:    'auto',
+      num_images:    1,
+      output_format: 'jpeg',
+    }
+  }
+  const map: Record<Resolution, string> = { hd: '1K', '2k': '2K', '4k': '4K' }
+  return { resolution: map[q], num_images: 1, output_format: 'jpeg' }
+}
+
+// Eixo persistido (vistas.axis) por ação — mantém filtros/verify-dna/histórico
+// coerentes com as gerações antigas ('angulo' segue sendo "nova vista").
+export function axisForAction(action: GenerationAction): Axis {
+  if (action === 'nova_vista') return 'angulo'
+  if (action === 'luz')        return 'iluminacao'
+  if (action === 'material')   return 'material'
+  return 'detalhe'
+}
+
+export interface VistaGenerationArgs {
+  admin:           ReturnType<typeof createAdminClient>
+  userId:          string
+  space:           Space
+  action:          GenerationAction
+  refs:            ReferenceSet
+  /** Slug do card/direção (vistas.axis_value). Null para print sem direção. */
+  axisValue:       string | null
+  /** Rótulo exibido no histórico (card, direção ou nome do print). */
+  axisLabel:       string
+  /** Modificador em inglês da opção escolhida (vazio quando não se aplica). */
+  userIntent:      string
+  /** Instrução livre do usuário (direção personalizada / pedido de material). */
+  userInstruction: string | null
+  engine:          EngineId
+  quality:         Resolution
+  costPerVista:    number
+  falEndpoint:     string
+  /** Provenance da referência geométrica (dimensões/aspect/hash). */
+  sourceMeta:      SourceMeta | null
+  dna:             ProjectDNA | null
+  briefing:        BriefingArquitetonico | null
+  /** Agrupa vistas geradas no mesmo lote (prints múltiplos). */
+  batchId?:        string | null
+  /** Contexto pros logs ('spaces.generate' | 'spaces.sketches'). */
+  logContext:      string
+}
+
+export async function generateVista(args: VistaGenerationArgs) {
+  const {
+    admin, userId, space, action, refs, axisValue, axisLabel,
+    userIntent, userInstruction, engine, quality, costPerVista, falEndpoint,
+    sourceMeta, dna, briefing, batchId, logContext,
+  } = args
+
+  const axis  = axisForAction(action)
+  const mode:  SpacesMode              = modeForAction(action)
+  const level: SpacesPreservationLevel = levelForGeneration(action, refs.geometry.kind)
+  const dualImage    = hasIdentityImage(refs)
+  const cropExpected = modeAllowsCloserCrop(mode)
+  const cameraMoves  = action === 'nova_vista' && refs.geometry.kind !== 'print'
+
+  let debited = false
+  let vistaId: string | null = null
+
+  try {
+    // 1) débito
+    const { error: debitErr } = await admin.rpc('consume_workspace_nodes', {
+      user_id_input: userId,
+      amount:        costPerVista,
+    })
+    if (debitErr) {
+      if (debitErr.code === 'P0001') throw new Error('insufficient_balance')
+      throw new Error('debit_failed: ' + debitErr.message)
+    }
+    debited = true
+
+    // 2) row pendente — provenance completa desde já (audita até falhas)
+    const insertRow: Record<string, unknown> = {
+      space_id:            space.id,
+      user_id:             userId,
+      status:              'processing',
+      engine,
+      quality,
+      axis,
+      axis_value:          axisValue,
+      axis_label:          axisLabel,
+      nodes_cost:          costPerVista,
+      spaces_mode:         mode,
+      preservation_level:  level,
+      provider:            'fal',
+      model:               falEndpoint,
+      // Referência GEOMÉTRICA (a autoridade desta geração)
+      reference_kind:      refs.geometry.kind,
+      source_image_url:    sourceMeta?.url ?? refs.geometry.url,
+      source_width:        sourceMeta?.width ?? null,
+      source_height:       sourceMeta?.height ?? null,
+      source_aspect_ratio: sourceMeta?.aspectRatio ?? null,
+      source_hash:         sourceMeta?.hash ?? null,
+      // Referência de IDENTIDADE (quando difere da geométrica)
+      identity_image_url:  dualImage ? refs.identity.imageUrl : null,
+      // Instrução livre do usuário
+      user_instruction:    userInstruction,
+    }
+    // Provenance da vista do Space envolvida na geração: como GEOMETRIA
+    // (kind='vista') ou como IDENTIDADE (multi-DNA legado). O verify-dna usa
+    // esta coluna pra comparar contra o DNA certo.
+    const provenanceVistaId =
+      (refs.geometry.kind === 'vista' ? refs.geometry.vistaId : null)
+      ?? refs.identity.vistaId ?? null
+    if (provenanceVistaId) {
+      insertRow.reference_vista_id = provenanceVistaId
+    }
+    if (refs.geometry.kind === 'print') {
+      insertRow.source_sketch_url = refs.geometry.url // coluna legada do eixo Ângulo
+    }
+    if (batchId) insertRow.batch_id = batchId
+
+    const { data: row, error: insErr } = await admin
+      .from('vistas')
+      .insert(insertRow)
+      .select('id')
+      .single()
+    if (insErr || !row) throw new Error('insert_failed: ' + (insErr?.message ?? '?'))
+    vistaId = row.id as string
+
+    // 3) Prompt único com papéis explícitos
+    const finalPrompt = buildGenerationPrompt({
+      action,
+      refKind:          refs.geometry.kind,
+      hasIdentityImage: dualImage,
+      userIntent,
+      userInstruction,
+      referenceLabel:   refs.geometry.label ?? null,
+      briefing,
+      dna,
+      quality,
+    })
+
+    // 4) Provider — Image #1 = geometria (sempre primeiro), #2 = identidade.
+    const imageUrls = imageUrlsFor(refs)
+    const falInput = {
+      prompt:     finalPrompt,
+      image_urls: imageUrls,
+      ...falParamsForEngine(engine, quality),
+    }
+
+    console.log(`[${logContext}] ação            :`, action, `(${mode}/${level})`)
+    console.log(`[${logContext}] ref geométrica  :`, refs.geometry.kind, '→', refs.geometry.url,
+      refs.geometry.label ? `(label "${refs.geometry.label}")` : '')
+    console.log(`[${logContext}] ref identidade  :`, dualImage
+      ? `${refs.identity.source} → ${refs.identity.imageUrl}`
+      : 'mesma imagem da geométrica (single-image)')
+    if (userInstruction) {
+      console.log(`[${logContext}] instrução user  :`, userInstruction)
+    }
+    console.log(`[${logContext}] engine/quality  :`, engine, '→', falEndpoint, '·', quality, '·', costPerVista, 'nodes')
+    console.log(`[${logContext}] image_urls      :`, imageUrls.length === 2 ? '[#1 geometria, #2 identidade]' : '[#1 geometria=identidade]')
+    console.log(`[${logContext}] prompt          :`, finalPrompt)
+
+    const gen = await generateImage({
+      falEndpoint,
+      falInput,
+      timeoutMs: FAL_TIMEOUT_MS[engine],
+      context:   logContext,
+      deliver:   { kind: 'url', userId, area: 'vistas' },
+    })
+    const outputUrl = gen.images[0]?.url
+    if (!outputUrl) throw new Error('provider_no_output')
+    const genW = gen.images[0]?.width  ?? null
+    const genH = gen.images[0]?.height ?? null
+
+    // 5) Validação contra a REFERÊNCIA GEOMÉTRICA — enquadramento/estrutura
+    // precisam sobreviver à geração. Nova Vista (câmera se move) e Detalhe
+    // (crop) mudam o enquadramento por design; nesses casos só a checagem de
+    // visão avalia (com a regra certa pro caso).
+    const genAspect = genW && genH ? genW / genH : null
+    const validation = validateGeneration({
+      sourceUrl:          sourceMeta?.url ?? refs.geometry.url,
+      generatedUrl:       outputUrl,
+      sourceAspect:       sourceMeta?.aspectRatio ?? null,
+      generatedAspect:    genAspect,
+      allowFramingChange: cropExpected || cameraMoves,
+    })
+    if (validation.issues.length) {
+      console.warn(`[${logContext}] validação estrutural:`, validation.issues.join(', '))
+    }
+    let preservationWarning = !validation.ok
+
+    let check: Awaited<ReturnType<typeof checkArchitecturalPreservation>> = null
+    if (visionPreservationCheckEnabled()) {
+      check = await checkArchitecturalPreservation(
+        sourceMeta?.url ?? refs.geometry.url, outputUrl, level,
+        { cropExpected },
+      )
+      if (check?.warning) preservationWarning = true
+      if (check) {
+        console.log(`[${logContext}] checagem visão  : preserved=${check.preserved} score=${check.score}${check.notes ? ` — ${check.notes}` : ''}`)
+      }
+    }
+
+    // 6) Persistir completed (provider/modelo REAIS — a row pendente registrou
+    // a intenção; aqui gravamos quem gerou de fato, gcp ou fal via fallback).
+    const completedAt = new Date().toISOString()
+    const updateRow: Record<string, unknown> = {
+      image_url:            outputUrl,
+      prompt:               finalPrompt,
+      fal_request_id:       gen.requestId,
+      provider:             gen.provider,
+      model:                gen.providerModel,
+      generated_width:      genW,
+      generated_height:     genH,
+      aspect_ratio:         aspectRatioLabel(genAspect) ?? aspectRatioLabel(sourceMeta?.aspectRatio ?? null),
+      preservation_warning: preservationWarning,
+      preservation_check:   check,
+      status:               'completed',
+      completed_at:         completedAt,
+    }
+    const { error: updErr } = await admin
+      .from('vistas')
+      .update(updateRow)
+      .eq('id', vistaId)
+    if (updErr) {
+      console.error(`[${logContext}] DB update FALHOU (imagem ok, persistência não):`, updErr)
+    }
+
+    return {
+      id:                   vistaId,
+      space_id:             space.id,
+      image_url:            outputUrl,
+      engine,
+      quality,
+      axis,
+      axis_value:           axisValue,
+      axis_label:           axisLabel,
+      nodes_cost:           costPerVista,
+      status:               'completed',
+      // A UI faz prepend deste objeto na grade — sem created_at o card mostra
+      // "NaNd". created_at real é o DEFAULT do banco; o carimbo aqui é
+      // display-only e é substituído no próximo fetch server-side.
+      created_at:           completedAt,
+      completed_at:         completedAt,
+      spaces_mode:          mode,
+      preservation_level:   level,
+      reference_kind:       refs.geometry.kind,
+      reference_vista_id:   provenanceVistaId,
+      source_image_url:     sourceMeta?.url ?? refs.geometry.url,
+      source_sketch_url:    refs.geometry.kind === 'print' ? refs.geometry.url : null,
+      identity_image_url:   dualImage ? refs.identity.imageUrl : null,
+      user_instruction:     userInstruction,
+      source_aspect_ratio:  sourceMeta?.aspectRatio ?? null,
+      aspect_ratio:         updateRow.aspect_ratio as string | null,
+      preservation_warning: preservationWarning,
+      preservation_check:   check,
+      batch_id:             batchId ?? null,
+    }
+  } catch (err) {
+    if (debited) {
+      await refundNodes(admin, userId, costPerVista, { module: 'spaces/generate', jobTable: 'vistas' })
+    }
+    if (vistaId) {
+      await admin
+        .from('vistas')
+        .update({ status: 'failed', error_message: (err as Error).message })
+        .eq('id', vistaId)
+    }
+    throw err
+  }
+}

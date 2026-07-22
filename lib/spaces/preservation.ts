@@ -9,7 +9,7 @@
 // a ação é "nova vista do mesmo projeto" (eixo Ângulo). CONTROLLED_EXPLORATION
 // nunca é padrão — fica reservado a um modo explicitamente experimental.
 
-import type { Axis } from './types'
+import type { Axis, GenerationAction, ReferenceKind } from './types'
 
 export type SpacesPreservationLevel =
   | 'STRICT_SOURCE_LOCK'
@@ -73,6 +73,7 @@ const AXIS_MODE: Record<Axis, SpacesMode> = {
   angulo:     'camera',
   horario:    'clima',
   detalhe:    'detalhe',
+  material:   'material',
 }
 
 export function modeForAxis(axis: Axis): SpacesMode {
@@ -94,6 +95,34 @@ export function modeAllowsCloserCrop(mode: SpacesMode): boolean {
 
 export function levelForAxis(axis: Axis): SpacesPreservationLevel {
   return levelForMode(modeForAxis(axis))
+}
+
+// ── Nível por AÇÃO × REFERÊNCIA (fluxo Referência → Ação → Gerar) ─
+//
+// O nível descreve o quanto o output pode se afastar da REFERÊNCIA GEOMÉTRICA
+// selecionada — não da Vista Mestre. Por isso ele depende dos dois:
+//
+//   - nova_vista + novo print       → STRICT: o print É a nova vista; câmera,
+//     enquadramento e geometria DELE são lei (a "novidade" é em relação ao
+//     projeto, não à referência).
+//   - nova_vista + mestre/histórico → ARCH: a câmera se move a partir da
+//     referência; arquitetura/materiais/DNA continuam travados.
+//   - luz / material / detalhe      → STRICT sempre, seja qual for a
+//     referência (muda só o atributo pedido sobre a imagem selecionada).
+export function levelForGeneration(
+  action:  GenerationAction,
+  refKind: ReferenceKind,
+): SpacesPreservationLevel {
+  if (action === 'nova_vista' && refKind !== 'print') return 'ARCHITECTURAL_DNA_LOCK'
+  return 'STRICT_SOURCE_LOCK'
+}
+
+// Modo persistido (vistas.spaces_mode) por ação.
+export function modeForAction(action: GenerationAction): SpacesMode {
+  if (action === 'nova_vista') return 'camera'
+  if (action === 'luz')        return 'luz'
+  if (action === 'material')   return 'material'
+  return 'detalhe'
 }
 
 export function profileForLevel(level: SpacesPreservationLevel): PreservationProfile {

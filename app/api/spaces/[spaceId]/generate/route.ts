@@ -1,145 +1,247 @@
 // POST /api/spaces/[spaceId]/generate
 //
-// Gera 1+ variações para um Space travado, reusando a stack do Renderizar
-// (`buildFidelityPrompt` + briefing arquitetônico). Princípios:
-//   - A fonte é única (image_urls = [fonte]): a Vista Mestre por padrão, ou —
-//     multi-DNA — uma vista-referência escolhida via reference_vista_id
-//     (imagem + DNA + briefing dela substituem os do Space nesta geração).
-//   - briefing arquitetônico (extraído junto do DNA) entra no prompt
-//     pra travar geometria/aberturas/câmera/entorno.
-//   - DNA visual reforça materiais (via `materials` derivados).
-//   - axis_value vira o campo `lighting` em inglês — buildFidelityPrompt
-//     já tem wrapper que impede o modelo de adicionar fixtures novos.
-//   - fidelityLevel = 'maximum' (mesmo padrão do Renderizar).
+// Rota ÚNICA de geração do Spaces (fluxo Referência → Ação → Gerar).
 //
-// Pipeline por vista: debit (consume_nodes_v2) → row pendente em vistas
-// (status='processing') → call FAL → update row pra completed. Refund
-// best-effort em qualquer falha pós-débito.
+// Body novo:
+//   {
+//     action:    'nova_vista' | 'luz' | 'material' | 'detalhe',
+//     reference: { kind: 'vista_mestre' }
+//              | { kind: 'vista',  vista_id: string }
+//              | { kind: 'print',  prints: [{ url, label? }] },   // 1..10
+//     values?:      string[],   // luz/detalhe: slugs dos cards
+//     directions?:  string[],   // nova_vista (mestre/histórico): slugs
+//     custom_direction?: string,// nova_vista: direção personalizada (texto)
+//     instruction?: string,     // material: pedido do usuário (texto)
+//     quality:   'hd' | '2k' | '4k',
+//   }
+//
+// Compat: o body legado ({ axis, axis_values, quality, reference_vista_id? })
+// segue aceito e é adaptado pro formato novo — nada de cliente antigo quebra.
+//
+// Separação explícita das entradas (ver lib/spaces/references.ts):
+//   - referência GEOMÉTRICA  = a imagem escolhida (prioridade máxima, Image #1)
+//   - referência de IDENTIDADE = Vista Mestre/DNA (materiais/paleta/linguagem)
+//   - instrução do USUÁRIO   = ação + cards/direções/texto livre
+//
+// Cada item selecionado gera uma vista independente (débito/refund próprios)
+// via lib/spaces/generation.ts. Regras por referência:
+//   - novo print  → o print é a autoridade geométrica; a Vista Mestre entra SÓ
+//                   como identidade (Image #2). Nunca como geometria.
+//   - histórico   → a vista escolhida é geometria+identidade; DNA dela (se
+//                   extraído) substitui o do Space.
+//   - vista mestre→ comportamento clássico (single-image).
+//   - prints > 1  → apenas ação Nova Vista (cada print vira uma vista).
 
 import { NextRequest, NextResponse } from 'next/server'
+import { randomUUID } from 'crypto'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getPayerId } from '@/lib/workspaces/context'
-import { refundNodes } from '@/lib/billing/refund-nodes'
-import { ENGINES, isResolution, type EngineId, type Resolution } from '@/lib/engines'
+import { ENGINES, isResolution } from '@/lib/engines'
 import { getVistaGenerationCost, supportsQuality } from '@/lib/spaces/economy'
-import { findAxisOption } from '@/lib/spaces/axes'
+import { findAxisOption, ANGULO_CUSTOM_VALUE, MATERIAL_VALUE } from '@/lib/spaces/axes'
 import { getVisualDna, getBriefingFromDna } from '@/lib/spaces/dna'
-import { isAxis, isQuality, type Axis, type ProjectDNA, type Space } from '@/lib/spaces/types'
 import {
-  buildFidelityPrompt,
-  type GenerateOptions,
-  type ProjectType,
-  type ProjectMaterials,
-  type BriefingArquitetonico,
-} from '@/lib/prompts'
-import { spacesPreserveV2Enabled, visionPreservationCheckEnabled } from '@/lib/spaces/preserve-flags'
-import {
-  modeForAxis, levelForAxis, modeAllowsCloserCrop,
-  type SpacesMode, type SpacesPreservationLevel,
-} from '@/lib/spaces/preservation'
-import { buildSpacesPreservePrompt } from '@/lib/spaces/preserve-prompt'
-import { computeSourceMeta, aspectRatioLabel, type SourceMeta } from '@/lib/spaces/source-meta'
-import { validateGeneration, checkArchitecturalPreservation } from '@/lib/spaces/preserve-validate'
-import { generateImage } from '@/lib/ai/image-provider'
+  isGenerationAction, isQuality,
+  type GenerationAction, type Space,
+} from '@/lib/spaces/types'
+import type { ReferenceSet } from '@/lib/spaces/references'
+import { generateVista, FAL_TIMEOUT_MS } from '@/lib/spaces/generation'
+import { computeSourceMeta } from '@/lib/spaces/source-meta'
 
-// A Vercel mata a função no maxDuration. As vistas geram em paralelo
-// (Promise.allSettled), então o cap precisa cobrir a vista mais lenta — não a
-// soma. 300s dá folga sobre o maior FAL_TIMEOUT_MS abaixo.
+// Os chunks rodam em SEQUÊNCIA (rate limit do provider), então o teto precisa
+// ser gerido: antes de iniciar um chunk, a rota confere se o pior caso dele
+// ainda cabe no orçamento. Chunk que não cabe NÃO inicia (e não debita) — nada
+// de função morta no meio com débito órfão em row 'processing'.
 export const maxDuration = 300
 
-// Timeout da chamada FAL por motor (espelha o /api/generate do Renderizar).
-// Vega (Nano Banana Pro) e Quasar (GPT Image 2) passam de 90s com frequência,
-// independente do tamanho da imagem. Pulsar (Nano Banana 2) é rápido. 90s flat
-// fazia a geração falhar com "tempo limite excedido" mesmo em imagem pequena.
-const FAL_TIMEOUT_MS: Record<EngineId, number> = {
-  vega:   180_000,
-  pulsar:  90_000,
-  quasar: 180_000,
+const MAX_PRINTS          = 10
+const MAX_ITEMS           = 10
+const MAX_INSTRUCTION_LEN = 300
+const PARALLEL_CHUNK      = 4
+
+// ── Body ──────────────────────────────────────────────────────
+
+interface IncomingPrint { url: string; label: string | null }
+
+interface ParsedReference {
+  kind:     'vista_mestre' | 'vista' | 'print'
+  vistaId?: string
+  prints?:  IncomingPrint[]
 }
 
-// ── FAL params por engine (espelha generate.ts do Renderizar) ─
-
-function falParamsForEngine(engine: EngineId, q: Resolution): Record<string, unknown> {
-  if (engine === 'quasar') {
-    return {
-      quality:       q === '4k' ? 'high' : 'medium',
-      image_size:    'auto',
-      num_images:    1,
-      output_format: 'jpeg',
-    }
-  }
-  const map: Record<Resolution, string> = { hd: '1K', '2k': '2K', '4k': '4K' }
-  return { resolution: map[q], num_images: 1, output_format: 'jpeg' }
-}
-
-// ── Heurística: projectType derivado do briefing ──────────────
-//
-// Bloco 1 só tem 6 cards de Iluminação que funcionam tanto pra interior
-// quanto exterior — se a categoria não bater, o briefing decide.
-
-function inferProjectType(
-  category: Space['category'],
-  briefing: BriefingArquitetonico | null,
-): ProjectType {
-  const blob = (
-    (briefing?.tipo_projeto ?? '') + ' ' +
-    (briefing?.entorno      ?? '')
-  ).toLowerCase()
-  if (/fachada|exterior|facade|terreno|rua|jardim|quintal|implanta|paisag/.test(blob)) {
-    return 'exterior'
-  }
-  if (/interior|cozinha|sala|quarto|banheiro|home office|hall/.test(blob)) {
-    return 'interior'
-  }
-  // Fallback por categoria: comercial/conceito tendem a ser apresentados de fora,
-  // residencial mais frequentemente como interior. Briefing manda quando dá pra
-  // detectar; fallback aqui é só pra Spaces antigos sem briefing.
-  return category === 'residencial' ? 'interior' : 'exterior'
-}
-
-// ── Mapeamento category → segment do prompts.ts ───────────────
-function mapSegment(category: Space['category']): string {
-  if (category === 'residencial') return 'Residencial'
-  if (category === 'comercial')   return 'Corporativo'
-  return 'Residencial' // 'conceito' — mais flexível, residencial é o default mais neutro
-}
-
-// ── Materials derivados do DNA visual ─────────────────────────
-//
-// `buildMaterialsBlock` do prompts.ts aceita ProjectMaterials parcial.
-// Com 3-5 materiais detectados pelo DNA, distribuímos nos campos mais
-// genéricos (não temos como saber se é piso/parede sem mais análise).
-// O efeito é um `MATERIAIS DO PROJETO` extra no prompt — reforço sobre o
-// briefing.materiais_aparentes que já está lá.
-
-function materialsFromDna(dna: ProjectDNA | null): ProjectMaterials | undefined {
-  if (!dna || dna.materiais.length === 0) return undefined
-  const list = dna.materiais.map(m => m.nome).join(', ')
-  // Único campo "elementos" comporta lista livre — o prompt builder vai
-  // injetar isso em INTERIOR ou EXTERIOR materials block, conforme o tipo.
-  return { elementos: list }
-}
-
-// ── Route ─────────────────────────────────────────────────────
-
-interface GenerateBody {
-  axis?:               unknown
-  axis_values?:        unknown
-  quality?:            unknown
-  /** Multi-DNA: vista-referência (com DNA extraído) que substitui a Vista
-   *  Mestre como autoridade de imagem + DNA desta geração. Opcional. */
-  reference_vista_id?: unknown
-}
-
-// Campos mínimos da vista-referência usados na geração.
-interface ReferenceVista {
+// Campos mínimos da vista do histórico usada como referência geométrica.
+interface ReferenceVistaRow {
   id:        string
   space_id:  string
   status:    string
   image_url: string | null
   dna:       unknown
 }
+
+// Item normalizado: 1 item = 1 vista gerada.
+interface GenerationItem {
+  axisValue:       string | null
+  axisLabel:       string
+  userIntent:      string
+  userInstruction: string | null
+  /** Print que serve de referência geométrica deste item (kind='print'). */
+  print?:          IncomingPrint
+}
+
+interface RawBody {
+  action?:             unknown
+  reference?:          unknown
+  values?:             unknown
+  directions?:         unknown
+  custom_direction?:   unknown
+  instruction?:        unknown
+  quality?:            unknown
+  // Body legado (EixosPanel antigo / integrações)
+  axis?:               unknown
+  axis_values?:        unknown
+  reference_vista_id?: unknown
+}
+
+function bad(msg: string, status = 400) {
+  return NextResponse.json({ error: msg }, { status })
+}
+
+// Adapta o body legado ({axis, axis_values, reference_vista_id}) pro formato
+// novo. axis 'iluminacao'→luz e 'detalhe'→detalhe; outros eixos nunca foram
+// aceitos por esta rota no formato antigo.
+function adaptLegacyBody(body: RawBody): RawBody | null {
+  if (body.action !== undefined || body.axis === undefined) return body
+  const action =
+    body.axis === 'iluminacao' ? 'luz'
+    : body.axis === 'detalhe'  ? 'detalhe'
+    : null
+  if (!action) return null
+  // reference_vista_id de tipo inválido era 400 no formato antigo — não pode
+  // virar Vista Mestre silenciosamente.
+  if (body.reference_vista_id !== undefined && body.reference_vista_id !== null
+      && typeof body.reference_vista_id !== 'string') {
+    return null
+  }
+  return {
+    action,
+    values:  body.axis_values,
+    quality: body.quality,
+    reference:
+      typeof body.reference_vista_id === 'string' && body.reference_vista_id
+        ? { kind: 'vista', vista_id: body.reference_vista_id }
+        : { kind: 'vista_mestre' },
+  }
+}
+
+function parseReference(raw: unknown): ParsedReference | string {
+  if (!raw || typeof raw !== 'object') return 'reference é obrigatório'
+  const ref = raw as Record<string, unknown>
+
+  if (ref.kind === 'vista_mestre') return { kind: 'vista_mestre' }
+
+  if (ref.kind === 'vista') {
+    if (typeof ref.vista_id !== 'string' || !ref.vista_id) return 'reference.vista_id é obrigatório'
+    return { kind: 'vista', vistaId: ref.vista_id }
+  }
+
+  if (ref.kind === 'print') {
+    if (!Array.isArray(ref.prints) || ref.prints.length === 0) return 'reference.prints é obrigatório'
+    if (ref.prints.length > MAX_PRINTS) return `Máximo ${MAX_PRINTS} prints por geração`
+    const prints: IncomingPrint[] = []
+    for (const p of ref.prints) {
+      if (!p || typeof p !== 'object') return 'print inválido'
+      const url = (p as Record<string, unknown>).url
+      const lbl = (p as Record<string, unknown>).label
+      if (typeof url !== 'string' || !url) return 'print sem url'
+      prints.push({ url, label: typeof lbl === 'string' && lbl.trim() ? lbl.trim().slice(0, 48) : null })
+    }
+    return { kind: 'print', prints }
+  }
+
+  return 'reference.kind inválido'
+}
+
+// Normaliza a seleção da etapa 2 em itens (1 item = 1 vista).
+function parseItems(
+  action:    GenerationAction,
+  reference: ParsedReference,
+  body:      RawBody,
+): GenerationItem[] | string {
+  // Nova Vista com prints: cada print é um item (o print É a nova vista).
+  if (action === 'nova_vista' && reference.kind === 'print') {
+    return reference.prints!.map(p => ({
+      axisValue:       null,
+      axisLabel:       p.label ?? 'Nova vista',
+      userIntent:      '',
+      userInstruction: null,
+      print:           p,
+    }))
+  }
+
+  if (action === 'nova_vista') {
+    const items: GenerationItem[] = []
+    const directions = Array.isArray(body.directions)
+      ? body.directions.filter((v): v is string => typeof v === 'string')
+      : []
+    for (const slug of directions) {
+      const opt = findAxisOption('angulo', slug)
+      if (!opt) return `Direção inválida: ${slug}`
+      items.push({
+        axisValue:       opt.value,
+        axisLabel:       opt.label,
+        userIntent:      opt.promptModifier,
+        userInstruction: null,
+      })
+    }
+    const custom = typeof body.custom_direction === 'string' ? body.custom_direction.trim() : ''
+    if (custom) {
+      if (custom.length > MAX_INSTRUCTION_LEN) return 'Direção personalizada longa demais'
+      items.push({
+        axisValue:       ANGULO_CUSTOM_VALUE,
+        axisLabel:       custom.slice(0, 48),
+        userIntent:      '',
+        userInstruction: custom,
+      })
+    }
+    if (items.length === 0) return 'Selecione ao menos uma direção (ou descreva a sua)'
+    return items
+  }
+
+  if (action === 'material') {
+    const instruction = typeof body.instruction === 'string' ? body.instruction.trim() : ''
+    if (instruction.length < 3)                   return 'Descreva qual material ajustar'
+    if (instruction.length > MAX_INSTRUCTION_LEN) return 'Instrução longa demais'
+    return [{
+      axisValue:       MATERIAL_VALUE,
+      axisLabel:       instruction.slice(0, 48),
+      userIntent:      '',
+      userInstruction: instruction,
+    }]
+  }
+
+  // luz / detalhe: cards
+  const axis = action === 'luz' ? 'iluminacao' as const : 'detalhe' as const
+  if (!Array.isArray(body.values) || body.values.length === 0) {
+    return 'Selecione ao menos uma opção'
+  }
+  const values = body.values.filter((v): v is string => typeof v === 'string')
+  if (values.length === 0) return 'Seleção inválida'
+  const items: GenerationItem[] = []
+  for (const v of values) {
+    const opt = findAxisOption(axis, v)
+    if (!opt) return `Opção inválida: ${axis}/${v}`
+    items.push({
+      axisValue:       opt.value,
+      axisLabel:       opt.label,
+      userIntent:      opt.promptModifier,
+      userInstruction: null,
+    })
+  }
+  return items
+}
+
+// ── Route ─────────────────────────────────────────────────────
 
 export async function POST(
   req:     NextRequest,
@@ -151,116 +253,77 @@ export async function POST(
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
   const admin = createAdminClient()
-  const body = (await req.json().catch(() => null)) as GenerateBody | null
-  if (!body) return NextResponse.json({ error: 'Body inválido' }, { status: 400 })
+  const rawBody = (await req.json().catch(() => null)) as RawBody | null
+  if (!rawBody) return bad('Body inválido')
 
-  if (!isAxis(body.axis)) {
-    return NextResponse.json({ error: 'axis inválido' }, { status: 400 })
-  }
-  const axis: Axis = body.axis
+  const body = adaptLegacyBody(rawBody)
+  if (!body) return bad('axis inválido')
 
-  if (!Array.isArray(body.axis_values) || body.axis_values.length === 0) {
-    return NextResponse.json({ error: 'axis_values é obrigatório' }, { status: 400 })
-  }
-  const axisValues = body.axis_values.filter((v): v is string => typeof v === 'string')
-  if (axisValues.length === 0) {
-    return NextResponse.json({ error: 'axis_values inválido' }, { status: 400 })
-  }
-  for (const v of axisValues) {
-    if (!findAxisOption(axis, v)) {
-      return NextResponse.json({ error: `Opção inválida: ${axis}/${v}` }, { status: 400 })
-    }
-  }
+  if (!isGenerationAction(body.action)) return bad('action inválida')
+  const action = body.action
 
-  // Detalhe (recorte) depende estruturalmente do prompt builder do Preserve V2
-  // (mode='detalhe' + crop preservado). Sem a flag, cair no prompt legado
-  // (maquete 3D → foto) desvirtua o recorte e não grava os metadados. Espelha o
-  // gate da UI (EixosPanel) como defesa no servidor.
-  if (axis === 'detalhe' && !spacesPreserveV2Enabled()) {
-    return NextResponse.json(
-      { error: 'O módulo Detalhe requer o Preserve V2 habilitado.' },
-      { status: 409 },
-    )
+  const refParsed = parseReference(body.reference)
+  if (typeof refParsed === 'string') return bad(refParsed)
+  // Alias já estreitado — TS não propaga o narrowing de união pra dentro das
+  // closures abaixo (refsForItem).
+  const reference: ParsedReference = refParsed
+
+  // Prints múltiplos só fazem sentido na Nova Vista (cada print = uma vista).
+  // Nas demais ações a referência precisa ser UMA imagem.
+  if (reference.kind === 'print' && action !== 'nova_vista' && reference.prints!.length > 1) {
+    return bad('Com mais de um print, a ação disponível é Nova Vista')
   }
 
-  if (!isQuality(body.quality) || !isResolution(body.quality)) {
-    return NextResponse.json({ error: 'quality inválida' }, { status: 400 })
-  }
+  if (!isQuality(body.quality) || !isResolution(body.quality)) return bad('quality inválida')
   const quality = body.quality
 
-  const referenceVistaId =
-    body.reference_vista_id === undefined || body.reference_vista_id === null
-      ? null
-      : (typeof body.reference_vista_id === 'string' ? body.reference_vista_id : undefined)
-  if (referenceVistaId === undefined) {
-    return NextResponse.json({ error: 'reference_vista_id inválido' }, { status: 400 })
-  }
+  const items = parseItems(action, reference, body)
+  if (typeof items === 'string') return bad(items)
+  if (items.length > MAX_ITEMS) return bad(`Máximo ${MAX_ITEMS} vistas por geração`)
 
-  // Carrega Space (RLS valida posse)
+  // ── Space (RLS valida posse) ─────────────────────────────────
   const { data: spaceRow, error: spaceErr } = await supabase
     .from('spaces')
     .select('*')
     .eq('id', spaceId)
     .single()
-  if (spaceErr || !spaceRow) {
-    return NextResponse.json({ error: 'Space não encontrado' }, { status: 404 })
-  }
+  if (spaceErr || !spaceRow) return bad('Space não encontrado', 404)
   const space = spaceRow as Space
-  if (space.status !== 'locked') {
-    return NextResponse.json({ error: 'Space ainda não está travado' }, { status: 409 })
-  }
-  if (!space.vista_mestre_url) {
-    return NextResponse.json({ error: 'Space sem Vista Mestre' }, { status: 409 })
-  }
+  if (space.status !== 'locked')  return bad('Space ainda não está travado', 409)
+  if (!space.vista_mestre_url)    return bad('Space sem Vista Mestre', 409)
   if (!supportsQuality(space.engine, quality)) {
-    return NextResponse.json(
-      { error: `Motor ${space.engine} não suporta ${quality.toUpperCase()}` },
-      { status: 400 },
-    )
+    return bad(`Motor ${space.engine} não suporta ${quality.toUpperCase()}`)
   }
 
-  // ── Referência selecionável (multi-DNA) ──────────────────────
-  // Sem reference_vista_id o comportamento é o histórico: Vista Mestre como
-  // fonte + DNA do Space. Com ele, a vista-referência (que teve DNA extraído
-  // via /api/vistas/[id]/extract-dna) vira a autoridade de imagem E de DNA.
-  let referenceVista: ReferenceVista | null = null
-  if (referenceVistaId) {
+  // ── Referência do histórico (kind='vista') ───────────────────
+  // Qualquer vista concluída do Space serve como referência GEOMÉTRICA — o DNA
+  // próprio (multi-DNA, quando extraído) passa a valer também como identidade.
+  let referenceVista: ReferenceVistaRow | null = null
+  if (reference.kind === 'vista') {
     const { data: refRow } = await supabase
       .from('vistas')
       .select('id, space_id, status, image_url, dna')
-      .eq('id', referenceVistaId)
+      .eq('id', reference.vistaId!)
       .single()
-    if (!refRow || refRow.space_id !== spaceId) {
-      return NextResponse.json({ error: 'Referência não encontrada neste Space' }, { status: 404 })
-    }
-    if (refRow.status !== 'completed' || !refRow.image_url) {
-      return NextResponse.json({ error: 'Referência não está pronta' }, { status: 409 })
-    }
-    if (!refRow.dna) {
-      return NextResponse.json({ error: 'Referência sem DNA extraído' }, { status: 409 })
-    }
-    referenceVista = refRow as ReferenceVista
+    if (!refRow || refRow.space_id !== spaceId) return bad('Referência não encontrada neste Space', 404)
+    if (refRow.status !== 'completed' || !refRow.image_url) return bad('Referência não está pronta', 409)
+    referenceVista = refRow as ReferenceVistaRow
   }
 
-  const sourceUrl = referenceVista?.image_url ?? space.vista_mestre_url!
-  const dnaSource = referenceVista?.dna ?? space.dna
-  const visualDna = getVisualDna(dnaSource)
-  const briefing  = getBriefingFromDna(dnaSource)
-  if (!visualDna) {
-    return NextResponse.json({ error: 'Space sem DNA' }, { status: 409 })
-  }
+  // ── Identidade (DNA/briefing) ────────────────────────────────
+  // Vista do histórico com DNA próprio extraído → identidade DELA; senão, a do
+  // Space. O DNA visual é obrigatório (Space travado sempre tem).
+  const dnaSource = (referenceVista?.dna ?? null) || space.dna
+  const visualDna = getVisualDna(dnaSource) ?? getVisualDna(space.dna)
+  const briefing  = getBriefingFromDna(dnaSource) ?? getBriefingFromDna(space.dna)
+  if (!visualDna) return bad('Space sem DNA', 409)
 
   const engine       = space.engine
   const costPerVista = getVistaGenerationCost(engine, quality)
-  const totalCost    = costPerVista * axisValues.length
+  const totalCost    = costPerVista * items.length
   const falEndpoint  = ENGINES[engine].falEndpoint
-  const projectType  = inferProjectType(space.category, briefing)
-  const segment      = mapSegment(space.category)
-  const materials    = materialsFromDna(visualDna)
 
-  // ── Pré-checagem de saldo (via view) ─────────────────────────
-  // Saldo é da bolsa: pré-check usa o PAGADOR (dono do workspace), o mesmo
-  // que consume_workspace_nodes debita — senão membro é barrado à toa.
+  // ── Saldo (pré-check no PAGADOR — dono da bolsa) ─────────────
   const payerId = (await getPayerId(admin, user.id)) ?? user.id
   const { data: bal } = await admin
     .from('user_node_balance')
@@ -275,44 +338,99 @@ export async function POST(
         available,
         required:  totalCost,
         per_vista: costPerVista,
-        message:   `Saldo insuficiente. Necessários ${totalCost} nodes (${axisValues.length} × ${costPerVista}).`,
+        message:   `Saldo insuficiente. Necessários ${totalCost} nodes (${items.length} × ${costPerVista}).`,
       },
       { status: 402 },
     )
   }
 
-  // ── Preserve V2 (flag-gated) ─────────────────────────────────
-  // A fonte selecionada (Vista Mestre ou vista-referência) é a autoridade:
-  // computamos a provenance UMA vez (não por vista) e a injetamos em cada
-  // geração. Best-effort — nunca derruba a geração. Com a flag off, nada
-  // disso roda e o caminho é idêntico ao anterior.
-  const preserveV2 = spacesPreserveV2Enabled()
-  const sourceMeta: SourceMeta | null = preserveV2
-    ? await computeSourceMeta(sourceUrl)
+  // ── Conjunto de referências por item ─────────────────────────
+  // kind='print': cada item tem o próprio print como geometria; Vista Mestre é
+  // a identidade (Image #2). Nos demais, geometria fixa (mestre ou vista) e
+  // identidade embutida na própria imagem — nunca uma segunda imagem que possa
+  // competir com a geometria.
+  function refsForItem(item: GenerationItem): ReferenceSet {
+    if (reference.kind === 'print') {
+      // Nova Vista: cada item carrega o próprio print. Luz/Materiais/Detalhe
+      // sobre 1 print: os itens são cards — o print único é a geometria de todos.
+      const p = item.print ?? reference.prints![0]
+      return {
+        geometry: { kind: 'print', url: p.url, label: p.label },
+        identity: { imageUrl: space.vista_mestre_url!, source: 'vista_mestre' },
+      }
+    }
+    if (reference.kind === 'vista') {
+      return {
+        geometry: { kind: 'vista', url: referenceVista!.image_url!, vistaId: referenceVista!.id },
+        identity: {
+          imageUrl: null,
+          source: referenceVista!.dna ? 'reference_vista' : 'same_as_geometry',
+        },
+      }
+    }
+    return {
+      geometry: { kind: 'vista_mestre', url: space.vista_mestre_url! },
+      identity: { imageUrl: null, source: 'same_as_geometry' },
+    }
+  }
+
+  // Provenance da geometria: única quando todos os itens partem da MESMA
+  // imagem (mestre, histórico ou 1 print); por item quando cada print é a
+  // própria autoridade (Nova Vista em lote). computeSourceMeta nunca lança.
+  const singleGeometry = reference.kind !== 'print' || reference.prints!.length === 1
+  const sharedMeta = singleGeometry
+    ? await computeSourceMeta(refsForItem(items[0]).geometry.url)
     : null
 
-  // ── Geração paralela (uma transação independente por vista) ──
-  const tasks = axisValues.map(axisValue =>
-    generateOne({
-      admin, userId: user.id, space, projectType, segment, materials, briefing,
-      engine, quality, axis, axisValue, costPerVista, falEndpoint,
-      preserveV2, sourceMeta, dna: visualDna,
-      sourceUrl, referenceVistaId,
-    })
-  )
+  const batchId = items.length > 1 ? randomUUID() : null
 
-  const results = await Promise.allSettled(tasks)
-  const vistas:  unknown[] = []
-  const errors:  string[]  = []
+  console.log('[spaces.generate] fluxo           :', action, '· referência', reference.kind, '·', items.length, 'item(ns)')
 
-  for (const r of results) {
-    if (r.status === 'fulfilled') vistas.push(r.value)
-    else {
-      // Não vaza mensagem crua (Postgres/FAL) pro cliente — loga o detalhe e
-      // devolve mensagem genérica (AL-9).
-      console.error('[spaces.generate] vista falhou:', r.reason?.message ?? r.reason)
-      errors.push('Falha ao gerar uma das vistas. Tente novamente.')
+  // ── Geração (chunks paralelos — rate limit do provider) ──────
+  // Orçamento de tempo: pior caso de um chunk = timeout do provider + checagem
+  // de visão/overhead. Um chunk só inicia se couber inteiro antes do
+  // maxDuration (15s de margem pra resposta) — itens pulados não são cobrados.
+  const startedAt     = Date.now()
+  const ROUTE_BUDGET  = (maxDuration - 15) * 1000
+  const WORST_ITEM_MS = FAL_TIMEOUT_MS[engine] + 60_000
+
+  const vistas: unknown[] = []
+  const errors: { label: string | null; error: string }[] = []
+
+  for (let i = 0; i < items.length; i += PARALLEL_CHUNK) {
+    const chunk = items.slice(i, i + PARALLEL_CHUNK)
+    if (Date.now() - startedAt + WORST_ITEM_MS > ROUTE_BUDGET) {
+      console.warn('[spaces.generate] chunk pulado por orçamento de tempo:', chunk.length, 'item(ns) não iniciados (sem cobrança)')
+      chunk.forEach(item => errors.push({
+        label: item.axisLabel,
+        error: 'Não iniciada por limite de tempo do lote — nada foi cobrado. Gere novamente.',
+      }))
+      continue
     }
+    const settled = await Promise.allSettled(chunk.map(async item => {
+      const refs = refsForItem(item)
+      const meta = sharedMeta ?? await computeSourceMeta(refs.geometry.url)
+      return generateVista({
+        admin, userId: user.id, space, action, refs,
+        axisValue:       item.axisValue,
+        axisLabel:       item.axisLabel,
+        userIntent:      item.userIntent,
+        userInstruction: item.userInstruction,
+        engine, quality, costPerVista, falEndpoint,
+        sourceMeta: meta, dna: visualDna, briefing,
+        batchId, logContext: 'spaces.generate',
+      })
+    }))
+    settled.forEach((r, idx) => {
+      if (r.status === 'fulfilled') vistas.push(r.value)
+      else {
+        // Não vaza mensagem crua (Postgres/provider) pro cliente (AL-9).
+        const item = chunk[idx]
+        console.error('[spaces.generate] item falhou:', item.axisLabel,
+          r.reason instanceof Error ? r.reason.message : r.reason)
+        errors.push({ label: item.axisLabel, error: 'Falha ao gerar uma das vistas. Tente novamente.' })
+      }
+    })
   }
 
   const { data: balAfter } = await admin
@@ -322,253 +440,9 @@ export async function POST(
     .single()
 
   return NextResponse.json({
+    batch_id:      batchId,
     vistas,
     errors:        errors.length ? errors : undefined,
     balance_after: balAfter ?? null,
   })
-}
-
-// ── Helper: geração + persistência de uma única vista ─────────
-
-async function generateOne(args: {
-  admin:        ReturnType<typeof createAdminClient>
-  userId:       string
-  space:        Space
-  projectType:  ProjectType
-  segment:      string
-  materials:    ProjectMaterials | undefined
-  briefing:     BriefingArquitetonico | null
-  engine:       EngineId
-  quality:      Resolution
-  axis:         Axis
-  axisValue:    string
-  costPerVista: number
-  falEndpoint:  string
-  preserveV2:   boolean
-  sourceMeta:   SourceMeta | null
-  dna:          ProjectDNA | null
-  // Multi-DNA: fonte da geração (Vista Mestre ou vista-referência) + id da
-  // referência pra gravar a provenance na row.
-  sourceUrl:        string
-  referenceVistaId: string | null
-}) {
-  const {
-    admin, userId, space, projectType, segment, materials, briefing,
-    engine, quality, axis, axisValue, costPerVista, falEndpoint,
-    preserveV2, sourceMeta, dna, sourceUrl, referenceVistaId,
-  } = args
-
-  let debited = false
-  let vistaId: string | null = null
-
-  try {
-    // 1) débito
-    const { error: debitErr } = await admin.rpc('consume_workspace_nodes', {
-      user_id_input: userId,
-      amount:        costPerVista,
-    })
-    if (debitErr) {
-      if (debitErr.code === 'P0001') throw new Error('insufficient_balance')
-      throw new Error('debit_failed: ' + debitErr.message)
-    }
-    debited = true
-
-    // Intenção da ação (Preserve V2): modo + nível. Computado cedo pra registrar
-    // na row pendente também (audita até vistas que falharem).
-    const opt   = findAxisOption(axis, axisValue)!
-    const mode:  SpacesMode | null              = preserveV2 ? modeForAxis(axis)  : null
-    const level: SpacesPreservationLevel | null = preserveV2 ? levelForAxis(axis) : null
-
-    // 2) row pendente
-    const insertRow: Record<string, unknown> = {
-      space_id:    space.id,
-      user_id:     userId,
-      status:      'processing',
-      engine,
-      quality,
-      axis,
-      axis_value:  axisValue,
-      axis_label:  opt.label,
-      nodes_cost:  costPerVista,
-    }
-    if (preserveV2) {
-      insertRow.spaces_mode         = mode
-      insertRow.preservation_level  = level
-      insertRow.provider            = 'fal'
-      insertRow.model               = falEndpoint
-      insertRow.source_image_url    = sourceMeta?.url ?? sourceUrl
-      insertRow.source_width        = sourceMeta?.width ?? null
-      insertRow.source_height       = sourceMeta?.height ?? null
-      insertRow.source_aspect_ratio = sourceMeta?.aspectRatio ?? null
-      insertRow.source_hash         = sourceMeta?.hash ?? null
-    }
-    // Provenance multi-DNA — só preenche quando o usuário selecionou uma
-    // referência (caminho legado segue sem tocar na coluna).
-    if (referenceVistaId) {
-      insertRow.reference_vista_id = referenceVistaId
-    }
-    const { data: row, error: insErr } = await admin
-      .from('vistas')
-      .insert(insertRow)
-      .select('id')
-      .single()
-    if (insErr || !row) throw new Error('insert_failed: ' + (insErr?.message ?? '?'))
-    vistaId = row.id as string
-
-    // 3) Prompt
-    //
-    // Preserve V2: builder PRÓPRIO do Spaces — a imagem upada é a autoridade, o
-    // prompt manda PRESERVAR e mudar só o atributo pedido (ver
-    // lib/spaces/preserve-prompt.ts). NÃO usa a moldura "isto é uma maquete 3D,
-    // re-renderize em foto" nem MATERIAL OVERRIDES do caminho do Renderizar.
-    //
-    // Legado (flag off): mantém exatamente a stack do Renderizar de antes.
-    let finalPrompt: string
-    if (preserveV2 && mode && level) {
-      finalPrompt = buildSpacesPreservePrompt({
-        level, mode, userIntent: opt.promptModifier, briefing, dna,
-      })
-    } else {
-      const options: GenerateOptions = {
-        projectType,
-        segment,
-        environment:    '',
-        lighting:       opt.promptModifier,
-        background:     'Preservar Original',
-        sceneElements:  [],
-        geometryLock:   85,
-        materials,
-        fidelityMode:   'strict',
-        fidelityLevel:  'maximum',
-        briefing:       briefing ?? undefined,
-        hasAnchor:      false,
-        refinementText: undefined,
-      }
-      finalPrompt = buildFidelityPrompt(options, 'maximum', briefing ?? undefined)
-    }
-
-    // 4) FAL call — sempre image-to-image/edit: a fonte selecionada (Vista
-    // Mestre ou vista-referência) vai como image_urls. Nunca text-to-image puro.
-    const falInput = {
-      prompt:     finalPrompt,
-      image_urls: [sourceUrl],
-      ...falParamsForEngine(engine, quality),
-    }
-
-    console.log('[spaces.generate] engine    :', engine, '→', falEndpoint)
-    console.log('[spaces.generate] quality   :', quality, '→', costPerVista, 'nodes')
-    console.log('[spaces.generate] axis      :', axis, '/', axisValue)
-    console.log('[spaces.generate] referência:', referenceVistaId ?? 'vista mestre')
-    console.log('[spaces.generate] preserveV2:', preserveV2, preserveV2 ? `(${mode}/${level})` : '')
-    console.log('[spaces.generate] prompt    :', finalPrompt)
-
-    // Camada única de provider (lib/ai/image-provider): GCP/Vertex primário
-    // quando ligado por env, fallback FAL transparente. width/height vêm do
-    // provider (FAL devolve na resposta; GCP mede via parse do header) — o
-    // Preserve V2 usa nas validações de aspecto.
-    const gen = await generateImage({
-      falEndpoint,
-      falInput,
-      timeoutMs: FAL_TIMEOUT_MS[engine],
-      context:   'spaces.generate',
-      deliver:   { kind: 'url', userId, area: 'vistas' },
-    })
-    const outputUrl = gen.images[0]?.url
-    if (!outputUrl) throw new Error('provider_no_output')
-    const genW = gen.images[0]?.width  ?? null
-    const genH = gen.images[0]?.height ?? null
-    // Rastreabilidade: id do request no provider (fal ou Vertex). Ver vistas.fal_request_id.
-    const falRequestId = gen.requestId
-
-    // 5) Persistir completed (+ metadados/validação de preservação no V2)
-    const updateRow: Record<string, unknown> = {
-      image_url:      outputUrl,
-      prompt:         finalPrompt,
-      fal_request_id: falRequestId,
-      status:         'completed',
-      completed_at:   new Date().toISOString(),
-    }
-
-    let preservationWarning = false
-    let check: Awaited<ReturnType<typeof checkArchitecturalPreservation>> = null
-    if (preserveV2) {
-      // Detalhe (crop) fecha o enquadramento de propósito — aspect/câmera mudam
-      // legitimamente, então as validações não tratam isso como violação.
-      const cropExpected = mode ? modeAllowsCloserCrop(mode) : false
-      const genAspect = genW && genH ? genW / genH : null
-      const validation = validateGeneration({
-        sourceUrl:          sourceMeta?.url ?? sourceUrl,
-        generatedUrl:       outputUrl,
-        sourceAspect:       sourceMeta?.aspectRatio ?? null,
-        generatedAspect:    genAspect,
-        allowFramingChange: cropExpected,
-      })
-      if (validation.issues.length) {
-        console.warn('[spaces.generate] validação preserve:', validation.issues.join(', '))
-      }
-      preservationWarning = !validation.ok
-
-      // Checagem opcional por visão (source × generated), killável. Best-effort.
-      if (level && visionPreservationCheckEnabled()) {
-        check = await checkArchitecturalPreservation(
-          sourceMeta?.url ?? sourceUrl, outputUrl, level,
-          { cropExpected },
-        )
-        if (check?.warning) preservationWarning = true
-      }
-
-      // Provider/modelo REAIS (a row pendente registrou a intenção 'fal';
-      // aqui gravamos quem gerou de fato — gcp ou fal via fallback).
-      updateRow.provider             = gen.provider
-      updateRow.model                = gen.providerModel
-      updateRow.generated_width      = genW
-      updateRow.generated_height     = genH
-      updateRow.aspect_ratio         = aspectRatioLabel(genAspect) ?? aspectRatioLabel(sourceMeta?.aspectRatio ?? null)
-      updateRow.preservation_warning = preservationWarning
-      updateRow.preservation_check   = check
-    }
-
-    const { error: updErr } = await admin
-      .from('vistas')
-      .update(updateRow)
-      .eq('id', vistaId)
-    if (updErr) {
-      console.error('[spaces.generate] DB update FALHOU (imagem ok, persistência não):', updErr)
-    }
-
-    return {
-      id:         vistaId,
-      space_id:   space.id,
-      image_url:  outputUrl,
-      engine,
-      quality,
-      axis,
-      axis_value: axisValue,
-      axis_label: opt.label,
-      nodes_cost: costPerVista,
-      status:     'completed',
-      reference_vista_id: referenceVistaId,
-      ...(preserveV2 ? {
-        spaces_mode:          mode,
-        preservation_level:   level,
-        source_image_url:     sourceMeta?.url ?? sourceUrl,
-        source_aspect_ratio:  sourceMeta?.aspectRatio ?? null,
-        aspect_ratio:         updateRow.aspect_ratio as string | null,
-        preservation_warning: preservationWarning,
-        preservation_check:   check,
-      } : {}),
-    }
-
-  } catch (err) {
-    if (debited) {
-      await refundNodes(admin, userId, costPerVista, { module: 'spaces/generate', jobTable: 'vistas' })
-    }
-    if (vistaId) {
-      await admin
-        .from('vistas')
-        .update({ status: 'failed', error_message: (err as Error).message })
-        .eq('id', vistaId)
-    }
-    throw err
-  }
 }

@@ -7,10 +7,10 @@ import { VistaCard } from './VistaCard'
 
 type Filter = 'all' | 'favorited' | Axis
 
-// Ordem dos filtros de eixo no MVP. Clima (horario) fica fora — só apareceria
-// se houvesse vistas legadas desse eixo (não há). Cada chip de eixo só é exibido
-// quando há vistas dele, pra não poluir a galeria com filtros vazios.
-const AXIS_FILTER_ORDER: Axis[] = ['iluminacao', 'angulo', 'detalhe', 'horario']
+// Ordem dos filtros de ação. Clima (horario) fica fora — só apareceria se
+// houvesse vistas legadas desse eixo (não há). Cada chip só é exibido quando
+// há vistas dele, pra não poluir a galeria com filtros vazios.
+const AXIS_FILTER_ORDER: Axis[] = ['angulo', 'iluminacao', 'material', 'detalhe', 'horario']
 
 interface Props {
   vistas:           Vista[]
@@ -55,8 +55,8 @@ export function VistasGrid({ vistas, vistaMestreUrl }: Props) {
           fontSize: 12, color: 'var(--color-text-tertiary)',
           maxWidth: 400, margin: '0 auto', lineHeight: 1.6,
         }}>
-          Selecione uma variação no painel acima e clique em Gerar.
-          O DNA do projeto será preservado em cada variação.
+          Escolha a referência e a ação no painel acima e clique em Gerar.
+          A identidade do projeto é preservada em cada vista.
         </div>
       </div>
     )
