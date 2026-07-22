@@ -1,12 +1,50 @@
 'use client'
 
-// Ícones line-art dos cards do eixo Detalhe. Um recorte não tem "cor
-// representativa" como a luz tem, então o card mostra um ícone neutro no lugar
-// do swatch colorido. Mantém o idioma do projeto (SVG inline, stroke fino).
+// Ícones line-art dos cards do Spaces (Detalhe + direções de Nova Vista).
+// Um recorte/direção não tem "cor representativa" como a luz tem, então o card
+// mostra um ícone neutro no lugar do swatch colorido. Mantém o idioma do
+// projeto (SVG inline, stroke fino).
 
 import type { DetailIconKey } from '@/lib/spaces/axes'
 
 const PATHS: Record<DetailIconKey, React.ReactNode> = {
+  rooms: (
+    <>
+      <rect x="3.5" y="4" width="17" height="16" rx="1.5" />
+      <path d="M12 4v16" />
+      <path d="M12 12h8.5" />
+      <circle cx="9.8" cy="12" r="0.8" fill="currentColor" stroke="none" />
+    </>
+  ),
+  orbit: (
+    <>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M4.5 9.2C3 10 2.2 11 2.2 12c0 2.2 4.4 4 9.8 4s9.8-1.8 9.8-4c0-1-.8-2-2.3-2.8" />
+      <path d="M19 6.5 21.5 9l-3.4.4" />
+    </>
+  ),
+  front: (
+    <>
+      <rect x="4" y="6" width="16" height="12" rx="1" />
+      <path d="M4 18 2.5 21M20 18l1.5 3" />
+      <path d="M9.5 10.5h5" />
+    </>
+  ),
+  aerial: (
+    <>
+      <rect x="6" y="10" width="12" height="9" rx="1" />
+      <path d="M12 10V7" />
+      <path d="M8.5 4.5 12 7l3.5-2.5" />
+      <path d="M9.5 14.5h5" />
+    </>
+  ),
+  zoom: (
+    <>
+      <circle cx="11" cy="11" r="6" />
+      <path d="M20 20l-4.5-4.5" />
+      <path d="M8.5 11h5M11 8.5v5" />
+    </>
+  ),
   layers: (
     <>
       <path d="M12 3 3 7.5l9 4.5 9-4.5-9-4.5Z" />

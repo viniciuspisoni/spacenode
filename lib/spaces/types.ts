@@ -19,7 +19,16 @@ export type SpaceStatus =
   | 'locked'
   | 'archived'
 
-export type Axis = 'iluminacao' | 'angulo' | 'horario' | 'detalhe'
+export type Axis = 'iluminacao' | 'angulo' | 'horario' | 'detalhe' | 'material'
+
+// Origem da REFERÊNCIA GEOMÉTRICA de uma geração (fluxo Referência → Ação →
+// Gerar). A imagem escolhida aqui é a autoridade de geometria/enquadramento;
+// a identidade visual (materiais/paleta/estilo) vem sempre do projeto.
+export type ReferenceKind = 'vista_mestre' | 'print' | 'vista'
+
+// Ação escolhida na etapa 2 do fluxo. Mapeia 1:1 pra um `spaces_mode` +
+// `axis` persistidos (ver lib/spaces/references.ts).
+export type GenerationAction = 'nova_vista' | 'luz' | 'material' | 'detalhe'
 
 export type Quality = Resolution // 'hd' | '2k' | '4k'
 
@@ -148,6 +157,12 @@ export interface Vista {
   dna_extracted_at?:         string | null
   dna_extracting?:           boolean
   reference_vista_id?:       string | null
+  // Fluxo Referência → Ação → Gerar (migration 20260722): origem da referência
+  // geométrica, imagem de identidade (quando difere da geométrica) e instrução
+  // livre do usuário. Opcionais — rows anteriores à migration não têm.
+  reference_kind?:           ReferenceKind | null
+  identity_image_url?:       string | null
+  user_instruction?:         string | null
   // Eixo Ângulo: sketch usado como geometry input + id do batch que agrupa
   // as vistas geradas no mesmo upload em massa.
   source_sketch_url:         string | null
@@ -246,7 +261,15 @@ export function isSpaceCategory(v: unknown): v is SpaceCategory {
 }
 
 export function isAxis(v: unknown): v is Axis {
-  return v === 'iluminacao' || v === 'angulo' || v === 'horario' || v === 'detalhe'
+  return v === 'iluminacao' || v === 'angulo' || v === 'horario' || v === 'detalhe' || v === 'material'
+}
+
+export function isReferenceKind(v: unknown): v is ReferenceKind {
+  return v === 'vista_mestre' || v === 'print' || v === 'vista'
+}
+
+export function isGenerationAction(v: unknown): v is GenerationAction {
+  return v === 'nova_vista' || v === 'luz' || v === 'material' || v === 'detalhe'
 }
 
 export function isQuality(v: unknown): v is Quality {

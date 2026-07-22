@@ -1,23 +1,26 @@
-// Eixos exploráveis do Spaces — variáveis que o usuário aplica preservando o DNA.
+// Catálogo de ações do Spaces — cards/direções que o usuário aplica sobre a
+// referência escolhida, preservando o DNA do projeto.
 //
-// Dois modos de operação:
-//   - parametric    : usuário escolhe valor(es) de uma lista; motor varia o
-//                     atributo mantendo a composição (Iluminação, Horário,
-//                     Detalhe quando entrar).
-//   - sketch_guided : usuário sobe sketches; motor aplica DNA da Vista Mestre
-//                     sobre cada sketch (Ângulo).
+// Fluxo Referência → Ação → Gerar (2026-07): o antigo conceito de "eixo" segue
+// vivo no schema (vistas.axis) e nos filtros, mas a UI apresenta AÇÕES:
+//   - Nova Vista       (axis 'angulo')     — novo print OU direção de câmera
+//   - Alterar Luz      (axis 'iluminacao') — cards de iluminação
+//   - Ajustar Materiais(axis 'material')   — instrução livre
+//   - Criar Detalhe    (axis 'detalhe')    — recortes da referência
 //
-// Bloco 1 entrega Iluminação completo. Sketch-guided estreia com Ângulo.
+// `AxisMode` é legado (painel antigo) — mantido só pra tipagem de config.
 
 import type { Axis, BriefingArquitetonico } from './types'
 
 export type AxisMode = 'parametric' | 'sketch_guided'
 
-// Ícones (line-art) usados pelos cards de Detalhe — um recorte não tem "cor
-// representativa" como a luz tem, então o card mostra um ícone neutro.
+// Ícones (line-art) usados pelos cards de Detalhe e pelas direções de Nova
+// Vista — um recorte/direção não tem "cor representativa" como a luz tem,
+// então o card mostra um ícone neutro.
 export type DetailIconKey =
   | 'layers' | 'bulb' | 'sofa' | 'frame' | 'focus' | 'grid'
   | 'counter' | 'bed' | 'door' | 'building' | 'plant' | 'vase'
+  | 'rooms' | 'orbit' | 'front' | 'aerial' | 'zoom'
 
 export interface AxisOption {
   value:           string  // slug salvo em vistas.axis_value
@@ -82,7 +85,7 @@ export const ILUMINACAO_OPTIONS: AxisOption[] = [
   },
 ]
 
-// Sugestões de nomes de ângulo para chips na UI
+// Sugestões de nomes pros prints enviados (chips na UI)
 export const ANGULO_LABEL_SUGGESTIONS = [
   'Vista frontal',
   'Vista lateral',
@@ -92,24 +95,85 @@ export const ANGULO_LABEL_SUGGESTIONS = [
   'Detalhe arquitetônico',
 ]
 
-export const ANGULO_OPTIONS:  AxisOption[] = []
+// ── Nova Vista (direções) ─────────────────────────────────────
+//
+// Direções de câmera quando a referência geométrica é a Vista Mestre ou uma
+// imagem do histórico (sem novo print): o motor produz um NOVO ponto de vista
+// do MESMO projeto (ARCHITECTURAL_DNA_LOCK — arquitetura/materiais/DNA
+// travados, só a câmera se move). Quando a referência é um novo print, a
+// direção não se aplica: o próprio print É a nova vista (autoridade
+// geométrica máxima).
+//
+// `promptModifier` (inglês) entra como "Requested change" no USER INTENT do
+// prompt de camera (lib/spaces/reference-prompt.ts). A "direção personalizada"
+// não é card — é texto livre do usuário (vistas.user_instruction).
+export const ANGULO_OPTIONS: AxisOption[] = [
+  {
+    value: 'outro_ambiente', label: 'Outro ambiente', icon: 'rooms',
+    description: 'Ambiente vizinho do mesmo projeto, coerente com o DNA.',
+    color: '#8A8276',
+    promptModifier: 'move the camera to an ADJACENT space of this same project — a different room or area that logically belongs to the same design — keeping the same architectural language, materials and finish quality',
+  },
+  {
+    value: 'novo_angulo', label: 'Novo ângulo', icon: 'orbit',
+    description: 'Outro ponto de vista do mesmo ambiente.',
+    color: '#8A8276',
+    promptModifier: 'a different camera angle of the SAME space shown in the reference, seen from another believable standing position',
+  },
+  {
+    value: 'frontal', label: 'Vista frontal', icon: 'front',
+    description: 'Enquadramento frontal, verticais alinhadas.',
+    color: '#8A8276',
+    promptModifier: 'a straight frontal one-point-perspective view of the main subject of the reference, camera at eye level, vertical lines straight',
+  },
+  {
+    value: 'aerea', label: 'Vista aérea', icon: 'aerial',
+    description: 'Câmera elevada revelando o layout.',
+    color: '#8A8276',
+    promptModifier: 'an elevated view of the same space, camera raised and angled down, revealing the layout of the project',
+  },
+  {
+    value: 'close', label: 'Close', icon: 'zoom',
+    description: 'Câmera mais próxima da área principal.',
+    color: '#8A8276',
+    promptModifier: 'a closer camera position on the main area of interest of the reference, tighter framing, same lens character',
+  },
+]
+
+// Direção personalizada (texto livre) — slug reservado, validado à parte
+// porque não é card: o conteúdo vem em user_instruction.
+export const ANGULO_CUSTOM_VALUE = 'personalizada'
+
 export const HORARIO_OPTIONS: AxisOption[] = []
+
+// ── Ajustar Materiais ─────────────────────────────────────────
+//
+// Sem cards: a ação é uma instrução livre ("trocar o piso para tauari claro").
+// O slug único marca axis_value; a instrução real vive em user_instruction.
+export const MATERIAL_VALUE = 'ajuste_material'
+export const MATERIAL_OPTIONS: AxisOption[] = [
+  {
+    value: MATERIAL_VALUE, label: 'Ajuste de material', icon: 'layers',
+    description: 'Troca pontual de material descrita por você.',
+    color: '#8A8276',
+    promptModifier: '', // a instrução real vem do usuário (user_instruction)
+  },
+]
 
 // ── Detalhe ───────────────────────────────────────────────────
 //
-// Recortes aproximados do MESMO projeto (crop/zoom da Vista Mestre),
+// Recortes aproximados do MESMO projeto (crop/zoom da referência escolhida),
 // preservando materiais, estilo, paleta e linguagem. NÃO é redesenho nem nova
 // câmera — é um enquadramento mais fechado da cena existente (ver
-// lib/spaces/preserve-prompt.ts, mode='detalhe').
+// lib/spaces/reference-prompt.ts, action='detalhe').
 //
 // Os cards se adaptam ao contexto do projeto (default / corporativo /
 // residencial / exterior). Como o slug é validado pela rota via
 // findAxisOption('detalhe', slug), DETALHE_OPTIONS é a UNIÃO de todos os cards
 // possíveis — a UI mostra só o subconjunto do contexto (detalheOptionsForContext).
 //
-// `promptModifier` (inglês) é o ALVO do recorte — entra como "Requested change"
-// no userIntentBlock do preserve-prompt, depois do "closer architectural crop
-// focused on …".
+// `promptModifier` (inglês) é o ALVO do recorte — entra no USER INTENT do
+// reference-prompt, depois do "closer architectural crop focused on …".
 
 export type DetalheContext = 'default' | 'corporativo' | 'residencial' | 'exterior'
 
@@ -280,20 +344,24 @@ export const AXIS_OPTIONS: Record<Axis, AxisOption[]> = {
   angulo:     ANGULO_OPTIONS,
   horario:    HORARIO_OPTIONS,
   detalhe:    DETALHE_OPTIONS,
+  material:   MATERIAL_OPTIONS,
 }
 
+// Labels das AÇÕES do fluxo novo — usados também nos filtros da galeria.
 export const AXIS_LABEL: Record<Axis, string> = {
-  iluminacao: 'Iluminação',
-  angulo:     'Ângulo',
-  horario:    'Horário',
+  iluminacao: 'Luz',
+  angulo:     'Nova Vista',
+  horario:    'Clima',
   detalhe:    'Detalhe',
+  material:   'Materiais',
 }
 
 export const AXIS_CONFIG: Record<Axis, AxisConfig> = {
-  iluminacao: { id: 'iluminacao', label: 'Iluminação', mode: 'parametric',    isAvailable: true                                                  },
-  angulo:     { id: 'angulo',     label: 'Ângulo',     mode: 'sketch_guided', isAvailable: true,  labelSuggestions: ANGULO_LABEL_SUGGESTIONS    },
-  horario:    { id: 'horario',    label: 'Horário',    mode: 'parametric',    isAvailable: false                                                 },
-  detalhe:    { id: 'detalhe',    label: 'Detalhe',    mode: 'parametric',    isAvailable: true                                                  },
+  iluminacao: { id: 'iluminacao', label: 'Luz',        mode: 'parametric', isAvailable: true                                               },
+  angulo:     { id: 'angulo',     label: 'Nova Vista', mode: 'parametric', isAvailable: true,  labelSuggestions: ANGULO_LABEL_SUGGESTIONS },
+  horario:    { id: 'horario',    label: 'Clima',      mode: 'parametric', isAvailable: false                                              },
+  detalhe:    { id: 'detalhe',    label: 'Detalhe',    mode: 'parametric', isAvailable: true                                               },
+  material:   { id: 'material',   label: 'Materiais',  mode: 'parametric', isAvailable: true                                               },
 }
 
 export function findAxisOption(axis: Axis, value: string): AxisOption | undefined {

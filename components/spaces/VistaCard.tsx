@@ -19,6 +19,15 @@ export function VistaCard({ vista }: { vista: Vista }) {
   const opt = vista.axis && vista.axis_value ? findAxisOption(vista.axis, vista.axis_value) : null
   const isProcessing = vista.status === 'processing' || vista.status === 'pending'
   const isFailed     = vista.status === 'failed'
+  // Origem da referência geométrica (fluxo Referência → Ação → Gerar). Rows
+  // antigas não têm reference_kind; um print legado é detectável pelo
+  // source_sketch_url. Vista Mestre é o default — não precisa de selo.
+  const refOrigin =
+    vista.reference_kind === 'print' || (!vista.reference_kind && vista.source_sketch_url)
+      ? 'do seu print'
+      : vista.reference_kind === 'vista' || (!vista.reference_kind && vista.reference_vista_id)
+        ? 'ref. do histórico'
+        : null
 
   return (
     <Link
@@ -49,18 +58,35 @@ export function VistaCard({ vista }: { vista: Vista }) {
           </div>
         )}
 
-        {/* Color badge (axis) */}
-        {opt && (
+        {/* Badges: ação (card escolhido) + origem da referência geométrica */}
+        {(opt || refOrigin) && (
           <div style={{
             position: 'absolute', top: 8, left: 8,
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            padding: '4px 8px', borderRadius: 5,
-            background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)',
+            display: 'flex', gap: 4, flexWrap: 'wrap', maxWidth: 'calc(100% - 44px)',
           }}>
-            <span style={{ width: 8, height: 8, borderRadius: 999, background: opt.color }} />
-            <span style={{ fontSize: 10, color: '#fff', letterSpacing: '0.02em' }}>
-              {opt.label}
-            </span>
+            {opt && (
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '4px 8px', borderRadius: 5,
+                background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)',
+              }}>
+                <span style={{ width: 8, height: 8, borderRadius: 999, background: opt.color }} />
+                <span style={{ fontSize: 10, color: '#fff', letterSpacing: '0.02em' }}>
+                  {opt.label}
+                </span>
+              </div>
+            )}
+            {refOrigin && (
+              <div style={{
+                display: 'inline-flex', alignItems: 'center',
+                padding: '4px 8px', borderRadius: 5,
+                background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)',
+                fontSize: 9, color: 'rgba(255,255,255,0.8)',
+                letterSpacing: '0.05em', textTransform: 'uppercase',
+              }}>
+                {refOrigin}
+              </div>
+            )}
           </div>
         )}
 

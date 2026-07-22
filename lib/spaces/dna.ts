@@ -269,7 +269,16 @@ const VERIFY_SYSTEM = (
   'Responda SEMPRE e APENAS com JSON.'
 )
 
-export type VerifyMode = 'standard' | 'angulo_relaxed' | 'edit_relaxed' | 'detalhe_relaxed'
+export type VerifyMode =
+  | 'standard'
+  | 'angulo_relaxed'
+  | 'edit_relaxed'
+  | 'detalhe_relaxed'
+  | 'material_relaxed'
+  // Ajustar Materiais sobre um NOVO PRINT (outro ambiente/ângulo do projeto):
+  // além da troca pedida, o contexto também não pode ser comparado ao pé da
+  // letra com o da referência de DNA.
+  | 'material_print_relaxed'
 
 export async function verifyDna(
   variationUrl: string,
@@ -317,6 +326,20 @@ export async function verifyDna(
         'da imagem foi mascarada e editada). Compare contexto considerando que apenas ' +
         'uma região foi alterada — espere coerência geral, mas pequenas divergências ' +
         'localizadas na área editada são esperadas e aceitáveis.\n\n'
+      )
+    : mode === 'material_relaxed' || mode === 'material_print_relaxed'
+      ? (
+        'IMPORTANTE — esta vista veio da ação Ajustar Materiais: o usuário pediu ' +
+        'explicitamente a troca de UM material/superfície. Para "materiais", NÃO ' +
+        'penalize a superfície trocada — avalie se os DEMAIS materiais do DNA seguem ' +
+        'presentes e coerentes. Para "paleta", tolere o desvio causado pelo novo ' +
+        'material; avalie a harmonia geral. "Estilo" permanece estrito — a linguagem ' +
+        'arquitetônica não pode ter mudado. ' +
+        (mode === 'material_print_relaxed'
+          ? 'Para "contexto", esta vista partiu de um NOVO PRINT do projeto (pode ser ' +
+            'outro ambiente ou ângulo): compare APENAS categorias amplas ' +
+            '(Interno/Externo, tipologia geral) e ignore composição/enquadramento.\n\n'
+          : '"Contexto" permanece estrito — o ambiente não pode ter mudado.\n\n')
       )
       : ''
 

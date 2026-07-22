@@ -7,8 +7,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import type { Space, Vista, DnaVerification } from '@/lib/spaces/types'
-import { findAxisOption } from '@/lib/spaces/axes'
+import type { Space, Vista, DnaVerification, ReferenceKind } from '@/lib/spaces/types'
+import { findAxisOption, AXIS_LABEL } from '@/lib/spaces/axes'
 import { ENGINES, isEngineId, type EngineId } from '@/lib/engines'
 
 // Helper de nome amigável: motores secundários (clarity, flux-fill) caem
@@ -55,6 +55,16 @@ export function VistaDetail({ space, vista, others, initialBalance }: Props) {
   const [isCurrentMestre, setIsCurrentMestre] = useState(space.vista_mestre_vista_id === vista.id)
 
   const opt = vista.axis && vista.axis_value ? findAxisOption(vista.axis, vista.axis_value) : null
+
+  // Referência GEOMÉTRICA desta geração (fluxo Referência → Ação → Gerar).
+  // Rows antigas caem nos campos legados: source_sketch_url (print do eixo
+  // Ângulo) ou reference_vista_id (multi-DNA); default = Vista Mestre.
+  const refKind: ReferenceKind = vista.reference_kind
+    ?? (vista.source_sketch_url ? 'print' : vista.reference_vista_id ? 'vista' : 'vista_mestre')
+  const referenceUrl = vista.source_image_url ?? vista.source_sketch_url ?? space.vista_mestre_url
+  const referenceLabel =
+    refKind === 'print' ? 'Seu print' : refKind === 'vista' ? 'Referência do histórico' : 'Vista Mestre'
+
   const canUpscale = vista.engine !== 'clarity'
                      && vista.status === 'completed'
                      && vista.quality !== '4k'
@@ -223,9 +233,11 @@ export function VistaDetail({ space, vista, others, initialBalance }: Props) {
         {space.name}
       </Link>
 
-      {/* Comparação Antes/Depois */}
+      {/* Comparação Antes/Depois — "Antes" é a REFERÊNCIA GEOMÉTRICA usada
+          nesta geração (print/histórico/mestre), não necessariamente a mestre. */}
       <ComparisonSection
-        mestreUrl={space.vista_mestre_url}
+        referenceUrl={referenceUrl}
+        referenceLabel={referenceLabel}
         variationUrl={vista.image_url}
         variationLabel={vista.axis_label ?? 'Variação'}
         variationColor={opt?.color ?? '#888'}
@@ -250,8 +262,8 @@ export function VistaDetail({ space, vista, others, initialBalance }: Props) {
         </div>
       )}
 
-      {/* Eixo aplicado */}
-      {opt && (
+      {/* Ação aplicada + referências desta geração */}
+      {(opt || vista.axis) && (
         <div style={{
           padding: '16px 20px', borderRadius: 12,
           background: 'var(--color-bg-elevated)',
@@ -262,23 +274,36 @@ export function VistaDetail({ space, vista, others, initialBalance }: Props) {
             display: 'inline-flex', alignItems: 'center', gap: 8,
             padding: '6px 12px', borderRadius: 999,
             background: 'var(--color-surface)',
-            border: `0.5px solid ${opt.color}66`,
+            border: `0.5px solid ${(opt?.color ?? '#8A8276')}66`,
             fontSize: 11, fontWeight: 500, color: 'var(--color-text-primary)',
           }}>
-            <span style={{ width: 8, height: 8, borderRadius: 999, background: opt.color }} />
-            {opt.label}
+            <span style={{ width: 8, height: 8, borderRadius: 999, background: opt?.color ?? '#8A8276' }} />
+            {opt?.label ?? (vista.axis ? AXIS_LABEL[vista.axis] : 'Vista')}
           </span>
           <div style={{ flex: 1, minWidth: 180 }}>
             <div style={{
               fontSize: 13, color: 'var(--color-text-secondary)',
               lineHeight: 1.55, letterSpacing: '-0.005em',
             }}>
-              {opt.description}
+              {opt?.description ?? (refKind === 'print'
+                ? 'Nova vista gerada a partir do print enviado — geometria e enquadramento preservados.'
+                : 'Nova vista do mesmo projeto na direção pedida — arquitetura e identidade preservadas.')}
             </div>
+            {vista.user_instruction && (
+              <div style={{
+                fontSize: 12, color: 'var(--color-text-tertiary)', marginTop: 6,
+                lineHeight: 1.5, letterSpacing: '-0.005em', fontStyle: 'italic',
+              }}>
+                “{vista.user_instruction}”
+              </div>
+            )}
             <div style={{
               fontSize: 11, color: 'var(--color-text-quaternary)', marginTop: 6,
               letterSpacing: '0.02em',
             }}>
+              Geometria: {referenceLabel.toLowerCase()}
+              {vista.identity_image_url ? ' · identidade: vista mestre' : ''}
+              {' · '}
               {vista.engine === 'clarity'
                 ? 'Clarity (upscale)'
                 : vista.engine === 'flux-fill'
@@ -448,15 +473,16 @@ export function VistaDetail({ space, vista, others, initialBalance }: Props) {
 
 // ── Sub ───────────────────────────────────────────────────────
 
-// Comparação Antes/Depois. Flag off → grid lado-a-lado clássico (comportamento
-// anterior). Flag on → mesmo grid + toggle "Lado a lado / Sobrepor" (alterna uma
-// imagem única entre Antes e Depois) + selo deixando claro que a ORIGINAL foi
-// preservada (nunca sobrescrita) e, se houver, aviso de preservação.
+// Comparação Antes/Depois contra a REFERÊNCIA GEOMÉTRICA da geração (print,
+// imagem do histórico ou Vista Mestre). Flag off → grid lado-a-lado clássico.
+// Flag on → mesmo grid + toggle "Lado a lado / Sobrepor" + selo deixando claro
+// que a referência original foi preservada e, se houver, aviso de preservação.
 function ComparisonSection({
-  mestreUrl, variationUrl, variationLabel, variationColor, variationSub,
+  referenceUrl, referenceLabel, variationUrl, variationLabel, variationColor, variationSub,
   preserveV2, preservationWarning,
 }: {
-  mestreUrl:           string | null
+  referenceUrl:        string | null
+  referenceLabel:      string
   variationUrl:        string | null
   variationLabel:      string
   variationColor:      string
@@ -472,7 +498,7 @@ function ComparisonSection({
       display: 'grid', gap: 14,
       gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
     }}>
-      <ComparisonCard label="Vista Mestre" color="#1D9E75" imageUrl={mestreUrl} subLabel={preserveV2 ? 'original' : undefined} />
+      <ComparisonCard label={referenceLabel} color="#1D9E75" imageUrl={referenceUrl} subLabel={preserveV2 ? 'referência' : undefined} />
       <ComparisonCard label={variationLabel} color={variationColor} imageUrl={variationUrl} subLabel={variationSub} />
     </div>
   )
@@ -501,7 +527,7 @@ function ComparisonSection({
           ))}
         </div>
         <span
-          title="A Vista Mestre original nunca é sobrescrita — cada variação é salva separadamente."
+          title="A referência original nunca é sobrescrita — cada variação é salva separadamente."
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
             padding: '5px 11px', borderRadius: 999,
@@ -518,10 +544,10 @@ function ComparisonSection({
         <div>
           {/* Imagem única que alterna Antes/Depois */}
           <ComparisonCard
-            label={side === 'antes' ? 'Antes · Vista Mestre' : `Depois · ${variationLabel}`}
+            label={side === 'antes' ? `Antes · ${referenceLabel}` : `Depois · ${variationLabel}`}
             color={side === 'antes' ? '#1D9E75' : variationColor}
-            imageUrl={side === 'antes' ? mestreUrl : variationUrl}
-            subLabel={side === 'depois' ? variationSub : 'original'}
+            imageUrl={side === 'antes' ? referenceUrl : variationUrl}
+            subLabel={side === 'depois' ? variationSub : 'referência'}
           />
           <div style={{ display: 'flex', gap: 4, padding: 4, marginTop: 10, background: 'var(--color-surface)', borderRadius: 9, width: 'fit-content' }}>
             {(['antes', 'depois'] as const).map(s => (
@@ -550,7 +576,7 @@ function ComparisonSection({
           color: '#e0a766', fontSize: 12, lineHeight: 1.5,
         }}>
           Possível alteração além do solicitado nesta variação — registrada para auditoria.
-          Compare com a Vista Mestre acima; se necessário, gere novamente.
+          Compare com a referência acima; se necessário, gere novamente.
         </div>
       )}
     </div>
