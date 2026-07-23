@@ -1,28 +1,35 @@
 // lib/spaces/reference-prompt.ts
 //
-// Prompt builder ÚNICO do Spaces (fluxo Referência → Ação → Gerar). Substitui
-// o preserve-prompt (uma imagem só, sempre a mestre) e o buildAnguloPrompt
-// (dual-reference do eixo Ângulo), unificando os dois em torno da separação
-// explícita de papéis:
+// Prompt builder ÚNICO do Spaces (fluxo Referência → Ação → Gerar).
 //
+// Revisão 2026-07-22 (feedback de testes em prod: texturas repintadas e
+// geometria escapando):
+//   1. MISSÃO NA PRIMEIRA LINHA — modelos de edição de imagem pesam o início
+//      do prompt; a instrução mais crítica de cada ação×referência abre o
+//      texto (padrão validado no fix do eixo Ângulo de 2026-06-30, que abria
+//      com "Image #1 is the ABSOLUTE GEOMETRIC AUTHORITY").
+//   2. Bloco novo MATERIAL & TEXTURE FIDELITY — materiais são evidência
+//      fotográfica, não sugestão: mesmo padrão de textura, veios, tramas,
+//      juntas. Proíbe regenerar textura com padrão novo ou "idealizar".
+//   3. DNA reformulado como INVENTÁRIO de verificação ("se a lista divergir
+//      da imagem, a imagem vence") — a versão anterior dizia "apply as
+//      finish/materials", linguagem de transformação que convidava a
+//      repintar superfícies que já estavam corretas.
+//   4. Travas de overlay ("output must overlay the reference") e negatives
+//      contra "consertar" perspectiva/proporção.
+//
+// Papéis (inalterados):
 //   Image #1 — referência GEOMÉTRICA (a escolhida pelo usuário). Autoridade
 //              máxima de geometria, enquadramento, câmera e elementos.
 //   Image #2 — referência de IDENTIDADE (Vista Mestre), presente apenas quando
 //              a geométrica é um print cru. Fornece materiais/paleta/luz —
 //              NUNCA geometria, câmera ou composição.
-//   DNA/briefing — identidade em texto (sempre presentes quando extraídos).
-//   USER INTENT — a ação escolhida + card/direção/instrução livre.
+//   DNA/briefing — identidade em texto; USER INTENT — a ação escolhida.
 //
 // Regras de produto codificadas aqui:
 //   - A Vista Mestre não pode sobrescrever a geometria da referência atual.
-//   - Nada é adicionado/removido/reposicionado sem pedido explícito (tapetes,
-//     móveis, luminárias, aberturas, objetos).
-//   - Em conflito coerência visual × fidelidade geométrica, vence a geometria
-//     da referência (CONFLICT RULE explícita no prompt).
-//
-// Saída em inglês (modelos de imagem obedecem melhor). Blocos:
-// ROLE · REFERENCES · GEOMETRY LOCK · IDENTITY · PROJECT FACTS · USER INTENT ·
-// ELEMENT INTEGRITY · CONFLICT RULE · NEGATIVE · OUTPUT.
+//   - Nada é adicionado/removido/reposicionado sem pedido explícito.
+//   - Em conflito coerência visual × fidelidade geométrica, vence a geometria.
 
 import type { BriefingArquitetonico } from '@/lib/prompts'
 import type { GenerationAction, ProjectDNA, ReferenceKind } from './types'
@@ -44,14 +51,77 @@ export interface GenerationPromptInput {
   quality:          Resolution
 }
 
-// ── A. ROLE ───────────────────────────────────────────────────
-const ROLE_BLOCK =
-  'ROLE: You are an architectural visualization specialist. Your job is to ' +
-  'preserve real architectural projects, never to reinvent them. Every image ' +
-  'you produce must read as another photograph of the SAME project — same ' +
-  'design, same identity — never a new design "inspired" by it.'
+// A câmera se move? Só na Nova Vista a partir de mestre/histórico.
+function cameraMoves(input: GenerationPromptInput): boolean {
+  return input.action === 'nova_vista' && input.refKind !== 'print'
+}
 
-// ── B. REFERENCES (papéis explícitos) ─────────────────────────
+// ── 1. MISSION (primeira linha = a trava mais importante da ação) ──
+function missionBlock(input: GenerationPromptInput): string {
+  const { action, refKind, hasIdentityImage } = input
+  const role =
+    'You are an architectural visualization specialist who preserves real ' +
+    'projects — never reinvents them.'
+
+  if (action === 'nova_vista') {
+    if (refKind === 'print') {
+      return (
+        "TASK: turn the user's uploaded view (Image #1) into a finished " +
+        'photorealistic render of this project. Image #1 is the ABSOLUTE ' +
+        'GEOMETRIC AUTHORITY of this generation — its geometry, camera, ' +
+        'framing and every element are law and must survive exactly. ' +
+        (hasIdentityImage
+          ? 'Image #2 supplies the project identity (materials, finish, light ' +
+            'character) ONLY — never geometry, never composition. '
+          : '') +
+        role
+      )
+    }
+    return (
+      'TASK: photograph the SAME finished architectural project from a NEW ' +
+      'viewpoint. The design is built and immutable — same architecture, same ' +
+      'materials and textures, same furniture and objects; ONLY the camera ' +
+      'moves. ' + role
+    )
+  }
+
+  if (action === 'luz') {
+    return (
+      (refKind === 'print' && hasIdentityImage
+        ? "TASK: RELIGHT the user's view (Image #1) while making it a finished " +
+          'photorealistic render of this project. Image #1 is the geometric ' +
+          'authority — geometry, camera and framing survive exactly; Image #2 ' +
+          'supplies the material identity. '
+        : 'TASK: RELIGHT this photograph of a real architectural project. This ' +
+          'is a minimal edit of the provided image — the output must be the ' +
+          'SAME photograph, same camera, same geometry, same materials and the ' +
+          'same textures, with ONLY the lighting, shadows, reflections and ' +
+          'atmosphere changed. ') +
+      role
+    )
+  }
+
+  if (action === 'material') {
+    return (
+      'TASK: SURGICAL MATERIAL SWAP on this photograph of a real ' +
+      'architectural project. Replace ONLY the surface(s) the user explicitly ' +
+      'named; every other pixel-level characteristic of the image — geometry, ' +
+      'camera, framing, all other materials and their textures, furniture, ' +
+      'lighting — must remain IDENTICAL to the reference. ' + role
+    )
+  }
+
+  // detalhe
+  return (
+    'TASK: produce a CLOSER CROP of this same photograph — the same shot, the ' +
+    'same perspective and lens character, only a tighter framing on the ' +
+    'requested region. Nothing in the scene may be redesigned, moved, ' +
+    're-textured or reinterpreted; the crop magnifies what already exists. ' +
+    role
+  )
+}
+
+// ── 2. REFERENCES (papéis explícitos + conflict rule no caso dual) ──
 function referencesBlock(input: GenerationPromptInput): string {
   const { hasIdentityImage, refKind } = input
 
@@ -66,8 +136,9 @@ function referencesBlock(input: GenerationPromptInput): string {
     return (
       'REFERENCE IMAGE (single):\n' +
       `Image #1 — GEOMETRIC AND VISUAL AUTHORITY. It is ${geomOrigin}. ` +
-      'Its geometry, framing, camera, elements, materials and lighting logic ' +
-      'define this project. Everything you generate derives from it.'
+      'Its geometry, framing, camera, elements, materials and textures define ' +
+      'this project. Everything you generate derives from it; when in doubt, ' +
+      'copy it.'
     )
   }
 
@@ -78,26 +149,24 @@ function referencesBlock(input: GenerationPromptInput): string {
     'composition, volumes, proportions and every visible element and opening ' +
     '(windows, doors, voids, recesses). Do NOT move, add, remove, redraw, ' +
     'simplify or reinterpret any element. The result must align ' +
-    'element-by-element with Image #1.\n' +
-    "Image #2 — VISUAL IDENTITY REFERENCE ONLY (the project's master view). " +
-    'Use it solely as the source of materials, textures, color palette, finish ' +
-    'quality, lighting language and mood. Do NOT borrow geometry, camera, ' +
-    'composition, framing, layout or any object placement from Image #2. ' +
-    'Do NOT reproduce the scene of Image #2.'
+    'element-by-element with Image #1, edge over edge.\n' +
+    "Image #2 — VISUAL IDENTITY REFERENCE ONLY (the project's reference " +
+    'image). Copy from it the physical materials, textures, color palette, ' +
+    'finish quality, lighting language and mood — faithfully, without ' +
+    'substituting materials. Do NOT borrow geometry, camera, composition, ' +
+    'framing, layout or any object placement from Image #2. Do NOT reproduce ' +
+    "Image #2's scene.\n" +
+    'CONFLICT RULE: if the identity of Image #2 ever conflicts with the ' +
+    'geometry of Image #1, GEOMETRY WINS — follow Image #1 and apply identity ' +
+    'only where it does not alter geometry, framing or elements.'
   )
 }
 
-// ── C. GEOMETRY LOCK ──────────────────────────────────────────
-//
-// O que fica travado em relação à Image #1, conforme a ação:
-//   - luz/material: tudo, inclusive câmera.
-//   - detalhe: tudo, mas o enquadramento pode FECHAR (crop da mesma vista).
-//   - nova_vista + print: tudo da Image #1 (o print é a nova vista).
-//   - nova_vista + mestre/histórico: a câmera se move; arquitetura travada.
+// ── 3. GEOMETRY LOCK ──────────────────────────────────────────
 function geometryLockBlock(input: GenerationPromptInput): string {
-  const { action, refKind } = input
-  const cameraMoves = action === 'nova_vista' && refKind !== 'print'
-  const closerCrop  = action === 'detalhe'
+  const { action } = input
+  const moves      = cameraMoves(input)
+  const closerCrop = action === 'detalhe'
 
   const items = [
     'geometry, volumetry, proportions and scale',
@@ -108,7 +177,7 @@ function geometryLockBlock(input: GenerationPromptInput): string {
     'facade rhythm and composition',
     'roof profile, slabs, columns, brises, railings',
     'terrain, boundaries and site implantation',
-    !cameraMoves && !closerCrop ? 'camera position, viewing angle, perspective and framing' : null,
+    !moves && !closerCrop ? 'camera position, viewing angle, perspective and framing' : null,
   ].filter(Boolean)
 
   const head =
@@ -121,10 +190,10 @@ function geometryLockBlock(input: GenerationPromptInput): string {
       'THIS SAME view — same perspective, same lens character, same ' +
       'architecture, same materials. It is a tighter crop of the existing ' +
       'scene: never a new camera angle, never a relayout. Everything that ' +
-      'remains in frame must match Image #1 exactly.'
+      'remains in frame must match Image #1 exactly, edge over edge.'
   }
 
-  if (cameraMoves) {
+  if (moves) {
     return head +
       'THE CAMERA MAY MOVE: produce a NEW viewpoint as requested, but of this ' +
       'SAME project — same architectural language, same volumetry, same ' +
@@ -132,17 +201,73 @@ function geometryLockBlock(input: GenerationPromptInput): string {
       'photograph of the same project, never another project.'
   }
 
-  return head
+  return head +
+    'OVERLAY RULE: the output must overlay the reference — every edge, wall ' +
+    'line, opening contour and object silhouette in the same position, at the ' +
+    'same size, seen from the same camera.'
 }
 
-// ── D. IDENTITY (DNA em texto) ────────────────────────────────
+// ── 4. MATERIAL & TEXTURE FIDELITY (novo — resposta ao drift de textura) ──
+function textureFidelityBlock(input: GenerationPromptInput): string {
+  const { action, hasIdentityImage } = input
+
+  const source = hasIdentityImage
+    ? 'the reference images (Image #1 where finished, Image #2 for the project identity)'
+    : 'the reference image'
+
+  const scopeException =
+    action === 'material'
+      ? ' This applies to EVERY surface except the one(s) the user explicitly asked to change.'
+      : ''
+
+  const lightNote =
+    action === 'luz'
+      ? ' Lighting changes how surfaces are LIT — never what they are made of: ' +
+        'albedo, texture pattern and material identity stay constant; only ' +
+        'illumination, shadow direction, color temperature and reflections update.'
+      : ''
+
+  const cropNote =
+    action === 'detalhe'
+      ? ' When magnifying, reveal the texture that plausibly exists in the ' +
+        'reference — do not invent a new pattern at close range.'
+      : ''
+
+  return (
+    `MATERIAL & TEXTURE FIDELITY: the materials visible in ${source} are ` +
+    'photographic evidence, not suggestions. Reproduce the exact same physical ' +
+    'materials with the same texture pattern and scale, the same wood grain ' +
+    'direction, the same stone/marble veining layout, the same fabric weave, ' +
+    'the same tile/grout and joint alignment, the same finish (matte/gloss) ' +
+    'and the same imperfections. Never substitute a material for a ' +
+    'similar-looking one, never regenerate a texture with a new random ' +
+    'pattern, never idealize or "clean up" real surfaces.' +
+    scopeException + lightNote + cropNote
+  )
+}
+
+// ── 5. IDENTITY (DNA como inventário de verificação, não repintura) ──
 function identityBlock(input: GenerationPromptInput): string {
   const { dna, hasIdentityImage } = input
   if (!dna) return ''
   const mats = dna.materiais.map(m => `${m.nome} (${m.hex})`).join(', ')
-  const from = hasIdentityImage ? 'Image #2 and the data below' : 'the reference and the data below'
+
+  if (hasIdentityImage) {
+    return (
+      'PROJECT VISUAL IDENTITY (from Image #2 and the data below — use as ' +
+      'materials/finish/mood applied onto the geometry of Image #1, never as ' +
+      'geometry):\n' +
+      `- Style: ${dna.estilo.nome}\n` +
+      `- Materials: ${mats}\n` +
+      `- Palette: ${dna.paleta.join(', ')}\n` +
+      `- Context: ${dna.contexto.join(', ')}`
+    )
+  }
+
   return (
-    `PROJECT VISUAL IDENTITY (from ${from} — apply as finish/materials/mood ONLY, never as geometry):\n` +
+    'MATERIAL INVENTORY (verification checklist of what is ALREADY in the ' +
+    'reference — NOT a repaint instruction; if this list disagrees with the ' +
+    'image, the IMAGE wins):\n' +
     `- Style: ${dna.estilo.nome}\n` +
     `- Materials: ${mats}\n` +
     `- Palette: ${dna.paleta.join(', ')}\n` +
@@ -150,7 +275,7 @@ function identityBlock(input: GenerationPromptInput): string {
   )
 }
 
-// ── E. PROJECT FACTS (briefing como lock factual) ─────────────
+// ── 6. PROJECT FACTS (briefing como lock factual) ─────────────
 function factsBlock(briefing?: BriefingArquitetonico | null): string {
   if (!briefing) return ''
   const locked = briefing.elementos_preservar.length > 0
@@ -167,7 +292,7 @@ function factsBlock(briefing?: BriefingArquitetonico | null): string {
   )
 }
 
-// ── F. USER INTENT (por ação) ─────────────────────────────────
+// ── 7. USER INTENT (a mudança pedida — e SÓ ela) ──────────────
 function userIntentBlock(input: GenerationPromptInput): string {
   const { action, refKind, userIntent, userInstruction, referenceLabel } = input
   const intent      = userIntent.trim()
@@ -178,36 +303,24 @@ function userIntentBlock(input: GenerationPromptInput): string {
   if (action === 'nova_vista') {
     if (refKind === 'print') {
       core =
-        "Turn the user's uploaded view (Image #1) into a finished photorealistic " +
-        'architectural render of this project. Image #1 IS the new view: keep its ' +
-        'exact geometry, camera and framing, and apply the project identity ' +
-        '(materials, finish, lighting language) on top of it.' +
+        'Make Image #1 real: keep its exact geometry, camera and framing, and ' +
+        'render it with the project identity.' +
         (label ? ` The user calls this view: "${label}".` : '')
     } else {
       core =
-        'Produce a NEW viewpoint of this SAME project. Requested direction: ' +
+        'Requested direction for the new viewpoint: ' +
         (intent ? `${intent}. ` : '') +
-        (instruction ? `User's own words (may be in Portuguese): "${instruction}". ` : '') +
-        'Keep the architectural DNA intact.'
+        (instruction ? `User's own words (may be in Portuguese): "${instruction}". ` : '')
     }
   } else if (action === 'luz') {
-    core =
-      'Change ONLY the lighting and atmosphere of the scene in Image #1: ' +
-      `${intent}. Light direction, exposure, sky and shadows update coherently; ` +
-      'architecture, camera, materials and every object stay exactly as they are.'
+    core = `Requested lighting: ${intent}.`
   } else if (action === 'material') {
     core =
-      'Change ONLY the material/surface the user specified, exactly as asked. ' +
       `User request (may be written in Portuguese): "${instruction}". ` +
-      'Apply the new material with realistic texture and correct perspective on ' +
-      'that surface alone. Every other surface, object, opening, the camera and ' +
-      'the lighting stay exactly as in Image #1.'
+      'Apply the new material(s) with realistic texture and correct ' +
+      'perspective on the named surface(s) alone.'
   } else {
-    core =
-      'Create a closer architectural crop of Image #1 focused on: ' +
-      `${intent}. Same design language, materials, palette, lighting logic and ` +
-      'proportions — the result must look like another image from the SAME ' +
-      'project presentation.'
+    core = `Crop target: ${intent}.`
   }
 
   return (
@@ -216,14 +329,10 @@ function userIntentBlock(input: GenerationPromptInput): string {
   )
 }
 
-// ── G. ELEMENT INTEGRITY ──────────────────────────────────────
-//
-// A regra "não mexe no que não foi pedido", nomeando o que o usuário reclama
-// quando muda sozinho: tapetes, móveis, luminárias, aberturas, objetos.
+// ── 8. ELEMENT INTEGRITY ──────────────────────────────────────
 function elementIntegrityBlock(input: GenerationPromptInput): string {
-  const { action, refKind } = input
   const adjacentRoomException =
-    action === 'nova_vista' && refKind !== 'print'
+    cameraMoves(input)
       ? ' If the requested view reveals areas not visible in Image #1, extend ' +
         'them with restraint and full coherence with the project identity — ' +
         'never inventing a different design.'
@@ -237,17 +346,11 @@ function elementIntegrityBlock(input: GenerationPromptInput): string {
   )
 }
 
-// ── H. CONFLICT RULE ──────────────────────────────────────────
-const CONFLICT_BLOCK =
-  'CONFLICT RULE: if visual coherence with the project identity ever conflicts ' +
-  'with geometric fidelity to Image #1, GEOMETRY WINS. Follow Image #1 and ' +
-  'apply the identity only where it does not alter geometry, framing or elements.'
-
-// ── I. NEGATIVE ───────────────────────────────────────────────
+// ── 9. NEGATIVE ───────────────────────────────────────────────
 function negativeBlock(input: GenerationPromptInput): string {
-  const { action, refKind, hasIdentityImage } = input
-  const cameraMoves = action === 'nova_vista' && refKind !== 'print'
-  const closerCrop  = action === 'detalhe'
+  const { action, hasIdentityImage } = input
+  const moves      = cameraMoves(input)
+  const closerCrop = action === 'detalhe'
 
   const base = [
     'do not redesign the architecture',
@@ -256,6 +359,7 @@ function negativeBlock(input: GenerationPromptInput): string {
     'do not change window/door frames (esquadrias)' + (action === 'material' ? ' unless they are the requested surface' : ''),
     'do not change the roof profile',
     'do not change the architectural style',
+    'do not straighten, re-proportion or "fix" the perspective of the reference',
     'do not distort or warp the perspective',
     'do not turn the image into concept art, illustration or cartoon',
     'do not create surreal, neon, fantasy or generic-AI atmosphere',
@@ -265,8 +369,10 @@ function negativeBlock(input: GenerationPromptInput): string {
   if (action !== 'material') {
     base.push('do not recolor, repaint or replace any existing finish or material')
   }
-  if (!cameraMoves && !closerCrop) {
+  base.push('do not alter the texture pattern, veining, grain, weave or joints of any surface that was not explicitly requested to change')
+  if (!moves && !closerCrop) {
     base.push('do not change the camera, viewing angle, perspective or framing of Image #1')
+    base.push('do not change the aspect or crop of the reference')
   }
   if (closerCrop) {
     base.push('do not invent a new camera angle or viewpoint — only crop closer into the existing view')
@@ -279,29 +385,32 @@ function negativeBlock(input: GenerationPromptInput): string {
   return 'STRICTLY AVOID: ' + base.join('; ') + '.'
 }
 
-// ── J. OUTPUT ─────────────────────────────────────────────────
-function outputBlock(quality: Resolution): string {
+// ── 10. OUTPUT (fecho com o lembrete de cópia — primazia + recência) ──
+function outputBlock(input: GenerationPromptInput): string {
+  const closing = cameraMoves(input)
+    ? 'The result must read as another photograph of the same finished project.'
+    : 'When in doubt about any surface, edge or element, COPY THE REFERENCE exactly.'
   return (
-    `OUTPUT: photorealistic architectural image, ${quality.toUpperCase()} quality; ` +
+    `OUTPUT: photorealistic architectural image, ${input.quality.toUpperCase()} quality; ` +
     'plausible light and shadows; legible materiality; clean composition; ' +
     'rigorous preservation of the reference; suitable for a professional ' +
     'architecture presentation. No "redesign", no "creative reinterpretation", ' +
-    'no "new concept".'
+    `no "new concept". ${closing}`
   )
 }
 
 // ── Builder ───────────────────────────────────────────────────
 export function buildGenerationPrompt(input: GenerationPromptInput): string {
   return [
-    ROLE_BLOCK,
+    missionBlock(input),
     referencesBlock(input),
     geometryLockBlock(input),
+    textureFidelityBlock(input),
     identityBlock(input),
     factsBlock(input.briefing),
     userIntentBlock(input),
     elementIntegrityBlock(input),
-    CONFLICT_BLOCK,
     negativeBlock(input),
-    outputBlock(input.quality),
+    outputBlock(input),
   ].filter(Boolean).join('\n\n')
 }
