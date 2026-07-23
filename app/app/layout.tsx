@@ -1,6 +1,8 @@
+import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Sidebar from '@/components/app/Sidebar'
+import SignupConversionPing from '@/components/SignupConversionPing'
 import { getPlanById, type PlanId } from '@/lib/plans'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getPayerId } from '@/lib/workspaces/context'
@@ -56,6 +58,9 @@ export default async function AppLayout({
       <main style={{ flex: 1, overflow: 'hidden', minHeight: 0, display: 'flex', background: 'var(--color-bg)' }}>
         {children}
       </main>
+      <Suspense fallback={null}>
+        <SignupConversionPing />
+      </Suspense>
     </div>
   )
 }
