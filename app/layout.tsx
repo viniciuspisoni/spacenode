@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { ThemeProvider } from "@/lib/theme/ThemeProvider";
+import GoogleTag from "@/components/GoogleTag";
 import "./globals.css";
 
 // Geist served from local woff2 — avoids the network fetch that next/font/google
@@ -67,6 +68,7 @@ export default function RootLayout({
       </head>
       <body className="antialiased">
         <ThemeProvider>{children}</ThemeProvider>
+        <GoogleTag />
       </body>
     </html>
   );
