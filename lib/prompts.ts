@@ -647,9 +647,13 @@ function buildMaterialsBlock(
   ].filter(Boolean)
   if (lines.length === 0) return ''
   if (level === 'maximum') {
-    // Removida a frase "All OTHER materials must remain identical" — já dita
-    // 2x antes (fidelityModifier + buildNegativePromptForFidelity).
-    return `MATERIAL OVERRIDES (priority over reference): ${lines.join('; ')}. `
+    // A cláusula de escopo é essencial: a override vale SÓ pros campos
+    // listados — sem ela, "MATERIAL OVERRIDES (priority over reference)" era
+    // lida como licença geral pra reinterpretar acabamentos vizinhos.
+    return (
+      `MATERIAL OVERRIDES (priority over reference, ONLY on the surfaces named here): ${lines.join('; ')}. ` +
+      'Every surface NOT named in these overrides keeps the reference material, color and texture pattern exactly. '
+    )
   }
   return `EXACT PROJECT MATERIALS — reproduce these faithfully: ${lines.join('; ')}. `
 }
@@ -675,6 +679,7 @@ const NEGATIVE_BASE = [
 const MAXIMUM_EXTRA_NEGATIVES = [
   'no recoloring, restaining, repainting or replaced finishes on any wall, ceiling, floor, door, window frame, ceiling fan, light fixture or furniture (no concrete texture replacing painted walls, no industrial finish replacing flat paint)',
   'no altered geometry, hardware or proportions on doors, windows, fans or fixtures',
+  'no altered texture pattern, plank/tile layout, stone veining, wood grain direction, fabric weave or joint/grout alignment on any surface that was not explicitly overridden',
 ]
 
 export function buildNegativePromptForFidelity(level: FidelityLevel): string {
@@ -730,6 +735,60 @@ function buildAnchorBlock(hasAnchor?: boolean): string {
     'camera angle and perspective. ' +
     'Apply the lighting and scene changes requested below to image #1 while ' +
     'preserving its materials and textures pixel-by-pixel where geometry allows. '
+  )
+}
+
+// ── Locks positivos da Máxima (revisão 2026-07-22) ─────────────────────────────
+//
+// Feedback de testes em prod (mesma classe de sintoma corrigida no Spaces):
+// texturas repintadas e geometria escapando. Até aqui o lock de geometria da
+// Máxima vivia SÓ nos negativos ("no different camera angle…") — locks
+// positivos com regra de overlay aderem melhor que listas de proibição, e o
+// vocabulário de TEXTURA (veios, grãos, paginação, juntas) não existia.
+// Ambos os blocos são exclusivos do level 'maximum'.
+
+function buildGeometryLockMaxBlock(hasAnchor?: boolean): string {
+  const ref = hasAnchor ? 'image #2, the geometry source' : 'the reference image'
+  return (
+    `GEOMETRY LOCK (relative to ${ref}): preserve exactly the camera position, ` +
+    'perspective, framing and horizon; the building/space silhouette; every ' +
+    'wall, slab and ceiling plane; the count, size, shape and position of ' +
+    'every door and window; all proportions; stairs, columns, beams and ' +
+    'built-in volumes; the surrounding context. OVERLAY RULE: the output must ' +
+    'overlay the geometry reference — every edge, opening contour and object ' +
+    'silhouette in the same position, at the same size, seen from the same ' +
+    'camera. '
+  )
+}
+
+function buildTextureFidelityMaxBlock(hasAnchor?: boolean): string {
+  if (hasAnchor) {
+    // Âncora = render fotorealista anterior do MESMO projeto: as texturas dela
+    // são evidência fotográfica pronta — copiar, nunca regenerar.
+    return (
+      'MATERIAL & TEXTURE FIDELITY: materials and textures come from image #1 ' +
+      'and are photographic evidence, not suggestions — reproduce the same ' +
+      'physical materials with the same texture pattern and scale, the same ' +
+      'wood grain direction, the same stone/marble veining layout, the same ' +
+      'fabric weave, the same plank/tile layout and joint/grout alignment, the ' +
+      'same finish (matte/gloss). Never substitute a material for a ' +
+      'similar-looking one, never regenerate a texture with a new random ' +
+      'pattern. '
+    )
+  }
+  // Sem âncora = modelo 3D/SketchUp: as texturas mapeadas são DECISÕES DE
+  // PROJETO. O realismo é bem-vindo (é o objetivo), mas a identidade do
+  // material — cor, padrão, paginação — não muda.
+  return (
+    'MATERIAL IDENTITY LOCK: the materials mapped in the model are design ' +
+    'decisions, not placeholders. Render each surface as the SAME material ' +
+    'with the SAME color and the SAME pattern layout shown in the reference — ' +
+    'wood keeps its tone and plank layout, stone keeps its color and cut, ' +
+    'painted surfaces keep their exact paint color, tiles keep their size and ' +
+    'grid. Add ONLY photographic realism: real micro-texture, grain, ' +
+    'reflectance and light response. Never swap a material for a similar one, ' +
+    'never recolor, never invent veining or patterns that contradict the ' +
+    'reference, never "upgrade" a finish. '
   )
 }
 
@@ -800,6 +859,8 @@ export function buildFidelityPrompt(
   const allow      = briefing ? transformationBlock(briefing, level) : ''
   const matBlock   = buildMaterialsBlock(materials, projectType, level)
   const negative   = buildNegativePromptForFidelity(level)
+  const geoLock    = level === 'maximum' ? buildGeometryLockMaxBlock(hasAnchor)     : ''
+  const texture    = level === 'maximum' ? buildTextureFidelityMaxBlock(hasAnchor)  : ''
 
   const lightDesc  = LIGHT_EN[lighting] ?? lighting
   const segDesc    = SEG_EN[segment]    ?? segment.toLowerCase()
@@ -879,6 +940,31 @@ export function buildFidelityPrompt(
     lightingLine = 'Lighting: keep the reference lighting EXACTLY — every fixture stays in the same on/off state, same time of day, same shadow direction. '
   }
 
+  // Máxima: MISSÃO PRIMEIRO — modelos de edição pesam o início do prompt
+  // (padrão validado no Spaces, fix 2026-07-22). A ordem vira:
+  //   âncora/refinamento (papéis das imagens + pedido cirúrgico do usuário)
+  //   → intent (a missão CGI→foto ou re-render fiel)
+  //   → modifier (contrato de preservação)
+  //   → GEOMETRY LOCK + MATERIAL/TEXTURE (locks positivos novos)
+  //   → fatos/overrides/luz/cena → negativos → câmera.
+  // Balanced/creative mantêm a ordem histórica, byte a byte.
+  if (level === 'maximum') {
+    return (
+      anchor +
+      refinement +
+      intent +
+      modifier +
+      geoLock +
+      texture +
+      preserve +
+      matBlock +
+      lightingLine +
+      bgBlock +
+      elemBlock +
+      negative +
+      buildCameraBlock(level, hasAnchor)
+    )
+  }
   return (
     anchor +
     refinement +
