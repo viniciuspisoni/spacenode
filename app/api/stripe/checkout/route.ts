@@ -17,6 +17,7 @@ import {
   getLumenStripePriceId,
   type LumenPackSize,
 } from '@/lib/lumens'
+import { isLaunchOfferOpen } from '@/lib/launch-offer'
 
 export const dynamic = 'force-dynamic'
 
@@ -51,6 +52,20 @@ async function hasActiveSubscription(stripe: Stripe, id: string): Promise<boolea
     if (isResourceMissing(err)) return false
     throw err
   }
+}
+
+/**
+ * A oferta de lançamento é de PRIMEIRA assinatura. Sem essa checagem, um
+ * usuário poderia assinar com 50%, cancelar e reassinar com 50% de novo
+ * indefinidamente.
+ *
+ * Sem customer no Stripe = nunca comprou nada = elegível. Com customer,
+ * `status: 'all'` inclui canceladas — é o que fecha a brecha.
+ */
+async function isFirstSubscription(stripe: Stripe, customerId: string | null): Promise<boolean> {
+  if (!customerId) return true
+  const subs = await stripe.subscriptions.list({ customer: customerId, status: 'all', limit: 1 })
+  return subs.data.length === 0
 }
 
 export async function POST(req: NextRequest) {
@@ -140,11 +155,34 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Configuração indisponível' }, { status: 500 })
     }
 
+    // ── Oferta de lançamento: 50% na primeira mensalidade ────────────────
+    // Entra via `discounts` (e não `allow_promotion_codes`): o desconto é
+    // automático e o cliente não digita código nenhum. Os dois campos são
+    // mutuamente exclusivos no Stripe — não dá pra ter os dois na mesma session.
+    // Só no mensal: "primeiro mês" não significa nada num plano anual.
+    const launchCouponId = process.env.STRIPE_LAUNCH_COUPON_ID
+    const offerEligible =
+      body.billing === 'monthly' &&
+      isLaunchOfferOpen() &&
+      (await isFirstSubscription(stripe, reusableCustomerId))
+
+    if (offerEligible && !launchCouponId) {
+      // Config incompleta: a UI está anunciando 50% e o Stripe vai cobrar
+      // cheio. Não bloqueia a venda (o cliente ainda vê o valor real na tela
+      // do Stripe antes de pagar), mas precisa gritar no log.
+      console.error(
+        '[checkout] oferta de lançamento aberta mas STRIPE_LAUNCH_COUPON_ID ' +
+        'não está definido — cobrando preço cheio'
+      )
+    }
+    const applyOffer = offerEligible && Boolean(launchCouponId)
+
     const session = await stripe.checkout.sessions.create({
       ...customerArgs,
       payment_method_types: ['card'],
       line_items:           [{ price: priceId, quantity: 1 }],
       mode:                 'subscription',
+      ...(applyOffer ? { discounts: [{ coupon: launchCouponId! }] } : {}),
       success_url:          `${successBase}?success=true`,
       cancel_url:           `${successBase}?canceled=true`,
       metadata: {
@@ -153,6 +191,7 @@ export async function POST(req: NextRequest) {
         plan_id:       plan.id,
         billing_cycle: body.billing,
         nodes_to_add:  String(plan.nodes),
+        launch_offer:  applyOffer ? 'applied' : 'none',
       },
     })
 
@@ -161,7 +200,7 @@ export async function POST(req: NextRequest) {
       user_id: user.id,
       event_type: 'checkout_started',
       plan_id: plan.id,
-      metadata: { billing_cycle: body.billing },
+      metadata: { billing_cycle: body.billing, launch_offer: applyOffer },
     })
 
     return NextResponse.json({ url: session.url })

@@ -63,12 +63,19 @@ export async function POST(req: NextRequest) {
       console.log(`[stripe webhook] plano ${planId} ativado p/ user ${userId} (${nodesToAdd} nodes)`)
 
       // Funil first-party (best-effort — recordAcquisitionEvent nunca lança).
+      // `value_cents` é o valor efetivamente cobrado (já com o desconto de
+      // lançamento, quando houve); `launch_offer` separa as duas coortes na
+      // hora de medir retenção do 2º mês, que é o número que importa aqui.
       await recordAcquisitionEvent(supabase, {
         user_id: userId,
         event_type: 'subscription_started',
         plan_id: planId,
         value_cents: session.amount_total ?? null,
-        metadata: { billing_cycle: session.metadata?.billing_cycle ?? null, stripe_session_id: session.id },
+        metadata: {
+          billing_cycle:     session.metadata?.billing_cycle ?? null,
+          stripe_session_id: session.id,
+          launch_offer:      session.metadata?.launch_offer === 'applied',
+        },
       })
     } else if (productType === 'lumen') {
       const packSize = parseInt(session.metadata?.pack_size ?? '0', 10)

@@ -24,6 +24,18 @@ export default async function BillingPage() {
     .gt('expires_at', new Date().toISOString())
     .order('expires_at', { ascending: true })
 
+  // Elegibilidade à oferta de lançamento (só para anunciar — quem decide de
+  // fato é o checkout, consultando o Stripe). Num usuário free, ter
+  // `stripe_customer_id` significa que já assinou e cancelou: Lumens, a outra
+  // via de compra, exigem Pro ou superior. Membro de workspace fica de fora
+  // porque quem paga é o dono da bolsa.
+  const { data: own } = await admin
+    .from('profiles')
+    .select('stripe_customer_id')
+    .eq('id', user.id)
+    .single()
+  const offerEligible = !balance.pooled && balance.planId === 'free' && !own?.stripe_customer_id
+
   return (
     <BillingClient
       plan={balance.planId}
@@ -34,6 +46,7 @@ export default async function BillingPage() {
       }}
       lumens={(lumenRows ?? []) as LumenPackRow[]}
       pooled={balance.pooled}
+      offerEligible={offerEligible}
     />
   )
 }
