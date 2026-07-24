@@ -3,6 +3,14 @@
 import { useState } from 'react'
 import { ANNUAL_BILLING_ENABLED, PLANS, type PaidPlanId, type BillingCycle } from '@/lib/plans'
 import { LUMEN_PACKS, LUMEN_VALIDITY_DAYS, type LumenPackSize } from '@/lib/lumens'
+import {
+  isLaunchOfferOpen,
+  launchOfferPrice,
+  launchOfferDeadlineLabel,
+  formatBRL,
+  LAUNCH_OFFER_HEADLINE,
+  LAUNCH_OFFER_PITCH,
+} from '@/lib/launch-offer'
 
 export interface LumenPackRow {
   id:              string
@@ -20,6 +28,8 @@ interface BillingClientProps {
   lumens:  LumenPackRow[]
   /** true = saldo exibido é a bolsa do workspace (membro de escritório). */
   pooled?: boolean
+  /** true = nunca assinou, então cai na oferta de lançamento (50% no 1º mês). */
+  offerEligible?: boolean
 }
 
 type CheckoutPayload =
@@ -41,7 +51,7 @@ function daysUntil(date: string): number {
   return Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)))
 }
 
-export function BillingClient({ plan, balance, lumens, pooled }: BillingClientProps) {
+export function BillingClient({ plan, balance, lumens, pooled, offerEligible }: BillingClientProps) {
   const isLumenBlocked = plan === 'free' || plan === 'starter'
   const [billing, setBilling] = useState<BillingCycle>('monthly')
   const [loading, setLoading] = useState<string | null>(null)
@@ -70,6 +80,8 @@ export function BillingClient({ plan, balance, lumens, pooled }: BillingClientPr
     if (r.url) window.location.assign(r.url)
   }
   const canManage = plan !== 'free' && !pooled
+  // Só no mensal: o desconto é da primeira mensalidade.
+  const showOffer = Boolean(offerEligible) && billing === 'monthly' && isLaunchOfferOpen()
 
   return (
     <div style={{
@@ -124,6 +136,27 @@ export function BillingClient({ plan, balance, lumens, pooled }: BillingClientPr
               </button>
             )}
           </div>
+          {showOffer && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+              background: 'var(--color-accent-green-bg)',
+              border: '0.5px solid var(--color-accent-green-border)',
+              borderRadius: 12, padding: '14px 18px', marginBottom: 14,
+            }}>
+              <span style={{
+                fontSize: 10, fontWeight: 600, letterSpacing: '0.18em',
+                textTransform: 'uppercase', color: 'var(--color-accent-green)',
+              }}>
+                {LAUNCH_OFFER_HEADLINE}
+              </span>
+              <span style={{ fontSize: 12.5, color: 'var(--color-text-primary)', letterSpacing: '-0.005em' }}>
+                {LAUNCH_OFFER_PITCH}
+              </span>
+              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginLeft: 'auto' }}>
+                até {launchOfferDeadlineLabel()}
+              </span>
+            </div>
+          )}
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
@@ -147,8 +180,23 @@ export function BillingClient({ plan, balance, lumens, pooled }: BillingClientPr
                     <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginLeft: 4, fontWeight: 400 }}>nodes/mês</span>
                   </div>
                   <div style={{ fontSize: 13, color: 'var(--color-text-primary)', fontWeight: 500, marginBottom: 4 }}>
-                    R$ {price}<span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', fontWeight: 400 }}>/mês</span>
+                    R$ {formatBRL(showOffer ? launchOfferPrice(price) : price)}
+                    <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', fontWeight: 400 }}>/mês</span>
+                    {showOffer && (
+                      <span style={{
+                        fontSize: 11, fontWeight: 400, marginLeft: 6,
+                        textDecoration: 'line-through', color: 'var(--color-text-tertiary)',
+                      }}>
+                        R$ {formatBRL(price)}
+                      </span>
+                    )}
                   </div>
+                  {showOffer && (
+                    <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginBottom: 12 }}>
+                      <span style={{ color: 'var(--color-accent-green)', fontWeight: 500 }}>no 1º mês</span>
+                      {' '}· depois R$ {formatBRL(price)}/mês
+                    </div>
+                  )}
                   {billing === 'annual' && (
                     <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginBottom: 12 }}>
                       R$ {p.annualTotal.toLocaleString('pt-BR')} cobrado anualmente

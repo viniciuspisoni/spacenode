@@ -5,6 +5,13 @@ import { ENGINES, ENGINE_ORDER, type Resolution } from '@/lib/engines'
 import { ANNUAL_BILLING_ENABLED, PLANS, recommendPlan, type PaidPlanId, type BillingCycle } from '@/lib/plans'
 import { LUMEN_PACKS } from '@/lib/lumens'
 import { SUPPORT_EMAIL, supportWhatsAppUrl } from '@/lib/support'
+import {
+  isLaunchOfferOpen,
+  launchOfferPrice,
+  launchOfferDeadlineLabel,
+  formatBRL,
+  LAUNCH_OFFER_FINE_PRINT,
+} from '@/lib/launch-offer'
 
 // UI-specific data por plano: features, badge, breakdown de renders.
 // Renders calculados com engine padrão por resolução: HD→Pulsar (10 nodes),
@@ -74,6 +81,10 @@ function PlanCard({ planId, billing, loading, onSelect }: {
   const [hovered, setHovered] = useState(false)
   const price = billing === 'annual' ? plan.annualMonthlyPrice : plan.monthlyPrice
   const f = d.featured
+  // Oferta de lançamento vale só no mensal — "primeiro mês" não faz sentido
+  // num ciclo anual.
+  const offer        = billing === 'monthly' && isLaunchOfferOpen()
+  const shownPrice   = offer ? launchOfferPrice(price) : price
 
   return (
     <div
@@ -121,14 +132,29 @@ function PlanCard({ planId, billing, loading, onSelect }: {
           letterSpacing: '-0.04em', lineHeight: 1,
           fontVariantNumeric: 'tabular-nums' as const,
         }}>
-          {price}
+          {formatBRL(shownPrice)}
         </span>
         <span style={{ fontSize: 13, color: f ? 'rgba(255,255,255,0.4)' : 'var(--color-text-tertiary)', letterSpacing: '-0.005em' }}>
           /mês
         </span>
+        {offer && (
+          <span style={{
+            fontSize: 14, letterSpacing: '-0.01em',
+            textDecoration: 'line-through',
+            color: f ? 'rgba(255,255,255,0.35)' : 'var(--color-text-tertiary)',
+            fontVariantNumeric: 'tabular-nums' as const,
+          }}>
+            R$ {formatBRL(price)}
+          </span>
+        )}
       </div>
 
-      {billing === 'annual' ? (
+      {offer ? (
+        <p style={{ fontSize: 10.5, letterSpacing: '-0.005em', marginBottom: 14, color: f ? 'rgba(255,255,255,0.3)' : 'var(--color-text-tertiary)' }}>
+          <span style={{ color: 'var(--color-accent-green)', fontWeight: 500 }}>no 1º mês</span>
+          {' '}· depois R$ {formatBRL(price)}/mês
+        </p>
+      ) : billing === 'annual' ? (
         <p style={{ fontSize: 10.5, letterSpacing: '-0.005em', marginBottom: 14, color: f ? 'rgba(255,255,255,0.3)' : 'var(--color-text-tertiary)' }}>
           R$ {d.monthlyAnnualLabel} cobrado anualmente
         </p>
@@ -533,6 +559,7 @@ export function PricingToggle() {
         {/* Footer */}
         <div style={{ textAlign: 'center', marginTop: 32 }}>
           <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', letterSpacing: '-0.005em', lineHeight: 1.7 }}>
+            {isLaunchOfferOpen() && <>{LAUNCH_OFFER_FINE_PRINT} Oferta válida até {launchOfferDeadlineLabel()}.<br /></>}
             Nodes renovam mensalmente e não acumulam para o mês seguinte.<br />
             Lumens (créditos avulsos) ficam disponíveis a partir do plano Pro.<br />
             Dúvidas?{' '}
