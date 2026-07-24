@@ -2,9 +2,11 @@
 //
 // Redigida para refletir o tratamento REAL de dados do produto: Supabase
 // (auth/banco/storage), Vercel (hospedagem), Google Cloud e fal.ai (IA),
-// Stripe (pagamentos), zero analytics/pixel de terceiros hoje (cookies só
-// essenciais + tema em localStorage). Se algum tracker for adicionado no
-// futuro, a cláusula 7 PRECISA ser atualizada junto.
+// Stripe (pagamentos), zero analytics/pixel de TERCEIROS (cookies essenciais +
+// tema em localStorage + cookie PRÓPRIO de atribuição de campanha
+// sn_attribution — first-party, sem dados pessoais, citado na cláusula 7 em
+// 2026-07-18). Se algum tracker de terceiro for adicionado no futuro, a
+// cláusula 7 PRECISA ser atualizada junto (e consentimento, quando exigido).
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { LegalShell, LegalSection, P, UL, LI, Strong } from '@/components/legal/LegalShell'
@@ -17,7 +19,7 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 }
 
-const UPDATED_AT = '15 de julho de 2026'
+const UPDATED_AT = '18 de julho de 2026'
 
 export default function PrivacidadePage() {
   return (
@@ -30,7 +32,7 @@ export default function PrivacidadePage() {
           cadastro, as imagens que você envia e registros técnicos de uso. Suas imagens são processadas por
           provedores de IA contratados <Strong>apenas para gerar os seus resultados</Strong>; não usamos seu
           conteúdo para treinar modelos próprios nem vendemos dados. Pagamentos ficam com a Stripe. Não
-          usamos cookies de publicidade. Este resumo não substitui o texto completo abaixo.
+          usamos cookies de publicidade de terceiros. Este resumo não substitui o texto completo abaixo.
         </>
       }
     >
@@ -149,11 +151,16 @@ export default function PrivacidadePage() {
       <LegalSection n={7} title="Cookies e tecnologias locais">
         <P>
           Usamos apenas o essencial para a plataforma funcionar: cookies de sessão para manter você
-          autenticado e armazenamento local do navegador para preferências de interface (como o tema).
+          autenticado, armazenamento local do navegador para preferências de interface (como o tema) e um
+          cookie próprio de atribuição de campanha (<Strong>sn_attribution</Strong>), que guarda por até 90
+          dias os parâmetros da campanha que trouxe você ao site (como utm_source e utm_campaign), o
+          endereço da página de origem e a data do acesso. Esse cookie é nosso (first-party), não contém
+          dados pessoais e não é compartilhado com terceiros.
         </P>
         <P>
-          <Strong>Não usamos cookies de publicidade nem rastreadores de terceiros.</Strong> Se isso mudar,
-          esta Política será atualizada antes e, quando exigido, o seu consentimento será solicitado.
+          <Strong>Não usamos cookies de publicidade de terceiros nem rastreadores de terceiros.</Strong> Se
+          isso mudar, esta Política será atualizada antes e, quando exigido, o seu consentimento será
+          solicitado.
         </P>
       </LegalSection>
 

@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Sidebar from '@/components/app/Sidebar'
 import WelcomeTour from '@/components/app/WelcomeTour'
+import AttributionBinder from '@/components/marketing/AttributionBinder'
 import NodiRoot from '@/components/nodi/NodiRoot'
 import { isNodiEnabled } from '@/lib/nodi/flags'
 import SignupConversionPing from '@/components/SignupConversionPing'
@@ -62,6 +63,9 @@ export default async function AppLayout({
         {children}
       </main>
       <WelcomeTour needsOnboarding={needsOnboarding} />
+      {/* Vincula a atribuição de campanha (cookie first-party) ao cadastro —
+          uma única vez por navegador, best-effort. */}
+      <AttributionBinder />
       <Suspense fallback={null}>
         <SignupConversionPing />
       </Suspense>
