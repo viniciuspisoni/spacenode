@@ -158,25 +158,30 @@ para o Starter, o ticket médio cai sem ganho de retenção).
 Passo a passo. O cupom precisa ser criado por quem tem acesso ao dashboard —
 não faz parte do deploy.
 
-1. Stripe → **Product catalog → Coupons → New**
-2. Configurar:
+**Modo teste: já feito.** O cupom `launch50-first-month` existe em teste e foi
+validado — os quatro planos batem exatamente a metade na primeira fatura
+(89 → 44,50 · 199 → 99,50 · 349 → 174,50 · 699 → 349,50). O `.env.local` já
+aponta para ele, então o ambiente de desenvolvimento funciona sem mais nada.
+
+**Modo live: falta fazer.** Cupom é por modo — o de teste não existe em produção.
+
+1. Stripe → alternar para **modo live** → **Product catalog → Coupons → New**
+2. Configurar **exatamente** assim:
+   - **ID: `launch50-first-month`** ← use este mesmo ID (o campo aparece ao
+     expandir as opções avançadas). Assim a env vale igual em teste e produção.
    - Discount type: **Percentage**, valor **50**
-   - Duration: **Once** ← isto é o que faz valer só na primeira fatura
-   - Name: `Lançamento 50% primeiro mês`
-   - (Opcional, recomendado) **Redeem by: 31/08/2026** — trava a janela no
-     próprio Stripe, além da trava que já existe no código
-3. Copiar o **ID do cupom** gerado (formato tipo `Xy3ZaBcD`)
-4. Vercel → Environment Variables → adicionar em **Production**:
+   - Duration: **Once** ← é isto que faz valer só na primeira fatura
+   - Name: `Lancamento 50% primeiro mes`
+   - **Redeem by: 31/08/2026** — trava a janela no próprio Stripe, além da trava
+     que já existe no código
+3. Vercel → Environment Variables → adicionar em **Production**:
    ```
-   STRIPE_LAUNCH_COUPON_ID=<id copiado>
+   STRIPE_LAUNCH_COUPON_ID=launch50-first-month
    ```
    Depois **redeploy** — env nova só entra em build novo.
-5. Validar com uma compra real de R$ 44,50 (Starter) numa conta que nunca
+4. Validar com uma compra real de R$ 44,50 (Starter) numa conta que nunca
    assinou. Conferir: valor cobrado pela metade, plano ativado, 750 nodes
    creditados, evento no funil com `launch_offer: true`. Reembolsar depois.
-
-> Fazer o mesmo em modo teste antes, com a chave de teste, se quiser validar sem
-> mexer em dinheiro real.
 
 ---
 
