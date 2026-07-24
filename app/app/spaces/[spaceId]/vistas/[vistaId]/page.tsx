@@ -43,10 +43,11 @@ export default async function VistaDetailPage({
   const vistaRaw = vistaRes.data as Vista
   const vista: Vista = {
     ...vistaRaw,
-    image_url:         await signStorageUrl(admin, vistaRaw.image_url),
-    source_sketch_url: await signStorageUrl(admin, vistaRaw.source_sketch_url),
-    edit_mask_url:     await signStorageUrl(admin, vistaRaw.edit_mask_url),
-    source_image_url:  await signStorageUrl(admin, vistaRaw.source_image_url),
+    image_url:          await signStorageUrl(admin, vistaRaw.image_url),
+    source_sketch_url:  await signStorageUrl(admin, vistaRaw.source_sketch_url),
+    edit_mask_url:      await signStorageUrl(admin, vistaRaw.edit_mask_url),
+    source_image_url:   await signStorageUrl(admin, vistaRaw.source_image_url),
+    identity_image_url: await signStorageUrl(admin, vistaRaw.identity_image_url ?? null),
   }
   const others  = (await signRows(admin, otherRes.data ?? [], ['image_url'])) as Pick<Vista, 'id' | 'image_url' | 'axis' | 'axis_value' | 'axis_label' | 'quality'>[]
   const balance = payerBalance.totalBalance

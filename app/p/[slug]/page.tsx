@@ -76,10 +76,11 @@ export default async function PublicPackPage({
                           .format(new Date(pack.created_at))
 
   // Bucketing por axis pra seções
-  const ilum   = vistas.filter(v => v.axis === 'iluminacao')
-  const angulo = vistas.filter(v => v.axis === 'angulo')
-  const detalhe = vistas.filter(v => v.axis === 'detalhe')
-  const hero   = vistas[0] ?? null
+  const ilum     = vistas.filter(v => v.axis === 'iluminacao')
+  const angulo   = vistas.filter(v => v.axis === 'angulo')
+  const detalhe  = vistas.filter(v => v.axis === 'detalhe')
+  const material = vistas.filter(v => v.axis === 'material')
+  const hero     = vistas[0] ?? null
 
   return (
     <div style={{
@@ -210,6 +211,20 @@ export default async function PublicPackPage({
               marginTop: 12,
             }}>
               {angulo.map(v => <PublicImageCard key={v.id} vista={v} accent={accent} />)}
+            </div>
+          </section>
+        )}
+
+        {/* Materiais (ação Ajustar Materiais) */}
+        {material.length > 0 && (
+          <section style={{ marginBottom: 36 }}>
+            <SectionTitle accent={accent}>Estudos de materiais</SectionTitle>
+            <div className="ppk-grid-2" style={{
+              display: 'grid', gap: 12,
+              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+              marginTop: 12,
+            }}>
+              {material.map(v => <PublicImageCard key={v.id} vista={v} accent={accent} />)}
             </div>
           </section>
         )}

@@ -18,6 +18,19 @@ import type {
 } from '@/lib/nodi/types'
 import type { NodiAttachment, NodiV2Answer, ProjectMemory } from '@/lib/nodi/v2/types'
 import type { NodiV2Capabilities } from '@/lib/nodi/v2/flags'
+import type { NextBestAction } from '@/lib/nodi/v4/next-action'
+import type { NodiSettings } from '@/lib/nodi/v4/settings'
+
+export interface NodiActivityItem {
+  event: string
+  at: string
+  module: string | null
+  kind: string | null
+  cost: number | null
+  auto: boolean
+  type: string | null
+  category: string | null
+}
 
 export interface NodiBootstrap {
   moduleId: string | null
@@ -25,6 +38,8 @@ export interface NodiBootstrap {
   suggestions: { id: string; title: string }[]
   faq: { id: string; title: string }[]
   capabilities?: NodiV2Capabilities
+  nextAction?: NextBestAction | null
+  settings?: NodiSettings | null
 }
 
 type Result<T> =
@@ -107,10 +122,30 @@ export function chatV2(input: {
 }
 
 export function executeIntent(intentToken: string) {
-  return call<{ outputUrl: string; renderId: string | null; cost: number }>('/api/nodi/v3/execute', {
+  return call<{
+    outputUrl: string
+    renderId: string | null
+    cost: number
+    review: NodiV2Answer['review'] | null
+  }>('/api/nodi/v3/execute', {
     method: 'POST',
     body: JSON.stringify({ intentToken }),
   })
+}
+
+export function saveSettingsV4(settings: NodiSettings) {
+  return call<{ settings: NodiSettings }>('/api/nodi/v4/settings', {
+    method: 'POST',
+    body: JSON.stringify(settings),
+  })
+}
+
+export function fetchActivity() {
+  return call<{ items: NodiActivityItem[] }>('/api/nodi/v4/activity')
+}
+
+export function fetchProjectMemory(spaceId: string) {
+  return call<{ memory: ProjectMemory | null }>(`/api/nodi/v2/memory?spaceId=${encodeURIComponent(spaceId)}`)
 }
 
 export function saveProjectMemoryV2(spaceId: string, patch: ProjectMemory) {

@@ -1,0 +1,21 @@
+.git
+.claude
+.next
+.next-*
+node_modules
+
+.env*
+*.log
+*.tsbuildinfo
+
+sidebar-demo.html
+.npm-cache*
+.vercel-cli-*
+vercel-login.*.log
+vercel-login.pid
+start-process-test.*
+.vercel-device-flow*.json
+
+# WIP local — excluído do deploy até integrar com tipos atuais
+lib/spaces/engines/google-imagen-edit.ts
+test-*.js

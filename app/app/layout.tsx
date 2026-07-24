@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Sidebar from '@/components/app/Sidebar'
@@ -5,6 +6,7 @@ import WelcomeTour from '@/components/app/WelcomeTour'
 import AttributionBinder from '@/components/marketing/AttributionBinder'
 import NodiRoot from '@/components/nodi/NodiRoot'
 import { isNodiEnabled } from '@/lib/nodi/flags'
+import SignupConversionPing from '@/components/SignupConversionPing'
 import { getPlanById, type PlanId } from '@/lib/plans'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getPayerBalance } from '@/lib/workspaces/balance'
@@ -64,6 +66,9 @@ export default async function AppLayout({
       {/* Vincula a atribuição de campanha (cookie first-party) ao cadastro —
           uma única vez por navegador, best-effort. */}
       <AttributionBinder />
+      <Suspense fallback={null}>
+        <SignupConversionPing />
+      </Suspense>
       {/* Nodi (assistente) — ativação gradual via NODI_ENABLED, lido no servidor */}
       {isNodiEnabled() && <NodiRoot />}
     </div>

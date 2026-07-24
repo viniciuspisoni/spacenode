@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { ThemeProvider } from "@/lib/theme/ThemeProvider";
 import UtmCapture from "@/components/marketing/UtmCapture";
+import GoogleTag from "@/components/GoogleTag";
 import "./globals.css";
 
 // Geist served from local woff2 — avoids the network fetch that next/font/google
@@ -71,6 +72,7 @@ export default function RootLayout({
             só grava quando a URL traz parâmetros de campanha. */}
         <UtmCapture />
         <ThemeProvider>{children}</ThemeProvider>
+        <GoogleTag />
       </body>
     </html>
   );

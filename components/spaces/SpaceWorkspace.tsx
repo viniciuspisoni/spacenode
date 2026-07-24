@@ -4,22 +4,19 @@
 // Eixos panel e VistasGrid. Estado de geração é local; balance e
 // lista de vistas são atualizados no client após cada geração.
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ENGINES } from '@/lib/engines'
-import type { Space, Vista, ArchitectIdentity, Axis, Quality } from '@/lib/spaces/types'
+import type { Space, Vista, ArchitectIdentity, Quality } from '@/lib/spaces/types'
 import type { PlanId } from '@/lib/plans'
 import { getVisualDna, getBriefingFromDna } from '@/lib/spaces/dna'
 import { detalheContextFor } from '@/lib/spaces/axes'
-import { getVistaGenerationCost } from '@/lib/spaces/economy'
 import { DnaPanel } from './DnaPanel'
-import { EixosPanel } from './EixosPanel'
+import { GenerationFlow, type GenerateRequestBody } from './GenerationFlow'
 import { VistasGrid } from './VistasGrid'
 import { SynapticLoading } from './SynapticLoading'
-import { BatchProgressOverlay } from './BatchProgressOverlay'
 import { TrocarVistaMestreModal } from './TrocarVistaMestreModal'
-import type { SketchPayload } from './SketchGuidedEixoBody'
 
 interface Props {
   space:          Space
@@ -37,12 +34,6 @@ interface GenerateMeta {
   quality: Quality
 }
 
-interface BatchMeta {
-  count:   number
-  total:   number
-  quality: Quality
-}
-
 interface ToastState {
   type:    'success' | 'warning'
   message: string
@@ -53,50 +44,44 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId, p
   const [vistas, setVistas]       = useState<Vista[]>(initialVistas)
   const [balance, setBalance]     = useState<number>(initialBalance)
   const [meta, setMeta]           = useState<GenerateMeta | null>(null)
-  const [batchMeta, setBatchMeta] = useState<BatchMeta | null>(null)
   const [toast, setToast]         = useState<ToastState | null>(null)
-  const [error, setError]         = useState<string | null>(null)
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [showTrocarMestre, setShowTrocarMestre] = useState(false)
 
   const isLocked = space.status === 'locked'
   const dna      = getVisualDna(space.dna)
-  // Contexto pra adaptar os cards do eixo Detalhe (corporativo / residencial /
+  // Contexto pra adaptar os cards de Detalhe (corporativo / residencial /
   // exterior / default), a partir da categoria + briefing arquitetônico.
   const detalheContext = detalheContextFor(space.category, getBriefingFromDna(space.dna))
 
-  // Multi-DNA: vistas com DNA próprio extraído viram referências selecionáveis
-  // no painel de geração (a Vista Mestre segue sendo o default). A vista que
-  // JÁ é a mestre atual sai da lista (senão apareceria duplicada no seletor).
-  const dnaReferences = vistas
-    .filter(v => v.status === 'completed' && !!v.image_url && !!v.dna)
+  // Referências do histórico: qualquer vista concluída serve de referência
+  // GEOMÉTRICA (a identidade continua vindo do projeto; se a vista tiver DNA
+  // próprio extraído, ele assume — multi-DNA). A vista que JÁ é a mestre atual
+  // sai da lista (senão apareceria duplicada no seletor).
+  const historyOptions = vistas
+    .filter(v => v.status === 'completed' && !!v.image_url)
     .filter(v => v.id !== space.vista_mestre_vista_id)
     .map(v => ({ id: v.id, image_url: v.image_url!, label: v.axis_label ?? 'Vista' }))
 
   const hasCompletedVistas = vistas.some(v => v.status === 'completed' && !!v.image_url)
 
   function showToast(t: ToastState) {
+    // Cancela o timer do toast anterior — senão ele fecha o novo cedo demais.
+    if (toastTimer.current) clearTimeout(toastTimer.current)
     setToast(t)
-    setTimeout(() => setToast(null), 6000)
+    toastTimer.current = setTimeout(() => setToast(null), 6000)
   }
 
-  // ── Geração paramétrica (Iluminação etc.) ──────────────────
+  // ── Geração (fluxo único Referência → Ação → Gerar) ─────────
 
-  async function handleGenerate(axis: Axis, axisValues: string[], quality: Quality, referenceVistaId: string | null) {
-    setError(null)
-    const costPer = getVistaGenerationCost(space.engine, quality)
-    const total   = costPer * axisValues.length
-    setMeta({ count: axisValues.length, total, quality })
+  async function handleGenerate(body: GenerateRequestBody, genMeta: { count: number; total: number; quality: Quality }) {
+    setMeta(genMeta)
 
     try {
       const res = await fetch(`/api/spaces/${space.id}/generate`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({
-          axis,
-          axis_values: axisValues,
-          quality,
-          ...(referenceVistaId ? { reference_vista_id: referenceVistaId } : {}),
-        }),
+        body:    JSON.stringify(body),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -104,14 +89,33 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId, p
         throw new Error(data?.error ?? 'Erro ao gerar')
       }
 
-      const newVistas = (data.vistas ?? []) as Vista[]
-      // Prepend (mais novas em cima)
-      setVistas(curr => [...newVistas, ...curr])
+      const newVistas  = (data.vistas ?? []) as Vista[]
+      const genErrors  = (data.errors ?? []) as Array<{ label: string | null; error: string }>
+
+      // Saldo primeiro — vale mesmo quando tudo falhou (refunds refletidos).
       if (data.balance_after?.total_balance != null) {
         setBalance(data.balance_after.total_balance as number)
       }
 
-      // Fire-and-forget DNA verification
+      // Falha TOTAL vira erro lançado: o GenerationFlow mostra a mensagem e
+      // PRESERVA a configuração do usuário (prints, instrução, seleções) —
+      // limpar tudo e pedir "tente novamente" seria contraditório.
+      if (newVistas.length === 0 && genErrors.length > 0) {
+        throw new Error(genErrors[0]?.error ?? 'A geração falhou. Os nodes foram devolvidos — tente novamente.')
+      }
+
+      // Prepend (mais novas em cima)
+      setVistas(curr => [...newVistas, ...curr])
+
+      if (genErrors.length > 0) {
+        showToast({
+          type:    'warning',
+          message: `${newVistas.length} vista${newVistas.length === 1 ? '' : 's'} gerada${newVistas.length === 1 ? '' : 's'}; ${genErrors.length} falhou. Nodes das falhas foram devolvidos.`,
+        })
+      }
+
+      // Verificação de DNA fire-and-forget (modo decidido server-side pela
+      // rota verify-dna a partir de vista.axis)
       newVistas.forEach(v => {
         fetch(`/api/vistas/${v.id}/verify-dna`, { method: 'POST' })
           .then(r => r.ok ? r.json() : null)
@@ -134,85 +138,10 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId, p
       // Re-busca server side stats (vista_count etc.) sem flicker
       router.refresh()
     } catch (e) {
-      setError((e as Error).message)
+      // O erro é exibido inline pelo GenerationFlow (etapa Gerar).
+      throw e
     } finally {
       setMeta(null)
-    }
-  }
-
-  // ── Geração em batch a partir de sketches (Ângulo) ─────────
-
-  async function handleGenerateFromSketches(sketches: SketchPayload[], quality: Quality, referenceVistaId: string | null) {
-    setError(null)
-    const costPer = getVistaGenerationCost(space.engine, quality)
-    const total   = costPer * sketches.length
-    setBatchMeta({ count: sketches.length, total, quality })
-
-    try {
-      const res = await fetch(`/api/spaces/${space.id}/generate-from-sketches`, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({
-          sketches,
-          quality,
-          ...(referenceVistaId ? { reference_vista_id: referenceVistaId } : {}),
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        if (res.status === 402) throw new Error(data?.message ?? 'Saldo insuficiente')
-        throw new Error(data?.error ?? 'Erro ao gerar')
-      }
-
-      const newVistas = (data.vistas ?? []) as Vista[]
-      const errors    = (data.errors  ?? []) as Array<{ label: string | null; error: string }>
-
-      setVistas(curr => [...newVistas, ...curr])
-      if (data.balance_after?.total_balance != null) {
-        setBalance(data.balance_after.total_balance as number)
-      }
-
-      // Toasts de feedback
-      if (newVistas.length > 0) {
-        showToast({
-          type:    'success',
-          message: `${newVistas.length} variaç${newVistas.length === 1 ? 'ão' : 'ões'} gerada${newVistas.length === 1 ? '' : 's'} com sucesso.`,
-        })
-      }
-      if (errors.length > 0) {
-        const labels = errors.map(e => e.label ?? 'sem nome').join(', ')
-        showToast({
-          type:    'warning',
-          message: `${errors.length} sketch${errors.length === 1 ? '' : 'es'} falhou: ${labels}. Tente novamente.`,
-        })
-      }
-
-      // Fire-and-forget DNA verification (modo angulo_relaxed é decidido server-side
-      // pela rota verify-dna lendo vista.axis)
-      newVistas.forEach(v => {
-        fetch(`/api/vistas/${v.id}/verify-dna`, { method: 'POST' })
-          .then(r => r.ok ? r.json() : null)
-          .then(verifyData => {
-            if (verifyData?.verification) {
-              setVistas(curr => curr.map(x =>
-                x.id === v.id
-                  ? {
-                      ...x,
-                      dna_verified: verifyData.verification.passed,
-                      dna_verification_details: verifyData.verification,
-                    }
-                  : x,
-              ))
-            }
-          })
-          .catch(() => { /* silencioso */ })
-      })
-
-      router.refresh()
-    } catch (e) {
-      setError((e as Error).message)
-    } finally {
-      setBatchMeta(null)
     }
   }
 
@@ -359,19 +288,16 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId, p
           </section>
         )}
 
-        {/* Eixos */}
+        {/* Fluxo de geração: Referência → Ação → Gerar */}
         {isLocked ? (
           <section>
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               marginBottom: 12,
             }}>
-              <SectionLabel>Eixos exploráveis</SectionLabel>
-              <span style={{ fontSize: 11, color: 'var(--color-text-quaternary)' }}>
-                Selecione e clique em Gerar
-              </span>
+              <SectionLabel>Nova geração</SectionLabel>
             </div>
-            <EixosPanel
+            <GenerationFlow
               engine={space.engine}
               defaultQuality={space.engine === 'pulsar' ? 'hd' : '2k'}
               balance={balance}
@@ -380,19 +306,9 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId, p
               spaceId={space.id}
               detalheContext={detalheContext}
               vistaMestreUrl={space.vista_mestre_url}
-              references={dnaReferences}
+              historyOptions={historyOptions}
               onGenerate={handleGenerate}
-              onGenerateFromSketches={handleGenerateFromSketches}
             />
-            {error && (
-              <div style={{
-                marginTop: 12, padding: '10px 14px', borderRadius: 8,
-                background: 'var(--color-error-bg)', border: '0.5px solid var(--color-error-border)',
-                color: 'var(--color-error)', fontSize: 13,
-              }}>
-                {error}
-              </div>
-            )}
           </section>
         ) : (
           <section style={{
@@ -425,16 +341,6 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId, p
           totalNodes={meta.total}
           engine={space.engine}
           quality={meta.quality}
-        />
-      )}
-
-      {batchMeta && (
-        <BatchProgressOverlay
-          spaceName={space.name}
-          batchSize={batchMeta.count}
-          totalNodes={batchMeta.total}
-          engine={space.engine}
-          quality={batchMeta.quality}
         />
       )}
 

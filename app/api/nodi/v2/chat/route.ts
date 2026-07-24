@@ -12,6 +12,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isNodiEnabled } from '@/lib/nodi/flags'
+import { readSettings } from '@/lib/nodi/v4/settings'
 import { capabilitiesFor, isNodiV2EnabledFor } from '@/lib/nodi/v2/flags'
 import { checkUserBudget } from '@/lib/nodi/v2/budget'
 import { runNodiV2 } from '@/lib/nodi/v2/orchestrator'
@@ -21,6 +22,9 @@ import { logNodiEvent } from '@/lib/nodi/telemetry'
 import { clampText } from '@/lib/nodi/redact'
 import type { NodiTurn, GenerationKind } from '@/lib/nodi/types'
 import type { NodiAttachment, NodiV2Answer } from '@/lib/nodi/v2/types'
+
+// autopiloto pode executar uma geração dentro deste request
+export const maxDuration = 300
 
 const KINDS: GenerationKind[] = ['render', 'edit', 'video', 'upscale', 'vista']
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -102,9 +106,13 @@ export async function POST(req: Request) {
     }
   }
 
-  // 3 — orquestrador agentic.
+  // 3 — orquestrador agentic (com modo de autonomia do usuário).
+  const settings = await readSettings(supabase, user.id)
   const answer = await runNodiV2({
     supabase, admin, userId: user.id, route, message, history, attachment, capabilities,
+    settings,
+    origin: new URL(req.url).origin,
+    cookie: req.headers.get('cookie') ?? '',
   })
 
   if (answer) {

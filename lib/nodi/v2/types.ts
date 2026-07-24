@@ -105,6 +105,22 @@ export interface SupervisedAction {
 
 // ── Memória de projeto (só grava após confirmação) ───────────────────────────
 
+export interface ProjectPlanStep {
+  order: number
+  moduleId: string
+  moduleLabel: string
+  goal: string
+  status: 'pendente' | 'feita'
+  estimatedNodes?: number
+}
+
+/** Plano do Projeto (V4) — persistido na memória, gravado só após confirmação. */
+export interface ProjectPlan {
+  objective: string
+  steps: ProjectPlanStep[]
+  updatedAt?: string
+}
+
 export interface ProjectMemory {
   style?: string
   materials?: string
@@ -112,6 +128,7 @@ export interface ProjectMemory {
   mainImage?: string
   lockedElements?: string
   decisions?: string[]
+  plan?: ProjectPlan
 }
 
 export interface MemoryProposal {
@@ -144,6 +161,10 @@ export interface NodiV2Answer {
   ticketDraft?: TicketDraft
   /** ações simples da V1 (navigate/link/copy) continuam valendo */
   actions?: NodiAction[]
+  /** V4: execução feita pelo próprio fluxo (autopiloto) */
+  executed?: { outputUrl: string; renderId: string | null; cost: number; auto: boolean }
+  /** V4: avaliação visual pós-execução + decisão determinística */
+  review?: { summary: string; decision: string; reason: string; findings: { dimension: string; severity: string; note: string }[] }
   usage?: NodiV2Usage
 }
 

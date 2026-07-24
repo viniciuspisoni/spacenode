@@ -32,19 +32,25 @@ import type {
   NodiAttachment, NodiV2Answer, PromptSuggestion, SupervisedAction,
 } from '@/lib/nodi/v2/types'
 import NodiAvatar, { type NodiAvatarState } from './NodiAvatar'
+import type { NodiSettings } from '@/lib/nodi/v4/settings'
 import {
   askNodi,
   chatV2,
   executeIntent,
+  fetchActivity,
   fetchBootstrap,
   fetchMyTickets,
+  fetchProjectMemory,
   fetchRecentGenerations,
   runDiagnosis,
   saveProjectMemoryV2,
+  saveSettingsV4,
   sendNodiEvent,
   submitTicket,
+  type NodiActivityItem,
   type NodiBootstrap,
 } from './nodi-client'
+import type { ProjectPlan } from '@/lib/nodi/v2/types'
 import { actionDestination, writeHandoff, moduleHref } from './actions-bus'
 
 // ── Modelo de mensagem ────────────────────────────────────────────────────────
@@ -81,13 +87,15 @@ interface PanelMsg {
   v2?: NodiV2Answer
   /** kind 'executed': imagem gerada (URL assinada — expira; Histórico é o acervo) */
   outputUrl?: string
+  /** V4: avaliação visual pós-execução */
+  review?: NodiV2Answer['review']
   /** feedback já dado nesta resposta */
   feedback?: 'up' | 'down'
   /** bloco interativo já consumido → chips desabilitados */
   done?: boolean
 }
 
-type PanelView = 'home' | 'chat' | 'tickets'
+type PanelView = 'home' | 'chat' | 'tickets' | 'plan' | 'activity'
 type Pending = null | 'ask' | 'list' | 'diagnose' | 'ticket' | 'execute'
 
 /** "sim", "pode", "confirma"… digitados executam a proposta pendente (V3). */
@@ -185,6 +193,10 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
   const [avatarFlash, setAvatarFlash] = useState<'success' | null>(null)
   // V2: imagem anexada à próxima pergunta (geração escolhida ou vista da rota)
   const [attachment, setAttachment] = useState<NodiAttachment | null>(null)
+  // V4: modo de autonomia (vem do bootstrap; edição otimista) + views novas
+  const [settings, setSettings] = useState<NodiSettings | null>(null)
+  const [activity, setActivity] = useState<NodiActivityItem[] | null>(null)
+  const [plan, setPlan] = useState<ProjectPlan | null | 'loading'>(null)
 
   const bodyRef = useRef<HTMLDivElement | null>(null)
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
@@ -208,6 +220,7 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
       if (!alive) return
       if (res.ok) {
         setBootstrap(res.data)
+        if (res.data.settings) setSettings(res.data.settings)
         setOffline(false)
       } else if (res.offline) {
         setOffline(true)
@@ -277,6 +290,10 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
     })
   }, [pending, context.route, historyTurns, append])
 
+  // ref-mais-recente: sendV2 dispara confirmProposal (declarada depois) sem
+  // problema de ordem nem dependência circular de useCallback
+  const confirmRef = useRef<((msgId: string, a: SupervisedAction) => void) | null>(null)
+
   // ── V2 (copiloto): pergunta livre com contexto + anexo → envelope com cards
   const sendV2 = useCallback(async (message: string) => {
     if (pending) return
@@ -298,7 +315,14 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
     }
     setOffline(false)
     const answer = res.data.answer
-    append({ id: newId(), role: 'nodi', kind: 'v2', text: answer.text, v2: answer })
+    const msgId = newId()
+    append({ id: msgId, role: 'nodi', kind: 'v2', text: answer.text, v2: answer })
+    // Autopiloto: ações SEM custo (navegar/preencher/configurar) executam
+    // sozinhas — gasto de nodes continua passando pelos limites do servidor.
+    const free = answer.proposals?.find(p => !p.executable && (p.type === 'navigate' || p.type === 'fill_prompt' || p.type === 'apply_settings'))
+    if (settings?.mode === 'autopiloto' && free) {
+      window.setTimeout(() => confirmRef.current?.(msgId, free), 400)
+    }
     // chamado preparado pelo copiloto entra direto no fluxo de revisão da V1
     if (answer.ticketDraft) {
       append(
@@ -325,11 +349,51 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
     window.setTimeout(() => setAvatarFlash(null), 2600)
     append({
       id: newId(), role: 'nodi', kind: 'executed',
-      text: `Pronto — ${res.data.cost} nodes debitados. Está no Histórico também. Quer refinar algo, ampliar ou animar?`,
+      text: `Pronto — ${res.data.cost} nodes debitados. Está no Histórico também.`,
       outputUrl: res.data.outputUrl,
+      review: res.data.review ?? undefined,
       actions: [{ type: 'navigate', label: 'Abrir no Histórico', href: '/app/history' }],
     })
   }, [pending, markDone, context.route, context.moduleId, append])
+
+  // ── V4: modo de autonomia, plano do projeto, atividade ─────────────────────
+  const updateSettings = useCallback((patch: Partial<NodiSettings>) => {
+    setSettings(prev => {
+      const next = { ...(prev ?? { mode: 'copiloto', maxNodesPerAction: 60, maxNodesPerDay: 200, autoReview: true }), ...patch } as NodiSettings
+      void saveSettingsV4(next) // otimista; servidor revalida limites na execução
+      return next
+    })
+  }, [])
+
+  const openPlan = useCallback(async () => {
+    setView('plan')
+    if (!context.projectId) return
+    setPlan('loading')
+    const res = await fetchProjectMemory(context.projectId)
+    setPlan(res.ok ? res.data.memory?.plan ?? null : null)
+  }, [context.projectId])
+
+  const openActivity = useCallback(async () => {
+    setView('activity')
+    const res = await fetchActivity()
+    setActivity(res.ok ? res.data.items : [])
+  }, [])
+
+  /** Próximo passo sugerido pela avaliação visual. */
+  const runReviewFollowUp = useCallback((decision: string, findingsNote: string) => {
+    if (decision === 'editar_local') {
+      writeHandoff({ id: 'rv', type: 'fill_prompt', label: 'corrigir', moduleId: 'editar', prompt: `Corrigir: ${findingsNote}` })
+      router.push(moduleHref('editar') ?? '/app/editar')
+      onClose()
+      return
+    }
+    if (decision === 'melhorar') { router.push('/app/upscale'); onClose(); return }
+    if (decision === 'regenerar') {
+      setView('chat')
+      setInput(`Regenera com atenção a: ${findingsNote}`)
+      inputRef.current?.focus()
+    }
+  }, [router, onClose])
 
   /** Ação supervisionada CONFIRMADA pelo usuário no card. */
   const confirmProposal = useCallback((msgId: string, action: SupervisedAction) => {
@@ -348,6 +412,8 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
     }
     append({ id: newId(), role: 'nodi', kind: 'notice', tone: 'warning', text: 'Não encontrei a rota dessa ação — nada foi executado.' })
   }, [runExecutable, markDone, context.route, context.moduleId, router, onClose, append])
+
+  useEffect(() => { confirmRef.current = confirmProposal }, [confirmProposal])
 
   /** Usar um prompt sugerido no módulo alvo (o clique é a confirmação). */
   const usePrompt = useCallback((suggestion: PromptSuggestion) => {
@@ -417,6 +483,16 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
       { id: newId(), role: 'nodi', kind: 'options', options: CATEGORY_OPTIONS },
     )
   }, [pending, context.route, context.moduleId, append])
+
+  /** Executa a "próxima melhor ação" sugerida no home (V4). */
+  const runNextAction = useCallback(() => {
+    const na = bootstrap?.nextAction
+    if (!na) return
+    sendNodiEvent('action_clicked', context.route, context.moduleId, { action: 'next_best' })
+    if (na.kind === 'problem') { startProblemFlow(); return }
+    if (na.kind === 'navigate' && na.href) { router.push(na.href); onClose(); return }
+    if (na.kind === 'chat') { setView('chat'); setInput(na.chatPrompt ?? na.action); inputRef.current?.focus() }
+  }, [bootstrap, context.route, context.moduleId, startProblemFlow, router, onClose])
 
   const pickCategory = useCallback(async (msgId: string, category: TicketCategory) => {
     if (pending) return
@@ -605,14 +681,16 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
     // "sim"/"pode"/"confirma" digitado com uma execução pendente → executa
     // (confirmação por texto, sem precisar do clique)
     if (CONFIRM_RE.test(q)) {
-      const pendingExec = [...messages].reverse().find(
-        m => !m.done && m.v2?.proposals?.some(p => p.executable && p.intentToken),
-      )
-      const action = pendingExec?.v2?.proposals?.find(p => p.executable && p.intentToken)
-      if (pendingExec && action) {
+      // "sim" confirma a proposta pendente mais recente — executável (gera) ou
+      // simples (navegar/preencher). Autonomia por texto, sem caçar botão.
+      const pendingMsg = [...messages].reverse().find(m => !m.done && m.v2?.proposals?.length)
+      const action = pendingMsg?.v2?.proposals?.find(p => p.executable && p.intentToken)
+        ?? pendingMsg?.v2?.proposals?.[0]
+      if (pendingMsg && action) {
         setInput('')
         append({ id: newId(), role: 'user', kind: 'text', text: q })
-        void runExecutable(pendingExec.id, action)
+        if (action.executable && action.intentToken) void runExecutable(pendingMsg.id, action)
+        else confirmProposal(pendingMsg.id, action)
         return
       }
     }
@@ -693,6 +771,68 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
               </div>
             )}
 
+            {caps?.v2 && bootstrap?.nextAction && (
+              <section aria-label="Próximo passo sugerido">
+                <h3 className="spn-nodi-section-title">Próximo passo</h3>
+                <div className="spn-nodi-card">
+                  <strong>{bootstrap.nextAction.action}</strong>
+                  <p>{bootstrap.nextAction.identified} {bootstrap.nextAction.why}</p>
+                  <p className="spn-nodi-muted">
+                    {bootstrap.nextAction.estimatedNodes ? `~${bootstrap.nextAction.estimatedNodes} nodes` : 'Sem custo'}
+                    {' · '}
+                    {bootstrap.nextAction.needsApproval ? 'você aprova antes' : 'sem aprovação necessária'}
+                  </p>
+                  <div className="spn-nodi-actions">
+                    <ActionBtn label={bootstrap.nextAction.action} onClick={runNextAction} />
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {caps?.v2 && settings && (
+              <section aria-label="Modo de autonomia">
+                <h3 className="spn-nodi-section-title">Autonomia</h3>
+                <div className="spn-nodi-chips" role="radiogroup" aria-label="Modo do Nodi">
+                  {([['consultor', 'Consultor'], ['copiloto', 'Copiloto'], ['autopiloto', 'Autopiloto']] as const).map(([id, label]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      role="radio"
+                      aria-checked={settings.mode === id}
+                      className={`spn-nodi-chip${settings.mode === id ? ' spn-nodi-chip--active' : ''}`}
+                      onClick={() => updateSettings({ mode: id })}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <p className="spn-nodi-muted" style={{ marginTop: 6 }}>
+                  {settings.mode === 'consultor' && 'Analisa e recomenda — nunca executa.'}
+                  {settings.mode === 'copiloto' && 'Prepara tudo e espera sua aprovação antes de executar.'}
+                  {settings.mode === 'autopiloto' && 'Executa sozinho dentro dos limites abaixo; fora deles, pede aprovação.'}
+                </p>
+                {settings.mode === 'autopiloto' && (
+                  <div className="spn-nodi-limits">
+                    <label>
+                      por ação
+                      <input
+                        type="number" min={0} max={1000} value={settings.maxNodesPerAction}
+                        onChange={e => updateSettings({ maxNodesPerAction: Number(e.target.value) || 0 })}
+                      />
+                    </label>
+                    <label>
+                      por dia
+                      <input
+                        type="number" min={0} max={5000} value={settings.maxNodesPerDay}
+                        onChange={e => updateSettings({ maxNodesPerDay: Number(e.target.value) || 0 })}
+                      />
+                    </label>
+                    <span className="spn-nodi-muted">nodes</span>
+                  </div>
+                )}
+              </section>
+            )}
+
             {caps?.v2 && (
               <section aria-label="Ações rápidas do copiloto">
                 <h3 className="spn-nodi-section-title">Copiloto</h3>
@@ -766,6 +906,18 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
               </button>
               <span aria-hidden>·</span>
               <button type="button" onClick={openTickets}>Meus chamados</button>
+              {caps?.v2 && caps.memory && context.projectId && (
+                <>
+                  <span aria-hidden>·</span>
+                  <button type="button" onClick={() => void openPlan()}>Plano do projeto</button>
+                </>
+              )}
+              {caps?.v2 && (
+                <>
+                  <span aria-hidden>·</span>
+                  <button type="button" onClick={() => void openActivity()}>Ações do Nodi</button>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -791,6 +943,63 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
           </div>
         )}
 
+        {view === 'plan' && (
+          <div className="spn-nodi-home">
+            <h3 className="spn-nodi-section-title">Plano do projeto</h3>
+            {plan === 'loading' && <p className="spn-nodi-muted">Carregando…</p>}
+            {plan === null && (
+              <p className="spn-nodi-muted">
+                Este projeto ainda não tem um plano. Peça no chat: “monte o plano deste projeto” — eu proponho objetivo e etapas, e você confirma antes de salvar.
+              </p>
+            )}
+            {plan && plan !== 'loading' && (
+              <div className="spn-nodi-card">
+                <strong>{plan.objective}</strong>
+                <ol className="spn-nodi-plan">
+                  {plan.steps.map(s => (
+                    <li key={s.order}>
+                      <strong>{s.moduleLabel}</strong> — {s.goal}
+                      <span className="spn-nodi-muted">
+                        {[s.status === 'feita' ? '✓ feita' : 'pendente', s.estimatedNodes ? `${s.estimatedNodes} nodes` : null]
+                          .filter(Boolean).join(' · ')}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+                <p className="spn-nodi-muted">
+                  Próxima decisão: {plan.steps.find(s => s.status === 'pendente')?.goal ?? 'todas as etapas concluídas'}.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {view === 'activity' && (
+          <div className="spn-nodi-home">
+            <h3 className="spn-nodi-section-title">Ações do Nodi</h3>
+            {activity === null && <p className="spn-nodi-muted">Carregando…</p>}
+            {activity !== null && activity.length === 0 && (
+              <p className="spn-nodi-muted">Nenhuma ação registrada ainda. Execuções, confirmações e memórias aparecem aqui para revisão.</p>
+            )}
+            {activity?.map((a, i) => (
+              <div key={i} className="spn-nodi-ticket-row">
+                <div>
+                  <strong>
+                    {a.event === 'v3_executed' ? (a.auto ? 'Execução automática' : 'Execução confirmada')
+                      : a.event === 'v2_action_confirmed' ? 'Ação confirmada'
+                      : a.event === 'v2_memory_saved' ? 'Memória do projeto atualizada'
+                      : 'Chamado aberto'}
+                  </strong>
+                  <span>{formatWhen(a.at) ?? a.at}{a.kind ? ` · ${a.kind}` : ''}{a.type ? ` · ${a.type}` : ''}</span>
+                </div>
+                {typeof a.cost === 'number' && (
+                  <span className="spn-nodi-badge spn-nodi-badge--neutral">{a.cost} nodes</span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
         {view === 'chat' && (
           <div className="spn-nodi-thread" aria-live="polite">
             {messages.map(m => (
@@ -806,6 +1015,7 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
                 onUsePrompt={usePrompt}
                 onConfirmMemory={confirmMemory}
                 onFeedback={giveFeedback}
+                onReviewFollowUp={runReviewFollowUp}
                 onRetryDiagnosis={retryDiagnosis}
                 onResolved={(id) => { markDone(id); setAvatarFlash('success'); window.setTimeout(() => setAvatarFlash(null), 2600); append({ id: newId(), role: 'nodi', kind: 'text', text: 'Ótimo. Qualquer coisa, estou por aqui.' }) }}
                 onOpenTicket={(id, report) => { markDone(id); openDescribe(report) }}
@@ -826,7 +1036,7 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
       </div>
 
       {/* Entrada */}
-      {view !== 'tickets' && (
+      {(view === 'home' || view === 'chat') && (
         <footer className="spn-nodi-inputrow">
           {attachment && (
             <span className="spn-nodi-attach" title="Imagem anexada à próxima pergunta">
@@ -914,6 +1124,46 @@ interface MessageProps {
   onUsePrompt: (s: PromptSuggestion) => void
   onConfirmMemory: (msgId: string, p: MemoryProposal) => void
   onFeedback: (msgId: string, helpful: boolean) => void
+  onReviewFollowUp: (decision: string, findingsNote: string) => void
+}
+
+const DECISION_LABEL: Record<string, string> = {
+  aprovar: 'Pronta para apresentar',
+  editar_local: 'Corrigir no Editar',
+  melhorar: 'Vale melhorar antes',
+  regenerar: 'Melhor regenerar',
+  decidir: 'Sua decisão',
+}
+
+function ReviewBlock({ review, onFollowUp }: {
+  review: NonNullable<NodiV2Answer['review']>
+  onFollowUp: (decision: string, note: string) => void
+}) {
+  const issues = review.findings.filter(f => f.severity !== 'ok')
+  const note = issues.map(f => `${f.dimension}: ${f.note}`).join('; ').slice(0, 300) || review.summary
+  const actionable = review.decision === 'editar_local' || review.decision === 'melhorar' || review.decision === 'regenerar'
+  return (
+    <div className="spn-nodi-reviewblock">
+      <span className={`spn-nodi-decision spn-nodi-decision--${review.decision}`}>{DECISION_LABEL[review.decision] ?? review.decision}</span>
+      <p>{review.summary}</p>
+      {issues.length > 0 && (
+        <ul className="spn-nodi-findings">
+          {issues.slice(0, 4).map((f, i) => (
+            <li key={i}>
+              <i className={`spn-nodi-sev spn-nodi-sev--${f.severity}`} aria-hidden />
+              <span><strong>{f.dimension}:</strong> {f.note}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="spn-nodi-muted">{review.reason}</p>
+      {actionable && (
+        <div className="spn-nodi-actions">
+          <ActionBtn label={DECISION_LABEL[review.decision]} onClick={() => onFollowUp(review.decision, note)} />
+        </div>
+      )}
+    </div>
+  )
 }
 
 function Message(props: MessageProps) {
@@ -991,6 +1241,7 @@ function Message(props: MessageProps) {
             <img className="spn-nodi-result" src={msg.outputUrl} alt="Resultado da geração feita pelo Nodi" />
           )}
           {msg.text && <p>{msg.text}</p>}
+          {msg.review && <ReviewBlock review={msg.review} onFollowUp={props.onReviewFollowUp} />}
           {msg.actions && msg.actions.length > 0 && (
             <div className="spn-nodi-actions">
               {msg.actions.map(a => (
@@ -1069,6 +1320,17 @@ function V2Message(props: MessageProps & { answer: NodiV2Answer }) {
   return (
     <div className="spn-nodi-msg spn-nodi-msg--nodi spn-nodi-msg--block">
       {msg.text && <div className="spn-nodi-bubble">{msg.text}</div>}
+      {answer.executed && (
+        <div className="spn-nodi-card spn-nodi-card--success">
+          <strong>{answer.executed.auto ? 'Executado pelo autopiloto' : 'Geração concluída'} — {answer.executed.cost} nodes</strong>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="spn-nodi-result" src={answer.executed.outputUrl} alt="Resultado gerado pelo Nodi" />
+          {answer.review && <ReviewBlock review={answer.review} onFollowUp={props.onReviewFollowUp} />}
+          <div className="spn-nodi-actions">
+            <ActionBtn label="Abrir no Histórico" onClick={() => props.onAction({ type: 'navigate', label: 'hist', href: '/app/history' }, msg.id)} />
+          </div>
+        </div>
+      )}
       {answer.analysis && <AnalysisCard report={answer.analysis} />}
       {answer.recommendation && (
         <RecommendationCard rec={answer.recommendation} onUse={() =>
@@ -1283,6 +1545,16 @@ function MemoryCard({ proposal, done, onConfirm }: {
         {p.lockedElements && <><dt>Não pode mudar</dt><dd>{p.lockedElements}</dd></>}
         {p.decisions?.map((d, i) => <FragmentRow key={i} k="Decisão" v={d} />)}
       </dl>
+      {p.plan && (
+        <>
+          <p><strong>Plano:</strong> {p.plan.objective}</p>
+          <ol className="spn-nodi-plan">
+            {p.plan.steps.map(s => (
+              <li key={s.order}><strong>{s.moduleLabel}</strong> — {s.goal}</li>
+            ))}
+          </ol>
+        </>
+      )}
       <p className="spn-nodi-muted">{proposal.reason} Nada é salvo sem a sua confirmação.</p>
       <div className="spn-nodi-actions">
         <ActionBtn tone="green" label="Salvar na memória" onClick={onConfirm} disabled={done} />

@@ -315,3 +315,40 @@ ser uma geração existente (upload novo continua na página da ferramenta).
 6. **Custos por ferramenta não importáveis** (Editar/Ampliar) — respostas
    qualitativas de propósito; se esses módulos exportarem tabela estática de
    custo um dia, importar em `entries.ts`.
+
+## V4 — copiloto central (2026-07-18)
+
+**Modos de autonomia** (`nodi_user_settings`, seletor no painel, default copiloto):
+consultor (analisa/recomenda, propor_acao nem entra no toolset) · copiloto
+(prepara e aguarda aprovação) · **autopiloto** (executa sozinho DENTRO dos
+limites por ação/por dia; fora deles a proposta espera confirmação). O
+servidor revalida os limites (`checkAutoAllowance` + gasto do dia somado de
+`nodi_events`) — o client nunca compra autonomia.
+
+**Memória de série**: com projeto aberto, estilo/materiais/iluminação/travas/
+decisões e o Plano do Projeto entram no contexto do modelo automaticamente
+(regra dura no prompt: nunca perguntar o que já se sabe).
+
+**Avaliação pós-geração** (`lib/nodi/v4/review.ts`): toda execução (manual ou
+autopiloto) dispara comparação original × resultado e uma decisão
+determinística — aprovar · editar_local · melhorar · regenerar · decidir —
+com a regra "não regenerar quando correção localizada resolve". O card do
+resultado mostra achados + botão do próximo passo. Desligável em
+`auto_review`.
+
+**Próxima melhor ação** (`lib/nodi/v4/next-action.ts`): regras puras no
+bootstrap (falha recente → diagnóstico; saldo baixo → planos; render sem
+ampliação → Ampliar; sem vídeo → Animar; conta nova → Renderizar), sempre no
+formato identifiquei → ação → porquê → custo → precisa aprovação. Card
+"Próximo passo" no home do painel.
+
+**Plano do Projeto** (`nodi_project_memory.plan` + tool
+`propor_plano_projeto`): objetivo + etapas com módulo/status/custo, proposto
+pelo Nodi e confirmado pelo usuário; view própria no painel com a próxima
+decisão. **Ações do Nodi**: registro revisável (`/api/nodi/v4/activity`,
+lendo `nodi_events` sanitizado) com execuções (auto ou confirmadas), memórias
+e chamados.
+
+Migration `20260718120000_nodi_v4_autonomy.sql` — APLICADA em dev+prod.
+Pendências V4: próxima ação por módulo (embutida nas ferramentas), execução
+de Ampliar/Animar no autopiloto, edição de status das etapas do plano na UI.

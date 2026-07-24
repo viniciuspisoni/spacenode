@@ -27,13 +27,13 @@ export async function POST(
   // Carrega vista + DNA do Space
   const { data: vistaRow, error: vErr } = await supabase
     .from('vistas')
-    .select('id, image_url, space_id, status, dna_verified, axis, is_edited, edit_mask_coverage, reference_vista_id')
+    .select('id, image_url, space_id, status, dna_verified, axis, is_edited, edit_mask_coverage, reference_vista_id, reference_kind, source_sketch_url')
     .eq('id', vistaId)
     .single()
   if (vErr || !vistaRow) {
     return NextResponse.json({ error: 'Vista não encontrada' }, { status: 404 })
   }
-  const vista = vistaRow as Pick<Vista, 'id' | 'image_url' | 'space_id' | 'status' | 'dna_verified' | 'axis' | 'is_edited' | 'edit_mask_coverage' | 'reference_vista_id'>
+  const vista = vistaRow as Pick<Vista, 'id' | 'image_url' | 'space_id' | 'status' | 'dna_verified' | 'axis' | 'is_edited' | 'edit_mask_coverage' | 'reference_vista_id' | 'reference_kind' | 'source_sketch_url'>
 
   if (vista.status !== 'completed' || !vista.image_url) {
     return NextResponse.json({ error: 'Vista não está pronta' }, { status: 409 })
@@ -68,11 +68,21 @@ export async function POST(
   }
 
   try {
+    // Referência geométrica foi um NOVO PRINT? Pode retratar outro ambiente ou
+    // ângulo do projeto — comparar contexto ao pé da letra com o DNA da mestre
+    // geraria falso "DNA divergente" sistemático.
+    const printBase = vista.reference_kind === 'print'
+      || (!vista.reference_kind && !!vista.source_sketch_url)
+
     // Modo de verificação:
     // - vistas editadas (Retocar) → edit_relaxed (só uma região mudou)
-    // - eixo Ângulo → angulo_relaxed (nova vista: enquadramento muda por design)
+    // - eixo Ângulo (Nova Vista) → angulo_relaxed (enquadramento muda por design)
     // - eixo Detalhe → detalhe_relaxed (recorte mostra só parte dos materiais/
     //   paleta; avaliar só o que está visível, senão dá falso "DNA divergente")
+    // - eixo Material (Ajustar Materiais) → material_relaxed; sobre print,
+    //   material_print_relaxed (contexto por categoria ampla)
+    // - Luz sobre print → angulo_relaxed (mesma régua: outro recorte do
+    //   projeto, identidade estrita, contexto amplo)
     // - padrão       → standard
     const mode = vista.is_edited
       ? 'edit_relaxed'
@@ -80,7 +90,11 @@ export async function POST(
         ? 'angulo_relaxed'
         : vista.axis === 'detalhe'
           ? 'detalhe_relaxed'
-          : 'standard'
+          : vista.axis === 'material'
+            ? (printBase ? 'material_print_relaxed' : 'material_relaxed')
+            : printBase
+              ? 'angulo_relaxed'
+              : 'standard'
     const coverage = typeof vista.edit_mask_coverage === 'number' ? vista.edit_mask_coverage : 0
     const verification = await verifyDna(vista.image_url, visualDna, mode, coverage)
 

@@ -1,6 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
+// Sem webhook de "usuário criado" — usar a idade da conta como proxy de
+// "acabou de se cadastrar" pra disparar a conversão do Google Ads uma única vez.
+const NEW_USER_WINDOW_MS = 60_000
+
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
@@ -8,9 +12,14 @@ export async function GET(request: Request) {
 
   if (code) {
     const supabase = await createClient()
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
-      return NextResponse.redirect(`${origin}${next}`)
+      const redirectUrl = new URL(next, origin)
+      const isNewUser =
+        !!data.user?.created_at &&
+        Date.now() - new Date(data.user.created_at).getTime() < NEW_USER_WINDOW_MS
+      if (isNewUser) redirectUrl.searchParams.set('signup', '1')
+      return NextResponse.redirect(redirectUrl)
     }
   }
 
