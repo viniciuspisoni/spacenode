@@ -2,7 +2,7 @@
 
 **Período:** da publicação até **31 de agosto de 2026**, 23h59 (BRT)
 **Canais:** mídia própria — landing (`/`) e área de assinatura (`/app/billing`)
-**Status:** implementado, aguardando criação do cupom no Stripe (ver [Ativação](#ativação))
+**Status:** **no ar em produção desde 24/07/2026** (ver [Ativação](#ativação))
 
 ---
 
@@ -155,33 +155,54 @@ para o Starter, o ticket médio cai sem ganho de retenção).
 
 ## Ativação
 
-Passo a passo. O cupom precisa ser criado por quem tem acesso ao dashboard —
-não faz parte do deploy.
+Feito em 24/07/2026. Os cupons já existem nos dois modos.
 
-**Modo teste: já feito.** O cupom `launch50-first-month` existe em teste e foi
-validado — os quatro planos batem exatamente a metade na primeira fatura
-(89 → 44,50 · 199 → 99,50 · 349 → 174,50 · 699 → 349,50). O `.env.local` já
-aponta para ele, então o ambiente de desenvolvimento funciona sem mais nada.
+### Os IDs são diferentes em cada modo
 
-**Modo live: falta fazer.** Cupom é por modo — o de teste não existe em produção.
+Cupom no Stripe é por modo, e **o ID de cada um é diferente** — não confunda:
 
-1. Stripe → alternar para **modo live** → **Product catalog → Coupons → New**
-2. Configurar **exatamente** assim:
-   - **ID: `launch50-first-month`** ← use este mesmo ID (o campo aparece ao
-     expandir as opções avançadas). Assim a env vale igual em teste e produção.
-   - Discount type: **Percentage**, valor **50**
-   - Duration: **Once** ← é isto que faz valer só na primeira fatura
-   - Name: `Lancamento 50% primeiro mes`
-   - **Redeem by: 31/08/2026** — trava a janela no próprio Stripe, além da trava
-     que já existe no código
-3. Vercel → Environment Variables → adicionar em **Production**:
-   ```
-   STRIPE_LAUNCH_COUPON_ID=launch50-first-month
-   ```
-   Depois **redeploy** — env nova só entra em build novo.
-4. Validar com uma compra real de R$ 44,50 (Starter) numa conta que nunca
+| Modo | ID do cupom | Onde a env aponta |
+| ---- | ----------- | ----------------- |
+| **Live** (produção) | `2j5cQz5k` | `STRIPE_LAUNCH_COUPON_ID` em Production, na Vercel |
+| **Teste** (dev) | `launch50-first-month` | `STRIPE_LAUNCH_COUPON_ID` no `.env.local` |
+
+Os dois são idênticos no resto: Percentage 50, Duration **Once**, Redeem by
+31/08/2026.
+
+O ID de live saiu aleatório porque **o campo de ID fica escondido em *Advanced
+options*** na tela de criação — sem preencher, o Stripe gera um. Foi o que
+aconteceu, e a primeira tentativa de checkout em produção saiu a preço cheio até
+a env ser corrigida. Se algum dia recriar o cupom, ou preenche o ID à mão, ou
+copia o ID gerado para a env.
+
+### Como descobrir em que modo um cupom vive
+
+Sem acesso à chave live, dá para deduzir pela chave de teste:
+
+```js
+await stripe.coupons.retrieve('<id>')  // com a chave sk_test
+```
+
+`resource_missing` significa que o cupom **não** está em teste — ou seja, está em
+live. Achar o cupom aqui é que seria o problema.
+
+### Se precisar recriar (ou repetir a campanha)
+
+1. Stripe → conferir que **Test mode está DESLIGADO** → **Product catalog →
+   Coupons → New**
+2. Discount type **Percentage** = **50** · Duration **Once** · Name
+   `Lancamento 50% primeiro mes` · Redeem by **31/08/2026**
+3. Em *Advanced options*, preencher o **ID** — ou anotar o que o Stripe gerar
+4. Vercel → `STRIPE_LAUNCH_COUPON_ID` em **Production** com esse ID exato →
+   **redeploy** (env nova só vale em deploy novo)
+5. Validar com uma compra real de R$ 44,50 (Starter) numa conta que nunca
    assinou. Conferir: valor cobrado pela metade, plano ativado, 750 nodes
    creditados, evento no funil com `launch_offer: true`. Reembolsar depois.
+
+> Errar o ID não derruba a venda: o checkout refaz a session sem desconto e
+> registra `[checkout] cupom "<id>" não existe neste modo do Stripe` nos logs da
+> Vercel. Mas a landing continua anunciando 50% enquanto isso — então é para
+> corrigir na hora, não no dia seguinte.
 
 ---
 
