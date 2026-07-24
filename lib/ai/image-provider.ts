@@ -18,10 +18,14 @@
 //   GOOGLE_VERTEX_IMAGE_LOCATION    — região (default 'global' — os modelos
 //                                     Gemini Image ficam no endpoint global)
 //
-// Overrides de modelo (se o id -preview mudar no Vertex, troca por env):
+// Overrides de modelo (env tem precedência sobre o default; troca por env se o
+// id mudar no Vertex):
 //   GCP_IMAGE_MODEL_NANO_BANANA     (default gemini-2.5-flash-image)
-//   GCP_IMAGE_MODEL_NANO_BANANA_2   (default gemini-3.1-flash-image-preview)
-//   GCP_IMAGE_MODEL_NANO_BANANA_PRO (default gemini-3-pro-image-preview)
+//   GCP_IMAGE_MODEL_NANO_BANANA_2   (default gemini-3.1-flash-image)
+//   GCP_IMAGE_MODEL_NANO_BANANA_PRO (default gemini-3-pro-image)
+// ATENÇÃO: no Vertex os Gemini 3 Image são GA (SEM -preview) — os aliases
+// -preview dão 404 neste projeto. É o OPOSTO da API direta do Google
+// (lib/ai/google/editImage.ts), onde o id válido hoje ainda é -preview.
 //
 // Contrato: cada call site passa o MESMO falInput que já enviava pra FAL
 // (prompt, image_urls, resolution, num_images, output_format, seed). O caminho
@@ -143,11 +147,13 @@ function gcpModelFor(falEndpoint: string): GcpModelMapping | null {
     case 'fal-ai/nano-banana/edit':
       return { model: envModel('GCP_IMAGE_MODEL_NANO_BANANA', 'gemini-2.5-flash-image'), supportsImageSize: false }
     case 'fal-ai/nano-banana-2/edit':
-      return { model: envModel('GCP_IMAGE_MODEL_NANO_BANANA_2', 'gemini-3.1-flash-image-preview'), supportsImageSize: true }
+      // GA no Vertex é sem -preview (o alias -preview dá 404 neste projeto).
+      return { model: envModel('GCP_IMAGE_MODEL_NANO_BANANA_2', 'gemini-3.1-flash-image'), supportsImageSize: true }
     // Nano Banana Pro e o endpoint explícito do preview são o MESMO Gemini 3 Pro.
     case 'fal-ai/nano-banana-pro/edit':
     case 'fal-ai/gemini-3-pro-image-preview/edit':
-      return { model: envModel('GCP_IMAGE_MODEL_NANO_BANANA_PRO', 'gemini-3-pro-image-preview'), supportsImageSize: true }
+      // GA no Vertex é sem -preview (o alias -preview dá 404 neste projeto).
+      return { model: envModel('GCP_IMAGE_MODEL_NANO_BANANA_PRO', 'gemini-3-pro-image'), supportsImageSize: true }
     default:
       return null
   }
