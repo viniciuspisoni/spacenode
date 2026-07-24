@@ -45,10 +45,10 @@ const CREDS_JSON = process.env.GOOGLE_VERTEX_CREDENTIALS_JSON?.trim()
 const CREDS_FILE = process.env.GOOGLE_APPLICATION_CREDENTIALS?.trim()
 
 const MODEL = USE_PRO
-  ? (process.env.GCP_IMAGE_MODEL_NANO_BANANA_PRO?.trim() || 'gemini-3-pro-image-preview')
+  ? (process.env.GCP_IMAGE_MODEL_NANO_BANANA_PRO?.trim() || 'gemini-3-pro-image')
   : USE_NB1
     ? (process.env.GCP_IMAGE_MODEL_NANO_BANANA?.trim() || 'gemini-2.5-flash-image')
-    : (process.env.GCP_IMAGE_MODEL_NANO_BANANA_2?.trim() || 'gemini-3.1-flash-image-preview')
+    : (process.env.GCP_IMAGE_MODEL_NANO_BANANA_2?.trim() || 'gemini-3.1-flash-image')
 // 2.5 Flash Image não aceita imageConfig.imageSize (o provider também omite).
 const SUPPORTS_IMAGE_SIZE = !USE_NB1
 const RESOLUTION = USE_PRO ? '2K' : '1K'
