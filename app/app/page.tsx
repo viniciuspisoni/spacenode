@@ -92,7 +92,7 @@ export default async function AppPage() {
   const firstName = (user.user_metadata.full_name ?? user.email ?? 'usuário').split(' ')[0]
 
   const admin = createAdminClient()
-  const [payerBalance, recentResult, countResult, monthResult, spacesResult] = await Promise.all([
+  const [payerBalance, recentResult, countResult, monthResult, spacesResult, firstRunResult] = await Promise.all([
     // Saldo/plano da bolsa (dono do workspace) — é dele que a geração debita.
     getPayerBalance(admin, user.id),
     supabase.from('renders')
@@ -112,7 +112,15 @@ export default async function AppPage() {
       .neq('status', 'archived')
       .order('updated_at', { ascending: false })
       .limit(PROJECT_LIMIT),
+    supabase.from('profiles').select('first_run_done_at').eq('id', user.id).maybeSingle(),
   ])
+
+  // Quem nunca gerou nada não começa pelo dashboard: o /app/comecar leva direto
+  // à primeira imagem. Complemento exato do redirect de lá (que devolve pra cá
+  // quem já gerou ou já dispensou o fluxo), então não há ping-pong.
+  if (!firstRunResult.data?.first_run_done_at && (countResult.count ?? 0) === 0) {
+    redirect('/app/comecar')
+  }
 
   const planId       = (payerBalance.planId as PlanId) ?? 'free'
   const plan         = getPlanById(planId)
@@ -304,14 +312,15 @@ export default async function AppPage() {
 function StartBlock() {
   return (
     <section className="spn-dash-start" data-tour="projetos">
-      <h2 className="spn-dash-start-title">Comece seu primeiro projeto</h2>
+      <h2 className="spn-dash-start-title">Comece pela primeira imagem</h2>
       <p className="spn-dash-start-sub">
-        Envie um print, modelo, planta ou referência para gerar a primeira visualização.
+        Envie um print, modelo, planta ou referência — ou use um exemplo nosso.
+        Leva dois passos e nenhuma configuração.
       </p>
       <div className="spn-dash-start-actions">
-        <Link href="/app/spaces/new" className="spn-dash-cta">Criar novo projeto</Link>
-        <Link href="/app/generate" className="spn-btn-ghost" style={{ borderRadius: 'var(--radius-full)' }}>
-          Renderizar imagem avulsa
+        <Link href="/app/comecar" className="spn-dash-cta">Gerar minha primeira imagem</Link>
+        <Link href="/app/spaces/new" className="spn-btn-ghost" style={{ borderRadius: 'var(--radius-full)' }}>
+          Criar um projeto
         </Link>
       </div>
       <div className="spn-dash-steps">

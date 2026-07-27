@@ -60,11 +60,15 @@ export default async function NewSpaceOriginPage() {
           gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
         }}>
           <OriginCard
-            href={hasRenders ? '/app/spaces/new/from-render' : '/app/generate'}
-            recommended
+            href={hasRenders ? '/app/spaces/new/from-render' : '/app/comecar'}
+            // Recomendar um card desabilitado deixava quem chega sem nenhuma
+            // render — todo mundo no primeiro acesso — encarando um beco: a
+            // única opção destacada era justamente a bloqueada. Sem renders, a
+            // recomendação passa pro upload, que funciona agora.
+            recommended={hasRenders}
             disabled={!hasRenders}
-            disabledHref="/app/generate"
-            disabledLabel="Crie sua primeira render →"
+            disabledHref="/app/comecar"
+            disabledLabel="Gere sua primeira imagem →"
             icon={
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="3" width="18" height="18" rx="2"/>
@@ -82,6 +86,7 @@ export default async function NewSpaceOriginPage() {
           />
           <OriginCard
             href="/app/spaces/new/upload"
+            recommended={!hasRenders}
             icon={
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
