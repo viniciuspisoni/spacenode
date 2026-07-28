@@ -18,6 +18,14 @@ import {
   type LumenPackSize,
 } from '@/lib/lumens'
 import { isLaunchOfferOpen } from '@/lib/launch-offer'
+import {
+  isPixEnabled,
+  isPixRejectedError,
+  paymentMethodTypes,
+  pixAllowedForCycle,
+  pixMandateOptions,
+  PIX_EXPIRES_AFTER_SECONDS,
+} from '@/lib/stripe/pix'
 
 export const dynamic = 'force-dynamic'
 
@@ -180,14 +188,39 @@ export async function POST(req: NextRequest) {
     // Fixado fora do closure: dentro dele o TS perde o narrowing de `body`.
     const billingCycle: BillingCycle = body.billing
 
-    const buildSession = (withOffer: boolean) =>
+    // ── Pix Automático: teto do mandato ─────────────────────────────────
+    // O valor que o cliente autoriza no app do banco precisa cobrir o que o
+    // Stripe vai cobrar de fato. Quem manda nisso é o Price, não o catálogo:
+    // se os dois divergirem, é o Price que é cobrado e um mandato calculado
+    // pelo catálogo faria TODA renovação falhar meses depois, em silêncio.
+    // Por isso o valor vem do Stripe, com o catálogo só como plano B.
+    const usePixMandate = isPixEnabled() && pixAllowedForCycle(billingCycle)
+    let mandateAmount = plan.monthlyPrice * 100
+    if (usePixMandate) {
+      try {
+        const price = await stripe.prices.retrieve(priceId)
+        if (price.unit_amount && price.unit_amount !== mandateAmount) {
+          console.error(
+            `[checkout] preço do catálogo (${mandateAmount}) diverge do Stripe ` +
+            `(${price.unit_amount}) em ${plan.id}/${billingCycle} — mandato Pix ` +
+            'usando o valor do Stripe'
+          )
+        }
+        mandateAmount = price.unit_amount ?? mandateAmount
+      } catch (err) {
+        console.error('[checkout] falha ao ler o price p/ mandato Pix:', err)
+      }
+    }
+
+    const buildSession = (withOffer: boolean, withPix: boolean) =>
       stripe.checkout.sessions.create({
         ...customerArgs,
-        payment_method_types: ['card'],
+        payment_method_types: paymentMethodTypes(withPix),
         line_items:           [{ price: priceId, quantity: 1 }],
         mode:                 'subscription',
         ...(withOffer ? { discounts: [{ coupon: launchCouponId! }] } : {}),
-        success_url:          `${successBase}?success=true`,
+        ...(withPix ? { payment_method_options: { pix: pixMandateOptions(mandateAmount) } } : {}),
+        success_url:          `${successBase}?success=true&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url:           `${successBase}?canceled=true`,
         metadata: {
           user_id:       user.id,
@@ -197,25 +230,61 @@ export async function POST(req: NextRequest) {
           nodes_to_add:  String(plan.nodes),
           launch_offer:  withOffer ? 'applied' : 'none',
         },
+        // Espelhado na assinatura porque a ativação por Pix acontece em
+        // `invoice.paid` (subscription_create), e a Invoice não carrega o
+        // metadata da session. Sem isso, o webhook dependeria de o
+        // checkout.session.completed ter chegado antes — uma corrida.
+        subscription_data: {
+          metadata: {
+            user_id:      user.id,
+            plan_id:      plan.id,
+            nodes_to_add: String(plan.nodes),
+          },
+        },
       })
 
-    // O cupom existe por MODO no Stripe (teste ≠ live) e a env pode apontar
-    // para um que ainda não foi criado. Sem esta rede, esse descompasso
-    // derrubaria o checkout de TODO mundo com `resource_missing` — um erro de
-    // configuração viraria queda de venda. Melhor vender a preço cheio e
-    // gritar no log: o cliente ainda vê o valor real na tela do Stripe.
-    let session
+    // Degradação em cascata: cada rede desliga UM opcional e tenta de novo.
+    //
+    //  • Pix: se não estiver ativado no Dashboard (ou o Pix Automático não
+    //    liberado), o Stripe recusa a session INTEIRA — inclusive para quem ia
+    //    pagar no cartão. Um erro de configuração viraria outage de vendas.
+    //  • Cupom: existe por MODO no Stripe (teste ≠ live) e a env pode apontar
+    //    para um que ainda não foi criado.
+    //
+    // Nos dois casos vender degradado é melhor que não vender, e o log grita.
+    // O cliente vê o valor e os meios de pagamento reais na tela do Stripe
+    // antes de confirmar qualquer coisa.
+    let session: Stripe.Checkout.Session | undefined
     let offerApplied = applyOffer
-    try {
-      session = await buildSession(applyOffer)
-    } catch (err) {
-      if (!applyOffer || !isResourceMissing(err)) throw err
-      console.error(
-        `[checkout] cupom "${launchCouponId}" não existe neste modo do Stripe — ` +
-        'vendendo a preço cheio. Confira se o cupom foi criado em live.'
-      )
-      offerApplied = false
-      session = await buildSession(false)
+    let pixApplied   = usePixMandate
+
+    for (let attempt = 0; attempt < 3 && !session; attempt++) {
+      try {
+        session = await buildSession(offerApplied, pixApplied)
+      } catch (err) {
+        if (pixApplied && isPixRejectedError(err)) {
+          console.error(
+            '[checkout] Stripe recusou `pix` — ative Pix e Pix Automático no ' +
+            'Dashboard deste modo. Seguindo só no cartão.'
+          )
+          pixApplied = false
+          continue
+        }
+        if (offerApplied && isResourceMissing(err)) {
+          console.error(
+            `[checkout] cupom "${launchCouponId}" não existe neste modo do Stripe — ` +
+            'vendendo a preço cheio. Confira se o cupom foi criado em live.'
+          )
+          offerApplied = false
+          continue
+        }
+        throw err
+      }
+    }
+    if (!session) {
+      // Inalcançável: 3 tentativas cobrem as 2 degradações possíveis e
+      // qualquer outro erro é relançado acima.
+      throw new Error('[checkout] session não criada após degradações')
     }
 
     // Funil first-party (best-effort — recordAcquisitionEvent nunca lança).
@@ -223,7 +292,7 @@ export async function POST(req: NextRequest) {
       user_id: user.id,
       event_type: 'checkout_started',
       plan_id: plan.id,
-      metadata: { billing_cycle: body.billing, launch_offer: offerApplied },
+      metadata: { billing_cycle: body.billing, launch_offer: offerApplied, pix_offered: pixApplied },
     })
 
     return NextResponse.json({ url: session.url })
@@ -246,18 +315,36 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Configuração indisponível' }, { status: 500 })
   }
 
-  const session = await stripe.checkout.sessions.create({
-    ...customerArgs,
-    payment_method_types: ['card'],
-    line_items:           [{ price: priceId, quantity: 1 }],
-    mode:                 'payment',
-    success_url:          `${successBase}?lumen_success=true`,
-    cancel_url:           `${successBase}?canceled=true`,
-    metadata: {
-      user_id:      user.id,
-      product_type: 'lumen',
-      pack_size:    String(pack.id),
-    },
-  })
+  // Pix comum (QR de pagamento único). Mesma rede da assinatura: se o Stripe
+  // recusar o tipo, refaz só no cartão em vez de derrubar a venda.
+  const buildLumenSession = (withPix: boolean) =>
+    stripe.checkout.sessions.create({
+      ...customerArgs,
+      payment_method_types: paymentMethodTypes(withPix),
+      line_items:           [{ price: priceId, quantity: 1 }],
+      mode:                 'payment',
+      ...(withPix
+        ? { payment_method_options: { pix: { expires_after_seconds: PIX_EXPIRES_AFTER_SECONDS } } }
+        : {}),
+      success_url:          `${successBase}?lumen_success=true&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url:           `${successBase}?canceled=true`,
+      metadata: {
+        user_id:      user.id,
+        product_type: 'lumen',
+        pack_size:    String(pack.id),
+      },
+    })
+
+  let session: Stripe.Checkout.Session
+  try {
+    session = await buildLumenSession(isPixEnabled())
+  } catch (err) {
+    if (!isPixEnabled() || !isPixRejectedError(err)) throw err
+    console.error(
+      '[checkout] Stripe recusou `pix` no pack Lumen — ative Pix no Dashboard ' +
+      'deste modo. Seguindo só no cartão.'
+    )
+    session = await buildLumenSession(false)
+  }
   return NextResponse.json({ url: session.url })
 }
