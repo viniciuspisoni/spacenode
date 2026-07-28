@@ -79,7 +79,7 @@ describe('conteúdo dinâmico (fonte de verdade)', () => {
       expect(text).toContain(String(plan.monthlyPrice))
     }
     // regra de marca: não citar a quantidade de nodes de cortesia (não importável)
-    expect(text).not.toMatch(/\b40 nodes\b/)
+    expect(text).not.toMatch(/\b80 nodes\b/)
   })
 
   it('lumens refletem lib/lumens', () => {
