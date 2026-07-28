@@ -12,6 +12,12 @@ import {
   LAUNCH_OFFER_PITCH,
 } from '@/lib/launch-offer'
 
+/** Desfecho do checkout recém-concluído. Ver readCheckoutNotice em page.tsx. */
+export interface CheckoutNotice {
+  kind:    'ok' | 'pending'
+  message: string
+}
+
 export interface LumenPackRow {
   id:              string
   pack_size:       number
@@ -30,6 +36,8 @@ interface BillingClientProps {
   pooled?: boolean
   /** true = nunca assinou, então cai na oferta de lançamento (50% no 1º mês). */
   offerEligible?: boolean
+  /** Resultado do checkout que trouxe o usuário de volta pra cá, se houve. */
+  notice?: CheckoutNotice | null
 }
 
 type CheckoutPayload =
@@ -51,7 +59,7 @@ function daysUntil(date: string): number {
   return Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)))
 }
 
-export function BillingClient({ plan, balance, lumens, pooled, offerEligible }: BillingClientProps) {
+export function BillingClient({ plan, balance, lumens, pooled, offerEligible, notice }: BillingClientProps) {
   const isLumenBlocked = plan === 'free' || plan === 'starter'
   const [billing, setBilling] = useState<BillingCycle>('monthly')
   const [loading, setLoading] = useState<string | null>(null)
@@ -89,6 +97,36 @@ export function BillingClient({ plan, balance, lumens, pooled, offerEligible }: 
       fontFamily: "'Geist', system-ui, sans-serif", letterSpacing: '-0.011em',
     }}>
       <div style={{ maxWidth: 960, margin: '0 auto', padding: '64px 32px 96px' }}>
+
+        {/* ── 0. Retorno do checkout ─────────────────────────────────────── */}
+        {notice && (
+          <div style={{
+            display: 'flex', alignItems: 'flex-start', gap: 10,
+            background: notice.kind === 'ok'
+              ? 'var(--color-accent-green-bg)'
+              : 'var(--color-bg-elevated)',
+            border: `0.5px solid ${notice.kind === 'ok'
+              ? 'var(--color-accent-green-border)'
+              : 'var(--color-border)'}`,
+            borderRadius: 12, padding: '14px 18px', marginBottom: 24,
+          }}>
+            <span style={{
+              fontSize: 10, fontWeight: 600, letterSpacing: '0.18em',
+              textTransform: 'uppercase', whiteSpace: 'nowrap', paddingTop: 2,
+              color: notice.kind === 'ok'
+                ? 'var(--color-accent-green)'
+                : 'var(--color-text-tertiary)',
+            }}>
+              {notice.kind === 'ok' ? 'pago' : 'processando'}
+            </span>
+            <span style={{
+              fontSize: 12.5, lineHeight: 1.6, letterSpacing: '-0.005em',
+              color: 'var(--color-text-primary)',
+            }}>
+              {notice.message}
+            </span>
+          </div>
+        )}
 
         {/* ── 1. Saldo atual ─────────────────────────────────────────────── */}
         <Section>
