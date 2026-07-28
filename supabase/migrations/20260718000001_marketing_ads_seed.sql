@@ -13,7 +13,7 @@
 --
 -- Copy segue docs/marketing/prohibited-content.md: nenhum número inventado,
 -- nenhum depoimento, nenhum módulo desativado citado. Fatos utilizáveis:
--- 40 nodes grátis sem cartão · planos a partir de R$ 89/mês · preserva
+-- 80 nodes grátis sem cartão · planos a partir de R$ 89/mês · preserva
 -- geometria, proporções e perspectiva · aceita prints de SketchUp/Revit/
 -- Archicad como imagem base (NUNCA "plugin"/"importação direta").
 -- ════════════════════════════════════════════════════════════════════════════
@@ -119,7 +119,7 @@ insert into marketing.landing_pages
   'arquiteto_autonomo',
   'horas esperando render',
   'Do modelo à imagem apresentável. Sem fila de render.',
-  'Envie um print do seu modelo de SketchUp, Revit ou Archicad e gere imagens que preservam geometria, proporções e perspectiva. 40 nodes grátis, sem cartão.',
+  'Envie um print do seu modelo de SketchUp, Revit ou Archicad e gere imagens que preservam geometria, proporções e perspectiva. 80 nodes grátis, sem cartão.',
   'Comece grátis',
   '[
     {
@@ -135,7 +135,7 @@ insert into marketing.landing_pages
         },
         {
           "title": "Comece sem cartão",
-          "body": "Todo cadastro começa com 40 nodes grátis, sem cartão. Planos a partir de R$ 89/mês quando fizer sentido escalar."
+          "body": "Todo cadastro começa com 80 nodes grátis, sem cartão. Planos a partir de R$ 89/mês quando fizer sentido escalar."
         }
       ]
     },
@@ -168,7 +168,7 @@ insert into marketing.landing_pages
       "items": [
         {
           "q": "Preciso de cartão de crédito para testar?",
-          "a": "Não. Todo cadastro começa com 40 nodes grátis, sem cartão."
+          "a": "Não. Todo cadastro começa com 80 nodes grátis, sem cartão."
         },
         {
           "q": "Funciona com SketchUp, Revit e Archicad?",
@@ -182,7 +182,7 @@ insert into marketing.landing_pages
     }
   ]'::jsonb,
   'SpaceNode — do modelo à imagem apresentável, sem fila de render',
-  'Envie um print do seu modelo de SketchUp, Revit ou Archicad e gere imagens de apresentação que preservam geometria, proporções e perspectiva. 40 nodes grátis, sem cartão.'
+  'Envie um print do seu modelo de SketchUp, Revit ou Archicad e gere imagens de apresentação que preservam geometria, proporções e perspectiva. 80 nodes grátis, sem cartão.'
 ),
 (
   'fidelidade-ao-projeto',
@@ -248,13 +248,13 @@ insert into marketing.landing_pages
         },
         {
           "q": "Quanto custa para começar?",
-          "a": "Nada: todo cadastro começa com 40 nodes grátis, sem cartão. Planos a partir de R$ 89/mês."
+          "a": "Nada: todo cadastro começa com 80 nodes grátis, sem cartão. Planos a partir de R$ 89/mês."
         }
       ]
     }
   ]'::jsonb,
   'SpaceNode — a imagem muda, o seu projeto não',
-  'Imagens de apresentação que preservam geometria, proporções e perspectiva do seu modelo, com coerência entre vistas do mesmo ambiente. Comece com 40 nodes grátis, sem cartão.'
+  'Imagens de apresentação que preservam geometria, proporções e perspectiva do seu modelo, com coerência entre vistas do mesmo ambiente. Comece com 80 nodes grátis, sem cartão.'
 )
 on conflict (slug) do nothing;
 

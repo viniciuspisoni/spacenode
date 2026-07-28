@@ -408,7 +408,7 @@ export function PricingToggle() {
         }}>
           Ainda em dúvida?{' '}
           <a href="/login?mode=signup" style={{ color: 'var(--color-text-primary)', textDecoration: 'underline', textUnderlineOffset: 3 }}>
-            Comece grátis com 40 nodes
+            Comece grátis com 80 nodes
           </a>
           {' '}— assine quando o volume pedir.
         </p>

@@ -174,7 +174,7 @@ export default async function LandingCampaignPage({
             </LpCtaLink>
           </div>
           <p className="mt-5 text-[11px] text-text-tertiary" style={{ letterSpacing: '0.02em' }}>
-            40 nodes grátis · sem cartão
+            80 nodes grátis · sem cartão
           </p>
         </section>
 
@@ -184,7 +184,7 @@ export default async function LandingCampaignPage({
         {/* CTA final */}
         <section className="mx-auto max-w-3xl px-5 py-16 text-center sm:px-10" style={{ borderTop: HAIRLINE }}>
           <h2 className="text-[26px] font-light text-text-primary" style={{ letterSpacing: '-0.03em' }}>
-            comece com 40 nodes grátis.
+            comece com 80 nodes grátis.
           </h2>
           <p className="mx-auto mt-3 max-w-md text-sm text-text-secondary">
             Sem cartão para começar. Planos a partir de R$ 89/mês.

@@ -3,7 +3,7 @@
 // Quem paga os nodes é o DONO do workspace ativo (individual: o próprio
 // usuário). O débito já resolve isso no banco (consume_workspace_nodes), mas
 // exibição e pré-checagens precisam ler o saldo do MESMO pagador — ler
-// user_node_balance/profiles do membro mostra os 40 nodes de cadastro dele e
+// user_node_balance/profiles do membro mostra os 80 nodes de cadastro dele e
 // bloqueia geração por engano.
 //
 // Use SEMPRE este helper para mostrar ou pré-checar saldo em server

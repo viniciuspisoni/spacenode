@@ -165,7 +165,7 @@ const FRONT_GUIDE: Record<CampaignFront, string> = {
   produto:
     'produto: apresentar um módulo específico ATIVO e o que ele faz de verdade, sem promessa vaga. Meio de funil.',
   conversao:
-    'conversao: fundo de funil/remarketing — oferta real e objetiva ("40 nodes grátis, sem cartão"; "planos a partir de R$ 89/mês"), fricção mínima, cta_button SIGN_UP.',
+    'conversao: fundo de funil/remarketing — oferta real e objetiva ("80 nodes grátis, sem cartão"; "planos a partir de R$ 89/mês"), fricção mínima, cta_button SIGN_UP.',
 }
 
 function buildSystemPrompt(rules: Record<string, unknown>): string {
@@ -200,7 +200,7 @@ function buildSystemPrompt(rules: Record<string, unknown>): string {
     '1. NUNCA inventar número, métrica, depoimento, case, cliente ou funcionalidade. Sem dado real conferido, escreva a peça sem número.',
     '2. Léxico e emojis proibidos acima — nunca usar. Anúncio não leva emoji.',
     '3. Nunca prometer "plugin" ou "importação direta" — o insumo é o print/imagem exportada do SketchUp/Revit/Archicad.',
-    '4. Fatos reais permitidos sem conferência extra: "40 nodes grátis, sem cartão"; "planos a partir de R$ 89/mês"; "preserva geometria, proporções e perspectiva"; "aceita prints de SketchUp/Revit/Archicad como imagem base". Qualquer outro claim exige conferência humana — sinalize em risk_flags.',
+    '4. Fatos reais permitidos sem conferência extra: "80 nodes grátis, sem cartão"; "planos a partir de R$ 89/mês"; "preserva geometria, proporções e perspectiva"; "aceita prints de SketchUp/Revit/Archicad como imagem base". Qualquer outro claim exige conferência humana — sinalize em risk_flags.',
     '5. Português brasileiro, tom de arquiteto sênior falando com arquiteto: direto, técnico, específico. A IA é meio, não assunto.',
     '6. Não repetir as headlines/títulos anteriores listados — variar ângulo, dor e promessa.',
     '7. Preencher risk_flags com autocrítica honesta: claims a conferir, dependência de material real, risco de fugir da marca.',

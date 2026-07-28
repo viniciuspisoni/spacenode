@@ -4,7 +4,7 @@ import { getPayerBalance } from '@/lib/workspaces/balance'
 import { redirect } from 'next/navigation'
 import GenerateClient from './GenerateClient'
 
-const DEFAULT_CREDITS = 40
+const DEFAULT_CREDITS = 80
 
 export default async function GeneratePage({
   searchParams,

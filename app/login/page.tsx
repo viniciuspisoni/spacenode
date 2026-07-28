@@ -458,7 +458,7 @@ function LoginForm() {
           display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center',
           gap: 8, fontSize: 10, color: 'var(--color-text-quaternary)', letterSpacing: '0.02em',
         }}>
-          {(['40 nodes grátis', 'Sem cartão', 'Suporte em português'] as const).map((item, i, arr) => (
+          {(['80 nodes grátis', 'Sem cartão', 'Suporte em português'] as const).map((item, i, arr) => (
             <span key={item} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {item}
               {i < arr.length - 1 && <span style={{ opacity: 0.45 }}>·</span>}

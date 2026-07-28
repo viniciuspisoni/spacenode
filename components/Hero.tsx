@@ -120,7 +120,7 @@ export default function Hero() {
           letterSpacing: "0.02em",
         }}
       >
-        <span>40 nodes grátis</span>
+        <span>80 nodes grátis</span>
         <span style={{ opacity: 0.4 }}>•</span>
         <span>Sem cartão</span>
         <span style={{ opacity: 0.4 }}>•</span>
