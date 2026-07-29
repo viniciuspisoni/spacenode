@@ -1,4 +1,4 @@
-// /privacidade — Política de Privacidade da SPACENODE (LGPD).
+// /privacidade — Política de Privacidade da SpaceNode (LGPD).
 //
 // Redigida para refletir o tratamento REAL de dados do produto: Supabase
 // (auth/banco/storage), Vercel (hospedagem), Google Cloud e fal.ai (IA),
@@ -15,7 +15,7 @@ import { LEGAL_CNPJ, LEGAL_NAME, SUPPORT_EMAIL, SUPPORT_PHONE_DISPLAY, SUPPORT_W
 export const metadata: Metadata = {
   title: 'Política de Privacidade · SpaceNode',
   description:
-    'Política de Privacidade da SPACENODE — como coletamos, usamos e protegemos seus dados pessoais, em conformidade com a LGPD.',
+    'Política de Privacidade da SpaceNode — como coletamos, usamos e protegemos seus dados pessoais, em conformidade com a LGPD.',
   robots: { index: true, follow: true },
 }
 
@@ -39,7 +39,7 @@ export default function PrivacidadePage() {
       <LegalSection n={1} title="Quem somos">
         <P>
           Esta Política descreve como a <Strong>{LEGAL_NAME}</Strong>, inscrita no CNPJ sob o nº{' '}
-          {LEGAL_CNPJ} (&ldquo;SPACENODE&rdquo;, &ldquo;nós&rdquo;), operadora da plataforma de visualização
+          {LEGAL_CNPJ} (&ldquo;SpaceNode&rdquo;, &ldquo;nós&rdquo;), operadora da plataforma de visualização
           arquitetônica com inteligência artificial disponível em spacenode.app, trata dados pessoais na
           qualidade de <Strong>controladora</Strong>, em conformidade com a Lei Geral de Proteção de Dados —
           LGPD (Lei nº 13.709/2018) e o Marco Civil da Internet (Lei nº 12.965/2014).

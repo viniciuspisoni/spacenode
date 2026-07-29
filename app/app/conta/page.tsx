@@ -64,7 +64,7 @@ export default async function ContaPage() {
             fontSize: 13, color: 'var(--color-text-tertiary)',
             lineHeight: 1.6, letterSpacing: '-0.005em',
           }}>
-            Resumo da sua conta SPACENODE — identificação, plano e segurança.
+            Resumo da sua conta SpaceNode — identificação, plano e segurança.
           </p>
         </div>
 
@@ -130,7 +130,7 @@ export default async function ContaPage() {
           <Field label="WhatsApp" value={SUPPORT_PHONE_DISPLAY} />
           <Field label="E-mail" value={SUPPORT_EMAIL} />
           <a
-            href={supportWhatsAppUrl('Olá! Preciso de ajuda com a minha conta SPACENODE.')}
+            href={supportWhatsAppUrl('Olá! Preciso de ajuda com a minha conta SpaceNode.')}
             target="_blank"
             rel="noopener noreferrer"
             style={linkButtonStyle}

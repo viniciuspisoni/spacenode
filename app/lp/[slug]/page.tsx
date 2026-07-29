@@ -140,7 +140,7 @@ export default async function LandingCampaignPage({
           className="text-[13px] font-semibold text-text-primary no-underline"
           style={{ letterSpacing: '0.22em' }}
         >
-          SPACENODE
+          spacenode
         </Link>
       </header>
 

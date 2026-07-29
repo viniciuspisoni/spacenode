@@ -716,7 +716,7 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
                     <rect x="3" y="3" width="18" height="18" rx="2"/>
                     <path d="M3 9h18M9 21V9"/>
                   </svg>
-                  Usar no Spaces
+                  Usar em novo projeto
                 </a>
               </div>
             </div>

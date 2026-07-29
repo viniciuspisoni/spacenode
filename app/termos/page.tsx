@@ -1,4 +1,4 @@
-// /termos — Termos de Uso da SPACENODE.
+// /termos — Termos de Uso da SpaceNode.
 //
 // Conteúdo redigido para refletir o produto real (planos/nodes/lumens de
 // lib/plans.ts e lib/lumens.ts, Stripe, workspaces, provedores de IA) e
@@ -17,7 +17,7 @@ import { LEGAL_CNPJ, LEGAL_NAME, SUPPORT_EMAIL, SUPPORT_PHONE_DISPLAY, SUPPORT_W
 export const metadata: Metadata = {
   title: 'Termos de Uso · SpaceNode',
   description:
-    'Termos de Uso da SPACENODE — condições para uso da plataforma de visualização arquitetônica com IA: planos, créditos, direitos sobre imagens e responsabilidades.',
+    'Termos de Uso da SpaceNode — condições para uso da plataforma de visualização arquitetônica com IA: planos, créditos, direitos sobre imagens e responsabilidades.',
   robots: { index: true, follow: true },
 }
 
@@ -30,7 +30,7 @@ export default function TermosPage() {
       updatedAt={UPDATED_AT}
       intro={
         <>
-          Resumo em linguagem simples: a SPACENODE gera <Strong>visualizações arquitetônicas com IA</Strong> a
+          Resumo em linguagem simples: a SpaceNode gera <Strong>visualizações arquitetônicas com IA</Strong> a
           partir do material que você envia. As imagens geradas são suas, mas têm natureza{' '}
           <Strong>ilustrativa</Strong> — não substituem projeto técnico nem responsabilidade profissional.
           Créditos do plano renovam todo mês e não acumulam; o plano anual é pago antecipadamente.
@@ -40,10 +40,10 @@ export default function TermosPage() {
     >
       <LegalSection n={1} title="Aceitação">
         <P>
-          Estes Termos de Uso (&ldquo;Termos&rdquo;) regulam o acesso e o uso da plataforma SPACENODE
+          Estes Termos de Uso (&ldquo;Termos&rdquo;) regulam o acesso e o uso da plataforma SpaceNode
           (&ldquo;Plataforma&rdquo;), disponível em spacenode.app e operada por{' '}
           <Strong>{LEGAL_NAME}</Strong>, inscrita no CNPJ sob o nº {LEGAL_CNPJ}
-          (&ldquo;SPACENODE&rdquo;, &ldquo;nós&rdquo;). Ao criar uma conta,
+          (&ldquo;SpaceNode&rdquo;, &ldquo;nós&rdquo;). Ao criar uma conta,
           acessar ou usar a Plataforma, você (&ldquo;Usuário&rdquo;) declara que leu, compreendeu e aceita
           integralmente estes Termos e a{' '}
           <Link href="/privacidade" style={{ color: 'var(--color-text-primary)', textUnderlineOffset: 3 }}>
@@ -59,7 +59,7 @@ export default function TermosPage() {
 
       <LegalSection n={2} title="O serviço">
         <P>
-          A SPACENODE é uma plataforma de visualização arquitetônica assistida por inteligência artificial.
+          A SpaceNode é uma plataforma de visualização arquitetônica assistida por inteligência artificial.
           A partir de imagens, estudos, modelos e instruções fornecidos pelo Usuário, ela gera visualizações,
           edições, ampliações, vídeos e materiais de apresentação.
         </P>
@@ -218,7 +218,7 @@ export default function TermosPage() {
 
       <LegalSection n={11} title="Propriedade intelectual da Plataforma">
         <P>
-          O software, a marca SPACENODE, a identidade visual, a interface e a tecnologia da Plataforma são
+          O software, a marca SpaceNode, a identidade visual, a interface e a tecnologia da Plataforma são
           protegidos por lei e permanecem de nossa titularidade ou de nossos licenciantes. Estes Termos
           concedem apenas uma licença pessoal, limitada e intransferível de uso da Plataforma conforme o
           plano contratado — nenhum outro direito é transferido.
@@ -267,7 +267,7 @@ export default function TermosPage() {
           </LI>
           <LI>
             nossa responsabilidade total, por qualquer causa, fica limitada ao valor efetivamente pago por
-            você à SPACENODE nos 12 (doze) meses anteriores ao evento.
+            você à SpaceNode nos 12 (doze) meses anteriores ao evento.
           </LI>
         </UL>
         <P>Nada nestes Termos exclui responsabilidades que não podem ser excluídas por lei.</P>
@@ -287,7 +287,7 @@ export default function TermosPage() {
           A eventual tolerância quanto ao descumprimento de qualquer cláusula não implica renúncia ou
           novação. Se qualquer disposição destes Termos for considerada inválida, as demais permanecem em
           vigor. Estes Termos, junto com a Política de Privacidade, constituem o acordo integral entre você e
-          a SPACENODE quanto ao uso da Plataforma.
+          a SpaceNode quanto ao uso da Plataforma.
         </P>
       </LegalSection>
 

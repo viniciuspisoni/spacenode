@@ -138,9 +138,9 @@ export function FromRenderFlow({ gallery, preselected, initialBalance }: Props) 
         fontSize: 12, color: 'var(--color-text-tertiary)',
         letterSpacing: '-0.005em', marginBottom: 28,
       }}>
-        <Link href="/app/spaces">Spaces</Link>
+        <Link href="/app/spaces">Meus projetos</Link>
         <span style={{ opacity: 0.35, fontSize: 9 }}>›</span>
-        <Link href="/app/spaces/new">Novo</Link>
+        <Link href="/app/spaces/new">Novo projeto</Link>
         <span style={{ opacity: 0.35, fontSize: 9 }}>›</span>
         <span style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>A partir de render</span>
       </div>
@@ -174,7 +174,7 @@ export function FromRenderFlow({ gallery, preselected, initialBalance }: Props) 
 
       {step === 'analyzing' && render && (
         <SynapticLoading
-          spaceName={name || 'Novo Space'}
+          spaceName={name || 'Novo projeto'}
           count={1}
           totalNodes={DNA_EXTRACTION_COST}
           engine={finalEngine}
@@ -211,7 +211,7 @@ function GalleryStep({ gallery, onPick }: {
           Escolha uma render
         </h1>
         <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)', letterSpacing: '-0.005em' }}>
-          A render selecionada vira a Vista Mestre do novo Space. Ela define o
+          A render selecionada vira a Vista Mestre do novo projeto. Ela define o
           DNA visual; toda variação que você gerar depois preserva esse DNA.
         </p>
       </div>
@@ -332,7 +332,7 @@ function ConfigStep(props: {
           fontSize: 26, fontWeight: 500, color: 'var(--color-text-primary)',
           letterSpacing: '-0.03em', lineHeight: 1.1, marginBottom: 8,
         }}>
-          Novo Space
+          Novo projeto
         </h1>
         <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)', letterSpacing: '-0.005em' }}>
           Esta render vira a Vista Mestre. O DNA é extraído com ground truth das

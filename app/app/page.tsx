@@ -59,7 +59,7 @@ const MODULE_ICON: Record<SidebarModule['iconKey'], (p: { size?: number }) => Re
 
 const MODULE_DESC: Record<string, string> = {
   renderizar:        'Imagem fotorrealista a partir da sua referência.',
-  spaces:            'Novas vistas mantendo o DNA do projeto.',
+  spaces:            'Cada projeto é um Space: novas vistas que preservam o DNA da Vista Mestre.',
   editar:            'Ajuste áreas específicas sem perder a geometria.',
   ampliar:           'Aumente resolução e acabamento.',
   animar:            'Vídeos de apresentação do projeto.',

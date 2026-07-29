@@ -15,7 +15,7 @@ import {
   IconTeam, IconIdentity, IconAccount, IconPlans, IconGuide,
 } from './sidebar-icons'
 import { TOUR_START_EVENT } from './WelcomeTour'
-import { getEnabledModules, type SidebarModule } from '@/lib/nav/modules-config'
+import { getSidebarModules, type SidebarModule } from '@/lib/nav/modules-config'
 
 type NavItem = {
   label: string
@@ -61,14 +61,16 @@ function toNavItem(m: SidebarModule): NavItem {
   }
 }
 
-const criarItems      = getEnabledModules('criar').map(toNavItem)
-const apresentarItems = getEnabledModules('apresentar').map(toNavItem)
+const criarItems      = getSidebarModules('criar').map(toNavItem)
+const apresentarItems = getSidebarModules('apresentar').map(toNavItem)
 
 const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: 'PROJETOS',
     items: [
-      { label: 'Meus projetos', href: '/app/spaces',   exact: false, match: (p) => p.startsWith('/app/spaces') && !p.startsWith('/app/spaces/new'), Icon: IconProjects },
+      // Cobre também /app/spaces/new — o item "Projetos" do CRIAR (que era o
+      // dono exato dessa rota) saiu da sidebar.
+      { label: 'Meus projetos', href: '/app/spaces',   exact: false, match: (p) => p.startsWith('/app/spaces'), Icon: IconProjects },
       { label: 'Dashboard',     href: '/app',          exact: true,  Icon: IconDashboard },
       { label: 'Histórico',     href: '/app/history',  exact: false, Icon: IconHistory   },
     ],

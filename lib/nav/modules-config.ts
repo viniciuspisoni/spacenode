@@ -19,11 +19,15 @@ export interface SidebarModule {
   iconKey: 'generate' | 'spaces' | 'retocar' | 'enhance' | 'video' | 'finalizar' | 'humanizedPlan' | 'blocos3d' | 'isometric' | 'board' | 'moodboard'
   enabled: boolean
   beta?:   boolean
+  /** Some só da sidebar, sem desabilitar o módulo — dashboard, Nodi e LPs continuam vendo. */
+  hideInSidebar?: boolean
 }
 
 export const SIDEBAR_MODULES: SidebarModule[] = [
   { id: 'renderizar',       label: 'Renderizar',       href: '/app/generate',                     section: 'criar',      iconKey: 'generate',      enabled: true },
-  { id: 'spaces',           label: 'Spaces',           href: '/app/spaces/new',                    section: 'criar',      iconKey: 'spaces',        enabled: true },
+  // "Projetos" (nome técnico: Space). Fora da sidebar: criar projeto já existe
+  // em "Meus projetos" e no botão "+ Novo projeto" — o card do dashboard fica.
+  { id: 'spaces',           label: 'Projetos',         href: '/app/spaces/new',                    section: 'criar',      iconKey: 'spaces',        enabled: true, hideInSidebar: true },
   { id: 'editar',           label: 'Editar',           href: '/app/editar',                        section: 'criar',      iconKey: 'retocar',       enabled: true },
   { id: 'ampliar',          label: 'Ampliar',          href: '/app/upscale',                       section: 'criar',      iconKey: 'enhance',       enabled: true },
   { id: 'animar',           label: 'Animar',           href: '/app/video',                         section: 'criar',      iconKey: 'video',         enabled: true },
@@ -38,4 +42,9 @@ export const SIDEBAR_MODULES: SidebarModule[] = [
 
 export function getEnabledModules(section?: ModuleSection): SidebarModule[] {
   return SIDEBAR_MODULES.filter((m) => m.enabled && (section ? m.section === section : true))
+}
+
+/** Módulos exibidos na sidebar — habilitados e sem hideInSidebar. */
+export function getSidebarModules(section?: ModuleSection): SidebarModule[] {
+  return getEnabledModules(section).filter((m) => !m.hideInSidebar)
 }

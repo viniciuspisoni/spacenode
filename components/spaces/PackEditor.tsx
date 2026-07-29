@@ -147,7 +147,7 @@ export function PackEditor({ space, vistas, initialPack, identity }: Props) {
             Nenhuma variação completa ainda
           </div>
           <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>
-            Gere variações no Space antes de montar um Pack.
+            Gere variações no projeto antes de montar um Pack.
           </div>
         </div>
       </div>

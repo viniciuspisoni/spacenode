@@ -332,7 +332,7 @@ function FormStep(props: {
 
   return (
     <>
-      <StepHeader index={1} total={2} title="Criar novo Space" subtitle="Um Space carrega um projeto inteiro com DNA travado." />
+      <StepHeader index={1} total={2} title="Criar novo projeto" subtitle="Cada projeto é um Space — ele guarda o DNA visual que todas as vistas vão preservar." />
 
       <Section label="Nome do projeto">
         <input
@@ -369,7 +369,7 @@ function FormStep(props: {
 
       <Section
         label="Motor"
-        helper="O motor fica gravado no Space pra manter coerência. Trocar depois exige re-extração de DNA."
+        helper="O motor fica gravado no projeto pra manter coerência. Trocar depois exige re-extração de DNA."
       >
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
           {ENGINE_ORDER.map(eId => {

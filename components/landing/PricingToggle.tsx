@@ -564,7 +564,7 @@ export function PricingToggle() {
             Lumens (créditos avulsos) ficam disponíveis a partir do plano Pro.<br />
             Dúvidas?{' '}
             <a
-              href={supportWhatsAppUrl('Olá! Tenho uma dúvida sobre os planos da SPACENODE.')}
+              href={supportWhatsAppUrl('Olá! Tenho uma dúvida sobre os planos da SpaceNode.')}
               target="_blank"
               rel="noopener noreferrer"
               style={{ color: 'var(--color-text-primary)', textDecoration: 'underline', textUnderlineOffset: 3 }}

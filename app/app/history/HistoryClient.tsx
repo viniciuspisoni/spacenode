@@ -927,8 +927,8 @@ function VistasTabView({
   if (loading)                       return <TabLoading />
   if ((items ?? []).length === 0)    return (
     <TabEmpty
-      message="Sem vistas geradas em Spaces ainda."
-      action={{ href: '/app/spaces', label: 'Abrir Spaces →' }}
+      message="Sem vistas geradas em projetos ainda."
+      action={{ href: '/app/spaces', label: 'Abrir Meus projetos →' }}
     />
   )
 

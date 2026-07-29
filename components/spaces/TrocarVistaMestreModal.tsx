@@ -102,7 +102,7 @@ export function TrocarVistaMestreModal({
               letterSpacing: '-0.005em', lineHeight: 1.5,
             }}>
               A vista promovida vira a nova autoridade do projeto — imagem e DNA.
-              A Vista Mestre atual fica registrada no histórico do Space.
+              A Vista Mestre atual fica registrada no histórico do projeto.
             </p>
           </div>
           <button onClick={onClose} style={{
