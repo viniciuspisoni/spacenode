@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { signRows } from '@/lib/storage/signed'
 import { getPlanById, type PlanId } from '@/lib/plans'
+import { getPlanDisplayName } from '@/lib/plan-display'
 import { getPayerBalance } from '@/lib/workspaces/balance'
 import {
   IconGenerate, IconSpaces, IconRetocar, IconEnhance,
@@ -116,7 +117,7 @@ export default async function AppPage() {
 
   const planId       = (payerBalance.planId as PlanId) ?? 'free'
   const plan         = getPlanById(planId)
-  const planName     = plan?.name ?? 'Beta'
+  const planName     = getPlanDisplayName(planId)
   const planTotal    = plan?.nodes ?? 0
   const planBalance  = payerBalance.planBalance
   const lumenBalance = payerBalance.lumenBalance

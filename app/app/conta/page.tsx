@@ -7,7 +7,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getPayerBalance } from '@/lib/workspaces/balance'
-import { getPlanById, type PlanId } from '@/lib/plans'
+import { getPlanDisplayName } from '@/lib/plan-display'
 import { SUPPORT_EMAIL, SUPPORT_PHONE_DISPLAY, supportWhatsAppUrl } from '@/lib/support'
 import ThemeSelector from '@/components/app/ThemeSelector'
 
@@ -24,9 +24,7 @@ export default async function ContaPage() {
     getPayerBalance(createAdminClient(), user.id),
   ])
 
-  const planId    = (balance.planId as PlanId) ?? 'free'
-  const plan      = getPlanById(planId)
-  const planName  = plan?.name ?? (planId === 'free' ? 'Beta' : planId)
+  const planName  = getPlanDisplayName(balance.planId)
   const fullName  = profileRes.data?.full_name ?? null
   const email     = user.email ?? ''
   const planNodes  = balance.planBalance
