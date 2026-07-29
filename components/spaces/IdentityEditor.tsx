@@ -130,7 +130,7 @@ export function IdentityEditor({ initialIdentity, planName, whiteLabelAllowed }:
         </h1>
         <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)', marginTop: 8, lineHeight: 1.6, maxWidth: 600 }}>
           Aplicado em todos os Packs e links compartilháveis. A cor de acento por padrão
-          é derivada do DNA de cada projeto — varia por Space.
+          é derivada do DNA de cada projeto — varia de projeto pra projeto.
         </p>
       </header>
 
@@ -311,7 +311,7 @@ export function IdentityEditor({ initialIdentity, planName, whiteLabelAllowed }:
             />
             <div>
               <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary)' }}>
-                Remover atribuição SPACENODE
+                Remover atribuição spacenode
               </div>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
                 {whiteLabel ? 'Atribuição removida do rodapé.' : 'Atribuição visível no rodapé.'}

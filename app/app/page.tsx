@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { signRows } from '@/lib/storage/signed'
 import { getPlanById, type PlanId } from '@/lib/plans'
+import { getPlanDisplayName } from '@/lib/plan-display'
 import { getPayerBalance } from '@/lib/workspaces/balance'
 import {
   IconGenerate, IconSpaces, IconRetocar, IconEnhance,
@@ -58,7 +59,7 @@ const MODULE_ICON: Record<SidebarModule['iconKey'], (p: { size?: number }) => Re
 
 const MODULE_DESC: Record<string, string> = {
   renderizar:        'Imagem fotorrealista a partir da sua referência.',
-  spaces:            'Novas vistas mantendo o DNA do projeto.',
+  spaces:            'Cada projeto é um Space: novas vistas que preservam o DNA da Vista Mestre.',
   editar:            'Ajuste áreas específicas sem perder a geometria.',
   ampliar:           'Aumente resolução e acabamento.',
   animar:            'Vídeos de apresentação do projeto.',
@@ -116,7 +117,7 @@ export default async function AppPage() {
 
   const planId       = (payerBalance.planId as PlanId) ?? 'free'
   const plan         = getPlanById(planId)
-  const planName     = plan?.name ?? 'Beta'
+  const planName     = getPlanDisplayName(planId)
   const planTotal    = plan?.nodes ?? 0
   const planBalance  = payerBalance.planBalance
   const lumenBalance = payerBalance.lumenBalance

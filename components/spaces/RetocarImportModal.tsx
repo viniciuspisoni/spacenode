@@ -142,7 +142,7 @@ export function RetocarImportModal({ onClose, onPick, title }: Props) {
                 label: v.axis_label ?? 'Vista',
                 date:  v.created_at,
               }))}
-              empty="Sem vistas geradas em Spaces ainda."
+              empty="Sem vistas geradas em projetos ainda."
               onPick={(item) => onPick({ url: item.url, type: 'vista', id: item.id })}
             />
           )}

@@ -320,7 +320,7 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId, p
               {space.status === 'draft'           && 'Envie a Vista Mestre pra começar.'}
               {space.status === 'dna_extracting'  && 'Extraindo DNA…'}
               {space.status === 'dna_extracted'   && 'Trave o DNA pra liberar variações.'}
-              {space.status === 'archived'        && 'Este Space foi arquivado.'}
+              {space.status === 'archived'        && 'Este projeto foi arquivado.'}
             </div>
           </section>
         )}

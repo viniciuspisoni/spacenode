@@ -48,7 +48,7 @@ function pickUrl(row: Record<string, unknown>): string | null {
 
 const EMPTY_COPY: Record<Tab, string> = {
   renders: 'Nenhum render concluído ainda. Gere uma imagem no Renderizar — ou envie um arquivo.',
-  vistas: 'Nenhuma vista gerada em Spaces ainda.',
+  vistas: 'Nenhuma vista gerada em projetos ainda.',
   edits: 'Nenhuma edição anterior ainda.',
 }
 

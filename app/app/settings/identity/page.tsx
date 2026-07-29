@@ -4,7 +4,8 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { IdentityEditor } from '@/components/spaces/IdentityEditor'
-import { getPlanById, type PlanId } from '@/lib/plans'
+import type { PlanId } from '@/lib/plans'
+import { getPlanDisplayName } from '@/lib/plan-display'
 import { signStorageUrl } from '@/lib/storage/signed'
 import type { ArchitectIdentity } from '@/lib/spaces/types'
 
@@ -24,7 +25,6 @@ export default async function IdentityPage() {
     ? { ...rawIdentity, logo_url: await signStorageUrl(createAdminClient(), rawIdentity.logo_url) }
     : null
   const planId   = (profRes.data?.plan as PlanId | undefined) ?? 'free'
-  const plan     = getPlanById(planId)
   // White-label disponível em Pro/Studio/Office; Starter e free não têm.
   const whiteLabelAllowed =
     planId === 'pro' || planId === 'studio' || planId === 'office'
@@ -34,7 +34,7 @@ export default async function IdentityPage() {
       <IdentityEditor
         initialIdentity={identity}
         planId={planId}
-        planName={plan?.name ?? 'Beta'}
+        planName={getPlanDisplayName(planId)}
         whiteLabelAllowed={whiteLabelAllowed}
       />
     </main>

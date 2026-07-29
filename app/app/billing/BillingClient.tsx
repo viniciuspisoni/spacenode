@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { ANNUAL_BILLING_ENABLED, PLANS, type PaidPlanId, type BillingCycle } from '@/lib/plans'
+import { getPlanDisplayName } from '@/lib/plan-display'
 import { LUMEN_PACKS, LUMEN_VALIDITY_DAYS, type LumenPackSize } from '@/lib/lumens'
 import {
   isLaunchOfferOpen,
@@ -136,7 +137,7 @@ export function BillingClient({ plan, balance, lumens, pooled, offerEligible, no
             border: '0.5px solid var(--color-border)', boxShadow: 'var(--shadow-sm)',
             display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 28,
           }}>
-            <BalanceItem label="Plano"   value={balance.plan}  detail={`${plan === 'free' ? 'Gratuito' : capitalize(plan)}`} />
+            <BalanceItem label="Plano"   value={balance.plan}  detail={getPlanDisplayName(plan)} />
             <BalanceItem label="Lumens"  value={balance.lumen} detail={`${lumens.length} pack${lumens.length === 1 ? '' : 's'} ativo${lumens.length === 1 ? '' : 's'}`} />
             <BalanceItem label="Total disponível" value={balance.total} detail="nodes" green />
           </div>
@@ -157,7 +158,7 @@ export function BillingClient({ plan, balance, lumens, pooled, offerEligible, no
           <div style={{ display: 'flex', gap: 8, marginBottom: 18, alignItems: 'center', flexWrap: 'wrap' }}>
             {ANNUAL_BILLING_ENABLED && <BillingToggle billing={billing} setBilling={setBilling} />}
             <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
-              Plano atual: <strong style={{ color: 'var(--color-text-primary)' }}>{plan === 'free' ? 'Gratuito' : capitalize(plan)}</strong>
+              Plano atual: <strong style={{ color: 'var(--color-text-primary)' }}>{getPlanDisplayName(plan)}</strong>
             </span>
             {canManage && (
               <button
@@ -458,8 +459,4 @@ function BillingToggle({ billing, setBilling }: {
       ))}
     </div>
   )
-}
-
-function capitalize(s: string): string {
-  return s.length === 0 ? s : s[0].toUpperCase() + s.slice(1)
 }

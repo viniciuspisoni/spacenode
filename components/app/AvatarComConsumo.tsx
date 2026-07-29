@@ -8,7 +8,8 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { getBalanceState, BALANCE_COLORS, type BalanceState } from '@/lib/spaces/balance'
-import { getPlanById, type PlanId } from '@/lib/plans'
+import type { PlanId } from '@/lib/plans'
+import { getPlanDisplayName } from '@/lib/plan-display'
 
 interface Props {
   userName:   string
@@ -101,7 +102,7 @@ export function AvatarComConsumo({
           state={state}
           ratio={ratio}
           arcLen={arcLen}
-          beta={planTotal <= 0}
+          noQuota={planTotal <= 0}
           userAvatar={userAvatar}
           initials={initials}
         />
@@ -143,16 +144,16 @@ export function AvatarComConsumo({
 
 // ── Ring SVG ──────────────────────────────────────────────────
 
-function AvatarRing({ state, ratio, arcLen, beta, userAvatar, initials }: {
+function AvatarRing({ state, ratio, arcLen, noQuota, userAvatar, initials }: {
   state:      BalanceState
   ratio:      number
   arcLen:     number
-  beta:       boolean
+  noQuota:    boolean
   userAvatar: string | null
   initials:   string
 }) {
   const color = BALANCE_COLORS[state]
-  const showDot = !beta && state !== 'zerado' && ratio > 0.001
+  const showDot = !noQuota && state !== 'zerado' && ratio > 0.001
   // "Node" indicador na ponta do arco — começa às 12h, sentido horário.
   const angle = 2 * Math.PI * Math.min(1, ratio)
   const dotX = 21 + RADIUS * Math.sin(angle)
@@ -160,8 +161,8 @@ function AvatarRing({ state, ratio, arcLen, beta, userAvatar, initials }: {
   return (
     <div style={{ position: 'relative', width: 42, height: 42, flexShrink: 0 }}>
       <svg width="42" height="42" viewBox="0 0 42 42" style={{ overflow: 'visible' }}>
-        {beta ? (
-          /* Beta: anel verde sutil e decorativo — não há cota mensal pra medir. */
+        {noQuota ? (
+          /* Sem cota mensal (conta gratuita): anel verde sutil e decorativo. */
           <circle cx="21" cy="21" r={RADIUS}
             fill="none"
             stroke="var(--color-accent-green-glow)"
@@ -261,15 +262,14 @@ function BalancePopover({ planId, planBalance, planTotal, lumenBalance, state, d
   usageDays:     { day: string; nodes: number }[]
   onClose:       () => void
 }) {
-  const plan = getPlanById(planId)
-  const planName = plan?.name ?? (planId === 'free' ? 'Beta' : planId)
-  const isBeta = planTotal <= 0
+  const planName = getPlanDisplayName(planId)
+  const noQuota = planTotal <= 0
   const stateLabel: Record<BalanceState, string> = {
     saudavel: 'Saudável', atencao: 'Atenção', critico: 'Crítico', zerado: 'Zerado',
   }
-  // Beta não tem cota mensal: estado próprio (verde), em vez de "Zerado".
-  const pillColor = isBeta ? '#30d158' : BALANCE_COLORS[state]
-  const pillLabel = isBeta ? 'Beta' : stateLabel[state]
+  // Conta gratuita não tem cota mensal: estado próprio (verde), em vez de "Zerado".
+  const pillColor = noQuota ? '#30d158' : BALANCE_COLORS[state]
+  const pillLabel = noQuota ? 'Gratuito' : stateLabel[state]
 
   return (
     <div style={{
@@ -295,8 +295,8 @@ function BalancePopover({ planId, planBalance, planTotal, lumenBalance, state, d
             {planBalance + lumenBalance} <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', fontWeight: 400 }}>nodes</span>
           </div>
           <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>
-            {isBeta
-              ? <>Acesso antecipado{lumenBalance > 0 && <> · {lumenBalance} avulsos</>}</>
+            {noQuota
+              ? <>Sem assinatura ativa{lumenBalance > 0 && <> · {lumenBalance} avulsos</>}</>
               : <>{planBalance} de {planTotal} do plano{lumenBalance > 0 && <> · {lumenBalance} avulsos</>}</>}
           </div>
         </div>

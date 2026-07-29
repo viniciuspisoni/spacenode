@@ -350,7 +350,7 @@ export function VistaDetail({ space, vista, others, initialBalance }: Props) {
         {vista.status === 'completed' && (
           isDnaReference ? (
             <span
-              title="Esta vista tem DNA próprio extraído — selecione-a como referência no painel de geração do Space."
+              title="Esta vista tem DNA próprio extraído — selecione-a como referência no painel de geração do projeto."
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6,
                 padding: '10px 16px', borderRadius: 10,

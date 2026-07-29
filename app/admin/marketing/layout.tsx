@@ -27,7 +27,7 @@ export default async function AdminMarketingLayout({ children }: { children: Rea
       <header className="border-b border-border">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-6 py-4">
           <Link href="/admin/marketing" className="flex items-baseline gap-2">
-            <span className="text-sm font-semibold tracking-tight">SPACENODE</span>
+            <span className="text-sm font-semibold tracking-tight">spacenode</span>
             <span className="text-xs uppercase tracking-[0.28em] text-text-tertiary">conteúdo</span>
           </Link>
           <nav className="flex flex-wrap items-center gap-1 text-sm">
