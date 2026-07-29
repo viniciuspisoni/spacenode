@@ -1,5 +1,6 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { ConstellationN } from '@/components/brand'
 import {
@@ -16,7 +17,10 @@ import InsufficientNodesCta from '@/components/app/InsufficientNodesCta'
 import { consumeHandoff } from '@/components/nodi/actions-bus'
 
 interface GenerateClientProps {
+  /** Saldo total da bolsa (plano + Lumens) — mesmo pool que o débito consome. */
   initialCredits:    number
+  /** true = assinatura ativa; false = conta free (default econômico Pulsar+HD). */
+  isSubscriber?:     boolean
   initialMaterials?: ProjectMaterials
   initialConfig?:    ProjectConfig | null
   /** URL https de uma render existente a pré-carregar como input (ex.: "Reutilizar" no dashboard). */
@@ -41,7 +45,10 @@ interface ProjectConfig {
 interface GenerateResult {
   outputUrl: string
   renderId?: string | null
+  /** Saldo do plano pós-débito (backward compat). */
   credits:   number
+  /** Saldo total pós-débito (plano + Lumens) — preferir este. */
+  totalBalance?: number
   prompt?:   string
   error?:    string
 }
@@ -163,19 +170,28 @@ function deriveDefaults(projectType: ProjectType, segment: string) {
   }
 }
 
+// Defaults econômicos pra conta sem assinatura: o trial de 80 nodes rende
+// ~8 renders em Pulsar+HD (10 nodes) contra 4 em Vega+2K (20 nodes).
+const ECONOMY_ENGINE:     EngineId   = 'pulsar'
+const ECONOMY_RESOLUTION: Resolution = 'hd'
+
 // Hidrata o estado inicial a partir do project_config persistido. Campos
 // tipo-estrito caem pra default se a string salva for desconhecida (ex: engine
 // removida). Combinação engine×resolução também é checada — saved Vega+HD
 // passou a ser inválido depois de Pricing v2 e quebraria getNodesCost.
-function resolveInitialConfig(cfg: ProjectConfig | null | undefined) {
+// Config salva sempre vence; o default por status de assinatura só entra
+// quando não há valor persistido válido.
+function resolveInitialConfig(cfg: ProjectConfig | null | undefined, isSubscriber: boolean) {
   const projectType: ProjectType =
     cfg?.projectType === 'interior' || cfg?.projectType === 'exterior'
       ? cfg.projectType : 'exterior'
   const fidelityLevel: FidelityLevel =
     cfg?.fidelityLevel === 'balanced' || cfg?.fidelityLevel === 'creative'
       ? cfg.fidelityLevel : 'maximum'
-  const engine: EngineId = isEngineId(cfg?.selectedEngine) ? cfg.selectedEngine : DEFAULT_ENGINE
-  const rawRes: Resolution = isResolution(cfg?.selectedResolution) ? cfg.selectedResolution : DEFAULT_RESOLUTION
+  const fallbackEngine: EngineId   = isSubscriber ? DEFAULT_ENGINE     : ECONOMY_ENGINE
+  const fallbackRes:    Resolution = isSubscriber ? DEFAULT_RESOLUTION : ECONOMY_RESOLUTION
+  const engine: EngineId = isEngineId(cfg?.selectedEngine) ? cfg.selectedEngine : fallbackEngine
+  const rawRes: Resolution = isResolution(cfg?.selectedResolution) ? cfg.selectedResolution : fallbackRes
   const resolution: Resolution = isValidCombination(engine, rawRes) ? rawRes : ENGINES[engine].resolutions[0]
   const sceneElements: string[] = Array.isArray(cfg?.sceneElements)
     ? cfg.sceneElements.filter((x): x is string => typeof x === 'string')
@@ -211,8 +227,8 @@ function ProjectTypeGlyph({ type }: { type: ProjectType }) {
   )
 }
 
-export function GenerateClient({ initialCredits, initialMaterials, initialConfig, initialSourceUrl }: GenerateClientProps) {
-  const init = resolveInitialConfig(initialConfig)
+export function GenerateClient({ initialCredits, isSubscriber = false, initialMaterials, initialConfig, initialSourceUrl }: GenerateClientProps) {
+  const init = resolveInitialConfig(initialConfig, isSubscriber)
   const supabase = createClient()
 
   // ── Global state
@@ -490,7 +506,7 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
       })
       const data: GenerateResult = await res.json()
       if (!res.ok || data.error) throw new Error(data.error ?? 'Erro na geração')
-      setOutputUrl(data.outputUrl); setCredits(data.credits); setSliderPos(50)
+      setOutputUrl(data.outputUrl); setCredits(data.totalBalance ?? data.credits); setSliderPos(50)
       setLastRenderId(data.renderId ?? null)
       setScale(1); setPan({ x: 0, y: 0 })
       if (refinementText.trim()) setRefinementText('')
@@ -614,6 +630,9 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
   const bgTitle       = projectType === 'exterior' ? 'ENTORNO' : 'CONTEXTO VISUAL'
   const typeLabel     = projectType === 'exterior' ? 'Fotorrealismo Exterior' : 'Fotorrealismo Interior'
   const noNodes       = credits < nodeCost
+  // Quantos renders o saldo total cobre na config atual — recalcula client-side
+  // a cada troca de motor/qualidade e após cada geração (credits é estado).
+  const rendersAfford = Math.floor(credits / nodeCost)
 
   // Melhor combinação motor × resolução que ainda cabe no saldo — a saída
   // honesta pra quem está sem nodes: gerar com menos qualidade em vez de pagar.
@@ -935,6 +954,23 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
               </svg>
             </span>
           </button>
+        )}
+
+        {/* Alcance do saldo — sempre visível junto ao CTA */}
+        {noNodes ? (
+          <div style={S.balanceReach}>
+            saldo insuficiente para esta configuração —{' '}
+            <Link
+              href="/app/billing"
+              style={{ color: 'var(--color-text-primary)', textDecoration: 'underline', textUnderlineOffset: 2 }}
+            >
+              ver planos
+            </Link>
+          </div>
+        ) : (
+          <div style={S.balanceReach}>
+            seu saldo dá para ~{rendersAfford} render{rendersAfford === 1 ? '' : 's'} nessa configuração
+          </div>
         )}
       </div>
 
@@ -1328,6 +1364,7 @@ const S: Record<string, React.CSSProperties> = {
   errorBox:          { fontSize:12, color:'var(--color-error)', background:'var(--color-error-bg)', border:'0.5px solid var(--color-error-border)', borderRadius:12, padding:'10px 14px' },
   genBtn:            { width:'100%', padding:'14px 17px', background:'var(--color-inverse)', color:'var(--color-inverse-foreground)', border:'none', borderRadius:12, fontSize:13, fontWeight:650, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'space-between', fontFamily:'inherit', boxShadow:'var(--shadow-md)', transition:'opacity 0.18s ease, transform 0.12s ease' },
   genBtnMeta:        { display:'flex', alignItems:'center', gap:8, fontSize:11, color:'var(--color-text-tertiary)' },
+  balanceReach:      { fontSize:11, color:'var(--color-text-tertiary)', textAlign:'center', letterSpacing:'-0.005em', lineHeight:1.5, marginTop:-8 },
   uploadZone:        { border:'0.5px dashed var(--color-border-strong)', borderRadius:18, padding:'50px 20px', textAlign:'center', cursor:'pointer', background:'var(--color-upload-area)', flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:14, minHeight:300, boxShadow:'var(--shadow-lg)', transition:'background 0.18s ease, border-color 0.18s ease, transform 0.18s ease' },
   uploadIcon:        { width:44, height:44, borderRadius:14, background:'var(--color-surface)', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'inset 0 0 0 0.5px var(--color-border)' },
   uploadTitle:       { fontSize:15, fontWeight:500, color:'var(--color-text-primary)', letterSpacing:'-0.02em' },

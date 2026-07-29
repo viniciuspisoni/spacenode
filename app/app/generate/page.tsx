@@ -48,7 +48,12 @@ export default async function GeneratePage({
 
   return (
     <GenerateClient
-      initialCredits={balance.planBalance}
+      // Saldo TOTAL da bolsa (plano + Lumens) — é o que consume_workspace_nodes
+      // debita, então é o que gateia o CTA e alimenta o contador de renders.
+      initialCredits={balance.totalBalance}
+      // Sem assinatura ativa, o default de motor×qualidade é o econômico
+      // (Pulsar + HD) — config persistida do usuário continua vencendo.
+      isSubscriber={balance.planId !== 'free'}
       initialMaterials={profile.project_materials ?? undefined}
       initialConfig={profile.project_config ?? undefined}
       initialSourceUrl={sp.source}
