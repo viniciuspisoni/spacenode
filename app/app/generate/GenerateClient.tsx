@@ -25,6 +25,8 @@ interface GenerateClientProps {
   initialConfig?:    ProjectConfig | null
   /** URL https de uma render existente a pré-carregar como input (ex.: "Reutilizar" no dashboard). */
   initialSourceUrl?: string
+  /** 'spaces/new' = veio do fluxo Novo projeto sem renders — o CTA de resultado vira o caminho de volta. */
+  returnTo?:         'spaces/new'
 }
 
 // Persisted last-used render config (profiles.project_config — JSONB).
@@ -227,8 +229,9 @@ function ProjectTypeGlyph({ type }: { type: ProjectType }) {
   )
 }
 
-export function GenerateClient({ initialCredits, isSubscriber = false, initialMaterials, initialConfig, initialSourceUrl }: GenerateClientProps) {
+export function GenerateClient({ initialCredits, isSubscriber = false, initialMaterials, initialConfig, initialSourceUrl, returnTo }: GenerateClientProps) {
   const init = resolveInitialConfig(initialConfig, isSubscriber)
+  const fromSpacesNew = returnTo === 'spaces/new'
   const supabase = createClient()
 
   // ── Global state
@@ -1092,8 +1095,16 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
                   </svg>
                 </span>
                 <span className="render-to-space-cta__body">
-                  <span className="render-to-space-cta__title">Criar Space a partir desta render</span>
-                  <span className="render-to-space-cta__sub">Trave o DNA e gere variações coerentes — iluminação, ângulo, horário</span>
+                  <span className="render-to-space-cta__title">
+                    {fromSpacesNew
+                      ? 'Render pronta. Continuar criando o projeto'
+                      : 'Criar projeto a partir desta render'}
+                  </span>
+                  <span className="render-to-space-cta__sub">
+                    {fromSpacesNew
+                      ? 'Volte pro novo projeto com esta render já selecionada como Vista Mestre'
+                      : 'Trave o DNA e gere variações coerentes — iluminação, ângulo, horário'}
+                  </span>
                 </span>
                 <span className="render-to-space-cta__arrow" aria-hidden="true">→</span>
               </a>

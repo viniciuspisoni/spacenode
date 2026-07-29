@@ -9,9 +9,12 @@ const DEFAULT_CREDITS = 80
 export default async function GeneratePage({
   searchParams,
 }: {
-  searchParams: Promise<{ source?: string }>
+  searchParams: Promise<{ source?: string; return?: string }>
 }) {
   const sp = await searchParams
+  // ?return=spaces/new — veio do fluxo "Novo projeto" sem renders; ao concluir
+  // a render, o CTA de resultado volta pro fluxo com ela pré-selecionada.
+  const returnTo = sp.return === 'spaces/new' ? ('spaces/new' as const) : undefined
   const supabase = await createClient()
   const {
     data: { user },
@@ -57,6 +60,7 @@ export default async function GeneratePage({
       initialMaterials={profile.project_materials ?? undefined}
       initialConfig={profile.project_config ?? undefined}
       initialSourceUrl={sp.source}
+      returnTo={returnTo}
     />
   )
 }
