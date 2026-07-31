@@ -8,31 +8,6 @@ export default function Hero() {
 
   return (
     <section className="spn-hero">
-      <span
-        style={{
-          fontSize: 10,
-          letterSpacing: "0.28em",
-          color: "var(--color-text-tertiary)",
-          textTransform: "uppercase",
-          fontWeight: 500,
-          marginBottom: 24,
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 10,
-        }}
-      >
-        <span
-          style={{
-            width: 5,
-            height: 5,
-            borderRadius: "50%",
-            background: "var(--color-accent-green)",
-            boxShadow: "0 0 8px var(--color-accent-green-glow)",
-          }}
-        />
-        BETA ABERTO
-      </span>
-
       <h1 className="spn-hero-title">
         Visualização arquitetônica{" "}
         <span style={{ color: "var(--color-text-tertiary)" }}>
