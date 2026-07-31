@@ -163,11 +163,17 @@ que não é nosso.
 
 ## 7. Ativação
 
-1. **Aplicar a migration** `supabase/migrations/20260731000000_referral_program.sql`.
-   Antes disso o programa fica **inerte**: as rotas respondem, o painel mostra
-   o aviso de código em preparo e nenhuma recompensa é concedida.
-2. **Adicionar os eventos no webhook do Stripe** (Dashboard → Webhooks → o
-   endpoint `/api/stripe/webhook`):
+1. ~~**Aplicar a migration**~~ ✅ **FEITO** — aplicada em produção
+   (`nucyyqmurhnakhldshwr`) em 31/07/2026 como `20260731173901_referral_program`.
+   Verificado: 8 tabelas com RLS ligada e 0 policies, 14 funções com `md5(prosrc)`
+   idêntico ao arquivo do repo, `EXECUTE` apenas para `postgres` e `service_role`
+   (o linter de segurança do Supabase não lista nenhuma delas como executável por
+   `authenticated`).
+2. **Adicionar os eventos no webhook do Stripe** ⬅ **PENDENTE** (Dashboard →
+   Webhooks → endpoint `https://spacenode.app/api/stripe/webhook`, hoje com
+   apenas 3 eventos). A API `POST /v1/webhook_endpoints/{id}` **substitui** a
+   lista, então a alteração pelo Dashboard (que só acrescenta) é o caminho
+   seguro:
    - `invoice.created` ← **indispensável**, é a única janela para aplicar o desconto
    - `invoice.payment_failed`
    - `invoice.voided`
@@ -178,6 +184,30 @@ que não é nosso.
 
    `customer.subscription.deleted` já está no endpoint (é o downgrade para o
    plano gratuito) e passa a servir também ao cancelamento imediato.
+
+   Aproveite a mesma passada para três eventos que a rota **já trata** e o
+   endpoint nunca assinou — lacuna anterior a este programa:
+
+   - `checkout.session.async_payment_succeeded` ← sem ele, **pack Lumen pago
+     via Pix nunca é creditado**: a session completa `unpaid`, a guarda do
+     webhook retorna cedo e a confirmação não chega. Hoje é latente (as
+     assinaturas em live estão como `payment_method_types: ["card"]`, ou seja,
+     o Pix está desligado), mas vira perda de dinheiro no dia em que ligar.
+   - `checkout.session.async_payment_failed` ← registra o Pix que expirou.
+   - `mandate.updated` ← avisa quando o cliente revoga a autorização do Pix
+     Automático, que é o motivo de renovações passarem a falhar.
+
+   **Estado final esperado do endpoint (13 eventos):**
+
+   ```
+   checkout.session.completed              invoice.created
+   checkout.session.async_payment_succeeded invoice.paid
+   checkout.session.async_payment_failed   invoice.payment_failed
+   customer.subscription.updated           invoice.voided
+   customer.subscription.deleted           invoice.marked_uncollectible
+   mandate.updated                         charge.refunded
+                                           charge.dispute.created
+   ```
 3. **Conferir `CRON_SECRET`** na Vercel — o cron diário
    `/api/cron/referral-rewards` (06:00 UTC) já está em `vercel.json`.
 4. **Nada de cupom manual.** Os cupons (`spn-referral-10`, `spn-referral-20`,
