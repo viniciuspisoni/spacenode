@@ -21,7 +21,17 @@ import {
   isResolution,
   isValidCombination,
 } from '@/lib/engines'
-import { generateImage } from '@/lib/ai/image-provider'
+import { generateImage, type GenerateImageResult } from '@/lib/ai/image-provider'
+import {
+  getRenderFidelityConfig,
+  getFidelityAttemptParams,
+} from '@/lib/ai/fidelity/render-only'
+import {
+  computeGeometryScore,
+  buildEdgeMapPng,
+  type GeometryScoreBreakdown,
+} from '@/lib/ai/fidelity/geometry-score'
+import { fetchStorageBuffer } from '@/lib/storage/fetch'
 
 fal.config({ credentials: process.env.FAL_KEY })
 
@@ -73,9 +83,16 @@ function falParamsForEngine(engine: EngineId, resolution: Resolution): Record<st
   }
 }
 
+function truncateErr(err: unknown): string {
+  const msg = (err as Error)?.message ?? String(err)
+  return msg.length > 200 ? msg.slice(0, 200) + '…' : msg
+}
+
 // ── Route ────────────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
+  // Base do orçamento de tempo do retry ladder (a Vercel mata no maxDuration).
+  const routeStartedAt = Date.now()
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
@@ -207,52 +224,196 @@ export async function POST(req: NextRequest) {
       refinementText,
     }
 
-    const finalPrompt = buildFidelityPrompt(options, fidelityLevel, briefing)
+    // ── Modo estrutural render_only (gate de fidelidade) ─────────────────────
+    //
+    // Na Máxima fidelidade o Renderizar opera em render_only: a imagem
+    // original é a base obrigatória e o resultado é VALIDADO contra ela
+    // (geometry score em lib/ai/fidelity/geometry-score). Score abaixo do
+    // limite → retry com menos criatividade (temperatura ↓ no GCP), prompt de
+    // escalada e condicionamento estrutural por edge map. Entrega a MELHOR
+    // tentativa. RENDER_FIDELITY_GATE=0 restaura o comportamento single-shot.
+    const fidelityCfg = getRenderFidelityConfig()
+    const renderOnlyActive = fidelityLevel === 'maximum' && fidelityCfg.enabled
+
+    // Refinamento explícito do usuário muda a cena de propósito — relaxa o
+    // limite pra validação não brigar com o pedido.
+    const minScore = refinementText?.trim()
+      ? fidelityCfg.minScore * fidelityCfg.refinementRelaxFactor
+      : fidelityCfg.minScore
+    const maxAttempts = renderOnlyActive ? fidelityCfg.maxAttempts : 1
 
     console.log('[generate] engine     :', engine, '→', falEndpoint)
     console.log('[generate] resolution :', resolution, '→', nodesToCharge, 'nodes')
-    console.log('[generate] fidelity   :', `${fidelityLevel}${briefing ? ' (+briefing)' : ''}`)
+    console.log('[generate] fidelity   :', `${fidelityLevel}${briefing ? ' (+briefing)' : ''}${renderOnlyActive ? ` [render_only min=${minScore.toFixed(2)} max_attempts=${maxAttempts}]` : ''}`)
     devLog('[generate] anchor     :', hasAnchor ? anchorUrl : 'none')
     devLog('[generate] refine     :', refinementText?.trim() || 'none')
-    devLog('[generate] prompt     :', finalPrompt)
 
+    // Buffer do original (autoridade de geometria) — presente no caminho
+    // base64; no caminho inputUrl reusado, é baixado sob demanda pro score.
+    let originalBuffer: Buffer | null = null
     if (providedInputUrl) {
       inputUrl = providedInputUrl
       devLog('[generate] inputUrl   : reused', inputUrl)
     } else {
       const base64Data = imageBase64!.includes(',') ? imageBase64!.split(',')[1] : imageBase64!
-      const buffer     = Buffer.from(base64Data, 'base64')
-      const imageFile  = new File([buffer], 'input.jpg', { type: 'image/jpeg' })
+      originalBuffer = Buffer.from(base64Data, 'base64')
+      // Uint8Array novo: BlobPart exige ArrayBuffer próprio (o let Buffer|null
+      // alarga pra ArrayBufferLike e o File recusa).
+      const imageFile  = new File([new Uint8Array(originalBuffer)], 'input.jpg', { type: 'image/jpeg' })
       inputUrl = await fal.storage.upload(imageFile)
       devLog('[generate] inputUrl   :', inputUrl)
     }
 
     // Anchor vai PRIMEIRO em image_urls — Gemini/NB2/GPT Image extraem
     // materiais e atmosfera dela antes de processar a geometria do input.
-    const imageUrls = (anchorUrl && anchorUrl !== inputUrl)
+    const baseImageUrls = (anchorUrl && anchorUrl !== inputUrl)
       ? [anchorUrl, inputUrl]
       : [inputUrl]
 
-    const falInput = {
-      prompt:     finalPrompt,
-      image_urls: imageUrls,
-      ...falParamsForEngine(engine, resolution),
+    // Orçamento de tempo: retries só rodam se sobrar tempo real de geração
+    // (a Vercel mata a função no maxDuration — margem pra persistência).
+    const ROUTE_BUDGET_MS = (maxDuration - 20) * 1000
+    const remainingMs = () => ROUTE_BUDGET_MS - (Date.now() - routeStartedAt)
+
+    interface FidelityAttemptLog {
+      attempt:        number
+      provider:       string
+      provider_model: string
+      request_id:     string | null
+      temperature:    number
+      edge_map_used:  boolean
+      fallback_used:  boolean
+      duration_ms:    number
+      geometry:       GeometryScoreBreakdown | null
+      score_error?:   string
     }
 
-    devLog('[generate] FAL INPUT  :', JSON.stringify(falInput))
+    let edgeMapUrl: string | null = null
+    let finalPrompt = ''
+    let best: { gen: GenerateImageResult; prompt: string; score: number | null } | null = null
+    const attemptLogs: FidelityAttemptLog[] = []
 
-    // Camada única de provider (lib/ai/image-provider): GCP/Vertex primário
-    // quando IMAGE_PROVIDER_PRIMARY=gcp, fallback FAL transparente. Saída GCP
-    // é re-hospedada no Storage; saída FAL continua sendo a URL da CDN.
-    const gen = await generateImage({
-      falEndpoint,
-      falInput,
-      timeoutMs: FAL_TIMEOUT_MS[engine],
-      context:   'generate',
-      deliver:   { kind: 'url', userId: user.id, area: 'renders' },
-    })
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const params = getFidelityAttemptParams(attempt)
 
-    const generationDurationMs = gen.latencyMs
+      // Condicionamento estrutural nos retries: lineart do original anexado
+      // como imagem extra (upload único). Falha aqui NUNCA derruba a geração —
+      // segue sem o edge map.
+      let imageUrls = baseImageUrls
+      let edgeMapImageIndex: number | null = null
+      if (renderOnlyActive && params.useEdgeMap) {
+        try {
+          if (!originalBuffer) originalBuffer = await fetchStorageBuffer(inputUrl)
+          if (!edgeMapUrl) {
+            const edgePng = await buildEdgeMapPng(originalBuffer)
+            edgeMapUrl = await fal.storage.upload(new File([new Uint8Array(edgePng)], 'edge-map.png', { type: 'image/png' }))
+          }
+          imageUrls = [...baseImageUrls, edgeMapUrl]
+          edgeMapImageIndex = imageUrls.length
+        } catch (edgeErr) {
+          console.warn('[generate:fidelity] edge map indisponível (segue sem):', (edgeErr as Error).message)
+        }
+      }
+
+      finalPrompt = buildFidelityPrompt(options, fidelityLevel, briefing, {
+        attempt,
+        edgeMapImageIndex,
+      })
+      devLog('[generate] prompt     :', finalPrompt)
+
+      const falInput = {
+        prompt:     finalPrompt,
+        image_urls: imageUrls,
+        ...falParamsForEngine(engine, resolution),
+      }
+      devLog('[generate] FAL INPUT  :', JSON.stringify(falInput))
+
+      // Camada única de provider (lib/ai/image-provider): GCP/Vertex primário
+      // quando IMAGE_PROVIDER_PRIMARY=gcp, fallback FAL transparente. Saída GCP
+      // é re-hospedada no Storage; saída FAL continua sendo a URL da CDN.
+      const attemptTimeoutMs = Math.min(FAL_TIMEOUT_MS[engine], Math.max(30_000, remainingMs() - 15_000))
+      let gen: GenerateImageResult
+      try {
+        gen = await generateImage({
+          falEndpoint,
+          falInput,
+          timeoutMs: attemptTimeoutMs,
+          context:   attempt === 1 ? 'generate' : `generate#${attempt}`,
+          deliver:   { kind: 'url', userId: user.id, area: 'renders' },
+          gcpConfig: { temperature: params.temperature },
+        })
+      } catch (genErr) {
+        // Retry é best-effort: se JÁ existe imagem válida de tentativa
+        // anterior, falha aqui não pode virar erro+refund pro usuário.
+        if (attempt === 1 || !best) throw genErr
+        console.warn(`[generate:fidelity] retry ${attempt} falhou (${truncateErr(genErr)}) — entregando a melhor tentativa anterior`)
+        break
+      }
+
+      // Validação estrutural pós-geração — nunca derruba a request: falha no
+      // score vira log e a imagem é entregue (comportamento legado).
+      let geometry: GeometryScoreBreakdown | null = null
+      let scoreError: string | undefined
+      if (renderOnlyActive) {
+        try {
+          if (!originalBuffer) originalBuffer = await fetchStorageBuffer(inputUrl)
+          const generatedBuffer = await fetchStorageBuffer(gen.images[0].url)
+          geometry = await computeGeometryScore(originalBuffer, generatedBuffer)
+        } catch (scoreErr) {
+          scoreError = (scoreErr as Error).message
+          console.warn('[generate:fidelity] geometry score indisponível:', scoreError)
+        }
+      }
+
+      attemptLogs.push({
+        attempt,
+        provider:       gen.provider,
+        provider_model: gen.providerModel,
+        request_id:     gen.requestId,
+        temperature:    params.temperature,
+        edge_map_used:  edgeMapImageIndex !== null,
+        fallback_used:  gen.fallbackUsed,
+        duration_ms:    gen.latencyMs,
+        geometry,
+        ...(scoreError ? { score_error: scoreError } : {}),
+      })
+
+      // Log técnico do modo: provider, modelo, parâmetros de fidelidade,
+      // tentativa e geometry score (requisito de observabilidade).
+      console.log(
+        `[generate:fidelity] attempt=${attempt}/${maxAttempts} provider=${gen.provider} model=${gen.providerModel} ` +
+        `temp=${params.temperature} edgeMap=${edgeMapImageIndex !== null} ` +
+        `score=${geometry ? geometry.score.toFixed(3) : 'n/a'}` +
+        (geometry
+          ? ` (recall=${geometry.edgeRecall.toFixed(3)} blockCorr=${geometry.blockCorrelation.toFixed(3)} worstBlock=${geometry.worstBlockDelta.toFixed(3)} aspectDelta=${geometry.aspectDelta.toFixed(3)})`
+          : '') +
+        ` min=${renderOnlyActive ? minScore.toFixed(2) : 'off'}`
+      )
+
+      if (!best || (geometry?.score ?? -1) > (best.score ?? -1)) {
+        best = { gen, prompt: finalPrompt, score: geometry?.score ?? null }
+      }
+
+      const passed = !renderOnlyActive || geometry === null || geometry.score >= minScore
+      if (passed) break
+      if (attempt >= maxAttempts) {
+        console.warn(`[generate:fidelity] score abaixo do limite após ${attempt} tentativas — entregando a melhor (score=${best.score?.toFixed(3) ?? 'n/a'})`)
+        break
+      }
+      if (remainingMs() < 60_000) {
+        console.warn('[generate:fidelity] sem orçamento de tempo pra retry — entregando a melhor tentativa')
+        break
+      }
+    }
+
+    // best sempre existe (≥ 1 tentativa). Entrega a de MAIOR score — não
+    // necessariamente a última.
+    if (!best) throw new Error('nenhuma tentativa de geração concluída')
+    const gen = best.gen
+    finalPrompt = best.prompt
+    const fidelityScore = best.score
+    const retryCount = attemptLogs.length - 1
+    const generationDurationMs = attemptLogs.reduce((sum, a) => sum + a.duration_ms, 0)
 
     outputUrl = gen.images[0].url
     // Rastreabilidade: id do request no provider (requestId da fal ou
@@ -309,7 +470,7 @@ export async function POST(req: NextRequest) {
       ...baseRow,
       user_prompt:  refinementText?.trim() || null,
       duration_ms:  generationDurationMs,
-      retry_count:  0,
+      retry_count:  retryCount,
       generation_log: {
         provider:       gen.provider,
         provider_model: gen.providerModel,
@@ -321,9 +482,19 @@ export async function POST(req: NextRequest) {
         resolution,
         parameters:  falParamsForEngine(engine, resolution),
         anchor_used: hasAnchor,
-        image_count: imageUrls.length,
+        image_count: baseImageUrls.length,
         duration_ms: generationDurationMs,
         nodes_charged: nodesToCharge,
+        // Diagnóstico do modo estrutural render_only: limite, tentativas
+        // (params + geometry score de cada) e score final da entregue.
+        fidelity: renderOnlyActive
+          ? {
+              mode:        'render_only',
+              min_score:   minScore,
+              final_score: fidelityScore,
+              attempts:    attemptLogs,
+            }
+          : null,
       },
     }
 
@@ -366,6 +537,9 @@ export async function POST(req: NextRequest) {
       lumenBalance: balance?.lumen_balance ?? 0,
       totalBalance: balance?.total_balance ?? 0,
       nodesCharged: nodesToCharge,
+      // Diagnóstico do gate render_only (aditivo; a UI atual ignora).
+      fidelityScore,
+      fidelityAttempts: attemptLogs.length,
       // O prompt final (buildFidelityPrompt) é proprietário e o GenerateClient
       // nunca o consumia — não viaja mais na resposta.
     })
