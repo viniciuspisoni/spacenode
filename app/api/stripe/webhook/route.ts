@@ -8,9 +8,12 @@ import {
   handleChargeRefunded,
   handleDisputeCreated,
   handleReferredFirstPayment,
+  handleReferredSubscriptionCanceled,
+  handleReferredSubscriptionReactivated,
   handleReferrerInvoiceCreated,
   handleReferrerInvoicePaid,
   handleReferrerInvoiceUnpaid,
+  resolveSubscriptionUserId,
 } from '@/lib/referral/webhook'
 
 export const dynamic = 'force-dynamic'
@@ -395,6 +398,31 @@ export async function POST(req: NextRequest) {
     await handleDisputeCreated(supabase, event.data.object as Stripe.Dispute)
   }
 
+  // Cancelamento AGENDADO (cancel_at_period_end) — o caminho do portal do
+  // Stripe, e o mais comum. O `customer.subscription.deleted` correspondente só
+  // chega no fim do período, muito depois da janela de reembolso; é aqui que o
+  // pedido de cancelamento é visto na hora em que acontece.
+  //
+  // Só mexe em indicação: plano, saldo e assinatura seguem intocados (o
+  // downgrade continua sendo do subscription.deleted, mais abaixo).
+  if (event.type === 'customer.subscription.updated') {
+    const sub  = event.data.object as Stripe.Subscription
+    const prev = event.data.previous_attributes as Partial<Stripe.Subscription> | undefined
+
+    // Só reage quando o próprio campo mudou neste evento — `updated` dispara
+    // por muitos motivos, e reprocessar a cada um seria ruído.
+    if (prev && 'cancel_at_period_end' in prev) {
+      const userId = await resolveSubscriptionUserId(supabase, sub)
+      if (userId) {
+        if (sub.cancel_at_period_end) {
+          await handleReferredSubscriptionCanceled(supabase, userId)
+        } else {
+          await handleReferredSubscriptionReactivated(supabase, userId)
+        }
+      }
+    }
+  }
+
   // ── mandate.updated: cliente mexeu na autorização do Pix Automático ──────
   //
   // O mandato vive no app do banco e pode ser revogado lá, fora do SPACENODE.
@@ -451,6 +479,10 @@ export async function POST(req: NextRequest) {
         plan_id: (cancelingProfile.plan as string | null) ?? null,
         metadata: { stripe_subscription_id: subscriptionId },
       })
+
+      // Indicações — cancelamento imediato (sem passar por cancel_at_period_end).
+      // Dentro da janela de reembolso, derruba a recompensa do indicador.
+      await handleReferredSubscriptionCanceled(supabase, cancelingProfile.id as string)
     }
   }
 

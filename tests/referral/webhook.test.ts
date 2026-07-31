@@ -13,9 +13,12 @@ import {
   handleChargeRefunded,
   handleDisputeCreated,
   handleReferredFirstPayment,
+  handleReferredSubscriptionCanceled,
+  handleReferredSubscriptionReactivated,
   handleReferrerInvoiceCreated,
   handleReferrerInvoicePaid,
   handleReferrerInvoiceUnpaid,
+  resolveSubscriptionUserId,
 } from '@/lib/referral/webhook'
 
 // O programa entra em vigor em 01/09/2026 — sem congelar o relógio, todo
@@ -467,5 +470,78 @@ describe('revogação por dinheiro devolvido', () => {
     const { admin, rpcCalls } = makeAdmin()
     await handleChargeRefunded(admin, { payment_intent: null } as unknown as Stripe.Charge)
     expect(rpcCalls).toHaveLength(0)
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════════════
+// 4. Cancelamento do indicado dentro da janela de reembolso
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('cancelamento do indicado', () => {
+  it('revoga pedindo explicitamente a checagem da janela', async () => {
+    const { admin, rpcArgs } = makeAdmin({
+      rpc: { revoke_referral_reward: { ok: true, found: true } },
+    })
+    await handleReferredSubscriptionCanceled(admin, REFERRED)
+
+    expect(rpcArgs('revoke_referral_reward')).toEqual({
+      p_reason:           'canceled_within_hold',
+      p_invoice:          null,
+      p_payment_intent:   null,
+      p_referred_user:    REFERRED,
+      p_only_within_hold: true,
+    })
+  })
+
+  it('reembolso continua revogando fora da janela também', async () => {
+    const { admin, rpcArgs } = makeAdmin({
+      rpc: { revoke_referral_reward: { ok: true, found: true } },
+    })
+    await handleChargeRefunded(admin, { payment_intent: 'pi_9' } as unknown as Stripe.Charge)
+
+    expect(rpcArgs('revoke_referral_reward')?.p_only_within_hold).toBe(false)
+  })
+
+  it('desfazer o cancelamento restaura a recompensa', async () => {
+    const { admin, rpcArgs } = makeAdmin({
+      rpc: { restore_referral_reward: { ok: true, found: true, restored: true } },
+    })
+    await handleReferredSubscriptionReactivated(admin, REFERRED)
+
+    expect(rpcArgs('restore_referral_reward')).toEqual({ p_referred_user: REFERRED })
+  })
+
+  it('fica inerte antes de o programa entrar em vigor', async () => {
+    vi.setSystemTime(new Date('2026-08-20T12:00:00Z'))
+    const { admin, rpcCalls } = makeAdmin()
+
+    await handleReferredSubscriptionCanceled(admin, REFERRED)
+    await handleReferredSubscriptionReactivated(admin, REFERRED)
+
+    expect(rpcCalls).toHaveLength(0)
+  })
+})
+
+describe('dono da assinatura', () => {
+  const sub = (overrides: Record<string, unknown> = {}) => ({
+    id: 'sub_1', customer: 'cus_1', metadata: {}, ...overrides,
+  } as unknown as Stripe.Subscription)
+
+  it('prefere o metadata gravado no checkout', async () => {
+    const { admin } = makeAdmin({ rows: { profiles: { id: 'do-banco' } } })
+    const resolved = await resolveSubscriptionUserId(
+      admin, sub({ metadata: { user_id: 'do-metadata' } }),
+    )
+    expect(resolved).toBe('do-metadata')
+  })
+
+  it('cai para o profile quando não há metadata', async () => {
+    const { admin } = makeAdmin({ rows: { profiles: { id: 'do-banco' } } })
+    expect(await resolveSubscriptionUserId(admin, sub())).toBe('do-banco')
+  })
+
+  it('devolve null quando não dá para resolver', async () => {
+    const { admin } = makeAdmin()
+    expect(await resolveSubscriptionUserId(admin, sub({ customer: null }))).toBeNull()
   })
 })

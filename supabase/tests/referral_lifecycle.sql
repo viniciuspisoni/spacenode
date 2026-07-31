@@ -123,6 +123,58 @@ select chk('revogação é idempotente',
            (public.revoke_referral_reward('refund', null, 'pi_2') ->> 'already')::boolean);
 select chk('recompensa revogada não amadurece', public.mature_referral_rewards() = 0);
 
+-- ── cancelamento dentro / fora da janela de reembolso ──────────────────────
+insert into public.profiles (id, email, created_at) values
+  ('00000000-0000-0000-0000-0000000000d1', 'cancela-cedo@cliente.com',  now()),
+  ('00000000-0000-0000-0000-0000000000d2', 'cancela-tarde@cliente.com', now());
+select public.bind_referral(:'code', '00000000-0000-0000-0000-0000000000d1');
+select public.bind_referral(:'code', '00000000-0000-0000-0000-0000000000d2');
+select public.confirm_referral('00000000-0000-0000-0000-0000000000d1', 'in_d1', 'pi_d1', 20, interval '7 days');
+select public.confirm_referral('00000000-0000-0000-0000-0000000000d2', 'in_d2', 'pi_d2', 20, interval '7 days');
+
+-- Dentro da janela: cai.
+select chk('cancelamento dentro da janela revoga',
+           (public.revoke_referral_reward('canceled_within_hold', null, null,
+              '00000000-0000-0000-0000-0000000000d1', true) ->> 'found')::boolean);
+select chk('recompensa do cancelamento fica revogada',
+           (select rw.status from public.referral_rewards rw
+              join public.referrals r on r.id = rw.referral_id
+             where r.referred_user_id = '00000000-0000-0000-0000-0000000000d1') = 'revoked');
+
+-- Desfez o cancelamento ainda dentro da janela: volta.
+select chk('reativação dentro da janela restaura',
+           (public.restore_referral_reward('00000000-0000-0000-0000-0000000000d1') ->> 'restored')::boolean);
+select chk('recompensa restaurada volta a pending',
+           (select rw.status from public.referral_rewards rw
+              join public.referrals r on r.id = rw.referral_id
+             where r.referred_user_id = '00000000-0000-0000-0000-0000000000d1') = 'pending');
+select chk('indicação restaurada volta a confirmed',
+           (select status from public.referrals
+             where referred_user_id = '00000000-0000-0000-0000-0000000000d1') = 'confirmed');
+
+-- Fora da janela: cancelar não desfaz nada (o mês pago foi usado).
+update public.referrals
+   set hold_until = now() - interval '1 day'
+ where referred_user_id = '00000000-0000-0000-0000-0000000000d2';
+select chk('cancelamento fora da janela não revoga',
+           public.revoke_referral_reward('canceled_within_hold', null, null,
+              '00000000-0000-0000-0000-0000000000d2', true) ->> 'skipped' = 'hold_expired');
+select chk('indicação segue confirmada fora da janela',
+           (select status from public.referrals
+             where referred_user_id = '00000000-0000-0000-0000-0000000000d2') = 'confirmed');
+
+-- Reembolso é definitivo: reativação NÃO traz o benefício de volta.
+select public.revoke_referral_reward('refunded', null, 'pi_d2');
+select chk('reembolso não é revertido por reativação',
+           (public.restore_referral_reward('00000000-0000-0000-0000-0000000000d2') ->> 'restored')::boolean = false);
+select chk('indicação reembolsada continua revogada',
+           (select status from public.referrals
+             where referred_user_id = '00000000-0000-0000-0000-0000000000d2') = 'revoked');
+
+-- Limpa os atores deste bloco para não interferir na contagem de acúmulo.
+delete from public.profiles
+ where id in ('00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000d2');
+
 -- ── acúmulo até 100% e excedente para a mensalidade seguinte ────────────────
 select public.confirm_referral('00000000-0000-0000-0000-0000000000b3', 'in_3', 'pi_3', 20, interval '7 days');
 select public.confirm_referral('00000000-0000-0000-0000-0000000000b4', 'in_4', 'pi_4', 20, interval '7 days');

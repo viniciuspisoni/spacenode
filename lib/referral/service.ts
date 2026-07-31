@@ -206,6 +206,9 @@ export async function confirmReferral(
 /**
  * Reembolso, contestação, falha de pagamento ou cancelamento antes do fim da
  * janela: a indicação e a recompensa caem. Idempotente.
+ *
+ * `onlyWithinHold` é do cancelamento: fora da janela de reembolso, cancelar
+ * não desfaz nada — o indicado já usou o mês que pagou.
  */
 export async function revokeReferralReward(
   admin: SupabaseClient,
@@ -214,16 +217,37 @@ export async function revokeReferralReward(
     invoiceId?: string | null
     paymentIntentId?: string | null
     referredUserId?: string | null
+    onlyWithinHold?: boolean
   },
-): Promise<{ found: boolean; note?: string }> {
+): Promise<{ found: boolean; note?: string; skipped?: string }> {
   const data = await callRpc(admin, 'revoke_referral_reward', {
-    p_reason:         input.reason,
-    p_invoice:        input.invoiceId ?? null,
-    p_payment_intent: input.paymentIntentId ?? null,
-    p_referred_user:  input.referredUserId ?? null,
+    p_reason:           input.reason,
+    p_invoice:          input.invoiceId ?? null,
+    p_payment_intent:   input.paymentIntentId ?? null,
+    p_referred_user:    input.referredUserId ?? null,
+    p_only_within_hold: input.onlyWithinHold === true,
   })
   if (!data) return { found: false }
-  return { found: data.found === true, note: (data.note as string | null) ?? undefined }
+  return {
+    found:   data.found === true,
+    note:    (data.note as string | null) ?? undefined,
+    skipped: (data.skipped as string | null) ?? undefined,
+  }
+}
+
+/**
+ * O indicado desfez o cancelamento ainda dentro da janela: a recompensa volta
+ * para `pending` e segue o curso normal. Só reverte revogação por
+ * cancelamento — reembolso e contestação continuam definitivos.
+ */
+export async function restoreReferralReward(
+  admin: SupabaseClient,
+  referredUserId: string,
+): Promise<{ restored: boolean }> {
+  const data = await callRpc(admin, 'restore_referral_reward', {
+    p_referred_user: referredUserId,
+  })
+  return { restored: data?.restored === true }
 }
 
 /** Antiabuso detectado na confirmação (ex.: cartão já usado por outra conta). */

@@ -37,9 +37,10 @@ no saldo do cliente. Três consequências que valem a escolha:
 2. **A assinatura não é tocada.** O cupom entra na *fatura em rascunho*, não na
    Subscription. Nenhum cupom existente é alterado, nenhum histórico de
    assinatura muda.
-3. **Cancelar não queima o benefício.** Sem fatura, nada é consumido; as
-   recompensas ficam `available`. Ao reativar, entram na primeira mensalidade
-   seguinte.
+3. **Cancelar não queima o benefício já conquistado.** Sem fatura, nada é
+   consumido; as recompensas do *indicador* ficam `available` e entram na
+   primeira mensalidade depois da reativação. (Cancelamento do *indicado*
+   dentro da janela de reembolso é outra história — ver §6.)
 
 ---
 
@@ -139,10 +140,8 @@ que não é nosso.
 | Conta antiga usando link de amigo | Só vincula conta com menos de 30 dias e que nunca teve `stripe_customer_id` |
 | Mesmo cartão em várias contas | `claim_payment_fingerprint`: o fingerprint do Stripe fica preso à primeira conta; repetido em outra, a indicação é `rejected` |
 | Pagar, ganhar e pedir reembolso | Recompensa nasce `pending` e só fica disponível 7 dias após o pagamento; `charge.refunded` e `charge.dispute.created` revogam |
+| Assinar só para gerar recompensa e cancelar em seguida | Cancelamento **dentro** da janela de 7 dias revoga a recompensa (ver §6) |
 | Reentrega de webhook | `stripe_webhook_events` + funções idempotentes por natureza |
-
-Cancelamento **sem** reembolso não revoga nada: o dinheiro do indicado ficou, e
-o indicador cumpriu o que o programa pede.
 
 ---
 
@@ -152,7 +151,10 @@ o indicador cumpriu o que o programa pede.
 | -------- | ------------- |
 | **Upgrade / downgrade** | O desconto é percentual e entra na fatura do ciclo: acompanha o novo valor automaticamente. Faturas de proração (`subscription_update`) ficam de fora — não são mensalidade |
 | **Cancelamento do indicador** | Nada é consumido; as recompensas seguem `available` |
-| **Reativação** | A primeira mensalidade nova recebe o acumulado, até 100% |
+| **Cancelamento do indicado, dentro dos 7 dias** | A indicação é revogada e a recompensa do indicador cai. Vale para o cancelamento imediato (`customer.subscription.deleted`) **e** para o agendado no portal (`cancel_at_period_end`) — é este o caminho comum, e ouvir só o `deleted` deixaria o caso comum de fora, porque ele só chega no fim do período |
+| **Cancelamento do indicado, depois dos 7 dias** | Não desfaz nada: o indicado usou o mês que pagou e o indicador cumpriu o que o programa pede |
+| **Indicado desfaz o cancelamento na mesma janela** | A recompensa volta para `pending` e segue o curso normal. Só revogação por *cancelamento* é reversível — reembolso e contestação são definitivos |
+| **Reativação do indicador** | A primeira mensalidade nova recebe o acumulado, até 100% |
 | **Ciclo anual** | Fora do programa: o benefício é de *mensalidade* (`findPlanByStripePriceId(...).billing === 'monthly'`) |
 | **Pagamento falhou / fatura anulada** | A reserva é devolvida à fila e entra na mensalidade seguinte |
 | **Pix** | Funciona igual: a confirmação vem por `invoice.paid`, que é o mesmo sinal do cartão. Sem cartão não há fingerprint, e a checagem simplesmente não bloqueia |
@@ -172,6 +174,10 @@ o indicador cumpriu o que o programa pede.
    - `invoice.marked_uncollectible`
    - `charge.refunded`
    - `charge.dispute.created`
+   - `customer.subscription.updated` ← pega o cancelamento **agendado** no portal
+
+   `customer.subscription.deleted` já está no endpoint (é o downgrade para o
+   plano gratuito) e passa a servir também ao cancelamento imediato.
 3. **Conferir `CRON_SECRET`** na Vercel — o cron diário
    `/api/cron/referral-rewards` (06:00 UTC) já está em `vercel.json`.
 4. **Nada de cupom manual.** Os cupons (`spn-referral-10`, `spn-referral-20`,
@@ -192,9 +198,10 @@ Nenhum passo mexe em assinatura, cupom ou histórico existente.
 | Orquestração dos webhooks | `tests/referral/webhook.test.ts` | `npm test` |
 | Ciclo de vida no banco, ponta a ponta | `supabase/tests/referral_lifecycle.sql` | `psql -d <db> -f supabase/tests/referral_lifecycle.sql` |
 
-O script SQL sobe atores, vincula, confirma, revoga, acumula até 100%, empurra
-o excedente para a mensalidade seguinte e liquida — 46 asserções contra um
-Postgres real, aplicadas depois da migration.
+O script SQL sobe atores, vincula, confirma, revoga por reembolso, revoga por
+cancelamento dentro da janela, restaura na reativação, acumula até 100%,
+empurra o excedente para a mensalidade seguinte e liquida — 56 asserções
+contra um Postgres real, aplicadas depois da migration.
 
 ---
 

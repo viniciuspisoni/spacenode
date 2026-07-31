@@ -560,11 +560,17 @@ $$;
 
 -- ── revoke_referral_reward — reembolso, contestação, falha, cancelamento ────
 -- Localiza a indicação por fatura, payment intent OU conta do indicado.
+--
+-- `p_only_within_hold` existe para o CANCELAMENTO: assinatura encerrada dentro
+-- da janela de reembolso derruba a recompensa; encerrada depois, não — nesse
+-- ponto o indicado já usou o mês que pagou e o indicador cumpriu o que o
+-- programa pede. Reembolso e contestação chamam com `false` e revogam sempre.
 create or replace function public.revoke_referral_reward(
-  p_reason         text,
-  p_invoice        text default null,
-  p_payment_intent text default null,
-  p_referred_user  uuid default null
+  p_reason           text,
+  p_invoice          text default null,
+  p_payment_intent   text default null,
+  p_referred_user    uuid default null,
+  p_only_within_hold boolean default false
 )
 returns jsonb
 language plpgsql
@@ -590,6 +596,11 @@ begin
   end if;
   if v_referral.status in ('revoked', 'rejected') then
     return jsonb_build_object('ok', true, 'found', true, 'already', true);
+  end if;
+
+  -- Fora da janela de reembolso o cancelamento não desfaz nada.
+  if p_only_within_hold and (v_referral.hold_until is null or v_referral.hold_until <= now()) then
+    return jsonb_build_object('ok', true, 'found', true, 'skipped', 'hold_expired');
   end if;
 
   update public.referrals
@@ -623,6 +634,61 @@ begin
           jsonb_build_object('reason', p_reason, 'note', v_note));
 
   return jsonb_build_object('ok', true, 'found', true, 'note', v_note);
+end;
+$$;
+
+-- ── restore_referral_reward — o indicado desfez o cancelamento ──────────────
+--
+-- Só reverte revogação causada por CANCELAMENTO, e só enquanto a janela de
+-- reembolso ainda estiver aberta. Reembolso e contestação são definitivos: o
+-- dinheiro voltou e nenhuma reativação traz de volta o benefício.
+create or replace function public.restore_referral_reward(p_referred_user uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_referral public.referrals;
+  v_reward   public.referral_rewards;
+begin
+  select * into v_referral
+    from public.referrals where referred_user_id = p_referred_user for update;
+  if v_referral.id is null then
+    return jsonb_build_object('ok', true, 'found', false);
+  end if;
+
+  if v_referral.status <> 'revoked'
+     or v_referral.revoke_reason is distinct from 'canceled_within_hold' then
+    return jsonb_build_object('ok', true, 'found', true, 'restored', false);
+  end if;
+
+  if v_referral.hold_until is null or v_referral.hold_until <= now() then
+    return jsonb_build_object(
+      'ok', true, 'found', true, 'restored', false, 'reason', 'hold_expired'
+    );
+  end if;
+
+  update public.referrals
+     set status        = 'confirmed',
+         revoked_at    = null,
+         revoke_reason = null,
+         updated_at    = now()
+   where id = v_referral.id;
+
+  update public.referral_rewards
+     set status        = 'pending',
+         revoked_at    = null,
+         revoke_reason = null,
+         updated_at    = now()
+   where referral_id = v_referral.id and status = 'revoked'
+  returning * into v_reward;
+
+  insert into public.referral_events (referral_id, reward_id, user_id, type, detail)
+  values (v_referral.id, v_reward.id, v_referral.referrer_user_id, 'referral_restored',
+          jsonb_build_object('hold_until', v_referral.hold_until));
+
+  return jsonb_build_object('ok', true, 'found', true, 'restored', true);
 end;
 $$;
 
@@ -843,7 +909,8 @@ begin
     'public.claim_payment_fingerprint(text, uuid)',
     'public.reject_referral(uuid, text, text)',
     'public.confirm_referral(uuid, text, text, integer, interval)',
-    'public.revoke_referral_reward(text, text, text, uuid)',
+    'public.revoke_referral_reward(text, text, text, uuid, boolean)',
+    'public.restore_referral_reward(uuid)',
     'public.mature_referral_rewards(uuid)',
     'public.claim_referral_rewards(uuid, text, integer)',
     'public.set_application_coupon(text, text)',

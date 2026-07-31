@@ -18,6 +18,9 @@
 //        vingou: a recompensa VOLTA para a fila e entra na mensalidade seguinte.
 //   charge.refunded / charge.dispute.created → o dinheiro do indicado voltou:
 //        indicação e recompensa são revogadas.
+//   customer.subscription.updated (cancel_at_period_end) / .deleted → o
+//        indicado cancelou: se ainda estiver DENTRO da janela de reembolso, a
+//        recompensa cai; desfazer o cancelamento na mesma janela a traz de volta.
 //
 // Todas as funções são best-effort para a cobrança: nenhuma delas pode impedir
 // a ativação de um plano. Só o caminho de `invoice.created` pede retentativa,
@@ -34,6 +37,7 @@ import {
   confirmReferral,
   getPendingReferral,
   rejectReferral,
+  restoreReferralReward,
   revokeReferralReward,
   setApplicationCoupon,
   settleApplication,
@@ -282,6 +286,82 @@ export async function handleDisputeCreated(
     console.warn(
       `[referral] indicação revogada por contestação (payment intent ${paymentIntentId})` +
       (result.note ? ` — atenção: ${result.note}` : ''),
+    )
+  }
+}
+
+// ── Cancelamento do indicado dentro da janela ───────────────────────────────
+
+/**
+ * Dono de uma assinatura, sem ida ao Stripe: o objeto do evento já traz tudo.
+ * Ordem igual à do resto do webhook — metadata primeiro (gravado no checkout),
+ * depois o profile pela assinatura e, por fim, pelo customer.
+ */
+export async function resolveSubscriptionUserId(
+  admin: SupabaseClient,
+  sub: Stripe.Subscription,
+): Promise<string | null> {
+  const fromMeta = sub.metadata?.user_id
+  if (fromMeta) return fromMeta
+
+  const bySubscription = await admin
+    .from('profiles')
+    .select('id')
+    .eq('stripe_subscription_id', sub.id)
+    .maybeSingle()
+  if (bySubscription.data?.id) return bySubscription.data.id as string
+
+  const customerId = strId(sub.customer)
+  if (!customerId) return null
+  const { data } = await admin
+    .from('profiles')
+    .select('id')
+    .eq('stripe_customer_id', customerId)
+    .maybeSingle()
+  return (data?.id as string | undefined) ?? null
+}
+
+/**
+ * O indicado cancelou. Dentro da janela de reembolso a recompensa cai — é o
+ * mesmo raciocínio do reembolso: a assinatura não se sustentou.
+ *
+ * Vale tanto para o cancelamento imediato (`customer.subscription.deleted`)
+ * quanto para o agendado no portal do Stripe (`cancel_at_period_end`), que é o
+ * caminho comum. Ouvir só o `deleted` deixaria o caso comum de fora: ele só
+ * chega no fim do período, muito depois da janela.
+ *
+ * Fora da janela não desfaz nada: o indicado usou o mês que pagou e o
+ * indicador cumpriu o que o programa pede.
+ */
+export async function handleReferredSubscriptionCanceled(
+  admin: SupabaseClient,
+  referredUserId: string,
+): Promise<void> {
+  if (!isReferralProgramOpen()) return
+  const result = await revokeReferralReward(admin, {
+    reason:         'canceled_within_hold',
+    referredUserId,
+    onlyWithinHold: true,
+  })
+  if (result.found && !result.skipped) {
+    console.warn(
+      `[referral] indicação revogada — indicado ${referredUserId} cancelou ` +
+      'dentro da janela de reembolso',
+    )
+  }
+}
+
+/** O indicado desfez o cancelamento ainda dentro da janela. */
+export async function handleReferredSubscriptionReactivated(
+  admin: SupabaseClient,
+  referredUserId: string,
+): Promise<void> {
+  if (!isReferralProgramOpen()) return
+  const { restored } = await restoreReferralReward(admin, referredUserId)
+  if (restored) {
+    console.log(
+      `[referral] indicação restaurada — indicado ${referredUserId} desfez o ` +
+      'cancelamento dentro da janela',
     )
   }
 }
