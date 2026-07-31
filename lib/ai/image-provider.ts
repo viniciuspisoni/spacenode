@@ -72,6 +72,12 @@ export interface GenerateImageArgs {
   /** Identificação nos logs, ex.: 'generate', 'spaces.generate', 'retocar/nb2'. */
   context: string
   deliver: ImageDelivery
+  /** Overrides do caminho GCP/Vertex (o caminho FAL ignora — o schema da FAL
+   *  não expõe esses knobs). Usado pelo retry ladder do render_only pra
+   *  reduzir "criatividade" (temperatura ↓). */
+  gcpConfig?: {
+    temperature?: number
+  }
 }
 
 export interface GeneratedImage {
@@ -292,8 +298,9 @@ async function generateViaGcp(
       const config = {
         responseModalities: [Modality.IMAGE, Modality.TEXT],
         // Fluxos de preservação (norte do produto): temperatura baixa reduz
-        // "criatividade" fora do pedido — mesmo valor do lib/ai/google.
-        temperature: 0.2,
+        // "criatividade" fora do pedido — mesmo valor do lib/ai/google. O
+        // retry ladder do render_only baixa ainda mais via gcpConfig.
+        temperature: args.gcpConfig?.temperature ?? 0.2,
         ...(parsed.seed !== undefined ? { seed: parsed.seed } : {}),
         ...(mapping.supportsImageSize && (parsed.resolution || parsed.aspectRatio)
           ? {

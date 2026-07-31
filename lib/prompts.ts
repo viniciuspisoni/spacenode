@@ -1,5 +1,17 @@
 // lib/prompts.ts
 
+// O contrato de fidelidade da Máxima (modo estrutural render_only) vive em
+// lib/ai/fidelity/render-only.ts — fonte única, aplicada ANTES dos blocos
+// derivados de escolha do usuário. Aqui ficam vocabulário, blocos por nível e
+// a composição final do prompt.
+import {
+  NEGATIVE_BASE,
+  buildRenderOnlyNegatives,
+  buildRenderOnlySystemHead,
+  buildRenderOnlyCameraBlock,
+  buildEdgeMapBlock,
+} from '@/lib/ai/fidelity/render-only'
+
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 export type ProjectType = 'exterior' | 'interior'
@@ -584,10 +596,7 @@ const SEG_EN: Record<string, string> = {
 // reinterpretação fotográfica é desejada.
 function buildCameraBlock(level?: FidelityLevel, hasAnchor?: boolean): string {
   if (level === 'maximum') {
-    if (hasAnchor) {
-      return ', high quality photorealistic image, sharp focus, no compression artifacts'
-    }
-    return ', photorealistic architectural photograph of this exact scene — render the surfaces with real-world physically-based materials and natural micro-texture, realistic light transport with soft natural shadows, ambient occlusion and global illumination, accurate reflections and refraction on glass and water, true-to-life sky and vegetation, subtle depth of field, sharp focus. It must read as a real DSLR photograph, NOT a flat CGI / 3D / SketchUp render. Keep every material, color and finish exactly as shown — only their real-world rendering and lighting become photographic, never the design.'
+    return buildRenderOnlyCameraBlock(Boolean(hasAnchor))
   }
   return ', captured with professional architectural camera, Canon R5, 24mm tilt-shift lens, f/4, ISO 100, Hasselblad aesthetic, hyperrealistic, 8K RAW photo, photorealistic architectural photography, not a render, not CGI, real life photo'
 }
@@ -660,28 +669,8 @@ function buildMaterialsBlock(
 
 // ── Fidelity Engine prompt builder ─────────────────────────────────────────────
 
-// 17 itens esparsos consolidados em 6 itens densos. Cada item carrega um vetor
-// completo em vez de fragmentar a mesma proibição em N linhas — modelo de
-// difusão presta menos atenção quando há muitos itens repetitivos competindo.
-const NEGATIVE_BASE = [
-  'no architectural changes (no added, removed, repositioned or resized walls, partitions, columns, beams, doors, windows, arches, niches, openings, ceiling line, roofline, stories or room boundaries)',
-  'no transformed openings (a door stays a door, a window stays a window, an arch stays an arch)',
-  'no different camera angle, perspective, framing, zoom, rotation or altered silhouette',
-  'no warped proportions',
-  'no removed neighboring buildings',
-  'no fantasy, surreal or impossibly-shaped additions',
-]
-
-// Negativos específicos pra Máxima — só vetores que NÃO são cobertos por
-// outros blocos. Item antigo de "fixture on/off state" foi removido: já é
-// coberto pela `lightingLine` quando lighting === 'Preservar Original' e,
-// quando o user pediu mudar a luz, esse negativo seria contra-pedido.
-const MAXIMUM_EXTRA_NEGATIVES = [
-  'no recoloring, restaining, repainting or replaced finishes on any wall, ceiling, floor, door, window frame, ceiling fan, light fixture or furniture (no concrete texture replacing painted walls, no industrial finish replacing flat paint)',
-  'no altered geometry, hardware or proportions on doors, windows, fans or fixtures',
-  'no altered texture pattern, plank/tile layout, stone veining, wood grain direction, fabric weave or joint/grout alignment on any surface that was not explicitly overridden',
-]
-
+// A lista NEGATIVE_BASE (compartilhada pelos três níveis) e os extras da
+// Máxima vivem em lib/ai/fidelity/render-only.ts.
 export function buildNegativePromptForFidelity(level: FidelityLevel): string {
   if (level === 'creative') {
     // ainda preserva volumetria/aberturas/perspectiva, mas relaxa entorno e estilo
@@ -693,9 +682,9 @@ export function buildNegativePromptForFidelity(level: FidelityLevel): string {
   if (level === 'balanced') {
     return `AVOID: ${NEGATIVE_BASE.join(', ')}.`
   }
-  // maximum — base + extras específicos contra drift de cor/material/fixture
-  const all = [...NEGATIVE_BASE, ...MAXIMUM_EXTRA_NEGATIVES]
-  return `STRICTLY AVOID: ${all.join(', ')}, no reframe, no zoom, no rotation, no altered silhouette.`
+  // maximum/render_only — base + extras contra drift de cor/material/fixture/
+  // mobiliário (fonte única no módulo de fidelidade)
+  return buildRenderOnlyNegatives()
 }
 
 // Pedido cirúrgico de alteração entre gerações ("trocar só o piso", "adicionar
@@ -738,77 +727,17 @@ function buildAnchorBlock(hasAnchor?: boolean): string {
   )
 }
 
-// ── Locks positivos da Máxima (revisão 2026-07-22) ─────────────────────────────
-//
-// Feedback de testes em prod (mesma classe de sintoma corrigida no Spaces):
-// texturas repintadas e geometria escapando. Até aqui o lock de geometria da
-// Máxima vivia SÓ nos negativos ("no different camera angle…") — locks
-// positivos com regra de overlay aderem melhor que listas de proibição, e o
-// vocabulário de TEXTURA (veios, grãos, paginação, juntas) não existia.
-// Ambos os blocos são exclusivos do level 'maximum'.
-
-function buildGeometryLockMaxBlock(hasAnchor?: boolean): string {
-  const ref = hasAnchor ? 'image #2, the geometry source' : 'the reference image'
-  return (
-    `GEOMETRY LOCK (relative to ${ref}): preserve exactly the camera position, ` +
-    'perspective, framing and horizon; the building/space silhouette; every ' +
-    'wall, slab and ceiling plane; the count, size, shape and position of ' +
-    'every door and window; all proportions; stairs, columns, beams and ' +
-    'built-in volumes; the surrounding context. OVERLAY RULE: the output must ' +
-    'overlay the geometry reference — every edge, opening contour and object ' +
-    'silhouette in the same position, at the same size, seen from the same ' +
-    'camera. '
-  )
-}
-
-function buildTextureFidelityMaxBlock(hasAnchor?: boolean): string {
-  if (hasAnchor) {
-    // Âncora = render fotorealista anterior do MESMO projeto: as texturas dela
-    // são evidência fotográfica pronta — copiar, nunca regenerar.
-    return (
-      'MATERIAL & TEXTURE FIDELITY: materials and textures come from image #1 ' +
-      'and are photographic evidence, not suggestions — reproduce the same ' +
-      'physical materials with the same texture pattern and scale, the same ' +
-      'wood grain direction, the same stone/marble veining layout, the same ' +
-      'fabric weave, the same plank/tile layout and joint/grout alignment, the ' +
-      'same finish (matte/gloss). Never substitute a material for a ' +
-      'similar-looking one, never regenerate a texture with a new random ' +
-      'pattern. '
-    )
-  }
-  // Sem âncora = modelo 3D/SketchUp: as texturas mapeadas são DECISÕES DE
-  // PROJETO. O realismo é bem-vindo (é o objetivo), mas a identidade do
-  // material — cor, padrão, paginação — não muda.
-  return (
-    'MATERIAL IDENTITY LOCK: the materials mapped in the model are design ' +
-    'decisions, not placeholders. Render each surface as the SAME material ' +
-    'with the SAME color and the SAME pattern layout shown in the reference — ' +
-    'wood keeps its tone and plank layout, stone keeps its color and cut, ' +
-    'painted surfaces keep their exact paint color, tiles keep their size and ' +
-    'grid. Add ONLY photographic realism: real micro-texture, grain, ' +
-    'reflectance and light response. Never swap a material for a similar one, ' +
-    'never recolor, never invent veining or patterns that contradict the ' +
-    'reference, never "upgrade" a finish. '
-  )
-}
+// Os locks positivos da Máxima (GEOMETRY LOCK + MATERIAL/TEXTURE, revisão
+// 2026-07-22) e o contrato do modo estrutural render_only foram consolidados
+// em lib/ai/fidelity/render-only.ts (buildRenderOnlySystemHead) — fonte única,
+// usada também pelo retry ladder do /api/generate.
 
 function fidelityModifier(level: FidelityLevel): string {
   if (level === 'creative') {
     return 'CREATIVE FIDELITY MODE: Preserve volumetry, number of stories, opening positions and overall perspective. Stylistic freedom is allowed on materials, sky, ambient props, vegetation and surroundings. '
   }
-  if (level === 'balanced') {
-    return 'BALANCED FIDELITY MODE: Preserve architecture, camera angle, opening positions, number of stories and main volumetry. Light composition tweaks allowed (vegetation, sky, ambient props). Do not redesign the facade. '
-  }
-  // maximum — princípios apenas. Lista exaustiva de "walls, openings,
-  // partitions, beams, columns..." vive no NEGATIVE_BASE; lista exaustiva
-  // de fixtures vive na lightingLine; lista de finishes vive no
-  // MAXIMUM_EXTRA_NEGATIVES. Aqui só os 4 vetores conceituais.
-  return (
-    'MAXIMUM FIDELITY MODE — faithful photorealistic re-render of the reference. ' +
-    'Preserve every visible element exactly: architecture, materials, colors, finishes, fixtures, furniture, props. ' +
-    'Context and mood descriptors below are ATMOSPHERE ONLY, never license to alter anything visible. ' +
-    'Apply ONLY changes explicitly requested in the lighting, scene, material or refinement blocks. '
-  )
+  // balanced (o nível maximum monta o contrato via buildRenderOnlySystemHead)
+  return 'BALANCED FIDELITY MODE: Preserve architecture, camera angle, opening positions, number of stories and main volumetry. Light composition tweaks allowed (vegetation, sky, ambient props). Do not redesign the facade. '
 }
 
 // Lista de fatos da análise prévia. Removidos os "DO NOT" inline (já cobertos
@@ -845,22 +774,27 @@ function transformationBlock(briefing: BriefingArquitetonico, level: FidelityLev
 // instrução de preservação — o modelo já vê a imagem direto e não precisa de
 // uma redescrição textual dos elementos. Quando presente (ex: futuro Spaces
 // Vista Mestre), os PROJECT FACTS adicionam locks específicos.
+/** Opções do modo estrutural render_only (nível maximum): tentativa do retry
+ *  ladder e posição (1-based) do edge map de condicionamento em image_urls. */
+export interface RenderOnlyPromptOpts {
+  attempt?: number
+  edgeMapImageIndex?: number | null
+}
+
 export function buildFidelityPrompt(
-  options:   GenerateOptions,
-  level:     FidelityLevel = 'maximum',
-  briefing?: BriefingArquitetonico,
+  options:    GenerateOptions,
+  level:      FidelityLevel = 'maximum',
+  briefing?:  BriefingArquitetonico,
+  renderOnly?: RenderOnlyPromptOpts,
 ): string {
   const { projectType, segment, lighting, background, sceneElements, materials, hasAnchor, refinementText } = options
 
   const anchor     = buildAnchorBlock(hasAnchor)
   const refinement = buildRefinementBlock(refinementText, hasAnchor)
-  const modifier   = fidelityModifier(level)
   const preserve   = briefing ? preservationBlock(briefing) : ''
   const allow      = briefing ? transformationBlock(briefing, level) : ''
   const matBlock   = buildMaterialsBlock(materials, projectType, level)
   const negative   = buildNegativePromptForFidelity(level)
-  const geoLock    = level === 'maximum' ? buildGeometryLockMaxBlock(hasAnchor)     : ''
-  const texture    = level === 'maximum' ? buildTextureFidelityMaxBlock(hasAnchor)  : ''
 
   const lightDesc  = LIGHT_EN[lighting] ?? lighting
   const segDesc    = SEG_EN[segment]    ?? segment.toLowerCase()
@@ -912,11 +846,9 @@ export function buildFidelityPrompt(
   const kind   = projectType === 'exterior'
     ? `${segDesc} architectural exterior photograph`
     : `${segDesc} architectural interior photograph`
-  const intent = level === 'maximum'
-    ? (hasAnchor
-        ? `Render this reference faithfully — photograph the EXACT scene shown, no magazine-style upgrades. `
-        : `This reference is a raw 3D / CAD / SketchUp model. Re-render it into a real photograph of the SAME ${projectType === 'exterior' ? 'building' : 'space'}: convert the flat CGI shading into real-world photographic materials and light, while keeping the exact design, geometry, layout, materials, colors and finishes shown. Photorealism of surfaces and light ONLY — never a redesign. `)
-    : `Transform this reference image as a photorealistic ${kind}. `
+  // Só balanced/creative — na Máxima o intent (CGI→foto ou re-render fiel)
+  // vem do buildRenderOnlySystemHead.
+  const intent = `Transform this reference image as a photorealistic ${kind}. `
 
   // 'Preservar Original' ativa lock afirmativo: cada fixture mantém o estado
   // on/off do input, mesmo time of day, mesmas sombras. Sem essa especificidade
@@ -940,22 +872,24 @@ export function buildFidelityPrompt(
     lightingLine = 'Lighting: keep the reference lighting EXACTLY — every fixture stays in the same on/off state, same time of day, same shadow direction. '
   }
 
-  // Máxima: MISSÃO PRIMEIRO — modelos de edição pesam o início do prompt
-  // (padrão validado no Spaces, fix 2026-07-22). A ordem vira:
-  //   âncora/refinamento (papéis das imagens + pedido cirúrgico do usuário)
-  //   → intent (a missão CGI→foto ou re-render fiel)
-  //   → modifier (contrato de preservação)
-  //   → GEOMETRY LOCK + MATERIAL/TEXTURE (locks positivos novos)
-  //   → fatos/overrides/luz/cena → negativos → câmera.
+  // Máxima (render_only): SYSTEM PROMPT PRIMEIRO — papéis das imagens, missão
+  // CGI→foto, contrato render-only e locks de geometria/textura (fonte única
+  // em lib/ai/fidelity/render-only.ts, com bloco de escalada nos retries),
+  // aplicados ANTES de qualquer bloco derivado do usuário (refinamento,
+  // materiais, luz, cena). Negativos + direção fotográfica fecham o prompt —
+  // sanduíche validado em prod (fix 2026-07-22).
   // Balanced/creative mantêm a ordem histórica, byte a byte.
   if (level === 'maximum') {
+    const head = buildRenderOnlySystemHead({
+      projectNoun: projectType === 'exterior' ? 'building' : 'space',
+      hasAnchor:   Boolean(hasAnchor),
+      attempt:     renderOnly?.attempt ?? 1,
+    })
     return (
       anchor +
+      head +
+      buildEdgeMapBlock(renderOnly?.edgeMapImageIndex) +
       refinement +
-      intent +
-      modifier +
-      geoLock +
-      texture +
       preserve +
       matBlock +
       lightingLine +
@@ -965,6 +899,7 @@ export function buildFidelityPrompt(
       buildCameraBlock(level, hasAnchor)
     )
   }
+  const modifier = fidelityModifier(level)
   return (
     anchor +
     refinement +
