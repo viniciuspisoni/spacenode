@@ -50,6 +50,23 @@ function isResourceMissing(err: unknown): boolean {
   return err instanceof Stripe.errors.StripeError && err.code === 'resource_missing'
 }
 
+/**
+ * O cupom não serve para esta cobrança. Duas causas, uma degradação só:
+ *
+ *  • `resource_missing` — o objeto existe por MODO no Stripe (teste ≠ live) e
+ *    a env pode apontar para um que ainda não foi criado.
+ *  • `coupon_expired`   — o `redeem_by` do objeto no Stripe e a janela do
+ *    código são dois relógios diferentes. Se o cupom vencer antes, todo
+ *    checkout de primeira assinatura no intervalo viraria 500 — a venda morre
+ *    por causa de um desconto. Vender a preço cheio é ruim; não vender é pior.
+ */
+function isCouponRejectedError(err: unknown): boolean {
+  return (
+    err instanceof Stripe.errors.StripeError &&
+    (err.code === 'resource_missing' || err.code === 'coupon_expired')
+  )
+}
+
 async function customerExists(stripe: Stripe, id: string): Promise<boolean> {
   try {
     const customer = await stripe.customers.retrieve(id)
@@ -295,8 +312,8 @@ export async function POST(req: NextRequest) {
     //  • Pix: se não estiver ativado no Dashboard (ou o Pix Automático não
     //    liberado), o Stripe recusa a session INTEIRA — inclusive para quem ia
     //    pagar no cartão. Um erro de configuração viraria outage de vendas.
-    //  • Cupom: existe por MODO no Stripe (teste ≠ live) e a env pode apontar
-    //    para um que ainda não foi criado.
+    //  • Cupom: pode não existir neste modo do Stripe ou já ter vencido
+    //    (`redeem_by`) — ver isCouponRejectedError.
     //
     // Nos dois casos vender degradado é melhor que não vender, e o log grita.
     // O cliente vê o valor e os meios de pagamento reais na tela do Stripe
@@ -317,10 +334,11 @@ export async function POST(req: NextRequest) {
           pixApplied = false
           continue
         }
-        if (offerApplied && isResourceMissing(err)) {
+        if (offerApplied && isCouponRejectedError(err)) {
           console.error(
-            `[checkout] cupom "${discountCouponId}" não existe neste modo do Stripe — ` +
-            'vendendo a preço cheio. Confira se o cupom foi criado em live.'
+            `[checkout] Stripe recusou o cupom "${discountCouponId}" (não existe ` +
+            'neste modo ou já venceu) — vendendo a preço cheio. Confira o objeto ' +
+            'em live e o redeem_by dele.'
           )
           offerApplied = false
           continue
