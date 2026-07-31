@@ -181,6 +181,20 @@ export async function handleReferrerInvoiceCreated(
   invoice: Stripe.Invoice,
 ): Promise<InvoiceCreatedOutcome> {
   if (!isReferralProgramOpen()) return 'skipped'
+
+  // DECISÃO DE PRODUTO, NÃO DESCUIDO — não remova `subscription_cycle` daqui.
+  //
+  // Só RENOVAÇÃO recebe a recompensa. A primeira fatura de uma assinatura
+  // (`subscription_create`) fica de fora de propósito: ela é criada e
+  // finalizada dentro do próprio checkout, então o cupom dela tem de sair da
+  // Checkout Session — e lá só cabe UM desconto, que já é o do indicado (10%)
+  // ou o da campanha de lançamento.
+  //
+  // Consequência aceita: quem indica estando no plano gratuito paga o primeiro
+  // mês cheio e usa o acumulado a partir do segundo. Confirmado com o produto
+  // em 31/07/2026. Mudar isso não é trocar esta linha — exige levar o desconto
+  // para o checkout e definir a precedência entre "sou indicado" e "sou
+  // indicador" na mesma fatura.
   if (invoice.billing_reason !== 'subscription_cycle') return 'skipped'
   if (invoice.status !== 'draft') return 'skipped'
   if (!invoice.id) return 'skipped'

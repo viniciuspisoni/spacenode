@@ -154,10 +154,31 @@ que não é nosso.
 | **Cancelamento do indicado, dentro dos 7 dias** | A indicação é revogada e a recompensa do indicador cai. Vale para o cancelamento imediato (`customer.subscription.deleted`) **e** para o agendado no portal (`cancel_at_period_end`) — é este o caminho comum, e ouvir só o `deleted` deixaria o caso comum de fora, porque ele só chega no fim do período |
 | **Cancelamento do indicado, depois dos 7 dias** | Não desfaz nada: o indicado usou o mês que pagou e o indicador cumpriu o que o programa pede |
 | **Indicado desfaz o cancelamento na mesma janela** | A recompensa volta para `pending` e segue o curso normal. Só revogação por *cancelamento* é reversível — reembolso e contestação são definitivos |
+| **Indicador ainda no plano gratuito** | Acumula normalmente, mas o benefício entra a partir da **segunda** mensalidade — a primeira fatura nasce e é paga dentro do checkout, e lá só cabe um desconto (ver §6.1) |
 | **Reativação do indicador** | A primeira mensalidade nova recebe o acumulado, até 100% |
 | **Ciclo anual** | Fora do programa: o benefício é de *mensalidade* (`findPlanByStripePriceId(...).billing === 'monthly'`) |
 | **Pagamento falhou / fatura anulada** | A reserva é devolvida à fila e entra na mensalidade seguinte |
 | **Pix** | Funciona igual: a confirmação vem por `invoice.paid`, que é o mesmo sinal do cartão. Sem cartão não há fingerprint, e a checagem simplesmente não bloqueia |
+
+### 6.1 A recompensa entra a partir da segunda mensalidade
+
+**Decidido em 31/07/2026. Está assim de propósito.**
+
+A recompensa do indicador é aplicada em `invoice.created` com
+`billing_reason = subscription_cycle` — ou seja, só em **renovação**. A
+primeira fatura de uma assinatura (`subscription_create`) é criada e finalizada
+dentro do próprio checkout: o desconto dela teria de sair da Checkout Session,
+onde cabe **um** cupom só, e esse lugar já é do indicado (10%) ou da campanha
+de lançamento.
+
+Quem indica estando no plano gratuito, portanto, paga o primeiro mês cheio e
+começa a usar o acumulado no segundo. Com a base atual (poucos assinantes,
+maioria das contas no gratuito) esse é o caso comum, e foi aceito
+conscientemente — não é regressão nem bug.
+
+Reverter não é trocar a linha do guard em `lib/referral/webhook.ts`: exige
+levar o desconto acumulado para o checkout e definir a precedência entre "sou
+indicado" e "sou indicador" quando os dois caem na mesma primeira fatura.
 
 ---
 
