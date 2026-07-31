@@ -4,6 +4,14 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { findPlanByStripePriceId, type BillingCycle } from '@/lib/plans'
 import { recordAcquisitionEvent } from '@/lib/marketing/ads/service'
+import {
+  handleChargeRefunded,
+  handleDisputeCreated,
+  handleReferredFirstPayment,
+  handleReferrerInvoiceCreated,
+  handleReferrerInvoicePaid,
+  handleReferrerInvoiceUnpaid,
+} from '@/lib/referral/webhook'
 
 export const dynamic = 'force-dynamic'
 
@@ -241,6 +249,11 @@ export async function POST(req: NextRequest) {
     const invoice = event.data.object as Stripe.Invoice
     const reason  = invoice.billing_reason
 
+    // Indicações — a mensalidade cobrada com desconto acumulado foi paga: o
+    // benefício vira "utilizado". Idempotente e independente do que vem
+    // abaixo (não altera plano, saldo nem assinatura).
+    await handleReferrerInvoicePaid(supabase, invoice)
+
     if (reason === 'subscription_create' || reason === 'subscription_cycle') {
       const lineItem    = invoice.lines.data[0]
       const priceField  = lineItem?.pricing?.price_details?.price
@@ -302,6 +315,12 @@ export async function POST(req: NextRequest) {
           eventMetadata: { stripe_invoice_id: invoice.id },
         })
         if (!ok) return NextResponse.json({ error: 'db' }, { status: 500 })
+
+        // Indicações — primeira mensalidade do indicado paga: confirma a
+        // indicação e agenda a recompensa do indicador (liberada só depois da
+        // janela de reembolso). Best-effort: nunca derruba a ativação.
+        await handleReferredFirstPayment(stripe, supabase, event, invoice, userId)
+
         return NextResponse.json({ received: true })
       }
 
@@ -339,6 +358,41 @@ export async function POST(req: NextRequest) {
         })
       }
     }
+  }
+
+  // ── Programa de Indicações ───────────────────────────────────────────────
+  //
+  // Estes eventos NÃO tocam plano, saldo, assinatura nem cupom existente: só
+  // aplicam e liquidam o benefício acumulado de indicações. Ver
+  // lib/referral/webhook.ts para o mapa completo dos sinais.
+
+  // Mensalidade do indicador nasce como rascunho: única janela em que o Stripe
+  // aceita alterar a fatura antes de finalizá-la (~1h depois).
+  if (event.type === 'invoice.created') {
+    const invoice = event.data.object as Stripe.Invoice
+    const outcome = await handleReferrerInvoiceCreated(stripe, supabase, invoice)
+    // 500 → Stripe reentrega. A reserva já foi devolvida à fila, então a
+    // retentativa recomeça limpa.
+    if (outcome === 'retry') return NextResponse.json({ error: 'referral' }, { status: 500 })
+  }
+
+  // Fatura que não vingou: o benefício volta para a fila e entra na
+  // mensalidade seguinte — benefício excedente nunca se perde.
+  if (
+    event.type === 'invoice.payment_failed' ||
+    event.type === 'invoice.voided' ||
+    event.type === 'invoice.marked_uncollectible'
+  ) {
+    await handleReferrerInvoiceUnpaid(supabase, event.data.object as Stripe.Invoice)
+  }
+
+  // Dinheiro do indicado voltou: indicação e recompensa caem. É a garantia de
+  // que nenhum benefício sobrevive a pagamento reembolsado ou contestado.
+  if (event.type === 'charge.refunded') {
+    await handleChargeRefunded(supabase, event.data.object as Stripe.Charge)
+  }
+  if (event.type === 'charge.dispute.created') {
+    await handleDisputeCreated(supabase, event.data.object as Stripe.Dispute)
   }
 
   // ── mandate.updated: cliente mexeu na autorização do Pix Automático ──────

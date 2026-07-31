@@ -5,6 +5,11 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useTheme } from '@/lib/theme/ThemeProvider'
 import { Brandmark } from '@/components/brand'
+import {
+  REFERRAL_COOKIE,
+  REFERRED_PERCENT_OFF,
+  isReferralProgramOpen,
+} from '@/lib/referral/config'
 
 type Mode = 'login' | 'signup'
 
@@ -101,6 +106,18 @@ function LoginForm() {
   const googleReadyRef = useRef(false)
   const [googleReady,    setGoogleReady]    = useState(false)
   const [googleFallback, setGoogleFallback] = useState(!process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID)
+
+  // Chegou por um link de indicação? Confirma discretamente — quem clicou num
+  // convite precisa saber que ele foi registrado antes de criar a conta.
+  // Só uma linha de texto: o cookie é a fonte, o vínculo real é no servidor.
+  // O cookie só existe no browser: ler no render daria hydration mismatch, por
+  // isso a leitura acontece depois da montagem.
+  const [hasInvite, setHasInvite] = useState(false)
+  useEffect(() => {
+    if (!isReferralProgramOpen()) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setHasInvite(document.cookie.includes(`${REFERRAL_COOKIE}=`))
+  }, [])
 
   // Clear feedback ao alternar Entrar/Criar conta. Não limpar por email/password:
   // autofill (extensões/Chrome) dispara input nos campos logo após o load e
@@ -298,6 +315,18 @@ function LoginForm() {
             </button>
           ))}
         </div>
+
+        {/* Convite ativo — informação, não faixa promocional */}
+        {hasInvite && (
+          <p style={{
+            width: '100%', marginBottom: 16,
+            fontSize: 11.5, color: 'var(--color-text-tertiary)',
+            letterSpacing: '-0.005em', lineHeight: 1.6, textAlign: 'center',
+          }}>
+            Convite registrado — {REFERRED_PERCENT_OFF}% de desconto na primeira
+            mensalidade ao criar sua conta.
+          </p>
+        )}
 
         {/* Error banner */}
         {error && (

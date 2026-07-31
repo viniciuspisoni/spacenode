@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { ThemeProvider } from "@/lib/theme/ThemeProvider";
 import UtmCapture from "@/components/marketing/UtmCapture";
+import ReferralCapture from "@/components/referral/ReferralCapture";
 import GoogleTag from "@/components/GoogleTag";
 import "./globals.css";
 
@@ -71,6 +72,9 @@ export default function RootLayout({
         {/* Captura first-party de UTMs/click-ids em cookie (sem terceiros) —
             só grava quando a URL traz parâmetros de campanha. */}
         <UtmCapture />
+        {/* Guarda o código de indicação de ?ref= — o vínculo com a conta só
+            acontece depois do cadastro, no servidor. */}
+        <ReferralCapture />
         <ThemeProvider>{children}</ThemeProvider>
         <GoogleTag />
       </body>

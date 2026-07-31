@@ -165,6 +165,17 @@ export const IconPlans = (p: IconProps = {}) => (
   </SVG>
 )
 
+// Indicações: uma pessoa e o vínculo que sai dela para outros dois nós —
+// mesma gramática de constelação da marca, sem metáfora de presente/promoção.
+export const IconReferrals = (p: IconProps = {}) => (
+  <SVG {...p}>
+    <circle cx="6.2" cy="12" r="2.6" />
+    <circle cx="17.8" cy="6.4" r="2.2" />
+    <circle cx="17.8" cy="17.6" r="2.2" />
+    <path d="M8.6 10.9l6.9-3.3M8.6 13.1l6.9 3.3" />
+  </SVG>
+)
+
 // ── AJUDA ─────────────────────────────────────────────────
 export const IconGuide = (p: IconProps = {}) => (
   <SVG {...p}>

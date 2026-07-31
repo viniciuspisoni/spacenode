@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import Sidebar from '@/components/app/Sidebar'
 import WelcomeTour from '@/components/app/WelcomeTour'
 import AttributionBinder from '@/components/marketing/AttributionBinder'
+import ReferralBinder from '@/components/referral/ReferralBinder'
 import NodiRoot from '@/components/nodi/NodiRoot'
 import { isNodiEnabled } from '@/lib/nodi/flags'
 import SignupConversionPing from '@/components/SignupConversionPing'
@@ -66,6 +67,9 @@ export default async function AppLayout({
       {/* Vincula a atribuição de campanha (cookie first-party) ao cadastro —
           uma única vez por navegador, best-effort. */}
       <AttributionBinder />
+      {/* Vincula o código de indicação (cookie first-party) à conta — uma
+          única vez, best-effort, sem bloquear nada. */}
+      <ReferralBinder />
       <Suspense fallback={null}>
         <SignupConversionPing />
       </Suspense>

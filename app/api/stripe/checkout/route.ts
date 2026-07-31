@@ -19,6 +19,14 @@ import {
 } from '@/lib/lumens'
 import { isLaunchOfferOpen } from '@/lib/launch-offer'
 import {
+  REFERRAL_COOKIE,
+  isReferralProgramOpen,
+  resolveCheckoutDiscount,
+} from '@/lib/referral/config'
+import { normalizeReferralCode } from '@/lib/referral/codes'
+import { bindReferral, getPendingReferral, markReferredDiscount } from '@/lib/referral/service'
+import { ensureReferralCoupon } from '@/lib/referral/stripe'
+import {
   isPixEnabled,
   isPixRejectedError,
   paymentMethodTypes,
@@ -163,18 +171,43 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Configuração indisponível' }, { status: 500 })
     }
 
-    // ── Oferta de lançamento: 50% na primeira mensalidade ────────────────
+    // Fixado fora do closure: dentro dele o TS perde o narrowing de `body`.
+    const billingCycle: BillingCycle = body.billing
+
+    // ── Desconto da session: lançamento OU indicação, nunca os dois ──────
+    //
     // Entra via `discounts` (e não `allow_promotion_codes`): o desconto é
     // automático e o cliente não digita código nenhum. Os dois campos são
     // mutuamente exclusivos no Stripe — não dá pra ter os dois na mesma session.
-    // Só no mensal: "primeiro mês" não significa nada num plano anual.
-    const launchCouponId = process.env.STRIPE_LAUNCH_COUPON_ID
-    const offerEligible =
-      body.billing === 'monthly' &&
-      isLaunchOfferOpen() &&
-      (await isFirstSubscription(stripe, reusableCustomerId))
+    // Só no mensal: "primeira mensalidade" não significa nada num plano anual.
+    //
+    // Quem escolhe é resolveCheckoutDiscount (lib/referral/config.ts): a
+    // promoção de lançamento tem precedência enquanto estiver no ar, e a
+    // indicação só entra depois que ela fecha. Sem acúmulo, por construção.
+    const admin             = createAdminClient()
+    const firstSubscription = await isFirstSubscription(stripe, reusableCustomerId)
+    const launchEligible    = billingCycle === 'monthly' && isLaunchOfferOpen() && firstSubscription
+    // O vínculo do código normalmente acontece na primeira visita ao /app
+    // (ReferralBinder). Quem vai direto do convite para o checkout pode chegar
+    // aqui antes disso — então tenta vincular na hora, com o cookie da própria
+    // requisição. Vínculo já existente devolve `already_referred` e não muda
+    // nada; todas as regras antiabuso continuam sendo do banco.
+    let pendingReferral: Awaited<ReturnType<typeof getPendingReferral>> = null
+    if (!launchEligible && isReferralProgramOpen()) {
+      const cookieCode = normalizeReferralCode(req.cookies.get(REFERRAL_COOKIE)?.value)
+      if (cookieCode) await bindReferral(admin, cookieCode, user.id)
+      pendingReferral = await getPendingReferral(admin, user.id)
+    }
 
-    if (offerEligible && !launchCouponId) {
+    const discount = resolveCheckoutDiscount({
+      launchEligible,
+      hasPendingReferral: Boolean(pendingReferral),
+      firstSubscription,
+      billing: billingCycle,
+    })
+
+    const launchCouponId = process.env.STRIPE_LAUNCH_COUPON_ID
+    if (discount.kind === 'launch' && !launchCouponId) {
       // Config incompleta: a UI está anunciando 50% e o Stripe vai cobrar
       // cheio. Não bloqueia a venda (o cliente ainda vê o valor real na tela
       // do Stripe antes de pagar), mas precisa gritar no log.
@@ -183,10 +216,22 @@ export async function POST(req: NextRequest) {
         'não está definido — cobrando preço cheio'
       )
     }
-    const applyOffer = offerEligible && Boolean(launchCouponId)
 
-    // Fixado fora do closure: dentro dele o TS perde o narrowing de `body`.
-    const billingCycle: BillingCycle = body.billing
+    // O cupom da indicação é criado sob demanda (id determinístico por
+    // percentual), então não depende de env nem de passo manual de deploy.
+    let discountCouponId: string | undefined
+    if (discount.kind === 'launch') {
+      discountCouponId = launchCouponId
+    } else if (discount.kind === 'referral') {
+      try {
+        discountCouponId = await ensureReferralCoupon(stripe, discount.percentOff)
+      } catch (err) {
+        // Vender sem o desconto é melhor que não vender: a indicação continua
+        // vinculada e o benefício do indicador não depende desta session.
+        console.error('[checkout] falha ao preparar o cupom de indicação:', err)
+      }
+    }
+    const applyOffer = Boolean(discountCouponId)
 
     // ── Pix Automático: teto do mandato ─────────────────────────────────
     // O valor que o cliente autoriza no app do banco precisa cobrir o que o
@@ -218,7 +263,7 @@ export async function POST(req: NextRequest) {
         payment_method_types: paymentMethodTypes(withPix),
         line_items:           [{ price: priceId, quantity: 1 }],
         mode:                 'subscription',
-        ...(withOffer ? { discounts: [{ coupon: launchCouponId! }] } : {}),
+        ...(withOffer ? { discounts: [{ coupon: discountCouponId! }] } : {}),
         ...(withPix ? { payment_method_options: { pix: pixMandateOptions(mandateAmount) } } : {}),
         success_url:          `${successBase}?success=true&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url:           `${successBase}?canceled=true`,
@@ -228,7 +273,9 @@ export async function POST(req: NextRequest) {
           plan_id:       plan.id,
           billing_cycle: billingCycle,
           nodes_to_add:  String(plan.nodes),
-          launch_offer:  withOffer ? 'applied' : 'none',
+          launch_offer:  withOffer && discount.kind === 'launch'   ? 'applied' : 'none',
+          referral_discount: withOffer && discount.kind === 'referral' ? 'applied' : 'none',
+          ...(pendingReferral ? { referral_id: pendingReferral.id } : {}),
         },
         // Espelhado na assinatura porque a ativação por Pix acontece em
         // `invoice.paid` (subscription_create), e a Invoice não carrega o
@@ -272,7 +319,7 @@ export async function POST(req: NextRequest) {
         }
         if (offerApplied && isResourceMissing(err)) {
           console.error(
-            `[checkout] cupom "${launchCouponId}" não existe neste modo do Stripe — ` +
+            `[checkout] cupom "${discountCouponId}" não existe neste modo do Stripe — ` +
             'vendendo a preço cheio. Confira se o cupom foi criado em live.'
           )
           offerApplied = false
@@ -287,12 +334,22 @@ export async function POST(req: NextRequest) {
       throw new Error('[checkout] session não criada após degradações')
     }
 
+    // Auditoria do benefício do indicado (best-effort, nunca lança).
+    if (offerApplied && discount.kind === 'referral') {
+      await markReferredDiscount(admin, user.id, discount.percentOff, session.id)
+    }
+
     // Funil first-party (best-effort — recordAcquisitionEvent nunca lança).
-    await recordAcquisitionEvent(createAdminClient(), {
+    await recordAcquisitionEvent(admin, {
       user_id: user.id,
       event_type: 'checkout_started',
       plan_id: plan.id,
-      metadata: { billing_cycle: body.billing, launch_offer: offerApplied, pix_offered: pixApplied },
+      metadata: {
+        billing_cycle:     body.billing,
+        launch_offer:      offerApplied && discount.kind === 'launch',
+        referral_discount: offerApplied && discount.kind === 'referral',
+        pix_offered:       pixApplied,
+      },
     })
 
     return NextResponse.json({ url: session.url })

@@ -12,7 +12,7 @@ import {
   IconProjects, IconDashboard, IconHistory,
   IconGenerate, IconSpaces, IconRetocar, IconEnhance, IconVideo, IconFinalizar,
   IconHumanizedPlan, IconBlocos3D, IconIsometric, IconBoard, IconMoodboard,
-  IconTeam, IconIdentity, IconAccount, IconPlans, IconGuide,
+  IconTeam, IconIdentity, IconAccount, IconPlans, IconReferrals, IconGuide,
 } from './sidebar-icons'
 import { TOUR_START_EVENT } from './WelcomeTour'
 import { getSidebarModules, type SidebarModule } from '@/lib/nav/modules-config'
@@ -90,6 +90,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { label: 'Identidade', href: '/app/settings/identity', exact: false, Icon: IconIdentity },
       { label: 'Conta',      href: '/app/conta',             exact: false, Icon: IconAccount  },
       { label: 'Planos',     href: '/app/billing',           exact: false, Icon: IconPlans    },
+      { label: 'Indicações', href: '/app/indicacoes',        exact: false, Icon: IconReferrals },
       { label: 'Como usar',  href: '/app#tour',              exact: false, match: () => false, Icon: IconGuide, onClick: startTourClick },
     ],
   },

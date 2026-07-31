@@ -9,6 +9,7 @@
   ],
   "crons": [
     { "path": "/api/cron/ads-alerts", "schedule": "0 9 * * *" },
-    { "path": "/api/cron/ads-report", "schedule": "0 9 * * 1" }
+    { "path": "/api/cron/ads-report", "schedule": "0 9 * * 1" },
+    { "path": "/api/cron/referral-rewards", "schedule": "0 6 * * *" }
   ]
 }
