@@ -21,8 +21,15 @@ export const LAUNCH_OFFER_PERCENT_OFF = 50
  * faixa e os preços riscados continuam no HTML publicado até o próximo
  * deploy. Deixar a data vencer sem deploy = anunciar 50% e cobrar cheio.
  * Agende o deploy de encerramento junto com a data abaixo.
+ *
+ * OS SEGUNDOS NÃO SÃO ENFEITE: 23:59:00 é o `redeem_by` do cupom em live
+ * (`2j5cQz5k`). O `redeem_by` de um cupom do Stripe é IMUTÁVEL — só `name` e
+ * `metadata` são editáveis —, então quem tem de ceder é esta constante. Com
+ * 23:59:59 sobrava um minuto em que o código mandava o cupom e o Stripe
+ * respondia `coupon_expired`. Ao trocar o cupom, copie o `redeem_by` novo
+ * para cá.
  */
-export const LAUNCH_OFFER_ENDS_AT = new Date('2026-08-31T23:59:59-03:00')
+export const LAUNCH_OFFER_ENDS_AT = new Date('2026-08-31T23:59:00-03:00')
 
 /** Desliga a oferta inteira sem mexer na data (kill switch de deploy). */
 export const LAUNCH_OFFER_ENABLED = true

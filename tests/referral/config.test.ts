@@ -27,10 +27,13 @@ describe('janela do programa', () => {
     expect(isReferralProgramOpen(after)).toBe(true)
   })
 
-  it('começa exatamente quando a promoção de lançamento acaba', () => {
-    // 1 segundo entre 31/08 23:59:59 e 01/09 00:00:00 — as janelas não se
-    // sobrepõem por um único instante.
-    expect(REFERRAL_PROGRAM_STARTS_AT.getTime() - LAUNCH_OFFER_ENDS_AT.getTime()).toBe(1000)
+  it('começa depois — e nunca antes — do fim da promoção de lançamento', () => {
+    // As duas janelas não podem se sobrepor nem por um instante. A folga é de
+    // 60s porque LAUNCH_OFFER_ENDS_AT acompanha o `redeem_by` do cupom em live
+    // (31/08 23:59:00), que é imutável no Stripe. Ver lib/launch-offer.ts.
+    const gap = REFERRAL_PROGRAM_STARTS_AT.getTime() - LAUNCH_OFFER_ENDS_AT.getTime()
+    expect(gap).toBeGreaterThan(0)
+    expect(gap).toBe(60_000)
   })
 })
 

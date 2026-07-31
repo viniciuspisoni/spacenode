@@ -183,8 +183,30 @@ que não é nosso.
 4. **Nada de cupom manual.** Os cupons (`spn-referral-10`, `spn-referral-20`,
    …, `spn-referral-100`) são criados sozinhos no primeiro uso, em qualquer
    modo do Stripe.
+5. **Redeploy em 01/09** — não pelo programa (todas as rotas dele são
+   dinâmicas e viram sozinhas na data), mas pela campanha de lançamento: a
+   landing é estática e continua anunciando 50% até o próximo build.
 
 Nenhum passo mexe em assinatura, cupom ou histórico existente.
+
+### Ordem não importa
+
+Os passos 1 e 2 são independentes e seguros em qualquer ordem, inclusive
+semanas antes da data:
+
+- **Eventos habilitados antes do deploy do código?** A rota cai no
+  `{ received: true }` para tipo desconhecido.
+- **Código no ar sem a migration?** Programa inerte — o serviço engole
+  `42883`/`42P01` (função/tabela inexistente) de propósito.
+- **Migration aplicada sem o código?** Ninguém lê as tabelas.
+- **Eventos chegando com o programa fechado?** Cada handler ou sai na guarda
+  `isReferralProgramOpen()` ou cai numa RPC que não acha linha e devolve
+  `found: false`. Nenhum toca plano, saldo, assinatura ou cupom.
+
+Aplicar cedo é, inclusive, melhor: a recusa por "programa ainda não vigente" é
+**não-terminal**, então o cookie do convite (90 dias) sobrevive e o vínculo
+acontece sozinho na data. Convite compartilhado em agosto vira indicação
+válida em setembro.
 
 ---
 
