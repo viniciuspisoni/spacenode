@@ -419,6 +419,9 @@ export async function POST(
         engine, quality, costPerVista, falEndpoint,
         sourceMeta: meta, dna: visualDna, briefing,
         batchId, logContext: 'spaces.generate',
+        // Retries do gate de fidelidade só rodam se couberem no orçamento da
+        // função (a reserva por chunk cobre 1 tentativa; o resto é oportunista).
+        deadlineAt: startedAt + ROUTE_BUDGET,
       })
     }))
     settled.forEach((r, idx) => {

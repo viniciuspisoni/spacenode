@@ -64,6 +64,24 @@ export function hasIdentityImage(refs: ReferenceSet): boolean {
   return !!refs.identity.imageUrl && refs.identity.imageUrl !== refs.geometry.url
 }
 
+// Rótulos de papel das imagens, paralelos a imageUrlsFor. No caminho GCP/Vertex
+// cada rótulo vira uma parte de texto imediatamente antes da imagem — é o
+// binding explícito entre o "Image #N" do prompt e a imagem real. Sem ele o
+// modelo escolhe a âncora sozinho e, num par print+mestre, tende a ancorar na
+// imagem mais acabada (a Vista Mestre) — exatamente o bug que motivou o fluxo
+// Referência → Ação → Gerar.
+export function imagePartLabelsFor(refs: ReferenceSet): string[] {
+  const geomLabel =
+    'Image #1 — GEOMETRIC REFERENCE (the base image of this generation: its ' +
+    'geometry, camera and framing are law):'
+  if (!hasIdentityImage(refs)) return [geomLabel]
+  return [
+    geomLabel,
+    'Image #2 — VISUAL IDENTITY ONLY (project materials/palette/light; NEVER ' +
+    'copy its geometry, camera, scene or composition):',
+  ]
+}
+
 // ── Rótulos (UI/logs) ─────────────────────────────────────────
 
 export const REFERENCE_KIND_LABEL: Record<ReferenceKind, string> = {

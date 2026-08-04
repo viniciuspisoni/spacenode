@@ -18,6 +18,20 @@
 //   4. Travas de overlay ("output must overlay the reference") e negatives
 //      contra "consertar" perspectiva/proporção.
 //
+// Revisão 2026-08-04 (refactor do modo Spaces — sintoma: geração a partir de
+// print upado saindo como variação da Vista Mestre):
+//   1. Binding ORDINAL das imagens — "Image #1" é apresentado como "the FIRST
+//      attached image" (e #2 como SECOND). Os modelos de edição não recebem os
+//      nomes "#1/#2" junto dos pixels; a posição é o único vínculo confiável.
+//      (No caminho GCP as imagens agora chegam com rótulo de papel intercalado
+//      — ver lib/ai/image-provider imageLabels — e o prompt reforça o mesmo
+//      contrato pro caminho FAL.)
+//   2. WRONG-BASE CHECK — a falha conhecida (ancorar na Vista Mestre em vez do
+//      print) é declarada como modo de erro e proibida explicitamente.
+//   3. Escalada de retry (attempt >= 2) + bloco do edge map — usados pelo gate
+//      de fidelidade do Spaces (lib/spaces/fidelity.ts), espelhando o
+//      render_only do Renderizar.
+//
 // Papéis (inalterados):
 //   Image #1 — referência GEOMÉTRICA (a escolhida pelo usuário). Autoridade
 //              máxima de geometria, enquadramento, câmera e elementos.
@@ -32,6 +46,7 @@
 //   - Em conflito coerência visual × fidelidade geométrica, vence a geometria.
 
 import type { BriefingArquitetonico } from '@/lib/prompts'
+import { buildEdgeMapBlock } from '@/lib/ai/fidelity/render-only'
 import type { GenerationAction, ProjectDNA, ReferenceKind } from './types'
 import type { Resolution } from '@/lib/engines'
 
@@ -49,6 +64,10 @@ export interface GenerationPromptInput {
   briefing?:        BriefingArquitetonico | null
   dna?:             ProjectDNA | null
   quality:          Resolution
+  /** 1-based; >= 2 liga o bloco de escalada do retry do gate de fidelidade. */
+  attempt?:         number
+  /** Índice 1-based do edge map em image_urls quando anexado no retry. */
+  edgeMapImageIndex?: number | null
 }
 
 // A câmera se move? Só na Nova Vista a partir de mestre/histórico.
@@ -143,22 +162,52 @@ function referencesBlock(input: GenerationPromptInput): string {
   }
 
   return (
-    'TWO REFERENCE IMAGES WITH STRICTLY SEPARATE ROLES:\n' +
-    `Image #1 — GEOMETRIC REFERENCE (maximum priority). It is ${geomOrigin}. ` +
+    'TWO REFERENCE IMAGES WITH STRICTLY SEPARATE ROLES (in attachment order):\n' +
+    `Image #1 = the FIRST attached image — GEOMETRIC REFERENCE (maximum ` +
+    `priority). It is ${geomOrigin}. ` +
     'Preserve EXACTLY its geometry, framing, perspective, camera angle, ' +
     'composition, volumes, proportions and every visible element and opening ' +
     '(windows, doors, voids, recesses). Do NOT move, add, remove, redraw, ' +
     'simplify or reinterpret any element. The result must align ' +
     'element-by-element with Image #1, edge over edge.\n' +
-    "Image #2 — VISUAL IDENTITY REFERENCE ONLY (the project's reference " +
-    'image). Copy from it the physical materials, textures, color palette, ' +
-    'finish quality, lighting language and mood — faithfully, without ' +
-    'substituting materials. Do NOT borrow geometry, camera, composition, ' +
-    'framing, layout or any object placement from Image #2. Do NOT reproduce ' +
-    "Image #2's scene.\n" +
+    "Image #2 = the SECOND attached image — VISUAL IDENTITY REFERENCE ONLY " +
+    "(the project's reference image). Copy from it the physical materials, " +
+    'textures, color palette, finish quality, lighting language and mood — ' +
+    'faithfully, transferring each material onto the MATCHING surface of ' +
+    'Image #1 (wall finish onto walls, floor onto floors, frames onto frames), ' +
+    'without substituting materials. Do NOT borrow geometry, camera, ' +
+    'composition, framing, layout or any object placement from Image #2. Do ' +
+    "NOT reproduce Image #2's scene.\n" +
     'CONFLICT RULE: if the identity of Image #2 ever conflicts with the ' +
     'geometry of Image #1, GEOMETRY WINS — follow Image #1 and apply identity ' +
-    'only where it does not alter geometry, framing or elements.'
+    'only where it does not alter geometry, framing or elements.\n' +
+    'WRONG-BASE CHECK (known failure mode — forbidden): generating a variation ' +
+    'of Image #2, or any output whose scene, camera, framing or layout ' +
+    "resembles Image #2 instead of Image #1, is a FAILED generation. Image #2's " +
+    'scene must never appear in the output — the output is Image #1, made real. ' +
+    'Before finishing, verify the output overlays Image #1, not Image #2.'
+  )
+}
+
+// ── 2b. RETRY ESCALATION (só attempt >= 2 — gate de fidelidade) ──
+// A tentativa anterior divergiu da referência geométrica (score baixo — em
+// geral troca de âncora ou drift de geometria). Reforça o modo "trace, not
+// inspiration" sem expor a tentativa anterior (frame de prioridade absoluta,
+// não de correção) — mesmo racional do render_only do Renderizar.
+function escalationBlock(input: GenerationPromptInput): string {
+  if ((input.attempt ?? 1) <= 1) return ''
+  const dualNote = input.hasIdentityImage
+    ? ' Image #2 contributes ONLY surface materials and light character — zero ' +
+      'geometry, zero composition, zero scene content.'
+    : ''
+  return (
+    'ABSOLUTE STRUCTURAL PRIORITY: treat Image #1 as a fixed template that you ' +
+    'TRACE, never as inspiration. This pass is a pure re-texturing and ' +
+    'relighting of the exact scene in Image #1 — as if projecting materials ' +
+    'and light onto its existing geometry. Reproduce the position, size and ' +
+    'outline of every wall, opening, piece of furniture and object of Image #1 ' +
+    'with zero deviation. When in doubt between beauty and accuracy, always ' +
+    'choose accuracy to Image #1.' + dualNote
   )
 }
 
@@ -404,7 +453,9 @@ export function buildGenerationPrompt(input: GenerationPromptInput): string {
   return [
     missionBlock(input),
     referencesBlock(input),
+    escalationBlock(input),
     geometryLockBlock(input),
+    buildEdgeMapBlock(input.edgeMapImageIndex).trim(),
     textureFidelityBlock(input),
     identityBlock(input),
     factsBlock(input.briefing),

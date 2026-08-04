@@ -7,9 +7,13 @@
 //   débito (consume_workspace_nodes)
 //     → row pendente em `vistas` com a provenance COMPLETA das referências
 //     → prompt único (lib/spaces/reference-prompt) com papéis explícitos
-//     → chamada ao provider (image_urls: [#1 geometria, #2 identidade?])
-//     → validação do output contra a REFERÊNCIA GEOMÉTRICA (aspecto + visão)
-//     → update pra completed (metadados + resultado das validações)
+//     → chamada ao provider (image_urls: [#1 geometria, #2 identidade?],
+//       com rótulo de papel por imagem no caminho GCP)
+//     → gate de fidelidade (lib/spaces/fidelity): geometry score do output
+//       contra a REFERÊNCIA GEOMÉTRICA; score baixo → retry com temperatura
+//       menor, prompt escalado e edge map — entrega a MELHOR tentativa
+//     → validação do output (aspecto + visão)
+//     → update pra completed (metadados + telemetria + validações)
 //   refund best-effort + row 'failed' em qualquer erro pós-débito.
 //
 // Princípios do fluxo Referência → Ação → Gerar:
@@ -18,7 +22,10 @@
 //   - A validação pós-geração compara com a referência geométrica — não com a
 //     Vista Mestre — porque é o enquadramento DELA que precisa sobreviver.
 //   - Logs registram a origem de cada referência e os parâmetros enviados.
+//
+// SERVER-ONLY (importa sharp via geometry-score) — consumir apenas de rotas.
 
+import { fal } from '@fal-ai/client'
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { refundNodes } from '@/lib/billing/refund-nodes'
 import type { EngineId, Resolution } from '@/lib/engines'
@@ -28,12 +35,19 @@ import {
   levelForGeneration, modeForAction, modeAllowsCloserCrop,
   type SpacesMode, type SpacesPreservationLevel,
 } from './preservation'
-import { imageUrlsFor, hasIdentityImage, type ReferenceSet } from './references'
+import { imageUrlsFor, imagePartLabelsFor, hasIdentityImage, type ReferenceSet } from './references'
 import { buildGenerationPrompt } from './reference-prompt'
 import { aspectRatioLabel, type SourceMeta } from './source-meta'
 import { validateGeneration, checkArchitecturalPreservation } from './preserve-validate'
 import { visionPreservationCheckEnabled } from './preserve-flags'
-import { generateImage } from '@/lib/ai/image-provider'
+import { generateImage, type GenerateImageResult } from '@/lib/ai/image-provider'
+import {
+  getSpacesFidelityConfig, fidelityGateApplies, minScoreForAction,
+  getFidelityAttemptParams, EDGE_MAP_PART_LABEL,
+  type SpacesFidelityAttemptLog,
+} from './fidelity'
+import { computeGeometryScore, buildEdgeMapPng, type GeometryScoreBreakdown } from '@/lib/ai/fidelity/geometry-score'
+import { fetchStorageBuffer } from '@/lib/storage/fetch'
 
 // Timeout da chamada ao provider por motor (espelha o /api/generate do
 // Renderizar). Vega (Nano Banana Pro) e Quasar (GPT Image 2) passam de 90s com
@@ -93,13 +107,17 @@ export interface VistaGenerationArgs {
   batchId?:        string | null
   /** Contexto pros logs ('spaces.generate' | 'spaces.sketches'). */
   logContext:      string
+  /** Epoch ms do fim do orçamento da rota (startedAt + ROUTE_BUDGET). Retries
+   *  do gate de fidelidade só rodam se couberem antes dele; ausente → nenhum
+   *  retry (single-shot, comportamento seguro por default). */
+  deadlineAt?:     number | null
 }
 
 export async function generateVista(args: VistaGenerationArgs) {
   const {
     admin, userId, space, action, refs, axisValue, axisLabel,
     userIntent, userInstruction, engine, quality, costPerVista, falEndpoint,
-    sourceMeta, dna, briefing, batchId, logContext,
+    sourceMeta, dna, briefing, batchId, logContext, deadlineAt,
   } = args
 
   const axis  = axisForAction(action)
@@ -173,26 +191,21 @@ export async function generateVista(args: VistaGenerationArgs) {
     if (insErr || !row) throw new Error('insert_failed: ' + (insErr?.message ?? '?'))
     vistaId = row.id as string
 
-    // 3) Prompt único com papéis explícitos
-    const finalPrompt = buildGenerationPrompt({
-      action,
-      refKind:          refs.geometry.kind,
-      hasIdentityImage: dualImage,
-      userIntent,
-      userInstruction,
-      referenceLabel:   refs.geometry.label ?? null,
-      briefing,
-      dna,
-      quality,
-    })
+    // 3) Gate de fidelidade + geração (retry ladder)
+    //
+    // Cada tentativa monta o prompt (escalada a partir da 2ª), chama o provider
+    // e — quando o gate se aplica (regra OVERLAY) — mede o geometry score do
+    // output contra a referência geométrica. Score baixo captura exatamente a
+    // falha reportada em prod: o modelo ancorar na Vista Mestre (Image #2) em
+    // vez de transformar o print (Image #1). Entrega a MELHOR tentativa; o
+    // retry nunca vira erro/refund se já existe imagem válida.
+    const fidelityCfg = getSpacesFidelityConfig()
+    const gateActive  = fidelityCfg.enabled && fidelityGateApplies(action, refs.geometry.kind)
+    const minScore    = minScoreForAction(fidelityCfg, action)
+    const maxAttempts = gateActive ? fidelityCfg.maxAttempts : 1
 
-    // 4) Provider — Image #1 = geometria (sempre primeiro), #2 = identidade.
-    const imageUrls = imageUrlsFor(refs)
-    const falInput = {
-      prompt:     finalPrompt,
-      image_urls: imageUrls,
-      ...falParamsForEngine(engine, quality),
-    }
+    const baseImageUrls   = imageUrlsFor(refs)
+    const baseImageLabels = imagePartLabelsFor(refs)
 
     console.log(`[${logContext}] ação            :`, action, `(${mode}/${level})`)
     console.log(`[${logContext}] ref geométrica  :`, refs.geometry.kind, '→', refs.geometry.url,
@@ -204,16 +217,154 @@ export async function generateVista(args: VistaGenerationArgs) {
       console.log(`[${logContext}] instrução user  :`, userInstruction)
     }
     console.log(`[${logContext}] engine/quality  :`, engine, '→', falEndpoint, '·', quality, '·', costPerVista, 'nodes')
-    console.log(`[${logContext}] image_urls      :`, imageUrls.length === 2 ? '[#1 geometria, #2 identidade]' : '[#1 geometria=identidade]')
-    console.log(`[${logContext}] prompt          :`, finalPrompt)
+    console.log(`[${logContext}] image_urls      :`, baseImageUrls.length === 2 ? '[#1 geometria, #2 identidade]' : '[#1 geometria=identidade]')
+    console.log(`[${logContext}] fidelity gate   :`, gateActive
+      ? `on (min=${minScore.toFixed(2)} max_attempts=${maxAttempts})`
+      : 'off (câmera/crop muda por design ou gate desligado)')
 
-    const gen = await generateImage({
-      falEndpoint,
-      falInput,
-      timeoutMs: FAL_TIMEOUT_MS[engine],
-      context:   logContext,
-      deliver:   { kind: 'url', userId, area: 'vistas' },
-    })
+    // Bytes da referência geométrica — lidos uma vez, servem ao score e ao
+    // edge map. Best-effort: falha aqui não derruba a geração (só o gate).
+    let sourceBuffer: Buffer | null = null
+    const getSourceBuffer = async (): Promise<Buffer> => {
+      if (!sourceBuffer) sourceBuffer = await fetchStorageBuffer(sourceMeta?.url ?? refs.geometry.url)
+      return sourceBuffer
+    }
+
+    let edgeMapUrl: string | null = null
+    let best: { gen: GenerateImageResult; prompt: string; geometry: GeometryScoreBreakdown | null } | null = null
+    const attemptLogs: SpacesFidelityAttemptLog[] = []
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const params = getFidelityAttemptParams(attempt)
+
+      // Condicionamento estrutural nos retries: lineart da referência
+      // geométrica anexado como imagem extra (upload único por vista).
+      let imageUrls   = baseImageUrls
+      let imageLabels = baseImageLabels
+      let edgeMapImageIndex: number | null = null
+      if (gateActive && params.useEdgeMap) {
+        try {
+          if (!edgeMapUrl) {
+            const edgePng = await buildEdgeMapPng(await getSourceBuffer())
+            edgeMapUrl = await fal.storage.upload(new File([new Uint8Array(edgePng)], 'edge-map.png', { type: 'image/png' }))
+          }
+          imageUrls   = [...baseImageUrls, edgeMapUrl]
+          imageLabels = [...baseImageLabels, EDGE_MAP_PART_LABEL]
+          edgeMapImageIndex = imageUrls.length
+        } catch (edgeErr) {
+          console.warn(`[${logContext}] edge map indisponível (segue sem):`, (edgeErr as Error).message)
+        }
+      }
+
+      const prompt = buildGenerationPrompt({
+        action,
+        refKind:          refs.geometry.kind,
+        hasIdentityImage: dualImage,
+        userIntent,
+        userInstruction,
+        referenceLabel:   refs.geometry.label ?? null,
+        briefing,
+        dna,
+        quality,
+        attempt,
+        edgeMapImageIndex,
+      })
+      if (attempt === 1) console.log(`[${logContext}] prompt          :`, prompt)
+
+      const falInput = {
+        prompt,
+        image_urls: imageUrls,
+        ...falParamsForEngine(engine, quality),
+      }
+
+      // 1ª tentativa: timeout cheio do engine (contrato atual das rotas, que
+      // reservam FAL_TIMEOUT + overhead por chunk). Retries: só o que sobra
+      // até o deadline da rota.
+      const remainingMs = deadlineAt ? deadlineAt - Date.now() : null
+      const attemptTimeoutMs = attempt === 1 || remainingMs === null
+        ? FAL_TIMEOUT_MS[engine]
+        : Math.min(FAL_TIMEOUT_MS[engine], Math.max(30_000, remainingMs - 15_000))
+
+      let gen: GenerateImageResult
+      try {
+        gen = await generateImage({
+          falEndpoint,
+          falInput,
+          timeoutMs: attemptTimeoutMs,
+          context:   attempt === 1 ? logContext : `${logContext}#${attempt}`,
+          deliver:   { kind: 'url', userId, area: 'vistas' },
+          imageLabels,
+          gcpConfig: { temperature: params.temperature },
+        })
+      } catch (genErr) {
+        // Retry é best-effort: com imagem válida de tentativa anterior, falha
+        // aqui não pode virar erro (nem refund) — entrega a melhor.
+        if (attempt === 1 || !best) throw genErr
+        console.warn(`[${logContext}] retry ${attempt} falhou (${(genErr as Error).message}) — entregando a melhor tentativa anterior`)
+        break
+      }
+
+      // Score estrutural da tentativa — nunca derruba a request: sem score, a
+      // imagem é aceita (comportamento legado).
+      let geometry: GeometryScoreBreakdown | null = null
+      let scoreError: string | undefined
+      if (gateActive && gen.images[0]?.url) {
+        try {
+          const generatedBuffer = await fetchStorageBuffer(gen.images[0].url)
+          geometry = await computeGeometryScore(await getSourceBuffer(), generatedBuffer)
+        } catch (scoreErr) {
+          scoreError = (scoreErr as Error).message
+          console.warn(`[${logContext}] geometry score indisponível:`, scoreError)
+        }
+      }
+
+      attemptLogs.push({
+        attempt,
+        provider:       gen.provider,
+        provider_model: gen.providerModel,
+        request_id:     gen.requestId,
+        temperature:    params.temperature,
+        edge_map_used:  edgeMapImageIndex !== null,
+        fallback_used:  gen.fallbackUsed,
+        duration_ms:    gen.latencyMs,
+        geometry,
+        ...(scoreError ? { score_error: scoreError } : {}),
+      })
+
+      console.log(
+        `[${logContext}] fidelity attempt=${attempt}/${maxAttempts} provider=${gen.provider} model=${gen.providerModel} ` +
+        `temp=${params.temperature} edgeMap=${edgeMapImageIndex !== null} ` +
+        `score=${geometry ? geometry.score.toFixed(3) : 'n/a'}` +
+        (geometry
+          ? ` (recall=${geometry.edgeRecall.toFixed(3)} blockCorr=${geometry.blockCorrelation.toFixed(3)} worstBlock=${geometry.worstBlockDelta.toFixed(3)} aspectDelta=${geometry.aspectDelta.toFixed(3)})`
+          : '') +
+        ` min=${gateActive ? minScore.toFixed(2) : 'off'}`,
+      )
+
+      if (!best || (geometry?.score ?? -1) > (best.geometry?.score ?? -1)) {
+        best = { gen, prompt, geometry }
+      }
+
+      const passed = !gateActive || geometry === null || geometry.score >= minScore
+      if (passed) break
+      if (attempt >= maxAttempts) {
+        console.warn(`[${logContext}] score abaixo do limite após ${attempt} tentativas — entregando a melhor (score=${best.geometry?.score.toFixed(3) ?? 'n/a'})`)
+        break
+      }
+      if (!deadlineAt || deadlineAt - Date.now() < 45_000) {
+        console.warn(`[${logContext}] sem orçamento de tempo pra retry — entregando a melhor tentativa`)
+        break
+      }
+    }
+
+    // best sempre existe (≥ 1 tentativa concluída ou a 1ª lançou acima).
+    if (!best) throw new Error('provider_no_output')
+    const gen           = best.gen
+    const finalPrompt   = best.prompt
+    const fidelityScore = best.geometry?.score ?? null
+    const retryCount    = Math.max(0, attemptLogs.length - 1)
+    const generationDurationMs = attemptLogs.reduce((sum, a) => sum + a.duration_ms, 0)
+
     const outputUrl = gen.images[0]?.url
     if (!outputUrl) throw new Error('provider_no_output')
     const genW = gen.images[0]?.width  ?? null
@@ -235,6 +386,12 @@ export async function generateVista(args: VistaGenerationArgs) {
       console.warn(`[${logContext}] validação estrutural:`, validation.issues.join(', '))
     }
     let preservationWarning = !validation.ok
+    // Gate de fidelidade: melhor tentativa ainda abaixo do limite → o output
+    // provavelmente não preservou a referência geométrica (ex.: ancorou na
+    // Vista Mestre). Warning visível na UI, como as demais validações.
+    if (gateActive && fidelityScore !== null && fidelityScore < minScore) {
+      preservationWarning = true
+    }
 
     let check: Awaited<ReturnType<typeof checkArchitecturalPreservation>> = null
     if (visionPreservationCheckEnabled()) {
@@ -265,12 +422,40 @@ export async function generateVista(args: VistaGenerationArgs) {
       status:               'completed',
       completed_at:         completedAt,
     }
-    const { error: updErr } = await admin
-      .from('vistas')
-      .update(updateRow)
-      .eq('id', vistaId)
-    if (updErr) {
-      console.error(`[${logContext}] DB update FALHOU (imagem ok, persistência não):`, updErr)
+    // Arquivo técnico do Histórico (migration 20260701000000) + diagnóstico do
+    // gate de fidelidade. Update resiliente: se as colunas de metadados ainda
+    // não existirem no banco, regrava só com as colunas base — a vista nunca
+    // fica presa em 'processing' por causa de telemetria.
+    const extendedRow: Record<string, unknown> = {
+      ...updateRow,
+      duration_ms: generationDurationMs,
+      retry_count: retryCount,
+      generation_log: {
+        provider:       gen.provider,
+        provider_model: gen.providerModel,
+        fallback_used:  gen.fallbackUsed,
+        provider_error: gen.errorMessage,
+        endpoint:       falEndpoint,
+        request_id:     gen.requestId,
+        engine,
+        quality,
+        parameters:     falParamsForEngine(engine, quality),
+        image_count:    baseImageUrls.length,
+        dual_image:     dualImage,
+        duration_ms:    generationDurationMs,
+        nodes_charged:  costPerVista,
+        fidelity: gateActive
+          ? { mode: 'spaces_overlay', min_score: minScore, final_score: fidelityScore, attempts: attemptLogs }
+          : null,
+      },
+    }
+    let upd = await admin.from('vistas').update(extendedRow).eq('id', vistaId)
+    if (upd.error && (upd.error.code === 'PGRST204' || upd.error.code === '42703')) {
+      console.warn(`[${logContext}] colunas de metadados ausentes — regravando com colunas base:`, upd.error.message)
+      upd = await admin.from('vistas').update(updateRow).eq('id', vistaId)
+    }
+    if (upd.error) {
+      console.error(`[${logContext}] DB update FALHOU (imagem ok, persistência não):`, upd.error)
     }
 
     return {

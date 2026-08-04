@@ -72,6 +72,14 @@ export interface GenerateImageArgs {
   /** Identificação nos logs, ex.: 'generate', 'spaces.generate', 'retocar/nb2'. */
   context: string
   deliver: ImageDelivery
+  /** Rótulo de PAPEL de cada imagem, paralelo a falInput.image_urls. No caminho
+   *  GCP/Vertex cada rótulo vira uma parte de texto imediatamente ANTES da
+   *  imagem correspondente — é o que vincula "Image #1"/"Image #2" do prompt à
+   *  imagem certa (sem isso o modelo escolhe a âncora por conta própria, e em
+   *  pares print+mestre ele tende a ancorar na imagem mais acabada). Entradas
+   *  null pulam o rótulo daquela posição. O caminho FAL ignora (o schema só
+   *  aceita image_urls; os papéis seguem indo no texto do prompt). */
+  imageLabels?: (string | null)[]
   /** Overrides do caminho GCP/Vertex (o caminho FAL ignora — o schema da FAL
    *  não expõe esses knobs). Usado pelo retry ladder do render_only pra
    *  reduzir "criatividade" (temperatura ↓). */
@@ -291,9 +299,16 @@ async function generateViaGcp(
   const generated = await Promise.race([
     (async () => {
       // Ordem preservada: em vários fluxos ela é contrato do prompt
-      // (âncora primeiro, fonte → máscara → referências).
+      // (âncora primeiro, fonte → máscara → referências). Com imageLabels,
+      // cada imagem é precedida pelo rótulo do seu papel — binding explícito
+      // entre o "Image #N" do prompt e a imagem real.
       const imageParts = await Promise.all(parsed.imageUrls.map(fetchImagePart))
-      const contents = [createPartFromText(parsed.prompt), ...imageParts]
+      const contents: Part[] = [createPartFromText(parsed.prompt)]
+      imageParts.forEach((part, i) => {
+        const label = args.imageLabels?.[i]
+        if (label && label.trim()) contents.push(createPartFromText(label.trim()))
+        contents.push(part)
+      })
 
       const config = {
         responseModalities: [Modality.IMAGE, Modality.TEXT],
