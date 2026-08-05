@@ -68,7 +68,7 @@ export default function WelcomeTour({ needsOnboarding }: { needsOnboarding: bool
       progressText: '{{current}} de {{total}}',
       nextBtnText: 'Avançar',
       prevBtnText: 'Voltar',
-      doneBtnText: pendingPersistRef.current ? 'Criar meu primeiro projeto' : 'Criar novo projeto',
+      doneBtnText: pendingPersistRef.current ? 'Criar meu primeiro Space' : 'Criar novo Space',
       // "Pular tour" discreto junto aos botões (o popover é reaproveitado entre
       // etapas — daí o dedupe e a remoção na última, onde concluir é o caminho).
       onPopoverRender: (popover, opts) => {
@@ -96,9 +96,9 @@ export default function WelcomeTour({ needsOnboarding }: { needsOnboarding: bool
         {
           element: '[data-tour="projetos"]',
           popover: {
-            title: 'Projetos',
+            title: 'Spaces',
             description:
-              'Seus projetos moram aqui. Cada um reúne as vistas do espaço e preserva o DNA do projeto entre uma geração e outra.',
+              'Seus Spaces moram aqui. Cada um reúne as vistas do espaço e preserva o DNA do projeto entre uma geração e outra.',
             side: 'bottom',
             align: 'start',
           },

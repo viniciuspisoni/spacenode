@@ -36,7 +36,7 @@ export default async function SpacesPage() {
         }}>
           <span>Workspace</span>
           <span style={{ opacity: 0.35, fontSize: 9 }}>›</span>
-          <span style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>Meus projetos</span>
+          <span style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>Meus Spaces</span>
         </div>
 
         {error ? <ProjectsLoadError /> : <ProjectsLibrary spaces={spaces} />}

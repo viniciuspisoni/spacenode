@@ -176,9 +176,9 @@ export function ProjectsLibrary({ spaces }: { spaces: SpaceWithCounts[] }) {
         marginBottom: 14, gap: 24, flexWrap: 'wrap',
       }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <h1 className="spn-page-title">Meus projetos</h1>
+          <h1 className="spn-page-title">Meus Spaces</h1>
           <p className="spn-page-sub" style={{ marginTop: 0 }}>
-            Cada projeto nasce de uma Vista Mestre. O DNA visual mantém geometria,
+            Cada Space nasce de uma Vista Mestre. O DNA visual mantém geometria,
             materialidade e atmosfera consistentes em todas as gerações.
           </p>
         </div>
@@ -188,7 +188,7 @@ export function ProjectsLibrary({ spaces }: { spaces: SpaceWithCounts[] }) {
             <line x1="12" y1="5" x2="12" y2="19"/>
             <line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
-          Novo projeto
+          Novo Space
         </Link>
       </div>
 

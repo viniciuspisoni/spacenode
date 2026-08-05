@@ -31,9 +31,9 @@ export default async function NewSpaceOriginPage() {
           fontSize: 12, color: 'var(--color-text-tertiary)',
           letterSpacing: '-0.005em', marginBottom: 32,
         }}>
-          <Link href="/app/spaces">Meus projetos</Link>
+          <Link href="/app/spaces">Meus Spaces</Link>
           <span style={{ opacity: 0.35, fontSize: 9 }}>›</span>
-          <span style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>Novo projeto</span>
+          <span style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>Novo Space</span>
         </div>
 
         {/* Header */}

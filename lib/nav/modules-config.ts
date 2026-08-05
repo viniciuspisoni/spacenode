@@ -25,9 +25,9 @@ export interface SidebarModule {
 
 export const SIDEBAR_MODULES: SidebarModule[] = [
   { id: 'renderizar',       label: 'Renderizar',       href: '/app/generate',                     section: 'criar',      iconKey: 'generate',      enabled: true },
-  // "Projetos" (nome técnico: Space). Fora da sidebar: criar projeto já existe
-  // em "Meus projetos" e no botão "+ Novo projeto" — o card do dashboard fica.
-  { id: 'spaces',           label: 'Projetos',         href: '/app/spaces/new',                    section: 'criar',      iconKey: 'spaces',        enabled: true, hideInSidebar: true },
+  // Spaces de volta ao CRIAR por feedback de beta (Muda): "não fica muito
+  // claro que é uma ferramenta dali". Nomenclatura da UI: "Space(s)".
+  { id: 'spaces',           label: 'Spaces',           href: '/app/spaces/new',                    section: 'criar',      iconKey: 'spaces',        enabled: true },
   { id: 'editar',           label: 'Editar',           href: '/app/editar',                        section: 'criar',      iconKey: 'retocar',       enabled: true },
   { id: 'ampliar',          label: 'Ampliar',          href: '/app/upscale',                       section: 'criar',      iconKey: 'enhance',       enabled: true },
   { id: 'animar',           label: 'Animar',           href: '/app/video',                         section: 'criar',      iconKey: 'video',         enabled: true },

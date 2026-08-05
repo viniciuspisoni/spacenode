@@ -408,7 +408,10 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
             <h1 style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.02em' }}>Edição aplicada</h1>
           </div>
           <span style={{ fontSize: 12.5, color: 'var(--color-text-tertiary)' }}>
-            {result.nodes} nodes · {result.charged ? 'debitados' : 'cobrança simulada nesta fase'}
+            {result.nodes} nodes · {result.charged ? 'debitados' : 'cobrança simulada nesta fase'} · salva no{' '}
+            <a href="/app/history" style={{ color: 'var(--color-text-secondary)', textDecoration: 'underline', textUnderlineOffset: 3 }}>
+              Histórico
+            </a>
           </span>
         </div>
 

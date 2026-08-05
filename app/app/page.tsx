@@ -59,7 +59,7 @@ const MODULE_ICON: Record<SidebarModule['iconKey'], (p: { size?: number }) => Re
 
 const MODULE_DESC: Record<string, string> = {
   renderizar:        'Imagem fotorrealista a partir da sua referência.',
-  spaces:            'Cada projeto é um Space: novas vistas que preservam o DNA da Vista Mestre.',
+  spaces:            'Novas vistas que preservam o DNA da Vista Mestre do seu projeto.',
   editar:            'Ajuste áreas específicas sem perder a geometria.',
   ampliar:           'Aumente resolução e acabamento.',
   animar:            'Vídeos de apresentação do projeto.',
@@ -151,7 +151,7 @@ export default async function AppPage() {
                 <line x1="12" y1="5" x2="12" y2="19"/>
                 <line x1="5" y1="12" x2="19" y2="12"/>
               </svg>
-              Novo projeto
+              Novo Space
             </Link>
           </div>
         </header>
@@ -163,7 +163,7 @@ export default async function AppPage() {
           <section data-tour="projetos">
             <div className="spn-dash-section-head">
               <div className="spn-dash-section-label">Continuar de onde parou</div>
-              <Link href="/app/spaces" className="spn-dash-section-link">Todos os projetos →</Link>
+              <Link href="/app/spaces" className="spn-dash-section-link">Todos os Spaces →</Link>
             </div>
             <div className="spn-dash-projects">
               {spaces.map(s => <ProjectCard key={s.id} space={s} />)}
@@ -172,7 +172,7 @@ export default async function AppPage() {
                   <line x1="12" y1="5" x2="12" y2="19"/>
                   <line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
-                <span>Novo projeto</span>
+                <span>Novo Space</span>
               </Link>
             </div>
           </section>
@@ -191,7 +191,7 @@ export default async function AppPage() {
           </div>
 
           <div className="spn-dash-stat">
-            <div className="spn-dash-stat-label">Projetos ativos</div>
+            <div className="spn-dash-stat-label">Spaces ativos</div>
             <div className="spn-dash-stat-value">{totalSpaces}</div>
             <div className="spn-dash-stat-sub">no seu atelier</div>
           </div>
@@ -305,12 +305,12 @@ export default async function AppPage() {
 function StartBlock() {
   return (
     <section className="spn-dash-start" data-tour="projetos">
-      <h2 className="spn-dash-start-title">Comece seu primeiro projeto</h2>
+      <h2 className="spn-dash-start-title">Comece seu primeiro Space</h2>
       <p className="spn-dash-start-sub">
         Envie um print, modelo, planta ou referência para gerar a primeira visualização.
       </p>
       <div className="spn-dash-start-actions">
-        <Link href="/app/spaces/new" className="spn-dash-cta">Criar novo projeto</Link>
+        <Link href="/app/spaces/new" className="spn-dash-cta">Criar novo Space</Link>
         <Link href="/app/generate" className="spn-btn-ghost" style={{ borderRadius: 'var(--radius-full)' }}>
           Renderizar imagem avulsa
         </Link>
