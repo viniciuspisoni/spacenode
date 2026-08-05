@@ -7,7 +7,10 @@ import { refundNodes } from '@/lib/billing/refund-nodes'
 import { APRESENTAR_TOOLS } from '@/lib/apresentar/config'
 import { buildHumanizedPlanPrompt } from '@/lib/apresentar/prompts'
 import { getFalEndpoint, getNodesCost, type EngineId, type Resolution } from '@/lib/engines'
-import { generateImage } from '@/lib/ai/image-provider'
+import { generateImage, type GenerateImageResult } from '@/lib/ai/image-provider'
+import { computeGeometryScore, buildEdgeMapPng, type GeometryScoreBreakdown } from '@/lib/ai/fidelity/geometry-score'
+import { getFidelityAttemptParams } from '@/lib/ai/fidelity/render-only'
+import { fetchStorageBuffer } from '@/lib/storage/fetch'
 import type {
   HumanizedPlanProjectType,
   HumanizedPlanStyle,
@@ -20,6 +23,27 @@ export const maxDuration = 300
 fal.config({ credentials: process.env.FAL_KEY })
 
 const FAL_TIMEOUT_MS = 90_000
+
+// ── Gate de fidelidade da planta (envs com defaults; espelha o render_only) ──
+//
+//   HUMANIZED_PLAN_FIDELITY_GATE  '0' desliga validação+retry (rollback rápido)
+//   HUMANIZED_PLAN_MIN_SCORE      limite do geometry score (default 0.50)
+//   HUMANIZED_PLAN_MAX_ATTEMPTS   total de tentativas (default 2, cap 3)
+//
+// Motivação (feedback de beta — Muda, "leitura incorreta"): a planta humanizada
+// saía "bem diferente" da planta técnica original. Mesmo contrato do
+// render_only: paredes/aberturas/limites de ambientes são a autoridade; o gate
+// mede recall de bordas do original na saída e re-tenta com temperatura menor +
+// mapa de bordas anexado quando o score fica abaixo do limite.
+function getPlanFidelityConfig(): { enabled: boolean; minScore: number; maxAttempts: number } {
+  const rawScore    = Number(process.env.HUMANIZED_PLAN_MIN_SCORE)
+  const rawAttempts = Number(process.env.HUMANIZED_PLAN_MAX_ATTEMPTS)
+  return {
+    enabled:     process.env.HUMANIZED_PLAN_FIDELITY_GATE !== '0',
+    minScore:    Number.isFinite(rawScore) && rawScore > 0 && rawScore < 1 ? rawScore : 0.5,
+    maxAttempts: Number.isFinite(rawAttempts) && rawAttempts >= 1 ? Math.min(Math.floor(rawAttempts), 3) : 2,
+  }
+}
 
 // ── Apresentar · Planta Humanizada ───────────────────────────────────────────
 //
@@ -108,41 +132,138 @@ export async function POST(req: NextRequest) {
     }
     debited = true
 
-    // ── Geração ───────────────────────────────────────────────────────────────
-    const prompt = buildHumanizedPlanPrompt({
+    // ── Geração com gate de fidelidade (retry ladder) ─────────────────────────
+    const promptInput = {
       projectType: projectType as HumanizedPlanProjectType,
       style:       style       as HumanizedPlanStyle,
       level:       level       as HumanizedPlanLevel,
       options,
       additionalInstructions,
-    })
+    }
 
     inputUrl = await fal.storage.upload(imageFile)
+    // Buffer do original direto do upload — sem re-fetch.
+    const originalBuffer = Buffer.from(await imageFile.arrayBuffer())
 
     console.log('[apresentar/humanized-plan] engine    :', engine, '→', falEndpoint)
     console.log('[apresentar/humanized-plan] resolution:', resolution, '→', nodesToCharge, 'nodes')
     console.log('[apresentar/humanized-plan] inputUrl  :', inputUrl)
-    console.log('[apresentar/humanized-plan] prompt    :', prompt)
 
     // Vega (nano-banana-pro/edit): resolution param 1K/2K/4K
     const resolutionMap: Record<Resolution, string> = { hd: '1K', '2k': '2K', '4k': '4K' }
-    const falInput = {
-      prompt,
-      image_urls:    [inputUrl],
-      resolution:    resolutionMap[resolution],
-      num_images:    1,
-      output_format: 'jpeg',
+
+    const gate = getPlanFidelityConfig()
+    const maxAttempts = gate.enabled ? gate.maxAttempts : 1
+
+    let edgeMapUrl: string | null = null
+    let prompt = ''
+    let best: { gen: GenerateImageResult; prompt: string; score: number | null } | null = null
+    const attemptLogs: {
+      attempt: number; provider: string; provider_model: string | null
+      temperature: number; edge_map_used: boolean; duration_ms: number
+      geometry: GeometryScoreBreakdown | null; score_error?: string
+    }[] = []
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const params = getFidelityAttemptParams(attempt)
+
+      // Condicionamento estrutural nos retries: lineart da planta original
+      // anexado como imagem extra (upload único). Falha aqui NUNCA derruba a
+      // geração — segue sem o edge map.
+      let imageUrls = [inputUrl]
+      let edgeMapImageIndex: number | null = null
+      if (gate.enabled && params.useEdgeMap) {
+        try {
+          if (!edgeMapUrl) {
+            const edgePng = await buildEdgeMapPng(originalBuffer)
+            edgeMapUrl = await fal.storage.upload(new File([new Uint8Array(edgePng)], 'edge-map.png', { type: 'image/png' }))
+          }
+          imageUrls = [inputUrl, edgeMapUrl]
+          edgeMapImageIndex = imageUrls.length
+        } catch (edgeErr) {
+          console.warn('[apresentar/humanized-plan] edge map indisponível (segue sem):', (edgeErr as Error).message)
+        }
+      }
+
+      prompt = buildHumanizedPlanPrompt(promptInput, { attempt, edgeMapImageIndex })
+
+      const falInput = {
+        prompt,
+        image_urls:    imageUrls,
+        resolution:    resolutionMap[resolution],
+        num_images:    1,
+        output_format: 'jpeg',
+      }
+
+      // Camada única de provider (lib/ai/image-provider): GCP/Vertex primário
+      // quando ligado por env, fallback FAL transparente.
+      let gen: GenerateImageResult
+      try {
+        gen = await generateImage({
+          falEndpoint,
+          falInput,
+          timeoutMs: FAL_TIMEOUT_MS,
+          context:   attempt === 1 ? 'apresentar/humanized-plan' : `apresentar/humanized-plan#${attempt}`,
+          deliver:   { kind: 'url', userId: user.id, area: 'apresentar' },
+          gcpConfig: { temperature: params.temperature },
+        })
+      } catch (genErr) {
+        // Retry é best-effort: com imagem válida de tentativa anterior, falha
+        // aqui não pode virar erro+refund pro usuário.
+        if (attempt === 1 || !best) throw genErr
+        console.warn(`[apresentar/humanized-plan] retry ${attempt} falhou — entregando a melhor tentativa anterior`)
+        break
+      }
+      if (!gen.images[0]?.url) {
+        if (attempt === 1 || !best) throw new Error('Provider não retornou imagem')
+        break
+      }
+
+      // Validação estrutural pós-geração — nunca derruba a request: falha no
+      // score vira log e a imagem é entregue.
+      let geometry: GeometryScoreBreakdown | null = null
+      let scoreError: string | undefined
+      if (gate.enabled) {
+        try {
+          const generatedBuffer = await fetchStorageBuffer(gen.images[0].url)
+          geometry = await computeGeometryScore(originalBuffer, generatedBuffer)
+        } catch (scoreErr) {
+          scoreError = (scoreErr as Error).message
+          console.warn('[apresentar/humanized-plan] geometry score indisponível:', scoreError)
+        }
+      }
+
+      attemptLogs.push({
+        attempt,
+        provider:       gen.provider,
+        provider_model: gen.providerModel,
+        temperature:    params.temperature,
+        edge_map_used:  edgeMapImageIndex !== null,
+        duration_ms:    gen.latencyMs,
+        geometry,
+        ...(scoreError ? { score_error: scoreError } : {}),
+      })
+
+      console.log(
+        `[apresentar/humanized-plan:fidelity] attempt=${attempt}/${maxAttempts} provider=${gen.provider} ` +
+        `temp=${params.temperature} edgeMap=${edgeMapImageIndex !== null} ` +
+        `score=${geometry ? geometry.score.toFixed(3) : 'n/a'} min=${gate.enabled ? gate.minScore.toFixed(2) : 'off'}`
+      )
+
+      if (!best || (geometry?.score ?? -1) > (best.score ?? -1)) {
+        best = { gen, prompt, score: geometry?.score ?? null }
+      }
+
+      const passed = !gate.enabled || geometry === null || geometry.score >= gate.minScore
+      if (passed) break
+      if (attempt >= maxAttempts) {
+        console.warn(`[apresentar/humanized-plan:fidelity] score abaixo do limite após ${attempt} tentativas — entregando a melhor (score=${best.score?.toFixed(3) ?? 'n/a'})`)
+      }
     }
 
-    // Camada única de provider (lib/ai/image-provider): GCP/Vertex primário
-    // quando ligado por env, fallback FAL transparente.
-    const gen = await generateImage({
-      falEndpoint,
-      falInput,
-      timeoutMs: FAL_TIMEOUT_MS,
-      context:   'apresentar/humanized-plan',
-      deliver:   { kind: 'url', userId: user.id, area: 'apresentar' },
-    })
+    if (!best) throw new Error('nenhuma tentativa de geração concluída')
+    const gen = best.gen
+    prompt = best.prompt
 
     outputUrl = gen.images[0]?.url
     if (!outputUrl) throw new Error('Provider não retornou imagem')
@@ -164,6 +285,13 @@ export async function POST(req: NextRequest) {
         fallback_used:  gen.fallbackUsed,
         provider_error: gen.errorMessage,
         latency_ms:     gen.latencyMs,
+      },
+      // Observabilidade do gate de fidelidade da planta (attempts + scores).
+      fidelity: {
+        gate_enabled:  getPlanFidelityConfig().enabled,
+        min_score:     getPlanFidelityConfig().minScore,
+        final_score:   best.score,
+        attempts:      attemptLogs,
       },
     }
 

@@ -64,8 +64,48 @@ export interface HumanizedPlanPromptInput {
   additionalInstructions?: string | null
 }
 
-export function buildHumanizedPlanPrompt(input: HumanizedPlanPromptInput): string {
+// Opções do gate de fidelidade (retry ladder da rota — mesmo padrão do
+// render_only em lib/ai/fidelity/render-only.ts, adaptado pra planta baixa
+// ortográfica): `attempt` >= 2 liga o bloco de escalada; `edgeMapImageIndex`
+// (1-based, na ordem de image_urls) descreve o mapa de bordas anexado.
+export interface HumanizedPlanPromptOpts {
+  attempt?:          number
+  edgeMapImageIndex?: number | null
+}
+
+// Escalada de retry — reforça o frame "TRACE, não inspiração" sem mencionar
+// que houve tentativa anterior (o modelo não a vê).
+function buildPlanEscalation(attempt: number): string {
+  if (attempt <= 1) return ''
+  return (
+    'ABSOLUTE STRUCTURAL PRIORITY: treat the original floor plan as a fixed template that you TRACE, never as ' +
+    'inspiration. This pass is a pure re-styling of the EXACT same drawing — as if painting materials, furniture ' +
+    'and shadows onto the existing plan. Reproduce the position, length and thickness of every wall, the position ' +
+    'and swing of every door, every window and every room boundary with zero deviation. The output must overlay ' +
+    'the original plan line-over-line. When in doubt between beauty and accuracy, always choose accuracy.'
+  )
+}
+
+// Papel do mapa de bordas anexado nos retries (condicionamento estrutural).
+// Sem menção a perspectiva/pontos de fuga — planta é ortográfica top-down.
+function buildPlanEdgeMapBlock(imageIndex: number | null | undefined): string {
+  if (!imageIndex) return ''
+  return (
+    `STRUCTURAL CONSTRAINT MAP: image #${imageIndex} is an automatically extracted edge/line map of the original ` +
+    'floor plan. It is a CONSTRAINT, not content: every wall line, opening contour and room boundary of your ' +
+    'output must align with this map exactly — same positions, same sizes, same top-down orthographic layout. ' +
+    'Do NOT imitate its graphic style: the output is the humanized plan whose underlying structure matches these lines.'
+  )
+}
+
+export function buildHumanizedPlanPrompt(
+  input: HumanizedPlanPromptInput,
+  opts?: HumanizedPlanPromptOpts,
+): string {
   const { projectType, style, level, options, additionalInstructions } = input
+  const attempt = opts?.attempt ?? 1
+  const escalation = buildPlanEscalation(attempt)
+  const edgeBlock  = buildPlanEdgeMapBlock(opts?.edgeMapImageIndex)
 
   const optionLines = OPTION_FRAGMENTS
     .filter(({ key }) => options[key])
@@ -76,10 +116,13 @@ export function buildHumanizedPlanPrompt(input: HumanizedPlanPromptInput): strin
     `Transform this technical ${PROJECT_TYPE_HINT[projectType]} into a HUMANIZED PRESENTATION floor plan for client review.`,
     '',
     `STRUCTURAL FIDELITY (non-negotiable):`,
+    `- The original drawing is the ABSOLUTE GEOMETRIC AUTHORITY: the output must read as the SAME plan, humanized — never a different apartment/house.`,
     `- DO NOT change walls, doors, windows, room shapes, or proportions.`,
     `- DO NOT add or remove rooms. DO NOT alter the layout in any way.`,
     `- Camera stays strict TOP-DOWN orthographic. No perspective, no isometric.`,
     `- Preserve the original drawing scale and aspect ratio.`,
+    ...(escalation ? ['', escalation] : []),
+    ...(edgeBlock  ? ['', edgeBlock]  : []),
     '',
     `STYLE: ${STYLE_DIRECTIVE[style]}`,
     '',
@@ -90,7 +133,7 @@ export function buildHumanizedPlanPrompt(input: HumanizedPlanPromptInput): strin
       ? ['', `ADDITIONAL USER INSTRUCTIONS (complement the settings above, do not override structural fidelity):\n${additionalInstructions.trim()}`]
       : []),
     '',
-    `Output: a single high-quality top-down humanized floor plan, ready for client presentation.`,
+    `Output: a single high-quality top-down humanized floor plan of THIS exact layout, ready for client presentation.`,
   ].join('\n')
 }
 
