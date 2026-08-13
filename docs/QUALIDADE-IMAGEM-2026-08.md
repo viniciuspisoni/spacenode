@@ -417,11 +417,28 @@ Mudança de prompt hoje vai para produção sem medição comparável. Proposta:
 4. ✅ Heatmap estrutural no comparador: `GET /api/renders/[id]/diff` renderiza
    o original esmaecido com as bordas NÃO encontradas no render em vermelho
    (mesma lógica do edgeRecall); toggle "Ver mapa de diferenças estruturais"
-   na UI. ⏳ "Corrigir drift" em 1 clique fica para a próxima rodada.
-5. 🟡 Benchmark: o drop-folder `tests/fidelity/real/` (pares
-   `<caso>-original|generated`) já roda no geometry-score.test e agora imprime
-   também os ΔE. ⏳ Harness contra a API real + dashboard de telemetria.
-6. ⏳ Finalizar (float FBOs, máscara full-res, sRGB piecewise) — não iniciado.
+   na UI. ✅ **"Corrigir drift" em 1 clique**: o aviso de fidelidade ganha o
+   botão "Corrigir automaticamente" — re-gera com a MESMA seed
+   (`structuralBoost` desloca o ladder: temperatura mínima + edge map +
+   escalada desde o 1º shot, sem âncora). Telemetria em
+   `generation_log.structural_boost`.
+5. ✅ Telemetria: `scripts/fidelity-telemetry.sql` — p10/p50/p95 do score por
+   engine×resolução (guia do gate), taxa de retry, A/B do edge-first,
+   distribuição de ΔE (calibra o gate de cor), auditoria semântica, boost e
+   fallback/fator do Ampliar. O drop-folder `tests/fidelity/real/` segue como
+   benchmark offline. ⏳ Harness automatizado contra a API real.
+6. ✅ Finalizar: FBOs intermediários em **RGBA16F** quando
+   `EXT_color_buffer_float` está disponível (probe real com
+   `checkFramebufferStatus`; fallback = RGBA8 idêntico ao anterior) — fim do
+   banding de 6 passes 8-bit; **máscaras em resolução cheia no export**
+   (preview segue ½; instância fresca → sem cache misto); transferência
+   **sRGB piecewise** (IEC 61966-2-1) no lugar do `pow(2.2)` — sombras
+   profundas deixam de plastificar no lift.
+
+**Pendentes conscientes:** subir o gate para 0.75-0.80 (usar a query 1 do
+`fidelity-telemetry.sql` após 1-2 semanas de produção); kit de materiais por
+Space; harness contra a API real; derivado de exibição WebP para os masters
+PNG se o custo de CDN pesar.
 
 Custo marginal das chamadas novas por render: briefing ≈ US$ 0,001 (Gemini
 Flash), depth map ≈ US$ 0,002 (FAL), audit semântico ≈ US$ 0,002 — desprezível

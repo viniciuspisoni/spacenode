@@ -31,8 +31,18 @@ const COMMON = `
 precision highp float;
 
 float luma(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
-vec3 srgb2lin(vec3 c) { return pow(max(c, 0.0), vec3(2.2)); }
-vec3 lin2srgb(vec3 c) { return pow(max(c, 0.0), vec3(1.0 / 2.2)); }
+// Transferência sRGB PIECEWISE (IEC 61966-2-1) — a aproximação pow(2.2)
+// concentrava erro nas sombras profundas (< ~0.04 linear), exatamente onde
+// interiores guardam informação de material: lift de sombra esmagava ou
+// plastificava em vez de revelar.
+vec3 srgb2lin(vec3 c) {
+  vec3 x = max(c, 0.0);
+  return mix(x / 12.92, pow((x + 0.055) / 1.055, vec3(2.4)), step(0.04045, x));
+}
+vec3 lin2srgb(vec3 c) {
+  vec3 x = max(c, 0.0);
+  return mix(x * 12.92, 1.055 * pow(x, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, x));
+}
 
 vec3 rgb2hsv(vec3 c) {
   vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);

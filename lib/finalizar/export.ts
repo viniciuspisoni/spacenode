@@ -92,6 +92,11 @@ export async function renderExport(doc: FinalizeDoc, settings: ExportSettings): 
     renderer.dispose()
     throw new Error('Exportação indisponível: WebGL2 não suportado neste navegador.')
   }
+  // Export usa máscara em RESOLUÇÃO CHEIA: a meia-res do preview upscalada
+  // com LINEAR criava halo de 2-4 px nas arestas duras (requadro de janela,
+  // linha de teto) — invisível em tela, visível no 4K impresso. Instância
+  // fresca de renderer → cache de máscara vazio, sem risco de meia-res cacheada.
+  renderer.masks.maskScale = 1
 
   try {
     const maxTex = Math.min(renderer.maxTextureSize(), 8192)

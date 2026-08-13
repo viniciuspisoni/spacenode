@@ -62,6 +62,8 @@ interface GenerateResult {
   /** true quando a auditoria de visão (volumetria/aberturas/câmera/materiais)
    *  apontou desvio de projeto. */
   semanticWarning?: boolean
+  /** Seed usada na geração (caminho GCP) — reenviada no "Corrigir drift". */
+  seed?: number
   prompt?:   string
   error?:    string
 }
@@ -309,6 +311,8 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
   const [fidelityWarning,   setFidelityWarning]   = useState(false)
   // Overlay do mapa de diferenças estruturais (/api/renders/[id]/diff).
   const [showDiff,          setShowDiff]          = useState(false)
+  // Seed do último render — o "Corrigir drift" reusa pra manter a amostra.
+  const [lastSeed,          setLastSeed]          = useState<number | null>(null)
   // Id da última render persistida — usado pelo CTA "Criar Space" pra
   // ligar o Space novo à render como Vista Mestre.
   const [lastRenderId,      setLastRenderId]      = useState<string | null>(null)
@@ -561,15 +565,19 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
   }
 
   // ── Geração
-  const handleGenerate = async (resolutionOverride?: Resolution) => {
+  const handleGenerate = async (
+    resolutionOverride?: Resolution,
+    opts?: { structuralBoost?: boolean },
+  ) => {
     if (!imagePreview || (!sourceFile && !serverInputUrl)) { setError('Faça upload de uma imagem primeiro.'); return }
     if (credits < nodeCost) { setError('Nodes insuficientes.'); return }
     setError(null); setLoading(true); startLoadingTexts()
     try {
       // Anchor: usa o último output como referência visual de materiais quando
       // o usuário regera a mesma imagem (ex: troca de iluminação) e o toggle
-      // estiver ligado.
-      const anchorUrl = useAnchor && outputUrl ? outputUrl : undefined
+      // estiver ligado. No "Corrigir drift" a âncora fica de fora — ela seria
+      // exatamente o output com o drift que estamos corrigindo.
+      const anchorUrl = !opts?.structuralBoost && useAnchor && outputUrl ? outputUrl : undefined
 
       // Primeira geração desta imagem: sobe o arquivo ORIGINAL direto pro
       // Storage (browser → bucket, sem passar pela Vercel) e envia só a key.
@@ -610,6 +618,9 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
           materialRefs:  materialRefEntries.length > 0 ? materialRefEntries : undefined,
           anchorUrl,
           refinementText: refinementText.trim() || undefined,
+          ...(opts?.structuralBoost
+            ? { structuralBoost: true, ...(lastSeed !== null ? { seed: lastSeed } : {}) }
+            : {}),
         }),
       })
       const data: GenerateResult = await res.json()
@@ -620,6 +631,7 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
       setServerInputUrl(data.originalUrl ?? serverInputUrl ?? null)
       setFidelityScore(typeof data.fidelityScore === 'number' ? data.fidelityScore : null)
       setFidelityWarning(Boolean(data.fidelityWarning) || Boolean(data.semanticWarning))
+      setLastSeed(typeof data.seed === 'number' ? data.seed : null)
       setScale(1); setPan({ x: 0, y: 0 })
       if (refinementText.trim()) setRefinementText('')
     } catch (err: unknown) {
@@ -1252,8 +1264,21 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
             {fidelityWarning ? (
               <div style={S.fidelityWarn}>
                 A verificação estrutural detectou possíveis diferenças em relação ao
-                projeto original. Gere uma nova variação ou descreva no refinamento o
-                que deve ser corrigido.
+                projeto original.
+                {/* Corrigir drift: re-gera com a MESMA seed, condicionamento
+                    estrutural máximo (edge map + temperatura mínima) e sem
+                    âncora — muda o condicionamento, não a amostra. */}
+                <button
+                  onClick={() => handleGenerate(undefined, { structuralBoost: true })}
+                  style={{
+                    display:'block', marginTop:8, fontSize:11, fontWeight:600,
+                    color:'var(--color-error)', background:'none',
+                    border:'0.5px solid var(--color-error-border)', borderRadius:8,
+                    padding:'6px 12px', cursor:'pointer', fontFamily:'inherit',
+                  }}
+                >
+                  Corrigir automaticamente ({nodeCost} nodes)
+                </button>
               </div>
             ) : fidelityScore !== null && fidelityScore >= 0.8 ? (
               <div style={S.fidelityOk}>✓ Estrutura verificada contra o projeto original</div>

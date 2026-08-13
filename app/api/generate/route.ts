@@ -165,6 +165,8 @@ export async function POST(req: NextRequest) {
       fidelityLevel = 'maximum',
       anchorUrl,
       refinementText,
+      structuralBoost,
+      seed: providedSeed,
     } = body as {
       imageBase64?:    string
       sourceKey?:      string
@@ -185,6 +187,12 @@ export async function POST(req: NextRequest) {
       fidelityLevel?:  FidelityLevel
       anchorUrl?:      string
       refinementText?: string
+      /** "Corrigir drift": desloca o ladder (temp ↓ + edge map + escalada
+       *  desde a 1ª tentativa). O caller NÃO deve mandar anchorUrl junto —
+       *  a âncora seria o output com o próprio drift. */
+      structuralBoost?: boolean
+      /** Seed a reutilizar (reprodutibilidade — vem do render anterior). */
+      seed?:            number
     }
 
     // ── Validações que ficam ANTES do débito ──────────────────────────────────
@@ -448,8 +456,16 @@ export async function POST(req: NextRequest) {
     // Seed fixa por request (caminho GCP): retries do ladder viram variação
     // CONTROLADA da mesma amostra (só temperatura/edge map mudam) e o render
     // fica reproduzível. Os schemas FAL desses motores não expõem seed — lá
-    // segue não-determinístico.
-    const generationSeed = Math.floor(Math.random() * 2_147_483_647)
+    // segue não-determinístico. "Corrigir drift" reenvia a seed do render
+    // anterior pra mudar SÓ o condicionamento, não a amostra.
+    const generationSeed = Number.isInteger(providedSeed) && (providedSeed as number) >= 0
+      ? (providedSeed as number)
+      : Math.floor(Math.random() * 2_147_483_647)
+
+    // "Corrigir drift": começa o ladder já na postura de retry — temperatura
+    // baixa, edge map anexado e bloco de escalada no prompt desde o 1º shot.
+    const attemptOffset = structuralBoost === true && renderOnlyActive ? 1 : 0
+    if (attemptOffset > 0) console.log('[generate] structural boost ativo (ladder deslocado)')
 
     // Orçamento de tempo: retries só rodam se sobrar tempo real de geração
     // (a Vercel mata a função no maxDuration — margem pra persistência).
@@ -486,7 +502,8 @@ export async function POST(req: NextRequest) {
       !materials
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      const params = getFidelityAttemptParams(attempt, {
+      const ladderAttempt = attempt + attemptOffset
+      const params = getFidelityAttemptParams(ladderAttempt, {
         // Edge map desde a 1ª tentativa pra CGI sem âncora (Fase 3; A/B via
         // telemetria edge_map_used). Com âncora mantém o comportamento
         // clássico — a âncora já ancora a estrutura.
@@ -547,7 +564,7 @@ export async function POST(req: NextRequest) {
       }
 
       finalPrompt = buildFidelityPrompt(options, fidelityLevel, resolvedBriefing, {
-        attempt,
+        attempt: ladderAttempt,
         edgeMapImageIndex,
         depthMapImageIndex,
         materialSamples: materialSamples.length > 0 ? materialSamples : undefined,
@@ -754,6 +771,7 @@ export async function POST(req: NextRequest) {
         parameters:  falParamsForEngine(engine, resolution, aspectRatio),
         // Reprodutibilidade: seed aplicada no caminho GCP (a FAL não expõe).
         seed:            generationSeed,
+        structural_boost: attemptOffset > 0,
         aspect_ratio:    aspectRatio,
         briefing_source: briefingSource,
         anchor_used: hasAnchor,
@@ -826,6 +844,9 @@ export async function POST(req: NextRequest) {
       // Auditoria de visão: warning quando o auditor viu desvio de projeto
       // (volumetria/aberturas/câmera/materiais) — complementa o score de bordas.
       semanticWarning:  preservationAudit?.warning ?? false,
+      // Seed usada (caminho GCP) — o client reenvia no "Corrigir drift" pra
+      // manter a mesma amostra e mudar só o condicionamento.
+      seed:             generationSeed,
       // O prompt final (buildFidelityPrompt) é proprietário e o GenerateClient
       // nunca o consumia — não viaja mais na resposta.
     })

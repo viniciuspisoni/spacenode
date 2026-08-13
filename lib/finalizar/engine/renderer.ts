@@ -62,6 +62,8 @@ export class FinalizeRenderer {
   private smallFbos: { fbo: WebGLFramebuffer; tex: WebGLTexture }[] = []
   private fboW = 0
   private fboH = 0
+  /** Intermediários em RGBA16F (probe no setup; false = RGBA8 clássico). */
+  private floatFbos = false
 
   private curveTex: WebGLTexture | null = null
   private curveKey = ''
@@ -139,6 +141,19 @@ export class FinalizeRenderer {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]))
     setTexParams(gl)
 
+    // FBOs float16 quando o driver renderiza em RGBA16F (o canvas final segue
+    // 8-bit). Probe real com checkFramebufferStatus: extensão presente não
+    // garante FBO completo em todo driver — incompleto = fica no RGBA8 de
+    // sempre (comportamento idêntico ao anterior).
+    this.floatFbos = false
+    if (gl.getExtension('EXT_color_buffer_float')) {
+      const probe = makeFbo(gl, 4, 4, true)
+      gl.bindFramebuffer(gl.FRAMEBUFFER, probe.fbo)
+      this.floatFbos = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+      gl.deleteFramebuffer(probe.fbo)
+      gl.deleteTexture(probe.tex)
+    }
   }
 
   /** Textura de máscara de um elemento — upload só quando o canvas do
@@ -258,10 +273,10 @@ export class FinalizeRenderer {
     }
     this.fbos = []
     this.smallFbos = []
-    for (let i = 0; i < 4; i++) this.fbos.push(makeFbo(gl, w, h))
+    for (let i = 0; i < 4; i++) this.fbos.push(makeFbo(gl, w, h, this.floatFbos))
     const sw = Math.max(2, Math.round(w / 4))
     const sh = Math.max(2, Math.round(h / 4))
-    for (let i = 0; i < 2; i++) this.smallFbos.push(makeFbo(gl, sw, sh))
+    for (let i = 0; i < 2; i++) this.smallFbos.push(makeFbo(gl, sw, sh, this.floatFbos))
     this.fboW = w
     this.fboH = h
   }
@@ -673,10 +688,22 @@ function uploadTexture(gl: WebGL2RenderingContext, tex: WebGLTexture, source: Te
   setTexParams(gl)
 }
 
-function makeFbo(gl: WebGL2RenderingContext, w: number, h: number): { fbo: WebGLFramebuffer; tex: WebGLTexture } {
+function makeFbo(
+  gl: WebGL2RenderingContext,
+  w: number,
+  h: number,
+  float16 = false,
+): { fbo: WebGLFramebuffer; tex: WebGLTexture } {
   const tex = gl.createTexture()!
   gl.bindTexture(gl.TEXTURE_2D, tex)
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
+  // float16: intermediários RGBA16F (precisa de EXT_color_buffer_float pra
+  // renderizar; filtragem LINEAR de half-float é core no WebGL2). A 8 bits,
+  // 6 passes encadeados quantizavam a cada etapa — banding em céu/gradiente.
+  if (float16) {
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.HALF_FLOAT, null)
+  } else {
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
+  }
   setTexParams(gl)
   const fbo = gl.createFramebuffer()!
   gl.bindFramebuffer(gl.FRAMEBUFFER, fbo)
