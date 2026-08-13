@@ -32,6 +32,9 @@ import {
   type GeometryScoreBreakdown,
 } from '@/lib/ai/fidelity/geometry-score'
 import { fetchStorageBuffer } from '@/lib/storage/fetch'
+import { nearestSupportedAspectRatio } from '@/lib/ai/aspect-ratio'
+import { analyzeImage } from '@/lib/fidelity-engine'
+import sharp from 'sharp'
 
 fal.config({ credentials: process.env.FAL_KEY })
 
@@ -65,7 +68,11 @@ const FAL_TIMEOUT_MS: Record<EngineId, number> = {
 // Quasar (GPT Image 2 edit)        → `quality` ∈ 'medium'|'high'
 //   2K interno → 'medium', 4K → 'high'.
 
-function falParamsForEngine(engine: EngineId, resolution: Resolution): Record<string, unknown> {
+function falParamsForEngine(
+  engine:      EngineId,
+  resolution:  Resolution,
+  aspectRatio: string | null = null,
+): Record<string, unknown> {
   if (engine === 'quasar') {
     return {
       quality:       resolution === '4k' ? 'high' : 'medium',
@@ -80,7 +87,25 @@ function falParamsForEngine(engine: EngineId, resolution: Resolution): Record<st
     resolution:    map[resolution],
     num_images:    1,
     output_format: 'jpeg',
+    // Pino de formato (lib/ai/aspect-ratio): presente só quando o aspecto do
+    // original bate (≤2%) com um valor suportado — previne o drift de
+    // enquadramento em vez de puni-lo depois via aspectDelta. Ausente, o
+    // motor segue o formato do input (default 'auto').
+    ...(aspectRatio ? { aspect_ratio: aspectRatio } : {}),
   }
+}
+
+// Teto do briefing de visão inline (PROJECT FACTS). analyzeImage nunca lança
+// (fallback interno) — o race cobre lentidão extrema sem travar a geração.
+const BRIEFING_TIMEOUT_MS = 15_000
+
+// Type-guard mínimo pro briefing cacheado em renders.config_snapshot (foi
+// persistido por nós via parseBriefing, mas o JSONB não tem contrato de tipo).
+function isBriefing(value: unknown): value is BriefingArquitetonico {
+  const b = value as BriefingArquitetonico | null
+  return !!b && typeof b === 'object' &&
+    typeof b.tipo_projeto === 'string' &&
+    Array.isArray(b.elementos_preservar)
 }
 
 function truncateErr(err: unknown): string {
@@ -270,6 +295,80 @@ export async function POST(req: NextRequest) {
       ? [anchorUrl, inputUrl]
       : [inputUrl]
 
+    // Rótulos de papel por imagem, paralelos a baseImageUrls. No caminho GCP
+    // cada rótulo vira uma parte de texto imediatamente antes da imagem —
+    // binding explícito entre o "Image #N" do prompt e os pixels certos
+    // (mesma correção do Spaces em lib/spaces/references.ts). Sem isso, com a
+    // âncora primeiro, o modelo tende a ancorar a GEOMETRIA na imagem mais
+    // acabada — exatamente o drift que o buildAnchorBlock tenta impedir.
+    const baseImageLabels: string[] = baseImageUrls.length === 2
+      ? [
+          'Image #1 — MATERIAL & ATMOSPHERE ANCHOR (previous render of this same project: source of materials, textures and palette only):',
+          'Image #2 — GEOMETRY SOURCE (architecture, layout, camera and perspective are law):',
+        ]
+      : ['Image #1 — REFERENCE IMAGE (mandatory base: geometry, camera, materials and framing are law):']
+
+    // Buffer do original disponível cedo: alimenta o pino de aspect ratio e,
+    // no render_only, o edge map/score (que antes o buscavam sob demanda).
+    // Best-effort — sem buffer, os consumidores seguem sem ele.
+    if (!originalBuffer) {
+      try {
+        originalBuffer = await fetchStorageBuffer(inputUrl)
+      } catch (bufErr) {
+        console.warn('[generate] original indisponível pra aspecto (segue sem):', truncateErr(bufErr))
+      }
+    }
+    let aspectRatio: string | null = null
+    if (originalBuffer) {
+      try {
+        const meta = await sharp(originalBuffer).metadata()
+        aspectRatio = nearestSupportedAspectRatio(meta.width ?? null, meta.height ?? null)
+      } catch { /* sem pino — motor segue o formato do input */ }
+    }
+    devLog('[generate] aspect     :', aspectRatio ?? 'auto (sem pino)')
+
+    // Briefing de visão (PROJECT FACTS) — religado ao Renderizar. Ordem de
+    // resolução: body (caller explícito, ex. Spaces) → cache do histórico
+    // (mesmo input_url já analisado nesta conta) → análise Gemini inline com
+    // teto de 15s. Em 'creative' não injetamos: os FACTS travam materiais e
+    // entorno, contra o propósito do nível.
+    let resolvedBriefing: BriefingArquitetonico | undefined = briefing
+    let briefingSource: 'body' | 'cache' | 'vision' | 'none' = briefing ? 'body' : 'none'
+    if (!resolvedBriefing && fidelityLevel !== 'creative') {
+      if (providedInputUrl) {
+        const { data: cachedRender } = await admin
+          .from('renders')
+          .select('config_snapshot')
+          .eq('user_id', user.id)
+          .eq('input_url', inputUrl)
+          .not('config_snapshot->briefing', 'is', null)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        const cachedBriefing = (cachedRender?.config_snapshot as { briefing?: unknown } | null)?.briefing
+        if (isBriefing(cachedBriefing)) {
+          resolvedBriefing = cachedBriefing
+          briefingSource = 'cache'
+        }
+      }
+      if (!resolvedBriefing) {
+        const briefingStartedAt = Date.now()
+        resolvedBriefing = await Promise.race([
+          analyzeImage(inputUrl),
+          new Promise<undefined>(resolve => setTimeout(() => resolve(undefined), BRIEFING_TIMEOUT_MS)),
+        ])
+        if (resolvedBriefing) briefingSource = 'vision'
+        devLog('[generate] briefing   :', briefingSource, `(${Date.now() - briefingStartedAt}ms)`)
+      }
+    }
+    options.briefing = resolvedBriefing
+
+    // Seed fixa por request (caminho GCP): retries do ladder viram variação
+    // CONTROLADA da mesma amostra (só temperatura/edge map mudam) e o render
+    // fica reproduzível. Os schemas FAL desses motores não expõem seed — lá
+    // segue não-determinístico.
+    const generationSeed = Math.floor(Math.random() * 2_147_483_647)
+
     // Orçamento de tempo: retries só rodam se sobrar tempo real de geração
     // (a Vercel mata a função no maxDuration — margem pra persistência).
     const ROUTE_BUDGET_MS = (maxDuration - 20) * 1000
@@ -300,6 +399,7 @@ export async function POST(req: NextRequest) {
       // como imagem extra (upload único). Falha aqui NUNCA derruba a geração —
       // segue sem o edge map.
       let imageUrls = baseImageUrls
+      let imageLabels = baseImageLabels
       let edgeMapImageIndex: number | null = null
       if (renderOnlyActive && params.useEdgeMap) {
         try {
@@ -310,12 +410,16 @@ export async function POST(req: NextRequest) {
           }
           imageUrls = [...baseImageUrls, edgeMapUrl]
           edgeMapImageIndex = imageUrls.length
+          imageLabels = [
+            ...baseImageLabels,
+            `Image #${edgeMapImageIndex} — STRUCTURAL CONSTRAINT MAP (edge/line map of the reference geometry; align every edge to it, never imitate its graphic style):`,
+          ]
         } catch (edgeErr) {
           console.warn('[generate:fidelity] edge map indisponível (segue sem):', (edgeErr as Error).message)
         }
       }
 
-      finalPrompt = buildFidelityPrompt(options, fidelityLevel, briefing, {
+      finalPrompt = buildFidelityPrompt(options, fidelityLevel, resolvedBriefing, {
         attempt,
         edgeMapImageIndex,
       })
@@ -324,7 +428,7 @@ export async function POST(req: NextRequest) {
       const falInput = {
         prompt:     finalPrompt,
         image_urls: imageUrls,
-        ...falParamsForEngine(engine, resolution),
+        ...falParamsForEngine(engine, resolution, aspectRatio),
       }
       devLog('[generate] FAL INPUT  :', JSON.stringify(falInput))
 
@@ -337,10 +441,11 @@ export async function POST(req: NextRequest) {
         gen = await generateImage({
           falEndpoint,
           falInput,
+          imageLabels,
           timeoutMs: attemptTimeoutMs,
           context:   attempt === 1 ? 'generate' : `generate#${attempt}`,
           deliver:   { kind: 'url', userId: user.id, area: 'renders' },
-          gcpConfig: { temperature: params.temperature },
+          gcpConfig: { temperature: params.temperature, seed: generationSeed },
         })
       } catch (genErr) {
         // Retry é best-effort: se JÁ existe imagem válida de tentativa
@@ -442,7 +547,9 @@ export async function POST(req: NextRequest) {
       fidelityMode:  fidelityMode  === 'balanced' ? 'balanced' : 'strict',
       fidelityLevel,
       materials:     materials     ?? null,
-      briefing:      briefing      ?? null,
+      // Briefing resolvido (body/cache/visão) — persistido aqui vira o cache
+      // das próximas gerações com o mesmo input_url.
+      briefing:      resolvedBriefing ?? null,
     }
 
     const baseRow = {
@@ -480,7 +587,11 @@ export async function POST(req: NextRequest) {
         request_id:     falRequestId,
         engine,
         resolution,
-        parameters:  falParamsForEngine(engine, resolution),
+        parameters:  falParamsForEngine(engine, resolution, aspectRatio),
+        // Reprodutibilidade: seed aplicada no caminho GCP (a FAL não expõe).
+        seed:            generationSeed,
+        aspect_ratio:    aspectRatio,
+        briefing_source: briefingSource,
         anchor_used: hasAnchor,
         image_count: baseImageUrls.length,
         duration_ms: generationDurationMs,
@@ -537,9 +648,12 @@ export async function POST(req: NextRequest) {
       lumenBalance: balance?.lumen_balance ?? 0,
       totalBalance: balance?.total_balance ?? 0,
       nodesCharged: nodesToCharge,
-      // Diagnóstico do gate render_only (aditivo; a UI atual ignora).
+      // Diagnóstico do gate render_only. fidelityWarning: score final ficou
+      // abaixo do limite mesmo após retries — a UI mostra o aviso (mesmo
+      // papel do preservation_warning das vistas no Spaces).
       fidelityScore,
       fidelityAttempts: attemptLogs.length,
+      fidelityWarning:  renderOnlyActive && fidelityScore !== null && fidelityScore < minScore,
       // O prompt final (buildFidelityPrompt) é proprietário e o GenerateClient
       // nunca o consumia — não viaja mais na resposta.
     })

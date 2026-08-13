@@ -51,6 +51,10 @@ interface GenerateResult {
   credits:   number
   /** Saldo total pós-débito (plano + Lumens) — preferir este. */
   totalBalance?: number
+  /** Geometry score da entrega (0..1) — só no nível Máxima com gate ativo. */
+  fidelityScore?:   number | null
+  /** true quando o score final ficou abaixo do limite mesmo após retries. */
+  fidelityWarning?: boolean
   prompt?:   string
   error?:    string
 }
@@ -272,6 +276,11 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
   // ── Imagem e resultado
   const [imagePreview,      setImagePreview]      = useState<string | null>(null)
   const [outputUrl,         setOutputUrl]         = useState<string | null>(null)
+  // Verificação estrutural do render_only (a API compara o resultado com o
+  // original e devolve o veredito — mesmo papel do preservation_warning do
+  // Spaces). null = sem verificação (nível != Máxima ou gate desligado).
+  const [fidelityScore,     setFidelityScore]     = useState<number | null>(null)
+  const [fidelityWarning,   setFidelityWarning]   = useState(false)
   // Id da última render persistida — usado pelo CTA "Criar Space" pra
   // ligar o Space novo à render como Vista Mestre.
   const [lastRenderId,      setLastRenderId]      = useState<string | null>(null)
@@ -433,6 +442,7 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
     if (!file.type.startsWith('image/')) return
     if (file.size > 10 * 1024 * 1024) { setError('Imagem muito grande. Máximo 10 MB.'); return }
     setOutputUrl(null); setError(null); setUseAnchor(true); setRefinementText('')
+    setFidelityScore(null); setFidelityWarning(false)
     setScale(1); setPan({ x: 0, y: 0 })
     const reader = new FileReader()
     reader.onload = async (e) => {
@@ -511,6 +521,8 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
       if (!res.ok || data.error) throw new Error(data.error ?? 'Erro na geração')
       setOutputUrl(data.outputUrl); setCredits(data.totalBalance ?? data.credits); setSliderPos(50)
       setLastRenderId(data.renderId ?? null)
+      setFidelityScore(typeof data.fidelityScore === 'number' ? data.fidelityScore : null)
+      setFidelityWarning(Boolean(data.fidelityWarning))
       setScale(1); setPan({ x: 0, y: 0 })
       if (refinementText.trim()) setRefinementText('')
     } catch (err: unknown) {
@@ -609,6 +621,8 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
     setRefinementText('')
     setUseAnchor(true)
     setError(null)
+    setFidelityScore(null)
+    setFidelityWarning(false)
     setSliderPos(50)
     setScale(1)
     setPan({ x: 0, y: 0 })
@@ -1076,6 +1090,19 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
         {/* ── POST-GENERATION ACTIONS ── */}
         {imagePreview && outputUrl && !loading && (
           <div style={S.postGen}>
+            {/* Veredito da verificação estrutural (gate render_only): aviso
+                quando o score da entrega ficou abaixo do limite; selo discreto
+                quando a estrutura foi verificada com folga (≥ 0.8). */}
+            {fidelityWarning ? (
+              <div style={S.fidelityWarn}>
+                A verificação estrutural detectou possíveis diferenças em relação ao
+                projeto original. Gere uma nova variação ou descreva no refinamento o
+                que deve ser corrigido.
+              </div>
+            ) : fidelityScore !== null && fidelityScore >= 0.8 ? (
+              <div style={S.fidelityOk}>✓ Estrutura verificada contra o projeto original</div>
+            ) : null}
+
             {selectedResolution === 'hd' && (
               <div className="spn-upsell-note">
                 Melhore para 2K ou 4K para apresentação profissional
@@ -1396,6 +1423,8 @@ const S: Record<string, React.CSSProperties> = {
   promptText:        { fontSize:11, color:'var(--color-text-tertiary)', lineHeight:1.65 },
   downloadLink:      { fontSize:11, color:'var(--color-text-tertiary)', textDecoration:'none' },
   postGen:           { display:'flex', flexDirection:'column', gap:8 },
+  fidelityWarn:      { fontSize:12, color:'var(--color-error)', background:'var(--color-error-bg)', border:'0.5px solid var(--color-error-border)', borderRadius:12, padding:'10px 14px', lineHeight:1.5 },
+  fidelityOk:        { fontSize:11, color:'var(--color-accent-green)', display:'flex', alignItems:'center', gap:6 },
   postGenPrimary:    { display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 },
   postGenSecondary:  { display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 },
 }

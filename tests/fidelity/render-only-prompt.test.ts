@@ -94,6 +94,29 @@ describe('render_only: invariantes obrigatórios', () => {
   })
 })
 
+describe('render_only: contexto de cena (Segmento/Espaço religados na Máxima)', () => {
+  it('Máxima inclui SCENE TYPE com nome curto do ambiente', () => {
+    const p = buildFidelityPrompt(baseOptions, 'maximum')
+    expect(p).toContain('SCENE TYPE')
+    expect(p).toContain('high-end residential')
+    expect(p).toContain('kitchen')
+  })
+
+  it('nunca vaza a descrição prescritiva do ENV_EN (isca de drift)', () => {
+    // ENV_EN['Cozinha'] = 'kitchen with custom cabinetry, quartz countertop…'
+    // — na Máxima só o substantivo inicial pode entrar.
+    const p = buildFidelityPrompt(baseOptions, 'maximum')
+    expect(p).not.toContain('custom cabinetry')
+    expect(p).not.toContain('quartz countertop')
+  })
+
+  it('contrato render-only continua precedendo o contexto', () => {
+    const p = buildFidelityPrompt(baseOptions, 'maximum')
+    expect(p.indexOf('RENDER-ONLY MODE')).toBeGreaterThanOrEqual(0)
+    expect(p.indexOf('RENDER-ONLY MODE')).toBeLessThan(p.indexOf('SCENE TYPE'))
+  })
+})
+
 describe('render_only: escalada e condicionamento estrutural', () => {
   it('attempt 1 não tem escalada; attempt 2 tem', () => {
     const a1 = buildFidelityPrompt(baseOptions, 'maximum', undefined, { attempt: 1 })

@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getUpscaleCost } from '@/lib/spaces/economy'
 import { refundNodes } from '@/lib/billing/refund-nodes'
+import { buildClarityConservativeParams } from '@/lib/upscale/presets/clarity-conservative'
 
 fal.config({ credentials: process.env.FAL_KEY })
 
@@ -86,18 +87,16 @@ export async function POST(
     if (insErr || !inserted) throw new Error('insert_failed')
     newId = inserted.id as string
 
-    // Clarity call — campos extras (creativity/resemblance/dynamic/etc.) são
-    // suportados pelo endpoint mas não aparecem no tipo gerado do client; o
-    // cast pra `never` evita o type-check estrito e mantém o payload completo.
+    // Clarity call — preset CONSERVADOR compartilhado com o Ampliar
+    // (lib/upscale/presets/clarity-conservative): creativity 0.15 + negative
+    // prompt. A config antiga desta rota (creativity 0.3, sem negative) era a
+    // receita clássica de esquadria entortada e textura inventada — unificada
+    // na revisão de fidelidade 2026-08. O cast pra `never` continua necessário:
+    // os campos extras não aparecem no tipo gerado do client FAL.
     const scaleFactor = target === '4k' ? 4 : 2
     const clarityInput = {
-      image_url:           src.image_url,
-      upscale_factor:      scaleFactor,
-      prompt:              'architectural render, photorealistic, preserve details',
-      creativity:          0.3,
-      resemblance:         0.9,
-      dynamic:             6,
-      num_inference_steps: 20,
+      image_url: src.image_url,
+      ...buildClarityConservativeParams({ upscaleFactor: scaleFactor }),
     } as unknown as never
     const result = await Promise.race([
       fal.subscribe('fal-ai/clarity-upscaler', { input: clarityInput }),

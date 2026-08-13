@@ -152,6 +152,10 @@ export async function POST(req: NextRequest) {
 
     const outputUrl   = result.outputUrl
     const usedProvider = finalProvider(result) ?? modeT
+    // Fallback (ex.: Topaz → Clarity na Alta Fidelidade) deixa de ser
+    // silencioso: a UI avisa que o resultado veio de um provider generativo,
+    // não do preservador prometido pelo modo.
+    const fallbackUsed = result.steps.some(s => s.status === 'completed' && s.fallbackOf !== null)
     // Rastreabilidade: id do request fal do último step concluído (o que produziu
     // o output). O detalhe por step também vai em upscale_meta.steps[].requestId.
     const falRequestId = [...result.steps].reverse().find(s => s.status === 'completed')?.requestId ?? null
@@ -198,10 +202,11 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({
-      url:         outputUrl,
-      originalUrl: inputUrl,
-      provider:    usedProvider,
-      durationMs:  result.totalDurationMs,
+      url:          outputUrl,
+      originalUrl:  inputUrl,
+      provider:     usedProvider,
+      fallbackUsed,
+      durationMs:   result.totalDurationMs,
     })
 
   } catch (err: unknown) {

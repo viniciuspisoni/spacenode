@@ -159,6 +159,10 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
   const [isLoading,   setIsLoading]   = useState(false)
   const [loadingText, setLoadingText] = useState(LOADING_TEXTS_RESOLUTION[0])
   const [resultUrl,   setResultUrl]   = useState<string | null>(null)
+  // true quando o provider primário do modo falhou e o resultado veio do
+  // fallback generativo (ex.: Alta Fidelidade Topaz → Clarity). O aviso na
+  // UI é o que impede o fallback de ser silencioso.
+  const [usedFallback, setUsedFallback] = useState(false)
   const [credits,     setCredits]     = useState(initialCredits)
   const [error,       setError]       = useState<string | null>(null)
   const [isDownloading, setIsDownloading] = useState(false)
@@ -369,6 +373,7 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
       const data = await jsonOrNull(res)
       if (!res.ok) { setError(errMsg(data, 'Erro desconhecido')); return }
       setResultUrl(data?.url as string)
+      setUsedFallback(Boolean(data?.fallbackUsed))
       setCredits(c => c - nodeCost)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Falha de conexão. Tente novamente.')
@@ -681,6 +686,13 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
 
         {!isLoading && resultUrl && imagePreview && (
           <div style={{ width: '100%', maxWidth: 760, animation: 'fadeIn 0.3s ease' }}>
+            {usedFallback && (
+              <div style={{ fontSize: 12, color: 'var(--color-error)', background: 'var(--color-error-bg)', border: '0.5px solid var(--color-error-border)', borderRadius: 12, padding: '10px 14px', lineHeight: 1.5, marginBottom: 12 }}>
+                O motor de alta fidelidade não respondeu e usamos o motor alternativo
+                nesta ampliação. Confira detalhes finos (esquadrias, textos, linhas) —
+                se notar diferenças, tente novamente em alguns minutos.
+              </div>
+            )}
             <BeforeAfter beforeUrl={imagePreview} afterUrl={resultUrl} beforeLabel="ORIGINAL" afterLabel={tab === 'resolution' ? 'AMPLIADO' : 'APRIMORADO'} />
             <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' as const }}>
               <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', letterSpacing: '0.04em' }}>

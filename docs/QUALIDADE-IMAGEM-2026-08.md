@@ -350,14 +350,25 @@ Mudança de prompt hoje vai para produção sem medição comparável. Proposta:
 
 ## 8. Priorização sugerida
 
-**Fase 1 — Quick wins (dias, sem migração):**
-1. `imageLabels` no `/api/generate` (§3.4) — 1 linha + constantes.
-2. `aspect_ratio` derivado do original (§3.5).
-3. Briefing server-side no `/api/generate` (§3.2).
-4. Linha de contexto Segmento/Espaço na Máxima (§3.3).
-5. Unificar presets Clarity + modelo High Fidelity no Topaz (§5).
-6. Expor `fidelityScore` na UI (warning como no Spaces) + `seed` nos retries.
-7. Fallback Topaz→Clarity sinalizado ao usuário.
+**Fase 1 — Quick wins (dias, sem migração):** ✅ **IMPLEMENTADA (2026-08-13)**
+1. ✅ `imageLabels` no `/api/generate` (§3.4) — rótulos de papel por imagem
+   (âncora/geometria/edge map), espelhando `lib/spaces/references.ts`.
+2. ✅ `aspect_ratio` derivado do original (§3.5) — `lib/ai/aspect-ratio.ts`
+   pina só quando o aspecto bate (≤2%) com valor suportado por FAL e Vertex.
+3. ✅ Briefing server-side no `/api/generate` (§3.2) — body → cache do
+   histórico (mesmo `input_url`) → `analyzeImage` com teto de 15 s; não roda
+   em `creative` (FACTS travariam materiais contra o propósito do nível).
+4. ✅ Contexto Segmento/Espaço na Máxima (§3.3) — bloco `SCENE TYPE` com nome
+   curto do ambiente (nunca a descrição prescritiva do `ENV_EN`).
+5. ✅ Presets Clarity unificados no conservador (vistas upscale incluído) +
+   Topaz com `model: 'High Fidelity V2'` e clamp do fator em 4 (teto do schema
+   FAL — antes, 8x falhava direto pro Clarity).
+6. ✅ `fidelityScore`/`fidelityWarning` na resposta e na UI do Renderizar
+   (aviso abaixo do limite; selo discreto com score ≥ 0.8) + `seed` fixa por
+   request no caminho GCP (retries controlados; registrada no
+   `generation_log`).
+7. ✅ Fallback Topaz→Clarity sinalizado (`fallbackUsed` na resposta + aviso na
+   UI do Ampliar).
 
 **Fase 2 — Correções estruturais (1-2 semanas):**
 1. Direct upload no Renderizar; fim do downscale 2048 px (§3.1).

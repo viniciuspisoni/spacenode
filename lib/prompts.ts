@@ -770,6 +770,41 @@ function transformationBlock(briefing: BriefingArquitetonico, level: FidelityLev
   return `ALLOWED IMPROVEMENTS ONLY (visual quality, not architecture): ${briefing.elementos_melhorar.join('; ')}. `
 }
 
+// Nome curto do ambiente pro contexto da Máxima. As entradas de ENV_EN são
+// prescritivas ("living room with sofa set, porcelain tile floor…") — na
+// Máxima isso é isca de drift (sugere materiais/mobiliário que podem
+// contradizer a referência). Usamos só o substantivo inicial ("living room"),
+// nunca a lista de acabamentos.
+function shortEnvName(environment?: string): string {
+  if (!environment) return ''
+  const desc = ENV_EN[environment]
+  if (!desc) return environment
+  return (desc.split(' with ')[0] ?? desc).split(',')[0].trim()
+}
+
+// Contexto de cena da Máxima: identifica O QUE a cena é (Segmento + Espaço
+// escolhidos na UI) sem licença de alteração. Sem este bloco os dois seletores
+// eram no-ops no nível default — o `intent` (único carregador de segDesc) só
+// entra em balanced/creative, e `environment` nem era desestruturado.
+function buildSceneContextBlock(
+  projectType: ProjectType,
+  segment:     string,
+  environment?: string,
+): string {
+  const segDesc = SEG_EN[segment] ?? (segment ? segment.toLowerCase() : '')
+  const envName = shortEnvName(environment)
+  const kind    = projectType === 'exterior' ? 'exterior' : 'interior'
+  const scene   = [segDesc, kind, envName ? `— ${envName}` : '']
+    .filter(Boolean)
+    .join(' ')
+  if (!scene) return ''
+  return (
+    'SCENE TYPE (context for understanding only — the reference image remains ' +
+    'the sole source of truth for what exists; never license to add, remove or ' +
+    `restyle anything): ${scene}. `
+  )
+}
+
 // briefing é opcional. Quando ausente, o `fidelityModifier` carrega sozinho a
 // instrução de preservação — o modelo já vê a imagem direto e não precisa de
 // uma redescrição textual dos elementos. Quando presente (ex: futuro Spaces
@@ -787,7 +822,7 @@ export function buildFidelityPrompt(
   briefing?:  BriefingArquitetonico,
   renderOnly?: RenderOnlyPromptOpts,
 ): string {
-  const { projectType, segment, lighting, background, sceneElements, materials, hasAnchor, refinementText } = options
+  const { projectType, segment, environment, lighting, background, sceneElements, materials, hasAnchor, refinementText } = options
 
   const anchor     = buildAnchorBlock(hasAnchor)
   const refinement = buildRefinementBlock(refinementText, hasAnchor)
@@ -888,6 +923,7 @@ export function buildFidelityPrompt(
     return (
       anchor +
       head +
+      buildSceneContextBlock(projectType, segment, environment) +
       buildEdgeMapBlock(renderOnly?.edgeMapImageIndex) +
       refinement +
       preserve +

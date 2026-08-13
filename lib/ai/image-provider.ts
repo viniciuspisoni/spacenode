@@ -82,9 +82,11 @@ export interface GenerateImageArgs {
   imageLabels?: (string | null)[]
   /** Overrides do caminho GCP/Vertex (o caminho FAL ignora — o schema da FAL
    *  não expõe esses knobs). Usado pelo retry ladder do render_only pra
-   *  reduzir "criatividade" (temperatura ↓). */
+   *  reduzir "criatividade" (temperatura ↓) e pra fixar seed por request
+   *  (retries viram variação CONTROLADA da mesma amostra, não amostra nova). */
   gcpConfig?: {
     temperature?: number
+    seed?: number
   }
 }
 
@@ -316,7 +318,12 @@ async function generateViaGcp(
         // "criatividade" fora do pedido — mesmo valor do lib/ai/google. O
         // retry ladder do render_only baixa ainda mais via gcpConfig.
         temperature: args.gcpConfig?.temperature ?? 0.2,
-        ...(parsed.seed !== undefined ? { seed: parsed.seed } : {}),
+        // gcpConfig.seed tem precedência: é o caminho seguro pra fixar seed sem
+        // tocar o falInput (que o fallback FAL repassa byte-idêntico a schemas
+        // que não expõem seed).
+        ...(args.gcpConfig?.seed !== undefined
+          ? { seed: args.gcpConfig.seed }
+          : parsed.seed !== undefined ? { seed: parsed.seed } : {}),
         ...(mapping.supportsImageSize && (parsed.resolution || parsed.aspectRatio)
           ? {
               imageConfig: {
