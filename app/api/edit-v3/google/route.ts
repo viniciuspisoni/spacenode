@@ -27,7 +27,9 @@ import {
   editV3AllowHighPrecision,
   editV3DebugAllowed,
   editV3NoMaskEnabled,
+  editV3NormalizerEnabled,
 } from '@/lib/edit-v3/flags'
+import { normalizeInstruction } from '@/lib/edit-v2/normalizer'
 import {
   nodesForAction,
   resolveResolution,
@@ -35,7 +37,7 @@ import {
   MODEL_FOR_QUALITY,
   marginAt,
 } from '@/lib/edit-v3/pricing'
-import { runEditV3, EditV3GenerationError } from '@/lib/edit-v3/pipeline'
+import { runEditV3, EditV3GenerationError, INTENT_FOR_ACTION } from '@/lib/edit-v3/pipeline'
 import { assertSafeImageUrl, EditV3InputError } from '@/lib/edit-v3/ssrf'
 import { insertJobResilient, updateJobResilient } from '@/lib/edit-v3/persist'
 import {
@@ -205,6 +207,30 @@ export async function POST(req: Request) {
     // user_node_balance leria a carteira do MEMBRO, não a do pagador, e
     // bloquearia membros por engano. Débito só no sucesso; falha nunca cobra.
 
+    // ── Normalizador PT→EN (camada do V2 religada no V3) ─────────────────────
+    //
+    // Traduz o pedido pra inglês técnico seguro e sinaliza rigor geométrico —
+    // PT cru interpolado num prompt EN degrada instruction-following e o V3
+    // tinha perdido o sinal requiresStrictGeometry do V2. Best-effort: falha
+    // do LLM cai na instrução crua (as cláusulas do prompt seguram o contrato).
+    const normalized = await normalizeInstruction({
+      instructionPt: instruction,
+      intent: INTENT_FOR_ACTION[action],
+      hasMask: !!maskUrl,
+      referenceKind: references[0]?.kind ?? null,
+      enabled: editV3NormalizerEnabled(),
+      timeoutMs: 12_000,
+    })
+    const instructionEn = normalized.instructionEn || instruction
+    // Pedido toca estrutura/aberturas/esquadrias → preservação máxima forçada.
+    const effectivePreservation = normalized.requiresStrictGeometry ? 'maximum' : preservation
+    if (normalized.used) {
+      console.log(
+        `[edit-v3] normalizer: strictGeo=${normalized.requiresStrictGeometry} ` +
+        `ambiguous=${normalized.ambiguous} ${normalized.durationMs}ms`,
+      )
+    }
+
     // ── Job 'processing' (persistência completa; resiliente) ─────────────────
     jobId = await insertJobResilient(db, {
       user_id: userId,
@@ -237,14 +263,14 @@ export async function POST(req: Request) {
       maskUrl,
       instruction,
       quality,
-      preservation,
+      preservation: effectivePreservation,
       intensity,
       outputResolution,
       references,
     }
     const run = await runEditV3({
       request,
-      instructionEn: instruction, // PT cru — as cláusulas do prompt garantem o contrato
+      instructionEn,
       model,
       resolution,
       falFallback: editV3FalFallbackEnabled(),
@@ -265,16 +291,19 @@ export async function POST(req: Request) {
         error_message: run.rejectReasons.join(','),
         completed_at: new Date().toISOString(),
       })
-      console.log(`[edit-v3] rejected user=${userId} action=${action} reasons=${run.rejectReasons.join(',')}`)
+      console.log(`[edit-v3] rejected user=${userId} action=${action} reasons=${run.rejectReasons.join(',')} retried=${run.retried} crop=${run.usedCrop}`)
+      const semanticOnly = run.rejectReasons.every(r => r.startsWith('semantic_'))
       return NextResponse.json({
         rejected: true,
-        reasons: [maskUrl
-          ? 'A edição alterou áreas fora da seleção ou não aplicou o pedido e foi descartada.'
-          : 'A edição não aplicou o pedido como esperado e foi descartada.'],
+        reasons: [semanticOnly
+          ? 'A verificação visual detectou alterações além do que foi pedido e a edição foi descartada.'
+          : maskUrl
+            ? 'A edição alterou áreas fora da seleção ou não aplicou o pedido e foi descartada.'
+            : 'A edição não aplicou o pedido como esperado e foi descartada.'],
         message: 'Nenhum node foi consumido. Refazer é grátis.',
         nodes_cost: nodes,
         charge: { simulated: !chargeOn, debited: false },
-        ...(debug ? { debug: { ...debugBlock, metrics: run.metrics, reject_reasons: run.rejectReasons, used_fallback: run.usedFallback } } : {}),
+        ...(debug ? { debug: { ...debugBlock, metrics: run.metrics, reject_reasons: run.rejectReasons, used_fallback: run.usedFallback, retried: run.retried, used_crop: run.usedCrop, semantic: run.semantic } } : {}),
       })
     }
 
@@ -332,10 +361,16 @@ export async function POST(req: Request) {
     console.log(
       `[edit-v3] done user=${userId} action=${action} provider=${run.provider} model=${run.model} ` +
       `res=${resolution} fallback=${run.usedFallback} charged=${charged} nodes=${nodes} ` +
+      `crop=${run.usedCrop} retried=${run.retried} semantic=${run.semantic ? (run.semantic.skipped ? 'skip' : run.semantic.pass ? 'pass' : run.semantic.reasons.join('|')) : 'off'} ` +
       `tokens=${ps.totalTokens}(out ${ps.outputTokens}) realUsd=${ps.realCostUsd != null ? ps.realCostUsd.toFixed(4) : 'n/a'} ` +
       `marginReal=${ps.realCostUsd != null ? Math.round(marginAt(nodes, ps.realCostUsd) * 100) + '%' : 'n/a'} ` +
       `outDrift=${run.metrics.outOfMaskDelta} inDelta=${run.metrics.inMaskDelta} dur=${ps.durationMs}ms`,
     )
+
+    // Com máscara o gate semântico é advisory: reprovou → warning na resposta
+    // (o recompose já garantiu os pixels fora da seleção; o aviso cobre o
+    // DENTRO — material errado, artefato — sem bloquear entrega legítima).
+    const semanticWarning = run.semantic && !run.semantic.pass && !run.semantic.skipped
 
     return NextResponse.json({
       rejected: false,
@@ -343,11 +378,17 @@ export async function POST(req: Request) {
       nodes_cost: nodes,
       charge: { simulated: !chargeOn, debited: charged },
       output: run.outputDims,
+      ...(semanticWarning
+        ? { warning: 'A verificação visual apontou possíveis diferenças além do pedido. Confira o resultado antes de usar.' }
+        : {}),
       ...(debug
         ? {
             debug: {
               ...debugBlock,
               used_fallback: run.usedFallback,
+              used_crop: run.usedCrop,
+              retried: run.retried,
+              semantic: run.semantic,
               request_id: run.requestId,
               metrics: run.metrics,
               job_id: jobId,

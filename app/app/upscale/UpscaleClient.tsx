@@ -163,6 +163,9 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
   // fallback generativo (ex.: Alta Fidelidade Topaz → Clarity). O aviso na
   // UI é o que impede o fallback de ser silencioso.
   const [usedFallback, setUsedFallback] = useState(false)
+  // Dimensões REAIS medidas pelo servidor no output (o provider pode clampar
+  // o fator — ex.: Topaz vai só até 4×); null = verificação indisponível.
+  const [resultDims,   setResultDims]   = useState<{ w: number; h: number } | null>(null)
   const [credits,     setCredits]     = useState(initialCredits)
   const [error,       setError]       = useState<string | null>(null)
   const [isDownloading, setIsDownloading] = useState(false)
@@ -374,6 +377,11 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
       if (!res.ok) { setError(errMsg(data, 'Erro desconhecido')); return }
       setResultUrl(data?.url as string)
       setUsedFallback(Boolean(data?.fallbackUsed))
+      setResultDims(
+        typeof data?.outputWidth === 'number' && typeof data?.outputHeight === 'number'
+          ? { w: data.outputWidth, h: data.outputHeight }
+          : null,
+      )
       setCredits(c => c - nodeCost)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Falha de conexão. Tente novamente.')
@@ -697,7 +705,11 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
             <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' as const }}>
               <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', letterSpacing: '0.04em' }}>
                 Arraste para comparar · {selectedScale === 'none' ? 'sem aumento' : `${factorOut}×`} · {activeMode.label}
-                {imageDimensions && factorOut > 1 && <span> · {imageDimensions.w * factorOut}×{imageDimensions.h * factorOut}px</span>}
+                {/* Dimensões REAIS do output quando o servidor mediu; a estimativa
+                    (origem × fator) só como fallback — o provider pode clampar. */}
+                {resultDims
+                  ? <span> · {resultDims.w}×{resultDims.h}px</span>
+                  : imageDimensions && factorOut > 1 && <span> · {imageDimensions.w * factorOut}×{imageDimensions.h * factorOut}px</span>}
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={handleDownload} disabled={isDownloading}

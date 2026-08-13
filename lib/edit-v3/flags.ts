@@ -46,3 +46,18 @@ export function editV3AllowHighPrecision(): boolean {
 export function editV3DebugAllowed(): boolean {
   return process.env.NODE_ENV !== 'production' || process.env.EDIT_V3_DEBUG === '1'
 }
+
+/** Normalizador de instrução PT→EN (reusa lib/edit-v2/normalizer — clean e
+ *  validado em prod). Default LIGADO; EDIT_V3_NORMALIZER=0 desliga
+ *  (kill-switch). Falha do LLM nunca bloqueia: cai na instrução crua. */
+export function editV3NormalizerEnabled(): boolean {
+  return process.env.EDIT_V3_NORMALIZER !== '0'
+}
+
+/** Gate semântico pós-geração (Gemini vision compara original × resultado).
+ *  Default LIGADO; EDIT_V3_SEMANTIC_GATE=0 desliga. Com máscara é ADVISORY
+ *  (warning — o recompose já garante os pixels); sem máscara REJEITA — é a
+ *  única proteção fina do modo (gates de pixel só pegam catástrofe). */
+export function editV3SemanticGateEnabled(): boolean {
+  return process.env.EDIT_V3_SEMANTIC_GATE !== '0'
+}

@@ -20,12 +20,14 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { refundNodes } from '@/lib/billing/refund-nodes'
 import { DIRECT_UPLOAD_AREAS, downloadDirectUpload } from '@/lib/storage/direct-upload'
+import { fetchStorageBuffer } from '@/lib/storage/fetch'
 import sharp from 'sharp'
 import {
   computeUpscaleCost,
   finalProvider,
   megapixelsFromDimensions,
   runUpscalePipeline,
+  scaleToFactor,
   type ModeId,
   type Scale,
   type UpscaleTab,
@@ -38,6 +40,11 @@ fal.config({ credentials: process.env.FAL_KEY })
 const VALID_TABS:   UpscaleTab[] = ['resolution', 'enhance']
 const VALID_MODES:  ModeId[]     = ['fidelity', 'recover', 'denoise', 'deblur', 'restore', 'smart']
 const VALID_SCALES: Scale[]      = ['none', '2x', '4x', '8x', 'ultra']
+
+// Teto do OUTPUT em megapixels (input_MP × fator²). 256 MP ≈ 16K×16K — acima
+// disso o provider falha depois de minutos (refund, tempo perdido) ou devolve
+// resultado silenciosamente reduzido. Checado ANTES do custo/débito.
+const MAX_OUTPUT_MP = 256
 
 // Constraint: aba × modo precisam combinar para evitar requisições inválidas.
 const ALLOWED_MODES_BY_TAB: Record<UpscaleTab, ModeId[]> = {
@@ -104,6 +111,22 @@ export async function POST(req: NextRequest) {
     height = heightRaw ? Number(heightRaw) : null
   }
 
+  // ── Teto de resolução do output (antes de custo/débito) ────────────────────
+  const scaleFactor = scaleToFactor(scaleT)
+  if (width && height) {
+    const outputMp = (width * height * scaleFactor * scaleFactor) / 1_000_000
+    if (outputMp > MAX_OUTPUT_MP) {
+      return NextResponse.json(
+        {
+          error:
+            `Essa combinação geraria ~${Math.round(outputMp)} MP — acima do limite de ${MAX_OUTPUT_MP} MP. ` +
+            'Use uma escala menor para esta imagem.',
+        },
+        { status: 400 },
+      )
+    }
+  }
+
   // ── Custo ──────────────────────────────────────────────────────────────────
   const cost = computeUpscaleCost({
     tab:        tabT,
@@ -156,6 +179,27 @@ export async function POST(req: NextRequest) {
     // silencioso: a UI avisa que o resultado veio de um provider generativo,
     // não do preservador prometido pelo modo.
     const fallbackUsed = result.steps.some(s => s.status === 'completed' && s.fallbackOf !== null)
+
+    // ── Verificação do output: dimensões REAIS + fator atingido ──────────────
+    // (o provider pode clampar/reduzir sem avisar — ex.: Topaz vai só até 4×).
+    // Best-effort: falha aqui nunca derruba a entrega.
+    let outputWidth:  number | null = null
+    let outputHeight: number | null = null
+    let achievedFactor: number | null = null
+    try {
+      const outBuf  = await fetchStorageBuffer(outputUrl)
+      const outMeta = await sharp(outBuf).metadata()
+      outputWidth  = outMeta.width  ?? null
+      outputHeight = outMeta.height ?? null
+      if (outputWidth && width) {
+        achievedFactor = Math.round((outputWidth / width) * 100) / 100
+        if (scaleFactor > 1 && achievedFactor < scaleFactor * 0.9) {
+          console.warn('[upscale] fator atingido abaixo do pedido:', achievedFactor, 'vs', scaleFactor)
+        }
+      }
+    } catch (verifyErr) {
+      console.warn('[upscale] verificação do output falhou (segue sem):', (verifyErr as Error).message)
+    }
     // Rastreabilidade: id do request fal do último step concluído (o que produziu
     // o output). O detalhe por step também vai em upscale_meta.steps[].requestId.
     const falRequestId = [...result.steps].reverse().find(s => s.status === 'completed')?.requestId ?? null
@@ -173,6 +217,9 @@ export async function POST(req: NextRequest) {
       scale:            scaleT,
       steps:            result.steps,
       input_dimensions:  width && height ? { width, height } : null,
+      output_dimensions: outputWidth && outputHeight ? { width: outputWidth, height: outputHeight } : null,
+      achieved_factor:   achievedFactor,
+      fallback_used:     fallbackUsed,
       total_duration_ms: result.totalDurationMs,
     }
 
@@ -206,6 +253,9 @@ export async function POST(req: NextRequest) {
       originalUrl:  inputUrl,
       provider:     usedProvider,
       fallbackUsed,
+      outputWidth,
+      outputHeight,
+      achievedFactor,
       durationMs:   result.totalDurationMs,
     })
 

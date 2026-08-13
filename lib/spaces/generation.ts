@@ -59,17 +59,20 @@ export const FAL_TIMEOUT_MS: Record<EngineId, number> = {
 }
 
 // Params do provider por engine (espelha generate.ts do Renderizar).
+// output_format png: master lossless — alinha o caminho FAL com o GCP/Vertex
+// (que já devolve PNG e re-hospeda). JPEG na entrega criava uma geração de
+// perda a cada passo da cadeia render → editar → ampliar.
 export function falParamsForEngine(engine: EngineId, q: Resolution): Record<string, unknown> {
   if (engine === 'quasar') {
     return {
       quality:       q === '4k' ? 'high' : 'medium',
       image_size:    'auto',
       num_images:    1,
-      output_format: 'jpeg',
+      output_format: 'png',
     }
   }
   const map: Record<Resolution, string> = { hd: '1K', '2k': '2K', '4k': '4K' }
-  return { resolution: map[q], num_images: 1, output_format: 'jpeg' }
+  return { resolution: map[q], num_images: 1, output_format: 'png' }
 }
 
 // Eixo persistido (vistas.axis) por ação — mantém filtros/verify-dna/histórico

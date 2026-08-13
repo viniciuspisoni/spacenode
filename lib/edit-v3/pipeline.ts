@@ -13,13 +13,16 @@
 import {
   assertMaskMatchesImage,
   dilateMask,
+  extractCrop,
   fetchImageBuffer,
   fullRegion,
   measureInMaskChange,
   measureOutOfMaskDrift,
   maskWhiteRatio,
   normalizeMaskToImage,
+  planCrop,
   recomposeMasked,
+  type CropRegion,
 } from '@/lib/spaces/edit-crop'
 import {
   editImageWithGoogle,
@@ -27,9 +30,13 @@ import {
   type GoogleImageModel,
 } from '@/lib/ai/google/editImage'
 import { editImageWithFal, FalEditError } from '@/lib/ai/fal/editImage'
-import { buildEditPrompt } from './buildEditPrompt'
+import { buildEditPrompt, buildStrictRetryPrompt } from './buildEditPrompt'
 import { outputImageCostUsd } from './pricing'
 import { assertSafeImageUrl, EditV3InputError } from './ssrf'
+import { editV3SemanticGateEnabled } from './flags'
+import { evaluateEditSemantics } from '@/lib/edit-v2/semantic-gate'
+import type { EditIntentV2 } from '@/lib/edit-v2/types'
+import { normalizeSourceImage } from '@/lib/storage/normalize-image'
 import type {
   EditV3Action,
   EditV3Intensity,
@@ -52,6 +59,27 @@ export class EditV3GenerationError extends Error {
 const BLEND_ACTIONS: ReadonlySet<EditV3Action> = new Set(['swap_material', 'insert_element'])
 // Ações que ajudam com dilatação leve da máscara (objeto/artefato sem contorno exato).
 const DILATE_ACTIONS: ReadonlySet<EditV3Action> = new Set(['remove', 'refine_area'])
+
+// Mapeia a ação V3 pro vocabulário V2 (normalizer + gate semântico reusados).
+export const INTENT_FOR_ACTION: Record<EditV3Action, EditIntentV2> = {
+  remove:         'remove_element',
+  swap_material:  'swap_material',
+  insert_element: 'insert_element',
+  refine_area:    'fix_image',
+}
+
+// Crop só quando a região (bbox da seleção + 25% de padding) é meaningfully
+// menor que a imagem — acima disso o crop é a imagem inteira com custo extra.
+const CROP_MAX_AREA_RATIO = 0.8
+
+// Rejeições de pixel que valem UM retry com prompt estrito (drift/enquadramento).
+// 'no_change' fica de fora: o prompt estrito reforça preservação — o oposto do
+// que um no-op precisa.
+const PIXEL_RETRYABLE: ReadonlySet<string> = new Set([
+  'out_of_mask_drift',
+  'framing_changed',
+  'global_redesign',
+])
 
 // Limite do bucket de resultado (space-mestres) ~15 MB; alvo conservador.
 const STORAGE_MAX_BYTES = 14 * 1024 * 1024
@@ -128,8 +156,9 @@ export interface EditV3RunInput {
   resolution: EditV3Resolution
   /** Permite fallback FAL quando o Google falha. */
   falFallback: boolean
-  /** Re-hospeda buffers (máscara efetiva, resultado) no Storage do produto. */
-  uploadAsset: (buffer: Buffer, kind: 'result' | 'crop-mask') => Promise<string>
+  /** Re-hospeda buffers (crop da origem, máscara efetiva, resultado) no
+   *  Storage do produto. */
+  uploadAsset: (buffer: Buffer, kind: 'result' | 'crop' | 'crop-mask') => Promise<string>
 }
 
 export interface EditV3RunResult {
@@ -145,6 +174,15 @@ export interface EditV3RunResult {
     inMaskDelta: number | null
     maskCoverage: number | null
   }
+  /** true = a 1ª tentativa reprovou no gate de pixels e a entrega veio do
+   *  retry com prompt estrito. */
+  retried: boolean
+  /** true = o provider recebeu só o CROP da seleção (bbox+25%) — o budget de
+   *  resolução do modelo é gasto na região editada, não no frame inteiro. */
+  usedCrop: boolean
+  /** Veredito do gate semântico (Gemini vision, best-effort). null = desligado
+   *  ou indisponível. */
+  semantic: { pass: boolean; reasons: string[]; skipped: boolean } | null
   stages: {
     provider: {
       durationMs: number
@@ -158,10 +196,14 @@ export interface EditV3RunResult {
   outputDims: { width: number; height: number } | null
 }
 
-/** Re-encoda o resultado (PNG lossless do recompose) para JPEG de alta qualidade
- *  abaixo do limite do bucket. Feito DEPOIS dos gates — não afeta drift. */
+/** Entrega o resultado como MASTER LOSSLESS (o PNG do recompose) enquanto
+ *  couber no bucket — a cadeia de edições deixa de acumular uma geração JPEG
+ *  por edição (cada re-encode q92 do frame inteiro degradava exatamente as
+ *  áreas que o recompose garantiu intactas). JPEG de alta qualidade só como
+ *  fallback de tamanho. Feito DEPOIS dos gates — não afeta drift. */
 async function encodeResultForStorage(buf: Buffer): Promise<Buffer> {
   const sharp = (await import('sharp')).default
+  if (buf.length <= STORAGE_MAX_BYTES) return buf
   for (const quality of [92, 86, 80, 72]) {
     const out = await sharp(buf).jpeg({ quality, mozjpeg: true }).keepMetadata().toBuffer()
     if (out.length <= STORAGE_MAX_BYTES) return out
@@ -185,7 +227,27 @@ export async function runEditV3(input: EditV3RunInput): Promise<EditV3RunResult>
   if (request.maskUrl) assertSafeImageUrl(request.maskUrl)
   for (const ref of request.references) assertSafeImageUrl(ref.url)
 
-  const sourceBuf = await fetchImageBuffer(request.sourceImageUrl)
+  // Origem normalizada ANTES de tudo: rotação EXIF + ICC→sRGB, SEM resize (o
+  // crop da seleção abaixo é quem limita o que vai ao modelo). Elimina o shift
+  // de cor confinado à seleção: o recompose mistura pixels da origem com o
+  // output sRGB sem tag do modelo — em origem P3/Adobe RGB o patch destoava.
+  // Provider, recompose, gates e entrega leem o MESMO buffer normalizado.
+  const sourceRaw = await fetchImageBuffer(request.sourceImageUrl)
+  const normalizedSource = await normalizeSourceImage(sourceRaw, {
+    maxLongSide: null,
+    maxBytes: Number.MAX_SAFE_INTEGER,
+  })
+  const sourceBuf = normalizedSource.buffer
+  if (normalizedSource.transforms.length > 0) {
+    console.log('[edit-v3] source normalizado:', normalizedSource.transforms.join('+'))
+  }
+  // URL da origem que provider (caminho sem crop) e gate semântico enxergam —
+  // precisa ser o MESMO pixel-space do recompose, senão máscara/vereditos
+  // desalinham quando a normalização mexeu na imagem.
+  let normalizedSourceUrl = request.sourceImageUrl
+  if (normalizedSource.transforms.length > 0) {
+    normalizedSourceUrl = await input.uploadAsset(sourceBuf, 'crop')
+  }
   const hasMask = !!request.maskUrl
 
   // 2. Máscara (quando houver): valida proporção → normaliza às dims → dilata
@@ -224,6 +286,31 @@ export async function runEditV3(input: EditV3RunInput): Promise<EditV3RunResult>
     }
   }
 
+  // CROP da seleção (bbox + 25% de padding — regressão do v1 restaurada): o
+  // provider recebe só a região editada e gasta o budget de resolução
+  // (1K/2K/4K) nela, em vez de diluí-lo no frame inteiro e devolver um patch
+  // esticado/borrado no recompose. Bônus estrutural: o featherSigma do
+  // recompose deriva da REGIÃO → proporcional à seleção, não à imagem (o
+  // vazamento de material de ~70 px em imagens grandes desaparece).
+  let providerImageUrl = normalizedSourceUrl
+  let cropRegion: CropRegion | null = null
+  if (maskBuf) {
+    const srcMeta = await sharp(sourceBuf).metadata()
+    const srcArea = (srcMeta.width ?? 0) * (srcMeta.height ?? 0)
+    const plan = await planCrop({ imageBuffer: sourceBuf, maskBuffer: maskBuf })
+    if (plan && srcArea > 0 && (plan.region.width * plan.region.height) / srcArea <= CROP_MAX_AREA_RATIO) {
+      const [cropImg, cropMask] = await Promise.all([
+        extractCrop(sourceBuf, plan),
+        extractCrop(maskBuf, plan),
+      ])
+      ;[providerImageUrl, providerMaskUrl] = await Promise.all([
+        input.uploadAsset(cropImg, 'crop'),
+        input.uploadAsset(cropMask, 'crop-mask'),
+      ])
+      cropRegion = plan.region
+    }
+  }
+
   // 3. Prompt rígido por ação. SEM máscara: força preservação MÁXIMA + clampa
   //    intensidade forte (whole-frame + forte é o combo mais arriscado).
   const promptPreservation = hasMask ? request.preservation : 'maximum'
@@ -238,54 +325,155 @@ export async function runEditV3(input: EditV3RunInput): Promise<EditV3RunResult>
     references: request.references,
   })
 
-  // 4. Motor Google (fallback FAL opcional)
-  const providerStart = Date.now()
-  let provider: EditV3Provider
-  let model: EditV3Model
-  let requestId: string | null
-  let imageRef: string
-  let usedFallback = false
-  let promptTokens: number | null = null
-  let outputTokens: number | null = null
-  let totalTokens: number | null = null
-  try {
-    const out = await editImageWithGoogle({
-      imageUrl: request.sourceImageUrl,
-      maskUrl: providerMaskUrl,
-      references: request.references.map(r => ({ url: r.url })),
-      prompt,
-      model: input.model,
-      resolution: input.resolution,
-    })
-    provider = 'google'
-    model = out.model
-    requestId = out.requestId
-    imageRef = out.imageRef
-    promptTokens = out.promptTokens
-    outputTokens = out.outputTokens
-    totalTokens = out.totalTokens
-  } catch (googleErr) {
-    if (!(input.falFallback && googleErr instanceof GoogleEditError)) {
-      throw googleErr
-    }
-    console.warn('[edit-v3] Google falhou, tentando fallback FAL:', (googleErr as Error).message)
+  // 4. Motor (Google, fallback FAL opcional) — encapsulado pra permitir o
+  //    retry estrito sem duplicar o tratamento de erro.
+  interface ProviderOut {
+    provider: EditV3Provider
+    model: EditV3Model
+    requestId: string | null
+    usedFallback: boolean
+    editedBuf: Buffer
+    promptTokens: number | null
+    outputTokens: number | null
+    totalTokens: number | null
+  }
+  const callProvider = async (activePrompt: string): Promise<ProviderOut> => {
     try {
-      const out = await editImageWithFal({
-        imageUrl: request.sourceImageUrl,
+      const out = await editImageWithGoogle({
+        imageUrl: providerImageUrl,
         maskUrl: providerMaskUrl,
         references: request.references.map(r => ({ url: r.url })),
-        prompt,
+        prompt: activePrompt,
+        model: input.model,
+        resolution: input.resolution,
       })
-      provider = 'fal'
-      model = out.model
-      requestId = out.requestId
-      imageRef = out.imageRef
-      usedFallback = true
-    } catch (falErr) {
-      const fe = falErr instanceof FalEditError ? falErr.message : String(falErr)
-      throw new EditV3GenerationError(`Google e fallback FAL falharam (${fe}).`)
+      return {
+        provider: 'google',
+        model: out.model,
+        requestId: out.requestId,
+        usedFallback: false,
+        editedBuf: await fetchImageBuffer(out.imageRef),
+        promptTokens: out.promptTokens,
+        outputTokens: out.outputTokens,
+        totalTokens: out.totalTokens,
+      }
+    } catch (googleErr) {
+      if (!(input.falFallback && googleErr instanceof GoogleEditError)) {
+        throw googleErr
+      }
+      console.warn('[edit-v3] Google falhou, tentando fallback FAL:', (googleErr as Error).message)
+      try {
+        const out = await editImageWithFal({
+          imageUrl: providerImageUrl,
+          maskUrl: providerMaskUrl,
+          references: request.references.map(r => ({ url: r.url })),
+          prompt: activePrompt,
+        })
+        return {
+          provider: 'fal',
+          model: out.model,
+          requestId: out.requestId,
+          usedFallback: true,
+          editedBuf: await fetchImageBuffer(out.imageRef),
+          promptTokens: null,
+          outputTokens: null,
+          totalTokens: null,
+        }
+      } catch (falErr) {
+        const fe = falErr instanceof FalEditError ? falErr.message : String(falErr)
+        throw new EditV3GenerationError(`Google e fallback FAL falharam (${fe}).`)
+      }
     }
   }
+
+  // 5. Composição + gates (dois caminhos), também encapsulados pro retry.
+  interface Composed {
+    resultBuf: Buffer
+    outOfMaskDelta: number | null
+    inMaskDelta: number | null
+    reasons: string[]
+  }
+  const composeAndGate = async (editedBuf: Buffer): Promise<Composed> => {
+    const reasons: string[] = []
+    if (maskBuf) {
+      // COM máscara: o output (patch do crop ou frame inteiro) só entra DENTRO
+      // da seleção (garantia de servidor). region = crop quando houve.
+      const region = cropRegion ?? await fullRegion(sourceBuf)
+      const softEdges = BLEND_ACTIONS.has(request.action)
+      const resultBuf = await recomposeMasked({
+        originalBuffer: sourceBuf,
+        editedCropBuffer: editedBuf,
+        maskBuffer: maskBuf,
+        region,
+        softEdges,
+      })
+      const [outOfMaskDelta, inMaskDelta] = await Promise.all([
+        // softEdges na MEDIÇÃO acompanha a AÇÃO (padrão v1): blend precisa da
+        // folga do feather; remove/refino medem contra a máscara JÁ dilatada —
+        // régua dura sem falso positivo, e o gate volta a enxergar a borda da
+        // seleção (antes, softEdges fixo em true cegava ~100-200 px em volta).
+        measureOutOfMaskDrift({ originalBuffer: sourceBuf, resultBuffer: resultBuf, maskBuffer: maskBuf, softEdges }),
+        measureInMaskChange({ originalBuffer: sourceBuf, resultBuffer: resultBuf, maskBuffer: maskBuf }),
+      ])
+      const { outOfMask, noChangeFloor } = gateThresholds({ action: request.action, preservation: request.preservation })
+      if (outOfMaskDelta > outOfMask) reasons.push('out_of_mask_drift')
+      if (inMaskDelta < noChangeFloor) reasons.push('no_change')
+      return { resultBuf, outOfMaskDelta, inMaskDelta, reasons }
+    }
+    // SEM máscara (instrução): sem recompose. fitToSource preserva dims/aspecto
+    // da origem. Gates determinísticos pegam catástrofe; a preservação fina é o
+    // gate semântico abaixo.
+    const fitted = await fitToSource(editedBuf, sourceBuf)
+    if (!fitted.aspectOk) reasons.push('framing_changed')
+    const globalChange = await measureGlobalChange(sourceBuf, fitted.buf)
+    const { globalNoChangeFloor, blowupCeiling } = noMaskGateThresholds()
+    if (globalChange < globalNoChangeFloor) reasons.push('no_change')
+    if (globalChange > blowupCeiling) reasons.push('global_redesign')
+    return { resultBuf: fitted.buf, outOfMaskDelta: null, inMaskDelta: globalChange, reasons }
+  }
+
+  // Tentativa 1 → se reprovar por drift/enquadramento, UM retry com o prompt
+  // estrito (buildStrictRetryPrompt — escrito no V3 e nunca chamado até aqui).
+  // Nunca cobra: o retry é interno; se ainda reprovar, entrega a MELHOR
+  // tentativa como rejeitada (refazer é grátis).
+  const sumTok = (a: number | null, b: number | null) =>
+    a == null && b == null ? null : (a ?? 0) + (b ?? 0)
+  const providerStart = Date.now()
+  const first = await callProvider(prompt)
+  const firstComp = await composeAndGate(first.editedBuf)
+  let chosenProv = first
+  let chosenComp = firstComp
+  let promptTokens = first.promptTokens
+  let outputTokens = first.outputTokens
+  let totalTokens = first.totalTokens
+  let retried = false
+  const retryReasons = firstComp.reasons.filter(r => PIXEL_RETRYABLE.has(r))
+  if (retryReasons.length > 0) {
+    try {
+      const second = await callProvider(buildStrictRetryPrompt(prompt, retryReasons))
+      const secondComp = await composeAndGate(second.editedBuf)
+      // Tokens/custo somam as DUAS tentativas (gasto real do job).
+      promptTokens = sumTok(first.promptTokens, second.promptTokens)
+      outputTokens = sumTok(first.outputTokens, second.outputTokens)
+      totalTokens  = sumTok(first.totalTokens, second.totalTokens)
+      const secondBetter =
+        secondComp.reasons.length < firstComp.reasons.length ||
+        (secondComp.reasons.length === firstComp.reasons.length &&
+          (secondComp.outOfMaskDelta ?? 0) <= (firstComp.outOfMaskDelta ?? 0))
+      if (secondBetter) {
+        chosenProv = second
+        chosenComp = secondComp
+      }
+      retried = true
+      console.log(`[edit-v3] retry estrito: reasons ${firstComp.reasons.join(',')} → ${secondComp.reasons.join(',') || 'ok'} (entregue: ${secondBetter ? '2ª' : '1ª'})`)
+    } catch (retryErr) {
+      console.warn('[edit-v3] retry estrito falhou (mantém 1ª tentativa):', (retryErr as Error).message)
+    }
+  }
+  const { provider, model, requestId, usedFallback } = chosenProv
+  const reasons = [...chosenComp.reasons]
+  const { resultBuf, outOfMaskDelta, inMaskDelta } = chosenComp
+
   const realCostUsd =
     provider === 'google' && model !== 'nano-banana' && outputTokens != null
       ? outputImageCostUsd(model, outputTokens)
@@ -298,55 +486,33 @@ export async function runEditV3(input: EditV3RunInput): Promise<EditV3RunResult>
     realCostUsd,
   }
 
-  const editedBuf = await fetchImageBuffer(imageRef)
-
-  // 5. Composição + gates (dois caminhos)
-  let resultBuf: Buffer
-  let outOfMaskDelta: number | null = null
-  let inMaskDelta: number | null = null
-  const reasons: string[] = []
-
-  if (maskBuf) {
-    // COM máscara: o output só entra DENTRO da seleção (garantia de servidor).
-    const region = await fullRegion(sourceBuf)
-    const softEdges = BLEND_ACTIONS.has(request.action)
-    resultBuf = await recomposeMasked({
-      originalBuffer: sourceBuf,
-      editedCropBuffer: editedBuf,
-      maskBuffer: maskBuf,
-      region,
-      softEdges,
-    })
-    ;[outOfMaskDelta, inMaskDelta] = await Promise.all([
-      // Tolerância de borda na MEDIÇÃO (absorve a banda de dilatação/feather);
-      // o recompose continua duro para remove/refino — só a régua ganha folga.
-      measureOutOfMaskDrift({ originalBuffer: sourceBuf, resultBuffer: resultBuf, maskBuffer: maskBuf, softEdges: true }),
-      measureInMaskChange({ originalBuffer: sourceBuf, resultBuffer: resultBuf, maskBuffer: maskBuf }),
-    ])
-    const { outOfMask, noChangeFloor } = gateThresholds({ action: request.action, preservation: request.preservation })
-    if (outOfMaskDelta > outOfMask) reasons.push('out_of_mask_drift')
-    if (inMaskDelta < noChangeFloor) reasons.push('no_change')
-  } else {
-    // SEM máscara (instrução): sem recompose. resizeToSource preserva dims/aspecto
-    // da origem (o modelo devolve outro tamanho). Gates determinísticos só pegam
-    // catástrofe (no-op / imagem totalmente trocada); a preservação fina é
-    // semântica (prompt rígido + Fase 1.5: gate VLM).
-    const fitted = await fitToSource(editedBuf, sourceBuf)
-    resultBuf = fitted.buf
-    // Modelo mudou o enquadramento (aspecto) → rejeita (grátis); não entrega
-    // imagem cortada/distorcida.
-    if (!fitted.aspectOk) reasons.push('framing_changed')
-    const globalChange = await measureGlobalChange(sourceBuf, resultBuf)
-    inMaskDelta = globalChange // reaproveita o campo p/ telemetria (mudança global)
-    const { globalNoChangeFloor, blowupCeiling } = noMaskGateThresholds()
-    if (globalChange < globalNoChangeFloor) reasons.push('no_change')
-    if (globalChange > blowupCeiling) reasons.push('global_redesign')
-  }
-
-  // 6. Upload do resultado (entrega comprimida; gates já mediram no lossless)
+  // 6. Upload do resultado (master lossless quando couber no bucket; os gates
+  //    já mediram no lossless de qualquer forma)
   const storageBuf = await encodeResultForStorage(resultBuf)
   const resultUrl = await input.uploadAsset(storageBuf, 'result')
   const outMeta = await sharp(storageBuf).metadata()
+
+  // 7. Gate semântico (Gemini vision, best-effort — ver flags.ts). Compara a
+  //    origem NORMALIZADA com o resultado final. SEM máscara os reasons entram
+  //    na rejeição (única proteção fina do modo — fecha o buraco "restyle
+  //    completo passa"); COM máscara vira warning (o recompose já garante os
+  //    pixels). Sem instrução não roda: "change_applied" sem pedido é ruído.
+  let semantic: EditV3RunResult['semantic'] = null
+  if (editV3SemanticGateEnabled() && input.instructionEn.trim()) {
+    const verdict = await evaluateEditSemantics({
+      originalUrl: normalizedSourceUrl,
+      editedUrl: resultUrl,
+      referenceUrl: request.references[0]?.url ?? null,
+      instructionEn: input.instructionEn,
+      intent: INTENT_FOR_ACTION[request.action],
+      enabled: true,
+      timeoutMs: 20_000,
+    })
+    semantic = { pass: verdict.pass, reasons: verdict.reasons, skipped: verdict.skipped }
+    if (!hasMask && !verdict.pass && !verdict.skipped) {
+      for (const r of verdict.reasons) reasons.push(`semantic_${r}`)
+    }
+  }
 
   return {
     resultUrl,
@@ -357,6 +523,9 @@ export async function runEditV3(input: EditV3RunInput): Promise<EditV3RunResult>
     requestId,
     usedFallback,
     metrics: { outOfMaskDelta, inMaskDelta, maskCoverage },
+    retried,
+    usedCrop: cropRegion !== null,
+    semantic,
     stages: { provider: providerStage },
     outputDims: outMeta.width && outMeta.height ? { width: outMeta.width, height: outMeta.height } : null,
   }

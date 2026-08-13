@@ -370,13 +370,29 @@ Mudança de prompt hoje vai para produção sem medição comparável. Proposta:
 7. ✅ Fallback Topaz→Clarity sinalizado (`fallbackUsed` na resposta + aviso na
    UI do Ampliar).
 
-**Fase 2 — Correções estruturais (1-2 semanas):**
-1. Direct upload no Renderizar; fim do downscale 2048 px (§3.1).
-2. Master lossless + derivado de exibição; PNG no download 2K/4K (§3.6).
-3. Editar V3: crop bbox+25%, feather por bbox, gate com máscara dura, retry
-   estrito, normalizer, gate semântico (§4).
-4. `.toColorspace('srgb')` em todos os pipelines (§3.7).
-5. Teto e verificação de output no Ampliar (§5).
+**Fase 2 — Correções estruturais (1-2 semanas):** ✅ **IMPLEMENTADA (2026-08-13)**
+1. ✅ Upload direto no Renderizar (área `render-source`, 15 MB) — fim do
+   downscale de 2048 px; preview via objectURL; regeneração reusa `inputUrl`
+   (ativa o cache de briefing). `imageBase64` segue aceito (Nodi/legado).
+2. ✅ Normalização de entrada (`lib/storage/normalize-image`): rotação EXIF +
+   ICC→sRGB + teto 4096 px/9 MB via Lanczos no Renderizar; só EXIF+ICC no
+   Editar (o crop limita o que vai ao modelo). Pass-through byte-idêntico
+   quando nada é necessário.
+3. ✅ Master lossless: geração FAL pede `output_format: 'png'` (alinha com o
+   GCP, que já devolvia PNG); Editar V3 entrega o PNG do recompose enquanto
+   couber no bucket (JPEG só como fallback de tamanho); download do Renderizar
+   nomeia a extensão real.
+4. ✅ Editar V3: crop bbox+25% restaurado (`planCrop`/`extractCrop` do v1,
+   com o feather derivado da região → proporcional à seleção); medição de
+   drift com `softEdges` por ação (padrão v1 — o gate volta a enxergar a borda
+   da seleção); retry único com `buildStrictRetryPrompt` em rejeição por
+   drift; normalizer PT→EN do V2 religado (+ `requiresStrictGeometry` força
+   preservação máxima); gate semântico Gemini — rejeita SEM máscara (fecha o
+   "restyle completo passa"), warning COM máscara. Kill-switches:
+   `EDIT_V3_NORMALIZER=0`, `EDIT_V3_SEMANTIC_GATE=0`.
+5. ✅ Ampliar: teto de output 256 MP checado antes do débito; dimensões reais
+   do resultado medidas pós-pipeline (`achieved_factor` em `upscale_meta`,
+   dimensões reais na UI).
 
 **Fase 3 — Diferenciação (2-4+ semanas):**
 1. Depth map + edge map na 1ª tentativa com A/B via telemetria (§7.1).

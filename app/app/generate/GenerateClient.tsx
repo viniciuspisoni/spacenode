@@ -15,6 +15,7 @@ import {
 import { EngineIcon } from '@/components/icons/engines'
 import InsufficientNodesCta from '@/components/app/InsufficientNodesCta'
 import { consumeHandoff } from '@/components/nodi/actions-bus'
+import { uploadDirect } from '@/lib/storage/direct-upload-client'
 
 interface GenerateClientProps {
   /** Saldo total da bolsa (plano + Lumens) — mesmo pool que o débito consome. */
@@ -47,6 +48,9 @@ interface ProjectConfig {
 interface GenerateResult {
   outputUrl: string
   renderId?: string | null
+  /** URL do input hospedado pelo servidor — reusada nas regenerações
+   *  (sem re-upload; ativa o cache de briefing por input_url). */
+  originalUrl?: string | null
   /** Saldo do plano pós-débito (backward compat). */
   credits:   number
   /** Saldo total pós-débito (plano + Lumens) — preferir este. */
@@ -119,16 +123,18 @@ const MATERIAL_FIELDS_EXTERIOR: readonly MaterialField[] = [
 
 function firstOf(arr: string[]): string { return arr[0] ?? '' }
 
-// ── Compressão de imagem no client ────────────────────────────────────────────
+// ── Conversão de imagem no client (só formatos fora do upload direto) ─────────
 //
-// Aceita uploads de até 10 MB e devolve um JPEG normalizado em até maxSide px
-// no maior lado. Garante que o payload base64 enviado pro /api/generate fique
-// confortavelmente abaixo do limite de ~4.5 MB da Vercel, independente do que
-// o usuário subir (foto de celular, PNG enorme, render exportado em alta).
+// HISTÓRICO: até 2026-08 esta função era o caminho de TODO upload — reduzia
+// qualquer imagem a 2048 px/JPEG 0.92 pra caber no body de 4,5 MB da Vercel,
+// destruindo resolução antes do modelo ver o projeto. O fluxo principal agora
+// é upload direto browser → Storage (uploadDirect, área render-source) com o
+// arquivo ORIGINAL; esta função ficou só como conversor de formatos que o
+// upload direto não aceita (ex.: HEIC/AVIF → JPEG), em resolução cheia.
 async function compressImage(
   dataUrl: string,
-  maxSide: number = 2048,
-  quality: number = 0.92,
+  maxSide: number = 8192,
+  quality: number = 0.95,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image()
@@ -155,6 +161,14 @@ async function compressImage(
 // fetch server-side da imagem e devolve com Content-Disposition: attachment,
 // que faz o browser salvar em vez de abrir. Funciona independente de CORS
 // no CDN.
+// Extensão real do output no nome do download (o caminho GCP re-hospeda PNG;
+// a FAL passa a entregar PNG com o master lossless — .jpg fixo mentia o tipo).
+function outputFilename(url: string): string {
+  const m = url.split('?')[0].match(/\.(png|jpe?g|webp)$/i)
+  const ext = m ? m[1].toLowerCase().replace('jpeg', 'jpg') : 'jpg'
+  return `spacenode-render.${ext}`
+}
+
 function downloadImage(url: string, filename: string) {
   const proxyUrl = `/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`
   const a = document.createElement('a')
@@ -276,6 +290,10 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
   // ── Imagem e resultado
   const [imagePreview,      setImagePreview]      = useState<string | null>(null)
   const [outputUrl,         setOutputUrl]         = useState<string | null>(null)
+  // Arquivo original selecionado (sobe INTEIRO via upload direto no Gerar) e
+  // URL do input já hospedado pelo servidor (regenerações reusam sem re-upload).
+  const [sourceFile,        setSourceFile]        = useState<File | null>(null)
+  const [serverInputUrl,    setServerInputUrl]    = useState<string | null>(null)
   // Verificação estrutural do render_only (a API compara o resultado com o
   // original e devolve o veredito — mesmo papel do preservation_warning do
   // Spaces). null = sem verificação (nível != Máxima ou gate desligado).
@@ -438,18 +456,48 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
   ])
 
   // ── Upload — plain functions; React Compiler handles memoization
+  //
+  // Preview via objectURL (resolução cheia, sem cópia base64 em memória);
+  // revogado ao trocar de imagem e no unmount.
+  const previewObjectUrlRef = useRef<string | null>(null)
+  const setPreviewFromFile = (file: File) => {
+    if (previewObjectUrlRef.current) URL.revokeObjectURL(previewObjectUrlRef.current)
+    const url = URL.createObjectURL(file)
+    previewObjectUrlRef.current = url
+    setImagePreview(url)
+  }
+  useEffect(() => () => {
+    if (previewObjectUrlRef.current) URL.revokeObjectURL(previewObjectUrlRef.current)
+  }, [])
+
+  // MIMEs que a área render-source aceita (lib/storage/direct-upload).
+  const DIRECT_UPLOAD_MIMES = ['image/jpeg', 'image/png', 'image/webp']
+
   const loadImage = (file: File) => {
     if (!file.type.startsWith('image/')) return
-    if (file.size > 10 * 1024 * 1024) { setError('Imagem muito grande. Máximo 10 MB.'); return }
+    if (file.size > 15 * 1024 * 1024) { setError('Imagem muito grande. Máximo 15 MB.'); return }
     setOutputUrl(null); setError(null); setUseAnchor(true); setRefinementText('')
     setFidelityScore(null); setFidelityWarning(false)
+    setServerInputUrl(null)
     setScale(1); setPan({ x: 0, y: 0 })
+    if (DIRECT_UPLOAD_MIMES.includes(file.type)) {
+      // Caminho principal: o arquivo ORIGINAL sobe inteiro no Gerar (upload
+      // direto). Nada de canvas/downscale no client.
+      setSourceFile(file)
+      setPreviewFromFile(file)
+      return
+    }
+    // Formato fora do upload direto (ex.: HEIC/AVIF quando o browser decoda):
+    // converte pra JPEG em resolução cheia (teto 8192) — nunca mais o
+    // downscale de 2048 px que este fluxo aplicava a todo upload.
     const reader = new FileReader()
     reader.onload = async (e) => {
       try {
-        const sourceUrl  = e.target?.result as string
-        const compressed = await compressImage(sourceUrl, 2048, 0.92)
-        setImagePreview(compressed)
+        const dataUrl = await compressImage(e.target?.result as string, 8192, 0.95)
+        const blob = await (await fetch(dataUrl)).blob()
+        const converted = new File([blob], 'input.jpg', { type: 'image/jpeg' })
+        setSourceFile(converted)
+        setPreviewFromFile(converted)
       } catch {
         setError('Não foi possível processar essa imagem. Tente outro arquivo.')
       }
@@ -487,7 +535,7 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
 
   // ── Geração
   const handleGenerate = async (resolutionOverride?: Resolution) => {
-    if (!imagePreview) { setError('Faça upload de uma imagem primeiro.'); return }
+    if (!imagePreview || (!sourceFile && !serverInputUrl)) { setError('Faça upload de uma imagem primeiro.'); return }
     if (credits < nodeCost) { setError('Nodes insuficientes.'); return }
     setError(null); setLoading(true); startLoadingTexts()
     try {
@@ -496,11 +544,23 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
       // estiver ligado.
       const anchorUrl = useAnchor && outputUrl ? outputUrl : undefined
 
+      // Primeira geração desta imagem: sobe o arquivo ORIGINAL direto pro
+      // Storage (browser → bucket, sem passar pela Vercel) e envia só a key.
+      // Regenerações reusam a URL que o servidor já hospedou — sem re-upload
+      // e com cache de briefing por input_url na rota.
+      const sourceParams: Record<string, string> = {}
+      if (serverInputUrl) {
+        sourceParams.inputUrl = serverInputUrl
+      } else {
+        const { key } = await uploadDirect(sourceFile!, 'render-source', {}, { confirm: false })
+        sourceParams.sourceKey = key
+      }
+
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          imageBase64:   imagePreview,
+          ...sourceParams,
           fidelityLevel,
           projectType,
           segment,
@@ -521,6 +581,7 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
       if (!res.ok || data.error) throw new Error(data.error ?? 'Erro na geração')
       setOutputUrl(data.outputUrl); setCredits(data.totalBalance ?? data.credits); setSliderPos(50)
       setLastRenderId(data.renderId ?? null)
+      setServerInputUrl(data.originalUrl ?? serverInputUrl ?? null)
       setFidelityScore(typeof data.fidelityScore === 'number' ? data.fidelityScore : null)
       setFidelityWarning(Boolean(data.fidelityWarning))
       setScale(1); setPan({ x: 0, y: 0 })
@@ -616,8 +677,14 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
   //    com nova imagem. Mantém os parâmetros (segmento, ambiente etc.) —
   //    só limpa o que pertence ao ciclo da imagem atual.
   const handleNewRender = () => {
+    if (previewObjectUrlRef.current) {
+      URL.revokeObjectURL(previewObjectUrlRef.current)
+      previewObjectUrlRef.current = null
+    }
     setImagePreview(null)
     setOutputUrl(null)
+    setSourceFile(null)
+    setServerInputUrl(null)
     setRefinementText('')
     setUseAnchor(true)
     setError(null)
@@ -997,7 +1064,7 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
           <span style={S.pageTitle}>ANTES / DEPOIS</span>
           {outputUrl && (
             <button
-              onClick={() => downloadImage(outputUrl, 'spacenode-render.jpg')}
+              onClick={() => downloadImage(outputUrl, outputFilename(outputUrl))}
               style={{...S.downloadLink, background:'none', border:'none', padding:0, cursor:'pointer', fontFamily:'inherit'}}
             >
               baixar render ↓
@@ -1021,7 +1088,7 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
             </div>
             <div>
               <div style={S.uploadTitle}>arraste sua imagem aqui</div>
-              <div style={S.uploadSub}>SketchUp · Render · 3D · JPG · PNG · até 10 MB</div>
+              <div style={S.uploadSub}>SketchUp · Render · 3D · JPG · PNG · até 15 MB</div>
             </div>
             <button style={S.uploadBtn} onClick={e => { e.stopPropagation(); fileInputRef.current?.click() }}>
               escolher arquivo
@@ -1143,7 +1210,7 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
               </button>
               <button
                 className="spn-action spn-action--primary"
-                onClick={() => downloadImage(outputUrl, 'spacenode-render.jpg')}
+                onClick={() => downloadImage(outputUrl, outputFilename(outputUrl))}
               >
                 Baixar imagem
               </button>
@@ -1241,7 +1308,7 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
           <div style={S.compareWrap}>
             <img src={imagePreview} alt="Input" style={S.compareImg}/>
             <span style={{...S.compareLabel, left:14}}>ANTES</span>
-            <button style={S.changeImageBtn} onClick={() => { setImagePreview(null); setOutputUrl(null) }}>
+            <button style={S.changeImageBtn} onClick={() => { setImagePreview(null); setOutputUrl(null); setSourceFile(null); setServerInputUrl(null) }}>
               trocar imagem
             </button>
           </div>

@@ -34,6 +34,8 @@ import {
 import { fetchStorageBuffer } from '@/lib/storage/fetch'
 import { nearestSupportedAspectRatio } from '@/lib/ai/aspect-ratio'
 import { analyzeImage } from '@/lib/fidelity-engine'
+import { DIRECT_UPLOAD_AREAS, downloadDirectUpload } from '@/lib/storage/direct-upload'
+import { normalizeSourceImage } from '@/lib/storage/normalize-image'
 import sharp from 'sharp'
 
 fal.config({ credentials: process.env.FAL_KEY })
@@ -78,7 +80,10 @@ function falParamsForEngine(
       quality:       resolution === '4k' ? 'high' : 'medium',
       image_size:    'auto',
       num_images:    1,
-      output_format: 'jpeg',
+      // Master lossless — alinha o caminho FAL com o GCP/Vertex (que já
+      // devolve PNG). JPEG aqui criava uma geração de perda logo na origem
+      // da cadeia render → editar → ampliar.
+      output_format: 'png',
     }
   }
   // vega | pulsar
@@ -86,7 +91,7 @@ function falParamsForEngine(
   return {
     resolution:    map[resolution],
     num_images:    1,
-    output_format: 'jpeg',
+    output_format: 'png',
     // Pino de formato (lib/ai/aspect-ratio): presente só quando o aspecto do
     // original bate (≤2%) com um valor suportado — previne o drift de
     // enquadramento em vez de puni-lo depois via aspectDelta. Ausente, o
@@ -134,6 +139,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const {
       imageBase64,
+      sourceKey,
       projectType,
       segment,
       environment,
@@ -152,6 +158,7 @@ export async function POST(req: NextRequest) {
       refinementText,
     } = body as {
       imageBase64?:    string
+      sourceKey?:      string
       projectType?:    'exterior' | 'interior'
       segment?:        string
       environment?:    string
@@ -172,7 +179,7 @@ export async function POST(req: NextRequest) {
 
     // ── Validações que ficam ANTES do débito ──────────────────────────────────
 
-    if ((!imageBase64 && !providedInputUrl) || !projectType) {
+    if ((!imageBase64 && !providedInputUrl && !sourceKey) || !projectType) {
       return NextResponse.json(
         { error: 'Imagem e tipo de projeto são obrigatórios' },
         { status: 400 }
@@ -197,6 +204,38 @@ export async function POST(req: NextRequest) {
 
     nodesToCharge = getNodesCost(engine, resolution)
     const falEndpoint = getFalEndpoint(engine)
+
+    // ── Aquisição + normalização do input ANTES do débito ────────────────────
+    //
+    // sourceKey (upload direto, resolução cheia) tem precedência sobre
+    // imageBase64 (legado, 2048 px do client). Ambos passam pela normalização
+    // (rotação EXIF + ICC→sRGB + teto 4096 px/9 MB via Lanczos — ver
+    // lib/storage/normalize-image). Falha aqui é 400 barato, sem débito.
+    let sourceBuffer: Buffer | null = null
+    let sourceMime: 'image/jpeg' | 'image/png' = 'image/jpeg'
+    if (!providedInputUrl) {
+      let rawBuffer: Buffer
+      if (sourceKey) {
+        const src = await downloadDirectUpload(
+          admin, DIRECT_UPLOAD_AREAS['render-source'], user.id, {}, sourceKey,
+        )
+        if (!src.ok) return NextResponse.json({ error: src.message }, { status: src.status })
+        rawBuffer = src.buffer
+      } else {
+        const base64Data = imageBase64!.includes(',') ? imageBase64!.split(',')[1] : imageBase64!
+        rawBuffer = Buffer.from(base64Data, 'base64')
+      }
+      try {
+        const normalized = await normalizeSourceImage(rawBuffer)
+        sourceBuffer = normalized.buffer
+        sourceMime   = normalized.mime
+        if (normalized.transforms.length > 0) {
+          console.log('[generate] normalize  :', normalized.transforms.join('+'), `→ ${normalized.width}×${normalized.height}`)
+        }
+      } catch {
+        return NextResponse.json({ error: 'Imagem inválida ou corrompida.' }, { status: 400 })
+      }
+    }
 
     // ── Débito atômico antes da chamada Fal.ai ────────────────────────────────
     //
@@ -273,18 +312,19 @@ export async function POST(req: NextRequest) {
     devLog('[generate] anchor     :', hasAnchor ? anchorUrl : 'none')
     devLog('[generate] refine     :', refinementText?.trim() || 'none')
 
-    // Buffer do original (autoridade de geometria) — presente no caminho
-    // base64; no caminho inputUrl reusado, é baixado sob demanda pro score.
+    // Buffer do original (autoridade de geometria) — adquirido/normalizado
+    // antes do débito; no caminho inputUrl reusado, é baixado adiante pro
+    // aspecto/score.
     let originalBuffer: Buffer | null = null
     if (providedInputUrl) {
       inputUrl = providedInputUrl
       devLog('[generate] inputUrl   : reused', inputUrl)
     } else {
-      const base64Data = imageBase64!.includes(',') ? imageBase64!.split(',')[1] : imageBase64!
-      originalBuffer = Buffer.from(base64Data, 'base64')
+      originalBuffer = sourceBuffer!
+      const ext = sourceMime === 'image/png' ? 'png' : 'jpg'
       // Uint8Array novo: BlobPart exige ArrayBuffer próprio (o let Buffer|null
       // alarga pra ArrayBufferLike e o File recusa).
-      const imageFile  = new File([new Uint8Array(originalBuffer)], 'input.jpg', { type: 'image/jpeg' })
+      const imageFile  = new File([new Uint8Array(originalBuffer)], `input.${ext}`, { type: sourceMime })
       inputUrl = await fal.storage.upload(imageFile)
       devLog('[generate] inputUrl   :', inputUrl)
     }
