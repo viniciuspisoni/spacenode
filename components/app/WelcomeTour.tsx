@@ -108,7 +108,7 @@ export default function WelcomeTour({ needsOnboarding }: { needsOnboarding: bool
           popover: {
             title: 'Criar',
             description:
-              'As ferramentas do atelier: renderize a partir da sua referência, edite com precisão, amplie a resolução, anime e finalize para entrega.',
+              'As ferramentas do atelier: renderize a partir da sua referência, edite com precisão, amplie a resolução, anime e finalize para entrega. Na primeira imagem, o Renderizar abre um guia que acompanha cada passo.',
             side: 'top',
             align: 'start',
           },

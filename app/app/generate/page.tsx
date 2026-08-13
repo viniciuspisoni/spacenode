@@ -26,6 +26,14 @@ export default async function GeneratePage({
 
   const admin = createAdminClient()
 
+  // Conta renders do usuário (head-only) — 0 liga o Guia da primeira imagem.
+  // O .then() já dispara a requisição, correndo em paralelo com o bloco abaixo.
+  const renderCountPromise = supabase
+    .from('renders')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', user.id)
+    .then(({ count }) => count ?? 0)
+
   // Materiais/config são do PRÓPRIO usuário; o saldo exibido/gateado é da
   // bolsa (dono do workspace) — é dele que a geração debita.
   let [{ data: profile }, balance] = await Promise.all([
@@ -49,6 +57,8 @@ export default async function GeneratePage({
     balance = await getPayerBalance(admin, user.id)
   }
 
+  const renderCount = await renderCountPromise
+
   return (
     <GenerateClient
       // Saldo TOTAL da bolsa (plano + Lumens) — é o que consume_workspace_nodes
@@ -61,6 +71,7 @@ export default async function GeneratePage({
       initialConfig={profile.project_config ?? undefined}
       initialSourceUrl={sp.source}
       returnTo={returnTo}
+      firstRender={renderCount === 0}
     />
   )
 }

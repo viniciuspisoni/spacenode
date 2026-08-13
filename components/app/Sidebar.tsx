@@ -15,6 +15,7 @@ import {
   IconTeam, IconIdentity, IconAccount, IconPlans, IconGuide,
 } from './sidebar-icons'
 import { TOUR_START_EVENT } from './WelcomeTour'
+import { GUIDE_START_EVENT } from './GenerateGuide'
 import { getSidebarModules, type SidebarModule } from '@/lib/nav/modules-config'
 
 type NavItem = {
@@ -28,10 +29,16 @@ type NavItem = {
   onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void
 }
 
-// "Como usar": reabre o tour de boas-vindas. Já no /app, dispara na hora (evento
-// ouvido pelo WelcomeTour) em vez de navegar; de outras rotas, o Link segue o
-// href /app#tour e o tour abre ao chegar no dashboard.
+// "Como usar" é contextual: no Renderizar reabre o Guia da primeira imagem
+// (evento ouvido pelo GenerateClient); já no /app, dispara o tour na hora
+// (evento ouvido pelo WelcomeTour) em vez de navegar; de outras rotas, o Link
+// segue o href /app#tour e o tour abre ao chegar no dashboard.
 function startTourClick(e: React.MouseEvent<HTMLAnchorElement>) {
+  if (window.location.pathname.startsWith('/app/generate')) {
+    e.preventDefault()
+    window.dispatchEvent(new Event(GUIDE_START_EVENT))
+    return
+  }
   if (window.location.pathname === '/app') {
     e.preventDefault()
     window.dispatchEvent(new Event(TOUR_START_EVENT))

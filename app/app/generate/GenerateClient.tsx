@@ -16,6 +16,9 @@ import { EngineIcon } from '@/components/icons/engines'
 import InsufficientNodesCta from '@/components/app/InsufficientNodesCta'
 import { consumeHandoff } from '@/components/nodi/actions-bus'
 import { uploadDirect } from '@/lib/storage/direct-upload-client'
+import GenerateGuide, {
+  GUIDE_START_EVENT, GUIDE_DISMISSED_KEY, type GuidePhase,
+} from '@/components/app/GenerateGuide'
 
 interface GenerateClientProps {
   /** Saldo total da bolsa (plano + Lumens) — mesmo pool que o débito consome. */
@@ -28,6 +31,8 @@ interface GenerateClientProps {
   initialSourceUrl?: string
   /** 'spaces/new' = veio do fluxo Novo projeto sem renders — o CTA de resultado vira o caminho de volta. */
   returnTo?:         'spaces/new'
+  /** true = a conta nunca gerou uma render — o Guia da primeira imagem abre sozinho. */
+  firstRender?:      boolean
 }
 
 // Persisted last-used render config (profiles.project_config — JSONB).
@@ -252,7 +257,7 @@ function ProjectTypeGlyph({ type }: { type: ProjectType }) {
   )
 }
 
-export function GenerateClient({ initialCredits, isSubscriber = false, initialMaterials, initialConfig, initialSourceUrl, returnTo }: GenerateClientProps) {
+export function GenerateClient({ initialCredits, isSubscriber = false, initialMaterials, initialConfig, initialSourceUrl, returnTo, firstRender = false }: GenerateClientProps) {
   const init = resolveInitialConfig(initialConfig, isSubscriber)
   const fromSpacesNew = returnTo === 'spaces/new'
   const supabase = createClient()
@@ -359,6 +364,59 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
     })
     return () => cancelAnimationFrame(raf)
   }, [])
+
+  // ── Guia da primeira imagem: abre sozinho pra conta que nunca gerou (e não
+  //    dispensou); manual via /app/generate#guia ou "Como usar" da sidebar.
+  //    Estado inicia fechado e abre em effect — sem mismatch de hidratação.
+  const [guideOpen,      setGuideOpen]      = useState(false)
+  const [guideAttention, setGuideAttention] = useState(false)
+  const attentionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    // Pós-mount via rAF, mesmo padrão do handoff do Nodi acima (sem setState
+    // síncrono em effect, sem mismatch de hidratação).
+    const raf = requestAnimationFrame(() => {
+      if (window.location.hash === '#guia') {
+        // Limpa o hash (refresh não força reabrir) e abre mesmo já tendo renders.
+        window.history.replaceState(null, '', window.location.pathname + window.location.search)
+        setGuideOpen(true)
+        return
+      }
+      try {
+        if (firstRender && localStorage.getItem(GUIDE_DISMISSED_KEY) !== '1') setGuideOpen(true)
+      } catch {
+        if (firstRender) setGuideOpen(true)
+      }
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [firstRender])
+
+  // "Como usar" com o Renderizar já aberto: reabre o guia sem navegar.
+  useEffect(() => {
+    const onStart = () => setGuideOpen(true)
+    window.addEventListener(GUIDE_START_EVENT, onStart)
+    return () => window.removeEventListener(GUIDE_START_EVENT, onStart)
+  }, [])
+
+  useEffect(() => () => {
+    if (attentionTimerRef.current) clearTimeout(attentionTimerRef.current)
+  }, [])
+
+  const dismissGuide = () => {
+    setGuideOpen(false)
+    try { localStorage.setItem(GUIDE_DISMISSED_KEY, '1') } catch {}
+  }
+
+  // Rola a coluna de controles até o botão Gerar e pulsa pra localizá-lo —
+  // primeira visita costuma ter o CTA abaixo da dobra do painel esquerdo.
+  const locateGenerateButton = () => {
+    const btn = document.querySelector<HTMLElement>('[data-guide="gerar"]')
+    if (!btn) return
+    btn.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    setGuideAttention(true)
+    if (attentionTimerRef.current) clearTimeout(attentionTimerRef.current)
+    attentionTimerRef.current = setTimeout(() => setGuideAttention(false), 2700)
+  }
 
   const fileInputRef         = useRef<HTMLInputElement>(null)
   const compareRef           = useRef<HTMLDivElement>(null)
@@ -789,6 +847,14 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
+  // Fase do Guia da primeira imagem — deriva do estado real da página, sem
+  // estado próprio: enviar referência → montar cenário → gerar → resultado.
+  const guidePhase: GuidePhase =
+    loading ? 'generating'
+    : outputUrl ? 'done'
+    : imagePreview ? 'configure'
+    : 'upload'
+
   return (
     <div className="spn-generate-shell" style={S.main}>
 
@@ -1094,6 +1160,8 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
           />
         ) : (
           <button
+            data-guide="gerar"
+            className={guideAttention ? 'spn-guide-attention' : undefined}
             style={loading || !imagePreview
               ? {...S.genBtn, opacity:0.6, cursor:'not-allowed'}
               : S.genBtn}
@@ -1135,6 +1203,14 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
 
       {/* ── PREVIEW ── */}
       <div className="spn-generate-preview" style={S.preview}>
+        {guideOpen && (
+          <GenerateGuide
+            phase={guidePhase}
+            fromSpacesNew={fromSpacesNew}
+            onLocateGenerate={locateGenerateButton}
+            onDismiss={dismissGuide}
+          />
+        )}
         <div style={S.topbar}>
           <span style={S.pageTitle}>ANTES / DEPOIS</span>
           {outputUrl && (
