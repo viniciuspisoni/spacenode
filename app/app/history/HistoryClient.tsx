@@ -22,6 +22,8 @@ interface Render {
   user_id?: string | null
   input_url: string
   output_url: string | null
+  /** Derivado WebP ~1600px do master (grids); download/lightbox seguem no master. */
+  preview_url?: string | null
   ambient: string
   style: string
   lighting: string
@@ -1275,7 +1277,11 @@ function RenderCard({
   const date      = formatDate(render.created_at)
   const isUpscale = render.ambient === 'upscale'
   const isVideo   = render.ambient === 'video'
-  const display   = isVideo ? render.input_url : (render.output_url ?? render.input_url)
+  // Card usa o derivado WebP quando existe — o master PNG (10-30 MB) fica pro
+  // download/lightbox. Renders antigos (sem preview) seguem no master.
+  const display   = isVideo
+    ? render.input_url
+    : (render.preview_url ?? render.output_url ?? render.input_url)
   const nodes     = renderNodes(render)
   const quality   = (isUpscale || isVideo) ? null : qualityLabel(nodes)
   const engine    = (isUpscale || isVideo) ? null : engineLabel(renderEngineRaw(render))

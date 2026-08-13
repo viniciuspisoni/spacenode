@@ -44,6 +44,7 @@ import { nearestSupportedAspectRatio } from '@/lib/ai/aspect-ratio'
 import { analyzeImage } from '@/lib/fidelity-engine'
 import { DIRECT_UPLOAD_AREAS, downloadDirectUpload } from '@/lib/storage/direct-upload'
 import { normalizeSourceImage } from '@/lib/storage/normalize-image'
+import { createDisplayPreview } from '@/lib/storage/preview'
 import sharp from 'sharp'
 
 fal.config({ credentials: process.env.FAL_KEY })
@@ -704,6 +705,17 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ── Derivado de exibição (WebP ~1600px) ──────────────────────────────────
+    // Grids (Histórico) deixam de baixar o master PNG (10-30 MB) por card.
+    // Best-effort: sem preview, a UI serve o master (comportamento anterior).
+    let previewUrl: string | null = null
+    try {
+      const outBuf = await fetchStorageBuffer(outputUrl)
+      previewUrl = await createDisplayPreview(admin, user.id, 'renders', outBuf)
+    } catch (previewErr) {
+      console.warn('[generate] preview indisponível (segue sem):', truncateErr(previewErr))
+    }
+
     // ── Persistência ─────────────────────────────────────────────────────────
     //
     // Se a imagem foi gerada mas o INSERT falhou: NÃO refundamos. O usuário
@@ -756,6 +768,9 @@ export async function POST(req: NextRequest) {
     // regrava só com as colunas base para nunca perder o registro.
     const extendedRow = {
       ...baseRow,
+      // preview_url SÓ na extendedRow: o fallback baseRow segue funcionando
+      // em banco sem a migration 20260813000000.
+      preview_url:  previewUrl,
       user_prompt:  refinementText?.trim() || null,
       duration_ms:  generationDurationMs,
       retry_count:  retryCount,
@@ -827,6 +842,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       outputUrl,
       renderId,
+      previewUrl,
       originalUrl:  inputUrl ?? null,
       // `credits` continua refletindo o saldo do plano (backward compat com
       // a UI atual em GenerateClient); novos campos detalham plano + Lumens.

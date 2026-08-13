@@ -45,7 +45,7 @@
 //   - Nada é adicionado/removido/reposicionado sem pedido explícito.
 //   - Em conflito coerência visual × fidelidade geométrica, vence a geometria.
 
-import type { BriefingArquitetonico } from '@/lib/prompts'
+import { buildMaterialSamplesBlock, type BriefingArquitetonico, type MaterialSampleRef } from '@/lib/prompts'
 import { buildEdgeMapBlock } from '@/lib/ai/fidelity/render-only'
 import type { GenerationAction, ProjectDNA, ReferenceKind } from './types'
 import type { Resolution } from '@/lib/engines'
@@ -68,6 +68,9 @@ export interface GenerationPromptInput {
   attempt?:         number
   /** Índice 1-based do edge map em image_urls quando anexado no retry. */
   edgeMapImageIndex?: number | null
+  /** Kit de materiais do Space: amostras anexadas em image_urls (campo →
+   *  posição 1-based). Bloco compartilhado com o Renderizar (lib/prompts). */
+  materialSamples?: { field: string; imageIndex: number }[]
 }
 
 // A câmera se move? Só na Nova Vista a partir de mestre/histórico.
@@ -457,6 +460,7 @@ export function buildGenerationPrompt(input: GenerationPromptInput): string {
     geometryLockBlock(input),
     buildEdgeMapBlock(input.edgeMapImageIndex).trim(),
     textureFidelityBlock(input),
+    buildMaterialSamplesBlock(input.materialSamples as MaterialSampleRef[] | undefined).trim(),
     identityBlock(input),
     factsBlock(input.briefing),
     userIntentBlock(input),

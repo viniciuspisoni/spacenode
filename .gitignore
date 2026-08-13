@@ -43,3 +43,8 @@ next-env.d.ts
 .vercel
 .env*.local
 /.next-preview/
+
+# Bench de fidelidade (FIDELITY_BENCH=1): inputs são projetos reais de
+# cliente e o last-run é derivado — só a baseline.json versiona.
+tests/fidelity/bench/inputs/
+tests/fidelity/bench/last-run.json

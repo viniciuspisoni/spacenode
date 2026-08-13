@@ -697,7 +697,9 @@ export interface MaterialSampleRef {
 // livre (onde o modelo inventa veio/paginação) em referência visual exata. O
 // fechamento de escopo é essencial — sem ele, uma amostra de piso virava
 // licença pra "harmonizar" os acabamentos vizinhos.
-function buildMaterialSamplesBlock(
+// Exportado: o Spaces reusa o MESMO bloco no kit de materiais do projeto
+// (lib/spaces/reference-prompt.ts) — uma fonte, dois fluxos.
+export function buildMaterialSamplesBlock(
   samples?: MaterialSampleRef[],
   projectType?: ProjectType,
 ): string {

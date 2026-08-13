@@ -435,10 +435,25 @@ Mudança de prompt hoje vai para produção sem medição comparável. Proposta:
    **sRGB piecewise** (IEC 61966-2-1) no lugar do `pow(2.2)` — sombras
    profundas deixam de plastificar no lift.
 
-**Pendentes conscientes:** subir o gate para 0.75-0.80 (usar a query 1 do
-`fidelity-telemetry.sql` após 1-2 semanas de produção); kit de materiais por
-Space; harness contra a API real; derivado de exibição WebP para os masters
-PNG se o custo de CDN pesar.
+**Fechamento dos pendentes (2026-08-13, rodada 5):**
+- ✅ **Kit de materiais por Space**: `SpaceDnaPayload.materialRefs` herda as
+  amostras da render de origem (`config_snapshot.material_refs` →
+  `extractDnaPayload`); toda geração de vista anexa o kit como referências
+  rotuladas por superfície (mesmo bloco `MATERIAL SAMPLES` do Renderizar,
+  fonte única em `lib/prompts`).
+- ✅ **Harness contra a API real**: `tests/fidelity/bench.test.ts` — gated por
+  `FIDELITY_BENCH=1` (gasta dinheiro real; skip na suíte normal). Dropar
+  inputs em `tests/fidelity/bench/inputs/` (gitignored), rodar, fixar
+  `baseline.json`; regressão de score > 0.05 FALHA o bench.
+- ✅ **Derivado WebP de exibição**: migration `20260813000000` adiciona
+  `renders.preview_url`; a geração cria o WebP ~1600px (`lib/storage/preview`)
+  best-effort; Histórico usa preview nos cards (download/lightbox seguem no
+  master) com fallback de projeção pra janela pré-migration.
+
+**Pendente final:** subir o gate para 0.75-0.80 — decisão por DADOS: rodar a
+query 1 do `fidelity-telemetry.sql` após 1-2 semanas de produção e ajustar
+`RENDER_FIDELITY_MIN_SCORE` quando o p10 dos renders saudáveis sustentar o
+novo limite.
 
 Custo marginal das chamadas novas por render: briefing ≈ US$ 0,001 (Gemini
 Flash), depth map ≈ US$ 0,002 (FAL), audit semântico ≈ US$ 0,002 — desprezível

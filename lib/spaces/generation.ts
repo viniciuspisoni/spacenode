@@ -29,8 +29,9 @@ import { fal } from '@fal-ai/client'
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { refundNodes } from '@/lib/billing/refund-nodes'
 import type { EngineId, Resolution } from '@/lib/engines'
-import type { BriefingArquitetonico } from '@/lib/prompts'
+import { materialSurfaceEn, type BriefingArquitetonico, type ProjectMaterials } from '@/lib/prompts'
 import type { Axis, GenerationAction, ProjectDNA, Space } from './types'
+import { getMaterialRefsFromDna } from './dna'
 import {
   levelForGeneration, modeForAction, modeAllowsCloserCrop,
   type SpacesMode, type SpacesPreservationLevel,
@@ -47,7 +48,7 @@ import {
   type SpacesFidelityAttemptLog,
 } from './fidelity'
 import { computeGeometryScore, buildEdgeMapPng, type GeometryScoreBreakdown } from '@/lib/ai/fidelity/geometry-score'
-import { fetchStorageBuffer } from '@/lib/storage/fetch'
+import { fetchStorageBuffer, assertSafeFetchUrl } from '@/lib/storage/fetch'
 
 // Timeout da chamada ao provider por motor (espelha o /api/generate do
 // Renderizar). Vega (Nano Banana Pro) e Quasar (GPT Image 2) passam de 90s com
@@ -210,6 +211,32 @@ export async function generateVista(args: VistaGenerationArgs) {
     const baseImageUrls   = imageUrlsFor(refs)
     const baseImageLabels = imagePartLabelsFor(refs)
 
+    // Kit de materiais do Space (herdado da render de origem via DNA): cada
+    // amostra entra como referência ROTULADA por superfície — o modelo copia
+    // o produto real em vez de reinterpretar o nome/hex do DNA. URLs passam
+    // pelo allowlist; campo fora do vocabulário já foi filtrado na extração.
+    const kit = getMaterialRefsFromDna(space.dna)
+    const kitUrls: string[] = []
+    const kitLabels: string[] = []
+    const materialSamples: { field: string; imageIndex: number }[] = []
+    const projectTypeHint =
+      (space.source_metadata as { config_snapshot?: { projectType?: string } } | null)
+        ?.config_snapshot?.projectType === 'interior' ? ('interior' as const) : undefined
+    for (const ref of kit) {
+      try { assertSafeFetchUrl(ref.url) } catch { continue }
+      kitUrls.push(ref.url)
+      const imageIndex = baseImageUrls.length + kitUrls.length
+      kitLabels.push(
+        `Image #${imageIndex} — MATERIAL SAMPLE for the ${materialSurfaceEn(ref.field as keyof ProjectMaterials, projectTypeHint)} (reproduce this exact material on that surface only):`,
+      )
+      materialSamples.push({ field: ref.field, imageIndex })
+    }
+    const imagesWithKit = kitUrls.length ? [...baseImageUrls, ...kitUrls] : baseImageUrls
+    const labelsWithKit = kitLabels.length ? [...baseImageLabels, ...kitLabels] : baseImageLabels
+    if (materialSamples.length > 0) {
+      console.log(`[${logContext}] kit materiais   :`, materialSamples.map(s => `${s.field}→#${s.imageIndex}`).join(' '))
+    }
+
     console.log(`[${logContext}] ação            :`, action, `(${mode}/${level})`)
     console.log(`[${logContext}] ref geométrica  :`, refs.geometry.kind, '→', refs.geometry.url,
       refs.geometry.label ? `(label "${refs.geometry.label}")` : '')
@@ -242,8 +269,8 @@ export async function generateVista(args: VistaGenerationArgs) {
 
       // Condicionamento estrutural nos retries: lineart da referência
       // geométrica anexado como imagem extra (upload único por vista).
-      let imageUrls   = baseImageUrls
-      let imageLabels = baseImageLabels
+      let imageUrls   = imagesWithKit
+      let imageLabels = labelsWithKit
       let edgeMapImageIndex: number | null = null
       if (gateActive && params.useEdgeMap) {
         try {
@@ -251,8 +278,8 @@ export async function generateVista(args: VistaGenerationArgs) {
             const edgePng = await buildEdgeMapPng(await getSourceBuffer())
             edgeMapUrl = await fal.storage.upload(new File([new Uint8Array(edgePng)], 'edge-map.png', { type: 'image/png' }))
           }
-          imageUrls   = [...baseImageUrls, edgeMapUrl]
-          imageLabels = [...baseImageLabels, EDGE_MAP_PART_LABEL]
+          imageUrls   = [...imagesWithKit, edgeMapUrl]
+          imageLabels = [...labelsWithKit, EDGE_MAP_PART_LABEL]
           edgeMapImageIndex = imageUrls.length
         } catch (edgeErr) {
           console.warn(`[${logContext}] edge map indisponível (segue sem):`, (edgeErr as Error).message)
@@ -271,6 +298,7 @@ export async function generateVista(args: VistaGenerationArgs) {
         quality,
         attempt,
         edgeMapImageIndex,
+        materialSamples: materialSamples.length > 0 ? materialSamples : undefined,
       })
       if (attempt === 1) console.log(`[${logContext}] prompt          :`, prompt)
 

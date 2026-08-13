@@ -1,7 +1,8 @@
+import type { ComponentProps } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
-import { RENDER_LIST_COLUMNS, sanitizeRenderListRow } from '@/lib/history/redact'
+import { sanitizeRenderListRow, selectRenderList } from '@/lib/history/redact'
 import { getPayerBalance } from '@/lib/workspaces/balance'
 import { signRows } from '@/lib/storage/signed'
 import { HistoryClient } from './HistoryClient'
@@ -20,13 +21,9 @@ export default async function HistoryPage() {
     getPayerBalance(admin, user.id),
     // Projeção explícita + tradução de campos de provider: as linhas viram
     // props do client component (serializam no payload RSC) — nada de prompt
-    // final, fal_request_id ou endpoints aqui. Ver lib/history/redact.ts.
-    supabase
-      .from('renders')
-      .select(RENDER_LIST_COLUMNS)
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(PAGE_SIZE),
+    // final, fal_request_id ou endpoints aqui. Ver lib/history/redact.ts
+    // (selectRenderList tem fallback pra janela pré-migration do preview_url).
+    selectRenderList(supabase, user.id, { limit: PAGE_SIZE }),
     // parent_id: null = pasta de topo (cliente), preenchido = subpasta (projeto).
     supabase.from('render_folders').select('id, name, parent_id, created_at').eq('user_id', user.id).order('created_at', { ascending: false }),
     supabase.from('renders').select('folder_id').eq('user_id', user.id),
@@ -52,9 +49,9 @@ export default async function HistoryPage() {
     .select('id, full_name, email')
     .in('id', authorIds)
 
-  // Assina input_url/output_url server-side antes de passar pro client (bucket
+  // Assina input/output/preview server-side antes de passar pro client (bucket
   // privado após o flip). Renders são FAL hoje → no-op, mas embrulhamos igual.
-  const signedRenders = await signRows(admin, renders ?? [], ['input_url', 'output_url'])
+  const signedRenders = await signRows(admin, renders ?? [], ['input_url', 'output_url', 'preview_url'])
 
   const authors: Record<string, { name: string | null; email: string | null }> = {}
   for (const a of authorRows ?? []) {
@@ -63,7 +60,9 @@ export default async function HistoryPage() {
 
   return (
     <HistoryClient
-      renders={signedRenders.map(sanitizeRenderListRow)}
+      // selectRenderList devolve linhas não-tipadas (fallback de projeção);
+      // a forma real é a da projeção — cast único na fronteira do client.
+      renders={signedRenders.map(sanitizeRenderListRow) as unknown as ComponentProps<typeof HistoryClient>['renders']}
       folderCounts={{ counts, unfiled, total }}
       pageSize={PAGE_SIZE}
       credits={balance.planBalance}
