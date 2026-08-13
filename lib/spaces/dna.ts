@@ -135,10 +135,40 @@ export interface SourceMetadataHint {
     lighting?:       string | null
     background?:     string | null
     materials?:      Record<string, string | undefined> | null
+    /** Amostras visuais de material usadas na render de origem. */
+    material_refs?:  { field?: string; url?: string }[] | null
     briefing?:       BriefingArquitetonico | null
     [k: string]:     unknown
   } | null
   [k: string]:       unknown
+}
+
+// Campos de material conhecidos (mesma lista do Renderizar) — refs fora do
+// vocabulário são descartadas em vez de virar label sem sentido no prompt.
+const MATERIAL_REF_FIELDS: ReadonlySet<string> = new Set([
+  'fachada', 'piso', 'esquadrias', 'paredes', 'teto', 'marcenaria', 'bancadas', 'elementos', 'outros',
+])
+
+function sanitizeMaterialRefs(raw: unknown): { field: string; url: string }[] {
+  if (!Array.isArray(raw)) return []
+  const out: { field: string; url: string }[] = []
+  const seen = new Set<string>()
+  for (const item of raw) {
+    if (out.length >= 4) break
+    const r = item as { field?: unknown; url?: unknown }
+    const field = typeof r?.field === 'string' ? r.field : ''
+    const url   = typeof r?.url   === 'string' ? r.url   : ''
+    if (!MATERIAL_REF_FIELDS.has(field) || seen.has(field) || !/^https:\/\//i.test(url)) continue
+    seen.add(field)
+    out.push({ field, url })
+  }
+  return out
+}
+
+/** Kit de materiais do Space (payload novo; ProjectDNA legado → []). */
+export function getMaterialRefsFromDna(dna: unknown): { field: string; url: string }[] {
+  if (!dna || typeof dna !== 'object') return []
+  return sanitizeMaterialRefs((dna as Record<string, unknown>).materialRefs)
 }
 
 export async function extractDnaPayload(
@@ -153,7 +183,10 @@ export async function extractDnaPayload(
       ? Promise.resolve(cachedBriefing)
       : analyzeImage(imageUrl),
   ])
-  return { visual, briefing }
+  // Kit de materiais herdado da render de origem — vira parte permanente do
+  // DNA e é anexado como referência visual em toda geração do Space.
+  const materialRefs = sanitizeMaterialRefs(sourceMetadata?.config_snapshot?.material_refs)
+  return { visual, briefing, ...(materialRefs.length > 0 ? { materialRefs } : {}) }
 }
 
 // Versão enriquecida do extractDna — quando há source metadata, usa o

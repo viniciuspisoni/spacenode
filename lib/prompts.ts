@@ -10,6 +10,7 @@ import {
   buildRenderOnlySystemHead,
   buildRenderOnlyCameraBlock,
   buildEdgeMapBlock,
+  buildDepthMapBlock,
 } from '@/lib/ai/fidelity/render-only'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -667,6 +668,54 @@ function buildMaterialsBlock(
   return `EXACT PROJECT MATERIALS — reproduce these faithfully: ${lines.join('; ')}. `
 }
 
+// ── Amostras visuais de material ───────────────────────────────────────────────
+
+/** Nome EN da superfície de cada campo de material — mesma nomenclatura do
+ *  buildMaterialsBlock, exportado pra rota rotular as imagens de amostra. */
+export function materialSurfaceEn(field: keyof ProjectMaterials, projectType?: ProjectType): string {
+  const isInterior = projectType === 'interior'
+  switch (field) {
+    case 'fachada':    return 'facade cladding'
+    case 'piso':       return isInterior ? 'flooring' : 'floor and paving'
+    case 'esquadrias': return isInterior ? 'interior doors and window frames' : 'external doors and window frames'
+    case 'paredes':    return 'wall finishes'
+    case 'teto':       return 'ceiling finish'
+    case 'marcenaria': return 'built-in millwork and cabinetry'
+    case 'bancadas':   return 'countertops'
+    case 'elementos':  return 'special architectural elements'
+    case 'outros':     return 'additional noted elements'
+  }
+}
+
+export interface MaterialSampleRef {
+  field: keyof ProjectMaterials
+  /** Posição (1-based) da amostra em image_urls. */
+  imageIndex: number
+}
+
+// Evidência fotográfica por superfície: transforma o spec de material de texto
+// livre (onde o modelo inventa veio/paginação) em referência visual exata. O
+// fechamento de escopo é essencial — sem ele, uma amostra de piso virava
+// licença pra "harmonizar" os acabamentos vizinhos.
+// Exportado: o Spaces reusa o MESMO bloco no kit de materiais do projeto
+// (lib/spaces/reference-prompt.ts) — uma fonte, dois fluxos.
+export function buildMaterialSamplesBlock(
+  samples?: MaterialSampleRef[],
+  projectType?: ProjectType,
+): string {
+  if (!samples || samples.length === 0) return ''
+  const lines = samples.map(
+    s => `image #${s.imageIndex} is the real product sample for the ${materialSurfaceEn(s.field, projectType)}`,
+  )
+  return (
+    `MATERIAL SAMPLES (photographic evidence, not inspiration): ${lines.join('; ')}. ` +
+    'Reproduce each sample EXACTLY on its named surface — same color, same texture pattern ' +
+    'and scale, same finish (matte/gloss) — never a similar-looking substitute. ' +
+    'Samples define ONLY the material of their named surfaces: they never change geometry, ' +
+    'layout, lighting or any surface not named here. '
+  )
+}
+
 // ── Fidelity Engine prompt builder ─────────────────────────────────────────────
 
 // A lista NEGATIVE_BASE (compartilhada pelos três níveis) e os extras da
@@ -770,6 +819,41 @@ function transformationBlock(briefing: BriefingArquitetonico, level: FidelityLev
   return `ALLOWED IMPROVEMENTS ONLY (visual quality, not architecture): ${briefing.elementos_melhorar.join('; ')}. `
 }
 
+// Nome curto do ambiente pro contexto da Máxima. As entradas de ENV_EN são
+// prescritivas ("living room with sofa set, porcelain tile floor…") — na
+// Máxima isso é isca de drift (sugere materiais/mobiliário que podem
+// contradizer a referência). Usamos só o substantivo inicial ("living room"),
+// nunca a lista de acabamentos.
+function shortEnvName(environment?: string): string {
+  if (!environment) return ''
+  const desc = ENV_EN[environment]
+  if (!desc) return environment
+  return (desc.split(' with ')[0] ?? desc).split(',')[0].trim()
+}
+
+// Contexto de cena da Máxima: identifica O QUE a cena é (Segmento + Espaço
+// escolhidos na UI) sem licença de alteração. Sem este bloco os dois seletores
+// eram no-ops no nível default — o `intent` (único carregador de segDesc) só
+// entra em balanced/creative, e `environment` nem era desestruturado.
+function buildSceneContextBlock(
+  projectType: ProjectType,
+  segment:     string,
+  environment?: string,
+): string {
+  const segDesc = SEG_EN[segment] ?? (segment ? segment.toLowerCase() : '')
+  const envName = shortEnvName(environment)
+  const kind    = projectType === 'exterior' ? 'exterior' : 'interior'
+  const scene   = [segDesc, kind, envName ? `— ${envName}` : '']
+    .filter(Boolean)
+    .join(' ')
+  if (!scene) return ''
+  return (
+    'SCENE TYPE (context for understanding only — the reference image remains ' +
+    'the sole source of truth for what exists; never license to add, remove or ' +
+    `restyle anything): ${scene}. `
+  )
+}
+
 // briefing é opcional. Quando ausente, o `fidelityModifier` carrega sozinho a
 // instrução de preservação — o modelo já vê a imagem direto e não precisa de
 // uma redescrição textual dos elementos. Quando presente (ex: futuro Spaces
@@ -779,6 +863,11 @@ function transformationBlock(briefing: BriefingArquitetonico, level: FidelityLev
 export interface RenderOnlyPromptOpts {
   attempt?: number
   edgeMapImageIndex?: number | null
+  /** Posição (1-based) do depth map de condicionamento em image_urls
+   *  (experimental — RENDER_FIDELITY_DEPTH_MAP=1). */
+  depthMapImageIndex?: number | null
+  /** Amostras visuais de material anexadas em image_urls. */
+  materialSamples?: MaterialSampleRef[]
 }
 
 export function buildFidelityPrompt(
@@ -787,7 +876,7 @@ export function buildFidelityPrompt(
   briefing?:  BriefingArquitetonico,
   renderOnly?: RenderOnlyPromptOpts,
 ): string {
-  const { projectType, segment, lighting, background, sceneElements, materials, hasAnchor, refinementText } = options
+  const { projectType, segment, environment, lighting, background, sceneElements, materials, hasAnchor, refinementText } = options
 
   const anchor     = buildAnchorBlock(hasAnchor)
   const refinement = buildRefinementBlock(refinementText, hasAnchor)
@@ -888,10 +977,13 @@ export function buildFidelityPrompt(
     return (
       anchor +
       head +
+      buildSceneContextBlock(projectType, segment, environment) +
       buildEdgeMapBlock(renderOnly?.edgeMapImageIndex) +
+      buildDepthMapBlock(renderOnly?.depthMapImageIndex) +
       refinement +
       preserve +
       matBlock +
+      buildMaterialSamplesBlock(renderOnly?.materialSamples, projectType) +
       lightingLine +
       bgBlock +
       elemBlock +

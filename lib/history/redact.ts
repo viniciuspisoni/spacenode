@@ -22,7 +22,32 @@ import { videoEngineLabel, upscaleProviderLabel } from '@/lib/renderLabels'
 // QUERY INTEIRA (PostgREST 42703), não apenas o campo — checar
 // information_schema.columns antes de adicionar qualquer coluna nova aqui.
 export const RENDER_LIST_COLUMNS =
+  'id, user_id, input_url, output_url, preview_url, ambient, style, lighting, status, cost_credits, nodes_charged, engine, resolution, folder_id, created_at'
+
+// Projeção sem preview_url — fallback pra janela entre o deploy do código e a
+// migration 20260813000000 (42703 = coluna inexistente).
+export const RENDER_LIST_COLUMNS_LEGACY =
   'id, user_id, input_url, output_url, ambient, style, lighting, status, cost_credits, nodes_charged, engine, resolution, folder_id, created_at'
+
+/** SELECT do histórico com fallback de projeção: tenta com preview_url e cai
+ *  pra projeção legada se a coluna ainda não existir. Usado pela página do
+ *  Histórico e pelo /api/renders/list — uma fonte, duas superfícies. */
+export async function selectRenderList(
+  sb: { from: (t: string) => any },  // eslint-disable-line @typescript-eslint/no-explicit-any -- aceita client SSR e admin
+  userId: string,
+  opts: { cursor?: string | null; limit: number },
+): Promise<{ data: Record<string, unknown>[] | null; error: { code?: string; message?: string } | null }> {
+  const run = (cols: string) => {
+    let q = sb.from('renders').select(cols).eq('user_id', userId)
+    if (opts.cursor) q = q.lt('created_at', opts.cursor)
+    return q.order('created_at', { ascending: false }).limit(opts.limit)
+  }
+  let res = await run(RENDER_LIST_COLUMNS)
+  if (res.error && res.error.code === '42703') {
+    res = await run(RENDER_LIST_COLUMNS_LEGACY)
+  }
+  return res
+}
 
 // Traduz campos que carregam identificadores de provider para labels de
 // produto. Muta uma CÓPIA — usar no servidor antes de responder/serializar.

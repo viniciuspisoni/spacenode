@@ -94,6 +94,29 @@ describe('render_only: invariantes obrigatórios', () => {
   })
 })
 
+describe('render_only: contexto de cena (Segmento/Espaço religados na Máxima)', () => {
+  it('Máxima inclui SCENE TYPE com nome curto do ambiente', () => {
+    const p = buildFidelityPrompt(baseOptions, 'maximum')
+    expect(p).toContain('SCENE TYPE')
+    expect(p).toContain('high-end residential')
+    expect(p).toContain('kitchen')
+  })
+
+  it('nunca vaza a descrição prescritiva do ENV_EN (isca de drift)', () => {
+    // ENV_EN['Cozinha'] = 'kitchen with custom cabinetry, quartz countertop…'
+    // — na Máxima só o substantivo inicial pode entrar.
+    const p = buildFidelityPrompt(baseOptions, 'maximum')
+    expect(p).not.toContain('custom cabinetry')
+    expect(p).not.toContain('quartz countertop')
+  })
+
+  it('contrato render-only continua precedendo o contexto', () => {
+    const p = buildFidelityPrompt(baseOptions, 'maximum')
+    expect(p.indexOf('RENDER-ONLY MODE')).toBeGreaterThanOrEqual(0)
+    expect(p.indexOf('RENDER-ONLY MODE')).toBeLessThan(p.indexOf('SCENE TYPE'))
+  })
+})
+
 describe('render_only: escalada e condicionamento estrutural', () => {
   it('attempt 1 não tem escalada; attempt 2 tem', () => {
     const a1 = buildFidelityPrompt(baseOptions, 'maximum', undefined, { attempt: 1 })
@@ -108,6 +131,33 @@ describe('render_only: escalada e condicionamento estrutural', () => {
     expect(sem).not.toContain('STRUCTURAL CONSTRAINT MAP')
     expect(com).toContain('STRUCTURAL CONSTRAINT MAP')
     expect(com).toContain('image #3')
+  })
+
+  it('bloco do depth map só aparece com índice', () => {
+    const sem = buildFidelityPrompt(baseOptions, 'maximum')
+    const com = buildFidelityPrompt(baseOptions, 'maximum', undefined, { depthMapImageIndex: 4 })
+    expect(sem).not.toContain('DEPTH CONSTRAINT MAP')
+    expect(com).toContain('DEPTH CONSTRAINT MAP')
+    expect(com).toContain('image #4')
+  })
+
+  it('amostras de material citam imagem e superfície com escopo fechado', () => {
+    const p = buildFidelityPrompt(baseOptions, 'maximum', undefined, {
+      materialSamples: [{ field: 'piso', imageIndex: 2 }, { field: 'bancadas', imageIndex: 3 }],
+    })
+    expect(p).toContain('MATERIAL SAMPLES')
+    expect(p).toContain('image #2 is the real product sample for the flooring')
+    expect(p).toContain('image #3 is the real product sample for the countertops')
+    expect(p).toContain('never change geometry')
+  })
+})
+
+describe('render_only: edge map na 1ª tentativa (opt-in do caller)', () => {
+  it('default segue sem edge map na 1ª; com a opção liga só na 1ª', () => {
+    expect(getFidelityAttemptParams(1).useEdgeMap).toBe(false)
+    expect(getFidelityAttemptParams(1, { edgeFromFirstAttempt: true }).useEdgeMap).toBe(true)
+    // Retries sempre têm edge map, independente da opção.
+    expect(getFidelityAttemptParams(2, { edgeFromFirstAttempt: false }).useEdgeMap).toBe(true)
   })
 })
 

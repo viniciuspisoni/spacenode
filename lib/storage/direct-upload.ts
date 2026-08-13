@@ -100,6 +100,25 @@ export const DIRECT_UPLOAD_AREAS = {
     dir: () => 'retocar/reference',
     probe: true,
   },
+  // Imagem de origem do Renderizar (consumida por /api/generate). Substitui o
+  // caminho base64, que forçava downscale client-side a 2048 px pra caber no
+  // body de 4,5 MB da Vercel — aqui a imagem sobe inteira; o teto de dimensão
+  // vira responsabilidade do server (lib/storage/normalize-image, Lanczos).
+  'render-source': {
+    bucket: 'space-mestres',
+    maxBytes: 15 * 1024 * 1024,
+    allowedMime: () => IMAGE_MIME,
+    dir: () => 'render/source',
+  },
+  // Amostra visual de material do Renderizar (foto do porcelanato, da madeira,
+  // do tecido…) — vira imagem de referência rotulada na geração. O confirm
+  // devolve a URL pública que o client envia em materialRefs.
+  'render-material': {
+    bucket: 'space-mestres',
+    maxBytes: 8 * 1024 * 1024,
+    allowedMime: () => IMAGE_MIME,
+    dir: () => 'render/material',
+  },
   // Imagem de origem do Ampliar (consumida por /api/upscale).
   'upscale-source': {
     bucket: 'space-mestres',

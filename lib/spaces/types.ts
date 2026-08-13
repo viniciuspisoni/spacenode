@@ -73,6 +73,11 @@ export interface DnaVerification {
 export interface SpaceDnaPayload {
   visual:   ProjectDNA
   briefing: BriefingArquitetonico
+  /** Kit de materiais do projeto: amostras visuais (campo → URL) herdadas da
+   *  render de origem (config_snapshot.material_refs). Anexadas como
+   *  referências rotuladas por superfície em TODA geração do Space — o DNA
+   *  passa a carregar evidência fotográfica dos materiais, não só nomes/hex. */
+  materialRefs?: { field: string; url: string }[] | null
 }
 
 // ── Space ──────────────────────────────────────────────────────

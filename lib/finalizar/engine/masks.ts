@@ -101,6 +101,13 @@ interface MaskCacheEntry {
 }
 
 export class MaskRasterizer {
+  /** Escala de rasterização relativa à imagem base. ½ no preview (default,
+   *  indistinguível em tela); o EXPORT sobe pra 1.0 — a meia-resolução
+   *  upscalada com LINEAR criava halo de 2-4 px exatamente nas arestas duras
+   *  (requadro de janela, linha de teto) que uma máscara 4K precisa segurar.
+   *  A escala entra nas dims do canvas, que já compõem a cache key. */
+  maskScale = MASK_SCALE
+
   private cache = new Map<string, MaskCacheEntry>()
   /** Imagens carregadas (bakedUrl / maskUrl legado). */
   private images = new Map<string, HTMLImageElement | 'loading' | 'failed'>()
@@ -139,8 +146,8 @@ export class MaskRasterizer {
   /** Máscara de um ajuste local, rasterizada em (w×h)·MASK_SCALE.
    *  `live` = traço em andamento (não persistido) aplicado por cima. */
   localMask(local: LocalAdjustment, imgW: number, imgH: number, live?: LiveStroke | null): HTMLCanvasElement {
-    const w = Math.max(2, Math.round(imgW * MASK_SCALE))
-    const h = Math.max(2, Math.round(imgH * MASK_SCALE))
+    const w = Math.max(2, Math.round(imgW * this.maskScale))
+    const h = Math.max(2, Math.round(imgH * this.maskScale))
     const baked = local.shape.kind === 'sky' ? local.shape.bakedUrl ?? '' : ''
     const key = `${w}x${h}|${baked}|${local.feather}|${this.strokesKey(local.strokes)}|${live ? `live${live.points.length}:${live.erase ? 1 : 0}` : ''}`
     const cacheId = `local:${local.id}`
@@ -159,13 +166,13 @@ export class MaskRasterizer {
         addCtx.drawImage(alphaFromLuma(img, w, h), 0, 0)
       }
     }
-    const scale = MASK_SCALE
+    const scale = this.maskScale
     for (const s of local.strokes) applyStroke(addCtx, eraseCtx, s, w, h, scale)
     if (live && live.points.length > 0) applyStroke(addCtx, eraseCtx, live, w, h, scale)
 
     let out = combineRG(add, erase)
     // Feather da máscara inteira (pincel/céu): blur dos canais R/G.
-    const featherPx = local.feather * MASK_SCALE
+    const featherPx = local.feather * this.maskScale
     if (featherPx > 0.5) {
       const blurred = makeCanvas(w, h)
       const bctx = blurred.getContext('2d')!
@@ -182,8 +189,8 @@ export class MaskRasterizer {
 
   /** Máscara de elemento (alfa único no canal R; feather aplicado). */
   elementMask(el: ElementLayer, imgW: number, imgH: number, live?: LiveStroke | null): HTMLCanvasElement {
-    const w = Math.max(2, Math.round(imgW * MASK_SCALE))
-    const h = Math.max(2, Math.round(imgH * MASK_SCALE))
+    const w = Math.max(2, Math.round(imgW * this.maskScale))
+    const h = Math.max(2, Math.round(imgH * this.maskScale))
     const key = `${w}x${h}|${el.maskFill}|${el.maskUrl ?? ''}|${el.feather}|${this.strokesKey(el.maskStrokes)}|${live ? `live${live.points.length}:${live.erase ? 1 : 0}` : ''}`
     const cacheId = `el:${el.id}`
     const hit = this.cache.get(cacheId)
@@ -201,8 +208,8 @@ export class MaskRasterizer {
     } else if (el.maskFill === 'full') {
       fillWhite(addCtx, w, h)
     }
-    for (const s of el.maskStrokes) applyStroke(addCtx, eraseCtx, s, w, h, MASK_SCALE)
-    if (live && live.points.length > 0) applyStroke(addCtx, eraseCtx, live, w, h, MASK_SCALE)
+    for (const s of el.maskStrokes) applyStroke(addCtx, eraseCtx, s, w, h, this.maskScale)
+    if (live && live.points.length > 0) applyStroke(addCtx, eraseCtx, live, w, h, this.maskScale)
 
     // Resolve add/erase num único alfa e aplica feather.
     const solved = makeCanvas(w, h)
@@ -213,7 +220,7 @@ export class MaskRasterizer {
     sctx.globalCompositeOperation = 'source-over'
 
     let final = solved
-    const featherPx = el.feather * MASK_SCALE
+    const featherPx = el.feather * this.maskScale
     if (featherPx > 0.5) {
       const blurred = makeCanvas(w, h)
       const bctx = blurred.getContext('2d')!

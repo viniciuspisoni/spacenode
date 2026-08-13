@@ -42,6 +42,21 @@ describe('geometry-score: re-render fiel passa', () => {
     const g = await computeGeometryScore(original, original)
     expect(g.score).toBeGreaterThanOrEqual(0.98)
     expect(g.edgeRecall).toBeGreaterThanOrEqual(0.99)
+    // Score v2: ΔE de cor ~0 em imagens idênticas.
+    expect(g.meanColorDelta).toBeLessThan(0.5)
+    expect(g.worstCellColorDelta).toBeLessThan(0.5)
+  })
+
+  it('recolor global dispara o ΔE sem derrubar o score estrutural', async () => {
+    // Mesma estrutura, cores viradas pra quente (simula parede/materiais
+    // repintados): o Sobel é cego a isso — o ΔE é a régua que acusa.
+    // (tint em vez de hue-rotate: a fixture é acinzentada e girar matiz de
+    // cinza não muda nada.)
+    const sharpMod = (await import('sharp')).default
+    const recolored = await sharpMod(original).tint({ r: 210, g: 150, b: 95 }).png().toBuffer()
+    const g = await computeGeometryScore(original, recolored)
+    expect(g.edgeRecall).toBeGreaterThanOrEqual(0.8)
+    expect(g.worstCellColorDelta).toBeGreaterThan(5)
   })
 
   it('re-render fiel (textura + relight + brilho, estrutura intacta) pontua alto', () => {

@@ -43,6 +43,15 @@ export interface GeometryScoreBreakdown {
   worstBlockDelta: number
   /** |aspecto_gerado − aspecto_original| / aspecto_original. */
   aspectDelta: number
+  /** ΔE (Lab, CIE76) MÉDIO das células da grade — drift global de cor. O Sobel
+   *  é cego a cor: parede repintada com a mesma luminância passa no edge
+   *  recall. Score v2 (Fase 3): NÃO entra no `score`; telemetria sempre, gate
+   *  opcional na rota (RENDER_FIDELITY_MAX_COLOR_DELTA). Em CGI→foto um ΔE
+   *  médio moderado é esperado (a luz muda de natureza); o sinal de RECOLOR
+   *  localizado é a pior célula destoando do médio. */
+  meanColorDelta: number
+  /** ΔE da PIOR célula da grade — recolor/troca de material localizado. */
+  worstCellColorDelta: number
   analysisWidth: number
   analysisHeight: number
 }
@@ -147,6 +156,74 @@ function blockDensities(mag: Float32Array, w: number, h: number): Float64Array {
   return cells
 }
 
+// ── Cor (ΔE Lab por célula) ───────────────────────────────────────────────────
+
+async function rgbResize(buf: Buffer, width: number, height: number): Promise<Buffer> {
+  return sharp(buf)
+    .resize(width, height, { fit: 'fill' })
+    .removeAlpha()
+    .raw()
+    .toBuffer()
+}
+
+function srgbToLinear(c255: number): number {
+  const s = c255 / 255
+  return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4)
+}
+
+/** RGB LINEAR médio → Lab (D65). A média é feita em linear (fisicamente
+ *  correta) e a conversão pra Lab acontece uma vez por célula. */
+function linearRgbToLab(r: number, g: number, b: number): [number, number, number] {
+  // linear sRGB → XYZ (D65)
+  const x = (0.4124564 * r + 0.3575761 * g + 0.1804375 * b) / 0.95047
+  const y =  0.2126729 * r + 0.7151522 * g + 0.072175  * b
+  const z = (0.0193339 * r + 0.119192  * g + 0.9503041 * b) / 1.08883
+  const f = (t: number) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116)
+  const fx = f(x), fy = f(y), fz = f(z)
+  return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)]
+}
+
+/** Lab médio por célula da grade GRID×GRID. */
+function cellLabs(rgb: Buffer, w: number, h: number): Float64Array {
+  const sums = new Float64Array(GRID * GRID * 3)
+  const counts = new Float64Array(GRID * GRID)
+  for (let y = 0; y < h; y++) {
+    const gy = Math.min(GRID - 1, Math.floor((y * GRID) / h))
+    for (let x = 0; x < w; x++) {
+      const gx = Math.min(GRID - 1, Math.floor((x * GRID) / w))
+      const ci = gy * GRID + gx
+      const p = (y * w + x) * 3
+      sums[ci * 3]     += srgbToLinear(rgb[p])
+      sums[ci * 3 + 1] += srgbToLinear(rgb[p + 1])
+      sums[ci * 3 + 2] += srgbToLinear(rgb[p + 2])
+      counts[ci]++
+    }
+  }
+  const labs = new Float64Array(GRID * GRID * 3)
+  for (let i = 0; i < GRID * GRID; i++) {
+    const n = counts[i] || 1
+    const [L, a, b] = linearRgbToLab(sums[i * 3] / n, sums[i * 3 + 1] / n, sums[i * 3 + 2] / n)
+    labs[i * 3] = L; labs[i * 3 + 1] = a; labs[i * 3 + 2] = b
+  }
+  return labs
+}
+
+/** ΔE76 médio e pior célula entre as grades Lab das duas imagens. */
+function colorDeltas(labsO: Float64Array, labsG: Float64Array): { mean: number; worst: number } {
+  let sum = 0
+  let worst = 0
+  const cells = GRID * GRID
+  for (let i = 0; i < cells; i++) {
+    const dL = labsO[i * 3] - labsG[i * 3]
+    const da = labsO[i * 3 + 1] - labsG[i * 3 + 1]
+    const db = labsO[i * 3 + 2] - labsG[i * 3 + 2]
+    const dE = Math.sqrt(dL * dL + da * da + db * db)
+    sum += dE
+    if (dE > worst) worst = dE
+  }
+  return { mean: sum / cells, worst }
+}
+
 function pearson(a: Float64Array, b: Float64Array): number {
   const n = a.length
   let ma = 0, mb = 0
@@ -188,9 +265,11 @@ export async function computeGeometryScore(
     ? Math.max(MIN_SIDE, Math.round(ANALYSIS_LONG_SIDE / arOrig))
     : ANALYSIS_LONG_SIDE
 
-  const [grayO, grayG] = await Promise.all([
+  const [grayO, grayG, rgbO, rgbG] = await Promise.all([
     grayResize(originalBuf, w, h),
     grayResize(generatedBuf, w, h),
+    rgbResize(originalBuf, w, h),
+    rgbResize(generatedBuf, w, h),
   ])
 
   const magO = sobelMagnitude(grayO, w, h)
@@ -217,6 +296,12 @@ export async function computeGeometryScore(
     if (d > worstBlockDelta) worstBlockDelta = d
   }
 
+  // ΔE Lab por célula — telemetria de drift de cor/material (não entra no score).
+  const { mean: meanColorDelta, worst: worstCellColorDelta } = colorDeltas(
+    cellLabs(rgbO, w, h),
+    cellLabs(rgbG, w, h),
+  )
+
   // 2% de tolerância de aspecto (crop/pad de provider); acima disso penaliza
   // rápido — formato diferente = enquadramento alterado.
   const aspectPenalty = aspectDelta <= 0.02 ? 0 : Math.min(0.4, (aspectDelta - 0.02) * 4)
@@ -234,9 +319,63 @@ export async function computeGeometryScore(
     blockCorrelation,
     worstBlockDelta,
     aspectDelta,
+    meanColorDelta,
+    worstCellColorDelta,
     analysisWidth: w,
     analysisHeight: h,
   }
+}
+
+// ── Mapa visual de diferenças estruturais (Fase 3) ────────────────────────────
+//
+// Overlay pro comparador: o original esmaecido em cinza com, EM VERMELHO, as
+// bordas estruturais do original que NÃO foram encontradas no gerado (mesma
+// lógica do edgeRecall, ±2px). Diferença de pixel cru seria inútil aqui —
+// CGI→foto muda TODA textura legitimamente; o que importa (e o que o usuário
+// precisa conferir) é estrutura que sumiu ou se moveu.
+
+const DIFF_LONG_SIDE = 1024
+
+export async function buildStructuralDiffPng(
+  originalBuf: Buffer,
+  generatedBuf: Buffer,
+): Promise<Buffer> {
+  const om = await sharp(originalBuf).metadata()
+  if (!om.width || !om.height) {
+    throw new Error('diff-map: dimensões indisponíveis no original')
+  }
+  const ar = om.width / om.height
+  const w = ar >= 1 ? DIFF_LONG_SIDE : Math.max(MIN_SIDE, Math.round(DIFF_LONG_SIDE * ar))
+  const h = ar >= 1 ? Math.max(MIN_SIDE, Math.round(DIFF_LONG_SIDE / ar)) : DIFF_LONG_SIDE
+
+  const [grayO, grayG] = await Promise.all([
+    grayResize(originalBuf, w, h),
+    grayResize(generatedBuf, w, h),
+  ])
+  const magO = sobelMagnitude(grayO, w, h)
+  const magG = sobelMagnitude(grayG, w, h)
+  const binO = binarize(magO, strongEdgeThreshold(magO))
+  const dilatedG = dilate(binarize(magG, strongEdgeThreshold(magG)), w, h, DILATE_RADIUS)
+
+  const missing = new Uint8Array(w * h)
+  for (let i = 0; i < missing.length; i++) {
+    missing[i] = binO[i] && !dilatedG[i] ? 1 : 0
+  }
+  // Dilatação leve só pra legibilidade do traço vermelho.
+  const missingBold = dilate(missing, w, h, 1)
+
+  const px = new Uint8Array(w * h * 3)
+  for (let i = 0; i < w * h; i++) {
+    if (missingBold[i]) {
+      px[i * 3] = 235; px[i * 3 + 1] = 64; px[i * 3 + 2] = 52
+    } else {
+      const g = Math.round(grayO[i] * 0.5 + 24)
+      px[i * 3] = g; px[i * 3 + 1] = g; px[i * 3 + 2] = g
+    }
+  }
+  return sharp(Buffer.from(px), { raw: { width: w, height: h, channels: 3 } })
+    .png()
+    .toBuffer()
 }
 
 /** Lineart do original (bordas pretas sobre branco) pro condicionamento

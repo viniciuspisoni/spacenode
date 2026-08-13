@@ -6,10 +6,12 @@ import { getPayerId } from '@/lib/workspaces/context'
 import { refundNodes } from '@/lib/billing/refund-nodes'
 import {
   buildFidelityPrompt,
+  materialSurfaceEn,
   type GenerateOptions,
   type ProjectMaterials,
   type BriefingArquitetonico,
   type FidelityLevel,
+  type MaterialSampleRef,
 } from '@/lib/prompts'
 import {
   ENGINES,
@@ -25,13 +27,25 @@ import { generateImage, type GenerateImageResult } from '@/lib/ai/image-provider
 import {
   getRenderFidelityConfig,
   getFidelityAttemptParams,
+  depthMapConditioningEnabled,
+  depthMapEndpoint,
 } from '@/lib/ai/fidelity/render-only'
+import {
+  checkArchitecturalPreservation,
+  type PreservationCheck,
+} from '@/lib/spaces/preserve-validate'
 import {
   computeGeometryScore,
   buildEdgeMapPng,
   type GeometryScoreBreakdown,
 } from '@/lib/ai/fidelity/geometry-score'
-import { fetchStorageBuffer } from '@/lib/storage/fetch'
+import { fetchStorageBuffer, assertSafeFetchUrl } from '@/lib/storage/fetch'
+import { nearestSupportedAspectRatio } from '@/lib/ai/aspect-ratio'
+import { analyzeImage } from '@/lib/fidelity-engine'
+import { DIRECT_UPLOAD_AREAS, downloadDirectUpload } from '@/lib/storage/direct-upload'
+import { normalizeSourceImage } from '@/lib/storage/normalize-image'
+import { createDisplayPreview } from '@/lib/storage/preview'
+import sharp from 'sharp'
 
 fal.config({ credentials: process.env.FAL_KEY })
 
@@ -65,13 +79,20 @@ const FAL_TIMEOUT_MS: Record<EngineId, number> = {
 // Quasar (GPT Image 2 edit)        → `quality` ∈ 'medium'|'high'
 //   2K interno → 'medium', 4K → 'high'.
 
-function falParamsForEngine(engine: EngineId, resolution: Resolution): Record<string, unknown> {
+function falParamsForEngine(
+  engine:      EngineId,
+  resolution:  Resolution,
+  aspectRatio: string | null = null,
+): Record<string, unknown> {
   if (engine === 'quasar') {
     return {
       quality:       resolution === '4k' ? 'high' : 'medium',
       image_size:    'auto',
       num_images:    1,
-      output_format: 'jpeg',
+      // Master lossless — alinha o caminho FAL com o GCP/Vertex (que já
+      // devolve PNG). JPEG aqui criava uma geração de perda logo na origem
+      // da cadeia render → editar → ampliar.
+      output_format: 'png',
     }
   }
   // vega | pulsar
@@ -79,8 +100,26 @@ function falParamsForEngine(engine: EngineId, resolution: Resolution): Record<st
   return {
     resolution:    map[resolution],
     num_images:    1,
-    output_format: 'jpeg',
+    output_format: 'png',
+    // Pino de formato (lib/ai/aspect-ratio): presente só quando o aspecto do
+    // original bate (≤2%) com um valor suportado — previne o drift de
+    // enquadramento em vez de puni-lo depois via aspectDelta. Ausente, o
+    // motor segue o formato do input (default 'auto').
+    ...(aspectRatio ? { aspect_ratio: aspectRatio } : {}),
   }
+}
+
+// Teto do briefing de visão inline (PROJECT FACTS). analyzeImage nunca lança
+// (fallback interno) — o race cobre lentidão extrema sem travar a geração.
+const BRIEFING_TIMEOUT_MS = 15_000
+
+// Type-guard mínimo pro briefing cacheado em renders.config_snapshot (foi
+// persistido por nós via parseBriefing, mas o JSONB não tem contrato de tipo).
+function isBriefing(value: unknown): value is BriefingArquitetonico {
+  const b = value as BriefingArquitetonico | null
+  return !!b && typeof b === 'object' &&
+    typeof b.tipo_projeto === 'string' &&
+    Array.isArray(b.elementos_preservar)
 }
 
 function truncateErr(err: unknown): string {
@@ -109,6 +148,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const {
       imageBase64,
+      sourceKey,
       projectType,
       segment,
       environment,
@@ -119,14 +159,18 @@ export async function POST(req: NextRequest) {
       engine:     rawEngine,
       resolution: rawResolution,
       materials,
+      materialRefs,
       fidelityMode  = 'strict',
       briefing,
       inputUrl:     providedInputUrl,
       fidelityLevel = 'maximum',
       anchorUrl,
       refinementText,
+      structuralBoost,
+      seed: providedSeed,
     } = body as {
       imageBase64?:    string
+      sourceKey?:      string
       projectType?:    'exterior' | 'interior'
       segment?:        string
       environment?:    string
@@ -137,17 +181,24 @@ export async function POST(req: NextRequest) {
       engine?:         string
       resolution?:     string
       materials?:      ProjectMaterials
+      materialRefs?:   { field?: string; url?: string }[]
       fidelityMode?:   'strict' | 'balanced'
       briefing?:       BriefingArquitetonico
       inputUrl?:       string
       fidelityLevel?:  FidelityLevel
       anchorUrl?:      string
       refinementText?: string
+      /** "Corrigir drift": desloca o ladder (temp ↓ + edge map + escalada
+       *  desde a 1ª tentativa). O caller NÃO deve mandar anchorUrl junto —
+       *  a âncora seria o output com o próprio drift. */
+      structuralBoost?: boolean
+      /** Seed a reutilizar (reprodutibilidade — vem do render anterior). */
+      seed?:            number
     }
 
     // ── Validações que ficam ANTES do débito ──────────────────────────────────
 
-    if ((!imageBase64 && !providedInputUrl) || !projectType) {
+    if ((!imageBase64 && !providedInputUrl && !sourceKey) || !projectType) {
       return NextResponse.json(
         { error: 'Imagem e tipo de projeto são obrigatórios' },
         { status: 400 }
@@ -172,6 +223,38 @@ export async function POST(req: NextRequest) {
 
     nodesToCharge = getNodesCost(engine, resolution)
     const falEndpoint = getFalEndpoint(engine)
+
+    // ── Aquisição + normalização do input ANTES do débito ────────────────────
+    //
+    // sourceKey (upload direto, resolução cheia) tem precedência sobre
+    // imageBase64 (legado, 2048 px do client). Ambos passam pela normalização
+    // (rotação EXIF + ICC→sRGB + teto 4096 px/9 MB via Lanczos — ver
+    // lib/storage/normalize-image). Falha aqui é 400 barato, sem débito.
+    let sourceBuffer: Buffer | null = null
+    let sourceMime: 'image/jpeg' | 'image/png' = 'image/jpeg'
+    if (!providedInputUrl) {
+      let rawBuffer: Buffer
+      if (sourceKey) {
+        const src = await downloadDirectUpload(
+          admin, DIRECT_UPLOAD_AREAS['render-source'], user.id, {}, sourceKey,
+        )
+        if (!src.ok) return NextResponse.json({ error: src.message }, { status: src.status })
+        rawBuffer = src.buffer
+      } else {
+        const base64Data = imageBase64!.includes(',') ? imageBase64!.split(',')[1] : imageBase64!
+        rawBuffer = Buffer.from(base64Data, 'base64')
+      }
+      try {
+        const normalized = await normalizeSourceImage(rawBuffer)
+        sourceBuffer = normalized.buffer
+        sourceMime   = normalized.mime
+        if (normalized.transforms.length > 0) {
+          console.log('[generate] normalize  :', normalized.transforms.join('+'), `→ ${normalized.width}×${normalized.height}`)
+        }
+      } catch {
+        return NextResponse.json({ error: 'Imagem inválida ou corrompida.' }, { status: 400 })
+      }
+    }
 
     // ── Débito atômico antes da chamada Fal.ai ────────────────────────────────
     //
@@ -248,18 +331,19 @@ export async function POST(req: NextRequest) {
     devLog('[generate] anchor     :', hasAnchor ? anchorUrl : 'none')
     devLog('[generate] refine     :', refinementText?.trim() || 'none')
 
-    // Buffer do original (autoridade de geometria) — presente no caminho
-    // base64; no caminho inputUrl reusado, é baixado sob demanda pro score.
+    // Buffer do original (autoridade de geometria) — adquirido/normalizado
+    // antes do débito; no caminho inputUrl reusado, é baixado adiante pro
+    // aspecto/score.
     let originalBuffer: Buffer | null = null
     if (providedInputUrl) {
       inputUrl = providedInputUrl
       devLog('[generate] inputUrl   : reused', inputUrl)
     } else {
-      const base64Data = imageBase64!.includes(',') ? imageBase64!.split(',')[1] : imageBase64!
-      originalBuffer = Buffer.from(base64Data, 'base64')
+      originalBuffer = sourceBuffer!
+      const ext = sourceMime === 'image/png' ? 'png' : 'jpg'
       // Uint8Array novo: BlobPart exige ArrayBuffer próprio (o let Buffer|null
       // alarga pra ArrayBufferLike e o File recusa).
-      const imageFile  = new File([new Uint8Array(originalBuffer)], 'input.jpg', { type: 'image/jpeg' })
+      const imageFile  = new File([new Uint8Array(originalBuffer)], `input.${ext}`, { type: sourceMime })
       inputUrl = await fal.storage.upload(imageFile)
       devLog('[generate] inputUrl   :', inputUrl)
     }
@@ -269,6 +353,120 @@ export async function POST(req: NextRequest) {
     const baseImageUrls = (anchorUrl && anchorUrl !== inputUrl)
       ? [anchorUrl, inputUrl]
       : [inputUrl]
+
+    // Rótulos de papel por imagem, paralelos a baseImageUrls. No caminho GCP
+    // cada rótulo vira uma parte de texto imediatamente antes da imagem —
+    // binding explícito entre o "Image #N" do prompt e os pixels certos
+    // (mesma correção do Spaces em lib/spaces/references.ts). Sem isso, com a
+    // âncora primeiro, o modelo tende a ancorar a GEOMETRIA na imagem mais
+    // acabada — exatamente o drift que o buildAnchorBlock tenta impedir.
+    const baseImageLabels: string[] = baseImageUrls.length === 2
+      ? [
+          'Image #1 — MATERIAL & ATMOSPHERE ANCHOR (previous render of this same project: source of materials, textures and palette only):',
+          'Image #2 — GEOMETRY SOURCE (architecture, layout, camera and perspective are law):',
+        ]
+      : ['Image #1 — REFERENCE IMAGE (mandatory base: geometry, camera, materials and framing are law):']
+
+    // Amostras visuais de material (Fase 3): fotos reais do produto viram
+    // referências ROTULADAS por superfície — o spec deixa de ser só texto
+    // livre (onde o modelo inventa veio, paginação e rejunte). Cap 4; URLs
+    // validadas no allowlist (Storage próprio + CDN FAL). Índices fixos por
+    // request: edge/depth map entram DEPOIS na lista, então nada desloca.
+    const MATERIAL_FIELD_KEYS: ReadonlySet<string> = new Set([
+      'fachada', 'piso', 'esquadrias', 'paredes', 'teto', 'marcenaria', 'bancadas', 'elementos', 'outros',
+    ])
+    const materialSamples: MaterialSampleRef[] = []
+    const materialRefsUsed: { field: string; url: string }[] = []
+    if (Array.isArray(materialRefs)) {
+      const seenFields = new Set<string>()
+      for (const raw of materialRefs) {
+        if (materialSamples.length >= 4) break
+        const field = typeof raw?.field === 'string' ? raw.field : ''
+        const url   = typeof raw?.url   === 'string' ? raw.url   : ''
+        if (!MATERIAL_FIELD_KEYS.has(field) || seenFields.has(field) || !url) continue
+        try { assertSafeFetchUrl(url) } catch { continue }
+        seenFields.add(field)
+        baseImageUrls.push(url)
+        const imageIndex = baseImageUrls.length
+        baseImageLabels.push(
+          `Image #${imageIndex} — MATERIAL SAMPLE for the ${materialSurfaceEn(field as keyof ProjectMaterials, projectType)} (reproduce this exact material on that surface only):`,
+        )
+        materialSamples.push({ field: field as keyof ProjectMaterials, imageIndex })
+        materialRefsUsed.push({ field, url })
+      }
+      if (materialSamples.length > 0) {
+        devLog('[generate] materialRef:', materialSamples.map(s => `${s.field}→#${s.imageIndex}`).join(' '))
+      }
+    }
+
+    // Buffer do original disponível cedo: alimenta o pino de aspect ratio e,
+    // no render_only, o edge map/score (que antes o buscavam sob demanda).
+    // Best-effort — sem buffer, os consumidores seguem sem ele.
+    if (!originalBuffer) {
+      try {
+        originalBuffer = await fetchStorageBuffer(inputUrl)
+      } catch (bufErr) {
+        console.warn('[generate] original indisponível pra aspecto (segue sem):', truncateErr(bufErr))
+      }
+    }
+    let aspectRatio: string | null = null
+    if (originalBuffer) {
+      try {
+        const meta = await sharp(originalBuffer).metadata()
+        aspectRatio = nearestSupportedAspectRatio(meta.width ?? null, meta.height ?? null)
+      } catch { /* sem pino — motor segue o formato do input */ }
+    }
+    devLog('[generate] aspect     :', aspectRatio ?? 'auto (sem pino)')
+
+    // Briefing de visão (PROJECT FACTS) — religado ao Renderizar. Ordem de
+    // resolução: body (caller explícito, ex. Spaces) → cache do histórico
+    // (mesmo input_url já analisado nesta conta) → análise Gemini inline com
+    // teto de 15s. Em 'creative' não injetamos: os FACTS travam materiais e
+    // entorno, contra o propósito do nível.
+    let resolvedBriefing: BriefingArquitetonico | undefined = briefing
+    let briefingSource: 'body' | 'cache' | 'vision' | 'none' = briefing ? 'body' : 'none'
+    if (!resolvedBriefing && fidelityLevel !== 'creative') {
+      if (providedInputUrl) {
+        const { data: cachedRender } = await admin
+          .from('renders')
+          .select('config_snapshot')
+          .eq('user_id', user.id)
+          .eq('input_url', inputUrl)
+          .not('config_snapshot->briefing', 'is', null)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        const cachedBriefing = (cachedRender?.config_snapshot as { briefing?: unknown } | null)?.briefing
+        if (isBriefing(cachedBriefing)) {
+          resolvedBriefing = cachedBriefing
+          briefingSource = 'cache'
+        }
+      }
+      if (!resolvedBriefing) {
+        const briefingStartedAt = Date.now()
+        resolvedBriefing = await Promise.race([
+          analyzeImage(inputUrl),
+          new Promise<undefined>(resolve => setTimeout(() => resolve(undefined), BRIEFING_TIMEOUT_MS)),
+        ])
+        if (resolvedBriefing) briefingSource = 'vision'
+        devLog('[generate] briefing   :', briefingSource, `(${Date.now() - briefingStartedAt}ms)`)
+      }
+    }
+    options.briefing = resolvedBriefing
+
+    // Seed fixa por request (caminho GCP): retries do ladder viram variação
+    // CONTROLADA da mesma amostra (só temperatura/edge map mudam) e o render
+    // fica reproduzível. Os schemas FAL desses motores não expõem seed — lá
+    // segue não-determinístico. "Corrigir drift" reenvia a seed do render
+    // anterior pra mudar SÓ o condicionamento, não a amostra.
+    const generationSeed = Number.isInteger(providedSeed) && (providedSeed as number) >= 0
+      ? (providedSeed as number)
+      : Math.floor(Math.random() * 2_147_483_647)
+
+    // "Corrigir drift": começa o ladder já na postura de retry — temperatura
+    // baixa, edge map anexado e bloco de escalada no prompt desde o 1º shot.
+    const attemptOffset = structuralBoost === true && renderOnlyActive ? 1 : 0
+    if (attemptOffset > 0) console.log('[generate] structural boost ativo (ladder deslocado)')
 
     // Orçamento de tempo: retries só rodam se sobrar tempo real de geração
     // (a Vercel mata a função no maxDuration — margem pra persistência).
@@ -289,17 +487,35 @@ export async function POST(req: NextRequest) {
     }
 
     let edgeMapUrl: string | null = null
+    let depthMapUrl: string | null = null
     let finalPrompt = ''
     let best: { gen: GenerateImageResult; prompt: string; score: number | null } | null = null
     const attemptLogs: FidelityAttemptLog[] = []
 
+    // Gate opcional de cor (score v2): só quando o usuário NÃO pediu mudança
+    // que legitimamente altera cores — luz nova, override de material ou
+    // refinamento. Nesses casos o ΔE alto é pedido, não drift.
+    const colorGateActive =
+      renderOnlyActive &&
+      fidelityCfg.maxColorDelta !== null &&
+      (!lighting || lighting === 'Preservar Original') &&
+      !refinementText?.trim() &&
+      !materials
+
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      const params = getFidelityAttemptParams(attempt)
+      const ladderAttempt = attempt + attemptOffset
+      const params = getFidelityAttemptParams(ladderAttempt, {
+        // Edge map desde a 1ª tentativa pra CGI sem âncora (Fase 3; A/B via
+        // telemetria edge_map_used). Com âncora mantém o comportamento
+        // clássico — a âncora já ancora a estrutura.
+        edgeFromFirstAttempt: fidelityCfg.edgeFirst && !hasAnchor,
+      })
 
       // Condicionamento estrutural nos retries: lineart do original anexado
       // como imagem extra (upload único). Falha aqui NUNCA derruba a geração —
       // segue sem o edge map.
       let imageUrls = baseImageUrls
+      let imageLabels = baseImageLabels
       let edgeMapImageIndex: number | null = null
       if (renderOnlyActive && params.useEdgeMap) {
         try {
@@ -310,21 +526,56 @@ export async function POST(req: NextRequest) {
           }
           imageUrls = [...baseImageUrls, edgeMapUrl]
           edgeMapImageIndex = imageUrls.length
+          imageLabels = [
+            ...baseImageLabels,
+            `Image #${edgeMapImageIndex} — STRUCTURAL CONSTRAINT MAP (edge/line map of the reference geometry; align every edge to it, never imitate its graphic style):`,
+          ]
         } catch (edgeErr) {
           console.warn('[generate:fidelity] edge map indisponível (segue sem):', (edgeErr as Error).message)
         }
       }
 
-      finalPrompt = buildFidelityPrompt(options, fidelityLevel, briefing, {
-        attempt,
+      // Depth map (Fase 3, experimental — RENDER_FIDELITY_DEPTH_MAP=1): volumes
+      // e pontos de fuga que o edge map não segura. Uma chamada FAL por request
+      // (URL cacheada entre tentativas); falha NUNCA derruba a geração.
+      let depthMapImageIndex: number | null = null
+      if (renderOnlyActive && depthMapConditioningEnabled() && !hasAnchor) {
+        try {
+          if (!depthMapUrl) {
+            const depthOut = await Promise.race([
+              fal.subscribe(depthMapEndpoint(), { input: { image_url: inputUrl } as unknown as never }),
+              new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error('DEPTH_TIMEOUT')), 25_000),
+              ),
+            ])
+            const d = (depthOut as { data?: { image?: { url?: string }; images?: { url?: string }[] } }).data
+            depthMapUrl = d?.image?.url ?? d?.images?.[0]?.url ?? null
+          }
+          if (depthMapUrl) {
+            imageUrls = [...imageUrls, depthMapUrl]
+            depthMapImageIndex = imageUrls.length
+            imageLabels = [
+              ...imageLabels,
+              `Image #${depthMapImageIndex} — DEPTH CONSTRAINT MAP (bright = near, dark = far; match its 3D structure, never render it):`,
+            ]
+          }
+        } catch (depthErr) {
+          console.warn('[generate:fidelity] depth map indisponível (segue sem):', (depthErr as Error).message)
+        }
+      }
+
+      finalPrompt = buildFidelityPrompt(options, fidelityLevel, resolvedBriefing, {
+        attempt: ladderAttempt,
         edgeMapImageIndex,
+        depthMapImageIndex,
+        materialSamples: materialSamples.length > 0 ? materialSamples : undefined,
       })
       devLog('[generate] prompt     :', finalPrompt)
 
       const falInput = {
         prompt:     finalPrompt,
         image_urls: imageUrls,
-        ...falParamsForEngine(engine, resolution),
+        ...falParamsForEngine(engine, resolution, aspectRatio),
       }
       devLog('[generate] FAL INPUT  :', JSON.stringify(falInput))
 
@@ -337,10 +588,11 @@ export async function POST(req: NextRequest) {
         gen = await generateImage({
           falEndpoint,
           falInput,
+          imageLabels,
           timeoutMs: attemptTimeoutMs,
           context:   attempt === 1 ? 'generate' : `generate#${attempt}`,
           deliver:   { kind: 'url', userId: user.id, area: 'renders' },
-          gcpConfig: { temperature: params.temperature },
+          gcpConfig: { temperature: params.temperature, seed: generationSeed },
         })
       } catch (genErr) {
         // Retry é best-effort: se JÁ existe imagem válida de tentativa
@@ -385,16 +637,22 @@ export async function POST(req: NextRequest) {
         `temp=${params.temperature} edgeMap=${edgeMapImageIndex !== null} ` +
         `score=${geometry ? geometry.score.toFixed(3) : 'n/a'}` +
         (geometry
-          ? ` (recall=${geometry.edgeRecall.toFixed(3)} blockCorr=${geometry.blockCorrelation.toFixed(3)} worstBlock=${geometry.worstBlockDelta.toFixed(3)} aspectDelta=${geometry.aspectDelta.toFixed(3)})`
+          ? ` (recall=${geometry.edgeRecall.toFixed(3)} blockCorr=${geometry.blockCorrelation.toFixed(3)} worstBlock=${geometry.worstBlockDelta.toFixed(3)} aspectDelta=${geometry.aspectDelta.toFixed(3)} ΔEmean=${geometry.meanColorDelta.toFixed(1)} ΔEworst=${geometry.worstCellColorDelta.toFixed(1)})`
           : '') +
-        ` min=${renderOnlyActive ? minScore.toFixed(2) : 'off'}`
+        ` min=${renderOnlyActive ? minScore.toFixed(2) : 'off'}` +
+        (colorGateActive ? ` maxΔE=${fidelityCfg.maxColorDelta}` : '')
       )
 
       if (!best || (geometry?.score ?? -1) > (best.score ?? -1)) {
         best = { gen, prompt: finalPrompt, score: geometry?.score ?? null }
       }
 
-      const passed = !renderOnlyActive || geometry === null || geometry.score >= minScore
+      // Passa quando estrutura ≥ limite E (gate de cor ativo) a pior célula de
+      // ΔE fica sob o teto — recolor localizado força retry mesmo com edges ok.
+      const colorOk = !colorGateActive || geometry === null ||
+        geometry.worstCellColorDelta <= (fidelityCfg.maxColorDelta ?? Infinity)
+      const passed = !renderOnlyActive || geometry === null ||
+        (geometry.score >= minScore && colorOk)
       if (passed) break
       if (attempt >= maxAttempts) {
         console.warn(`[generate:fidelity] score abaixo do limite após ${attempt} tentativas — entregando a melhor (score=${best.score?.toFixed(3) ?? 'n/a'})`)
@@ -421,6 +679,43 @@ export async function POST(req: NextRequest) {
     const falRequestId = gen.requestId
     devLog('[generate] outputUrl  :', outputUrl, '| provider:', gen.provider, '| req:', falRequestId)
 
+    // ── Auditoria semântica de preservação (Fase 3) ──────────────────────────
+    //
+    // Mesma checagem de visão do Spaces (checkArchitecturalPreservation):
+    // volumetria, aberturas, telhado, proporções, câmera, materiais — pega o
+    // que o Sobel não vê. Rodada por padrão só nos casos LIMÍTROFES (score
+    // < 0.80 ou indisponível) pra não taxar a latência do caminho feliz;
+    // RENDER_SEMANTIC_AUDIT=1 força sempre, =0 desliga. Best-effort: falha
+    // vira null e nada bloqueia a entrega.
+    let preservationAudit: PreservationCheck | null = null
+    const auditMode = process.env.RENDER_SEMANTIC_AUDIT ?? ''
+    const auditBorderline = fidelityScore === null || fidelityScore < 0.8
+    if (
+      renderOnlyActive && auditMode !== '0' &&
+      (auditMode === '1' || auditBorderline) &&
+      remainingMs() > 20_000
+    ) {
+      preservationAudit = await checkArchitecturalPreservation(inputUrl, outputUrl, 'STRICT_SOURCE_LOCK')
+      if (preservationAudit) {
+        console.log(
+          `[generate:fidelity] audit semântico: score=${preservationAudit.score.toFixed(2)} ` +
+          `preserved=${preservationAudit.preserved} warning=${preservationAudit.warning}` +
+          (preservationAudit.notes ? ` notes="${preservationAudit.notes}"` : '')
+        )
+      }
+    }
+
+    // ── Derivado de exibição (WebP ~1600px) ──────────────────────────────────
+    // Grids (Histórico) deixam de baixar o master PNG (10-30 MB) por card.
+    // Best-effort: sem preview, a UI serve o master (comportamento anterior).
+    let previewUrl: string | null = null
+    try {
+      const outBuf = await fetchStorageBuffer(outputUrl)
+      previewUrl = await createDisplayPreview(admin, user.id, 'renders', outBuf)
+    } catch (previewErr) {
+      console.warn('[generate] preview indisponível (segue sem):', truncateErr(previewErr))
+    }
+
     // ── Persistência ─────────────────────────────────────────────────────────
     //
     // Se a imagem foi gerada mas o INSERT falhou: NÃO refundamos. O usuário
@@ -442,7 +737,12 @@ export async function POST(req: NextRequest) {
       fidelityMode:  fidelityMode  === 'balanced' ? 'balanced' : 'strict',
       fidelityLevel,
       materials:     materials     ?? null,
-      briefing:      briefing      ?? null,
+      // Amostras visuais de material usadas (field + url) — reaproveitáveis
+      // pelo Spaces (kit de materiais do projeto) e pelo histórico.
+      material_refs: materialRefsUsed.length > 0 ? materialRefsUsed : null,
+      // Briefing resolvido (body/cache/visão) — persistido aqui vira o cache
+      // das próximas gerações com o mesmo input_url.
+      briefing:      resolvedBriefing ?? null,
     }
 
     const baseRow = {
@@ -468,6 +768,9 @@ export async function POST(req: NextRequest) {
     // regrava só com as colunas base para nunca perder o registro.
     const extendedRow = {
       ...baseRow,
+      // preview_url SÓ na extendedRow: o fallback baseRow segue funcionando
+      // em banco sem a migration 20260813000000.
+      preview_url:  previewUrl,
       user_prompt:  refinementText?.trim() || null,
       duration_ms:  generationDurationMs,
       retry_count:  retryCount,
@@ -480,8 +783,14 @@ export async function POST(req: NextRequest) {
         request_id:     falRequestId,
         engine,
         resolution,
-        parameters:  falParamsForEngine(engine, resolution),
+        parameters:  falParamsForEngine(engine, resolution, aspectRatio),
+        // Reprodutibilidade: seed aplicada no caminho GCP (a FAL não expõe).
+        seed:            generationSeed,
+        structural_boost: attemptOffset > 0,
+        aspect_ratio:    aspectRatio,
+        briefing_source: briefingSource,
         anchor_used: hasAnchor,
+        material_ref_count: materialSamples.length,
         image_count: baseImageUrls.length,
         duration_ms: generationDurationMs,
         nodes_charged: nodesToCharge,
@@ -492,7 +801,11 @@ export async function POST(req: NextRequest) {
               mode:        'render_only',
               min_score:   minScore,
               final_score: fidelityScore,
+              color_gate:  colorGateActive ? fidelityCfg.maxColorDelta : null,
               attempts:    attemptLogs,
+              // Auditoria de visão (volumetria/aberturas/câmera/materiais) —
+              // null quando não rodou (caminho feliz ou desligada).
+              semantic_audit: preservationAudit,
             }
           : null,
       },
@@ -529,6 +842,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       outputUrl,
       renderId,
+      previewUrl,
       originalUrl:  inputUrl ?? null,
       // `credits` continua refletindo o saldo do plano (backward compat com
       // a UI atual em GenerateClient); novos campos detalham plano + Lumens.
@@ -537,9 +851,18 @@ export async function POST(req: NextRequest) {
       lumenBalance: balance?.lumen_balance ?? 0,
       totalBalance: balance?.total_balance ?? 0,
       nodesCharged: nodesToCharge,
-      // Diagnóstico do gate render_only (aditivo; a UI atual ignora).
+      // Diagnóstico do gate render_only. fidelityWarning: score final ficou
+      // abaixo do limite mesmo após retries — a UI mostra o aviso (mesmo
+      // papel do preservation_warning das vistas no Spaces).
       fidelityScore,
       fidelityAttempts: attemptLogs.length,
+      fidelityWarning:  renderOnlyActive && fidelityScore !== null && fidelityScore < minScore,
+      // Auditoria de visão: warning quando o auditor viu desvio de projeto
+      // (volumetria/aberturas/câmera/materiais) — complementa o score de bordas.
+      semanticWarning:  preservationAudit?.warning ?? false,
+      // Seed usada (caminho GCP) — o client reenvia no "Corrigir drift" pra
+      // manter a mesma amostra e mudar só o condicionamento.
+      seed:             generationSeed,
       // O prompt final (buildFidelityPrompt) é proprietário e o GenerateClient
       // nunca o consumia — não viaja mais na resposta.
     })

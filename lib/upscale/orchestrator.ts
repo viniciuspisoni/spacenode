@@ -6,8 +6,11 @@
 // sequência (ex: denoise → upscale) para um lançamento futuro:
 // basta estender PIPELINE_BY_MODE e a tipagem.
 //
-// Política de fallback (silenciosa):
+// Política de fallback:
 //   - "Alta Fidelidade" (Topaz) cai para Clarity conservador se falhar.
+//     O fallback é registrado em steps[].fallbackOf e a rota o expõe na
+//     resposta (fallbackUsed) — a UI avisa o usuário que o resultado veio
+//     de um provider generativo, não do preservador do modo.
 //   - Demais modos NÃO têm fallback (failures sobem como erro).
 //
 // O orchestrator NÃO toca nodes — débito/refund é responsabilidade da
