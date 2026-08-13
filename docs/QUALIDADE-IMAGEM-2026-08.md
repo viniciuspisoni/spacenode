@@ -394,13 +394,34 @@ Mudança de prompt hoje vai para produção sem medição comparável. Proposta:
    do resultado medidas pós-pipeline (`achieved_factor` em `upscale_meta`,
    dimensões reais na UI).
 
-**Fase 3 — Diferenciação (2-4+ semanas):**
-1. Depth map + edge map na 1ª tentativa com A/B via telemetria (§7.1).
-2. Score v2 (ΔE materiais + audit de aberturas) e gate a 0.75-0.80 (§7.2).
-3. Amostras visuais de material / kit por Space (§7.3).
-4. Selo de fidelidade + heatmap no comparador; "Corrigir drift" (§7.5).
-5. Benchmark harness + dashboard (§7.6).
-6. Finalizar: float FBOs, máscara full-res no export, sRGB correto (§5).
+**Fase 3 — Diferenciação:** 🟡 **PARCIALMENTE IMPLEMENTADA (2026-08-13)**
+1. ✅ Edge map na 1ª tentativa para input sem âncora (default ON, kill-switch
+   `RENDER_FIDELITY_EDGE_FIRST=0`; A/B via `edge_map_used` na telemetria).
+   ✅ Depth map como condicionamento extra — experimental, **default OFF**
+   (`RENDER_FIDELITY_DEPTH_MAP=1`; endpoint via `RENDER_DEPTH_ENDPOINT`,
+   default `fal-ai/image-preprocessors/depth-anything/v2`).
+2. ✅ Score v2: `meanColorDelta`/`worstCellColorDelta` (ΔE Lab por célula) em
+   todo geometry score — telemetria sempre; gate opcional via
+   `RENDER_FIDELITY_MAX_COLOR_DELTA` (só quando o usuário não pediu mudança de
+   luz/material/refinamento). ✅ Auditoria semântica de visão no Renderizar
+   (reusa `checkArchitecturalPreservation` do Spaces): roda nos casos
+   limítrofes (score < 0.80) por default, `RENDER_SEMANTIC_AUDIT=1` força
+   sempre, `=0` desliga; resultado em `generation_log.fidelity.semantic_audit`
+   e `semanticWarning` na resposta/UI. ⏳ Subir o gate para 0.75-0.80 continua
+   aguardando dados de produção (agora existentes na telemetria).
+3. ✅ Amostras visuais de material no Renderizar: slot "+ amostra" por campo
+   (área `render-material`), anexadas como referências rotuladas por
+   superfície (cap 4) com bloco `MATERIAL SAMPLES` de escopo fechado;
+   persistidas em `config_snapshot.material_refs`. ⏳ Kit por Space (DNA)
+   fica para a integração Spaces.
+4. ✅ Heatmap estrutural no comparador: `GET /api/renders/[id]/diff` renderiza
+   o original esmaecido com as bordas NÃO encontradas no render em vermelho
+   (mesma lógica do edgeRecall); toggle "Ver mapa de diferenças estruturais"
+   na UI. ⏳ "Corrigir drift" em 1 clique fica para a próxima rodada.
+5. 🟡 Benchmark: o drop-folder `tests/fidelity/real/` (pares
+   `<caso>-original|generated`) já roda no geometry-score.test e agora imprime
+   também os ΔE. ⏳ Harness contra a API real + dashboard de telemetria.
+6. ⏳ Finalizar (float FBOs, máscara full-res, sRGB piecewise) — não iniciado.
 
 Custo marginal das chamadas novas por render: briefing ≈ US$ 0,001 (Gemini
 Flash), depth map ≈ US$ 0,002 (FAL), audit semântico ≈ US$ 0,002 — desprezível

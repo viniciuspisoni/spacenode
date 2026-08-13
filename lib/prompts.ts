@@ -10,6 +10,7 @@ import {
   buildRenderOnlySystemHead,
   buildRenderOnlyCameraBlock,
   buildEdgeMapBlock,
+  buildDepthMapBlock,
 } from '@/lib/ai/fidelity/render-only'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -667,6 +668,52 @@ function buildMaterialsBlock(
   return `EXACT PROJECT MATERIALS — reproduce these faithfully: ${lines.join('; ')}. `
 }
 
+// ── Amostras visuais de material ───────────────────────────────────────────────
+
+/** Nome EN da superfície de cada campo de material — mesma nomenclatura do
+ *  buildMaterialsBlock, exportado pra rota rotular as imagens de amostra. */
+export function materialSurfaceEn(field: keyof ProjectMaterials, projectType?: ProjectType): string {
+  const isInterior = projectType === 'interior'
+  switch (field) {
+    case 'fachada':    return 'facade cladding'
+    case 'piso':       return isInterior ? 'flooring' : 'floor and paving'
+    case 'esquadrias': return isInterior ? 'interior doors and window frames' : 'external doors and window frames'
+    case 'paredes':    return 'wall finishes'
+    case 'teto':       return 'ceiling finish'
+    case 'marcenaria': return 'built-in millwork and cabinetry'
+    case 'bancadas':   return 'countertops'
+    case 'elementos':  return 'special architectural elements'
+    case 'outros':     return 'additional noted elements'
+  }
+}
+
+export interface MaterialSampleRef {
+  field: keyof ProjectMaterials
+  /** Posição (1-based) da amostra em image_urls. */
+  imageIndex: number
+}
+
+// Evidência fotográfica por superfície: transforma o spec de material de texto
+// livre (onde o modelo inventa veio/paginação) em referência visual exata. O
+// fechamento de escopo é essencial — sem ele, uma amostra de piso virava
+// licença pra "harmonizar" os acabamentos vizinhos.
+function buildMaterialSamplesBlock(
+  samples?: MaterialSampleRef[],
+  projectType?: ProjectType,
+): string {
+  if (!samples || samples.length === 0) return ''
+  const lines = samples.map(
+    s => `image #${s.imageIndex} is the real product sample for the ${materialSurfaceEn(s.field, projectType)}`,
+  )
+  return (
+    `MATERIAL SAMPLES (photographic evidence, not inspiration): ${lines.join('; ')}. ` +
+    'Reproduce each sample EXACTLY on its named surface — same color, same texture pattern ' +
+    'and scale, same finish (matte/gloss) — never a similar-looking substitute. ' +
+    'Samples define ONLY the material of their named surfaces: they never change geometry, ' +
+    'layout, lighting or any surface not named here. '
+  )
+}
+
 // ── Fidelity Engine prompt builder ─────────────────────────────────────────────
 
 // A lista NEGATIVE_BASE (compartilhada pelos três níveis) e os extras da
@@ -814,6 +861,11 @@ function buildSceneContextBlock(
 export interface RenderOnlyPromptOpts {
   attempt?: number
   edgeMapImageIndex?: number | null
+  /** Posição (1-based) do depth map de condicionamento em image_urls
+   *  (experimental — RENDER_FIDELITY_DEPTH_MAP=1). */
+  depthMapImageIndex?: number | null
+  /** Amostras visuais de material anexadas em image_urls. */
+  materialSamples?: MaterialSampleRef[]
 }
 
 export function buildFidelityPrompt(
@@ -925,9 +977,11 @@ export function buildFidelityPrompt(
       head +
       buildSceneContextBlock(projectType, segment, environment) +
       buildEdgeMapBlock(renderOnly?.edgeMapImageIndex) +
+      buildDepthMapBlock(renderOnly?.depthMapImageIndex) +
       refinement +
       preserve +
       matBlock +
+      buildMaterialSamplesBlock(renderOnly?.materialSamples, projectType) +
       lightingLine +
       bgBlock +
       elemBlock +

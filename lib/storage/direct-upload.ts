@@ -110,6 +110,15 @@ export const DIRECT_UPLOAD_AREAS = {
     allowedMime: () => IMAGE_MIME,
     dir: () => 'render/source',
   },
+  // Amostra visual de material do Renderizar (foto do porcelanato, da madeira,
+  // do tecido…) — vira imagem de referência rotulada na geração. O confirm
+  // devolve a URL pública que o client envia em materialRefs.
+  'render-material': {
+    bucket: 'space-mestres',
+    maxBytes: 8 * 1024 * 1024,
+    allowedMime: () => IMAGE_MIME,
+    dir: () => 'render/material',
+  },
   // Imagem de origem do Ampliar (consumida por /api/upscale).
   'upscale-source': {
     bucket: 'space-mestres',

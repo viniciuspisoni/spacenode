@@ -59,6 +59,9 @@ interface GenerateResult {
   fidelityScore?:   number | null
   /** true quando o score final ficou abaixo do limite mesmo após retries. */
   fidelityWarning?: boolean
+  /** true quando a auditoria de visão (volumetria/aberturas/câmera/materiais)
+   *  apontou desvio de projeto. */
+  semanticWarning?: boolean
   prompt?:   string
   error?:    string
 }
@@ -294,11 +297,18 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
   // URL do input já hospedado pelo servidor (regenerações reusam sem re-upload).
   const [sourceFile,        setSourceFile]        = useState<File | null>(null)
   const [serverInputUrl,    setServerInputUrl]    = useState<string | null>(null)
+  // Amostras visuais de material (field → URL pública). Viram imagens de
+  // referência rotuladas na geração — o modelo reproduz o produto real em vez
+  // de inventar veio/paginação a partir do texto. Sessão-only (não persiste).
+  const [materialRefs,      setMaterialRefs]      = useState<Partial<Record<keyof ProjectMaterials, string>>>({})
+  const [uploadingRef,      setUploadingRef]      = useState<keyof ProjectMaterials | null>(null)
   // Verificação estrutural do render_only (a API compara o resultado com o
   // original e devolve o veredito — mesmo papel do preservation_warning do
   // Spaces). null = sem verificação (nível != Máxima ou gate desligado).
   const [fidelityScore,     setFidelityScore]     = useState<number | null>(null)
   const [fidelityWarning,   setFidelityWarning]   = useState(false)
+  // Overlay do mapa de diferenças estruturais (/api/renders/[id]/diff).
+  const [showDiff,          setShowDiff]          = useState(false)
   // Id da última render persistida — usado pelo CTA "Criar Space" pra
   // ligar o Space novo à render como Vista Mestre.
   const [lastRenderId,      setLastRenderId]      = useState<string | null>(null)
@@ -477,7 +487,7 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
     if (!file.type.startsWith('image/')) return
     if (file.size > 15 * 1024 * 1024) { setError('Imagem muito grande. Máximo 15 MB.'); return }
     setOutputUrl(null); setError(null); setUseAnchor(true); setRefinementText('')
-    setFidelityScore(null); setFidelityWarning(false)
+    setFidelityScore(null); setFidelityWarning(false); setShowDiff(false)
     setServerInputUrl(null)
     setScale(1); setPan({ x: 0, y: 0 })
     if (DIRECT_UPLOAD_MIMES.includes(file.type)) {
@@ -533,6 +543,23 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialSourceUrl])
 
+  // ── Amostra de material: upload direto → URL pública ─────────────────────
+  const handleMaterialRefUpload = async (field: keyof ProjectMaterials, file: File) => {
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setError('Amostra deve ser JPG, PNG ou WebP.'); return
+    }
+    if (file.size > 8 * 1024 * 1024) { setError('Amostra muito grande. Máximo 8 MB.'); return }
+    setUploadingRef(field); setError(null)
+    try {
+      const { url } = await uploadDirect(file, 'render-material', {}, { confirm: true })
+      if (url) setMaterialRefs(prev => ({ ...prev, [field]: url }))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Falha ao enviar a amostra.')
+    } finally {
+      setUploadingRef(null)
+    }
+  }
+
   // ── Geração
   const handleGenerate = async (resolutionOverride?: Resolution) => {
     if (!imagePreview || (!sourceFile && !serverInputUrl)) { setError('Faça upload de uma imagem primeiro.'); return }
@@ -556,6 +583,13 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
         sourceParams.sourceKey = key
       }
 
+      // Amostras só dos campos visíveis no tipo de projeto atual (mesma regra
+      // do texto de materiais — campo interior não vaza pro exterior).
+      const fieldsNow = projectType === 'interior' ? MATERIAL_FIELDS_INTERIOR : MATERIAL_FIELDS_EXTERIOR
+      const materialRefEntries = fieldsNow
+        .filter(({ field }) => materialRefs[field])
+        .map(({ field }) => ({ field, url: materialRefs[field]! }))
+
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -573,6 +607,7 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
           engine:        selectedEngine,
           resolution:    resolutionOverride ?? selectedResolution,
           materials:     Object.values(materials).some(v => v) ? materials : undefined,
+          materialRefs:  materialRefEntries.length > 0 ? materialRefEntries : undefined,
           anchorUrl,
           refinementText: refinementText.trim() || undefined,
         }),
@@ -581,9 +616,10 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
       if (!res.ok || data.error) throw new Error(data.error ?? 'Erro na geração')
       setOutputUrl(data.outputUrl); setCredits(data.totalBalance ?? data.credits); setSliderPos(50)
       setLastRenderId(data.renderId ?? null)
+      setShowDiff(false)
       setServerInputUrl(data.originalUrl ?? serverInputUrl ?? null)
       setFidelityScore(typeof data.fidelityScore === 'number' ? data.fidelityScore : null)
-      setFidelityWarning(Boolean(data.fidelityWarning))
+      setFidelityWarning(Boolean(data.fidelityWarning) || Boolean(data.semanticWarning))
       setScale(1); setPan({ x: 0, y: 0 })
       if (refinementText.trim()) setRefinementText('')
     } catch (err: unknown) {
@@ -690,6 +726,7 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
     setError(null)
     setFidelityScore(null)
     setFidelityWarning(false)
+    setShowDiff(false)
     setSliderPos(50)
     setScale(1)
     setPan({ x: 0, y: 0 })
@@ -835,7 +872,32 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
             <div style={S.materiaisGrid}>
               {(projectType === 'interior' ? MATERIAL_FIELDS_INTERIOR : MATERIAL_FIELDS_EXTERIOR).map(({ field, label, placeholder }) => (
                 <div key={field} style={S.materialField}>
-                  <div style={S.materialLabel}>{label}</div>
+                  <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:8}}>
+                    <div style={S.materialLabel}>{label}</div>
+                    {/* Amostra visual: foto do produto real reproduzida fielmente
+                        na superfície — muito mais preciso que o texto sozinho. */}
+                    {materialRefs[field] ? (
+                      <span style={S.matRefChip}>
+                        <img src={materialRefs[field]} alt={`Amostra de ${label}`} style={S.matRefThumb}/>
+                        <button
+                          style={S.matRefRemove}
+                          aria-label={`Remover amostra de ${label}`}
+                          onClick={() => setMaterialRefs(prev => { const next = { ...prev }; delete next[field]; return next })}
+                        >×</button>
+                      </span>
+                    ) : (
+                      <label style={{...S.matRefAdd, ...(uploadingRef !== null ? {opacity:0.5, cursor:'wait'} : {})}}>
+                        {uploadingRef === field ? 'enviando…' : '+ amostra'}
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          style={{display:'none'}}
+                          disabled={uploadingRef !== null}
+                          onChange={e => { const f = e.target.files?.[0]; if (f) handleMaterialRefUpload(field, f); e.target.value = '' }}
+                        />
+                      </label>
+                    )}
+                  </div>
                   <input
                     type="text"
                     value={materials[field] ?? ''}
@@ -847,6 +909,7 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
               ))}
               <p style={S.infoNote}>
                 Preencha apenas pra <strong>alterar</strong> materiais específicos. Em branco = preserva todos do original. Salvo automaticamente.
+                Anexe uma <strong>amostra</strong> (foto do produto) pro material ser reproduzido com exatidão.
               </p>
             </div>
           )}
@@ -1148,10 +1211,36 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
             </div>
             <span style={{...S.compareLabel, left:14}}>ANTES</span>
             <span style={{...S.compareLabel, right:14}}>DEPOIS</span>
+            {/* Overlay do mapa de diferenças estruturais — cobre o comparador
+                inteiro (acompanha zoom/pan) e não captura eventos. */}
+            {showDiff && lastRenderId && (
+              <div style={{
+                position:'absolute', inset:0,
+                transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
+                transformOrigin:'0 0',
+                pointerEvents:'none',
+                opacity:0.92,
+              }}>
+                <img
+                  src={`/api/renders/${lastRenderId}/diff`}
+                  alt="Mapa de diferenças estruturais"
+                  style={S.compareImg}
+                  draggable={false}
+                />
+              </div>
+            )}
             {scale > 1 && (
               <div style={S.zoomBadge}>{Math.round(scale * 100)}%</div>
             )}
           </div>
+        )}
+
+        {imagePreview && outputUrl && showDiff && (
+          <p style={{fontSize:10, color:'var(--color-text-tertiary)', margin:'6px 0 0', lineHeight:1.5}}>
+            <span style={{color:'#eb4034'}}>Vermelho</span>: bordas estruturais do
+            projeto original não encontradas no render — confira se são mudanças
+            pedidas ou desvios.
+          </p>
         )}
 
         {/* ── POST-GENERATION ACTIONS ── */}
@@ -1223,6 +1312,22 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
                 Iniciar novo render
               </button>
             </div>
+
+            {/* Transparência de fidelidade: overlay com as bordas do original
+                que não foram encontradas no render (endpoint /diff). */}
+            {lastRenderId && (
+              <button
+                onClick={() => setShowDiff(v => !v)}
+                style={{
+                  fontSize:10, letterSpacing:'0.06em', textTransform:'uppercase',
+                  color: showDiff ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
+                  background:'none', border:'none', cursor:'pointer', padding:'2px 0',
+                  fontFamily:'inherit', alignSelf:'center',
+                }}
+              >
+                {showDiff ? 'Ocultar mapa de diferenças' : 'Ver mapa de diferenças estruturais'}
+              </button>
+            )}
 
             <style jsx>{`
               .render-to-space-cta {
@@ -1492,6 +1597,10 @@ const S: Record<string, React.CSSProperties> = {
   postGen:           { display:'flex', flexDirection:'column', gap:8 },
   fidelityWarn:      { fontSize:12, color:'var(--color-error)', background:'var(--color-error-bg)', border:'0.5px solid var(--color-error-border)', borderRadius:12, padding:'10px 14px', lineHeight:1.5 },
   fidelityOk:        { fontSize:11, color:'var(--color-accent-green)', display:'flex', alignItems:'center', gap:6 },
+  matRefAdd:         { fontSize:9, color:'var(--color-text-tertiary)', border:'0.5px dashed var(--color-border-strong)', borderRadius:999, padding:'2px 8px', cursor:'pointer', whiteSpace:'nowrap' },
+  matRefChip:        { display:'inline-flex', alignItems:'center', gap:4 },
+  matRefThumb:       { width:22, height:22, borderRadius:4, objectFit:'cover', border:'0.5px solid var(--color-border-strong)' },
+  matRefRemove:      { fontSize:12, color:'var(--color-text-tertiary)', background:'none', border:'none', cursor:'pointer', padding:0, lineHeight:1 },
   postGenPrimary:    { display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 },
   postGenSecondary:  { display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 },
 }

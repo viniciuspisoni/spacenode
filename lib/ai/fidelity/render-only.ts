@@ -207,10 +207,44 @@ export interface FidelityAttemptParams {
   useEdgeMap: boolean
 }
 
-export function getFidelityAttemptParams(attempt: number): FidelityAttemptParams {
-  if (attempt <= 1) return { temperature: 0.2, useEdgeMap: false }
+export interface FidelityAttemptOpts {
+  /** Edge map já na 1ª tentativa (Fase 3): pra input CGI sem âncora, ancorar a
+   *  estrutura desde o primeiro shot evita gastar o retry com drift previsível.
+   *  Custo zero (sharp local + 1 upload). A telemetria (edge_map_used por
+   *  tentativa em generation_log.fidelity.attempts) permite A/B por período. */
+  edgeFromFirstAttempt?: boolean
+}
+
+export function getFidelityAttemptParams(
+  attempt: number,
+  opts?: FidelityAttemptOpts,
+): FidelityAttemptParams {
+  if (attempt <= 1) return { temperature: 0.2, useEdgeMap: opts?.edgeFromFirstAttempt ?? false }
   if (attempt === 2) return { temperature: 0.05, useEdgeMap: true }
   return { temperature: 0, useEdgeMap: true }
+}
+
+// Condicionamento por DEPTH MAP (Fase 3, experimental — default OFF): edges
+// seguram contornos; depth segura VOLUMES e perspectiva (o vetor "pontos de
+// fuga" pontua 0.564 e passa no gate default). Liga com
+// RENDER_FIDELITY_DEPTH_MAP=1; endpoint FAL configurável por env.
+export function depthMapConditioningEnabled(): boolean {
+  return process.env.RENDER_FIDELITY_DEPTH_MAP === '1'
+}
+
+export function depthMapEndpoint(): string {
+  return process.env.RENDER_DEPTH_ENDPOINT?.trim() || 'fal-ai/image-preprocessors/depth-anything/v2'
+}
+
+/** Bloco de prompt do depth map (imageIndex 1-based em image_urls). */
+export function buildDepthMapBlock(imageIndex: number | null | undefined): string {
+  if (!imageIndex) return ''
+  return (
+    `DEPTH CONSTRAINT MAP: image #${imageIndex} is the monocular depth map of the reference ` +
+    '(bright = near, dark = far). It is a CONSTRAINT, not content: the spatial layout, volume ' +
+    'placement, perspective and vanishing points of your output must match this depth structure ' +
+    'exactly. Do NOT render the map itself — the output is a photograph whose 3D structure matches it. '
+  )
 }
 
 // ── Config do gate (envs com defaults) ────────────────────────────────────────
@@ -229,15 +263,26 @@ export interface RenderFidelityConfig {
   /** Fator de relaxamento do limite quando há refinementText (mudança local
    *  legítima pedida pelo usuário reduz o score sem ser drift). */
   refinementRelaxFactor: number
+  /** Edge map já na 1ª tentativa para input sem âncora (kill-switch:
+   *  RENDER_FIDELITY_EDGE_FIRST=0). */
+  edgeFirst: boolean
+  /** Gate opcional de drift de cor/material (ΔE Lab da pior célula da grade).
+   *  null = só telemetria. Setar RENDER_FIDELITY_MAX_COLOR_DELTA (ex. 18) pra
+   *  reprovar recolor localizado; só se aplica quando o usuário NÃO pediu
+   *  mudança de luz/material/refinamento (a rota decide). */
+  maxColorDelta: number | null
 }
 
 export function getRenderFidelityConfig(): RenderFidelityConfig {
   const rawScore = Number(process.env.RENDER_FIDELITY_MIN_SCORE)
   const rawAttempts = Number(process.env.RENDER_FIDELITY_MAX_ATTEMPTS)
+  const rawColor = Number(process.env.RENDER_FIDELITY_MAX_COLOR_DELTA)
   return {
     enabled: process.env.RENDER_FIDELITY_GATE !== '0',
     minScore: Number.isFinite(rawScore) && rawScore > 0 && rawScore < 1 ? rawScore : 0.5,
     maxAttempts: Number.isFinite(rawAttempts) && rawAttempts >= 1 ? Math.min(Math.floor(rawAttempts), 3) : 2,
     refinementRelaxFactor: 0.85,
+    edgeFirst: process.env.RENDER_FIDELITY_EDGE_FIRST !== '0',
+    maxColorDelta: Number.isFinite(rawColor) && rawColor > 0 ? rawColor : null,
   }
 }

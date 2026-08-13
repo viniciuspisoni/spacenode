@@ -6,10 +6,12 @@ import { getPayerId } from '@/lib/workspaces/context'
 import { refundNodes } from '@/lib/billing/refund-nodes'
 import {
   buildFidelityPrompt,
+  materialSurfaceEn,
   type GenerateOptions,
   type ProjectMaterials,
   type BriefingArquitetonico,
   type FidelityLevel,
+  type MaterialSampleRef,
 } from '@/lib/prompts'
 import {
   ENGINES,
@@ -25,13 +27,19 @@ import { generateImage, type GenerateImageResult } from '@/lib/ai/image-provider
 import {
   getRenderFidelityConfig,
   getFidelityAttemptParams,
+  depthMapConditioningEnabled,
+  depthMapEndpoint,
 } from '@/lib/ai/fidelity/render-only'
+import {
+  checkArchitecturalPreservation,
+  type PreservationCheck,
+} from '@/lib/spaces/preserve-validate'
 import {
   computeGeometryScore,
   buildEdgeMapPng,
   type GeometryScoreBreakdown,
 } from '@/lib/ai/fidelity/geometry-score'
-import { fetchStorageBuffer } from '@/lib/storage/fetch'
+import { fetchStorageBuffer, assertSafeFetchUrl } from '@/lib/storage/fetch'
 import { nearestSupportedAspectRatio } from '@/lib/ai/aspect-ratio'
 import { analyzeImage } from '@/lib/fidelity-engine'
 import { DIRECT_UPLOAD_AREAS, downloadDirectUpload } from '@/lib/storage/direct-upload'
@@ -150,6 +158,7 @@ export async function POST(req: NextRequest) {
       engine:     rawEngine,
       resolution: rawResolution,
       materials,
+      materialRefs,
       fidelityMode  = 'strict',
       briefing,
       inputUrl:     providedInputUrl,
@@ -169,6 +178,7 @@ export async function POST(req: NextRequest) {
       engine?:         string
       resolution?:     string
       materials?:      ProjectMaterials
+      materialRefs?:   { field?: string; url?: string }[]
       fidelityMode?:   'strict' | 'balanced'
       briefing?:       BriefingArquitetonico
       inputUrl?:       string
@@ -348,6 +358,38 @@ export async function POST(req: NextRequest) {
         ]
       : ['Image #1 — REFERENCE IMAGE (mandatory base: geometry, camera, materials and framing are law):']
 
+    // Amostras visuais de material (Fase 3): fotos reais do produto viram
+    // referências ROTULADAS por superfície — o spec deixa de ser só texto
+    // livre (onde o modelo inventa veio, paginação e rejunte). Cap 4; URLs
+    // validadas no allowlist (Storage próprio + CDN FAL). Índices fixos por
+    // request: edge/depth map entram DEPOIS na lista, então nada desloca.
+    const MATERIAL_FIELD_KEYS: ReadonlySet<string> = new Set([
+      'fachada', 'piso', 'esquadrias', 'paredes', 'teto', 'marcenaria', 'bancadas', 'elementos', 'outros',
+    ])
+    const materialSamples: MaterialSampleRef[] = []
+    const materialRefsUsed: { field: string; url: string }[] = []
+    if (Array.isArray(materialRefs)) {
+      const seenFields = new Set<string>()
+      for (const raw of materialRefs) {
+        if (materialSamples.length >= 4) break
+        const field = typeof raw?.field === 'string' ? raw.field : ''
+        const url   = typeof raw?.url   === 'string' ? raw.url   : ''
+        if (!MATERIAL_FIELD_KEYS.has(field) || seenFields.has(field) || !url) continue
+        try { assertSafeFetchUrl(url) } catch { continue }
+        seenFields.add(field)
+        baseImageUrls.push(url)
+        const imageIndex = baseImageUrls.length
+        baseImageLabels.push(
+          `Image #${imageIndex} — MATERIAL SAMPLE for the ${materialSurfaceEn(field as keyof ProjectMaterials, projectType)} (reproduce this exact material on that surface only):`,
+        )
+        materialSamples.push({ field: field as keyof ProjectMaterials, imageIndex })
+        materialRefsUsed.push({ field, url })
+      }
+      if (materialSamples.length > 0) {
+        devLog('[generate] materialRef:', materialSamples.map(s => `${s.field}→#${s.imageIndex}`).join(' '))
+      }
+    }
+
     // Buffer do original disponível cedo: alimenta o pino de aspect ratio e,
     // no render_only, o edge map/score (que antes o buscavam sob demanda).
     // Best-effort — sem buffer, os consumidores seguem sem ele.
@@ -428,12 +470,28 @@ export async function POST(req: NextRequest) {
     }
 
     let edgeMapUrl: string | null = null
+    let depthMapUrl: string | null = null
     let finalPrompt = ''
     let best: { gen: GenerateImageResult; prompt: string; score: number | null } | null = null
     const attemptLogs: FidelityAttemptLog[] = []
 
+    // Gate opcional de cor (score v2): só quando o usuário NÃO pediu mudança
+    // que legitimamente altera cores — luz nova, override de material ou
+    // refinamento. Nesses casos o ΔE alto é pedido, não drift.
+    const colorGateActive =
+      renderOnlyActive &&
+      fidelityCfg.maxColorDelta !== null &&
+      (!lighting || lighting === 'Preservar Original') &&
+      !refinementText?.trim() &&
+      !materials
+
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      const params = getFidelityAttemptParams(attempt)
+      const params = getFidelityAttemptParams(attempt, {
+        // Edge map desde a 1ª tentativa pra CGI sem âncora (Fase 3; A/B via
+        // telemetria edge_map_used). Com âncora mantém o comportamento
+        // clássico — a âncora já ancora a estrutura.
+        edgeFromFirstAttempt: fidelityCfg.edgeFirst && !hasAnchor,
+      })
 
       // Condicionamento estrutural nos retries: lineart do original anexado
       // como imagem extra (upload único). Falha aqui NUNCA derruba a geração —
@@ -459,9 +517,40 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      // Depth map (Fase 3, experimental — RENDER_FIDELITY_DEPTH_MAP=1): volumes
+      // e pontos de fuga que o edge map não segura. Uma chamada FAL por request
+      // (URL cacheada entre tentativas); falha NUNCA derruba a geração.
+      let depthMapImageIndex: number | null = null
+      if (renderOnlyActive && depthMapConditioningEnabled() && !hasAnchor) {
+        try {
+          if (!depthMapUrl) {
+            const depthOut = await Promise.race([
+              fal.subscribe(depthMapEndpoint(), { input: { image_url: inputUrl } as unknown as never }),
+              new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error('DEPTH_TIMEOUT')), 25_000),
+              ),
+            ])
+            const d = (depthOut as { data?: { image?: { url?: string }; images?: { url?: string }[] } }).data
+            depthMapUrl = d?.image?.url ?? d?.images?.[0]?.url ?? null
+          }
+          if (depthMapUrl) {
+            imageUrls = [...imageUrls, depthMapUrl]
+            depthMapImageIndex = imageUrls.length
+            imageLabels = [
+              ...imageLabels,
+              `Image #${depthMapImageIndex} — DEPTH CONSTRAINT MAP (bright = near, dark = far; match its 3D structure, never render it):`,
+            ]
+          }
+        } catch (depthErr) {
+          console.warn('[generate:fidelity] depth map indisponível (segue sem):', (depthErr as Error).message)
+        }
+      }
+
       finalPrompt = buildFidelityPrompt(options, fidelityLevel, resolvedBriefing, {
         attempt,
         edgeMapImageIndex,
+        depthMapImageIndex,
+        materialSamples: materialSamples.length > 0 ? materialSamples : undefined,
       })
       devLog('[generate] prompt     :', finalPrompt)
 
@@ -530,16 +619,22 @@ export async function POST(req: NextRequest) {
         `temp=${params.temperature} edgeMap=${edgeMapImageIndex !== null} ` +
         `score=${geometry ? geometry.score.toFixed(3) : 'n/a'}` +
         (geometry
-          ? ` (recall=${geometry.edgeRecall.toFixed(3)} blockCorr=${geometry.blockCorrelation.toFixed(3)} worstBlock=${geometry.worstBlockDelta.toFixed(3)} aspectDelta=${geometry.aspectDelta.toFixed(3)})`
+          ? ` (recall=${geometry.edgeRecall.toFixed(3)} blockCorr=${geometry.blockCorrelation.toFixed(3)} worstBlock=${geometry.worstBlockDelta.toFixed(3)} aspectDelta=${geometry.aspectDelta.toFixed(3)} ΔEmean=${geometry.meanColorDelta.toFixed(1)} ΔEworst=${geometry.worstCellColorDelta.toFixed(1)})`
           : '') +
-        ` min=${renderOnlyActive ? minScore.toFixed(2) : 'off'}`
+        ` min=${renderOnlyActive ? minScore.toFixed(2) : 'off'}` +
+        (colorGateActive ? ` maxΔE=${fidelityCfg.maxColorDelta}` : '')
       )
 
       if (!best || (geometry?.score ?? -1) > (best.score ?? -1)) {
         best = { gen, prompt: finalPrompt, score: geometry?.score ?? null }
       }
 
-      const passed = !renderOnlyActive || geometry === null || geometry.score >= minScore
+      // Passa quando estrutura ≥ limite E (gate de cor ativo) a pior célula de
+      // ΔE fica sob o teto — recolor localizado força retry mesmo com edges ok.
+      const colorOk = !colorGateActive || geometry === null ||
+        geometry.worstCellColorDelta <= (fidelityCfg.maxColorDelta ?? Infinity)
+      const passed = !renderOnlyActive || geometry === null ||
+        (geometry.score >= minScore && colorOk)
       if (passed) break
       if (attempt >= maxAttempts) {
         console.warn(`[generate:fidelity] score abaixo do limite após ${attempt} tentativas — entregando a melhor (score=${best.score?.toFixed(3) ?? 'n/a'})`)
@@ -566,6 +661,32 @@ export async function POST(req: NextRequest) {
     const falRequestId = gen.requestId
     devLog('[generate] outputUrl  :', outputUrl, '| provider:', gen.provider, '| req:', falRequestId)
 
+    // ── Auditoria semântica de preservação (Fase 3) ──────────────────────────
+    //
+    // Mesma checagem de visão do Spaces (checkArchitecturalPreservation):
+    // volumetria, aberturas, telhado, proporções, câmera, materiais — pega o
+    // que o Sobel não vê. Rodada por padrão só nos casos LIMÍTROFES (score
+    // < 0.80 ou indisponível) pra não taxar a latência do caminho feliz;
+    // RENDER_SEMANTIC_AUDIT=1 força sempre, =0 desliga. Best-effort: falha
+    // vira null e nada bloqueia a entrega.
+    let preservationAudit: PreservationCheck | null = null
+    const auditMode = process.env.RENDER_SEMANTIC_AUDIT ?? ''
+    const auditBorderline = fidelityScore === null || fidelityScore < 0.8
+    if (
+      renderOnlyActive && auditMode !== '0' &&
+      (auditMode === '1' || auditBorderline) &&
+      remainingMs() > 20_000
+    ) {
+      preservationAudit = await checkArchitecturalPreservation(inputUrl, outputUrl, 'STRICT_SOURCE_LOCK')
+      if (preservationAudit) {
+        console.log(
+          `[generate:fidelity] audit semântico: score=${preservationAudit.score.toFixed(2)} ` +
+          `preserved=${preservationAudit.preserved} warning=${preservationAudit.warning}` +
+          (preservationAudit.notes ? ` notes="${preservationAudit.notes}"` : '')
+        )
+      }
+    }
+
     // ── Persistência ─────────────────────────────────────────────────────────
     //
     // Se a imagem foi gerada mas o INSERT falhou: NÃO refundamos. O usuário
@@ -587,6 +708,9 @@ export async function POST(req: NextRequest) {
       fidelityMode:  fidelityMode  === 'balanced' ? 'balanced' : 'strict',
       fidelityLevel,
       materials:     materials     ?? null,
+      // Amostras visuais de material usadas (field + url) — reaproveitáveis
+      // pelo Spaces (kit de materiais do projeto) e pelo histórico.
+      material_refs: materialRefsUsed.length > 0 ? materialRefsUsed : null,
       // Briefing resolvido (body/cache/visão) — persistido aqui vira o cache
       // das próximas gerações com o mesmo input_url.
       briefing:      resolvedBriefing ?? null,
@@ -633,6 +757,7 @@ export async function POST(req: NextRequest) {
         aspect_ratio:    aspectRatio,
         briefing_source: briefingSource,
         anchor_used: hasAnchor,
+        material_ref_count: materialSamples.length,
         image_count: baseImageUrls.length,
         duration_ms: generationDurationMs,
         nodes_charged: nodesToCharge,
@@ -643,7 +768,11 @@ export async function POST(req: NextRequest) {
               mode:        'render_only',
               min_score:   minScore,
               final_score: fidelityScore,
+              color_gate:  colorGateActive ? fidelityCfg.maxColorDelta : null,
               attempts:    attemptLogs,
+              // Auditoria de visão (volumetria/aberturas/câmera/materiais) —
+              // null quando não rodou (caminho feliz ou desligada).
+              semantic_audit: preservationAudit,
             }
           : null,
       },
@@ -694,6 +823,9 @@ export async function POST(req: NextRequest) {
       fidelityScore,
       fidelityAttempts: attemptLogs.length,
       fidelityWarning:  renderOnlyActive && fidelityScore !== null && fidelityScore < minScore,
+      // Auditoria de visão: warning quando o auditor viu desvio de projeto
+      // (volumetria/aberturas/câmera/materiais) — complementa o score de bordas.
+      semanticWarning:  preservationAudit?.warning ?? false,
       // O prompt final (buildFidelityPrompt) é proprietário e o GenerateClient
       // nunca o consumia — não viaja mais na resposta.
     })
