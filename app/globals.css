@@ -340,12 +340,185 @@ a {
   background: var(--color-surface) !important;
 }
 
+/* ── Guia da primeira imagem (/app/generate) ──────────────────────────────────
+   Régua de 3 passos que acompanha o estado real da geração. Mesma linguagem
+   dos passos 01/02/03 do dashboard (spn-dash-step); verde só no concluído. */
+.spn-guide {
+  border: 0.5px solid var(--color-border-strong);
+  border-radius: 14px;
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-sm);
+  padding: 13px 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  animation: spn-guide-in 0.32s ease both;
+}
+@keyframes spn-guide-in {
+  from { opacity: 0; transform: translateY(-5px); }
+  to   { opacity: 1; transform: none; }
+}
+.spn-guide-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.spn-guide-steps {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.spn-guide-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.spn-guide-step-num {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 7px;
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  background: var(--color-surface);
+  color: var(--color-text-quaternary);
+  box-shadow: inset 0 0 0 0.5px var(--color-border);
+  flex-shrink: 0;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.spn-guide-step-label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--color-text-quaternary);
+  transition: color 0.2s ease;
+}
+.spn-guide-step--active .spn-guide-step-num {
+  background: var(--color-inverse);
+  color: var(--color-inverse-foreground);
+  box-shadow: none;
+}
+.spn-guide-step--active .spn-guide-step-label {
+  color: var(--color-text-primary);
+}
+.spn-guide-step--done .spn-guide-step-num {
+  background: var(--color-accent-green-bg);
+  color: var(--color-accent-green);
+  box-shadow: none;
+}
+.spn-guide-step--done .spn-guide-step-label {
+  color: var(--color-text-secondary);
+}
+.spn-guide-sep {
+  width: 16px;
+  height: 0.5px;
+  background: var(--color-border-strong);
+  flex-shrink: 0;
+}
+.spn-guide-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  border: none;
+  background: none;
+  color: var(--color-text-quaternary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.spn-guide-close:hover {
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+}
+.spn-guide-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.spn-guide-tip {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  letter-spacing: -0.005em;
+  line-height: 1.55;
+  margin: 0;
+  min-width: 0;
+  flex: 1 1 260px;
+}
+.spn-guide-tip strong {
+  color: var(--color-text-primary);
+  font-weight: 550;
+}
+.spn-guide-goto {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border: 0.5px solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: 11px;
+  font-weight: 550;
+  letter-spacing: -0.005em;
+  font-family: inherit;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+.spn-guide-goto:hover {
+  border-color: var(--color-border-focus);
+  background: var(--color-surface-hover);
+  transform: translateY(-1px);
+}
+.spn-guide-live {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-accent-green);
+  box-shadow: 0 0 8px var(--color-accent-green-glow);
+  margin-right: 8px;
+  vertical-align: 1px;
+  animation: spn-guide-live 1.4s ease-in-out infinite;
+}
+@keyframes spn-guide-live {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+/* Chamada de atenção no botão Gerar quando o guia leva o usuário até ele. */
+.spn-guide-attention {
+  animation: spn-guide-pulse 0.85s ease-out 3;
+}
+@keyframes spn-guide-pulse {
+  0%   { box-shadow: 0 0 0 0 var(--color-accent-green-glow); }
+  100% { box-shadow: 0 0 0 14px rgba(0, 0, 0, 0); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .spn-pill,
   .spn-type-card,
   .spn-upload-zone {
     transition: none !important;
     transform: none !important;
+  }
+  .spn-guide,
+  .spn-guide-live,
+  .spn-guide-attention {
+    animation: none !important;
   }
 }
 
