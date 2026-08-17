@@ -332,6 +332,15 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
   const [pan,               setPan]               = useState({ x: 0, y: 0 })
   const [isPanning,         setIsPanning]         = useState(false)
 
+  // ── Palco do comparador: o antes/depois é desenhado num retângulo com o
+  //    aspecto do ORIGINAL (contain dentro da área flex), e as duas imagens
+  //    preenchem esse MESMO retângulo. Sem isso, motor que devolve aspecto
+  //    diferente do input fazia cada imagem letterboxar por conta própria
+  //    (objectFit:contain numa caixa de aspecto arbitrário) e o render
+  //    aparecia menor, flutuando sobreposto ao original.
+  const [beforeAspect,      setBeforeAspect]      = useState<number | null>(null)
+  const [compareArea,       setCompareArea]       = useState<{ w: number; h: number } | null>(null)
+
   // ── Âncora visual: render anterior usado pra manter consistência de
   //    materiais/texturas entre gerações sucessivas do mesmo input.
   //    Default true; usuário pode desligar pra começar do zero.
@@ -420,6 +429,7 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
 
   const fileInputRef         = useRef<HTMLInputElement>(null)
   const compareRef           = useRef<HTMLDivElement>(null)
+  const compareOuterRef      = useRef<HTMLDivElement>(null)
   const loadingTimerRef      = useRef<ReturnType<typeof setInterval> | null>(null)
   const isDraggingSliderRef  = useRef(false)
   const isPanningRef         = useRef(false)
@@ -550,7 +560,7 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
     if (file.size > 15 * 1024 * 1024) { setError('Imagem muito grande. Máximo 15 MB.'); return }
     setOutputUrl(null); setError(null); setUseAnchor(true); setRefinementText('')
     setFidelityScore(null); setFidelityWarning(false); setShowDiff(false)
-    setServerInputUrl(null)
+    setServerInputUrl(null); setBeforeAspect(null)
     setScale(1); setPan({ x: 0, y: 0 })
     if (DIRECT_UPLOAD_MIMES.includes(file.type)) {
       // Caminho principal: o arquivo ORIGINAL sobe inteiro no Gerar (upload
@@ -697,6 +707,28 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
     } finally { setLoading(false); stopLoadingTexts() }
   }
 
+  // Aspecto natural do input — alimenta o palco do comparador. Vem do onLoad
+  // dos <img> de preview (cobre upload direto e fonte via URL do histórico);
+  // naturalWidth/Height já consideram a orientação EXIF nos browsers atuais,
+  // então bate com o que o servidor normaliza e manda ao modelo.
+  const readBeforeAspect = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const { naturalWidth, naturalHeight } = e.currentTarget
+    if (naturalWidth > 0 && naturalHeight > 0) setBeforeAspect(naturalWidth / naturalHeight)
+  }
+
+  // Área flex disponível pro comparador (ResizeObserver acompanha resize de
+  // janela/coluna). O palco deriva no render: contain(área, beforeAspect).
+  useEffect(() => {
+    const el = compareOuterRef.current
+    if (!el) return
+    const ro = new ResizeObserver((entries) => {
+      const r = entries[0]?.contentRect
+      if (r && r.width > 0 && r.height > 0) setCompareArea({ w: r.width, h: r.height })
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [imagePreview, outputUrl])
+
   // ── Slider BeforeAfter — ref keeps event handler stable, avoids re-subscribing
   useEffect(() => { isDraggingSliderRef.current = isDraggingSlider }, [isDraggingSlider])
 
@@ -800,6 +832,15 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
     setSliderPos(50)
     setScale(1)
     setPan({ x: 0, y: 0 })
+    setBeforeAspect(null)
+  }
+
+  // Palco do comparador: retângulo com o aspecto do original, contido na área
+  // disponível. Fallback 100% no primeiro frame (antes de imagem/área medirem).
+  let stageBox: React.CSSProperties = { width: '100%', height: '100%' }
+  if (beforeAspect && compareArea) {
+    const stageW = Math.min(compareArea.w, compareArea.h * beforeAspect)
+    stageBox = { width: stageW, height: stageW / beforeAspect }
   }
 
   // ── Computed
@@ -1250,76 +1291,84 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
         )}
 
         {imagePreview && outputUrl && (
-          <div
-            ref={compareRef}
-            style={{
-              ...S.compareWrap,
-              cursor: scale > 1 ? (isPanning ? 'grabbing' : 'grab') : 'ew-resize',
-            }}
-            onMouseDown={(e) => {
-              if (scale > 1) {
-                panStartRef.current = { mouseX: e.clientX, mouseY: e.clientY, panX: pan.x, panY: pan.y }
-                setIsPanning(true)
-              } else {
-                setIsDraggingSlider(true)
-              }
-            }}
-            onDoubleClick={() => { setScale(1); setPan({ x: 0, y: 0 }) }}
-          >
-            {/* Antes — dentro do wrapper transformável */}
-            <div style={{
-              position:'absolute', inset:0,
-              transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
-              transformOrigin:'0 0',
-              pointerEvents:'none',
-            }}>
-              <img src={imagePreview} alt="Antes" style={S.compareImg} draggable={false}/>
-            </div>
-            {/* Depois — clip em coords do container, transform aplicado dentro do clip */}
-            <div style={{...S.compareAfterWrap, clipPath:`inset(0 ${100-sliderPos}% 0 0)`, pointerEvents:'none'}}>
-              <div style={{
-                position:'absolute', inset:0,
-                transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
-                transformOrigin:'0 0',
-              }}>
-                <img src={outputUrl} alt="Depois" style={S.compareImg} draggable={false}/>
-              </div>
-            </div>
-            {/* Handle do slider em coords do container; ativa pointerEvents só no círculo
-                pra continuar arrastável quando zoomado (parent passa a iniciar pan). */}
-            <div style={{...S.compareHandle, left:`${sliderPos}%`}}>
-              <div
-                style={{...S.compareHandleCircle, pointerEvents:'auto', cursor:'ew-resize'}}
-                onMouseDown={(e) => { e.stopPropagation(); setIsDraggingSlider(true) }}
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" strokeWidth="2">
-                  <path d="M8 5l-5 7 5 7M16 5l5 7-5 7" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </div>
-            </div>
-            <span style={{...S.compareLabel, left:14}}>ANTES</span>
-            <span style={{...S.compareLabel, right:14}}>DEPOIS</span>
-            {/* Overlay do mapa de diferenças estruturais — cobre o comparador
-                inteiro (acompanha zoom/pan) e não captura eventos. */}
-            {showDiff && lastRenderId && (
+          <div ref={compareOuterRef} style={S.compareOuter}>
+            {/* Palco com o aspecto do original: antes, depois e diff preenchem
+                o MESMO retângulo (objectFit:fill). Aspecto igual (caso comum,
+                pino de formato) = idêntico ao contain; quando o motor devolve
+                formato diferente, o depois é mapeado no quadro do antes e a
+                cortina segue alinhada — nada de render menor flutuando. */}
+            <div
+              ref={compareRef}
+              style={{
+                ...S.compareStage,
+                ...stageBox,
+                cursor: scale > 1 ? (isPanning ? 'grabbing' : 'grab') : 'ew-resize',
+              }}
+              onMouseDown={(e) => {
+                if (scale > 1) {
+                  panStartRef.current = { mouseX: e.clientX, mouseY: e.clientY, panX: pan.x, panY: pan.y }
+                  setIsPanning(true)
+                } else {
+                  setIsDraggingSlider(true)
+                }
+              }}
+              onDoubleClick={() => { setScale(1); setPan({ x: 0, y: 0 }) }}
+            >
+              {/* Antes — dentro do wrapper transformável */}
               <div style={{
                 position:'absolute', inset:0,
                 transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
                 transformOrigin:'0 0',
                 pointerEvents:'none',
-                opacity:0.92,
               }}>
-                <img
-                  src={`/api/renders/${lastRenderId}/diff`}
-                  alt="Mapa de diferenças estruturais"
-                  style={S.compareImg}
-                  draggable={false}
-                />
+                <img src={imagePreview} alt="Antes" style={S.stageImg} draggable={false} onLoad={readBeforeAspect}/>
               </div>
-            )}
-            {scale > 1 && (
-              <div style={S.zoomBadge}>{Math.round(scale * 100)}%</div>
-            )}
+              {/* Depois — clip em coords do palco, transform aplicado dentro do clip */}
+              <div style={{...S.compareAfterWrap, clipPath:`inset(0 ${100-sliderPos}% 0 0)`, pointerEvents:'none'}}>
+                <div style={{
+                  position:'absolute', inset:0,
+                  transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
+                  transformOrigin:'0 0',
+                }}>
+                  <img src={outputUrl} alt="Depois" style={S.stageImg} draggable={false}/>
+                </div>
+              </div>
+              {/* Handle do slider em coords do palco; ativa pointerEvents só no círculo
+                  pra continuar arrastável quando zoomado (parent passa a iniciar pan). */}
+              <div style={{...S.compareHandle, left:`${sliderPos}%`}}>
+                <div
+                  style={{...S.compareHandleCircle, pointerEvents:'auto', cursor:'ew-resize'}}
+                  onMouseDown={(e) => { e.stopPropagation(); setIsDraggingSlider(true) }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" strokeWidth="2">
+                    <path d="M8 5l-5 7 5 7M16 5l5 7-5 7" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+              </div>
+              <span style={{...S.compareLabel, left:14}}>ANTES</span>
+              <span style={{...S.compareLabel, right:14}}>DEPOIS</span>
+              {/* Overlay do mapa de diferenças estruturais — cobre o comparador
+                  inteiro (acompanha zoom/pan) e não captura eventos. */}
+              {showDiff && lastRenderId && (
+                <div style={{
+                  position:'absolute', inset:0,
+                  transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
+                  transformOrigin:'0 0',
+                  pointerEvents:'none',
+                  opacity:0.92,
+                }}>
+                  <img
+                    src={`/api/renders/${lastRenderId}/diff`}
+                    alt="Mapa de diferenças estruturais"
+                    style={S.stageImg}
+                    draggable={false}
+                  />
+                </div>
+              )}
+              {scale > 1 && (
+                <div style={S.zoomBadge}>{Math.round(scale * 100)}%</div>
+              )}
+            </div>
           </div>
         )}
 
@@ -1512,9 +1561,9 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
 
         {imagePreview && !outputUrl && !loading && (
           <div style={S.compareWrap}>
-            <img src={imagePreview} alt="Input" style={S.compareImg}/>
+            <img src={imagePreview} alt="Input" style={S.compareImg} onLoad={readBeforeAspect}/>
             <span style={{...S.compareLabel, left:14}}>ANTES</span>
-            <button style={S.changeImageBtn} onClick={() => { setImagePreview(null); setOutputUrl(null); setSourceFile(null); setServerInputUrl(null) }}>
+            <button style={S.changeImageBtn} onClick={() => { setImagePreview(null); setOutputUrl(null); setSourceFile(null); setServerInputUrl(null); setBeforeAspect(null) }}>
               trocar imagem
             </button>
           </div>
@@ -1683,6 +1732,13 @@ const S: Record<string, React.CSSProperties> = {
   uploadBtn:         { padding:'8px 18px', border:'0.5px solid var(--color-border-strong)', borderRadius:999, fontSize:11, color:'var(--color-text-primary)', background:'var(--color-surface)', cursor:'pointer', fontFamily:'inherit' },
   compareWrap:       { position:'relative', borderRadius:18, overflow:'hidden', flex:1, minHeight:300, background:'var(--color-preview-bg)', border:'0.5px solid var(--color-border)', boxShadow:'var(--shadow-lg)', userSelect:'none', cursor:'ew-resize' },
   compareImg:        { position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'contain', pointerEvents:'none' },
+  // Área flex do comparador (sem moldura) + palco dimensionado pelo aspecto do
+  // original. As imagens do palco usam fill: o retângulo JÁ tem o aspecto do
+  // antes, e o depois é esticado pra alinhar com a cortina quando o motor
+  // devolve formato levemente diferente (drift grande vira aviso de fidelidade).
+  compareOuter:      { position:'relative', flex:1, minHeight:300, minWidth:0, display:'flex', alignItems:'center', justifyContent:'center' },
+  compareStage:      { position:'relative', borderRadius:18, overflow:'hidden', maxWidth:'100%', maxHeight:'100%', background:'var(--color-preview-bg)', border:'0.5px solid var(--color-border)', boxShadow:'var(--shadow-lg)', userSelect:'none' },
+  stageImg:          { position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'fill', pointerEvents:'none' },
   compareAfterWrap:  { position:'absolute', inset:0 },
   compareHandle:     { position:'absolute', top:0, bottom:0, width:2, background:'#ffffff', transform:'translateX(-50%)', display:'flex', alignItems:'center', justifyContent:'center', pointerEvents:'none' },
   compareHandleCircle: { width:34, height:34, borderRadius:'50%', background:'#ffffff', border:'0.5px solid rgba(0,0,0,0.1)', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 8px 22px rgba(0,0,0,0.26)' },
