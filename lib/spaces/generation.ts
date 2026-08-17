@@ -10,8 +10,9 @@
 //     → chamada ao provider (image_urls: [#1 geometria, #2 identidade?],
 //       com rótulo de papel por imagem no caminho GCP)
 //     → gate de fidelidade (lib/spaces/fidelity): geometry score do output
-//       contra a REFERÊNCIA GEOMÉTRICA; score baixo → retry com temperatura
-//       menor, prompt escalado e edge map — entrega a MELHOR tentativa
+//       contra a REFERÊNCIA GEOMÉTRICA; score baixo → retry com
+//       condicionamento reforçado (edge map, mediaResolution ultra, thinking
+//       do NB2, prompt escalado) — entrega a MELHOR tentativa
 //     → validação do output (aspecto + visão)
 //     → update pra completed (metadados + telemetria + validações)
 //   refund best-effort + row 'failed' em qualquer erro pós-débito.
@@ -48,6 +49,7 @@ import {
   type SpacesFidelityAttemptLog,
 } from './fidelity'
 import { computeGeometryScore, buildEdgeMapPng, type GeometryScoreBreakdown } from '@/lib/ai/fidelity/geometry-score'
+import { nearestSupportedAspectRatio } from '@/lib/ai/aspect-ratio'
 import { fetchStorageBuffer, assertSafeFetchUrl } from '@/lib/storage/fetch'
 
 // Timeout da chamada ao provider por motor (espelha o /api/generate do
@@ -63,7 +65,14 @@ export const FAL_TIMEOUT_MS: Record<EngineId, number> = {
 // output_format png: master lossless — alinha o caminho FAL com o GCP/Vertex
 // (que já devolve PNG e re-hospeda). JPEG na entrega criava uma geração de
 // perda a cada passo da cadeia render → editar → ampliar.
-export function falParamsForEngine(engine: EngineId, q: Resolution): Record<string, unknown> {
+// aspectRatio: pino de formato (lib/ai/aspect-ratio) — presente só quando o
+// aspecto da referência geométrica bate (≤2%) com um valor suportado; ausente,
+// o motor segue o formato do input (default 'auto').
+export function falParamsForEngine(
+  engine: EngineId,
+  q: Resolution,
+  aspectRatio: string | null = null,
+): Record<string, unknown> {
   if (engine === 'quasar') {
     return {
       quality:       q === '4k' ? 'high' : 'medium',
@@ -73,7 +82,12 @@ export function falParamsForEngine(engine: EngineId, q: Resolution): Record<stri
     }
   }
   const map: Record<Resolution, string> = { hd: '1K', '2k': '2K', '4k': '4K' }
-  return { resolution: map[q], num_images: 1, output_format: 'png' }
+  return {
+    resolution:    map[q],
+    num_images:    1,
+    output_format: 'png',
+    ...(aspectRatio ? { aspect_ratio: aspectRatio } : {}),
+  }
 }
 
 // Eixo persistido (vistas.axis) por ação — mantém filtros/verify-dna/histórico
@@ -252,6 +266,21 @@ export async function generateVista(args: VistaGenerationArgs) {
       ? `on (min=${minScore.toFixed(2)} max_attempts=${maxAttempts})`
       : 'off (câmera/crop muda por design ou gate desligado)')
 
+    // Pino de formato: quando a regra OVERLAY vale (gate ativo), o formato do
+    // output é o da referência geométrica — pinado quando bate (≤2%) com um
+    // valor suportado pelos dois caminhos. Fora do gate (Nova Vista/Detalhe
+    // mudam o enquadramento por design), sem pino: o motor segue o input.
+    const aspectPin = gateActive
+      ? nearestSupportedAspectRatio(sourceMeta?.width ?? null, sourceMeta?.height ?? null)
+      : null
+
+    // Seed fixa por vista (espelha o Renderizar): retries do ladder viram
+    // variação CONTROLADA da mesma amostra (tentativa 3 desloca via
+    // seedOffset) e a geração fica reproduzível. NB2/Pro na FAL expõem `seed`
+    // no schema (conferido 2026-08-17); o GCP recebe via gcpConfig.
+    const generationSeed = Math.floor(Math.random() * 2_147_483_647)
+    console.log(`[${logContext}] aspect/seed     :`, aspectPin ?? 'auto', '·', generationSeed)
+
     // Bytes da referência geométrica — lidos uma vez, servem ao score e ao
     // edge map. Best-effort: falha aqui não derruba a geração (só o gate).
     let sourceBuffer: Buffer | null = null
@@ -302,10 +331,17 @@ export async function generateVista(args: VistaGenerationArgs) {
       })
       if (attempt === 1) console.log(`[${logContext}] prompt          :`, prompt)
 
+      const attemptSeed = generationSeed + params.seedOffset
       const falInput = {
         prompt,
         image_urls: imageUrls,
-        ...falParamsForEngine(engine, quality),
+        ...falParamsForEngine(engine, quality, aspectPin),
+        // Reprodutibilidade nos DOIS caminhos (Quasar não expõe seed).
+        ...(engine !== 'quasar' ? { seed: attemptSeed } : {}),
+        // Thinking do NB2 (único motor com o knob na FAL): planejar a cena
+        // antes de gerar adere melhor ao contrato de preservação. No caminho
+        // GCP o provider converte em thinkingConfig.
+        ...(engine === 'pulsar' && params.thinkingLevel ? { thinking_level: params.thinkingLevel } : {}),
       }
 
       // 1ª tentativa: timeout cheio do engine (contrato atual das rotas, que
@@ -325,7 +361,12 @@ export async function generateVista(args: VistaGenerationArgs) {
           context:   attempt === 1 ? logContext : `${logContext}#${attempt}`,
           deliver:   { kind: 'url', userId, area: 'vistas' },
           imageLabels,
-          gcpConfig: { temperature: params.temperature },
+          gcpConfig: {
+            temperature: params.temperature,
+            seed:        attemptSeed,
+            ...(params.thinkingLevel   ? { thinkingLevel:   params.thinkingLevel }   : {}),
+            ...(params.mediaResolution ? { mediaResolution: params.mediaResolution } : {}),
+          },
         })
       } catch (genErr) {
         // Retry é best-effort: com imagem válida de tentativa anterior, falha
@@ -355,6 +396,9 @@ export async function generateVista(args: VistaGenerationArgs) {
         provider_model: gen.providerModel,
         request_id:     gen.requestId,
         temperature:    params.temperature,
+        thinking_level:   params.thinkingLevel,
+        media_resolution: params.mediaResolution,
+        seed:             attemptSeed,
         edge_map_used:  edgeMapImageIndex !== null,
         fallback_used:  gen.fallbackUsed,
         duration_ms:    gen.latencyMs,
@@ -364,7 +408,7 @@ export async function generateVista(args: VistaGenerationArgs) {
 
       console.log(
         `[${logContext}] fidelity attempt=${attempt}/${maxAttempts} provider=${gen.provider} model=${gen.providerModel} ` +
-        `temp=${params.temperature} edgeMap=${edgeMapImageIndex !== null} ` +
+        `temp=${params.temperature} thinking=${params.thinkingLevel ?? 'off'} mediaRes=${params.mediaResolution ?? 'default'} edgeMap=${edgeMapImageIndex !== null} ` +
         `score=${geometry ? geometry.score.toFixed(3) : 'n/a'}` +
         (geometry
           ? ` (recall=${geometry.edgeRecall.toFixed(3)} blockCorr=${geometry.blockCorrelation.toFixed(3)} worstBlock=${geometry.worstBlockDelta.toFixed(3)} aspectDelta=${geometry.aspectDelta.toFixed(3)})`

@@ -312,9 +312,10 @@ export async function POST(req: NextRequest) {
     // Na Máxima fidelidade o Renderizar opera em render_only: a imagem
     // original é a base obrigatória e o resultado é VALIDADO contra ela
     // (geometry score em lib/ai/fidelity/geometry-score). Score abaixo do
-    // limite → retry com menos criatividade (temperatura ↓ no GCP), prompt de
-    // escalada e condicionamento estrutural por edge map. Entrega a MELHOR
-    // tentativa. RENDER_FIDELITY_GATE=0 restaura o comportamento single-shot.
+    // limite → retry com condicionamento reforçado (edge map, tokenização
+    // ultra_high dos inputs, thinking do NB2, prompt de escalada; temperatura
+    // fica fixa — ver o ladder em lib/ai/fidelity/render-only). Entrega a
+    // MELHOR tentativa. RENDER_FIDELITY_GATE=0 restaura o single-shot.
     const fidelityCfg = getRenderFidelityConfig()
     const renderOnlyActive = fidelityLevel === 'maximum' && fidelityCfg.enabled
 
@@ -454,10 +455,11 @@ export async function POST(req: NextRequest) {
     }
     options.briefing = resolvedBriefing
 
-    // Seed fixa por request (caminho GCP): retries do ladder viram variação
-    // CONTROLADA da mesma amostra (só temperatura/edge map mudam) e o render
-    // fica reproduzível. Os schemas FAL desses motores não expõem seed — lá
-    // segue não-determinístico. "Corrigir drift" reenvia a seed do render
+    // Seed fixa por request: retries do ladder viram variação CONTROLADA da
+    // mesma amostra (só o condicionamento muda; a tentativa 3 desloca a seed
+    // de propósito — seedOffset) e o render fica reproduzível. Vale nos DOIS
+    // caminhos: NB2/Pro na FAL expõem `seed` no schema (conferido 2026-08-17)
+    // e o GCP recebe via gcpConfig. "Corrigir drift" reenvia a seed do render
     // anterior pra mudar SÓ o condicionamento, não a amostra.
     const generationSeed = Number.isInteger(providedSeed) && (providedSeed as number) >= 0
       ? (providedSeed as number)
@@ -479,6 +481,9 @@ export async function POST(req: NextRequest) {
       provider_model: string
       request_id:     string | null
       temperature:    number
+      thinking_level:   string | null
+      media_resolution: string | null
+      seed:             number
       edge_map_used:  boolean
       fallback_used:  boolean
       duration_ms:    number
@@ -572,10 +577,18 @@ export async function POST(req: NextRequest) {
       })
       devLog('[generate] prompt     :', finalPrompt)
 
+      const attemptSeed = generationSeed + params.seedOffset
       const falInput = {
         prompt:     finalPrompt,
         image_urls: imageUrls,
         ...falParamsForEngine(engine, resolution, aspectRatio),
+        // Reprodutibilidade nos DOIS caminhos: NB2/Pro na FAL expõem `seed`
+        // (schema conferido 2026-08-17); Quasar (gpt-image-2) não.
+        ...(engine !== 'quasar' ? { seed: attemptSeed } : {}),
+        // Thinking do NB2 (único motor com o knob na FAL): planejar a cena
+        // antes de gerar adere melhor ao contrato de preservação. No caminho
+        // GCP o provider converte em thinkingConfig.
+        ...(engine === 'pulsar' && params.thinkingLevel ? { thinking_level: params.thinkingLevel } : {}),
       }
       devLog('[generate] FAL INPUT  :', JSON.stringify(falInput))
 
@@ -592,7 +605,12 @@ export async function POST(req: NextRequest) {
           timeoutMs: attemptTimeoutMs,
           context:   attempt === 1 ? 'generate' : `generate#${attempt}`,
           deliver:   { kind: 'url', userId: user.id, area: 'renders' },
-          gcpConfig: { temperature: params.temperature, seed: generationSeed },
+          gcpConfig: {
+            temperature: params.temperature,
+            seed:        attemptSeed,
+            ...(params.thinkingLevel   ? { thinkingLevel:   params.thinkingLevel }   : {}),
+            ...(params.mediaResolution ? { mediaResolution: params.mediaResolution } : {}),
+          },
         })
       } catch (genErr) {
         // Retry é best-effort: se JÁ existe imagem válida de tentativa
@@ -623,6 +641,9 @@ export async function POST(req: NextRequest) {
         provider_model: gen.providerModel,
         request_id:     gen.requestId,
         temperature:    params.temperature,
+        thinking_level:   params.thinkingLevel,
+        media_resolution: params.mediaResolution,
+        seed:             attemptSeed,
         edge_map_used:  edgeMapImageIndex !== null,
         fallback_used:  gen.fallbackUsed,
         duration_ms:    gen.latencyMs,
@@ -634,7 +655,7 @@ export async function POST(req: NextRequest) {
       // tentativa e geometry score (requisito de observabilidade).
       console.log(
         `[generate:fidelity] attempt=${attempt}/${maxAttempts} provider=${gen.provider} model=${gen.providerModel} ` +
-        `temp=${params.temperature} edgeMap=${edgeMapImageIndex !== null} ` +
+        `temp=${params.temperature} thinking=${params.thinkingLevel ?? 'off'} mediaRes=${params.mediaResolution ?? 'default'} edgeMap=${edgeMapImageIndex !== null} ` +
         `score=${geometry ? geometry.score.toFixed(3) : 'n/a'}` +
         (geometry
           ? ` (recall=${geometry.edgeRecall.toFixed(3)} blockCorr=${geometry.blockCorrelation.toFixed(3)} worstBlock=${geometry.worstBlockDelta.toFixed(3)} aspectDelta=${geometry.aspectDelta.toFixed(3)} ΔEmean=${geometry.meanColorDelta.toFixed(1)} ΔEworst=${geometry.worstCellColorDelta.toFixed(1)})`
@@ -784,7 +805,8 @@ export async function POST(req: NextRequest) {
         engine,
         resolution,
         parameters:  falParamsForEngine(engine, resolution, aspectRatio),
-        // Reprodutibilidade: seed aplicada no caminho GCP (a FAL não expõe).
+        // Reprodutibilidade: seed BASE do request (os dois caminhos recebem;
+        // a seed efetiva por tentativa fica em fidelity.attempts[].seed).
         seed:            generationSeed,
         structural_boost: attemptOffset > 0,
         aspect_ratio:    aspectRatio,

@@ -28,11 +28,19 @@
 // (lib/ai/google/editImage.ts), onde o id válido hoje ainda é -preview.
 //
 // Contrato: cada call site passa o MESMO falInput que já enviava pra FAL
-// (prompt, image_urls, resolution, num_images, output_format, seed). O caminho
-// GCP deriva o generateContent DESSE input (ordem das imagens preservada — ela
-// é contrato de prompt em vários fluxos); o fallback repassa o input
+// (prompt, image_urls, resolution, num_images, output_format, seed e — nos
+// endpoints cujo schema FAL aceita, hoje só nano-banana-2/edit —
+// thinking_level). O caminho GCP deriva o generateContent DESSE input (ordem
+// das imagens preservada — ela é contrato de prompt em vários fluxos;
+// thinking_level vira thinkingConfig); o fallback repassa o input
 // byte-idêntico pra FAL. Endpoints sem mapeamento Google (flux, gpt-image…)
 // passam direto pela FAL, então TODAS as rotas podem usar esta camada.
+//
+// Knobs Gemini 3 de fidelidade (lib/ai/gemini-knobs): os INPUTS de imagem são
+// tokenizados em mediaResolution 'high' por default (IMAGE_INPUT_MEDIA_RESOLUTION
+// desliga/ajusta) — o modelo não preserva o que ele nem "viu". Knob rejeitado
+// pelo Vertex (400) dispara UM retry compat sem os knobs novos antes de
+// qualquer fallback — knob novo nunca pode rebaixar o caminho primário.
 //
 // Saída GCP vem como bytes (Vertex não tem CDN pública como a FAL):
 //   deliver 'url'     → re-hospeda no bucket space-mestres e devolve URL https
@@ -46,9 +54,23 @@
 // falha continuam nas rotas, exatamente como hoje.
 
 import { fal } from '@fal-ai/client'
-import { GoogleGenAI, Modality, createPartFromBase64, createPartFromText, type Part } from '@google/genai'
+import {
+  GoogleGenAI,
+  Modality,
+  PartMediaResolutionLevel,
+  ThinkingLevel,
+  createPartFromBase64,
+  createPartFromText,
+  type GenerateContentConfig,
+  type Part,
+} from '@google/genai'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { fetchStorageBytes } from '@/lib/storage/fetch'
+import {
+  inputMediaResolutionDefault,
+  isInvalidArgumentError,
+  type InputMediaResolution,
+} from '@/lib/ai/gemini-knobs'
 
 fal.config({ credentials: process.env.FAL_KEY })
 
@@ -80,13 +102,21 @@ export interface GenerateImageArgs {
    *  null pulam o rótulo daquela posição. O caminho FAL ignora (o schema só
    *  aceita image_urls; os papéis seguem indo no texto do prompt). */
   imageLabels?: (string | null)[]
-  /** Overrides do caminho GCP/Vertex (o caminho FAL ignora — o schema da FAL
-   *  não expõe esses knobs). Usado pelo retry ladder do render_only pra
-   *  reduzir "criatividade" (temperatura ↓) e pra fixar seed por request
-   *  (retries viram variação CONTROLADA da mesma amostra, não amostra nova). */
+  /** Overrides do caminho GCP/Vertex (o caminho FAL ignora — knobs que o
+   *  schema da FAL não expõe entram aqui; os que ela expõe vão no próprio
+   *  falInput). Usado pelo retry ladder dos fluxos de fidelidade. */
   gcpConfig?: {
     temperature?: number
+    /** Fixa a seed por request: retries viram variação CONTROLADA da mesma
+     *  amostra, não amostra nova. Precedência sobre falInput.seed. */
     seed?: number
+    /** Thinking do NB2 no caminho GCP (precedência sobre falInput.thinking_level).
+     *  Ignorado em modelos sem o knob (Pro pensa sempre; 2.5 não pensa). */
+    thinkingLevel?: GcpThinkingLevel
+    /** Tokenização dos INPUTS de imagem (Gemini 3). Precedência sobre o
+     *  default IMAGE_INPUT_MEDIA_RESOLUTION — o ladder usa pra escalar
+     *  high → ultra_high nos retries. */
+    mediaResolution?: InputMediaResolution
   }
 }
 
@@ -149,9 +179,15 @@ function hasVertexCredentials(): boolean {
 // Gemini 3 aceita imageConfig.imageSize (1K/2K/4K); o 2.5 Flash Image não —
 // e os call sites desse endpoint também não passam `resolution` pra FAL.
 
+export type GcpThinkingLevel = 'minimal' | 'low' | 'medium' | 'high'
+
 interface GcpModelMapping {
   model: string
   supportsImageSize: boolean
+  /** Gemini 3 Image aceita mediaResolution por parte nos INPUTS; o 2.5 não. */
+  supportsInputMediaResolution: boolean
+  /** Só o NB2 (gemini-3.1-flash-image) expõe thinking configurável. */
+  supportsThinking: boolean
 }
 
 function envModel(name: string, fallback: string): string {
@@ -161,15 +197,31 @@ function envModel(name: string, fallback: string): string {
 function gcpModelFor(falEndpoint: string): GcpModelMapping | null {
   switch (falEndpoint) {
     case 'fal-ai/nano-banana/edit':
-      return { model: envModel('GCP_IMAGE_MODEL_NANO_BANANA', 'gemini-2.5-flash-image'), supportsImageSize: false }
+      return {
+        model: envModel('GCP_IMAGE_MODEL_NANO_BANANA', 'gemini-2.5-flash-image'),
+        supportsImageSize: false,
+        supportsInputMediaResolution: false,
+        supportsThinking: false,
+      }
     case 'fal-ai/nano-banana-2/edit':
       // GA no Vertex é sem -preview (o alias -preview dá 404 neste projeto).
-      return { model: envModel('GCP_IMAGE_MODEL_NANO_BANANA_2', 'gemini-3.1-flash-image'), supportsImageSize: true }
+      return {
+        model: envModel('GCP_IMAGE_MODEL_NANO_BANANA_2', 'gemini-3.1-flash-image'),
+        supportsImageSize: true,
+        supportsInputMediaResolution: true,
+        supportsThinking: true,
+      }
     // Nano Banana Pro e o endpoint explícito do preview são o MESMO Gemini 3 Pro.
     case 'fal-ai/nano-banana-pro/edit':
     case 'fal-ai/gemini-3-pro-image-preview/edit':
       // GA no Vertex é sem -preview (o alias -preview dá 404 neste projeto).
-      return { model: envModel('GCP_IMAGE_MODEL_NANO_BANANA_PRO', 'gemini-3-pro-image'), supportsImageSize: true }
+      // Thinking do Pro é sempre-ligado (sem knob na API nem na FAL).
+      return {
+        model: envModel('GCP_IMAGE_MODEL_NANO_BANANA_PRO', 'gemini-3-pro-image'),
+        supportsImageSize: true,
+        supportsInputMediaResolution: true,
+        supportsThinking: false,
+      }
     default:
       return null
   }
@@ -208,6 +260,7 @@ interface ParsedFalInput {
   numImages: number
   seed: number | undefined
   aspectRatio: string | null
+  thinkingLevel: GcpThinkingLevel | null
 }
 
 function parseFalInput(falInput: Record<string, unknown>): ParsedFalInput {
@@ -220,15 +273,48 @@ function parseFalInput(falInput: Record<string, unknown>): ParsedFalInput {
   const numImages = Number.isFinite(rawNum) && rawNum >= 1 ? Math.min(Math.floor(rawNum), 4) : 1
   const seed = typeof falInput.seed === 'number' ? falInput.seed : undefined
   const aspectRatio = typeof falInput.aspect_ratio === 'string' ? falInput.aspect_ratio : null
-  return { prompt, imageUrls, resolution, numImages, seed, aspectRatio }
+  const rawThinking = typeof falInput.thinking_level === 'string' ? falInput.thinking_level.toLowerCase() : null
+  const thinkingLevel =
+    rawThinking === 'minimal' || rawThinking === 'low' || rawThinking === 'medium' || rawThinking === 'high'
+      ? rawThinking
+      : null
+  return { prompt, imageUrls, resolution, numImages, seed, aspectRatio, thinkingLevel }
 }
 
-async function fetchImagePart(url: string): Promise<Part> {
+const PART_MEDIA_LEVEL: Record<InputMediaResolution, PartMediaResolutionLevel> = {
+  low:        PartMediaResolutionLevel.MEDIA_RESOLUTION_LOW,
+  medium:     PartMediaResolutionLevel.MEDIA_RESOLUTION_MEDIUM,
+  high:       PartMediaResolutionLevel.MEDIA_RESOLUTION_HIGH,
+  ultra_high: PartMediaResolutionLevel.MEDIA_RESOLUTION_ULTRA_HIGH,
+}
+
+const THINKING_LEVEL: Record<GcpThinkingLevel, ThinkingLevel> = {
+  minimal: ThinkingLevel.MINIMAL,
+  low:     ThinkingLevel.LOW,
+  medium:  ThinkingLevel.MEDIUM,
+  high:    ThinkingLevel.HIGH,
+}
+
+async function fetchImagePart(url: string, mediaLevel?: PartMediaResolutionLevel): Promise<Part> {
   const { buffer, contentType } = await fetchStorageBytes(url)
   const ct = contentType.split(';')[0]?.trim()
   const mime = ct && ct.startsWith('image/') ? ct : 'image/jpeg'
-  return createPartFromBase64(buffer.toString('base64'), mime)
+  return createPartFromBase64(buffer.toString('base64'), mime, mediaLevel)
 }
+
+// Retry compat: remove o mediaResolution de uma parte sem re-baixar a imagem.
+function stripPartMediaResolution(part: Part): Part {
+  if (!part.mediaResolution) return part
+  const clone = { ...part }
+  delete clone.mediaResolution
+  return clone
+}
+
+// Sticky por instância: liga DEPOIS que um retry compat deu certo (evidência
+// forte de que o endpoint rejeita os knobs Gemini 3) — as próximas chamadas
+// pulam os knobs direto, sem pagar a ida-e-volta do 400 a cada request. Reset
+// natural a cada cold start (deploy novo re-testa os knobs).
+let gcpKnobsRejected = false
 
 // Dimensões via parse do CABEÇALHO (PNG/JPEG) em JS puro. Sem sharp de
 // propósito: este módulo entra no grafo dos client components via barrel de
@@ -300,27 +386,45 @@ async function generateViaGcp(
 
   const generated = await Promise.race([
     (async () => {
+      // Knobs Gemini 3 de fidelidade (lib/ai/gemini-knobs):
+      //   - mediaResolution por parte: quanto detalhe fino dos INPUTS o modelo
+      //     tokeniza (default 'high'; o ladder escala pra 'ultra_high').
+      //   - thinkingLevel: NB2 planeja a cena antes de gerar — adere melhor ao
+      //     contrato de preservação. gcpConfig tem precedência; sem ele vale o
+      //     thinking_level do falInput (o MESMO valor que o fallback FAL vê).
+      const inputMediaRes = mapping.supportsInputMediaResolution && !gcpKnobsRejected
+        ? (args.gcpConfig?.mediaResolution ?? inputMediaResolutionDefault())
+        : null
+      const thinkingLevel = mapping.supportsThinking && !gcpKnobsRejected
+        ? (args.gcpConfig?.thinkingLevel ?? parsed.thinkingLevel)
+        : null
+
       // Ordem preservada: em vários fluxos ela é contrato do prompt
       // (âncora primeiro, fonte → máscara → referências). Com imageLabels,
       // cada imagem é precedida pelo rótulo do seu papel — binding explícito
-      // entre o "Image #N" do prompt e a imagem real.
-      const imageParts = await Promise.all(parsed.imageUrls.map(fetchImagePart))
-      const contents: Part[] = [createPartFromText(parsed.prompt)]
-      imageParts.forEach((part, i) => {
-        const label = args.imageLabels?.[i]
-        if (label && label.trim()) contents.push(createPartFromText(label.trim()))
-        contents.push(part)
-      })
+      // entre o "Image #N" do prompt e a imagem real. buildContents é reusado
+      // pelo retry compat (mesmos bytes, sem mediaResolution).
+      const partLevel = inputMediaRes ? PART_MEDIA_LEVEL[inputMediaRes] : undefined
+      const imageParts = await Promise.all(parsed.imageUrls.map(u => fetchImagePart(u, partLevel)))
+      const buildContents = (parts: Part[]): Part[] => {
+        const out: Part[] = [createPartFromText(parsed.prompt)]
+        parts.forEach((part, i) => {
+          const label = args.imageLabels?.[i]
+          if (label && label.trim()) out.push(createPartFromText(label.trim()))
+          out.push(part)
+        })
+        return out
+      }
+      const contents = buildContents(imageParts)
 
-      const config = {
+      const baseConfig: GenerateContentConfig = {
         responseModalities: [Modality.IMAGE, Modality.TEXT],
         // Fluxos de preservação (norte do produto): temperatura baixa reduz
-        // "criatividade" fora do pedido — mesmo valor do lib/ai/google. O
-        // retry ladder do render_only baixa ainda mais via gcpConfig.
+        // "criatividade" fora do pedido — mesmo valor do lib/ai/google. (O
+        // ladder mantém 0.2 fixo: a escalada é por condicionamento, não por
+        // sampling — ver lib/ai/fidelity/render-only.)
         temperature: args.gcpConfig?.temperature ?? 0.2,
-        // gcpConfig.seed tem precedência: é o caminho seguro pra fixar seed sem
-        // tocar o falInput (que o fallback FAL repassa byte-idêntico a schemas
-        // que não expõem seed).
+        // gcpConfig.seed tem precedência sobre o seed do falInput.
         ...(args.gcpConfig?.seed !== undefined
           ? { seed: args.gcpConfig.seed }
           : parsed.seed !== undefined ? { seed: parsed.seed } : {}),
@@ -333,12 +437,16 @@ async function generateViaGcp(
             }
           : {}),
       }
+      const config: GenerateContentConfig = {
+        ...baseConfig,
+        ...(thinkingLevel ? { thinkingConfig: { thinkingLevel: THINKING_LEVEL[thinkingLevel] } } : {}),
+      }
 
-      const callOnce = async () => {
+      const requestOnce = async (reqContents: Part[], reqConfig: GenerateContentConfig) => {
         const response = await vertexClient().models.generateContent({
           model: mapping.model,
-          contents,
-          config,
+          contents: reqContents,
+          config: reqConfig,
         })
         const parts = response.candidates?.[0]?.content?.parts ?? []
         const inline = parts.find(p => p.inlineData?.data)?.inlineData
@@ -348,6 +456,25 @@ async function generateViaGcp(
           buffer: Buffer.from(inline.data, 'base64'),
           mime,
           responseId: response.responseId ?? null,
+        }
+      }
+
+      const callOnce = async () => {
+        try {
+          return await requestOnce(contents, config)
+        } catch (err) {
+          // Retry compat: knob Gemini 3 rejeitado (400/INVALID_ARGUMENT) não
+          // pode rebaixar o caminho primário pro fallback — tenta 1x sem os
+          // knobs novos. Erros de outra natureza sobem como antes.
+          if ((inputMediaRes || thinkingLevel) && isInvalidArgumentError(err)) {
+            console.warn(
+              `[image-provider] ${args.context} knob Gemini 3 rejeitado (${truncate((err as Error).message ?? String(err), 160)}) — retry compat sem mediaResolution/thinking`,
+            )
+            const result = await requestOnce(buildContents(imageParts.map(stripPartMediaResolution)), baseConfig)
+            gcpKnobsRejected = true
+            return result
+          }
+          throw err
         }
       }
 

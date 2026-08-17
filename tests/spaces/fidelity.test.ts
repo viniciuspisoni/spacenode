@@ -95,14 +95,18 @@ describe('limite por ação', () => {
 })
 
 describe('ladder de tentativas (compartilhado com o render_only)', () => {
-  it('temperatura não-crescente; edge map a partir da 2ª tentativa', () => {
+  it('temperatura fixa; edge map a partir da 2ª; escalada por condicionamento', () => {
     const a1 = getFidelityAttemptParams(1)
     const a2 = getFidelityAttemptParams(2)
     const a3 = getFidelityAttemptParams(3)
     expect(a1.useEdgeMap).toBe(false)
     expect(a2.useEdgeMap).toBe(true)
     expect(a3.useEdgeMap).toBe(true)
-    expect(a2.temperature).toBeLessThan(a1.temperature)
-    expect(a3.temperature).toBeLessThanOrEqual(a2.temperature)
+    // Guia do Gemini 3 + telemetria de prod: retries não derrubam mais a
+    // temperatura — escalam mediaResolution (high → ultra_high) e seedOffset.
+    expect(a2.temperature).toBe(a1.temperature)
+    expect(a3.temperature).toBe(a2.temperature)
+    expect(a2.mediaResolution).toBe('ultra_high')
+    expect(a3.seedOffset).toBeGreaterThan(a2.seedOffset)
   })
 })
