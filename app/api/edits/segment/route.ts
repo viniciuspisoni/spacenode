@@ -46,6 +46,9 @@ interface Body {
   points?:        unknown
   base_mask_url?: unknown
   op?:            unknown
+  /** true → não gera o overlay de preview (cliente que desenha a máscara ele
+   *  mesmo, ex. varinha do V3: economiza 1 composite sharp + 1 upload). */
+  skip_preview?:  unknown
 }
 
 interface ClickPoint { x: number; y: number }
@@ -81,6 +84,7 @@ export async function POST(req: NextRequest) {
   const baseMaskUrl = typeof body?.base_mask_url === 'string' ? body.base_mask_url : null
   const op          = body?.op === 'add' || body?.op === 'subtract' ? body.op : null
   const clickPoints = parsePoints(body?.points)
+  const skipPreview = body?.skip_preview === true
 
   if (!imageUrl || (!maskUrl && !semantic && clickPoints.length === 0)) {
     return NextResponse.json(
@@ -169,8 +173,8 @@ export async function POST(req: NextRequest) {
     // Overlay de preview: render com a superfície detectada tingida (verde Spacenode).
     const meta = await sharp(imgBuf).metadata()
     const W = meta.width ?? 0, H = meta.height ?? 0
-    let previewUrl = imageUrl
-    if (W && H) {
+    let previewUrl: string | null = skipPreview ? null : imageUrl
+    if (W && H && !skipPreview) {
       const maskRaw = await sharp(mask).resize(W, H, { fit: 'fill' }).greyscale().raw().toBuffer()
       const dim = Buffer.alloc(maskRaw.length)
       for (let i = 0; i < maskRaw.length; i++) dim[i] = Math.round(maskRaw[i] * 0.42)

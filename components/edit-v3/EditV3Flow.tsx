@@ -18,11 +18,16 @@ import { EditV2ImportModal } from '@/components/editar/EditV2ImportModal'
 import { consumeHandoff } from '@/components/nodi/actions-bus'
 import { uploadDirect } from '@/lib/storage/direct-upload-client'
 import {
-  IconLasso, IconPolygon, IconBrush, IconEraser, IconHand,
+  IconWand, IconLasso, IconPolygon, IconBrush, IconEraser, IconHand,
   IconUndo, IconRedo, IconTrash,
   IconRemove, IconMaterial, IconInsert, IconRefine,
   IconUpload, IconHistory, IconDownload,
 } from './icons'
+
+// Varinha mágica (seleção por clique via detecção de área no servidor).
+// Mesma flag da segmentação de superfície do v1/v2 — o backend é o mesmo
+// (/api/edits/segment). Inlinada no build (NEXT_PUBLIC).
+const WAND_ENABLED = process.env.NEXT_PUBLIC_EDIT_SURFACE_SEGMENTATION === '1'
 
 type Action = 'remove' | 'swap_material' | 'insert_element' | 'refine_area'
 
@@ -86,6 +91,9 @@ const ACTIONS: ActionDef[] = [
   },
 ]
 
+const MIN_USABLE = 0.0002
+const SMALL_WARN = 0.004
+
 interface HistItem {
   url: string
   kind: 'original' | 'result'
@@ -97,9 +105,12 @@ interface ResultState {
   charged: boolean
   width: number | null
   height: number | null
+  /** Aviso do gate semântico (advisory com máscara): confira antes de usar. */
+  warning: string | null
 }
 
 const TOOLS: { id: EditV3Tool; label: string; Icon: typeof IconBrush }[] = [
+  ...(WAND_ENABLED ? [{ id: 'wand' as const, label: 'Varinha mágica — clique para selecionar', Icon: IconWand }] : []),
   { id: 'lasso', label: 'Laço', Icon: IconLasso },
   { id: 'polygon', label: 'Polígono', Icon: IconPolygon },
   { id: 'brush', label: 'Pincel', Icon: IconBrush },
@@ -123,8 +134,11 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
   const [quality] = useState<'standard' | 'high'>('standard') // Alta precisão: gated
   const [referenceUrl, setReferenceUrl] = useState<string | null>(null)
   const [coverage, setCoverage] = useState(0)
-  const [tool, setTool] = useState<EditV3Tool>('lasso')
+  const [tool, setTool] = useState<EditV3Tool>(WAND_ENABLED ? 'wand' : 'lasso')
   const [brushSize, setBrushSize] = useState(36)
+  const [wandMode, setWandMode] = useState<'add' | 'subtract'>('add')
+  const [wandBusy, setWandBusy] = useState(false)
+  const [wandAt, setWandAt] = useState<{ x: number; y: number } | null>(null)
   const [cost, setCost] = useState<number | null>(null)
   const [busy, setBusy] = useState<null | 'upload' | 'generate'>(null)
   const [elapsed, setElapsed] = useState(0)
@@ -141,10 +155,15 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
   // Latch SÍNCRONO anti-duplo-envio: `busy` (estado) não vira síncrono, então
   // dois disparos no mesmo tick poderiam submeter (e cobrar) duas vezes.
   const submittingRef = useRef(false)
+  // Latch da varinha (1 detecção por vez) + guarda de imagem: uma resposta que
+  // chega depois de o usuário trocar de imagem NUNCA vira camada na imagem nova.
+  const wandBusyRef = useRef(false)
+  const sourceUrlRef = useRef<string | null>(null)
+  useEffect(() => {
+    sourceUrlRef.current = sourceUrl
+  }, [sourceUrl])
 
   const actionDef = ACTIONS.find(a => a.id === action)!
-  const MIN_USABLE = 0.0002
-  const SMALL_WARN = 0.004
   const hasSelection = coverage >= MIN_USABLE
   // Seleção é OPCIONAL (exceto Inserir, que exige onde). A instrução nomeia o
   // alvo ("retirar o tapete"); marcar uma área é o reforço de precisão.
@@ -155,7 +174,8 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
     action === 'insert_element' ? hasSelection && taskDescribed // posição + o quê
     : action === 'swap_material' ? taskDescribed                // precisa dizer o material
     : taskDescribed || hasSelection                             // remove/refine: texto OU área
-  const canGenerate = !!sourceUrl && busy === null && ready
+  // wandBusy bloqueia o Gerar: a seleção em detecção ainda não virou camada.
+  const canGenerate = !!sourceUrl && busy === null && ready && !wandBusy
 
   const softWarning =
     hasSelection && coverage < SMALL_WARN
@@ -251,6 +271,46 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
     return () => clearInterval(id)
   }, [busy])
 
+  // ── Varinha mágica (clique → detecção de área → camada de seleção) ──────
+  const handleWandPoint = useCallback(
+    async (pt: { x: number; y: number }, opts: { alt: boolean }) => {
+      const src = sourceUrl
+      if (!src || busy || wandBusyRef.current) return
+      // Subtrair só faz sentido com algo selecionado; sem seleção, todo clique soma.
+      const subtract = (opts.alt || wandMode === 'subtract') && coverage >= MIN_USABLE
+      wandBusyRef.current = true
+      setWandBusy(true)
+      setWandAt(pt)
+      setError(null)
+      try {
+        const res = await fetch('/api/edits/segment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image_url: src, points: [pt], skip_preview: true }),
+        })
+        const json = await res.json().catch(() => null)
+        if (sourceUrlRef.current !== src) return // trocou de imagem no meio
+        if (!res.ok || typeof json?.surface_mask_url !== 'string') {
+          setError(
+            res.status === 429
+              ? 'Muitas seleções em sequência. Aguarde um instante e clique de novo.'
+              : 'Não foi possível detectar a área clicada. Tente outro ponto ou marque com o pincel.',
+          )
+          return
+        }
+        const ok = await canvasRef.current?.addMaskLayer(json.surface_mask_url, subtract ? 'subtract' : 'add')
+        if (!ok) setError('Não foi possível aplicar a área detectada. Marque com o pincel.')
+      } catch {
+        if (sourceUrlRef.current === src) setError('Falha de conexão ao detectar a área. Tente novamente.')
+      } finally {
+        wandBusyRef.current = false
+        setWandBusy(false)
+        setWandAt(null)
+      }
+    },
+    [busy, coverage, sourceUrl, wandMode],
+  )
+
   // ── Gerar ───────────────────────────────────────────────────────────────
   const handleGenerate = useCallback(async () => {
     if (!sourceUrl || busy || submittingRef.current) return
@@ -295,6 +355,7 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
           charged: json?.charge?.debited === true,
           width: json.output?.width ?? null,
           height: json.output?.height ?? null,
+          warning: typeof json.warning === 'string' ? json.warning : null,
         }
         setResult(r)
         setHistory(h => [...h, { url: r.url, kind: 'result' }])
@@ -422,6 +483,12 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
           </div>
         </div>
 
+        {result.warning && (
+          <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 10, border: '0.5px solid var(--color-warning-border)', background: 'var(--color-warning-bg)', fontSize: 12.5, color: 'var(--color-text-secondary)' }}>
+            {result.warning}
+          </div>
+        )}
+
         <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap', alignItems: 'center' }}>
           <button type="button" className="edv3-cta" style={{ width: 'auto', padding: '11px 20px' }} onClick={editFromResult}>
             Continuar editando este resultado
@@ -500,8 +567,37 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
             tool={tool}
             brushSize={brushSize}
             onCoverageChange={setCoverage}
+            onWandPoint={handleWandPoint}
+            wandBusyAt={wandBusy ? wandAt : null}
             disabled={busy === 'generate'}
           />
+          {tool === 'wand' && (
+            <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <div style={{ display: 'inline-flex', borderRadius: 9, border: '0.5px solid var(--color-border-strong)', overflow: 'hidden' }}>
+                {([['add', '＋ Adicionar'], ['subtract', '－ Remover']] as const).map(([m, label]) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setWandMode(m)}
+                    style={{
+                      padding: '6px 12px',
+                      fontSize: 12,
+                      fontWeight: 500,
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: wandMode === m ? 'var(--color-surface-hover)' : 'transparent',
+                      color: wandMode === m ? 'var(--color-accent-green)' : 'var(--color-text-secondary)',
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>
+                Clique em um objeto ou superfície para selecioná-lo inteiro · Alt-clique remove da seleção
+              </span>
+            </div>
+          )}
           {(tool === 'brush' || tool === 'eraser') && (
             <label style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, color: 'var(--color-text-tertiary)' }}>
               Tamanho do pincel
@@ -509,12 +605,16 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
             </label>
           )}
           <div style={{ marginTop: 12, fontSize: 12.5, color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 7 }}>
-            <span style={{ width: 6, height: 6, borderRadius: 99, flexShrink: 0, background: hasSelection ? 'var(--color-accent-green)' : 'var(--color-text-tertiary)' }} />
-            {hasSelection
-              ? `Área marcada — a edição fica só aqui · ${(coverage * 100).toFixed(1)}%`
-              : action === 'insert_element'
-                ? 'Marque o lugar onde o elemento será inserido'
-                : 'Imagem inteira — pinte uma área se quiser precisão máxima'}
+            <span className={wandBusy ? 'edv3-pulse' : undefined} style={{ width: 6, height: 6, borderRadius: 99, flexShrink: 0, background: wandBusy || hasSelection ? 'var(--color-accent-green)' : 'var(--color-text-tertiary)' }} />
+            {wandBusy
+              ? 'Detectando a área clicada…'
+              : hasSelection
+                ? `Área marcada — a edição fica só aqui · ${(coverage * 100).toFixed(1)}%`
+                : action === 'insert_element'
+                  ? 'Marque o lugar onde o elemento será inserido'
+                  : tool === 'wand'
+                    ? 'Clique no que você quer mudar — a área inteira é detectada'
+                    : 'Imagem inteira — pinte uma área se quiser precisão máxima'}
           </div>
           {!hasSelection && action !== 'insert_element' && (
             <div style={{ marginTop: 6, fontSize: 11, color: 'var(--color-text-tertiary)' }}>
@@ -642,6 +742,8 @@ const EDV3_CSS = `
 .edv3-cta:hover:not(:disabled) { opacity:0.9; }
 .edv3-cta:active:not(:disabled) { transform:scale(0.985); }
 .edv3-cta:disabled { opacity:0.4; cursor:not-allowed; }
+.edv3-pulse { animation: edv3-pulse 1s ease-in-out infinite; }
+@keyframes edv3-pulse { 0%,100% { opacity:1 } 50% { opacity:0.25 } }
 @media (max-width: 980px) {
   .edv3-grid { grid-template-columns: 46px minmax(0,1fr); }
   .edv3-panel { grid-column: 1 / -1; }
