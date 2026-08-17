@@ -14,8 +14,23 @@
 //
 // Ordem das imagens: [principal] → [máscara?] → [referências...].
 
-import { GoogleGenAI, Modality, createPartFromBase64, createPartFromText, type Part } from '@google/genai'
+import {
+  GoogleGenAI,
+  Modality,
+  PartMediaResolutionLevel,
+  ThinkingLevel,
+  createPartFromBase64,
+  createPartFromText,
+  type GenerateContentConfig,
+  type Part,
+} from '@google/genai'
 import { fetchStorageBytes } from '@/lib/storage/fetch'
+import {
+  inputMediaResolutionDefault,
+  isInvalidArgumentError,
+  nb2ThinkingLevel,
+  type InputMediaResolution,
+} from '@/lib/ai/gemini-knobs'
 
 export type GoogleImageModel = 'gemini-3.1-flash-image' | 'gemini-3-pro-image'
 export type GoogleImageResolution = '1K' | '2K' | '4K'
@@ -58,7 +73,16 @@ function client(): GoogleGenAI {
   return _client
 }
 
-async function fetchImagePart(url: string): Promise<Part> {
+// Tokenização dos INPUTS (Gemini 3): 'high' por default — o modelo não
+// preserva o detalhe que ele nem "viu" (ver lib/ai/gemini-knobs).
+const PART_MEDIA_LEVEL: Record<InputMediaResolution, PartMediaResolutionLevel> = {
+  low:        PartMediaResolutionLevel.MEDIA_RESOLUTION_LOW,
+  medium:     PartMediaResolutionLevel.MEDIA_RESOLUTION_MEDIUM,
+  high:       PartMediaResolutionLevel.MEDIA_RESOLUTION_HIGH,
+  ultra_high: PartMediaResolutionLevel.MEDIA_RESOLUTION_ULTRA_HIGH,
+}
+
+async function fetchImagePart(url: string, mediaLevel?: PartMediaResolutionLevel): Promise<Part> {
   let buffer: Buffer
   let contentType: string
   try {
@@ -68,8 +92,21 @@ async function fetchImagePart(url: string): Promise<Part> {
   }
   const ct = contentType.split(';')[0]?.trim()
   const mime = ct && ct.startsWith('image/') ? ct : 'image/jpeg'
-  return createPartFromBase64(buffer.toString('base64'), mime)
+  return createPartFromBase64(buffer.toString('base64'), mime, mediaLevel)
 }
+
+// Retry compat: remove o mediaResolution de uma parte sem re-baixar a imagem.
+function stripPartMediaResolution(part: Part): Part {
+  if (!part.mediaResolution) return part
+  const clone = { ...part }
+  delete clone.mediaResolution
+  return clone
+}
+
+// Sticky por instância: liga DEPOIS que um retry compat deu certo — as
+// próximas edições pulam os knobs direto (sem pagar o 400 a cada request).
+// Reset natural a cada cold start.
+let googleKnobsRejected = false
 
 export interface GoogleEditImageInput {
   imageUrl: string
@@ -99,28 +136,62 @@ export interface GoogleEditImageOutput {
 export async function editImageWithGoogle(input: GoogleEditImageInput): Promise<GoogleEditImageOutput> {
   const startedAt = Date.now()
 
+  // Knobs Gemini 3 de fidelidade (lib/ai/gemini-knobs): tokenização 'high'
+  // dos inputs + thinking do NB2 (o Pro pensa sempre — sem knob).
+  const mediaRes = googleKnobsRejected ? null : inputMediaResolutionDefault()
+  const partLevel = mediaRes ? PART_MEDIA_LEVEL[mediaRes] : undefined
+  const thinking = !googleKnobsRejected && input.model === 'gemini-3.1-flash-image' ? nb2ThinkingLevel() : null
+
   // Ordem das imagens = contrato do prompt: principal → máscara? → referências.
   const urls: string[] = [input.imageUrl]
   if (input.maskUrl) urls.push(input.maskUrl)
   for (const ref of input.references ?? []) urls.push(ref.url)
-  const imageParts = await Promise.all(urls.map(fetchImagePart))
+  const imageParts = await Promise.all(urls.map(u => fetchImagePart(u, partLevel)))
 
   const timeoutMs = TIMEOUT_MS[input.model]
   const apiModel = API_MODEL_NAME[input.model]
   const resolution = input.resolution ?? '1K'
 
+  const baseConfig: GenerateContentConfig = {
+    responseModalities: [Modality.IMAGE, Modality.TEXT],
+    imageConfig: { imageSize: resolution },
+    // Edição é determinística — temperatura baixa reduz "criatividade" fora
+    // do pedido (preservar o projeto acima de imagem bonita).
+    temperature: 0.2,
+  }
+  const config: GenerateContentConfig = {
+    ...baseConfig,
+    ...(thinking
+      ? { thinkingConfig: { thinkingLevel: thinking === 'minimal' ? ThinkingLevel.MINIMAL : ThinkingLevel.HIGH } }
+      : {}),
+  }
+
+  const runGenerate = (reqContents: Part[], reqConfig: GenerateContentConfig) =>
+    client().models.generateContent({ model: apiModel, contents: reqContents, config: reqConfig })
+
+  const attemptOnce = async () => {
+    try {
+      return await runGenerate([createPartFromText(input.prompt), ...imageParts], config)
+    } catch (err) {
+      // Retry compat: knob Gemini 3 rejeitado (400/INVALID_ARGUMENT) não pode
+      // derrubar a edição — tenta 1x sem os knobs novos. Outros erros sobem.
+      if ((partLevel || thinking) && isInvalidArgumentError(err)) {
+        console.warn(
+          `[editImage] knob Gemini 3 rejeitado (${((err as Error).message ?? String(err)).slice(0, 160)}) — retry compat sem mediaResolution/thinking`,
+        )
+        const result = await runGenerate(
+          [createPartFromText(input.prompt), ...imageParts.map(stripPartMediaResolution)],
+          baseConfig,
+        )
+        googleKnobsRejected = true
+        return result
+      }
+      throw err
+    }
+  }
+
   const response = await Promise.race([
-    client().models.generateContent({
-      model: apiModel,
-      contents: [createPartFromText(input.prompt), ...imageParts],
-      config: {
-        responseModalities: [Modality.IMAGE, Modality.TEXT],
-        imageConfig: { imageSize: resolution },
-        // Edição é determinística — temperatura baixa reduz "criatividade" fora
-        // do pedido (preservar o projeto acima de imagem bonita).
-        temperature: 0.2,
-      },
-    }),
+    attemptOnce(),
     new Promise<never>((_, reject) =>
       setTimeout(
         () => reject(new GoogleEditError('timeout', `${input.model} excedeu ${timeoutMs}ms`)),

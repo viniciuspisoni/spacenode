@@ -178,15 +178,37 @@ describe('níveis balanced/creative seguem fora do render_only', () => {
 })
 
 describe('render_only: ladder de parâmetros', () => {
-  it('temperatura não-crescente e edge map liga a partir da 2ª tentativa', () => {
+  it('escala por condicionamento (edge map, mediaRes, seed) com temperatura FIXA', () => {
     const a1 = getFidelityAttemptParams(1)
     const a2 = getFidelityAttemptParams(2)
     const a3 = getFidelityAttemptParams(3)
-    expect(a1).toEqual({ temperature: 0.2, useEdgeMap: false })
-    expect(a2).toEqual({ temperature: 0.05, useEdgeMap: true })
-    expect(a3).toEqual({ temperature: 0, useEdgeMap: true })
-    expect(a2.temperature).toBeLessThan(a1.temperature)
-    expect(a3.temperature).toBeLessThanOrEqual(a2.temperature)
+    expect(a1).toEqual({ temperature: 0.2, useEdgeMap: false, thinkingLevel: 'high', mediaResolution: 'high', seedOffset: 0 })
+    expect(a2).toEqual({ temperature: 0.2, useEdgeMap: true, thinkingLevel: 'high', mediaResolution: 'ultra_high', seedOffset: 0 })
+    expect(a3).toEqual({ temperature: 0.2, useEdgeMap: true, thinkingLevel: 'high', mediaResolution: 'ultra_high', seedOffset: 1 })
+    // Guia do Gemini 3: não derrubar a temperatura pra perto de 0 — a
+    // escalada dos retries é por condicionamento, não por sampling.
+    expect(a2.temperature).toBe(a1.temperature)
+    expect(a3.temperature).toBe(a2.temperature)
+    // Tentativa 3 troca a amostra (mantendo reprodutibilidade via offset).
+    expect(a3.seedOffset).toBeGreaterThan(a2.seedOffset)
+  })
+
+  it('kill-switches: IMAGE_NB2_THINKING_LEVEL=off e IMAGE_INPUT_MEDIA_RESOLUTION=off', () => {
+    const savedThinking = process.env.IMAGE_NB2_THINKING_LEVEL
+    const savedMedia    = process.env.IMAGE_INPUT_MEDIA_RESOLUTION
+    process.env.IMAGE_NB2_THINKING_LEVEL     = 'off'
+    process.env.IMAGE_INPUT_MEDIA_RESOLUTION = 'off'
+    try {
+      const a2 = getFidelityAttemptParams(2)
+      expect(a2.thinkingLevel).toBeNull()
+      expect(a2.mediaResolution).toBeNull()
+      expect(a2.useEdgeMap).toBe(true)
+    } finally {
+      if (savedThinking === undefined) delete process.env.IMAGE_NB2_THINKING_LEVEL
+      else process.env.IMAGE_NB2_THINKING_LEVEL = savedThinking
+      if (savedMedia === undefined) delete process.env.IMAGE_INPUT_MEDIA_RESOLUTION
+      else process.env.IMAGE_INPUT_MEDIA_RESOLUTION = savedMedia
+    }
   })
 })
 

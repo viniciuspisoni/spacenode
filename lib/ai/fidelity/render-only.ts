@@ -17,6 +17,13 @@
 // lib/prompts.ts (GenerateClient importa listas de lá). NUNCA importar sharp,
 // fs ou supabase aqui; análise de imagem vive em ./geometry-score.ts
 // (server-only).
+
+import {
+  inputMediaResolutionDefault,
+  nb2ThinkingLevel,
+  type InputMediaResolution,
+  type Nb2ThinkingLevel,
+} from '@/lib/ai/gemini-knobs'
 //
 // Regra do modo (contrato de produto): a imagem original é a base obrigatória;
 // a IA só pode alterar materiais, texturas, iluminação, sombras, reflexos e
@@ -192,19 +199,40 @@ export function buildRenderOnlySystemHead(opts: RenderOnlyHeadOpts): string {
 
 // ── Ladder de parâmetros por tentativa ────────────────────────────────────────
 //
-// "Menor força de edição + mais guidance" traduzido pros providers reais:
-//   - GCP/Vertex (Gemini Image): temperature ↓ (única alavanca numérica que o
-//     generateContent expõe pra imagem; não há denoise/guidance scale).
-//   - FAL nano-banana (fallback): sem knobs numéricos no schema — o reforço vem
-//     do prompt (escalada) + edge map.
-//   - FAL gpt-image-2 (Quasar): schema não expõe input_fidelity/guidance
-//     (verificado 2026-07-31) — idem, prompt + edge map.
+// "Menor força de edição + mais guidance" traduzido pros providers reais
+// (revisado 2026-08-17 contra os docs do Gemini 3 + telemetria de prod):
+//   - GCP/Vertex (Gemini 3 Image): a escalada é por CONDICIONAMENTO — edge
+//     map, mediaResolution dos inputs (high → ultra_high) e thinking do NB2.
+//     A temperatura fica FIXA em 0.2: o guia do Gemini 3 desaconselha
+//     temperatura muito baixa (looping/comportamento degradado) e a telemetria
+//     (35 retries até ago/2026: Δscore médio +0.04, 20/35 sem melhora) mostrou
+//     que 0.05/0 não recuperava o score.
+//   - FAL nano-banana-2 (fallback do Pulsar): o schema ganhou thinking_level e
+//     seed (conferido 2026-08-17) — ambos vão no falInput, então o fallback
+//     acompanha. Sem knobs de guidance/strength.
+//   - FAL nano-banana-pro: seed no schema; thinking é sempre-ligado (sem knob).
+//   - FAL gpt-image-2 (Quasar): sem knobs (schema verificado 2026-07-31) — o
+//     reforço é prompt de escalada + edge map.
 
 export interface FidelityAttemptParams {
-  /** Temperatura do caminho GCP/Vertex (ignorada pela FAL). */
+  /** Temperatura do caminho GCP/Vertex (ignorada pela FAL). Fixa em 0.2 em
+   *  todas as tentativas — ver nota do ladder acima. */
   temperature: number
   /** Anexa o edge map do original como imagem de condicionamento estrutural. */
   useEdgeMap: boolean
+  /** NB2: thinking 'high' planeja a cena antes de gerar e adere melhor ao
+   *  contrato de preservação (default de fábrica do modelo é 'minimal').
+   *  Vai nos DOIS caminhos (falInput.thinking_level + thinkingConfig no GCP).
+   *  null = kill-switch IMAGE_NB2_THINKING_LEVEL=off. */
+  thinkingLevel: Nb2ThinkingLevel | null
+  /** Tokenização dos INPUTS no caminho GCP: 'high' na 1ª tentativa,
+   *  'ultra_high' nos retries (mais tokens = o modelo enxerga mais detalhe
+   *  fino da referência). null = IMAGE_INPUT_MEDIA_RESOLUTION=off. */
+  mediaResolution: InputMediaResolution | null
+  /** Offset determinístico da seed. Tentativa 3+ desloca a amostra (mantendo
+   *  reprodutibilidade): se dois passes de condicionamento não corrigiram o
+   *  drift, a amostra é a variável que resta. */
+  seedOffset: number
 }
 
 export interface FidelityAttemptOpts {
@@ -219,9 +247,19 @@ export function getFidelityAttemptParams(
   attempt: number,
   opts?: FidelityAttemptOpts,
 ): FidelityAttemptParams {
-  if (attempt <= 1) return { temperature: 0.2, useEdgeMap: opts?.edgeFromFirstAttempt ?? false }
-  if (attempt === 2) return { temperature: 0.05, useEdgeMap: true }
-  return { temperature: 0, useEdgeMap: true }
+  const thinkingLevel = nb2ThinkingLevel()
+  const mediaDefault = inputMediaResolutionDefault()
+  // Retries escalam a tokenização pra ULTRA_HIGH (só por parte existe esse
+  // nível); 'off' desliga tudo, inclusive a escalada.
+  const mediaResolution: InputMediaResolution | null =
+    mediaDefault === null ? null : attempt >= 2 ? 'ultra_high' : mediaDefault
+  if (attempt <= 1) {
+    return { temperature: 0.2, useEdgeMap: opts?.edgeFromFirstAttempt ?? false, thinkingLevel, mediaResolution, seedOffset: 0 }
+  }
+  if (attempt === 2) {
+    return { temperature: 0.2, useEdgeMap: true, thinkingLevel, mediaResolution, seedOffset: 0 }
+  }
+  return { temperature: 0.2, useEdgeMap: true, thinkingLevel, mediaResolution, seedOffset: 1 }
 }
 
 // Condicionamento por DEPTH MAP (Fase 3, experimental — default OFF): edges

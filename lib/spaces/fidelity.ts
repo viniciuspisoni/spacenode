@@ -88,6 +88,11 @@ export interface SpacesFidelityAttemptLog {
   provider_model: string
   request_id:     string | null
   temperature:    number
+  /** Knobs Gemini 3 aplicados na tentativa (null = motor sem o knob/off). */
+  thinking_level?:   string | null
+  media_resolution?: string | null
+  /** Seed efetiva da tentativa (base + seedOffset do ladder). */
+  seed?:             number
   edge_map_used:  boolean
   fallback_used:  boolean
   duration_ms:    number
