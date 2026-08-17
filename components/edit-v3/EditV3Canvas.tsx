@@ -199,6 +199,10 @@ export const EditV3Canvas = forwardRef<EditV3CanvasHandle, Props>(
       baseLayerRef.current = null
       panRef.current = { x: 0, y: 0 }
       setZoom(1)
+      // Sincroniza o dono: todo (re)mount/troca de imagem zera a seleção AQUI —
+      // sem isto, voltar da visão de resultado (canvas desmontado) deixava o
+      // fluxo achando que havia área marcada e gerava SEM máscara.
+      onCoverageChange?.(0)
       // Sem crossOrigin: nunca lemos pixels da IMAGEM; exigir CORS quebraria o
       // load de fontes como o CDN da FAL.
       const img = new Image()
@@ -210,7 +214,7 @@ export const EditV3Canvas = forwardRef<EditV3CanvasHandle, Props>(
       return () => {
         imgRef.current = null
       }
-    }, [imageUrl])
+    }, [imageUrl, onCoverageChange])
 
     // ── Camada de superfície (máscara P&B → branco-sobre-transparente) ───────
     useEffect(() => {

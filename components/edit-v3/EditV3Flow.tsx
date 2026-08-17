@@ -169,6 +169,9 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
   const [result, setResult] = useState<ResultState | null>(null)
   const [view, setView] = useState<'edit' | 'result'>('edit')
   const [importOpen, setImportOpen] = useState(false)
+  // Comparar o resultado com QUALQUER versão do rodapé (null = o "antes" da
+  // edição). Reset a cada novo resultado.
+  const [compareWith, setCompareWith] = useState<string | null>(null)
 
   const canvasRef = useRef<EditV3CanvasHandle | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -226,6 +229,7 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
     setNotice(null)
     setImportOpen(false)
     setResult(null)
+    setCompareWith(null)
     setView('edit')
     if (!keepHistory) setHistory([{ url, kind: 'original' }])
     fireWandWarmup() // modelos de seleção quentes antes do 1º clique
@@ -417,6 +421,7 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
           warning: typeof json.warning === 'string' ? json.warning : null,
         }
         setResult(r)
+        setCompareWith(null)
         setHistory(h => [...h, { url: r.url, kind: 'result' }])
         setView('result') // leva o usuário para a visão de resultado (claro que gerou)
         return
@@ -536,9 +541,11 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
         </div>
 
         <div style={{ ...card, padding: 12 }}>
-          <BeforeAfter before={result.before} after={result.url} aspect={sourceDims ? sourceDims.w / sourceDims.h : 4 / 3} />
+          <BeforeAfter before={compareWith ?? result.before} after={result.url} aspect={sourceDims ? sourceDims.w / sourceDims.h : 4 / 3} />
           <div style={{ marginTop: 8, fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center' }}>
-            Arraste a alça para comparar antes e depois
+            {compareWith
+              ? 'Comparando o resultado com a versão selecionada — clique nas versões abaixo para trocar'
+              : 'Arraste a alça para comparar antes e depois'}
           </div>
         </div>
 
@@ -565,15 +572,25 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
           <div style={{ ...card, marginTop: 16, padding: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflowX: 'auto' }}>
               <span style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-text-tertiary)', flexShrink: 0 }}>Versões</span>
-              {history.map((h, i) => (
-                <div key={i} style={{ position: 'relative', flexShrink: 0 }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={h.url} alt={h.kind === 'original' ? 'Original' : `Versão ${i}`} style={{ width: 56, height: 40, objectFit: 'cover', borderRadius: 8, border: `0.5px solid ${h.url === result.url ? 'var(--color-accent-green)' : 'var(--color-border-strong)'}` }} />
-                  <span style={{ position: 'absolute', bottom: 2, left: 4, fontSize: 9, color: 'rgba(255,255,255,0.9)', background: 'rgba(0,0,0,0.5)', padding: '0 4px', borderRadius: 4 }}>
-                    {h.kind === 'original' ? 'orig' : `v${i}`}
-                  </span>
-                </div>
-              ))}
+              {history.map((h, i) => {
+                const isCurrent = h.url === result.url
+                const isCompared = !isCurrent && (compareWith ? h.url === compareWith : h.url === result.before)
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => { if (!isCurrent) setCompareWith(h.url === result.before ? null : h.url) }}
+                    title={isCurrent ? 'Resultado atual' : 'Comparar o resultado com esta versão'}
+                    style={{ position: 'relative', flexShrink: 0, padding: 0, background: 'none', border: 'none', cursor: isCurrent ? 'default' : 'pointer' }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={h.url} alt={h.kind === 'original' ? 'Original' : `Versão ${i}`} style={{ display: 'block', width: 56, height: 40, objectFit: 'cover', borderRadius: 8, border: `1px solid ${isCurrent ? 'var(--color-accent-green)' : isCompared ? 'var(--color-border-strong)' : 'var(--color-border)'}`, opacity: isCurrent || isCompared ? 1 : 0.72 }} />
+                    <span style={{ position: 'absolute', bottom: 2, left: 4, fontSize: 9, color: 'rgba(255,255,255,0.9)', background: 'rgba(0,0,0,0.5)', padding: '0 4px', borderRadius: 4 }}>
+                      {h.kind === 'original' ? 'orig' : `v${i}`}
+                    </span>
+                  </button>
+                )
+              })}
             </div>
           </div>
         )}
