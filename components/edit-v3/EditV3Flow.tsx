@@ -29,6 +29,26 @@ import {
 // (/api/edits/segment). Inlinada no build (NEXT_PUBLIC).
 const WAND_ENABLED = process.env.NEXT_PUBLIC_EDIT_SURFACE_SEGMENTATION === '1'
 
+// Warm-up dos modelos de segmentação (SAM2 + evf-sam): dispara ao carregar uma
+// imagem, fire-and-forget, deduplicado por janela — o 1º clique da varinha cai
+// de ~10-30s (cold boot) para ~3s. Custo de casa mínimo; falha é silenciosa.
+const WARMUP_WINDOW_MS = 120_000
+let lastWarmupAt = 0
+function fireWandWarmup(): void {
+  if (!WAND_ENABLED) return
+  const now = Date.now()
+  if (now - lastWarmupAt < WARMUP_WINDOW_MS) return
+  lastWarmupAt = now
+  void fetch('/api/edits/segment', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ warmup: true }),
+  }).catch(() => {})
+}
+
+/** Tarefa de seleção assistida em andamento (null = ocioso). */
+type WandTask = 'point' | 'floor' | 'wall' | 'query'
+
 type Action = 'remove' | 'swap_material' | 'insert_element' | 'refine_area'
 
 // Controles fixos (decisão do dono): sempre preservação MÁXIMA + intensidade
@@ -137,8 +157,9 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
   const [tool, setTool] = useState<EditV3Tool>(WAND_ENABLED ? 'wand' : 'lasso')
   const [brushSize, setBrushSize] = useState(36)
   const [wandMode, setWandMode] = useState<'add' | 'subtract'>('add')
-  const [wandBusy, setWandBusy] = useState(false)
+  const [wandTask, setWandTask] = useState<WandTask | null>(null)
   const [wandAt, setWandAt] = useState<{ x: number; y: number } | null>(null)
+  const wandBusy = wandTask !== null
   const [cost, setCost] = useState<number | null>(null)
   const [busy, setBusy] = useState<null | 'upload' | 'generate'>(null)
   const [elapsed, setElapsed] = useState(0)
@@ -207,6 +228,7 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
     setResult(null)
     setView('edit')
     if (!keepHistory) setHistory([{ url, kind: 'original' }])
+    fireWandWarmup() // modelos de seleção quentes antes do 1º clique
   }, [])
 
   const handlePickSource = useCallback(
@@ -271,45 +293,82 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
     return () => clearInterval(id)
   }, [busy])
 
-  // ── Varinha mágica (clique → detecção de área → camada de seleção) ──────
-  const handleWandPoint = useCallback(
-    async (pt: { x: number; y: number }, opts: { alt: boolean }) => {
+  // ── Seleção assistida (varinha, Piso/Parede, texto) → camada de seleção ──
+  //
+  // Um único executor: monta o payload do /api/edits/segment, aplica a máscara
+  // detectada como camada bitmap e trata erros/429/imagem-trocada. Cada entrada
+  // (clique, chip, instrução) só define a tarefa e o payload.
+  const segmentToLayer = useCallback(
+    async (
+      task: WandTask,
+      payload: Record<string, unknown>,
+      opts: { subtract?: boolean; point?: { x: number; y: number } | null } = {},
+    ) => {
       const src = sourceUrl
       if (!src || busy || wandBusyRef.current) return
-      // Subtrair só faz sentido com algo selecionado; sem seleção, todo clique soma.
-      const subtract = (opts.alt || wandMode === 'subtract') && coverage >= MIN_USABLE
       wandBusyRef.current = true
-      setWandBusy(true)
-      setWandAt(pt)
+      setWandTask(task)
+      setWandAt(opts.point ?? null)
       setError(null)
       try {
         const res = await fetch('/api/edits/segment', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image_url: src, points: [pt], skip_preview: true }),
+          body: JSON.stringify({ image_url: src, skip_preview: true, ...payload }),
         })
         const json = await res.json().catch(() => null)
         if (sourceUrlRef.current !== src) return // trocou de imagem no meio
         if (!res.ok || typeof json?.surface_mask_url !== 'string') {
           setError(
             res.status === 429
-              ? 'Muitas seleções em sequência. Aguarde um instante e clique de novo.'
-              : 'Não foi possível detectar a área clicada. Tente outro ponto ou marque com o pincel.',
+              ? 'Muitas seleções em sequência. Aguarde um instante e tente de novo.'
+              : res.status === 422 && typeof json?.error === 'string'
+                ? json.error
+                : 'Não foi possível detectar a área. Tente outro ponto ou marque com o pincel.',
           )
           return
         }
-        const ok = await canvasRef.current?.addMaskLayer(json.surface_mask_url, subtract ? 'subtract' : 'add')
-        if (!ok) setError('Não foi possível aplicar a área detectada. Marque com o pincel.')
+        const ok = await canvasRef.current?.addMaskLayer(json.surface_mask_url, opts.subtract ? 'subtract' : 'add')
+        if (!ok) {
+          setError('Não foi possível aplicar a área detectada. Marque com o pincel.')
+          return
+        }
+        if (typeof json.target_label === 'string' && json.target_label) {
+          const loc = typeof json.target_location === 'string' && json.target_location ? ` · ${json.target_location}` : ''
+          setNotice(`Detectado: ${json.target_label}${loc}`)
+        }
       } catch {
         if (sourceUrlRef.current === src) setError('Falha de conexão ao detectar a área. Tente novamente.')
       } finally {
         wandBusyRef.current = false
-        setWandBusy(false)
+        setWandTask(null)
         setWandAt(null)
       }
     },
-    [busy, coverage, sourceUrl, wandMode],
+    [busy, sourceUrl],
   )
+
+  const handleWandPoint = useCallback(
+    (pt: { x: number; y: number }, opts: { alt: boolean }) => {
+      // Subtrair só faz sentido com algo selecionado; sem seleção, todo clique soma.
+      const subtract = (opts.alt || wandMode === 'subtract') && coverage >= MIN_USABLE
+      void segmentToLayer('point', { points: [pt] }, { subtract, point: pt })
+    },
+    [coverage, segmentToLayer, wandMode],
+  )
+
+  const handleSemanticSelect = useCallback(
+    (kind: 'floor' | 'wall') => {
+      void segmentToLayer(kind, { semantic: kind })
+    },
+    [segmentToLayer],
+  )
+
+  const handleQueryDetect = useCallback(() => {
+    const q = instruction.trim()
+    if (!q) return
+    void segmentToLayer('query', { query: q })
+  }, [instruction, segmentToLayer])
 
   // ── Gerar ───────────────────────────────────────────────────────────────
   const handleGenerate = useCallback(async () => {
@@ -495,6 +554,9 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
           </button>
           <button type="button" className="edv3-ghost" onClick={() => setView('edit')}>Voltar e ajustar</button>
           <button type="button" className="edv3-ghost" onClick={() => void download(result.url)}><IconDownload size={14} /> Baixar</button>
+          <a className="edv3-ghost" style={{ textDecoration: 'none' }} href={`/app/upscale?source=${encodeURIComponent(result.url)}`}>
+            Ampliar esta imagem
+          </a>
           <div style={{ flex: 1 }} />
           <button type="button" className="edv3-ghost" onClick={() => { setView('edit'); setResult(null); setHistory([]); setSourceUrl(null) }}>Nova imagem</button>
         </div>
@@ -568,7 +630,7 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
             brushSize={brushSize}
             onCoverageChange={setCoverage}
             onWandPoint={handleWandPoint}
-            wandBusyAt={wandBusy ? wandAt : null}
+            wandBusyAt={wandTask === 'point' ? wandAt : null}
             disabled={busy === 'generate'}
           />
           {tool === 'wand' && (
@@ -593,6 +655,20 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
                   </button>
                 ))}
               </div>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 11.5, color: 'var(--color-text-quaternary)' }}>Atalhos</span>
+                <button type="button" className="edv3-chip" disabled={wandBusy} onClick={() => handleSemanticSelect('floor')}>Piso</button>
+                <button type="button" className="edv3-chip" disabled={wandBusy} onClick={() => handleSemanticSelect('wall')}>Parede</button>
+                <button
+                  type="button"
+                  className="edv3-chip"
+                  disabled={wandBusy || !hasInstruction}
+                  title={hasInstruction ? 'Localiza a área citada na sua descrição' : 'Escreva a mudança primeiro — a área citada é localizada automaticamente'}
+                  onClick={handleQueryDetect}
+                >
+                  Detectar pela descrição
+                </button>
+              </div>
               <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>
                 Clique em um objeto ou superfície para selecioná-lo inteiro · Alt-clique remove da seleção
               </span>
@@ -607,7 +683,10 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
           <div style={{ marginTop: 12, fontSize: 12.5, color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 7 }}>
             <span className={wandBusy ? 'edv3-pulse' : undefined} style={{ width: 6, height: 6, borderRadius: 99, flexShrink: 0, background: wandBusy || hasSelection ? 'var(--color-accent-green)' : 'var(--color-text-tertiary)' }} />
             {wandBusy
-              ? 'Detectando a área clicada…'
+              ? wandTask === 'floor' ? 'Detectando o piso…'
+                : wandTask === 'wall' ? 'Detectando a parede…'
+                : wandTask === 'query' ? 'Localizando a área citada na descrição…'
+                : 'Detectando a área clicada…'
               : hasSelection
                 ? `Área marcada — a edição fica só aqui · ${(coverage * 100).toFixed(1)}%`
                 : action === 'insert_element'
@@ -744,6 +823,9 @@ const EDV3_CSS = `
 .edv3-cta:disabled { opacity:0.4; cursor:not-allowed; }
 .edv3-pulse { animation: edv3-pulse 1s ease-in-out infinite; }
 @keyframes edv3-pulse { 0%,100% { opacity:1 } 50% { opacity:0.25 } }
+.edv3-chip { font-size:12px; font-weight:500; color:var(--color-text-secondary); background:var(--color-surface); border:0.5px solid var(--color-border-strong); border-radius:99px; padding:5px 11px; cursor:pointer; }
+.edv3-chip:hover:not(:disabled) { color:var(--color-text-primary); background:var(--color-surface-hover); }
+.edv3-chip:disabled { opacity:0.45; cursor:not-allowed; }
 @media (max-width: 980px) {
   .edv3-grid { grid-template-columns: 46px minmax(0,1fr); }
   .edv3-panel { grid-column: 1 / -1; }

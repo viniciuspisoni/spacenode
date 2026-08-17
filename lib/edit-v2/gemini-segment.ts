@@ -50,6 +50,19 @@ TIGHT bounding box (box_2d) and a concise label. Do NOT return a pixel mask. Lis
 objects sitting ON or IN FRONT of it that must be excluded (rug, bed, sofa, chairs, lamp,
 plants, frames). Output JSON only, no prose.`
 
+// Variante SEM região (seleção por texto do V3): o alvo vem só da instrução.
+const SYSTEM_TEXT_ONLY = `You are the target detector of an architectural image editor
+for architects and interior designers. You receive: (1) an interior/architectural photo
+and (2) the user's edit instruction in Portuguese.
+
+Identify the SINGLE architectural surface/element or object the instruction targets (a
+wall, the floor, a set of wood panels, a countertop, the ceiling, a cabinetry run, a rug,
+a sofa, a lamp). Return its TIGHT bounding box (box_2d) and a concise label. Do NOT
+return a pixel mask. If the target is a surface, list the objects sitting ON or IN FRONT
+of it that must be excluded (rug, bed, sofa, chairs, lamp, plants, frames); if the target
+IS an object, exclusions is []. If the instruction names nothing visible in the photo,
+return confidence 0. Output JSON only, no prose.`
+
 let _client: GoogleGenAI | null = null
 function client(): GoogleGenAI {
   if (_client) return _client
@@ -96,7 +109,9 @@ function pickItem(parsed: unknown): SegLlmOutput | null {
 
 export interface GeminiSegmentOpts {
   imageUrl: string
-  regionOverlayUrl: string
+  /** Overlay verde da região circulada. null = modo TEXTO-PURO (o alvo vem só
+   *  da instrução — seleção por texto do V3). */
+  regionOverlayUrl: string | null
   instructionPt: string
   enabled: boolean
   timeoutMs?: number
@@ -112,13 +127,16 @@ export async function geminiSegmentTarget(opts: GeminiSegmentOpts): Promise<Gemi
 
   const startedAt = Date.now()
   try {
+    const withRegion = !!opts.regionOverlayUrl
     const [imgPart, overlayPart] = await Promise.all([
       inlinePart(opts.imageUrl),
-      inlinePart(opts.regionOverlayUrl),
+      withRegion ? inlinePart(opts.regionOverlayUrl as string) : Promise.resolve(null),
     ])
     const userPrompt = createPartFromText(JSON.stringify({
       user_instruction_pt: opts.instructionPt.trim() || '(sem texto — use só a região destacada)',
-      images: ['1: original photo', '2: same photo with GREEN highlight on the user region'],
+      images: withRegion
+        ? ['1: original photo', '2: same photo with GREEN highlight on the user region']
+        : ['1: original photo'],
       output_schema: {
         label: 'string',
         description: 'string — short PT',
@@ -133,9 +151,9 @@ export async function geminiSegmentTarget(opts: GeminiSegmentOpts): Promise<Gemi
     const result = await Promise.race([
       client().models.generateContent({
         model: MODEL,
-        contents: [userPrompt, imgPart, overlayPart],
+        contents: overlayPart ? [userPrompt, imgPart, overlayPart] : [userPrompt, imgPart],
         config: {
-          systemInstruction: SYSTEM,
+          systemInstruction: withRegion ? SYSTEM : SYSTEM_TEXT_ONLY,
           responseMimeType: 'application/json',
           temperature: 0.1,
           maxOutputTokens: MAX_OUTPUT_TOKENS,

@@ -14,6 +14,14 @@
 //   4. BLOB       { image_url, mask_url }  (legado — pincel)
 //      O blob pintado vira seeds; tenta a superfície semântica que melhor cobre
 //      o blob e cai pro SAM2 com fallback duro pro próprio blob.
+//   5. TEXTO      { image_url, query }
+//      Seleção por texto (varinha do V3): a instrução nomeia o alvo → Gemini
+//      localiza (box, PT-nativo) → SAM2 dá os pixels na box → refino de borda →
+//      completion limitada à box e às exclusões. Cadeia do caminho B validada
+//      no laboratório v2 (2026-06-12).
+//   +  WARM-UP    { warmup: true }
+//      Acorda SAM2 + evf-sam com uma imagem-mínima (cold boot FAL ~10-40s →
+//      próximo clique ~3s). Fire-and-forget do cliente; rate-limit próprio.
 
 import { NextRequest, NextResponse } from 'next/server'
 import sharp from 'sharp'
@@ -35,9 +43,14 @@ import {
   maskWhiteRatio,
 } from '@/lib/spaces/edit-crop'
 import { uploadEditAsset } from '@/lib/spaces/edit-route-helpers'
+import { geminiSegmentTarget } from '@/lib/edit-v2/gemini-segment'
+import { parseBoxNorm, boxToPixels, boxFillMask } from '@/lib/edit-v2/gemini-mask-raster'
+import { completeSurfaceMask } from '@/lib/edit-v2/mask-ops'
+import { refineSurfaceMaskV2 } from '@/lib/edit-v2/mask-refine'
 
 fal.config({ credentials: process.env.FAL_KEY })
 export const runtime = 'nodejs'
+export const maxDuration = 120
 
 interface Body {
   image_url?:     unknown
@@ -46,6 +59,10 @@ interface Body {
   points?:        unknown
   base_mask_url?: unknown
   op?:            unknown
+  /** Seleção por TEXTO: instrução PT que nomeia o alvo (modo 5). */
+  query?:         unknown
+  /** true → só acorda os modelos de segmentação e retorna (sem máscara). */
+  warmup?:        unknown
   /** true → não gera o overlay de preview (cliente que desenha a máscara ele
    *  mesmo, ex. varinha do V3: economiza 1 composite sharp + 1 upload). */
   skip_preview?:  unknown
@@ -85,10 +102,29 @@ export async function POST(req: NextRequest) {
   const op          = body?.op === 'add' || body?.op === 'subtract' ? body.op : null
   const clickPoints = parsePoints(body?.points)
   const skipPreview = body?.skip_preview === true
+  const query       = typeof body?.query === 'string' ? body.query.trim().slice(0, 300) : null
 
-  if (!imageUrl || (!maskUrl && !semantic && clickPoints.length === 0)) {
+  // ── WARM-UP: acorda SAM2 + evf-sam com a imagem-mínima de /public (asset
+  // estático, público em prod sem passar pelo proxy). Não devolve máscara;
+  // erros dos modelos não importam (o boot do container é o objetivo; em dev a
+  // FAL não alcança localhost → no-op silencioso). Rate-limit próprio.
+  if (body?.warmup === true) {
+    const rlWarm = await rateLimit(createAdminClient(), `segment-warmup:${user.id}`, 4, 60)
+    if (!rlWarm.allowed) return NextResponse.json({ ok: false }, { status: 429 })
+    const base = (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '') || req.nextUrl.origin
+    const tiny = `${base}/segment-warmup.png`
+    const results = await Promise.allSettled([
+      callSam2Segment({ imageUrl: tiny, points: [{ x: 16, y: 16, label: 1 }] }),
+      callEvfSam({ imageUrl: tiny, prompt: 'floor' }),
+    ])
+    const warmed = results.filter(r => r.status === 'fulfilled').length
+    console.log(`[edits.segment] warmup: ${warmed}/2 modelos quentes`)
+    return NextResponse.json({ ok: true, warmed })
+  }
+
+  if (!imageUrl || (!maskUrl && !semantic && clickPoints.length === 0 && !query)) {
     return NextResponse.json(
-      { error: 'image_url + (mask_url | semantic | points) obrigatórios' },
+      { error: 'image_url + (mask_url | semantic | points | query) obrigatórios' },
       { status: 400 },
     )
   }
@@ -101,6 +137,8 @@ export async function POST(req: NextRequest) {
     let usedFallback = false
     let source = 'sam'
     let pointCount = clickPoints.length
+    let targetLabel: string | null = null
+    let targetLocation: string | null = null
 
     if (semantic) {
       // ── 1) SEMÂNTICO: "Piso" / "Parede" em um clique. ──
@@ -132,6 +170,47 @@ export async function POST(req: NextRequest) {
       const region = await normalizeMaskToImage(await fetchImageBuffer(samUrl), imgBuf)
       mask = await closeErodeMask(region)
       source = 'sam:points'
+    } else if (query) {
+      // ── 5) TEXTO: instrução → box (Gemini, PT-nativo) → SAM2 na box →
+      //    refino de borda → completion limitada à box − exclusões. ──
+      const target = await geminiSegmentTarget({
+        imageUrl,
+        regionOverlayUrl: null,
+        instructionPt: query,
+        enabled: true,
+      })
+      const box = target.box2d ? parseBoxNorm(target.box2d) : null
+      const meta = await sharp(imgBuf).metadata()
+      const W = meta.width ?? 0
+      const H = meta.height ?? 0
+      const px = box && W && H ? boxToPixels(box, W, H) : null
+      if (!target.used || !box || !px || target.confidence < 0.45) {
+        return NextResponse.json(
+          { error: 'Não deu para localizar o elemento pela descrição. Clique nele com a varinha.', code: 'target_not_found' },
+          { status: 422 },
+        )
+      }
+      // SAM2 na box (ponto central + box) ∥ exclusões (evf-sam, best-effort) —
+      // paralelo pra não somar cold boots.
+      const [sam, excl] = await Promise.all([
+        callSam2Segment({
+          imageUrl,
+          points: [{ x: px.left + px.width / 2, y: px.top + px.height / 2, label: 1 as const }],
+          box: { x_min: px.left, y_min: px.top, x_max: px.left + px.width, y_max: px.top + px.height },
+        }),
+        target.exclusions.length > 0
+          ? callEvfSam({ imageUrl, prompt: target.exclusions.join(', ') }).catch(() => null)
+          : Promise.resolve(null),
+      ])
+      const samMask = await normalizeMaskToImage(await fetchImageBuffer(sam.maskUrl), imgBuf)
+      const exclMask = excl ? await normalizeMaskToImage(await fetchImageBuffer(excl.maskUrl), imgBuf) : null
+      const refined = await refineSurfaceMaskV2({ imageBuffer: imgBuf, maskBuffer: samMask })
+      const boxMask = await boxFillMask(box, W, H)
+      const comp = await completeSurfaceMask(refined.mask, { boxMaskBuf: boxMask, exclusionBuf: exclMask })
+      mask = comp.mask
+      source = 'gemini-box-sam2'
+      targetLabel = target.label || null
+      targetLocation = target.location || null
     } else {
       // ── 4) BLOB (legado — pincel): seeds do blob + melhor superfície. ──
       const blobBuf = await normalizeMaskToImage(await fetchImageBuffer(maskUrl as string), imgBuf)
@@ -193,6 +272,7 @@ export async function POST(req: NextRequest) {
       used_fallback:    usedFallback,
       surface_source:   source,
       point_count:      pointCount,
+      ...(targetLabel ? { target_label: targetLabel, target_location: targetLocation } : {}),
     })
   } catch (e) {
     console.error('[edits.segment]', (e as Error).message)
