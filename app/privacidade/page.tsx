@@ -3,10 +3,12 @@
 // Redigida para refletir o tratamento REAL de dados do produto: Supabase
 // (auth/banco/storage), Vercel (hospedagem), Google Cloud e fal.ai (IA),
 // Stripe (pagamentos), zero analytics/pixel de TERCEIROS (cookies essenciais +
-// tema em localStorage + cookie PRÓPRIO de atribuição de campanha
-// sn_attribution — first-party, sem dados pessoais, citado na cláusula 7 em
-// 2026-07-18). Se algum tracker de terceiro for adicionado no futuro, a
-// cláusula 7 PRECISA ser atualizada junto (e consentimento, quando exigido).
+// tema em localStorage + cookies PRÓPRIOS de medição/atribuição sn_attribution,
+// sn_aid e sn_intent — first-party, sem dados pessoais, citados na cláusula 7;
+// sn_attribution em 2026-07-18, sn_aid/sn_intent em 2026-08-18). Se algum
+// tracker de terceiro for adicionado no futuro (GA4/Meta — adapters existem
+// desligados em lib/analytics/adapters), a cláusula 7 PRECISA ser atualizada
+// junto (e consentimento, quando exigido).
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { LegalShell, LegalSection, P, UL, LI, Strong } from '@/components/legal/LegalShell'
@@ -19,7 +21,7 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 }
 
-const UPDATED_AT = '18 de julho de 2026'
+const UPDATED_AT = '18 de agosto de 2026'
 
 export default function PrivacidadePage() {
   return (
@@ -151,11 +153,14 @@ export default function PrivacidadePage() {
       <LegalSection n={7} title="Cookies e tecnologias locais">
         <P>
           Usamos apenas o essencial para a plataforma funcionar: cookies de sessão para manter você
-          autenticado, armazenamento local do navegador para preferências de interface (como o tema) e um
-          cookie próprio de atribuição de campanha (<Strong>sn_attribution</Strong>), que guarda por até 90
-          dias os parâmetros da campanha que trouxe você ao site (como utm_source e utm_campaign), o
-          endereço da página de origem e a data do acesso. Esse cookie é nosso (first-party), não contém
-          dados pessoais e não é compartilhado com terceiros.
+          autenticado, armazenamento local do navegador para preferências de interface (como o tema) e
+          cookies próprios de medição de audiência e atribuição de campanha —{' '}
+          <Strong>sn_attribution</Strong>, que guarda por até 90 dias os parâmetros da campanha que trouxe
+          você ao site (como utm_source e utm_campaign), o endereço da página de origem e a data do acesso;{' '}
+          <Strong>sn_aid</Strong>, um identificador aleatório de visita que nos permite contar visitantes e
+          medir o funil de cadastro sem identificar você; e <Strong>sn_intent</Strong>, que guarda por até 1
+          dia o plano que você escolheu antes de entrar, para retomar a contratação depois do login. Esses
+          cookies são nossos (first-party), não contêm dados pessoais e não são compartilhados com terceiros.
         </P>
         <P>
           <Strong>Não usamos cookies de publicidade de terceiros nem rastreadores de terceiros.</Strong> Se

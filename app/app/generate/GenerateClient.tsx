@@ -16,6 +16,7 @@ import { EngineIcon } from '@/components/icons/engines'
 import InsufficientNodesCta from '@/components/app/InsufficientNodesCta'
 import { consumeHandoff } from '@/components/nodi/actions-bus'
 import { uploadDirect } from '@/lib/storage/direct-upload-client'
+import { track } from '@/lib/analytics/client'
 import GenerateGuide, {
   GUIDE_START_EVENT, GUIDE_DISMISSED_KEY, type GuidePhase,
 } from '@/components/app/GenerateGuide'
@@ -179,7 +180,18 @@ function outputFilename(url: string): string {
   return `spacenode-render.${ext}`
 }
 
+// Funil: baixar É a aprovação implícita do render (não existe botão "aprovar").
+// 1× por resultado — repetir o download do mesmo output não infla o evento.
+// O result_downloaded em si é gravado server-side pelo próprio /api/download.
+const approvedOutputs = new Set<string>()
+function markResultApproved(url: string, actionTaken: string) {
+  if (approvedOutputs.has(url)) return
+  approvedOutputs.add(url)
+  track('result_approved', { feature: 'renderizar', action: actionTaken })
+}
+
 function downloadImage(url: string, filename: string) {
+  markResultApproved(url, 'download')
   const proxyUrl = `/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`
   const a = document.createElement('a')
   a.href = proxyUrl
@@ -1394,7 +1406,11 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
                     estrutural máximo (edge map + temperatura mínima) e sem
                     âncora — muda o condicionamento, não a amostra. */}
                 <button
-                  onClick={() => handleGenerate(undefined, { structuralBoost: true })}
+                  onClick={() => {
+                    // Funil: pedir correção = rejeição do resultado pelo usuário.
+                    track('result_rejected', { feature: 'renderizar', by: 'user', reason: 'drift' })
+                    handleGenerate(undefined, { structuralBoost: true })
+                  }}
                   style={{
                     display:'block', marginTop:8, fontSize:11, fontWeight:600,
                     color:'var(--color-error)', background:'none',

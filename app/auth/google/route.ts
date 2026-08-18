@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { createHash, randomBytes } from 'crypto'
+import { INTENT_COOKIE } from '@/lib/analytics/attribution'
+import { clearIntentCookieOn, isNewUser, postAuthDestination } from '@/lib/analytics/auth-intent'
 
 // ── Login com Google via GIS (ux_mode: 'redirect') ─────────────────────────────
 //
@@ -10,6 +12,13 @@ import { createHash, randomBytes } from 'crypto'
 // spacenode.app e accounts.google.com — o domínio *.supabase.co não aparece
 // na tela de consentimento. O ID token chega aqui por POST e vira sessão via
 // signInWithIdToken (cookies gravados pelo client server-side do @supabase/ssr).
+//
+// O destino pós-login é decidido por lib/analytics/auth-intent: intenção de
+// plano (cookie sn_intent, SameSite=None — o POST do Google é cross-site) →
+// /app/billing com o plano escolhido; senão /app. Conta recém-criada ganha
+// ?signup=1, o MESMO gatilho do /auth/callback — antes o caminho GIS
+// redirecionava seco para /app e o ping de conversão do Google Ads
+// (SignupConversionPing) nunca disparava para cadastros via botão oficial.
 
 // Prefixo __Host- (exige Secure + Path=/ + sem Domain): impede que um
 // subdomínio comprometido plante/sobrescreva o nonce no domínio pai — sem
@@ -110,12 +119,19 @@ export async function POST(request: Request) {
   if (!nonce) return fail()
 
   const supabase = await createClient()
-  const { error } = await supabase.auth.signInWithIdToken({
+  const { data, error } = await supabase.auth.signInWithIdToken({
     provider: 'google',
     token: credential,
     nonce,
   })
   if (error) return fail()
 
-  return NextResponse.redirect(`${origin}/app`, 303)
+  const { url, intent } = postAuthDestination({
+    origin,
+    intentCookie: cookieStore.get(INTENT_COOKIE)?.value ?? null,
+    newUser: isNewUser(data.user),
+  })
+  const res = NextResponse.redirect(url, 303)
+  if (intent) clearIntentCookieOn(res) // intenção é de uso único
+  return res
 }

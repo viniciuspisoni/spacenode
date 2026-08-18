@@ -15,6 +15,7 @@
 
 import { createClient } from '@/lib/supabase/client'
 import { jsonOrNull, errMsg } from '@/lib/http/fetch-json'
+import { track } from '@/lib/analytics/client'
 import type { DirectUploadAreaId } from '@/lib/storage/direct-upload'
 
 export interface DirectUploadResult {
@@ -56,6 +57,10 @@ export async function uploadDirect(
   if (uploadErr) {
     throw new Error('Erro ao enviar o arquivo. Verifique a conexão e tente novamente.')
   }
+
+  // Funil: upload concluído — ÚNICA porta browser→Storage do produto, então
+  // uma chamada aqui cobre todas as superfícies. Só a área (nunca o arquivo).
+  track('image_uploaded', { area })
 
   if (opts.confirm === false) return { key, url: null }
 

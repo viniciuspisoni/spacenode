@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { recordAcquisitionEvent } from '@/lib/marketing/ads/service'
+import { identityFromRequest, trackServerEvent } from '@/lib/analytics/server'
 import {
   ANNUAL_BILLING_ENABLED,
   isPaidPlanId,
@@ -117,6 +117,23 @@ export async function POST(req: NextRequest) {
 
   const successBase = `${process.env.NEXT_PUBLIC_APP_URL}/app/billing`
 
+  // Atribuição first-party no metadata da session: o webhook NÃO tem cookies,
+  // então anon id + last-touch viajam pelo Stripe e voltam nos eventos de
+  // dinheiro (checkout_completed/subscription_started) — a atribuição de
+  // receita não depende do browser estar vivo na confirmação (Pix, retries).
+  const { anonymousId, attribution } = identityFromRequest(req)
+  const lastTouch = attribution?.last
+  const attributionMetadata: Record<string, string> = {
+    ...(anonymousId          ? { anonymous_id: anonymousId }       : {}),
+    ...(lastTouch?.source    ? { utm_source: lastTouch.source }     : {}),
+    ...(lastTouch?.medium    ? { utm_medium: lastTouch.medium }     : {}),
+    ...(lastTouch?.campaign  ? { utm_campaign: lastTouch.campaign } : {}),
+    ...(lastTouch?.content   ? { utm_content: lastTouch.content }   : {}),
+    ...(lastTouch?.term      ? { utm_term: lastTouch.term }         : {}),
+    ...(lastTouch?.gclid     ? { gclid: lastTouch.gclid }           : {}),
+    ...(lastTouch?.fbclid    ? { fbclid: lastTouch.fbclid }         : {}),
+  }
+
   // ── Plano (assinatura) ──────────────────────────────────────────────────
   if (body.type === 'plan') {
     if (!isPaidPlanId(body.id)) {
@@ -229,16 +246,20 @@ export async function POST(req: NextRequest) {
           billing_cycle: billingCycle,
           nodes_to_add:  String(plan.nodes),
           launch_offer:  withOffer ? 'applied' : 'none',
+          ...attributionMetadata,
         },
         // Espelhado na assinatura porque a ativação por Pix acontece em
         // `invoice.paid` (subscription_create), e a Invoice não carrega o
         // metadata da session. Sem isso, o webhook dependeria de o
         // checkout.session.completed ter chegado antes — uma corrida.
+        // A atribuição viaja junto pelo mesmo motivo (funil de receita no Pix).
         subscription_data: {
           metadata: {
             user_id:      user.id,
             plan_id:      plan.id,
             nodes_to_add: String(plan.nodes),
+            launch_offer: withOffer ? 'applied' : 'none',
+            ...attributionMetadata,
           },
         },
       })
@@ -287,12 +308,20 @@ export async function POST(req: NextRequest) {
       throw new Error('[checkout] session não criada após degradações')
     }
 
-    // Funil first-party (best-effort — recordAcquisitionEvent nunca lança).
-    await recordAcquisitionEvent(createAdminClient(), {
-      user_id: user.id,
-      event_type: 'checkout_started',
-      plan_id: plan.id,
-      metadata: { billing_cycle: body.billing, launch_offer: offerApplied, pix_offered: pixApplied },
+    // Funil first-party (best-effort — trackServerEvent nunca lança).
+    await trackServerEvent(createAdminClient(), {
+      event: 'checkout_started',
+      userId: user.id,
+      req,
+      planId: plan.id,
+      offerId: offerApplied ? 'launch50' : null,
+      page: '/app/billing',
+      props: {
+        product_type: 'plan',
+        billing_cycle: body.billing,
+        launch_offer: offerApplied,
+        pix_offered: pixApplied,
+      },
     })
 
     return NextResponse.json({ url: session.url })
@@ -332,6 +361,7 @@ export async function POST(req: NextRequest) {
         user_id:      user.id,
         product_type: 'lumen',
         pack_size:    String(pack.id),
+        ...attributionMetadata,
       },
     })
 
@@ -346,5 +376,15 @@ export async function POST(req: NextRequest) {
     )
     session = await buildLumenSession(false)
   }
+
+  // Funil first-party (best-effort) — o pack Lumen também é um checkout.
+  await trackServerEvent(createAdminClient(), {
+    event: 'checkout_started',
+    userId: user.id,
+    req,
+    page: '/app/billing',
+    props: { product_type: 'lumen', pack_size: pack.id },
+  })
+
   return NextResponse.json({ url: session.url })
 }

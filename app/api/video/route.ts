@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { after } from 'next/server'
 import { fal } from '@fal-ai/client'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getPayerId } from '@/lib/workspaces/context'
 import { refundNodes } from '@/lib/billing/refund-nodes'
+import { trackServerEvent } from '@/lib/analytics/server'
 import { requireVideoModel, getNodeCost } from '@/lib/video/models'
 import { buildArchitectureVideoPrompt, buildPromptFromLegacyInput, type FidelityMode } from '@/lib/video/promptBuilder'
 import { isSceneTypeId, type SceneTypeId } from '@/lib/video/scenes'
@@ -131,6 +133,17 @@ export async function POST(req: NextRequest) {
     }
     debited = true
 
+    // Funil: animação iniciada (pós-débito; after() = latência zero).
+    after(() =>
+      trackServerEvent(admin, {
+        event: 'generation_started',
+        userId: user.id,
+        req,
+        feature: 'animar',
+        props: { engine: engineId, duration, nodes: nodesToCharge },
+      }),
+    )
+
     // ── Upload da(s) imagem(ns) pra FAL (buffers já baixados do Storage) ─────
     inputUrl = await fal.storage.upload(
       new File([new Uint8Array(src.buffer)], sourceKey.split('/').pop() ?? 'source.jpg', { type: src.mime }),
@@ -252,6 +265,23 @@ export async function POST(req: NextRequest) {
       })
     }
 
+    // Funil: animação concluída. (first_generation fica com os módulos de
+    // imagem — animar pressupõe um render anterior.)
+    after(() =>
+      trackServerEvent(admin, {
+        event: 'generation_completed',
+        userId: user.id,
+        req,
+        feature: 'animar',
+        props: {
+          engine: engineId,
+          duration,
+          nodes: nodesToCharge,
+          duration_ms: generationDurationMs,
+        },
+      }),
+    )
+
     // Saldo real pós-débito da BOLSA (dono do workspace) — é dela que saiu.
     const payerId = (await getPayerId(admin, user.id)) ?? user.id
     const { data: balance } = await admin
@@ -276,6 +306,19 @@ export async function POST(req: NextRequest) {
     const e = err as { status?: number; body?: unknown; message?: string }
     console.error('[video] ERROR status:', e?.status)
     console.error('[video] ERROR body  :', JSON.stringify(e?.body ?? e?.message ?? err))
+
+    // Funil: animação falhou (pós-refund quando houve débito).
+    if (debited) {
+      after(() =>
+        trackServerEvent(admin, {
+          event: 'generation_failed',
+          userId: user.id,
+          req,
+          feature: 'animar',
+          props: { nodes: nodesToCharge, reason: String(e?.status ?? 'error') },
+        }),
+      )
+    }
 
     if (e?.status === 422) {
       const detail = (e.body as { detail?: { msg?: string }[] })?.detail

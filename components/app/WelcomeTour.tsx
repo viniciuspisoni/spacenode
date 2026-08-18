@@ -13,6 +13,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { driver, type Driver } from 'driver.js'
 import 'driver.js/dist/driver.css'
 import { createClient } from '@/lib/supabase/client'
+import { track } from '@/lib/analytics/client'
 
 export const TOUR_START_EVENT = 'spn:tour:start'
 
@@ -31,6 +32,9 @@ export default function WelcomeTour({ needsOnboarding }: { needsOnboarding: bool
   const markCompleted = useCallback(() => {
     if (!pendingPersistRef.current) return
     pendingPersistRef.current = false
+    // Funil: onboarding concluído (só a PRIMEIRA conclusão — o guard acima
+    // já filtra re-execuções via "Como usar").
+    track('onboarding_completed')
     // Fire-and-forget, mesmo modelo do theme_preference (falhar não é fatal:
     // a coluna segue NULL e o tour volta a se oferecer no próximo acesso).
     void (async () => {

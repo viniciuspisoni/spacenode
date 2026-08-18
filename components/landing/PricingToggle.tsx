@@ -12,6 +12,8 @@ import {
   formatBRL,
   LAUNCH_OFFER_FINE_PRINT,
 } from '@/lib/launch-offer'
+import { track } from '@/lib/analytics/client'
+import { writeIntentCookie } from '@/lib/analytics/attribution'
 
 // UI-specific data por plano: features, badge, breakdown de renders.
 // Renders calculados com engine padrão por resolução: HD→Pulsar (10 nodes),
@@ -50,13 +52,23 @@ const PLAN_DISPLAY: Record<PaidPlanId, PlanDisplay> = {
   },
 }
 
-async function startCheckout(id: PaidPlanId, billing: BillingCycle) {
+async function startCheckout(id: PaidPlanId, billing: BillingCycle, offer: string | null) {
   const res = await fetch('/api/stripe/checkout', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ type: 'plan', id, billing }),
   })
-  if (res.status === 401) { window.location.href = '/login?mode=signup'; return }
+  if (res.status === 401) {
+    // Visitante deslogado: preserva a escolha no cookie de intenção (sobrevive
+    // ao GIS/OAuth/e-mail) + querystring. Pós-auth, os handlers de auth retomam
+    // em /app/billing?plan=…&resume=1 e o checkout abre sozinho — em vez de
+    // largar o usuário no fluxo genérico (lib/analytics/auth-intent).
+    writeIntentCookie({ plan: id, billing, ...(offer ? { offer } : {}) })
+    const q = new URLSearchParams({ mode: 'signup', plan: id, billing })
+    if (offer) q.set('offer', offer)
+    window.location.href = `/login?${q.toString()}`
+    return
+  }
   // Já assinante (guarda anti-cobrança-dupla) — plano se gerencia no billing.
   if (res.status === 409) { window.location.href = '/app/billing'; return }
   if (!res.ok) return
@@ -306,8 +318,11 @@ export function PricingToggle() {
 
   const handleSelect = async (id: PaidPlanId) => {
     setLoading(id)
+    // Oferta ANUNCIADA no momento do clique (a aplicação real é do checkout).
+    const offer = billing === 'monthly' && isLaunchOfferOpen() ? 'launch50' : null
+    track('cta_clicked', { cta: 'pricing_card', plan: id, billing, ...(offer ? { offer } : {}) })
     try {
-      await startCheckout(id, billing)
+      await startCheckout(id, billing, offer)
     } finally {
       setLoading(null)
     }

@@ -15,10 +15,12 @@
 // Histórico: insere em `renders` com upscale_meta jsonb completo.
 
 import { NextRequest, NextResponse } from 'next/server'
+import { after } from 'next/server'
 import { fal } from '@fal-ai/client'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { refundNodes } from '@/lib/billing/refund-nodes'
+import { trackServerEvent } from '@/lib/analytics/server'
 import { DIRECT_UPLOAD_AREAS, downloadDirectUpload } from '@/lib/storage/direct-upload'
 import { fetchStorageBuffer } from '@/lib/storage/fetch'
 import sharp from 'sharp'
@@ -156,6 +158,17 @@ export async function POST(req: NextRequest) {
     }
     debited = true
 
+    // Funil: ampliação iniciada (pós-débito; after() = latência zero).
+    after(() =>
+      trackServerEvent(admin, {
+        event: 'generation_started',
+        userId: user.id,
+        req,
+        feature: 'ampliar',
+        props: { tab: tabT, mode: modeT, scale: scaleT, nodes: cost },
+      }),
+    )
+
     // ── Upload da imagem para FAL (buffer já baixado do nosso Storage) ─────
     inputUrl = await fal.storage.upload(
       new File([new Uint8Array(src.buffer)], sourceKey.split('/').pop() ?? 'source.jpg', { type: src.mime }),
@@ -248,6 +261,25 @@ export async function POST(req: NextRequest) {
       await admin.from('renders').insert(upscaleRow as never)
     }
 
+    // Funil: ampliação concluída. (first_generation fica com Renderizar/
+    // Spaces/Editar — ampliar pressupõe uma geração anterior.)
+    after(() =>
+      trackServerEvent(admin, {
+        event: 'generation_completed',
+        userId: user.id,
+        req,
+        feature: 'ampliar',
+        props: {
+          tab: tabT,
+          mode: modeT,
+          scale: scaleT,
+          nodes: cost,
+          duration_ms: result.totalDurationMs ?? null,
+          fallback_used: fallbackUsed,
+        },
+      }),
+    )
+
     return NextResponse.json({
       url:          outputUrl,
       originalUrl:  inputUrl,
@@ -267,6 +299,17 @@ export async function POST(req: NextRequest) {
     if (debited) {
       await refundNodes(admin, user.id, cost, { module: 'upscale' })
     }
+
+    // Funil: ampliação falhou (pós-refund quando houve débito).
+    after(() =>
+      trackServerEvent(admin, {
+        event: 'generation_failed',
+        userId: user.id,
+        req,
+        feature: 'ampliar',
+        props: { nodes: cost, reason: String(e?.status ?? 'error') },
+      }),
+    )
 
     return NextResponse.json({ error: 'Erro ao processar imagem. Tente novamente.' }, { status: 500 })
   }

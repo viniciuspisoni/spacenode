@@ -14,8 +14,11 @@
 // <uuid>` — aceito APENAS fora de produção e fora da Vercel.
 
 import { NextResponse } from 'next/server'
+import { after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { trackServerEvent } from '@/lib/analytics/server'
+import { recordAcquisitionEvent } from '@/lib/marketing/ads/service'
 import { uploadEditAsset } from '@/lib/spaces/edit-route-helpers'
 import { MaskImageMismatchError, fetchImageBuffer } from '@/lib/spaces/edit-crop'
 import { GoogleEditError, type GoogleImageModel } from '@/lib/ai/google/editImage'
@@ -256,6 +259,17 @@ export async function POST(req: Request) {
       error_message: null,
     })
 
+    // Funil: edição iniciada (job persistido; latência zero via after()).
+    after(() =>
+      trackServerEvent(db, {
+        event: 'generation_started',
+        userId,
+        req,
+        feature: 'editar',
+        props: { action, quality, nodes },
+      }),
+    )
+
     // ── Geração (recompose + gates dentro do pipeline) ───────────────────────
     const request: EditV3Request = {
       action,
@@ -292,6 +306,17 @@ export async function POST(req: Request) {
         completed_at: new Date().toISOString(),
       })
       console.log(`[edit-v3] rejected user=${userId} action=${action} reasons=${run.rejectReasons.join(',')} retried=${run.retried} crop=${run.usedCrop}`)
+      // Funil: o GATE descartou o resultado (rejeição do sistema, não do
+      // usuário — a distinção viaja em props.by).
+      after(() =>
+        trackServerEvent(db, {
+          event: 'result_rejected',
+          userId,
+          req,
+          feature: 'editar',
+          props: { by: 'system', reason: run.rejectReasons.slice(0, 3).join(','), action },
+        }),
+      )
       const semanticOnly = run.rejectReasons.every(r => r.startsWith('semantic_'))
       return NextResponse.json({
         rejected: true,
@@ -367,6 +392,22 @@ export async function POST(req: Request) {
       `outDrift=${run.metrics.outOfMaskDelta} inDelta=${run.metrics.inMaskDelta} dur=${ps.durationMs}ms`,
     )
 
+    // Funil: edição concluída + ativação (first_generation 1× por usuário).
+    after(async () => {
+      await trackServerEvent(db, {
+        event: 'generation_completed',
+        userId,
+        req,
+        feature: 'editar',
+        props: { action, quality, nodes, charged },
+      })
+      await recordAcquisitionEvent(db, {
+        user_id: userId,
+        event_type: 'first_generation',
+        metadata: { feature: 'editar' },
+      })
+    })
+
     // Com máscara o gate semântico é advisory: reprovou → warning na resposta
     // (o recompose já garantiu os pixels fora da seleção; o aviso cobre o
     // DENTRO — material errado, artefato — sem bloquear entrega legítima).
@@ -424,6 +465,17 @@ export async function POST(req: Request) {
         error_message: (err as Error).message?.slice(0, 500) ?? 'erro',
         completed_at: new Date().toISOString(),
       })
+      // Funil: edição falhou (nada cobrado). Sem echo da mensagem — só a classe.
+      const adminDb = admin
+      after(() =>
+        trackServerEvent(adminDb, {
+          event: 'generation_failed',
+          userId,
+          req,
+          feature: 'editar',
+          props: { action, reason: String(status) },
+        }),
+      )
     }
     return NextResponse.json({ error: message, charge: { simulated: !chargeOn, debited: false } }, { status })
   }
