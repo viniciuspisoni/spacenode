@@ -18,6 +18,7 @@ import { PlatformModules } from "@/components/landing/PlatformModules";
 import { ValueProps } from "@/components/landing/ValueProps";
 import { MobileCTA } from "@/components/landing/MobileCTA";
 import { LaunchOfferBanner } from "@/components/launch/LaunchOfferBanner";
+import LandingAnalytics from "@/components/analytics/LandingAnalytics";
 
 const Divider = () => (
   <hr style={{ border: 'none', borderTop: '0.5px solid rgba(255,255,255,0.06)', maxWidth: 960, margin: '0 auto', width: 'calc(100% - 40px)' }} />
@@ -30,6 +31,8 @@ export default function Home() {
           light na rota "/" (anti-flash pré-paint); ForceDarkScope cobre a
           navegação client-side e restaura o tema do usuário ao sair. */}
       <ForceDarkScope />
+      {/* landing_view + plans_viewed + cta_clicked (delegado) — sem UI */}
+      <LandingAnalytics />
       <LaunchOfferBanner />
       <Navbar />
       <Hero />

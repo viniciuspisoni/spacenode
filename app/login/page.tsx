@@ -5,6 +5,9 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useTheme } from '@/lib/theme/ThemeProvider'
 import { Brandmark } from '@/components/brand'
+import { isPaidPlanId, type BillingCycle } from '@/lib/plans'
+import { track } from '@/lib/analytics/client'
+import { writeIntentCookie } from '@/lib/analytics/attribution'
 
 type Mode = 'login' | 'signup'
 
@@ -114,6 +117,28 @@ function LoginForm() {
     if (err === 'google') setError('Não foi possível entrar com o Google. Tente novamente.')
     else if (err)         setError('Não foi possível concluir a autenticação. Tente novamente.')
   }, [searchParams])
+
+  // Intenção de plano vinda por URL (?plan=starter&billing=monthly&offer=…):
+  // (re)grava o cookie sn_intent — fonte da retomada pós-auth em
+  // lib/analytics/auth-intent. Cobre também link direto pro /login com plano,
+  // sem depender do clique no card da landing.
+  useEffect(() => {
+    const plan = searchParams.get('plan')
+    if (!isPaidPlanId(plan)) return
+    const billing: BillingCycle = searchParams.get('billing') === 'annual' ? 'annual' : 'monthly'
+    const offer = searchParams.get('offer')
+    writeIntentCookie({ plan, billing, ...(offer ? { offer } : {}) })
+  }, [searchParams])
+
+  // signup_started: 1× por carga da página, quando o modo cadastro fica ativo
+  // (chegada com ?mode=signup ou toque no toggle "Criar conta").
+  const signupStartedRef = useRef(false)
+  useEffect(() => {
+    if (mode !== 'signup' || signupStartedRef.current) return
+    signupStartedRef.current = true
+    const plan = searchParams.get('plan')
+    track('signup_started', { ...(isPaidPlanId(plan) ? { plan } : {}) })
+  }, [mode, searchParams])
 
   // Monta o botão oficial do Google (re-renderiza quando o tema resolve/muda).
   // O nonce é mintado UMA vez por carga da página (ref compartilhada): re-runs

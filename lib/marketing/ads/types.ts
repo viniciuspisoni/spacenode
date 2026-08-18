@@ -171,6 +171,21 @@ export type AcquisitionEventType =
   | 'subscription_started'
   | 'subscription_renewed'
   | 'subscription_canceled'
+  // Funil completo (migration 20260818000000; catálogo em lib/analytics/events.ts —
+  // signup_completed/subscription_cancelled são ALIASES dos nomes legados acima).
+  | 'landing_view'
+  | 'cta_clicked'
+  | 'plans_viewed'
+  | 'signup_started'
+  | 'onboarding_completed'
+  | 'image_uploaded'
+  | 'generation_started'
+  | 'generation_completed'
+  | 'generation_failed'
+  | 'result_approved'
+  | 'result_rejected'
+  | 'result_downloaded'
+  | 'checkout_completed'
 
 export interface AcquisitionEvent {
   id: string
@@ -184,6 +199,11 @@ export interface AcquisitionEvent {
   plan_id: string | null
   value_cents: number | null
   metadata: Record<string, unknown>
+  // Colunas do funil completo (migration 20260818000000)
+  anonymous_id: string | null
+  page: string | null
+  offer_id: string | null
+  dedupe_key: string | null
   created_at: string
 }
 
@@ -523,4 +543,10 @@ export interface NewAcquisitionEvent {
   plan_id?: string | null
   value_cents?: number | null
   metadata?: Record<string, unknown>
+  // Colunas do funil completo (migration 20260818000000)
+  anonymous_id?: string | null
+  page?: string | null
+  offer_id?: string | null
+  /** Idempotência server-side (índice único parcial — 23505 = já gravado). */
+  dedupe_key?: string | null
 }

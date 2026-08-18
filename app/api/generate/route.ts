@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { after } from 'next/server'
 import { fal } from '@fal-ai/client'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getPayerId } from '@/lib/workspaces/context'
 import { refundNodes } from '@/lib/billing/refund-nodes'
+import { trackServerEvent } from '@/lib/analytics/server'
+import { recordAcquisitionEvent } from '@/lib/marketing/ads/service'
 import {
   buildFidelityPrompt,
   materialSurfaceEn,
@@ -287,6 +290,18 @@ export async function POST(req: NextRequest) {
     if (debit.from_lumens > 0) {
       console.log('[generate] débito misto:', debit.from_plan, 'plano +', debit.from_lumens, 'lumens')
     }
+
+    // Funil: geração iniciada (pós-débito = intenção paga). after() roda
+    // depois da resposta — latência zero no caminho quente.
+    after(() =>
+      trackServerEvent(admin, {
+        event: 'generation_started',
+        userId: user.id,
+        req,
+        feature: 'renderizar',
+        props: { engine, resolution, nodes: nodesToCharge },
+      }),
+    )
 
     // ── Geração ──────────────────────────────────────────────────────────────
 
@@ -853,6 +868,29 @@ export async function POST(req: NextRequest) {
       })
     }
 
+    // Funil: geração concluída + ativação (first_generation é 1× por usuário —
+    // o índice único absorve repetições e o painel de ads já espera o evento).
+    after(async () => {
+      await trackServerEvent(admin, {
+        event: 'generation_completed',
+        userId: user.id,
+        req,
+        feature: 'renderizar',
+        props: {
+          engine,
+          resolution,
+          nodes: nodesToCharge,
+          duration_ms: generationDurationMs,
+          ...(renderId ? { render_id: renderId } : {}),
+        },
+      })
+      await recordAcquisitionEvent(admin, {
+        user_id: user.id,
+        event_type: 'first_generation',
+        metadata: { feature: 'renderizar' },
+      })
+    })
+
     // Saldo pós-débito da BOLSA (dono do workspace) — é dela que o débito saiu.
     const payerId = (await getPayerId(admin, user.id)) ?? user.id
     const { data: balance } = await admin
@@ -898,6 +936,21 @@ export async function POST(req: NextRequest) {
     const e = err as { status?: number; body?: unknown; message?: string; isFalTimeout?: boolean }
     console.error('[generate] ERROR status:', e?.status)
     console.error('[generate] ERROR body  :', JSON.stringify(e?.body ?? e?.message ?? err))
+
+    // Funil: geração falhou (pós-refund). Sem echo de mensagem de erro —
+    // só a classe da falha (as variáveis do corpo não existem neste escopo).
+    after(() =>
+      trackServerEvent(admin, {
+        event: 'generation_failed',
+        userId: user.id,
+        req,
+        feature: 'renderizar',
+        props: {
+          nodes: nodesToCharge,
+          reason: e?.isFalTimeout ? 'timeout' : String(e?.status ?? 'error'),
+        },
+      }),
+    )
 
     let userMessage = 'Erro ao gerar render. Tente novamente.'
     if (e?.isFalTimeout)        userMessage = 'A geração demorou mais que o esperado. Tente novamente.'

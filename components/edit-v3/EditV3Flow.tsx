@@ -17,6 +17,7 @@ import { BeforeAfter } from './BeforeAfter'
 import { EditV2ImportModal } from '@/components/editar/EditV2ImportModal'
 import { consumeHandoff } from '@/components/nodi/actions-bus'
 import { uploadDirect } from '@/lib/storage/direct-upload-client'
+import { track } from '@/lib/analytics/client'
 import {
   IconLasso, IconPolygon, IconBrush, IconEraser, IconHand,
   IconUndo, IconRedo, IconTrash,
@@ -314,13 +315,28 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
     }
   }, [busy, instruction, action, actionDef.ref, quality, referenceUrl, sourceUrl, uploadFile])
 
+  // Funil: 1ª ação positiva sobre um resultado = aprovação implícita (o Editar
+  // não tem botão "aprovar"; baixar ou continuar editando É o aceite). 1× por
+  // resultado — o ref reseta quando um novo resultado chega.
+  const approvedRef = useRef<string | null>(null)
+  const markApproved = useCallback((actionTaken: string) => {
+    if (!result || approvedRef.current === result.url) return
+    approvedRef.current = result.url
+    track('result_approved', { feature: 'editar', action: actionTaken })
+  }, [result])
+
   const editFromResult = useCallback(() => {
     if (!result) return
+    markApproved('continue_edit')
     void applySource(result.url, true)
     setNotice('Editando a partir do resultado.')
-  }, [applySource, result])
+  }, [applySource, markApproved, result])
 
   const download = useCallback(async (url: string) => {
+    // Baixa via blob (não passa pelo proxy /api/download) — o evento de
+    // download do Editar é rastreado AQUI, no client.
+    markApproved('download')
+    track('result_downloaded', { feature: 'editar' })
     const res = await fetch(url)
     const blob = await res.blob()
     const a = document.createElement('a')
@@ -328,7 +344,7 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
     a.download = 'spacenode-editar.png'
     a.click()
     URL.revokeObjectURL(a.href)
-  }, [])
+  }, [markApproved])
 
   // ── Estilos (tokens da marca; namespace local) ──────────────────────────
   const card: React.CSSProperties = {

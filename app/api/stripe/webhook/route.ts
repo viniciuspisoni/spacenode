@@ -4,6 +4,11 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { findPlanByStripePriceId, type BillingCycle } from '@/lib/plans'
 import { recordAcquisitionEvent } from '@/lib/marketing/ads/service'
+import type { AttributionSnapshot } from '@/lib/marketing/ads/naming'
+import { trackServerEvent } from '@/lib/analytics/server'
+import { metaCapiTrack } from '@/lib/analytics/adapters/meta-capi'
+import { ga4MpTrack } from '@/lib/analytics/adapters/ga4-mp'
+import { parseAnonymousId } from '@/lib/analytics/attribution'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,6 +17,31 @@ export const dynamic = 'force-dynamic'
 function strId<T extends { id: string }>(value: string | T | null | undefined): string | null {
   if (!value) return null
   return typeof value === 'string' ? value : value.id
+}
+
+// O webhook não tem cookies — a atribuição chega pelo metadata que o checkout
+// gravou na session/assinatura (anonymous_id + last-touch). O `at` sintético
+// (epoch) marca o snapshot como reconstruído, não como toque novo.
+function attributionFromMetadata(md: Record<string, string> | null | undefined): {
+  anonymousId: string | null
+  attribution: AttributionSnapshot | null
+} {
+  if (!md) return { anonymousId: null, attribution: null }
+  const touch: Record<string, string> = {}
+  if (md.utm_source)   touch.source   = md.utm_source
+  if (md.utm_medium)   touch.medium   = md.utm_medium
+  if (md.utm_campaign) touch.campaign = md.utm_campaign
+  if (md.utm_content)  touch.content  = md.utm_content
+  if (md.utm_term)     touch.term     = md.utm_term
+  if (md.gclid)        touch.gclid    = md.gclid
+  if (md.fbclid)       touch.fbclid   = md.fbclid
+  const hasTouch = Object.keys(touch).length > 0
+  return {
+    anonymousId: parseAnonymousId(md.anonymous_id),
+    attribution: hasTouch
+      ? ({ last: { ...touch, at: new Date(0).toISOString() } } as AttributionSnapshot)
+      : null,
+  }
 }
 
 interface ActivationInput {
@@ -25,6 +55,8 @@ interface ActivationInput {
   /** De onde veio o sinal — só para o log e o funil. */
   source:         'checkout' | 'invoice'
   eventMetadata?: Record<string, unknown>
+  /** metadata da session/assinatura — fonte de atribuição (anon id + UTMs). */
+  stripeMetadata?: Record<string, string> | null
 }
 
 /**
@@ -38,10 +70,9 @@ interface ActivationInput {
  *    é o único sinal confiável, porque a session completa ANTES de o dinheiro
  *    entrar. Vale como rede de segurança para o cartão também.
  *
- * O update é idempotente (valores absolutos), mas o evento de funil NÃO é —
- * `subscription_started` não tem índice único. Daí a checagem prévia: se o
- * profile já está no plano com a mesma assinatura, sai sem gravar nada e o
- * funil não conta a mesma venda duas vezes.
+ * O update é idempotente (valores absolutos) e o evento de funil também:
+ * checagem prévia (profile já no plano com a mesma assinatura → sai sem gravar)
+ * + dedupe_key único por assinatura no próprio evento (migration 20260818).
  *
  * Retorna `false` só quando o banco falhou — o caller devolve 500 e o Stripe
  * retenta a entrega.
@@ -83,20 +114,53 @@ async function activatePlan(
     `(${input.nodes} nodes, via ${input.source})`
   )
 
-  // Funil first-party (best-effort — recordAcquisitionEvent nunca lança).
+  // Funil first-party (best-effort — trackServerEvent nunca lança).
   // `value_cents` é o valor efetivamente cobrado (já com o desconto de
   // lançamento, quando houve); `launch_offer` separa as duas coortes na
   // hora de medir retenção do 2º mês, que é o número que importa aqui.
-  await recordAcquisitionEvent(supabase, {
-    user_id:     input.userId,
-    event_type:  'subscription_started',
-    plan_id:     input.planId,
-    value_cents: input.valueCents,
-    metadata: {
-      billing_cycle: input.billingCycle ?? null,
+  // Duas linhas de defesa contra dupla contagem: a checagem alreadyActive
+  // acima + dedupe_key único por assinatura (retry do Stripe e a corrida
+  // checkout×invoice caem no mesmo índice).
+  const { anonymousId, attribution } = attributionFromMetadata(input.stripeMetadata)
+  const offerApplied =
+    input.stripeMetadata?.launch_offer === 'applied' ||
+    input.eventMetadata?.launch_offer === true
+  const dedupeKey = `sub_started:${input.subscriptionId ?? input.userId}`
+  await trackServerEvent(supabase, {
+    event: 'subscription_started',
+    userId: input.userId,
+    anonymousId,
+    attribution,
+    planId: input.planId,
+    offerId: offerApplied ? 'launch50' : null,
+    valueCents: input.valueCents,
+    dedupeKey,
+    props: {
+      billing_cycle: (input.billingCycle as string | null) ?? null,
       activated_via: input.source,
-      ...(input.eventMetadata ?? {}),
+      launch_offer: offerApplied,
+      ...(typeof input.eventMetadata?.stripe_session_id === 'string'
+        ? { stripe_session_id: input.eventMetadata.stripe_session_id }
+        : {}),
+      ...(typeof input.eventMetadata?.stripe_invoice_id === 'string'
+        ? { stripe_invoice_id: input.eventMetadata.stripe_invoice_id }
+        : {}),
     },
+  })
+  // Adapters opcionais (env-gated; docs/ANALYTICS.md) — mesmo event_id do
+  // dedupe interno, então Pixel×CAPI também deduplicam.
+  await metaCapiTrack({
+    event: 'subscription_started',
+    eventId: dedupeKey,
+    userId: input.userId,
+    valueCents: input.valueCents,
+  })
+  await ga4MpTrack({
+    event: 'subscription_started',
+    anonymousId,
+    userId: input.userId,
+    valueCents: input.valueCents,
+    params: { plan: input.planId },
   })
   return true
 }
@@ -186,9 +250,46 @@ export async function POST(req: NextRequest) {
           stripe_session_id: session.id,
           launch_offer:      session.metadata?.launch_offer === 'applied',
         },
+        stripeMetadata: session.metadata ?? null,
       })
       // 500 → Stripe retenta a entrega; o update é idempotente (valores absolutos)
       if (!ok) return NextResponse.json({ error: 'db' }, { status: 500 })
+
+      // checkout_completed = session PAGA (confirmação do Stripe, nunca o
+      // browser). Dedupe por session.id: retry de entrega e o par
+      // completed/async_payment_succeeded do Pix caem no mesmo índice único.
+      {
+        const { anonymousId, attribution } = attributionFromMetadata(session.metadata)
+        const offerApplied = session.metadata?.launch_offer === 'applied'
+        await trackServerEvent(supabase, {
+          event: 'checkout_completed',
+          userId,
+          anonymousId,
+          attribution,
+          planId,
+          offerId: offerApplied ? 'launch50' : null,
+          valueCents: session.amount_total ?? null,
+          dedupeKey: `checkout:${session.id}`,
+          props: {
+            product_type: 'plan',
+            billing_cycle: session.metadata?.billing_cycle ?? null,
+            launch_offer: offerApplied,
+          },
+        })
+        await metaCapiTrack({
+          event: 'checkout_completed',
+          eventId: `checkout:${session.id}`,
+          userId,
+          valueCents: session.amount_total ?? null,
+        })
+        await ga4MpTrack({
+          event: 'checkout_completed',
+          anonymousId,
+          userId,
+          valueCents: session.amount_total ?? null,
+          params: { product_type: 'plan', ...(planId ? { plan: planId } : {}) },
+        })
+      }
     } else if (productType === 'lumen') {
       const packSize = parseInt(session.metadata?.pack_size ?? '0', 10)
       if (![500, 1500, 4000].includes(packSize)) {
@@ -215,6 +316,34 @@ export async function POST(req: NextRequest) {
           .update({ stripe_customer_id: customerId })
           .eq('id', userId)
           .is('stripe_customer_id', null)
+      }
+
+      // checkout_completed do pack Lumen — mesma regra do plano: só session
+      // paga, dedupe por session.id.
+      {
+        const { anonymousId, attribution } = attributionFromMetadata(session.metadata)
+        await trackServerEvent(supabase, {
+          event: 'checkout_completed',
+          userId,
+          anonymousId,
+          attribution,
+          valueCents: session.amount_total ?? null,
+          dedupeKey: `checkout:${session.id}`,
+          props: { product_type: 'lumen', pack_size: packSize },
+        })
+        await metaCapiTrack({
+          event: 'checkout_completed',
+          eventId: `checkout:${session.id}`,
+          userId,
+          valueCents: session.amount_total ?? null,
+        })
+        await ga4MpTrack({
+          event: 'checkout_completed',
+          anonymousId,
+          userId,
+          valueCents: session.amount_total ?? null,
+          params: { product_type: 'lumen' },
+        })
       }
     }
   }
@@ -269,10 +398,15 @@ export async function POST(req: NextRequest) {
         // evento pode chegar antes de o checkout.session.completed ter gravado
         // o customer_id no profile.
         let userId: string | null = null
+        let subMetadata: Record<string, string> | null = null
         if (subscriptionId) {
           try {
             const sub = await stripe.subscriptions.retrieve(subscriptionId)
             userId = sub.metadata?.user_id ?? null
+            // A atribuição foi espelhada no metadata da assinatura pelo
+            // checkout — é a única fonte neste caminho (Pix não passa pelo
+            // checkout.session.completed pago).
+            subMetadata = sub.metadata ?? null
           } catch (err) {
             console.error('[stripe webhook] falha ao ler metadata da assinatura:', err)
           }
@@ -300,6 +434,7 @@ export async function POST(req: NextRequest) {
           valueCents:    invoice.amount_paid ?? null,
           source:        'invoice',
           eventMetadata: { stripe_invoice_id: invoice.id },
+          stripeMetadata: subMetadata,
         })
         if (!ok) return NextResponse.json({ error: 'db' }, { status: 500 })
         return NextResponse.json({ received: true })
@@ -335,6 +470,8 @@ export async function POST(req: NextRequest) {
           event_type: 'subscription_renewed',
           plan_id: match.plan.id,
           value_cents: invoice.amount_paid ?? null,
+          // Retry de entrega do Stripe não conta a mesma renovação duas vezes.
+          dedupe_key: `sub_renewed:${invoice.id}`,
           metadata: { stripe_invoice_id: invoice.id },
         })
       }
@@ -391,11 +528,14 @@ export async function POST(req: NextRequest) {
     console.log(`[stripe webhook] plano cancelado (sub ${subscriptionId})`)
 
     if (cancelingProfile?.id) {
-      await recordAcquisitionEvent(supabase, {
-        user_id: cancelingProfile.id as string,
-        event_type: 'subscription_canceled',
-        plan_id: (cancelingProfile.plan as string | null) ?? null,
-        metadata: { stripe_subscription_id: subscriptionId },
+      // Catálogo público: subscription_cancelled (alias → subscription_canceled
+      // no storage, que o painel de ads já consome). Dedupe por assinatura.
+      await trackServerEvent(supabase, {
+        event: 'subscription_cancelled',
+        userId: cancelingProfile.id as string,
+        planId: (cancelingProfile.plan as string | null) ?? null,
+        dedupeKey: `sub_canceled:${subscriptionId}`,
+        props: { stripe_subscription_id: subscriptionId },
       })
     }
   }

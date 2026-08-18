@@ -27,8 +27,11 @@
 // SERVER-ONLY (importa sharp via geometry-score) — consumir apenas de rotas.
 
 import { fal } from '@fal-ai/client'
+import { after } from 'next/server'
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { refundNodes } from '@/lib/billing/refund-nodes'
+import { trackServerEvent } from '@/lib/analytics/server'
+import { recordAcquisitionEvent } from '@/lib/marketing/ads/service'
 import type { EngineId, Resolution } from '@/lib/engines'
 import { materialSurfaceEn, type BriefingArquitetonico, type ProjectMaterials } from '@/lib/prompts'
 import type { Axis, GenerationAction, ProjectDNA, Space } from './types'
@@ -159,6 +162,17 @@ export async function generateVista(args: VistaGenerationArgs) {
       throw new Error('debit_failed: ' + debitErr.message)
     }
     debited = true
+
+    // Funil: vista iniciada (pós-débito). Cobre as DUAS rotas que chamam este
+    // gerador (generate e generate-from-sketches); after() = latência zero.
+    after(() =>
+      trackServerEvent(admin, {
+        event: 'generation_started',
+        userId,
+        feature: 'spaces',
+        props: { action, engine, quality, nodes: costPerVista },
+      }),
+    )
 
     // 2) row pendente — provenance completa desde já (audita até falhas)
     const insertRow: Record<string, unknown> = {
@@ -533,6 +547,28 @@ export async function generateVista(args: VistaGenerationArgs) {
       console.error(`[${logContext}] DB update FALHOU (imagem ok, persistência não):`, upd.error)
     }
 
+    // Funil: vista concluída + ativação (first_generation 1× por usuário).
+    after(async () => {
+      await trackServerEvent(admin, {
+        event: 'generation_completed',
+        userId,
+        feature: 'spaces',
+        props: {
+          action,
+          engine,
+          quality,
+          nodes: costPerVista,
+          duration_ms: generationDurationMs,
+          ...(vistaId ? { vista_id: vistaId } : {}),
+        },
+      })
+      await recordAcquisitionEvent(admin, {
+        user_id: userId,
+        event_type: 'first_generation',
+        metadata: { feature: 'spaces' },
+      })
+    })
+
     return {
       id:                   vistaId,
       space_id:             space.id,
@@ -566,6 +602,16 @@ export async function generateVista(args: VistaGenerationArgs) {
   } catch (err) {
     if (debited) {
       await refundNodes(admin, userId, costPerVista, { module: 'spaces/generate', jobTable: 'vistas' })
+      // Funil: só falha PÓS-débito conta como geração falha (pré-débito é
+      // validação barata, não uma geração que o usuário perdeu).
+      after(() =>
+        trackServerEvent(admin, {
+          event: 'generation_failed',
+          userId,
+          feature: 'spaces',
+          props: { action, engine, quality, nodes: costPerVista },
+        }),
+      )
     }
     if (vistaId) {
       await admin

@@ -8,10 +8,12 @@
 // Space. Premium só com opt-in explícito (body.premium).
 
 import { NextRequest, NextResponse } from 'next/server'
+import { after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getPayerId } from '@/lib/workspaces/context'
 import { refundNodes } from '@/lib/billing/refund-nodes'
+import { trackServerEvent } from '@/lib/analytics/server'
 import { isQuality, type Quality, type Space, type Vista } from '@/lib/spaces/types'
 import { isEditMode, dispatchEndpoint, type EditMode } from '@/lib/spaces/engines'
 import {
@@ -288,6 +290,18 @@ export async function POST(
     if (insErr || !row) throw new Error('insert_failed: ' + (insErr?.message ?? '?'))
     newVistaId = row.id as string
 
+    // Funil: edição de vista iniciada (cobre também correção grátis —
+    // costNodes=0). after() roda pós-resposta, latência zero.
+    after(() =>
+      trackServerEvent(admin, {
+        event: 'generation_started',
+        userId: user.id,
+        req,
+        feature: 'spaces',
+        props: { action: 'vista_edit', tool, nodes: routing.costNodes, free_fix: routing.isFreeFix },
+      }),
+    )
+
     // ── 6) Executa com quality gate AMPLIADO + retry automático grátis ──
     const gated = await runGatedEdit({
       sourceUrl:    vista.image_url,
@@ -335,6 +349,16 @@ export async function POST(
           out_of_mask_delta: run.outOfMaskDelta,
         },
         rejectBase,
+      )
+      // Funil: o quality gate descartou a edição (rejeição do SISTEMA).
+      after(() =>
+        trackServerEvent(admin, {
+          event: 'result_rejected',
+          userId: user.id,
+          req,
+          feature: 'spaces',
+          props: { by: 'system', reason: gated.rejectionKind ?? 'quality_gate', action: 'vista_edit' },
+        }),
       )
       const { data: balGate } = await admin
         .from('user_node_balance')
@@ -401,6 +425,17 @@ export async function POST(
       nodes_delta:      routing.costNodes,
     })
 
+    // Funil: edição de vista concluída.
+    after(() =>
+      trackServerEvent(admin, {
+        event: 'generation_completed',
+        userId: user.id,
+        req,
+        feature: 'spaces',
+        props: { action: 'vista_edit', tool, nodes: routing.costNodes, free_fix: routing.isFreeFix },
+      }),
+    )
+
     const { data: balAfter } = await admin
       .from('user_node_balance')
       .select('plan_balance, lumen_balance, total_balance')
@@ -448,6 +483,18 @@ export async function POST(
     }
     await failAttempt((err as Error).message)
     console.error('[vista.edit] error:', (err as Error).message)
+    // Funil: edição de vista falhou (pós-refund quando houve débito).
+    if (debited) {
+      after(() =>
+        trackServerEvent(admin, {
+          event: 'generation_failed',
+          userId: user.id,
+          req,
+          feature: 'spaces',
+          props: { action: 'vista_edit', nodes: routing.costNodes },
+        }),
+      )
+    }
     if (err instanceof MaskImageMismatchError) {
       return NextResponse.json(
         {

@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ANNUAL_BILLING_ENABLED, PLANS, type PaidPlanId, type BillingCycle } from '@/lib/plans'
+import { track } from '@/lib/analytics/client'
 import { getPlanDisplayName } from '@/lib/plan-display'
 import { LUMEN_PACKS, LUMEN_VALIDITY_DAYS, type LumenPackSize } from '@/lib/lumens'
 import {
@@ -17,6 +18,13 @@ import {
 export interface CheckoutNotice {
   kind:    'ok' | 'pending'
   message: string
+}
+
+/** Plano escolhido ANTES do login (CTA da landing → sn_intent → auth →
+ *  /app/billing?plan=…&resume=1). Validado/filtrado em page.tsx. */
+export interface ResumeIntent {
+  plan:    PaidPlanId
+  billing: BillingCycle
 }
 
 export interface LumenPackRow {
@@ -39,6 +47,8 @@ interface BillingClientProps {
   offerEligible?: boolean
   /** Resultado do checkout que trouxe o usuário de volta pra cá, se houve. */
   notice?: CheckoutNotice | null
+  /** Retomada do plano escolhido antes do login (abre o checkout sozinho, 1×). */
+  resumeIntent?: ResumeIntent | null
 }
 
 type CheckoutPayload =
@@ -60,11 +70,33 @@ function daysUntil(date: string): number {
   return Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)))
 }
 
-export function BillingClient({ plan, balance, lumens, pooled, offerEligible, notice }: BillingClientProps) {
+export function BillingClient({ plan, balance, lumens, pooled, offerEligible, notice, resumeIntent }: BillingClientProps) {
   const isLumenBlocked = plan === 'free' || plan === 'starter'
   const [billing, setBilling] = useState<BillingCycle>('monthly')
   const [loading, setLoading] = useState<string | null>(null)
   const [error,   setError]   = useState<string | null>(null)
+
+  // Funil: a página de cobrança é o "ver planos" de quem já está logado.
+  const viewedRef = useRef(false)
+  useEffect(() => {
+    if (viewedRef.current) return
+    viewedRef.current = true
+    track('plans_viewed', { source: 'billing' })
+  }, [])
+
+  // Retomada pós-login do CTA "Começar com <plano>": abre o checkout do plano
+  // escolhido UMA vez (ref) — page.tsx já filtrou assinante/membro de
+  // workspace, então um erro aqui é excepcional e cai no banner de erro.
+  const resumedRef = useRef(false)
+  useEffect(() => {
+    if (!resumeIntent || resumedRef.current) return
+    resumedRef.current = true
+    void (async () => {
+      const r = await startCheckout({ type: 'plan', id: resumeIntent.plan, billing: resumeIntent.billing })
+      if (r.url) window.location.assign(r.url)
+      else if (r.error) setError(r.error)
+    })()
+  }, [resumeIntent])
 
   const handlePlan = async (id: PaidPlanId) => {
     setLoading(`plan-${id}`); setError(null)

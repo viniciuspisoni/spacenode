@@ -3,12 +3,22 @@ import Stripe from 'stripe'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getPayerBalance } from '@/lib/workspaces/balance'
-import { BillingClient, type LumenPackRow, type CheckoutNotice } from './BillingClient'
+import { isPaidPlanId, type BillingCycle, type PaidPlanId } from '@/lib/plans'
+import { BillingClient, type LumenPackRow, type CheckoutNotice, type ResumeIntent } from './BillingClient'
 
 export const dynamic = 'force-dynamic'
 
 type Props = {
-  searchParams: Promise<{ session_id?: string; canceled?: string }>
+  searchParams: Promise<{
+    session_id?: string
+    canceled?: string
+    // Retomada pós-login da intenção de plano (CTA "Começar com <plano>" →
+    // /login → auth → aqui). Ver lib/analytics/auth-intent.ts.
+    plan?: string
+    billing?: string
+    offer?: string
+    resume?: string
+  }>
 }
 
 /**
@@ -83,8 +93,22 @@ export default async function BillingPage({ searchParams }: Props) {
     .single()
   const offerEligible = !balance.pooled && balance.planId === 'free' && !own?.stripe_customer_id
 
-  const { session_id } = await searchParams
-  const notice = await readCheckoutNotice(session_id, user.id)
+  const params = await searchParams
+  const notice = await readCheckoutNotice(params.session_id, user.id)
+
+  // Retomada do plano escolhido antes do login. Só faz sentido para quem pode
+  // assinar: membro de workspace e quem já tem plano ativo ficam de fora — o
+  // checkout recusaria (409) e o auto-start viraria um erro na cara do usuário.
+  let resumeIntent: ResumeIntent | null = null
+  if (
+    params.resume === '1' &&
+    isPaidPlanId(params.plan) &&
+    !balance.pooled &&
+    balance.planId === 'free'
+  ) {
+    const billingCycle: BillingCycle = params.billing === 'annual' ? 'annual' : 'monthly'
+    resumeIntent = { plan: params.plan as PaidPlanId, billing: billingCycle }
+  }
 
   return (
     <BillingClient
@@ -98,6 +122,7 @@ export default async function BillingPage({ searchParams }: Props) {
       lumens={(lumenRows ?? []) as LumenPackRow[]}
       pooled={balance.pooled}
       offerEligible={offerEligible}
+      resumeIntent={resumeIntent}
     />
   )
 }
