@@ -65,7 +65,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" className={geist.variable} suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{__html: `try{var t=localStorage.getItem('theme');var light=t==='light'||((t===null||t==='system')&&window.matchMedia('(prefers-color-scheme: light)').matches);if(location.pathname==='/'||location.pathname.indexOf('/lp/')===0)light=false;document.documentElement.classList.toggle('light',light)}catch(e){}`}} />
+        <script dangerouslySetInnerHTML={{__html: `try{var t=localStorage.getItem('theme');var light=t==='light'||((t===null||t==='system')&&window.matchMedia('(prefers-color-scheme: light)').matches);if(location.pathname==='/')light=true;else if(location.pathname.indexOf('/lp/')===0)light=false;document.documentElement.classList.toggle('light',light)}catch(e){}`}} />
       </head>
       <body className="antialiased">
         {/* Captura first-party de UTMs/click-ids em cookie (sem terceiros) —

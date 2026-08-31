@@ -44,7 +44,9 @@ export default function Navbar() {
           WebkitBackdropFilter: 'blur(24px)',
           borderBottom: '0.5px solid var(--color-border)',
         }}
-        className="spn-nav"
+        // spn-dark: a barra fica sempre escura sobre a landing light — mesma
+        // linguagem das faixas hero/produto/galeria.
+        className="spn-nav spn-dark"
       >
         <Logo symbolSize={48} />
 
@@ -72,7 +74,7 @@ export default function Navbar() {
             Entrar
           </a>
           <a href="/login?mode=signup" className="nav-pill nav-pill-cta">
-            Começar agora
+            Testar grátis
           </a>
         </div>
 
@@ -113,7 +115,7 @@ export default function Navbar() {
 
       {/* Mobile drawer */}
       <div
-        className={`nav-drawer ${open ? 'is-open' : ''}`}
+        className={`nav-drawer spn-dark ${open ? 'is-open' : ''}`}
         role="dialog"
         aria-modal="true"
         aria-hidden={!open}
@@ -148,7 +150,7 @@ export default function Navbar() {
               onClick={() => setOpen(false)}
               className="drawer-cta drawer-cta-primary"
             >
-              Começar agora
+              Testar grátis
               <svg width="14" height="14" viewBox="0 0 12 12" fill="none">
                 <path d="M2 6h8M6.5 2.5L10 6l-3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
@@ -171,7 +173,7 @@ export default function Navbar() {
               textAlign: 'center',
             }}
           >
-            80 nodes grátis · sem cartão de crédito
+            80 nodes grátis · sem cartão · em português
           </p>
         </div>
       </div>

@@ -5,14 +5,12 @@ import { SUPPORT_EMAIL, SUPPORT_PHONE_DISPLAY, supportWhatsAppUrl } from '@/lib/
 
 const faqLink = { color: 'var(--color-text-primary)', textDecoration: 'underline', textUnderlineOffset: 3 } as const
 
+// FAQ enxuto: 7 perguntas essenciais. As respostas de "substitui minhas
+// ferramentas?" e "prompts avançados?" foram absorvidas nas vizinhas.
 const faqs: { q: string; a: React.ReactNode }[] = [
   {
     q: 'O que é a SpaceNode?',
     a: 'Uma plataforma de visualização arquitetônica com IA para arquitetos e designers de interiores. Ela transforma estudos, modelos e imagens base em visualizações fotorrealistas — preservando a intenção do projeto, do estudo ao material de apresentação.',
-  },
-  {
-    q: 'A SpaceNode substitui SketchUp, Revit, Enscape ou Lumion?',
-    a: 'Não. Ela complementa o fluxo de trabalho: você continua projetando nas ferramentas que já usa e utiliza a SpaceNode para acelerar visualizações, estudos de atmosfera, variações e imagens de apresentação. É 100% web — sem plugin, sem instalação e sem GPU dedicada.',
   },
   {
     q: 'A IA altera o meu projeto?',
@@ -20,7 +18,7 @@ const faqs: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: 'Posso usar imagens do SketchUp como base?',
-    a: 'Sim. Prints de tela, exportações de imagem, estudos volumétricos, fotos e referências funcionam como imagem base — do SketchUp, Revit, ArchiCAD, Blender ou qualquer modelador. Quanto mais clara a imagem de origem, maior o controle sobre o resultado.',
+    a: 'Sim. Prints de tela, exportações de imagem, estudos volumétricos, fotos e referências funcionam como imagem base — do SketchUp, Revit, ArchiCAD, Blender ou qualquer modelador. A SpaceNode complementa as ferramentas que você já usa: é 100% web, sem plugin, sem instalação e sem GPU dedicada.',
   },
   {
     q: 'O que são Nodes?',
@@ -31,20 +29,8 @@ const faqs: { q: string; a: React.ReactNode }[] = [
     a: 'Sim, os direitos das imagens geradas são seus. Use em apresentações comerciais, portfólio, redes sociais, sites e materiais de apoio ao projeto — incluindo saída em alta resolução (até 4K) para impressão.',
   },
   {
-    q: 'Funciona para interiores e exteriores?',
-    a: 'Sim. Projetos residenciais, comerciais e corporativos; interiores, fachadas, paisagismo e estudos de materialidade. Se é visualização arquitetônica, é caso de uso da plataforma.',
-  },
-  {
-    q: 'Preciso saber criar prompts avançados?',
-    a: 'Não. A interface orienta com escolhas de arquitetura — tipo de ambiente, iluminação, câmera, atmosfera e nível de fidelidade. O objetivo é eliminar a dependência de prompts longos e genéricos.',
-  },
-  {
     q: 'Posso cancelar quando quiser?',
     a: 'Sim — a assinatura é mensal: você paga apenas o mês em uso e mantém o acesso até o fim do período. O cancelamento é feito direto no painel, sem burocracia.',
-  },
-  {
-    q: 'A SpaceNode é indicada para escritórios?',
-    a: 'Sim. Os planos Studio e Office foram desenhados para equipes com volume: mais nodes por mês, Lumens avulsos para picos de demanda e suporte prioritário — velocidade e consistência visual em todas as etapas do projeto.',
   },
   {
     q: 'Como falo com o suporte?',

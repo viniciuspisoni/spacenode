@@ -55,7 +55,7 @@ export default function FinalCTA() {
             transition: "opacity 0.2s",
           }}
         >
-          Começar agora →
+          Testar grátis →
         </a>
         <a
           href="#planos"
@@ -78,7 +78,7 @@ export default function FinalCTA() {
       </div>
 
       <p style={{ color: "var(--color-text-tertiary)", fontSize: 11, marginTop: 4 }}>
-        80 nodes grátis · sem cartão de crédito · sem compromisso
+        80 nodes grátis · sem cartão · em português
       </p>
 
       <style jsx>{`

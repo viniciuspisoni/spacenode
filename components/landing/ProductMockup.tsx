@@ -1,4 +1,5 @@
 import React from 'react'
+import Image from 'next/image'
 
 // ── Ícones — mesmo desenho de components/app/sidebar-icons.tsx, em escala
 //    de mockup (viewBox 24×24, stroke 1.5, terminações arredondadas) ─────────
@@ -198,8 +199,7 @@ function VistaMiniCard({ v }: { v: typeof VISTAS[number] }) {
       border: hairline, borderRadius: 8, overflow: 'hidden',
     }}>
       <div style={{ position: 'relative', aspectRatio: '4 / 3', background: 'rgba(255,255,255,0.03)' }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={v.src} alt={v.badge} loading="lazy" decoding="async" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+        <Image src={v.src} alt={v.badge} fill sizes="(max-width: 768px) 45vw, 200px" style={{ objectFit: 'cover' }} />
         <span style={{
           position: 'absolute', top: 6, left: 6,
           display: 'inline-flex', alignItems: 'center', gap: 4,
@@ -255,8 +255,7 @@ function VistaMestreBanner({ compact = false }: { compact?: boolean }) {
       aspectRatio: compact ? '16 / 9' : '32 / 9',
       background: 'rgba(255,255,255,0.03)', border: hairline,
     }}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/demo-render.jpg" alt="Vista Mestre" loading="lazy" decoding="async" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+      <Image src="/demo-render.jpg" alt="Vista Mestre" fill sizes="(max-width: 768px) 90vw, 620px" style={{ objectFit: 'cover' }} />
       <span style={{
         position: 'absolute', top: 8, left: 8,
         fontSize: 6.5, fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase',
@@ -599,6 +598,17 @@ function MobileMockup() {
   )
 }
 
+// ── Faixa compacta de módulos (absorve a antiga seção PlatformModules) ────────
+
+const MODULES = [
+  { Icon: IconGenerate,  name: 'renderizar', desc: 'Estudos e modelos viram imagens fotorrealistas com fidelidade geométrica.' },
+  { Icon: IconSpaces,    name: 'spaces',     desc: 'Variações coerentes do mesmo projeto: ângulos, luzes, atmosferas.' },
+  { Icon: IconRetocar,   name: 'editar',     desc: 'Ajustes pontuais sem recomeçar a imagem inteira.' },
+  { Icon: IconEnhance,   name: 'ampliar',    desc: 'Mais resolução, nitidez e qualidade final para apresentação.' },
+  { Icon: IconVideo,     name: 'animar',     desc: 'Imagens do projeto viram vídeos curtos de apresentação.' },
+  { Icon: IconHistory,   name: 'histórico',  desc: 'Gerações anteriores, comparação de versões e controle visual.' },
+]
+
 // ── Section wrapper ────────────────────────────────────────────────────────────
 
 export function ProductMockup() {
@@ -623,6 +633,27 @@ export function ProductMockup() {
 
       <div className="spn-mockup-desktop"><DesktopMockup /></div>
       <div className="spn-mockup-mobile"><MobileMockup /></div>
+
+      <div className="spn-mockup-modules">
+        {MODULES.map(({ Icon, name, desc }) => (
+          <div key={name} className="spn-mockup-module">
+            <span className="spn-mockup-module-icon"><Icon size={16} /></span>
+            <div>
+              <div className="spn-mockup-module-name">{name}</div>
+              <p className="spn-mockup-module-desc">{desc}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="spn-mockup-cta">
+        <a href="/login?mode=signup" className="spn-mockup-cta-btn">
+          Testar grátis — 80 nodes
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
+            <path d="M2 6h8M6.5 2.5L10 6l-3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </a>
+      </div>
 
       <style jsx>{`
         .spn-mockup {
@@ -662,6 +693,86 @@ export function ProductMockup() {
         .spn-mockup-desktop { display: block; }
         .spn-mockup-mobile { display: none; }
 
+        .spn-mockup-modules {
+          margin-top: 48px;
+          padding-top: 36px;
+          border-top: 0.5px solid var(--color-border);
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 22px 28px;
+        }
+        .spn-mockup-module {
+          display: flex;
+          gap: 12px;
+          align-items: flex-start;
+        }
+        .spn-mockup-module-icon {
+          width: 30px;
+          height: 30px;
+          flex-shrink: 0;
+          border-radius: 8px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: var(--color-text-secondary);
+          background: rgba(255, 255, 255, 0.05);
+          border: 0.5px solid rgba(255, 255, 255, 0.09);
+        }
+        .spn-mockup-module-name {
+          font-size: 13px;
+          font-weight: 500;
+          letter-spacing: -0.01em;
+          color: var(--color-text-primary);
+          margin-bottom: 3px;
+        }
+        .spn-mockup-module-desc {
+          font-size: 12px;
+          color: var(--color-text-tertiary);
+          line-height: 1.55;
+          letter-spacing: -0.005em;
+          margin: 0;
+        }
+        .spn-mockup-cta {
+          text-align: center;
+          margin-top: 40px;
+        }
+        .spn-mockup-cta-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          min-height: 44px;
+          padding: 0 22px;
+          border-radius: var(--radius-full);
+          font-size: 13px;
+          font-weight: 500;
+          letter-spacing: -0.01em;
+          text-decoration: none;
+          color: var(--color-text-primary);
+          background: rgba(255, 255, 255, 0.055);
+          border: 0.5px solid rgba(255, 255, 255, 0.1);
+          -webkit-backdrop-filter: blur(12px);
+          backdrop-filter: blur(12px);
+          box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.08);
+          transition:
+            transform var(--duration-base) cubic-bezier(0.21, 0.6, 0.35, 1),
+            background-color var(--duration-base) ease,
+            border-color var(--duration-base) ease;
+        }
+        .spn-mockup-cta-btn:hover {
+          background: rgba(255, 255, 255, 0.085);
+          border-color: rgba(255, 255, 255, 0.16);
+          transform: translateY(-1px);
+        }
+        .spn-mockup-cta-btn:active { transform: translateY(0); }
+        .spn-mockup-cta-btn:focus-visible {
+          outline: 2px solid rgba(255, 255, 255, 0.75);
+          outline-offset: 2px;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .spn-mockup-cta-btn { transition: none; }
+          .spn-mockup-cta-btn:hover { transform: none; }
+        }
+
         @media (max-width: 768px) {
           .spn-mockup {
             padding: 72px 20px;
@@ -677,6 +788,15 @@ export function ProductMockup() {
           }
           .spn-mockup-desktop { display: none; }
           .spn-mockup-mobile  { display: block; }
+          .spn-mockup-modules {
+            margin-top: 36px;
+            padding-top: 28px;
+            grid-template-columns: 1fr;
+            gap: 18px;
+          }
+          .spn-mockup-cta {
+            margin-top: 32px;
+          }
         }
       `}</style>
     </section>

@@ -2,20 +2,22 @@
 
 import { useState, useCallback } from 'react'
 import { ENGINES, ENGINE_ORDER, type Resolution } from '@/lib/engines'
-import { ANNUAL_BILLING_ENABLED, PLANS, recommendPlan, type PaidPlanId, type BillingCycle } from '@/lib/plans'
+import { ANNUAL_BILLING_ENABLED, PLANS, type Plan, type PaidPlanId, type BillingCycle } from '@/lib/plans'
 import { LUMEN_PACKS } from '@/lib/lumens'
 import { SUPPORT_EMAIL, supportWhatsAppUrl } from '@/lib/support'
-import {
-  isLaunchOfferOpen,
-  launchOfferPrice,
-  launchOfferDeadlineLabel,
-  formatBRL,
-  LAUNCH_OFFER_FINE_PRINT,
-} from '@/lib/launch-offer'
+import { formatBRL } from '@/lib/launch-offer'
+
+// A landing exibe só Starter / Pro / Studio — o Office saiu da vitrine
+// (volume maior vira conversa: "fale com a gente"). O catálogo em lib/plans
+// segue intacto para billing/checkout/webhook.
+type LandingPlanId = Exclude<PaidPlanId, 'office'>
+
+const DISPLAY_PLANS = PLANS.filter((p): p is Plan & { id: LandingPlanId } => p.id !== 'office')
 
 // UI-specific data por plano: features, badge, breakdown de renders.
 // Renders calculados com engine padrão por resolução: HD→Pulsar (10 nodes),
-// 2K→Vega (20), 4K→Vega (40). meterPct é proporcional ao maior plano (Office=100%).
+// 2K→Vega (20), 4K→Vega (40). meterPct é proporcional ao maior plano
+// exibido (Studio=100%).
 interface PlanDisplay {
   rendersHD: number
   renders2K: number
@@ -27,25 +29,20 @@ interface PlanDisplay {
   features: string[]
 }
 
-const PLAN_DISPLAY: Record<PaidPlanId, PlanDisplay> = {
+const PLAN_DISPLAY: Record<LandingPlanId, PlanDisplay> = {
   starter: {
     rendersHD: 75,  renders2K: 37,  renders4K: 18,
-    monthlyAnnualLabel: '890', meterPct: 9, featured: false, badge: '',
+    monthlyAnnualLabel: '890', meterPct: 21, featured: false, badge: '',
     features: ['Acesso a todos os motores', 'Renders em HD, 2K e 4K', 'Suporte por e-mail'],
   },
   pro: {
     rendersHD: 180, renders2K: 90,  renders4K: 45,
-    monthlyAnnualLabel: '1.990', meterPct: 23, featured: true, badge: 'recomendado',
+    monthlyAnnualLabel: '1.990', meterPct: 51, featured: true, badge: 'recomendado',
     features: ['Acesso a todos os motores', 'Lumens avulsos disponíveis', 'Suporte por e-mail'],
   },
   studio: {
     rendersHD: 350, renders2K: 175, renders4K: 87,
-    monthlyAnnualLabel: '3.490', meterPct: 44, featured: false, badge: '',
-    features: ['Acesso a todos os motores', 'Lumens avulsos disponíveis', 'Suporte prioritário'],
-  },
-  office: {
-    rendersHD: 800, renders2K: 400, renders4K: 200,
-    monthlyAnnualLabel: '6.990', meterPct: 100, featured: false, badge: '',
+    monthlyAnnualLabel: '3.490', meterPct: 100, featured: false, badge: '',
     features: ['Acesso a todos os motores', 'Lumens avulsos disponíveis', 'Suporte prioritário'],
   },
 }
@@ -71,7 +68,7 @@ const CheckIcon = () => (
 )
 
 function PlanCard({ planId, billing, loading, onSelect }: {
-  planId: PaidPlanId
+  planId: LandingPlanId
   billing: BillingCycle
   loading: string | null
   onSelect: (id: PaidPlanId) => void
@@ -81,10 +78,6 @@ function PlanCard({ planId, billing, loading, onSelect }: {
   const [hovered, setHovered] = useState(false)
   const price = billing === 'annual' ? plan.annualMonthlyPrice : plan.monthlyPrice
   const f = d.featured
-  // Oferta de lançamento vale só no mensal — "primeiro mês" não faz sentido
-  // num ciclo anual.
-  const offer        = billing === 'monthly' && isLaunchOfferOpen()
-  const shownPrice   = offer ? launchOfferPrice(price) : price
 
   return (
     <div
@@ -97,7 +90,7 @@ function PlanCard({ planId, billing, loading, onSelect }: {
         borderRadius: 14, padding: '28px 24px 24px',
         display: 'flex', flexDirection: 'column',
         position: 'relative', overflow: 'hidden',
-        boxShadow: hovered ? (f ? '0 8px 40px rgba(0,0,0,0.5)' : '0 4px 24px rgba(0,0,0,0.2)') : 'none',
+        boxShadow: hovered ? (f ? '0 8px 40px rgba(0,0,0,0.5)' : 'var(--shadow-md)') : (f ? 'var(--shadow-md)' : 'none'),
         transform: hovered ? 'translateY(-2px)' : 'translateY(0)',
         transition: 'box-shadow 0.2s, transform 0.2s',
       }}
@@ -107,7 +100,7 @@ function PlanCard({ planId, billing, loading, onSelect }: {
           position: 'absolute', top: 16, right: 16,
           fontSize: 9, fontWeight: 500, letterSpacing: '0.14em',
           textTransform: 'uppercase' as const,
-          background: 'rgba(48,209,88,0.15)', color: 'var(--color-accent-green)',
+          background: 'rgba(48,209,88,0.15)', color: '#30d158',
           padding: '3px 8px', borderRadius: 20,
           border: '0.5px solid rgba(48,209,88,0.25)',
         }}>
@@ -132,29 +125,14 @@ function PlanCard({ planId, billing, loading, onSelect }: {
           letterSpacing: '-0.04em', lineHeight: 1,
           fontVariantNumeric: 'tabular-nums' as const,
         }}>
-          {formatBRL(shownPrice)}
+          {formatBRL(price)}
         </span>
         <span style={{ fontSize: 13, color: f ? 'rgba(255,255,255,0.4)' : 'var(--color-text-tertiary)', letterSpacing: '-0.005em' }}>
           /mês
         </span>
-        {offer && (
-          <span style={{
-            fontSize: 14, letterSpacing: '-0.01em',
-            textDecoration: 'line-through',
-            color: f ? 'rgba(255,255,255,0.35)' : 'var(--color-text-tertiary)',
-            fontVariantNumeric: 'tabular-nums' as const,
-          }}>
-            R$ {formatBRL(price)}
-          </span>
-        )}
       </div>
 
-      {offer ? (
-        <p style={{ fontSize: 10.5, letterSpacing: '-0.005em', marginBottom: 14, color: f ? 'rgba(255,255,255,0.3)' : 'var(--color-text-tertiary)' }}>
-          <span style={{ color: 'var(--color-accent-green)', fontWeight: 500 }}>no 1º mês</span>
-          {' '}· depois R$ {formatBRL(price)}/mês
-        </p>
-      ) : billing === 'annual' ? (
+      {billing === 'annual' ? (
         <p style={{ fontSize: 10.5, letterSpacing: '-0.005em', marginBottom: 14, color: f ? 'rgba(255,255,255,0.3)' : 'var(--color-text-tertiary)' }}>
           R$ {d.monthlyAnnualLabel} cobrado anualmente
         </p>
@@ -194,7 +172,7 @@ function PlanCard({ planId, billing, loading, onSelect }: {
         }}>
           <div style={{
             height: '100%', borderRadius: 2,
-            background: f ? 'var(--color-accent-green)' : 'var(--color-text-primary)',
+            background: f ? '#30d158' : 'var(--color-text-primary)',
             width: `${d.meterPct}%`,
           }} />
         </div>
@@ -209,7 +187,11 @@ function PlanCard({ planId, billing, loading, onSelect }: {
             fontSize: 12, letterSpacing: '-0.005em',
             color: f ? 'rgba(255,255,255,0.7)' : 'var(--color-text-primary)',
           }}>
-            <CheckIcon />
+            {f ? (
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#30d158" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                <path d="M2 7l3.5 3.5L12 3.5"/>
+              </svg>
+            ) : <CheckIcon />}
             {feat}
           </li>
         ))}
@@ -223,8 +205,8 @@ function PlanCard({ planId, billing, loading, onSelect }: {
           fontFamily: 'inherit', fontSize: 12, fontWeight: 500, letterSpacing: '0.01em',
           cursor: loading ? 'wait' : 'pointer', transition: 'all 0.15s',
           border: f ? 'none' : '0.5px solid var(--color-border-strong)',
-          background: f ? 'var(--color-text-primary)' : 'var(--color-surface)',
-          color: f ? 'var(--color-bg)' : 'var(--color-text-primary)',
+          background: f ? '#fafafa' : 'var(--color-surface)',
+          color: f ? '#0a0a0a' : 'var(--color-text-primary)',
           opacity: loading && loading !== plan.id ? 0.5 : 1,
         }}
       >
@@ -288,7 +270,12 @@ function ConsumptionTable() {
   )
 }
 
-const TOP_PLAN_NODES = PLANS[PLANS.length - 1].nodes
+const TOP_PLAN_NODES = DISPLAY_PLANS[DISPLAY_PLANS.length - 1].nodes
+
+/** Menor plano exibido na landing cujo limite cobre a necessidade. */
+function recommendDisplayPlan(nodesNeeded: number): Plan {
+  return DISPLAY_PLANS.find(p => p.nodes >= nodesNeeded) ?? DISPLAY_PLANS[DISPLAY_PLANS.length - 1]
+}
 
 export function PricingToggle() {
   const [billing, setBilling]         = useState<BillingCycle>('monthly')
@@ -297,7 +284,7 @@ export function PricingToggle() {
   const [qualityCost, setQualityCost] = useState(10)
 
   const totalNodes      = renders * qualityCost
-  const recommended     = recommendPlan(totalNodes)
+  const recommended     = recommendDisplayPlan(totalNodes)
   const overflow        = totalNodes > TOP_PLAN_NODES
   const overflowAmount  = overflow ? totalNodes - TOP_PLAN_NODES : 0
   const suggestedLumen  = overflow
@@ -319,7 +306,7 @@ export function PricingToggle() {
 
   return (
     <section id="planos" className="spn-pricing" style={{ background: 'var(--color-bg)' }}>
-      <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+      <div style={{ maxWidth: 1000, margin: '0 auto' }}>
 
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 48 }}>
@@ -376,9 +363,9 @@ export function PricingToggle() {
               <span style={{
                 fontSize: 9, fontWeight: 500, letterSpacing: '0.08em',
                 textTransform: 'uppercase' as const,
-                background: 'rgba(48,209,88,0.15)', color: 'var(--color-accent-green)',
+                background: 'var(--color-accent-green-bg)', color: 'var(--color-accent-green)',
                 padding: '2px 7px', borderRadius: 20,
-                border: '0.5px solid rgba(48,209,88,0.25)',
+                border: '0.5px solid var(--color-accent-green-border)',
               }}>
                 2 meses grátis
               </span>
@@ -387,23 +374,39 @@ export function PricingToggle() {
           )}
         </div>
 
-        {/* Plan cards: 4 colunas em desktop, auto-fit em telas menores */}
+        {/* Plan cards: Starter / Pro (recomendado, central) / Studio */}
         <div
           className="spn-pricing-grid"
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
             gap: 12, alignItems: 'start',
           }}
         >
-          {PLANS.map(p => (
+          {DISPLAY_PLANS.map(p => (
             <PlanCard key={p.id} planId={p.id} billing={billing} loading={loading} onSelect={handleSelect} />
           ))}
         </div>
 
-        {/* Risk-reduction microcopy */}
+        {/* Volume maior → conversa (substitui o antigo plano Office na vitrine) */}
         <p style={{
           textAlign: 'center', marginTop: 20,
+          fontSize: 12, color: 'var(--color-text-secondary)', letterSpacing: '-0.005em',
+        }}>
+          Precisa de mais volume para o seu escritório?{' '}
+          <a
+            href={supportWhatsAppUrl('Olá! Preciso de mais volume de nodes para o meu escritório.')}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: 'var(--color-text-primary)', textDecoration: 'underline', textUnderlineOffset: 3 }}
+          >
+            Fale com a gente
+          </a>.
+        </p>
+
+        {/* Risk-reduction microcopy */}
+        <p style={{
+          textAlign: 'center', marginTop: 8,
           fontSize: 12, color: 'var(--color-text-tertiary)', letterSpacing: '-0.005em',
         }}>
           Ainda em dúvida?{' '}
@@ -484,6 +487,7 @@ export function PricingToggle() {
               <input
                 type="range" min="5" max="200" step="5" value={renders}
                 onChange={handleRenders}
+                aria-label="Renders por mês"
                 style={{ width: '100%', marginBottom: 8, cursor: 'pointer', accentColor: 'var(--color-accent-green)' }}
               />
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--color-text-tertiary)' }}>
@@ -559,7 +563,6 @@ export function PricingToggle() {
         {/* Footer */}
         <div style={{ textAlign: 'center', marginTop: 32 }}>
           <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', letterSpacing: '-0.005em', lineHeight: 1.7 }}>
-            {isLaunchOfferOpen() && <>{LAUNCH_OFFER_FINE_PRINT} Oferta válida até {launchOfferDeadlineLabel()}.<br /></>}
             Nodes renovam mensalmente e não acumulam para o mês seguinte.<br />
             Lumens (créditos avulsos) ficam disponíveis a partir do plano Pro.<br />
             Dúvidas?{' '}
