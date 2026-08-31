@@ -31,8 +31,10 @@ emoji pontual e sóbrio tolerado apenas em legenda orgânica.
   imagens/prints do modelo*.
 - "Histórico de 30 dias" / "histórico ilimitado por plano" — não existe retenção por plano.
 - "Lumens" — conceito aposentado em 2026-08-31; o nome atual é **Nodes extras** (avulsos, sem
-  validade, a partir do Pro). Nunca usar "Lumens" em peça nova, nem prometer validade/expiração
-  para Nodes extras.
+  validade, em qualquer plano pago). Nunca usar "Lumens" em peça nova, nem prometer
+  validade/expiração para Nodes extras.
+- Plano **Office** — aposentado para novas assinaturas em 2026-08-31. Não promover; a vitrine
+  é Starter/Pro/Studio e volume maior vira conversa com o suporte.
 
 ## 3. Invenções (proibição absoluta)
 

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ANNUAL_BILLING_ENABLED, PLANS, type PaidPlanId, type BillingCycle } from '@/lib/plans'
+import { ANNUAL_BILLING_ENABLED, SELLABLE_PLANS, type PaidPlanId, type BillingCycle } from '@/lib/plans'
 import { getPlanDisplayName } from '@/lib/plan-display'
 import { EXTRA_NODE_PACKS, type ExtraPackSize } from '@/lib/extra-nodes'
 import {
@@ -68,7 +68,11 @@ function daysUntil(date: string): number {
 }
 
 export function BillingClient({ plan, balance, extras, pooled, offerEligible, notice }: BillingClientProps) {
-  const isExtraBlocked = plan === 'free' || plan === 'starter'
+  // Extras para qualquer plano pago (Starter incluso desde 2026-08-31).
+  const isExtraBlocked = plan === 'free'
+  // Assinante do Office (aposentado): a vitrine não o exibe, mas os
+  // benefícios seguem até troca/cancelamento — rotulado como plano legado.
+  const isLegacyPlan = plan === 'office'
   const [billing, setBilling] = useState<BillingCycle>('monthly')
   const [loading, setLoading] = useState<string | null>(null)
   const [error,   setError]   = useState<string | null>(null)
@@ -165,7 +169,7 @@ export function BillingClient({ plan, balance, extras, pooled, offerEligible, no
           <div style={{ display: 'flex', gap: 8, marginBottom: 18, alignItems: 'center', flexWrap: 'wrap' }}>
             {ANNUAL_BILLING_ENABLED && <BillingToggle billing={billing} setBilling={setBilling} />}
             <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
-              Plano atual: <strong style={{ color: 'var(--color-text-primary)' }}>{getPlanDisplayName(plan)}</strong>
+              Plano atual: <strong style={{ color: 'var(--color-text-primary)' }}>{getPlanDisplayName(plan)}{isLegacyPlan && ' · plano legado'}</strong>
             </span>
             {canManage && (
               <button
@@ -203,12 +207,25 @@ export function BillingClient({ plan, balance, extras, pooled, offerEligible, no
               </span>
             </div>
           )}
+          {isLegacyPlan && (
+            <div style={{
+              background: 'var(--color-bg-elevated)',
+              border: '0.5px solid var(--color-border)',
+              borderRadius: 12, padding: '14px 18px', marginBottom: 14,
+              fontSize: 12.5, color: 'var(--color-text-secondary)',
+              lineHeight: 1.6, letterSpacing: '-0.005em',
+            }}>
+              O plano <strong style={{ color: 'var(--color-text-primary)' }}>Office</strong> foi
+              aposentado para novas assinaturas, mas o seu segue valendo: os 8.000 nodes
+              mensais e todos os benefícios continuam até você trocar de plano ou cancelar.
+            </div>
+          )}
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
             gap: 12, alignItems: 'stretch',
           }}>
-            {PLANS.map(p => {
+            {SELLABLE_PLANS.map(p => {
               const current = p.id === plan
               const price = billing === 'annual' ? p.annualMonthlyPrice : p.monthlyPrice
               return (
@@ -282,10 +299,10 @@ export function BillingClient({ plan, balance, extras, pooled, offerEligible, no
               textAlign: 'center',
             }}>
               <p style={{ fontSize: 14, color: 'var(--color-text-primary)', marginBottom: 8, fontWeight: 500 }}>
-                Nodes extras disponíveis a partir do plano Pro.
+                Nodes extras disponíveis para assinantes.
               </p>
               <p style={{ fontSize: 12, color: 'var(--color-text-tertiary)', lineHeight: 1.6 }}>
-                Faça upgrade para Pro ou superior para comprar nodes avulsos que não expiram.
+                Assine qualquer plano para comprar nodes avulsos que não expiram.
               </p>
             </div>
           ) : (

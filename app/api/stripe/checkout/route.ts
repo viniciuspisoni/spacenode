@@ -6,6 +6,7 @@ import { recordAcquisitionEvent } from '@/lib/marketing/ads/service'
 import {
   ANNUAL_BILLING_ENABLED,
   isPaidPlanId,
+  isSellablePlanId,
   getPlanById,
   getStripePriceId,
   type PaidPlanId,
@@ -123,6 +124,19 @@ export async function POST(req: NextRequest) {
   if (body.type === 'plan') {
     if (!isPaidPlanId(body.id)) {
       return NextResponse.json({ error: 'plano inválido' }, { status: 400 })
+    }
+    // Plano legado (Office): sem NOVAS assinaturas — a UI não oferece, e o
+    // servidor barra payload direto. Assinantes existentes seguem renovando
+    // normalmente via webhook (findPlanByStripePriceId cobre o catálogo todo).
+    if (!isSellablePlanId(body.id)) {
+      return NextResponse.json(
+        {
+          error:
+            'O plano Office foi aposentado e não aceita novas assinaturas. ' +
+            'Precisa de mais volume? Fale com o suporte.',
+        },
+        { status: 400 }
+      )
     }
     if (body.billing !== 'monthly' && body.billing !== 'annual') {
       return NextResponse.json({ error: 'billing inválido' }, { status: 400 })
@@ -304,9 +318,11 @@ export async function POST(req: NextRequest) {
   if (!isExtraPackSize(body.id)) {
     return NextResponse.json({ error: 'pack de Nodes extras inválido' }, { status: 400 })
   }
-  if (!profile || profile.plan === 'free' || profile.plan === 'starter') {
+  // Qualquer plano PAGO compra extras (Starter incluso desde 2026-08-31, com
+  // a aposentadoria do Office — o caminho de volume extra ficou universal).
+  if (!profile || profile.plan === 'free') {
     return NextResponse.json(
-      { error: 'Nodes extras disponíveis a partir do plano Pro' },
+      { error: 'Nodes extras disponíveis para assinantes — assine um plano para comprar.' },
       { status: 403 }
     )
   }

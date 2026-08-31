@@ -7,9 +7,10 @@
 // primeiro os mensais, depois os extras na ordem de compra
 // (consume_nodes_v2).
 //
-// Restrição de venda: apenas para usuários com plano Pro ou superior.
-// A checagem fica na rota de checkout, não aqui — esta lib é fonte de
-// verdade só do catálogo.
+// Restrição de venda: qualquer plano PAGO (Starter incluso desde
+// 2026-08-31, junto com a aposentadoria do plano Office). A checagem fica
+// na rota de checkout, não aqui — esta lib é fonte de verdade só do
+// catálogo.
 
 export type ExtraPackSize = 500 | 1500 | 4000
 
