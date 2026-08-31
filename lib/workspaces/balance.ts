@@ -20,10 +20,12 @@ export interface PayerBalance {
   pooled: boolean
   /** Plano do pagador (profiles.plan). */
   planId: string
+  /** Nodes mensais — renovam com o plano (profiles.credits). */
   planBalance: number
-  lumenBalance: number
+  /** Nodes extras — avulsos, sem validade (ex-"Lumens"; tabela lumen_packs). */
+  extraBalance: number
   totalBalance: number
-  activeLumenPacks: number
+  extraPacks: number
 }
 
 export async function getPayerBalance(
@@ -42,17 +44,18 @@ export async function getPayerBalance(
   ])
 
   // View sem linha (conta pré-view): cai pro credits do perfil do pagador.
+  // As colunas lumen_* da view são o nome interno legado de Nodes extras.
   const fallbackPlan = profRes.data?.credits ?? 0
   const planBalance  = balRes.data?.plan_balance  ?? fallbackPlan
-  const lumenBalance = balRes.data?.lumen_balance ?? 0
+  const extraBalance = balRes.data?.lumen_balance ?? 0
 
   return {
     payerId,
-    pooled:           payerId !== userId,
-    planId:           (profRes.data?.plan as string | undefined) ?? 'free',
+    pooled:       payerId !== userId,
+    planId:       (profRes.data?.plan as string | undefined) ?? 'free',
     planBalance,
-    lumenBalance,
-    totalBalance:     balRes.data?.total_balance ?? planBalance + lumenBalance,
-    activeLumenPacks: balRes.data?.active_lumen_packs ?? 0,
+    extraBalance,
+    totalBalance: balRes.data?.total_balance ?? planBalance + extraBalance,
+    extraPacks:   balRes.data?.active_lumen_packs ?? 0,
   }
 }

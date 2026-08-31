@@ -19,7 +19,8 @@ export interface RequestContext {
   planId: string | null
   planName: string | null
   balance: number | null
-  lumens: number | null
+  /** Nodes extras (avulsos, sem validade). */
+  extras: number | null
   attachment: NodiAttachment | null
 }
 
@@ -32,17 +33,17 @@ export async function buildRequestContext(
   const nodi = deriveNodiContext(route)
   let planId: string | null = null
   let balance: number | null = null
-  let lumens: number | null = null
+  let extras: number | null = null
   try {
     const payer = await getPayerBalance(admin, userId)
     planId = (payer?.planId as string) ?? null
     balance = typeof payer?.planBalance === 'number' ? payer.planBalance : null
-    lumens = typeof payer?.lumenBalance === 'number' ? payer.lumenBalance : null
+    extras = typeof payer?.extraBalance === 'number' ? payer.extraBalance : null
   } catch {
     // saldo indisponível não derruba a conversa — as tools reportam se preciso
   }
   const planName = planId ? getPlanById(planId as PlanId)?.name ?? planId : null
-  return { nodi, planId, planName, balance, lumens, attachment }
+  return { nodi, planId, planName, balance, extras, attachment }
 }
 
 /** Bloco de contexto pro primeiro turno do modelo. */
@@ -53,8 +54,8 @@ export function contextBlock(ctx: RequestContext): string {
     ctx.nodi.projectId ? `projeto_aberto: ${ctx.nodi.projectId}` : 'projeto_aberto: nenhum',
     ctx.nodi.vistaId ? `vista_aberta: ${ctx.nodi.vistaId}` : null,
     ctx.planName ? `plano: ${ctx.planName}` : 'plano: desconhecido',
-    ctx.balance !== null ? `saldo_nodes_plano: ${ctx.balance}` : 'saldo_nodes_plano: desconhecido',
-    ctx.lumens !== null && ctx.lumens > 0 ? `saldo_lumens: ${ctx.lumens}` : null,
+    ctx.balance !== null ? `saldo_nodes_mensais: ${ctx.balance}` : 'saldo_nodes_mensais: desconhecido',
+    ctx.extras !== null && ctx.extras > 0 ? `saldo_nodes_extras: ${ctx.extras}` : null,
     ctx.attachment ? `imagem_anexada: ${ctx.attachment.kind} ${ctx.attachment.id}` : 'imagem_anexada: nenhuma',
     ctx.nodi.extra ? `contexto_da_pagina: ${JSON.stringify(ctx.nodi.extra)}` : null,
   ].filter(Boolean)

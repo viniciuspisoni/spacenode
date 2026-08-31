@@ -7,7 +7,7 @@
 // Princípios (herdados do manual da marca):
 //   · voz de arquiteto sênior: direto, específico, sem entusiasmo vazio;
 //   · números SEMPRE importados da fonte de verdade (lib/plans, lib/engines,
-//     lib/video/models, lib/lumens, lib/support) — nunca digitados aqui;
+//     lib/video/models, lib/extra-nodes, lib/support) — nunca digitados aqui;
 //   · quando o valor não é importável (ex.: nodes de cortesia do cadastro,
 //     que é DEFAULT de coluna no banco), a resposta fica qualitativa;
 //   · nada de promessa que o produto não cumpre; nada de jargão de IA.
@@ -16,7 +16,7 @@
 // títulos (sugestões/FAQ) e pede a resposta por id.
 
 import { PLANS } from '@/lib/plans'
-import { LUMEN_PACKS, LUMEN_VALIDITY_DAYS } from '@/lib/lumens'
+import { EXTRA_NODE_PACKS } from '@/lib/extra-nodes'
 import { ENGINES, ENGINE_ORDER } from '@/lib/engines'
 import { listAvailableVideoModels } from '@/lib/video/models'
 import { SUPPORT_EMAIL, SUPPORT_PHONE_DISPLAY, supportWhatsAppUrl } from '@/lib/support'
@@ -214,18 +214,20 @@ export const KB_ENTRIES: KBEntry[] = [
     }),
   },
   {
-    id: 'lumens',
-    title: 'O que são Lumens?',
-    keywords: ['lumens', 'lumen', 'avulso', 'recarga', 'creditos extras', 'acabaram os nodes'],
-    patterns: [/o que sao lumens/, /(comprar|recarregar).*(nodes|lumens|creditos)/, /nodes acabaram/],
+    id: 'nodes-extras',
+    title: 'O que são Nodes extras?',
+    // "lumens" fica nos keywords: é o nome antigo e usuários veteranos ainda
+    // perguntam por ele — a resposta já corrige a nomenclatura.
+    keywords: ['nodes extras', 'extras', 'avulso', 'recarga', 'creditos extras', 'acabaram os nodes', 'lumens', 'lumen'],
+    patterns: [/o que sao (nodes extras|lumens)/, /(comprar|recarregar).*(nodes|lumens|creditos)/, /nodes acabaram/],
     modules: ['planos'],
     faq: true,
     build: () => ({
       text:
-        'Lumens são pacotes avulsos de nodes para quando o mês aperta, com validade de ' +
-        `${LUMEN_VALIDITY_DAYS} dias:\n` +
-        LUMEN_PACKS.map(p => `• ${p.name}: ${p.nodes.toLocaleString('pt-BR')} nodes — ${brl(p.price)}`).join('\n') +
-        '\nDisponíveis para quem tem plano ativo. O consumo usa primeiro os nodes do plano; Lumens entram depois, na ordem de compra.',
+        'Nodes extras são pacotes avulsos de nodes para quando o mês aperta — sem validade ' +
+        '(antes se chamavam "Lumens"):\n' +
+        EXTRA_NODE_PACKS.map(p => `• ${p.name}: ${p.nodes.toLocaleString('pt-BR')} nodes — ${brl(p.price)}`).join('\n') +
+        '\nDisponíveis a partir do plano Pro. O consumo usa primeiro os Nodes mensais do plano; os extras entram depois, na ordem de compra.',
       actions: [ACT.planos],
     }),
   },
@@ -237,7 +239,7 @@ export const KB_ENTRIES: KBEntry[] = [
     build: () => ({
       text:
         'O anel em volta do seu avatar, na barra lateral, mostra o consumo do ciclo — passe o mouse para o detalhe. ' +
-        'O saldo completo (plano + Lumens) fica em Planos. Em equipe, o saldo exibido é a bolsa do dono do workspace.',
+        'O saldo completo (mensais + extras) fica em Planos. Em equipe, o saldo exibido é a bolsa do dono do workspace.',
       actions: [ACT.planos],
     }),
   },

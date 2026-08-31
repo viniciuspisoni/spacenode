@@ -20,12 +20,12 @@ export async function GET() {
   const state = getBalanceState(balance.planBalance, planTotal)
 
   return NextResponse.json({
-    plan_balance:        balance.planBalance,
-    plan_total:          planTotal,
-    lumen_balance:       balance.lumenBalance,
-    active_lumen_packs:  balance.activeLumenPacks,
-    total_balance:       balance.totalBalance,
-    plan_id:             balance.planId,
+    plan_balance:  balance.planBalance,
+    plan_total:    planTotal,
+    extra_balance: balance.extraBalance,
+    extra_packs:   balance.extraPacks,
+    total_balance: balance.totalBalance,
+    plan_id:       balance.planId,
     state,
   })
 }

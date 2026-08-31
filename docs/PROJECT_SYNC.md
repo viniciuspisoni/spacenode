@@ -57,7 +57,7 @@
 - **Geração de imagem (`/app/generate`):** upload drag-and-drop, seletores Ambiente/Estilo/Iluminação, slider Geometry Lock (0–100%), seletor de motor (Vega/Pulsar/Quasar + outros), comparador antes/depois, download.
 - **Upscale (`/app/upscale`):** recomendação dinâmica de modelo a partir de heurísticas de arquivo, banner contextual, tags de modelo.
 - **Histórico (`/app/history`):** galeria de renders, labels amigáveis dos modelos, double-click para seleção.
-- **Planos (`/app/plans`):** integração Stripe (checkout + webhook), compra de Lumens restrita a Pro+.
+- **Planos (`/app/plans`):** integração Stripe (checkout + webhook), compra de Nodes extras (avulsos, sem validade; ex-"Lumens") restrita a Pro+.
 - **Landing:** versão minimal, sem SocialProof, foco em conversão.
 
 ---
@@ -165,7 +165,7 @@ Ambas estão **em `main`** (chegaram via PR #5 antes do merge do PR #53; os arqu
 - **IA de imagem:** `@fal-ai/client` v1.9.5.
 - **Cliente Supabase:** três variantes — `lib/supabase/client.ts` (browser), `lib/supabase/server.ts` (SSR), `lib/supabase/admin.ts` (service role, apenas server-side).
 - **RPC sensível chamada com JWT do usuário:** sempre via `supabase.rpc`, nunca `admin.rpc`, para que `auth.uid()` resolva.
-- **Stripe:** Lumens (compra avulsa) restritos a planos Pro+.
+- **Stripe:** Nodes extras (compra avulsa, sem validade; ex-"Lumens") restritos a planos Pro+.
 
 ---
 

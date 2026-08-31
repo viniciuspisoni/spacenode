@@ -12,11 +12,11 @@ import {
   type BillingCycle,
 } from '@/lib/plans'
 import {
-  isLumenPackSize,
-  getLumenPackById,
-  getLumenStripePriceId,
-  type LumenPackSize,
-} from '@/lib/lumens'
+  isExtraPackSize,
+  getExtraPackById,
+  getExtraPackStripePriceId,
+  type ExtraPackSize,
+} from '@/lib/extra-nodes'
 import { isLaunchOfferOpen } from '@/lib/launch-offer'
 import {
   isPixEnabled,
@@ -30,8 +30,10 @@ import {
 export const dynamic = 'force-dynamic'
 
 interface PlanCheckoutBody  { type: 'plan';  id: PaidPlanId;    billing: BillingCycle }
-interface LumenCheckoutBody { type: 'lumen'; id: LumenPackSize }
-type CheckoutBody = PlanCheckoutBody | LumenCheckoutBody
+/** 'lumen' é o nome legado de Nodes extras — aceito por compatibilidade
+ *  com abas abertas antes do deploy da unificação (2026-08-31). */
+interface ExtraCheckoutBody { type: 'extra' | 'lumen'; id: ExtraPackSize }
+type CheckoutBody = PlanCheckoutBody | ExtraCheckoutBody
 
 // IDs gravados no profile podem ficar órfãos (ex.: objetos de modo teste após
 // a virada pra live) — validar antes de reusar evita "No such customer" → 500.
@@ -91,7 +93,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Payload inválido' }, { status: 400 })
   }
 
-  if (body.type !== 'plan' && body.type !== 'lumen') {
+  if (body.type !== 'plan' && body.type !== 'extra' && body.type !== 'lumen') {
     return NextResponse.json({ error: 'type inválido' }, { status: 400 })
   }
 
@@ -298,26 +300,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ url: session.url })
   }
 
-  // ── Lumen (pagamento avulso) ────────────────────────────────────────────
-  if (!isLumenPackSize(body.id)) {
-    return NextResponse.json({ error: 'pack Lumen inválido' }, { status: 400 })
+  // ── Nodes extras (pagamento avulso, sem validade) ───────────────────────
+  if (!isExtraPackSize(body.id)) {
+    return NextResponse.json({ error: 'pack de Nodes extras inválido' }, { status: 400 })
   }
   if (!profile || profile.plan === 'free' || profile.plan === 'starter') {
     return NextResponse.json(
-      { error: 'Lumens disponíveis a partir do plano Pro' },
+      { error: 'Nodes extras disponíveis a partir do plano Pro' },
       { status: 403 }
     )
   }
-  const pack    = getLumenPackById(body.id)!
-  const priceId = getLumenStripePriceId(pack.id)
+  const pack    = getExtraPackById(body.id)!
+  const priceId = getExtraPackStripePriceId(pack.id)
   if (!priceId) {
-    console.error('[checkout] missing Stripe price id for lumen', pack.id)
+    console.error('[checkout] missing Stripe price id for extra pack', pack.id)
     return NextResponse.json({ error: 'Configuração indisponível' }, { status: 500 })
   }
 
   // Pix comum (QR de pagamento único). Mesma rede da assinatura: se o Stripe
   // recusar o tipo, refaz só no cartão em vez de derrubar a venda.
-  const buildLumenSession = (withPix: boolean) =>
+  const buildExtraSession = (withPix: boolean) =>
     stripe.checkout.sessions.create({
       ...customerArgs,
       payment_method_types: paymentMethodTypes(withPix),
@@ -326,25 +328,25 @@ export async function POST(req: NextRequest) {
       ...(withPix
         ? { payment_method_options: { pix: { expires_after_seconds: PIX_EXPIRES_AFTER_SECONDS } } }
         : {}),
-      success_url:          `${successBase}?lumen_success=true&session_id={CHECKOUT_SESSION_ID}`,
+      success_url:          `${successBase}?extra_success=true&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url:           `${successBase}?canceled=true`,
       metadata: {
         user_id:      user.id,
-        product_type: 'lumen',
+        product_type: 'extra',
         pack_size:    String(pack.id),
       },
     })
 
   let session: Stripe.Checkout.Session
   try {
-    session = await buildLumenSession(isPixEnabled())
+    session = await buildExtraSession(isPixEnabled())
   } catch (err) {
     if (!isPixEnabled() || !isPixRejectedError(err)) throw err
     console.error(
-      '[checkout] Stripe recusou `pix` no pack Lumen — ative Pix no Dashboard ' +
-      'deste modo. Seguindo só no cartão.'
+      '[checkout] Stripe recusou `pix` no pack de Nodes extras — ative Pix no ' +
+      'Dashboard deste modo. Seguindo só no cartão.'
     )
-    session = await buildLumenSession(false)
+    session = await buildExtraSession(false)
   }
   return NextResponse.json({ url: session.url })
 }

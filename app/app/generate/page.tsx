@@ -61,7 +61,7 @@ export default async function GeneratePage({
 
   return (
     <GenerateClient
-      // Saldo TOTAL da bolsa (plano + Lumens) — é o que consume_workspace_nodes
+      // Saldo TOTAL da bolsa (mensais + extras) — é o que consume_workspace_nodes
       // debita, então é o que gateia o CTA e alimenta o contador de renders.
       initialCredits={balance.totalBalance}
       // Sem assinatura ativa, o default de motor×qualidade é o econômico

@@ -90,7 +90,7 @@ componente. Cada entrada:
 Regras:
 
 - **Números vêm de import** (`lib/plans`, `lib/engines`, `lib/video/models`,
-  `lib/lumens`, `lib/support`) — nunca digitados. Se o valor não é importável
+  `lib/extra-nodes`, `lib/support`) — nunca digitados. Se o valor não é importável
   (ex.: nodes de cortesia do cadastro, DEFAULT de coluna), a resposta fica
   qualitativa (regra de marca: não citar número sem fonte no código).
 - Voz do manual da marca: direto, específico, sem hype, sem emoji, sem jargão

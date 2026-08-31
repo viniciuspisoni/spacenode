@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react'
 import { ENGINES, ENGINE_ORDER, type Resolution } from '@/lib/engines'
 import { ANNUAL_BILLING_ENABLED, PLANS, type Plan, type PaidPlanId, type BillingCycle } from '@/lib/plans'
-import { LUMEN_PACKS } from '@/lib/lumens'
+import { EXTRA_NODE_PACKS } from '@/lib/extra-nodes'
 import { SUPPORT_EMAIL, supportWhatsAppUrl } from '@/lib/support'
 import { formatBRL } from '@/lib/launch-offer'
 
@@ -38,12 +38,12 @@ const PLAN_DISPLAY: Record<LandingPlanId, PlanDisplay> = {
   pro: {
     rendersHD: 180, renders2K: 90,  renders4K: 45,
     monthlyAnnualLabel: '1.990', meterPct: 51, featured: true, badge: 'recomendado',
-    features: ['Acesso a todos os motores', 'Lumens avulsos disponíveis', 'Suporte por e-mail'],
+    features: ['Acesso a todos os motores', 'Nodes extras disponíveis', 'Suporte por e-mail'],
   },
   studio: {
     rendersHD: 350, renders2K: 175, renders4K: 87,
     monthlyAnnualLabel: '3.490', meterPct: 100, featured: false, badge: '',
-    features: ['Acesso a todos os motores', 'Lumens avulsos disponíveis', 'Suporte prioritário'],
+    features: ['Acesso a todos os motores', 'Nodes extras disponíveis', 'Suporte prioritário'],
   },
 }
 
@@ -287,8 +287,8 @@ export function PricingToggle() {
   const recommended     = recommendDisplayPlan(totalNodes)
   const overflow        = totalNodes > TOP_PLAN_NODES
   const overflowAmount  = overflow ? totalNodes - TOP_PLAN_NODES : 0
-  const suggestedLumen  = overflow
-    ? (LUMEN_PACKS.find(p => p.nodes >= overflowAmount) ?? LUMEN_PACKS[LUMEN_PACKS.length - 1])
+  const suggestedExtra  = overflow
+    ? (EXTRA_NODE_PACKS.find(p => p.nodes >= overflowAmount) ?? EXTRA_NODE_PACKS[EXTRA_NODE_PACKS.length - 1])
     : null
 
   const handleSelect = async (id: PaidPlanId) => {
@@ -468,7 +468,7 @@ export function PricingToggle() {
               fontSize: 12, fontWeight: 500, letterSpacing: '-0.01em', whiteSpace: 'nowrap' as const,
             }}>
               {overflow
-                ? <>Sugestão:&nbsp;<span style={{ color: 'var(--color-accent-green)', fontWeight: 400 }}>{recommended.name} + {suggestedLumen!.name}</span></>
+                ? <>Sugestão:&nbsp;<span style={{ color: 'var(--color-accent-green)', fontWeight: 400 }}>{recommended.name} + {suggestedExtra!.name}</span></>
                 : <>Plano recomendado:&nbsp;<span style={{ color: 'var(--color-accent-green)', fontWeight: 400 }}>{recommended.name}</span></>}
             </div>
           </div>
@@ -537,7 +537,7 @@ export function PricingToggle() {
               { label: 'renders / mês',     value: String(renders),                                       green: false },
               { label: 'nodes / render',    value: String(qualityCost),                                   green: false },
               { label: 'nodes necessários', value: totalNodes.toLocaleString('pt-BR'),                    green: false },
-              { label: 'plano ideal',       value: overflow ? `${recommended.name} + ${suggestedLumen!.name}` : recommended.name, green: true },
+              { label: 'plano ideal',       value: overflow ? `${recommended.name} + ${suggestedExtra!.name}` : recommended.name, green: true },
             ]).map((item, i, arr) => (
               <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -564,7 +564,7 @@ export function PricingToggle() {
         <div style={{ textAlign: 'center', marginTop: 32 }}>
           <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', letterSpacing: '-0.005em', lineHeight: 1.7 }}>
             Nodes renovam mensalmente e não acumulam para o mês seguinte.<br />
-            Lumens (créditos avulsos) ficam disponíveis a partir do plano Pro.<br />
+            Nodes extras (avulsos, sem validade) ficam disponíveis a partir do plano Pro.<br />
             Dúvidas?{' '}
             <a
               href={supportWhatsAppUrl('Olá! Tenho uma dúvida sobre os planos da SpaceNode.')}

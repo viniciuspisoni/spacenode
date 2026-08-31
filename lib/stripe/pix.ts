@@ -3,7 +3,7 @@
 // São DUAS coisas diferentes, e o Stripe as trata como produtos distintos:
 //
 //  • Pix comum (`mode: 'payment'`) — QR code, pagamento único. É o dos packs
-//    Lumen. Assíncrono: a Checkout Session completa ANTES do dinheiro entrar,
+//    de Nodes extras. Assíncrono: a Checkout Session completa ANTES do dinheiro entrar,
 //    com `payment_status: 'unpaid'`. Quem credita é o webhook, em
 //    `checkout.session.async_payment_succeeded`.
 //

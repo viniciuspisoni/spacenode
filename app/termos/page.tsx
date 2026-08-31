@@ -1,7 +1,7 @@
 // /termos — Termos de Uso da SpaceNode.
 //
-// Conteúdo redigido para refletir o produto real (planos/nodes/lumens de
-// lib/plans.ts e lib/lumens.ts, Stripe, workspaces, provedores de IA) e
+// Conteúdo redigido para refletir o produto real (planos/nodes de
+// lib/plans.ts e lib/extra-nodes.ts, Stripe, workspaces, provedores de IA) e
 // proteger o operador: natureza ilustrativa das imagens (cláusulas 8–9),
 // indenização por conteúdo de terceiros (7), limitação de responsabilidade
 // (14) e arrependimento nos termos do CDC (6).
@@ -90,7 +90,7 @@ export default function TermosPage() {
         </P>
       </LegalSection>
 
-      <LegalSection n={5} title="Planos, nodes e lumens">
+      <LegalSection n={5} title="Planos e nodes">
         <UL>
           <LI>
             <Strong>Nodes</Strong> são os créditos de uso da Plataforma. Cada geração, edição, ampliação ou
@@ -98,12 +98,13 @@ export default function TermosPage() {
             antes da confirmação.
           </LI>
           <LI>
-            Os nodes incluídos no plano <Strong>renovam mensalmente e não acumulam</Strong> para o período
-            seguinte.
+            Os <Strong>nodes mensais</Strong>, incluídos no plano, <Strong>renovam mensalmente e não
+            acumulam</Strong> para o período seguinte.
           </LI>
           <LI>
-            <Strong>Lumens</Strong> são créditos avulsos, com <Strong>validade de 90 dias</Strong> a contar
-            da compra, disponíveis conforme as condições do seu plano.
+            Os <Strong>nodes extras</Strong> são créditos avulsos, comprados separadamente, <Strong>sem prazo
+            de validade</Strong>, disponíveis conforme as condições do seu plano. O consumo utiliza primeiro
+            os nodes mensais e, depois, os nodes extras.
           </LI>
           <LI>
             Contas gratuitas podem receber créditos de cortesia, cuja quantidade e disponibilidade podem ser
@@ -141,7 +142,7 @@ export default function TermosPage() {
           </LI>
           <LI>
             Fora das hipóteses previstas em lei ou nestes Termos, os valores pagos não são reembolsáveis —
-            inclusive nodes e lumens não utilizados —, na máxima extensão permitida pela legislação.
+            inclusive nodes não utilizados, mensais ou extras —, na máxima extensão permitida pela legislação.
           </LI>
           <LI>
             Em caso de falha ou estorno de pagamento, os recursos pagos podem ser suspensos até a

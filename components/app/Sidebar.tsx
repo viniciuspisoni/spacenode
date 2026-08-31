@@ -112,13 +112,14 @@ interface SidebarProps {
   userAvatar: string | null
   planBalance: number
   planTotal: number
-  lumenBalance: number
+  /** Nodes extras (avulsos, sem validade). */
+  extraBalance: number
   planId: PlanId
 }
 
 export default function Sidebar({
   userName, userAvatar,
-  planBalance, planTotal, lumenBalance, planId,
+  planBalance, planTotal, extraBalance, planId,
 }: SidebarProps) {
   const pathname = usePathname()
   const [hovered, setHovered] = useState(false)
@@ -371,7 +372,7 @@ export default function Sidebar({
           expanded={expanded}
           initialPlanBalance={planBalance}
           initialPlanTotal={planTotal}
-          initialLumenBalance={lumenBalance}
+          initialExtraBalance={extraBalance}
           initialPlanId={planId}
         />
         <div style={{

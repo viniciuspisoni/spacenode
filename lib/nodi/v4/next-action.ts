@@ -47,7 +47,7 @@ export function computeNextBestAction(input: NextActionInput): NextBestAction | 
   if (balance !== null && balance < CHEAPEST_RENDER) {
     return {
       identified: `Saldo de ${balance} nodes — abaixo do custo da geração mais barata (${CHEAPEST_RENDER}).`,
-      action: 'Rever plano ou recarregar com Lumens',
+      action: 'Rever plano ou comprar Nodes extras',
       why: 'Sem saldo, qualquer fluxo trava no meio.',
       estimatedNodes: 0,
       needsApproval: false,

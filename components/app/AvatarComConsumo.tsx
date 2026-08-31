@@ -18,7 +18,8 @@ interface Props {
   // saldo carregado do server pra primeira render (sem flicker)
   initialPlanBalance: number
   initialPlanTotal:   number
-  initialLumenBalance: number
+  /** Nodes extras (avulsos, sem validade). */
+  initialExtraBalance: number
   initialPlanId:      PlanId
 }
 
@@ -27,12 +28,12 @@ const CIRCUMFERENCE  = 2 * Math.PI * RADIUS  // ~113.10
 
 export function AvatarComConsumo({
   userName, userAvatar, expanded,
-  initialPlanBalance, initialPlanTotal, initialLumenBalance, initialPlanId,
+  initialPlanBalance, initialPlanTotal, initialExtraBalance, initialPlanId,
 }: Props) {
   const [open, setOpen] = useState(false)
   const [planBalance, setPlanBalance]   = useState(initialPlanBalance)
   const [planTotal, setPlanTotal]       = useState(initialPlanTotal)
-  const [lumenBalance, setLumenBalance] = useState(initialLumenBalance)
+  const [extraBalance, setExtraBalance] = useState(initialExtraBalance)
   const [planId, setPlanId]             = useState<PlanId>(initialPlanId)
   const [usageDays, setUsageDays]       = useState<{ day: string; nodes: number }[]>([])
   const [avgPerDay, setAvgPerDay]       = useState<number>(0)
@@ -57,7 +58,7 @@ export function AvatarComConsumo({
       if (bal) {
         setPlanBalance(bal.plan_balance ?? 0)
         setPlanTotal(bal.plan_total ?? 0)
-        setLumenBalance(bal.lumen_balance ?? 0)
+        setExtraBalance(bal.extra_balance ?? 0)
         if (bal.plan_id) setPlanId(bal.plan_id as PlanId)
       }
       if (usage) {
@@ -118,7 +119,7 @@ export function AvatarComConsumo({
             color: 'var(--color-text-tertiary)', marginTop: 2,
             display: 'flex', alignItems: 'center', gap: 6,
           }}>
-            <span>{planBalance + lumenBalance} nodes</span>
+            <span>{planBalance + extraBalance} nodes</span>
           </div>
         </div>
         {showUpgradePill && expanded && (
@@ -131,7 +132,7 @@ export function AvatarComConsumo({
           planId={planId}
           planBalance={planBalance}
           planTotal={planTotal}
-          lumenBalance={lumenBalance}
+          extraBalance={extraBalance}
           state={state}
           daysUntilEmpty={daysUntilEmpty}
           usageDays={usageDays}
@@ -252,11 +253,11 @@ function UpgradePill({ state }: { state: BalanceState }) {
 
 // ── Popover ───────────────────────────────────────────────────
 
-function BalancePopover({ planId, planBalance, planTotal, lumenBalance, state, daysUntilEmpty, usageDays, onClose }: {
+function BalancePopover({ planId, planBalance, planTotal, extraBalance, state, daysUntilEmpty, usageDays, onClose }: {
   planId:        PlanId
   planBalance:   number
   planTotal:     number
-  lumenBalance:  number
+  extraBalance:  number
   state:         BalanceState
   daysUntilEmpty: number | null
   usageDays:     { day: string; nodes: number }[]
@@ -292,12 +293,12 @@ function BalancePopover({ planId, planBalance, planTotal, lumenBalance, state, d
           <div style={{
             fontSize: 22, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.02em', marginTop: 4,
           }}>
-            {planBalance + lumenBalance} <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', fontWeight: 400 }}>nodes</span>
+            {planBalance + extraBalance} <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', fontWeight: 400 }}>nodes</span>
           </div>
           <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>
             {noQuota
-              ? <>Sem assinatura ativa{lumenBalance > 0 && <> · {lumenBalance} avulsos</>}</>
-              : <>{planBalance} de {planTotal} do plano{lumenBalance > 0 && <> · {lumenBalance} avulsos</>}</>}
+              ? <>Sem assinatura ativa{extraBalance > 0 && <> · {extraBalance} extras</>}</>
+              : <>{planBalance} de {planTotal} mensais{extraBalance > 0 && <> · {extraBalance} extras</>}</>}
           </div>
         </div>
         <span style={{
