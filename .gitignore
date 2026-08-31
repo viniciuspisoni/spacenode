@@ -42,7 +42,9 @@ next-env.d.ts
 
 .vercel
 .env*.local
-/.next-preview/
+# distDirs paralelos de dev (NEXT_DIST_DIR=.next-*), ex.: .next-preview,
+# .next-landing — nunca versionar artefato de build
+/.next-*/
 
 # Bench de fidelidade (FIDELITY_BENCH=1): inputs são projetos reais de
 # cliente e o last-run é derivado — só a baseline.json versiona.

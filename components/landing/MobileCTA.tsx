@@ -42,7 +42,7 @@ export function MobileCTA() {
             minHeight: 52,
           }}
         >
-          Começar agora
+          Testar grátis
           <svg width="13" height="13" viewBox="0 0 12 12" fill="none">
             <path d="M2 6h8M6.5 2.5L10 6l-3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
@@ -56,7 +56,7 @@ export function MobileCTA() {
             letterSpacing: "0.01em",
           }}
         >
-          80 nodes grátis · sem cartão de crédito
+          80 nodes grátis · sem cartão · em português
         </p>
       </div>
 

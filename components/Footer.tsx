@@ -18,14 +18,14 @@ export default function Footer() {
       <style jsx>{`
         .spn-footer {
           padding: 32px 40px;
-          border-top: 0.5px solid rgba(255,255,255,0.06);
+          border-top: 0.5px solid var(--color-border);
           display: flex;
           justify-content: space-between;
           align-items: center;
           flex-wrap: wrap;
           gap: 16px;
-          background: #0a0a0a;
-          color: #6e6e73;
+          background: var(--color-bg);
+          color: var(--color-text-tertiary);
         }
         .spn-footer-brand {
           font-size: 11px;

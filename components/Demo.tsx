@@ -1,21 +1,34 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
+import Image from "next/image";
+import sketchImg from "@/public/demo-sketch.jpg";
+import renderImg from "@/public/demo-render.jpg";
 
+// O melhor antes/depois do acervo: modelo SketchUp branco → render da mesma
+// casa, geometria idêntica. Fica logo após o hero, em fundo claro.
 export default function Demo() {
   const [position, setPosition] = useState(50);
   const containerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
 
-  const handleMove = (clientX: number) => {
+  const handleMove = useCallback((clientX: number) => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const newPos = ((clientX - rect.left) / rect.width) * 100;
     setPosition(Math.max(0, Math.min(100, newPos)));
-  };
+  }, []);
+
+  const handleKey = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      e.preventDefault();
+      const delta = e.key === "ArrowLeft" ? -5 : 5;
+      setPosition((p) => Math.max(0, Math.min(100, p + delta)));
+    }
+  }, []);
 
   return (
-    <section className="spn-demo">
+    <section id="antes-depois" className="spn-demo">
       <div className="spn-demo-head">
         <div
           style={{
@@ -32,7 +45,7 @@ export default function Demo() {
           }}
         >
           <span style={{ display: "block", width: 32, height: "0.5px", background: "var(--color-border-strong)" }} />
-          Prova visual
+          Antes / depois
           <span style={{ display: "block", width: 32, height: "0.5px", background: "var(--color-border-strong)" }} />
         </div>
         <h2 className="spn-demo-title">
@@ -49,19 +62,26 @@ export default function Demo() {
           background: "var(--color-bg-elevated)",
           borderRadius: 20,
           padding: 12,
-          boxShadow:
-            "0 2px 4px rgba(0,0,0,0.12), 0 16px 48px rgba(0,0,0,0.28), 0 0 0 0.5px rgba(255,255,255,0.06)",
+          border: "0.5px solid var(--color-border-strong)",
+          boxShadow: "var(--shadow-lg)",
         }}
       >
         <div
           ref={containerRef}
           onMouseMove={(e) => isDragging.current && handleMove(e.clientX)}
-          onMouseDown={() => (isDragging.current = true)}
+          onMouseDown={(e) => { isDragging.current = true; handleMove(e.clientX); }}
           onMouseUp={() => (isDragging.current = false)}
           onMouseLeave={() => (isDragging.current = false)}
           onTouchStart={() => (isDragging.current = true)}
           onTouchEnd={() => (isDragging.current = false)}
           onTouchMove={(e) => isDragging.current && handleMove(e.touches[0].clientX)}
+          onKeyDown={handleKey}
+          tabIndex={0}
+          role="slider"
+          aria-label="Comparar modelo e render — setas movem o divisor"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(position)}
           className="spn-demo-frame"
           style={{
             position: "relative",
@@ -73,15 +93,13 @@ export default function Demo() {
             touchAction: "pan-y",
           }}
         >
-          <img
-            src="/demo-sketch.jpg"
+          <Image
+            src={sketchImg}
             alt="Imagem base — modelo SketchUp"
+            fill
             draggable={false}
+            sizes="(max-width: 768px) 100vw, (max-width: 1024px) 92vw, 936px"
             style={{
-              position: "absolute",
-              inset: 0,
-              width: "100%",
-              height: "100%",
               objectFit: "cover",
               pointerEvents: "none",
               filter: "contrast(0.9) saturate(0.9) brightness(0.95) blur(0.4px)",
@@ -95,15 +113,13 @@ export default function Demo() {
               clipPath: `inset(0 0 0 ${position}%)`,
             }}
           >
-            <img
-              src="/demo-render.jpg"
+            <Image
+              src={renderImg}
               alt="Resultado SpaceNode — render fotorrealista"
+              fill
               draggable={false}
+              sizes="(max-width: 768px) 100vw, (max-width: 1024px) 92vw, 936px"
               style={{
-                position: "absolute",
-                inset: 0,
-                width: "100%",
-                height: "100%",
                 objectFit: "cover",
                 pointerEvents: "none",
                 filter: "contrast(1.05) saturate(1.05)",
@@ -141,10 +157,10 @@ export default function Demo() {
                 gap: 2,
               }}
             >
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="#1a1a1a">
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="#1a1a1a" aria-hidden>
                 <path d="M6 1L2 5L6 9" stroke="#1a1a1a" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="#1a1a1a">
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="#1a1a1a" aria-hidden>
                 <path d="M4 1L8 5L4 9" stroke="#1a1a1a" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </div>
@@ -157,9 +173,14 @@ export default function Demo() {
               left: 14,
               fontSize: 9,
               letterSpacing: "0.2em",
-              color: "rgba(255,255,255,0.4)",
+              color: "rgba(255,255,255,0.75)",
               fontWeight: 600,
               textTransform: "uppercase",
+              background: "var(--color-scrim)",
+              backdropFilter: "blur(6px)",
+              WebkitBackdropFilter: "blur(6px)",
+              padding: "4px 8px",
+              borderRadius: 4,
               pointerEvents: "none",
             }}
           >
@@ -172,9 +193,14 @@ export default function Demo() {
               right: 14,
               fontSize: 9,
               letterSpacing: "0.2em",
-              color: "rgba(255,255,255,0.85)",
+              color: "rgba(255,255,255,0.92)",
               fontWeight: 600,
               textTransform: "uppercase",
+              background: "var(--color-scrim)",
+              backdropFilter: "blur(6px)",
+              WebkitBackdropFilter: "blur(6px)",
+              padding: "4px 8px",
+              borderRadius: 4,
               pointerEvents: "none",
             }}
           >
@@ -196,26 +222,9 @@ export default function Demo() {
       </p>
 
       <div style={{ textAlign: "center" }}>
-        <a
-          href="/login?mode=signup"
-          className="spn-demo-cta"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 8,
-            background: "var(--color-text-primary)",
-            color: "var(--color-bg)",
-            borderRadius: 12,
-            fontSize: 14,
-            fontWeight: 500,
-            textDecoration: "none",
-            letterSpacing: "-0.01em",
-            whiteSpace: "nowrap",
-          }}
-        >
+        <a href="/login?mode=signup" className="spn-demo-cta">
           Testar com meu projeto
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
             <path d="M2 6h8M6.5 2.5L10 6l-3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </a>
@@ -225,7 +234,7 @@ export default function Demo() {
         .spn-demo {
           max-width: 960px;
           margin: 0 auto;
-          padding: 96px 32px 48px;
+          padding: 88px 32px 48px;
         }
         .spn-demo-head {
           text-align: center;
@@ -250,14 +259,34 @@ export default function Demo() {
         .spn-demo-frame {
           aspect-ratio: 16 / 9;
         }
+        .spn-demo-frame:focus-visible {
+          outline: 2px solid var(--color-border-focus);
+          outline-offset: 2px;
+        }
         .spn-demo-cta {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          background: var(--color-inverse);
+          color: var(--color-inverse-foreground);
+          border-radius: 12px;
+          font-size: 14px;
+          font-weight: 500;
+          text-decoration: none;
+          letter-spacing: -0.01em;
+          white-space: nowrap;
           padding: 14px 28px;
           min-height: 52px;
+        }
+        .spn-demo-cta:focus-visible {
+          outline: 2px solid var(--color-border-focus);
+          outline-offset: 2px;
         }
 
         @media (max-width: 768px) {
           .spn-demo {
-            padding: 72px 20px 40px;
+            padding: 64px 20px 40px;
           }
           .spn-demo-head {
             margin: 0 auto 28px;

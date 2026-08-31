@@ -1,5 +1,6 @@
 'use client'
 import { useState, useRef, useCallback } from 'react'
+import Image from 'next/image'
 
 const transformations = [
   { before: '/gallery-banheiro-before.jpg',    after: '/gallery-banheiro-after.jpg',    caption: 'Interior · Banheiro' },
@@ -35,28 +36,26 @@ function MiniBeforeAfter({ before, after }: { before: string; after: string }) {
         background: 'var(--color-surface)',
       }}
     >
-      <img
+      <Image
         src={before}
-        alt="imagem base"
+        alt="imagem base — modelo do projeto"
+        fill
         draggable={false}
-        loading="lazy"
-        decoding="async"
+        sizes="(max-width: 768px) 100vw, 310px"
         style={{
-          position: 'absolute', inset: 0,
-          width: '100%', height: '100%', objectFit: 'cover',
+          objectFit: 'cover',
           filter: 'contrast(0.9) saturate(0.9) brightness(0.95) blur(0.4px)',
           pointerEvents: 'none',
         }}
       />
-      <img
+      <Image
         src={after}
-        alt="resultado"
+        alt="resultado — render fotorrealista"
+        fill
         draggable={false}
-        loading="lazy"
-        decoding="async"
+        sizes="(max-width: 768px) 100vw, 310px"
         style={{
-          position: 'absolute', inset: 0,
-          width: '100%', height: '100%', objectFit: 'cover',
+          objectFit: 'cover',
           clipPath: `inset(0 0 0 ${pos}%)`,
           filter: 'contrast(1.05) saturate(1.05)',
           pointerEvents: 'none',
@@ -91,7 +90,10 @@ function MiniBeforeAfter({ before, after }: { before: string; after: string }) {
         position: 'absolute', bottom: 10, left: 10,
         fontSize: 8, fontWeight: 600, letterSpacing: '0.18em',
         textTransform: 'uppercase' as const,
-        color: 'rgba(255,255,255,0.32)', pointerEvents: 'none',
+        color: 'rgba(255,255,255,0.7)',
+        background: 'var(--color-scrim)',
+        padding: '3px 6px', borderRadius: 3,
+        pointerEvents: 'none',
       }}>
         base
       </span>
@@ -99,8 +101,9 @@ function MiniBeforeAfter({ before, after }: { before: string; after: string }) {
         position: 'absolute', bottom: 10, right: 10,
         fontSize: 8, fontWeight: 600, letterSpacing: '0.18em',
         textTransform: 'uppercase' as const,
-        color: 'rgba(255,255,255,0.88)',
-        textShadow: '0 0 8px rgba(255,255,255,0.25)',
+        color: 'rgba(255,255,255,0.92)',
+        background: 'var(--color-scrim)',
+        padding: '3px 6px', borderRadius: 3,
         pointerEvents: 'none',
       }}>
         resultado
