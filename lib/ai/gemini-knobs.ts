@@ -48,3 +48,23 @@ export function isInvalidArgumentError(err: unknown): boolean {
   const msg = (err as Error)?.message ?? String(err)
   return /INVALID_ARGUMENT|Unknown name|Invalid JSON payload/i.test(msg)
 }
+
+/** Erro TRANSIENTE de capacidade do Gemini — vale repetir, não vale cair pro
+ *  fallback. O 429 do Vertex nos modelos de imagem vem genérico ("Resource
+ *  exhausted. Please try again later", SEM quota_metric/violations): é a
+ *  capacidade COMPARTILHADA do endpoint global acabando, não quota do projeto
+ *  estourada — some sozinho em segundos e não tem relação com o nosso volume
+ *  (dezenas de imagens/dia). Mesma classificação do isRetryable do lib/gemini
+ *  (texto), que já absorve isso desde sempre; o caminho de IMAGEM não tinha,
+ *  então cada 429 custava uma geração inteira no provider caro.
+ *  NÃO inclui 400/401/403/404 — esses não se curam sozinhos. */
+export function isTransientCapacityError(err: unknown): boolean {
+  const e = err as { status?: unknown; code?: unknown; message?: unknown }
+  const status = typeof e?.status === 'number' ? e.status
+               : typeof e?.code   === 'number' ? e.code
+               : undefined
+  if (status !== undefined) return status === 429 || (status >= 500 && status <= 504)
+  const msg = typeof e?.message === 'string' ? e.message : String(err)
+  if (/\b(429|500|502|503|504)\b/.test(msg)) return true
+  return /RESOURCE_EXHAUSTED|UNAVAILABLE|INTERNAL|overloaded|high demand/i.test(msg)
+}
