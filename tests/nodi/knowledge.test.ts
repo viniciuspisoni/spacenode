@@ -14,7 +14,7 @@ import {
   normalizeText,
 } from '@/lib/nodi/knowledge'
 import { ENGINES } from '@/lib/engines'
-import { PLANS } from '@/lib/plans'
+import { SELLABLE_PLANS } from '@/lib/plans'
 import { EXTRA_NODE_PACKS } from '@/lib/extra-nodes'
 
 describe('normalizeText', () => {
@@ -71,13 +71,17 @@ describe('conteúdo dinâmico (fonte de verdade)', () => {
     expect(text).toContain('Pulsar')
   })
 
-  it('planos refletem lib/plans', () => {
+  it('planos refletem a vitrine (SELLABLE_PLANS, sem Office)', () => {
     const entry = getKbEntry('planos-precos')!
     const { text } = buildKbAnswer(entry)
-    for (const plan of PLANS) {
+    for (const plan of SELLABLE_PLANS) {
       expect(text).toContain(plan.name)
       expect(text).toContain(String(plan.monthlyPrice))
     }
+    // Office é legado: nada de preço/nodes na lista, só a nota de aposentadoria
+    expect(text).not.toContain('699')
+    expect(text).not.toContain('8.000 nodes')
+    expect(text).toContain('Office foi aposentado')
     // regra de marca: não citar a quantidade de nodes de cortesia (não importável)
     expect(text).not.toMatch(/\b80 nodes\b/)
   })

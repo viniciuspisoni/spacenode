@@ -33,9 +33,10 @@ export function InsufficientBalancePanel({ count, costPer, total, available, cur
   const recommended = recommendPlan(total)
   const currentPlanObj = getPlanById(currentPlan)
   const upgradeNeeded  = !pooled && recommended.nodes > (currentPlanObj?.nodes ?? 0)
-  // Espelha a regra da rota de checkout: Nodes extras só a partir do Pro — e a
-  // rota valida o plano do COMPRADOR, então membro pooled não compra por aqui.
-  const extraAvailable = !pooled && currentPlan !== 'free' && currentPlan !== 'starter'
+  // Espelha a regra da rota de checkout: Nodes extras para qualquer plano
+  // pago — e a rota valida o plano do COMPRADOR, então membro pooled não
+  // compra por aqui.
+  const extraAvailable = !pooled && currentPlan !== 'free'
 
   async function handleAvulso() {
     setSubmittingAvulso(true)
@@ -118,7 +119,7 @@ export function InsufficientBalancePanel({ count, costPer, total, available, cur
         </div>
       </div>
 
-      {/* Opções: Avulso (Pro+) e/ou Upgrade — a primeira visível leva o badge */}
+      {/* Opções: Avulso (qualquer plano pago) e/ou Upgrade — a primeira visível leva o badge */}
       <div style={{
         display: 'grid', gap: 10,
         gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
@@ -188,7 +189,7 @@ export function InsufficientBalancePanel({ count, costPer, total, available, cur
                    Vale se você gera muito mais do que cabe no plano atual.`
                 : pooled
                 ? 'Este saldo é do workspace — o plano e os pacotes são gerenciados pelo dono da conta.'
-                : 'Veja os planos — Nodes extras ficam disponíveis a partir do Pro.'}
+                : 'Veja os planos — Nodes extras ficam disponíveis em qualquer plano pago.'}
             </div>
             <Link
               href="/app/billing"

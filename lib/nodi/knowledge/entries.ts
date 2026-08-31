@@ -15,7 +15,7 @@
 // Este módulo roda no SERVIDOR (rotas /api/nodi/*). O painel só recebe os
 // títulos (sugestões/FAQ) e pede a resposta por id.
 
-import { PLANS } from '@/lib/plans'
+import { SELLABLE_PLANS } from '@/lib/plans'
 import { EXTRA_NODE_PACKS } from '@/lib/extra-nodes'
 import { ENGINES, ENGINE_ORDER } from '@/lib/engines'
 import { listAvailableVideoModels } from '@/lib/video/models'
@@ -206,10 +206,11 @@ export const KB_ENTRIES: KBEntry[] = [
     faq: true,
     build: () => ({
       text:
-        PLANS.map(p =>
+        SELLABLE_PLANS.map(p =>
           `• ${p.name}: ${p.nodes.toLocaleString('pt-BR')} nodes/mês — ${brl(p.monthlyPrice)}/mês (ou ${brl(p.annualMonthlyPrice)}/mês no anual)`,
         ).join('\n') +
-        '\nO cadastro concede nodes de cortesia para testar com um projeto real. Upgrade e downgrade ficam em Planos.',
+        '\nO cadastro concede nodes de cortesia para testar com um projeto real. Upgrade e downgrade ficam em Planos.' +
+        '\nO plano Office foi aposentado para novas assinaturas — quem já assina mantém todos os benefícios até trocar ou cancelar.',
       actions: [ACT.planos],
     }),
   },
@@ -227,7 +228,7 @@ export const KB_ENTRIES: KBEntry[] = [
         'Nodes extras são pacotes avulsos de nodes para quando o mês aperta — sem validade ' +
         '(antes se chamavam "Lumens"):\n' +
         EXTRA_NODE_PACKS.map(p => `• ${p.name}: ${p.nodes.toLocaleString('pt-BR')} nodes — ${brl(p.price)}`).join('\n') +
-        '\nDisponíveis a partir do plano Pro. O consumo usa primeiro os Nodes mensais do plano; os extras entram depois, na ordem de compra.',
+        '\nDisponíveis em qualquer plano pago. O consumo usa primeiro os Nodes mensais do plano; os extras entram depois, na ordem de compra.',
       actions: [ACT.planos],
     }),
   },

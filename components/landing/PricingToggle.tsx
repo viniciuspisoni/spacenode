@@ -2,22 +2,19 @@
 
 import { useState, useCallback } from 'react'
 import { ENGINES, ENGINE_ORDER, type Resolution } from '@/lib/engines'
-import { ANNUAL_BILLING_ENABLED, PLANS, type Plan, type PaidPlanId, type BillingCycle } from '@/lib/plans'
+import { ANNUAL_BILLING_ENABLED, SELLABLE_PLANS, recommendPlan, type SellablePlanId, type PaidPlanId, type BillingCycle } from '@/lib/plans'
 import { EXTRA_NODE_PACKS } from '@/lib/extra-nodes'
 import { SUPPORT_EMAIL, supportWhatsAppUrl } from '@/lib/support'
 import { formatBRL } from '@/lib/launch-offer'
 
-// A landing exibe só Starter / Pro / Studio — o Office saiu da vitrine
-// (volume maior vira conversa: "fale com a gente"). O catálogo em lib/plans
-// segue intacto para billing/checkout/webhook.
-type LandingPlanId = Exclude<PaidPlanId, 'office'>
-
-const DISPLAY_PLANS = PLANS.filter((p): p is Plan & { id: LandingPlanId } => p.id !== 'office')
+// A vitrine (Starter / Pro / Studio) vem de SELLABLE_PLANS — o Office é
+// legado (2026-08-31): fora de venda, mas segue no catálogo p/ assinantes
+// existentes (billing/webhook).
 
 // UI-specific data por plano: features, badge, breakdown de renders.
 // Renders calculados com engine padrão por resolução: HD→Pulsar (10 nodes),
 // 2K→Vega (20), 4K→Vega (40). meterPct é proporcional ao maior plano
-// exibido (Studio=100%).
+// exibido (Studio=100%). Nodes extras valem p/ qualquer plano pago.
 interface PlanDisplay {
   rendersHD: number
   renders2K: number
@@ -29,11 +26,11 @@ interface PlanDisplay {
   features: string[]
 }
 
-const PLAN_DISPLAY: Record<LandingPlanId, PlanDisplay> = {
+const PLAN_DISPLAY: Record<SellablePlanId, PlanDisplay> = {
   starter: {
     rendersHD: 75,  renders2K: 37,  renders4K: 18,
     monthlyAnnualLabel: '890', meterPct: 21, featured: false, badge: '',
-    features: ['Acesso a todos os motores', 'Renders em HD, 2K e 4K', 'Suporte por e-mail'],
+    features: ['Acesso a todos os motores', 'Nodes extras disponíveis', 'Suporte por e-mail'],
   },
   pro: {
     rendersHD: 180, renders2K: 90,  renders4K: 45,
@@ -68,12 +65,12 @@ const CheckIcon = () => (
 )
 
 function PlanCard({ planId, billing, loading, onSelect }: {
-  planId: LandingPlanId
+  planId: SellablePlanId
   billing: BillingCycle
   loading: string | null
   onSelect: (id: PaidPlanId) => void
 }) {
-  const plan = PLANS.find(p => p.id === planId)!
+  const plan = SELLABLE_PLANS.find(p => p.id === planId)!
   const d = PLAN_DISPLAY[planId]
   const [hovered, setHovered] = useState(false)
   const price = billing === 'annual' ? plan.annualMonthlyPrice : plan.monthlyPrice
@@ -270,12 +267,7 @@ function ConsumptionTable() {
   )
 }
 
-const TOP_PLAN_NODES = DISPLAY_PLANS[DISPLAY_PLANS.length - 1].nodes
-
-/** Menor plano exibido na landing cujo limite cobre a necessidade. */
-function recommendDisplayPlan(nodesNeeded: number): Plan {
-  return DISPLAY_PLANS.find(p => p.nodes >= nodesNeeded) ?? DISPLAY_PLANS[DISPLAY_PLANS.length - 1]
-}
+const TOP_PLAN_NODES = SELLABLE_PLANS[SELLABLE_PLANS.length - 1].nodes
 
 export function PricingToggle() {
   const [billing, setBilling]         = useState<BillingCycle>('monthly')
@@ -284,7 +276,7 @@ export function PricingToggle() {
   const [qualityCost, setQualityCost] = useState(10)
 
   const totalNodes      = renders * qualityCost
-  const recommended     = recommendDisplayPlan(totalNodes)
+  const recommended     = recommendPlan(totalNodes)
   const overflow        = totalNodes > TOP_PLAN_NODES
   const overflowAmount  = overflow ? totalNodes - TOP_PLAN_NODES : 0
   const suggestedExtra  = overflow
@@ -383,7 +375,7 @@ export function PricingToggle() {
             gap: 12, alignItems: 'start',
           }}
         >
-          {DISPLAY_PLANS.map(p => (
+          {SELLABLE_PLANS.map(p => (
             <PlanCard key={p.id} planId={p.id} billing={billing} loading={loading} onSelect={handleSelect} />
           ))}
         </div>
@@ -564,7 +556,7 @@ export function PricingToggle() {
         <div style={{ textAlign: 'center', marginTop: 32 }}>
           <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', letterSpacing: '-0.005em', lineHeight: 1.7 }}>
             Nodes renovam mensalmente e não acumulam para o mês seguinte.<br />
-            Nodes extras (avulsos, sem validade) ficam disponíveis a partir do plano Pro.<br />
+            Nodes extras (avulsos, sem validade) ficam disponíveis em qualquer plano pago.<br />
             Dúvidas?{' '}
             <a
               href={supportWhatsAppUrl('Olá! Tenho uma dúvida sobre os planos da SpaceNode.')}
