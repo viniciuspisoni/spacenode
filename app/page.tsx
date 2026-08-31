@@ -22,8 +22,9 @@ const Divider = () => (
 export default function Home() {
   return (
     <main>
-      {/* Landing é sempre light (#fafafa predominante); as áreas escuras ficam
-          reservadas ao hero, produto e galeria via .spn-dark. O script do
+      {/* Landing é sempre light (#fafafa predominante); as faixas pretas
+          (#1a1a1a, via .spn-dark) são intencionais: header/hero, produto/
+          interface, projetos reais e o fecho CTA final + footer. O script do
           layout raiz já força light na rota "/" (anti-flash pré-paint);
           ForceLightScope cobre a navegação client-side e restaura o tema do
           usuário ao sair. */}
@@ -46,9 +47,11 @@ export default function Home() {
       <PricingToggle />
       <Divider />
       <FAQ />
-      <Divider />
-      <FinalCTA />
-      <Footer />
+      {/* Fecho preto: a própria troca de faixa separa do FAQ — sem divider. */}
+      <div className="spn-dark">
+        <FinalCTA />
+        <Footer />
+      </div>
       <MobileCTA />
     </main>
   );
