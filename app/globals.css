@@ -146,35 +146,36 @@ html.light {
   --shadow-xl: 0 28px 72px rgba(0, 0, 0, 0.16);
 }
 
-/* Escopo dark local — faixas escuras da landing light (hero, produto, galeria).
-   Redefine os tokens semânticos com os valores dark do @theme dentro da
-   subárvore, independente de html.light. Manter em sincronia com o bloco
-   dark-first acima. */
+/* Escopo dark local — faixas pretas da landing light (header/hero, produto/
+   interface, projetos reais, CTA final + footer). Não é cópia 1:1 do tema
+   dark do app: o preto de faixa é #1a1a1a (spec de marca da landing,
+   2026-08-31) e o cinza terciário sobe p/ manter AA (4.5:1) sobre esse
+   fundo mais claro. Verde segue o do tema dark (#30d158) — só funcional. */
 .spn-dark {
-  --color-bg: #0a0a0a;
-  --color-bg-elevated: #111111;
+  --color-bg: #1a1a1a;
+  --color-bg-elevated: #242424;
   --color-surface: rgba(255, 255, 255, 0.05);
   --color-surface-hover: rgba(255, 255, 255, 0.08);
 
   --color-text-primary: #f5f5f7;
   --color-text-secondary: #a1a1a6;
-  --color-text-tertiary: #6e6e73;
-  --color-text-quaternary: #3a3a3c;
+  --color-text-tertiary: #8a8a8f; /* #6e6e73 caía a ~3.4:1 sobre #1a1a1a */
+  --color-text-quaternary: #4a4a4e;
 
   --color-border: rgba(255, 255, 255, 0.06);
   --color-border-strong: rgba(255, 255, 255, 0.14);
   --color-border-focus: rgba(255, 255, 255, 0.28);
 
   --color-surface-subtle: rgba(255, 255, 255, 0.02);
-  --color-bg-elevated-hover: #131313;
+  --color-bg-elevated-hover: #2a2a2a;
   --color-chip: rgba(255, 255, 255, 0.06);
   --color-chip-hover: rgba(255, 255, 255, 0.10);
   --color-chip-active: #f5f5f7;
-  --color-chip-active-foreground: #0a0a0a;
+  --color-chip-active-foreground: #1a1a1a;
 
   --color-inverse: #f5f5f7;
   --color-inverse-hover: #e8e8e6;
-  --color-inverse-foreground: #0a0a0a;
+  --color-inverse-foreground: #1a1a1a;
 
   --color-scrollbar: rgba(255, 255, 255, 0.14);
   --color-scrollbar-hover: rgba(255, 255, 255, 0.22);
