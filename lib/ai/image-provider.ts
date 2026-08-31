@@ -10,6 +10,9 @@
 //   IMAGE_PROVIDER_PRIMARY  = 'gcp' | 'fal'   (default 'fal' — rollback é só
 //                                              remover/trocar a env e redeploy)
 //   IMAGE_PROVIDER_FALLBACK = 'fal' | 'none'  (default 'fal')
+//   IMAGE_GCP_TRANSIENT_RETRIES = 0..5        (default 2 — retries extras do
+//                                              caminho GCP em 429/500/503/rede
+//                                              antes do fallback; 0 desliga)
 //
 // Credenciais Vertex (mesma convenção do vertexVeoAdapter / vertex-imagen-edit):
 //   GOOGLE_VERTEX_PROJECT           — id do projeto GCP
@@ -42,6 +45,14 @@
 // pelo Vertex (400) dispara UM retry compat sem os knobs novos antes de
 // qualquer fallback — knob novo nunca pode rebaixar o caminho primário.
 //
+// Erro TRANSITÓRIO do Vertex (429 capacidade/quota, 500/503, rede) ganha até
+// IMAGE_GCP_TRANSIENT_RETRIES tentativas extras com backoff curto ANTES do
+// fallback (default 2; 0 desliga) — no incidente de 2026-08-14 uma janela de
+// 429 intermitente no gemini-3-pro-image mandou ~50% do vega pra FAL, sendo
+// que o mesmo request passava segundos depois. O orçamento total continua
+// valendo: a race de timeout corre por fora, então retry nunca estoura o
+// budget — no pior caso o timeout dispara e o fallback segue como antes.
+//
 // Saída GCP vem como bytes (Vertex não tem CDN pública como a FAL):
 //   deliver 'url'     → re-hospeda no bucket space-mestres e devolve URL https
 //                       (rotas que persistem/retornam URL: Renderizar, Spaces,
@@ -69,6 +80,7 @@ import { fetchStorageBytes } from '@/lib/storage/fetch'
 import {
   inputMediaResolutionDefault,
   isInvalidArgumentError,
+  isTransientProviderError,
   type InputMediaResolution,
 } from '@/lib/ai/gemini-knobs'
 
@@ -166,6 +178,19 @@ export function imageProviderPrimary(): ImageProviderId {
 function imageFallbackEnabled(): boolean {
   return (process.env.IMAGE_PROVIDER_FALLBACK?.trim().toLowerCase() || 'fal') !== 'none'
 }
+
+// Tentativas EXTRAS do caminho GCP em erro transitório (429/500/503/rede)
+// antes de qualquer fallback. 0 desliga (comportamento anterior: o primeiro
+// erro já derrubava pro FAL). Env é kill-switch — o default vive no código.
+function gcpTransientRetries(): number {
+  const raw = Number(process.env.IMAGE_GCP_TRANSIENT_RETRIES)
+  return Number.isFinite(raw) && raw >= 0 ? Math.min(Math.floor(raw), 5) : 2
+}
+
+// Backoff dos retries transitórios: curto de propósito — 429 de capacidade do
+// Vertex costuma limpar em segundos e a espera consome o MESMO budget da
+// geração (a race de timeout continua correndo por fora).
+const TRANSIENT_BACKOFF_MS = [1_500, 4_000]
 
 function hasVertexCredentials(): boolean {
   return !!process.env.GOOGLE_VERTEX_PROJECT?.trim() &&
@@ -478,9 +503,30 @@ async function generateViaGcp(
         }
       }
 
+      // Retry transitório (por chamada): 429 de capacidade/quota, 500/503 e
+      // blip de rede se resolvem em segundos — segurar o caminho GCP vale mais
+      // que a ida precoce pro fallback (crédito GCP vs fatura FAL). Erros de
+      // contrato (400/404) NÃO entram aqui: sobem na hora, como antes. O retry
+      // compat de knobs (callOnce) roda por dentro e continua intacto.
+      const maxTransientRetries = gcpTransientRetries()
+      const callWithTransientRetry = async () => {
+        for (let attempt = 0; ; attempt++) {
+          try {
+            return await callOnce()
+          } catch (err) {
+            if (attempt >= maxTransientRetries || !isTransientProviderError(err)) throw err
+            const delayMs = TRANSIENT_BACKOFF_MS[Math.min(attempt, TRANSIENT_BACKOFF_MS.length - 1)]
+            console.warn(
+              `[image-provider] ${args.context} erro transitório do Vertex (${truncate((err as Error).message ?? String(err), 160)}) — retry ${attempt + 1}/${maxTransientRetries} em ${delayMs}ms`,
+            )
+            await new Promise(resolve => setTimeout(resolve, delayMs))
+          }
+        }
+      }
+
       // num_images > 1 não existe nos call sites atuais (sempre 1), mas a FAL
       // aceitava — cobrimos com N chamadas paralelas pra não quebrar contrato.
-      return Promise.all(Array.from({ length: parsed.numImages }, callOnce))
+      return Promise.all(Array.from({ length: parsed.numImages }, callWithTransientRetry))
     })(),
     new Promise<never>((_, reject) =>
       setTimeout(() => reject(new ImageProviderTimeoutError('gcp', args.falEndpoint, budgetMs)), budgetMs),

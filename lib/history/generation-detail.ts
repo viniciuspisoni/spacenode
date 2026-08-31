@@ -87,6 +87,26 @@ function num(v: unknown): number | null {
   return typeof v === 'number' && Number.isFinite(v) ? v : null
 }
 
+// ── Provider real de uma geração (Diagnóstico técnico/admin) ───────────────────
+//
+// generation_log.provider é a fonte de verdade (gravado por lib/ai/image-provider
+// desde 2026-07). Quando o log não existe — geração antiga OU janela em que uma
+// migration pendente derrubou o insert estendido — o provider é INFERIDO pela
+// evidência que sobra na row, nunca chutado: o default `?? 'fal'` fez todos os
+// renders de 13→18/08 (gerados no GCP) aparecerem como "fal" no Diagnóstico e
+// disparou um alarme falso de "caiu tudo no fallback".
+//   · request id UUID           → FAL (formato dos request ids da fila da FAL)
+//   · request id noutro formato → GCP (responseId do Vertex)
+//   · URL de saída na CDN fal.media → FAL (o caminho GCP re-hospeda no Storage)
+//   · sem evidência             → null (a UI trata como "Não registrado")
+const FAL_REQUEST_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+export function inferProvider(requestId: string | null, outputUrl?: string | null): 'fal' | 'gcp' | null {
+  if (outputUrl && outputUrl.includes('fal.media')) return 'fal'
+  if (requestId) return FAL_REQUEST_ID_RE.test(requestId) ? 'fal' : 'gcp'
+  return null
+}
+
 export function engineDisplayLabel(raw: string | null | undefined): string | null {
   if (!raw) return null
   const v = raw.toLowerCase()
@@ -526,7 +546,7 @@ function normalizeRender(res: DetailResponse): GenerationDetail {
     variationHref,
     technicalLog: privileged
       ? buildTechnicalLog('render', r, {
-          provider: str(log?.provider) ?? 'fal',
+          provider: str(log?.provider) ?? inferProvider(str(r.fal_request_id), outputUrl),
           model: str(r.engine) ?? str(r.model),
           endpoint: str(log?.endpoint),
           finalPrompt: str(r.prompt),
@@ -596,7 +616,9 @@ function normalizeEdit(res: DetailResponse): GenerationDetail {
     variationHref: null,
     technicalLog: privileged
       ? buildTechnicalLog('edit', r, {
-          provider: 'fal',
+          // edits não têm coluna provider — o request id decide (o resultado é
+          // re-hospedado no Storage, então a URL não carrega evidência aqui).
+          provider: inferProvider(str(r.fal_request_id)),
           model: str(r.engine),
           endpoint: str(r.engine),
           finalPrompt: str(r.prompt),
@@ -669,7 +691,7 @@ function normalizeVista(res: DetailResponse): GenerationDetail {
     variationHref: null,
     technicalLog: privileged
       ? buildTechnicalLog('vista', r, {
-          provider: str(r.provider) ?? 'fal',
+          provider: str(r.provider) ?? inferProvider(str(r.fal_request_id), imageUrl),
           model: str(r.model) ?? str(r.engine),
           endpoint: str(r.model),
           finalPrompt: str(r.prompt),

@@ -833,15 +833,46 @@ export async function POST(req: NextRequest) {
       },
     }
 
+    // Coluna ausente no banco (migration pendente — PGRST204/42703) não pode
+    // custar o arquivo técnico INTEIRO: o erro do PostgREST nomeia a coluna que
+    // faltou, então removemos SÓ ela e regravamos. Incidente 2026-08-13→18:
+    // preview_url sem migration em prod derrubava o insert estendido completo e
+    // o generation_log (provider/fallback_used/provider_error) sumiu por 5 dias
+    // — sem ele a operação fica cega pra saber QUEM gerou (GCP ou FAL) e o
+    // Diagnóstico técnico do Histórico exibia o default errado. Só quando a
+    // coluna não é identificável é que o fallback degrada pras colunas base.
+    const isMissingColumnError = (e: { code?: string } | null): boolean =>
+      !!e && (e.code === 'PGRST204' || e.code === '42703')
+    // "Could not find the 'preview_url' column of 'renders'…" (PGRST204) ou
+    // `column "preview_url" of relation "renders" does not exist` (42703).
+    const missingColumnName = (message: string): string | null =>
+      message.match(/'([A-Za-z0-9_]+)' column/)?.[1] ??
+      message.match(/column "([A-Za-z0-9_]+)"/)?.[1] ?? null
+
     let insertResult = await admin
       .from('renders')
       .insert(extendedRow)
       .select('id')
       .single()
 
-    if (insertResult.error && (insertResult.error.code === 'PGRST204' || insertResult.error.code === '42703')) {
-      console.warn('[generate] colunas de metadados ausentes — regravando com colunas base:', insertResult.error.message)
-      insertResult = await admin.from('renders').insert(baseRow).select('id').single()
+    if (isMissingColumnError(insertResult.error)) {
+      const extraKeys = Object.keys(extendedRow).filter(k => !(k in baseRow))
+      let row: Record<string, unknown> = { ...extendedRow }
+      // Teto: uma regravação por coluna estendida + a final com as colunas base.
+      for (let i = 0; i <= extraKeys.length; i++) {
+        const missing = missingColumnName(insertResult.error?.message ?? '')
+        if (missing && missing in row && !(missing in baseRow)) {
+          // error (não warn): ficou 5 dias invisível como warn — isto é uma
+          // migration pendente degradando o arquivo técnico a cada render.
+          console.error(`[generate] coluna '${missing}' ausente no banco (migration pendente?) — regravando sem ela; aplicar a migration pra parar de degradar o arquivo técnico`)
+          delete row[missing]
+        } else {
+          console.error('[generate] colunas de metadados ausentes (não identificáveis no erro) — regravando com colunas base:', insertResult.error?.message)
+          row = baseRow
+        }
+        insertResult = await admin.from('renders').insert(row).select('id').single()
+        if (!isMissingColumnError(insertResult.error) || row === baseRow) break
+      }
     }
 
     const renderId = insertResult.data?.id ?? null

@@ -11,6 +11,7 @@ import {
   inputMediaResolutionDefault,
   nb2ThinkingLevel,
   isInvalidArgumentError,
+  isTransientProviderError,
 } from '@/lib/ai/gemini-knobs'
 
 const savedMedia    = process.env.IMAGE_INPUT_MEDIA_RESOLUTION
@@ -71,5 +72,27 @@ describe('isInvalidArgumentError', () => {
     expect(isInvalidArgumentError(new Error('RESOURCE_EXHAUSTED: quota'))).toBe(false)
     expect(isInvalidArgumentError(Object.assign(new Error('internal'), { status: 500 }))).toBe(false)
     expect(isInvalidArgumentError(new Error('geração de imagem excedeu 90000ms'))).toBe(false)
+  })
+})
+
+describe('isTransientProviderError', () => {
+  it('reconhece capacidade/quota (429 RESOURCE_EXHAUSTED) e 5xx do Vertex', () => {
+    expect(isTransientProviderError(Object.assign(new Error('quota'), { status: 429 }))).toBe(true)
+    expect(isTransientProviderError(new Error('got status: RESOURCE_EXHAUSTED.'))).toBe(true)
+    expect(isTransientProviderError(Object.assign(new Error('internal'), { status: 500 }))).toBe(true)
+    expect(isTransientProviderError(Object.assign(new Error('unavailable'), { status: 503 }))).toBe(true)
+    expect(isTransientProviderError(new Error('UNAVAILABLE: The model is overloaded. Please try again later.'))).toBe(true)
+  })
+
+  it('reconhece blip de rede (fetch/socket)', () => {
+    expect(isTransientProviderError(new Error('fetch failed'))).toBe(true)
+    expect(isTransientProviderError(new Error('read ECONNRESET'))).toBe(true)
+  })
+
+  it('erro de contrato (400/404) e timeout do budget NÃO são transitórios', () => {
+    expect(isTransientProviderError(Object.assign(new Error('bad'), { status: 400 }))).toBe(false)
+    expect(isTransientProviderError(new Error('INVALID_ARGUMENT: unknown field'))).toBe(false)
+    expect(isTransientProviderError(Object.assign(new Error('não achou'), { status: 404 }))).toBe(false)
+    expect(isTransientProviderError(new Error('geração de imagem excedeu 90000ms (gcp: fal-ai/nano-banana-pro/edit)'))).toBe(false)
   })
 })

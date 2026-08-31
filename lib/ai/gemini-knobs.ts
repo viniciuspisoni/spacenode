@@ -48,3 +48,17 @@ export function isInvalidArgumentError(err: unknown): boolean {
   const msg = (err as Error)?.message ?? String(err)
   return /INVALID_ARGUMENT|Unknown name|Invalid JSON payload/i.test(msg)
 }
+
+/** Falha TRANSITÓRIA do Vertex/Google — capacidade/quota (429 RESOURCE_EXHAUSTED,
+ *  frequente no gemini-3-pro-image em horário de pico), blip de servidor (500/503)
+ *  ou rede. É o caso em que tentar DE NOVO no caminho primário costuma resolver
+ *  em segundos; cair direto pro fallback FAL troca crédito GCP por fatura FAL sem
+ *  necessidade (incidente 2026-08-14: ~50% do vega caiu na FAL numa janela de 3h
+ *  de 429 intermitente). Erros de contrato (400/404) NUNCA entram aqui — retry
+ *  não conserta request inválida. */
+export function isTransientProviderError(err: unknown): boolean {
+  const status = (err as { status?: number })?.status
+  if (status === 429 || status === 500 || status === 503) return true
+  const msg = (err as Error)?.message ?? String(err)
+  return /RESOURCE_EXHAUSTED|UNAVAILABLE|model is overloaded|try again later|ECONNRESET|fetch failed|socket hang up/i.test(msg)
+}
