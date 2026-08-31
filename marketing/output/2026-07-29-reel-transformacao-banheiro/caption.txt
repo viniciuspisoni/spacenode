@@ -1,0 +1,16 @@
+O modelo do SketchUp está claríssimo pra você. Pro seu cliente, é um monte de
+linha cinza.
+
+As duas imagens são o mesmo projeto: mesma geometria, mesmo enquadramento, mesma
+câmera. A diferença é o render com IA aplicado por cima do seu próprio modelo —
+em minutos, sem virar a madrugada no V-Ray e sem trocar de placa de vídeo.
+
+E o medo que todo mundo tem de IA em arquitetura: o Geometry Lock trava a
+geometria do projeto. A IA resolve luz, material e acabamento — não inventa
+parede, não muda pé-direito, não reinventa o seu banheiro.
+
+Feito por um arquiteto brasileiro, pra arquiteto brasileiro.
+
+Teste grátis no link da bio.
+
+#arquitetura #render #sketchup #archviz #arquiteto #projetodeinteriores #renderizacao #iaparaarquitetos

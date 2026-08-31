@@ -1,5 +1,6 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { ConstellationN } from '@/components/brand'
 import {
@@ -12,6 +13,8 @@ import {
   getNodesCost, isEngineId, isResolution, isValidCombination,
 } from '@/lib/engines'
 import { EngineIcon } from '@/components/icons/engines'
+import InsufficientNodesCta from '@/components/app/InsufficientNodesCta'
+import { consumeHandoff } from '@/components/nodi/actions-bus'
 
 interface GenerateClientProps {
   initialCredits:    number
@@ -274,6 +277,29 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
   //    Só faz efeito quando há render anterior (anchor) — sem isso o modelo não
   //    tem referência fixa do "tudo o que deve ser preservado".
   const [refinementText, setRefinementText] = useState('')
+
+  // ── Handoff do Nodi (ação confirmada no painel): pré-preenche engine,
+  //    resolução e direção de refino. Consumido uma única vez, aplicado após
+  //    o mount (rAF: sem mismatch de hidratação, sem setState síncrono em
+  //    effect). O clique que gasta nodes continua sendo o botão Gerar.
+  useEffect(() => {
+    const handoff = consumeHandoff('renderizar')
+    if (!handoff) return
+    const raf = requestAnimationFrame(() => {
+      const engine = handoff.settings?.engine
+      const resolution = handoff.settings?.resolution
+      if (isEngineId(engine)) {
+        setSelectedEngine(engine)
+        setSelectedResolution(
+          isResolution(resolution) && isValidCombination(engine, resolution)
+            ? resolution
+            : ENGINES[engine].resolutions[0],
+        )
+      }
+      if (handoff.prompt) setRefinementText(handoff.prompt)
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [])
 
   const fileInputRef         = useRef<HTMLInputElement>(null)
   const compareRef           = useRef<HTMLDivElement>(null)
@@ -550,12 +576,6 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
     }
   }, [])
 
-  const handleBuyCredits = async () => {
-    const res = await fetch('/api/stripe/checkout', { method: 'POST' })
-    const data = await res.json()
-    if (data.url) window.location.href = data.url
-  }
-
   // ── Reseta o estado da geração atual pra começar um render do zero
   //    com nova imagem. Mantém os parâmetros (segmento, ambiente etc.) —
   //    só limpa o que pertence ao ciclo da imagem atual.
@@ -587,6 +607,18 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
   const backgrounds   = getBackgrounds(projectType)
   const elementsOpts  = getSceneElements(projectType, segment)
   const bgTitle       = projectType === 'exterior' ? 'ENTORNO' : 'CONTEXTO VISUAL'
+  const noNodes       = credits < nodeCost
+
+  // Melhor combinação motor × resolução que ainda cabe no saldo — a saída
+  // honesta pra quem está sem nodes: gerar com menos qualidade em vez de pagar.
+  // "Melhor" = a mais cara dentro do orçamento (mais qualidade pelo que sobrou).
+  const cheaperFit = !noNodes ? null : ENGINE_ORDER.flatMap(eid =>
+    ENGINES[eid].resolutions
+      .filter(res => isValidCombination(eid, res))
+      .map(res => ({ engine: eid, res, cost: getNodesCost(eid, res) }))
+  ).filter(o => o.cost <= credits)
+   .sort((a, b) => b.cost - a.cost)[0] ?? null
+
   const typeLabel     = projectType === 'exterior' ? 'Fotorrealismo Exterior' : 'Fotorrealismo Interior'
 
   // ── Summary lines
@@ -614,7 +646,7 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
             <span style={S.creditDot}/>
             <span style={S.creditNum}>{credits}</span>
             <span>nodes</span>
-            <button onClick={handleBuyCredits} style={S.buyBtn}>Recarregar</button>
+            <Link href="/app/billing" style={S.buyBtn}>Recarregar</Link>
           </div>
         </div>
 
@@ -865,27 +897,41 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
           </div>
         )}
 
-        {/* 11 — Botão Gerar */}
-        <button
-          style={loading || !imagePreview || credits < nodeCost
-            ? {...S.genBtn, opacity:0.6, cursor:'not-allowed'}
-            : S.genBtn}
-          onClick={() => handleGenerate()}
-          disabled={loading || !imagePreview || credits < nodeCost}
-        >
-          <span>{loading
-            ? 'gerando…'
-            : (refinementText.trim() && outputUrl && useAnchor
-                ? 'aplicar refinamento'
-                : (outputUrl && useAnchor ? 'gerar variação' : 'gerar render'))
-          }</span>
-          <span style={S.genBtnMeta}>
-            <span>{nodeCost} Nodes por render</span>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-bg)" strokeWidth="1.5">
-              <path d="M5 12h14M13 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </span>
-        </button>
+        {/* 11 — Botão Gerar · sem saldo, o CTA vira caminho pros planos */}
+        {noNodes ? (
+          <InsufficientNodesCta
+            needed={nodeCost}
+            available={credits}
+            alternative={cheaperFit ? {
+              label: `gere em ${ENGINES[cheaperFit.engine].name} · ${cheaperFit.res.toUpperCase()} por ${cheaperFit.cost} nodes`,
+              onClick: () => {
+                setSelectedEngine(cheaperFit.engine)
+                setSelectedResolution(cheaperFit.res)
+              },
+            } : undefined}
+          />
+        ) : (
+          <button
+            style={loading || !imagePreview
+              ? {...S.genBtn, opacity:0.6, cursor:'not-allowed'}
+              : S.genBtn}
+            onClick={() => handleGenerate()}
+            disabled={loading || !imagePreview}
+          >
+            <span>{loading
+              ? 'gerando…'
+              : (refinementText.trim() && outputUrl && useAnchor
+                  ? 'aplicar refinamento'
+                  : (outputUrl && useAnchor ? 'gerar variação' : 'gerar render'))
+            }</span>
+            <span style={S.genBtnMeta}>
+              <span>{nodeCost} Nodes por render</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-bg)" strokeWidth="1.5">
+                <path d="M5 12h14M13 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </span>
+          </button>
+        )}
       </div>
 
       {/* ── PREVIEW ── */}

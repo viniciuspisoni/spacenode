@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>SPACENODE — Carrossel 5 slides 1080×1350</title>
+<style>
+  @font-face {
+    font-family: 'Geist';
+    src: url('../../public/fonts/geist-latin.woff2') format('woff2');
+    font-weight: 100 900;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #1c1c1e;
+    font-family: 'Geist', -apple-system, 'Segoe UI', Roboto, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 48px;
+    padding: 48px;
+  }
+
+  /* ---- Cabeçalho da página (FORA da arte) ---- */
+  .page-head {
+    width: 1080px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 24px;
+  }
+  .page-head strong {
+    color: #f5f5f7;
+    font-size: 15px;
+    font-weight: 620;
+    letter-spacing: 0.02em;
+  }
+  .page-head span {
+    color: #6e6e73;
+    font-size: 13px;
+    font-weight: 460;
+  }
+
+  /* ---- Etiqueta do slide (FORA do canvas) ---- */
+  .slide-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .slide-label {
+    color: #6e6e73;
+    font-size: 13px;
+    font-weight: 460;
+    letter-spacing: 0.06em;
+  }
+
+  /* ================= ARTE ================= */
+  .canvas {
+    width: 1080px;
+    height: 1350px;
+    background: #0a0a0a;
+    position: relative;
+    overflow: hidden;
+    flex-shrink: 0;
+    padding: 96px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ---- Eyebrow (slide 1) ---- */
+  .eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+  .eyebrow .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #30d158;
+    flex-shrink: 0;
+  }
+  .eyebrow .line {
+    width: 72px;
+    height: 1px;
+    background: rgba(255,255,255,0.08);
+    flex-shrink: 0;
+  }
+  .eyebrow .label {
+    color: #a1a1a6;
+    font-size: 24px;
+    font-weight: 460;
+    text-transform: uppercase;
+    letter-spacing: 0.28em;
+  }
+
+  /* ---- Número discreto (slides 2–4) ---- */
+  .slide-num {
+    color: #6e6e73;
+    font-size: 36px;
+    font-weight: 460;
+    letter-spacing: 0.08em;
+  }
+
+  /* ---- Títulos ---- */
+  .title-hook {
+    color: #f5f5f7;
+    font-size: 96px;
+    font-weight: 620;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+  .title-arg {
+    color: #f5f5f7;
+    font-size: 64px;
+    font-weight: 620;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    margin-top: 32px;
+  }
+  .title-close {
+    color: #f5f5f7;
+    font-size: 84px;
+    font-weight: 620;
+    line-height: 1.06;
+    letter-spacing: -0.02em;
+  }
+
+  /* ---- Corpo ---- */
+  .body-text {
+    color: #a1a1a6;
+    font-size: 36px;
+    font-weight: 460;
+    line-height: 1.45;
+    max-width: 800px;
+    margin-top: 40px;
+  }
+
+  /* ---- Slot de imagem (apenas slide 3) ---- */
+  .image-slot {
+    margin-top: 44px;
+    flex: 1 1 auto;
+    min-height: 578px; /* ≥35% da arte de 1080×1350 com margens de 96px */
+    border: 1px dashed rgba(255,255,255,0.14);
+    border-radius: 8px;
+    background: #111111;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .image-note {
+    color: #6e6e73;
+    font-size: 26px;
+    font-weight: 460;
+    line-height: 1.5;
+    text-align: center;
+    max-width: 70%;
+  }
+
+  /* ---- CTA (slide 5, mesma pill do story) ---- */
+  .cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 16px;
+    padding: 24px 44px;
+    border: 1px solid rgba(255,255,255,0.16);
+    border-radius: 999px;
+    color: #f5f5f7;
+    font-size: 30px;
+    font-weight: 460;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    align-self: flex-start;
+    margin-top: 56px;
+  }
+  .cta .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #30d158;
+    flex-shrink: 0;
+  }
+
+  /* ---- Rodapé de todos os slides ---- */
+  .spacer { flex: 1 1 auto; }
+
+  .footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 32px;
+    margin-top: 48px;
+  }
+  .wordmark {
+    color: #a1a1a6;
+    font-size: 20px;
+    font-weight: 460;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .wordmark-lg {
+    font-size: 30px;
+  }
+  .progress {
+    display: flex;
+    gap: 10px;
+  }
+  .progress i {
+    display: block;
+    width: 44px;
+    height: 2px;
+    background: rgba(255,255,255,0.16);
+  }
+  .progress i.on {
+    background: #f5f5f7; /* ativo em branco — nunca verde */
+  }
+</style>
+</head>
+<body>
+
+  <header class="page-head">
+    <strong>Carrossel · 5 slides · 1080×1350</strong>
+    <span>DevTools → clique-direito no nó .canvas → Capture node screenshot</span>
+  </header>
+
+  <!-- ============ SLIDE 1 — GANCHO ============ -->
+  <div class="slide-wrap">
+    <div class="slide-label">Slide 1/5</div>
+    <div class="canvas">
+      <div class="eyebrow">
+        <span class="dot"></span>
+        <span class="line"></span>
+        <span class="label">{{EYEBROW}}</span>
+      </div>
+      <div class="spacer"></div>
+      <h1 class="title-hook">{{SLIDE1_TITLE}}</h1>
+      <p class="body-text">{{SLIDE1_BODY}}</p>
+      <div class="spacer"></div>
+      <div class="footer">
+        <span class="wordmark">SPACENODE</span>
+        <span class="progress"><i class="on"></i><i></i><i></i><i></i><i></i></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SLIDE 2 — ARGUMENTO ============ -->
+  <div class="slide-wrap">
+    <div class="slide-label">Slide 2/5</div>
+    <div class="canvas">
+      <div class="slide-num">02</div>
+      <h2 class="title-arg">{{SLIDE2_TITLE}}</h2>
+      <p class="body-text">{{SLIDE2_BODY}}</p>
+      <div class="spacer"></div>
+      <div class="footer">
+        <span class="wordmark">SPACENODE</span>
+        <span class="progress"><i></i><i class="on"></i><i></i><i></i><i></i></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SLIDE 3 — ARGUMENTO + IMAGEM ============ -->
+  <div class="slide-wrap">
+    <div class="slide-label">Slide 3/5</div>
+    <div class="canvas">
+      <div class="slide-num">03</div>
+      <h2 class="title-arg">{{SLIDE3_TITLE}}</h2>
+      <div class="image-slot">
+        <p class="image-note">{{IMAGE_NOTE}}</p>
+      </div>
+      <p class="body-text">{{SLIDE3_BODY}}</p>
+      <div class="footer">
+        <span class="wordmark">SPACENODE</span>
+        <span class="progress"><i></i><i></i><i class="on"></i><i></i><i></i></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SLIDE 4 — ARGUMENTO ============ -->
+  <div class="slide-wrap">
+    <div class="slide-label">Slide 4/5</div>
+    <div class="canvas">
+      <div class="slide-num">04</div>
+      <h2 class="title-arg">{{SLIDE4_TITLE}}</h2>
+      <p class="body-text">{{SLIDE4_BODY}}</p>
+      <div class="spacer"></div>
+      <div class="footer">
+        <span class="wordmark">SPACENODE</span>
+        <span class="progress"><i></i><i></i><i></i><i class="on"></i><i></i></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SLIDE 5 — FECHAMENTO + CTA ============ -->
+  <div class="slide-wrap">
+    <div class="slide-label">Slide 5/5</div>
+    <div class="canvas">
+      <div class="spacer"></div>
+      <h2 class="title-close">{{SLIDE5_TITLE}}</h2>
+      <p class="body-text">{{SLIDE5_BODY}}</p>
+      <span class="cta"><span class="dot"></span>{{CTA_LABEL}}</span>
+      <div class="spacer"></div>
+      <div class="footer">
+        <span class="wordmark wordmark-lg">SPACENODE</span>
+        <span class="progress"><i></i><i></i><i></i><i></i><i class="on"></i></span>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

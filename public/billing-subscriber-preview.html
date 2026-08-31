@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Billing – Assinante Pro (preview)</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-size: 14px;
+    letter-spacing: -0.011em;
+    background: #f2f2f2;
+    color: #1a1a1a;
+    min-height: 100vh;
+  }
+  .page {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 64px 32px 96px;
+  }
+  .section { margin-bottom: 40px; }
+  .section-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #86868b;
+    margin-bottom: 14px;
+  }
+  /* Balance card */
+  .balance-card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 28px 32px;
+    border: 0.5px solid rgba(0,0,0,0.07);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 28px;
+  }
+  .balance-item-label {
+    font-size: 10px;
+    color: #86868b;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .balance-item-value {
+    font-size: 28px;
+    font-weight: 500;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+    color: #1a1a1a;
+  }
+  .balance-item-value.green { color: #30b46c; }
+  .balance-item-detail { font-size: 11px; color: #86868b; margin-top: 2px; }
+
+  /* Billing toggle */
+  .billing-toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+  }
+  .billing-toggle {
+    display: inline-flex;
+    align-items: center;
+    background: #fff;
+    border: 0.5px solid rgba(0,0,0,0.07);
+    border-radius: 32px;
+    padding: 3px;
+  }
+  .toggle-btn {
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: -0.005em;
+    border: none;
+    border-radius: 28px;
+    padding: 6px 14px;
+    cursor: pointer;
+    transition: all 0.18s;
+    white-space: nowrap;
+  }
+  .toggle-btn.active  { background: #1a1a1a; color: #fafafa; }
+  .toggle-btn.passive { background: transparent; color: #86868b; }
+  .plan-label-hint { font-size: 11px; color: #86868b; }
+
+  /* Plan grid */
+  .plan-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    align-items: stretch;
+  }
+  .plan-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px 18px;
+    border: 0.5px solid rgba(0,0,0,0.07);
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .plan-card.current { border-color: #30b46c; }
+  .plan-card-header {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #86868b;
+    margin-bottom: 12px;
+  }
+  .plan-card-header .current-tag { color: #30b46c; margin-left: 6px; }
+  .plan-nodes {
+    font-size: 28px;
+    font-weight: 500;
+    color: #1a1a1a;
+    letter-spacing: -0.04em;
+    margin-bottom: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+  .plan-nodes span { font-size: 10px; color: #86868b; margin-left: 4px; font-weight: 400; }
+  .plan-price {
+    font-size: 13px;
+    color: #1a1a1a;
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+  .plan-price span { font-size: 10px; color: #86868b; font-weight: 400; }
+  .plan-desc {
+    font-size: 11px;
+    color: #86868b;
+    line-height: 1.5;
+    flex: 1;
+    margin: 8px 0 16px;
+  }
+  .plan-btn {
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+  }
+  .plan-btn.default  { background: #1a1a1a; color: #fafafa; }
+  .plan-btn.current  { background: rgba(48,180,108,0.1); color: #30b46c; cursor: default; }
+
+  /* Lumens section */
+  .lumens-subtitle {
+    font-size: 11px;
+    color: #86868b;
+    margin-bottom: 14px;
+    line-height: 1.5;
+  }
+  .lumen-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+  }
+  .lumen-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 18px;
+    border: 0.5px solid rgba(0,0,0,0.07);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    display: flex;
+    flex-direction: column;
+  }
+  .lumen-name {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #86868b;
+    margin-bottom: 8px;
+  }
+  .lumen-nodes {
+    font-size: 22px;
+    font-weight: 500;
+    color: #1a1a1a;
+    letter-spacing: -0.04em;
+    margin-bottom: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+  .lumen-nodes span { font-size: 10px; color: #86868b; margin-left: 4px; font-weight: 400; }
+  .lumen-price {
+    font-size: 13px;
+    color: #1a1a1a;
+    font-weight: 500;
+    margin-bottom: 12px;
+  }
+  .lumen-meta { font-size: 10px; color: #86868b; margin-bottom: 14px; }
+  .lumen-btn {
+    margin-top: auto;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 0.5px solid rgba(0,0,0,0.09);
+    background: #fafafa;
+    color: #1a1a1a;
+  }
+  .lumen-btn:hover { background: #f0f0f0; }
+
+  /* Active lumens table */
+  .active-lumens-box {
+    background: #fff;
+    border-radius: 12px;
+    border: 0.5px solid rgba(0,0,0,0.07);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    overflow: hidden;
+  }
+  .lumen-row {
+    padding: 16px 22px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 16px;
+    align-items: center;
+    border-top: 0.5px solid rgba(0,0,0,0.06);
+  }
+  .lumen-row:first-child { border-top: none; }
+  .lumen-row-name { font-size: 13px; font-weight: 500; color: #1a1a1a; }
+  .lumen-row-date { font-size: 10px; color: #86868b; margin-top: 2px; }
+  .lumen-row-balance { font-size: 13px; font-weight: 500; color: #1a1a1a; font-variant-numeric: tabular-nums; }
+  .lumen-row-balance span { font-size: 10px; color: #86868b; margin-left: 3px; font-weight: 400; }
+  .progress-bar {
+    height: 2px;
+    background: rgba(0,0,0,0.06);
+    border-radius: 2px;
+    margin-top: 4px;
+    overflow: hidden;
+  }
+  .progress-fill { height: 100%; background: #30b46c; border-radius: 2px; }
+  .expiry-text { font-size: 11px; color: #86868b; }
+  .expiry-days { font-weight: 600; color: #1a1a1a; }
+  .expiry-days.warning { color: #d63638; }
+  .lumen-exp-date { font-size: 10px; color: #86868b; text-align: right; }
+
+  .footer-note {
+    margin-top: 32px;
+    text-align: center;
+    font-size: 11px;
+    color: #bbb;
+    line-height: 1.7;
+  }
+
+  /* annotation */
+  .preview-badge {
+    display: inline-block;
+    background: #1a1a1a;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border-radius: 20px;
+    margin-bottom: 24px;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="preview-badge">Preview — Assinante Pro com Lumen 1.500 ativo</div>
+
+  <!-- 1. Saldo -->
+  <section class="section">
+    <div class="section-label">saldo</div>
+    <div class="balance-card">
+      <div>
+        <div class="balance-item-label">Plano</div>
+        <div class="balance-item-value">1.800</div>
+        <div class="balance-item-detail">Pro</div>
+      </div>
+      <div>
+        <div class="balance-item-label">Lumens</div>
+        <div class="balance-item-value">1.200</div>
+        <div class="balance-item-detail">1 pack ativo</div>
+      </div>
+      <div>
+        <div class="balance-item-label">Total disponível</div>
+        <div class="balance-item-value green">3.000</div>
+        <div class="balance-item-detail">nodes</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. Plano -->
+  <section class="section">
+    <div class="section-label">plano</div>
+    <div class="billing-toggle-row">
+      <div class="billing-toggle">
+        <button class="toggle-btn active">Mensal</button>
+        <button class="toggle-btn passive">Anual</button>
+      </div>
+      <span class="plan-label-hint">Plano atual: <strong style="color:#1a1a1a">Pro</strong></span>
+    </div>
+    <div class="plan-grid">
+
+      <!-- Starter -->
+      <div class="plan-card">
+        <div class="plan-card-header">Starter</div>
+        <div class="plan-nodes">750 <span>nodes/mês</span></div>
+        <div class="plan-price">R$ 89 <span>/mês</span></div>
+        <p class="plan-desc">Estudante / freelancer testando</p>
+        <button class="plan-btn default">assinar starter</button>
+      </div>
+
+      <!-- Pro (current) -->
+      <div class="plan-card current">
+        <div class="plan-card-header">Pro <span class="current-tag">· atual</span></div>
+        <div class="plan-nodes">1.800 <span>nodes/mês</span></div>
+        <div class="plan-price">R$ 199 <span>/mês</span></div>
+        <p class="plan-desc">Profissional autônomo em produção</p>
+        <button class="plan-btn current">plano atual</button>
+      </div>
+
+      <!-- Studio -->
+      <div class="plan-card">
+        <div class="plan-card-header">Studio</div>
+        <div class="plan-nodes">3.500 <span>nodes/mês</span></div>
+        <div class="plan-price">R$ 349 <span>/mês</span></div>
+        <p class="plan-desc">Escritório com volume e equipe</p>
+        <button class="plan-btn default">assinar studio</button>
+      </div>
+
+      <!-- Office -->
+      <div class="plan-card">
+        <div class="plan-card-header">Office</div>
+        <div class="plan-nodes">8.000 <span>nodes/mês</span></div>
+        <div class="plan-price">R$ 699 <span>/mês</span></div>
+        <p class="plan-desc">Escritório consolidado, alto volume</p>
+        <button class="plan-btn default">assinar office</button>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- 3. Lumens -->
+  <section class="section">
+    <div class="section-label">lumens · créditos avulsos</div>
+    <p class="lumens-subtitle">
+      Pague uma vez, use em até 90 dias. Consumidos automaticamente quando o saldo do plano acabar.
+    </p>
+    <div class="lumen-grid">
+
+      <div class="lumen-card">
+        <div class="lumen-name">Lumen 500</div>
+        <div class="lumen-nodes">500 <span>nodes</span></div>
+        <div class="lumen-price">R$ 89</div>
+        <div class="lumen-meta">Validade: 90 dias · R$ 0.178/node</div>
+        <button class="lumen-btn">comprar</button>
+      </div>
+
+      <div class="lumen-card">
+        <div class="lumen-name">Lumen 1.500</div>
+        <div class="lumen-nodes">1.500 <span>nodes</span></div>
+        <div class="lumen-price">R$ 219</div>
+        <div class="lumen-meta">Validade: 90 dias · R$ 0.146/node</div>
+        <button class="lumen-btn">comprar</button>
+      </div>
+
+      <div class="lumen-card">
+        <div class="lumen-name">Lumen 4.000</div>
+        <div class="lumen-nodes">4.000 <span>nodes</span></div>
+        <div class="lumen-price">R$ 499</div>
+        <div class="lumen-meta">Validade: 90 dias · R$ 0.125/node</div>
+        <button class="lumen-btn">comprar</button>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- 4. Meus Lumens ativos -->
+  <section class="section">
+    <div class="section-label">meus lumens ativos</div>
+    <div class="active-lumens-box">
+
+      <!-- Pack 1: Lumen 1.500 – 1.200/1.500 nodes, 45 dias -->
+      <div class="lumen-row">
+        <div>
+          <div class="lumen-row-name">Lumen 1.500</div>
+          <div class="lumen-row-date">Comprado em 01/04/2026</div>
+        </div>
+        <div>
+          <div class="lumen-row-balance">1.200 <span>/ 1.500</span></div>
+          <div class="progress-bar"><div class="progress-fill" style="width:80%"></div></div>
+        </div>
+        <div class="expiry-text">
+          Expira em <span class="expiry-days">45 dias</span>
+        </div>
+        <div class="lumen-exp-date">30/06/2026</div>
+      </div>
+
+      <!-- Pack 2: Lumen 500 – quase vencendo (6 dias) -->
+      <div class="lumen-row">
+        <div>
+          <div class="lumen-row-name">Lumen 500</div>
+          <div class="lumen-row-date">Comprado em 05/02/2026</div>
+        </div>
+        <div>
+          <div class="lumen-row-balance">120 <span>/ 500</span></div>
+          <div class="progress-bar"><div class="progress-fill" style="width:24%;background:#d63638"></div></div>
+        </div>
+        <div class="expiry-text">
+          Expira em <span class="expiry-days warning">6 dias</span>
+        </div>
+        <div class="lumen-exp-date">15/05/2026</div>
+      </div>
+
+    </div>
+  </section>
+
+  <p class="footer-note">Cobranças seguras pelo Stripe. Cancele quando quiser.</p>
+</div>
+</body>
+</html>

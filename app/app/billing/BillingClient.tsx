@@ -18,6 +18,8 @@ interface BillingClientProps {
   plan:    string
   balance: { plan: number; lumen: number; total: number }
   lumens:  LumenPackRow[]
+  /** true = saldo exibido é a bolsa do workspace (membro de escritório). */
+  pooled?: boolean
 }
 
 type CheckoutPayload =
@@ -39,7 +41,7 @@ function daysUntil(date: string): number {
   return Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)))
 }
 
-export function BillingClient({ plan, balance, lumens }: BillingClientProps) {
+export function BillingClient({ plan, balance, lumens, pooled }: BillingClientProps) {
   const isLumenBlocked = plan === 'free' || plan === 'starter'
   const [billing, setBilling] = useState<BillingCycle>('monthly')
   const [loading, setLoading] = useState<string | null>(null)
@@ -57,6 +59,17 @@ export function BillingClient({ plan, balance, lumens }: BillingClientProps) {
     if (r.error) { setError(r.error); setLoading(null); return }
     if (r.url) window.location.assign(r.url)
   }
+  // Billing Portal do Stripe — trocar cartão, ver faturas, cancelar.
+  // Só para o pagador (membro de workspace não tem assinatura própria).
+  const handlePortal = async () => {
+    setLoading('portal'); setError(null)
+    const res = await fetch('/api/stripe/portal', { method: 'POST' })
+    if (res.status === 401) { window.location.href = '/login'; return }
+    const r = await res.json() as { url?: string; error?: string }
+    if (r.error) { setError(r.error); setLoading(null); return }
+    if (r.url) window.location.assign(r.url)
+  }
+  const canManage = plan !== 'free' && !pooled
 
   return (
     <div style={{
@@ -77,6 +90,15 @@ export function BillingClient({ plan, balance, lumens }: BillingClientProps) {
             <BalanceItem label="Lumens"  value={balance.lumen} detail={`${lumens.length} pack${lumens.length === 1 ? '' : 's'} ativo${lumens.length === 1 ? '' : 's'}`} />
             <BalanceItem label="Total disponível" value={balance.total} detail="nodes" green />
           </div>
+          {pooled && (
+            <p style={{
+              fontSize: 12.5, color: 'var(--color-text-tertiary)',
+              lineHeight: 1.6, letterSpacing: '-0.005em', marginTop: 12,
+            }}>
+              Você faz parte de um workspace — este é o saldo da conta principal,
+              compartilhado por toda a equipe.
+            </p>
+          )}
         </Section>
 
         {/* ── 2. Plano ───────────────────────────────────────────────────── */}
@@ -87,6 +109,20 @@ export function BillingClient({ plan, balance, lumens }: BillingClientProps) {
             <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
               Plano atual: <strong style={{ color: 'var(--color-text-primary)' }}>{plan === 'free' ? 'Gratuito' : capitalize(plan)}</strong>
             </span>
+            {canManage && (
+              <button
+                onClick={handlePortal}
+                disabled={loading === 'portal'}
+                style={{
+                  background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                  fontSize: 11, color: 'var(--color-text-secondary)',
+                  textDecoration: 'underline', textUnderlineOffset: 2,
+                  letterSpacing: '-0.005em', fontFamily: 'inherit',
+                }}
+              >
+                {loading === 'portal' ? 'Abrindo…' : 'Gerenciar assinatura →'}
+              </button>
+            )}
           </div>
           <div style={{
             display: 'grid',

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { findPlanByStripePriceId } from '@/lib/plans'
+import { recordAcquisitionEvent } from '@/lib/marketing/ads/service'
 
 export const dynamic = 'force-dynamic'
 
@@ -56,6 +57,17 @@ export async function POST(req: NextRequest) {
       const { error } = await supabase.from('profiles').update(updates).eq('id', userId)
       if (error) console.error('[stripe webhook] plan activation falhou:', error)
       else       console.log(`[stripe webhook] plano ${planId} ativado p/ user ${userId} (${nodesToAdd} nodes)`)
+
+      // Funil first-party (best-effort — recordAcquisitionEvent nunca lança).
+      if (!error) {
+        await recordAcquisitionEvent(supabase, {
+          user_id: userId,
+          event_type: 'subscription_started',
+          plan_id: planId,
+          value_cents: session.amount_total ?? null,
+          metadata: { billing_cycle: session.metadata?.billing_cycle ?? null, stripe_session_id: session.id },
+        })
+      }
     } else if (productType === 'lumen') {
       const packSize = parseInt(session.metadata?.pack_size ?? '0', 10)
       if (![500, 1500, 4000].includes(packSize)) {
@@ -116,6 +128,23 @@ export async function POST(req: NextRequest) {
       const { error } = await filtered
       if (error) console.error('[stripe webhook] renovação falhou:', error)
       else       console.log(`[stripe webhook] renovação aplicada (${match.plan.id} → ${match.plan.nodes} nodes)`)
+
+      // Funil first-party (best-effort): resolve o dono da assinatura para
+      // registrar a renovação com receita — nunca afeta o billing.
+      if (!error) {
+        const { data: renewed } = subscriptionId
+          ? await supabase.from('profiles').select('id').eq('stripe_subscription_id', subscriptionId).maybeSingle()
+          : await supabase.from('profiles').select('id').eq('stripe_customer_id', customerId!).maybeSingle()
+        if (renewed?.id) {
+          await recordAcquisitionEvent(supabase, {
+            user_id: renewed.id as string,
+            event_type: 'subscription_renewed',
+            plan_id: match.plan.id,
+            value_cents: invoice.amount_paid ?? null,
+            metadata: { stripe_invoice_id: invoice.id },
+          })
+        }
+      }
     }
   }
 
@@ -135,9 +164,27 @@ export async function POST(req: NextRequest) {
       console.error('[stripe webhook] subscription.deleted sem id resolvível:', sub.id)
       return NextResponse.json({ received: true })
     }
+
+    // Resolve o dono ANTES do update (que anula stripe_subscription_id) para
+    // registrar o cancelamento no funil first-party (best-effort).
+    const { data: cancelingProfile } = subscriptionId
+      ? await supabase.from('profiles').select('id, plan').eq('stripe_subscription_id', subscriptionId).maybeSingle()
+      : customerId
+        ? await supabase.from('profiles').select('id, plan').eq('stripe_customer_id', customerId).maybeSingle()
+        : { data: null }
+
     const { error } = await q
     if (error) console.error('[stripe webhook] cancelamento falhou:', error)
     else       console.log(`[stripe webhook] plano cancelado (sub ${subscriptionId})`)
+
+    if (!error && cancelingProfile?.id) {
+      await recordAcquisitionEvent(supabase, {
+        user_id: cancelingProfile.id as string,
+        event_type: 'subscription_canceled',
+        plan_id: (cancelingProfile.plan as string | null) ?? null,
+        metadata: { stripe_subscription_id: subscriptionId },
+      })
+    }
   }
 
   return NextResponse.json({ received: true })

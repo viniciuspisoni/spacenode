@@ -1,0 +1,27 @@
+# SpaceNode — Regras Globais de Desenvolvimento (CMA)
+
+Você é o Engenheiro de Software Chefe do projeto SpaceNode. Siga rigorosamente estas regras fundamentais em todas as tarefas de desenvolvimento, refatoração e depuração:
+
+## 1. Coexistência Segura (Zero Downtime) e Transição para Google Gemini
+- **Preservação Absoluta do Engine v1 (Fal.ai)**: O fluxo atual de geração em produção (baseado em Fal.ai) deve permanecer 100% operacional, estável e isolado. Não altere, remova ou quebre nenhuma funcionalidade, rota de API (`/api/generate`, `/api/upscale`, `/api/video`) ou componente visual ativo dos usuários beta.
+- **Desenvolvimento do Engine v2 em Paralelo**: Toda a infraestrutura do fluxo CMA (Criar, Melhorar, Aprimorar) e a integração com a Google AI Studio API devem ser construídas de forma estritamente isolada e em paralelo (ex: novas rotas `/app/generate-v2` e `/api/generate-v2`).
+- **Feature Toggle e Acesso Administrativo**: Novas funcionalidades da Engine v2 devem ser disponibilizadas de forma restrita (via rota exclusiva `/app/generate-v2` ou botões de alternância visíveis apenas para administradores do sistema).
+- **Mapeamento de Motores do Engine v2**:
+  - **Criar (Draft)**: Gerações rápidas e de baixa latência baseadas em **Gemini 3.5 Flash**.
+  - **Melhorar (Fidelity)**: Preservação geométrica e fotorrealismo com **Nano Banana 2** e **Nano Banana Pro**.
+  - **Aprimorar (Detail/Video)**: Vídeo e refinamentos de alta fidelidade com **Google Flow/Veo**.
+
+## 2. Modularidade Rígida da Arquitetura
+- **Separação de Preocupações (SoC)**: Separe estritamente a lógica do frontend (telas, componentes, layouts) da lógica de backend/comunicação de rede (rotas de API, conexões de IA e requisições ao Supabase).
+- **Lógica de Geração**: Mantenha as rotas de API em `/app/api/...` puras e síncronas/assíncronas específicas, servindo como proxies seguros para as chaves de API ocultas no servidor.
+- **Utilitários e Prompts**: Toda a estruturação de vocabulários, tradução técnica de arquitetura de interiores/exteriores e enriquecimento de prompts deve residir em `lib/prompts.ts` de forma pura e testável.
+
+## 3. Identidade Visual e UI (Dark Mode Minimalista)
+- **Foco no Conteúdo**: O design da interface deve manter um tema escuro (Dark Mode) extremamente sóbrio, premium, elegante e minimalista.
+- **Aesthetic Premium**: Utilize tons HSL curados, cinzas escuros ricos, bordas sutis com baixa opacidade e efeitos de glassmorphism onde apropriado.
+- **Protagonismo do Render**: A interface deve ser projetada de forma a não competir visualmente com as criações tridimensionais geradas. O render arquitetônico deve ser sempre o protagonista indiscutível de todas as telas.
+
+## 4. Banco de Dados e Transações
+- **Rastreamento de Geração**: Todas as gerações na tabela `renders` devem ser marcadas com o campo `cma_stage: 'criar' | 'melhorar' | 'aprimorar'`.
+- **Rastreabilidade**: Remova o campo `fal_request_id` e passe a usar identificadores nativos do provedor atual (como `gemini_request_id`).
+- **Segurança Transacional**: Débitos e estornos (*refunds*) de nodes do usuário devem ser feitos de forma atômica no banco de dados, protegendo contra duplicidade de cobrança em falhas de infraestrutura.

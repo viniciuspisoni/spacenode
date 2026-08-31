@@ -87,9 +87,59 @@ function redactRowForUser(kind: string, row: Record<string, unknown>): Record<st
     // edits.prompt é a instrução escrita pelo USUÁRIO — permanece.
     // engine guarda o endpoint do provider: entrega só a label de produto.
     r.engine = engineDisplayLabel(typeof r.engine === 'string' ? r.engine : null)
+    // Campos de diagnóstico interno presentes nas linhas vindas de
+    // edit_v3_jobs — no-ops para as `edits` legadas, que não têm essas chaves.
+    delete r.provider
+    delete r.model
+    delete r.request_id
+    delete r.out_of_mask_delta
+    delete r.in_mask_delta
+    delete r.action_type
+    delete r.quality_mode
+    delete r.preservation_mode
+    delete r.intensity_mode
+    delete r.instruction
+    delete r.charged
   }
 
   return r
+}
+
+// Linha de edit_v3_jobs → shape das `edits` legadas, que é o contrato do
+// painel (normalizeEdit em lib/history/generation-detail.ts). Campos crus de
+// provider seguem na linha p/ admin (Diagnóstico técnico); a redação acima os
+// remove para usuário comum.
+function v3JobAsEditRow(j: Record<string, unknown>): Record<string, unknown> {
+  return {
+    id: j.id,
+    user_id: j.user_id,
+    status: j.status,
+    source_image_url: j.source_image_url,
+    result_image_url: j.result_image_url,
+    mask_url: j.mask_url,
+    prompt: (j.instruction ?? j.prompt) ?? null,
+    quality: j.quality_mode ?? null,
+    nodes_cost: j.nodes_cost ?? null,
+    engine: j.model ?? null,
+    source_type: null,
+    source_id: null,
+    mask_coverage: j.mask_coverage ?? null,
+    reference_count: j.reference_count ?? null,
+    created_at: j.created_at,
+    completed_at: j.completed_at ?? null,
+    // Diagnóstico (só sobrevive para admin — ver redactRowForUser):
+    provider: j.provider ?? null,
+    model: j.model ?? null,
+    request_id: j.request_id ?? null,
+    action_type: j.action_type ?? null,
+    quality_mode: j.quality_mode ?? null,
+    preservation_mode: j.preservation_mode ?? null,
+    intensity_mode: j.intensity_mode ?? null,
+    out_of_mask_delta: j.out_of_mask_delta ?? null,
+    in_mask_delta: j.in_mask_delta ?? null,
+    charged: j.charged ?? null,
+    error_message: j.error_message ?? null,
+  }
 }
 
 export async function GET(req: NextRequest) {
@@ -107,10 +157,16 @@ export async function GET(req: NextRequest) {
 
   const admin = createAdminClient()
 
-  const { data: row, error } = await admin.from(table).select('*').eq('id', id).maybeSingle()
+  let { data: row, error } = await admin.from(table).select('*').eq('id', id).maybeSingle()
   if (error) {
     console.error('[history/detail] erro ao buscar geração:', error)
     return NextResponse.json({ error: 'Erro ao carregar detalhes' }, { status: 500 })
+  }
+  // Fallback: edições do Editar V3 vivem em edit_v3_jobs, não em `edits`.
+  // Mesmo id pesquisado nas duas — uuids não colidem entre tabelas.
+  if (!row && kind === 'edit') {
+    const { data: j } = await admin.from('edit_v3_jobs').select('*').eq('id', id).maybeSingle()
+    if (j) row = v3JobAsEditRow(j as Record<string, unknown>) as typeof row
   }
   if (!row) return NextResponse.json({ error: 'Geração não encontrada' }, { status: 404 })
 

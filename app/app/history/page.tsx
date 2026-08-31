@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { RENDER_LIST_COLUMNS, sanitizeRenderListRow } from '@/lib/history/redact'
+import { getPayerBalance } from '@/lib/workspaces/balance'
 import { signRows } from '@/lib/storage/signed'
 import { HistoryClient } from './HistoryClient'
 
@@ -13,8 +14,10 @@ export default async function HistoryPage() {
 
   if (!user) redirect('/login')
 
-  const [{ data: profile }, { data: renders }, { data: folders }, { data: allFolderIds }] = await Promise.all([
-    supabase.from('profiles').select('credits').eq('id', user.id).single(),
+  const admin = createAdminClient()
+  const [balance, { data: renders }, { data: folders }, { data: allFolderIds }] = await Promise.all([
+    // Saldo da bolsa (dono do workspace) — é dele que a geração debita.
+    getPayerBalance(admin, user.id),
     // Projeção explícita + tradução de campos de provider: as linhas viram
     // props do client component (serializam no payload RSC) — nada de prompt
     // final, fal_request_id ou endpoints aqui. Ver lib/history/redact.ts.
@@ -44,7 +47,6 @@ export default async function HistoryPage() {
   // aqui sem mudança na UI. Admin client porque a RLS de profiles não permite
   // ler perfis de outros membros.
   const authorIds = Array.from(new Set([user.id, ...(renders ?? []).map(r => r.user_id).filter(Boolean)]))
-  const admin = createAdminClient()
   const { data: authorRows } = await admin
     .from('profiles')
     .select('id, full_name, email')
@@ -64,7 +66,7 @@ export default async function HistoryPage() {
       renders={signedRenders.map(sanitizeRenderListRow)}
       folderCounts={{ counts, unfiled, total }}
       pageSize={PAGE_SIZE}
-      credits={profile?.credits ?? 0}
+      credits={balance.planBalance}
       folders={folders ?? []}
       authors={authors}
       currentUserId={user.id}

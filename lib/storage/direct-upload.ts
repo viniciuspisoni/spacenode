@@ -78,7 +78,7 @@ export const DIRECT_UPLOAD_AREAS = {
   'finalizar-export': {
     bucket: 'space-mestres',
     maxBytes: 15 * 1024 * 1024,
-    allowedMime: () => ['image/png', 'image/jpeg'],
+    allowedMime: () => ['image/png', 'image/jpeg', 'image/webp'],
     dir: () => 'finalizar/export',
   },
   // Source/máscara do Retocar e dos editores (Editar v1/v2/v3).

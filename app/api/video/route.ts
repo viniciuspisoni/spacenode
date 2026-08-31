@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { fal } from '@fal-ai/client'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getPayerId } from '@/lib/workspaces/context'
 import { refundNodes } from '@/lib/billing/refund-nodes'
 import { requireVideoModel, getNodeCost } from '@/lib/video/models'
 import { buildArchitectureVideoPrompt, buildPromptFromLegacyInput, type FidelityMode } from '@/lib/video/promptBuilder'
@@ -229,11 +230,12 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // Saldo real pós-débito — a UI atualiza sem estimar (mesma view do /api/generate).
+    // Saldo real pós-débito da BOLSA (dono do workspace) — é dela que saiu.
+    const payerId = (await getPayerId(admin, user.id)) ?? user.id
     const { data: balance } = await admin
       .from('user_node_balance')
       .select('plan_balance')
-      .eq('user_id', user.id)
+      .eq('user_id', payerId)
       .single()
 
     return NextResponse.json({

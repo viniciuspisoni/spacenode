@@ -67,8 +67,11 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: 'PROJETOS',
     items: [
-      { label: 'Meus projetos', href: '/app/spaces',   exact: false, match: (p) => p.startsWith('/app/spaces') && !p.startsWith('/app/spaces/new'), Icon: IconProjects },
+      // Ordem por feedback de beta (Muda): Dashboard é a porta de entrada,
+      // depois os Spaces, depois o Histórico. "Meus Spaces" (não "Meus
+      // projetos") pra não confundir com os projetos do Histórico.
       { label: 'Dashboard',     href: '/app',          exact: true,  Icon: IconDashboard },
+      { label: 'Meus Spaces',   href: '/app/spaces',   exact: false, match: (p) => p.startsWith('/app/spaces') && !p.startsWith('/app/spaces/new'), Icon: IconProjects },
       { label: 'Histórico',     href: '/app/history',  exact: false, Icon: IconHistory   },
     ],
   },
@@ -138,8 +141,9 @@ export default function Sidebar({
       onMouseLeave={() => setHovered(false)}
     >
       {/* Logo — wordmark horizontal limpo (igual à LP) quando expandido,
-          símbolo "N" isolado quando colapsado. Botão para recolher/expandir. */}
-      <div style={{
+          símbolo "N" isolado quando colapsado. Clicável: leva ao Dashboard
+          (feedback de beta — clicar no logo/"spacenode" deve ir pro início). */}
+      <Link href="/app" title="Ir para o Dashboard" aria-label="Ir para o Dashboard" style={{
         position: 'relative',
         height: 78,
         flexShrink: 0,
@@ -149,6 +153,8 @@ export default function Sidebar({
         paddingLeft: expanded ? 20 : 0,
         color: 'var(--color-sidebar-foreground)',
         transition: 'padding 0.5s cubic-bezier(0.4,0,0.2,1)',
+        textDecoration: 'none',
+        cursor: 'pointer',
       }}>
         {/* Símbolo isolado — visível só colapsado */}
         <div
@@ -177,7 +183,7 @@ export default function Sidebar({
         }}>
           <Logo symbolSize={42} color="currentColor" />
         </div>
-      </div>
+      </Link>
 
       {/* Hairline sob o logo — estrutura (estilo header premium) */}
       <div

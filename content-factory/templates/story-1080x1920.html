@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>SPACENODE — Story 1080×1920</title>
+<style>
+  @font-face {
+    font-family: 'Geist';
+    src: url('../../public/fonts/geist-latin.woff2') format('woff2');
+    font-weight: 100 900;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #1c1c1e;
+    font-family: 'Geist', -apple-system, 'Segoe UI', Roboto, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    padding: 48px;
+  }
+
+  /* ---- Cabeçalho da página (FORA da arte) ---- */
+  .page-head {
+    width: 1080px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 24px;
+  }
+  .page-head strong {
+    color: #f5f5f7;
+    font-size: 15px;
+    font-weight: 620;
+    letter-spacing: 0.02em;
+  }
+  .page-head span {
+    color: #6e6e73;
+    font-size: 13px;
+    font-weight: 460;
+  }
+
+  /* ================= ARTE ================= */
+  .canvas {
+    width: 1080px;
+    height: 1920px;
+    background: #0a0a0a;
+    position: relative;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  /* Guias de zona segura do Instagram (sutis, quase invisíveis na captura) */
+  .safe-top,
+  .safe-bottom {
+    position: absolute;
+    left: 0;
+    right: 0;
+    border-top: 1px dashed rgba(255,255,255,0.06);
+    pointer-events: none;
+  }
+  .safe-top    { top: 220px; }
+  .safe-bottom { top: 1600px; }
+
+  /* Área útil: entre as zonas seguras, margens laterais de 96px */
+  .content {
+    position: absolute;
+    top: 220px;
+    bottom: 320px;
+    left: 96px;
+    right: 96px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ---- Eyebrow ---- */
+  .eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+  .eyebrow .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #30d158;
+    flex-shrink: 0;
+  }
+  .eyebrow .line {
+    width: 72px;
+    height: 1px;
+    background: rgba(255,255,255,0.08);
+    flex-shrink: 0;
+  }
+  .eyebrow .label {
+    color: #a1a1a6;
+    font-size: 24px;
+    font-weight: 460;
+    text-transform: uppercase;
+    letter-spacing: 0.28em;
+  }
+
+  /* ---- Headline ---- */
+  .headline {
+    margin-top: 32px;
+    color: #f5f5f7;
+    font-size: 104px;
+    font-weight: 620;
+    line-height: 1.04;
+    letter-spacing: -0.02em;
+  }
+
+  /* ---- Slot de imagem (nota do briefing indica o render) ---- */
+  .image-slot {
+    margin-top: 40px;
+    flex: 1 1 auto;
+    min-height: 818px; /* ≥35% da arte com 96px de margem lateral */
+    border: 1px dashed rgba(255,255,255,0.14);
+    border-radius: 8px;
+    background: #111111;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .image-note {
+    color: #6e6e73;
+    font-size: 28px;
+    font-weight: 460;
+    line-height: 1.5;
+    text-align: center;
+    max-width: 70%;
+  }
+
+  /* ---- Apoio ---- */
+  .support {
+    margin-top: 32px;
+    color: #a1a1a6;
+    font-size: 34px;
+    font-weight: 460;
+    line-height: 1.45;
+    max-width: 800px;
+  }
+
+  /* ---- Rodapé da área útil: CTA + wordmark ---- */
+  .bottom-row {
+    margin-top: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 32px;
+  }
+  .cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 16px;
+    padding: 20px 40px;
+    border: 1px solid rgba(255,255,255,0.16);
+    border-radius: 999px;
+    color: #f5f5f7;
+    font-size: 30px;
+    font-weight: 460;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+  }
+  .cta .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #30d158;
+    flex-shrink: 0;
+  }
+  .wordmark {
+    color: #a1a1a6;
+    font-size: 22px;
+    font-weight: 460;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+
+  <header class="page-head">
+    <strong>Story · 1080×1920</strong>
+    <span>DevTools → clique-direito no nó .canvas → Capture node screenshot</span>
+  </header>
+
+  <div class="canvas">
+    <div class="safe-top"></div>
+    <div class="safe-bottom"></div>
+
+    <div class="content">
+      <div class="eyebrow">
+        <span class="dot"></span>
+        <span class="line"></span>
+        <span class="label">{{EYEBROW}}</span>
+      </div>
+
+      <h1 class="headline">{{HEADLINE}}</h1>
+
+      <div class="image-slot">
+        <p class="image-note">{{IMAGE_NOTE}}</p>
+      </div>
+
+      <p class="support">{{SUPPORT}}</p>
+
+      <div class="bottom-row">
+        <span class="cta"><span class="dot"></span>{{CTA_LABEL}}</span>
+        <span class="wordmark">SPACENODE</span>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

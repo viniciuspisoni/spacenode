@@ -1,0 +1,8 @@
+# Assets gerados (mp4/png) não entram no git — só o esqueleto do diretório.
+# Os textos (caption.txt / QA.md) são versionados de propósito, para dar
+# histórico das legendas publicadas.
+*
+!.gitignore
+!*/
+!*/caption.txt
+!*/QA.md

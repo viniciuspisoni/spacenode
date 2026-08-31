@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { recordAcquisitionEvent } from '@/lib/marketing/ads/service'
 import {
   isPaidPlanId,
   getPlanById,
@@ -87,6 +89,15 @@ export async function POST(req: NextRequest) {
         nodes_to_add:  String(plan.nodes),
       },
     })
+
+    // Funil first-party (best-effort — recordAcquisitionEvent nunca lança).
+    await recordAcquisitionEvent(createAdminClient(), {
+      user_id: user.id,
+      event_type: 'checkout_started',
+      plan_id: plan.id,
+      metadata: { billing_cycle: body.billing },
+    })
+
     return NextResponse.json({ url: session.url })
   }
 

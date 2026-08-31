@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getPayerId } from '@/lib/workspaces/context'
 import { refundNodes } from '@/lib/billing/refund-nodes'
 import { isQuality, type Quality, type Space, type Vista } from '@/lib/spaces/types'
 import { isEditMode, dispatchEndpoint, type EditMode } from '@/lib/spaces/engines'
@@ -133,6 +134,10 @@ export async function POST(
   const dna   = getVisualDna(space.dna)
   const admin = createAdminClient()
 
+  // Saldo é da bolsa: pré-check e leituras usam o PAGADOR (dono do workspace),
+  // o mesmo que consume_workspace_nodes debita — senão membro é barrado à toa.
+  const payerId = (await getPayerId(admin, user.id)) ?? user.id
+
   // ── 1) Contexto + rota (sem tocar em saldo) ──
   // Cobertura medida no SERVIDOR (o valor do cliente é estimativa de preview).
   const serverCoverage = await measureServerMaskCoverage(maskUrl)
@@ -164,7 +169,7 @@ export async function POST(
     const { data: bal } = await admin
       .from('user_node_balance')
       .select('total_balance')
-      .eq('user_id', user.id)
+      .eq('user_id', payerId)
       .single()
     if ((bal?.total_balance ?? 0) < routing.costNodes) {
       return NextResponse.json(
@@ -323,7 +328,7 @@ export async function POST(
       const { data: balGate } = await admin
         .from('user_node_balance')
         .select('plan_balance, lumen_balance, total_balance')
-        .eq('user_id', user.id)
+        .eq('user_id', payerId)
         .single()
       return NextResponse.json({
         rejected:          true,
@@ -388,7 +393,7 @@ export async function POST(
     const { data: balAfter } = await admin
       .from('user_node_balance')
       .select('plan_balance, lumen_balance, total_balance')
-      .eq('user_id', user.id)
+      .eq('user_id', payerId)
       .single()
 
     return NextResponse.json({

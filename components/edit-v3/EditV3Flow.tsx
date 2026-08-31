@@ -15,6 +15,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { EditV3Canvas, type EditV3CanvasHandle, type EditV3Tool } from './EditV3Canvas'
 import { BeforeAfter } from './BeforeAfter'
 import { EditV2ImportModal } from '@/components/editar/EditV2ImportModal'
+import { consumeHandoff } from '@/components/nodi/actions-bus'
 import {
   IconLasso, IconPolygon, IconBrush, IconEraser, IconHand,
   IconUndo, IconRedo, IconTrash,
@@ -110,6 +111,16 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
   const [sourceDims, setSourceDims] = useState<{ w: number; h: number } | null>(null)
   const [action, setAction] = useState<Action>('swap_material')
   const [instruction, setInstruction] = useState('')
+
+  // Handoff do Nodi (ação confirmada no painel): pré-preenche a instrução.
+  // Aplicado pós-mount via rAF (sem mismatch de hidratação); o débito de
+  // nodes continua acontecendo só no botão Aplicar edição desta tela.
+  useEffect(() => {
+    const handoff = consumeHandoff('editar')
+    if (!handoff?.prompt) return
+    const raf = requestAnimationFrame(() => setInstruction(handoff.prompt!))
+    return () => cancelAnimationFrame(raf)
+  }, [])
   const [quality] = useState<'standard' | 'high'>('standard') // Alta precisão: gated
   const [referenceUrl, setReferenceUrl] = useState<string | null>(null)
   const [coverage, setCoverage] = useState(0)
@@ -402,7 +413,10 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
             <h1 style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.02em' }}>Edição aplicada</h1>
           </div>
           <span style={{ fontSize: 12.5, color: 'var(--color-text-tertiary)' }}>
-            {result.nodes} nodes · {result.charged ? 'debitados' : 'cobrança simulada nesta fase'}
+            {result.nodes} nodes · {result.charged ? 'debitados' : 'cobrança simulada nesta fase'} · salva no{' '}
+            <a href="/app/history" style={{ color: 'var(--color-text-secondary)', textDecoration: 'underline', textUnderlineOffset: 3 }}>
+              Histórico
+            </a>
           </span>
         </div>
 

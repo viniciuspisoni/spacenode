@@ -19,11 +19,12 @@ const TEST_USER = '00000000-0000-4000-8000-0000000000ec'
 const BASE_URL = process.env.EDIT_V2_TEST_BASE ?? 'http://localhost:3000'
 const IMG = path.join(ROOT, '_batch_base.jpg')
 
-// Máscara detectada no teste de detecção aprovado (componente conexo dos
-// painéis da parede esquerda). Reusada como está — NÃO re-detectar.
+// Máscara COMPLETA (gemini-box-sam2-complete) do teste de detecção aprovado
+// 2026-06-12 — painéis da parede esquerda, interior sólido (holeRatio 0.000).
+// Reusada como está — NÃO re-detectar (condição do dono).
 const MASK_URL =
   process.env.DETECTED_MASK_URL ??
-  'https://nucyyqmurhnakhldshwr.supabase.co/storage/v1/object/public/space-mestres/00000000-0000-4000-8000-0000000000ec/retocar/crop-mask/1781461715997-s4ebou.png'
+  'https://nucyyqmurhnakhldshwr.supabase.co/storage/v1/object/public/space-mestres/00000000-0000-4000-8000-0000000000ec/retocar/crop-mask/1781472910631-hlucw0.png'
 
 const INSTRUCTION = 'trocar os painéis por madeira clara'
 

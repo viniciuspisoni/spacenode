@@ -4,8 +4,10 @@
 // opt-in explícito do usuário). Mesmos dois modos do Nano Banana 2:
 // mascarado (máscara como 2ª imagem + recompose + gate) e instrução
 // (edição conversacional da imagem inteira).
+//
+// Geração via lib/ai/image-provider: GCP/Vertex primário (quando ligado por
+// env) com fallback FAL byte-idêntico ao comportamento anterior.
 
-import { fal } from '@fal-ai/client'
 import {
   type RetouchEngine,
   type RetouchInput,
@@ -15,6 +17,11 @@ import {
 } from './types'
 import type { Quality } from '../types'
 import { buildTwoImageMaskPrompt, buildInstructPrompt } from './mask-prompt'
+import {
+  generateImage,
+  ImageProviderNoOutputError,
+  ImageProviderTimeoutError,
+} from '@/lib/ai/image-provider'
 
 // fal-ai/nano-banana-pro/edit é o ID interno do router; o endpoint FAL real é
 // fal-ai/gemini-3-pro-image-preview/edit (Gemini 3 Pro Image).
@@ -28,10 +35,6 @@ const QUALITY_RESOLUTION: Record<Quality, string> = {
   '4k': '4K',
 }
 
-interface FalNBOutput {
-  images?: { url?: string }[]
-}
-
 async function callNBPro(input: RetouchInput, withMask: boolean): Promise<RetouchOutput> {
   const refUrls = (input.references ?? []).map(r => r.url)
   const imageUrls = withMask
@@ -41,27 +44,42 @@ async function callNBPro(input: RetouchInput, withMask: boolean): Promise<Retouc
     ? buildTwoImageMaskPrompt(input.prompt, input.references)
     : buildInstructPrompt(input.prompt, input.references)
 
-  const result = await Promise.race([
-    fal.subscribe(FAL_NB_PRO_ENDPOINT, {
-      input: {
-        prompt,
-        image_urls:    imageUrls,
-        resolution:    QUALITY_RESOLUTION[input.quality],
-        num_images:    1,
-        output_format: 'png',
-        ...(input.seed !== undefined ? { seed: input.seed } : {}),
-      } as unknown as never,
-    }),
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new RetouchTimeoutError(NANO_BANANA_PRO_EDIT_ENDPOINT)), TIMEOUT_MS),
-    ),
-  ])
+  const falInput = {
+    prompt,
+    image_urls:    imageUrls,
+    resolution:    QUALITY_RESOLUTION[input.quality],
+    num_images:    1,
+    output_format: 'png',
+    ...(input.seed !== undefined ? { seed: input.seed } : {}),
+  }
 
-  const data = result.data as FalNBOutput
-  const url  = data.images?.[0]?.url
+  let gen
+  try {
+    gen = await generateImage({
+      falEndpoint: FAL_NB_PRO_ENDPOINT,
+      falInput,
+      timeoutMs:   TIMEOUT_MS,
+      context:     withMask ? 'editar/nbpro-masked' : 'editar/nbpro-instruct',
+      deliver:     { kind: 'dataUrl' },
+    })
+  } catch (err) {
+    if (err instanceof ImageProviderTimeoutError) throw new RetouchTimeoutError(NANO_BANANA_PRO_EDIT_ENDPOINT)
+    if (err instanceof ImageProviderNoOutputError) throw new RetouchNoOutputError(NANO_BANANA_PRO_EDIT_ENDPOINT)
+    throw err
+  }
+
+  const url = gen.images[0]?.url
   if (!url) throw new RetouchNoOutputError(NANO_BANANA_PRO_EDIT_ENDPOINT)
 
-  return { imageUrl: url, endpoint: NANO_BANANA_PRO_EDIT_ENDPOINT, requestId: (result as { requestId?: string }).requestId ?? null }
+  return {
+    imageUrl:      url,
+    endpoint:      NANO_BANANA_PRO_EDIT_ENDPOINT,
+    requestId:     gen.requestId,
+    provider:      gen.provider,
+    providerModel: gen.providerModel,
+    fallbackUsed:  gen.fallbackUsed,
+    latencyMs:     gen.latencyMs,
+  }
 }
 
 export const callNanoBananaProMasked: RetouchEngine = (input) => callNBPro(input, true)

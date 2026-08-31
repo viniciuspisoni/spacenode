@@ -17,6 +17,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getPayerId } from '@/lib/workspaces/context'
 import { isQuality, isEditSourceType, type Quality } from '@/lib/spaces/types'
 import { isEditMode, dispatchEndpoint, type EditMode } from '@/lib/spaces/engines'
 import { composeRouterPrompt, isFidelityMode, type FidelityMode } from '@/lib/spaces/edit-prompts'
@@ -125,6 +126,10 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminClient()
 
+  // Saldo é da bolsa: pré-check e leituras usam o PAGADOR (dono do workspace),
+  // o mesmo que consume_workspace_nodes debita — senão membro é barrado à toa.
+  const payerId = (await getPayerId(admin, user.id)) ?? user.id
+
   // swap_material com referências visuais mas sem máscara pintada → gera máscara
   // branca automática (1×1 px, normalizada pelo pipeline). Assim o nano-banana
   // recebe o formato correto: [source, mask, texture] e usa a textura visualmente.
@@ -168,7 +173,7 @@ export async function POST(req: NextRequest) {
     const { data: bal } = await admin
       .from('user_node_balance')
       .select('total_balance')
-      .eq('user_id', user.id)
+      .eq('user_id', payerId)
       .single()
     if ((bal?.total_balance ?? 0) < routing.costNodes) {
       return NextResponse.json(
@@ -294,7 +299,7 @@ export async function POST(req: NextRequest) {
       const { data: balGate } = await admin
         .from('user_node_balance')
         .select('plan_balance, lumen_balance, total_balance')
-        .eq('user_id', user.id)
+        .eq('user_id', payerId)
         .single()
       return NextResponse.json({
         rejected:          true,
@@ -368,7 +373,7 @@ export async function POST(req: NextRequest) {
     const { data: balAfter } = await admin
       .from('user_node_balance')
       .select('plan_balance, lumen_balance, total_balance')
-      .eq('user_id', user.id)
+      .eq('user_id', payerId)
       .single()
 
     const signedEdit = row
@@ -427,18 +432,61 @@ export async function GET() {
   // Defesa em profundidade: filtra explicitamente por user_id em vez de confiar
   // só na RLS da tabela `edits` (cuja DDL/policy não está versionada no repo —
   // CR-3 da auditoria 2026-07-03). Mesmo padrão de renders/list e folders/[id].
-  const { data, error } = await supabase
-    .from('edits')
-    .select('id, user_id, source_image_url, result_image_url, mask_url, prompt, quality, nodes_cost, engine, source_type, source_id, mask_coverage, created_at')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
-    .limit(60)
-  if (error) {
+  //
+  // MERGE com o Editar V3: o editor atual persiste em `edit_v3_jobs`, não em
+  // `edits` — sem este merge, nenhuma edição feita no V3 aparece no Histórico
+  // (feedback de beta: "editei, fui no histórico e não tava lá"). As linhas V3
+  // completas são normalizadas para o mesmo shape das `edits` legadas.
+  const [v1Res, v3Res] = await Promise.all([
+    supabase
+      .from('edits')
+      .select('id, user_id, source_image_url, result_image_url, mask_url, prompt, quality, nodes_cost, engine, source_type, source_id, mask_coverage, created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(60),
+    supabase
+      .from('edit_v3_jobs')
+      .select('id, user_id, source_image_url, result_image_url, mask_url, instruction, prompt, quality_mode, nodes_cost, model, mask_coverage, created_at')
+      .eq('user_id', user.id)
+      .eq('status', 'completed')
+      .not('result_image_url', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(60),
+  ])
+  if (v1Res.error) {
     return NextResponse.json({ error: 'Erro ao listar edições' }, { status: 500 })
   }
+  // Erro no V3 não derruba a lista (a tabela pode não existir em ambientes
+  // antigos — mesma postura resiliente de lib/edit-v3/persist.ts).
+  const v3Rows = v3Res.error ? [] : (v3Res.data ?? [])
+
+  const v3AsEdits = v3Rows.map(j => ({
+    id: j.id,
+    user_id: j.user_id,
+    source_image_url: j.source_image_url,
+    result_image_url: j.result_image_url,
+    mask_url: j.mask_url,
+    // No V3 a instrução escrita pelo usuário vive em `instruction` (prompt espelha).
+    prompt: j.instruction ?? j.prompt,
+    quality: j.quality_mode ?? 'standard',
+    nodes_cost: j.nodes_cost,
+    engine: engineDisplayLabel(j.model),
+    source_type: null as string | null,
+    source_id: null as string | null,
+    mask_coverage: j.mask_coverage,
+    created_at: j.created_at,
+  }))
+
+  const merged = [
+    ...(v1Res.data ?? []).map(e => ({ ...e, engine: engineDisplayLabel(e.engine) })),
+    ...v3AsEdits,
+  ]
+    .sort((a, b) => ((a.created_at ?? '') < (b.created_at ?? '') ? 1 : -1))
+    .slice(0, 60)
+
   const edits = await signRows(
     createAdminClient(),
-    (data ?? []).map(e => ({ ...e, engine: engineDisplayLabel(e.engine) })),
+    merged,
     ['source_image_url', 'result_image_url', 'mask_url'],
   )
   return NextResponse.json({ edits })

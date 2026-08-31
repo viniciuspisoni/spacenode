@@ -4,14 +4,15 @@ import { useState, useEffect } from 'react';
 import { Logo } from './brand';
 
 const LINKS = [
-  { href: '#produto',       label: 'PRODUTO'       },
-  { href: '#como-funciona', label: 'COMO FUNCIONA' },
-  { href: '#planos',        label: 'PREÇOS'        },
+  { href: '#produto',       label: 'Produto'       },
+  { href: '#como-funciona', label: 'Como funciona' },
+  { href: '#planos',        label: 'Preços'        },
   { href: '#faq',           label: 'FAQ'           },
 ];
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
+  const [active, setActive] = useState<string | null>(null);
 
   // Lock body scroll while drawer is open
   useEffect(() => {
@@ -29,6 +30,30 @@ export default function Navbar() {
     return () => window.removeEventListener('keydown', onKey);
   }, [open]);
 
+  // Scroll-spy: marca o link da seção que cruza a faixa central do viewport
+  useEffect(() => {
+    const sections = LINKS
+      .map(l => document.getElementById(l.href.slice(1)))
+      .filter((el): el is HTMLElement => el !== null);
+    if (!sections.length) return;
+
+    const observer = new IntersectionObserver(
+      entries => {
+        const entering = entries.filter(e => e.isIntersecting);
+        if (entering.length) {
+          setActive(`#${entering[entering.length - 1].target.id}`);
+        } else {
+          // nenhuma seção na faixa (ex.: hero) — limpa se o ativo foi quem saiu
+          const left = new Set(entries.map(e => `#${e.target.id}`));
+          setActive(prev => (prev && left.has(prev) ? null : prev));
+        }
+      },
+      { rootMargin: '-40% 0px -55% 0px', threshold: 0 },
+    );
+    sections.forEach(s => observer.observe(s));
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <>
       <nav
@@ -39,28 +64,22 @@ export default function Navbar() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          background: 'color-mix(in srgb, var(--color-bg) 85%, transparent)',
-          backdropFilter: 'blur(24px)',
-          WebkitBackdropFilter: 'blur(24px)',
+          background: 'color-mix(in srgb, var(--color-bg) 92%, transparent)',
+          backdropFilter: 'blur(20px) saturate(140%)',
+          WebkitBackdropFilter: 'blur(20px) saturate(140%)',
           borderBottom: '0.5px solid var(--color-border)',
         }}
         className="spn-nav"
       >
         <Logo symbolSize={48} />
 
-        <div style={{ display: 'flex', gap: 36 }} className="nav-links">
+        <div className="nav-links">
           {LINKS.map(l => (
             <a
               key={l.href}
               href={l.href}
-              style={{
-                fontSize: 10,
-                letterSpacing: '0.18em',
-                color: 'var(--color-text-secondary)',
-                textTransform: 'uppercase',
-                fontWeight: 500,
-                transition: 'color 0.2s',
-              }}
+              className={`nav-link ${active === l.href ? 'is-active' : ''}`}
+              aria-current={active === l.href ? 'true' : undefined}
             >
               {l.label}
             </a>
@@ -171,23 +190,71 @@ export default function Navbar() {
               textAlign: 'center',
             }}
           >
-            40 nodes grátis · sem cartão de crédito
+            80 nodes grátis · sem cartão de crédito
           </p>
         </div>
       </div>
 
       <style jsx>{`
-        .spn-nav { padding: 18px 40px; }
+        .spn-nav { height: 72px; padding: 0 40px; }
         .nav-burger { display: none !important; }
+
+        /* Menu central — centralização óptica real, independente das larguras laterais */
+        .nav-links {
+          position: absolute;
+          left: 50%;
+          top: 50%;
+          transform: translate(-50%, -50%);
+          display: flex;
+          align-items: center;
+          gap: 28px;
+        }
+        .nav-link {
+          position: relative;
+          padding: 8px 2px;
+          font-size: 13px;
+          font-weight: 500;
+          letter-spacing: 0.01em;
+          line-height: 1;
+          color: rgba(255, 255, 255, 0.62);
+          text-decoration: none;
+          transition: color var(--duration-base) cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+        .nav-link::after {
+          content: '';
+          position: absolute;
+          left: 2px;
+          right: 2px;
+          bottom: 0;
+          height: 1px;
+          background: rgba(255, 255, 255, 0.85);
+          transform: scaleX(0);
+          transform-origin: center;
+          transition:
+            transform var(--duration-base) cubic-bezier(0.33, 0, 0.2, 1),
+            background-color var(--duration-base) ease;
+        }
+        .nav-link:hover { color: rgba(255, 255, 255, 0.95); }
+        .nav-link:hover::after { transform: scaleX(1); }
+        .nav-link.is-active { color: var(--color-text-primary); }
+        .nav-link.is-active::after {
+          transform: scaleX(1);
+          background: var(--color-accent-green-dim);
+        }
+        .nav-link:focus-visible {
+          outline: 2px solid rgba(255, 255, 255, 0.75);
+          outline-offset: 4px;
+          border-radius: 2px;
+        }
 
         .nav-pill {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          min-height: 34px;
-          padding: 0 16px;
+          min-height: 36px;
+          padding: 0 18px;
           border-radius: var(--radius-full);
-          font-size: 12px;
+          font-size: 13px;
           font-weight: 500;
           letter-spacing: -0.01em;
           text-decoration: none;
@@ -243,12 +310,13 @@ export default function Navbar() {
         .nav-pill:active { transform: translateY(0); }
 
         @media (prefers-reduced-motion: reduce) {
-          .nav-pill { transition: none; }
+          .nav-pill, .nav-link, .nav-link::after { transition: none; }
           .nav-pill:hover { transform: none; }
         }
 
-        @media (max-width: 768px) {
-          .spn-nav { padding: 14px 20px; }
+        /* Com menu central + CTAs, 768px já colidia — hambúrguer entra mais cedo */
+        @media (max-width: 920px) {
+          .spn-nav { height: 64px; padding: 0 20px; }
           .nav-links, .nav-actions { display: none !important; }
           .nav-burger { display: inline-flex !important; }
         }
@@ -275,7 +343,7 @@ export default function Navbar() {
           margin: 0 auto;
         }
 
-        @media (min-width: 769px) {
+        @media (min-width: 921px) {
           .nav-drawer { display: none; }
         }
 

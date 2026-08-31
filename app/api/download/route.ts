@@ -5,9 +5,19 @@ import { NextRequest, NextResponse } from 'next/server'
 // salvar em vez de abrir. Resolve o problema de o atributo download em <a>
 // ser ignorado pra URLs cross-origin sem CORS.
 //
-// Restrito ao host fal.media por segurança — sem isso vira open proxy.
+// Restrito a hosts confiáveis por segurança — sem isso vira open proxy:
+// CDNs da fal + o Storage do próprio projeto (vídeos do Veo/Vertex são
+// re-hospedados lá — ver lib/video/adapters/vertexVeoAdapter.ts).
 
 const ALLOWED_HOSTS = ['fal.media', 'v2.fal.media', 'v3.fal.media']
+
+function supabaseHost(): string | null {
+  try {
+    return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').host
+  } catch {
+    return null
+  }
+}
 
 export async function GET(req: NextRequest) {
   const url      = req.nextUrl.searchParams.get('url')
@@ -24,7 +34,11 @@ export async function GET(req: NextRequest) {
     return new NextResponse('invalid url', { status: 400 })
   }
 
-  if (!ALLOWED_HOSTS.some(h => parsed.host === h || parsed.host.endsWith(`.${h}`))) {
+  const allowedHosts = [...ALLOWED_HOSTS]
+  const sbHost = supabaseHost()
+  if (sbHost) allowedHosts.push(sbHost)
+
+  if (!allowedHosts.some(h => parsed.host === h || parsed.host.endsWith(`.${h}`))) {
     return new NextResponse('forbidden host', { status: 403 })
   }
 

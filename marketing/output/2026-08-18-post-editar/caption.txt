@@ -1,0 +1,9 @@
+O render ficou pronto. Aí o cliente pediu outro piso.
+
+Antes, isso significava regenerar a imagem inteira — e torcer pra nada mais mudar no caminho. Com o Editar, a alteração é pontual: você troca o acabamento e o resto do ambiente continua exatamente como estava. Mesma geometria, mesma câmera, mesma luz.
+
+Iterar deixa de ser uma rodada nova de render e vira minutos entre uma mensagem e outra do cliente. Três opções de piso antes da resposta dele chegar.
+
+Teste grátis no link da bio.
+
+#arquitetura #render #sketchup #archviz #arquiteto #projetodeinteriores #renderizacao #iaparaarquitetos

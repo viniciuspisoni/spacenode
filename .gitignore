@@ -32,6 +32,8 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# exemplo versionado (documentação, sem segredos)
+!.env.example
 
 # vercel
 .vercel
@@ -42,4 +44,6 @@ next-env.d.ts
 
 .vercel
 .env*.local
-/.next-preview/
+/.next-preview*/
+/.next-build/
+/.next-nodi/

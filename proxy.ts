@@ -32,7 +32,13 @@ export default async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
-  if (!user && (pathname === '/app' || pathname.startsWith('/app/'))) {
+  // /admin (painel interno de staff) exige login como /app; a checagem de
+  // staff em si acontece no layout + APIs (lib/marketing/auth.ts).
+  if (
+    !user &&
+    (pathname === '/app' || pathname.startsWith('/app/') ||
+     pathname === '/admin' || pathname.startsWith('/admin/'))
+  ) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)

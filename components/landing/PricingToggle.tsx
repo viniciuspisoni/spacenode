@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react'
 import { ENGINES, ENGINE_ORDER, type Resolution } from '@/lib/engines'
 import { PLANS, recommendPlan, type PaidPlanId, type BillingCycle } from '@/lib/plans'
 import { LUMEN_PACKS } from '@/lib/lumens'
+import { SUPPORT_EMAIL, supportWhatsAppUrl } from '@/lib/support'
 
 // UI-specific data por plano: features, badge, breakdown de renders.
 // Renders calculados com engine padrão por resolução: HD→Pulsar (10 nodes),
@@ -377,7 +378,7 @@ export function PricingToggle() {
         }}>
           Ainda em dúvida?{' '}
           <a href="/login?mode=signup" style={{ color: 'var(--color-text-primary)', textDecoration: 'underline', textUnderlineOffset: 3 }}>
-            Comece grátis com 40 nodes
+            Comece grátis com 80 nodes
           </a>
           {' '}— assine quando o volume pedir.
         </p>
@@ -531,9 +532,18 @@ export function PricingToggle() {
             Nodes renovam mensalmente e não acumulam para o mês seguinte.<br />
             Lumens (créditos avulsos) ficam disponíveis a partir do plano Pro.<br />
             Dúvidas?{' '}
-            <a href="mailto:contato@spacenode.app" style={{ color: 'var(--color-text-primary)', textDecoration: 'underline', textUnderlineOffset: 3 }}>
-              fale com a gente.
+            <a
+              href={supportWhatsAppUrl('Olá! Tenho uma dúvida sobre os planos da SPACENODE.')}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: 'var(--color-text-primary)', textDecoration: 'underline', textUnderlineOffset: 3 }}
+            >
+              chame no WhatsApp
             </a>
+            {' '}ou escreva para{' '}
+            <a href={`mailto:${SUPPORT_EMAIL}`} style={{ color: 'var(--color-text-primary)', textDecoration: 'underline', textUnderlineOffset: 3 }}>
+              {SUPPORT_EMAIL}
+            </a>.
           </p>
         </div>
 

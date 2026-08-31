@@ -20,17 +20,16 @@
 // categoria ampla) — disparado pelo cliente após receber a resposta.
 
 import { NextRequest, NextResponse } from 'next/server'
-import { fal } from '@fal-ai/client'
 import { randomUUID } from 'crypto'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getPayerId } from '@/lib/workspaces/context'
 import { refundNodes } from '@/lib/billing/refund-nodes'
 import { ENGINES, isResolution, type EngineId, type Resolution } from '@/lib/engines'
 import { getVistaGenerationCost, supportsQuality } from '@/lib/spaces/economy'
 import { getVisualDna, getBriefingFromDna } from '@/lib/spaces/dna'
 import { isQuality, type ProjectDNA, type Space } from '@/lib/spaces/types'
-
-fal.config({ credentials: process.env.FAL_KEY })
+import { generateImage } from '@/lib/ai/image-provider'
 
 const FAL_TIMEOUT_MS = 120_000
 const MAX_SKETCHES   = 10
@@ -138,10 +137,13 @@ export async function POST(
   const batchId      = randomUUID()
 
   // Pré-checagem de saldo
+  // Saldo é da bolsa: pré-check usa o PAGADOR (dono do workspace), o mesmo
+  // que consume_workspace_nodes debita — senão membro é barrado à toa.
+  const payerId = (await getPayerId(admin, user.id)) ?? user.id
   const { data: bal } = await admin
     .from('user_node_balance')
     .select('total_balance')
-    .eq('user_id', user.id)
+    .eq('user_id', payerId)
     .single()
   const available = bal?.total_balance ?? 0
   if (available < totalCost) {
@@ -189,7 +191,7 @@ export async function POST(
   const { data: balAfter } = await admin
     .from('user_node_balance')
     .select('plan_balance, lumen_balance, total_balance')
-    .eq('user_id', user.id)
+    .eq('user_id', payerId)
     .single()
 
   return NextResponse.json({
@@ -276,24 +278,29 @@ async function generateOne(args: {
     console.log('[spaces.angulo] ref estética   (image #2)     :', space.vista_mestre_url)
     console.log('[spaces.angulo] batch_id                      :', batchId)
 
-    const result = await Promise.race([
-      fal.subscribe(falEndpoint, { input: falInput }),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(Object.assign(new Error('FAL_TIMEOUT'), { isFalTimeout: true })), FAL_TIMEOUT_MS),
-      ),
-    ])
-    const images = (result.data as { images: { url: string }[] }).images
-    const outputUrl = images?.[0]?.url
-    if (!outputUrl) throw new Error('fal_no_output')
+    // Camada única de provider (lib/ai/image-provider): GCP/Vertex primário
+    // quando ligado por env, fallback FAL transparente.
+    const gen = await generateImage({
+      falEndpoint,
+      falInput,
+      timeoutMs: FAL_TIMEOUT_MS,
+      context:   'spaces.angulo',
+      deliver:   { kind: 'url', userId, area: 'vistas' },
+    })
+    const outputUrl = gen.images[0]?.url
+    if (!outputUrl) throw new Error('provider_no_output')
 
     // 4) Persistir
     const { error: updErr } = await admin
       .from('vistas')
       .update({
-        image_url:    outputUrl,
+        image_url:      outputUrl,
         prompt,
-        status:       'completed',
-        completed_at: new Date().toISOString(),
+        fal_request_id: gen.requestId,
+        provider:       gen.provider,
+        model:          gen.providerModel,
+        status:         'completed',
+        completed_at:   new Date().toISOString(),
       })
       .eq('id', vistaId)
     if (updErr) {

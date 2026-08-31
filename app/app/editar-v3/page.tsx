@@ -7,6 +7,8 @@
 // Rollback = remover a flag (a página V3 some, /app/editar segue intocado).
 
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { getPayerBalance } from '@/lib/workspaces/balance'
 import { redirect } from 'next/navigation'
 import { EditV3Flow } from '@/components/edit-v3/EditV3Flow'
 
@@ -17,13 +19,10 @@ export default async function EditarV3Page() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: balanceRow } = await supabase
-    .from('user_node_balance')
-    .select('total_balance')
-    .eq('user_id', user.id)
-    .single()
+  // Saldo da bolsa (dono do workspace) — é dele que a edição debita.
+  const payerBalance = await getPayerBalance(createAdminClient(), user.id)
 
-  const balance = balanceRow?.total_balance ?? 0
+  const balance = payerBalance.totalBalance
 
   return (
     <main style={{ flex: 1, overflowY: 'auto', background: 'var(--color-bg)' }}>

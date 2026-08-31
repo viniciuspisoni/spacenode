@@ -78,7 +78,7 @@ export default function FinalCTA() {
       </div>
 
       <p style={{ color: "var(--color-text-tertiary)", fontSize: 11, marginTop: 4 }}>
-        40 nodes grátis · sem cartão de crédito · sem compromisso
+        80 nodes grátis · sem cartão de crédito · sem compromisso
       </p>
 
       <style jsx>{`

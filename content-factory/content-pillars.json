@@ -1,0 +1,126 @@
+{
+  "versao": 1,
+  "atualizado_em": "2026-07-02",
+  "descricao": "Pilares editoriais do conteúdo SPACENODE (Instagram @spacenode + Meta Ads). Cada peça gerada pertence a exatamente um pilar. Percentuais são a participação sugerida no mix mensal.",
+  "mix_semanal_sugerido": [
+    { "dia": "segunda", "formato": "carrossel", "pilar": "criterio-tecnico" },
+    { "dia": "quarta", "formato": "quadrado", "pilar": "fidelidade-geometrica" },
+    { "dia": "sexta", "formato": "reels", "pilar": "do-modelo-a-apresentacao" },
+    { "dia": "domingo", "formato": "vertical", "pilar": "apresentacao-que-vende" }
+  ],
+  "pilares": [
+    {
+      "id": "fidelidade-geometrica",
+      "nome": "Fidelidade geométrica",
+      "participacao": 0.25,
+      "objetivo": "Provar visualmente a promessa central: geometria, proporções e perspectiva do projeto preservadas. É o pilar de diferenciação — ninguém mais sustenta esse argumento com prova.",
+      "angulos": [
+        "Antes/depois honesto do mesmo projeto (modelo/print → render), com linhas de fuga sobrepostas",
+        "Zoom em detalhe que a IA genérica erra: esquadria, pé-direito, alinhamento de piso, escala de mobiliário",
+        "Coerência entre vistas do mesmo ambiente (mesmo DNA visual em 4 ângulos)",
+        "O que 'respeitar o projeto' significa na prática, item por item"
+      ],
+      "formatos_recomendados": ["quadrado", "vertical", "carrossel", "reels"],
+      "exemplos_de_tema": [
+        "Linhas de fuga antes e depois do render",
+        "Mesmo living, quatro vistas, um DNA visual",
+        "Por que a escada do seu render genérico tem 22 degraus"
+      ],
+      "cta_padrao": "Teste com um projeto real",
+      "kpis": ["salvamentos", "compartilhamentos", "cadastros"]
+    },
+    {
+      "id": "do-modelo-a-apresentacao",
+      "nome": "Do modelo à apresentação",
+      "participacao": 0.2,
+      "objetivo": "Mostrar o fluxo de trabalho real e o ganho de prazo: do upload do print do modelo à imagem de apresentação, em minutos. Sem prometer plugin ou importação direta — o insumo é imagem do modelo.",
+      "angulos": [
+        "Screen capture real do fluxo: upload do print → render final (tempo real na tela)",
+        "Um dia de entrega: o render que caberia entre duas reuniões",
+        "Iteração com cliente: 3 variações do mesmo ambiente antes da reunião de aprovação",
+        "Comparação de prazo: render tradicional externo vs. iteração na plataforma"
+      ],
+      "formatos_recomendados": ["reels", "story", "carrossel"],
+      "exemplos_de_tema": [
+        "Do print do SketchUp à imagem de apresentação em 4 minutos",
+        "Três variações de acabamento antes da reunião das 14h"
+      ],
+      "cta_padrao": "Renderize seu projeto",
+      "kpis": ["visualizações de reels", "cliques no link", "cadastros"]
+    },
+    {
+      "id": "apresentacao-que-vende",
+      "nome": "Apresentação que aprova projeto",
+      "participacao": 0.15,
+      "objetivo": "Conectar qualidade de visualização a resultado de negócio do arquiteto: aprovação mais rápida, menos retrabalho, cliente que entende o que está comprando.",
+      "angulos": [
+        "O cliente aprova o que vê — o custo invisível de apresentar planta seca",
+        "Como montar a sequência de imagens de uma reunião de aprovação",
+        "Planta Humanizada como primeira leitura do leigo",
+        "Vídeo (Animar) como fechamento de apresentação"
+      ],
+      "formatos_recomendados": ["carrossel", "vertical", "quadrado"],
+      "exemplos_de_tema": [
+        "A ordem das imagens numa reunião de aprovação",
+        "Planta humanizada: o que o cliente leigo lê primeiro"
+      ],
+      "cta_padrao": "Comece agora",
+      "kpis": ["salvamentos", "DMs", "cadastros"]
+    },
+    {
+      "id": "criterio-tecnico",
+      "nome": "Critério técnico",
+      "participacao": 0.15,
+      "objetivo": "Educar o olhar: como avaliar uma imagem gerada por IA com critério de arquiteto. Constrói autoridade e é o nosso anti-hype — a crítica ao render genérico é feita com régua, não com opinião.",
+      "angulos": [
+        "Checklist: o que verificar antes de mandar um render pro cliente (fuga, escala, materiais, sombras)",
+        "Anatomia de um render ruim: onde a IA genérica trai o projeto",
+        "Por que 'bonito' não é critério — coerência é",
+        "Limites honestos: o que IA ainda não resolve em visualização arquitetônica"
+      ],
+      "formatos_recomendados": ["carrossel", "quadrado"],
+      "exemplos_de_tema": [
+        "5 pontos para conferir antes de enviar um render ao cliente",
+        "Onde o render genérico erra a escada (e como perceber em 10 segundos)"
+      ],
+      "cta_padrao": "Veja no seu próprio projeto",
+      "kpis": ["salvamentos", "compartilhamentos", "seguidores"]
+    },
+    {
+      "id": "produto-sem-verniz",
+      "nome": "Produto sem verniz",
+      "participacao": 0.15,
+      "objetivo": "Apresentar módulos e recursos ativos mostrando o resultado na tela real, sem tour de features. Regra dura: só módulos ativos em produção (conferir lib/nav/modules-config.ts antes de citar).",
+      "angulos": [
+        "Um módulo, um problema resolvido, uma tela real (Renderizar, Editar, Animar, Spaces, Upscale, Planta Humanizada)",
+        "Edição pontual sem regenerar tudo (Editar)",
+        "Organização por projeto e vistas coerentes (Spaces)",
+        "Do render ao vídeo de apresentação (Animar)"
+      ],
+      "formatos_recomendados": ["reels", "story", "quadrado"],
+      "exemplos_de_tema": [
+        "Trocar o piso sem regenerar o ambiente inteiro",
+        "Spaces: todas as vistas do projeto com o mesmo DNA visual"
+      ],
+      "cta_padrao": "Comece grátis",
+      "kpis": ["cliques no link", "cadastros", "ativação"]
+    },
+    {
+      "id": "voz-do-arquiteto",
+      "nome": "Voz do arquiteto",
+      "participacao": 0.1,
+      "objetivo": "Prova social real: casos, usos e resultados de arquitetos que usam a plataforma. Regra dura: nunca inventar depoimento, métrica ou caso — sem material real, este pilar espera.",
+      "angulos": [
+        "Caso real: projeto do arquiteto X, do modelo à apresentação (com autorização e crédito)",
+        "Repost comentado de resultado publicado por usuário",
+        "Como um escritório pequeno absorveu visualização no fluxo semanal"
+      ],
+      "formatos_recomendados": ["vertical", "carrossel", "reels"],
+      "exemplos_de_tema": [
+        "O render que segurou a aprovação de uma reforma comercial (caso real, com crédito)"
+      ],
+      "cta_padrao": "Teste com um projeto real",
+      "kpis": ["alcance", "seguidores", "cadastros"]
+    }
+  ]
+}
