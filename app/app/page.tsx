@@ -8,7 +8,7 @@ import { getPlanDisplayName } from '@/lib/plan-display'
 import { getPayerBalance } from '@/lib/workspaces/balance'
 import {
   IconGenerate, IconSpaces, IconRetocar, IconEnhance,
-  IconVideo, IconFinalizar, IconHumanizedPlan, IconBlocos3D, IconIsometric, IconBoard, IconMoodboard,
+  IconVideo, IconFinalizar, IconEstudar, IconHumanizedPlan, IconBlocos3D, IconIsometric, IconBoard, IconMoodboard,
 } from '@/components/app/sidebar-icons'
 import { getEnabledModules, type SidebarModule } from '@/lib/nav/modules-config'
 import { RecentCard, type RecentRender } from './_components/RecentCard'
@@ -50,6 +50,7 @@ const MODULE_ICON: Record<SidebarModule['iconKey'], (p: { size?: number }) => Re
   enhance:       IconEnhance,
   video:         IconVideo,
   finalizar:     IconFinalizar,
+  estudar:       IconEstudar,
   humanizedPlan: IconHumanizedPlan,
   blocos3d:      IconBlocos3D,
   isometric:     IconIsometric,
@@ -64,6 +65,7 @@ const MODULE_DESC: Record<string, string> = {
   ampliar:           'Aumente resolução e acabamento.',
   animar:            'Vídeos de apresentação do projeto.',
   finalizar:         'Camadas, ajustes finais e exportação.',
+  estudar:           'Estudos preliminares em 3 propostas pra ambientes reais.',
   planta_humanizada: 'Humanize plantas com materiais reais.',
   blocos_3d:         'Modelos 3D a partir de uma imagem.',
   isometricas:       'Vistas isométricas premium do projeto.',
