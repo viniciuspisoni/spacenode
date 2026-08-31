@@ -336,7 +336,7 @@ export async function POST(req: NextRequest) {
       renderId:         insertResult.data?.id ?? null,
       creditsRemaining: balance?.total_balance ?? 0,
       planBalance:      balance?.plan_balance  ?? 0,
-      lumenBalance:     balance?.lumen_balance ?? 0,
+      extraBalance:     balance?.lumen_balance ?? 0,
       nodesCharged:     nodesToCharge,
       prompt,
     })

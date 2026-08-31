@@ -866,11 +866,11 @@ export async function POST(req: NextRequest) {
       renderId,
       previewUrl,
       originalUrl:  inputUrl ?? null,
-      // `credits` continua refletindo o saldo do plano (backward compat com
-      // a UI atual em GenerateClient); novos campos detalham plano + Lumens.
+      // `credits` continua refletindo o saldo mensal (backward compat com
+      // a UI atual em GenerateClient); novos campos detalham mensais + extras.
       credits:      balance?.plan_balance  ?? 0,
       planBalance:  balance?.plan_balance  ?? 0,
-      lumenBalance: balance?.lumen_balance ?? 0,
+      extraBalance: balance?.lumen_balance ?? 0,
       totalBalance: balance?.total_balance ?? 0,
       nodesCharged: nodesToCharge,
       // Diagnóstico do gate render_only. fidelityWarning: score final ficou

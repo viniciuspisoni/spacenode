@@ -1,7 +1,7 @@
 // Base de conhecimento do Nodi: matching determinístico + conteúdo dinâmico.
 // Garante que perguntas recorrentes acham a entrada certa e que os números
-// vêm das fontes de verdade (lib/engines, lib/plans, lib/lumens) — não de
-// texto digitado na base.
+// vêm das fontes de verdade (lib/engines, lib/plans, lib/extra-nodes) — não
+// de texto digitado na base.
 
 import { describe, expect, it } from 'vitest'
 import {
@@ -15,7 +15,7 @@ import {
 } from '@/lib/nodi/knowledge'
 import { ENGINES } from '@/lib/engines'
 import { PLANS } from '@/lib/plans'
-import { LUMEN_PACKS } from '@/lib/lumens'
+import { EXTRA_NODE_PACKS } from '@/lib/extra-nodes'
 
 describe('normalizeText', () => {
   it('remove acento, caixa e pontuação', () => {
@@ -82,12 +82,16 @@ describe('conteúdo dinâmico (fonte de verdade)', () => {
     expect(text).not.toMatch(/\b80 nodes\b/)
   })
 
-  it('lumens refletem lib/lumens', () => {
-    const entry = getKbEntry('lumens')!
+  it('nodes extras refletem lib/extra-nodes', () => {
+    const entry = getKbEntry('nodes-extras')!
     const { text } = buildKbAnswer(entry)
-    for (const pack of LUMEN_PACKS) {
+    for (const pack of EXTRA_NODE_PACKS) {
       expect(text).toContain(String(pack.price))
     }
+    // sem validade — a base não pode voltar a prometer expiração
+    expect(text).toContain('sem validade')
+    // pergunta com o nome antigo continua achando a entrada nova
+    expect(matchKb('o que são lumens?', null)[0]?.entry.id).toBe('nodes-extras')
   })
 
   it('toda entrada constrói resposta não vazia com ações válidas', () => {

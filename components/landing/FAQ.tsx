@@ -22,7 +22,7 @@ const faqs: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: 'O que são Nodes?',
-    a: 'Nodes são os créditos de uso da SpaceNode. Cada geração, edição ou ampliação consome nodes conforme o motor e a resolução escolhidos — um render HD parte de 10 nodes; 2K, de 15; 4K, de 25. Os nodes renovam mensalmente e não acumulam para o mês seguinte.',
+    a: 'Nodes são os créditos de uso da SpaceNode. Cada geração, edição ou ampliação consome nodes conforme o motor e a resolução escolhidos — um render HD parte de 10 nodes; 2K, de 15; 4K, de 25. Existem dois tipos: os Nodes mensais, incluídos no plano, renovam todo mês e não acumulam; os Nodes extras, comprados avulsos (a partir do Pro), não expiram. O consumo usa primeiro os mensais.',
   },
   {
     q: 'Consigo usar as imagens com clientes?',

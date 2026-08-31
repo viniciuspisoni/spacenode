@@ -28,7 +28,7 @@ export default async function ContaPage() {
   const fullName  = profileRes.data?.full_name ?? null
   const email     = user.email ?? ''
   const planNodes  = balance.planBalance
-  const lumenNodes = balance.lumenBalance
+  const extraNodes = balance.extraBalance
   const totalNodes = balance.totalBalance
 
   // Detecta provider — usado pra customizar mensagem de senha.
@@ -86,8 +86,8 @@ export default async function ContaPage() {
             </p>
           )}
           <Field label="Plano atual" value={planName} />
-          <Field label="Nodes do plano" value={`${planNodes} disponíveis`} />
-          {lumenNodes > 0 && <Field label="Lumens" value={`${lumenNodes} avulsos`} />}
+          <Field label="Nodes mensais" value={`${planNodes} disponíveis`} />
+          {extraNodes > 0 && <Field label="Nodes extras" value={`${extraNodes} sem validade`} />}
           <Field label="Total disponível" value={`${totalNodes} nodes`} />
           <Link
             href="/app/billing"

@@ -33,9 +33,9 @@ export function InsufficientBalancePanel({ count, costPer, total, available, cur
   const recommended = recommendPlan(total)
   const currentPlanObj = getPlanById(currentPlan)
   const upgradeNeeded  = !pooled && recommended.nodes > (currentPlanObj?.nodes ?? 0)
-  // Espelha a regra da rota de checkout: Lumens só a partir do Pro — e a rota
-  // valida o plano do COMPRADOR, então membro pooled não compra por aqui.
-  const lumenAvailable = !pooled && currentPlan !== 'free' && currentPlan !== 'starter'
+  // Espelha a regra da rota de checkout: Nodes extras só a partir do Pro — e a
+  // rota valida o plano do COMPRADOR, então membro pooled não compra por aqui.
+  const extraAvailable = !pooled && currentPlan !== 'free' && currentPlan !== 'starter'
 
   async function handleAvulso() {
     setSubmittingAvulso(true)
@@ -44,7 +44,7 @@ export function InsufficientBalancePanel({ count, costPer, total, available, cur
       const res = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'lumen', id: 500 }),
+        body: JSON.stringify({ type: 'extra', id: 500 }),
       })
       const data = (await res.json()) as { url?: string; error?: string }
       if (data.url) {
@@ -123,7 +123,7 @@ export function InsufficientBalancePanel({ count, costPer, total, available, cur
         display: 'grid', gap: 10,
         gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
       }}>
-        {lumenAvailable && (
+        {extraAvailable && (
           <div style={{
             padding: '14px 16px', borderRadius: 10,
             background: 'var(--color-bg-elevated)',
@@ -140,10 +140,10 @@ export function InsufficientBalancePanel({ count, costPer, total, available, cur
               Recomendado
             </span>
             <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.01em' }}>
-              Pacote avulso
+              Nodes extras
             </div>
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.55 }}>
-              500 nodes por R$ 89, válidos 90 dias. Sem mexer no seu plano.
+              500 nodes por R$ 89, sem validade. Sem mexer no seu plano.
             </div>
             <button
               onClick={handleAvulso}
@@ -161,15 +161,15 @@ export function InsufficientBalancePanel({ count, costPer, total, available, cur
           </div>
         )}
 
-        {(upgradeNeeded || !lumenAvailable) && (
+        {(upgradeNeeded || !extraAvailable) && (
           <div style={{
             padding: '14px 16px', borderRadius: 10,
             background: 'var(--color-bg-elevated)',
-            border: lumenAvailable ? '0.5px solid var(--color-border-strong)' : '1.5px solid var(--color-text-primary)',
+            border: extraAvailable ? '0.5px solid var(--color-border-strong)' : '1.5px solid var(--color-text-primary)',
             display: 'flex', flexDirection: 'column', gap: 10,
             position: 'relative',
           }}>
-            {!lumenAvailable && (
+            {!extraAvailable && (
               <span style={{
                 position: 'absolute', top: -9, left: 14,
                 fontSize: 9, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase',
@@ -188,7 +188,7 @@ export function InsufficientBalancePanel({ count, costPer, total, available, cur
                    Vale se você gera muito mais do que cabe no plano atual.`
                 : pooled
                 ? 'Este saldo é do workspace — o plano e os pacotes são gerenciados pelo dono da conta.'
-                : 'Veja os planos — pacotes avulsos ficam disponíveis a partir do Pro.'}
+                : 'Veja os planos — Nodes extras ficam disponíveis a partir do Pro.'}
             </div>
             <Link
               href="/app/billing"

@@ -110,7 +110,9 @@ você", "eleve seus projetos", "transforme suas ideias", "potencialize sua criat
 - "Importação direta do SketchUp" / plugin — não existe; o correto é *upload de imagens/prints do
   modelo*.
 - "Histórico de 30 dias / ilimitado por plano" — não existe retenção por plano.
-- Lumens como exclusividade do plano Office — disponíveis a partir do Pro.
+- "Lumens" — conceito APOSENTADO em 2026-08-31. Todo crédito é "Node": **Nodes mensais**
+  (renovam com o plano, não acumulam) e **Nodes extras** (avulsos, sem validade, a partir do
+  Pro). Nunca usar "Lumens" em peça nova, nem prometer validade/expiração para Nodes extras.
 - Quantidade de nodes grátis, preços ou números de plano **sem conferir o valor vigente no
   código** antes.
 

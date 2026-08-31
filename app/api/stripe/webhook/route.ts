@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
 
   const supabase = createAdminClient()
 
-  // ── Checkout pago: ativa plano OU adiciona Lumen ─────────────────────────
+  // ── Checkout pago: ativa plano OU adiciona Nodes extras ──────────────────
   //
   // Dois eventos caem aqui porque o Pix é assíncrono:
   //  • checkout.session.completed — no cartão já chega paga; no Pix chega com
@@ -189,7 +189,9 @@ export async function POST(req: NextRequest) {
       })
       // 500 → Stripe retenta a entrega; o update é idempotente (valores absolutos)
       if (!ok) return NextResponse.json({ error: 'db' }, { status: 500 })
-    } else if (productType === 'lumen') {
+    } else if (productType === 'extra' || productType === 'lumen') {
+      // 'lumen' é o metadata legado de Nodes extras — sessions criadas antes
+      // do deploy da unificação (2026-08-31) ainda chegam com ele.
       const packSize = parseInt(session.metadata?.pack_size ?? '0', 10)
       if (![500, 1500, 4000].includes(packSize)) {
         console.error('[stripe webhook] pack_size inválido:', packSize)
@@ -206,7 +208,7 @@ export async function POST(req: NextRequest) {
         // 500 → Stripe retenta; a RPC é idempotente por stripe_session_id
         return NextResponse.json({ error: 'db' }, { status: 500 })
       }
-      console.log(`[stripe webhook] lumen ${packSize} adicionado p/ user ${userId}`)
+      console.log(`[stripe webhook] pack extra ${packSize} adicionado p/ user ${userId}`)
 
       // Persiste customer_id se for primeira compra do user
       if (customerId) {

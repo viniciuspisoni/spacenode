@@ -120,8 +120,8 @@ export default async function AppPage() {
   const planName     = getPlanDisplayName(planId)
   const planTotal    = plan?.nodes ?? 0
   const planBalance  = payerBalance.planBalance
-  const lumenBalance = payerBalance.lumenBalance
-  const availableNodes = planBalance + lumenBalance
+  const extraBalance = payerBalance.extraBalance
+  const availableNodes = planBalance + extraBalance
 
   // Assina URLs de Storage (space-mestres) antes de passar pro client (bucket
   // privado após o flip). Renders são FAL hoje → no-op, mas embrulhamos igual.
@@ -186,7 +186,7 @@ export default async function AppPage() {
               {availableNodes}
             </div>
             <div className="spn-dash-stat-sub">
-              {lumenBalance > 0 ? `${planBalance} do plano · ${lumenBalance} avulsos` : 'para suas gerações'}
+              {extraBalance > 0 ? `${planBalance} mensais · ${extraBalance} extras` : 'para suas gerações'}
             </div>
           </div>
 

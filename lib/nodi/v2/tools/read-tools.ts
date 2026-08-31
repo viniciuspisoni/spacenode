@@ -26,8 +26,8 @@ export const readTools: NodiTool[] = [
         projeto_aberto: ctx.request.nodi.projectId,
         vista_aberta: ctx.request.nodi.vistaId,
         plano: ctx.request.planName,
-        saldo_nodes: ctx.request.balance,
-        saldo_lumens: ctx.request.lumens,
+        saldo_nodes_mensais: ctx.request.balance,
+        saldo_nodes_extras: ctx.request.extras,
         imagem_anexada: ctx.request.attachment,
       },
     }),
@@ -133,7 +133,7 @@ export const readTools: NodiTool[] = [
   },
   {
     name: 'consultar_saldo_custos',
-    description: 'Saldo atual do pagador (plano + lumens) e custo de uma combinação, se informada.',
+    description: 'Saldo atual do pagador (Nodes mensais + extras) e custo de uma combinação, se informada.',
     spec: {
       engine: { type: 'string', required: false, enum: ENGINE_ORDER },
       resolution: { type: 'string', required: false, enum: ['hd', '2k', '4k'] },
@@ -147,8 +147,8 @@ export const readTools: NodiTool[] = [
       }
       return {
         output: {
-          saldo_plano: payer?.planBalance ?? null,
-          saldo_lumens: payer?.lumenBalance ?? null,
+          saldo_nodes_mensais: payer?.planBalance ?? null,
+          saldo_nodes_extras: payer?.extraBalance ?? null,
           saldo_total: payer?.totalBalance ?? null,
           bolsa_compartilhada: payer?.pooled ?? false,
           custo_consultado: custo,

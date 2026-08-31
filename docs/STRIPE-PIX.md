@@ -36,7 +36,7 @@ mas gasta uma chamada à API por checkout sem nenhum ganho.
 
 | Produto | Modo | Meio |
 |---|---|---|
-| Packs Lumen (avulso) | `payment` | Pix comum (QR, expira em 1h) |
+| Packs de Nodes extras (avulso; ex-"Lumen") | `payment` | Pix comum (QR, expira em 1h) |
 | Planos (assinatura mensal) | `subscription` | Pix Automático (mandato no app do banco) |
 
 Ciclo **anual** fica só no cartão: `payment_schedule` do mandato espelha a

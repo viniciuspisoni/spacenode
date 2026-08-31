@@ -30,7 +30,9 @@ emoji pontual e sóbrio tolerado apenas em legenda orgânica.
 - "Importação direta do SketchUp" / "plugin do SketchUp" — não existe. O correto: *upload de
   imagens/prints do modelo*.
 - "Histórico de 30 dias" / "histórico ilimitado por plano" — não existe retenção por plano.
-- Lumens como exclusividade do plano Office — disponíveis a partir do Pro.
+- "Lumens" — conceito aposentado em 2026-08-31; o nome atual é **Nodes extras** (avulsos, sem
+  validade, a partir do Pro). Nunca usar "Lumens" em peça nova, nem prometer validade/expiração
+  para Nodes extras.
 
 ## 3. Invenções (proibição absoluta)
 

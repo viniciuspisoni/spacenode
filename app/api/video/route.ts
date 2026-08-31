@@ -112,7 +112,7 @@ export async function POST(req: NextRequest) {
     // ── Débito atômico ANTES da geração (padrão do /api/generate) ─────────────
     // consume_workspace_nodes cobra a bolsa do PAGADOR (dono do workspace) e é a
     // autoridade de saldo — sem pré-check no `profiles.credits` do membro (que
-    // ignorava Lumens e a bolsa do escritório). P0001 = saldo insuficiente → 402;
+    // ignorava Nodes extras e a bolsa do escritório). P0001 = saldo insuficiente → 402;
     // qualquer outro erro → 500. Nada é gerado sem débito confirmado: o vídeo
     // (item mais caro) nunca sai de graça por corrida nem por erro de RPC engolido.
     const { error: debitError } = await admin.rpc('consume_workspace_nodes', {

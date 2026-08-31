@@ -21,7 +21,7 @@ import GenerateGuide, {
 } from '@/components/app/GenerateGuide'
 
 interface GenerateClientProps {
-  /** Saldo total da bolsa (plano + Lumens) — mesmo pool que o débito consome. */
+  /** Saldo total da bolsa (mensais + extras) — mesmo pool que o débito consome. */
   initialCredits:    number
   /** true = assinatura ativa; false = conta free (default econômico Pulsar+HD). */
   isSubscriber?:     boolean
@@ -58,7 +58,7 @@ interface GenerateResult {
   originalUrl?: string | null
   /** Saldo do plano pós-débito (backward compat). */
   credits:   number
-  /** Saldo total pós-débito (plano + Lumens) — preferir este. */
+  /** Saldo total pós-débito (mensais + extras) — preferir este. */
   totalBalance?: number
   /** Geometry score da entrega (0..1) — só no nível Máxima com gate ativo. */
   fidelityScore?:   number | null
@@ -805,8 +805,8 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
     }
   }, [])
 
-  // A compra (plano ou Lumen) acontece no billing — a rota de checkout exige
-  // payload tipado, então chamar direto daqui era um 400 silencioso.
+  // A compra (plano ou Nodes extras) acontece no billing — a rota de checkout
+  // exige payload tipado, então chamar direto daqui era um 400 silencioso.
   const handleBuyCredits = () => {
     window.location.href = '/app/billing'
   }

@@ -43,11 +43,11 @@ export default async function AppLayout({
   const needsOnboarding =
     !!onboardingRow.data && onboardingRow.data.onboarding_completed_at === null
 
-  const planId      = (balance.planId as PlanId) ?? 'free'
-  const plan        = getPlanById(planId)
-  const planTotal   = plan?.nodes ?? 0
-  const planBalance = balance.planBalance
-  const lumenBalance = balance.lumenBalance
+  const planId       = (balance.planId as PlanId) ?? 'free'
+  const plan         = getPlanById(planId)
+  const planTotal    = plan?.nodes ?? 0
+  const planBalance  = balance.planBalance
+  const extraBalance = balance.extraBalance
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--color-bg)' }}>
@@ -56,7 +56,7 @@ export default async function AppLayout({
         userAvatar={userAvatar}
         planBalance={planBalance}
         planTotal={planTotal}
-        lumenBalance={lumenBalance}
+        extraBalance={extraBalance}
         planId={planId}
       />
       <main style={{ flex: 1, overflow: 'hidden', minHeight: 0, display: 'flex', background: 'var(--color-bg)' }}>

@@ -22,7 +22,7 @@ const KNOWN_ISSUES: KnownIssuePattern[] = [
     id: 'insufficient_balance',
     patterns: [/nodes? insuficientes?/i, /saldo insuficiente/i, /insufficient_balance/i],
     cause: 'A geração pedia mais nodes do que o saldo disponível na bolsa do pagador (em equipe, o saldo é o do dono do workspace).',
-    suggestion: 'Confira o saldo no anel do avatar, na barra lateral. Dá para recarregar com Lumens ou ajustar o plano em Planos.',
+    suggestion: 'Confira o saldo no anel do avatar, na barra lateral. Dá para comprar Nodes extras ou ajustar o plano em Planos.',
     priority: 'low',
   },
   {
