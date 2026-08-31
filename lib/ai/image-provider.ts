@@ -36,6 +36,16 @@
 // byte-idêntico pra FAL. Endpoints sem mapeamento Google (flux, gpt-image…)
 // passam direto pela FAL, então TODAS as rotas podem usar esta camada.
 //
+// Resiliência do caminho primário (o fallback FAL é o provider CARO — só vale
+// quando o GCP realmente não entrega):
+//   - 429/5xx do Vertex é capacidade compartilhada do endpoint global, não
+//     quota do projeto: até 3 tentativas com backoff 2s/4s (+jitter) dentro do
+//     orçamento do GCP antes de considerar fallback. IMAGE_GCP_MAX_ATTEMPTS=1
+//     desliga; IMAGE_GCP_BACKOFF_MS ajusta.
+//   - o GCP recebe 75% do orçamento do call site (IMAGE_GCP_BUDGET_SHARE),
+//     limitado por IMAGE_GCP_TIMEOUT_MS; o fallback FAL tem piso próprio de
+//     45s (FAL_FALLBACK_MIN_MS) pra que a fatia maior não vire falha total.
+//
 // Knobs Gemini 3 de fidelidade (lib/ai/gemini-knobs): os INPUTS de imagem são
 // tokenizados em mediaResolution 'high' por default (IMAGE_INPUT_MEDIA_RESOLUTION
 // desliga/ajusta) — o modelo não preserva o que ele nem "viu". Knob rejeitado
@@ -69,12 +79,36 @@ import { fetchStorageBytes } from '@/lib/storage/fetch'
 import {
   inputMediaResolutionDefault,
   isInvalidArgumentError,
+  isTransientCapacityError,
   type InputMediaResolution,
 } from '@/lib/ai/gemini-knobs'
 
 fal.config({ credentials: process.env.FAL_KEY })
 
 const STORAGE_BUCKET = 'space-mestres'
+
+// ── Retry de capacidade do Vertex ─────────────────────────────────────────────
+//
+// O 429 RESOURCE_EXHAUSTED dos modelos de imagem no endpoint global é de
+// capacidade compartilhada, não de quota do projeto: passa em segundos. Backoff
+// bem maior que o do lib/gemini (texto) porque geração de imagem é lenta e um
+// pico de capacidade não se resolve em 500ms. Envs só pra ajuste fino/rollback
+// (IMAGE_GCP_MAX_ATTEMPTS=1 desliga o retry sem redeploy de código).
+const GCP_MAX_ATTEMPTS    = Math.max(1, Number(process.env.IMAGE_GCP_MAX_ATTEMPTS) || 3)
+const GCP_BASE_BACKOFF_MS = Math.max(250, Number(process.env.IMAGE_GCP_BACKOFF_MS) || 2_000)
+// Tempo mínimo que precisa sobrar do orçamento pra mais uma tentativa valer a
+// pena: abaixo disso a chamada não termina e só queima o tempo do fallback.
+const GCP_MIN_RETRY_WINDOW_MS = 25_000
+
+// Piso de tempo do fallback FAL quando o GCP consumiu o orçamento (timeout do
+// primário). Medido em produção: a FAL leva de ~24s a ~68s no Nano Banana Pro
+// nesses casos. Com o piso antigo de 15s, dar mais orçamento ao GCP trocaria
+// "fallback lento" por "falha total + refund" — o piso é o que torna a fatia
+// de 75% segura. Pode estourar o timeoutMs do call site em alguns segundos: a
+// rota tem folga de orçamento própria e prefere entregar a imagem.
+const FAL_FALLBACK_MIN_MS = 45_000
+
+const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -384,6 +418,10 @@ async function generateViaGcp(
   const parsed = parseFalInput(args.falInput)
   if (!parsed.prompt) throw new Error('falInput sem prompt — nada pra enviar ao Vertex')
 
+  // Instante em que o orçamento do GCP acaba — o retry de capacidade só repete
+  // enquanto couber DENTRO dele (a race abaixo é quem corta de verdade).
+  const deadline = Date.now() + budgetMs
+
   const generated = await Promise.race([
     (async () => {
       // Knobs Gemini 3 de fidelidade (lib/ai/gemini-knobs):
@@ -478,9 +516,44 @@ async function generateViaGcp(
         }
       }
 
+      // Retry de CAPACIDADE (429/5xx), camada de FORA do retry compat: o Vertex
+      // devolve 429 RESOURCE_EXHAUSTED genérico quando a capacidade do endpoint
+      // global acaba — passa em segundos e nada tem a ver com o nosso volume
+      // (ver isTransientCapacityError). Sem isto, UM 429 mandava a geração
+      // inteira pro fallback FAL, que é o provider caro: era a causa da maior
+      // parte dos fallbacks do Nano Banana Pro. Repetir dentro do orçamento do
+      // GCP custa segundos; cair pro FAL custa a geração toda.
+      const callWithRetry = async () => {
+        let lastErr: unknown
+        for (let attempt = 1; attempt <= GCP_MAX_ATTEMPTS; attempt++) {
+          try {
+            return await callOnce()
+          } catch (err) {
+            lastErr = err
+            if (attempt === GCP_MAX_ATTEMPTS || !isTransientCapacityError(err)) throw err
+            const backoff = GCP_BASE_BACKOFF_MS * 2 ** (attempt - 1) + Math.floor(Math.random() * 500)
+            // Sem tempo pro backoff MAIS uma tentativa com chance real de
+            // terminar: desiste agora e entrega o resto do orçamento pro
+            // fallback, em vez de queimar os dois caminhos.
+            if (Date.now() + backoff + GCP_MIN_RETRY_WINDOW_MS > deadline) {
+              console.warn(
+                `[image-provider] ${args.context} gcp 429/5xx na tentativa ${attempt} sem orçamento pra repetir — vai de fallback`,
+              )
+              throw err
+            }
+            console.warn(
+              `[image-provider] ${args.context} gcp tentativa ${attempt}/${GCP_MAX_ATTEMPTS} falhou ` +
+              `(${truncate((err as Error)?.message ?? String(err), 140)}) — retry em ${backoff}ms`,
+            )
+            await sleep(backoff)
+          }
+        }
+        throw lastErr
+      }
+
       // num_images > 1 não existe nos call sites atuais (sempre 1), mas a FAL
       // aceitava — cobrimos com N chamadas paralelas pra não quebrar contrato.
-      return Promise.all(Array.from({ length: parsed.numImages }, callOnce))
+      return Promise.all(Array.from({ length: parsed.numImages }, callWithRetry))
     })(),
     new Promise<never>((_, reject) =>
       setTimeout(() => reject(new ImageProviderTimeoutError('gcp', args.falEndpoint, budgetMs)), budgetMs),
@@ -533,11 +606,15 @@ export async function generateImage(args: GenerateImageArgs): Promise<GenerateIm
 
   if (primary === 'gcp' && mapping && hasVertexCredentials()) {
     const fallback = imageFallbackEnabled()
-    // Com fallback ligado, o GCP fica com ~60% do orçamento pra sobrar tempo
-    // real de FAL depois; sem fallback, leva o orçamento inteiro.
+    // Com fallback ligado o GCP fica com 75% do orçamento (era 60%): a 60% o
+    // Nano Banana Pro só tinha 108s de 180s e estourava sozinho — o timeout do
+    // PRIMÁRIO virava geração no provider caro. Sem fallback, leva o orçamento
+    // inteiro. O piso de segurança do fallback é o FAL_FALLBACK_MIN_MS abaixo,
+    // não esta fatia — é ele que impede a fatia maior de virar falha total.
     const gcpCap = Number(process.env.IMAGE_GCP_TIMEOUT_MS) || 150_000
+    const gcpShare = Math.min(0.9, Math.max(0.5, Number(process.env.IMAGE_GCP_BUDGET_SHARE) || 0.75))
     const gcpBudget = fallback
-      ? Math.min(Math.max(30_000, Math.floor(args.timeoutMs * 0.6)), gcpCap, args.timeoutMs)
+      ? Math.min(Math.max(30_000, Math.floor(args.timeoutMs * gcpShare)), gcpCap, args.timeoutMs)
       : Math.min(args.timeoutMs, gcpCap)
 
     console.log(`[image-provider] ${args.context} → gcp model=${mapping.model} budget=${Math.round(gcpBudget / 1000)}s fallback=${fallback ? 'fal' : 'none'}`)
@@ -553,7 +630,7 @@ export async function generateImage(args: GenerateImageArgs): Promise<GenerateIm
         throw err
       }
       console.error(`[image-provider] ${args.context} gcp FALHOU (${primaryError}) → fallback fal ${args.falEndpoint}`)
-      const remaining = Math.max(15_000, args.timeoutMs - (Date.now() - startedAt))
+      const remaining = Math.max(FAL_FALLBACK_MIN_MS, args.timeoutMs - (Date.now() - startedAt))
       const core = await generateViaFal(args, remaining)
       const latencyMs = Date.now() - startedAt
       console.log(`[image-provider] ${args.context} ok provider=fal (fallback) ${latencyMs}ms images=${core.images.length}`)

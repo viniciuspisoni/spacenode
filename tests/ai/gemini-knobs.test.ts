@@ -11,6 +11,7 @@ import {
   inputMediaResolutionDefault,
   nb2ThinkingLevel,
   isInvalidArgumentError,
+  isTransientCapacityError,
 } from '@/lib/ai/gemini-knobs'
 
 const savedMedia    = process.env.IMAGE_INPUT_MEDIA_RESOLUTION
@@ -71,5 +72,49 @@ describe('isInvalidArgumentError', () => {
     expect(isInvalidArgumentError(new Error('RESOURCE_EXHAUSTED: quota'))).toBe(false)
     expect(isInvalidArgumentError(Object.assign(new Error('internal'), { status: 500 }))).toBe(false)
     expect(isInvalidArgumentError(new Error('geração de imagem excedeu 90000ms'))).toBe(false)
+  })
+})
+
+// Payloads REAIS colhidos do generation_log de produção (renders que caíram no
+// fallback FAL). O 429 do Vertex nos modelos de imagem vem sem quota_metric e
+// sem violations — é capacidade compartilhada do endpoint global, o caso que o
+// retry existe pra absorver.
+describe('isTransientCapacityError', () => {
+  const prod429 = '{"error":{"code":429,"message":"Resource exhausted. Please try again later. Please refer to https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429 for more details.","status":"RESOURCE_EXHAUSTED"}}'
+  const prod429Curto = '{"error":{"code":429,"message":"Resource has been exhausted (e.g. check quota).","status":"RESOURCE_EXHAUSTED"}}'
+  const prod503 = '{"error":{"code":503,"message":"The service is currently unavailable.","status":"UNAVAILABLE"}}'
+
+  it('repete o 429 de capacidade do Vertex (mensagem crua de produção)', () => {
+    expect(isTransientCapacityError(new Error(prod429))).toBe(true)
+    expect(isTransientCapacityError(new Error(prod429Curto))).toBe(true)
+  })
+
+  it('repete 503 UNAVAILABLE', () => {
+    expect(isTransientCapacityError(new Error(prod503))).toBe(true)
+  })
+
+  it('repete quando o ApiError expõe status/code numérico', () => {
+    expect(isTransientCapacityError({ status: 429 })).toBe(true)
+    expect(isTransientCapacityError({ code: 503 })).toBe(true)
+    expect(isTransientCapacityError({ status: 500 })).toBe(true)
+  })
+
+  it('NÃO repete o que não se cura sozinho — 400/401/403 e o 404 do incidente -preview', () => {
+    expect(isTransientCapacityError({ status: 400 })).toBe(false)
+    expect(isTransientCapacityError({ status: 401 })).toBe(false)
+    expect(isTransientCapacityError({ status: 403 })).toBe(false)
+    const prod404 = '{"error":{"code":404,"message":"Publisher model `projects/x/locations/global/publishers/google/models/gemini-3-pro-image-preview` was not found or your project does not have access to it.","status":"NOT_FOUND"}}'
+    expect(isTransientCapacityError(new Error(prod404))).toBe(false)
+  })
+
+  it('status numérico tem precedência sobre o texto da mensagem', () => {
+    // 400 cuja mensagem cita "429" não pode virar retry.
+    expect(isTransientCapacityError({ status: 400, message: 'quota 429 mencionada' })).toBe(false)
+  })
+
+  it('não lança em entrada estranha', () => {
+    expect(isTransientCapacityError(null)).toBe(false)
+    expect(isTransientCapacityError(undefined)).toBe(false)
+    expect(isTransientCapacityError('erro solto')).toBe(false)
   })
 })
