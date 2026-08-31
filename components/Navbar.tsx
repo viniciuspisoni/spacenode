@@ -10,6 +10,18 @@ const LINKS = [
   { href: '#faq',           label: 'FAQ'           },
 ];
 
+const INSTAGRAM_URL = 'https://instagram.com/spacenode.app';
+
+function InstagramIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <rect x="3" y="3" width="18" height="18" rx="5" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="17.5" cy="6.5" r="1" fill="currentColor" />
+    </svg>
+  );
+}
+
 export default function Navbar() {
   const [open, setOpen] = useState(false);
 
@@ -70,6 +82,15 @@ export default function Navbar() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }} className="nav-actions">
+          <a
+            href={INSTAGRAM_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Instagram"
+            className="nav-pill nav-pill-ghost nav-pill-icon"
+          >
+            <InstagramIcon />
+          </a>
           <a href="/login" className="nav-pill nav-pill-ghost">
             Entrar
           </a>
@@ -175,6 +196,19 @@ export default function Navbar() {
           >
             80 nodes grátis · sem cartão · em português
           </p>
+
+          <div style={{ marginTop: 24, display: 'flex', justifyContent: 'center' }}>
+            <a
+              href={INSTAGRAM_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Instagram"
+              onClick={() => setOpen(false)}
+              className="drawer-social"
+            >
+              <InstagramIcon size={20} />
+            </a>
+          </div>
         </div>
       </div>
 
@@ -243,6 +277,15 @@ export default function Navbar() {
         }
         /* depois dos :hover para vencer o empate de especificidade na cascata */
         .nav-pill:active { transform: translateY(0); }
+
+        .nav-pill-icon {
+          width: 34px;
+          padding: 0;
+          color: var(--color-text-secondary);
+        }
+        .nav-pill-icon:hover {
+          color: var(--color-text-primary);
+        }
 
         @media (prefers-reduced-motion: reduce) {
           .nav-pill { transition: none; }
@@ -317,6 +360,19 @@ export default function Navbar() {
           box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.08);
         }
         .drawer-cta-ghost:hover { color: var(--color-text-primary); }
+
+        .drawer-social {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 40px;
+          height: 40px;
+          border-radius: var(--radius-full);
+          color: var(--color-text-secondary);
+          background: rgba(255, 255, 255, 0.05);
+          border: 0.5px solid rgba(255, 255, 255, 0.1);
+        }
+        .drawer-social:hover { color: var(--color-text-primary); }
 
         a:hover { color: var(--color-text-primary); }
       `}</style>
