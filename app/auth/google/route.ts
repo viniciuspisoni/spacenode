@@ -31,6 +31,11 @@ const NONCE_COOKIE_OPTS = {
 // antiga falhar sempre (última escrita vence).
 const MAX_NONCES = 5
 
+function safeNextPath(value: string | null): string {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) return '/app'
+  return value
+}
+
 function readNonces(value: string | undefined): string[] {
   if (!value) return []
   try {
@@ -69,7 +74,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const { origin } = new URL(request.url)
+  const { origin, searchParams } = new URL(request.url)
+  const next = safeNextPath(searchParams.get('next'))
   const fail = () => NextResponse.redirect(`${origin}/login?error=google`, 303)
 
   let form: FormData
@@ -117,5 +123,5 @@ export async function POST(request: Request) {
   })
   if (error) return fail()
 
-  return NextResponse.redirect(`${origin}/app`, 303)
+  return NextResponse.redirect(`${origin}${next}`, 303)
 }

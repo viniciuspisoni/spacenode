@@ -1,0 +1,616 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SpaceNode</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0a0a0a;
+      --panel: #111111;
+      --surface: rgba(255,255,255,0.055);
+      --surface-hover: rgba(255,255,255,0.09);
+      --border: rgba(255,255,255,0.12);
+      --border-soft: rgba(255,255,255,0.07);
+      --text: #f5f5f7;
+      --muted: #a1a1a6;
+      --dim: #6e6e73;
+      --green: #30d158;
+      --green-bg: rgba(48,209,88,0.10);
+      --green-border: rgba(48,209,88,0.24);
+      --error: #e0584a;
+      --warning: #d4a327;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+      overflow: hidden;
+    }
+
+    button, input, textarea {
+      font: inherit;
+      letter-spacing: 0;
+    }
+
+    button {
+      border: 0;
+      cursor: pointer;
+    }
+
+    .shell {
+      height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      background: var(--bg);
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 15px 16px 13px;
+      border-bottom: 0.5px solid var(--border-soft);
+      background: var(--bg);
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      min-width: 0;
+      color: var(--text);
+      font-weight: 560;
+      font-size: 15px;
+    }
+
+    .brand svg {
+      width: 23px;
+      height: 23px;
+      flex: 0 0 23px;
+    }
+
+    .icon-button {
+      width: 30px;
+      height: 30px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--muted);
+    }
+
+    .icon-button:hover { background: var(--surface); color: var(--text); }
+
+    main {
+      overflow-y: auto;
+      padding: 14px 14px 18px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255,255,255,0.18) transparent;
+    }
+
+    .connection {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 11px;
+      border: 0.5px solid var(--border-soft);
+      border-radius: 8px;
+      background: var(--surface);
+      margin-bottom: 12px;
+    }
+
+    .status-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      font-weight: 520;
+      font-size: 12px;
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--dim);
+      flex: 0 0 7px;
+    }
+
+    .dot.is-on {
+      background: var(--green);
+      box-shadow: 0 0 10px rgba(48,209,88,0.42);
+    }
+
+    .status-sub {
+      margin-top: 2px;
+      color: var(--dim);
+      font-size: 11px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .ghost {
+      height: 30px;
+      padding: 0 11px;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--muted);
+      border: 0.5px solid var(--border);
+      font-size: 12px;
+    }
+
+    .ghost:hover { background: var(--surface-hover); color: var(--text); }
+
+    .preview {
+      position: relative;
+      aspect-ratio: 4 / 3;
+      width: 100%;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #050505;
+      border: 0.5px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 10px;
+    }
+
+    .preview img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: #050505;
+      display: none;
+    }
+
+    .empty-preview {
+      text-align: center;
+      color: var(--dim);
+      font-size: 12px;
+      padding: 20px;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .field { margin-bottom: 12px; }
+
+    label {
+      display: block;
+      margin-bottom: 7px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 520;
+    }
+
+    textarea, input {
+      width: 100%;
+      border: 0.5px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      border-radius: 8px;
+      outline: none;
+    }
+
+    textarea {
+      min-height: 96px;
+      resize: vertical;
+      padding: 10px 11px;
+    }
+
+    input { height: 36px; padding: 0 10px; }
+
+    textarea:focus, input:focus { border-color: rgba(255,255,255,0.28); }
+
+    .segmented {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3px;
+      padding: 3px;
+      border: 0.5px solid var(--border-soft);
+      border-radius: 8px;
+      background: var(--panel);
+    }
+
+    .segmented button {
+      height: 32px;
+      border-radius: 6px;
+      color: var(--dim);
+      background: transparent;
+      font-size: 12px;
+    }
+
+    .segmented button.is-active {
+      background: var(--text);
+      color: var(--bg);
+      font-weight: 560;
+    }
+
+    .primary {
+      width: 100%;
+      height: 42px;
+      border-radius: 8px;
+      background: var(--text);
+      color: var(--bg);
+      font-weight: 600;
+      margin-top: 2px;
+    }
+
+    .primary:disabled {
+      opacity: 0.38;
+      cursor: default;
+    }
+
+    .notice {
+      display: none;
+      margin-top: 10px;
+      padding: 9px 10px;
+      border-radius: 8px;
+      border: 0.5px solid var(--border);
+      color: var(--muted);
+      background: var(--surface);
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+
+    .notice.is-error {
+      display: block;
+      color: var(--error);
+      border-color: rgba(224,88,74,0.22);
+      background: rgba(224,88,74,0.08);
+    }
+
+    .notice.is-success {
+      display: block;
+      color: var(--text);
+      border-color: var(--green-border);
+      background: var(--green-bg);
+    }
+
+    .result-actions {
+      display: none;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .result-actions.is-visible { display: grid; }
+
+    details {
+      border-top: 0.5px solid var(--border-soft);
+      padding-top: 13px;
+      margin-top: 16px;
+    }
+
+    summary {
+      color: var(--dim);
+      cursor: pointer;
+      font-size: 12px;
+      margin-bottom: 10px;
+    }
+
+    footer {
+      min-height: 28px;
+      border-top: 0.5px solid var(--border-soft);
+      color: var(--dim);
+      font-size: 11px;
+      padding: 7px 14px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <div class="brand">
+        <svg viewBox="0 0 64 64" fill="none" aria-hidden="true">
+          <path d="M16 16L48 48M16 48L48 16M16 16H48V48H16V16Z" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="16" cy="16" r="4" fill="currentColor"/>
+          <circle cx="48" cy="16" r="4" fill="currentColor"/>
+          <circle cx="48" cy="48" r="4" fill="currentColor"/>
+          <circle cx="16" cy="48" r="4" fill="#30d158"/>
+        </svg>
+        <span>spacenode</span>
+      </div>
+      <button class="icon-button" id="settingsToggle" title="Configurar API" aria-label="Configurar API">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z"/>
+          <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21a2 2 0 0 1-4 0v-.1A1.7 1.7 0 0 0 8 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3a2 2 0 0 1 0-4h.1A1.7 1.7 0 0 0 4.6 8a1.7 1.7 0 0 0-.34-1.88l-.06-.06A2 2 0 1 1 7.03 3.2l.06.06A1.7 1.7 0 0 0 9 4.6c.38-.16.7-.37 1-.6.31-.24.4-.72.4-1.1V3a2 2 0 0 1 4 0v.1c0 .38.09.86.4 1.1.3.23.62.44 1 .6a1.7 1.7 0 0 0 1.88-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.16.38.37.7.6 1 .24.31.72.4 1.1.4h.1a2 2 0 0 1 0 4h-.1c-.38 0-.86.09-1.1.4-.23.3-.44.62-.6 1Z"/>
+        </svg>
+      </button>
+    </header>
+
+    <main>
+      <section class="connection">
+        <div>
+          <div class="status-title"><span class="dot" id="authDot"></span><span id="authTitle">Desconectado</span></div>
+          <div class="status-sub" id="authSub">Conecte sua conta SpaceNode</div>
+        </div>
+        <button class="ghost" id="connectButton">Conectar</button>
+      </section>
+
+      <div class="preview">
+        <img id="captureImage" alt="Viewport capturado">
+        <img id="resultImage" alt="Resultado SpaceNode">
+        <div class="empty-preview" id="emptyPreview">Capture a vista atual do SketchUp</div>
+      </div>
+
+      <div class="row">
+        <button class="ghost" id="captureButton">Capturar viewport</button>
+        <button class="ghost" id="checkButton">Verificar sessão</button>
+      </div>
+
+      <div class="field">
+        <label for="prompt">Descrição</label>
+        <textarea id="prompt" placeholder="Ex.: render fotorrealista, sala residencial, luz natural, preservar geometria e móveis"></textarea>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label>Projeto</label>
+          <div class="segmented" data-segmented="projectType">
+            <button type="button" data-value="interior" class="is-active">Interior</button>
+            <button type="button" data-value="exterior">Exterior</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>Modo</label>
+          <div class="segmented" data-segmented="mode">
+            <button type="button" data-value="fast">Rápido</button>
+            <button type="button" data-value="quality" class="is-active">Alta fidelidade</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label for="environment">Ambiente</label>
+          <input id="environment" placeholder="Sala, fachada, cozinha">
+        </div>
+        <div class="field">
+          <label for="lighting">Luz</label>
+          <input id="lighting" placeholder="Natural, noturna">
+        </div>
+      </div>
+
+      <button class="primary" id="generateButton" disabled>Gerar</button>
+
+      <div class="notice" id="notice"></div>
+
+      <div class="result-actions" id="resultActions">
+        <button class="ghost" id="openResultButton">Abrir resultado</button>
+        <button class="ghost" id="openHistoryButton">Abrir histórico</button>
+      </div>
+
+      <details id="settingsPanel">
+        <summary>API</summary>
+        <div class="field">
+          <label for="apiBaseUrl">API_BASE_URL</label>
+          <input id="apiBaseUrl" value="https://spacenode.app">
+        </div>
+        <button class="ghost" id="saveSettingsButton">Salvar URL</button>
+      </details>
+    </main>
+
+    <footer id="footer">SpaceNode for SketchUp</footer>
+  </div>
+
+  <script>
+    const model = {
+      authenticated: false,
+      apiBaseUrl: 'https://spacenode.app',
+      mode: 'quality',
+      projectType: 'interior',
+      captureReady: false,
+      resultUrl: null,
+      busy: false
+    };
+
+    const $ = (id) => document.getElementById(id);
+    const els = {
+      authDot: $('authDot'),
+      authTitle: $('authTitle'),
+      authSub: $('authSub'),
+      connectButton: $('connectButton'),
+      checkButton: $('checkButton'),
+      captureButton: $('captureButton'),
+      generateButton: $('generateButton'),
+      prompt: $('prompt'),
+      environment: $('environment'),
+      lighting: $('lighting'),
+      captureImage: $('captureImage'),
+      resultImage: $('resultImage'),
+      emptyPreview: $('emptyPreview'),
+      notice: $('notice'),
+      resultActions: $('resultActions'),
+      openResultButton: $('openResultButton'),
+      openHistoryButton: $('openHistoryButton'),
+      apiBaseUrl: $('apiBaseUrl'),
+      saveSettingsButton: $('saveSettingsButton'),
+      settingsToggle: $('settingsToggle'),
+      settingsPanel: $('settingsPanel'),
+      footer: $('footer')
+    };
+
+    function callSketchUp(name, ...args) {
+      const bridge = window.sketchup && window.sketchup[name];
+      if (typeof bridge !== 'function') {
+        showError('Abra este painel dentro do SketchUp.');
+        return;
+      }
+      bridge(...args);
+    }
+
+    function setBusy(busy, label) {
+      model.busy = busy;
+      els.generateButton.textContent = busy ? (label || 'Gerando...') : 'Gerar';
+      els.captureButton.disabled = busy;
+      els.checkButton.disabled = busy;
+      els.connectButton.disabled = busy;
+      updateButtons();
+    }
+
+    function updateButtons() {
+      const hasPrompt = els.prompt.value.trim().length > 0;
+      els.generateButton.disabled = model.busy || !model.authenticated || !hasPrompt;
+      els.authDot.classList.toggle('is-on', model.authenticated);
+      els.authTitle.textContent = model.authenticated ? 'Conectado' : 'Desconectado';
+      els.connectButton.textContent = model.authenticated ? 'Trocar' : 'Conectar';
+    }
+
+    function showNotice(message, kind) {
+      els.notice.textContent = message || '';
+      els.notice.className = 'notice';
+      if (message) els.notice.classList.add(kind === 'success' ? 'is-success' : 'is-error');
+    }
+
+    function showError(message) {
+      setBusy(false);
+      showNotice(message || 'Erro inesperado.', 'error');
+    }
+
+    function setPreview(kind, url) {
+      els.emptyPreview.style.display = 'none';
+      els.captureImage.style.display = kind === 'capture' ? 'block' : 'none';
+      els.resultImage.style.display = kind === 'result' ? 'block' : 'none';
+      if (kind === 'capture') els.captureImage.src = url;
+      if (kind === 'result') els.resultImage.src = url;
+    }
+
+    function selectedValue(name) {
+      const active = document.querySelector(`[data-segmented="${name}"] .is-active`);
+      return active ? active.dataset.value : '';
+    }
+
+    function setFooter(message) {
+      els.footer.textContent = message || 'SpaceNode for SketchUp';
+    }
+
+    document.querySelectorAll('.segmented').forEach((group) => {
+      group.addEventListener('click', (event) => {
+        const button = event.target.closest('button');
+        if (!button) return;
+        group.querySelectorAll('button').forEach((item) => item.classList.remove('is-active'));
+        button.classList.add('is-active');
+        model[group.dataset.segmented] = button.dataset.value;
+      });
+    });
+
+    els.prompt.addEventListener('input', updateButtons);
+    els.connectButton.addEventListener('click', () => callSketchUp('connect'));
+    els.checkButton.addEventListener('click', () => callSketchUp('checkSession'));
+    els.captureButton.addEventListener('click', () => {
+      showNotice('', 'success');
+      setBusy(true, 'Capturando...');
+      callSketchUp('captureViewport');
+    });
+    els.generateButton.addEventListener('click', () => {
+      showNotice('', 'success');
+      setBusy(true, 'Gerando...');
+      callSketchUp('generate', JSON.stringify({
+        prompt: els.prompt.value,
+        mode: selectedValue('mode'),
+        projectType: selectedValue('projectType'),
+        environment: els.environment.value,
+        lighting: els.lighting.value,
+        segment: 'Residencial',
+        freshCapture: true
+      }));
+    });
+    els.openResultButton.addEventListener('click', () => {
+      if (model.resultUrl) callSketchUp('openUrl', model.resultUrl);
+    });
+    els.openHistoryButton.addEventListener('click', () => {
+      callSketchUp('openUrl', `${model.apiBaseUrl}/app/history`);
+    });
+    els.saveSettingsButton.addEventListener('click', () => {
+      callSketchUp('saveSettings', JSON.stringify({ apiBaseUrl: els.apiBaseUrl.value }));
+    });
+    els.settingsToggle.addEventListener('click', () => {
+      els.settingsPanel.open = !els.settingsPanel.open;
+    });
+
+    window.SpaceNodeBridge = {
+      receive(event, payload) {
+        if (event === 'state') {
+          model.apiBaseUrl = payload.apiBaseUrl || model.apiBaseUrl;
+          model.authenticated = Boolean(payload.authenticated);
+          els.apiBaseUrl.value = model.apiBaseUrl;
+          els.authSub.textContent = payload.userEmail || 'Conecte sua conta SpaceNode';
+          if (payload.lastResult && payload.lastResult.outputUrl) {
+            model.resultUrl = payload.lastResult.outputUrl;
+            setPreview('result', payload.lastResult.previewUrl || payload.lastResult.outputUrl);
+            els.resultActions.classList.add('is-visible');
+          }
+          updateButtons();
+        }
+
+        if (event === 'capture') {
+          setBusy(false);
+          model.captureReady = true;
+          setPreview('capture', payload.imageDataUrl);
+          setFooter('Viewport capturado');
+          showNotice('Viewport capturado.', 'success');
+        }
+
+        if (event === 'status') {
+          setFooter(payload.message || '');
+        }
+
+        if (event === 'session') {
+          setBusy(false);
+          model.authenticated = true;
+          els.authSub.textContent = payload.user && payload.user.email ? payload.user.email : 'Sessão ativa';
+          const total = payload.balance && typeof payload.balance.totalBalance === 'number'
+            ? `${payload.balance.totalBalance} nodes`
+            : 'Sessão ativa';
+          setFooter(total);
+          showNotice('Sessão verificada.', 'success');
+          updateButtons();
+        }
+
+        if (event === 'result') {
+          setBusy(false);
+          model.resultUrl = payload.outputUrl;
+          setPreview('result', payload.previewUrl || payload.outputUrl);
+          els.resultActions.classList.add('is-visible');
+          const cost = payload.nodesCharged ? `${payload.nodesCharged} nodes usados.` : 'Render concluído.';
+          showNotice(payload.fidelityWarning ? `${cost} Revise a fidelidade antes de apresentar.` : cost, 'success');
+          setFooter(payload.totalBalance != null ? `${payload.totalBalance} nodes restantes` : 'Render concluído');
+        }
+
+        if (event === 'error') {
+          if (payload.authExpired) {
+            model.authenticated = false;
+            els.authSub.textContent = 'Conecte sua conta SpaceNode';
+          }
+          showError(payload.message);
+          updateButtons();
+        }
+      }
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+      callSketchUp('ready');
+    });
+  </script>
+</body>
+</html>

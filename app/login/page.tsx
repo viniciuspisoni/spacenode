@@ -73,6 +73,17 @@ function translateError(msg: string): string {
   return 'Algo deu errado. Tente novamente.'
 }
 
+function authErrorMessage(value: string | null): string | null {
+  if (value === 'google') return 'Não foi possível entrar com o Google. Tente novamente.'
+  if (value) return 'Não foi possível concluir a autenticação. Tente novamente.'
+  return null
+}
+
+function safeNextPath(value: string | null): string {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) return '/app'
+  return value
+}
+
 export default function LoginPage() {
   return (
     <Suspense fallback={null}>
@@ -84,6 +95,7 @@ export default function LoginPage() {
 function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const nextPath = safeNextPath(searchParams.get('next'))
 
   const [mode,          setMode]          = useState<Mode>(searchParams.get('mode') === 'signup' ? 'signup' : 'login')
   const [email,         setEmail]         = useState('')
@@ -92,7 +104,7 @@ function LoginForm() {
   const [googleLoading, setGoogleLoading] = useState(false)
   const [googleHovered, setGoogleHovered] = useState(false)
   const [submitHovered, setSubmitHovered] = useState(false)
-  const [error,         setError]         = useState<string | null>(null)
+  const [error,         setError]         = useState<string | null>(() => authErrorMessage(searchParams.get('error')))
   const [success,       setSuccess]       = useState<string | null>(null)
 
   const { resolvedTheme } = useTheme()
@@ -107,13 +119,6 @@ function LoginForm() {
   // apagaria o banner de erro vindo por ?error= antes do usuário ler.
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setError(null); setSuccess(null) }, [mode])
-
-  // Feedback de falha vindo por redirect (POST /auth/google ou /auth/callback)
-  useEffect(() => {
-    const err = searchParams.get('error')
-    if (err === 'google') setError('Não foi possível entrar com o Google. Tente novamente.')
-    else if (err)         setError('Não foi possível concluir a autenticação. Tente novamente.')
-  }, [searchParams])
 
   // Monta o botão oficial do Google (re-renderiza quando o tema resolve/muda).
   // O nonce é mintado UMA vez por carga da página (ref compartilhada): re-runs
@@ -153,7 +158,7 @@ function LoginForm() {
         window.google.accounts.id.initialize({
           client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!,
           ux_mode: 'redirect',
-          login_uri: `${window.location.origin}/auth/google`,
+          login_uri: `${window.location.origin}/auth/google?next=${encodeURIComponent(nextPath)}`,
           nonce,
           use_fedcm_for_prompt: true,
           itp_support: true,
@@ -201,7 +206,7 @@ function LoginForm() {
       cancelled = true
       timers.forEach(t => window.clearTimeout(t))
     }
-  }, [googleFallback, resolvedTheme])
+  }, [googleFallback, resolvedTheme, nextPath])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -213,18 +218,18 @@ function LoginForm() {
     if (mode === 'login') {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) { setError(translateError(error.message)); setLoading(false) }
-      else        { router.push('/app') }
+      else        { router.push(nextPath) }
     } else {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+        options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}` },
       })
       if (error) {
         setError(translateError(error.message))
         setLoading(false)
       } else if (data.session) {
-        router.push('/app')
+        router.push(nextPath)
       } else {
         setSuccess('Verifique seu email para confirmar o cadastro.')
         setLoading(false)
@@ -237,7 +242,7 @@ function LoginForm() {
     const supabase = createClient()
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}` },
     })
   }
 
