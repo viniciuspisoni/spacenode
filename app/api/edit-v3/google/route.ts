@@ -13,9 +13,9 @@
 // Bypass de teste local (sem sessão de browser): header `x-edit-v3-test-user:
 // <uuid>` — aceito APENAS fora de produção e fora da Vercel.
 
-import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getRequestUser } from '@/lib/auth/request-user'
 import { uploadEditAsset } from '@/lib/spaces/edit-route-helpers'
 import { MaskImageMismatchError, fetchImageBuffer } from '@/lib/spaces/edit-crop'
 import { GoogleEditError, type GoogleImageModel } from '@/lib/ai/google/editImage'
@@ -92,7 +92,7 @@ function parseReferences(action: EditV3Action, raw: unknown): EditV3Reference[] 
   return []
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   // Flag de produto: desligada → a rota não existe para o mundo.
   if (!editV3Enabled()) {
     return NextResponse.json({ error: 'Não disponível.' }, { status: 404 })
@@ -105,8 +105,8 @@ export async function POST(req: Request) {
   if (testUser && /^[0-9a-f-]{36}$/i.test(testUser)) {
     userId = testUser
   } else {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    // Cookie (browser) ou Bearer (plugin SketchUp).
+    const { user } = await getRequestUser(req)
     if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
     userId = user.id
   }

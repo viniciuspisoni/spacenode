@@ -6,18 +6,18 @@
 // estragar packs já compartilhados.
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getRequestAuthContext } from '@/lib/auth/request-user'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { signRow } from '@/lib/storage/signed'
 
 export async function GET(
-  _req:    NextRequest,
+  req:     NextRequest,
   context: { params: Promise<{ spaceId: string }> },
 ) {
   const { spaceId } = await context.params
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+  // Cookie (browser) ou Bearer (plugin SketchUp) — client RLS do usuário.
+  const { user, supabase } = await getRequestAuthContext(req)
+  if (!user || !supabase) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
   const { data, error } = await supabase
     .from('spaces_with_counts')
@@ -40,9 +40,9 @@ export async function PATCH(
   context: { params: Promise<{ spaceId: string }> },
 ) {
   const { spaceId } = await context.params
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+  // Cookie (browser) ou Bearer (plugin SketchUp) — client RLS do usuário.
+  const { user, supabase } = await getRequestAuthContext(req)
+  if (!user || !supabase) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
   let body: { name?: unknown; action?: unknown }
   try {
@@ -98,13 +98,13 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _req:    NextRequest,
+  req:     NextRequest,
   context: { params: Promise<{ spaceId: string }> },
 ) {
   const { spaceId } = await context.params
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+  // Cookie (browser) ou Bearer (plugin SketchUp) — client RLS do usuário.
+  const { user, supabase } = await getRequestAuthContext(req)
+  if (!user || !supabase) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
   const { error } = await supabase
     .from('spaces')

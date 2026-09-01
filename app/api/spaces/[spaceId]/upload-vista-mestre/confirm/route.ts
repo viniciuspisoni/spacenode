@@ -9,7 +9,7 @@
 // Não consome nodes. Nodes são debitados na extração de DNA.
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getRequestAuthContext } from '@/lib/auth/request-user'
 import { createAdminClient } from '@/lib/supabase/admin'
 import {
   VISTA_MESTRE_BUCKET,
@@ -24,9 +24,9 @@ export async function POST(
   context: { params: Promise<{ spaceId: string }> },
 ) {
   const { spaceId } = await context.params
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+  // Cookie (browser) ou Bearer (plugin SketchUp) — client RLS do usuário.
+  const { user, supabase } = await getRequestAuthContext(req)
+  if (!user || !supabase) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
   const guard = await requireEditableSpace(supabase, spaceId)
   if (guard.error) return guard.error
