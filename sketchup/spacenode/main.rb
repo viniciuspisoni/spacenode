@@ -26,14 +26,58 @@ module SpaceNode
   module SketchUp
     extend self
 
-    VERSION = '0.4.0'
+    VERSION = '0.5.0'
     PREFERENCES_KEY = 'com.spacenode.sketchup'
     DEFAULT_API_BASE_URL = 'https://spacenode.app'
     MIN_SKETCHUP_MAJOR = 21          # Ruby 2.7+; recomendado 2024+
     CATALOG_TTL_SECONDS = 6 * 3600
     GENERATE_TIMEOUT_SECONDS = 320   # /api/generate tem maxDuration=300
     UPLOAD_TIMEOUT_SECONDS = 120     # sign/PUT/confirm (Sketchup::Http não tem timeout)
-    SILENT_AUTH_TIMEOUT_SECONDS = 25
+
+    # Strings do Ruby visíveis no painel (etapas/erros centrais). O grosso da
+    # UI é traduzido no dialog; mensagens vindas do SERVIDOR seguem em pt-BR.
+    RB_STRINGS = {
+      'pt' => {
+        :capturing => 'Capturando a vista…',
+        :sending => 'Enviando o projeto…',
+        :sending_materials => 'Enviando materiais do modelo…',
+        :generating => 'Gerando na SPACENODE…',
+        :editing => 'Editando na SPACENODE…',
+        :upscaling => 'Ampliando na SPACENODE…',
+        :renewing => 'Renovando sessão…',
+        :cancelled => 'Geração cancelada.',
+        :view_restored => 'Vista do render restaurada.',
+        :downloading => 'Baixando o render…',
+        :reconciling => 'Conexão instável — verificando se o render foi concluído…',
+        :connect_first => 'Conecte sua conta SPACENODE primeiro.',
+        :busy => 'Já existe uma geração em andamento.',
+        :session_expired => 'Sua sessão expirou. Conecte novamente.',
+        :pairing_waiting => 'Confirme o código no navegador…',
+        :pairing_expired => 'O código expirou. Clique em Conectar pra gerar outro.',
+        :pairing_failed => 'Não foi possível conectar. Tente de novo.',
+        :save_title => 'Salvar render'
+      },
+      'en' => {
+        :capturing => 'Capturing the view…',
+        :sending => 'Uploading the project…',
+        :sending_materials => 'Uploading model materials…',
+        :generating => 'Rendering on SPACENODE…',
+        :editing => 'Editing on SPACENODE…',
+        :upscaling => 'Upscaling on SPACENODE…',
+        :renewing => 'Renewing session…',
+        :cancelled => 'Generation cancelled.',
+        :view_restored => 'Render view restored.',
+        :downloading => 'Downloading the render…',
+        :reconciling => 'Unstable connection — checking if the render finished…',
+        :connect_first => 'Connect your SPACENODE account first.',
+        :busy => 'A generation is already running.',
+        :session_expired => 'Your session expired. Connect again.',
+        :pairing_waiting => 'Confirm the code in your browser…',
+        :pairing_expired => 'The code expired. Click Connect to get a new one.',
+        :pairing_failed => 'Could not connect. Try again.',
+        :save_title => 'Save render'
+      }
+    }.freeze
 
     # Lado maior da captura por resolução de saída. O servidor normaliza em
     # 4096 px — capturar menos que isso pra 2K/4K joga fora o sinal
@@ -99,6 +143,26 @@ module SpaceNode
       ::Sketchup.version.to_i >= MIN_SKETCHUP_MAJOR
     rescue StandardError
       true
+    end
+
+    # 'auto' segue o idioma do SketchUp (Sketchup.get_locale, ex.: 'pt-BR',
+    # 'en-US', 'fr' — parsing tolerante); override manual 'pt'/'en' nas
+    # configurações do painel.
+    def locale
+      override = ::Sketchup.read_default(PREFERENCES_KEY, 'locale', 'auto').to_s
+      return override if %w[pt en].include?(override)
+
+      raw = begin
+        ::Sketchup.get_locale.to_s
+      rescue StandardError
+        'en'
+      end
+      raw.downcase.start_with?('pt') ? 'pt' : 'en'
+    end
+
+    def t(key)
+      table = RB_STRINGS[locale] || RB_STRINGS['pt']
+      table[key] || RB_STRINGS['pt'][key] || key.to_s
     end
 
     def show_dialog
@@ -245,10 +309,15 @@ module SpaceNode
       end
       dialog.add_action_callback('connect') do |_ctx|
         begin
-          show_auth_dialog(false)
+          start_pairing
         rescue StandardError => e
           emit_error(e.message)
         end
+      end
+      dialog.add_action_callback('cancelPairing') do |_ctx|
+        stop_pairing
+        emit('pairingDone', { :ok => false })
+        emit('status', { :stage => 'idle', :message => '' })
       end
       dialog.add_action_callback('disconnect') do |_ctx|
         clear_session
@@ -333,8 +402,9 @@ module SpaceNode
       end
     end
 
-    def json_request(method, path, body, on_error, &on_success)
+    def json_request(method, path, body, on_error, opts = {}, &on_success)
       options = {}
+      options[:auth] = false if opts[:auth] == false
       if body
         options[:body] = JSON.generate(body)
         options[:content_type] = 'application/json'
@@ -376,113 +446,143 @@ module SpaceNode
       on_error.call(error)
     end
 
-    def handle_auth_failure
-      clear_session
-      send_state
+    # ── Sessão (pareamento por código — device flow) ─────────────────────────
+    #
+    # O plugin guarda APENAS device_id + device_secret (opaco, revogável no
+    # servidor) + o access token corrente. Refresh token NUNCA chega aqui —
+    # a renovação é POST /api/sketchup/pair/refresh, com o token custodiado
+    # e rotacionado no servidor. O login acontece no NAVEGADOR DO SISTEMA
+    # (UI.openURL) — onde a sessão Google do usuário vive.
+
+    PAIR_POLL_MAX_SECONDS = 660
+
+    def start_pairing
+      stop_pairing
+
+      device_name = begin
+        "SketchUp #{::Sketchup.version.to_s.split('.').first} · #{ENV['COMPUTERNAME'] || ENV['HOSTNAME'] || 'desktop'}"
+      rescue StandardError
+        'SketchUp'
+      end
+
+      json_request(:post, '/api/sketchup/pair/start', { :deviceName => device_name },
+                   proc { |e| emit_error(e.message) }, :auth => false) do |data|
+        device_id = data['deviceId'].to_s
+        secret = data['deviceSecret'].to_s
+        code = data['userCode'].to_s
+        url = data['verificationUrl'].to_s
+        if device_id.empty? || secret.empty? || code.empty?
+          emit_error(t(:pairing_failed))
+        else
+          @pairing = {
+            :device_id => device_id,
+            :secret => secret,
+            :deadline => Time.now + [data['expiresIn'].to_i, PAIR_POLL_MAX_SECONDS].min
+          }
+          emit('pairing', { :code => code, :url => url, :expiresIn => data['expiresIn'].to_i })
+          emit('status', { :stage => 'auth', :message => t(:pairing_waiting) })
+          open_url(url)
+          schedule_pair_poll([data['pollInterval'].to_i, 2].max)
+        end
+      end
     end
 
-    # ── Sessão ───────────────────────────────────────────────────────────────
+    def schedule_pair_poll(interval)
+      pairing = @pairing
+      return unless pairing
 
-    def show_auth_dialog(silent)
-      close_auth_dialog
-
-      @auth_nonce = SecureRandom.hex(16)
-      @auth_silent = silent
-
-      # O dialog silencioso NÃO usa preferences_key: HtmlDialog persiste
-      # posição por key, e a posição fora da tela do modo silencioso
-      # envenenaria a geometria do dialog de Conectar visível.
-      dialog_options = {
-        :dialog_title => 'Conectar SPACENODE',
-        :scrollable => false,
-        :resizable => true,
-        :width => 440,
-        :height => 580,
-        :min_width => 380,
-        :min_height => 480,
-        :style => dialog_style
-      }
-      dialog_options[:preferences_key] = "#{PREFERENCES_KEY}.auth" unless silent
-      dialog = ::UI::HtmlDialog.new(dialog_options)
-
-      dialog.add_action_callback('receiveSpaceNodeSession') do |_ctx, raw|
+      ::UI.start_timer(interval, false) do
         begin
-          receive_session(raw)
-        rescue StandardError => e
-          emit_error(e.message)
-        end
-      end
-
-      dialog.set_url("#{api_base_url}/sketchup/connect?nonce=#{@auth_nonce}")
-      @auth_dialog = dialog
-      dialog.show
-
-      # Renovação silenciosa: mesma página, janela movida pra fora da área
-      # visível DEPOIS do show (antes, a restauração de geometria competiria
-      # com o set_position). O CEF guarda a sessão web do usuário; o
-      # supabase-js renova o access token e a página entrega sem interação.
-      dialog.set_position(20_000, 20_000) if silent && dialog.respond_to?(:set_position)
-
-      if silent
-        ::UI.start_timer(SILENT_AUTH_TIMEOUT_SECONDS, false) do
-          if @auth_dialog.equal?(dialog)
-            close_auth_dialog
-            had_pending = !@pending_generate.nil?
-            @pending_generate = nil
-            emit_error('Sua sessão expirou. Conecte novamente.', true, had_pending)
-          end
+          poll_pairing(pairing, interval)
+        rescue StandardError
+          nil
         end
       end
     end
 
-    def receive_session(raw)
-      payload = parse_json(raw)
+    def poll_pairing(pairing, interval)
+      return unless @pairing.equal?(pairing)
 
-      # O nonce foi gerado aqui e ecoado pela página — nenhuma outra página
-      # carregada no dialog consegue injetar uma sessão.
-      nonce = payload['nonce'].to_s
-      if @auth_nonce.nil? || nonce.empty? || nonce != @auth_nonce
-        close_auth_dialog
-        raise 'Sessão recusada: origem não confiável.'
+      if Time.now > pairing[:deadline]
+        stop_pairing
+        emit('pairingDone', { :ok => false })
+        emit_error(t(:pairing_expired))
+        return
       end
-      @auth_nonce = nil
 
-      token = payload['accessToken'].to_s
-      raise 'Sessão inválida recebida da SPACENODE.' if token.empty?
+      body = { :deviceId => pairing[:device_id], :deviceSecret => pairing[:secret] }
+      on_error = proc do |error|
+        next unless @pairing.equal?(pairing)
 
+        status = error.respond_to?(:status) ? error.status.to_i : 0
+        if status == 410
+          stop_pairing
+          emit('pairingDone', { :ok => false })
+          emit_error(t(:pairing_expired))
+        elsif status >= 400 && status != 429
+          stop_pairing
+          emit('pairingDone', { :ok => false })
+          emit_error(error.message)
+        else
+          # rede/429: continua tentando até o deadline
+          schedule_pair_poll(interval)
+        end
+      end
+      json_request(:post, '/api/sketchup/pair/claim', body, on_error, :auth => false) do |data|
+        next unless @pairing.equal?(pairing)
+
+        if data['status'] == 'ready' && !data['accessToken'].to_s.empty?
+          ::Sketchup.write_default(PREFERENCES_KEY, 'device_id', pairing[:device_id])
+          ::Sketchup.write_default(PREFERENCES_KEY, 'device_secret', pairing[:secret])
+          save_access_token(data['accessToken'].to_s, data['expiresAt'].to_i, data['userEmail'])
+          stop_pairing
+          emit('pairingDone', { :ok => true })
+          send_state
+          ensure_catalog
+          check_session
+        else
+          schedule_pair_poll(interval)
+        end
+      end
+    end
+
+    def stop_pairing
+      @pairing = nil
+    end
+
+    def save_access_token(token, expires_at, email = nil)
       ::Sketchup.write_default(PREFERENCES_KEY, 'access_token', token)
-      ::Sketchup.write_default(PREFERENCES_KEY, 'expires_at', payload['expiresAt'].to_i)
-      ::Sketchup.write_default(PREFERENCES_KEY, 'user_email', payload['userEmail'].to_s)
-
-      close_auth_dialog
-      send_state
-      ensure_catalog
-
-      pending = @pending_generate
-      @pending_generate = nil
-      if pending
-        run_generation(pending)
-      else
-        check_session
-      end
-    end
-
-    def close_auth_dialog
-      dialog = @auth_dialog
-      @auth_dialog = nil
-      dialog.close if dialog && dialog.respond_to?(:close)
-    rescue StandardError
-      nil
+      ::Sketchup.write_default(PREFERENCES_KEY, 'expires_at', expires_at.to_i)
+      ::Sketchup.write_default(PREFERENCES_KEY, 'user_email', email.to_s) unless email.nil?
     end
 
     def clear_session
+      stop_pairing
       ::Sketchup.write_default(PREFERENCES_KEY, 'access_token', '')
       ::Sketchup.write_default(PREFERENCES_KEY, 'expires_at', 0)
       ::Sketchup.write_default(PREFERENCES_KEY, 'user_email', '')
+      ::Sketchup.write_default(PREFERENCES_KEY, 'device_id', '')
+      ::Sketchup.write_default(PREFERENCES_KEY, 'device_secret', '')
+    end
+
+    # 401 do servidor: com dispositivo pareado, só o access token cai (a
+    # próxima ação renova via pair/refresh); sem dispositivo, desconecta.
+    def handle_auth_failure
+      if device_paired?
+        ::Sketchup.write_default(PREFERENCES_KEY, 'expires_at', 0)
+      else
+        clear_session
+      end
+      send_state
+    end
+
+    def device_paired?
+      !::Sketchup.read_default(PREFERENCES_KEY, 'device_id', '').to_s.empty? &&
+        !::Sketchup.read_default(PREFERENCES_KEY, 'device_secret', '').to_s.empty?
     end
 
     def authenticated?
-      !access_token.empty?
+      device_paired? || !access_token.empty?
     end
 
     # Token utilizável sem renovar? expiresAt desconhecido conta como VENCIDO
@@ -496,6 +596,68 @@ module SpaceNode
 
     def access_token
       ::Sketchup.read_default(PREFERENCES_KEY, 'access_token', '').to_s
+    end
+
+    # Garante token fresco e SEGUE (continuation): renova via pair/refresh
+    # quando pareado. generation_scope marca se um fracasso deve desarmar a
+    # UI de geração do painel.
+    def ensure_fresh_session(generation_scope, &continuation)
+      if session_fresh?
+        continuation.call
+        return
+      end
+
+      unless device_paired?
+        emit_error(t(:session_expired), true, generation_scope)
+        return
+      end
+
+      # Coalescing: a renovação é assíncrona (segundos). Um 2º clique nesse
+      # intervalo NÃO pode disparar um 2º POST /pair/refresh — dois refreshes
+      # concorrentes rotacionam o mesmo token e um 401 de corrida chamaria
+      # clear_session, deslogando por baixo da geração. Enfileira a
+      # continuação; um único refresh serve todas.
+      @refresh_waiters ||= []
+      @refresh_waiters << [continuation, generation_scope]
+      return if @renewing
+
+      @renewing = true
+      emit('status', { :stage => 'auth', :message => t(:renewing) })
+      body = {
+        :deviceId => ::Sketchup.read_default(PREFERENCES_KEY, 'device_id', '').to_s,
+        :deviceSecret => ::Sketchup.read_default(PREFERENCES_KEY, 'device_secret', '').to_s
+      }
+      finish = proc do |ok, message|
+        @renewing = false
+        waiters = @refresh_waiters || []
+        @refresh_waiters = []
+        waiters.each do |cont, scope|
+          if ok
+            cont.call
+          else
+            emit_error(message[:text], message[:auth], scope)
+          end
+        end
+      end
+      on_error = proc do |error|
+        status = error.respond_to?(:status) ? error.status.to_i : 0
+        if status == 401
+          clear_session
+          send_state
+          finish.call(false, { :text => t(:session_expired), :auth => true })
+        else
+          finish.call(false, { :text => error.message, :auth => false })
+        end
+      end
+      json_request(:post, '/api/sketchup/pair/refresh', body, on_error, :auth => false) do |data|
+        token = data['accessToken'].to_s
+        if token.empty?
+          finish.call(false, { :text => t(:session_expired), :auth => true })
+        else
+          save_access_token(token, data['expiresAt'].to_i)
+          finish.call(true, nil)
+        end
+      end
     end
 
     def check_session
@@ -711,7 +873,7 @@ module SpaceNode
       raise 'Nenhum modelo aberto no SketchUp.' unless model
 
       model.active_view.camera = camera
-      emit('status', { :stage => 'idle', :message => 'Vista do render restaurada.' })
+      emit('status', { :stage => 'idle', :message => t(:view_restored) })
     end
 
     def vector3(value)
@@ -1019,28 +1181,21 @@ module SpaceNode
     def handle_generate(raw)
       payload = parse_json(raw)
       unless authenticated?
-        emit_error('Conecte sua conta SPACENODE primeiro.', true, true)
+        emit_error(t(:connect_first), true, true)
         return
       end
       if @generating
         # Sem tocar no lock da geração em andamento (generation: false).
-        emit_error('Já existe uma geração em andamento.')
+        emit_error(t(:busy))
         return
       end
 
-      unless session_fresh?
-        @pending_generate = payload
-        emit('status', { :stage => 'auth', :message => 'Renovando sessão…' })
-        show_auth_dialog(true)
-        return
-      end
-
-      run_generation(payload)
+      ensure_fresh_session(true) { run_generation(payload) }
     end
 
     def run_generation(payload)
       if @generating
-        emit_error('Já existe uma geração em andamento.')
+        emit_error(t(:busy))
         return
       end
 
@@ -1059,11 +1214,11 @@ module SpaceNode
     def handle_generate_batch(raw)
       payload = parse_json(raw)
       unless authenticated?
-        emit_error('Conecte sua conta SPACENODE primeiro.', true, true)
+        emit_error(t(:connect_first), true, true)
         return
       end
       if @generating
-        emit_error('Já existe uma geração em andamento.')
+        emit_error(t(:busy))
         return
       end
 
@@ -1076,16 +1231,7 @@ module SpaceNode
         return
       end
 
-      unless session_fresh?
-        @pending_generate = nil
-        # generation:true — o painel acabou de armar a UI de lote e precisa
-        # desarmar (a renovação silenciosa roda em paralelo).
-        emit_error('Sua sessão está renovando — tente de novo em instantes.', false, true)
-        show_auth_dialog(true)
-        return
-      end
-
-      run_batch(payload, entries)
+      ensure_fresh_session(true) { run_batch(payload, entries) }
     end
 
     def run_batch(payload, entries)
@@ -1206,7 +1352,7 @@ module SpaceNode
       epoch = @generation_epoch
       @generation_started_at = Time.now
 
-      emit('status', { :stage => 'capture', :message => 'Capturando a vista…' })
+      emit('status', { :stage => 'capture', :message => t(:capturing) })
       resolution = payload['resolution'].to_s
       fidelity = payload['fidelityLevel'].to_s
       want_edge = fidelity != 'balanced' && fidelity != 'creative' && !payload['useAnchor']
@@ -1223,7 +1369,7 @@ module SpaceNode
       camera = @last_capture_camera
       mime = @last_capture_mime || 'image/png'
 
-      emit('status', { :stage => 'upload', :message => 'Enviando o projeto…' })
+      emit('status', { :stage => 'upload', :message => t(:sending) })
       upload_direct(capture[:path], mime, 'render-source', false, epoch) do |source_key, _url|
         delete_quiet(capture[:path])
         upload_edge_map(capture[:edge_path], epoch) do |edge_key|
@@ -1292,7 +1438,7 @@ module SpaceNode
           end
         end
       end
-      emit('status', { :stage => 'upload', :message => 'Enviando materiais do modelo…' }) unless jobs.empty?
+      emit('status', { :stage => 'upload', :message => t(:sending_materials) }) unless jobs.empty?
       step.call
     end
 
@@ -1468,7 +1614,7 @@ module SpaceNode
         body[:materialRefs] = extras[:material_refs]
       end
 
-      emit('status', { :stage => 'generate', :message => 'Gerando na SPACENODE…' })
+      emit('status', { :stage => 'generate', :message => t(:generating) })
 
       request = json_request(:post, '/api/generate', body, generation_error_handler_for(epoch)) do |data|
         finish_generation(data, extras) if generation_alive?(epoch)
@@ -1601,7 +1747,7 @@ module SpaceNode
       return unless @generating
 
       started_at = @generation_started_at || Time.now
-      emit('status', { :stage => 'reconcile', :message => 'Conexão instável — verificando se o render foi concluído…' })
+      emit('status', { :stage => 'reconcile', :message => t(:reconciling) })
 
       epoch = @generation_epoch
       previous_id = @last_result && (@last_result[:renderId] || @last_result['renderId'])
@@ -1679,7 +1825,7 @@ module SpaceNode
           :vistas => [], :errors => ctx[:vista_errors] || []
         })
       end
-      emit('status', { :stage => 'idle', :message => 'Geração cancelada.' })
+      emit('status', { :stage => 'idle', :message => t(:cancelled) })
     end
 
     # Falha de UMA geração. No lote: saldo/sessão abortam o restante; outros
@@ -1792,10 +1938,10 @@ module SpaceNode
 
       suggested = payload['suggestedName'].to_s
       suggested = "spacenode-render-#{Time.now.strftime('%Y%m%d-%H%M')}.png" if suggested.empty?
-      target = ::UI.savepanel('Salvar render', nil, suggested)
+      target = ::UI.savepanel(t(:save_title), nil, suggested)
       return unless target
 
-      emit('status', { :stage => 'download', :message => 'Baixando o render…' })
+      emit('status', { :stage => 'download', :message => t(:downloading) })
       http_request(:get, url, :auth => false) do |response|
         status = response.status_code.to_i
         body = response.body.to_s
@@ -1835,17 +1981,17 @@ module SpaceNode
       scale = payload['scale'].to_s
       raise 'Nenhum render pra ampliar.' if url.empty?
       raise 'Escala inválida.' unless %w[2x 4x].include?(scale)
-      raise 'Já existe uma geração em andamento.' if @generating
+      raise t(:busy) if @generating
 
       catalog = cached_catalog
       upscale_cfg = catalog && catalog['upscale']
       raise 'Reconecte pra atualizar o catálogo de custos.' unless upscale_cfg
 
-      unless session_fresh?
-        emit_error('Sua sessão está renovando — tente de novo em instantes.', false, true)
-        show_auth_dialog(true)
-        return
-      end
+      ensure_fresh_session(true) { start_upscale_quote(payload, url, scale, upscale_cfg) }
+    end
+
+    def start_upscale_quote(payload, url, scale, upscale_cfg)
+      return emit_error(t(:busy)) if @generating
 
       old_pending = @upscale_pending
       @upscale_pending = nil
@@ -1937,14 +2083,13 @@ module SpaceNode
     def run_upscale
       pending = @upscale_pending
       raise 'Nada pra confirmar.' unless pending
-      raise 'Já existe uma geração em andamento.' if @generating
+      raise t(:busy) if @generating
 
-      unless session_fresh?
-        @upscale_pending = pending
-        emit_error('Sua sessão está renovando — tente de novo em instantes.', false, true)
-        show_auth_dialog(true)
-        return
-      end
+      ensure_fresh_session(true) { execute_upscale(pending) }
+    end
+
+    def execute_upscale(pending)
+      return emit_error(t(:busy)) if @generating
 
       @upscale_pending = nil
       @generating = true
@@ -1963,7 +2108,7 @@ module SpaceNode
           :scale => pending[:scale],
           :objectiveId => 'client'
         }
-        emit('status', { :stage => 'generate', :message => 'Ampliando na SPACENODE…' })
+        emit('status', { :stage => 'generate', :message => t(:upscaling) })
         request = json_request(:post, '/api/upscale', body, direct_error_handler_for(epoch, 'A conexão caiu durante a ampliação. Veja o Histórico antes de tentar de novo — os Nodes podem ter sido usados.')) do |data|
           next unless generation_alive?(epoch)
 
@@ -2024,17 +2169,18 @@ module SpaceNode
 
     def handle_apply_edit(raw)
       payload = parse_json(raw)
-      raise 'Conecte sua conta SPACENODE primeiro.' unless authenticated?
-      raise 'Já existe uma geração em andamento.' if @generating
-
-      unless session_fresh?
-        emit_error('Sua sessão está renovando — tente de novo em instantes.', false, true)
-        show_auth_dialog(true)
-        return
-      end
+      raise t(:connect_first) unless authenticated?
+      raise t(:busy) if @generating
 
       source = payload['sourceUrl'].to_s
       raise 'Nenhum render pra editar.' if source.empty?
+
+      ensure_fresh_session(true) { execute_apply_edit(payload, source) }
+    end
+
+    def execute_apply_edit(payload, source)
+      return emit_error(t(:busy)) if @generating
+
 
       @generating = true
       @generation_epoch = (@generation_epoch || 0) + 1
@@ -2077,7 +2223,7 @@ module SpaceNode
         emit('status', { :stage => 'generate', :message => 'Amostra não enviada — editando pela descrição…' })
       end
 
-      emit('status', { :stage => 'generate', :message => 'Editando na SPACENODE…' })
+      emit('status', { :stage => 'generate', :message => t(:editing) })
       request = json_request(:post, '/api/edit-v3/google', body, direct_error_handler_for(epoch, 'A conexão caiu durante a edição. Veja o Histórico antes de tentar de novo — os Nodes podem ter sido usados.')) do |data|
         next unless generation_alive?(epoch)
 
@@ -2152,14 +2298,14 @@ module SpaceNode
 
     def handle_create_space(raw)
       payload = parse_json(raw)
-      raise 'Conecte sua conta SPACENODE primeiro.' unless authenticated?
-      raise 'Já existe uma geração em andamento.' if @generating
+      raise t(:connect_first) unless authenticated?
+      raise t(:busy) if @generating
 
-      unless session_fresh?
-        emit_error('Sua sessão está renovando — tente de novo em instantes.', false, true)
-        show_auth_dialog(true)
-        return
-      end
+      ensure_fresh_session(true) { execute_create_space(payload) }
+    end
+
+    def execute_create_space(payload)
+      return emit_error(t(:busy)) if @generating
 
       name = payload['name'].to_s.strip
       name = default_space_name if name.empty?
@@ -2416,6 +2562,12 @@ module SpaceNode
 
     def handle_save_settings(raw)
       payload = parse_json(raw)
+
+      requested_locale = payload['locale'].to_s
+      if %w[auto pt en].include?(requested_locale)
+        ::Sketchup.write_default(PREFERENCES_KEY, 'locale', requested_locale)
+      end
+
       next_url = normalize_api_base_url(payload['apiBaseUrl'].to_s)
       current_url = api_base_url
 
@@ -2478,6 +2630,9 @@ module SpaceNode
         :apiBaseUrl => api_base_url,
         :authenticated => authenticated?,
         :sessionFresh => session_fresh?,
+        :devicePaired => device_paired?,
+        :locale => locale,
+        :localeSetting => ::Sketchup.read_default(PREFERENCES_KEY, 'locale', 'auto').to_s,
         :userEmail => ::Sketchup.read_default(PREFERENCES_KEY, 'user_email', '').to_s,
         :version => VERSION,
         :balance => @balance,
