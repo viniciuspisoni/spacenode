@@ -3,6 +3,28 @@
 Extensão oficial da SPACENODE: renderização fotorrealista das vistas do
 SketchUp com o mesmo motor de fidelidade do app web.
 
+## Superpoderes nativos (Fase 2)
+
+O que só um plugin dentro do modelo consegue:
+
+- **Cenas em lote** — selecione as cenas do modelo e gere o caderno inteiro
+  com os mesmos presets e a mesma semente (coerência de material/estilo).
+  Falha de uma cena não derruba o lote; saldo insuficiente aborta o resto.
+- **Captura determinística** — sketchy edges, extensão de linha, névoa,
+  guias e a grade de seção saem da imagem que a IA vê (restauro manual das
+  RenderingOptions — nunca via abort_operation, que não as reverte).
+- **Edge map nativo** — segunda captura em hidden-line da MESMA câmera vira
+  o mapa estrutural do motor de fidelidade (`edgeMapKey` no /api/generate),
+  no lugar do edge map inferido do pixel.
+- **Sol e lente reais no prompt** — posição solar calculada do ShadowInfo
+  (lat/long/hora) + FOV/focal da câmera viram `modelFacts` (bloco MODEL
+  FACTS do ramo Máxima). Presets de sol (Manhã/Meio-dia/Entardecer/Golden
+  hour) aplicados só durante a captura.
+- **Materiais do modelo** — texturas reais exportadas como `materialRefs`
+  (até 4, superfície escolhida no painel).
+- **Voltar à vista** — cada render guarda a câmera; um clique restaura o
+  enquadramento exato no SketchUp.
+
 ## Arquitetura
 
 - `spacenode.rb` — só registra a extensão (requisito do Extension Warehouse).

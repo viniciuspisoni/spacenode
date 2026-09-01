@@ -47,6 +47,27 @@ export interface GenerateOptions {
   briefing?:       BriefingArquitetonico
   hasAnchor?:      boolean
   refinementText?: string
+  modelFacts?:     ModelFacts
+}
+
+// Fatos medidos do modelo 3D (hoje: plugin SketchUp) — verdade de origem
+// sobre câmera e sol, em vez de o modelo de imagem adivinhar pelo pixel.
+// Só entra no ramo maximum (render_only); sanitizado na rota.
+export interface ModelFacts {
+  camera?: {
+    focalLengthMm?: number
+    fovDeg?:        number
+    /** up travado no eixo Z — perspectiva de dois pontos, verticais paralelas */
+    twoPoint?:      boolean
+  }
+  sun?: {
+    azimuthDeg?:     number
+    elevationDeg?:   number
+    localTime?:      string
+    date?:           string
+    city?:           string
+    shadowsVisible?: boolean
+  }
 }
 
 // ── Fidelity Engine ────────────────────────────────────────────────────────────
@@ -785,6 +806,53 @@ function buildRefinementBlock(refinementText?: string, hasAnchor?: boolean, leve
   )
 }
 
+// Fatos medidos do modelo 3D em bloco factual curto. Números clampados na
+// rota; aqui só formatação. Nunca contradiz os locks: reforça consistência
+// com as sombras/perspectiva JÁ VISÍVEIS na referência.
+function buildModelFactsBlock(facts?: ModelFacts, includeSun: boolean = true): string {
+  if (!facts) return ''
+  const parts: string[] = []
+
+  const cam = facts.camera
+  if (cam && (cam.fovDeg || cam.focalLengthMm || cam.twoPoint)) {
+    const lens: string[] = []
+    if (cam.focalLengthMm) lens.push(`${Math.round(cam.focalLengthMm)}mm lens`)
+    if (cam.fovDeg) lens.push(`${Math.round(cam.fovDeg)}° field of view`)
+    let line = `Camera: ${lens.join(', ')}`.replace(/: $/, ': unknown')
+    if (cam.twoPoint) line += '; two-point perspective — vertical lines are perfectly parallel, keep them parallel (no keystone)'
+    parts.push(line + '.')
+  }
+
+  // Quando o usuário pediu uma iluminação diferente da capturada, o bloco de
+  // sol contradiria o override (e vice-versa) — só a câmera entra.
+  const sun = includeSun ? facts.sun : undefined
+  if (sun && typeof sun.elevationDeg === 'number') {
+    if (sun.elevationDeg > 0) {
+      const bits: string[] = [`elevation ${Math.round(sun.elevationDeg)}°`]
+      if (typeof sun.azimuthDeg === 'number') bits.push(`azimuth ${Math.round(sun.azimuthDeg)}° (${compassLabel(sun.azimuthDeg)})`)
+      if (sun.localTime) bits.push(`${sun.localTime} local time`)
+      if (sun.date) bits.push(sun.date)
+      if (sun.city) bits.push(sun.city)
+      let line = `Sun: ${bits.join(', ')}.`
+      line += sun.shadowsVisible
+        ? ' The shadows visible in the reference are cast by this sun — keep light direction and shadow angles consistent with them.'
+        : ' Light the scene consistently with this sun position.'
+      parts.push(line)
+    } else {
+      parts.push('Sun: below the horizon at the model’s set time — do not introduce direct sunlight or hard sun shadows.')
+    }
+  }
+
+  if (parts.length === 0) return ''
+  return `MODEL FACTS (measured from the 3D model — trust these over visual guesses): ${parts.join(' ')} `
+}
+
+function compassLabel(azimuthDeg: number): string {
+  const names = ['north', 'northeast', 'east', 'southeast', 'south', 'southwest', 'west', 'northwest']
+  const idx = Math.round((((azimuthDeg % 360) + 360) % 360) / 45) % 8
+  return names[idx]
+}
+
 // Quando o cliente envia uma âncora (render anterior do MESMO projeto), ela vai
 // PRIMEIRO em image_urls — Gemini/GPT extrai materiais e atmosfera dela. A
 // imagem de input (geometria) vai segundo. Este bloco diz isso ao modelo.
@@ -902,7 +970,7 @@ export function buildFidelityPrompt(
   briefing?:  BriefingArquitetonico,
   renderOnly?: RenderOnlyPromptOpts,
 ): string {
-  const { projectType, segment, environment, lighting, background, sceneElements, materials, hasAnchor, refinementText } = options
+  const { projectType, segment, environment, lighting, background, sceneElements, materials, hasAnchor, refinementText, modelFacts } = options
 
   const anchor     = buildAnchorBlock(hasAnchor)
   const refinement = buildRefinementBlock(refinementText, hasAnchor, level)
@@ -1004,6 +1072,7 @@ export function buildFidelityPrompt(
       anchor +
       head +
       buildSceneContextBlock(projectType, segment, environment) +
+      buildModelFactsBlock(modelFacts, preserveLighting) +
       buildEdgeMapBlock(renderOnly?.edgeMapImageIndex) +
       buildDepthMapBlock(renderOnly?.depthMapImageIndex) +
       refinement +

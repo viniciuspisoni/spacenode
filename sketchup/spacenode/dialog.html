@@ -271,6 +271,27 @@
     .history-more { margin-top: 8px; width: 100%; height: 30px; }
     .history-empty { font-size: 11px; color: var(--text-3); }
 
+    /* ── Cenas em lote / materiais ── */
+    .scenes-count { letter-spacing: 0; text-transform: none; font-weight: 500; }
+    .cta--batch { margin-top: 12px; height: 38px; font-size: 12px; }
+    .batch-note { margin-top: 7px; font-size: 10px; color: var(--text-3); }
+    .batch-progress { margin-top: 10px; display: flex; flex-direction: column; gap: 4px; }
+    .batch-row { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--text-2); }
+    .batch-row .st { width: 6px; height: 6px; border-radius: 50%; background: var(--text-3); flex: 0 0 6px; }
+    .batch-row.is-done .st { background: var(--green); }
+    .batch-row.is-error .st { background: var(--error); }
+    .batch-row.is-active .st { background: var(--warning); }
+    .batch-row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .batch-row .msg { color: var(--text-3); font-size: 10.5px; margin-left: auto; }
+    .material-row { display: grid; grid-template-columns: 1fr 150px; gap: 7px; align-items: center; margin-bottom: 6px; }
+    .material-row .mname { font-size: 11.5px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .material-row select {
+      height: 30px; border-radius: 8px; font-size: 11px;
+      background: var(--input); color: var(--text);
+      border: 0.5px solid var(--border-strong); outline: none; padding: 0 6px;
+    }
+    .material-row select:focus { border-color: var(--border-focus); }
+
     /* ── Configurações ── */
     .settings-field label { display: block; margin-bottom: 6px; font-size: 11px; color: var(--text-3); }
     .settings-field input {
@@ -353,7 +374,23 @@
       <div class="result-actions" id="resultActions">
         <button class="ghost" id="downloadButton">Baixar imagem</button>
         <button class="ghost" id="openResultButton">Abrir no site</button>
+        <button class="ghost" id="restoreCameraButton" style="display:none;grid-column:1 / -1">Voltar à vista deste render</button>
       </div>
+
+      <details id="scenesSection">
+        <summary>Cenas do modelo <span class="scenes-count" id="scenesCount"></span></summary>
+        <div class="details-body">
+          <div class="pills" id="scenesPills"></div>
+          <div class="history-empty" id="scenesEmpty" style="display:none">Crie cenas no SketchUp pra gerar o caderno inteiro de uma vez.</div>
+          <button class="cta cta--batch" id="batchButton" disabled>
+            <span id="batchLabel">Gerar cenas</span>
+            <span class="meta" id="batchMeta"></span>
+          </button>
+          <div class="batch-note" id="batchNote">Todas as cenas com os mesmos presets e a mesma semente — coerência de material e estilo no conjunto.</div>
+          <div class="batch-progress" id="batchProgress"></div>
+          <div class="history-grid" id="batchResults" style="margin-top:8px"></div>
+        </div>
+      </details>
 
       <section class="section">
         <span class="section-label">Tipo de projeto</span>
@@ -381,6 +418,12 @@
       </section>
 
       <section class="section">
+        <span class="section-label">Sol na captura</span>
+        <div class="pills" id="sunPills" role="radiogroup" aria-label="Sol na captura"></div>
+        <div class="hint">Usa o sol real do modelo (data, hora e localização) — as sombras da captura guiam a luz do render.</div>
+      </section>
+
+      <section class="section">
         <span class="section-label">Descrição <span style="letter-spacing:0;text-transform:none;font-weight:500">· opcional</span></span>
         <textarea id="prompt" placeholder="Direções específicas — ex.: piso de madeira clara, paredes off-white, decoração minimalista"></textarea>
         <div class="hint">O que você não pedir aqui é preservado do jeito que está no modelo.</div>
@@ -391,6 +434,11 @@
         <div class="details-body">
           <span class="section-label">Elementos na cena</span>
           <div class="pills" id="elementsPills" aria-label="Elementos na cena"></div>
+          <div id="modelMaterialsBlock" style="display:none;margin-top:14px">
+            <span class="section-label">Materiais do modelo</span>
+            <div class="hint" style="margin:0 0 8px">Use as texturas reais do seu modelo como referência de material (até 4).</div>
+            <div id="materialsList"></div>
+          </div>
         </div>
       </details>
 
@@ -476,8 +524,22 @@
       generateStage: null,
       historyCursor: null,
       userEmail: null,
-      version: ''
+      version: '',
+      sunPreset: 'atual',
+      scenes: [],
+      selectedScenes: [],
+      modelMaterials: [],
+      materialSel: {},
+      batchRunning: false
     };
+
+    var SUN_OPTIONS = [
+      { id: 'atual', label: 'Atual' },
+      { id: 'manha', label: 'Manhã' },
+      { id: 'meiodia', label: 'Meio-dia' },
+      { id: 'tarde', label: 'Entardecer' },
+      { id: 'golden', label: 'Golden hour' }
+    ];
 
     var GENERATING_TEXTS = ['Analisando composição…', 'Ajustando iluminação…', 'Refinando materiais…', 'Aplicando fotorrealismo…', 'Gerando versão final…'];
     var generatingTimer = null;
@@ -492,7 +554,9 @@
      'backgroundLabel','backgroundPills','prompt','elementsPills','fidelityCards','engineCards','resolutionCards',
      'notice','insufficient','insufficientTitle','insufficientMath','insufficientBuy','insufficientAlt',
      'generateButton','generateLabel','generateMeta','reachLine','historySection','historyGrid','historyEmpty','historyMore',
-     'apiBaseUrl','saveSettingsButton','footer','advanced'
+     'apiBaseUrl','saveSettingsButton','footer','advanced',
+     'restoreCameraButton','scenesSection','scenesCount','scenesPills','scenesEmpty','batchButton','batchLabel','batchMeta',
+     'batchNote','batchProgress','batchResults','sunPills','modelMaterialsBlock','materialsList'
     ].forEach(function (id) { els[id] = $(id); });
 
     function callSketchUp(name, arg) {
@@ -657,7 +721,168 @@
         });
       }));
 
+      fill(els.sunPills, SUN_OPTIONS.map(function (s) {
+        return pillButton(s.label, s.id === model.sunPreset, function () {
+          model.sunPreset = s.id; onSelectionChanged();
+        });
+      }));
+
+      renderModelMaterials();
+      renderScenes();
       updateGenerateState();
+    }
+
+    // ── Materiais do modelo ─────────────────────────────────────────────────
+    function currentMaterialFields() {
+      var pt = currentProjectType();
+      return (pt && pt.materialFields) || [];
+    }
+    function materialSelArray() {
+      var out = [];
+      Object.keys(model.materialSel).forEach(function (name) {
+        var field = model.materialSel[name];
+        if (field) out.push({ name: name, field: field });
+      });
+      return out.slice(0, 4);
+    }
+    function renderModelMaterials() {
+      var fields = currentMaterialFields();
+      var show = fields.length > 0 && model.modelMaterials.length > 0;
+      els.modelMaterialsBlock.style.display = show ? '' : 'none';
+      if (!show) return;
+      els.materialsList.innerHTML = '';
+      model.modelMaterials.forEach(function (mat) {
+        var row = document.createElement('div');
+        row.className = 'material-row';
+        var nameEl = document.createElement('span');
+        nameEl.className = 'mname';
+        nameEl.textContent = mat.displayName || mat.name;
+        nameEl.title = mat.displayName || mat.name;
+        var select = document.createElement('select');
+        select.disabled = model.generating;
+        var none = document.createElement('option');
+        none.value = '';
+        none.textContent = '—';
+        select.appendChild(none);
+        fields.forEach(function (f) {
+          var opt = document.createElement('option');
+          opt.value = f.id;
+          opt.textContent = f.label;
+          select.appendChild(opt);
+        });
+        select.value = model.materialSel[mat.name] || '';
+        select.addEventListener('change', function () {
+          var field = select.value;
+          if (field) {
+            // Uma superfície por material: tira o campo de quem o tinha.
+            Object.keys(model.materialSel).forEach(function (other) {
+              if (other !== mat.name && model.materialSel[other] === field) {
+                delete model.materialSel[other];
+              }
+            });
+            if (materialSelArray().length >= 4 && !model.materialSel[mat.name]) {
+              select.value = '';
+              showNotice('Até 4 materiais por geração.', 'error');
+              return;
+            }
+            model.materialSel[mat.name] = field;
+          } else {
+            delete model.materialSel[mat.name];
+          }
+          renderModelMaterials();
+          persistStateSoon();
+        });
+        row.appendChild(nameEl);
+        row.appendChild(select);
+        els.materialsList.appendChild(row);
+      });
+    }
+
+    // ── Cenas em lote ───────────────────────────────────────────────────────
+    function renderScenes() {
+      var scenes = model.scenes || [];
+      els.scenesCount.textContent = scenes.length ? '· ' + scenes.length : '';
+      els.scenesEmpty.style.display = scenes.length ? 'none' : '';
+      els.scenesPills.innerHTML = '';
+      scenes.forEach(function (scene) {
+        var active = model.selectedScenes.indexOf(scene.index) >= 0;
+        var b = pillButton(scene.name || ('Cena ' + (scene.index + 1)), active, function () {
+          var at = model.selectedScenes.indexOf(scene.index);
+          if (at >= 0) model.selectedScenes.splice(at, 1);
+          else model.selectedScenes.push(scene.index);
+          renderScenes();
+          updateGenerateState();
+        });
+        b.setAttribute('role', 'checkbox');
+        b.disabled = model.generating;
+        els.scenesPills.appendChild(b);
+      });
+    }
+    function updateBatchButton() {
+      var n = model.selectedScenes.length;
+      var cost = currentCost();
+      var total = cost != null ? n * cost : null;
+      var balance = model.totalBalance;
+      var insufficient = total != null && balance != null && balance < total;
+      els.batchButton.disabled = model.generating || !model.authenticated || !model.catalog || n === 0 || total == null || insufficient;
+      els.batchLabel.textContent = model.batchRunning
+        ? 'gerando cenas…'
+        : (n > 0 ? 'Gerar ' + n + ' cena' + (n === 1 ? '' : 's') : 'Gerar cenas');
+      els.batchMeta.textContent = model.batchRunning || total == null || n === 0 ? '' : total + ' nodes';
+      els.batchNote.textContent = insufficient
+        ? 'Saldo insuficiente pro lote: custa ' + total + ' · você tem ' + balance + '.'
+        : 'Todas as cenas com os mesmos presets e a mesma semente — coerência de material e estilo no conjunto.';
+    }
+    els.batchButton.addEventListener('click', function () {
+      if (model.generating || model.selectedScenes.length === 0) return;
+      if (!(window.sketchup && typeof window.sketchup.generateBatch === 'function')) {
+        showError('Abra este painel dentro do SketchUp.');
+        return;
+      }
+      showNotice('', 'success');
+      els.batchProgress.innerHTML = '';
+      els.batchResults.innerHTML = '';
+      model.batchRunning = true;
+      startGeneratingUi();
+      var sceneEntries = [];
+      model.selectedScenes.forEach(function (i) {
+        var s = null;
+        model.scenes.forEach(function (sc) { if (sc.index === i) s = sc; });
+        if (s) sceneEntries.push({ index: s.index, name: s.name });
+      });
+      callSketchUp('generateBatch', JSON.stringify({
+        scenes: sceneEntries,
+        prompt: els.prompt.value,
+        projectType: model.projectType,
+        segment: model.segment,
+        environment: model.environment,
+        lighting: model.lighting,
+        background: model.background,
+        sceneElements: model.sceneElements,
+        fidelityLevel: model.fidelityLevel,
+        engine: model.engine,
+        resolution: model.resolution,
+        sunPreset: model.sunPreset,
+        materialSel: materialSelArray()
+      }));
+    });
+    els.scenesSection.addEventListener('toggle', function () {
+      if (els.scenesSection.open) callSketchUpQuiet('listScenes');
+    });
+    els.advanced.addEventListener('toggle', function () {
+      if (els.advanced.open && model.modelMaterials.length === 0) callSketchUpQuiet('listMaterials');
+    });
+    function batchRow(sceneName, status, message) {
+      var row = document.createElement('div');
+      row.className = 'batch-row is-' + status;
+      var dot = document.createElement('span'); dot.className = 'st';
+      var nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = sceneName || 'Cena';
+      row.appendChild(dot); row.appendChild(nm);
+      if (message) {
+        var msg = document.createElement('span'); msg.className = 'msg'; msg.textContent = message;
+        row.appendChild(msg);
+      }
+      return row;
     }
 
     function onSelectionChanged() {
@@ -718,6 +943,8 @@
       els.downloadButton.disabled = model.generating;
       els.openResultButton.disabled = model.generating;
       els.compareButton.disabled = model.generating;
+      els.restoreCameraButton.disabled = model.generating;
+      updateBatchButton();
     }
 
     function cheapestOption() {
@@ -755,6 +982,7 @@
       els.emptyPreview.style.display = 'none';
       els.resultActions.classList.add('is-visible');
       els.compareButton.style.display = model.captureUrl ? '' : 'none';
+      els.restoreCameraButton.style.display = result.camera ? '' : 'none';
       els.preview.classList.remove('is-comparing');
       updateGenerateState();
     }
@@ -860,6 +1088,8 @@
           fidelityLevel: model.fidelityLevel,
           engine: model.engine,
           resolution: model.resolution,
+          sunPreset: model.sunPreset,
+          materialSel: model.materialSel,
           prompt: els.prompt.value
         };
         callSketchUpQuiet('persistState', JSON.stringify(snapshot));
@@ -876,6 +1106,10 @@
       if (saved.fidelityLevel) model.fidelityLevel = saved.fidelityLevel;
       if (saved.engine) model.engine = saved.engine;
       if (saved.resolution) model.resolution = saved.resolution;
+      if (saved.sunPreset) model.sunPreset = saved.sunPreset;
+      if (saved.materialSel && typeof saved.materialSel === 'object' && !Array.isArray(saved.materialSel)) {
+        model.materialSel = saved.materialSel;
+      }
       if (typeof saved.prompt === 'string') els.prompt.value = saved.prompt;
     }
 
@@ -921,6 +1155,8 @@
         fidelityLevel: model.fidelityLevel,
         engine: model.engine,
         resolution: model.resolution,
+        sunPreset: model.sunPreset,
+        materialSel: materialSelArray(),
         useAnchor: !!model.result,
         anchorUrl: model.result ? (model.result.outputUrl || null) : null,
         seed: model.result && model.result.seed != null ? model.result.seed : null
@@ -936,6 +1172,11 @@
     });
     els.openResultButton.addEventListener('click', function () {
       if (model.result && model.result.outputUrl) callSketchUp('openUrl', model.result.outputUrl);
+    });
+    els.restoreCameraButton.addEventListener('click', function () {
+      if (model.result && model.result.camera) {
+        callSketchUp('restoreCamera', JSON.stringify({ camera: model.result.camera }));
+      }
     });
     els.balanceRecharge.addEventListener('click', function () {
       callSketchUp('openUrl', model.apiBaseUrl + '/app/billing');
@@ -1080,6 +1321,93 @@
           renderHistory(Array.isArray(payload.renders) ? payload.renders : [], payload.pageSize);
         }
 
+        if (event === 'scenes') {
+          model.scenes = Array.isArray(payload.scenes) ? payload.scenes : [];
+          // Índices selecionados que sumiram (cena apagada) saem da seleção.
+          var valid = {};
+          model.scenes.forEach(function (s) { valid[s.index] = true; });
+          model.selectedScenes = model.selectedScenes.filter(function (i) { return valid[i]; });
+          renderScenes();
+          updateBatchButton();
+        }
+
+        if (event === 'materials') {
+          model.modelMaterials = Array.isArray(payload.materials) ? payload.materials : [];
+          // Seleções de materiais que não existem mais no modelo caem fora.
+          var names = {};
+          model.modelMaterials.forEach(function (m) { names[m.name] = true; });
+          Object.keys(model.materialSel).forEach(function (n) { if (!names[n]) delete model.materialSel[n]; });
+          renderModelMaterials();
+        }
+
+        if (event === 'batchStart') {
+          model.batchRunning = true;
+          els.batchProgress.innerHTML = '';
+          els.batchResults.innerHTML = '';
+          if (!model.generating) startGeneratingUi();
+          els.overlayText.textContent = 'Cena 1 de ' + payload.total + '…';
+          updateBatchButton();
+        }
+
+        if (event === 'batchProgress') {
+          var label = (payload.sceneName || 'Cena');
+          if (payload.status === 'generating') {
+            var active = els.batchProgress.querySelector('.is-active');
+            if (active) active.classList.remove('is-active');
+            els.batchProgress.appendChild(batchRow(label, 'active'));
+            els.overlayText.textContent = 'Cena ' + (payload.done + 1) + ' de ' + payload.total + ' — ' + label;
+          } else {
+            // Fecha a linha "em andamento" desta cena — nunca uma linha já
+            // finalizada (done/error de eventos anteriores).
+            var actives = els.batchProgress.querySelectorAll('.is-active');
+            var last = actives.length ? actives[actives.length - 1] : null;
+            if (last) last.remove();
+            els.batchProgress.appendChild(batchRow(
+              label,
+              payload.status === 'done' ? 'done' : 'error',
+              payload.status === 'error' ? (payload.message || 'falhou') : null
+            ));
+            if (payload.status === 'done' && payload.result) {
+              if (typeof payload.result.totalBalance === 'number') model.totalBalance = payload.result.totalBalance;
+              var url = payload.result.previewUrl || payload.result.outputUrl;
+              if (url) {
+                var thumb = document.createElement('img');
+                thumb.src = url;
+                thumb.alt = label;
+                thumb.title = label + ' — ver no painel';
+                thumb.addEventListener('error', function () { thumb.remove(); });
+                thumb.addEventListener('click', (function (r) {
+                  return function () { showResult(r); };
+                })(payload.result));
+                els.batchResults.appendChild(thumb);
+              }
+              updateGenerateState();
+            }
+          }
+        }
+
+        if (event === 'batchDone') {
+          model.batchRunning = false;
+          stopGeneratingUi();
+          // Nenhuma linha pode sobrar como "em andamento" num lote encerrado.
+          els.batchProgress.querySelectorAll('.is-active').forEach(function (row) {
+            row.classList.remove('is-active');
+            row.classList.add('is-error');
+          });
+          var ok = Array.isArray(payload.results) ? payload.results.length : 0;
+          var bad = Array.isArray(payload.errors) ? payload.errors.length : 0;
+          if (payload.aborted && payload.abortMessage) {
+            // O erro fatal já chegou pelo evento 'error'.
+          } else if (payload.cancelled) {
+            showNotice(ok + ' cena' + (ok === 1 ? '' : 's') + ' gerada' + (ok === 1 ? '' : 's') + ' antes do cancelamento.', ok > 0 ? 'success' : 'error');
+          } else if (bad > 0) {
+            showNotice(ok + ' de ' + payload.total + ' cenas geradas — ' + bad + ' falhou' + (bad === 1 ? '' : 'aram') + '. Nenhum node foi consumido nas que falharam.', 'error');
+          } else if (ok > 0) {
+            showNotice(ok + ' cena' + (ok === 1 ? '' : 's') + ' gerada' + (ok === 1 ? '' : 's') + '. Clique nas miniaturas pra revisar.', 'success');
+          }
+          updateGenerateState();
+        }
+
         if (event === 'saved') {
           showNotice('Render salvo em ' + payload.path, 'success');
           setFooter('');
@@ -1089,7 +1417,10 @@
           // Só erros que encerram uma geração (generation:true) destravam a
           // UI de "gerando" — um erro paralelo (histórico, sessão) não pode
           // soltar o overlay de uma geração em andamento.
-          if (payload.generation) stopGeneratingUi();
+          if (payload.generation) {
+            model.batchRunning = false;
+            stopGeneratingUi();
+          }
           if (payload.authExpired) {
             model.authenticated = false;
             els.connSub.textContent = 'Conecte sua conta SPACENODE';
