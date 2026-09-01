@@ -26,7 +26,7 @@ module SpaceNode
   module SketchUp
     extend self
 
-    VERSION = '0.5.1'
+    VERSION = '0.5.2'
     PREFERENCES_KEY = 'com.spacenode.sketchup'
     DEFAULT_API_BASE_URL = 'https://spacenode.app'
     MIN_SKETCHUP_MAJOR = 21          # Ruby 2.7+; recomendado 2024+
@@ -2261,36 +2261,70 @@ module SpaceNode
     def execute_apply_edit(payload, source)
       return emit_error(t(:busy)) if @generating
 
-
       @generating = true
       @generation_epoch = (@generation_epoch || 0) + 1
       @generation_started_at = Time.now
       @generation_context = { :mode => :edit }
       epoch = @generation_epoch
 
-      reference_name = payload['referenceMaterial'].to_s
-      if payload['action'] == 'swap_material' && !reference_name.empty?
-        exported = export_material_texture(::Sketchup.active_model, reference_name)
-        if exported
-          emit('status', { :stage => 'upload', :message => 'Enviando a amostra do material…' })
-          upload_direct(exported[:path], exported[:mime], 'retocar-reference', true, epoch, :optional => true) do |_k, url|
-            delete_quiet(exported[:path])
-            request_edit(payload, source, url, epoch)
-          end
-          return
+      # Cadeia: máscara da área selecionada → amostra de material → requisição.
+      upload_edit_mask(payload, epoch) do |mask_url|
+        upload_edit_reference(payload, epoch) do |reference_url|
+          request_edit(payload, source, reference_url, mask_url, epoch)
         end
       end
-      request_edit(payload, source, nil, epoch)
     end
 
-    def request_edit(payload, source, reference_url, epoch)
-      return unless generation_alive?(epoch)
-
-      body = build_edit_body(payload, source, false)
-      unless body
-        fail_generation('Descreva o que deseja alterar.')
+    # Máscara da área que o usuário pintou no preview (PNG branco-no-preto,
+    # já na proporção da fonte). Vai pela área retocar-asset (kind mask).
+    def upload_edit_mask(payload, epoch, &done)
+      data_url = payload['maskDataUrl'].to_s
+      if data_url.empty?
+        done.call(nil)
         return
       end
+
+      b64 = data_url.sub(%r{\Adata:image/png;base64,}, '')
+      tmp = File.join(Dir.tmpdir, "spacenode-mask-#{SecureRandom.hex(4)}.png")
+      File.binwrite(tmp, Base64.decode64(b64))
+      emit('status', { :stage => 'upload', :message => 'Enviando a área selecionada…' })
+      upload_direct(tmp, 'image/png', 'retocar-asset', true, epoch, :optional => true, :params => { :kind => 'mask' }) do |_key, url|
+        delete_quiet(tmp)
+        done.call(url && !url.empty? ? url : nil)
+      end
+    rescue StandardError
+      done.call(nil)
+    end
+
+    def upload_edit_reference(payload, epoch, &done)
+      reference_name = payload['referenceMaterial'].to_s
+      if payload['action'] != 'swap_material' || reference_name.empty?
+        done.call(nil)
+        return
+      end
+
+      exported = export_material_texture(::Sketchup.active_model, reference_name)
+      unless exported
+        done.call(nil)
+        return
+      end
+      emit('status', { :stage => 'upload', :message => 'Enviando a amostra do material…' })
+      upload_direct(exported[:path], exported[:mime], 'retocar-reference', true, epoch, :optional => true) do |_k, url|
+        delete_quiet(exported[:path])
+        done.call(url && !url.empty? ? url : nil)
+      end
+    end
+
+    def request_edit(payload, source, reference_url, mask_url, epoch)
+      return unless generation_alive?(epoch)
+
+      has_mask = mask_url && !mask_url.empty?
+      body = build_edit_body(payload, source, false, has_mask)
+      unless body
+        fail_generation('Descreva o que deseja alterar ou selecione uma área.')
+        return
+      end
+      body[:mask_url] = mask_url if has_mask
       has_reference = reference_url && !reference_url.empty?
       body[:references] = [{ :kind => 'material', :url => reference_url }] if has_reference
       # Amostra escolhida mas perdida no upload + sem instrução = nada pra
@@ -2349,12 +2383,15 @@ module SpaceNode
       end
     end
 
-    def build_edit_body(payload, source, dry_run)
+    def build_edit_body(payload, source, dry_run, has_mask = false)
       action = payload['action'].to_s
       return nil unless %w[remove swap_material refine_area].include?(action)
 
       instruction = payload['instruction'].to_s.strip
-      return nil if instruction.empty? && !dry_run && payload['referenceMaterial'].to_s.empty?
+      # remove/refine COM área selecionada não exigem instrução — a máscara já
+      # diz ONDE, e a ação já diz O QUÊ.
+      mask_action = has_mask && %w[remove refine_area].include?(action)
+      return nil if instruction.empty? && !dry_run && !mask_action && payload['referenceMaterial'].to_s.empty?
 
       body = {
         :action => action,
