@@ -37,18 +37,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Dispositivo desconectado. Conecte novamente.' }, { status: 401 })
   }
 
-  const refreshed = await refreshDeviceSession(device.refresh_token)
+  const usedToken = device.refresh_token
+  const refreshed = await refreshDeviceSession(usedToken)
   if (!refreshed) {
-    // Refresh negado upstream (sessão morta/família revogada) — encerra o device.
+    // Refresh negado upstream (sessão morta/família revogada) — encerra o
+    // device, mas só se a linha ainda tem O TOKEN que tentamos (senão outro
+    // refresh concorrente já rotacionou e a falha é de um token obsoleto).
     await admin.from('sketchup_devices')
       .update({ status: 'revoked', revoked_at: new Date().toISOString(), refresh_token: null })
       .eq('id', device.id)
+      .eq('refresh_token', usedToken)
     return NextResponse.json({ error: 'Sessão expirada. Conecte novamente.' }, { status: 401 })
   }
 
+  // Write-back guardado: só grava o token rotacionado se a linha ainda
+  // contém o token de onde partimos (nunca sobrescreve rotação concorrente).
   await admin.from('sketchup_devices')
     .update({ refresh_token: refreshed.refreshToken, last_seen_at: new Date().toISOString() })
     .eq('id', device.id)
+    .eq('refresh_token', usedToken)
 
   return NextResponse.json({
     accessToken: refreshed.accessToken,

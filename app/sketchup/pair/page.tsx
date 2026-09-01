@@ -5,29 +5,20 @@
 // webview embutido). O usuário confere o código mostrado no SketchUp e
 // autoriza; o plugin recebe a sessão via polling no /pair/claim.
 
-import { Suspense, useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
 import { Brandmark } from '@/components/brand'
 import { createClient } from '@/lib/supabase/client'
 
 type PairState = 'checking' | 'signed-out' | 'ready' | 'approving' | 'done' | 'error'
 
 export default function SketchUpPairPage() {
-  return (
-    <Suspense fallback={null}>
-      <SketchUpPairInner />
-    </Suspense>
-  )
-}
-
-function SketchUpPairInner() {
   const supabase = useMemo(() => createClient(), [])
-  const searchParams = useSearchParams()
-  const codeFromUrl = (searchParams.get('code') ?? '').toUpperCase()
 
   const [state, setState] = useState<PairState>('checking')
-  const [code, setCode] = useState(codeFromUrl)
+  // O código NUNCA vem da URL — o usuário o digita a partir do painel do
+  // SketchUp. Prefill viraria um link de takeover em 1 clique (RFC 8628).
+  const [code, setCode] = useState('')
   const [email, setEmail] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -67,7 +58,7 @@ function SketchUpPairInner() {
     }
   }
 
-  const loginNext = `/sketchup/pair${code ? `?code=${encodeURIComponent(code)}` : ''}`
+  const loginNext = '/sketchup/pair'
   const codeValid = /^[A-Z0-9]{4}-?[A-Z0-9]{4}$/.test(code.replace(/\s/g, ''))
 
   return (
@@ -106,7 +97,7 @@ function SketchUpPairInner() {
               placeholder="XXXX-XXXX"
               maxLength={9}
               spellCheck={false}
-              autoFocus={!codeFromUrl}
+              autoFocus
             />
             {error && <div style={S.error}>{error}</div>}
             <button

@@ -47,7 +47,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Pareamento inválido. Conecte novamente.' }, { status: 409 })
   }
 
-  const refreshed = await refreshDeviceSession(device.refresh_token)
+  // Transição atômica approved→active: só UM claim concorrente vence e faz
+  // o refresh. Sem isso, dois polls sobrepostos consomem o MESMO refresh
+  // token e a reuse-detection do GoTrue revoga a família (mata o device no
+  // primeiro uso). O perdedor recebe pending e reagenda.
+  const { data: claimed } = await admin
+    .from('sketchup_devices')
+    .update({ status: 'active' })
+    .eq('id', device.id)
+    .eq('status', 'approved')
+    .select('refresh_token')
+    .maybeSingle()
+
+  if (!claimed?.refresh_token) {
+    return NextResponse.json({ status: 'pending' })
+  }
+
+  const refreshed = await refreshDeviceSession(claimed.refresh_token)
   if (!refreshed) {
     await admin.from('sketchup_devices')
       .update({ status: 'revoked', revoked_at: new Date().toISOString(), refresh_token: null })

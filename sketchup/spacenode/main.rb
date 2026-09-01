@@ -38,19 +38,19 @@ module SpaceNode
     # UI é traduzido no dialog; mensagens vindas do SERVIDOR seguem em pt-BR.
     RB_STRINGS = {
       'pt' => {
-        :capturing => t(:capturing),
-        :sending => t(:sending),
-        :sending_materials => t(:sending_materials),
-        :generating => t(:generating),
-        :editing => t(:editing),
-        :upscaling => t(:upscaling),
+        :capturing => 'Capturando a vista…',
+        :sending => 'Enviando o projeto…',
+        :sending_materials => 'Enviando materiais do modelo…',
+        :generating => 'Gerando na SPACENODE…',
+        :editing => 'Editando na SPACENODE…',
+        :upscaling => 'Ampliando na SPACENODE…',
         :renewing => 'Renovando sessão…',
-        :cancelled => t(:cancelled),
-        :view_restored => t(:view_restored),
-        :downloading => t(:downloading),
-        :reconciling => t(:reconciling),
-        :connect_first => t(:connect_first),
-        :busy => t(:busy),
+        :cancelled => 'Geração cancelada.',
+        :view_restored => 'Vista do render restaurada.',
+        :downloading => 'Baixando o render…',
+        :reconciling => 'Conexão instável — verificando se o render foi concluído…',
+        :connect_first => 'Conecte sua conta SPACENODE primeiro.',
+        :busy => 'Já existe uma geração em andamento.',
         :session_expired => 'Sua sessão expirou. Conecte novamente.',
         :pairing_waiting => 'Confirme o código no navegador…',
         :pairing_expired => 'O código expirou. Clique em Conectar pra gerar outro.',
@@ -446,11 +446,6 @@ module SpaceNode
       on_error.call(error)
     end
 
-    def handle_auth_failure
-      clear_session
-      send_state
-    end
-
     # ── Sessão (pareamento por código — device flow) ─────────────────────────
     #
     # O plugin guarda APENAS device_id + device_secret (opaco, revogável no
@@ -617,28 +612,50 @@ module SpaceNode
         return
       end
 
+      # Coalescing: a renovação é assíncrona (segundos). Um 2º clique nesse
+      # intervalo NÃO pode disparar um 2º POST /pair/refresh — dois refreshes
+      # concorrentes rotacionam o mesmo token e um 401 de corrida chamaria
+      # clear_session, deslogando por baixo da geração. Enfileira a
+      # continuação; um único refresh serve todas.
+      @refresh_waiters ||= []
+      @refresh_waiters << [continuation, generation_scope]
+      return if @renewing
+
+      @renewing = true
       emit('status', { :stage => 'auth', :message => t(:renewing) })
       body = {
         :deviceId => ::Sketchup.read_default(PREFERENCES_KEY, 'device_id', '').to_s,
         :deviceSecret => ::Sketchup.read_default(PREFERENCES_KEY, 'device_secret', '').to_s
       }
+      finish = proc do |ok, message|
+        @renewing = false
+        waiters = @refresh_waiters || []
+        @refresh_waiters = []
+        waiters.each do |cont, scope|
+          if ok
+            cont.call
+          else
+            emit_error(message[:text], message[:auth], scope)
+          end
+        end
+      end
       on_error = proc do |error|
         status = error.respond_to?(:status) ? error.status.to_i : 0
         if status == 401
           clear_session
           send_state
-          emit_error(t(:session_expired), true, generation_scope)
+          finish.call(false, { :text => t(:session_expired), :auth => true })
         else
-          emit_error(error.message, false, generation_scope)
+          finish.call(false, { :text => error.message, :auth => false })
         end
       end
       json_request(:post, '/api/sketchup/pair/refresh', body, on_error, :auth => false) do |data|
         token = data['accessToken'].to_s
         if token.empty?
-          emit_error(t(:session_expired), true, generation_scope)
+          finish.call(false, { :text => t(:session_expired), :auth => true })
         else
           save_access_token(token, data['expiresAt'].to_i)
-          continuation.call
+          finish.call(true, nil)
         end
       end
     end

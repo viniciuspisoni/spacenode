@@ -58,7 +58,10 @@ export async function POST(req: NextRequest) {
     deviceId: data.id,
     deviceSecret,
     userCode,
-    verificationUrl: `${origin}/sketchup/pair?code=${encodeURIComponent(userCode)}`,
+    // URL SEM o código: o usuário digita o código (mostrado no painel do
+    // SketchUp) manualmente. Carregar o código aqui permitiria um link
+    // pré-preenchido de takeover em 1 clique (RFC 8628 §5.4).
+    verificationUrl: `${origin}/sketchup/pair`,
     expiresIn: PAIR_CODE_TTL_SECONDS,
     pollInterval: PAIR_POLL_INTERVAL_SECONDS,
   })

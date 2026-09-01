@@ -8,7 +8,10 @@
 import { createHash, randomBytes } from 'crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-export const PAIR_CODE_TTL_SECONDS = 600
+// TTL curto: o código é anti-phishing só enquanto a janela é estreita
+// (RFC 8628). O usuário digita o código MANUALMENTE no navegador — ele
+// nunca viaja na URL (senão um link pré-preenchido vira takeover 1-clique).
+export const PAIR_CODE_TTL_SECONDS = 300
 export const PAIR_POLL_INTERVAL_SECONDS = 3
 
 // Alfabeto sem confundíveis (0/O, 1/I/L) — código lido/digitado por humanos.
