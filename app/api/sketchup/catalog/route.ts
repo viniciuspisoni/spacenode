@@ -38,6 +38,26 @@ const FIDELITY_LEVELS = [
   { id: 'creative', label: 'Criativo', note: 'Mais liberdade estética' },
 ] as const
 
+// Superfícies válidas pra materialRefs (mesmo vocabulário do /api/generate),
+// com rótulo de UI — o plugin usa pra mapear materiais do modelo → superfície.
+const MATERIAL_FIELDS: Record<ProjectType, { id: string; label: string }[]> = {
+  interior: [
+    { id: 'piso', label: 'Piso' },
+    { id: 'paredes', label: 'Paredes / Revestimentos' },
+    { id: 'teto', label: 'Teto' },
+    { id: 'marcenaria', label: 'Marcenaria' },
+    { id: 'bancadas', label: 'Bancadas' },
+    { id: 'esquadrias', label: 'Portas e caixilhos' },
+    { id: 'elementos', label: 'Elementos especiais' },
+  ],
+  exterior: [
+    { id: 'fachada', label: 'Revestimento de fachada' },
+    { id: 'piso', label: 'Piso externo / calçada' },
+    { id: 'esquadrias', label: 'Esquadrias / caixilhos' },
+    { id: 'elementos', label: 'Elementos especiais' },
+  ],
+}
+
 function taxonomyFor(projectType: ProjectType) {
   return {
     segments: getSegments(projectType).map(segment => ({
@@ -48,6 +68,7 @@ function taxonomyFor(projectType: ProjectType) {
     })),
     backgrounds: getBackgrounds(projectType),
     backgroundLabel: projectType === 'exterior' ? 'Entorno' : 'Contexto visual',
+    materialFields: MATERIAL_FIELDS[projectType],
   }
 }
 
@@ -56,7 +77,7 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
   return NextResponse.json({
-    version: 1,
+    version: 2,
     engines: ENGINE_ORDER.map(id => {
       const e = ENGINES[id]
       return {

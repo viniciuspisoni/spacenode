@@ -26,7 +26,7 @@ module SpaceNode
   module SketchUp
     extend self
 
-    VERSION = '0.2.0'
+    VERSION = '0.3.0'
     PREFERENCES_KEY = 'com.spacenode.sketchup'
     DEFAULT_API_BASE_URL = 'https://spacenode.app'
     MIN_SKETCHUP_MAJOR = 21          # Ruby 2.7+; recomendado 2024+
@@ -38,6 +38,33 @@ module SpaceNode
     # 4096 px — capturar menos que isso pra 2K/4K joga fora o sinal
     # geométrico que o motor de fidelidade precisa.
     CAPTURE_EDGE = { 'hd' => 2048, '2k' => 3072, '4k' => 4096 }.freeze
+
+    # Higiene de captura: opções que poluem a imagem que a IA vê (sketchy
+    # edges, extensão de linha, névoa, guias, grade de seção). Salvas e
+    # RESTAURADAS MANUALMENTE — RenderingOptions não entram em operações.
+    CLEAN_CAPTURE_OPTIONS = {
+      'DisplaySectionPlanes' => false,
+      'DisplaySketchEdges' => false,
+      'ExtendLines' => false,
+      'DrawDepthQue' => false,
+      'DrawLineEnds' => false,
+      'DisplayFog' => false,
+      'HideConstructionGeometry' => true
+    }.freeze
+
+    # Edge map nativo: hidden-line (RenderMode 1) da MESMA câmera — mapa de
+    # arestas geometricamente exato pro condicionamento estrutural do backend.
+    EDGE_CAPTURE_OPTIONS = {
+      'RenderMode' => 1,
+      'DisplayShadows' => false,
+      'DisplaySketchEdges' => false,
+      'ExtendLines' => false,
+      'DrawLineEnds' => false,
+      'DisplayFog' => false
+    }.freeze
+
+    # Presets de sol (hora local aplicada só durante a captura, com restauro).
+    SUN_PRESETS = %w[atual manha meiodia tarde golden].freeze
 
     class ApiError < StandardError
       attr_reader :status
@@ -132,6 +159,34 @@ module SpaceNode
           emit_error(e.message)
         end
       end
+      dialog.add_action_callback('generateBatch') do |_ctx, raw|
+        begin
+          handle_generate_batch(raw)
+        rescue StandardError => e
+          emit_error(e.message)
+        end
+      end
+      dialog.add_action_callback('listScenes') do |_ctx|
+        begin
+          list_scenes
+        rescue StandardError => e
+          emit_error(e.message)
+        end
+      end
+      dialog.add_action_callback('listMaterials') do |_ctx|
+        begin
+          list_materials
+        rescue StandardError => e
+          emit_error(e.message)
+        end
+      end
+      dialog.add_action_callback('restoreCamera') do |_ctx, raw|
+        begin
+          restore_camera(raw)
+        rescue StandardError => e
+          emit_error(e.message)
+        end
+      end
       dialog.add_action_callback('cancelGenerate') do |_ctx|
         begin
           handle_cancel
@@ -189,6 +244,7 @@ module SpaceNode
     def on_panel_ready
       send_state
       ensure_catalog
+      list_scenes
       check_session if authenticated?
     end
 
@@ -469,9 +525,235 @@ module SpaceNode
     # ── Captura ──────────────────────────────────────────────────────────────
 
     def handle_capture
-      path = capture_viewport('2k')
-      @last_capture_path = path
-      emit('capture', capture_event_payload(path))
+      capture = capture_viewport('2k')
+      @last_capture_path = capture[:path]
+      emit('capture', capture_event_payload(capture[:path]))
+    end
+
+    # ── Sol / câmera / fatos do modelo ──────────────────────────────────────
+
+    # Override temporário do sol (só durante a captura). Devolve o estado
+    # salvo pra restauro manual — ShadowInfo tem o mesmo caveat de undo das
+    # RenderingOptions.
+    def apply_sun_override(model, preset)
+      key = preset.to_s
+      return nil if key.empty? || key == 'atual' || !SUN_PRESETS.include?(key)
+
+      shadow = model.shadow_info
+      saved = {}
+      begin
+        saved['ShadowTime'] = shadow['ShadowTime']
+        saved['DisplayShadows'] = shadow['DisplayShadows']
+        target = sun_time_for(shadow, key)
+        return nil unless target
+
+        shadow['ShadowTime'] = target
+        shadow['DisplayShadows'] = true
+        saved
+      rescue StandardError
+        nil
+      end
+    end
+
+    def restore_sun_override(model, saved)
+      return unless saved
+
+      shadow = model.shadow_info
+      saved.each do |key, value|
+        begin
+          shadow[key] = value unless value.nil?
+        rescue StandardError
+          nil
+        end
+      end
+    rescue StandardError
+      nil
+    end
+
+    # ShadowTime do SketchUp guarda o relógio de parede nos componentes UTC
+    # do Time — lemos e escrevemos SEMPRE por .utc pra ficar consistente.
+    def sun_time_for(shadow, preset)
+      base = shadow['ShadowTime'] || Time.now
+      wall = base.utc
+      case preset
+      when 'manha'   then Time.utc(wall.year, wall.month, wall.day, 9, 0)
+      when 'meiodia' then Time.utc(wall.year, wall.month, wall.day, 12, 30)
+      when 'tarde'   then Time.utc(wall.year, wall.month, wall.day, 15, 30)
+      when 'golden'
+        sunset = shadow['SunSet']
+        if sunset
+          s = sunset.utc
+          Time.utc(wall.year, wall.month, wall.day, s.hour, s.min) - (45 * 60)
+        else
+          Time.utc(wall.year, wall.month, wall.day, 17, 45)
+        end
+      end
+    rescue StandardError
+      nil
+    end
+
+    # Posição solar aproximada (declinação + ângulo horário — NOAA
+    # simplificado; erro < ~2°, suficiente pra direção descritiva no prompt).
+    def solar_position(lat_deg, lon_deg, wall_time, tz_offset)
+      d2r = Math::PI / 180.0
+      day = wall_time.yday
+      declination = -23.44 * Math.cos(d2r * (360.0 / 365.0) * (day + 10))
+      solar_hour = wall_time.hour + (wall_time.min / 60.0) + (lon_deg / 15.0 - tz_offset.to_f)
+      hour_angle = (solar_hour - 12.0) * 15.0
+
+      lat = lat_deg * d2r
+      dec = declination * d2r
+      hra = hour_angle * d2r
+      sin_elevation = (Math.sin(lat) * Math.sin(dec)) + (Math.cos(lat) * Math.cos(dec) * Math.cos(hra))
+      sin_elevation = 1.0 if sin_elevation > 1.0
+      sin_elevation = -1.0 if sin_elevation < -1.0
+      elevation = Math.asin(sin_elevation) / d2r
+      azimuth = Math.atan2(Math.sin(hra), (Math.cos(hra) * Math.sin(lat)) - (Math.tan(dec) * Math.cos(lat))) / d2r
+      [(azimuth + 180.0) % 360.0, elevation]
+    end
+
+    def snapshot_camera(view)
+      camera = view.camera
+      data = {
+        :eye => camera.eye.to_a,
+        :target => camera.target.to_a,
+        :up => camera.up.to_a,
+        :perspective => camera.perspective? ? true : false
+      }
+      data[:fov] = camera.fov if camera.perspective?
+      data
+    rescue StandardError
+      nil
+    end
+
+    def restore_camera(raw)
+      payload = parse_json(raw)
+      data = payload['camera'].is_a?(Hash) ? payload['camera'] : payload
+      eye = vector3(data['eye'])
+      target = vector3(data['target'])
+      up = vector3(data['up'])
+      unless eye && target && up
+        emit_error('Esta geração não guardou a câmera.')
+        return
+      end
+
+      camera = ::Sketchup::Camera.new(
+        ::Geom::Point3d.new(*eye),
+        ::Geom::Point3d.new(*target),
+        ::Geom::Vector3d.new(*up)
+      )
+      fov = data['fov']
+      if data['perspective'] == false
+        camera.perspective = false
+      elsif fov.is_a?(Numeric) && fov > 0
+        camera.fov = fov
+      end
+
+      model = ::Sketchup.active_model
+      raise 'Nenhum modelo aberto no SketchUp.' unless model
+
+      model.active_view.camera = camera
+      emit('status', { :stage => 'idle', :message => 'Vista do render restaurada.' })
+    end
+
+    def vector3(value)
+      return nil unless value.is_a?(Array) && value.length == 3
+      return nil unless value.all? { |v| v.is_a?(Numeric) }
+
+      value.map(&:to_f)
+    end
+
+    # Fatos medidos do modelo pro prompt (câmera + sol) — best-effort: nil
+    # em qualquer falha; o servidor sanitiza de novo.
+    def collect_model_facts(sun_preset)
+      model = ::Sketchup.active_model
+      return nil unless model
+
+      facts = {}
+      begin
+        camera = model.active_view.camera
+        if camera.perspective?
+          cam = { :fovDeg => camera.fov.round(1) }
+          begin
+            cam[:focalLengthMm] = camera.focal_length.round
+          rescue StandardError
+            nil
+          end
+          up = camera.up
+          cam[:twoPoint] = true if up && up.z.abs > 0.999 && camera.direction.z.abs < 0.98
+          facts[:camera] = cam
+        end
+      rescue StandardError
+        nil
+      end
+
+      begin
+        shadow = model.shadow_info
+        st = shadow['ShadowTime']
+        if st
+          wall = st.utc
+          lat = shadow['Latitude'].to_f
+          lon = shadow['Longitude'].to_f
+          tz = shadow['TZOffset'].to_f
+          azimuth, elevation = solar_position(lat, lon, wall, tz)
+          sun = {
+            :azimuthDeg => azimuth.round(1),
+            :elevationDeg => elevation.round(1),
+            :localTime => wall.strftime('%H:%M'),
+            :date => wall.strftime('%d %b')
+          }
+          city = shadow['City'].to_s
+          sun[:city] = city[0, 40] unless city.empty?
+          shadows_on = shadow['DisplayShadows'] ? true : false
+          shadows_on = true if sun_preset.to_s != '' && sun_preset.to_s != 'atual'
+          sun[:shadowsVisible] = true if shadows_on
+          facts[:sun] = sun
+        end
+      rescue StandardError
+        nil
+      end
+
+      facts.empty? ? nil : facts
+    end
+
+    # ── Cenas / materiais do modelo ─────────────────────────────────────────
+
+    def list_scenes
+      model = ::Sketchup.active_model
+      scenes = []
+      selected = nil
+      if model
+        begin
+          pages = model.pages
+          pages.each_with_index do |page, index|
+            scenes << { :index => index, :name => page.name.to_s }
+            selected = index if pages.selected_page && page.equal?(pages.selected_page)
+          end
+        rescue StandardError
+          nil
+        end
+      end
+      emit('scenes', { :scenes => scenes, :selectedIndex => selected })
+    end
+
+    def list_materials
+      model = ::Sketchup.active_model
+      materials = []
+      if model
+        begin
+          model.materials.each do |material|
+            next unless material.texture
+
+            display = material.display_name.to_s
+            display = material.name.to_s if display.empty?
+            materials << { :name => material.name.to_s, :displayName => display }
+            break if materials.length >= 40
+          end
+        rescue StandardError
+          nil
+        end
+      end
+      emit('materials', { :materials => materials })
     end
 
     def capture_event_payload(path)
@@ -485,7 +767,43 @@ module SpaceNode
       }
     end
 
-    def capture_viewport(resolution)
+    # Aplica overrides de RenderingOptions devolvendo APENAS o que mudou (pra
+    # restauração exata). Chave inexistente na versão (nil) é pulada.
+    def apply_rendering_options(rendering, overrides)
+      saved = {}
+      overrides.each do |key, value|
+        begin
+          current = rendering[key]
+          next if current.nil?
+          next if current == value
+
+          saved[key] = current
+          rendering[key] = value
+        rescue StandardError
+          nil
+        end
+      end
+      saved
+    end
+
+    def restore_rendering_options(rendering, saved)
+      return unless saved
+
+      saved.each do |key, value|
+        begin
+          rendering[key] = value
+        rescue StandardError
+          nil
+        end
+      end
+    end
+
+    # Captura determinística. opts:
+    #   :sun_preset — 'atual'|'manha'|'meiodia'|'tarde'|'golden' (sol aplicado
+    #                 só durante a captura, com restauro manual do ShadowInfo)
+    #   :edge_map   — true captura também o hidden-line da MESMA câmera
+    # Retorna { :path, :edge_path } e preenche @last_capture_size/mime/camera.
+    def capture_viewport(resolution, opts = {})
       model = ::Sketchup.active_model
       raise 'Nenhum modelo aberto no SketchUp.' unless model
 
@@ -500,25 +818,18 @@ module SpaceNode
       width = [(vpw * scale).round, 1].max
       height = [(vph * scale).round, 1].max
 
-      path = File.join(Dir.tmpdir, "spacenode-viewport-#{Time.now.strftime('%Y%m%d-%H%M%S')}-#{SecureRandom.hex(3)}.png")
+      stamp = "#{Time.now.strftime('%Y%m%d-%H%M%S')}-#{SecureRandom.hex(3)}"
+      path = File.join(Dir.tmpdir, "spacenode-viewport-#{stamp}.png")
+      edge_path = nil
 
-      # Higiene: a grade laranja de um plano de seção ativo entraria na imagem
-      # e viraria artefato no render. Esconde só durante a captura e RESTAURA
-      # MANUALMENTE — mudanças em RenderingOptions não são registradas em
-      # operações (abort_operation não as reverte; só viraram undoáveis no
-      # SketchUp 2026, e apenas no nível de Page). Sem operação: a mudança
-      # não cria passo de undo de qualquer forma.
       rendering = model.rendering_options
-      hide_planes = false
-      begin
-        hide_planes = rendering['DisplaySectionPlanes'] ? true : false
-      rescue StandardError
-        hide_planes = false
-      end
+      sun_saved = apply_sun_override(model, opts[:sun_preset])
+      # Higiene salva/restaurada MANUALMENTE — RenderingOptions não são
+      # registradas em operações (abort_operation não as reverte; só viraram
+      # undoáveis no SketchUp 2026, e apenas no nível de Page).
+      clean_saved = apply_rendering_options(rendering, CLEAN_CAPTURE_OPTIONS)
 
       begin
-        rendering['DisplaySectionPlanes'] = false if hide_planes
-
         options = {
           :filename => path,
           :width => width,
@@ -565,19 +876,38 @@ module SpaceNode
           :compression => 0.85
         )
         @last_preview_path = File.exist?(preview) ? preview : nil
-      ensure
-        if hide_planes
+
+        # Edge map nativo: hidden-line da MESMA câmera, MESMO tamanho (o
+        # condicionamento estrutural exige alinhamento pixel a pixel).
+        # Falha aqui nunca derruba a captura — segue sem edge map.
+        if opts[:edge_map]
+          edge_saved = apply_rendering_options(rendering, EDGE_CAPTURE_OPTIONS)
           begin
-            rendering['DisplaySectionPlanes'] = true
+            candidate = File.join(Dir.tmpdir, "spacenode-edge-#{stamp}.png")
+            edge_options = {
+              :filename => candidate,
+              :width => width,
+              :height => height,
+              :antialias => true
+            }
+            edge_options[:scale_factor] = scale if scale > 1.0
+            view.write_image(edge_options)
+            edge_path = candidate if File.exist?(candidate) && File.size(candidate) <= 14_000_000
           rescue StandardError
-            nil
+            edge_path = nil
+          ensure
+            restore_rendering_options(rendering, edge_saved)
           end
         end
+      ensure
+        restore_rendering_options(rendering, clean_saved)
+        restore_sun_override(model, sun_saved)
       end
 
       @last_capture_size = [width, height]
       @last_capture_mime = path.end_with?('.jpg') ? 'image/jpeg' : 'image/png'
-      path
+      @last_capture_camera = snapshot_camera(view)
+      { :path => path, :edge_path => edge_path }
     end
 
     def thumbnail_data_url(path)
@@ -635,15 +965,123 @@ module SpaceNode
       # Época invalida callbacks de gerações antigas/canceladas: cada
       # continuação assíncrona confere a época antes de seguir.
       @generation_epoch = (@generation_epoch || 0) + 1
-      @generation_started_at = Time.now
+      @generation_context = { :mode => :single }
+      execute_generation(payload)
+    rescue StandardError => e
+      fail_generation(e.message)
+    end
 
-      emit('status', { :stage => 'capture', :message => 'Capturando a vista…' })
-      resolution = payload['resolution'].to_s
-      path = capture_viewport(resolution)
-      @last_capture_path = path
-      emit('capture', capture_event_payload(path))
+    # ── Cenas em lote ────────────────────────────────────────────────────────
 
-      upload_capture(path, payload)
+    def handle_generate_batch(raw)
+      payload = parse_json(raw)
+      unless authenticated?
+        emit_error('Conecte sua conta SPACENODE primeiro.', true, true)
+        return
+      end
+      if @generating
+        emit_error('Já existe uma geração em andamento.')
+        return
+      end
+
+      indexes = Array(payload['sceneIndexes']).map { |i| i.to_i }.uniq
+      if indexes.empty?
+        emit_error('Selecione ao menos uma cena.')
+        return
+      end
+
+      unless session_fresh?
+        @pending_generate = nil
+        emit_error('Sua sessão está renovando — tente de novo em instantes.', false)
+        show_auth_dialog(true)
+        return
+      end
+
+      run_batch(payload, indexes)
+    end
+
+    def run_batch(payload, indexes)
+      model = ::Sketchup.active_model
+      raise 'Nenhum modelo aberto no SketchUp.' unless model
+
+      pages = model.pages
+      original = nil
+      begin
+        pages.each_with_index do |page, index|
+          original = index if pages.selected_page && page.equal?(pages.selected_page)
+        end
+      rescue StandardError
+        original = nil
+      end
+
+      @generating = true
+      @generation_epoch = (@generation_epoch || 0) + 1
+      @generation_context = {
+        :mode => :batch,
+        :queue => indexes.dup,
+        :total => indexes.length,
+        :done => 0,
+        :results => [],
+        :errors => [],
+        :payload => payload,
+        :shared_seed => nil,
+        :original_scene => original
+      }
+      emit('batchStart', { :total => indexes.length })
+      process_next_scene
+    end
+
+    def process_next_scene
+      ctx = @generation_context
+      return unless ctx && ctx[:mode] == :batch
+
+      if ctx[:queue].empty?
+        finalize_batch
+        return
+      end
+
+      model = ::Sketchup.active_model
+      unless model
+        finalize_batch('O modelo foi fechado no meio do lote.')
+        return
+      end
+
+      index = ctx[:queue].shift
+      pages = model.pages
+      page = nil
+      begin
+        page = pages[index]
+      rescue StandardError
+        page = nil
+      end
+      unless page
+        ctx[:errors] << { :scene => "Cena #{index + 1}", :message => 'Cena não encontrada.' }
+        process_next_scene
+        return
+      end
+
+      ctx[:current_scene] = page.name.to_s
+      emit('batchProgress', {
+        :done => ctx[:done], :total => ctx[:total],
+        :sceneName => ctx[:current_scene], :status => 'generating'
+      })
+
+      # Ativa a cena SEM animação (a transição capturaria o meio do caminho).
+      begin
+        old_transition = page.transition_time
+        page.transition_time = 0
+        pages.selected_page = page
+        page.transition_time = old_transition
+      rescue StandardError
+        nil
+      end
+
+      payload = ctx[:payload].dup
+      payload['seed'] = ctx[:shared_seed] if ctx[:shared_seed]
+      # Âncora não se aplica a lote: cada cena é geometria própria; a
+      # coerência do conjunto vem do seed compartilhado + mesmos presets.
+      payload['useAnchor'] = false
+      execute_generation(payload, :scene_name => ctx[:current_scene])
     rescue StandardError => e
       fail_generation(e.message)
     end
@@ -653,57 +1091,190 @@ module SpaceNode
       @generating && epoch == @generation_epoch
     end
 
-    def upload_capture(path, payload)
+    # Pipeline de uma geração (single ou uma cena do lote):
+    # captura (+sol +edge) → upload da vista → upload do edge → upload dos
+    # materiais → POST /api/generate.
+    def execute_generation(payload, opts = {})
       epoch = @generation_epoch
-      size = File.size(path)
-      mime = @last_capture_mime || 'image/png'
-      emit('status', { :stage => 'upload', :message => 'Enviando o projeto…' })
+      @generation_started_at = Time.now
 
-      sign_body = {
-        :area => 'render-source',
-        :contentType => mime,
-        :sizeBytes => size
-      }
-      json_request(:post, '/api/uploads/sign', sign_body, generation_error_handler_for(epoch)) do |sign|
+      emit('status', { :stage => 'capture', :message => 'Capturando a vista…' })
+      resolution = payload['resolution'].to_s
+      fidelity = payload['fidelityLevel'].to_s
+      want_edge = fidelity != 'balanced' && fidelity != 'creative' && !payload['useAnchor']
+
+      capture = capture_viewport(
+        resolution,
+        :sun_preset => payload['sunPreset'],
+        :edge_map => want_edge
+      )
+      @last_capture_path = capture[:path]
+      emit('capture', capture_event_payload(capture[:path]))
+
+      facts = collect_model_facts(payload['sunPreset'])
+      camera = @last_capture_camera
+      mime = @last_capture_mime || 'image/png'
+
+      emit('status', { :stage => 'upload', :message => 'Enviando o projeto…' })
+      upload_direct(capture[:path], mime, 'render-source', false, epoch) do |source_key, _url|
+        delete_quiet(capture[:path])
+        upload_edge_map(capture[:edge_path], epoch) do |edge_key|
+          upload_materials(payload, epoch) do |material_refs|
+            request_generation(source_key, payload,
+                               :edge_key => edge_key,
+                               :facts => facts,
+                               :camera => camera,
+                               :material_refs => material_refs,
+                               :scene_name => opts[:scene_name])
+          end
+        end
+      end
+    rescue StandardError => e
+      fail_generation(e.message)
+    end
+
+    def upload_edge_map(edge_path, epoch, &done)
+      if edge_path.nil? || !File.exist?(edge_path)
+        done.call(nil)
+        return
+      end
+
+      upload_direct(edge_path, 'image/png', 'render-source', false, epoch, :optional => true) do |key, _url|
+        delete_quiet(edge_path)
+        done.call(key)
+      end
+    end
+
+    # Materiais do modelo selecionados no painel → texturas exportadas e
+    # subidas como materialRefs (área render-material, com confirm pra URL).
+    # Cada falha individual é pulada — materiais nunca derrubam a geração.
+    def upload_materials(payload, epoch, &done)
+      selection = payload['materialSel'].is_a?(Array) ? payload['materialSel'].first(4) : []
+      if selection.empty?
+        done.call([])
+        return
+      end
+
+      model = ::Sketchup.active_model
+      jobs = []
+      selection.each do |item|
+        next unless item.is_a?(Hash)
+
+        name = item['name'].to_s
+        field = item['field'].to_s
+        next if name.empty? || field.empty?
+
+        material = nil
+        begin
+          material = model && model.materials[name]
+        rescue StandardError
+          material = nil
+        end
+        next unless material && material.texture
+
+        tmp = File.join(Dir.tmpdir, "spacenode-mat-#{SecureRandom.hex(4)}.png")
+        written = false
+        begin
+          written = material.texture.write(tmp)
+        rescue StandardError
+          written = false
+        end
+        next unless written && File.exist?(tmp)
+        if File.size(tmp) > 7_800_000
+          delete_quiet(tmp)
+          next
+        end
+
+        jobs << { :path => tmp, :field => field }
+      end
+
+      results = []
+      step = nil
+      step = proc do
+        if jobs.empty?
+          done.call(results)
+        else
+          job = jobs.shift
+          upload_direct(job[:path], 'image/png', 'render-material', true, epoch, :optional => true) do |_key, url|
+            delete_quiet(job[:path])
+            results << { :field => job[:field], :url => url } if url && !url.empty?
+            step.call
+          end
+        end
+      end
+      emit('status', { :stage => 'upload', :message => 'Enviando materiais do modelo…' }) unless jobs.empty?
+      step.call
+    end
+
+    # Upload direto genérico: sign → PUT (→ confirm quando o consumidor
+    # precisa da URL pública). :optional => true não derruba a geração em
+    # falha — devolve nil e o chamador segue sem o arquivo.
+    def upload_direct(path, mime, area, want_url, epoch, opts = {}, &done)
+      optional = opts[:optional] ? true : false
+      on_fail = proc do |error|
+        if generation_alive?(epoch)
+          if optional
+            done.call(nil, nil)
+          else
+            generation_error_handler_for(epoch).call(error)
+          end
+        end
+      end
+
+      size = File.size(path)
+      sign_body = { :area => area, :contentType => mime, :sizeBytes => size }
+      json_request(:post, '/api/uploads/sign', sign_body, on_fail) do |sign|
         next unless generation_alive?(epoch)
 
         upload_url = sign['uploadUrl'].to_s
         key = sign['key'].to_s
         if upload_url.empty? || key.empty?
-          fail_generation('Não foi possível preparar o envio da imagem.')
-        else
-          put_capture(path, mime, upload_url, key, payload)
+          on_fail.call(ApiError.new('Não foi possível preparar o envio da imagem.'))
+          next
         end
-      end
-    end
 
-    def put_capture(path, mime, upload_url, key, payload)
-      epoch = @generation_epoch
-      binary = File.binread(path)
-      http_request(:put, upload_url, :body => binary, :content_type => mime, :auth => false) do |response|
-        next unless generation_alive?(epoch)
+        binary = File.binread(path)
+        http_request(:put, upload_url, :body => binary, :content_type => mime, :auth => false) do |response|
+          next unless generation_alive?(epoch)
 
-        status = response.status_code.to_i
-        if status >= 200 && status < 300
-          begin
-            File.delete(path) if File.exist?(path)
-          rescue StandardError
-            nil
+          status = response.status_code.to_i
+          unless status >= 200 && status < 300
+            on_fail.call(ApiError.new('Falha no envio da imagem. Verifique sua internet e tente de novo.', status))
+            next
           end
-          request_generation(key, payload)
-        else
-          fail_generation('Falha no envio da imagem. Verifique sua internet e tente de novo.')
+
+          if want_url
+            json_request(:post, '/api/uploads/confirm', { :area => area, :key => key }, on_fail) do |confirm|
+              next unless generation_alive?(epoch)
+
+              done.call(key, confirm['url'].to_s)
+            end
+          else
+            done.call(key, nil)
+          end
         end
       end
     end
 
-    def request_generation(source_key, payload)
+    def delete_quiet(path)
+      File.delete(path) if path && File.exist?(path)
+    rescue StandardError
+      nil
+    end
+
+    def request_generation(source_key, payload, extras = {})
       epoch = @generation_epoch
       body = build_generate_payload(source_key, payload)
+      body[:edgeMapKey] = extras[:edge_key] if extras[:edge_key]
+      body[:modelFacts] = extras[:facts] if extras[:facts]
+      if extras[:material_refs].is_a?(Array) && !extras[:material_refs].empty?
+        body[:materialRefs] = extras[:material_refs]
+      end
+
       emit('status', { :stage => 'generate', :message => 'Gerando na SPACENODE…' })
 
       request = json_request(:post, '/api/generate', body, generation_error_handler_for(epoch)) do |data|
-        finish_generation(data) if generation_alive?(epoch)
+        finish_generation(data, extras) if generation_alive?(epoch)
       end
       @generate_request = request
 
@@ -763,17 +1334,14 @@ module SpaceNode
             # Queda de rede DEPOIS do POST: o servidor pode ter cobrado e gerado.
             reconcile_lost_generation
           else
-            fail_generation(error.message, status == 401)
+            fail_generation(error.message, status == 401, status)
           end
         end
       end
     end
 
-    def finish_generation(data)
+    def finish_generation(data, extras = {})
       return unless @generating
-
-      @generating = false
-      @generate_request = nil
 
       result = {
         :outputUrl => data['outputUrl'],
@@ -786,10 +1354,30 @@ module SpaceNode
         :fidelityWarning => data['fidelityWarning'] || data['semanticWarning'],
         :seed => data['seed']
       }
+      result[:camera] = extras[:camera] if extras[:camera]
+      result[:sceneName] = extras[:scene_name] if extras[:scene_name]
+
       @last_result = result
       @balance = { 'totalBalance' => data['totalBalance'] } if data['totalBalance']
-      persist_last_result(result)
-      emit('result', result)
+      @generate_request = nil
+
+      ctx = @generation_context
+      if ctx && ctx[:mode] == :batch
+        ctx[:shared_seed] ||= result[:seed]
+        ctx[:done] += 1
+        ctx[:results] << result
+        emit('batchProgress', {
+          :done => ctx[:done], :total => ctx[:total],
+          :sceneName => ctx[:current_scene], :status => 'done',
+          :result => result
+        })
+        process_next_scene
+      else
+        @generating = false
+        @generation_context = nil
+        persist_last_result(result)
+        emit('result', result)
+      end
     end
 
     # A conexão caiu com uma geração possivelmente concluída no servidor.
@@ -841,8 +1429,10 @@ module SpaceNode
 
     def handle_cancel
       request = @generate_request
+      ctx = @generation_context
       @generate_request = nil
       @generating = false
+      @generation_context = nil
       @pending_generate = nil
       # Invalida TODA continuação em voo (sign/PUT/generate) — sem isso, o
       # callback do sign ainda dispararia o POST /api/generate e cobraria
@@ -855,13 +1445,75 @@ module SpaceNode
           nil
         end
       end
+      restore_original_scene(ctx)
+      if ctx && ctx[:mode] == :batch
+        emit('batchDone', {
+          :results => ctx[:results], :errors => ctx[:errors],
+          :total => ctx[:total], :cancelled => true
+        })
+      end
       emit('status', { :stage => 'idle', :message => 'Geração cancelada.' })
     end
 
-    def fail_generation(message, auth_expired = false)
-      @generating = false
+    # Falha de UMA geração. No lote: saldo/sessão abortam o restante; outros
+    # erros registram a cena e seguem pra próxima.
+    def fail_generation(message, auth_expired = false, status = nil)
+      ctx = @generation_context
       @generate_request = nil
-      emit_error(message, auth_expired, true)
+
+      if ctx && ctx[:mode] == :batch
+        if auth_expired || status == 402
+          finalize_batch(message, auth_expired)
+        else
+          ctx[:errors] << { :scene => ctx[:current_scene].to_s, :message => message.to_s }
+          emit('batchProgress', {
+            :done => ctx[:done], :total => ctx[:total],
+            :sceneName => ctx[:current_scene], :status => 'error',
+            :message => message.to_s
+          })
+          process_next_scene
+        end
+      else
+        @generating = false
+        @generation_context = nil
+        emit_error(message, auth_expired, true)
+      end
+    end
+
+    def finalize_batch(abort_message = nil, auth_expired = false)
+      ctx = @generation_context
+      @generating = false
+      @generation_context = nil
+      @generate_request = nil
+      return unless ctx
+
+      restore_original_scene(ctx)
+      persist_last_result(@last_result) if @last_result
+      emit('batchDone', {
+        :results => ctx[:results],
+        :errors => ctx[:errors],
+        :total => ctx[:total],
+        :aborted => abort_message ? true : false,
+        :abortMessage => abort_message
+      })
+      emit_error(abort_message, auth_expired, true) if abort_message
+    end
+
+    def restore_original_scene(ctx)
+      return unless ctx && ctx[:original_scene]
+
+      model = ::Sketchup.active_model
+      return unless model
+
+      page = model.pages[ctx[:original_scene]]
+      if page
+        old_transition = page.transition_time
+        page.transition_time = 0
+        model.pages.selected_page = page
+        page.transition_time = old_transition
+      end
+    rescue StandardError
+      nil
     end
 
     # Última geração viaja com o arquivo .skp (operação transparente — não

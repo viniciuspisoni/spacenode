@@ -12,6 +12,7 @@ import {
   type BriefingArquitetonico,
   type FidelityLevel,
   type MaterialSampleRef,
+  type ModelFacts,
 } from '@/lib/prompts'
 import {
   ENGINES,
@@ -122,6 +123,51 @@ function isBriefing(value: unknown): value is BriefingArquitetonico {
     Array.isArray(b.elementos_preservar)
 }
 
+// modelFacts vem de cliente (plugin SketchUp): números clampados, strings
+// truncadas, chaves whitelistadas — nada além disso chega ao prompt.
+function sanitizeModelFacts(raw: unknown): ModelFacts | undefined {
+  if (!raw || typeof raw !== 'object') return undefined
+  const src = raw as Record<string, unknown>
+  const num = (v: unknown, min: number, max: number): number | undefined => {
+    const n = typeof v === 'number' ? v : NaN
+    return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : undefined
+  }
+  const str = (v: unknown, maxLen: number): string | undefined => {
+    if (typeof v !== 'string') return undefined
+    const trimmed = v.trim().replace(/[\r\n]+/g, ' ').slice(0, maxLen)
+    return trimmed || undefined
+  }
+
+  const out: ModelFacts = {}
+  const cam = src.camera as Record<string, unknown> | undefined
+  if (cam && typeof cam === 'object') {
+    const camera: NonNullable<ModelFacts['camera']> = {}
+    const focal = num(cam.focalLengthMm, 8, 400)
+    const fov = num(cam.fovDeg, 5, 140)
+    if (focal) camera.focalLengthMm = focal
+    if (fov) camera.fovDeg = fov
+    if (cam.twoPoint === true) camera.twoPoint = true
+    if (Object.keys(camera).length > 0) out.camera = camera
+  }
+  const sun = src.sun as Record<string, unknown> | undefined
+  if (sun && typeof sun === 'object') {
+    const s: NonNullable<ModelFacts['sun']> = {}
+    const el = num(sun.elevationDeg, -90, 90)
+    const az = num(sun.azimuthDeg, 0, 360)
+    if (el !== undefined) s.elevationDeg = el
+    if (az !== undefined) s.azimuthDeg = az
+    const time = str(sun.localTime, 8)
+    const date = str(sun.date, 16)
+    const city = str(sun.city, 40)
+    if (time && /^\d{1,2}:\d{2}$/.test(time)) s.localTime = time
+    if (date) s.date = date
+    if (city) s.city = city
+    if (sun.shadowsVisible === true) s.shadowsVisible = true
+    if (s.elevationDeg !== undefined) out.sun = s
+  }
+  return out.camera || out.sun ? out : undefined
+}
+
 function truncateErr(err: unknown): string {
   const msg = (err as Error)?.message ?? String(err)
   return msg.length > 200 ? msg.slice(0, 200) + '…' : msg
@@ -167,6 +213,8 @@ export async function POST(req: NextRequest) {
       refinementText,
       structuralBoost,
       seed: providedSeed,
+      edgeMapKey,
+      modelFacts: rawModelFacts,
     } = body as {
       imageBase64?:    string
       sourceKey?:      string
@@ -193,6 +241,11 @@ export async function POST(req: NextRequest) {
       structuralBoost?: boolean
       /** Seed a reutilizar (reprodutibilidade — vem do render anterior). */
       seed?:            number
+      /** Edge map NATIVO (hidden-line do plugin SketchUp) via upload direto
+       *  na área render-source — substitui o edge map derivado do pixel. */
+      edgeMapKey?:      string
+      /** Fatos medidos do modelo 3D (câmera/sol) — sanitizados abaixo. */
+      modelFacts?:      unknown
     }
 
     // ── Validações que ficam ANTES do débito ──────────────────────────────────
@@ -304,6 +357,7 @@ export async function POST(req: NextRequest) {
       briefing,
       hasAnchor,
       refinementText,
+      modelFacts:    sanitizeModelFacts(rawModelFacts),
     }
 
     // ── Modo estrutural render_only (gate de fidelidade) ─────────────────────
@@ -496,6 +550,30 @@ export async function POST(req: NextRequest) {
     let best: { gen: GenerateImageResult; prompt: string; score: number | null } | null = null
     const attemptLogs: FidelityAttemptLog[] = []
 
+    // Edge map NATIVO (plugin SketchUp): captura hidden-line da MESMA câmera,
+    // subida por upload direto — verdade geométrica de origem, superior ao
+    // edge map derivado do pixel. Falha aqui NUNCA derruba a geração: cai
+    // pro derivado de sempre.
+    let edgeMapNative = false
+    if (renderOnlyActive && typeof edgeMapKey === 'string' && edgeMapKey) {
+      try {
+        const edge = await downloadDirectUpload(
+          admin, DIRECT_UPLOAD_AREAS['render-source'], user.id, {}, edgeMapKey,
+        )
+        if (edge.ok) {
+          edgeMapUrl = await fal.storage.upload(
+            new File([new Uint8Array(edge.buffer)], 'edge-map.png', { type: edge.mime || 'image/png' }),
+          )
+          edgeMapNative = true
+          devLog('[generate:fidelity] edge map nativo em uso:', edgeMapKey)
+        } else {
+          console.warn('[generate:fidelity] edge map nativo rejeitado (segue derivado):', edge.message)
+        }
+      } catch (edgeErr) {
+        console.warn('[generate:fidelity] edge map nativo indisponível (segue derivado):', (edgeErr as Error).message)
+      }
+    }
+
     // Gate opcional de cor (score v2): só quando o usuário NÃO pediu mudança
     // que legitimamente altera cores — luz nova, override de material ou
     // refinamento. Nesses casos o ΔE alto é pedido, não drift.
@@ -511,8 +589,9 @@ export async function POST(req: NextRequest) {
       const params = getFidelityAttemptParams(ladderAttempt, {
         // Edge map desde a 1ª tentativa pra CGI sem âncora (Fase 3; A/B via
         // telemetria edge_map_used). Com âncora mantém o comportamento
-        // clássico — a âncora já ancora a estrutura.
-        edgeFromFirstAttempt: fidelityCfg.edgeFirst && !hasAnchor,
+        // clássico — a âncora já ancora a estrutura. Um edge map NATIVO
+        // presente também força edge-first: é estritamente melhor.
+        edgeFromFirstAttempt: (fidelityCfg.edgeFirst || edgeMapNative) && !hasAnchor,
       })
 
       // Condicionamento estrutural nos retries: lineart do original anexado
@@ -763,6 +842,9 @@ export async function POST(req: NextRequest) {
       // Briefing resolvido (body/cache/visão) — persistido aqui vira o cache
       // das próximas gerações com o mesmo input_url.
       briefing:      resolvedBriefing ?? null,
+      // Fase 2 do plugin SketchUp: telemetria do condicionamento nativo.
+      edge_map_native: edgeMapNative || undefined,
+      model_facts:     options.modelFacts ?? undefined,
     }
 
     const baseRow = {
