@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { safeNextPath } from '@/lib/auth/safe-next-path'
 
 export default async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
@@ -40,7 +41,13 @@ export default async function proxy(request: NextRequest) {
 
   if (user && pathname === '/login') {
     const url = request.nextUrl.clone()
-    url.pathname = '/app'
+    // Honra ?next= (ex.: /login?next=/sketchup/connect?nonce=X vindo do
+    // plugin) — antes o redirect descartava o destino e jogava em /app.
+    // Path e query separados: o setter de pathname percent-encodaria o '?'.
+    const target = safeNextPath(url.searchParams.get('next'))
+    const qIndex = target.indexOf('?')
+    url.pathname = qIndex >= 0 ? target.slice(0, qIndex) : target
+    url.search = qIndex >= 0 ? target.slice(qIndex) : ''
     return NextResponse.redirect(url)
   }
 

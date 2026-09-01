@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { fal } from '@fal-ai/client'
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getRequestUser } from '@/lib/auth/request-user'
 import { getPayerId } from '@/lib/workspaces/context'
 import { refundNodes } from '@/lib/billing/refund-nodes'
 import {
@@ -132,8 +132,7 @@ function truncateErr(err: unknown): string {
 export async function POST(req: NextRequest) {
   // Base do orçamento de tempo do retry ladder (a Vercel mata no maxDuration).
   const routeStartedAt = Date.now()
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { user } = await getRequestUser(req)
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
   const admin = createAdminClient()

@@ -9,14 +9,15 @@
 // Resposta:  { bucket, key, token }
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getRequestAuthContext } from '@/lib/auth/request-user'
 import { getDirectUploadArea, buildDirectUploadKey } from '@/lib/storage/direct-upload'
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+  // Cookie (browser) ou Bearer (plugin SketchUp) — o client devolvido roda
+  // sob a RLS do usuário nos dois modos, o que o authorize da área exige.
+  const { user, supabase } = await getRequestAuthContext(req)
+  if (!user || !supabase) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
   const body = await req.json().catch(() => null)
   const areaId      = typeof body?.area        === 'string' ? body.area        : ''
@@ -52,7 +53,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Erro ao preparar upload' }, { status: 500 })
   }
 
-  return NextResponse.json({ bucket: area.bucket, key, token: data.token })
+  // uploadUrl pronto pro PUT: clientes fora do browser (plugin SketchUp) não
+  // têm o supabase-js pra montar a URL a partir de bucket+token. É a mesma
+  // URL que uploadToSignedUrl usa por baixo; o token é o gate.
+  const base = process.env.NEXT_PUBLIC_SUPABASE_URL!.replace(/\/$/, '')
+  const uploadUrl = `${base}/storage/v1/object/upload/sign/${area.bucket}/${key}?token=${encodeURIComponent(data.token)}`
+
+  return NextResponse.json({ bucket: area.bucket, key, token: data.token, uploadUrl })
 }
 
 function sanitizeParams(raw: unknown): Record<string, string> {

@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { createHash, randomBytes } from 'crypto'
+import { safeNextPath } from '@/lib/auth/safe-next-path'
+import { LOGIN_NEXT_COOKIE, readLoginNextCookie } from '@/lib/auth/login-next-cookie'
 
 // ── Login com Google via GIS (ux_mode: 'redirect') ─────────────────────────────
 //
@@ -69,7 +71,12 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const { origin } = new URL(request.url)
+  const { origin, searchParams } = new URL(request.url)
+  // O login_uri do GIS é FIXO (/auth/google, sem query — a doc exige match
+  // exato com a redirect URI autorizada). O destino pós-login viaja no cookie
+  // sn_login_next mintado pela página de login; ?next= fica como fallback pra
+  // POSTs same-site.
+  const next = safeNextPath(readLoginNextCookie(request.headers.get('cookie')) ?? searchParams.get('next'))
   const fail = () => NextResponse.redirect(`${origin}/login?error=google`, 303)
 
   let form: FormData
@@ -117,5 +124,8 @@ export async function POST(request: Request) {
   })
   if (error) return fail()
 
-  return NextResponse.redirect(`${origin}/app`, 303)
+  const response = NextResponse.redirect(`${origin}${next}`, 303)
+  // Cookie de destino é de uso único.
+  response.cookies.set(LOGIN_NEXT_COOKIE, '', { path: '/', maxAge: 0 })
+  return response
 }

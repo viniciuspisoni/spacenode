@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "dev:preview": "node scripts/dev-preview.mjs",
+    "package:sketchup": "powershell -ExecutionPolicy Bypass -File scripts/package-sketchup-plugin.ps1",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

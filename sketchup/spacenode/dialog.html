@@ -1,0 +1,1124 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SPACENODE</title>
+  <style>
+    /* Tokens — espelho exato de app/globals.css (dark). Não inventar valores. */
+    @font-face {
+      font-family: 'Geist';
+      src: url('assets/geist-latin.woff2') format('woff2');
+      font-weight: 100 900;
+      font-display: swap;
+    }
+    :root {
+      color-scheme: dark;
+      --bg: #0a0a0a;
+      --bg-elevated: #111111;
+      --surface: rgba(255,255,255,0.05);
+      --surface-hover: rgba(255,255,255,0.08);
+      --surface-subtle: rgba(255,255,255,0.02);
+      --text: #f5f5f7;
+      --text-2: #a1a1a6;
+      --text-3: #6e6e73;
+      --border: rgba(255,255,255,0.06);
+      --border-strong: rgba(255,255,255,0.14);
+      --border-focus: rgba(255,255,255,0.28);
+      --input: rgba(255,255,255,0.05);
+      --chip: rgba(255,255,255,0.06);
+      --chip-hover: rgba(255,255,255,0.10);
+      --chip-active: #f5f5f7;
+      --chip-active-fg: #0a0a0a;
+      --inverse: #f5f5f7;
+      --inverse-fg: #0a0a0a;
+      --green: #30d158;
+      --green-bg: rgba(48,209,88,0.09);
+      --green-border: rgba(48,209,88,0.22);
+      --green-glow: rgba(48,209,88,0.45);
+      --error: #e0584a;
+      --error-bg: rgba(224,88,74,0.08);
+      --error-border: rgba(224,88,74,0.20);
+      --warning: #d4a327;
+      --shadow-sm: 0 2px 8px rgba(0,0,0,0.22);
+      --shadow-md: 0 8px 24px rgba(0,0,0,0.32);
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Geist', -apple-system, 'Segoe UI', sans-serif;
+      font-size: 13px;
+      line-height: 1.45;
+      letter-spacing: -0.011em;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+    button, input, textarea { font: inherit; letter-spacing: inherit; color: inherit; }
+    button { border: 0; background: none; cursor: pointer; padding: 0; }
+    button:disabled { cursor: default; }
+    :focus-visible { outline: 1.5px solid var(--border-focus); outline-offset: 2px; border-radius: 6px; }
+
+    .shell { height: 100vh; display: grid; grid-template-rows: auto 1fr auto; }
+
+    header {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      padding: 13px 16px 12px;
+      border-bottom: 0.5px solid var(--border);
+    }
+    .brand { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; letter-spacing: -0.02em; }
+    .brand svg { width: 21px; height: 21px; }
+    .balance {
+      display: none; align-items: center; gap: 7px;
+      padding: 6px 10px; border-radius: 999px;
+      background: var(--chip); border: 0.5px solid var(--border-strong);
+    }
+    .balance.is-visible { display: inline-flex; }
+    .balance .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green-glow); }
+    .balance b { font-size: 12px; font-weight: 650; font-variant-numeric: tabular-nums; }
+    .balance span { font-size: 11px; color: var(--text-3); }
+    .balance a { font-size: 11px; color: var(--text-3); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+    .balance a:hover { color: var(--text-2); }
+
+    /* CEF 112 não tem scrollbar-width/scrollbar-color (Chromium 121+) —
+       estilo via ::-webkit-scrollbar, que cobre todas as versões alvo. */
+    main { overflow-y: auto; padding: 14px 16px 20px; }
+    main::-webkit-scrollbar { width: 8px; }
+    main::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.14); border-radius: 999px; }
+    main::-webkit-scrollbar-track { background: transparent; }
+
+    /* ── Conexão ── */
+    .connection {
+      display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px;
+      padding: 10px 12px; border: 0.5px solid var(--border); border-radius: 12px;
+      background: var(--surface-subtle); margin-bottom: 12px;
+    }
+    .conn-status { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 12px; font-weight: 520; }
+    .conn-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-3); flex: 0 0 7px; }
+    .conn-dot.is-on { background: var(--green); box-shadow: 0 0 10px var(--green-glow); }
+    .conn-sub { margin-top: 2px; color: var(--text-3); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .conn-actions { display: flex; gap: 6px; }
+
+    .ghost {
+      height: 30px; padding: 0 12px; border-radius: 9px;
+      background: var(--bg-elevated); color: var(--text-2);
+      border: 0.5px solid var(--border-strong); font-size: 12px;
+    }
+    .ghost:hover:not(:disabled) { background: var(--surface-hover); color: var(--text); }
+    .ghost:disabled { opacity: 0.4; }
+
+    /* ── Preview ── */
+    .preview {
+      position: relative; width: 100%; aspect-ratio: 4 / 3;
+      border-radius: 12px; overflow: hidden; background: #101010;
+      border: 0.5px solid var(--border); margin-bottom: 8px;
+    }
+    .preview img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: none; }
+    .preview img.is-visible { display: block; }
+    .empty-preview {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 6px;
+      color: var(--text-3); font-size: 12px; text-align: center; padding: 20px;
+    }
+    /* Comparador antes/depois: resultado por baixo, captura recortada por cima. */
+    .compare-clip { position: absolute; inset: 0; overflow: hidden; display: none; }
+    .compare-clip img { display: block; position: absolute; top: 0; left: 0; }
+    .preview.is-comparing .compare-clip { display: block; }
+    .compare-handle {
+      position: absolute; top: 0; bottom: 0; width: 1.5px; background: rgba(255,255,255,0.85);
+      display: none; pointer-events: none; box-shadow: 0 0 8px rgba(0,0,0,0.6);
+    }
+    .preview.is-comparing .compare-handle { display: block; }
+    .compare-range {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      opacity: 0; cursor: ew-resize; display: none; margin: 0;
+    }
+    .preview.is-comparing .compare-range { display: block; }
+    .preview-tag {
+      position: absolute; top: 8px; padding: 3px 8px; border-radius: 6px;
+      background: rgba(0,0,0,0.55); color: var(--text-2);
+      font-size: 9px; font-weight: 600; letter-spacing: 0.17em; text-transform: uppercase;
+      display: none; pointer-events: none;
+    }
+    .preview.is-comparing .preview-tag { display: block; }
+    #tagBefore { left: 8px; }
+    #tagAfter { right: 8px; }
+    .preview-overlay {
+      position: absolute; inset: 0; display: none; flex-direction: column;
+      align-items: center; justify-content: center; gap: 12px;
+      background: rgba(10,10,10,0.72); backdrop-filter: blur(4px);
+    }
+    .preview-overlay.is-visible { display: flex; }
+    .constellation { width: 34px; height: 34px; animation: pulse 2.2s ease-in-out infinite; }
+    @keyframes pulse { 0%,100% { opacity: 0.35 } 50% { opacity: 1 } }
+    @media (prefers-reduced-motion: reduce) { .constellation { animation: none; } * { transition: none !important; } }
+    .overlay-text { font-size: 12px; color: var(--text-2); }
+    .overlay-elapsed { font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+    .overlay-cancel { font-size: 11px; color: var(--text-3); text-decoration: underline; text-underline-offset: 2px; }
+    .overlay-cancel:hover { color: var(--text-2); }
+
+    .preview-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 2px; }
+    .preview-actions .ghost { flex: 1; min-width: 110px; }
+
+    /* ── Seções ── */
+    .section { border-top: 0.5px solid var(--border); padding-top: 13px; margin-top: 13px; }
+    .section-label {
+      display: block; margin-bottom: 9px;
+      font-size: 10px; font-weight: 600; letter-spacing: 0.17em; text-transform: uppercase;
+      color: var(--text-3);
+    }
+    .pills { display: flex; flex-wrap: wrap; gap: 6px; }
+    .pill {
+      padding: 6px 13px; border-radius: 999px;
+      border: 0.5px solid var(--border-strong); background: var(--chip);
+      color: var(--text-2); font-size: 11px; letter-spacing: -0.005em;
+      transition: transform 150ms ease, background 150ms ease;
+    }
+    .pill:hover:not(.is-active):not(:disabled) { background: var(--chip-hover); transform: translateY(-1px); }
+    .pill.is-active { background: var(--chip-active); color: var(--chip-active-fg); font-weight: 560; box-shadow: var(--shadow-sm); }
+    .pill:disabled { opacity: 0.45; }
+
+    .cards { display: grid; gap: 7px; }
+    .cards.cols-2 { grid-template-columns: 1fr 1fr; }
+    .cards.cols-3 { grid-template-columns: repeat(3, 1fr); }
+    .card {
+      border-radius: 12px; padding: 11px 9px; text-align: center;
+      border: 0.5px solid var(--border-strong);
+      background: linear-gradient(180deg, var(--surface), var(--surface-subtle));
+      transition: transform 150ms ease;
+    }
+    .card:hover:not(.is-active):not(:disabled) { transform: translateY(-1px); background: var(--surface-hover); }
+    .card.is-active { background: var(--chip-active); color: var(--chip-active-fg); box-shadow: var(--shadow-sm); }
+    .card b { display: block; font-size: 11px; font-weight: 560; }
+    .card span { display: block; margin-top: 3px; font-size: 10px; color: var(--text-3); }
+    .card.is-active span { color: rgba(10,10,10,0.6); }
+    .card:disabled { opacity: 0.45; }
+
+    textarea {
+      width: 100%; min-height: 74px; resize: vertical;
+      padding: 10px 12px; border-radius: 10px;
+      border: 0.5px solid var(--border-strong); background: var(--input); color: var(--text);
+      font-size: 12px; outline: none;
+    }
+    textarea:focus { border-color: var(--border-focus); }
+    .hint { margin-top: 6px; font-size: 10px; color: var(--text-3); }
+
+    details { border-top: 0.5px solid var(--border); margin-top: 13px; }
+    details summary {
+      list-style: none; cursor: pointer; padding: 13px 0 0;
+      font-size: 10px; font-weight: 600; letter-spacing: 0.17em; text-transform: uppercase; color: var(--text-3);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    details summary::-webkit-details-marker { display: none; }
+    details summary::after { content: '+'; font-size: 13px; color: var(--text-3); }
+    details[open] summary::after { content: '–'; }
+    details .details-body { padding-top: 11px; }
+
+    /* ── CTA ── */
+    .cta {
+      width: 100%; height: 44px; margin-top: 15px;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 15px; border-radius: 12px;
+      background: var(--inverse); color: var(--inverse-fg);
+      font-size: 13px; font-weight: 650; box-shadow: var(--shadow-md);
+      transition: opacity 150ms ease, transform 150ms ease;
+    }
+    .cta:hover:not(:disabled) { opacity: 0.88; }
+    .cta:active:not(:disabled) { transform: scale(0.985); }
+    .cta:disabled { opacity: 0.38; }
+    .cta .meta { font-size: 11px; font-weight: 500; opacity: 0.65; font-variant-numeric: tabular-nums; }
+    .reach { margin-top: 8px; font-size: 11px; color: var(--text-3); text-align: center; }
+
+    /* ── Notice / erro ── */
+    .notice {
+      display: none; margin-top: 12px; padding: 11px 12px; border-radius: 12px;
+      border: 0.5px solid var(--border); background: var(--surface);
+      color: var(--text-2); font-size: 12px; overflow-wrap: anywhere;
+    }
+    .notice.is-error { display: block; color: var(--error); border-color: var(--error-border); background: var(--error-bg); }
+    .notice.is-success { display: block; color: var(--text); border-color: var(--green-border); background: var(--green-bg); }
+    .notice .notice-action { margin-top: 8px; }
+    .notice .notice-action button { font-size: 12px; color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
+
+    .insufficient {
+      display: none; margin-top: 12px; padding: 13px 14px; border-radius: 12px;
+      border: 0.5px solid var(--border-strong); background: var(--surface-subtle);
+    }
+    .insufficient.is-visible { display: block; }
+    .insufficient b { display: block; font-size: 12.5px; font-weight: 600; }
+    .insufficient .math { margin-top: 3px; font-size: 11px; color: var(--text-3); }
+    .insufficient .buy {
+      margin-top: 10px; width: 100%; height: 34px; border-radius: 9px;
+      background: var(--inverse); color: var(--inverse-fg); font-size: 12px; font-weight: 600;
+    }
+    .insufficient .alt { margin-top: 8px; font-size: 11px; color: var(--text-3); text-align: center; }
+    .insufficient .alt button { color: var(--text-2); text-decoration: underline; text-underline-offset: 2px; font-size: 11px; }
+
+    /* ── Resultado ── */
+    .result-actions { display: none; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 8px; }
+    .result-actions.is-visible { display: grid; }
+    .result-actions .ghost { height: 34px; }
+
+    /* ── Histórico ── */
+    .history-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .history-grid img {
+      width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px;
+      border: 0.5px solid var(--border); cursor: pointer; display: block; background: #101010;
+    }
+    .history-grid img:hover { border-color: var(--border-focus); }
+    .history-more { margin-top: 8px; width: 100%; height: 30px; }
+    .history-empty { font-size: 11px; color: var(--text-3); }
+
+    /* ── Configurações ── */
+    .settings-field label { display: block; margin-bottom: 6px; font-size: 11px; color: var(--text-3); }
+    .settings-field input {
+      width: 100%; height: 34px; padding: 0 11px; border-radius: 9px;
+      border: 0.5px solid var(--border-strong); background: var(--input); font-size: 12px; outline: none;
+    }
+    .settings-field input:focus { border-color: var(--border-focus); }
+    .settings-row { display: flex; gap: 6px; margin-top: 8px; }
+
+    footer {
+      min-height: 30px; border-top: 0.5px solid var(--border);
+      color: var(--text-3); font-size: 11px; padding: 8px 16px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <div class="brand">
+        <svg viewBox="0 0 64 64" aria-hidden="true">
+          <g stroke="#f5f5f7" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none">
+            <line x1="16" y1="16" x2="16" y2="48"/><line x1="16" y1="16" x2="48" y2="48"/><line x1="48" y1="16" x2="48" y2="48"/>
+          </g>
+          <g fill="#f5f5f7">
+            <circle cx="16" cy="16" r="3"/><circle cx="16" cy="48" r="3"/><circle cx="48" cy="48" r="3"/><circle cx="48" cy="16" r="3"/>
+          </g>
+        </svg>
+        <span>spacenode</span>
+      </div>
+      <div class="balance" id="balanceChip">
+        <span class="dot"></span><b id="balanceValue">–</b><span>nodes</span><a id="balanceRecharge">Recarregar</a>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="connection">
+        <div>
+          <div class="conn-status"><span class="conn-dot" id="connDot"></span><span id="connTitle">Desconectado</span></div>
+          <div class="conn-sub" id="connSub" aria-live="polite">Conecte sua conta SPACENODE</div>
+        </div>
+        <div class="conn-actions">
+          <button class="ghost" id="disconnectButton" style="display:none" title="Sair da conta">Sair</button>
+          <button class="ghost" id="connectButton">Conectar</button>
+        </div>
+      </section>
+
+      <div class="preview" id="preview">
+        <img id="resultImage" alt="Render SPACENODE">
+        <div class="compare-clip" id="compareClip"><img id="captureCompareImage" alt=""></div>
+        <img id="captureImage" alt="Vista capturada">
+        <div class="compare-handle" id="compareHandle"></div>
+        <span class="preview-tag" id="tagBefore">Antes</span>
+        <span class="preview-tag" id="tagAfter">Depois</span>
+        <input class="compare-range" id="compareRange" type="range" min="0" max="100" value="50" aria-label="Comparar antes e depois">
+        <div class="empty-preview" id="emptyPreview">
+          <span>A vista atual do SketchUp vira o seu render.</span>
+          <span style="font-size:11px">Capture pra conferir o enquadramento — ou clique em Gerar direto.</span>
+        </div>
+        <div class="preview-overlay" id="previewOverlay">
+          <svg class="constellation" viewBox="0 0 64 64" aria-hidden="true">
+            <g stroke="#f5f5f7" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none">
+              <line x1="16" y1="16" x2="16" y2="48"/><line x1="16" y1="16" x2="48" y2="48"/><line x1="48" y1="16" x2="48" y2="48"/>
+            </g>
+            <g fill="#f5f5f7">
+              <circle cx="16" cy="16" r="3"/><circle cx="16" cy="48" r="3"/><circle cx="48" cy="48" r="3"/><circle cx="48" cy="16" r="3"/>
+            </g>
+          </svg>
+          <span class="overlay-text" id="overlayText">Gerando…</span>
+          <span class="overlay-elapsed" id="overlayElapsed"></span>
+          <button class="overlay-cancel" id="cancelButton">cancelar</button>
+        </div>
+      </div>
+
+      <div class="preview-actions">
+        <button class="ghost" id="captureButton">Capturar vista</button>
+        <button class="ghost" id="compareButton" style="display:none">Comparar antes/depois</button>
+      </div>
+
+      <div class="result-actions" id="resultActions">
+        <button class="ghost" id="downloadButton">Baixar imagem</button>
+        <button class="ghost" id="openResultButton">Abrir no site</button>
+      </div>
+
+      <section class="section">
+        <span class="section-label">Tipo de projeto</span>
+        <div class="cards cols-2" id="projectTypeCards" role="radiogroup" aria-label="Tipo de projeto"></div>
+      </section>
+
+      <section class="section">
+        <span class="section-label">Segmento</span>
+        <div class="pills" id="segmentPills" role="radiogroup" aria-label="Segmento"></div>
+      </section>
+
+      <section class="section">
+        <span class="section-label">Espaço</span>
+        <div class="pills" id="environmentPills" role="radiogroup" aria-label="Espaço"></div>
+      </section>
+
+      <section class="section">
+        <span class="section-label">Iluminação</span>
+        <div class="pills" id="lightingPills" role="radiogroup" aria-label="Iluminação"></div>
+      </section>
+
+      <section class="section">
+        <span class="section-label" id="backgroundLabel">Contexto visual</span>
+        <div class="pills" id="backgroundPills" role="radiogroup" aria-label="Contexto"></div>
+      </section>
+
+      <section class="section">
+        <span class="section-label">Descrição <span style="letter-spacing:0;text-transform:none;font-weight:500">· opcional</span></span>
+        <textarea id="prompt" placeholder="Direções específicas — ex.: piso de madeira clara, paredes off-white, decoração minimalista"></textarea>
+        <div class="hint">O que você não pedir aqui é preservado do jeito que está no modelo.</div>
+      </section>
+
+      <details id="advanced">
+        <summary>Avançado</summary>
+        <div class="details-body">
+          <span class="section-label">Elementos na cena</span>
+          <div class="pills" id="elementsPills" aria-label="Elementos na cena"></div>
+        </div>
+      </details>
+
+      <section class="section">
+        <span class="section-label">Fidelidade ao projeto</span>
+        <div class="cards cols-3" id="fidelityCards" role="radiogroup" aria-label="Fidelidade"></div>
+      </section>
+
+      <section class="section">
+        <span class="section-label">Motor de IA</span>
+        <div class="cards cols-3" id="engineCards" role="radiogroup" aria-label="Motor"></div>
+      </section>
+
+      <section class="section">
+        <span class="section-label">Qualidade de saída</span>
+        <div class="cards cols-3" id="resolutionCards" role="radiogroup" aria-label="Qualidade"></div>
+      </section>
+
+      <div class="notice" id="notice" role="status" aria-live="polite"></div>
+
+      <div class="insufficient" id="insufficient">
+        <b id="insufficientTitle">Faltam nodes pra gerar</b>
+        <div class="math" id="insufficientMath"></div>
+        <button class="buy" id="insufficientBuy">ver planos</button>
+        <div class="alt" id="insufficientAlt"></div>
+      </div>
+
+      <button class="cta" id="generateButton" disabled>
+        <span id="generateLabel">Gerar render</span>
+        <span class="meta" id="generateMeta"></span>
+      </button>
+      <div class="reach" id="reachLine"></div>
+
+      <details id="historySection">
+        <summary>Histórico</summary>
+        <div class="details-body">
+          <div class="history-grid" id="historyGrid"></div>
+          <div class="history-empty" id="historyEmpty" style="display:none">Seus renders aparecem aqui.</div>
+          <button class="ghost history-more" id="historyMore" style="display:none">Carregar mais</button>
+        </div>
+      </details>
+
+      <details id="settingsSection">
+        <summary>Conexão avançada</summary>
+        <div class="details-body">
+          <div class="settings-field">
+            <label for="apiBaseUrl">Servidor</label>
+            <input id="apiBaseUrl" spellcheck="false">
+          </div>
+          <div class="settings-row">
+            <button class="ghost" id="saveSettingsButton" style="flex:1">Salvar</button>
+          </div>
+        </div>
+      </details>
+    </main>
+
+    <footer id="footer">SPACENODE para SketchUp</footer>
+  </div>
+
+  <script>
+    'use strict';
+
+    // ── Estado ───────────────────────────────────────────────────────────────
+    var model = {
+      authenticated: false,
+      sessionFresh: false,
+      apiBaseUrl: 'https://spacenode.app',
+      catalog: null,
+      projectType: 'interior',
+      segment: null,
+      environment: null,
+      lighting: null,
+      background: null,
+      sceneElements: [],
+      fidelityLevel: 'maximum',
+      engine: null,
+      resolution: null,
+      totalBalance: null,
+      captureUrl: null,
+      result: null,
+      generating: false,
+      generateStartedAt: null,
+      generateStage: null,
+      historyCursor: null,
+      userEmail: null,
+      version: ''
+    };
+
+    var GENERATING_TEXTS = ['Analisando composição…', 'Ajustando iluminação…', 'Refinando materiais…', 'Aplicando fotorrealismo…', 'Gerando versão final…'];
+    var generatingTimer = null;
+    var elapsedTimer = null;
+
+    function $(id) { return document.getElementById(id); }
+    var els = {};
+    ['balanceChip','balanceValue','balanceRecharge','connDot','connTitle','connSub','connectButton','disconnectButton',
+     'preview','captureImage','captureCompareImage','resultImage','compareClip','compareHandle','compareRange','emptyPreview',
+     'previewOverlay','overlayText','overlayElapsed','cancelButton','captureButton','compareButton','resultActions',
+     'downloadButton','openResultButton','projectTypeCards','segmentPills','environmentPills','lightingPills',
+     'backgroundLabel','backgroundPills','prompt','elementsPills','fidelityCards','engineCards','resolutionCards',
+     'notice','insufficient','insufficientTitle','insufficientMath','insufficientBuy','insufficientAlt',
+     'generateButton','generateLabel','generateMeta','reachLine','historySection','historyGrid','historyEmpty','historyMore',
+     'apiBaseUrl','saveSettingsButton','footer','advanced'
+    ].forEach(function (id) { els[id] = $(id); });
+
+    function callSketchUp(name, arg) {
+      var bridge = window.sketchup && window.sketchup[name];
+      if (typeof bridge !== 'function') {
+        showError('Abra este painel dentro do SketchUp.');
+        return;
+      }
+      if (arg === undefined) bridge(); else bridge(arg);
+    }
+    function callSketchUpQuiet(name, arg) {
+      var bridge = window.sketchup && window.sketchup[name];
+      if (typeof bridge === 'function') bridge(arg);
+    }
+
+    // ── Catálogo / seleções ──────────────────────────────────────────────────
+    function currentProjectType() {
+      if (!model.catalog) return null;
+      var list = model.catalog.projectTypes || [];
+      for (var i = 0; i < list.length; i++) if (list[i].id === model.projectType) return list[i];
+      return list[0] || null;
+    }
+    function currentSegment() {
+      var pt = currentProjectType();
+      if (!pt) return null;
+      var segs = pt.segments || [];
+      for (var i = 0; i < segs.length; i++) if (segs[i].name === model.segment) return segs[i];
+      return segs[0] || null;
+    }
+    function currentEngine() {
+      if (!model.catalog) return null;
+      var engines = model.catalog.engines || [];
+      for (var i = 0; i < engines.length; i++) if (engines[i].id === model.engine) return engines[i];
+      return engines[0] || null;
+    }
+    function currentResolution() {
+      var e = currentEngine();
+      if (!e) return null;
+      for (var i = 0; i < e.resolutions.length; i++) if (e.resolutions[i].id === model.resolution) return e.resolutions[i];
+      return e.resolutions[0] || null;
+    }
+    function currentCost() {
+      var r = currentResolution();
+      return r ? r.nodes : null;
+    }
+
+    function normalizeSelections() {
+      var pt = currentProjectType();
+      if (!pt) return;
+      var defaults = model.catalog.defaults || {};
+      if (!model.engine && defaults.engine) model.engine = defaults.engine;
+      if (!model.resolution && defaults.resolution) model.resolution = defaults.resolution;
+      if (!model.fidelityLevel && defaults.fidelityLevel) model.fidelityLevel = defaults.fidelityLevel;
+      model.projectType = pt.id;
+      var seg = currentSegment();
+      model.segment = seg ? seg.name : null;
+      if (seg) {
+        if ((seg.environments || []).indexOf(model.environment) < 0) model.environment = (seg.environments || [])[0] || null;
+        if ((seg.lighting || []).indexOf(model.lighting) < 0) model.lighting = (seg.lighting || [])[0] || null;
+        model.sceneElements = (model.sceneElements || []).filter(function (e) { return (seg.sceneElements || []).indexOf(e) >= 0; });
+      }
+      if ((pt.backgrounds || []).indexOf(model.background) < 0) model.background = (pt.backgrounds || [])[0] || null;
+      var engine = currentEngine();
+      model.engine = engine ? engine.id : null;
+      var res = currentResolution();
+      model.resolution = res ? res.id : null;
+    }
+
+    // ── Renderização da UI ───────────────────────────────────────────────────
+    function pillButton(label, active, onClick) {
+      var b = document.createElement('button');
+      b.className = 'pill' + (active ? ' is-active' : '');
+      b.type = 'button';
+      b.textContent = label;
+      b.setAttribute('role', 'radio');
+      b.setAttribute('aria-checked', active ? 'true' : 'false');
+      b.disabled = model.generating;
+      b.addEventListener('click', onClick);
+      return b;
+    }
+    function cardButton(title, sub, active, onClick) {
+      var b = document.createElement('button');
+      b.className = 'card' + (active ? ' is-active' : '');
+      b.type = 'button';
+      b.setAttribute('role', 'radio');
+      b.setAttribute('aria-checked', active ? 'true' : 'false');
+      var t = document.createElement('b'); t.textContent = title; b.appendChild(t);
+      if (sub) { var s = document.createElement('span'); s.textContent = sub; b.appendChild(s); }
+      b.disabled = model.generating;
+      b.addEventListener('click', onClick);
+      return b;
+    }
+    function fill(container, nodes) {
+      container.innerHTML = '';
+      nodes.forEach(function (n) { container.appendChild(n); });
+    }
+
+    function renderControls() {
+      if (!model.catalog) { updateGenerateState(); return; }
+      normalizeSelections();
+      var pt = currentProjectType();
+      var seg = currentSegment();
+
+      fill(els.projectTypeCards, (model.catalog.projectTypes || []).map(function (p) {
+        return cardButton(p.label, null, p.id === model.projectType, function () {
+          model.projectType = p.id; onSelectionChanged();
+        });
+      }));
+
+      fill(els.segmentPills, ((pt && pt.segments) || []).map(function (s) {
+        return pillButton(s.name, seg && s.name === seg.name, function () {
+          model.segment = s.name; onSelectionChanged();
+        });
+      }));
+
+      fill(els.environmentPills, ((seg && seg.environments) || []).map(function (e) {
+        return pillButton(e, e === model.environment, function () {
+          model.environment = e; onSelectionChanged();
+        });
+      }));
+
+      fill(els.lightingPills, ((seg && seg.lighting) || []).map(function (l) {
+        return pillButton(l, l === model.lighting, function () {
+          model.lighting = l; onSelectionChanged();
+        });
+      }));
+
+      els.backgroundLabel.textContent = (pt && pt.backgroundLabel) || 'Contexto visual';
+      fill(els.backgroundPills, ((pt && pt.backgrounds) || []).map(function (b) {
+        return pillButton(b, b === model.background, function () {
+          model.background = b; onSelectionChanged();
+        });
+      }));
+
+      fill(els.elementsPills, ((seg && seg.sceneElements) || []).map(function (e) {
+        var active = model.sceneElements.indexOf(e) >= 0;
+        var b = pillButton(e, active, function () {
+          var idx = model.sceneElements.indexOf(e);
+          if (idx >= 0) model.sceneElements.splice(idx, 1); else model.sceneElements.push(e);
+          onSelectionChanged();
+        });
+        b.setAttribute('role', 'checkbox');
+        return b;
+      }));
+
+      fill(els.fidelityCards, (model.catalog.fidelityLevels || []).map(function (f) {
+        return cardButton(f.label, f.note, f.id === model.fidelityLevel, function () {
+          model.fidelityLevel = f.id; onSelectionChanged();
+        });
+      }));
+
+      fill(els.engineCards, (model.catalog.engines || []).map(function (e) {
+        return cardButton(e.name, e.tagline, e.id === model.engine, function () {
+          model.engine = e.id; onSelectionChanged();
+        });
+      }));
+
+      var engine = currentEngine();
+      fill(els.resolutionCards, ((engine && engine.resolutions) || []).map(function (r) {
+        return cardButton(r.label, r.nodes + ' Nodes por imagem', r.id === model.resolution, function () {
+          model.resolution = r.id; onSelectionChanged();
+        });
+      }));
+
+      updateGenerateState();
+    }
+
+    function onSelectionChanged() {
+      renderControls();
+      persistStateSoon();
+    }
+
+    // ── CTA / saldo ──────────────────────────────────────────────────────────
+    function updateGenerateState() {
+      var cost = currentCost();
+      var balance = model.totalBalance;
+      var insufficient = model.authenticated && cost != null && balance != null && balance < cost;
+
+      els.generateButton.disabled = model.generating || !model.authenticated || !model.catalog || cost == null || insufficient;
+      els.generateLabel.textContent = model.generating ? 'gerando…' : (model.result ? 'Gerar variação' : 'Gerar render');
+      els.generateMeta.textContent = model.generating || cost == null ? '' : cost + ' nodes';
+
+      if (balance != null && cost) {
+        var reach = Math.floor(balance / cost);
+        els.reachLine.textContent = 'seu saldo dá para ~' + reach + ' render' + (reach === 1 ? '' : 's') + ' nessa configuração';
+      } else {
+        els.reachLine.textContent = '';
+      }
+
+      els.insufficient.classList.toggle('is-visible', !!insufficient);
+      if (insufficient) {
+        var missing = cost - balance;
+        els.insufficientTitle.textContent = 'Faltam ' + missing + ' node' + (missing === 1 ? '' : 's') + ' pra gerar';
+        els.insufficientMath.textContent = 'Esta geração custa ' + cost + ' · você tem ' + balance;
+        els.insufficientAlt.innerHTML = '';
+        var cheapest = cheapestOption();
+        if (cheapest && cheapest.nodes <= balance) {
+          var span = document.createElement('span');
+          span.textContent = 'Ou gere em ';
+          var btn = document.createElement('button');
+          btn.textContent = cheapest.engineName + ' · ' + cheapest.label + ' por ' + cheapest.nodes + ' nodes';
+          btn.addEventListener('click', function () {
+            model.engine = cheapest.engineId;
+            model.resolution = cheapest.id;
+            onSelectionChanged();
+          });
+          els.insufficientAlt.appendChild(span);
+          els.insufficientAlt.appendChild(btn);
+        }
+      }
+
+      els.balanceChip.classList.toggle('is-visible', model.authenticated && balance != null);
+      els.balanceValue.textContent = balance != null ? String(balance) : '–';
+
+      els.connDot.classList.toggle('is-on', model.authenticated);
+      els.connTitle.textContent = model.authenticated ? 'Conectado' : 'Desconectado';
+      els.connectButton.textContent = model.authenticated ? 'Trocar' : 'Conectar';
+      els.disconnectButton.style.display = model.authenticated ? '' : 'none';
+
+      els.captureButton.disabled = model.generating;
+      els.connectButton.disabled = model.generating;
+      els.disconnectButton.disabled = model.generating;
+      els.downloadButton.disabled = model.generating;
+      els.openResultButton.disabled = model.generating;
+      els.compareButton.disabled = model.generating;
+    }
+
+    function cheapestOption() {
+      if (!model.catalog) return null;
+      var best = null;
+      (model.catalog.engines || []).forEach(function (e) {
+        (e.resolutions || []).forEach(function (r) {
+          if (!best || r.nodes < best.nodes) {
+            best = { engineId: e.id, engineName: e.name, id: r.id, label: r.label, nodes: r.nodes };
+          }
+        });
+      });
+      return best;
+    }
+
+    // ── Preview / comparador ────────────────────────────────────────────────
+    function setAspect(w, h) {
+      if (w > 0 && h > 0) els.preview.style.aspectRatio = w + ' / ' + h;
+    }
+    function showCapture(url) {
+      model.captureUrl = url;
+      els.captureImage.src = url;
+      els.captureCompareImage.src = url;
+      els.captureImage.classList.add('is-visible');
+      els.resultImage.classList.remove('is-visible');
+      els.preview.classList.remove('is-comparing');
+      els.emptyPreview.style.display = 'none';
+      els.compareButton.style.display = model.result ? '' : 'none';
+    }
+    function showResult(result) {
+      model.result = result;
+      els.resultImage.src = result.previewUrl || result.outputUrl;
+      els.resultImage.classList.add('is-visible');
+      els.captureImage.classList.remove('is-visible');
+      els.emptyPreview.style.display = 'none';
+      els.resultActions.classList.add('is-visible');
+      els.compareButton.style.display = model.captureUrl ? '' : 'none';
+      els.preview.classList.remove('is-comparing');
+      updateGenerateState();
+    }
+    function toggleCompare() {
+      if (!model.result || !model.captureUrl) return;
+      var comparing = els.preview.classList.toggle('is-comparing');
+      if (comparing) {
+        els.resultImage.classList.add('is-visible');
+        els.captureImage.classList.remove('is-visible');
+        fixCompareImageSize();
+        els.compareRange.value = 50;
+        setCompare(50);
+      }
+    }
+    function setCompare(pct) {
+      els.compareClip.style.width = pct + '%';
+      els.compareHandle.style.left = pct + '%';
+    }
+    function fixCompareImageSize() {
+      els.captureCompareImage.style.width = els.preview.clientWidth + 'px';
+      els.captureCompareImage.style.height = els.preview.clientHeight + 'px';
+      els.captureCompareImage.style.objectFit = 'contain';
+    }
+    els.compareRange.addEventListener('input', function () { setCompare(Number(els.compareRange.value)); });
+    window.addEventListener('resize', fixCompareImageSize);
+    if (typeof ResizeObserver === 'function') {
+      new ResizeObserver(fixCompareImageSize).observe(els.preview);
+    }
+
+    // ── Estados de processo ─────────────────────────────────────────────────
+    function startGeneratingUi() {
+      model.generating = true;
+      model.generateStartedAt = Date.now();
+      model.generateStage = 'capture';
+      els.previewOverlay.classList.add('is-visible');
+      var i = 0;
+      els.overlayText.textContent = 'Capturando a vista…';
+      clearInterval(generatingTimer);
+      generatingTimer = setInterval(function () {
+        // O rotador só fala durante a etapa longa de geração — as etapas
+        // reais (captura/envio/reconciliação) vêm do Ruby e não podem ser
+        // atropeladas.
+        if (model.generateStage !== 'generate') return;
+        i = (i + 1) % GENERATING_TEXTS.length;
+        els.overlayText.textContent = GENERATING_TEXTS[i];
+      }, 9000);
+      clearInterval(elapsedTimer);
+      elapsedTimer = setInterval(function () {
+        var s = Math.floor((Date.now() - model.generateStartedAt) / 1000);
+        els.overlayElapsed.textContent = Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2);
+      }, 1000);
+      renderControls();
+    }
+    function stopGeneratingUi() {
+      if (!model.generating) return;
+      model.generating = false;
+      els.previewOverlay.classList.remove('is-visible');
+      clearInterval(generatingTimer);
+      clearInterval(elapsedTimer);
+      els.overlayElapsed.textContent = '';
+      renderControls();
+    }
+
+    function showNotice(message, kind, action) {
+      els.notice.innerHTML = '';
+      els.notice.className = 'notice';
+      if (!message) return;
+      els.notice.classList.add(kind === 'success' ? 'is-success' : 'is-error');
+      els.notice.appendChild(document.createTextNode(message));
+      if (action) {
+        var wrap = document.createElement('div');
+        wrap.className = 'notice-action';
+        var b = document.createElement('button');
+        b.textContent = action.label;
+        b.addEventListener('click', action.onClick);
+        wrap.appendChild(b);
+        els.notice.appendChild(wrap);
+      }
+    }
+    function showError(message) { showNotice(message, 'error'); }
+
+    // lastResult pode vir do atributo de um .skp de terceiros — só URLs
+    // http(s) entram no preview/ações.
+    function isSafeResult(r) {
+      var u = r && (r.outputUrl || r.previewUrl);
+      return typeof u === 'string' && /^https?:\/\//i.test(u);
+    }
+
+    function setFooter(text) { els.footer.textContent = text || ('SPACENODE para SketchUp · v' + (model.version || '')); }
+
+    // ── Persistência do painel ──────────────────────────────────────────────
+    var persistTimer = null;
+    function persistStateSoon() {
+      clearTimeout(persistTimer);
+      persistTimer = setTimeout(function () {
+        var snapshot = {
+          projectType: model.projectType,
+          segment: model.segment,
+          environment: model.environment,
+          lighting: model.lighting,
+          background: model.background,
+          sceneElements: model.sceneElements,
+          fidelityLevel: model.fidelityLevel,
+          engine: model.engine,
+          resolution: model.resolution,
+          prompt: els.prompt.value
+        };
+        callSketchUpQuiet('persistState', JSON.stringify(snapshot));
+      }, 400);
+    }
+    function restorePanelState(saved) {
+      if (!saved) return;
+      if (saved.projectType) model.projectType = saved.projectType;
+      if (saved.segment) model.segment = saved.segment;
+      if (saved.environment) model.environment = saved.environment;
+      if (saved.lighting) model.lighting = saved.lighting;
+      if (saved.background) model.background = saved.background;
+      if (Array.isArray(saved.sceneElements)) model.sceneElements = saved.sceneElements;
+      if (saved.fidelityLevel) model.fidelityLevel = saved.fidelityLevel;
+      if (saved.engine) model.engine = saved.engine;
+      if (saved.resolution) model.resolution = saved.resolution;
+      if (typeof saved.prompt === 'string') els.prompt.value = saved.prompt;
+    }
+
+    // ── Ações ────────────────────────────────────────────────────────────────
+    els.connectButton.addEventListener('click', function () { callSketchUp('connect'); });
+    els.disconnectButton.addEventListener('click', function () { callSketchUp('disconnect'); });
+    els.captureButton.addEventListener('click', function () {
+      showNotice('', 'success');
+      callSketchUp('captureViewport');
+    });
+    els.compareButton.addEventListener('click', toggleCompare);
+    els.cancelButton.addEventListener('click', function () {
+      var elapsed = model.generateStartedAt ? (Date.now() - model.generateStartedAt) / 1000 : 0;
+      callSketchUp('cancelGenerate');
+      stopGeneratingUi();
+      if (elapsed > 8) {
+        showNotice('Cancelado no painel. Se a geração já tinha sido enviada, o render pode aparecer no Histórico (Nodes debitados).', 'error');
+      }
+    });
+    els.generateButton.addEventListener('click', submitGenerate);
+    document.addEventListener('keydown', function (ev) {
+      if ((ev.ctrlKey || ev.metaKey) && ev.key === 'Enter' && !els.generateButton.disabled) submitGenerate();
+    });
+
+    function submitGenerate() {
+      if (model.generating) return;
+      // Bridge primeiro: sem SketchUp por trás, não ligar o overlay (ficaria
+      // preso pra sempre — nenhum evento viria destravar).
+      if (!(window.sketchup && typeof window.sketchup.generate === 'function')) {
+        showError('Abra este painel dentro do SketchUp.');
+        return;
+      }
+      showNotice('', 'success');
+      startGeneratingUi();
+      callSketchUp('generate', JSON.stringify({
+        prompt: els.prompt.value,
+        projectType: model.projectType,
+        segment: model.segment,
+        environment: model.environment,
+        lighting: model.lighting,
+        background: model.background,
+        sceneElements: model.sceneElements,
+        fidelityLevel: model.fidelityLevel,
+        engine: model.engine,
+        resolution: model.resolution,
+        useAnchor: !!model.result,
+        anchorUrl: model.result ? (model.result.outputUrl || null) : null,
+        seed: model.result && model.result.seed != null ? model.result.seed : null
+      }));
+    }
+
+    els.downloadButton.addEventListener('click', function () {
+      if (!model.result) return;
+      callSketchUp('saveResult', JSON.stringify({
+        url: model.result.outputUrl,
+        suggestedName: 'spacenode-render.png'
+      }));
+    });
+    els.openResultButton.addEventListener('click', function () {
+      if (model.result && model.result.outputUrl) callSketchUp('openUrl', model.result.outputUrl);
+    });
+    els.balanceRecharge.addEventListener('click', function () {
+      callSketchUp('openUrl', model.apiBaseUrl + '/app/billing');
+    });
+    els.insufficientBuy.addEventListener('click', function () {
+      callSketchUp('openUrl', model.apiBaseUrl + '/app/billing');
+    });
+    els.saveSettingsButton.addEventListener('click', function () {
+      callSketchUp('saveSettings', JSON.stringify({ apiBaseUrl: els.apiBaseUrl.value }));
+    });
+    els.prompt.addEventListener('input', persistStateSoon);
+
+    // Histórico
+    var historyLoaded = false;
+    var historyLoading = false;
+    var historyAppend = false;
+    els.historySection.addEventListener('toggle', function () {
+      if (els.historySection.open && !historyLoaded) loadHistory(null);
+    });
+    els.historyMore.addEventListener('click', function () { loadHistory(model.historyCursor); });
+    function loadHistory(cursor) {
+      if (!model.authenticated) { els.historyEmpty.style.display = ''; return; }
+      if (historyLoading) return;
+      historyLoading = true;
+      historyAppend = !!cursor;
+      els.historyMore.disabled = true;
+      callSketchUp('fetchHistory', JSON.stringify({ cursor: cursor || '' }));
+    }
+    function resetHistory() {
+      historyLoaded = false;
+      historyLoading = false;
+      historyAppend = false;
+      model.historyCursor = null;
+      els.historyGrid.innerHTML = '';
+      els.historyMore.style.display = 'none';
+      els.historyEmpty.style.display = 'none';
+    }
+    function renderHistory(renders, pageSize) {
+      historyLoaded = true;
+      historyLoading = false;
+      els.historyMore.disabled = false;
+      if (!historyAppend) els.historyGrid.innerHTML = '';
+      renders.forEach(function (r) {
+        var url = r.preview_url || r.output_url;
+        if (!url) return;
+        var img = document.createElement('img');
+        img.src = url;
+        img.alt = 'Render';
+        img.loading = 'lazy';
+        img.title = 'Abrir no site';
+        // URLs assinadas expiram (~1h) — thumbnail morto some em vez de
+        // virar ícone quebrado.
+        img.addEventListener('error', function () { img.remove(); });
+        img.addEventListener('click', function () {
+          callSketchUp('openUrl', r.output_url || url);
+        });
+        els.historyGrid.appendChild(img);
+      });
+      var empty = els.historyGrid.children.length === 0;
+      els.historyEmpty.style.display = empty ? '' : 'none';
+      if (renders.length > 0) {
+        model.historyCursor = renders[renders.length - 1].created_at;
+        els.historyMore.style.display = renders.length >= (pageSize || 60) ? '' : 'none';
+      } else {
+        els.historyMore.style.display = 'none';
+      }
+    }
+
+    // ── Ponte Ruby → JS ─────────────────────────────────────────────────────
+    window.SpaceNodeBridge = {
+      receive: function (event, payload) {
+        if (event === 'state') {
+          var wasAuthenticated = model.authenticated;
+          var previousEmail = model.userEmail;
+          model.apiBaseUrl = payload.apiBaseUrl || model.apiBaseUrl;
+          model.authenticated = !!payload.authenticated;
+          model.sessionFresh = !!payload.sessionFresh;
+          model.version = payload.version || model.version;
+          model.userEmail = payload.userEmail || null;
+          // Não sobrescrever o campo enquanto o usuário edita.
+          if (document.activeElement !== els.apiBaseUrl) els.apiBaseUrl.value = model.apiBaseUrl;
+          els.connSub.textContent = payload.userEmail || 'Conecte sua conta SPACENODE';
+          if (payload.balance && typeof payload.balance.totalBalance === 'number') {
+            model.totalBalance = payload.balance.totalBalance;
+          }
+          if (!model.authenticated) model.totalBalance = null;
+          // Sair/trocar de conta: o histórico da conta anterior não pode vazar.
+          if ((wasAuthenticated && !model.authenticated) || (previousEmail && model.userEmail && previousEmail !== model.userEmail)) {
+            resetHistory();
+          }
+          if (payload.panelState && !model.catalog) restorePanelState(payload.panelState);
+          if (!model.result && payload.lastResult && isSafeResult(payload.lastResult)) {
+            showResult(payload.lastResult);
+          }
+          setFooter('');
+          updateGenerateState();
+        }
+
+        if (event === 'catalog') {
+          model.catalog = payload;
+          renderControls();
+        }
+
+        if (event === 'capture') {
+          if (payload.width && payload.height) setAspect(payload.width, payload.height);
+          showCapture(payload.imageDataUrl);
+          if (!model.generating) setFooter('Vista capturada');
+        }
+
+        if (event === 'status') {
+          if (payload.message) setFooter(payload.message);
+          if (payload.stage) model.generateStage = payload.stage;
+          if (model.generating && payload.message && payload.stage !== 'idle') {
+            els.overlayText.textContent = payload.message;
+          }
+          if (payload.stage === 'idle') stopGeneratingUi();
+        }
+
+        if (event === 'session') {
+          if (payload.balance && typeof payload.balance.totalBalance === 'number') {
+            model.totalBalance = payload.balance.totalBalance;
+          }
+          if (payload.user && payload.user.email) els.connSub.textContent = payload.user.email;
+          model.authenticated = true;
+          updateGenerateState();
+        }
+
+        if (event === 'result') {
+          stopGeneratingUi();
+          if (typeof payload.totalBalance === 'number') model.totalBalance = payload.totalBalance;
+          showResult(payload);
+          var cost = payload.nodesCharged ? payload.nodesCharged + ' Nodes utilizados.' : 'Render concluído.';
+          if (payload.fidelityWarning) {
+            showNotice(cost + ' Revise a fidelidade antes de apresentar.', 'error');
+          } else {
+            showNotice(cost, 'success');
+          }
+          setFooter(typeof payload.totalBalance === 'number' ? payload.totalBalance + ' nodes restantes' : 'Render concluído');
+        }
+
+        if (event === 'history') {
+          renderHistory(Array.isArray(payload.renders) ? payload.renders : [], payload.pageSize);
+        }
+
+        if (event === 'saved') {
+          showNotice('Render salvo em ' + payload.path, 'success');
+          setFooter('');
+        }
+
+        if (event === 'error') {
+          // Só erros que encerram uma geração (generation:true) destravam a
+          // UI de "gerando" — um erro paralelo (histórico, sessão) não pode
+          // soltar o overlay de uma geração em andamento.
+          if (payload.generation) stopGeneratingUi();
+          if (payload.authExpired) {
+            model.authenticated = false;
+            els.connSub.textContent = 'Conecte sua conta SPACENODE';
+            showNotice(payload.message || 'Sua sessão expirou.', 'error', {
+              label: 'Reconectar',
+              onClick: function () { callSketchUp('connect'); }
+            });
+          } else {
+            showError(payload.message);
+          }
+          updateGenerateState();
+          setFooter('');
+        }
+
+        if (event === 'catalogError') {
+          if (!model.catalog) {
+            showNotice('Não foi possível carregar os presets e custos.', 'error', {
+              label: 'Tentar de novo',
+              onClick: function () { callSketchUp('refreshCatalog'); }
+            });
+          }
+        }
+      }
+    };
+
+    document.addEventListener('DOMContentLoaded', function () {
+      setFooter('');
+      callSketchUp('ready');
+    });
+  </script>
+</body>
+</html>

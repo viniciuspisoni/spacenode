@@ -1,22 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getRequestAuthContext } from '@/lib/auth/request-user'
 import { signRows } from '@/lib/storage/signed'
 import { sanitizeRenderListRow, selectRenderList } from '@/lib/history/redact'
 
 // GET /api/renders/list?cursor={ISO}
 // Pagina o histórico em ordem desc por created_at. cursor = created_at do
 // último render já carregado; retorna até PAGE_SIZE renders mais antigos.
+// Sem cursor = primeira página (agora) — usado pelo plugin SketchUp.
 
 const PAGE_SIZE = 60
 
 export async function GET(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+  // Cookie (browser) ou Bearer (plugin SketchUp) — a query roda sob a RLS
+  // do usuário nos dois modos.
+  const { user, supabase } = await getRequestAuthContext(req)
+  if (!user || !supabase) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
-  const cursor = req.nextUrl.searchParams.get('cursor')
-  if (!cursor || isNaN(Date.parse(cursor))) {
+  const cursor = req.nextUrl.searchParams.get('cursor') ?? new Date().toISOString()
+  if (isNaN(Date.parse(cursor))) {
     return NextResponse.json({ error: 'cursor inválido' }, { status: 400 })
   }
 

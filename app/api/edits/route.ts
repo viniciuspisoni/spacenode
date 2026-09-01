@@ -17,6 +17,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getRequestAuthContext } from '@/lib/auth/request-user'
 import { getPayerId } from '@/lib/workspaces/context'
 import { isQuality, isEditSourceType, type Quality } from '@/lib/spaces/types'
 import { isEditMode, dispatchEndpoint, type EditMode } from '@/lib/spaces/engines'
@@ -420,10 +421,12 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+export async function GET(req: NextRequest) {
+  // Cookie (browser) ou Bearer (plugin SketchUp) — as queries abaixo rodam
+  // sob a RLS do usuário nos dois modos (com filtro explícito por user_id
+  // como defesa em profundidade, igual antes).
+  const { user, supabase } = await getRequestAuthContext(req)
+  if (!user || !supabase) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
   // Projeção explícita: sem fal_request_id/generation_log. engine guarda o
   // endpoint do provider — sai daqui como label de produto (mesma redação do

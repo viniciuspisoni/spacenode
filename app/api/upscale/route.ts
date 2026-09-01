@@ -16,8 +16,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { fal } from '@fal-ai/client'
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getRequestUser } from '@/lib/auth/request-user'
 import { refundNodes } from '@/lib/billing/refund-nodes'
 import { DIRECT_UPLOAD_AREAS, downloadDirectUpload } from '@/lib/storage/direct-upload'
 import { fetchStorageBuffer } from '@/lib/storage/fetch'
@@ -53,8 +53,8 @@ const ALLOWED_MODES_BY_TAB: Record<UpscaleTab, ModeId[]> = {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  // Cookie (browser) ou Bearer (plugin SketchUp).
+  const { user } = await getRequestUser(req)
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
   // ── Parse + validação ──────────────────────────────────────────────────────
