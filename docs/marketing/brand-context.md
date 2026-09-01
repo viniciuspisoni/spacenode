@@ -67,7 +67,15 @@ A crítica ao render genérico de IA é parte do posicionamento — feita com r�
 - Gerador genérico de imagens "bonitas".
 - Brinquedo de IA / entretenimento.
 - Substituto do arquiteto ou da autoria do projeto.
-- Plugin de SketchUp/Revit (não existe importação direta — o insumo é imagem/print do modelo).
+- Plugin de Revit (não existe; NÃO prometer).
+
+**É também (desde 2026-09-01):**
+- **Plugin oficial para SketchUp** (2024+, Windows e macOS) — captura a vista
+  de dentro do modelo, alimenta o motor de fidelidade com dados reais
+  (geometria hidden-line, sol, lente, materiais) e devolve o render no painel.
+  Download em spacenode.app/sketchup. Claim correto: "renderize de dentro do
+  SketchUp"; claim ERRADO: "importa o arquivo .skp" (o insumo segue sendo a
+  vista capturada, não o arquivo).
 
 ## 7. Princípios da marca
 
@@ -107,8 +115,9 @@ você", "eleve seus projetos", "transforme suas ideias", "potencialize sua criat
 🚀 🔥 🤯 ✨ em qualquer contexto.
 
 **Claims proibidos por serem falsos** (não reintroduzir):
-- "Importação direta do SketchUp" / plugin — não existe; o correto é *upload de imagens/prints do
-  modelo*.
+- "Importa o arquivo .skp" / "plugin de Revit" — não existem. O **plugin de
+  SketchUp EXISTE desde 2026-09** (captura a vista de dentro do modelo); o
+  claim certo é "renderize de dentro do SketchUp", nunca importação de arquivo.
 - "Histórico de 30 dias / ilimitado por plano" — não existe retenção por plano.
 - "Lumens" — conceito APOSENTADO em 2026-08-31. Todo crédito é "Node": **Nodes mensais**
   (renovam com o plano, não acumulam) e **Nodes extras** (avulsos, sem validade, em qualquer

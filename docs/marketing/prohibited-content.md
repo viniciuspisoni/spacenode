@@ -27,8 +27,10 @@ emoji pontual e sóbrio tolerado apenas em legenda orgânica.
 
 ## 2. Claims falsos (não reintroduzir — já removidos da landing)
 
-- "Importação direta do SketchUp" / "plugin do SketchUp" — não existe. O correto: *upload de
-  imagens/prints do modelo*.
+- "Importa o arquivo .skp" / "plugin do Revit" — não existem. O **plugin do
+  SketchUp existe desde 2026-09** (spacenode.app/sketchup) e captura a vista de
+  dentro do modelo — claim certo: *renderize de dentro do SketchUp*; nunca
+  prometer importação do arquivo.
 - "Histórico de 30 dias" / "histórico ilimitado por plano" — não existe retenção por plano.
 - "Lumens" — conceito aposentado em 2026-08-31; o nome atual é **Nodes extras** (avulsos, sem
   validade, em qualquer plano pago). Nunca usar "Lumens" em peça nova, nem prometer
