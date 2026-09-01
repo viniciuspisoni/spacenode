@@ -40,7 +40,11 @@ export default async function proxy(request: NextRequest) {
 
   if (user && pathname === '/login') {
     const url = request.nextUrl.clone()
-    url.pathname = '/app'
+    // Honra ?next= (ex.: /login?next=/sketchup/connect vindo do plugin) —
+    // antes o redirect descartava o destino e jogava sempre em /app.
+    const next = url.searchParams.get('next')
+    url.pathname = next && next.startsWith('/') && !next.startsWith('//') ? next : '/app'
+    url.search = ''
     return NextResponse.redirect(url)
   }
 

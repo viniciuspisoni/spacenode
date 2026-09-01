@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getRequestUser } from '@/lib/auth/request-user'
 import { isInternalStaff } from '@/lib/auth/privileged'
 import { engineDisplayLabel, editV3DisplayPrompt, editV3QualityLabel } from '@/lib/history/generation-detail'
 import { videoEngineLabel, upscaleProviderLabel } from '@/lib/renderLabels'
@@ -136,8 +136,8 @@ function editV3RowToEditShape(j: Record<string, unknown>): Record<string, unknow
 }
 
 export async function GET(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  // Cookie (browser) ou Bearer (plugin SketchUp).
+  const { user } = await getRequestUser(req)
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
   const kind = req.nextUrl.searchParams.get('kind') ?? ''
@@ -150,11 +150,12 @@ export async function GET(req: NextRequest) {
 
   const admin = createAdminClient()
 
-  let { data: row, error } = await admin.from(table).select('*').eq('id', id).maybeSingle()
-  if (error) {
-    console.error('[history/detail] erro ao buscar geração:', error)
+  const first = await admin.from(table).select('*').eq('id', id).maybeSingle()
+  if (first.error) {
+    console.error('[history/detail] erro ao buscar geração:', first.error)
     return NextResponse.json({ error: 'Erro ao carregar detalhes' }, { status: 500 })
   }
+  let row = first.data
   // kind 'edit' cobre dois storages: `edits` (editor v1) e `edit_v3_jobs`
   // (Editar V3, padrão em produção). Id ausente na primeira → tenta a segunda,
   // já traduzida pro vocabulário do painel. Sem workspace_id no V3 → segue

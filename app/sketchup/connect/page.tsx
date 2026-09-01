@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { Suspense, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { Brandmark } from '@/components/brand'
 import { createClient } from '@/lib/supabase/client'
 
@@ -19,10 +20,24 @@ interface SketchUpSessionPayload {
   accessToken: string
   expiresAt: number | null
   userEmail: string | null
+  nonce: string | null
 }
 
 export default function SketchUpConnectPage() {
+  return (
+    <Suspense fallback={null}>
+      <SketchUpConnectInner />
+    </Suspense>
+  )
+}
+
+function SketchUpConnectInner() {
   const supabase = useMemo(() => createClient(), [])
+  const searchParams = useSearchParams()
+  // Nonce de uso único gerado pelo Ruby e ecoado de volta no payload — o
+  // plugin só aceita a sessão se o nonce bater com o que ele mesmo criou
+  // (nenhuma outra página carregada no dialog consegue injetar um token).
+  const nonce = searchParams.get('nonce')
   const [state, setState] = useState<ConnectionState>('checking')
   const [sessionPayload, setSessionPayload] = useState<SketchUpSessionPayload | null>(null)
 
@@ -44,6 +59,7 @@ export default function SketchUpConnectPage() {
         accessToken: session.access_token,
         expiresAt: session.expires_at ?? null,
         userEmail: session.user.email ?? null,
+        nonce,
       }
       setSessionPayload(payload)
       setState(deliverToSketchUp(payload) ? 'sent' : 'ready')
@@ -55,7 +71,7 @@ export default function SketchUpConnectPage() {
       alive = false
       authListener.subscription.unsubscribe()
     }
-  }, [supabase])
+  }, [supabase, nonce])
 
   function deliverToSketchUp(payload: SketchUpSessionPayload): boolean {
     const callback = window.sketchup?.receiveSpaceNodeSession
@@ -108,7 +124,10 @@ export default function SketchUpConnectPage() {
         )}
 
         {state === 'signed-out' ? (
-          <Link href="/login?next=/sketchup/connect" style={S.primary}>
+          <Link
+            href={`/login?next=${encodeURIComponent(nonce ? `/sketchup/connect?nonce=${nonce}` : '/sketchup/connect')}`}
+            style={S.primary}
+          >
             Entrar na SpaceNode
           </Link>
         ) : (

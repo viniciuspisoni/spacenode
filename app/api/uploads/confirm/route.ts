@@ -10,8 +10,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import sharp from 'sharp'
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getRequestUser } from '@/lib/auth/request-user'
 import {
   getDirectUploadArea,
   verifyDirectUpload,
@@ -21,8 +21,7 @@ import {
 export const runtime = 'nodejs'
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { user } = await getRequestUser(req)
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
   const body = await req.json().catch(() => null)

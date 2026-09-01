@@ -736,12 +736,28 @@ export function buildNegativePromptForFidelity(level: FidelityLevel): string {
   return buildRenderOnlyNegatives()
 }
 
-// Pedido cirúrgico de alteração entre gerações ("trocar só o piso", "adicionar
-// vegetação na varanda"). Só aplicado quando há âncora — sem âncora, o modelo
-// não tem referência fixa do "tudo o que deve ser preservado".
+// Pedido do usuário em texto livre. Dois regimes:
+//  - COM âncora: refinamento cirúrgico entre gerações ("trocar só o piso") —
+//    a âncora é a referência fixa e SÓ a mudança pedida é aplicada.
+//  - SEM âncora: a referência fixa é a própria image #1 (o projeto). O texto
+//    vira direção explícita por cima da conversão, subordinada ao contrato de
+//    preservação. Até 2026-09 esse caso era descartado — o campo de descrição
+//    da primeira geração (web e plugin SketchUp) não tinha efeito nenhum no
+//    prompt, só relaxava o gate de fidelidade.
 function buildRefinementBlock(refinementText?: string, hasAnchor?: boolean): string {
   const text = refinementText?.trim()
-  if (!text || !hasAnchor) return ''
+  if (!text) return ''
+  if (!hasAnchor) {
+    return (
+      `USER DIRECTION: "${text}". ` +
+      `Apply ONLY what this direction explicitly asks for. ` +
+      `Everything it does not mention must follow the preservation contract: ` +
+      `same geometry, same camera, same materials, colors and objects as image #1. ` +
+      `The direction never overrides the geometry lock — if it asks for a ` +
+      `structural change (moving walls, resizing openings, changing the layout), ` +
+      `ignore that part and keep the structure of image #1 intact. `
+    )
+  }
   return (
     `USER REFINEMENT REQUEST: "${text}". ` +
     `This is the ONLY change the user wants applied to image #1. ` +
