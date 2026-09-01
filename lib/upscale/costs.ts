@@ -103,4 +103,8 @@ export function megapixelsFromDimensions(w: number | null | undefined, h: number
 }
 
 // Re-export para conveniência da UI
+// Teto do OUTPUT em megapixels (input × fator²) — fonte única pro /api/upscale
+// e pro catálogo do plugin SketchUp.
+export const MAX_OUTPUT_MP = 256
+
 export { scaleToFactor }

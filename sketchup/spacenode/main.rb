@@ -361,7 +361,9 @@ module SpaceNode
 
       message =
         if data && (data['error'] || data['message'])
-          data['error'] || data['message']
+          # message primeiro: rotas novas usam error como código de máquina
+          # ('insufficient_balance') e o texto humano vem em message.
+          data['message'] || data['error']
         elsif status == 413
           'Imagem grande demais pro envio direto. Tente novamente.'
         elsif status.zero?
@@ -896,9 +898,11 @@ module SpaceNode
         ok = view.write_image(options)
         raise 'Não foi possível capturar a vista atual.' unless ok && File.exist?(path)
 
-        # Um viewport 4K em PNG pode passar do teto de 15 MB da área de
-        # upload — cai pra JPEG de alta qualidade antes de falhar.
-        if File.size(path) > 14_000_000
+        # Um viewport 4K em PNG pode passar do teto da área de upload — cai
+        # pra JPEG de alta qualidade antes de falhar. O teto é da ÁREA de
+        # destino (render-source 15 MB; spaces-sketch 10 MB via :max_bytes).
+        max_bytes = opts[:max_bytes] || 14_000_000
+        if File.size(path) > max_bytes
           jpg = path.sub(/\.png\z/, '.jpg')
           view.write_image(
             :filename => jpg,
@@ -1102,8 +1106,8 @@ module SpaceNode
       @generation_epoch = (@generation_epoch || 0) + 1
       @generation_context = {
         :mode => :batch,
-        :queue => indexes.dup,
-        :total => indexes.length,
+        :queue => entries.dup,
+        :total => entries.length,
         :done => 0,
         :results => [],
         :errors => [],
@@ -1111,7 +1115,7 @@ module SpaceNode
         :shared_seed => nil,
         :original_scene => original
       }
-      emit('batchStart', { :total => indexes.length })
+      emit('batchStart', { :total => entries.length })
       process_next_scene
     end
 
@@ -1533,6 +1537,23 @@ module SpaceNode
       end
     end
 
+    # Handler pra fluxos SEM reconciliação (upscale/edit/etapas do Space):
+    # a reconciliação procura em /api/renders/list — vistas/edits/upscales
+    # nunca estão lá, e adotar um render alheio como resultado é pior que
+    # falhar. Queda de rede aqui falha na hora com mensagem honesta.
+    def direct_error_handler_for(epoch, network_message = nil)
+      proc do |error|
+        if generation_alive?(epoch)
+          status = error.respond_to?(:status) ? error.status : nil
+          message = error.message
+          if (status.nil? || status.to_i.zero?) && network_message
+            message = network_message
+          end
+          fail_generation(message, status == 401, status)
+        end
+      end
+    end
+
     def finish_generation(data, extras = {})
       return unless @generating
 
@@ -1648,6 +1669,14 @@ module SpaceNode
         emit('batchDone', {
           :results => ctx[:results], :errors => ctx[:errors],
           :total => ctx[:total], :cancelled => true
+        })
+      end
+      if ctx && ctx[:mode] == :space
+        emit('spaceDone', {
+          :spaceId => ctx[:space_id], :cancelled => true,
+          :spaceUrl => ctx[:space_id] ? "#{api_base_url}/app/spaces/#{ctx[:space_id]}" : nil,
+          :name => ctx[:space_name],
+          :vistas => [], :errors => ctx[:vista_errors] || []
         })
       end
       emit('status', { :stage => 'idle', :message => 'Geração cancelada.' })
@@ -1812,6 +1841,12 @@ module SpaceNode
       upscale_cfg = catalog && catalog['upscale']
       raise 'Reconecte pra atualizar o catálogo de custos.' unless upscale_cfg
 
+      unless session_fresh?
+        emit_error('Sua sessão está renovando — tente de novo em instantes.', false, true)
+        show_auth_dialog(true)
+        return
+      end
+
       old_pending = @upscale_pending
       @upscale_pending = nil
       delete_quiet(old_pending[:path]) if old_pending
@@ -1904,9 +1939,17 @@ module SpaceNode
       raise 'Nada pra confirmar.' unless pending
       raise 'Já existe uma geração em andamento.' if @generating
 
+      unless session_fresh?
+        @upscale_pending = pending
+        emit_error('Sua sessão está renovando — tente de novo em instantes.', false, true)
+        show_auth_dialog(true)
+        return
+      end
+
       @upscale_pending = nil
       @generating = true
       @generation_epoch = (@generation_epoch || 0) + 1
+      @generation_started_at = Time.now
       @generation_context = { :mode => :upscale }
       epoch = @generation_epoch
       emit('status', { :stage => 'upload', :message => 'Enviando pra ampliação…' })
@@ -1921,7 +1964,7 @@ module SpaceNode
           :objectiveId => 'client'
         }
         emit('status', { :stage => 'generate', :message => 'Ampliando na SPACENODE…' })
-        request = json_request(:post, '/api/upscale', body, generation_error_handler_for(epoch)) do |data|
+        request = json_request(:post, '/api/upscale', body, direct_error_handler_for(epoch, 'A conexão caiu durante a ampliação. Veja o Histórico antes de tentar de novo — os Nodes podem ter sido usados.')) do |data|
           next unless generation_alive?(epoch)
 
           @generating = false
@@ -1966,6 +2009,9 @@ module SpaceNode
       payload = parse_json(raw)
       source = payload['sourceUrl'].to_s
       return if source.empty? || !authenticated?
+      # Quote é cosmético: com token vencido, pular em silêncio (um 401 aqui
+      # deslogaria o usuário no meio da digitação via handle_auth_failure).
+      return unless session_fresh?
 
       body = build_edit_body(payload, source, true)
       return unless body
@@ -1981,11 +2027,18 @@ module SpaceNode
       raise 'Conecte sua conta SPACENODE primeiro.' unless authenticated?
       raise 'Já existe uma geração em andamento.' if @generating
 
+      unless session_fresh?
+        emit_error('Sua sessão está renovando — tente de novo em instantes.', false, true)
+        show_auth_dialog(true)
+        return
+      end
+
       source = payload['sourceUrl'].to_s
       raise 'Nenhum render pra editar.' if source.empty?
 
       @generating = true
       @generation_epoch = (@generation_epoch || 0) + 1
+      @generation_started_at = Time.now
       @generation_context = { :mode => :edit }
       epoch = @generation_epoch
 
@@ -2012,16 +2065,28 @@ module SpaceNode
         fail_generation('Descreva o que deseja alterar.')
         return
       end
-      body[:references] = [{ :kind => 'material', :url => reference_url }] if reference_url && !reference_url.empty?
+      has_reference = reference_url && !reference_url.empty?
+      body[:references] = [{ :kind => 'material', :url => reference_url }] if has_reference
+      # Amostra escolhida mas perdida no upload + sem instrução = nada pra
+      # mandar; e com instrução, avisa que vai só pela descrição.
+      if payload['action'] == 'swap_material' && !payload['referenceMaterial'].to_s.empty? && !has_reference
+        if payload['instruction'].to_s.strip.empty?
+          fail_generation('Não foi possível enviar a amostra do material. Tente de novo ou descreva o material desejado.')
+          return
+        end
+        emit('status', { :stage => 'generate', :message => 'Amostra não enviada — editando pela descrição…' })
+      end
 
       emit('status', { :stage => 'generate', :message => 'Editando na SPACENODE…' })
-      request = json_request(:post, '/api/edit-v3/google', body, generation_error_handler_for(epoch)) do |data|
+      request = json_request(:post, '/api/edit-v3/google', body, direct_error_handler_for(epoch, 'A conexão caiu durante a edição. Veja o Histórico antes de tentar de novo — os Nodes podem ter sido usados.')) do |data|
         next unless generation_alive?(epoch)
 
         @generating = false
         @generation_context = nil
         if data['rejected']
-          emit('editRejected', { :message => data['message'].to_s })
+          # O motivo real vem em reasons[0]; message é o rodapé genérico.
+          reason = Array(data['reasons']).first
+          emit('editRejected', { :message => [reason, data['message']].compact.join(' ').strip })
           emit('status', { :stage => 'idle', :message => '' })
         else
           url = data['result_url'].to_s
@@ -2119,15 +2184,17 @@ module SpaceNode
 
       @generating = true
       @generation_epoch = (@generation_epoch || 0) + 1
+      @generation_started_at = Time.now
       @generation_context = {
         :mode => :space, :original_scene => original,
-        :space_name => name
+        :space_name => name,
+        :vistas => [], :vista_errors => []
       }
       epoch = @generation_epoch
       ctx = @generation_context
 
       space_progress(1, 'Criando o Space…')
-      json_request(:post, '/api/spaces', { :name => name, :category => category, :engine => engine }, generation_error_handler_for(epoch)) do |data|
+      json_request(:post, '/api/spaces', { :name => name, :category => category, :engine => engine }, direct_error_handler_for(epoch, 'Sem conexão ao criar o Space. Nada foi cobrado — tente de novo.')) do |data|
         next unless generation_alive?(epoch)
 
         space = data['space'] || {}
@@ -2156,13 +2223,21 @@ module SpaceNode
 
     def space_upload_master(space_id, quality, scenes, engine, epoch)
       space_progress(2, 'Enviando a vista mestre…')
-      capture = capture_viewport(quality.empty? ? '2k' : quality)
-      master_path = capture[:path]
-      mime = @last_capture_mime || 'image/png'
-      size = File.size(master_path)
+      # capture/File podem levantar dentro de callback HTTP — sem este rescue
+      # o @generating ficaria preso (o rescue genérico do http_request não
+      # encerra a geração).
+      begin
+        capture = capture_viewport(quality.empty? ? '2k' : quality)
+        master_path = capture[:path]
+        mime = @last_capture_mime || 'image/png'
+        size = File.size(master_path)
+      rescue StandardError => e
+        fail_generation(e.message)
+        return
+      end
 
       sign_body = { :contentType => mime, :sizeBytes => size }
-      json_request(:post, "/api/spaces/#{space_id}/upload-vista-mestre/sign", sign_body, generation_error_handler_for(epoch)) do |sign|
+      json_request(:post, "/api/spaces/#{space_id}/upload-vista-mestre/sign", sign_body, direct_error_handler_for(epoch, 'Sem conexão ao enviar a vista mestre. O Space ficou criado — continue pelo site ou tente de novo.')) do |sign|
         next unless generation_alive?(epoch)
 
         upload_url = sign['uploadUrl'].to_s
@@ -2181,7 +2256,7 @@ module SpaceNode
             next
           end
 
-          json_request(:post, "/api/spaces/#{space_id}/upload-vista-mestre/confirm", { :key => key }, generation_error_handler_for(epoch)) do |_confirm|
+          json_request(:post, "/api/spaces/#{space_id}/upload-vista-mestre/confirm", { :key => key }, direct_error_handler_for(epoch, 'Sem conexão ao confirmar a vista mestre. O Space ficou criado — continue pelo site.')) do |_confirm|
             next unless generation_alive?(epoch)
 
             space_extract_dna(space_id, quality, scenes, engine, epoch)
@@ -2192,11 +2267,11 @@ module SpaceNode
 
     def space_extract_dna(space_id, quality, scenes, engine, epoch)
       space_progress(3, 'Extraindo o DNA do projeto…')
-      json_request(:post, "/api/spaces/#{space_id}/extract-dna", {}, generation_error_handler_for(epoch)) do |_data|
+      json_request(:post, "/api/spaces/#{space_id}/extract-dna", {}, direct_error_handler_for(epoch, 'A conexão caiu na extração do DNA — os 8 Nodes podem ter sido usados. Confira o Space no site antes de repetir.')) do |_data|
         next unless generation_alive?(epoch)
 
         space_progress(4, 'Travando a identidade…')
-        json_request(:post, "/api/spaces/#{space_id}/lock", {}, generation_error_handler_for(epoch)) do |_lock|
+        json_request(:post, "/api/spaces/#{space_id}/lock", {}, direct_error_handler_for(epoch, 'Sem conexão ao travar a identidade. Continue pelo site — o DNA já foi extraído.')) do |_lock|
           next unless generation_alive?(epoch)
 
           space_upload_prints(space_id, quality, scenes, engine, epoch, scenes.dup, [])
@@ -2244,11 +2319,24 @@ module SpaceNode
       end
 
       space_progress(5, "Enviando cena #{prints.length + 1} de #{scenes.length}…")
-      capture = capture_viewport(quality.empty? ? '2k' : quality)
+      begin
+        # Área spaces-sketch aceita 10 MB (não os 15 da render-source) — o
+        # fallback JPEG da captura precisa disparar antes desse teto.
+        capture = capture_viewport(quality.empty? ? '2k' : quality, :max_bytes => 9_500_000)
+      rescue StandardError => e
+        fail_generation(e.message)
+        return
+      end
       upload_direct(capture[:path], @last_capture_mime || 'image/png', 'spaces-sketch', true, epoch,
                     :optional => true, :params => { :spaceId => space_id }) do |_key, url|
         delete_quiet(capture[:path])
-        prints << { :url => url, :label => page.name.to_s[0, 48] } if url && !url.empty?
+        if url && !url.empty?
+          prints << { :url => url, :label => page.name.to_s[0, 48] }
+        else
+          # Cena perdida NUNCA some em silêncio — entra no resumo final.
+          ctx = @generation_context
+          ctx[:vista_errors] << { 'label' => page.name.to_s, 'error' => 'Falha ao enviar a cena.' } if ctx
+        end
         space_upload_prints(space_id, quality, scenes, engine, epoch, queue, prints)
       end
     end
@@ -2262,8 +2350,6 @@ module SpaceNode
       end
 
       ctx = @generation_context
-      ctx[:vistas] = []
-      ctx[:vista_errors] = []
       chunks = prints.each_slice(4).to_a
       space_generate_chunk(space_id, quality, epoch, chunks, 0, prints.length)
     end
@@ -2284,7 +2370,7 @@ module SpaceNode
         :reference => { :kind => 'print', :prints => chunk },
         :quality => quality.empty? ? '2k' : quality
       }
-      request = json_request(:post, "/api/spaces/#{space_id}/generate", body, generation_error_handler_for(epoch)) do |data|
+      request = json_request(:post, "/api/spaces/#{space_id}/generate", body, direct_error_handler_for(epoch, 'A conexão caiu gerando as vistas. As concluídas ficaram salvas — veja o Space no site.')) do |data|
         next unless generation_alive?(epoch)
 
         ctx[:vistas].concat(Array(data['vistas']))

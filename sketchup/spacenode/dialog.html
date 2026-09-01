@@ -417,7 +417,7 @@
           <div class="hint" style="margin:0 0 8px">A vista atual vira a identidade do projeto (DNA); as cenas selecionadas acima viram vistas coerentes entre si.</div>
           <div class="settings-field">
             <label for="spaceName">Nome do Space</label>
-            <input id="spaceName" spellcheck="false" placeholder="Nome do projeto">
+            <input id="spaceName" spellcheck="false" maxlength="80" placeholder="Nome do projeto">
           </div>
           <div class="pills" id="spaceCategoryPills" role="radiogroup" aria-label="Categoria" style="margin-top:8px"></div>
           <button class="cta cta--batch" id="spaceButton" disabled>
@@ -1044,7 +1044,9 @@
       els.spaceButton.disabled = model.generating || !model.authenticated || n === 0 || total == null || insufficient;
       els.spaceLabel.textContent = model.spaceRunning ? 'criando Space…' : (n > 0 ? 'Criar Space · ' + n + ' vista' + (n === 1 ? '' : 's') : 'Criar Space');
       els.spaceMeta.textContent = model.spaceRunning || total == null || n === 0 ? '' : total + ' nodes';
-      if (insufficient) {
+      if (model.selectedScenes.length > (spaces.maxPrints || 10)) {
+        els.spaceNote.textContent = 'Máximo de ' + (spaces.maxPrints || 10) + ' cenas por Space — só as ' + (spaces.maxPrints || 10) + ' primeiras selecionadas entram.';
+      } else if (insufficient) {
         els.spaceNote.textContent = 'Saldo insuficiente: custa ' + total + ' (' + (spaces.dnaCost || 8) + ' do DNA + ' + n + '×' + vista + ') · você tem ' + model.totalBalance + '.';
       } else if (n === 0) {
         els.spaceNote.textContent = 'Selecione as cenas na seção acima — elas viram as vistas do Space.';
@@ -1334,6 +1336,8 @@
     els.cancelButton.addEventListener('click', function () {
       var elapsed = model.generateStartedAt ? (Date.now() - model.generateStartedAt) / 1000 : 0;
       callSketchUp('cancelGenerate');
+      model.batchRunning = false;
+      model.spaceRunning = false;
       stopGeneratingUi();
       if (elapsed > 8) {
         showNotice('Cancelado no painel. Se a geração já tinha sido enviada, o render pode aparecer no Histórico (Nodes debitados).', 'error');
@@ -1623,7 +1627,7 @@
 
         if (event === 'editRejected') {
           stopGeneratingUi();
-          showNotice('Nada foi alterado — refazer é grátis. ' + (payload.message || ''), 'error');
+          showNotice(payload.message || 'Nada foi alterado — refazer é grátis.', 'error');
         }
 
         if (event === 'spaceProgress') {
@@ -1641,6 +1645,15 @@
         if (event === 'spaceDone') {
           model.spaceRunning = false;
           stopGeneratingUi();
+          if (payload.cancelled) {
+            if (payload.spaceUrl) {
+              model.lastSpace = payload;
+              els.openSpaceButton.style.display = '';
+              showNotice('Criação cancelada. O que já foi feito ficou salvo no Space — continue pelo site.', 'error');
+            }
+            updateGenerateState();
+            return;
+          }
           model.lastSpace = payload;
           els.openSpaceButton.style.display = '';
           var vistas = Array.isArray(payload.vistas) ? payload.vistas : [];

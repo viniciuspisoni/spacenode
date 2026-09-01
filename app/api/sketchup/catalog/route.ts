@@ -26,7 +26,7 @@ import {
   type ProjectType,
 } from '@/lib/prompts'
 import { DNA_EXTRACTION_COST, getVistaGenerationCost, getAvailableQualities } from '@/lib/spaces/economy'
-import { getUpscaleCostNodes, type ModeId, type Scale } from '@/lib/upscale'
+import { getUpscaleCostNodes, scaleToFactor, MAX_OUTPUT_MP, type ModeId, type Scale } from '@/lib/upscale'
 
 const RESOLUTION_LABELS: Record<Resolution, { label: string; note: string }> = {
   hd: { label: 'HD', note: 'Rápido para testes' },
@@ -101,8 +101,8 @@ export async function GET(req: NextRequest) {
       { maxMP: 16, add: surchargeProbe(16) },
       { maxMP: null, add: surchargeProbe(17) },
     ],
-    maxOutputMP: 256,
-    scaleFactor: { '2x': 2, '4x': 4 },
+    maxOutputMP: MAX_OUTPUT_MP,
+    scaleFactor: { '2x': scaleToFactor('2x'), '4x': scaleToFactor('4x') },
   }
 
   const spaces = {
