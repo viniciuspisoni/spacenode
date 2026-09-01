@@ -27,6 +27,45 @@ import {
 } from '@/lib/prompts'
 import { DNA_EXTRACTION_COST, getVistaGenerationCost, getAvailableQualities } from '@/lib/spaces/economy'
 import { getUpscaleCostNodes, scaleToFactor, MAX_OUTPUT_MP, type ModeId, type Scale } from '@/lib/upscale'
+import { PRESET_LABELS_EN } from '@/lib/sketchup/preset-labels-en'
+
+// i18n EN do painel do plugin: presets (mapa gerado, valor enviado à API
+// segue pt-BR) + rótulos estruturais do catálogo. O chrome do painel
+// (botões/estados) é traduzido no próprio dialog.
+const CATALOG_I18N_EN = {
+  presets: PRESET_LABELS_EN,
+  ui: {
+    projectTypes: { interior: 'Interior', exterior: 'Exterior' } as Record<string, string>,
+    backgroundLabels: { interior: 'Visual context', exterior: 'Surroundings' } as Record<string, string>,
+    engineTaglines: { vega: 'Premium', pulsar: 'Fast', quasar: 'Special' } as Record<string, string>,
+    resolutionNotes: {
+      hd: 'Quick tests',
+      '2k': 'Ideal for presentations',
+      '4k': 'Maximum definition',
+    } as Record<string, string>,
+    fidelity: {
+      maximum: { label: 'Maximum', note: 'Preserves everything in the project' },
+      balanced: { label: 'Balanced', note: 'Small improvements allowed' },
+      creative: { label: 'Creative', note: 'More aesthetic freedom' },
+    } as Record<string, { label: string; note: string }>,
+    materialFields: {
+      piso: 'Floor',
+      paredes: 'Walls / finishes',
+      teto: 'Ceiling',
+      marcenaria: 'Millwork',
+      bancadas: 'Countertops',
+      esquadrias: 'Window & door frames',
+      elementos: 'Special elements',
+      fachada: 'Facade cladding',
+    } as Record<string, string>,
+    categories: {
+      residencial: 'Residential',
+      comercial: 'Commercial',
+      conceito: 'Concept',
+    } as Record<string, string>,
+    upscaleModes: { fidelity: 'Fidelity' } as Record<string, string>,
+  },
+}
 
 const RESOLUTION_LABELS: Record<Resolution, { label: string; note: string }> = {
   hd: { label: 'HD', note: 'Rápido para testes' },
@@ -121,7 +160,8 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({
-    version: 3,
+    version: 4,
+    i18n: { en: CATALOG_I18N_EN },
     upscale,
     spaces,
     engines: ENGINE_ORDER.map(id => {

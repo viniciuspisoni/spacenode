@@ -334,10 +334,21 @@
           <div class="conn-sub" id="connSub" aria-live="polite">Conecte sua conta SPACENODE</div>
         </div>
         <div class="conn-actions">
-          <button class="ghost" id="disconnectButton" style="display:none" title="Sair da conta">Sair</button>
+          <button class="ghost" id="disconnectButton" style="display:none" title="Sair da conta"><span id='signOutLabel'>Sair</span></button>
           <button class="ghost" id="connectButton">Conectar</button>
         </div>
       </section>
+
+      <div class="insufficient" id="pairingBox">
+        <b id="pairingTitle">Conecte no navegador</b>
+        <div class="math" id="pairingHint">Confirme este código na página que abriu:</div>
+        <div id="pairingCode" style="margin-top:10px;text-align:center;font-size:26px;font-weight:650;letter-spacing:0.22em"></div>
+        <div class="alt" style="margin-top:10px">
+          <button id="pairingReopen">abrir o navegador de novo</button>
+          <span style="color:#3a3a3c"> · </span>
+          <button id="pairingCancel">cancelar</button>
+        </div>
+      </div>
 
       <div class="preview" id="preview">
         <img id="resultImage" alt="Render SPACENODE">
@@ -380,7 +391,7 @@
       </div>
 
       <details id="editSection" style="display:none">
-        <summary>Editar este render</summary>
+        <summary id="L_edit">Editar este render</summary>
         <div class="details-body">
           <div class="pills" id="editActionPills" role="radiogroup" aria-label="Tipo de edição"></div>
           <textarea id="editInstruction" style="margin-top:10px;min-height:60px" placeholder="Ex.: trocar o piso por carvalho claro / remover o pendente sobre a bancada"></textarea>
@@ -397,7 +408,7 @@
       </details>
 
       <details id="scenesSection">
-        <summary>Cenas do modelo <span class="scenes-count" id="scenesCount"></span></summary>
+        <summary><span id="L_scenes">Cenas do modelo</span> <span class="scenes-count" id="scenesCount"></span></summary>
         <div class="details-body">
           <div class="pills" id="scenesPills"></div>
           <div class="history-empty" id="scenesEmpty" style="display:none">Crie cenas no SketchUp pra gerar o caderno inteiro de uma vez.</div>
@@ -412,7 +423,7 @@
       </details>
 
       <details id="spaceSection">
-        <summary>Criar Space das cenas</summary>
+        <summary id="L_space">Criar Space das cenas</summary>
         <div class="details-body">
           <div class="hint" style="margin:0 0 8px">A vista atual vira a identidade do projeto (DNA); as cenas selecionadas acima viram vistas coerentes entre si.</div>
           <div class="settings-field">
@@ -432,22 +443,22 @@
       </details>
 
       <section class="section">
-        <span class="section-label">Tipo de projeto</span>
+        <span class="section-label" id="L_projectType">Tipo de projeto</span>
         <div class="cards cols-2" id="projectTypeCards" role="radiogroup" aria-label="Tipo de projeto"></div>
       </section>
 
       <section class="section">
-        <span class="section-label">Segmento</span>
+        <span class="section-label" id="L_segment">Segmento</span>
         <div class="pills" id="segmentPills" role="radiogroup" aria-label="Segmento"></div>
       </section>
 
       <section class="section">
-        <span class="section-label">Espaço</span>
+        <span class="section-label" id="L_environment">Espaço</span>
         <div class="pills" id="environmentPills" role="radiogroup" aria-label="Espaço"></div>
       </section>
 
       <section class="section">
-        <span class="section-label">Iluminação</span>
+        <span class="section-label" id="L_lighting">Iluminação</span>
         <div class="pills" id="lightingPills" role="radiogroup" aria-label="Iluminação"></div>
       </section>
 
@@ -457,7 +468,7 @@
       </section>
 
       <section class="section">
-        <span class="section-label">Sol na captura</span>
+        <span class="section-label" id="L_sun">Sol na captura</span>
         <div class="pills" id="sunPills" role="radiogroup" aria-label="Sol na captura"></div>
         <div class="hint">Usa o sol real do modelo (data, hora e localização) — as sombras da captura guiam a luz do render.</div>
       </section>
@@ -469,12 +480,12 @@
       </section>
 
       <details id="advanced">
-        <summary>Avançado</summary>
+        <summary id="L_advanced">Avançado</summary>
         <div class="details-body">
-          <span class="section-label">Elementos na cena</span>
+          <span class="section-label" id="L_elements">Elementos na cena</span>
           <div class="pills" id="elementsPills" aria-label="Elementos na cena"></div>
           <div id="modelMaterialsBlock" style="display:none;margin-top:14px">
-            <span class="section-label">Materiais do modelo</span>
+            <span class="section-label" id="L_modelMaterials">Materiais do modelo</span>
             <div class="hint" style="margin:0 0 8px">Use as texturas reais do seu modelo como referência de material (até 4).</div>
             <div id="materialsList"></div>
           </div>
@@ -482,17 +493,17 @@
       </details>
 
       <section class="section">
-        <span class="section-label">Fidelidade ao projeto</span>
+        <span class="section-label" id="L_fidelity">Fidelidade ao projeto</span>
         <div class="cards cols-3" id="fidelityCards" role="radiogroup" aria-label="Fidelidade"></div>
       </section>
 
       <section class="section">
-        <span class="section-label">Motor de IA</span>
+        <span class="section-label" id="L_engine">Motor de IA</span>
         <div class="cards cols-3" id="engineCards" role="radiogroup" aria-label="Motor"></div>
       </section>
 
       <section class="section">
-        <span class="section-label">Qualidade de saída</span>
+        <span class="section-label" id="L_resolution">Qualidade de saída</span>
         <div class="cards cols-3" id="resolutionCards" role="radiogroup" aria-label="Qualidade"></div>
       </section>
 
@@ -512,7 +523,7 @@
       <div class="reach" id="reachLine"></div>
 
       <details id="historySection">
-        <summary>Histórico</summary>
+        <summary id="L_history">Histórico</summary>
         <div class="details-body">
           <div class="history-grid" id="historyGrid"></div>
           <div class="history-empty" id="historyEmpty" style="display:none">Seus renders aparecem aqui.</div>
@@ -521,10 +532,12 @@
       </details>
 
       <details id="settingsSection">
-        <summary>Conexão avançada</summary>
+        <summary id="L_settings">Conexão avançada</summary>
         <div class="details-body">
           <div class="settings-field">
-            <label for="apiBaseUrl">Servidor</label>
+            <label id="L_language">Idioma</label>
+            <div class="pills" id="languagePills" style="margin-bottom:10px"></div>
+            <label for="apiBaseUrl" id="L_server">Servidor</label>
             <input id="apiBaseUrl" spellcheck="false">
           </div>
           <div class="settings-row">
@@ -575,24 +588,260 @@
       editNodes: null,
       spaceCategory: 'residencial',
       spaceRunning: false,
-      lastSpace: null
+      lastSpace: null,
+      locale: 'pt',
+      localeSetting: 'auto',
+      pairing: null
     };
 
-    var EDIT_ACTIONS = [
-      { id: 'swap_material', label: 'Trocar material' },
-      { id: 'remove', label: 'Remover' },
-      { id: 'refine_area', label: 'Refinar área' }
-    ];
+    // ── i18n ────────────────────────────────────────────────────────────────
+    // O chrome do painel traduz aqui; presets vêm do catálogo
+    // (catalog.i18n.en.presets — o VALOR enviado à API segue pt-BR).
+    var UI = {
+      pt: {
+        connTitleOn: 'Conectado', connTitleOff: 'Desconectado', connSubEmpty: 'Conecte sua conta SPACENODE',
+        connect: 'Conectar', switchAccount: 'Trocar', signOut: 'Sair',
+        emptyTitle: 'A vista atual do SketchUp vira o seu render.',
+        emptySub: 'Capture pra conferir o enquadramento — ou clique em Gerar direto.',
+        captureBtn: 'Capturar vista', compareBtn: 'Comparar antes/depois', captured: 'Vista capturada',
+        tagBefore: 'Antes', tagAfter: 'Depois',
+        download: 'Baixar imagem', openSite: 'Abrir no site', restoreView: 'Voltar à vista deste render',
+        upscale2x: 'Ampliar 2x', upscale4x: 'Ampliar 4x',
+        L_projectType: 'Tipo de projeto', L_segment: 'Segmento', L_environment: 'Espaço', L_lighting: 'Iluminação',
+        L_sun: 'Sol na captura', L_elements: 'Elementos na cena', L_modelMaterials: 'Materiais do modelo',
+        L_fidelity: 'Fidelidade ao projeto', L_engine: 'Motor de IA', L_resolution: 'Qualidade de saída',
+        L_advanced: 'Avançado', L_history: 'Histórico', L_settings: 'Conexão avançada',
+        L_edit: 'Editar este render', L_space: 'Criar Space das cenas', L_scenes: 'Cenas do modelo',
+        L_language: 'Idioma', L_server: 'Servidor', save: 'Salvar',
+        L_description: 'Descrição', optional: '· opcional',
+        promptPlaceholder: 'Direções específicas — ex.: piso de madeira clara, paredes off-white, decoração minimalista',
+        promptHint: 'O que você não pedir aqui é preservado do jeito que está no modelo.',
+        sunHint: 'Usa o sol real do modelo (data, hora e localização) — as sombras da captura guiam a luz do render.',
+        matHint: 'Use as texturas reais do seu modelo como referência de material (até 4).',
+        matCap: 'Até 4 materiais por geração.',
+        nodes: 'nodes', recharge: 'Recarregar',
+        generateRender: 'Gerar render', generateVariation: 'Gerar variação', generating: 'gerando…',
+        reach: function (n) { return 'seu saldo dá para ~' + n + ' render' + (n === 1 ? '' : 's') + ' nessa configuração'; },
+        missing: function (n) { return 'Faltam ' + n + ' node' + (n === 1 ? '' : 's') + ' pra gerar'; },
+        costMath: function (c, h) { return 'Esta geração custa ' + c + ' · você tem ' + h; },
+        buyCta: 'ver planos',
+        orGenerate: function (e, l, c) { return e + ' · ' + l + ' por ' + c + ' nodes'; }, orPrefix: 'Ou gere em ',
+        nodesUsed: function (n) { return n + ' Nodes utilizados.'; }, renderDone: 'Render concluído.',
+        reviewFidelity: ' Revise a fidelidade antes de apresentar.',
+        nodesLeft: function (n) { return n + ' nodes restantes'; },
+        savedAt: function (p) { return 'Render salvo em ' + p; },
+        historyEmpty: 'Seus renders aparecem aqui.', loadMore: 'Carregar mais',
+        scenesEmpty: 'Crie cenas no SketchUp pra gerar o caderno inteiro de uma vez.',
+        batchLabel: function (n) { return n > 0 ? 'Gerar ' + n + ' cena' + (n === 1 ? '' : 's') : 'Gerar cenas'; },
+        batchRunning: 'gerando cenas…',
+        batchNote: 'Todas as cenas com os mesmos presets e a mesma semente — coerência de material e estilo no conjunto.',
+        batchInsufficient: function (t, h) { return 'Saldo insuficiente pro lote: custa ' + t + ' · você tem ' + h + '.'; },
+        sceneOf: function (i, t, nm) { return 'Cena ' + i + ' de ' + t + (nm ? ' — ' + nm : '') + '…'; },
+        batchOk: function (n) { return n + ' cena' + (n === 1 ? '' : 's') + ' gerada' + (n === 1 ? '' : 's') + '. Clique nas miniaturas pra revisar.'; },
+        batchPartial: function (ok, t, bad) { return ok + ' de ' + t + ' cenas geradas — ' + bad + ' falhou' + (bad === 1 ? '' : 'aram') + '. Nenhum node foi consumido nas que falharam.'; },
+        batchCancelled: function (n) { return n + ' cena' + (n === 1 ? '' : 's') + ' gerada' + (n === 1 ? '' : 's') + ' antes do cancelamento.'; },
+        failed: 'falhou',
+        editHint: 'Só a alteração pedida muda — todo o resto do render é preservado. Edição recusada pelo controle de qualidade não é cobrada.',
+        editPlaceholder: 'Ex.: trocar o piso por carvalho claro / remover o pendente sobre a bancada',
+        editSample: 'Amostra do modelo (opcional)',
+        applyEdit: 'Aplicar edição', editing: 'editando…', editingOverlay: 'Editando na SPACENODE…',
+        editRejectedFallback: 'Nada foi alterado — refazer é grátis.',
+        spaceHint: 'A vista atual vira a identidade do projeto (DNA); as cenas selecionadas acima viram vistas coerentes entre si.',
+        spaceNamePh: 'Nome do projeto', spaceNameLabel: 'Nome do Space',
+        createSpace: function (n) { return n > 0 ? 'Criar Space · ' + n + ' vista' + (n === 1 ? '' : 's') : 'Criar Space'; },
+        spaceRunning: 'criando Space…', spaceCreatingOverlay: 'Criando o Space…',
+        spaceMax: function (m) { return 'Máximo de ' + m + ' cenas por Space — só as ' + m + ' primeiras selecionadas entram.'; },
+        spaceInsufficient: function (t, dna, n, v, h) { return 'Saldo insuficiente: custa ' + t + ' (' + dna + ' do DNA + ' + n + '×' + v + ') · você tem ' + h + '.'; },
+        spaceSelect: 'Selecione as cenas na seção acima — elas viram as vistas do Space.',
+        spaceCost: function (dna, n, v) { return dna + ' nodes do DNA + ' + n + ' vista' + (n === 1 ? '' : 's') + ' × ' + v + ' nodes.'; },
+        spaceDone: function (nm, n) { return 'Space "' + nm + '" criado com ' + n + ' vista' + (n === 1 ? '' : 's') + '.'; },
+        spaceDoneErrors: function (k) { return ' ' + k + ' não iniciada' + (k === 1 ? '' : 's') + ' — gere pelo site sem custo perdido.'; },
+        spaceCancelled: 'Criação cancelada. O que já foi feito ficou salvo no Space — continue pelo site.',
+        openSpace: 'Abrir o Space no site',
+        upscaleQuote: function (s, w, h, n) { return 'Ampliar ' + s + ' (' + w + '×' + h + ') custa ' + n + ' nodes.'; },
+        applyUpscale: function (n) { return 'Aplicar ampliação · ' + n + ' nodes'; },
+        upscalePrep: 'Preparando a ampliação…', upscaleOverlay: 'Ampliando na SPACENODE…',
+        catalogError: 'Não foi possível carregar os presets e custos.', tryAgain: 'Tentar de novo',
+        reconnect: 'Reconectar', sessionGone: 'Sua sessão expirou.', outsideSketchup: 'Abra este painel dentro do SketchUp.',
+        cancelledLate: 'Cancelado no painel. Se a geração já tinha sido enviada, o render pode aparecer no Histórico (Nodes debitados).',
+        pairingTitle: 'Conecte no navegador', pairingHint: 'Confirme este código na página que abriu:',
+        pairingReopen: 'abrir o navegador de novo', pairingCancel: 'cancelar',
+        cancel: 'cancelar',
+        capturingOverlay: 'Capturando a vista…',
+        nodesPerImage: function (n) { return n + ' Nodes por imagem'; },
+        sun: { atual: 'Atual', manha: 'Manhã', meiodia: 'Meio-dia', tarde: 'Entardecer', golden: 'Golden hour' },
+        editActions: { swap_material: 'Trocar material', remove: 'Remover', refine_area: 'Refinar área' },
+        lang: { auto: 'Auto', pt: 'Português', en: 'English' },
+        loadingTexts: ['Analisando composição…', 'Ajustando iluminação…', 'Refinando materiais…', 'Aplicando fotorrealismo…', 'Gerando versão final…']
+      },
+      en: {
+        connTitleOn: 'Connected', connTitleOff: 'Disconnected', connSubEmpty: 'Connect your SPACENODE account',
+        connect: 'Connect', switchAccount: 'Switch', signOut: 'Sign out',
+        emptyTitle: 'Your current SketchUp view becomes the render.',
+        emptySub: 'Capture to check the framing — or just click Generate.',
+        captureBtn: 'Capture view', compareBtn: 'Compare before/after', captured: 'View captured',
+        tagBefore: 'Before', tagAfter: 'After',
+        download: 'Download image', openSite: 'Open on the site', restoreView: 'Back to this render view',
+        upscale2x: 'Upscale 2x', upscale4x: 'Upscale 4x',
+        L_projectType: 'Project type', L_segment: 'Segment', L_environment: 'Space', L_lighting: 'Lighting',
+        L_sun: 'Sun at capture', L_elements: 'Scene elements', L_modelMaterials: 'Model materials',
+        L_fidelity: 'Project fidelity', L_engine: 'AI engine', L_resolution: 'Output quality',
+        L_advanced: 'Advanced', L_history: 'History', L_settings: 'Advanced connection',
+        L_edit: 'Edit this render', L_space: 'Create a Space from scenes', L_scenes: 'Model scenes',
+        L_language: 'Language', L_server: 'Server', save: 'Save',
+        L_description: 'Description', optional: '· optional',
+        promptPlaceholder: 'Specific directions — e.g. light oak floor, off-white walls, minimal decor',
+        promptHint: 'Anything you do not ask for here is preserved exactly as modeled.',
+        sunHint: 'Uses the model real sun (date, time and location) — the captured shadows guide the render light.',
+        matHint: 'Use your model real textures as material references (up to 4).',
+        matCap: 'Up to 4 materials per generation.',
+        nodes: 'nodes', recharge: 'Top up',
+        generateRender: 'Generate render', generateVariation: 'Generate variation', generating: 'generating…',
+        reach: function (n) { return 'your balance covers ~' + n + ' render' + (n === 1 ? '' : 's') + ' at this setup'; },
+        missing: function (n) { return n + ' node' + (n === 1 ? '' : 's') + ' short to generate'; },
+        costMath: function (c, h) { return 'This generation costs ' + c + ' · you have ' + h; },
+        buyCta: 'see plans',
+        orGenerate: function (e, l, c) { return e + ' · ' + l + ' for ' + c + ' nodes'; }, orPrefix: 'Or generate on ',
+        nodesUsed: function (n) { return n + ' Nodes used.'; }, renderDone: 'Render complete.',
+        reviewFidelity: ' Review fidelity before presenting.',
+        nodesLeft: function (n) { return n + ' nodes left'; },
+        savedAt: function (p) { return 'Render saved to ' + p; },
+        historyEmpty: 'Your renders show up here.', loadMore: 'Load more',
+        scenesEmpty: 'Create scenes in SketchUp to generate the whole set at once.',
+        batchLabel: function (n) { return n > 0 ? 'Generate ' + n + ' scene' + (n === 1 ? '' : 's') : 'Generate scenes'; },
+        batchRunning: 'generating scenes…',
+        batchNote: 'Every scene with the same presets and the same seed — consistent materials and style across the set.',
+        batchInsufficient: function (t, h) { return 'Not enough balance for the batch: costs ' + t + ' · you have ' + h + '.'; },
+        sceneOf: function (i, t, nm) { return 'Scene ' + i + ' of ' + t + (nm ? ' — ' + nm : '') + '…'; },
+        batchOk: function (n) { return n + ' scene' + (n === 1 ? '' : 's') + ' generated. Click the thumbnails to review.'; },
+        batchPartial: function (ok, t, bad) { return ok + ' of ' + t + ' scenes generated — ' + bad + ' failed. No nodes were charged for failures.'; },
+        batchCancelled: function (n) { return n + ' scene' + (n === 1 ? '' : 's') + ' generated before cancelling.'; },
+        failed: 'failed',
+        editHint: 'Only what you ask for changes — everything else in the render is preserved. Edits declined by quality control are not charged.',
+        editPlaceholder: 'E.g. swap the floor to light oak / remove the pendant over the counter',
+        editSample: 'Model sample (optional)',
+        applyEdit: 'Apply edit', editing: 'editing…', editingOverlay: 'Editing on SPACENODE…',
+        editRejectedFallback: 'Nothing was changed — retrying is free.',
+        spaceHint: 'The current view becomes the project identity (DNA); the scenes selected above become consistent views.',
+        spaceNamePh: 'Project name', spaceNameLabel: 'Space name',
+        createSpace: function (n) { return n > 0 ? 'Create Space · ' + n + ' view' + (n === 1 ? '' : 's') : 'Create Space'; },
+        spaceRunning: 'creating Space…', spaceCreatingOverlay: 'Creating the Space…',
+        spaceMax: function (m) { return 'Up to ' + m + ' scenes per Space — only the first ' + m + ' selected are included.'; },
+        spaceInsufficient: function (t, dna, n, v, h) { return 'Not enough balance: costs ' + t + ' (' + dna + ' DNA + ' + n + '×' + v + ') · you have ' + h + '.'; },
+        spaceSelect: 'Select scenes in the section above — they become the Space views.',
+        spaceCost: function (dna, n, v) { return dna + ' nodes for DNA + ' + n + ' view' + (n === 1 ? '' : 's') + ' × ' + v + ' nodes.'; },
+        spaceDone: function (nm, n) { return 'Space "' + nm + '" created with ' + n + ' view' + (n === 1 ? '' : 's') + '.'; },
+        spaceDoneErrors: function (k) { return ' ' + k + ' not started — generate on the site at no lost cost.'; },
+        spaceCancelled: 'Creation cancelled. What was done is saved in the Space — continue on the site.',
+        openSpace: 'Open the Space on the site',
+        upscaleQuote: function (s, w, h, n) { return 'Upscaling ' + s + ' (' + w + '×' + h + ') costs ' + n + ' nodes.'; },
+        applyUpscale: function (n) { return 'Apply upscale · ' + n + ' nodes'; },
+        upscalePrep: 'Preparing the upscale…', upscaleOverlay: 'Upscaling on SPACENODE…',
+        catalogError: 'Could not load presets and costs.', tryAgain: 'Try again',
+        reconnect: 'Reconnect', sessionGone: 'Your session expired.', outsideSketchup: 'Open this panel inside SketchUp.',
+        cancelledLate: 'Cancelled in the panel. If the generation was already sent, the render may appear in History (Nodes charged).',
+        pairingTitle: 'Connect in your browser', pairingHint: 'Confirm this code on the page that opened:',
+        pairingReopen: 'open the browser again', pairingCancel: 'cancel',
+        cancel: 'cancel',
+        capturingOverlay: 'Capturing the view…',
+        nodesPerImage: function (n) { return n + ' Nodes per image'; },
+        sun: { atual: 'Current', manha: 'Morning', meiodia: 'Midday', tarde: 'Late afternoon', golden: 'Golden hour' },
+        editActions: { swap_material: 'Swap material', remove: 'Remove', refine_area: 'Refine area' },
+        lang: { auto: 'Auto', pt: 'Português', en: 'English' },
+        loadingTexts: ['Analyzing composition…', 'Adjusting lighting…', 'Refining materials…', 'Applying photorealism…', 'Generating final version…']
+      }
+    };
+    function tt(key) {
+      var table = UI[model.locale] || UI.pt;
+      var v = table[key] != null ? table[key] : UI.pt[key];
+      if (typeof v === 'function') {
+        var args = Array.prototype.slice.call(arguments, 1);
+        return v.apply(null, args);
+      }
+      return v != null ? v : key;
+    }
+    // Presets: exibição traduzida quando locale=en (valor enviado segue pt-BR).
+    function pLabel(name) {
+      if (model.locale !== 'en') return name;
+      var map = model.catalog && model.catalog.i18n && model.catalog.i18n.en && model.catalog.i18n.en.presets;
+      return (map && map[name]) || name;
+    }
+    function catUi(section) {
+      var i18n = model.catalog && model.catalog.i18n && model.catalog.i18n.en && model.catalog.i18n.en.ui;
+      return (model.locale === 'en' && i18n && i18n[section]) || null;
+    }
+    function localizeStatic() {
+      ['L_projectType','L_segment','L_environment','L_lighting','L_sun','L_elements','L_modelMaterials',
+       'L_fidelity','L_engine','L_resolution','L_advanced','L_history','L_settings','L_edit','L_space',
+       'L_scenes','L_language','L_server'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.textContent = tt(id);
+      });
+      var emptySpans = document.querySelectorAll('#emptyPreview span');
+      if (emptySpans[0]) emptySpans[0].textContent = tt('emptyTitle');
+      if (emptySpans[1]) emptySpans[1].textContent = tt('emptySub');
+      els.captureButton.textContent = tt('captureBtn');
+      els.compareButton.textContent = tt('compareBtn');
+      els.downloadButton.textContent = tt('download');
+      els.openResultButton.textContent = tt('openSite');
+      els.restoreCameraButton.textContent = tt('restoreView');
+      els.upscale2xButton.textContent = tt('upscale2x');
+      els.upscale4xButton.textContent = tt('upscale4x');
+      document.getElementById('tagBefore').textContent = tt('tagBefore');
+      document.getElementById('tagAfter').textContent = tt('tagAfter');
+      els.prompt.placeholder = tt('promptPlaceholder');
+      var promptHint = document.querySelector('#prompt ~ .hint');
+      if (promptHint) promptHint.textContent = tt('promptHint');
+      var sunHint = document.querySelector('#sunPills ~ .hint');
+      if (sunHint) sunHint.textContent = tt('sunHint');
+      var matHint = document.querySelector('#modelMaterialsBlock .hint');
+      if (matHint) matHint.textContent = tt('matHint');
+      var desc = document.getElementById('L_description');
+      if (desc) {
+        desc.childNodes[0].textContent = tt('L_description') + ' ';
+        var opt = desc.querySelector('span');
+        if (opt) opt.textContent = tt('optional');
+      }
+      els.historyMore.textContent = tt('loadMore');
+      els.historyEmpty.textContent = tt('historyEmpty');
+      els.scenesEmpty.textContent = tt('scenesEmpty');
+      els.saveSettingsButton.textContent = tt('save');
+      document.getElementById('pairingTitle').textContent = tt('pairingTitle');
+      document.getElementById('pairingHint').textContent = tt('pairingHint');
+      document.getElementById('pairingReopen').textContent = tt('pairingReopen');
+      document.getElementById('pairingCancel').textContent = tt('pairingCancel');
+      var editHint = document.querySelector('#editSection .batch-note');
+      if (editHint) editHint.textContent = tt('editHint');
+      els.editInstruction.placeholder = tt('editPlaceholder');
+      var editSample = document.querySelector('#editMaterialRow .mname');
+      if (editSample) editSample.textContent = tt('editSample');
+      var spaceHint = document.querySelector('#spaceSection .hint');
+      if (spaceHint) spaceHint.textContent = tt('spaceHint');
+      els.spaceName.placeholder = tt('spaceNamePh');
+      var spaceLabel = document.querySelector('label[for="spaceName"]');
+      if (spaceLabel) spaceLabel.textContent = tt('spaceNameLabel');
+      els.openSpaceButton.textContent = tt('openSpace');
+      var signOut = document.getElementById('signOutLabel');
+      if (signOut) signOut.textContent = tt('signOut');
+      els.balanceRecharge.textContent = tt('recharge');
+      els.cancelButton.textContent = tt('cancel');
+      renderLanguagePills();
+    }
+    function renderLanguagePills() {
+      var el = document.getElementById('languagePills');
+      if (!el) return;
+      el.innerHTML = '';
+      ['auto', 'pt', 'en'].forEach(function (c) {
+        var b = pillButton(tt('lang')[c] || c, model.localeSetting === c, function () {
+          callSketchUp('saveSettings', JSON.stringify({ apiBaseUrl: els.apiBaseUrl.value, locale: c }));
+        });
+        el.appendChild(b);
+      });
+    }
 
-    var SUN_OPTIONS = [
-      { id: 'atual', label: 'Atual' },
-      { id: 'manha', label: 'Manhã' },
-      { id: 'meiodia', label: 'Meio-dia' },
-      { id: 'tarde', label: 'Entardecer' },
-      { id: 'golden', label: 'Golden hour' }
-    ];
+    var SUN_OPTIONS = ['atual', 'manha', 'meiodia', 'tarde', 'golden'];
+    var EDIT_ACTIONS = ['swap_material', 'remove', 'refine_area'];
 
-    var GENERATING_TEXTS = ['Analisando composição…', 'Ajustando iluminação…', 'Refinando materiais…', 'Aplicando fotorrealismo…', 'Gerando versão final…'];
     var generatingTimer = null;
     var elapsedTimer = null;
 
@@ -616,7 +865,7 @@
     function callSketchUp(name, arg) {
       var bridge = window.sketchup && window.sketchup[name];
       if (typeof bridge !== 'function') {
-        showError('Abra este painel dentro do SketchUp.');
+        showError(tt('outsideSketchup'));
         return;
       }
       if (arg === undefined) bridge(); else bridge(arg);
@@ -715,39 +964,39 @@
       var seg = currentSegment();
 
       fill(els.projectTypeCards, (model.catalog.projectTypes || []).map(function (p) {
-        return cardButton(p.label, null, p.id === model.projectType, function () {
+        return cardButton((catUi('projectTypes') || {})[p.id] || p.label, null, p.id === model.projectType, function () {
           model.projectType = p.id; onSelectionChanged();
         });
       }));
 
       fill(els.segmentPills, ((pt && pt.segments) || []).map(function (s) {
-        return pillButton(s.name, seg && s.name === seg.name, function () {
+        return pillButton(pLabel(s.name), seg && s.name === seg.name, function () {
           model.segment = s.name; onSelectionChanged();
         });
       }));
 
       fill(els.environmentPills, ((seg && seg.environments) || []).map(function (e) {
-        return pillButton(e, e === model.environment, function () {
+        return pillButton(pLabel(e), e === model.environment, function () {
           model.environment = e; onSelectionChanged();
         });
       }));
 
       fill(els.lightingPills, ((seg && seg.lighting) || []).map(function (l) {
-        return pillButton(l, l === model.lighting, function () {
+        return pillButton(pLabel(l), l === model.lighting, function () {
           model.lighting = l; onSelectionChanged();
         });
       }));
 
-      els.backgroundLabel.textContent = (pt && pt.backgroundLabel) || 'Contexto visual';
+      els.backgroundLabel.textContent = (pt && ((catUi('backgroundLabels') || {})[pt.id] || pt.backgroundLabel)) || tt('L_environment');
       fill(els.backgroundPills, ((pt && pt.backgrounds) || []).map(function (b) {
-        return pillButton(b, b === model.background, function () {
+        return pillButton(pLabel(b), b === model.background, function () {
           model.background = b; onSelectionChanged();
         });
       }));
 
       fill(els.elementsPills, ((seg && seg.sceneElements) || []).map(function (e) {
         var active = model.sceneElements.indexOf(e) >= 0;
-        var b = pillButton(e, active, function () {
+        var b = pillButton(pLabel(e), active, function () {
           var idx = model.sceneElements.indexOf(e);
           if (idx >= 0) model.sceneElements.splice(idx, 1); else model.sceneElements.push(e);
           onSelectionChanged();
@@ -757,27 +1006,28 @@
       }));
 
       fill(els.fidelityCards, (model.catalog.fidelityLevels || []).map(function (f) {
-        return cardButton(f.label, f.note, f.id === model.fidelityLevel, function () {
+        var fEn = (catUi('fidelity') || {})[f.id];
+        return cardButton((fEn && fEn.label) || f.label, (fEn && fEn.note) || f.note, f.id === model.fidelityLevel, function () {
           model.fidelityLevel = f.id; onSelectionChanged();
         });
       }));
 
       fill(els.engineCards, (model.catalog.engines || []).map(function (e) {
-        return cardButton(e.name, e.tagline, e.id === model.engine, function () {
+        return cardButton(e.name, (catUi('engineTaglines') || {})[e.id] || e.tagline, e.id === model.engine, function () {
           model.engine = e.id; onSelectionChanged();
         });
       }));
 
       var engine = currentEngine();
       fill(els.resolutionCards, ((engine && engine.resolutions) || []).map(function (r) {
-        return cardButton(r.label, r.nodes + ' Nodes por imagem', r.id === model.resolution, function () {
+        return cardButton(r.label, tt('nodesPerImage', r.nodes), r.id === model.resolution, function () {
           model.resolution = r.id; onSelectionChanged();
         });
       }));
 
-      fill(els.sunPills, SUN_OPTIONS.map(function (s) {
-        return pillButton(s.label, s.id === model.sunPreset, function () {
-          model.sunPreset = s.id; onSelectionChanged();
+      fill(els.sunPills, SUN_OPTIONS.map(function (id) {
+        return pillButton(tt('sun')[id] || id, id === model.sunPreset, function () {
+          model.sunPreset = id; onSelectionChanged();
         });
       }));
 
@@ -823,7 +1073,7 @@
         fields.forEach(function (f) {
           var opt = document.createElement('option');
           opt.value = f.id;
-          opt.textContent = f.label;
+          opt.textContent = (catUi('materialFields') || {})[f.id] || f.label;
           select.appendChild(opt);
         });
         select.value = model.materialSel[mat.name] || '';
@@ -838,7 +1088,7 @@
             });
             if (materialSelArray().length >= 4 && !model.materialSel[mat.name]) {
               select.value = '';
-              showNotice('Até 4 materiais por geração.', 'error');
+              showNotice(tt('matCap'), 'error');
               return;
             }
             model.materialSel[mat.name] = field;
@@ -881,18 +1131,14 @@
       var balance = model.totalBalance;
       var insufficient = total != null && balance != null && balance < total;
       els.batchButton.disabled = model.generating || !model.authenticated || !model.catalog || n === 0 || total == null || insufficient;
-      els.batchLabel.textContent = model.batchRunning
-        ? 'gerando cenas…'
-        : (n > 0 ? 'Gerar ' + n + ' cena' + (n === 1 ? '' : 's') : 'Gerar cenas');
-      els.batchMeta.textContent = model.batchRunning || total == null || n === 0 ? '' : total + ' nodes';
-      els.batchNote.textContent = insufficient
-        ? 'Saldo insuficiente pro lote: custa ' + total + ' · você tem ' + balance + '.'
-        : 'Todas as cenas com os mesmos presets e a mesma semente — coerência de material e estilo no conjunto.';
+      els.batchLabel.textContent = model.batchRunning ? tt('batchRunning') : tt('batchLabel', n);
+      els.batchMeta.textContent = model.batchRunning || total == null || n === 0 ? '' : total + ' ' + tt('nodes');
+      els.batchNote.textContent = insufficient ? tt('batchInsufficient', total, balance) : tt('batchNote');
     }
     els.batchButton.addEventListener('click', function () {
       if (model.generating || model.selectedScenes.length === 0) return;
       if (!(window.sketchup && typeof window.sketchup.generateBatch === 'function')) {
-        showError('Abra este painel dentro do SketchUp.');
+        showError(tt('outsideSketchup'));
         return;
       }
       showNotice('', 'success');
@@ -933,7 +1179,7 @@
       if (model.generating || !model.result || !model.result.outputUrl) return;
       showNotice('', 'success');
       startGeneratingUi();
-      els.overlayText.textContent = 'Preparando a ampliação…';
+      els.overlayText.textContent = tt('upscalePrep');
       callSketchUp('upscaleQuote', JSON.stringify({ url: model.result.outputUrl, scale: scale }));
     }
     els.upscale2xButton.addEventListener('click', function () { requestUpscale('2x'); });
@@ -944,9 +1190,9 @@
       var visible = !!(model.result && model.result.outputUrl);
       els.editSection.style.display = visible ? '' : 'none';
       if (!visible) return;
-      fill(els.editActionPills, EDIT_ACTIONS.map(function (a) {
-        return pillButton(a.label, a.id === model.editAction, function () {
-          model.editAction = a.id;
+      fill(els.editActionPills, EDIT_ACTIONS.map(function (id) {
+        return pillButton(tt('editActions')[id] || id, id === model.editAction, function () {
+          model.editAction = id;
           renderEditControls();
           scheduleEditQuote();
         });
@@ -971,8 +1217,8 @@
     function updateEditButton() {
       var hasInstruction = els.editInstruction.value.trim().length > 0;
       els.editButton.disabled = model.generating || !model.authenticated || !hasInstruction;
-      els.editLabel.textContent = model.generating ? 'editando…' : 'Aplicar edição';
-      els.editMeta.textContent = model.editNodes != null && !model.generating ? model.editNodes + ' nodes' : '';
+      els.editLabel.textContent = model.generating ? tt('editing') : tt('applyEdit');
+      els.editMeta.textContent = model.editNodes != null && !model.generating ? model.editNodes + ' ' + tt('nodes') : '';
     }
     var editQuoteTimer = null;
     function scheduleEditQuote() {
@@ -998,7 +1244,7 @@
       if (model.generating || !model.result) return;
       showNotice('', 'success');
       startGeneratingUi();
-      els.overlayText.textContent = 'Editando na SPACENODE…';
+      els.overlayText.textContent = tt('editingOverlay');
       callSketchUp('applyEdit', JSON.stringify({
         action: model.editAction,
         instruction: els.editInstruction.value,
@@ -1026,7 +1272,7 @@
       els.spaceSection.style.display = spaces ? '' : 'none';
       if (!spaces) return;
       fill(els.spaceCategoryPills, (spaces.categories || []).map(function (c) {
-        return pillButton(c.label, c.id === model.spaceCategory, function () {
+        return pillButton((catUi('categories') || {})[c.id] || c.label, c.id === model.spaceCategory, function () {
           model.spaceCategory = c.id;
           renderSpaceControls();
         });
@@ -1042,16 +1288,16 @@
       var total = vista != null ? (spaces.dnaCost || 8) + n * vista : null;
       var insufficient = total != null && model.totalBalance != null && model.totalBalance < total;
       els.spaceButton.disabled = model.generating || !model.authenticated || n === 0 || total == null || insufficient;
-      els.spaceLabel.textContent = model.spaceRunning ? 'criando Space…' : (n > 0 ? 'Criar Space · ' + n + ' vista' + (n === 1 ? '' : 's') : 'Criar Space');
-      els.spaceMeta.textContent = model.spaceRunning || total == null || n === 0 ? '' : total + ' nodes';
+      els.spaceLabel.textContent = model.spaceRunning ? tt('spaceRunning') : tt('createSpace', n);
+      els.spaceMeta.textContent = model.spaceRunning || total == null || n === 0 ? '' : total + ' ' + tt('nodes');
       if (model.selectedScenes.length > (spaces.maxPrints || 10)) {
-        els.spaceNote.textContent = 'Máximo de ' + (spaces.maxPrints || 10) + ' cenas por Space — só as ' + (spaces.maxPrints || 10) + ' primeiras selecionadas entram.';
+        els.spaceNote.textContent = tt('spaceMax', spaces.maxPrints || 10);
       } else if (insufficient) {
-        els.spaceNote.textContent = 'Saldo insuficiente: custa ' + total + ' (' + (spaces.dnaCost || 8) + ' do DNA + ' + n + '×' + vista + ') · você tem ' + model.totalBalance + '.';
+        els.spaceNote.textContent = tt('spaceInsufficient', total, spaces.dnaCost || 8, n, vista, model.totalBalance);
       } else if (n === 0) {
-        els.spaceNote.textContent = 'Selecione as cenas na seção acima — elas viram as vistas do Space.';
+        els.spaceNote.textContent = tt('spaceSelect');
       } else if (total != null) {
-        els.spaceNote.textContent = (spaces.dnaCost || 8) + ' nodes do DNA + ' + n + ' vista' + (n === 1 ? '' : 's') + ' × ' + vista + ' nodes.';
+        els.spaceNote.textContent = tt('spaceCost', spaces.dnaCost || 8, n, vista);
       }
     }
     els.spaceButton.addEventListener('click', function () {
@@ -1066,7 +1312,7 @@
       els.openSpaceButton.style.display = 'none';
       model.spaceRunning = true;
       startGeneratingUi();
-      els.overlayText.textContent = 'Criando o Space…';
+      els.overlayText.textContent = tt('spaceCreatingOverlay');
       callSketchUp('createSpace', JSON.stringify({
         name: els.spaceName.value,
         category: model.spaceCategory,
@@ -1104,12 +1350,12 @@
       var insufficient = model.authenticated && cost != null && balance != null && balance < cost;
 
       els.generateButton.disabled = model.generating || !model.authenticated || !model.catalog || cost == null || insufficient;
-      els.generateLabel.textContent = model.generating ? 'gerando…' : (model.result ? 'Gerar variação' : 'Gerar render');
-      els.generateMeta.textContent = model.generating || cost == null ? '' : cost + ' nodes';
+      els.generateLabel.textContent = model.generating ? tt('generating') : (model.result ? tt('generateVariation') : tt('generateRender'));
+      els.generateMeta.textContent = model.generating || cost == null ? '' : cost + ' ' + tt('nodes');
 
       if (balance != null && cost) {
         var reach = Math.floor(balance / cost);
-        els.reachLine.textContent = 'seu saldo dá para ~' + reach + ' render' + (reach === 1 ? '' : 's') + ' nessa configuração';
+        els.reachLine.textContent = tt('reach', reach);
       } else {
         els.reachLine.textContent = '';
       }
@@ -1117,15 +1363,15 @@
       els.insufficient.classList.toggle('is-visible', !!insufficient);
       if (insufficient) {
         var missing = cost - balance;
-        els.insufficientTitle.textContent = 'Faltam ' + missing + ' node' + (missing === 1 ? '' : 's') + ' pra gerar';
-        els.insufficientMath.textContent = 'Esta geração custa ' + cost + ' · você tem ' + balance;
+        els.insufficientTitle.textContent = tt('missing', missing);
+        els.insufficientMath.textContent = tt('costMath', cost, balance);
         els.insufficientAlt.innerHTML = '';
         var cheapest = cheapestOption();
         if (cheapest && cheapest.nodes <= balance) {
           var span = document.createElement('span');
-          span.textContent = 'Ou gere em ';
+          span.textContent = tt('orPrefix');
           var btn = document.createElement('button');
-          btn.textContent = cheapest.engineName + ' · ' + cheapest.label + ' por ' + cheapest.nodes + ' nodes';
+          btn.textContent = tt('orGenerate', cheapest.engineName, cheapest.label, cheapest.nodes);
           btn.addEventListener('click', function () {
             model.engine = cheapest.engineId;
             model.resolution = cheapest.id;
@@ -1140,8 +1386,8 @@
       els.balanceValue.textContent = balance != null ? String(balance) : '–';
 
       els.connDot.classList.toggle('is-on', model.authenticated);
-      els.connTitle.textContent = model.authenticated ? 'Conectado' : 'Desconectado';
-      els.connectButton.textContent = model.authenticated ? 'Trocar' : 'Conectar';
+      els.connTitle.textContent = model.authenticated ? tt('connTitleOn') : tt('connTitleOff');
+      els.connectButton.textContent = model.authenticated ? tt('switchAccount') : tt('connect');
       els.disconnectButton.style.display = model.authenticated ? '' : 'none';
 
       els.captureButton.disabled = model.generating;
@@ -1231,15 +1477,16 @@
       model.generateStage = 'capture';
       els.previewOverlay.classList.add('is-visible');
       var i = 0;
-      els.overlayText.textContent = 'Capturando a vista…';
+      els.overlayText.textContent = tt('capturingOverlay');
       clearInterval(generatingTimer);
       generatingTimer = setInterval(function () {
         // O rotador só fala durante a etapa longa de geração — as etapas
         // reais (captura/envio/reconciliação) vêm do Ruby e não podem ser
         // atropeladas.
         if (model.generateStage !== 'generate') return;
-        i = (i + 1) % GENERATING_TEXTS.length;
-        els.overlayText.textContent = GENERATING_TEXTS[i];
+        var texts = tt('loadingTexts');
+        i = (i + 1) % texts.length;
+        els.overlayText.textContent = texts[i];
       }, 9000);
       clearInterval(elapsedTimer);
       elapsedTimer = setInterval(function () {
@@ -1327,6 +1574,14 @@
 
     // ── Ações ────────────────────────────────────────────────────────────────
     els.connectButton.addEventListener('click', function () { callSketchUp('connect'); });
+    document.getElementById('pairingReopen').addEventListener('click', function () {
+      if (model.pairing && model.pairing.url) callSketchUp('openUrl', model.pairing.url);
+    });
+    document.getElementById('pairingCancel').addEventListener('click', function () {
+      callSketchUpQuiet('cancelPairing');
+      model.pairing = null;
+      document.getElementById('pairingBox').classList.remove('is-visible');
+    });
     els.disconnectButton.addEventListener('click', function () { callSketchUp('disconnect'); });
     els.captureButton.addEventListener('click', function () {
       showNotice('', 'success');
@@ -1340,7 +1595,7 @@
       model.spaceRunning = false;
       stopGeneratingUi();
       if (elapsed > 8) {
-        showNotice('Cancelado no painel. Se a geração já tinha sido enviada, o render pode aparecer no Histórico (Nodes debitados).', 'error');
+        showNotice(tt('cancelledLate'), 'error');
       }
     });
     els.generateButton.addEventListener('click', submitGenerate);
@@ -1353,7 +1608,7 @@
       // Bridge primeiro: sem SketchUp por trás, não ligar o overlay (ficaria
       // preso pra sempre — nenhum evento viria destravar).
       if (!(window.sketchup && typeof window.sketchup.generate === 'function')) {
-        showError('Abra este painel dentro do SketchUp.');
+        showError(tt('outsideSketchup'));
         return;
       }
       showNotice('', 'success');
@@ -1470,9 +1725,17 @@
           model.sessionFresh = !!payload.sessionFresh;
           model.version = payload.version || model.version;
           model.userEmail = payload.userEmail || null;
+          var localeChanged = payload.locale && payload.locale !== model.locale;
+          if (payload.locale) model.locale = payload.locale;
+          if (payload.localeSetting) model.localeSetting = payload.localeSetting;
+          if (localeChanged || !model.localizedOnce) {
+            model.localizedOnce = true;
+            localizeStatic();
+            renderControls();
+          }
           // Não sobrescrever o campo enquanto o usuário edita.
           if (document.activeElement !== els.apiBaseUrl) els.apiBaseUrl.value = model.apiBaseUrl;
-          els.connSub.textContent = payload.userEmail || 'Conecte sua conta SPACENODE';
+          els.connSub.textContent = payload.userEmail || tt('connSubEmpty');
           if (payload.balance && typeof payload.balance.totalBalance === 'number') {
             model.totalBalance = payload.balance.totalBalance;
           }
@@ -1497,7 +1760,7 @@
         if (event === 'capture') {
           if (payload.width && payload.height) setAspect(payload.width, payload.height);
           showCapture(payload.imageDataUrl);
-          if (!model.generating) setFooter('Vista capturada');
+          if (!model.generating) setFooter(tt('captured'));
         }
 
         if (event === 'status') {
@@ -1522,13 +1785,13 @@
           stopGeneratingUi();
           if (typeof payload.totalBalance === 'number') model.totalBalance = payload.totalBalance;
           showResult(payload);
-          var cost = payload.nodesCharged ? payload.nodesCharged + ' Nodes utilizados.' : 'Render concluído.';
+          var cost = payload.nodesCharged ? tt('nodesUsed', payload.nodesCharged) : tt('renderDone');
           if (payload.fidelityWarning) {
-            showNotice(cost + ' Revise a fidelidade antes de apresentar.', 'error');
+            showNotice(cost + tt('reviewFidelity'), 'error');
           } else {
             showNotice(cost, 'success');
           }
-          setFooter(typeof payload.totalBalance === 'number' ? payload.totalBalance + ' nodes restantes' : 'Render concluído');
+          setFooter(typeof payload.totalBalance === 'number' ? tt('nodesLeft', payload.totalBalance) : tt('renderDone'));
         }
 
         if (event === 'history') {
@@ -1560,7 +1823,7 @@
           els.batchProgress.innerHTML = '';
           els.batchResults.innerHTML = '';
           if (!model.generating) startGeneratingUi();
-          els.overlayText.textContent = 'Cena 1 de ' + payload.total + '…';
+          els.overlayText.textContent = tt('sceneOf', 1, payload.total, null);
           updateBatchButton();
         }
 
@@ -1570,7 +1833,7 @@
             var active = els.batchProgress.querySelector('.is-active');
             if (active) active.classList.remove('is-active');
             els.batchProgress.appendChild(batchRow(label, 'active'));
-            els.overlayText.textContent = 'Cena ' + (payload.done + 1) + ' de ' + payload.total + ' — ' + label;
+            els.overlayText.textContent = tt('sceneOf', payload.done + 1, payload.total, label);
           } else {
             // Fecha a linha "em andamento" desta cena — nunca uma linha já
             // finalizada (done/error de eventos anteriores).
@@ -1580,7 +1843,7 @@
             els.batchProgress.appendChild(batchRow(
               label,
               payload.status === 'done' ? 'done' : 'error',
-              payload.status === 'error' ? (payload.message || 'falhou') : null
+              payload.status === 'error' ? (payload.message || tt('failed')) : null
             ));
             if (payload.status === 'done' && payload.result) {
               if (typeof payload.result.totalBalance === 'number') model.totalBalance = payload.result.totalBalance;
@@ -1604,14 +1867,14 @@
         if (event === 'upscaleQuote') {
           stopGeneratingUi();
           showNotice(
-            'Ampliar ' + payload.scale + ' (' + payload.width + '×' + payload.height + ') custa ' + payload.nodes + ' nodes.',
+            tt('upscaleQuote', payload.scale, payload.width, payload.height, payload.nodes),
             'success',
             {
-              label: 'Aplicar ampliação · ' + payload.nodes + ' nodes',
+              label: tt('applyUpscale', payload.nodes),
               onClick: function () {
                 showNotice('', 'success');
                 startGeneratingUi();
-                els.overlayText.textContent = 'Ampliando na SPACENODE…';
+                els.overlayText.textContent = tt('upscaleOverlay');
                 callSketchUp('confirmUpscale');
               }
             }
@@ -1627,11 +1890,11 @@
 
         if (event === 'editRejected') {
           stopGeneratingUi();
-          showNotice(payload.message || 'Nada foi alterado — refazer é grátis.', 'error');
+          showNotice(payload.message || tt('editRejectedFallback'), 'error');
         }
 
         if (event === 'spaceProgress') {
-          els.overlayText.textContent = payload.message || 'Criando o Space…';
+          els.overlayText.textContent = payload.message || tt('spaceCreatingOverlay');
           var stepRow = document.createElement('div');
           stepRow.className = 'batch-row is-done';
           var d = document.createElement('span'); d.className = 'st';
@@ -1649,7 +1912,7 @@
             if (payload.spaceUrl) {
               model.lastSpace = payload;
               els.openSpaceButton.style.display = '';
-              showNotice('Criação cancelada. O que já foi feito ficou salvo no Space — continue pelo site.', 'error');
+              showNotice(tt('spaceCancelled'), 'error');
             }
             updateGenerateState();
             return;
@@ -1667,8 +1930,8 @@
             img.addEventListener('click', function () { callSketchUp('openUrl', payload.spaceUrl); });
             els.spaceResults.appendChild(img);
           });
-          var msg = 'Space "' + (payload.name || '') + '" criado com ' + vistas.length + ' vista' + (vistas.length === 1 ? '' : 's') + '.';
-          if (vErrors.length) msg += ' ' + vErrors.length + ' não iniciada' + (vErrors.length === 1 ? '' : 's') + ' — gere pelo site sem custo perdido.';
+          var msg = tt('spaceDone', payload.name || '', vistas.length);
+          if (vErrors.length) msg += tt('spaceDoneErrors', vErrors.length);
           showNotice(msg, vistas.length > 0 ? 'success' : 'error');
           updateGenerateState();
         }
@@ -1686,17 +1949,17 @@
           if (payload.aborted && payload.abortMessage) {
             // O erro fatal já chegou pelo evento 'error'.
           } else if (payload.cancelled) {
-            showNotice(ok + ' cena' + (ok === 1 ? '' : 's') + ' gerada' + (ok === 1 ? '' : 's') + ' antes do cancelamento.', ok > 0 ? 'success' : 'error');
+            showNotice(tt('batchCancelled', ok), ok > 0 ? 'success' : 'error');
           } else if (bad > 0) {
-            showNotice(ok + ' de ' + payload.total + ' cenas geradas — ' + bad + ' falhou' + (bad === 1 ? '' : 'aram') + '. Nenhum node foi consumido nas que falharam.', 'error');
+            showNotice(tt('batchPartial', ok, payload.total, bad), 'error');
           } else if (ok > 0) {
-            showNotice(ok + ' cena' + (ok === 1 ? '' : 's') + ' gerada' + (ok === 1 ? '' : 's') + '. Clique nas miniaturas pra revisar.', 'success');
+            showNotice(tt('batchOk', ok), 'success');
           }
           updateGenerateState();
         }
 
         if (event === 'saved') {
-          showNotice('Render salvo em ' + payload.path, 'success');
+          showNotice(tt('savedAt', payload.path), 'success');
           setFooter('');
         }
 
@@ -1711,9 +1974,9 @@
           }
           if (payload.authExpired) {
             model.authenticated = false;
-            els.connSub.textContent = 'Conecte sua conta SPACENODE';
-            showNotice(payload.message || 'Sua sessão expirou.', 'error', {
-              label: 'Reconectar',
+            els.connSub.textContent = tt('connSubEmpty');
+            showNotice(payload.message || tt('sessionGone'), 'error', {
+              label: tt('reconnect'),
               onClick: function () { callSketchUp('connect'); }
             });
           } else {
@@ -1723,10 +1986,23 @@
           setFooter('');
         }
 
+        if (event === 'pairing') {
+          model.pairing = payload;
+          document.getElementById('pairingCode').textContent = payload.code || '';
+          document.getElementById('pairingBox').classList.add('is-visible');
+          setFooter(tt('pairingTitle'));
+        }
+
+        if (event === 'pairingDone') {
+          model.pairing = null;
+          document.getElementById('pairingBox').classList.remove('is-visible');
+          setFooter('');
+        }
+
         if (event === 'catalogError') {
           if (!model.catalog) {
-            showNotice('Não foi possível carregar os presets e custos.', 'error', {
-              label: 'Tentar de novo',
+            showNotice(tt('catalogError'), 'error', {
+              label: tt('tryAgain'),
               onClick: function () { callSketchUp('refreshCatalog'); }
             });
           }
