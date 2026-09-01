@@ -825,6 +825,33 @@ module SpaceNode
       [(azimuth + 180.0) % 360.0, elevation]
     end
 
+    # Ativa uma cena PRA CAPTURA de forma fiel. O selected_page= aplica
+    # tags/estilo/sombras, MAS a troca de câmera dele é ADIADA (anima "como se
+    # o usuário clicasse na aba") e não assenta antes do write_image seguinte
+    # — por isso todas as cenas saíam com a vista que estava na tela. A cura é
+    # setar view.camera direto: manipulação de câmera é SÍNCRONA e o
+    # write_image (source :image) renderiza a partir dela na hora.
+    def apply_page_for_capture(model, page)
+      pages = model.pages
+      begin
+        old_transition = page.transition_time
+        begin
+          page.transition_time = 0
+          pages.selected_page = page
+        ensure
+          page.transition_time = old_transition if old_transition
+        end
+      rescue StandardError
+        nil
+      end
+      begin
+        uses_camera = page.respond_to?(:use_camera?) ? page.use_camera? : true
+        model.active_view.camera = page.camera if uses_camera
+      rescue StandardError
+        nil
+      end
+    end
+
     def snapshot_camera(view)
       camera = view.camera
       data = {
@@ -1316,19 +1343,7 @@ module SpaceNode
         :sceneName => ctx[:current_scene], :status => 'generating'
       })
 
-      # Ativa a cena SEM animação (a transição capturaria o meio do caminho).
-      # transition_time é persistido no .skp — o restauro fica num ensure.
-      begin
-        old_transition = page.transition_time
-        begin
-          page.transition_time = 0
-          pages.selected_page = page
-        ensure
-          page.transition_time = old_transition if old_transition
-        end
-      rescue StandardError
-        nil
-      end
+      apply_page_for_capture(model, page)
 
       payload = ctx[:payload].dup
       payload['seed'] = ctx[:shared_seed] if ctx[:shared_seed]
@@ -2511,15 +2526,7 @@ module SpaceNode
           pages.each { |p| match = p if match.nil? && p.name.to_s == expected_name }
           page = match
         end
-        if page
-          old_transition = page.transition_time
-          begin
-            page.transition_time = 0
-            pages.selected_page = page
-          ensure
-            page.transition_time = old_transition if old_transition
-          end
-        end
+        apply_page_for_capture(model, page) if page
       rescue StandardError
         page = nil
       end
