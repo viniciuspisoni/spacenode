@@ -809,7 +809,7 @@ function buildRefinementBlock(refinementText?: string, hasAnchor?: boolean, leve
 // Fatos medidos do modelo 3D em bloco factual curto. Números clampados na
 // rota; aqui só formatação. Nunca contradiz os locks: reforça consistência
 // com as sombras/perspectiva JÁ VISÍVEIS na referência.
-function buildModelFactsBlock(facts?: ModelFacts): string {
+function buildModelFactsBlock(facts?: ModelFacts, includeSun: boolean = true): string {
   if (!facts) return ''
   const parts: string[] = []
 
@@ -823,7 +823,9 @@ function buildModelFactsBlock(facts?: ModelFacts): string {
     parts.push(line + '.')
   }
 
-  const sun = facts.sun
+  // Quando o usuário pediu uma iluminação diferente da capturada, o bloco de
+  // sol contradiria o override (e vice-versa) — só a câmera entra.
+  const sun = includeSun ? facts.sun : undefined
   if (sun && typeof sun.elevationDeg === 'number') {
     if (sun.elevationDeg > 0) {
       const bits: string[] = [`elevation ${Math.round(sun.elevationDeg)}°`]
@@ -1070,7 +1072,7 @@ export function buildFidelityPrompt(
       anchor +
       head +
       buildSceneContextBlock(projectType, segment, environment) +
-      buildModelFactsBlock(modelFacts) +
+      buildModelFactsBlock(modelFacts, preserveLighting) +
       buildEdgeMapBlock(renderOnly?.edgeMapImageIndex) +
       buildDepthMapBlock(renderOnly?.depthMapImageIndex) +
       refinement +

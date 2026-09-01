@@ -134,7 +134,9 @@ function sanitizeModelFacts(raw: unknown): ModelFacts | undefined {
   }
   const str = (v: unknown, maxLen: number): string | undefined => {
     if (typeof v !== 'string') return undefined
-    const trimmed = v.trim().replace(/[\r\n]+/g, ' ').slice(0, maxLen)
+    // Remove TODOS os controles/formatadores (não só \r\n): um NUL em city
+    // dentro do config_snapshot jsonb derrubaria o INSERT do histórico.
+    const trimmed = v.replace(/[\p{Cc}\p{Cf}]+/gu, ' ').trim().slice(0, maxLen)
     return trimmed || undefined
   }
 
@@ -557,17 +559,27 @@ export async function POST(req: NextRequest) {
     let edgeMapNative = false
     if (renderOnlyActive && typeof edgeMapKey === 'string' && edgeMapKey) {
       try {
-        const edge = await downloadDirectUpload(
-          admin, DIRECT_UPLOAD_AREAS['render-source'], user.id, {}, edgeMapKey,
-        )
-        if (edge.ok) {
-          edgeMapUrl = await fal.storage.upload(
-            new File([new Uint8Array(edge.buffer)], 'edge-map.png', { type: edge.mime || 'image/png' }),
-          )
+        // Teto de 15s: roda pós-débito dentro do orçamento de 280s — um
+        // storage lento não pode comer o tempo das tentativas de geração.
+        const native = await Promise.race([
+          (async () => {
+            const edge = await downloadDirectUpload(
+              admin, DIRECT_UPLOAD_AREAS['render-source'], user.id, {}, edgeMapKey,
+            )
+            if (!edge.ok) {
+              console.warn('[generate:fidelity] edge map nativo rejeitado (segue derivado):', edge.message)
+              return null
+            }
+            return fal.storage.upload(
+              new File([new Uint8Array(edge.buffer)], 'edge-map.png', { type: edge.mime || 'image/png' }),
+            )
+          })(),
+          new Promise<null>(resolve => setTimeout(() => resolve(null), 15_000)),
+        ])
+        if (native) {
+          edgeMapUrl = native
           edgeMapNative = true
           devLog('[generate:fidelity] edge map nativo em uso:', edgeMapKey)
-        } else {
-          console.warn('[generate:fidelity] edge map nativo rejeitado (segue derivado):', edge.message)
         }
       } catch (edgeErr) {
         console.warn('[generate:fidelity] edge map nativo indisponível (segue derivado):', (edgeErr as Error).message)

@@ -844,8 +844,14 @@
       els.batchResults.innerHTML = '';
       model.batchRunning = true;
       startGeneratingUi();
+      var sceneEntries = [];
+      model.selectedScenes.forEach(function (i) {
+        var s = null;
+        model.scenes.forEach(function (sc) { if (sc.index === i) s = sc; });
+        if (s) sceneEntries.push({ index: s.index, name: s.name });
+      });
       callSketchUp('generateBatch', JSON.stringify({
-        sceneIndexes: model.selectedScenes,
+        scenes: sceneEntries,
         prompt: els.prompt.value,
         projectType: model.projectType,
         segment: model.segment,
@@ -1351,8 +1357,10 @@
             els.batchProgress.appendChild(batchRow(label, 'active'));
             els.overlayText.textContent = 'Cena ' + (payload.done + 1) + ' de ' + payload.total + ' — ' + label;
           } else {
-            var rows = els.batchProgress.querySelectorAll('.batch-row');
-            var last = rows.length ? rows[rows.length - 1] : null;
+            // Fecha a linha "em andamento" desta cena — nunca uma linha já
+            // finalizada (done/error de eventos anteriores).
+            var actives = els.batchProgress.querySelectorAll('.is-active');
+            var last = actives.length ? actives[actives.length - 1] : null;
             if (last) last.remove();
             els.batchProgress.appendChild(batchRow(
               label,
@@ -1381,6 +1389,11 @@
         if (event === 'batchDone') {
           model.batchRunning = false;
           stopGeneratingUi();
+          // Nenhuma linha pode sobrar como "em andamento" num lote encerrado.
+          els.batchProgress.querySelectorAll('.is-active').forEach(function (row) {
+            row.classList.remove('is-active');
+            row.classList.add('is-error');
+          });
           var ok = Array.isArray(payload.results) ? payload.results.length : 0;
           var bad = Array.isArray(payload.errors) ? payload.errors.length : 0;
           if (payload.aborted && payload.abortMessage) {
@@ -1404,7 +1417,10 @@
           // Só erros que encerram uma geração (generation:true) destravam a
           // UI de "gerando" — um erro paralelo (histórico, sessão) não pode
           // soltar o overlay de uma geração em andamento.
-          if (payload.generation) stopGeneratingUi();
+          if (payload.generation) {
+            model.batchRunning = false;
+            stopGeneratingUi();
+          }
           if (payload.authExpired) {
             model.authenticated = false;
             els.connSub.textContent = 'Conecte sua conta SPACENODE';

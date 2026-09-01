@@ -32,6 +32,7 @@ module SpaceNode
     MIN_SKETCHUP_MAJOR = 21          # Ruby 2.7+; recomendado 2024+
     CATALOG_TTL_SECONDS = 6 * 3600
     GENERATE_TIMEOUT_SECONDS = 320   # /api/generate tem maxDuration=300
+    UPLOAD_TIMEOUT_SECONDS = 120     # sign/PUT/confirm (Sketchup::Http não tem timeout)
     SILENT_AUTH_TIMEOUT_SECONDS = 25
 
     # Lado maior da captura por resolução de saída. O servidor normaliza em
@@ -42,9 +43,13 @@ module SpaceNode
     # Higiene de captura: opções que poluem a imagem que a IA vê (sketchy
     # edges, extensão de linha, névoa, guias, grade de seção). Salvas e
     # RESTAURADAS MANUALMENTE — RenderingOptions não entram em operações.
+    # 'EdgeType' 0 = arestas padrão (1 = sketchy/NPR) — a chave
+    # 'DisplaySketchEdges' NÃO existe em RenderingOptions. Sombras vivem em
+    # ShadowInfo, não aqui.
     CLEAN_CAPTURE_OPTIONS = {
       'DisplaySectionPlanes' => false,
-      'DisplaySketchEdges' => false,
+      'EdgeType' => 0,
+      'JitterEdges' => false,
       'ExtendLines' => false,
       'DrawDepthQue' => false,
       'DrawLineEnds' => false,
@@ -54,10 +59,11 @@ module SpaceNode
 
     # Edge map nativo: hidden-line (RenderMode 1) da MESMA câmera — mapa de
     # arestas geometricamente exato pro condicionamento estrutural do backend.
+    # Sombras são desligadas via ShadowInfo no bloco da captura do edge.
     EDGE_CAPTURE_OPTIONS = {
       'RenderMode' => 1,
-      'DisplayShadows' => false,
-      'DisplaySketchEdges' => false,
+      'EdgeType' => 0,
+      'JitterEdges' => false,
       'ExtendLines' => false,
       'DrawLineEnds' => false,
       'DisplayFog' => false
@@ -163,7 +169,9 @@ module SpaceNode
         begin
           handle_generate_batch(raw)
         rescue StandardError => e
-          emit_error(e.message)
+          # generation:true: o painel armou a UI de lote no clique e um erro
+          # aqui encerra a tentativa — precisa desarmar.
+          emit_error(e.message, false, true)
         end
       end
       dialog.add_action_callback('listScenes') do |_ctx|
@@ -620,7 +628,12 @@ module SpaceNode
         :up => camera.up.to_a,
         :perspective => camera.perspective? ? true : false
       }
-      data[:fov] = camera.fov if camera.perspective?
+      if camera.perspective?
+        data[:fov] = camera.fov
+      else
+        # Em projeção paralela o "zoom" é a altura de vista (polegadas).
+        data[:height] = camera.height
+      end
       data
     rescue StandardError
       nil
@@ -645,6 +658,8 @@ module SpaceNode
       fov = data['fov']
       if data['perspective'] == false
         camera.perspective = false
+        height = data['height']
+        camera.height = height if height.is_a?(Numeric) && height > 0
       elsif fov.is_a?(Numeric) && fov > 0
         camera.fov = fov
       end
@@ -664,8 +679,9 @@ module SpaceNode
     end
 
     # Fatos medidos do modelo pro prompt (câmera + sol) — best-effort: nil
-    # em qualquer falha; o servidor sanitiza de novo.
-    def collect_model_facts(sun_preset)
+    # em qualquer falha; o servidor sanitiza de novo. Lê o estado VIGENTE
+    # (chamado dentro da captura, com override de sol ainda aplicado).
+    def collect_model_facts
       model = ::Sketchup.active_model
       return nil unless model
 
@@ -704,9 +720,7 @@ module SpaceNode
           }
           city = shadow['City'].to_s
           sun[:city] = city[0, 40] unless city.empty?
-          shadows_on = shadow['DisplayShadows'] ? true : false
-          shadows_on = true if sun_preset.to_s != '' && sun_preset.to_s != 'atual'
-          sun[:shadowsVisible] = true if shadows_on
+          sun[:shadowsVisible] = true if shadow['DisplayShadows']
           facts[:sun] = sun
         end
       rescue StandardError
@@ -877,11 +891,26 @@ module SpaceNode
         )
         @last_preview_path = File.exist?(preview) ? preview : nil
 
+        # Fatos do modelo coletados AQUI, com o override de sol ainda
+        # aplicado — coletar depois do ensure descreveria o sol restaurado,
+        # contradizendo as sombras realmente visíveis na captura.
+        facts = collect_model_facts
+
         # Edge map nativo: hidden-line da MESMA câmera, MESMO tamanho (o
         # condicionamento estrutural exige alinhamento pixel a pixel).
         # Falha aqui nunca derruba a captura — segue sem edge map.
         if opts[:edge_map]
           edge_saved = apply_rendering_options(rendering, EDGE_CAPTURE_OPTIONS)
+          # Sombras poluiriam o mapa de arestas (hidden line renderiza
+          # sombras!) — desligadas via ShadowInfo, que é onde elas vivem.
+          edge_shadow_prev = nil
+          begin
+            shadow = model.shadow_info
+            edge_shadow_prev = shadow['DisplayShadows'] ? true : nil
+            shadow['DisplayShadows'] = false if edge_shadow_prev
+          rescue StandardError
+            edge_shadow_prev = nil
+          end
           begin
             candidate = File.join(Dir.tmpdir, "spacenode-edge-#{stamp}.png")
             edge_options = {
@@ -897,6 +926,13 @@ module SpaceNode
             edge_path = nil
           ensure
             restore_rendering_options(rendering, edge_saved)
+            if edge_shadow_prev
+              begin
+                model.shadow_info['DisplayShadows'] = true
+              rescue StandardError
+                nil
+              end
+            end
           end
         end
       ensure
@@ -907,7 +943,7 @@ module SpaceNode
       @last_capture_size = [width, height]
       @last_capture_mime = path.end_with?('.jpg') ? 'image/jpeg' : 'image/png'
       @last_capture_camera = snapshot_camera(view)
-      { :path => path, :edge_path => edge_path }
+      { :path => path, :edge_path => edge_path, :facts => facts }
     end
 
     def thumbnail_data_url(path)
@@ -918,7 +954,9 @@ module SpaceNode
     end
 
     def cleanup_stale_captures
-      pattern = File.join(Dir.tmpdir, 'spacenode-viewport-*')
+      # Cobre viewport, edge map e texturas de material — os caminhos de
+      # falha/cancelamento deixam órfãos que só esta varredura recolhe.
+      pattern = File.join(Dir.tmpdir, 'spacenode-*')
       cutoff = Time.now - (24 * 3600)
       Dir.glob(pattern).each do |file|
         begin
@@ -984,23 +1022,28 @@ module SpaceNode
         return
       end
 
-      indexes = Array(payload['sceneIndexes']).map { |i| i.to_i }.uniq
-      if indexes.empty?
+      # Identidade das cenas viaja como {index, name} — o nome é a âncora
+      # caso as cenas tenham mudado no SketchUp desde o clique.
+      entries = Array(payload['scenes']).select { |s| s.is_a?(Hash) }
+      entries = Array(payload['sceneIndexes']).map { |i| { 'index' => i.to_i } } if entries.empty?
+      if entries.empty?
         emit_error('Selecione ao menos uma cena.')
         return
       end
 
       unless session_fresh?
         @pending_generate = nil
-        emit_error('Sua sessão está renovando — tente de novo em instantes.', false)
+        # generation:true — o painel acabou de armar a UI de lote e precisa
+        # desarmar (a renovação silenciosa roda em paralelo).
+        emit_error('Sua sessão está renovando — tente de novo em instantes.', false, true)
         show_auth_dialog(true)
         return
       end
 
-      run_batch(payload, indexes)
+      run_batch(payload, entries)
     end
 
-    def run_batch(payload, indexes)
+    def run_batch(payload, entries)
       model = ::Sketchup.active_model
       raise 'Nenhum modelo aberto no SketchUp.' unless model
 
@@ -1046,16 +1089,32 @@ module SpaceNode
         return
       end
 
-      index = ctx[:queue].shift
+      entry = ctx[:queue].shift
+      index = entry.is_a?(Hash) ? entry['index'].to_i : entry.to_i
+      expected_name = entry.is_a?(Hash) ? entry['name'].to_s : ''
       pages = model.pages
       page = nil
       begin
         page = pages[index]
+        # O painel selecionou por índice num instante anterior — se as cenas
+        # mudaram no SketchUp, o índice pode apontar pra OUTRA página.
+        # A identidade é o nome: divergiu, busca por nome; sumiu, pula.
+        if page && !expected_name.empty? && page.name.to_s != expected_name
+          match = nil
+          pages.each { |p| match = p if match.nil? && p.name.to_s == expected_name }
+          page = match
+        end
       rescue StandardError
         page = nil
       end
       unless page
-        ctx[:errors] << { :scene => "Cena #{index + 1}", :message => 'Cena não encontrada.' }
+        label = expected_name.empty? ? "Cena #{index + 1}" : expected_name
+        ctx[:errors] << { :scene => label, :message => 'Cena não encontrada no modelo.' }
+        emit('batchProgress', {
+          :done => ctx[:done], :total => ctx[:total],
+          :sceneName => label, :status => 'error',
+          :message => 'Cena não encontrada no modelo.'
+        })
         process_next_scene
         return
       end
@@ -1067,11 +1126,15 @@ module SpaceNode
       })
 
       # Ativa a cena SEM animação (a transição capturaria o meio do caminho).
+      # transition_time é persistido no .skp — o restauro fica num ensure.
       begin
         old_transition = page.transition_time
-        page.transition_time = 0
-        pages.selected_page = page
-        page.transition_time = old_transition
+        begin
+          page.transition_time = 0
+          pages.selected_page = page
+        ensure
+          page.transition_time = old_transition if old_transition
+        end
       rescue StandardError
         nil
       end
@@ -1111,7 +1174,7 @@ module SpaceNode
       @last_capture_path = capture[:path]
       emit('capture', capture_event_payload(capture[:path]))
 
-      facts = collect_model_facts(payload['sunPreset'])
+      facts = capture[:facts]
       camera = @last_capture_camera
       mime = @last_capture_mime || 'image/png'
 
@@ -1172,12 +1235,37 @@ module SpaceNode
         end
         next unless material && material.texture
 
-        tmp = File.join(Dir.tmpdir, "spacenode-mat-#{SecureRandom.hex(4)}.png")
+        # Texture#write NÃO converte formato pela extensão — preserva os
+        # bytes de origem. Extensão+mime saem do arquivo original; formatos
+        # fora de jpg/png são pulados (a área só aceita jpeg/png/webp).
+        source_ext = ''
+        begin
+          source_ext = File.extname(material.texture.filename.to_s).downcase
+        rescue StandardError
+          source_ext = ''
+        end
+        ext, mime =
+          case source_ext
+          when '.jpg', '.jpeg' then ['.jpg', 'image/jpeg']
+          when '.png', ''      then ['.png', 'image/png']
+          end
+        next unless ext
+
+        tmp = File.join(Dir.tmpdir, "spacenode-mat-#{SecureRandom.hex(4)}#{ext}")
         written = false
         begin
-          written = material.texture.write(tmp)
+          # colorize=true respeita o ajuste de cor do material (o que o
+          # usuário vê no viewport); fallback pro write simples.
+          written = material.texture.write(tmp, true)
         rescue StandardError
           written = false
+        end
+        unless written
+          begin
+            written = material.texture.write(tmp)
+          rescue StandardError
+            written = false
+          end
         end
         next unless written && File.exist?(tmp)
         if File.size(tmp) > 7_800_000
@@ -1185,7 +1273,7 @@ module SpaceNode
           next
         end
 
-        jobs << { :path => tmp, :field => field }
+        jobs << { :path => tmp, :field => field, :mime => mime }
       end
 
       results = []
@@ -1195,7 +1283,7 @@ module SpaceNode
           done.call(results)
         else
           job = jobs.shift
-          upload_direct(job[:path], 'image/png', 'render-material', true, epoch, :optional => true) do |_key, url|
+          upload_direct(job[:path], job[:mime] || 'image/png', 'render-material', true, epoch, :optional => true) do |_key, url|
             delete_quiet(job[:path])
             results << { :field => job[:field], :url => url } if url && !url.empty?
             step.call
@@ -1209,22 +1297,41 @@ module SpaceNode
     # Upload direto genérico: sign → PUT (→ confirm quando o consumidor
     # precisa da URL pública). :optional => true não derruba a geração em
     # falha — devolve nil e o chamador segue sem o arquivo.
+    #
+    # Nesta fase NADA foi cobrado: falha aqui falha na hora (nunca cai na
+    # reconciliação, que existe só pro POST /api/generate). O watchdog cobre
+    # o caso de request que nunca responde (Sketchup::Http não tem timeout).
     def upload_direct(path, mime, area, want_url, epoch, opts = {}, &done)
       optional = opts[:optional] ? true : false
+      settled = { :done => false }
+      settle = proc do |key, url|
+        unless settled[:done]
+          settled[:done] = true
+          done.call(key, url)
+        end
+      end
       on_fail = proc do |error|
-        if generation_alive?(epoch)
+        if generation_alive?(epoch) && !settled[:done]
           if optional
-            done.call(nil, nil)
+            settle.call(nil, nil)
           else
-            generation_error_handler_for(epoch).call(error)
+            settled[:done] = true
+            status = error.respond_to?(:status) ? error.status : nil
+            fail_generation(error.message, status == 401, status)
           end
+        end
+      end
+
+      ::UI.start_timer(UPLOAD_TIMEOUT_SECONDS, false) do
+        if generation_alive?(epoch) && !settled[:done]
+          on_fail.call(ApiError.new('O envio travou. Verifique a internet e tente de novo.'))
         end
       end
 
       size = File.size(path)
       sign_body = { :area => area, :contentType => mime, :sizeBytes => size }
       json_request(:post, '/api/uploads/sign', sign_body, on_fail) do |sign|
-        next unless generation_alive?(epoch)
+        next unless generation_alive?(epoch) && !settled[:done]
 
         upload_url = sign['uploadUrl'].to_s
         key = sign['key'].to_s
@@ -1235,7 +1342,7 @@ module SpaceNode
 
         binary = File.binread(path)
         http_request(:put, upload_url, :body => binary, :content_type => mime, :auth => false) do |response|
-          next unless generation_alive?(epoch)
+          next unless generation_alive?(epoch) && !settled[:done]
 
           status = response.status_code.to_i
           unless status >= 200 && status < 300
@@ -1245,12 +1352,12 @@ module SpaceNode
 
           if want_url
             json_request(:post, '/api/uploads/confirm', { :area => area, :key => key }, on_fail) do |confirm|
-              next unless generation_alive?(epoch)
+              next unless generation_alive?(epoch) && !settled[:done]
 
-              done.call(key, confirm['url'].to_s)
+              settle.call(key, confirm['url'].to_s)
             end
           else
-            done.call(key, nil)
+            settle.call(key, nil)
           end
         end
       end
@@ -1413,12 +1520,17 @@ module SpaceNode
             end
           end
           if found && found['output_url']
+            ctx = @generation_context
             finish_generation(
-              'outputUrl' => found['output_url'],
-              'previewUrl' => found['preview_url'],
-              'originalUrl' => found['input_url'],
-              'renderId' => found['id'],
-              'nodesCharged' => found['nodes_charged']
+              {
+                'outputUrl' => found['output_url'],
+                'previewUrl' => found['preview_url'],
+                'originalUrl' => found['input_url'],
+                'renderId' => found['id'],
+                'nodesCharged' => found['nodes_charged']
+              },
+              :camera => @last_capture_camera,
+              :scene_name => ctx && ctx[:mode] == :batch ? ctx[:current_scene] : nil
             )
           else
             fail_generation('A conexão caiu durante a geração. Veja o Histórico antes de gerar de novo — os Nodes podem ter sido usados.')
@@ -1463,6 +1575,14 @@ module SpaceNode
 
       if ctx && ctx[:mode] == :batch
         if auth_expired || status == 402
+          # A cena corrente vira erro visível antes do encerramento — senão
+          # a linha dela fica presa como "em andamento" num lote morto.
+          ctx[:errors] << { :scene => ctx[:current_scene].to_s, :message => message.to_s }
+          emit('batchProgress', {
+            :done => ctx[:done], :total => ctx[:total],
+            :sceneName => ctx[:current_scene], :status => 'error',
+            :message => message.to_s
+          })
           finalize_batch(message, auth_expired)
         else
           ctx[:errors] << { :scene => ctx[:current_scene].to_s, :message => message.to_s }
@@ -1508,9 +1628,12 @@ module SpaceNode
       page = model.pages[ctx[:original_scene]]
       if page
         old_transition = page.transition_time
-        page.transition_time = 0
-        model.pages.selected_page = page
-        page.transition_time = old_transition
+        begin
+          page.transition_time = 0
+          model.pages.selected_page = page
+        ensure
+          page.transition_time = old_transition if old_transition
+        end
       end
     rescue StandardError
       nil
