@@ -271,6 +271,24 @@
     .history-more { margin-top: 8px; width: 100%; height: 30px; }
     .history-empty { font-size: 11px; color: var(--text-3); }
 
+    /* ── Máscara de edição por área ── */
+    .mask-canvas {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      display: none; cursor: crosshair; touch-action: none; z-index: 3;
+    }
+    .preview.is-masking .mask-canvas { display: block; }
+    .preview.is-masking { cursor: crosshair; }
+    .mask-tools { display: flex; gap: 6px; margin-top: 10px; }
+    .mask-tools .ghost { flex: 1; }
+    #maskToggle.is-active { background: var(--chip-active); color: var(--chip-active-fg); border-color: var(--chip-active); }
+    .mask-hint {
+      position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: 4;
+      text-align: center; font-size: 10px; color: var(--text-2);
+      background: rgba(0,0,0,0.55); border-radius: 6px; padding: 4px 8px;
+      pointer-events: none; display: none;
+    }
+    .preview.is-masking .mask-hint { display: block; }
+
     /* ── Cenas em lote / materiais ── */
     .scenes-count { letter-spacing: 0; text-transform: none; font-weight: 500; }
     .cta--batch { margin-top: 12px; height: 38px; font-size: 12px; }
@@ -358,6 +376,8 @@
         <span class="preview-tag" id="tagBefore">Antes</span>
         <span class="preview-tag" id="tagAfter">Depois</span>
         <input class="compare-range" id="compareRange" type="range" min="0" max="100" value="50" aria-label="Comparar antes e depois">
+        <canvas class="mask-canvas" id="maskCanvas"></canvas>
+        <div class="mask-hint" id="maskHint">Pinte sobre a área a editar</div>
         <div class="empty-preview" id="emptyPreview">
           <span>A vista atual do SketchUp vira o seu render.</span>
           <span style="font-size:11px">Capture pra conferir o enquadramento — ou clique em Gerar direto.</span>
@@ -394,6 +414,10 @@
         <summary id="L_edit">Editar este render</summary>
         <div class="details-body">
           <div class="pills" id="editActionPills" role="radiogroup" aria-label="Tipo de edição"></div>
+          <div class="mask-tools">
+            <button class="ghost" id="maskToggle">Selecionar área</button>
+            <button class="ghost" id="maskClear" style="display:none">Limpar seleção</button>
+          </div>
           <textarea id="editInstruction" style="margin-top:10px;min-height:60px" placeholder="Ex.: trocar o piso por carvalho claro / remover o pendente sobre a bancada"></textarea>
           <div id="editMaterialRow" style="display:none;margin-top:8px" class="material-row">
             <span class="mname">Amostra do modelo (opcional)</span>
@@ -586,6 +610,8 @@
       editAction: 'swap_material',
       editQuoteId: 0,
       editNodes: null,
+      maskActive: false,
+      maskStrokes: [],
       spaceCategory: 'residencial',
       spaceRunning: false,
       lastSpace: null,
@@ -644,6 +670,8 @@
         editHint: 'Só a alteração pedida muda — todo o resto do render é preservado. Edição recusada pelo controle de qualidade não é cobrada.',
         editPlaceholder: 'Ex.: trocar o piso por carvalho claro / remover o pendente sobre a bancada',
         editSample: 'Amostra do modelo (opcional)',
+        maskSelect: 'Selecionar área', maskDone: 'Concluir seleção', maskClear: 'Limpar seleção',
+        maskHint: 'Pinte sobre a área a editar',
         applyEdit: 'Aplicar edição', editing: 'editando…', editingOverlay: 'Editando na SPACENODE…',
         editRejectedFallback: 'Nada foi alterado — refazer é grátis.',
         spaceHint: 'A vista atual vira a identidade do projeto (DNA); as cenas selecionadas acima viram vistas coerentes entre si.',
@@ -720,6 +748,8 @@
         editHint: 'Only what you ask for changes — everything else in the render is preserved. Edits declined by quality control are not charged.',
         editPlaceholder: 'E.g. swap the floor to light oak / remove the pendant over the counter',
         editSample: 'Model sample (optional)',
+        maskSelect: 'Select area', maskDone: 'Done selecting', maskClear: 'Clear selection',
+        maskHint: 'Paint over the area to edit',
         applyEdit: 'Apply edit', editing: 'editing…', editingOverlay: 'Editing on SPACENODE…',
         editRejectedFallback: 'Nothing was changed — retrying is free.',
         spaceHint: 'The current view becomes the project identity (DNA); the scenes selected above become consistent views.',
@@ -815,6 +845,9 @@
       els.editInstruction.placeholder = tt('editPlaceholder');
       var editSample = document.querySelector('#editMaterialRow .mname');
       if (editSample) editSample.textContent = tt('editSample');
+      els.maskToggle.textContent = model.maskActive ? tt('maskDone') : tt('maskSelect');
+      els.maskClear.textContent = tt('maskClear');
+      els.maskHint.textContent = tt('maskHint');
       var spaceHint = document.querySelector('#spaceSection .hint');
       if (spaceHint) spaceHint.textContent = tt('spaceHint');
       els.spaceName.placeholder = tt('spaceNamePh');
@@ -858,7 +891,8 @@
      'restoreCameraButton','scenesSection','scenesCount','scenesPills','scenesEmpty','batchButton','batchLabel','batchMeta',
      'batchNote','batchProgress','batchResults','sunPills','modelMaterialsBlock','materialsList',
      'upscale2xButton','upscale4xButton','editSection','editActionPills','editInstruction','editMaterialRow',
-     'editMaterialSelect','editButton','editLabel','editMeta','spaceSection','spaceName','spaceCategoryPills',
+     'editMaterialSelect','editButton','editLabel','editMeta','maskCanvas','maskHint','maskToggle','maskClear',
+     'spaceSection','spaceName','spaceCategoryPills',
      'spaceButton','spaceLabel','spaceMeta','spaceNote','spaceProgress','spaceResults','openSpaceButton'
     ].forEach(function (id) { els[id] = $(id); });
 
@@ -1216,7 +1250,11 @@
     }
     function updateEditButton() {
       var hasInstruction = els.editInstruction.value.trim().length > 0;
-      els.editButton.disabled = model.generating || !model.authenticated || !hasInstruction;
+      var hasMask = model.maskStrokes.length > 0;
+      var maskAction = model.editAction === 'remove' || model.editAction === 'refine_area';
+      // Remover/refinar COM área marcada dispensam texto (a área diz onde).
+      var ready = hasInstruction || (hasMask && maskAction);
+      els.editButton.disabled = model.generating || !model.authenticated || !ready;
       els.editLabel.textContent = model.generating ? tt('editing') : tt('applyEdit');
       els.editMeta.textContent = model.editNodes != null && !model.generating ? model.editNodes + ' ' + tt('nodes') : '';
     }
@@ -1225,7 +1263,9 @@
       clearTimeout(editQuoteTimer);
       model.editNodes = null;
       updateEditButton();
-      if (!model.result || !els.editInstruction.value.trim()) return;
+      // O custo (dry-run) depende das dimensões da fonte x qualidade — não do
+      // texto nem da máscara; roda se houver instrução OU área marcada.
+      if (!model.result || (!els.editInstruction.value.trim() && !model.maskStrokes.length)) return;
       editQuoteTimer = setTimeout(function () {
         model.editQuoteId += 1;
         callSketchUpQuiet('editQuote', JSON.stringify({
@@ -1242,6 +1282,8 @@
     });
     els.editButton.addEventListener('click', function () {
       if (model.generating || !model.result) return;
+      var maskDataUrl = buildMaskDataUrl();
+      exitMaskMode();
       showNotice('', 'success');
       startGeneratingUi();
       els.overlayText.textContent = tt('editingOverlay');
@@ -1249,9 +1291,118 @@
         action: model.editAction,
         instruction: els.editInstruction.value,
         referenceMaterial: model.editAction === 'swap_material' ? els.editMaterialSelect.value : '',
+        maskDataUrl: maskDataUrl,
         sourceUrl: model.result.outputUrl
       }));
     });
+
+    // ── Máscara por área (pincel sobre o preview) ──────────────────────────
+    var maskCtx = els.maskCanvas.getContext('2d');
+    var maskDrawing = false;
+    var MASK_BRUSH = 18; // raio em px de display
+
+    function sizeMaskCanvas() {
+      els.maskCanvas.width = Math.max(1, Math.round(els.preview.clientWidth));
+      els.maskCanvas.height = Math.max(1, Math.round(els.preview.clientHeight));
+    }
+    function drawStroke(ctx, points, radius) {
+      if (!points.length) return;
+      ctx.lineWidth = radius * 2;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      if (points.length === 1) {
+        ctx.beginPath();
+        ctx.arc(points[0].x, points[0].y, radius, 0, Math.PI * 2);
+        ctx.fill();
+        return;
+      }
+      ctx.beginPath();
+      points.forEach(function (p, i) { if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); });
+      ctx.stroke();
+    }
+    function redrawMaskOverlay() {
+      if (!maskCtx) return;
+      maskCtx.clearRect(0, 0, els.maskCanvas.width, els.maskCanvas.height);
+      maskCtx.fillStyle = 'rgba(48,209,88,0.45)';
+      maskCtx.strokeStyle = 'rgba(48,209,88,0.45)';
+      model.maskStrokes.forEach(function (st) { drawStroke(maskCtx, st.points, st.radius); });
+    }
+    function enterMaskMode() {
+      if (!model.result) return;
+      model.maskActive = true;
+      els.preview.classList.add('is-masking');
+      els.maskToggle.classList.add('is-active');
+      els.maskToggle.textContent = tt('maskDone');
+      els.maskClear.style.display = '';
+      sizeMaskCanvas();
+      redrawMaskOverlay();
+    }
+    function exitMaskMode() {
+      model.maskActive = false;
+      els.preview.classList.remove('is-masking');
+      els.maskToggle.classList.remove('is-active');
+      els.maskToggle.textContent = tt('maskSelect');
+    }
+    function clearMask() {
+      model.maskStrokes = [];
+      redrawMaskOverlay();
+      els.maskClear.style.display = model.maskActive ? '' : 'none';
+      updateEditButton();
+      scheduleEditQuote();
+    }
+    function maskPoint(ev) {
+      var r = els.maskCanvas.getBoundingClientRect();
+      return { x: ev.clientX - r.left, y: ev.clientY - r.top };
+    }
+    els.maskToggle.addEventListener('click', function () {
+      if (model.maskActive) exitMaskMode(); else enterMaskMode();
+    });
+    els.maskClear.addEventListener('click', clearMask);
+    els.maskCanvas.addEventListener('pointerdown', function (ev) {
+      if (!model.maskActive) return;
+      maskDrawing = true;
+      try { els.maskCanvas.setPointerCapture(ev.pointerId); } catch (e) {}
+      model.maskStrokes.push({ points: [maskPoint(ev)], radius: MASK_BRUSH });
+      redrawMaskOverlay();
+    });
+    els.maskCanvas.addEventListener('pointermove', function (ev) {
+      if (!maskDrawing) return;
+      model.maskStrokes[model.maskStrokes.length - 1].points.push(maskPoint(ev));
+      redrawMaskOverlay();
+    });
+    function endMaskStroke() {
+      if (!maskDrawing) return;
+      maskDrawing = false;
+      updateEditButton();
+      scheduleEditQuote();
+    }
+    els.maskCanvas.addEventListener('pointerup', endMaskStroke);
+    els.maskCanvas.addEventListener('pointercancel', endMaskStroke);
+
+    // Máscara final na resolução da FONTE (branco = editar, preto = preserva),
+    // com a proporção da imagem original. Traços mapeados do preview (que usa
+    // object-fit: contain) pro espaço de pixels da fonte.
+    function buildMaskDataUrl() {
+      if (!model.maskStrokes.length || !model.result) return '';
+      var img = els.resultImage;
+      var nw = img.naturalWidth, nh = img.naturalHeight;
+      if (!nw || !nh) return '';
+      var pw = els.maskCanvas.width, ph = els.maskCanvas.height;
+      if (!pw || !ph) return '';
+      var scale = Math.min(pw / nw, ph / nh);
+      var offX = (pw - nw * scale) / 2, offY = (ph - nh * scale) / 2;
+      var inv = 1 / scale;
+      var c = document.createElement('canvas');
+      c.width = nw; c.height = nh;
+      var ctx = c.getContext('2d');
+      ctx.fillStyle = '#000'; ctx.fillRect(0, 0, nw, nh);
+      ctx.fillStyle = '#fff'; ctx.strokeStyle = '#fff';
+      model.maskStrokes.forEach(function (st) {
+        var mapped = st.points.map(function (p) { return { x: (p.x - offX) * inv, y: (p.y - offY) * inv }; });
+        drawStroke(ctx, mapped, st.radius * inv);
+      });
+      return c.toDataURL('image/png');
+    }
 
     // ── Criar Space ─────────────────────────────────────────────────────────
     function spaceVistaCost() {
@@ -1399,6 +1550,8 @@
       els.restoreCameraButton.disabled = model.generating;
       els.upscale2xButton.disabled = model.generating;
       els.upscale4xButton.disabled = model.generating;
+      els.maskToggle.disabled = model.generating;
+      els.maskClear.disabled = model.generating;
       updateBatchButton();
       updateEditButton();
       updateSpaceButton();
@@ -1441,6 +1594,10 @@
       els.compareButton.style.display = model.captureUrl ? '' : 'none';
       els.restoreCameraButton.style.display = result.camera ? '' : 'none';
       els.preview.classList.remove('is-comparing');
+      // Novo resultado = nova imagem: a seleção anterior não se aplica mais.
+      model.maskStrokes = [];
+      exitMaskMode();
+      els.maskClear.style.display = 'none';
       renderEditControls();
       updateGenerateState();
     }
