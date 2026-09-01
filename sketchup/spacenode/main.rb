@@ -26,7 +26,7 @@ module SpaceNode
   module SketchUp
     extend self
 
-    VERSION = '0.3.0'
+    VERSION = '0.4.0'
     PREFERENCES_KEY = 'com.spacenode.sketchup'
     DEFAULT_API_BASE_URL = 'https://spacenode.app'
     MIN_SKETCHUP_MAJOR = 21          # Ruby 2.7+; recomendado 2024+
@@ -195,6 +195,47 @@ module SpaceNode
           emit_error(e.message)
         end
       end
+      dialog.add_action_callback('upscaleQuote') do |_ctx, raw|
+        begin
+          handle_upscale_quote(raw)
+        rescue StandardError => e
+          emit_error(e.message, false, true)
+        end
+      end
+      dialog.add_action_callback('confirmUpscale') do |_ctx|
+        begin
+          run_upscale
+        rescue StandardError => e
+          emit_error(e.message, false, true)
+        end
+      end
+      dialog.add_action_callback('cancelUpscale') do |_ctx|
+        pending = @upscale_pending
+        @upscale_pending = nil
+        delete_quiet(pending[:path]) if pending
+        emit('status', { :stage => 'idle', :message => '' })
+      end
+      dialog.add_action_callback('editQuote') do |_ctx, raw|
+        begin
+          handle_edit_quote(raw)
+        rescue StandardError
+          nil
+        end
+      end
+      dialog.add_action_callback('applyEdit') do |_ctx, raw|
+        begin
+          handle_apply_edit(raw)
+        rescue StandardError => e
+          emit_error(e.message, false, true)
+        end
+      end
+      dialog.add_action_callback('createSpace') do |_ctx, raw|
+        begin
+          handle_create_space(raw)
+        rescue StandardError => e
+          emit_error(e.message, false, true)
+        end
+      end
       dialog.add_action_callback('cancelGenerate') do |_ctx|
         begin
           handle_cancel
@@ -320,7 +361,9 @@ module SpaceNode
 
       message =
         if data && (data['error'] || data['message'])
-          data['error'] || data['message']
+          # message primeiro: rotas novas usam error como código de máquina
+          # ('insufficient_balance') e o texto humano vem em message.
+          data['message'] || data['error']
         elsif status == 413
           'Imagem grande demais pro envio direto. Tente novamente.'
         elsif status.zero?
@@ -855,9 +898,11 @@ module SpaceNode
         ok = view.write_image(options)
         raise 'Não foi possível capturar a vista atual.' unless ok && File.exist?(path)
 
-        # Um viewport 4K em PNG pode passar do teto de 15 MB da área de
-        # upload — cai pra JPEG de alta qualidade antes de falhar.
-        if File.size(path) > 14_000_000
+        # Um viewport 4K em PNG pode passar do teto da área de upload — cai
+        # pra JPEG de alta qualidade antes de falhar. O teto é da ÁREA de
+        # destino (render-source 15 MB; spaces-sketch 10 MB via :max_bytes).
+        max_bytes = opts[:max_bytes] || 14_000_000
+        if File.size(path) > max_bytes
           jpg = path.sub(/\.png\z/, '.jpg')
           view.write_image(
             :filename => jpg,
@@ -1061,8 +1106,8 @@ module SpaceNode
       @generation_epoch = (@generation_epoch || 0) + 1
       @generation_context = {
         :mode => :batch,
-        :queue => indexes.dup,
-        :total => indexes.length,
+        :queue => entries.dup,
+        :total => entries.length,
         :done => 0,
         :results => [],
         :errors => [],
@@ -1070,7 +1115,7 @@ module SpaceNode
         :shared_seed => nil,
         :original_scene => original
       }
-      emit('batchStart', { :total => indexes.length })
+      emit('batchStart', { :total => entries.length })
       process_next_scene
     end
 
@@ -1227,53 +1272,10 @@ module SpaceNode
         field = item['field'].to_s
         next if name.empty? || field.empty?
 
-        material = nil
-        begin
-          material = model && model.materials[name]
-        rescue StandardError
-          material = nil
-        end
-        next unless material && material.texture
+        exported = export_material_texture(model, name)
+        next unless exported
 
-        # Texture#write NÃO converte formato pela extensão — preserva os
-        # bytes de origem. Extensão+mime saem do arquivo original; formatos
-        # fora de jpg/png são pulados (a área só aceita jpeg/png/webp).
-        source_ext = ''
-        begin
-          source_ext = File.extname(material.texture.filename.to_s).downcase
-        rescue StandardError
-          source_ext = ''
-        end
-        ext, mime =
-          case source_ext
-          when '.jpg', '.jpeg' then ['.jpg', 'image/jpeg']
-          when '.png', ''      then ['.png', 'image/png']
-          end
-        next unless ext
-
-        tmp = File.join(Dir.tmpdir, "spacenode-mat-#{SecureRandom.hex(4)}#{ext}")
-        written = false
-        begin
-          # colorize=true respeita o ajuste de cor do material (o que o
-          # usuário vê no viewport); fallback pro write simples.
-          written = material.texture.write(tmp, true)
-        rescue StandardError
-          written = false
-        end
-        unless written
-          begin
-            written = material.texture.write(tmp)
-          rescue StandardError
-            written = false
-          end
-        end
-        next unless written && File.exist?(tmp)
-        if File.size(tmp) > 7_800_000
-          delete_quiet(tmp)
-          next
-        end
-
-        jobs << { :path => tmp, :field => field, :mime => mime }
+        jobs << { :path => exported[:path], :field => field, :mime => exported[:mime] }
       end
 
       results = []
@@ -1330,6 +1332,7 @@ module SpaceNode
 
       size = File.size(path)
       sign_body = { :area => area, :contentType => mime, :sizeBytes => size }
+      sign_body[:params] = opts[:params] if opts[:params]
       json_request(:post, '/api/uploads/sign', sign_body, on_fail) do |sign|
         next unless generation_alive?(epoch) && !settled[:done]
 
@@ -1351,7 +1354,9 @@ module SpaceNode
           end
 
           if want_url
-            json_request(:post, '/api/uploads/confirm', { :area => area, :key => key }, on_fail) do |confirm|
+            confirm_body = { :area => area, :key => key }
+            confirm_body[:params] = opts[:params] if opts[:params]
+            json_request(:post, '/api/uploads/confirm', confirm_body, on_fail) do |confirm|
               next unless generation_alive?(epoch) && !settled[:done]
 
               settle.call(key, confirm['url'].to_s)
@@ -1365,6 +1370,91 @@ module SpaceNode
 
     def delete_quiet(path)
       File.delete(path) if path && File.exist?(path)
+    rescue StandardError
+      nil
+    end
+
+    # Exporta a textura de um material pra tmp. Texture#write NÃO converte
+    # formato pela extensão — preserva os bytes de origem; extensão+mime saem
+    # do arquivo original e formatos fora de jpg/png são pulados (as áreas
+    # de upload só aceitam jpeg/png/webp). Devolve { :path, :mime } ou nil.
+    def export_material_texture(model, name)
+      material = nil
+      begin
+        material = model && model.materials[name]
+      rescue StandardError
+        material = nil
+      end
+      return nil unless material && material.texture
+
+      source_ext = ''
+      begin
+        source_ext = File.extname(material.texture.filename.to_s).downcase
+      rescue StandardError
+        source_ext = ''
+      end
+      ext, mime =
+        case source_ext
+        when '.jpg', '.jpeg' then ['.jpg', 'image/jpeg']
+        when '.png', ''      then ['.png', 'image/png']
+        end
+      return nil unless ext
+
+      tmp = File.join(Dir.tmpdir, "spacenode-mat-#{SecureRandom.hex(4)}#{ext}")
+      written = false
+      begin
+        # colorize=true respeita o ajuste de cor do material (o que o
+        # usuário vê no viewport); fallback pro write simples.
+        written = material.texture.write(tmp, true)
+      rescue StandardError
+        written = false
+      end
+      unless written
+        begin
+          written = material.texture.write(tmp)
+        rescue StandardError
+          written = false
+        end
+      end
+      return nil unless written && File.exist?(tmp)
+      if File.size(tmp) > 7_800_000
+        delete_quiet(tmp)
+        return nil
+      end
+
+      { :path => tmp, :mime => mime }
+    end
+
+    # ── Dimensões de imagem (PNG IHDR / JPEG SOF) ───────────────────────────
+
+    def image_dimensions(bytes)
+      return nil if bytes.nil? || bytes.bytesize < 26
+
+      b = bytes.bytes
+      if b[0, 4] == [0x89, 0x50, 0x4E, 0x47]
+        width = (b[16] << 24) | (b[17] << 16) | (b[18] << 8) | b[19]
+        height = (b[20] << 24) | (b[21] << 16) | (b[22] << 8) | b[23]
+        return [width, height] if width > 0 && height > 0
+        return nil
+      end
+      if b[0, 2] == [0xFF, 0xD8]
+        i = 2
+        size = bytes.bytesize
+        while i + 9 < size
+          break unless b[i] == 0xFF
+
+          marker = b[i + 1]
+          seg_len = (b[i + 2] << 8) | b[i + 3]
+          if [0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF].include?(marker)
+            height = (b[i + 5] << 8) | b[i + 6]
+            width = (b[i + 7] << 8) | b[i + 8]
+            return [width, height] if width > 0 && height > 0
+            return nil
+          end
+          i += 2 + seg_len
+        end
+      end
+      nil
     rescue StandardError
       nil
     end
@@ -1443,6 +1533,23 @@ module SpaceNode
           else
             fail_generation(error.message, status == 401, status)
           end
+        end
+      end
+    end
+
+    # Handler pra fluxos SEM reconciliação (upscale/edit/etapas do Space):
+    # a reconciliação procura em /api/renders/list — vistas/edits/upscales
+    # nunca estão lá, e adotar um render alheio como resultado é pior que
+    # falhar. Queda de rede aqui falha na hora com mensagem honesta.
+    def direct_error_handler_for(epoch, network_message = nil)
+      proc do |error|
+        if generation_alive?(epoch)
+          status = error.respond_to?(:status) ? error.status : nil
+          message = error.message
+          if (status.nil? || status.to_i.zero?) && network_message
+            message = network_message
+          end
+          fail_generation(message, status == 401, status)
         end
       end
     end
@@ -1564,6 +1671,14 @@ module SpaceNode
           :total => ctx[:total], :cancelled => true
         })
       end
+      if ctx && ctx[:mode] == :space
+        emit('spaceDone', {
+          :spaceId => ctx[:space_id], :cancelled => true,
+          :spaceUrl => ctx[:space_id] ? "#{api_base_url}/app/spaces/#{ctx[:space_id]}" : nil,
+          :name => ctx[:space_name],
+          :vistas => [], :errors => ctx[:vista_errors] || []
+        })
+      end
       emit('status', { :stage => 'idle', :message => 'Geração cancelada.' })
     end
 
@@ -1596,6 +1711,7 @@ module SpaceNode
       else
         @generating = false
         @generation_context = nil
+        restore_original_scene(ctx) if ctx && ctx[:original_scene]
         emit_error(message, auth_expired, true)
       end
     end
@@ -1706,6 +1822,594 @@ module SpaceNode
       return true if bytes[0, 4] == [0x52, 0x49, 0x46, 0x46] && bytes[8, 4] == [0x57, 0x45, 0x42, 0x50]
 
       false
+    end
+
+    # ── Ampliar (upscale) ────────────────────────────────────────────────────
+    #
+    # Duas etapas honestas: quote (baixa o render, mede as dimensões e mostra
+    # o custo EXATO calculado da grade do catálogo) → confirmação → job.
+
+    def handle_upscale_quote(raw)
+      payload = parse_json(raw)
+      url = payload['url'].to_s
+      scale = payload['scale'].to_s
+      raise 'Nenhum render pra ampliar.' if url.empty?
+      raise 'Escala inválida.' unless %w[2x 4x].include?(scale)
+      raise 'Já existe uma geração em andamento.' if @generating
+
+      catalog = cached_catalog
+      upscale_cfg = catalog && catalog['upscale']
+      raise 'Reconecte pra atualizar o catálogo de custos.' unless upscale_cfg
+
+      unless session_fresh?
+        emit_error('Sua sessão está renovando — tente de novo em instantes.', false, true)
+        show_auth_dialog(true)
+        return
+      end
+
+      old_pending = @upscale_pending
+      @upscale_pending = nil
+      delete_quiet(old_pending[:path]) if old_pending
+
+      @generating = true
+      @generation_epoch = (@generation_epoch || 0) + 1
+      @generation_context = { :mode => :upscale_quote }
+      epoch = @generation_epoch
+      emit('status', { :stage => 'download', :message => 'Preparando a ampliação…' })
+
+      settled = { :done => false }
+      ::UI.start_timer(60, false) do
+        if generation_alive?(epoch) && !settled[:done]
+          settled[:done] = true
+          fail_generation('O download do render travou. Tente de novo.')
+        end
+      end
+
+      http_request(:get, url, :auth => false) do |response|
+        next unless generation_alive?(epoch) && !settled[:done]
+
+        settled[:done] = true
+        body = response.body.to_s
+        status = response.status_code.to_i
+        unless status >= 200 && status < 300 && image_bytes?(body)
+          fail_generation('Não foi possível baixar o render pra ampliar.')
+          next
+        end
+
+        dims = image_dimensions(body)
+        unless dims
+          fail_generation('Não foi possível medir o render. Tente pelo site.')
+          next
+        end
+
+        ext = body.byteslice(0, 4).bytes[0] == 0x89 ? '.png' : '.jpg'
+        mime = ext == '.png' ? 'image/png' : 'image/jpeg'
+        path = File.join(Dir.tmpdir, "spacenode-up-#{SecureRandom.hex(4)}#{ext}")
+        File.binwrite(path, body)
+
+        nodes = upscale_cost_for(upscale_cfg, scale, dims[0], dims[1])
+        factor = (upscale_cfg['scaleFactor'] || {})[scale].to_i
+        factor = scale == '4x' ? 4 : 2 if factor <= 0
+        output_mp = (dims[0].to_f * dims[1] * factor * factor) / 1_000_000.0
+        max_mp = upscale_cfg['maxOutputMP'].to_i
+        if max_mp > 0 && output_mp > max_mp
+          delete_quiet(path)
+          fail_generation("Essa ampliação passaria de #{max_mp} MP. Use uma escala menor.")
+          next
+        end
+
+        # Quote pronto: solta o lock — o job só arma de novo na confirmação.
+        @generating = false
+        @generation_context = nil
+        @upscale_pending = {
+          :path => path, :mime => mime, :scale => scale, :nodes => nodes,
+          :width => dims[0], :height => dims[1]
+        }
+        emit('status', { :stage => 'idle', :message => '' })
+        emit('upscaleQuote', {
+          :scale => scale, :nodes => nodes,
+          :width => dims[0], :height => dims[1]
+        })
+      end
+    end
+
+    def upscale_cost_for(cfg, scale, width, height)
+      base = 0
+      (cfg['modes'] || []).each do |mode|
+        next unless mode['id'] == 'fidelity'
+
+        (mode['scales'] || []).each do |s|
+          base = s['baseNodes'].to_i if s['id'] == scale
+        end
+      end
+      mp = (width.to_f * height) / 1_000_000.0
+      surcharge = 0
+      (cfg['mpSurchargeTiers'] || []).each do |tier|
+        max = tier['maxMP']
+        if max.nil? || mp <= max.to_f
+          surcharge = tier['add'].to_i
+          break
+        end
+      end
+      base + surcharge
+    end
+
+    def run_upscale
+      pending = @upscale_pending
+      raise 'Nada pra confirmar.' unless pending
+      raise 'Já existe uma geração em andamento.' if @generating
+
+      unless session_fresh?
+        @upscale_pending = pending
+        emit_error('Sua sessão está renovando — tente de novo em instantes.', false, true)
+        show_auth_dialog(true)
+        return
+      end
+
+      @upscale_pending = nil
+      @generating = true
+      @generation_epoch = (@generation_epoch || 0) + 1
+      @generation_started_at = Time.now
+      @generation_context = { :mode => :upscale }
+      epoch = @generation_epoch
+      emit('status', { :stage => 'upload', :message => 'Enviando pra ampliação…' })
+
+      upload_direct(pending[:path], pending[:mime], 'upscale-source', false, epoch) do |key, _url|
+        delete_quiet(pending[:path])
+        body = {
+          :sourceKey => key,
+          :tab => 'resolution',
+          :modeId => 'fidelity',
+          :scale => pending[:scale],
+          :objectiveId => 'client'
+        }
+        emit('status', { :stage => 'generate', :message => 'Ampliando na SPACENODE…' })
+        request = json_request(:post, '/api/upscale', body, direct_error_handler_for(epoch, 'A conexão caiu durante a ampliação. Veja o Histórico antes de tentar de novo — os Nodes podem ter sido usados.')) do |data|
+          next unless generation_alive?(epoch)
+
+          @generating = false
+          @generation_context = nil
+          url = data['url'].to_s
+          if url.empty?
+            emit_error('A ampliação não devolveu resultado. Veja o Histórico.', false, true)
+          else
+            previous = @last_result || {}
+            result = {
+              :outputUrl => url,
+              :previewUrl => url,
+              :originalUrl => data['originalUrl'],
+              :nodesCharged => pending[:nodes],
+              :seed => previous[:seed],
+              :camera => previous[:camera],
+              :upscaled => pending[:scale]
+            }
+            @last_result = result
+            persist_last_result(result)
+            emit('result', result)
+            check_session
+          end
+        end
+        @generate_request = request
+        ::UI.start_timer(GENERATE_TIMEOUT_SECONDS, false) do
+          if generation_alive?(epoch) && @generate_request.equal?(request)
+            begin
+              request.cancel
+            rescue StandardError
+              nil
+            end
+            fail_generation('A ampliação demorou demais. Veja o Histórico antes de tentar de novo — os Nodes podem ter sido usados.')
+          end
+        end
+      end
+    end
+
+    # ── Editar (V3, por instrução) ──────────────────────────────────────────
+
+    def handle_edit_quote(raw)
+      payload = parse_json(raw)
+      source = payload['sourceUrl'].to_s
+      return if source.empty? || !authenticated?
+      # Quote é cosmético: com token vencido, pular em silêncio (um 401 aqui
+      # deslogaria o usuário no meio da digitação via handle_auth_failure).
+      return unless session_fresh?
+
+      body = build_edit_body(payload, source, true)
+      return unless body
+
+      quote_id = payload['quoteId']
+      json_request(:post, '/api/edit-v3/google', body, proc { |_e| emit('editQuote', { :quoteId => quote_id, :nodes => nil }) }) do |data|
+        emit('editQuote', { :quoteId => quote_id, :nodes => data['nodes_cost'] })
+      end
+    end
+
+    def handle_apply_edit(raw)
+      payload = parse_json(raw)
+      raise 'Conecte sua conta SPACENODE primeiro.' unless authenticated?
+      raise 'Já existe uma geração em andamento.' if @generating
+
+      unless session_fresh?
+        emit_error('Sua sessão está renovando — tente de novo em instantes.', false, true)
+        show_auth_dialog(true)
+        return
+      end
+
+      source = payload['sourceUrl'].to_s
+      raise 'Nenhum render pra editar.' if source.empty?
+
+      @generating = true
+      @generation_epoch = (@generation_epoch || 0) + 1
+      @generation_started_at = Time.now
+      @generation_context = { :mode => :edit }
+      epoch = @generation_epoch
+
+      reference_name = payload['referenceMaterial'].to_s
+      if payload['action'] == 'swap_material' && !reference_name.empty?
+        exported = export_material_texture(::Sketchup.active_model, reference_name)
+        if exported
+          emit('status', { :stage => 'upload', :message => 'Enviando a amostra do material…' })
+          upload_direct(exported[:path], exported[:mime], 'retocar-reference', true, epoch, :optional => true) do |_k, url|
+            delete_quiet(exported[:path])
+            request_edit(payload, source, url, epoch)
+          end
+          return
+        end
+      end
+      request_edit(payload, source, nil, epoch)
+    end
+
+    def request_edit(payload, source, reference_url, epoch)
+      return unless generation_alive?(epoch)
+
+      body = build_edit_body(payload, source, false)
+      unless body
+        fail_generation('Descreva o que deseja alterar.')
+        return
+      end
+      has_reference = reference_url && !reference_url.empty?
+      body[:references] = [{ :kind => 'material', :url => reference_url }] if has_reference
+      # Amostra escolhida mas perdida no upload + sem instrução = nada pra
+      # mandar; e com instrução, avisa que vai só pela descrição.
+      if payload['action'] == 'swap_material' && !payload['referenceMaterial'].to_s.empty? && !has_reference
+        if payload['instruction'].to_s.strip.empty?
+          fail_generation('Não foi possível enviar a amostra do material. Tente de novo ou descreva o material desejado.')
+          return
+        end
+        emit('status', { :stage => 'generate', :message => 'Amostra não enviada — editando pela descrição…' })
+      end
+
+      emit('status', { :stage => 'generate', :message => 'Editando na SPACENODE…' })
+      request = json_request(:post, '/api/edit-v3/google', body, direct_error_handler_for(epoch, 'A conexão caiu durante a edição. Veja o Histórico antes de tentar de novo — os Nodes podem ter sido usados.')) do |data|
+        next unless generation_alive?(epoch)
+
+        @generating = false
+        @generation_context = nil
+        if data['rejected']
+          # O motivo real vem em reasons[0]; message é o rodapé genérico.
+          reason = Array(data['reasons']).first
+          emit('editRejected', { :message => [reason, data['message']].compact.join(' ').strip })
+          emit('status', { :stage => 'idle', :message => '' })
+        else
+          url = data['result_url'].to_s
+          if url.empty?
+            emit_error('A edição não devolveu resultado.', false, true)
+          else
+            previous = @last_result || {}
+            result = {
+              :outputUrl => url,
+              :previewUrl => url,
+              :originalUrl => source,
+              :nodesCharged => data['nodes_cost'],
+              :seed => previous[:seed],
+              :camera => previous[:camera],
+              :edited => payload['action'].to_s
+            }
+            @last_result = result
+            persist_last_result(result)
+            emit('result', result)
+            check_session
+          end
+        end
+      end
+      @generate_request = request
+      ::UI.start_timer(GENERATE_TIMEOUT_SECONDS, false) do
+        if generation_alive?(epoch) && @generate_request.equal?(request)
+          begin
+            request.cancel
+          rescue StandardError
+            nil
+          end
+          fail_generation('A edição demorou demais. Veja o Histórico antes de tentar de novo — os Nodes podem ter sido usados.')
+        end
+      end
+    end
+
+    def build_edit_body(payload, source, dry_run)
+      action = payload['action'].to_s
+      return nil unless %w[remove swap_material refine_area].include?(action)
+
+      instruction = payload['instruction'].to_s.strip
+      return nil if instruction.empty? && !dry_run && payload['referenceMaterial'].to_s.empty?
+
+      body = {
+        :action => action,
+        :source_image_url => source,
+        :quality => 'standard',
+        :preservation => 'maximum',
+        :intensity => 'standard',
+        :output_resolution => 'source'
+      }
+      body[:instruction] = instruction unless instruction.empty?
+      body[:dry_run] = true if dry_run
+      body
+    end
+
+    # ── Criar Space das cenas ───────────────────────────────────────────────
+    #
+    # A máquina de estados do Spaces (draft → mestre → DNA → lock → prints →
+    # generate) roda inteira aqui, invisível pro arquiteto. A vista mestre é
+    # a VISTA ATUAL; as cenas selecionadas viram prints (autoridade
+    # geométrica própria + identidade do DNA por cima).
+
+    def handle_create_space(raw)
+      payload = parse_json(raw)
+      raise 'Conecte sua conta SPACENODE primeiro.' unless authenticated?
+      raise 'Já existe uma geração em andamento.' if @generating
+
+      unless session_fresh?
+        emit_error('Sua sessão está renovando — tente de novo em instantes.', false, true)
+        show_auth_dialog(true)
+        return
+      end
+
+      name = payload['name'].to_s.strip
+      name = default_space_name if name.empty?
+      category = %w[residencial comercial conceito].include?(payload['category']) ? payload['category'] : 'residencial'
+      engine = payload['engine'].to_s
+      quality = payload['quality'].to_s
+      scenes = Array(payload['scenes']).select { |s| s.is_a?(Hash) }.first(10)
+      raise 'Selecione ao menos uma cena pros prints.' if scenes.empty?
+
+      model = ::Sketchup.active_model
+      raise 'Nenhum modelo aberto no SketchUp.' unless model
+
+      original = nil
+      begin
+        pages = model.pages
+        pages.each_with_index do |page, index|
+          original = index if pages.selected_page && page.equal?(pages.selected_page)
+        end
+      rescue StandardError
+        original = nil
+      end
+
+      @generating = true
+      @generation_epoch = (@generation_epoch || 0) + 1
+      @generation_started_at = Time.now
+      @generation_context = {
+        :mode => :space, :original_scene => original,
+        :space_name => name,
+        :vistas => [], :vista_errors => []
+      }
+      epoch = @generation_epoch
+      ctx = @generation_context
+
+      space_progress(1, 'Criando o Space…')
+      json_request(:post, '/api/spaces', { :name => name, :category => category, :engine => engine }, direct_error_handler_for(epoch, 'Sem conexão ao criar o Space. Nada foi cobrado — tente de novo.')) do |data|
+        next unless generation_alive?(epoch)
+
+        space = data['space'] || {}
+        space_id = space['id'].to_s
+        if space_id.empty?
+          fail_generation('Não foi possível criar o Space.')
+        else
+          ctx[:space_id] = space_id
+          space_upload_master(space_id, quality, scenes, engine, epoch)
+        end
+      end
+    end
+
+    def default_space_name
+      model = ::Sketchup.active_model
+      title = model && model.title.to_s
+      title.nil? || title.empty? ? "Projeto SketchUp #{Time.now.strftime('%d/%m')}" : title[0, 80]
+    rescue StandardError
+      "Projeto SketchUp #{Time.now.strftime('%d/%m')}"
+    end
+
+    def space_progress(step, message)
+      emit('spaceProgress', { :step => step, :total => 6, :message => message })
+      emit('status', { :stage => 'generate', :message => message })
+    end
+
+    def space_upload_master(space_id, quality, scenes, engine, epoch)
+      space_progress(2, 'Enviando a vista mestre…')
+      # capture/File podem levantar dentro de callback HTTP — sem este rescue
+      # o @generating ficaria preso (o rescue genérico do http_request não
+      # encerra a geração).
+      begin
+        capture = capture_viewport(quality.empty? ? '2k' : quality)
+        master_path = capture[:path]
+        mime = @last_capture_mime || 'image/png'
+        size = File.size(master_path)
+      rescue StandardError => e
+        fail_generation(e.message)
+        return
+      end
+
+      sign_body = { :contentType => mime, :sizeBytes => size }
+      json_request(:post, "/api/spaces/#{space_id}/upload-vista-mestre/sign", sign_body, direct_error_handler_for(epoch, 'Sem conexão ao enviar a vista mestre. O Space ficou criado — continue pelo site ou tente de novo.')) do |sign|
+        next unless generation_alive?(epoch)
+
+        upload_url = sign['uploadUrl'].to_s
+        key = sign['key'].to_s
+        if upload_url.empty? || key.empty?
+          fail_generation('Não foi possível preparar a vista mestre.')
+          next
+        end
+
+        http_request(:put, upload_url, :body => File.binread(master_path), :content_type => mime, :auth => false) do |response|
+          next unless generation_alive?(epoch)
+
+          delete_quiet(master_path)
+          unless response.status_code.to_i.between?(200, 299)
+            fail_generation('Falha no envio da vista mestre.')
+            next
+          end
+
+          json_request(:post, "/api/spaces/#{space_id}/upload-vista-mestre/confirm", { :key => key }, direct_error_handler_for(epoch, 'Sem conexão ao confirmar a vista mestre. O Space ficou criado — continue pelo site.')) do |_confirm|
+            next unless generation_alive?(epoch)
+
+            space_extract_dna(space_id, quality, scenes, engine, epoch)
+          end
+        end
+      end
+    end
+
+    def space_extract_dna(space_id, quality, scenes, engine, epoch)
+      space_progress(3, 'Extraindo o DNA do projeto…')
+      json_request(:post, "/api/spaces/#{space_id}/extract-dna", {}, direct_error_handler_for(epoch, 'A conexão caiu na extração do DNA — os 8 Nodes podem ter sido usados. Confira o Space no site antes de repetir.')) do |_data|
+        next unless generation_alive?(epoch)
+
+        space_progress(4, 'Travando a identidade…')
+        json_request(:post, "/api/spaces/#{space_id}/lock", {}, direct_error_handler_for(epoch, 'Sem conexão ao travar a identidade. Continue pelo site — o DNA já foi extraído.')) do |_lock|
+          next unless generation_alive?(epoch)
+
+          space_upload_prints(space_id, quality, scenes, engine, epoch, scenes.dup, [])
+        end
+      end
+    end
+
+    def space_upload_prints(space_id, quality, scenes, engine, epoch, queue, prints)
+      return unless generation_alive?(epoch)
+
+      if queue.empty?
+        space_generate_vistas(space_id, quality, engine, epoch, prints)
+        return
+      end
+
+      entry = queue.shift
+      index = entry['index'].to_i
+      expected_name = entry['name'].to_s
+      model = ::Sketchup.active_model
+      page = nil
+      begin
+        pages = model.pages
+        page = pages[index]
+        if page && !expected_name.empty? && page.name.to_s != expected_name
+          match = nil
+          pages.each { |p| match = p if match.nil? && p.name.to_s == expected_name }
+          page = match
+        end
+        if page
+          old_transition = page.transition_time
+          begin
+            page.transition_time = 0
+            pages.selected_page = page
+          ensure
+            page.transition_time = old_transition if old_transition
+          end
+        end
+      rescue StandardError
+        page = nil
+      end
+
+      unless page
+        space_upload_prints(space_id, quality, scenes, engine, epoch, queue, prints)
+        return
+      end
+
+      space_progress(5, "Enviando cena #{prints.length + 1} de #{scenes.length}…")
+      begin
+        # Área spaces-sketch aceita 10 MB (não os 15 da render-source) — o
+        # fallback JPEG da captura precisa disparar antes desse teto.
+        capture = capture_viewport(quality.empty? ? '2k' : quality, :max_bytes => 9_500_000)
+      rescue StandardError => e
+        fail_generation(e.message)
+        return
+      end
+      upload_direct(capture[:path], @last_capture_mime || 'image/png', 'spaces-sketch', true, epoch,
+                    :optional => true, :params => { :spaceId => space_id }) do |_key, url|
+        delete_quiet(capture[:path])
+        if url && !url.empty?
+          prints << { :url => url, :label => page.name.to_s[0, 48] }
+        else
+          # Cena perdida NUNCA some em silêncio — entra no resumo final.
+          ctx = @generation_context
+          ctx[:vista_errors] << { 'label' => page.name.to_s, 'error' => 'Falha ao enviar a cena.' } if ctx
+        end
+        space_upload_prints(space_id, quality, scenes, engine, epoch, queue, prints)
+      end
+    end
+
+    def space_generate_vistas(space_id, quality, engine, epoch, prints)
+      return unless generation_alive?(epoch)
+
+      if prints.empty?
+        fail_generation('Nenhuma cena pôde ser enviada. O Space ficou criado — continue pelo site.')
+        return
+      end
+
+      ctx = @generation_context
+      chunks = prints.each_slice(4).to_a
+      space_generate_chunk(space_id, quality, epoch, chunks, 0, prints.length)
+    end
+
+    def space_generate_chunk(space_id, quality, epoch, chunks, done_count, total)
+      return unless generation_alive?(epoch)
+
+      ctx = @generation_context
+      if chunks.empty?
+        finish_space(space_id)
+        return
+      end
+
+      chunk = chunks.shift
+      space_progress(6, "Gerando vistas (#{done_count + chunk.length} de #{total})…")
+      body = {
+        :action => 'nova_vista',
+        :reference => { :kind => 'print', :prints => chunk },
+        :quality => quality.empty? ? '2k' : quality
+      }
+      request = json_request(:post, "/api/spaces/#{space_id}/generate", body, direct_error_handler_for(epoch, 'A conexão caiu gerando as vistas. As concluídas ficaram salvas — veja o Space no site.')) do |data|
+        next unless generation_alive?(epoch)
+
+        ctx[:vistas].concat(Array(data['vistas']))
+        ctx[:vista_errors].concat(Array(data['errors']))
+        balance = data['balance_after']
+        @balance = { 'totalBalance' => balance['total_balance'] } if balance.is_a?(Hash) && balance['total_balance']
+        space_generate_chunk(space_id, quality, epoch, chunks, done_count + chunk.length, total)
+      end
+      @generate_request = request
+      ::UI.start_timer(GENERATE_TIMEOUT_SECONDS, false) do
+        if generation_alive?(epoch) && @generate_request.equal?(request)
+          begin
+            request.cancel
+          rescue StandardError
+            nil
+          end
+          fail_generation('A geração das vistas demorou demais. O Space ficou criado — veja pelo site.')
+        end
+      end
+    end
+
+    def finish_space(space_id)
+      ctx = @generation_context
+      @generating = false
+      @generation_context = nil
+      @generate_request = nil
+      restore_original_scene(ctx)
+
+      vistas = (ctx && ctx[:vistas]) || []
+      errors = (ctx && ctx[:vista_errors]) || []
+      emit('spaceDone', {
+        :spaceId => space_id,
+        :spaceUrl => "#{api_base_url}/app/spaces/#{space_id}",
+        :name => ctx && ctx[:space_name],
+        :vistas => vistas.map { |v| { :url => v['image_url'], :label => v['axis_label'] } },
+        :errors => errors
+      })
+      emit('status', { :stage => 'idle', :message => '' })
+      send_state
     end
 
     # ── Configurações ────────────────────────────────────────────────────────

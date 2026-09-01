@@ -5,20 +5,20 @@
 // Em caso de falha pós-débito, faz refund best-effort.
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getRequestAuthContext } from '@/lib/auth/request-user'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { refundNodes } from '@/lib/billing/refund-nodes'
 import { extractDnaPayload } from '@/lib/spaces/dna'
 import { DNA_EXTRACTION_COST } from '@/lib/spaces/economy'
 
 export async function POST(
-  _req:    NextRequest,
+  req:     NextRequest,
   context: { params: Promise<{ spaceId: string }> },
 ) {
   const { spaceId } = await context.params
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+  // Cookie (browser) ou Bearer (plugin SketchUp) — client RLS do usuário.
+  const { user, supabase } = await getRequestAuthContext(req)
+  if (!user || !supabase) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
   const admin = createAdminClient()
 

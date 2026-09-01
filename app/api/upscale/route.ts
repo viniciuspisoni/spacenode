@@ -23,6 +23,7 @@ import { DIRECT_UPLOAD_AREAS, downloadDirectUpload } from '@/lib/storage/direct-
 import { fetchStorageBuffer } from '@/lib/storage/fetch'
 import sharp from 'sharp'
 import {
+  MAX_OUTPUT_MP,
   computeUpscaleCost,
   finalProvider,
   megapixelsFromDimensions,
@@ -41,10 +42,9 @@ const VALID_TABS:   UpscaleTab[] = ['resolution', 'enhance']
 const VALID_MODES:  ModeId[]     = ['fidelity', 'recover', 'denoise', 'deblur', 'restore', 'smart']
 const VALID_SCALES: Scale[]      = ['none', '2x', '4x', '8x', 'ultra']
 
-// Teto do OUTPUT em megapixels (input_MP × fator²). 256 MP ≈ 16K×16K — acima
+// Teto do OUTPUT em MAX_OUTPUT_MP (lib/upscale): 256 MP ≈ 16K×16K — acima
 // disso o provider falha depois de minutos (refund, tempo perdido) ou devolve
 // resultado silenciosamente reduzido. Checado ANTES do custo/débito.
-const MAX_OUTPUT_MP = 256
 
 // Constraint: aba × modo precisam combinar para evitar requisições inválidas.
 const ALLOWED_MODES_BY_TAB: Record<UpscaleTab, ModeId[]> = {

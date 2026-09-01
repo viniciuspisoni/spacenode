@@ -25,6 +25,8 @@ import {
   getSceneElements,
   type ProjectType,
 } from '@/lib/prompts'
+import { DNA_EXTRACTION_COST, getVistaGenerationCost, getAvailableQualities } from '@/lib/spaces/economy'
+import { getUpscaleCostNodes, scaleToFactor, MAX_OUTPUT_MP, type ModeId, type Scale } from '@/lib/upscale'
 
 const RESOLUTION_LABELS: Record<Resolution, { label: string; note: string }> = {
   hd: { label: 'HD', note: 'Rápido para testes' },
@@ -76,8 +78,52 @@ export async function GET(req: NextRequest) {
   const { user } = await getRequestUser(req)
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
+  // Ampliar: grade derivada DA PRÓPRIA função de custo (zero drift). O
+  // surcharge por megapixel é do INPUT: derivado por sondas na mesma função.
+  const upscaleModes: { id: ModeId; label: string; scales: Scale[] }[] = [
+    { id: 'fidelity', label: 'Fidelidade', scales: ['2x', '4x'] },
+  ]
+  const surchargeProbe = (mp: number) =>
+    getUpscaleCostNodes({ tab: 'resolution', modeId: 'fidelity', scale: '2x', megapixels: mp }) -
+    getUpscaleCostNodes({ tab: 'resolution', modeId: 'fidelity', scale: '2x', megapixels: 0 })
+  const upscale = {
+    modes: upscaleModes.map(m => ({
+      id: m.id,
+      label: m.label,
+      scales: m.scales.map(s => ({
+        id: s,
+        baseNodes: getUpscaleCostNodes({ tab: 'resolution', modeId: m.id, scale: s, megapixels: 0 }),
+      })),
+    })),
+    mpSurchargeTiers: [
+      { maxMP: 4, add: surchargeProbe(4) },
+      { maxMP: 8, add: surchargeProbe(8) },
+      { maxMP: 16, add: surchargeProbe(16) },
+      { maxMP: null, add: surchargeProbe(17) },
+    ],
+    maxOutputMP: MAX_OUTPUT_MP,
+    scaleFactor: { '2x': scaleToFactor('2x'), '4x': scaleToFactor('4x') },
+  }
+
+  const spaces = {
+    dnaCost: DNA_EXTRACTION_COST,
+    maxPrints: 10,
+    chunkSize: 4,
+    categories: [
+      { id: 'residencial', label: 'Residencial' },
+      { id: 'comercial', label: 'Comercial' },
+      { id: 'conceito', label: 'Conceito' },
+    ],
+    vistaCosts: ENGINE_ORDER.map(id => ({
+      engine: id,
+      qualities: getAvailableQualities(id).map(q => ({ id: q, nodes: getVistaGenerationCost(id, q) })),
+    })),
+  }
+
   return NextResponse.json({
-    version: 2,
+    version: 3,
+    upscale,
+    spaces,
     engines: ENGINE_ORDER.map(id => {
       const e = ENGINES[id]
       return {

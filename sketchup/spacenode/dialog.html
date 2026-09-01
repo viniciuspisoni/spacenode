@@ -374,8 +374,27 @@
       <div class="result-actions" id="resultActions">
         <button class="ghost" id="downloadButton">Baixar imagem</button>
         <button class="ghost" id="openResultButton">Abrir no site</button>
+        <button class="ghost" id="upscale2xButton">Ampliar 2x</button>
+        <button class="ghost" id="upscale4xButton">Ampliar 4x</button>
         <button class="ghost" id="restoreCameraButton" style="display:none;grid-column:1 / -1">Voltar à vista deste render</button>
       </div>
+
+      <details id="editSection" style="display:none">
+        <summary>Editar este render</summary>
+        <div class="details-body">
+          <div class="pills" id="editActionPills" role="radiogroup" aria-label="Tipo de edição"></div>
+          <textarea id="editInstruction" style="margin-top:10px;min-height:60px" placeholder="Ex.: trocar o piso por carvalho claro / remover o pendente sobre a bancada"></textarea>
+          <div id="editMaterialRow" style="display:none;margin-top:8px" class="material-row">
+            <span class="mname">Amostra do modelo (opcional)</span>
+            <select id="editMaterialSelect"></select>
+          </div>
+          <button class="cta cta--batch" id="editButton" disabled>
+            <span id="editLabel">Aplicar edição</span>
+            <span class="meta" id="editMeta"></span>
+          </button>
+          <div class="batch-note">Só a alteração pedida muda — todo o resto do render é preservado. Edição recusada pelo controle de qualidade não é cobrada.</div>
+        </div>
+      </details>
 
       <details id="scenesSection">
         <summary>Cenas do modelo <span class="scenes-count" id="scenesCount"></span></summary>
@@ -389,6 +408,26 @@
           <div class="batch-note" id="batchNote">Todas as cenas com os mesmos presets e a mesma semente — coerência de material e estilo no conjunto.</div>
           <div class="batch-progress" id="batchProgress"></div>
           <div class="history-grid" id="batchResults" style="margin-top:8px"></div>
+        </div>
+      </details>
+
+      <details id="spaceSection">
+        <summary>Criar Space das cenas</summary>
+        <div class="details-body">
+          <div class="hint" style="margin:0 0 8px">A vista atual vira a identidade do projeto (DNA); as cenas selecionadas acima viram vistas coerentes entre si.</div>
+          <div class="settings-field">
+            <label for="spaceName">Nome do Space</label>
+            <input id="spaceName" spellcheck="false" maxlength="80" placeholder="Nome do projeto">
+          </div>
+          <div class="pills" id="spaceCategoryPills" role="radiogroup" aria-label="Categoria" style="margin-top:8px"></div>
+          <button class="cta cta--batch" id="spaceButton" disabled>
+            <span id="spaceLabel">Criar Space</span>
+            <span class="meta" id="spaceMeta"></span>
+          </button>
+          <div class="batch-note" id="spaceNote"></div>
+          <div class="batch-progress" id="spaceProgress"></div>
+          <div class="history-grid" id="spaceResults" style="margin-top:8px"></div>
+          <button class="ghost history-more" id="openSpaceButton" style="display:none">Abrir o Space no site</button>
         </div>
       </details>
 
@@ -530,8 +569,20 @@
       selectedScenes: [],
       modelMaterials: [],
       materialSel: {},
-      batchRunning: false
+      batchRunning: false,
+      editAction: 'swap_material',
+      editQuoteId: 0,
+      editNodes: null,
+      spaceCategory: 'residencial',
+      spaceRunning: false,
+      lastSpace: null
     };
+
+    var EDIT_ACTIONS = [
+      { id: 'swap_material', label: 'Trocar material' },
+      { id: 'remove', label: 'Remover' },
+      { id: 'refine_area', label: 'Refinar área' }
+    ];
 
     var SUN_OPTIONS = [
       { id: 'atual', label: 'Atual' },
@@ -556,7 +607,10 @@
      'generateButton','generateLabel','generateMeta','reachLine','historySection','historyGrid','historyEmpty','historyMore',
      'apiBaseUrl','saveSettingsButton','footer','advanced',
      'restoreCameraButton','scenesSection','scenesCount','scenesPills','scenesEmpty','batchButton','batchLabel','batchMeta',
-     'batchNote','batchProgress','batchResults','sunPills','modelMaterialsBlock','materialsList'
+     'batchNote','batchProgress','batchResults','sunPills','modelMaterialsBlock','materialsList',
+     'upscale2xButton','upscale4xButton','editSection','editActionPills','editInstruction','editMaterialRow',
+     'editMaterialSelect','editButton','editLabel','editMeta','spaceSection','spaceName','spaceCategoryPills',
+     'spaceButton','spaceLabel','spaceMeta','spaceNote','spaceProgress','spaceResults','openSpaceButton'
     ].forEach(function (id) { els[id] = $(id); });
 
     function callSketchUp(name, arg) {
@@ -729,6 +783,8 @@
 
       renderModelMaterials();
       renderScenes();
+      renderEditControls();
+      renderSpaceControls();
       updateGenerateState();
     }
 
@@ -872,6 +928,157 @@
     els.advanced.addEventListener('toggle', function () {
       if (els.advanced.open && model.modelMaterials.length === 0) callSketchUpQuiet('listMaterials');
     });
+    // ── Ampliar ─────────────────────────────────────────────────────────────
+    function requestUpscale(scale) {
+      if (model.generating || !model.result || !model.result.outputUrl) return;
+      showNotice('', 'success');
+      startGeneratingUi();
+      els.overlayText.textContent = 'Preparando a ampliação…';
+      callSketchUp('upscaleQuote', JSON.stringify({ url: model.result.outputUrl, scale: scale }));
+    }
+    els.upscale2xButton.addEventListener('click', function () { requestUpscale('2x'); });
+    els.upscale4xButton.addEventListener('click', function () { requestUpscale('4x'); });
+
+    // ── Editar ──────────────────────────────────────────────────────────────
+    function renderEditControls() {
+      var visible = !!(model.result && model.result.outputUrl);
+      els.editSection.style.display = visible ? '' : 'none';
+      if (!visible) return;
+      fill(els.editActionPills, EDIT_ACTIONS.map(function (a) {
+        return pillButton(a.label, a.id === model.editAction, function () {
+          model.editAction = a.id;
+          renderEditControls();
+          scheduleEditQuote();
+        });
+      }));
+      var swap = model.editAction === 'swap_material';
+      els.editMaterialRow.style.display = swap && model.modelMaterials.length ? '' : 'none';
+      if (swap) {
+        var current = els.editMaterialSelect.value;
+        els.editMaterialSelect.innerHTML = '';
+        var none = document.createElement('option');
+        none.value = ''; none.textContent = '—';
+        els.editMaterialSelect.appendChild(none);
+        model.modelMaterials.forEach(function (m) {
+          var opt = document.createElement('option');
+          opt.value = m.name; opt.textContent = m.displayName || m.name;
+          els.editMaterialSelect.appendChild(opt);
+        });
+        els.editMaterialSelect.value = current || '';
+      }
+      updateEditButton();
+    }
+    function updateEditButton() {
+      var hasInstruction = els.editInstruction.value.trim().length > 0;
+      els.editButton.disabled = model.generating || !model.authenticated || !hasInstruction;
+      els.editLabel.textContent = model.generating ? 'editando…' : 'Aplicar edição';
+      els.editMeta.textContent = model.editNodes != null && !model.generating ? model.editNodes + ' nodes' : '';
+    }
+    var editQuoteTimer = null;
+    function scheduleEditQuote() {
+      clearTimeout(editQuoteTimer);
+      model.editNodes = null;
+      updateEditButton();
+      if (!model.result || !els.editInstruction.value.trim()) return;
+      editQuoteTimer = setTimeout(function () {
+        model.editQuoteId += 1;
+        callSketchUpQuiet('editQuote', JSON.stringify({
+          quoteId: model.editQuoteId,
+          action: model.editAction,
+          instruction: els.editInstruction.value,
+          sourceUrl: model.result.outputUrl
+        }));
+      }, 700);
+    }
+    els.editInstruction.addEventListener('input', function () { scheduleEditQuote(); updateEditButton(); });
+    els.editSection.addEventListener('toggle', function () {
+      if (els.editSection.open && model.modelMaterials.length === 0) callSketchUpQuiet('listMaterials');
+    });
+    els.editButton.addEventListener('click', function () {
+      if (model.generating || !model.result) return;
+      showNotice('', 'success');
+      startGeneratingUi();
+      els.overlayText.textContent = 'Editando na SPACENODE…';
+      callSketchUp('applyEdit', JSON.stringify({
+        action: model.editAction,
+        instruction: els.editInstruction.value,
+        referenceMaterial: model.editAction === 'swap_material' ? els.editMaterialSelect.value : '',
+        sourceUrl: model.result.outputUrl
+      }));
+    });
+
+    // ── Criar Space ─────────────────────────────────────────────────────────
+    function spaceVistaCost() {
+      var cat = model.catalog;
+      if (!cat || !cat.spaces) return null;
+      var found = null;
+      (cat.spaces.vistaCosts || []).forEach(function (e) {
+        if (e.engine === model.engine) {
+          (e.qualities || []).forEach(function (q) { if (q.id === model.resolution) found = q.nodes; });
+        }
+      });
+      return found;
+    }
+    function renderSpaceControls() {
+      var cat = model.catalog;
+      var spaces = cat && cat.spaces;
+      // Catálogo antigo em cache (sem bloco spaces) esconde a seção inteira.
+      els.spaceSection.style.display = spaces ? '' : 'none';
+      if (!spaces) return;
+      fill(els.spaceCategoryPills, (spaces.categories || []).map(function (c) {
+        return pillButton(c.label, c.id === model.spaceCategory, function () {
+          model.spaceCategory = c.id;
+          renderSpaceControls();
+        });
+      }));
+      updateSpaceButton();
+    }
+    function updateSpaceButton() {
+      var cat = model.catalog;
+      var spaces = cat && cat.spaces;
+      if (!spaces) return;
+      var n = Math.min(model.selectedScenes.length, spaces.maxPrints || 10);
+      var vista = spaceVistaCost();
+      var total = vista != null ? (spaces.dnaCost || 8) + n * vista : null;
+      var insufficient = total != null && model.totalBalance != null && model.totalBalance < total;
+      els.spaceButton.disabled = model.generating || !model.authenticated || n === 0 || total == null || insufficient;
+      els.spaceLabel.textContent = model.spaceRunning ? 'criando Space…' : (n > 0 ? 'Criar Space · ' + n + ' vista' + (n === 1 ? '' : 's') : 'Criar Space');
+      els.spaceMeta.textContent = model.spaceRunning || total == null || n === 0 ? '' : total + ' nodes';
+      if (model.selectedScenes.length > (spaces.maxPrints || 10)) {
+        els.spaceNote.textContent = 'Máximo de ' + (spaces.maxPrints || 10) + ' cenas por Space — só as ' + (spaces.maxPrints || 10) + ' primeiras selecionadas entram.';
+      } else if (insufficient) {
+        els.spaceNote.textContent = 'Saldo insuficiente: custa ' + total + ' (' + (spaces.dnaCost || 8) + ' do DNA + ' + n + '×' + vista + ') · você tem ' + model.totalBalance + '.';
+      } else if (n === 0) {
+        els.spaceNote.textContent = 'Selecione as cenas na seção acima — elas viram as vistas do Space.';
+      } else if (total != null) {
+        els.spaceNote.textContent = (spaces.dnaCost || 8) + ' nodes do DNA + ' + n + ' vista' + (n === 1 ? '' : 's') + ' × ' + vista + ' nodes.';
+      }
+    }
+    els.spaceButton.addEventListener('click', function () {
+      if (model.generating || model.selectedScenes.length === 0) return;
+      var sceneEntries = [];
+      model.selectedScenes.forEach(function (i) {
+        model.scenes.forEach(function (sc) { if (sc.index === i) sceneEntries.push({ index: sc.index, name: sc.name }); });
+      });
+      showNotice('', 'success');
+      els.spaceProgress.innerHTML = '';
+      els.spaceResults.innerHTML = '';
+      els.openSpaceButton.style.display = 'none';
+      model.spaceRunning = true;
+      startGeneratingUi();
+      els.overlayText.textContent = 'Criando o Space…';
+      callSketchUp('createSpace', JSON.stringify({
+        name: els.spaceName.value,
+        category: model.spaceCategory,
+        engine: model.engine,
+        quality: model.resolution,
+        scenes: sceneEntries
+      }));
+    });
+    els.openSpaceButton.addEventListener('click', function () {
+      if (model.lastSpace) callSketchUp('openUrl', model.lastSpace.spaceUrl);
+    });
+
     function batchRow(sceneName, status, message) {
       var row = document.createElement('div');
       row.className = 'batch-row is-' + status;
@@ -944,7 +1151,11 @@
       els.openResultButton.disabled = model.generating;
       els.compareButton.disabled = model.generating;
       els.restoreCameraButton.disabled = model.generating;
+      els.upscale2xButton.disabled = model.generating;
+      els.upscale4xButton.disabled = model.generating;
       updateBatchButton();
+      updateEditButton();
+      updateSpaceButton();
     }
 
     function cheapestOption() {
@@ -984,6 +1195,7 @@
       els.compareButton.style.display = model.captureUrl ? '' : 'none';
       els.restoreCameraButton.style.display = result.camera ? '' : 'none';
       els.preview.classList.remove('is-comparing');
+      renderEditControls();
       updateGenerateState();
     }
     function toggleCompare() {
@@ -1124,6 +1336,8 @@
     els.cancelButton.addEventListener('click', function () {
       var elapsed = model.generateStartedAt ? (Date.now() - model.generateStartedAt) / 1000 : 0;
       callSketchUp('cancelGenerate');
+      model.batchRunning = false;
+      model.spaceRunning = false;
       stopGeneratingUi();
       if (elapsed > 8) {
         showNotice('Cancelado no painel. Se a geração já tinha sido enviada, o render pode aparecer no Histórico (Nodes debitados).', 'error');
@@ -1338,6 +1552,7 @@
           model.modelMaterials.forEach(function (m) { names[m.name] = true; });
           Object.keys(model.materialSel).forEach(function (n) { if (!names[n]) delete model.materialSel[n]; });
           renderModelMaterials();
+          renderEditControls();
         }
 
         if (event === 'batchStart') {
@@ -1386,6 +1601,78 @@
           }
         }
 
+        if (event === 'upscaleQuote') {
+          stopGeneratingUi();
+          showNotice(
+            'Ampliar ' + payload.scale + ' (' + payload.width + '×' + payload.height + ') custa ' + payload.nodes + ' nodes.',
+            'success',
+            {
+              label: 'Aplicar ampliação · ' + payload.nodes + ' nodes',
+              onClick: function () {
+                showNotice('', 'success');
+                startGeneratingUi();
+                els.overlayText.textContent = 'Ampliando na SPACENODE…';
+                callSketchUp('confirmUpscale');
+              }
+            }
+          );
+        }
+
+        if (event === 'editQuote') {
+          if (payload.quoteId === model.editQuoteId) {
+            model.editNodes = typeof payload.nodes === 'number' ? payload.nodes : null;
+            updateEditButton();
+          }
+        }
+
+        if (event === 'editRejected') {
+          stopGeneratingUi();
+          showNotice(payload.message || 'Nada foi alterado — refazer é grátis.', 'error');
+        }
+
+        if (event === 'spaceProgress') {
+          els.overlayText.textContent = payload.message || 'Criando o Space…';
+          var stepRow = document.createElement('div');
+          stepRow.className = 'batch-row is-done';
+          var d = document.createElement('span'); d.className = 'st';
+          var t = document.createElement('span'); t.className = 'nm'; t.textContent = payload.message || '';
+          stepRow.appendChild(d); stepRow.appendChild(t);
+          var prev = els.spaceProgress.querySelectorAll('.batch-row');
+          if (prev.length && prev[prev.length - 1].textContent === stepRow.textContent) return;
+          els.spaceProgress.appendChild(stepRow);
+        }
+
+        if (event === 'spaceDone') {
+          model.spaceRunning = false;
+          stopGeneratingUi();
+          if (payload.cancelled) {
+            if (payload.spaceUrl) {
+              model.lastSpace = payload;
+              els.openSpaceButton.style.display = '';
+              showNotice('Criação cancelada. O que já foi feito ficou salvo no Space — continue pelo site.', 'error');
+            }
+            updateGenerateState();
+            return;
+          }
+          model.lastSpace = payload;
+          els.openSpaceButton.style.display = '';
+          var vistas = Array.isArray(payload.vistas) ? payload.vistas : [];
+          var vErrors = Array.isArray(payload.errors) ? payload.errors : [];
+          els.spaceResults.innerHTML = '';
+          vistas.forEach(function (v) {
+            if (!v.url) return;
+            var img = document.createElement('img');
+            img.src = v.url; img.alt = v.label || 'Vista'; img.title = v.label || 'Vista';
+            img.addEventListener('error', function () { img.remove(); });
+            img.addEventListener('click', function () { callSketchUp('openUrl', payload.spaceUrl); });
+            els.spaceResults.appendChild(img);
+          });
+          var msg = 'Space "' + (payload.name || '') + '" criado com ' + vistas.length + ' vista' + (vistas.length === 1 ? '' : 's') + '.';
+          if (vErrors.length) msg += ' ' + vErrors.length + ' não iniciada' + (vErrors.length === 1 ? '' : 's') + ' — gere pelo site sem custo perdido.';
+          showNotice(msg, vistas.length > 0 ? 'success' : 'error');
+          updateGenerateState();
+        }
+
         if (event === 'batchDone') {
           model.batchRunning = false;
           stopGeneratingUi();
@@ -1419,6 +1706,7 @@
           // soltar o overlay de uma geração em andamento.
           if (payload.generation) {
             model.batchRunning = false;
+            model.spaceRunning = false;
             stopGeneratingUi();
           }
           if (payload.authExpired) {

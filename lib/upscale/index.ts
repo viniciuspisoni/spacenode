@@ -30,6 +30,7 @@ export {
   computeUpscaleCost,
   getUpscaleCostNodes,
   megapixelsFromDimensions,
+  MAX_OUTPUT_MP,
   type CostInput,
   type CostBreakdown,
 } from './costs'

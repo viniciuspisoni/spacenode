@@ -2,16 +2,16 @@
 // GET  /api/spaces  → lista do usuário (via spaces_with_counts)
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getRequestAuthContext } from '@/lib/auth/request-user'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isEngineId } from '@/lib/engines'
 import { isSpaceCategory } from '@/lib/spaces/types'
 import { signRows } from '@/lib/storage/signed'
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+  // Cookie (browser) ou Bearer (plugin SketchUp) — client RLS do usuário.
+  const { user, supabase } = await getRequestAuthContext(req)
+  if (!user || !supabase) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
   const body = await req.json().catch(() => null) as
     | { name?: string; category?: string; engine?: string }
@@ -53,10 +53,10 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ space: data }, { status: 201 })
 }
 
-export async function GET() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+export async function GET(req: NextRequest) {
+  // Cookie (browser) ou Bearer (plugin SketchUp) — client RLS do usuário.
+  const { user, supabase } = await getRequestAuthContext(req)
+  if (!user || !supabase) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
   const { data, error } = await supabase
     .from('spaces_with_counts')

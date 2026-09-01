@@ -4,16 +4,16 @@
 // exigir re-extração (operação explícita, fora do escopo do Bloco 1).
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getRequestAuthContext } from '@/lib/auth/request-user'
 
 export async function POST(
-  _req:    NextRequest,
+  req:     NextRequest,
   context: { params: Promise<{ spaceId: string }> },
 ) {
   const { spaceId } = await context.params
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+  // Cookie (browser) ou Bearer (plugin SketchUp) — client RLS do usuário.
+  const { user, supabase } = await getRequestAuthContext(req)
+  if (!user || !supabase) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
   const { data: space, error: fetchErr } = await supabase
     .from('spaces')
