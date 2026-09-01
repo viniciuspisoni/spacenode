@@ -120,7 +120,16 @@ module SpaceNode
         begin
           handle_generate(raw)
         rescue StandardError => e
-          fail_generation(e.message)
+          # NUNCA fail_generation aqui: um erro deste callback com outra
+          # geração em andamento soltaria o lock dela (cobrança dupla).
+          emit_error(e.message)
+        end
+      end
+      dialog.add_action_callback('refreshCatalog') do |_ctx|
+        begin
+          refresh_catalog
+        rescue StandardError => e
+          emit_error(e.message)
         end
       end
       dialog.add_action_callback('cancelGenerate') do |_ctx|
@@ -163,11 +172,7 @@ module SpaceNode
         end
       end
       dialog.add_action_callback('persistState') do |_ctx, raw|
-        begin
-          ::Sketchup.write_default(PREFERENCES_KEY, 'panel_state', raw.to_s)
-        rescue StandardError
-          nil
-        end
+        write_json_default('panel_state', raw.to_s)
       end
       dialog.add_action_callback('saveSettings') do |_ctx, raw|
         begin
@@ -277,9 +282,11 @@ module SpaceNode
       @auth_nonce = SecureRandom.hex(16)
       @auth_silent = silent
 
-      dialog = ::UI::HtmlDialog.new(
+      # O dialog silencioso NÃO usa preferences_key: HtmlDialog persiste
+      # posição por key, e a posição fora da tela do modo silencioso
+      # envenenaria a geometria do dialog de Conectar visível.
+      dialog_options = {
         :dialog_title => 'Conectar SPACENODE',
-        :preferences_key => "#{PREFERENCES_KEY}.auth",
         :scrollable => false,
         :resizable => true,
         :width => 440,
@@ -287,7 +294,9 @@ module SpaceNode
         :min_width => 380,
         :min_height => 480,
         :style => dialog_style
-      )
+      }
+      dialog_options[:preferences_key] = "#{PREFERENCES_KEY}.auth" unless silent
+      dialog = ::UI::HtmlDialog.new(dialog_options)
 
       dialog.add_action_callback('receiveSpaceNodeSession') do |_ctx, raw|
         begin
@@ -297,21 +306,23 @@ module SpaceNode
         end
       end
 
-      # Renovação silenciosa: mesma página, janela fora da área visível. O CEF
-      # guarda a sessão web do usuário; o supabase-js renova o access token e
-      # a página entrega de volta sem interação.
-      dialog.set_position(20_000, 20_000) if silent && dialog.respond_to?(:set_position)
-
       dialog.set_url("#{api_base_url}/sketchup/connect?nonce=#{@auth_nonce}")
       @auth_dialog = dialog
       dialog.show
+
+      # Renovação silenciosa: mesma página, janela movida pra fora da área
+      # visível DEPOIS do show (antes, a restauração de geometria competiria
+      # com o set_position). O CEF guarda a sessão web do usuário; o
+      # supabase-js renova o access token e a página entrega sem interação.
+      dialog.set_position(20_000, 20_000) if silent && dialog.respond_to?(:set_position)
 
       if silent
         ::UI.start_timer(SILENT_AUTH_TIMEOUT_SECONDS, false) do
           if @auth_dialog.equal?(dialog)
             close_auth_dialog
+            had_pending = !@pending_generate.nil?
             @pending_generate = nil
-            emit_error('Sua sessão expirou. Conecte novamente.', true)
+            emit_error('Sua sessão expirou. Conecte novamente.', true, had_pending)
           end
         end
       end
@@ -408,10 +419,15 @@ module SpaceNode
     def refresh_catalog
       return unless authenticated?
 
-      json_request(:get, '/api/sketchup/catalog', nil, proc { |_e| nil }) do |data|
+      on_fail = proc do |error|
+        # Sem catálogo o painel fica sem presets/custos — o painel mostra
+        # aviso com ação de tentar de novo (callback refreshCatalog).
+        emit('catalogError', { :message => error.message })
+      end
+      json_request(:get, '/api/sketchup/catalog', nil, on_fail) do |data|
         @catalog = data
+        write_json_default('catalog_json', JSON.generate(data))
         begin
-          ::Sketchup.write_default(PREFERENCES_KEY, 'catalog_json', JSON.generate(data))
           ::Sketchup.write_default(PREFERENCES_KEY, 'catalog_at', Time.now.to_i)
         rescue StandardError
           nil
@@ -423,12 +439,29 @@ module SpaceNode
     def cached_catalog
       return @catalog if @catalog
 
-      raw = ::Sketchup.read_default(PREFERENCES_KEY, 'catalog_json', '').to_s
+      raw = read_json_default('catalog_json')
       at = ::Sketchup.read_default(PREFERENCES_KEY, 'catalog_at', 0).to_i
-      return nil if raw.empty?
+      return nil if raw.nil? || raw.empty?
       return nil if Time.now.to_i - at > CATALOG_TTL_SECONDS
 
       @catalog = JSON.parse(raw)
+    rescue StandardError
+      nil
+    end
+
+    # write_default/read_default têm bugs históricos de round-trip com aspas
+    # e barras invertidas (pior no macOS/plist) — JSON vai SEMPRE em Base64.
+    def write_json_default(key, json)
+      ::Sketchup.write_default(PREFERENCES_KEY, key, Base64.strict_encode64(json.to_s))
+    rescue StandardError
+      nil
+    end
+
+    def read_json_default(key)
+      raw = ::Sketchup.read_default(PREFERENCES_KEY, key, '').to_s
+      return nil if raw.empty?
+
+      Base64.strict_decode64(raw).force_encoding('UTF-8')
     rescue StandardError
       nil
     end
@@ -470,8 +503,11 @@ module SpaceNode
       path = File.join(Dir.tmpdir, "spacenode-viewport-#{Time.now.strftime('%Y%m%d-%H%M%S')}-#{SecureRandom.hex(3)}.png")
 
       # Higiene: a grade laranja de um plano de seção ativo entraria na imagem
-      # e viraria artefato no render. Esconde só durante a captura, dentro de
-      # uma operação abortada — nada muda no modelo nem na pilha de undo.
+      # e viraria artefato no render. Esconde só durante a captura e RESTAURA
+      # MANUALMENTE — mudanças em RenderingOptions não são registradas em
+      # operações (abort_operation não as reverte; só viraram undoáveis no
+      # SketchUp 2026, e apenas no nível de Page). Sem operação: a mudança
+      # não cria passo de undo de qualquer forma.
       rendering = model.rendering_options
       hide_planes = false
       begin
@@ -480,13 +516,8 @@ module SpaceNode
         hide_planes = false
       end
 
-      operation_open = false
       begin
-        if hide_planes
-          model.start_operation('SPACENODE Captura', true)
-          operation_open = true
-          rendering['DisplaySectionPlanes'] = false
-        end
+        rendering['DisplaySectionPlanes'] = false if hide_planes
 
         options = {
           :filename => path,
@@ -498,6 +529,27 @@ module SpaceNode
 
         ok = view.write_image(options)
         raise 'Não foi possível capturar a vista atual.' unless ok && File.exist?(path)
+
+        # Um viewport 4K em PNG pode passar do teto de 15 MB da área de
+        # upload — cai pra JPEG de alta qualidade antes de falhar.
+        if File.size(path) > 14_000_000
+          jpg = path.sub(/\.png\z/, '.jpg')
+          view.write_image(
+            :filename => jpg,
+            :width => width,
+            :height => height,
+            :antialias => true,
+            :compression => 0.92
+          )
+          if File.exist?(jpg)
+            begin
+              File.delete(path)
+            rescue StandardError
+              nil
+            end
+            path = jpg
+          end
+        end
 
         # Segunda captura pequena só pro preview do painel — nunca injetamos
         # o arquivo cheio (megabytes de base64 dentro de execute_script
@@ -514,10 +566,17 @@ module SpaceNode
         )
         @last_preview_path = File.exist?(preview) ? preview : nil
       ensure
-        model.abort_operation if operation_open
+        if hide_planes
+          begin
+            rendering['DisplaySectionPlanes'] = true
+          rescue StandardError
+            nil
+          end
+        end
       end
 
       @last_capture_size = [width, height]
+      @last_capture_mime = path.end_with?('.jpg') ? 'image/jpeg' : 'image/png'
       path
     end
 
@@ -546,8 +605,15 @@ module SpaceNode
 
     def handle_generate(raw)
       payload = parse_json(raw)
-      raise 'Conecte sua conta SPACENODE primeiro.' unless authenticated?
-      raise 'Já existe uma geração em andamento.' if @generating
+      unless authenticated?
+        emit_error('Conecte sua conta SPACENODE primeiro.', true, true)
+        return
+      end
+      if @generating
+        # Sem tocar no lock da geração em andamento (generation: false).
+        emit_error('Já existe uma geração em andamento.')
+        return
+      end
 
       unless session_fresh?
         @pending_generate = payload
@@ -560,9 +626,15 @@ module SpaceNode
     end
 
     def run_generation(payload)
-      raise 'Já existe uma geração em andamento.' if @generating
+      if @generating
+        emit_error('Já existe uma geração em andamento.')
+        return
+      end
 
       @generating = true
+      # Época invalida callbacks de gerações antigas/canceladas: cada
+      # continuação assíncrona confere a época antes de seguir.
+      @generation_epoch = (@generation_epoch || 0) + 1
       @generation_started_at = Time.now
 
       emit('status', { :stage => 'capture', :message => 'Capturando a vista…' })
@@ -576,29 +648,41 @@ module SpaceNode
       fail_generation(e.message)
     end
 
+    # Continuação de geração ainda válida? (não cancelada/substituída)
+    def generation_alive?(epoch)
+      @generating && epoch == @generation_epoch
+    end
+
     def upload_capture(path, payload)
+      epoch = @generation_epoch
       size = File.size(path)
+      mime = @last_capture_mime || 'image/png'
       emit('status', { :stage => 'upload', :message => 'Enviando o projeto…' })
 
       sign_body = {
         :area => 'render-source',
-        :contentType => 'image/png',
+        :contentType => mime,
         :sizeBytes => size
       }
-      json_request(:post, '/api/uploads/sign', sign_body, method(:generation_error_handler)) do |sign|
+      json_request(:post, '/api/uploads/sign', sign_body, generation_error_handler_for(epoch)) do |sign|
+        next unless generation_alive?(epoch)
+
         upload_url = sign['uploadUrl'].to_s
         key = sign['key'].to_s
         if upload_url.empty? || key.empty?
           fail_generation('Não foi possível preparar o envio da imagem.')
         else
-          put_capture(path, upload_url, key, payload)
+          put_capture(path, mime, upload_url, key, payload)
         end
       end
     end
 
-    def put_capture(path, upload_url, key, payload)
+    def put_capture(path, mime, upload_url, key, payload)
+      epoch = @generation_epoch
       binary = File.binread(path)
-      http_request(:put, upload_url, :body => binary, :content_type => 'image/png', :auth => false) do |response|
+      http_request(:put, upload_url, :body => binary, :content_type => mime, :auth => false) do |response|
+        next unless generation_alive?(epoch)
+
         status = response.status_code.to_i
         if status >= 200 && status < 300
           begin
@@ -614,16 +698,17 @@ module SpaceNode
     end
 
     def request_generation(source_key, payload)
+      epoch = @generation_epoch
       body = build_generate_payload(source_key, payload)
       emit('status', { :stage => 'generate', :message => 'Gerando na SPACENODE…' })
 
-      request = json_request(:post, '/api/generate', body, method(:generation_error_handler)) do |data|
-        finish_generation(data)
+      request = json_request(:post, '/api/generate', body, generation_error_handler_for(epoch)) do |data|
+        finish_generation(data) if generation_alive?(epoch)
       end
       @generate_request = request
 
       ::UI.start_timer(GENERATE_TIMEOUT_SECONDS, false) do
-        if @generating && @generate_request.equal?(request)
+        if generation_alive?(epoch) && @generate_request.equal?(request)
           begin
             request.cancel
           rescue StandardError
@@ -654,9 +739,15 @@ module SpaceNode
       body[:refinementText] = prompt unless prompt.empty?
 
       # Variação: o render anterior vira âncora de materiais/atmosfera e o
-      # refino passa a ser cirúrgico (contrato do /api/generate).
-      if payload['useAnchor'] && @last_result && @last_result[:outputUrl]
-        body[:anchorUrl] = @last_result[:outputUrl]
+      # refino passa a ser cirúrgico (contrato do /api/generate). O painel
+      # manda a URL explícita — @last_result é só fallback e não existe após
+      # reiniciar o SketchUp (o resultado restaurado do .skp fica só no JS).
+      if payload['useAnchor']
+        anchor = payload['anchorUrl'].to_s
+        anchor = @last_result && @last_result[:outputUrl].to_s if anchor.empty?
+        if anchor && anchor =~ %r{\Ahttps?://}
+          body[:anchorUrl] = anchor
+        end
       end
       seed = payload['seed']
       body[:seed] = seed.to_i if seed.is_a?(Numeric) || seed.to_s =~ /\A\d+\z/
@@ -664,17 +755,23 @@ module SpaceNode
       body
     end
 
-    def generation_error_handler(error)
-      status = error.respond_to?(:status) ? error.status : nil
-      if status.nil? || status.to_i.zero?
-        # Queda de rede DEPOIS do POST: o servidor pode ter cobrado e gerado.
-        reconcile_lost_generation
-      else
-        fail_generation(error.message, status == 401)
+    def generation_error_handler_for(epoch)
+      proc do |error|
+        if generation_alive?(epoch)
+          status = error.respond_to?(:status) ? error.status : nil
+          if status.nil? || status.to_i.zero?
+            # Queda de rede DEPOIS do POST: o servidor pode ter cobrado e gerado.
+            reconcile_lost_generation
+          else
+            fail_generation(error.message, status == 401)
+          end
+        end
       end
     end
 
     def finish_generation(data)
+      return unless @generating
+
       @generating = false
       @generate_request = nil
 
@@ -704,15 +801,25 @@ module SpaceNode
       started_at = @generation_started_at || Time.now
       emit('status', { :stage => 'reconcile', :message => 'Conexão instável — verificando se o render foi concluído…' })
 
+      epoch = @generation_epoch
+      previous_id = @last_result && (@last_result[:renderId] || @last_result['renderId'])
+
       ::UI.start_timer(6, false) do
         on_fail = proc do |_e|
-          fail_generation('Não foi possível confirmar a geração. Veja o Histórico antes de gerar de novo — os Nodes podem ter sido usados.')
+          fail_generation('Não foi possível confirmar a geração. Veja o Histórico antes de gerar de novo — os Nodes podem ter sido usados.') if generation_alive?(epoch)
         end
         json_request(:get, '/api/renders/list', nil, on_fail) do |data|
+          next unless generation_alive?(epoch)
+
           renders = data['renders'].is_a?(Array) ? data['renders'] : []
+          # Nunca adotar o render ANTERIOR como se fosse o desta geração:
+          # exclui o último renderId conhecido e exige created_at após o
+          # início (com 60s de folga pra clock skew cliente↔servidor).
           found = renders.find do |r|
             begin
-              Time.parse(r['created_at'].to_s) >= started_at - 30
+              next false if previous_id && r['id'].to_s == previous_id.to_s
+
+              Time.parse(r['created_at'].to_s) >= started_at - 60
             rescue StandardError
               false
             end
@@ -737,6 +844,10 @@ module SpaceNode
       @generate_request = nil
       @generating = false
       @pending_generate = nil
+      # Invalida TODA continuação em voo (sign/PUT/generate) — sem isso, o
+      # callback do sign ainda dispararia o POST /api/generate e cobraria
+      # Nodes de uma geração cancelada.
+      @generation_epoch = (@generation_epoch || 0) + 1
       if request
         begin
           request.cancel
@@ -750,7 +861,7 @@ module SpaceNode
     def fail_generation(message, auth_expired = false)
       @generating = false
       @generate_request = nil
-      emit_error(message, auth_expired)
+      emit_error(message, auth_expired, true)
     end
 
     # Última geração viaja com o arquivo .skp (operação transparente — não
@@ -796,13 +907,30 @@ module SpaceNode
       emit('status', { :stage => 'download', :message => 'Baixando o render…' })
       http_request(:get, url, :auth => false) do |response|
         status = response.status_code.to_i
-        if status >= 200 && status < 300 && response.body && !response.body.empty?
-          File.binwrite(target, response.body)
+        body = response.body.to_s
+        if status >= 200 && status < 300 && image_bytes?(body)
+          File.binwrite(target, body)
           emit('saved', { :path => target })
         else
+          # Corpo não é imagem (página de erro, corpo corrompido) — não
+          # gravar lixo; o site sempre funciona como fallback.
           emit_error('Não foi possível baixar o render. Tente pelo site.')
+          open_url(url) if status >= 200 && status < 300
         end
       end
+    end
+
+    # Assinaturas PNG/JPEG/WebP — o suficiente pra distinguir imagem de uma
+    # página de erro/HTML antes de gravar em disco.
+    def image_bytes?(body)
+      return false if body.nil? || body.bytesize < 12
+
+      bytes = body.byteslice(0, 12).bytes
+      return true if bytes[0, 4] == [0x89, 0x50, 0x4E, 0x47]
+      return true if bytes[0, 2] == [0xFF, 0xD8]
+      return true if bytes[0, 4] == [0x52, 0x49, 0x46, 0x46] && bytes[8, 4] == [0x57, 0x45, 0x42, 0x50]
+
+      false
     end
 
     # ── Configurações ────────────────────────────────────────────────────────
@@ -816,6 +944,7 @@ module SpaceNode
       if next_url != current_url
         clear_session
         @catalog = nil
+        @balance = nil
         ::Sketchup.write_default(PREFERENCES_KEY, 'catalog_json', '')
       end
       send_state
@@ -851,8 +980,8 @@ module SpaceNode
     def send_state
       panel_state = nil
       begin
-        raw = ::Sketchup.read_default(PREFERENCES_KEY, 'panel_state', '').to_s
-        panel_state = JSON.parse(raw) unless raw.empty?
+        raw = read_json_default('panel_state')
+        panel_state = JSON.parse(raw) if raw && !raw.empty?
       rescue StandardError
         panel_state = nil
       end
@@ -896,8 +1025,15 @@ module SpaceNode
       end
     end
 
-    def emit_error(message, auth_expired = false)
-      emit('error', { :message => message.to_s, :authExpired => auth_expired ? true : false })
+    # generation=true marca erros que encerram uma geração — só esses podem
+    # destravar a UI de "gerando" no painel (erros paralelos, como uma falha
+    # do histórico, não podem soltar o overlay de uma geração em andamento).
+    def emit_error(message, auth_expired = false, generation = false)
+      emit('error', {
+        :message => message.to_s,
+        :authExpired => auth_expired ? true : false,
+        :generation => generation ? true : false
+      })
     end
 
     def open_url(url)

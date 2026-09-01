@@ -82,7 +82,12 @@
     .balance a { font-size: 11px; color: var(--text-3); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
     .balance a:hover { color: var(--text-2); }
 
-    main { overflow-y: auto; padding: 14px 16px 20px; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.14) transparent; }
+    /* CEF 112 não tem scrollbar-width/scrollbar-color (Chromium 121+) —
+       estilo via ::-webkit-scrollbar, que cobre todas as versões alvo. */
+    main { overflow-y: auto; padding: 14px 16px 20px; }
+    main::-webkit-scrollbar { width: 8px; }
+    main::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.14); border-radius: 999px; }
+    main::-webkit-scrollbar-track { background: transparent; }
 
     /* ── Conexão ── */
     .connection {
@@ -468,7 +473,9 @@
       result: null,
       generating: false,
       generateStartedAt: null,
+      generateStage: null,
       historyCursor: null,
+      userEmail: null,
       version: ''
     };
 
@@ -535,6 +542,10 @@
     function normalizeSelections() {
       var pt = currentProjectType();
       if (!pt) return;
+      var defaults = model.catalog.defaults || {};
+      if (!model.engine && defaults.engine) model.engine = defaults.engine;
+      if (!model.resolution && defaults.resolution) model.resolution = defaults.resolution;
+      if (!model.fidelityLevel && defaults.fidelityLevel) model.fidelityLevel = defaults.fidelityLevel;
       model.projectType = pt.id;
       var seg = currentSegment();
       model.segment = seg ? seg.name : null;
@@ -704,6 +715,9 @@
       els.captureButton.disabled = model.generating;
       els.connectButton.disabled = model.generating;
       els.disconnectButton.disabled = model.generating;
+      els.downloadButton.disabled = model.generating;
+      els.openResultButton.disabled = model.generating;
+      els.compareButton.disabled = model.generating;
     }
 
     function cheapestOption() {
@@ -766,16 +780,24 @@
     }
     els.compareRange.addEventListener('input', function () { setCompare(Number(els.compareRange.value)); });
     window.addEventListener('resize', fixCompareImageSize);
+    if (typeof ResizeObserver === 'function') {
+      new ResizeObserver(fixCompareImageSize).observe(els.preview);
+    }
 
     // ── Estados de processo ─────────────────────────────────────────────────
     function startGeneratingUi() {
       model.generating = true;
       model.generateStartedAt = Date.now();
+      model.generateStage = 'capture';
       els.previewOverlay.classList.add('is-visible');
       var i = 0;
-      els.overlayText.textContent = GENERATING_TEXTS[0];
+      els.overlayText.textContent = 'Capturando a vista…';
       clearInterval(generatingTimer);
       generatingTimer = setInterval(function () {
+        // O rotador só fala durante a etapa longa de geração — as etapas
+        // reais (captura/envio/reconciliação) vêm do Ruby e não podem ser
+        // atropeladas.
+        if (model.generateStage !== 'generate') return;
         i = (i + 1) % GENERATING_TEXTS.length;
         els.overlayText.textContent = GENERATING_TEXTS[i];
       }, 9000);
@@ -813,6 +835,13 @@
       }
     }
     function showError(message) { showNotice(message, 'error'); }
+
+    // lastResult pode vir do atributo de um .skp de terceiros — só URLs
+    // http(s) entram no preview/ações.
+    function isSafeResult(r) {
+      var u = r && (r.outputUrl || r.previewUrl);
+      return typeof u === 'string' && /^https?:\/\//i.test(u);
+    }
 
     function setFooter(text) { els.footer.textContent = text || ('SPACENODE para SketchUp · v' + (model.version || '')); }
 
@@ -873,6 +902,12 @@
 
     function submitGenerate() {
       if (model.generating) return;
+      // Bridge primeiro: sem SketchUp por trás, não ligar o overlay (ficaria
+      // preso pra sempre — nenhum evento viria destravar).
+      if (!(window.sketchup && typeof window.sketchup.generate === 'function')) {
+        showError('Abra este painel dentro do SketchUp.');
+        return;
+      }
       showNotice('', 'success');
       startGeneratingUi();
       callSketchUp('generate', JSON.stringify({
@@ -887,6 +922,7 @@
         engine: model.engine,
         resolution: model.resolution,
         useAnchor: !!model.result,
+        anchorUrl: model.result ? (model.result.outputUrl || null) : null,
         seed: model.result && model.result.seed != null ? model.result.seed : null
       }));
     }
@@ -914,17 +950,34 @@
 
     // Histórico
     var historyLoaded = false;
+    var historyLoading = false;
+    var historyAppend = false;
     els.historySection.addEventListener('toggle', function () {
       if (els.historySection.open && !historyLoaded) loadHistory(null);
     });
     els.historyMore.addEventListener('click', function () { loadHistory(model.historyCursor); });
     function loadHistory(cursor) {
       if (!model.authenticated) { els.historyEmpty.style.display = ''; return; }
+      if (historyLoading) return;
+      historyLoading = true;
+      historyAppend = !!cursor;
+      els.historyMore.disabled = true;
       callSketchUp('fetchHistory', JSON.stringify({ cursor: cursor || '' }));
     }
-    function renderHistory(renders, append) {
+    function resetHistory() {
+      historyLoaded = false;
+      historyLoading = false;
+      historyAppend = false;
+      model.historyCursor = null;
+      els.historyGrid.innerHTML = '';
+      els.historyMore.style.display = 'none';
+      els.historyEmpty.style.display = 'none';
+    }
+    function renderHistory(renders, pageSize) {
       historyLoaded = true;
-      if (!append) els.historyGrid.innerHTML = '';
+      historyLoading = false;
+      els.historyMore.disabled = false;
+      if (!historyAppend) els.historyGrid.innerHTML = '';
       renders.forEach(function (r) {
         var url = r.preview_url || r.output_url;
         if (!url) return;
@@ -933,6 +986,9 @@
         img.alt = 'Render';
         img.loading = 'lazy';
         img.title = 'Abrir no site';
+        // URLs assinadas expiram (~1h) — thumbnail morto some em vez de
+        // virar ícone quebrado.
+        img.addEventListener('error', function () { img.remove(); });
         img.addEventListener('click', function () {
           callSketchUp('openUrl', r.output_url || url);
         });
@@ -942,7 +998,7 @@
       els.historyEmpty.style.display = empty ? '' : 'none';
       if (renders.length > 0) {
         model.historyCursor = renders[renders.length - 1].created_at;
-        els.historyMore.style.display = renders.length >= 60 ? '' : 'none';
+        els.historyMore.style.display = renders.length >= (pageSize || 60) ? '' : 'none';
       } else {
         els.historyMore.style.display = 'none';
       }
@@ -952,17 +1008,26 @@
     window.SpaceNodeBridge = {
       receive: function (event, payload) {
         if (event === 'state') {
+          var wasAuthenticated = model.authenticated;
+          var previousEmail = model.userEmail;
           model.apiBaseUrl = payload.apiBaseUrl || model.apiBaseUrl;
           model.authenticated = !!payload.authenticated;
           model.sessionFresh = !!payload.sessionFresh;
           model.version = payload.version || model.version;
-          els.apiBaseUrl.value = model.apiBaseUrl;
+          model.userEmail = payload.userEmail || null;
+          // Não sobrescrever o campo enquanto o usuário edita.
+          if (document.activeElement !== els.apiBaseUrl) els.apiBaseUrl.value = model.apiBaseUrl;
           els.connSub.textContent = payload.userEmail || 'Conecte sua conta SPACENODE';
           if (payload.balance && typeof payload.balance.totalBalance === 'number') {
             model.totalBalance = payload.balance.totalBalance;
           }
+          if (!model.authenticated) model.totalBalance = null;
+          // Sair/trocar de conta: o histórico da conta anterior não pode vazar.
+          if ((wasAuthenticated && !model.authenticated) || (previousEmail && model.userEmail && previousEmail !== model.userEmail)) {
+            resetHistory();
+          }
           if (payload.panelState && !model.catalog) restorePanelState(payload.panelState);
-          if (!model.result && payload.lastResult && payload.lastResult.outputUrl) {
+          if (!model.result && payload.lastResult && isSafeResult(payload.lastResult)) {
             showResult(payload.lastResult);
           }
           setFooter('');
@@ -982,6 +1047,7 @@
 
         if (event === 'status') {
           if (payload.message) setFooter(payload.message);
+          if (payload.stage) model.generateStage = payload.stage;
           if (model.generating && payload.message && payload.stage !== 'idle') {
             els.overlayText.textContent = payload.message;
           }
@@ -1011,7 +1077,7 @@
         }
 
         if (event === 'history') {
-          renderHistory(Array.isArray(payload.renders) ? payload.renders : [], !!model.historyCursor);
+          renderHistory(Array.isArray(payload.renders) ? payload.renders : [], payload.pageSize);
         }
 
         if (event === 'saved') {
@@ -1020,7 +1086,10 @@
         }
 
         if (event === 'error') {
-          stopGeneratingUi();
+          // Só erros que encerram uma geração (generation:true) destravam a
+          // UI de "gerando" — um erro paralelo (histórico, sessão) não pode
+          // soltar o overlay de uma geração em andamento.
+          if (payload.generation) stopGeneratingUi();
           if (payload.authExpired) {
             model.authenticated = false;
             els.connSub.textContent = 'Conecte sua conta SPACENODE';
@@ -1033,6 +1102,15 @@
           }
           updateGenerateState();
           setFooter('');
+        }
+
+        if (event === 'catalogError') {
+          if (!model.catalog) {
+            showNotice('Não foi possível carregar os presets e custos.', 'error', {
+              label: 'Tentar de novo',
+              onClick: function () { callSketchUp('refreshCatalog'); }
+            });
+          }
         }
       }
     };

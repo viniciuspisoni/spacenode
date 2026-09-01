@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useTheme } from '@/lib/theme/ThemeProvider'
 import { Brandmark } from '@/components/brand'
+import { safeNextPath } from '@/lib/auth/safe-next-path'
+import { LOGIN_NEXT_COOKIE, LOGIN_NEXT_MAX_AGE } from '@/lib/auth/login-next-cookie'
 
 type Mode = 'login' | 'signup'
 
@@ -79,11 +81,6 @@ function authErrorMessage(value: string | null): string | null {
   return null
 }
 
-function safeNextPath(value: string | null): string {
-  if (!value || !value.startsWith('/') || value.startsWith('//')) return '/app'
-  return value
-}
-
 export default function LoginPage() {
   return (
     <Suspense fallback={null}>
@@ -96,6 +93,17 @@ function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const nextPath = safeNextPath(searchParams.get('next'))
+
+  // Destino pós-login pro caminho do GIS: o login_uri precisa ser FIXO (match
+  // exato com a redirect URI autorizada no client OAuth), então o next viaja
+  // num cookie de curta duração que o POST /auth/google lê. SameSite=None
+  // porque o POST do Google é cross-site (igual ao cookie de nonce).
+  useEffect(() => {
+    const secure = window.location.protocol === 'https:'
+    document.cookie =
+      `${LOGIN_NEXT_COOKIE}=${encodeURIComponent(nextPath)}; path=/; max-age=${LOGIN_NEXT_MAX_AGE}` +
+      (secure ? '; SameSite=None; Secure' : '; SameSite=Lax')
+  }, [nextPath])
 
   const [mode,          setMode]          = useState<Mode>(searchParams.get('mode') === 'signup' ? 'signup' : 'login')
   const [email,         setEmail]         = useState('')
@@ -158,7 +166,9 @@ function LoginForm() {
         window.google.accounts.id.initialize({
           client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!,
           ux_mode: 'redirect',
-          login_uri: `${window.location.origin}/auth/google?next=${encodeURIComponent(nextPath)}`,
+          // FIXO — a doc do GIS exige match exato com a redirect URI
+          // autorizada; o destino pós-login viaja no cookie sn_login_next.
+          login_uri: `${window.location.origin}/auth/google`,
           nonce,
           use_fedcm_for_prompt: true,
           itp_support: true,
@@ -206,7 +216,7 @@ function LoginForm() {
       cancelled = true
       timers.forEach(t => window.clearTimeout(t))
     }
-  }, [googleFallback, resolvedTheme, nextPath])
+  }, [googleFallback, resolvedTheme])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

@@ -744,10 +744,20 @@ export function buildNegativePromptForFidelity(level: FidelityLevel): string {
 //    preservação. Até 2026-09 esse caso era descartado — o campo de descrição
 //    da primeira geração (web e plugin SketchUp) não tinha efeito nenhum no
 //    prompt, só relaxava o gate de fidelidade.
-function buildRefinementBlock(refinementText?: string, hasAnchor?: boolean): string {
+function buildRefinementBlock(refinementText?: string, hasAnchor?: boolean, level: FidelityLevel = 'maximum'): string {
   const text = refinementText?.trim()
   if (!text) return ''
   if (!hasAnchor) {
+    // Em balanced/creative não existe "preservation contract" nem "geometry
+    // lock" no prompt — referenciá-los confundiria o modelo. A direção entra
+    // com o mesmo espírito do nível: aplicar o pedido, manter o resto coerente.
+    if (level !== 'maximum') {
+      return (
+        `USER DIRECTION: "${text}". ` +
+        `Apply what this direction explicitly asks for; keep everything else ` +
+        `consistent with the reference image. `
+      )
+    }
     return (
       `USER DIRECTION: "${text}". ` +
       `Apply ONLY what this direction explicitly asks for. ` +
@@ -895,7 +905,7 @@ export function buildFidelityPrompt(
   const { projectType, segment, environment, lighting, background, sceneElements, materials, hasAnchor, refinementText } = options
 
   const anchor     = buildAnchorBlock(hasAnchor)
-  const refinement = buildRefinementBlock(refinementText, hasAnchor)
+  const refinement = buildRefinementBlock(refinementText, hasAnchor, level)
   const preserve   = briefing ? preservationBlock(briefing) : ''
   const allow      = briefing ? transformationBlock(briefing, level) : ''
   const matBlock   = buildMaterialsBlock(materials, projectType, level)
