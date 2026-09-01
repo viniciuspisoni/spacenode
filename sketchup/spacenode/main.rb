@@ -26,7 +26,7 @@ module SpaceNode
   module SketchUp
     extend self
 
-    VERSION = '0.5.0'
+    VERSION = '0.5.1'
     PREFERENCES_KEY = 'com.spacenode.sketchup'
     DEFAULT_API_BASE_URL = 'https://spacenode.app'
     MIN_SKETCHUP_MAJOR = 21          # Ruby 2.7+; recomendado 2024+
@@ -2759,20 +2759,35 @@ module SpaceNode
       command.tooltip = 'SPACENODE'
       command.status_bar_text = 'Renderizar a vista atual com a SPACENODE'
 
+      # PNG nas DUAS plataformas: o renderizador de SVG do SketchUp no Windows
+      # exibe ícones feitos só de stroke (sem fill) em branco/preto — o botão
+      # parecia inexistente. PNG rasterizado é confiável. Caminho absoluto.
       icon_base = File.join(__dir__, 'assets')
-      if ::Sketchup.platform == :platform_win && File.exist?(File.join(icon_base, 'spacenode.svg'))
-        command.small_icon = File.join(icon_base, 'spacenode.svg')
-        command.large_icon = File.join(icon_base, 'spacenode.svg')
-      elsif File.exist?(File.join(icon_base, 'spacenode-24.png'))
-        command.small_icon = File.join(icon_base, 'spacenode-24.png')
-        command.large_icon = File.join(icon_base, 'spacenode-48.png')
+      small_icon = File.join(icon_base, 'spacenode-24.png')
+      large_icon = File.join(icon_base, 'spacenode-48.png')
+      if File.exist?(small_icon)
+        command.small_icon = small_icon
+        command.large_icon = File.exist?(large_icon) ? large_icon : small_icon
       end
 
       ::UI.menu('Extensions').add_item(command)
 
       toolbar = ::UI::Toolbar.new('SPACENODE')
       toolbar.add_item(command)
-      toolbar.restore
+      # restore sozinho NÃO exibe no primeiro load (get_last_state
+      # TB_NEVER_SHOWN) — só reposiciona se já foi mostrada antes. show força
+      # a exibição na estreia; nas próximas sessões restore respeita a escolha
+      # do usuário (se ele fechou a barra, fica fechada).
+      begin
+        never_shown = defined?(TB_NEVER_SHOWN) ? TB_NEVER_SHOWN : -1
+        if toolbar.get_last_state == never_shown
+          toolbar.show
+        else
+          toolbar.restore
+        end
+      rescue StandardError
+        toolbar.restore
+      end
 
       file_loaded(__FILE__)
     end
