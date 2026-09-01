@@ -1938,23 +1938,88 @@ module SpaceNode
 
       suggested = payload['suggestedName'].to_s
       suggested = "spacenode-render-#{Time.now.strftime('%Y%m%d-%H%M')}.png" if suggested.empty?
-      target = ::UI.savepanel(t(:save_title), nil, suggested)
+      # Diretório default explícito (não nil): remove qualquer dúvida de o
+      # diálogo não abrir e dá um ponto de partida previsível.
+      target = ::UI.savepanel(t(:save_title), default_save_dir, suggested)
       return unless target
 
+      # savepanel não força extensão — garante um sufixo de imagem no destino.
+      target = "#{target}.png" unless target =~ /\.(png|jpe?g|webp)\z/i
+
       emit('status', { :stage => 'download', :message => t(:downloading) })
+      download_to_file(url, target, 4)
+    end
+
+    def default_save_dir
+      base = ENV['USERPROFILE'] || ENV['HOME']
+      return nil unless base
+
+      desktop = File.join(base, 'Desktop')
+      File.directory?(desktop) ? desktop : base
+    rescue StandardError
+      nil
+    end
+
+    # GET que segue redirects MANUALMENTE — Sketchup::Http::Request não segue
+    # 3xx (o preview no CEF vê a imagem porque o Chromium segue sozinho; o
+    # Http do SketchUp receberia só o stub do redirect). Grava em binário
+    # ('wb') e valida a assinatura de imagem antes de escrever em disco.
+    def download_to_file(url, target, hops)
       http_request(:get, url, :auth => false) do |response|
         status = response.status_code.to_i
+
+        if status >= 300 && status < 400
+          location = redirect_location(response)
+          if hops > 0 && location && !location.empty?
+            download_to_file(absolute_url(location, url), target, hops - 1)
+          else
+            emit_error('Não foi possível baixar o render. Tente pelo site.')
+            open_url(url)
+          end
+          next
+        end
+
         body = response.body.to_s
         if status >= 200 && status < 300 && image_bytes?(body)
-          File.binwrite(target, body)
-          emit('saved', { :path => target })
+          begin
+            File.open(target, 'wb') { |f| f.write(body) }
+            emit('saved', { :path => target })
+          rescue StandardError => e
+            emit_error("Não foi possível salvar o arquivo: #{e.message}")
+          end
         else
-          # Corpo não é imagem (página de erro, corpo corrompido) — não
-          # gravar lixo; o site sempre funciona como fallback.
-          emit_error('Não foi possível baixar o render. Tente pelo site.')
+          # Diagnóstico embutido: o motivo exato aparece pro usuário (e pra
+          # nós) sem depender do Ruby Console — status + tamanho recebido.
+          reason = status.zero? ? 'sem resposta do servidor' : "HTTP #{status}, #{body.bytesize} bytes"
+          emit_error("Não foi possível baixar o render (#{reason}). Use \"Abrir no site\".")
           open_url(url) if status >= 200 && status < 300
         end
       end
+    end
+
+    # Location do response (headers é Hash; a chave pode variar de caixa).
+    def redirect_location(response)
+      headers = response.headers
+      return nil unless headers.respond_to?(:each)
+
+      found = nil
+      headers.each { |k, v| found = v if k.to_s.downcase == 'location' }
+      found.to_s
+    rescue StandardError
+      nil
+    end
+
+    # Resolve Location relativo contra a URL de origem (absoluto passa direto).
+    def absolute_url(location, base)
+      return location if location =~ %r{\Ahttps?://}
+
+      uri = URI.parse(base)
+      port = uri.port
+      default_port = (uri.scheme == 'https' && port == 443) || (uri.scheme == 'http' && port == 80)
+      host = "#{uri.scheme}://#{uri.host}#{default_port ? '' : ":#{port}"}"
+      location.start_with?('/') ? "#{host}#{location}" : "#{host}/#{location}"
+    rescue StandardError
+      location
     end
 
     # Assinaturas PNG/JPEG/WebP — o suficiente pra distinguir imagem de uma
