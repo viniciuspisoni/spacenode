@@ -3,9 +3,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { Logo } from './brand';
 
+// '#sketchup' é a faixa do plugin na própria landing; o link "Conhecer o
+// plugin" de lá leva pra /sketchup. Mantendo tudo como âncora, o scroll-spy
+// e o drawer seguem funcionando sem exceção.
 const LINKS = [
   { href: '#produto',       label: 'PRODUTO'       },
   { href: '#como-funciona', label: 'COMO FUNCIONA' },
+  { href: '#sketchup',      label: 'SKETCHUP'      },
   { href: '#planos',        label: 'PREÇOS'        },
   { href: '#faq',           label: 'FAQ'           },
 ];
@@ -462,8 +466,13 @@ export default function Navbar() {
 
         /* ── Responsivo ───────────────────────────────────────────────────── */
         /* Menu central + CTAs já colidiam em 768px na barra original: o
-           hambúrguer precisa entrar antes. */
-        @media (max-width: 900px) {
+           hambúrguer precisa entrar antes. O breakpoint é calibrado pela
+           LARGURA DOS LINKS — com 4 links, 900px bastava; com o 5º
+           (SKETCHUP) a colisão sobe pra ~1000px (medido: em 901px o gap
+           links↔CTAs zera e o "Testar grátis" invade os 40px de padding,
+           sem gerar scrollbar). Se um link entrar ou sair daqui, MEÇA de
+           novo — este número não é decorativo. */
+        @media (max-width: 1024px) {
           .spn-nav { height: 76px; padding: 0 20px; }
           .spn-nav.is-scrolled { height: 68px; }
           .nav-links, .nav-actions { display: none !important; }
@@ -511,7 +520,7 @@ export default function Navbar() {
           margin: 0 auto;
         }
 
-        @media (min-width: 901px) {
+        @media (min-width: 1025px) {
           .nav-drawer { display: none; }
         }
 
@@ -558,7 +567,7 @@ export default function Navbar() {
       {/* Âncoras (#produto, #planos…) não podem parar embaixo da barra. */}
       <style jsx global>{`
         html { scroll-padding-top: 88px; }
-        @media (max-width: 900px) {
+        @media (max-width: 1024px) {
           html { scroll-padding-top: 80px; }
         }
       `}</style>

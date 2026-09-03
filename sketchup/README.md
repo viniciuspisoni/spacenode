@@ -62,8 +62,8 @@ Rotas web do plugin:
 
 ## Compatibilidade
 
-SketchUp 2021+ (gate em runtime); alvo suportado e testado: **2024, 2025 e
-2026** (Ruby 3.2.2; HtmlDialog CEF 112/128/137).
+SketchUp 2021+ (gate em runtime). Testado em campo no **2022** (Windows);
+alvo de suporte: 2024/2025/2026 (Ruby 3.2.2; HtmlDialog CEF 112/128/137).
 
 ## Empacotar
 

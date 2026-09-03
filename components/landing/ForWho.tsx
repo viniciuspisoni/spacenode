@@ -78,7 +78,7 @@ export function ForWho() {
             <span key={t} className="spn-who-chip">{t}</span>
           ))}
         </div>
-        <span className="spn-who-tools-note">Prints e imagens base — sem plugin, sem integração.</span>
+        <span className="spn-who-tools-note">Prints e imagens base de qualquer modelador — e plugin oficial para SketchUp.</span>
       </div>
 
       <style jsx>{`
