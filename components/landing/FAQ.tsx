@@ -18,7 +18,7 @@ const faqs: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: 'Posso usar imagens do SketchUp como base?',
-    a: 'Sim. Prints de tela, exportações de imagem, estudos volumétricos, fotos e referências funcionam como imagem base — do SketchUp, Revit, ArchiCAD, Blender ou qualquer modelador. A SpaceNode complementa as ferramentas que você já usa: é 100% web, sem plugin, sem instalação e sem GPU dedicada.',
+    a: 'Sim. Prints de tela, exportações de imagem, estudos volumétricos, fotos e referências funcionam como imagem base — do SketchUp, Revit, ArchiCAD, Blender ou qualquer modelador. A SpaceNode complementa as ferramentas que você já usa: roda no navegador, sem instalação e sem GPU dedicada. Para SketchUp existe também o plugin oficial, que captura a vista direto do modelo — opcional, para quem prefere não sair do projeto.',
   },
   {
     q: 'O que são Nodes?',

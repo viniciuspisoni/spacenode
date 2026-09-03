@@ -43,7 +43,7 @@ export default function HowItWorks() {
             três passos. do estudo à apresentação.
           </h2>
           <p className="spn-hiw-sub">
-            Sem prompts complexos. Sem plugins. Escolhas de arquitetura, não de
+            Sem prompts complexos. Escolhas de arquitetura, não de
             tecnologia.
           </p>
         </div>

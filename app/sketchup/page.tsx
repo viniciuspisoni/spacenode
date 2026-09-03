@@ -10,7 +10,7 @@ import { Brandmark } from '@/components/brand'
 export const metadata: Metadata = {
   title: 'SPACENODE para SketchUp',
   description:
-    'Renderize suas vistas do SketchUp com o motor de fidelidade da SPACENODE — sem sair do modelo. Extensão oficial para SketchUp 2024 ou superior.',
+    'Renderize suas vistas do SketchUp com o motor de fidelidade da SPACENODE — sem sair do modelo. Extensão oficial para SketchUp 2021 ou superior.',
 }
 
 const RBZ_PATH = '/downloads/spacenode-sketchup.rbz'
@@ -35,7 +35,7 @@ const FEATURES: { title: string; body: string }[] = [
   },
   {
     title: 'edite por instrução.',
-    body: 'Trocar material, remover, refinar — direto do painel, com as texturas reais do seu modelo como amostra e o custo exato no botão antes de aplicar.',
+    body: 'Trocar material, remover, refinar — direto do painel. Pinte a área sobre o render para dizer onde, use as texturas reais do modelo como amostra e veja o custo exato no botão antes de aplicar.',
   },
   {
     title: 'cenas viram um Space.',
@@ -73,7 +73,7 @@ export default function SketchUpPage() {
             <span>Baixar a extensão (.rbz)</span>
             <span style={S.downloadMeta}>v{PLUGIN_VERSION} · Windows e macOS</span>
           </a>
-          <p style={S.requirement}>SketchUp 2024 ou superior. Grátis — os renders usam os Nodes da sua conta SPACENODE.</p>
+          <p style={S.requirement}>SketchUp 2021 ou superior. Grátis — os renders usam os Nodes da sua conta SPACENODE.</p>
         </section>
 
         <section style={S.section}>

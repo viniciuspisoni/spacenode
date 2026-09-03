@@ -8,6 +8,7 @@ export default function Footer() {
       </span>
 
       <div className="spn-footer-links">
+        <a href="/sketchup">PLUGIN SKETCHUP</a>
         <a href="/termos">TERMOS</a>
         <a href="/privacidade">PRIVACIDADE</a>
         <a href={`mailto:${SUPPORT_EMAIL}`}>CONTATO</a>

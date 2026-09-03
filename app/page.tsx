@@ -12,6 +12,7 @@ import { ProductMockup } from "@/components/landing/ProductMockup";
 import { Differentiators } from "@/components/landing/Differentiators";
 import { ForWho } from "@/components/landing/ForWho";
 import { FAQ } from "@/components/landing/FAQ";
+import { SketchUpBand } from "@/components/landing/SketchUpBand";
 import { PricingToggle } from "@/components/landing/PricingToggle";
 import { MobileCTA } from "@/components/landing/MobileCTA";
 
@@ -43,6 +44,8 @@ export default function Home() {
       <HowItWorks />
       <Divider />
       <ForWho />
+      <Divider />
+      <SketchUpBand />
       <Divider />
       <PricingToggle />
       <Divider />

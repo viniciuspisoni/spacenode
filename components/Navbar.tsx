@@ -3,9 +3,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { Logo } from './brand';
 
+// '#sketchup' é a faixa do plugin na própria landing; o link "Conhecer o
+// plugin" de lá leva pra /sketchup. Mantendo tudo como âncora, o scroll-spy
+// e o drawer seguem funcionando sem exceção.
 const LINKS = [
   { href: '#produto',       label: 'PRODUTO'       },
   { href: '#como-funciona', label: 'COMO FUNCIONA' },
+  { href: '#sketchup',      label: 'SKETCHUP'      },
   { href: '#planos',        label: 'PREÇOS'        },
   { href: '#faq',           label: 'FAQ'           },
 ];
