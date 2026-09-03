@@ -1997,7 +1997,9 @@
       return Date.now() - r.signedAt * 1000 > RESULT_TTL_MS;
     }
     function requestResultRefresh() {
-      if (!model.result || !model.result.renderId || model.result._refreshing) return false;
+      // Uma re-assinatura por resultado: se a imagem falhar DE NOVO com o
+      // link novo, o arquivo sumiu — repetir viraria um loop de requests.
+      if (!model.result || !model.result.renderId || model.result._refreshing || model.result._refreshed) return false;
       model.result._refreshing = true;
       callSketchUpQuiet('refreshResult', JSON.stringify({ renderId: model.result.renderId }));
       return true;
@@ -2367,6 +2369,7 @@
         if (event === 'resultRefreshed') {
           if (model.result && model.result.renderId === payload.renderId) {
             model.result._refreshing = false;
+            model.result._refreshed = true;
             model.result.outputUrl = payload.outputUrl || model.result.outputUrl;
             model.result.previewUrl = payload.previewUrl || model.result.previewUrl;
             model.result.signedAt = payload.signedAt || Math.floor(Date.now() / 1000);
