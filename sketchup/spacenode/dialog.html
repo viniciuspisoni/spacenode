@@ -313,7 +313,7 @@
     .material-row.is-unsupported { opacity: 0.5; }
     /* Animar: o painel NÃO reproduz vídeo (CEF sem H.264) — pôster + ações. */
     .video-card { margin: 8px 0; }
-    .video-poster-wrap { position: relative; border-radius: 8px; overflow: hidden; background: var(--preview-bg); }
+    .video-poster-wrap { position: relative; min-height: 96px; border-radius: 8px; overflow: hidden; background: var(--preview-bg); }
     #videoPoster { width: 100%; display: block; filter: brightness(0.85); }
     .video-play {
       position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
@@ -2049,6 +2049,10 @@
       var hasType = false;
       types.forEach(function (t) { if (t.id === model.animarType) hasType = true; });
       if (!hasType) selectAnimarType((types[0] && types[0].id) || (cfg.defaults && cfg.defaults.videoType));
+      // Motor/duração restaurados de uma sessão antiga podem ter saído do
+      // catálogo (recalibração de preço/durações): sem custo válido o botão
+      // ficaria cinza sem explicação — volta pros defaults do tipo.
+      if (animarCost() == null) selectAnimarType(model.animarType);
       fill(els.animarTypePills, types.map(function (t) {
         return pillButton(typeLabel(t.id), t.id === model.animarType, function () {
           selectAnimarType(t.id); renderAnimarControls(); persistStateSoon();

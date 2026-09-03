@@ -2322,25 +2322,32 @@ module SpaceNode
         next unless generation_alive?(epoch) && !settled[:done]
 
         settled[:done] = true
-        body = response.body.to_s
-        status = response.status_code.to_i
-        unless status >= 200 && status < 300 && image_bytes?(body)
-          fail_generation('Não foi possível baixar o render pra animar.')
-          next
-        end
-        if spec[:max_bytes] > 0 && body.bytesize > spec[:max_bytes]
-          fail_generation('Este render é grande demais pra animar daqui — anime pelo site.')
-          next
-        end
+        # Este bloco roda DENTRO do callback HTTP: uma exceção aqui cairia no
+        # rescue genérico do http_request, que não encerra a geração —
+        # @generating preso pra sempre. Tudo passa por fail_generation.
+        begin
+          body = response.body.to_s
+          status = response.status_code.to_i
+          unless status >= 200 && status < 300 && image_bytes?(body)
+            fail_generation('Não foi possível baixar o render pra animar.')
+            next
+          end
+          if spec[:max_bytes] > 0 && body.bytesize > spec[:max_bytes]
+            fail_generation('Este render é grande demais pra animar daqui — anime pelo site.')
+            next
+          end
 
-        ext, mime = image_ext_and_mime(body)
-        path = File.join(Dir.tmpdir, "spacenode-anim-#{SecureRandom.hex(4)}#{ext}")
-        File.binwrite(path, body)
+          ext, mime = image_ext_and_mime(body)
+          path = File.join(Dir.tmpdir, "spacenode-anim-#{SecureRandom.hex(4)}#{ext}")
+          File.binwrite(path, body)
 
-        emit('status', { :stage => 'upload', :message => t(:animar_sending) })
-        upload_direct(path, mime, 'animar-source', false, epoch) do |key, _url|
-          delete_quiet(path)
-          request_animar(key, spec, epoch)
+          emit('status', { :stage => 'upload', :message => t(:animar_sending) })
+          upload_direct(path, mime, 'animar-source', false, epoch) do |key, _url|
+            delete_quiet(path)
+            request_animar(key, spec, epoch)
+          end
+        rescue StandardError => e
+          fail_generation(e.message)
         end
       end
     rescue StandardError => e
@@ -2640,10 +2647,27 @@ module SpaceNode
     # forjado no .skp nunca vira ShellExecute.
     def local_video_ok?(path)
       path = path.to_s
-      return false if path.empty? || path !~ /\.mp4\z/i || !File.file?(path)
+      return false unless local_path_shape_ok?(path)
+      return false if path !~ /\.mp4\z/i || !File.file?(path)
 
       head = File.binread(path, 12)
       head.bytesize >= 12 && head.byteslice(4, 4) == 'ftyp'
+    rescue StandardError
+      false
+    end
+
+    # Caminho absoluto local, sem UNC (\\host, //host), sem esquema (x://),
+    # sem device path (\\?\) — nada que faça o SO abrir rede antes de a
+    # gente conferir o arquivo.
+    def local_path_shape_ok?(path)
+      return false if path.empty? || path.length > 1024
+      return false if path.include?('://') || path.start_with?('\\\\', '//')
+
+      if ::Sketchup.platform == :platform_win
+        path =~ /\A[A-Za-z]:[\\\/](?![\\\/])/ ? true : false
+      else
+        path.start_with?('/') && !path.start_with?('//')
+      end
     rescue StandardError
       false
     end
@@ -2769,13 +2793,15 @@ module SpaceNode
         end
       end
 
+      # O hop em voo é sempre o último request criado — o watchdog cancela ele.
+      state[:request] = request
       return if opts[:state] # hop de redirect: o watchdog já está armado
 
       ::UI.start_timer(DOWNLOAD_TIMEOUT_SECONDS, false) do
         unless state[:done]
           state[:done] = true
           begin
-            request.cancel
+            (state[:request] || request).cancel
           rescue StandardError
             nil
           end
@@ -2902,6 +2928,9 @@ module SpaceNode
         next unless generation_alive?(epoch) && !settled[:done]
 
         settled[:done] = true
+        # Dentro do callback HTTP: Errno no binwrite cairia no rescue
+        # genérico do http_request e prenderia @generating. Rede de segurança:
+        begin
         body = response.body.to_s
         status = response.status_code.to_i
         unless status >= 200 && status < 300 && image_bytes?(body)
@@ -2942,6 +2971,9 @@ module SpaceNode
           :scale => scale, :nodes => nodes,
           :width => dims[0], :height => dims[1]
         })
+        rescue StandardError => e
+          fail_generation(e.message)
+        end
       end
     end
 
