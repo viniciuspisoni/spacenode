@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getRequestAuthContext } from '@/lib/auth/request-user'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { signRows } from '@/lib/storage/signed'
 
@@ -12,9 +12,10 @@ const DEFAULT_LIMIT = 18
 const MAX_LIMIT     = 50
 
 export async function GET(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+  // Cookie (app web) OU Bearer (plugin SketchUp): o client devolvido já vem
+  // escopado ao token (RLS) — a consulta abaixo continua filtrando por user_id.
+  const { user, supabase } = await getRequestAuthContext(req)
+  if (!user || !supabase) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
   const limitParam = req.nextUrl.searchParams.get('limit')
   const limit = (() => {

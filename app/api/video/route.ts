@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { fal } from '@fal-ai/client'
-import { createClient } from '@/lib/supabase/server'
+import { getRequestUser } from '@/lib/auth/request-user'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getPayerId } from '@/lib/workspaces/context'
 import { refundNodes } from '@/lib/billing/refund-nodes'
@@ -37,8 +37,8 @@ function pickIntensity(raw: string | null): CameraIntensity {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  // Cookie (app web) OU Bearer (plugin SketchUp) — mesmo contrato do /api/generate.
+  const { user } = await getRequestUser(req)
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
   const admin = createAdminClient()
