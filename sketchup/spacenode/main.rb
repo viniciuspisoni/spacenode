@@ -705,7 +705,12 @@ module SpaceNode
     # fail_generation (restaura a cena, fecha o lote, solta @generating);
     # fora deles basta o erro visível.
     def session_step_failed(text, auth, scope)
-      if (scope == :batch || scope == :space) && @generating
+      if scope == :batch && @generating
+        # Sem sessão não há como continuar NENHUMA cena: encerra o lote de
+        # uma vez (fail_generation por cena tentaria renovar N vezes e
+        # produziria N erros iguais).
+        finalize_batch(text, auth)
+      elsif scope == :space && @generating
         fail_generation(text, auth)
       else
         emit_error(text, auth, scope ? true : false)
