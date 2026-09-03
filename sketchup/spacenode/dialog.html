@@ -107,7 +107,7 @@
     button:disabled { cursor: default; }
     :focus-visible { outline: 1.5px solid var(--border-focus); outline-offset: 2px; border-radius: 6px; }
 
-    .shell { height: 100vh; display: grid; grid-template-rows: auto 1fr auto; }
+    .shell { height: 100vh; display: grid; grid-template-rows: auto 1fr auto auto; }
 
     header {
       display: flex; align-items: center; justify-content: space-between; gap: 10px;
@@ -278,6 +278,29 @@
     .cta .meta { font-size: 11px; font-weight: 500; opacity: 0.65; font-variant-numeric: tabular-nums; }
     .reach { margin-top: 8px; font-size: 11px; color: var(--text-3); text-align: center; }
 
+    /* ── Dock: o botão Gerar mora numa barra fixa acima do rodapé — antes
+       ficava abaixo de 10 seções e cada render exigia rolar até o fim. ── */
+    .dock {
+      padding: 10px 16px 8px; border-top: 0.5px solid var(--border);
+      background: var(--bg); box-shadow: 0 -8px 20px rgba(0,0,0,0.06);
+    }
+    .dock .cta { margin-top: 0; }
+    .dock .reach { margin-top: 6px; }
+    .dock .insufficient { margin: 0 0 10px; }
+    .dock-summary {
+      display: block; width: 100%; margin: 0 0 8px; text-align: left;
+      font-size: 11px; color: var(--text-3); letter-spacing: -0.005em;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .dock-summary:hover { color: var(--text-2); }
+    .dock-summary:empty { display: none; }
+    .cta-right { display: inline-flex; align-items: center; gap: 8px; }
+    .kbd {
+      font: inherit; font-size: 9.5px; font-weight: 500; opacity: 0.45;
+      border: 0.5px solid currentColor; border-radius: 4px; padding: 1px 5px;
+      letter-spacing: 0.02em;
+    }
+
     /* ── Notice / erro ── */
     .notice {
       display: none; margin-top: 12px; padding: 11px 12px; border-radius: 12px;
@@ -286,6 +309,8 @@
     }
     .notice.is-error { display: block; color: var(--error); border-color: var(--error-border); background: var(--error-bg); }
     .notice.is-success { display: block; color: var(--text); border-color: var(--green-border); background: var(--green-bg); }
+    .notice.is-warn { display: block; color: var(--text); border-color: var(--border-strong); background: var(--surface); }
+    .material-row.is-unsupported { opacity: 0.5; }
     .notice .notice-action { margin-top: 8px; }
     .notice .notice-action button { font-size: 12px; color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
 
@@ -464,6 +489,7 @@
         <button class="ghost" id="openResultButton">Abrir no site</button>
         <button class="ghost" id="upscale2xButton">Ampliar 2x</button>
         <button class="ghost" id="upscale4xButton">Ampliar 4x</button>
+        <button class="ghost" id="variationButton" style="grid-column:1 / -1">Gerar variação deste render</button>
         <button class="ghost" id="restoreCameraButton" style="display:none;grid-column:1 / -1">Voltar à vista deste render</button>
       </div>
 
@@ -585,19 +611,6 @@
 
       <div class="notice" id="notice" role="status" aria-live="polite"></div>
 
-      <div class="insufficient" id="insufficient">
-        <b id="insufficientTitle">Faltam nodes pra gerar</b>
-        <div class="math" id="insufficientMath"></div>
-        <button class="buy" id="insufficientBuy">ver planos</button>
-        <div class="alt" id="insufficientAlt"></div>
-      </div>
-
-      <button class="cta" id="generateButton" disabled>
-        <span id="generateLabel">Gerar render</span>
-        <span class="meta" id="generateMeta"></span>
-      </button>
-      <div class="reach" id="reachLine"></div>
-
       <details id="historySection">
         <summary id="L_history">Histórico</summary>
         <div class="details-body">
@@ -625,6 +638,21 @@
         </div>
       </details>
     </main>
+
+    <div class="dock" id="dock">
+      <button class="dock-summary" id="dockSummary" type="button" title="Ir para a configuração"></button>
+      <div class="insufficient" id="insufficient">
+        <b id="insufficientTitle">Faltam nodes pra gerar</b>
+        <div class="math" id="insufficientMath"></div>
+        <button class="buy" id="insufficientBuy">ver planos</button>
+        <div class="alt" id="insufficientAlt"></div>
+      </div>
+      <button class="cta" id="generateButton" disabled title="Ctrl+Enter">
+        <span id="generateLabel">Gerar render</span>
+        <span class="cta-right"><span class="meta" id="generateMeta"></span><kbd class="kbd" id="generateKbd">Ctrl+Enter</kbd></span>
+      </button>
+      <div class="reach" id="reachLine"></div>
+    </div>
 
     <footer id="footer">SPACENODE para SketchUp</footer>
   </div>
@@ -707,7 +735,17 @@
         matHint: 'Use as texturas reais do seu modelo como referência de material (até 4).',
         matCap: 'Até 4 materiais por geração.',
         nodes: 'nodes', recharge: 'Recarregar',
-        generateRender: 'Gerar render', generateVariation: 'Gerar variação', generating: 'gerando…',
+        generateRender: 'Gerar render', generateVariation: 'Gerar variação deste render', generating: 'gerando…',
+        dockGoto: 'Ir para a configuração', kbdHint: 'Ctrl+Enter',
+        anchorDropped: 'A câmera mudou desde o render anterior — gerado sem âncora.',
+        condNoEdge: 'Sem mapa de arestas nesta geração (a estrutura veio da própria imagem).',
+        condMaterials: function (sent, req, names) { return sent + ' de ' + req + ' materiais enviados' + (names ? ' — ' + names : '') + '.'; },
+        condNoSun: 'O preset de sol não foi aplicado — a captura saiu com o sol atual do modelo.',
+        matUnsupported: 'Textura fora de jpg/png — não dá pra enviar como amostra.',
+        matReason: { not_found: 'não encontrado', unsupported_format: 'formato não suportado', too_large: 'acima de 7,8 MB', export_failed: 'falha ao exportar', upload_failed: 'falha no envio' },
+        historyOpen: 'Trazer para o painel',
+        resultExpired: 'O link deste render venceu. Gere de novo ou abra pelo Histórico.',
+        resultRefreshing: 'Atualizando o link do render… tente de novo em instantes.',
         reach: function (n) { return 'seu saldo dá para ~' + n + ' render' + (n === 1 ? '' : 's') + ' nessa configuração'; },
         missing: function (n) { return 'Faltam ' + n + ' node' + (n === 1 ? '' : 's') + ' pra gerar'; },
         costMath: function (c, h) { return 'Esta geração custa ' + c + ' · você tem ' + h; },
@@ -787,7 +825,17 @@
         matHint: 'Use your model real textures as material references (up to 4).',
         matCap: 'Up to 4 materials per generation.',
         nodes: 'nodes', recharge: 'Top up',
-        generateRender: 'Generate render', generateVariation: 'Generate variation', generating: 'generating…',
+        generateRender: 'Generate render', generateVariation: 'Generate a variation of this render', generating: 'generating…',
+        dockGoto: 'Go to the settings', kbdHint: 'Ctrl+Enter',
+        anchorDropped: 'The camera moved since the previous render — generated without anchor.',
+        condNoEdge: 'No edge map in this generation (structure came from the image itself).',
+        condMaterials: function (sent, req, names) { return sent + ' of ' + req + ' materials sent' + (names ? ' — ' + names : '') + '.'; },
+        condNoSun: 'The sun preset was not applied — the capture used the model current sun.',
+        matUnsupported: 'Texture is not jpg/png — it cannot be sent as a sample.',
+        matReason: { not_found: 'not found', unsupported_format: 'unsupported format', too_large: 'over 7.8 MB', export_failed: 'export failed', upload_failed: 'upload failed' },
+        historyOpen: 'Bring into the panel',
+        resultExpired: 'This render link expired. Generate again or open it from History.',
+        resultRefreshing: 'Refreshing the render link… try again in a moment.',
         reach: function (n) { return 'your balance covers ~' + n + ' render' + (n === 1 ? '' : 's') + ' at this setup'; },
         missing: function (n) { return n + ' node' + (n === 1 ? '' : 's') + ' short to generate'; },
         costMath: function (c, h) { return 'This generation costs ' + c + ' · you have ' + h; },
@@ -924,6 +972,10 @@
       if (signOut) signOut.textContent = tt('signOut');
       els.balanceRecharge.textContent = tt('recharge');
       els.cancelButton.textContent = tt('cancel');
+      els.variationButton.textContent = tt('generateVariation');
+      els.dockSummary.title = tt('dockGoto');
+      els.generateKbd.textContent = /mac/i.test(navigator.platform || '') ? '⌘⏎' : tt('kbdHint');
+      els.generateButton.title = els.generateKbd.textContent;
       renderThemePills();
       renderLanguagePills();
     }
@@ -998,7 +1050,7 @@
      'downloadButton','openResultButton','projectTypeCards','segmentPills','environmentPills','lightingPills',
      'backgroundLabel','backgroundPills','prompt','elementsPills','engineCards','resolutionCards',
      'notice','insufficient','insufficientTitle','insufficientMath','insufficientBuy','insufficientAlt',
-     'generateButton','generateLabel','generateMeta','reachLine','historySection','historyGrid','historyEmpty','historyMore',
+     'generateButton','generateLabel','generateMeta','generateKbd','dockSummary','variationButton','reachLine','historySection','historyGrid','historyEmpty','historyMore',
      'apiBaseUrl','saveSettingsButton','footer','advanced',
      'restoreCameraButton','scenesSection','scenesCount','scenesPills','scenesEmpty','batchButton','batchLabel','batchMeta',
      'batchNote','batchProgress','batchResults','sunPills','modelMaterialsBlock','materialsList',
@@ -1197,13 +1249,14 @@
       els.materialsList.innerHTML = '';
       model.modelMaterials.forEach(function (mat) {
         var row = document.createElement('div');
-        row.className = 'material-row';
+        row.className = 'material-row' + (mat.unsupported ? ' is-unsupported' : '');
         var nameEl = document.createElement('span');
         nameEl.className = 'mname';
         nameEl.textContent = mat.displayName || mat.name;
-        nameEl.title = mat.displayName || mat.name;
+        nameEl.title = mat.unsupported ? tt('matUnsupported') : (mat.displayName || mat.name);
         var select = document.createElement('select');
-        select.disabled = model.generating;
+        select.disabled = model.generating || !!mat.unsupported;
+        if (mat.unsupported) { select.title = tt('matUnsupported'); delete model.materialSel[mat.name]; }
         var none = document.createElement('option');
         none.value = '';
         none.textContent = '—';
@@ -1314,6 +1367,7 @@
     // ── Ampliar ─────────────────────────────────────────────────────────────
     function requestUpscale(scale) {
       if (model.generating || !model.result || !model.result.outputUrl) return;
+      if (!ensureLiveResult()) return;
       showNotice('', 'success');
       startGeneratingUi();
       els.overlayText.textContent = tt('upscalePrep');
@@ -1385,6 +1439,7 @@
     });
     els.editButton.addEventListener('click', function () {
       if (model.generating || !model.result) return;
+      if (!ensureLiveResult()) return;
       var maskDataUrl = buildMaskDataUrl();
       exitMaskMode();
       showNotice('', 'success');
@@ -1598,14 +1653,33 @@
     }
 
     // ── CTA / saldo ──────────────────────────────────────────────────────────
+    function dockSummaryText() {
+      if (!model.catalog) return '';
+      var seg = currentSegment();
+      var eng = currentEngine();
+      var res = currentResolution();
+      var parts = [];
+      if (model.segment) parts.push(model.segment);
+      if (model.environment) parts.push(model.environment);
+      if (model.lighting && model.lighting !== 'Preservar Original') parts.push(model.lighting);
+      if (eng) parts.push(eng.name + (res ? ' ' + res.label : ''));
+      return parts.join(' · ');
+    }
     function updateGenerateState() {
       var cost = currentCost();
       var balance = model.totalBalance;
       var insufficient = model.authenticated && cost != null && balance != null && balance < cost;
 
-      els.generateButton.disabled = model.generating || !model.authenticated || !model.catalog || cost == null || insufficient;
-      els.generateLabel.textContent = model.generating ? tt('generating') : (model.result ? tt('generateVariation') : tt('generateRender'));
+      var canGenerate = !(model.generating || !model.authenticated || !model.catalog || cost == null || insufficient);
+      els.generateButton.disabled = !canGenerate;
+      // O CTA principal SEMPRE gera do zero. A variação (ancorada no render
+      // anterior) é um pedido explícito — antes virava o default depois do
+      // 1º render e prendia toda geração seguinte à atmosfera/seed de outra cena.
+      els.generateLabel.textContent = model.generating ? tt('generating') : tt('generateRender');
       els.generateMeta.textContent = model.generating || cost == null ? '' : cost + ' ' + tt('nodes');
+      els.generateKbd.style.display = model.generating ? 'none' : '';
+      els.variationButton.disabled = !canGenerate || !model.result || !model.result.outputUrl;
+      els.dockSummary.textContent = dockSummaryText();
 
       if (balance != null && cost) {
         var reach = Math.floor(balance / cost);
@@ -1769,7 +1843,7 @@
       els.notice.innerHTML = '';
       els.notice.className = 'notice';
       if (!message) return;
-      els.notice.classList.add(kind === 'success' ? 'is-success' : 'is-error');
+      els.notice.classList.add(kind === 'success' ? 'is-success' : (kind === 'warn' ? 'is-warn' : 'is-error'));
       els.notice.appendChild(document.createTextNode(message));
       if (action) {
         var wrap = document.createElement('div');
@@ -1785,6 +1859,24 @@
 
     // lastResult pode vir do atributo de um .skp de terceiros — só URLs
     // http(s) entram no preview/ações.
+    // O que a captura NÃO conseguiu mandar — o usuário paga o máximo e
+    // precisa saber quando recebeu o caminho degradado.
+    function conditioningNotes(p) {
+      var notes = [];
+      if (p.anchorDropped) notes.push(tt('anchorDropped'));
+      var c = p.conditioning;
+      if (!c) return notes;
+      if (c.edgeRequested && !c.edgeMap) notes.push(tt('condNoEdge'));
+      if (c.materialsRequested > c.materialsSent) {
+        var reasons = tt('matReason') || {};
+        var names = (c.skipped || []).map(function (s) {
+          return s.name + (reasons[s.reason] ? ' (' + reasons[s.reason] + ')' : '');
+        }).join(', ');
+        notes.push(tt('condMaterials', c.materialsSent, c.materialsRequested, names));
+      }
+      if (c.sunRequested && !c.sunApplied) notes.push(tt('condNoSun'));
+      return notes;
+    }
     function isSafeResult(r) {
       var u = r && (r.outputUrl || r.previewUrl);
       return typeof u === 'string' && /^https?:\/\//i.test(u);
@@ -1856,12 +1948,14 @@
         showNotice(tt('cancelledLate'), 'error');
       }
     });
-    els.generateButton.addEventListener('click', submitGenerate);
+    els.generateButton.addEventListener('click', function () { submitGenerate(false); });
     document.addEventListener('keydown', function (ev) {
-      if ((ev.ctrlKey || ev.metaKey) && ev.key === 'Enter' && !els.generateButton.disabled) submitGenerate();
+      if ((ev.ctrlKey || ev.metaKey) && ev.key === 'Enter' && !els.generateButton.disabled) submitGenerate(false);
     });
 
-    function submitGenerate() {
+    function submitGenerate(variation) {
+      var asVariation = variation === true && !!model.result && !!model.result.outputUrl;
+      if (asVariation && !ensureLiveResult()) return;
       if (model.generating) return;
       // Bridge primeiro: sem SketchUp por trás, não ligar o overlay (ficaria
       // preso pra sempre — nenhum evento viria destravar).
@@ -1883,14 +1977,48 @@
         resolution: model.resolution,
         sunPreset: model.sunPreset,
         materialSel: materialSelArray(),
-        useAnchor: !!model.result,
-        anchorUrl: model.result ? (model.result.outputUrl || null) : null,
-        seed: model.result && model.result.seed != null ? model.result.seed : null
+        useAnchor: asVariation,
+        anchorUrl: asVariation ? (model.result.outputUrl || null) : null,
+        anchorCamera: asVariation ? (model.result.camera || null) : null,
+        seed: asVariation && model.result.seed != null ? model.result.seed : null
       }));
     }
+    els.variationButton.addEventListener('click', function () { submitGenerate(true); });
+    els.dockSummary.addEventListener('click', function () {
+      var target = document.getElementById('L_projectType');
+      if (target && target.scrollIntoView) target.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    });
+
+    // ── Resultado vivo: URLs assinadas vencem em 1 h ────────────────────────
+    var RESULT_TTL_MS = 50 * 60 * 1000;
+    function resultIsStale(r) {
+      if (!r) return false;
+      if (!r.signedAt) return false; // resultado de sessão antiga sem carimbo: deixa tentar
+      return Date.now() - r.signedAt * 1000 > RESULT_TTL_MS;
+    }
+    function requestResultRefresh() {
+      if (!model.result || !model.result.renderId || model.result._refreshing) return false;
+      model.result._refreshing = true;
+      callSketchUpQuiet('refreshResult', JSON.stringify({ renderId: model.result.renderId }));
+      return true;
+    }
+    // Antes de qualquer ação sobre o resultado (baixar, ampliar, editar,
+    // variação): link vencido com renderId → re-assina e pede pra tentar de
+    // novo; sem renderId (Ampliar/Editar não devolvem id) → diz a verdade.
+    function ensureLiveResult() {
+      if (!model.result) return false;
+      if (!resultIsStale(model.result)) return true;
+      if (requestResultRefresh()) showNotice(tt('resultRefreshing'), 'warn');
+      else showNotice(tt('resultExpired'), 'warn');
+      return false;
+    }
+    els.resultImage.addEventListener('error', function () {
+      if (!model.result || !els.resultImage.getAttribute('src')) return;
+      if (!requestResultRefresh()) showNotice(tt('resultExpired'), 'warn');
+    });
 
     els.downloadButton.addEventListener('click', function () {
-      if (!model.result) return;
+      if (!model.result || !ensureLiveResult()) return;
       callSketchUp('saveResult', JSON.stringify({
         url: model.result.outputUrl,
         suggestedName: 'spacenode-render.png'
@@ -1945,19 +2073,32 @@
       historyLoading = false;
       els.historyMore.disabled = false;
       if (!historyAppend) els.historyGrid.innerHTML = '';
+      var signedAt = Math.floor(Date.now() / 1000);
       renders.forEach(function (r) {
         var url = r.preview_url || r.output_url;
         if (!url) return;
+        if (r.ambient === 'video') return; // /api/renders/list não filtra ambient
         var img = document.createElement('img');
         img.src = url;
         img.alt = 'Render';
         img.loading = 'lazy';
-        img.title = 'Abrir no site';
+        img.title = tt('historyOpen');
         // URLs assinadas expiram (~1h) — thumbnail morto some em vez de
         // virar ícone quebrado.
         img.addEventListener('error', function () { img.remove(); });
+        // Clique traz o render PRO PAINEL (Ampliar/Editar/Baixar/Comparar
+        // funcionam nele); "Abrir no site" continua nas ações do resultado.
         img.addEventListener('click', function () {
-          callSketchUp('openUrl', r.output_url || url);
+          if (model.generating) return;
+          showNotice('', 'success');
+          showResult({
+            outputUrl: r.output_url || url,
+            previewUrl: r.preview_url || null,
+            renderId: r.id || null,
+            engine: r.engine || null,
+            resolution: r.resolution || null,
+            signedAt: signedAt
+          });
         });
         els.historyGrid.appendChild(img);
       });
@@ -2007,6 +2148,8 @@
           if (payload.panelState && !model.catalog) restorePanelState(payload.panelState);
           if (!model.result && payload.lastResult && isSafeResult(payload.lastResult)) {
             showResult(payload.lastResult);
+            // Resultado restaurado do .skp: o link provavelmente venceu — re-assina.
+            if (resultIsStale(model.result) || !model.result.signedAt) requestResultRefresh();
           }
           setFooter('');
           updateGenerateState();
@@ -2050,11 +2193,10 @@
           if (typeof payload.totalBalance === 'number') model.totalBalance = payload.totalBalance;
           showResult(payload);
           var cost = payload.nodesCharged ? tt('nodesUsed', payload.nodesCharged) : tt('renderDone');
-          if (payload.fidelityWarning) {
-            showNotice(cost + tt('reviewFidelity'), 'error');
-          } else {
-            showNotice(cost, 'success');
-          }
+          var notes = conditioningNotes(payload);
+          var msg = cost + (payload.fidelityWarning ? tt('reviewFidelity') : '');
+          if (notes.length) msg += ' ' + notes.join(' ');
+          showNotice(msg, payload.fidelityWarning ? 'error' : (notes.length ? 'warn' : 'success'));
           setFooter(typeof payload.totalBalance === 'number' ? tt('nodesLeft', payload.totalBalance) : tt('renderDone'));
         }
 
@@ -2220,6 +2362,24 @@
             showNotice(tt('batchOk', ok), 'success');
           }
           updateGenerateState();
+        }
+
+        if (event === 'resultRefreshed') {
+          if (model.result && model.result.renderId === payload.renderId) {
+            model.result._refreshing = false;
+            model.result.outputUrl = payload.outputUrl || model.result.outputUrl;
+            model.result.previewUrl = payload.previewUrl || model.result.previewUrl;
+            model.result.signedAt = payload.signedAt || Math.floor(Date.now() / 1000);
+            els.resultImage.src = model.result.previewUrl || model.result.outputUrl;
+            if (els.notice.textContent === tt('resultRefreshing')) showNotice('', 'success');
+            updateGenerateState();
+          }
+        }
+        if (event === 'resultRefreshFailed') {
+          if (model.result && model.result.renderId === payload.renderId) {
+            model.result._refreshing = false;
+            showNotice(tt('resultExpired'), 'warn');
+          }
         }
 
         if (event === 'saved') {
