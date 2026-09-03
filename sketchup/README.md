@@ -25,6 +25,33 @@ O que só um plugin dentro do modelo consegue:
 - **Voltar à vista** — cada render guarda a câmera; um clique restaura o
   enquadramento exato no SketchUp.
 
+## O que mudou na 0.6.0
+
+- **Fidelidade sempre máxima** — o seletor Máxima/Equilibrado/Criativo saiu
+  (web e plugin); o servidor coage. Edge map nativo vai em toda cena sem
+  âncora.
+- **Tema claro / escuro / automático** (ver seção Tema).
+- **Âncora explícita** — o CTA principal sempre gera do zero; "Gerar
+  variação deste render" é botão próprio e só ancora se a câmera ainda é a
+  do render (2% da distância olho→alvo, 0,5° de FOV); divergiu, gera sem
+  âncora e avisa.
+- **Dock** — o botão Gerar vive numa barra fixa acima do rodapé, com resumo
+  clicável da configuração, custo, saldo e a tecla de atalho (Ctrl+Enter /
+  ⌘⏎).
+- **Higiene de captura v2** — X-ray, cor por tag, cotas, textos, eixos,
+  marca d'água e wireframe/monocromático ficam de fora só durante a captura
+  (`RenderMode` texturizado). Cortes NÃO são ligados à força; só o
+  preenchimento.
+- **Degradação visível** — edge map, materiais e preset de sol que falham
+  aparecem no resultado (`conditioning`), com o motivo por material;
+  texturas fora de jpg/png nascem desabilitadas na lista.
+- **Sessão por etapa** — folga de 10 min e renovação antes de cada cena do
+  lote e de cada etapa do Space; falha de renovação dentro de lote/Space
+  encerra o contexto (nunca mais overlay preso).
+- **Resultado vivo** — URLs assinadas vencem em 1 h; o painel re-assina por
+  `renderId` (`GET /api/sketchup/render`) ao restaurar, no erro da imagem
+  e antes de qualquer ação; miniatura do Histórico traz o render pro painel.
+
 ## Arquitetura
 
 - `spacenode.rb` — só registra a extensão (requisito do Extension Warehouse).
