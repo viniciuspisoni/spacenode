@@ -256,15 +256,21 @@ export async function POST(req: NextRequest) {
     const payerId = (await getPayerId(admin, user.id)) ?? user.id
     const { data: balance } = await admin
       .from('user_node_balance')
-      .select('plan_balance')
+      .select('plan_balance, total_balance')
       .eq('user_id', payerId)
       .single()
 
+    // Aditivo (o web ignora): id do render, saldo TOTAL (plano + extras — o
+    // que o plugin SketchUp exibe) e createdAt pra reconciliação.
+    const bal = (balance ?? null) as { plan_balance?: number | null; total_balance?: number | null } | null
     return NextResponse.json({
+      id:           insertResult.data?.id ?? null,
       url:          outputUrl,
       inputUrl,
-      credits:      balance?.plan_balance ?? undefined,
+      credits:      bal?.plan_balance ?? undefined,
+      totalBalance: bal?.total_balance ?? undefined,
       nodesCharged: nodesToCharge,
+      createdAt:    baseRow.completed_at,
     })
 
   } catch (err: unknown) {

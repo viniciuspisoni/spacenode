@@ -20,19 +20,23 @@ require 'json'
 require 'securerandom'
 require 'time'
 require 'tmpdir'
+require 'fileutils'
 require 'uri'
 
 module SpaceNode
   module SketchUp
     extend self
 
-    VERSION = '0.6.0'
+    VERSION = '0.7.0'
     PREFERENCES_KEY = 'com.spacenode.sketchup'
     DEFAULT_API_BASE_URL = 'https://spacenode.app'
     MIN_SKETCHUP_MAJOR = 21          # Ruby 2.7+; recomendado 2024+
     CATALOG_TTL_SECONDS = 6 * 3600
     GENERATE_TIMEOUT_SECONDS = 320   # /api/generate tem maxDuration=300
     UPLOAD_TIMEOUT_SECONDS = 120     # sign/PUT/confirm (Sketchup::Http não tem timeout)
+    DOWNLOAD_TIMEOUT_SECONDS = 180   # download_to_file (render/vídeo) — não tinha watchdog
+    VIDEO_STAGE_TIMEOUT_SECONDS = 60 # GET do preview antes de animar (mesmo valor do quote do Ampliar)
+    CATALOG_MIN_VERSION = 6          # cache em disco mais velho que isso é descartado (bloco animar)
 
     # Strings do Ruby visíveis no painel (etapas/erros centrais). O grosso da
     # UI é traduzido no dialog; mensagens vindas do SERVIDOR seguem em pt-BR.
@@ -55,7 +59,18 @@ module SpaceNode
         :pairing_waiting => 'Confirme o código no navegador…',
         :pairing_expired => 'O código expirou. Clique em Conectar pra gerar outro.',
         :pairing_failed => 'Não foi possível conectar. Tente de novo.',
-        :save_title => 'Salvar render'
+        :save_title => 'Salvar render',
+        :animar_prep => 'Preparando o vídeo…',
+        :animar_sending => 'Enviando o render…',
+        :animating => 'Animando na SPACENODE…',
+        :animar_eta => 'costuma levar ~%d min',
+        :animar_reconciling => 'Conexão instável — verificando se o vídeo foi concluído…',
+        :downloading_video => 'Baixando o vídeo…',
+        :save_video_title => 'Salvar vídeo',
+        :video_cancel_warn => 'Cancelado no painel — o vídeo pode já ter sido gerado e cobrado. Veja o Histórico no site.',
+        :notif_video_ready => 'Vídeo pronto',
+        :notif_video_failed => 'A animação falhou',
+        :notif_open_panel => 'Abrir painel'
       },
       'en' => {
         :capturing => 'Capturing the view…',
@@ -75,7 +90,18 @@ module SpaceNode
         :pairing_waiting => 'Confirm the code in your browser…',
         :pairing_expired => 'The code expired. Click Connect to get a new one.',
         :pairing_failed => 'Could not connect. Try again.',
-        :save_title => 'Save render'
+        :save_title => 'Save render',
+        :animar_prep => 'Preparing the video…',
+        :animar_sending => 'Uploading the render…',
+        :animating => 'Animating on SPACENODE…',
+        :animar_eta => 'usually takes ~%d min',
+        :animar_reconciling => 'Unstable connection — checking if the video finished…',
+        :downloading_video => 'Downloading the video…',
+        :save_video_title => 'Save video',
+        :video_cancel_warn => 'Cancelled in the panel — the video may already have been generated and charged. Check History on the site.',
+        :notif_video_ready => 'Video ready',
+        :notif_video_failed => 'The animation failed',
+        :notif_open_panel => 'Open panel'
       }
     }.freeze
 
@@ -382,6 +408,30 @@ module SpaceNode
         rescue StandardError => e
           emit_error(e.message)
         end
+      end
+      dialog.add_action_callback('animar') do |_ctx, raw|
+        begin
+          handle_animar(raw)
+        rescue StandardError => e
+          emit_error(e.message, false, true)
+        end
+      end
+      dialog.add_action_callback('saveVideo') do |_ctx, raw|
+        begin
+          save_video_to_disk(raw)
+        rescue StandardError => e
+          emit_error(e.message)
+        end
+      end
+      dialog.add_action_callback('openVideo') do |_ctx, _raw|
+        begin
+          open_last_video
+        rescue StandardError => e
+          emit_error(e.message)
+        end
+      end
+      dialog.add_action_callback('revealVideo') do |_ctx, _raw|
+        reveal_last_video
       end
       dialog.add_action_callback('openUrl') do |_ctx, url|
         open_url(url)
@@ -771,7 +821,12 @@ module SpaceNode
       return nil if raw.nil? || raw.empty?
       return nil if Time.now.to_i - at > CATALOG_TTL_SECONDS
 
-      @catalog = JSON.parse(raw)
+      parsed = JSON.parse(raw)
+      # Cache de antes do bloco 'animar' esconderia a seção por até 6 h
+      # depois de atualizar o plugin — descarta e força refresh.
+      return nil if parsed.is_a?(Hash) && parsed['version'].to_i < CATALOG_MIN_VERSION
+
+      @catalog = parsed
     rescue StandardError
       nil
     end
@@ -1958,6 +2013,9 @@ module SpaceNode
           # início (com 60s de folga pra clock skew cliente↔servidor).
           found = renders.find do |r|
             begin
+              # /api/renders/list não filtra ambient: um take terminado há
+              # pouco entraria aqui como se fosse o render (mp4 num <img>).
+              next false if r['ambient'].to_s == 'video'
               next false if previous_id && r['id'].to_s == previous_id.to_s
 
               Time.parse(r['created_at'].to_s) >= started_at - 60
@@ -2018,7 +2076,8 @@ module SpaceNode
           :vistas => [], :errors => ctx[:vista_errors] || []
         })
       end
-      emit('status', { :stage => 'idle', :message => t(:cancelled) })
+      late_video = ctx && ctx[:mode] == :animar && ctx[:posted]
+      emit('status', { :stage => 'idle', :message => late_video ? t(:video_cancel_warn) : t(:cancelled) })
     end
 
     # Falha de UMA geração. No lote: saldo/sessão abortam o restante; outros
@@ -2051,6 +2110,7 @@ module SpaceNode
         @generating = false
         @generation_context = nil
         restore_original_scene(ctx) if ctx && ctx[:original_scene]
+        notify_video(t(:notif_video_failed)) if ctx && ctx[:mode] == :animar
         emit_error(message, auth_expired, true)
       end
     end
@@ -2179,6 +2239,451 @@ module SpaceNode
       nil
     end
 
+    # ── Animar: take curto do render (POST /api/video, síncrono até 300 s) ──
+    #
+    # O painel NUNCA reproduz vídeo (o CEF do SketchUp não decodifica H.264):
+    # o resultado é pôster + ações, e o mp4 cai no disco ao lado do .skp.
+    # Fonte = preview do render (WebP ≤1600 px — cabe na área animar-source
+    # e basta pra 1080p). Custo vem do catálogo; ids são REVALIDADOS aqui.
+
+    def handle_animar(raw)
+      payload = parse_json(raw)
+      url = payload['url'].to_s
+      raise 'Nenhum render pra animar.' if url.empty? || url !~ %r{\Ahttps?://}
+      raise t(:connect_first) unless authenticated?
+      raise t(:busy) if @generating
+
+      catalog = cached_catalog
+      cfg = catalog && catalog['animar']
+      raise 'Reconecte pra atualizar o catálogo de custos.' unless cfg.is_a?(Hash)
+
+      spec = animar_spec_from_catalog(cfg, payload)
+      ensure_fresh_session(true) { execute_animar(spec) }
+    end
+
+    def animar_spec_from_catalog(cfg, payload)
+      invalid = 'Opção de vídeo inválida. Feche e reabra o painel pra atualizar o catálogo.'
+      engines = cfg['engines'].is_a?(Array) ? cfg['engines'] : []
+      engine = engines.find { |e| e.is_a?(Hash) && e['id'].to_s == payload['engine'].to_s }
+      raise invalid unless engine
+
+      durations = engine['durations'].is_a?(Array) ? engine['durations'] : []
+      dur = durations.find { |d| d.is_a?(Hash) && d['id'].to_s == payload['duration'].to_s }
+      raise invalid unless dur
+
+      types = cfg['videoTypes'].is_a?(Array) ? cfg['videoTypes'] : []
+      vtype = types.find { |v| v.is_a?(Hash) && v['id'].to_s == payload['videoType'].to_s }
+      raise invalid unless vtype
+
+      defaults = vtype['defaults'].is_a?(Hash) ? vtype['defaults'] : {}
+      scene_ids = (cfg['scenes'].is_a?(Array) ? cfg['scenes'] : []).map { |s| s.is_a?(Hash) ? s['id'].to_s : nil }.compact
+      scene = payload['scene'].to_s
+      scene = nil unless scene_ids.include?(scene)
+      limits = cfg['limits'].is_a?(Hash) ? cfg['limits'] : {}
+
+      {
+        :url => payload['url'].to_s,
+        :render_id => payload['renderId'].to_s,
+        :scene_name => payload['sceneName'].to_s,
+        :video_type => vtype['id'].to_s,
+        :engine => engine['id'].to_s,
+        :engine_label => engine['label'].to_s,
+        :duration => dur['id'].to_s,
+        :motion => defaults['motion'].to_s,
+        :intensity => defaults['intensity'].to_s,
+        # Regra do plugin: nunca reenquadrar a captura — só o Reels pede 9:16.
+        :aspect_ratio => vtype['id'].to_s == 'reels' ? defaults['aspectRatio'].to_s : 'auto',
+        :scene => scene,
+        :nodes => dur['nodes'].to_i,
+        :eta_s => engine['estimatedSeconds'].to_i,
+        :max_bytes => limits['maxSourceBytes'].to_i
+      }
+    end
+
+    def execute_animar(spec)
+      return emit_error(t(:busy)) if @generating
+
+      @generating = true
+      @generation_epoch = (@generation_epoch || 0) + 1
+      @generation_started_at = Time.now
+      @generation_context = { :mode => :animar, :spec => spec, :posted => false }
+      epoch = @generation_epoch
+      emit('status', { :stage => 'download', :message => t(:animar_prep) })
+
+      settled = { :done => false }
+      ::UI.start_timer(VIDEO_STAGE_TIMEOUT_SECONDS, false) do
+        if generation_alive?(epoch) && !settled[:done]
+          settled[:done] = true
+          fail_generation('O download do render travou. Tente de novo.')
+        end
+      end
+
+      http_request(:get, spec[:url], :auth => false) do |response|
+        next unless generation_alive?(epoch) && !settled[:done]
+
+        settled[:done] = true
+        body = response.body.to_s
+        status = response.status_code.to_i
+        unless status >= 200 && status < 300 && image_bytes?(body)
+          fail_generation('Não foi possível baixar o render pra animar.')
+          next
+        end
+        if spec[:max_bytes] > 0 && body.bytesize > spec[:max_bytes]
+          fail_generation('Este render é grande demais pra animar daqui — anime pelo site.')
+          next
+        end
+
+        ext, mime = image_ext_and_mime(body)
+        path = File.join(Dir.tmpdir, "spacenode-anim-#{SecureRandom.hex(4)}#{ext}")
+        File.binwrite(path, body)
+
+        emit('status', { :stage => 'upload', :message => t(:animar_sending) })
+        upload_direct(path, mime, 'animar-source', false, epoch) do |key, _url|
+          delete_quiet(path)
+          request_animar(key, spec, epoch)
+        end
+      end
+    rescue StandardError => e
+      fail_generation(e.message)
+    end
+
+    # Todos os valores em STRING: a rota lê o corpo com str() e ignora
+    # número/boolean. cameraMotion OMITIDO quando o preset é 'auto' — o
+    # servidor resolve pela cena.
+    def request_animar(key, spec, epoch)
+      return unless generation_alive?(epoch)
+
+      body = {
+        :sourceKey => key,
+        :engine => spec[:engine],
+        :duration => spec[:duration],
+        :videoType => spec[:video_type],
+        :aspectRatio => spec[:aspect_ratio],
+        :intensity => spec[:intensity],
+        :fidelity => 'max',
+        :avoidPeople => '1'
+      }
+      body[:scene] = spec[:scene] unless spec[:scene].to_s.empty?
+      body[:cameraMotion] = spec[:motion] unless spec[:motion].to_s.empty? || spec[:motion] == 'auto'
+
+      ctx = @generation_context
+      ctx[:posted] = true if ctx
+      eta_min = [(spec[:eta_s] / 60.0).round, 1].max
+      emit('status', { :stage => 'animate', :message => "#{t(:animating)} #{format(t(:animar_eta), eta_min)}" })
+
+      request = json_request(:post, '/api/video', body, animar_error_handler_for(epoch)) do |data|
+        finish_animar(data, spec) if generation_alive?(epoch)
+      end
+      @generate_request = request
+
+      ::UI.start_timer(GENERATE_TIMEOUT_SECONDS, false) do
+        if generation_alive?(epoch) && @generate_request.equal?(request)
+          begin
+            request.cancel
+          rescue StandardError
+            nil
+          end
+          # Nunca falha seco: o servidor pode ter gerado e cobrado.
+          reconcile_lost_video(epoch)
+        end
+      end
+    end
+
+    # Queda de rede DEPOIS do POST → reconcilia pelo histórico de vídeos;
+    # erro HTTP (400/402/422/500) → falha normal (refund já aconteceu no servidor).
+    def animar_error_handler_for(epoch)
+      proc do |error|
+        next unless generation_alive?(epoch)
+
+        status = error.respond_to?(:status) ? error.status : nil
+        if status.nil? || status.to_i.zero?
+          reconcile_lost_video(epoch)
+        else
+          fail_generation(error.message, status == 401, status)
+        end
+      end
+    end
+
+    def reconcile_lost_video(epoch)
+      return unless @generating && generation_alive?(epoch)
+
+      started_at = @generation_started_at || Time.now
+      spec = @generation_context && @generation_context[:spec]
+      emit('status', { :stage => 'reconcile', :message => t(:animar_reconciling) })
+
+      ::UI.start_timer(6, false) do
+        next unless generation_alive?(epoch)
+
+        on_fail = proc do |_e|
+          fail_generation('Não foi possível confirmar o vídeo. Veja o Histórico no site antes de tentar de novo — os Nodes podem ter sido usados.') if generation_alive?(epoch)
+        end
+        json_request(:get, '/api/video/history?limit=5', nil, on_fail) do |data|
+          next unless generation_alive?(epoch)
+
+          videos = data['videos'].is_a?(Array) ? data['videos'] : []
+          # Único em voo pelo lock @generating: o vídeo mais novo criado
+          # depois do início (60 s de folga pra clock skew) é o nosso.
+          found = videos.find do |v|
+            begin
+              v['output_url'].to_s.start_with?('http') && Time.parse(v['created_at'].to_s) >= started_at - 60
+            rescue StandardError
+              false
+            end
+          end
+          if found
+            finish_animar({
+              'id' => found['id'], 'url' => found['output_url'],
+              'nodesCharged' => found['cost_credits'], 'createdAt' => found['created_at']
+            }, spec)
+          else
+            on_fail.call(nil)
+          end
+        end
+      end
+    end
+
+    def finish_animar(data, spec)
+      return unless @generating
+
+      @generating = false
+      @generation_context = nil
+      @generate_request = nil
+      spec ||= {}
+      url = data['url'].to_s
+      if url.empty?
+        emit_error('A animação não devolveu resultado. Veja o Histórico no site.', false, true)
+        return
+      end
+
+      video = {
+        :videoId => data['id'],
+        :videoUrl => url,
+        # Pôster = o render já na tela — nunca o inputUrl do fal.storage.
+        :posterUrl => spec[:url],
+        :renderId => spec[:render_id],
+        :sceneName => spec[:scene_name],
+        :videoType => spec[:video_type],
+        :engineLabel => spec[:engine_label],
+        :duration => spec[:duration],
+        :nodesCharged => data['nodesCharged'] || spec[:nodes],
+        :totalBalance => data['totalBalance'],
+        :createdAt => data['createdAt'] || Time.now.utc.iso8601,
+        :localPath => nil
+      }
+      @last_video = video
+      persist_last_video(video)
+      if data['totalBalance'].is_a?(Numeric)
+        @balance = { 'totalBalance' => data['totalBalance'] }
+      else
+        check_session
+      end
+      emit('videoResult', video)
+      notify_video("#{t(:notif_video_ready)} · #{spec[:duration]} s")
+      auto_save_video(video) if video_save_mode == 'project'
+    end
+
+    # Notificação nativa do SketchUp (o arquiteto pode estar modelando com o
+    # painel atrás). SketchUp sem UI::Notification só não avisa.
+    def notify_video(message)
+      return unless defined?(::UI::Notification)
+
+      ext = defined?(EXTENSION) ? EXTENSION : nil
+      return unless ext
+
+      n = ::UI::Notification.new(ext, message)
+      n.on_accept(t(:notif_open_panel)) { |_n, _t| show_dialog }
+      n.show
+      @dialog.bring_to_front if @dialog && @dialog.respond_to?(:visible?) && @dialog.visible? && @dialog.respond_to?(:bring_to_front)
+    rescue StandardError
+      nil
+    end
+
+    # ── Vídeo no .skp e no disco ──
+
+    def persist_last_video(video)
+      model = ::Sketchup.active_model
+      return unless model
+
+      begin
+        model.start_operation('SPACENODE', true, false, true)
+        model.set_attribute('spacenode', 'last_video', JSON.generate(video))
+        model.commit_operation
+      rescue StandardError
+        begin
+          model.abort_operation
+        rescue StandardError
+          nil
+        end
+      end
+    end
+
+    def last_video_state
+      video = @last_video
+      unless video
+        model = ::Sketchup.active_model
+        stored = model && model.get_attribute('spacenode', 'last_video', nil)
+        video = JSON.parse(stored) if stored.is_a?(String) && !stored.empty?
+      end
+      return nil unless video.is_a?(Hash)
+
+      out = {}
+      video.each { |k, v| out[k.to_s] = v }
+      out['localExists'] = local_video_ok?(out['localPath'])
+      out
+    rescue StandardError
+      nil
+    end
+
+    def remember_local_video(target)
+      if @last_video
+        @last_video[:localPath] = target
+        persist_last_video(@last_video)
+      else
+        current = last_video_state
+        return unless current
+
+        current['localPath'] = target
+        current.delete('localExists')
+        persist_last_video(current)
+      end
+    rescue StandardError
+      nil
+    end
+
+    def video_save_mode
+      v = ::Sketchup.read_default(PREFERENCES_KEY, 'video_save', 'project').to_s
+      %w[project ask].include?(v) ? v : 'project'
+    end
+
+    def video_slug(s)
+      s = s.to_s
+      begin
+        s = s.unicode_normalize(:nfd).gsub(/[\u0300-\u036f]/, '')
+      rescue StandardError
+        nil
+      end
+      s.gsub(/[^A-Za-z0-9 _-]/, '').strip.gsub(/\s+/, '-').downcase[0, 40]
+    end
+
+    def video_file_name(video)
+      model = ::Sketchup.active_model
+      title = video_slug(model && model.title)
+      scene_name = video[:sceneName] || video['sceneName']
+      if scene_name.to_s.empty? && model
+        begin
+          page = model.pages.selected_page
+          scene_name = page && page.name
+        rescue StandardError
+          scene_name = nil
+        end
+      end
+      scene = video_slug(scene_name)
+      parts = [title, scene].reject(&:empty?)
+      parts = ['spacenode-video'] if parts.empty?
+      duration = video[:duration] || video['duration']
+      "#{parts.join('-')}-#{duration}s.mp4"
+    end
+
+    # <pasta do .skp>/spacenode-videos — nil quando o modelo nunca foi salvo.
+    def video_dir
+      model = ::Sketchup.active_model
+      return nil unless model && !model.path.to_s.empty?
+
+      dir = File.join(File.dirname(model.path), 'spacenode-videos')
+      FileUtils.mkdir_p(dir) unless File.directory?(dir)
+      dir
+    rescue StandardError
+      nil
+    end
+
+    # Nunca sobrescreve: -2, -3…
+    def unique_path(path)
+      return path unless File.exist?(path)
+
+      base = path.sub(/\.mp4\z/i, '')
+      i = 2
+      i += 1 while File.exist?("#{base}-#{i}.mp4")
+      "#{base}-#{i}.mp4"
+    end
+
+    def auto_save_video(video)
+      dir = video_dir
+      unless dir
+        emit('videoSaveFailed', { :message => 'Salve o modelo (.skp) pra guardar o vídeo ao lado do projeto — ou use "Salvar vídeo…".' })
+        return
+      end
+
+      target = unique_path(File.join(dir, video_file_name(video)))
+      emit('status', { :stage => 'download', :message => t(:downloading_video) })
+      download_to_file(video[:videoUrl], target, 4, :kind => :video, :auto => true)
+    rescue StandardError => e
+      emit('videoSaveFailed', { :message => "Não foi possível salvar o vídeo ao lado do projeto (#{e.message}). Use \"Salvar vídeo…\"." })
+    end
+
+    def save_video_to_disk(raw)
+      payload = parse_json(raw)
+      url = payload['url'].to_s
+      url = (@last_video || {})[:videoUrl].to_s if url.empty?
+      raise 'Nenhum vídeo pra salvar.' if url.empty? || url !~ %r{\Ahttps?://}
+
+      suggested = video_file_name(@last_video || last_video_state || { :duration => '' })
+      target = ::UI.savepanel(t(:save_video_title), video_dir || default_save_dir, suggested)
+      return unless target
+
+      target = "#{target}.mp4" unless target =~ /\.mp4\z/i # savepanel não força extensão
+      emit('status', { :stage => 'download', :message => t(:downloading_video) })
+      download_to_file(url, target, 4, :kind => :video)
+    end
+
+    # Arquivo local só é aberto/revelado se o Ruby o conhece (memória ou
+    # atributo do .skp), tem extensão .mp4 e assinatura 'ftyp' — um caminho
+    # forjado no .skp nunca vira ShellExecute.
+    def local_video_ok?(path)
+      path = path.to_s
+      return false if path.empty? || path !~ /\.mp4\z/i || !File.file?(path)
+
+      head = File.binread(path, 12)
+      head.bytesize >= 12 && head.byteslice(4, 4) == 'ftyp'
+    rescue StandardError
+      false
+    end
+
+    def last_video_local_path
+      v = @last_video || last_video_state
+      p = v && (v[:localPath] || v['localPath'])
+      local_video_ok?(p) ? p : nil
+    end
+
+    def open_last_video
+      path = last_video_local_path
+      if path
+        if ::Sketchup.platform == :platform_win
+          ::UI.openURL(path) # ShellExecute no app associado ao .mp4
+        else
+          system('open', path)
+        end
+        return
+      end
+      v = @last_video || last_video_state || {}
+      url = (v[:videoUrl] || v['videoUrl']).to_s
+      raise 'Nenhum vídeo pra abrir.' if url.empty?
+
+      open_url(url)
+    end
+
+    def reveal_last_video
+      path = last_video_local_path
+      raise 'O vídeo ainda não está salvo neste computador.' unless path
+
+      if ::Sketchup.platform == :platform_win
+        system('explorer.exe', "/select,#{path.tr('/', '\\')}")
+      else
+        system('open', '-R', path)
+      end
+    rescue StandardError => e
+      emit_error(e.message)
+    end
+
     def save_result_to_disk(raw)
       payload = parse_json(raw)
       url = payload['url'].to_s
@@ -2212,26 +2717,47 @@ module SpaceNode
     # 3xx (o preview no CEF vê a imagem porque o Chromium segue sozinho; o
     # Http do SketchUp receberia só o stub do redirect). Grava em binário
     # ('wb') e valida a assinatura de imagem antes de escrever em disco.
-    def download_to_file(url, target, hops)
-      http_request(:get, url, :auth => false) do |response|
+    # kind: :image (render, default) ou :video (mp4 — assinatura 'ftyp').
+    # Watchdog de DOWNLOAD_TIMEOUT_SECONDS (Sketchup::Http não tem timeout):
+    # o estado é compartilhado entre os hops de redirect; cancel FORA do
+    # callback de resposta. Vídeo com :auto => true (auto-save) falha em
+    # aviso brando (videoSaveFailed) — o botão "Salvar vídeo…" segue vivo.
+    def download_to_file(url, target, hops, opts = {})
+      kind = opts[:kind] || :image
+      state = opts[:state] || { :done => false }
+      request = http_request(:get, url, :auth => false) do |response|
+        next if state[:done]
+
         status = response.status_code.to_i
 
         if status >= 300 && status < 400
           location = redirect_location(response)
           if hops > 0 && location && !location.empty?
-            download_to_file(absolute_url(location, url), target, hops - 1)
+            download_to_file(absolute_url(location, url), target, hops - 1, opts.merge(:state => state))
           else
-            emit_error('Não foi possível baixar o render. Tente pelo site.')
-            open_url(url)
+            state[:done] = true
+            if kind == :video
+              download_failed(kind, url, opts, 'redirecionamento inválido', status)
+            else
+              emit_error('Não foi possível baixar o render. Tente pelo site.')
+              open_url(url)
+            end
           end
           next
         end
 
+        state[:done] = true
         body = response.body.to_s
-        if status >= 200 && status < 300 && image_bytes?(body)
+        valid = kind == :video ? video_bytes?(body) : image_bytes?(body)
+        if status >= 200 && status < 300 && valid
           begin
             File.open(target, 'wb') { |f| f.write(body) }
-            emit('saved', { :path => target })
+            if kind == :video
+              remember_local_video(target)
+              emit('saved', { :path => target, :kind => 'video', :auto => opts[:auto] ? true : false })
+            else
+              emit('saved', { :path => target, :kind => 'image' })
+            end
           rescue StandardError => e
             emit_error("Não foi possível salvar o arquivo: #{e.message}")
           end
@@ -2239,10 +2765,58 @@ module SpaceNode
           # Diagnóstico embutido: o motivo exato aparece pro usuário (e pra
           # nós) sem depender do Ruby Console — status + tamanho recebido.
           reason = status.zero? ? 'sem resposta do servidor' : "HTTP #{status}, #{body.bytesize} bytes"
-          emit_error("Não foi possível baixar o render (#{reason}). Use \"Abrir no site\".")
-          open_url(url) if status >= 200 && status < 300
+          download_failed(kind, url, opts, reason, status)
         end
       end
+
+      return if opts[:state] # hop de redirect: o watchdog já está armado
+
+      ::UI.start_timer(DOWNLOAD_TIMEOUT_SECONDS, false) do
+        unless state[:done]
+          state[:done] = true
+          begin
+            request.cancel
+          rescue StandardError
+            nil
+          end
+          if kind == :video
+            if opts[:auto]
+              emit('videoSaveFailed', { :message => 'O download do vídeo travou. Tente "Salvar vídeo…".' })
+            else
+              emit_error('O download do vídeo travou. Tente "Salvar vídeo…" de novo.')
+            end
+          else
+            emit_error('O download travou. Tente de novo.')
+          end
+        end
+      end
+    end
+
+    def download_failed(kind, url, opts, reason, status)
+      if kind == :video
+        if opts[:auto]
+          emit('videoSaveFailed', { :message => "Não foi possível salvar o vídeo ao lado do projeto (#{reason}). Use \"Salvar vídeo…\"." })
+        else
+          emit_error("Não foi possível baixar o vídeo (#{reason}). Use \"Abrir vídeo\".")
+        end
+      else
+        emit_error("Não foi possível baixar o render (#{reason}). Use \"Abrir no site\".")
+        open_url(url) if status >= 200 && status < 300
+      end
+    end
+
+    # mp4/mov: 'ftyp' nos bytes 4..7 (o Veo real é 'ftypisom').
+    def video_bytes?(body)
+      !body.nil? && body.bytesize >= 12 && body.byteslice(4, 4) == 'ftyp'
+    end
+
+    # Extensão/mime pela assinatura — PNG, JPEG e WebP (preview do render).
+    def image_ext_and_mime(body)
+      bytes = body.byteslice(0, 12).bytes
+      return ['.png', 'image/png'] if bytes[0, 4] == [0x89, 0x50, 0x4E, 0x47]
+      return ['.webp', 'image/webp'] if bytes[0, 4] == [0x52, 0x49, 0x46, 0x46] && bytes[8, 4] == [0x57, 0x45, 0x42, 0x50]
+
+      ['.jpg', 'image/jpeg']
     end
 
     # Location do response (headers é Hash; a chave pode variar de caixa).
@@ -2341,8 +2915,7 @@ module SpaceNode
           next
         end
 
-        ext = body.byteslice(0, 4).bytes[0] == 0x89 ? '.png' : '.jpg'
-        mime = ext == '.png' ? 'image/png' : 'image/jpeg'
+        ext, mime = image_ext_and_mime(body)
         path = File.join(Dir.tmpdir, "spacenode-up-#{SecureRandom.hex(4)}#{ext}")
         File.binwrite(path, body)
 
@@ -2942,6 +3515,13 @@ module SpaceNode
         ::Sketchup.write_default(PREFERENCES_KEY, 'theme', requested_theme)
       end
 
+      # Vídeos: 'project' = salva sozinho em <pasta do .skp>/spacenode-videos;
+      # 'ask' = só pelo botão "Salvar vídeo…".
+      requested_video_save = payload['videoSave'].to_s
+      if %w[project ask].include?(requested_video_save)
+        ::Sketchup.write_default(PREFERENCES_KEY, 'video_save', requested_video_save)
+      end
+
       # Só mexe no servidor quando o painel manda a chave — trocar tema ou
       # idioma não pode gravar um campo de URL meio digitado e derrubar a
       # sessão (trocar de servidor limpa a sessão de propósito).
@@ -3018,7 +3598,9 @@ module SpaceNode
         :version => VERSION,
         :balance => @balance,
         :panelState => panel_state,
-        :lastResult => @last_result || model_result
+        :lastResult => @last_result || model_result,
+        :videoSave => video_save_mode,
+        :lastVideo => last_video_state
       })
     end
 

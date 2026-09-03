@@ -10,6 +10,10 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestUser } from '@/lib/auth/request-user'
+import { listAvailableVideoModels } from '@/lib/video/models'
+import { VIDEO_TYPE_PRESETS, DEFAULT_VIDEO_TYPE, resolvePresetDefaults, type VideoTypeId } from '@/lib/video/videoPresets'
+import { SCENE_TYPES, SCENE_TYPE_ORDER } from '@/lib/video/scenes'
+import { DIRECT_UPLOAD_AREAS } from '@/lib/storage/direct-upload'
 import {
   ENGINES,
   ENGINE_ORDER,
@@ -59,6 +63,18 @@ const CATALOG_I18N_EN = {
       conceito: 'Concept',
     } as Record<string, string>,
     upscaleModes: { fidelity: 'Fidelity' } as Record<string, string>,
+    animar: {
+      videoTypes: {
+        cinematic: { label: 'Presentation', tagline: 'Subtle, elegant motion that brings the render to life.' },
+        detail:    { label: 'Detail',       tagline: 'Highlights materials, light, textures and furniture.' },
+        tour:      { label: 'Tour',         tagline: 'A smooth walk through the space, like a guided visit.' },
+        reels:     { label: 'Reels',        tagline: 'Vertical and dynamic, ready for Instagram and TikTok.' },
+      } as Record<string, { label: string; tagline: string }>,
+      engines: {
+        'fal-ai/veo3.1/image-to-video': 'Cinematic',
+        'fal-ai/kling-video/v2.5-turbo/pro/image-to-video': 'Fast',
+      } as Record<string, string>,
+    },
   },
 }
 
@@ -99,6 +115,56 @@ function taxonomyFor(projectType: ProjectType) {
     backgrounds: getBackgrounds(projectType),
     backgroundLabel: projectType === 'exterior' ? 'Entorno' : 'Contexto visual',
     materialFields: MATERIAL_FIELDS[projectType],
+  }
+}
+
+// ── Animar (v6) ──────────────────────────────────────────────────────────────
+// Tipos oferecidos no painel (rótulo curto pro painel de 440 px; tagline vem
+// do preset). 'commercial' fica de fora: com aspecto 'auto' (regra do plugin:
+// nunca reenquadrar a captura) ele é idêntico ao 'cinematic'.
+// only: 'portrait' = só aparece com render vertical; 'interior' = só com
+// projectType interior. Nunca expõe promptFragment/provider/tag técnica —
+// o `id` do motor é valor opaco exigido pelo /api/video.
+const PLUGIN_VIDEO_TYPES: { id: VideoTypeId; label: string; only: 'portrait' | 'interior' | null }[] = [
+  { id: 'cinematic', label: 'Apresentação', only: null },
+  { id: 'detail',    label: 'Detalhe',      only: null },
+  { id: 'tour',      label: 'Tour',         only: 'interior' },
+  { id: 'reels',     label: 'Reels',        only: 'portrait' },
+]
+
+function buildAnimarCatalog() {
+  return {
+    // Placeholders Flow/Omni (provider 'google'/'omni') nunca entram: os adapters lançam erro.
+    engines: listAvailableVideoModels().filter(m => m.provider === 'fal').map(m => ({
+      id: m.id,
+      label: m.label,
+      description: m.description,
+      recommended: !!m.badge,
+      estimatedSeconds: Math.round(m.estimatedGenerationMs / 1000),
+      durations: m.supportedDurations.map(d => ({ id: d, nodes: m.costInNodes[d] })),
+      aspectRatios: m.supportedAspectRatios,
+    })),
+    videoTypes: PLUGIN_VIDEO_TYPES.map(t => {
+      const p = VIDEO_TYPE_PRESETS[t.id]
+      const d = resolvePresetDefaults(p)
+      return {
+        id: t.id, label: t.label, tagline: p.tagline, only: t.only,
+        defaults: {
+          engine: d.modelId,
+          duration: d.duration,
+          motion: d.motionId,            // 'auto' ou CameraMotionId — 'auto' = plugin OMITE cameraMotion
+          intensity: d.intensity,
+          // Regra do plugin: nunca reenquadrar a captura. Só o Reels (que só
+          // aparece em retrato) pede 9:16.
+          aspectRatio: t.id === 'reels' ? d.aspectRatio : 'auto',
+        },
+      }
+    }),
+    scenes: SCENE_TYPE_ORDER.map(id => ({ id, archetype: SCENE_TYPES[id].archetype, aliases: SCENE_TYPES[id].aliases })),
+    defaults: { videoType: DEFAULT_VIDEO_TYPE },
+    limits: { maxSourceBytes: DIRECT_UPLOAD_AREAS['animar-source'].maxBytes, aspectMin: 0.4, aspectMax: 2.5 },
+    // Vira true só quando o falAdapter honrar endImageUrl (PR seguinte).
+    endFrame: false,
   }
 }
 
@@ -149,10 +215,11 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({
-    version: 5,
+    version: 6,
     i18n: { en: CATALOG_I18N_EN },
     upscale,
     spaces,
+    animar: buildAnimarCatalog(),
     engines: ENGINE_ORDER.map(id => {
       const e = ENGINES[id]
       return {
