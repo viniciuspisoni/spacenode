@@ -5,9 +5,16 @@
 // Faixa CLARA com dividers, como HowItWorks/ForWho — o ritmo de faixas
 // pretas da landing (hero, produto/galeria, fecho) fica intocado.
 //
-// Os três pontos são recursos REAIS em produção (Fase 2 do plugin): lote de
-// cenas com semente compartilhada, edge map nativo da própria câmera e
-// sol/materiais do modelo no prompt. Nada aqui é promessa.
+// Os três pontos são recursos REAIS em produção (Fase 2 do plugin). O texto
+// carrega as condições de verdade de propósito — sem elas a faixa mentiria:
+//
+// - edge map: `want_edge` em main.rb exige fidelidade Máxima (default) e
+//   NÃO vale em variação com âncora, onde o render anterior já é a estrutura.
+// - sol: prompts.ts só injeta o bloco solar quando a iluminação é
+//   "Preservar Original"; escolher um preset de atmosfera descarta o sol
+//   medido de propósito (senão o fato contradiria o override).
+// - materiais: `materialSel` nasce vazio e a lista nem é carregada até o
+//   usuário abrir o painel Avançado — é uma AÇÃO dele, nunca automático.
 
 const POINTS = [
   {
@@ -16,11 +23,11 @@ const POINTS = [
   },
   {
     title: 'geometria como verdade',
-    desc: 'Um mapa de arestas da própria câmera guia o motor de fidelidade. É a estrutura do seu modelo, não uma leitura aproximada da imagem.',
+    desc: 'Na fidelidade máxima, a cena é capturada duas vezes: a vista e um mapa de arestas hidden-line da mesma câmera. O motor recebe a estrutura medida do modelo, no lugar de inferi-la do pixel.',
   },
   {
-    title: 'sol e materiais do modelo',
-    desc: 'A posição real do sol e as texturas aplicadas no projeto entram no render como dado medido — a luz respeita as sombras que você modelou.',
+    title: 'o modelo entra como dado',
+    desc: 'Preservando a luz do projeto, a posição do sol (data, hora e local do modelo) e a lente da câmera vão no prompt como fato medido. E você pode apontar texturas do próprio modelo como amostra de material.',
   },
 ]
 
@@ -36,9 +43,10 @@ export function SketchUpBand() {
           </div>
           <h2 className="spn-skp-title">renderize de dentro do SketchUp.</h2>
           <p className="spn-skp-sub">
-            A extensão oficial captura a vista atual e envia o que só quem está dentro do
-            modelo tem — geometria, sol, lente e materiais. O render volta com o mesmo motor
-            de fidelidade da plataforma, sem exportar imagem e sem sair do projeto.
+            A extensão oficial captura a vista atual e manda junto o que só quem está dentro
+            do modelo tem: a geometria em mapa de arestas, a lente da câmera e a posição do
+            sol. O render volta com o mesmo motor de fidelidade da plataforma, sem exportar
+            imagem e sem sair do projeto.
           </p>
         </div>
 

@@ -73,7 +73,7 @@ export default function SketchUpPage() {
             <span>Baixar a extensão (.rbz)</span>
             <span style={S.downloadMeta}>v{PLUGIN_VERSION} · Windows e macOS</span>
           </a>
-          <p style={S.requirement}>SketchUp 2021 ou superior. Grátis — os renders usam os Nodes da sua conta SPACENODE.</p>
+          <p style={S.requirement}>SketchUp 2021 ou superior (recomendamos 2024+). Grátis — os renders usam os Nodes da sua conta SPACENODE.</p>
         </section>
 
         <section style={S.section}>
