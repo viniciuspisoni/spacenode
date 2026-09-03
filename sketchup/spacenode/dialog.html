@@ -50,7 +50,7 @@
       /* Constantes entre temas: véus sobre imagem (regra do design system —
          scrim é sempre escuro porque a imagem embaixo não segue o tema). */
       --scrim: rgba(0,0,0,0.55);
-      --scrim-strong: rgba(10,10,10,0.72);
+      --scrim-strong: rgba(0,0,0,0.75);
     }
     /* Tema claro — espelho EXATO de html.light em app/globals.css. Não
        inventar valores: se o app mudar, mudar aqui junto. */
@@ -1397,6 +1397,7 @@
         none.value = ''; none.textContent = '—';
         els.editMaterialSelect.appendChild(none);
         model.modelMaterials.forEach(function (m) {
+          if (m.unsupported) return; // .tif/.bmp/.psd não viram amostra
           var opt = document.createElement('option');
           opt.value = m.name; opt.textContent = m.displayName || m.name;
           els.editMaterialSelect.appendChild(opt);
@@ -1411,7 +1412,7 @@
       var maskAction = model.editAction === 'remove' || model.editAction === 'refine_area';
       // Remover/refinar COM área marcada dispensam texto (a área diz onde).
       var ready = hasInstruction || (hasMask && maskAction);
-      els.editButton.disabled = model.generating || !model.authenticated || !ready;
+      els.editButton.disabled = model.generating || !model.authenticated || !ready || !!(model.result && model.result._unverified);
       els.editLabel.textContent = model.generating ? tt('editing') : tt('applyEdit');
       els.editMeta.textContent = model.editNodes != null && !model.generating ? model.editNodes + ' ' + tt('nodes') : '';
     }
@@ -1678,7 +1679,8 @@
       els.generateLabel.textContent = model.generating ? tt('generating') : tt('generateRender');
       els.generateMeta.textContent = model.generating || cost == null ? '' : cost + ' ' + tt('nodes');
       els.generateKbd.style.display = model.generating ? 'none' : '';
-      els.variationButton.disabled = !canGenerate || !model.result || !model.result.outputUrl;
+      els.variationButton.disabled = !canGenerate || !model.result || !model.result.outputUrl || !!model.result._unverified;
+      els.variationButton.style.display = model.result && model.result.camera ? '' : 'none';
       els.dockSummary.textContent = dockSummaryText();
 
       if (balance != null && cost) {
@@ -1721,12 +1723,13 @@
       els.captureButton.disabled = model.generating;
       els.connectButton.disabled = model.generating;
       els.disconnectButton.disabled = model.generating;
-      els.downloadButton.disabled = model.generating;
-      els.openResultButton.disabled = model.generating;
+      var unverified = !!(model.result && model.result._unverified);
+      els.downloadButton.disabled = model.generating || unverified;
+      els.openResultButton.disabled = model.generating || unverified;
       els.compareButton.disabled = model.generating;
       els.restoreCameraButton.disabled = model.generating;
-      els.upscale2xButton.disabled = model.generating;
-      els.upscale4xButton.disabled = model.generating;
+      els.upscale2xButton.disabled = model.generating || unverified;
+      els.upscale4xButton.disabled = model.generating || unverified;
       els.maskToggle.disabled = model.generating;
       els.maskClear.disabled = model.generating;
       updateBatchButton();
@@ -1763,6 +1766,7 @@
     }
     function showResult(result) {
       model.result = result;
+      if (!result._unverified) setResultActionsEnabled(true);
       els.resultImage.src = result.previewUrl || result.outputUrl;
       els.resultImage.classList.add('is-visible');
       els.captureImage.classList.remove('is-visible');
@@ -1999,7 +2003,8 @@
     function requestResultRefresh() {
       // Uma re-assinatura por resultado: se a imagem falhar DE NOVO com o
       // link novo, o arquivo sumiu — repetir viraria um loop de requests.
-      if (!model.result || !model.result.renderId || model.result._refreshing || model.result._refreshed) return false;
+      if (!model.result || !model.result.renderId || model.result._refreshing) return false;
+      if (model.result._refreshed && !resultIsStale(model.result)) return false;
       model.result._refreshing = true;
       callSketchUpQuiet('refreshResult', JSON.stringify({ renderId: model.result.renderId }));
       return true;
@@ -2009,10 +2014,23 @@
     // novo; sem renderId (Ampliar/Editar não devolvem id) → diz a verdade.
     function ensureLiveResult() {
       if (!model.result) return false;
+      if (model.result._unverified) {
+        if (!requestResultRefresh()) showNotice(tt('resultExpired'), 'warn');
+        else showNotice(tt('resultRefreshing'), 'warn');
+        return false;
+      }
       if (!resultIsStale(model.result)) return true;
       if (requestResultRefresh()) showNotice(tt('resultRefreshing'), 'warn');
       else showNotice(tt('resultExpired'), 'warn');
       return false;
+    }
+    // Ações sobre o resultado (Baixar/Abrir/Ampliar/Editar/Variação) só com
+    // resultado verificado — o botão de voltar à vista não sai do SketchUp.
+    function setResultActionsEnabled(on) {
+      ['downloadButton', 'openResultButton', 'upscale2xButton', 'upscale4xButton', 'variationButton'].forEach(function (id) {
+        if (els[id]) els[id].disabled = !on;
+      });
+      if (els.editButton) els.editButton.disabled = !on;
     }
     els.resultImage.addEventListener('error', function () {
       if (!model.result || !els.resultImage.getAttribute('src')) return;
@@ -2092,6 +2110,7 @@
         // funcionam nele); "Abrir no site" continua nas ações do resultado.
         img.addEventListener('click', function () {
           if (model.generating) return;
+          if (!isSafeResult({ outputUrl: r.output_url || url })) return;
           showNotice('', 'success');
           showResult({
             outputUrl: r.output_url || url,
@@ -2150,8 +2169,13 @@
           if (payload.panelState && !model.catalog) restorePanelState(payload.panelState);
           if (!model.result && payload.lastResult && isSafeResult(payload.lastResult)) {
             showResult(payload.lastResult);
-            // Resultado restaurado do .skp: o link provavelmente venceu — re-assina.
-            if (resultIsStale(model.result) || !model.result.signedAt) requestResultRefresh();
+            // Resultado restaurado do .skp: o atributo é controlado por quem
+            // editou o arquivo. Só vira acionável depois que o servidor
+            // re-assina pelo renderId (e confere que o render é desta conta).
+            // Sem renderId (Ampliar/Editar antigos) fica só de visualização.
+            model.result._unverified = true;
+            setResultActionsEnabled(false);
+            requestResultRefresh();
           }
           setFooter('');
           updateGenerateState();
@@ -2370,6 +2394,8 @@
           if (model.result && model.result.renderId === payload.renderId) {
             model.result._refreshing = false;
             model.result._refreshed = true;
+            model.result._unverified = false;
+            setResultActionsEnabled(true);
             model.result.outputUrl = payload.outputUrl || model.result.outputUrl;
             model.result.previewUrl = payload.previewUrl || model.result.previewUrl;
             model.result.signedAt = payload.signedAt || Math.floor(Date.now() / 1000);

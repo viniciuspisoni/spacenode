@@ -1815,7 +1815,10 @@ module SpaceNode
         anchor = @last_result && @last_result[:outputUrl].to_s if anchor.empty?
         anchor_camera = payload['anchorCamera'].is_a?(Hash) ? payload['anchorCamera'] : (@last_result && @last_result[:camera])
         if anchor && anchor =~ %r{\Ahttps?://}
-          if anchor_camera && @last_capture_camera && camera_moved?(anchor_camera, @last_capture_camera)
+          # Sem câmera de um dos lados não há como garantir que é a mesma
+          # vista — fail-safe é NÃO ancorar (o painel nem oferece a variação
+          # pra resultado sem câmera; isto cobre payload antigo/forjado).
+          if !anchor_camera || !@last_capture_camera || camera_moved?(anchor_camera, @last_capture_camera)
             @anchor_dropped = true
           else
             body[:anchorUrl] = anchor
@@ -2534,7 +2537,9 @@ module SpaceNode
       end
 
       exported = export_material_texture(::Sketchup.active_model, reference_name)
-      unless exported
+      # Contrato novo: sempre Hash — { :path, :mime } ou { :error }. Testar
+      # só a verdade do Hash mandava path nil pro upload e prendia @generating.
+      if exported[:error]
         done.call(nil)
         return
       end
@@ -2719,6 +2724,10 @@ module SpaceNode
     end
 
     def space_upload_master_now(space_id, quality, scenes, engine, epoch)
+      # A renovação de sessão é assíncrona: um Cancelar nesse intervalo não
+      # pode deixar a etapa seguir (e cobrar) depois.
+      return unless generation_alive?(epoch)
+
       space_progress(2, 'Enviando a vista mestre…')
       # capture/File podem levantar dentro de callback HTTP — sem este rescue
       # o @generating ficaria preso (o rescue genérico do http_request não
@@ -2767,6 +2776,8 @@ module SpaceNode
     end
 
     def space_extract_dna_now(space_id, quality, scenes, engine, epoch)
+      return unless generation_alive?(epoch)
+
       space_progress(3, 'Extraindo o DNA do projeto…')
       json_request(:post, "/api/spaces/#{space_id}/extract-dna", {}, direct_error_handler_for(epoch, 'A conexão caiu na extração do DNA — os 8 Nodes podem ter sido usados. Confira o Space no site antes de repetir.')) do |_data|
         next unless generation_alive?(epoch)
