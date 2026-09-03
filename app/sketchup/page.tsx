@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 }
 
 const RBZ_PATH = '/downloads/spacenode-sketchup.rbz'
-const PLUGIN_VERSION = '0.6.0'
+const PLUGIN_VERSION = '0.7.0'
 
 const FEATURES: { title: string; body: string }[] = [
   {
@@ -36,6 +36,10 @@ const FEATURES: { title: string; body: string }[] = [
   {
     title: 'edite por instrução.',
     body: 'Trocar material, remover, refinar — direto do painel. Pinte a área sobre o render para dizer onde, use as texturas reais do modelo como amostra e veja o custo exato no botão antes de aplicar.',
+  },
+  {
+    title: 'anime o render.',
+    body: 'Um take curto do render que acabou de sair — Apresentação, Detalhe, Tour ou Reels — com o custo em Nodes antes de clicar. O vídeo abre no navegador e é salvo ao lado do .skp; o SketchUp avisa quando termina.',
   },
   {
     title: 'cenas viram um Space.',

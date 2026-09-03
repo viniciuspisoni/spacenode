@@ -311,6 +311,15 @@
     .notice.is-success { display: block; color: var(--text); border-color: var(--green-border); background: var(--green-bg); }
     .notice.is-warn { display: block; color: var(--text); border-color: var(--border-strong); background: var(--surface); }
     .material-row.is-unsupported { opacity: 0.5; }
+    /* Animar: o painel NÃO reproduz vídeo (CEF sem H.264) — pôster + ações. */
+    .video-card { margin: 8px 0; }
+    .video-poster-wrap { position: relative; min-height: 96px; border-radius: 8px; overflow: hidden; background: var(--preview-bg); }
+    #videoPoster { width: 100%; display: block; filter: brightness(0.85); }
+    .video-play {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      font-size: 28px; color: #f5f5f7; text-shadow: 0 1px 6px rgba(0,0,0,0.5); pointer-events: none;
+    }
+    .video-caption { font-size: 11px; margin: 6px 0 4px; color: var(--text-2); }
     .notice .notice-action { margin-top: 8px; }
     .notice .notice-action button { font-size: 12px; color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
 
@@ -493,6 +502,18 @@
         <button class="ghost" id="restoreCameraButton" style="display:none;grid-column:1 / -1">Voltar à vista deste render</button>
       </div>
 
+      <div class="video-card" id="videoCard" style="display:none">
+        <div class="video-poster-wrap"><img id="videoPoster" alt=""><span class="video-play" aria-hidden="true">▶</span></div>
+        <div class="video-caption" id="videoCaption"></div>
+        <div class="result-actions is-visible">
+          <button class="ghost" id="videoOpenButton">Abrir vídeo</button>
+          <button class="ghost" id="videoSaveButton">Salvar vídeo…</button>
+          <button class="ghost" id="videoRevealButton" style="display:none">Mostrar na pasta</button>
+          <button class="ghost" id="videoSiteButton">Ver no site</button>
+        </div>
+        <div class="hint" id="videoHint"></div>
+      </div>
+
       <details id="editSection" style="display:none">
         <summary id="L_edit">Editar este render</summary>
         <div class="details-body">
@@ -511,6 +532,31 @@
             <span class="meta" id="editMeta"></span>
           </button>
           <div class="batch-note">Só a alteração pedida muda — todo o resto do render é preservado. Edição recusada pelo controle de qualidade não é cobrada.</div>
+        </div>
+      </details>
+
+      <details id="animarSection" style="display:none">
+        <summary id="L_animar">Animar este render</summary>
+        <div class="details-body">
+          <div class="hint" id="L_animarType">Tipo de vídeo</div>
+          <div class="pills" id="animarTypePills" role="radiogroup" aria-label="Tipo de vídeo"></div>
+          <div class="hint" id="animarTypeHint" style="margin:4px 0 8px"></div>
+          <div class="hint" id="L_animarQuality">Qualidade</div>
+          <div class="pills" id="animarEnginePills" role="radiogroup" aria-label="Qualidade"></div>
+          <div class="hint" id="L_animarDuration" style="margin-top:6px">Duração</div>
+          <div class="pills" id="animarDurationPills" role="radiogroup" aria-label="Duração"></div>
+          <div class="batch-note" id="animarRatioNote" style="display:none"></div>
+          <button class="cta cta--batch" id="animarButton" disabled>
+            <span id="animarLabel">Animar este render</span>
+            <span class="meta" id="animarMeta"></span>
+          </button>
+          <div class="batch-note" id="animarNote"></div>
+          <div class="insufficient" id="animarInsufficient">
+            <b id="animarInsufficientTitle"></b>
+            <div class="math" id="animarInsufficientMath"></div>
+            <button class="buy" id="animarInsufficientBuy">ver planos</button>
+            <div class="alt" id="animarInsufficientAlt"></div>
+          </div>
         </div>
       </details>
 
@@ -629,6 +675,8 @@
             <div class="hint" id="themeHint" style="margin:6px 0 10px">Automático segue a preferência da sua conta SPACENODE — ou, sem ela, o tema do sistema.</div>
             <label id="L_language">Idioma</label>
             <div class="pills" id="languagePills" role="radiogroup" aria-label="Idioma" style="margin-bottom:10px"></div>
+            <label id="L_videoSave">Vídeos</label>
+            <div class="pills" id="videoSavePills" role="radiogroup" aria-label="Vídeos" style="margin-bottom:10px"></div>
             <label for="apiBaseUrl" id="L_server">Servidor</label>
             <input id="apiBaseUrl" spellcheck="false">
           </div>
@@ -666,6 +714,9 @@
       sessionFresh: false,
       themeSetting: 'auto',   // auto | light | dark (escolha local, Sketchup.write_default)
       accountTheme: null,     // preferência da conta (profiles.theme_preference) via /api/sketchup/session
+      video: null,            // último take (cartão) — independe de model.result
+      animarType: null, animarEngine: null, animarDuration: null,
+      videoSave: 'project',   // project | ask (Preferências)
       apiBaseUrl: 'https://spacenode.app',
       catalog: null,
       projectType: 'interior',
@@ -800,6 +851,29 @@
         editActions: { swap_material: 'Trocar material', remove: 'Remover', refine_area: 'Refinar área' },
         lang: { auto: 'Auto', pt: 'Português', en: 'English' },
         theme: { auto: 'Automático', light: 'Claro', dark: 'Escuro' },
+        L_animar: 'Animar este render', L_animarType: 'Tipo de vídeo', L_animarQuality: 'Qualidade', L_animarDuration: 'Duração',
+        L_videoSave: 'Vídeos', videoSave: { project: 'Salvar ao lado do projeto', ask: 'Perguntar onde salvar' },
+        recommended: 'recomendado',
+        engineEta: function (m) { return '~' + m + ' min'; },
+        durationOption: function (d, n) { return d + ' s · ' + n + ' nodes'; },
+        animarCta: 'Animar este render', animating: 'animando…',
+        animarMeta: function (e, d, n) { return e + ' · ' + d + ' s · ' + n + ' nodes'; },
+        animarNote: 'Leva de 2 a 4 minutos — pode continuar modelando, avisamos quando terminar. O vídeo abre no navegador e é salvo ao lado do projeto.',
+        animarNoteAsk: 'Leva de 2 a 4 minutos — pode continuar modelando, avisamos quando terminar. O vídeo abre no navegador e pode ser salvo em .mp4.',
+        animarInsufficient: function (c, h) { return 'Este vídeo custa ' + c + ' · você tem ' + h; },
+        animarOrOption: function (e, d, n) { return 'Ou ' + e + ' ' + d + ' s por ' + n + ' nodes'; },
+        animarReelsHint: 'Reels aparece quando o render é vertical — capture em pé.',
+        animarRatioBad: 'Proporção fora do aceito pro vídeo (entre 0,4 e 2,5). Capture um enquadramento menos extremo.',
+        animarPrep: 'Preparando o vídeo…',
+        animarLoadingTexts: ['Estudando a profundidade da cena…', 'Planejando o movimento de câmera…', 'Renderizando os quadros…', 'Suavizando o movimento…', 'Finalizando o vídeo…'],
+        videoReady: function (n) { return 'Vídeo pronto · ' + n + ' Nodes utilizados.'; },
+        videoReadySaved: function (p) { return 'Vídeo salvo ao lado do projeto: ' + p; },
+        videoSavedAt: function (p) { return 'Vídeo salvo em ' + p; },
+        videoAutosaveFailed: 'Não foi possível salvar ao lado do projeto — use "Salvar vídeo…".',
+        videoCaption: function (t, d) { return t + ' · ' + d + ' s'; },
+        videoFromEarlier: 'de uma sessão anterior',
+        videoOpen: 'Abrir vídeo', videoSaveBtn: 'Salvar vídeo…', videoReveal: 'Mostrar na pasta', videoSite: 'Ver no site',
+        videoNoPreview: 'O vídeo toca no navegador ou no arquivo salvo — o painel do SketchUp não reproduz vídeo.',
         loadingTexts: ['Analisando composição…', 'Ajustando iluminação…', 'Refinando materiais…', 'Aplicando fotorrealismo…', 'Gerando versão final…']
       },
       en: {
@@ -890,6 +964,29 @@
         editActions: { swap_material: 'Swap material', remove: 'Remove', refine_area: 'Refine area' },
         lang: { auto: 'Auto', pt: 'Português', en: 'English' },
         theme: { auto: 'Automatic', light: 'Light', dark: 'Dark' },
+        L_animar: 'Animate this render', L_animarType: 'Video type', L_animarQuality: 'Quality', L_animarDuration: 'Duration',
+        L_videoSave: 'Videos', videoSave: { project: 'Save next to the project', ask: 'Ask where to save' },
+        recommended: 'recommended',
+        engineEta: function (m) { return '~' + m + ' min'; },
+        durationOption: function (d, n) { return d + ' s · ' + n + ' nodes'; },
+        animarCta: 'Animate this render', animating: 'animating…',
+        animarMeta: function (e, d, n) { return e + ' · ' + d + ' s · ' + n + ' nodes'; },
+        animarNote: 'Takes 2–4 minutes — keep modeling, we let you know when it is done. The video opens in your browser and is saved next to the project.',
+        animarNoteAsk: 'Takes 2–4 minutes — keep modeling, we let you know when it is done. The video opens in your browser and can be saved as .mp4.',
+        animarInsufficient: function (c, h) { return 'This video costs ' + c + ' · you have ' + h; },
+        animarOrOption: function (e, d, n) { return 'Or ' + e + ' ' + d + ' s for ' + n + ' nodes'; },
+        animarReelsHint: 'Reels shows up when the render is portrait — capture in portrait.',
+        animarRatioBad: 'Aspect ratio outside the accepted range for video (0.4–2.5). Capture a less extreme framing.',
+        animarPrep: 'Preparing the video…',
+        animarLoadingTexts: ['Reading the depth of the scene…', 'Planning the camera move…', 'Rendering the frames…', 'Smoothing the motion…', 'Finishing the video…'],
+        videoReady: function (n) { return 'Video ready · ' + n + ' Nodes used.'; },
+        videoReadySaved: function (p) { return 'Video saved next to the project: ' + p; },
+        videoSavedAt: function (p) { return 'Video saved to ' + p; },
+        videoAutosaveFailed: 'Could not save next to the project — use "Save video…".',
+        videoCaption: function (t, d) { return t + ' · ' + d + ' s'; },
+        videoFromEarlier: 'from an earlier session',
+        videoOpen: 'Open video', videoSaveBtn: 'Save video…', videoReveal: 'Show in folder', videoSite: 'View on the site',
+        videoNoPreview: 'The video plays in your browser or from the saved file — the SketchUp panel cannot play video.',
         loadingTexts: ['Analyzing composition…', 'Adjusting lighting…', 'Refining materials…', 'Applying photorealism…', 'Generating final version…']
       }
     };
@@ -915,7 +1012,7 @@
     function localizeStatic() {
       ['L_projectType','L_segment','L_environment','L_lighting','L_sun','L_elements','L_modelMaterials',
        'L_engine','L_resolution','L_advanced','L_history','L_settings','L_edit','L_space',
-       'L_scenes','L_theme','L_language','L_server'].forEach(function (id) {
+       'L_scenes','L_theme','L_language','L_server','L_animar','L_animarType','L_animarQuality','L_animarDuration','L_videoSave'].forEach(function (id) {
         var el = document.getElementById(id);
         if (el) el.textContent = tt(id);
       });
@@ -973,6 +1070,11 @@
       els.balanceRecharge.textContent = tt('recharge');
       els.cancelButton.textContent = tt('cancel');
       els.variationButton.textContent = tt('generateVariation');
+      els.videoOpenButton.textContent = tt('videoOpen');
+      els.videoSaveButton.textContent = tt('videoSaveBtn');
+      els.videoRevealButton.textContent = tt('videoReveal');
+      els.videoSiteButton.textContent = tt('videoSite');
+      renderVideoSavePills();
       els.dockSummary.title = tt('dockGoto');
       els.generateKbd.textContent = /mac/i.test(navigator.platform || '') ? '⌘⏎' : tt('kbdHint');
       els.generateButton.title = els.generateKbd.textContent;
@@ -1051,6 +1153,9 @@
      'backgroundLabel','backgroundPills','prompt','elementsPills','engineCards','resolutionCards',
      'notice','insufficient','insufficientTitle','insufficientMath','insufficientBuy','insufficientAlt',
      'generateButton','generateLabel','generateMeta','generateKbd','dockSummary','variationButton','reachLine','historySection','historyGrid','historyEmpty','historyMore',
+     'videoCard','videoPoster','videoCaption','videoOpenButton','videoSaveButton','videoRevealButton','videoSiteButton','videoHint',
+     'animarSection','animarTypePills','animarTypeHint','animarEnginePills','animarDurationPills','animarRatioNote','animarButton','animarLabel','animarMeta','animarNote',
+     'animarInsufficient','animarInsufficientTitle','animarInsufficientMath','animarInsufficientBuy','animarInsufficientAlt',
      'apiBaseUrl','saveSettingsButton','footer','advanced',
      'restoreCameraButton','scenesSection','scenesCount','scenesPills','scenesEmpty','batchButton','batchLabel','batchMeta',
      'batchNote','batchProgress','batchResults','sunPills','modelMaterialsBlock','materialsList',
@@ -1225,6 +1330,7 @@
       renderScenes();
       renderEditControls();
       renderSpaceControls();
+      renderAnimarControls();
       updateGenerateState();
     }
 
@@ -1682,6 +1788,7 @@
       els.variationButton.disabled = !canGenerate || !model.result || !model.result.outputUrl || !!model.result._unverified;
       els.variationButton.style.display = model.result && model.result.camera ? '' : 'none';
       els.dockSummary.textContent = dockSummaryText();
+      updateAnimarButton();
 
       if (balance != null && cost) {
         var reach = Math.floor(balance / cost);
@@ -1780,6 +1887,7 @@
       exitMaskMode();
       els.maskClear.style.display = 'none';
       renderEditControls();
+      renderAnimarControls();
       updateGenerateState();
     }
     function toggleCompare() {
@@ -1821,8 +1929,8 @@
         // O rotador só fala durante a etapa longa de geração — as etapas
         // reais (captura/envio/reconciliação) vêm do Ruby e não podem ser
         // atropeladas.
-        if (model.generateStage !== 'generate') return;
-        var texts = tt('loadingTexts');
+        if (model.generateStage !== 'generate' && model.generateStage !== 'animate') return;
+        var texts = tt(model.generateStage === 'animate' ? 'animarLoadingTexts' : 'loadingTexts');
         i = (i + 1) % texts.length;
         els.overlayText.textContent = texts[i];
       }, 9000);
@@ -1863,6 +1971,223 @@
 
     // lastResult pode vir do atributo de um .skp de terceiros — só URLs
     // http(s) entram no preview/ações.
+    // ── Animar (take curto do render) ───────────────────────────────────────
+    // O painel NÃO reproduz vídeo (CEF do SketchUp sem H.264): pôster + ações.
+    // Custo é determinístico (motor × duração) e vem do catálogo; o Ruby
+    // revalida os ids antes de enviar.
+    function animarCfg() { return model.catalog && model.catalog.animar; }
+    function resultDims() { var img = els.resultImage; return { w: img.naturalWidth || 0, h: img.naturalHeight || 0 }; }
+    function resultIsPortrait() { var d = resultDims(); return d.w > 0 && d.h > d.w; }
+    function resultAspectOk() {
+      var cfg = animarCfg(), d = resultDims();
+      if (!cfg || !cfg.limits || !d.w || !d.h) return true; // sem medida: o servidor é o backstop (422 + refund)
+      var r = d.w / d.h;
+      return r >= cfg.limits.aspectMin && r <= cfg.limits.aspectMax;
+    }
+    function animarTypes() { // só os que fazem sentido pra ESTE render
+      var cfg = animarCfg(); if (!cfg) return [];
+      return (cfg.videoTypes || []).filter(function (t) {
+        if (t.only === 'portrait') return resultIsPortrait();
+        if (t.only === 'interior') return model.projectType === 'interior';
+        return true;
+      });
+    }
+    function animarEngine() {
+      var cfg = animarCfg(), e = null;
+      ((cfg && cfg.engines) || []).forEach(function (x) { if (x.id === model.animarEngine) e = x; });
+      return e;
+    }
+    function animarCost() {
+      var e = animarEngine(), n = null;
+      ((e && e.durations) || []).forEach(function (d) { if (String(d.id) === String(model.animarDuration)) n = d.nodes; });
+      return n;
+    }
+    function engineLabel(e) {
+      if (!e) return '';
+      var en = (catUi('animar') || {}).engines;
+      var id = e.id || e.engine;
+      return (en && en[id]) || e.label || e.engineLabel || id;
+    }
+    function typeLabel(id) {
+      var t = null;
+      ((animarCfg() || {}).videoTypes || []).forEach(function (x) { if (x.id === id) t = x; });
+      var en = (catUi('animar') || {}).videoTypes;
+      return (en && en[id] && en[id].label) || (t && t.label) || id;
+    }
+    function typeTagline(t) {
+      var en = (catUi('animar') || {}).videoTypes;
+      return (en && en[t.id] && en[t.id].tagline) || t.tagline || '';
+    }
+    function cheapestAnimarOption(max) { // opção mais barata que cabe em max (ou null)
+      var best = null;
+      (((animarCfg() || {}).engines) || []).forEach(function (e) {
+        (e.durations || []).forEach(function (d) {
+          if (d.nodes <= max && (!best || d.nodes < best.nodes)) best = { engine: e.id, label: e.label, duration: String(d.id), nodes: d.nodes };
+        });
+      });
+      return best;
+    }
+    function selectAnimarType(id) {
+      var cfg = animarCfg(), t = null;
+      ((cfg && cfg.videoTypes) || []).forEach(function (x) { if (x.id === id) t = x; });
+      if (!t) return;
+      model.animarType = t.id;
+      model.animarEngine = t.defaults.engine;
+      model.animarDuration = String(t.defaults.duration);
+      var cost = animarCost();
+      if (model.authenticated && model.totalBalance != null && cost != null && cost > model.totalBalance) {
+        var alt = cheapestAnimarOption(model.totalBalance);
+        if (alt) { model.animarEngine = alt.engine; model.animarDuration = alt.duration; }
+      }
+    }
+    function renderAnimarControls() {
+      var cfg = animarCfg();
+      var visible = !!(model.result && model.result.outputUrl && cfg);
+      els.animarSection.style.display = visible ? '' : 'none';
+      if (!visible) return;
+      var types = animarTypes();
+      var hasType = false;
+      types.forEach(function (t) { if (t.id === model.animarType) hasType = true; });
+      if (!hasType) selectAnimarType((types[0] && types[0].id) || (cfg.defaults && cfg.defaults.videoType));
+      // Motor/duração restaurados de uma sessão antiga podem ter saído do
+      // catálogo (recalibração de preço/durações): sem custo válido o botão
+      // ficaria cinza sem explicação — volta pros defaults do tipo.
+      if (animarCost() == null) selectAnimarType(model.animarType);
+      fill(els.animarTypePills, types.map(function (t) {
+        return pillButton(typeLabel(t.id), t.id === model.animarType, function () {
+          selectAnimarType(t.id); renderAnimarControls(); persistStateSoon();
+        });
+      }));
+      var current = null;
+      types.forEach(function (t) { if (t.id === model.animarType) current = t; });
+      els.animarTypeHint.textContent = (current ? typeTagline(current) : '') + (resultIsPortrait() ? '' : ' ' + tt('animarReelsHint'));
+      var engine = animarEngine();
+      fill(els.animarEnginePills, (cfg.engines || []).map(function (e) {
+        var label = engineLabel(e) + (e.recommended ? ' · ' + tt('recommended') : '') + ' · ' + tt('engineEta', Math.max(1, Math.round((e.estimatedSeconds || 120) / 60)));
+        return pillButton(label, e.id === model.animarEngine, function () {
+          model.animarEngine = e.id;
+          var keep = null;
+          (e.durations || []).forEach(function (d) { if (String(d.id) === String(model.animarDuration)) keep = d; });
+          model.animarDuration = String(keep ? keep.id : ((e.durations || [{}])[0].id || ''));
+          renderAnimarControls(); persistStateSoon();
+        });
+      }));
+      fill(els.animarDurationPills, ((engine && engine.durations) || []).map(function (d) {
+        return pillButton(tt('durationOption', d.id, d.nodes), String(d.id) === String(model.animarDuration), function () {
+          model.animarDuration = String(d.id); renderAnimarControls(); persistStateSoon();
+        });
+      }));
+      var ratioOk = resultAspectOk();
+      els.animarRatioNote.style.display = ratioOk ? 'none' : '';
+      els.animarRatioNote.textContent = ratioOk ? '' : tt('animarRatioBad');
+      updateAnimarButton();
+    }
+    function updateAnimarButton() {
+      if (!els.animarButton) return;
+      var e = animarEngine(), cost = animarCost(), bal = model.totalBalance;
+      var insufficient = model.authenticated && cost != null && bal != null && bal < cost;
+      var blocked = !resultAspectOk();
+      els.animarButton.disabled = model.generating || !model.authenticated || cost == null || !!insufficient || blocked || !!(model.result && model.result._unverified);
+      els.animarLabel.textContent = model.generating ? tt('animating') : tt('animarCta');
+      els.animarMeta.textContent = (model.generating || cost == null || !e) ? '' : tt('animarMeta', engineLabel(e), model.animarDuration, cost);
+      els.animarNote.textContent = model.videoSave === 'project' ? tt('animarNote') : tt('animarNoteAsk');
+      els.animarInsufficient.classList.toggle('is-visible', !!insufficient);
+      if (insufficient) {
+        els.animarInsufficientTitle.textContent = tt('missing', cost - bal);
+        els.animarInsufficientMath.textContent = tt('animarInsufficient', cost, bal);
+        els.animarInsufficientAlt.innerHTML = '';
+        var alt = cheapestAnimarOption(bal);
+        if (alt) {
+          var b = document.createElement('button');
+          b.textContent = tt('animarOrOption', engineLabel(alt), alt.duration, alt.nodes);
+          b.addEventListener('click', function () {
+            model.animarEngine = alt.engine; model.animarDuration = alt.duration; renderAnimarControls();
+          });
+          els.animarInsufficientAlt.appendChild(b);
+        }
+      }
+    }
+    els.animarInsufficientBuy.addEventListener('click', function () { callSketchUp('openUrl', model.apiBaseUrl + '/app/billing'); });
+
+    function normText(s) {
+      s = String(s || '').toLowerCase();
+      try { s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); } catch (e) {}
+      return s;
+    }
+    // Cena do vídeo a partir do que o painel já sabe, usando os aliases DO
+    // CATÁLOGO (lib/video/scenes.ts) — só a política de arquétipo mora aqui.
+    // Importa só quando o tipo tem movimento 'auto' (o servidor resolve por cena).
+    function sceneFromPanel() {
+      var cfg = animarCfg(); if (!cfg) return '';
+      var scenes = cfg.scenes || [], exterior = model.projectType === 'exterior', cands = [];
+      if (exterior) {
+        ['exterior', 'terrace', 'facade'].forEach(function (id) { scenes.forEach(function (s) { if (s.id === id) cands.push(s); }); });
+      } else {
+        scenes.forEach(function (s) { if (['facade', 'exterior', 'detail', 'static'].indexOf(s.id) < 0) cands.push(s); });
+      }
+      var texts = [normText(model.environment), normText(model.segment)];
+      for (var i = 0; i < texts.length; i++) {
+        if (!texts[i]) continue;
+        for (var j = 0; j < cands.length; j++) {
+          var al = cands[j].aliases || [];
+          for (var k = 0; k < al.length; k++) { if (texts[i].indexOf(normText(al[k])) >= 0) return cands[j].id; }
+        }
+      }
+      return exterior ? 'facade' : 'living';
+    }
+    els.animarButton.addEventListener('click', function () {
+      if (model.generating || !model.result || !animarEngine()) return;
+      if (!ensureLiveResult()) return;
+      var d = resultDims();
+      showNotice('', 'success');
+      startGeneratingUi();
+      els.overlayText.textContent = tt('animarPrep');
+      callSketchUp('animar', JSON.stringify({
+        url: model.result.previewUrl || model.result.outputUrl, // preview WebP ≤1600 px: cabe nos 15 MB, basta pra 1080p
+        renderId: model.result.renderId || '',
+        sceneName: model.result.sceneName || '',
+        videoType: model.animarType,
+        engine: model.animarEngine,
+        duration: String(model.animarDuration),
+        scene: sceneFromPanel(),
+        width: d.w, height: d.h
+      }));
+    });
+
+    // Cartão do vídeo — sobrevive à troca de render (a legenda diz de que cena/tipo é).
+    function showVideo(v, restored) {
+      model.video = v;
+      if (!v) { els.videoCard.style.display = 'none'; return; }
+      els.videoCard.style.display = '';
+      var poster = v.posterUrl && /^https?:\/\//.test(String(v.posterUrl));
+      els.videoPoster.style.display = poster ? '' : 'none';
+      if (poster) els.videoPoster.src = v.posterUrl;
+      var cap = tt('videoCaption', typeLabel(v.videoType), v.duration) + (v.sceneName ? ' · ' + v.sceneName : '') + (restored ? ' · ' + tt('videoFromEarlier') : '');
+      els.videoCaption.textContent = cap;
+      els.videoRevealButton.style.display = v.localPath && v.localExists !== false ? '' : 'none';
+      els.videoHint.textContent = tt('videoNoPreview');
+    }
+    els.videoPoster.addEventListener('error', function () { els.videoPoster.style.display = 'none'; });
+    els.videoOpenButton.addEventListener('click', function () { if (model.video) callSketchUp('openVideo', '{}'); });
+    els.videoSaveButton.addEventListener('click', function () { if (model.video) callSketchUp('saveVideo', JSON.stringify({ url: model.video.videoUrl })); });
+    els.videoRevealButton.addEventListener('click', function () { callSketchUp('revealVideo', '{}'); });
+    els.videoSiteButton.addEventListener('click', function () { callSketchUp('openUrl', model.apiBaseUrl + '/app/video'); });
+
+    function renderVideoSavePills() {
+      var el = document.getElementById('videoSavePills');
+      if (!el) return;
+      el.innerHTML = '';
+      ['project', 'ask'].forEach(function (c) {
+        var b = pillButton(tt('videoSave')[c] || c, model.videoSave === c, function () {
+          model.videoSave = c;
+          renderVideoSavePills();
+          updateAnimarButton();
+          callSketchUp('saveSettings', JSON.stringify({ videoSave: c }));
+        });
+        el.appendChild(b);
+      });
+    }
+
     // O que a captura NÃO conseguiu mandar — o usuário paga o máximo e
     // precisa saber quando recebeu o caminho degradado.
     function conditioningNotes(p) {
@@ -1903,6 +2228,7 @@
           engine: model.engine,
           resolution: model.resolution,
           sunPreset: model.sunPreset,
+          animarType: model.animarType, animarEngine: model.animarEngine, animarDuration: model.animarDuration,
           materialSel: model.materialSel,
           prompt: els.prompt.value
         };
@@ -1920,6 +2246,9 @@
       if (saved.engine) model.engine = saved.engine;
       if (saved.resolution) model.resolution = saved.resolution;
       if (saved.sunPreset) model.sunPreset = saved.sunPreset;
+      if (saved.animarType) model.animarType = saved.animarType;
+      if (saved.animarEngine) model.animarEngine = saved.animarEngine;
+      if (saved.animarDuration) model.animarDuration = String(saved.animarDuration);
       if (saved.materialSel && typeof saved.materialSel === 'object' && !Array.isArray(saved.materialSel)) {
         model.materialSel = saved.materialSel;
       }
@@ -2027,11 +2356,14 @@
     // Ações sobre o resultado (Baixar/Abrir/Ampliar/Editar/Variação) só com
     // resultado verificado — o botão de voltar à vista não sai do SketchUp.
     function setResultActionsEnabled(on) {
-      ['downloadButton', 'openResultButton', 'upscale2xButton', 'upscale4xButton', 'variationButton'].forEach(function (id) {
+      ['downloadButton', 'openResultButton', 'upscale2xButton', 'upscale4xButton', 'variationButton', 'animarButton'].forEach(function (id) {
         if (els[id]) els[id].disabled = !on;
       });
       if (els.editButton) els.editButton.disabled = !on;
     }
+    // As dimensões do render (Reels só em retrato; proporção 0,4–2,5) só
+    // existem depois do load.
+    els.resultImage.addEventListener('load', function () { renderAnimarControls(); });
     els.resultImage.addEventListener('error', function () {
       if (!model.result || !els.resultImage.getAttribute('src')) return;
       if (!requestResultRefresh()) showNotice(tt('resultExpired'), 'warn');
@@ -2167,6 +2499,10 @@
             resetHistory();
           }
           if (payload.panelState && !model.catalog) restorePanelState(payload.panelState);
+          model.videoSave = payload.videoSave === 'ask' ? 'ask' : 'project';
+          renderVideoSavePills();
+          if (!model.authenticated) showVideo(null);
+          else if (!model.video && payload.lastVideo && /^https?:\/\//.test(String(payload.lastVideo.videoUrl))) showVideo(payload.lastVideo, true);
           if (!model.result && payload.lastResult && isSafeResult(payload.lastResult)) {
             showResult(payload.lastResult);
             // Resultado restaurado do .skp: o atributo é controlado por quem
@@ -2411,7 +2747,24 @@
           }
         }
 
-        if (event === 'saved') {
+        if (event === 'videoResult') {
+          stopGeneratingUi();
+          if (typeof payload.totalBalance === 'number') model.totalBalance = payload.totalBalance;
+          showVideo(payload, false);
+          showNotice(tt('videoReady', payload.nodesCharged), 'success');
+          setFooter(typeof payload.totalBalance === 'number' ? tt('nodesLeft', payload.totalBalance) : '');
+          updateGenerateState();
+        }
+        if (event === 'videoSaveFailed') {
+          showNotice(payload.message || tt('videoAutosaveFailed'), 'warn');
+          setFooter('');
+        }
+
+        if (event === 'saved' && payload.kind === 'video') {
+          if (model.video) { model.video.localPath = payload.path; model.video.localExists = true; showVideo(model.video, false); }
+          showNotice(payload.auto ? tt('videoReadySaved', payload.path) : tt('videoSavedAt', payload.path), 'success');
+          setFooter('');
+        } else if (event === 'saved') {
           showNotice(tt('savedAt', payload.path), 'success');
           setFooter('');
         }

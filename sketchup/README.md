@@ -25,6 +25,40 @@ O que só um plugin dentro do modelo consegue:
 - **Voltar à vista** — cada render guarda a câmera; um clique restaura o
   enquadramento exato no SketchUp.
 
+## O que mudou na 0.7.0 — Animar
+
+- **Animar este render**: take curto (Veo "Cinemático" 4/6/8 s, Kling
+  "Rápido" 5/10 s) a partir do render na tela. Tipo (Apresentação, Detalhe,
+  Tour só em interior, Reels só em render vertical) → qualidade → duração,
+  com o custo em Nodes no pill, no botão e no bloco de saldo insuficiente.
+- Fonte do vídeo = `previewUrl` do render (WebP ≤1600 px: cabe nos 15 MB da
+  área `animar-source` e basta pra 1080p). O Ruby REVALIDA engine/duração/
+  tipo contra o catálogo (`animar`, catálogo v6) antes de enviar; todos os
+  valores vão como string (a rota lê com `str()`).
+- **O painel não reproduz vídeo**: o CEF do SketchUp não decodifica H.264 em
+  nenhuma versão (Trimble: wontfix) e o Animar entrega H.264. Resultado =
+  pôster (o render) + "Abrir vídeo" (arquivo local ou navegador), "Salvar
+  vídeo…", "Mostrar na pasta", "Ver no site". Sem `<video>`, nem atrás de
+  gate.
+- Auto-save em `<pasta do .skp>/spacenode-videos/<projeto>-<cena>-<dur>s.mp4`
+  (nunca sobrescreve; toggle em Preferências → Vídeos). Modelo nunca salvo →
+  aviso brando e o botão "Salvar vídeo…" segue vivo.
+- `UI::Notification` nativa quando termina/falha (o arquiteto pode estar
+  modelando com o painel atrás).
+- Queda de rede depois do POST → reconciliação por `GET /api/video/history`
+  (o vídeo mais novo criado depois do início). Cancelar depois do POST avisa
+  que pode ter sido cobrado. `reconcile_lost_generation` (renders) passa a
+  ignorar `ambient == 'video'`.
+- `download_to_file` ganhou `kind: :video` (assinatura `ftyp`), watchdog de
+  180 s e falha branda no auto-save; `image_ext_and_mime` (PNG/JPEG/WebP)
+  também serve o Ampliar.
+- Servidor: `/api/video` e `/api/video/history` aceitam Bearer; a resposta
+  ganhou `id`, `totalBalance` e `createdAt`.
+- Fora desta versão (próxima): frame final real (falAdapter → Veo
+  `first-last-frame-to-video` com `generate_audio:false` e `resolution:'1080p'`
+  explícitos; Kling `tail_image_url`) e o "take entre cenas" com a Δcâmera do
+  modelo; "Animar todas as cenas do lote"; tira Vídeos no Histórico.
+
 ## O que mudou na 0.6.0
 
 - **Fidelidade sempre máxima** — o seletor Máxima/Equilibrado/Criativo saiu
