@@ -8,7 +8,10 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
   const admin = createAdminClient()
-  const balance = await getPayerBalance(admin, user.id)
+  const [balance, theme] = await Promise.all([
+    getPayerBalance(admin, user.id),
+    readThemePreference(admin, user.id),
+  ])
 
   return NextResponse.json({
     ok: true,
@@ -18,5 +21,29 @@ export async function GET(req: NextRequest) {
       email: user.email ?? null,
     },
     balance,
+    // Preferência de tema da conta (a mesma do app web). O plugin usa como
+    // segundo degrau do "Automático": escolha local → conta → SO → escuro.
+    theme,
   })
+}
+
+type ThemePreference = 'system' | 'light' | 'dark'
+
+async function readThemePreference(
+  admin: ReturnType<typeof createAdminClient>,
+  userId: string,
+): Promise<ThemePreference | null> {
+  try {
+    const { data } = await admin
+      .from('profiles')
+      .select('theme_preference')
+      .eq('id', userId)
+      .maybeSingle()
+    const v = data?.theme_preference
+    return v === 'light' || v === 'dark' || v === 'system' ? v : null
+  } catch {
+    // Coluna ausente ou perfil sem linha: o plugin cai pro SO — nunca falha
+    // a sessão por causa de tema.
+    return null
+  }
 }

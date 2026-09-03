@@ -36,8 +36,9 @@ interface GenerateClientProps {
 }
 
 // Persisted last-used render config (profiles.project_config — JSONB).
-// Type-strict fields (projectType / fidelityLevel / engine / resolution) are
-// validated on load; free-text taxonomy strings flow through as-is.
+// Type-strict fields (projectType / engine / resolution) are validated on
+// load; free-text taxonomy strings flow through as-is. Configs antigas ainda
+// podem trazer `fidelityLevel` — é ignorado: fidelidade é sempre máxima.
 interface ProjectConfig {
   projectType?:        ProjectType
   segment?:            string
@@ -45,7 +46,6 @@ interface ProjectConfig {
   lighting?:           string
   background?:         string
   sceneElements?:      string[]
-  fidelityLevel?:      FidelityLevel
   selectedEngine?:     EngineId
   selectedResolution?: Resolution
 }
@@ -79,14 +79,6 @@ const LOADING_TEXTS = [
   'Refinando materiais...',
   'Aplicando fotorrealismo...',
   'Gerando versão final...',
-]
-
-type FidelityLevel = 'maximum' | 'balanced' | 'creative'
-
-const FIDELITY_LEVELS: { id: FidelityLevel; label: string; desc: string }[] = [
-  { id: 'maximum',  label: 'Máxima',     desc: 'Preserva tudo do projeto'           },
-  { id: 'balanced', label: 'Equilibrado',desc: 'Pequenas melhorias permitidas'      },
-  { id: 'creative', label: 'Criativo',   desc: 'Mais liberdade estética'            },
 ]
 
 const RESOLUTION_DESC: Record<Resolution, string> = {
@@ -215,9 +207,6 @@ function resolveInitialConfig(cfg: ProjectConfig | null | undefined, isSubscribe
   const projectType: ProjectType =
     cfg?.projectType === 'interior' || cfg?.projectType === 'exterior'
       ? cfg.projectType : 'exterior'
-  const fidelityLevel: FidelityLevel =
-    cfg?.fidelityLevel === 'balanced' || cfg?.fidelityLevel === 'creative'
-      ? cfg.fidelityLevel : 'maximum'
   const fallbackEngine: EngineId   = isSubscriber ? DEFAULT_ENGINE     : ECONOMY_ENGINE
   const fallbackRes:    Resolution = isSubscriber ? DEFAULT_RESOLUTION : ECONOMY_RESOLUTION
   const engine: EngineId = isEngineId(cfg?.selectedEngine) ? cfg.selectedEngine : fallbackEngine
@@ -233,7 +222,6 @@ function resolveInitialConfig(cfg: ProjectConfig | null | undefined, isSubscribe
     lighting:           cfg?.lighting    ?? 'Preservar Original',
     background:         cfg?.background  ?? 'Preservar Original',
     sceneElements,
-    fidelityLevel,
     selectedEngine:     engine,
     selectedResolution: resolution,
   }
@@ -285,7 +273,6 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
   // ── Parâmetros técnicos
   const geometryLock = 85
   const fidelityMode = 'strict' as const
-  const [fidelityLevel,      setFidelityLevel]      = useState<FidelityLevel>(init.fidelityLevel)
   const [selectedEngine,     setSelectedEngine]     = useState<EngineId>(init.selectedEngine)
   const [selectedResolution, setSelectedResolution] = useState<Resolution>(init.selectedResolution)
 
@@ -526,14 +513,14 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
         if (!user) return
         const config: ProjectConfig = {
           projectType, segment, environment, lighting, background,
-          sceneElements, fidelityLevel, selectedEngine, selectedResolution,
+          sceneElements, selectedEngine, selectedResolution,
         }
         await supabase.from('profiles').update({ project_config: config }).eq('id', user.id)
       } catch (e) { console.error('Erro ao salvar config:', e) }
     }, 1500)
   }, [
     projectType, segment, environment, lighting, background,
-    sceneElements, fidelityLevel, selectedEngine, selectedResolution,
+    sceneElements, selectedEngine, selectedResolution,
     supabase,
   ])
 
@@ -671,7 +658,9 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...sourceParams,
-          fidelityLevel,
+          // Fidelidade é sempre máxima: os níveis "Equilibrado"/"Criativo"
+          // foram descontinuados (deixavam a IA alucinar no projeto).
+          fidelityLevel: 'maximum',
           projectType,
           segment,
           environment,
@@ -883,8 +872,7 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
     background !== 'Preservar Original' ? background : null,
     sceneElements.join(', '),
   ].filter(Boolean).join(' · ')
-  const fidelityLabel = FIDELITY_LEVELS.find(l => l.id === fidelityLevel)?.label ?? 'Máxima'
-  const summaryLine3  = `Fidelidade ${fidelityLabel} · ${currentEngine.name} · ${selectedResolution.toUpperCase()}`
+  const summaryLine3  = `Fidelidade máxima · ${currentEngine.name} · ${selectedResolution.toUpperCase()}`
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -1063,31 +1051,8 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
 
         <div style={S.divider}/>
 
-        {/* 10 — Fidelidade ao Projeto */}
-        <div style={S.section}>
-          <div style={S.label}>FIDELIDADE AO PROJETO</div>
-          <div style={S.fidelityGrid}>
-            {FIDELITY_LEVELS.map(lvl => (
-              <div
-                key={lvl.id}
-                style={{...S.fidelityOpt, ...(fidelityLevel === lvl.id ? S.fidelityOptActive : {})}}
-                onClick={() => setFidelityLevel(lvl.id)}
-              >
-                <div style={{...S.fidelityName, ...(fidelityLevel === lvl.id ? {color:'var(--color-bg)'} : {})}}>{lvl.label}</div>
-                <div style={{...S.motorDesc, ...(fidelityLevel === lvl.id ? {color:'var(--color-bg)', opacity:0.6} : {})}}>{lvl.desc}</div>
-              </div>
-            ))}
-          </div>
-          <p style={S.infoNote}>
-            {fidelityLevel === 'maximum'  && 'Preserva tudo da imagem (materiais, móveis, decoração, câmera). Só altera o que você pedir explicitamente.'}
-            {fidelityLevel === 'balanced' && 'Preserva arquitetura e câmera, com pequenas melhorias de composição e ambientação permitidas.'}
-            {fidelityLevel === 'creative' && 'Mais liberdade estética. Preserva apenas o essencial do projeto.'}
-          </p>
-        </div>
-
-        <div style={S.divider}/>
-
-        {/* 11 — Motor de IA */}
+        {/* 10 — Motor de IA (o seletor "Fidelidade ao projeto" foi
+            descontinuado: fidelidade é sempre máxima) */}
         <div style={S.section}>
           <div style={S.label}>MOTOR DE IA</div>
           <div style={S.motorGrid}>
@@ -1707,10 +1672,6 @@ const S: Record<string, React.CSSProperties> = {
   refineLabel:       { fontSize:10, letterSpacing:'0.15em', textTransform:'uppercase', color:'var(--color-text-tertiary)', fontWeight:500 },
   refineInput:       { padding:'9px 11px', border:'0.5px solid var(--color-input-border)', borderRadius:9, fontSize:11, color:'var(--color-text-primary)', background:'var(--color-input)', fontFamily:'inherit', outline:'none', resize:'vertical', minHeight:38 },
   refineHint:        { fontSize:10, color:'var(--color-text-tertiary)', lineHeight:1.5 },
-  fidelityGrid:      { display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:7 },
-  fidelityOpt:       { border:'0.5px solid var(--color-border-strong)', borderRadius:12, padding:'11px 9px', cursor:'pointer', background:'var(--color-surface)', textAlign:'center' as const, transition:'background 0.18s ease, border-color 0.18s ease' },
-  fidelityOptActive: { border:'0.5px solid var(--color-chip-active)', background:'var(--color-chip-active)' },
-  fidelityName:      { fontSize:11, fontWeight:560, color:'var(--color-text-primary)', marginBottom:3 },
   motorGrid:         { display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:7 },
   motorOpt:          { display:'flex', alignItems:'center', gap:10, border:'0.5px solid var(--color-border-strong)', borderRadius:12, padding:'11px 10px', cursor:'pointer', background:'var(--color-surface)', color:'var(--color-text-primary)', transition:'background 0.18s ease, border-color 0.18s ease' },
   motorOptActive:    { border:'0.5px solid var(--color-chip-active)', background:'var(--color-chip-active)', color:'var(--color-chip-active-foreground)' },

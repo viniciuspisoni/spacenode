@@ -473,3 +473,14 @@ contra 20-40 nodes cobrados.
   contrato no prompt) é o correto para a família Gemini.
 - **Upscale generativo como etapa padrão**: creativity > 0 em cadeia padrão
   contradiz o contrato de fidelidade; manter opt-in.
+
+---
+
+**Adendo 2026-09-03 — níveis de fidelidade descontinuados.** O seletor
+"Fidelidade ao projeto" (Máxima/Equilibrado/Criativo) saiu do Renderizar web
+e do plugin SketchUp; `/api/generate` coage `fidelityLevel` para `maximum`
+independentemente do que o cliente manda (plugin v0.5.2 em campo, config
+salva no perfil). Motivo: `balanced`/`creative` deixavam a IA alucinar sobre
+o projeto — a promessa do produto é preservação. Os ramos de `balanced`/
+`creative` em `lib/prompts.ts` seguem no código como caminho morto, de
+propósito: removê-los mexe no motor de prompt e não muda o comportamento.

@@ -43,11 +43,6 @@ const CATALOG_I18N_EN = {
       '2k': 'Ideal for presentations',
       '4k': 'Maximum definition',
     } as Record<string, string>,
-    fidelity: {
-      maximum: { label: 'Maximum', note: 'Preserves everything in the project' },
-      balanced: { label: 'Balanced', note: 'Small improvements allowed' },
-      creative: { label: 'Creative', note: 'More aesthetic freedom' },
-    } as Record<string, { label: string; note: string }>,
     materialFields: {
       piso: 'Floor',
       paredes: 'Walls / finishes',
@@ -72,12 +67,6 @@ const RESOLUTION_LABELS: Record<Resolution, { label: string; note: string }> = {
   '2k': { label: '2K', note: 'Ideal para apresentação' },
   '4k': { label: '4K', note: 'Máxima definição' },
 }
-
-const FIDELITY_LEVELS = [
-  { id: 'maximum', label: 'Máxima', note: 'Preserva tudo do projeto' },
-  { id: 'balanced', label: 'Equilibrado', note: 'Pequenas melhorias permitidas' },
-  { id: 'creative', label: 'Criativo', note: 'Mais liberdade estética' },
-] as const
 
 // Superfícies válidas pra materialRefs (mesmo vocabulário do /api/generate),
 // com rótulo de UI — o plugin usa pra mapear materiais do modelo → superfície.
@@ -160,7 +149,7 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({
-    version: 4,
+    version: 5,
     i18n: { en: CATALOG_I18N_EN },
     upscale,
     spaces,
@@ -178,12 +167,13 @@ export async function GET(req: NextRequest) {
         })),
       }
     }),
+    // Sem `fidelityLevels`/`defaults.fidelityLevel` desde a v5: o seletor
+    // foi descontinuado (fidelidade é sempre máxima). O plugin v0.5.2 em
+    // campo lê `fidelityLevels || []` e renderiza a seção vazia — inofensivo.
     defaults: {
       engine: DEFAULT_ENGINE,
       resolution: DEFAULT_RESOLUTION,
-      fidelityLevel: 'maximum',
     },
-    fidelityLevels: FIDELITY_LEVELS,
     projectTypes: [
       { id: 'interior', label: 'Interior', ...taxonomyFor('interior') },
       { id: 'exterior', label: 'Exterior', ...taxonomyFor('exterior') },

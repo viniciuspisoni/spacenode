@@ -42,6 +42,52 @@
       --warning: #d4a327;
       --shadow-sm: 0 2px 8px rgba(0,0,0,0.22);
       --shadow-md: 0 8px 24px rgba(0,0,0,0.32);
+      /* Tokens que o painel usava como cor fixa e viravam bloco preto no claro */
+      --text-4: #3a3a3c;                    /* --color-text-quaternary */
+      --preview-bg: #101010;                /* --color-preview-bg */
+      --scrollbar: rgba(255,255,255,0.14);  /* --color-scrollbar */
+      --chip-active-fg-dim: rgba(10,10,10,0.6); /* subtítulo sobre chip ativo */
+      /* Constantes entre temas: véus sobre imagem (regra do design system —
+         scrim é sempre escuro porque a imagem embaixo não segue o tema). */
+      --scrim: rgba(0,0,0,0.55);
+      --scrim-strong: rgba(0,0,0,0.75);
+    }
+    /* Tema claro — espelho EXATO de html.light em app/globals.css. Não
+       inventar valores: se o app mudar, mudar aqui junto. */
+    html.light {
+      color-scheme: light;
+      --bg: #fafafa;
+      --bg-elevated: #ffffff;
+      --surface: #f5f5f7;
+      --surface-hover: #e8e8ed;
+      --surface-subtle: rgba(0,0,0,0.02);
+      --text: #1a1a1a;
+      --text-2: #424245;
+      --text-3: #86868b;
+      --border: rgba(0,0,0,0.07);
+      --border-strong: rgba(0,0,0,0.15);
+      --border-focus: rgba(0,0,0,0.32);
+      --input: #ffffff;
+      --chip: rgba(0,0,0,0.05);
+      --chip-hover: rgba(0,0,0,0.08);
+      --chip-active: #1a1a1a;
+      --chip-active-fg: #fafafa;
+      --inverse: #1a1a1a;
+      --inverse-fg: #fafafa;
+      --green: #30b46c;
+      --green-bg: rgba(48,180,108,0.09);
+      --green-border: rgba(48,180,108,0.22);
+      --green-glow: rgba(48,180,108,0.45);
+      --error: #c0392b;
+      --error-bg: rgba(192,57,43,0.08);
+      --error-border: rgba(192,57,43,0.20);
+      --warning: #b8860b;
+      --shadow-sm: 0 2px 8px rgba(0,0,0,0.08);
+      --shadow-md: 0 8px 24px rgba(0,0,0,0.10);
+      --text-4: #c7c7cc;
+      --preview-bg: #e9e9e7;
+      --scrollbar: rgba(0,0,0,0.18);
+      --chip-active-fg-dim: rgba(250,250,250,0.65);
     }
     * { box-sizing: border-box; }
     html, body { height: 100%; }
@@ -61,7 +107,7 @@
     button:disabled { cursor: default; }
     :focus-visible { outline: 1.5px solid var(--border-focus); outline-offset: 2px; border-radius: 6px; }
 
-    .shell { height: 100vh; display: grid; grid-template-rows: auto 1fr auto; }
+    .shell { height: 100vh; display: grid; grid-template-rows: auto 1fr auto auto; }
 
     header {
       display: flex; align-items: center; justify-content: space-between; gap: 10px;
@@ -86,7 +132,7 @@
        estilo via ::-webkit-scrollbar, que cobre todas as versões alvo. */
     main { overflow-y: auto; padding: 14px 16px 20px; }
     main::-webkit-scrollbar { width: 8px; }
-    main::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.14); border-radius: 999px; }
+    main::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 999px; }
     main::-webkit-scrollbar-track { background: transparent; }
 
     /* ── Conexão ── */
@@ -112,7 +158,7 @@
     /* ── Preview ── */
     .preview {
       position: relative; width: 100%; aspect-ratio: 4 / 3;
-      border-radius: 12px; overflow: hidden; background: #101010;
+      border-radius: 12px; overflow: hidden; background: var(--preview-bg);
       border: 0.5px solid var(--border); margin-bottom: 8px;
     }
     .preview img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: none; }
@@ -138,7 +184,7 @@
     .preview.is-comparing .compare-range { display: block; }
     .preview-tag {
       position: absolute; top: 8px; padding: 3px 8px; border-radius: 6px;
-      background: rgba(0,0,0,0.55); color: var(--text-2);
+      background: var(--scrim); color: #f5f5f7; /* sobre imagem: sempre claro no escuro */
       font-size: 9px; font-weight: 600; letter-spacing: 0.17em; text-transform: uppercase;
       display: none; pointer-events: none;
     }
@@ -148,16 +194,17 @@
     .preview-overlay {
       position: absolute; inset: 0; display: none; flex-direction: column;
       align-items: center; justify-content: center; gap: 12px;
-      background: rgba(10,10,10,0.72); backdrop-filter: blur(4px);
+      background: var(--scrim-strong); backdrop-filter: blur(4px);
     }
     .preview-overlay.is-visible { display: flex; }
     .constellation { width: 34px; height: 34px; animation: pulse 2.2s ease-in-out infinite; }
     @keyframes pulse { 0%,100% { opacity: 0.35 } 50% { opacity: 1 } }
     @media (prefers-reduced-motion: reduce) { .constellation { animation: none; } * { transition: none !important; } }
-    .overlay-text { font-size: 12px; color: var(--text-2); }
-    .overlay-elapsed { font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
-    .overlay-cancel { font-size: 11px; color: var(--text-3); text-decoration: underline; text-underline-offset: 2px; }
-    .overlay-cancel:hover { color: var(--text-2); }
+    /* Sobre o véu escuro a cor NÃO segue o tema (senão some no claro). */
+    .overlay-text { font-size: 12px; color: #a1a1a6; }
+    .overlay-elapsed { font-size: 11px; color: #6e6e73; font-variant-numeric: tabular-nums; }
+    .overlay-cancel { font-size: 11px; color: #6e6e73; text-decoration: underline; text-underline-offset: 2px; }
+    .overlay-cancel:hover { color: #a1a1a6; }
 
     .preview-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 2px; }
     .preview-actions .ghost { flex: 1; min-width: 110px; }
@@ -193,7 +240,7 @@
     .card.is-active { background: var(--chip-active); color: var(--chip-active-fg); box-shadow: var(--shadow-sm); }
     .card b { display: block; font-size: 11px; font-weight: 560; }
     .card span { display: block; margin-top: 3px; font-size: 10px; color: var(--text-3); }
-    .card.is-active span { color: rgba(10,10,10,0.6); }
+    .card.is-active span { color: var(--chip-active-fg-dim); }
     .card:disabled { opacity: 0.45; }
 
     textarea {
@@ -231,6 +278,29 @@
     .cta .meta { font-size: 11px; font-weight: 500; opacity: 0.65; font-variant-numeric: tabular-nums; }
     .reach { margin-top: 8px; font-size: 11px; color: var(--text-3); text-align: center; }
 
+    /* ── Dock: o botão Gerar mora numa barra fixa acima do rodapé — antes
+       ficava abaixo de 10 seções e cada render exigia rolar até o fim. ── */
+    .dock {
+      padding: 10px 16px 8px; border-top: 0.5px solid var(--border);
+      background: var(--bg); box-shadow: 0 -8px 20px rgba(0,0,0,0.06);
+    }
+    .dock .cta { margin-top: 0; }
+    .dock .reach { margin-top: 6px; }
+    .dock .insufficient { margin: 0 0 10px; }
+    .dock-summary {
+      display: block; width: 100%; margin: 0 0 8px; text-align: left;
+      font-size: 11px; color: var(--text-3); letter-spacing: -0.005em;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .dock-summary:hover { color: var(--text-2); }
+    .dock-summary:empty { display: none; }
+    .cta-right { display: inline-flex; align-items: center; gap: 8px; }
+    .kbd {
+      font: inherit; font-size: 9.5px; font-weight: 500; opacity: 0.45;
+      border: 0.5px solid currentColor; border-radius: 4px; padding: 1px 5px;
+      letter-spacing: 0.02em;
+    }
+
     /* ── Notice / erro ── */
     .notice {
       display: none; margin-top: 12px; padding: 11px 12px; border-radius: 12px;
@@ -239,6 +309,8 @@
     }
     .notice.is-error { display: block; color: var(--error); border-color: var(--error-border); background: var(--error-bg); }
     .notice.is-success { display: block; color: var(--text); border-color: var(--green-border); background: var(--green-bg); }
+    .notice.is-warn { display: block; color: var(--text); border-color: var(--border-strong); background: var(--surface); }
+    .material-row.is-unsupported { opacity: 0.5; }
     .notice .notice-action { margin-top: 8px; }
     .notice .notice-action button { font-size: 12px; color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
 
@@ -265,7 +337,7 @@
     .history-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
     .history-grid img {
       width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px;
-      border: 0.5px solid var(--border); cursor: pointer; display: block; background: #101010;
+      border: 0.5px solid var(--border); cursor: pointer; display: block; background: var(--preview-bg);
     }
     .history-grid img:hover { border-color: var(--border-focus); }
     .history-more { margin-top: 8px; width: 100%; height: 30px; }
@@ -283,8 +355,8 @@
     #maskToggle.is-active { background: var(--chip-active); color: var(--chip-active-fg); border-color: var(--chip-active); }
     .mask-hint {
       position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: 4;
-      text-align: center; font-size: 10px; color: var(--text-2);
-      background: rgba(0,0,0,0.55); border-radius: 6px; padding: 4px 8px;
+      text-align: center; font-size: 10px; color: #f5f5f7;
+      background: var(--scrim); border-radius: 6px; padding: 4px 8px;
       pointer-events: none; display: none;
     }
     .preview.is-masking .mask-hint { display: block; }
@@ -325,16 +397,26 @@
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
   </style>
+  <script>
+    // Anti-flash: aplica o último tema RESOLVIDO antes do primeiro paint.
+    // O estado real chega do Ruby depois do 'ready' e corrige se preciso.
+    // localStorage pode não existir no CEF (file://) — nunca pode quebrar.
+    (function () {
+      try {
+        if (localStorage.getItem('com.spacenode.sketchup.theme') === 'light') document.documentElement.classList.add('light');
+      } catch (e) {}
+    })();
+  </script>
 </head>
 <body>
   <div class="shell">
     <header>
       <div class="brand">
         <svg viewBox="0 0 64 64" aria-hidden="true">
-          <g stroke="#f5f5f7" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none">
+          <g stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none">
             <line x1="16" y1="16" x2="16" y2="48"/><line x1="16" y1="16" x2="48" y2="48"/><line x1="48" y1="16" x2="48" y2="48"/>
           </g>
-          <g fill="#f5f5f7">
+          <g fill="currentColor">
             <circle cx="16" cy="16" r="3"/><circle cx="16" cy="48" r="3"/><circle cx="48" cy="48" r="3"/><circle cx="48" cy="16" r="3"/>
           </g>
         </svg>
@@ -363,7 +445,7 @@
         <div id="pairingCode" style="margin-top:10px;text-align:center;font-size:26px;font-weight:650;letter-spacing:0.22em"></div>
         <div class="alt" style="margin-top:10px">
           <button id="pairingReopen">abrir o navegador de novo</button>
-          <span style="color:#3a3a3c"> · </span>
+          <span style="color:var(--text-4)"> · </span>
           <button id="pairingCancel">cancelar</button>
         </div>
       </div>
@@ -407,6 +489,7 @@
         <button class="ghost" id="openResultButton">Abrir no site</button>
         <button class="ghost" id="upscale2xButton">Ampliar 2x</button>
         <button class="ghost" id="upscale4xButton">Ampliar 4x</button>
+        <button class="ghost" id="variationButton" style="grid-column:1 / -1">Gerar variação deste render</button>
         <button class="ghost" id="restoreCameraButton" style="display:none;grid-column:1 / -1">Voltar à vista deste render</button>
       </div>
 
@@ -517,11 +600,6 @@
       </details>
 
       <section class="section">
-        <span class="section-label" id="L_fidelity">Fidelidade ao projeto</span>
-        <div class="cards cols-3" id="fidelityCards" role="radiogroup" aria-label="Fidelidade"></div>
-      </section>
-
-      <section class="section">
         <span class="section-label" id="L_engine">Motor de IA</span>
         <div class="cards cols-3" id="engineCards" role="radiogroup" aria-label="Motor"></div>
       </section>
@@ -533,19 +611,6 @@
 
       <div class="notice" id="notice" role="status" aria-live="polite"></div>
 
-      <div class="insufficient" id="insufficient">
-        <b id="insufficientTitle">Faltam nodes pra gerar</b>
-        <div class="math" id="insufficientMath"></div>
-        <button class="buy" id="insufficientBuy">ver planos</button>
-        <div class="alt" id="insufficientAlt"></div>
-      </div>
-
-      <button class="cta" id="generateButton" disabled>
-        <span id="generateLabel">Gerar render</span>
-        <span class="meta" id="generateMeta"></span>
-      </button>
-      <div class="reach" id="reachLine"></div>
-
       <details id="historySection">
         <summary id="L_history">Histórico</summary>
         <div class="details-body">
@@ -556,11 +621,14 @@
       </details>
 
       <details id="settingsSection">
-        <summary id="L_settings">Conexão avançada</summary>
+        <summary id="L_settings">Preferências</summary>
         <div class="details-body">
           <div class="settings-field">
+            <label id="L_theme">Tema</label>
+            <div class="pills" id="themePills" role="radiogroup" aria-label="Tema"></div>
+            <div class="hint" id="themeHint" style="margin:6px 0 10px">Automático segue a preferência da sua conta SPACENODE — ou, sem ela, o tema do sistema.</div>
             <label id="L_language">Idioma</label>
-            <div class="pills" id="languagePills" style="margin-bottom:10px"></div>
+            <div class="pills" id="languagePills" role="radiogroup" aria-label="Idioma" style="margin-bottom:10px"></div>
             <label for="apiBaseUrl" id="L_server">Servidor</label>
             <input id="apiBaseUrl" spellcheck="false">
           </div>
@@ -570,6 +638,21 @@
         </div>
       </details>
     </main>
+
+    <div class="dock" id="dock">
+      <button class="dock-summary" id="dockSummary" type="button" title="Ir para a configuração"></button>
+      <div class="insufficient" id="insufficient">
+        <b id="insufficientTitle">Faltam nodes pra gerar</b>
+        <div class="math" id="insufficientMath"></div>
+        <button class="buy" id="insufficientBuy">ver planos</button>
+        <div class="alt" id="insufficientAlt"></div>
+      </div>
+      <button class="cta" id="generateButton" disabled title="Ctrl+Enter">
+        <span id="generateLabel">Gerar render</span>
+        <span class="cta-right"><span class="meta" id="generateMeta"></span><kbd class="kbd" id="generateKbd">Ctrl+Enter</kbd></span>
+      </button>
+      <div class="reach" id="reachLine"></div>
+    </div>
 
     <footer id="footer">SPACENODE para SketchUp</footer>
   </div>
@@ -581,6 +664,8 @@
     var model = {
       authenticated: false,
       sessionFresh: false,
+      themeSetting: 'auto',   // auto | light | dark (escolha local, Sketchup.write_default)
+      accountTheme: null,     // preferência da conta (profiles.theme_preference) via /api/sketchup/session
       apiBaseUrl: 'https://spacenode.app',
       catalog: null,
       projectType: 'interior',
@@ -589,6 +674,9 @@
       lighting: null,
       background: null,
       sceneElements: [],
+      // Sempre máxima: o seletor Máxima/Equilibrado/Criativo foi
+      // descontinuado (deixava a IA alucinar no projeto). Não é restaurado
+      // de estado salvo nem exposto na UI — o Ruby e o servidor coagem.
       fidelityLevel: 'maximum',
       engine: null,
       resolution: null,
@@ -635,18 +723,29 @@
         upscale2x: 'Ampliar 2x', upscale4x: 'Ampliar 4x',
         L_projectType: 'Tipo de projeto', L_segment: 'Segmento', L_environment: 'Espaço', L_lighting: 'Iluminação',
         L_sun: 'Sol na captura', L_elements: 'Elementos na cena', L_modelMaterials: 'Materiais do modelo',
-        L_fidelity: 'Fidelidade ao projeto', L_engine: 'Motor de IA', L_resolution: 'Qualidade de saída',
-        L_advanced: 'Avançado', L_history: 'Histórico', L_settings: 'Conexão avançada',
+        L_engine: 'Motor de IA', L_resolution: 'Qualidade de saída',
+        L_advanced: 'Avançado', L_history: 'Histórico', L_settings: 'Preferências',
         L_edit: 'Editar este render', L_space: 'Criar Space das cenas', L_scenes: 'Cenas do modelo',
-        L_language: 'Idioma', L_server: 'Servidor', save: 'Salvar',
+        L_theme: 'Tema', L_language: 'Idioma', L_server: 'Servidor', save: 'Salvar',
         L_description: 'Descrição', optional: '· opcional',
         promptPlaceholder: 'Direções específicas — ex.: piso de madeira clara, paredes off-white, decoração minimalista',
         promptHint: 'O que você não pedir aqui é preservado do jeito que está no modelo.',
         sunHint: 'Usa o sol real do modelo (data, hora e localização) — as sombras da captura guiam a luz do render.',
+        themeHint: 'Automático segue a preferência da sua conta SPACENODE — ou, sem ela, o tema do sistema.',
         matHint: 'Use as texturas reais do seu modelo como referência de material (até 4).',
         matCap: 'Até 4 materiais por geração.',
         nodes: 'nodes', recharge: 'Recarregar',
-        generateRender: 'Gerar render', generateVariation: 'Gerar variação', generating: 'gerando…',
+        generateRender: 'Gerar render', generateVariation: 'Gerar variação deste render', generating: 'gerando…',
+        dockGoto: 'Ir para a configuração', kbdHint: 'Ctrl+Enter',
+        anchorDropped: 'A câmera mudou desde o render anterior — gerado sem âncora.',
+        condNoEdge: 'Sem mapa de arestas nesta geração (a estrutura veio da própria imagem).',
+        condMaterials: function (sent, req, names) { return sent + ' de ' + req + ' materiais enviados' + (names ? ' — ' + names : '') + '.'; },
+        condNoSun: 'O preset de sol não foi aplicado — a captura saiu com o sol atual do modelo.',
+        matUnsupported: 'Textura fora de jpg/png — não dá pra enviar como amostra.',
+        matReason: { not_found: 'não encontrado', unsupported_format: 'formato não suportado', too_large: 'acima de 7,8 MB', export_failed: 'falha ao exportar', upload_failed: 'falha no envio' },
+        historyOpen: 'Trazer para o painel',
+        resultExpired: 'O link deste render venceu. Gere de novo ou abra pelo Histórico.',
+        resultRefreshing: 'Atualizando o link do render… tente de novo em instantes.',
         reach: function (n) { return 'seu saldo dá para ~' + n + ' render' + (n === 1 ? '' : 's') + ' nessa configuração'; },
         missing: function (n) { return 'Faltam ' + n + ' node' + (n === 1 ? '' : 's') + ' pra gerar'; },
         costMath: function (c, h) { return 'Esta geração custa ' + c + ' · você tem ' + h; },
@@ -700,6 +799,7 @@
         sun: { atual: 'Atual', manha: 'Manhã', meiodia: 'Meio-dia', tarde: 'Entardecer', golden: 'Golden hour' },
         editActions: { swap_material: 'Trocar material', remove: 'Remover', refine_area: 'Refinar área' },
         lang: { auto: 'Auto', pt: 'Português', en: 'English' },
+        theme: { auto: 'Automático', light: 'Claro', dark: 'Escuro' },
         loadingTexts: ['Analisando composição…', 'Ajustando iluminação…', 'Refinando materiais…', 'Aplicando fotorrealismo…', 'Gerando versão final…']
       },
       en: {
@@ -713,18 +813,29 @@
         upscale2x: 'Upscale 2x', upscale4x: 'Upscale 4x',
         L_projectType: 'Project type', L_segment: 'Segment', L_environment: 'Space', L_lighting: 'Lighting',
         L_sun: 'Sun at capture', L_elements: 'Scene elements', L_modelMaterials: 'Model materials',
-        L_fidelity: 'Project fidelity', L_engine: 'AI engine', L_resolution: 'Output quality',
-        L_advanced: 'Advanced', L_history: 'History', L_settings: 'Advanced connection',
+        L_engine: 'AI engine', L_resolution: 'Output quality',
+        L_advanced: 'Advanced', L_history: 'History', L_settings: 'Preferences',
         L_edit: 'Edit this render', L_space: 'Create a Space from scenes', L_scenes: 'Model scenes',
-        L_language: 'Language', L_server: 'Server', save: 'Save',
+        L_theme: 'Theme', L_language: 'Language', L_server: 'Server', save: 'Save',
         L_description: 'Description', optional: '· optional',
         promptPlaceholder: 'Specific directions — e.g. light oak floor, off-white walls, minimal decor',
         promptHint: 'Anything you do not ask for here is preserved exactly as modeled.',
         sunHint: 'Uses the model real sun (date, time and location) — the captured shadows guide the render light.',
+        themeHint: 'Automatic follows your SPACENODE account preference — or, without one, the system theme.',
         matHint: 'Use your model real textures as material references (up to 4).',
         matCap: 'Up to 4 materials per generation.',
         nodes: 'nodes', recharge: 'Top up',
-        generateRender: 'Generate render', generateVariation: 'Generate variation', generating: 'generating…',
+        generateRender: 'Generate render', generateVariation: 'Generate a variation of this render', generating: 'generating…',
+        dockGoto: 'Go to the settings', kbdHint: 'Ctrl+Enter',
+        anchorDropped: 'The camera moved since the previous render — generated without anchor.',
+        condNoEdge: 'No edge map in this generation (structure came from the image itself).',
+        condMaterials: function (sent, req, names) { return sent + ' of ' + req + ' materials sent' + (names ? ' — ' + names : '') + '.'; },
+        condNoSun: 'The sun preset was not applied — the capture used the model current sun.',
+        matUnsupported: 'Texture is not jpg/png — it cannot be sent as a sample.',
+        matReason: { not_found: 'not found', unsupported_format: 'unsupported format', too_large: 'over 7.8 MB', export_failed: 'export failed', upload_failed: 'upload failed' },
+        historyOpen: 'Bring into the panel',
+        resultExpired: 'This render link expired. Generate again or open it from History.',
+        resultRefreshing: 'Refreshing the render link… try again in a moment.',
         reach: function (n) { return 'your balance covers ~' + n + ' render' + (n === 1 ? '' : 's') + ' at this setup'; },
         missing: function (n) { return n + ' node' + (n === 1 ? '' : 's') + ' short to generate'; },
         costMath: function (c, h) { return 'This generation costs ' + c + ' · you have ' + h; },
@@ -778,6 +889,7 @@
         sun: { atual: 'Current', manha: 'Morning', meiodia: 'Midday', tarde: 'Late afternoon', golden: 'Golden hour' },
         editActions: { swap_material: 'Swap material', remove: 'Remove', refine_area: 'Refine area' },
         lang: { auto: 'Auto', pt: 'Português', en: 'English' },
+        theme: { auto: 'Automatic', light: 'Light', dark: 'Dark' },
         loadingTexts: ['Analyzing composition…', 'Adjusting lighting…', 'Refining materials…', 'Applying photorealism…', 'Generating final version…']
       }
     };
@@ -802,8 +914,8 @@
     }
     function localizeStatic() {
       ['L_projectType','L_segment','L_environment','L_lighting','L_sun','L_elements','L_modelMaterials',
-       'L_fidelity','L_engine','L_resolution','L_advanced','L_history','L_settings','L_edit','L_space',
-       'L_scenes','L_language','L_server'].forEach(function (id) {
+       'L_engine','L_resolution','L_advanced','L_history','L_settings','L_edit','L_space',
+       'L_scenes','L_theme','L_language','L_server'].forEach(function (id) {
         var el = document.getElementById(id);
         if (el) el.textContent = tt(id);
       });
@@ -824,6 +936,8 @@
       if (promptHint) promptHint.textContent = tt('promptHint');
       var sunHint = document.querySelector('#sunPills ~ .hint');
       if (sunHint) sunHint.textContent = tt('sunHint');
+      var themeHint = document.getElementById('themeHint');
+      if (themeHint) themeHint.textContent = tt('themeHint');
       var matHint = document.querySelector('#modelMaterialsBlock .hint');
       if (matHint) matHint.textContent = tt('matHint');
       var desc = document.getElementById('L_description');
@@ -858,15 +972,65 @@
       if (signOut) signOut.textContent = tt('signOut');
       els.balanceRecharge.textContent = tt('recharge');
       els.cancelButton.textContent = tt('cancel');
+      els.variationButton.textContent = tt('generateVariation');
+      els.dockSummary.title = tt('dockGoto');
+      els.generateKbd.textContent = /mac/i.test(navigator.platform || '') ? '⌘⏎' : tt('kbdHint');
+      els.generateButton.title = els.generateKbd.textContent;
+      renderThemePills();
       renderLanguagePills();
     }
+
+    // ── Tema ────────────────────────────────────────────────────────────────
+    // Resolução (mesma ordem do app web quando o device é novo):
+    //   escolha local (auto|light|dark) → preferência da conta → tema do SO → escuro.
+    // Os tokens do painel espelham app/globals.css; html.light liga o claro.
+    var themeMedia = null;
+    function resolveTheme() {
+      if (model.themeSetting === 'light' || model.themeSetting === 'dark') return model.themeSetting;
+      if (model.accountTheme === 'light' || model.accountTheme === 'dark') return model.accountTheme;
+      try {
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) return 'light';
+      } catch (e) {}
+      return 'dark';
+    }
+    function applyTheme() {
+      var resolved = resolveTheme();
+      document.documentElement.classList.toggle('light', resolved === 'light');
+      try { localStorage.setItem('com.spacenode.sketchup.theme', resolved); } catch (e) {}
+      // Segue o SO só enquanto nada mais decidir (setting e conta em "auto").
+      var followsOs = !(model.themeSetting === 'light' || model.themeSetting === 'dark') &&
+        !(model.accountTheme === 'light' || model.accountTheme === 'dark');
+      if (followsOs && !themeMedia && window.matchMedia) {
+        try {
+          themeMedia = window.matchMedia('(prefers-color-scheme: light)');
+          var onChange = function () { applyTheme(); };
+          if (themeMedia.addEventListener) themeMedia.addEventListener('change', onChange);
+          else if (themeMedia.addListener) themeMedia.addListener(onChange); // CEF antigo
+        } catch (e) { themeMedia = null; }
+      }
+    }
+    function renderThemePills() {
+      var el = document.getElementById('themePills');
+      if (!el) return;
+      el.innerHTML = '';
+      ['auto', 'light', 'dark'].forEach(function (c) {
+        var b = pillButton(tt('theme')[c] || c, model.themeSetting === c, function () {
+          model.themeSetting = c;
+          applyTheme();
+          renderThemePills();
+          callSketchUp('saveSettings', JSON.stringify({ theme: c }));
+        });
+        el.appendChild(b);
+      });
+    }
+
     function renderLanguagePills() {
       var el = document.getElementById('languagePills');
       if (!el) return;
       el.innerHTML = '';
       ['auto', 'pt', 'en'].forEach(function (c) {
         var b = pillButton(tt('lang')[c] || c, model.localeSetting === c, function () {
-          callSketchUp('saveSettings', JSON.stringify({ apiBaseUrl: els.apiBaseUrl.value, locale: c }));
+          callSketchUp('saveSettings', JSON.stringify({ locale: c }));
         });
         el.appendChild(b);
       });
@@ -884,9 +1048,9 @@
      'preview','captureImage','captureCompareImage','resultImage','compareClip','compareHandle','compareRange','emptyPreview',
      'previewOverlay','overlayText','overlayElapsed','cancelButton','captureButton','compareButton','resultActions',
      'downloadButton','openResultButton','projectTypeCards','segmentPills','environmentPills','lightingPills',
-     'backgroundLabel','backgroundPills','prompt','elementsPills','fidelityCards','engineCards','resolutionCards',
+     'backgroundLabel','backgroundPills','prompt','elementsPills','engineCards','resolutionCards',
      'notice','insufficient','insufficientTitle','insufficientMath','insufficientBuy','insufficientAlt',
-     'generateButton','generateLabel','generateMeta','reachLine','historySection','historyGrid','historyEmpty','historyMore',
+     'generateButton','generateLabel','generateMeta','generateKbd','dockSummary','variationButton','reachLine','historySection','historyGrid','historyEmpty','historyMore',
      'apiBaseUrl','saveSettingsButton','footer','advanced',
      'restoreCameraButton','scenesSection','scenesCount','scenesPills','scenesEmpty','batchButton','batchLabel','batchMeta',
      'batchNote','batchProgress','batchResults','sunPills','modelMaterialsBlock','materialsList',
@@ -946,7 +1110,6 @@
       var defaults = model.catalog.defaults || {};
       if (!model.engine && defaults.engine) model.engine = defaults.engine;
       if (!model.resolution && defaults.resolution) model.resolution = defaults.resolution;
-      if (!model.fidelityLevel && defaults.fidelityLevel) model.fidelityLevel = defaults.fidelityLevel;
       model.projectType = pt.id;
       var seg = currentSegment();
       model.segment = seg ? seg.name : null;
@@ -1039,13 +1202,6 @@
         return b;
       }));
 
-      fill(els.fidelityCards, (model.catalog.fidelityLevels || []).map(function (f) {
-        var fEn = (catUi('fidelity') || {})[f.id];
-        return cardButton((fEn && fEn.label) || f.label, (fEn && fEn.note) || f.note, f.id === model.fidelityLevel, function () {
-          model.fidelityLevel = f.id; onSelectionChanged();
-        });
-      }));
-
       fill(els.engineCards, (model.catalog.engines || []).map(function (e) {
         return cardButton(e.name, (catUi('engineTaglines') || {})[e.id] || e.tagline, e.id === model.engine, function () {
           model.engine = e.id; onSelectionChanged();
@@ -1093,13 +1249,14 @@
       els.materialsList.innerHTML = '';
       model.modelMaterials.forEach(function (mat) {
         var row = document.createElement('div');
-        row.className = 'material-row';
+        row.className = 'material-row' + (mat.unsupported ? ' is-unsupported' : '');
         var nameEl = document.createElement('span');
         nameEl.className = 'mname';
         nameEl.textContent = mat.displayName || mat.name;
-        nameEl.title = mat.displayName || mat.name;
+        nameEl.title = mat.unsupported ? tt('matUnsupported') : (mat.displayName || mat.name);
         var select = document.createElement('select');
-        select.disabled = model.generating;
+        select.disabled = model.generating || !!mat.unsupported;
+        if (mat.unsupported) { select.title = tt('matUnsupported'); delete model.materialSel[mat.name]; }
         var none = document.createElement('option');
         none.value = '';
         none.textContent = '—';
@@ -1195,7 +1352,6 @@
         lighting: model.lighting,
         background: model.background,
         sceneElements: model.sceneElements,
-        fidelityLevel: model.fidelityLevel,
         engine: model.engine,
         resolution: model.resolution,
         sunPreset: model.sunPreset,
@@ -1211,6 +1367,7 @@
     // ── Ampliar ─────────────────────────────────────────────────────────────
     function requestUpscale(scale) {
       if (model.generating || !model.result || !model.result.outputUrl) return;
+      if (!ensureLiveResult()) return;
       showNotice('', 'success');
       startGeneratingUi();
       els.overlayText.textContent = tt('upscalePrep');
@@ -1240,6 +1397,7 @@
         none.value = ''; none.textContent = '—';
         els.editMaterialSelect.appendChild(none);
         model.modelMaterials.forEach(function (m) {
+          if (m.unsupported) return; // .tif/.bmp/.psd não viram amostra
           var opt = document.createElement('option');
           opt.value = m.name; opt.textContent = m.displayName || m.name;
           els.editMaterialSelect.appendChild(opt);
@@ -1254,7 +1412,7 @@
       var maskAction = model.editAction === 'remove' || model.editAction === 'refine_area';
       // Remover/refinar COM área marcada dispensam texto (a área diz onde).
       var ready = hasInstruction || (hasMask && maskAction);
-      els.editButton.disabled = model.generating || !model.authenticated || !ready;
+      els.editButton.disabled = model.generating || !model.authenticated || !ready || !!(model.result && model.result._unverified);
       els.editLabel.textContent = model.generating ? tt('editing') : tt('applyEdit');
       els.editMeta.textContent = model.editNodes != null && !model.generating ? model.editNodes + ' ' + tt('nodes') : '';
     }
@@ -1282,6 +1440,7 @@
     });
     els.editButton.addEventListener('click', function () {
       if (model.generating || !model.result) return;
+      if (!ensureLiveResult()) return;
       var maskDataUrl = buildMaskDataUrl();
       exitMaskMode();
       showNotice('', 'success');
@@ -1495,14 +1654,34 @@
     }
 
     // ── CTA / saldo ──────────────────────────────────────────────────────────
+    function dockSummaryText() {
+      if (!model.catalog) return '';
+      var seg = currentSegment();
+      var eng = currentEngine();
+      var res = currentResolution();
+      var parts = [];
+      if (model.segment) parts.push(model.segment);
+      if (model.environment) parts.push(model.environment);
+      if (model.lighting && model.lighting !== 'Preservar Original') parts.push(model.lighting);
+      if (eng) parts.push(eng.name + (res ? ' ' + res.label : ''));
+      return parts.join(' · ');
+    }
     function updateGenerateState() {
       var cost = currentCost();
       var balance = model.totalBalance;
       var insufficient = model.authenticated && cost != null && balance != null && balance < cost;
 
-      els.generateButton.disabled = model.generating || !model.authenticated || !model.catalog || cost == null || insufficient;
-      els.generateLabel.textContent = model.generating ? tt('generating') : (model.result ? tt('generateVariation') : tt('generateRender'));
+      var canGenerate = !(model.generating || !model.authenticated || !model.catalog || cost == null || insufficient);
+      els.generateButton.disabled = !canGenerate;
+      // O CTA principal SEMPRE gera do zero. A variação (ancorada no render
+      // anterior) é um pedido explícito — antes virava o default depois do
+      // 1º render e prendia toda geração seguinte à atmosfera/seed de outra cena.
+      els.generateLabel.textContent = model.generating ? tt('generating') : tt('generateRender');
       els.generateMeta.textContent = model.generating || cost == null ? '' : cost + ' ' + tt('nodes');
+      els.generateKbd.style.display = model.generating ? 'none' : '';
+      els.variationButton.disabled = !canGenerate || !model.result || !model.result.outputUrl || !!model.result._unverified;
+      els.variationButton.style.display = model.result && model.result.camera ? '' : 'none';
+      els.dockSummary.textContent = dockSummaryText();
 
       if (balance != null && cost) {
         var reach = Math.floor(balance / cost);
@@ -1544,12 +1723,13 @@
       els.captureButton.disabled = model.generating;
       els.connectButton.disabled = model.generating;
       els.disconnectButton.disabled = model.generating;
-      els.downloadButton.disabled = model.generating;
-      els.openResultButton.disabled = model.generating;
+      var unverified = !!(model.result && model.result._unverified);
+      els.downloadButton.disabled = model.generating || unverified;
+      els.openResultButton.disabled = model.generating || unverified;
       els.compareButton.disabled = model.generating;
       els.restoreCameraButton.disabled = model.generating;
-      els.upscale2xButton.disabled = model.generating;
-      els.upscale4xButton.disabled = model.generating;
+      els.upscale2xButton.disabled = model.generating || unverified;
+      els.upscale4xButton.disabled = model.generating || unverified;
       els.maskToggle.disabled = model.generating;
       els.maskClear.disabled = model.generating;
       updateBatchButton();
@@ -1586,6 +1766,7 @@
     }
     function showResult(result) {
       model.result = result;
+      if (!result._unverified) setResultActionsEnabled(true);
       els.resultImage.src = result.previewUrl || result.outputUrl;
       els.resultImage.classList.add('is-visible');
       els.captureImage.classList.remove('is-visible');
@@ -1666,7 +1847,7 @@
       els.notice.innerHTML = '';
       els.notice.className = 'notice';
       if (!message) return;
-      els.notice.classList.add(kind === 'success' ? 'is-success' : 'is-error');
+      els.notice.classList.add(kind === 'success' ? 'is-success' : (kind === 'warn' ? 'is-warn' : 'is-error'));
       els.notice.appendChild(document.createTextNode(message));
       if (action) {
         var wrap = document.createElement('div');
@@ -1682,6 +1863,24 @@
 
     // lastResult pode vir do atributo de um .skp de terceiros — só URLs
     // http(s) entram no preview/ações.
+    // O que a captura NÃO conseguiu mandar — o usuário paga o máximo e
+    // precisa saber quando recebeu o caminho degradado.
+    function conditioningNotes(p) {
+      var notes = [];
+      if (p.anchorDropped) notes.push(tt('anchorDropped'));
+      var c = p.conditioning;
+      if (!c) return notes;
+      if (c.edgeRequested && !c.edgeMap) notes.push(tt('condNoEdge'));
+      if (c.materialsRequested > c.materialsSent) {
+        var reasons = tt('matReason') || {};
+        var names = (c.skipped || []).map(function (s) {
+          return s.name + (reasons[s.reason] ? ' (' + reasons[s.reason] + ')' : '');
+        }).join(', ');
+        notes.push(tt('condMaterials', c.materialsSent, c.materialsRequested, names));
+      }
+      if (c.sunRequested && !c.sunApplied) notes.push(tt('condNoSun'));
+      return notes;
+    }
     function isSafeResult(r) {
       var u = r && (r.outputUrl || r.previewUrl);
       return typeof u === 'string' && /^https?:\/\//i.test(u);
@@ -1701,7 +1900,6 @@
           lighting: model.lighting,
           background: model.background,
           sceneElements: model.sceneElements,
-          fidelityLevel: model.fidelityLevel,
           engine: model.engine,
           resolution: model.resolution,
           sunPreset: model.sunPreset,
@@ -1719,7 +1917,6 @@
       if (saved.lighting) model.lighting = saved.lighting;
       if (saved.background) model.background = saved.background;
       if (Array.isArray(saved.sceneElements)) model.sceneElements = saved.sceneElements;
-      if (saved.fidelityLevel) model.fidelityLevel = saved.fidelityLevel;
       if (saved.engine) model.engine = saved.engine;
       if (saved.resolution) model.resolution = saved.resolution;
       if (saved.sunPreset) model.sunPreset = saved.sunPreset;
@@ -1755,12 +1952,14 @@
         showNotice(tt('cancelledLate'), 'error');
       }
     });
-    els.generateButton.addEventListener('click', submitGenerate);
+    els.generateButton.addEventListener('click', function () { submitGenerate(false); });
     document.addEventListener('keydown', function (ev) {
-      if ((ev.ctrlKey || ev.metaKey) && ev.key === 'Enter' && !els.generateButton.disabled) submitGenerate();
+      if ((ev.ctrlKey || ev.metaKey) && ev.key === 'Enter' && !els.generateButton.disabled) submitGenerate(false);
     });
 
-    function submitGenerate() {
+    function submitGenerate(variation) {
+      var asVariation = variation === true && !!model.result && !!model.result.outputUrl;
+      if (asVariation && !ensureLiveResult()) return;
       if (model.generating) return;
       // Bridge primeiro: sem SketchUp por trás, não ligar o overlay (ficaria
       // preso pra sempre — nenhum evento viria destravar).
@@ -1778,19 +1977,68 @@
         lighting: model.lighting,
         background: model.background,
         sceneElements: model.sceneElements,
-        fidelityLevel: model.fidelityLevel,
         engine: model.engine,
         resolution: model.resolution,
         sunPreset: model.sunPreset,
         materialSel: materialSelArray(),
-        useAnchor: !!model.result,
-        anchorUrl: model.result ? (model.result.outputUrl || null) : null,
-        seed: model.result && model.result.seed != null ? model.result.seed : null
+        useAnchor: asVariation,
+        anchorUrl: asVariation ? (model.result.outputUrl || null) : null,
+        anchorCamera: asVariation ? (model.result.camera || null) : null,
+        seed: asVariation && model.result.seed != null ? model.result.seed : null
       }));
     }
+    els.variationButton.addEventListener('click', function () { submitGenerate(true); });
+    els.dockSummary.addEventListener('click', function () {
+      var target = document.getElementById('L_projectType');
+      if (target && target.scrollIntoView) target.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    });
+
+    // ── Resultado vivo: URLs assinadas vencem em 1 h ────────────────────────
+    var RESULT_TTL_MS = 50 * 60 * 1000;
+    function resultIsStale(r) {
+      if (!r) return false;
+      if (!r.signedAt) return false; // resultado de sessão antiga sem carimbo: deixa tentar
+      return Date.now() - r.signedAt * 1000 > RESULT_TTL_MS;
+    }
+    function requestResultRefresh() {
+      // Uma re-assinatura por resultado: se a imagem falhar DE NOVO com o
+      // link novo, o arquivo sumiu — repetir viraria um loop de requests.
+      if (!model.result || !model.result.renderId || model.result._refreshing) return false;
+      if (model.result._refreshed && !resultIsStale(model.result)) return false;
+      model.result._refreshing = true;
+      callSketchUpQuiet('refreshResult', JSON.stringify({ renderId: model.result.renderId }));
+      return true;
+    }
+    // Antes de qualquer ação sobre o resultado (baixar, ampliar, editar,
+    // variação): link vencido com renderId → re-assina e pede pra tentar de
+    // novo; sem renderId (Ampliar/Editar não devolvem id) → diz a verdade.
+    function ensureLiveResult() {
+      if (!model.result) return false;
+      if (model.result._unverified) {
+        if (!requestResultRefresh()) showNotice(tt('resultExpired'), 'warn');
+        else showNotice(tt('resultRefreshing'), 'warn');
+        return false;
+      }
+      if (!resultIsStale(model.result)) return true;
+      if (requestResultRefresh()) showNotice(tt('resultRefreshing'), 'warn');
+      else showNotice(tt('resultExpired'), 'warn');
+      return false;
+    }
+    // Ações sobre o resultado (Baixar/Abrir/Ampliar/Editar/Variação) só com
+    // resultado verificado — o botão de voltar à vista não sai do SketchUp.
+    function setResultActionsEnabled(on) {
+      ['downloadButton', 'openResultButton', 'upscale2xButton', 'upscale4xButton', 'variationButton'].forEach(function (id) {
+        if (els[id]) els[id].disabled = !on;
+      });
+      if (els.editButton) els.editButton.disabled = !on;
+    }
+    els.resultImage.addEventListener('error', function () {
+      if (!model.result || !els.resultImage.getAttribute('src')) return;
+      if (!requestResultRefresh()) showNotice(tt('resultExpired'), 'warn');
+    });
 
     els.downloadButton.addEventListener('click', function () {
-      if (!model.result) return;
+      if (!model.result || !ensureLiveResult()) return;
       callSketchUp('saveResult', JSON.stringify({
         url: model.result.outputUrl,
         suggestedName: 'spacenode-render.png'
@@ -1845,19 +2093,33 @@
       historyLoading = false;
       els.historyMore.disabled = false;
       if (!historyAppend) els.historyGrid.innerHTML = '';
+      var signedAt = Math.floor(Date.now() / 1000);
       renders.forEach(function (r) {
         var url = r.preview_url || r.output_url;
         if (!url) return;
+        if (r.ambient === 'video') return; // /api/renders/list não filtra ambient
         var img = document.createElement('img');
         img.src = url;
         img.alt = 'Render';
         img.loading = 'lazy';
-        img.title = 'Abrir no site';
+        img.title = tt('historyOpen');
         // URLs assinadas expiram (~1h) — thumbnail morto some em vez de
         // virar ícone quebrado.
         img.addEventListener('error', function () { img.remove(); });
+        // Clique traz o render PRO PAINEL (Ampliar/Editar/Baixar/Comparar
+        // funcionam nele); "Abrir no site" continua nas ações do resultado.
         img.addEventListener('click', function () {
-          callSketchUp('openUrl', r.output_url || url);
+          if (model.generating) return;
+          if (!isSafeResult({ outputUrl: r.output_url || url })) return;
+          showNotice('', 'success');
+          showResult({
+            outputUrl: r.output_url || url,
+            previewUrl: r.preview_url || null,
+            renderId: r.id || null,
+            engine: r.engine || null,
+            resolution: r.resolution || null,
+            signedAt: signedAt
+          });
         });
         els.historyGrid.appendChild(img);
       });
@@ -1885,6 +2147,9 @@
           var localeChanged = payload.locale && payload.locale !== model.locale;
           if (payload.locale) model.locale = payload.locale;
           if (payload.localeSetting) model.localeSetting = payload.localeSetting;
+          if (payload.themeSetting) model.themeSetting = payload.themeSetting;
+          if ('accountTheme' in payload) model.accountTheme = payload.accountTheme || null;
+          applyTheme();
           if (localeChanged || !model.localizedOnce) {
             model.localizedOnce = true;
             localizeStatic();
@@ -1904,6 +2169,13 @@
           if (payload.panelState && !model.catalog) restorePanelState(payload.panelState);
           if (!model.result && payload.lastResult && isSafeResult(payload.lastResult)) {
             showResult(payload.lastResult);
+            // Resultado restaurado do .skp: o atributo é controlado por quem
+            // editou o arquivo. Só vira acionável depois que o servidor
+            // re-assina pelo renderId (e confere que o render é desta conta).
+            // Sem renderId (Ampliar/Editar antigos) fica só de visualização.
+            model.result._unverified = true;
+            setResultActionsEnabled(false);
+            requestResultRefresh();
           }
           setFooter('');
           updateGenerateState();
@@ -1934,6 +2206,10 @@
             model.totalBalance = payload.balance.totalBalance;
           }
           if (payload.user && payload.user.email) els.connSub.textContent = payload.user.email;
+          if (payload.theme === 'light' || payload.theme === 'dark' || payload.theme === 'system') {
+            model.accountTheme = payload.theme;
+            applyTheme();
+          }
           model.authenticated = true;
           updateGenerateState();
         }
@@ -1943,11 +2219,10 @@
           if (typeof payload.totalBalance === 'number') model.totalBalance = payload.totalBalance;
           showResult(payload);
           var cost = payload.nodesCharged ? tt('nodesUsed', payload.nodesCharged) : tt('renderDone');
-          if (payload.fidelityWarning) {
-            showNotice(cost + tt('reviewFidelity'), 'error');
-          } else {
-            showNotice(cost, 'success');
-          }
+          var notes = conditioningNotes(payload);
+          var msg = cost + (payload.fidelityWarning ? tt('reviewFidelity') : '');
+          if (notes.length) msg += ' ' + notes.join(' ');
+          showNotice(msg, payload.fidelityWarning ? 'error' : (notes.length ? 'warn' : 'success'));
           setFooter(typeof payload.totalBalance === 'number' ? tt('nodesLeft', payload.totalBalance) : tt('renderDone'));
         }
 
@@ -2113,6 +2388,27 @@
             showNotice(tt('batchOk', ok), 'success');
           }
           updateGenerateState();
+        }
+
+        if (event === 'resultRefreshed') {
+          if (model.result && model.result.renderId === payload.renderId) {
+            model.result._refreshing = false;
+            model.result._refreshed = true;
+            model.result._unverified = false;
+            setResultActionsEnabled(true);
+            model.result.outputUrl = payload.outputUrl || model.result.outputUrl;
+            model.result.previewUrl = payload.previewUrl || model.result.previewUrl;
+            model.result.signedAt = payload.signedAt || Math.floor(Date.now() / 1000);
+            els.resultImage.src = model.result.previewUrl || model.result.outputUrl;
+            if (els.notice.textContent === tt('resultRefreshing')) showNotice('', 'success');
+            updateGenerateState();
+          }
+        }
+        if (event === 'resultRefreshFailed') {
+          if (model.result && model.result.renderId === payload.renderId) {
+            model.result._refreshing = false;
+            showNotice(tt('resultExpired'), 'warn');
+          }
         }
 
         if (event === 'saved') {

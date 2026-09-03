@@ -26,7 +26,7 @@ module SpaceNode
   module SketchUp
     extend self
 
-    VERSION = '0.5.2'
+    VERSION = '0.6.0'
     PREFERENCES_KEY = 'com.spacenode.sketchup'
     DEFAULT_API_BASE_URL = 'https://spacenode.app'
     MIN_SKETCHUP_MAJOR = 21          # Ruby 2.7+; recomendado 2024+
@@ -98,8 +98,30 @@ module SpaceNode
       'DrawDepthQue' => false,
       'DrawLineEnds' => false,
       'DisplayFog' => false,
-      'HideConstructionGeometry' => true
+      'HideConstructionGeometry' => true,
+      # v2 (0.6.0): a IA preserva EXATAMENTE o que vê — e com a fidelidade
+      # sempre máxima, um estilo X-ray, cor por tag, cotas, textos, eixos ou
+      # marca d'água na tela viram "parte do projeto" no render. Tudo isso
+      # fica de fora só durante a captura; chave inexistente na versão é
+      # pulada por apply_rendering_options (leitura nil).
+      'Texture' => true,
+      'ModelTransparency' => false,
+      'DisplayColorByLayer' => false,
+      'DisplayWatermarks' => false,
+      'DisplaySketchAxes' => false,
+      'DisplayInstanceAxes' => false,
+      'DisplayText' => false,
+      'DisplayDims' => false,
+      # Corte preenchido quando o usuário JÁ exibe cortes (não forçamos
+      # DisplaySectionCuts: ligar um corte que ele escondeu mudaria a cena).
+      'SectionCutFilled' => true
     }.freeze
+
+    # RenderMode do SketchUp: 0 wireframe, 1 hidden line, 2 shaded,
+    # 3 shaded with textures, 5 monochrome. A captura fotográfica é a 3 —
+    # wireframe/hidden line/monochrome viram "render de linhas" se forem
+    # pra IA. Aplicado só quando o modo atual for outro inteiro conhecido.
+    PHOTO_RENDER_MODE = 3
 
     # Edge map nativo: hidden-line (RenderMode 1) da MESMA câmera — mapa de
     # arestas geometricamente exato pro condicionamento estrutural do backend.
@@ -354,6 +376,13 @@ module SpaceNode
           emit_error(e.message)
         end
       end
+      dialog.add_action_callback('refreshResult') do |_ctx, raw|
+        begin
+          refresh_result(raw)
+        rescue StandardError => e
+          emit_error(e.message)
+        end
+      end
       dialog.add_action_callback('openUrl') do |_ctx, url|
         open_url(url)
       end
@@ -563,6 +592,7 @@ module SpaceNode
       ::Sketchup.write_default(PREFERENCES_KEY, 'user_email', '')
       ::Sketchup.write_default(PREFERENCES_KEY, 'device_id', '')
       ::Sketchup.write_default(PREFERENCES_KEY, 'device_secret', '')
+      @account_theme = nil
     end
 
     # 401 do servidor: com dispositivo pareado, só o access token cai (a
@@ -591,7 +621,10 @@ module SpaceNode
       return false if access_token.empty?
 
       expires_at = ::Sketchup.read_default(PREFERENCES_KEY, 'expires_at', 0).to_i
-      expires_at > Time.now.to_i + 60
+      # Folga de 10 min (não 60 s): um lote de cenas em 4K ou o wizard do
+      # Space levam mais que isso entre etapas — renovar cedo custa zero
+      # (coalescido) e evita um 401 no meio de um lote pago.
+      expires_at > Time.now.to_i + 600
     end
 
     def access_token
@@ -608,7 +641,7 @@ module SpaceNode
       end
 
       unless device_paired?
-        emit_error(t(:session_expired), true, generation_scope)
+        session_step_failed(t(:session_expired), true, generation_scope)
         return
       end
 
@@ -633,9 +666,16 @@ module SpaceNode
         @refresh_waiters = []
         waiters.each do |cont, scope|
           if ok
-            cont.call
+            # A continuação roda DENTRO do callback HTTP: uma exceção aqui
+            # cairia no rescue genérico do http_request, que não encerra a
+            # geração — overlay "Renovando sessão…" preso pra sempre.
+            begin
+              cont.call
+            rescue StandardError => e
+              session_step_failed(e.message, false, scope)
+            end
           else
-            emit_error(message[:text], message[:auth], scope)
+            session_step_failed(message[:text], message[:auth], scope)
           end
         end
       end
@@ -660,11 +700,29 @@ module SpaceNode
       end
     end
 
+    # Falha de renovação/continuação: dentro de um lote ou do wizard do
+    # Space (scope :batch/:space) o contexto precisa ser ENCERRADO por
+    # fail_generation (restaura a cena, fecha o lote, solta @generating);
+    # fora deles basta o erro visível.
+    def session_step_failed(text, auth, scope)
+      if scope == :batch && @generating
+        # Sem sessão não há como continuar NENHUMA cena: encerra o lote de
+        # uma vez (fail_generation por cena tentaria renovar N vezes e
+        # produziria N erros iguais).
+        finalize_batch(text, auth)
+      elsif scope == :space && @generating
+        fail_generation(text, auth)
+      else
+        emit_error(text, auth, scope ? true : false)
+      end
+    end
+
     def check_session
       return unless authenticated?
 
       json_request(:get, '/api/sketchup/session', nil, method(:emit_api_error)) do |data|
         @balance = data['balance']
+        @account_theme = %w[light dark system].include?(data['theme']) ? data['theme'] : nil
         emit('session', data)
         send_state
       end
@@ -992,7 +1050,12 @@ module SpaceNode
 
             display = material.display_name.to_s
             display = material.name.to_s if display.empty?
-            materials << { :name => material.name.to_s, :displayName => display }
+            ext, _mime = texture_export_format(material)
+            entry = { :name => material.name.to_s, :displayName => display }
+            # Textura .tif/.bmp/.psd… não sai como jpg/png — o painel mostra
+            # desabilitado em vez de deixar o usuário escolher e não receber.
+            entry[:unsupported] = true unless ext
+            materials << entry
             break if materials.length >= 40
           end
         rescue StandardError
@@ -1069,11 +1132,21 @@ module SpaceNode
       edge_path = nil
 
       rendering = model.rendering_options
+      sun_preset = opts[:sun_preset].to_s
+      sun_requested = !sun_preset.empty? && sun_preset != 'atual'
       sun_saved = apply_sun_override(model, opts[:sun_preset])
       # Higiene salva/restaurada MANUALMENTE — RenderingOptions não são
       # registradas em operações (abort_operation não as reverte; só viraram
       # undoáveis no SketchUp 2026, e apenas no nível de Page).
-      clean_saved = apply_rendering_options(rendering, CLEAN_CAPTURE_OPTIONS)
+      clean = CLEAN_CAPTURE_OPTIONS.dup
+      begin
+        mode = rendering['RenderMode']
+        clean['RenderMode'] = PHOTO_RENDER_MODE if mode.is_a?(Integer) && mode != PHOTO_RENDER_MODE && [0, 1, 2, 5].include?(mode)
+      rescue StandardError
+        nil
+      end
+      clean_saved = apply_rendering_options(rendering, clean)
+      edge_reason = opts[:edge_map] ? 'write_failed' : 'not_requested'
 
       begin
         options = {
@@ -1155,9 +1228,18 @@ module SpaceNode
             }
             edge_options[:scale_factor] = scale if scale > 1.0
             view.write_image(edge_options)
-            edge_path = candidate if File.exist?(candidate) && File.size(candidate) <= 14_000_000
+            if File.exist?(candidate)
+              if File.size(candidate) <= 14_000_000
+                edge_path = candidate
+                edge_reason = nil
+              else
+                edge_reason = 'too_large'
+                delete_quiet(candidate)
+              end
+            end
           rescue StandardError
             edge_path = nil
+            edge_reason = 'write_failed'
           ensure
             restore_rendering_options(rendering, edge_saved)
             if edge_shadow_prev
@@ -1177,7 +1259,14 @@ module SpaceNode
       @last_capture_size = [width, height]
       @last_capture_mime = path.end_with?('.jpg') ? 'image/jpeg' : 'image/png'
       @last_capture_camera = snapshot_camera(view)
-      { :path => path, :edge_path => edge_path, :facts => facts }
+      {
+        :path => path, :edge_path => edge_path, :facts => facts,
+        # Relatório honesto do que a captura conseguiu — vai pro painel no
+        # resultado (o usuário paga o máximo e precisa saber se recebeu).
+        :edge_reason => edge_reason,
+        :sun_requested => sun_requested,
+        :sun_applied => sun_requested && !sun_saved.nil?
+      }
     end
 
     def thumbnail_data_url(path)
@@ -1350,7 +1439,9 @@ module SpaceNode
       # Âncora não se aplica a lote: cada cena é geometria própria; a
       # coerência do conjunto vem do seed compartilhado + mesmos presets.
       payload['useAnchor'] = false
-      execute_generation(payload, :scene_name => ctx[:current_scene])
+      # Sessão conferida a CADA cena — o token dura ~1 h e um lote 4K passa
+      # disso; a renovação é coalescida e só dispara quando faltam <10 min.
+      ensure_fresh_session(:batch) { execute_generation(payload, :scene_name => ctx[:current_scene]) }
     rescue StandardError => e
       fail_generation(e.message)
     end
@@ -1369,8 +1460,10 @@ module SpaceNode
 
       emit('status', { :stage => 'capture', :message => t(:capturing) })
       resolution = payload['resolution'].to_s
-      fidelity = payload['fidelityLevel'].to_s
-      want_edge = fidelity != 'balanced' && fidelity != 'creative' && !payload['useAnchor']
+      # Edge map nativo sempre que não há âncora (em variação o render
+      # anterior já é a estrutura). Não depende mais de nível de fidelidade:
+      # o seletor foi descontinuado e a fidelidade é sempre máxima.
+      want_edge = !payload['useAnchor']
 
       capture = capture_viewport(
         resolution,
@@ -1383,18 +1476,37 @@ module SpaceNode
       facts = capture[:facts]
       camera = @last_capture_camera
       mime = @last_capture_mime || 'image/png'
+      conditioning = {
+        :edgeRequested => want_edge,
+        :edgeMap => false,
+        :edgeReason => capture[:edge_reason],
+        :sunRequested => capture[:sun_requested] ? true : false,
+        :sunApplied => capture[:sun_applied] ? true : false,
+        :materialsRequested => 0,
+        :materialsSent => 0,
+        :skipped => []
+      }
 
       emit('status', { :stage => 'upload', :message => t(:sending) })
       upload_direct(capture[:path], mime, 'render-source', false, epoch) do |source_key, _url|
         delete_quiet(capture[:path])
         upload_edge_map(capture[:edge_path], epoch) do |edge_key|
-          upload_materials(payload, epoch) do |material_refs|
+          conditioning[:edgeMap] = !edge_key.nil?
+          conditioning[:edgeReason] = 'upload_failed' if want_edge && capture[:edge_path] && edge_key.nil?
+          conditioning[:edgeReason] = nil if edge_key
+          upload_materials(payload, epoch) do |material_refs, report|
+            if report.is_a?(Hash)
+              conditioning[:materialsRequested] = report[:requested].to_i
+              conditioning[:materialsSent] = report[:sent].to_i
+              conditioning[:skipped] = report[:skipped] || []
+            end
             request_generation(source_key, payload,
                                :edge_key => edge_key,
                                :facts => facts,
                                :camera => camera,
                                :material_refs => material_refs,
-                               :scene_name => opts[:scene_name])
+                               :scene_name => opts[:scene_name],
+                               :conditioning => conditioning)
           end
         end
       end
@@ -1419,8 +1531,9 @@ module SpaceNode
     # Cada falha individual é pulada — materiais nunca derrubam a geração.
     def upload_materials(payload, epoch, &done)
       selection = payload['materialSel'].is_a?(Array) ? payload['materialSel'].first(4) : []
+      report = { :requested => 0, :sent => 0, :skipped => [] }
       if selection.empty?
-        done.call([])
+        done.call([], report)
         return
       end
 
@@ -1433,22 +1546,31 @@ module SpaceNode
         field = item['field'].to_s
         next if name.empty? || field.empty?
 
+        report[:requested] += 1
         exported = export_material_texture(model, name)
-        next unless exported
+        if exported[:error]
+          report[:skipped] << { :name => name, :reason => exported[:error] }
+          next
+        end
 
-        jobs << { :path => exported[:path], :field => field, :mime => exported[:mime] }
+        jobs << { :path => exported[:path], :field => field, :mime => exported[:mime], :name => name }
       end
 
       results = []
       step = nil
       step = proc do
         if jobs.empty?
-          done.call(results)
+          done.call(results, report)
         else
           job = jobs.shift
           upload_direct(job[:path], job[:mime] || 'image/png', 'render-material', true, epoch, :optional => true) do |_key, url|
             delete_quiet(job[:path])
-            results << { :field => job[:field], :url => url } if url && !url.empty?
+            if url && !url.empty?
+              results << { :field => job[:field], :url => url }
+              report[:sent] += 1
+            else
+              report[:skipped] << { :name => job[:name], :reason => 'upload_failed' }
+            end
             step.call
           end
         end
@@ -1539,6 +1661,8 @@ module SpaceNode
     # formato pela extensão — preserva os bytes de origem; extensão+mime saem
     # do arquivo original e formatos fora de jpg/png são pulados (as áreas
     # de upload só aceitam jpeg/png/webp). Devolve { :path, :mime } ou nil.
+    # Devolve { :path, :mime } ou { :error => motivo } — o motivo vai pro
+    # relatório de condicionamento do resultado (nunca silencia).
     def export_material_texture(model, name)
       material = nil
       begin
@@ -1546,20 +1670,10 @@ module SpaceNode
       rescue StandardError
         material = nil
       end
-      return nil unless material && material.texture
+      return { :error => 'not_found' } unless material && material.texture
 
-      source_ext = ''
-      begin
-        source_ext = File.extname(material.texture.filename.to_s).downcase
-      rescue StandardError
-        source_ext = ''
-      end
-      ext, mime =
-        case source_ext
-        when '.jpg', '.jpeg' then ['.jpg', 'image/jpeg']
-        when '.png', ''      then ['.png', 'image/png']
-        end
-      return nil unless ext
+      ext, mime = texture_export_format(material)
+      return { :error => 'unsupported_format' } unless ext
 
       tmp = File.join(Dir.tmpdir, "spacenode-mat-#{SecureRandom.hex(4)}#{ext}")
       written = false
@@ -1577,13 +1691,29 @@ module SpaceNode
           written = false
         end
       end
-      return nil unless written && File.exist?(tmp)
+      return { :error => 'export_failed' } unless written && File.exist?(tmp)
       if File.size(tmp) > 7_800_000
         delete_quiet(tmp)
-        return nil
+        return { :error => 'too_large' }
       end
 
       { :path => tmp, :mime => mime }
+    end
+
+    # Texture#write não converte formato: só jpg/png saem como estão. Sem
+    # extensão (textura embutida) o SketchUp grava PNG.
+    def texture_export_format(material)
+      source_ext = ''
+      begin
+        source_ext = File.extname(material.texture.filename.to_s).downcase
+      rescue StandardError
+        source_ext = ''
+      end
+      case source_ext
+      when '.jpg', '.jpeg' then ['.jpg', 'image/jpeg']
+      when '.png', ''      then ['.png', 'image/png']
+      else [nil, nil]
+      end
     end
 
     # ── Dimensões de imagem (PNG IHDR / JPEG SOF) ───────────────────────────
@@ -1631,6 +1761,7 @@ module SpaceNode
 
       emit('status', { :stage => 'generate', :message => t(:generating) })
 
+      extras = extras.merge(:anchor_dropped => true) if @anchor_dropped
       request = json_request(:post, '/api/generate', body, generation_error_handler_for(epoch)) do |data|
         finish_generation(data, extras) if generation_alive?(epoch)
       end
@@ -1659,7 +1790,9 @@ module SpaceNode
         :lighting => payload['lighting'].to_s,
         :background => payload['background'].to_s.empty? ? 'Preservar Original' : payload['background'].to_s,
         :sceneElements => Array(payload['sceneElements']).map(&:to_s),
-        :fidelityLevel => %w[maximum balanced creative].include?(payload['fidelityLevel']) ? payload['fidelityLevel'] : 'maximum',
+        # Sempre máxima — "Equilibrado"/"Criativo" foram descontinuados
+        # (deixavam a IA alucinar no projeto). O servidor também coage.
+        :fidelityLevel => 'maximum',
         :engine => payload['engine'].to_s,
         :resolution => payload['resolution'].to_s
       }
@@ -1671,17 +1804,57 @@ module SpaceNode
       # refino passa a ser cirúrgico (contrato do /api/generate). O painel
       # manda a URL explícita — @last_result é só fallback e não existe após
       # reiniciar o SketchUp (o resultado restaurado do .skp fica só no JS).
+      #
+      # Desde a 0.6.0 a âncora é PEDIDA (botão "Variação deste render"), não
+      # automática — e só vale se a câmera ainda é a do render ancorado: com
+      # a vista em outro cômodo, ancorar preservaria materiais/atmosfera de
+      # uma cena que não é esta. Divergiu → gera sem âncora e avisa.
+      @anchor_dropped = false
       if payload['useAnchor']
         anchor = payload['anchorUrl'].to_s
         anchor = @last_result && @last_result[:outputUrl].to_s if anchor.empty?
+        anchor_camera = payload['anchorCamera'].is_a?(Hash) ? payload['anchorCamera'] : (@last_result && @last_result[:camera])
         if anchor && anchor =~ %r{\Ahttps?://}
-          body[:anchorUrl] = anchor
+          # Sem câmera de um dos lados não há como garantir que é a mesma
+          # vista — fail-safe é NÃO ancorar (o painel nem oferece a variação
+          # pra resultado sem câmera; isto cobre payload antigo/forjado).
+          if !anchor_camera || !@last_capture_camera || camera_moved?(anchor_camera, @last_capture_camera)
+            @anchor_dropped = true
+          else
+            body[:anchorUrl] = anchor
+          end
         end
       end
       seed = payload['seed']
-      body[:seed] = seed.to_i if seed.is_a?(Numeric) || seed.to_s =~ /\A\d+\z/
+      body[:seed] = seed.to_i if (seed.is_a?(Numeric) || seed.to_s =~ /\A\d+\z/) && !@anchor_dropped
 
       body
+    end
+
+    # A câmera "mudou" quando olho ou alvo andaram mais de 2% da distância
+    # olho→alvo, o FOV mudou mais de meio grau, ou trocou perspectiva ↔
+    # paralela. Tolerante a chaves string (JSON do painel) e símbolo (Ruby).
+    def camera_moved?(a, b)
+      get = proc { |h, k| h[k] || h[k.to_s] || h[k.to_sym] }
+      ea = get.call(a, :eye); ta = get.call(a, :target)
+      eb = get.call(b, :eye); tb = get.call(b, :target)
+      return true unless [ea, ta, eb, tb].all? { |v| v.is_a?(Array) && v.length == 3 }
+
+      dist = proc { |p, q| Math.sqrt((0..2).map { |i| (p[i].to_f - q[i].to_f)**2 }.sum) }
+      radius = dist.call(ea, ta)
+      radius = 1.0 if radius < 1.0
+      moved = dist.call(ea, eb) + dist.call(ta, tb)
+      return true if moved > radius * 0.02
+
+      pa = get.call(a, :perspective); pb = get.call(b, :perspective)
+      return true if !pa.nil? && !pb.nil? && (pa ? true : false) != (pb ? true : false)
+
+      fa = get.call(a, :fov); fb = get.call(b, :fov)
+      return true if fa.is_a?(Numeric) && fb.is_a?(Numeric) && (fa - fb).abs > 0.5
+
+      false
+    rescue StandardError
+      true
     end
 
     def generation_error_handler_for(epoch)
@@ -1731,6 +1904,11 @@ module SpaceNode
       }
       result[:camera] = extras[:camera] if extras[:camera]
       result[:sceneName] = extras[:scene_name] if extras[:scene_name]
+      result[:conditioning] = extras[:conditioning] if extras[:conditioning]
+      result[:anchorDropped] = true if extras[:anchor_dropped]
+      # URLs assinadas duram 1 h (lib/storage/signed.ts): o painel usa isto
+      # pra saber quando re-assinar por renderId em vez de mostrar imagem morta.
+      result[:signedAt] = Time.now.to_i
 
       @last_result = result
       @balance = { 'totalBalance' => data['totalBalance'] } if data['totalBalance']
@@ -1944,6 +2122,61 @@ module SpaceNode
       json_request(:get, path, nil, method(:emit_api_error)) do |data|
         emit('history', data)
       end
+    end
+
+    # URLs assinadas vencem em 1 h. Um resultado restaurado do .skp (ou um
+    # painel aberto há mais de uma hora) mostraria imagem morta com
+    # Baixar/Ampliar/Editar vivos — GET /api/sketchup/render re-assina pelo
+    # renderId e o painel troca as URLs em silêncio (evento resultRefreshed).
+    RENDER_ID_RE = /\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/i
+
+    def refresh_result(raw)
+      payload = parse_json(raw)
+      render_id = payload['renderId'].to_s
+      return unless render_id =~ RENDER_ID_RE
+      return unless authenticated?
+
+      on_fail = proc do |_error|
+        emit('resultRefreshFailed', { :renderId => render_id })
+      end
+      json_request(:get, "/api/sketchup/render?id=#{URI.encode_www_form_component(render_id)}", nil, on_fail) do |data|
+        fresh = {
+          :renderId => render_id,
+          :outputUrl => data['outputUrl'],
+          :previewUrl => data['previewUrl'],
+          :signedAt => Time.now.to_i
+        }
+        if fresh[:outputUrl].to_s.empty?
+          on_fail.call(nil)
+        else
+          if @last_result && @last_result[:renderId].to_s == render_id
+            @last_result = @last_result.merge(fresh)
+            persist_last_result(@last_result)
+          else
+            merge_persisted_result(render_id, fresh)
+          end
+          emit('resultRefreshed', fresh)
+        end
+      end
+    end
+
+    # Atualiza as URLs do last_result gravado no .skp quando o Ruby já não
+    # tem @last_result (SketchUp reaberto) — sem isso a próxima abertura
+    # voltaria a mostrar a URL vencida.
+    def merge_persisted_result(render_id, fresh)
+      model = ::Sketchup.active_model
+      return unless model
+
+      stored = model.get_attribute('spacenode', 'last_result', nil)
+      return unless stored.is_a?(String) && !stored.empty?
+
+      current = JSON.parse(stored)
+      return unless current.is_a?(Hash) && current['renderId'].to_s == render_id
+
+      fresh.each { |k, v| current[k.to_s] = v }
+      persist_last_result(current)
+    rescue StandardError
+      nil
     end
 
     def save_result_to_disk(raw)
@@ -2304,7 +2537,9 @@ module SpaceNode
       end
 
       exported = export_material_texture(::Sketchup.active_model, reference_name)
-      unless exported
+      # Contrato novo: sempre Hash — { :path, :mime } ou { :error }. Testar
+      # só a verdade do Hash mandava path nil pro upload e prendia @generating.
+      if exported[:error]
         done.call(nil)
         return
       end
@@ -2485,6 +2720,14 @@ module SpaceNode
     end
 
     def space_upload_master(space_id, quality, scenes, engine, epoch)
+      ensure_fresh_session(:space) { space_upload_master_now(space_id, quality, scenes, engine, epoch) }
+    end
+
+    def space_upload_master_now(space_id, quality, scenes, engine, epoch)
+      # A renovação de sessão é assíncrona: um Cancelar nesse intervalo não
+      # pode deixar a etapa seguir (e cobrar) depois.
+      return unless generation_alive?(epoch)
+
       space_progress(2, 'Enviando a vista mestre…')
       # capture/File podem levantar dentro de callback HTTP — sem este rescue
       # o @generating ficaria preso (o rescue genérico do http_request não
@@ -2529,6 +2772,12 @@ module SpaceNode
     end
 
     def space_extract_dna(space_id, quality, scenes, engine, epoch)
+      ensure_fresh_session(:space) { space_extract_dna_now(space_id, quality, scenes, engine, epoch) }
+    end
+
+    def space_extract_dna_now(space_id, quality, scenes, engine, epoch)
+      return unless generation_alive?(epoch)
+
       space_progress(3, 'Extraindo o DNA do projeto…')
       json_request(:post, "/api/spaces/#{space_id}/extract-dna", {}, direct_error_handler_for(epoch, 'A conexão caiu na extração do DNA — os 8 Nodes podem ter sido usados. Confira o Space no site antes de repetir.')) do |_data|
         next unless generation_alive?(epoch)
@@ -2617,6 +2866,14 @@ module SpaceNode
         finish_space(space_id)
         return
       end
+      # Cada bloco de vistas pode levar minutos — renova antes se preciso.
+      ensure_fresh_session(:space) { space_generate_chunk_now(space_id, quality, epoch, chunks, done_count, total) }
+    end
+
+    def space_generate_chunk_now(space_id, quality, epoch, chunks, done_count, total)
+      return unless generation_alive?(epoch)
+
+      ctx = @generation_context
 
       chunk = chunks.shift
       space_progress(6, "Gerando vistas (#{done_count + chunk.length} de #{total})…")
@@ -2677,15 +2934,28 @@ module SpaceNode
         ::Sketchup.write_default(PREFERENCES_KEY, 'locale', requested_locale)
       end
 
-      next_url = normalize_api_base_url(payload['apiBaseUrl'].to_s)
-      current_url = api_base_url
+      # Tema do painel: 'auto' resolve no JS (escolha local → preferência da
+      # conta → tema do SO → escuro); 'light'/'dark' são override manual,
+      # mesmo padrão do override de idioma acima.
+      requested_theme = payload['theme'].to_s
+      if %w[auto light dark].include?(requested_theme)
+        ::Sketchup.write_default(PREFERENCES_KEY, 'theme', requested_theme)
+      end
 
-      ::Sketchup.write_default(PREFERENCES_KEY, 'api_base_url', next_url)
-      if next_url != current_url
-        clear_session
-        @catalog = nil
-        @balance = nil
-        ::Sketchup.write_default(PREFERENCES_KEY, 'catalog_json', '')
+      # Só mexe no servidor quando o painel manda a chave — trocar tema ou
+      # idioma não pode gravar um campo de URL meio digitado e derrubar a
+      # sessão (trocar de servidor limpa a sessão de propósito).
+      if payload.key?('apiBaseUrl')
+        next_url = normalize_api_base_url(payload['apiBaseUrl'].to_s)
+        current_url = api_base_url
+
+        ::Sketchup.write_default(PREFERENCES_KEY, 'api_base_url', next_url)
+        if next_url != current_url
+          clear_session
+          @catalog = nil
+          @balance = nil
+          ::Sketchup.write_default(PREFERENCES_KEY, 'catalog_json', '')
+        end
       end
       send_state
     end
@@ -2742,6 +3012,8 @@ module SpaceNode
         :devicePaired => device_paired?,
         :locale => locale,
         :localeSetting => ::Sketchup.read_default(PREFERENCES_KEY, 'locale', 'auto').to_s,
+        :themeSetting => ::Sketchup.read_default(PREFERENCES_KEY, 'theme', 'auto').to_s,
+        :accountTheme => @account_theme,
         :userEmail => ::Sketchup.read_default(PREFERENCES_KEY, 'user_email', '').to_s,
         :version => VERSION,
         :balance => @balance,

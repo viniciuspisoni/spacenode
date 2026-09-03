@@ -25,6 +25,33 @@ O que só um plugin dentro do modelo consegue:
 - **Voltar à vista** — cada render guarda a câmera; um clique restaura o
   enquadramento exato no SketchUp.
 
+## O que mudou na 0.6.0
+
+- **Fidelidade sempre máxima** — o seletor Máxima/Equilibrado/Criativo saiu
+  (web e plugin); o servidor coage. Edge map nativo vai em toda cena sem
+  âncora.
+- **Tema claro / escuro / automático** (ver seção Tema).
+- **Âncora explícita** — o CTA principal sempre gera do zero; "Gerar
+  variação deste render" é botão próprio e só ancora se a câmera ainda é a
+  do render (2% da distância olho→alvo, 0,5° de FOV); divergiu, gera sem
+  âncora e avisa.
+- **Dock** — o botão Gerar vive numa barra fixa acima do rodapé, com resumo
+  clicável da configuração, custo, saldo e a tecla de atalho (Ctrl+Enter /
+  ⌘⏎).
+- **Higiene de captura v2** — X-ray, cor por tag, cotas, textos, eixos,
+  marca d'água e wireframe/monocromático ficam de fora só durante a captura
+  (`RenderMode` texturizado). Cortes NÃO são ligados à força; só o
+  preenchimento.
+- **Degradação visível** — edge map, materiais e preset de sol que falham
+  aparecem no resultado (`conditioning`), com o motivo por material;
+  texturas fora de jpg/png nascem desabilitadas na lista.
+- **Sessão por etapa** — folga de 10 min e renovação antes de cada cena do
+  lote e de cada etapa do Space; falha de renovação dentro de lote/Space
+  encerra o contexto (nunca mais overlay preso).
+- **Resultado vivo** — URLs assinadas vencem em 1 h; o painel re-assina por
+  `renderId` (`GET /api/sketchup/render`) ao restaurar, no erro da imagem
+  e antes de qualquer ação; miniatura do Histórico traz o render pro painel.
+
 ## Arquitetura
 
 - `spacenode.rb` — só registra a extensão (requisito do Extension Warehouse).
@@ -59,6 +86,29 @@ Rotas web do plugin:
 - O payload da conexão só é aceito se ecoar o nonce gerado pelo Ruby.
 - `expiresAt` ausente conta como sessão vencida (nunca "válida pra sempre").
 - API base aceita apenas HTTPS (HTTP só em localhost).
+
+## Tema (claro / escuro / automático)
+
+O painel tem os mesmos dois temas do app web. Os tokens de `dialog.html` são
+espelho EXATO de `app/globals.css` (`:root` = dark, `html.light` = claro) —
+se um valor mudar no app, mudar aqui junto. Resolução do "Automático", na
+mesma ordem do app quando o device é novo:
+
+1. escolha local no painel (`Sketchup.write_default(PREFERENCES_KEY, 'theme')`,
+   mesmo padrão do override de idioma);
+2. preferência da conta (`profiles.theme_preference`, entregue por
+   `GET /api/sketchup/session` como `theme`);
+3. tema do sistema operacional (`prefers-color-scheme` no CEF);
+4. escuro.
+
+Anti-flash: o último tema resolvido fica em `localStorage('spn-theme')` e um
+script inline no `<head>` aplica `html.light` antes do primeiro paint; o
+estado do Ruby chega depois do `ready` e corrige se preciso.
+
+Cores que NÃO seguem o tema, de propósito: véus sobre imagem (`--scrim`,
+`--scrim-strong` e os textos do overlay de geração), o pincel verde da
+máscara sobre o render, e o preto/branco do canvas que vira o PNG da máscara
+enviado ao servidor.
 
 ## Compatibilidade
 
@@ -97,8 +147,10 @@ require 'spacenode/main'
 ## Contrato enviado para geração
 
 O painel envia pro Ruby: `prompt`, `projectType`, `segment`, `environment`,
-`lighting`, `background`, `sceneElements[]`, `fidelityLevel`, `engine`,
-`resolution`, `useAnchor`, `seed`. O Ruby captura a vista (PNG, lado maior
+`lighting`, `background`, `sceneElements[]`, `engine`, `resolution`,
+`useAnchor`, `seed`. `fidelityLevel` é sempre `maximum` (o Ruby fixa e o
+servidor coage — o seletor Máxima/Equilibrado/Criativo foi descontinuado em
+2026-09-03 porque os níveis relaxados deixavam a IA alucinar no projeto). O Ruby captura a vista (PNG, lado maior
 2048–4096 px conforme a resolução), sobe via `sourceKey` e monta o corpo do
 `/api/generate`. Em variações (`useAnchor`), o render anterior vai como
 `anchorUrl`. `geometryLock`/`fidelityMode` não são enviados (são no-ops na
