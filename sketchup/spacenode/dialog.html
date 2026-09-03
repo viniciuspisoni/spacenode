@@ -42,6 +42,52 @@
       --warning: #d4a327;
       --shadow-sm: 0 2px 8px rgba(0,0,0,0.22);
       --shadow-md: 0 8px 24px rgba(0,0,0,0.32);
+      /* Tokens que o painel usava como cor fixa e viravam bloco preto no claro */
+      --text-4: #3a3a3c;                    /* --color-text-quaternary */
+      --preview-bg: #101010;                /* --color-preview-bg */
+      --scrollbar: rgba(255,255,255,0.14);  /* --color-scrollbar */
+      --chip-active-fg-dim: rgba(10,10,10,0.6); /* subtítulo sobre chip ativo */
+      /* Constantes entre temas: véus sobre imagem (regra do design system —
+         scrim é sempre escuro porque a imagem embaixo não segue o tema). */
+      --scrim: rgba(0,0,0,0.55);
+      --scrim-strong: rgba(10,10,10,0.72);
+    }
+    /* Tema claro — espelho EXATO de html.light em app/globals.css. Não
+       inventar valores: se o app mudar, mudar aqui junto. */
+    html.light {
+      color-scheme: light;
+      --bg: #fafafa;
+      --bg-elevated: #ffffff;
+      --surface: #f5f5f7;
+      --surface-hover: #e8e8ed;
+      --surface-subtle: rgba(0,0,0,0.02);
+      --text: #1a1a1a;
+      --text-2: #424245;
+      --text-3: #86868b;
+      --border: rgba(0,0,0,0.07);
+      --border-strong: rgba(0,0,0,0.15);
+      --border-focus: rgba(0,0,0,0.32);
+      --input: #ffffff;
+      --chip: rgba(0,0,0,0.05);
+      --chip-hover: rgba(0,0,0,0.08);
+      --chip-active: #1a1a1a;
+      --chip-active-fg: #fafafa;
+      --inverse: #1a1a1a;
+      --inverse-fg: #fafafa;
+      --green: #30b46c;
+      --green-bg: rgba(48,180,108,0.09);
+      --green-border: rgba(48,180,108,0.22);
+      --green-glow: rgba(48,180,108,0.45);
+      --error: #c0392b;
+      --error-bg: rgba(192,57,43,0.08);
+      --error-border: rgba(192,57,43,0.20);
+      --warning: #b8860b;
+      --shadow-sm: 0 2px 8px rgba(0,0,0,0.08);
+      --shadow-md: 0 8px 24px rgba(0,0,0,0.10);
+      --text-4: #c7c7cc;
+      --preview-bg: #e9e9e7;
+      --scrollbar: rgba(0,0,0,0.18);
+      --chip-active-fg-dim: rgba(250,250,250,0.65);
     }
     * { box-sizing: border-box; }
     html, body { height: 100%; }
@@ -86,7 +132,7 @@
        estilo via ::-webkit-scrollbar, que cobre todas as versões alvo. */
     main { overflow-y: auto; padding: 14px 16px 20px; }
     main::-webkit-scrollbar { width: 8px; }
-    main::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.14); border-radius: 999px; }
+    main::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 999px; }
     main::-webkit-scrollbar-track { background: transparent; }
 
     /* ── Conexão ── */
@@ -112,7 +158,7 @@
     /* ── Preview ── */
     .preview {
       position: relative; width: 100%; aspect-ratio: 4 / 3;
-      border-radius: 12px; overflow: hidden; background: #101010;
+      border-radius: 12px; overflow: hidden; background: var(--preview-bg);
       border: 0.5px solid var(--border); margin-bottom: 8px;
     }
     .preview img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: none; }
@@ -138,7 +184,7 @@
     .preview.is-comparing .compare-range { display: block; }
     .preview-tag {
       position: absolute; top: 8px; padding: 3px 8px; border-radius: 6px;
-      background: rgba(0,0,0,0.55); color: var(--text-2);
+      background: var(--scrim); color: #f5f5f7; /* sobre imagem: sempre claro no escuro */
       font-size: 9px; font-weight: 600; letter-spacing: 0.17em; text-transform: uppercase;
       display: none; pointer-events: none;
     }
@@ -148,16 +194,17 @@
     .preview-overlay {
       position: absolute; inset: 0; display: none; flex-direction: column;
       align-items: center; justify-content: center; gap: 12px;
-      background: rgba(10,10,10,0.72); backdrop-filter: blur(4px);
+      background: var(--scrim-strong); backdrop-filter: blur(4px);
     }
     .preview-overlay.is-visible { display: flex; }
     .constellation { width: 34px; height: 34px; animation: pulse 2.2s ease-in-out infinite; }
     @keyframes pulse { 0%,100% { opacity: 0.35 } 50% { opacity: 1 } }
     @media (prefers-reduced-motion: reduce) { .constellation { animation: none; } * { transition: none !important; } }
-    .overlay-text { font-size: 12px; color: var(--text-2); }
-    .overlay-elapsed { font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
-    .overlay-cancel { font-size: 11px; color: var(--text-3); text-decoration: underline; text-underline-offset: 2px; }
-    .overlay-cancel:hover { color: var(--text-2); }
+    /* Sobre o véu escuro a cor NÃO segue o tema (senão some no claro). */
+    .overlay-text { font-size: 12px; color: #a1a1a6; }
+    .overlay-elapsed { font-size: 11px; color: #6e6e73; font-variant-numeric: tabular-nums; }
+    .overlay-cancel { font-size: 11px; color: #6e6e73; text-decoration: underline; text-underline-offset: 2px; }
+    .overlay-cancel:hover { color: #a1a1a6; }
 
     .preview-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 2px; }
     .preview-actions .ghost { flex: 1; min-width: 110px; }
@@ -193,7 +240,7 @@
     .card.is-active { background: var(--chip-active); color: var(--chip-active-fg); box-shadow: var(--shadow-sm); }
     .card b { display: block; font-size: 11px; font-weight: 560; }
     .card span { display: block; margin-top: 3px; font-size: 10px; color: var(--text-3); }
-    .card.is-active span { color: rgba(10,10,10,0.6); }
+    .card.is-active span { color: var(--chip-active-fg-dim); }
     .card:disabled { opacity: 0.45; }
 
     textarea {
@@ -265,7 +312,7 @@
     .history-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
     .history-grid img {
       width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px;
-      border: 0.5px solid var(--border); cursor: pointer; display: block; background: #101010;
+      border: 0.5px solid var(--border); cursor: pointer; display: block; background: var(--preview-bg);
     }
     .history-grid img:hover { border-color: var(--border-focus); }
     .history-more { margin-top: 8px; width: 100%; height: 30px; }
@@ -283,8 +330,8 @@
     #maskToggle.is-active { background: var(--chip-active); color: var(--chip-active-fg); border-color: var(--chip-active); }
     .mask-hint {
       position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: 4;
-      text-align: center; font-size: 10px; color: var(--text-2);
-      background: rgba(0,0,0,0.55); border-radius: 6px; padding: 4px 8px;
+      text-align: center; font-size: 10px; color: #f5f5f7;
+      background: var(--scrim); border-radius: 6px; padding: 4px 8px;
       pointer-events: none; display: none;
     }
     .preview.is-masking .mask-hint { display: block; }
@@ -325,16 +372,26 @@
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
   </style>
+  <script>
+    // Anti-flash: aplica o último tema RESOLVIDO antes do primeiro paint.
+    // O estado real chega do Ruby depois do 'ready' e corrige se preciso.
+    // localStorage pode não existir no CEF (file://) — nunca pode quebrar.
+    (function () {
+      try {
+        if (localStorage.getItem('com.spacenode.sketchup.theme') === 'light') document.documentElement.classList.add('light');
+      } catch (e) {}
+    })();
+  </script>
 </head>
 <body>
   <div class="shell">
     <header>
       <div class="brand">
         <svg viewBox="0 0 64 64" aria-hidden="true">
-          <g stroke="#f5f5f7" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none">
+          <g stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none">
             <line x1="16" y1="16" x2="16" y2="48"/><line x1="16" y1="16" x2="48" y2="48"/><line x1="48" y1="16" x2="48" y2="48"/>
           </g>
-          <g fill="#f5f5f7">
+          <g fill="currentColor">
             <circle cx="16" cy="16" r="3"/><circle cx="16" cy="48" r="3"/><circle cx="48" cy="48" r="3"/><circle cx="48" cy="16" r="3"/>
           </g>
         </svg>
@@ -363,7 +420,7 @@
         <div id="pairingCode" style="margin-top:10px;text-align:center;font-size:26px;font-weight:650;letter-spacing:0.22em"></div>
         <div class="alt" style="margin-top:10px">
           <button id="pairingReopen">abrir o navegador de novo</button>
-          <span style="color:#3a3a3c"> · </span>
+          <span style="color:var(--text-4)"> · </span>
           <button id="pairingCancel">cancelar</button>
         </div>
       </div>
@@ -517,11 +574,6 @@
       </details>
 
       <section class="section">
-        <span class="section-label" id="L_fidelity">Fidelidade ao projeto</span>
-        <div class="cards cols-3" id="fidelityCards" role="radiogroup" aria-label="Fidelidade"></div>
-      </section>
-
-      <section class="section">
         <span class="section-label" id="L_engine">Motor de IA</span>
         <div class="cards cols-3" id="engineCards" role="radiogroup" aria-label="Motor"></div>
       </section>
@@ -556,11 +608,14 @@
       </details>
 
       <details id="settingsSection">
-        <summary id="L_settings">Conexão avançada</summary>
+        <summary id="L_settings">Preferências</summary>
         <div class="details-body">
           <div class="settings-field">
+            <label id="L_theme">Tema</label>
+            <div class="pills" id="themePills" role="radiogroup" aria-label="Tema"></div>
+            <div class="hint" id="themeHint" style="margin:6px 0 10px">Automático segue a preferência da sua conta SPACENODE — ou, sem ela, o tema do sistema.</div>
             <label id="L_language">Idioma</label>
-            <div class="pills" id="languagePills" style="margin-bottom:10px"></div>
+            <div class="pills" id="languagePills" role="radiogroup" aria-label="Idioma" style="margin-bottom:10px"></div>
             <label for="apiBaseUrl" id="L_server">Servidor</label>
             <input id="apiBaseUrl" spellcheck="false">
           </div>
@@ -581,6 +636,8 @@
     var model = {
       authenticated: false,
       sessionFresh: false,
+      themeSetting: 'auto',   // auto | light | dark (escolha local, Sketchup.write_default)
+      accountTheme: null,     // preferência da conta (profiles.theme_preference) via /api/sketchup/session
       apiBaseUrl: 'https://spacenode.app',
       catalog: null,
       projectType: 'interior',
@@ -589,6 +646,9 @@
       lighting: null,
       background: null,
       sceneElements: [],
+      // Sempre máxima: o seletor Máxima/Equilibrado/Criativo foi
+      // descontinuado (deixava a IA alucinar no projeto). Não é restaurado
+      // de estado salvo nem exposto na UI — o Ruby e o servidor coagem.
       fidelityLevel: 'maximum',
       engine: null,
       resolution: null,
@@ -635,14 +695,15 @@
         upscale2x: 'Ampliar 2x', upscale4x: 'Ampliar 4x',
         L_projectType: 'Tipo de projeto', L_segment: 'Segmento', L_environment: 'Espaço', L_lighting: 'Iluminação',
         L_sun: 'Sol na captura', L_elements: 'Elementos na cena', L_modelMaterials: 'Materiais do modelo',
-        L_fidelity: 'Fidelidade ao projeto', L_engine: 'Motor de IA', L_resolution: 'Qualidade de saída',
-        L_advanced: 'Avançado', L_history: 'Histórico', L_settings: 'Conexão avançada',
+        L_engine: 'Motor de IA', L_resolution: 'Qualidade de saída',
+        L_advanced: 'Avançado', L_history: 'Histórico', L_settings: 'Preferências',
         L_edit: 'Editar este render', L_space: 'Criar Space das cenas', L_scenes: 'Cenas do modelo',
-        L_language: 'Idioma', L_server: 'Servidor', save: 'Salvar',
+        L_theme: 'Tema', L_language: 'Idioma', L_server: 'Servidor', save: 'Salvar',
         L_description: 'Descrição', optional: '· opcional',
         promptPlaceholder: 'Direções específicas — ex.: piso de madeira clara, paredes off-white, decoração minimalista',
         promptHint: 'O que você não pedir aqui é preservado do jeito que está no modelo.',
         sunHint: 'Usa o sol real do modelo (data, hora e localização) — as sombras da captura guiam a luz do render.',
+        themeHint: 'Automático segue a preferência da sua conta SPACENODE — ou, sem ela, o tema do sistema.',
         matHint: 'Use as texturas reais do seu modelo como referência de material (até 4).',
         matCap: 'Até 4 materiais por geração.',
         nodes: 'nodes', recharge: 'Recarregar',
@@ -700,6 +761,7 @@
         sun: { atual: 'Atual', manha: 'Manhã', meiodia: 'Meio-dia', tarde: 'Entardecer', golden: 'Golden hour' },
         editActions: { swap_material: 'Trocar material', remove: 'Remover', refine_area: 'Refinar área' },
         lang: { auto: 'Auto', pt: 'Português', en: 'English' },
+        theme: { auto: 'Automático', light: 'Claro', dark: 'Escuro' },
         loadingTexts: ['Analisando composição…', 'Ajustando iluminação…', 'Refinando materiais…', 'Aplicando fotorrealismo…', 'Gerando versão final…']
       },
       en: {
@@ -713,14 +775,15 @@
         upscale2x: 'Upscale 2x', upscale4x: 'Upscale 4x',
         L_projectType: 'Project type', L_segment: 'Segment', L_environment: 'Space', L_lighting: 'Lighting',
         L_sun: 'Sun at capture', L_elements: 'Scene elements', L_modelMaterials: 'Model materials',
-        L_fidelity: 'Project fidelity', L_engine: 'AI engine', L_resolution: 'Output quality',
-        L_advanced: 'Advanced', L_history: 'History', L_settings: 'Advanced connection',
+        L_engine: 'AI engine', L_resolution: 'Output quality',
+        L_advanced: 'Advanced', L_history: 'History', L_settings: 'Preferences',
         L_edit: 'Edit this render', L_space: 'Create a Space from scenes', L_scenes: 'Model scenes',
-        L_language: 'Language', L_server: 'Server', save: 'Save',
+        L_theme: 'Theme', L_language: 'Language', L_server: 'Server', save: 'Save',
         L_description: 'Description', optional: '· optional',
         promptPlaceholder: 'Specific directions — e.g. light oak floor, off-white walls, minimal decor',
         promptHint: 'Anything you do not ask for here is preserved exactly as modeled.',
         sunHint: 'Uses the model real sun (date, time and location) — the captured shadows guide the render light.',
+        themeHint: 'Automatic follows your SPACENODE account preference — or, without one, the system theme.',
         matHint: 'Use your model real textures as material references (up to 4).',
         matCap: 'Up to 4 materials per generation.',
         nodes: 'nodes', recharge: 'Top up',
@@ -778,6 +841,7 @@
         sun: { atual: 'Current', manha: 'Morning', meiodia: 'Midday', tarde: 'Late afternoon', golden: 'Golden hour' },
         editActions: { swap_material: 'Swap material', remove: 'Remove', refine_area: 'Refine area' },
         lang: { auto: 'Auto', pt: 'Português', en: 'English' },
+        theme: { auto: 'Automatic', light: 'Light', dark: 'Dark' },
         loadingTexts: ['Analyzing composition…', 'Adjusting lighting…', 'Refining materials…', 'Applying photorealism…', 'Generating final version…']
       }
     };
@@ -802,8 +866,8 @@
     }
     function localizeStatic() {
       ['L_projectType','L_segment','L_environment','L_lighting','L_sun','L_elements','L_modelMaterials',
-       'L_fidelity','L_engine','L_resolution','L_advanced','L_history','L_settings','L_edit','L_space',
-       'L_scenes','L_language','L_server'].forEach(function (id) {
+       'L_engine','L_resolution','L_advanced','L_history','L_settings','L_edit','L_space',
+       'L_scenes','L_theme','L_language','L_server'].forEach(function (id) {
         var el = document.getElementById(id);
         if (el) el.textContent = tt(id);
       });
@@ -824,6 +888,8 @@
       if (promptHint) promptHint.textContent = tt('promptHint');
       var sunHint = document.querySelector('#sunPills ~ .hint');
       if (sunHint) sunHint.textContent = tt('sunHint');
+      var themeHint = document.getElementById('themeHint');
+      if (themeHint) themeHint.textContent = tt('themeHint');
       var matHint = document.querySelector('#modelMaterialsBlock .hint');
       if (matHint) matHint.textContent = tt('matHint');
       var desc = document.getElementById('L_description');
@@ -858,15 +924,61 @@
       if (signOut) signOut.textContent = tt('signOut');
       els.balanceRecharge.textContent = tt('recharge');
       els.cancelButton.textContent = tt('cancel');
+      renderThemePills();
       renderLanguagePills();
     }
+
+    // ── Tema ────────────────────────────────────────────────────────────────
+    // Resolução (mesma ordem do app web quando o device é novo):
+    //   escolha local (auto|light|dark) → preferência da conta → tema do SO → escuro.
+    // Os tokens do painel espelham app/globals.css; html.light liga o claro.
+    var themeMedia = null;
+    function resolveTheme() {
+      if (model.themeSetting === 'light' || model.themeSetting === 'dark') return model.themeSetting;
+      if (model.accountTheme === 'light' || model.accountTheme === 'dark') return model.accountTheme;
+      try {
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) return 'light';
+      } catch (e) {}
+      return 'dark';
+    }
+    function applyTheme() {
+      var resolved = resolveTheme();
+      document.documentElement.classList.toggle('light', resolved === 'light');
+      try { localStorage.setItem('com.spacenode.sketchup.theme', resolved); } catch (e) {}
+      // Segue o SO só enquanto nada mais decidir (setting e conta em "auto").
+      var followsOs = !(model.themeSetting === 'light' || model.themeSetting === 'dark') &&
+        !(model.accountTheme === 'light' || model.accountTheme === 'dark');
+      if (followsOs && !themeMedia && window.matchMedia) {
+        try {
+          themeMedia = window.matchMedia('(prefers-color-scheme: light)');
+          var onChange = function () { applyTheme(); };
+          if (themeMedia.addEventListener) themeMedia.addEventListener('change', onChange);
+          else if (themeMedia.addListener) themeMedia.addListener(onChange); // CEF antigo
+        } catch (e) { themeMedia = null; }
+      }
+    }
+    function renderThemePills() {
+      var el = document.getElementById('themePills');
+      if (!el) return;
+      el.innerHTML = '';
+      ['auto', 'light', 'dark'].forEach(function (c) {
+        var b = pillButton(tt('theme')[c] || c, model.themeSetting === c, function () {
+          model.themeSetting = c;
+          applyTheme();
+          renderThemePills();
+          callSketchUp('saveSettings', JSON.stringify({ theme: c }));
+        });
+        el.appendChild(b);
+      });
+    }
+
     function renderLanguagePills() {
       var el = document.getElementById('languagePills');
       if (!el) return;
       el.innerHTML = '';
       ['auto', 'pt', 'en'].forEach(function (c) {
         var b = pillButton(tt('lang')[c] || c, model.localeSetting === c, function () {
-          callSketchUp('saveSettings', JSON.stringify({ apiBaseUrl: els.apiBaseUrl.value, locale: c }));
+          callSketchUp('saveSettings', JSON.stringify({ locale: c }));
         });
         el.appendChild(b);
       });
@@ -884,7 +996,7 @@
      'preview','captureImage','captureCompareImage','resultImage','compareClip','compareHandle','compareRange','emptyPreview',
      'previewOverlay','overlayText','overlayElapsed','cancelButton','captureButton','compareButton','resultActions',
      'downloadButton','openResultButton','projectTypeCards','segmentPills','environmentPills','lightingPills',
-     'backgroundLabel','backgroundPills','prompt','elementsPills','fidelityCards','engineCards','resolutionCards',
+     'backgroundLabel','backgroundPills','prompt','elementsPills','engineCards','resolutionCards',
      'notice','insufficient','insufficientTitle','insufficientMath','insufficientBuy','insufficientAlt',
      'generateButton','generateLabel','generateMeta','reachLine','historySection','historyGrid','historyEmpty','historyMore',
      'apiBaseUrl','saveSettingsButton','footer','advanced',
@@ -946,7 +1058,6 @@
       var defaults = model.catalog.defaults || {};
       if (!model.engine && defaults.engine) model.engine = defaults.engine;
       if (!model.resolution && defaults.resolution) model.resolution = defaults.resolution;
-      if (!model.fidelityLevel && defaults.fidelityLevel) model.fidelityLevel = defaults.fidelityLevel;
       model.projectType = pt.id;
       var seg = currentSegment();
       model.segment = seg ? seg.name : null;
@@ -1037,13 +1148,6 @@
         });
         b.setAttribute('role', 'checkbox');
         return b;
-      }));
-
-      fill(els.fidelityCards, (model.catalog.fidelityLevels || []).map(function (f) {
-        var fEn = (catUi('fidelity') || {})[f.id];
-        return cardButton((fEn && fEn.label) || f.label, (fEn && fEn.note) || f.note, f.id === model.fidelityLevel, function () {
-          model.fidelityLevel = f.id; onSelectionChanged();
-        });
       }));
 
       fill(els.engineCards, (model.catalog.engines || []).map(function (e) {
@@ -1195,7 +1299,6 @@
         lighting: model.lighting,
         background: model.background,
         sceneElements: model.sceneElements,
-        fidelityLevel: model.fidelityLevel,
         engine: model.engine,
         resolution: model.resolution,
         sunPreset: model.sunPreset,
@@ -1701,7 +1804,6 @@
           lighting: model.lighting,
           background: model.background,
           sceneElements: model.sceneElements,
-          fidelityLevel: model.fidelityLevel,
           engine: model.engine,
           resolution: model.resolution,
           sunPreset: model.sunPreset,
@@ -1719,7 +1821,6 @@
       if (saved.lighting) model.lighting = saved.lighting;
       if (saved.background) model.background = saved.background;
       if (Array.isArray(saved.sceneElements)) model.sceneElements = saved.sceneElements;
-      if (saved.fidelityLevel) model.fidelityLevel = saved.fidelityLevel;
       if (saved.engine) model.engine = saved.engine;
       if (saved.resolution) model.resolution = saved.resolution;
       if (saved.sunPreset) model.sunPreset = saved.sunPreset;
@@ -1778,7 +1879,6 @@
         lighting: model.lighting,
         background: model.background,
         sceneElements: model.sceneElements,
-        fidelityLevel: model.fidelityLevel,
         engine: model.engine,
         resolution: model.resolution,
         sunPreset: model.sunPreset,
@@ -1885,6 +1985,9 @@
           var localeChanged = payload.locale && payload.locale !== model.locale;
           if (payload.locale) model.locale = payload.locale;
           if (payload.localeSetting) model.localeSetting = payload.localeSetting;
+          if (payload.themeSetting) model.themeSetting = payload.themeSetting;
+          if ('accountTheme' in payload) model.accountTheme = payload.accountTheme || null;
+          applyTheme();
           if (localeChanged || !model.localizedOnce) {
             model.localizedOnce = true;
             localizeStatic();
@@ -1934,6 +2037,10 @@
             model.totalBalance = payload.balance.totalBalance;
           }
           if (payload.user && payload.user.email) els.connSub.textContent = payload.user.email;
+          if (payload.theme === 'light' || payload.theme === 'dark' || payload.theme === 'system') {
+            model.accountTheme = payload.theme;
+            applyTheme();
+          }
           model.authenticated = true;
           updateGenerateState();
         }

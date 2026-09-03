@@ -26,7 +26,7 @@ module SpaceNode
   module SketchUp
     extend self
 
-    VERSION = '0.5.2'
+    VERSION = '0.6.0'
     PREFERENCES_KEY = 'com.spacenode.sketchup'
     DEFAULT_API_BASE_URL = 'https://spacenode.app'
     MIN_SKETCHUP_MAJOR = 21          # Ruby 2.7+; recomendado 2024+
@@ -563,6 +563,7 @@ module SpaceNode
       ::Sketchup.write_default(PREFERENCES_KEY, 'user_email', '')
       ::Sketchup.write_default(PREFERENCES_KEY, 'device_id', '')
       ::Sketchup.write_default(PREFERENCES_KEY, 'device_secret', '')
+      @account_theme = nil
     end
 
     # 401 do servidor: com dispositivo pareado, só o access token cai (a
@@ -665,6 +666,7 @@ module SpaceNode
 
       json_request(:get, '/api/sketchup/session', nil, method(:emit_api_error)) do |data|
         @balance = data['balance']
+        @account_theme = %w[light dark system].include?(data['theme']) ? data['theme'] : nil
         emit('session', data)
         send_state
       end
@@ -1369,8 +1371,10 @@ module SpaceNode
 
       emit('status', { :stage => 'capture', :message => t(:capturing) })
       resolution = payload['resolution'].to_s
-      fidelity = payload['fidelityLevel'].to_s
-      want_edge = fidelity != 'balanced' && fidelity != 'creative' && !payload['useAnchor']
+      # Edge map nativo sempre que não há âncora (em variação o render
+      # anterior já é a estrutura). Não depende mais de nível de fidelidade:
+      # o seletor foi descontinuado e a fidelidade é sempre máxima.
+      want_edge = !payload['useAnchor']
 
       capture = capture_viewport(
         resolution,
@@ -1659,7 +1663,9 @@ module SpaceNode
         :lighting => payload['lighting'].to_s,
         :background => payload['background'].to_s.empty? ? 'Preservar Original' : payload['background'].to_s,
         :sceneElements => Array(payload['sceneElements']).map(&:to_s),
-        :fidelityLevel => %w[maximum balanced creative].include?(payload['fidelityLevel']) ? payload['fidelityLevel'] : 'maximum',
+        # Sempre máxima — "Equilibrado"/"Criativo" foram descontinuados
+        # (deixavam a IA alucinar no projeto). O servidor também coage.
+        :fidelityLevel => 'maximum',
         :engine => payload['engine'].to_s,
         :resolution => payload['resolution'].to_s
       }
@@ -2677,15 +2683,28 @@ module SpaceNode
         ::Sketchup.write_default(PREFERENCES_KEY, 'locale', requested_locale)
       end
 
-      next_url = normalize_api_base_url(payload['apiBaseUrl'].to_s)
-      current_url = api_base_url
+      # Tema do painel: 'auto' resolve no JS (escolha local → preferência da
+      # conta → tema do SO → escuro); 'light'/'dark' são override manual,
+      # mesmo padrão do override de idioma acima.
+      requested_theme = payload['theme'].to_s
+      if %w[auto light dark].include?(requested_theme)
+        ::Sketchup.write_default(PREFERENCES_KEY, 'theme', requested_theme)
+      end
 
-      ::Sketchup.write_default(PREFERENCES_KEY, 'api_base_url', next_url)
-      if next_url != current_url
-        clear_session
-        @catalog = nil
-        @balance = nil
-        ::Sketchup.write_default(PREFERENCES_KEY, 'catalog_json', '')
+      # Só mexe no servidor quando o painel manda a chave — trocar tema ou
+      # idioma não pode gravar um campo de URL meio digitado e derrubar a
+      # sessão (trocar de servidor limpa a sessão de propósito).
+      if payload.key?('apiBaseUrl')
+        next_url = normalize_api_base_url(payload['apiBaseUrl'].to_s)
+        current_url = api_base_url
+
+        ::Sketchup.write_default(PREFERENCES_KEY, 'api_base_url', next_url)
+        if next_url != current_url
+          clear_session
+          @catalog = nil
+          @balance = nil
+          ::Sketchup.write_default(PREFERENCES_KEY, 'catalog_json', '')
+        end
       end
       send_state
     end
@@ -2742,6 +2761,8 @@ module SpaceNode
         :devicePaired => device_paired?,
         :locale => locale,
         :localeSetting => ::Sketchup.read_default(PREFERENCES_KEY, 'locale', 'auto').to_s,
+        :themeSetting => ::Sketchup.read_default(PREFERENCES_KEY, 'theme', 'auto').to_s,
+        :accountTheme => @account_theme,
         :userEmail => ::Sketchup.read_default(PREFERENCES_KEY, 'user_email', '').to_s,
         :version => VERSION,
         :balance => @balance,

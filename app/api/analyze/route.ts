@@ -8,7 +8,7 @@ import { analyzeImage } from '@/lib/fidelity-engine'
 fal.config({ credentials: process.env.FAL_KEY })
 
 // Endpoint do Fidelity Engine.
-// Roda ANTES do /api/generate quando o usuário escolhe Máxima ou Equilibrado.
+// Roda ANTES do /api/generate (fidelidade é sempre máxima desde 2026-09-03).
 // - Faz upload da imagem pra fal.storage uma única vez.
 // - Chama Claude 3.5 Sonnet via fal-ai/any-llm/vision.
 // - Devolve { inputUrl, briefing }. O cliente passa AMBOS pro /api/generate

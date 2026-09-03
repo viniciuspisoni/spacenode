@@ -210,7 +210,7 @@ export async function POST(req: NextRequest) {
       fidelityMode  = 'strict',
       briefing,
       inputUrl:     providedInputUrl,
-      fidelityLevel = 'maximum',
+      fidelityLevel: requestedFidelityLevel,
       anchorUrl,
       refinementText,
       structuralBoost,
@@ -248,6 +248,15 @@ export async function POST(req: NextRequest) {
       edgeMapKey?:      string
       /** Fatos medidos do modelo 3D (câmera/sol) — sanitizados abaixo. */
       modelFacts?:      unknown
+    }
+
+    // Fidelidade é SEMPRE máxima. Os níveis "Equilibrado"/"Criativo" foram
+    // descontinuados (deixavam a IA alucinar no projeto) — o servidor coage
+    // aqui pra que nenhum cliente antigo (plugin v0.5.2 em campo, config
+    // salva no perfil) consiga pedi-los. Só registra quando alguém ainda manda.
+    const fidelityLevel: FidelityLevel = 'maximum'
+    if (requestedFidelityLevel && requestedFidelityLevel !== 'maximum') {
+      console.log('[generate] fidelity   : pedido', requestedFidelityLevel, '→ coagido pra maximum (nível descontinuado)')
     }
 
     // ── Validações que ficam ANTES do débito ──────────────────────────────────
@@ -477,11 +486,11 @@ export async function POST(req: NextRequest) {
     // Briefing de visão (PROJECT FACTS) — religado ao Renderizar. Ordem de
     // resolução: body (caller explícito, ex. Spaces) → cache do histórico
     // (mesmo input_url já analisado nesta conta) → análise Gemini inline com
-    // teto de 15s. Em 'creative' não injetamos: os FACTS travam materiais e
-    // entorno, contra o propósito do nível.
+    // teto de 15s. (O antigo nível 'creative' pulava os FACTS; com a
+    // fidelidade sempre máxima, o briefing entra sempre.)
     let resolvedBriefing: BriefingArquitetonico | undefined = briefing
     let briefingSource: 'body' | 'cache' | 'vision' | 'none' = briefing ? 'body' : 'none'
-    if (!resolvedBriefing && fidelityLevel !== 'creative') {
+    if (!resolvedBriefing) {
       if (providedInputUrl) {
         const { data: cachedRender } = await admin
           .from('renders')

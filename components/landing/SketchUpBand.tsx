@@ -8,8 +8,9 @@
 // Os três pontos são recursos REAIS em produção (Fase 2 do plugin). O texto
 // carrega as condições de verdade de propósito — sem elas a faixa mentiria:
 //
-// - edge map: `want_edge` em main.rb exige fidelidade Máxima (default) e
-//   NÃO vale em variação com âncora, onde o render anterior já é a estrutura.
+// - edge map: `want_edge` em main.rb NÃO vale em variação com âncora, onde
+//   o render anterior já é a estrutura. (Desde a v0.6 a fidelidade é sempre
+//   máxima — o seletor foi descontinuado — então a captura dupla é a regra.)
 // - sol: prompts.ts só injeta o bloco solar quando a iluminação é
 //   "Preservar Original"; escolher um preset de atmosfera descarta o sol
 //   medido de propósito (senão o fato contradiria o override).
@@ -23,7 +24,7 @@ const POINTS = [
   },
   {
     title: 'geometria como verdade',
-    desc: 'Na fidelidade máxima, a cena é capturada duas vezes: a vista e um mapa de arestas hidden-line da mesma câmera. O motor recebe a estrutura medida do modelo, no lugar de inferi-la do pixel.',
+    desc: 'Cada cena é capturada duas vezes: a vista e um mapa de arestas hidden-line da mesma câmera. O motor recebe a estrutura medida do modelo, no lugar de inferi-la do pixel.',
   },
   {
     title: 'o modelo entra como dado',

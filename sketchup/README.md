@@ -60,6 +60,29 @@ Rotas web do plugin:
 - `expiresAt` ausente conta como sessão vencida (nunca "válida pra sempre").
 - API base aceita apenas HTTPS (HTTP só em localhost).
 
+## Tema (claro / escuro / automático)
+
+O painel tem os mesmos dois temas do app web. Os tokens de `dialog.html` são
+espelho EXATO de `app/globals.css` (`:root` = dark, `html.light` = claro) —
+se um valor mudar no app, mudar aqui junto. Resolução do "Automático", na
+mesma ordem do app quando o device é novo:
+
+1. escolha local no painel (`Sketchup.write_default(PREFERENCES_KEY, 'theme')`,
+   mesmo padrão do override de idioma);
+2. preferência da conta (`profiles.theme_preference`, entregue por
+   `GET /api/sketchup/session` como `theme`);
+3. tema do sistema operacional (`prefers-color-scheme` no CEF);
+4. escuro.
+
+Anti-flash: o último tema resolvido fica em `localStorage('spn-theme')` e um
+script inline no `<head>` aplica `html.light` antes do primeiro paint; o
+estado do Ruby chega depois do `ready` e corrige se preciso.
+
+Cores que NÃO seguem o tema, de propósito: véus sobre imagem (`--scrim`,
+`--scrim-strong` e os textos do overlay de geração), o pincel verde da
+máscara sobre o render, e o preto/branco do canvas que vira o PNG da máscara
+enviado ao servidor.
+
 ## Compatibilidade
 
 SketchUp 2021+ (gate em runtime). Testado em campo no **2022** (Windows);
@@ -97,8 +120,10 @@ require 'spacenode/main'
 ## Contrato enviado para geração
 
 O painel envia pro Ruby: `prompt`, `projectType`, `segment`, `environment`,
-`lighting`, `background`, `sceneElements[]`, `fidelityLevel`, `engine`,
-`resolution`, `useAnchor`, `seed`. O Ruby captura a vista (PNG, lado maior
+`lighting`, `background`, `sceneElements[]`, `engine`, `resolution`,
+`useAnchor`, `seed`. `fidelityLevel` é sempre `maximum` (o Ruby fixa e o
+servidor coage — o seletor Máxima/Equilibrado/Criativo foi descontinuado em
+2026-09-03 porque os níveis relaxados deixavam a IA alucinar no projeto). O Ruby captura a vista (PNG, lado maior
 2048–4096 px conforme a resolução), sobe via `sourceKey` e monta o corpo do
 `/api/generate`. Em variações (`useAnchor`), o render anterior vai como
 `anchorUrl`. `geometryLock`/`fidelityMode` não são enviados (são no-ops na
