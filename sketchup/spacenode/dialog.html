@@ -498,6 +498,7 @@
         <button class="ghost" id="openResultButton">Abrir no site</button>
         <button class="ghost" id="upscale2xButton">Ampliar 2x</button>
         <button class="ghost" id="upscale4xButton">Ampliar 4x</button>
+        <button class="ghost" id="animarShortcutButton" style="grid-column:1 / -1;display:none">Animar este render</button>
         <button class="ghost" id="variationButton" style="grid-column:1 / -1">Gerar variação deste render</button>
         <button class="ghost" id="restoreCameraButton" style="display:none;grid-column:1 / -1">Voltar à vista deste render</button>
       </div>
@@ -1070,6 +1071,7 @@
       els.balanceRecharge.textContent = tt('recharge');
       els.cancelButton.textContent = tt('cancel');
       els.variationButton.textContent = tt('generateVariation');
+      els.animarShortcutButton.textContent = tt('L_animar');
       els.videoOpenButton.textContent = tt('videoOpen');
       els.videoSaveButton.textContent = tt('videoSaveBtn');
       els.videoRevealButton.textContent = tt('videoReveal');
@@ -1153,7 +1155,7 @@
      'backgroundLabel','backgroundPills','prompt','elementsPills','engineCards','resolutionCards',
      'notice','insufficient','insufficientTitle','insufficientMath','insufficientBuy','insufficientAlt',
      'generateButton','generateLabel','generateMeta','generateKbd','dockSummary','variationButton','reachLine','historySection','historyGrid','historyEmpty','historyMore',
-     'videoCard','videoPoster','videoCaption','videoOpenButton','videoSaveButton','videoRevealButton','videoSiteButton','videoHint',
+     'videoCard','videoPoster','videoCaption','videoOpenButton','videoSaveButton','videoRevealButton','videoSiteButton','videoHint','animarShortcutButton',
      'animarSection','animarTypePills','animarTypeHint','animarEnginePills','animarDurationPills','animarRatioNote','animarButton','animarLabel','animarMeta','animarNote',
      'animarInsufficient','animarInsufficientTitle','animarInsufficientMath','animarInsufficientBuy','animarInsufficientAlt',
      'apiBaseUrl','saveSettingsButton','footer','advanced',
@@ -1837,6 +1839,7 @@
       els.restoreCameraButton.disabled = model.generating;
       els.upscale2xButton.disabled = model.generating || unverified;
       els.upscale4xButton.disabled = model.generating || unverified;
+      els.animarShortcutButton.disabled = model.generating || unverified;
       els.maskToggle.disabled = model.generating;
       els.maskClear.disabled = model.generating;
       updateBatchButton();
@@ -2044,6 +2047,7 @@
       var cfg = animarCfg();
       var visible = !!(model.result && model.result.outputUrl && cfg);
       els.animarSection.style.display = visible ? '' : 'none';
+      els.animarShortcutButton.style.display = visible ? '' : 'none';
       if (!visible) return;
       var types = animarTypes();
       var hasType = false;
@@ -2108,6 +2112,12 @@
       }
     }
     els.animarInsufficientBuy.addEventListener('click', function () { callSketchUp('openUrl', model.apiBaseUrl + '/app/billing'); });
+    els.animarShortcutButton.addEventListener('click', function () {
+      if (!model.result) return;
+      els.animarSection.open = true;
+      renderAnimarControls();
+      if (els.animarSection.scrollIntoView) els.animarSection.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    });
 
     function normText(s) {
       s = String(s || '').toLowerCase();
@@ -2356,7 +2366,7 @@
     // Ações sobre o resultado (Baixar/Abrir/Ampliar/Editar/Variação) só com
     // resultado verificado — o botão de voltar à vista não sai do SketchUp.
     function setResultActionsEnabled(on) {
-      ['downloadButton', 'openResultButton', 'upscale2xButton', 'upscale4xButton', 'variationButton', 'animarButton'].forEach(function (id) {
+      ['downloadButton', 'openResultButton', 'upscale2xButton', 'upscale4xButton', 'variationButton', 'animarButton', 'animarShortcutButton'].forEach(function (id) {
         if (els[id]) els[id].disabled = !on;
       });
       if (els.editButton) els.editButton.disabled = !on;
