@@ -1,0 +1,103 @@
+{
+ "slug": "2026-09-05-reel-plugin-o-botao-que-faltava",
+ "accent": false,
+ "segments": [
+  {
+   "type": "card",
+   "card": "icon",
+   "dur": 1.8
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/plugin/shots/s1-conectado.png",
+   "dur": 1.6,
+   "fit": "contain",
+   "inset": 200,
+   "bg": "dark",
+   "kenburns": [
+    1,
+    1
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/plugin/shots/s2-capturada.png",
+   "dur": 1.2,
+   "fit": "contain",
+   "inset": 200,
+   "bg": "dark",
+   "kenburns": [
+    1,
+    1
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/plugin/shots/s4-resultado.png",
+   "dur": 2,
+   "fit": "contain",
+   "inset": 200,
+   "bg": "dark",
+   "kenburns": [
+    1,
+    1
+   ]
+  },
+  {
+   "type": "card",
+   "card": "final",
+   "dur": 1
+  }
+ ],
+ "transitions": [
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "fade",
+   "dur": 0.3
+  }
+ ],
+ "cards": {
+  "icon": {
+   "layout": "html",
+   "transparent": false,
+   "body": "<div style=\"position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:56px\"><img src=\"file:///$REPO/marketing/brand/spacenode-symbol.svg\" style=\"width:200px;height:200px\"><div class=\"hook\" style=\"position:static;width:920px\">o botão que faltava na sua barra.</div><span class=\"eyebrow\"><i></i>plugin oficial para sketchup<i></i></span></div>"
+  },
+  "a": {
+   "layout": "hook-fixed",
+   "hook": "conecta. captura. gera.",
+   "top": 250,
+   "size": 58
+  },
+  "b": {
+   "layout": "hook-fixed",
+   "hook": "sem exportar. sem sair do projeto.",
+   "top": 250,
+   "size": 58
+  },
+  "final": {
+   "layout": "final",
+   "cta": "Comece agora",
+   "micro": "plugin oficial · grátis · usa os nodes da sua conta"
+  }
+ },
+ "overlays": [
+  {
+   "card": "a",
+   "from": 1.8,
+   "to": 4.6
+  },
+  {
+   "card": "b",
+   "from": 4.6,
+   "to": 6.6
+  }
+ ]
+}

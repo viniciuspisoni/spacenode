@@ -1,0 +1,119 @@
+{
+ "slug": "2026-09-05-reel-sim-e-o-mesmo-projeto",
+ "accent": false,
+ "segments": [
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0645-vista-after.jpg",
+   "dur": 1.8,
+   "kenburns": [
+    1,
+    1.03
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0652-vista-after.jpg",
+   "dur": 1.3,
+   "kenburns": [
+    1,
+    1.03
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0656-vista-after.jpg",
+   "dur": 1.3,
+   "kenburns": [
+    1,
+    1.03
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0660-vista-after.jpg",
+   "dur": 2.2,
+   "kenburns": [
+    1,
+    1.05
+   ]
+  },
+  {
+   "type": "card",
+   "card": "final",
+   "dur": 1
+  }
+ ],
+ "transitions": [
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "fade",
+   "dur": 0.3
+  }
+ ],
+ "cards": {
+  "scrim": {
+   "layout": "scrim"
+  },
+  "a": {
+   "layout": "hook-sub",
+   "hook": "sim, é o mesmo projeto.",
+   "eyebrow": "vista 01"
+  },
+  "b": {
+   "layout": "hook-sub",
+   "hook": "sim, é o mesmo projeto.",
+   "eyebrow": "vista 02"
+  },
+  "c": {
+   "layout": "hook-sub",
+   "hook": "sim, é o mesmo projeto.",
+   "eyebrow": "vista 03"
+  },
+  "d": {
+   "layout": "hook-sub",
+   "hook": "sim, é o mesmo projeto.",
+   "eyebrow": "vista 04",
+   "sub": "Spaces: uma identidade, várias vistas."
+  },
+  "final": {
+   "layout": "final",
+   "cta": "Renderize seu projeto"
+  }
+ },
+ "overlays": [
+  {
+   "card": "scrim",
+   "from": 0,
+   "to": 6.3
+  },
+  {
+   "card": "a",
+   "from": 0,
+   "to": 1.8
+  },
+  {
+   "card": "b",
+   "from": 1.8,
+   "to": 3.1
+  },
+  {
+   "card": "c",
+   "from": 3.1,
+   "to": 4.4
+  },
+  {
+   "card": "d",
+   "from": 4.4,
+   "to": 6.3
+  }
+ ]
+}

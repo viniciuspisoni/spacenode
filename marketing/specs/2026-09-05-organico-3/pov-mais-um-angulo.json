@@ -1,0 +1,144 @@
+{
+ "slug": "2026-09-05-reel-pov-mais-um-angulo",
+ "accent": false,
+ "segments": [
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0704-vista-before.jpg",
+   "dur": 1.6,
+   "kenburns": [
+    1,
+    1
+   ],
+   "brightness": -0.12
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0703-vista-after.jpg",
+   "dur": 1.8,
+   "kenburns": [
+    1,
+    1.04
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0705-vista-after.jpg",
+   "dur": 1.4,
+   "kenburns": [
+    1,
+    1.04
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0707-vista-after.jpg",
+   "dur": 1.4,
+   "kenburns": [
+    1,
+    1.04
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0712-vista-after.jpg",
+   "dur": 2.2,
+   "kenburns": [
+    1,
+    1.05
+   ]
+  },
+  {
+   "type": "card",
+   "card": "final",
+   "dur": 1
+  }
+ ],
+ "transitions": [
+  {
+   "type": "wipeleft",
+   "dur": 0.5,
+   "ruler": true
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "fade",
+   "dur": 0.3
+  }
+ ],
+ "cards": {
+  "scrim": {
+   "layout": "scrim"
+  },
+  "a": {
+   "layout": "hook-sub",
+   "hook": "POV: o cliente pediu \"mais um ângulo\".",
+   "eyebrow": "modelo"
+  },
+  "b": {
+   "layout": "hook-sub",
+   "hook": "mais um.",
+   "eyebrow": "vista 01"
+  },
+  "c": {
+   "layout": "hook-sub",
+   "hook": "mais um.",
+   "eyebrow": "vista 02"
+  },
+  "d": {
+   "layout": "hook-sub",
+   "hook": "e mais um.",
+   "eyebrow": "vista 03"
+  },
+  "e": {
+   "layout": "hook-sub",
+   "hook": "sem refazer nada.",
+   "eyebrow": "vista 04",
+   "sub": "Spaces: o projeto não recomeça a cada vista."
+  },
+  "final": {
+   "layout": "final",
+   "cta": "Veja no seu próprio projeto"
+  }
+ },
+ "overlays": [
+  {
+   "card": "scrim",
+   "from": 0,
+   "to": 7.6
+  },
+  {
+   "card": "a",
+   "from": 0,
+   "to": 1.6
+  },
+  {
+   "card": "b",
+   "from": 1.6,
+   "to": 2.9
+  },
+  {
+   "card": "c",
+   "from": 2.9,
+   "to": 4.3
+  },
+  {
+   "card": "d",
+   "from": 4.3,
+   "to": 5.7
+  },
+  {
+   "card": "e",
+   "from": 5.7,
+   "to": 7.6
+  }
+ ]
+}

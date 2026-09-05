@@ -113,3 +113,9 @@ yuv420p, sem áudio), `qa-frames/*.png`, `probe.json`, `spec.json` (cópia do sp
   inteira — o "mistério" do Reel "o que é isso?".
 - `accent: false` no topo do spec neutraliza o verde de `{palavra}` em todos os cards (rodada orgânica
   de 05/09 foi inteira sem verde, a pedido do dono).
+
+## Specs versionados (`marketing/specs/`)
+- Caminhos de imagem usam `$ACERVO` (raiz do acervo baixado, fora do repo — `SPACENODE_ACERVO`,
+  default `../acervo`) e `$REPO` (raiz do repositório). `reel-spec.mjs` expande os dois ao ler o spec.
+- O acervo é gerado por `marketing/scripts/acervo/inventory.mjs --download` + `pairs.mjs`; os estados
+  do painel do plugin por `marketing/scripts/plugin/capture-states.mjs`. Ver `marketing/specs/README.md`.

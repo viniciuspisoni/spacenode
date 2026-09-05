@@ -46,7 +46,13 @@ if (argv.includes('--exemplo')) {
 
 const specPath = argv.find((a) => !a.startsWith('--'));
 if (!specPath) { console.error('uso: node marketing/scripts/reel-spec.mjs spec.json [--plan]'); process.exit(1); }
-const spec = JSON.parse(await readFile(specPath, 'utf8'));
+
+// Os specs versionados em marketing/specs/ apontam para o acervo baixado do banco (fora do
+// repo) como `$ACERVO/assets/...`. A raiz vem de SPACENODE_ACERVO; sem ela, ../acervo.
+// `$REPO` expande para a raiz do repositório (recortes pré-processados de algumas peças e o
+// símbolo da marca usado em cards HTML).
+const ACERVO = (process.env.SPACENODE_ACERVO || join(REPO, '..', 'acervo')).replace(/\\/g, '/');
+const spec = JSON.parse((await readFile(specPath, 'utf8')).replaceAll('$ACERVO', ACERVO).replaceAll('$REPO', REPO.replace(/\\/g, '/')));
 
 if (argv.includes('--plan')) {
   const durs = [];
