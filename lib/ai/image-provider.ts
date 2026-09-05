@@ -36,6 +36,24 @@
 // byte-idêntico pra FAL. Endpoints sem mapeamento Google (flux, seedream…)
 // passam direto pela FAL, então TODAS as rotas podem usar esta camada.
 //
+// Rota direta ModelArk (ByteDance) pro Seedream 5.0 Pro — o motor Quasar
+// (2026-09-06). Só pro endpoint bytedance/seedream/v5/pro/edit:
+//   SEEDREAM_ROUTE = 'ark' | 'fal'   (default 'fal' — rollback é trocar a env)
+//   Com 'ark' e ARK_API_KEY presente, a ModelArk vai PRIMEIRO
+//   (POST /images/generations, compatível com Images da OpenAI) e a FAL entra
+//   como fallback em falha/timeout (IMAGE_PROVIDER_FALLBACK=none desliga).
+//   Medido com a mesma imagem e prompt: 2K em 40–52 s direto contra ~130 s via
+//   FAL em produção; US$0,09/imagem (>2,61 MP) contra 0,135. Em 16:9 o '2K' da
+//   ModelArk sai 2752×1536 (segue o aspecto da entrada).
+//   Envs: ARK_API_KEY (obrigatória), ARK_BASE_URL (default ap-southeast-1 — a
+//   única região com o Pro), ARK_SEEDREAM_PRO_MODEL (default
+//   dola-seedream-5-0-pro-260628), SEEDREAM_ARK_FAST=1 (modo rápido de prompt).
+//   A saída vem em base64 (response_format b64_json) e segue a MESMA entrega do
+//   GCP abaixo (re-host no Storage ou data: URL): a URL de resultado da
+//   ByteDance não está na allowlist de fetch do produto e expira em 24 h.
+//   Dados saem do país (Singapura): /privacidade precisa nomear a operadora
+//   antes de ligar em produção.
+//
 // Resiliência do caminho primário (o fallback FAL é o provider CARO — só vale
 // quando o GCP realmente não entrega):
 //   - 429/5xx do Vertex é capacidade compartilhada do endpoint global, não
@@ -145,7 +163,7 @@ const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, m
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
-export type ImageProviderId = 'gcp' | 'fal'
+export type ImageProviderId = 'gcp' | 'fal' | 'ark'
 
 export type ImageDelivery =
   | { kind: 'url'; userId: string; area: string }
@@ -234,6 +252,29 @@ export function imageProviderPrimary(): ImageProviderId {
 
 function imageFallbackEnabled(): boolean {
   return (process.env.IMAGE_PROVIDER_FALLBACK?.trim().toLowerCase() || 'fal') !== 'none'
+}
+
+// ── Rota direta ModelArk (Seedream / Quasar) ──────────────────────────────────
+
+export const SEEDREAM_FAL_ENDPOINT = 'bytedance/seedream/v5/pro/edit'
+const ARK_DEFAULT_BASE_URL = 'https://ark.ap-southeast.bytepluses.com/api/v3'
+const ARK_DEFAULT_SEEDREAM_PRO_MODEL = 'dola-seedream-5-0-pro-260628'
+
+export function seedreamRoute(): 'ark' | 'fal' {
+  return process.env.SEEDREAM_ROUTE?.trim().toLowerCase() === 'ark' ? 'ark' : 'fal'
+}
+
+/** A ModelArk só atende o endpoint Seedream, e só com a rota ligada E chave presente. */
+function arkAvailableFor(falEndpoint: string): boolean {
+  return falEndpoint === SEEDREAM_FAL_ENDPOINT && seedreamRoute() === 'ark' && !!process.env.ARK_API_KEY?.trim()
+}
+
+function arkModel(): string {
+  return process.env.ARK_SEEDREAM_PRO_MODEL?.trim() || ARK_DEFAULT_SEEDREAM_PRO_MODEL
+}
+
+function arkBaseUrl(): string {
+  return (process.env.ARK_BASE_URL?.trim() || ARK_DEFAULT_BASE_URL).replace(/\/+$/, '')
 }
 
 function hasVertexCredentials(): boolean {
@@ -655,6 +696,107 @@ async function generateViaFal(args: GenerateImageArgs, budgetMs: number): Promis
   }
 }
 
+// ── Caminho ModelArk (ByteDance direto — só o endpoint Seedream) ──────────────
+
+/** Traduz o image_size do schema da FAL pro `size` da ModelArk. 'auto_2K' →
+ *  '2K' (o modelo segue o aspecto da entrada), 'auto_1K' → '1K',
+ *  {width,height} → 'LxA'. Presets de aspecto da FAL (landscape_16_9…) não
+ *  existem na ModelArk — caem em '2K', que já segue o input. */
+function arkSizeFrom(imageSize: unknown): string {
+  if (typeof imageSize === 'string') {
+    const s = imageSize.toLowerCase()
+    if (s === 'auto_1k' || s === '1k') return '1K'
+    return '2K'
+  }
+  if (imageSize && typeof imageSize === 'object') {
+    const { width, height } = imageSize as { width?: unknown; height?: unknown }
+    if (typeof width === 'number' && typeof height === 'number' && width > 0 && height > 0) {
+      return `${Math.round(width)}x${Math.round(height)}`
+    }
+  }
+  return '2K'
+}
+
+interface ArkImagesResponse {
+  model?: string
+  data?: { url?: string; b64_json?: string; size?: string }[]
+  error?: { code?: string; message?: string }
+}
+
+async function arkGenerateOnce(
+  prompt: string,
+  imageUrls: string[],
+  size: string,
+  signal: AbortSignal,
+): Promise<{ buffer: Buffer; mime: string; requestId: string | null }> {
+  const key = process.env.ARK_API_KEY?.trim() ?? ''
+  const body: Record<string, unknown> = {
+    model: arkModel(),
+    prompt,
+    // Ordem preservada (âncora primeiro, depois amostras/edge map) — os papéis
+    // já vão no texto do prompt, como no caminho FAL.
+    ...(imageUrls.length > 0 ? { image: imageUrls.length === 1 ? imageUrls[0] : imageUrls } : {}),
+    size,
+    output_format: 'png',
+    response_format: 'b64_json',
+    watermark: false,
+    ...(process.env.SEEDREAM_ARK_FAST === '1' ? { optimize_prompt_options: { mode: 'fast' } } : {}),
+  }
+  const res = await fetch(`${arkBaseUrl()}/images/generations`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+    body: JSON.stringify(body),
+    signal,
+  })
+  const json = (await res.json().catch(() => null)) as ArkImagesResponse | null
+  if (!res.ok || json?.error) {
+    // Status + código da ModelArk — sem prompt/URLs (AL-9). `status` deixa a
+    // rota traduzir 429 como hoje faz com a FAL.
+    const err = new Error(
+      `ark HTTP ${res.status} ${json?.error?.code ?? ''} ${truncate(json?.error?.message ?? '', 200)}`.trim(),
+    ) as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
+  const img = json?.data?.[0]
+  if (!img?.b64_json) throw new ImageProviderNoOutputError('ark', SEEDREAM_FAL_ENDPOINT)
+  return { buffer: Buffer.from(img.b64_json, 'base64'), mime: 'image/png', requestId: res.headers.get('x-request-id') }
+}
+
+async function generateViaArk(args: GenerateImageArgs, budgetMs: number): Promise<CoreResult> {
+  const parsed = parseFalInput(args.falInput)
+  if (!parsed.prompt) throw new Error('falInput sem prompt — nada pra enviar à ModelArk')
+  const size = arkSizeFrom(args.falInput.image_size)
+
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), budgetMs)
+  let generated: { buffer: Buffer; mime: string; requestId: string | null }[]
+  try {
+    generated = await Promise.race([
+      // num_images > 1 não existe nos call sites (sempre 1); N chamadas cobrem o contrato.
+      Promise.all(Array.from({ length: parsed.numImages }, () => arkGenerateOnce(parsed.prompt, parsed.imageUrls, size, ctrl.signal))),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new ImageProviderTimeoutError('ark', args.falEndpoint, budgetMs)), budgetMs),
+      ),
+    ])
+  } catch (err) {
+    if ((err as Error).name === 'AbortError') throw new ImageProviderTimeoutError('ark', args.falEndpoint, budgetMs)
+    throw err
+  } finally {
+    clearTimeout(timer)
+  }
+
+  const images: GeneratedImage[] = []
+  for (const g of generated) {
+    const dims = imageDims(g.buffer)
+    const url = args.deliver.kind === 'url'
+      ? await uploadToStorage(g.buffer, g.mime, args.deliver.userId, args.deliver.area)
+      : `data:${g.mime};base64,${g.buffer.toString('base64')}`
+    images.push({ url, width: dims.width, height: dims.height })
+  }
+  return { images, providerModel: arkModel(), requestId: generated[0]?.requestId ?? null }
+}
+
 // ── Entrada única ─────────────────────────────────────────────────────────────
 
 /** Gera imagem(ns) respeitando IMAGE_PROVIDER_PRIMARY/FALLBACK. Lança em falha
@@ -663,6 +805,34 @@ export async function generateImage(args: GenerateImageArgs): Promise<GenerateIm
   const startedAt = Date.now()
   const primary = imageProviderPrimary()
   const mapping = gcpModelFor(args.falEndpoint)
+
+  // Rota direta ModelArk (Seedream/Quasar): ByteDance primeiro, FAL de fallback.
+  // Sequencial (sem hedge): a ModelArk responde em ~50 s de forma estável.
+  if (arkAvailableFor(args.falEndpoint)) {
+    const fallback = imageFallbackEnabled()
+    const arkBudget = fallback
+      ? Math.min(Math.max(30_000, Math.floor(args.timeoutMs * 0.75)), 150_000, args.timeoutMs)
+      : args.timeoutMs
+    console.log(`[image-provider] ${args.context} → ark model=${arkModel()} budget=${Math.round(arkBudget / 1000)}s fallback=${fallback ? 'fal' : 'none'}`)
+    try {
+      const core = await generateViaArk(args, arkBudget)
+      const latencyMs = Date.now() - startedAt
+      console.log(`[image-provider] ${args.context} ok provider=ark model=${core.providerModel} ${latencyMs}ms images=${core.images.length}`)
+      return { ...core, provider: 'ark', fallbackUsed: false, latencyMs, errorMessage: null }
+    } catch (err) {
+      const primaryError = truncate((err as Error).message ?? String(err))
+      if (!fallback) {
+        console.error(`[image-provider] ${args.context} ark FALHOU sem fallback: ${primaryError}`)
+        throw err
+      }
+      console.error(`[image-provider] ${args.context} ark FALHOU (${primaryError}) → fallback fal ${args.falEndpoint}`)
+      const remaining = Math.max(FAL_FALLBACK_MIN_MS, args.timeoutMs - (Date.now() - startedAt))
+      const core = await generateViaFal(args, remaining)
+      const latencyMs = Date.now() - startedAt
+      console.log(`[image-provider] ${args.context} ok provider=fal (fallback do ark) ${latencyMs}ms images=${core.images.length}`)
+      return { ...core, provider: 'fal', fallbackUsed: true, latencyMs, errorMessage: primaryError }
+    }
+  }
 
   if (primary === 'gcp' && mapping && hasVertexCredentials()) {
     const fallback = imageFallbackEnabled()
@@ -786,7 +956,7 @@ export async function generateImage(args: GenerateImageArgs): Promise<GenerateIm
   }
 
   if (primary === 'gcp' && !mapping) {
-    // Endpoint não-Google (flux, seedream, upscaler) — FAL é o caminho normal.
+    // Endpoint não-Google (flux, upscaler, seedream sem SEEDREAM_ROUTE=ark) — FAL é o caminho normal.
   } else if (primary === 'gcp') {
     console.warn(`[image-provider] ${args.context} IMAGE_PROVIDER_PRIMARY=gcp mas credenciais Vertex ausentes — usando fal direto`)
   }
