@@ -328,6 +328,22 @@ export const KB_ENTRIES: KBEntry[] = [
     }),
   },
   {
+    id: 'estudar-o-que',
+    title: 'Para que serve o Estudar?',
+    keywords: ['estudar', 'estudo preliminar', 'estudo', 'propostas', 'layout', 'marcenaria', 'reforma', 'decoracao', 'antes e depois do ambiente'],
+    patterns: [...aboutTool('estudar'), /estudo (preliminar|do ambiente)/],
+    modules: ['estudar'],
+    suggest: true,
+    build: () => ({
+      text:
+        'O Estudar gera estudos preliminares para ambientes REAIS: você envia a fotografia, marca o que deve ser preservado, ' +
+        'preenche um briefing (tipo de estudo — layout, marcenaria, reforma ou decoração —, itens obrigatórios, estilo, orçamento) ' +
+        'e recebe 3 propostas: Essencial, Equilibrada e Completa. Estrutura, perspectiva e aberturas são sempre preservadas; ' +
+        'depois dá pra refinar uma região específica e salvar a proposta escolhida no projeto. ' +
+        'É um estudo de visualização — não substitui projeto técnico ou executivo.',
+    }),
+  },
+  {
     id: 'planta-humanizada',
     title: 'O que a Planta humanizada faz?',
     keywords: ['planta humanizada', 'planta', 'humanizada', 'planta baixa', 'apresentar planta'],
@@ -370,6 +386,7 @@ export const KB_ENTRIES: KBEntry[] = [
         'Ampliar (mais resolução e nitidez na imagem aprovada) · ' +
         'Animar (vídeo de apresentação a partir da imagem) · ' +
         'Finalizar (pós-produção e exportação) · ' +
+        'Estudar (3 propostas de estudo preliminar sobre a foto de um ambiente real) · ' +
         'Planta humanizada (a planta técnica vestida para o cliente). ' +
         'Tudo fica guardado no Histórico.',
       actions: [{ type: 'navigate', label: 'Ir ao Dashboard', href: '/app' }],

@@ -379,6 +379,7 @@ function normalizeRender(res: DetailResponse): GenerationDetail {
   const ambient   = str(r.ambient)
   const isUpscale = ambient === 'upscale'
   const isVideo   = ambient === 'video'
+  const isEstudo  = ambient === 'estudo'
   const cs        = (r.config_snapshot ?? null) as Record<string, unknown> | null
   const um        = (r.upscale_meta ?? null) as Record<string, unknown> | null
   const log       = (r.generation_log ?? null) as Record<string, unknown> | null
@@ -444,6 +445,19 @@ function normalizeRender(res: DetailResponse): GenerationDetail {
         config.push({ label: 'Sem pessoas', value: 'Sim', advanced: true })
       }
     }
+  } else if (isEstudo) {
+    // ── Estudar — proposta escolhida salva do estudo preliminar.
+    // style = 'estudo:<variante>'; prompt já é label de produto ("estudo … ·
+    // Variante"), sem prompt interno (ele fica em estudo_alternativas).
+    moduleLabel = 'Estudar'
+    title       = 'Estudo preliminar'
+    engine      = null
+    const variante = (str(r.style) ?? '').split(':')[1] ?? null
+    config.push(
+      { label: 'Módulo',   value: 'Estudar' },
+      { label: 'Tipo',     value: 'Estudo preliminar' },
+      { label: 'Proposta', value: variante ? variante.charAt(0).toUpperCase() + variante.slice(1) : null },
+    )
   } else {
     // ── Renderizar
     moduleLabel = 'Renderizar'

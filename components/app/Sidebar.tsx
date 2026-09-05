@@ -10,7 +10,7 @@ import ThemeSelector from './ThemeSelector'
 import type { PlanId } from '@/lib/plans'
 import {
   IconProjects, IconDashboard, IconHistory,
-  IconGenerate, IconSpaces, IconRetocar, IconEnhance, IconVideo, IconFinalizar,
+  IconGenerate, IconSpaces, IconRetocar, IconEnhance, IconVideo, IconFinalizar, IconEstudar,
   IconHumanizedPlan, IconBlocos3D, IconIsometric, IconBoard, IconMoodboard,
   IconTeam, IconIdentity, IconAccount, IconPlans, IconGuide,
 } from './sidebar-icons'
@@ -52,6 +52,7 @@ const MODULE_ICON: Record<SidebarModule['iconKey'], () => React.ReactElement> = 
   enhance:       IconEnhance,
   video:         IconVideo,
   finalizar:     IconFinalizar,
+  estudar:       IconEstudar,
   humanizedPlan: IconHumanizedPlan,
   blocos3d:      IconBlocos3D,
   isometric:     IconIsometric,

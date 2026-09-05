@@ -22,7 +22,7 @@ import type {
 } from '../types'
 import type { NodiTool, ToolContext } from './registry'
 
-const MODULE_IDS = ['renderizar', 'spaces', 'editar', 'ampliar', 'animar', 'finalizar', 'planta_humanizada'] as const
+const MODULE_IDS = ['renderizar', 'spaces', 'editar', 'ampliar', 'animar', 'finalizar', 'estudar', 'planta_humanizada'] as const
 const ACTION_TYPES: SupervisedActionType[] = ['navigate', 'fill_prompt', 'apply_settings', 'start_generation']
 const CATEGORIES: TicketCategory[] = ['generation_failed', 'unexpected_result', 'billing', 'access', 'question', 'other']
 

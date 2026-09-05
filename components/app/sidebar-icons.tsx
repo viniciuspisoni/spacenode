@@ -91,6 +91,15 @@ export const IconFinalizar = (p: IconProps = {}) => (
   </SVG>
 )
 
+// Compasso de desenho — estudo preliminar (Estudar).
+export const IconEstudar = (p: IconProps = {}) => (
+  <SVG {...p}>
+    <circle cx="12" cy="4.4" r="1.7" />
+    <path d="M11.2 6 6.2 19.6M12.8 6l5 13.6" />
+    <path d="M7.9 15a8.8 8.8 0 0 0 8.2 0" />
+  </SVG>
+)
+
 // ── APRESENTAR ────────────────────────────────────────────
 export const IconHumanizedPlan = (p: IconProps = {}) => (
   <SVG {...p}>
