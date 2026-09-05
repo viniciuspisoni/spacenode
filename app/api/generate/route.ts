@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { fal } from '@fal-ai/client'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getRequestUser } from '@/lib/auth/request-user'
@@ -854,8 +854,22 @@ export async function POST(req: NextRequest) {
       }
     })()
 
-    preservationAudit = await auditPromise
+    // O audit fica INLINE só por até RENDER_SEMANTIC_AUDIT_INLINE_MS (4 s).
+    // Medido: o Gemini 2.5 flash direto leva ~20 s saudável e 40 s+ com 503
+    // de demanda, e roda em ~85% dos Vega (score < 0,8) — era ele que
+    // segurava a resposta. Se não terminou a tempo, a resposta sai sem o
+    // aviso semântico (o fidelityWarning do geometry score continua) e o
+    // resultado é gravado depois no generation_log via after().
+    const AUDIT_INLINE_MS = Math.max(0, Number(process.env.RENDER_SEMANTIC_AUDIT_INLINE_MS) || 4_000)
+    let auditSettled = false
+    void auditPromise.then(() => { auditSettled = true })
+    preservationAudit = await Promise.race([
+      auditPromise,
+      new Promise<null>(resolve => setTimeout(() => resolve(null), AUDIT_INLINE_MS)),
+    ])
+    const auditDeferred = !auditSettled
     await previewPromise
+    if (auditDeferred) console.log(`[generate:fidelity] audit semântico passou de ${AUDIT_INLINE_MS}ms — segue em background`)
     {
       if (preservationAudit) {
         console.log(
@@ -986,6 +1000,35 @@ export async function POST(req: NextRequest) {
         error:   insertResult.error,
         userId:  user.id,
         outputUrl,
+      })
+    }
+
+    // Audit que não coube no inline: grava no generation_log depois da
+    // resposta (a Vercel mantém a função viva pro after()). O Histórico lê
+    // fidelity.semantic_audit de lá.
+    if (auditDeferred && renderId) {
+      const logForUpdate = extendedRow.generation_log
+      after(async () => {
+        try {
+          const audit = await auditPromise
+          if (!audit) return
+          console.log(
+            `[generate:fidelity] audit semântico (background): score=${audit.score.toFixed(2)} ` +
+            `preserved=${audit.preserved} warning=${audit.warning}`,
+          )
+          const { error } = await admin
+            .from('renders')
+            .update({
+              generation_log: {
+                ...logForUpdate,
+                fidelity: logForUpdate.fidelity ? { ...logForUpdate.fidelity, semantic_audit: audit } : null,
+              },
+            })
+            .eq('id', renderId)
+          if (error) console.warn('[generate:fidelity] audit em background não gravou:', error.message)
+        } catch (auditErr) {
+          console.warn('[generate:fidelity] audit em background falhou:', truncateErr(auditErr))
+        }
       })
     }
 
