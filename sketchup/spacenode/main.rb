@@ -27,7 +27,7 @@ module SpaceNode
   module SketchUp
     extend self
 
-    VERSION = '0.7.0'
+    VERSION = '0.8.0'
     PREFERENCES_KEY = 'com.spacenode.sketchup'
     DEFAULT_API_BASE_URL = 'https://spacenode.app'
     MIN_SKETCHUP_MAJOR = 21          # Ruby 2.7+; recomendado 2024+
@@ -51,6 +51,7 @@ module SpaceNode
         :renewing => 'Renovando sessão…',
         :cancelled => 'Geração cancelada.',
         :view_restored => 'Vista do render restaurada.',
+        :no_floor => 'Não achei piso abaixo da câmera pra medir a altura do olho.',
         :downloading => 'Baixando o render…',
         :reconciling => 'Conexão instável — verificando se o render foi concluído…',
         :connect_first => 'Conecte sua conta SPACENODE primeiro.',
@@ -82,6 +83,7 @@ module SpaceNode
         :renewing => 'Renewing session…',
         :cancelled => 'Generation cancelled.',
         :view_restored => 'Render view restored.',
+        :no_floor => 'No floor found below the camera to measure the eye height.',
         :downloading => 'Downloading the render…',
         :reconciling => 'Unstable connection — checking if the render finished…',
         :connect_first => 'Connect your SPACENODE account first.',
@@ -109,6 +111,25 @@ module SpaceNode
     # 4096 px — capturar menos que isso pra 2K/4K joga fora o sinal
     # geométrico que o motor de fidelidade precisa.
     CAPTURE_EDGE = { 'hd' => 2048, '2k' => 3072, '4k' => 4096 }.freeze
+
+    # ── Fotografia (0.8.0) ───────────────────────────────────────────────
+    # Convenções: o fov do SketchUp é o ângulo VERTICAL (fov_is_height?);
+    # "lente" no painel é a focal equivalente full-frame medida pela ALTURA
+    # do sensor (24 mm) — f = 12 / tan(fov_v / 2). Isso bate com a lente real
+    # num quadro 3:2 e evita o número inflado que o SketchUp mostra (ele usa
+    # a LARGURA de 36 mm sobre o fov vertical: 35° viram "57 mm", quando na
+    # foto isso é um 38 mm).
+    PHOTO_SENSOR_HALF_HEIGHT_MM = 12.0
+    PHOTO_LENS_RANGE_MM = (8.0..400.0)
+    PHOTO_ASPECT_RANGE = (0.3..4.0)
+    PHOTO_EYE_RANGE_M = (0.2..12.0)
+    # Nivelar (2 pontos): inclinação mínima pra valer a pena e máxima que o
+    # fov de 120° do SketchUp comporta com folga (fov' = fov + 2·inclinação).
+    PHOTO_LEVEL_MIN_DEG = 0.5
+    PHOTO_LEVEL_MAX_DEG = 40.0
+    PHOTO_FOV_MAX_DEG = 118.0
+    PHOTO_GUIDES = %w[none thirds golden center diagonals].freeze
+    INCH_PER_M = 39.3700787
 
     # Higiene de captura: opções que poluem a imagem que a IA vê (sketchy
     # edges, extensão de linha, névoa, guias, grade de seção). Salvas e
@@ -236,7 +257,10 @@ module SpaceNode
       dialog.set_on_closed do
         # Só limpa se ainda somos o dialog corrente (um dialog antigo fechando
         # tarde não pode anular o novo).
-        @dialog = nil if @dialog.equal?(dialog)
+        if @dialog.equal?(dialog)
+          @dialog = nil
+          detach_photo_observers
+        end
       end
       @dialog = dialog
       dialog.show
@@ -254,9 +278,39 @@ module SpaceNode
           emit_error(e.message)
         end
       end
-      dialog.add_action_callback('captureViewport') do |_ctx|
+      dialog.add_action_callback('captureViewport') do |_ctx, raw|
         begin
-          handle_capture
+          handle_capture(raw)
+        rescue StandardError => e
+          emit_error(e.message)
+        end
+      end
+      # Fotografia: ajustes persistentes (proporção/nivelar/guias) e ações
+      # pontuais na câmera viva (lente, altura do olho).
+      dialog.add_action_callback('setPhoto') do |_ctx, raw|
+        begin
+          handle_set_photo(raw)
+        rescue StandardError => e
+          emit_error(e.message)
+        end
+      end
+      dialog.add_action_callback('applyLens') do |_ctx, raw|
+        begin
+          handle_apply_lens(raw)
+        rescue StandardError => e
+          emit_error(e.message)
+        end
+      end
+      dialog.add_action_callback('applyEyeHeight') do |_ctx, raw|
+        begin
+          handle_apply_eye_height(raw)
+        rescue StandardError => e
+          emit_error(e.message)
+        end
+      end
+      dialog.add_action_callback('cameraFacts') do |_ctx|
+        begin
+          emit_camera_facts
         rescue StandardError => e
           emit_error(e.message)
         end
@@ -440,6 +494,8 @@ module SpaceNode
 
     def on_panel_ready
       send_state
+      attach_photo_observers
+      emit_camera_facts
       ensure_catalog
       list_scenes
       check_session if authenticated?
@@ -850,10 +906,516 @@ module SpaceNode
 
     # ── Captura ──────────────────────────────────────────────────────────────
 
-    def handle_capture
-      capture = capture_viewport('2k')
+    def handle_capture(raw = nil)
+      payload = parse_json(raw)
+      capture = capture_viewport('2k', :photo => photo_settings_from(payload['photo']))
       @last_capture_path = capture[:path]
-      emit('capture', capture_event_payload(capture[:path]))
+      emit('capture', capture_event_payload(capture[:path]).merge(:photo => capture[:photo_report]))
+    end
+
+    # ── Fotografia ───────────────────────────────────────────────────────────
+    #
+    # Princípio: a IA preserva o que vê — então o que dá realismo é a CAPTURA
+    # sair como uma fotografia de arquitetura: proporção escolhida, lente
+    # coerente, olho na altura de uma pessoa e verticais paralelas. Proporção
+    # e lente mexem na câmera viva (o SketchUp mostra a moldura); "nivelar"
+    # é só na captura (câmera temporária + recorte), sem tocar na vista do
+    # usuário.
+
+    # Ajustes persistentes vindos do painel: { aspect, level, guide }.
+    # aspect: Float (largura/altura) ou 0 = livre (segue a viewport).
+    def handle_set_photo(raw)
+      payload = parse_json(raw)
+      settings = photo_settings_from(payload)
+      @photo = settings
+      begin
+        model = ::Sketchup.active_model
+        if model
+          camera = model.active_view.camera
+          apply_camera_aspect(camera, settings[:aspect])
+          sync_guides_overlay(model, settings)
+          model.active_view.invalidate
+        end
+      rescue StandardError
+        nil
+      end
+      emit_camera_facts
+    end
+
+    def photo_settings_from(value)
+      base = @photo || { :aspect => 0.0, :level => false, :guide => 'none' }
+      return base unless value.is_a?(Hash)
+
+      out = base.dup
+      if value.key?('aspect')
+        aspect = value['aspect'].to_f
+        out[:aspect] = PHOTO_ASPECT_RANGE.cover?(aspect) ? aspect : 0.0
+      end
+      out[:level] = value['level'] == true if value.key?('level')
+      if value.key?('guide')
+        guide = value['guide'].to_s
+        out[:guide] = PHOTO_GUIDES.include?(guide) ? guide : 'none'
+      end
+      out
+    end
+
+    # Livre (0) só limpa a moldura que o PAINEL pôs — uma moldura que o
+    # usuário definiu por conta própria no SketchUp fica como está.
+    def apply_camera_aspect(camera, aspect)
+      return unless camera.respond_to?(:aspect_ratio=)
+
+      target = aspect.to_f > 0 ? aspect.to_f : 0.0
+      current = camera.aspect_ratio.to_f
+      if target > 0
+        camera.aspect_ratio = target if (current - target).abs > 0.001
+        @panel_aspect = target
+      elsif @panel_aspect && (current - @panel_aspect).abs < 0.001
+        camera.aspect_ratio = 0.0
+        @panel_aspect = nil
+      end
+    rescue StandardError
+      nil
+    end
+
+    # Lente: focal equivalente full-frame (pela altura do sensor) → fov
+    # vertical do SketchUp. Mantém olho, alvo e up.
+    def handle_apply_lens(raw)
+      payload = parse_json(raw)
+      mm = payload['mm'].to_f
+      raise 'Lente fora do intervalo (8–400 mm).' unless PHOTO_LENS_RANGE_MM.cover?(mm)
+
+      model = ::Sketchup.active_model
+      raise 'Nenhum modelo aberto no SketchUp.' unless model
+
+      view = model.active_view
+      camera = view.camera
+      raise 'A lente só se aplica em perspectiva (a câmera está em projeção paralela).' unless camera.perspective?
+
+      fov_v = 2.0 * Math.atan(PHOTO_SENSOR_HALF_HEIGHT_MM / mm) * 180.0 / Math::PI
+      set_vertical_fov(camera, fov_v, frame_aspect(view, camera))
+      view.invalidate
+      emit_camera_facts
+    end
+
+    # Altura do olho: raio pra baixo a partir do olho acha o piso (geometria
+    # visível); move olho E alvo juntos — a direção não muda.
+    def handle_apply_eye_height(raw)
+      payload = parse_json(raw)
+      meters = payload['meters'].to_f
+      raise 'Altura fora do intervalo (0,2–12 m).' unless PHOTO_EYE_RANGE_M.cover?(meters)
+
+      model = ::Sketchup.active_model
+      raise 'Nenhum modelo aberto no SketchUp.' unless model
+
+      view = model.active_view
+      camera = view.camera
+      floor_z = floor_under(model, camera.eye)
+      raise t(:no_floor) unless floor_z
+
+      dz = (floor_z + meters * INCH_PER_M) - camera.eye.z
+      shift = ::Geom::Vector3d.new(0, 0, dz)
+      camera.set(camera.eye.offset(shift), camera.target.offset(shift), camera.up)
+      view.invalidate
+      emit_camera_facts
+    end
+
+    # Cota z do primeiro elemento visível abaixo do ponto (polegadas) ou nil.
+    def floor_under(model, point)
+      hit = model.raytest([point, ::Geom::Vector3d.new(0, 0, -1)], true)
+      return nil unless hit && hit[0]
+
+      z = hit[0].z
+      return nil if z > point.z
+
+      z
+    rescue StandardError
+      nil
+    end
+
+    # Proporção efetiva do quadro: a moldura da câmera, se houver; senão a
+    # viewport.
+    def frame_aspect(view, camera)
+      begin
+        ar = camera.aspect_ratio.to_f
+        return ar if ar > 0
+      rescue StandardError
+        nil
+      end
+      vpw = [view.vpwidth.to_f, 1.0].max
+      vph = [view.vpheight.to_f, 1.0].max
+      vpw / vph
+    end
+
+    def fov_is_height?(camera)
+      camera.respond_to?(:fov_is_height?) ? camera.fov_is_height? : true
+    rescue StandardError
+      true
+    end
+
+    # fov vertical em graus, qualquer que seja o eixo em que o SketchUp mede.
+    def vertical_fov_deg(camera, aspect)
+      fov = camera.fov.to_f
+      return fov if fov_is_height?(camera)
+
+      half = Math.atan(Math.tan(fov * Math::PI / 360.0) / [aspect.to_f, 0.01].max)
+      half * 360.0 / Math::PI
+    end
+
+    def set_vertical_fov(camera, fov_v_deg, aspect)
+      value = fov_v_deg.to_f
+      unless fov_is_height?(camera)
+        half = Math.atan(Math.tan(value * Math::PI / 360.0) * [aspect.to_f, 0.01].max)
+        value = half * 360.0 / Math::PI
+      end
+      value = 1.0 if value < 1.0
+      value = 120.0 if value > 120.0
+      camera.fov = value
+    end
+
+    # Focal equivalente (full-frame, pela altura) a partir do fov vertical.
+    def lens_mm_for(fov_v_deg)
+      half = [fov_v_deg.to_f, 0.5].max * Math::PI / 360.0
+      PHOTO_SENSOR_HALF_HEIGHT_MM / Math.tan(half)
+    end
+
+    # Inclinação da câmera em graus (+ olhando pra cima).
+    def camera_tilt_deg(camera)
+      z = camera.direction.z.to_f
+      z = 1.0 if z > 1.0
+      z = -1.0 if z < -1.0
+      Math.asin(z) * 180.0 / Math::PI
+    end
+
+    # Fatos de câmera pro HUD do painel e pro prompt. two_point força o valor
+    # (captura nivelada); nil deduz da câmera (modo 2 pontos do SketchUp ou
+    # direção horizontal).
+    def camera_facts(view, camera, two_point = nil)
+      facts = { :perspective => camera.perspective? ? true : false }
+      begin
+        facts[:aspect] = camera.aspect_ratio.to_f
+      rescue StandardError
+        facts[:aspect] = 0.0
+      end
+      if camera.perspective?
+        aspect = frame_aspect(view, camera)
+        fov_v = vertical_fov_deg(camera, aspect)
+        tilt = camera_tilt_deg(camera)
+        native_2d = camera.respond_to?(:is_2d?) && camera.is_2d?
+        facts[:fovDeg] = fov_v.round(1)
+        facts[:focalLengthMm] = lens_mm_for(fov_v).round
+        facts[:tiltDeg] = tilt.round(1)
+        facts[:twoPoint] = two_point.nil? ? (native_2d || tilt.abs < PHOTO_LEVEL_MIN_DEG) : (two_point ? true : false)
+      end
+      begin
+        model = ::Sketchup.active_model
+        floor_z = model ? floor_under(model, camera.eye) : nil
+        if floor_z
+          meters = (camera.eye.z - floor_z) / INCH_PER_M
+          facts[:eyeHeightM] = meters.round(2) if PHOTO_EYE_RANGE_M.cover?(meters)
+        end
+      rescue StandardError
+        nil
+      end
+      facts
+    rescue StandardError
+      nil
+    end
+
+    def emit_camera_facts
+      model = ::Sketchup.active_model
+      return unless model && @dialog
+
+      view = model.active_view
+      facts = camera_facts(view, view.camera)
+      return unless facts
+
+      facts[:overlay] = guides_overlay_supported?
+      emit('camera', facts)
+    rescue StandardError
+      nil
+    end
+
+    # Observers: câmera mudou → HUD do painel (com debounce — o orbit dispara
+    # dezenas de vezes por segundo); modelo trocou → religa overlay/observer.
+    def attach_photo_observers
+      model = ::Sketchup.active_model
+      return unless model
+
+      view = model.active_view
+      unless @view_observer && @observed_view.equal?(view)
+        detach_view_observer
+        @view_observer = PhotoViewObserver.new(self)
+        view.add_observer(@view_observer)
+        @observed_view = view
+      end
+      unless @app_observer
+        @app_observer = PhotoAppObserver.new(self)
+        ::Sketchup.add_observer(@app_observer)
+      end
+      sync_guides_overlay(model, @photo || photo_settings_from(nil))
+    rescue StandardError
+      nil
+    end
+
+    def detach_view_observer
+      return unless @view_observer && @observed_view
+
+      begin
+        @observed_view.remove_observer(@view_observer)
+      rescue StandardError
+        nil
+      end
+      @view_observer = nil
+      @observed_view = nil
+    end
+
+    def detach_photo_observers
+      detach_view_observer
+      if @app_observer
+        begin
+          ::Sketchup.remove_observer(@app_observer)
+        rescue StandardError
+          nil
+        end
+        @app_observer = nil
+      end
+      begin
+        overlay = @guides_overlay
+        overlay.enabled = false if overlay && overlay.respond_to?(:valid?) && overlay.valid?
+      rescue StandardError
+        nil
+      end
+    end
+
+    # Chamado pelo ViewObserver a cada mudança de câmera; coalesce num timer.
+    def camera_changed
+      return unless @dialog
+      return if @camera_timer
+
+      @camera_timer = ::UI.start_timer(0.25, false) do
+        @camera_timer = nil
+        emit_camera_facts
+      end
+    rescue StandardError
+      @camera_timer = nil
+    end
+
+    def model_switched
+      @guides_overlay = nil
+      detach_view_observer
+      attach_photo_observers
+      emit_camera_facts
+    rescue StandardError
+      nil
+    end
+
+    def guides_overlay_supported?
+      defined?(::Sketchup::Overlay) ? true : false
+    end
+
+    # Overlay é por modelo: (re)adiciona quando necessário e liga/desliga
+    # conforme a guia escolhida. Sem Overlay (SketchUp < 2023) as guias
+    # existem só no preview do painel.
+    def sync_guides_overlay(model, settings)
+      return unless guides_overlay_supported? && model.respond_to?(:overlays)
+
+      overlay = @guides_overlay
+      unless overlay && overlay.respond_to?(:valid?) && overlay.valid? && overlay.model_id == model.object_id
+        overlay = nil
+        begin
+          model.overlays.each { |o| overlay = o if o.is_a?(GuidesOverlay) }
+        rescue StandardError
+          overlay = nil
+        end
+        unless overlay
+          overlay = GuidesOverlay.new
+          model.overlays.add(overlay)
+        end
+        overlay.model_id = model.object_id
+        @guides_overlay = overlay
+      end
+      overlay.guide = settings[:guide].to_s
+      overlay.aspect = settings[:aspect].to_f
+      wanted = overlay.guide != 'none'
+      overlay.enabled = wanted if overlay.enabled? != wanted
+      model.active_view.invalidate
+    rescue StandardError
+      nil
+    end
+
+    # Segmentos (x1, y1, x2, y2) em fração do quadro — compartilhado com o
+    # painel (mesma tabela em JS).
+    def self.guide_segments(guide)
+      phi = 0.381966
+      case guide.to_s
+      when 'thirds'
+        [[1 / 3.0, 0, 1 / 3.0, 1], [2 / 3.0, 0, 2 / 3.0, 1], [0, 1 / 3.0, 1, 1 / 3.0], [0, 2 / 3.0, 1, 2 / 3.0]]
+      when 'golden'
+        [[phi, 0, phi, 1], [1 - phi, 0, 1 - phi, 1], [0, phi, 1, phi], [0, 1 - phi, 1, 1 - phi]]
+      when 'center'
+        [[0.5, 0, 0.5, 1], [0, 0.5, 1, 0.5]]
+      when 'diagonals'
+        [[0, 0, 1, 1], [1, 0, 0, 1]]
+      else
+        []
+      end
+    end
+
+    # Plano de captura nivelada ("shift" de lente): câmera temporária com a
+    # direção horizontal e fov vertical maior (fov + 2·inclinação), render
+    # mais alto e recorte da faixa que corresponde ao quadro original. As
+    # verticais saem paralelas e o enquadramento vertical é preservado (a
+    # cobertura horizontal fica um pouco mais larga — geometria do plano
+    # vertical). nil = nada a fazer; { :reason } = não dá.
+    # Razões "brandas" (nada a fazer, a imagem já sai certa): not_perspective,
+    # native_2d, already_level — o painel não avisa nesses casos.
+    def level_plan(view, camera, width, height)
+      return { :reason => 'not_perspective' } unless camera.perspective?
+      return { :reason => 'native_2d' } if camera.respond_to?(:is_2d?) && camera.is_2d?
+
+      tilt_deg = camera_tilt_deg(camera)
+      return { :reason => 'already_level', :tilt => tilt_deg.round(1) } if tilt_deg.abs < PHOTO_LEVEL_MIN_DEG
+      return { :reason => 'too_steep', :tilt => tilt_deg.round(1) } if tilt_deg.abs > PHOTO_LEVEL_MAX_DEG
+
+      aspect = width.to_f / height
+      fv = vertical_fov_deg(camera, frame_aspect(view, camera)) * Math::PI / 180.0
+      tilt = tilt_deg * Math::PI / 180.0
+      half = tilt.abs + fv / 2.0
+      fov2_deg = half * 360.0 / Math::PI
+      return { :reason => 'too_steep', :tilt => tilt_deg.round(1) } if fov2_deg > PHOTO_FOV_MAX_DEG
+
+      span = Math.tan(tilt + fv / 2.0) - Math.tan(tilt - fv / 2.0)
+      return { :reason => 'degenerate' } if span <= 0
+
+      render_h = (2.0 * height * Math.tan(half) / span).ceil
+      render_h = height if render_h < height
+      top = ((render_h / 2.0) * (1.0 - Math.tan(tilt + fv / 2.0) / Math.tan(half))).round
+      top = 0 if top < 0
+      top = render_h - height if top > render_h - height
+
+      dir = camera.direction
+      flat = ::Geom::Vector3d.new(dir.x, dir.y, 0)
+      return { :reason => 'degenerate' } if flat.length < 1e-6
+
+      flat.normalize!
+      dist = camera.eye.distance(camera.target)
+      dist = 100.0 if dist < 1e-3
+      target = camera.eye.offset(flat, dist)
+      {
+        :eye => camera.eye, :target => target,
+        :fov_v => fov2_deg, :width => width, :render_h => render_h,
+        :top => top, :height => height, :tilt => tilt_deg.round(1), :aspect => aspect
+      }
+    rescue StandardError
+      { :reason => 'error' }
+    end
+
+    def leveled_camera_for(plan)
+      camera = ::Sketchup::Camera.new(plan[:eye], plan[:target], ::Geom::Vector3d.new(0, 0, 1))
+      camera.perspective = true
+      render_aspect = plan[:width].to_f / plan[:render_h]
+      set_vertical_fov(camera, plan[:fov_v], render_aspect)
+      camera.aspect_ratio = render_aspect if camera.respond_to?(:aspect_ratio=)
+      camera
+    end
+
+    # Renderiza com a câmera nivelada e recorta a faixa. Devolve true se o
+    # arquivo em `path` ficou pronto; false mantém a captura normal.
+    def write_leveled_image(view, plan, path, options)
+      original = view.camera
+      temp = leveled_camera_for(plan)
+      scale = options[:height].to_f / plan[:height]
+      scale = 1.0 if scale <= 0
+      render_h = (plan[:render_h] * scale).round
+      top = (plan[:top] * scale).round
+      height = options[:height].to_i
+      render_h = height if render_h < height
+      top = render_h - height if top > render_h - height
+      top = 0 if top < 0
+
+      write_options = options.merge(:height => render_h)
+      begin
+        view.camera = temp
+        ok = view.write_image(write_options)
+      ensure
+        begin
+          view.camera = original
+        rescue StandardError
+          nil
+        end
+      end
+      return false unless ok && File.exist?(path)
+
+      crop_rows(path, top, height)
+    rescue StandardError
+      false
+    end
+
+    # Recorte vertical no lugar via ImageRep (SketchUp 2018+). A ordem das
+    # linhas do buffer não é documentada — detectamos comparando as bordas
+    # com color_at_uv (v=0 é a base da imagem, por doc).
+    def crop_rows(path, top, height)
+      return false unless defined?(::Sketchup::ImageRep)
+
+      rep = ::Sketchup::ImageRep.new
+      rep.load_file(path)
+      w = rep.width.to_i
+      h = rep.height.to_i
+      bpp = rep.bits_per_pixel.to_i
+      pad = rep.row_padding.to_i
+      return false if w <= 0 || h <= 0 || ![8, 24, 32].include?(bpp)
+      return true if top <= 0 && height >= h
+
+      stride = ((w * bpp) / 8) + pad
+      data = rep.data
+      return false unless data && data.bytesize >= stride * h
+
+      height = h - top if top + height > h
+      first = imagerep_top_down?(rep, data, stride, bpp, w, h) ? top : (h - top - height)
+      sliced = data.byteslice(first * stride, height * stride)
+      return false unless sliced && sliced.bytesize == height * stride
+
+      out = ::Sketchup::ImageRep.new
+      out.set_data(w, height, bpp, pad, sliced.force_encoding('ASCII-8BIT'))
+      out.save_file(path)
+      File.exist?(path)
+    rescue StandardError
+      false
+    end
+
+    def imagerep_top_down?(rep, data, stride, bpp, w, h)
+      return true if h < 2 || bpp < 24
+
+      bytes = bpp / 8
+      columns = [0.1, 0.3, 0.5, 0.7, 0.9].map { |f| [(w * f).floor, w - 1].min }
+      score_top_down = 0
+      score_bottom_up = 0
+      columns.each do |x|
+        first = data.byteslice(x * bytes, 3)
+        last = data.byteslice((h - 1) * stride + x * bytes, 3)
+        next unless first && last
+
+        u = (x + 0.5) / w
+        top_color = rep.color_at_uv(u, 1.0 - (0.5 / h), false)
+        bottom_color = rep.color_at_uv(u, 0.5 / h, false)
+        next unless top_color && bottom_color
+
+        score_top_down += 1 if pixel_matches?(first, top_color) || pixel_matches?(last, bottom_color)
+        score_bottom_up += 1 if pixel_matches?(first, bottom_color) || pixel_matches?(last, top_color)
+      end
+      score_top_down >= score_bottom_up
+    rescue StandardError
+      true
+    end
+
+    def pixel_matches?(raw, color)
+      b = raw.bytes
+      return false if b.length < 3
+
+      r, g, bl = color.red, color.green, color.blue
+      close = ->(x, y) { (x - y).abs <= 3 }
+      (close.call(b[0], r) && close.call(b[1], g) && close.call(b[2], bl)) ||
+        (close.call(b[0], bl) && close.call(b[1], g) && close.call(b[2], r))
     end
 
     # ── Sol / câmera / fatos do modelo ──────────────────────────────────────
@@ -1026,23 +1588,22 @@ module SpaceNode
     # Fatos medidos do modelo pro prompt (câmera + sol) — best-effort: nil
     # em qualquer falha; o servidor sanitiza de novo. Lê o estado VIGENTE
     # (chamado dentro da captura, com override de sol ainda aplicado).
-    def collect_model_facts
+    def collect_model_facts(view = nil, camera = nil, two_point = nil)
       model = ::Sketchup.active_model
       return nil unless model
 
       facts = {}
       begin
-        camera = model.active_view.camera
+        view ||= model.active_view
+        camera ||= view.camera
         if camera.perspective?
-          cam = { :fovDeg => camera.fov.round(1) }
-          begin
-            cam[:focalLengthMm] = camera.focal_length.round
-          rescue StandardError
-            nil
-          end
-          up = camera.up
-          cam[:twoPoint] = true if up && up.z.abs > 0.999 && camera.direction.z.abs < 0.98
-          facts[:camera] = cam
+          cf = camera_facts(view, camera, two_point) || {}
+          cam = {}
+          cam[:fovDeg] = cf[:fovDeg] if cf[:fovDeg]
+          cam[:focalLengthMm] = cf[:focalLengthMm] if cf[:focalLengthMm]
+          cam[:twoPoint] = true if cf[:twoPoint]
+          cam[:eyeHeightM] = cf[:eyeHeightM] if cf[:eyeHeightM]
+          facts[:camera] = cam unless cam.empty?
         end
       rescue StandardError
         nil
@@ -1166,6 +1727,8 @@ module SpaceNode
     #   :sun_preset — 'atual'|'manha'|'meiodia'|'tarde'|'golden' (sol aplicado
     #                 só durante a captura, com restauro manual do ShadowInfo)
     #   :edge_map   — true captura também o hidden-line da MESMA câmera
+    #   :photo      — { :aspect, :level } (proporção do quadro; nivelar
+    #                 verticais com câmera temporária + recorte)
     # Retorna { :path, :edge_path } e preenche @last_capture_size/mime/camera.
     def capture_viewport(resolution, opts = {})
       model = ::Sketchup.active_model
@@ -1175,12 +1738,52 @@ module SpaceNode
       vpw = [view.vpwidth.to_i, 1].max
       vph = [view.vpheight.to_i, 1].max
 
+      photo = opts[:photo] || @photo || photo_settings_from(nil)
+      capture_camera = view.camera
+      aspect = photo[:aspect].to_f
+      if aspect <= 0
+        # Livre: se o usuário já pôs uma moldura na câmera (Advanced Camera
+        # Tools etc.), a captura segue ELA; senão, a viewport.
+        own = begin
+          capture_camera.aspect_ratio.to_f
+        rescue StandardError
+          0.0
+        end
+        aspect = own > 0 ? own : vpw.to_f / vph
+      end
+      # Quadro: lado maior = alvo da resolução; o outro segue a proporção.
+      # A moldura (aspect_ratio) é aplicada na câmera antes do write_image
+      # pra pixels e quadro concordarem; sem moldura escolhida, o quadro é a
+      # viewport (comportamento anterior).
       target_edge = CAPTURE_EDGE[resolution.to_s] || CAPTURE_EDGE['2k']
-      scale = target_edge.to_f / [vpw, vph].max
+      if aspect >= 1.0
+        width = target_edge
+        height = [(target_edge / aspect).round, 1].max
+      else
+        height = target_edge
+        width = [(target_edge * aspect).round, 1].max
+      end
+      frame_px = [vpw.to_f / vph >= aspect ? vph * aspect : vpw, vpw.to_f / vph >= aspect ? vph : vpw / aspect]
+      scale = width.to_f / [frame_px[0], 1.0].max
       scale = 1.0 if scale < 1.0
       scale = 4.0 if scale > 4.0
-      width = [(vpw * scale).round, 1].max
-      height = [(vph * scale).round, 1].max
+
+      aspect_saved = nil
+      if photo[:aspect].to_f > 0 && capture_camera.respond_to?(:aspect_ratio=)
+        begin
+          aspect_saved = capture_camera.aspect_ratio.to_f
+          capture_camera.aspect_ratio = aspect if (aspect_saved - aspect).abs > 0.001
+        rescue StandardError
+          aspect_saved = nil
+        end
+      end
+      level_requested = photo[:level] ? true : false
+      plan = level_requested ? level_plan(view, capture_camera, width, height) : nil
+      level_reason = plan && plan[:reason] ? plan[:reason] : nil
+      plan = nil if level_reason
+      level_applied = false
+      # "Voltar à vista" restaura a câmera do USUÁRIO — nunca a temporária.
+      @last_capture_camera = snapshot_camera(view)
 
       stamp = "#{Time.now.strftime('%Y%m%d-%H%M%S')}-#{SecureRandom.hex(3)}"
       path = File.join(Dir.tmpdir, "spacenode-viewport-#{stamp}.png")
@@ -1212,8 +1815,14 @@ module SpaceNode
         }
         options[:scale_factor] = scale if scale > 1.0
 
-        ok = view.write_image(options)
-        raise 'Não foi possível capturar a vista atual.' unless ok && File.exist?(path)
+        if plan
+          level_applied = write_leveled_image(view, plan, path, options)
+          level_reason = 'render_failed' unless level_applied
+        end
+        unless level_applied
+          ok = view.write_image(options)
+          raise 'Não foi possível capturar a vista atual.' unless ok && File.exist?(path)
+        end
 
         # Um viewport 4K em PNG pode passar do teto da área de upload — cai
         # pra JPEG de alta qualidade antes de falhar. O teto é da ÁREA de
@@ -1221,13 +1830,24 @@ module SpaceNode
         max_bytes = opts[:max_bytes] || 14_000_000
         if File.size(path) > max_bytes
           jpg = path.sub(/\.png\z/, '.jpg')
-          view.write_image(
-            :filename => jpg,
-            :width => width,
-            :height => height,
-            :antialias => true,
-            :compression => 0.92
-          )
+          if level_applied
+            # Já recortado: reencoda o próprio arquivo (ImageRep salva jpg).
+            begin
+              rep = ::Sketchup::ImageRep.new
+              rep.load_file(path)
+              rep.save_file(jpg)
+            rescue StandardError
+              nil
+            end
+          else
+            view.write_image(
+              :filename => jpg,
+              :width => width,
+              :height => height,
+              :antialias => true,
+              :compression => 0.92
+            )
+          end
           if File.exist?(jpg)
             begin
               File.delete(path)
@@ -1240,23 +1860,32 @@ module SpaceNode
 
         # Segunda captura pequena só pro preview do painel — nunca injetamos
         # o arquivo cheio (megabytes de base64 dentro de execute_script
-        # travam o CEF).
+        # travam o CEF). Mesmo quadro (proporção e nivelamento) da captura.
         preview = "#{path}.preview.jpg"
-        preview_scale = 900.0 / [vpw, vph].max
+        preview_scale = 900.0 / [width, height].max
         preview_scale = 1.0 if preview_scale > 1.0
-        view.write_image(
+        preview_w = [(width * preview_scale).round, 1].max
+        preview_h = [(height * preview_scale).round, 1].max
+        preview_options = {
           :filename => preview,
-          :width => [(vpw * preview_scale).round, 1].max,
-          :height => [(vph * preview_scale).round, 1].max,
+          :width => preview_w,
+          :height => preview_h,
           :antialias => true,
           :compression => 0.85
-        )
+        }
+        preview_done = false
+        if level_applied
+          preview_done = write_leveled_image(view, plan, preview, preview_options)
+        end
+        view.write_image(preview_options) unless preview_done
         @last_preview_path = File.exist?(preview) ? preview : nil
 
         # Fatos do modelo coletados AQUI, com o override de sol ainda
         # aplicado — coletar depois do ensure descreveria o sol restaurado,
-        # contradizendo as sombras realmente visíveis na captura.
-        facts = collect_model_facts
+        # contradizendo as sombras realmente visíveis na captura. A câmera
+        # descrita é a do usuário (lente/altura); twoPoint só é verdade se
+        # a captura saiu nivelada (ou a câmera já era).
+        facts = collect_model_facts(view, capture_camera, level_applied ? true : nil)
 
         # Edge map nativo: hidden-line da MESMA câmera, MESMO tamanho (o
         # condicionamento estrutural exige alinhamento pixel a pixel).
@@ -1282,7 +1911,15 @@ module SpaceNode
               :antialias => true
             }
             edge_options[:scale_factor] = scale if scale > 1.0
-            view.write_image(edge_options)
+            # Mesmo plano nivelado da captura — o edge map precisa casar
+            # pixel a pixel; se o recorte falhar aqui, segue sem edge map.
+            edge_done = level_applied ? write_leveled_image(view, plan, candidate, edge_options) : false
+            if level_applied && !edge_done
+              delete_quiet(candidate)
+              edge_reason = 'level_mismatch'
+            elsif !level_applied
+              view.write_image(edge_options)
+            end
             if File.exist?(candidate)
               if File.size(candidate) <= 14_000_000
                 edge_path = candidate
@@ -1309,18 +1946,33 @@ module SpaceNode
       ensure
         restore_rendering_options(rendering, clean_saved)
         restore_sun_override(model, sun_saved)
+        # Moldura temporária (só quando a câmera não tinha a escolhida).
+        if aspect_saved && (aspect_saved - aspect).abs > 0.001
+          begin
+            capture_camera.aspect_ratio = aspect_saved
+          rescue StandardError
+            nil
+          end
+        end
       end
 
       @last_capture_size = [width, height]
       @last_capture_mime = path.end_with?('.jpg') ? 'image/jpeg' : 'image/png'
-      @last_capture_camera = snapshot_camera(view)
+      photo_report = {
+        :aspect => photo[:aspect].to_f > 0 ? photo[:aspect].to_f.round(4) : 0,
+        :levelRequested => level_requested,
+        :levelApplied => level_applied,
+        :levelReason => level_reason,
+        :tiltDeg => plan ? plan[:tilt] : (level_requested ? camera_tilt_deg(capture_camera).round(1) : nil)
+      }
       {
         :path => path, :edge_path => edge_path, :facts => facts,
         # Relatório honesto do que a captura conseguiu — vai pro painel no
         # resultado (o usuário paga o máximo e precisa saber se recebeu).
         :edge_reason => edge_reason,
         :sun_requested => sun_requested,
-        :sun_applied => sun_requested && !sun_saved.nil?
+        :sun_applied => sun_requested && !sun_saved.nil?,
+        :photo_report => photo_report
       }
     end
 
@@ -1523,20 +2175,26 @@ module SpaceNode
       capture = capture_viewport(
         resolution,
         :sun_preset => payload['sunPreset'],
-        :edge_map => want_edge
+        :edge_map => want_edge,
+        :photo => photo_settings_from(payload['photo'])
       )
       @last_capture_path = capture[:path]
-      emit('capture', capture_event_payload(capture[:path]))
+      emit('capture', capture_event_payload(capture[:path]).merge(:photo => capture[:photo_report]))
 
       facts = capture[:facts]
       camera = @last_capture_camera
       mime = @last_capture_mime || 'image/png'
+      report = capture[:photo_report] || {}
       conditioning = {
         :edgeRequested => want_edge,
         :edgeMap => false,
         :edgeReason => capture[:edge_reason],
         :sunRequested => capture[:sun_requested] ? true : false,
         :sunApplied => capture[:sun_applied] ? true : false,
+        :levelRequested => report[:levelRequested] ? true : false,
+        :levelApplied => report[:levelApplied] ? true : false,
+        :levelReason => report[:levelReason],
+        :tiltDeg => report[:tiltDeg],
         :materialsRequested => 0,
         :materialsSent => 0,
         :skipped => []
@@ -3632,7 +4290,9 @@ module SpaceNode
         :panelState => panel_state,
         :lastResult => @last_result || model_result,
         :videoSave => video_save_mode,
-        :lastVideo => last_video_state
+        :lastVideo => last_video_state,
+        :photo => @photo,
+        :guidesOverlay => guides_overlay_supported?
       })
     end
 
@@ -3673,6 +4333,102 @@ module SpaceNode
       ::UI.openURL(raw)
     rescue StandardError
       emit_error('URL inválida.')
+    end
+
+    # ── Fotografia: overlay de guias e observers ─────────────────────────────
+
+    # Guias de composição desenhadas na viewport (SketchUp 2023+). Overlay é
+    # passivo: não toma cliques nem a ferramenta ativa, e não sai no export.
+    if defined?(::Sketchup::Overlay)
+      class GuidesOverlay < ::Sketchup::Overlay
+        attr_accessor :guide, :aspect, :model_id
+
+        def initialize
+          super('com.spacenode.sketchup.guides', 'SPACENODE · Guias de composição',
+                description: 'Terços, proporção áurea, centro ou diagonais sobre a vista, dentro da moldura escolhida.')
+          @guide = 'none'
+          @aspect = 0.0
+          @model_id = nil
+        end
+
+        def draw(view)
+          segments = SpaceNode::SketchUp.guide_segments(@guide)
+          return if segments.empty?
+
+          w = view.vpwidth.to_f
+          h = view.vpheight.to_f
+          return if w < 2 || h < 2
+
+          x0 = 0.0
+          y0 = 0.0
+          fw = w
+          fh = h
+          if @aspect.to_f > 0
+            if w / h > @aspect
+              fw = h * @aspect
+              x0 = (w - fw) / 2.0
+            else
+              fh = w / @aspect
+              y0 = (h - fh) / 2.0
+            end
+          end
+          points = []
+          segments.each do |s|
+            points << ::Geom::Point3d.new(x0 + s[0] * fw, y0 + s[1] * fh, 0)
+            points << ::Geom::Point3d.new(x0 + s[2] * fw, y0 + s[3] * fh, 0)
+          end
+          view.line_stipple = ''
+          # Halo escuro + linha clara: legível sobre céu branco e sombra.
+          view.line_width = 3
+          view.drawing_color = ::Sketchup::Color.new(0, 0, 0, 70)
+          view.draw2d(::GL_LINES, points)
+          view.line_width = 1
+          view.drawing_color = ::Sketchup::Color.new(255, 255, 255, 200)
+          view.draw2d(::GL_LINES, points)
+        rescue StandardError
+          nil
+        end
+      end
+    end
+
+    class PhotoViewObserver < ::Sketchup::ViewObserver
+      def initialize(owner)
+        @owner = owner
+      end
+
+      def onViewChanged(_view)
+        @owner.camera_changed
+      rescue StandardError
+        nil
+      end
+    end
+
+    class PhotoAppObserver < ::Sketchup::AppObserver
+      def initialize(owner)
+        @owner = owner
+      end
+
+      def onNewModel(_model)
+        @owner.model_switched
+      rescue StandardError
+        nil
+      end
+
+      def onOpenModel(_model)
+        @owner.model_switched
+      rescue StandardError
+        nil
+      end
+
+      def onActivateModel(_model)
+        @owner.model_switched
+      rescue StandardError
+        nil
+      end
+
+      def expectsStartupModelNotifications
+        false
+      end
     end
 
     # ── Registro de UI ───────────────────────────────────────────────────────
