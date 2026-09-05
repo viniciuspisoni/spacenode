@@ -74,9 +74,11 @@ export function falParamsForEngine(
   aspectRatio: string | null = null,
 ): Record<string, unknown> {
   if (engine === 'quasar') {
+    // TESTE 2026-09-04 — Seedream 5.0 Pro Edit (ver lib/engines.ts): só campos
+    // do schema; 'auto_2K' segue o aspecto do input no teto do modelo (2048²),
+    // então 2K e 4K mapeiam ambos pra 'auto_2K'. Sem seed/quality/aspect_ratio.
     return {
-      quality:       q === '4k' ? 'high' : 'medium',
-      image_size:    'auto',
+      image_size:    'auto_2K',
       num_images:    1,
       output_format: 'png',
     }

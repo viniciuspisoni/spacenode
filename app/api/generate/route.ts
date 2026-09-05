@@ -77,8 +77,10 @@ const FAL_TIMEOUT_MS: Record<EngineId, number> = {
 // Vega   (Gemini 3 Pro Image edit) → `resolution` ∈ '1K'|'2K'|'4K'
 // Pulsar (Nano Banana 2 edit)      → `resolution` ∈ '1K'|'2K'|'4K'
 //   HD interno mapeia para '1K' na Fal.ai (NB2 não tem rótulo "HD" nativo).
-// Quasar (GPT Image 2 edit)        → `quality` ∈ 'medium'|'high'
-//   2K interno → 'medium', 4K → 'high'.
+// Quasar (Seedream 5.0 Pro edit)   → `image_size` = 'auto_2K' (TESTE 2026-09-04)
+//   'auto_*' segue o aspecto da imagem de entrada; o modelo tem teto de
+//   2048×2048, então 2K e 4K internos mapeiam ambos para 'auto_2K'. Schema da
+//   FAL sem seed/quality/aspect_ratio (antes, GPT Image 2: quality medium/high).
 
 function falParamsForEngine(
   engine:      EngineId,
@@ -86,9 +88,10 @@ function falParamsForEngine(
   aspectRatio: string | null = null,
 ): Record<string, unknown> {
   if (engine === 'quasar') {
+    // Seedream 5.0 Pro Edit: só campos do schema (conferido 2026-09-04).
+    // 'auto_2K' preserva a proporção do input no maior tamanho suportado.
     return {
-      quality:       resolution === '4k' ? 'high' : 'medium',
-      image_size:    'auto',
+      image_size:    'auto_2K',
       num_images:    1,
       // Master lossless — alinha o caminho FAL com o GCP/Vertex (que já
       // devolve PNG). JPEG aqui criava uma geração de perda logo na origem
@@ -682,7 +685,7 @@ export async function POST(req: NextRequest) {
         image_urls: imageUrls,
         ...falParamsForEngine(engine, resolution, aspectRatio),
         // Reprodutibilidade nos DOIS caminhos: NB2/Pro na FAL expõem `seed`
-        // (schema conferido 2026-08-17); Quasar (gpt-image-2) não.
+        // (schema conferido 2026-08-17); Quasar (Seedream 5.0 Pro edit) não.
         ...(engine !== 'quasar' ? { seed: attemptSeed } : {}),
         // Thinking do NB2 (único motor com o knob na FAL): planejar a cena
         // antes de gerar adere melhor ao contrato de preservação. No caminho
