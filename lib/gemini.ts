@@ -43,7 +43,9 @@ const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504])
 // demand" em cadeia — era metade do tempo percebido de um render Vega. O
 // Vertex usa a quota do projeto (mesma credencial dos renders de imagem) e
 // não passa por esse pool. GEMINI_VIA_VERTEX=1 liga; GEMINI_VERTEX_LOCATION
-// escolhe a região (default 'global'). Se o Vertex falhar com erro NÃO
+// escolhe a região — default 'us-central1': medido no mesmo render, briefing
+// 7,8–8,0 s e audit 3,2–3,7 s, contra 50–63 s / 3,6–3,9 s no endpoint
+// 'global' e 20–33 s / 63–76 s (falhando) na API direta. Se o Vertex falhar com erro NÃO
 // transiente (404 de modelo, permissão, credencial), a chamada cai UMA vez
 // pra API direta — configuração errada nunca derruba DNA/briefing/audit.
 type GeminiTransport = 'vertex' | 'direct'
@@ -62,7 +64,7 @@ let _vertexClient: GoogleGenAI | null = null
 function vertexClient(): GoogleGenAI {
   if (!_vertexClient) {
     const project   = process.env.GOOGLE_VERTEX_PROJECT?.trim()
-    const location  = process.env.GEMINI_VERTEX_LOCATION?.trim() || 'global'
+    const location  = process.env.GEMINI_VERTEX_LOCATION?.trim() || 'us-central1'
     const credsJson = process.env.GOOGLE_VERTEX_CREDENTIALS_JSON?.trim()
     _vertexClient = new GoogleGenAI({
       vertexai: true,
