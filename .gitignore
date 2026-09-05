@@ -50,3 +50,6 @@ next-env.d.ts
 # cliente e o last-run é derivado — só a baseline.json versiona.
 tests/fidelity/bench/inputs/
 tests/fidelity/bench/last-run.json
+
+# Saída da fábrica de Reels (mp4, frames de QA): centenas de MB, regenerável a partir dos specs
+/marketing/output/
