@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 }
 
 const RBZ_PATH = '/downloads/spacenode-sketchup.rbz'
-const PLUGIN_VERSION = '0.7.0'
+const PLUGIN_VERSION = '0.8.0'
 
 const FEATURES: { title: string; body: string }[] = [
   {
@@ -32,6 +32,10 @@ const FEATURES: { title: string; body: string }[] = [
   {
     title: 'sol e lente reais.',
     body: 'A posição do sol (data, hora e localização do modelo) e a lente da câmera entram no prompt como fato medido. A luz do render respeita as sombras do projeto.',
+  },
+  {
+    title: 'enquadre como fotógrafo.',
+    body: 'Proporção, lente, altura do olho, guias de composição e verticais niveladas (2 pontos) direto no painel — a captura sai como uma fotografia de arquitetura, e é isso que a IA preserva.',
   },
   {
     title: 'edite por instrução.',

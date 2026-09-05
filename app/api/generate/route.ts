@@ -157,6 +157,8 @@ function sanitizeModelFacts(raw: unknown): ModelFacts | undefined {
     if (focal) camera.focalLengthMm = focal
     if (fov) camera.fovDeg = fov
     if (cam.twoPoint === true) camera.twoPoint = true
+    const eye = num(cam.eyeHeightM, 0.2, 12)
+    if (eye !== undefined) camera.eyeHeightM = Math.round(eye * 100) / 100
     if (Object.keys(camera).length > 0) out.camera = camera
   }
   const sun = src.sun as Record<string, unknown> | undefined

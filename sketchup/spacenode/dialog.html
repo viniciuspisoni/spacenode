@@ -163,6 +163,15 @@
     }
     .preview img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: none; }
     .preview img.is-visible { display: block; }
+    /* Guias de composição sobre o preview (mesma tabela de segmentos do
+       overlay do SketchUp). Halo escuro + linha clara: legível em qualquer
+       fundo; stroke não escala com o viewBox. */
+    .guides { position: absolute; inset: 0; width: 100%; height: 100%; display: none; pointer-events: none; z-index: 2; }
+    .preview.has-guides .guides { display: block; }
+    .guides line { vector-effect: non-scaling-stroke; }
+    .guides .halo { stroke: rgba(0, 0, 0, 0.35); stroke-width: 3; }
+    .guides .line { stroke: rgba(255, 255, 255, 0.85); stroke-width: 1; }
+    .photo-hud { letter-spacing: 0; text-transform: none; font-weight: 500; color: var(--text-3); }
     .empty-preview {
       position: absolute; inset: 0; display: flex; flex-direction: column;
       align-items: center; justify-content: center; gap: 6px;
@@ -463,6 +472,7 @@
         <img id="resultImage" alt="Render SPACENODE">
         <div class="compare-clip" id="compareClip"><img id="captureCompareImage" alt=""></div>
         <img id="captureImage" alt="Vista capturada">
+        <svg class="guides" id="guidesSvg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
         <div class="compare-handle" id="compareHandle"></div>
         <span class="preview-tag" id="tagBefore">Antes</span>
         <span class="preview-tag" id="tagAfter">Depois</span>
@@ -514,6 +524,26 @@
         </div>
         <div class="hint" id="videoHint"></div>
       </div>
+
+      <details id="photoSection" open>
+        <summary><span id="L_photo">Fotografia</span> <span class="scenes-count photo-hud" id="photoHud"></span></summary>
+        <div class="details-body">
+          <div class="hint" id="L_photoAspect" style="margin:0 0 8px">Proporção</div>
+          <div class="pills" id="aspectPills" role="radiogroup" aria-label="Proporção"></div>
+          <div class="hint" id="L_photoLens" style="margin-top:10px">Lente</div>
+          <div class="pills" id="lensPills" role="radiogroup" aria-label="Lente"></div>
+          <div class="hint" id="L_photoEye" style="margin-top:10px">Altura do olho</div>
+          <div class="pills" id="eyePills" aria-label="Altura do olho"></div>
+          <div class="hint" id="eyeHint" style="display:none"></div>
+          <div class="hint" id="L_photoLevel" style="margin-top:10px">Verticais</div>
+          <div class="pills" id="levelPills" role="radiogroup" aria-label="Verticais"></div>
+          <div class="hint" id="levelHint"></div>
+          <div class="hint" id="L_photoGuide" style="margin-top:10px">Guias de composição</div>
+          <div class="pills" id="guidePills" role="radiogroup" aria-label="Guias de composição"></div>
+          <div class="hint" id="guideHint"></div>
+          <div class="batch-note" id="photoNote"></div>
+        </div>
+      </details>
 
       <details id="editSection" style="display:none">
         <summary id="L_edit">Editar este render</summary>
@@ -742,6 +772,14 @@
       userEmail: null,
       version: '',
       sunPreset: 'atual',
+      // Fotografia: proporção (largura/altura; 0 = livre), nivelar verticais
+      // na captura, guia de composição; `camera` são os fatos vivos do Ruby.
+      photoAspect: 0,
+      photoLevel: false,
+      photoGuide: 'none',
+      camera: null,
+      guidesOverlay: false,
+      captureSize: null,
       scenes: [],
       selectedScenes: [],
       modelMaterials: [],
@@ -849,6 +887,29 @@
         capturingOverlay: 'Capturando a vista…',
         nodesPerImage: function (n) { return n + ' Nodes por imagem'; },
         sun: { atual: 'Atual', manha: 'Manhã', meiodia: 'Meio-dia', tarde: 'Entardecer', golden: 'Golden hour' },
+        L_photo: 'Fotografia', L_photoAspect: 'Proporção', L_photoLens: 'Lente', L_photoEye: 'Altura do olho',
+        L_photoLevel: 'Verticais', L_photoGuide: 'Guias de composição',
+        aspectFree: 'Livre',
+        lensMm: function (mm) { return mm + ' mm'; },
+        eye: { seated: 'Sentado · 1,20 m', standing: 'Em pé · 1,60 m' },
+        eyeNoFloor: 'Sem piso abaixo da câmera — não dá pra medir nem ajustar a altura do olho.',
+        eyeParallel: 'Em projeção paralela a altura do olho não muda a imagem.',
+        level: { asis: 'Como está', level: 'Nivelar (2 pontos)' },
+        levelFlat: 'Câmera nivelada — as verticais já saem paralelas.',
+        levelTilted: function (deg, up) { return 'Câmera inclinada ' + deg + '° para ' + (up ? 'cima' : 'baixo') + ' — as verticais convergem.'; },
+        levelWill: 'Na captura a câmera é nivelada e o quadro recortado: verticais paralelas, enquadramento preservado.',
+        levelSteep: function (max) { return 'Inclinação grande demais pra nivelar com esta lente (limite ~' + max + '°) — aponte a câmera mais reto ou feche a lente.'; },
+        levelParallel: 'Projeção paralela — nivelar só se aplica em perspectiva.',
+        guide: { none: 'Nenhuma', thirds: 'Terços', golden: 'Áurea', center: 'Centro', diagonals: 'Diagonais' },
+        guideOverlayOn: 'As guias aparecem no preview e na viewport do SketchUp (não saem no render).',
+        guideOverlayOff: 'As guias aparecem no preview da captura. No SketchUp 2023 ou mais novo, também na viewport.',
+        hudParallel: 'projeção paralela',
+        hudLens: function (mm, fov) { return mm + ' mm · ' + fov + '°'; },
+        hudEye: function (m) { return 'olho a ' + m + ' m'; },
+        hudTilt: function (deg, up) { return (up ? '↑' : '↓') + ' ' + deg + '°'; },
+        photoNote: 'A IA preserva o que vê: proporção, lente, altura do olho e verticais retas viram parte do render.',
+        levelReasons: { too_steep: 'inclinação acima do limite', render_failed: 'o recorte da captura falhou', level_mismatch: 'o mapa de arestas não casou', degenerate: 'câmera apontando reto para cima ou para baixo', error: 'erro ao calcular o nivelamento' },
+        condNoLevel: function (reason) { return 'A captura não saiu nivelada (' + reason + ') — as verticais ficaram como na vista.'; },
         editActions: { swap_material: 'Trocar material', remove: 'Remover', refine_area: 'Refinar área' },
         lang: { auto: 'Auto', pt: 'Português', en: 'English' },
         theme: { auto: 'Automático', light: 'Claro', dark: 'Escuro' },
@@ -962,6 +1023,29 @@
         capturingOverlay: 'Capturing the view…',
         nodesPerImage: function (n) { return n + ' Nodes per image'; },
         sun: { atual: 'Current', manha: 'Morning', meiodia: 'Midday', tarde: 'Late afternoon', golden: 'Golden hour' },
+        L_photo: 'Photography', L_photoAspect: 'Aspect ratio', L_photoLens: 'Lens', L_photoEye: 'Eye height',
+        L_photoLevel: 'Verticals', L_photoGuide: 'Composition guides',
+        aspectFree: 'Free',
+        lensMm: function (mm) { return mm + ' mm'; },
+        eye: { seated: 'Seated · 1.20 m', standing: 'Standing · 1.60 m' },
+        eyeNoFloor: 'No floor below the camera — the eye height cannot be measured or adjusted.',
+        eyeParallel: 'In parallel projection the eye height does not change the image.',
+        level: { asis: 'As is', level: 'Level (2-point)' },
+        levelFlat: 'Camera is level — verticals already come out parallel.',
+        levelTilted: function (deg, up) { return 'Camera tilted ' + deg + '° ' + (up ? 'up' : 'down') + ' — verticals converge.'; },
+        levelWill: 'At capture the camera is levelled and the frame cropped: parallel verticals, framing preserved.',
+        levelSteep: function (max) { return 'Tilt too large to level with this lens (limit ~' + max + '°) — aim the camera closer to horizontal or use a longer lens.'; },
+        levelParallel: 'Parallel projection — levelling only applies to perspective.',
+        guide: { none: 'None', thirds: 'Thirds', golden: 'Golden', center: 'Center', diagonals: 'Diagonals' },
+        guideOverlayOn: 'Guides show on the preview and in the SketchUp viewport (never in the render).',
+        guideOverlayOff: 'Guides show on the capture preview. On SketchUp 2023 or newer they also show in the viewport.',
+        hudParallel: 'parallel projection',
+        hudLens: function (mm, fov) { return mm + ' mm · ' + fov + '°'; },
+        hudEye: function (m) { return 'eye at ' + m + ' m'; },
+        hudTilt: function (deg, up) { return (up ? '↑' : '↓') + ' ' + deg + '°'; },
+        photoNote: 'The AI preserves what it sees: aspect ratio, lens, eye height and straight verticals become part of the render.',
+        levelReasons: { too_steep: 'tilt above the limit', render_failed: 'the capture crop failed', level_mismatch: 'the edge map did not match', degenerate: 'camera pointing straight up or down', error: 'error computing the levelling' },
+        condNoLevel: function (reason) { return 'The capture was not levelled (' + reason + ') — verticals stayed as in the view.'; },
         editActions: { swap_material: 'Swap material', remove: 'Remove', refine_area: 'Refine area' },
         lang: { auto: 'Auto', pt: 'Português', en: 'English' },
         theme: { auto: 'Automatic', light: 'Light', dark: 'Dark' },
@@ -1013,7 +1097,8 @@
     function localizeStatic() {
       ['L_projectType','L_segment','L_environment','L_lighting','L_sun','L_elements','L_modelMaterials',
        'L_engine','L_resolution','L_advanced','L_history','L_settings','L_edit','L_space',
-       'L_scenes','L_theme','L_language','L_server','L_animar','L_animarType','L_animarQuality','L_animarDuration','L_videoSave'].forEach(function (id) {
+       'L_scenes','L_theme','L_language','L_server','L_animar','L_animarType','L_animarQuality','L_animarDuration','L_videoSave',
+       'L_photo','L_photoAspect','L_photoLens','L_photoEye','L_photoLevel','L_photoGuide'].forEach(function (id) {
         var el = document.getElementById(id);
         if (el) el.textContent = tt(id);
       });
@@ -1141,6 +1226,22 @@
     }
 
     var SUN_OPTIONS = ['atual', 'manha', 'meiodia', 'tarde', 'golden'];
+    var ASPECT_OPTIONS = [
+      { id: 'free', value: 0 }, { id: '3:2', value: 1.5 }, { id: '4:3', value: 4 / 3 }, { id: '16:9', value: 16 / 9 },
+      { id: '1:1', value: 1 }, { id: '4:5', value: 0.8 }, { id: '9:16', value: 9 / 16 }
+    ];
+    // Focal equivalente full-frame pela ALTURA do sensor (bate com a lente
+    // real num quadro 3:2) — o Ruby converte em fov vertical.
+    var LENS_OPTIONS = [16, 20, 24, 28, 35, 50];
+    var EYE_OPTIONS = [{ id: 'seated', m: 1.2 }, { id: 'standing', m: 1.6 }];
+    var GUIDE_OPTIONS = ['none', 'thirds', 'golden', 'center', 'diagonals'];
+    var LEVEL_MAX_DEG = 40;
+    var LEVEL_FOV_MAX_DEG = 118; // fov' = fov + 2·inclinação precisa caber (espelho do Ruby)
+    // Nivelar "não aplicado" sem ser falha: a imagem já sai com verticais retas.
+    var LEVEL_SOFT_REASONS = ['already_level', 'not_perspective', 'native_2d'];
+    function levelFailed(report) {
+      return !!(report && report.levelRequested && !report.levelApplied && LEVEL_SOFT_REASONS.indexOf(report.levelReason) < 0);
+    }
     var EDIT_ACTIONS = ['swap_material', 'remove', 'refine_area'];
 
     var generatingTimer = null;
@@ -1164,7 +1265,8 @@
      'upscale2xButton','upscale4xButton','editSection','editActionPills','editInstruction','editMaterialRow',
      'editMaterialSelect','editButton','editLabel','editMeta','maskCanvas','maskHint','maskToggle','maskClear',
      'spaceSection','spaceName','spaceCategoryPills',
-     'spaceButton','spaceLabel','spaceMeta','spaceNote','spaceProgress','spaceResults','openSpaceButton'
+     'spaceButton','spaceLabel','spaceMeta','spaceNote','spaceProgress','spaceResults','openSpaceButton',
+     'photoSection','photoHud','aspectPills','lensPills','eyePills','eyeHint','levelPills','levelHint','guidePills','guideHint','photoNote','guidesSvg'
     ].forEach(function (id) { els[id] = $(id); });
 
     function callSketchUp(name, arg) {
@@ -1333,6 +1435,7 @@
       renderEditControls();
       renderSpaceControls();
       renderAnimarControls();
+      renderPhotoControls();
       updateGenerateState();
     }
 
@@ -1463,6 +1566,7 @@
         engine: model.engine,
         resolution: model.resolution,
         sunPreset: model.sunPreset,
+        photo: photoPayload(),
         materialSel: materialSelArray()
       }));
     });
@@ -1860,6 +1964,129 @@
       return best;
     }
 
+    // ── Fotografia ──────────────────────────────────────────────────────────
+    function fmtNum(n, digits) {
+      var s = Number(n).toFixed(digits);
+      return model.locale === 'pt' ? s.replace('.', ',') : s;
+    }
+    function photoPayload() {
+      return { aspect: model.photoAspect || 0, level: !!model.photoLevel, guide: model.photoGuide || 'none' };
+    }
+    function syncPhoto() {
+      callSketchUpQuiet('setPhoto', JSON.stringify(photoPayload()));
+    }
+    // Segmentos (x1,y1,x2,y2) em fração do quadro — espelho de guide_segments no Ruby.
+    function guideSegments(guide) {
+      var phi = 0.381966;
+      if (guide === 'thirds') return [[1 / 3, 0, 1 / 3, 1], [2 / 3, 0, 2 / 3, 1], [0, 1 / 3, 1, 1 / 3], [0, 2 / 3, 1, 2 / 3]];
+      if (guide === 'golden') return [[phi, 0, phi, 1], [1 - phi, 0, 1 - phi, 1], [0, phi, 1, phi], [0, 1 - phi, 1, 1 - phi]];
+      if (guide === 'center') return [[0.5, 0, 0.5, 1], [0, 0.5, 1, 0.5]];
+      if (guide === 'diagonals') return [[0, 0, 1, 1], [1, 0, 0, 1]];
+      return [];
+    }
+    function drawGuides() {
+      var svg = els.guidesSvg;
+      if (!svg) return;
+      while (svg.firstChild) svg.removeChild(svg.firstChild);
+      var segs = guideSegments(model.photoGuide);
+      var ns = 'http://www.w3.org/2000/svg';
+      ['halo', 'line'].forEach(function (cls) {
+        segs.forEach(function (s) {
+          var line = document.createElementNS(ns, 'line');
+          line.setAttribute('x1', String(s[0] * 100)); line.setAttribute('y1', String(s[1] * 100));
+          line.setAttribute('x2', String(s[2] * 100)); line.setAttribute('y2', String(s[3] * 100));
+          line.setAttribute('class', cls);
+          svg.appendChild(line);
+        });
+      });
+      var resultVisible = els.resultImage.classList.contains('is-visible');
+      els.preview.classList.toggle('has-guides', segs.length > 0 && !resultVisible);
+    }
+    // O quadro do preview segue a proporção escolhida enquanto não há imagem;
+    // com imagem na tela, o quadro é o da imagem (a próxima captura atualiza).
+    function applyPreviewAspect() {
+      if (model.captureUrl || model.result) return;
+      if (model.photoAspect > 0) els.preview.style.aspectRatio = String(model.photoAspect);
+      else if (model.captureSize) setAspect(model.captureSize[0], model.captureSize[1]);
+      else els.preview.style.aspectRatio = '4 / 3';
+    }
+    function photoHudText(cam) {
+      if (!cam) return '';
+      if (!cam.perspective) return tt('hudParallel');
+      var parts = [];
+      if (cam.focalLengthMm) parts.push(tt('hudLens', cam.focalLengthMm, Math.round(cam.fovDeg || 0)));
+      if (typeof cam.eyeHeightM === 'number') parts.push(tt('hudEye', fmtNum(cam.eyeHeightM, 2)));
+      if (typeof cam.tiltDeg === 'number' && Math.abs(cam.tiltDeg) >= 0.5) parts.push(tt('hudTilt', fmtNum(Math.abs(cam.tiltDeg), 0), cam.tiltDeg > 0));
+      return parts.join(' · ');
+    }
+    function renderPhotoControls() {
+      if (!els.aspectPills) return;
+      var cam = model.camera;
+      var perspective = !cam || cam.perspective !== false;
+
+      fill(els.aspectPills, ASPECT_OPTIONS.map(function (o) {
+        var active = Math.abs((model.photoAspect || 0) - o.value) < 0.01;
+        return pillButton(o.id === 'free' ? tt('aspectFree') : o.id, active, function () {
+          model.photoAspect = o.value; syncPhoto(); applyPreviewAspect(); renderPhotoControls(); persistStateSoon();
+        });
+      }));
+
+      fill(els.lensPills, LENS_OPTIONS.map(function (mm) {
+        var active = !!(cam && cam.perspective && Math.abs((cam.focalLengthMm || 0) - mm) <= 1);
+        var b = pillButton(tt('lensMm', mm), active, function () {
+          callSketchUp('applyLens', JSON.stringify({ mm: mm }));
+        });
+        if (!perspective) b.disabled = true;
+        return b;
+      }));
+
+      var hasFloor = !!(cam && typeof cam.eyeHeightM === 'number');
+      fill(els.eyePills, EYE_OPTIONS.map(function (o) {
+        var active = hasFloor && Math.abs(cam.eyeHeightM - o.m) <= 0.05;
+        var b = pillButton(tt('eye')[o.id] || o.id, active, function () {
+          callSketchUp('applyEyeHeight', JSON.stringify({ meters: o.m }));
+        });
+        if (!hasFloor || !perspective) b.disabled = true;
+        return b;
+      }));
+      var eyeMsg = '';
+      if (!perspective) eyeMsg = tt('eyeParallel');
+      else if (cam && !hasFloor) eyeMsg = tt('eyeNoFloor');
+      els.eyeHint.textContent = eyeMsg;
+      els.eyeHint.style.display = eyeMsg ? '' : 'none';
+
+      fill(els.levelPills, ['asis', 'level'].map(function (id) {
+        var active = (id === 'level') === !!model.photoLevel;
+        var b = pillButton(tt('level')[id] || id, active, function () {
+          model.photoLevel = id === 'level'; syncPhoto(); renderPhotoControls(); persistStateSoon();
+        });
+        if (!perspective) b.disabled = true;
+        return b;
+      }));
+      var levelMsg = '';
+      if (!perspective) levelMsg = tt('levelParallel');
+      else if (cam) {
+        var tilt = typeof cam.tiltDeg === 'number' ? cam.tiltDeg : 0;
+        if (cam.twoPoint || Math.abs(tilt) < 0.5) levelMsg = tt('levelFlat');
+        else if (Math.abs(tilt) > LEVEL_MAX_DEG || (cam.fovDeg || 0) + 2 * Math.abs(tilt) > LEVEL_FOV_MAX_DEG) levelMsg = tt('levelSteep', LEVEL_MAX_DEG);
+        else {
+          levelMsg = tt('levelTilted', fmtNum(Math.abs(tilt), 0), tilt > 0);
+          if (model.photoLevel) levelMsg += ' ' + tt('levelWill');
+        }
+      } else if (model.photoLevel) levelMsg = tt('levelWill');
+      els.levelHint.textContent = levelMsg;
+
+      fill(els.guidePills, GUIDE_OPTIONS.map(function (id) {
+        return pillButton(tt('guide')[id] || id, id === model.photoGuide, function () {
+          model.photoGuide = id; syncPhoto(); drawGuides(); renderPhotoControls(); persistStateSoon();
+        });
+      }));
+      els.guideHint.textContent = tt(model.guidesOverlay ? 'guideOverlayOn' : 'guideOverlayOff');
+      els.photoNote.textContent = tt('photoNote');
+      els.photoHud.textContent = photoHudText(cam);
+      drawGuides();
+    }
+
     // ── Preview / comparador ────────────────────────────────────────────────
     function setAspect(w, h) {
       if (w > 0 && h > 0) els.preview.style.aspectRatio = w + ' / ' + h;
@@ -1873,6 +2100,7 @@
       els.preview.classList.remove('is-comparing');
       els.emptyPreview.style.display = 'none';
       els.compareButton.style.display = model.result ? '' : 'none';
+      drawGuides();
     }
     function showResult(result) {
       model.result = result;
@@ -1892,6 +2120,7 @@
       renderEditControls();
       renderAnimarControls();
       updateGenerateState();
+      drawGuides();
     }
     function toggleCompare() {
       if (!model.result || !model.captureUrl) return;
@@ -2214,6 +2443,10 @@
         notes.push(tt('condMaterials', c.materialsSent, c.materialsRequested, names));
       }
       if (c.sunRequested && !c.sunApplied) notes.push(tt('condNoSun'));
+      if (levelFailed(c)) {
+        var lr = tt('levelReasons') || {};
+        notes.push(tt('condNoLevel', lr[c.levelReason] || c.levelReason || '—'));
+      }
       return notes;
     }
     function isSafeResult(r) {
@@ -2238,6 +2471,7 @@
           engine: model.engine,
           resolution: model.resolution,
           sunPreset: model.sunPreset,
+          photoAspect: model.photoAspect, photoLevel: !!model.photoLevel, photoGuide: model.photoGuide,
           animarType: model.animarType, animarEngine: model.animarEngine, animarDuration: model.animarDuration,
           materialSel: model.materialSel,
           prompt: els.prompt.value
@@ -2256,6 +2490,9 @@
       if (saved.engine) model.engine = saved.engine;
       if (saved.resolution) model.resolution = saved.resolution;
       if (saved.sunPreset) model.sunPreset = saved.sunPreset;
+      if (typeof saved.photoAspect === 'number' && saved.photoAspect >= 0) model.photoAspect = saved.photoAspect;
+      if (typeof saved.photoLevel === 'boolean') model.photoLevel = saved.photoLevel;
+      if (GUIDE_OPTIONS.indexOf(saved.photoGuide) >= 0) model.photoGuide = saved.photoGuide;
       if (saved.animarType) model.animarType = saved.animarType;
       if (saved.animarEngine) model.animarEngine = saved.animarEngine;
       if (saved.animarDuration) model.animarDuration = String(saved.animarDuration);
@@ -2278,7 +2515,7 @@
     els.disconnectButton.addEventListener('click', function () { callSketchUp('disconnect'); });
     els.captureButton.addEventListener('click', function () {
       showNotice('', 'success');
-      callSketchUp('captureViewport');
+      callSketchUp('captureViewport', JSON.stringify({ photo: photoPayload() }));
     });
     els.compareButton.addEventListener('click', toggleCompare);
     els.cancelButton.addEventListener('click', function () {
@@ -2319,6 +2556,7 @@
         engine: model.engine,
         resolution: model.resolution,
         sunPreset: model.sunPreset,
+        photo: photoPayload(),
         materialSel: materialSelArray(),
         useAnchor: asVariation,
         anchorUrl: asVariation ? (model.result.outputUrl || null) : null,
@@ -2508,7 +2746,15 @@
           if ((wasAuthenticated && !model.authenticated) || (previousEmail && model.userEmail && previousEmail !== model.userEmail)) {
             resetHistory();
           }
-          if (payload.panelState && !model.catalog) restorePanelState(payload.panelState);
+          if ('guidesOverlay' in payload) model.guidesOverlay = !!payload.guidesOverlay;
+          if (payload.panelState && !model.catalog) {
+            restorePanelState(payload.panelState);
+            // Os ajustes de foto vivem no painel; o Ruby precisa deles pra
+            // moldura/overlay/captura antes mesmo do catálogo chegar.
+            syncPhoto();
+          }
+          applyPreviewAspect();
+          renderPhotoControls();
           model.videoSave = payload.videoSave === 'ask' ? 'ask' : 'project';
           renderVideoSavePills();
           if (!model.authenticated) showVideo(null);
@@ -2533,9 +2779,25 @@
         }
 
         if (event === 'capture') {
-          if (payload.width && payload.height) setAspect(payload.width, payload.height);
+          if (payload.width && payload.height) {
+            model.captureSize = [payload.width, payload.height];
+            setAspect(payload.width, payload.height);
+          }
           showCapture(payload.imageDataUrl);
           if (!model.generating) setFooter(tt('captured'));
+          // Captura manual: avisa na hora se o nivelamento pedido não saiu
+          // (na geração o mesmo aviso vai nas notas do resultado).
+          var pr = payload.photo;
+          if (!model.generating && levelFailed(pr)) {
+            var lr2 = tt('levelReasons') || {};
+            showNotice(tt('condNoLevel', lr2[pr.levelReason] || pr.levelReason || '—'), 'error');
+          }
+        }
+
+        if (event === 'camera') {
+          model.camera = payload;
+          if ('overlay' in payload) model.guidesOverlay = !!payload.overlay;
+          renderPhotoControls();
         }
 
         if (event === 'status') {

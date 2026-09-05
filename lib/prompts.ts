@@ -57,8 +57,13 @@ export interface ModelFacts {
   camera?: {
     focalLengthMm?: number
     fovDeg?:        number
-    /** up travado no eixo Z — perspectiva de dois pontos, verticais paralelas */
+    /** Câmera NIVELADA (direção horizontal) ou modo 2 pontos do SketchUp —
+     *  verticais paralelas. Só é verdade quando a captura foi feita assim;
+     *  câmera inclinada NÃO é 2 pontos (as verticais convergem). */
     twoPoint?:      boolean
+    /** Altura do olho acima do piso sob a câmera, em metros (raytest do
+     *  plugin) — fato de escala que a imagem sozinha não dá. */
+    eyeHeightM?:    number
   }
   sun?: {
     azimuthDeg?:     number
@@ -820,6 +825,11 @@ function buildModelFactsBlock(facts?: ModelFacts, includeSun: boolean = true): s
     if (cam.fovDeg) lens.push(`${Math.round(cam.fovDeg)}° field of view`)
     let line = `Camera: ${lens.join(', ')}`.replace(/: $/, ': unknown')
     if (cam.twoPoint) line += '; two-point perspective — vertical lines are perfectly parallel, keep them parallel (no keystone)'
+    if (typeof cam.eyeHeightM === 'number' && cam.eyeHeightM > 0) {
+      line += `; camera ${cam.eyeHeightM.toFixed(2).replace(/\.?0+$/, '')} m above the floor` +
+        (cam.eyeHeightM >= 1.3 && cam.eyeHeightM <= 1.9 ? ' (standing eye level)' : '') +
+        ' — keep scale cues (door heights, counters, furniture) consistent with this viewpoint'
+    }
     parts.push(line + '.')
   }
 

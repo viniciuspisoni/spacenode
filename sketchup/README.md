@@ -25,6 +25,49 @@ O que só um plugin dentro do modelo consegue:
 - **Voltar à vista** — cada render guarda a câmera; um clique restaura o
   enquadramento exato no SketchUp.
 
+## O que mudou na 0.8.0 — Fotografia
+
+Princípio: a IA preserva o que vê. O que dá realismo ao render é a CAPTURA
+sair como uma fotografia de arquitetura — proporção escolhida, lente
+coerente, olho na altura de uma pessoa e verticais paralelas. Nova seção
+"Fotografia" no painel, com HUD vivo da câmera (lente · fov · altura do olho
+· inclinação) via `ViewObserver` (debounce de 250 ms em `UI.start_timer`).
+
+- **Proporção** (Livre, 3:2, 4:3, 16:9, 1:1, 4:5, 9:16): aplicada na câmera
+  viva (`camera.aspect_ratio=` — o SketchUp desenha a moldura cinza) e
+  honrada pela captura: lado maior = alvo da resolução, o outro segue a
+  proporção. Vale pra captura manual, geração, lote e Spaces.
+- **Lente** (16/20/24/28/35/50 mm): focal equivalente full-frame medida pela
+  ALTURA do sensor — `fov_v = 2·atan(12/f)`, gravada com `camera.fov=`
+  (o fov do SketchUp é o ângulo vertical). Evita o número inflado do
+  `camera.focal_length` (35° viram "57 mm" lá; na foto é um 38 mm). O mesmo
+  valor vai pro prompt em `modelFacts.camera.focalLengthMm`.
+- **Altura do olho** (Sentado 1,20 m / Em pé 1,60 m): `model.raytest` pra
+  baixo a partir do olho acha o piso visível; olho e alvo sobem/descem juntos
+  (a direção não muda). Sem piso abaixo → pills desligadas, hint explica. A
+  altura medida vai pro prompt (`eyeHeightM`) como pista de escala.
+- **Nivelar (2 pontos)**: SÓ NA CAPTURA, sem tocar na vista do usuário. Não
+  existe setter de 2 pontos na API — o plugin faz o "shift de lente" na mão:
+  câmera temporária nivelada com `fov' = fov + 2·inclinação`, render mais
+  alto (`H' = 2·H·tan(h)/(tan(θ+fov/2) − tan(θ−fov/2))`) e recorte da faixa
+  que corresponde ao quadro original via `Sketchup::ImageRep` (a ordem das
+  linhas do buffer não é documentada — `crop_rows` sonda com
+  `color_at_uv`). Preview do painel e edge map usam o MESMO plano (pixels
+  alinhados). Limites: inclinação < 0,5° = nada a fazer; > 40° ou fov' > 118°
+  = não nivela e avisa (`levelReason` no relatório de condicionamento).
+  `twoPoint` no prompt só é verdade quando a captura saiu nivelada ou a
+  câmera já estava (`is_2d?` / direção horizontal) — antes o heurístico
+  marcava quase toda vista inclinada como 2 pontos.
+- **Guias de composição** (Terços, Áurea, Centro, Diagonais): SVG sobre o
+  preview do painel e, no SketchUp 2023+, `Sketchup::Overlay` na viewport
+  (passivo: não toma cliques nem sai no export), dentro da moldura da
+  proporção. Mesma tabela de segmentos nos dois lados.
+- Ajustes persistem no estado do painel (`photoAspect/photoLevel/photoGuide`)
+  e o painel os reenvia ao Ruby no `state` (`setPhoto`) — o Ruby guarda em
+  `@photo` e usa como fallback em qualquer captura sem `:photo` explícito.
+- Servidor: `sanitizeModelFacts` aceita `camera.eyeHeightM` (0,2–12 m) e o
+  bloco MODEL FACTS ganha "camera X m above the floor".
+
 ## O que mudou na 0.7.0 — Animar
 
 - **Animar este render**: take curto (Veo "Cinemático" 4/6/8 s, Kling
