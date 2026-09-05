@@ -47,10 +47,18 @@
 //   ModelArk sai 2752×1536 (segue o aspecto da entrada).
 //   Envs: ARK_API_KEY (obrigatória), ARK_BASE_URL (default ap-southeast-1 — a
 //   única região com o Pro), ARK_SEEDREAM_PRO_MODEL (default
-//   dola-seedream-5-0-pro-260628), SEEDREAM_ARK_FAST=1 (modo rápido de prompt).
-//   A saída vem em base64 (response_format b64_json) e segue a MESMA entrega do
-//   GCP abaixo (re-host no Storage ou data: URL): a URL de resultado da
-//   ByteDance não está na allowlist de fetch do produto e expira em 24 h.
+//   dola-seedream-5-0-pro-260628), SEEDREAM_ARK_FAST=1 (modo rápido de prompt),
+//   SEEDREAM_ARK_HEDGE_MS (default 60 s; 0 = fallback sequencial),
+//   IMAGE_ARK_TIMEOUT_MS (teto da ModelArk, default 150 s).
+//   Corrida ModelArk × FAL: a maioria dos 2K volta em 40–58 s, mas há pedidos
+//   de ~2 min (imagem 2,6:1 com pessoas, pico em Singapura); com fallback
+//   sequencial a FAL sobrava com 45 s e falhava. Depois do hedge a FAL entra em
+//   paralelo e a primeira vence — nos casos lentos os dois cobram.
+//   A ModelArk devolve a URL do resultado (response_format url, expira em 24 h);
+//   esta camada baixa os bytes na hora (URL do provider, não do usuário — sem
+//   allowlist) e segue a MESMA entrega do GCP abaixo (re-host no Storage ou
+//   data: URL). b64_json foi descartado: um JSON de vários MB estourava o
+//   orçamento na leitura do corpo e virava "sem imagem".
 //   Dados saem do país (Singapura): /privacidade precisa nomear a operadora
 //   antes de ligar em produção.
 //
@@ -158,6 +166,10 @@ const FAL_FALLBACK_MIN_MS = 45_000
 // Custo: nas chamadas em que os dois terminam, os dois cobram — só nos ~35%
 // que passam do hedge. 0 desliga (volta ao fallback sequencial).
 const GCP_HEDGE_MS = Math.max(0, Number(process.env.IMAGE_GCP_HEDGE_MS ?? 40_000) || 0)
+
+// Hedge da rota ModelArk (Seedream/Quasar) — mesma ideia do GCP acima, com
+// gatilho mais tarde porque a ModelArk normal é ~50 s. 0 desliga (sequencial).
+const ARK_HEDGE_MS = Math.max(0, Number(process.env.SEEDREAM_ARK_HEDGE_MS ?? 60_000) || 0)
 
 const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))
 
@@ -738,17 +750,24 @@ async function arkGenerateOnce(
     ...(imageUrls.length > 0 ? { image: imageUrls.length === 1 ? imageUrls[0] : imageUrls } : {}),
     size,
     output_format: 'png',
-    response_format: 'b64_json',
+    response_format: 'url',
     watermark: false,
     ...(process.env.SEEDREAM_ARK_FAST === '1' ? { optimize_prompt_options: { mode: 'fast' } } : {}),
   }
+  const t0 = Date.now()
   const res = await fetch(`${arkBaseUrl()}/images/generations`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
     body: JSON.stringify(body),
     signal,
   })
-  const json = (await res.json().catch(() => null)) as ArkImagesResponse | null
+  let json: ArkImagesResponse | null = null
+  try {
+    json = (await res.json()) as ArkImagesResponse
+  } catch (err) {
+    if ((err as Error).name === 'AbortError') throw err
+    json = null
+  }
   if (!res.ok || json?.error) {
     // Status + código da ModelArk — sem prompt/URLs (AL-9). `status` deixa a
     // rota traduzir 429 como hoje faz com a FAL.
@@ -759,8 +778,27 @@ async function arkGenerateOnce(
     throw err
   }
   const img = json?.data?.[0]
-  if (!img?.b64_json) throw new ImageProviderNoOutputError('ark', SEEDREAM_FAL_ENDPOINT)
-  return { buffer: Buffer.from(img.b64_json, 'base64'), mime: 'image/png', requestId: res.headers.get('x-request-id') }
+  if (!img?.url && !img?.b64_json) {
+    // Diagnóstico sem base64/prompt: forma da resposta (ex.: filtro de conteúdo
+    // devolve 200 com data[0] sem imagem e um código dentro do item).
+    console.error(
+      `[image-provider] ark resposta sem imagem status=${res.status} keys=${Object.keys(json ?? {}).join(',')} ` +
+      `data0=${truncate(JSON.stringify(img ?? null), 240)}`,
+    )
+    throw new ImageProviderNoOutputError('ark', SEEDREAM_FAL_ENDPOINT)
+  }
+  const genMs = Date.now() - t0
+  let buffer: Buffer
+  if (img.b64_json) {
+    buffer = Buffer.from(img.b64_json, 'base64')
+  } else {
+    // URL do provider (não do usuário): download direto, sem allowlist.
+    const dl = await fetch(img.url as string, { signal })
+    if (!dl.ok) throw new Error(`ark: download do resultado falhou (HTTP ${dl.status})`)
+    buffer = Buffer.from(await dl.arrayBuffer())
+  }
+  console.log(`[image-provider] ark gerou em ${genMs}ms size=${img.size ?? '?'} download=${Date.now() - t0 - genMs}ms`)
+  return { buffer, mime: 'image/png', requestId: res.headers.get('x-request-id') }
 }
 
 async function generateViaArk(args: GenerateImageArgs, budgetMs: number): Promise<CoreResult> {
@@ -806,32 +844,92 @@ export async function generateImage(args: GenerateImageArgs): Promise<GenerateIm
   const primary = imageProviderPrimary()
   const mapping = gcpModelFor(args.falEndpoint)
 
-  // Rota direta ModelArk (Seedream/Quasar): ByteDance primeiro, FAL de fallback.
-  // Sequencial (sem hedge): a ModelArk responde em ~50 s de forma estável.
+  // Rota direta ModelArk (Seedream/Quasar): ByteDance primeiro; a FAL entra em
+  // PARALELO depois do hedge e a primeira que voltar vence — mesmas regras da
+  // corrida GCP × FAL abaixo (ark falha antes do hedge → FAL na hora; depois →
+  // espera a FAL em voo; os dois falham → sobe o erro traduzível).
   if (arkAvailableFor(args.falEndpoint)) {
     const fallback = imageFallbackEnabled()
-    const arkBudget = fallback
-      ? Math.min(Math.max(30_000, Math.floor(args.timeoutMs * 0.75)), 150_000, args.timeoutMs)
-      : args.timeoutMs
-    console.log(`[image-provider] ${args.context} → ark model=${arkModel()} budget=${Math.round(arkBudget / 1000)}s fallback=${fallback ? 'fal' : 'none'}`)
-    try {
-      const core = await generateViaArk(args, arkBudget)
-      const latencyMs = Date.now() - startedAt
-      console.log(`[image-provider] ${args.context} ok provider=ark model=${core.providerModel} ${latencyMs}ms images=${core.images.length}`)
-      return { ...core, provider: 'ark', fallbackUsed: false, latencyMs, errorMessage: null }
-    } catch (err) {
-      const primaryError = truncate((err as Error).message ?? String(err))
-      if (!fallback) {
-        console.error(`[image-provider] ${args.context} ark FALHOU sem fallback: ${primaryError}`)
-        throw err
+    const arkBudget = Math.min(args.timeoutMs, Number(process.env.IMAGE_ARK_TIMEOUT_MS) || 150_000)
+    const hedgeMs = fallback && ARK_HEDGE_MS > 0 && ARK_HEDGE_MS < arkBudget &&
+      args.timeoutMs - ARK_HEDGE_MS >= FAL_FALLBACK_MIN_MS
+      ? ARK_HEDGE_MS
+      : 0
+    console.log(`[image-provider] ${args.context} → ark model=${arkModel()} budget=${Math.round(arkBudget / 1000)}s fallback=${fallback ? 'fal' : 'none'}${hedgeMs ? ` hedge=${Math.round(hedgeMs / 1000)}s` : ''}`)
+    const remainingBudget = () => Math.max(FAL_FALLBACK_MIN_MS, args.timeoutMs - (Date.now() - startedAt))
+    const outcome = await new Promise<{ core: CoreResult; winner: 'ark' | 'fal'; hedged: boolean; primaryError: string | null }>((resolve, reject) => {
+      let settled = false
+      let falStarted = false
+      let hedged = false
+      let arkError: unknown
+      let falError: unknown
+      let hasArkError = false
+      let hasFalError = false
+      let timer: ReturnType<typeof setTimeout> | undefined
+      const done = (v: { core: CoreResult; winner: 'ark' | 'fal' }) => {
+        if (settled) return
+        settled = true
+        if (timer) clearTimeout(timer)
+        resolve({ ...v, hedged, primaryError: hasArkError ? truncate((arkError as Error)?.message ?? String(arkError)) : null })
       }
-      console.error(`[image-provider] ${args.context} ark FALHOU (${primaryError}) → fallback fal ${args.falEndpoint}`)
-      const remaining = Math.max(FAL_FALLBACK_MIN_MS, args.timeoutMs - (Date.now() - startedAt))
-      const core = await generateViaFal(args, remaining)
-      const latencyMs = Date.now() - startedAt
-      console.log(`[image-provider] ${args.context} ok provider=fal (fallback do ark) ${latencyMs}ms images=${core.images.length}`)
-      return { ...core, provider: 'fal', fallbackUsed: true, latencyMs, errorMessage: primaryError }
+      const fail = () => {
+        if (settled) return
+        settled = true
+        if (timer) clearTimeout(timer)
+        const falStatus = (falError as { status?: unknown } | undefined)?.status
+        reject(hasFalError && typeof falStatus === 'number' ? falError : arkError)
+      }
+      const startFal = (reason: 'hedge' | 'fallback') => {
+        if (falStarted) return
+        falStarted = true
+        if (reason === 'hedge') {
+          hedged = true
+          console.warn(`[image-provider] ${args.context} ark sem resposta em ${Math.round(hedgeMs / 1000)}s → hedge fal ${args.falEndpoint} em paralelo`)
+        }
+        generateViaFal(args, remainingBudget()).then(
+          core => {
+            if (settled) console.log(`[image-provider] ${args.context} hedge fal terminou depois do ark (${Date.now() - startedAt}ms) — cobrado sem uso`)
+            done({ core, winner: 'fal' })
+          },
+          err => {
+            hasFalError = true
+            falError = err
+            if (settled) return
+            if (hasArkError) fail()
+          },
+        )
+      }
+      if (hedgeMs > 0) timer = setTimeout(() => startFal('hedge'), hedgeMs)
+      generateViaArk(args, arkBudget).then(
+        core => {
+          if (settled) console.log(`[image-provider] ${args.context} ark terminou depois do hedge fal vencer (${Date.now() - startedAt}ms) — cobrado sem uso`)
+          done({ core, winner: 'ark' })
+        },
+        err => {
+          hasArkError = true
+          arkError = err
+          const primaryError = truncate((err as Error).message ?? String(err))
+          if (settled) return
+          if (!fallback || hasFalError) { fail(); return }
+          if (!falStarted) {
+            if (timer) clearTimeout(timer)
+            console.error(`[image-provider] ${args.context} ark FALHOU (${primaryError}) → fallback fal ${args.falEndpoint}`)
+            startFal('fallback')
+          } else {
+            console.error(`[image-provider] ${args.context} ark FALHOU (${primaryError}) com o hedge fal já em voo — esperando a FAL`)
+          }
+        },
+      )
+    })
+
+    const latencyMs = Date.now() - startedAt
+    if (outcome.winner === 'ark') {
+      console.log(`[image-provider] ${args.context} ok provider=ark model=${outcome.core.providerModel} ${latencyMs}ms images=${outcome.core.images.length}${outcome.hedged ? ' (venceu o hedge)' : ''}`)
+      return { ...outcome.core, provider: 'ark', fallbackUsed: false, latencyMs, errorMessage: null, hedgeUsed: outcome.hedged }
     }
+    const why = outcome.primaryError ?? `hedge: ark sem resposta em ${Math.round(hedgeMs / 1000)}s`
+    console.log(`[image-provider] ${args.context} ok provider=fal (${outcome.hedged && !outcome.primaryError ? 'hedge' : 'fallback'} do ark) ${latencyMs}ms images=${outcome.core.images.length}`)
+    return { ...outcome.core, provider: 'fal', fallbackUsed: true, latencyMs, errorMessage: why, hedgeUsed: outcome.hedged }
   }
 
   if (primary === 'gcp' && mapping && hasVertexCredentials()) {
