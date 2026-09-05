@@ -26,6 +26,7 @@ import {
   editV3FalFallbackEnabled,
   editV3AllowHighPrecision,
   editV3DebugAllowed,
+  editV3Engine,
   editV3NoMaskEnabled,
   editV3NormalizerEnabled,
 } from '@/lib/edit-v3/flags'
@@ -34,7 +35,7 @@ import {
   nodesForAction,
   resolveResolution,
   modelCostUsd,
-  MODEL_FOR_QUALITY,
+  modelForEngine,
   marginAt,
 } from '@/lib/edit-v3/pricing'
 import { runEditV3, EditV3GenerationError, INTENT_FOR_ACTION } from '@/lib/edit-v3/pipeline'
@@ -157,6 +158,8 @@ export async function POST(req: NextRequest) {
 
   const chargeOn = editV3ChargeEnabled()
   const model: GoogleImageModel = quality === 'high' ? 'gemini-3-pro-image' : 'gemini-3.1-flash-image'
+  // Motor (PROTÓTIPO): EDIT_V3_ENGINE=seedream → Seedream 5.0 Pro Edit; senão Google.
+  const engine = editV3Engine()
   let admin: ReturnType<typeof createAdminClient> | null = null
   let jobId: string | null = null
 
@@ -176,7 +179,7 @@ export async function POST(req: NextRequest) {
     const resolution = resolveResolution({ requested: outputResolution, imageMegapixels, quality })
     const hasReference = references.length > 0
     const nodes = nodesForAction({ action, quality, hasReference, resolution })
-    const providerCostUsd = modelCostUsd(MODEL_FOR_QUALITY[quality], resolution)
+    const providerCostUsd = modelCostUsd(modelForEngine(engine, quality), resolution)
 
     const debugBlock = debug
       ? {
@@ -274,6 +277,7 @@ export async function POST(req: NextRequest) {
       model,
       resolution,
       falFallback: editV3FalFallbackEnabled(),
+      engine,
       uploadAsset: (buffer, kind) => uploadEditAsset(db, userId, buffer, kind),
     })
 
@@ -360,7 +364,7 @@ export async function POST(req: NextRequest) {
     const ps = run.stages.provider
     console.log(
       `[edit-v3] done user=${userId} action=${action} provider=${run.provider} model=${run.model} ` +
-      `res=${resolution} fallback=${run.usedFallback} charged=${charged} nodes=${nodes} ` +
+      `engine=${engine} res=${resolution} fallback=${run.usedFallback} charged=${charged} nodes=${nodes} ` +
       `crop=${run.usedCrop} retried=${run.retried} semantic=${run.semantic ? (run.semantic.skipped ? 'skip' : run.semantic.pass ? 'pass' : run.semantic.reasons.join('|')) : 'off'} ` +
       `tokens=${ps.totalTokens}(out ${ps.outputTokens}) realUsd=${ps.realCostUsd != null ? ps.realCostUsd.toFixed(4) : 'n/a'} ` +
       `marginReal=${ps.realCostUsd != null ? Math.round(marginAt(nodes, ps.realCostUsd) * 100) + '%' : 'n/a'} ` +
