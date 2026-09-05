@@ -1,0 +1,126 @@
+{
+ "slug": "2026-09-05-reel-ache-o-que-saiu",
+ "accent": false,
+ "segments": [
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0174-render-before.jpg",
+   "dur": 1.6,
+   "kenburns": [
+    1,
+    1
+   ],
+   "brightness": -0.2
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0173-render-after.jpg",
+   "dur": 0.6,
+   "kenburns": [
+    1,
+    1
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0174-render-before.jpg",
+   "dur": 0.45,
+   "kenburns": [
+    1,
+    1
+   ],
+   "brightness": -0.2
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0173-render-after.jpg",
+   "dur": 0.45,
+   "kenburns": [
+    1,
+    1
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0174-render-before.jpg",
+   "dur": 0.35,
+   "kenburns": [
+    1,
+    1
+   ],
+   "brightness": -0.2
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0173-render-after.jpg",
+   "dur": 2.8,
+   "kenburns": [
+    1,
+    1.06
+   ]
+  },
+  {
+   "type": "card",
+   "card": "final",
+   "dur": 1
+  }
+ ],
+ "transitions": [
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "fade",
+   "dur": 0.3
+  }
+ ],
+ "cards": {
+  "scrim": {
+   "layout": "scrim"
+  },
+  "a": {
+   "layout": "hook-sub",
+   "hook": "ache o que saiu do lugar.",
+   "eyebrow": "modelo → render"
+  },
+  "b": {
+   "layout": "hook-sub",
+   "hook": "nada.",
+   "eyebrow": "render",
+   "sub": "mesma câmera. mesmos muros. mesmas janelas."
+  },
+  "final": {
+   "layout": "final",
+   "cta": "Renderize seu projeto"
+  }
+ },
+ "overlays": [
+  {
+   "card": "scrim",
+   "from": 0,
+   "to": 5.95
+  },
+  {
+   "card": "a",
+   "from": 0,
+   "to": 3.45
+  },
+  {
+   "card": "b",
+   "from": 3.45,
+   "to": 5.95
+  }
+ ]
+}

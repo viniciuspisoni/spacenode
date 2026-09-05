@@ -1,0 +1,186 @@
+{
+  "slug": "2026-09-04-reel-spaces-cenas-viram-um-space",
+  "band": {
+    "aspect": 1.7777777777777777
+  },
+  "segments": [
+    {
+      "type": "still",
+      "src": "$ACERVO/assets/0562-vista-before.png",
+      "dur": 1.4,
+      "fit": "band",
+      "kenburns": [
+        1,
+        1
+      ],
+      "brightness": -0.14
+    },
+    {
+      "type": "still",
+      "src": "$ACERVO/assets/0561-vista-after.png",
+      "dur": 3.2,
+      "fit": "band",
+      "kenburns": [
+        1,
+        1.04
+      ]
+    },
+    {
+      "type": "still",
+      "src": "$ACERVO/assets/0030-render-after.png",
+      "dur": 1,
+      "fit": "band",
+      "kenburns": [
+        1.02,
+        1.04
+      ]
+    },
+    {
+      "type": "still",
+      "src": "$ACERVO/assets/0026-render-after.png",
+      "dur": 1,
+      "fit": "band",
+      "kenburns": [
+        1.02,
+        1.04
+      ]
+    },
+    {
+      "type": "still",
+      "src": "$ACERVO/assets/0559-vista-after.png",
+      "dur": 3.9,
+      "fit": "band",
+      "kenburns": [
+        1,
+        1.05
+      ]
+    },
+    {
+      "type": "card",
+      "card": "final",
+      "dur": 1.5
+    }
+  ],
+  "transitions": [
+    {
+      "type": "wipeleft",
+      "dur": 0.7,
+      "ruler": true
+    },
+    {
+      "type": "cut"
+    },
+    {
+      "type": "cut"
+    },
+    {
+      "type": "cut"
+    },
+    {
+      "type": "cut"
+    }
+  ],
+  "cards": {
+    "scrim": {
+      "layout": "scrim"
+    },
+    "hook": {
+      "layout": "hook-sub",
+      "hook": "mesmo projeto.<br>mesma identidade.<br>[quatro vistas.]"
+    },
+    "modelo": {
+      "layout": "hook-sub",
+      "eyebrow": "Modelo · SketchUp"
+    },
+    "payoff": {
+      "layout": "hook-sub",
+      "hook": "cada cena<br>vira uma vista<br>do mesmo {Space}."
+    },
+    "v01": {
+      "layout": "chip",
+      "text": "vista 01"
+    },
+    "v02": {
+      "layout": "chip",
+      "text": "vista 02"
+    },
+    "v03": {
+      "layout": "chip",
+      "text": "vista 03"
+    },
+    "v04": {
+      "layout": "chip",
+      "text": "vista 04"
+    },
+    "final": {
+      "layout": "final",
+      "cta": "Renderize seu projeto"
+    },
+    "render": {
+      "layout": "hook-sub",
+      "eyebrow": "Render · SpaceNode"
+    }
+  },
+  "overlays": [
+    {
+      "card": "scrim",
+      "from": 0,
+      "to": 9.8
+    },
+    {
+      "card": "modelo",
+      "from": 0,
+      "to": 1.05
+    },
+    {
+      "card": "render",
+      "from": 1.05,
+      "to": 1.4
+    },
+    {
+      "card": "hook",
+      "from": 1.4,
+      "to": 5.9
+    },
+    {
+      "card": "v01",
+      "from": 1.4,
+      "to": 3.9
+    },
+    {
+      "card": "v02",
+      "from": 3.9,
+      "to": 4.9
+    },
+    {
+      "card": "v03",
+      "from": 4.9,
+      "to": 5.9
+    },
+    {
+      "card": "v04",
+      "from": 5.9,
+      "to": 9.8
+    },
+    {
+      "card": "payoff",
+      "from": 5.9,
+      "to": 9.8
+    }
+  ],
+  "qa": [
+    0.35,
+    1,
+    1.2,
+    1.35,
+    1.6,
+    2.6,
+    4.4,
+    5.4,
+    6.2,
+    7.8,
+    9.3,
+    9.9,
+    10.8
+  ]
+}

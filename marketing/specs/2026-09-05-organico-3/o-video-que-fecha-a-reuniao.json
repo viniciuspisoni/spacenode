@@ -1,0 +1,97 @@
+{
+ "slug": "2026-09-05-reel-o-video-que-fecha-a-reuniao",
+ "accent": false,
+ "segments": [
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0584-vista-before.jpg",
+   "dur": 1.5,
+   "kenburns": [
+    1,
+    1
+   ],
+   "brightness": -0.12
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0583-vista-after.jpg",
+   "dur": 2.2,
+   "kenburns": [
+    1,
+    1.05
+   ]
+  },
+  {
+   "type": "video",
+   "src": "$ACERVO/assets/0042-video-video_out.mp4",
+   "dur": 3.8,
+   "fit": "cover"
+  },
+  {
+   "type": "card",
+   "card": "final",
+   "dur": 1
+  }
+ ],
+ "transitions": [
+  {
+   "type": "wipeleft",
+   "dur": 0.5,
+   "ruler": true
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "fade",
+   "dur": 0.3
+  }
+ ],
+ "cards": {
+  "scrim": {
+   "layout": "scrim"
+  },
+  "a": {
+   "layout": "hook-sub",
+   "hook": "o vídeo que fecha a reunião.",
+   "eyebrow": "modelo"
+  },
+  "b": {
+   "layout": "hook-sub",
+   "hook": "começa no print.",
+   "eyebrow": "render"
+  },
+  "v": {
+   "layout": "hook-fixed",
+   "hook": "e termina andando.",
+   "eyebrow": "animar · vídeo do render",
+   "scrim": true
+  },
+  "final": {
+   "layout": "final",
+   "cta": "Comece agora"
+  }
+ },
+ "overlays": [
+  {
+   "card": "scrim",
+   "from": 0,
+   "to": 3.2
+  },
+  {
+   "card": "a",
+   "from": 0,
+   "to": 1.5
+  },
+  {
+   "card": "b",
+   "from": 1.5,
+   "to": 3.2
+  },
+  {
+   "card": "v",
+   "from": 3.2,
+   "to": 6.7
+  }
+ ]
+}

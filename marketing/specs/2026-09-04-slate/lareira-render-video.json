@@ -1,0 +1,126 @@
+{
+  "slug": "2026-09-04-reel-lareira-render-video",
+  "band": {
+    "aspect": 1.7777778
+  },
+  "segments": [
+    {
+      "type": "still",
+      "src": "$ACERVO/assets/0003-render-before.png",
+      "dur": 1.5,
+      "fit": "band",
+      "kenburns": [
+        1,
+        1
+      ],
+      "brightness": -0.14
+    },
+    {
+      "type": "still",
+      "src": "$ACERVO/assets/0002-render-after.png",
+      "dur": 3,
+      "fit": "band",
+      "kenburns": [
+        1,
+        1
+      ],
+      "brightness": -0.2
+    },
+    {
+      "type": "video",
+      "src": "$ACERVO/assets/0000-video-video_out.mp4",
+      "dur": 6,
+      "start": 0,
+      "speed": 1,
+      "fit": "band",
+      "brightness": -0.2
+    },
+    {
+      "type": "card",
+      "card": "final",
+      "dur": 1.4
+    }
+  ],
+  "transitions": [
+    {
+      "type": "wipeleft",
+      "dur": 0.6,
+      "ruler": true
+    },
+    {
+      "type": "fade",
+      "dur": 0.1
+    },
+    {
+      "type": "fade",
+      "dur": 0.4
+    }
+  ],
+  "cards": {
+    "scrim": {
+      "layout": "scrim"
+    },
+    "antes": {
+      "layout": "hook-sub",
+      "hook": "o render parado. [agora anda.]",
+      "eyebrow": "Modelo · Sala de estar"
+    },
+    "depois": {
+      "layout": "hook-sub",
+      "hook": "o render parado. [agora anda.]",
+      "eyebrow": "Render · Sala de estar"
+    },
+    "chip": {
+      "layout": "chip",
+      "text": "Animar · vídeo do render"
+    },
+    "apoio": {
+      "layout": "hook-fixed",
+      "sub": "fecha a apresentação com {movimento} —<br>sem sair do projeto.",
+      "subSize": 40,
+      "bottom": 340
+    },
+    "final": {
+      "layout": "final",
+      "cta": "Veja no seu próprio projeto"
+    }
+  },
+  "overlays": [
+    {
+      "card": "scrim",
+      "from": 0,
+      "to": 9.8
+    },
+    {
+      "card": "antes",
+      "from": 0,
+      "to": 1.5
+    },
+    {
+      "card": "depois",
+      "from": 1.5,
+      "to": 3.85
+    },
+    {
+      "card": "chip",
+      "from": 3.85,
+      "to": 9.4
+    },
+    {
+      "card": "apoio",
+      "from": 4.3,
+      "to": 9.4
+    }
+  ],
+  "qa": [
+    0.5,
+    1.2,
+    1.7,
+    3.78,
+    3.92,
+    5,
+    7.5,
+    9.2,
+    10.2
+  ]
+}

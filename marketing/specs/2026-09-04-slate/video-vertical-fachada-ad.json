@@ -1,0 +1,55 @@
+{
+  "slug": "2026-09-04-reel-video-vertical-fachada-ad",
+  "segments": [
+    {
+      "type": "video",
+      "src": "$ACERVO/assets/0137-video-video_out.mp4",
+      "dur": 6,
+      "start": 0,
+      "speed": 1,
+      "fit": "cover"
+    },
+    {
+      "type": "card",
+      "card": "final",
+      "dur": 1.2
+    }
+  ],
+  "transitions": [
+    {
+      "type": "fade",
+      "dur": 0.3
+    }
+  ],
+  "cards": {
+    "hook": {
+      "layout": "hook-fixed",
+      "scrim": true,
+      "top": 300,
+      "size": 60,
+      "hook": "a imagem vira o {take}.<br>[o projeto continua.]",
+      "sub": "Animar · vídeo a partir do render.",
+      "bottom": 340,
+      "subSize": 38
+    },
+    "final": {
+      "layout": "final",
+      "cta": "Comece grátis"
+    }
+  },
+  "overlays": [
+    {
+      "card": "hook",
+      "from": 0.4,
+      "to": 5.7
+    }
+  ],
+  "qa": [
+    0.2,
+    0.5,
+    3,
+    5.6,
+    5.85,
+    6.5
+  ]
+}

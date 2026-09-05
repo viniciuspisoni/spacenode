@@ -1,0 +1,103 @@
+{
+  "slug": "2026-09-04-reel-entre-duas-reunioes-ad",
+  "_notas": "Cutdown pago 8,5 s do R4 (slate): corta a cena 6,0–8,5 s e entra no card final aos 6 s. Mensagem única (manhã: print / tarde: imagem), CTA no card, todo texto embutido (som off). Ken Burns recalibrado para bater 1,03 no fim do wipe (1,95 s).",
+  "segments": [
+    {
+      "type": "still",
+      "src": "$REPO/marketing/output/2026-09-04-reel-entre-duas-reunioes/src/0426-before-960x1104.jpg",
+      "dur": 1.95,
+      "fit": "contain",
+      "kenburns": [
+        1,
+        1.03
+      ],
+      "brightness": -0.34
+    },
+    {
+      "type": "still",
+      "src": "$ACERVO/assets/0425-render-after.jpg",
+      "dur": 4.5,
+      "fit": "contain",
+      "kenburns": [
+        1.0244,
+        1.08
+      ],
+      "brightness": -0.24
+    },
+    {
+      "type": "card",
+      "card": "final",
+      "dur": 2.5
+    }
+  ],
+  "transitions": [
+    {
+      "type": "wipedown",
+      "dur": 0.45,
+      "ruler": true
+    },
+    {
+      "type": "cut"
+    }
+  ],
+  "cards": {
+    "scrim": {
+      "layout": "html",
+      "body": "<div style=\"position:absolute;left:0;right:0;top:0;height:720px;background:linear-gradient(180deg,rgba(26,26,26,0.94) 0%,rgba(26,26,26,0.86) 40%,rgba(26,26,26,0.55) 70%,rgba(26,26,26,0) 100%)\"></div><div style=\"position:absolute;left:0;right:0;bottom:0;height:500px;background:linear-gradient(0deg,rgba(26,26,26,0.92) 0%,rgba(26,26,26,0.80) 40%,rgba(26,26,26,0.45) 70%,rgba(26,26,26,0) 100%)\"></div>"
+    },
+    "manha": {
+      "layout": "hook-fixed",
+      "hook": "reunião de manhã:<br>o print.",
+      "top": 380,
+      "size": 64
+    },
+    "tarde": {
+      "layout": "hook-fixed",
+      "hook": "reunião da tarde:<br>a imagem.",
+      "top": 380,
+      "size": 64
+    },
+    "apoio": {
+      "layout": "hook-fixed",
+      "sub": "sem fila. mesmo print, mesma câmera, {minutos}.",
+      "bottom": 350,
+      "subSize": 38
+    },
+    "final": {
+      "layout": "final",
+      "cta": "Comece agora"
+    }
+  },
+  "overlays": [
+    {
+      "card": "scrim",
+      "from": 0,
+      "to": 6
+    },
+    {
+      "card": "manha",
+      "from": 0,
+      "to": 1.5
+    },
+    {
+      "card": "tarde",
+      "from": 1.95,
+      "to": 6
+    },
+    {
+      "card": "apoio",
+      "from": 3,
+      "to": 6
+    }
+  ],
+  "qa": [
+    0.5,
+    1.5,
+    1.72,
+    1.95,
+    2.5,
+    3.5,
+    5.9,
+    7.2
+  ]
+}

@@ -1,0 +1,85 @@
+{
+ "slug": "2026-09-05-reel-espera-o-final",
+ "accent": false,
+ "band": {
+  "aspect": 1.7777777777777777
+ },
+ "segments": [
+  {
+   "type": "video",
+   "src": "$ACERVO/assets/0171-video-video_out.mp4",
+   "dur": 3,
+   "start": 0.5
+  },
+  {
+   "type": "video",
+   "src": "$ACERVO/assets/0188-video-video_out.mp4",
+   "dur": 3,
+   "start": 1
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0189-video-video_src.jpg",
+   "dur": 2,
+   "kenburns": [
+    1,
+    1
+   ],
+   "brightness": -0.12
+  },
+  {
+   "type": "card",
+   "card": "final",
+   "dur": 1
+  }
+ ],
+ "transitions": [
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "fade",
+   "dur": 0.3
+  }
+ ],
+ "cards": {
+  "scrim": {
+   "layout": "scrim"
+  },
+  "a": {
+   "layout": "hook-sub",
+   "hook": "espera o final.",
+   "eyebrow": "animar · vídeo do render"
+  },
+  "b": {
+   "layout": "hook-sub",
+   "hook": "era uma imagem parada.",
+   "eyebrow": "render",
+   "sub": "render → vídeo. sem sair do projeto."
+  },
+  "final": {
+   "layout": "final",
+   "cta": "Veja no seu próprio projeto"
+  }
+ },
+ "overlays": [
+  {
+   "card": "scrim",
+   "from": 0,
+   "to": 7.7
+  },
+  {
+   "card": "a",
+   "from": 0,
+   "to": 6
+  },
+  {
+   "card": "b",
+   "from": 6,
+   "to": 7.7
+  }
+ ]
+}

@@ -1,0 +1,134 @@
+{
+ "slug": "2026-09-05-reel-plugin-tres-cenas-um-clique",
+ "accent": false,
+ "segments": [
+  {
+   "type": "still",
+   "src": "$ACERVO/plugin/shots/s5-lote-selecionado.png",
+   "dur": 1.8,
+   "fit": "contain",
+   "inset": 200,
+   "bg": "dark",
+   "kenburns": [
+    1,
+    1
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/plugin/shots/s5b-lote-andamento.png",
+   "dur": 1.6,
+   "fit": "contain",
+   "inset": 200,
+   "bg": "dark",
+   "kenburns": [
+    1,
+    1
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/plugin/shots/s5c-lote-concluido.png",
+   "dur": 1.8,
+   "fit": "contain",
+   "inset": 200,
+   "bg": "dark",
+   "kenburns": [
+    1,
+    1
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0559-vista-after.png",
+   "dur": 0.9,
+   "kenburns": [
+    1,
+    1.02
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0561-vista-after.png",
+   "dur": 0.9,
+   "kenburns": [
+    1,
+    1.02
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0026-render-after.png",
+   "dur": 1.2,
+   "kenburns": [
+    1,
+    1.03
+   ]
+  },
+  {
+   "type": "card",
+   "card": "final",
+   "dur": 1
+  }
+ ],
+ "transitions": [
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "fade",
+   "dur": 0.3
+  }
+ ],
+ "cards": {
+  "a": {
+   "layout": "hook-fixed",
+   "hook": "três cenas. um clique.",
+   "top": 250,
+   "size": 58
+  },
+  "scrim": {
+   "layout": "scrim"
+  },
+  "b": {
+   "layout": "hook-sub",
+   "hook": "o caderno inteiro. mesma semente.",
+   "eyebrow": "cenas em lote",
+   "sub": "mesmos presets, mesma identidade no conjunto."
+  },
+  "final": {
+   "layout": "final",
+   "cta": "Renderize seu projeto",
+   "micro": "plugin oficial · grátis · usa os nodes da sua conta"
+  }
+ },
+ "overlays": [
+  {
+   "card": "a",
+   "from": 0,
+   "to": 5.2
+  },
+  {
+   "card": "scrim",
+   "from": 5.2,
+   "to": 8.2
+  },
+  {
+   "card": "b",
+   "from": 5.2,
+   "to": 8.2
+  }
+ ]
+}

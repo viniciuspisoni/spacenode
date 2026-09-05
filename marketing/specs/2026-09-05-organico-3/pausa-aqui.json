@@ -1,0 +1,78 @@
+{
+ "slug": "2026-09-05-reel-pausa-aqui",
+ "accent": false,
+ "segments": [
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0622-vista-before.jpg",
+   "dur": 2,
+   "kenburns": [
+    1,
+    1
+   ],
+   "brightness": -0.1
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0621-vista-after.jpg",
+   "dur": 3.4,
+   "kenburns": [
+    1,
+    1.07
+   ]
+  },
+  {
+   "type": "card",
+   "card": "final",
+   "dur": 1
+  }
+ ],
+ "transitions": [
+  {
+   "type": "wipeleft",
+   "dur": 0.5,
+   "ruler": true
+  },
+  {
+   "type": "fade",
+   "dur": 0.3
+  }
+ ],
+ "cards": {
+  "scrim": {
+   "layout": "scrim"
+  },
+  "a": {
+   "layout": "hook-sub",
+   "hook": "pausa aqui. olha o sofá.",
+   "eyebrow": "modelo"
+  },
+  "b": {
+   "layout": "hook-sub",
+   "hook": "agora pausa aqui.",
+   "eyebrow": "render",
+   "sub": "mesmo sofá. mesma câmera. minutos."
+  },
+  "final": {
+   "layout": "final",
+   "cta": "Veja no seu próprio projeto"
+  }
+ },
+ "overlays": [
+  {
+   "card": "scrim",
+   "from": 0,
+   "to": 4.6
+  },
+  {
+   "card": "a",
+   "from": 0,
+   "to": 2
+  },
+  {
+   "card": "b",
+   "from": 2,
+   "to": 4.6
+  }
+ ]
+}

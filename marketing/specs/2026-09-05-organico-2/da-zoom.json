@@ -1,0 +1,71 @@
+{
+ "slug": "2026-09-05-reel-da-zoom",
+ "accent": false,
+ "segments": [
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0047-upscale-before.jpg",
+   "dur": 2.6,
+   "fit": "cover",
+   "kenburns": [
+    1,
+    2.4
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0046-upscale-after.jpg",
+   "dur": 3.2,
+   "fit": "cover",
+   "kenburns": [
+    2.4,
+    3.2
+   ]
+  },
+  {
+   "type": "card",
+   "card": "final",
+   "dur": 1
+  }
+ ],
+ "transitions": [
+  {
+   "type": "cut"
+  },
+  {
+   "type": "fade",
+   "dur": 0.3
+  }
+ ],
+ "cards": {
+  "a": {
+   "layout": "hook-fixed",
+   "hook": "dá zoom.",
+   "eyebrow": "2K",
+   "scrim": true
+  },
+  "b": {
+   "layout": "hook-fixed",
+   "hook": "aguenta.",
+   "eyebrow": "ampliado 4×",
+   "sub": "Ampliar: a imagem cresce, o detalhe fica.",
+   "scrim": true
+  },
+  "final": {
+   "layout": "final",
+   "cta": "Comece agora"
+  }
+ },
+ "overlays": [
+  {
+   "card": "a",
+   "from": 0,
+   "to": 2.6
+  },
+  {
+   "card": "b",
+   "from": 2.6,
+   "to": 5.5
+  }
+ ]
+}

@@ -1,0 +1,58 @@
+{
+  "slug": "2026-09-04-reel-print-render-video-piscina",
+  "segments": [
+    {
+      "type": "video",
+      "src": "$REPO/marketing/output/2026-09-04-reel-print-render-video-piscina/bed-organico.mp4",
+      "dur": 12,
+      "fit": "cover"
+    }
+  ],
+  "transitions": [],
+  "cards": {
+    "hook": {
+      "layout": "html",
+      "css": "\n.r9-scrim-top { position:absolute; left:0; right:0; top:0; height:700px;\n  background: linear-gradient(180deg, rgba(26,26,26,0.94) 0%, rgba(26,26,26,0.90) 36%, rgba(26,26,26,0.62) 62%, rgba(26,26,26,0) 100%); }\n.r9-scrim-bottom { position:absolute; left:0; right:0; bottom:0; height:700px;\n  background: linear-gradient(0deg, rgba(26,26,26,0.94) 0%, rgba(26,26,26,0.90) 34%, rgba(26,26,26,0.70) 64%, rgba(26,26,26,0) 100%); }\n.r9-hook { position:absolute; left:60px; width:960px; top:372px; text-align:center; text-wrap:balance;\n  font-size:60px; font-weight:500; line-height:1.12; letter-spacing:-0.035em; color:#f5f5f7; }\n.r9-sub { position:absolute; left:80px; width:920px; bottom:392px; text-align:center; }\n.r9-sub .payoff { display:block; margin-top:26px; font-size:42px; font-weight:400; line-height:1.3; letter-spacing:-0.02em; color:#f5f5f7; text-wrap:balance; }\n.r9-sub .payoff .dim { color:#c7c7cc; }\n/* QA 2026-09-04: o eyebrow cinza do kit (#a1a1a6) desaparecia sobre a água clara da piscina. */\n.r9-sub .eyebrow { color:#f5f5f7; }\n.r9-sub .eyebrow i { background: rgba(255,255,255,0.42); }\n.r9-close { position:absolute; left:0; right:0; top:352px; display:flex; flex-direction:column; align-items:center; gap:30px; }\n.r9-close svg { width:340px; height:auto; margin-bottom:10px; }\n.r9-close .cta { display:inline-flex; align-items:center; gap:18px; padding:24px 46px; border-radius:999px;\n  background:#f5f5f7; color:#1a1a1a; font-size:36px; font-weight:500; letter-spacing:-0.01em; }\n.r9-close .micro { font-size:24px; font-weight:400; letter-spacing:0.01em; color:#c7c7cc; }\n",
+      "body": "<div class=\"r9-scrim-top\"></div><div class=\"r9-hook\">um print. uma imagem. um vídeo.</div>"
+    },
+    "apoio": {
+      "layout": "html",
+      "css": "\n.r9-scrim-top { position:absolute; left:0; right:0; top:0; height:700px;\n  background: linear-gradient(180deg, rgba(26,26,26,0.94) 0%, rgba(26,26,26,0.90) 36%, rgba(26,26,26,0.62) 62%, rgba(26,26,26,0) 100%); }\n.r9-scrim-bottom { position:absolute; left:0; right:0; bottom:0; height:700px;\n  background: linear-gradient(0deg, rgba(26,26,26,0.94) 0%, rgba(26,26,26,0.90) 34%, rgba(26,26,26,0.70) 64%, rgba(26,26,26,0) 100%); }\n.r9-hook { position:absolute; left:60px; width:960px; top:372px; text-align:center; text-wrap:balance;\n  font-size:60px; font-weight:500; line-height:1.12; letter-spacing:-0.035em; color:#f5f5f7; }\n.r9-sub { position:absolute; left:80px; width:920px; bottom:392px; text-align:center; }\n.r9-sub .payoff { display:block; margin-top:26px; font-size:42px; font-weight:400; line-height:1.3; letter-spacing:-0.02em; color:#f5f5f7; text-wrap:balance; }\n.r9-sub .payoff .dim { color:#c7c7cc; }\n/* QA 2026-09-04: o eyebrow cinza do kit (#a1a1a6) desaparecia sobre a água clara da piscina. */\n.r9-sub .eyebrow { color:#f5f5f7; }\n.r9-sub .eyebrow i { background: rgba(255,255,255,0.42); }\n.r9-close { position:absolute; left:0; right:0; top:352px; display:flex; flex-direction:column; align-items:center; gap:30px; }\n.r9-close svg { width:340px; height:auto; margin-bottom:10px; }\n.r9-close .cta { display:inline-flex; align-items:center; gap:18px; padding:24px 46px; border-radius:999px;\n  background:#f5f5f7; color:#1a1a1a; font-size:36px; font-weight:500; letter-spacing:-0.01em; }\n.r9-close .micro { font-size:24px; font-weight:400; letter-spacing:0.01em; color:#c7c7cc; }\n",
+      "body": "<div class=\"r9-scrim-bottom\"></div><div class=\"r9-sub\"><span class=\"eyebrow\"><i></i>render<i></i></span><span class=\"payoff\">piscina, deck e espreguiçadeiras<br><span class=\"dim\">onde você desenhou.</span></span></div>"
+    },
+    "fecho": {
+      "layout": "html",
+      "css": "\n.r9-scrim-top { position:absolute; left:0; right:0; top:0; height:700px;\n  background: linear-gradient(180deg, rgba(26,26,26,0.94) 0%, rgba(26,26,26,0.90) 36%, rgba(26,26,26,0.62) 62%, rgba(26,26,26,0) 100%); }\n.r9-scrim-bottom { position:absolute; left:0; right:0; bottom:0; height:700px;\n  background: linear-gradient(0deg, rgba(26,26,26,0.94) 0%, rgba(26,26,26,0.90) 34%, rgba(26,26,26,0.70) 64%, rgba(26,26,26,0) 100%); }\n.r9-hook { position:absolute; left:60px; width:960px; top:372px; text-align:center; text-wrap:balance;\n  font-size:60px; font-weight:500; line-height:1.12; letter-spacing:-0.035em; color:#f5f5f7; }\n.r9-sub { position:absolute; left:80px; width:920px; bottom:392px; text-align:center; }\n.r9-sub .payoff { display:block; margin-top:26px; font-size:42px; font-weight:400; line-height:1.3; letter-spacing:-0.02em; color:#f5f5f7; text-wrap:balance; }\n.r9-sub .payoff .dim { color:#c7c7cc; }\n/* QA 2026-09-04: o eyebrow cinza do kit (#a1a1a6) desaparecia sobre a água clara da piscina. */\n.r9-sub .eyebrow { color:#f5f5f7; }\n.r9-sub .eyebrow i { background: rgba(255,255,255,0.42); }\n.r9-close { position:absolute; left:0; right:0; top:352px; display:flex; flex-direction:column; align-items:center; gap:30px; }\n.r9-close svg { width:340px; height:auto; margin-bottom:10px; }\n.r9-close .cta { display:inline-flex; align-items:center; gap:18px; padding:24px 46px; border-radius:999px;\n  background:#f5f5f7; color:#1a1a1a; font-size:36px; font-weight:500; letter-spacing:-0.01em; }\n.r9-close .micro { font-size:24px; font-weight:400; letter-spacing:0.01em; color:#c7c7cc; }\n",
+      "body": "<div class=\"r9-scrim-top\"></div><div class=\"r9-close\"><svg width=\"176\" height=\"48\" viewBox=\"0 0 176 48\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"spacenode\" shape-rendering=\"geometricPrecision\">\r\n  <title>spacenode — lockup horizontal (símbolo + wordmark), monocromático</title>\r\n  <!-- Espelha components/brand/Logo.tsx com symbolSize=48: gap 12px, wordmark 22.99px peso 500, letter-spacing -0.025em -->\r\n  <g transform=\"scale(0.75)\">\r\n    <g stroke=\"#FFFFFF\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" fill=\"none\">\r\n      <line x1=\"16\" y1=\"16\" x2=\"16\" y2=\"48\" />\r\n      <line x1=\"16\" y1=\"16\" x2=\"48\" y2=\"48\" />\r\n      <line x1=\"48\" y1=\"16\" x2=\"48\" y2=\"48\" />\r\n    </g>\r\n    <g fill=\"#FFFFFF\">\r\n      <circle cx=\"16\" cy=\"16\" r=\"3\" />\r\n      <circle cx=\"16\" cy=\"48\" r=\"3\" />\r\n      <circle cx=\"48\" cy=\"48\" r=\"3\" />\r\n      <circle cx=\"48\" cy=\"16\" r=\"3\" />\r\n    </g>\r\n  </g>\r\n  <text x=\"60\" y=\"24\" fill=\"#FFFFFF\" font-family=\"GeistLocal\" font-size=\"22.99\" font-weight=\"500\" letter-spacing=\"-0.575\" dominant-baseline=\"central\">spacenode</text>\r\n</svg>\r\n<div class=\"cta\">Comece grátis<span>→</span></div><div class=\"micro\">80 nodes grátis · sem cartão · em português</div></div>"
+    }
+  },
+  "overlays": [
+    {
+      "card": "hook",
+      "from": 0,
+      "to": 4
+    },
+    {
+      "card": "apoio",
+      "from": 4.2,
+      "to": 5.58
+    },
+    {
+      "card": "fecho",
+      "from": 9,
+      "to": 12
+    }
+  ],
+  "qa": [
+    0.6,
+    2.4,
+    2.9,
+    3.8,
+    4.9,
+    5.55,
+    5.8,
+    7.5,
+    9.5,
+    11.5
+  ]
+}
