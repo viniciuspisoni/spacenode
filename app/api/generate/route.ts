@@ -567,7 +567,7 @@ export async function POST(req: NextRequest) {
     let edgeMapUrl: string | null = null
     let depthMapUrl: string | null = null
     let finalPrompt = ''
-    let best: { gen: GenerateImageResult; prompt: string; score: number | null } | null = null
+    let best: { gen: GenerateImageResult; prompt: string; score: number | null; buffer: Buffer | null } | null = null
     const attemptLogs: FidelityAttemptLog[] = []
 
     // Edge map NATIVO (plugin SketchUp): captura hidden-line da MESMA câmera,
@@ -732,10 +732,11 @@ export async function POST(req: NextRequest) {
       // score vira log e a imagem é entregue (comportamento legado).
       let geometry: GeometryScoreBreakdown | null = null
       let scoreError: string | undefined
+      let generatedBuffer: Buffer | null = null
       if (renderOnlyActive) {
         try {
           if (!originalBuffer) originalBuffer = await fetchStorageBuffer(inputUrl)
-          const generatedBuffer = await fetchStorageBuffer(gen.images[0].url)
+          generatedBuffer = await fetchStorageBuffer(gen.images[0].url)
           geometry = await computeGeometryScore(originalBuffer, generatedBuffer)
         } catch (scoreErr) {
           scoreError = (scoreErr as Error).message
@@ -774,7 +775,7 @@ export async function POST(req: NextRequest) {
       )
 
       if (!best || (geometry?.score ?? -1) > (best.score ?? -1)) {
-        best = { gen, prompt: finalPrompt, score: geometry?.score ?? null }
+        best = { gen, prompt: finalPrompt, score: geometry?.score ?? null, buffer: generatedBuffer }
       }
 
       // Passa quando estrutura ≥ limite E (gate de cor ativo) a pior célula de
@@ -829,12 +830,33 @@ export async function POST(req: NextRequest) {
     let preservationAudit: PreservationCheck | null = null
     const auditMode = process.env.RENDER_SEMANTIC_AUDIT ?? ''
     const auditBorderline = fidelityScore === null || fidelityScore < 0.8
-    if (
+    // Audit (vision, ~segundos) e preview (download + sharp + upload) não
+    // dependem um do outro — rodam em paralelo; o preview reaproveita o
+    // buffer que o geometry score já baixou (antes baixava o master de novo).
+    const auditPromise: Promise<PreservationCheck | null> = (
       renderOnlyActive && auditMode !== '0' &&
       (auditMode === '1' || auditBorderline) &&
       remainingMs() > 20_000
-    ) {
-      preservationAudit = await checkArchitecturalPreservation(inputUrl, outputUrl, 'STRICT_SOURCE_LOCK')
+    )
+      ? checkArchitecturalPreservation(inputUrl, outputUrl, 'STRICT_SOURCE_LOCK').catch((auditErr: unknown) => {
+          console.warn('[generate:fidelity] audit semântico indisponível (segue sem):', truncateErr(auditErr))
+          return null
+        })
+      : Promise.resolve(null)
+
+    let previewUrl: string | null = null
+    const previewPromise = (async () => {
+      try {
+        const outBuf = best.buffer ?? await fetchStorageBuffer(outputUrl)
+        previewUrl = await createDisplayPreview(admin, user.id, 'renders', outBuf)
+      } catch (previewErr) {
+        console.warn('[generate] preview indisponível (segue sem):', truncateErr(previewErr))
+      }
+    })()
+
+    preservationAudit = await auditPromise
+    await previewPromise
+    {
       if (preservationAudit) {
         console.log(
           `[generate:fidelity] audit semântico: score=${preservationAudit.score.toFixed(2)} ` +
@@ -844,16 +866,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ── Derivado de exibição (WebP ~1600px) ──────────────────────────────────
-    // Grids (Histórico) deixam de baixar o master PNG (10-30 MB) por card.
-    // Best-effort: sem preview, a UI serve o master (comportamento anterior).
-    let previewUrl: string | null = null
-    try {
-      const outBuf = await fetchStorageBuffer(outputUrl)
-      previewUrl = await createDisplayPreview(admin, user.id, 'renders', outBuf)
-    } catch (previewErr) {
-      console.warn('[generate] preview indisponível (segue sem):', truncateErr(previewErr))
-    }
+    // (Derivado de exibição — WebP ~1600px — criado acima, em paralelo com o
+    // audit. Grids do Histórico deixam de baixar o master PNG por card;
+    // best-effort: sem preview, a UI serve o master.)
 
     // ── Persistência ─────────────────────────────────────────────────────────
     //
