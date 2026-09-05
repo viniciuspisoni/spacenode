@@ -677,7 +677,13 @@ export async function generateImage(args: GenerateImageArgs): Promise<GenerateIm
       ? Math.min(Math.max(30_000, Math.floor(args.timeoutMs * gcpShare)), gcpCap, args.timeoutMs)
       : Math.min(args.timeoutMs, gcpCap)
 
-    const hedgeMs = fallback && GCP_HEDGE_MS > 0 && GCP_HEDGE_MS < gcpBudget ? GCP_HEDGE_MS : 0
+    // Hedge só quando, depois dele, ainda cabe uma FAL inteira (piso de 45 s)
+    // DENTRO do timeoutMs do call site — senão a corrida empurraria a chamada
+    // além do orçamento da rota (tentativas tardias do ladder com pouco tempo).
+    const hedgeMs = fallback && GCP_HEDGE_MS > 0 && GCP_HEDGE_MS < gcpBudget &&
+      args.timeoutMs - GCP_HEDGE_MS >= FAL_FALLBACK_MIN_MS
+      ? GCP_HEDGE_MS
+      : 0
     console.log(`[image-provider] ${args.context} → gcp model=${mapping.model} budget=${Math.round(gcpBudget / 1000)}s fallback=${fallback ? 'fal' : 'none'}${hedgeMs ? ` hedge=${Math.round(hedgeMs / 1000)}s` : ''}`)
 
     if (!fallback) {
@@ -715,11 +721,14 @@ export async function generateImage(args: GenerateImageArgs): Promise<GenerateIm
         if (timer) clearTimeout(timer)
         resolve({ ...v, hedged, primaryError: hasGcpError ? truncate((gcpError as Error)?.message ?? String(gcpError)) : null })
       }
-      const fail = (err: unknown) => {
+      // Os dois falharam: sobe o erro que a rota consegue TRADUZIR (o da FAL
+      // carrega .status 422/429 → mensagem específica); sem status, o do primário.
+      const fail = (_err: unknown) => {
         if (settled) return
         settled = true
         if (timer) clearTimeout(timer)
-        reject(err)
+        const falStatus = (falError as { status?: unknown } | undefined)?.status
+        reject(hasFalError && typeof falStatus === 'number' ? falError : (hasGcpError ? gcpError : _err))
       }
       const startFal = (reason: 'hedge' | 'fallback') => {
         if (falStarted) return
@@ -729,10 +738,15 @@ export async function generateImage(args: GenerateImageArgs): Promise<GenerateIm
           console.warn(`[image-provider] ${args.context} gcp sem resposta em ${Math.round(hedgeMs / 1000)}s → hedge fal ${args.falEndpoint} em paralelo`)
         }
         generateViaFal(args, remainingBudget()).then(
-          core => done({ core, winner: 'fal' }),
+          core => {
+            // Perdedor: o GCP já venceu — a FAL terminou e cobrou à toa (telemetria de custo do hedge).
+            if (settled) console.log(`[image-provider] ${args.context} hedge fal terminou depois do gcp (${Date.now() - startedAt}ms) — cobrado sem uso`)
+            done({ core, winner: 'fal' })
+          },
           err => {
             hasFalError = true
             falError = err
+            if (settled) { console.warn(`[image-provider] ${args.context} hedge fal falhou depois do gcp vencer: ${truncate((err as Error)?.message ?? String(err))}`); return }
             // FAL morreu e o GCP também → nada mais vai chegar.
             if (hasGcpError) fail(gcpError)
           },
@@ -740,13 +754,16 @@ export async function generateImage(args: GenerateImageArgs): Promise<GenerateIm
       }
       if (hedgeMs > 0) timer = setTimeout(() => startFal('hedge'), hedgeMs)
       generateViaGcp(args, mapping, gcpBudget).then(
-        core => done({ core, winner: 'gcp' }),
+        core => {
+          if (settled) console.log(`[image-provider] ${args.context} gcp terminou depois do hedge fal vencer (${Date.now() - startedAt}ms) — cobrado sem uso`)
+          done({ core, winner: 'gcp' })
+        },
         err => {
           hasGcpError = true
           gcpError = err
           const primaryError = truncate((err as Error).message ?? String(err))
+          if (settled) { console.warn(`[image-provider] ${args.context} gcp falhou depois do hedge fal vencer: ${primaryError}`); return }
           if (hasFalError) { fail(err); return }
-          if (settled) return
           if (!falStarted) {
             if (timer) clearTimeout(timer)
             console.error(`[image-provider] ${args.context} gcp FALHOU (${primaryError}) → fallback fal ${args.falEndpoint}`)
@@ -756,7 +773,6 @@ export async function generateImage(args: GenerateImageArgs): Promise<GenerateIm
           }
         },
       )
-      void falError
     })
 
     const latencyMs = Date.now() - startedAt
