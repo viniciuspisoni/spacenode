@@ -61,7 +61,7 @@ const devLog = (...args: unknown[]) => {
 // recebe um 504 opaco em vez da mensagem tratada (+ refund).
 export const maxDuration = 300
 
-// Timeout da chamada FAL por motor. Vega (Nano Banana Pro) e Quasar (GPT Image 2)
+// Timeout da chamada FAL por motor. Vega (Nano Banana Pro) e Quasar (Seedream 5.0 Pro)
 // são modelos de alta fidelidade e passam de 90s com frequência — independente do
 // tamanho da imagem, sobretudo em 4K. Pulsar (Nano Banana 2) é rápido. O cap de 90s
 // era curto demais pro Vega e fazia a geração falhar com "tente uma resolução menor"
@@ -77,10 +77,10 @@ const FAL_TIMEOUT_MS: Record<EngineId, number> = {
 // Vega   (Gemini 3 Pro Image edit) → `resolution` ∈ '1K'|'2K'|'4K'
 // Pulsar (Nano Banana 2 edit)      → `resolution` ∈ '1K'|'2K'|'4K'
 //   HD interno mapeia para '1K' na Fal.ai (NB2 não tem rótulo "HD" nativo).
-// Quasar (Seedream 5.0 Pro edit)   → `image_size` = 'auto_2K' (TESTE 2026-09-04)
-//   'auto_*' segue o aspecto da imagem de entrada; o modelo tem teto de
-//   2048×2048, então 2K e 4K internos mapeiam ambos para 'auto_2K'. Schema da
-//   FAL sem seed/quality/aspect_ratio (antes, GPT Image 2: quality medium/high).
+// Quasar (Seedream 5.0 Pro edit)   → `image_size` = 'auto_2K'
+//   'auto_*' segue o aspecto da imagem de entrada. O endpoint tem teto de
+//   2048×2048, por isso o Quasar só oferece 2K (lib/engines). Schema da FAL
+//   sem seed/quality/aspect_ratio.
 
 function falParamsForEngine(
   engine:      EngineId,
@@ -89,7 +89,7 @@ function falParamsForEngine(
 ): Record<string, unknown> {
   if (engine === 'quasar') {
     // Seedream 5.0 Pro Edit: só campos do schema (conferido 2026-09-04).
-    // 'auto_2K' preserva a proporção do input no maior tamanho suportado.
+    // 'auto_2K' preserva a proporção do input no maior tamanho do endpoint.
     return {
       image_size:    'auto_2K',
       num_images:    1,
@@ -416,7 +416,7 @@ export async function POST(req: NextRequest) {
       devLog('[generate] inputUrl   :', inputUrl)
     }
 
-    // Anchor vai PRIMEIRO em image_urls — Gemini/NB2/GPT Image extraem
+    // Anchor vai PRIMEIRO em image_urls — Gemini/NB2/Seedream extraem
     // materiais e atmosfera dela antes de processar a geometria do input.
     const baseImageUrls = (anchorUrl && anchorUrl !== inputUrl)
       ? [anchorUrl, inputUrl]

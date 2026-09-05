@@ -91,7 +91,8 @@ export function engineDisplayLabel(raw: string | null | undefined): string | nul
   if (!raw) return null
   const v = raw.toLowerCase()
   if (v.includes('nano-banana-pro') || v.includes('vega'))   return 'Vega'
-  if (v.includes('gpt-image')       || v.includes('quasar')) return 'Quasar'
+  // 'gpt-image' = renders antigos (Quasar era GPT Image 2 até 2026-09-05).
+  if (v.includes('seedream') || v.includes('gpt-image') || v.includes('quasar')) return 'Quasar'
   if (v.includes('nano-banana')     || v.includes('pulsar')) return 'Pulsar'
   // Editar V3 grava o modelo Google cru (gemini-*-image); mesmos motores das
   // labels acima: Flash = Pulsar, Pro = Vega.

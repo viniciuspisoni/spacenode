@@ -211,7 +211,7 @@ export function buildRenderOnlySystemHead(opts: RenderOnlyHeadOpts): string {
 //     seed (conferido 2026-08-17) — ambos vão no falInput, então o fallback
 //     acompanha. Sem knobs de guidance/strength.
 //   - FAL nano-banana-pro: seed no schema; thinking é sempre-ligado (sem knob).
-//   - FAL gpt-image-2 (Quasar): sem knobs (schema verificado 2026-07-31) — o
+//   - FAL seedream/v5/pro/edit (Quasar): sem knobs (schema verificado 2026-09-04) — o
 //     reforço é prompt de escalada + edge map.
 
 export interface FidelityAttemptParams {

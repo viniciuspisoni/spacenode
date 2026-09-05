@@ -91,7 +91,7 @@ function qualityLabel(nodes: number): string | null {
 function engineLabel(model: string | null | undefined): string | null {
   if (!model) return null
   if (model.includes('nano-banana-pro') || model.includes('vega'))   return 'Vega'
-  if (model.includes('gpt-image')       || model.includes('quasar')) return 'Quasar'
+  if (model.includes('seedream') || model.includes('gpt-image') || model.includes('quasar')) return 'Quasar'
   if (model.includes('nano-banana')     || model.includes('pulsar')) return 'Pulsar'
   return null
 }

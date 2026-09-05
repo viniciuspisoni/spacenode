@@ -53,7 +53,7 @@ import { nearestSupportedAspectRatio } from '@/lib/ai/aspect-ratio'
 import { fetchStorageBuffer, assertSafeFetchUrl } from '@/lib/storage/fetch'
 
 // Timeout da chamada ao provider por motor (espelha o /api/generate do
-// Renderizar). Vega (Nano Banana Pro) e Quasar (GPT Image 2) passam de 90s com
+// Renderizar). Vega (Nano Banana Pro) e Quasar (Seedream 5.0 Pro) passam de 90s com
 // frequência; Pulsar (Nano Banana 2) é rápido.
 export const FAL_TIMEOUT_MS: Record<EngineId, number> = {
   vega:   180_000,
@@ -74,9 +74,9 @@ export function falParamsForEngine(
   aspectRatio: string | null = null,
 ): Record<string, unknown> {
   if (engine === 'quasar') {
-    // TESTE 2026-09-04 — Seedream 5.0 Pro Edit (ver lib/engines.ts): só campos
-    // do schema; 'auto_2K' segue o aspecto do input no teto do modelo (2048²),
-    // então 2K e 4K mapeiam ambos pra 'auto_2K'. Sem seed/quality/aspect_ratio.
+    // Seedream 5.0 Pro Edit (ver lib/engines.ts): só campos do schema;
+    // 'auto_2K' segue o aspecto do input no teto do endpoint (2048²) — o
+    // Quasar só oferece 2K. Sem seed/quality/aspect_ratio.
     return {
       image_size:    'auto_2K',
       num_images:    1,
