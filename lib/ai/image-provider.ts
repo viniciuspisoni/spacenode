@@ -619,7 +619,16 @@ async function generateViaFal(args: GenerateImageArgs, budgetMs: number): Promis
     new Promise<never>((_, reject) =>
       setTimeout(() => reject(new ImageProviderTimeoutError('fal', args.falEndpoint, budgetMs)), budgetMs),
     ),
-  ])
+  ]).catch((err: unknown) => {
+    // Erro da FAL com endpoint + status + body (ex.: 422 de schema, 429) —
+    // sem prompt/URLs (AL-9). Rethrow: as rotas seguem tratando/refundando.
+    const e = err as { status?: number; body?: unknown; message?: string }
+    console.error(
+      `[image-provider] ${args.context} fal FALHOU endpoint=${args.falEndpoint}` +
+      ` status=${e?.status ?? 'n/a'} body=${truncate(JSON.stringify(e?.body ?? e?.message ?? String(err)))}`,
+    )
+    throw err
+  })
 
   const data = result.data as { images?: { url?: string; width?: number; height?: number }[] }
   const images: GeneratedImage[] = (data.images ?? [])
