@@ -5,7 +5,7 @@
 // gates). Imagens/máscaras/resultados vão pro storage temporário da fal.
 //
 // Uso (na raiz do projeto, com .env.local):
-//   npx tsx scripts/edit-v3-ab-seedream.mts <pastaDeSaida> [--engines=google,seedream] [--cases=a,b]
+//   npx tsx scripts/edit-v3-ab-seedream.mts <pastaDeSaida> [--engines=google,seedream] [--cases=a,b] [--route=fal|ark]
 //
 // Saída: <pasta>/<caso>-<motor>.png, <pasta>/<caso>-ab.jpg (original | google |
 // seedream), <pasta>/summary.md e a tabela no stdout. Gate semântico desligado
@@ -22,6 +22,9 @@ for (const line of fs.readFileSync(path.resolve(process.cwd(), '.env.local'), 'u
   if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2].trim().replace(/^["']|["']$/g, '')
 }
 process.env.EDIT_V3_SEMANTIC_GATE ??= '0'
+// --route=ark → Seedream direto na ModelArk (ARK_API_KEY); default via fal.
+const routeArg = process.argv.find(a => a.startsWith('--route='))?.split('=')[1]
+if (routeArg) process.env.EDIT_V3_SEEDREAM_ROUTE = routeArg
 fal.config({ credentials: process.env.FAL_KEY?.trim() })
 
 const { runEditV3 } = await import('@/lib/edit-v3/pipeline')

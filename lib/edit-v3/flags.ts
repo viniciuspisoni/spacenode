@@ -44,6 +44,13 @@ export function editV3Engine(): import('./types').EditV3Engine {
   return process.env.EDIT_V3_ENGINE?.trim().toLowerCase() === 'seedream' ? 'seedream' : 'google'
 }
 
+/** Rota do motor Seedream (PROTÓTIPO): EDIT_V3_SEEDREAM_ROUTE=ark chama a ModelArk
+ *  (ByteDance direto: 2K em ~45 s e 1/3 do custo, medido 2026-09-06); qualquer outro
+ *  valor = via fal. Só vale quando EDIT_V3_ENGINE=seedream. */
+export function editV3SeedreamRoute(): 'fal' | 'ark' {
+  return process.env.EDIT_V3_SEEDREAM_ROUTE?.trim().toLowerCase() === 'ark' ? 'ark' : 'fal'
+}
+
 /** Libera a Alta precisão (Gemini Pro). Default OFF (custo/validação). */
 export function editV3AllowHighPrecision(): boolean {
   return process.env.EDIT_V3_ALLOW_PRO === '1'

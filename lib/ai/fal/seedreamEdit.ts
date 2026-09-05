@@ -64,9 +64,9 @@ export interface SeedreamEditImageInput {
 }
 
 export interface SeedreamEditImageOutput {
-  /** URL pública do resultado (CDN da fal). O pipeline busca o buffer e recompõe. */
+  /** URL pública do resultado (CDN da fal) ou data: URL (rota ark). O pipeline busca o buffer e recompõe. */
   imageRef: string
-  provider: 'fal'
+  provider: 'fal' | 'ark'
   model: 'seedream-5-pro-edit'
   requestId: string | null
   durationMs: number

@@ -31,6 +31,8 @@ import {
 } from '@/lib/ai/google/editImage'
 import { editImageWithFal, FalEditError } from '@/lib/ai/fal/editImage'
 import { editImageWithSeedream, seedreamRegionTag } from '@/lib/ai/fal/seedreamEdit'
+import { editImageWithSeedreamArk } from '@/lib/ai/ark/seedreamEdit'
+import { editV3SeedreamRoute } from './flags'
 import { buildEditPrompt, buildSeedreamEditPrompt, buildStrictRetryPrompt } from './buildEditPrompt'
 import { outputImageCostUsd } from './pricing'
 import { assertSafeImageUrl, EditV3InputError } from './ssrf'
@@ -358,7 +360,7 @@ export async function runEditV3(input: EditV3RunInput): Promise<EditV3RunResult>
       references: request.references,
       regionTag,
     })
-    console.log(`[edit-v3] engine=seedream region=${regionTag ?? 'none'} dims=${providerDims.width}x${providerDims.height} crop=${cropRegion !== null}`)
+    console.log(`[edit-v3] engine=seedream route=${editV3SeedreamRoute()} region=${regionTag ?? 'none'} dims=${providerDims.width}x${providerDims.height} crop=${cropRegion !== null}`)
   }
 
   // 4. Motor (Google, fallback FAL opcional) — encapsulado pra permitir o
@@ -380,16 +382,19 @@ export async function runEditV3(input: EditV3RunInput): Promise<EditV3RunResult>
     let seedreamFailed = false
     if (engine === 'seedream' && activeSeedreamPrompt && providerDims) {
       try {
-        const out = await editImageWithSeedream({
+        const seedreamInput = {
           imageUrl: providerImageUrl,
           imageWidth: providerDims.width,
           imageHeight: providerDims.height,
           references: request.references.map(r => ({ url: r.url })),
           prompt: activeSeedreamPrompt,
           resolution: input.resolution,
-        })
+        }
+        const out = editV3SeedreamRoute() === 'ark'
+          ? await editImageWithSeedreamArk(seedreamInput)
+          : await editImageWithSeedream(seedreamInput)
         return {
-          provider: 'fal',
+          provider: out.provider,
           model: out.model,
           requestId: out.requestId,
           usedFallback: false,

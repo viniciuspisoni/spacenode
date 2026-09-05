@@ -39,7 +39,8 @@ export interface EditV3Reference {
   url: string
 }
 
-export type EditV3Provider = 'google' | 'fal'
+/** 'ark' = ModelArk (ByteDance direto), rota alternativa do motor Seedream. */
+export type EditV3Provider = 'google' | 'fal' | 'ark'
 export type EditV3Model =
   | 'gemini-3.1-flash-image'
   | 'gemini-3-pro-image'
