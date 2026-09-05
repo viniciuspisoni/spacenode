@@ -17,7 +17,7 @@ O núcleo do motor está bem construído e à frente do mercado: modo estrutural
 (`lib/ai/fidelity/render-only.ts`), validação geométrica pós-geração por Sobel
 edge-recall (`lib/ai/fidelity/geometry-score.ts`), retry ladder com temperatura
 decrescente + edge map, âncora de materiais entre gerações e recompose
-server-side no Editar. Os três motores (Nano Banana Pro / NB2 / GPT Image 2)
+server-side no Editar. Os três motores (Nano Banana Pro / NB2 / Seedream 5.0 Pro)
 são o estado da arte atual em edição com referência.
 
 **A conclusão central da auditoria: os maiores ganhos de fidelidade agora não
@@ -46,7 +46,7 @@ As descobertas mais graves:
 Renderizar  GenerateClient ─▶ POST /api/generate ─▶ image-provider (GCP Vertex primário, FAL fallback)
                                    │                    │ Vega   = fal-ai/nano-banana-pro/edit → gemini-3-pro-image
                                    │                    │ Pulsar = fal-ai/nano-banana-2/edit   → gemini-3.1-flash-image
-                                   │                    │ Quasar = openai/gpt-image-2/edit     (só FAL)
+                                   │                    │ Quasar = bytedance/seedream/v5/pro/edit (só FAL, teto 2K)
                                    │                    └ saída GCP re-hospedada no Storage; FAL fica no CDN
                                    ├ prompt: lib/prompts.ts (buildFidelityPrompt) + lib/ai/fidelity/render-only.ts
                                    └ gate:   geometry-score (Sobel 384px) + retry ladder (temp ↓, edge map)

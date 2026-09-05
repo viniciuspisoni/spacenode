@@ -43,14 +43,17 @@ export const ENGINES: Record<EngineId, EngineConfig> = {
     name:        'Quasar',
     tagline:     'Especial',
     description: 'Tipografia, multi-referência e diversificação de provedor.',
-    // TESTE (2026-09-04): Seedream 5.0 Pro Edit (ByteDance via fal.ai) no lugar
-    // do GPT Image 2 ('openai/gpt-image-2/edit') — pra comparar os dois. Só FAL
-    // (sem mapeamento GCP). Schema conferido em 2026-09-04: prompt, image_urls,
-    // image_size (teto 2048×2048 — sem 4K nativo), num_images, output_format,
-    // sync_mode, enable_safety_checker. Sem seed/quality/aspect_ratio.
+    // Seedream 5.0 Pro Edit (ByteDance via fal.ai) — padrão desde 2026-09-05,
+    // substituiu o GPT Image 2 ('openai/gpt-image-2/edit') após teste em prod.
+    // Só FAL (sem mapeamento GCP). Schema conferido em 2026-09-04: prompt,
+    // image_urls, image_size, num_images, output_format, sync_mode,
+    // enable_safety_checker. Sem seed/quality/aspect_ratio.
+    // Sem 4K: o endpoint Pro da fal tem teto de 2048×2048 (pedido explícito de
+    // 4096×4096 volta em 2048×2048 — medido em 2026-09-05), por isso o Quasar
+    // só oferece 2K.
     falEndpoint: 'bytedance/seedream/v5/pro/edit',
-    resolutions: ['2k', '4k'],
-    nodes:       { '2k': 28, '4k': 56 },
+    resolutions: ['2k'],
+    nodes:       { '2k': 28 },
   },
 }
 

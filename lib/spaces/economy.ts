@@ -10,11 +10,12 @@ export const DNA_EXTRACTION_COST = 8
 
 // Custo de variação por motor × qualidade.
 // Pulsar é o motor de exploração e suporta HD; Vega/Quasar são premium e
-// bloqueiam HD (constraint do banco e da UI).
+// bloqueiam HD (constraint do banco e da UI). Quasar (Seedream 5.0 Pro na
+// fal) não tem 4K: o endpoint entrega no máximo 2048×2048 (ver lib/engines).
 const GENERATION_COST: Record<EngineId, Partial<Record<Quality, number>>> = {
   pulsar: { hd: 10, '2k': 15, '4k': 25 },
   vega:   {         '2k': 20, '4k': 40 },
-  quasar: {         '2k': 28, '4k': 56 },
+  quasar: {         '2k': 28 },
 }
 
 export function getVistaGenerationCost(engine: EngineId, quality: Quality): number {

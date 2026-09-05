@@ -33,7 +33,7 @@
 // thinking_level). O caminho GCP deriva o generateContent DESSE input (ordem
 // das imagens preservada — ela é contrato de prompt em vários fluxos;
 // thinking_level vira thinkingConfig); o fallback repassa o input
-// byte-idêntico pra FAL. Endpoints sem mapeamento Google (flux, gpt-image…)
+// byte-idêntico pra FAL. Endpoints sem mapeamento Google (flux, seedream…)
 // passam direto pela FAL, então TODAS as rotas podem usar esta camada.
 //
 // Resiliência do caminho primário (o fallback FAL é o provider CARO — só vale
@@ -687,7 +687,7 @@ export async function generateImage(args: GenerateImageArgs): Promise<GenerateIm
   }
 
   if (primary === 'gcp' && !mapping) {
-    // Endpoint não-Google (flux, gpt-image, upscaler) — FAL é o caminho normal.
+    // Endpoint não-Google (flux, seedream, upscaler) — FAL é o caminho normal.
   } else if (primary === 'gcp') {
     console.warn(`[image-provider] ${args.context} IMAGE_PROVIDER_PRIMARY=gcp mas credenciais Vertex ausentes — usando fal direto`)
   }
