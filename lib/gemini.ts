@@ -36,6 +36,46 @@ const MAX_ATTEMPTS     = 3
 const BASE_BACKOFF_MS  = 500
 const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504])
 
+// ── Transporte: Vertex (projeto do dono) ou API direta (chave) ─────────────
+//
+// A API direta com GEMINI_API_KEY é um pool compartilhado: medido em
+// 2026-09-05, o briefing de visão levou 49 s e o audit 19–40 s com 503 "high
+// demand" em cadeia — era metade do tempo percebido de um render Vega. O
+// Vertex usa a quota do projeto (mesma credencial dos renders de imagem) e
+// não passa por esse pool. GEMINI_VIA_VERTEX=1 liga; GEMINI_VERTEX_LOCATION
+// escolhe a região — default 'us-central1': medido no mesmo render, briefing
+// 7,8–8,0 s e audit 3,2–3,7 s, contra 50–63 s / 3,6–3,9 s no endpoint
+// 'global' e 20–33 s / 63–76 s (falhando) na API direta. Se o Vertex falhar com erro NÃO
+// transiente (404 de modelo, permissão, credencial), a chamada cai UMA vez
+// pra API direta — configuração errada nunca derruba DNA/briefing/audit.
+type GeminiTransport = 'vertex' | 'direct'
+
+function vertexConfigured(): boolean {
+  return process.env.GEMINI_VIA_VERTEX === '1' &&
+    !!process.env.GOOGLE_VERTEX_PROJECT?.trim() &&
+    (!!process.env.GOOGLE_VERTEX_CREDENTIALS_JSON?.trim() || !!process.env.GOOGLE_APPLICATION_CREDENTIALS?.trim())
+}
+
+function primaryTransport(): GeminiTransport {
+  return vertexConfigured() ? 'vertex' : 'direct'
+}
+
+let _vertexClient: GoogleGenAI | null = null
+function vertexClient(): GoogleGenAI {
+  if (!_vertexClient) {
+    const project   = process.env.GOOGLE_VERTEX_PROJECT?.trim()
+    const location  = process.env.GEMINI_VERTEX_LOCATION?.trim() || 'us-central1'
+    const credsJson = process.env.GOOGLE_VERTEX_CREDENTIALS_JSON?.trim()
+    _vertexClient = new GoogleGenAI({
+      vertexai: true,
+      project,
+      location,
+      ...(credsJson ? { googleAuthOptions: { credentials: JSON.parse(credsJson) } } : {}),
+    })
+  }
+  return _vertexClient
+}
+
 let _client: GoogleGenAI | null = null
 function client(): GoogleGenAI {
   if (!_client) {
@@ -89,13 +129,15 @@ async function fetchImagePart(imageUrl: string): Promise<Part> {
   return createPartFromBase64(buffer.toString('base64'), mimeType)
 }
 
-async function generate(
+async function generateVia(
+  transport:   GeminiTransport,
   system:      string,
   parts:       Part[],
   temperature: number,
   maxTokens:   number,
 ): Promise<string> {
-  const response = await client().models.generateContent({
+  const sdk = transport === 'vertex' ? vertexClient() : client()
+  const response = await sdk.models.generateContent({
     model:    GEMINI_MODEL,
     contents: parts,
     config: {
@@ -109,6 +151,27 @@ async function generate(
   const text = response.text
   if (!text) throw new Error('Gemini returned empty output')
   return text
+}
+
+async function generate(
+  system:      string,
+  parts:       Part[],
+  temperature: number,
+  maxTokens:   number,
+): Promise<string> {
+  const transport = primaryTransport()
+  try {
+    return await generateVia(transport, system, parts, temperature, maxTokens)
+  } catch (err) {
+    // Vertex com erro que não se cura sozinho (404 de modelo, 403, credencial)
+    // → API direta, se houver chave. Transiente (503/429/timeout) segue pro
+    // retry normal do mesmo transporte.
+    if (transport === 'vertex' && !isRetryable(err) && process.env.GEMINI_API_KEY?.trim()) {
+      console.warn(`[gemini] vertex falhou (${String((err as Error)?.message ?? err).slice(0, 140)}) — caindo pra API direta`)
+      return generateVia('direct', system, parts, temperature, maxTokens)
+    }
+    throw err
+  }
 }
 
 // generate + retry exponencial em erro transiente. Cada tentativa tem o timeout
