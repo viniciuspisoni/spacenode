@@ -131,6 +131,16 @@ class GcpAttemptStallError extends Error {
 // rota tem folga de orçamento própria e prefere entregar a imagem.
 const FAL_FALLBACK_MIN_MS = 45_000
 
+// HEDGE: depois de IMAGE_GCP_HEDGE_MS sem resposta do Vertex, a FAL entra em
+// PARALELO e a primeira que voltar vence. Medido em prod (14 dias, Vega 2K):
+// 32% dos renders caíam no fallback e esses levavam p50 101 s / p90 178 s —
+// 75 s esperando um Vertex travado + ~35 s de FAL. Com a corrida aos 40 s
+// (≈ p65 do Vertex) o teto prático do render vira ~75–80 s, e um Vertex
+// legitimamente lento (45–83 s) ainda vence quando chega antes da FAL.
+// Custo: nas chamadas em que os dois terminam, os dois cobram — só nos ~35%
+// que passam do hedge. 0 desliga (volta ao fallback sequencial).
+const GCP_HEDGE_MS = Math.max(0, Number(process.env.IMAGE_GCP_HEDGE_MS ?? 40_000) || 0)
+
 const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
@@ -194,6 +204,8 @@ export interface GenerateImageResult {
   latencyMs: number
   /** Erro do provider primário quando o fallback foi usado. */
   errorMessage: string | null
+  /** A FAL foi disparada em paralelo (hedge) — vencendo ou não. */
+  hedgeUsed?: boolean
 }
 
 // ── Erros (compat com o tratamento das rotas/wrappers atuais) ─────────────────
@@ -665,25 +677,112 @@ export async function generateImage(args: GenerateImageArgs): Promise<GenerateIm
       ? Math.min(Math.max(30_000, Math.floor(args.timeoutMs * gcpShare)), gcpCap, args.timeoutMs)
       : Math.min(args.timeoutMs, gcpCap)
 
-    console.log(`[image-provider] ${args.context} → gcp model=${mapping.model} budget=${Math.round(gcpBudget / 1000)}s fallback=${fallback ? 'fal' : 'none'}`)
-    try {
-      const core = await generateViaGcp(args, mapping, gcpBudget)
-      const latencyMs = Date.now() - startedAt
-      console.log(`[image-provider] ${args.context} ok provider=gcp model=${core.providerModel} ${latencyMs}ms images=${core.images.length}`)
-      return { ...core, provider: 'gcp', fallbackUsed: false, latencyMs, errorMessage: null }
-    } catch (err) {
-      const primaryError = truncate((err as Error).message ?? String(err))
-      if (!fallback) {
-        console.error(`[image-provider] ${args.context} gcp FALHOU sem fallback: ${primaryError}`)
+    // Hedge só quando, depois dele, ainda cabe uma FAL inteira (piso de 45 s)
+    // DENTRO do timeoutMs do call site — senão a corrida empurraria a chamada
+    // além do orçamento da rota (tentativas tardias do ladder com pouco tempo).
+    const hedgeMs = fallback && GCP_HEDGE_MS > 0 && GCP_HEDGE_MS < gcpBudget &&
+      args.timeoutMs - GCP_HEDGE_MS >= FAL_FALLBACK_MIN_MS
+      ? GCP_HEDGE_MS
+      : 0
+    console.log(`[image-provider] ${args.context} → gcp model=${mapping.model} budget=${Math.round(gcpBudget / 1000)}s fallback=${fallback ? 'fal' : 'none'}${hedgeMs ? ` hedge=${Math.round(hedgeMs / 1000)}s` : ''}`)
+
+    if (!fallback) {
+      try {
+        const core = await generateViaGcp(args, mapping, gcpBudget)
+        const latencyMs = Date.now() - startedAt
+        console.log(`[image-provider] ${args.context} ok provider=gcp model=${core.providerModel} ${latencyMs}ms images=${core.images.length}`)
+        return { ...core, provider: 'gcp', fallbackUsed: false, latencyMs, errorMessage: null }
+      } catch (err) {
+        console.error(`[image-provider] ${args.context} gcp FALHOU sem fallback: ${truncate((err as Error).message ?? String(err))}`)
         throw err
       }
-      console.error(`[image-provider] ${args.context} gcp FALHOU (${primaryError}) → fallback fal ${args.falEndpoint}`)
-      const remaining = Math.max(FAL_FALLBACK_MIN_MS, args.timeoutMs - (Date.now() - startedAt))
-      const core = await generateViaFal(args, remaining)
-      const latencyMs = Date.now() - startedAt
-      console.log(`[image-provider] ${args.context} ok provider=fal (fallback) ${latencyMs}ms images=${core.images.length}`)
-      return { ...core, provider: 'fal', fallbackUsed: true, latencyMs, errorMessage: primaryError }
     }
+
+    // Corrida GCP × FAL. Regras:
+    //   - GCP volta primeiro → vence (a FAL do hedge, se já disparou, é
+    //     abandonada — o provider termina e cobra, mas o usuário não espera);
+    //   - GCP falha ANTES do hedge → FAL entra na hora (fallback clássico);
+    //   - GCP falha DEPOIS do hedge → só espera a FAL que já está rodando;
+    //   - FAL falha com GCP vivo → segue esperando o GCP;
+    //   - os dois falham → sobe o erro do primário (a rota refunda, como hoje).
+    const remainingBudget = () => Math.max(FAL_FALLBACK_MIN_MS, args.timeoutMs - (Date.now() - startedAt))
+    const outcome = await new Promise<{ core: CoreResult; winner: 'gcp' | 'fal'; hedged: boolean; primaryError: string | null }>((resolve, reject) => {
+      let settled = false
+      let falStarted = false
+      let hedged = false
+      let gcpError: unknown
+      let falError: unknown
+      let hasGcpError = false
+      let hasFalError = false
+      let timer: ReturnType<typeof setTimeout> | undefined
+      const done = (v: { core: CoreResult; winner: 'gcp' | 'fal' }) => {
+        if (settled) return
+        settled = true
+        if (timer) clearTimeout(timer)
+        resolve({ ...v, hedged, primaryError: hasGcpError ? truncate((gcpError as Error)?.message ?? String(gcpError)) : null })
+      }
+      // Os dois falharam: sobe o erro que a rota consegue TRADUZIR (o da FAL
+      // carrega .status 422/429 → mensagem específica); sem status, o do primário.
+      const fail = (_err: unknown) => {
+        if (settled) return
+        settled = true
+        if (timer) clearTimeout(timer)
+        const falStatus = (falError as { status?: unknown } | undefined)?.status
+        reject(hasFalError && typeof falStatus === 'number' ? falError : (hasGcpError ? gcpError : _err))
+      }
+      const startFal = (reason: 'hedge' | 'fallback') => {
+        if (falStarted) return
+        falStarted = true
+        if (reason === 'hedge') {
+          hedged = true
+          console.warn(`[image-provider] ${args.context} gcp sem resposta em ${Math.round(hedgeMs / 1000)}s → hedge fal ${args.falEndpoint} em paralelo`)
+        }
+        generateViaFal(args, remainingBudget()).then(
+          core => {
+            // Perdedor: o GCP já venceu — a FAL terminou e cobrou à toa (telemetria de custo do hedge).
+            if (settled) console.log(`[image-provider] ${args.context} hedge fal terminou depois do gcp (${Date.now() - startedAt}ms) — cobrado sem uso`)
+            done({ core, winner: 'fal' })
+          },
+          err => {
+            hasFalError = true
+            falError = err
+            if (settled) { console.warn(`[image-provider] ${args.context} hedge fal falhou depois do gcp vencer: ${truncate((err as Error)?.message ?? String(err))}`); return }
+            // FAL morreu e o GCP também → nada mais vai chegar.
+            if (hasGcpError) fail(gcpError)
+          },
+        )
+      }
+      if (hedgeMs > 0) timer = setTimeout(() => startFal('hedge'), hedgeMs)
+      generateViaGcp(args, mapping, gcpBudget).then(
+        core => {
+          if (settled) console.log(`[image-provider] ${args.context} gcp terminou depois do hedge fal vencer (${Date.now() - startedAt}ms) — cobrado sem uso`)
+          done({ core, winner: 'gcp' })
+        },
+        err => {
+          hasGcpError = true
+          gcpError = err
+          const primaryError = truncate((err as Error).message ?? String(err))
+          if (settled) { console.warn(`[image-provider] ${args.context} gcp falhou depois do hedge fal vencer: ${primaryError}`); return }
+          if (hasFalError) { fail(err); return }
+          if (!falStarted) {
+            if (timer) clearTimeout(timer)
+            console.error(`[image-provider] ${args.context} gcp FALHOU (${primaryError}) → fallback fal ${args.falEndpoint}`)
+            startFal('fallback')
+          } else {
+            console.error(`[image-provider] ${args.context} gcp FALHOU (${primaryError}) com o hedge fal já em voo — esperando a FAL`)
+          }
+        },
+      )
+    })
+
+    const latencyMs = Date.now() - startedAt
+    if (outcome.winner === 'gcp') {
+      console.log(`[image-provider] ${args.context} ok provider=gcp model=${outcome.core.providerModel} ${latencyMs}ms images=${outcome.core.images.length}${outcome.hedged ? ' (venceu o hedge)' : ''}`)
+      return { ...outcome.core, provider: 'gcp', fallbackUsed: false, latencyMs, errorMessage: null, hedgeUsed: outcome.hedged }
+    }
+    const why = outcome.primaryError ?? `hedge: gcp sem resposta em ${Math.round(hedgeMs / 1000)}s`
+    console.log(`[image-provider] ${args.context} ok provider=fal (${outcome.hedged && !outcome.primaryError ? 'hedge' : 'fallback'}) ${latencyMs}ms images=${outcome.core.images.length}`)
+    return { ...outcome.core, provider: 'fal', fallbackUsed: true, latencyMs, errorMessage: why, hedgeUsed: outcome.hedged }
   }
 
   if (primary === 'gcp' && !mapping) {

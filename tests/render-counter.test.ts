@@ -13,7 +13,8 @@ import { FREE_PLAN_LABEL, getPlanDisplayName } from '@/lib/plan-display'
 const SIGNUP_NODES = 80
 
 describe('contador de renders (floor(saldo / custo))', () => {
-  // Combinações válidas hoje: vega 2k/4k, pulsar hd/2k/4k, quasar 2k/4k.
+  // Combinações válidas hoje: vega 2k/4k, pulsar hd/2k/4k, quasar 2k
+  // (o Quasar perdeu o 4K na PR #167 — Seedream 5.0 Pro só vai até 2K).
   const expected: Record<string, number> = {
     'vega:2k':   4,  // 20 nodes
     'vega:4k':   2,  // 40 nodes
@@ -21,7 +22,6 @@ describe('contador de renders (floor(saldo / custo))', () => {
     'pulsar:2k': 5,  // 15 nodes
     'pulsar:4k': 3,  // 25 nodes
     'quasar:2k': 2,  // 28 nodes
-    'quasar:4k': 1,  // 56 nodes
   }
 
   it('cobre todas as combinações válidas do catálogo', () => {

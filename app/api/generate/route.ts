@@ -61,6 +61,11 @@ const devLog = (...args: unknown[]) => {
 // recebe um 504 opaco em vez da mensagem tratada (+ refund).
 export const maxDuration = 300
 
+// Teto de latência da 1ª tentativa pra valer um retry de fidelidade
+// (RENDER_FIDELITY_RETRY_MAX_ATTEMPT_MS). Acima disso — ou se ela veio do
+// fallback FAL — entrega a melhor tentativa em vez de dobrar o tempo.
+const RETRY_ONLY_IF_ATTEMPT_UNDER_MS = Math.max(10_000, Number(process.env.RENDER_FIDELITY_RETRY_MAX_ATTEMPT_MS) || 50_000)
+
 // Timeout da chamada FAL por motor. Vega (Nano Banana Pro) e Quasar (Seedream 5.0 Pro)
 // são modelos de alta fidelidade e passam de 90s com frequência — independente do
 // tamanho da imagem, sobretudo em 4K. Pulsar (Nano Banana 2) é rápido. O cap de 90s
@@ -553,6 +558,7 @@ export async function POST(req: NextRequest) {
       seed:             number
       edge_map_used:  boolean
       fallback_used:  boolean
+      hedge_used:     boolean
       duration_ms:    number
       geometry:       GeometryScoreBreakdown | null
       score_error?:   string
@@ -748,6 +754,7 @@ export async function POST(req: NextRequest) {
         seed:             attemptSeed,
         edge_map_used:  edgeMapImageIndex !== null,
         fallback_used:  gen.fallbackUsed,
+        hedge_used:     gen.hedgeUsed ?? false,
         duration_ms:    gen.latencyMs,
         geometry,
         ...(scoreError ? { score_error: scoreError } : {}),
@@ -783,6 +790,15 @@ export async function POST(req: NextRequest) {
       }
       if (remainingMs() < 60_000) {
         console.warn('[generate:fidelity] sem orçamento de tempo pra retry — entregando a melhor tentativa')
+        break
+      }
+      // Retry só quando a 1ª tentativa foi RÁPIDA e no provider primário.
+      // Medido (30 dias): a 2ª tentativa resgata o score em ~1 de 5 casos e
+      // custa +30–45 s no GCP — aceitável; mas no fallback FAL (que já vem
+      // de um stall de 40–75 s) ela dobrava o render (p50 213 s) pelo mesmo
+      // ~1 em 3. A promessa de fidelidade não vale um render de 3,5 min.
+      if (gen.fallbackUsed || gen.latencyMs > RETRY_ONLY_IF_ATTEMPT_UNDER_MS) {
+        console.warn(`[generate:fidelity] sem retry: 1ª tentativa ${gen.fallbackUsed ? 'via fallback' : 'lenta'} (${gen.latencyMs}ms) — entregando a melhor (score=${best.score?.toFixed(3) ?? 'n/a'})`)
         break
       }
     }
