@@ -30,7 +30,8 @@ import {
   type GoogleImageModel,
 } from '@/lib/ai/google/editImage'
 import { editImageWithFal, FalEditError } from '@/lib/ai/fal/editImage'
-import { buildEditPrompt, buildStrictRetryPrompt } from './buildEditPrompt'
+import { editImageWithSeedream, seedreamRegionTag } from '@/lib/ai/fal/seedreamEdit'
+import { buildEditPrompt, buildSeedreamEditPrompt, buildStrictRetryPrompt } from './buildEditPrompt'
 import { outputImageCostUsd } from './pricing'
 import { assertSafeImageUrl, EditV3InputError } from './ssrf'
 import { editV3SemanticGateEnabled } from './flags'
@@ -39,6 +40,7 @@ import type { EditIntentV2 } from '@/lib/edit-v2/types'
 import { normalizeSourceImage } from '@/lib/storage/normalize-image'
 import type {
   EditV3Action,
+  EditV3Engine,
   EditV3Intensity,
   EditV3Provider,
   EditV3Model,
@@ -156,6 +158,9 @@ export interface EditV3RunInput {
   resolution: EditV3Resolution
   /** Permite fallback FAL quando o Google falha. */
   falFallback: boolean
+  /** Motor principal (PROTÓTIPO): 'seedream' = Seedream 5.0 Pro Edit com a
+   *  seleção como tag <bbox>; falha cai no Google. Default 'google'. */
+  engine?: EditV3Engine
   /** Re-hospeda buffers (crop da origem, máscara efetiva, resultado) no
    *  Storage do produto. */
   uploadAsset: (buffer: Buffer, kind: 'result' | 'crop' | 'crop-mask') => Promise<string>
@@ -294,6 +299,10 @@ export async function runEditV3(input: EditV3RunInput): Promise<EditV3RunResult>
   // vazamento de material de ~70 px em imagens grandes desaparece).
   let providerImageUrl = normalizedSourceUrl
   let cropRegion: CropRegion | null = null
+  // Máscara e dimensões NO ESPAÇO da imagem enviada ao provider (crop ou origem)
+  // — base da tag <bbox> do Seedream.
+  let providerMaskBuf: Buffer | null = maskBuf
+  let providerDims: { width: number; height: number } | null = null
   if (maskBuf) {
     const srcMeta = await sharp(sourceBuf).metadata()
     const srcArea = (srcMeta.width ?? 0) * (srcMeta.height ?? 0)
@@ -308,6 +317,8 @@ export async function runEditV3(input: EditV3RunInput): Promise<EditV3RunResult>
         input.uploadAsset(cropMask, 'crop-mask'),
       ])
       cropRegion = plan.region
+      providerMaskBuf = cropMask
+      providerDims = { width: plan.outWidth, height: plan.outHeight }
     }
   }
 
@@ -325,6 +336,31 @@ export async function runEditV3(input: EditV3RunInput): Promise<EditV3RunResult>
     references: request.references,
   })
 
+  // Prompt do Seedream (PROTÓTIPO, EDIT_V3_ENGINE=seedream): a seleção vira a
+  // caixa envolvente da máscara como tag <bbox> (0–999) no espaço da imagem
+  // enviada. O recompose abaixo segue garantindo os pixels fora da máscara.
+  const engine: EditV3Engine = input.engine ?? 'google'
+  let seedreamPrompt: string | null = null
+  if (engine === 'seedream') {
+    if (!providerDims) {
+      const m = await sharp(sourceBuf).metadata()
+      providerDims = { width: m.width ?? 0, height: m.height ?? 0 }
+    }
+    const regionTag = providerMaskBuf
+      ? await seedreamRegionTag(providerMaskBuf, providerDims.width, providerDims.height)
+      : null
+    seedreamPrompt = buildSeedreamEditPrompt({
+      action: request.action,
+      instructionEn: input.instructionEn,
+      preservation: promptPreservation,
+      intensity: promptIntensity,
+      hasMask,
+      references: request.references,
+      regionTag,
+    })
+    console.log(`[edit-v3] engine=seedream region=${regionTag ?? 'none'} dims=${providerDims.width}x${providerDims.height} crop=${cropRegion !== null}`)
+  }
+
   // 4. Motor (Google, fallback FAL opcional) — encapsulado pra permitir o
   //    retry estrito sem duplicar o tratamento de erro.
   interface ProviderOut {
@@ -336,8 +372,38 @@ export async function runEditV3(input: EditV3RunInput): Promise<EditV3RunResult>
     promptTokens: number | null
     outputTokens: number | null
     totalTokens: number | null
+    /** Custo USD por imagem (providers cobrados por imagem, ex.: Seedream). */
+    costUsd: number | null
   }
-  const callProvider = async (activePrompt: string): Promise<ProviderOut> => {
+  const callProvider = async (activePrompt: string, activeSeedreamPrompt: string | null = null): Promise<ProviderOut> => {
+    // Motor Seedream (PROTÓTIPO): tenta primeiro; falha cai no Google abaixo.
+    let seedreamFailed = false
+    if (engine === 'seedream' && activeSeedreamPrompt && providerDims) {
+      try {
+        const out = await editImageWithSeedream({
+          imageUrl: providerImageUrl,
+          imageWidth: providerDims.width,
+          imageHeight: providerDims.height,
+          references: request.references.map(r => ({ url: r.url })),
+          prompt: activeSeedreamPrompt,
+          resolution: input.resolution,
+        })
+        return {
+          provider: 'fal',
+          model: out.model,
+          requestId: out.requestId,
+          usedFallback: false,
+          editedBuf: await fetchImageBuffer(out.imageRef),
+          promptTokens: null,
+          outputTokens: null,
+          totalTokens: null,
+          costUsd: out.costUsd,
+        }
+      } catch (seedErr) {
+        seedreamFailed = true
+        console.warn('[edit-v3] Seedream falhou, caindo no Google:', (seedErr as Error).message)
+      }
+    }
     try {
       const out = await editImageWithGoogle({
         imageUrl: providerImageUrl,
@@ -351,11 +417,12 @@ export async function runEditV3(input: EditV3RunInput): Promise<EditV3RunResult>
         provider: 'google',
         model: out.model,
         requestId: out.requestId,
-        usedFallback: false,
+        usedFallback: seedreamFailed,
         editedBuf: await fetchImageBuffer(out.imageRef),
         promptTokens: out.promptTokens,
         outputTokens: out.outputTokens,
         totalTokens: out.totalTokens,
+        costUsd: null,
       }
     } catch (googleErr) {
       if (!(input.falFallback && googleErr instanceof GoogleEditError)) {
@@ -378,6 +445,7 @@ export async function runEditV3(input: EditV3RunInput): Promise<EditV3RunResult>
           promptTokens: null,
           outputTokens: null,
           totalTokens: null,
+          costUsd: null,
         }
       } catch (falErr) {
         const fe = falErr instanceof FalEditError ? falErr.message : String(falErr)
@@ -439,8 +507,9 @@ export async function runEditV3(input: EditV3RunInput): Promise<EditV3RunResult>
   const sumTok = (a: number | null, b: number | null) =>
     a == null && b == null ? null : (a ?? 0) + (b ?? 0)
   const providerStart = Date.now()
-  const first = await callProvider(prompt)
+  const first = await callProvider(prompt, seedreamPrompt)
   const firstComp = await composeAndGate(first.editedBuf)
+  let perImageCostUsd = first.costUsd ?? 0
   let chosenProv = first
   let chosenComp = firstComp
   let promptTokens = first.promptTokens
@@ -450,8 +519,12 @@ export async function runEditV3(input: EditV3RunInput): Promise<EditV3RunResult>
   const retryReasons = firstComp.reasons.filter(r => PIXEL_RETRYABLE.has(r))
   if (retryReasons.length > 0) {
     try {
-      const second = await callProvider(buildStrictRetryPrompt(prompt, retryReasons))
+      const second = await callProvider(
+        buildStrictRetryPrompt(prompt, retryReasons),
+        seedreamPrompt ? buildStrictRetryPrompt(seedreamPrompt, retryReasons) : null,
+      )
       const secondComp = await composeAndGate(second.editedBuf)
+      perImageCostUsd += second.costUsd ?? 0
       // Tokens/custo somam as DUAS tentativas (gasto real do job).
       promptTokens = sumTok(first.promptTokens, second.promptTokens)
       outputTokens = sumTok(first.outputTokens, second.outputTokens)
@@ -477,7 +550,9 @@ export async function runEditV3(input: EditV3RunInput): Promise<EditV3RunResult>
   const realCostUsd =
     provider === 'google' && model !== 'nano-banana' && outputTokens != null
       ? outputImageCostUsd(model, outputTokens)
-      : null
+      : model === 'seedream-5-pro-edit'
+        ? perImageCostUsd
+        : null
   const providerStage = {
     durationMs: Date.now() - providerStart,
     promptTokens,

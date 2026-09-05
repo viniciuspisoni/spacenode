@@ -37,6 +37,13 @@ export function editV3FalFallbackEnabled(): boolean {
   return process.env.EDIT_V3_FAL_FALLBACK === '1'
 }
 
+/** Motor da edição (PROTÓTIPO 2026-09-05): EDIT_V3_ENGINE=seedream liga o
+ *  Seedream 5.0 Pro Edit (fal) com a seleção como tag <bbox>; qualquer outro
+ *  valor (ou ausente) = Google/Gemini, o caminho validado em prod. */
+export function editV3Engine(): import('./types').EditV3Engine {
+  return process.env.EDIT_V3_ENGINE?.trim().toLowerCase() === 'seedream' ? 'seedream' : 'google'
+}
+
 /** Libera a Alta precisão (Gemini Pro). Default OFF (custo/validação). */
 export function editV3AllowHighPrecision(): boolean {
   return process.env.EDIT_V3_ALLOW_PRO === '1'

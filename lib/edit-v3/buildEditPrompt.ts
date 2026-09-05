@@ -228,6 +228,75 @@ export function buildEditPrompt(opts: BuildEditPromptOpts): string {
   return parts.join('\n\n')
 }
 
+// ── Variante Seedream 5.0 Pro (PROTÓTIPO 2026-09-05) ─────────────────────────
+//
+// O Seedream não recebe máscara em pixels nem "mapa"; a edição interativa
+// nativa dele localiza a região por tags de coordenadas no prompt:
+// `<bbox>x1 y1 x2 y2</bbox>` normalizadas 0–999 (canto superior esquerdo 0 0).
+// A seleção do usuário vira a caixa envolvente da máscara (no espaço da imagem
+// enviada — o crop, quando houve). O recompose server-side continua sendo a
+// garantia dos pixels fora da máscara: o modelo trata a região de forma
+// semântica (repinta "a parede" inteira, não só a caixa).
+
+function seedreamRolesContract(opts: { regionTag: string | null; references: EditV3Reference[] }): string {
+  const roles: string[] = []
+  if (opts.regionTag) {
+    roles.push(
+      'Image 1 is the MAIN architectural image to edit. The ONLY region you may change is the ' +
+      `area of Image 1 ${opts.regionTag}. Everything outside this region must remain pixel-identical.`,
+    )
+  } else {
+    roles.push(
+      'Image 1 is the MAIN architectural image to edit. There is NO selection. You must locate the edit ' +
+      'target yourself, purely from the written instruction, by reading the scene. Identify the single element ' +
+      'or surface that the instruction names and operate on that one target only; treat the entire rest of the ' +
+      'image as locked, off-limits pixels.',
+    )
+  }
+  let n = 2
+  for (const ref of opts.references) {
+    const desc =
+      ref.kind === 'material'
+        ? 'a MATERIAL REFERENCE: reproduce this material/texture/finish faithfully on the selected surface'
+        : 'an OBJECT REFERENCE: insert/replace using this object as the visual model'
+    roles.push(
+      `Image ${n} is ${desc}. It is ONLY a reference — never edit it, never copy its ` +
+      'composition, camera or background into the main image.',
+    )
+    n++
+  }
+  return roles.join(' ')
+}
+
+export interface BuildSeedreamEditPromptOpts extends BuildEditPromptOpts {
+  /** Tag `<bbox>x1 y1 x2 y2</bbox>` (0–999) da seleção na imagem enviada; null = sem máscara. */
+  regionTag: string | null
+}
+
+/** Prompt do Editar V3 para o Seedream 5.0 Pro: mesmas cláusulas rígidas, mas a
+ *  seleção entra como coordenadas (edição interativa) em vez de mapa. */
+export function buildSeedreamEditPrompt(opts: BuildSeedreamEditPromptOpts): string {
+  const masked = opts.regionTag !== null
+  const parts: string[] = [
+    seedreamRolesContract({ regionTag: opts.regionTag, references: opts.references }),
+    BASE_EDIT_PROMPT,
+    masked
+      ? actionInstructionMasked(opts.action, opts.instructionEn)
+      : actionInstructionNoMask(opts.action, opts.instructionEn),
+    preservationClause(opts.preservation),
+    intensityClause(opts.intensity),
+  ]
+  if (masked) {
+    parts.push(
+      `Apply the change only inside the region ${opts.regionTag} of Image 1. Outside it the output must be ` +
+      'pixel-identical to Image 1: same camera, same framing, same resolution, no zoom, no re-render.',
+    )
+  } else {
+    parts.push(NO_MASK_PRESERVATION_CLAUSE)
+  }
+  return parts.join('\n\n')
+}
+
 /** Retry mais restritivo após reprovação do gate (nunca cobra o usuário). */
 export function buildStrictRetryPrompt(basePrompt: string, reasons: string[]): string {
   const reasonText = reasons.length ? reasons.join('; ') : 'previous attempt failed automatic validation'

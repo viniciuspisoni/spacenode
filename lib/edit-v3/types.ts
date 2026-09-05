@@ -44,6 +44,14 @@ export type EditV3Model =
   | 'gemini-3.1-flash-image'
   | 'gemini-3-pro-image'
   | 'nano-banana'
+  | 'seedream-5-pro-edit'
+
+/** Motor principal da edição (PROTÓTIPO 2026-09-05). 'google' = Gemini (padrão,
+ *  máscara como mapa + recompose); 'seedream' = Seedream 5.0 Pro Edit via fal —
+ *  a seleção vira tag <bbox> no prompt (edição interativa nativa do modelo) e o
+ *  recompose server-side segue garantindo os pixels fora da máscara. Falha do
+ *  Seedream cai no Google. Selecionado por EDIT_V3_ENGINE (ver flags). */
+export type EditV3Engine = 'google' | 'seedream'
 
 export type EditV3Status =
   | 'processing'

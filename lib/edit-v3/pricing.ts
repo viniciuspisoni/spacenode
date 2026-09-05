@@ -12,6 +12,7 @@
 
 import type {
   EditV3Action,
+  EditV3Engine,
   EditV3Model,
   EditV3Quality,
   EditV3Resolution,
@@ -36,6 +37,15 @@ export const MODEL_COST_USD: Record<EditV3Model, Record<EditV3Resolution, number
   'gemini-3-pro-image': { '1K': 0.134, '2K': 0.134, '4K': 0.24 },
   // fallback FAL nano-banana/edit (per-image; a resolução segue a imagem).
   'nano-banana': { '1K': 0.039, '2K': 0.039, '4K': 0.039 },
+  // Seedream 5.0 Pro Edit via fal (protótipo): 2 faixas por pixels de SAÍDA —
+  // ≤1536² $0,0675, até 2048² $0,135 (+$0,0045 por imagem de entrada extra).
+  // Direto na ByteDance (ModelArk) seria $0,045 / $0,09. Sem 4K no endpoint.
+  'seedream-5-pro-edit': { '1K': 0.0675, '2K': 0.135, '4K': 0.135 },
+}
+
+/** Modelo efetivo por motor × qualidade (o Seedream não tem tier de qualidade). */
+export function modelForEngine(engine: EditV3Engine, quality: EditV3Quality): EditV3Model {
+  return engine === 'seedream' ? 'seedream-5-pro-edit' : MODEL_FOR_QUALITY[quality]
 }
 
 /** Modelo Google por qualidade. */
