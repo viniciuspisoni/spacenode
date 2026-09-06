@@ -18,11 +18,36 @@ import { EditV2ImportModal } from '@/components/editar/EditV2ImportModal'
 import { consumeHandoff } from '@/components/nodi/actions-bus'
 import { uploadDirect } from '@/lib/storage/direct-upload-client'
 import {
-  IconLasso, IconPolygon, IconBrush, IconEraser, IconHand,
+  IconWand, IconLasso, IconPolygon, IconBrush, IconEraser, IconHand,
   IconUndo, IconRedo, IconTrash,
   IconRemove, IconMaterial, IconInsert, IconRefine,
   IconUpload, IconHistory, IconDownload,
 } from './icons'
+
+// Varinha mágica (seleção por clique via detecção de área no servidor).
+// Mesma flag da segmentação de superfície do v1/v2 — o backend é o mesmo
+// (/api/edits/segment). Inlinada no build (NEXT_PUBLIC).
+const WAND_ENABLED = process.env.NEXT_PUBLIC_EDIT_SURFACE_SEGMENTATION === '1'
+
+// Warm-up dos modelos de segmentação (SAM2 + evf-sam): dispara ao carregar uma
+// imagem, fire-and-forget, deduplicado por janela — o 1º clique da varinha cai
+// de ~10-30s (cold boot) para ~3s. Custo de casa mínimo; falha é silenciosa.
+const WARMUP_WINDOW_MS = 120_000
+let lastWarmupAt = 0
+function fireWandWarmup(): void {
+  if (!WAND_ENABLED) return
+  const now = Date.now()
+  if (now - lastWarmupAt < WARMUP_WINDOW_MS) return
+  lastWarmupAt = now
+  void fetch('/api/edits/segment', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ warmup: true }),
+  }).catch(() => {})
+}
+
+/** Tarefa de seleção assistida em andamento (null = ocioso). */
+type WandTask = 'point' | 'floor' | 'wall' | 'query'
 
 type Action = 'remove' | 'swap_material' | 'insert_element' | 'refine_area'
 
@@ -86,6 +111,9 @@ const ACTIONS: ActionDef[] = [
   },
 ]
 
+const MIN_USABLE = 0.0002
+const SMALL_WARN = 0.004
+
 interface HistItem {
   url: string
   kind: 'original' | 'result'
@@ -97,9 +125,12 @@ interface ResultState {
   charged: boolean
   width: number | null
   height: number | null
+  /** Aviso do gate semântico (advisory com máscara): confira antes de usar. */
+  warning: string | null
 }
 
 const TOOLS: { id: EditV3Tool; label: string; Icon: typeof IconBrush }[] = [
+  ...(WAND_ENABLED ? [{ id: 'wand' as const, label: 'Varinha mágica — clique para selecionar', Icon: IconWand }] : []),
   { id: 'lasso', label: 'Laço', Icon: IconLasso },
   { id: 'polygon', label: 'Polígono', Icon: IconPolygon },
   { id: 'brush', label: 'Pincel', Icon: IconBrush },
@@ -123,8 +154,12 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
   const [quality] = useState<'standard' | 'high'>('standard') // Alta precisão: gated
   const [referenceUrl, setReferenceUrl] = useState<string | null>(null)
   const [coverage, setCoverage] = useState(0)
-  const [tool, setTool] = useState<EditV3Tool>('lasso')
+  const [tool, setTool] = useState<EditV3Tool>(WAND_ENABLED ? 'wand' : 'lasso')
   const [brushSize, setBrushSize] = useState(36)
+  const [wandMode, setWandMode] = useState<'add' | 'subtract'>('add')
+  const [wandTask, setWandTask] = useState<WandTask | null>(null)
+  const [wandAt, setWandAt] = useState<{ x: number; y: number } | null>(null)
+  const wandBusy = wandTask !== null
   const [cost, setCost] = useState<number | null>(null)
   const [busy, setBusy] = useState<null | 'upload' | 'generate'>(null)
   const [elapsed, setElapsed] = useState(0)
@@ -134,6 +169,9 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
   const [result, setResult] = useState<ResultState | null>(null)
   const [view, setView] = useState<'edit' | 'result'>('edit')
   const [importOpen, setImportOpen] = useState(false)
+  // Comparar o resultado com QUALQUER versão do rodapé (null = o "antes" da
+  // edição). Reset a cada novo resultado.
+  const [compareWith, setCompareWith] = useState<string | null>(null)
 
   const canvasRef = useRef<EditV3CanvasHandle | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -141,10 +179,15 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
   // Latch SÍNCRONO anti-duplo-envio: `busy` (estado) não vira síncrono, então
   // dois disparos no mesmo tick poderiam submeter (e cobrar) duas vezes.
   const submittingRef = useRef(false)
+  // Latch da varinha (1 detecção por vez) + guarda de imagem: uma resposta que
+  // chega depois de o usuário trocar de imagem NUNCA vira camada na imagem nova.
+  const wandBusyRef = useRef(false)
+  const sourceUrlRef = useRef<string | null>(null)
+  useEffect(() => {
+    sourceUrlRef.current = sourceUrl
+  }, [sourceUrl])
 
   const actionDef = ACTIONS.find(a => a.id === action)!
-  const MIN_USABLE = 0.0002
-  const SMALL_WARN = 0.004
   const hasSelection = coverage >= MIN_USABLE
   // Seleção é OPCIONAL (exceto Inserir, que exige onde). A instrução nomeia o
   // alvo ("retirar o tapete"); marcar uma área é o reforço de precisão.
@@ -155,7 +198,8 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
     action === 'insert_element' ? hasSelection && taskDescribed // posição + o quê
     : action === 'swap_material' ? taskDescribed                // precisa dizer o material
     : taskDescribed || hasSelection                             // remove/refine: texto OU área
-  const canGenerate = !!sourceUrl && busy === null && ready
+  // wandBusy bloqueia o Gerar: a seleção em detecção ainda não virou camada.
+  const canGenerate = !!sourceUrl && busy === null && ready && !wandBusy
 
   const softWarning =
     hasSelection && coverage < SMALL_WARN
@@ -185,8 +229,10 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
     setNotice(null)
     setImportOpen(false)
     setResult(null)
+    setCompareWith(null)
     setView('edit')
     if (!keepHistory) setHistory([{ url, kind: 'original' }])
+    fireWandWarmup() // modelos de seleção quentes antes do 1º clique
   }, [])
 
   const handlePickSource = useCallback(
@@ -251,6 +297,83 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
     return () => clearInterval(id)
   }, [busy])
 
+  // ── Seleção assistida (varinha, Piso/Parede, texto) → camada de seleção ──
+  //
+  // Um único executor: monta o payload do /api/edits/segment, aplica a máscara
+  // detectada como camada bitmap e trata erros/429/imagem-trocada. Cada entrada
+  // (clique, chip, instrução) só define a tarefa e o payload.
+  const segmentToLayer = useCallback(
+    async (
+      task: WandTask,
+      payload: Record<string, unknown>,
+      opts: { subtract?: boolean; point?: { x: number; y: number } | null } = {},
+    ) => {
+      const src = sourceUrl
+      if (!src || busy || wandBusyRef.current) return
+      wandBusyRef.current = true
+      setWandTask(task)
+      setWandAt(opts.point ?? null)
+      setError(null)
+      try {
+        const res = await fetch('/api/edits/segment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image_url: src, skip_preview: true, ...payload }),
+        })
+        const json = await res.json().catch(() => null)
+        if (sourceUrlRef.current !== src) return // trocou de imagem no meio
+        if (!res.ok || typeof json?.surface_mask_url !== 'string') {
+          setError(
+            res.status === 429
+              ? 'Muitas seleções em sequência. Aguarde um instante e tente de novo.'
+              : res.status === 422 && typeof json?.error === 'string'
+                ? json.error
+                : 'Não foi possível detectar a área. Tente outro ponto ou marque com o pincel.',
+          )
+          return
+        }
+        const ok = await canvasRef.current?.addMaskLayer(json.surface_mask_url, opts.subtract ? 'subtract' : 'add')
+        if (!ok) {
+          setError('Não foi possível aplicar a área detectada. Marque com o pincel.')
+          return
+        }
+        if (typeof json.target_label === 'string' && json.target_label) {
+          const loc = typeof json.target_location === 'string' && json.target_location ? ` · ${json.target_location}` : ''
+          setNotice(`Detectado: ${json.target_label}${loc}`)
+        }
+      } catch {
+        if (sourceUrlRef.current === src) setError('Falha de conexão ao detectar a área. Tente novamente.')
+      } finally {
+        wandBusyRef.current = false
+        setWandTask(null)
+        setWandAt(null)
+      }
+    },
+    [busy, sourceUrl],
+  )
+
+  const handleWandPoint = useCallback(
+    (pt: { x: number; y: number }, opts: { alt: boolean }) => {
+      // Subtrair só faz sentido com algo selecionado; sem seleção, todo clique soma.
+      const subtract = (opts.alt || wandMode === 'subtract') && coverage >= MIN_USABLE
+      void segmentToLayer('point', { points: [pt] }, { subtract, point: pt })
+    },
+    [coverage, segmentToLayer, wandMode],
+  )
+
+  const handleSemanticSelect = useCallback(
+    (kind: 'floor' | 'wall') => {
+      void segmentToLayer(kind, { semantic: kind })
+    },
+    [segmentToLayer],
+  )
+
+  const handleQueryDetect = useCallback(() => {
+    const q = instruction.trim()
+    if (!q) return
+    void segmentToLayer('query', { query: q })
+  }, [instruction, segmentToLayer])
+
   // ── Gerar ───────────────────────────────────────────────────────────────
   const handleGenerate = useCallback(async () => {
     if (!sourceUrl || busy || submittingRef.current) return
@@ -295,8 +418,10 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
           charged: json?.charge?.debited === true,
           width: json.output?.width ?? null,
           height: json.output?.height ?? null,
+          warning: typeof json.warning === 'string' ? json.warning : null,
         }
         setResult(r)
+        setCompareWith(null)
         setHistory(h => [...h, { url: r.url, kind: 'result' }])
         setView('result') // leva o usuário para a visão de resultado (claro que gerou)
         return
@@ -416,11 +541,19 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
         </div>
 
         <div style={{ ...card, padding: 12 }}>
-          <BeforeAfter before={result.before} after={result.url} aspect={sourceDims ? sourceDims.w / sourceDims.h : 4 / 3} />
+          <BeforeAfter before={compareWith ?? result.before} after={result.url} aspect={sourceDims ? sourceDims.w / sourceDims.h : 4 / 3} />
           <div style={{ marginTop: 8, fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center' }}>
-            Arraste a alça para comparar antes e depois
+            {compareWith
+              ? 'Comparando o resultado com a versão selecionada — clique nas versões abaixo para trocar'
+              : 'Arraste a alça para comparar antes e depois'}
           </div>
         </div>
+
+        {result.warning && (
+          <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 10, border: '0.5px solid var(--color-warning-border)', background: 'var(--color-warning-bg)', fontSize: 12.5, color: 'var(--color-text-secondary)' }}>
+            {result.warning}
+          </div>
+        )}
 
         <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap', alignItems: 'center' }}>
           <button type="button" className="edv3-cta" style={{ width: 'auto', padding: '11px 20px' }} onClick={editFromResult}>
@@ -428,6 +561,9 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
           </button>
           <button type="button" className="edv3-ghost" onClick={() => setView('edit')}>Voltar e ajustar</button>
           <button type="button" className="edv3-ghost" onClick={() => void download(result.url)}><IconDownload size={14} /> Baixar</button>
+          <a className="edv3-ghost" style={{ textDecoration: 'none' }} href={`/app/upscale?source=${encodeURIComponent(result.url)}`}>
+            Ampliar esta imagem
+          </a>
           <div style={{ flex: 1 }} />
           <button type="button" className="edv3-ghost" onClick={() => { setView('edit'); setResult(null); setHistory([]); setSourceUrl(null) }}>Nova imagem</button>
         </div>
@@ -436,15 +572,25 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
           <div style={{ ...card, marginTop: 16, padding: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflowX: 'auto' }}>
               <span style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-text-tertiary)', flexShrink: 0 }}>Versões</span>
-              {history.map((h, i) => (
-                <div key={i} style={{ position: 'relative', flexShrink: 0 }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={h.url} alt={h.kind === 'original' ? 'Original' : `Versão ${i}`} style={{ width: 56, height: 40, objectFit: 'cover', borderRadius: 8, border: `0.5px solid ${h.url === result.url ? 'var(--color-accent-green)' : 'var(--color-border-strong)'}` }} />
-                  <span style={{ position: 'absolute', bottom: 2, left: 4, fontSize: 9, color: 'rgba(255,255,255,0.9)', background: 'rgba(0,0,0,0.5)', padding: '0 4px', borderRadius: 4 }}>
-                    {h.kind === 'original' ? 'orig' : `v${i}`}
-                  </span>
-                </div>
-              ))}
+              {history.map((h, i) => {
+                const isCurrent = h.url === result.url
+                const isCompared = !isCurrent && (compareWith ? h.url === compareWith : h.url === result.before)
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => { if (!isCurrent) setCompareWith(h.url === result.before ? null : h.url) }}
+                    title={isCurrent ? 'Resultado atual' : 'Comparar o resultado com esta versão'}
+                    style={{ position: 'relative', flexShrink: 0, padding: 0, background: 'none', border: 'none', cursor: isCurrent ? 'default' : 'pointer' }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={h.url} alt={h.kind === 'original' ? 'Original' : `Versão ${i}`} style={{ display: 'block', width: 56, height: 40, objectFit: 'cover', borderRadius: 8, border: `1px solid ${isCurrent ? 'var(--color-accent-green)' : isCompared ? 'var(--color-border-strong)' : 'var(--color-border)'}`, opacity: isCurrent || isCompared ? 1 : 0.72 }} />
+                    <span style={{ position: 'absolute', bottom: 2, left: 4, fontSize: 9, color: 'rgba(255,255,255,0.9)', background: 'rgba(0,0,0,0.5)', padding: '0 4px', borderRadius: 4 }}>
+                      {h.kind === 'original' ? 'orig' : `v${i}`}
+                    </span>
+                  </button>
+                )
+              })}
             </div>
           </div>
         )}
@@ -500,8 +646,51 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
             tool={tool}
             brushSize={brushSize}
             onCoverageChange={setCoverage}
+            onWandPoint={handleWandPoint}
+            wandBusyAt={wandTask === 'point' ? wandAt : null}
             disabled={busy === 'generate'}
           />
+          {tool === 'wand' && (
+            <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <div style={{ display: 'inline-flex', borderRadius: 9, border: '0.5px solid var(--color-border-strong)', overflow: 'hidden' }}>
+                {([['add', '＋ Adicionar'], ['subtract', '－ Remover']] as const).map(([m, label]) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setWandMode(m)}
+                    style={{
+                      padding: '6px 12px',
+                      fontSize: 12,
+                      fontWeight: 500,
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: wandMode === m ? 'var(--color-surface-hover)' : 'transparent',
+                      color: wandMode === m ? 'var(--color-accent-green)' : 'var(--color-text-secondary)',
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 11.5, color: 'var(--color-text-quaternary)' }}>Atalhos</span>
+                <button type="button" className="edv3-chip" disabled={wandBusy} onClick={() => handleSemanticSelect('floor')}>Piso</button>
+                <button type="button" className="edv3-chip" disabled={wandBusy} onClick={() => handleSemanticSelect('wall')}>Parede</button>
+                <button
+                  type="button"
+                  className="edv3-chip"
+                  disabled={wandBusy || !hasInstruction}
+                  title={hasInstruction ? 'Localiza a área citada na sua descrição' : 'Escreva a mudança primeiro — a área citada é localizada automaticamente'}
+                  onClick={handleQueryDetect}
+                >
+                  Detectar pela descrição
+                </button>
+              </div>
+              <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>
+                Clique em um objeto ou superfície para selecioná-lo inteiro · Alt-clique remove da seleção
+              </span>
+            </div>
+          )}
           {(tool === 'brush' || tool === 'eraser') && (
             <label style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, color: 'var(--color-text-tertiary)' }}>
               Tamanho do pincel
@@ -509,12 +698,19 @@ export function EditV3Flow({ initialBalance }: { initialBalance: number }) {
             </label>
           )}
           <div style={{ marginTop: 12, fontSize: 12.5, color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 7 }}>
-            <span style={{ width: 6, height: 6, borderRadius: 99, flexShrink: 0, background: hasSelection ? 'var(--color-accent-green)' : 'var(--color-text-tertiary)' }} />
-            {hasSelection
-              ? `Área marcada — a edição fica só aqui · ${(coverage * 100).toFixed(1)}%`
-              : action === 'insert_element'
-                ? 'Marque o lugar onde o elemento será inserido'
-                : 'Imagem inteira — pinte uma área se quiser precisão máxima'}
+            <span className={wandBusy ? 'edv3-pulse' : undefined} style={{ width: 6, height: 6, borderRadius: 99, flexShrink: 0, background: wandBusy || hasSelection ? 'var(--color-accent-green)' : 'var(--color-text-tertiary)' }} />
+            {wandBusy
+              ? wandTask === 'floor' ? 'Detectando o piso…'
+                : wandTask === 'wall' ? 'Detectando a parede…'
+                : wandTask === 'query' ? 'Localizando a área citada na descrição…'
+                : 'Detectando a área clicada…'
+              : hasSelection
+                ? `Área marcada — a edição fica só aqui · ${(coverage * 100).toFixed(1)}%`
+                : action === 'insert_element'
+                  ? 'Marque o lugar onde o elemento será inserido'
+                  : tool === 'wand'
+                    ? 'Clique no que você quer mudar — a área inteira é detectada'
+                    : 'Imagem inteira — pinte uma área se quiser precisão máxima'}
           </div>
           {!hasSelection && action !== 'insert_element' && (
             <div style={{ marginTop: 6, fontSize: 11, color: 'var(--color-text-tertiary)' }}>
@@ -642,6 +838,11 @@ const EDV3_CSS = `
 .edv3-cta:hover:not(:disabled) { opacity:0.9; }
 .edv3-cta:active:not(:disabled) { transform:scale(0.985); }
 .edv3-cta:disabled { opacity:0.4; cursor:not-allowed; }
+.edv3-pulse { animation: edv3-pulse 1s ease-in-out infinite; }
+@keyframes edv3-pulse { 0%,100% { opacity:1 } 50% { opacity:0.25 } }
+.edv3-chip { font-size:12px; font-weight:500; color:var(--color-text-secondary); background:var(--color-surface); border:0.5px solid var(--color-border-strong); border-radius:99px; padding:5px 11px; cursor:pointer; }
+.edv3-chip:hover:not(:disabled) { color:var(--color-text-primary); background:var(--color-surface-hover); }
+.edv3-chip:disabled { opacity:0.45; cursor:not-allowed; }
 @media (max-width: 980px) {
   .edv3-grid { grid-template-columns: 46px minmax(0,1fr); }
   .edv3-panel { grid-column: 1 / -1; }

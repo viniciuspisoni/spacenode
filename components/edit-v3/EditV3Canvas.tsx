@@ -22,15 +22,55 @@ import {
   useState,
 } from 'react'
 
-export type EditV3Tool = 'auto' | 'lasso' | 'polygon' | 'brush' | 'eraser' | 'pan'
+export type EditV3Tool = 'auto' | 'wand' | 'lasso' | 'polygon' | 'brush' | 'eraser' | 'pan'
 
 type Pt = { x: number; y: number }
 
 interface Shape {
-  kind: 'stroke' | 'poly'
+  kind: 'stroke' | 'poly' | 'bitmap'
   points: Pt[]
   sizeImagePx: number
   mode: 'add' | 'subtract'
+  /** Camada bitmap (varinha mágica): máscara branco-sobre-transparente já
+   *  normalizada ao retângulo da imagem (0–1 → cobre a imagem inteira).
+   *  Entra no MESMO undo/redo e no MESMO paintShapes das formas manuais. */
+  bitmap?: HTMLCanvasElement
+}
+
+/** Máscara P&B (URL) → canvas branco-sobre-transparente (lum>110 = selecionado).
+ *  Downscale a ≤maxW para memória — a máscara final é renormalizada às dims da
+ *  imagem no servidor, então a folga de borda é sub-pixel na prática. */
+function loadMaskAsWhiteLayer(url: string, maxW = 2048): Promise<HTMLCanvasElement | null> {
+  return new Promise(resolve => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous' // máscaras moram no Storage (CORS ok)
+    img.onload = () => {
+      try {
+        const scale = Math.min(1, maxW / Math.max(1, img.naturalWidth))
+        const c = document.createElement('canvas')
+        c.width = Math.max(1, Math.round(img.naturalWidth * scale))
+        c.height = Math.max(1, Math.round(img.naturalHeight * scale))
+        const ctx = c.getContext('2d')
+        if (!ctx) return resolve(null)
+        ctx.drawImage(img, 0, 0, c.width, c.height)
+        const id = ctx.getImageData(0, 0, c.width, c.height)
+        const d = id.data
+        for (let i = 0; i < d.length; i += 4) {
+          const lum = d[i]
+          d[i] = 255
+          d[i + 1] = 255
+          d[i + 2] = 255
+          d[i + 3] = lum > 110 ? 255 : 0
+        }
+        ctx.putImageData(id, 0, 0)
+        resolve(c)
+      } catch {
+        resolve(null) // CORS/decode — chamador decide o fallback
+      }
+    }
+    img.onerror = () => resolve(null)
+    img.src = url
+  })
 }
 
 function paintShapes(
@@ -45,6 +85,14 @@ function paintShapes(
     ctx.globalCompositeOperation = s.mode === 'subtract' ? 'destination-out' : 'source-over'
     ctx.strokeStyle = '#ffffff'
     ctx.fillStyle = '#ffffff'
+    if (s.kind === 'bitmap') {
+      if (s.bitmap) {
+        const a = toPx(0, 0)
+        const b = toPx(1, 1)
+        ctx.drawImage(s.bitmap, a.x, a.y, b.x - a.x, b.y - a.y)
+      }
+      continue
+    }
     if (s.kind === 'poly') {
       if (s.points.length < 3) continue
       ctx.beginPath()
@@ -85,6 +133,9 @@ export interface EditV3CanvasHandle {
   hasSelection(): boolean
   undo(): void
   redo(): void
+  /** Varinha mágica: soma (ou subtrai) a máscara detectada como camada bitmap.
+   *  Entra no undo/redo normal. false = máscara ilegível (CORS/decode). */
+  addMaskLayer(url: string, mode: 'add' | 'subtract'): Promise<boolean>
 }
 
 interface Props {
@@ -96,6 +147,11 @@ interface Props {
   brushSize: number
   onCoverageChange?: (coverage: number) => void
   onClearedBase?: () => void
+  /** Clique da varinha mágica: ponto em px NATURAIS da imagem + modificadores.
+   *  O fluxo decide o que fazer (chamar a detecção, add/subtract). */
+  onWandPoint?: (point: { x: number; y: number }, opts: { alt: boolean }) => void
+  /** Ponto (px naturais) onde a detecção está rodando — desenha o marcador. */
+  wandBusyAt?: { x: number; y: number } | null
   disabled?: boolean
 }
 
@@ -109,7 +165,7 @@ function effTool(t: EditV3Tool): Exclude<EditV3Tool, 'auto'> {
 }
 
 export const EditV3Canvas = forwardRef<EditV3CanvasHandle, Props>(
-  function EditV3Canvas({ imageUrl, baseMaskUrl, tool, brushSize, onCoverageChange, onClearedBase, disabled }, ref) {
+  function EditV3Canvas({ imageUrl, baseMaskUrl, tool, brushSize, onCoverageChange, onClearedBase, onWandPoint, wandBusyAt, disabled }, ref) {
     const containerRef = useRef<HTMLDivElement | null>(null)
     const canvasRef = useRef<HTMLCanvasElement | null>(null)
     const imgRef = useRef<HTMLImageElement | null>(null)
@@ -143,6 +199,10 @@ export const EditV3Canvas = forwardRef<EditV3CanvasHandle, Props>(
       baseLayerRef.current = null
       panRef.current = { x: 0, y: 0 }
       setZoom(1)
+      // Sincroniza o dono: todo (re)mount/troca de imagem zera a seleção AQUI —
+      // sem isto, voltar da visão de resultado (canvas desmontado) deixava o
+      // fluxo achando que havia área marcada e gerava SEM máscara.
+      onCoverageChange?.(0)
       // Sem crossOrigin: nunca lemos pixels da IMAGEM; exigir CORS quebraria o
       // load de fontes como o CDN da FAL.
       const img = new Image()
@@ -154,7 +214,7 @@ export const EditV3Canvas = forwardRef<EditV3CanvasHandle, Props>(
       return () => {
         imgRef.current = null
       }
-    }, [imageUrl])
+    }, [imageUrl, onCoverageChange])
 
     // ── Camada de superfície (máscara P&B → branco-sobre-transparente) ───────
     useEffect(() => {
@@ -164,39 +224,13 @@ export const EditV3Canvas = forwardRef<EditV3CanvasHandle, Props>(
         return
       }
       let cancelled = false
-      const img = new Image()
-      img.crossOrigin = 'anonymous' // saída do detector mora no Storage (CORS ok)
-      img.onload = () => {
+      void loadMaskAsWhiteLayer(baseMaskUrl, Number.MAX_SAFE_INTEGER).then(layer => {
         if (cancelled) return
-        try {
-          const c = document.createElement('canvas')
-          c.width = img.naturalWidth
-          c.height = img.naturalHeight
-          const ctx = c.getContext('2d')
-          if (!ctx) return
-          ctx.drawImage(img, 0, 0)
-          const id = ctx.getImageData(0, 0, c.width, c.height)
-          const d = id.data
-          for (let i = 0; i < d.length; i += 4) {
-            const lum = d[i]
-            d[i] = 255
-            d[i + 1] = 255
-            d[i + 2] = 255
-            d[i + 3] = lum > 110 ? 255 : 0
-          }
-          ctx.putImageData(id, 0, 0)
-          baseLayerRef.current = c
-        } catch {
-          baseLayerRef.current = null
-          console.warn('[EditV3Canvas] camada de superfície indisponível (CORS)')
-        }
+        baseLayerRef.current = layer
+        if (!layer) console.warn('[EditV3Canvas] camada de superfície indisponível (CORS)')
         onCoverageChange?.(computeCoverageRef.current())
         scheduleRedrawRef.current?.()
-      }
-      img.onerror = () => {
-        baseLayerRef.current = null
-      }
-      img.src = baseMaskUrl
+      })
       return () => {
         cancelled = true
       }
@@ -320,7 +354,28 @@ export const EditV3Canvas = forwardRef<EditV3CanvasHandle, Props>(
         ctx.lineWidth = 1.5
         ctx.stroke()
       }
-    }, [active, brushSize, disabled, getTransform, isStrokeTool])
+
+      // Marcador da varinha: onde a detecção está rodando (px naturais → tela).
+      if (wandBusyAt && img) {
+        const q = toDisplay(wandBusyAt.x / img.naturalWidth, wandBusyAt.y / img.naturalHeight)
+        ctx.save()
+        ctx.beginPath()
+        ctx.arc(q.x, q.y, 10, 0, Math.PI * 2)
+        ctx.strokeStyle = 'rgba(48,209,88,0.95)'
+        ctx.lineWidth = 2
+        ctx.stroke()
+        ctx.beginPath()
+        ctx.arc(q.x, q.y, 15, 0, Math.PI * 2)
+        ctx.strokeStyle = 'rgba(255,255,255,0.45)'
+        ctx.lineWidth = 1
+        ctx.stroke()
+        ctx.beginPath()
+        ctx.arc(q.x, q.y, 3, 0, Math.PI * 2)
+        ctx.fillStyle = '#30d158'
+        ctx.fill()
+        ctx.restore()
+      }
+    }, [active, brushSize, disabled, getTransform, isStrokeTool, wandBusyAt])
 
     const scheduleRedraw = useCallback(() => {
       cancelAnimationFrame(rafRef.current)
@@ -512,6 +567,22 @@ export const EditV3Canvas = forwardRef<EditV3CanvasHandle, Props>(
       const p = toImageCoords(e.clientX, e.clientY)
       if (!p) return
 
+      if (active === 'wand') {
+        // Clique fora da imagem (letterbox) não segmenta.
+        if (p.x < 0 || p.x > 1 || p.y < 0 || p.y > 1) return
+        const img = imgRef.current
+        if (img) {
+          onWandPoint?.(
+            {
+              x: Math.min(img.naturalWidth - 1, Math.max(0, Math.round(p.x * img.naturalWidth))),
+              y: Math.min(img.naturalHeight - 1, Math.max(0, Math.round(p.y * img.naturalHeight))),
+            },
+            { alt: e.altKey },
+          )
+        }
+        return
+      }
+
       if (active === 'polygon') {
         const dev = toDeviceCoords(e.clientX, e.clientY)
         const t = getTransform()
@@ -612,6 +683,13 @@ export const EditV3Canvas = forwardRef<EditV3CanvasHandle, Props>(
         }
         return {
           hasSelection: () => computeCoverage() > 0,
+          addMaskLayer: async (url: string, mode: 'add' | 'subtract') => {
+            const layer = await loadMaskAsWhiteLayer(url)
+            if (!layer) return false
+            commitShape({ kind: 'bitmap', points: [], sizeImagePx: 0, mode, bitmap: layer })
+            scheduleRedraw()
+            return true
+          },
           clearStrokes: () => {
             shapesRef.current = []
             activeShapeRef.current = null
@@ -628,7 +706,7 @@ export const EditV3Canvas = forwardRef<EditV3CanvasHandle, Props>(
           redo,
         }
       },
-      [bump, clearAll, computeCoverage, onCoverageChange, redo, scheduleRedraw, undo],
+      [bump, clearAll, commitShape, computeCoverage, onCoverageChange, redo, scheduleRedraw, undo],
     )
 
     const cursorStyle = active === 'pan' || tool === 'auto' ? 'grab' : isStrokeTool ? 'none' : 'crosshair'
