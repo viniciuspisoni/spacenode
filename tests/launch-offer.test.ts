@@ -4,6 +4,7 @@ import {
   launchOfferPrice,
   launchOfferDeadlineLabel,
   formatBRL,
+  LAUNCH_OFFER_ENABLED,
   LAUNCH_OFFER_ENDS_AT,
   LAUNCH_OFFER_PERCENT_OFF,
 } from '@/lib/launch-offer'
@@ -11,17 +12,14 @@ import { PLANS } from '@/lib/plans'
 
 const MINUTE = 60 * 1000
 
-describe('janela da campanha', () => {
-  it('está aberta antes do fim', () => {
-    expect(isLaunchOfferOpen(new Date(LAUNCH_OFFER_ENDS_AT.getTime() - MINUTE))).toBe(true)
+describe('janela da campanha (encerrada em 2026-09-01)', () => {
+  it('kill switch desligado fecha a oferta mesmo dentro da janela de datas', () => {
+    expect(LAUNCH_OFFER_ENABLED).toBe(false)
+    expect(isLaunchOfferOpen(new Date(LAUNCH_OFFER_ENDS_AT.getTime() - MINUTE))).toBe(false)
   })
 
-  it('fecha depois do fim', () => {
+  it('segue fechada depois do fim', () => {
     expect(isLaunchOfferOpen(new Date(LAUNCH_OFFER_ENDS_AT.getTime() + MINUTE))).toBe(false)
-  })
-
-  it('inclui o instante exato do fim', () => {
-    expect(isLaunchOfferOpen(new Date(LAUNCH_OFFER_ENDS_AT.getTime()))).toBe(true)
   })
 })
 
