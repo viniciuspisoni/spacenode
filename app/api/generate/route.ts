@@ -161,6 +161,14 @@ function sanitizeModelFacts(raw: unknown): ModelFacts | undefined {
     if (eye !== undefined) camera.eyeHeightM = Math.round(eye * 100) / 100
     if (Object.keys(camera).length > 0) out.camera = camera
   }
+  const mirrors = src.mirrors as Record<string, unknown> | undefined
+  if (mirrors && typeof mirrors === 'object') {
+    const count = num(mirrors.count, 0, 50)
+    if (count !== undefined && count >= 1) {
+      const glass = num(mirrors.glass, 0, count)
+      out.mirrors = { count: Math.round(count), ...(glass ? { glass: Math.round(glass) } : {}) }
+    }
+  }
   const sun = src.sun as Record<string, unknown> | undefined
   if (sun && typeof sun === 'object') {
     const s: NonNullable<ModelFacts['sun']> = {}
@@ -177,7 +185,7 @@ function sanitizeModelFacts(raw: unknown): ModelFacts | undefined {
     if (sun.shadowsVisible === true) s.shadowsVisible = true
     if (s.elevationDeg !== undefined) out.sun = s
   }
-  return out.camera || out.sun ? out : undefined
+  return out.camera || out.sun || out.mirrors ? out : undefined
 }
 
 function truncateErr(err: unknown): string {

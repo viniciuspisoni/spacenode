@@ -27,7 +27,7 @@ module SpaceNode
   module SketchUp
     extend self
 
-    VERSION = '0.8.0'
+    VERSION = '0.9.0'
     PREFERENCES_KEY = 'com.spacenode.sketchup'
     DEFAULT_API_BASE_URL = 'https://spacenode.app'
     MIN_SKETCHUP_MAJOR = 21          # Ruby 2.7+; recomendado 2024+
@@ -52,6 +52,10 @@ module SpaceNode
         :cancelled => 'Geração cancelada.',
         :view_restored => 'Vista do render restaurada.',
         :no_floor => 'Não achei piso abaixo da câmera pra medir a altura do olho.',
+        :mirror_select_face => 'Selecione no SketchUp a face do espelho (ou vidro) e clique de novo.',
+        :mirror_select_inside => 'Entre no grupo com dois cliques e selecione a FACE do espelho — não o grupo inteiro.',
+        :mirror_marked => 'Face marcada como espelho — o reflexo entra em toda captura.',
+        :mirror_marked_glass => 'Face marcada como vidro — reflexo suave, com o que há atrás visível.',
         :downloading => 'Baixando o render…',
         :reconciling => 'Conexão instável — verificando se o render foi concluído…',
         :connect_first => 'Conecte sua conta SPACENODE primeiro.',
@@ -84,6 +88,10 @@ module SpaceNode
         :cancelled => 'Generation cancelled.',
         :view_restored => 'Render view restored.',
         :no_floor => 'No floor found below the camera to measure the eye height.',
+        :mirror_select_face => 'Select the mirror (or glass) face in SketchUp and click again.',
+        :mirror_select_inside => 'Double-click into the group and select the mirror FACE — not the whole group.',
+        :mirror_marked => 'Face marked as a mirror — the reflection goes into every capture.',
+        :mirror_marked_glass => 'Face marked as glass — soft reflection, with what is behind still visible.',
         :downloading => 'Downloading the render…',
         :reconciling => 'Unstable connection — checking if the render finished…',
         :connect_first => 'Connect your SPACENODE account first.',
@@ -130,6 +138,18 @@ module SpaceNode
     PHOTO_FOV_MAX_DEG = 118.0
     PHOTO_GUIDES = %w[none thirds golden center diagonals].freeze
     INCH_PER_M = 39.3700787
+
+    # ── Espelhos (0.9.0) ──────────────────────────────────────────────────
+    # Reflexo calculado NA CAPTURA: câmera refletida pelo plano da face,
+    # render do que ela vê (geometria atrás do plano escondida), recorte da
+    # região do espelho e textura projetada na face — tudo dentro de uma
+    # operação abortada no fim (nada fica no modelo, nunca envelhece).
+    MIRROR_KINDS = %w[mirror glass].freeze
+    MIRROR_ALPHA = { 'mirror' => 1.0, 'glass' => 0.45 }.freeze
+    MIRROR_PLANE_EPS_IN = 0.4          # ~1 cm: coplanar/atrás = escondido no render refletido
+    MIRROR_REFLECTION_EDGE = 2048      # lado maior do render refletido (o viewport mostra texturas até 1024)
+    MIRROR_MAX_PER_CAPTURE = 6         # planos distintos por captura (um render cada)
+    MIRROR_MAX_ENTITIES = 400_000      # teto da varredura de ocultação
 
     # Higiene de captura: opções que poluem a imagem que a IA vê (sketchy
     # edges, extensão de linha, névoa, guias, grade de seção). Salvas e
@@ -315,6 +335,21 @@ module SpaceNode
           emit_error(e.message)
         end
       end
+      # Espelhos: marca/desmarca as faces selecionadas no SketchUp.
+      dialog.add_action_callback('markMirror') do |_ctx, raw|
+        begin
+          handle_mark_mirror(raw)
+        rescue StandardError => e
+          emit_error(e.message)
+        end
+      end
+      dialog.add_action_callback('unmarkMirror') do |_ctx, raw|
+        begin
+          handle_unmark_mirror(raw)
+        rescue StandardError => e
+          emit_error(e.message)
+        end
+      end
       dialog.add_action_callback('generate') do |_ctx, raw|
         begin
           handle_generate(raw)
@@ -496,6 +531,7 @@ module SpaceNode
       send_state
       attach_photo_observers
       emit_camera_facts
+      emit_mirrors
       ensure_catalog
       list_scenes
       check_session if authenticated?
@@ -1205,6 +1241,576 @@ module SpaceNode
       detach_view_observer
       attach_photo_observers
       emit_camera_facts
+      emit_mirrors
+    rescue StandardError
+      nil
+    end
+
+    # ── Espelhos ─────────────────────────────────────────────────────────────
+    #
+    # O SketchUp mostra o espelho como uma face chapada e a IA inventa o
+    # reflexo. Os concorrentes gravam uma textura na face amarrada a UMA cena
+    # (fica velha ao mover a câmera; precisa "apagar reflexos"). Aqui o
+    # reflexo é recalculado em toda captura, pra câmera daquela captura, e
+    # some com abort_operation — o modelo do usuário nunca muda.
+    #
+    # Marcação: o usuário seleciona a(s) face(s) no SketchUp (entrando no
+    # grupo) e clica em Marcar; guardamos persistent_id da face + o caminho
+    # de instâncias (active_path) no .skp, e um atributo na própria face.
+
+    def handle_mark_mirror(raw)
+      payload = parse_json(raw)
+      kind = payload['kind'].to_s
+      kind = 'mirror' unless MIRROR_KINDS.include?(kind)
+
+      model = ::Sketchup.active_model
+      raise 'Nenhum modelo aberto no SketchUp.' unless model
+
+      selection = model.selection.to_a
+      faces = selection.select { |e| e.is_a?(::Sketchup::Face) }
+      if faces.empty?
+        has_container = selection.any? { |e| e.is_a?(::Sketchup::Group) || e.is_a?(::Sketchup::ComponentInstance) }
+        raise t(has_container ? :mirror_select_inside : :mirror_select_face)
+      end
+
+      path_pids = Array(model.active_path).map { |inst| inst.persistent_id }
+      entries = mirror_entries(model)
+      model.start_operation('SPACENODE: marcar espelho', true)
+      begin
+        faces.each do |face|
+          pid = face.persistent_id
+          face.set_attribute('spacenode', 'mirror', kind)
+          entries.reject! { |e| e['pid'] == pid }
+          entries << { 'pid' => pid, 'path' => path_pids, 'kind' => kind }
+        end
+        save_mirror_entries(model, entries)
+        model.commit_operation
+      rescue StandardError
+        model.abort_operation
+        raise
+      end
+      emit_mirrors
+      emit('status', { :stage => 'idle', :message => t(kind == 'glass' ? :mirror_marked_glass : :mirror_marked) })
+    end
+
+    # 'selection' desmarca as faces selecionadas; 'all' limpa tudo.
+    def handle_unmark_mirror(raw)
+      payload = parse_json(raw)
+      scope = payload['scope'].to_s
+
+      model = ::Sketchup.active_model
+      raise 'Nenhum modelo aberto no SketchUp.' unless model
+
+      entries = mirror_entries(model)
+      model.start_operation('SPACENODE: desmarcar espelho', true)
+      begin
+        if scope == 'all'
+          resolve_mirror_entries(model, entries, false).each do |r|
+            begin
+              r[:face].delete_attribute('spacenode', 'mirror')
+            rescue StandardError
+              nil
+            end
+          end
+          entries = []
+        else
+          pids = model.selection.to_a.select { |e| e.is_a?(::Sketchup::Face) }.map(&:persistent_id)
+          raise t(:mirror_select_face) if pids.empty?
+
+          model.selection.to_a.each do |e|
+            next unless e.is_a?(::Sketchup::Face)
+
+            begin
+              e.delete_attribute('spacenode', 'mirror')
+            rescue StandardError
+              nil
+            end
+          end
+          entries.reject! { |e| pids.include?(e['pid']) }
+        end
+        save_mirror_entries(model, entries)
+        model.commit_operation
+      rescue StandardError
+        model.abort_operation
+        raise
+      end
+      emit_mirrors
+    end
+
+    def mirror_entries(model)
+      raw = model.get_attribute('spacenode', 'mirrors', nil)
+      list = raw.is_a?(String) && !raw.empty? ? JSON.parse(raw) : []
+      list.select { |e| e.is_a?(Hash) && e['pid'].is_a?(Integer) }
+    rescue StandardError
+      []
+    end
+
+    def save_mirror_entries(model, entries)
+      model.set_attribute('spacenode', 'mirrors', JSON.generate(entries))
+    end
+
+    # Resolve pids → faces vivas com a transformação de mundo do caminho.
+    # visible_only pula faces/instâncias ocultas ou em tags invisíveis.
+    def resolve_mirror_entries(model, entries, visible_only = true)
+      return [] if entries.empty?
+      return [] unless model.respond_to?(:find_entity_by_persistent_id)
+
+      ids = entries.flat_map { |e| Array(e['path']) + [e['pid']] }.uniq
+      found = model.find_entity_by_persistent_id(ids)
+      by_id = {}
+      ids.each_with_index { |id, i| by_id[id] = found[i] }
+
+      out = []
+      entries.each do |e|
+        face = by_id[e['pid']]
+        next unless face.is_a?(::Sketchup::Face) && face.valid?
+
+        instances = Array(e['path']).map { |id| by_id[id] }
+        next unless instances.all? { |i| (i.is_a?(::Sketchup::Group) || i.is_a?(::Sketchup::ComponentInstance)) && i.valid? }
+
+        if visible_only
+          next if entity_invisible?(face) || instances.any? { |i| entity_invisible?(i) }
+        end
+        tr = ::Geom::Transformation.new
+        instances.each { |i| tr = tr * i.transformation }
+        out << { :face => face, :transform => tr, :kind => MIRROR_KINDS.include?(e['kind'].to_s) ? e['kind'].to_s : 'mirror', :pid => e['pid'] }
+      end
+      out
+    rescue StandardError
+      []
+    end
+
+    def entity_invisible?(entity)
+      return true if entity.hidden?
+
+      layer = entity.layer
+      return true if layer && !layer.visible?
+
+      false
+    rescue StandardError
+      false
+    end
+
+    def emit_mirrors
+      model = ::Sketchup.active_model
+      return unless model && @dialog
+
+      entries = mirror_entries(model)
+      resolved = resolve_mirror_entries(model, entries, false)
+      emit('mirrors', {
+        :count => resolved.length,
+        :mirror => resolved.count { |r| r[:kind] == 'mirror' },
+        :glass => resolved.count { |r| r[:kind] == 'glass' },
+        :stale => entries.length - resolved.length,
+        :supported => model.respond_to?(:find_entity_by_persistent_id) && defined?(::Sketchup::ImageRep) ? true : false
+      })
+    rescue StandardError
+      nil
+    end
+
+    # ── Reflexo na captura ───────────────────────────────────────────────────
+
+    # Parâmetros da câmera que vai renderizar a imagem (a do usuário ou a
+    # temporária nivelada), normalizados pra projeção manual de pontos.
+    def render_camera_params(view, camera, plan, width, height)
+      if plan
+        eye = plan[:eye]
+        dir = plan[:target] - eye
+        up = ::Geom::Vector3d.new(0, 0, 1)
+        fov_v = plan[:fov_v].to_f
+        w = plan[:width].to_i
+        h = plan[:render_h].to_i
+      else
+        eye = camera.eye
+        dir = camera.direction
+        up = camera.up
+        w = width.to_i
+        h = height.to_i
+        fov_v = vertical_fov_deg(camera, w.to_f / h)
+      end
+      dir = dir.clone
+      dir.normalize!
+      right = dir * up
+      return nil if right.length < 1e-9
+
+      right.normalize!
+      up2 = right * dir
+      up2.normalize!
+      tan_v = Math.tan(fov_v * Math::PI / 360.0)
+      { :eye => eye, :dir => dir, :right => right, :up => up2, :fov_v => fov_v,
+        :tan_v => tan_v, :tan_h => tan_v * (w.to_f / h), :w => w, :h => h }
+    rescue StandardError
+      nil
+    end
+
+    # Pixel (x, y, profundidade) de um ponto do mundo na imagem da câmera.
+    def project_pixel(cam, point)
+      q = point - cam[:eye]
+      z = q % cam[:dir]
+      return nil if z <= 1e-6
+
+      x = (q % cam[:right]) / z
+      y = (q % cam[:up]) / z
+      [cam[:w] * (0.5 + x / (2.0 * cam[:tan_h])), cam[:h] * (0.5 - y / (2.0 * cam[:tan_v])), z]
+    end
+
+    def reflect_point(point, p0, n)
+      d = (point - p0) % n
+      point.offset(n, -2.0 * d)
+    end
+
+    def reflect_vector(vector, n)
+      d = vector % n
+      out = ::Geom::Vector3d.new(vector.x - 2.0 * d * n.x, vector.y - 2.0 * d * n.y, vector.z - 2.0 * d * n.z)
+      out
+    end
+
+    # Normal (Newell) do polígono já em coordenadas de mundo.
+    def polygon_normal(points)
+      nx = ny = nz = 0.0
+      points.each_with_index do |a, i|
+        b = points[(i + 1) % points.length]
+        nx += (a.y - b.y) * (a.z + b.z)
+        ny += (a.z - b.z) * (a.x + b.x)
+        nz += (a.x - b.x) * (a.y + b.y)
+      end
+      v = ::Geom::Vector3d.new(nx, ny, nz)
+      return nil if v.length < 1e-9
+
+      v.normalize!
+      v
+    end
+
+    # Esconde (dentro da operação aberta) tudo que está atrás do plano ou
+    # sobre ele: é o que a câmera refletida não pode ver. Instâncias que
+    # cruzam o plano são abertas só se a definição tem UMA instância
+    # (esconder uma face de definição compartilhada esconderia nas outras).
+    def hide_behind_plane(entities, tr, p0, n, list, stats, depth)
+      entities.each do |e|
+        stats[:visited] += 1
+        break if stats[:visited] > MIRROR_MAX_ENTITIES
+
+        begin
+          next if e.hidden?
+        rescue StandardError
+          next
+        end
+        case e
+        when ::Sketchup::Face, ::Sketchup::Edge
+          pts = e.vertices.map { |v| v.position.transform(tr) }
+          if pts.all? { |pt| (pt - p0) % n <= MIRROR_PLANE_EPS_IN }
+            e.hidden = true
+            list << e
+          end
+        when ::Sketchup::Group, ::Sketchup::ComponentInstance, ::Sketchup::Image
+          bb = e.bounds
+          ds = (0..7).map { |i| (bb.corner(i).transform(tr) - p0) % n }
+          if ds.max <= MIRROR_PLANE_EPS_IN
+            e.hidden = true
+            list << e
+          elsif ds.min >= -MIRROR_PLANE_EPS_IN
+            next
+          elsif (e.is_a?(::Sketchup::Group) || e.is_a?(::Sketchup::ComponentInstance)) && depth < 8
+            definition = e.definition
+            if definition.instances.length == 1
+              hide_behind_plane(definition.entities, tr * e.transformation, p0, n, list, stats, depth + 1)
+            else
+              stats[:straddle] += 1
+            end
+          end
+        end
+      end
+    rescue StandardError
+      nil
+    end
+
+    # Recorte retangular (linhas E colunas) via ImageRep → arquivo de textura.
+    def crop_image_rect(src_path, dst_path, x0, y0, cw, ch)
+      return false unless defined?(::Sketchup::ImageRep)
+
+      rep = ::Sketchup::ImageRep.new
+      rep.load_file(src_path)
+      w = rep.width.to_i
+      h = rep.height.to_i
+      bpp = rep.bits_per_pixel.to_i
+      pad = rep.row_padding.to_i
+      return false if w <= 0 || h <= 0 || ![24, 32].include?(bpp)
+
+      bytes = bpp / 8
+      stride = (w * bytes) + pad
+      data = rep.data
+      return false unless data && data.bytesize >= stride * h
+
+      x0 = [[x0, 0].max, w - 1].min
+      y0 = [[y0, 0].max, h - 1].min
+      cw = [[cw, 1].max, w - x0].min
+      ch = [[ch, 1].max, h - y0].min
+      top_down = imagerep_top_down?(rep, data, stride, bpp, w, h)
+      rows = []
+      ch.times do |i|
+        r = y0 + i
+        mem = top_down ? r : (h - 1 - r)
+        rows << data.byteslice((mem * stride) + (x0 * bytes), cw * bytes)
+      end
+      rows.reverse! unless top_down
+      out = ::Sketchup::ImageRep.new
+      out.set_data(cw, ch, bpp, 0, rows.join.force_encoding('ASCII-8BIT'))
+      out.save_file(dst_path)
+      File.exist?(dst_path)
+    rescue StandardError
+      false
+    end
+
+    # Abre a operação, renderiza o reflexo de cada plano marcado e aplica a
+    # textura projetada nas faces. Devolve o estado pra end_mirrors (que
+    # SEMPRE aborta a operação). Nunca levanta: qualquer falha vira relatório.
+    def begin_mirrors(model, view, camera, plan, width, height, stamp)
+      state = { :operation => false, :requested => 0, :applied => 0, :skipped => [], :files => [], :kinds => [] }
+      entries = mirror_entries(model)
+      return state if entries.empty?
+
+      resolved = resolve_mirror_entries(model, entries, true)
+      state[:requested] = resolved.length
+      return state if resolved.empty?
+      unless defined?(::Sketchup::ImageRep)
+        state[:skipped] << 'no_imagerep'
+        return state
+      end
+
+      cam = render_camera_params(view, camera, plan, width, height)
+      unless cam
+        state[:skipped] << 'camera'
+        return state
+      end
+
+      # Agrupa por plano (normal + distância) — um render refletido por plano.
+      groups = []
+      resolved.each do |r|
+        pts = r[:face].outer_loop.vertices.map { |v| v.position.transform(r[:transform]) }
+        next if pts.length < 3
+
+        normal = polygon_normal(pts)
+        next unless normal
+
+        p0 = pts[0]
+        # Lado espelhado = o que encara a câmera.
+        front_side = ((cam[:eye] - p0) % normal) >= 0
+        n = front_side ? normal : normal.reverse
+        r[:points] = pts
+        r[:front] = front_side
+        group = groups.find { |g| (g[:n] % n) > 0.9995 && ((p0 - g[:p0]) % g[:n]).abs < MIRROR_PLANE_EPS_IN }
+        if group
+          group[:faces] << r
+        else
+          groups << { :n => n, :p0 => p0, :faces => [r] }
+        end
+      end
+      if groups.length > MIRROR_MAX_PER_CAPTURE
+        state[:skipped] << 'too_many_planes'
+        groups = groups.first(MIRROR_MAX_PER_CAPTURE)
+      end
+      return state if groups.empty?
+
+      model.start_operation('SPACENODE: reflexo (temporário)', true)
+      state[:operation] = true
+
+      original_camera = view.camera
+      groups.each_with_index do |g, gi|
+        n = g[:n]
+        p0 = g[:p0]
+
+        # Região do espelho na imagem (todas as faces do plano) → recorte.
+        xs = []
+        ys = []
+        behind = false
+        g[:faces].each do |r|
+          r[:points].each do |pt|
+            px = project_pixel(cam, pt)
+            if px.nil?
+              behind = true
+              break
+            end
+            xs << px[0]
+            ys << px[1]
+          end
+          break if behind
+        end
+        if behind || xs.empty?
+          state[:skipped] << 'behind_camera'
+          next
+        end
+        if xs.max < 0 || ys.max < 0 || xs.min > cam[:w] || ys.min > cam[:h]
+          state[:skipped] << 'off_screen'
+          next
+        end
+
+        # Teto pelo lado MAIOR (retrato 9:16 tem a altura como lado maior).
+        long_edge = [cam[:w], cam[:h]].max
+        s = long_edge > MIRROR_REFLECTION_EDGE ? MIRROR_REFLECTION_EDGE.to_f / long_edge : 1.0
+        ref_w = [(cam[:w] * s).round, 1].max
+        ref_h = [(cam[:h] * s).round, 1].max
+        # Coordenadas na imagem refletida: x espelhado (a câmera refletida
+        # inverte a horizontal), y igual.
+        rx0 = ((cam[:w] - xs.max) * s).floor
+        rx1 = ((cam[:w] - xs.min) * s).ceil
+        ry0 = (ys.min * s).floor
+        ry1 = (ys.max * s).ceil
+        margin = [((rx1 - rx0) * 0.03).ceil, ((ry1 - ry0) * 0.03).ceil, 2].max
+        rx0 = [rx0 - margin, 0].max
+        ry0 = [ry0 - margin, 0].max
+        rx1 = [rx1 + margin, ref_w].min
+        ry1 = [ry1 + margin, ref_h].min
+        cw = rx1 - rx0
+        chh = ry1 - ry0
+        if cw < 4 || chh < 4
+          state[:skipped] << 'too_small'
+          next
+        end
+
+        # Câmera refletida.
+        eye2 = reflect_point(cam[:eye], p0, n)
+        dir2 = reflect_vector(cam[:dir], n)
+        up2 = reflect_vector(cam[:up], n)
+        target2 = eye2.offset(dir2, 100.0)
+        reflected = ::Sketchup::Camera.new(eye2, target2, up2)
+        reflected.perspective = true
+        set_vertical_fov(reflected, cam[:fov_v], cam[:w].to_f / cam[:h])
+        begin
+          reflected.aspect_ratio = cam[:w].to_f / cam[:h]
+        rescue StandardError
+          nil
+        end
+
+        hidden = []
+        stats = { :visited => 0, :straddle => 0 }
+        raw_path = File.join(Dir.tmpdir, "spacenode-reflect-#{stamp}-#{gi}.png")
+        tex_path = File.join(Dir.tmpdir, "spacenode-reflect-#{stamp}-#{gi}-tex.png")
+        ok = false
+        begin
+          hide_behind_plane(model.entities, ::Geom::Transformation.new, p0, n, hidden, stats, 0)
+          view.camera = reflected
+          ok = view.write_image(:filename => raw_path, :width => ref_w, :height => ref_h, :antialias => true)
+        rescue StandardError
+          ok = false
+        ensure
+          begin
+            view.camera = original_camera
+          rescue StandardError
+            nil
+          end
+          hidden.each do |e|
+            begin
+              e.hidden = false
+            rescue StandardError
+              nil
+            end
+          end
+        end
+        state[:files] << raw_path
+        unless ok && File.exist?(raw_path)
+          state[:skipped] << 'render_failed'
+          next
+        end
+        unless crop_image_rect(raw_path, tex_path, rx0, ry0, cw, chh)
+          state[:skipped] << 'crop_failed'
+          next
+        end
+        state[:files] << tex_path
+        state[:skipped] << 'shared_definition' if stats[:straddle] > 0
+
+        kind = g[:faces].first[:kind]
+        material = nil
+        begin
+          material = model.materials.add("SPACENODE reflexo #{gi + 1}")
+          material.texture = tex_path
+          material.alpha = MIRROR_ALPHA[kind] || 1.0
+        rescue StandardError
+          state[:skipped] << 'texture_failed'
+          next
+        end
+
+        g[:faces].each do |r|
+          face = r[:face]
+          # 4 cantos do retângulo envolvente da face NO PLANO → pinos
+          # (projeção perspectiva de um plano é uma homografia: 4 pares
+          # definem o mapeamento exato, seja qual for o contorno).
+          e1 = r[:points][1] - r[:points][0]
+          if e1.length < 1e-6
+            state[:skipped] << 'degenerate'
+            next
+          end
+
+          e1.normalize!
+          e2 = n * e1
+          e2.normalize!
+          origin = r[:points][0]
+          st = r[:points].map { |pt| v = pt - origin; [v % e1, v % e2] }
+          smin = st.map(&:first).min
+          smax = st.map(&:first).max
+          tmin = st.map(&:last).min
+          tmax = st.map(&:last).max
+          corners = [[smin, tmin], [smax, tmin], [smax, tmax], [smin, tmax]].map do |sv, tv|
+            origin.offset(e1, sv).offset(e2, tv)
+          end
+          inverse = r[:transform].inverse
+          pins = []
+          bad = false
+          corners.each do |c|
+            px = project_pixel(cam, c)
+            if px.nil?
+              bad = true
+              break
+            end
+            u = (((cam[:w] - px[0]) * s) - rx0) / cw
+            v = 1.0 - (((px[1] * s) - ry0) / chh)
+            pins << c.transform(inverse) << ::Geom::Point3d.new(u, v, 0)
+          end
+          if bad
+            state[:skipped] << 'behind_camera'
+            next
+          end
+          previous = r[:front] ? face.material : face.back_material
+          begin
+            if r[:front]
+              face.material = material
+            else
+              face.back_material = material
+            end
+            placed = face.position_material(material, pins, r[:front])
+            if placed
+              state[:applied] += 1
+              state[:kinds] << kind
+            else
+              if r[:front]
+                face.material = previous
+              else
+                face.back_material = previous
+              end
+              state[:skipped] << 'pin_failed'
+            end
+          rescue StandardError
+            state[:skipped] << 'pin_failed'
+          end
+        end
+      end
+      state
+    rescue StandardError => e
+      state[:skipped] << "error:#{e.class.name}"
+      state
+    end
+
+    def end_mirrors(model, state)
+      return unless state
+
+      if state[:operation]
+        begin
+          model.abort_operation
+        rescue StandardError
+          nil
+        end
+        state[:operation] = false
+      end
+      Array(state[:files]).each { |f| delete_quiet(f) }
     rescue StandardError
       nil
     end
@@ -1805,8 +2411,13 @@ module SpaceNode
       end
       clean_saved = apply_rendering_options(rendering, clean)
       edge_reason = opts[:edge_map] ? 'write_failed' : 'not_requested'
+      mirrors = nil
 
       begin
+        # Reflexos: render refletido + textura projetada, dentro de uma
+        # operação que end_mirrors aborta no ensure (modelo intocado).
+        mirrors = begin_mirrors(model, view, capture_camera, plan, width, height, stamp) unless opts[:skip_mirrors]
+
         options = {
           :filename => path,
           :width => width,
@@ -1944,6 +2555,7 @@ module SpaceNode
           end
         end
       ensure
+        end_mirrors(model, mirrors)
         restore_rendering_options(rendering, clean_saved)
         restore_sun_override(model, sun_saved)
         # Moldura temporária (só quando a câmera não tinha a escolhida).
@@ -1963,8 +2575,17 @@ module SpaceNode
         :levelRequested => level_requested,
         :levelApplied => level_applied,
         :levelReason => level_reason,
-        :tiltDeg => plan ? plan[:tilt] : (level_requested ? camera_tilt_deg(capture_camera).round(1) : nil)
+        :tiltDeg => plan ? plan[:tilt] : (level_requested ? camera_tilt_deg(capture_camera).round(1) : nil),
+        :mirrorsRequested => mirrors ? mirrors[:requested].to_i : 0,
+        :mirrorsApplied => mirrors ? mirrors[:applied].to_i : 0,
+        :mirrorReasons => mirrors ? mirrors[:skipped].uniq : []
       }
+      if facts.is_a?(Hash) && mirrors && mirrors[:applied].to_i > 0
+        facts[:mirrors] = {
+          :count => mirrors[:applied].to_i,
+          :glass => mirrors[:kinds].count { |k| k == 'glass' }
+        }
+      end
       {
         :path => path, :edge_path => edge_path, :facts => facts,
         # Relatório honesto do que a captura conseguiu — vai pro painel no
@@ -2195,6 +2816,9 @@ module SpaceNode
         :levelApplied => report[:levelApplied] ? true : false,
         :levelReason => report[:levelReason],
         :tiltDeg => report[:tiltDeg],
+        :mirrorsRequested => report[:mirrorsRequested].to_i,
+        :mirrorsApplied => report[:mirrorsApplied].to_i,
+        :mirrorReasons => report[:mirrorReasons] || [],
         :materialsRequested => 0,
         :materialsSent => 0,
         :skipped => []
