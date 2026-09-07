@@ -41,7 +41,7 @@ export const ENGINES: Record<EngineId, EngineConfig> = {
   quasar: {
     id:          'quasar',
     name:        'Quasar',
-    tagline:     'Especial',
+    tagline:     'Especial · ~2 min',
     description: 'Tipografia, multi-referência e diversificação de provedor.',
     // Seedream 5.0 Pro Edit (ByteDance via fal.ai) — padrão desde 2026-09-05,
     // substituiu o GPT Image 2 ('openai/gpt-image-2/edit') após teste em prod.

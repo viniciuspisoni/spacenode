@@ -41,7 +41,7 @@ const CATALOG_I18N_EN = {
   ui: {
     projectTypes: { interior: 'Interior', exterior: 'Exterior' } as Record<string, string>,
     backgroundLabels: { interior: 'Visual context', exterior: 'Surroundings' } as Record<string, string>,
-    engineTaglines: { vega: 'Premium', pulsar: 'Fast', quasar: 'Special' } as Record<string, string>,
+    engineTaglines: { vega: 'Premium', pulsar: 'Fast', quasar: 'Special · ~2 min' } as Record<string, string>,
     resolutionNotes: {
       hd: 'Quick tests',
       '2k': 'Ideal for presentations',
