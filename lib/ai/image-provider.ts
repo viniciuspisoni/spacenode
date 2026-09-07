@@ -167,9 +167,13 @@ const FAL_FALLBACK_MIN_MS = 45_000
 // que passam do hedge. 0 desliga (volta ao fallback sequencial).
 const GCP_HEDGE_MS = Math.max(0, Number(process.env.IMAGE_GCP_HEDGE_MS ?? 40_000) || 0)
 
-// Hedge da rota ModelArk (Seedream/Quasar) — mesma ideia do GCP acima, com
-// gatilho mais tarde porque a ModelArk normal é ~50 s. 0 desliga (sequencial).
-const ARK_HEDGE_MS = Math.max(0, Number(process.env.SEEDREAM_ARK_HEDGE_MS ?? 60_000) || 0)
+// Hedge da rota ModelArk (Seedream/Quasar) — mesma ideia do GCP acima. Era
+// 60 s (a ModelArk parecia ~50 s no protótipo), mas em prod o Seedream 5.0
+// Pro 2K leva 114–119 s na ModelArk e 120–138 s na fal (8 renders, 05–07/09):
+// o hedge disparava em TODA geração, a fal nunca vencia e o perdedor não é
+// cancelado → cobrança dupla (US$0,09 ARK + US$0,135 fal) sem ganho de
+// tempo. 130 s só pega cauda real da ModelArk. 0 desliga (sequencial).
+const ARK_HEDGE_MS = Math.max(0, Number(process.env.SEEDREAM_ARK_HEDGE_MS ?? 130_000) || 0)
 
 const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))
 
