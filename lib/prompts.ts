@@ -65,6 +65,14 @@ export interface ModelFacts {
      *  plugin) — fato de escala que a imagem sozinha não dá. */
     eyeHeightM?:    number
   }
+  /** Espelhos/vidros marcados no plugin: a captura JÁ traz o reflexo real
+   *  (câmera refletida pelo plano da face, textura projetada). O modelo
+   *  precisa saber que aquilo é espelho — senão vira janela/quadro. */
+  mirrors?: {
+    count:  number
+    /** quantos dos `count` são vidro (reflexo suave, fundo visível) */
+    glass?: number
+  }
   sun?: {
     azimuthDeg?:     number
     elevationDeg?:   number
@@ -831,6 +839,20 @@ function buildModelFactsBlock(facts?: ModelFacts, includeSun: boolean = true): s
         ' — keep scale cues (door heights, counters, furniture) consistent with this viewpoint'
     }
     parts.push(line + '.')
+  }
+
+  const mirrors = facts.mirrors
+  if (mirrors && mirrors.count > 0) {
+    const glass = Math.min(mirrors.glass ?? 0, mirrors.count)
+    const solid = mirrors.count - glass
+    const bits: string[] = []
+    if (solid > 0) bits.push(`${solid} mirror surface${solid > 1 ? 's' : ''}`)
+    if (glass > 0) bits.push(`${glass} glass surface${glass > 1 ? 's' : ''} (semi-transparent, faint reflection)`)
+    parts.push(
+      `Mirrors: ${bits.join(' and ')} in view already show the TRUE reflection of this room, computed from the 3D model — ` +
+      'render them as real reflective surfaces with exactly that reflected content (same furniture, walls and light, mirrored); ' +
+      'never turn a mirror into a window, painting, TV or blank panel, and do not invent different reflected content.',
+    )
   }
 
   // Quando o usuário pediu uma iluminação diferente da capturada, o bloco de

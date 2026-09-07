@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 }
 
 const RBZ_PATH = '/downloads/spacenode-sketchup.rbz'
-const PLUGIN_VERSION = '0.8.0'
+const PLUGIN_VERSION = '0.9.0'
 
 const FEATURES: { title: string; body: string }[] = [
   {
@@ -32,6 +32,10 @@ const FEATURES: { title: string; body: string }[] = [
   {
     title: 'sol e lente reais.',
     body: 'A posição do sol (data, hora e localização do modelo) e a lente da câmera entram no prompt como fato medido. A luz do render respeita as sombras do projeto.',
+  },
+  {
+    title: 'espelhos de verdade.',
+    body: 'Marque a face do espelho ou do vidro e o reflexo real do ambiente entra em toda captura, calculado pra câmera daquele momento — sem gravar nada no modelo, sem ficar velho ao mover a vista.',
   },
   {
     title: 'enquadre como fotógrafo.',

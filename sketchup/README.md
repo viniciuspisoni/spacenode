@@ -25,6 +25,52 @@ O que só um plugin dentro do modelo consegue:
 - **Voltar à vista** — cada render guarda a câmera; um clique restaura o
   enquadramento exato no SketchUp.
 
+## O que mudou na 0.9.0 — Espelhos e vidros
+
+O SketchUp mostra o espelho como uma face chapada e a IA inventa o reflexo
+(vira janela, quadro ou painel cinza). Todos os plugins BR de render IA
+(Vizai, 1 Click Render, Advanced Safe Frame, Redraw, HEMY, BM IA) resolvem
+com a mesma técnica: refletem a câmera da CENA pelo plano da face, capturam
+o que ela vê e gravam a imagem como textura na face — amarrada àquela cena,
+fica velha ao mover a câmera e precisa de "apagar reflexos".
+
+Aqui o reflexo é **calculado em toda captura, pra câmera daquela captura, e
+nunca fica no modelo**:
+
+- **Marcar**: o usuário seleciona a(s) face(s) no SketchUp (entrando no grupo
+  com dois cliques) e clica em "Marcar espelho" ou "Marcar vidro" no painel.
+  Guardamos `persistent_id` da face + o caminho de instâncias
+  (`model.active_path`) em `spacenode/mirrors` (atributo do modelo, JSON) e um
+  atributo na própria face. "Desmarcar seleção" / "Limpar todos" desfazem.
+  Resolução por `find_entity_by_persistent_id` (2017+); marcações de faces
+  apagadas são ignoradas e contadas como "stale".
+- **Na captura** (`begin_mirrors`/`end_mirrors`, dentro de
+  `start_operation` ABORTADA no ensure): agrupa as faces por plano (uma por
+  render), projeta os vértices com a câmera do render (projeção manual —
+  fov vertical, `render_camera_params`/`project_pixel`; com Nivelar ligado é
+  a câmera temporária nivelada), reflete a câmera pelo plano
+  (`reflect_point`/`reflect_vector`), esconde tudo que está atrás ou sobre o
+  plano (`hide_behind_plane`: faces/arestas por vértices, instâncias por
+  bbox; instância que cruza o plano só é aberta se a definição tem UMA
+  instância), renderiza o reflexo (≤ 2048 px), restaura câmera e ocultações,
+  recorta a região do espelho (`crop_image_rect`, linhas e colunas via
+  ImageRep — o viewport mostra texturas até 1024 px, por isso o recorte),
+  cria o material com a textura (alpha 1,0 espelho / 0,45 vidro) e pina na
+  face com `position_material` (4 pares = homografia exata do plano; U usa
+  `W − px` porque a câmera refletida inverte a horizontal). O render normal,
+  o preview e o edge map saem com a face texturizada; `abort_operation`
+  devolve o modelo intacto.
+- **Prompt**: `modelFacts.mirrors = { count, glass }` → bloco MODEL FACTS diz
+  que os espelhos já mostram o reflexo real e proíbe virar janela/quadro.
+- **Relatório**: `mirrorsRequested/mirrorsApplied/mirrorReasons` no
+  conditioning (atrás da câmera, fora do quadro, pequeno demais, render/
+  recorte/pino falhou, > 6 planos, componente repetido cruzando o plano).
+- Limites conhecidos: reflexo de reflexo não existe (outro espelho aparece
+  chapado no reflexo); sombras caem sobre a textura como em qualquer face;
+  componente com várias instâncias cruzando o plano não é aberto (pode
+  ocluir o reflexo — relatado); face de definição compartilhada recebe a
+  textura em todas as instâncias durante a captura.
+
 ## O que mudou na 0.8.0 — Fotografia
 
 Princípio: a IA preserva o que vê. O que dá realismo ao render é a CAPTURA

@@ -541,6 +541,9 @@
           <div class="hint" id="L_photoGuide" style="margin-top:10px">Guias de composição</div>
           <div class="pills" id="guidePills" role="radiogroup" aria-label="Guias de composição"></div>
           <div class="hint" id="guideHint"></div>
+          <div class="hint" id="L_photoMirror" style="margin-top:10px">Espelhos e vidros</div>
+          <div class="pills" id="mirrorPills" aria-label="Espelhos e vidros"></div>
+          <div class="hint" id="mirrorHint"></div>
           <div class="batch-note" id="photoNote"></div>
         </div>
       </details>
@@ -780,6 +783,8 @@
       camera: null,
       guidesOverlay: false,
       captureSize: null,
+      // Espelhos marcados no modelo (vem do Ruby: contagem por tipo).
+      mirrors: null,
       scenes: [],
       selectedScenes: [],
       modelMaterials: [],
@@ -910,6 +915,22 @@
         photoNote: 'A IA preserva o que vê: proporção, lente, altura do olho e verticais retas viram parte do render.',
         levelReasons: { too_steep: 'inclinação acima do limite', render_failed: 'o recorte da captura falhou', level_mismatch: 'o mapa de arestas não casou', degenerate: 'câmera apontando reto para cima ou para baixo', error: 'erro ao calcular o nivelamento' },
         condNoLevel: function (reason) { return 'A captura não saiu nivelada (' + reason + ') — as verticais ficaram como na vista.'; },
+        L_photoMirror: 'Espelhos e vidros',
+        mirrorMark: 'Marcar espelho', mirrorMarkGlass: 'Marcar vidro', mirrorUnmark: 'Desmarcar seleção', mirrorClear: 'Limpar todos',
+        mirrorNone: 'Nenhuma face marcada. Selecione a face do espelho no SketchUp (entre no grupo com dois cliques) e clique em Marcar.',
+        mirrorCount: function (m, g) {
+          var parts = [];
+          if (m) parts.push(m + (m === 1 ? ' espelho' : ' espelhos'));
+          if (g) parts.push(g + (g === 1 ? ' vidro' : ' vidros'));
+          return parts.join(' e ') + ' — o reflexo real entra em toda captura, calculado pra câmera do momento. Nada fica gravado no modelo.';
+        },
+        mirrorStale: function (n) { return n + (n === 1 ? ' marcação aponta' : ' marcações apontam') + ' pra face que não existe mais (ignorada).'; },
+        mirrorUnsupported: 'Reflexos exigem SketchUp 2018 ou mais novo.',
+        hudMirrors: function (n) { return n + (n === 1 ? ' espelho' : ' espelhos'); },
+        mirrorReasons: { behind_camera: 'atrás da câmera', off_screen: 'fora do quadro', too_small: 'pequeno demais no quadro', render_failed: 'o render do reflexo falhou', crop_failed: 'o recorte falhou', texture_failed: 'a textura não carregou', pin_failed: 'a textura não assentou na face', degenerate: 'face degenerada', too_many_planes: 'mais de 6 planos', shared_definition: 'componente repetido cruzando o plano', no_imagerep: 'SketchUp sem ImageRep', camera: 'câmera inválida' },
+        condMirrors: function (applied, requested, reasons) {
+          return 'Reflexo em ' + applied + ' de ' + requested + (requested === 1 ? ' face marcada' : ' faces marcadas') + (reasons ? ' (' + reasons + ')' : '') + '.';
+        },
         editActions: { swap_material: 'Trocar material', remove: 'Remover', refine_area: 'Refinar área' },
         lang: { auto: 'Auto', pt: 'Português', en: 'English' },
         theme: { auto: 'Automático', light: 'Claro', dark: 'Escuro' },
@@ -1046,6 +1067,22 @@
         photoNote: 'The AI preserves what it sees: aspect ratio, lens, eye height and straight verticals become part of the render.',
         levelReasons: { too_steep: 'tilt above the limit', render_failed: 'the capture crop failed', level_mismatch: 'the edge map did not match', degenerate: 'camera pointing straight up or down', error: 'error computing the levelling' },
         condNoLevel: function (reason) { return 'The capture was not levelled (' + reason + ') — verticals stayed as in the view.'; },
+        L_photoMirror: 'Mirrors and glass',
+        mirrorMark: 'Mark mirror', mirrorMarkGlass: 'Mark glass', mirrorUnmark: 'Unmark selection', mirrorClear: 'Clear all',
+        mirrorNone: 'No face marked. Select the mirror face in SketchUp (double-click into the group) and click Mark.',
+        mirrorCount: function (m, g) {
+          var parts = [];
+          if (m) parts.push(m + (m === 1 ? ' mirror' : ' mirrors'));
+          if (g) parts.push(g + (g === 1 ? ' glass surface' : ' glass surfaces'));
+          return parts.join(' and ') + ' — the true reflection goes into every capture, computed for that moment\'s camera. Nothing is written into the model.';
+        },
+        mirrorStale: function (n) { return n + (n === 1 ? ' mark points' : ' marks point') + ' to a face that no longer exists (ignored).'; },
+        mirrorUnsupported: 'Reflections require SketchUp 2018 or newer.',
+        hudMirrors: function (n) { return n + (n === 1 ? ' mirror' : ' mirrors'); },
+        mirrorReasons: { behind_camera: 'behind the camera', off_screen: 'outside the frame', too_small: 'too small in the frame', render_failed: 'the reflection render failed', crop_failed: 'the crop failed', texture_failed: 'the texture did not load', pin_failed: 'the texture did not fit the face', degenerate: 'degenerate face', too_many_planes: 'more than 6 planes', shared_definition: 'repeated component crossing the plane', no_imagerep: 'SketchUp without ImageRep', camera: 'invalid camera' },
+        condMirrors: function (applied, requested, reasons) {
+          return 'Reflection on ' + applied + ' of ' + requested + (requested === 1 ? ' marked face' : ' marked faces') + (reasons ? ' (' + reasons + ')' : '') + '.';
+        },
         editActions: { swap_material: 'Swap material', remove: 'Remove', refine_area: 'Refine area' },
         lang: { auto: 'Auto', pt: 'Português', en: 'English' },
         theme: { auto: 'Automatic', light: 'Light', dark: 'Dark' },
@@ -1098,7 +1135,7 @@
       ['L_projectType','L_segment','L_environment','L_lighting','L_sun','L_elements','L_modelMaterials',
        'L_engine','L_resolution','L_advanced','L_history','L_settings','L_edit','L_space',
        'L_scenes','L_theme','L_language','L_server','L_animar','L_animarType','L_animarQuality','L_animarDuration','L_videoSave',
-       'L_photo','L_photoAspect','L_photoLens','L_photoEye','L_photoLevel','L_photoGuide'].forEach(function (id) {
+       'L_photo','L_photoAspect','L_photoLens','L_photoEye','L_photoLevel','L_photoGuide','L_photoMirror'].forEach(function (id) {
         var el = document.getElementById(id);
         if (el) el.textContent = tt(id);
       });
@@ -1266,7 +1303,8 @@
      'editMaterialSelect','editButton','editLabel','editMeta','maskCanvas','maskHint','maskToggle','maskClear',
      'spaceSection','spaceName','spaceCategoryPills',
      'spaceButton','spaceLabel','spaceMeta','spaceNote','spaceProgress','spaceResults','openSpaceButton',
-     'photoSection','photoHud','aspectPills','lensPills','eyePills','eyeHint','levelPills','levelHint','guidePills','guideHint','photoNote','guidesSvg'
+     'photoSection','photoHud','aspectPills','lensPills','eyePills','eyeHint','levelPills','levelHint','guidePills','guideHint','photoNote','guidesSvg',
+     'mirrorPills','mirrorHint'
     ].forEach(function (id) { els[id] = $(id); });
 
     function callSketchUp(name, arg) {
@@ -2082,9 +2120,41 @@
         });
       }));
       els.guideHint.textContent = tt(model.guidesOverlay ? 'guideOverlayOn' : 'guideOverlayOff');
+      renderMirrorControls();
       els.photoNote.textContent = tt('photoNote');
-      els.photoHud.textContent = photoHudText(cam);
+      var hud = photoHudText(cam);
+      if (model.mirrors && model.mirrors.count > 0) hud += (hud ? ' · ' : '') + tt('hudMirrors', model.mirrors.count);
+      els.photoHud.textContent = hud;
       drawGuides();
+    }
+    // Espelhos: ações sobre a seleção atual do SketchUp (o painel não
+    // enxerga o modelo — o Ruby lê model.selection na hora do clique).
+    function renderMirrorControls() {
+      if (!els.mirrorPills) return;
+      var m = model.mirrors;
+      var supported = !m || m.supported !== false;
+      var count = m ? (m.count || 0) : 0;
+      var actions = [
+        { label: tt('mirrorMark'), run: function () { callSketchUp('markMirror', JSON.stringify({ kind: 'mirror' })); } },
+        { label: tt('mirrorMarkGlass'), run: function () { callSketchUp('markMirror', JSON.stringify({ kind: 'glass' })); } }
+      ];
+      if (count > 0) {
+        actions.push({ label: tt('mirrorUnmark'), run: function () { callSketchUp('unmarkMirror', JSON.stringify({ scope: 'selection' })); } });
+        actions.push({ label: tt('mirrorClear'), run: function () { callSketchUp('unmarkMirror', JSON.stringify({ scope: 'all' })); } });
+      }
+      fill(els.mirrorPills, actions.map(function (a) {
+        var b = pillButton(a.label, false, a.run);
+        b.removeAttribute('role');
+        b.removeAttribute('aria-checked');
+        if (!supported) b.disabled = true;
+        return b;
+      }));
+      var msg = '';
+      if (!supported) msg = tt('mirrorUnsupported');
+      else if (count > 0) msg = tt('mirrorCount', m.mirror || 0, m.glass || 0);
+      else msg = tt('mirrorNone');
+      if (m && m.stale > 0) msg += ' ' + tt('mirrorStale', m.stale);
+      els.mirrorHint.textContent = msg;
     }
 
     // ── Preview / comparador ────────────────────────────────────────────────
@@ -2447,6 +2517,11 @@
         var lr = tt('levelReasons') || {};
         notes.push(tt('condNoLevel', lr[c.levelReason] || c.levelReason || '—'));
       }
+      if (c.mirrorsRequested > 0 && c.mirrorsApplied < c.mirrorsRequested) {
+        var mr = tt('mirrorReasons') || {};
+        var why = (c.mirrorReasons || []).map(function (r) { return mr[r] || r; }).join(', ');
+        notes.push(tt('condMirrors', c.mirrorsApplied || 0, c.mirrorsRequested, why));
+      }
       return notes;
     }
     function isSafeResult(r) {
@@ -2792,11 +2867,23 @@
             var lr2 = tt('levelReasons') || {};
             showNotice(tt('condNoLevel', lr2[pr.levelReason] || pr.levelReason || '—'), 'error');
           }
+          if (!model.generating && pr && pr.mirrorsRequested > 0 && pr.mirrorsApplied < pr.mirrorsRequested) {
+            var mr2 = tt('mirrorReasons') || {};
+            var why2 = (pr.mirrorReasons || []).map(function (r) { return mr2[r] || r; }).join(', ');
+            var mirrorMsg = tt('condMirrors', pr.mirrorsApplied || 0, pr.mirrorsRequested, why2);
+            var existing = els.notice.textContent;
+            showNotice(existing ? existing + ' ' + mirrorMsg : mirrorMsg, existing ? 'error' : 'warn');
+          }
         }
 
         if (event === 'camera') {
           model.camera = payload;
           if ('overlay' in payload) model.guidesOverlay = !!payload.overlay;
+          renderPhotoControls();
+        }
+
+        if (event === 'mirrors') {
+          model.mirrors = payload;
           renderPhotoControls();
         }
 
