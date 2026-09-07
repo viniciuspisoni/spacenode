@@ -119,3 +119,24 @@ yuv420p, sem áudio), `qa-frames/*.png`, `probe.json`, `spec.json` (cópia do sp
   default `../acervo`) e `$REPO` (raiz do repositório). `reel-spec.mjs` expande os dois ao ler o spec.
 - O acervo é gerado por `marketing/scripts/acervo/inventory.mjs --download` + `pairs.mjs`; os estados
   do painel do plugin por `marketing/scripts/plugin/capture-states.mjs`. Ver `marketing/specs/README.md`.
+
+## Mosaico (`type: "grid"`)
+```jsonc
+{ "type": "grid", "srcs": ["$ACERVO/assets/a.jpg", "…"], "dur": 5, "cols": 3, "rows": 3,
+  "cellAspect": 1.3333, "hold": 1.4, "gap": 8, "fill": true, "reserveTop": 300, "zoom": [1, 1.04] }
+```
+Grade que se preenche célula a célula (`reveal: "all"` mostra tudo de uma vez). É a mecânica de
+escala: "nove luzes", "seis versões". `fill` faz a grade ocupar a zona segura (sem ele, uma 3×3
+de células 16:9 usa menos da metade do quadro); `reserveTop` desconta o espaço do hook.
+Cada estágio vira um PNG e a sequência é concatenada — por isso o `zoom` usa `zoompan` com
+`d=1` (a entrada já é vídeo; com `d=frames` o filtro repetiria o primeiro estágio e congelaria
+o mosaico, que foi o primeiro bug da mecânica).
+
+## Transições além do wipe
+`transitions[].type` vai direto para o `xfade` do ffmpeg, então valem `circleopen`, `circleclose`,
+`zoomin`, `pixelize`, `dissolve`, `hlslice`, `radial`, `squeezev` etc. `ruler: true` só desenha a
+régua nos quatro wipes (left/right/up/down).
+
+## Overlays e o card final
+Um overlay que ultrapassa o início do card final é **truncado automaticamente** (com aviso no
+console): o texto por cima do logo era o erro mais recorrente ao escrever spec à mão.

@@ -227,11 +227,14 @@ async function bandPng(src, dest, aspect, w, h) {
  * Quando o zoom volta a 1 a folga é zero, então qualquer centro converge para a imagem inteira —
  * é o que permite abrir num detalhe e afastar até revelar tudo.
  */
-const zoompan = (from, to, frames, w, h, pan, panY) => {
+const zoompan = (from, to, frames, w, h, pan, panY, perFrame = false) => {
   const n = Math.max(frames - 1, 1);
   const x = pan ? `(iw-iw/zoom)*(${pan[0]}+${pan[1] - pan[0]}*on/${n})` : 'iw/2-(iw/zoom/2)';
   const y = panY ? `(ih-ih/zoom)*(${panY[0]}+${panY[1] - panY[0]}*on/${n})` : 'ih/2-(ih/zoom/2)';
-  return `zoompan=z='${from}+${to - from}*on/${n}':x='${x}':y='${y}':d=${frames}:s=${w}x${h}:fps=${FPS}`;
+  // Entrada IMAGEM: d=frames (um frame de entrada vira a sequência inteira).
+  // Entrada VÍDEO: d=1, senão o zoompan repete o primeiro frame `frames` vezes e
+  // o resto do vídeo é descartado — foi o que congelou o primeiro mosaico.
+  return `zoompan=z='${from}+${to - from}*on/${n}':x='${x}':y='${y}':d=${perFrame ? 1 : frames}:s=${w}x${h}:fps=${FPS}`;
 };
 
 /** Geometria "contain": a imagem inteira (qualquer aspecto, inclusive retrato) dentro da zona segura. */
@@ -342,6 +345,71 @@ export async function renderSplit(seg, band, tmp, i) {
   return { file: out, dur: seg.dur, crop: `top ${cropT} · bottom ${cropB}` };
 }
 
+/**
+ * Mosaico que se preenche: N imagens numa grade que aparece célula a célula (ou de uma vez).
+ * É a mecânica de escala — "9 imagens, 1 modelo" — que corte e wipe não conseguem mostrar.
+ * Cada estágio vira um PNG (sharp) e a sequência é concatenada; o último estágio segura
+ * `hold` segundos. `zoom` aplica um Ken Burns leve no mosaico inteiro.
+ */
+export async function renderGrid(seg, tmp, i) {
+  const { default: sharp } = await import('sharp');
+  const srcs = seg.srcs || [];
+  if (!srcs.length) throw new Error(`segmento ${i}: grid sem "srcs"`);
+  const cols = seg.cols || Math.ceil(Math.sqrt(srcs.length));
+  const rows = seg.rows || Math.ceil(srcs.length / cols);
+  const gap = seg.gap ?? 10;
+  const margin = seg.margin ?? 24;
+  const aspect = seg.cellAspect || 16 / 9;
+  // Por largura; com `fill`, usa também a altura da zona segura e fica com o maior mosaico
+  // que ainda cabe (senão uma grade 3×3 de células 16:9 ocupa menos da metade do quadro).
+  let cellW = Math.floor((FRAME_W - margin * 2 - gap * (cols - 1)) / cols);
+  if (seg.fill) {
+    const byH = Math.floor(((SAFE_BOTTOM - SAFE_TOP - (seg.reserveTop || 0)) - gap * (rows - 1)) / rows * aspect);
+    cellW = Math.min(cellW, byH);
+  }
+  const cellH = Math.round(cellW / aspect);
+  const gridW = cols * cellW + (cols - 1) * gap;
+  const gridH = rows * cellH + (rows - 1) * gap;
+  if (gridH > SAFE_BOTTOM - SAFE_TOP) throw new Error(`grid ${cols}×${rows} não cabe na zona segura (${gridH}px > ${SAFE_BOTTOM - SAFE_TOP})`);
+  const x0 = Math.round((FRAME_W - gridW) / 2);
+  const y0 = seg.y ?? Math.round((FRAME_H - gridH) / 2);
+  const bg = seg.bg === 'light' ? '#fafafa' : '#1a1a1a';
+  const empty = seg.emptyCell === 'none' ? null : (seg.emptyCell || 'rgba(255,255,255,0.04)');
+
+  // células escaladas uma vez; cada estágio só recompõe
+  const cells = [];
+  for (const s of srcs) cells.push(await sharp(s).resize(cellW, cellH, { fit: 'cover' }).toBuffer());
+
+  const stages = seg.reveal === 'all' ? 1 : srcs.length;
+  const stagePngs = [];
+  for (let k = 1; k <= stages; k++) {
+    const shown = seg.reveal === 'all' ? srcs.length : k;
+    const comps = [];
+    for (let c = 0; c < cols * rows; c++) {
+      const cx = x0 + (c % cols) * (cellW + gap), cy = y0 + Math.floor(c / cols) * (cellH + gap);
+      if (c < shown && cells[c]) comps.push({ input: cells[c], left: cx, top: cy });
+      else if (empty) comps.push({ input: { create: { width: cellW, height: cellH, channels: 4, background: empty } }, left: cx, top: cy });
+    }
+    const p = join(tmp, `seg-${i}-g${k}.png`);
+    await sharp({ create: { width: FRAME_W, height: FRAME_H, channels: 3, background: bg } }).composite(comps).png().toFile(p);
+    stagePngs.push(p);
+  }
+
+  const out = join(tmp, `seg-${i}.mp4`);
+  const hold = seg.hold ?? 0;
+  const each = (seg.dur - hold) / stages;
+  const inputs = [];
+  stagePngs.forEach((p, k) => inputs.push('-loop', '1', '-framerate', String(FPS), '-t', String(k === stages - 1 ? each + hold : each), '-i', p));
+  const [zf, zt] = seg.zoom || [1, 1];
+  const frames = Math.round(seg.dur * FPS);
+  const chain = stagePngs.map((_, k) => `[${k}:v]fps=${FPS},setsar=1[g${k}]`).join(';');
+  const cat = stagePngs.map((_, k) => `[g${k}]`).join('') + `concat=n=${stages}:v=1:a=0[cat]`;
+  const zoom = zf === 1 && zt === 1 ? '[cat]format=yuv420p[out]' : `[cat]${zoompan(zf, zt, frames, FRAME_W, FRAME_H, null, null, true)},setsar=1,format=yuv420p[out]`;
+  await ffmpeg([...inputs, '-filter_complex', `${chain};${cat};${zoom}`, '-map', '[out]', '-t', String(seg.dur),
+    '-r', String(FPS), '-c:v', 'libx264', '-crf', '16', '-preset', 'medium', out]);
+  return { file: out, dur: seg.dur, crop: `grid ${cols}×${rows} · ${srcs.length} imgs · célula ${cellW}×${cellH}` };
+}
+
 export async function renderCardSegment(seg, cardPng, tmp, i) {
   const out = join(tmp, `seg-${i}.mp4`);
   await ffmpeg(['-loop', '1', '-framerate', String(FPS), '-t', String(seg.dur), '-i', cardPng,
@@ -401,6 +469,7 @@ export async function renderReel(spec, { repo, tmpRoot }) {
     if (s.type === 'still') segs.push(await renderStill(s, band, tmp, i));
     else if (s.type === 'video') segs.push(await renderVideo(s, band, tmp, i));
     else if (s.type === 'split') segs.push(await renderSplit(s, band, tmp, i));
+    else if (s.type === 'grid') segs.push(await renderGrid(s, tmp, i));
     else if (s.type === 'card') segs.push(await renderCardSegment(s, cards[s.card], tmp, i));
     else throw new Error(`segmento ${i}: tipo desconhecido ${s.type}`);
     console.log(`  seg ${i} ${s.type} ${segs[i].dur.toFixed(2)}s ${segs[i].crop || segs[i].src || ''}`);
@@ -444,8 +513,16 @@ export async function renderReel(spec, { repo, tmpRoot }) {
   // overlays globais
   let n = segs.length;
   const overlays = spec.overlays || [];
+  // Um overlay que passa do início do card final imprime o texto POR CIMA do logo/CTA.
+  // Erro recorrente ao escrever spec à mão, então o kit trunca e avisa.
+  const lastIsCard = spec.segments[spec.segments.length - 1]?.type === 'card';
+  const cardStart = lastIsCard ? tl.starts[segs.length - 1] : Infinity;
   for (const o of overlays) {
     if (!cards[o.card]) throw new Error(`overlay: card "${o.card}" não existe`);
+    if (o.to > cardStart + 0.01) {
+      console.log(`  aviso: overlay "${o.card}" ia até ${o.to}s e invadiria o card final (${cardStart.toFixed(2)}s) — truncado`);
+      o.to = cardStart;
+    }
     inputs.push('-loop', '1', '-framerate', String(FPS), '-t', String(tl.total), '-i', cards[o.card]);
     const lbl = `[o${n}]`;
     f.push(`${cur}[${n}:v]overlay=0:0:enable='between(t,${o.from},${o.to})'${lbl}`);

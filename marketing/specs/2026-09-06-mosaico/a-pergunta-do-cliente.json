@@ -1,0 +1,77 @@
+{
+ "slug": "2026-09-06-reel-a-pergunta-do-cliente",
+ "accent": false,
+ "segments": [
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0270-render-before.jpg",
+   "dur": 1.7,
+   "kenburns": [
+    1,
+    1
+   ],
+   "brightness": -0.1
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0271-render-after.jpg",
+   "dur": 3.4,
+   "kenburns": [
+    1,
+    1.06
+   ]
+  },
+  {
+   "type": "card",
+   "card": "final",
+   "dur": 1
+  }
+ ],
+ "transitions": [
+  {
+   "type": "circleopen",
+   "dur": 0.7
+  },
+  {
+   "type": "fade",
+   "dur": 0.3
+  }
+ ],
+ "cards": {
+  "scrim": {
+   "layout": "scrim"
+  },
+  "a": {
+   "layout": "hook-sub",
+   "hook": "\"como fica a parede verde?\"",
+   "eyebrow": "imagem base"
+  },
+  "b": {
+   "layout": "hook-sub",
+   "hook": "assim.",
+   "eyebrow": "render",
+   "sub": "mesma sala. mesma câmera. gerado em minutos."
+  },
+  "final": {
+   "layout": "final",
+   "cta": "Renderize seu projeto"
+  }
+ },
+ "overlays": [
+  {
+   "card": "scrim",
+   "from": 0,
+   "to": 4.8
+  },
+  {
+   "card": "a",
+   "from": 0,
+   "to": 1.7
+  },
+  {
+   "card": "b",
+   "from": 1.7,
+   "to": 4.8
+  }
+ ]
+}
