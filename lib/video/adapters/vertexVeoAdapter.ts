@@ -72,12 +72,22 @@ function sleep(ms: number): Promise<void> {
   return new Promise(r => setTimeout(r, ms))
 }
 
+// O Vertex só aceita image/jpeg e image/png no Veo (WebP é recusado). O
+// plugin do SketchUp manda o PREVIEW WebP do render — sem esta conversão o
+// submit falha e tudo cai pro fal em silêncio.
+const VERTEX_IMAGE_MIMES = new Set(['image/jpeg', 'image/png'])
+
 async function fetchImageBase64(url: string): Promise<{ bytes: string; mime: string; buf: Buffer }> {
   const res = await fetch(url)
   if (!res.ok) throw new Error(`download da imagem falhou (${res.status})`)
   const ct   = res.headers.get('content-type')?.split(';')[0]?.trim()
-  const mime = ct && ct.startsWith('image/') ? ct : 'image/jpeg'
-  const buf  = Buffer.from(await res.arrayBuffer())
+  let mime = ct && ct.startsWith('image/') ? ct : 'image/jpeg'
+  let buf  = Buffer.from(await res.arrayBuffer())
+  if (!VERTEX_IMAGE_MIMES.has(mime)) {
+    const sharp = (await import('sharp')).default
+    buf  = await sharp(buf).jpeg({ quality: 92 }).toBuffer()
+    mime = 'image/jpeg'
+  }
   return { bytes: buf.toString('base64'), mime, buf }
 }
 
