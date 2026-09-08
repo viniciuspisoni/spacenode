@@ -72,6 +72,7 @@ const CATALOG_I18N_EN = {
       } as Record<string, { label: string; tagline: string }>,
       engines: {
         'fal-ai/veo3.1/image-to-video': 'Cinematic',
+        'ark/seedance-2.0/image-to-video': 'Natural',
         'fal-ai/kling-video/v2.5-turbo/pro/image-to-video': 'Fast',
       } as Record<string, string>,
     },
@@ -135,7 +136,7 @@ const PLUGIN_VIDEO_TYPES: { id: VideoTypeId; label: string; only: 'portrait' | '
 function buildAnimarCatalog() {
   return {
     // Placeholders Flow/Omni (provider 'google'/'omni') nunca entram: os adapters lançam erro.
-    engines: listAvailableVideoModels().filter(m => m.provider === 'fal').map(m => ({
+    engines: listAvailableVideoModels().filter(m => m.provider === 'fal' || m.provider === 'ark').map(m => ({
       id: m.id,
       label: m.label,
       description: m.description,

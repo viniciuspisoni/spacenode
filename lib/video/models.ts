@@ -17,7 +17,8 @@ import { VIDEO_FLAGS } from './flags'
 // 'vertex' não tem modelo próprio no catálogo: é um provider alternativo do
 // MESMO Veo "Cinemático" (conta GCP do dono), selecionado pelo facade dos
 // adapters quando VERTEX_VEO_ENABLED=1. Catálogo, presets e preço não mudam.
-export type VideoProviderId = 'fal' | 'google' | 'omni' | 'vertex'
+// 'ark' = ModelArk (BytePlus): Seedance 2.0 direto, motor "Natural".
+export type VideoProviderId = 'fal' | 'google' | 'omni' | 'vertex' | 'ark'
 
 export type VideoInputKind =
   | 'image'        // imagem inicial obrigatória
@@ -138,6 +139,43 @@ const SEEDANCE_20: VideoModel = {
   badge:                 { label: 'FIDELIDADE', tone: 'blue' },
 }
 
+// ── Seedance 2.0 via ModelArk — motor "Natural" (2026-09-07) ─────────────────
+//
+// Pedido do dono: "outra opção com qualidade igual ou similar ao Veo"; arena
+// Artificial Analysis i2v (ago/26): Seedance 2.0 720p #2 (1192) contra Veo 3.1
+// #10 (1087). Editorial archviz: takes mais longos e movimento mais estável.
+//
+// Preço ModelArk (docs oficiais, set/26): 720p 5 s US$0,76 (0,15/s), 10 s 1,52;
+// 1080p 5 s US$1,87 — 720p é a resolução em que o modelo foi medido e cabe em
+// Reels/redes. Política de margem DESTE modelo (dono, 2026-09-07): 65% no piso
+// R$0,0729/node, FX 5,40, números redondos:
+//   5 s:  R$4,10 de custo → 165 nodes (R$12,03) → 65,9%
+//   10 s: R$8,21 de custo → 330 nodes (R$24,06) → 65,9%
+// Só entra com NEXT_PUBLIC_ANIMAR_SEEDANCE=1 (inlinado no build) E ARK_API_KEY
+// no server (o adapter recusa sem chave). Fallback de submit: Seedance 2.0 via
+// fal a 720p (2× o custo — raro, e o usuário recebe o vídeo).
+
+const SEEDANCE_20_ARK: VideoModel = {
+  id:                    'ark/seedance-2.0/image-to-video',
+  provider:              'ark',
+  label:                 'Natural',
+  tag:                   'Seedance 2.0',
+  description:           'Cena viva — vento na vegetação, água e luz em movimento, com a arquitetura intacta.',
+  strengths:             ['Vegetação, água e nuvens se movem', 'Movimento estável em takes de 5 ou 10 s', 'Aceita frame final'],
+  weaknesses:            ['720p (ideal para Reels e redes; hero em 16:9 fica com o Veo)', 'Tempo de geração 2-3 min'],
+  supportedInputs:       ['image', 'imageEnd', 'text'],
+  supportedDurations:    ['5', '10'],
+  supportedAspectRatios: ['auto'],
+  supportedResolutions:  ['720p'],
+  costInNodes:           { '5': 165, '10': 330 },
+  estimatedGenerationMs: 150_000,
+  recommendedFor:        ['exterior', 'facade', 'social', 'motion'],
+  safetyNotes:           'ModelArk: sem negative_prompt; generate_audio default TRUE (forçado false); ratio adaptive segue a imagem.',
+  isAvailable:           VIDEO_FLAGS.enableSeedanceArk,
+  isBeta:                false,
+  badge:                 { label: 'NOVO', tone: 'blue' },
+}
+
 // ── Placeholders futuros ─────────────────────────────────────────────────────
 // Mantidos como não-disponíveis até a env existir E a flag estar ligada.
 // O adapter correspondente lança erro se chamado sem credencial.
@@ -188,6 +226,7 @@ export const VIDEO_MODELS: Record<string, VideoModel> = {
   [KLING_25_TURBO_PRO.id]:      KLING_25_TURBO_PRO,
   [VEO_31.id]:                  VEO_31,
   [SEEDANCE_20.id]:             SEEDANCE_20,
+  [SEEDANCE_20_ARK.id]:         SEEDANCE_20_ARK,
   [GOOGLE_FLOW_PLACEHOLDER.id]: GOOGLE_FLOW_PLACEHOLDER,
   [GEMINI_OMNI_PLACEHOLDER.id]: GEMINI_OMNI_PLACEHOLDER,
 }
@@ -197,8 +236,9 @@ export const DEFAULT_VIDEO_MODEL_ID = VEO_31.id
 // Ordem de exibição. Disponíveis primeiro, placeholders depois.
 export const VIDEO_MODEL_ORDER: string[] = [
   VEO_31.id,
+  SEEDANCE_20_ARK.id,
   KLING_25_TURBO_PRO.id,
-  // SEEDANCE_20 omitido do catálogo visível — ver nota de "OCULTO" no modelo.
+  // SEEDANCE_20 (via fal) omitido do catálogo visível — ver nota de "OCULTO" no modelo.
   GOOGLE_FLOW_PLACEHOLDER.id,
   GEMINI_OMNI_PLACEHOLDER.id,
 ]

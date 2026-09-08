@@ -172,6 +172,11 @@ export async function POST(req: NextRequest) {
     // (Veo pode sair via fal OU via Vertex na conta GCP — ver adapters/index.)
     const generationStartedAt = Date.now()
     const adapter = getAdapterForModel(engineId)
+    // Resolução: o modelo manda (Natural é 720p) — nunca repassar 1080p a
+    // quem não vende 1080p, nem gravar 1080p no log de um clipe 720p.
+    const effectiveResolution = resolution && model.supportedResolutions.includes(resolution)
+      ? resolution
+      : model.supportedResolutions[0]
     const { outputUrl, requestId: falRequestId, provider: usedProvider } = await adapter.generate({
       modelId:        engineId,
       imageUrl:       inputUrl,
@@ -180,7 +185,7 @@ export async function POST(req: NextRequest) {
       negativePrompt: built.negativePrompt,
       duration,
       aspectRatio,
-      resolution,
+      resolution:     effectiveResolution,
       generateAudio:  false,
       userId:         user.id,
     })
@@ -235,7 +240,7 @@ export async function POST(req: NextRequest) {
         provider:      usedProvider ?? 'fal',
         endpoint:      engineId,
         request_id:    falRequestId ?? null,
-        parameters:    { duration, aspect_ratio: aspectRatio ?? 'auto', resolution: resolution ?? '1080p', generate_audio: false },
+        parameters:    { duration, aspect_ratio: aspectRatio ?? 'auto', resolution: effectiveResolution ?? '1080p', generate_audio: false },
         duration_ms:   generationDurationMs,
         nodes_charged: nodesToCharge,
       },

@@ -6,6 +6,8 @@
 // NEXT_PUBLIC_ENABLE_GEMINI_OMNI=1         libera o adapter omni (ainda placeholder)
 // NEXT_PUBLIC_ENABLE_AUTO_VIDEO_ANALYSIS=1 ativa análise automática da imagem
 //                                          de referência via fidelity-engine
+// NEXT_PUBLIC_ANIMAR_SEEDANCE=1            libera o motor "Natural" (Seedance 2.0
+//                                          via ModelArk; exige ARK_API_KEY no server)
 
 function flag(name: string): boolean {
   const v = process.env[name]
@@ -16,6 +18,7 @@ export const VIDEO_FLAGS = {
   enableGoogleFlow:        flag('NEXT_PUBLIC_ENABLE_GOOGLE_FLOW'),
   enableGeminiOmni:        flag('NEXT_PUBLIC_ENABLE_GEMINI_OMNI'),
   enableAutoVideoAnalysis: flag('NEXT_PUBLIC_ENABLE_AUTO_VIDEO_ANALYSIS'),
+  enableSeedanceArk:       flag('NEXT_PUBLIC_ANIMAR_SEEDANCE'),
 } as const
 
 export type VideoFlags = typeof VIDEO_FLAGS
