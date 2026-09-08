@@ -31,11 +31,44 @@ export interface BuiltVideoPrompt {
 // ── Diretivas centrais ───────────────────────────────────────────────────────
 
 // Sufixo arquitetônico — sempre presente, independente do modo de fidelidade.
+// "built surfaces": a proibição de morphing é da ARQUITETURA — vegetação,
+// água, nuvens e cortinas PODEM (e devem) se mover.
 const ARCH_SUFFIX =
   'Cinematic architectural visualization. Photorealistic rendering. ' +
   'Professional camera movement, smooth and controlled. ' +
   'High-end real estate presentation quality. ' +
-  'Sharp focus, no distortion, no warping, no morphing of surfaces or edges.'
+  'Sharp focus, no distortion, no warping or morphing of built surfaces or edges.'
+
+// Vida ambiental — o que DEVE se mover mesmo com a câmera quase parada.
+// Medido em campo (2026-09-07, Veo 3.1 fachada 6 s, intensidade "subtle"):
+// sem esta diretiva o modelo lê "barely perceptible motion" + "preserve
+// exactly" como cena congelada — árvores não mexiam. A arquitetura fica
+// rígida; natureza, luz e tecidos respiram.
+const AMBIENT_LIFE_BY_ARCHETYPE: Record<string, string> = {
+  exterior:
+    'Natural ambient life: tree canopies, shrubs and grass sway gently in a light breeze, ' +
+    'leaves flutter, water surfaces ripple softly, clouds drift slowly across the sky, ' +
+    'sunlight and shadows shift subtly. The built structure stays perfectly still and rigid.',
+  facade:
+    'Natural ambient life: trees and landscaping sway gently in a light breeze, leaves flutter, ' +
+    'clouds drift slowly across the sky, sunlight and shadows shift subtly, any water ripples softly. ' +
+    'The building itself stays perfectly still and rigid.',
+  interior:
+    'Natural ambient life: sheer curtains move slightly in a soft draft, daylight through the ' +
+    'windows shifts subtly, fine dust and haze drift in the sunbeams, plants indoors and foliage ' +
+    'seen through the glass sway gently. Walls, furniture and fixtures stay perfectly still.',
+  commercial:
+    'Natural ambient life: daylight shifts subtly, plants and foliage sway gently, fabrics and ' +
+    'curtains move slightly, screens and signage stay static. Walls, furniture and fixtures ' +
+    'stay perfectly still.',
+  social:
+    'Natural ambient life: foliage sways gently in a light breeze, light shifts subtly, water ' +
+    'ripples where present, fabrics move slightly. The architecture stays perfectly still.',
+}
+const AMBIENT_LIFE_DEFAULT =
+  'Natural ambient life: vegetation sways gently in a light breeze, light and shadows shift ' +
+  'subtly, water ripples and fabrics move slightly where present. The architecture stays ' +
+  'perfectly still and rigid.'
 
 // Preservação arquitetônica — peso varia por fidelityMode.
 const FIDELITY_DIRECTIVES: Record<FidelityMode, string> = {
@@ -57,7 +90,8 @@ const FIDELITY_DIRECTIVES: Record<FidelityMode, string> = {
 
 // Prefixos de intensidade — modulam pacing via vocabulário (modelos respondem).
 const INTENSITY_PREFIXES: Record<CameraIntensity, string> = {
-  subtle:     'Barely perceptible motion, ultra slow contemplative pace.',
+  // "camera" explícito: sem isso o modelo congelava a cena inteira.
+  subtle:     'Camera motion barely perceptible, ultra slow contemplative pace — the scene itself stays naturally alive.',
   normal:     '',
   cinematic:
     'Elegant cinematic camera language, smooth confident movement with anamorphic depth, ' +
@@ -119,6 +153,11 @@ export function buildArchitectureVideoPrompt(input: BuildVideoPromptInput): Buil
   if (scene) {
     parts.push(scene.promptFragment + '.')
   }
+
+  // 4b. Vida ambiental (por arquétipo da cena) — vento na vegetação, água,
+  //     nuvens, cortinas, luz. Sempre presente: é o que separa um vídeo de
+  //     uma foto com câmera passeando.
+  parts.push(AMBIENT_LIFE_BY_ARCHETYPE[scene?.archetype ?? ''] ?? AMBIENT_LIFE_DEFAULT)
 
   // 5. Atmosfera (livre)
   if (input.atmosphere && input.atmosphere.trim()) {
