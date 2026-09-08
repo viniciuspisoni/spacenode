@@ -82,10 +82,10 @@ async function fetchImageBase64(url: string): Promise<{ bytes: string; mime: str
   if (!res.ok) throw new Error(`download da imagem falhou (${res.status})`)
   const ct   = res.headers.get('content-type')?.split(';')[0]?.trim()
   let mime = ct && ct.startsWith('image/') ? ct : 'image/jpeg'
-  let buf  = Buffer.from(await res.arrayBuffer())
+  let buf: Buffer = Buffer.from(await res.arrayBuffer())
   if (!VERTEX_IMAGE_MIMES.has(mime)) {
     const sharp = (await import('sharp')).default
-    buf  = await sharp(buf).jpeg({ quality: 92 }).toBuffer()
+    buf  = Buffer.from(await sharp(buf).jpeg({ quality: 92 }).toBuffer())
     mime = 'image/jpeg'
   }
   return { bytes: buf.toString('base64'), mime, buf }
