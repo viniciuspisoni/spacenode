@@ -18,14 +18,15 @@ export default function Footer() {
 
       <style jsx>{`
         .spn-footer {
+          position: relative;
+          z-index: 1;
           padding: 32px 40px;
-          border-top: 0.5px solid var(--color-border);
+          border-top: 0.5px solid var(--glass-line);
           display: flex;
           justify-content: space-between;
           align-items: center;
           flex-wrap: wrap;
           gap: 16px;
-          background: var(--color-bg);
           color: var(--color-text-tertiary);
         }
         .spn-footer-brand {

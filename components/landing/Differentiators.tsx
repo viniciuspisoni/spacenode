@@ -1,20 +1,18 @@
-// 3 diferenciais — condensa as antigas ValueProps (4 células) e
-// ProblemSolution (2 colunas × 4 itens) numa seção só, com os três
-// argumentos centrais da marca: fidelidade, coerência, velocidade com
-// controle.
-
+// Os três argumentos centrais da marca: fidelidade, coerência, controle.
+// Texto encurtado na reforma de vidro (2026-09-09) — o argumento cabe em
+// uma linha e meia; o resto era eco do próprio título.
 const ITEMS = [
   {
-    title: 'Fidelidade geométrica',
-    desc: 'Construída para preservar geometria, proporções e perspectiva do projeto — nada é reinterpretado.',
+    title: 'fidelidade geométrica',
+    desc: 'Geometria, proporções e perspectiva do projeto preservadas. Nada é reinterpretado.',
   },
   {
-    title: 'Coerência entre vistas',
-    desc: 'Cada imagem pertence ao mesmo projeto. Luz, câmera e atmosfera variam — a identidade, não.',
+    title: 'coerência entre vistas',
+    desc: 'Luz, câmera e atmosfera variam. A identidade do projeto, não.',
   },
   {
-    title: 'Velocidade com controle',
-    desc: 'Iteração em minutos, com escolhas de arquiteto: motor, resolução, atmosfera e materialidade. Sem prompts.',
+    title: 'velocidade com controle',
+    desc: 'Minutos por imagem, com escolhas de arquiteto — motor, atmosfera, materialidade. Sem prompts.',
   },
 ]
 
@@ -27,26 +25,19 @@ const CheckIcon = () => (
 export function Differentiators() {
   return (
     <section className="spn-diff">
-      <div className="spn-diff-head">
-        <div className="spn-diff-eyebrow">
-          <span style={{ display: 'block', width: 32, height: '0.5px', background: 'var(--color-border-strong)' }} />
-          Por que existe
-          <span style={{ display: 'block', width: 32, height: '0.5px', background: 'var(--color-border-strong)' }} />
-        </div>
-        <h2 className="spn-diff-title">
-          ferramentas genéricas criam imagens.
-          <br />
-          a SpaceNode trabalha com projetos.
-        </h2>
-      </div>
+      <h2 className="spn-diff-title">
+        ferramentas genéricas criam imagens.
+        <br />
+        <span className="spn-diff-title-dim">a SpaceNode trabalha com projetos.</span>
+      </h2>
 
       <div className="spn-diff-grid">
         {ITEMS.map(item => (
-          <div key={item.title} className="spn-diff-card">
-            <div className="spn-diff-card-title">
+          <div key={item.title} className="spn-diff-card spn-glass">
+            <p className="spn-diff-card-title">
               <CheckIcon />
               {item.title}
-            </div>
+            </p>
             <p className="spn-diff-card-desc">{item.desc}</p>
           </div>
         ))}
@@ -54,45 +45,30 @@ export function Differentiators() {
 
       <style jsx>{`
         .spn-diff {
-          padding: 88px 24px;
-          max-width: 960px;
+          position: relative;
+          z-index: 1;
+          padding: 0 24px 96px;
+          max-width: 1000px;
           margin: 0 auto;
         }
-        .spn-diff-head {
-          text-align: center;
-          margin-bottom: 44px;
-        }
-        .spn-diff-eyebrow {
-          font-size: 10px;
-          font-weight: 500;
-          letter-spacing: 0.22em;
-          text-transform: uppercase;
-          color: var(--color-text-tertiary);
-          margin-bottom: 16px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 10px;
-        }
         .spn-diff-title {
-          font-size: clamp(24px, 4.5vw, 34px);
+          text-align: center;
+          font-size: clamp(24px, 4.2vw, 34px);
           font-weight: 400;
           letter-spacing: -0.035em;
           line-height: 1.2;
-          margin: 0;
+          margin: 0 0 32px;
           color: var(--color-text-primary);
         }
+        .spn-diff-title-dim { color: var(--color-text-tertiary); }
         .spn-diff-grid {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
           gap: 12px;
         }
         .spn-diff-card {
-          padding: 26px 24px;
-          border: 0.5px solid var(--color-border);
-          border-radius: 14px;
-          background: var(--color-bg-elevated);
-          box-shadow: var(--shadow-sm);
+          padding: 24px 22px;
+          border-radius: var(--r-card);
         }
         .spn-diff-card-title {
           display: flex;
@@ -102,7 +78,7 @@ export function Differentiators() {
           font-weight: 500;
           letter-spacing: -0.015em;
           color: var(--color-text-primary);
-          margin-bottom: 10px;
+          margin: 0 0 9px;
         }
         .spn-diff-card-desc {
           font-size: 13.5px;
@@ -113,19 +89,10 @@ export function Differentiators() {
         }
 
         @media (max-width: 768px) {
-          .spn-diff {
-            padding: 64px 20px;
-          }
-          .spn-diff-head {
-            margin-bottom: 28px;
-          }
-          .spn-diff-grid {
-            grid-template-columns: 1fr;
-            gap: 10px;
-          }
-          .spn-diff-card {
-            padding: 20px 18px;
-          }
+          .spn-diff { padding: 0 16px 64px; }
+          .spn-diff-title { margin-bottom: 20px; }
+          .spn-diff-grid { grid-template-columns: 1fr; gap: 10px; }
+          .spn-diff-card { padding: 20px 18px; }
         }
       `}</style>
     </section>
