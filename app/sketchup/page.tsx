@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 }
 
 const RBZ_PATH = '/downloads/spacenode-sketchup.rbz'
-const PLUGIN_VERSION = '1.0.1'
+const PLUGIN_VERSION = '1.0.2'
 
 const FEATURES: { title: string; body: string }[] = [
   {

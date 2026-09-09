@@ -346,6 +346,8 @@
       transition: color 180ms var(--ease);
     }
     .tools-hint.is-tip { color: var(--text-2); }
+    .tools-hint.is-action { cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+    .tools-hint.is-action:hover { color: var(--text-2); }
 
     /* Barra de ações flutuante sobre o palco. */
     .stage-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
@@ -2617,6 +2619,9 @@
       else if (count > 0) msg = tt('mirrorCount', m.mirror || 0, m.glass || 0);
       else msg = tt('mirrorNone');
       if (m && m.stale > 0) msg += ' ' + tt('mirrorStale', m.stale);
+      // Seis planos por captura é o teto do Ruby (MIRROR_MAX_PER_CAPTURE):
+      // acima disso o excedente é ignorado e cada plano custa um render.
+      if (count > 6) msg += ' ' + st('mirrorOverLimit').replace('%d', 6).replace('%d', 6);
       els.mirrorHint.textContent = msg;
     }
 
@@ -3668,7 +3673,9 @@
         tipLevel: 'Nivelar: endireita as verticais na captura, como numa foto de arquitetura.',
         tipGuides: 'Guias: grade de terços sobre o quadro, pra posicionar o que importa.',
         tipSun: 'Sol: troca a hora do sol do modelo só na captura — atual, manhã, meio-dia, entardecer, golden.',
-        tipMirror: 'Espelho: selecione a face do espelho no SketchUp e o reflexo real entra na captura.',
+        tipMirror: 'Espelho: dois cliques pra entrar no grupo, clique só na FACE do espelho e toque aqui.',
+        mirrorReview: '%s — toque pra revisar',
+        mirrorOverLimit: 'Acima de %d planos por captura só os %d primeiros entram — limpe o que não for espelho.',
         tipScene: 'Nova cena: salva esta vista como cena do SketchUp, pra usar no lote e no Space.',
         onLevel: 'Verticais retas na próxima captura.',
         offLevel: 'Verticais ficam como estão na vista.',
@@ -3704,7 +3711,9 @@
         tipLevel: 'Level: straightens the verticals in the capture, like an architectural photo.',
         tipGuides: 'Guides: rule-of-thirds grid over the frame, to place what matters.',
         tipSun: 'Sun: changes the model sun hour for the capture only — current, morning, noon, late afternoon, golden.',
-        tipMirror: 'Mirror: select the mirror face in SketchUp and the real reflection goes into the capture.',
+        tipMirror: 'Mirror: double-click into the group, select the mirror FACE only, then tap here.',
+        mirrorReview: '%s — tap to review',
+        mirrorOverLimit: 'Above %d planes per capture only the first %d are used — clear whatever is not a mirror.',
         tipScene: 'New scene: saves this view as a SketchUp scene, for the batch and the Space.',
         onLevel: 'Verticals will be straight in the next capture.',
         offLevel: 'Verticals stay as they are in the view.',
@@ -4026,6 +4035,9 @@
     $s('toolMirror').addEventListener('click', function () {
       callSketchUp('markMirror', JSON.stringify({ kind: 'mirror' }));
     });
+    $s('toolsHint').addEventListener('click', function () {
+      if ($s('toolsHint').classList.contains('is-action')) openSheet('sheetPhoto');
+    });
     $s('toolScene').addEventListener('click', function () {
       callSketchUp('addScene');
     });
@@ -4042,7 +4054,9 @@
       if (model.sunPreset && model.sunPreset !== 'atual') {
         parts.push(st('sunNow').replace('%s', (tt('sun') || {})[model.sunPreset] || model.sunPreset).replace(/\.$/, ''));
       }
-      if (model.mirrors && model.mirrors.count > 0) parts.push(tt('hudMirrors', model.mirrors.count));
+      if (model.mirrors && model.mirrors.count > 0) {
+        parts.push(st('mirrorReview').replace('%s', tt('hudMirrors', model.mirrors.count)));
+      }
       return parts.length ? parts.join(' · ') : st('toolsHint');
     }
     function setToolsHint(text, sticky) {
@@ -4051,6 +4065,9 @@
       clearTimeout(toolsHintTimer);
       el.textContent = text || toolsStateText();
       el.classList.toggle('is-tip', !!text);
+      var revisavel = !text && !!(model.mirrors && model.mirrors.count > 0);
+      el.classList.toggle('is-action', revisavel);
+      el.setAttribute('role', revisavel ? 'button' : 'status');
       if (text && sticky) toolsHintTimer = setTimeout(function () { setToolsHint(null); }, 3000);
     }
     [['toolLevel', 'tipLevel'], ['toolGuides', 'tipGuides'], ['toolSun', 'tipSun'],

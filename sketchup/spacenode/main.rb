@@ -27,7 +27,7 @@ module SpaceNode
   module SketchUp
     extend self
 
-    VERSION = '1.0.1'
+    VERSION = '1.0.2'
     PREFERENCES_KEY = 'com.spacenode.sketchup'
     DEFAULT_API_BASE_URL = 'https://spacenode.app'
     MIN_SKETCHUP_MAJOR = 21          # Ruby 2.7+; recomendado 2024+
@@ -56,6 +56,9 @@ module SpaceNode
         :mirror_select_inside => 'Entre no grupo com dois cliques e selecione a FACE do espelho — não o grupo inteiro.',
         :mirror_marked => 'Face marcada como espelho — o reflexo entra em toda captura.',
         :mirror_marked_glass => 'Face marcada como vidro — reflexo suave, com o que há atrás visível.',
+        :mirror_marked_n => '%d faces marcadas como espelho.',
+        :mirror_marked_glass_n => '%d faces marcadas como vidro.',
+        :mirror_over_limit => 'Cada plano vira um render extra na captura — acima de %d, só os %d primeiros entram. Limpe o que não for espelho em Fotografia.',
         :downloading => 'Baixando o render…',
         :style_no_seed => 'Este render não tem semente — gere um novo pra travar o estilo.',
         :scene_base_name => 'Vista',
@@ -107,6 +110,9 @@ module SpaceNode
         :mirror_select_inside => 'Double-click into the group and select the mirror FACE — not the whole group.',
         :mirror_marked => 'Face marked as a mirror — the reflection goes into every capture.',
         :mirror_marked_glass => 'Face marked as glass — soft reflection, with what is behind still visible.',
+        :mirror_marked_n => '%d faces marked as mirrors.',
+        :mirror_marked_glass_n => '%d faces marked as glass.',
+        :mirror_over_limit => 'Each plane is one extra render in the capture — above %d, only the first %d are used. Clear what is not a mirror under Photography.',
         :downloading => 'Downloading the render…',
         :style_no_seed => 'This render has no seed — generate a new one to lock the style.',
         :scene_base_name => 'View',
@@ -1351,7 +1357,18 @@ module SpaceNode
         raise
       end
       emit_mirrors
-      emit('status', { :stage => 'idle', :message => t(kind == 'glass' ? :mirror_marked_glass : :mirror_marked) })
+      # Quantas: marcar em lote (seleção que pegou o grupo inteiro por dentro)
+      # tem que ser VISÍVEL na hora, senão o usuário só descobre no render.
+      message = if faces.length > 1
+                  format(t(kind == 'glass' ? :mirror_marked_glass_n : :mirror_marked_n), faces.length)
+                else
+                  t(kind == 'glass' ? :mirror_marked_glass : :mirror_marked)
+                end
+      total = mirror_entries(model).length
+      if total > MIRROR_MAX_PER_CAPTURE
+        message += ' ' + format(t(:mirror_over_limit), MIRROR_MAX_PER_CAPTURE, MIRROR_MAX_PER_CAPTURE)
+      end
+      emit('status', { :stage => 'idle', :message => message })
     end
 
     # 'selection' desmarca as faces selecionadas; 'all' limpa tudo.
