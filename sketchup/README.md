@@ -25,6 +25,27 @@ O que só um plugin dentro do modelo consegue:
 - **Voltar à vista** — cada render guarda a câmera; um clique restaura o
   enquadramento exato no SketchUp.
 
+## O que mudou na 1.0.3 — ícones redesenhados
+
+Com a barra na tela, os ícones da 1.0.0 se mostraram pesados: elemento demais
+por ícone e traço da espessura do símbolo, que é uma marca e não um ícone de
+UI. Redesenhados no mesmo sistema (grade 64, pontas redondas, #333333), com
+traço 4,4 no lugar de 5 e curvas de verdade:
+
+- **Capturar** — o visor perdeu a moldura fechada: quatro cantos e o ponto de
+  foco. O vazio é que faz um ícone respirar a 24 px.
+- **Gerar** — a faísca ganhou lados CÔNCAVOS (quadráticas puxadas pro centro).
+  É exatamente isso que separa uma faísca de um asterisco.
+- **Nova cena** — a vista com um "+" de crachá FORA do quadro, com um vão
+  aberto em volta (`subtract`). Na primeira tentativa o vão comia o canto e o
+  que sobrava parecia um retângulo quebrado.
+- **Espelho** — virou o arco de um espelho de parede, com um brilho só na
+  diagonal; dois riscos viravam mancha no tamanho pequeno.
+
+O gerador ganhou `quad`/`arc` (curva vira polilinha densa antes de virar
+distância) e `subtract` para o vão do crachá. A marca ConstellationN não
+mudou.
+
 ## O que mudou na 1.0.2 — o Espelho conta o que fez
 
 Segundo feedback de campo: "não sei se eu que não estou sabendo usar a
