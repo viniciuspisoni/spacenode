@@ -25,6 +25,89 @@ O que só um plugin dentro do modelo consegue:
 - **Voltar à vista** — cada render guarda a câmera; um clique restaura o
   enquadramento exato no SketchUp.
 
+## O que mudou na 1.0.0 — painel de vidro e Estilo do projeto
+
+### Estilo do projeto (semente travada no .skp)
+
+A queixa nº 1 de quem renderiza com IA não é qualidade de imagem: é
+conjunto. Cinco vistas do mesmo apartamento voltam como cinco apartamentos
+diferentes — outro piso, outra madeira, outra luz. Veras e Arko expõem
+`seed`, mas solta e por render: o arquiteto tem que anotar o número e
+recolar a cada geração.
+
+Aqui a semente do render aprovado + os presets que o geraram ficam gravados
+**no arquivo**, no dicionário `spacenode`, chave `style`
+(`{seed, preset, thumb, renderId, createdAt, version}`):
+
+- **Travar** — um clique no cartão "Estilo do projeto" (habilitado quando há
+  render com semente). Dali em diante TODA geração deste `.skp` manda a
+  mesma semente: render solto, variação e lote (o `shared_seed` do lote
+  passa a nascer do estilo, não da primeira cena gerada).
+- **Viaja com o modelo** — quem abre o `.skp` em outra máquina herda o
+  estilo. Ao trocar de modelo (`AppObserver#onOpenModel`) o painel reaplica
+  sozinho os presets do arquivo e avisa. Gravação em operação transparente:
+  não vira passo na pilha de desfazer.
+- **Atualizar / Aplicar / Destravar** — "Atualizar" só aparece quando o
+  render na tela tem semente diferente da travada; "Aplicar" devolve os
+  presets do estilo ao painel; "Destravar" volta a sortear semente por
+  render. O dock mostra um ponto verde e "Estilo travado" enquanto vale.
+- A miniatura é URL assinada (vence em ~1 h): serve pra sessão e o painel a
+  esconde sozinho quando o link morre — o estilo em si não depende dela.
+
+### Painel novo (material de vidro, no estilo Apple)
+
+As 15 seções empilhadas num scroll de 440 px viraram um app:
+
+- **Abas de vidro** (Render · Editar · Animar · Cenas) com polegar que
+  desliza; Editar e Animar só aparecem quando há resultado — o mesmo sinal
+  que já mostrava/escondia as seções.
+- **Folhas (sheets)** que sobem de baixo pros ajustes: Cena, Luz, Fotografia
+  e Saída. No lugar de dez seções, quatro linhas com o resumo do que está
+  escolhido ("Residencial · Sala de Estar", "Vega · 2K") — o padrão de
+  Ajustes do iOS. Histórico e Preferências saíram do scroll e viraram folhas
+  chamadas por botões de ícone no topo.
+- **Fundo ambiente** — o render (ou a captura) vira papel de parede borrado
+  atrás de tudo: é o que o vidro refrata, e o painel assume a paleta do
+  projeto. Sem imagem, um degradê neutro segura o mesmo papel.
+- **Vidro de verdade** — `backdrop-filter: blur() saturate()` com aresta
+  especular no topo e sombra na base, cápsulas com `scale(0.96)` ao
+  pressionar e curva de mola `cubic-bezier(.32,.72,0,1)`. CEF sem
+  `backdrop-filter` (SketchUp antigo) cai pra superfície sólida via
+  `@supports` — legibilidade acima do efeito.
+- **Conteúdo rola por baixo do chrome**: topo e dock são fixos e translúcidos.
+- **Conta** sai do caminho: com sessão ativa, o cartão de conexão migra pra
+  folha de Preferências; desconectado, volta pro topo do painel.
+- **Aviso fora das abas** — a faixa de `notice` (erro de sessão, notas de
+  condicionamento, recusa do controle de qualidade) ficava dentro da seção
+  do Render; agora vive acima das abas e aparece em qualquer uma.
+- **Atalho "Animar este render"** virou a aba Animar (era a mesma ação duas
+  vezes na mesma tela).
+- **Barra de ferramentas no painel**, logo abaixo do preview: Nivelar,
+  Guias, Sol, Espelho e Nova cena. São as decisões que se tomam ENQUADRANDO,
+  e estavam todas atrás da folha de Fotografia. Mexem no mesmo estado que os
+  controles completos, que continuam existindo.
+
+### Toolbar nativa do SketchUp
+
+A barra deixou de ter um botão só. Cinco comandos, com os mesmos PNG 24/48
+(SVG só-contorno sai branco na toolbar do Windows) e um submenu em
+Extensions → SPACENODE:
+
+- **SPACENODE** — abre o painel.
+- **Capturar vista** e **Gerar render** — precisam do painel, porque é ele
+  que mostra progresso, custo e resultado: com o painel fechado, o comando
+  abre e a ação espera o `ready` (`@pending_toolbar_action`). O Gerar chega
+  ao painel como evento `runGenerate`; se o CTA ainda estiver travado
+  (catálogo carregando), o painel espera até ~3 s e desiste em silêncio — a
+  tela já está na frente dizendo o motivo.
+- **Nova cena** e **Marcar espelho** — agem no modelo e valem sozinhas; sem
+  painel aberto o retorno vai pra barra de status do SketchUp. Marcar espelho
+  fica cinza sem seleção (`set_validation_proc`).
+- Ícones gerados por `scripts/sketchup-toolbar-icons.mjs` no mesmo sistema do
+  símbolo (grade 64, traço 5, pontas redondas, #333333), com rasterizador
+  próprio (distâncias com sinal + supersampling 4×) pra não trazer
+  dependência de imagem pro projeto.
+
 ## O que mudou na 0.9.0 — Espelhos e vidros
 
 O SketchUp mostra o espelho como uma face chapada e a IA inventa o reflexo
