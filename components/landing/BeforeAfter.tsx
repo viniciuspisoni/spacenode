@@ -7,23 +7,30 @@ import Image, { type StaticImageData } from 'next/image'
 // (grande, com teclado) e na Gallery (pequeno, só ponteiro); aqui é um só,
 // e o tamanho é só uma variante.
 //
-// O `before` leva um tratamento leve (contraste/saturação/blur de 0.4px)
+// A `base` leva um tratamento leve (contraste/saturação/blur de 0.4px)
 // para ler como MODELO e não como foto: sem isso, em miniatura, os dois
 // lados parecem dois renders e a comparação perde o argumento.
+//
+// As props são `base`/`render`, não before/after: no acervo antigo os pares
+// casa e comercial estão trocados no disco (o "-before" deles é o render) e
+// isso já derrubou alteração antes. base = modelo, render = resultado.
 
 type Src = string | StaticImageData
 
 export function BeforeAfter({
-  before,
-  after,
+  base,
+  render,
   size = 'sm',
+  aspect,
   priority = false,
   sizes,
   caption,
 }: {
-  before: Src
-  after: Src
+  base: Src
+  render: Src
   size?: 'sm' | 'lg'
+  /** Sobrescreve a proporção da moldura (padrão 4/3, ou 16/10 no `lg`). */
+  aspect?: string
   priority?: boolean
   sizes: string
   caption?: string
@@ -60,9 +67,10 @@ export function BeforeAfter({
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={Math.round(pos)}
+      style={aspect ? { aspectRatio: aspect } : undefined}
     >
       <Image
-        src={before}
+        src={base}
         alt="Imagem base — modelo do projeto"
         fill
         draggable={false}
@@ -75,7 +83,7 @@ export function BeforeAfter({
         }}
       />
       <Image
-        src={after}
+        src={render}
         alt="Resultado SpaceNode — render fotorrealista"
         fill
         draggable={false}
