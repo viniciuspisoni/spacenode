@@ -25,6 +25,26 @@ O que só um plugin dentro do modelo consegue:
 - **Voltar à vista** — cada render guarda a câmera; um clique restaura o
   enquadramento exato no SketchUp.
 
+## O que mudou na 1.0.1 — a barra se explica, tema no topo
+
+Feedback de campo do dono, com o 1.0.0 instalado: "não entendi o
+funcionamento dos primeiros botões: nivelar, guias, sol". Ícone de 16 px com
+rótulo de 9,5 px e `title` não ensinam nada — no CEF a tooltip ainda demora
+pra aparecer e some sozinha.
+
+- **Linha de explicação sob a barra de ferramentas.** Parada, ela mostra o
+  que está ligado ("Verticais retas · Terços · Sol da captura: Manhã") ou,
+  sem nada ligado, o porquê da barra existir: "estes cinco ajustam a CAPTURA
+  — e a IA preserva o que ela vê". No hover/foco de cada botão, a frase do
+  que aquele botão faz. No clique, o que passou a valer, por 3 s. É a mesma
+  linha, então não cresce a interface.
+- **Tema no topo**: botão de sol/lua ao lado do Histórico e das Preferências,
+  um toque pra alternar claro ↔ escuro (grava em `saveSettings` e sincroniza
+  os pills). O seletor de três estados — Automático, Claro, Escuro — segue em
+  Preferências, porque "automático" é escolha e não gesto.
+- `applyTheme` passou a repintar o ícone, então ele acompanha até a troca
+  vinda do sistema operacional quando o tema está em automático.
+
 ## O que mudou na 1.0.0 — painel de vidro e Estilo do projeto
 
 ### Estilo do projeto (semente travada no .skp)

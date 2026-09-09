@@ -337,6 +337,15 @@
       box-shadow: inset 0 0.5px 0 var(--glass-spec), 0 1px 4px rgba(0,0,0,0.18);
     }
     .tool:disabled { opacity: 0.35; }
+    /* A barra sozinha não se explica: "Nivelar" e "Guias" não dizem o que
+       fazem com a captura. Esta linha conta — no hover, o que aquele botão
+       faz; no clique, o que passou a valer; parada, o estado atual. */
+    .tools-hint {
+      margin: 7px 2px 0; min-height: 15px;
+      font-size: 11px; line-height: 1.35; color: var(--text-3);
+      transition: color 180ms var(--ease);
+    }
+    .tools-hint.is-tip { color: var(--text-2); }
 
     /* Barra de ações flutuante sobre o palco. */
     .stage-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
@@ -743,6 +752,7 @@
       <div class="balance" id="balanceChip">
         <span class="dot"></span><b id="balanceValue">–</b><span>nodes</span><a id="balanceRecharge">Recarregar</a>
       </div>
+      <button class="icon-btn" id="themeToggle" type="button" title="Tema" aria-label="Tema"></button>
       <button class="icon-btn" id="historyOpen" type="button" title="Histórico" aria-label="Histórico">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>
@@ -849,6 +859,7 @@
           <span id="toolSceneLabel">Nova cena</span>
         </button>
       </div>
+      <div class="tools-hint" id="toolsHint" aria-live="polite"></div>
 
       <div class="stage-actions">
         <button class="ghost" id="captureButton">Capturar vista</button>
@@ -1680,6 +1691,7 @@
     function applyTheme() {
       var resolved = resolveTheme();
       document.documentElement.classList.toggle('light', resolved === 'light');
+      if (typeof renderThemeToggle === 'function') renderThemeToggle();
       try { localStorage.setItem('com.spacenode.sketchup.theme', resolved); } catch (e) {}
       // Segue o SO só enquanto nada mais decidir (setting e conta em "auto").
       var followsOs = !(model.themeSetting === 'light' || model.themeSetting === 'dark') &&
@@ -3651,7 +3663,20 @@
         toolSunTip: 'Alterna o sol aplicado na captura',
         toolMirrorTip: 'Marca a face selecionada no SketchUp como espelho',
         toolSceneTip: 'Cria uma cena do SketchUp com a vista atual',
-        sceneAdded: 'Cena "%s" criada — já entra no lote e no Space.'
+        sceneAdded: 'Cena "%s" criada — já entra no lote e no Space.',
+        toolsHint: 'Estes cinco ajustam a CAPTURA — e a IA preserva o que ela vê.',
+        tipLevel: 'Nivelar: endireita as verticais na captura, como numa foto de arquitetura.',
+        tipGuides: 'Guias: grade de terços sobre o quadro, pra posicionar o que importa.',
+        tipSun: 'Sol: troca a hora do sol do modelo só na captura — atual, manhã, meio-dia, entardecer, golden.',
+        tipMirror: 'Espelho: selecione a face do espelho no SketchUp e o reflexo real entra na captura.',
+        tipScene: 'Nova cena: salva esta vista como cena do SketchUp, pra usar no lote e no Space.',
+        onLevel: 'Verticais retas na próxima captura.',
+        offLevel: 'Verticais ficam como estão na vista.',
+        onGuides: 'Guias de terços ligadas.',
+        offGuides: 'Guias desligadas.',
+        sunNow: 'Sol da captura: %s.',
+        themeToLight: 'Mudar para o tema claro',
+        themeToDark: 'Mudar para o tema escuro'
       },
       en: {
         tabRender: 'Render', tabEdit: 'Edit', tabAnimar: 'Animate', tabScenes: 'Scenes',
@@ -3674,7 +3699,20 @@
         toolSunTip: 'Cycles the sun applied to the capture',
         toolMirrorTip: 'Marks the face selected in SketchUp as a mirror',
         toolSceneTip: 'Creates a SketchUp scene from the current view',
-        sceneAdded: 'Scene "%s" created — it joins the batch and the Space.'
+        sceneAdded: 'Scene "%s" created — it joins the batch and the Space.',
+        toolsHint: 'These five shape the CAPTURE — and the AI preserves what it sees.',
+        tipLevel: 'Level: straightens the verticals in the capture, like an architectural photo.',
+        tipGuides: 'Guides: rule-of-thirds grid over the frame, to place what matters.',
+        tipSun: 'Sun: changes the model sun hour for the capture only — current, morning, noon, late afternoon, golden.',
+        tipMirror: 'Mirror: select the mirror face in SketchUp and the real reflection goes into the capture.',
+        tipScene: 'New scene: saves this view as a SketchUp scene, for the batch and the Space.',
+        onLevel: 'Verticals will be straight in the next capture.',
+        offLevel: 'Verticals stay as they are in the view.',
+        onGuides: 'Rule-of-thirds guides on.',
+        offGuides: 'Guides off.',
+        sunNow: 'Capture sun: %s.',
+        themeToLight: 'Switch to the light theme',
+        themeToDark: 'Switch to the dark theme'
       }
     };
     function st(key) {
@@ -3969,16 +4007,19 @@
     $s('toolLevel').addEventListener('click', function () {
       model.photoLevel = !model.photoLevel;
       syncPhoto(); renderPhotoControls(); persistStateSoon(); renderQuickTools();
+      setToolsHint(st(model.photoLevel ? 'onLevel' : 'offLevel'), true);
     });
     $s('toolGuides').addEventListener('click', function () {
       model.photoGuide = (model.photoGuide && model.photoGuide !== 'none') ? 'none' : 'thirds';
       syncPhoto(); drawGuides(); renderPhotoControls(); persistStateSoon(); renderQuickTools();
+      setToolsHint(st(model.photoGuide === 'none' ? 'offGuides' : 'onGuides'), true);
     });
     $s('toolSun').addEventListener('click', function () {
       var i = SUN_OPTIONS.indexOf(model.sunPreset);
       model.sunPreset = SUN_OPTIONS[(i + 1) % SUN_OPTIONS.length];
       onSelectionChanged();
       renderQuickTools();
+      setToolsHint(st('sunNow').replace('%s', (tt('sun') || {})[model.sunPreset] || model.sunPreset), true);
     });
     // Espelho e cena agem sobre o MODELO (seleção viva / câmera viva): quem
     // lê o SketchUp é o Ruby, no instante do clique.
@@ -3987,6 +4028,64 @@
     });
     $s('toolScene').addEventListener('click', function () {
       callSketchUp('addScene');
+    });
+
+    // ── A barra se explica ───────────────────────────────────────────────
+    // Hover/foco conta o que o botão faz; clique conta o que passou a valer
+    // (por 3 s); parada, a linha mostra o que está ligado. Sem tooltip como
+    // única fonte: no CEF ela demora e some.
+    var toolsHintTimer = null;
+    function toolsStateText() {
+      var parts = [];
+      if (model.photoLevel) parts.push(st('onLevel').replace(/\.$/, ''));
+      if (model.photoGuide && model.photoGuide !== 'none') parts.push(activePillText('guidePills'));
+      if (model.sunPreset && model.sunPreset !== 'atual') {
+        parts.push(st('sunNow').replace('%s', (tt('sun') || {})[model.sunPreset] || model.sunPreset).replace(/\.$/, ''));
+      }
+      if (model.mirrors && model.mirrors.count > 0) parts.push(tt('hudMirrors', model.mirrors.count));
+      return parts.length ? parts.join(' · ') : st('toolsHint');
+    }
+    function setToolsHint(text, sticky) {
+      var el = $s('toolsHint');
+      if (!el) return;
+      clearTimeout(toolsHintTimer);
+      el.textContent = text || toolsStateText();
+      el.classList.toggle('is-tip', !!text);
+      if (text && sticky) toolsHintTimer = setTimeout(function () { setToolsHint(null); }, 3000);
+    }
+    [['toolLevel', 'tipLevel'], ['toolGuides', 'tipGuides'], ['toolSun', 'tipSun'],
+     ['toolMirror', 'tipMirror'], ['toolScene', 'tipScene']].forEach(function (pair) {
+      var el = $s(pair[0]);
+      if (!el) return;
+      var show = function () { setToolsHint(st(pair[1]), false); };
+      var hide = function () { setToolsHint(null); };
+      el.addEventListener('mouseenter', show);
+      el.addEventListener('focus', show);
+      el.addEventListener('mouseleave', hide);
+      el.addEventListener('blur', hide);
+    });
+
+    // ── Tema no topo ─────────────────────────────────────────────────────
+    // O seletor de três estados (automático/claro/escuro) segue em
+    // Preferências; aqui é o gesto de um toque, que é o que se usa.
+    var THEME_ICON = {
+      sun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/></svg>',
+      moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.2A8.2 8.2 0 0 1 9.8 4a8.4 8.4 0 1 0 10.2 10.2Z"/></svg>'
+    };
+    function renderThemeToggle() {
+      var btn = $s('themeToggle');
+      if (!btn) return;
+      var dark = !document.documentElement.classList.contains('light');
+      btn.innerHTML = dark ? THEME_ICON.sun : THEME_ICON.moon;
+      btn.title = dark ? st('themeToLight') : st('themeToDark');
+      btn.setAttribute('aria-label', btn.title);
+    }
+    $s('themeToggle').addEventListener('click', function () {
+      var next = document.documentElement.classList.contains('light') ? 'dark' : 'light';
+      model.themeSetting = next;
+      applyTheme();
+      renderThemePills();
+      callSketchUp('saveSettings', JSON.stringify({ theme: next }));
     });
 
     // ── Textos da casca ──────────────────────────────────────────────────
@@ -4008,6 +4107,8 @@
       $s('settingsOpen').title = st('settings');
       renderStyleCard();
       renderQuickTools();
+      renderThemeToggle();
+      setToolsHint(null);
       [['toolLevel', 'toolLevelTip'], ['toolGuides', 'toolGuidesTip'], ['toolSun', 'toolSunTip'],
        ['toolMirror', 'toolMirrorTip'], ['toolScene', 'toolSceneTip']].forEach(function (pair) {
         var el = $s(pair[0]);
@@ -4024,6 +4125,7 @@
       syncAccountPlacement();
       renderStyleCard();
       renderQuickTools();
+      if (!$s('toolsHint').classList.contains('is-tip')) setToolsHint(null);
       var locked = styleLocked();
       els.dockSummary.classList.toggle('is-locked', locked);
       els.dockSummary.textContent = joinParts([locked ? st('lockedTag') : '', dockSummaryText()]);
