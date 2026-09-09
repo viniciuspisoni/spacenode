@@ -43,8 +43,8 @@ export default function Hero() {
 
       <figure className="spn-hero-frame spn-glass">
         <BeforeAfter
-          before={sketchImg}
-          after={renderImg}
+          base={sketchImg}
+          render={renderImg}
           size="lg"
           priority
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 92vw, 1000px"
