@@ -27,7 +27,7 @@ module SpaceNode
   module SketchUp
     extend self
 
-    VERSION = '0.9.0'
+    VERSION = '1.0.0'
     PREFERENCES_KEY = 'com.spacenode.sketchup'
     DEFAULT_API_BASE_URL = 'https://spacenode.app'
     MIN_SKETCHUP_MAJOR = 21          # Ruby 2.7+; recomendado 2024+
@@ -57,6 +57,10 @@ module SpaceNode
         :mirror_marked => 'Face marcada como espelho — o reflexo entra em toda captura.',
         :mirror_marked_glass => 'Face marcada como vidro — reflexo suave, com o que há atrás visível.',
         :downloading => 'Baixando o render…',
+        :style_no_seed => 'Este render não tem semente — gere um novo pra travar o estilo.',
+        :scene_base_name => 'Vista',
+        :scene_no_model => 'Nenhum modelo aberto pra criar a cena.',
+        :scene_failed => 'Não consegui criar a cena.',
         :reconciling => 'Conexão instável — verificando se o render foi concluído…',
         :connect_first => 'Conecte sua conta SPACENODE primeiro.',
         :busy => 'Já existe uma geração em andamento.',
@@ -93,6 +97,10 @@ module SpaceNode
         :mirror_marked => 'Face marked as a mirror — the reflection goes into every capture.',
         :mirror_marked_glass => 'Face marked as glass — soft reflection, with what is behind still visible.',
         :downloading => 'Downloading the render…',
+        :style_no_seed => 'This render has no seed — generate a new one to lock the style.',
+        :scene_base_name => 'View',
+        :scene_no_model => 'No open model to create the scene in.',
+        :scene_failed => 'Could not create the scene.',
         :reconciling => 'Unstable connection — checking if the render finished…',
         :connect_first => 'Connect your SPACENODE account first.',
         :busy => 'A generation is already running.',
@@ -375,6 +383,13 @@ module SpaceNode
           emit_error(e.message, false, true)
         end
       end
+      dialog.add_action_callback('addScene') do |_ctx|
+        begin
+          handle_add_scene
+        rescue StandardError => e
+          emit_error(e.message)
+        end
+      end
       dialog.add_action_callback('listScenes') do |_ctx|
         begin
           list_scenes
@@ -477,6 +492,20 @@ module SpaceNode
       dialog.add_action_callback('saveResult') do |_ctx, raw|
         begin
           save_result_to_disk(raw)
+        rescue StandardError => e
+          emit_error(e.message)
+        end
+      end
+      dialog.add_action_callback('saveProjectStyle') do |_ctx, raw|
+        begin
+          handle_save_project_style(raw)
+        rescue StandardError => e
+          emit_error(e.message)
+        end
+      end
+      dialog.add_action_callback('clearProjectStyle') do |_ctx|
+        begin
+          handle_clear_project_style
         rescue StandardError => e
           emit_error(e.message)
         end
@@ -1242,6 +1271,7 @@ module SpaceNode
       attach_photo_observers
       emit_camera_facts
       emit_mirrors
+      emit_project_style(false)
     rescue StandardError
       nil
     end
@@ -2244,6 +2274,29 @@ module SpaceNode
 
     # ── Cenas / materiais do modelo ─────────────────────────────────────────
 
+    # Nova cena com a vista atual. O lote e o Space vivem de cenas — e criar
+    # cena é trabalho manual no SketchUp (menu, nomear, conferir). pages.add
+    # captura a câmera viva e já seleciona a página nova.
+    def handle_add_scene
+      model = ::Sketchup.active_model
+      raise t(:scene_no_model) unless model
+
+      pages = model.pages
+      page = pages.add(unique_page_name(pages, t(:scene_base_name)))
+      raise t(:scene_failed) unless page
+
+      emit('sceneAdded', { :name => page.name.to_s })
+      list_scenes
+    end
+
+    def unique_page_name(pages, base)
+      taken = {}
+      pages.each { |p| taken[p.name.to_s] = true }
+      index = pages.count + 1
+      index += 1 while taken["#{base} #{index}"]
+      "#{base} #{index}"
+    end
+
     def list_scenes
       model = ::Sketchup.active_model
       scenes = []
@@ -2702,7 +2755,7 @@ module SpaceNode
         :results => [],
         :errors => [],
         :payload => payload,
-        :shared_seed => nil,
+        :shared_seed => (payload['seed'].to_s =~ /\A\d+\z/ ? payload['seed'].to_i : nil),
         :original_scene => original
       }
       emit('batchStart', { :total => entries.length })
@@ -4811,6 +4864,93 @@ module SpaceNode
       send_state
     end
 
+    # ── Estilo do projeto ────────────────────────────────────────────────────
+    #
+    # A dor nº 1 de quem renderiza com IA é o conjunto: cinco vistas do mesmo
+    # projeto voltam como cinco projetos diferentes. Aqui a semente do render
+    # aprovado + os presets que o geraram ficam gravados NO ARQUIVO (dicionário
+    # 'spacenode', chave 'style'). Enquanto travado, toda geração deste .skp
+    # repete a mesma semente — e quem abre o arquivo (outra máquina, outro
+    # projetista) herda o estilo junto com o modelo.
+    #
+    # O painel é quem manda a semente no payload; aqui só guardamos, devolvemos
+    # e validamos. Miniatura é URL assinada (vence em ~1 h): serve pra sessão,
+    # e o painel esconde sozinho quando o link morre.
+    PROJECT_STYLE_KEY = 'style'
+
+    def project_style
+      model = ::Sketchup.active_model
+      return nil unless model
+
+      raw = model.get_attribute('spacenode', PROJECT_STYLE_KEY, nil)
+      return nil unless raw.is_a?(String) && !raw.empty?
+
+      style = JSON.parse(raw)
+      return nil unless style.is_a?(Hash) && style['seed'].to_s =~ /\A\d+\z/
+
+      style
+    rescue StandardError
+      nil
+    end
+
+    def handle_save_project_style(raw)
+      payload = parse_json(raw)
+      seed = payload['seed']
+      unless seed.is_a?(Numeric) || seed.to_s =~ /\A\d+\z/
+        raise t(:style_no_seed)
+      end
+
+      preset = payload['preset'].is_a?(Hash) ? payload['preset'] : {}
+      style = {
+        'seed' => seed.to_i,
+        'preset' => preset,
+        # Corta o que não cabe num atributo de modelo por engano (URL longa,
+        # texto colado gigante): o arquivo do usuário não é depósito.
+        'thumb' => payload['thumb'].to_s[0, 2048],
+        'renderId' => payload['renderId'].to_s[0, 128],
+        'createdAt' => Time.now.to_i,
+        'version' => VERSION
+      }
+      write_project_style(JSON.generate(style))
+      emit('projectStyle', { :style => style, :saved => true })
+    end
+
+    def handle_clear_project_style
+      write_project_style(nil)
+      emit('projectStyle', { :style => nil, :saved => true })
+    end
+
+    def emit_project_style(saved)
+      emit('projectStyle', { :style => project_style, :saved => saved })
+    rescue StandardError
+      nil
+    end
+
+    # Operação transparente: gravar o estilo não vira um passo de desfazer na
+    # pilha do usuário (mesmo tratamento do último resultado).
+    def write_project_style(json)
+      model = ::Sketchup.active_model
+      return unless model
+
+      begin
+        model.start_operation('SPACENODE', true, false, true)
+        if json
+          model.set_attribute('spacenode', PROJECT_STYLE_KEY, json)
+        else
+          dict = model.attribute_dictionary('spacenode')
+          dict.delete_key(PROJECT_STYLE_KEY) if dict
+        end
+        model.commit_operation
+      rescue StandardError
+        begin
+          model.abort_operation
+        rescue StandardError
+          nil
+        end
+        raise
+      end
+    end
+
     # ── Configurações ────────────────────────────────────────────────────────
 
     def handle_save_settings(raw)
@@ -4916,6 +5056,7 @@ module SpaceNode
         :videoSave => video_save_mode,
         :lastVideo => last_video_state,
         :photo => @photo,
+        :projectStyle => project_style,
         :guidesOverlay => guides_overlay_supported?
       })
     end

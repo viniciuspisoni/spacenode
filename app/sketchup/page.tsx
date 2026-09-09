@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 }
 
 const RBZ_PATH = '/downloads/spacenode-sketchup.rbz'
-const PLUGIN_VERSION = '0.9.0'
+const PLUGIN_VERSION = '1.0.0'
 
 const FEATURES: { title: string; body: string }[] = [
   {
@@ -24,6 +24,10 @@ const FEATURES: { title: string; body: string }[] = [
   {
     title: 'geometria como verdade.',
     body: 'Um mapa de arestas hidden-line da mesma câmera guia o motor de fidelidade — condicionamento estrutural por dados do modelo, não por adivinhação de pixel.',
+  },
+  {
+    title: 'o estilo fica no arquivo.',
+    body: 'Trave o estilo de um render aprovado e a semente vai junto com o .skp — todas as vistas do projeto, soltas ou em lote, saem com a mesma paleta, os mesmos materiais e a mesma atmosfera. Quem abrir o arquivo herda o estilo.',
   },
   {
     title: 'cenas em lote.',
