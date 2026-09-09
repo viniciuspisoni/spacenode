@@ -25,6 +25,28 @@ O que só um plugin dentro do modelo consegue:
 - **Voltar à vista** — cada render guarda a câmera; um clique restaura o
   enquadramento exato no SketchUp.
 
+## O que mudou na 1.0.2 — o Espelho conta o que fez
+
+Segundo feedback de campo: "não sei se eu que não estou sabendo usar a
+ferramenta espelho", com o painel mostrando **20 espelhos** marcados e o erro
+"selecione a FACE, não o grupo". As duas coisas eram a mesma falha nossa: o
+gesto (dois cliques pra entrar no grupo) só era ensinado DEPOIS do erro, e
+marcar 20 faces de uma vez respondia "Face marcada como espelho" — no
+singular, sem contagem. O usuário não tinha como saber que a seleção pegou o
+grupo inteiro por dentro.
+
+- **A confirmação diz quantas**: marcar em lote agora responde "20 faces
+  marcadas como espelho." Uma face segue com a mensagem de sempre.
+- **Aviso do teto**: passando de `MIRROR_MAX_PER_CAPTURE` (6 planos por
+  captura, cada um um render extra), a mensagem completa que só os 6
+  primeiros entram e manda limpar em Fotografia. O mesmo aviso aparece no
+  hint de Espelhos e vidros, que é onde moram "Desmarcar seleção" e "Limpar
+  todos".
+- **A dica ensina antes**: no hover, "Espelho: dois cliques pra entrar no
+  grupo, clique só na FACE do espelho e toque aqui".
+- **Com espelho marcado a linha vira caminho**: "20 espelhos — toque pra
+  revisar" abre a folha de Fotografia direto na limpeza.
+
 ## O que mudou na 1.0.1 — a barra se explica, tema no topo
 
 Feedback de campo do dono, com o 1.0.0 instalado: "não entendi o
