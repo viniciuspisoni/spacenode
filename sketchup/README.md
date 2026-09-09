@@ -82,6 +82,31 @@ As 15 seções empilhadas num scroll de 440 px viraram um app:
   do Render; agora vive acima das abas e aparece em qualquer uma.
 - **Atalho "Animar este render"** virou a aba Animar (era a mesma ação duas
   vezes na mesma tela).
+- **Barra de ferramentas no painel**, logo abaixo do preview: Nivelar,
+  Guias, Sol, Espelho e Nova cena. São as decisões que se tomam ENQUADRANDO,
+  e estavam todas atrás da folha de Fotografia. Mexem no mesmo estado que os
+  controles completos, que continuam existindo.
+
+### Toolbar nativa do SketchUp
+
+A barra deixou de ter um botão só. Cinco comandos, com os mesmos PNG 24/48
+(SVG só-contorno sai branco na toolbar do Windows) e um submenu em
+Extensions → SPACENODE:
+
+- **SPACENODE** — abre o painel.
+- **Capturar vista** e **Gerar render** — precisam do painel, porque é ele
+  que mostra progresso, custo e resultado: com o painel fechado, o comando
+  abre e a ação espera o `ready` (`@pending_toolbar_action`). O Gerar chega
+  ao painel como evento `runGenerate`; se o CTA ainda estiver travado
+  (catálogo carregando), o painel espera até ~3 s e desiste em silêncio — a
+  tela já está na frente dizendo o motivo.
+- **Nova cena** e **Marcar espelho** — agem no modelo e valem sozinhas; sem
+  painel aberto o retorno vai pra barra de status do SketchUp. Marcar espelho
+  fica cinza sem seleção (`set_validation_proc`).
+- Ícones gerados por `scripts/sketchup-toolbar-icons.mjs` no mesmo sistema do
+  símbolo (grade 64, traço 5, pontas redondas, #333333), com rasterizador
+  próprio (distâncias com sinal + supersampling 4×) pra não trazer
+  dependência de imagem pro projeto.
 
 ## O que mudou na 0.9.0 — Espelhos e vidros
 

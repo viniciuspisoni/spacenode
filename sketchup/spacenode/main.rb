@@ -61,6 +61,17 @@ module SpaceNode
         :scene_base_name => 'Vista',
         :scene_no_model => 'Nenhum modelo aberto pra criar a cena.',
         :scene_failed => 'Não consegui criar a cena.',
+        :tb_panel => 'SPACENODE',
+        :tb_panel_hint => 'Abrir o painel da SPACENODE',
+        :tb_capture => 'Capturar vista',
+        :tb_capture_hint => 'Capturar a vista atual no painel da SPACENODE',
+        :tb_generate => 'Gerar render',
+        :tb_generate_hint => 'Gerar o render da vista atual com os ajustes do painel',
+        :tb_scene => 'Nova cena',
+        :tb_scene_hint => 'Criar uma cena do SketchUp com a vista atual',
+        :tb_scene_done => 'Cena criada: %s',
+        :tb_mirror => 'Marcar espelho',
+        :tb_mirror_hint => 'Marcar a face selecionada como espelho (o reflexo entra na captura)',
         :reconciling => 'Conexão instável — verificando se o render foi concluído…',
         :connect_first => 'Conecte sua conta SPACENODE primeiro.',
         :busy => 'Já existe uma geração em andamento.',
@@ -101,6 +112,17 @@ module SpaceNode
         :scene_base_name => 'View',
         :scene_no_model => 'No open model to create the scene in.',
         :scene_failed => 'Could not create the scene.',
+        :tb_panel => 'SPACENODE',
+        :tb_panel_hint => 'Open the SPACENODE panel',
+        :tb_capture => 'Capture view',
+        :tb_capture_hint => 'Capture the current view into the SPACENODE panel',
+        :tb_generate => 'Generate render',
+        :tb_generate_hint => 'Render the current view with the panel settings',
+        :tb_scene => 'New scene',
+        :tb_scene_hint => 'Create a SketchUp scene from the current view',
+        :tb_scene_done => 'Scene created: %s',
+        :tb_mirror => 'Mark mirror',
+        :tb_mirror_hint => 'Mark the selected face as a mirror (the reflection goes into the capture)',
         :reconciling => 'Unstable connection — checking if the render finished…',
         :connect_first => 'Connect your SPACENODE account first.',
         :busy => 'A generation is already running.',
@@ -564,6 +586,15 @@ module SpaceNode
       ensure_catalog
       list_scenes
       check_session if authenticated?
+      # Ação disparada na toolbar com o painel fechado: roda agora que ele
+      # existe — capturar/gerar sem painel seria trabalho invisível.
+      pending = @pending_toolbar_action
+      @pending_toolbar_action = nil
+      begin
+        pending.call if pending
+      rescue StandardError => e
+        emit_error(e.message)
+      end
     end
 
     # ── HTTP assíncrono (Sketchup::Http) ────────────────────────────────────
@@ -2287,6 +2318,7 @@ module SpaceNode
 
       emit('sceneAdded', { :name => page.name.to_s })
       list_scenes
+      page.name.to_s
     end
 
     def unique_page_name(pages, base)
@@ -5196,28 +5228,98 @@ module SpaceNode
       end
     end
 
+    # ── Toolbar nativa ───────────────────────────────────────────────────────
+    #
+    # O painel resolve tudo, mas quem está modelando quer as ações de um
+    # clique. Capturar e Gerar PRECISAM do painel (é ele que mostra progresso,
+    # custo e resultado): fechado, ele abre e a ação espera o 'ready'. Nova
+    # cena e Marcar espelho agem no modelo e valem sozinhas — sem painel, o
+    # retorno vai pra barra de status.
+    def panel_open?
+      !!(@dialog && @dialog.respond_to?(:visible?) && @dialog.visible?)
+    rescue StandardError
+      false
+    end
+
+    def selection_empty?
+      model = ::Sketchup.active_model
+      model.nil? || model.selection.empty?
+    rescue StandardError
+      false
+    end
+
+    def with_panel(&block)
+      if panel_open?
+        @dialog.bring_to_front if @dialog.respond_to?(:bring_to_front)
+        block.call
+      else
+        @pending_toolbar_action = block
+        activate
+      end
+    rescue StandardError => e
+      ::UI.messagebox(e.message)
+    end
+
+    def toolbar_capture
+      with_panel { handle_capture }
+    end
+
+    def toolbar_generate
+      with_panel { emit('runGenerate') }
+    end
+
+    def toolbar_add_scene
+      name = handle_add_scene
+      ::Sketchup.status_text = format(t(:tb_scene_done), name) unless panel_open?
+    rescue StandardError => e
+      ::UI.messagebox(e.message)
+    end
+
+    def toolbar_mark_mirror
+      handle_mark_mirror(JSON.generate({ 'kind' => 'mirror' }))
+      ::Sketchup.status_text = t(:mirror_marked) unless panel_open?
+    rescue StandardError => e
+      ::UI.messagebox(e.message)
+    end
+
+    # PNG nas DUAS plataformas: o renderizador de SVG do SketchUp no Windows
+    # exibe ícones feitos só de stroke (sem fill) em branco — o botão parecia
+    # inexistente. Caminho absoluto, e o 48 cai pro 24 se faltar.
+    def build_command(label, hint, icon, &block)
+      command = ::UI::Command.new(label) { block.call }
+      command.tooltip = label
+      command.status_bar_text = hint
+      base = File.join(__dir__, 'assets')
+      small = File.join(base, "#{icon}-24.png")
+      large = File.join(base, "#{icon}-48.png")
+      if File.exist?(small)
+        command.small_icon = small
+        command.large_icon = File.exist?(large) ? large : small
+      end
+      command
+    end
+
     # ── Registro de UI ───────────────────────────────────────────────────────
 
     unless file_loaded?(__FILE__)
-      command = ::UI::Command.new('SPACENODE') { SpaceNode::SketchUp.activate }
-      command.tooltip = 'SPACENODE'
-      command.status_bar_text = 'Renderizar a vista atual com a SPACENODE'
+      commands = [
+        build_command(t(:tb_panel), t(:tb_panel_hint), 'spacenode') { SpaceNode::SketchUp.activate },
+        build_command(t(:tb_capture), t(:tb_capture_hint), 'toolbar-capture') { SpaceNode::SketchUp.toolbar_capture },
+        build_command(t(:tb_generate), t(:tb_generate_hint), 'toolbar-generate') { SpaceNode::SketchUp.toolbar_generate },
+        build_command(t(:tb_scene), t(:tb_scene_hint), 'toolbar-scene') { SpaceNode::SketchUp.toolbar_add_scene },
+        build_command(t(:tb_mirror), t(:tb_mirror_hint), 'toolbar-mirror') { SpaceNode::SketchUp.toolbar_mark_mirror }
+      ]
+      # Marcar espelho age sobre a seleção: cinza quando não há nada
+      # selecionado (a proc roda a cada refresh de UI — só uma checagem).
+      commands.last.set_validation_proc { SpaceNode::SketchUp.selection_empty? ? MF_GRAYED : MF_ENABLED }
 
-      # PNG nas DUAS plataformas: o renderizador de SVG do SketchUp no Windows
-      # exibe ícones feitos só de stroke (sem fill) em branco/preto — o botão
-      # parecia inexistente. PNG rasterizado é confiável. Caminho absoluto.
-      icon_base = File.join(__dir__, 'assets')
-      small_icon = File.join(icon_base, 'spacenode-24.png')
-      large_icon = File.join(icon_base, 'spacenode-48.png')
-      if File.exist?(small_icon)
-        command.small_icon = small_icon
-        command.large_icon = File.exist?(large_icon) ? large_icon : small_icon
-      end
-
-      ::UI.menu('Extensions').add_item(command)
+      menu = ::UI.menu('Extensions').add_submenu('SPACENODE')
+      commands.each { |c| menu.add_item(c) }
 
       toolbar = ::UI::Toolbar.new('SPACENODE')
-      toolbar.add_item(command)
+      toolbar.add_item(commands.first)
+      toolbar.add_separator
+      commands.drop(1).each { |c| toolbar.add_item(c) }
       # restore sozinho NÃO exibe no primeiro load (get_last_state
       # TB_NEVER_SHOWN) — só reposiciona se já foi mostrada antes. show força
       # a exibição na estreia; nas próximas sessões restore respeita a escolha

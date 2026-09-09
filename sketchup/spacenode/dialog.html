@@ -4059,9 +4059,21 @@
         if (applyStylePreset(true)) showNotice(st('styleRestored'), 'success');
       }
       if (event === 'sceneAdded') showNotice(st('sceneAdded').replace('%s', payload.name || ''), 'success');
+      if (event === 'runGenerate') runGenerateWhenReady(0);
       if (event === 'pairing') closeSheet();
       if (event === 'result' || event === 'capture') closeSheet();
       updateShell();
+    }
+
+    // "Gerar render" da toolbar nativa. A ordem pode chegar antes do catálogo
+    // (painel recém-aberto pelo próprio botão): espera o CTA liberar por até
+    // ~3 s e desiste em silêncio — o painel já está na frente mostrando o
+    // motivo (conectar, saldo insuficiente).
+    function runGenerateWhenReady(tries) {
+      if (model.generating) return;
+      if (!els.generateButton.disabled) { submitGenerate(false); return; }
+      if (tries >= 12) return;
+      setTimeout(function () { runGenerateWhenReady(tries + 1); }, 250);
     }
 
     // Primeira pintura: o Ruby ainda não respondeu, mas a casca já existe.

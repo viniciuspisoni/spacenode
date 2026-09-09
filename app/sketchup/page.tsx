@@ -62,7 +62,7 @@ const FEATURES: { title: string; body: string }[] = [
 const STEPS: string[] = [
   'Baixe o arquivo .rbz abaixo.',
   'No SketchUp: Window → Extension Manager → Install Extension.',
-  'Abra a barra de ferramentas SPACENODE e clique em Conectar.',
+  'Abra a barra de ferramentas SPACENODE e clique em Conectar. Os outros botões da barra capturam a vista, geram o render, criam uma cena e marcam espelhos sem passar pelo painel.',
 ]
 
 export default function SketchUpPage() {
