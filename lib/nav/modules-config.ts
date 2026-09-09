@@ -16,7 +16,7 @@ export interface SidebarModule {
   label:   string
   href:    string
   section: ModuleSection
-  iconKey: 'generate' | 'spaces' | 'retocar' | 'enhance' | 'video' | 'finalizar' | 'humanizedPlan' | 'blocos3d' | 'isometric' | 'board' | 'moodboard'
+  iconKey: 'generate' | 'spaces' | 'retocar' | 'enhance' | 'video' | 'finalizar' | 'estudar' | 'humanizedPlan' | 'blocos3d' | 'isometric' | 'board' | 'moodboard'
   enabled: boolean
   beta?:   boolean
   /** Some só da sidebar, sem desabilitar o módulo — dashboard, Nodi e LPs continuam vendo. */
@@ -32,6 +32,7 @@ export const SIDEBAR_MODULES: SidebarModule[] = [
   { id: 'ampliar',          label: 'Ampliar',          href: '/app/upscale',                       section: 'criar',      iconKey: 'enhance',       enabled: true },
   { id: 'animar',           label: 'Animar',           href: '/app/video',                         section: 'criar',      iconKey: 'video',         enabled: true },
   { id: 'finalizar',        label: 'Finalizar',        href: '/app/finalizar',                     section: 'criar',      iconKey: 'finalizar',     enabled: true },
+  { id: 'estudar',          label: 'Estudar',          href: '/app/estudar',                       section: 'criar',      iconKey: 'estudar',       enabled: true, beta: true },
   { id: 'planta_humanizada',label: 'Planta humanizada',href: '/app/apresentar/planta-humanizada',  section: 'criar',      iconKey: 'humanizedPlan', enabled: true },
   { id: 'blocos_3d',        label: 'Blocos 3D',        href: '/app/blocos-3d',                     section: 'criar',      iconKey: 'blocos3d',      enabled: true, beta: true },
 

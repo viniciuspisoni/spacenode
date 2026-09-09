@@ -107,10 +107,11 @@ function renderEngineRaw(r: Render): string | null {
 }
 
 // Módulo de origem derivado do ambient (renders concentram Renderizar,
-// Ampliar e Animar na mesma tabela).
-function renderModule(r: Render): 'render' | 'upscale' | 'video' {
+// Ampliar, Animar e a proposta salva do Estudar na mesma tabela).
+function renderModule(r: Render): 'render' | 'upscale' | 'video' | 'estudo' {
   if (r.ambient === 'upscale') return 'upscale'
   if (r.ambient === 'video')   return 'video'
+  if (r.ambient === 'estudo')  return 'estudo'
   return 'render'
 }
 
@@ -207,7 +208,7 @@ export function HistoryClient({
   // Filtros técnicos do arquivo do projeto. Módulo/engine/autor já ativos;
   // TODO(filters): resolução, status e período seguem o mesmo padrão — basta
   // adicionar o estado + cláusula no `filtered` + <select> nos controls.
-  const [moduleFilter, setModuleFilter] = useState<'all' | 'render' | 'upscale' | 'video'>('all')
+  const [moduleFilter, setModuleFilter] = useState<'all' | 'render' | 'upscale' | 'video' | 'estudo'>('all')
   const [engineFilter, setEngineFilter] = useState('all')
   const [authorFilter, setAuthorFilter] = useState('all')
 
@@ -547,6 +548,7 @@ export function HistoryClient({
               <option value="render">Renderizar</option>
               <option value="upscale">Ampliar</option>
               <option value="video">Animar</option>
+              <option value="estudo">Estudar</option>
             </select>
 
             <select value={engineFilter} onChange={e => setEngineFilter(e.target.value)} style={S.select}>

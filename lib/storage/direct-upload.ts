@@ -140,6 +140,17 @@ export const DIRECT_UPLOAD_AREAS = {
     allowedMime: () => IMAGE_MIME,
     dir: () => 'blocos3d/source',
   },
+  // Assets do Estudar: foto do ambiente, máscara de preservação e máscara do
+  // refino localizado (máscaras são sempre PNG — export do canvas).
+  'estudo-asset': {
+    bucket: 'space-mestres',
+    maxBytes: 15 * 1024 * 1024,
+    allowedMime: p =>
+      p.kind === 'mask' || p.kind === 'refine-mask' ? ['image/png']
+      : p.kind === 'source' ? IMAGE_MIME
+      : null,
+    dir: p => (['source', 'mask', 'refine-mask'].includes(p.kind ?? '') ? `estudar/${p.kind}` : null),
+  },
 } satisfies Record<string, DirectUploadArea>
 
 export type DirectUploadAreaId = keyof typeof DIRECT_UPLOAD_AREAS
