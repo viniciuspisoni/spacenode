@@ -6,12 +6,16 @@ import { Logo } from './brand';
 // '#sketchup' é a faixa do plugin na própria landing; o link "Conhecer o
 // plugin" de lá leva pra /sketchup. Mantendo tudo como âncora, o scroll-spy
 // e o drawer seguem funcionando sem exceção.
+//
+// São CINCO links de propósito: o breakpoint da barra foi calibrado pela
+// contagem (ver .nav-links abaixo). '#como-funciona' saiu na reforma de
+// vidro — os três passos viraram uma tira dentro de '#produto'.
 const LINKS = [
-  { href: '#produto',       label: 'PRODUTO'       },
-  { href: '#como-funciona', label: 'COMO FUNCIONA' },
-  { href: '#sketchup',      label: 'SKETCHUP'      },
-  { href: '#planos',        label: 'PREÇOS'        },
-  { href: '#faq',           label: 'FAQ'           },
+  { href: '#projetos', label: 'PROJETOS' },
+  { href: '#produto',  label: 'PRODUTO'  },
+  { href: '#sketchup', label: 'SKETCHUP' },
+  { href: '#planos',   label: 'PREÇOS'   },
+  { href: '#faq',      label: 'FAQ'      },
 ];
 
 /** Deslocamento máximo do texto em direção ao cursor. */
@@ -116,15 +120,15 @@ export default function Navbar() {
     e.currentTarget.style.setProperty('--tx', '0px');
   };
 
-  // A superfície da barra vai inline porque nenhum styled-jsx desta landing
-  // entra na folha que bloqueia o paint (o CSS só é injetado na hidratação) —
-  // assim a barra já nasce escura e integrada, como na versão original.
-  // O que varia por breakpoint (altura, paddings) fica no CSS.
-  // No topo da página não há nada atrás da barra além do fundo claro do body
-  // (#fafafa): qualquer transparência ali vira cinza, não vidro — medimos
-  // rgb(64,64,64) com 78%. Então a barra nasce preta e opaca, e só vira vidro
-  // depois que existe conteúdo passando por baixo.
-  const glass = 'blur(20px) saturate(160%)';
+  // A superfície vai inline porque nenhum styled-jsx desta landing entra na
+  // folha que bloqueia o paint (o CSS só é injetado na hidratação) — assim a
+  // barra já nasce vidro, sem piscar opaca. O que varia por breakpoint
+  // (altura, paddings) fica no CSS.
+  //
+  // Antes da reforma a barra nascia PRETA e opaca: no topo de uma landing
+  // clara não havia nada atrás dela para refratar. Agora há — o papel de
+  // parede do <Ambient /> cobre a página inteira — então o vidro vale desde
+  // o primeiro pixel; rolar só o adensa.
   const navStyle: React.CSSProperties = {
     position: 'sticky',
     top: 0,
@@ -132,21 +136,17 @@ export default function Navbar() {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    background: scrolled
-      ? 'color-mix(in srgb, var(--color-bg) 92%, transparent)'
-      : 'var(--color-bg)',
-    backdropFilter: scrolled ? glass : 'none',
-    WebkitBackdropFilter: scrolled ? glass : 'none',
-    borderBottom: `0.5px solid rgba(255, 255, 255, ${scrolled ? 0.1 : 0.06})`,
-    // reflexo interno muito discreto, só a linha de topo
-    boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.045)',
+    background: scrolled ? 'var(--glass-strong)' : 'var(--glass)',
+    backdropFilter: 'blur(30px) saturate(190%)',
+    WebkitBackdropFilter: 'blur(30px) saturate(190%)',
+    borderBottom: `0.5px solid ${scrolled ? 'var(--glass-line-strong)' : 'var(--glass-line)'}`,
+    boxShadow: 'inset 0 0.5px 0 var(--glass-spec)',
+    transition: 'background-color 220ms var(--ease), border-color 220ms var(--ease)',
   };
 
   return (
     <>
-      {/* spn-dark: a barra fica sempre escura sobre a landing light — mesma
-          linguagem das faixas hero/produto/galeria. */}
-      <nav className={`spn-nav spn-dark ${scrolled ? 'is-scrolled' : ''}`} style={navStyle}>
+      <nav className={`spn-nav ${scrolled ? 'is-scrolled' : ''}`} style={navStyle}>
         <span className="nav-logo">
           <Logo symbolSize={48} />
         </span>
@@ -205,7 +205,7 @@ export default function Navbar() {
 
       {/* Mobile drawer */}
       <div
-        className={`nav-drawer spn-dark ${open ? 'is-open' : ''}`}
+        className={`nav-drawer ${open ? 'is-open' : ''}`}
         role="dialog"
         aria-modal="true"
         aria-hidden={!open}

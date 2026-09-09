@@ -197,6 +197,119 @@ html.light {
   background: var(--color-bg);
   color: var(--color-text-primary);
 }
+/* ── Vidro ─────────────────────────────────────────────────────────────
+   O material da nova cara da SPACENODE. Espelho EXATO do painel v1 do
+   plugin (sketchup/spacenode/dialog.html) — um conjunto só de tokens serve
+   landing, plugin e, depois, o web app. Se um mudar, mudam os três.
+
+   --glass         superfície padrão (cartões, linhas, folhas)
+   --glass-strong  superfície que precisa segurar leitura (chrome fixo)
+   --glass-raised  controle elevado (botão, pílula, chip)
+   --glass-line    borda do vidro
+   --glass-spec    brilho especular na aresta de cima
+   --glass-shade   sombra interna na aresta de baixo
+   --ambient-*     intensidade do papel de parede que fica atrás
+
+   O vidro só existe se houver algo passando por trás: quem usa .spn-glass
+   precisa de um fundo ambiente (ver components/landing/Ambient.tsx). Sobre
+   cor chapada ele vira cinza, não vidro.                                */
+:root {
+  --glass: rgba(30, 30, 32, 0.55);
+  --glass-strong: rgba(22, 22, 24, 0.72);
+  --glass-raised: rgba(58, 58, 62, 0.55);
+  --glass-line: rgba(255, 255, 255, 0.11);
+  --glass-line-strong: rgba(255, 255, 255, 0.20);
+  --glass-spec: rgba(255, 255, 255, 0.18);
+  --glass-shade: rgba(0, 0, 0, 0.28);
+  --glass-blur: 24px;
+
+  --ambient-opacity: 0.55;
+  --ambient-veil: rgba(10, 10, 10, 0.62);
+
+  --shadow-float: 0 10px 34px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.30);
+
+  /* Curva de mola da Apple: sai rápido, chega devagar, sem overshoot. */
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --r-card: 18px;
+  --r-inner: 12px;
+}
+
+html.light {
+  --glass: rgba(255, 255, 255, 0.62);
+  --glass-strong: rgba(250, 250, 250, 0.80);
+  --glass-raised: rgba(255, 255, 255, 0.92);
+  --glass-line: rgba(0, 0, 0, 0.08);
+  --glass-line-strong: rgba(0, 0, 0, 0.16);
+  --glass-spec: rgba(255, 255, 255, 0.90);
+  --glass-shade: rgba(0, 0, 0, 0.05);
+
+  --ambient-opacity: 0.42;
+  --ambient-veil: rgba(250, 250, 250, 0.66);
+
+  --shadow-float: 0 10px 30px rgba(0, 0, 0, 0.10), 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+/* Translúcido + borrão + aresta especular. Tudo que flutua usa isto. */
+.spn-glass {
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  border: 0.5px solid var(--glass-line);
+  box-shadow: inset 0 0.5px 0 var(--glass-spec), inset 0 -0.5px 0 var(--glass-shade);
+}
+
+/* Chrome fixo (navbar, barra de CTA): segura leitura sobre qualquer coisa. */
+.spn-glass--chrome {
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: blur(30px) saturate(190%);
+  backdrop-filter: blur(30px) saturate(190%);
+}
+
+/* Controle elevado: pega mais luz que a superfície onde está apoiado. */
+.spn-glass--raised {
+  background: var(--glass-raised);
+  border: 0.5px solid var(--glass-line);
+  box-shadow: inset 0 0.5px 0 var(--glass-spec);
+}
+
+/* Sem backdrop-filter, ou com transparência reduzida por acessibilidade, o
+   vidro vira superfície sólida — legibilidade acima do efeito. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root { --glass: #141416; --glass-strong: #0e0e10; --glass-raised: #2a2a2e; }
+  html.light { --glass: #ffffff; --glass-strong: #fbfbfd; --glass-raised: #ffffff; }
+  .spn-ambient-img { display: none; }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root { --glass: #141416; --glass-strong: #0e0e10; --glass-raised: #2a2a2e; }
+  html.light { --glass: #ffffff; --glass-strong: #fbfbfd; --glass-raised: #ffffff; }
+  .spn-glass, .spn-glass--chrome {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .spn-ambient-img { display: none; }
+}
+
+/* Escopo da landing. Dois desvios dos tokens compartilhados, os dois pela
+   mesma razão — ESCALA. No plugin, TODO texto fica sobre vidro, e o vidro
+   já escurece o papel de parede embaixo dele. Numa página, títulos,
+   subtítulos e microcopy ficam direto sobre o papel de parede, e aí ele
+   passa a ser o fundo de leitura:
+
+   - --ambient-opacity cai de 0.55 para 0.16. Os papéis de parede são
+     renders reais: medindo os blurDataURL, o mais claro (a fachada, com
+     céu) chega a luminância 0.47. A 0.55 de opacidade o trecho de céu
+     compõe um fundo de ~0.10 — texto secundário lá dá 2,8:1. A 0.16 o pico
+     fica em ~0.03 e o secundário sobe para 5,2:1.
+   - --color-text-tertiary sobe de #6e6e73 para #9a9aa0. #6e6e73 dá 3,8:1
+     mesmo sobre preto puro: não alcança AA em fundo NENHUM, e a landing
+     usa terciário em texto corrido (legendas, microcopy, notas de plano).
+     #9a9aa0 dá 4,6:1 no pior ponto do papel de parede e 5,2:1 sobre vidro. */
+.spn-landing {
+  --ambient-opacity: 0.16;
+  --color-text-tertiary: #9a9aa0;
+  --color-text-quaternary: #5a5a5e;
+}
 
 * {
   box-sizing: border-box;

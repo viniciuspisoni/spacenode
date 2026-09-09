@@ -5,51 +5,26 @@ import { SUPPORT_EMAIL, SUPPORT_PHONE_DISPLAY, supportWhatsAppUrl } from '@/lib/
 
 const faqLink = { color: 'var(--color-text-primary)', textDecoration: 'underline', textUnderlineOffset: 3 } as const
 
-// FAQ enxuto: 7 perguntas essenciais. As respostas de "substitui minhas
-// ferramentas?" e "prompts avançados?" foram absorvidas nas vizinhas.
+// Quatro objeções — as que de fato travam a assinatura. Saíram na reforma
+// de vidro (2026-09-09): "o que é a SpaceNode" (a página inteira responde),
+// "posso cancelar" (agora está na própria seção de planos) e "como falo com
+// o suporte", que virou a linha de contato logo abaixo da lista.
 const faqs: { q: string; a: React.ReactNode }[] = [
   {
-    q: 'O que é a SpaceNode?',
-    a: 'Uma plataforma de visualização arquitetônica com IA para arquitetos e designers de interiores. Ela transforma estudos, modelos e imagens base em visualizações fotorrealistas — preservando a intenção do projeto, do estudo ao material de apresentação.',
-  },
-  {
     q: 'A IA altera o meu projeto?',
-    a: 'A plataforma é construída para preservar geometria, proporções, perspectiva e composição. Como toda ferramenta de IA, o resultado pode pedir ajustes — mas o objetivo é respeitar o projeto original e reduzir reinterpretações indesejadas, não criar uma imagem apenas "parecida".',
+    a: 'A plataforma é construída para preservar geometria, proporções, perspectiva e composição. Como toda ferramenta de IA, o resultado pode pedir ajustes — mas o objetivo é respeitar o projeto original, não criar uma imagem apenas "parecida".',
   },
   {
-    q: 'Posso usar imagens do SketchUp como base?',
-    a: 'Sim. Prints de tela, exportações de imagem, estudos volumétricos, fotos e referências funcionam como imagem base — do SketchUp, Revit, ArchiCAD, Blender ou qualquer modelador. A SpaceNode complementa as ferramentas que você já usa: roda no navegador, sem instalação e sem GPU dedicada. Para SketchUp existe também o plugin oficial, que captura a vista direto do modelo — opcional, para quem prefere não sair do projeto.',
+    q: 'Funciona com o que eu já uso?',
+    a: 'Sim. Prints de tela, exportações, estudos volumétricos e referências funcionam como imagem base — do SketchUp, Revit, ArchiCAD, Blender ou qualquer modelador. Roda no navegador, sem instalação e sem GPU dedicada. Para SketchUp existe também o plugin oficial, que captura a vista direto do modelo.',
   },
   {
     q: 'O que são Nodes?',
-    a: 'Nodes são os créditos de uso da SpaceNode. Cada geração, edição ou ampliação consome nodes conforme o motor e a resolução escolhidos — um render HD parte de 10 nodes; 2K, de 15; 4K, de 25. Existem dois tipos: os Nodes mensais, incluídos no plano, renovam todo mês e não acumulam; os Nodes extras, comprados avulsos em qualquer plano pago, não expiram. O consumo usa primeiro os mensais.',
+    a: 'São os créditos de uso. Cada geração, edição ou ampliação consome nodes conforme o motor e a resolução — um render HD parte de 10 nodes; 2K, de 15; 4K, de 25. Os Nodes mensais do plano renovam todo mês e não acumulam; os Nodes extras, comprados avulsos, não expiram. O consumo usa primeiro os mensais.',
   },
   {
     q: 'Consigo usar as imagens com clientes?',
-    a: 'Sim, os direitos das imagens geradas são seus. Use em apresentações comerciais, portfólio, redes sociais, sites e materiais de apoio ao projeto — incluindo saída em alta resolução (até 4K) para impressão.',
-  },
-  {
-    q: 'Posso cancelar quando quiser?',
-    a: 'Sim — a assinatura é mensal: você paga apenas o mês em uso e mantém o acesso até o fim do período. O cancelamento é feito direto no painel, sem burocracia.',
-  },
-  {
-    q: 'Como falo com o suporte?',
-    a: (
-      <>
-        Pelo WhatsApp{' '}
-        <a
-          href={supportWhatsAppUrl('Olá! Vim do site da SpaceNode e tenho uma dúvida.')}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={faqLink}
-        >
-          {SUPPORT_PHONE_DISPLAY}
-        </a>
-        {' '}ou pelo e-mail{' '}
-        <a href={`mailto:${SUPPORT_EMAIL}`} style={faqLink}>{SUPPORT_EMAIL}</a>
-        {' '}— atendimento em português.
-      </>
-    ),
+    a: 'Sim, os direitos das imagens geradas são seus. Use em apresentações comerciais, portfólio, redes sociais e materiais de projeto — incluindo saída em alta resolução (até 4K) para impressão.',
   },
 ]
 
@@ -58,132 +33,148 @@ export function FAQ() {
 
   return (
     <section id="faq" className="spn-faq">
+      <h2 className="spn-faq-title">perguntas de quem projeta.</h2>
 
-      <div className="spn-faq-head">
-        <div style={{ fontSize: 10, fontWeight: 500, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'var(--color-text-tertiary)', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-          <span style={{ display: 'block', width: 32, height: '0.5px', background: 'var(--color-border-strong)' }} />
-          Dúvidas frequentes
-          <span style={{ display: 'block', width: 32, height: '0.5px', background: 'var(--color-border-strong)' }} />
-        </div>
-        <h2 className="spn-faq-title">
-          perguntas de quem projeta.
-        </h2>
-        <p className="spn-faq-sub">
-          As dúvidas reais de arquitetos e designers antes de assinar — respondidas de forma direta.
-        </p>
-      </div>
-
-      <div style={{ border: '0.5px solid var(--color-border-strong)', borderRadius: 14, overflow: 'hidden' }}>
+      <div className="spn-faq-list spn-glass">
         {faqs.map((faq, i) => {
           const isOpen = open === i
           return (
-            <div key={i} style={{ borderBottom: i < faqs.length - 1 ? '0.5px solid var(--color-border)' : 'none' }}>
+            <div key={i} className="spn-faq-item" data-last={i === faqs.length - 1}>
               <button
+                type="button"
                 onClick={() => setOpen(isOpen ? null : i)}
                 className="spn-faq-q"
-                style={{
-                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  cursor: 'pointer', gap: 16,
-                  background: isOpen ? 'var(--color-surface)' : 'var(--color-bg-elevated)',
-                  border: 'none', textAlign: 'left',
-                  transition: 'background 0.15s',
-                }}
+                aria-expanded={isOpen}
               >
-                <span className="spn-faq-q-text">
-                  {faq.q}
-                </span>
-                <span style={{
-                  width: 22, height: 22, flexShrink: 0,
-                  border: `0.5px solid ${isOpen ? 'transparent' : 'var(--color-border-strong)'}`,
-                  borderRadius: '50%',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: isOpen ? 'var(--color-surface-hover)' : 'transparent',
-                  transform: isOpen ? 'rotate(45deg)' : 'rotate(0deg)',
-                  transition: 'transform 0.25s ease, background 0.15s',
-                }}>
-                  <svg viewBox="0 0 24 24" fill="none" width="11" height="11">
-                    <path d="M12 5v14M5 12h14" stroke="var(--color-text-secondary)" strokeWidth="1.8" strokeLinecap="round"/>
+                <span className="spn-faq-q-text">{faq.q}</span>
+                <span className="spn-faq-icon" data-open={isOpen}>
+                  <svg viewBox="0 0 24 24" fill="none" width="11" height="11" aria-hidden>
+                    <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                   </svg>
                 </span>
               </button>
 
-              <div style={{
-                maxHeight: isOpen ? 400 : 0,
-                overflow: 'hidden',
-                transition: 'max-height 0.35s cubic-bezier(0.4,0,0.2,1)',
-              }}>
-                <p className="spn-faq-a">
-                  {faq.a}
-                </p>
+              <div className="spn-faq-panel" data-open={isOpen}>
+                <p className="spn-faq-a">{faq.a}</p>
               </div>
             </div>
           )
         })}
       </div>
 
+      <p className="spn-faq-support">
+        Ficou outra dúvida? Fale com a gente no WhatsApp{' '}
+        <a
+          href={supportWhatsAppUrl('Olá! Vim do site da SpaceNode e tenho uma dúvida.')}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={faqLink}
+        >
+          {SUPPORT_PHONE_DISPLAY}
+        </a>
+        {' '}ou por e-mail{' '}
+        <a href={`mailto:${SUPPORT_EMAIL}`} style={faqLink}>{SUPPORT_EMAIL}</a>.
+      </p>
+
       <style jsx>{`
         .spn-faq {
-          padding: 96px 24px;
-          max-width: 960px;
+          position: relative;
+          z-index: 1;
+          padding: 0 24px 96px;
+          max-width: 780px;
           margin: 0 auto;
         }
-        .spn-faq-head {
-          text-align: center;
-          margin-bottom: 56px;
-        }
         .spn-faq-title {
-          font-size: 28px;
-          font-weight: 500;
-          letter-spacing: -0.03em;
+          text-align: center;
+          font-size: clamp(22px, 3.6vw, 30px);
+          font-weight: 400;
+          letter-spacing: -0.035em;
           line-height: 1.2;
-          margin: 0 0 10px;
+          margin: 0 0 28px;
           color: var(--color-text-primary);
         }
-        .spn-faq-sub {
-          font-size: 14px;
-          color: var(--color-text-tertiary);
-          letter-spacing: -0.005em;
-          line-height: 1.6;
-          margin: 0;
+        .spn-faq-list {
+          border-radius: var(--r-card);
+          overflow: hidden;
+        }
+        .spn-faq-item[data-last='false'] {
+          border-bottom: 0.5px solid var(--glass-line);
         }
         .spn-faq-q {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
           padding: 20px 24px;
-          min-height: 64px;
+          background: none;
+          border: none;
+          text-align: left;
+          cursor: pointer;
+          color: inherit;
+          transition: background 150ms var(--ease);
+        }
+        .spn-faq-q:hover { background: var(--color-surface-subtle); }
+        .spn-faq-q:focus-visible {
+          outline: 1.5px solid var(--color-border-focus);
+          outline-offset: -3px;
         }
         .spn-faq-q-text {
-          font-size: 13.5px;
+          font-size: 15px;
           font-weight: 500;
+          letter-spacing: -0.015em;
           color: var(--color-text-primary);
-          letter-spacing: -0.01em;
-          line-height: 1.4;
         }
-        .spn-faq-a {
-          padding: 0 24px 22px;
-          font-size: 13.5px;
+        .spn-faq-icon {
+          width: 24px;
+          height: 24px;
+          flex-shrink: 0;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
           color: var(--color-text-secondary);
-          line-height: 1.65;
-          letter-spacing: -0.005em;
+          border: 0.5px solid var(--glass-line-strong);
+          transition: transform 250ms var(--ease), background 150ms var(--ease);
+        }
+        .spn-faq-icon[data-open='true'] {
+          transform: rotate(45deg);
+          background: var(--color-surface-hover);
+          border-color: transparent;
+        }
+        .spn-faq-panel {
+          display: grid;
+          grid-template-rows: 0fr;
+          transition: grid-template-rows 350ms var(--ease);
+        }
+        .spn-faq-panel[data-open='true'] { grid-template-rows: 1fr; }
+        .spn-faq-a {
+          overflow: hidden;
           margin: 0;
+          font-size: 13.5px;
+          line-height: 1.65;
+          color: var(--color-text-secondary);
+          padding: 0 24px;
+        }
+        .spn-faq-panel[data-open='true'] .spn-faq-a { padding-bottom: 22px; }
+        .spn-faq-support {
+          text-align: center;
+          font-size: 13px;
+          color: var(--color-text-tertiary);
+          line-height: 1.6;
+          margin: 22px 0 0;
         }
 
         @media (max-width: 768px) {
-          .spn-faq {
-            padding: 72px 20px;
-          }
-          .spn-faq-head {
-            margin-bottom: 32px;
-          }
-          .spn-faq-title { font-size: 24px; }
-          .spn-faq-sub  { font-size: 13px; }
-          .spn-faq-q {
-            padding: 18px 18px;
-          }
+          .spn-faq { padding: 0 16px 64px; }
+          .spn-faq-title { margin-bottom: 20px; }
+          .spn-faq-q { padding: 18px 18px; }
           .spn-faq-q-text { font-size: 14px; }
-          .spn-faq-a {
-            padding: 0 18px 20px;
-            font-size: 13.5px;
-            line-height: 1.6;
-          }
+          .spn-faq-a { padding: 0 18px; font-size: 13px; }
+          .spn-faq-panel[data-open='true'] .spn-faq-a { padding-bottom: 18px; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .spn-faq-panel, .spn-faq-icon, .spn-faq-q { transition: none; }
         }
       `}</style>
     </section>

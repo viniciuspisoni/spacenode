@@ -597,57 +597,56 @@ function MobileMockup() {
     </div>
   )
 }
+// ── Passos (absorve a antiga seção HowItWorks) ───────────────────────────────
 
-// ── Faixa compacta de módulos (absorve a antiga seção PlatformModules) ────────
-
-const MODULES = [
-  { Icon: IconGenerate,  name: 'renderizar', desc: 'Estudos e modelos viram imagens fotorrealistas com fidelidade geométrica.' },
-  { Icon: IconSpaces,    name: 'spaces',     desc: 'Variações coerentes do mesmo projeto: ângulos, luzes, atmosferas.' },
-  { Icon: IconRetocar,   name: 'editar',     desc: 'Ajustes pontuais sem recomeçar a imagem inteira.' },
-  { Icon: IconEnhance,   name: 'ampliar',    desc: 'Mais resolução, nitidez e qualidade final para apresentação.' },
-  { Icon: IconVideo,     name: 'animar',     desc: 'Imagens do projeto viram vídeos curtos de apresentação.' },
-  { Icon: IconHistory,   name: 'histórico',  desc: 'Gerações anteriores, comparação de versões e controle visual.' },
+const STEPS = [
+  { num: '01', title: 'envie',     desc: 'Print do SketchUp, estudo volumétrico ou referência.' },
+  { num: '02', title: 'defina',    desc: 'Atmosfera, enquadramento, luz e materiais — sem prompt.' },
+  { num: '03', title: 'apresente', desc: 'Variações coerentes do mesmo projeto, prontas para o cliente.' },
 ]
 
-// ── Section wrapper ────────────────────────────────────────────────────────────
+// Os módulos já aparecem nomeados na barra lateral do mockup — aqui viram só
+// pílulas. A grade com uma descrição para cada um era eco do que a própria
+// interface acima mostra.
+const MODULES = ['renderizar', 'spaces', 'editar', 'ampliar', 'animar', 'finalizar']
+
+// ── Section wrapper ─────────────────────────────────────────────────────────
 
 export function ProductMockup() {
   return (
     <section id="produto" className="spn-mockup">
-
       <div className="spn-mockup-head">
-        <div className="spn-mockup-eyebrow">
-          <span style={{ display: 'block', width: 32, height: '0.5px', background: 'var(--color-border-strong)' }} />
-          O produto
-          <span style={{ display: 'block', width: 32, height: '0.5px', background: 'var(--color-border-strong)' }} />
-        </div>
         <h2 className="spn-mockup-title">
           um espaço de trabalho, não um gerador de imagens.
         </h2>
         <p className="spn-mockup-sub">
           Cada projeto vira um Space: a Vista Mestre define o DNA — estilo,
-          materiais, paleta e contexto — e cada variação preserva geometria e
-          identidade. Motor, resolução e consumo sempre visíveis.
+          materiais, paleta e contexto — e toda variação o preserva.
         </p>
       </div>
 
-      <div className="spn-mockup-desktop"><DesktopMockup /></div>
-      <div className="spn-mockup-mobile"><MobileMockup /></div>
-
-      <div className="spn-mockup-modules">
-        {MODULES.map(({ Icon, name, desc }) => (
-          <div key={name} className="spn-mockup-module">
-            <span className="spn-mockup-module-icon"><Icon size={16} /></span>
-            <div>
-              <div className="spn-mockup-module-name">{name}</div>
-              <p className="spn-mockup-module-desc">{desc}</p>
-            </div>
-          </div>
-        ))}
+      <div className="spn-mockup-frame spn-glass">
+        <div className="spn-mockup-desktop"><DesktopMockup /></div>
+        <div className="spn-mockup-mobile"><MobileMockup /></div>
       </div>
 
-      <div className="spn-mockup-cta">
-        <a href="/login?mode=signup" className="spn-mockup-cta-btn">
+      <ol className="spn-mockup-steps">
+        {STEPS.map(s => (
+          <li key={s.num} className="spn-mockup-step spn-glass">
+            <span className="spn-mockup-step-num">{s.num}</span>
+            <p className="spn-mockup-step-title">{s.title}</p>
+            <p className="spn-mockup-step-desc">{s.desc}</p>
+          </li>
+        ))}
+      </ol>
+
+      <div className="spn-mockup-foot">
+        <div className="spn-mockup-pills">
+          {MODULES.map(m => (
+            <span key={m} className="spn-mockup-pill spn-glass--raised">{m}</span>
+          ))}
+        </div>
+        <a href="/login?mode=signup" className="spn-mockup-cta-btn spn-glass--raised">
           Testar grátis — 80 nodes
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
             <path d="M2 6h8M6.5 2.5L10 6l-3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -657,27 +656,20 @@ export function ProductMockup() {
 
       <style jsx>{`
         .spn-mockup {
-          padding: 96px 24px;
-          max-width: 960px;
+          position: relative;
+          z-index: 1;
+          padding: 0 24px 96px;
+          max-width: 1000px;
           margin: 0 auto;
         }
         .spn-mockup-head {
           text-align: center;
-          margin-bottom: 56px;
-        }
-        .spn-mockup-eyebrow {
-          font-size: 10px; font-weight: 500;
-          letter-spacing: 0.22em;
-          text-transform: uppercase;
-          color: var(--color-text-tertiary);
-          margin-bottom: 16px;
-          display: flex; align-items: center; justify-content: center;
-          gap: 10px;
+          margin-bottom: 32px;
         }
         .spn-mockup-title {
-          font-size: 28px;
-          font-weight: 500;
-          letter-spacing: -0.03em;
+          font-size: clamp(22px, 3.6vw, 30px);
+          font-weight: 400;
+          letter-spacing: -0.035em;
           line-height: 1.2;
           margin: 0 0 10px;
           color: var(--color-text-primary);
@@ -688,84 +680,95 @@ export function ProductMockup() {
           letter-spacing: -0.005em;
           line-height: 1.6;
           margin: 0 auto;
-          max-width: 580px;
+          max-width: 520px;
+        }
+
+        /* Bandeja de vidro: o mockup é uma janela opaca, então quem carrega
+           o material é a moldura em volta dela. */
+        .spn-mockup-frame {
+          padding: 10px;
+          border-radius: calc(var(--r-card) + 6px);
+          box-shadow: var(--shadow-float);
         }
         .spn-mockup-desktop { display: block; }
-        .spn-mockup-mobile { display: none; }
+        .spn-mockup-mobile  { display: none; }
 
-        .spn-mockup-modules {
-          margin-top: 48px;
-          padding-top: 36px;
-          border-top: 0.5px solid var(--color-border);
+        .spn-mockup-steps {
+          list-style: none;
+          margin: 12px 0 0;
+          padding: 0;
           display: grid;
           grid-template-columns: repeat(3, 1fr);
-          gap: 22px 28px;
-        }
-        .spn-mockup-module {
-          display: flex;
           gap: 12px;
-          align-items: flex-start;
         }
-        .spn-mockup-module-icon {
-          width: 30px;
-          height: 30px;
-          flex-shrink: 0;
-          border-radius: 8px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: var(--color-text-secondary);
-          background: rgba(255, 255, 255, 0.05);
-          border: 0.5px solid rgba(255, 255, 255, 0.09);
+        .spn-mockup-step {
+          padding: 20px 22px;
+          border-radius: var(--r-card);
         }
-        .spn-mockup-module-name {
-          font-size: 13px;
+        .spn-mockup-step-num {
+          display: block;
+          font-size: 10px;
           font-weight: 500;
-          letter-spacing: -0.01em;
-          color: var(--color-text-primary);
-          margin-bottom: 3px;
-        }
-        .spn-mockup-module-desc {
-          font-size: 12px;
+          letter-spacing: 0.22em;
           color: var(--color-text-tertiary);
+          font-variant-numeric: tabular-nums;
+          margin-bottom: 10px;
+        }
+        .spn-mockup-step-title {
+          font-size: 16px;
+          font-weight: 500;
+          letter-spacing: -0.02em;
+          color: var(--color-text-primary);
+          margin: 0 0 6px;
+        }
+        .spn-mockup-step-desc {
+          font-size: 13px;
+          color: var(--color-text-secondary);
           line-height: 1.55;
-          letter-spacing: -0.005em;
           margin: 0;
         }
-        .spn-mockup-cta {
-          text-align: center;
-          margin-top: 40px;
+
+        .spn-mockup-foot {
+          margin-top: 32px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 22px;
+        }
+        .spn-mockup-pills {
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: center;
+          gap: 7px;
+        }
+        .spn-mockup-pill {
+          padding: 6px 13px;
+          border-radius: var(--radius-full);
+          font-size: 12px;
+          letter-spacing: -0.005em;
+          color: var(--color-text-secondary);
         }
         .spn-mockup-cta-btn {
           display: inline-flex;
           align-items: center;
           gap: 8px;
-          min-height: 44px;
-          padding: 0 22px;
-          border-radius: var(--radius-full);
+          padding: 14px 26px;
+          min-height: 50px;
+          border-radius: var(--r-inner);
           font-size: 13px;
           font-weight: 500;
           letter-spacing: -0.01em;
           text-decoration: none;
           color: var(--color-text-primary);
-          background: rgba(255, 255, 255, 0.055);
-          border: 0.5px solid rgba(255, 255, 255, 0.1);
-          -webkit-backdrop-filter: blur(12px);
-          backdrop-filter: blur(12px);
-          box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.08);
-          transition:
-            transform var(--duration-base) cubic-bezier(0.21, 0.6, 0.35, 1),
-            background-color var(--duration-base) ease,
-            border-color var(--duration-base) ease;
+          transition: transform 200ms var(--ease), border-color 200ms var(--ease);
         }
         .spn-mockup-cta-btn:hover {
-          background: rgba(255, 255, 255, 0.085);
-          border-color: rgba(255, 255, 255, 0.16);
           transform: translateY(-1px);
+          border-color: var(--glass-line-strong);
         }
         .spn-mockup-cta-btn:active { transform: translateY(0); }
         .spn-mockup-cta-btn:focus-visible {
-          outline: 2px solid rgba(255, 255, 255, 0.75);
+          outline: 1.5px solid var(--color-border-focus);
           outline-offset: 2px;
         }
         @media (prefers-reduced-motion: reduce) {
@@ -774,29 +777,14 @@ export function ProductMockup() {
         }
 
         @media (max-width: 768px) {
-          .spn-mockup {
-            padding: 72px 20px;
-          }
-          .spn-mockup-head {
-            margin-bottom: 36px;
-          }
-          .spn-mockup-title {
-            font-size: 24px;
-          }
-          .spn-mockup-sub {
-            font-size: 13px;
-          }
+          .spn-mockup { padding: 0 16px 64px; }
+          .spn-mockup-head { margin-bottom: 24px; }
+          .spn-mockup-frame { padding: 7px; }
           .spn-mockup-desktop { display: none; }
           .spn-mockup-mobile  { display: block; }
-          .spn-mockup-modules {
-            margin-top: 36px;
-            padding-top: 28px;
-            grid-template-columns: 1fr;
-            gap: 18px;
-          }
-          .spn-mockup-cta {
-            margin-top: 32px;
-          }
+          .spn-mockup-steps { grid-template-columns: 1fr; gap: 10px; }
+          .spn-mockup-step { padding: 18px 18px; }
+          .spn-mockup-foot { margin-top: 24px; gap: 18px; }
         }
       `}</style>
     </section>
