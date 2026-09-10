@@ -24,7 +24,7 @@ import {
   Segmented, PillGroup, MultiPillGroup, ChoiceGroup, RowIcon, useAmbient,
 } from '@/components/app/glass'
 import {
-  ORION_CONFIG, ORION_NODES_COST,
+  ORION_CONFIG, ORION_LONG_EDGE, ORION_NODES_COST,
   ORION_QUALITY_LABEL, ORION_QUALITY_ORDER,
   ORION_VARIANT_LABEL, ORION_VARIANT_ORDER,
   DEFAULT_ORION_QUALITY, DEFAULT_ORION_VARIANT,
@@ -1567,7 +1567,11 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
                 options={currentEngine.resolutions.map(res => ({
                   value: res,
                   title: res.toUpperCase(),
-                  note:  `${currentEngine.nodes[res] ?? 0} nodes`,
+                  // No piloto os dois custam 0 nodes — repetir "0 nodes" nos dois
+                  // cartões não informa nada. O que difere é o tamanho entregue.
+                  note:  isOrion
+                    ? `lado maior ${ORION_LONG_EDGE[res === '4k' ? '4k' : '2k']} px`
+                    : `${currentEngine.nodes[res] ?? 0} nodes`,
                 }))}
               />
               <p className="spn-hint">{RESOLUTION_DESC[selectedResolution]}</p>

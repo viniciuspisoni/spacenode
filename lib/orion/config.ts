@@ -10,8 +10,8 @@
 // lê env privada nem importa nada de servidor. A escolha de fornecedor
 // (ORION_IMAGE_PROVIDER) vive em lib/orion/provider.ts, que é server-only.
 //
-// Piloto: 2K, uma imagem por solicitação, ZERO nodes — a decisão de não cobrar
-// acontece no SERVIDOR, depois da autorização (ver app/api/generate/route.ts).
+// Piloto: 2K ou 4K, uma imagem por solicitação, ZERO nodes — a decisão de não
+// cobrar acontece no SERVIDOR, depois da autorização (app/api/generate/route.ts).
 
 import { ENGINES, isEngineId, type EngineId, type Resolution } from '@/lib/engines'
 
@@ -54,8 +54,8 @@ export const ORION_CONFIG = {
   name:        'Orion',
   tagline:     'Experimental',
   description: 'Teste interno de geração e preservação do projeto. Não cobra nodes.',
-  resolutions: ['2k'] as Resolution[],
-  nodes:       { '2k': ORION_NODES_COST } as Partial<Record<Resolution, number>>,
+  resolutions: ['2k', '4k'] as Resolution[],
+  nodes:       { '2k': ORION_NODES_COST, '4k': ORION_NODES_COST } as Partial<Record<Resolution, number>>,
 }
 
 // ── Dimensões explícitas do preset 2K ────────────────────────────────────────
@@ -71,9 +71,21 @@ export const ORION_CONFIG = {
 // o teto de 3:1 nunca é estourado pelo arredondamento.
 
 export const ORION_LONG_EDGE_2K = 2048
+/** 3840 é o TETO por lado da Image API — não dá pra alcançar os 4096 do "4K"
+ *  de Vega/Pulsar. 3840 no lado maior é o 4K UHD (3840×2160 em 16:9). */
+export const ORION_LONG_EDGE_4K = 3840
 const OPENAI_MAX_EDGE = 3840
 const OPENAI_MIN_EDGE = 512
 const OPENAI_MAX_ASPECT = 3
+
+/** Lado maior por preset. ATENÇÃO ao custo: a Image API cobra por token de
+ *  saída, que sobe com o número de PIXELS — e como fixamos o lado MAIOR, um
+ *  4K em retrato tem muito mais pixel (e custa muito mais) que um 4K em
+ *  paisagem. Ver docs/ORION-PILOTO-2026-09-10.md. */
+export const ORION_LONG_EDGE: Record<'2k' | '4k', number> = {
+  '2k': ORION_LONG_EDGE_2K,
+  '4k': ORION_LONG_EDGE_4K,
+}
 
 export interface OrionSize {
   width:  number
@@ -86,18 +98,20 @@ export interface OrionSize {
 const ceil16  = (n: number) => Math.max(16, Math.ceil(n / 16) * 16)
 const floor16 = (n: number) => Math.max(16, Math.floor(n / 16) * 16)
 
-/** Dimensões explícitas do preset 2K para um original de `width`×`height`.
- *  Preserva a proporção; sem dimensões, cai no quadrado 2K (nunca 'auto'). */
+/** Dimensões explícitas do preset para um original de `width`×`height`.
+ *  Preserva a proporção; sem dimensões, cai no quadrado do preset (nunca 'auto'). */
 export function orionTargetSize(
   width: number | null | undefined,
   height: number | null | undefined,
+  resolution: '2k' | '4k' = '2k',
 ): OrionSize {
+  const longEdge = ORION_LONG_EDGE[resolution] ?? ORION_LONG_EDGE_2K
   if (!width || !height || width <= 0 || height <= 0) {
-    return { width: ORION_LONG_EDGE_2K, height: ORION_LONG_EDGE_2K, source: 'fallback' }
+    return { width: longEdge, height: longEdge, source: 'fallback' }
   }
   const ratio = width / height
   const clamped = Math.min(OPENAI_MAX_ASPECT, Math.max(1 / OPENAI_MAX_ASPECT, ratio))
-  const long = Math.min(ORION_LONG_EDGE_2K, OPENAI_MAX_EDGE)
+  const long = Math.min(longEdge, OPENAI_MAX_EDGE)
 
   let w: number
   let h: number
@@ -108,8 +122,8 @@ export function orionTargetSize(
     h = long
     w = ceil16(long * clamped)
   }
-  // Guardas defensivas: com lado maior 2048 e aspecto ≤ 3:1 o lado menor cai
-  // em [688, 2048] e nenhuma delas dispara — ficam pra caso o preset mude.
+  // Guardas defensivas: com o lado maior no teto (3840) e aspecto ≤ 3:1 o
+  // lado menor cai em [1280, 3840]; nenhuma delas dispara nos presets atuais.
   w = Math.min(OPENAI_MAX_EDGE, Math.max(OPENAI_MIN_EDGE, w))
   h = Math.min(OPENAI_MAX_EDGE, Math.max(OPENAI_MIN_EDGE, h))
   w = w > OPENAI_MAX_EDGE ? floor16(OPENAI_MAX_EDGE) : ceil16(w)
@@ -152,9 +166,15 @@ export function isOrionProvider(value: unknown): value is OrionProvider {
   return value === 'openai' || value === 'fal'
 }
 
-/** Resolução liberada no piloto. O servidor recusa qualquer outra. */
+/** Resoluções liberadas no piloto. O servidor recusa qualquer outra — HD não
+ *  entra: 1024 px de lado maior não é entrega de apresentação. */
 export function isOrionResolution(value: unknown): value is Resolution {
-  return value === '2k'
+  return value === '2k' || value === '4k'
+}
+
+/** Estreita a Resolution do catálogo pro par que o preset de tamanho conhece. */
+export function orionResolutionOrDefault(value: unknown): '2k' | '4k' {
+  return value === '4k' ? '4k' : '2k'
 }
 
 export function getRenderEngineConfig(engine: RenderEngineId) {

@@ -34,6 +34,7 @@ import {
   isOrionResolution,
   isOrionVariant,
   isRenderEngineId,
+  orionResolutionOrDefault,
   orionSizeParam,
   orionTargetSize,
   type OrionQuality,
@@ -669,7 +670,11 @@ export async function POST(req: NextRequest) {
     // Orion: dimensão EXPLÍCITA derivada do aspecto do original (nunca 'auto',
     // nunca upscale silencioso). Reusa o `sourceSize` que a rota já calcula pra
     // faixa barata do Seedream. Pedido e entregue vão os dois pro generation_log.
-    const orionSize = orionTargetSize(sourceSize?.width ?? null, sourceSize?.height ?? null)
+    const orionSize = orionTargetSize(
+      sourceSize?.width ?? null,
+      sourceSize?.height ?? null,
+      orionResolutionOrDefault(resolution),
+    )
     let orionGen: OrionGenerateResult | null = null
     if (isOrion) {
       console.log(

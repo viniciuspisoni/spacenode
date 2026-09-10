@@ -14,6 +14,7 @@
 //
 //   ORION_SMOKE_VARIANT   sunburst (default) | flare
 //   ORION_SMOKE_QUALITY   high (default) | medium
+//   ORION_SMOKE_RESOLUTION 2k (default) | 4k  — 4k = lado maior 3840 (teto da API)
 //   ORION_SMOKE_INPUT     caminho da imagem base (default _batch_base.jpg)
 //   ORION_SMOKE_OUT       diretório de saída (default o diretório atual)
 //   ORION_IMAGE_PROVIDER  openai (default) | fal
@@ -21,7 +22,7 @@
 // A chave sai do .env.local (o vitest não carrega .env sozinho) e NUNCA é
 // impressa. A saída vai como data: URL — sem Storage, sem Supabase.
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { buildFidelityPrompt, type GenerateOptions } from '@/lib/prompts'
@@ -41,13 +42,17 @@ describe.runIf(SMOKE_ON)('Orion · smoke real (ORION_SMOKE=1 — chamada paga)',
     const quality = isOrionQuality(process.env.ORION_SMOKE_QUALITY) ? process.env.ORION_SMOKE_QUALITY : 'high'
     const inputPath = process.env.ORION_SMOKE_INPUT ?? join(process.cwd(), '_batch_base.jpg')
     const outDir = process.env.ORION_SMOKE_OUT ?? process.cwd()
+    // Diretório pedido por env pode não existir — criar antes, senão a geração
+    // (que JÁ foi paga) se perde no writeFileSync.
+    mkdirSync(outDir, { recursive: true })
 
     expect(existsSync(inputPath), `imagem de entrada não encontrada: ${inputPath}`).toBe(true)
     const inputBuf = readFileSync(inputPath)
 
     const sharp = (await import('sharp')).default
     const meta = await sharp(inputBuf).metadata()
-    const size = orionTargetSize(meta.width ?? null, meta.height ?? null)
+    const resolution: '2k' | '4k' = process.env.ORION_SMOKE_RESOLUTION === '4k' ? '4k' : '2k'
+    const size = orionTargetSize(meta.width ?? null, meta.height ?? null, resolution)
 
     // MESMO prompt da produção (Máxima, sem briefing — o smoke mede o motor).
     const options: GenerateOptions = {

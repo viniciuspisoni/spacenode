@@ -9,6 +9,7 @@ import { ENGINE_ORDER, ENGINES, isEngineId } from '@/lib/engines'
 import {
   ORION_CONFIG, ORION_LONG_EDGE_2K, ORION_MODELS, ORION_NODES_COST,
   ORION_QUALITY_ORDER, ORION_VARIANT_ORDER,
+  ORION_LONG_EDGE_4K, orionResolutionOrDefault,
   isInternalRenderRow,
   isOrionProvider, isOrionQuality, isOrionResolution, isOrionVariant, isRenderEngineId,
   orionSizeParam, orionTargetSize, parseOrionSizeParam,
@@ -47,9 +48,9 @@ describe('catálogo do piloto', () => {
     })
   })
 
-  it('2K, zero nodes', () => {
-    expect(ORION_CONFIG.resolutions).toEqual(['2k'])
-    expect(ORION_CONFIG.nodes).toEqual({ '2k': 0 })
+  it('2K e 4K, zero nodes nos dois', () => {
+    expect(ORION_CONFIG.resolutions).toEqual(['2k', '4k'])
+    expect(ORION_CONFIG.nodes).toEqual({ '2k': 0, '4k': 0 })
     expect(ORION_NODES_COST).toBe(0)
   })
 
@@ -69,10 +70,10 @@ describe('catálogo do piloto', () => {
     expect(isOrionProvider('openai')).toBe(true)
     expect(isOrionProvider('fal')).toBe(true)
 
-    // Só 2K no piloto: HD e 4K são recusados mesmo sendo Resolution válidas.
+    // 2K e 4K no piloto; HD é recusado mesmo sendo Resolution válida.
     expect(isOrionResolution('2k')).toBe(true)
+    expect(isOrionResolution('4k')).toBe(true)
     expect(isOrionResolution('hd')).toBe(false)
-    expect(isOrionResolution('4k')).toBe(false)
   })
 })
 
@@ -160,5 +161,34 @@ describe('isInternalRenderRow — bloqueio de promoção pro Spaces', () => {
     expect(isInternalRenderRow({ engine: 'vega', config_snapshot: { internal_test: 1 } })).toBe(false)
     // …mas o motor 'orion' sozinho já basta.
     expect(isInternalRenderRow({ engine: 'orion', is_internal_test: false })).toBe(true)
+  })
+})
+
+describe('preset 4K (teto de 3840 px por lado da Image API)', () => {
+  it('lado maior 3840 — não os 4096 do "4K" de Vega/Pulsar', () => {
+    expect(ORION_LONG_EDGE_4K).toBe(3840)
+    const s = orionTargetSize(1920, 1080, '4k')
+    expect(orionSizeParam(s)).toBe('3840x2160')   // 4K UHD exato em 16:9
+  })
+
+  it('4K tem ~3,5× os pixels do 2K em qualquer aspecto', () => {
+    for (const [w, h] of [[2207, 857], [1920, 1080], [1280, 1600], [1000, 1000]] as [number, number][]) {
+      const a = orionTargetSize(w, h, '2k')
+      const b = orionTargetSize(w, h, '4k')
+      const ratio = (b.width * b.height) / (a.width * a.height)
+      expect(ratio, `${w}x${h}`).toBeGreaterThan(3.3)
+      expect(ratio, `${w}x${h}`).toBeLessThan(3.7)
+      // Continua válido pro fornecedor: múltiplo de 16 e dentro do teto.
+      expect(b.width % 16).toBe(0)
+      expect(b.height % 16).toBe(0)
+      expect(Math.max(b.width, b.height)).toBeLessThanOrEqual(3840)
+    }
+  })
+
+  it('default continua 2K — quem não pede resolução não paga 4K sem querer', () => {
+    expect(orionTargetSize(1920, 1080)).toEqual(orionTargetSize(1920, 1080, '2k'))
+    expect(orionResolutionOrDefault(undefined)).toBe('2k')
+    expect(orionResolutionOrDefault('hd')).toBe('2k')
+    expect(orionResolutionOrDefault('4k')).toBe('4k')
   })
 })
