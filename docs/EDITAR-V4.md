@@ -122,6 +122,48 @@ Nada disso chama modelo. Custo zero, resposta em milissegundos.
 `R` retângulo · `H`/espaço mover · `Ctrl+Z`/`Ctrl+Shift+Z` desfazer/refazer ·
 `Ctrl+D` desmarcar · `Ctrl+Shift+I` inverter.
 
+## A tela
+
+Crítica do dono na primeira olhada: *"simples e ao mesmo tempo poluído (excesso
+de texto nos botões) e poucas funções, quero mais apple glass style"*. As três
+partes tinham causas diferentes.
+
+**O texto.** As ações eram cartões de duas linhas — título mais uma nota
+("Piso, parede, bancada, marcenaria"). Cinco ações davam dez linhas de texto
+para escolher uma coisa só, e ainda havia rótulo de campo e um parágrafo de
+dica embaixo. Agora a ação é um **segmentado de uma linha** com uma palavra
+cada (Material · Remover · Inserir · Substituir · Refinar), que é o que o
+próprio contrato de design manda para o eixo que reconfigura o resto
+(`docs/VIDRO-NO-APP.md`, seção 3, item 4). A nota morreu porque o exemplo
+dentro do campo de texto ensina a mesma coisa no momento em que a pessoa vai
+escrever. O rótulo do campo morreu porque o segmentado logo acima já disse o
+assunto. E a dica só aparece quando é **bloqueio** — quando a ação exige
+seleção e não há nenhuma; nas outras, quem conta o estado é o próprio palco
+("nada selecionado" / "12% selecionado"). Saiu de ~14 linhas de texto na
+superfície para 5.
+
+**O vidro.** Não era gosto, eram dois defeitos mecânicos. O `/app/editar`
+envolve o editor num `<main>` com `background: var(--color-bg)` — cor chapada
+que pinta por cima do papel de parede do `<Ambient/>`; e o palco do canvas
+tinha fundo sólido. Vidro sem nada atrás é cinza. Agora: o V4 sai antes desse
+`<main>` no fork, o palco é **transparente**, a tela chama
+`useAmbient(imagem)` — o papel de parede passa a ser o próprio render, borrado
+— e a imagem ganha sombra para flutuar sobre ele. O painel virou **uma
+superfície de vidro contínua** (`.spn-glass--chrome`) que abraça o próprio
+conteúdo em vez de esticar: esticado, abria um vazio de ~200 px entre a última
+linha e o dock.
+
+**O canvas parou de repintar à toa.** O item 6 do contrato proíbe vidro sobre
+canvas que repinta em rAF, e as barras de ferramentas flutuam sobre o palco.
+O laço agora só pinta quando algo mudou, e o tracejado anda a ~12 fps em vez de
+60. Medido no browser: **0 repinturas em 2 s com a tela parada** (antes eram
+todas as que o rAF permitisse).
+
+**`?source=`.** A página aceita uma imagem já escolhida em outra tela, com a
+mesma allowlist de origem que a rota de edição usa — é o contrato que o
+`/app/upscale` já tinha, e é o que permite um "editar esta imagem" vindo do
+Histórico ou do resultado de um render.
+
 ## O motor
 
 ModelArk primeiro, fal como **fallback por erro** — nunca em paralelo: hedge
@@ -176,6 +218,10 @@ continua grátis — a decisão passou a ser do usuário.
 | `EDIT_V4_NORMALIZER` | on | Traduz a instrução PT→EN. Depende do Gemini; degrada sozinho. |
 | `EDIT_V4_SEMANTIC_GATE` | on | Verificação visual pós-geração. Mesma dependência. |
 | `EDIT_V4_DEBUG` | off | Expõe o bloco `debug` (rota, USD, métricas). |
+
+O preço em nodes desce da página como prop (`nodesPerEdit`), derivado por
+`nodesForEdit()` — não é buscado por uma chamada seca à API, que só criava um
+estado "— nodes" na tela enquanto a resposta não chegava.
 
 Obrigatórias para o motor: `ARK_API_KEY` (rota ark), `FAL_KEY` (rota fal /
 fallback), `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`.

@@ -25,6 +25,7 @@ import { DEFAULT_WAND_OPTIONS, type WandOptions } from './selection/magic-wand'
 import {
   ChoiceGroup,
   RowIcon,
+  Segmented,
   SettingGroup,
   SettingRow,
   Sheet,
@@ -44,8 +45,16 @@ type EdgeSoftness = 'hard' | 'soft'
 
 interface ActionDef {
   id: Action
+  /** Nome completo — usado só onde há espaço (mensagens de erro). */
   label: string
-  note: string
+  /** UMA palavra. É o que aparece na tela.
+   *
+   *  Os cartões de duas linhas que estavam aqui somavam dez linhas de texto
+   *  para escolher uma coisa só. A nota de cada cartão ("Piso, parede,
+   *  bancada, marcenaria") ensina na primeira vez e vira ruído em todas as
+   *  outras — e o exemplo dentro do campo de texto já ensina a mesma coisa,
+   *  no momento em que a pessoa vai escrever. */
+  short: string
   placeholder: string
   ref: 'material' | 'object' | null
   refLabel?: string
@@ -58,17 +67,17 @@ const ACTIONS: ActionDef[] = [
   {
     id: 'swap_material',
     label: 'Trocar material',
-    note: 'Piso, parede, bancada, marcenaria',
+    short: 'Material',
     placeholder: 'Ex.: trocar o piso por porcelanato amadeirado',
     ref: 'material',
-    refLabel: 'Usar referência de material',
+    refLabel: 'Material de referência',
     requiresSelection: false,
     defaultEdge: 'soft',
   },
   {
     id: 'remove',
     label: 'Remover',
-    note: 'Tira um objeto da cena',
+    short: 'Remover',
     placeholder: 'Ex.: retirar o tapete da sala',
     ref: null,
     requiresSelection: false,
@@ -76,28 +85,28 @@ const ACTIONS: ActionDef[] = [
   },
   {
     id: 'insert_element',
-    label: 'Inserir',
-    note: 'Vegetação, mobiliário, detalhes',
+    label: 'Inserir elemento',
+    short: 'Inserir',
     placeholder: 'Ex.: inserir um vaso com planta no canto',
     ref: 'object',
-    refLabel: 'Usar imagem de referência',
+    refLabel: 'Objeto de referência',
     requiresSelection: true,
     defaultEdge: 'soft',
   },
   {
     id: 'replace_object',
-    label: 'Substituir',
-    note: 'Troca um objeto por outro',
+    label: 'Substituir objeto',
+    short: 'Substituir',
     placeholder: 'Ex.: trocar este sofá por um de couro caramelo',
     ref: 'object',
-    refLabel: 'Usar imagem de referência',
+    refLabel: 'Objeto de referência',
     requiresSelection: true,
     defaultEdge: 'soft',
   },
   {
     id: 'refine_area',
-    label: 'Refinar',
-    note: 'Corrige falhas e artefatos',
+    label: 'Refinar área',
+    short: 'Refinar',
     placeholder: 'Ex.: corrigir a textura da parede do fundo',
     ref: null,
     requiresSelection: false,
@@ -128,7 +137,22 @@ interface HistItem {
   kind: 'original' | 'result'
 }
 
-export function EditV4Flow({ initialBalance }: { initialBalance: number }) {
+export function EditV4Flow({
+  initialBalance,
+  initialSourceUrl,
+  nodesPerEdit,
+}: {
+  initialBalance: number
+  /** Preço de uma edição, já derivado no servidor (lib/edit-v4/pricing). Vem
+   *  como prop e não por uma consulta seca à API porque é constante: pedir pela
+   *  rede só criava um estado "— nodes" enquanto a resposta não chegava, e um
+   *  jeito de o preço sumir da tela se a chamada falhasse. */
+  nodesPerEdit: number
+  /** Imagem já escolhida em OUTRA tela (`?source=` — o mesmo contrato que o
+   *  /app/upscale já usa). Chega validada pela página; aqui é só o ponto de
+   *  partida, e o usuário pode trocar por outra a qualquer momento. */
+  initialSourceUrl?: string | null
+}) {
   const canvasRef = useRef<EditV4CanvasHandle | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const refInputRef = useRef<HTMLInputElement | null>(null)
@@ -159,7 +183,6 @@ export function EditV4Flow({ initialBalance }: { initialBalance: number }) {
   const [elapsed, setElapsed] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
-  const [nodes, setNodes] = useState<number | null>(null)
   const [balance, setBalance] = useState(initialBalance)
   const [result, setResult] = useState<ResultState | null>(null)
   const [history, setHistory] = useState<HistItem[]>([])
@@ -180,23 +203,9 @@ export function EditV4Flow({ initialBalance }: { initialBalance: number }) {
     return () => cancelAnimationFrame(raf)
   }, [])
 
-  // Custo: uma consulta seca, sem chamada paga e sem telemetria.
-  useEffect(() => {
-    let cancelled = false
-    fetch('/api/edit-v4', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'swap_material', dry_run: true }),
-    })
-      .then(r => r.json())
-      .then(j => {
-        if (!cancelled && typeof j?.nodes_cost === 'number') setNodes(j.nodes_cost)
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [])
+  // A semeadura da imagem inicial vive logo abaixo de applySource — a ordem de
+  // declaração importa e é o motivo de ela não estar aqui em cima com os
+  // outros efeitos.
 
   useEffect(() => {
     if (busy !== 'generate') return
@@ -269,6 +278,15 @@ export function EditV4Flow({ initialBalance }: { initialBalance: number }) {
     setWandAvailable(true)
     setHistory(h => (keepHistory ? [...h, { url, kind: 'result' }] : [{ url, kind: 'original' }]))
   }, [])
+
+  // Imagem vinda de outra tela (`?source=`). Uma vez só: se a pessoa trocar de
+  // imagem, a URL na barra de endereço não pode puxá-la de volta.
+  const seededRef = useRef(false)
+  useEffect(() => {
+    if (!initialSourceUrl || seededRef.current) return
+    seededRef.current = true
+    void applySource(initialSourceUrl)
+  }, [applySource, initialSourceUrl])
 
   const handlePickSource = useCallback(
     async (file: File) => {
@@ -662,38 +680,42 @@ export function EditV4Flow({ initialBalance }: { initialBalance: number }) {
           )}
         </div>
 
-        {/* ── Painel ── */}
-        <div className="edv4-panel">
+        {/* ── Painel ──
+            Uma superfície de vidro só, do topo ao dock. É "chrome" e não vidro
+            comum porque precisa segurar leitura de texto por cima do papel de
+            parede (docs/VIDRO-NO-APP.md). */}
+        <div className="edv4-panel spn-glass spn-glass--chrome">
           <div className="edv4-panel-scroll">
-            <ChoiceGroup
+            <Segmented
+              className="edv4-actions"
               label="O que deseja fazer"
-              cols={2}
               value={action}
               onChange={v => {
                 setAction(v)
                 setEdge(null)
                 setReferenceUrl(null)
               }}
-              options={ACTIONS.map(a => ({ value: a.id, title: a.label, note: a.note }))}
+              items={ACTIONS.map(a => ({ value: a.id, label: a.short }))}
             />
 
-            <div style={{ marginTop: 16 }}>
-              <label className="spn-field-label" htmlFor="edv4-instr">Descreva a mudança</label>
-              <textarea
-                id="edv4-instr"
-                className="spn-textarea"
-                rows={3}
-                value={instruction}
-                onChange={e => setInstruction(e.target.value)}
-                placeholder={actionDef.placeholder}
-                disabled={generating}
-              />
-              <p className="spn-hint">
-                {actionDef.requiresSelection
-                  ? 'Marque a área na imagem — é ela que diz onde a mudança acontece.'
-                  : 'Marque uma área para mirar só nela. Sem marcação, a IA localiza o alvo pela descrição.'}
-              </p>
-            </div>
+            {/* Sem rótulo em cima do campo: o exemplo dentro dele já diz o que
+                escrever, e o segmentado logo acima já disse o assunto. */}
+            <textarea
+              className="spn-textarea edv4-instr"
+              aria-label="Descreva a mudança"
+              rows={3}
+              value={instruction}
+              onChange={e => setInstruction(e.target.value)}
+              placeholder={actionDef.placeholder}
+              disabled={generating}
+            />
+            {/* A dica só aparece quando é BLOQUEIO. Nas ações em que marcar é
+                opcional, quem conta o estado da seleção é o próprio palco
+                ("nada selecionado" / "12% selecionado") — repetir aqui era
+                texto sobre texto. */}
+            {actionDef.requiresSelection && !hasSelection && (
+              <p className="edv4-need">Marque o alvo na imagem</p>
+            )}
 
             {actionDef.ref && (
               <div style={{ marginTop: 12 }}>
@@ -722,11 +744,9 @@ export function EditV4Flow({ initialBalance }: { initialBalance: number }) {
               <SettingRow
                 icon={<RowIcon name="area" />}
                 title="Seleção"
-                value={summarize([
-                  `Tolerância ${wand.tolerance}`,
-                  wand.contiguous ? '' : 'toda a imagem',
-                  hasSelection ? `${coveragePct < 1 ? '<1' : coveragePct}% marcado` : '',
-                ])}
+                value={
+                  hasSelection ? `${coveragePct < 1 ? '<1' : coveragePct}% marcado` : 'Nada marcado'
+                }
                 onOpen={() => setSheet('selecao')}
                 controls="edv4-sheet-selecao"
               />
@@ -734,9 +754,8 @@ export function EditV4Flow({ initialBalance }: { initialBalance: number }) {
                 icon={<RowIcon name="precision" />}
                 title="Precisão"
                 value={summarize([
-                  preservation === 'maximum' ? 'Preserva o máximo' : 'Preservação padrão',
+                  preservation === 'maximum' ? 'Preserva o máximo' : 'Padrão',
                   intensity === 'standard' ? '' : intensity === 'subtle' ? 'sutil' : 'forte',
-                  effectiveEdge === 'soft' ? 'borda macia' : 'borda exata',
                 ])}
                 onOpen={() => setSheet('precisao')}
                 controls="edv4-sheet-precisao"
@@ -750,7 +769,7 @@ export function EditV4Flow({ initialBalance }: { initialBalance: number }) {
           {/* O CTA vive no dock — nunca some no scroll. */}
           <div className="spn-dock">
             <div className="spn-cost">
-              <span>{nodes ?? '—'} nodes</span>
+              <span>{nodesPerEdit} nodes</span>
               <span className="spn-balance">Saldo: {balance} nodes</span>
             </div>
             <button
@@ -921,10 +940,17 @@ const EDV4_CSS = `
 .edv4-link:hover { color: var(--color-text); }
 .edv4-a { color: var(--color-text-secondary); text-decoration: underline; text-underline-offset: 3px; }
 
-.edv4-grid { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 16px; align-items: stretch; }
+/* align-items: start — o painel abraça o próprio conteúdo em vez de esticar
+   até a altura do palco. Esticado, ele abria um vazio de uns 200px entre a
+   última linha de ajuste e o dock, e um cartão com um buraco no meio parece
+   uma tela inacabada. O teto de altura mantém o dock visível quando o conteúdo
+   cresce (erro, referência, aviso). */
+.edv4-grid { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 16px; align-items: start; }
 @media (max-width: 1100px) { .edv4-grid { grid-template-columns: 1fr; } }
 
 .edv4-stage { position: relative; min-height: 62vh; height: 72vh; }
+/* Nada de fundo aqui: o papel de parede do <Ambient/> tem que aparecer em volta
+   da imagem. É o que faz o vidro das barras flutuantes ter o que refratar. */
 @media (max-width: 1100px) { .edv4-stage { height: 58vh; } }
 
 .edv4-tools, .edv4-selactions, .edv4-status, .edv4-brush {
@@ -962,11 +988,36 @@ const EDV4_CSS = `
 
 .edv4-panel {
   display: flex; flex-direction: column; min-height: 0;
+  max-height: 72vh;
   border-radius: var(--r-card); overflow: hidden;
 }
-.edv4-panel-scroll { flex: 1; overflow-y: auto; padding: 2px 2px 14px; min-height: 0; }
-.edv4-group { margin-top: 16px; }
+.edv4-panel-scroll { flex: 1; overflow-y: auto; padding: 14px 14px 16px; min-height: 0; }
+.edv4-group { margin-top: 14px; }
 .edv4-notice { font-size: 12px; color: var(--color-text-secondary); margin-top: 12px; }
+
+/* Cinco palavras em 380px: o segmentado padrão tem 14px de respiro em cada
+   célula, o que estoura a largura. Aqui a geometria é mais apertada — é a única
+   coisa que esta tela muda no controle. */
+.edv4-actions .spn-seg-btn { padding: 0 9px; font-size: 12px; }
+
+.edv4-instr { margin-top: 12px; }
+
+/* Aviso de bloqueio, não dica: só aparece quando a ação EXIGE seleção e não há
+   nenhuma. Por isso tem cor de atenção e não de texto terciário. */
+.edv4-need {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.edv4-need::before {
+  content: '';
+  width: 5px; height: 5px; border-radius: 99px;
+  background: var(--color-accent-green);
+  flex-shrink: 0;
+}
 
 .edv4-ref { display: flex; align-items: center; gap: 10px; }
 .edv4-ref img { width: 44px; height: 44px; object-fit: cover; border-radius: 9px; }

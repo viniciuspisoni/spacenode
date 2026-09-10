@@ -65,6 +65,10 @@ const MAX_ZOOM = 12
 const CLOSE_THRESHOLD_PX = 14
 /** Teto de estados de undo. Em RLE cada um custa alguns KB, não alguns MB. */
 const HISTORY_LIMIT = 40
+/** Passo do tracejado: ~12 fps. A 60 fps o formigueiro não fica mais bonito —
+ *  fica cinco vezes mais caro, porque cada quadro obriga o vidro por cima a
+ *  refazer o borrão. */
+const ANTS_STEP_MS = 80
 
 type Pt = { x: number; y: number }
 
@@ -128,6 +132,9 @@ export const EditV4Canvas = forwardRef<EditV4CanvasHandle, Props>(function EditV
   const panRef = useRef<Pt>({ x: 0, y: 0 })
   const dashRef = useRef(0)
   const rafRef = useRef(0)
+  /** Alguma coisa mudou desde a última pintura? */
+  const dirtyRef = useRef(true)
+  const lastAntsRef = useRef(0)
 
   const dragRef = useRef<
     | { kind: 'pan'; startX: number; startY: number; panX: number; panY: number }
@@ -142,7 +149,10 @@ export const EditV4Canvas = forwardRef<EditV4CanvasHandle, Props>(function EditV
 
   const [ready, setReady] = useState(false)
   const [, tick] = useState(0)
-  const bump = useCallback(() => tick(n => n + 1), [])
+  const bump = useCallback(() => {
+    dirtyRef.current = true
+    tick(n => n + 1)
+  }, [])
 
   // Os callbacks do pai vivem num ref, e não nas dependências dos hooks.
   //
@@ -317,7 +327,15 @@ export const EditV4Canvas = forwardRef<EditV4CanvasHandle, Props>(function EditV
     ctx.translate(offsetX, offsetY)
     ctx.scale(scale, scale)
 
+    // A sombra é o que separa a imagem do papel de parede borrado atrás dela.
+    // Em unidades de imagem dividido pela escala, para ficar constante na tela
+    // em qualquer zoom.
+    ctx.save()
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.55)'
+    ctx.shadowBlur = 34 / scale
+    ctx.shadowOffsetY = 12 / scale
     ctx.drawImage(img, 0, 0)
+    ctx.restore()
     const overlay = overlayRef.current
     if (overlay) ctx.drawImage(overlay, 0, 0)
 
@@ -402,13 +420,30 @@ export const EditV4Canvas = forwardRef<EditV4CanvasHandle, Props>(function EditV
     }
   }, [brushSize, disabled, tool, viewport])
 
-  // Loop de animação: só corre quando há tracejado para animar.
+  // Laço de animação — e, mais importante, de NÃO-animação.
+  //
+  // Antes ele repintava o canvas 60 vezes por segundo para sempre. Com barras
+  // de vidro flutuando por cima, cada repintura força o `backdrop-filter` a
+  // refazer o borrão: é exatamente o custo que o item 6 do contrato de design
+  // manda evitar. Agora o canvas só repinta quando alguma coisa mudou de fato
+  // — e o tracejado, que é a única animação permanente, anda a ~12 fps em vez
+  // de 60. Parado, o laço custa uma chamada vazia por frame.
   useEffect(() => {
     let running = true
     const loop = () => {
       if (!running) return
-      if (antsRef.current) dashRef.current = (dashRef.current + 0.35) % 9
-      draw()
+      const now = performance.now()
+      let repaint = dirtyRef.current
+      if (antsRef.current && now - lastAntsRef.current >= ANTS_STEP_MS) {
+        dashRef.current = (dashRef.current + 3) % 9
+        lastAntsRef.current = now
+        repaint = true
+      }
+      if (dragRef.current || polyRef.current) repaint = true
+      if (repaint) {
+        draw()
+        dirtyRef.current = false
+      }
       rafRef.current = requestAnimationFrame(loop)
     }
     rafRef.current = requestAnimationFrame(loop)
@@ -421,7 +456,10 @@ export const EditV4Canvas = forwardRef<EditV4CanvasHandle, Props>(function EditV
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
-    const ro = new ResizeObserver(() => draw())
+    const ro = new ResizeObserver(() => {
+      dirtyRef.current = true
+      draw()
+    })
     ro.observe(el)
     return () => ro.disconnect()
   }, [draw])
@@ -584,6 +622,9 @@ export const EditV4Canvas = forwardRef<EditV4CanvasHandle, Props>(function EditV
       if (!ready) return
       const p = toImage(e.clientX, e.clientY)
       cursorRef.current = p
+      // O cursor do pincel é desenhado no canvas, então mover o mouse já é
+      // motivo para repintar mesmo sem gesto em andamento.
+      dirtyRef.current = true
       const drag = dragRef.current
       if (!drag) return
       if (drag.kind === 'pan') {
@@ -886,9 +927,16 @@ export const EditV4Canvas = forwardRef<EditV4CanvasHandle, Props>(function EditV
         overflow: 'hidden',
         touchAction: 'none',
         cursor,
-        // Sólido de propósito: vidro por cima de um canvas que repinta em rAF é
-        // o caso que o contrato de design proíbe (docs/VIDRO-NO-APP.md, item 6).
-        background: 'var(--color-bg-elevated)',
+        // TRANSPARENTE de propósito. Uma cor chapada aqui apagava o papel de
+        // parede do <Ambient/>, e sem nada por trás o vidro das barras
+        // flutuantes vira cinza — era o motivo real de a tela "não parecer
+        // vidro". Agora a imagem flutua sobre a versão borrada dela mesma.
+        //
+        // O item 6 do contrato (nada de vidro sobre canvas que repinta em rAF)
+        // continua respeitado porque o canvas ficou PARADO: ele só repinta
+        // quando há gesto ou tracejado, e o tracejado anda a ~12 fps. Ver o
+        // laço de animação acima.
+        background: 'transparent',
         borderRadius: 'var(--r-card)',
       }}
     >

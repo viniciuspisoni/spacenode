@@ -21,6 +21,8 @@ import { EditV2Flow } from '@/components/editar/EditV2Flow'
 import { EditCleanFlow } from '@/components/editar/EditCleanFlow'
 import { EditV3Flow } from '@/components/edit-v3/EditV3Flow'
 import { EditV4Flow } from '@/components/edit-v4/EditV4Flow'
+import { nodesForEdit } from '@/lib/edit-v4/pricing'
+import { editV4Route } from '@/lib/edit-v4/flags'
 
 export default async function RetocarPage() {
   const supabase = await createClient()
@@ -39,7 +41,7 @@ export default async function RetocarPage() {
   if (process.env.NEXT_PUBLIC_EDIT_V4 === '1') {
     return (
       <div style={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
-        <EditV4Flow initialBalance={balance} />
+        <EditV4Flow initialBalance={balance} nodesPerEdit={nodesForEdit({ provider: editV4Route() })} />
       </div>
     )
   }
