@@ -54,14 +54,17 @@ export function ToolRail({ tool, onTool }: Props) {
   return (
     <nav
       aria-label="Ferramentas"
+      className="spn-glass spn-glass--chrome"
       style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-        padding: '10px 7px', borderRight: '0.5px solid var(--color-border)',
-        flexShrink: 0, background: 'var(--color-bg)',
+        padding: '10px 7px', borderWidth: '0 0.5px 0 0',
+        flexShrink: 0, position: 'relative', zIndex: 2,
       }}
     >
       {TOOLS.map((t) => {
         const active = tool === t.id
+        // Ativo = controle elevado, o mesmo material do polegar do segmentado.
+        // O verde continua sendo só a marca de estado, na linha lateral.
         return (
           <button
             key={t.id}
@@ -69,15 +72,16 @@ export function ToolRail({ tool, onTool }: Props) {
             onClick={() => onTool(t.id)}
             title={`${t.label} — tecla ${t.shortcut}`}
             aria-pressed={active}
+            className={active ? 'spn-glass spn-glass--raised' : undefined}
             style={{
               position: 'relative',
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-              width: 52, padding: '8px 0 6px', borderRadius: 10,
-              border: '0.5px solid transparent',
-              background: active ? 'var(--color-surface-hover)' : 'transparent',
+              width: 52, padding: '8px 0 6px', borderRadius: 'var(--r-inner)',
+              border: active ? undefined : '0.5px solid transparent',
+              background: active ? undefined : 'transparent',
               color: active ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
               cursor: 'pointer',
-              transition: 'background var(--duration-fast), color var(--duration-fast)',
+              transition: 'color 180ms var(--ease)',
             }}
           >
             {/* estado ativo: linha lateral verde de 2px — único verde do trilho */}

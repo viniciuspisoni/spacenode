@@ -63,15 +63,15 @@ export function InsufficientBalancePanel({ count, costPer, total, available, cur
   return (
     <div style={{
       padding: 18, borderRadius: 12,
-      background: 'rgba(186,117,23,0.06)',
-      border: '0.5px solid rgba(186,117,23,0.3)',
+      background: 'var(--color-warning-bg)',
+      border: '0.5px solid var(--color-warning-border)',
       display: 'flex', flexDirection: 'column', gap: 16,
     }}>
       {/* Sua seleção · preservada */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <span style={{
           fontSize: 9, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase',
-          color: '#46d191', background: 'rgba(29,158,117,0.18)',
+          color: 'var(--color-accent-green)', background: 'var(--color-accent-green-bg)',
           padding: '4px 8px', borderRadius: 4,
         }}>
           ✓ Salvo
@@ -113,7 +113,7 @@ export function InsufficientBalancePanel({ count, costPer, total, available, cur
           }} />
         </div>
         <div style={{
-          marginTop: 10, fontSize: 11, color: '#e0a766', fontWeight: 500,
+          marginTop: 10, fontSize: 11, color: 'var(--color-warning)', fontWeight: 500,
         }}>
           Faltam {missing} nodes pra essa geração.
         </div>
@@ -149,7 +149,7 @@ export function InsufficientBalancePanel({ count, costPer, total, available, cur
             <button
               onClick={handleAvulso}
               disabled={submittingAvulso}
-              className="spn-action spn-action--primary"
+              className="spn-cta"
               style={{ width: '100%', padding: '9px 14px', fontSize: 12 }}
             >
               {submittingAvulso ? '…' : 'Comprar pacote · R$ 89'}
@@ -193,7 +193,7 @@ export function InsufficientBalancePanel({ count, costPer, total, available, cur
             </div>
             <Link
               href="/app/billing"
-              className="spn-action spn-action--ghost"
+              className="spn-ghost"
               style={{ width: '100%', padding: '9px 14px', fontSize: 12, textAlign: 'center' }}
             >
               Ver detalhes →

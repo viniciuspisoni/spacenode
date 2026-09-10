@@ -4,6 +4,16 @@ import { useState, useRef, useMemo, useEffect } from 'react'
 import BeforeAfter from '@/components/app/BeforeAfter'
 import { RetocarImportModal } from '@/components/spaces/RetocarImportModal'
 import {
+  ChoiceGroup,
+  RowIcon,
+  Segmented,
+  SettingGroup,
+  SettingRow,
+  Sheet,
+  summarize,
+  useAmbient,
+} from '@/components/app/glass'
+import {
   computeUpscaleCost,
   megapixelsFromDimensions,
   OBJECTIVE_PRESETS,
@@ -20,59 +30,37 @@ import { urlToFile } from '@/lib/http/url-to-file'
 // ── Tipagem da UI (labels sem nomes técnicos de modelo) ───────────────────────
 
 interface ModeDef {
-  id:       ModeId
-  label:    string
-  desc:     string
+  id:    ModeId
+  label: string
+  /** Uma linha só — é a nota do cartão dentro da folha, não um parágrafo. */
+  note:  string
 }
 
 const RESOLUTION_MODES: ModeDef[] = [
-  {
-    id:    'fidelity',
-    label: 'Alta Fidelidade',
-    desc:  'Preserva geometria, materiais, iluminação e detalhes originais. Ideal para renders realistas, portfólio e apresentação.',
-  },
-  {
-    id:    'recover',
-    label: 'Recuperar Imagem Baixa',
-    desc:  'Melhora imagens compactadas, antigas ou com baixa nitidez. Pode reconstruir pequenos detalhes.',
-  },
+  { id: 'fidelity', label: 'Alta Fidelidade',        note: 'Preserva geometria e materiais' },
+  { id: 'recover',  label: 'Recuperar Imagem Baixa', note: 'Reconstrói o que a compressão comeu' },
 ]
 
 const ENHANCE_MODES: ModeDef[] = [
-  {
-    id:    'denoise',
-    label: 'Limpar Ruído',
-    desc:  'Remove granulação e limpa imperfeições visuais.',
-  },
-  {
-    id:    'deblur',
-    label: 'Corrigir Desfoque',
-    desc:  'Recupera nitidez e melhora imagens levemente borradas.',
-  },
-  {
-    id:    'restore',
-    label: 'Restaurar Imagem',
-    desc:  'Restaura imagens degradadas, corrigindo danos e melhorando a aparência geral.',
-  },
-  {
-    id:    'smart',
-    label: 'Melhoria Inteligente',
-    desc:  'Refina a imagem preservando o máximo possível do original.',
-  },
+  { id: 'denoise', label: 'Limpar Ruído',         note: 'Tira granulação' },
+  { id: 'deblur',  label: 'Corrigir Desfoque',    note: 'Devolve nitidez' },
+  { id: 'restore', label: 'Restaurar Imagem',     note: 'Corrige degradação' },
+  { id: 'smart',   label: 'Melhoria Inteligente', note: 'Refino discreto' },
 ]
 
 interface ScaleDef {
   value: Scale
   label: string
   sub:   string
-  locked?: boolean
 }
 
+// 'ultra' saiu. Era um cartão permanentemente desabilitado, com cadeado e
+// title="Em breve", na fileira mais importante da tela: um controle que nunca
+// habilita não é um controle. Quando o pipeline de tiles existir, ele volta.
 const RESOLUTION_SCALES: ScaleDef[] = [
-  { value: '2x',    label: '2×',    sub: '~4K'      },
-  { value: '4x',    label: '4×',    sub: '~8K'      },
-  { value: '8x',    label: '8×',    sub: 'até 16K'  },
-  { value: 'ultra', label: 'Ultra', sub: 'até 16K', locked: true },
+  { value: '2x', label: '2×', sub: '~4K'     },
+  { value: '4x', label: '4×', sub: '~8K'     },
+  { value: '8x', label: '8×', sub: 'até 16K' },
 ]
 
 // Smart usa 2x/4x; denoise/deblur/restore ficam em 'none'.
@@ -81,17 +69,16 @@ const SMART_SCALES: ScaleDef[] = [
   { value: '4x', label: '4×', sub: 'forte'    },
 ]
 
-interface ObjectiveDef {
-  id:    ObjectiveId
-  label: string
-}
-
-const OBJECTIVES: ObjectiveDef[] = [
-  { id: 'client',    label: 'Apresentação para cliente' },
-  { id: 'portfolio', label: 'Portfólio / Instagram'     },
-  { id: 'print',     label: 'Impressão / prancha'       },
-  { id: 'recover',   label: 'Recuperar imagem baixa'    },
-  { id: 'final',     label: 'Entrega final premium'     },
+// O objetivo é o único campo desta tela escrito na língua do arquiteto — e é
+// ele que preenche aba, modo e escala de uma vez (OBJECTIVE_PRESETS). Por isso
+// virou a superfície, em cartão: título é o trabalho, nota é o que ele resolve.
+// Aba/modo/escala são o EFEITO dele e foram para a folha.
+const OBJECTIVES: { value: ObjectiveId; title: string; note: string }[] = [
+  { value: 'client',    title: 'Apresentação para cliente', note: 'Nítida na tela e no PDF'     },
+  { value: 'portfolio', title: 'Portfólio / Instagram',     note: 'Aguenta o zoom do feed'      },
+  { value: 'print',     title: 'Impressão / prancha',       note: 'Densidade para papel'        },
+  { value: 'recover',   title: 'Recuperar imagem baixa',    note: 'Imagem antiga ou comprimida' },
+  { value: 'final',     title: 'Entrega final premium',     note: 'Máximo acabamento'           },
 ]
 
 const LOADING_TEXTS_RESOLUTION = [
@@ -134,6 +121,10 @@ interface UpscaleClientProps {
   sourceUrl?: string
 }
 
+// Toda família tem de funcionar sem ninguém tocar nela: a tela abre com um
+// objetivo já escolhido, e ele é quem define aba/modo/escala iniciais.
+const DEFAULT_OBJECTIVE: ObjectiveId = 'client'
+
 export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClientProps) {
   // Image state
   const [imageFile,       setImageFile]       = useState<File | null>(null)
@@ -141,11 +132,12 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
   const [imageDimensions, setImageDimensions] = useState<{ w: number; h: number } | null>(null)
   const [isDragging,      setIsDragging]      = useState(false)
 
-  // Tab + mode + scale + objective
-  const [tab,              setTab]              = useState<UpscaleTab>('resolution')
-  const [selectedModeId,   setSelectedModeId]   = useState<ModeId>('fidelity')
-  const [selectedScale,    setSelectedScale]    = useState<Scale>('4x')
-  const [selectedObjective, setSelectedObjective] = useState<ObjectiveId | null>(null)
+  // Objetivo (superfície) + os três efeitos dele (folha de ajuste fino).
+  const [selectedObjective, setSelectedObjective] = useState<ObjectiveId>(DEFAULT_OBJECTIVE)
+  const [tab,            setTab]            = useState<UpscaleTab>(OBJECTIVE_PRESETS[DEFAULT_OBJECTIVE].tab)
+  const [selectedModeId, setSelectedModeId] = useState<ModeId>(OBJECTIVE_PRESETS[DEFAULT_OBJECTIVE].modeId)
+  const [selectedScale,  setSelectedScale]  = useState<Scale>(OBJECTIVE_PRESETS[DEFAULT_OBJECTIVE].scale)
+  const [tuneOpen,       setTuneOpen]       = useState(false)
 
   // Recommendation
   const [recommended, setRecommended] = useState<{ modeId: ModeId; reason: string } | null>(null)
@@ -174,6 +166,11 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
   const loadingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const analyzeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // O papel de parede passa a ser a imagem em jogo — o resultado assim que ele
+  // sai, o original enquanto não há resultado. É o que faz o painel assumir a
+  // paleta do projeto, como no plugin.
+  useAmbient(resultUrl ?? imagePreview)
+
   // ── Derivações ─────────────────────────────────────────────────────────────
 
   const modes = tab === 'resolution' ? RESOLUTION_MODES : ENHANCE_MODES
@@ -183,13 +180,13 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
   )
 
   // Aba Aprimorar: escolha de escala depende do modo.
-  //   - denoise / deblur / restore → fixo em 'none' (sem aumento)
+  //   - denoise / deblur / restore → fixo em 'none' (sem aumento; sem controle)
   //   - smart                     → escolha entre 2× e 4×
-  // Aba Resolução: sempre o conjunto completo (2/4/8/ultra).
+  // Aba Resolução: sempre o conjunto completo (2/4/8).
   const availableScales: ScaleDef[] = useMemo(() => {
     if (tab === 'resolution') return RESOLUTION_SCALES
     if (selectedModeId === 'smart') return SMART_SCALES
-    return [{ value: 'none', label: 'Sem aumento', sub: 'resolução original' }]
+    return []
   }, [tab, selectedModeId])
 
   const megapixels = useMemo(
@@ -210,6 +207,27 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
   const nodeCost  = costBreakdown.total
   const canSubmit = !!imageFile && credits >= nodeCost && !isLoading
 
+  const scaleLabel = selectedScale === 'none'
+    ? ''
+    : availableScales.find(s => s.value === selectedScale)?.label ?? selectedScale
+  // Regra do resumo: entra o que o usuário ESCOLHEU. "Sem aumento" é o default
+  // silencioso dos modos de Aprimorar — some, e a linha fica só com o modo.
+  const tuneSummary = summarize([activeMode.label, scaleLabel])
+
+  // O objetivo é a ETIQUETA de um preset de aba+modo+escala. Quem mexe no
+  // ajuste fino desfaz esse vínculo — e antes disso o HEAD zerava o objetivo
+  // (`setSelectedObjective(null)` em applyTab/applyObjective), de modo que
+  // `objectiveId` nunca viajava contradizendo o que foi de fato pedido. Aqui o
+  // objetivo continua na tela (é o eixo da superfície), então o que sai do
+  // payload é a etiqueta: `upscale_meta.objective_id` (app/api/upscale/route.ts)
+  // é o único sinal de POR QUE o usuário ampliou; gravar "Impressão" numa
+  // ampliação 2×/Recuperar envenena esse dado.
+  const objectivePreset = OBJECTIVE_PRESETS[selectedObjective]
+  const objectiveInSync =
+    objectivePreset.tab === tab &&
+    objectivePreset.modeId === selectedModeId &&
+    objectivePreset.scale === selectedScale
+
   // ── Handlers ───────────────────────────────────────────────────────────────
 
   function applyTab(next: UpscaleTab) {
@@ -219,7 +237,6 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
     const nextScale = defaultScaleForMode(next, nextMode)
     setSelectedModeId(nextMode)
     setSelectedScale(nextScale)
-    setSelectedObjective(null)
   }
 
   function applyMode(next: ModeId) {
@@ -232,9 +249,8 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
 
   function applyObjective(id: ObjectiveId) {
     const preset = OBJECTIVE_PRESETS[id]
-    setSelectedObjective(selectedObjective === id ? null : id)
-    if (selectedObjective === id) return
-    if (preset.tab !== tab) setTab(preset.tab)
+    setSelectedObjective(id)
+    setTab(preset.tab)
     setSelectedModeId(preset.modeId)
     setSelectedScale(preset.scale)
   }
@@ -264,10 +280,10 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
     analyzeTimerRef.current = setTimeout(() => {
       const rec = analyzeFile({ fileName: file.name, fileSize: file.size })
       setRecommended({ modeId: rec.modeId, reason: rec.reason })
-      // Aplica a recomendação como ponto de partida.
-      if (rec.tab !== tab) setTab(rec.tab)
-      setSelectedModeId(rec.modeId)
-      setSelectedScale(rec.scale)
+      // A análise agora fala a mesma língua da tela: move o OBJETIVO, não três
+      // controles soltos. E só age quando discorda de verdade — imagem
+      // comprimida pede Recuperar; nos demais casos o objetivo já resolveu.
+      if (rec.modeId === 'recover') applyObjective('recover')
       setIsAnalyzing(false)
     }, 400)
   }
@@ -307,11 +323,19 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
     if (sourcePreloadedRef.current || !sourceUrl || imageFile) return
     if (!/^https:\/\//i.test(sourceUrl)) return
     sourcePreloadedRef.current = true
-    setIsImporting(true)
-    urlToFile(sourceUrl)
-      .then(file => loadImageFile(file))
-      .catch(() => setError('Não foi possível carregar a imagem selecionada.'))
-      .finally(() => setIsImporting(false))
+    // O setState vive dentro do fluxo assíncrono da importação, não no corpo
+    // do efeito: chamado direto ali, ele dispara uma cascata de render (e o
+    // lint do react-hooks reprova).
+    void (async () => {
+      setIsImporting(true)
+      try {
+        loadImageFile(await urlToFile(sourceUrl))
+      } catch {
+        setError('Não foi possível carregar a imagem selecionada.')
+      } finally {
+        setIsImporting(false)
+      }
+    })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourceUrl])
 
@@ -369,7 +393,8 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
           tab,
           modeId: selectedModeId,
           scale:  selectedScale,
-          ...(selectedObjective ? { objectiveId: selectedObjective } : {}),
+          // Opcional, como sempre foi: só vai quando ainda descreve o pedido.
+          ...(objectiveInSync ? { objectiveId: selectedObjective } : {}),
           ...(imageDimensions ? { imageWidth: imageDimensions.w, imageHeight: imageDimensions.h } : {}),
         }),
       })
@@ -404,76 +429,48 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
     }
   })()
 
+  // .spn-ghost não fixa display — num <a> a altura só pega com flex.
+  const ghostLink: React.CSSProperties = {
+    display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none',
+  }
+
   return (
-    <div style={{ display: 'flex', width: '100%', height: '100%', overflow: 'hidden', background: 'var(--color-bg)', color: 'var(--color-text-primary)' }}>
+    <div className="spn-tool">
       <style>{`
         @keyframes spin   { to { transform: rotate(360deg); } }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
 
-      {/* ── Left panel ──────────────────────────────────────────────────────── */}
-      <div style={{ width: 420, flexShrink: 0, display: 'flex', flexDirection: 'column', borderRight: '0.5px solid var(--color-border)', overflow: 'hidden' }}>
+      {/* ── Painel ──────────────────────────────────────────────────────────── */}
+      <section className="spn-tool-panel spn-glass spn-glass--chrome">
+        <div className="spn-tool-panel-body">
+          <h1 style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--color-text-primary)' }}>
+            Ampliar
+          </h1>
+          <p style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginTop: 4, marginBottom: 18, lineHeight: 1.5 }}>
+            Diga para que serve a imagem — o resto vem decidido.
+          </p>
 
-        <div style={{ padding: '24px 24px 0', flexShrink: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--color-text-primary)' }}>Ampliar imagem</div>
-          <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 3 }}>
-            Aumente a resolução ou aprimore a qualidade da imagem.
-          </div>
-
-          {/* Tabs */}
-          <div style={{ marginTop: 16, display: 'flex', gap: 2, borderBottom: '0.5px solid var(--color-border)' }}>
-            {([
-              { id: 'resolution', label: 'Resolução' },
-              { id: 'enhance',    label: 'Aprimorar' },
-            ] as { id: UpscaleTab; label: string }[]).map(t => {
-              const active = tab === t.id
-              return (
-                <button key={t.id} onClick={() => applyTab(t.id)}
-                  style={{
-                    flex: 1, background: 'none', border: 'none',
-                    padding: '10px 0 12px', cursor: 'pointer',
-                    color: active ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
-                    fontSize: 12, fontWeight: 500, letterSpacing: '-0.01em',
-                    position: 'relative',
-                    transition: 'color 0.15s',
-                  }}
-                >
-                  {t.label}
-                  {active && (
-                    <span style={{
-                      position: 'absolute', bottom: -0.5, left: 0, right: 0,
-                      height: 1.5, background: 'var(--color-text-primary)', borderRadius: 2,
-                    }} />
-                  )}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 24 }}>
-
-          {/* Upload */}
-          <div>
-            <label style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 10 }}>
-              Imagem
-            </label>
+          {/* Imagem: campo obrigatório, fica na superfície. */}
+          <div className="spn-field">
+            <span className="spn-field-label">Imagem</span>
             <div
               onClick={() => fileInputRef.current?.click()}
               onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
               onDragLeave={() => setIsDragging(false)}
               onDrop={(e) => { e.preventDefault(); setIsDragging(false); const f = e.dataTransfer.files[0]; if (f) loadImageFile(f) }}
               style={{
-                border: `1.5px dashed ${isDragging ? 'var(--color-border-focus)' : imageFile ? 'var(--color-border-strong)' : 'var(--color-border-strong)'}`,
-                borderRadius: 10, overflow: 'hidden', cursor: 'pointer',
-                transition: 'border-color 0.15s',
-                background: isDragging ? 'var(--color-surface)' : 'var(--color-upload-area)',
+                border: `1px dashed ${isDragging ? 'var(--color-border-focus)' : 'var(--glass-line-strong)'}`,
+                borderRadius: 'var(--r-inner)', overflow: 'hidden', cursor: 'pointer',
+                transition: 'border-color 180ms var(--ease)',
+                background: isDragging ? 'var(--color-chip-hover)' : 'var(--color-chip)',
                 minHeight: imageFile ? 0 : 120,
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                 padding: imageFile ? 0 : '28px 20px',
               }}
             >
               {imageFile ? (
+                // eslint-disable-next-line @next/next/no-img-element
                 <img src={imagePreview!} alt="preview" style={{ width: '100%', display: 'block', maxHeight: 200, objectFit: 'cover' }} />
               ) : (
                 <>
@@ -482,22 +479,22 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
                     <polyline points="17 8 12 3 7 8"/>
                     <line x1="12" y1="3" x2="12" y2="15"/>
                   </svg>
-                  <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 10 }}>Arraste ou clique para enviar</span>
-                  <span style={{ fontSize: 10, color: 'var(--color-text-quaternary)', marginTop: 4 }}>PNG, JPG, WEBP — até 20 MB</span>
+                  <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginTop: 10 }}>Arraste ou clique para enviar</span>
+                  <span style={{ fontSize: 11, color: 'var(--color-text-quaternary)', marginTop: 4 }}>PNG, JPG, WEBP — até 20 MB</span>
                 </>
               )}
             </div>
 
             {imageFile && (
-              <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', display: 'flex', gap: 8 }}>
-                  {imageDimensions && <span>{imageDimensions.w}×{imageDimensions.h}px</span>}
-                  {ext && <span>{ext}</span>}
-                  <span>{formatFileSize(imageFile.size)}</span>
-                </div>
-                <button onClick={(e) => { e.stopPropagation(); resetImage() }}
-                  style={{ fontSize: 10, color: 'var(--color-text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                  Trocar imagem
+              <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                <span className="spn-hint" style={{ marginTop: 0 }}>
+                  {imageDimensions ? `${imageDimensions.w}×${imageDimensions.h}px · ` : ''}
+                  {ext ? `${ext} · ` : ''}
+                  {formatFileSize(imageFile.size)}
+                </span>
+                <button type="button" className="spn-ghost" style={{ height: 28, padding: '0 11px', fontSize: 11.5, flexShrink: 0 }}
+                  onClick={(e) => { e.stopPropagation(); resetImage() }}>
+                  Trocar
                 </button>
               </div>
             )}
@@ -505,227 +502,118 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
             <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }}
               onChange={(e) => { const f = e.target.files?.[0]; if (f) loadImageFile(f) }} />
 
-            <button
-              onClick={() => setShowImportModal(true)}
-              disabled={isImporting}
-              style={{
-                marginTop: 10, width: '100%', padding: '8px 0', borderRadius: 7,
-                border: '1px solid var(--color-border)',
-                background: 'transparent',
-                fontSize: 11, color: 'var(--color-text-tertiary)',
-                cursor: isImporting ? 'wait' : 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                transition: 'border-color 0.15s, color 0.15s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--color-border-strong)'; e.currentTarget.style.color = 'var(--color-text-secondary)' }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.color = 'var(--color-text-tertiary)' }}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+            <button type="button" className="spn-ghost"
+              style={{ width: '100%', marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+              onClick={() => setShowImportModal(true)} disabled={isImporting}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
                 <circle cx="12" cy="12" r="9"/>
                 <path d="M12 7v5l3 3"/>
               </svg>
               {isImporting ? 'Importando…' : 'Importar do histórico'}
             </button>
+
+            {/* A análise do arquivo virou uma dica: ela sugere, o objetivo
+                decide. A faixa verde saiu — verde é estado, não recomendação. */}
+            {isAnalyzing ? (
+              <p className="spn-hint">Analisando a imagem…</p>
+            ) : recommended ? (
+              <p className="spn-hint">{recommended.reason}</p>
+            ) : null}
           </div>
 
-          {/* Recommendation banner */}
-          {isAnalyzing ? (
-            <div style={{ padding: '8px 10px', borderRadius: 6, background: 'var(--color-surface)', border: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', border: '1.5px solid var(--color-border-strong)', borderTop: '1.5px solid var(--color-text-secondary)', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
-              <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>Analisando imagem...</span>
-            </div>
-          ) : !imageFile ? (
-            <div style={{ padding: '10px 12px', borderRadius: 6, background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
-              <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', lineHeight: 1.5 }}>
-                Envie uma imagem para a SpaceNode analisar e sugerir o melhor caminho.
-              </div>
-            </div>
-          ) : recommended ? (
-            <div style={{ padding: '10px 12px', borderRadius: 8, background: 'var(--color-accent-green-bg)', border: '1px solid var(--color-accent-green-border)', animation: 'fadeIn 0.2s ease' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <svg width="10" height="10" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0 }}>
-                  <path d="M6 1l1.09 3.26L10.5 4.5l-2.59 2.09.91 3.41L6 8.25l-2.82 1.75.91-3.41L1.5 4.5l3.41-.24L6 1z" fill="var(--color-accent-green)"/>
-                </svg>
-                <span style={{ fontSize: 10, color: 'var(--color-accent-green)', fontWeight: 500 }}>
-                  Recomendado: <strong style={{ fontWeight: 700 }}>{modes.find(m => m.id === recommended.modeId)?.label ?? 'Alta Fidelidade'}</strong>
-                </span>
-              </div>
-              <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', marginTop: 4, paddingLeft: 16 }}>{recommended.reason}</div>
-            </div>
-          ) : null}
-
-          {/* Mode selector */}
-          <div>
-            <label style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 10 }}>
-              Modo
-            </label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {modes.map(mode => {
-                const isSelected    = selectedModeId === mode.id
-                const isRecommended = recommended?.modeId === mode.id && !!imageFile
-                return (
-                  <button key={mode.id} onClick={() => applyMode(mode.id)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 10,
-                      padding: '10px 12px', borderRadius: 8,
-                      border: `1px solid ${isSelected ? 'var(--color-border-focus)' : 'var(--color-border)'}`,
-                      background: isSelected ? 'var(--color-surface)' : 'transparent',
-                      cursor: 'pointer', textAlign: 'left', width: '100%',
-                      transition: 'border-color 0.15s, background 0.15s',
-                    }}
-                  >
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: isSelected ? 'var(--color-text-primary)' : 'var(--color-text-quaternary)', transition: 'background 0.15s' }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' as const }}>
-                        <span style={{ fontSize: 12, fontWeight: 500, color: isSelected ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', letterSpacing: '-0.01em' }}>{mode.label}</span>
-                        {isRecommended && (
-                          <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'var(--color-accent-green)', background: 'var(--color-accent-green-bg)', border: '1px solid var(--color-accent-green-border)', padding: '1px 5px', borderRadius: 20 }}>
-                            Recomendado
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 }}>{mode.desc}</div>
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
+          {/* Objetivo: o eixo da tela. */}
+          <div className="spn-field">
+            <span className="spn-field-label">Para que serve esta imagem</span>
+            <ChoiceGroup
+              label="Objetivo"
+              cols={2}
+              value={selectedObjective}
+              onChange={applyObjective}
+              options={OBJECTIVES}
+            />
+            {/* O cartão continua marcado depois de um ajuste manual — sem esta
+                linha a superfície diria "Impressão / prancha" enquanto o que
+                vale é o que está na folha. */}
+            {!objectiveInSync && (
+              <p className="spn-hint">Ajustado à mão — vale o que está em “Ajuste fino”.</p>
+            )}
           </div>
 
-          {/* Objective (only on Resolução) */}
-          {tab === 'resolution' && (
-            <div>
-              <label style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 10 }}>
-                Objetivo
-              </label>
-              <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 6 }}>
-                {OBJECTIVES.map(obj => (
-                  <button key={obj.id} onClick={() => applyObjective(obj.id)}
-                    style={{
-                      padding: '6px 10px', borderRadius: 6,
-                      border: `1px solid ${selectedObjective === obj.id ? 'var(--color-border-focus)' : 'var(--color-border)'}`,
-                      background: selectedObjective === obj.id ? 'var(--color-chip-hover)' : 'transparent',
-                      fontSize: 11, color: selectedObjective === obj.id ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
-                      cursor: 'pointer', transition: 'all 0.15s',
-                    }}
-                  >
-                    {obj.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Scale */}
-          <div>
-            <label style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 10 }}>
-              {tab === 'resolution' ? 'Escala' : 'Tamanho final'}
-            </label>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {availableScales.map(s => {
-                const isSelected = selectedScale === s.value
-                const locked     = !!s.locked
-                return (
-                  <button key={s.value} onClick={() => !locked && setSelectedScale(s.value)} disabled={locked}
-                    title={locked ? 'Em breve' : undefined}
-                    style={{
-                      flex: 1, padding: '10px 8px', borderRadius: 8,
-                      border: `1px solid ${!locked && isSelected ? 'var(--color-border-focus)' : 'var(--color-border)'}`,
-                      background: !locked && isSelected ? 'var(--color-chip-hover)' : 'transparent',
-                      cursor: locked ? 'not-allowed' : 'pointer',
-                      opacity: locked ? 0.4 : 1, textAlign: 'center', transition: 'all 0.15s', position: 'relative',
-                    }}
-                  >
-                    <div style={{ fontSize: 14, fontWeight: 600, color: !locked && isSelected ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)', letterSpacing: '-0.01em' }}>{s.label}</div>
-                    <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', marginTop: 2, letterSpacing: '0.04em' }}>{s.sub}</div>
-                    {locked && (
-                      <div style={{ position: 'absolute', top: 4, right: 6 }}>
-                        <svg width="9" height="9" viewBox="0 0 14 16" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="1.5" strokeLinecap="round">
-                          <rect x="2" y="7" width="10" height="8" rx="1.5"/><path d="M5 7V5a2 2 0 0 1 4 0v2"/>
-                        </svg>
-                      </div>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
+          {/* Ajuste fino: os três efeitos do objetivo, numa linha só. */}
+          <div className="spn-field">
+            <SettingGroup>
+              <SettingRow
+                icon={<RowIcon name="scale" />}
+                title="Ajuste fino"
+                value={tuneSummary}
+                controls="upscale-tune"
+                onOpen={() => setTuneOpen(true)}
+              />
+            </SettingGroup>
           </div>
 
-          {error && (
-            <div style={{ padding: '10px 12px', borderRadius: 8, background: 'var(--color-error-bg)', border: '0.5px solid var(--color-error-border)', fontSize: 11, color: 'var(--color-error)' }}>
-              {error}
-            </div>
-          )}
+          {error && <div className="spn-error">{error}</div>}
         </div>
 
-        {/* Footer */}
-        <div style={{ padding: '16px 24px', borderTop: '0.5px solid var(--color-border)', flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
-              Custo: <span style={{ color: 'var(--color-text-secondary)', fontWeight: 500 }}>{nodeCost} Nodes</span>
+        {/* Dock: o CTA nunca some no scroll. */}
+        <div className="spn-dock spn-glass spn-glass--chrome">
+          <div className="spn-cost">
+            <div className="spn-cost-figures">
+              <div className="spn-cost-main">{nodeCost} nodes</div>
+              <div className="spn-cost-sub" style={credits < nodeCost ? { color: 'var(--color-error)' } : undefined}>
+                Saldo: {credits} nodes
+              </div>
             </div>
-            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
-              Saldo: <span style={{ color: credits > 0 ? 'var(--color-text-secondary)' : 'var(--color-error)', fontWeight: 500 }}>{credits} Nodes</span>
-            </div>
+            <button type="button" className="spn-cta" onClick={handleSubmit} disabled={!canSubmit}>
+              {isLoading
+                ? loadingText
+                : credits < nodeCost
+                  ? 'Sem nodes'
+                  : tab === 'resolution' ? 'Ampliar imagem' : 'Aprimorar imagem'}
+            </button>
           </div>
-          <button onClick={handleSubmit} disabled={!canSubmit}
-            style={{
-              width: '100%', padding: '12px 20px', borderRadius: 8, border: 'none',
-              background: canSubmit ? 'var(--color-inverse)' : 'var(--color-surface-hover)',
-              color: canSubmit ? 'var(--color-inverse-foreground)' : 'var(--color-text-quaternary)',
-              fontSize: 13, fontWeight: 600, cursor: canSubmit ? 'pointer' : 'not-allowed',
-              transition: 'background 0.15s, color 0.15s', letterSpacing: '-0.01em',
-            }}
-          >
-            {isLoading ? loadingText : credits < nodeCost ? 'Sem Nodes' : tab === 'resolution' ? 'Ampliar Imagem' : 'Aprimorar Imagem'}
-          </button>
         </div>
-      </div>
+      </section>
 
-      {/* ── Right panel ─────────────────────────────────────────────────────── */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, overflow: 'hidden' }}>
-
+      {/* ── Palco ───────────────────────────────────────────────────────────── */}
+      <section className="spn-tool-stage spn-glass">
         {isLoading && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-            <div style={{ width: 40, height: 40, borderRadius: '50%', border: '2px solid var(--color-border-strong)', borderTop: '2px solid var(--color-text-secondary)', animation: 'spin 0.9s linear infinite' }} />
-            <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', letterSpacing: '0.02em' }}>{loadingText}</div>
+            <div style={{ width: 40, height: 40, borderRadius: '50%', border: '2px solid var(--glass-line-strong)', borderTop: '2px solid var(--color-text-secondary)', animation: 'spin 0.9s linear infinite' }} />
+            <div style={{ fontSize: 12.5, color: 'var(--color-text-tertiary)' }}>{loadingText}</div>
           </div>
         )}
 
         {!isLoading && resultUrl && imagePreview && (
-          <div style={{ width: '100%', maxWidth: 760, animation: 'fadeIn 0.3s ease' }}>
+          <div style={{ width: '100%', maxWidth: 760, maxHeight: '100%', overflowY: 'auto', padding: 20, animation: 'fadeIn 0.3s ease' }}>
             {usedFallback && (
-              <div style={{ fontSize: 12, color: 'var(--color-error)', background: 'var(--color-error-bg)', border: '0.5px solid var(--color-error-border)', borderRadius: 12, padding: '10px 14px', lineHeight: 1.5, marginBottom: 12 }}>
+              <div className="spn-error" style={{ marginBottom: 12 }}>
                 O motor de alta fidelidade não respondeu e usamos o motor alternativo
                 nesta ampliação. Confira detalhes finos (esquadrias, textos, linhas) —
                 se notar diferenças, tente novamente em alguns minutos.
               </div>
             )}
             <BeforeAfter beforeUrl={imagePreview} afterUrl={resultUrl} beforeLabel="ORIGINAL" afterLabel={tab === 'resolution' ? 'AMPLIADO' : 'APRIMORADO'} />
-            <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' as const }}>
-              <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', letterSpacing: '0.04em' }}>
+            <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <span className="spn-hint" style={{ marginTop: 0 }}>
                 Arraste para comparar · {selectedScale === 'none' ? 'sem aumento' : `${factorOut}×`} · {activeMode.label}
                 {/* Dimensões REAIS do output quando o servidor mediu; a estimativa
                     (origem × fator) só como fallback — o provider pode clampar. */}
                 {resultDims
                   ? <span> · {resultDims.w}×{resultDims.h}px</span>
                   : imageDimensions && factorOut > 1 && <span> · {imageDimensions.w * factorOut}×{imageDimensions.h * factorOut}px</span>}
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={handleDownload} disabled={isDownloading}
-                  style={{ fontSize: 11, fontWeight: 500, color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 6, border: '1px solid var(--color-border-strong)', background: 'var(--color-surface)', cursor: isDownloading ? 'wait' : 'pointer' }}
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+              </span>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button type="button" className="spn-ghost" style={ghostLink} onClick={handleDownload} disabled={isDownloading}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                     <polyline points="7 10 12 15 17 10"/>
                     <line x1="12" y1="15" x2="12" y2="3"/>
                   </svg>
                   {isDownloading ? 'Baixando…' : 'Baixar imagem'}
                 </button>
-                <button onClick={resetImage}
-                  style={{ fontSize: 11, fontWeight: 500, color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 6, border: '1px solid var(--color-border-strong)', background: 'var(--color-surface)', cursor: 'pointer' }}
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <button type="button" className="spn-ghost" style={ghostLink} onClick={resetImage}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M3 21v-5h5"/>
                     <path d="M21 3v5h-5"/>
                     <path d="M21 8a9 9 0 0 0-15-3.5L3 8"/>
@@ -733,10 +621,8 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
                   </svg>
                   Ampliar nova imagem
                 </button>
-                <a href={`/app/spaces/new/upload?source=${encodeURIComponent(resultUrl)}`}
-                  style={{ fontSize: 11, fontWeight: 500, color: 'var(--color-text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 6, border: '1px solid var(--color-border-strong)', background: 'var(--color-surface)' }}
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <a className="spn-ghost" style={ghostLink} href={`/app/spaces/new/upload?source=${encodeURIComponent(resultUrl)}`}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <rect x="3" y="3" width="18" height="18" rx="2"/>
                     <path d="M3 9h18M9 21V9"/>
                   </svg>
@@ -748,8 +634,8 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
         )}
 
         {!isLoading && !resultUrl && (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, animation: 'fadeIn 0.2s ease' }}>
-            <div style={{ opacity: 0.16 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, padding: 24, animation: 'fadeIn 0.2s ease' }}>
+            <div style={{ opacity: 0.16, color: 'var(--color-text-primary)' }}>
               <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="0.8" strokeLinecap="round">
                 <rect x="3" y="3" width="18" height="18" rx="2"/>
                 <path d="M3 9h18M9 21V9"/>
@@ -757,14 +643,63 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
               </svg>
             </div>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', fontWeight: 500, letterSpacing: '-0.01em' }}>O resultado aparecerá aqui</div>
-              <div style={{ fontSize: 11, color: 'var(--color-text-quaternary)', marginTop: 5, lineHeight: 1.5 }}>
+              <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', fontWeight: 500 }}>O resultado aparecerá aqui</div>
+              <div style={{ fontSize: 11.5, color: 'var(--color-text-quaternary)', marginTop: 5, lineHeight: 1.5 }}>
                 Envie uma imagem para comparar antes/depois em alta resolução.
               </div>
             </div>
           </div>
         )}
-      </div>
+      </section>
+
+      {/* Folha de ajuste fino: aba, modo e escala. Quem confia no objetivo
+          nunca abre isto. */}
+      <Sheet id="upscale-tune" open={tuneOpen} title="Ajuste fino" onClose={() => setTuneOpen(false)}>
+        <div className="spn-field">
+          <span className="spn-field-label">Tratamento</span>
+          <Segmented
+            label="Tratamento"
+            value={tab}
+            onChange={applyTab}
+            items={[
+              { value: 'resolution', label: 'Aumentar resolução'  },
+              { value: 'enhance',    label: 'Aprimorar qualidade' },
+            ]}
+          />
+        </div>
+
+        <div className="spn-field">
+          <span className="spn-field-label">Modo</span>
+          <ChoiceGroup
+            label="Modo"
+            cols={2}
+            value={selectedModeId}
+            onChange={applyMode}
+            options={modes.map(m => ({ value: m.id, title: m.label, note: m.note }))}
+          />
+        </div>
+
+        <div className="spn-field">
+          <span className="spn-field-label">{tab === 'resolution' ? 'Escala' : 'Tamanho final'}</span>
+          {availableScales.length > 0 ? (
+            <ChoiceGroup
+              label="Escala"
+              cols={availableScales.length === 2 ? 2 : 3}
+              value={selectedScale}
+              onChange={setSelectedScale}
+              options={availableScales.map(s => ({ value: s.value, title: s.label, note: s.sub }))}
+            />
+          ) : (
+            <p className="spn-hint" style={{ marginTop: 0 }}>
+              Este modo entrega na resolução original — ele limpa, não amplia.
+            </p>
+          )}
+        </div>
+
+        <p className="spn-hint">
+          Os três já vêm resolvidos pelo objetivo. Mexer aqui vale só para esta imagem.
+        </p>
+      </Sheet>
 
       {showImportModal && (
         <RetocarImportModal

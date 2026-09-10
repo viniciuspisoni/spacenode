@@ -41,13 +41,8 @@ export default async function ConvitePage({ params }: { params: Promise<{ token:
     && user.email.toLowerCase() === String(invite.email).toLowerCase()
 
   return (
-    <main style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg)', padding: 48 }}>
-      <div style={{
-        width: '100%', maxWidth: 440,
-        background: 'var(--color-bg-elevated)',
-        border: '0.5px solid var(--color-border)',
-        borderRadius: 16, padding: '32px 30px',
-      }}>
+    <main style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 48 }}>
+      <div className="spn-glass" style={{ width: '100%', maxWidth: 440, borderRadius: 'var(--r-card)', padding: '32px 30px' }}>
         {!invite && <Message>Convite não encontrado. Confira se o link está completo.</Message>}
 
         {invite && !valid && (
@@ -64,9 +59,7 @@ export default async function ConvitePage({ params }: { params: Promise<{ token:
 
         {invite && valid && emailMatches && (
           <>
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--color-text-tertiary)', marginBottom: 14 }}>
-              Convite de equipe
-            </div>
+            <div className="spn-field-label" style={{ marginBottom: 14 }}>Convite de equipe</div>
             <h1 style={{ fontSize: 22, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.02em', marginBottom: 12, lineHeight: 1.2 }}>
               Entrar em {ws?.name ?? 'um workspace'}
             </h1>
@@ -81,7 +74,7 @@ export default async function ConvitePage({ params }: { params: Promise<{ token:
           </>
         )}
 
-        <div style={{ marginTop: 24, paddingTop: 18, borderTop: '0.5px solid var(--color-border)' }}>
+        <div style={{ marginTop: 24, paddingTop: 18, borderTop: '0.5px solid var(--glass-line)' }}>
           <Link href="/app" style={{ fontSize: 12.5, color: 'var(--color-text-tertiary)', textDecoration: 'none' }}>
             ← Voltar ao app
           </Link>

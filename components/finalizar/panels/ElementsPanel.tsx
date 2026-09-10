@@ -11,7 +11,7 @@ import {
 } from '@/lib/finalizar/types'
 import { makeId } from '@/lib/finalizar/composition'
 import type { BrushSettings } from '../CanvasViewport'
-import { ActiveDot, Chip, Section, Seg, SliderRow } from '../ui'
+import { ActiveDot, Chip, ConfirmSheet, Section, Seg, SliderRow } from '../ui'
 
 export interface ElementsPanelProps {
   doc: FinalizeDoc
@@ -35,6 +35,8 @@ export function ElementsPanel(props: ElementsPanelProps) {
   const [openList, setOpenList] = useState(true)
   const [openProps, setOpenProps] = useState(true)
   const [openMask, setOpenMask] = useState(false)
+  // Remover camada perguntava por window.confirm — agora é folha.
+  const [pendingDelete, setPendingDelete] = useState<ElementLayer | null>(null)
 
   const active = doc.elements.find((e) => e.id === activeElementId) ?? null
   const full = doc.elements.length >= MAX_ELEMENTS
@@ -75,6 +77,19 @@ export function ElementsPanel(props: ElementsPanelProps) {
 
   return (
     <div>
+      <ConfirmSheet
+        open={pendingDelete !== null}
+        title="Remover camada"
+        message={<>A camada <b>{pendingDelete?.name}</b> sai da composição. Dá para desfazer com Ctrl+Z.</>}
+        confirmLabel="Remover"
+        onConfirm={() => {
+          const el = pendingDelete
+          if (!el) return
+          patch(`Remover ${el.name}`, (d) => ({ ...d, elements: d.elements.filter((x) => x.id !== el.id) }))
+          if (activeElementId === el.id) onSelectElement(null)
+        }}
+        onClose={() => setPendingDelete(null)}
+      />
       <Section
         title="Camadas"
         open={openList}
@@ -144,9 +159,7 @@ export function ElementsPanel(props: ElementsPanelProps) {
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation()
-                      if (!window.confirm(`Remover "${el.name}"?`)) return
-                      patch(`Remover ${el.name}`, (d) => ({ ...d, elements: d.elements.filter((x) => x.id !== el.id) }))
-                      if (isActive) onSelectElement(null)
+                      setPendingDelete(el)
                     }}
                     style={miniBtn}
                     title="Remover camada"
@@ -260,6 +273,7 @@ export function ElementsPanel(props: ElementsPanelProps) {
         <Section title="Máscara do elemento" open={openMask || elementMaskMode} onToggle={() => setOpenMask((v) => !v)}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <Seg
+              label="Modo do elemento"
               options={[
                 { id: 'transform', label: 'Transformar', title: 'Mover, redimensionar e rotacionar no canvas' },
                 { id: 'paint', label: 'Pintar máscara', title: 'Revele ou oculte partes do elemento com o pincel' },
@@ -270,6 +284,7 @@ export function ElementsPanel(props: ElementsPanelProps) {
             {elementMaskMode && (
               <>
                 <Seg
+                  label="Pincel da máscara do elemento"
                   options={[
                     { id: 'paint', label: 'Revelar', title: 'Mostra o elemento na área pintada' },
                     { id: 'erase', label: 'Ocultar', title: 'Esconde o elemento na área pintada' },

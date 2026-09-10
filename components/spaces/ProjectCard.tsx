@@ -36,17 +36,14 @@ const BADGE_TONE: Record<DnaBadge['tone'], React.CSSProperties> = {
     color: 'var(--color-accent-green)',
     border: '0.5px solid var(--color-accent-green-border)',
   },
+  // Os dois tons neutros são vidro (classe .spn-glass--raised no elemento):
+  // aqui fica só a cor do texto, porque o material vem da classe e é ela que
+  // carrega os fallbacks de acessibilidade.
   neutral: {
-    background: 'rgba(0,0,0,0.55)',
-    color: 'rgba(255,255,255,0.88)',
-    border: '0.5px solid rgba(255,255,255,0.14)',
-    backdropFilter: 'blur(8px)',
+    color: 'var(--color-text-primary)',
   },
   muted: {
-    background: 'rgba(0,0,0,0.55)',
-    color: 'rgba(255,255,255,0.6)',
-    border: '0.5px solid rgba(255,255,255,0.1)',
-    backdropFilter: 'blur(8px)',
+    color: 'var(--color-text-tertiary)',
   },
   error: {
     background: 'var(--color-error-bg)',
@@ -108,7 +105,6 @@ export function ProjectCard({ space, onRename, onDuplicate, onArchive, onUnarchi
 
   return (
     <div
-      className="spn-space-card"
       role="link"
       tabIndex={0}
       aria-label={`Abrir projeto ${space.name}`}
@@ -118,12 +114,10 @@ export function ProjectCard({ space, onRename, onDuplicate, onArchive, onUnarchi
           router.push(`/app/spaces/${space.id}`)
         }
       }}
+      className="spn-space-card spn-glass spn-card"
       style={{
         display:        'flex',
         flexDirection:  'column',
-        background:     'var(--color-bg-elevated)',
-        border:         '0.5px solid var(--color-border)',
-        borderRadius:   'var(--radius-lg)',
         overflow:       'hidden',
         cursor:         'pointer',
         position:       'relative',
@@ -169,21 +163,23 @@ export function ProjectCard({ space, onRename, onDuplicate, onArchive, onUnarchi
           display: 'flex', alignItems: 'center', gap: 6,
           maxWidth: 'calc(100% - 52px)',
         }}>
-          <span style={{
+          <span className="spn-glass spn-glass--raised" style={{
             fontSize: 10, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase',
-            padding: '4px 8px', borderRadius: 5, flexShrink: 0,
-            background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)',
-            color: 'rgba(255,255,255,0.88)',
+            padding: '4px 8px', borderRadius: 999, flexShrink: 0,
+            color: 'var(--color-text-primary)',
           }}>
             {engineName}
           </span>
-          <span style={{
-            fontSize: 10, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase',
-            padding: '4px 8px', borderRadius: 5,
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-            whiteSpace: 'nowrap',
-            ...BADGE_TONE[badge.tone],
-          }}>
+          <span
+            className={badge.tone === 'neutral' || badge.tone === 'muted' ? 'spn-glass spn-glass--raised' : undefined}
+            style={{
+              fontSize: 10, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase',
+              padding: '4px 8px', borderRadius: 999,
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              whiteSpace: 'nowrap',
+              ...BADGE_TONE[badge.tone],
+            }}
+          >
             {badge.tone === 'green' && (
               <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
                 <rect x="4" y="11" width="16" height="10" rx="1.5"/>

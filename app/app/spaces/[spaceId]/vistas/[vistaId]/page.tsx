@@ -53,7 +53,7 @@ export default async function VistaDetailPage({
   const balance = payerBalance.totalBalance
 
   return (
-    <main style={{ flex: 1, overflowY: 'auto', background: 'var(--color-bg)' }}>
+    <main style={{ flex: 1, overflowY: 'auto' }}>
       <VistaDetail
         space={space}
         vista={vista}

@@ -12,6 +12,7 @@ import type { Space, Vista, ArchitectIdentity, Quality } from '@/lib/spaces/type
 import type { PlanId } from '@/lib/plans'
 import { getVisualDna, getBriefingFromDna } from '@/lib/spaces/dna'
 import { detalheContextFor } from '@/lib/spaces/axes'
+import { useAmbient } from '@/components/app/glass'
 import { DnaPanel } from './DnaPanel'
 import { GenerationFlow, type GenerateRequestBody } from './GenerationFlow'
 import { VistasGrid } from './VistasGrid'
@@ -47,6 +48,10 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId, p
   const [toast, setToast]         = useState<ToastState | null>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [showTrocarMestre, setShowTrocarMestre] = useState(false)
+
+  // A Vista Mestre é a imagem em foco desta tela: ela vira o papel de parede,
+  // e o vidro do workspace passa a refratar o projeto do usuário.
+  useAmbient(space.vista_mestre_url)
 
   const isLocked = space.status === 'locked'
   const dna      = getVisualDna(space.dna)
@@ -220,12 +225,9 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId, p
             <Link
               href={`/app/spaces/${space.id}/pack`}
               aria-disabled={vistas.filter(v => v.status === 'completed').length === 0}
+              className="spn-ghost"
               style={{
-                padding: '10px 18px', borderRadius: 10,
-                background: 'var(--color-bg-elevated)',
-                color: 'var(--color-text-secondary)',
-                border: '0.5px solid var(--color-border-strong)',
-                fontSize: 13, fontWeight: 500, letterSpacing: '-0.005em',
+                display: 'inline-flex', alignItems: 'center', textDecoration: 'none',
                 pointerEvents: vistas.filter(v => v.status === 'completed').length === 0 ? 'none' : 'auto',
                 opacity:        vistas.filter(v => v.status === 'completed').length === 0 ? 0.45 : 1,
               }}
@@ -239,19 +241,19 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId, p
         {space.vista_mestre_url && (
           <div style={{
             position: 'relative',
-            borderRadius: 14, overflow: 'hidden',
-            background: 'var(--color-bg-elevated)',
+            borderRadius: 'var(--r-card)', overflow: 'hidden',
+            background: 'var(--color-preview-bg)',
             aspectRatio: '32 / 9',
             maxHeight: 240,
           }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={space.vista_mestre_url} alt="Vista Mestre"
                  style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            <div style={{
+            <div className="spn-glass spn-glass--raised" style={{
               position: 'absolute', top: 14, left: 14,
               fontSize: 9, fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase',
-              color: '#fff', background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)',
-              padding: '5px 10px', borderRadius: 4,
+              color: 'var(--color-text-primary)',
+              padding: '5px 10px', borderRadius: 999,
             }}>
               vista mestre
             </div>
@@ -265,14 +267,10 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId, p
               title={hasCompletedVistas
                 ? 'Promover uma vista gerada a nova Vista Mestre do projeto'
                 : 'Gere vistas primeiro — a troca promove uma vista existente'}
+              className="spn-ghost"
               style={{
                 position: 'absolute', top: 14, right: 14,
-                fontSize: 10, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase',
-                color: hasCompletedVistas ? '#fff' : 'rgba(255,255,255,0.55)',
-                background: 'rgba(0,0,0,0.5)',
-                backdropFilter: 'blur(8px)', border: '0.5px solid rgba(255,255,255,0.14)',
-                padding: '5px 10px', borderRadius: 4,
-                cursor: hasCompletedVistas ? 'pointer' : 'not-allowed',
+                letterSpacing: '0.04em', textTransform: 'uppercase', fontSize: 10,
               }}
             >
               Trocar Vista Mestre
@@ -311,11 +309,7 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId, p
             />
           </section>
         ) : (
-          <section style={{
-            background: 'var(--color-bg-elevated)',
-            border: '0.5px dashed var(--color-border-strong)',
-            borderRadius: 14, padding: '32px 24px', textAlign: 'center',
-          }}>
+          <section className="spn-empty">
             <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
               {space.status === 'draft'           && 'Envie a Vista Mestre pra começar.'}
               {space.status === 'dna_extracting'  && 'Extraindo DNA…'}
@@ -366,18 +360,18 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId, p
 }
 
 function Toast({ toast }: { toast: ToastState }) {
-  const colors = toast.type === 'success'
-    ? { bg: 'rgba(29,158,117,0.16)', fg: '#46d191', border: 'rgba(29,158,117,0.45)' }
-    : { bg: 'rgba(186,117,23,0.16)', fg: '#e0a766', border: 'rgba(186,117,23,0.45)' }
+  // O toast é cromo flutuante: vidro pela classe (que traz os fallbacks), e a
+  // cor do TEXTO diz o tom. Antes era um retângulo pintado de verde ou âmbar,
+  // o que fazia o aviso competir com o CTA.
+  const fg = toast.type === 'success' ? 'var(--color-accent-green)' : 'var(--color-warning)'
   return (
-    <div style={{
+    <div className="spn-glass spn-glass--chrome" style={{
       position: 'fixed', bottom: 24, right: 24, zIndex: 90,
       maxWidth: 400, padding: '14px 18px',
-      background: colors.bg, color: colors.fg,
-      border: `0.5px solid ${colors.border}`,
-      borderRadius: 12, backdropFilter: 'blur(12px)',
+      color: fg,
+      borderRadius: 'var(--r-card)',
       fontSize: 13, letterSpacing: '-0.005em',
-      boxShadow: '0 12px 32px rgba(0,0,0,0.4)',
+      boxShadow: 'var(--shadow-float)',
     }}>
       {toast.message}
     </div>
@@ -399,17 +393,9 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 function BalanceBadge({ balance }: { balance: number }) {
   return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 6,
-      padding: '8px 12px', borderRadius: 8,
-      background: 'var(--color-bg-elevated)',
-      border: '0.5px solid var(--color-border-strong)',
-      fontSize: 12, color: 'var(--color-text-secondary)',
-      letterSpacing: '-0.005em',
-    }}>
-      <span style={{ width: 6, height: 6, borderRadius: 999, background: '#1D9E75' }} />
-      <span style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>{balance}</span>
-      <span style={{ color: 'var(--color-text-tertiary)' }}>nodes</span>
+    <span className="spn-balance spn-glass spn-glass--raised">
+      <span className="spn-balance-dot" aria-hidden />
+      <b>{balance}</b> nodes
     </span>
   )
 }

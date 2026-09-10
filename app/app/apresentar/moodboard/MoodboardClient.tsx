@@ -1,7 +1,19 @@
 'use client'
 
-import { useRef, useState } from 'react'
 import Link from 'next/link'
+import { useRef, useState } from 'react'
+import {
+  ChoiceGroup,
+  PillGroup,
+  RowIcon,
+  Segmented,
+  SettingGroup,
+  SettingRow,
+  Sheet,
+  summarize,
+  useAmbient,
+} from '@/components/app/glass'
+import { CostDock, DownloadIcon, formatFileSize, SourceDrop, StageLoading, ToolHeader } from '../_shell/ToolShell'
 import {
   APRESENTAR_TOOLS,
   MOODBOARD_AMBIENTS,
@@ -34,26 +46,30 @@ const LOADING_TEXTS = [
   'Refinando moodboard…',
 ]
 
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
+/* As pílulas do kit mostram a própria string que recebem; os presets são
+   pares id/label. Converte-se nas bordas — o id é o que viaja na API. */
+const AMBIENT_LABELS = MOODBOARD_AMBIENTS.map(a => a.label)
+const STYLE_LABELS   = MOODBOARD_STYLES.map(s => s.label)
+const PALETTE_LABELS = MOODBOARD_PALETTES.map(p => p.label)
+
+type SheetId = 'cena' | 'estilo' | 'saida'
 
 export default function MoodboardClient({ initialCredits, studioName: initialStudio = null }: Props) {
-  // ── Entrada ─────────────────────────────────────────────────────────────────
+  // Entrada
   const [imageFile,    setImageFile]    = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
-  const [isDragging,   setIsDragging]   = useState(false)
   const [projectName,  setProjectName]  = useState('')
 
-  // ── Presets ─────────────────────────────────────────────────────────────────
+  // Presets — mesmos nomes e tipos que viajam para /api/apresentar/moodboard
   const [ambient, setAmbient] = useState<MoodboardAmbient>('sala')
   const [style,   setStyle]   = useState<MoodboardStyle>('contemporaneo')
   const [palette, setPalette] = useState<MoodboardPalette>('neutra')
   const [level,   setLevel]   = useState<MoodboardLevel>('comercial')
   const [format,  setFormat]  = useState<MoodboardFormat>('portrait')
 
-  // ── Geração ─────────────────────────────────────────────────────────────────
+  const [sheet, setSheet] = useState<SheetId | null>(null)
+
+  // Geração
   const [isLoading,   setIsLoading]   = useState(false)
   const [loadingText, setLoadingText] = useState(LOADING_TEXTS[0])
   const [result,      setResult]      = useState<MoodboardResult | null>(null)
@@ -61,16 +77,25 @@ export default function MoodboardClient({ initialCredits, studioName: initialStu
   const [credits,     setCredits]     = useState(initialCredits)
   const [error,       setError]       = useState<string | null>(null)
 
-  // ── Export ──────────────────────────────────────────────────────────────────
+  // Export
   const [isExporting, setIsExporting] = useState(false)
 
-  const fileInputRef    = useRef<HTMLInputElement>(null)
   const loadingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const canvasHostRef   = useRef<HTMLDivElement | null>(null)
 
-  const nodeCost  = TOOL.nodes ?? 0
-  // Imagem é opcional — sempre dá pra gerar usando só os presets
+  const nodeCost = TOOL.nodes ?? 0
+  // Imagem é opcional — sempre dá pra gerar usando só os presets.
   const canSubmit = credits >= nodeCost && !isLoading
+
+  // O papel de parede é o trabalho em foco: a capa que saiu, ou a referência
+  // que entrou.
+  useAmbient(result?.coverUrl ?? imagePreview)
+
+  const ambientLabel = MOODBOARD_AMBIENTS.find(a => a.id === ambient)?.label ?? ''
+  const styleLabel   = MOODBOARD_STYLES.find(s => s.id === style)?.label ?? ''
+  const paletteLabel = MOODBOARD_PALETTES.find(p => p.id === palette)?.label ?? ''
+  const levelSpec    = MOODBOARD_LEVELS.find(l => l.id === level)
+  const formatSpec   = MOODBOARD_FORMATS.find(f => f.id === format)!
 
   function loadImageFile(file: File) {
     if (!file.type.startsWith('image/')) { setError('O arquivo deve ser uma imagem.'); return }
@@ -112,8 +137,8 @@ export default function MoodboardClient({ initialCredits, studioName: initialStu
 
     try {
       const fd = new FormData()
-      if (imageFile)             fd.append('image',       imageFile)
-      if (projectName.trim())    fd.append('projectName', projectName.trim())
+      if (imageFile)          fd.append('image',       imageFile)
+      if (projectName.trim()) fd.append('projectName', projectName.trim())
       fd.append('ambient', ambient)
       fd.append('style',   style)
       fd.append('palette', palette)
@@ -143,11 +168,10 @@ export default function MoodboardClient({ initialCredits, studioName: initialStu
     const svg = canvasHostRef.current.querySelector('svg') as SVGSVGElement | null
     if (!svg) return
 
-    const dim = MOODBOARD_FORMATS.find(f => f.id === format)!
     setIsExporting(true)
     setError(null)
     try {
-      const blob = await svgElementToPngBlob(svg, dim.width, dim.height)
+      const blob = await svgElementToPngBlob(svg, formatSpec.width, formatSpec.height)
       const safeName = (projectName.trim() || result.title || 'moodboard')
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
@@ -161,273 +185,81 @@ export default function MoodboardClient({ initialCredits, studioName: initialStu
   }
 
   return (
-    <div style={{ display: 'flex', width: '100%', height: '100%', overflow: 'hidden', background: 'var(--color-bg)', color: 'var(--color-text-primary)' }}>
-      <style>{`
-        @keyframes spin   { to { transform: rotate(360deg); } }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-      `}</style>
+    <div className="spn-tool">
+      {/* ── Painel ─────────────────────────────────────────────────────────── */}
+      <div className="spn-tool-panel spn-glass spn-glass--chrome">
+        <ToolHeader
+          title={TOOL.name}
+          desc="Paleta, materiais e conceito escrito — a direção visual do projeto numa prancha só."
+        />
 
-      {/* ── Left panel · entrada ─────────────────────────────────────────────── */}
-      <div style={{
-        width: 420, flexShrink: 0,
-        display: 'flex', flexDirection: 'column',
-        borderRight: '0.5px solid var(--color-border)',
-        overflow: 'hidden',
-      }}>
+        <div className="spn-tool-panel-body">
+          <div className="spn-field">
+            <span className="spn-field-label">Referência (opcional)</span>
+            <SourceDrop
+              height={110}
+              preview={imagePreview}
+              label="Arraste uma imagem ou render de referência"
+              note="Sem ela, os presets decidem sozinhos"
+              meta={imageFile ? formatFileSize(imageFile.size) : ''}
+              onFile={loadImageFile}
+              onClear={resetImage}
+            />
+          </div>
 
-        {/* Header */}
-        <div style={{ padding: '24px 24px 16px', borderBottom: '0.5px solid var(--color-border)', flexShrink: 0 }}>
-          <Breadcrumb />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--color-text-primary)' }}>{TOOL.name}</div>
-            <Pill tone="green">novo</Pill>
+          {/* O nível reconfigura o tom de tudo o mais — fica na superfície. */}
+          <div className="spn-field">
+            <span className="spn-field-label">Nível</span>
+            <Segmented
+              label="Nível"
+              value={level}
+              onChange={setLevel}
+              items={MOODBOARD_LEVELS.map(l => ({ value: l.id, label: l.label }))}
+            />
+            {levelSpec ? <p className="spn-hint">{levelSpec.desc}</p> : null}
           </div>
-          <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4, lineHeight: 1.5 }}>
-            Crie paletas, materiais e conceitos visuais para apresentar seus projetos.
-          </div>
+
+          <SettingGroup>
+            <SettingRow icon={<RowIcon name="scene" />} title="Cena"
+                        value={summarize([ambientLabel])}
+                        onOpen={() => setSheet('cena')} />
+            <SettingRow icon={<RowIcon name="materials" />} title="Estilo"
+                        value={summarize([styleLabel, paletteLabel])}
+                        onOpen={() => setSheet('estilo')} />
+            <SettingRow icon={<RowIcon name="output" />} title="Saída"
+                        value={summarize([formatSpec.label, projectName.trim()])}
+                        onOpen={() => setSheet('saida')} />
+          </SettingGroup>
+
+          {error ? <div className="spn-error" style={{ marginTop: 14 }}>{error}</div> : null}
         </div>
 
-        {/* Scrollable */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 24 }}>
-
-          {/* Upload */}
-          <Section label="Referência visual (opcional)">
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
-              onDragLeave={() => setIsDragging(false)}
-              onDrop={(e) => { e.preventDefault(); setIsDragging(false); const f = e.dataTransfer.files[0]; if (f) loadImageFile(f) }}
-              style={{
-                border: `1.5px dashed ${isDragging ? 'var(--color-border-focus)' : imageFile ? 'var(--color-border-strong)' : 'var(--color-border-strong)'}`,
-                borderRadius: 10, overflow: 'hidden', cursor: 'pointer',
-                transition: 'border-color 0.15s, background 0.15s',
-                background: isDragging ? 'var(--color-surface)' : 'transparent',
-                minHeight: imageFile ? 0 : 110,
-                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                padding: imageFile ? 0 : '22px 18px',
-              }}
-            >
-              {imageFile && imagePreview ? (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img src={imagePreview} alt="referência" style={{ width: '100%', display: 'block', maxHeight: 200, objectFit: 'cover', background: 'var(--color-preview-bg)' }} />
-              ) : (
-                <>
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-quaternary)" strokeWidth="1.5" strokeLinecap="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                    <polyline points="17 8 12 3 7 8"/>
-                    <line x1="12" y1="3" x2="12" y2="15"/>
-                  </svg>
-                  <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 9 }}>
-                    Arraste imagem ou render de referência
-                  </span>
-                  <span style={{ fontSize: 10, color: 'var(--color-text-quaternary)', marginTop: 4 }}>PNG, JPG, WEBP — até 20 MB</span>
-                </>
-              )}
-            </div>
-
-            {imageFile && (
-              <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>
-                  {formatFileSize(imageFile.size)}
-                </div>
-                <button onClick={(e) => { e.stopPropagation(); resetImage() }}
-                  style={{ fontSize: 10, color: 'var(--color-text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                  Trocar imagem
-                </button>
-              </div>
-            )}
-
-            <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }}
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) loadImageFile(f) }} />
-          </Section>
-
-          {/* Nome do projeto */}
-          <Section label="Nome do projeto (opcional)">
-            <input
-              type="text"
-              value={projectName}
-              onChange={(e) => setProjectName(e.target.value)}
-              placeholder="Ex.: Cobertura Itaim"
-              style={{
-                width: '100%', padding: '10px 12px', borderRadius: 8,
-                background: 'var(--color-input)',
-                border: '1px solid var(--color-input-border)',
-                color: 'var(--color-text-primary)', fontSize: 12,
-                letterSpacing: '-0.01em', outline: 'none',
-                transition: 'border-color 0.15s, background 0.15s',
-              }}
-              onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-border-focus)' }}
-              onBlur={(e)  => { e.currentTarget.style.borderColor = 'var(--color-input-border)' }}
-            />
-            <div style={{ fontSize: 10, color: 'var(--color-text-quaternary)', marginTop: 6 }}>
-              Aparece no rodapé do moodboard.
-            </div>
-          </Section>
-
-          {/* Ambiente */}
-          <Section label="Ambiente">
-            <PillRow
-              items={MOODBOARD_AMBIENTS}
-              selected={ambient}
-              onSelect={(id) => setAmbient(id as MoodboardAmbient)}
-            />
-          </Section>
-
-          {/* Estilo */}
-          <Section label="Estilo">
-            <PillRow
-              items={MOODBOARD_STYLES}
-              selected={style}
-              onSelect={(id) => setStyle(id as MoodboardStyle)}
-            />
-          </Section>
-
-          {/* Paleta */}
-          <Section label="Paleta">
-            <PillRow
-              items={MOODBOARD_PALETTES}
-              selected={palette}
-              onSelect={(id) => setPalette(id as MoodboardPalette)}
-            />
-          </Section>
-
-          {/* Nível */}
-          <Section label="Nível">
-            <div style={{ display: 'flex', gap: 8 }}>
-              {MOODBOARD_LEVELS.map((l) => {
-                const selected = level === l.id
-                return (
-                  <button key={l.id} onClick={() => setLevel(l.id)}
-                    style={{
-                      flex: 1, padding: '10px 8px', borderRadius: 8,
-                      border: `1px solid ${selected ? 'var(--color-border-focus)' : 'var(--color-border)'}`,
-                      background: selected ? 'var(--color-surface-hover)' : 'transparent',
-                      cursor: 'pointer', textAlign: 'center', transition: 'all 0.15s',
-                    }}
-                  >
-                    <div style={{ fontSize: 12, fontWeight: 600, color: selected ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', letterSpacing: '-0.01em' }}>
-                      {l.label}
-                    </div>
-                    <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', marginTop: 3, lineHeight: 1.3 }}>
-                      {l.desc}
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-          </Section>
-
-          {/* Formato de saída */}
-          <Section label="Formato de saída">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {MOODBOARD_FORMATS.map((f) => {
-                const sel = format === f.id
-                return (
-                  <button key={f.id} onClick={() => setFormat(f.id)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 10,
-                      padding: '10px 12px', borderRadius: 8,
-                      border: `1px solid ${sel ? 'var(--color-border-strong)' : 'var(--color-border)'}`,
-                      background: sel ? 'var(--color-surface)' : 'transparent',
-                      cursor: 'pointer', textAlign: 'left', width: '100%',
-                      transition: 'border-color 0.15s, background 0.15s',
-                    }}>
-                    <div style={{
-                      width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-                      background: sel ? 'var(--color-text-primary)' : 'var(--color-text-quaternary)',
-                    }} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 12, fontWeight: 500, color: sel ? 'var(--color-text-primary)' : 'var(--color-text-secondary)' }}>
-                        {f.label}
-                      </div>
-                      <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
-                        {f.desc}
-                      </div>
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-          </Section>
-
-          {/* Identity hint */}
-          {studioName ? (
-            <div style={{
-              padding: '8px 12px', borderRadius: 8,
-              background: 'var(--color-accent-green-bg)',
-              border: '1px solid var(--color-accent-green-border)',
-              fontSize: 10, color: 'var(--color-accent-green)', lineHeight: 1.5,
-            }}>
-              <strong style={{ fontWeight: 600 }}>{studioName}</strong> aparecerá no cabeçalho do moodboard.
-            </div>
-          ) : (
-            <div style={{
-              padding: '8px 12px', borderRadius: 8,
-              background: 'var(--color-surface)',
-              border: '1px solid var(--color-border)',
-              fontSize: 10, color: 'var(--color-text-tertiary)', lineHeight: 1.5,
-            }}>
-              Configure sua{' '}
-              <Link href="/app/settings/identity" style={{ color: 'var(--color-text-secondary)', textDecoration: 'underline' }}>
-                identidade
-              </Link>{' '}
-              para aparecer no cabeçalho.
-            </div>
-          )}
-
-          {error && (
-            <div style={{ padding: '10px 12px', borderRadius: 8, background: 'var(--color-error-bg)', border: '0.5px solid var(--color-error-border)', fontSize: 11, color: 'var(--color-error)' }}>
-              {error}
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div style={{ padding: '16px 24px', borderTop: '0.5px solid var(--color-border)', flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
-              Custo: <span style={{ color: 'var(--color-text-secondary)', fontWeight: 500 }}>{nodeCost} Nodes</span>
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
-              Saldo: <span style={{ color: credits > 0 ? 'var(--color-text-secondary)' : 'var(--color-error)', fontWeight: 500 }}>{credits} Nodes</span>
-            </div>
-          </div>
-          <button onClick={handleSubmit} disabled={!canSubmit}
-            style={{
-              width: '100%', padding: '12px 20px', borderRadius: 8, border: 'none',
-              background: canSubmit ? 'var(--color-inverse)' : 'var(--color-surface-hover)',
-              color: canSubmit ? 'var(--color-inverse-foreground)' : 'var(--color-text-quaternary)',
-              fontSize: 13, fontWeight: 600, cursor: canSubmit ? 'pointer' : 'not-allowed',
-              transition: 'background 0.15s, color 0.15s', letterSpacing: '-0.01em',
-            }}
-          >
+        <CostDock cost={nodeCost} balance={credits}>
+          <button type="button" className="spn-cta" onClick={handleSubmit} disabled={!canSubmit}>
             {isLoading
-              ? loadingText
+              ? 'Gerando…'
               : credits < nodeCost
-              ? 'Sem Nodes suficientes'
+              ? 'Saldo insuficiente'
               : result
-              ? `Gerar novo (${nodeCost} nodes)`
+              ? 'Gerar de novo'
               : TOOL.ctaLabel}
           </button>
-        </div>
+        </CostDock>
       </div>
 
-      {/* ── Right panel · resultado ──────────────────────────────────────────── */}
-      <div style={{
-        flex: 1, display: 'flex', flexDirection: 'column',
-        overflow: 'hidden',
-      }}>
+      {/* ── Palco ──────────────────────────────────────────────────────────── */}
+      <div className="spn-tool-stage spn-glass">
+        {isLoading ? <StageLoading label={loadingText} /> : null}
 
-        {isLoading && (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
-            <div style={{ width: 40, height: 40, borderRadius: '50%', border: '2px solid var(--color-border-strong)', borderTop: '2px solid var(--color-text-secondary)', animation: 'spin 0.9s linear infinite' }} />
-            <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', letterSpacing: '0.02em' }}>{loadingText}</div>
+        {!isLoading && !result ? (
+          <div className="spn-empty" style={{ maxWidth: 360 }}>
+            Seu moodboard aparece aqui.
+            <br />
+            Escolha ambiente, estilo e paleta — a referência é opcional.
           </div>
-        )}
+        ) : null}
 
-        {!isLoading && !result && <EmptyState />}
-
-        {!isLoading && result && (
+        {!isLoading && result ? (
           <ResultView
             result={result}
             format={format}
@@ -437,13 +269,97 @@ export default function MoodboardClient({ initialCredits, studioName: initialStu
             onDownload={handleDownload}
             isExporting={isExporting}
           />
-        )}
+        ) : null}
       </div>
+
+      {/* ── Folhas ─────────────────────────────────────────────────────────── */}
+      <Sheet open={sheet === 'cena'} title="Cena" onClose={() => setSheet(null)}>
+        <div className="spn-field">
+          <span className="spn-field-label">Ambiente</span>
+          <PillGroup
+            label="Ambiente"
+            options={AMBIENT_LABELS}
+            value={ambientLabel}
+            onChange={(label) => {
+              const found = MOODBOARD_AMBIENTS.find(a => a.label === label)
+              if (found) setAmbient(found.id)
+            }}
+          />
+        </div>
+      </Sheet>
+
+      <Sheet open={sheet === 'estilo'} title="Estilo" onClose={() => setSheet(null)}>
+        <div className="spn-field">
+          <span className="spn-field-label">Linguagem</span>
+          <PillGroup
+            label="Estilo"
+            options={STYLE_LABELS}
+            value={styleLabel}
+            onChange={(label) => {
+              const found = MOODBOARD_STYLES.find(s => s.label === label)
+              if (found) setStyle(found.id)
+            }}
+          />
+        </div>
+        <div className="spn-field">
+          <span className="spn-field-label">Paleta</span>
+          <PillGroup
+            label="Paleta"
+            options={PALETTE_LABELS}
+            value={paletteLabel}
+            onChange={(label) => {
+              const found = MOODBOARD_PALETTES.find(p => p.label === label)
+              if (found) setPalette(found.id)
+            }}
+          />
+        </div>
+      </Sheet>
+
+      <Sheet open={sheet === 'saida'} title="Saída" onClose={() => setSheet(null)}>
+        <div className="spn-field">
+          <span className="spn-field-label">Formato</span>
+          <ChoiceGroup
+            label="Formato"
+            cols={3}
+            value={format}
+            onChange={setFormat}
+            options={MOODBOARD_FORMATS.map(f => ({ value: f.id, title: f.label, note: f.desc }))}
+          />
+        </div>
+        <div className="spn-field">
+          <span className="spn-field-label">Nome do projeto</span>
+          <input
+            className="spn-input"
+            type="text"
+            value={projectName}
+            onChange={(e) => setProjectName(e.target.value)}
+            placeholder="Ex.: Cobertura Itaim"
+          />
+          <p className="spn-hint">
+            Aparece no rodapé da prancha.{' '}
+            {studioName
+              ? `No cabeçalho vai ${studioName}.`
+              : (
+                <>
+                  O cabeçalho fica vazio até você configurar a{' '}
+                  <Link href="/app/settings/identity" style={{ color: 'var(--color-text-secondary)' }}>
+                    identidade do estúdio
+                  </Link>.
+                </>
+              )}
+          </p>
+        </div>
+      </Sheet>
     </div>
   )
 }
 
-// ── Result view ─────────────────────────────────────────────────────────────
+// ── Resultado ───────────────────────────────────────────────────────────────
+//
+// O host do canvas mantém o fundo #1a1612 chapado de propósito: é cor de
+// artefato IMPRESSO, não do app. E nada de vidro dentro do SVG — ele é
+// serializado para PNG por lib/apresentar/svg-to-png.ts, e backdrop-filter
+// não sobrevive à serialização (a tela e o arquivo exportado divergiriam).
 
 function ResultView({
   result, format, studioName, projectName,
@@ -461,71 +377,38 @@ function ResultView({
 
   return (
     <div style={{
-      flex: 1, overflowY: 'auto',
-      padding: '32px 40px 56px',
-      animation: 'fadeIn 0.3s ease',
+      alignSelf: 'stretch', flex: 1, minHeight: 0, overflowY: 'auto',
+      padding: '20px 24px 32px',
     }}>
-      <div style={{ maxWidth: 980, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 28 }}>
+      <div style={{ maxWidth: 940, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' as const }}>
-          <div>
-            <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>
-              Moodboard · {formatSpec.label}
-            </div>
-            <h2 style={{ fontSize: 24, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.03em', margin: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+          <div style={{ minWidth: 0 }}>
+            <span className="spn-field-label">Moodboard · {formatSpec.label}</span>
+            <h2 style={{ fontSize: 22, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.03em' }}>
               {result.title}
             </h2>
-            <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' as const }}>
+            <div className="spn-pills" style={{ marginTop: 10 }}>
               {result.tags.map((t) => (
-                <span key={t} style={{
-                  fontSize: 10, fontWeight: 500,
-                  color: 'var(--color-text-secondary)',
-                  padding: '3px 9px', borderRadius: 999,
-                  background: 'var(--color-chip)',
-                  border: '0.5px solid var(--color-border-strong)',
-                  letterSpacing: '0.01em',
-                }}>
-                  {t}
-                </span>
+                <span key={t} className="spn-pill" style={{ cursor: 'default' }}>{t}</span>
               ))}
             </div>
           </div>
-          <button onClick={onDownload} disabled={isExporting}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 8,
-              padding: '10px 18px', borderRadius: 8,
-              background: 'var(--color-inverse)', color: 'var(--color-inverse-foreground)',
-              fontSize: 12, fontWeight: 600, border: 'none',
-              cursor: isExporting ? 'wait' : 'pointer', letterSpacing: '-0.01em',
-              opacity: isExporting ? 0.7 : 1, flexShrink: 0,
-            }}>
-            {isExporting ? (
-              <>
-                <span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: '50%', border: '1.5px solid color-mix(in srgb, var(--color-inverse-foreground) 20%, transparent)', borderTop: '1.5px solid var(--color-inverse-foreground)', animation: 'spin 0.8s linear infinite' }} />
-                Exportando…
-              </>
-            ) : (
-              <>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                  <polyline points="7 10 12 15 17 10"/>
-                  <line x1="12" y1="15" x2="12" y2="3"/>
-                </svg>
-                Baixar PNG ({formatSpec.width}×{formatSpec.height})
-              </>
-            )}
+          <button type="button" className="spn-ghost" onClick={onDownload} disabled={isExporting}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 7, flex: '0 0 auto' }}>
+            <DownloadIcon />
+            {isExporting ? 'Exportando…' : `Baixar PNG ${formatSpec.width}×${formatSpec.height}`}
           </button>
         </div>
 
-        {/* Preview do canvas — host com SVG escalado para o container */}
+        {/* Preview do canvas — host com o SVG escalado para o container. */}
         <div ref={canvasHostRef} style={{
           width: '100%',
           aspectRatio: `${formatSpec.width} / ${formatSpec.height}`,
-          maxHeight: '70vh',
+          maxHeight: '64vh',
           margin: '0 auto',
-          borderRadius: 12, overflow: 'hidden',
-          border: '0.5px solid var(--color-border-strong)',
+          borderRadius: 'var(--r-inner)', overflow: 'hidden',
+          border: '0.5px solid var(--glass-line)',
           background: '#1a1612',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
@@ -537,174 +420,58 @@ function ResultView({
           />
         </div>
 
-        {/* Panels informativos */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
-          {/* Paleta */}
-          <Panel title="Paleta">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
+          <ResultPanel title="Paleta">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {result.palette.map((s) => (
                 <div key={s.hex} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{
-                    width: 32, height: 32, borderRadius: 6, flexShrink: 0,
-                    background: s.hex,
-                    border: '0.5px solid var(--color-border-strong)',
+                  <span style={{
+                    width: 30, height: 30, borderRadius: 8, flexShrink: 0,
+                    background: s.hex, border: '0.5px solid var(--glass-line-strong)',
                   }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, color: 'var(--color-text-primary)', fontWeight: 500, letterSpacing: '-0.01em' }}>
-                      {s.name}
-                    </div>
-                    <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', marginTop: 2 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 12.5, color: 'var(--color-text-primary)', fontWeight: 500 }}>{s.name}</div>
+                    <div style={{
+                      fontSize: 10.5, color: 'var(--color-text-tertiary)', marginTop: 2,
+                      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                    }}>
                       {s.hex.toUpperCase()}
                     </div>
                   </div>
                 </div>
               ))}
             </div>
-          </Panel>
+          </ResultPanel>
 
-          {/* Conceito */}
-          <Panel title="Conceito">
-            <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', lineHeight: 1.65, margin: 0, letterSpacing: '-0.005em' }}>
+          <ResultPanel title="Conceito">
+            <p style={{ fontSize: 12.5, color: 'var(--color-text-secondary)', lineHeight: 1.65 }}>
               {result.concept}
             </p>
-          </Panel>
+          </ResultPanel>
         </div>
 
-        {/* Materiais */}
-        <Panel title="Materiais sugeridos">
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
+        <ResultPanel title="Materiais sugeridos">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 8 }}>
             {result.materials.map((m, i) => (
-              <div key={`${m.category}-${i}`} style={{
-                padding: '12px 14px',
-                background: 'var(--color-surface-subtle)',
-                border: '0.5px solid var(--color-border)',
-                borderRadius: 10,
-              }}>
-                <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--color-text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 6 }}>
-                  {m.category}
-                </div>
-                <div style={{ fontSize: 12.5, color: 'var(--color-text-primary)', fontWeight: 500, letterSpacing: '-0.01em', marginBottom: m.note ? 4 : 0 }}>
-                  {m.name}
-                </div>
-                {m.note && (
-                  <div style={{ fontSize: 10.5, color: 'var(--color-text-tertiary)', lineHeight: 1.45 }}>
-                    {m.note}
-                  </div>
-                )}
+              <div key={`${m.category}-${i}`} className="spn-glass spn-glass--raised"
+                   style={{ padding: '11px 13px', borderRadius: 'var(--r-inner)' }}>
+                <span className="spn-field-label" style={{ marginBottom: 5 }}>{m.category}</span>
+                <div style={{ fontSize: 12.5, color: 'var(--color-text-primary)', fontWeight: 500 }}>{m.name}</div>
+                {m.note ? <p className="spn-hint" style={{ marginTop: 3 }}>{m.note}</p> : null}
               </div>
             ))}
           </div>
-        </Panel>
+        </ResultPanel>
       </div>
     </div>
   )
 }
 
-// ── Empty state ─────────────────────────────────────────────────────────────
-
-function EmptyState() {
+function ResultPanel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, animation: 'fadeIn 0.2s ease' }}>
-      <div style={{ opacity: 0.16 }}>
-        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="0.8" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="9"/>
-          <circle cx="12" cy="6.5" r="1.4" fill="currentColor" stroke="none"/>
-          <circle cx="17" cy="10" r="1.4" fill="currentColor" stroke="none"/>
-          <circle cx="16" cy="15.5" r="1.4" fill="currentColor" stroke="none"/>
-          <circle cx="8" cy="15.5" r="1.4" fill="currentColor" stroke="none"/>
-          <circle cx="7" cy="10" r="1.4" fill="currentColor" stroke="none"/>
-        </svg>
-      </div>
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', fontWeight: 500, letterSpacing: '-0.01em' }}>
-          Seu moodboard aparecerá aqui
-        </div>
-        <div style={{ fontSize: 11, color: 'var(--color-text-quaternary)', marginTop: 5, lineHeight: 1.5, maxWidth: 340 }}>
-          Envie uma referência ou descreva o conceito e escolha ambiente, estilo, paleta e nível.
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── Sub-components ──────────────────────────────────────────────────────────
-
-function Breadcrumb() {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: 'var(--color-text-tertiary)', letterSpacing: '0.04em', textTransform: 'uppercase' as const }}>
-      <Link href="/app/apresentar" style={{ color: 'var(--color-text-tertiary)', textDecoration: 'none' }}>
-        Apresentar
-      </Link>
-      <span>›</span>
-      <span style={{ color: 'var(--color-text-secondary)' }}>Moodboard</span>
-    </div>
-  )
-}
-
-function Section({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 10 }}>
-        {label}
-      </label>
+    <section className="spn-glass" style={{ borderRadius: 'var(--r-card)', padding: '16px 18px' }}>
+      <span className="spn-field-label" style={{ marginBottom: 12 }}>{title}</span>
       {children}
-    </div>
+    </section>
   )
 }
-
-function Pill({ tone = 'green', children }: { tone?: 'green' | 'muted'; children: React.ReactNode }) {
-  const color = tone === 'green' ? 'var(--color-accent-green)' : 'var(--color-text-tertiary)'
-  const bg    = tone === 'green' ? 'var(--color-accent-green-bg)' : 'var(--color-chip)'
-  return (
-    <span style={{
-      fontSize: 8, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' as const,
-      color, background: bg, padding: '2px 6px', borderRadius: 999,
-    }}>
-      {children}
-    </span>
-  )
-}
-
-function PillRow<T extends string>({ items, selected, onSelect }: {
-  items: { id: T; label: string }[]
-  selected: T
-  onSelect: (id: T) => void
-}) {
-  return (
-    <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 6 }}>
-      {items.map(it => {
-        const isSel = selected === it.id
-        return (
-          <button key={it.id} onClick={() => onSelect(it.id)}
-            style={{
-              padding: '6px 11px', borderRadius: 6,
-              border: `1px solid ${isSel ? 'var(--color-border-focus)' : 'var(--color-border)'}`,
-              background: isSel ? 'var(--color-surface-hover)' : 'transparent',
-              fontSize: 11, color: isSel ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
-              cursor: 'pointer', transition: 'all 0.15s',
-            }}
-          >
-            {it.label}
-          </button>
-        )
-      })}
-    </div>
-  )
-}
-
-function Panel({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div style={{
-      padding: '18px 20px',
-      background: 'var(--color-surface-subtle)',
-      border: '0.5px solid var(--color-border)',
-      borderRadius: 12,
-    }}>
-      <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-text-tertiary)', marginBottom: 14 }}>
-        {title}
-      </div>
-      {children}
-    </div>
-  )
-}
-

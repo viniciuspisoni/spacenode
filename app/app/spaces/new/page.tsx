@@ -22,7 +22,7 @@ export default async function NewSpaceOriginPage() {
   const hasRenders = (renderCount ?? 0) > 0
 
   return (
-    <main style={{ flex: 1, overflowY: 'auto', background: 'var(--color-bg)' }}>
+    <main style={{ flex: 1, overflowY: 'auto' }}>
       <div style={{ maxWidth: 880, margin: '0 auto', padding: '40px 24px 80px' }}>
 
         {/* Breadcrumb */}
@@ -131,10 +131,10 @@ function OriginCard({
         position: 'relative',
         padding: '24px 22px',
         background: recommended
-          ? 'linear-gradient(135deg, rgba(29,158,117,0.08) 0%, rgba(29,158,117,0.02) 100%)'
+          ? 'var(--color-accent-green-bg)'
           : 'var(--color-bg-elevated)',
         border: recommended
-          ? '0.5px solid rgba(29,158,117,0.45)'
+          ? '0.5px solid var(--color-accent-green-border)'
           : '0.5px solid var(--color-border-strong)',
         borderRadius: 14,
         display: 'flex', flexDirection: 'column', gap: 14,

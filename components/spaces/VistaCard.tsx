@@ -32,11 +32,10 @@ export function VistaCard({ vista }: { vista: Vista }) {
   return (
     <Link
       href={`/app/spaces/${vista.space_id}/vistas/${vista.id}`}
+      className="spn-glass spn-card"
       style={{
         display: 'flex', flexDirection: 'column',
-        background: 'var(--color-bg-elevated)',
-        border: '0.5px solid var(--color-border)',
-        borderRadius: 12, overflow: 'hidden',
+        overflow: 'hidden',
         textDecoration: 'none', color: 'inherit',
         transition: 'border-color 0.2s, transform 0.2s',
         position: 'relative',
@@ -65,23 +64,21 @@ export function VistaCard({ vista }: { vista: Vista }) {
             display: 'flex', gap: 4, flexWrap: 'wrap', maxWidth: 'calc(100% - 44px)',
           }}>
             {opt && (
-              <div style={{
+              <div className="spn-glass spn-glass--raised" style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6,
-                padding: '4px 8px', borderRadius: 5,
-                background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)',
+                padding: '4px 8px', borderRadius: 999,
               }}>
                 <span style={{ width: 8, height: 8, borderRadius: 999, background: opt.color }} />
-                <span style={{ fontSize: 10, color: '#fff', letterSpacing: '0.02em' }}>
+                <span style={{ fontSize: 10, color: 'var(--color-text-primary)', letterSpacing: '0.02em' }}>
                   {opt.label}
                 </span>
               </div>
             )}
             {refOrigin && (
-              <div style={{
+              <div className="spn-glass spn-glass--raised" style={{
                 display: 'inline-flex', alignItems: 'center',
-                padding: '4px 8px', borderRadius: 5,
-                background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)',
-                fontSize: 9, color: 'rgba(255,255,255,0.8)',
+                padding: '4px 8px', borderRadius: 999,
+                fontSize: 9, color: 'var(--color-text-secondary)',
                 letterSpacing: '0.05em', textTransform: 'uppercase',
               }}>
                 {refOrigin}
@@ -91,10 +88,9 @@ export function VistaCard({ vista }: { vista: Vista }) {
         )}
 
         {vista.is_favorited && (
-          <div style={{
+          <div className="spn-glass spn-glass--raised" style={{
             position: 'absolute', top: 8, right: 8,
             width: 24, height: 24, borderRadius: 999,
-            background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             color: '#FFD25E',
           }}>
@@ -103,11 +99,11 @@ export function VistaCard({ vista }: { vista: Vista }) {
         )}
 
         {vista.dna_verified === false && (
-          <div style={{
+          <div className="spn-glass spn-glass--raised" style={{
             position: 'absolute', bottom: 8, right: 8,
             display: 'inline-flex', alignItems: 'center', gap: 4,
-            padding: '3px 7px', borderRadius: 4,
-            background: 'rgba(186,117,23,0.85)', color: '#fff',
+            padding: '3px 7px', borderRadius: 999,
+            color: 'var(--color-warning)',
             fontSize: 9, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase',
           }}>
             DNA divergente
@@ -118,20 +114,20 @@ export function VistaCard({ vista }: { vista: Vista }) {
           <div style={{ position: 'absolute', bottom: 8, left: 8, display: 'flex', gap: 4 }}>
             {/* Multi-DNA: vista com DNA próprio extraído (referência selecionável) */}
             {vista.dna && (
-              <div style={{
+              <div className="spn-glass spn-glass--raised" style={{
                 display: 'inline-flex', alignItems: 'center', gap: 4,
-                padding: '3px 7px', borderRadius: 4,
-                background: 'rgba(29,158,117,0.85)', color: '#fff',
+                padding: '3px 7px', borderRadius: 999,
+                color: 'var(--color-accent-green)',
                 fontSize: 9, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase',
               }}>
                 ◈ referência
               </div>
             )}
             {vista.is_edited && (
-              <div style={{
+              <div className="spn-glass spn-glass--raised" style={{
                 display: 'inline-flex', alignItems: 'center', gap: 4,
-                padding: '3px 7px', borderRadius: 4,
-                background: 'rgba(70,209,145,0.85)', color: '#042818',
+                padding: '3px 7px', borderRadius: 999,
+                color: 'var(--color-accent-green)',
                 fontSize: 9, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase',
               }}>
                 ✎ editada

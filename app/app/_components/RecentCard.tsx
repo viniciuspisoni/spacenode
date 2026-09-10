@@ -59,7 +59,7 @@ export function RecentCard({ render: r }: { render: RecentRender }) {
   const out       = r.output_url ?? ''
 
   return (
-    <div className="spn-dash-recent-card">
+    <div className="spn-dash-recent-card spn-glass">
       <div className="spn-dash-recent-thumb">
         {display && (
           // eslint-disable-next-line @next/next/no-img-element

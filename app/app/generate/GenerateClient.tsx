@@ -12,13 +12,16 @@ import {
   type EngineId, type Resolution,
   getNodesCost, isEngineId, isResolution, isValidCombination,
 } from '@/lib/engines'
-import { EngineIcon } from '@/components/icons/engines'
 import InsufficientNodesCta from '@/components/app/InsufficientNodesCta'
 import { consumeHandoff } from '@/components/nodi/actions-bus'
 import { uploadDirect } from '@/lib/storage/direct-upload-client'
 import GenerateGuide, {
   GUIDE_START_EVENT, GUIDE_DISMISSED_KEY, type GuidePhase,
 } from '@/components/app/GenerateGuide'
+import {
+  Sheet, SettingGroup, SettingRow, summarize,
+  Segmented, PillGroup, MultiPillGroup, ChoiceGroup, RowIcon, useAmbient,
+} from '@/components/app/glass'
 
 interface GenerateClientProps {
   /** Saldo total da bolsa (mensais + extras) — mesmo pool que o débito consome. */
@@ -87,6 +90,15 @@ const RESOLUTION_DESC: Record<Resolution, string> = {
   '4k': 'Máxima definição',
 }
 
+// O eixo que reconfigura tudo o mais fica na superfície (contrato do vidro,
+// §3.4). Tipado aqui em cima porque o <Segmented> infere T dos itens: um
+// array literal solto viraria `string` e o onChange deixaria de casar com
+// handleProjectTypeChange.
+const PROJECT_TYPE_ITEMS: ReadonlyArray<{ value: ProjectType; label: string }> = [
+  { value: 'exterior', label: 'Ambiente Exterior' },
+  { value: 'interior', label: 'Ambiente Interior' },
+]
+
 const EMPTY_MATERIALS: ProjectMaterials = {
   fachada: '', piso: '', esquadrias: '',
   paredes: '', teto: '', marcenaria: '', bancadas: '',
@@ -121,9 +133,16 @@ const MATERIAL_FIELDS_EXTERIOR: readonly MaterialField[] = [
   { field: 'outros',     label: 'Observações adicionais',  placeholder: 'ex: estrutura em concreto aparente, laje invertida' },
 ]
 
+/** As quatro famílias da coluna de config. Cada uma é uma linha + uma folha. */
+type SheetId = 'cena' | 'luz' | 'materiais' | 'saida'
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function firstOf(arr: string[]): string { return arr[0] ?? '' }
+
+function plural(n: number, one: string, many: string): string {
+  return `${n} ${n === 1 ? one : many}`
+}
 
 // ── Conversão de imagem no client (só formatos fora do upload direto) ─────────
 //
@@ -227,24 +246,6 @@ function resolveInitialConfig(cfg: ProjectConfig | null | undefined, isSubscribe
   }
 }
 
-function ProjectTypeGlyph({ type }: { type: ProjectType }) {
-  if (type === 'exterior') {
-    return (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <circle cx="12" cy="12" r="3.4" stroke="currentColor" strokeWidth="1.55" />
-        <path d="M12 3.8v2.1M12 18.1v2.1M20.2 12h-2.1M5.9 12H3.8M17.8 6.2l-1.5 1.5M7.7 16.3l-1.5 1.5M17.8 17.8l-1.5-1.5M7.7 7.7 6.2 6.2" stroke="currentColor" strokeWidth="1.55" strokeLinecap="round" />
-      </svg>
-    )
-  }
-
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect x="5.3" y="5.3" width="13.4" height="13.4" rx="3" stroke="currentColor" strokeWidth="1.45" />
-      <rect x="8.2" y="8.2" width="7.6" height="7.6" rx="1.8" fill="currentColor" opacity="0.9" />
-    </svg>
-  )
-}
-
 export function GenerateClient({ initialCredits, isSubscriber = false, initialMaterials, initialConfig, initialSourceUrl, returnTo, firstRender = false }: GenerateClientProps) {
   const init = resolveInitialConfig(initialConfig, isSubscriber)
   const fromSpacesNew = returnTo === 'spaces/new'
@@ -257,6 +258,10 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
   const [loadingTextVisible, setLoadingTextVisible] = useState(true)
   const [generationKey,      setGenerationKey]     = useState(0)
   const [error,              setError]             = useState<string | null>(null)
+
+  // ── Qual folha está aberta. Uma de cada vez: as quatro famílias são
+  //    excludentes e o scrim é único.
+  const [sheet, setSheet] = useState<SheetId | null>(null)
 
   // ── Tipo e Segmento
   const [projectType, setProjectType] = useState<ProjectType>(init.projectType)
@@ -277,8 +282,6 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
   const [selectedResolution, setSelectedResolution] = useState<Resolution>(init.selectedResolution)
 
   // ── Materiais
-  const [materiaisAberto, setMateriaisAberto] = useState(false)
-  const [elemAberto,      setElemAberto]      = useState(false)
   const [materials,       setMaterials]       = useState<ProjectMaterials>(initialMaterials ?? EMPTY_MATERIALS)
   const [salvando,        setSalvando]        = useState(false)
   const [salvoOk,         setSalvoOk]         = useState(false)
@@ -296,6 +299,11 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
   // de inventar veio/paginação a partir do texto. Sessão-only (não persiste).
   const [materialRefs,      setMaterialRefs]      = useState<Partial<Record<keyof ProjectMaterials, string>>>({})
   const [uploadingRef,      setUploadingRef]      = useState<keyof ProjectMaterials | null>(null)
+  // Erro da amostra tem estado PRÓPRIO. O único gatilho dele vive dentro da
+  // folha Materiais, e a folha é um portal em z-index 161 sobre um scrim de
+  // 160 — a caixa de erro do dock (z-index 40) fica atrás do scrim, então
+  // recusar um arquivo ali não produzia sinal visível nenhum pro usuário.
+  const [sampleError,       setSampleError]       = useState<string | null>(null)
   // Verificação estrutural do render_only (a API compara o resultado com o
   // original e devolve o veredito — mesmo papel do preservation_warning do
   // Spaces). null = sem verificação (nível != Máxima ou gate desligado).
@@ -338,6 +346,11 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
   //    tem referência fixa do "tudo o que deve ser preservado".
   const [refinementText, setRefinementText] = useState('')
 
+  // A imagem em foco vira o papel de parede do app: é o que faz o painel de
+  // vidro assumir a paleta do projeto, como no plugin. Enquanto não há
+  // resultado, o papel é a própria referência que o usuário enviou.
+  useAmbient(outputUrl ?? imagePreview)
+
   // ── Handoff do Nodi (ação confirmada no painel): pré-preenche engine,
   //    resolução e direção de refino. Aplicado pós-mount via rAF (sem mismatch
   //    de hidratação, sem setState síncrono em effect). O clique que gasta
@@ -364,9 +377,7 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
   // ── Guia da primeira imagem: abre sozinho pra conta que nunca gerou (e não
   //    dispensou); manual via /app/generate#guia ou "Como usar" da sidebar.
   //    Estado inicia fechado e abre em effect — sem mismatch de hidratação.
-  const [guideOpen,      setGuideOpen]      = useState(false)
-  const [guideAttention, setGuideAttention] = useState(false)
-  const attentionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [guideOpen, setGuideOpen] = useState(false)
 
   useEffect(() => {
     // Pós-mount via rAF, mesmo padrão do handoff do Nodi acima (sem setState
@@ -394,24 +405,9 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
     return () => window.removeEventListener(GUIDE_START_EVENT, onStart)
   }, [])
 
-  useEffect(() => () => {
-    if (attentionTimerRef.current) clearTimeout(attentionTimerRef.current)
-  }, [])
-
   const dismissGuide = () => {
     setGuideOpen(false)
     try { localStorage.setItem(GUIDE_DISMISSED_KEY, '1') } catch {}
-  }
-
-  // Rola a coluna de controles até o botão Gerar e pulsa pra localizá-lo —
-  // primeira visita costuma ter o CTA abaixo da dobra do painel esquerdo.
-  const locateGenerateButton = () => {
-    const btn = document.querySelector<HTMLElement>('[data-guide="gerar"]')
-    if (!btn) return
-    btn.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    setGuideAttention(true)
-    if (attentionTimerRef.current) clearTimeout(attentionTimerRef.current)
-    attentionTimerRef.current = setTimeout(() => setGuideAttention(false), 2700)
   }
 
   const fileInputRef         = useRef<HTMLInputElement>(null)
@@ -445,11 +441,13 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
     setSceneElements([])
   }
 
-  // ── Toggle scene element
-  const toggleElement = (el: string) => {
-    setSceneElements(prev =>
-      prev.includes(el) ? prev.filter(e => e !== el) : [...prev, el]
-    )
+  // ── Cascade: engine → resolução suportada
+  const handleEngineChange = (eid: EngineId) => {
+    setSelectedEngine(eid)
+    // Se a resolução atual não é suportada, cai pra 2K.
+    if (!ENGINES[eid].resolutions.includes(selectedResolution)) {
+      setSelectedResolution('2k')
+    }
   }
 
   // ── Loading texts
@@ -605,15 +603,15 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
   // ── Amostra de material: upload direto → URL pública ─────────────────────
   const handleMaterialRefUpload = async (field: keyof ProjectMaterials, file: File) => {
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      setError('Amostra deve ser JPG, PNG ou WebP.'); return
+      setSampleError('Amostra deve ser JPG, PNG ou WebP.'); return
     }
-    if (file.size > 8 * 1024 * 1024) { setError('Amostra muito grande. Máximo 8 MB.'); return }
-    setUploadingRef(field); setError(null)
+    if (file.size > 8 * 1024 * 1024) { setSampleError('Amostra muito grande. Máximo 8 MB.'); return }
+    setUploadingRef(field); setSampleError(null)
     try {
       const { url } = await uploadDirect(file, 'render-material', {}, { confirm: true })
       if (url) setMaterialRefs(prev => ({ ...prev, [field]: url }))
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Falha ao enviar a amostra.')
+      setSampleError(e instanceof Error ? e.message : 'Falha ao enviar a amostra.')
     } finally {
       setUploadingRef(null)
     }
@@ -794,12 +792,6 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
     }
   }, [])
 
-  // A compra (plano ou Nodes extras) acontece no billing — a rota de checkout
-  // exige payload tipado, então chamar direto daqui era um 400 silencioso.
-  const handleBuyCredits = () => {
-    window.location.href = '/app/billing'
-  }
-
   // ── Reseta o estado da geração atual pra começar um render do zero
   //    com nova imagem. Mantém os parâmetros (segmento, ambiente etc.) —
   //    só limpa o que pertence ao ciclo da imagem atual.
@@ -834,13 +826,14 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
 
   // ── Computed
   // Considera apenas os campos visíveis no projectType atual. Sem isso, um
-  // campo interior-only preenchido (ex: marcenaria) marcava o badge
-  // "preenchido" mesmo depois de trocar pra exterior, onde ele nem aparece.
+  // campo interior-only preenchido (ex: marcenaria) contaria no resumo mesmo
+  // depois de trocar pra exterior, onde ele nem aparece.
   const visibleMaterialFields = projectType === 'interior' ? MATERIAL_FIELDS_INTERIOR : MATERIAL_FIELDS_EXTERIOR
-  const hasMaterials  = visibleMaterialFields.some(({ field }) => {
+  const filledMaterials = visibleMaterialFields.filter(({ field }) => {
     const v = materials[field]
-    return v && v.trim()
-  })
+    return !!(v && v.trim())
+  }).length
+  const materialSamples = visibleMaterialFields.filter(({ field }) => materialRefs[field]).length
   const currentEngine = ENGINES[selectedEngine]
   const nodeCost      = getNodesCost(selectedEngine, selectedResolution)
   const segments      = getSegments(projectType)
@@ -848,8 +841,7 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
   const lightingOpts  = getLighting(projectType, segment)
   const backgrounds   = getBackgrounds(projectType)
   const elementsOpts  = getSceneElements(projectType, segment)
-  const bgTitle       = projectType === 'exterior' ? 'ENTORNO' : 'CONTEXTO VISUAL'
-  const typeLabel     = projectType === 'exterior' ? 'Fotorrealismo Exterior' : 'Fotorrealismo Interior'
+  const bgTitle       = projectType === 'exterior' ? 'Entorno' : 'Contexto visual'
   const noNodes       = credits < nodeCost
   // Quantos renders o saldo total cobre na config atual — recalcula client-side
   // a cada troca de motor/qualidade e após cada geração (credits é estado).
@@ -865,14 +857,35 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
   ).filter(o => o.cost <= credits)
    .sort((a, b) => b.cost - a.cost)[0] ?? null
 
-  // ── Summary lines
-  const summaryLine1 = `${typeLabel} · ${segment} · ${environment}`
-  const summaryLine2 = [
-    lighting   !== 'Preservar Original' ? lighting   : null,
-    background !== 'Preservar Original' ? background : null,
-    sceneElements.join(', '),
-  ].filter(Boolean).join(' · ')
-  const summaryLine3  = `Fidelidade máxima · ${currentEngine.name} · ${selectedResolution.toUpperCase()}`
+  // ── Resumos das quatro linhas ────────────────────────────────────────────
+  // Regra do contrato: entra o que o usuário ESCOLHEU. "Preservar Original"
+  // só aparece quando é a única coisa a dizer — senão é ruído ocupando a
+  // largura de uma linha de 44px.
+  const cenaSummary = summarize([
+    segment,
+    environment,
+    background !== 'Preservar Original' ? background : '',
+    sceneElements.length ? plural(sceneElements.length, 'elemento', 'elementos') : '',
+  ])
+  const luzSummary = lighting === 'Preservar Original' ? 'Preservar original' : lighting
+  const materiaisSummary = filledMaterials === 0 && materialSamples === 0
+    ? 'Preservar do original'
+    : summarize([
+        filledMaterials ? plural(filledMaterials, 'superfície', 'superfícies') : '',
+        materialSamples ? plural(materialSamples, 'amostra', 'amostras') : '',
+      ])
+  const saidaSummary = summarize([
+    currentEngine.name,
+    selectedResolution.toUpperCase(),
+    `${nodeCost} nodes`,
+  ])
+
+  // Rótulo do CTA: a mesma ação muda de nome conforme o que já existe na tela.
+  const ctaLabel = loading
+    ? 'Gerando…'
+    : refinementText.trim() && outputUrl && useAnchor ? 'Aplicar refinamento'
+    : outputUrl && useAnchor ? 'Gerar variação'
+    : 'Gerar render'
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -884,843 +897,592 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
     : imagePreview ? 'configure'
     : 'upload'
 
+  const closeSheet = () => setSheet(null)
+
   return (
-    <div className="spn-generate-shell" style={S.main}>
+    <div className="spn-tool">
 
-      {/* ── CONTROLES ── */}
-      <div className="spn-generate-controls" style={S.controls}>
+      {/* ── CONFIGURAÇÃO ──
+          Painel com scroll próprio e dock colado embaixo: o CTA não depende
+          mais de o usuário chegar ao fim da coluna. */}
+      <div className="spn-tool-panel spn-glass">
+        <div className="spn-tool-panel-body" style={S.panelBody}>
 
-        {/* Topbar */}
-        <div style={S.topbar}>
-          <span style={S.pageTitle}>RENDERIZAR</span>
-          <div style={S.credits}>
-            <span style={S.creditDot}/>
-            <span style={S.creditNum}>{credits}</span>
-            <span>nodes</span>
-            <button onClick={handleBuyCredits} style={S.buyBtn}>Recarregar</button>
-          </div>
-        </div>
-
-        {/* 1 — Tipo de Projeto */}
-        <div style={S.section}>
-          <div style={S.label}>TIPO DE PROJETO</div>
-          <div style={S.typeGrid}>
-            {(['exterior', 'interior'] as const).map(type => {
-              const active = projectType === type
-              return (
-                <button
-                  key={type}
-                  type="button"
-                  className={active ? 'spn-type-card spn-type-card--active' : 'spn-type-card'}
-                  aria-pressed={active}
-                  style={active ? {...S.typeCard, ...S.typeCardActive} : S.typeCard}
-                  onClick={() => handleProjectTypeChange(type)}
-                >
-                  <span style={{...S.typeIcon, ...(active ? S.typeIconActive : {})}}>
-                    <ProjectTypeGlyph type={type} />
-                  </span>
-                  <span style={{...S.typeLabel, ...(active ? {color:'var(--color-bg)'} : {})}}>
-                    {type === 'exterior' ? 'Ambiente Exterior' : 'Ambiente Interior'}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        <div style={S.divider}/>
-
-        {/* 2 — Segmento */}
-        <div style={S.section}>
-          <div style={S.label}>SEGMENTO</div>
-          <PillGroup options={segments} selected={segment} onChange={handleSegmentChange}/>
-        </div>
-
-        <div style={S.divider}/>
-
-        {/* 5 — Espaço */}
-        <div style={S.section}>
-          <div style={S.label}>ESPAÇO</div>
-          <PillGroup options={environments} selected={environment} onChange={setEnvironment}/>
-        </div>
-
-        <div style={S.divider}/>
-
-        {/* 6 — Iluminação */}
-        <div style={S.section}>
-          <div style={S.label}>ILUMINAÇÃO</div>
-          <PillGroup options={lightingOpts} selected={lighting} onChange={setLighting}/>
-        </div>
-
-        <div style={S.divider}/>
-
-        {/* 7 — Entorno / Contexto Visual */}
-        <div style={S.section}>
-          <div style={S.label}>{bgTitle}</div>
-          <PillGroup options={backgrounds} selected={background} onChange={setBackground}/>
-        </div>
-
-        <div style={S.divider}/>
-
-        {/* 8 — Materiais do Projeto */}
-        <div style={S.section}>
-          <button style={S.collapseBtn} onClick={() => setMateriaisAberto(!materiaisAberto)}>
-            <div style={{display:'flex', alignItems:'center', gap:8}}>
-              <span style={S.label}>MATERIAIS DO PROJETO</span>
-              {hasMaterials && <span style={S.materiaisBadge}>preenchido</span>}
-            </div>
-            <div style={{display:'flex', alignItems:'center', gap:6}}>
-              {salvando && <span style={{fontSize:9, color:'var(--color-text-tertiary)'}}>salvando...</span>}
-              {salvoOk  && <span style={{fontSize:9, color:'var(--color-accent-green)'}}>salvo ✓</span>}
-              <span style={{fontSize:14, color:'var(--color-text-tertiary)', transform: materiaisAberto ? 'rotate(180deg)' : 'none', display:'inline-block', transition:'transform 0.2s'}}>▾</span>
-            </div>
-          </button>
-          {materiaisAberto && (
-            <div style={S.materiaisGrid}>
-              {(projectType === 'interior' ? MATERIAL_FIELDS_INTERIOR : MATERIAL_FIELDS_EXTERIOR).map(({ field, label, placeholder }) => (
-                <div key={field} style={S.materialField}>
-                  <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:8}}>
-                    <div style={S.materialLabel}>{label}</div>
-                    {/* Amostra visual: foto do produto real reproduzida fielmente
-                        na superfície — muito mais preciso que o texto sozinho. */}
-                    {materialRefs[field] ? (
-                      <span style={S.matRefChip}>
-                        <img src={materialRefs[field]} alt={`Amostra de ${label}`} style={S.matRefThumb}/>
-                        <button
-                          style={S.matRefRemove}
-                          aria-label={`Remover amostra de ${label}`}
-                          onClick={() => setMaterialRefs(prev => { const next = { ...prev }; delete next[field]; return next })}
-                        >×</button>
-                      </span>
-                    ) : (
-                      <label style={{...S.matRefAdd, ...(uploadingRef !== null ? {opacity:0.5, cursor:'wait'} : {})}}>
-                        {uploadingRef === field ? 'enviando…' : '+ amostra'}
-                        <input
-                          type="file"
-                          accept="image/jpeg,image/png,image/webp"
-                          style={{display:'none'}}
-                          disabled={uploadingRef !== null}
-                          onChange={e => { const f = e.target.files?.[0]; if (f) handleMaterialRefUpload(field, f); e.target.value = '' }}
-                        />
-                      </label>
-                    )}
-                  </div>
-                  <input
-                    type="text"
-                    value={materials[field] ?? ''}
-                    placeholder={placeholder}
-                    onChange={e => handleMaterialChange(field, e.target.value)}
-                    style={S.materialInput}
-                  />
-                </div>
-              ))}
-              <p style={S.infoNote}>
-                Preencha apenas pra <strong>alterar</strong> materiais específicos. Em branco = preserva todos do original. Salvo automaticamente.
-                Anexe uma <strong>amostra</strong> (foto do produto) pro material ser reproduzido com exatidão.
-              </p>
-            </div>
-          )}
-        </div>
-
-        <div style={S.divider}/>
-
-        {/* 9 — Avançado */}
-        <div style={S.section}>
-          <button style={S.collapseBtn} onClick={() => setElemAberto(!elemAberto)}>
-            <div style={{display:'flex', alignItems:'center', gap:8}}>
-              <span style={S.label}>AVANÇADO</span>
-              {sceneElements.length > 0 && <span style={S.materiaisBadge}>{sceneElements.length} elemento{sceneElements.length > 1 ? 's' : ''}</span>}
-            </div>
-            <span style={{fontSize:14, color:'var(--color-text-tertiary)', transform: elemAberto ? 'rotate(180deg)' : 'none', display:'inline-block', transition:'transform 0.2s'}}>▾</span>
-          </button>
-          {elemAberto && (
-            <div style={{display:'flex', flexDirection:'column', gap:10}}>
-              <div style={S.label}>ELEMENTOS NA CENA</div>
-              <MultiPillGroup options={elementsOpts} selected={sceneElements} onToggle={toggleElement}/>
-              {sceneElements.length > 0 && (
-                <button
-                  style={{...S.buyBtn, fontSize:10, marginTop:4, textDecoration:'none', color:'var(--color-text-tertiary)'}}
-                  onClick={() => setSceneElements([])}
-                >
-                  limpar seleção
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div style={S.divider}/>
-
-        {/* 10 — Motor de IA (o seletor "Fidelidade ao projeto" foi
-            descontinuado: fidelidade é sempre máxima) */}
-        <div style={S.section}>
-          <div style={S.label}>MOTOR DE IA</div>
-          <div style={S.motorGrid}>
-            {ENGINE_ORDER.map(eid => {
-              const e = ENGINES[eid]
-              const active = selectedEngine === eid
-              return (
-                <div key={eid}
-                  role="button"
-                  aria-pressed={active}
-                  aria-label={`Motor ${e.name} · ${e.tagline}`}
-                  style={{...S.motorOpt, ...(active ? S.motorOptActive : {})}}
-                  onClick={() => {
-                    setSelectedEngine(eid)
-                    // Se a resolução atual não é suportada, cai pra 2K.
-                    if (!e.resolutions.includes(selectedResolution)) {
-                      setSelectedResolution('2k')
-                    }
-                  }}
-                >
-                  <EngineIcon engine={eid} style={{width:22, height:22, flexShrink:0}} />
-                  <div style={{display:'flex', flexDirection:'column', minWidth:0}}>
-                    <div style={{...S.motorName, ...(active ? {color:'var(--color-bg)'} : {})}}>{e.name}</div>
-                    <div style={{...S.motorDesc, ...(active ? {color:'var(--color-bg)', opacity:0.6} : {})}}>{e.tagline}</div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* 12 — Qualidade de Saída */}
-        <div style={S.section}>
-          <div style={S.label}>QUALIDADE DE SAÍDA</div>
-          <div style={S.qualityGrid}>
-            {currentEngine.resolutions.map(res => {
-              const active = selectedResolution === res
-              const cost   = currentEngine.nodes[res]!
-              return (
-                <div key={res}
-                  style={{...S.qualityOpt, ...(active ? S.qualityOptActive : {})}}
-                  onClick={() => setSelectedResolution(res)}
-                >
-                  <div style={{...S.qualityRes, ...(active ? {color:'var(--color-bg)'} : {})}}>{res.toUpperCase()}</div>
-                  <div style={{...S.motorDesc, ...(active ? {color:'var(--color-bg)', opacity:0.6} : {})}}>{cost} Nodes por imagem</div>
-                  <div style={{...S.motorDesc, ...(active ? {color:'var(--color-bg)', opacity:0.6} : {})}}>{RESOLUTION_DESC[res]}</div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-
-        {error && <div style={S.errorBox}>{error}</div>}
-
-        {/* Anchor toggle — só aparece depois da primeira geração */}
-        {outputUrl && (
-          <button
-            style={S.anchorRow}
-            onClick={() => setUseAnchor(v => !v)}
-            title={useAnchor
-              ? 'Desligar pra gerar do zero, sem ancorar nos materiais do render anterior'
-              : 'Ligar pra manter os materiais e texturas do render anterior'}
-          >
-            <span style={{display:'flex', alignItems:'center', gap:8}}>
-              <span style={{
-                width:14, height:14, borderRadius:4,
-                border:'0.5px solid var(--color-border-strong)',
-                background: useAnchor ? 'var(--color-text-primary)' : 'var(--color-bg-elevated)',
-                display:'flex', alignItems:'center', justifyContent:'center',
-                color:'var(--color-bg)', fontSize:9, fontWeight:600,
-              }}>{useAnchor ? '✓' : ''}</span>
-              <span style={{fontSize:11, color:'var(--color-text-primary)', fontWeight:500}}>
-                Manter materiais do render anterior
-              </span>
-            </span>
-            <span style={{fontSize:10, color:'var(--color-text-tertiary)'}}>
-              {useAnchor ? 'ancorado' : 'do zero'}
-            </span>
-          </button>
-        )}
-
-        {/* Refinar — só faz sentido com âncora ativa (precisa da #1 como referência) */}
-        {outputUrl && useAnchor && (
-          <div style={S.refineBox}>
-            <div style={S.refineLabel}>REFINAR IMAGEM (opcional)</div>
-            <textarea
-              value={refinementText}
-              onChange={e => setRefinementText(e.target.value)}
-              placeholder="ex: trocar o piso para porcelanato cinza claro, mantendo todo o resto"
-              rows={2}
-              style={S.refineInput}
-            />
-            <div style={S.refineHint}>
-              Deixe em branco pra apenas regerar com novos parâmetros. Preencha pra pedir uma alteração específica.
-            </div>
-          </div>
-        )}
-
-        {/* 11 — Botão Gerar · sem saldo, o CTA vira caminho pros planos */}
-        {noNodes ? (
-          <InsufficientNodesCta
-            needed={nodeCost}
-            available={credits}
-            alternative={cheaperFit ? {
-              label: `gere em ${ENGINES[cheaperFit.engine].name} · ${cheaperFit.res.toUpperCase()} por ${cheaperFit.cost} nodes`,
-              onClick: () => {
-                setSelectedEngine(cheaperFit.engine)
-                setSelectedResolution(cheaperFit.res)
-              },
-            } : undefined}
-          />
-        ) : (
-          <button
-            data-guide="gerar"
-            className={guideAttention ? 'spn-guide-attention' : undefined}
-            style={loading || !imagePreview
-              ? {...S.genBtn, opacity:0.6, cursor:'not-allowed'}
-              : S.genBtn}
-            onClick={() => handleGenerate()}
-            disabled={loading || !imagePreview}
-          >
-            <span>{loading
-              ? 'gerando…'
-              : (refinementText.trim() && outputUrl && useAnchor
-                  ? 'aplicar refinamento'
-                  : (outputUrl && useAnchor ? 'gerar variação' : 'gerar render'))
-            }</span>
-            <span style={S.genBtnMeta}>
-              <span>{nodeCost} Nodes por render</span>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-bg)" strokeWidth="1.5">
-                <path d="M5 12h14M13 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </span>
-          </button>
-        )}
-
-        {/* Alcance do saldo — sempre visível junto ao CTA */}
-        {noNodes ? (
-          <div style={S.balanceReach}>
-            saldo insuficiente para esta configuração —{' '}
-            <Link
-              href="/app/billing"
-              style={{ color: 'var(--color-text-primary)', textDecoration: 'underline', textUnderlineOffset: 2 }}
-            >
-              ver planos
+          <div style={S.topbar}>
+            <span style={S.pageTitle}>RENDERIZAR</span>
+            <Link href="/app/billing" className="spn-balance spn-glass spn-glass--raised"
+                  style={{ textDecoration: 'none' }} title="Recarregar nodes">
+              <span className="spn-balance-dot" aria-hidden />
+              <b>{credits}</b> nodes
             </Link>
           </div>
-        ) : (
-          <div style={S.balanceReach}>
-            seu saldo dá para ~{rendersAfford} render{rendersAfford === 1 ? '' : 's'} nessa configuração
-          </div>
-        )}
-      </div>
 
-      {/* ── PREVIEW ── */}
-      <div className="spn-generate-preview" style={S.preview}>
-        {guideOpen && (
-          <GenerateGuide
-            phase={guidePhase}
-            fromSpacesNew={fromSpacesNew}
-            onLocateGenerate={locateGenerateButton}
-            onDismiss={dismissGuide}
+          {/* Único controle que fica na superfície: é o eixo que reconfigura
+              segmento, espaço, luz, entorno, elementos e campos de material. */}
+          <Segmented
+            label="Tipo de projeto"
+            value={projectType}
+            onChange={handleProjectTypeChange}
+            items={PROJECT_TYPE_ITEMS}
           />
-        )}
-        <div style={S.topbar}>
-          <span style={S.pageTitle}>ANTES / DEPOIS</span>
-          {outputUrl && (
-            <button
-              onClick={() => downloadImage(outputUrl, outputFilename(outputUrl))}
-              style={{...S.downloadLink, background:'none', border:'none', padding:0, cursor:'pointer', fontFamily:'inherit'}}
-            >
-              baixar render ↓
-            </button>
-          )}
+
+          <SettingGroup>
+            <SettingRow icon={<RowIcon name="scene" />}     title="Cena"      value={cenaSummary}      onOpen={() => setSheet('cena')} />
+            <SettingRow icon={<RowIcon name="light" />}     title="Luz"       value={luzSummary}       onOpen={() => setSheet('luz')} />
+            <SettingRow icon={<RowIcon name="materials" />} title="Materiais" value={materiaisSummary} onOpen={() => setSheet('materiais')} />
+            <SettingRow icon={<RowIcon name="output" />}    title="Saída"     value={saidaSummary}     onOpen={() => setSheet('saida')} />
+          </SettingGroup>
+
+          <p className="spn-hint">
+            Tudo já vem decidido. O que você não pedir aqui é preservado do jeito
+            que está no seu modelo.
+          </p>
         </div>
 
-        {!imagePreview && (
-          <div
-            className={isDraggingFile ? 'spn-upload-zone spn-upload-zone--dragging' : 'spn-upload-zone'}
-            style={isDraggingFile ? {...S.uploadZone, borderColor:'var(--color-text-primary)', background:'var(--color-surface)'} : S.uploadZone}
-            onDragOver={e => { e.preventDefault(); setIsDraggingFile(true) }}
-            onDragLeave={() => setIsDraggingFile(false)}
-            onDrop={handleDrop}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <div style={S.uploadIcon}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="1.3">
-                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </div>
-            <div>
-              <div style={S.uploadTitle}>arraste sua imagem aqui</div>
-              <div style={S.uploadSub}>SketchUp · Render · 3D · JPG · PNG · até 15 MB</div>
-            </div>
-            <button style={S.uploadBtn} onClick={e => { e.stopPropagation(); fileInputRef.current?.click() }}>
-              escolher arquivo
-            </button>
-            <input ref={fileInputRef} type="file" accept="image/*" style={{display:'none'}}
-              onChange={e => { const f = e.target.files?.[0]; if (f) loadImage(f) }}/>
-          </div>
-        )}
+        {/* Dock: o CTA nunca some no scroll. */}
+        <div className="spn-dock spn-glass spn-glass--chrome">
+          {error && <div className="spn-error" style={{ marginBottom: 10 }}>{error}</div>}
 
-        {imagePreview && outputUrl && (
-          <div ref={compareOuterRef} style={S.compareOuter}>
-            {/* Palco com o aspecto do original: antes, depois e diff preenchem
-                o MESMO retângulo (objectFit:fill). Aspecto igual (caso comum,
-                pino de formato) = idêntico ao contain; quando o motor devolve
-                formato diferente, o depois é mapeado no quadro do antes e a
-                cortina segue alinhada — nada de render menor flutuando. */}
+          {noNodes ? (
+            <InsufficientNodesCta
+              needed={nodeCost}
+              available={credits}
+              alternative={cheaperFit ? {
+                label: `gere em ${ENGINES[cheaperFit.engine].name} · ${cheaperFit.res.toUpperCase()} por ${cheaperFit.cost} nodes`,
+                onClick: () => {
+                  setSelectedEngine(cheaperFit.engine)
+                  setSelectedResolution(cheaperFit.res)
+                },
+              } : undefined}
+            />
+          ) : (
+            <div className="spn-cost">
+              <div className="spn-cost-figures">
+                <div className="spn-cost-main">{nodeCost} nodes</div>
+                <div className="spn-cost-sub">
+                  {imagePreview
+                    ? `saldo para ~${rendersAfford} render${rendersAfford === 1 ? '' : 's'}`
+                    : 'envie uma imagem para começar'}
+                </div>
+              </div>
+              <button
+                type="button"
+                className="spn-cta"
+                onClick={() => handleGenerate()}
+                disabled={loading || !imagePreview}
+              >
+                {ctaLabel}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── PALCO ── */}
+      <div className="spn-glass" style={S.stage}>
+        <div style={S.stageBody}>
+
+          {guideOpen && (
+            <div style={S.guideSlot}>
+              <GenerateGuide
+                phase={guidePhase}
+                fromSpacesNew={fromSpacesNew}
+                onDismiss={dismissGuide}
+              />
+            </div>
+          )}
+
+          <div style={S.topbar}>
+            <span style={S.pageTitle}>{outputUrl ? 'ANTES / DEPOIS' : 'REFERÊNCIA'}</span>
+            {outputUrl && (
+              <button
+                type="button"
+                onClick={() => downloadImage(outputUrl, outputFilename(outputUrl))}
+                style={S.linkBtn}
+              >
+                baixar render ↓
+              </button>
+            )}
+          </div>
+
+          {!imagePreview && (
             <div
-              ref={compareRef}
+              className="spn-empty spn-glass"
               style={{
-                ...S.compareStage,
-                ...stageBox,
-                cursor: scale > 1 ? (isPanning ? 'grabbing' : 'grab') : 'ew-resize',
+                ...S.uploadZone,
+                ...(isDraggingFile ? { borderColor: 'var(--color-text-primary)' } : null),
               }}
-              onMouseDown={(e) => {
-                if (scale > 1) {
-                  panStartRef.current = { mouseX: e.clientX, mouseY: e.clientY, panX: pan.x, panY: pan.y }
-                  setIsPanning(true)
-                } else {
-                  setIsDraggingSlider(true)
-                }
-              }}
-              onDoubleClick={() => { setScale(1); setPan({ x: 0, y: 0 }) }}
+              onDragOver={e => { e.preventDefault(); setIsDraggingFile(true) }}
+              onDragLeave={() => setIsDraggingFile(false)}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
             >
-              {/* Antes — dentro do wrapper transformável */}
-              <div style={{
-                position:'absolute', inset:0,
-                transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
-                transformOrigin:'0 0',
-                pointerEvents:'none',
-              }}>
-                <img src={imagePreview} alt="Antes" style={S.stageImg} draggable={false} onLoad={readBeforeAspect}/>
+              <div style={S.uploadIcon}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3">
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
               </div>
-              {/* Depois — clip em coords do palco, transform aplicado dentro do clip */}
-              <div style={{...S.compareAfterWrap, clipPath:`inset(0 ${100-sliderPos}% 0 0)`, pointerEvents:'none'}}>
-                <div style={{
-                  position:'absolute', inset:0,
-                  transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
-                  transformOrigin:'0 0',
-                }}>
-                  <img src={outputUrl} alt="Depois" style={S.stageImg} draggable={false}/>
-                </div>
+              <div>
+                <div style={S.uploadTitle}>arraste sua imagem aqui</div>
+                <div style={S.uploadSub}>SketchUp · Render · 3D · JPG · PNG · até 15 MB</div>
               </div>
-              {/* Handle do slider em coords do palco; ativa pointerEvents só no círculo
-                  pra continuar arrastável quando zoomado (parent passa a iniciar pan). */}
-              <div style={{...S.compareHandle, left:`${sliderPos}%`}}>
-                <div
-                  style={{...S.compareHandleCircle, pointerEvents:'auto', cursor:'ew-resize'}}
-                  onMouseDown={(e) => { e.stopPropagation(); setIsDraggingSlider(true) }}
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" strokeWidth="2">
-                    <path d="M8 5l-5 7 5 7M16 5l5 7-5 7" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </div>
-              </div>
-              <span style={{...S.compareLabel, left:14}}>ANTES</span>
-              <span style={{...S.compareLabel, right:14}}>DEPOIS</span>
-              {/* Overlay do mapa de diferenças estruturais — cobre o comparador
-                  inteiro (acompanha zoom/pan) e não captura eventos. */}
-              {showDiff && lastRenderId && (
+              <button type="button" className="spn-ghost" onClick={e => { e.stopPropagation(); fileInputRef.current?.click() }}>
+                escolher arquivo
+              </button>
+              <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }}
+                onChange={e => { const f = e.target.files?.[0]; if (f) loadImage(f) }}/>
+            </div>
+          )}
+
+          {imagePreview && outputUrl && (
+            <div ref={compareOuterRef} style={S.compareOuter}>
+              {/* Palco com o aspecto do original: antes, depois e diff preenchem
+                  o MESMO retângulo (objectFit:fill). Aspecto igual (caso comum,
+                  pino de formato) = idêntico ao contain; quando o motor devolve
+                  formato diferente, o depois é mapeado no quadro do antes e a
+                  cortina segue alinhada — nada de render menor flutuando. */}
+              <div
+                ref={compareRef}
+                style={{
+                  ...S.compareStage,
+                  ...stageBox,
+                  cursor: scale > 1 ? (isPanning ? 'grabbing' : 'grab') : 'ew-resize',
+                }}
+                onMouseDown={(e) => {
+                  if (scale > 1) {
+                    panStartRef.current = { mouseX: e.clientX, mouseY: e.clientY, panX: pan.x, panY: pan.y }
+                    setIsPanning(true)
+                  } else {
+                    setIsDraggingSlider(true)
+                  }
+                }}
+                onDoubleClick={() => { setScale(1); setPan({ x: 0, y: 0 }) }}
+              >
+                {/* Antes — dentro do wrapper transformável */}
                 <div style={{
                   position:'absolute', inset:0,
                   transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
                   transformOrigin:'0 0',
                   pointerEvents:'none',
-                  opacity:0.92,
                 }}>
-                  <img
-                    src={`/api/renders/${lastRenderId}/diff`}
-                    alt="Mapa de diferenças estruturais"
-                    style={S.stageImg}
-                    draggable={false}
-                  />
+                  <img src={imagePreview} alt="Antes" style={S.stageImg} draggable={false} onLoad={readBeforeAspect}/>
                 </div>
-              )}
-              {scale > 1 && (
-                <div style={S.zoomBadge}>{Math.round(scale * 100)}%</div>
-              )}
+                {/* Depois — clip em coords do palco, transform aplicado dentro do clip */}
+                <div style={{...S.compareAfterWrap, clipPath:`inset(0 ${100-sliderPos}% 0 0)`, pointerEvents:'none'}}>
+                  <div style={{
+                    position:'absolute', inset:0,
+                    transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
+                    transformOrigin:'0 0',
+                  }}>
+                    <img src={outputUrl} alt="Depois" style={S.stageImg} draggable={false}/>
+                  </div>
+                </div>
+                {/* Handle do slider em coords do palco; ativa pointerEvents só no círculo
+                    pra continuar arrastável quando zoomado (parent passa a iniciar pan). */}
+                <div style={{...S.compareHandle, left:`${sliderPos}%`}}>
+                  <div
+                    style={{...S.compareHandleCircle, pointerEvents:'auto', cursor:'ew-resize'}}
+                    onMouseDown={(e) => { e.stopPropagation(); setIsDraggingSlider(true) }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" strokeWidth="2">
+                      <path d="M8 5l-5 7 5 7M16 5l5 7-5 7" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                </div>
+                <span style={{...S.compareLabel, left:14}}>ANTES</span>
+                <span style={{...S.compareLabel, right:14}}>DEPOIS</span>
+                {/* Overlay do mapa de diferenças estruturais — cobre o comparador
+                    inteiro (acompanha zoom/pan) e não captura eventos. */}
+                {showDiff && lastRenderId && (
+                  <div style={{
+                    position:'absolute', inset:0,
+                    transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
+                    transformOrigin:'0 0',
+                    pointerEvents:'none',
+                    opacity:0.92,
+                  }}>
+                    <img
+                      src={`/api/renders/${lastRenderId}/diff`}
+                      alt="Mapa de diferenças estruturais"
+                      style={S.stageImg}
+                      draggable={false}
+                    />
+                  </div>
+                )}
+                {scale > 1 && (
+                  <div style={S.zoomBadge}>{Math.round(scale * 100)}%</div>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {imagePreview && outputUrl && showDiff && (
-          <p style={{fontSize:10, color:'var(--color-text-tertiary)', margin:'6px 0 0', lineHeight:1.5}}>
-            <span style={{color:'#eb4034'}}>Vermelho</span>: bordas estruturais do
-            projeto original não encontradas no render — confira se são mudanças
-            pedidas ou desvios.
-          </p>
-        )}
+          {imagePreview && outputUrl && showDiff && (
+            <p className="spn-hint" style={{ marginTop: 0 }}>
+              <span style={{ color: 'var(--color-error)' }}>Vermelho</span>: bordas
+              estruturais do projeto original não encontradas no render — confira se
+              são mudanças pedidas ou desvios.
+            </p>
+          )}
 
-        {/* ── POST-GENERATION ACTIONS ── */}
-        {imagePreview && outputUrl && !loading && (
-          <div style={S.postGen}>
-            {/* Veredito da verificação estrutural (gate render_only): aviso
-                quando o score da entrega ficou abaixo do limite; selo discreto
-                quando a estrutura foi verificada com folga (≥ 0.8). */}
-            {fidelityWarning ? (
-              <div style={S.fidelityWarn}>
-                A verificação estrutural detectou possíveis diferenças em relação ao
-                projeto original.
-                {/* Corrigir drift: re-gera com a MESMA seed, condicionamento
-                    estrutural máximo (edge map + temperatura mínima) e sem
-                    âncora — muda o condicionamento, não a amostra. */}
+          {/* ── POST-GENERATION ACTIONS ──
+              Âncora e refino são CONTEXTUAIS: só existem depois do primeiro
+              resultado. Por isso vivem aqui, junto dele, e não como uma quinta
+              linha permanente na coluna de config. */}
+          {imagePreview && outputUrl && !loading && (
+            <div style={S.postGen}>
+              {/* Veredito da verificação estrutural (gate render_only): aviso
+                  quando o score da entrega ficou abaixo do limite; selo discreto
+                  quando a estrutura foi verificada com folga (≥ 0.8). */}
+              {fidelityWarning ? (
+                <div className="spn-error">
+                  A verificação estrutural detectou possíveis diferenças em relação ao
+                  projeto original.
+                  {/* Corrigir drift: re-gera com a MESMA seed, condicionamento
+                      estrutural máximo (edge map + temperatura mínima) e sem
+                      âncora — muda o condicionamento, não a amostra. */}
+                  <button
+                    type="button"
+                    className="spn-ghost"
+                    style={{ display: 'block', marginTop: 8 }}
+                    onClick={() => handleGenerate(undefined, { structuralBoost: true })}
+                  >
+                    Corrigir automaticamente ({nodeCost} nodes)
+                  </button>
+                </div>
+              ) : fidelityScore !== null && fidelityScore >= 0.8 ? (
+                <div style={S.fidelityOk}>✓ Estrutura verificada contra o projeto original</div>
+              ) : null}
+
+              {/* Âncora: pílula de ESTADO (role=switch), não um campo de config. */}
+              <div className="spn-pills">
                 <button
-                  onClick={() => handleGenerate(undefined, { structuralBoost: true })}
-                  style={{
-                    display:'block', marginTop:8, fontSize:11, fontWeight:600,
-                    color:'var(--color-error)', background:'none',
-                    border:'0.5px solid var(--color-error-border)', borderRadius:8,
-                    padding:'6px 12px', cursor:'pointer', fontFamily:'inherit',
-                  }}
+                  type="button"
+                  role="switch"
+                  className="spn-pill"
+                  aria-checked={useAnchor}
+                  onClick={() => setUseAnchor(v => !v)}
+                  title={useAnchor
+                    ? 'Desligar pra gerar do zero, sem ancorar nos materiais do render anterior'
+                    : 'Ligar pra manter os materiais e texturas do render anterior'}
                 >
-                  Corrigir automaticamente ({nodeCost} nodes)
+                  Manter materiais do render anterior
                 </button>
               </div>
-            ) : fidelityScore !== null && fidelityScore >= 0.8 ? (
-              <div style={S.fidelityOk}>✓ Estrutura verificada contra o projeto original</div>
-            ) : null}
+              {/* A pílula sozinha comunica o estado só pelo preenchimento —
+                  numa pílula ÚNICA (sem irmã pra comparar) isso é ambíguo, e
+                  o rótulo não muda. O original dizia "ancorado"/"do zero" ao
+                  lado do check; a linha abaixo devolve essa palavra. */}
+              <p className="spn-hint" style={{ marginTop: -4 }}>
+                {useAnchor
+                  ? 'Ligado — a próxima geração parte dos materiais do render atual.'
+                  : 'Desligado — a próxima geração começa do zero.'}
+              </p>
 
-            {selectedResolution === 'hd' && (
-              <div className="spn-upsell-note">
-                Melhore para 2K ou 4K para apresentação profissional
+              {/* Refinar — só faz sentido com âncora ativa (precisa da #1 como referência) */}
+              {useAnchor && (
+                <div className="spn-field" style={{ marginBottom: 0 }}>
+                  <span className="spn-field-label">Refinar imagem (opcional)</span>
+                  <textarea
+                    className="spn-textarea"
+                    value={refinementText}
+                    onChange={e => setRefinementText(e.target.value)}
+                    placeholder="ex: trocar o piso para porcelanato cinza claro, mantendo todo o resto"
+                    rows={2}
+                  />
+                  <p className="spn-hint">
+                    Em branco, o botão só regera com os parâmetros atuais. Preenchido,
+                    ele pede a alteração específica.
+                  </p>
+                </div>
+              )}
+
+              {selectedResolution === 'hd' && (
+                <div className="spn-upsell-note">
+                  Melhore para 2K ou 4K para apresentação profissional
+                </div>
+              )}
+
+              {/* Próximo passo natural depois da render. Sem verde: verde é
+                  estado, nunca ação (contrato do vidro, §2.3). */}
+              {lastRenderId && (
+                <Link
+                  href={`/app/spaces/new/from-render?render_id=${lastRenderId}`}
+                  className="spn-glass spn-glass--raised"
+                  style={S.nextStep}
+                >
+                  <span style={S.nextStepIcon} aria-hidden="true">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="3"/>
+                      <path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/>
+                    </svg>
+                  </span>
+                  <span style={S.nextStepBody}>
+                    <span style={S.nextStepTitle}>
+                      {fromSpacesNew
+                        ? 'Render pronta. Continuar criando o projeto'
+                        : 'Criar projeto a partir desta render'}
+                    </span>
+                    <span style={S.nextStepSub}>
+                      {fromSpacesNew
+                        ? 'Volte pro novo projeto com esta render já selecionada como Vista Mestre'
+                        : 'Trave o DNA e gere variações coerentes — iluminação, ângulo, horário'}
+                    </span>
+                  </span>
+                  <span style={S.nextStepArrow} aria-hidden="true">→</span>
+                </Link>
+              )}
+
+              {/* O primário da tela é o do dock. Aqui tudo é secundário. */}
+              <div style={S.postGenGrid}>
+                <button type="button" className="spn-ghost" onClick={() => downloadImage(outputUrl, outputFilename(outputUrl))}>
+                  Baixar imagem
+                </button>
+                <button type="button" className="spn-ghost" onClick={() => handleGenerate('2k')}>
+                  Melhorar qualidade (2K)
+                </button>
+                <button type="button" className="spn-ghost" onClick={handleNewRender}>
+                  Iniciar novo render
+                </button>
+                {/* Transparência de fidelidade: overlay com as bordas do original
+                    que não foram encontradas no render (endpoint /diff). */}
+                {lastRenderId && (
+                  <button type="button" className="spn-ghost" onClick={() => setShowDiff(v => !v)}>
+                    {showDiff ? 'Ocultar diferenças' : 'Ver diferenças'}
+                  </button>
+                )}
               </div>
-            )}
+            </div>
+          )}
 
-            {/* CTA Spaces — induz o próximo passo natural após a render. */}
-            {lastRenderId && (
-              <a
-                href={`/app/spaces/new/from-render?render_id=${lastRenderId}`}
-                className="render-to-space-cta"
-              >
-                <span className="render-to-space-cta__icon" aria-hidden="true">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="3"/>
-                    <path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/>
-                  </svg>
-                </span>
-                <span className="render-to-space-cta__body">
-                  <span className="render-to-space-cta__title">
-                    {fromSpacesNew
-                      ? 'Render pronta. Continuar criando o projeto'
-                      : 'Criar projeto a partir desta render'}
-                  </span>
-                  <span className="render-to-space-cta__sub">
-                    {fromSpacesNew
-                      ? 'Volte pro novo projeto com esta render já selecionada como Vista Mestre'
-                      : 'Trave o DNA e gere variações coerentes — iluminação, ângulo, horário'}
-                  </span>
-                </span>
-                <span className="render-to-space-cta__arrow" aria-hidden="true">→</span>
-              </a>
-            )}
-
-            <div style={S.postGenPrimary}>
-              <button className="spn-action spn-action--primary" onClick={() => handleGenerate()}>
-                Gerar nova variação
-              </button>
+          {imagePreview && !outputUrl && !loading && (
+            <div style={S.compareWrap}>
+              <img src={imagePreview} alt="Input" style={S.compareImg} onLoad={readBeforeAspect}/>
+              <span style={{...S.compareLabel, left:14}}>ANTES</span>
               <button
-                className="spn-action spn-action--primary"
-                onClick={() => downloadImage(outputUrl, outputFilename(outputUrl))}
+                type="button"
+                className="spn-ghost"
+                style={S.changeImageBtn}
+                onClick={() => { setImagePreview(null); setOutputUrl(null); setSourceFile(null); setServerInputUrl(null); setBeforeAspect(null) }}
               >
-                Baixar imagem
+                trocar imagem
               </button>
             </div>
-            <div style={S.postGenSecondary}>
-              <button className="spn-action spn-action--ghost" onClick={() => handleGenerate('2k')}>
-                Melhorar qualidade (2K / 4K)
-              </button>
-              <button className="spn-action spn-action--ghost" onClick={handleNewRender}>
-                Iniciar novo render
-              </button>
-            </div>
+          )}
 
-            {/* Transparência de fidelidade: overlay com as bordas do original
-                que não foram encontradas no render (endpoint /diff). */}
-            {lastRenderId && (
-              <button
-                onClick={() => setShowDiff(v => !v)}
-                style={{
-                  fontSize:10, letterSpacing:'0.06em', textTransform:'uppercase',
-                  color: showDiff ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
-                  background:'none', border:'none', cursor:'pointer', padding:'2px 0',
-                  fontFamily:'inherit', alignSelf:'center',
-                }}
-              >
-                {showDiff ? 'Ocultar mapa de diferenças' : 'Ver mapa de diferenças estruturais'}
-              </button>
-            )}
-
-            <style jsx>{`
-              .render-to-space-cta {
-                display: flex;
-                align-items: center;
-                gap: 14px;
-                padding: 14px 18px;
-                border-radius: 12px;
-                background: linear-gradient(135deg, var(--color-accent-green-bg) 0%, transparent 100%);
-                border: 0.5px solid var(--color-accent-green-border);
-                color: var(--color-text-primary);
-                text-decoration: none;
-                transition: transform 0.18s, border-color 0.18s, background 0.18s, box-shadow 0.18s;
-                position: relative;
-                overflow: hidden;
-              }
-              .render-to-space-cta::before {
-                content: '';
-                position: absolute;
-                inset: 0;
-                background: radial-gradient(circle at 100% 50%, var(--color-accent-green-bg) 0%, transparent 60%);
-                opacity: 0;
-                transition: opacity 0.25s;
-                pointer-events: none;
-              }
-              .render-to-space-cta:hover {
-                transform: translateY(-1px);
-                border-color: var(--color-accent-green);
-                box-shadow: 0 8px 24px var(--color-accent-green-bg);
-              }
-              .render-to-space-cta:hover::before { opacity: 1; }
-              .render-to-space-cta__icon {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                width: 36px;
-                height: 36px;
-                flex-shrink: 0;
-                border-radius: 10px;
-                background: var(--color-accent-green-bg);
-                color: var(--color-accent-green);
-              }
-              .render-to-space-cta__body {
-                display: flex;
-                flex-direction: column;
-                gap: 3px;
-                flex: 1;
-                min-width: 0;
-              }
-              .render-to-space-cta__title {
-                font-size: 13px;
-                font-weight: 500;
-                color: var(--color-text-primary);
-                letter-spacing: -0.01em;
-              }
-              .render-to-space-cta__sub {
-                font-size: 11px;
-                color: var(--color-text-tertiary);
-                letter-spacing: -0.005em;
-                line-height: 1.45;
-              }
-              .render-to-space-cta__arrow {
-                color: var(--color-accent-green);
-                font-size: 16px;
-                flex-shrink: 0;
-                transition: transform 0.18s;
-              }
-              .render-to-space-cta:hover .render-to-space-cta__arrow {
-                transform: translateX(3px);
-              }
-              @media (prefers-reduced-motion: reduce) {
-                .render-to-space-cta,
-                .render-to-space-cta__arrow,
-                .render-to-space-cta::before { transition: none; animation: none; }
-                .render-to-space-cta:hover { transform: none; }
-                .render-to-space-cta:hover .render-to-space-cta__arrow { transform: none; }
-              }
-            `}</style>
-          </div>
-        )}
-
-        {imagePreview && !outputUrl && !loading && (
-          <div style={S.compareWrap}>
-            <img src={imagePreview} alt="Input" style={S.compareImg} onLoad={readBeforeAspect}/>
-            <span style={{...S.compareLabel, left:14}}>ANTES</span>
-            <button style={S.changeImageBtn} onClick={() => { setImagePreview(null); setOutputUrl(null); setSourceFile(null); setServerInputUrl(null); setBeforeAspect(null) }}>
-              trocar imagem
-            </button>
-          </div>
-        )}
-
-        {loading && imagePreview && (
-          <div style={S.compareWrap}>
-            <img src={imagePreview} alt="Input" style={{...S.compareImg, opacity:0.12, filter:'blur(6px)'}}/>
-            <div style={S.loadingOverlay}>
-              <div className="constellation-loading" style={{color:'#fafafa'}}>
-                <ConstellationN size={40} />
-              </div>
-              <div style={{display:'flex', flexDirection:'column', alignItems:'center', gap:10}}>
-                <span style={{
-                  fontSize: 12,
-                  color: '#fafafa',
-                  letterSpacing: '0.06em',
-                  fontWeight: 500,
-                  opacity: loadingTextVisible ? 1 : 0,
-                  transition: 'opacity 0.22s ease',
-                }}>
-                  {loadingText}
-                </span>
-                <div style={{width:100, height:1, background:'rgba(255,255,255,0.1)', borderRadius:1, overflow:'hidden'}}>
-                  <div key={generationKey} style={{height:'100%', background:'rgba(255,255,255,0.45)', borderRadius:1, animation:'loadProgress 40s cubic-bezier(0.05,0,0.2,1) forwards'}}/>
+          {loading && imagePreview && (
+            <div style={S.compareWrap}>
+              <img src={imagePreview} alt="Input" style={{...S.compareImg, opacity:0.12, filter:'blur(6px)'}}/>
+              <div className="spn-overlay">
+                <div className="constellation-loading" style={{color:'#fafafa'}}>
+                  <ConstellationN size={40} />
+                </div>
+                <div style={{display:'flex', flexDirection:'column', alignItems:'center', gap:10}}>
+                  <span style={{
+                    fontSize: 12,
+                    letterSpacing: '0.06em',
+                    fontWeight: 500,
+                    opacity: loadingTextVisible ? 1 : 0,
+                    transition: 'opacity 0.22s ease',
+                  }}>
+                    {loadingText}
+                  </span>
+                  <div style={{width:100, height:1, background:'rgba(255,255,255,0.1)', borderRadius:1, overflow:'hidden'}}>
+                    <div key={generationKey} style={{height:'100%', background:'rgba(255,255,255,0.45)', borderRadius:1, animation:'loadProgress 40s cubic-bezier(0.05,0,0.2,1) forwards'}}/>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
-
-        {/* 11 — Resumo da Geração */}
-        <div style={S.promptPreview}>
-          <div style={S.promptLabel}>RESUMO DA GERAÇÃO</div>
-          <div style={S.promptText}>
-            <span style={{color:'var(--color-text-primary)', fontWeight:500}}>{summaryLine1}</span>
-            {hasMaterials && <span style={{color:'var(--color-accent-green)', fontSize:10, marginLeft:6}}>+ materiais</span>}
-            <br/>
-            <span style={{color:'var(--color-text-tertiary)'}}>{summaryLine2}</span>
-            <br/>
-            <span style={{color:'var(--color-text-tertiary)'}}>{summaryLine3}</span>
-          </div>
-
+          )}
         </div>
       </div>
+
+      {/* ── FOLHAS ────────────────────────────────────────────────────────────
+          A cascata (tipo → segmento → espaço/luz/elementos) continua inteira:
+          trocar segmento aqui dentro ainda reescreve espaço, luz e elementos,
+          e o auto-save de 1,5 s continua vendo só o estado final do batch. */}
+
+      <Sheet open={sheet === 'cena'} title="Cena" onClose={closeSheet}>
+        <div className="spn-field">
+          <span className="spn-field-label">Segmento</span>
+          <PillGroup label="Segmento" options={segments} value={segment} onChange={handleSegmentChange} />
+        </div>
+        <div className="spn-field">
+          <span className="spn-field-label">Espaço</span>
+          <PillGroup label="Espaço" options={environments} value={environment} onChange={setEnvironment} />
+        </div>
+        <div className="spn-field">
+          <span className="spn-field-label">{bgTitle}</span>
+          <PillGroup label={bgTitle} options={backgrounds} value={background} onChange={setBackground} />
+        </div>
+        <div className="spn-field">
+          <span className="spn-field-label">Elementos na cena</span>
+          <MultiPillGroup label="Elementos na cena" options={elementsOpts} values={sceneElements} onChange={setSceneElements} />
+          <p className="spn-hint">
+            Só o que você marcar entra na cena. Nada marcado = a cena fica como está no modelo.
+          </p>
+          {sceneElements.length > 0 && (
+            <button type="button" className="spn-ghost" style={{ marginTop: 10 }} onClick={() => setSceneElements([])}>
+              Limpar seleção
+            </button>
+          )}
+        </div>
+      </Sheet>
+
+      <Sheet open={sheet === 'luz'} title="Luz" onClose={closeSheet}>
+        <div className="spn-field">
+          <span className="spn-field-label">Iluminação</span>
+          <PillGroup label="Iluminação" options={lightingOpts} value={lighting} onChange={setLighting} />
+          <p className="spn-hint">
+            &quot;Preservar Original&quot; mantém exatamente a luz que já está no seu modelo.
+          </p>
+        </div>
+      </Sheet>
+
+      <Sheet open={sheet === 'materiais'} title="Materiais" onClose={closeSheet}>
+        <p className="spn-hint" style={{ marginTop: 0, marginBottom: 16 }}>
+          Preencha apenas pra <strong>alterar</strong> materiais específicos. Em branco =
+          preserva todos do original. Anexe uma <strong>amostra</strong> (foto do produto)
+          pro material ser reproduzido com exatidão.
+        </p>
+        {/* A recusa da amostra tem de aparecer AQUI: o dock fica atrás do
+            scrim enquanto a folha está aberta. */}
+        {sampleError && (
+          <div className="spn-error" role="alert" style={{ marginBottom: 16 }}>{sampleError}</div>
+        )}
+        {visibleMaterialFields.map(({ field, label, placeholder }) => (
+          <div key={field} className="spn-field">
+            <div style={S.materialHead}>
+              <span className="spn-field-label" style={{ marginBottom: 0 }}>{label}</span>
+              {/* Amostra visual: foto do produto real reproduzida fielmente
+                  na superfície — muito mais preciso que o texto sozinho. */}
+              {materialRefs[field] ? (
+                <span style={S.matRefChip}>
+                  <img src={materialRefs[field]} alt={`Amostra de ${label}`} style={S.matRefThumb}/>
+                  <button
+                    type="button"
+                    style={S.matRefRemove}
+                    aria-label={`Remover amostra de ${label}`}
+                    onClick={() => setMaterialRefs(prev => { const next = { ...prev }; delete next[field]; return next })}
+                  >×</button>
+                </span>
+              ) : (
+                <label className="spn-pill" style={{ ...S.matRefAdd, ...(uploadingRef !== null ? { opacity: 0.5, cursor: 'wait' } : null) }}>
+                  {uploadingRef === field ? 'enviando…' : '+ amostra'}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    style={{ display: 'none' }}
+                    disabled={uploadingRef !== null}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) handleMaterialRefUpload(field, f); e.target.value = '' }}
+                  />
+                </label>
+              )}
+            </div>
+            <input
+              className="spn-input"
+              type="text"
+              value={materials[field] ?? ''}
+              placeholder={placeholder}
+              onChange={e => handleMaterialChange(field, e.target.value)}
+            />
+          </div>
+        ))}
+        <p className="spn-hint" aria-live="polite">
+          {salvando ? 'salvando…' : salvoOk ? 'salvo ✓' : 'salvo automaticamente'}
+        </p>
+      </Sheet>
+
+      <Sheet open={sheet === 'saida'} title="Saída" onClose={closeSheet}>
+        <div className="spn-field">
+          <span className="spn-field-label">Motor</span>
+          <ChoiceGroup
+            label="Motor"
+            cols={3}
+            value={selectedEngine}
+            onChange={handleEngineChange}
+            options={ENGINE_ORDER.map(eid => ({
+              value: eid,
+              title: ENGINES[eid].name,
+              note:  ENGINES[eid].tagline,
+            }))}
+          />
+          <p className="spn-hint">{currentEngine.description}</p>
+        </div>
+        <div className="spn-field">
+          <span className="spn-field-label">Qualidade</span>
+          <ChoiceGroup
+            label="Qualidade"
+            cols={currentEngine.resolutions.length >= 3 ? 3 : 2}
+            value={selectedResolution}
+            onChange={setSelectedResolution}
+            options={currentEngine.resolutions.map(res => ({
+              value: res,
+              title: res.toUpperCase(),
+              note:  `${currentEngine.nodes[res] ?? 0} nodes`,
+            }))}
+          />
+          <p className="spn-hint">{RESOLUTION_DESC[selectedResolution]}</p>
+        </div>
+      </Sheet>
     </div>
   )
-}
-
-// ── Pill components ────────────────────────────────────────────────────────────
-
-function PillGroup({ options, selected, onChange }: { options: string[]; selected: string; onChange: (v: string) => void }) {
-  return (
-    <div style={{display:'flex', flexWrap:'wrap', gap:6}}>
-      {options.map(opt => {
-        const active = selected === opt
-        return (
-          <button
-            key={opt}
-            className={active ? 'spn-pill spn-pill--active' : 'spn-pill'}
-            style={active ? {...pill, ...pillActive} : pill}
-            onClick={() => onChange(opt)}
-          >
-            {opt}
-          </button>
-        )
-      })}
-    </div>
-  )
-}
-
-function MultiPillGroup({ options, selected, onToggle }: { options: string[]; selected: string[]; onToggle: (v: string) => void }) {
-  return (
-    <div style={{display:'flex', flexWrap:'wrap', gap:6}}>
-      {options.map(opt => {
-        const active = selected.includes(opt)
-        return (
-          <button
-            key={opt}
-            className={active ? 'spn-pill spn-pill--active' : 'spn-pill'}
-            style={active ? {...pill, ...pillActive} : pill}
-            onClick={() => onToggle(opt)}
-          >
-            {opt}
-          </button>
-        )
-      })}
-    </div>
-  )
-}
-
-const pill: React.CSSProperties = {
-  padding: '6px 13px', borderRadius: 999,
-  border: '0.5px solid var(--color-border-strong)',
-  fontSize: 11, color: 'var(--color-text-secondary)',
-  cursor: 'pointer', background: 'var(--color-chip)',
-  letterSpacing: '-0.005em', fontFamily: 'inherit',
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)',
-}
-const pillActive: React.CSSProperties = {
-  background: 'var(--color-chip-active)',
-  color: 'var(--color-chip-active-foreground)',
-  border: '0.5px solid var(--color-chip-active)',
-  boxShadow: 'var(--shadow-sm)',
 }
 
 // ── Styles ─────────────────────────────────────────────────────────────────────
+//
+// O que sobrou de inline é geometria (posição, grade, tamanho de imagem) e
+// tipografia de rótulo. Material, raio, sombra e curva vêm dos tokens — nada
+// de `borderRadius: 18` ou sombra literal (contrato do vidro, §1).
 
 const S: Record<string, React.CSSProperties> = {
-  main:              { display:'grid', gridTemplateColumns:'minmax(430px, 500px) minmax(0, 1fr)', height:'100%', width:'100%', overflow:'hidden', background:'var(--color-bg)' },
-  controls:          { padding:'28px 24px 30px', borderRight:'0.5px solid var(--color-border)', background:'var(--color-bg)', overflowY:'auto', display:'flex', flexDirection:'column', gap:18 },
-  preview:           { padding:'28px 28px 24px', background:'var(--color-bg)', display:'flex', flexDirection:'column', gap:18, minWidth:0 },
-  topbar:            { display:'flex', justifyContent:'space-between', alignItems:'center' },
+  panelBody:         { display:'flex', flexDirection:'column', gap:16 },
+  stage:             { minHeight:0, borderRadius:'var(--r-card)', overflow:'hidden', display:'flex', flexDirection:'column' },
+  stageBody:         { flex:1, minHeight:0, overflowY:'auto', padding:16, display:'flex', flexDirection:'column', gap:14 },
+  // O guia e o bloco pós-resultado NÃO encolhem: numa coluna flex, quem
+  // encolhe primeiro é quem tem altura automática, e aí o cartão do guia
+  // ficaria com o texto cortado em vez de a coluna rolar.
+  guideSlot:         { flex:'0 0 auto' },
+  topbar:            { display:'flex', justifyContent:'space-between', alignItems:'center', gap:10, flexShrink:0 },
   pageTitle:         { fontSize:10, letterSpacing:'0.24em', textTransform:'uppercase', color:'var(--color-text-tertiary)', fontWeight:600 },
-  credits:           { display:'flex', alignItems:'center', gap:7, fontSize:11, color:'var(--color-text-secondary)', padding:'7px 9px', border:'0.5px solid var(--color-border)', borderRadius:999, background:'var(--color-chip)' },
-  creditDot:         { width:5, height:5, borderRadius:'50%', background:'var(--color-accent-green)', boxShadow:'0 0 9px var(--color-accent-green-glow)', display:'inline-block' },
-  creditNum:         { color:'var(--color-text-primary)', fontWeight:650, fontSize:12 },
-  buyBtn:            { fontSize:'11px', color:'var(--color-text-tertiary)', background:'none', border:'none', cursor:'pointer', textDecoration:'none', marginLeft:'4px', fontFamily:'inherit' },
-  section:           { display:'flex', flexDirection:'column', gap:11 },
-  label:             { fontSize:10, letterSpacing:'0.17em', textTransform:'uppercase', color:'var(--color-text-tertiary)', fontWeight:600 },
-  divider:           { height:'0.5px', background:'var(--color-border)' },
-  typeGrid:          { display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 },
-  typeCard:          { border:'0.5px solid var(--color-border-strong)', borderRadius:14, padding:'13px 12px', minHeight:78, cursor:'pointer', textAlign:'center', background:'linear-gradient(180deg, var(--color-surface), var(--color-surface-subtle))', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:8, transition:'transform 0.18s ease, border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease' },
-  typeCardActive:    { border:'0.5px solid var(--color-chip-active)', background:'var(--color-chip-active)', boxShadow:'var(--shadow-md)' },
-  typeIcon:          { width:30, height:30, borderRadius:10, color:'var(--color-text-secondary)', background:'var(--color-surface)', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'inset 0 0 0 0.5px var(--color-border)' },
-  typeIconActive:    { color:'var(--color-bg)', background:'rgba(0,0,0,0.06)', boxShadow:'none' },
-  typeLabel:         { fontSize:11, fontWeight:560, color:'var(--color-text-primary)', lineHeight:1.3 },
-  infoNote:          { fontSize:11, color:'var(--color-text-tertiary)', lineHeight:1.6 },
-  collapseBtn:       { display:'flex', justifyContent:'space-between', alignItems:'center', background:'none', border:'none', cursor:'pointer', padding:0, width:'100%', fontFamily:'inherit' },
-  materiaisBadge:    { fontSize:9, letterSpacing:'0.08em', textTransform:'uppercase', background:'var(--color-accent-green-bg)', color:'var(--color-accent-green)', padding:'2px 7px', borderRadius:10 },
-  materiaisGrid:     { display:'flex', flexDirection:'column', gap:10, paddingTop:4 },
-  materialField:     { display:'flex', flexDirection:'column', gap:5 },
-  materialLabel:     { fontSize:10, color:'var(--color-text-tertiary)', letterSpacing:'0.05em' },
-  materialInput:     { padding:'9px 12px', border:'0.5px solid var(--color-input-border)', borderRadius:10, fontSize:11, color:'var(--color-text-primary)', background:'var(--color-input)', fontFamily:'inherit', outline:'none' },
-  sliderRow:         { display:'flex', alignItems:'center', gap:10 },
-  sliderEnd:         { fontSize:11, color:'var(--color-text-tertiary)' },
-  range:             { flex:1, accentColor:'var(--color-text-primary)', height:3 },
-  sliderVal:         { fontSize:12, fontWeight:500, color:'var(--color-text-primary)', minWidth:34, textAlign:'right' },
-  anchorRow:         { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'11px 14px', border:'0.5px solid var(--color-border-strong)', borderRadius:12, background:'var(--color-surface)', cursor:'pointer', fontFamily:'inherit', width:'100%' },
-  refineBox:         { display:'flex', flexDirection:'column', gap:7, padding:'13px 14px', border:'0.5px solid var(--color-border-strong)', borderRadius:12, background:'var(--color-surface)' },
-  refineLabel:       { fontSize:10, letterSpacing:'0.15em', textTransform:'uppercase', color:'var(--color-text-tertiary)', fontWeight:500 },
-  refineInput:       { padding:'9px 11px', border:'0.5px solid var(--color-input-border)', borderRadius:9, fontSize:11, color:'var(--color-text-primary)', background:'var(--color-input)', fontFamily:'inherit', outline:'none', resize:'vertical', minHeight:38 },
-  refineHint:        { fontSize:10, color:'var(--color-text-tertiary)', lineHeight:1.5 },
-  motorGrid:         { display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:7 },
-  motorOpt:          { display:'flex', alignItems:'center', gap:10, border:'0.5px solid var(--color-border-strong)', borderRadius:12, padding:'11px 10px', cursor:'pointer', background:'var(--color-surface)', color:'var(--color-text-primary)', transition:'background 0.18s ease, border-color 0.18s ease' },
-  motorOptActive:    { border:'0.5px solid var(--color-chip-active)', background:'var(--color-chip-active)', color:'var(--color-chip-active-foreground)' },
-  motorName:         { fontSize:11, fontWeight:560, color:'var(--color-text-primary)', marginBottom:3 },
-  motorTag:          { display:'inline-block', fontSize:9, letterSpacing:'0.08em', textTransform:'uppercase', background:'var(--color-border-strong)', color:'var(--color-text-tertiary)', padding:'2px 6px', borderRadius:4 },
-  motorDesc:         { fontSize:10, color:'var(--color-text-tertiary)', marginTop:4 },
-  qualityGrid:       { display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:7 },
-  qualityOpt:        { border:'0.5px solid var(--color-border-strong)', borderRadius:12, padding:'11px 8px', cursor:'pointer', background:'var(--color-surface)', textAlign:'center' as const, transition:'background 0.18s ease, border-color 0.18s ease' },
-  qualityOptActive:  { border:'0.5px solid var(--color-chip-active)', background:'var(--color-chip-active)' },
-  qualityRes:        { fontSize:14, fontWeight:500, color:'var(--color-text-primary)', marginBottom:4, letterSpacing:'-0.02em' },
-  errorBox:          { fontSize:12, color:'var(--color-error)', background:'var(--color-error-bg)', border:'0.5px solid var(--color-error-border)', borderRadius:12, padding:'10px 14px' },
-  genBtn:            { width:'100%', padding:'14px 17px', background:'var(--color-inverse)', color:'var(--color-inverse-foreground)', border:'none', borderRadius:12, fontSize:13, fontWeight:650, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'space-between', fontFamily:'inherit', boxShadow:'var(--shadow-md)', transition:'opacity 0.18s ease, transform 0.12s ease' },
-  genBtnMeta:        { display:'flex', alignItems:'center', gap:8, fontSize:11, color:'var(--color-text-tertiary)' },
-  balanceReach:      { fontSize:11, color:'var(--color-text-tertiary)', textAlign:'center', letterSpacing:'-0.005em', lineHeight:1.5, marginTop:-8 },
-  uploadZone:        { border:'0.5px dashed var(--color-border-strong)', borderRadius:18, padding:'50px 20px', textAlign:'center', cursor:'pointer', background:'var(--color-upload-area)', flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:14, minHeight:300, boxShadow:'var(--shadow-lg)', transition:'background 0.18s ease, border-color 0.18s ease, transform 0.18s ease' },
-  uploadIcon:        { width:44, height:44, borderRadius:14, background:'var(--color-surface)', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'inset 0 0 0 0.5px var(--color-border)' },
+  linkBtn:           { fontSize:11, color:'var(--color-text-tertiary)', background:'none', border:'none', padding:0, cursor:'pointer', fontFamily:'inherit' },
+
+  uploadZone:        { flex:1, minHeight:300, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:14, cursor:'pointer' },
+  uploadIcon:        { width:44, height:44, borderRadius:'var(--r-inner)', color:'var(--color-text-tertiary)', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'inset 0 0 0 0.5px var(--glass-line-strong)' },
   uploadTitle:       { fontSize:15, fontWeight:500, color:'var(--color-text-primary)', letterSpacing:'-0.02em' },
   uploadSub:         { fontSize:12, color:'var(--color-text-tertiary)', marginTop:4 },
-  uploadBtn:         { padding:'8px 18px', border:'0.5px solid var(--color-border-strong)', borderRadius:999, fontSize:11, color:'var(--color-text-primary)', background:'var(--color-surface)', cursor:'pointer', fontFamily:'inherit' },
-  compareWrap:       { position:'relative', borderRadius:18, overflow:'hidden', flex:1, minHeight:300, background:'var(--color-preview-bg)', border:'0.5px solid var(--color-border)', boxShadow:'var(--shadow-lg)', userSelect:'none', cursor:'ew-resize' },
+
+  compareWrap:       { position:'relative', borderRadius:'var(--r-card)', overflow:'hidden', flex:1, minHeight:300, background:'var(--color-preview-bg)', border:'0.5px solid var(--glass-line)', boxShadow:'var(--shadow-float)', userSelect:'none', cursor:'ew-resize' },
   compareImg:        { position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'contain', pointerEvents:'none' },
   // Área flex do comparador (sem moldura) + palco dimensionado pelo aspecto do
   // original. As imagens do palco usam fill: o retângulo JÁ tem o aspecto do
   // antes, e o depois é esticado pra alinhar com a cortina quando o motor
   // devolve formato levemente diferente (drift grande vira aviso de fidelidade).
   compareOuter:      { position:'relative', flex:1, minHeight:300, minWidth:0, display:'flex', alignItems:'center', justifyContent:'center' },
-  compareStage:      { position:'relative', borderRadius:18, overflow:'hidden', maxWidth:'100%', maxHeight:'100%', background:'var(--color-preview-bg)', border:'0.5px solid var(--color-border)', boxShadow:'var(--shadow-lg)', userSelect:'none' },
+  compareStage:      { position:'relative', borderRadius:'var(--r-card)', overflow:'hidden', maxWidth:'100%', maxHeight:'100%', background:'var(--color-preview-bg)', border:'0.5px solid var(--glass-line)', boxShadow:'var(--shadow-float)', userSelect:'none' },
   stageImg:          { position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'fill', pointerEvents:'none' },
   compareAfterWrap:  { position:'absolute', inset:0 },
   compareHandle:     { position:'absolute', top:0, bottom:0, width:2, background:'#ffffff', transform:'translateX(-50%)', display:'flex', alignItems:'center', justifyContent:'center', pointerEvents:'none' },
   compareHandleCircle: { width:34, height:34, borderRadius:'50%', background:'#ffffff', border:'0.5px solid rgba(0,0,0,0.1)', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 8px 22px rgba(0,0,0,0.26)' },
   compareLabel:      { position:'absolute', bottom:12, fontSize:9, letterSpacing:'0.12em', color:'#fafafa', textTransform:'uppercase', fontWeight:500, textShadow:'0 1px 3px rgba(0,0,0,0.5)', pointerEvents:'none' },
-  changeImageBtn:    { position:'absolute', top:12, right:14, padding:'6px 12px', border:'0.5px solid rgba(255,255,255,0.28)', borderRadius:999, fontSize:10, color:'#fafafa', background:'var(--color-scrim)', cursor:'pointer', fontFamily:'inherit', backdropFilter:'blur(10px)' },
+  changeImageBtn:    { position:'absolute', top:12, right:14, zIndex:6 },
   zoomBadge:         { position:'absolute', top:12, left:14, padding:'3px 9px', fontSize:9, letterSpacing:'0.1em', color:'#fafafa', background:'var(--color-scrim)', borderRadius:10, fontWeight:500, pointerEvents:'none' },
-  loadingOverlay:    { position:'absolute', inset:0, background:'var(--color-scrim)', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:14 },
-  spinner:           { width:28, height:28, borderRadius:'50%', border:'2px solid rgba(255,255,255,0.3)', borderTopColor:'#ffffff', animation:'spin 0.8s linear infinite' },
-  promptPreview:     { background:'var(--color-surface-subtle)', border:'0.5px solid var(--color-border)', borderRadius:16, padding:'15px 17px' },
-  promptLabel:       { fontSize:9, letterSpacing:'0.16em', textTransform:'uppercase', color:'var(--color-text-tertiary)', fontWeight:600, marginBottom:8 },
-  promptText:        { fontSize:11, color:'var(--color-text-tertiary)', lineHeight:1.65 },
-  downloadLink:      { fontSize:11, color:'var(--color-text-tertiary)', textDecoration:'none' },
-  postGen:           { display:'flex', flexDirection:'column', gap:8 },
-  fidelityWarn:      { fontSize:12, color:'var(--color-error)', background:'var(--color-error-bg)', border:'0.5px solid var(--color-error-border)', borderRadius:12, padding:'10px 14px', lineHeight:1.5 },
+
+  postGen:           { display:'flex', flexDirection:'column', gap:12, flexShrink:0 },
+  postGenGrid:       { display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 },
   fidelityOk:        { fontSize:11, color:'var(--color-accent-green)', display:'flex', alignItems:'center', gap:6 },
-  matRefAdd:         { fontSize:9, color:'var(--color-text-tertiary)', border:'0.5px dashed var(--color-border-strong)', borderRadius:999, padding:'2px 8px', cursor:'pointer', whiteSpace:'nowrap' },
+
+  nextStep:          { display:'flex', alignItems:'center', gap:12, padding:'13px 14px', borderRadius:'var(--r-inner)', textDecoration:'none' },
+  nextStepIcon:      { width:32, height:32, flex:'0 0 32px', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--color-text-secondary)' },
+  nextStepBody:      { display:'flex', flexDirection:'column', gap:3, flex:1, minWidth:0 },
+  nextStepTitle:     { fontSize:12.5, fontWeight:560, color:'var(--color-text-primary)', letterSpacing:'-0.01em' },
+  nextStepSub:       { fontSize:11, color:'var(--color-text-tertiary)', lineHeight:1.45 },
+  nextStepArrow:     { flex:'0 0 auto', fontSize:15, color:'var(--color-text-quaternary)' },
+
+  materialHead:      { display:'flex', alignItems:'center', justifyContent:'space-between', gap:8, marginBottom:8 },
+  matRefAdd:         { fontSize:10, padding:'3px 9px', whiteSpace:'nowrap', cursor:'pointer' },
   matRefChip:        { display:'inline-flex', alignItems:'center', gap:4 },
-  matRefThumb:       { width:22, height:22, borderRadius:4, objectFit:'cover', border:'0.5px solid var(--color-border-strong)' },
+  matRefThumb:       { width:22, height:22, borderRadius:4, objectFit:'cover', border:'0.5px solid var(--glass-line-strong)' },
   matRefRemove:      { fontSize:12, color:'var(--color-text-tertiary)', background:'none', border:'none', cursor:'pointer', padding:0, lineHeight:1 },
-  postGenPrimary:    { display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 },
-  postGenSecondary:  { display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 },
 }
 
 export default GenerateClient

@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import type { SpaceWithCounts } from '@/lib/spaces/types'
 import { getVisualDna } from '@/lib/spaces/dna'
+import { Sheet } from '@/components/app/glass'
 import { ProjectCard } from './ProjectCard'
 
 type FilterId =
@@ -263,15 +264,7 @@ export function ProjectsLibrary({ spaces }: { spaces: SpaceWithCounts[] }) {
       </div>
 
       {/* Erro de ação (rename/duplicate/archive) */}
-      {error && (
-        <div style={{
-          marginBottom: 16, padding: '10px 14px', borderRadius: 'var(--radius-sm)',
-          background: 'var(--color-error-bg)', border: '0.5px solid var(--color-error-border)',
-          color: 'var(--color-error)', fontSize: 13, letterSpacing: '-0.005em',
-        }}>
-          {error}
-        </div>
-      )}
+      {error && <div className="spn-error" style={{ marginBottom: 16 }}>{error}</div>}
 
       {/* Grid / estados */}
       {spaces.length === 0 ? (
@@ -300,90 +293,46 @@ export function ProjectsLibrary({ spaces }: { spaces: SpaceWithCounts[] }) {
         </div>
       )}
 
-      {/* Modal renomear / arquivar */}
-      {modal && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          onClick={() => setModal(null)}
-          style={{
-            position: 'fixed', inset: 0, zIndex: 80,
-            background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
-          }}
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{
-              width: '100%', maxWidth: 420,
-              background: 'var(--color-bg-elevated)',
-              border: '0.5px solid var(--color-border-strong)',
-              borderRadius: 'var(--radius-lg)', padding: 24,
-              boxShadow: 'var(--shadow-xl)',
-            }}
-          >
-            {modal.type === 'rename' ? (
-              <>
-                <div style={{
-                  fontSize: 15, fontWeight: 500, color: 'var(--color-text-primary)',
-                  letterSpacing: '-0.02em', marginBottom: 14,
-                }}>
-                  Renomear projeto
-                </div>
-                <input
-                  autoFocus
-                  type="text"
-                  maxLength={80}
-                  value={renameValue}
-                  onChange={e => setRenameValue(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') confirmRename() }}
-                  className="spn-proj-search"
-                  style={{ maxWidth: 'none', paddingLeft: 12, marginBottom: 18 }}
-                  aria-label="Novo nome do projeto"
-                />
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                  <button type="button" className="spn-btn-ghost" onClick={() => setModal(null)}>
-                    Cancelar
-                  </button>
-                  <button
-                    type="button"
-                    className="spn-btn-primary"
-                    disabled={!renameValue.trim()}
-                    style={{ opacity: renameValue.trim() ? 1 : 0.5 }}
-                    onClick={confirmRename}
-                  >
-                    Salvar
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <div style={{
-                  fontSize: 15, fontWeight: 500, color: 'var(--color-text-primary)',
-                  letterSpacing: '-0.02em', marginBottom: 8,
-                }}>
-                  Arquivar “{modal.space.name}”?
-                </div>
-                <p style={{
-                  fontSize: 13, color: 'var(--color-text-tertiary)', lineHeight: 1.6,
-                  marginBottom: 20,
-                }}>
-                  O projeto sai da biblioteca, mas nada é apagado — vistas, DNA e packs
-                  continuam guardados. Você pode restaurar pelo filtro Arquivados.
-                </p>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                  <button type="button" className="spn-btn-ghost" onClick={() => setModal(null)}>
-                    Cancelar
-                  </button>
-                  <button type="button" className="spn-btn-primary" onClick={confirmArchive}>
-                    Arquivar
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+      {/* Renomear e arquivar são folhas, não caixinhas centradas: a mesma
+          peça que o resto do app usa para "só se você quiser mexer". */}
+      <Sheet
+        open={modal?.type === 'rename'}
+        title="Renomear projeto"
+        onClose={() => setModal(null)}
+        doneLabel="Cancelar"
+      >
+        <div className="spn-field">
+          <span className="spn-field-label">Nome do projeto</span>
+          <input
+            autoFocus
+            type="text"
+            maxLength={80}
+            value={renameValue}
+            onChange={e => setRenameValue(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') confirmRename() }}
+            className="spn-input"
+            aria-label="Novo nome do projeto"
+          />
         </div>
-      )}
+        <button type="button" className="spn-cta" disabled={!renameValue.trim()} onClick={confirmRename}>
+          Salvar
+        </button>
+      </Sheet>
+
+      <Sheet
+        open={modal?.type === 'archive'}
+        title={modal ? `Arquivar “${modal.space.name}”?` : 'Arquivar projeto'}
+        onClose={() => setModal(null)}
+        doneLabel="Cancelar"
+      >
+        <p className="spn-hint" style={{ marginTop: 0, marginBottom: 16 }}>
+          O projeto sai da biblioteca, mas nada é apagado — vistas, DNA e packs
+          continuam guardados. Você pode restaurar pelo filtro Arquivados.
+        </p>
+        <button type="button" className="spn-cta" onClick={confirmArchive}>
+          Arquivar
+        </button>
+      </Sheet>
     </>
   )
 }
@@ -392,12 +341,9 @@ export function ProjectsLibrary({ spaces }: { spaces: SpaceWithCounts[] }) {
 
 function EmptyLibrary() {
   return (
-    <div style={{
+    <div className="spn-empty" style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center',
-      justifyContent: 'center', padding: '80px 24px', textAlign: 'center',
-      background: 'var(--color-bg-elevated)',
-      border: '0.5px dashed var(--color-border-strong)',
-      borderRadius: 14,
+      justifyContent: 'center', padding: '80px 24px',
     }}>
       <div style={{
         width: 52, height: 52, borderRadius: '50%',
@@ -433,12 +379,9 @@ function EmptyLibrary() {
 
 function NoResults({ isArchiveFilter, onClear }: { isArchiveFilter: boolean; onClear: () => void }) {
   return (
-    <div style={{
+    <div className="spn-empty" style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center',
-      justifyContent: 'center', padding: '64px 24px', textAlign: 'center',
-      background: 'var(--color-bg-elevated)',
-      border: '0.5px dashed var(--color-border-strong)',
-      borderRadius: 14,
+      justifyContent: 'center', padding: '64px 24px',
     }}>
       <div style={{
         fontSize: 14, fontWeight: 500, color: 'var(--color-text-primary)',
@@ -454,7 +397,7 @@ function NoResults({ isArchiveFilter, onClear }: { isArchiveFilter: boolean; onC
           ? 'Projetos arquivados aparecem aqui e podem ser restaurados a qualquer momento.'
           : 'Ajuste a busca ou os filtros pra encontrar o que procura.'}
       </div>
-      <button type="button" className="spn-btn-ghost" onClick={onClear}>
+      <button type="button" className="spn-ghost" onClick={onClear}>
         Limpar busca e filtros
       </button>
     </div>
@@ -464,12 +407,10 @@ function NoResults({ isArchiveFilter, onClear }: { isArchiveFilter: boolean; onC
 // Estado de erro do carregamento server-side — botão de retry precisa de JS.
 export function ProjectsLoadError() {
   return (
-    <div style={{
+    <div className="spn-empty" style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center',
-      justifyContent: 'center', padding: '80px 24px', textAlign: 'center',
-      background: 'var(--color-bg-elevated)',
-      border: '0.5px solid var(--color-error-border)',
-      borderRadius: 14,
+      justifyContent: 'center', padding: '80px 24px',
+      borderStyle: 'solid', borderColor: 'var(--color-error-border)',
     }}>
       <div style={{
         fontSize: 15, fontWeight: 500, color: 'var(--color-text-primary)',

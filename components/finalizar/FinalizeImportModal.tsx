@@ -13,6 +13,7 @@
 // EditV2ImportModal — que vive na branch do edit-v2, não na main.
 
 import { useEffect, useRef, useState } from 'react'
+import { Segmented, Sheet } from '@/components/app/glass'
 import { createClient } from '@/lib/supabase/client'
 import { toMediaProxyUrl } from '@/lib/storage/media-url'
 import { uploadDirect } from '@/lib/storage/direct-upload-client'
@@ -112,57 +113,51 @@ export function FinalizeImportModal({ open, purpose, onClose, onSelect }: Props)
     }
   }
 
-  if (!open) return null
   const current = items[tab]
   const count = (t: Tab) => (items[t] !== null ? ` (${items[t]!.length})` : '')
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'var(--color-scrim)', display: 'grid', placeItems: 'center', padding: 24 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: 'min(880px, 100%)', maxHeight: '78vh', display: 'flex', flexDirection: 'column', background: 'var(--color-bg-elevated)', border: '0.5px solid var(--color-border-strong)', borderRadius: 16, overflow: 'hidden' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 18px', borderBottom: '0.5px solid var(--color-border)' }}>
-          <span style={{ fontSize: 14.5, fontWeight: 600, marginRight: 10 }}>
-            {purpose === 'base' ? 'Escolher imagem base' : 'Adicionar camada'}
-          </span>
-          <button type="button" style={tabBtn(tab === 'renders')} onClick={() => setTab('renders')}>Renders{count('renders')}</button>
-          <button type="button" style={tabBtn(tab === 'vistas')} onClick={() => setTab('vistas')}>Vistas{count('vistas')}</button>
-          <button type="button" style={tabBtn(tab === 'edits')} onClick={() => setTab('edits')}>Edições{count('edits')}</button>
-          <div style={{ flex: 1 }} />
-          <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading} style={tabBtn(false)}>
-            {uploading ? 'Enviando…' : 'Enviar arquivo'}
-          </button>
-          <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = '' }} />
-          <button type="button" onClick={onClose} style={{ fontSize: 13, color: 'var(--color-text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', marginLeft: 4 }}>Fechar</button>
-        </div>
-
-        <div style={{ overflowY: 'auto', padding: 16 }}>
-          {error && <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', padding: 24, textAlign: 'center' }}>{error}</div>}
-          {!error && current === null && <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', padding: 24, textAlign: 'center' }}>Carregando…</div>}
-          {!error && current !== null && current.length === 0 && <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', padding: 24, textAlign: 'center' }}>{EMPTY_COPY[tab]}</div>}
-          {!error && current && current.length > 0 && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
-              {current.map((item) => (
-                <button key={item.id} type="button" onClick={() => onSelect(item.url)} title={`${item.label} · ${item.createdAt ? new Date(item.createdAt).toLocaleDateString('pt-BR') : ''}`}
-                  style={{ position: 'relative', aspectRatio: '4 / 3', borderRadius: 10, overflow: 'hidden', border: '0.5px solid var(--color-border)', background: 'var(--color-surface)', cursor: 'pointer', padding: 0 }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={toMediaProxyUrl(item.url) ?? item.url} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+    <Sheet
+      open={open}
+      title={purpose === 'base' ? 'Escolher imagem base' : 'Adicionar camada'}
+      onClose={onClose}
+      doneLabel="Fechar"
+    >
+      {/* A fonte é UM eixo que reconfigura tudo abaixo — então fica na
+          superfície, como segmentado de 30px, e não como três abas soltas. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
+        <Segmented
+          label="Fonte da imagem"
+          value={tab}
+          onChange={setTab}
+          items={[
+            { value: 'renders', label: `Renders${count('renders')}` },
+            { value: 'vistas', label: `Vistas${count('vistas')}` },
+            { value: 'edits', label: `Edições${count('edits')}` },
+          ]}
+        />
+        <button type="button" className="spn-ghost" onClick={() => fileRef.current?.click()} disabled={uploading}
+                style={{ marginLeft: 'auto' }}>
+          {uploading ? 'Enviando…' : 'Enviar arquivo'}
+        </button>
+        <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = '' }} />
       </div>
-    </div>
-  )
-}
 
-function tabBtn(active: boolean): React.CSSProperties {
-  return {
-    padding: '6px 14px',
-    borderRadius: 8,
-    fontSize: 13,
-    border: `0.5px solid ${active ? 'var(--color-border-strong)' : 'transparent'}`,
-    background: active ? 'var(--color-surface-hover)' : 'transparent',
-    color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-    cursor: 'pointer',
-  }
+      {error && <div className="spn-error">{error}</div>}
+      {!error && current === null && <div className="spn-empty">Carregando…</div>}
+      {!error && current !== null && current.length === 0 && <div className="spn-empty">{EMPTY_COPY[tab]}</div>}
+      {!error && current && current.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(118px, 1fr))', gap: 8 }}>
+          {current.map((item) => (
+            <button key={item.id} type="button" className="spn-glass" onClick={() => onSelect(item.url)}
+              title={`${item.label} · ${item.createdAt ? new Date(item.createdAt).toLocaleDateString('pt-BR') : ''}`}
+              style={{ position: 'relative', aspectRatio: '4 / 3', borderRadius: 'var(--r-inner)', overflow: 'hidden', cursor: 'pointer', padding: 0 }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={toMediaProxyUrl(item.url) ?? item.url} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+            </button>
+          ))}
+        </div>
+      )}
+    </Sheet>
+  )
 }

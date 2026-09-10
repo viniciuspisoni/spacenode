@@ -104,7 +104,7 @@ export function IdentityEditor({ initialIdentity, planName, whiteLabelAllowed }:
   }
 
   // Preview accent (modo "derived" mostra default verde como exemplo)
-  const previewAccent = accentMode === 'fixed' ? accentFixed : '#1D9E75'
+  const previewAccent = accentMode === 'fixed' ? accentFixed : 'var(--color-accent-green)'
 
   return (
     <div style={{ maxWidth: 980, margin: '0 auto', padding: '40px 32px 80px' }}>
@@ -211,11 +211,11 @@ export function IdentityEditor({ initialIdentity, planName, whiteLabelAllowed }:
               </div>
             )}
             <div style={{ display: 'flex', gap: 6, flex: 1 }}>
-              <button onClick={() => fileInputRef.current?.click()} className="spn-action spn-action--ghost" style={{ width: 'auto', padding: '8px 14px', fontSize: 12 }}>
+              <button onClick={() => fileInputRef.current?.click()} className="spn-ghost" style={{ width: 'auto', padding: '8px 14px', fontSize: 12 }}>
                 {logoPreview ? 'Trocar' : 'Selecionar'}
               </button>
               {logoPreview && (
-                <button onClick={removeLogo} className="spn-action spn-action--ghost" style={{ width: 'auto', padding: '8px 14px', fontSize: 12, color: '#e57373' }}>
+                <button onClick={removeLogo} className="spn-ghost" style={{ width: 'auto', padding: '8px 14px', fontSize: 12, color: 'var(--color-error)' }}>
                   Remover
                 </button>
               )}
@@ -324,8 +324,8 @@ export function IdentityEditor({ initialIdentity, planName, whiteLabelAllowed }:
       {error && (
         <div style={{
           marginTop: 24, padding: '10px 14px', borderRadius: 8,
-          background: 'rgba(163,45,45,0.12)', border: '0.5px solid rgba(163,45,45,0.3)',
-          color: '#e57373', fontSize: 13,
+          background: 'var(--color-error-bg)', border: '0.5px solid var(--color-error-border)',
+          color: 'var(--color-error)', fontSize: 13,
         }}>
           {error}
         </div>
@@ -342,13 +342,13 @@ export function IdentityEditor({ initialIdentity, planName, whiteLabelAllowed }:
           {savedAt && (Date.now() - savedAt) < 8000 ? '✓ Identidade salva.' : ''}
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <Link href="/app" className="spn-action spn-action--ghost" style={{ width: 'auto', padding: '10px 18px', fontSize: 12 }}>
+          <Link href="/app" className="spn-ghost" style={{ width: 'auto', padding: '10px 18px', fontSize: 12 }}>
             Cancelar
           </Link>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="spn-action spn-action--primary"
+            className="spn-cta"
             style={{ width: 'auto', padding: '10px 18px', fontSize: 12 }}
           >
             {saving ? 'Salvando…' : 'Salvar identidade'}

@@ -136,7 +136,7 @@ export default async function AppPage() {
   const lowNodes   = availableNodes < 10
 
   return (
-    <main style={{ flex: 1, overflowY: 'auto', background: 'var(--color-bg)', padding: '0 32px 88px' }}>
+    <main style={{ flex: 1, overflowY: 'auto', padding: '0 32px 88px' }}>
       <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 34 }}>
 
         {/* ── 1 · Topo: saudação + CTA principal ───────────────────────────── */}
@@ -146,7 +146,7 @@ export default async function AppPage() {
             <p className="spn-dash-head-sub">Seu atelier de visualização arquitetônica.</p>
           </div>
           <div className="spn-dash-head-actions">
-            <Link href="/app/spaces/new" className="spn-dash-cta">
+            <Link href="/app/spaces/new" className="spn-cta spn-dash-cta">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
                 <line x1="12" y1="5" x2="12" y2="19"/>
                 <line x1="5" y1="12" x2="19" y2="12"/>
@@ -179,7 +179,7 @@ export default async function AppPage() {
         )}
 
         {/* ── 3 · Métricas discretas ────────────────────────────────────────── */}
-        <div className="spn-dash-stats-row">
+        <div className="spn-dash-stats-row spn-glass">
           <div className="spn-dash-stat" data-tour="nodes" style={lowNodes ? { boxShadow: 'inset 0 2px 0 var(--color-error-border)' } : undefined}>
             <div className="spn-dash-stat-label">Nodes disponíveis</div>
             <div className="spn-dash-stat-value" style={lowNodes ? { color: 'var(--color-error)' } : undefined}>
@@ -227,7 +227,7 @@ export default async function AppPage() {
               </>
             ) : (
               <div style={{ marginTop: 6 }}>
-                <Link href="/app/billing" style={{ fontSize: 11, color: 'var(--color-accent-green)', textDecoration: 'none', fontWeight: 500, letterSpacing: '-0.01em' }}>
+                <Link href="/app/billing" style={{ fontSize: 11, color: 'var(--color-text-primary)', textDecoration: 'none', fontWeight: 500, letterSpacing: '-0.01em' }}>
                   Ver planos →
                 </Link>
               </div>
@@ -245,13 +245,10 @@ export default async function AppPage() {
               <Link
                 key={m.href}
                 href={m.href}
-                className="spn-dash-module"
+                className="spn-dash-module spn-glass"
                 data-tour={m.id === 'planta_humanizada' ? 'apresentar' : undefined}
               >
-                <div
-                  className="spn-dash-module-icon"
-                  style={{ background: 'var(--color-surface)', color: 'var(--color-text-secondary)' }}
-                >
+                <div className="spn-dash-module-icon">
                   <m.Icon size={19} />
                 </div>
                 <div style={{ minWidth: 0 }}>
@@ -284,7 +281,7 @@ export default async function AppPage() {
                   Crie um projeto ou envie uma referência para gerar a primeira visualização.
                 </div>
               </div>
-              <Link href="/app/generate" className="spn-btn-ghost" style={{ flexShrink: 0, borderRadius: 'var(--radius-full)' }}>
+              <Link href="/app/generate" className="spn-ghost" style={{ flexShrink: 0, borderRadius: 'var(--radius-full)', display: 'inline-flex', alignItems: 'center' }}>
                 Criar primeira visualização
               </Link>
             </div>
@@ -304,14 +301,14 @@ export default async function AppPage() {
 
 function StartBlock() {
   return (
-    <section className="spn-dash-start" data-tour="projetos">
+    <section className="spn-dash-start spn-glass" data-tour="projetos">
       <h2 className="spn-dash-start-title">Comece seu primeiro Space</h2>
       <p className="spn-dash-start-sub">
         Envie um print, modelo, planta ou referência para gerar a primeira visualização.
       </p>
       <div className="spn-dash-start-actions">
-        <Link href="/app/spaces/new" className="spn-dash-cta">Criar novo Space</Link>
-        <Link href="/app/generate" className="spn-btn-ghost" style={{ borderRadius: 'var(--radius-full)' }}>
+        <Link href="/app/spaces/new" className="spn-cta spn-dash-cta">Criar novo Space</Link>
+        <Link href="/app/generate" className="spn-ghost" style={{ borderRadius: 'var(--radius-full)', display: 'inline-flex', alignItems: 'center' }}>
           Renderizar imagem avulsa
         </Link>
       </div>
@@ -341,7 +338,7 @@ function StartBlock() {
 function ProjectCard({ space: s }: { space: RecentSpace }) {
   const vistas = s.vista_count
   return (
-    <Link href={`/app/spaces/${s.id}`} className="spn-dash-project">
+    <Link href={`/app/spaces/${s.id}`} className="spn-dash-project spn-glass">
       <div className="spn-dash-project-thumb">
         {s.vista_mestre_url ? (
           // eslint-disable-next-line @next/next/no-img-element

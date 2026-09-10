@@ -1,21 +1,24 @@
 'use client'
 
-// Root client do Animar. Fluxo único orientado a presets:
-//   - canvas grande à esquerda (imagem base → geração → resultado)
-//   - painel de configuração à direita (tipo de vídeo → movimento →
-//     formato → duração → intensidade → direção criativa → avançados)
-//   - carrossel de vídeos recentes no rodapé do canvas
+// Root client do Animar.
 //
-// Responsivo: abaixo de 940px o painel empilha sob o canvas
-// (.spn-animar-layout / .spn-animar-panel em globals.css).
+// A casca é a `.spn-tool` do kit de vidro (globals.css): painel de config à
+// esquerda com scroll próprio e dock colado embaixo, palco à direita. Era um
+// sexto clone do shell de 420px que já estava copiado em cinco telas — agora
+// é a mesma peça, e a media query de 900px vem junto.
+//
+// O papel de parede passa a ser a imagem de origem: o vidro do painel refrata
+// o projeto do usuário, como no painel v1 do plugin.
 
 import { useEffect, useState } from 'react'
 import { VIDEO_FLAGS } from '@/lib/video/flags'
+import { summarize, useAmbient } from '@/components/app/glass'
 import AnimateHeader from './_components/AnimateHeader'
 import VideoCreationCanvas from './_components/VideoCreationCanvas'
 import VideoHistoryCarousel from './_components/VideoHistoryCarousel'
 import type { VideoHistoryItem } from './_components/VideoHistoryCarousel'
 import AnimatePanel from './_components/AnimatePanel'
+import { formatLabel } from './_components/animateLabels'
 import { useAnimateState } from './_hooks/useAnimateState'
 import { useImageUpload } from './_hooks/useImageUpload'
 import { useReferenceAnalysis } from './_hooks/useReferenceAnalysis'
@@ -37,6 +40,11 @@ export default function AnimateClient({ initialCredits }: AnimateClientProps) {
   const { generate } = useVideoGeneration(state, dispatch, nodeCost)
   const { extract: extractFrame } = useFrameExtractor()
   const [importOpen, setImportOpen] = useState(false)
+
+  // O papel de parede é a imagem em foco. Depois de gerar, o resultado é um
+  // vídeo — que não serve de background-image; fica a origem, que é o mesmo
+  // projeto e a mesma paleta.
+  useAmbient(state.imagePreview ?? state.result?.inputUrl ?? null)
 
   // Import do histórico: baixa a imagem escolhida e injeta no MESMO pipeline
   // do upload (validação de tipo/tamanho + auto-crop de proporção + preview).
@@ -148,60 +156,65 @@ export default function AnimateClient({ initialCredits }: AnimateClientProps) {
     }
   }
 
-  const configLine = [
+  const configLine = summarize([
     VIDEO_TYPE_PRESETS[state.videoType].label,
     resolvedMotion.label,
-    state.aspectRatio === 'auto' ? 'Formato original' : state.aspectRatio,
+    formatLabel(state.aspectRatio),
     `${state.duration}s`,
-  ].join(' · ')
+  ])
 
   return (
-    <div className="spn-animar-layout" style={{
-      background: 'var(--color-bg)',
-      color:      'var(--color-text-primary)',
-    }}>
+    <div className="spn-animar-shell" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
-      {/* ── Canvas à esquerda (área principal) ──────────────────────────── */}
-      {/* overflow fica na classe (.spn-animar-canvas) p/ a media query mobile vencer */}
-      <section className="spn-animar-canvas" style={{
-        flex:           1,
-        display:        'flex',
-        flexDirection:  'column',
-        minWidth:       0,
-      }}>
-        <AnimateHeader />
-        <VideoCreationCanvas
-          state={state}
-          configLine={configLine}
-          onImagePicked={handleImagePicked}
-          onImageError={handleImageError}
-          onPickFromHistory={() => setImportOpen(true)}
-          onClearImage={handleClearImage}
-          onGenerateAgain={handleGenerateAgain}
-          onAdjust={handleAdjust}
-          onUseAsReference={handleUseAsReference}
-          onClearError={handleClearError}
-        />
-        <VideoHistoryCarousel onReuse={handleReuseHistory} />
-      </section>
+      <AnimateHeader />
 
-      {/* ── Importar imagem do histórico (renders, vistas, edições, ampliadas) ─ */}
+      <div className="spn-tool">
+        <AnimatePanel
+          state={state}
+          dispatch={dispatch}
+          model={model}
+          resolvedMotion={resolvedMotion}
+          nodeCost={nodeCost}
+          onGenerate={generate}
+        />
+
+        {/* Palco: o que está em foco (imagem, geração, resultado) e, embaixo,
+            os últimos vídeos. Dois cartões de vidro, não uma coluna solta. */}
+        <div style={{
+          minWidth: 0, minHeight: 0,
+          display: 'flex', flexDirection: 'column', gap: 12,
+        }}>
+          <section
+            className="spn-tool-stage spn-glass"
+            style={{ flex: 1, alignItems: 'stretch' }}
+          >
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+              <VideoCreationCanvas
+                state={state}
+                configLine={configLine}
+                onImagePicked={handleImagePicked}
+                onImageError={handleImageError}
+                onPickFromHistory={() => setImportOpen(true)}
+                onClearImage={handleClearImage}
+                onGenerateAgain={handleGenerateAgain}
+                onAdjust={handleAdjust}
+                onUseAsReference={handleUseAsReference}
+                onClearError={handleClearError}
+              />
+            </div>
+          </section>
+
+          <VideoHistoryCarousel onReuse={handleReuseHistory} />
+        </div>
+      </div>
+
+      {/* Importar imagem do histórico (renders, vistas, edições, ampliadas) */}
       <EditV2ImportModal
         open={importOpen}
         onClose={() => setImportOpen(false)}
         onSelect={url => void handleImportFromHistory(url)}
         includeUpscales
-      />
-
-      {/* ── Painel de configuração ──────────────────────────────────────── */}
-      <AnimatePanel
-        state={state}
-        dispatch={dispatch}
-        model={model}
-        resolvedMotion={resolvedMotion}
-        nodeCost={nodeCost}
-        onGenerate={generate}
       />
     </div>
   )
