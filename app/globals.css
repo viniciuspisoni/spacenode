@@ -290,11 +290,12 @@ html.light {
   .spn-ambient-img { display: none; }
 }
 
-/* Escopo da landing. Dois desvios dos tokens compartilhados, os dois pela
-   mesma razão — ESCALA. No plugin, TODO texto fica sobre vidro, e o vidro
-   já escurece o papel de parede embaixo dele. Numa página, títulos,
-   subtítulos e microcopy ficam direto sobre o papel de parede, e aí ele
-   passa a ser o fundo de leitura:
+/* Escopo de PÁGINA em vidro — a landing e a página do plugin (/sketchup).
+   Dois desvios dos tokens compartilhados, os dois pela mesma razão —
+   ESCALA. No plugin, TODO texto fica sobre vidro, e o vidro já escurece o
+   papel de parede embaixo dele. Numa página, títulos, subtítulos e
+   microcopy ficam direto sobre o papel de parede, e aí ele passa a ser o
+   fundo de leitura:
 
    - --ambient-opacity cai de 0.55 para 0.16. Os papéis de parede são
      renders reais: medindo os blurDataURL, o mais claro (a fachada, com
@@ -304,8 +305,12 @@ html.light {
    - --color-text-tertiary sobe de #6e6e73 para #9a9aa0. #6e6e73 dá 3,8:1
      mesmo sobre preto puro: não alcança AA em fundo NENHUM, e a landing
      usa terciário em texto corrido (legendas, microcopy, notas de plano).
-     #9a9aa0 dá 4,6:1 no pior ponto do papel de parede e 5,2:1 sobre vidro. */
-.spn-landing {
+     #9a9aa0 dá 4,6:1 no pior ponto do papel de parede e 5,2:1 sobre vidro.
+
+   Os dois escopos dividem a regra de propósito: são a MESMA superfície, e
+   um valor que drife num só reabre o buraco de contraste no outro. */
+.spn-landing,
+.spn-skpage {
   --ambient-opacity: 0.16;
   --color-text-tertiary: #9a9aa0;
   --color-text-quaternary: #5a5a5e;
