@@ -21,6 +21,7 @@ import {
   type IsometricType,
   type IsometricStyle,
 } from '@/lib/apresentar/config'
+import { useObjectUrls } from '@/lib/browser/object-url'
 
 interface Props {
   initialCredits: number
@@ -46,6 +47,9 @@ export default function IsometricasClient({ initialCredits }: Props) {
   // Entrada
   const [imageFile,       setImageFile]       = useState<File | null>(null)
   const [imagePreview,    setImagePreview]    = useState<string | null>(null)
+  // Governa as URLs de blob das prévias: revoga a que sai e varre o resto
+  // ao desmontar (uma object URL segura o arquivo em memória até alguém soltar).
+  const objectUrls = useObjectUrls()
   const [imageDimensions, setImageDimensions] = useState<{ w: number; h: number } | null>(null)
 
   // Parâmetros — mesmos nomes e tipos que viajam para /api/apresentar/isometric
@@ -84,18 +88,20 @@ export default function IsometricasClient({ initialCredits }: Props) {
     setError(null)
     setImageDimensions(null)
 
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      const dataUrl = e.target?.result as string
-      setImagePreview(dataUrl)
-      const img = new Image()
-      img.onload = () => setImageDimensions({ w: img.naturalWidth, h: img.naturalHeight })
-      img.src = dataUrl
-    }
-    reader.readAsDataURL(file)
+    // Object URL, não data URL: a mesma foto vira um ponteiro de 60
+    // caracteres em vez de ~27 MB de base64 no DOM — e o papel de parede
+    // (useAmbient) deixa de decodificar o arquivo uma segunda vez só para
+    // borrá-lo. Ver lib/browser/object-url.ts.
+    objectUrls.revoke(imagePreview)
+    const url = objectUrls.create(file)
+    setImagePreview(url)
+    const img = new Image()
+    img.onload = () => setImageDimensions({ w: img.naturalWidth, h: img.naturalHeight })
+    img.src = url
   }
 
   function resetImage() {
+    objectUrls.revoke(imagePreview)
     setImageFile(null)
     setImagePreview(null)
     setResultUrl(null)

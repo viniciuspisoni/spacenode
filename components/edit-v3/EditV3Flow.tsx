@@ -795,11 +795,30 @@ const EDV3_CSS = `
 .edv3-brush { display:flex; align-items:center; gap:8px; font-size:11.5px; color:var(--color-text-tertiary); }
 .edv3-brush input { width:120px; accent-color:var(--color-text-primary); }
 .edv3-progress { display:flex; justify-content:space-between; gap:10px; margin-top:12px; padding:10px 14px; border-radius:var(--r-inner); font-size:13px; }
-.edv3-panel { align-self:stretch; }
+/* O dock só é dock se o painel tiver altura LIMITADA — é o limite que faz
+   .spn-tool-panel-body rolar por dentro e o botão ficar preso no rodapé.
+   Com align-self:stretch a linha do grid crescia junto com o conteúdo do
+   painel: nada rolava por dentro, o dock virava o último bloco da coluna e
+   sumia no scroll da página, que é exatamente o que ele existe para evitar.
+   align-self:start + max-height devolvem o limite; sticky mantém o painel no
+   campo de visão enquanto o palco, que pode ser mais alto, rola ao lado. */
+.edv3-panel {
+  align-self: start;
+  position: sticky;
+  top: 14px;
+  /* 86px = os 14 do topo + o cabeçalho da página (h1 + margem, ~58) + 14
+     de folga embaixo. Sem descontar o cabeçalho, em viewport curta o dock
+     nascia logo ABAIXO da dobra e só aparecia depois de rolar um pouco —
+     meio conserto. */
+  max-height: calc(100dvh - 86px);
+}
 .edv3-link { display:inline-flex; align-items:center; gap:5px; font-size:12.5px; color:var(--color-text-secondary); background:none; border:none; cursor:pointer; padding:0; font:inherit; }
 .edv3-link:hover { color:var(--color-text-primary); }
 @media (max-width: 980px) {
   .edv3-grid { grid-template-columns: minmax(0,1fr); }
   .edv3-stage { min-height:min(60vh,560px); }
+  /* Coluna única: o painel vem DEPOIS do palco e a página inteira é o
+     scroller. Prender aqui deixaria um scroll dentro do outro. */
+  .edv3-panel { position: static; max-height: none; }
 }
 `

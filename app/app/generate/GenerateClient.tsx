@@ -1403,25 +1403,40 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
             options={ENGINE_ORDER.map(eid => ({
               value: eid,
               title: ENGINES[eid].name,
-              note:  ENGINES[eid].tagline,
             }))}
           />
           <p className="spn-hint">{currentEngine.description}</p>
         </div>
         <div className="spn-field">
           <span className="spn-field-label">Qualidade</span>
-          <ChoiceGroup
-            label="Qualidade"
-            cols={currentEngine.resolutions.length >= 3 ? 3 : 2}
-            value={selectedResolution}
-            onChange={setSelectedResolution}
-            options={currentEngine.resolutions.map(res => ({
-              value: res,
-              title: res.toUpperCase(),
-              note:  `${currentEngine.nodes[res] ?? 0} nodes`,
-            }))}
-          />
-          <p className="spn-hint">{RESOLUTION_DESC[selectedResolution]}</p>
+          {/* Motor de resolução única (é o caso do Quasar, que só entrega 2K):
+              um cartão sozinho e sempre marcado é um controle que não se
+              opera — vira ruído com aparência de escolha. A informação
+              continua na tela, como linha. */}
+          {currentEngine.resolutions.length === 1 ? (
+            <p className="spn-hint" style={{ marginTop: 0 }}>
+              <b style={{ color: 'var(--color-text-primary)', fontWeight: 560 }}>
+                {selectedResolution.toUpperCase()} · {currentEngine.nodes[selectedResolution] ?? 0} nodes
+              </b>
+              {' — '}{RESOLUTION_DESC[selectedResolution]}
+              {' · única resolução do '}{currentEngine.name}
+            </p>
+          ) : (
+            <>
+              <ChoiceGroup
+                label="Qualidade"
+                cols={currentEngine.resolutions.length >= 3 ? 3 : 2}
+                value={selectedResolution}
+                onChange={setSelectedResolution}
+                options={currentEngine.resolutions.map(res => ({
+                  value: res,
+                  title: res.toUpperCase(),
+                  note:  `${currentEngine.nodes[res] ?? 0} nodes`,
+                }))}
+              />
+              <p className="spn-hint">{RESOLUTION_DESC[selectedResolution]}</p>
+            </>
+          )}
         </div>
       </Sheet>
     </div>

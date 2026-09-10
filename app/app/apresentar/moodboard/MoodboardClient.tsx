@@ -30,6 +30,7 @@ import {
 } from '@/lib/apresentar/config'
 import MoodboardCanvas from './MoodboardCanvas'
 import { svgElementToPngBlob, downloadBlob } from '@/lib/apresentar/svg-to-png'
+import { useObjectUrls } from '@/lib/browser/object-url'
 
 interface Props {
   initialCredits: number
@@ -58,6 +59,9 @@ export default function MoodboardClient({ initialCredits, studioName: initialStu
   // Entrada
   const [imageFile,    setImageFile]    = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+  // Governa as URLs de blob das prévias: revoga a que sai e varre o resto
+  // ao desmontar (uma object URL segura o arquivo em memória até alguém soltar).
+  const objectUrls = useObjectUrls()
   const [projectName,  setProjectName]  = useState('')
 
   // Presets — mesmos nomes e tipos que viajam para /api/apresentar/moodboard
@@ -105,12 +109,13 @@ export default function MoodboardClient({ initialCredits, studioName: initialStu
     setResult(null)
     setError(null)
 
-    const reader = new FileReader()
-    reader.onload = (e) => setImagePreview(e.target?.result as string)
-    reader.readAsDataURL(file)
+    // Object URL, não data URL — ver lib/browser/object-url.ts.
+    objectUrls.revoke(imagePreview)
+    setImagePreview(objectUrls.create(file))
   }
 
   function resetImage() {
+    objectUrls.revoke(imagePreview)
     setImageFile(null)
     setImagePreview(null)
   }

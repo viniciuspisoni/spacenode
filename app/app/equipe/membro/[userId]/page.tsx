@@ -101,12 +101,13 @@ export default async function MembroPage({
 
         {/* Filtro por projeto */}
         {projects.length > 0 && (
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 22 }}>
+          <nav aria-label="Filtrar por projeto"
+               style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 22 }}>
             <Chip href={base} active={!project} label="Todos os projetos" />
             {projects.map((p) => (
               <Chip key={p.id} href={`${base}?project=${p.id}`} active={project === p.id} label={p.name} />
             ))}
-          </div>
+          </nav>
         )}
 
         {/* Grade de gerações */}
@@ -154,11 +155,18 @@ export default async function MembroPage({
   )
 }
 
-/** Filtro por projeto. O verde de seleção saiu: verde é estado, e escolher
- *  um filtro é ação — a pílula ligada usa o chip ativo do sistema. */
+/** Filtro por projeto. Duas decisões:
+ *
+ *  - O verde de seleção saiu: verde é estado, e escolher um filtro é ação —
+ *    a pílula ligada usa o chip ativo do sistema.
+ *  - O estado é `aria-current="page"`, não `aria-checked`/`role="radio"`.
+ *    Cada pílula é um <Link> para uma URL diferente da MESMA página; pôr
+ *    `role="radio"` sobrescrevia o papel de link (o leitor de tela deixava
+ *    de anunciar que aquilo navega) e ainda declarava rádios sem radiogroup
+ *    em volta. Quem dá o nome do conjunto agora é o <nav> acima. */
 function Chip({ href, active, label }: { href: string; active: boolean; label: string }) {
   return (
-    <Link href={href} className="spn-pill" aria-checked={active} role="radio"
+    <Link href={href} className="spn-pill" aria-current={active ? 'page' : undefined}
           style={{ textDecoration: 'none', display: 'inline-block' }}>
       {label}
     </Link>

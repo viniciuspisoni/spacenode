@@ -46,6 +46,7 @@ import {
   VIEW_POSITION_ORDER,
 } from '@/lib/blocos3d/config'
 import type { Blocos3DJobView, Blocos3DQuality, ModelFormat, ViewPosition } from '@/lib/blocos3d/types'
+import { useObjectUrls } from '@/lib/browser/object-url'
 
 const GlbViewer = dynamic(() => import('./GlbViewer'), { ssr: false })
 
@@ -165,6 +166,9 @@ export default function Blocos3DClient({ initialCredits, engineAvailability, ini
   // Entrada — multiview por posição
   const [slotFiles,    setSlotFiles]    = useState<SlotFiles>({})
   const [slotPreviews, setSlotPreviews] = useState<SlotPreviews>({})
+  // Governa as URLs de blob das prévias: revoga a que sai e varre o resto
+  // ao desmontar (uma object URL segura o arquivo em memória até alguém soltar).
+  const objectUrls = useObjectUrls()
   const [dragSlot,     setDragSlot]     = useState<ViewPosition | null>(null)
 
   // Opções
@@ -275,19 +279,30 @@ export default function Blocos3DClient({ initialCredits, engineAvailability, ini
     if (file.size > BLOCOS3D_SOURCE_MAX_BYTES) { setError(`Imagem muito grande. Máximo ${BLOCOS3D_SOURCE_MAX_MB} MB.`); return }
     setError(null)
     setSlotFiles(cur => ({ ...cur, [pos]: file }))
-    const reader = new FileReader()
-    reader.onload = (e) => setSlotPreviews(cur => ({ ...cur, [pos]: (e.target?.result as string) ?? undefined }))
-    reader.readAsDataURL(file)
+    // Object URL, não data URL: aqui são QUATRO slots de até 20 MB cada, e
+    // o slot frontal ainda alimenta o papel de parede. Ver
+    // lib/browser/object-url.ts.
+    const url = objectUrls.create(file)
+    setSlotPreviews(cur => {
+      objectUrls.revoke(cur[pos])
+      return { ...cur, [pos]: url }
+    })
   }
 
   function removeSlot(pos: ViewPosition) {
     setSlotFiles(cur => { const next = { ...cur }; delete next[pos]; return next })
-    setSlotPreviews(cur => { const next = { ...cur }; delete next[pos]; return next })
+    setSlotPreviews(cur => {
+      objectUrls.revoke(cur[pos])
+      const next = { ...cur }; delete next[pos]; return next
+    })
   }
 
   function resetInput() {
     setSlotFiles({})
-    setSlotPreviews({})
+    setSlotPreviews(cur => {
+      Object.values(cur).forEach(u => objectUrls.revoke(u))
+      return {}
+    })
     setError(null)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }

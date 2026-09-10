@@ -122,6 +122,9 @@ export function FinalizeImportModal({ open, purpose, onClose, onSelect }: Props)
       title={purpose === 'base' ? 'Escolher imagem base' : 'Adicionar camada'}
       onClose={onClose}
       doneLabel="Fechar"
+      // O conteúdo é uma GRADE de miniaturas: nos 560px padrão da folha a
+      // célula encolhe até não valer mais como escolha visual.
+      className="spn-sheet--wide"
     >
       {/* A fonte é UM eixo que reconfigura tudo abaixo — então fica na
           superfície, como segmentado de 30px, e não como três abas soltas. */}
@@ -147,7 +150,7 @@ export function FinalizeImportModal({ open, purpose, onClose, onSelect }: Props)
       {!error && current === null && <div className="spn-empty">Carregando…</div>}
       {!error && current !== null && current.length === 0 && <div className="spn-empty">{EMPTY_COPY[tab]}</div>}
       {!error && current && current.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(118px, 1fr))', gap: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 8 }}>
           {current.map((item) => (
             <button key={item.id} type="button" className="spn-glass" onClick={() => onSelect(item.url)}
               title={`${item.label} · ${item.createdAt ? new Date(item.createdAt).toLocaleDateString('pt-BR') : ''}`}
