@@ -65,7 +65,12 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" className={geist.variable} suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{__html: `try{var t=localStorage.getItem('theme');var light=t==='light'||((t===null||t==='system')&&window.matchMedia('(prefers-color-scheme: light)').matches);if(location.pathname==='/'||location.pathname.indexOf('/lp/')===0)light=false;document.documentElement.classList.toggle('light',light)}catch(e){}`}} />
+        {/* Anti-flash de tema, antes do primeiro paint. As rotas sempre
+            escuras entram na exceção: a landing, as LPs de campanha e todo
+            o namespace /sketchup (a página do plugin, a de conexão e a de
+            pareamento — o painel dentro do SketchUp é escuro, e a página
+            que o vende usa os mesmos tokens de vidro). */}
+        <script dangerouslySetInnerHTML={{__html: `try{var t=localStorage.getItem('theme');var light=t==='light'||((t===null||t==='system')&&window.matchMedia('(prefers-color-scheme: light)').matches);if(location.pathname==='/'||location.pathname.indexOf('/lp/')===0||location.pathname.indexOf('/sketchup')===0)light=false;document.documentElement.classList.toggle('light',light)}catch(e){}`}} />
       </head>
       <body className="antialiased">
         {/* Captura first-party de UTMs/click-ids em cookie (sem terceiros) —

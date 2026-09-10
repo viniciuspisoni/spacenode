@@ -25,6 +25,73 @@ O que só um plugin dentro do modelo consegue:
 - **Voltar à vista** — cada render guarda a câmera; um clique restaura o
   enquadramento exato no SketchUp.
 
+## O que mudou na 1.0.4 — os quatro primeiros da varredura
+
+Varredura de 13 concorrentes (set/2026) apontou que o que mais dói não é
+faltar recurso: é recurso pronto que não chega. Os quatro primeiros itens do
+ranking destravam coisa que já existia.
+
+### Aviso de versão
+
+Distribuímos `.rbz` FORA do Extension Warehouse: não há atualização
+automática, e quem instalou uma vez ficava naquela versão pra sempre. O
+catálogo virou **v7** e devolve `pluginLatest {version, path, note}`; o Ruby
+compara com a própria `VERSION` e emite `pluginUpdate` UMA vez por sessão. O
+painel mostra aviso brando com botão de baixar — nunca bloqueia, nunca por
+cima de geração em andamento. A versão publicada passou a viver em
+`lib/sketchup/plugin-release.ts`, lida pela página e pelo catálogo: já drifou
+duas vezes (página em 0.4.0 com `.rbz` 0.5.0; `EXTENSION.version` preso em
+0.2.0).
+
+### Inserir elemento no Editar
+
+O servidor declara quatro ações (`lib/edit-v3/types.ts`) e o Ruby liberava
+três. `insert_element` entrou na lista branca com a regra do servidor:
+**exige máscara E instrução** — a área diz onde, o texto diz o quê
+(`REQUIRES_MASK`). O painel espelha o gate, e `request_edit` recusa antes do
+POST quando o upload da máscara falhou (ela sobe como `:optional`, então sem
+essa checagem o usuário levava um erro que se contradizia).
+
+### Salvar o caderno num clique
+
+Tirar 8 imagens do lote era um `savepanel` por imagem. Agora um botão grava
+todas em `<pasta do .skp>/spacenode-renders/`, sem sobrescrever, com progresso
+e notificação nativa — o mesmo tratamento que o vídeo já tinha. `download_to_file`
+ganhou `on_finish`: sem ele, uma falha no meio do caderno abriria uma aba do
+navegador por imagem. `unique_path` deixou de ser só `.mp4`.
+
+### Retomar o lote de onde parou
+
+Saldo ou sessão caindo no meio matava o caderno inteiro. O contexto passou a
+guardar as cenas que falharam **e a que estava em voo**; `@batch_pending`
+sobrevive ao fim do lote e o botão "Retomar N cenas" regera só o que faltou.
+Quando o motivo foi saldo, aparece "Comprar Nodes" ao lado.
+
+Fatos que a revisão adversarial (81 agentes, 12 achados confirmados de 25)
+obrigou a acertar, e que valem pra qualquer mexida futura no lote:
+
+- **A semente viaja com a pendência.** `ctx[:payload]` não carrega o
+  `shared_seed`, que nasce do primeiro resultado — retomar sem ele daria
+  cenas que não combinam com as já pagas, justamente o que o lote promete.
+- **`current_entry` só é resolvida quando a cena entrega ou falha.**
+  `process_next_scene` tira da fila ANTES de `ensure_fresh_session`; se a
+  renovação falha ali, a cena não estava na fila nem em `failed_entries` e
+  sumia. Mas somá-la sem guarda faria o término NORMAL devolver a última cena
+  boa como pendente e recobrá-la — por isso `finish_generation` e o ramo de
+  cena inexistente zeram a entrada.
+- **A pendência só é limpa quando o lote recomeça de verdade** (dentro da
+  continuação de `ensure_fresh_session`), senão um clique em Retomar com
+  sessão morta apagava a pendência pra sempre.
+- **A retomada herda os resultados anteriores** (`opts[:results]`), senão
+  "Salvar as imagens" gravaria só o pedaço retomado.
+- **A pendência é amarrada ao modelo** (`guid`, `path` como reserva):
+  retomar noutro `.skp` geraria e cobraria cenas do projeto errado.
+- **Todo caminho de erro do salvar termina em `batchSaveDone`**, e o painel
+  destrava `batchSaving` no evento `error` — uma recusa que só emitisse erro
+  deixava Salvar e Retomar mortos pelo resto da sessão.
+- **Falha sem status HTTP** (rede caindo depois do POST) pode ter sido
+  cobrada: o painel avisa pra conferir o Histórico antes de retomar.
+
 ## O que mudou na 1.0.3 — ícones redesenhados
 
 Com a barra na tela, os ícones da 1.0.0 se mostraram pesados: elemento demais

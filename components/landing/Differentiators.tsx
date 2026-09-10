@@ -16,9 +16,11 @@ const ITEMS = [
   },
 ]
 
+// Neutro, como os checks dos planos: aqui ele pontua um argumento, não
+// marca um estado de sucesso. Ver PricingToggle.
 const CheckIcon = () => (
   <svg width="14" height="14" viewBox="0 0 12 12" fill="none" aria-hidden>
-    <path d="M2 6.2l2.6 2.6L10 3.4" stroke="var(--color-accent-green)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M2 6.2l2.6 2.6L10 3.4" stroke="var(--color-text-tertiary)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 )
 

@@ -27,7 +27,7 @@ module SpaceNode
   module SketchUp
     extend self
 
-    VERSION = '1.0.3'
+    VERSION = '1.0.4'
     PREFERENCES_KEY = 'com.spacenode.sketchup'
     DEFAULT_API_BASE_URL = 'https://spacenode.app'
     MIN_SKETCHUP_MAJOR = 21          # Ruby 2.7+; recomendado 2024+
@@ -36,7 +36,7 @@ module SpaceNode
     UPLOAD_TIMEOUT_SECONDS = 120     # sign/PUT/confirm (Sketchup::Http não tem timeout)
     DOWNLOAD_TIMEOUT_SECONDS = 180   # download_to_file (render/vídeo) — não tinha watchdog
     VIDEO_STAGE_TIMEOUT_SECONDS = 60 # GET do preview antes de animar (mesmo valor do quote do Ampliar)
-    CATALOG_MIN_VERSION = 6          # cache em disco mais velho que isso é descartado (bloco animar)
+    CATALOG_MIN_VERSION = 7          # cache em disco mais velho que isso é descartado (v7 = pluginLatest)
 
     # Strings do Ruby visíveis no painel (etapas/erros centrais). O grosso da
     # UI é traduzido no dialog; mensagens vindas do SERVIDOR seguem em pt-BR.
@@ -62,6 +62,13 @@ module SpaceNode
         :downloading => 'Baixando o render…',
         :style_no_seed => 'Este render não tem semente — gere um novo pra travar o estilo.',
         :scene_base_name => 'Vista',
+        :batch_save_empty => 'Nenhuma imagem do lote pra salvar.',
+        :batch_save_no_dir => 'Salve o arquivo .skp primeiro — as imagens vão pra uma pasta ao lado dele.',
+        :batch_save_busy => 'Já estou salvando as imagens deste lote.',
+        :batch_saved_n => '%d imagens salvas ao lado do projeto.',
+        :batch_resume_empty => 'Não há cenas pendentes pra retomar.',
+        :batch_resume_other_model => 'As cenas pendentes são de outro arquivo. Abra o projeto do lote pra retomar.',
+        :edit_mask_failed => 'Não consegui enviar a área marcada — Inserir precisa dela. Tente marcar de novo.',
         :scene_no_model => 'Nenhum modelo aberto pra criar a cena.',
         :scene_failed => 'Não consegui criar a cena.',
         :tb_panel => 'SPACENODE',
@@ -116,6 +123,13 @@ module SpaceNode
         :downloading => 'Downloading the render…',
         :style_no_seed => 'This render has no seed — generate a new one to lock the style.',
         :scene_base_name => 'View',
+        :batch_save_empty => 'No batch images to save.',
+        :batch_save_no_dir => 'Save the .skp file first — the images go to a folder next to it.',
+        :batch_save_busy => 'Already saving the images from this batch.',
+        :batch_saved_n => '%d images saved next to the project.',
+        :batch_resume_empty => 'No pending scenes to resume.',
+        :batch_resume_other_model => 'The pending scenes belong to another file. Open the batch project to resume.',
+        :edit_mask_failed => 'Could not upload the marked area — Insert needs it. Try marking it again.',
         :scene_no_model => 'No open model to create the scene in.',
         :scene_failed => 'Could not create the scene.',
         :tb_panel => 'SPACENODE',
@@ -408,6 +422,24 @@ module SpaceNode
         rescue StandardError => e
           # generation:true: o painel armou a UI de lote no clique e um erro
           # aqui encerra a tentativa — precisa desarmar.
+          emit_error(e.message, false, true)
+        end
+      end
+      dialog.add_action_callback('saveBatch') do |_ctx, raw|
+        begin
+          handle_save_batch(raw)
+        rescue StandardError => e
+          # O painel fica em "salvando" até ouvir batchSaveDone — recusa que
+          # só emitisse erro mataria os botões Salvar e Retomar pelo resto
+          # da sessão.
+          emit('batchSaveDone', { :saved => 0, :failed => [], :total => 0, :dir => '', :error => e.message })
+          emit_error(e.message)
+        end
+      end
+      dialog.add_action_callback('resumeBatch') do |_ctx|
+        begin
+          handle_resume_batch
+        rescue StandardError => e
           emit_error(e.message, false, true)
         end
       end
@@ -945,10 +977,58 @@ module SpaceNode
     def ensure_catalog
       cached = cached_catalog
       if cached
-        emit('catalog', cached)
+        emit_catalog(cached)
         return
       end
       refresh_catalog
+    end
+
+    # Distribuímos .rbz FORA do Extension Warehouse: não existe atualização
+    # automática, e quem instalou uma vez ficaria preso naquela versão pra
+    # sempre. O catálogo (v7) carrega pluginLatest; aqui comparamos com a
+    # nossa VERSION e avisamos UMA vez por sessão. Nunca bloqueia nada.
+    def emit_catalog(data)
+      emit('catalog', data)
+      check_plugin_update(data)
+    end
+
+    def check_plugin_update(data)
+      return if @update_notified
+      return unless data.is_a?(Hash)
+
+      latest = data['pluginLatest']
+      return unless latest.is_a?(Hash)
+
+      version = latest['version'].to_s
+      return unless version_newer?(version, VERSION)
+
+      @update_notified = true
+      path = latest['path'].to_s
+      url = path.start_with?('/') ? "#{api_base_url}#{path}" : path
+      emit('pluginUpdate', {
+        :version => version,
+        :current => VERSION,
+        :url => url,
+        :note => latest['note'].to_s
+      })
+    rescue StandardError
+      nil
+    end
+
+    # Comparação NUMÉRICA por segmento — string comparison diria que "1.0.9"
+    # é maior que "1.0.10".
+    def version_newer?(a, b)
+      pa = a.to_s.split('.').map(&:to_i)
+      pb = b.to_s.split('.').map(&:to_i)
+      return false if a.to_s.strip.empty?
+
+      [pa.length, pb.length].max.times do |i|
+        x = pa[i] || 0
+        y = pb[i] || 0
+        return true if x > y
+        return false if x < y
+      end
+      false
     end
 
     def refresh_catalog
@@ -967,7 +1047,7 @@ module SpaceNode
         rescue StandardError
           nil
         end
-        emit('catalog', data)
+        emit_catalog(data)
       end
     end
 
@@ -2780,7 +2860,7 @@ module SpaceNode
       ensure_fresh_session(true) { run_batch(payload, entries) }
     end
 
-    def run_batch(payload, entries)
+    def run_batch(payload, entries, opts = {})
       model = ::Sketchup.active_model
       raise 'Nenhum modelo aberto no SketchUp.' unless model
 
@@ -2801,13 +2881,18 @@ module SpaceNode
         :queue => entries.dup,
         :total => entries.length,
         :done => 0,
-        :results => [],
+        # Retomada carrega o que o lote anterior já entregou: sem isto,
+        # "Salvar as imagens" gravaria só o pedaço retomado do caderno.
+        :results => Array(opts[:results]),
         :errors => [],
         :payload => payload,
+        # Entradas que falharam, pra "Retomar" saber o que refazer.
+        :failed_entries => [],
+        :current_entry => nil,
         :shared_seed => (payload['seed'].to_s =~ /\A\d+\z/ ? payload['seed'].to_i : nil),
         :original_scene => original
       }
-      emit('batchStart', { :total => entries.length })
+      emit('batchStart', { :total => entries.length, :resumed => opts[:resumed] ? true : false })
       process_next_scene
     end
 
@@ -2827,6 +2912,7 @@ module SpaceNode
       end
 
       entry = ctx[:queue].shift
+      ctx[:current_entry] = entry
       index = entry.is_a?(Hash) ? entry['index'].to_i : entry.to_i
       expected_name = entry.is_a?(Hash) ? entry['name'].to_s : ''
       pages = model.pages
@@ -2847,6 +2933,9 @@ module SpaceNode
       unless page
         label = expected_name.empty? ? "Cena #{index + 1}" : expected_name
         ctx[:errors] << { :scene => label, :message => 'Cena não encontrada no modelo.' }
+        # Cena apagada do modelo não volta no Retomar — retomar geraria o
+        # mesmo erro pra sempre.
+        ctx[:current_entry] = nil
         emit('batchProgress', {
           :done => ctx[:done], :total => ctx[:total],
           :sceneName => label, :status => 'error',
@@ -3357,6 +3446,8 @@ module SpaceNode
       if ctx && ctx[:mode] == :batch
         ctx[:shared_seed] ||= result[:seed]
         ctx[:done] += 1
+        # A cena entregou: sai de "em voo" pra não voltar no Retomar.
+        ctx[:current_entry] = nil
         ctx[:results] << result
         emit('batchProgress', {
           :done => ctx[:done], :total => ctx[:total],
@@ -3449,7 +3540,8 @@ module SpaceNode
       if ctx && ctx[:mode] == :batch
         emit('batchDone', {
           :results => ctx[:results], :errors => ctx[:errors],
-          :total => ctx[:total], :cancelled => true
+          :total => ctx[:total], :cancelled => true,
+          :pending => remember_batch_pending(ctx)
         })
       end
       if ctx && ctx[:mode] == :space
@@ -3471,10 +3563,15 @@ module SpaceNode
       @generate_request = nil
 
       if ctx && ctx[:mode] == :batch
+        @batch_insufficient = true if status == 402
+        # Falha SEM status (rede caiu depois do POST) pode ter sido cobrada:
+        # o Retomar avisa em vez de fingir que é seguro regerar.
+        ctx[:uncertain] = (ctx[:uncertain] || 0) + 1 if status.nil?
         if auth_expired || status == 402
           # A cena corrente vira erro visível antes do encerramento — senão
           # a linha dela fica presa como "em andamento" num lote morto.
           ctx[:errors] << { :scene => ctx[:current_scene].to_s, :message => message.to_s }
+          ctx[:failed_entries] << ctx[:current_entry] if ctx[:current_entry]
           emit('batchProgress', {
             :done => ctx[:done], :total => ctx[:total],
             :sceneName => ctx[:current_scene], :status => 'error',
@@ -3483,6 +3580,7 @@ module SpaceNode
           finalize_batch(message, auth_expired)
         else
           ctx[:errors] << { :scene => ctx[:current_scene].to_s, :message => message.to_s }
+          ctx[:failed_entries] << ctx[:current_entry] if ctx[:current_entry]
           emit('batchProgress', {
             :done => ctx[:done], :total => ctx[:total],
             :sceneName => ctx[:current_scene], :status => 'error',
@@ -3494,7 +3592,7 @@ module SpaceNode
         @generating = false
         @generation_context = nil
         restore_original_scene(ctx) if ctx && ctx[:original_scene]
-        notify_video(t(:notif_video_failed)) if ctx && ctx[:mode] == :animar
+        notify_panel(t(:notif_video_failed)) if ctx && ctx[:mode] == :animar
         emit_error(message, auth_expired, true)
       end
     end
@@ -3513,9 +3611,78 @@ module SpaceNode
         :errors => ctx[:errors],
         :total => ctx[:total],
         :aborted => abort_message ? true : false,
-        :abortMessage => abort_message
+        :abortMessage => abort_message,
+        :pending => remember_batch_pending(ctx),
+        :insufficient => @batch_insufficient ? true : false,
+        :uncertain => ctx[:uncertain] || 0
       })
+      @batch_insufficient = false
       emit_error(abort_message, auth_expired, true) if abort_message
+    end
+
+    # Cenas que não entregaram = as que sobraram na fila + as que falharam.
+    # Saldo ou sessão caindo no meio não podem obrigar o arquiteto a refazer
+    # o caderno inteiro — nem a pagar de novo pelas que já saíram.
+    def remember_batch_pending(ctx)
+      return 0 unless ctx && ctx[:mode] == :batch
+
+      # current_entry só sobrevive aqui quando a cena NÃO entregou nem falhou
+      # (sessão caiu ou cancelaram no meio dela) — finish_generation e o ramo
+      # de cena inexistente zeram. Ela é pendente como qualquer outra.
+      em_voo = ctx[:current_entry]
+      pending = (Array(ctx[:queue]) + Array(ctx[:failed_entries]) + [em_voo]).compact
+      if pending.empty?
+        @batch_pending = nil
+        return 0
+      end
+      payload = ctx[:payload].is_a?(Hash) ? ctx[:payload].dup : {}
+      payload['seed'] = ctx[:shared_seed] if ctx[:shared_seed]
+      @batch_pending = {
+        :payload => payload,
+        :entries => pending,
+        # Retomar noutro arquivo geraria (e cobraria) cenas do projeto errado.
+        :model => batch_model_key,
+        :results => Array(ctx[:results])
+      }
+      pending.length
+    end
+
+    # Chave do modelo ativo: guid quando existe (não muda ao salvar), path
+    # como reserva.
+    def batch_model_key
+      model = ::Sketchup.active_model
+      return nil unless model
+
+      key = model.respond_to?(:guid) ? model.guid.to_s : ''
+      key = model.path.to_s if key.empty?
+      key.empty? ? nil : key
+    rescue StandardError
+      nil
+    end
+
+    def handle_resume_batch
+      raise t(:busy) if @generating
+
+      pending = @batch_pending
+      raise t(:batch_resume_empty) unless pending && !Array(pending[:entries]).empty?
+
+      if pending[:model] && batch_model_key && pending[:model] != batch_model_key
+        raise t(:batch_resume_other_model)
+      end
+
+      unless authenticated?
+        emit_error(t(:connect_first), true, true)
+        return
+      end
+
+      # @batch_pending só é limpa QUANDO o lote realmente recomeça: se a
+      # renovação de sessão falhar aqui, o botão Retomar tem que continuar
+      # valendo — senão a pendência morre com o clique.
+      ensure_fresh_session(true) do
+        @batch_pending = nil
+        run_batch(pending[:payload], pending[:entries],
+                  :resumed => true, :results => Array(pending[:results]))
+      end
     end
 
     def restore_original_scene(ctx)
@@ -3869,13 +4036,13 @@ module SpaceNode
         check_session
       end
       emit('videoResult', video)
-      notify_video("#{t(:notif_video_ready)} · #{spec[:duration]} s")
+      notify_panel("#{t(:notif_video_ready)} · #{spec[:duration]} s")
       auto_save_video(video) if video_save_mode == 'project'
     end
 
     # Notificação nativa do SketchUp (o arquiteto pode estar modelando com o
     # painel atrás). SketchUp sem UI::Notification só não avisa.
-    def notify_video(message)
+    def notify_panel(message)
       return unless defined?(::UI::Notification)
 
       ext = defined?(EXTENSION) ? EXTENSION : nil
@@ -3987,14 +4154,15 @@ module SpaceNode
       nil
     end
 
-    # Nunca sobrescreve: -2, -3…
+    # Nunca sobrescreve: -2, -3… Serve vídeo e render (extensão preservada).
     def unique_path(path)
       return path unless File.exist?(path)
 
-      base = path.sub(/\.mp4\z/i, '')
+      ext = File.extname(path)
+      base = ext.empty? ? path : path[0...-ext.length]
       i = 2
-      i += 1 while File.exist?("#{base}-#{i}.mp4")
-      "#{base}-#{i}.mp4"
+      i += 1 while File.exist?("#{base}-#{i}#{ext}")
+      "#{base}-#{i}#{ext}"
     end
 
     def auto_save_video(video)
@@ -4144,7 +4312,9 @@ module SpaceNode
             download_to_file(absolute_url(location, url), target, hops - 1, opts.merge(:state => state))
           else
             state[:done] = true
-            if kind == :video
+            if opts[:on_finish]
+              opts[:on_finish].call(false, 'redirecionamento inválido')
+            elsif kind == :video
               download_failed(kind, url, opts, 'redirecionamento inválido', status)
             else
               emit_error('Não foi possível baixar o render. Tente pelo site.')
@@ -4160,14 +4330,20 @@ module SpaceNode
         if status >= 200 && status < 300 && valid
           begin
             File.open(target, 'wb') { |f| f.write(body) }
-            if kind == :video
+            if opts[:on_finish]
+              opts[:on_finish].call(true, target)
+            elsif kind == :video
               remember_local_video(target)
               emit('saved', { :path => target, :kind => 'video', :auto => opts[:auto] ? true : false })
             else
               emit('saved', { :path => target, :kind => 'image' })
             end
           rescue StandardError => e
-            emit_error("Não foi possível salvar o arquivo: #{e.message}")
+            if opts[:on_finish]
+              opts[:on_finish].call(false, e.message)
+            else
+              emit_error("Não foi possível salvar o arquivo: #{e.message}")
+            end
           end
         else
           # Diagnóstico embutido: o motivo exato aparece pro usuário (e pra
@@ -4195,6 +4371,8 @@ module SpaceNode
             else
               emit_error('O download do vídeo travou. Tente "Salvar vídeo…" de novo.')
             end
+          elsif opts[:on_finish]
+            opts[:on_finish].call(false, 'o download travou')
           else
             emit_error('O download travou. Tente de novo.')
           end
@@ -4203,6 +4381,10 @@ module SpaceNode
     end
 
     def download_failed(kind, url, opts, reason, status)
+      # Quem passou on_finish cuida do próprio erro — sem isto, uma falha no
+      # meio do caderno abriria N abas do navegador.
+      return opts[:on_finish].call(false, reason) if opts[:on_finish]
+
       if kind == :video
         if opts[:auto]
           emit('videoSaveFailed', { :message => "Não foi possível salvar o vídeo ao lado do projeto (#{reason}). Use \"Salvar vídeo…\"." })
@@ -4265,6 +4447,94 @@ module SpaceNode
       return true if bytes[0, 4] == [0x52, 0x49, 0x46, 0x46] && bytes[8, 4] == [0x57, 0x45, 0x42, 0x50]
 
       false
+    end
+
+    # ── Salvar o caderno ─────────────────────────────────────────────────────
+    #
+    # O lote devolve N imagens e, até aqui, tirá-las do painel era um
+    # savepanel por imagem: clicar na miniatura, esperar virar o resultado
+    # ativo, "Baixar imagem", escolher pasta e nome. Oito vezes. O VÍDEO já
+    # caía sozinho ao lado do .skp; a imagem, que é o produto principal, não.
+    # Sequencial de propósito: N downloads simultâneos competiriam com a
+    # próxima geração e o Sketchup::Http não tem controle de concorrência.
+
+    def renders_dir
+      model = ::Sketchup.active_model
+      return nil unless model && !model.path.to_s.empty?
+
+      dir = File.join(File.dirname(model.path), 'spacenode-renders')
+      FileUtils.mkdir_p(dir) unless File.directory?(dir)
+      dir
+    rescue StandardError
+      nil
+    end
+
+    # <cena>-<data>.png. A extensão sai da URL quando reconhecível — o render
+    # em prod é PNG, mas Ampliar/Editar podem devolver outro formato.
+    def render_file_name(item, index)
+      scene = video_slug(item['sceneName'].to_s)
+      scene = format('vista-%02d', index + 1) if scene.empty?
+      ext = item['url'].to_s.split('?').first.to_s[/\.(png|jpe?g|webp)\z/i]
+      ext = ext ? ext.downcase : '.png'
+      "#{scene}-#{Time.now.strftime('%Y%m%d')}#{ext}"
+    end
+
+    def handle_save_batch(raw)
+      payload = parse_json(raw)
+      raise t(:batch_save_busy) if @batch_save
+
+      items = Array(payload['items']).select do |i|
+        i.is_a?(Hash) && i['url'].to_s =~ %r{\Ahttps?://}
+      end
+      raise t(:batch_save_empty) if items.empty?
+
+      dir = renders_dir
+      raise t(:batch_save_no_dir) unless dir
+
+      @batch_save = {
+        :queue => items.dup, :dir => dir, :total => items.length,
+        :saved => 0, :failed => [], :index => 0
+      }
+      emit('batchSaveProgress', { :done => 0, :total => items.length })
+      save_next_render
+    end
+
+    def save_next_render
+      st = @batch_save
+      return unless st
+
+      item = st[:queue].shift
+      unless item
+        @batch_save = nil
+        emit('batchSaveDone', {
+          :saved => st[:saved], :failed => st[:failed],
+          :total => st[:total], :dir => st[:dir]
+        })
+        notify_panel(format(t(:batch_saved_n), st[:saved])) if st[:saved] > 0
+        return
+      end
+
+      index = st[:index]
+      st[:index] += 1
+      target = unique_path(File.join(st[:dir], render_file_name(item, index)))
+      done = proc do |ok, info|
+        if ok
+          st[:saved] += 1
+        else
+          st[:failed] << { :scene => item['sceneName'].to_s, :message => info.to_s }
+        end
+        emit('batchSaveProgress', { :done => st[:saved] + st[:failed].length, :total => st[:total] })
+        save_next_render
+      end
+      download_to_file(item['url'].to_s, target, 3, :kind => :image, :on_finish => done)
+    rescue StandardError => e
+      st = @batch_save
+      @batch_save = nil
+      emit('batchSaveDone', {
+        :saved => st ? st[:saved] : 0, :failed => st ? st[:failed] : [],
+        :total => st ? st[:total] : 0, :dir => st ? st[:dir] : '', :error => e.message
+      })
+      emit_error(e.message)
     end
 
     # ── Ampliar (upscale) ────────────────────────────────────────────────────
@@ -4540,6 +4810,15 @@ module SpaceNode
     end
 
     def request_edit(payload, source, reference_url, mask_url, epoch)
+      # O upload da máscara é :optional (uma falha não derruba a edição), mas
+      # insert_element EXIGE máscara no servidor (REQUIRES_MASK): sem esta
+      # checagem o usuário levaria um erro que se contradiz — "marque a área"
+      # com a área marcada.
+      if payload['action'].to_s == 'insert_element' && mask_url.to_s.empty?
+        fail_generation(t(:edit_mask_failed))
+        return
+      end
+
       return unless generation_alive?(epoch)
 
       has_mask = mask_url && !mask_url.empty?
@@ -4609,7 +4888,9 @@ module SpaceNode
 
     def build_edit_body(payload, source, dry_run, has_mask = false)
       action = payload['action'].to_s
-      return nil unless %w[remove swap_material refine_area].include?(action)
+      # insert_element exige máscara (REQUIRES_MASK no servidor) E instrução:
+      # a área diz ONDE, o texto diz O QUÊ. O painel espelha essa regra.
+      return nil unless %w[remove swap_material refine_area insert_element].include?(action)
 
       instruction = payload['instruction'].to_s.strip
       # remove/refine COM área selecionada não exigem instrução — a máscara já

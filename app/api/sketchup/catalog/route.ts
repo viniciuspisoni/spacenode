@@ -32,6 +32,7 @@ import {
 import { DNA_EXTRACTION_COST, getVistaGenerationCost, getAvailableQualities } from '@/lib/spaces/economy'
 import { getUpscaleCostNodes, scaleToFactor, MAX_OUTPUT_MP, type ModeId, type Scale } from '@/lib/upscale'
 import { PRESET_LABELS_EN } from '@/lib/sketchup/preset-labels-en'
+import { PLUGIN_VERSION, PLUGIN_RBZ_PATH, PLUGIN_RELEASE_NOTE } from '@/lib/sketchup/plugin-release'
 
 // i18n EN do painel do plugin: presets (mapa gerado, valor enviado à API
 // segue pt-BR) + rótulos estruturais do catálogo. O chrome do painel
@@ -215,7 +216,16 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({
-    version: 6,
+    // v7: pluginLatest. Distribuímos .rbz fora do Extension Warehouse, então
+    // não existe atualização automática — sem isto, quem instalou uma vez
+    // nunca fica sabendo que saiu versão nova. O plugin compara com a VERSION
+    // dele e avisa; nunca bloqueia.
+    version: 7,
+    pluginLatest: {
+      version: PLUGIN_VERSION,
+      path: PLUGIN_RBZ_PATH,
+      note: PLUGIN_RELEASE_NOTE,
+    },
     i18n: { en: CATALOG_I18N_EN },
     upscale,
     spaces,

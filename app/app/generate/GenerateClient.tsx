@@ -6,6 +6,7 @@ import { ConstellationN } from '@/components/brand'
 import {
   ProjectType, ProjectMaterials,
   getSegments, getEnvironments, getLighting, getBackgrounds, getSceneElements,
+  PRESERVE, isPreserved,
 } from '@/lib/prompts'
 import {
   ENGINES, ENGINE_ORDER, DEFAULT_ENGINE, DEFAULT_RESOLUTION,
@@ -232,10 +233,12 @@ function resolveInitialConfig(cfg: ProjectConfig | null | undefined) {
     : []
   return {
     projectType,
-    segment:            cfg?.segment     ?? 'Residencial',
-    environment:        cfg?.environment ?? 'Fachada Residencial',
-    lighting:           cfg?.lighting    ?? 'Preservar Original',
-    background:         cfg?.background  ?? 'Preservar Original',
+    // Os quatro nascem preservando: quem não abrir a folha não impõe nada
+    // ao modelo. Config salva continua vencendo.
+    segment:            cfg?.segment     ?? PRESERVE,
+    environment:        cfg?.environment ?? PRESERVE,
+    lighting:           cfg?.lighting    ?? PRESERVE,
+    background:         cfg?.background  ?? PRESERVE,
     sceneElements,
     selectedEngine:     engine,
     selectedResolution: resolution,
@@ -857,13 +860,18 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
   // Regra do contrato: entra o que o usuário ESCOLHEU. "Preservar Original"
   // só aparece quando é a única coisa a dizer — senão é ruído ocupando a
   // largura de uma linha de 44px.
-  const cenaSummary = summarize([
-    segment,
-    environment,
-    background !== 'Preservar Original' ? background : '',
+  // O resumo mostra o que o usuário ESCOLHEU. Preservado não é escolha —
+  // sai da linha. Com os quatro preservados a linha ficaria vazia, e aí o
+  // texto assume o lugar: dizer "Preservar original" é mais honesto do que
+  // uma linha muda, porque essa É a configuração.
+  const cenaEscolhas = summarize([
+    isPreserved(segment)     ? '' : segment,
+    isPreserved(environment) ? '' : environment,
+    isPreserved(background)  ? '' : background,
     sceneElements.length ? plural(sceneElements.length, 'elemento', 'elementos') : '',
   ])
-  const luzSummary = lighting === 'Preservar Original' ? 'Preservar original' : lighting
+  const cenaSummary = cenaEscolhas || 'Preservar original'
+  const luzSummary = isPreserved(lighting) ? 'Preservar original' : lighting
   const materiaisSummary = filledMaterials === 0 && materialSamples === 0
     ? 'Preservar do original'
     : summarize([
@@ -1305,6 +1313,12 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
         <div className="spn-field">
           <span className="spn-field-label">Espaço</span>
           <PillGroup label="Espaço" options={environments} value={environment} onChange={setEnvironment} />
+          {/* Com o segmento preservado a lista tem uma pílula só, e sem esta
+              linha ela parece um grupo morto — o usuário não descobre que é
+              o segmento que a acorda. */}
+          {isPreserved(segment) && (
+            <p className="spn-hint">Escolha um segmento acima para listar os espaços.</p>
+          )}
         </div>
         <div className="spn-field">
           <span className="spn-field-label">{bgTitle}</span>
