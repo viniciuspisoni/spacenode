@@ -9,7 +9,7 @@
 // Dureza do pincel = blur de filtro aplicado no traço inteiro (um stroke() por
 // traço — segmentos do mesmo traço não acumulam); fluxo = alpha do traço.
 
-import type { ElementLayer, LocalAdjustment, MaskStroke } from '../types'
+import type { ElementLayer, LocalAdjustment, MaskStroke, WandShape } from '../types'
 
 export interface LiveStroke {
   points: { x: number; y: number }[]
@@ -100,6 +100,11 @@ interface MaskCacheEntry {
   canvas: HTMLCanvasElement
 }
 
+/** Produz o raster de uma varinha (branco = selecionado) na resolução pedida.
+ *  Quem instala isto é o viewport, que é dono da imagem-base e do índice de cor
+ *  — a lib de máscaras não precisa saber ler pixels de imagem nenhuma. */
+export type WandSampler = (shape: WandShape, w: number, h: number) => HTMLCanvasElement | null
+
 export class MaskRasterizer {
   /** Escala de rasterização relativa à imagem base. ½ no preview (default,
    *  indistinguível em tela); o EXPORT sobe pra 1.0 — a meia-resolução
@@ -107,6 +112,12 @@ export class MaskRasterizer {
    *  (requadro de janela, linha de teto) que uma máscara 4K precisa segurar.
    *  A escala entra nas dims do canvas, que já compõem a cache key. */
   maskScale = MASK_SCALE
+
+  /** Rasterizador da varinha, instalado pelo viewport. */
+  wandSampler: WandSampler | null = null
+  /** Muda quando a imagem-base muda (ação de IA). Entra na chave de cache para
+   *  que a varinha seja recalculada sobre a imagem nova. */
+  baseEpoch = 0
 
   private cache = new Map<string, MaskCacheEntry>()
   /** Imagens carregadas (bakedUrl / maskUrl legado). */
@@ -149,7 +160,11 @@ export class MaskRasterizer {
     const w = Math.max(2, Math.round(imgW * this.maskScale))
     const h = Math.max(2, Math.round(imgH * this.maskScale))
     const baked = local.shape.kind === 'sky' ? local.shape.bakedUrl ?? '' : ''
-    const key = `${w}x${h}|${baked}|${local.feather}|${this.strokesKey(local.strokes)}|${live ? `live${live.points.length}:${live.erase ? 1 : 0}` : ''}`
+    const wand = local.shape.kind === 'wand'
+      ? `wand:${this.baseEpoch}:${local.shape.seed.x.toFixed(4)}:${local.shape.seed.y.toFixed(4)}` +
+        `:${local.shape.tolerance}:${local.shape.contiguous ? 1 : 0}:${local.shape.sampleRadius}`
+      : ''
+    const key = `${w}x${h}|${baked}|${wand}|${local.feather}|${this.strokesKey(local.strokes)}|${live ? `live${live.points.length}:${live.erase ? 1 : 0}` : ''}`
     const cacheId = `local:${local.id}`
     const hit = this.cache.get(cacheId)
     if (hit && hit.key === key) return hit.canvas
@@ -165,6 +180,12 @@ export class MaskRasterizer {
         // PNG branco=selecionado → alfa via luminância
         addCtx.drawImage(alphaFromLuma(img, w, h), 0, 0)
       }
+    } else if (local.shape.kind === 'wand') {
+      // Mesmo caminho do céu: a forma entrega um raster e os traços de pincel
+      // refinam por cima. É o que faz varinha + pincel + borracha comporem sem
+      // que nada aqui saiba que a varinha existe.
+      const canvas = this.wandSampler?.(local.shape, w, h)
+      if (canvas) addCtx.drawImage(canvas, 0, 0)
     }
     const scale = this.maskScale
     for (const s of local.strokes) applyStroke(addCtx, eraseCtx, s, w, h, scale)
@@ -373,6 +394,51 @@ export function computeSkyMask(source: CanvasImageSource, srcW: number, srcH: nu
 
 /** Rasteriza traços num PNG preto/branco (branco = área marcada) nas dimensões
  *  EXATAS pedidas — o /api/edits exige máscara do tamanho da imagem. */
+/**
+ * Máscara de SELEÇÃO para enviar à IA: um raster de base (o resultado da
+ * varinha, em espaço de origem) com os traços de pincel/borracha aplicados por
+ * cima. Branco = editar, nas dimensões exatas que a rota exige.
+ *
+ * É a mesma composição que o overlay da tela faz — por isso o que a pessoa vê
+ * marcado é exatamente o que vai ser editado, que é a única propriedade que
+ * importa numa ferramenta de seleção.
+ */
+export function selectionMaskPngCanvas(
+  base: HTMLCanvasElement | null,
+  strokes: MaskStroke[],
+  outW: number,
+  outH: number,
+): HTMLCanvasElement {
+  // RESOLUÇÃO CHEIA, ao contrário do preview de tela.
+  //
+  // As máscaras de ajuste local vivem em ½ (indistinguível quando o efeito é
+  // uma mudança de exposição). Esta aqui é outra coisa: é o recorte que decide
+  // quais pixels a IA reescreve, e meia resolução upscalada arredonda
+  // exatamente as arestas duras que a seleção existe para respeitar — o
+  // encontro do piso com o rodapé, o contorno do céu contra a laje. Acontece
+  // uma vez por edição; pagar resolução cheia aqui é barato.
+  const add = makeCanvas(outW, outH)
+  const erase = makeCanvas(outW, outH)
+  const addCtx = add.getContext('2d')!
+  const eraseCtx = erase.getContext('2d')!
+  if (base) addCtx.drawImage(base, 0, 0, outW, outH)
+  for (const s of strokes) applyStroke(addCtx, eraseCtx, s, outW, outH, 1)
+
+  const solved = makeCanvas(outW, outH)
+  const sctx = solved.getContext('2d')!
+  sctx.drawImage(add, 0, 0)
+  sctx.globalCompositeOperation = 'destination-out'
+  sctx.drawImage(erase, 0, 0)
+  sctx.globalCompositeOperation = 'source-over'
+
+  const out = makeCanvas(outW, outH)
+  const octx = out.getContext('2d')!
+  octx.fillStyle = '#000000'
+  octx.fillRect(0, 0, outW, outH)
+  octx.drawImage(solved, 0, 0)
+  return out
+}
+
 export function strokesMaskPngCanvas(strokes: MaskStroke[], outW: number, outH: number): HTMLCanvasElement {
   const w = Math.max(2, Math.round(outW * MASK_SCALE))
   const h = Math.max(2, Math.round(outH * MASK_SCALE))

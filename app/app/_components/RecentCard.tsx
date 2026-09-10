@@ -96,6 +96,15 @@ export function RecentCard({ render: r }: { render: RecentRender }) {
                 Ampliar
               </Link>
             )}
+            {/* Editar faltava aqui, e o buraco era medível: 2.381 renders
+                contra 3 projetos de pós-produção em dois meses. Não era
+                qualidade da ferramenta — era que nada no produto apontava
+                para ela, e as pessoas seguem o fluxo. */}
+            {reusable && (
+              <Link className="spn-dash-recent-act" href={`/app/editar?source=${encodeURIComponent(out)}&source_type=render&source_id=${r.id}`} title="Editar">
+                Editar
+              </Link>
+            )}
             {r.output_url && (
               <a className="spn-dash-recent-act spn-dash-recent-act--icon" href={`/api/download?url=${encodeURIComponent(r.output_url)}&filename=${encodeURIComponent(buildFilename(r))}`} title="Baixar" aria-label="Baixar">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

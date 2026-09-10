@@ -11,8 +11,8 @@ import {
   rleDecode,
   rleEncode,
   maskToGrayscaleRgba,
-} from '@/components/edit-v4/selection/mask-raster'
-import { traceMaskContours } from '@/components/edit-v4/selection/contours'
+} from '@/lib/selection/mask-raster'
+import { traceMaskContours } from '@/lib/selection/contours'
 
 const W = 40
 const H = 40

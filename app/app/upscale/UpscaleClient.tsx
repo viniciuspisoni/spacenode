@@ -621,6 +621,13 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
                   </svg>
                   Ampliar nova imagem
                 </button>
+                <a className="spn-ghost" style={ghostLink} href={`/app/editar?source=${encodeURIComponent(resultUrl)}`}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 20h9"/>
+                    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+                  </svg>
+                  Editar imagem
+                </a>
                 <a className="spn-ghost" style={ghostLink} href={`/app/spaces/new/upload?source=${encodeURIComponent(resultUrl)}`}>
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <rect x="3" y="3" width="18" height="18" rx="2"/>

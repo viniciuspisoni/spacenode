@@ -1,4 +1,4 @@
-// components/edit-v4/selection/mask-raster.ts
+// lib/selection/mask-raster.ts
 //
 // A seleção do Editar V4 é um RASTER: um `Uint8Array` de 0/255 na resolução
 // natural da imagem. Essa é a mudança estrutural em relação ao V3, que guardava

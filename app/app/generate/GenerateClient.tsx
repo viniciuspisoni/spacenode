@@ -1244,6 +1244,13 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
                 <button type="button" className="spn-ghost" onClick={() => handleGenerate('2k')}>
                   Melhorar qualidade (2K)
                 </button>
+                <a
+                  className="spn-ghost"
+                  style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                  href={`/app/editar?source=${encodeURIComponent(outputUrl)}&source_type=render${lastRenderId ? `&source_id=${lastRenderId}` : ''}`}
+                >
+                  Editar imagem
+                </a>
                 <button type="button" className="spn-ghost" onClick={handleNewRender}>
                   Iniciar novo render
                 </button>

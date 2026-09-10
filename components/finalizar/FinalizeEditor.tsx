@@ -14,27 +14,35 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   type CropRect, type ElementTransform, type FinalizeDoc, type FinalizeProject,
-  type FinalizeProjectSummary, type MaskShape, type MaskStroke,
+  type FinalizeProjectSummary, type MaskShape, type MaskStroke, type WandShape,
   MAX_ELEMENTS, MAX_LOCAL_ADJUSTMENTS, MAX_SNAPSHOTS,
 } from '@/lib/finalizar/types'
+import type {
+  EditV4Action, EditV4EdgeSoftness, EditV4Intensity, EditV4Preservation,
+} from '@/lib/edit-v4/types'
+import { DEFAULT_EDGE_SOFTNESS } from '@/lib/edit-v4/types'
+import { DEFAULT_WAND_OPTIONS } from '@/lib/selection/magic-wand'
 import {
   compactStroke, createDocument, deserializeDocument, isGeometryIdentity,
   makeId, newElementLayer, newLocalAdjustment, serializeDocument,
 } from '@/lib/finalizar/composition'
 import { DocHistory } from '@/lib/finalizar/history'
 import {
+  defaultTextSpec, hydrateTextLayers, renderTextToDataUrl, type TextSpec,
+} from '@/lib/finalizar/text-layer'
+import {
   adjustmentsSummary, downloadBlob, renderExport,
 } from '@/lib/finalizar/export'
 import { computeColorMatch, displayToSource, imageStats, solveNeutral, type Histogram } from '@/lib/finalizar/engine/color-math'
-import { estimateStrokeCoverage, strokesMaskPngCanvas } from '@/lib/finalizar/engine/masks'
+import { selectionMaskPngCanvas } from '@/lib/finalizar/engine/masks'
 import { uploadDirect } from '@/lib/storage/direct-upload-client'
 import {
   CanvasViewport,
   type BrushSettings, type CanvasViewportHandle, type CompareMode,
-  type MaskOverlayColor, type StrokeTarget,
+  type EditSubTool, type MaskOverlayColor, type SelectionOp, type StrokeTarget,
 } from './CanvasViewport'
 import { TopBar, StatusStrip, type SaveStatus } from './TopBar'
-import { ToolRail, type EditorTool } from './ToolRail'
+import { ToolRail, visibleTools, type EditorTool } from './ToolRail'
 import { ConfirmSheet } from './ui'
 import { useAmbient } from '@/components/app/glass'
 import { ExportDialog, type ExportOptions } from './ExportDialog'
@@ -42,7 +50,8 @@ import { FinalizeImportModal } from './FinalizeImportModal'
 import { AdjustPanel, type QuickFix } from './panels/AdjustPanel'
 import { ColorPanel } from './panels/ColorPanel'
 import { MasksPanel, type QuickMask } from './panels/MasksPanel'
-import { CleanupPanel, type CleanupPreview } from './panels/CleanupPanel'
+import { EditPanel, EDIT_ACTIONS } from './panels/EditPanel'
+import { EditToolRail } from './EditToolRail'
 import { GeometryPanel } from './panels/GeometryPanel'
 import { ElementsPanel } from './panels/ElementsPanel'
 import { HistoryPanel } from './panels/HistoryPanel'
@@ -51,16 +60,63 @@ interface Props {
   initialProject?: FinalizeProject | null
   initialSourceUrl?: string | null
   savedProjects?: FinalizeProjectSummary[]
+  /** Saldo do PAGADOR, já resolvido no servidor. Evita a ida à rede só para
+   *  descobrir quanto a pessoa tem. */
+  initialBalance?: number | null
+  /** Preço de uma edição por IA, derivado em lib/edit-v4/pricing. */
+  nodesPerEdit?: number
+  /** A edição por IA está ligada neste ambiente (EDIT_V4_ENABLED no servidor)?
+   *  FAIL-SAFE em false: sem isto, o mesmo componente serve o /app/finalizar de
+   *  produção — onde a rota responde 404 — e abriria numa aba que só sabe
+   *  falhar. Com false ele é o editor de pós-produção de sempre. */
+  aiEnabled?: boolean
 }
 
 const PANEL_TITLE: Record<EditorTool, string> = {
+  edit: 'Editar com IA',
   adjust: 'Ajustes',
   color: 'Cor e atmosfera',
   masks: 'Máscaras e ajustes locais',
-  cleanup: 'Limpeza (IA)',
   geometry: 'Geometria',
   elements: 'Elementos',
   history: 'Histórico e versões',
+}
+
+/** Cada ferramenta de seleção explica o próprio gesto na barra de status —
+ *  é o único lugar onde ela cabe sem virar mais texto no painel. */
+/** Teto do crescimento AUTOMÁTICO da seleção, em fração da imagem.
+ *
+ *  Medido em scripts/editar-grow-calibrate.mts: uma peça de mobiliário cresce
+ *  para 2–4%, uma superfície grande (piso, parede) para 9–30%. Doze por cento
+ *  cobre a peça e a superfície pequena e deixa de fora "metade da cena" — que é
+ *  o que não pode acontecer sem ninguém ter pedido. Acima disso o crescimento é
+ *  descartado e vale o que foi marcado; o botão manual continua permitindo ir
+ *  além, aí com a pessoa vendo o resultado antes de gastar node. */
+const AUTO_UNIFORM_MAX_COVERAGE = 0.12
+
+/** Letra de cada ferramenta de seleção, como no V4 e como no Photoshop. */
+const EDIT_TOOL_KEYS: Record<string, EditSubTool> = {
+  v: 'wand', b: 'brush', e: 'eraser', l: 'lasso', p: 'polygon', r: 'rect',
+}
+
+/** Nome de cada ajuste na mensagem de retorno. */
+const SELECTION_OP_LABEL: Record<SelectionOp, string> = {
+  expand: 'Seleção expandida',
+  contract: 'Seleção contraída',
+  smooth: 'Seleção suavizada',
+  fillHoles: 'Buracos tapados',
+  cleanIslands: 'Respingos removidos',
+  invert: 'Seleção invertida',
+  selectAll: 'Imagem inteira selecionada',
+}
+
+const EDIT_HINTS: Record<EditSubTool, string> = {
+  wand: 'Clique numa superfície para selecioná-la inteira · Shift soma outra, Alt subtrai',
+  brush: 'Pinte a área a alterar — ela fica marcada em vermelho',
+  eraser: 'Pinte para tirar da seleção',
+  lasso: 'Arraste para contornar a área à mão livre · Alt subtrai',
+  polygon: 'Clique para cravar cada canto · duplo-clique ou "Fechar área" encerra · Alt subtrai',
+  rect: 'Arraste uma caixa sobre a área · Alt subtrai',
 }
 
 const AUTOSAVE_DELAY = 3500
@@ -75,7 +131,10 @@ function toStableStorageUrl(url: string): string {
   return noQuery.replace('/storage/v1/object/sign/', '/storage/v1/object/public/')
 }
 
-export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects = [] }: Props) {
+export function FinalizeEditor({
+  initialProject, initialSourceUrl, savedProjects = [],
+  initialBalance = null, nodesPerEdit = 18, aiEnabled = false,
+}: Props) {
   const router = useRouter()
   const viewportRef = useRef<CanvasViewportHandle | null>(null)
   const historyRef = useRef(new DocHistory())
@@ -84,7 +143,8 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
   // ── documento ──────────────────────────────────────────────────────────────
   const [doc, setDoc] = useState<FinalizeDoc | null>(() => {
     if (!initialProject) return null
-    const d = deserializeDocument(initialProject.document)
+    const d0 = deserializeDocument(initialProject.document)
+    const d = d0 ? hydrateTextLayers(d0) : null
     if (d) return d
     if (initialProject.base_image_url && initialProject.width && initialProject.height) {
       return createDocument(initialProject.base_image_url, initialProject.width, initialProject.height)
@@ -104,7 +164,11 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
   }, [])
 
   // ── UI ─────────────────────────────────────────────────────────────────────
-  const [tool, setTool] = useState<EditorTool>('adjust')
+  const [tool, setTool] = useState<EditorTool>(aiEnabled ? 'edit' : 'adjust')
+  // O undo é chamado de dentro de callbacks estáveis; ler a aba por ref evita
+  // recriar o callback (e a fiação do topo) a cada troca de painel.
+  const toolRef = useRef<EditorTool>(aiEnabled ? 'edit' : 'adjust')
+  useEffect(() => { toolRef.current = tool }, [tool])
   const [panelsOpen, setPanelsOpen] = useState(true)
   const [leaving, setLeaving] = useState(false)
   // A largura do painel vive em DUAS camadas de propósito. Em repouso é
@@ -159,14 +223,37 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
   )
 
   // ── limpeza (IA) ───────────────────────────────────────────────────────────
-  const [cleanupStrokes, setCleanupStrokes] = useState<MaskStroke[]>([])
-  const [cleanupMode, setCleanupMode] = useState<'remove' | 'fix'>('remove')
-  const [cleanupPrompt, setCleanupPrompt] = useState('')
-  const [cleanupPreview, setCleanupPreview] = useState<CleanupPreview | null>(null)
-  const [cleanupPreviewLoading, setCleanupPreviewLoading] = useState(false)
-  const [cleanupBusy, setCleanupBusy] = useState(false)
-  const [cleanupMsg, setCleanupMsg] = useState<{ text: string; kind: 'error' | 'info' } | null>(null)
-  const [balance, setBalance] = useState<number | null>(null)
+  // Seleção da edição por IA: a varinha é a FORMA (raster) e os traços de
+  // pincel/borracha refinam por cima — a mesma composição que uma máscara local
+  // usa, então o overlay e o que é enviado à IA são o mesmo desenho.
+  const [editStrokes, setEditStrokes] = useState<MaskStroke[]>([])
+  const [editWand, setEditWand] = useState<WandShape | null>(null)
+  const [editSubTool, setEditSubTool] = useState<EditSubTool>('wand')
+  /** Há laço/polígono/retângulo desenhados? (o raster vive no viewport). */
+  const [hasEditRegions, setHasEditRegions] = useState(false)
+  /** Nas ações de superfície, deixar a seleção crescer até a peça antes de
+   *  editar. Ligado por padrão: é a diferença entre um conserto e um remendo,
+   *  e ninguém vai pensar "preciso marcar mais do que o defeito". */
+  const [editUniform, setEditUniform] = useState(true)
+  const [snapBusy, setSnapBusy] = useState(false)
+  /** Histórico da SELEÇÃO (vive no viewport; aqui só o que a tela precisa
+   *  saber para acender a seta e para o Ctrl+Z decidir a quem obedecer). */
+  const [selHistory, setSelHistory] = useState({ canUndo: false, canRedo: false })
+  const [wandTolerance, setWandTolerance] = useState(DEFAULT_WAND_OPTIONS.tolerance)
+  const [wandContiguous, setWandContiguous] = useState(DEFAULT_WAND_OPTIONS.contiguous)
+  const [editAction, setEditAction] = useState<EditV4Action>('swap_material')
+  const [editInstruction, setEditInstruction] = useState('')
+  const [editReferenceUrl, setEditReferenceUrl] = useState<string | null>(null)
+  const [editReferenceBusy, setEditReferenceBusy] = useState(false)
+  const [editPreservation, setEditPreservation] = useState<EditV4Preservation>('maximum')
+  const [editIntensity, setEditIntensity] = useState<EditV4Intensity>('standard')
+  const [editEdge, setEditEdge] = useState<EditV4EdgeSoftness | null>(null)
+  /** A base atual permite ler pixels? (imagem sem CORS derruba a varinha.) */
+  const [canSample, setCanSample] = useState(false)
+  const [editBusy, setEditBusy] = useState(false)
+  const [editMsg, setEditMsg] = useState<{ text: string; kind: 'error' | 'info' } | null>(null)
+  const referenceInputRef = useRef<HTMLInputElement | null>(null)
+  const [balance, setBalance] = useState<number | null>(initialBalance)
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Mutação do documento + histórico
@@ -200,8 +287,20 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
     setActiveElementId((id) => (id && d.elements.some((e) => e.id === id) ? id : null))
   }, [markDirty, syncHistoryUi])
 
-  const undo = useCallback(() => applyHistoryDoc(historyRef.current.undo()), [applyHistoryDoc])
-  const redo = useCallback(() => applyHistoryDoc(historyRef.current.redo()), [applyHistoryDoc])
+  const undoDoc = useCallback(() => applyHistoryDoc(historyRef.current.undo()), [applyHistoryDoc])
+  const redoDoc = useCallback(() => applyHistoryDoc(historyRef.current.redo()), [applyHistoryDoc])
+
+  // A seta do topo e o Ctrl+Z têm que fazer a MESMA coisa. Antes a seta ia
+  // direto ao histórico do documento, então ela ficava apagada com uma seleção
+  // acabada de fazer na tela — que foi a reclamação.
+  const undo = useCallback(() => {
+    if (toolRef.current === 'edit' && viewportRef.current?.undoSelection()) return
+    undoDoc()
+  }, [undoDoc])
+  const redo = useCallback(() => {
+    if (toolRef.current === 'edit' && viewportRef.current?.redoSelection()) return
+    redoDoc()
+  }, [redoDoc])
 
   // ── nova base ──────────────────────────────────────────────────────────────
   const loadDims = (url: string) => new Promise<{ w: number; h: number }>((resolve, reject) => {
@@ -229,7 +328,11 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
       setImportPurpose(null)
       setActiveLocalId(null)
       setActiveElementId(null)
-      setCleanupStrokes([])
+      setEditStrokes([])
+      setEditWand(null)
+      viewportRef.current?.clearEditRegions()
+      setEditReferenceUrl(null)
+      setEditMsg(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Falha ao carregar imagem.')
     }
@@ -274,9 +377,9 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
   const onStrokeCommit = useCallback((target: StrokeTarget, rawStroke: MaskStroke) => {
     // Enxuga o traço antes de persistir (jsonb pequeno, sem perda visual).
     const stroke = compactStroke(rawStroke)
-    if (target.kind === 'cleanup') {
-      setCleanupStrokes((prev) => [...prev, stroke])
-      setCleanupMsg(null)
+    if (target.kind === 'edit') {
+      setEditStrokes((prev) => [...prev, stroke])
+      setEditMsg(null)
       return
     }
     if (target.kind === 'local') {
@@ -451,6 +554,69 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [patch])
 
+  /**
+   * Cria uma camada de TEXTO.
+   *
+   * Não passa pelo importador de imagem porque não há imagem: o raster nasce
+   * do próprio texto. A largura inicial sai da proporção do raster contra a
+   * base, para o corpo pedido em `size` (fração da ALTURA) valer de verdade —
+   * senão "6% da altura" viraria qualquer coisa dependendo de quantas letras a
+   * pessoa digitou.
+   */
+  const addTextLayer = useCallback(() => {
+    setError(null)
+    const cur = docRef.current
+    if (!cur) return
+    if (cur.elements.length >= MAX_ELEMENTS) {
+      setError(`Limite de ${MAX_ELEMENTS} elementos por projeto.`)
+      return
+    }
+    const spec = defaultTextSpec()
+    const r = renderTextToDataUrl(spec)
+    if (!r) return
+    const alturaAlvo = spec.size * cur.height
+    const larguraAlvo = (r.width / r.height) * alturaAlvo
+    const el = {
+      ...newElementLayer({ url: r.url, name: 'Texto', category: 'texto' as const, width: 1 }),
+      text: spec,
+      transform: {
+        x: 0.5, y: 0.5,
+        width: Math.max(0.02, Math.min(1, larguraAlvo / cur.width)),
+        rotation: 0, flipH: false, flipV: false,
+      },
+    }
+    patch('Adicionar texto', (d) => ({ ...d, elements: [...d.elements, el] }))
+    setActiveElementId(el.id)
+    setTool('elements')
+    setElementMaskMode(false)
+  }, [patch])
+
+  /** Reescreve o texto de uma camada e o raster junto. A largura acompanha,
+   *  senão trocar "Sala" por "Sala de estar" esticaria as letras. */
+  const updateTextLayer = useCallback((id: string, spec: TextSpec) => {
+    const cur = docRef.current
+    if (!cur) return
+    const r = renderTextToDataUrl(spec)
+    patch('Texto', (d) => ({
+      ...d,
+      elements: d.elements.map((e) => {
+        if (e.id !== id) return e
+        if (!r) return { ...e, text: spec }
+        const alturaAlvo = spec.size * d.height
+        const larguraAlvo = (r.width / r.height) * alturaAlvo
+        return {
+          ...e,
+          text: spec,
+          url: r.url,
+          transform: {
+            ...e.transform,
+            width: Math.max(0.02, Math.min(2, larguraAlvo / d.width)),
+          },
+        }
+      }),
+    }), `texto-${id}`)
+  }, [patch])
+
   // ═══════════════════════════════════════════════════════════════════════════
   // Tratamento: copiar/colar entre projetos (consistência entre vistas)
   // ═══════════════════════════════════════════════════════════════════════════
@@ -461,6 +627,10 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
     try {
       window.localStorage.setItem(TREATMENT_CLIPBOARD_KEY, JSON.stringify({
         adjust: d.adjust, vignette: d.vignette, curve: d.curve,
+        // As curvas por canal são tratamento como qualquer outro: sem elas o
+        // "colar" levaria metade da atmosfera e a vista seguinte sairia com
+        // outra dominante que a primeira.
+        curveR: d.curveR, curveG: d.curveG, curveB: d.curveB,
         hsl: d.hsl, grading: d.grading, treatmentAmount: d.treatmentAmount,
       }))
       setPasteAvailable(true)
@@ -476,7 +646,8 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
       const t = JSON.parse(raw) as Record<string, unknown>
       patch('Colar tratamento', (d) => {
         // O sanitizador do documento garante shape/limites do que veio do storage.
-        const merged = deserializeDocument({ ...d, ...t, snapshots: d.snapshots, versions: d.versions })
+        const m0 = deserializeDocument({ ...d, ...t, snapshots: d.snapshots, versions: d.versions })
+        const merged = m0 ? hydrateTextLayers(m0) : null
         return merged ?? d
       })
     } catch {
@@ -594,98 +765,144 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
   // Limpeza (IA) — única parte que consome Nodes
   // ═══════════════════════════════════════════════════════════════════════════
 
-  // saldo ao entrar na ferramenta
+  // saldo ao entrar na ferramenta (só se o servidor não tiver mandado)
   useEffect(() => {
-    if (tool !== 'cleanup' || balance !== null) return
+    if (tool !== 'edit' || balance !== null) return
     fetch('/api/users/me/balance')
       .then((r) => r.json())
       .then((j) => { if (typeof j?.total_balance === 'number') setBalance(j.total_balance) })
       .catch(() => {})
   }, [tool, balance])
 
-  // preview de custo (debounced; autoritativo no servidor)
-  useEffect(() => {
-    if (tool !== 'cleanup' || cleanupStrokes.length === 0 || !doc) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- limpa o preview quando a máscara some
-      setCleanupPreview(null)
-      setCleanupPreviewLoading(false)
+  // O preço não é mais consultado por rede: ele é constante por edição e desce
+  // do servidor em `nodesPerEdit` (lib/edit-v4/pricing). O preview do v1 existia
+  // porque lá o custo variava com cobertura da máscara e resolução.
+
+  /**
+   * Edição por IA. É a única operação da ferramenta que consome Nodes.
+   *
+   * O resultado NÃO substitui o projeto: ele avança a imagem de trabalho
+   * (`baseUrl`) e todos os ajustes — exposição, cor, curva, máscaras locais,
+   * geometria, camadas — continuam aplicados por cima. É o que faz IA e
+   * pós-produção conviverem no mesmo documento em vez de serem duas etapas
+   * que se atropelam.
+   */
+  /**
+   * "Colar na borda" — re-estima a seleção usando a própria imagem como guia
+   * (guided filter). Onde existe contraste visual — encontro de materiais,
+   * rodapé, esquadria, quina de marcenaria — a borda gruda no contorno real.
+   *
+   * É a diferença entre "mais ou menos ali" e acertar o rodapé no pixel, e em
+   * archviz isso é quase todo o resultado. Roda no servidor mas é aritmética
+   * local lá (sharp + imagens integrais, O(N)): ZERO nodes, quantas vezes
+   * quiser. A rota já existia desde o V4 e ficou órfã na fusão.
+   */
+  const snapEdges = useCallback(async () => {
+    const cur = docRef.current
+    const vp = viewportRef.current
+    if (!cur || !vp || snapBusy) return
+    setSnapBusy(true)
+    setEditMsg(null)
+    try {
+      const blob = await vp.selectionBlob()
+      if (!blob) {
+        setEditMsg({ kind: 'error', text: 'Marque uma área primeiro.' })
+        return
+      }
+      const up = await uploadDirect(blob, 'retocar-asset', { kind: 'mask' })
+      if (!up.url) throw new Error('sem URL')
+      const res = await fetch('/api/edit-v4/mask/refine', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image_url: cur.originalBaseUrl, mask_url: up.url }),
+      })
+      const j = await res.json().catch(() => null)
+      if (!res.ok || !j?.mask_url) {
+        setEditMsg({ kind: 'error', text: j?.error ?? 'Não foi possível ajustar a borda.' })
+        return
+      }
+      const ok = await vp.loadSelectionMask(j.mask_url as string)
+      if (!ok) setEditMsg({ kind: 'error', text: 'Não foi possível carregar a borda ajustada.' })
+      else setEditMsg({
+        kind: 'info',
+        text: j.changed === false
+          ? 'A borda já estava boa — nada mudou.'
+          : 'Borda colada no contorno real. Não consumiu nodes.',
+      })
+    } catch {
+      setEditMsg({ kind: 'error', text: 'Falha de conexão ao ajustar a borda.' })
+    } finally {
+      setSnapBusy(false)
+    }
+  }, [snapBusy])
+
+  const refineSelection = useCallback((op: SelectionOp) => {
+    const r = viewportRef.current?.refineSelection(op) ?? null
+    if (!r) {
+      setEditMsg({ kind: 'error', text: 'Marque uma área primeiro.' })
       return
     }
-    setCleanupPreviewLoading(true)
-    const abort = new AbortController()
-    const t = setTimeout(async () => {
-      try {
-        const coverage = estimateStrokeCoverage(cleanupStrokes, doc.width, doc.height)
-        const res = await fetch('/api/edits/preview', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          signal: abort.signal,
-          body: JSON.stringify({
-            has_mask: true,
-            mask_coverage: coverage,
-            mode: cleanupMode === 'remove' ? 'remove' : 'fix',
-            prompt: cleanupMode === 'fix' ? cleanupPrompt : '',
-            quality: 'hd',
-            source_type: 'upload',
-            image_megapixels: (doc.width * doc.height) / 1e6,
-          }),
-        })
-        const j = await res.json().catch(() => null)
-        if (abort.signal.aborted) return
-        if (res.ok && j && typeof j.cost_nodes === 'number') {
-          setCleanupPreview({
-            cost: j.cost_nodes,
-            isFree: Boolean(j.is_free_fix),
-            label: typeof j.label === 'string' ? j.label : '',
-            explanation: typeof j.explanation === 'string' ? j.explanation : '',
-          })
-        } else {
-          // Falha ao precificar → sem preview, botão desabilita (nunca custo velho).
-          setCleanupPreview(null)
-        }
-      } catch {
-        if (!abort.signal.aborted) setCleanupPreview(null)
-      } finally {
-        if (!abort.signal.aborted) setCleanupPreviewLoading(false)
-      }
-    }, 350)
-    return () => {
-      abort.abort()
-      clearTimeout(t)
-    }
-  }, [tool, cleanupStrokes, cleanupMode, cleanupPrompt, doc])
+    const pct = Math.round(r.coverage * 1000) / 10
+    setEditMsg({ kind: 'info', text: `${SELECTION_OP_LABEL[op]} — ${pct}% da imagem.` })
+  }, [])
 
-  const runCleanup = useCallback(async () => {
+  const runEdit = useCallback(async () => {
     const cur = docRef.current
-    if (!cur || cleanupStrokes.length === 0 || cleanupBusy) return
-    setCleanupBusy(true)
-    setCleanupMsg(null)
+    if (!cur || editBusy) return
+    const def = EDIT_ACTIONS.find((a2) => a2.id === editAction) ?? EDIT_ACTIONS[0]
+    const hasSelection = editStrokes.length > 0 || editWand !== null || hasEditRegions
+    if (def.requiresSelection && !hasSelection) {
+      setEditMsg({ kind: 'error', text: editAction === 'insert_element'
+        ? 'Marque o lugar onde o elemento entra.'
+        : 'Marque o objeto que será trocado.' })
+      return
+    }
+    if (!hasSelection && !editInstruction.trim() && !editReferenceUrl) {
+      setEditMsg({ kind: 'error', text: 'Descreva a mudança ou marque uma área.' })
+      return
+    }
+    setEditBusy(true)
+    setEditMsg(null)
+    // Cresce a seleção ANTES de gastar node. A pessoa marcou o defeito; o que
+    // precisa ser reescrito é a superfície inteira, senão o conserto não
+    // combina com o resto da peça — e a emenda continua visível, só que agora
+    // entre "consertado" e "original". O teto é uma CONDIÇÃO: se crescer passar
+    // dele, desiste e vale o que foi marcado. Melhor não uniformizar do que
+    // refazer meia cena que ninguém pediu.
+    let uniformizou: { coverage: number; applied: boolean } | null = null
+    if (def.uniformizes && editUniform && hasSelection) {
+      uniformizou = viewportRef.current?.growEditSelection({ maxCoverage: AUTO_UNIFORM_MAX_COVERAGE }) ?? null
+    }
     try {
-      // 1. máscara nas dimensões EXATAS da imagem (exigência do /api/edits).
-      //    Os traços foram desenhados sobre a imagem JÁ CORRIGIDA (geometria);
-      //    a IA edita a imagem ORIGINAL → mapeia cada ponto de volta.
-      const aspect = cur.width / Math.max(1, cur.height)
-      const mappedStrokes = isGeometryIdentity(cur.geometry)
-        ? cleanupStrokes
-        : cleanupStrokes.map((s) => ({
-            ...s,
-            points: s.points.map((p) => displayToSource(p, cur.geometry, aspect)),
-          }))
-      const maskCanvas = strokesMaskPngCanvas(mappedStrokes, cur.width, cur.height)
-      const maskBlob = await new Promise<Blob | null>((r) => maskCanvas.toBlob(r, 'image/png'))
-      if (!maskBlob) throw new Error('Falha ao gerar a máscara neste navegador. Tente novamente.')
-      // Upload DIRETO browser→Storage (rotas da Vercel rejeitam corpo >4,5MB —
-      // era a causa do "Falha ao enviar a máscara" em imagens grandes).
-      let maskUrl: string
-      try {
-        const up = await uploadDirect(maskBlob, 'retocar-asset', { kind: 'mask' })
-        if (!up.url) throw new Error('sem URL')
-        maskUrl = up.url
-      } catch (e) {
-        throw new Error(`Falha ao enviar a máscara (${e instanceof Error ? e.message : 'conexão'}). Sua seleção foi mantida — toque em Tentar novamente.`)
+      // 1. seleção → PNG nas dimensões EXATAS da imagem.
+      //    Os traços foram desenhados sobre a imagem JÁ CORRIGIDA pela
+      //    geometria; a IA edita a ORIGINAL → mapeia ponto a ponto de volta. O
+      //    raster da varinha já nasce em espaço de origem (por isso ela se
+      //    desliga quando há geometria aplicada — ver wandAvailable no viewport).
+      let maskUrl: string | undefined
+      if (hasSelection) {
+        const aspect = cur.width / Math.max(1, cur.height)
+        const mapped = isGeometryIdentity(cur.geometry)
+          ? editStrokes
+          : editStrokes.map((st) => ({
+              ...st,
+              points: st.points.map((p) => displayToSource(p, cur.geometry, aspect)),
+            }))
+        const wandCanvas = viewportRef.current?.wandMask() ?? null
+        const maskCanvas = selectionMaskPngCanvas(wandCanvas, mapped, cur.width, cur.height)
+        const maskBlob = await new Promise<Blob | null>((r) => maskCanvas.toBlob(r, 'image/png'))
+        if (!maskBlob) throw new Error('Falha ao gerar a seleção neste navegador. Tente novamente.')
+        // Upload DIRETO browser→Storage: rotas da Vercel rejeitam corpo >4,5 MB.
+        try {
+          const up = await uploadDirect(maskBlob, 'retocar-asset', { kind: 'mask' })
+          if (!up.url) throw new Error('sem URL')
+          maskUrl = up.url
+        } catch (e) {
+          throw new Error(`Falha ao enviar a seleção (${e instanceof Error ? e.message : 'conexão'}). Sua marcação foi mantida — tente de novo.`)
+        }
       }
 
-      // 2. imagem fonte: precisa ser URL absoluta alcançável pelo servidor
+      // 2. a imagem fonte precisa ser URL absoluta alcançável pelo servidor
       let sourceUrl = cur.baseUrl
       if (sourceUrl.startsWith('/')) {
         const baseImg = viewportRef.current?.baseImage()
@@ -696,64 +913,75 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
         c.getContext('2d')?.drawImage(baseImg, 0, 0)
         const blob = await new Promise<Blob | null>((r) => c.toBlob(r, 'image/png'))
         if (!blob) throw new Error('Falha ao preparar a imagem (CORS). Recarregue a página.')
-        try {
-          const up = await uploadDirect(blob, 'retocar-asset', { kind: 'source' })
-          if (!up.url) throw new Error('sem URL')
-          sourceUrl = up.url
-        } catch (e) {
-          throw new Error(`Falha ao preparar a imagem (${e instanceof Error ? e.message : 'conexão'}). Sua seleção foi mantida — toque em Tentar novamente.`)
-        }
+        const up = await uploadDirect(blob, 'retocar-asset', { kind: 'source' })
+        if (!up.url) throw new Error('Falha ao preparar a imagem. Tente de novo.')
+        sourceUrl = up.url
       }
 
-      // 3. execução — o servidor debita e reembolsa em falha/rejeição
-      const coverage = estimateStrokeCoverage(cleanupStrokes, cur.width, cur.height)
-      const res = await fetch('/api/edits', {
+      // 3. execução — o servidor só debita no sucesso
+      const res = await fetch('/api/edit-v4', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          action: editAction,
           source_image_url: sourceUrl,
-          mask_url: maskUrl,
-          prompt: cleanupMode === 'fix' ? cleanupPrompt.trim() : '',
-          mode: cleanupMode === 'remove' ? 'remove' : 'fix',
-          quality: 'hd',
-          source_type: 'upload',
-          mask_coverage: coverage,
-          image_megapixels: (cur.width * cur.height) / 1e6,
+          ...(maskUrl ? { mask_url: maskUrl } : {}),
+          instruction: editInstruction.trim(),
+          preservation: editPreservation,
+          intensity: editIntensity,
+          edge_softness: editEdge ?? DEFAULT_EDGE_SOFTNESS[editAction],
+          references: def.ref && editReferenceUrl ? [{ kind: def.ref, url: editReferenceUrl }] : [],
         }),
       })
       const j = await res.json().catch(() => null)
 
-      const applyBalance = (b: unknown) => {
-        const total = (b as { total_balance?: number } | null)?.total_balance
-        if (typeof total === 'number') setBalance(total)
-      }
-
-      if (j?.rejected) {
-        applyBalance(j.balance_after)
-        setCleanupMsg({ kind: 'error', text: j.message ?? 'O resultado foi rejeitado pelo controle de qualidade. Os Nodes foram devolvidos.' })
+      if (j?.rejected === true) {
+        setEditMsg({ kind: 'error', text: `${j.reasons?.[0] ?? 'A edição foi descartada.'} Nenhum node foi consumido.` })
         return
       }
       if (res.status === 402) {
-        if (typeof j?.available === 'number') setBalance(j.available)
-        setCleanupMsg({ kind: 'error', text: j?.message ?? 'Saldo insuficiente.' })
+        setEditMsg({ kind: 'error', text: j?.error ?? 'Saldo insuficiente.' })
         return
       }
       if (!res.ok || typeof j?.result_url !== 'string') {
-        throw new Error(j?.message ?? j?.error ?? 'Falha ao processar a limpeza.')
+        throw new Error(j?.error ?? 'Falha ao aplicar a edição.')
       }
 
-      applyBalance(j.balance_after)
+      if (j?.charge?.debited === true && typeof j.nodes_cost === 'number') {
+        setBalance((prev) => (prev === null ? prev : Math.max(0, prev - j.nodes_cost)))
+      }
       // URL assinada expira — persiste a forma ESTÁVEL (pública/proxy).
-      const resultUrl = toStableStorageUrl(j.result_url as string)
-      patch('Limpeza IA', (d) => ({ ...d, baseUrl: resultUrl }))
-      setCleanupStrokes([])
-      setCleanupMsg({ kind: 'info', text: 'Pronto — área substituída. Use Desfazer para voltar.' })
+      patch(`Editar — ${def.short}`, (d) => ({ ...d, baseUrl: toStableStorageUrl(j.result_url as string) }))
+      setEditStrokes([])
+      setEditWand(null)
+      viewportRef.current?.clearEditRegions()
+      const nota = uniformizou?.applied
+        ? `Tratei a peça inteira (${Math.round(uniformizou.coverage * 1000) / 10}% da imagem) para não ficar remendo. `
+        : ''
+      setEditMsg({ kind: 'info', text: nota + (j?.warning ?? 'Pronto — seus ajustes continuam por cima. Use Desfazer para voltar.') })
     } catch (e) {
-      setCleanupMsg({ kind: 'error', text: e instanceof Error ? e.message : 'Falha ao processar a limpeza.' })
+      setEditMsg({ kind: 'error', text: e instanceof Error ? e.message : 'Falha ao aplicar a edição.' })
     } finally {
-      setCleanupBusy(false)
+      setEditBusy(false)
     }
-  }, [cleanupStrokes, cleanupBusy, cleanupMode, cleanupPrompt, patch])
+  }, [
+    editAction, editBusy, editEdge, editInstruction, editIntensity, editPreservation,
+    editReferenceUrl, editStrokes, editUniform, editWand, hasEditRegions, patch,
+  ])
+
+  /** Envia a imagem de referência (material ou objeto) da ação atual. */
+  const pickReference = useCallback(async (fileInput: File) => {
+    setEditReferenceBusy(true)
+    try {
+      const up = await uploadDirect(fileInput, 'retocar-reference', {}, { confirm: true })
+      if (!up.url) throw new Error('sem URL')
+      setEditReferenceUrl(up.url)
+    } catch (e) {
+      setEditMsg({ kind: 'error', text: e instanceof Error ? e.message : 'Falha ao enviar a referência.' })
+    } finally {
+      setEditReferenceBusy(false)
+    }
+  }, [])
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Salvar / autosave
@@ -822,10 +1050,10 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
     if (!doc || !projectId || !dirtyRef.current) return
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
     autosaveTimer.current = setTimeout(() => {
-      if (dirtyRef.current && !cleanupBusy) void saveRef.current({ auto: true })
+      if (dirtyRef.current && !editBusy) void saveRef.current({ auto: true })
     }, AUTOSAVE_DELAY)
     return () => { if (autosaveTimer.current) clearTimeout(autosaveTimer.current) }
-  }, [doc, name, projectId, cleanupBusy, saveEpoch])
+  }, [doc, name, projectId, editBusy, saveEpoch])
 
   // aviso ao fechar com alterações pendentes
   useEffect(() => {
@@ -936,16 +1164,37 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
 
       if (mod && e.key.toLowerCase() === 'z') {
         e.preventDefault()
-        if (e.shiftKey) redo(); else undo()
+        // Na aba Editar, o Ctrl+Z desfaz primeiro o GESTO DE SELEÇÃO. É o que
+        // a pessoa acabou de fazer e o que ela quer de volta — o histórico do
+        // documento (ajustes, camadas, geometria) só entra quando não há mais
+        // gesto de seleção para desfazer. Se a seleção não estivesse aqui,
+        // Ctrl+Z depois de uma varinha que abraçou meia cena não faria nada.
+        if (e.shiftKey) {
+          if (!(tool === 'edit' && viewportRef.current?.redoSelection())) redo()
+        } else if (!(tool === 'edit' && viewportRef.current?.undoSelection())) {
+          undo()
+        }
       } else if (mod && e.key.toLowerCase() === 'y') {
         e.preventDefault()
-        redo()
+        if (!(tool === 'edit' && viewportRef.current?.redoSelection())) redo()
       } else if (mod && e.key.toLowerCase() === 's') {
         e.preventDefault()
         void saveRef.current({})
       } else if (mod && e.key.toLowerCase() === 'e') {
         e.preventDefault()
         setExportOpen(true)
+      } else if (mod && e.shiftKey && e.key.toLowerCase() === 'i') {
+        // Inverter seleção — o atalho do V4, e o de qualquer editor.
+        e.preventDefault()
+        if (tool === 'edit') refineSelection('invert')
+      } else if (mod && e.key.toLowerCase() === 'd') {
+        e.preventDefault()
+        if (tool === 'edit') {
+          setEditStrokes([])
+          setEditWand(null)
+          viewportRef.current?.clearEditRegions()
+          setEditMsg(null)
+        }
       } else if (mod) {
         // Demais combinações com Ctrl/Cmd são do navegador.
       } else if (e.key === '[' || e.key === ']') {
@@ -962,9 +1211,15 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
         viewportRef.current?.zoomBy(1.25)
       } else if (e.key === '-') {
         viewportRef.current?.zoomBy(1 / 1.25)
-      } else if (['1', '2', '3', '4', '5', '6', '7'].includes(e.key)) {
-        const tools: EditorTool[] = ['adjust', 'color', 'masks', 'cleanup', 'geometry', 'elements', 'history']
-        setTool(tools[Number(e.key) - 1])
+      } else if (tool === 'edit' && !mod && EDIT_TOOL_KEYS[e.key.toLowerCase()]) {
+        // V/B/E/L/P/R trocam a ferramenta de seleção — só valem na aba Editar,
+        // então não brigam com nada nas outras abas.
+        e.preventDefault()
+        setEditSubTool(EDIT_TOOL_KEYS[e.key.toLowerCase()])
+      } else if (/^[1-7]$/.test(e.key)) {
+        const tools = visibleTools(aiEnabled)
+        const alvo = tools[Number(e.key) - 1]
+        if (alvo) setTool(alvo)
       }
     }
     const onKeyUp = (e: KeyboardEvent) => {
@@ -976,11 +1231,14 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
       window.removeEventListener('keydown', onKey)
       window.removeEventListener('keyup', onKeyUp)
     }
-  }, [undo, redo])
+  }, [undo, redo, tool, refineSelection, aiEnabled])
 
+  // A ferramenta unificada mora em /app/editar. Mandar para /app/finalizar
+   // era herança do módulo antigo — e levava a pessoa para uma segunda porta
+   // da MESMA ferramenta, que é exatamente o que a fusão veio desfazer.
   const goBack = useCallback(() => {
     if (dirtyRef.current) { setLeaving(true); return }
-    router.push('/app/finalizar')
+    router.push('/app/editar')
   }, [router])
 
   // seleção automática coerente com a ferramenta — só na TRANSIÇÃO para
@@ -1027,7 +1285,7 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
               <div className="spn-field-label">Projetos salvos</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
                 {savedProjects.map((p) => (
-                  <button key={p.id} type="button" className="spn-card spn-glass" onClick={() => router.push(`/app/finalizar/${p.id}`)}
+                  <button key={p.id} type="button" className="spn-card spn-glass" onClick={() => router.push(`/app/editar/${p.id}`)}
                     style={{ textAlign: 'left', padding: 0, cursor: 'pointer' }}>
                     <div style={{ aspectRatio: '4 / 3', background: 'var(--color-preview-bg)' }}>
                       {p.thumbnail_url
@@ -1068,8 +1326,8 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
         ? maskInteraction === 'shape'
           ? 'Arraste no canvas para posicionar o gradiente'
           : 'Pinte para adicionar à máscara · Borracha remove'
-        : tool === 'cleanup'
-          ? 'Pinte sobre o que deseja remover — a área fica marcada em vermelho'
+        : tool === 'edit'
+          ? EDIT_HINTS[editSubTool]
           : tool === 'elements'
             ? elementMaskMode
               ? 'Pinte para revelar/ocultar partes do elemento'
@@ -1089,8 +1347,8 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
         onName={(n) => { setName(n); markDirty() }}
         onBack={goBack}
         status={saveStatus}
-        canUndo={historyUi.canUndo}
-        canRedo={historyUi.canRedo}
+        canUndo={historyUi.canUndo || (tool === 'edit' && selHistory.canUndo)}
+        canRedo={historyUi.canRedo || (tool === 'edit' && selHistory.canRedo)}
         onUndo={undo}
         onRedo={redo}
         compare={compare}
@@ -1110,22 +1368,47 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
       />
 
       <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
-        <ToolRail tool={tool} onTool={setTool} />
+        <ToolRail tool={tool} onTool={setTool} aiEnabled={aiEnabled} />
 
+        <div style={{ position: 'relative', flex: 1, minWidth: 0, minHeight: 0, display: 'flex' }}>
+        {tool === 'edit' && (
+          <EditToolRail
+            tool={editSubTool}
+            onTool={setEditSubTool}
+            wandAvailable={canSample && isGeometryIdentity(doc.geometry)}
+            disabled={editBusy}
+          />
+        )}
         <CanvasViewport
           ref={viewportRef}
           doc={doc}
           tool={viewportTool}
           activeLocalId={activeLocalId}
           activeElementId={activeElementId}
-          brush={brush}
+          brush={tool === 'edit' ? { ...brush, erase: editSubTool === 'eraser' } : brush}
           maskInteraction={maskInteraction}
           elementMaskMode={elementMaskMode}
           compare={compare}
           compareMode={compareMode}
           showMaskOverlay={showMaskOverlay && tool === 'masks'}
           maskOverlayColor={maskOverlayColor}
-          cleanupStrokes={cleanupStrokes}
+          editStrokes={editStrokes}
+          editWand={editWand}
+          editSubTool={editSubTool}
+          onRegionsChange={setHasEditRegions}
+          onWandAbsorbed={() => setEditWand(null)}
+          onSelectionGrown={() => { setEditStrokes([]); setEditWand(null) }}
+          onSelectionHistory={(canUndo, canRedo) => setSelHistory({ canUndo, canRedo })}
+          wandTolerance={wandTolerance}
+          wandContiguous={wandContiguous}
+          onWandPick={(shape) => {
+            setEditWand(shape)
+            // O clique pode ter baixado a tolerância para não engolir a cena;
+            // o controle passa a mostrar o valor que de fato valeu, senão o
+            // número na tela mente sobre o que aconteceu.
+            setWandTolerance(shape.tolerance)
+            setEditMsg(null)
+          }}
           wbPicking={wbPicking}
           onZoomChange={setZoomPct}
           onStrokeCommit={onStrokeCommit}
@@ -1135,8 +1418,9 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
           onPickWb={onPickWb}
           onSelectElement={setActiveElementId}
           onError={setError}
-          onBaseReady={() => setBaseTick((n) => n + 1)}
+          onBaseReady={(ok) => { setBaseTick((n) => n + 1); setCanSample(ok) }}
         />
+        </div>
 
         {panelsOpen && (
           <div
@@ -1233,23 +1517,84 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
                   skyBusy={skyBusy}
                 />
               )}
-              {tool === 'cleanup' && (
-                <CleanupPanel
-                  strokes={cleanupStrokes}
-                  onClearStrokes={() => { setCleanupStrokes([]); setCleanupMsg(null) }}
-                  brush={brush}
-                  onBrush={setBrush}
-                  mode={cleanupMode}
-                  onMode={setCleanupMode}
-                  prompt={cleanupPrompt}
-                  onPrompt={setCleanupPrompt}
-                  preview={cleanupPreview}
-                  previewLoading={cleanupPreviewLoading}
+              {tool === 'edit' && (
+                <EditPanel
+                  action={editAction}
+                  onAction={(a2) => { setEditAction(a2); setEditEdge(null); setEditReferenceUrl(null) }}
+                  instruction={editInstruction}
+                  onInstruction={setEditInstruction}
+                  subTool={editSubTool}
+                  brushSize={brush.size}
+                  onBrushSize={(v) => setBrush({ ...brush, size: v })}
+                  tolerance={wandTolerance}
+                  onTolerance={(v) => {
+                    setWandTolerance(v)
+                    setEditWand((w) => (w ? { ...w, tolerance: v } : w))
+                  }}
+                  contiguous={wandContiguous}
+                  onContiguous={(v) => {
+                    setWandContiguous(v)
+                    setEditWand((w) => (w ? { ...w, contiguous: v } : w))
+                  }}
+                  wandAvailable={canSample && isGeometryIdentity(doc.geometry)}
+                  uniform={editUniform}
+                  onUniform={setEditUniform}
+                  canGrow={canSample && isGeometryIdentity(doc.geometry)}
+                  snapBusy={snapBusy}
+                  onRefine={refineSelection}
+                  onSnapEdges={() => { void snapEdges() }}
+                  onGrow={() => {
+                    const r = viewportRef.current?.growEditSelection() ?? null
+                    if (!r) {
+                      setEditMsg({ kind: 'error', text: 'Marque a área primeiro; depois expanda para o material.' })
+                      return
+                    }
+                    // A cobertura vai na mensagem porque é o único jeito de a
+                    // pessoa saber se pegou a peça ou meia cena — a marcação
+                    // vermelha em cima da imagem engana quando a área é grande.
+                    const pct = Math.round(r.coverage * 1000) / 10
+                    const cresceu = r.coverage > r.before * 1.2
+                    // A ordem importa: quando a seleção já cobre um quarto da
+                    // cena, o que a pessoa precisa saber é ISSO — não se o
+                    // passo de crescimento acrescentou pouco.
+                    setEditMsg(
+                      r.coverage > 0.25
+                        ? {
+                            kind: 'error',
+                            text: `A seleção cobre ${pct}% da imagem — bem mais que uma peça. Baixe a tolerância de cor, desmarque e refaça.`,
+                          }
+                        : {
+                            kind: 'info',
+                            text: cresceu
+                              ? `Seleção crescida para a superfície inteira (${pct}% da imagem) — a IA trata a peça como um todo.`
+                              : `Não achei mais desse material em volta (${pct}% da imagem). Suba a tolerância de cor e expanda de novo.`,
+                          },
+                    )
+                  }}
+                  hasWand={editWand !== null}
+                  hasSelection={editWand !== null || editStrokes.length > 0 || hasEditRegions}
+                  onClearSelection={() => {
+                    setEditStrokes([])
+                    setEditWand(null)
+                    viewportRef.current?.clearEditRegions()
+                    setEditMsg(null)
+                  }}
+                  referenceUrl={editReferenceUrl}
+                  onPickReference={() => referenceInputRef.current?.click()}
+                  onClearReference={() => setEditReferenceUrl(null)}
+                  referenceBusy={editReferenceBusy}
+                  preservation={editPreservation}
+                  onPreservation={setEditPreservation}
+                  intensity={editIntensity}
+                  onIntensity={setEditIntensity}
+                  edge={editEdge ?? DEFAULT_EDGE_SOFTNESS[editAction]}
+                  onEdge={setEditEdge}
+                  nodes={nodesPerEdit}
                   balance={balance}
-                  busy={cleanupBusy}
-                  onExecute={() => void runCleanup()}
-                  message={cleanupMsg?.text ?? null}
-                  messageKind={cleanupMsg?.kind ?? null}
+                  busy={editBusy}
+                  onExecute={() => void runEdit()}
+                  message={editMsg?.text ?? null}
+                  messageKind={editMsg?.kind ?? null}
                 />
               )}
               {tool === 'geometry' && <GeometryPanel doc={doc} patch={patch} />}
@@ -1260,6 +1605,8 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
                   activeElementId={activeElementId}
                   onSelectElement={setActiveElementId}
                   onAddElement={() => setImportPurpose('element')}
+                  onAddText={addTextLayer}
+                  onUpdateText={updateTextLayer}
                   elementMaskMode={elementMaskMode}
                   onElementMaskMode={setElementMaskMode}
                   brush={brush}
@@ -1295,12 +1642,23 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
         canSaveToProject={projectId !== null}
         onExport={onExport}
       />
+      <input
+        ref={referenceInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        hidden
+        onChange={(e) => {
+          const f = e.target.files?.[0]
+          if (f) void pickReference(f)
+          e.currentTarget.value = ''
+        }}
+      />
       <ConfirmSheet
         open={leaving}
         title="Sair sem salvar?"
         message="As alterações desta sessão não foram salvas no projeto. Sair agora as descarta."
         confirmLabel="Sair sem salvar"
-        onConfirm={() => router.push('/app/finalizar')}
+        onConfirm={() => router.push('/app/editar')}
         onClose={() => setLeaving(false)}
       />
       <FinalizeImportModal

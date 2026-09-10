@@ -45,6 +45,7 @@ import { evaluateEditSemantics } from '@/lib/edit-v2/semantic-gate'
 import type { EditIntentV2 } from '@/lib/edit-v2/types'
 import { SEEDREAM_LOW_TIER_MAX_PIXELS } from '@/lib/ai/seedream-size'
 import { EditV3InputError, assertSafeImageUrl } from '@/lib/edit-v3/ssrf'
+import { withMinimumContext } from './crop-context'
 import { drawSelectionOutline, outlineLeakRatio } from './outline'
 import { outputSizeForCrop, runSeedreamEdit } from './engine'
 import { buildEditV4Prompt } from './prompt'
@@ -288,11 +289,15 @@ export async function runEditV4(input: EditV4RunInput): Promise<EditV4RunResult>
   }
   if (maskBuf) {
     const srcArea = providerDims.width * providerDims.height
-    const plan = await planCrop({
+    const maxMp = SEEDREAM_LOW_TIER_MAX_PIXELS / 1_000_000
+    const rawPlan = await planCrop({
       imageBuffer: sourceBuf,
       maskBuffer: maskBuf,
-      maxMegapixels: SEEDREAM_LOW_TIER_MAX_PIXELS / 1_000_000,
+      maxMegapixels: maxMp,
     })
+    const plan = rawPlan
+      ? withMinimumContext(rawPlan, providerDims.width, providerDims.height, maxMp)
+      : null
     if (plan && srcArea > 0 && (plan.region.width * plan.region.height) / srcArea <= CROP_MAX_AREA_RATIO) {
       const [cropImg, cropMask] = await Promise.all([
         extractCrop(sourceBuf, plan),

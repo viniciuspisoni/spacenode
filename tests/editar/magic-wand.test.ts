@@ -14,7 +14,7 @@ import {
   invertSelection,
   magicWandSelect,
   selectionCoverage,
-} from '@/components/edit-v4/selection/magic-wand'
+} from '@/lib/selection/magic-wand'
 
 const W = 60
 const H = 60

@@ -263,12 +263,28 @@ export function AdjustPanel({ doc, patch, histogram, wbPicking, onToggleWbPick, 
             title="Realça materiais e texturas"
           />
           <SliderRow label="Nitidez" value={adj.sharpen} min={0} max={100} onChange={setAdj('sharpen', 'Nitidez')} />
+          <SliderRow
+            label="Neblina"
+            value={adj.dehaze}
+            min={-100}
+            max={100}
+            onChange={setAdj('dehaze', 'Neblina')}
+            title="Para a direita dissolve o véu da vista pela janela; para a esquerda devolve atmosfera ao fundo"
+          />
           <SliderRow label="Redução de ruído" value={adj.noiseReduction} min={0} max={100} onChange={setAdj('noiseReduction', 'Redução de ruído')} />
         </div>
       </Section>
 
       <Section title="Efeitos" open={open.efeitos} onToggle={() => toggle('efeitos')}>
         <div style={column}>
+          <SliderRow
+            label="Glow"
+            value={adj.glow}
+            min={0}
+            max={100}
+            onChange={setAdj('glow', 'Glow')}
+            title="Sangra a luz das janelas estouradas para o entorno — a janela passa a iluminar o batente em vez de ser um retângulo branco"
+          />
           <SliderRow label="Vinheta" value={vig.amount} min={-100} max={100} onChange={setVig('amount', 'Vinheta')} />
           {vig.amount !== 0 && (
             <>
