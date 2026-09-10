@@ -120,9 +120,13 @@ você", "eleve seus projetos", "transforme suas ideias", "potencialize sua criat
   claim certo é "renderize de dentro do SketchUp", nunca importação de arquivo.
 - "Histórico de 30 dias / ilimitado por plano" — não existe retenção por plano.
 - "Lumens" — conceito APOSENTADO em 2026-08-31. Todo crédito é "Node": **Nodes mensais**
-  (renovam com o plano, não acumulam) e **Nodes extras** (avulsos, sem validade, em qualquer
-  plano pago). Nunca usar "Lumens" em peça nova, nem prometer validade/expiração para Nodes
-  extras.
+  (renovam com o plano e **acumulam** desde 2026-09-10) e **Nodes extras** (avulsos, sem
+  validade, em qualquer plano pago). Nunca usar "Lumens" em peça nova, nem prometer
+  validade/expiração para Nodes extras.
+- "Nodes não utilizados expiram no fim do mês" / "usou ou perdeu" — regra REVOGADA em
+  2026-09-10. O claim correto é "Nodes não utilizados acumulam enquanto sua assinatura
+  estiver ativa"; encerrada a assinatura, o saldo dura mais 30 dias. Não prometer acúmulo
+  ilimitado após o cancelamento.
 - Plano **Office** — APOSENTADO para novas assinaturas em 2026-08-31 (vitrine: Starter/Pro/
   Studio; volume maior = "fale com a gente"). Não promover; assinantes existentes mantêm os
   benefícios.

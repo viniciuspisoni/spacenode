@@ -1,8 +1,10 @@
 // Catálogo de Nodes extras — créditos avulsos SEM validade.
 //
 // O conceito "Lumens" foi aposentado em 2026-08-31: todo crédito é "Node".
-// Nodes MENSAIS renovam com o plano (profiles.credits, não acumulam);
-// Nodes EXTRAS são comprados avulsos e não expiram (tabela lumen_packs —
+// Nodes MENSAIS renovam com o plano (profiles.credits) e, desde 2026-09-10,
+// ACUMULAM — cada renovação soma ao saldo, que só expira 30 dias depois do
+// fim da assinatura (ver lib/billing/nodes.ts).
+// Nodes EXTRAS são comprados avulsos e não expiram nunca (tabela lumen_packs —
 // nome interno preservado; ver migration 20260831190000). O consumo usa
 // primeiro os mensais, depois os extras na ordem de compra
 // (consume_nodes_v2).

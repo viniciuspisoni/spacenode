@@ -3,15 +3,136 @@ import Stripe from 'stripe'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { findPlanByStripePriceId, type BillingCycle } from '@/lib/plans'
+import { graceDeadline, prorationNodes } from '@/lib/billing/nodes'
 import { recordAcquisitionEvent } from '@/lib/marketing/ads/service'
 
 export const dynamic = 'force-dynamic'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NODES ACUMULATIVOS (2026-09-10)
+//
+// Nenhum caminho deste arquivo escreve `credits` com valor ABSOLUTO. Toda
+// entrada de nodes passa por `grant_plan_nodes`, que SOMA ao saldo existente e
+// é idempotente por uma chave do Stripe. É a diferença que faz a regra nova
+// funcionar: somar não é idempotente sozinho, e o Stripe reentrega webhooks —
+// sem a chave, uma reentrega creditaria o mês duas vezes.
+//
+// Chave de idempotência por caminho:
+//   • ativação (checkout.session.completed  ⟷  invoice.paid/subscription_create)
+//     → o SUBSCRIPTION ID. Os dois eventos disparam na mesma compra, em ordem
+//       imprevisível, e carregam o mesmo id: quem chegar primeiro credita.
+//   • renovação (invoice.paid/subscription_cycle)  → o INVOICE ID (1 por ciclo).
+//   • upgrade   (invoice.paid/subscription_update) → o INVOICE ID da fatura
+//                                                    de proporcional.
+//
+// E o cancelamento não zera mais nada: `start_nodes_grace` preserva o saldo e
+// agenda a expiração para 30 dias depois do fim da assinatura.
+// ─────────────────────────────────────────────────────────────────────────────
 
 // Stripe SDK retorna `string | Object | null` em vários campos relacionais.
 // Quando o webhook não pediu expansion (default), os campos vêm como string.
 function strId<T extends { id: string }>(value: string | T | null | undefined): string | null {
   if (!value) return null
   return typeof value === 'string' ? value : value.id
+}
+
+/** Timestamp UNIX (segundos) do Stripe → Date. */
+function stripeDate(seconds: number | null | undefined): Date | null {
+  return typeof seconds === 'number' && Number.isFinite(seconds)
+    ? new Date(seconds * 1000)
+    : null
+}
+
+/** price id de uma linha da invoice, nos dois shapes (Basil e pré-Basil). */
+function linePriceId(line: Stripe.InvoiceLineItem): string | undefined {
+  const priceField = line?.pricing?.price_details?.price
+  // Fallback pro formato pré-Basil (`lines.data[].price`) — o endpoint é
+  // criado sem api_version pinada, então o shape segue o default da conta.
+  const legacyPrice = (line as unknown as { price?: { id?: string } | null })?.price
+  return (typeof priceField === 'string' ? priceField : priceField?.id) ?? legacyPrice?.id
+}
+
+/** subscription id fora das linhas (shape pré-Basil e o `parent` da Basil). */
+function invoiceSubscriptionId(invoice: Stripe.Invoice): string | null {
+  const legacy = (invoice as unknown as { subscription?: string | { id: string } | null }).subscription
+  const parent = invoice.parent?.subscription_details?.subscription
+  return strId(legacy) ?? strId(parent)
+}
+
+/**
+ * Descobre QUAL plano a fatura cobrou.
+ *
+ * Não dá pra olhar só `lines.data[0]`: uma fatura de proporcional (troca de
+ * plano) traz DUAS linhas — o crédito do tempo não usado do plano antigo
+ * (valor negativo) e a cobrança do tempo restante no novo (positivo) — e a
+ * ordem não é garantida. Pegar a primeira faria um upgrade ser lido como o
+ * plano ANTIGO, gravando o plano errado no profile.
+ *
+ * Por isso: entre as linhas que resolvem para um plano do catálogo, vence a de
+ * maior valor. Numa fatura normal (linha única) o resultado é o mesmo de antes.
+ */
+function resolveInvoicePlan(
+  invoice: Stripe.Invoice
+): { match: NonNullable<ReturnType<typeof findPlanByStripePriceId>>; lineItem: Stripe.InvoiceLineItem } | null {
+  let best: { match: NonNullable<ReturnType<typeof findPlanByStripePriceId>>; lineItem: Stripe.InvoiceLineItem; amount: number } | null = null
+
+  for (const line of invoice.lines?.data ?? []) {
+    const priceId = linePriceId(line)
+    if (!priceId) continue
+    const match = findPlanByStripePriceId(priceId)
+    if (!match) continue
+    const amount = line.amount ?? 0
+    if (!best || amount > best.amount) best = { match, lineItem: line, amount }
+  }
+
+  return best ? { match: best.match, lineItem: best.lineItem } : null
+}
+
+interface GrantResult {
+  /** false = já tinha sido creditado antes (reentrega do Stripe). */
+  applied: boolean
+  granted: number
+  balance: number
+}
+
+/**
+ * Credita nodes SOMANDO ao saldo (nunca sobrescrevendo).
+ *
+ * `sourceId` é a chave de idempotência — a RPC reserva a linha no node_ledger
+ * antes de somar, então a segunda entrega do mesmo evento sai sem creditar e
+ * devolve `applied: false`.
+ *
+ * Retorna null quando o banco falhou: o caller responde 500 e o Stripe
+ * retenta, o que agora é seguro justamente por causa da chave.
+ */
+async function grantNodes(
+  supabase: SupabaseClient,
+  args: {
+    userId:   string
+    amount:   number
+    planId?:  string | null
+    kind:     'grant_plan' | 'grant_renewal'
+    sourceId: string
+  }
+): Promise<GrantResult | null> {
+  const { data, error } = await supabase.rpc('grant_plan_nodes', {
+    user_id_input:   args.userId,
+    amount:          args.amount,
+    plan_name:       args.planId ?? null,
+    kind_input:      args.kind,
+    source_id_input: args.sourceId,
+    source_input:    'stripe',
+  })
+  if (error) {
+    console.error('[stripe webhook] grant_plan_nodes falhou:', error)
+    return null
+  }
+  const result = (data ?? {}) as { applied?: boolean; granted?: number; balance?: number }
+  return {
+    applied: result.applied !== false,
+    granted: result.granted ?? 0,
+    balance: result.balance ?? 0,
+  }
 }
 
 interface ActivationInput {
@@ -24,6 +145,8 @@ interface ActivationInput {
   valueCents:     number | null
   /** De onde veio o sinal — só para o log e o funil. */
   source:         'checkout' | 'invoice'
+  /** Chave de idempotência de último recurso quando não há subscription id. */
+  fallbackKey:    string
   eventMetadata?: Record<string, unknown>
 }
 
@@ -38,10 +161,11 @@ interface ActivationInput {
  *    é o único sinal confiável, porque a session completa ANTES de o dinheiro
  *    entrar. Vale como rede de segurança para o cartão também.
  *
- * O update é idempotente (valores absolutos), mas o evento de funil NÃO é —
- * `subscription_started` não tem índice único. Daí a checagem prévia: se o
- * profile já está no plano com a mesma assinatura, sai sem gravar nada e o
- * funil não conta a mesma venda duas vezes.
+ * Quem decide se o crédito acontece é a RPC, pelo subscription id — e não mais
+ * uma comparação de estado do profile (que só funcionava porque o valor era
+ * absoluto). O `applied` que ela devolve também governa o evento de funil:
+ * `subscription_started` não tem índice único, então contar a mesma venda duas
+ * vezes seria fácil.
  *
  * Retorna `false` só quando o banco falhou — o caller devolve 500 e o Stripe
  * retenta a entrega.
@@ -50,37 +174,39 @@ async function activatePlan(
   supabase: SupabaseClient,
   input: ActivationInput
 ): Promise<boolean> {
-  const { data: current } = await supabase
-    .from('profiles')
-    .select('plan, stripe_subscription_id')
-    .eq('id', input.userId)
-    .maybeSingle()
+  // Ids do Stripe primeiro: se a corrida entre os dois eventos fizer o grant
+  // sair por idempotência, o profile ainda precisa apontar pra assinatura.
+  const ids: Record<string, unknown> = {}
+  if (input.customerId)     ids.stripe_customer_id     = input.customerId
+  if (input.subscriptionId) ids.stripe_subscription_id = input.subscriptionId
+  if (Object.keys(ids).length > 0) {
+    const { error } = await supabase.from('profiles').update(ids).eq('id', input.userId)
+    if (error) {
+      console.error('[stripe webhook] gravação dos ids do Stripe falhou:', error)
+      return false
+    }
+  }
 
-  const alreadyActive =
-    current?.plan === input.planId &&
-    Boolean(input.subscriptionId) &&
-    current?.stripe_subscription_id === input.subscriptionId
+  const grant = await grantNodes(supabase, {
+    userId:   input.userId,
+    amount:   input.nodes,
+    planId:   input.planId,
+    kind:     'grant_plan',
+    sourceId: input.subscriptionId ?? input.fallbackKey,
+  })
+  if (!grant) return false
 
-  if (alreadyActive) {
+  if (!grant.applied) {
     console.log(
-      `[stripe webhook] assinatura ${input.subscriptionId} já ativa p/ user ` +
+      `[stripe webhook] assinatura ${input.subscriptionId} já creditada p/ user ` +
       `${input.userId} (sinal via ${input.source}) — nada a fazer`
     )
     return true
   }
 
-  const updates: Record<string, unknown> = { plan: input.planId, credits: input.nodes }
-  if (input.customerId)     updates.stripe_customer_id     = input.customerId
-  if (input.subscriptionId) updates.stripe_subscription_id = input.subscriptionId
-
-  const { error } = await supabase.from('profiles').update(updates).eq('id', input.userId)
-  if (error) {
-    console.error('[stripe webhook] plan activation falhou:', error)
-    return false
-  }
   console.log(
     `[stripe webhook] plano ${input.planId} ativado p/ user ${input.userId} ` +
-    `(${input.nodes} nodes, via ${input.source})`
+    `(+${input.nodes} nodes → saldo ${grant.balance}, via ${input.source})`
   )
 
   // Funil first-party (best-effort — recordAcquisitionEvent nunca lança).
@@ -99,6 +225,31 @@ async function activatePlan(
     },
   })
   return true
+}
+
+/**
+ * Resolve o dono da assinatura a partir dos ids que o evento trouxe.
+ * O subscription id é a chave preferida; o customer id cobre o caso de o
+ * profile ainda não ter a assinatura gravada.
+ */
+async function findProfileByStripeIds(
+  supabase: SupabaseClient,
+  subscriptionId: string | null,
+  customerId: string | null
+): Promise<{ id: string; plan: string | null } | null> {
+  for (const [column, value] of [
+    ['stripe_subscription_id', subscriptionId],
+    ['stripe_customer_id',     customerId],
+  ] as const) {
+    if (!value) continue
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, plan')
+      .eq(column, value)
+      .maybeSingle()
+    if (data?.id) return { id: data.id as string, plan: (data.plan as string | null) ?? null }
+  }
+  return null
 }
 
 export async function POST(req: NextRequest) {
@@ -182,12 +333,14 @@ export async function POST(req: NextRequest) {
         billingCycle:   session.metadata?.billing_cycle ?? null,
         valueCents:     session.amount_total ?? null,
         source:         'checkout',
+        fallbackKey:    session.id,
         eventMetadata: {
           stripe_session_id: session.id,
           launch_offer:      session.metadata?.launch_offer === 'applied',
         },
       })
-      // 500 → Stripe retenta a entrega; o update é idempotente (valores absolutos)
+      // 500 → Stripe retenta a entrega; a RPC de grant é idempotente pelo
+      // subscription id, então a retentativa não credita de novo
       if (!ok) return NextResponse.json({ error: 'db' }, { status: 500 })
     } else if (productType === 'extra' || productType === 'lumen') {
       // 'lumen' é o metadata legado de Nodes extras — sessions criadas antes
@@ -238,30 +391,28 @@ export async function POST(req: NextRequest) {
   //  • subscription_create — primeira fatura, ativa o plano. É por aqui que a
   //    assinatura no Pix Automático entra, já que a session completa antes do
   //    pagamento.
-  //  • subscription_cycle — renovação, recarrega os nodes do mês.
+  //  • subscription_cycle — renovação, SOMA os nodes do mês ao saldo.
+  //  • subscription_update — troca de plano no meio do ciclo: a fatura de
+  //    proporcional. Credita a mesma fração de mês que foi cobrada.
   if (event.type === 'invoice.paid') {
     const invoice = event.data.object as Stripe.Invoice
     const reason  = invoice.billing_reason
 
-    if (reason === 'subscription_create' || reason === 'subscription_cycle') {
-      const lineItem    = invoice.lines.data[0]
-      const priceField  = lineItem?.pricing?.price_details?.price
-      // Fallback pro formato pré-Basil (`lines.data[].price`) — o endpoint é
-      // criado sem api_version pinada, então o shape segue o default da conta.
-      const legacyPrice = (lineItem as unknown as { price?: { id?: string } | null })?.price
-      const priceId     =
-        (typeof priceField === 'string' ? priceField : priceField?.id) ?? legacyPrice?.id
-
-      if (!priceId) {
-        console.warn('[stripe webhook] invoice.paid sem price_id resolvível:', invoice.id)
+    if (
+      reason === 'subscription_create' ||
+      reason === 'subscription_cycle'  ||
+      reason === 'subscription_update'
+    ) {
+      const resolved = resolveInvoicePlan(invoice)
+      if (!resolved) {
+        console.warn(
+          '[stripe webhook] invoice.paid sem plano resolvível nas linhas:',
+          invoice.id
+        )
         return NextResponse.json({ received: true })
       }
-      const match = findPlanByStripePriceId(priceId)
-      if (!match) {
-        console.warn('[stripe webhook] price_id desconhecido em invoice.paid:', priceId)
-        return NextResponse.json({ received: true })
-      }
-      const subscriptionId = strId(lineItem?.subscription)
+      const { match, lineItem } = resolved
+      const subscriptionId = strId(lineItem.subscription) ?? invoiceSubscriptionId(invoice)
       const customerId     = strId(invoice.customer)
 
       // ── Primeira fatura: ativação ──────────────────────────────────────
@@ -301,44 +452,144 @@ export async function POST(req: NextRequest) {
           billingCycle:  match.billing,
           valueCents:    invoice.amount_paid ?? null,
           source:        'invoice',
+          fallbackKey:   invoice.id ?? `invoice:${event.id}`,
           eventMetadata: { stripe_invoice_id: invoice.id },
         })
         if (!ok) return NextResponse.json({ error: 'db' }, { status: 500 })
         return NextResponse.json({ received: true })
       }
 
-      // ── Renovação ──────────────────────────────────────────────────────
-      const baseUpdate = supabase.from('profiles').update({ credits: match.plan.nodes })
-      const filtered =
-        subscriptionId ? baseUpdate.eq('stripe_subscription_id', subscriptionId) :
-        customerId     ? baseUpdate.eq('stripe_customer_id', customerId)         :
-        null
-
-      if (!filtered) {
-        console.error('[stripe webhook] invoice sem subscription/customer:', invoice.id)
+      // ── Renovação e troca de plano ─────────────────────────────────────
+      //
+      // O dono é resolvido ANTES de creditar: a soma acontece por user id, não
+      // por um filtro de UPDATE. Sem linha, não há a quem creditar — e o log
+      // grita, porque isso é dinheiro entrando sem produto saindo.
+      const owner = await findProfileByStripeIds(supabase, subscriptionId, customerId)
+      if (!owner) {
+        console.error(
+          '[stripe webhook] invoice.paid sem profile correspondente ' +
+          `(invoice ${invoice.id}, sub ${subscriptionId ?? '?'}, cus ${customerId ?? '?'})`
+        )
         return NextResponse.json({ received: true })
       }
 
-      const { error } = await filtered
-      if (error) {
-        console.error('[stripe webhook] renovação falhou:', error)
-        return NextResponse.json({ error: 'db' }, { status: 500 })
-      }
-      console.log(`[stripe webhook] renovação aplicada (${match.plan.id} → ${match.plan.nodes} nodes)`)
+      // Chave de idempotência da soma: uma fatura credita uma vez só, por mais
+      // vezes que o Stripe reentregue o evento.
+      const invoiceKey = invoice.id ?? `invoice:${event.id}`
 
-      // Funil first-party (best-effort): resolve o dono da assinatura para
-      // registrar a renovação com receita — nunca afeta o billing.
-      const { data: renewed } = subscriptionId
-        ? await supabase.from('profiles').select('id').eq('stripe_subscription_id', subscriptionId).maybeSingle()
-        : await supabase.from('profiles').select('id').eq('stripe_customer_id', customerId!).maybeSingle()
-      if (renewed?.id) {
-        await recordAcquisitionEvent(supabase, {
-          user_id: renewed.id as string,
-          event_type: 'subscription_renewed',
-          plan_id: match.plan.id,
-          value_cents: invoice.amount_paid ?? null,
-          metadata: { stripe_invoice_id: invoice.id },
+      if (reason === 'subscription_update') {
+        // Fatura de proporcional (upgrade no meio do ciclo). Downgrade não cai
+        // aqui com valor: vira crédito na conta do Stripe, amount_paid = 0.
+        // O saldo acumulado NUNCA é tocado — a troca vale daqui pra frente.
+        const nodes = prorationNodes(
+          invoice.amount_paid,
+          match.plan.monthlyPrice * 100,
+          match.plan.nodes
+        )
+        if (nodes <= 0) {
+          // Downgrade ou fatura sem cobrança: só acerta o plano do profile,
+          // que é o que governa a vitrine e o "plano atual" na tela.
+          const { error } = await supabase
+            .from('profiles')
+            .update({ plan: match.plan.id })
+            .eq('id', owner.id)
+          if (error) {
+            console.error('[stripe webhook] troca de plano falhou:', error)
+            return NextResponse.json({ error: 'db' }, { status: 500 })
+          }
+          console.log(
+            `[stripe webhook] plano trocado p/ ${match.plan.id} (user ${owner.id}) ` +
+            '— sem proporcional a creditar, saldo acumulado preservado'
+          )
+          return NextResponse.json({ received: true })
+        }
+
+        const grant = await grantNodes(supabase, {
+          userId:   owner.id,
+          amount:   nodes,
+          planId:   match.plan.id,
+          kind:     'grant_renewal',
+          sourceId: invoiceKey,
         })
+        if (!grant) return NextResponse.json({ error: 'db' }, { status: 500 })
+        console.log(
+          `[stripe webhook] upgrade p/ ${match.plan.id} (user ${owner.id}) — ` +
+          `${grant.applied ? `+${grant.granted} nodes proporcionais → saldo ${grant.balance}` : 'já creditado'}`
+        )
+        return NextResponse.json({ received: true })
+      }
+
+      // Renovação: SOMA os nodes do mês ao que sobrou do ciclo anterior.
+      const grant = await grantNodes(supabase, {
+        userId:   owner.id,
+        amount:   match.plan.nodes,
+        planId:   match.plan.id,
+        kind:     'grant_renewal',
+        sourceId: invoiceKey,
+      })
+      if (!grant) return NextResponse.json({ error: 'db' }, { status: 500 })
+
+      if (!grant.applied) {
+        console.log(`[stripe webhook] renovação ${invoiceKey} já creditada — nada a fazer`)
+        return NextResponse.json({ received: true })
+      }
+      console.log(
+        `[stripe webhook] renovação aplicada (${match.plan.id}: +${match.plan.nodes} nodes ` +
+        `→ saldo ${grant.balance})`
+      )
+
+      // Funil first-party (best-effort) — nunca afeta o billing. Sai só quando
+      // a soma foi de fato aplicada, pra não contar a mesma renovação 2×.
+      await recordAcquisitionEvent(supabase, {
+        user_id: owner.id,
+        event_type: 'subscription_renewed',
+        plan_id: match.plan.id,
+        value_cents: invoice.amount_paid ?? null,
+        metadata: { stripe_invoice_id: invoice.id },
+      })
+    }
+  }
+
+  // ── customer.subscription.updated: upgrade/downgrade e reativação ────────
+  //
+  // O saldo NÃO é tocado aqui — trocar de plano não zera nem recarrega nada.
+  // O que muda é `profiles.plan`, que governa a vitrine, o "plano atual" e a
+  // cota de referência do anel de consumo. Os nodes da troca, quando há
+  // cobrança, entram pela fatura de proporcional (invoice.paid acima).
+  //
+  // Também é o caminho de volta de quem reativa antes do fim do período: o
+  // status volta a 'active' e a janela de cortesia (nodes_expire_at) some,
+  // devolvendo o saldo acumulado sem prazo.
+  if (event.type === 'customer.subscription.updated') {
+    const sub        = event.data.object as Stripe.Subscription
+    const customerId = strId(sub.customer)
+    const item       = sub.items?.data?.[0]
+    const priceId    = strId(item?.price)
+    const match      = priceId ? findPlanByStripePriceId(priceId) : undefined
+
+    const active = sub.status === 'active' || sub.status === 'trialing'
+    if (active && match) {
+      const owner = await findProfileByStripeIds(supabase, sub.id, customerId)
+      if (owner) {
+        const updates: Record<string, unknown> = {
+          plan:                   match.plan.id,
+          stripe_subscription_id: sub.id,
+          // Assinatura viva de novo: o saldo volta a não ter prazo.
+          nodes_expire_at:        null,
+        }
+        const { error } = await supabase.from('profiles').update(updates).eq('id', owner.id)
+        if (error) {
+          console.error('[stripe webhook] subscription.updated falhou:', error)
+          return NextResponse.json({ error: 'db' }, { status: 500 })
+        }
+        if (owner.plan !== match.plan.id) {
+          console.log(
+            `[stripe webhook] plano sincronizado ${owner.plan ?? '?'} → ${match.plan.id} ` +
+            `(user ${owner.id}) — saldo acumulado intacto`
+          )
+        }
+      } else {
+        console.warn('[stripe webhook] subscription.updated sem profile:', sub.id)
       }
     }
   }
@@ -360,46 +611,54 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // ── customer.subscription.deleted: downgrade pra free ────────────────────
+  // ── customer.subscription.deleted: downgrade pra free, saldo preservado ──
+  //
+  // O plano volta a 'free' na hora (os benefícios do plano acabam com a
+  // assinatura, como sempre), mas os nodes JÁ ADQUIRIDOS não são confiscados:
+  // ficam gastáveis por mais 30 dias. `start_nodes_grace` grava o prazo em
+  // profiles.nodes_expire_at; a expiração em si é do cron (e da checagem
+  // preguiçosa no consumo, se o cron falhar).
+  //
+  // A contagem parte do FIM da assinatura, não de "agora": numa assinatura
+  // encerrada por inadimplência o período já acabou dias antes, e contar de
+  // agora daria mais cortesia do que a regra promete.
   if (event.type === 'customer.subscription.deleted') {
     const sub            = event.data.object as Stripe.Subscription
     const subscriptionId = sub.id
     const customerId     = strId(sub.customer)
-    const baseUpdate     = { plan: 'free', credits: 0, stripe_subscription_id: null }
 
-    const q =
-      subscriptionId ? supabase.from('profiles').update(baseUpdate).eq('stripe_subscription_id', subscriptionId) :
-      customerId     ? supabase.from('profiles').update(baseUpdate).eq('stripe_customer_id', customerId)         :
-      null
-
-    if (!q) {
-      console.error('[stripe webhook] subscription.deleted sem id resolvível:', sub.id)
+    // Resolve o dono ANTES do update (que anula stripe_subscription_id).
+    const canceling = await findProfileByStripeIds(supabase, subscriptionId, customerId)
+    if (!canceling) {
+      console.error('[stripe webhook] subscription.deleted sem profile:', sub.id)
       return NextResponse.json({ received: true })
     }
 
-    // Resolve o dono ANTES do update (que anula stripe_subscription_id) para
-    // registrar o cancelamento no funil first-party (best-effort).
-    const { data: cancelingProfile } = subscriptionId
-      ? await supabase.from('profiles').select('id, plan').eq('stripe_subscription_id', subscriptionId).maybeSingle()
-      : customerId
-        ? await supabase.from('profiles').select('id, plan').eq('stripe_customer_id', customerId).maybeSingle()
-        : { data: null }
+    const endedAt   = stripeDate(sub.ended_at) ?? stripeDate(sub.canceled_at)
+    const graceEnds = graceDeadline(endedAt)
 
-    const { error } = await q
+    const { error } = await supabase.rpc('start_nodes_grace', {
+      user_id_input: canceling.id,
+      grace_until:   graceEnds.toISOString(),
+    })
     if (error) {
       console.error('[stripe webhook] cancelamento falhou:', error)
       return NextResponse.json({ error: 'db' }, { status: 500 })
     }
-    console.log(`[stripe webhook] plano cancelado (sub ${subscriptionId})`)
+    console.log(
+      `[stripe webhook] plano cancelado (sub ${subscriptionId}) — saldo mantido ` +
+      `até ${graceEnds.toISOString()}`
+    )
 
-    if (cancelingProfile?.id) {
-      await recordAcquisitionEvent(supabase, {
-        user_id: cancelingProfile.id as string,
-        event_type: 'subscription_canceled',
-        plan_id: (cancelingProfile.plan as string | null) ?? null,
-        metadata: { stripe_subscription_id: subscriptionId },
-      })
-    }
+    await recordAcquisitionEvent(supabase, {
+      user_id: canceling.id,
+      event_type: 'subscription_canceled',
+      plan_id: canceling.plan,
+      metadata: {
+        stripe_subscription_id: subscriptionId,
+        nodes_expire_at:        graceEnds.toISOString(),
+      },
+    })
   }
 
   return NextResponse.json({ received: true })

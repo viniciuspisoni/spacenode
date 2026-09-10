@@ -13,6 +13,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { LegalShell, LegalSection, P, UL, LI, Callout, Strong } from '@/components/legal/LegalShell'
 import { LEGAL_CNPJ, LEGAL_NAME, SUPPORT_EMAIL, SUPPORT_PHONE_DISPLAY, SUPPORT_WHATSAPP_URL } from '@/lib/support'
+import { NODES_GRACE_DAYS } from '@/lib/billing/nodes'
 
 export const metadata: Metadata = {
   title: 'Termos de Uso · SpaceNode',
@@ -21,7 +22,7 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 }
 
-const UPDATED_AT = '15 de julho de 2026'
+const UPDATED_AT = '10 de setembro de 2026'
 
 export default function TermosPage() {
   return (
@@ -33,8 +34,9 @@ export default function TermosPage() {
           Resumo em linguagem simples: a SpaceNode gera <Strong>visualizações arquitetônicas com IA</Strong> a
           partir do material que você envia. As imagens geradas são suas, mas têm natureza{' '}
           <Strong>ilustrativa</Strong> — não substituem projeto técnico nem responsabilidade profissional.
-          Créditos do plano renovam todo mês e não acumulam; o plano anual é pago antecipadamente.
-          Este resumo não substitui o texto completo abaixo.
+          Os créditos do plano renovam todo mês e <Strong>acumulam enquanto a assinatura estiver
+          ativa</Strong>; se você cancelar, o saldo restante fica disponível por mais {NODES_GRACE_DAYS} dias.
+          O plano anual é pago antecipadamente. Este resumo não substitui o texto completo abaixo.
         </>
       }
     >
@@ -98,8 +100,16 @@ export default function TermosPage() {
             antes da confirmação.
           </LI>
           <LI>
-            Os <Strong>nodes mensais</Strong>, incluídos no plano, <Strong>renovam mensalmente e não
-            acumulam</Strong> para o período seguinte.
+            Os <Strong>nodes mensais</Strong>, incluídos no plano, <Strong>renovam mensalmente e
+            acumulam</Strong>: os nodes não utilizados em um ciclo permanecem no saldo e são somados
+            aos do ciclo seguinte, enquanto a assinatura estiver ativa.
+          </LI>
+          <LI>
+            <Strong>Encerrada a assinatura</Strong> — por cancelamento ou falta de pagamento —, o saldo de
+            nodes mensais já adquirido permanece disponível por <Strong>{NODES_GRACE_DAYS} (trinta) dias
+            corridos</Strong> contados do fim da assinatura. Terminado esse prazo, o saldo mensal remanescente
+            expira, sem direito a reembolso ou conversão. Reassinar dentro do prazo preserva o saldo
+            acumulado.
           </LI>
           <LI>
             Os <Strong>nodes extras</Strong> são créditos avulsos, comprados separadamente, <Strong>sem prazo
@@ -129,7 +139,9 @@ export default function TermosPage() {
           </LI>
           <LI>
             Você pode cancelar a assinatura a qualquer momento no painel, sem burocracia. O acesso aos
-            recursos do plano permanece até o fim do período já pago, e não há novas cobranças.
+            recursos do plano permanece até o fim do período já pago, e não há novas cobranças. Os nodes
+            mensais acumulados seguem disponíveis por {NODES_GRACE_DAYS} dias após o fim da assinatura,
+            conforme a cláusula 5.
           </LI>
           <LI>
             No plano anual, o cancelamento interrompe a renovação ao fim dos 12 meses contratados; o

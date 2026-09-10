@@ -97,6 +97,7 @@ export default async function BillingPage({ searchParams }: Props) {
         extra: balance.extraBalance,
         total: balance.totalBalance,
       }}
+      nodesExpireAt={balance.planNodesExpireAt}
       extras={(extraRows ?? []) as ExtraPackRow[]}
       pooled={balance.pooled}
       offerEligible={offerEligible}

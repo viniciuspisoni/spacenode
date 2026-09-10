@@ -10,6 +10,7 @@ import Link from 'next/link'
 import { getBalanceState, BALANCE_COLORS, type BalanceState } from '@/lib/spaces/balance'
 import type { PlanId } from '@/lib/plans'
 import { getPlanDisplayName } from '@/lib/plan-display'
+import { graceDaysLeft } from '@/lib/billing/nodes'
 
 interface Props {
   userName:   string
@@ -35,6 +36,10 @@ export function AvatarComConsumo({
   const [planTotal, setPlanTotal]       = useState(initialPlanTotal)
   const [extraBalance, setExtraBalance] = useState(initialExtraBalance)
   const [planId, setPlanId]             = useState<PlanId>(initialPlanId)
+  // Preenchido só depois de um cancelamento: prazo em que o saldo acumulado
+  // ainda pode ser gasto. Chega do /api/users/me/balance, não do server render
+  // (o popover só abre depois do primeiro refresh).
+  const [nodesExpireAt, setNodesExpireAt] = useState<string | null>(null)
   const [usageDays, setUsageDays]       = useState<{ day: string; nodes: number }[]>([])
   const [avgPerDay, setAvgPerDay]       = useState<number>(0)
   const popoverRef = useRef<HTMLDivElement | null>(null)
@@ -59,6 +64,7 @@ export function AvatarComConsumo({
         setPlanBalance(bal.plan_balance ?? 0)
         setPlanTotal(bal.plan_total ?? 0)
         setExtraBalance(bal.extra_balance ?? 0)
+        setNodesExpireAt(bal.nodes_expire_at ?? null)
         if (bal.plan_id) setPlanId(bal.plan_id as PlanId)
       }
       if (usage) {
@@ -133,6 +139,7 @@ export function AvatarComConsumo({
           planBalance={planBalance}
           planTotal={planTotal}
           extraBalance={extraBalance}
+          graceDays={graceDaysLeft(nodesExpireAt)}
           state={state}
           daysUntilEmpty={daysUntilEmpty}
           usageDays={usageDays}
@@ -253,11 +260,13 @@ function UpgradePill({ state }: { state: BalanceState }) {
 
 // ── Popover ───────────────────────────────────────────────────
 
-function BalancePopover({ planId, planBalance, planTotal, extraBalance, state, daysUntilEmpty, usageDays, onClose }: {
+function BalancePopover({ planId, planBalance, planTotal, extraBalance, graceDays, state, daysUntilEmpty, usageDays, onClose }: {
   planId:        PlanId
   planBalance:   number
   planTotal:     number
   extraBalance:  number
+  /** Dias restantes da cortesia pós-cancelamento (0 = sem cortesia em curso). */
+  graceDays:     number
   state:         BalanceState
   daysUntilEmpty: number | null
   usageDays:     { day: string; nodes: number }[]
@@ -265,12 +274,16 @@ function BalancePopover({ planId, planBalance, planTotal, extraBalance, state, d
 }) {
   const planName = getPlanDisplayName(planId)
   const noQuota = planTotal <= 0
+  // Cancelou e ainda tem saldo mensal: o prazo importa mais que o plano.
+  const inGrace = graceDays > 0 && planBalance > 0
   const stateLabel: Record<BalanceState, string> = {
     saudavel: 'Saudável', atencao: 'Atenção', critico: 'Crítico', zerado: 'Zerado',
   }
   // Conta gratuita não tem cota mensal: estado próprio (verde), em vez de "Zerado".
-  const pillColor = noQuota ? '#30d158' : BALANCE_COLORS[state]
-  const pillLabel = noQuota ? 'Gratuito' : stateLabel[state]
+  // Na cortesia pós-cancelamento o que importa é o prazo, não a cota — o
+  // usuário está tecnicamente no free, mas ainda gastando saldo de assinante.
+  const pillColor = inGrace ? BALANCE_COLORS.atencao : noQuota ? '#30d158' : BALANCE_COLORS[state]
+  const pillLabel = inGrace ? 'Cortesia'             : noQuota ? 'Gratuito' : stateLabel[state]
 
   return (
     <div style={{
@@ -296,9 +309,11 @@ function BalancePopover({ planId, planBalance, planTotal, extraBalance, state, d
             {planBalance + extraBalance} <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', fontWeight: 400 }}>nodes</span>
           </div>
           <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>
-            {noQuota
-              ? <>Sem assinatura ativa{extraBalance > 0 && <> · {extraBalance} extras</>}</>
-              : <>{planBalance} de {planTotal} mensais{extraBalance > 0 && <> · {extraBalance} extras</>}</>}
+            {inGrace
+              ? <>{planBalance} mensais expiram em {graceDays} dia{graceDays === 1 ? '' : 's'}{extraBalance > 0 && <> · {extraBalance} extras</>}</>
+              : noQuota
+                ? <>Sem assinatura ativa{extraBalance > 0 && <> · {extraBalance} extras</>}</>
+                : <>{planBalance} mensais acumulados{extraBalance > 0 && <> · {extraBalance} extras</>}</>}
           </div>
         </div>
         <span style={{
@@ -314,10 +329,18 @@ function BalancePopover({ planId, planBalance, planTotal, extraBalance, state, d
       <Sparkline days={usageDays} />
 
       <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.5 }}>
-        {daysUntilEmpty !== null
-          ? <>No ritmo atual, zera em ~{daysUntilEmpty} dia{daysUntilEmpty === 1 ? '' : 's'}.</>
-          : 'Sem consumo recente registrado.'}
+        {inGrace
+          ? <>Reassine em até {graceDays} dia{graceDays === 1 ? '' : 's'} para manter o saldo acumulado.</>
+          : daysUntilEmpty !== null
+            ? <>No ritmo atual, zera em ~{daysUntilEmpty} dia{daysUntilEmpty === 1 ? '' : 's'}.</>
+            : 'Sem consumo recente registrado.'}
       </div>
+      {!noQuota && (
+        <div style={{ fontSize: 10.5, color: 'var(--color-text-tertiary)', lineHeight: 1.5 }}>
+          O que não for usado no mês continua no saldo — nodes acumulam
+          enquanto a assinatura estiver ativa.
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
         <Link

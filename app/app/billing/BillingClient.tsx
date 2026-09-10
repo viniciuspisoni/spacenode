@@ -5,6 +5,11 @@ import { ANNUAL_BILLING_ENABLED, SELLABLE_PLANS, type PaidPlanId, type BillingCy
 import { getPlanDisplayName } from '@/lib/plan-display'
 import { EXTRA_NODE_PACKS, type ExtraPackSize } from '@/lib/extra-nodes'
 import {
+  NODES_GRACE_DAYS,
+  NODES_ROLLOVER_COPY,
+  graceDaysLeft,
+} from '@/lib/billing/nodes'
+import {
   isLaunchOfferOpen,
   launchOfferPrice,
   launchOfferDeadlineLabel,
@@ -33,6 +38,11 @@ export interface ExtraPackRow {
 interface BillingClientProps {
   plan:    string
   balance: { plan: number; extra: number; total: number }
+  /**
+   * Fim da janela de cortesia pós-cancelamento (ISO), quando os Nodes mensais
+   * acumulados expiram. null = assinatura ativa, saldo sem prazo.
+   */
+  nodesExpireAt?: string | null
   extras:  ExtraPackRow[]
   /** true = saldo exibido é a bolsa do workspace (membro de escritório). */
   pooled?: boolean
@@ -67,7 +77,7 @@ function daysUntil(date: string): number {
   return Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)))
 }
 
-export function BillingClient({ plan, balance, extras, pooled, offerEligible, notice }: BillingClientProps) {
+export function BillingClient({ plan, balance, nodesExpireAt, extras, pooled, offerEligible, notice }: BillingClientProps) {
   // Extras para qualquer plano pago (Starter incluso desde 2026-08-31).
   const isExtraBlocked = plan === 'free'
   // Assinante do Office (aposentado): a vitrine não o exibe, mas os
@@ -102,6 +112,9 @@ export function BillingClient({ plan, balance, extras, pooled, offerEligible, no
   const canManage = plan !== 'free' && !pooled
   // Só no mensal: o desconto é da primeira mensalidade.
   const showOffer = Boolean(offerEligible) && billing === 'monthly' && isLaunchOfferOpen()
+  // Cancelou e ainda tem saldo acumulado: a contagem regressiva dos 30 dias.
+  const graceLeft = graceDaysLeft(nodesExpireAt)
+  const inGrace   = graceLeft > 0 && balance.plan > 0
 
   return (
     <div style={{
@@ -148,10 +161,40 @@ export function BillingClient({ plan, balance, extras, pooled, offerEligible, no
             border: '0.5px solid var(--color-border)', boxShadow: 'var(--shadow-sm)',
             display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 28,
           }}>
-            <BalanceItem label="Nodes mensais" value={balance.plan}  detail={`${getPlanDisplayName(plan)} · renovam com o plano`} />
+            <BalanceItem
+              label="Nodes mensais"
+              value={balance.plan}
+              detail={
+                inGrace
+                  ? `expiram em ${graceLeft} dia${graceLeft === 1 ? '' : 's'}`
+                  : `${getPlanDisplayName(plan)} · acumulam a cada renovação`
+              }
+            />
             <BalanceItem label="Nodes extras"  value={balance.extra} detail={balance.extra > 0 ? `${extras.length} pack${extras.length === 1 ? '' : 's'} · sem validade` : 'sem validade'} />
             <BalanceItem label="Total disponível" value={balance.total} detail="nodes" green />
           </div>
+
+          {/* A regra do acúmulo, onde o usuário olha o saldo. */}
+          {inGrace ? (
+            <p style={{
+              fontSize: 12.5, color: 'var(--color-text-secondary)',
+              lineHeight: 1.6, letterSpacing: '-0.005em', marginTop: 12,
+            }}>
+              Sua assinatura foi encerrada. Os Nodes que você já tinha continuam
+              disponíveis por mais <strong style={{ color: 'var(--color-text-primary)' }}>
+              {graceLeft} dia{graceLeft === 1 ? '' : 's'}</strong> — depois disso o
+              saldo mensal expira. Reassine dentro do prazo para manter tudo.
+            </p>
+          ) : (
+            <p style={{
+              fontSize: 12.5, color: 'var(--color-text-tertiary)',
+              lineHeight: 1.6, letterSpacing: '-0.005em', marginTop: 12,
+            }}>
+              {NODES_ROLLOVER_COPY} Se cancelar, o que sobrou continua disponível
+              por {NODES_GRACE_DAYS} dias.
+            </p>
+          )}
+
           {pooled && (
             <p style={{
               fontSize: 12.5, color: 'var(--color-text-tertiary)',
@@ -287,6 +330,12 @@ export function BillingClient({ plan, balance, extras, pooled, offerEligible, no
               )
             })}
           </div>
+          <p style={{
+            fontSize: 11, color: 'var(--color-text-tertiary)',
+            lineHeight: 1.6, marginTop: 12,
+          }}>
+            {NODES_ROLLOVER_COPY} O que não for usado no mês entra no saldo do mês seguinte.
+          </p>
         </Section>
 
         {/* ── 3. Nodes extras ────────────────────────────────────────────── */}
