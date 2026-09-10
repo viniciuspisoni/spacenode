@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Brandmark } from '@/components/brand'
+import { PLUGIN_VERSION, PLUGIN_RBZ_PATH } from '@/lib/sketchup/plugin-release'
 
 // Página pública do plugin — /sketchup. Dark como todo o namespace /sketchup/*
 // (o painel do plugin e a tela de conexão são dark); o tom segue o brand:
@@ -13,8 +14,7 @@ export const metadata: Metadata = {
     'Renderize suas vistas do SketchUp com o motor de fidelidade da SPACENODE — sem sair do modelo. Extensão oficial para SketchUp 2021 ou superior.',
 }
 
-const RBZ_PATH = '/downloads/spacenode-sketchup.rbz'
-const PLUGIN_VERSION = '1.0.3'
+const RBZ_PATH = PLUGIN_RBZ_PATH
 
 const FEATURES: { title: string; body: string }[] = [
   {

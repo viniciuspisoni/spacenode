@@ -674,6 +674,9 @@
 
     .scenes-count { letter-spacing: 0; text-transform: none; font-weight: 500; color: var(--text-3); font-size: 11px; }
     .batch-note { margin-top: 8px; font-size: 10.5px; color: var(--text-3); }
+    .batch-actions { display: none; gap: 6px; margin-top: 10px; }
+    .batch-actions.is-visible { display: flex; flex-wrap: wrap; }
+    .batch-actions .ghost { flex: 1; min-width: 120px; height: 32px; font-size: 11.5px; }
     .batch-progress { margin-top: 10px; display: flex; flex-direction: column; gap: 5px; }
     .batch-row { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--text-2); }
     .batch-row .st { width: 6px; height: 6px; border-radius: 50%; background: var(--text-3); flex: 0 0 6px; }
@@ -1035,6 +1038,12 @@
         <div class="batch-note" id="batchNote">Todas as cenas com os mesmos presets e a mesma semente — coerência de material e estilo no conjunto.</div>
         <div class="batch-progress" id="batchProgress"></div>
         <div class="history-grid" id="batchResults" style="margin-top:8px"></div>
+        <div class="batch-actions" id="batchActions">
+          <button class="ghost" id="batchSaveButton">Salvar as imagens</button>
+          <button class="ghost" id="batchResumeButton" style="display:none">Retomar</button>
+          <button class="ghost" id="batchBuyButton" style="display:none">Comprar Nodes</button>
+        </div>
+        <div class="batch-note" id="batchSaveNote"></div>
       </div>
 
       <div id="spaceSection" style="margin-top:20px">
@@ -1261,6 +1270,13 @@
       modelMaterials: [],
       materialSel: {},
       batchRunning: false,
+      // Resultados do último lote (pra salvar tudo de uma vez) e o que ficou
+      // pendente quando ele morreu no meio (saldo/sessão).
+      batchResults: [],
+      batchPending: 0,
+      batchInsufficient: false,
+      batchUncertain: 0,
+      batchSaving: false,
       editAction: 'swap_material',
       editQuoteId: 0,
       editNodes: null,
@@ -1326,6 +1342,16 @@
         batchLabel: function (n) { return n > 0 ? 'Gerar ' + n + ' cena' + (n === 1 ? '' : 's') : 'Gerar cenas'; },
         batchRunning: 'gerando cenas…',
         batchNote: 'Todas as cenas com os mesmos presets e a mesma semente — coerência de material e estilo no conjunto.',
+        batchSave: function (n) { return 'Salvar as ' + n + ' imagens'; },
+        batchSaving: function (d, t) { return 'Salvando ' + d + ' de ' + t + '…'; },
+        batchSaved: function (n, dir) { return n + (n === 1 ? ' imagem salva' : ' imagens salvas') + ' em ' + dir; },
+        batchSavedPartial: function (n, bad) { return n + ' salvas · ' + bad + (bad === 1 ? ' falhou' : ' falharam') + '. As que falharam seguem no Histórico.'; },
+        batchResume: function (n) { return 'Retomar ' + n + (n === 1 ? ' cena' : ' cenas'); },
+        batchResumeNote: function (n) { return n + (n === 1 ? ' cena não saiu' : ' cenas não saíram') + '. Retomar gera só o que falta — o que já saiu não é cobrado de novo.'; },
+        buyNodes: 'Comprar Nodes',
+        batchUncertain: function (n) { return n + (n === 1 ? ' delas caiu' : ' delas caíram') + ' com a rede — confira o Histórico antes de retomar, pra não gerar de novo o que já saiu.'; },
+        updateTitle: function (v) { return 'Versão ' + v + ' disponível'; },
+        updateAction: 'Baixar',
         batchInsufficient: function (t, h) { return 'Saldo insuficiente pro lote: custa ' + t + ' · você tem ' + h + '.'; },
         sceneOf: function (i, t, nm) { return 'Cena ' + i + ' de ' + t + (nm ? ' — ' + nm : '') + '…'; },
         batchOk: function (n) { return n + ' cena' + (n === 1 ? '' : 's') + ' gerada' + (n === 1 ? '' : 's') + '. Clique nas miniaturas pra revisar.'; },
@@ -1402,7 +1428,8 @@
         condMirrors: function (applied, requested, reasons) {
           return 'Reflexo em ' + applied + ' de ' + requested + (requested === 1 ? ' face marcada' : ' faces marcadas') + (reasons ? ' (' + reasons + ')' : '') + '.';
         },
-        editActions: { swap_material: 'Trocar material', remove: 'Remover', refine_area: 'Refinar área' },
+        editActions: { swap_material: 'Trocar material', remove: 'Remover', refine_area: 'Refinar área', insert_element: 'Inserir' },
+        editInsertHint: 'Marque a área onde o elemento entra e descreva o que é.',
         lang: { auto: 'Auto', pt: 'Português', en: 'English' },
         theme: { auto: 'Automático', light: 'Claro', dark: 'Escuro' },
         L_animar: 'Animar este render', L_animarType: 'Tipo de vídeo', L_animarQuality: 'Qualidade', L_animarDuration: 'Duração',
@@ -1478,6 +1505,16 @@
         batchLabel: function (n) { return n > 0 ? 'Generate ' + n + ' scene' + (n === 1 ? '' : 's') : 'Generate scenes'; },
         batchRunning: 'generating scenes…',
         batchNote: 'Every scene with the same presets and the same seed — consistent materials and style across the set.',
+        batchSave: function (n) { return 'Save the ' + n + ' images'; },
+        batchSaving: function (d, t) { return 'Saving ' + d + ' of ' + t + '…'; },
+        batchSaved: function (n, dir) { return n + (n === 1 ? ' image saved' : ' images saved') + ' to ' + dir; },
+        batchSavedPartial: function (n, bad) { return n + ' saved · ' + bad + ' failed. The failed ones are still in History.'; },
+        batchResume: function (n) { return 'Resume ' + n + (n === 1 ? ' scene' : ' scenes'); },
+        batchResumeNote: function (n) { return n + (n === 1 ? ' scene did not finish' : ' scenes did not finish') + '. Resuming generates only what is missing — what already came out is not charged again.'; },
+        buyNodes: 'Buy Nodes',
+        batchUncertain: function (n) { return n + ' of them dropped on the network — check History before resuming, so you do not regenerate what already came out.'; },
+        updateTitle: function (v) { return 'Version ' + v + ' available'; },
+        updateAction: 'Download',
         batchInsufficient: function (t, h) { return 'Not enough balance for the batch: costs ' + t + ' · you have ' + h + '.'; },
         sceneOf: function (i, t, nm) { return 'Scene ' + i + ' of ' + t + (nm ? ' — ' + nm : '') + '…'; },
         batchOk: function (n) { return n + ' scene' + (n === 1 ? '' : 's') + ' generated. Click the thumbnails to review.'; },
@@ -1554,7 +1591,8 @@
         condMirrors: function (applied, requested, reasons) {
           return 'Reflection on ' + applied + ' of ' + requested + (requested === 1 ? ' marked face' : ' marked faces') + (reasons ? ' (' + reasons + ')' : '') + '.';
         },
-        editActions: { swap_material: 'Swap material', remove: 'Remove', refine_area: 'Refine area' },
+        editActions: { swap_material: 'Swap material', remove: 'Remove', refine_area: 'Refine area', insert_element: 'Insert' },
+        editInsertHint: 'Mark the area where the element goes and describe what it is.',
         lang: { auto: 'Auto', pt: 'Português', en: 'English' },
         theme: { auto: 'Automatic', light: 'Light', dark: 'Dark' },
         L_animar: 'Animate this render', L_animarType: 'Video type', L_animarQuality: 'Quality', L_animarDuration: 'Duration',
@@ -1751,7 +1789,10 @@
     function levelFailed(report) {
       return !!(report && report.levelRequested && !report.levelApplied && LEVEL_SOFT_REASONS.indexOf(report.levelReason) < 0);
     }
-    var EDIT_ACTIONS = ['swap_material', 'remove', 'refine_area'];
+    var EDIT_ACTIONS = ['swap_material', 'remove', 'refine_area', 'insert_element'];
+    // Inserir exige os DOIS: a máscara diz onde, o texto diz o quê (é o
+    // contrato do REQUIRES_MASK no servidor).
+    var INSERT_ACTION = 'insert_element';
 
     var generatingTimer = null;
     var elapsedTimer = null;
@@ -1770,7 +1811,8 @@
      'animarInsufficient','animarInsufficientTitle','animarInsufficientMath','animarInsufficientBuy','animarInsufficientAlt',
      'apiBaseUrl','saveSettingsButton','footer','advanced',
      'restoreCameraButton','scenesSection','scenesCount','scenesPills','scenesEmpty','batchButton','batchLabel','batchMeta',
-     'batchNote','batchProgress','batchResults','sunPills','modelMaterialsBlock','materialsList',
+     'batchNote','batchProgress','batchResults','batchActions','batchSaveButton','batchResumeButton','batchBuyButton','batchSaveNote',
+     'sunPills','modelMaterialsBlock','materialsList',
      'upscale2xButton','upscale4xButton','editSection','editActionPills','editInstruction','editMaterialRow',
      'editMaterialSelect','editButton','editLabel','editMeta','maskCanvas','maskHint','maskToggle','maskClear',
      'spaceSection','spaceName','spaceCategoryPills',
@@ -2128,9 +2170,13 @@
       var hasMask = model.maskStrokes.length > 0;
       var maskAction = model.editAction === 'remove' || model.editAction === 'refine_area';
       // Remover/refinar COM área marcada dispensam texto (a área diz onde).
-      var ready = hasInstruction || (hasMask && maskAction);
+      // Inserir é o inverso: precisa dos dois, senão o servidor recusa.
+      var inserting = model.editAction === INSERT_ACTION;
+      var ready = inserting ? (hasInstruction && hasMask) : (hasInstruction || (hasMask && maskAction));
       els.editButton.disabled = model.generating || !model.authenticated || !ready || !!(model.result && model.result._unverified);
       els.editLabel.textContent = model.generating ? tt('editing') : tt('applyEdit');
+      var editHintEl = document.querySelector('#editSection .batch-note');
+      if (editHintEl) editHintEl.textContent = inserting && !ready ? tt('editInsertHint') : tt('editHint');
       els.editMeta.textContent = model.editNodes != null && !model.generating ? model.editNodes + ' ' + tt('nodes') : '';
     }
     var editQuoteTimer = null;
@@ -2624,6 +2670,50 @@
       if (count > 6) msg += ' ' + st('mirrorOverLimit').replace('%d', 6).replace('%d', 6);
       els.mirrorHint.textContent = msg;
     }
+
+    // ── Depois do lote: salvar tudo e retomar o que faltou ──────────────────
+    // Salvar era um savepanel por imagem; e saldo ou sessão caindo no meio
+    // matava o caderno inteiro, sem como continuar.
+    function renderBatchActions() {
+      if (!els.batchActions) return;
+      var temResultado = model.batchResults.length > 0;
+      var temPendente = model.batchPending > 0;
+      els.batchActions.classList.toggle('is-visible', (temResultado || temPendente) && !model.batchRunning);
+      els.batchSaveButton.style.display = temResultado ? '' : 'none';
+      els.batchSaveButton.textContent = tt('batchSave', model.batchResults.length);
+      els.batchSaveButton.disabled = model.batchSaving || model.generating;
+      els.batchResumeButton.style.display = temPendente ? '' : 'none';
+      els.batchResumeButton.textContent = tt('batchResume', model.batchPending);
+      els.batchResumeButton.disabled = model.generating || model.batchSaving;
+      els.batchBuyButton.style.display = temPendente && model.batchInsufficient ? '' : 'none';
+      els.batchBuyButton.textContent = tt('buyNodes');
+      if (!model.batchSaving) {
+        var nota = temPendente ? tt('batchResumeNote', model.batchPending) : '';
+        if (temPendente && model.batchUncertain > 0) nota += ' ' + tt('batchUncertain', model.batchUncertain);
+        els.batchSaveNote.textContent = nota;
+      }
+    }
+    els.batchSaveButton.addEventListener('click', function () {
+      if (!model.batchResults.length || model.batchSaving) return;
+      // Só o que tem URL viva: item sem outputUrl viraria erro de download.
+      var items = model.batchResults.filter(function (r) {
+        return r && typeof r.outputUrl === 'string' && /^https?:\/\//i.test(r.outputUrl);
+      }).map(function (r) {
+        return { url: r.outputUrl, sceneName: r.sceneName || '', renderId: r.renderId || null };
+      });
+      if (!items.length) return;
+      model.batchSaving = true;
+      renderBatchActions();
+      els.batchSaveNote.textContent = tt('batchSaving', 0, items.length);
+      callSketchUp('saveBatch', JSON.stringify({ items: items }));
+    });
+    els.batchResumeButton.addEventListener('click', function () {
+      if (model.generating || !model.batchPending) return;
+      callSketchUp('resumeBatch');
+    });
+    els.batchBuyButton.addEventListener('click', function () {
+      callSketchUp('openUrl', model.apiBaseUrl + '/app/billing');
+    });
 
     // ── Preview / comparador ────────────────────────────────────────────────
     function setAspect(w, h) {
@@ -3408,6 +3498,17 @@
         }
 
         if (event === 'batchStart') {
+          // Retomada NÃO apaga o que já saiu (e já foi pago): as miniaturas e
+          // os resultados do lote anterior seguem, e o batchDone concatena.
+          if (!payload.resumed) {
+            model.batchResults = [];
+            els.batchResults.innerHTML = '';
+          }
+          model.batchPending = 0;
+          model.batchInsufficient = false;
+          model.batchSaving = false;
+          els.batchSaveNote.textContent = '';
+          renderBatchActions();
           model.batchRunning = true;
           els.batchProgress.innerHTML = '';
           els.batchResults.innerHTML = '';
@@ -3535,6 +3636,11 @@
           });
           var ok = Array.isArray(payload.results) ? payload.results.length : 0;
           var bad = Array.isArray(payload.errors) ? payload.errors.length : 0;
+          model.batchResults = Array.isArray(payload.results) ? payload.results : [];
+          model.batchPending = payload.pending || 0;
+          model.batchInsufficient = !!payload.insufficient;
+          model.batchUncertain = payload.uncertain || 0;
+          renderBatchActions();
           if (payload.aborted && payload.abortMessage) {
             // O erro fatal já chegou pelo evento 'error'.
           } else if (payload.cancelled) {
@@ -3545,6 +3651,29 @@
             showNotice(tt('batchOk', ok), 'success');
           }
           updateGenerateState();
+        }
+
+        if (event === 'batchSaveProgress') {
+          els.batchSaveNote.textContent = tt('batchSaving', payload.done || 0, payload.total || 0);
+        }
+
+        if (event === 'batchSaveDone') {
+          model.batchSaving = false;
+          var falhas = Array.isArray(payload.failed) ? payload.failed.length : 0;
+          els.batchSaveNote.textContent = '';
+          renderBatchActions();
+          if (falhas > 0) showNotice(tt('batchSavedPartial', payload.saved || 0, falhas), 'warn');
+          else showNotice(tt('batchSaved', payload.saved || 0, payload.dir || ''), 'success');
+        }
+
+        // Distribuímos .rbz fora do Extension Warehouse: sem este aviso, quem
+        // instalou uma vez nunca fica sabendo que saiu versão nova. Brando, e
+        // nunca por cima de uma geração em andamento.
+        if (event === 'pluginUpdate' && !model.generating) {
+          showNotice(tt('updateTitle', payload.version) + (payload.note ? ' — ' + payload.note : ''), 'warn', {
+            label: tt('updateAction'),
+            onClick: function () { callSketchUp('openUrl', payload.url); }
+          });
         }
 
         if (event === 'resultRefreshed') {
@@ -3591,6 +3720,13 @@
         }
 
         if (event === 'error') {
+          // Erro no meio do salvamento destravaria nada: sem isto o painel
+          // ficaria "salvando" pra sempre, matando Salvar e Retomar juntos.
+          if (model.batchSaving) {
+            model.batchSaving = false;
+            els.batchSaveNote.textContent = '';
+            renderBatchActions();
+          }
           // Só erros que encerram uma geração (generation:true) destravam a
           // UI de "gerando" — um erro paralelo (histórico, sessão) não pode
           // soltar o overlay de uma geração em andamento.
