@@ -12,16 +12,19 @@ export const metadata = {
   title: 'Apresentar — Spacenode',
 }
 
-const STATUS_TONE: Record<ApresentarStatus, { label: string; color: string; bg: string; border: string }> = {
-  'novo':     { label: 'Novo',     color: 'var(--color-accent-green)',  bg: 'var(--color-accent-green-bg)', border: 'var(--color-accent-green-border)' },
-  'beta':     { label: 'Beta',     color: 'var(--color-warning)',       bg: 'var(--color-warning-bg)',      border: 'var(--color-warning-border)' },
-  'em-breve': { label: 'Em breve', color: 'var(--color-text-tertiary)', bg: 'var(--color-chip)',            border: 'var(--color-border-strong)' },
+// Status é ESTADO, não ação: vira um ponto colorido num chip neutro, e não um
+// bloco de cor por cartão. Verde continua reservado a estado (ver o contrato
+// em docs/VIDRO-NO-APP.md, §2.3).
+const STATUS_TONE: Record<ApresentarStatus, { label: string; dot: string }> = {
+  'novo':     { label: 'Novo',     dot: 'var(--color-accent-green)' },
+  'beta':     { label: 'Beta',     dot: 'var(--color-warning)' },
+  'em-breve': { label: 'Em breve', dot: 'var(--color-text-quaternary)' },
 }
 
 function ToolIcon({ id }: { id: ApresentarTool['id'] }) {
   if (id === 'humanized_plan') {
     return (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
         <rect x="3" y="3" width="18" height="18" rx="1.5"/>
         <path d="M3 11h7M14 11h7M10 3v8M10 15v6"/>
         <circle cx="16.5" cy="16.5" r="1.5"/>
@@ -30,7 +33,7 @@ function ToolIcon({ id }: { id: ApresentarTool['id'] }) {
   }
   if (id === 'isometric') {
     return (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 2L3 7v10l9 5 9-5V7l-9-5z"/>
         <path d="M3 7l9 5 9-5M12 12v10"/>
       </svg>
@@ -38,7 +41,7 @@ function ToolIcon({ id }: { id: ApresentarTool['id'] }) {
   }
   if (id === 'moodboard') {
     return (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="9"/>
         <circle cx="12" cy="6.5" r="1.6" fill="currentColor" stroke="none"/>
         <circle cx="17" cy="10" r="1.6" fill="currentColor" stroke="none"/>
@@ -49,7 +52,7 @@ function ToolIcon({ id }: { id: ApresentarTool['id'] }) {
     )
   }
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
       <rect x="3" y="3" width="18" height="18" rx="1.5"/>
       <rect x="6" y="6" width="6" height="5" rx="0.8"/>
       <rect x="14" y="6" width="4" height="5" rx="0.8"/>
@@ -66,80 +69,60 @@ export default async function ApresentarHubPage() {
   const tools = APRESENTAR_TOOL_ORDER.map((id) => APRESENTAR_TOOLS[id])
 
   return (
-    <main style={{ flex: 1, overflowY: 'auto', background: 'var(--color-bg)', padding: '52px 48px 80px' }}>
-      <div style={{ maxWidth: 1000, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 40 }}>
+    // Sem fundo chapado: quem pinta é o <Ambient/> do layout — sobre cor
+    // chapada o vidro dos cartões viraria cinza.
+    <main style={{ flex: 1, overflowY: 'auto', padding: '44px 40px 72px' }}>
+      {/* Hover do cartão: o único jeito num server component, e local demais
+          para virar classe global. */}
+      <style>{`
+        .apresentar-card { transition: transform 220ms var(--ease), box-shadow 220ms var(--ease); }
+        .apresentar-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-float); }
+      `}</style>
 
-        {/* Hero */}
+      <div style={{ maxWidth: 1000, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 30 }}>
+
         <section>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-            <h1 style={{
-              fontSize: 34, fontWeight: 500, color: 'var(--color-text-primary)',
-              letterSpacing: '-0.04em', lineHeight: 1.15, margin: 0,
-            }}>
-              Apresentar
-            </h1>
-            <span style={{
-              fontSize: 11, fontWeight: 500, color: 'var(--color-accent-green)',
-              background: 'var(--color-accent-green-bg)',
-              padding: '4px 10px', borderRadius: 999,
-              letterSpacing: '-0.01em', lineHeight: 1, flexShrink: 0,
-            }}>
-              Novo módulo
-            </span>
-          </div>
-          <p style={{
-            fontSize: 14, color: 'var(--color-text-tertiary)',
-            letterSpacing: '-0.01em', lineHeight: 1.5, maxWidth: 580,
+          <h1 style={{
+            fontSize: 30, fontWeight: 500, color: 'var(--color-text-primary)',
+            letterSpacing: '-0.04em', lineHeight: 1.15,
           }}>
-            Transforme seus projetos em materiais visuais prontos para apresentar ao cliente —
-            plantas humanizadas, isométricas premium e pranchas automáticas.
+            Apresentar
+          </h1>
+          <p style={{
+            fontSize: 13.5, color: 'var(--color-text-tertiary)',
+            letterSpacing: '-0.01em', lineHeight: 1.5, maxWidth: 560, marginTop: 8,
+          }}>
+            Do projeto ao material que vai para o cliente: plantas humanizadas, isométricas,
+            moodboards e carrosséis prontos para postar.
           </p>
         </section>
 
-        {/* Cards */}
         <section style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-          gap: 16,
+          gap: 14,
         }}>
-          {tools.map((tool) => (
-            <ToolCard key={tool.id} tool={tool} />
-          ))}
+          {tools.map((tool) => <ToolCard key={tool.id} tool={tool} />)}
         </section>
 
-        {/* Fidelity note */}
-        <section style={{
-          padding: '18px 22px',
-          background: 'var(--color-bg-elevated)',
-          border: '0.5px solid var(--color-border-strong)',
-          borderRadius: 12,
-          display: 'flex', alignItems: 'flex-start', gap: 14,
+        <section className="spn-glass" style={{
+          borderRadius: 'var(--r-card)', padding: '16px 20px',
+          display: 'flex', alignItems: 'flex-start', gap: 13,
         }}>
-          <div style={{
-            width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-            background: 'var(--color-accent-green-bg)',
-            color: 'var(--color-accent-green)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+          <span style={{ color: 'var(--color-text-secondary)', flexShrink: 0, display: 'flex', marginTop: 1 }}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 2L3 7l9 5 9-5-9-5z"/>
               <path d="M3 17l9 5 9-5M3 12l9 5 9-5"/>
             </svg>
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{
-              fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)',
-              letterSpacing: '-0.01em', marginBottom: 4,
-            }}>
+          </span>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 560, color: 'var(--color-text-primary)' }}>
               Fidelidade ao projeto original
             </div>
-            <div style={{
-              fontSize: 12, color: 'var(--color-text-tertiary)',
-              letterSpacing: '-0.005em', lineHeight: 1.5,
-            }}>
-              O Spacenode preserva paredes, aberturas, layout e proporções da sua planta ou modelo.
-              A IA atua na humanização, materialidade, ambientação e apresentação — não inventa alterações estruturais.
-            </div>
+            <p className="spn-hint" style={{ marginTop: 4 }}>
+              Paredes, aberturas, layout e proporções são preservados. A IA atua na humanização,
+              na materialidade e na apresentação — ela não inventa alterações estruturais.
+            </p>
           </div>
         </section>
 
@@ -148,99 +131,69 @@ export default async function ApresentarHubPage() {
   )
 }
 
-// ── Sub-components ───────────────────────────────────────────────────────────
+// ── Cartão de ferramenta ────────────────────────────────────────────────────
 
 function ToolCard({ tool }: { tool: ApresentarTool }) {
-  const href      = `/app/apresentar/${tool.slug}`
-  const statusTone = STATUS_TONE[tool.status]
+  const tone = STATUS_TONE[tool.status]
 
-  const body = (
-    <div style={{
-      display: 'flex', flexDirection: 'column', height: '100%',
-      padding: '22px 22px 18px',
-      background: 'var(--color-bg-elevated)',
-      border: '0.5px solid var(--color-border-strong)',
-      borderRadius: 14,
-      transition: 'border-color 180ms ease, transform 180ms ease',
-      cursor: tool.available ? 'pointer' : 'default',
-      opacity: tool.available ? 1 : 0.85,
-    }}
-      className="apresentar-card">
-
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
-        <div style={{
-          width: 40, height: 40, borderRadius: 10, flexShrink: 0,
-          background: 'var(--color-surface)',
-          border: '0.5px solid var(--color-border-strong)',
+  return (
+    <Link
+      href={`/app/apresentar/${tool.slug}`}
+      className="apresentar-card spn-glass"
+      style={{
+        display: 'flex', flexDirection: 'column', height: '100%',
+        padding: '18px 18px 15px',
+        borderRadius: 'var(--r-card)',
+        textDecoration: 'none',
+        opacity: tool.available ? 1 : 0.7,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 13 }}>
+        <span className="spn-glass spn-glass--raised" style={{
+          width: 38, height: 38, borderRadius: 'var(--r-inner)', flexShrink: 0,
           color: 'var(--color-text-primary)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
           <ToolIcon id={tool.id} />
-        </div>
-        <span style={{
-          fontSize: 10, fontWeight: 600,
-          letterSpacing: '0.06em', textTransform: 'uppercase',
-          color: statusTone.color,
-          background: statusTone.bg,
-          border: `0.5px solid ${statusTone.border}`,
-          padding: '4px 9px', borderRadius: 999,
-          flexShrink: 0, lineHeight: 1,
-        }}>
-          {statusTone.label}
+        </span>
+        <span className="spn-balance spn-glass spn-glass--raised" style={{ flexShrink: 0 }}>
+          <span className="spn-balance-dot" style={{ background: tone.dot, boxShadow: 'none' }} />
+          {tone.label}
         </span>
       </div>
 
-      {/* Title + desc */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
-          fontSize: 16, fontWeight: 500, color: 'var(--color-text-primary)',
-          letterSpacing: '-0.02em', marginBottom: 6,
+          fontSize: 15, fontWeight: 560, color: 'var(--color-text-primary)',
+          letterSpacing: '-0.02em', marginBottom: 5,
         }}>
           {tool.name}
         </div>
-        <div style={{
-          fontSize: 12, color: 'var(--color-text-tertiary)',
-          letterSpacing: '-0.005em', lineHeight: 1.55,
-        }}>
-          {tool.shortDesc}
-        </div>
+        <p className="spn-hint" style={{ marginTop: 0 }}>{tool.shortDesc}</p>
       </div>
 
-      {/* Footer */}
       <div style={{
-        marginTop: 18, paddingTop: 14,
-        borderTop: '0.5px solid var(--color-border)',
+        marginTop: 16, paddingTop: 12,
+        borderTop: '0.5px solid var(--glass-line)',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
       }}>
-        <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', letterSpacing: '-0.005em' }}>
-          {tool.nodes !== null ? (
-            <><span style={{ color: 'var(--color-text-secondary)', fontWeight: 500 }}>{tool.nodes}</span> nodes</>
-          ) : (
-            <span>sem custo definido</span>
-          )}
-        </div>
+        <span style={{ fontSize: 11.5, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>
+          {tool.nodes !== null
+            ? <><span style={{ color: 'var(--color-text-secondary)', fontWeight: 560 }}>{tool.nodes}</span> nodes</>
+            : 'sem custo definido'}
+        </span>
         <span style={{
           display: 'inline-flex', alignItems: 'center', gap: 6,
-          fontSize: 12, fontWeight: 500,
+          fontSize: 12, fontWeight: 500, letterSpacing: '-0.01em',
           color: tool.available ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
-          letterSpacing: '-0.01em',
         }}>
-          {tool.available ? 'Abrir ferramenta' : 'Saber mais'}
-          <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 6h6M6 3l3 3-3 3"/>
+          {tool.available ? 'Abrir' : 'Saber mais'}
+          <svg width="7" height="12" viewBox="0 0 8 14" fill="none" stroke="currentColor"
+               strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M1 1l6 6-6 6"/>
           </svg>
         </span>
       </div>
-    </div>
-  )
-
-  return (
-    <Link href={href} style={{ textDecoration: 'none', display: 'block' }}>
-      {body}
-      <style>{`
-        .apresentar-card:hover { border-color: var(--color-text-quaternary); transform: translateY(-1px); }
-      `}</style>
     </Link>
   )
 }

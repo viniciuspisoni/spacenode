@@ -16,7 +16,7 @@ import {
   type AdjustPreset,
 } from '@/lib/finalizar/presets'
 import { makeId } from '@/lib/finalizar/composition'
-import { Chip, Section, SliderRow } from '@/components/finalizar/ui'
+import { Chip, ConfirmSheet, PromptSheet, Section, SliderRow } from '@/components/finalizar/ui'
 
 /** Correções de um clique orientadas a arquitetura (o editor executa). */
 export type QuickFix =
@@ -47,6 +47,9 @@ export function AdjustPanel({ doc, patch, histogram, wbPicking, onToggleWbPick, 
 
   // Predefinições do usuário — carregadas no cliente (localStorage; SSR-safe).
   const [userPresets, setUserPresets] = useState<AdjustPreset[]>([])
+  // Nomear e excluir viravam window.prompt/confirm — folhas, agora.
+  const [naming, setNaming] = useState(false)
+  const [pendingDelete, setPendingDelete] = useState<AdjustPreset | null>(null)
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage só existe no cliente (evita mismatch de hidratação)
     setUserPresets(loadUserPresets())
@@ -70,13 +73,11 @@ export function AdjustPanel({ doc, patch, histogram, wbPicking, onToggleWbPick, 
     }))
   }
 
-  const savePresetFromCurrent = () => {
-    const name = window.prompt('Nome da predefinição')
-    if (!name || !name.trim()) return
+  const savePresetFromCurrent = (name: string) => {
     setUserPresets(
       saveUserPreset({
         id: makeId('p'),
-        name: name.trim(),
+        name,
         adjust: doc.adjust,
         vignette: doc.vignette,
         curve: doc.curve,
@@ -84,11 +85,6 @@ export function AdjustPanel({ doc, patch, histogram, wbPicking, onToggleWbPick, 
         grading: doc.grading,
       })
     )
-  }
-
-  const removePreset = (p: AdjustPreset) => {
-    if (!window.confirm(`Excluir a predefinição “${p.name}”?`)) return
-    setUserPresets(deleteUserPreset(p.id))
   }
 
   // Silhueta do histograma (256 faixas de luminosidade → path SVG).
@@ -111,6 +107,23 @@ export function AdjustPanel({ doc, patch, histogram, wbPicking, onToggleWbPick, 
 
   return (
     <div>
+      {/* Fora da <Section>: ela desmonta os filhos ao recolher, e uma folha
+          aberta sumiria junto com a seção. */}
+      <PromptSheet
+        open={naming}
+        title="Salvar predefinição"
+        label="Nome"
+        placeholder="Ex.: Interior quente"
+        onSubmit={savePresetFromCurrent}
+        onClose={() => setNaming(false)}
+      />
+      <ConfirmSheet
+        open={pendingDelete !== null}
+        title="Excluir predefinição"
+        message={<>A predefinição <b>{pendingDelete?.name}</b> some deste navegador. Os ajustes já aplicados na imagem continuam onde estão.</>}
+        onConfirm={() => { if (pendingDelete) setUserPresets(deleteUserPreset(pendingDelete.id)) }}
+        onClose={() => setPendingDelete(null)}
+      />
       {histPath && histogram && (
         <div style={{ padding: 14 }}>
           <svg
@@ -173,7 +186,7 @@ export function AdjustPanel({ doc, patch, histogram, wbPicking, onToggleWbPick, 
                   title="Excluir predefinição"
                   onClick={(e) => {
                     e.stopPropagation()
-                    removePreset(p)
+                    setPendingDelete(p)
                   }}
                   style={{
                     color: 'var(--color-text-quaternary)',
@@ -187,10 +200,11 @@ export function AdjustPanel({ doc, patch, histogram, wbPicking, onToggleWbPick, 
               </span>
             </Chip>
           ))}
-          <Chip onClick={savePresetFromCurrent} title="Salvar os ajustes atuais como predefinição">
+          <Chip onClick={() => setNaming(true)} title="Salvar os ajustes atuais como predefinição">
             Salvar atuais…
           </Chip>
         </div>
+
       </Section>
 
       <Section title="Luz" open={open.luz} onToggle={() => toggle('luz')}>

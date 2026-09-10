@@ -60,6 +60,7 @@ export function CleanupPanel(props: CleanupPanelProps) {
         </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <Seg
+            label="Modo do pincel"
             options={[
               { id: 'paint', label: 'Pintar', title: 'Marca a área a alterar' },
               { id: 'erase', label: 'Borracha', title: 'Desmarca' },
@@ -82,6 +83,7 @@ export function CleanupPanel(props: CleanupPanelProps) {
       <Section title="Ação" open={openAction} onToggle={() => setOpenAction((v) => !v)}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <Seg
+            label="Ação na área marcada"
             options={[
               { id: 'remove', label: 'Remover', title: 'Remove o que está marcado e reconstrói o fundo' },
               { id: 'fix', label: 'Corrigir', title: 'Corrige a área marcada seguindo sua instrução' },

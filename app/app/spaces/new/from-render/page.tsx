@@ -52,7 +52,7 @@ export default async function FromRenderPage({
     : null
 
   return (
-    <main style={{ flex: 1, overflowY: 'auto', background: 'var(--color-bg)' }}>
+    <main style={{ flex: 1, overflowY: 'auto' }}>
       <FromRenderFlow
         gallery={gallery}
         preselected={preselected}

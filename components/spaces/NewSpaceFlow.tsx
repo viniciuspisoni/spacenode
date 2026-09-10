@@ -397,7 +397,7 @@ function FormStep(props: {
           <button
             onClick={onContinue}
             disabled={!name.trim() || submitting}
-            className="spn-action spn-action--primary"
+            className="spn-cta"
             style={{ width: 'auto', minWidth: 180, padding: '12px 24px' }}
           >
             {submitting ? 'Criando…' : 'Continuar →'}
@@ -482,11 +482,10 @@ function UploadStep(props: {
           </div>
         )}
         {file && (
-          <div style={{
+          <div className="spn-glass spn-glass--raised" style={{
             position: 'absolute', bottom: 12, left: 12,
-            padding: '6px 10px', borderRadius: 6,
-            background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
-            fontSize: 11, color: '#fff',
+            padding: '6px 10px', borderRadius: 999,
+            fontSize: 11, color: 'var(--color-text-primary)',
           }}>
             {file.name} · {(file.size / (1024 * 1024)).toFixed(1)} MB
           </div>
@@ -514,8 +513,8 @@ function UploadStep(props: {
             <span>Etapa 2 de 2</span>
             <span style={{
               padding: '3px 8px', borderRadius: 999,
-              background: balanceShort ? 'rgba(163,45,45,0.18)' : 'var(--color-surface)',
-              color: balanceShort ? '#e57373' : 'var(--color-text-tertiary)',
+              background: balanceShort ? 'var(--color-error-bg)' : 'var(--color-chip)',
+              color: balanceShort ? 'var(--color-error)' : 'var(--color-text-tertiary)',
               fontSize: 10, letterSpacing: '0.02em',
             }}>
               {balance} nodes disponíveis
@@ -526,7 +525,7 @@ function UploadStep(props: {
           <button
             onClick={onAnalyze}
             disabled={!file || submitting || balanceShort}
-            className="spn-action spn-action--primary"
+            className="spn-cta"
             style={{ width: 'auto', minWidth: 220, padding: '12px 24px' }}
           >
             Analisar · {DNA_EXTRACTION_COST} nodes
@@ -578,11 +577,11 @@ function AnalyzingStep({ previewUrl }: { previewUrl: string | null }) {
         )}
         {/* Overlay scan */}
         <div className="dna-scan" />
-        <div style={{
+        <div className="spn-glass spn-glass--raised" style={{
           position: 'absolute', top: 14, left: 14,
           fontSize: 10, fontWeight: 600, letterSpacing: '0.16em', textTransform: 'uppercase',
-          color: '#46d191', background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)',
-          padding: '5px 10px', borderRadius: 4,
+          color: 'var(--color-accent-green)',
+          padding: '5px 10px', borderRadius: 999,
         }}>
           analisando
         </div>
@@ -604,11 +603,14 @@ function AnalyzingStep({ previewUrl }: { previewUrl: string | null }) {
       <style>{`
         .dna-scan {
           position: absolute; inset: 0; pointer-events: none;
+          /* Os alfas importam: a varredura era 0,15 nas bordas e 0,45 no
+             miolo. --...-bg (0,09) e --...-border (0,22) apagavam a linha
+             pela metade; --...-glow é justamente o 0,45 do original. */
           background: linear-gradient(180deg,
             transparent 0%,
-            rgba(70,209,145,0.15) 49%,
-            rgba(70,209,145,0.45) 50%,
-            rgba(70,209,145,0.15) 51%,
+            var(--color-accent-green-border) 49%,
+            var(--color-accent-green-glow) 50%,
+            var(--color-accent-green-border) 51%,
             transparent 100%);
           background-size: 100% 200%;
           animation: dnaScanMove 2.4s linear infinite;
@@ -639,11 +641,11 @@ function RevealStep(props: {
         <div style={{
           display: 'inline-flex', alignItems: 'center', gap: 8,
           padding: '5px 11px', borderRadius: 999,
-          background: 'rgba(29,158,117,0.14)', color: '#46d191',
+          background: 'var(--color-accent-green-bg)', color: 'var(--color-accent-green)',
           fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase',
           marginBottom: 14,
         }}>
-          <span style={{ width: 6, height: 6, borderRadius: 999, background: '#46d191' }} />
+          <span style={{ width: 6, height: 6, borderRadius: 999, background: 'var(--color-accent-green)' }} />
           DNA gerado
         </div>
         <h1 style={{
@@ -666,11 +668,11 @@ function RevealStep(props: {
       }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={vistaMestreUrl} alt="Vista Mestre" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        <div style={{
+        <div className="spn-glass spn-glass--raised" style={{
           position: 'absolute', top: 14, left: 14,
           fontSize: 10, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase',
-          color: '#fff', background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)',
-          padding: '5px 10px', borderRadius: 4,
+          color: 'var(--color-text-primary)',
+          padding: '5px 10px', borderRadius: 999,
         }}>
           análise completa
         </div>
@@ -697,13 +699,8 @@ function RevealStep(props: {
           <button
             onClick={onLock}
             disabled={submitting}
-            className="spn-action"
-            style={{
-              width: 'auto', minWidth: 220, padding: '12px 24px',
-              background: '#1D9E75', color: '#042818',
-              border: '0.5px solid rgba(0,0,0,0.18)',
-              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18), 0 8px 24px rgba(29,158,117,0.18)',
-            }}
+            className="spn-cta"
+            style={{ width: 'auto', minWidth: 220 }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 8 }}>
               <rect x="4" y="11" width="16" height="10" rx="1.5"/>
@@ -832,13 +829,5 @@ function Footer({ leftLabel, right }: { leftLabel: React.ReactNode; right: React
 }
 
 function ErrorBox({ message }: { message: string }) {
-  return (
-    <div style={{
-      marginTop: 16, padding: '10px 14px', borderRadius: 8,
-      background: 'rgba(163,45,45,0.12)', border: '0.5px solid rgba(163,45,45,0.3)',
-      color: '#e57373', fontSize: 13, letterSpacing: '-0.005em',
-    }}>
-      {message}
-    </div>
-  )
+  return <div className="spn-error" style={{ marginTop: 16 }}>{message}</div>
 }

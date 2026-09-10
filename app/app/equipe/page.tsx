@@ -111,7 +111,9 @@ export default async function EquipePage() {
   }))
 
   return (
-    <main style={{ flex: 1, overflowY: 'auto', background: 'var(--color-bg)', padding: '40px 48px 80px' }}>
+    // Sem fundo chapado: quem pinta é o <Ambient/> do shell, e é ele que o
+    // vidro refrata.
+    <main style={{ flex: 1, overflowY: 'auto', padding: '40px 48px 80px' }}>
       <div style={{ maxWidth: 860, margin: '0 auto' }}>
 
         {/* Breadcrumb */}
@@ -155,16 +157,13 @@ export default async function EquipePage() {
           <TeamManager members={managerMembers} invites={managerInvites} />
         )}
 
-        {/* Tabela de membros */}
-        <section style={{
-          background: 'var(--color-bg-elevated)',
-          border: '0.5px solid var(--color-border)',
-          borderRadius: 14, overflow: 'hidden',
-        }}>
+        {/* Tabela de membros — tabela é texto corrido: vai sobre vidro,
+            nunca direto no papel de parede. */}
+        <section className="spn-glass" style={{ borderRadius: 'var(--r-card)', overflow: 'hidden' }}>
           <div style={{
             display: 'grid', gridTemplateColumns: '2fr 0.8fr 0.8fr 0.8fr 1fr',
             gap: 12, padding: '14px 22px',
-            borderBottom: '0.5px solid var(--color-border)',
+            borderBottom: '0.5px solid var(--glass-line)',
             fontSize: 11, fontWeight: 600, letterSpacing: '0.08em',
             textTransform: 'uppercase', color: 'var(--color-text-tertiary)',
           }}>
@@ -179,7 +178,7 @@ export default async function EquipePage() {
             <div key={r.userId} style={{
               display: 'grid', gridTemplateColumns: '2fr 0.8fr 0.8fr 0.8fr 1fr',
               gap: 12, padding: '15px 22px', alignItems: 'center',
-              borderBottom: '0.5px solid var(--color-border)',
+              borderBottom: '0.5px solid var(--glass-line)',
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                 <Avatar name={r.name} />
@@ -189,7 +188,7 @@ export default async function EquipePage() {
                     letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                   }}>
                     {isManager
-                      ? <Link href={`/app/equipe/membro/${r.userId}`} style={{ color: 'inherit', textDecoration: 'none', borderBottom: '1px dotted var(--color-border-strong)' }}>{r.name}</Link>
+                      ? <Link href={`/app/equipe/membro/${r.userId}`} style={{ color: 'inherit', textDecoration: 'none', borderBottom: '1px dotted var(--glass-line-strong)' }}>{r.name}</Link>
                       : r.name}{r.isSelf && <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 400 }}> · você</span>}
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 1 }}>
@@ -209,13 +208,7 @@ export default async function EquipePage() {
 
         {/* Estado individual / convite */}
         {isSolo && (
-          <div style={{
-            marginTop: 18, padding: '16px 20px',
-            background: 'var(--color-surface-subtle)',
-            border: '0.5px dashed var(--color-border-strong)',
-            borderRadius: 12,
-            fontSize: 12.5, color: 'var(--color-text-tertiary)', lineHeight: 1.6,
-          }}>
+          <div className="spn-empty" style={{ marginTop: 18 }}>
             Por enquanto só você está neste workspace. O convite de membros por email
             chega na próxima fase — aí o consumo de cada pessoa do escritório aparece aqui.
           </div>
@@ -228,22 +221,11 @@ export default async function EquipePage() {
 
 function SummaryCard({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{
-      flex: '1 1 160px',
-      padding: '18px 20px',
-      background: 'var(--color-bg-elevated)',
-      border: '0.5px solid var(--color-border)',
-      borderRadius: 14,
-    }}>
+    <div className="spn-glass" style={{ flex: '1 1 160px', padding: '18px 20px', borderRadius: 'var(--r-card)' }}>
       <div style={{ fontSize: 26, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}>
         {value}
       </div>
-      <div style={{
-        fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase',
-        color: 'var(--color-text-tertiary)', marginTop: 6,
-      }}>
-        {label}
-      </div>
+      <div className="spn-field-label" style={{ marginTop: 6, marginBottom: 0 }}>{label}</div>
     </div>
   )
 }
@@ -263,10 +245,8 @@ function Num({ value, muted }: { value: number; muted?: boolean }) {
 function Avatar({ name }: { name: string }) {
   const initial = name.trim().charAt(0).toUpperCase() || '?'
   return (
-    <div style={{
-      width: 30, height: 30, borderRadius: 8, flexShrink: 0,
-      background: 'var(--color-surface)',
-      border: '0.5px solid var(--color-border-strong)',
+    <div className="spn-glass spn-glass--raised" style={{
+      width: 30, height: 30, borderRadius: 'var(--r-inner)', flexShrink: 0,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       fontSize: 13, fontWeight: 600, color: 'var(--color-text-secondary)',
     }}>
@@ -284,10 +264,10 @@ function fmtDate(iso: string | null): string {
 
 function EmptyState() {
   return (
-    <main style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg)', padding: 48 }}>
-      <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)' }}>
+    <main style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 48 }}>
+      <div className="spn-empty" style={{ maxWidth: 420 }}>
         Não encontramos um workspace ativo para esta conta.
-      </p>
+      </div>
     </main>
   )
 }

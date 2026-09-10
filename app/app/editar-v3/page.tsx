@@ -11,6 +11,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getPayerBalance } from '@/lib/workspaces/balance'
 import { redirect } from 'next/navigation'
 import { EditV3Flow } from '@/components/edit-v3/EditV3Flow'
+import { editV3AllowHighPrecision } from '@/lib/edit-v3/flags'
 
 export default async function EditarV3Page() {
   if (process.env.NEXT_PUBLIC_EDIT_V3 !== '1') redirect('/app/editar')
@@ -25,8 +26,17 @@ export default async function EditarV3Page() {
   const balance = payerBalance.totalBalance
 
   return (
-    <main style={{ flex: 1, overflowY: 'auto', background: 'var(--color-bg)' }}>
-      <EditV3Flow initialBalance={balance} />
-    </main>
+    // Sem fundo chapado e sem <main> aninhado: o shell do /app já é o <main>,
+    // e é o <Ambient/> dele que pinta o fundo — uma cor opaca aqui apagaria o
+    // papel de parede e o vidro da tela viraria cinza.
+    <div style={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
+      <EditV3Flow
+        initialBalance={balance}
+        // A alta precisão é gated no servidor (EDIT_V3_ALLOW_PRO). A flag é
+        // server-only, então a decisão de MOSTRAR o cartão desce daqui — sem
+        // ela o usuário só encontraria o 403.
+        allowHighQuality={editV3AllowHighPrecision()}
+      />
+    </div>
   )
 }

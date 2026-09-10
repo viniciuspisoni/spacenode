@@ -8,7 +8,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { DocSnapshot, ProjectVersion } from '@/lib/finalizar/types'
-import { ActiveDot, Chip, Section } from '@/components/finalizar/ui'
+import { ActiveDot, Chip, ConfirmSheet, PromptSheet, Section } from '@/components/finalizar/ui'
 
 export interface HistoryPanelProps {
   steps: { label: string; at: number; current: boolean }[]
@@ -44,6 +44,9 @@ export function HistoryPanel(props: HistoryPanelProps): React.ReactElement {
   const [historyOpen, setHistoryOpen] = useState(true)
   const [versionsOpen, setVersionsOpen] = useState(false)
   const currentStepRef = useRef<HTMLButtonElement | null>(null)
+  // Nomear e remover snapshot saíram do prompt/confirm do navegador.
+  const [naming, setNaming] = useState(false)
+  const [pendingDelete, setPendingDelete] = useState<DocSnapshot | null>(null)
 
   const currentIndex = steps.findIndex((s) => s.current)
 
@@ -51,18 +54,29 @@ export function HistoryPanel(props: HistoryPanelProps): React.ReactElement {
     currentStepRef.current?.scrollIntoView({ block: 'nearest' })
   }, [steps])
 
-  const saveSnapshot = () => {
-    const name = window.prompt('Nome do snapshot (ex.: "Correção de luz", "Versão cliente")')
-    if (name && name.trim()) onSaveSnapshot(name.trim().slice(0, 60))
-  }
-
   return (
     <div>
+      <PromptSheet
+        open={naming}
+        title="Novo snapshot"
+        label="Nome do marco"
+        placeholder="Ex.: Correção de luz, Versão cliente"
+        onSubmit={(name) => onSaveSnapshot(name.slice(0, 60))}
+        onClose={() => setNaming(false)}
+      />
+      <ConfirmSheet
+        open={pendingDelete !== null}
+        title="Remover snapshot"
+        message={<>O marco <b>{pendingDelete?.name}</b> sai do projeto. O estado atual da imagem não muda.</>}
+        confirmLabel="Remover"
+        onConfirm={() => { if (pendingDelete) onDeleteSnapshot(pendingDelete.id) }}
+        onClose={() => setPendingDelete(null)}
+      />
       <Section
         title="Snapshots"
         open={snapshotsOpen}
         onToggle={() => setSnapshotsOpen((v) => !v)}
-        right={<Chip onClick={saveSnapshot} disabled={snapshotsFull} title={snapshotsFull ? 'Limite de snapshots atingido' : 'Guarda o estado atual como um marco nomeado'}>+ Snapshot</Chip>}
+        right={<Chip onClick={() => setNaming(true)} disabled={snapshotsFull} title={snapshotsFull ? 'Limite de snapshots atingido' : 'Guarda o estado atual como um marco nomeado'}>+ Snapshot</Chip>}
       >
         {snapshots.length === 0 ? (
           <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', lineHeight: 1.5 }}>
@@ -97,7 +111,7 @@ export function HistoryPanel(props: HistoryPanelProps): React.ReactElement {
                 </button>
                 <button
                   type="button"
-                  onClick={() => { if (window.confirm(`Remover o snapshot "${s.name}"?`)) onDeleteSnapshot(s.id) }}
+                  onClick={() => setPendingDelete(s)}
                   title="Remover snapshot"
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'center',

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback, type CSSProperties } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef, Fragment, type CSSProperties } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { getUpscaleDisplayLabel, getVideoDisplayLabel } from '@/lib/renderLabels'
@@ -11,6 +11,9 @@ import { authorInitials, type GenerationKind } from '@/lib/history/generation-de
 import type { Edit } from '@/lib/spaces/types'
 import { BLOCOS3D_ENGINES } from '@/lib/blocos3d/config'
 import type { Blocos3DJobView } from '@/lib/blocos3d/types'
+import {
+  Sheet, SettingGroup, SettingRow, summarize, Segmented, PillGroup, RowIcon,
+} from '@/components/app/glass'
 
 type HistoryTab = 'renders' | 'edits' | 'vistas' | 'finalizar' | 'blocos3d'
 
@@ -80,6 +83,30 @@ interface Props {
 }
 
 type FolderFilter = 'all' | 'none' | string  // string = folder id
+
+// Aba de filtro aberta (a folha que a linha correspondente abre).
+type FilterSheet = 'conteudo' | 'origem' | 'ordem' | null
+
+// As três perguntas que o histórico faz. Antes eram confirm/alert/prompt
+// nativos — proibidos pelo contrato (regra 5) porque não têm tema, não têm
+// foco preso e travam a aba. Um feitio só, três formatos.
+type AskSpec =
+  | { kind: 'confirm'; title: string; message: string; confirmLabel: string }
+  | { kind: 'prompt';  title: string; message?: string; placeholder: string; confirmLabel: string }
+  | { kind: 'alert';   title: string; message: string }
+
+// Rótulos das pílulas de filtro. O usuário lê "Exterior"; o filtro guarda
+// 'exterior' — o mesmo valor que a coluna tem no banco.
+const TYPE_OPTIONS   = { 'Todos os tipos': 'all', 'Exterior': 'exterior', 'Interior': 'interior' } as const
+const MODULE_OPTIONS = { 'Todos os módulos': 'all', 'Renderizar': 'render', 'Ampliar': 'upscale', 'Animar': 'video' } as const
+const ENGINE_OPTIONS = { 'Todas as engines': 'all', 'Vega': 'Vega', 'Quasar': 'Quasar', 'Pulsar': 'Pulsar' } as const
+const SORT_OPTIONS   = { 'Mais recentes': 'desc', 'Mais antigos': 'asc' } as const
+const ALL_AUTHORS    = 'Todos os autores'
+
+/** Rótulo atual de um mapa de opções — o inverso do que a pílula devolve. */
+function labelOf(map: Record<string, string>, value: string): string {
+  return Object.keys(map).find(k => map[k] === value) ?? Object.keys(map)[0]
+}
 
 function qualityLabel(nodes: number): string | null {
   if (nodes === 4)  return 'HD'
@@ -186,14 +213,14 @@ export function HistoryClient({
       const res = await fetch(`/api/renders/list?cursor=${encodeURIComponent(last.created_at)}`)
       if (!res.ok) {
         const { error } = await res.json().catch(() => ({ error: 'Falha ao carregar' }))
-        alert(error || 'Falha ao carregar')
+        await askAlert('Não deu para carregar', error || 'Falha ao carregar')
         return
       }
       const { renders: next, pageSize: serverPageSize } = await res.json() as { renders: Render[], pageSize: number }
       setLoaded(prev => [...prev, ...next])
       if (next.length < serverPageSize) setExhausted(true)
     } catch {
-      alert('Falha ao carregar')
+      await askAlert('Não deu para carregar', 'Falha ao carregar mais renders. Tente de novo.')
     } finally {
       setLoadingMore(false)
     }
@@ -216,7 +243,49 @@ export function HistoryClient({
 
   // ── Painel "Detalhes da geração" ───────────────────────────────────────────
   const [detail, setDetail] = useState<{ kind: GenerationKind; id: string } | null>(null)
-  const openDetail = useCallback((kind: GenerationKind, id: string) => setDetail({ kind, id }), [])
+  // Sem useCallback: com o React Compiler ligado, a memoização à mão aqui só
+  // atrapalhava — o compilador deixava de otimizar o componente INTEIRO porque
+  // não conseguia casar as dependências que ele infere com o `[]` escrito na
+  // mão. Ele memoiza isto sozinho.
+  const openDetail = (kind: GenerationKind, id: string) => setDetail({ kind, id })
+
+  // ── Folhas de filtro ───────────────────────────────────────────────────────
+  const [filterSheet, setFilterSheet] = useState<FilterSheet>(null)
+
+  // ── Perguntas do sistema ───────────────────────────────────────────────────
+  // `ask()` devolve promessa, então as chamadas continuam lendo como as antigas
+  // (`if (!await confirm(…)) return`) e o fluxo assíncrono não precisou virar
+  // do avesso. `askSpec` NÃO é limpo ao fechar: a folha precisa do conteúdo no
+  // DOM durante a animação de saída — quem some é o `askOpen`.
+  const [askSpec, setAskSpec] = useState<AskSpec | null>(null)
+  const [askOpen, setAskOpen] = useState(false)
+  const askResolve = useRef<((v: string | boolean | null) => void) | null>(null)
+
+  // Também sem useCallback, pela mesma razão de `openDetail` acima.
+  const runAsk = (spec: AskSpec) => {
+    // Uma pergunta por vez: se houver outra no ar, ela sai como cancelada.
+    askResolve.current?.(spec.kind === 'prompt' ? null : false)
+    setAskSpec(spec)
+    setAskOpen(true)
+    return new Promise<string | boolean | null>(resolve => { askResolve.current = resolve })
+  }
+
+  const settleAsk = (value: string | boolean | null) => {
+    setAskOpen(false)
+    askResolve.current?.(value)
+    askResolve.current = null
+  }
+
+  const askConfirm = async (title: string, message: string, confirmLabel: string) =>
+    (await runAsk({ kind: 'confirm', title, message, confirmLabel })) === true
+
+  const askAlert = (title: string, message: string) =>
+    runAsk({ kind: 'alert', title, message })
+
+  const askPrompt = async (title: string, placeholder: string, confirmLabel: string) => {
+    const v = await runAsk({ kind: 'prompt', title, placeholder, confirmLabel })
+    return typeof v === 'string' ? v : null
+  }
 
   // ── Modo de seleção ─────────────────────────────────────────────────────────
   const [selectMode, setSelectMode] = useState(false)
@@ -250,6 +319,21 @@ export function HistoryClient({
     for (const r of loaded) if (r.user_id) ids.add(r.user_id)
     return Array.from(ids)
   }, [loaded])
+
+  // A pílula devolve o TEXTO da opção, não o id — ao contrário do <select>
+  // antigo, que carregava o uid em value. Dois autores sem linha em
+  // `profiles` (ou homônimos) dariam o MESMO rótulo: key duplicada no React e
+  // um `find` que casaria sempre o primeiro, filtrando pelo autor errado.
+  // Daí o desempate no rótulo e a busca por uid nas duas pontas.
+  const authorOptions = useMemo(() => {
+    const seen = new Map<string, number>()
+    return distinctAuthors.map(uid => {
+      const base = authorLabel(authors, uid, currentUserId)
+      const n = (seen.get(base) ?? 0) + 1
+      seen.set(base, n)
+      return { uid, label: n === 1 ? base : `${base} (${n})` }
+    })
+  }, [distinctAuthors, authors, currentUserId])
 
   // ── Hierarquia de pastas (1 nível: pasta do cliente > subpasta de projeto) ──
   const topFolders = useMemo(() => folders.filter(f => !f.parent_id), [folders])
@@ -326,8 +410,10 @@ export function HistoryClient({
   const handleDelete = async () => {
     if (selectedRenders.length === 0 || busy) return
     const n = selectedRenders.length
-    const ok = window.confirm(
-      `Excluir ${n} render${n !== 1 ? 's' : ''}? Esta ação não pode ser desfeita.`
+    const ok = await askConfirm(
+      'Excluir renders',
+      `${n} render${n !== 1 ? 's' : ''} ${n !== 1 ? 'serão apagados' : 'será apagado'} para sempre. Esta ação não pode ser desfeita.`,
+      `Excluir ${n} render${n !== 1 ? 's' : ''}`,
     )
     if (!ok) return
     setBusy(true)
@@ -339,7 +425,7 @@ export function HistoryClient({
       })
       if (!res.ok) {
         const { error } = await res.json().catch(() => ({ error: 'Falha ao excluir' }))
-        alert(error || 'Falha ao excluir')
+        await askAlert('Não deu para excluir', error || 'Falha ao excluir')
         return
       }
       exitSelectMode()
@@ -360,7 +446,7 @@ export function HistoryClient({
       })
       if (!res.ok) {
         const { error } = await res.json().catch(() => ({ error: 'Falha ao mover' }))
-        alert(error || 'Falha ao mover')
+        await askAlert('Não deu para mover', error || 'Falha ao mover')
         return
       }
       setMoveOpen(false)
@@ -375,7 +461,11 @@ export function HistoryClient({
   // parentId presente = cria SUBpasta dentro dela; ausente = pasta de topo.
   const createFolder = async (initialName?: string, parentId?: string | null): Promise<Folder | null> => {
     const isSubfolder = parentId != null
-    const name = (initialName ?? window.prompt(isSubfolder ? 'Nome da subpasta:' : 'Nome da pasta:'))?.trim()
+    const name = (initialName ?? await askPrompt(
+      isSubfolder ? 'Nova subpasta' : 'Nova pasta',
+      isSubfolder ? 'Nome da subpasta' : 'Nome da pasta',
+      'Criar',
+    ))?.trim()
     if (!name) return null
     setBusy(true)
     try {
@@ -387,7 +477,7 @@ export function HistoryClient({
       if (!res.ok) {
         const fallback = isSubfolder ? 'Falha ao criar subpasta' : 'Falha ao criar pasta'
         const { error } = await res.json().catch(() => ({ error: fallback }))
-        alert(error || fallback)
+        await askAlert('Não deu para criar', error || fallback)
         return null
       }
       const { folder } = await res.json()
@@ -406,17 +496,17 @@ export function HistoryClient({
     const directCount   = folderCounts.counts[folderId] ?? 0
     const cascadeCount  = directCount + childIds.reduce((sum, id) => sum + (folderCounts.counts[id] ?? 0), 0)
     const msg = childIds.length > 0
-      ? `Excluir a pasta "${folderName}" e ${childIds.length} subpasta${childIds.length !== 1 ? 's' : ''}? ${cascadeCount} render${cascadeCount !== 1 ? 's' : ''} dentro delas ficará${cascadeCount !== 1 ? 'ão' : ''} sem pasta (não serão apagados).`
+      ? `A pasta e ${childIds.length} subpasta${childIds.length !== 1 ? 's' : ''} somem. ${cascadeCount} render${cascadeCount !== 1 ? 's' : ''} dentro delas ficará${cascadeCount !== 1 ? 'ão' : ''} sem pasta — nenhum é apagado.`
       : directCount > 0
-        ? `Excluir a pasta "${folderName}"? Os ${directCount} render${directCount !== 1 ? 's' : ''} dentro dela ficarão sem pasta (não serão apagados).`
-        : `Excluir a pasta "${folderName}"?`
-    if (!window.confirm(msg)) return
+        ? `Os ${directCount} render${directCount !== 1 ? 's' : ''} dentro dela ficam sem pasta — nenhum é apagado.`
+        : 'A pasta está vazia.'
+    if (!await askConfirm(`Excluir "${folderName}"`, msg, 'Excluir pasta')) return
     setBusy(true)
     try {
       const res = await fetch(`/api/folders/${folderId}`, { method: 'DELETE' })
       if (!res.ok) {
         const { error } = await res.json().catch(() => ({ error: 'Falha ao excluir pasta' }))
-        alert(error || 'Falha ao excluir pasta')
+        await askAlert('Não deu para excluir', error || 'Falha ao excluir pasta')
         return
       }
       if (folderFilter === folderId || childIds.includes(folderFilter)) setFolderFilter('all')
@@ -434,14 +524,16 @@ export function HistoryClient({
       {/* ── Topbar ── */}
       <div style={S.topbar}>
         <span style={S.pageTitle}>HISTÓRICO</span>
-        <div style={S.creditsChip}>
-          <span style={S.creditDot} />
-          <span style={S.creditNum}>{credits}</span>
-          <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>nodes</span>
-        </div>
+        <span className="spn-balance">
+          <span className="spn-balance-dot" aria-hidden />
+          <b>{credits}</b> nodes
+        </span>
       </div>
 
-      <div style={{ ...S.content, paddingBottom: selected.size > 0 ? 120 : 64 }}>
+      {/* A barra de ação do modo seleção é um .spn-dock DENTRO deste scroller
+          (não mais uma ilha fixa no viewport): assim ela nunca cobre a
+          sidebar e o rodapé da página não precisa reservar altura. */}
+      <div style={S.content}>
 
         {/* ── Header ── */}
         <div style={S.header}>
@@ -464,17 +556,17 @@ export function HistoryClient({
               selectMode ? (
                 <>
                   <button
+                    className="spn-ghost"
                     onClick={allVisibleSelected ? clearSelection : selectAllVisible}
-                    style={S.headerGhostBtn}
                   >
                     {allVisibleSelected ? 'Limpar' : 'Selecionar todos'}
                   </button>
-                  <button onClick={exitSelectMode} style={S.headerGhostBtn}>
+                  <button className="spn-ghost" onClick={exitSelectMode}>
                     Cancelar
                   </button>
                 </>
               ) : (
-                <button onClick={enterSelectMode} style={S.headerGhostBtn}>
+                <button className="spn-ghost" onClick={enterSelectMode}>
                   Selecionar
                 </button>
               )
@@ -482,34 +574,23 @@ export function HistoryClient({
           </div>
         </div>
 
-        {/* ── Tabs (Renders / Edições / Vistas / Finalizar / Blocos 3D) ── */}
-        <div style={{
-          display: 'flex', gap: 4, padding: 4,
-          background: 'var(--color-surface)', borderRadius: 10,
-          marginBottom: 16, maxWidth: 680,
-        }}>
-          {(['renders', 'edits', 'vistas', 'finalizar', 'blocos3d'] as HistoryTab[]).map(t => {
-            const active = historyTab === t
-            const label = t === 'renders' ? 'Renders' : t === 'edits' ? 'Edições' : t === 'vistas' ? 'Vistas' : t === 'finalizar' ? 'Finalizar' : 'Blocos 3D'
-            return (
-              <button
-                key={t}
-                onClick={() => setHistoryTab(t)}
-                style={{
-                  flex: 1, padding: '8px 12px', borderRadius: 7,
-                  background: active ? 'var(--color-bg-elevated)' : 'transparent',
-                  color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                  fontSize: 12, fontWeight: 500, letterSpacing: '-0.005em',
-                  cursor: 'pointer',
-                  boxShadow: active ? 'inset 0 0 0 0.5px var(--color-border-strong)' : 'none',
-                  border: 'none',
-                }}
-              >
-                {label}
-              </button>
-            )
-          })}
-        </div>
+        {/* ── Abas ──
+            Fica na superfície porque é o eixo que reconfigura tudo o mais
+            (regra 4 da simplificação): trocar de aba troca a fonte de dados,
+            os filtros e as ações. */}
+        <Segmented
+          className="spn-hist-tabs"
+          label="Tipo de geração"
+          value={historyTab}
+          onChange={setHistoryTab}
+          items={[
+            { value: 'renders',   label: 'Renders' },
+            { value: 'edits',     label: 'Edições' },
+            { value: 'vistas',    label: 'Vistas' },
+            { value: 'finalizar', label: 'Finalizar' },
+            { value: 'blocos3d',  label: 'Blocos 3D' },
+          ] as const}
+        />
 
         {/* ── Tabs alternativas: Edições + Vistas + Finalizar + Blocos 3D ── */}
         {historyTab === 'edits'     && <EditsTabView  authors={authors} onOpenDetail={openDetail} />}
@@ -517,62 +598,58 @@ export function HistoryClient({
         {historyTab === 'finalizar' && <FinalizarTabView />}
         {historyTab === 'blocos3d'  && <Blocos3DTabView />}
 
-        {/* ── Controls (só renderiza na tab Renders) ── */}
+        {/* ── Controles (só na tab Renders) ──
+            Cinco <select> lado a lado viraram TRÊS linhas que mostram o valor
+            já resolvido. A busca fica de fora porque é a ação principal da
+            tela — e porque campo de texto não cabe atrás de uma linha. */}
         {historyTab === 'renders' && folderCounts.total > 0 && (
-          <div style={S.controls}>
-            <div style={S.searchWrap}>
-              <svg style={S.searchIcon} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-                <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
-              </svg>
-              <input
-                type="text"
-                placeholder="Buscar renders…"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                style={S.searchInput}
-              />
-              {search && (
-                <button onClick={() => setSearch('')} style={S.clearBtn}>✕</button>
-              )}
+          <>
+            <div style={S.controls}>
+              <div style={S.searchWrap}>
+                <svg style={S.searchIcon} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                  <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+                </svg>
+                <input
+                  className="spn-input"
+                  type="text"
+                  placeholder="Buscar renders…"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  style={S.searchInput}
+                />
+                {search && (
+                  <button onClick={() => setSearch('')} style={S.clearBtn} aria-label="Limpar busca">✕</button>
+                )}
+              </div>
             </div>
 
-            <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} style={S.select}>
-              <option value="all">Todos os tipos</option>
-              <option value="exterior">Exterior</option>
-              <option value="interior">Interior</option>
-            </select>
-
-            <select value={moduleFilter} onChange={e => setModuleFilter(e.target.value as typeof moduleFilter)} style={S.select}>
-              <option value="all">Todos os módulos</option>
-              <option value="render">Renderizar</option>
-              <option value="upscale">Ampliar</option>
-              <option value="video">Animar</option>
-            </select>
-
-            <select value={engineFilter} onChange={e => setEngineFilter(e.target.value)} style={S.select}>
-              <option value="all">Todas as engines</option>
-              <option value="Vega">Vega</option>
-              <option value="Quasar">Quasar</option>
-              <option value="Pulsar">Pulsar</option>
-            </select>
-
-            {distinctAuthors.length > 1 && (
-              <select value={authorFilter} onChange={e => setAuthorFilter(e.target.value)} style={S.select}>
-                <option value="all">Todos os autores</option>
-                {distinctAuthors.map(uid => (
-                  <option key={uid} value={uid}>
-                    {authors[uid]?.name || authors[uid]?.email || 'Autor não registrado'}
-                    {uid === currentUserId ? ' (você)' : ''}
-                  </option>
-                ))}
-              </select>
-            )}
-
-            <select value={sort} onChange={e => setSort(e.target.value as 'desc' | 'asc')} style={S.select}>
-              <option value="desc">Mais recentes</option>
-              <option value="asc">Mais antigos</option>
-            </select>
-          </div>
+            <SettingGroup className="spn-hist-filters">
+              <SettingRow
+                icon={<RowIcon name="scene" />}
+                title="Conteúdo"
+                value={summarize([
+                  typeFilter   !== 'all' ? labelOf(TYPE_OPTIONS, typeFilter)     : '',
+                  moduleFilter !== 'all' ? labelOf(MODULE_OPTIONS, moduleFilter) : '',
+                ]) || 'Tudo'}
+                onOpen={() => setFilterSheet('conteudo')}
+              />
+              <SettingRow
+                icon={<RowIcon name="output" />}
+                title="Origem"
+                value={summarize([
+                  engineFilter !== 'all' ? engineFilter : '',
+                  authorFilter !== 'all' ? (authorOptions.find(o => o.uid === authorFilter)?.label ?? '') : '',
+                ]) || 'Qualquer engine'}
+                onOpen={() => setFilterSheet('origem')}
+              />
+              <SettingRow
+                icon={<RowIcon name="scale" />}
+                title="Ordem"
+                value={labelOf(SORT_OPTIONS, sort)}
+                onOpen={() => setFilterSheet('ordem')}
+              />
+            </SettingGroup>
+          </>
         )}
 
         {/* ── Folder chips (só na tab Renders) — pastas de topo, contagem agregada
@@ -602,7 +679,7 @@ export function HistoryClient({
                 count={aggregateFolderCount(f.id, folders, folderCounts.counts)}
               />
             ))}
-            <button onClick={() => createFolder()} style={S.chipAdd} disabled={busy}>
+            <button onClick={() => void createFolder()} style={S.chipAdd} disabled={busy}>
               <PlusIcon /> Nova pasta
             </button>
           </div>
@@ -626,7 +703,7 @@ export function HistoryClient({
                 count={folderCounts.counts[sf.id] ?? 0}
               />
             ))}
-            <button onClick={() => createFolder(undefined, expandedParentId)} style={S.chipAdd} disabled={busy}>
+            <button onClick={() => void createFolder(undefined, expandedParentId)} style={S.chipAdd} disabled={busy}>
               <PlusIcon /> Nova subpasta
             </button>
           </div>
@@ -638,8 +715,8 @@ export function HistoryClient({
         ) : historyTab === 'renders' ? (
           <>
             {filtered.length === 0 ? (
-              <div style={{ padding: '48px 0', textAlign: 'center' }}>
-                <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', marginBottom: 10 }}>
+              <div className="spn-empty">
+                <div style={{ marginBottom: 12 }}>
                   {hasMore
                     ? 'Sem resultados nos renders carregados.'
                     : (search
@@ -648,37 +725,44 @@ export function HistoryClient({
                 </div>
                 {!hasMore && (
                   <button
-                    onClick={() => { setSearch(''); setTypeFilter('all'); setFolderFilter('all') }}
-                    style={S.clearFilterBtn}
+                    className="spn-ghost"
+                    onClick={() => {
+                      setSearch(''); setTypeFilter('all'); setFolderFilter('all')
+                      setModuleFilter('all'); setEngineFilter('all'); setAuthorFilter('all')
+                    }}
                   >
                     Limpar filtros
                   </button>
                 )}
               </div>
             ) : (
-              <div style={S.grid}>
-                {filtered.map(r => (
-                  <RenderCard
-                    key={r.id}
-                    render={r}
-                    author={r.user_id ? authors[r.user_id] ?? null : null}
-                    selectMode={selectMode}
-                    selected={selected.has(r.id)}
-                    onToggle={() => toggleOne(r.id)}
-                    onActivateSelect={() => activateSelectWith(r.id)}
-                    onOpenDetail={() => openDetail('render', r.id)}
-                  />
-                ))}
+              /* UMA superfície de vidro por trás da grade inteira, não uma por
+                 cartão: com PAGE_SIZE=60 e "carregar mais" acumulando, a grade
+                 passa de 200 cartões, e 200 backdrop-filter rolando sobre o
+                 papel de parede é filtro reamostrado 200 vezes por frame. O
+                 cartão fica sendo um chip apoiado nessa superfície — que é,
+                 aliás, o que o painel do plugin faz com as linhas dele. */
+              <div className="spn-glass" style={S.gridSurface}>
+                <div style={S.grid}>
+                  {filtered.map(r => (
+                    <RenderCard
+                      key={r.id}
+                      render={r}
+                      author={r.user_id ? authors[r.user_id] ?? null : null}
+                      selectMode={selectMode}
+                      selected={selected.has(r.id)}
+                      onToggle={() => toggleOne(r.id)}
+                      onActivateSelect={() => activateSelectWith(r.id)}
+                      onOpenDetail={() => openDetail('render', r.id)}
+                    />
+                  ))}
+                </div>
               </div>
             )}
 
             {hasMore && (
               <div style={S.loadMoreWrap}>
-                <button
-                  onClick={loadMore}
-                  disabled={loadingMore}
-                  style={S.loadMoreBtn}
-                >
+                <button className="spn-ghost" onClick={loadMore} disabled={loadingMore}>
                   {loadingMore ? 'Carregando…' : 'Carregar mais'}
                 </button>
                 <div style={S.loadMoreCount}>
@@ -689,29 +773,29 @@ export function HistoryClient({
           </>
         ) : null}
 
-      </div>
-
-      {/* ── Action bar (modo seleção) ── */}
-      {selected.size > 0 && (
-        <div style={S.actionBar}>
-          <div style={S.actionBarInner}>
-            <span style={S.actionBarCount}>
-              {selected.size} selecionado{selected.size !== 1 ? 's' : ''}
-            </span>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={handleDownload} disabled={busy} style={S.actionPrimary}>
+        {/* ── Dock do modo seleção ──
+            Colado no rodapé do scroller (o CTA nunca some no scroll) e com a
+            largura da coluna de conteúdo, nunca a do viewport. */}
+        {selected.size > 0 && (
+          <div className="spn-dock spn-glass spn-glass--chrome" style={S.dock}>
+            <div style={S.dockInner}>
+              <span style={S.dockCount}>
+                {selected.size} selecionado{selected.size !== 1 ? 's' : ''}
+              </span>
+              <button className="spn-cta" onClick={handleDownload} disabled={busy} style={S.dockCta}>
                 <DownloadIcon /> Baixar
               </button>
-              <button onClick={() => setMoveOpen(true)} disabled={busy} style={S.actionSecondary}>
+              <button className="spn-ghost" onClick={() => setMoveOpen(true)} disabled={busy} style={S.dockBtn}>
                 <FolderIcon /> Mover
               </button>
-              <button onClick={handleDelete} disabled={busy} style={S.actionDanger}>
+              <button className="spn-ghost" onClick={handleDelete} disabled={busy} style={S.dockDanger}>
                 <TrashIcon /> Excluir
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+
+      </div>
 
       {/* ── Painel "Detalhes da geração" ── */}
       {detail && (
@@ -722,22 +806,172 @@ export function HistoryClient({
         />
       )}
 
-      {/* ── Modal mover para pasta ── */}
-      {moveOpen && (
-        <MoveModal
-          folders={folders}
-          count={selected.size}
-          busy={busy}
-          onClose={() => setMoveOpen(false)}
-          onPick={handleMove}
-          onCreate={async () => {
-            const f = await createFolder()
-            if (f) await handleMove(f.id)
-          }}
-        />
-      )}
+      {/* ── Folha: mover para pasta ── */}
+      <MoveSheet
+        open={moveOpen}
+        folders={folders}
+        count={selected.size}
+        busy={busy}
+        onClose={() => setMoveOpen(false)}
+        onPick={handleMove}
+        onCreate={async () => {
+          // Fecha esta folha ANTES de perguntar o nome: duas folhas abertas ao
+          // mesmo tempo brigam pela trava de rolagem do <body>.
+          setMoveOpen(false)
+          const f = await createFolder()
+          if (f) await handleMove(f.id)
+        }}
+      />
+
+      {/* ── Folhas de filtro ── */}
+      <Sheet open={filterSheet === 'conteudo'} title="Conteúdo" onClose={() => setFilterSheet(null)}>
+        <div className="spn-field">
+          <span className="spn-field-label">Tipo</span>
+          <PillGroup
+            label="Tipo"
+            options={Object.keys(TYPE_OPTIONS)}
+            value={labelOf(TYPE_OPTIONS, typeFilter)}
+            onChange={l => setTypeFilter(TYPE_OPTIONS[l as keyof typeof TYPE_OPTIONS])}
+          />
+        </div>
+        <div className="spn-field">
+          <span className="spn-field-label">Módulo</span>
+          <PillGroup
+            label="Módulo"
+            options={Object.keys(MODULE_OPTIONS)}
+            value={labelOf(MODULE_OPTIONS, moduleFilter)}
+            onChange={l => setModuleFilter(MODULE_OPTIONS[l as keyof typeof MODULE_OPTIONS])}
+          />
+          <p className="spn-hint">Renderizar, Ampliar e Animar moram na mesma lista — o módulo separa.</p>
+        </div>
+      </Sheet>
+
+      <Sheet open={filterSheet === 'origem'} title="Origem" onClose={() => setFilterSheet(null)}>
+        <div className="spn-field">
+          <span className="spn-field-label">Engine</span>
+          <PillGroup
+            label="Engine"
+            options={Object.keys(ENGINE_OPTIONS)}
+            value={labelOf(ENGINE_OPTIONS, engineFilter)}
+            onChange={l => setEngineFilter(ENGINE_OPTIONS[l as keyof typeof ENGINE_OPTIONS])}
+          />
+        </div>
+        {/* Autor só existe quando há mais de um gerando no mesmo projeto. */}
+        {distinctAuthors.length > 1 && (
+          <div className="spn-field">
+            <span className="spn-field-label">Autor</span>
+            <PillGroup
+              label="Autor"
+              options={[ALL_AUTHORS, ...authorOptions.map(o => o.label)]}
+              value={authorFilter === 'all'
+                ? ALL_AUTHORS
+                : (authorOptions.find(o => o.uid === authorFilter)?.label ?? ALL_AUTHORS)}
+              onChange={l => setAuthorFilter(authorOptions.find(o => o.label === l)?.uid ?? 'all')}
+            />
+          </div>
+        )}
+      </Sheet>
+
+      <Sheet open={filterSheet === 'ordem'} title="Ordem" onClose={() => setFilterSheet(null)}>
+        <div className="spn-field">
+          <span className="spn-field-label">Ordenar por data</span>
+          <PillGroup
+            label="Ordem"
+            options={Object.keys(SORT_OPTIONS)}
+            value={labelOf(SORT_OPTIONS, sort)}
+            onChange={l => setSort(SORT_OPTIONS[l as keyof typeof SORT_OPTIONS])}
+          />
+        </div>
+      </Sheet>
+
+      {/* ── Folha: confirmar / perguntar / avisar ── */}
+      <AskSheet spec={askSpec} open={askOpen} onSettle={settleAsk} />
     </div>
   )
+}
+
+// ── AskSheet ───────────────────────────────────────────────────────────────────
+//
+// A folha que substituiu os nove confirm/alert/prompt nativos do arquivo. Um
+// componente só, três feitios — o que muda entre eles é ter campo, ter botão
+// de confirmar e o rótulo do "fechar".
+
+function AskSheet({
+  spec, open, onSettle,
+}: {
+  spec: AskSpec | null
+  open: boolean
+  onSettle: (value: string | boolean | null) => void
+}) {
+  const [text, setText] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    // Intencional: cada abertura reinicia o campo. Sem isto o nome da pasta
+    // anterior reapareceria na próxima pergunta.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (open) setText('')
+  }, [open, spec])
+
+  // O `prompt()` nativo entregava o cursor dentro do campo. `autoFocus` não
+  // repõe isso: a folha manda o foco para ELA 40ms depois de abrir
+  // (components/app/glass/Sheet.tsx:62), e numa segunda pergunta o React
+  // reaproveita o mesmo <input>, então `autoFocus` nem dispara. O campo é
+  // obrigatório (o botão só habilita com ele preenchido), então ele tem de
+  // vir focado — daí o foco explícito, DEPOIS do da folha.
+  useEffect(() => {
+    if (!open || spec?.kind !== 'prompt') return
+    const t = window.setTimeout(() => inputRef.current?.focus(), 90)
+    return () => window.clearTimeout(t)
+  }, [open, spec])
+
+  const cancel = () => onSettle(spec?.kind === 'prompt' ? null : false)
+
+  return (
+    <Sheet
+      open={open}
+      title={spec?.title ?? ''}
+      doneLabel={spec?.kind === 'alert' ? 'Fechar' : 'Cancelar'}
+      onClose={cancel}
+    >
+      {spec && (
+        <>
+          {spec.message && (
+            <p className="spn-hint" style={{ marginTop: 0 }}>{spec.message}</p>
+          )}
+          {spec.kind === 'prompt' && (
+            <input
+              ref={inputRef}
+              className="spn-input"
+              style={{ marginTop: 12 }}
+              value={text}
+              placeholder={spec.placeholder}
+              onChange={e => setText(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && text.trim()) onSettle(text.trim()) }}
+            />
+          )}
+          {spec.kind !== 'alert' && (
+            <button
+              className="spn-cta"
+              style={{ marginTop: 18 }}
+              disabled={spec.kind === 'prompt' && !text.trim()}
+              onClick={() => onSettle(spec.kind === 'prompt' ? text.trim() : true)}
+            >
+              {spec.confirmLabel}
+            </button>
+          )}
+        </>
+      )}
+    </Sheet>
+  )
+}
+
+/** Nome de exibição de um autor no filtro (e "(você)" no próprio). */
+function authorLabel(
+  authors: Record<string, AuthorInfo>, uid: string, currentUserId: string,
+): string {
+  const base = authors[uid]?.name || authors[uid]?.email || 'Autor não registrado'
+  return uid === currentUserId ? `${base} (você)` : base
 }
 
 // ── AuthorChip ─────────────────────────────────────────────────────────────────
@@ -745,21 +979,16 @@ export function HistoryClient({
 // Indicação discreta de autoria na thumb (cenário de equipes: mais de um
 // usuário gerando no mesmo projeto/escritório). Iniciais + tooltip nativo.
 
+// Chip sobre FOTO: o contraste vem do véu escuro, não do borrão — e o borrão
+// custava um backdrop-filter POR CARTÃO (×200 na grade). Fica o véu, sai o
+// filtro. Escuro fixo porque a imagem embaixo não segue o tema — é a mesma
+// razão do .spn-overlay.
 function AuthorChip({ author }: { author: AuthorInfo | null }) {
   const name = author?.name || author?.email || null
   return (
     <span
       title={name ? `Gerado por ${name}` : 'Autor não registrado'}
-      style={{
-        position: 'absolute', bottom: 8, left: 8, zIndex: 2,
-        width: 20, height: 20, borderRadius: '50%',
-        background: 'var(--color-scrim)', backdropFilter: 'blur(4px)',
-        border: '0.5px solid rgba(255,255,255,0.22)',
-        color: 'rgba(255,255,255,0.85)',
-        fontSize: 7.5, fontWeight: 600, letterSpacing: '0.04em',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        userSelect: 'none',
-      }}
+      style={S.authorChip}
     >
       {name ? authorInitials({ name: author!.name, email: author!.email }) : '—'}
     </span>
@@ -832,44 +1061,26 @@ function EditsTabView({
   )
 
   return (
-    <div style={{
-      display: 'grid', gap: 14,
-      gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-    }}>
+    <div style={S.tabGrid}>
       {items!.map(it => (
         <div
           key={it.id}
+          className="spn-card spn-glass"
           role="button"
           tabIndex={0}
           onClick={() => onOpenDetail('edit', it.id)}
           onKeyDown={e => { if (e.key === 'Enter') onOpenDetail('edit', it.id) }}
           title="Ver detalhes da geração"
-          style={{
-            background: 'var(--color-bg-elevated)',
-            border: '0.5px solid var(--color-border)',
-            borderRadius: 12, overflow: 'hidden',
-            color: 'inherit', cursor: 'pointer',
-            display: 'block',
-          }}
+          style={S.tabCard}
         >
-          <div style={{ aspectRatio: '4 / 3', background: 'var(--color-surface)', position: 'relative' }}>
+          <div style={S.tabThumb}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={it.result_image_url} alt={it.prompt}
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <img src={it.result_image_url} alt={it.prompt} style={S.tabImg} />
             <AuthorChip author={it.user_id ? authors[it.user_id] ?? null : null} />
           </div>
-          <div style={{ padding: '10px 12px 12px' }}>
-            <div style={{
-              fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary)',
-              letterSpacing: '-0.005em',
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            }}>
-              {it.prompt}
-            </div>
-            <div style={{
-              fontSize: 10, color: 'var(--color-text-quaternary)',
-              letterSpacing: '0.02em', marginTop: 4,
-            }}>
+          <div className="spn-card-body">
+            <div className="spn-card-title">{it.prompt}</div>
+            <div className="spn-card-meta">
               {it.quality.toUpperCase()} · {new Date(it.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
             </div>
           </div>
@@ -935,54 +1146,29 @@ function VistasTabView({
   )
 
   return (
-    <div style={{
-      display: 'grid', gap: 14,
-      gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-    }}>
+    <div style={S.tabGrid}>
       {items!.map(v => (
         <div
           key={v.id}
+          className="spn-card spn-glass"
           role="button"
           tabIndex={0}
           onClick={() => onOpenDetail('vista', v.id)}
           onKeyDown={e => { if (e.key === 'Enter') onOpenDetail('vista', v.id) }}
           title="Ver detalhes da geração"
-          style={{
-            background: 'var(--color-bg-elevated)',
-            border: '0.5px solid var(--color-border)',
-            borderRadius: 12, overflow: 'hidden',
-            color: 'inherit', cursor: 'pointer',
-            display: 'block', position: 'relative',
-          }}
+          style={S.tabCard}
         >
-          <div style={{ aspectRatio: '4 / 3', background: 'var(--color-surface)', position: 'relative' }}>
+          <div style={S.tabThumb}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={toMediaProxyUrl(v.image_url) ?? undefined} alt={v.axis_label ?? ''}
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <img src={toMediaProxyUrl(v.image_url) ?? undefined} alt={v.axis_label ?? ''} style={S.tabImg} />
             <AuthorChip author={v.user_id ? authors[v.user_id] ?? null : null} />
-            {v.is_edited && (
-              <div style={{
-                position: 'absolute', top: 8, right: 8,
-                padding: '3px 8px', borderRadius: 4,
-                background: 'var(--color-accent-green)', color: '#000',
-                fontSize: 9, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase',
-              }}>
-                editada
-              </div>
-            )}
+            {/* Verde aqui é ESTADO ("foi editada"), não ação — o contrato
+                permite exatamente este uso. */}
+            {v.is_edited && <span style={S.editedBadge}>editada</span>}
           </div>
-          <div style={{ padding: '10px 12px 12px' }}>
-            <div style={{
-              fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary)',
-              letterSpacing: '-0.005em',
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            }}>
-              {v.axis_label ?? 'Vista'}
-            </div>
-            <div style={{
-              fontSize: 10, color: 'var(--color-text-quaternary)',
-              letterSpacing: '0.02em', marginTop: 4,
-            }}>
+          <div className="spn-card-body">
+            <div className="spn-card-title">{v.axis_label ?? 'Vista'}</div>
+            <div className="spn-card-meta">
               {v.quality.toUpperCase()} · {new Date(v.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
             </div>
           </div>
@@ -1038,43 +1224,29 @@ function FinalizarTabView() {
   )
 
   return (
-    <div style={{
-      display: 'grid', gap: 14,
-      gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-    }}>
+    <div style={S.tabGrid}>
       {items!.map(x => {
         const projectName = x.finalize_projects?.name ?? 'Projeto do Finalizar'
         const openProject = () => { if (x.project_id) router.push(`/app/finalizar/${x.project_id}`) }
         return (
           <div
             key={x.id}
+            className="spn-card spn-glass"
             role="button"
             tabIndex={0}
             onClick={openProject}
             onKeyDown={e => { if (e.key === 'Enter') openProject() }}
             title={x.project_id ? 'Abrir o projeto no Finalizar' : 'Exportação avulsa'}
-            style={{
-              background: 'var(--color-bg-elevated)',
-              border: '0.5px solid var(--color-border)',
-              borderRadius: 12, overflow: 'hidden',
-              color: 'inherit', cursor: x.project_id ? 'pointer' : 'default',
-              display: 'block', position: 'relative',
-            }}
+            style={{ ...S.tabCard, cursor: x.project_id ? 'pointer' : 'default' }}
           >
-            <div style={{ aspectRatio: '4 / 3', background: 'var(--color-surface)', position: 'relative' }}>
+            <div style={S.tabThumb}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={toMediaProxyUrl(x.png_url) ?? undefined} alt={projectName}
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <img src={toMediaProxyUrl(x.png_url) ?? undefined} alt={projectName} style={S.tabImg} />
               <button
                 type="button"
                 title="Abrir o arquivo exportado"
                 onClick={e => { e.stopPropagation(); window.open(x.png_url, '_blank', 'noopener') }}
-                style={{
-                  position: 'absolute', top: 8, right: 8,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  width: 26, height: 26, borderRadius: 7, border: 'none',
-                  background: 'var(--color-scrim)', color: '#ffffff', cursor: 'pointer',
-                }}
+                style={S.thumbIconBtn}
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
@@ -1082,18 +1254,9 @@ function FinalizarTabView() {
                 </svg>
               </button>
             </div>
-            <div style={{ padding: '10px 12px 12px' }}>
-              <div style={{
-                fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary)',
-                letterSpacing: '-0.005em',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              }}>
-                {projectName}
-              </div>
-              <div style={{
-                fontSize: 10, color: 'var(--color-text-quaternary)',
-                letterSpacing: '0.02em', marginTop: 4,
-              }}>
+            <div className="spn-card-body">
+              <div className="spn-card-title">{projectName}</div>
+              <div className="spn-card-meta">
                 {x.format.toUpperCase()}
                 {x.width && x.height ? ` · ${x.width}×${x.height}` : ''}
                 {' · '}
@@ -1135,10 +1298,7 @@ function Blocos3DTabView() {
   )
 
   return (
-    <div style={{
-      display: 'grid', gap: 14,
-      gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-    }}>
+    <div style={S.tabGrid}>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       {items!.map(it => {
         const thumb = it.thumbnailUrl ?? it.inputUrl
@@ -1146,22 +1306,15 @@ function Blocos3DTabView() {
         return (
           <Link
             key={it.id}
+            className="spn-card spn-glass"
             href={`/app/blocos-3d?job=${it.id}`}
             title={it.status === 'failed' ? 'Falhou (estornado)' : it.status === 'processing' ? 'Gerando…' : 'Abrir bloco 3D'}
-            style={{
-              background: 'var(--color-bg-elevated)',
-              border: '0.5px solid var(--color-border)',
-              borderRadius: 12, overflow: 'hidden',
-              color: 'inherit', cursor: 'pointer',
-              display: 'block', textDecoration: 'none',
-              opacity: it.status === 'failed' ? 0.55 : 1,
-            }}
+            style={{ ...S.tabCard, textDecoration: 'none', opacity: it.status === 'failed' ? 0.55 : 1 }}
           >
-            <div style={{ aspectRatio: '4 / 3', background: 'var(--color-surface)', position: 'relative' }}>
+            <div style={S.tabThumb}>
               {thumb ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
-                <img src={thumb} alt="Bloco 3D"
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <img src={thumb} alt="Bloco 3D" style={S.tabImg} />
               ) : (
                 <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-quaternary)' }}>
                   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
@@ -1184,29 +1337,15 @@ function Blocos3DTabView() {
                 </div>
               )}
               {/* Selo 3D — diferencia dos cards de imagem das outras abas. */}
-              <span style={{
-                position: 'absolute', top: 8, right: 8,
-                fontSize: 8, fontWeight: 700, letterSpacing: '0.08em',
-                color: 'rgba(255,255,255,0.9)', background: 'var(--color-scrim)',
-                backdropFilter: 'blur(4px)', border: '0.5px solid rgba(255,255,255,0.22)',
-                padding: '2px 6px', borderRadius: 6,
-              }}>
-                3D
-              </span>
+              <span style={S.badge3d}>3D</span>
             </div>
-            <div style={{ padding: '10px 12px 12px' }}>
-              <div style={{
-                fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary)',
-                letterSpacing: '-0.005em',
-              }}>
+            <div className="spn-card-body">
+              <div className="spn-card-title">
                 {engineLabel}
                 {it.status === 'processing' && ' · gerando…'}
                 {it.status === 'failed' && ' · falhou'}
               </div>
-              <div style={{
-                fontSize: 10, color: 'var(--color-text-tertiary)',
-                letterSpacing: '0.02em', marginTop: 4,
-              }}>
+              <div className="spn-card-meta">
                 {it.nodesCost} nodes · {new Date(it.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
               </div>
             </div>
@@ -1218,30 +1357,15 @@ function Blocos3DTabView() {
 }
 
 function TabLoading() {
-  return (
-    <div style={{ padding: 48, textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 12 }}>
-      carregando…
-    </div>
-  )
+  return <div className="spn-empty">carregando…</div>
 }
 
 function TabEmpty({ message, action }: { message: string; action?: { href: string; label: string } }) {
   return (
-    <div style={{
-      padding: '48px 24px', textAlign: 'center',
-      background: 'var(--color-bg-elevated)',
-      border: '0.5px dashed var(--color-border-strong)',
-      borderRadius: 14,
-    }}>
-      <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 12 }}>
-        {message}
-      </div>
+    <div className="spn-empty">
+      <div style={{ marginBottom: action ? 14 : 0 }}>{message}</div>
       {action && (
-        <Link href={action.href} style={{
-          display: 'inline-block', padding: '10px 18px', borderRadius: 10,
-          background: 'var(--color-text-primary)', color: 'var(--color-bg)',
-          fontSize: 13, fontWeight: 500,
-        }}>
+        <Link href={action.href} className="spn-cta" style={S.inlineCta}>
           {action.label}
         </Link>
       )}
@@ -1300,15 +1424,18 @@ function RenderCard({
 
   return (
     <div
+      className="spn-card"
       style={{
         ...S.card,
-        cursor:    'pointer',
+        // Sem translateY no hover: o cartão está apoiado numa superfície de
+        // vidro e subir 3px obrigaria a recompor a pilha inteira a cada
+        // frame. Borda e sombra dizem "levantou" pelo mesmo preço de zero.
+        borderColor: selected || hovered ? 'var(--glass-line-strong)' : 'var(--glass-line)',
         boxShadow: selected
-          ? '0 0 0 2px var(--color-text-primary), var(--shadow-md)'
+          ? '0 0 0 2px var(--color-text-primary), var(--shadow-float)'
           : hovered
-            ? 'var(--shadow-md)'
-            : 'var(--shadow-sm)',
-        transform: hovered && !selectMode ? 'translateY(-3px)' : 'translateY(0)',
+            ? 'var(--shadow-float)'
+            : 'none',
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -1318,15 +1445,13 @@ function RenderCard({
       {/* Image */}
       <div style={S.cardImg}>
         {display && (
-          <img src={display} alt={title} draggable={false}
-            style={{
-              position: 'absolute', inset: 0, width: '100%', height: '100%',
-              objectFit: 'cover', pointerEvents: 'none',
-              filter: selectMode && !selected ? 'brightness(0.78)' : 'none',
-              transition: 'filter 0.15s',
-            }}
-          />
+          <img src={display} alt={title} draggable={false} style={S.cardImgTag} />
         )}
+
+        {/* Apagar as não-selecionadas era `filter: brightness(0.78)` na <img>.
+            Filtro obriga a imagem a virar camada própria e a ser reprocessada;
+            um véu opaco por cima faz o mesmo efeito só compondo. */}
+        {selectMode && !selected && <div style={S.dimVeil} aria-hidden />}
 
         {/* Before thumbnail on hover — não mostrar para vídeo nem em modo seleção.
             Deslocado pra direita pra não sobrepor o checkbox de seleção (hover). */}
@@ -1341,8 +1466,8 @@ function RenderCard({
 
         {/* Ícone de play para cards de vídeo */}
         {isVideo && !selectMode && (
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-            <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--color-scrim)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={S.playWrap}>
+            <div style={S.playDisc}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="white" style={{ marginLeft: 2 }}>
                 <polygon points="5 3 19 12 5 21 5 3"/>
               </svg>
@@ -1385,23 +1510,12 @@ function RenderCard({
 
         {/* Kebab menu — top-right, on hover, not in select mode */}
         {hovered && !selectMode && isCreateSpaceEligible && (
-          <div
-            style={{
-              position: 'absolute', top: 8, right: 8, zIndex: 4,
-            }}
-            onClick={e => e.stopPropagation()}
-          >
+          <div style={S.kebabWrap} onClick={e => e.stopPropagation()}>
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); setMenuOpen(o => !o) }}
               aria-label="Mais ações"
-              style={{
-                width: 28, height: 28, borderRadius: 6,
-                background: 'var(--color-scrim)', backdropFilter: 'blur(8px)',
-                border: '0.5px solid rgba(255,255,255,0.18)',
-                color: '#fff', cursor: 'pointer', padding: 0,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}
+              style={S.kebabBtn}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                 <circle cx="12" cy="5"  r="1.6"/>
@@ -1410,15 +1524,10 @@ function RenderCard({
               </svg>
             </button>
 
+            {/* Popover, não folha: nasce ancorado no botão e some ao sair do
+                hover — não tem estado nem decisão para sustentar uma folha. */}
             {menuOpen && (
-              <div style={{
-                position: 'absolute', top: 32, right: 0,
-                minWidth: 200, padding: 6,
-                background: 'var(--color-bg-elevated)',
-                border: '0.5px solid var(--color-border-strong)',
-                borderRadius: 10,
-                boxShadow: 'var(--shadow-lg)',
-              }}>
+              <div className="spn-glass" style={S.kebabMenu}>
                 <button
                   type="button"
                   onClick={(e) => {
@@ -1426,22 +1535,11 @@ function RenderCard({
                     setMenuOpen(false)
                     router.push(`/app/spaces/new/from-render?render_id=${render.id}`)
                   }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    width: '100%', padding: '8px 10px', borderRadius: 6,
-                    background: 'transparent', border: 'none',
-                    color: 'var(--color-text-primary)', fontSize: 12, textAlign: 'left',
-                    cursor: 'pointer',
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-accent-green-bg)'}
+                  style={S.kebabItem}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-chip-hover)'}
                   onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                 >
-                  <span style={{
-                    width: 22, height: 22, borderRadius: 6,
-                    background: 'var(--color-accent-green-bg)', color: 'var(--color-accent-green)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    flexShrink: 0,
-                  }}>
+                  <span style={S.kebabItemIcon}>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                       <circle cx="12" cy="12" r="3"/>
                       <path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/>
@@ -1497,10 +1595,15 @@ function RenderCard({
 }
 
 // ── Move Modal ─────────────────────────────────────────────────────────────────
+//
+// Era um modal próprio (overlay + caixa + cabeçalho + rodapé, tudo em estilo
+// inline). Virou a folha do kit com as linhas do kit: uma peça a menos no
+// sistema, e o comportamento de Esc/foco/scrim passa a ser o mesmo do resto.
 
-function MoveModal({
-  folders, count, busy, onClose, onPick, onCreate,
+function MoveSheet({
+  open, folders, count, busy, onClose, onPick, onCreate,
 }: {
+  open: boolean
   folders: Folder[]
   count: number
   busy: boolean
@@ -1509,65 +1612,38 @@ function MoveModal({
   onCreate: () => void | Promise<void>
 }) {
   return (
-    <div style={S.modalOverlay} onClick={onClose}>
-      <div style={S.modal} onClick={e => e.stopPropagation()}>
-        <div style={S.modalHeader}>
-          <div>
-            <div style={S.modalTitle}>Mover para pasta</div>
-            <div style={S.modalSub}>
-              {count} render{count !== 1 ? 's' : ''} selecionado{count !== 1 ? 's' : ''}
-            </div>
-          </div>
-          <button onClick={onClose} style={S.modalClose} aria-label="Fechar">✕</button>
-        </div>
+    <Sheet open={open} title="Mover para pasta" onClose={onClose} doneLabel="Cancelar">
+      <p className="spn-hint" style={{ marginTop: 0, marginBottom: 12 }}>
+        {count} render{count !== 1 ? 's' : ''} selecionado{count !== 1 ? 's' : ''}.
+      </p>
 
-        <div style={S.modalBody}>
-          <ul style={S.spaceList}>
-            {/* Pastas de topo com subpastas indentadas logo abaixo — deixa
-                claro em qual cliente/projeto cada subpasta vive. */}
-            {folders.filter(f => !f.parent_id).map(f => (
-              <li key={f.id}>
-                <button
-                  onClick={() => onPick(f.id)}
-                  disabled={busy}
-                  style={S.spaceItem}
-                >
-                  <FolderIcon />
-                  <span style={{ flex: 1, textAlign: 'left' }}>{f.name}</span>
-                </button>
-                {folders.filter(sf => sf.parent_id === f.id).map(sf => (
-                  <button
-                    key={sf.id}
-                    onClick={() => onPick(sf.id)}
-                    disabled={busy}
-                    style={S.spaceItemSub}
-                  >
-                    <FolderIcon />
-                    <span style={{ flex: 1, textAlign: 'left' }}>{sf.name}</span>
-                  </button>
-                ))}
-              </li>
-            ))}
-            <li>
-              <button
-                onClick={() => onCreate()}
-                disabled={busy}
-                style={{ ...S.spaceItem, color: 'var(--color-text-secondary)' }}
-              >
-                <PlusIcon />
-                <span style={{ flex: 1, textAlign: 'left' }}>Nova pasta…</span>
+      <SettingGroup>
+        {/* Pastas de topo com subpastas indentadas logo abaixo — deixa claro
+            em qual cliente/projeto cada subpasta vive. */}
+        {folders.filter(f => !f.parent_id).map(f => (
+          <Fragment key={f.id}>
+            <button className="spn-row" onClick={() => onPick(f.id)} disabled={busy}>
+              <span className="spn-row-ico" aria-hidden><FolderIcon /></span>
+              <span className="spn-row-title">{f.name}</span>
+            </button>
+            {folders.filter(sf => sf.parent_id === f.id).map(sf => (
+              <button key={sf.id} className="spn-row" style={S.rowSub} onClick={() => onPick(sf.id)} disabled={busy}>
+                <span className="spn-row-ico" aria-hidden><FolderIcon /></span>
+                <span className="spn-row-title" style={{ fontWeight: 400 }}>{sf.name}</span>
               </button>
-            </li>
-          </ul>
-        </div>
+            ))}
+          </Fragment>
+        ))}
+        <button className="spn-row" onClick={() => onCreate()} disabled={busy}>
+          <span className="spn-row-ico" aria-hidden><PlusIcon /></span>
+          <span className="spn-row-title" style={{ color: 'var(--color-text-secondary)' }}>Nova pasta…</span>
+        </button>
+      </SettingGroup>
 
-        <div style={S.modalFooter}>
-          <button onClick={() => onPick(null)} disabled={busy} style={S.modalGhostBtn}>
-            Tirar da pasta
-          </button>
-        </div>
-      </div>
-    </div>
+      <button className="spn-ghost" style={S.sheetWideBtn} onClick={() => onPick(null)} disabled={busy}>
+        Tirar da pasta
+      </button>
+    </Sheet>
   )
 }
 
@@ -1575,26 +1651,16 @@ function MoveModal({
 
 function EmptyState() {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 16, padding: '80px 48px' }}>
-      <div style={{ width: 60, height: 60, borderRadius: 16, background: 'var(--color-bg-elevated)', border: '0.5px solid var(--color-border-strong)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="1.4" strokeLinecap="round">
-          <rect x="3" y="3" width="18" height="18" rx="2"/>
-          <circle cx="8.5" cy="8.5" r="1.5"/>
-          <polyline points="21 15 16 10 5 21"/>
-        </svg>
+    <div className="spn-empty" style={{ marginTop: 8 }}>
+      <div style={{ fontSize: 15, fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: 8, letterSpacing: '-0.02em' }}>
+        Nenhum render ainda
       </div>
-      <div style={{ textAlign: 'center', maxWidth: 300 }}>
-        <div style={{ fontSize: 15, fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: 8, letterSpacing: '-0.02em' }}>
-          Nenhum render ainda
-        </div>
-        <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', lineHeight: 1.65 }}>
-          Seus renders aparecem aqui depois de gerados. Crie o primeiro agora.
-        </div>
+      <div style={{ marginBottom: 16 }}>
+        Seus renders aparecem aqui depois de gerados. Crie o primeiro agora.
       </div>
-      <a href="/app/generate"
-        style={{ marginTop: 8, padding: '10px 22px', background: 'var(--color-text-primary)', color: 'var(--color-bg)', borderRadius: 10, fontSize: 13, fontWeight: 500, textDecoration: 'none', letterSpacing: '-0.01em' }}>
+      <Link href="/app/generate" className="spn-cta" style={S.inlineCta}>
         Gerar render
-      </a>
+      </Link>
     </div>
   )
 }
@@ -1638,12 +1704,11 @@ function PlusIcon() {
 // ── Styles ─────────────────────────────────────────────────────────────────────
 
 const S: Record<string, CSSProperties> = {
-  main:          { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--color-bg)' },
-  topbar:        { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 28px', borderBottom: '0.5px solid var(--color-border)', flexShrink: 0 },
+  // O fundo chapado saiu: quem pinta é o <Ambient/> do layout, e sem ele o
+  // vidro dos cartões e das folhas vira cinza.
+  main:          { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
+  topbar:        { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 28px', borderBottom: '0.5px solid var(--glass-line)', flexShrink: 0 },
   pageTitle:     { fontSize: 10, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'var(--color-text-tertiary)', fontWeight: 500 },
-  creditsChip:   { display: 'flex', alignItems: 'center', gap: 6 },
-  creditDot:     { width: 5, height: 5, borderRadius: '50%', background: 'var(--color-accent-green)', boxShadow: '0 0 5px var(--color-accent-green-glow)', display: 'inline-block' },
-  creditNum:     { color: 'var(--color-text-primary)', fontWeight: 500, fontSize: 12 },
 
   content:       { flex: 1, overflowY: 'auto', padding: '36px 36px 64px' },
 
@@ -1651,86 +1716,109 @@ const S: Record<string, CSSProperties> = {
   headerTitle:   { fontSize: 28, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.04em', lineHeight: 1.1, marginBottom: 6 },
   headerSub:     { fontSize: 13, color: 'var(--color-text-tertiary)', letterSpacing: '-0.01em' },
   count:         { fontSize: 11, color: 'var(--color-text-tertiary)', letterSpacing: '-0.01em', paddingBottom: 2 },
-  headerGhostBtn:{ background: 'var(--color-bg-elevated)', border: '0.5px solid var(--color-border-strong)', borderRadius: 8, padding: '7px 13px', fontSize: 12, color: 'var(--color-text-secondary)', cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '-0.01em' },
 
-  controls:      { display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' },
+  // ── Busca ─
+  // O campo é .spn-input; aqui fica só o que a lupa e o ✕ exigem de espaço.
+  controls:      { display: 'flex', gap: 10, margin: '16px 0 12px', flexWrap: 'wrap' },
   searchWrap:    { position: 'relative', display: 'flex', alignItems: 'center', flex: 1, minWidth: 180 },
-  searchIcon:    { position: 'absolute', left: 11, color: 'var(--color-text-tertiary)', pointerEvents: 'none', flexShrink: 0 },
-  searchInput:   { width: '100%', padding: '8px 32px 8px 32px', border: '0.5px solid var(--color-border-strong)', borderRadius: 8, fontSize: 12, color: 'var(--color-text-primary)', background: 'var(--color-bg-elevated)', fontFamily: 'inherit', outline: 'none', letterSpacing: '-0.01em' },
+  searchIcon:    { position: 'absolute', left: 12, color: 'var(--color-text-tertiary)', pointerEvents: 'none', flexShrink: 0 },
+  searchInput:   { paddingLeft: 33, paddingRight: 33 },
   clearBtn:      { position: 'absolute', right: 10, background: 'none', border: 'none', cursor: 'pointer', fontSize: 10, color: 'var(--color-text-tertiary)', padding: 2 },
-  select:        { padding: '8px 12px', border: '0.5px solid var(--color-border-strong)', borderRadius: 8, fontSize: 12, color: 'var(--color-text-secondary)', background: 'var(--color-bg-elevated)', fontFamily: 'inherit', outline: 'none', cursor: 'pointer', letterSpacing: '-0.01em' },
-  clearFilterBtn:{ background: 'none', border: '0.5px solid var(--color-border-strong)', borderRadius: 8, padding: '7px 16px', fontSize: 12, color: 'var(--color-text-secondary)', cursor: 'pointer', fontFamily: 'inherit' },
 
   // ── Carregar mais ─
-  loadMoreWrap:  { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, marginTop: 28, padding: '8px 0 24px' },
-  loadMoreBtn:   { background: 'var(--color-bg-elevated)', border: '0.5px solid var(--color-border-strong)', borderRadius: 10, padding: '10px 24px', fontSize: 12, color: 'var(--color-text-primary)', cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '-0.01em', fontWeight: 500 },
+  loadMoreWrap:  { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, marginTop: 24, padding: '8px 0 8px' },
   loadMoreCount: { fontSize: 10, color: 'var(--color-text-tertiary)', letterSpacing: '0.01em' },
 
-  // ── Folder chips ─
-  chipRow:       { display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 22 },
-  chip:          { display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 4px 4px 12px', borderRadius: 999, background: 'var(--color-bg-elevated)', border: '0.5px solid var(--color-border-strong)', color: 'var(--color-text-secondary)', fontSize: 12, letterSpacing: '-0.01em' },
-  chipActive:    { background: 'var(--color-text-primary)', borderColor: 'var(--color-text-primary)', color: 'var(--color-bg)' },
+  // ── Chips de pasta ─
+  // Mesma receita da .spn-pill (fundo de chip, fio de vidro, ativo invertido);
+  // continua sendo um <div> porque carrega o ✕ dentro da própria pílula.
+  chipRow:       { display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 18, marginBottom: 22 },
+  chip:          { display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 4px 4px 12px', borderRadius: 999, background: 'var(--color-chip)', border: '0.5px solid var(--glass-line)', boxShadow: 'inset 0 0.5px 0 var(--glass-spec)', color: 'var(--color-text-secondary)', fontSize: 12, letterSpacing: '-0.01em' },
+  chipActive:    { background: 'var(--color-chip-active)', borderColor: 'transparent', color: 'var(--color-chip-active-foreground)' },
   // Pasta de topo "aberta" (subpastas visíveis abaixo) sem ser a seleção
   // exata — realce sutil, sem usar verde (reservado pra estados funcionais).
-  chipExpanded:  { borderColor: 'var(--color-text-tertiary)', background: 'var(--color-surface-hover)' },
+  chipExpanded:  { borderColor: 'var(--glass-line-strong)', background: 'var(--color-chip-hover)' },
 
   // ── Fileira de subpastas (dentro da pasta de topo ativa) ─
-  subchipRow:    { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginBottom: 22, paddingLeft: 14, borderLeft: '2px solid var(--color-border)' },
+  subchipRow:    { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginBottom: 22, paddingLeft: 14, borderLeft: '2px solid var(--glass-line)' },
   subchipHint:   { fontSize: 10, color: 'var(--color-text-quaternary)', letterSpacing: '0.02em', marginRight: 2 },
   chipBtn:       { display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: '3px 4px 3px 0', font: 'inherit' },
   chipCount:     { fontSize: 10, opacity: 0.7, fontVariantNumeric: 'tabular-nums' },
   chipDelete:    { width: 18, height: 18, marginLeft: 2, marginRight: 2, padding: 0, borderRadius: '50%', background: 'rgba(0,0,0,0.18)', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  chipAdd:       { display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 999, background: 'transparent', border: '0.5px dashed var(--color-border-strong)', color: 'var(--color-text-tertiary)', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '-0.01em' },
+  chipAdd:       { display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 999, background: 'transparent', border: '0.5px dashed var(--glass-line-strong)', color: 'var(--color-text-tertiary)', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '-0.01em' },
 
+  // ── Grade ─
+  gridSurface:   { borderRadius: 'var(--r-card)', padding: 14 },
   grid:          { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14 },
 
-  card:          { background: 'var(--color-bg-elevated)', border: '0.5px solid var(--color-border-strong)', borderRadius: 12, overflow: 'hidden', transition: 'box-shadow 0.18s, transform 0.18s', userSelect: 'none' },
-  cardImg:       { position: 'relative', aspectRatio: '4/3', background: 'var(--color-surface)', overflow: 'hidden' },
+  // Cartão apoiado na superfície de vidro da grade: chip, não outro vidro.
+  card:          { background: 'var(--color-chip)', border: '0.5px solid var(--glass-line)', cursor: 'pointer', transition: 'box-shadow 180ms var(--ease), border-color 180ms var(--ease)', userSelect: 'none' },
+  cardImg:       { position: 'relative', aspectRatio: '4/3', background: 'var(--color-preview-bg)', overflow: 'hidden' },
+  cardImgTag:    { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' },
+  dimVeil:       { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.30)', pointerEvents: 'none' },
   cardMeta:      { padding: '13px 15px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 },
   metaTitle:     { fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: 3 },
   metaSub:       { fontSize: 10, color: 'var(--color-text-tertiary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '0.01em' },
   metaDate:      { fontSize: 10, color: 'var(--color-text-tertiary)', whiteSpace: 'nowrap' },
   metaNodes:     { fontSize: 9, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-quaternary)', whiteSpace: 'nowrap' },
 
-  badgeRow:      { position: 'absolute', top: 10, right: 10, display: 'flex', gap: 5 },
-  badge:         { fontSize: 9, letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 500, padding: '3px 7px', borderRadius: 5, background: 'var(--color-scrim)', color: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)' },
+  // ── Selos e chips SOBRE a imagem ─
+  // Todos perderam o backdrop-filter inline (eram 4 por cartão, ×200 cartões).
+  // Sobre foto quem dá contraste é o véu escuro; o borrão era enfeite caro. E
+  // escuro fixo, porque a imagem embaixo não segue o tema (regra do .spn-overlay).
+  badgeRow:      { position: 'absolute', top: 10, right: 10, display: 'flex', gap: 5, zIndex: 2 },
+  badge:         { fontSize: 9, letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 500, padding: '3px 7px', borderRadius: 5, background: 'var(--color-scrim)', color: 'rgba(255,255,255,0.88)' },
+  badge3d:       { position: 'absolute', top: 8, right: 8, fontSize: 8, fontWeight: 700, letterSpacing: '0.08em', color: 'rgba(255,255,255,0.9)', background: 'var(--color-scrim)', border: '0.5px solid rgba(255,255,255,0.22)', padding: '2px 6px', borderRadius: 6 },
+  editedBadge:   { position: 'absolute', top: 8, right: 8, padding: '3px 8px', borderRadius: 5, background: 'var(--color-accent-green)', color: '#000', fontSize: 9, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' },
+  authorChip:    { position: 'absolute', bottom: 8, left: 8, zIndex: 2, width: 20, height: 20, borderRadius: '50%', background: 'var(--color-scrim)', border: '0.5px solid rgba(255,255,255,0.22)', color: 'rgba(255,255,255,0.85)', fontSize: 7.5, fontWeight: 600, letterSpacing: '0.04em', display: 'flex', alignItems: 'center', justifyContent: 'center', userSelect: 'none' },
+  thumbIconBtn:  { position: 'absolute', top: 8, right: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26, borderRadius: 7, border: 'none', background: 'var(--color-scrim)', color: '#ffffff', cursor: 'pointer' },
 
-  checkbox:      { position: 'absolute', top: 10, left: 10, width: 22, height: 22, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.85)', background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' },
+  checkbox:      { position: 'absolute', top: 10, left: 10, zIndex: 3, width: 22, height: 22, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.85)', background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' },
   checkboxOn:    { background: 'var(--color-text-primary)', borderColor: 'var(--color-text-primary)', color: 'var(--color-bg)' },
   // Mesma posição/tamanho do checkbox de seleção — aparece só no hover, fora
   // do modo seleção, como atalho pra entrar em seleção (ver RenderCard).
-  hoverCheckbox: { position: 'absolute', top: 10, left: 10, zIndex: 3, width: 22, height: 22, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.85)', background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(4px)', cursor: 'pointer', padding: 0, boxShadow: '0 1px 3px rgba(0,0,0,0.3)' },
+  hoverCheckbox: { position: 'absolute', top: 10, left: 10, zIndex: 3, width: 22, height: 22, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.85)', background: 'rgba(0,0,0,0.45)', cursor: 'pointer', padding: 0, boxShadow: '0 1px 3px rgba(0,0,0,0.3)' },
 
-  hoverActions:  { position: 'absolute', bottom: 10, right: 10, display: 'flex', gap: 6 },
+  playWrap:      { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' },
+  playDisc:      { width: 36, height: 36, borderRadius: '50%', background: 'var(--color-scrim)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+
+  // ── Kebab ─
+  kebabWrap:     { position: 'absolute', top: 8, right: 8, zIndex: 4 },
+  kebabBtn:      { width: 28, height: 28, borderRadius: 6, background: 'var(--color-scrim)', border: '0.5px solid rgba(255,255,255,0.18)', color: '#fff', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  kebabMenu:     { position: 'absolute', top: 32, right: 0, minWidth: 200, padding: 6, borderRadius: 'var(--r-inner)', boxShadow: 'var(--shadow-float)' },
+  kebabItem:     { display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 10px', borderRadius: 8, background: 'transparent', border: 'none', color: 'var(--color-text-primary)', fontSize: 12, textAlign: 'left', cursor: 'pointer', font: 'inherit' },
+  // Neutro: "Criar Space" é AÇÃO, e verde é estado (regra 3 do contrato).
+  kebabItemIcon: { width: 22, height: 22, borderRadius: 6, background: 'var(--color-chip)', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+
+  hoverActions:  { position: 'absolute', bottom: 10, right: 10, display: 'flex', gap: 6, zIndex: 3 },
   actionBtn:     { display: 'inline-flex', alignItems: 'center', padding: '5px 13px', background: 'rgba(255,255,255,0.92)', border: 'none', borderRadius: 7, fontSize: 11, color: '#0a0a0a', fontWeight: 500, textDecoration: 'none', fontFamily: 'inherit', letterSpacing: '-0.01em', cursor: 'pointer' },
-  actionBtnGhost:{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 11px', background: 'var(--color-scrim)', border: '0.5px solid rgba(255,255,255,0.25)', borderRadius: 7, fontSize: 10, color: '#fafafa', textDecoration: 'none', backdropFilter: 'blur(4px)', fontFamily: 'inherit' },
+  actionBtnGhost:{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 11px', background: 'var(--color-scrim)', border: '0.5px solid rgba(255,255,255,0.25)', borderRadius: 7, fontSize: 10, color: '#fafafa', textDecoration: 'none', fontFamily: 'inherit' },
 
   // left:40 (não 10) pra não sobrepor o checkbox de hover, que ocupa o
   // mesmo canto superior esquerdo.
-  beforeThumb:   { position: 'absolute', top: 10, left: 40, width: 72, height: 54, borderRadius: 6, overflow: 'hidden', border: '1.5px solid rgba(255,255,255,0.6)', boxShadow: '0 2px 8px rgba(0,0,0,0.4)' },
+  beforeThumb:   { position: 'absolute', top: 10, left: 40, width: 72, height: 54, borderRadius: 6, overflow: 'hidden', border: '1.5px solid rgba(255,255,255,0.6)', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', zIndex: 3 },
   beforeLabel:   { position: 'absolute', bottom: 3, left: 0, right: 0, textAlign: 'center', fontSize: 8, color: '#fff', fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', textShadow: '0 1px 2px rgba(0,0,0,0.8)' },
 
-  // ── Action bar (modo seleção) ─
-  actionBar:     { position: 'fixed', bottom: 18, left: 0, right: 0, display: 'flex', justifyContent: 'center', pointerEvents: 'none', zIndex: 50 },
-  actionBarInner:{ display: 'flex', alignItems: 'center', gap: 16, padding: '10px 14px', background: 'var(--color-bg-elevated)', border: '0.5px solid var(--color-border-strong)', borderRadius: 12, boxShadow: 'var(--shadow-lg)', pointerEvents: 'auto', backdropFilter: 'blur(12px)' },
-  actionBarCount:{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.01em', paddingLeft: 4 },
-  actionPrimary: { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'var(--color-text-primary)', color: 'var(--color-bg)', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '-0.01em' },
-  actionSecondary:{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'var(--color-bg)', color: 'var(--color-text-primary)', border: '0.5px solid var(--color-border-strong)', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '-0.01em' },
-  actionDanger:  { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'var(--color-bg)', color: 'var(--color-error)', border: '0.5px solid var(--color-error-border)', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '-0.01em' },
+  // ── Dock do modo seleção ─
+  // As margens negativas sangram o dock até as bordas da coluna de conteúdo
+  // (que tem 36px de padding), pra ele ler como rodapé e não como cartão.
+  dock:          { marginInline: -36, marginTop: 24, borderColor: 'var(--glass-line)' },
+  dockInner:     { display: 'flex', alignItems: 'center', gap: 10, maxWidth: 1100, margin: '0 auto' },
+  dockCount:     { fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.01em', marginRight: 'auto' },
+  dockCta:       { width: 'auto', minHeight: 36, padding: '0 16px', borderRadius: 999, gap: 6 },
+  dockBtn:       { display: 'inline-flex', alignItems: 'center', gap: 6, borderRadius: 999 },
+  dockDanger:    { display: 'inline-flex', alignItems: 'center', gap: 6, borderRadius: 999, color: 'var(--color-error)' },
 
-  // ── Modal ─
-  modalOverlay:  { position: 'fixed', inset: 0, background: 'var(--color-scrim)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 24, backdropFilter: 'blur(2px)' },
-  modal:         { width: '100%', maxWidth: 440, maxHeight: '80vh', background: 'var(--color-bg-elevated)', border: '0.5px solid var(--color-border-strong)', borderRadius: 14, display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: 'var(--shadow-xl)' },
-  modalHeader:   { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '18px 20px 14px', borderBottom: '0.5px solid var(--color-border)' },
-  modalTitle:    { fontSize: 15, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.02em', marginBottom: 3 },
-  modalSub:      { fontSize: 11, color: 'var(--color-text-tertiary)', letterSpacing: '-0.01em' },
-  modalClose:    { background: 'none', border: 'none', color: 'var(--color-text-tertiary)', fontSize: 14, cursor: 'pointer', padding: 4, lineHeight: 1 },
-  modalBody:     { flex: 1, overflowY: 'auto', padding: '8px 12px' },
-  modalFooter:   { padding: '12px 20px', borderTop: '0.5px solid var(--color-border)' },
-  modalGhostBtn: { width: '100%', background: 'none', border: '0.5px dashed var(--color-border-strong)', borderRadius: 8, padding: '9px 12px', fontSize: 12, color: 'var(--color-text-secondary)', cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '-0.01em' },
+  // ── Abas alternativas (Edições / Vistas / Finalizar / Blocos 3D) ─
+  // Aqui o cartão PODE ser vidro: as quatro abas carregam no máximo 50-60
+  // itens e não têm "carregar mais".
+  tabGrid:       { display: 'grid', gap: 14, gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' },
+  tabCard:       { color: 'inherit', cursor: 'pointer', display: 'block', position: 'relative' },
+  tabThumb:      { position: 'relative', aspectRatio: '4 / 3', background: 'var(--color-preview-bg)', overflow: 'hidden' },
+  tabImg:        { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },
 
-  spaceList:     { listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 2 },
-  spaceItem:     { width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'none', border: 'none', borderRadius: 8, fontSize: 13, color: 'var(--color-text-primary)', cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '-0.01em', textAlign: 'left' },
-  // Subpasta dentro da lista de mover — indentada, cor mais suave.
-  spaceItemSub:  { width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px 8px 30px', background: 'none', border: 'none', borderRadius: 8, fontSize: 12, color: 'var(--color-text-secondary)', cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '-0.01em', textAlign: 'left' },
+  // ── Folhas ─
+  rowSub:        { paddingLeft: 34 },
+  sheetWideBtn:  { width: '100%', marginTop: 14 },
+  inlineCta:     { width: 'auto', display: 'inline-flex', textDecoration: 'none', padding: '0 20px', minHeight: 38 },
 }

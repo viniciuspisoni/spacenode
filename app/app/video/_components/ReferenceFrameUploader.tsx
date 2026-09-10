@@ -41,12 +41,7 @@ export default function ReferenceFrameUploader({
   return (
     <div>
       {label && (
-        <div style={{
-          fontSize: 10, fontWeight: 600, letterSpacing: '0.1em',
-          textTransform: 'uppercase' as const,
-          color: 'var(--color-text-tertiary)',
-          marginBottom: 8,
-        }}>
+        <div className="spn-field-label">
           {label}
         </div>
       )}
@@ -63,12 +58,10 @@ export default function ReferenceFrameUploader({
           if (f) loadFile(f)
         }}
         style={{
-          border: `1.5px dashed ${
-            isDragging      ? 'var(--color-border-focus)' :
-            preview         ? 'var(--color-border-strong)' :
-                              'var(--color-border)'
+          border: `1px dashed ${
+            isDragging ? 'var(--color-border-focus)' : 'var(--glass-line-strong)'
           }`,
-          borderRadius:   10,
+          borderRadius:   'var(--r-inner)',
           overflow:       'hidden',
           padding:        preview ? 0 : (compact ? '18px 12px' : '24px 16px'),
           display:        'flex',
@@ -76,8 +69,8 @@ export default function ReferenceFrameUploader({
           alignItems:     'center',
           justifyContent: 'center',
           cursor:         disabled ? 'default' : 'pointer',
-          background:     isDragging ? 'var(--color-surface)' : 'transparent',
-          transition:     'border-color 0.15s, background 0.15s',
+          background:     isDragging ? 'var(--color-chip)' : 'transparent',
+          transition:     'border-color 180ms var(--ease), background 180ms var(--ease)',
           minHeight:      preview ? 0 : baseMinHeight,
         }}
       >
@@ -126,13 +119,9 @@ export default function ReferenceFrameUploader({
           {onClear && (
             <button
               type="button"
+              className="spn-pill"
               onClick={e => { e.stopPropagation(); onClear() }}
-              style={{
-                fontSize: 10,
-                color:    'var(--color-text-tertiary)',
-                background: 'none', border: 'none',
-                cursor:   'pointer', padding: 0,
-              }}
+              style={{ padding: '4px 11px', fontSize: 11 }}
             >
               Trocar imagem
             </button>

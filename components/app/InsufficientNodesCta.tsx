@@ -30,11 +30,9 @@ export default function InsufficientNodesCta({ needed, available, alternative }:
   const progress = needed > 0 ? Math.min(100, (available / needed) * 100) : 0
 
   return (
-    <div style={{
+    <div className="spn-glass" style={{
       display: 'flex', flexDirection: 'column', gap: 12,
-      padding: 16, borderRadius: 12,
-      background: 'var(--color-surface)',
-      border: '0.5px solid var(--color-border-strong)',
+      padding: 16, borderRadius: 'var(--r-card)',
     }}>
       <div>
         <div style={{
@@ -48,28 +46,22 @@ export default function InsufficientNodesCta({ needed, available, alternative }:
         </div>
       </div>
 
-      <div style={{ height: 4, borderRadius: 999, background: 'var(--color-chip)', overflow: 'hidden' }}>
+      <div style={{ height: 4, borderRadius: 999, background: 'var(--glass-line-strong)', overflow: 'hidden' }}>
         <div style={{
           height: '100%', width: `${progress}%`,
           background: 'var(--color-text-quaternary)',
-          transition: 'width 0.4s ease',
+          transition: 'width 400ms var(--ease)',
         }} />
       </div>
 
-      <Link
-        href="/app/billing"
-        style={{
-          width: '100%', padding: '14px 17px', borderRadius: 12,
-          background: 'var(--color-inverse)', color: 'var(--color-inverse-foreground)',
-          fontSize: 13, fontWeight: 650, textDecoration: 'none',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          boxShadow: 'var(--shadow-md)',
-        }}
-      >
+      {/* O CTA do sistema. O preço vai no .spn-cta-meta — era um span com
+          --color-text-tertiary sobre o fundo inverso, ou seja, cinza claro
+          sobre claro no tema claro. */}
+      <Link href="/app/billing" className="spn-cta" style={{ textDecoration: 'none', justifyContent: 'space-between' }}>
         <span>ver planos</span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+        <span className="spn-cta-meta" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span>a partir de R$ {cheapest.monthlyPrice}/mês</span>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-inverse-foreground)" strokeWidth="1.5">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
             <path d="M5 12h14M13 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </span>

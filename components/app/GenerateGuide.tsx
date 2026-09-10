@@ -11,6 +11,11 @@
 // /app/generate#guia ou pelo "Como usar" da sidebar (evento GUIDE_START_EVENT,
 // mesmo padrão do tour). Depois da primeira render a contagem passa a ser > 0
 // e o guia deixa de se oferecer — não há coluna nova nem migration.
+//
+// O botão "Ir para Gerar render" (com rolagem programática e pulso no CTA)
+// saiu na reforma de vidro: ele existia porque o CTA nascia abaixo da dobra de
+// uma coluna com 9 grupos empilhados. Agora o CTA mora num .spn-dock colado no
+// rodapé do painel e nunca sai da tela — apontar pra ele virou redundância.
 
 export const GUIDE_START_EVENT = 'spn:guide:start'
 export const GUIDE_DISMISSED_KEY = 'spn:generate-guide:dismissed'
@@ -42,20 +47,17 @@ function CheckGlyph() {
 export default function GenerateGuide({
   phase,
   fromSpacesNew,
-  onLocateGenerate,
   onDismiss,
 }: {
   phase: GuidePhase
-  /** true = veio do fluxo Novo Space sem renders — o desfecho aponta o cartão verde de retorno. */
+  /** true = veio do fluxo Novo Space sem renders — o desfecho aponta o cartão de retorno. */
   fromSpacesNew: boolean
-  /** Rola a coluna de controles até o botão Gerar e chama atenção pra ele. */
-  onLocateGenerate: () => void
   onDismiss: () => void
 }) {
   const active = ACTIVE_STEP[phase]
 
   return (
-    <section className="spn-guide" role="region" aria-label="Guia da primeira imagem">
+    <section className="spn-guide spn-glass" role="region" aria-label="Guia da primeira imagem">
       <div className="spn-guide-head">
         <ol className="spn-guide-steps">
           {STEPS.map((step, i) => {
@@ -102,19 +104,11 @@ export default function GenerateGuide({
         )}
 
         {phase === 'configure' && (
-          <>
-            <p className="spn-guide-tip">
-              Referência no lugar. À esquerda, confira espaço e iluminação — os
-              padrões já funcionam bem. O botão fica no fim do painel:
-            </p>
-            <button type="button" className="spn-guide-goto" onClick={onLocateGenerate}>
-              Ir para Gerar render
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <polyline points="19 12 12 19 5 12" />
-              </svg>
-            </button>
-          </>
+          <p className="spn-guide-tip">
+            Referência no lugar. À esquerda, as quatro linhas já vêm decididas —
+            abra alguma só se quiser mudar. O botão <strong>Gerar render</strong> fica
+            fixo no rodapé do painel, sempre à vista.
+          </p>
         )}
 
         {phase === 'generating' && (
@@ -128,7 +122,7 @@ export default function GenerateGuide({
           <p className="spn-guide-tip">
             <strong>Primeira imagem pronta.</strong>{' '}
             {fromSpacesNew
-              ? 'Arraste o divisor para comparar antes e depois. Para continuar seu Space com esta render, siga pelo cartão verde abaixo da imagem.'
+              ? 'Arraste o divisor para comparar antes e depois. Para continuar seu Space com esta render, siga pelo cartão de projeto abaixo da imagem.'
               : 'Arraste o divisor para comparar antes e depois. Daqui você pode baixar, gerar variações ou criar um Space a partir desta render.'}
           </p>
         )}

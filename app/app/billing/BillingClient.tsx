@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { ANNUAL_BILLING_ENABLED, SELLABLE_PLANS, type PaidPlanId, type BillingCycle } from '@/lib/plans'
 import { getPlanDisplayName } from '@/lib/plan-display'
 import { EXTRA_NODE_PACKS, type ExtraPackSize } from '@/lib/extra-nodes'
+import { RowIcon, Segmented, SettingGroup, SettingRow, Sheet, summarize } from '@/components/app/glass'
 import {
   isLaunchOfferOpen,
   launchOfferPrice,
@@ -76,6 +77,9 @@ export function BillingClient({ plan, balance, extras, pooled, offerEligible, no
   const [billing, setBilling] = useState<BillingCycle>('monthly')
   const [loading, setLoading] = useState<string | null>(null)
   const [error,   setError]   = useState<string | null>(null)
+  // Os packs já comprados são consulta, não decisão: viram uma linha que
+  // mostra o total e abrem a folha com o extrato de cada um.
+  const [extractOpen, setExtractOpen] = useState(false)
 
   const handlePlan = async (id: PaidPlanId) => {
     setLoading(`plan-${id}`); setError(null)
@@ -104,24 +108,27 @@ export function BillingClient({ plan, balance, extras, pooled, offerEligible, no
   const showOffer = Boolean(offerEligible) && billing === 'monthly' && isLaunchOfferOpen()
 
   return (
+    // Sem fundo chapado: é o <Ambient/> do shell que pinta atrás, e é ele que
+    // dá ao vidro algo para refratar.
     <div style={{
-      flex: 1, height: '100%', overflowY: 'auto', background: 'var(--color-bg)',
+      flex: 1, height: '100%', overflowY: 'auto',
       fontFamily: "'Geist', system-ui, sans-serif", letterSpacing: '-0.011em',
     }}>
       <div style={{ maxWidth: 960, margin: '0 auto', padding: '64px 32px 96px' }}>
 
         {/* ── 0. Retorno do checkout ─────────────────────────────────────── */}
         {notice && (
-          <div style={{
-            display: 'flex', alignItems: 'flex-start', gap: 10,
-            background: notice.kind === 'ok'
-              ? 'var(--color-accent-green-bg)'
-              : 'var(--color-bg-elevated)',
-            border: `0.5px solid ${notice.kind === 'ok'
-              ? 'var(--color-accent-green-border)'
-              : 'var(--color-border)'}`,
-            borderRadius: 12, padding: '14px 18px', marginBottom: 24,
-          }}>
+          <div
+            className={notice.kind === 'ok' ? undefined : 'spn-glass'}
+            style={{
+              display: 'flex', alignItems: 'flex-start', gap: 10,
+              // Verde é ESTADO: "pago" é um estado, não uma ação — por isso
+              // continua verde. "Processando" não é estado de sucesso: vidro.
+              background: notice.kind === 'ok' ? 'var(--color-accent-green-bg)' : undefined,
+              border: notice.kind === 'ok' ? '0.5px solid var(--color-accent-green-border)' : undefined,
+              borderRadius: 'var(--r-card)', padding: '14px 18px', marginBottom: 24,
+            }}
+          >
             <span style={{
               fontSize: 10, fontWeight: 600, letterSpacing: '0.18em',
               textTransform: 'uppercase', whiteSpace: 'nowrap', paddingTop: 2,
@@ -143,15 +150,31 @@ export function BillingClient({ plan, balance, extras, pooled, offerEligible, no
         {/* ── 1. Saldo atual ─────────────────────────────────────────────── */}
         <Section>
           <SectionLabel>saldo</SectionLabel>
-          <div style={{
-            background: 'var(--color-bg-elevated)', borderRadius: 16, padding: '28px 32px',
-            border: '0.5px solid var(--color-border)', boxShadow: 'var(--shadow-sm)',
+          <div className="spn-glass" style={{
+            borderRadius: 'var(--r-card)', padding: '28px 32px',
             display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 28,
           }}>
             <BalanceItem label="Nodes mensais" value={balance.plan}  detail={`${getPlanDisplayName(plan)} · renovam com o plano`} />
             <BalanceItem label="Nodes extras"  value={balance.extra} detail={balance.extra > 0 ? `${extras.length} pack${extras.length === 1 ? '' : 's'} · sem validade` : 'sem validade'} />
             <BalanceItem label="Total disponível" value={balance.total} detail="nodes" green />
           </div>
+
+          {/* Extrato dos packs: uma linha em vez de uma tabela sempre aberta. */}
+          {extras.length > 0 && (
+            <SettingGroup>
+              <SettingRow
+                icon={<RowIcon name="scale" />}
+                title="Meus packs"
+                value={summarize([
+                  `${extras.length} pack${extras.length === 1 ? '' : 's'}`,
+                  `${balance.extra.toLocaleString('pt-BR')} nodes restantes`,
+                ])}
+                onOpen={() => setExtractOpen(true)}
+                controls="billing-extrato"
+              />
+            </SettingGroup>
+          )}
+
           {pooled && (
             <p style={{
               fontSize: 12.5, color: 'var(--color-text-tertiary)',
@@ -166,8 +189,17 @@ export function BillingClient({ plan, balance, extras, pooled, offerEligible, no
         {/* ── 2. Plano ───────────────────────────────────────────────────── */}
         <Section>
           <SectionLabel>plano</SectionLabel>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 18, alignItems: 'center', flexWrap: 'wrap' }}>
-            {ANNUAL_BILLING_ENABLED && <BillingToggle billing={billing} setBilling={setBilling} />}
+          <div style={{ display: 'flex', gap: 12, marginBottom: 18, alignItems: 'center', flexWrap: 'wrap' }}>
+            {/* Mensal/anual reconfigura todo preço abaixo: é o eixo da tela e
+                fica na superfície, como segmentado. */}
+            {ANNUAL_BILLING_ENABLED && (
+              <Segmented
+                label="Ciclo de cobrança"
+                value={billing}
+                onChange={setBilling}
+                items={[{ value: 'monthly', label: 'Mensal' }, { value: 'annual', label: 'Anual' }]}
+              />
+            )}
             <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
               Plano atual: <strong style={{ color: 'var(--color-text-primary)' }}>{getPlanDisplayName(plan)}{isLegacyPlan && ' · plano legado'}</strong>
             </span>
@@ -191,7 +223,7 @@ export function BillingClient({ plan, balance, extras, pooled, offerEligible, no
               display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
               background: 'var(--color-accent-green-bg)',
               border: '0.5px solid var(--color-accent-green-border)',
-              borderRadius: 12, padding: '14px 18px', marginBottom: 14,
+              borderRadius: 'var(--r-card)', padding: '14px 18px', marginBottom: 14,
             }}>
               <span style={{
                 fontSize: 10, fontWeight: 600, letterSpacing: '0.18em',
@@ -208,10 +240,8 @@ export function BillingClient({ plan, balance, extras, pooled, offerEligible, no
             </div>
           )}
           {isLegacyPlan && (
-            <div style={{
-              background: 'var(--color-bg-elevated)',
-              border: '0.5px solid var(--color-border)',
-              borderRadius: 12, padding: '14px 18px', marginBottom: 14,
+            <div className="spn-glass" style={{
+              borderRadius: 'var(--r-card)', padding: '14px 18px', marginBottom: 14,
               fontSize: 12.5, color: 'var(--color-text-secondary)',
               lineHeight: 1.6, letterSpacing: '-0.005em',
             }}>
@@ -229,13 +259,13 @@ export function BillingClient({ plan, balance, extras, pooled, offerEligible, no
               const current = p.id === plan
               const price = billing === 'annual' ? p.annualMonthlyPrice : p.monthlyPrice
               return (
-                <div key={p.id} style={{
-                  background: 'var(--color-bg-elevated)', borderRadius: 12, padding: '20px 18px',
-                  border: `0.5px solid ${current ? 'var(--color-accent-green)' : 'var(--color-border)'}`,
+                <div key={p.id} className="spn-glass" style={{
+                  borderRadius: 'var(--r-card)', padding: '20px 18px',
+                  // Verde marca o plano ATUAL — estado, nunca ação.
+                  borderColor: current ? 'var(--color-accent-green)' : undefined,
                   display: 'flex', flexDirection: 'column',
-                  boxShadow: 'var(--shadow-sm)',
                 }}>
-                  <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--color-text-tertiary)', marginBottom: 12 }}>
+                  <div className="spn-field-label">
                     {p.name}{current && <span style={{ color: 'var(--color-accent-green)', marginLeft: 6 }}>· atual</span>}
                   </div>
                   <div style={{ fontSize: 28, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.04em', marginBottom: 2, fontVariantNumeric: 'tabular-nums' }}>
@@ -268,21 +298,26 @@ export function BillingClient({ plan, balance, extras, pooled, offerEligible, no
                   <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.5, flex: 1, margin: '8px 0 16px' }}>
                     {p.description}
                   </p>
-                  <button
-                    onClick={() => handlePlan(p.id)}
-                    disabled={loading !== null || current}
-                    style={{
-                      width: '100%', padding: '10px 14px', borderRadius: 8,
-                      fontFamily: 'inherit', fontSize: 12, fontWeight: 500,
-                      cursor: current ? 'default' : (loading ? 'wait' : 'pointer'),
-                      border: 'none',
-                      background: current ? 'var(--color-accent-green-bg)' : 'var(--color-inverse)',
-                      color:      current ? 'var(--color-accent-green)'    : 'var(--color-inverse-foreground)',
-                      opacity:    loading && loading !== `plan-${p.id}` ? 0.5 : 1,
-                    }}
-                  >
-                    {current ? 'plano atual' : (loading === `plan-${p.id}` ? 'redirecionando...' : `assinar ${p.name.toLowerCase()}`)}
-                  </button>
+                  {current ? (
+                    // Plano atual não é botão: é um estado. Um botão morto é
+                    // uma promessa de ação que não existe.
+                    <div style={{
+                      textAlign: 'center', padding: '11px 14px', borderRadius: 'var(--r-inner)',
+                      fontSize: 12, fontWeight: 500,
+                      background: 'var(--color-accent-green-bg)', color: 'var(--color-accent-green)',
+                    }}>
+                      plano atual
+                    </div>
+                  ) : (
+                    <button
+                      className="spn-cta"
+                      onClick={() => handlePlan(p.id)}
+                      disabled={loading !== null}
+                      style={{ opacity: loading && loading !== `plan-${p.id}` ? 0.5 : undefined }}
+                    >
+                      {loading === `plan-${p.id}` ? 'redirecionando…' : `assinar ${p.name.toLowerCase()}`}
+                    </button>
+                  )}
                 </div>
               )
             })}
@@ -293,17 +328,12 @@ export function BillingClient({ plan, balance, extras, pooled, offerEligible, no
         <Section>
           <SectionLabel>nodes extras · avulsos, sem validade</SectionLabel>
           {isExtraBlocked ? (
-            <div style={{
-              background: 'var(--color-bg-elevated)', borderRadius: 12, padding: '28px 32px',
-              border: '0.5px solid var(--color-border)', boxShadow: 'var(--shadow-sm)',
-              textAlign: 'center',
-            }}>
-              <p style={{ fontSize: 14, color: 'var(--color-text-primary)', marginBottom: 8, fontWeight: 500 }}>
+            <div className="spn-empty">
+              <strong style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>
                 Nodes extras disponíveis para assinantes.
-              </p>
-              <p style={{ fontSize: 12, color: 'var(--color-text-tertiary)', lineHeight: 1.6 }}>
-                Assine qualquer plano para comprar nodes avulsos que não expiram.
-              </p>
+              </strong>
+              <br />
+              Assine qualquer plano para comprar nodes avulsos que não expiram.
             </div>
           ) : (
             <>
@@ -316,14 +346,11 @@ export function BillingClient({ plan, balance, extras, pooled, offerEligible, no
                 gap: 12,
               }}>
                 {EXTRA_NODE_PACKS.map(pack => (
-                  <div key={pack.id} style={{
-                    background: 'var(--color-bg-elevated)', borderRadius: 12, padding: '18px 18px',
-                    border: '0.5px solid var(--color-border)', boxShadow: 'var(--shadow-sm)',
+                  <div key={pack.id} className="spn-glass" style={{
+                    borderRadius: 'var(--r-card)', padding: 18,
                     display: 'flex', flexDirection: 'column',
                   }}>
-                    <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--color-text-tertiary)', marginBottom: 8 }}>
-                      {pack.name}
-                    </div>
+                    <div className="spn-field-label">{pack.name}</div>
                     <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.04em', marginBottom: 2, fontVariantNumeric: 'tabular-nums' }}>
                       {pack.nodes.toLocaleString('pt-BR')}
                       <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginLeft: 4, fontWeight: 400 }}>nodes</span>
@@ -334,18 +361,18 @@ export function BillingClient({ plan, balance, extras, pooled, offerEligible, no
                     <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginBottom: 14 }}>
                       Sem validade · R$ {pack.pricePerNode.toFixed(3)}/node
                     </div>
+                    {/* Secundário ao plano: o avulso é a saída de quem já
+                        assina, não a decisão principal desta tela. */}
                     <button
+                      className="spn-ghost"
                       onClick={() => handleExtra(pack.id)}
                       disabled={loading !== null}
                       style={{
-                        marginTop: 'auto', padding: '10px 14px', borderRadius: 8,
-                        fontFamily: 'inherit', fontSize: 12, fontWeight: 500,
-                        cursor: loading ? 'wait' : 'pointer', border: '0.5px solid var(--color-border)',
-                        background: 'var(--color-surface)', color: 'var(--color-text-primary)',
-                        opacity: loading && loading !== `extra-${pack.id}` ? 0.5 : 1,
+                        marginTop: 'auto', width: '100%',
+                        opacity: loading && loading !== `extra-${pack.id}` ? 0.5 : undefined,
                       }}
                     >
-                      {loading === `extra-${pack.id}` ? 'redirecionando...' : 'comprar'}
+                      {loading === `extra-${pack.id}` ? 'redirecionando…' : 'comprar'}
                     </button>
                   </div>
                 ))}
@@ -354,70 +381,54 @@ export function BillingClient({ plan, balance, extras, pooled, offerEligible, no
           )}
         </Section>
 
-        {/* ── 4. Meus Nodes extras ───────────────────────────────────────── */}
-        {extras.length > 0 && (
-          <Section>
-            <SectionLabel>meus nodes extras</SectionLabel>
-            <div style={{
-              background: 'var(--color-bg-elevated)', borderRadius: 12,
-              border: '0.5px solid var(--color-border)', boxShadow: 'var(--shadow-sm)',
-              overflow: 'hidden',
-            }}>
-              {extras.map((p, i) => {
-                const expiring = hasExpiry(p.expires_at)
-                const days = expiring ? daysUntil(p.expires_at) : 0
-                const pct  = p.nodes_initial > 0 ? (p.nodes_remaining / p.nodes_initial) * 100 : 0
-                return (
-                  <div key={p.id} style={{
-                    padding: '16px 22px',
-                    borderTop: i === 0 ? 'none' : '0.5px solid var(--color-border)',
-                    display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, alignItems: 'center',
-                  }}>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>
-                        Pack {p.pack_size.toLocaleString('pt-BR')}
-                      </div>
-                      <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
-                        Comprado em {new Date(p.purchased_at).toLocaleDateString('pt-BR')}
-                      </div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' }}>
-                        {p.nodes_remaining.toLocaleString('pt-BR')}
-                        <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginLeft: 4, fontWeight: 400 }}>
-                          / {p.nodes_initial.toLocaleString('pt-BR')}
-                        </span>
-                      </div>
-                      <div style={{ height: 2, background: 'var(--color-surface-hover)', borderRadius: 2, marginTop: 4, overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${pct}%`, background: 'var(--color-accent-green)', borderRadius: 2 }} />
-                      </div>
-                    </div>
-                    <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'right' }}>
-                      {expiring
-                        ? <>Expira em <strong style={{ color: days <= 7 ? 'var(--color-error)' : 'var(--color-text-primary)' }}>{days} dia{days === 1 ? '' : 's'}</strong></>
-                        : 'Sem validade'}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </Section>
-        )}
-
-        {error && (
-          <div style={{
-            marginTop: 16, padding: '10px 14px', borderRadius: 8,
-            background: 'var(--color-error-bg)', border: '0.5px solid var(--color-error-border)',
-            color: 'var(--color-error)', fontSize: 12,
-          }}>
-            {error}
-          </div>
-        )}
+        {error && <div className="spn-error" style={{ marginTop: 16 }}>{error}</div>}
 
         <p style={{ marginTop: 32, textAlign: 'center', fontSize: 11, color: 'var(--color-text-quaternary)', lineHeight: 1.7 }}>
           Cobranças seguras pelo Stripe. Cancele quando quiser.
         </p>
       </div>
+
+      {/* ── Extrato dos packs ─────────────────────────────────────────────── */}
+      <Sheet open={extractOpen} title="Meus packs de nodes" onClose={() => setExtractOpen(false)}>
+        <div className="spn-group spn-glass" id="billing-extrato">
+          {extras.map((p) => {
+            const expiring = hasExpiry(p.expires_at)
+            const days = expiring ? daysUntil(p.expires_at) : 0
+            const pct  = p.nodes_initial > 0 ? (p.nodes_remaining / p.nodes_initial) * 100 : 0
+            return (
+              <div key={p.id} style={{ padding: '14px 16px', borderBottom: '0.5px solid var(--glass-line)' }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>
+                    Pack {p.pack_size.toLocaleString('pt-BR')}
+                  </span>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+                    {p.nodes_remaining.toLocaleString('pt-BR')}
+                    <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginLeft: 4, fontWeight: 400 }}>
+                      / {p.nodes_initial.toLocaleString('pt-BR')}
+                    </span>
+                  </span>
+                </div>
+                <div style={{ height: 2, background: 'var(--glass-line-strong)', borderRadius: 2, margin: '8px 0 6px', overflow: 'hidden' }}>
+                  {/* Verde = quanto ainda existe. Estado, não ação. */}
+                  <div style={{ height: '100%', width: `${pct}%`, background: 'var(--color-accent-green)', borderRadius: 2 }} />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+                  <span>Comprado em {new Date(p.purchased_at).toLocaleDateString('pt-BR')}</span>
+                  <span>
+                    {expiring
+                      ? <>Expira em <strong style={{ color: days <= 7 ? 'var(--color-error)' : 'var(--color-text-primary)' }}>{days} dia{days === 1 ? '' : 's'}</strong></>
+                      : 'Sem validade'}
+                  </span>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        <p className="spn-hint">
+          Os packs são consumidos na ordem em que foram comprados, e só depois
+          que os nodes mensais do plano acabam.
+        </p>
+      </Sheet>
     </div>
   )
 }
@@ -425,18 +436,11 @@ export function BillingClient({ plan, balance, extras, pooled, offerEligible, no
 // ── Helpers de UI ────────────────────────────────────────────────────────────
 
 function Section({ children }: { children: React.ReactNode }) {
-  return <section style={{ marginBottom: 40 }}>{children}</section>
+  return <section style={{ marginBottom: 40, display: 'grid', gap: 12 }}>{children}</section>
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{
-      fontSize: 10, fontWeight: 600, letterSpacing: '0.18em',
-      textTransform: 'uppercase', color: 'var(--color-text-tertiary)', marginBottom: 14,
-    }}>
-      {children}
-    </div>
-  )
+  return <div className="spn-field-label" style={{ marginBottom: 0 }}>{children}</div>
 }
 
 function BalanceItem({ label, value, detail, green = false }: {
@@ -454,33 +458,6 @@ function BalanceItem({ label, value, detail, green = false }: {
         {value.toLocaleString('pt-BR')}
       </div>
       <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 2 }}>{detail}</div>
-    </div>
-  )
-}
-
-function BillingToggle({ billing, setBilling }: {
-  billing: BillingCycle; setBilling: (b: BillingCycle) => void
-}) {
-  return (
-    <div style={{
-      display: 'inline-flex', alignItems: 'center', background: 'var(--color-bg-elevated)',
-      border: '0.5px solid var(--color-border)', borderRadius: 32, padding: 3,
-    }}>
-      {(['monthly', 'annual'] as const).map(b => (
-        <button
-          key={b}
-          onClick={() => setBilling(b)}
-          style={{
-            fontFamily: 'inherit', fontSize: 11, fontWeight: 500, letterSpacing: '-0.005em',
-            color: billing === b ? 'var(--color-chip-active-foreground)' : 'var(--color-text-tertiary)',
-            background: billing === b ? 'var(--color-chip-active)' : 'transparent',
-            border: 'none', borderRadius: 28, padding: '6px 14px',
-            cursor: 'pointer', transition: 'all 0.18s', whiteSpace: 'nowrap' as const,
-          }}
-        >
-          {b === 'monthly' ? 'Mensal' : 'Anual'}
-        </button>
-      ))}
     </div>
   )
 }

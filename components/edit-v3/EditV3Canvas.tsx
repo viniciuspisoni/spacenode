@@ -634,15 +634,19 @@ export const EditV3Canvas = forwardRef<EditV3CanvasHandle, Props>(
     const cursorStyle = active === 'pan' || tool === 'auto' ? 'grab' : isStrokeTool ? 'none' : 'crosshair'
     const polyReady = (polyRef.current?.points.length ?? 0) >= 3
 
+    // Sólido de propósito. O `backdropFilter` inline que estava aqui era
+    // proibido duas vezes: estilo inline não é alcançado pelos fallbacks de
+    // acessibilidade do vidro, e vidro não vai POR CIMA de canvas que repinta
+    // em rAF (o borrão seria refeito a cada frame do pincel). Estes dois
+    // botões flutuam sobre o canvas — então é superfície opaca, com hairline.
     const floatBtn: React.CSSProperties = {
-      padding: '5px 11px',
-      borderRadius: 8,
+      padding: '6px 12px',
+      borderRadius: 'var(--r-inner)',
       fontSize: 12,
       fontWeight: 500,
-      border: '0.5px solid var(--color-border-strong)',
-      background: 'rgba(20,20,20,0.72)',
+      border: '0.5px solid var(--glass-line-strong)',
+      background: 'var(--color-bg-elevated)',
       color: 'var(--color-text-primary)',
-      backdropFilter: 'blur(8px)',
       cursor: 'pointer',
     }
 
@@ -653,9 +657,9 @@ export const EditV3Canvas = forwardRef<EditV3CanvasHandle, Props>(
           position: 'relative',
           flex: 1,
           minHeight: 420,
-          borderRadius: 12,
+          borderRadius: 'var(--r-inner)',
           overflow: 'hidden',
-          border: '0.5px solid var(--color-border)',
+          border: '0.5px solid var(--glass-line)',
           background: '#0a0a0a',
         }}
       >

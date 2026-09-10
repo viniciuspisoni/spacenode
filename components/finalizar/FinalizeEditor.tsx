@@ -35,6 +35,8 @@ import {
 } from './CanvasViewport'
 import { TopBar, StatusStrip, type SaveStatus } from './TopBar'
 import { ToolRail, type EditorTool } from './ToolRail'
+import { ConfirmSheet } from './ui'
+import { useAmbient } from '@/components/app/glass'
 import { ExportDialog, type ExportOptions } from './ExportDialog'
 import { FinalizeImportModal } from './FinalizeImportModal'
 import { AdjustPanel, type QuickFix } from './panels/AdjustPanel'
@@ -104,8 +106,18 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
   // ── UI ─────────────────────────────────────────────────────────────────────
   const [tool, setTool] = useState<EditorTool>('adjust')
   const [panelsOpen, setPanelsOpen] = useState(true)
+  const [leaving, setLeaving] = useState(false)
+  // A largura do painel vive em DUAS camadas de propósito. Em repouso é
+  // state (é ela que o React renderiza e que vai para o localStorage). Durante
+  // o arrasto, quem manda é a custom property --fin-panel-w escrita direto no
+  // <aside> dentro de um rAF: o painel é vidro, e um setState por pointermove
+  // faria o React re-renderizar a árvore inteira do editor — CanvasViewport
+  // com os dois canvases incluído — a cada pixel arrastado, e o navegador
+  // recompor o backdrop-filter junto. Com a var, o arrasto é uma mudança de
+  // layout e nada mais; o state só recebe o valor final no pointerup.
   const [panelWidth, setPanelWidth] = useState(312)
   const panelWidthRef = useRef(panelWidth)
+  const asideRef = useRef<HTMLElement | null>(null)
   useEffect(() => { panelWidthRef.current = panelWidth }, [panelWidth])
   useEffect(() => {
     try {
@@ -905,6 +917,14 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (modalOpenRef.current) return
+      // Qualquer <Sheet> aberta também suspende os atalhos. As folhas de
+      // confirmar/nomear que substituíram os window.confirm/prompt vivem em
+      // state LOCAL de cada painel, então o modalOpenRef não as enxerga — e
+      // sem este guarda o Tab dentro da folha viraria "recolher painéis" (com
+      // preventDefault, o foco nem anda) e as teclas 1..7 trocariam de
+      // ferramenta, desmontando no meio da pergunta o painel dono da folha.
+      // A <Sheet> marca o body enquanto está aberta (components/app/glass/Sheet.tsx).
+      if (document.body.dataset.sheetOpen) return
       const el = e.target as HTMLElement | null
       const tag = el?.tagName
       // Sliders (range) mantêm foco após o arrasto — atalhos continuam valendo;
@@ -959,7 +979,7 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
   }, [undo, redo])
 
   const goBack = useCallback(() => {
-    if (dirtyRef.current && !window.confirm('Sair sem salvar? As alterações não salvas serão perdidas.')) return
+    if (dirtyRef.current) { setLeaving(true); return }
     router.push('/app/finalizar')
   }, [router])
 
@@ -977,13 +997,18 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tool])
 
+  // O papel de parede é a imagem que está sendo finalizada: é ela que o vidro
+  // do painel refrata, como no painel v1 do plugin. Fica ANTES do return do
+  // estado vazio porque hook não pode ficar atrás de condicional.
+  useAmbient(doc?.baseUrl ?? null)
+
   // ═══════════════════════════════════════════════════════════════════════════
   // Estado VAZIO — galeria + escolher base
   // ═══════════════════════════════════════════════════════════════════════════
 
   if (!doc) {
     return (
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', background: 'var(--color-bg)' }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 24px' }}>
           <h1 style={{ fontSize: 24, fontWeight: 600, letterSpacing: '-0.02em' }}>Finalizar</h1>
           <p style={{ fontSize: 14, color: 'var(--color-text-secondary)', marginTop: 8, maxWidth: 620, lineHeight: 1.55 }}>
@@ -992,27 +1017,27 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
             navegador e sem custo de Nodes.
           </p>
 
-          <button type="button" className="spn-action spn-action--primary" onClick={() => setImportPurpose('base')} style={{ width: 'auto', marginTop: 22, padding: '12px 20px' }}>
+          <button type="button" className="spn-cta" onClick={() => setImportPurpose('base')} style={{ width: 'auto', marginTop: 22 }}>
             Escolher imagem
           </button>
-          {error && <div style={{ marginTop: 14, fontSize: 13, color: 'var(--color-error)' }}>{error}</div>}
+          {error && <div className="spn-error" style={{ marginTop: 14 }}>{error}</div>}
 
           {savedProjects.length > 0 && (
             <div style={{ marginTop: 40 }}>
-              <div style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-text-tertiary)', marginBottom: 14 }}>Projetos salvos</div>
+              <div className="spn-field-label">Projetos salvos</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
                 {savedProjects.map((p) => (
-                  <button key={p.id} type="button" onClick={() => router.push(`/app/finalizar/${p.id}`)}
-                    style={{ textAlign: 'left', padding: 0, borderRadius: 14, overflow: 'hidden', border: '0.5px solid var(--color-border)', background: 'var(--color-bg-elevated)', cursor: 'pointer' }}>
-                    <div style={{ aspectRatio: '4 / 3', background: 'var(--color-surface)' }}>
+                  <button key={p.id} type="button" className="spn-card spn-glass" onClick={() => router.push(`/app/finalizar/${p.id}`)}
+                    style={{ textAlign: 'left', padding: 0, cursor: 'pointer' }}>
+                    <div style={{ aspectRatio: '4 / 3', background: 'var(--color-preview-bg)' }}>
                       {p.thumbnail_url
                         // eslint-disable-next-line @next/next/no-img-element
                         ? <img src={p.thumbnail_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                         : <div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', color: 'var(--color-text-quaternary)', fontSize: 12 }}>sem prévia</div>}
                     </div>
-                    <div style={{ padding: '11px 13px' }}>
-                      <div style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
-                      <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 3 }}>{new Date(p.updated_at).toLocaleDateString('pt-BR')}</div>
+                    <div className="spn-card-body">
+                      <div className="spn-card-title">{p.name}</div>
+                      <div className="spn-card-meta">{new Date(p.updated_at).toLocaleDateString('pt-BR')}</div>
                     </div>
                   </button>
                 ))}
@@ -1058,7 +1083,7 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
   const croppedH = Math.round((crop?.h ?? 1) * doc.height)
 
   return (
-    <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', background: 'var(--color-bg)' }}>
+    <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
       <TopBar
         name={name}
         onName={(n) => { setName(n); markDirty() }}
@@ -1118,20 +1143,31 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
             className="spn-panel-resizer"
             onPointerDown={(e) => {
               const startX = e.clientX
-              const startW = panelWidth
+              const startW = panelWidthRef.current
               const el = e.currentTarget
               el.setPointerCapture(e.pointerId)
               el.dataset.dragging = '1'
+              let next = startW
+              let raf = 0
+              // Uma escrita por quadro, direto na custom property: o React
+              // fica fora do arrasto inteiro (ver o comentário em panelWidth).
+              const paint = () => {
+                raf = 0
+                asideRef.current?.style.setProperty('--fin-panel-w', `${next}px`)
+              }
               const move = (ev: PointerEvent) => {
-                const w = Math.max(264, Math.min(480, startW + (startX - ev.clientX)))
-                setPanelWidth(w)
+                next = Math.max(264, Math.min(480, startW + (startX - ev.clientX)))
+                if (!raf) raf = requestAnimationFrame(paint)
               }
               const up = () => {
+                if (raf) cancelAnimationFrame(raf)
                 delete el.dataset.dragging
                 el.removeEventListener('pointermove', move)
                 el.removeEventListener('pointerup', up)
+                // Só aqui o valor entra no React — uma re-render por arrasto.
+                setPanelWidth(next)
                 try {
-                  window.localStorage.setItem(PANEL_WIDTH_KEY, String(panelWidthRef.current))
+                  window.localStorage.setItem(PANEL_WIDTH_KEY, String(next))
                 } catch { /* sem storage */ }
               }
               el.addEventListener('pointermove', move)
@@ -1141,13 +1177,15 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
           />
         )}
         {panelsOpen && (
-          <aside style={{
-            width: panelWidth, flexShrink: 0, display: 'flex', flexDirection: 'column',
-            borderLeft: '0.5px solid var(--color-border)', background: 'var(--color-bg)',
-            minHeight: 0,
+          <aside ref={asideRef} className="spn-glass spn-glass--chrome" style={{
+            // A largura sai da var; o state só a semeia e a persiste.
+            ['--fin-panel-w' as string]: `${panelWidth}px`,
+            width: 'var(--fin-panel-w)',
+            flexShrink: 0, display: 'flex', flexDirection: 'column',
+            borderWidth: '0 0 0 0.5px', minHeight: 0,
           }}>
             <div style={{
-              padding: '11px 14px', borderBottom: '0.5px solid var(--color-border)',
+              padding: '11px 14px', borderBottom: '0.5px solid var(--glass-line)',
               fontSize: 12.5, fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--color-text-primary)',
               flexShrink: 0,
             }}>
@@ -1256,6 +1294,14 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
         imageHeight={croppedH}
         canSaveToProject={projectId !== null}
         onExport={onExport}
+      />
+      <ConfirmSheet
+        open={leaving}
+        title="Sair sem salvar?"
+        message="As alterações desta sessão não foram salvas no projeto. Sair agora as descarta."
+        confirmLabel="Sair sem salvar"
+        onConfirm={() => router.push('/app/finalizar')}
+        onClose={() => setLeaving(false)}
       />
       <FinalizeImportModal
         open={importPurpose !== null}

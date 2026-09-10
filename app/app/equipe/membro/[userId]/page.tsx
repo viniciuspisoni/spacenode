@@ -79,7 +79,7 @@ export default async function MembroPage({
   const base = `/app/equipe/membro/${userId}`
 
   return (
-    <main style={{ flex: 1, overflowY: 'auto', background: 'var(--color-bg)', padding: '40px 48px 80px' }}>
+    <main style={{ flex: 1, overflowY: 'auto', padding: '40px 48px 80px' }}>
       <div style={{ maxWidth: 1040, margin: '0 auto' }}>
 
         {/* Breadcrumb */}
@@ -101,28 +101,25 @@ export default async function MembroPage({
 
         {/* Filtro por projeto */}
         {projects.length > 0 && (
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 22 }}>
+          <nav aria-label="Filtrar por projeto"
+               style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 22 }}>
             <Chip href={base} active={!project} label="Todos os projetos" />
             {projects.map((p) => (
               <Chip key={p.id} href={`${base}?project=${p.id}`} active={project === p.id} label={p.name} />
             ))}
-          </div>
+          </nav>
         )}
 
         {/* Grade de gerações */}
         {gens.length === 0 ? (
-          <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)', padding: '40px 0' }}>
+          <div className="spn-empty">
             Nenhuma geração encontrada{project ? ' para este projeto' : ''}.
-          </p>
+          </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 14 }}>
             {gens.map((g) => (
-              <div key={g.generation_id} style={{
-                background: 'var(--color-bg-elevated)',
-                border: '0.5px solid var(--color-border)',
-                borderRadius: 12, overflow: 'hidden',
-              }}>
-                <div style={{ position: 'relative', aspectRatio: '1 / 1', background: 'var(--color-surface)' }}>
+              <div key={g.generation_id} className="spn-card spn-glass">
+                <div style={{ position: 'relative', aspectRatio: '1 / 1', background: 'var(--color-preview-bg)' }}>
                   {g.url
                     ? <img src={g.url} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                     : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: 'var(--color-text-tertiary)' }}>sem imagem</div>}
@@ -158,16 +155,19 @@ export default async function MembroPage({
   )
 }
 
+/** Filtro por projeto. Duas decisões:
+ *
+ *  - O verde de seleção saiu: verde é estado, e escolher um filtro é ação —
+ *    a pílula ligada usa o chip ativo do sistema.
+ *  - O estado é `aria-current="page"`, não `aria-checked`/`role="radio"`.
+ *    Cada pílula é um <Link> para uma URL diferente da MESMA página; pôr
+ *    `role="radio"` sobrescrevia o papel de link (o leitor de tela deixava
+ *    de anunciar que aquilo navega) e ainda declarava rádios sem radiogroup
+ *    em volta. Quem dá o nome do conjunto agora é o <nav> acima. */
 function Chip({ href, active, label }: { href: string; active: boolean; label: string }) {
   return (
-    <Link href={href} style={{
-      padding: '6px 12px', borderRadius: 999, fontSize: 12, textDecoration: 'none',
-      whiteSpace: 'nowrap',
-      background: active ? 'var(--color-accent-green)' : 'var(--color-surface)',
-      color: active ? '#06140d' : 'var(--color-text-secondary)',
-      border: active ? 'none' : '0.5px solid var(--color-border-strong)',
-      fontWeight: active ? 600 : 400,
-    }}>
+    <Link href={href} className="spn-pill" aria-current={active ? 'page' : undefined}
+          style={{ textDecoration: 'none', display: 'inline-block' }}>
       {label}
     </Link>
   )

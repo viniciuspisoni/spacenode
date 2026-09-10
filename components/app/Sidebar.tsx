@@ -130,21 +130,23 @@ export default function Sidebar({
 
   return (
     <aside
+      className="spn-glass spn-glass--chrome"
       style={{
         width: expanded ? SIDEBAR_EXPANDED : SIDEBAR_COLLAPSED,
         transition: 'width 0.5s cubic-bezier(0.4,0,0.2,1), box-shadow 0.45s ease',
-        background: 'linear-gradient(180deg, var(--color-bg-elevated) 0%, var(--color-sidebar) 100%)',
+        // Sem cor de fundo própria: quem pinta é .spn-glass. O degradê opaco
+        // antigo cortava o papel de parede na vertical inteira — a sidebar
+        // deixava de fazer parte da mesma superfície do resto do app.
         display: 'flex',
         flexDirection: 'column',
         flexShrink: 0,
         overflow: 'hidden',
-        border: '0.5px solid var(--color-border)',
-        borderRadius: 18,
+        borderRadius: 'var(--r-card)',
         height: 'calc(100vh - 12px)',
         margin: 6,
         position: 'sticky',
         top: 6,
-        boxShadow: 'var(--shadow-md)',
+        boxShadow: 'var(--shadow-float), inset 0 0.5px 0 var(--glass-spec)',
         zIndex: 20,
       }}
       onMouseEnter={() => setHovered(true)}

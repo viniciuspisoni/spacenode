@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toMediaProxyUrl } from '@/lib/storage/media-url'
 import type { EditSourceType, Edit, Vista } from '@/lib/spaces/types'
+import { Sheet, Segmented } from '@/components/app/glass'
 
 type Tab = 'renders' | 'vistas' | 'edits'
 
@@ -61,127 +62,64 @@ export function RetocarImportModal({ onClose, onPick, title }: Props) {
   }, [])
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 80,
-        background: 'rgba(10,10,10,0.78)', backdropFilter: 'blur(8px)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: 24,
-      }}
-    >
-      <div
-        onClick={e => e.stopPropagation()}
-        style={{
-          width: '100%', maxWidth: 920, maxHeight: '88vh',
-          background: 'var(--color-bg-elevated)',
-          border: '0.5px solid var(--color-border-strong)',
-          borderRadius: 14, overflow: 'hidden',
-          display: 'flex', flexDirection: 'column',
-        }}
-      >
-        <header style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '16px 20px', borderBottom: '0.5px solid var(--color-border)',
-        }}>
-          <h2 style={{
-            fontSize: 15, fontWeight: 500, color: 'var(--color-text-primary)',
-            letterSpacing: '-0.015em',
-          }}>
-            {title ?? 'Importar do histórico'}
-          </h2>
-          <button onClick={onClose} style={{
-            width: 30, height: 30, borderRadius: 6, background: 'transparent',
-            border: '0.5px solid var(--color-border-strong)', color: 'var(--color-text-secondary)',
-            cursor: 'pointer',
-          }}>×</button>
-        </header>
-
-        <div style={{ padding: '12px 20px', borderBottom: '0.5px solid var(--color-border)' }}>
-          <div style={{
-            display: 'flex', gap: 4, padding: 4,
-            background: 'var(--color-surface)', borderRadius: 10,
-          }}>
-            <TabBtn active={tab==='renders'} onClick={() => setTab('renders')}>
-              Renders {renders ? `(${renders.length})` : ''}
-            </TabBtn>
-            <TabBtn active={tab==='vistas'}  onClick={() => setTab('vistas')}>
-              Vistas {vistas ? `(${vistas.length})` : ''}
-            </TabBtn>
-            <TabBtn active={tab==='edits'}   onClick={() => setTab('edits')}>
-              Edições {edits ? `(${edits.length})` : ''}
-            </TabBtn>
-          </div>
-        </div>
-
-        <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
-          {loading && (
-            <div style={{ textAlign: 'center', padding: 40, color: 'var(--color-text-tertiary)', fontSize: 12 }}>
-              carregando…
-            </div>
-          )}
-
-          {!loading && tab === 'renders' && (
-            <GalleryGrid
-              items={(renders ?? []).map(r => ({
-                id:    r.id,
-                url:   r.output_url ?? '',
-                label: r.ambient || r.style || 'Render',
-                date:  r.created_at,
-              }))}
-              empty="Sem renders concluídas ainda."
-              onPick={(item) => onPick({ url: item.url, type: 'render', id: item.id })}
-            />
-          )}
-
-          {!loading && tab === 'vistas' && (
-            <GalleryGrid
-              items={(vistas ?? []).filter(v => v.image_url).map(v => ({
-                id:    v.id,
-                url:   v.image_url!,
-                label: v.axis_label ?? 'Vista',
-                date:  v.created_at,
-              }))}
-              empty="Sem vistas geradas em projetos ainda."
-              onPick={(item) => onPick({ url: item.url, type: 'vista', id: item.id })}
-            />
-          )}
-
-          {!loading && tab === 'edits' && (
-            <GalleryGrid
-              items={(edits ?? []).map(e => ({
-                id:    e.id,
-                url:   e.result_image_url,
-                label: e.prompt.slice(0, 40) || 'Edição',
-                date:  e.created_at,
-              }))}
-              empty="Sem edições anteriores ainda."
-              onPick={(item) => onPick({ url: item.url, type: 'edit', id: item.id })}
-            />
-          )}
-        </div>
+    <Sheet open title={title ?? 'Importar do histórico'} onClose={onClose} doneLabel="Fechar">
+      {/* A contagem entra no rótulo do segmentado: é o polegar que mede a
+          largura de cada célula, então rótulos de tamanhos diferentes são o
+          caso normal, não uma exceção a evitar. */}
+      <div className="spn-field">
+        <Segmented
+          label="Origem da imagem"
+          value={tab}
+          onChange={setTab}
+          items={[
+            { value: 'renders', label: renders ? `Renders (${renders.length})` : 'Renders' },
+            { value: 'vistas',  label: vistas  ? `Vistas (${vistas.length})`   : 'Vistas' },
+            { value: 'edits',   label: edits   ? `Edições (${edits.length})`   : 'Edições' },
+          ]}
+        />
       </div>
-    </div>
-  )
-}
 
-function TabBtn({ active, onClick, children }: {
-  active: boolean; onClick: () => void; children: React.ReactNode
-}) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        flex: 1, padding: '7px 12px', borderRadius: 7,
-        background: active ? 'var(--color-bg-elevated)' : 'transparent',
-        color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-        fontSize: 12, fontWeight: 500, letterSpacing: '-0.005em',
-        cursor: 'pointer',
-        boxShadow: active ? 'inset 0 0 0 0.5px var(--color-border-strong)' : 'none',
-      }}
-    >
-      {children}
-    </button>
+      {loading && <div className="spn-empty">carregando…</div>}
+
+      {!loading && tab === 'renders' && (
+        <GalleryGrid
+          items={(renders ?? []).map(r => ({
+            id:    r.id,
+            url:   r.output_url ?? '',
+            label: r.ambient || r.style || 'Render',
+            date:  r.created_at,
+          }))}
+          empty="Sem renders concluídas ainda."
+          onPick={(item) => onPick({ url: item.url, type: 'render', id: item.id })}
+        />
+      )}
+
+      {!loading && tab === 'vistas' && (
+        <GalleryGrid
+          items={(vistas ?? []).filter(v => v.image_url).map(v => ({
+            id:    v.id,
+            url:   v.image_url!,
+            label: v.axis_label ?? 'Vista',
+            date:  v.created_at,
+          }))}
+          empty="Sem vistas geradas em projetos ainda."
+          onPick={(item) => onPick({ url: item.url, type: 'vista', id: item.id })}
+        />
+      )}
+
+      {!loading && tab === 'edits' && (
+        <GalleryGrid
+          items={(edits ?? []).map(e => ({
+            id:    e.id,
+            url:   e.result_image_url,
+            label: e.prompt.slice(0, 40) || 'Edição',
+            date:  e.created_at,
+          }))}
+          empty="Sem edições anteriores ainda."
+          onPick={(item) => onPick({ url: item.url, type: 'edit', id: item.id })}
+        />
+      )}
+    </Sheet>
   )
 }
 
@@ -190,45 +128,28 @@ function GalleryGrid({ items, empty, onPick }: {
   empty: string
   onPick: (item: { id: string; url: string; label: string; date: string }) => void
 }) {
-  if (items.length === 0) {
-    return (
-      <div style={{ textAlign: 'center', padding: 40, color: 'var(--color-text-tertiary)', fontSize: 12 }}>
-        {empty}
-      </div>
-    )
-  }
+  if (items.length === 0) return <div className="spn-empty">{empty}</div>
+
   return (
-    <div style={{
-      display: 'grid', gap: 10,
-      gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+    <div className="spn-choices" style={{
+      gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
     }}>
       {items.map(it => (
         <button
           key={it.id}
+          type="button"
+          className="spn-choice"
           onClick={() => onPick(it)}
-          style={{
-            background: 'var(--color-bg)',
-            border: '0.5px solid var(--color-border)',
-            borderRadius: 10, overflow: 'hidden',
-            padding: 0, cursor: 'pointer', textAlign: 'left',
-            transition: 'transform 0.18s, border-color 0.18s',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(29,158,117,0.5)' }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--color-border)' }}
+          style={{ padding: 0, overflow: 'hidden', textAlign: 'left' }}
         >
-          <div style={{ aspectRatio: '4 / 3', background: 'var(--color-surface)' }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={toMediaProxyUrl(it.url) ?? it.url} alt={it.label}
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          </div>
-          <div style={{
-            padding: '8px 10px',
-            fontSize: 11, color: 'var(--color-text-primary)',
-            fontWeight: 500, letterSpacing: '-0.005em',
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={toMediaProxyUrl(it.url) ?? it.url} alt={it.label} className="spn-card-thumb" />
+          <b style={{
+            display: 'block', padding: '8px 10px', fontSize: 11,
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}>
             {it.label}
-          </div>
+          </b>
         </button>
       ))}
     </div>

@@ -49,7 +49,7 @@ export default async function SpacePage({
   const planId   = (payerBalance.planId as PlanId) ?? 'free'
 
   return (
-    <main style={{ flex: 1, overflowY: 'auto', background: 'var(--color-bg)' }}>
+    <main style={{ flex: 1, overflowY: 'auto' }}>
       <SpaceWorkspace
         space={space}
         initialVistas={vistas}
