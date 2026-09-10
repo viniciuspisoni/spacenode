@@ -201,6 +201,9 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
   const glCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const rendererRef = useRef<FinalizeRenderer | null>(null)
   const baseImgRef = useRef<HTMLImageElement | null>(null)
+  /** A imagem de quando o projeto começou. É o "Antes" da comparação — ver o
+   *  efeito que a carrega. */
+  const originalImgRef = useRef<HTMLImageElement | null>(null)
   const [baseReady, setBaseReady] = useState(false)
   const [glOk, setGlOk] = useState(true)
 
@@ -382,7 +385,14 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
     const dw = v.vis.w * d.width * v.s
     const dh = v.vis.h * d.height * v.s
 
-    const img = baseImgRef.current
+    // O "Antes" da comparação é a imagem ORIGINAL do projeto, não a base atual.
+    //
+    // A distinção só passou a existir quando a edição por IA entrou na mesma
+    // ferramenta: ela AVANÇA `baseUrl`, então comparar contra a base virou
+    // comparar a imagem nova com ela mesma — os dois lados idênticos. Enquanto
+    // ninguém rodou IA as duas URLs são a mesma e nada muda; depois de rodar,
+    // "antes" volta a significar o que a palavra diz.
+    const img = originalImgRef.current ?? baseImgRef.current
     const drawView = (src: CanvasImageSource, srcW: number, srcH: number, clip?: { x: number; w: number }) => {
       ctx.save()
       if (clip) {
@@ -481,6 +491,31 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
     needsGlRef.current = true
     scheduleDraw()
   }, [doc, scheduleDraw])
+
+  // Imagem original do projeto, só para a comparação. Não entra no renderer
+  // nem no índice da varinha — é textura de leitura, carregada uma vez e
+  // apenas quando difere da base (projeto sem nenhuma ação de IA não paga nada).
+  useEffect(() => {
+    const original = doc.originalBaseUrl
+    if (!original || original === doc.baseUrl) {
+      originalImgRef.current = null
+      return
+    }
+    let cancelled = false
+    const im = new Image()
+    im.crossOrigin = 'anonymous'
+    im.onload = () => {
+      if (cancelled) return
+      originalImgRef.current = im
+      scheduleDraw()
+    }
+    im.onerror = () => {
+      if (!cancelled) originalImgRef.current = null
+    }
+    im.src = original
+    return () => { cancelled = true }
+  }, [doc.originalBaseUrl, doc.baseUrl, scheduleDraw])
+
 
   // overlays dependem de props de UI
   useEffect(() => {

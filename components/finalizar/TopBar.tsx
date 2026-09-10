@@ -103,7 +103,10 @@ export function TopBar(p: Props) {
         onPointerUp={() => p.onCompare(false)}
         onPointerLeave={() => p.compare && p.onCompare(false)}
         onClick={(e) => e.preventDefault()}
-        title="Segure para ver a imagem sem os ajustes (tecla \)"
+        // "Original" e não "sem os ajustes": desde que a edição por IA passou a
+        // viver na mesma ferramenta, o Antes reverte TAMBÉM as ações de IA — é a
+        // imagem com que a pessoa começou, que é o que ela quer ver.
+        title="Segure para ver a imagem original (tecla \)"
         className="spn-ghost"
         aria-pressed={p.compare}
         style={{
