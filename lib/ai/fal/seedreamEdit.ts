@@ -18,6 +18,7 @@
 
 import { fal } from '@fal-ai/client'
 import { detectMaskBoundingBox } from '@/lib/spaces/edit-crop'
+import { seedreamCheapSize, seedreamCheapTierEnabled } from '@/lib/ai/seedream-size'
 
 export const SEEDREAM_EDIT_ENDPOINT = 'bytedance/seedream/v5/pro/edit'
 const TIMEOUT_MS = 180_000
@@ -92,6 +93,13 @@ export function seedreamOutputSize(
   height: number,
   resolution: SeedreamEditResolution = '2K',
 ): { width: number; height: number } {
+  // SEEDREAM_CHEAP_TIER=1: mira o teto da faixa BARATA de preço (1536² = 2,36 MP)
+  // em vez do teto do endpoint (2048² = 4,2 MP). Metade do preço por imagem, e
+  // aqui quase de graça: o recompose já reduz o resultado pro tamanho do crop.
+  if (resolution !== '1K' && seedreamCheapTierEnabled()) {
+    const cheap = seedreamCheapSize(width, height)
+    if (cheap) return cheap
+  }
   const aspect = Math.max(1 / 16, Math.min(16, width / Math.max(1, height)))
   const target = resolution === '1K' ? MIN_PIXELS * 1.06 : MAX_PIXELS * 0.97
   const round16 = (v: number) => Math.max(16, Math.round(v / 16) * 16)

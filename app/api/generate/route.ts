@@ -44,6 +44,7 @@ import {
 } from '@/lib/ai/fidelity/geometry-score'
 import { fetchStorageBuffer, assertSafeFetchUrl } from '@/lib/storage/fetch'
 import { nearestSupportedAspectRatio } from '@/lib/ai/aspect-ratio'
+import { seedreamCheapSize, seedreamCheapTierEnabled } from '@/lib/ai/seedream-size'
 import { analyzeImage } from '@/lib/fidelity-engine'
 import { DIRECT_UPLOAD_AREAS, downloadDirectUpload } from '@/lib/storage/direct-upload'
 import { normalizeSourceImage } from '@/lib/storage/normalize-image'
@@ -61,7 +62,12 @@ const devLog = (...args: unknown[]) => {
 // A Vercel mata a função no maxDuration. Precisa cobrir o maior FAL_TIMEOUT_MS
 // abaixo com folga, senão a geração lenta morre antes da nossa race e o usuário
 // recebe um 504 opaco em vez da mensagem tratada (+ refund).
-export const maxDuration = 300
+// 360 s (era 300) desde 2026-09-10: com o hedge da ModelArk desligado, o
+// caminho lento virou SEQUENCIAL (ark até 180 s → FAL com o que sobra), e a
+// soma não cabia em 300. Decisão do dono: esperar mais de 3 min por uma imagem
+// é aceitável; falhar e pagar duas vezes, não. Teto do plano Pro é maior que
+// isto; o custo de função é por CPU ativa, e esperar rede é quase de graça.
+export const maxDuration = 360
 
 // Teto de latência da 1ª tentativa pra valer um retry de fidelidade
 // (RENDER_FIDELITY_RETRY_MAX_ATTEMPT_MS). Acima disso — ou se ela veio do
@@ -73,10 +79,14 @@ const RETRY_ONLY_IF_ATTEMPT_UNDER_MS = Math.max(10_000, Number(process.env.RENDE
 // tamanho da imagem, sobretudo em 4K. Pulsar (Nano Banana 2) é rápido. O cap de 90s
 // era curto demais pro Vega e fazia a geração falhar com "tente uma resolução menor"
 // mesmo com imagem pequena. (O resto do código usa 150s pra esse mesmo endpoint.)
+// Quasar 300 s (era 180): é o orçamento TOTAL do provider na tentativa, e no
+// caminho ModelArk ele é gasto em série — ark até 180 s e, se ela falhar ou
+// estourar, a FAL ainda precisa de ~120 s (medido: 120–138 s neste endpoint)
+// pra salvar o render em vez de devolver erro. Vega e Pulsar seguem iguais.
 const FAL_TIMEOUT_MS: Record<EngineId, number> = {
   vega:   180_000,
   pulsar:  90_000,
-  quasar: 180_000,
+  quasar: 300_000,
 }
 
 // ── Mapping de resolução interna → param da Fal.ai por engine ────────────────
@@ -84,7 +94,7 @@ const FAL_TIMEOUT_MS: Record<EngineId, number> = {
 // Vega   (Gemini 3 Pro Image edit) → `resolution` ∈ '1K'|'2K'|'4K'
 // Pulsar (Nano Banana 2 edit)      → `resolution` ∈ '1K'|'2K'|'4K'
 //   HD interno mapeia para '1K' na Fal.ai (NB2 não tem rótulo "HD" nativo).
-// Quasar (Seedream 5.0 Pro edit)   → `image_size` = 'auto_2K'
+// Quasar (Seedream 5.0 Pro edit)   → `image_size` = 'auto_2K' (ou WxH da faixa barata)
 //   'auto_*' segue o aspecto da imagem de entrada. O endpoint tem teto de
 //   2048×2048, por isso o Quasar só oferece 2K (lib/engines). Schema da FAL
 //   sem seed/quality/aspect_ratio.
@@ -93,12 +103,19 @@ function falParamsForEngine(
   engine:      EngineId,
   resolution:  Resolution,
   aspectRatio: string | null = null,
+  sourceSize:  { width: number; height: number } | null = null,
 ): Record<string, unknown> {
   if (engine === 'quasar') {
     // Seedream 5.0 Pro Edit: só campos do schema (conferido 2026-09-04).
     // 'auto_2K' preserva a proporção do input no maior tamanho do endpoint.
+    // Com SEEDREAM_CHEAP_TIER=1 pedimos WxH explícito no teto da faixa barata
+    // de preço (lib/ai/seedream-size): metade do custo nos dois provedores e
+    // 76% do lado. Sem as dimensões do original, segue o 'auto_2K'.
+    const cheap = seedreamCheapTierEnabled()
+      ? seedreamCheapSize(sourceSize?.width, sourceSize?.height)
+      : null
     return {
-      image_size:    'auto_2K',
+      image_size:    cheap ?? 'auto_2K',
       num_images:    1,
       // Master lossless — alinha o caminho FAL com o GCP/Vertex (que já
       // devolve PNG). JPEG aqui criava uma geração de perda logo na origem
@@ -498,10 +515,14 @@ export async function POST(req: NextRequest) {
       }
     }
     let aspectRatio: string | null = null
+    // Dimensões do original: além do pino de aspecto, dão o WxH da faixa barata
+    // do Seedream (Quasar) — sem elas o Quasar segue no 'auto_2K'.
+    let sourceSize: { width: number; height: number } | null = null
     if (originalBuffer) {
       try {
         const meta = await sharp(originalBuffer).metadata()
         aspectRatio = nearestSupportedAspectRatio(meta.width ?? null, meta.height ?? null)
+        if (meta.width && meta.height) sourceSize = { width: meta.width, height: meta.height }
       } catch { /* sem pino — motor segue o formato do input */ }
     }
     devLog('[generate] aspect     :', aspectRatio ?? 'auto (sem pino)')
@@ -704,7 +725,7 @@ export async function POST(req: NextRequest) {
       const falInput = {
         prompt:     finalPrompt,
         image_urls: imageUrls,
-        ...falParamsForEngine(engine, resolution, aspectRatio),
+        ...falParamsForEngine(engine, resolution, aspectRatio, sourceSize),
         // Reprodutibilidade nos DOIS caminhos: NB2/Pro na FAL expõem `seed`
         // (schema conferido 2026-08-17); Quasar (Seedream 5.0 Pro edit) não.
         ...(engine !== 'quasar' ? { seed: attemptSeed } : {}),
@@ -972,7 +993,7 @@ export async function POST(req: NextRequest) {
         request_id:     falRequestId,
         engine,
         resolution,
-        parameters:  falParamsForEngine(engine, resolution, aspectRatio),
+        parameters:  falParamsForEngine(engine, resolution, aspectRatio, sourceSize),
         // Reprodutibilidade: seed BASE do request (os dois caminhos recebem;
         // a seed efetiva por tentativa fica em fidelity.attempts[].seed).
         seed:            generationSeed,

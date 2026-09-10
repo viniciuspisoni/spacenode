@@ -50,6 +50,7 @@ import {
 } from './fidelity'
 import { computeGeometryScore, buildEdgeMapPng, type GeometryScoreBreakdown } from '@/lib/ai/fidelity/geometry-score'
 import { nearestSupportedAspectRatio } from '@/lib/ai/aspect-ratio'
+import { seedreamCheapSize, seedreamCheapTierEnabled } from '@/lib/ai/seedream-size'
 import { fetchStorageBuffer, assertSafeFetchUrl } from '@/lib/storage/fetch'
 
 // Timeout da chamada ao provider por motor (espelha o /api/generate do
@@ -72,13 +73,19 @@ export function falParamsForEngine(
   engine: EngineId,
   q: Resolution,
   aspectRatio: string | null = null,
+  sourceSize: { width: number; height: number } | null = null,
 ): Record<string, unknown> {
   if (engine === 'quasar') {
     // Seedream 5.0 Pro Edit (ver lib/engines.ts): só campos do schema;
     // 'auto_2K' segue o aspecto do input no teto do endpoint (2048²) — o
     // Quasar só oferece 2K. Sem seed/quality/aspect_ratio.
+    // SEEDREAM_CHEAP_TIER=1 troca o 'auto_2K' pelo WxH da faixa barata de preço
+    // (lib/ai/seedream-size) — metade do custo na ModelArk E na fal.
+    const cheap = seedreamCheapTierEnabled()
+      ? seedreamCheapSize(sourceSize?.width, sourceSize?.height)
+      : null
     return {
-      image_size:    'auto_2K',
+      image_size:    cheap ?? 'auto_2K',
       num_images:    1,
       output_format: 'png',
     }
@@ -276,6 +283,13 @@ export async function generateVista(args: VistaGenerationArgs) {
       ? nearestSupportedAspectRatio(sourceMeta?.width ?? null, sourceMeta?.height ?? null)
       : null
 
+    // Dimensões da referência geométrica — dão o WxH da faixa barata do
+    // Seedream (Quasar). Sem elas o Quasar segue no 'auto_2K'. Vale mesmo fora
+    // do gate: o tamanho é de PREÇO, não de enquadramento.
+    const sourceSize = sourceMeta?.width && sourceMeta?.height
+      ? { width: sourceMeta.width, height: sourceMeta.height }
+      : null
+
     // Seed fixa por vista (espelha o Renderizar): retries do ladder viram
     // variação CONTROLADA da mesma amostra (tentativa 3 desloca via
     // seedOffset) e a geração fica reproduzível. NB2/Pro na FAL expõem `seed`
@@ -337,7 +351,7 @@ export async function generateVista(args: VistaGenerationArgs) {
       const falInput = {
         prompt,
         image_urls: imageUrls,
-        ...falParamsForEngine(engine, quality, aspectPin),
+        ...falParamsForEngine(engine, quality, aspectPin, sourceSize),
         // Reprodutibilidade nos DOIS caminhos (Quasar não expõe seed).
         ...(engine !== 'quasar' ? { seed: attemptSeed } : {}),
         // Thinking do NB2 (único motor com o knob na FAL): planejar a cena
@@ -516,7 +530,7 @@ export async function generateVista(args: VistaGenerationArgs) {
         request_id:     gen.requestId,
         engine,
         quality,
-        parameters:     falParamsForEngine(engine, quality),
+        parameters:     falParamsForEngine(engine, quality, aspectPin, sourceSize),
         image_count:    baseImageUrls.length,
         dual_image:     dualImage,
         duration_ms:    generationDurationMs,
