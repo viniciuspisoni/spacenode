@@ -163,9 +163,18 @@ const FAL_FALLBACK_MIN_MS = 45_000
 // 75 s esperando um Vertex travado + ~35 s de FAL. Com a corrida aos 40 s
 // (≈ p65 do Vertex) o teto prático do render vira ~75–80 s, e um Vertex
 // legitimamente lento (45–83 s) ainda vence quando chega antes da FAL.
-// Custo: nas chamadas em que os dois terminam, os dois cobram — só nos ~35%
-// que passam do hedge. 0 desliga (volta ao fallback sequencial).
-const GCP_HEDGE_MS = Math.max(0, Number(process.env.IMAGE_GCP_HEDGE_MS ?? 40_000) || 0)
+// Custo: nas chamadas em que os dois terminam, os dois cobram — e em 10/09
+// os logs de prod mostraram esse "cobrado sem uso" batendo em ~50% dos
+// Vega (o GCP vencia de qualquer jeito, só mais devagar que 40s), bem acima
+// dos 35% medidos — o hedge disparava cedo demais contra o p50/p90 reais
+// (30,6 s / 45,5 s da distribuição documentada acima). Subiu pra 45 s
+// (≈ p90 do Vertex): ainda pega a cauda lenta (>45 s) rápido, mas deixa de
+// duplicar a maioria das chamadas que o GCP já ia resolver sozinho entre
+// 40–45 s. Teto: precisa caber FAL_FALLBACK_MIN_MS depois do hedge dentro do
+// orçamento do call site (IMAGE_GCP_BUDGET_SHARE) — no Pulsar (orçamento
+// menor, ~90 s) isso capa o hedge em ~45,7 s, por isso não subiu mais que
+// isso. 0 desliga (volta ao fallback sequencial).
+const GCP_HEDGE_MS = Math.max(0, Number(process.env.IMAGE_GCP_HEDGE_MS ?? 45_000) || 0)
 
 // Hedge da rota ModelArk (Seedream/Quasar) — mesma ideia do GCP acima. Era
 // 60 s (a ModelArk parecia ~50 s no protótipo), mas em prod o Seedream 5.0
