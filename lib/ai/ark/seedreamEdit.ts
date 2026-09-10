@@ -65,9 +65,11 @@ export async function editImageWithSeedreamArk(input: SeedreamEditImageInput): P
   const cheap = (input.resolution ?? '2K') !== '1K' && seedreamCheapTierEnabled()
     ? seedreamCheapSize(input.imageWidth, input.imageHeight)
     : null
-  const size = cheap
-    ? `${cheap.width}x${cheap.height}`
-    : (input.resolution ?? '2K') === '1K' ? '1K' : '2K'
+  const size = input.outputSize
+    ? `${input.outputSize.width}x${input.outputSize.height}`
+    : cheap
+      ? `${cheap.width}x${cheap.height}`
+      : (input.resolution ?? '2K') === '1K' ? '1K' : '2K'
   const body: Record<string, unknown> = {
     model: modelId(),
     prompt: input.prompt,
