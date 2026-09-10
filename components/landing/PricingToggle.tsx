@@ -60,15 +60,20 @@ async function startCheckout(id: PaidPlanId, billing: BillingCycle) {
   if (data.url) window.location.href = data.url
 }
 
+// Check neutro, não verde: o item da lista é FATO ("acesso a todos os
+// motores"), não estado de sucesso. Em terciário ele fica atrás do rótulo,
+// que é quem carrega a informação.
 const CheckIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="var(--color-accent-green)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }} aria-hidden>
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }} aria-hidden>
     <path d="M2 7l3.5 3.5L12 3.5" />
   </svg>
 )
 
 // Antes o plano recomendado se distinguia por ser o único cartão PRETO numa
-// landing clara. Com a landing inteira escura isso deixou de existir: agora
-// ele é o vidro mais claro da fileira, com a aresta de cima em verde.
+// landing clara. Com a landing inteira escura isso deixou de existir, e por
+// um tempo ele se marcou com verde (aresta, selo, medidor). Desde 2026-09-10
+// a marcação é a mesma que o resto da seção já usava para "isto aqui é a
+// ação": vidro mais claro, aresta forte, e o selo no branco opaco do CTA.
 function PlanCard({ planId, billing, loading, onSelect }: {
   planId: SellablePlanId
   billing: BillingCycle
@@ -139,9 +144,12 @@ function PlanCard({ planId, billing, loading, onSelect }: {
         }
         .spn-plan[data-featured='true'] {
           background: var(--glass-raised);
-          border-top: 1.5px solid var(--color-accent-green);
+          border-color: var(--glass-line-strong);
           box-shadow: var(--shadow-float), inset 0 0.5px 0 var(--glass-spec);
         }
+        /* Selo no mesmo branco opaco do CTA: o cartão passa a ter dois
+           pontos claros na diagonal (selo em cima, botão embaixo) e a cor
+           que diz "é por aqui" é uma só na seção inteira. */
         .spn-plan-badge {
           position: absolute;
           top: 16px;
@@ -150,9 +158,8 @@ function PlanCard({ planId, billing, loading, onSelect }: {
           font-weight: 500;
           letter-spacing: 0.14em;
           text-transform: uppercase;
-          background: var(--color-accent-green-bg);
-          color: var(--color-accent-green);
-          border: 0.5px solid var(--color-accent-green-border);
+          background: var(--color-inverse);
+          color: var(--color-inverse-foreground);
           padding: 3px 8px;
           border-radius: var(--radius-full);
         }
@@ -219,7 +226,8 @@ function PlanCard({ planId, billing, loading, onSelect }: {
           border-radius: 2px;
           background: var(--color-text-primary);
         }
-        .spn-plan[data-featured='true'] .spn-plan-meter span { background: var(--color-accent-green); }
+        /* O medidor compara volume ENTRE os planos — trocar a cor só no
+           recomendado quebrava a comparação, que é o trabalho dele. */
         .spn-plan-features {
           list-style: none;
           padding: 20px 0 0;
@@ -449,9 +457,9 @@ export function PricingToggle() {
           font-size: 9px;
           letter-spacing: 0.08em;
           text-transform: uppercase;
-          background: var(--color-accent-green-bg);
-          color: var(--color-accent-green);
-          border: 0.5px solid var(--color-accent-green-border);
+          background: var(--color-surface);
+          color: var(--color-text-primary);
+          border: 0.5px solid var(--glass-line-strong);
           padding: 2px 7px;
           border-radius: var(--radius-full);
         }
@@ -492,7 +500,7 @@ export function PricingToggle() {
           white-space: nowrap;
         }
         .spn-calc-pick b {
-          color: var(--color-accent-green);
+          color: var(--color-text-primary);
           font-weight: 500;
         }
         .spn-calc-grid {
@@ -512,7 +520,7 @@ export function PricingToggle() {
         .spn-calc-range {
           width: 100%;
           cursor: pointer;
-          accent-color: var(--color-accent-green);
+          accent-color: var(--color-text-primary);
         }
         .spn-calc-scale {
           display: flex;
