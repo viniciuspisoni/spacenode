@@ -1127,9 +1127,12 @@ export function FinalizeEditor({
     }
   }, [undo, redo, tool, refineSelection])
 
+  // A ferramenta unificada mora em /app/editar. Mandar para /app/finalizar
+   // era herança do módulo antigo — e levava a pessoa para uma segunda porta
+   // da MESMA ferramenta, que é exatamente o que a fusão veio desfazer.
   const goBack = useCallback(() => {
     if (dirtyRef.current) { setLeaving(true); return }
-    router.push('/app/finalizar')
+    router.push('/app/editar')
   }, [router])
 
   // seleção automática coerente com a ferramenta — só na TRANSIÇÃO para
@@ -1176,7 +1179,7 @@ export function FinalizeEditor({
               <div className="spn-field-label">Projetos salvos</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
                 {savedProjects.map((p) => (
-                  <button key={p.id} type="button" className="spn-card spn-glass" onClick={() => router.push(`/app/finalizar/${p.id}`)}
+                  <button key={p.id} type="button" className="spn-card spn-glass" onClick={() => router.push(`/app/editar/${p.id}`)}
                     style={{ textAlign: 'left', padding: 0, cursor: 'pointer' }}>
                     <div style={{ aspectRatio: '4 / 3', background: 'var(--color-preview-bg)' }}>
                       {p.thumbnail_url
@@ -1546,7 +1549,7 @@ export function FinalizeEditor({
         title="Sair sem salvar?"
         message="As alterações desta sessão não foram salvas no projeto. Sair agora as descarta."
         confirmLabel="Sair sem salvar"
-        onConfirm={() => router.push('/app/finalizar')}
+        onConfirm={() => router.push('/app/editar')}
         onClose={() => setLeaving(false)}
       />
       <FinalizeImportModal
