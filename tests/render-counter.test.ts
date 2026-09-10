@@ -18,10 +18,10 @@ describe('contador de renders (floor(saldo / custo))', () => {
   const expected: Record<string, number> = {
     'vega:2k':   4,  // 20 nodes
     'vega:4k':   2,  // 40 nodes
-    'pulsar:hd': 8,  // 10 nodes — default econômico da conta free
+    'pulsar:hd': 8,  // 10 nodes
     'pulsar:2k': 5,  // 15 nodes
     'pulsar:4k': 3,  // 25 nodes
-    'quasar:2k': 2,  // 28 nodes
+    'quasar:2k': 4,  // 20 nodes — DEFAULT_ENGINE, inclusive na conta gratuita
   }
 
   it('cobre todas as combinações válidas do catálogo', () => {

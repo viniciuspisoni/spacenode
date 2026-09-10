@@ -26,8 +26,6 @@ import {
 interface GenerateClientProps {
   /** Saldo total da bolsa (mensais + extras) — mesmo pool que o débito consome. */
   initialCredits:    number
-  /** true = assinatura ativa; false = conta free (default econômico Pulsar+HD). */
-  isSubscriber?:     boolean
   initialMaterials?: ProjectMaterials
   initialConfig?:    ProjectConfig | null
   /** URL https de uma render existente a pré-carregar como input (ex.: "Reutilizar" no dashboard). */
@@ -211,25 +209,23 @@ function deriveDefaults(projectType: ProjectType, segment: string) {
   }
 }
 
-// Defaults econômicos pra conta sem assinatura: o trial de 80 nodes rende
-// ~8 renders em Pulsar+HD (10 nodes) contra 4 em Vega+2K (20 nodes).
-const ECONOMY_ENGINE:     EngineId   = 'pulsar'
-const ECONOMY_RESOLUTION: Resolution = 'hd'
-
 // Hidrata o estado inicial a partir do project_config persistido. Campos
 // tipo-estrito caem pra default se a string salva for desconhecida (ex: engine
 // removida). Combinação engine×resolução também é checada — saved Vega+HD
 // passou a ser inválido depois de Pricing v2 e quebraria getNodesCost.
-// Config salva sempre vence; o default por status de assinatura só entra
-// quando não há valor persistido válido.
-function resolveInitialConfig(cfg: ProjectConfig | null | undefined, isSubscriber: boolean) {
+// Config salva sempre vence; o default do catálogo só entra quando não há
+// valor persistido válido.
+//
+// Até 2026-09-10 havia um default econômico só para conta sem assinatura
+// (Pulsar + HD, 10 nodes). Ele saiu: o Quasar passou a ser o padrão para
+// todo mundo, e manter um fork com os dois ramos apontando para o mesmo
+// motor seria código que mente. O trial de 80 nodes rende 4 renders.
+function resolveInitialConfig(cfg: ProjectConfig | null | undefined) {
   const projectType: ProjectType =
     cfg?.projectType === 'interior' || cfg?.projectType === 'exterior'
       ? cfg.projectType : 'exterior'
-  const fallbackEngine: EngineId   = isSubscriber ? DEFAULT_ENGINE     : ECONOMY_ENGINE
-  const fallbackRes:    Resolution = isSubscriber ? DEFAULT_RESOLUTION : ECONOMY_RESOLUTION
-  const engine: EngineId = isEngineId(cfg?.selectedEngine) ? cfg.selectedEngine : fallbackEngine
-  const rawRes: Resolution = isResolution(cfg?.selectedResolution) ? cfg.selectedResolution : fallbackRes
+  const engine: EngineId = isEngineId(cfg?.selectedEngine) ? cfg.selectedEngine : DEFAULT_ENGINE
+  const rawRes: Resolution = isResolution(cfg?.selectedResolution) ? cfg.selectedResolution : DEFAULT_RESOLUTION
   const resolution: Resolution = isValidCombination(engine, rawRes) ? rawRes : ENGINES[engine].resolutions[0]
   const sceneElements: string[] = Array.isArray(cfg?.sceneElements)
     ? cfg.sceneElements.filter((x): x is string => typeof x === 'string')
@@ -246,8 +242,8 @@ function resolveInitialConfig(cfg: ProjectConfig | null | undefined, isSubscribe
   }
 }
 
-export function GenerateClient({ initialCredits, isSubscriber = false, initialMaterials, initialConfig, initialSourceUrl, returnTo, firstRender = false }: GenerateClientProps) {
-  const init = resolveInitialConfig(initialConfig, isSubscriber)
+export function GenerateClient({ initialCredits, initialMaterials, initialConfig, initialSourceUrl, returnTo, firstRender = false }: GenerateClientProps) {
+  const init = resolveInitialConfig(initialConfig)
   const fromSpacesNew = returnTo === 'spaces/new'
   const supabase = createClient()
 

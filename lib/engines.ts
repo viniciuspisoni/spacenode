@@ -53,7 +53,12 @@ export const ENGINES: Record<EngineId, EngineConfig> = {
     // só oferece 2K.
     falEndpoint: 'bytedance/seedream/v5/pro/edit',
     resolutions: ['2k'],
-    nodes:       { '2k': 28 },
+    // 28 → 20 em 2026-09-10, quando o Quasar virou o motor padrão. O custo
+    // de origem caiu junto: a rota direta na ModelArk (SEEDREAM_ROUTE=ark,
+    // em prod desde 06/09) é ~2× mais barata que a fal, que era a base do 28.
+    // A 20 ele empata com o Vega 2K — o "Especial" deixou de custar mais que
+    // o premium, o que é a consequência de ser o padrão.
+    nodes:       { '2k': 20 },
   },
 }
 
