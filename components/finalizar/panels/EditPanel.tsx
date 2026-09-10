@@ -11,14 +11,21 @@
 // gratuito. O preço aparece antes de executar, sempre.
 
 import { useState } from 'react'
+import { ChoiceGroup } from '@/components/app/glass'
 import type { EditV4Action } from '@/lib/edit-v4/types'
 import { Chip, Label, Section, Seg, SliderRow } from '../ui'
 import type { EditSubTool } from '../CanvasViewport'
 
 export interface EditActionDef {
   id: EditV4Action
-  /** UMA palavra — é o que aparece no segmentado. */
+  /** UMA palavra — é o rótulo do cartão. */
   short: string
+  /** Três a cinco palavras, SEMPRE visíveis sob o rótulo. Não é enfeite: é o
+   *  que separa "Remover" de "Refinar" — a dúvida que faz alguém pedir para
+   *  deletar um objeto quando queria consertar a textura dele, e que custou
+   *  uma edição paga em 10/09. Dica de hover não resolveria: quem não sabe que
+   *  há diferença não passa o mouse para descobrir. */
+  note: string
   placeholder: string
   ref: 'material' | 'object' | null
   refLabel: string
@@ -26,11 +33,11 @@ export interface EditActionDef {
 }
 
 export const EDIT_ACTIONS: EditActionDef[] = [
-  { id: 'swap_material', short: 'Material', placeholder: 'Ex.: trocar o piso por porcelanato amadeirado', ref: 'material', refLabel: 'Material de referência', requiresSelection: false },
-  { id: 'remove', short: 'Remover', placeholder: 'Ex.: retirar o tapete da sala', ref: null, refLabel: '', requiresSelection: false },
-  { id: 'insert_element', short: 'Inserir', placeholder: 'Ex.: inserir um vaso com planta no canto', ref: 'object', refLabel: 'Objeto de referência', requiresSelection: true },
-  { id: 'replace_object', short: 'Substituir', placeholder: 'Ex.: trocar este sofá por um de couro caramelo', ref: 'object', refLabel: 'Objeto de referência', requiresSelection: true },
-  { id: 'refine_area', short: 'Refinar', placeholder: 'Ex.: corrigir a textura da parede do fundo', ref: null, refLabel: '', requiresSelection: false },
+  { id: 'swap_material', short: 'Material', note: 'troca o acabamento', placeholder: 'Ex.: trocar o piso por porcelanato amadeirado', ref: 'material', refLabel: 'Material de referência', requiresSelection: false },
+  { id: 'remove', short: 'Remover', note: 'tira o objeto, refaz o fundo', placeholder: 'Ex.: retirar o tapete da sala', ref: null, refLabel: '', requiresSelection: false },
+  { id: 'insert_element', short: 'Inserir', note: 'acrescenta algo novo', placeholder: 'Ex.: inserir um vaso com planta no canto', ref: 'object', refLabel: 'Objeto de referência', requiresSelection: true },
+  { id: 'replace_object', short: 'Substituir', note: 'um objeto por outro', placeholder: 'Ex.: trocar este sofá por um de couro caramelo', ref: 'object', refLabel: 'Objeto de referência', requiresSelection: true },
+  { id: 'refine_area', short: 'Refinar', note: 'conserta textura ou emenda', placeholder: 'Ex.: alisar a costura do estofado', ref: null, refLabel: '', requiresSelection: false },
 ]
 
 export interface EditPanelProps {
@@ -87,11 +94,12 @@ export function EditPanel(props: EditPanelProps) {
   return (
     <div>
       <Section title="O que fazer" open={openWhat} onToggle={() => setOpenWhat(v => !v)}>
-        <Seg
+        <ChoiceGroup
           label="Ação"
-          options={EDIT_ACTIONS.map(a => ({ id: a.id, label: a.short }))}
+          cols={2}
           value={props.action}
           onChange={props.onAction}
+          options={EDIT_ACTIONS.map(a => ({ value: a.id, title: a.short, note: a.note }))}
         />
         <textarea
           className="spn-textarea"
