@@ -25,7 +25,7 @@ export default async function SpacesPage() {
   const spaces = (await signRows(createAdminClient(), rows ?? [], ['vista_mestre_url'])) as SpaceWithCounts[]
 
   return (
-    <main style={{ flex: 1, overflowY: 'auto', background: 'var(--color-bg)', padding: '40px 48px 80px' }}>
+    <main style={{ flex: 1, overflowY: 'auto', padding: '40px 48px 80px' }}>
       <div style={{ maxWidth: 1100, margin: '0 auto' }}>
 
         {/* Breadcrumb */}

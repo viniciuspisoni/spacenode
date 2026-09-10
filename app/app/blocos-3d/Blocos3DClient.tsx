@@ -10,15 +10,30 @@
 //
 // Multiview: 4 slots posicionais (Frente obrigatória + Esquerda/Trás/Direita)
 // — o Tripo exige saber qual ângulo é qual; Rodin/Meshy recebem como lista.
+// Os 4 slots são O TRABALHO: ficam na superfície do painel. O que sobra —
+// motor e prompt de materiais — vive atrás de duas linhas de ajuste.
 //
 // Progresso: os motores fal não reportam % — quando o job vem com progress 0,
 // a barra é sintetizada pela estimativa do motor (capada em 92%).
+//
+// Vidro: o painel é vidro, o PALCO não. O GlbViewer roda requestAnimationFrame
+// permanente (OrbitControls com damping + autoRotate) e um backdrop-filter em
+// volta dele custaria uma recomposição por frame. Os cartões de progresso e de
+// falha podem ser vidro — quando eles aparecem, não há canvas rodando.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
+import {
+  RowIcon,
+  SettingGroup,
+  SettingRow,
+  Sheet,
+  ChoiceGroup,
+  summarize,
+  useAmbient,
+} from '@/components/app/glass'
 import { uploadDirect } from '@/lib/storage/direct-upload-client'
 import { jsonOrNull, errMsg } from '@/lib/http/fetch-json'
-import { urlToFile } from '@/lib/http/url-to-file'
 import { downloadBlob } from '@/lib/apresentar/svg-to-png'
 import {
   BLOCOS3D_ENGINES,
@@ -31,6 +46,7 @@ import {
   VIEW_POSITION_ORDER,
 } from '@/lib/blocos3d/config'
 import type { Blocos3DJobView, Blocos3DQuality, ModelFormat, ViewPosition } from '@/lib/blocos3d/types'
+import { useObjectUrls } from '@/lib/browser/object-url'
 
 const GlbViewer = dynamic(() => import('./GlbViewer'), { ssr: false })
 
@@ -79,6 +95,16 @@ function CubeGlyph({ size, strokeWidth = 1.5 }: { size: number; strokeWidth?: nu
   )
 }
 
+function DownloadIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <path d="M7 10l5 5 5-5M12 15V3" />
+    </svg>
+  )
+}
+
 /** Painel de progresso com ticker próprio de 1s — isola o re-render da barra
  *  sintetizada (sem ele, a árvore inteira do módulo re-renderizaria a cada
  *  segundo durante toda a geração). */
@@ -91,32 +117,42 @@ function ProcessingPanel({ job }: { job: Blocos3DJobView }) {
   const shownProgress = displayProgress(job, now)
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18, animation: 'fadeIn 0.2s ease' }}>
+    <div className="spn-glass" style={{
+      borderRadius: 'var(--r-card)', padding: '22px 24px',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, maxWidth: 340,
+    }}>
       {job.inputUrl && (
-        <img src={job.inputUrl} alt="origem"
-          style={{ width: 130, height: 130, objectFit: 'cover', borderRadius: 12, border: '0.5px solid var(--color-border)', opacity: 0.85 }} />
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img src={job.inputUrl} alt="origem" style={{
+          width: 120, height: 120, objectFit: 'cover',
+          borderRadius: 'var(--r-inner)', border: '0.5px solid var(--glass-line)',
+        }} />
       )}
-      <div style={{ width: 260 }}>
-        <div style={{ height: 3, borderRadius: 99, background: 'var(--color-surface-hover)', overflow: 'hidden' }}>
+      <div style={{ width: '100%' }}>
+        <div style={{ height: 3, borderRadius: 99, background: 'var(--color-chip)', overflow: 'hidden' }}>
           <div style={{
             height: '100%', borderRadius: 99, background: 'var(--color-text-primary)',
-            width: `${Math.max(4, shownProgress)}%`, transition: 'width 0.6s ease',
+            width: `${Math.max(4, shownProgress)}%`, transition: 'width 0.6s var(--ease)',
           }} />
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
-          <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{progressLabel(shownProgress)}</span>
-          <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{shownProgress}%</span>
+          <span style={{ fontSize: 11.5, color: 'var(--color-text-secondary)' }}>{progressLabel(shownProgress)}</span>
+          <span style={{ fontSize: 11.5, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>
+            {shownProgress}%
+          </span>
         </div>
       </div>
-      <div style={{ fontSize: 10.5, color: 'var(--color-text-tertiary)', textAlign: 'center', lineHeight: 1.6, maxWidth: 300 }}>
-        A geração leva {formatMinutes(BLOCOS3D_ENGINES[job.quality]?.estimatedMs ?? 150_000)}. Pode navegar pelo app — o bloco continua sendo gerado e fica no histórico.
-      </div>
+      <p className="spn-hint" style={{ marginTop: 0, textAlign: 'center' }}>
+        Leva {formatMinutes(BLOCOS3D_ENGINES[job.quality]?.estimatedMs ?? 150_000)}. Pode navegar pelo app —
+        o bloco continua sendo gerado e fica no histórico.
+      </p>
     </div>
   )
 }
 
 type SlotFiles    = Partial<Record<ViewPosition, File>>
 type SlotPreviews = Partial<Record<ViewPosition, string>>
+type SheetId      = 'saida' | 'materiais'
 
 interface Blocos3DClientProps {
   initialCredits: number
@@ -130,6 +166,9 @@ export default function Blocos3DClient({ initialCredits, engineAvailability, ini
   // Entrada — multiview por posição
   const [slotFiles,    setSlotFiles]    = useState<SlotFiles>({})
   const [slotPreviews, setSlotPreviews] = useState<SlotPreviews>({})
+  // Governa as URLs de blob das prévias: revoga a que sai e varre o resto
+  // ao desmontar (uma object URL segura o arquivo em memória até alguém soltar).
+  const objectUrls = useObjectUrls()
   const [dragSlot,     setDragSlot]     = useState<ViewPosition | null>(null)
 
   // Opções
@@ -138,6 +177,7 @@ export default function Blocos3DClient({ initialCredits, engineAvailability, ini
       : BLOCOS3D_QUALITY_ORDER.find(q => engineAvailability[q]) ?? DEFAULT_BLOCOS3D_QUALITY,
   )
   const [texturePrompt, setTexturePrompt] = useState('')
+  const [sheet,         setSheet]         = useState<SheetId | null>(null)
 
   // Job + histórico
   const [job,     setJob]     = useState<Blocos3DJobView | null>(null)
@@ -158,6 +198,9 @@ export default function Blocos3DClient({ initialCredits, engineAvailability, ini
   const imageCount = VIEW_POSITION_ORDER.filter(p => slotFiles[p]).length
   const isGenerating = isSubmitting || job?.status === 'processing'
   const canSubmit = !!slotFiles.front && credits >= nodeCost && !isGenerating && engineAvailability[quality]
+
+  // O papel de parede é o trabalho em foco: o bloco aberto, ou a foto da frente.
+  useAmbient(job?.thumbnailUrl ?? job?.inputUrl ?? slotPreviews.front ?? null)
 
   // ── Histórico + retomada de job em andamento ───────────────────────────────
 
@@ -236,19 +279,30 @@ export default function Blocos3DClient({ initialCredits, engineAvailability, ini
     if (file.size > BLOCOS3D_SOURCE_MAX_BYTES) { setError(`Imagem muito grande. Máximo ${BLOCOS3D_SOURCE_MAX_MB} MB.`); return }
     setError(null)
     setSlotFiles(cur => ({ ...cur, [pos]: file }))
-    const reader = new FileReader()
-    reader.onload = (e) => setSlotPreviews(cur => ({ ...cur, [pos]: (e.target?.result as string) ?? undefined }))
-    reader.readAsDataURL(file)
+    // Object URL, não data URL: aqui são QUATRO slots de até 20 MB cada, e
+    // o slot frontal ainda alimenta o papel de parede. Ver
+    // lib/browser/object-url.ts.
+    const url = objectUrls.create(file)
+    setSlotPreviews(cur => {
+      objectUrls.revoke(cur[pos])
+      return { ...cur, [pos]: url }
+    })
   }
 
   function removeSlot(pos: ViewPosition) {
     setSlotFiles(cur => { const next = { ...cur }; delete next[pos]; return next })
-    setSlotPreviews(cur => { const next = { ...cur }; delete next[pos]; return next })
+    setSlotPreviews(cur => {
+      objectUrls.revoke(cur[pos])
+      const next = { ...cur }; delete next[pos]; return next
+    })
   }
 
   function resetInput() {
     setSlotFiles({})
-    setSlotPreviews({})
+    setSlotPreviews(cur => {
+      Object.values(cur).forEach(u => objectUrls.revoke(u))
+      return {}
+    })
     setError(null)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
@@ -366,41 +420,52 @@ export default function Blocos3DClient({ initialCredits, engineAvailability, ini
 
   // ── Slot de upload ─────────────────────────────────────────────────────────
 
-  function renderSlot(pos: ViewPosition, style: React.CSSProperties) {
+  function renderSlot(pos: ViewPosition, boxStyle: React.CSSProperties) {
     const preview = slotPreviews[pos]
     const isFront = pos === 'front'
     const isDrag  = dragSlot === pos
     return (
       <div key={pos}
+        role="button"
+        tabIndex={0}
         onClick={() => openPicker(pos)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPicker(pos) } }}
         onDragOver={(e) => { e.preventDefault(); setDragSlot(pos) }}
         onDragLeave={() => setDragSlot(null)}
         onDrop={(e) => { e.preventDefault(); setDragSlot(null); const f = e.dataTransfer.files[0]; if (f) loadImageFile(f, pos) }}
         style={{
           position: 'relative',
-          border: `1.5px dashed ${isDrag ? 'var(--color-border-focus)' : preview ? 'var(--color-border-strong)' : 'var(--color-border)'}`,
-          borderRadius: 10, overflow: 'hidden', cursor: 'pointer',
-          background: isDrag ? 'var(--color-surface)' : 'var(--color-upload-area)',
+          border: `1px dashed ${isDrag ? 'var(--color-border-focus)' : 'var(--glass-line-strong)'}`,
+          borderRadius: 'var(--r-inner)', overflow: 'hidden', cursor: 'pointer',
+          background: isDrag ? 'var(--color-chip-hover)' : 'var(--color-chip)',
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          transition: 'border-color 0.15s',
-          ...style,
+          transition: 'border-color 180ms var(--ease), background 180ms var(--ease)',
+          ...boxStyle,
         }}
       >
         {preview ? (
           <>
-            <img src={preview} alt={VIEW_POSITION_LABEL[pos]} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={preview} alt={VIEW_POSITION_LABEL[pos]}
+                 style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+            {/* O fundo vem inline de propósito: `.spn-icon-btn` zera o
+                background e, sendo declarado depois no globals.css, venceria
+                o `.spn-glass--raised`. Sobre foto o ✕ precisa de apoio. */}
             <button
+              type="button"
+              className="spn-icon-btn"
               onClick={(e) => { e.stopPropagation(); removeSlot(pos) }}
-              title="Remover"
+              aria-label={`Remover ${VIEW_POSITION_LABEL[pos]}`}
               style={{
-                position: 'absolute', top: 5, right: 5, width: 18, height: 18,
-                borderRadius: '50%', border: 'none', cursor: 'pointer',
+                position: 'absolute', top: 5, right: 5, width: 20, height: 20, flex: '0 0 20px',
                 background: 'color-mix(in srgb, var(--color-bg) 78%, transparent)',
-                color: 'var(--color-text-secondary)', fontSize: 10, lineHeight: 1,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: 'var(--color-text-primary)',
               }}
             >
-              ✕
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+                   style={{ width: 10, height: 10 }}>
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
             </button>
           </>
         ) : (
@@ -409,7 +474,7 @@ export default function Blocos3DClient({ initialCredits, engineAvailability, ini
               <CubeGlyph size={isFront ? 22 : 14} strokeWidth={isFront ? 1.5 : 1.3} />
             </span>
             {isFront && (
-              <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 6 }}>
+              <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 7 }}>
                 Arraste ou clique — até {BLOCOS3D_SOURCE_MAX_MB} MB
               </span>
             )}
@@ -417,7 +482,7 @@ export default function Blocos3DClient({ initialCredits, engineAvailability, ini
         )}
         <span style={{
           position: 'absolute', left: 6, bottom: 5,
-          fontSize: 8.5, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' as const,
+          fontSize: 8.5, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase',
           color: preview ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
           background: preview ? 'color-mix(in srgb, var(--color-bg) 72%, transparent)' : 'transparent',
           padding: preview ? '2px 6px' : 0, borderRadius: 5,
@@ -431,232 +496,138 @@ export default function Blocos3DClient({ initialCredits, engineAvailability, ini
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ display: 'flex', width: '100%', height: '100%', overflow: 'hidden', background: 'var(--color-bg)', color: 'var(--color-text-primary)' }}>
-      <style>{`
-        @keyframes spin   { to { transform: rotate(360deg); } }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-      `}</style>
+    <div className="spn-tool">
+      <style>{'@keyframes spnSpin { to { transform: rotate(360deg) } }'}</style>
 
-      {/* ── Painel esquerdo ─────────────────────────────────────────────────── */}
-      <div style={{ width: 420, flexShrink: 0, display: 'flex', flexDirection: 'column', borderRight: '0.5px solid var(--color-border)', overflow: 'hidden' }}>
+      {/* ── Painel ─────────────────────────────────────────────────────────── */}
+      <div className="spn-tool-panel spn-glass spn-glass--chrome">
+        <header style={{ flex: '0 0 auto', padding: '15px 16px 12px', borderBottom: '0.5px solid var(--glass-line)' }}>
+          <h1 style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--color-text-primary)' }}>
+            Blocos 3D
+          </h1>
+          <p className="spn-hint" style={{ marginTop: 5 }}>
+            Fotos de um objeto viram um modelo 3D pronto para suas cenas e maquetes.
+          </p>
+        </header>
 
-        <div style={{ padding: '24px 24px 0', flexShrink: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em' }}>Blocos 3D</div>
-          <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 3 }}>
-            Transforme fotos de um objeto em um modelo 3D pronto para suas cenas e maquetes.
-          </div>
-        </div>
+        <div className="spn-tool-panel-body">
+          {/* Os ângulos são o trabalho: ficam na superfície, e sem a frente o
+              CTA não liga. */}
+          <div className="spn-field">
+            <span className="spn-field-label">Ângulos do objeto</span>
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 24 }}>
-
-          {/* Upload multiview */}
-          <div>
-            <label style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-text-secondary)', display: 'block', marginBottom: 10 }}>
-              Ângulos do objeto
-            </label>
-
-            {renderSlot('front', { width: '100%', height: 128, marginBottom: 8 })}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+            {renderSlot('front', { width: '100%', height: 128, marginBottom: 7 })}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 7 }}>
               {(['left', 'back', 'right'] as ViewPosition[]).map(pos => renderSlot(pos, { height: 72 }))}
             </div>
 
             <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }}
               onChange={(e) => { const f = e.target.files?.[0]; if (f) loadImageFile(f, activeSlotRef.current); e.target.value = '' }} />
 
-            <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>
+            <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+              <span className="spn-hint" style={{ marginTop: 0 }}>
                 {imageCount === 0 ? 'A frente é obrigatória' : imageCount === 1 ? '1 ângulo' : `${imageCount} ângulos`}
-                {imageCount >= 1 && ' · mais ângulos = mais fidelidade'}
+                {imageCount >= 1 && ' · mais ângulos, mais fidelidade'}
               </span>
               {imageCount > 0 && (
-                <button onClick={resetInput}
-                  style={{ fontSize: 10, color: 'var(--color-text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                  Limpar tudo
+                <button type="button" className="spn-ghost" style={{ height: 28, flex: '0 0 auto' }} onClick={resetInput}>
+                  Limpar
                 </button>
               )}
             </div>
 
-            <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 8, lineHeight: 1.5 }}>
-              Funciona melhor com um objeto único em destaque — mobiliário, luminária, elemento de fachada — sobre fundo limpo.
-            </div>
+            <p className="spn-hint">
+              Funciona melhor com um objeto único em destaque — mobiliário, luminária, elemento de
+              fachada — sobre fundo limpo.
+            </p>
           </div>
 
-          {/* Qualidade / motor */}
-          <div>
-            <label style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-text-secondary)', display: 'block', marginBottom: 10 }}>
-              Qualidade
-            </label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {BLOCOS3D_QUALITY_ORDER.map(q => {
-                const e = BLOCOS3D_ENGINES[q]
-                const available = engineAvailability[q]
-                const isSelected = quality === q && available
-                return (
-                  <button key={q} onClick={() => available && setQuality(q)} disabled={!available}
-                    title={available ? undefined : 'Indisponível no momento'}
-                    style={{
-                      display: 'flex', alignItems: 'flex-start', gap: 10,
-                      padding: '10px 12px', borderRadius: 8,
-                      border: `1px solid ${isSelected ? 'var(--color-border-focus)' : 'var(--color-border)'}`,
-                      background: isSelected ? 'var(--color-surface)' : 'transparent',
-                      cursor: available ? 'pointer' : 'not-allowed', textAlign: 'left', width: '100%',
-                      opacity: available ? 1 : 0.45,
-                      transition: 'border-color 0.15s, background 0.15s',
-                    }}
-                  >
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, marginTop: 4, background: isSelected ? 'var(--color-text-primary)' : 'var(--color-text-quaternary)', transition: 'background 0.15s' }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' as const }}>
-                        <span style={{ fontSize: 12, fontWeight: 500, color: isSelected ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', letterSpacing: '-0.01em' }}>{e.label}</span>
-                        {e.badge && (
-                          <span style={{
-                            fontSize: 8, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const,
-                            color: e.badge.tone === 'green' ? 'var(--color-accent-green)' : 'var(--color-text-tertiary)',
-                            background: e.badge.tone === 'green' ? 'var(--color-accent-green-bg)' : 'var(--color-chip)',
-                            border: e.badge.tone === 'green' ? '1px solid var(--color-accent-green-border)' : '1px solid var(--color-border)',
-                            padding: '1px 5px', borderRadius: 20,
-                          }}>
-                            {e.badge.label}
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ fontSize: 10.5, color: 'var(--color-text-secondary)', marginTop: 2, lineHeight: 1.45 }}>{e.description}</div>
-                      <div style={{ display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap' as const }}>
-                        {[...e.formats, ...e.features].map(tag => (
-                          <span key={tag} style={{
-                            fontSize: 9.5, color: 'var(--color-text-secondary)',
-                            background: 'var(--color-chip)', border: '1px solid var(--color-border-strong)',
-                            padding: '2px 7px', borderRadius: 5, letterSpacing: '0.02em', whiteSpace: 'nowrap' as const,
-                          }}>
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                      <div style={{ fontSize: 11, fontWeight: 600, color: isSelected ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)' }}>{e.costInNodes}</div>
-                      <div style={{ fontSize: 8, color: 'var(--color-text-quaternary)', letterSpacing: '0.06em' }}>NODES</div>
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
+          <SettingGroup>
+            <SettingRow icon={<RowIcon name="output" />} title="Saída"
+                        value={summarize([engine.label, `${nodeCost} nodes`, formatMinutes(engine.estimatedMs)])}
+                        onOpen={() => setSheet('saida')} />
+            {/* A linha de materiais só existe onde o motor a entende — uma
+                linha desabilitada seria ruído com cara de bug. */}
+            {engine.supportsTexturePrompt ? (
+              <SettingRow icon={<RowIcon name="materials" />} title="Materiais"
+                          value={summarize([texturePrompt.trim()])}
+                          onOpen={() => setSheet('materiais')} />
+            ) : null}
+          </SettingGroup>
 
-          {/* Prompt de materiais (só em motor que suporta) */}
-          {engine.supportsTexturePrompt && (
-            <div>
-              <label style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-text-secondary)', display: 'block', marginBottom: 10 }}>
-                Materiais (opcional)
-              </label>
-              <textarea
-                value={texturePrompt}
-                onChange={e => setTexturePrompt(e.target.value.slice(0, TEXTURE_PROMPT_MAX_LEN))}
-                placeholder="Descreva os materiais em inglês — ex: cream boucle fabric, soft nubby wool texture, visible weave detail"
-                rows={2}
-                style={{
-                  width: '100%', resize: 'vertical', minHeight: 52, maxHeight: 120,
-                  padding: '9px 11px', borderRadius: 8,
-                  border: '1px solid var(--color-border)', background: 'var(--color-surface)',
-                  fontSize: 11, color: 'var(--color-text-primary)', lineHeight: 1.5,
-                  outline: 'none', fontFamily: 'inherit',
-                }}
-              />
-              <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 4 }}>
-                Guia a texturização do modelo. Deixe vazio para seguir fielmente as fotos.
-              </div>
-            </div>
-          )}
-
-          {error && (
-            <div style={{ padding: '10px 12px', borderRadius: 8, background: 'var(--color-error-bg)', border: '0.5px solid var(--color-error-border)', fontSize: 11, color: 'var(--color-error)' }}>
-              {error}
-            </div>
-          )}
+          {error ? <div className="spn-error" style={{ marginTop: 14 }}>{error}</div> : null}
         </div>
 
-        {/* Rodapé */}
-        <div style={{ padding: '16px 24px', borderTop: '0.5px solid var(--color-border)', flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>
-              Custo: <span style={{ color: 'var(--color-text-primary)', fontWeight: 600 }}>{nodeCost} Nodes</span>
-              <span style={{ color: 'var(--color-text-tertiary)' }}> · {formatMinutes(engine.estimatedMs)}</span>
+        <div className="spn-dock spn-glass spn-glass--chrome">
+          <div className="spn-cost">
+            <div className="spn-cost-figures">
+              <div className="spn-cost-main">{nodeCost} nodes · {formatMinutes(engine.estimatedMs)}</div>
+              <div className="spn-cost-sub" style={credits < nodeCost ? { color: 'var(--color-error)' } : undefined}>
+                Saldo {credits}
+              </div>
             </div>
-            <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>
-              Saldo: <span style={{ color: credits > 0 ? 'var(--color-text-primary)' : 'var(--color-error)', fontWeight: 600 }}>{credits} Nodes</span>
-            </div>
+            <button type="button" className="spn-cta" onClick={handleSubmit} disabled={!canSubmit}>
+              {isGenerating ? 'Gerando…' : credits < nodeCost ? 'Saldo insuficiente' : 'Gerar bloco'}
+            </button>
           </div>
-          <button onClick={handleSubmit} disabled={!canSubmit}
-            style={{
-              width: '100%', padding: '12px 20px', borderRadius: 8, border: 'none',
-              background: canSubmit ? 'var(--color-inverse)' : 'var(--color-surface-hover)',
-              color: canSubmit ? 'var(--color-inverse-foreground)' : 'var(--color-text-quaternary)',
-              fontSize: 13, fontWeight: 600, cursor: canSubmit ? 'pointer' : 'not-allowed',
-              transition: 'background 0.15s, color 0.15s', letterSpacing: '-0.01em',
-            }}
-          >
-            {isGenerating ? 'Gerando bloco…' : credits < nodeCost ? 'Sem Nodes' : 'Gerar Bloco 3D'}
-          </button>
         </div>
       </div>
 
-      {/* ── Painel direito ──────────────────────────────────────────────────── */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
+      {/* ── Palco + histórico ──────────────────────────────────────────────── */}
+      <div style={{ minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {/* Sem .spn-glass aqui: o viewer repinta em rAF (ver o topo do arquivo). */}
+        <div className="spn-tool-stage" style={{ flex: 1 }}>
 
-        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', alignItems: 'stretch', justifyContent: 'center', padding: 32 }}>
-
-          {/* Em processamento */}
           {job?.status === 'processing' && <ProcessingPanel job={job} />}
 
           {/* Concluído aguardando URLs do detalhe (seleção vinda da listagem) */}
           {job?.status === 'completed' && !glbUrl && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-              <div style={{ width: 32, height: 32, borderRadius: '50%', border: '2px solid var(--color-border-strong)', borderTop: '2px solid var(--color-text-secondary)', animation: 'spin 0.9s linear infinite' }} />
-              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Abrindo o bloco…</span>
+              <span style={{
+                width: 30, height: 30, borderRadius: '50%',
+                border: '2px solid var(--glass-line-strong)',
+                borderTopColor: 'var(--color-text-secondary)',
+                animation: 'spnSpin 0.9s linear infinite',
+              }} />
+              <span style={{ fontSize: 12.5, color: 'var(--color-text-secondary)' }}>Abrindo o bloco…</span>
             </div>
           )}
 
           {/* Resultado */}
           {job?.status === 'completed' && glbUrl && (
-            <div style={{ width: '100%', height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', gap: 14, animation: 'fadeIn 0.3s ease' }}>
+            <div style={{
+              alignSelf: 'stretch', flex: 1, minHeight: 0,
+              display: 'flex', flexDirection: 'column', gap: 12, padding: 12,
+            }}>
               <div style={{
-                flex: 1, minHeight: 0, borderRadius: 14, overflow: 'hidden',
-                border: '0.5px solid var(--color-border)',
+                flex: 1, minHeight: 0, borderRadius: 'var(--r-card)', overflow: 'hidden',
+                border: '0.5px solid var(--glass-line)',
                 background: 'radial-gradient(120% 120% at 50% 0%, var(--color-bg-elevated) 0%, var(--color-bg) 100%)',
               }}>
                 <GlbViewer url={glbUrl} />
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' as const, flexShrink: 0 }}>
-                <div style={{ fontSize: 10.5, color: 'var(--color-text-secondary)', letterSpacing: '0.04em' }}>
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                gap: 10, flexWrap: 'wrap', flexShrink: 0,
+              }}>
+                <span className="spn-hint" style={{ marginTop: 0 }}>
                   Arraste para orbitar · scroll para zoom · {BLOCOS3D_ENGINES[job.quality]?.label ?? ''}
-                </div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' as const }}>
+                </span>
+                <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
                   {FORMAT_ORDER.filter(f => job.modelUrls[f]).map(f => (
-                    <button key={f} onClick={() => handleDownload(f)} disabled={downloading !== null}
-                      style={{
-                        fontSize: 11, fontWeight: 500, color: 'var(--color-text-secondary)',
-                        display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 6,
-                        border: '1px solid var(--color-border-strong)', background: 'var(--color-surface)',
-                        cursor: downloading ? 'wait' : 'pointer',
-                      }}
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                        <polyline points="7 10 12 15 17 10"/>
-                        <line x1="12" y1="15" x2="12" y2="3"/>
-                      </svg>
+                    <button key={f} type="button" className="spn-ghost"
+                            onClick={() => handleDownload(f)} disabled={downloading !== null}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      <DownloadIcon />
                       {downloading === f ? 'Baixando…' : FORMAT_LABEL[f]}
                     </button>
                   ))}
-                  <button onClick={() => { setJob(null); resetInput() }}
-                    style={{
-                      fontSize: 11, fontWeight: 500, color: 'var(--color-text-secondary)',
-                      display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 6,
-                      border: '1px solid var(--color-border-strong)', background: 'var(--color-surface)', cursor: 'pointer',
-                    }}
-                  >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 5v14M5 12h14"/>
+                  <button type="button" className="spn-ghost"
+                          onClick={() => { setJob(null); resetInput() }}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         strokeWidth="1.8" strokeLinecap="round" aria-hidden>
+                      <path d="M12 5v14M5 12h14" />
                     </svg>
                     Novo bloco
                   </button>
@@ -667,80 +638,71 @@ export default function Blocos3DClient({ initialCredits, engineAvailability, ini
 
           {/* Falha */}
           {job?.status === 'failed' && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, animation: 'fadeIn 0.2s ease' }}>
-              <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--color-error-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-error)" strokeWidth="1.8" strokeLinecap="round">
-                  <path d="M12 8v5M12 16.5v.01"/>
-                  <circle cx="12" cy="12" r="9"/>
-                </svg>
+            <div className="spn-glass" style={{
+              borderRadius: 'var(--r-card)', padding: '22px 24px', maxWidth: 360,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, textAlign: 'center',
+            }}>
+              <div className="spn-error">
+                {job.errorMessage ?? 'Falha no processamento.'} Os nodes foram estornados — tente de novo
+                com outras fotos ou outra qualidade.
               </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', fontWeight: 500 }}>A geração não foi concluída</div>
-                <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 5, maxWidth: 320, lineHeight: 1.5 }}>
-                  {job.errorMessage ?? 'Falha no processamento.'} Os nodes foram estornados — tente novamente com outras fotos ou qualidade.
-                </div>
-              </div>
-              <button onClick={() => setJob(null)}
-                style={{
-                  fontSize: 11, fontWeight: 500, color: 'var(--color-text-secondary)',
-                  padding: '7px 14px', borderRadius: 6,
-                  border: '1px solid var(--color-border-strong)', background: 'var(--color-surface)', cursor: 'pointer',
-                }}
-              >
-                Tentar novamente
-              </button>
+              <button type="button" className="spn-ghost" onClick={() => setJob(null)}>Tentar de novo</button>
             </div>
           )}
 
           {/* Vazio */}
           {!job && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, animation: 'fadeIn 0.2s ease' }}>
-              <div style={{ opacity: 0.16 }}>
-                <CubeGlyph size={56} strokeWidth={0.8} />
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', fontWeight: 500, letterSpacing: '-0.01em' }}>O bloco 3D aparecerá aqui</div>
-                <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 5, lineHeight: 1.5, maxWidth: 300 }}>
-                  Envie até 4 ângulos de um objeto para gerar um modelo 3D navegável — download em GLB, e todos os formatos no Premium.
-                </div>
-              </div>
+            <div className="spn-empty" style={{ maxWidth: 340 }}>
+              O bloco 3D aparece aqui.
+              <br />
+              Envie até 4 ângulos de um objeto — GLB sempre, todos os formatos no Premium.
             </div>
           )}
         </div>
 
         {/* Histórico do módulo */}
         {history.length > 0 && (
-          <div style={{ flexShrink: 0, borderTop: '0.5px solid var(--color-border)', padding: '12px 24px 14px' }}>
-            <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-text-secondary)', marginBottom: 10 }}>
-              Blocos recentes
-            </div>
-            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
+          <div className="spn-glass" style={{ flex: '0 0 auto', borderRadius: 'var(--r-card)', padding: '11px 14px 13px' }}>
+            <span className="spn-field-label">Blocos recentes</span>
+            <div style={{ display: 'flex', gap: 7, overflowX: 'auto', paddingBottom: 2 }}>
               {history.map(item => {
                 const thumb = item.thumbnailUrl ?? item.inputUrl
                 const isActive = job?.id === item.id
                 return (
-                  <button key={item.id} onClick={() => selectHistoryJob(item)}
+                  <button key={item.id} type="button" onClick={() => selectHistoryJob(item)}
                     title={item.status === 'failed' ? 'Falhou (estornado)' : item.status === 'processing' ? 'Gerando…' : 'Ver bloco'}
                     style={{
-                      position: 'relative', width: 64, height: 64, flexShrink: 0,
-                      borderRadius: 9, overflow: 'hidden', padding: 0,
-                      border: `1.5px solid ${isActive ? 'var(--color-border-focus)' : 'var(--color-border)'}`,
-                      background: 'var(--color-surface)', cursor: 'pointer',
+                      position: 'relative', width: 60, height: 60, flexShrink: 0,
+                      borderRadius: 10, overflow: 'hidden', padding: 0,
+                      border: `1px solid ${isActive ? 'var(--color-border-focus)' : 'var(--glass-line)'}`,
+                      background: 'var(--color-chip)', cursor: 'pointer',
                       opacity: item.status === 'failed' ? 0.45 : 1,
-                      transition: 'border-color 0.15s',
+                      transition: 'border-color 180ms var(--ease)',
                     }}
                   >
                     {thumb ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
                       <img src={thumb} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                     ) : (
-                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-quaternary)' }}>
+                      <span style={{
+                        width: '100%', height: '100%', display: 'flex', alignItems: 'center',
+                        justifyContent: 'center', color: 'var(--color-text-quaternary)',
+                      }}>
                         <CubeGlyph size={20} strokeWidth={1.2} />
-                      </div>
+                      </span>
                     )}
                     {item.status === 'processing' && (
-                      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'color-mix(in srgb, var(--color-bg) 55%, transparent)' }}>
-                        <div style={{ width: 14, height: 14, borderRadius: '50%', border: '1.5px solid var(--color-border-strong)', borderTop: '1.5px solid var(--color-text-primary)', animation: 'spin 0.9s linear infinite' }} />
-                      </div>
+                      <span style={{
+                        position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: 'var(--color-scrim)',
+                      }}>
+                        <span style={{
+                          width: 14, height: 14, borderRadius: '50%',
+                          border: '1.5px solid var(--glass-line-strong)',
+                          borderTopColor: '#f5f5f7',
+                          animation: 'spnSpin 0.9s linear infinite',
+                        }} />
+                      </span>
                     )}
                   </button>
                 )
@@ -749,6 +711,52 @@ export default function Blocos3DClient({ initialCredits, engineAvailability, ini
           </div>
         )}
       </div>
+
+      {/* ── Folhas ─────────────────────────────────────────────────────────── */}
+      <Sheet open={sheet === 'saida'} title="Saída" onClose={() => setSheet(null)}>
+        <div className="spn-field">
+          <span className="spn-field-label">Motor</span>
+          <ChoiceGroup
+            label="Motor"
+            cols={3}
+            value={quality}
+            onChange={setQuality}
+            options={BLOCOS3D_QUALITY_ORDER.map(q => ({
+              value:    q,
+              title:    BLOCOS3D_ENGINES[q].label,
+              note:     `${BLOCOS3D_ENGINES[q].costInNodes} nodes · ${formatMinutes(BLOCOS3D_ENGINES[q].estimatedMs)}`,
+              disabled: !engineAvailability[q],
+            }))}
+          />
+          <p className="spn-hint">{engine.description}</p>
+        </div>
+        <div className="spn-field">
+          <span className="spn-field-label">O que o {engine.label} entrega</span>
+          <div className="spn-pills">
+            {[...engine.formats, ...engine.features].map(tag => (
+              <span key={tag} className="spn-pill" style={{ cursor: 'default' }}>{tag}</span>
+            ))}
+          </div>
+          {BLOCOS3D_QUALITY_ORDER.some(q => !engineAvailability[q]) ? (
+            <p className="spn-hint">Um motor apagado está indisponível agora — os outros seguem gerando.</p>
+          ) : null}
+        </div>
+      </Sheet>
+
+      <Sheet open={sheet === 'materiais'} title="Materiais" onClose={() => setSheet(null)}>
+        <div className="spn-field">
+          <span className="spn-field-label">Descrição dos materiais</span>
+          <textarea
+            className="spn-textarea"
+            value={texturePrompt}
+            onChange={e => setTexturePrompt(e.target.value.slice(0, TEXTURE_PROMPT_MAX_LEN))}
+            placeholder="Em inglês — ex.: cream boucle fabric, soft nubby wool texture, visible weave detail"
+          />
+          <p className="spn-hint">
+            Guia a texturização do modelo. Em branco, o motor segue fielmente as fotos.
+          </p>
+        </div>
+      </Sheet>
     </div>
   )
 }

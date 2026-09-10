@@ -13,6 +13,7 @@
 // paga pela casa (decisão de produto: sem custo de nodes pro usuário).
 
 import { useRef, useState } from 'react'
+import { Sheet } from '@/components/app/glass'
 
 export interface SurfaceSelection {
   maskUrl:    string
@@ -108,143 +109,88 @@ export function SurfaceSelectModal({ imageUrl, initial, onConfirm, onUseBrush, o
     setCurrent(null)
   }
 
-  const chipStyle = (active: boolean): React.CSSProperties => ({
-    padding: '7px 14px', borderRadius: 999,
-    background: active ? 'rgba(29,158,117,0.14)' : 'var(--color-surface)',
-    border: active ? '0.5px solid rgba(29,158,117,0.55)' : '0.5px solid var(--color-border-strong)',
-    color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-    fontSize: 12, fontWeight: 500, letterSpacing: '-0.005em',
-    cursor: busy ? 'wait' : 'pointer', fontFamily: 'inherit',
-  })
-
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 120,
-      background: 'rgba(0,0,0,0.78)', backdropFilter: 'blur(8px)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
-    }}>
-      <div style={{
-        background: 'var(--color-bg-elevated)', border: '0.5px solid var(--color-border-strong)',
-        borderRadius: 14, padding: 18, maxWidth: 860, width: '100%',
-        display: 'flex', flexDirection: 'column', gap: 12, maxHeight: '92vh', overflowY: 'auto',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '-0.01em' }}>
-            Selecionar superfície
-          </div>
-          <button onClick={onClose} disabled={!!busy} style={{
-            fontSize: 11, color: 'var(--color-text-tertiary)', background: 'none',
-            textDecoration: 'underline', cursor: busy ? 'wait' : 'pointer', fontFamily: 'inherit',
-          }}>
-            Cancelar
-          </button>
-        </div>
+    <Sheet open title="Selecionar superfície" onClose={onClose} doneLabel="Cancelar">
+      <p className="spn-hint" style={{ marginTop: 0, marginBottom: 12 }}>
+        {current
+          ? <>Confira a área em <strong>verde</strong>. Para ajustar, escolha <strong>adicionar</strong> ou <strong>remover</strong> e clique na região.</>
+          : <>Clique na superfície que você quer alterar — ou use um atalho:</>}
+      </p>
 
-        <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
-          {current
-            ? <>Confira a área em <strong>verde</strong>. Para ajustar, escolha <strong>adicionar</strong> ou <strong>remover</strong> e clique na região.</>
-            : <>Clique na superfície que você quer alterar — ou use um atalho:</>}
-        </div>
-
-        {/* Atalhos semânticos + modo de refino */}
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <button type="button" onClick={() => pickSemantic('floor')} disabled={!!busy} style={chipStyle(false)}>
-            ▦ Piso
-          </button>
-          <button type="button" onClick={() => pickSemantic('wall')} disabled={!!busy} style={chipStyle(false)}>
-            ▤ Parede
-          </button>
-          {current && (
-            <>
-              <span style={{ width: 1, height: 18, background: 'var(--color-border-strong)', margin: '0 4px' }} />
-              <button type="button" onClick={() => setRefineMode('add')} disabled={!!busy} style={chipStyle(refineMode === 'add')}>
-                + Adicionar área
-              </button>
-              <button type="button" onClick={() => setRefineMode('remove')} disabled={!!busy} style={chipStyle(refineMode === 'remove')}>
-                − Remover área
-              </button>
-            </>
-          )}
-          <span style={{ flex: 1 }} />
-          {history.length > 0 && (
-            <button type="button" onClick={undo} disabled={!!busy} style={chipStyle(false)}>
-              ↶ Desfazer
+      {/* Atalhos semânticos + modo de refino, na mesma família de pílulas do
+          resto do app. `aria-checked` é o estado ativo e o seletor do CSS. */}
+      <div className="spn-pills" style={{ marginBottom: 12 }}>
+        <button type="button" className="spn-pill" onClick={() => pickSemantic('floor')} disabled={!!busy}>
+          ▦ Piso
+        </button>
+        <button type="button" className="spn-pill" onClick={() => pickSemantic('wall')} disabled={!!busy}>
+          ▤ Parede
+        </button>
+        {current && (
+          // Os dois modos de refino são um radiogroup DE VERDADE: `role="radio"`
+          // solto entre pílulas de ação (Piso, Parede, Desfazer, Limpar) não é
+          // dono de grupo nenhum, e o leitor de tela anuncia "opção 1 de 6".
+          <div className="spn-pills" role="radiogroup" aria-label="Modo de refino">
+            <button type="button" className="spn-pill" role="radio" aria-checked={refineMode === 'add'}
+                    onClick={() => setRefineMode('add')} disabled={!!busy}>
+              + Adicionar área
             </button>
-          )}
-          {current && (
-            <button type="button" onClick={clearAll} disabled={!!busy} style={chipStyle(false)}>
-              Limpar
+            <button type="button" className="spn-pill" role="radio" aria-checked={refineMode === 'remove'}
+                    onClick={() => setRefineMode('remove')} disabled={!!busy}>
+              − Remover área
             </button>
-          )}
-        </div>
-
-        {/* Imagem clicável (preview verde quando há seleção) */}
-        <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', border: '0.5px solid var(--color-border)' }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            ref={imgRef}
-            src={current?.previewUrl ?? imageUrl}
-            alt="selecionar superfície"
-            onClick={onImageClick}
-            draggable={false}
-            style={{
-              display: 'block', width: '100%', height: 'auto', maxHeight: '56vh',
-              objectFit: 'contain', background: 'var(--color-bg)',
-              cursor: busy ? 'wait' : 'crosshair', userSelect: 'none',
-            }}
-          />
-          {busy && (
-            <div style={{
-              position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)',
-              color: 'var(--color-text-primary)', fontSize: 13, fontWeight: 500, letterSpacing: '-0.005em',
-            }}>
-              {busy}
-            </div>
-          )}
-        </div>
-
-        {error && (
-          <div style={{
-            padding: '9px 12px', borderRadius: 8,
-            background: 'rgba(163,45,45,0.12)', border: '0.5px solid rgba(163,45,45,0.3)',
-            color: '#e57373', fontSize: 12,
-          }}>
-            {error}
           </div>
         )}
-
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <button
-            type="button"
-            onClick={() => current && onConfirm(current)}
-            disabled={!current || !!busy}
-            className="spn-action"
-            style={{
-              flex: 1, minWidth: 240, width: 'auto', padding: '12px 18px',
-              background: '#1D9E75', color: '#042818', border: '0.5px solid rgba(0,0,0,0.18)',
-              opacity: !current || busy ? 0.5 : 1,
-              cursor: !current || busy ? 'not-allowed' : 'pointer',
-            }}
-          >
-            {current
-              ? `Usar esta seleção — ${(current.coverage * 100).toFixed(1)}% da imagem`
-              : 'Clique na superfície para começar'}
-          </button>
-          {onUseBrush && (
-            <button
-              type="button"
-              onClick={onUseBrush}
-              disabled={!!busy}
-              className="spn-action spn-action--ghost"
-              style={{ width: 'auto', padding: '12px 16px', fontSize: 12 }}
-            >
-              Prefiro pintar com o pincel
-            </button>
-          )}
-        </div>
+        {history.length > 0 && (
+          <button type="button" className="spn-pill" onClick={undo} disabled={!!busy}>↶ Desfazer</button>
+        )}
+        {current && (
+          <button type="button" className="spn-pill" onClick={clearAll} disabled={!!busy}>Limpar</button>
+        )}
       </div>
-    </div>
+
+      {/* Imagem clicável (preview verde quando há seleção) */}
+      <div style={{
+        position: 'relative', borderRadius: 'var(--r-inner)', overflow: 'hidden',
+        border: '0.5px solid var(--glass-line)',
+      }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          ref={imgRef}
+          src={current?.previewUrl ?? imageUrl}
+          alt="selecionar superfície"
+          onClick={onImageClick}
+          draggable={false}
+          style={{
+            display: 'block', width: '100%', height: 'auto', maxHeight: '46dvh',
+            objectFit: 'contain', background: 'var(--color-preview-bg)',
+            cursor: busy ? 'wait' : 'crosshair', userSelect: 'none',
+          }}
+        />
+        {busy && <div className="spn-overlay">{busy}</div>}
+      </div>
+
+      {error && <div className="spn-error" style={{ marginTop: 12 }}>{error}</div>}
+
+      <div style={{ marginTop: 14, display: 'grid', gap: 8 }}>
+        <button
+          type="button"
+          className="spn-cta"
+          onClick={() => current && onConfirm(current)}
+          disabled={!current || !!busy}
+        >
+          {current
+            ? <>Usar esta seleção <span className="spn-cta-meta">{(current.coverage * 100).toFixed(1)}% da imagem</span></>
+            : 'Clique na superfície para começar'}
+        </button>
+        {onUseBrush && (
+          <button type="button" className="spn-ghost" onClick={onUseBrush} disabled={!!busy}
+                  style={{ width: '100%' }}>
+            Prefiro pintar com o pincel
+          </button>
+        )}
+      </div>
+    </Sheet>
   )
 }
 
@@ -263,14 +209,15 @@ export function SurfaceSelectionBar({ selection, onOpen, onClear, disabled }: {
         disabled={disabled}
         style={{
           display: 'flex', alignItems: 'center', gap: 10,
-          padding: '10px 12px', borderRadius: 10, width: '100%',
-          background: 'rgba(29,158,117,0.07)', border: '0.5px dashed rgba(29,158,117,0.45)',
+          padding: '10px 12px', borderRadius: 'var(--r-inner)', width: '100%',
+          background: 'var(--color-accent-green-bg)',
+          border: '0.5px dashed var(--color-accent-green-border)',
           color: 'var(--color-text-primary)', fontSize: 12, fontWeight: 500,
           letterSpacing: '-0.005em', cursor: disabled ? 'not-allowed' : 'pointer',
           fontFamily: 'inherit', textAlign: 'left', opacity: disabled ? 0.5 : 1,
         }}
       >
-        <span aria-hidden style={{ fontSize: 14, color: '#1D9E75' }}>⊙</span>
+        <span aria-hidden style={{ fontSize: 14, color: 'var(--color-accent-green)' }}>⊙</span>
         <span style={{ flex: 1 }}>
           Selecionar superfície com 1 clique
           <span style={{ display: 'block', fontSize: 10.5, fontWeight: 400, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
@@ -283,14 +230,15 @@ export function SurfaceSelectionBar({ selection, onOpen, onClear, disabled }: {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 10,
-      padding: 8, borderRadius: 10,
-      background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.45)',
+      padding: 8, borderRadius: 'var(--r-inner)',
+      background: 'var(--color-accent-green-bg)',
+      border: '0.5px solid var(--color-accent-green-border)',
     }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={selection.previewUrl}
         alt="superfície selecionada"
-        style={{ width: 64, height: 44, objectFit: 'cover', borderRadius: 6, border: '0.5px solid var(--color-border-strong)' }}
+        style={{ width: 64, height: 44, objectFit: 'cover', borderRadius: 6, border: '0.5px solid var(--glass-line)' }}
       />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 11.5, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.005em' }}>

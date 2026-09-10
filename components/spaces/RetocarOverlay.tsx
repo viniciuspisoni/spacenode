@@ -19,6 +19,11 @@ import { ReferencesPanel, suggestPromptForRole, downscaleImageForUpload, type Re
 import { ReferenceFocusModal, type NormCrop } from './ReferenceFocusModal'
 import { RetocarImportModal } from './RetocarImportModal'
 import { SurfaceSelectModal, SurfaceSelectionBar, type SurfaceSelection } from './SurfaceSelectModal'
+import { SurfaceConfirmSheet } from './SurfaceConfirmSheet'
+import { FULLSCREEN_OVERLAY, FULLSCREEN_SCREEN } from './fullscreen'
+import {
+  Segmented, Sheet, SettingGroup, SettingRow, RowIcon, summarize,
+} from '@/components/app/glass'
 import { uploadDirect } from '@/lib/storage/direct-upload-client'
 
 // Debug: mostra a imagem REJEITADA pelo quality gate (sem salvar) pra julgar se
@@ -65,6 +70,8 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
   // Camada de SUPERFÍCIE V2 (clique-primeiro): seleção ativa + modal.
   const [surfaceSel, setSurfaceSel]       = useState<SurfaceSelection | null>(null)
   const [surfacePicker, setSurfacePicker] = useState<{ initial: SurfaceSelection | null } | null>(null)
+  // Folha aberta no painel de ferramentas (Saída / Referências).
+  const [panelSheet, setPanelSheet] = useState<null | 'saida' | 'referencias'>(null)
   const [references, setReferences]     = useState<EditReferenceImage[]>([])
   const [refPicker, setRefPicker]       = useState<{ role: EditReferenceRole } | null>(null)
   const [refFocus, setRefFocus]         = useState<
@@ -416,15 +423,13 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
   }
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 100,
-      background: 'rgba(10,10,10,0.96)', backdropFilter: 'blur(20px)',
-      display: 'flex', flexDirection: 'column',
-    }}>
+    // Tela cheia, não folha: o Retocar TOMA a tela. O véu é o token forte
+    // sobre `.spn-overlay`, que já carrega o borrão e os dois fallbacks.
+    <div className="spn-overlay" style={{ ...FULLSCREEN_SCREEN, zIndex: 100, flexDirection: 'column' }}>
       {/* Header */}
-      <header style={{
+      <header className="spn-glass spn-glass--chrome" style={{
         padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        borderBottom: '0.5px solid var(--color-border)',
+        borderWidth: '0 0 0.5px', borderStyle: 'solid', flex: '0 0 auto',
       }}>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.01em' }}>
@@ -435,12 +440,8 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
             {stage === 'result' && ' · Resultado'}
           </div>
         </div>
-        <button onClick={onClose} style={{
-          width: 32, height: 32, borderRadius: 8,
-          background: 'var(--color-bg-elevated)', color: 'var(--color-text-secondary)',
-          border: '0.5px solid var(--color-border-strong)', cursor: 'pointer',
-          fontSize: 18,
-        }}>×</button>
+        <button type="button" onClick={onClose} className="spn-icon-btn" aria-label="Fechar"
+                style={{ fontSize: 18 }}>×</button>
       </header>
 
       {/* Body */}
@@ -533,24 +534,16 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
                     cursor: isRemove ? 'not-allowed' : 'text',
                   }}
                 />
-                {error && (
-                  <div style={{
-                    padding: '8px 12px', borderRadius: 8,
-                    background: 'rgba(163,45,45,0.12)', border: '0.5px solid rgba(163,45,45,0.3)',
-                    color: '#e57373', fontSize: 12,
-                  }}>
-                    {error}
-                  </div>
-                )}
+                {error && <div className="spn-error">{error}</div>}
                 {qualityGate && (
                   <div style={{
-                    padding: '10px 12px', borderRadius: 8,
-                    background: 'rgba(186,117,23,0.12)', border: '0.5px solid rgba(186,117,23,0.35)',
-                    color: '#e0a766', fontSize: 12, lineHeight: 1.5,
+                    padding: '10px 12px', borderRadius: 'var(--r-inner)',
+                    background: 'var(--color-warning-bg)', border: '0.5px solid var(--color-warning-border)',
+                    color: 'var(--color-warning)', fontSize: 12, lineHeight: 1.5,
                     display: 'flex', flexDirection: 'column', gap: 6,
                   }}>
                     <span style={{ fontWeight: 500 }}>A edição foi rejeitada para preservar sua imagem.</span>
-                    <span style={{ fontSize: 11, color: '#1D9E75' }}>Nenhum node foi consumido.</span>
+                    <span style={{ fontSize: 11, color: 'var(--color-accent-green)' }}>Nenhum node foi consumido.</span>
                     {references.length > 0 && (
                       <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
                         Dica: aumente um pouco a máscara ao redor do objeto para dar mais contexto.
@@ -567,10 +560,10 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
                       </div>
                     )}
                     <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
-                      <button type="button" onClick={() => setQualityGate(null)} className="spn-action spn-action--ghost"
-                        style={{ width: 'auto', padding: '6px 12px', fontSize: 11 }}>Tentar novamente</button>
-                      <button type="button" onClick={() => { setQualityGate(null); void handleGenerate(true) }} className="spn-action spn-action--ghost"
-                        style={{ width: 'auto', padding: '6px 12px', fontSize: 11 }}>Tentar com edição premium</button>
+                      <button type="button" onClick={() => setQualityGate(null)} className="spn-ghost"
+                        style={{ height: 28, fontSize: 11 }}>Tentar novamente</button>
+                      <button type="button" onClick={() => { setQualityGate(null); void handleGenerate(true) }} className="spn-ghost"
+                        style={{ height: 28, fontSize: 11 }}>Tentar com edição premium</button>
                     </div>
                   </div>
                 )}
@@ -586,34 +579,25 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
                         : (maskRequired
                             ? 'pinte a área a editar'
                             : 'sem seleção = vista inteira')}
-                    {largeMask && !surfaceSel && <span style={{ color: '#e0a766', marginLeft: 10 }}>⚠ área grande</span>}
+                    {largeMask && !surfaceSel && <span style={{ color: 'var(--color-warning)', marginLeft: 10 }}>⚠ área grande</span>}
                   </div>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     <button
+                      type="button"
                       onClick={() => handleGenerate(true)}
                       disabled={disabledPremium}
-                      className="spn-action spn-action--ghost"
+                      className="spn-ghost"
                       title="Modelo de máxima qualidade para pedidos complexos."
-                      style={{
-                        width: 'auto', padding: '11px 16px', fontSize: 12,
-                        opacity: disabledPremium ? 0.5 : 1,
-                      }}
+                      style={{ height: 44 }}
                     >
                       {premiumPreview ? `✦ Premium — ${premiumPreview.costNodes} nodes` : '✦ Premium'}
                     </button>
                     <button
+                      type="button"
                       onClick={() => handleGenerate(false)}
                       disabled={disabledBtn}
-                      className="spn-action"
-                      style={{
-                        width: 'auto', minWidth: 180, padding: '11px 22px',
-                        background: '#1D9E75', color: '#042818',
-                        border: '0.5px solid rgba(0,0,0,0.18)',
-                        opacity: disabledBtn ? 0.5 : 1,
-                        boxShadow: !disabledBtn
-                          ? 'inset 0 1px 0 rgba(255,255,255,0.18), 0 8px 24px rgba(29,158,117,0.18)'
-                          : 'none',
-                      }}
+                      className="spn-cta"
+                      style={{ width: 'auto', minWidth: 180 }}
                     >
                       {submitting
                         ? (segmenting ? 'Detectando superfície…' : validating ? 'Validando…' : 'Editando…')
@@ -641,10 +625,10 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
         </div>
 
         {/* Painel lateral */}
-        <aside style={{
-          background: 'var(--color-bg-elevated)',
-          border: '0.5px solid var(--color-border)',
-          borderRadius: 12, padding: 16,
+        {/* O painel de controle fica AO LADO do canvas, nunca por cima: o
+            RetocarCanvas repinta a máscara a cada pointermove. */}
+        <aside className="spn-glass spn-glass--chrome" style={{
+          borderRadius: 'var(--r-card)', padding: 16,
           display: 'flex', flexDirection: 'column', gap: 14,
           alignSelf: 'start', overflowY: 'auto', maxHeight: '100%',
         }}>
@@ -660,43 +644,49 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
                 <input
                   type="range" min={BRUSH_MIN} max={BRUSH_MAX} value={brush}
                   onChange={e => setBrush(Number(e.target.value))}
-                  style={{ width: '100%', accentColor: '#1D9E75' }}
+                  style={{ width: '100%', accentColor: 'var(--color-accent-green)' }}
                 />
               </div>
 
-              <button onClick={() => canvasRef.current?.clearMask()}
-                className="spn-action spn-action--ghost"
-                style={{ width: '100%', padding: '8px 12px', fontSize: 11 }}>
+              <button type="button" onClick={() => canvasRef.current?.clearMask()}
+                className="spn-ghost" style={{ width: '100%' }}>
                 Limpar máscara
               </button>
 
-              <div style={{ borderTop: '0.5px solid var(--color-border)', paddingTop: 12 }}>
-                <PanelLabel>Qualidade</PanelLabel>
-                <div style={{
-                  display: 'flex', gap: 4, padding: 3, marginTop: 8,
-                  background: 'var(--color-surface)', borderRadius: 8,
-                }}>
-                  {(['hd', '2k', '4k'] as Quality[]).map(q => {
-                    const active = q === quality
-                    return (
-                      <button key={q} onClick={() => setQuality(q)}
-                        style={{
-                          flex: 1, padding: '5px 0', borderRadius: 6,
-                          background: active ? 'var(--color-bg-elevated)' : 'transparent',
-                          color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                          fontSize: 11, fontWeight: 500,
-                          cursor: 'pointer',
-                          boxShadow: active ? 'inset 0 0 0 0.5px var(--color-border-strong)' : 'none',
-                        }}>
-                        {q.toUpperCase()}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
+              {/* Duas famílias saem da superfície do painel: cada uma vira
+                  UMA linha com o valor já resolvido, e a folha só abre se o
+                  usuário quiser mexer. */}
+              <SettingGroup>
+                <SettingRow
+                  icon={<RowIcon name="output" />}
+                  title="Saída"
+                  value={quality.toUpperCase()}
+                  onOpen={() => setPanelSheet('saida')}
+                  disabled={submitting}
+                />
+                <SettingRow
+                  icon={<RowIcon name="materials" />}
+                  title="Referências"
+                  value={summarize([references.length > 0 && `${references.length} imagem${references.length === 1 ? '' : 's'}`])}
+                  onOpen={() => setPanelSheet('referencias')}
+                  disabled={submitting}
+                />
+              </SettingGroup>
 
-              {/* Referências da edição */}
-              <div style={{ borderTop: '0.5px solid var(--color-border)', paddingTop: 12 }}>
+              <Sheet open={panelSheet === 'saida'} title="Saída" onClose={() => setPanelSheet(null)}>
+                <div className="spn-field">
+                  <span className="spn-field-label">Qualidade da edição</span>
+                  <Segmented
+                    label="Qualidade da edição"
+                    value={quality}
+                    onChange={setQuality}
+                    items={(['hd', '2k', '4k'] as Quality[]).map(q => ({ value: q, label: q.toUpperCase() }))}
+                    className="spn-glass--raised"
+                  />
+                </div>
+              </Sheet>
+
+              <Sheet open={panelSheet === 'referencias'} title="Referências" onClose={() => setPanelSheet(null)}>
                 <ReferencesPanel
                   references={references}
                   onAdd={handleAddReferenceKind}
@@ -705,13 +695,13 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
                   primaryRole={primaryRefRole}
                   disabled={submitting}
                 />
-              </div>
+              </Sheet>
             </>
           )}
 
           {/* DNA ativo */}
           {dna && (
-            <div style={{ borderTop: '0.5px solid var(--color-border)', paddingTop: 12 }}>
+            <div style={{ borderTop: '0.5px solid var(--glass-line)', paddingTop: 12 }}>
               <PanelLabel>DNA ativo</PanelLabel>
               <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 8, lineHeight: 1.55 }}>
                 <div style={{ marginBottom: 4 }}>
@@ -737,7 +727,7 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
 
           {/* Vista Mestre como thumb */}
           {space.vista_mestre_url && (
-            <div style={{ borderTop: '0.5px solid var(--color-border)', paddingTop: 12 }}>
+            <div style={{ borderTop: '0.5px solid var(--glass-line)', paddingTop: 12 }}>
               <PanelLabel>Referência</PanelLabel>
               <button
                 onClick={() => setShowMestreLightbox(true)}
@@ -760,23 +750,22 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
           )}
 
           {stage === 'editing' && (
-            <div style={{ borderTop: '0.5px solid var(--color-border)', paddingTop: 12, fontSize: 11, color: 'var(--color-text-tertiary)' }}>
-              Saldo: <span style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>{balance}</span> nodes
+            <div style={{ borderTop: '0.5px solid var(--glass-line)', paddingTop: 12 }}>
+              <span className="spn-balance">
+                <span className="spn-balance-dot" aria-hidden />
+                <b>{balance}</b> nodes
+              </span>
             </div>
           )}
         </aside>
       </div>
 
-      {/* Lightbox Vista Mestre */}
+      {/* Lightbox Vista Mestre — também tela cheia, mesmo véu. */}
       {showMestreLightbox && space.vista_mestre_url && (
         <div
+          className="spn-overlay"
           onClick={() => setShowMestreLightbox(false)}
-          style={{
-            position: 'fixed', inset: 0, zIndex: 110,
-            background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(10px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: 40, cursor: 'zoom-out',
-          }}
+          style={{ ...FULLSCREEN_OVERLAY, zIndex: 110, padding: 40, cursor: 'zoom-out' }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={space.vista_mestre_url} alt="Vista Mestre"
@@ -809,54 +798,20 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
         />
       )}
 
-      {/* Camada de SUPERFÍCIE (Fase 1): confirmação antes de aplicar na superfície inteira */}
-      {segConfirm && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 115,
-          background: 'rgba(0,0,0,0.74)', backdropFilter: 'blur(6px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
-        }}>
-          <div style={{
-            background: 'var(--color-bg-elevated)', border: '0.5px solid var(--color-border-strong)',
-            borderRadius: 14, padding: 18, maxWidth: 760, width: '100%',
-            display: 'flex', flexDirection: 'column', gap: 12, maxHeight: '90vh', overflowY: 'auto',
-          }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>
-              Detectamos a superfície inteira
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
-              Em vez de aplicar só no que você pintou, dá pra aplicar o material em <strong>toda a superfície destacada em verde</strong> — até onde ela termina de verdade. <strong>Confira que só a superfície ficou em verde</strong>: se pegou tapete, cama ou móveis (porque o pincel passou por cima deles), use <strong>“Usar só o que pintei”</strong> e pinte de novo evitando os objetos.
-            </div>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={segConfirm.previewUrl} alt="superfície detectada"
-              style={{ width: '100%', maxHeight: 360, objectFit: 'contain', borderRadius: 8, border: '0.5px solid var(--color-border)' }} />
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 2 }}>
-              <button type="button" onClick={confirmSurface} className="spn-action"
-                style={{ flex: 1, minWidth: 220, width: 'auto', padding: '11px 18px', background: '#1D9E75', color: '#042818', border: '0.5px solid rgba(0,0,0,0.18)' }}>
-                Aplicar na superfície — {segConfirm.surfaceCost} nodes
-              </button>
-              <button type="button"
-                onClick={() => {
-                  // Refina a detecção por cliques em vez de aceitar/recusar.
-                  setSurfacePicker({ initial: { maskUrl: segConfirm.surfaceMaskUrl, previewUrl: segConfirm.previewUrl, coverage: segConfirm.surfaceCoverage } })
-                  setSegConfirm(null)
-                }}
-                className="spn-action spn-action--ghost"
-                style={{ width: 'auto', padding: '11px 16px', fontSize: 12 }}>
-                Refinar seleção
-              </button>
-              <button type="button" onClick={useBlobOnly} className="spn-action spn-action--ghost"
-                style={{ width: 'auto', padding: '11px 16px', fontSize: 12 }}>
-                Usar só o que pintei
-              </button>
-              <button type="button" onClick={() => { setSegConfirm(null); setSubmitting(false) }} className="spn-action spn-action--ghost"
-                style={{ width: 'auto', padding: '11px 14px', fontSize: 12 }}>
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Camada de SUPERFÍCIE (Fase 1): confirmação antes de aplicar na
+          superfície inteira. A peça é a mesma do fluxo avulso — era a MESMA
+          marcação copiada nos dois arquivos. */}
+      <SurfaceConfirmSheet
+        data={segConfirm}
+        onApply={confirmSurface}
+        onRefine={d => {
+          // Refina a detecção por cliques em vez de aceitar/recusar.
+          setSurfacePicker({ initial: { maskUrl: d.surfaceMaskUrl, previewUrl: d.previewUrl, coverage: d.surfaceCoverage } })
+          setSegConfirm(null)
+        }}
+        onBlobOnly={useBlobOnly}
+        onCancel={() => { setSegConfirm(null); setSubmitting(false) }}
+      />
 
       {/* Seleção de SUPERFÍCIE por clique (V2 — clique-primeiro no Trocar material) */}
       {surfacePicker && vista.image_url && (
@@ -905,8 +860,8 @@ function ResultPane({ beforeUrl, afterUrl, prompt, driftWarning, onAccept, onRed
       {driftWarning !== null && (
         <div style={{
           padding: '10px 14px', borderRadius: 8,
-          background: 'rgba(186,117,23,0.12)', border: '0.5px solid rgba(186,117,23,0.3)',
-          color: '#e0a766', fontSize: 12,
+          background: 'var(--color-warning-bg)', border: '0.5px solid var(--color-warning-border)',
+          color: 'var(--color-warning)', fontSize: 12,
         }}>
           ⚠ Motor alterou {(driftWarning * 100).toFixed(1)}% dos pixels fora da máscara (acima do limite de 2%).
         </div>
@@ -939,10 +894,10 @@ function ResultPane({ beforeUrl, afterUrl, prompt, driftWarning, onAccept, onRed
         }} />
       </div>
 
-      <div style={{
-        background: 'var(--color-bg-elevated)',
-        border: '0.5px solid var(--color-border)',
-        borderRadius: 12, padding: 14,
+      {/* Barra de decisão AO LADO do comparador, nunca por cima: o slider
+          move um clipe a cada pointermove com duas imagens empilhadas. */}
+      <div className="spn-glass" style={{
+        borderRadius: 'var(--r-card)', padding: 14,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         gap: 10, flexWrap: 'wrap',
       }}>
@@ -950,20 +905,16 @@ function ResultPane({ beforeUrl, afterUrl, prompt, driftWarning, onAccept, onRed
           &quot;{prompt}&quot;
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button onClick={onDiscard} className="spn-action spn-action--ghost"
-            style={{ width: 'auto', padding: '9px 16px', fontSize: 12, color: '#e57373' }}>
+          <button onClick={onDiscard} className="spn-ghost"
+            style={{ width: 'auto', padding: '9px 16px', fontSize: 12, color: 'var(--color-error)' }}>
             Descartar
           </button>
-          <button onClick={onRedo} className="spn-action spn-action--ghost"
+          <button onClick={onRedo} className="spn-ghost"
             style={{ width: 'auto', padding: '9px 16px', fontSize: 12 }}>
             ↶ Refazer
           </button>
-          <button onClick={onAccept} className="spn-action"
-            style={{
-              width: 'auto', padding: '9px 18px', fontSize: 12,
-              background: '#1D9E75', color: '#042818',
-              border: '0.5px solid rgba(0,0,0,0.18)',
-            }}>
+          <button type="button" onClick={onAccept} className="spn-cta"
+            style={{ width: 'auto', minWidth: 200 }}>
             ✓ Aceitar como nova versão
           </button>
         </div>

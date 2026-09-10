@@ -39,12 +39,7 @@ export function VistasGrid({ vistas, vistaMestreUrl }: Props) {
 
   if (vistas.length === 0) {
     return (
-      <div style={{
-        padding: '60px 24px', textAlign: 'center',
-        background: 'var(--color-bg-elevated)',
-        border: '0.5px dashed var(--color-border-strong)',
-        borderRadius: 14,
-      }}>
+      <div className="spn-empty" style={{ padding: '60px 24px' }}>
         <div style={{
           fontSize: 14, fontWeight: 500, color: 'var(--color-text-secondary)',
           marginBottom: 6, letterSpacing: '-0.01em',
@@ -123,11 +118,11 @@ function MestreCard({ vistaMestreUrl }: { vistaMestreUrl: string }) {
       href={vistaMestreUrl}
       target="_blank"
       rel="noopener noreferrer"
+      className="spn-glass spn-card"
       style={{
         display: 'flex', flexDirection: 'column',
-        background: 'var(--color-bg-elevated)',
-        border: '0.5px solid rgba(70,209,145,0.45)',
-        borderRadius: 12, overflow: 'hidden',
+        borderColor: 'var(--color-accent-green-border)',
+        overflow: 'hidden',
         textDecoration: 'none', color: 'inherit',
         transition: 'border-color 0.2s, transform 0.2s',
         position: 'relative',
@@ -137,13 +132,14 @@ function MestreCard({ vistaMestreUrl }: { vistaMestreUrl: string }) {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={vistaMestreUrl} alt="Vista Mestre"
           style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        <div style={{
+        {/* Verde aqui é ESTADO (esta é a original), não ação: fica como cor
+            do texto sobre o vidro, não como fundo de botão. */}
+        <div className="spn-glass spn-glass--raised" style={{
           position: 'absolute', top: 8, left: 8,
           display: 'inline-flex', alignItems: 'center', gap: 6,
-          padding: '4px 8px', borderRadius: 5,
-          background: 'rgba(29,158,117,0.85)', backdropFilter: 'blur(8px)',
+          padding: '4px 8px', borderRadius: 999,
           fontSize: 9, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase',
-          color: '#fff',
+          color: 'var(--color-accent-green)',
         }}>
           original
         </div>

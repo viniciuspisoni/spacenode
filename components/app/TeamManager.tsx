@@ -3,9 +3,15 @@
 // Painel de gestão da Equipe (só owner/admin). Convidar por link, revogar
 // convites pendentes e gerenciar papéis/remoção de membros. Após cada ação,
 // router.refresh() re-renderiza os dados do servidor.
+//
+// Eram três cartões empilhados, sempre abertos. Convidar é o que o gestor vem
+// fazer — fica na superfície. Revogar convite e mexer em papel são manutenção
+// ocasional: viram duas linhas que já dizem quantos são, e a folha abre só se
+// ele quiser mexer.
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { RowIcon, SettingGroup, SettingRow, Sheet, summarize } from '@/components/app/glass'
 
 export type ManagerMember = { userId: string; name: string; role: 'owner' | 'admin' | 'member'; isSelf: boolean }
 export type ManagerInvite = { id: string; email: string; role: string; expiresAt: string }
@@ -15,29 +21,9 @@ interface Props {
   invites: ManagerInvite[]
 }
 
-const card: React.CSSProperties = {
-  background: 'var(--color-bg-elevated)',
-  border: '0.5px solid var(--color-border)',
-  borderRadius: 14, padding: '20px 22px', marginBottom: 18,
-}
-const heading: React.CSSProperties = {
-  fontSize: 11, fontWeight: 600, letterSpacing: '0.12em',
-  textTransform: 'uppercase', color: 'var(--color-text-tertiary)', marginBottom: 16,
-}
-const inputStyle: React.CSSProperties = {
-  flex: 1, minWidth: 0, padding: '9px 12px', borderRadius: 8,
-  background: 'var(--color-surface)', border: '0.5px solid var(--color-border-strong)',
-  color: 'var(--color-text-primary)', fontSize: 13, outline: 'none',
-}
-const btn: React.CSSProperties = {
-  padding: '9px 16px', borderRadius: 8, border: 'none',
-  background: 'var(--color-accent-green)', color: '#06140d',
-  fontSize: 12.5, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
-}
-const ghostBtn: React.CSSProperties = {
-  padding: '6px 10px', borderRadius: 7,
-  background: 'var(--color-surface)', border: '0.5px solid var(--color-border-strong)',
-  color: 'var(--color-text-secondary)', fontSize: 11.5, fontWeight: 500, cursor: 'pointer',
+const rowLine: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+  gap: 12, padding: '11px 0', borderBottom: '0.5px solid var(--glass-line)',
 }
 
 export function TeamManager({ members, invites }: Props) {
@@ -49,6 +35,7 @@ export function TeamManager({ members, invites }: Props) {
   const [link, setLink] = useState<string | null>(null)
   const [emailed, setEmailed] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [sheet, setSheet] = useState<'invites' | 'members' | null>(null)
 
   async function createInvite(e: React.FormEvent) {
     e.preventDefault()
@@ -90,23 +77,25 @@ export function TeamManager({ members, invites }: Props) {
   }
 
   const manageable = members.filter((m) => m.role !== 'owner')
+  const admins = manageable.filter((m) => m.role === 'admin').length
 
   return (
-    <div style={{ marginBottom: 26 }}>
-      {/* Convidar */}
-      <div style={card}>
-        <div style={heading}>Convidar membro</div>
+    <div style={{ marginBottom: 26, display: 'grid', gap: 12 }}>
+      {/* Convidar — a ação pela qual o gestor abriu esta tela. */}
+      <div className="spn-glass" style={{ borderRadius: 'var(--r-card)', padding: '20px 22px' }}>
+        <div className="spn-field-label">Convidar membro</div>
         <form onSubmit={createInvite} style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <input
             type="email" required placeholder="email@pessoa.com" value={email}
-            onChange={(e) => setEmail(e.target.value)} style={inputStyle}
+            onChange={(e) => setEmail(e.target.value)} className="spn-input"
+            style={{ flex: 1, minWidth: 180, width: 'auto' }}
           />
           <select value={role} onChange={(e) => setRole(e.target.value as 'member' | 'admin')}
-            style={{ ...inputStyle, flex: '0 0 120px' }}>
+            className="spn-input" style={{ flex: '0 0 120px', width: 'auto' }}>
             <option value="member">membro</option>
             <option value="admin">admin</option>
           </select>
-          <button type="submit" disabled={busy} style={{ ...btn, opacity: busy ? 0.7 : 1 }}>
+          <button type="submit" className="spn-cta" disabled={busy} style={{ width: 'auto', minHeight: 38 }}>
             {busy ? 'Gerando…' : 'Gerar link'}
           </button>
         </form>
@@ -119,39 +108,63 @@ export function TeamManager({ members, invites }: Props) {
                 : 'Link gerado — envie para a pessoa (WhatsApp, email…). Só o email convidado consegue aceitar.'}
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <input readOnly value={link} style={{ ...inputStyle, fontSize: 12, color: 'var(--color-text-secondary)' }} />
-              <button onClick={copy} style={ghostBtn}>{copied ? 'copiado ✓' : 'copiar'}</button>
+              <input readOnly value={link} className="spn-input" style={{ flex: 1, minWidth: 0, width: 'auto', color: 'var(--color-text-secondary)' }} />
+              <button onClick={copy} className="spn-ghost">{copied ? 'copiado ✓' : 'copiar'}</button>
             </div>
           </div>
         )}
 
-        {error && <p style={{ marginTop: 12, fontSize: 12.5, color: 'var(--color-error)' }}>{error}</p>}
+        {error && <div className="spn-error" style={{ marginTop: 12 }}>{error}</div>}
       </div>
 
-      {/* Convites pendentes */}
-      {invites.length > 0 && (
-        <div style={card}>
-          <div style={heading}>Convites pendentes</div>
+      {/* Manutenção: duas linhas que já mostram o número, e abrem se precisar. */}
+      {(invites.length > 0 || manageable.length > 0) && (
+        <SettingGroup>
+          {invites.length > 0 && (
+            <SettingRow
+              icon={<RowIcon name="direction" />}
+              title="Convites pendentes"
+              value={`${invites.length} aguardando`}
+              onOpen={() => setSheet('invites')}
+              controls="equipe-convites"
+            />
+          )}
+          {manageable.length > 0 && (
+            <SettingRow
+              icon={<RowIcon name="scene" />}
+              title="Gerenciar membros"
+              value={summarize([
+                `${manageable.length} pessoa${manageable.length === 1 ? '' : 's'}`,
+                admins > 0 ? `${admins} admin${admins === 1 ? '' : 's'}` : '',
+              ])}
+              onOpen={() => setSheet('members')}
+              controls="equipe-membros"
+            />
+          )}
+        </SettingGroup>
+      )}
+
+      <Sheet open={sheet === 'invites'} title="Convites pendentes" onClose={() => setSheet(null)}>
+        <div id="equipe-convites">
           {invites.map((inv) => (
-            <div key={inv.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '9px 0', borderBottom: '0.5px solid var(--color-border)' }}>
+            <div key={inv.id} style={rowLine}>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 13, color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{inv.email}</div>
                 <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 1 }}>
                   {inv.role === 'admin' ? 'admin' : 'membro'} · expira {fmt(inv.expiresAt)}
                 </div>
               </div>
-              <button onClick={() => post(`/api/workspaces/invites/${inv.id}/revoke`)} style={ghostBtn}>revogar</button>
+              <button onClick={() => post(`/api/workspaces/invites/${inv.id}/revoke`)} className="spn-ghost">revogar</button>
             </div>
           ))}
         </div>
-      )}
+        {error && <div className="spn-error" style={{ marginTop: 12 }}>{error}</div>}
+      </Sheet>
 
-      {/* Gerenciar membros */}
-      {manageable.length > 0 && (
-        <div style={card}>
-          <div style={heading}>Gerenciar membros</div>
+      <Sheet open={sheet === 'members'} title="Gerenciar membros" onClose={() => setSheet(null)}>
+        <div id="equipe-membros">
           {manageable.map((m) => (
-            <div key={m.userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '9px 0', borderBottom: '0.5px solid var(--color-border)' }}>
+            <div key={m.userId} style={rowLine}>
               <div style={{ fontSize: 13, color: 'var(--color-text-primary)', minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {m.name}{m.isSelf && <span style={{ color: 'var(--color-text-tertiary)' }}> · você</span>}
               </div>
@@ -159,20 +172,23 @@ export function TeamManager({ members, invites }: Props) {
                 <select
                   value={m.role}
                   onChange={(e) => post(`/api/workspaces/members/${m.userId}`, { action: 'set_role', role: e.target.value })}
-                  style={{ ...ghostBtn, padding: '6px 8px' }}
+                  className="spn-ghost"
+                  style={{ padding: '0 8px' }}
                 >
                   <option value="member">membro</option>
                   <option value="admin">admin</option>
                 </select>
                 <button onClick={() => post(`/api/workspaces/members/${m.userId}`, { action: 'remove' })}
-                  style={{ ...ghostBtn, color: 'var(--color-error)', borderColor: 'var(--color-error-border)' }}>
+                  className="spn-ghost"
+                  style={{ color: 'var(--color-error)', borderColor: 'var(--color-error-border)' }}>
                   remover
                 </button>
               </div>
             </div>
           ))}
         </div>
-      )}
+        {error && <div className="spn-error" style={{ marginTop: 12 }}>{error}</div>}
+      </Sheet>
     </div>
   )
 }

@@ -53,6 +53,8 @@ export default function RenderPicker({ minSelection, maxSelection, initialSelect
 
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
   const escapeRef   = useRef<(e: KeyboardEvent) => void>(() => {})
+  const dialogRef   = useRef<HTMLDivElement | null>(null)
+  const restoreFocusRef = useRef<HTMLElement | null>(null)
 
   // Bloqueia scroll do body enquanto o modal está aberto
   useEffect(() => {
@@ -60,6 +62,34 @@ export default function RenderPicker({ minSelection, maxSelection, initialSelect
     document.body.style.overflow = 'hidden'
     return () => { document.body.style.overflow = original }
   }, [])
+
+  // Foco entra no diálogo e volta pra quem abriu. O `aria-modal="true"` faz o
+  // leitor de tela tratar o resto da página como inerte — sem trazer o foco
+  // pra cá, o usuário ficaria preso em conteúdo que a AT acabou de esconder.
+  // Mesma receita da folha (components/app/glass/Sheet.tsx).
+  useEffect(() => {
+    restoreFocusRef.current = document.activeElement as HTMLElement | null
+    const t = window.setTimeout(() => dialogRef.current?.focus(), 40)
+    return () => {
+      window.clearTimeout(t)
+      restoreFocusRef.current?.focus?.()
+    }
+  }, [])
+
+  // Tab preso dentro do diálogo enquanto ele estiver aberto.
+  function onKeyDownTrap(ev: React.KeyboardEvent) {
+    if (ev.key !== 'Tab') return
+    const root = dialogRef.current
+    if (!root) return
+    const focusables = root.querySelectorAll<HTMLElement>(
+      'a[href], button:not(:disabled), textarea:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])',
+    )
+    if (focusables.length === 0) return
+    const first = focusables[0]
+    const last  = focusables[focusables.length - 1]
+    if (ev.shiftKey && document.activeElement === first) { ev.preventDefault(); last.focus() }
+    else if (!ev.shiftKey && document.activeElement === last) { ev.preventDefault(); first.focus() }
+  }
 
   // Esc fecha
   useEffect(() => {
@@ -135,63 +165,61 @@ export default function RenderPicker({ minSelection, maxSelection, initialSelect
   const canConfirm = selectedIds.length >= minSelection && selectedIds.length <= maxSelection
 
   return (
+    /* O scrim é o mesmo da folha (.spn-scrim): era aqui que morava o único
+       backdrop-filter inline do módulo — e inline ele não é alcançado pelos
+       fallbacks de @supports e prefers-reduced-transparency. */
     <div
+      className="spn-scrim"
+      data-open="true"
       onClick={onClose}
       style={{
-        position: 'fixed', inset: 0, zIndex: 100,
-        background: 'var(--color-scrim-strong)', backdropFilter: 'blur(6px)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         padding: 24,
-        animation: 'pickerFadeIn 0.18s ease',
       }}
     >
       <style>{`
-        @keyframes pickerFadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes pickerScaleIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
       `}</style>
 
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Selecionar imagens do histórico"
+        tabIndex={-1}
+        onKeyDown={onKeyDownTrap}
         onClick={(e) => e.stopPropagation()}
+        className="spn-glass spn-glass--chrome"
         style={{
           width: '100%', maxWidth: 1100, maxHeight: '90vh',
-          background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)',
-          borderRadius: 14, border: '0.5px solid var(--color-border-strong)',
+          color: 'var(--color-text-primary)',
+          borderRadius: 'var(--r-card)',
+          boxShadow: 'var(--shadow-float)',
           display: 'flex', flexDirection: 'column', overflow: 'hidden',
-          animation: 'pickerScaleIn 0.2s ease',
+          animation: 'pickerScaleIn 0.2s var(--ease)',
         }}
       >
         {/* Header */}
         <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '20px 24px',
-          borderBottom: '0.5px solid var(--color-border)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14,
+          padding: '16px 20px',
+          borderBottom: '0.5px solid var(--glass-line)',
           flexShrink: 0,
         }}>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em' }}>
-              Selecionar imagens do histórico
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 3 }}>
-              Escolha de {minSelection} a {maxSelection} imagens. A ordem da seleção será a ordem do carrossel.
-            </div>
+          <div style={{ minWidth: 0 }}>
+            <div className="spn-sheet-title">Selecionar imagens do histórico</div>
+            <p className="spn-hint" style={{ marginTop: 3 }}>
+              De {minSelection} a {maxSelection} imagens. A ordem da seleção é a ordem do carrossel.
+            </p>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={{
-              fontSize: 11, fontWeight: 500,
-              color: selectedIds.length >= minSelection ? 'var(--color-accent-green)' : 'var(--color-text-tertiary)',
-              padding: '6px 12px', borderRadius: 999,
-              background: selectedIds.length >= minSelection ? 'var(--color-accent-green-bg)' : 'var(--color-chip)',
-              border: `0.5px solid ${selectedIds.length >= minSelection ? 'var(--color-accent-green-border)' : 'var(--color-border-strong)'}`,
-            }}>
-              {selectedIds.length} / {maxSelection}
-            </div>
-            <button onClick={onClose}
-              style={{
-                background: 'none', border: 'none', cursor: 'pointer',
-                color: 'var(--color-text-tertiary)', padding: 4,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+            {/* Verde é ESTADO: aqui ele diz "já dá pra confirmar", não é ação. */}
+            <span className="spn-balance spn-glass spn-glass--raised">
+              {selectedIds.length >= minSelection ? <span className="spn-balance-dot" /> : null}
+              <b>{selectedIds.length}</b> / {maxSelection}
+            </span>
+            <button type="button" className="spn-icon-btn" onClick={onClose} aria-label="Fechar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
                 <path d="M18 6L6 18M6 6l12 12"/>
               </svg>
             </button>
@@ -199,19 +227,17 @@ export default function RenderPicker({ minSelection, maxSelection, initialSelect
         </div>
 
         {/* Grid */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '18px 20px' }}>
           {renders.length === 0 && !loading && !error && (
-            <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 13 }}>
+            <div className="spn-empty" style={{ maxWidth: 380, margin: '40px auto' }}>
               Você ainda não tem imagens no histórico.
               <br />
-              <span style={{ fontSize: 11 }}>Gere alguns renders primeiro para montar uma prancha.</span>
+              Gere alguns renders primeiro para montar uma prancha.
             </div>
           )}
 
           {error && (
-            <div style={{ padding: 14, borderRadius: 8, background: 'var(--color-error-bg)', border: '0.5px solid var(--color-error-border)', fontSize: 12, color: 'var(--color-error)', marginBottom: 16 }}>
-              {error}
-            </div>
+            <div className="spn-error" style={{ marginBottom: 14 }}>{error}</div>
           )}
 
           <div style={{
@@ -288,35 +314,20 @@ export default function RenderPicker({ minSelection, maxSelection, initialSelect
 
         {/* Footer */}
         <div style={{
-          padding: '16px 24px',
-          borderTop: '0.5px solid var(--color-border)',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '14px 20px',
+          borderTop: '0.5px solid var(--glass-line)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
           flexShrink: 0,
         }}>
-          <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+          <span className="spn-hint" style={{ marginTop: 0 }}>
             {selectedIds.length < minSelection
               ? `Selecione mais ${minSelection - selectedIds.length} imagem${minSelection - selectedIds.length === 1 ? '' : 'ns'}.`
               : `${selectedIds.length} imagem${selectedIds.length === 1 ? '' : 'ns'} selecionada${selectedIds.length === 1 ? '' : 's'}.`}
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={onClose}
-              style={{
-                padding: '9px 16px', borderRadius: 8,
-                background: 'transparent', border: '1px solid var(--color-border-strong)',
-                color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 500,
-                cursor: 'pointer', letterSpacing: '-0.01em',
-              }}>
-              Cancelar
-            </button>
-            <button onClick={handleConfirm} disabled={!canConfirm}
-              style={{
-                padding: '9px 18px', borderRadius: 8, border: 'none',
-                background: canConfirm ? 'var(--color-inverse)' : 'var(--color-surface-hover)',
-                color:      canConfirm ? 'var(--color-inverse-foreground)' : 'var(--color-text-tertiary)',
-                fontSize: 12, fontWeight: 600,
-                cursor: canConfirm ? 'pointer' : 'not-allowed',
-                letterSpacing: '-0.01em',
-              }}>
+          </span>
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+            <button type="button" className="spn-ghost" onClick={onClose}>Cancelar</button>
+            <button type="button" className="spn-cta" style={{ width: 'auto', minHeight: 34, padding: '0 18px' }}
+                    onClick={handleConfirm} disabled={!canConfirm}>
               Confirmar seleção
             </button>
           </div>

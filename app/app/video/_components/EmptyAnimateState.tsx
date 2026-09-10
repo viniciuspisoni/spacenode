@@ -18,8 +18,11 @@ interface Props {
 
 export default function EmptyAnimateState({ onPick, onPickFromHistory, isDragging }: Props) {
   return (
+    // .spn-empty é a única caixa de vazio do app — aqui ela só recebe a
+    // geometria de "ocupa o palco inteiro" e o realce de arrastar.
     <div
       onClick={onPick}
+      className="spn-empty"
       style={{
         flex:           1,
         display:        'flex',
@@ -27,21 +30,16 @@ export default function EmptyAnimateState({ onPick, onPickFromHistory, isDraggin
         alignItems:     'center',
         justifyContent: 'center',
         gap:            20,
-        margin:         28,
-        marginTop:      8,
-        padding:        '48px 32px',
-        borderRadius:   16,
-        border:         `1.5px dashed ${isDragging ? 'var(--color-border-focus)' : 'var(--color-border)'}`,
-        background:     isDragging ? 'var(--color-surface)' : 'transparent',
-        color:          'inherit',
+        margin:         14,
+        padding:        '40px 32px',
+        borderColor:    isDragging ? 'var(--color-border-focus)' : undefined,
+        background:     isDragging ? 'var(--color-chip)' : undefined,
         cursor:         'pointer',
-        transition:     'border-color 0.18s, background 0.18s',
+        transition:     'border-color 180ms var(--ease), background 180ms var(--ease)',
       }}
     >
-      <div style={{
+      <div className="spn-glass spn-glass--raised" style={{
         width:        58, height: 58, borderRadius: 16,
-        background:   'var(--color-surface)',
-        border:       '0.5px solid var(--color-border-strong)',
         display:      'flex', alignItems: 'center', justifyContent: 'center',
         color:        'var(--color-text-secondary)',
       }}>
@@ -85,10 +83,10 @@ export default function EmptyAnimateState({ onPick, onPickFromHistory, isDraggin
               fontSize:      10.5,
               letterSpacing: '-0.005em',
               color:         'var(--color-text-secondary)',
-              padding:       '4px 10px',
-              borderRadius:  20,
-              border:        '1px solid var(--color-border)',
-              background:    'var(--color-surface-subtle)',
+              padding:       '4px 11px',
+              borderRadius:  999,
+              border:        '0.5px solid var(--glass-line)',
+              background:    'var(--color-chip)',
             }}>
               {u}
             </span>
@@ -99,41 +97,17 @@ export default function EmptyAnimateState({ onPick, onPickFromHistory, isDraggin
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
         <button
           type="button"
+          className="spn-cta"
           onClick={e => { e.stopPropagation(); onPick() }}
-          style={{
-            display:    'inline-flex',
-            alignItems: 'center',
-            gap:        6,
-            padding:    '9px 18px',
-            borderRadius: 8,
-            background: 'var(--color-inverse)',
-            color:      'var(--color-inverse-foreground)',
-            fontSize:   12.5,
-            fontWeight: 600,
-            letterSpacing: '-0.01em',
-            border:     'none',
-            cursor:     'pointer',
-          }}
+          style={{ width: 'auto', minHeight: 38, padding: '0 20px' }}
         >
           Selecionar imagem
         </button>
         <button
           type="button"
+          className="spn-ghost"
           onClick={e => { e.stopPropagation(); onPickFromHistory() }}
-          style={{
-            display:    'inline-flex',
-            alignItems: 'center',
-            gap:        6,
-            padding:    '9px 16px',
-            borderRadius: 8,
-            background: 'transparent',
-            color:      'var(--color-text-secondary)',
-            fontSize:   12.5,
-            fontWeight: 500,
-            letterSpacing: '-0.01em',
-            border:     '1px solid var(--color-border-strong)',
-            cursor:     'pointer',
-          }}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 38 }}
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
             <rect x="3" y="3" width="18" height="18" rx="2"/>

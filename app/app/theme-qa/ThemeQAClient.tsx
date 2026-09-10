@@ -2,14 +2,23 @@
 
 import { useState } from 'react'
 import ThemeSelector from '@/components/app/ThemeSelector'
+import { Segmented, Sheet } from '@/components/app/glass'
+import GlassGallery from '@/components/app/glass/GlassGallery'
 
 export default function ThemeQAClient() {
   const [modalOpen, setModalOpen] = useState(false)
   const [activeChip, setActiveChip] = useState('Sala de estar')
+  const [seg, setSeg] = useState<'render' | 'editar' | 'animar'>('render')
 
   return (
-    <main style={{ flex: 1, overflowY: 'auto', background: 'var(--color-bg)', padding: '40px 48px 80px' }}>
-      <div style={{ maxWidth: 880, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 28 }}>
+    // Sem `background` aqui: era ele que fazia esta página REPROVAR o que
+    // deveria aprovar. Sobre `var(--color-bg)` chapado, `backdrop-filter` não
+    // produz nada visível — um vidro quebrado passava no teste porque não
+    // havia nada atrás dele para refratar. Agora o <Ambient/> do shell aparece.
+    <main style={{ flex: 1, overflowY: 'auto', padding: '40px 48px 80px' }}>
+      {/* z-index 1: a galeria de vidro monta o próprio papel de parede (fixed,
+          z-index 0) e sem isto ele cobriria as seções acima dela. */}
+      <div style={{ maxWidth: 880, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 28, position: 'relative', zIndex: 1 }}>
 
         <header style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <div>
@@ -164,7 +173,7 @@ export default function ThemeQAClient() {
               <span style={{
                 position: 'absolute', top: 10, left: 10, fontSize: 9, fontWeight: 600, letterSpacing: '0.06em',
                 textTransform: 'uppercase', padding: '3px 7px', borderRadius: 7,
-                background: 'var(--color-scrim)', color: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(6px)',
+                background: 'var(--color-scrim)', color: 'rgba(255,255,255,0.9)',
               }}>
                 Overlay
               </span>
@@ -211,42 +220,59 @@ export default function ThemeQAClient() {
         {/* Modal + dropdown */}
         <Section title="Modal e dropdown">
           <Row>
-            <button className="spn-btn-ghost" onClick={() => setModalOpen(true)}>Abrir modal</button>
+            <button className="spn-btn-ghost" onClick={() => setModalOpen(true)}>Abrir folha</button>
             <div className="spn-proj-menu" style={{ position: 'static', minWidth: 170 }}>
               <button className="spn-proj-menu-item">Renomear</button>
               <button className="spn-proj-menu-item">Duplicar</button>
               <button className="spn-proj-menu-item spn-proj-menu-item--danger">Excluir</button>
             </div>
           </Row>
-          {modalOpen && (
-            <div
-              onClick={() => setModalOpen(false)}
-              style={{
-                position: 'fixed', inset: 0, zIndex: 100, background: 'var(--color-scrim-strong)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
-              }}
-            >
-              <div
-                onClick={(e) => e.stopPropagation()}
-                style={{
-                  width: '100%', maxWidth: 400, background: 'var(--color-bg-elevated)',
-                  border: '0.5px solid var(--color-border-strong)', borderRadius: 16,
-                  padding: 24, boxShadow: 'var(--shadow-xl)',
-                }}
-              >
-                <h3 style={{ fontSize: 16, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}>
-                  Modal de exemplo
-                </h3>
-                <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)', lineHeight: 1.6, marginTop: 8 }}>
-                  Painel elevado sobre scrim. Deve ter contraste suficiente nos dois temas.
-                </p>
-                <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
-                  <button className="spn-btn-ghost" onClick={() => setModalOpen(false)}>Cancelar</button>
-                  <button className="spn-btn-primary" onClick={() => setModalOpen(false)}>Confirmar</button>
-                </div>
+          {/* Era um cartão opaco sobre --color-scrim, SEM backdrop-filter: a
+              amostra validava o contrário do que o app faz. Agora é a <Sheet>
+              de verdade — a mesma peça, o mesmo scrim, o mesmo borrão. */}
+          <Sheet open={modalOpen} title="Folha de exemplo" onClose={() => setModalOpen(false)}>
+            <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)', lineHeight: 1.6, margin: '0 0 16px' }}>
+              Vidro --chrome sobre scrim, com trap de foco, ESC e trava de rolagem.
+              Abaixo de 720px sobe da base; acima, é cartão flutuante centrado.
+            </p>
+            <button className="spn-cta" onClick={() => setModalOpen(false)}>Confirmar</button>
+          </Sheet>
+        </Section>
+
+        {/* Os três padrões mais repetidos do app, isolados. */}
+        <Section title="Padrões do vidro">
+          <div style={{ display: 'grid', gap: 18 }}>
+            <div>
+              <span className="spn-field-label">Segmentado (o eixo que fica na superfície)</span>
+              <Segmented
+                label="Modo"
+                value={seg}
+                onChange={setSeg}
+                items={[
+                  { value: 'render', label: 'Render' },
+                  { value: 'editar', label: 'Editar' },
+                  { value: 'animar', label: 'Animar este render' },
+                ]}
+              />
+            </div>
+            <div>
+              <span className="spn-field-label">CTA — um só por tela, sempre inverso</span>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                <button className="spn-cta" style={{ width: 'auto' }}>
+                  Gerar render <span className="spn-cta-meta">20 nodes</span>
+                </button>
+                <button className="spn-cta" style={{ width: 'auto' }} disabled>Sem saldo</button>
+                <button className="spn-ghost">Ação secundária</button>
               </div>
             </div>
-          )}
+            <div>
+              <span className="spn-field-label">Erro e vazio — uma versão de cada</span>
+              <div style={{ display: 'grid', gap: 10 }}>
+                <div className="spn-error">Saldo insuficiente: faltam 12 nodes para este render.</div>
+                <div className="spn-empty">Nenhum render ainda. O primeiro aparece aqui.</div>
+              </div>
+            </div>
+          </div>
         </Section>
 
         {/* Toast */}
@@ -261,6 +287,21 @@ export default function ThemeQAClient() {
               Não foi possível processar a imagem.
             </div>
           </Row>
+        </Section>
+
+        {/* Vidro — a galeria completa do kit, montada aqui dentro.
+            A moldura tem `transform`, e é isso que segura o `position: fixed`
+            da galeria (papel de parede e dock) dentro dela: um ancestral
+            transformado vira o containing block dos filhos fixos. Sem a
+            moldura, o dock ficaria colado no rodapé desta página inteira. */}
+        <Section title="Vidro">
+          <p style={{ fontSize: 12, color: 'var(--color-text-tertiary)', lineHeight: 1.5, marginBottom: 12 }}>
+            Troque o papel de parede e ligue o modo sólido para conferir os dois
+            fallbacks (@supports e prefers-reduced-transparency) sem mexer no SO.
+          </p>
+          <div className="spn-qa-glass-frame">
+            <GlassGallery />
+          </div>
         </Section>
 
         {/* Escala de texto */}
@@ -280,18 +321,8 @@ export default function ThemeQAClient() {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section style={{
-      padding: '20px 22px',
-      background: 'var(--color-bg-elevated)',
-      border: '0.5px solid var(--color-border)',
-      borderRadius: 14,
-    }}>
-      <h2 style={{
-        fontSize: 11, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase',
-        color: 'var(--color-text-tertiary)', marginBottom: 16,
-      }}>
-        {title}
-      </h2>
+    <section className="spn-glass" style={{ padding: '20px 22px', borderRadius: 'var(--r-card)' }}>
+      <h2 className="spn-field-label">{title}</h2>
       {children}
     </section>
   )

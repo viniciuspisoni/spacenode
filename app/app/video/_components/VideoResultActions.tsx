@@ -6,22 +6,15 @@
 // para apresentação, redes ou proposta comercial.
 
 import { useState } from 'react'
+import { Segmented } from '@/components/app/glass'
 import { getVideoModel } from '@/lib/video/models'
 import { CAMERA_MOTIONS } from '@/lib/video/cameraPresets'
 import { getVideoTypePreset } from '@/lib/video/videoPresets'
-import type { CameraIntensity } from '@/lib/video/cameraPresets'
+// Os rótulos vêm de animateLabels — a ficha técnica do resultado tem de
+// dizer as MESMAS palavras que o painel disse antes de gerar. Havia aqui uma
+// segunda cópia de INTENSITY_LABELS e de formatLabel.
+import { INTENSITY_LABELS, formatLabel } from './animateLabels'
 import type { GenerationResult } from '../_hooks/useAnimateState'
-
-const INTENSITY_LABELS: Record<CameraIntensity, string> = {
-  subtle:     'Sutil',
-  normal:     'Moderado',
-  cinematic:  'Cinematográfico',
-  pronounced: 'Dinâmico',
-}
-
-function formatLabel(aspectRatio: string): string {
-  return aspectRatio === 'auto' ? 'Original' : aspectRatio
-}
 
 // Download pelo proxy /api/download (Content-Disposition: attachment). Link
 // direto pro CDN abriria uma aba fora do site — o atributo download de <a>
@@ -104,47 +97,27 @@ export default function VideoResultActions({
           </span>
         </div>
 
-        <div style={{
-          display:      'flex',
-          gap:          3,
-          padding:      3,
-          borderRadius: 8,
-          background:   'var(--color-surface)',
-          border:       '0.5px solid var(--color-border)',
-        }}>
-          {([['video', 'Resultado'], ['base', 'Imagem base']] as const).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setView(id)}
-              style={{
-                padding:       '5px 12px',
-                fontSize:      11,
-                fontWeight:    500,
-                letterSpacing: '-0.01em',
-                borderRadius:  6,
-                border:        'none',
-                background:    view === id ? 'var(--color-surface-hover)' : 'transparent',
-                color:         view === id ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
-                cursor:        'pointer',
-                transition:    'background 0.15s, color 0.15s',
-              }}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        {/* Segmentado do kit: o polegar desliza entre resultado e original,
+            como o Render/Editar/Animar do plugin. */}
+        <Segmented
+          label="O que mostrar"
+          value={view}
+          onChange={setView}
+          items={[
+            { value: 'video', label: 'Resultado' },
+            { value: 'base',  label: 'Imagem base' },
+          ]}
+        />
       </div>
 
       {/* Player / comparação — dimensionamento intrínseco: um 9:16 aparece
           alto e centrado (não uma faixa letterboxed), um 16:9 preenche. */}
       <div style={{
         position:       'relative',
-        borderRadius:   14,
+        borderRadius:   'var(--r-card)',
         overflow:       'hidden',
         background:     'var(--color-preview-bg)',
-        border:         '0.5px solid var(--color-border)',
-        boxShadow:      'var(--shadow-lg, 0 18px 50px rgba(0,0,0,0.35))',
+        boxShadow:      'var(--shadow-float)',
         display:        'flex',
         justifyContent: 'center',
         minHeight:      240,
@@ -172,23 +145,14 @@ export default function VideoResultActions({
             />
 
             {playback === 'loading' && (
-              <div style={{
-                position:       'absolute',
-                inset:          0,
-                display:        'flex',
-                flexDirection:  'column',
-                alignItems:     'center',
-                justifyContent: 'center',
-                gap:            10,
-                pointerEvents:  'none',
-              }}>
+              <div className="spn-overlay" style={{ pointerEvents: 'none' }}>
                 <div style={{
                   width:     28, height: 28, borderRadius: '50%',
                   border:    '2px solid rgba(255,255,255,0.12)',
                   borderTop: '2px solid rgba(255,255,255,0.7)',
                   animation: 'spin 0.9s linear infinite',
                 }} />
-                <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.6)' }}>
+                <div style={{ fontSize: 11.5, opacity: 0.7 }}>
                   Carregando vídeo…
                 </div>
               </div>
@@ -212,19 +176,8 @@ export default function VideoResultActions({
                   rastreamento podem impedir o player embutido — baixe o
                   arquivo para assistir.
                 </div>
-                <a
-                  href={downloadHref(result.outputUrl)}
-                  style={{
-                    fontSize:      11.5,
-                    fontWeight:    500,
-                    padding:       '8px 14px',
-                    borderRadius:  8,
-                    textDecoration:'none',
-                    background:    'var(--color-surface-hover)',
-                    color:         'var(--color-text-primary)',
-                    border:        '1px solid var(--color-border-strong)',
-                  }}
-                >
+                <a className="spn-ghost" href={downloadHref(result.outputUrl)}
+                   style={{ display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}>
                   Baixar o vídeo
                 </a>
               </div>
@@ -248,13 +201,11 @@ export default function VideoResultActions({
       </div>
 
       {/* Resumo da geração */}
-      <div style={{
+      <div className="spn-glass" style={{
         display:      'flex',
         flexWrap:     'wrap',
         gap:          0,
-        borderRadius: 10,
-        border:       '1px solid var(--color-border)',
-        background:   'var(--color-surface-subtle)',
+        borderRadius: 'var(--r-card)',
         overflow:     'hidden',
       }}>
         {meta.map((m, i) => (
@@ -262,7 +213,7 @@ export default function VideoResultActions({
             flex:       '1 1 auto',
             minWidth:   96,
             padding:    '10px 14px',
-            borderLeft: i === 0 ? 'none' : '1px solid var(--color-border)',
+            borderLeft: i === 0 ? 'none' : '0.5px solid var(--glass-line)',
           }}>
             <div style={{
               fontSize: 9, fontWeight: 600, letterSpacing: '0.08em',
@@ -293,6 +244,7 @@ export default function VideoResultActions({
       }}>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <a
+            className="spn-cta"
             href={downloadHref(result.outputUrl)}
             style={primaryBtn}
           >
@@ -303,9 +255,9 @@ export default function VideoResultActions({
             </svg>
             Baixar vídeo
           </a>
-          <button type="button" onClick={onGenerateAgain}  style={ghostBtn}>Gerar nova versão</button>
-          <button type="button" onClick={onAdjust}         style={ghostBtn}>Ajustar configurações</button>
-          <button type="button" onClick={onUseAsReference} style={ghostBtn}>Continuar do último frame</button>
+          <button type="button" className="spn-ghost" onClick={onGenerateAgain}>Gerar nova versão</button>
+          <button type="button" className="spn-ghost" onClick={onAdjust}>Ajustar configurações</button>
+          <button type="button" className="spn-ghost" onClick={onUseAsReference}>Continuar do último frame</button>
         </div>
 
         <div style={{
@@ -333,30 +285,12 @@ export default function VideoResultActions({
   )
 }
 
-const baseBtn: React.CSSProperties = {
-  fontSize:      11.5,
-  fontWeight:    500,
-  padding:       '8px 14px',
-  borderRadius:  8,
-  letterSpacing: '-0.005em',
-  cursor:        'pointer',
-  display:       'inline-flex',
-  alignItems:    'center',
-  gap:           6,
-  textDecoration:'none',
-  transition:    'background 0.15s, border-color 0.15s, color 0.15s',
-}
-
+// Só a geometria de "botão numa linha de ações": o material dos dois é
+// .spn-cta e .spn-ghost, o único par de ação do app.
 const primaryBtn: React.CSSProperties = {
-  ...baseBtn,
-  background: 'var(--color-inverse)',
-  color:      'var(--color-inverse-foreground)',
-  border:     '1px solid var(--color-inverse)',
-}
-
-const ghostBtn: React.CSSProperties = {
-  ...baseBtn,
-  background: 'transparent',
-  color:      'var(--color-text-secondary)',
-  border:     '1px solid var(--color-border-strong)',
+  width:          'auto',
+  minHeight:      34,
+  padding:        '0 15px',
+  fontSize:       12.5,
+  textDecoration: 'none',
 }

@@ -25,6 +25,9 @@ import { getVistaGenerationCost, getAvailableQualities } from '@/lib/spaces/econ
 import type { GenerationAction, Quality, ReferenceKind } from '@/lib/spaces/types'
 import { ACTION_LABEL, summaryForGeneration } from '@/lib/spaces/references'
 import type { PlanId } from '@/lib/plans'
+import {
+  Segmented, Sheet, SettingGroup, SettingRow, RowIcon,
+} from '@/components/app/glass'
 import { InsufficientBalancePanel } from './InsufficientBalancePanel'
 import { DetailIcon } from './DetailIcons'
 import { uploadDirect } from '@/lib/storage/direct-upload-client'
@@ -330,43 +333,31 @@ export function GenerationFlow({
   // ── Render ──────────────────────────────────────────────────
 
   const summary = summaryForGeneration(effectiveAction, refKind)
+  // Só a folha de Saída: o eixo Referência e a Ação continuam na superfície
+  // porque reconfiguram tudo o mais.
+  const [qualitySheet, setQualitySheet] = useState(false)
 
   return (
-    <section style={{
-      background: 'var(--color-bg-elevated)',
-      border: '0.5px solid var(--color-border)',
-      borderRadius: 14, padding: 24,
-    }}>
+    <section className="spn-glass" style={{ borderRadius: 'var(--r-card)', padding: 24 }}>
       {/* ─── Etapa 1 · Referência ─── */}
       <StepHeader n={1} title="Referência" done={referenceReady}
         hint="De onde vem a geometria desta geração" />
 
-      <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--color-surface)', borderRadius: 10, marginBottom: 16 }}>
-        {(['vista_mestre', 'print', 'vista'] as ReferenceKind[]).map(k => {
-          const label = k === 'vista_mestre' ? 'Vista Mestre' : k === 'print' ? 'Novo print' : 'Do histórico'
-          const avail = k !== 'vista' || historyOptions.length > 0
-          const active = refKind === k
-          return (
-            <button
-              key={k}
-              onClick={() => avail && setRefKind(k)}
-              disabled={!avail}
-              title={avail ? '' : 'Gere vistas primeiro pra usá-las como referência'}
-              style={{
-                flex: 1, padding: '8px 12px', borderRadius: 7,
-                background: active ? 'var(--color-bg-elevated)' : 'transparent',
-                color: active ? 'var(--color-text-primary)'
-                  : avail ? 'var(--color-text-secondary)' : 'var(--color-text-quaternary)',
-                fontSize: 12, fontWeight: 500, letterSpacing: '-0.005em',
-                cursor: avail ? 'pointer' : 'not-allowed',
-                boxShadow: active ? 'inset 0 0 0 0.5px var(--color-border-strong)' : 'none',
-                transition: 'background 0.15s, color 0.15s',
-              }}
-            >
-              {label}
-            </button>
-          )
-        })}
+      {/* O eixo que reconfigura toda a etapa 1 fica NA SUPERFÍCIE, como
+          segmentado — é a regra do contrato: só o que reconfigura o resto
+          continua exposto, e como cápsula de 30px, não cartão. */}
+      <div style={{ marginBottom: 16 }}>
+        <Segmented
+          label="Referência geométrica"
+          value={refKind}
+          onChange={setRefKind}
+          items={[
+            { value: 'vista_mestre' as ReferenceKind, label: 'Vista Mestre' },
+            { value: 'print' as ReferenceKind, label: 'Novo print' },
+            { value: 'vista' as ReferenceKind, label: 'Do histórico', disabled: historyOptions.length === 0 },
+          ]}
+          className="spn-glass--raised"
+        />
       </div>
 
       {refKind === 'vista_mestre' && vistaMestreUrl && (
@@ -582,9 +573,8 @@ export function GenerationFlow({
 
       <div style={{ opacity: itemCount > 0 ? 1 : 0.45 }}>
         {/* Resumo — muda conforme referência × ação */}
-        <div style={{
-          background: 'var(--color-bg)', border: '0.5px solid var(--color-border)',
-          borderRadius: 10, padding: '14px 16px', marginBottom: 16,
+        <div className="spn-glass" style={{
+          borderRadius: 'var(--r-inner)', padding: '14px 16px', marginBottom: 12,
         }}>
           <div style={{ fontSize: 11.5, color: 'var(--color-text-secondary)', marginBottom: 10, letterSpacing: '-0.005em' }}>
             Referência usada:{' '}
@@ -598,21 +588,36 @@ export function GenerationFlow({
           </div>
         </div>
 
-        {/* Qualidade */}
-        <QualityPicker engine={engine} quality={quality} setQuality={setQuality} availableQualities={availableQualities} />
+        {/* Saída: a qualidade tem default defensável (a do projeto), então
+            sai da superfície e vira linha com o valor e o preço já resolvidos. */}
+        <SettingGroup>
+          <SettingRow
+            icon={<RowIcon name="output" />}
+            title="Saída"
+            value={`${ENGINES[engine].name} · ${quality.toUpperCase()} · ${costPer} nodes`}
+            onOpen={() => setQualitySheet(true)}
+          />
+        </SettingGroup>
 
-        {error && (
-          <div style={{
-            marginTop: 14, padding: '10px 14px', borderRadius: 8,
-            background: 'rgba(163,45,45,0.12)', border: '0.5px solid rgba(163,45,45,0.3)',
-            color: '#e57373', fontSize: 13,
-          }}>
-            {error}
+        <Sheet open={qualitySheet} title="Saída" onClose={() => setQualitySheet(false)}>
+          <div className="spn-field">
+            <QualityPicker engine={engine} quality={quality} setQuality={setQuality} availableQualities={availableQualities} />
+            <p className="spn-hint">
+              O motor é o do projeto e não muda aqui — trocá-lo mudaria a identidade
+              travada no DNA.
+            </p>
           </div>
-        )}
+        </Sheet>
 
-        {/* CTA / saldo insuficiente */}
-        <div style={{ marginTop: 16 }}>
+        {error && <div className="spn-error" style={{ marginTop: 14 }}>{error}</div>}
+
+        {/* O CTA vive num dock colado no rodapé do painel: sangra os 24px
+            de padding da seção e gruda embaixo, então não some no scroll. */}
+        <div className="spn-dock spn-glass spn-glass--chrome" style={{
+          marginTop: 16, marginLeft: -24, marginRight: -24, marginBottom: -24,
+          borderRadius: '0 0 var(--r-card) var(--r-card)',
+          borderColor: 'var(--glass-line)',
+        }}>
           {insufficient ? (
             <InsufficientBalancePanel
               count={itemCount}
@@ -653,20 +658,13 @@ export function GenerationFlow({
                     : 'complete as etapas acima pra gerar'}
               </div>
               <button
+                type="button"
                 onClick={handleGenerate}
                 disabled={itemCount === 0 || submitting || disabled || uploadsPending}
-                className="spn-action"
-                style={{
-                  width: 'auto', minWidth: 200, padding: '12px 22px',
-                  background: '#1D9E75', color: '#042818',
-                  border: '0.5px solid rgba(0,0,0,0.18)',
-                  opacity: itemCount === 0 ? 0.5 : 1,
-                  boxShadow: itemCount > 0
-                    ? 'inset 0 1px 0 rgba(255,255,255,0.18), 0 8px 24px rgba(29,158,117,0.18)'
-                    : 'none',
-                }}
+                className="spn-cta"
+                style={{ width: 'auto', minWidth: 200 }}
               >
-                {submitting ? 'Gerando…' : `Gerar · ${total} nodes →`}
+                {submitting ? 'Gerando…' : <>Gerar <span className="spn-cta-meta">{total} nodes</span></>}
               </button>
             </div>
           )}
@@ -828,40 +826,29 @@ export function QualityPicker({ engine, quality, setQuality, availableQualities 
   setQuality:         (q: Resolution) => void
   availableQualities: Quality[]
 }) {
+  // O custo entra no próprio rótulo: era um `title` que só aparecia no hover,
+  // e o preço da resolução é justamente o que decide a escolha. Resolução que
+  // o motor não faz vira item desabilitado — não some, senão o usuário fica
+  // sem saber que ela existe.
+  const items = (['hd', '2k', '4k'] as Resolution[]).map(q => {
+    const supported = availableQualities.includes(q)
+    return {
+      value: q,
+      label: supported ? `${q.toUpperCase()} · ${getVistaGenerationCost(engine, q)}` : q.toUpperCase(),
+      disabled: !supported,
+    }
+  })
+
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-      <span style={{
-        fontSize: 10, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase',
-        color: 'var(--color-text-tertiary)',
-      }}>
-        Qualidade
-      </span>
-      <div style={{ display: 'flex', gap: 4, padding: 3, background: 'var(--color-surface)', borderRadius: 8 }}>
-        {(['hd', '2k', '4k'] as Resolution[]).map(q => {
-          const supported = availableQualities.includes(q)
-          const active = quality === q && supported
-          const cost = supported ? getVistaGenerationCost(engine, q) : null
-          return (
-            <button
-              key={q}
-              onClick={() => supported && setQuality(q)}
-              disabled={!supported}
-              title={supported ? `${cost} nodes/vista` : `Não disponível em ${ENGINES[engine].name}`}
-              style={{
-                padding: '6px 12px', borderRadius: 6,
-                background: active ? 'var(--color-bg-elevated)' : 'transparent',
-                color: active ? 'var(--color-text-primary)'
-                  : supported ? 'var(--color-text-secondary)' : 'var(--color-text-quaternary)',
-                fontSize: 11, fontWeight: 500, letterSpacing: '0.02em',
-                cursor: supported ? 'pointer' : 'not-allowed',
-                boxShadow: active ? 'inset 0 0 0 0.5px var(--color-border-strong)' : 'none',
-              }}
-            >
-              {q.toUpperCase()}
-            </button>
-          )
-        })}
-      </div>
+      <span className="spn-field-label" style={{ marginBottom: 0, flex: '0 0 auto' }}>Qualidade</span>
+      <Segmented
+        label={`Qualidade — ${ENGINES[engine].name}`}
+        value={quality}
+        onChange={setQuality}
+        items={items}
+        className="spn-glass--raised"
+      />
     </div>
   )
 }
@@ -958,7 +945,7 @@ function PrintUploader({
               <div key={it.localId} style={{
                 display: 'flex', flexDirection: 'column',
                 borderBottom: i === prints.length - 1 ? 'none' : '0.5px solid var(--color-border)',
-                background: it.status === 'failed' ? 'rgba(163,45,45,0.06)' : 'transparent',
+                background: it.status === 'failed' ? 'var(--color-error-bg)' : 'transparent',
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px' }}>
                   <div style={{
@@ -970,11 +957,7 @@ function PrintUploader({
                     <img src={it.previewUrl} alt=""
                       style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     {it.status === 'uploading' && (
-                      <div style={{
-                        position: 'absolute', inset: 0,
-                        background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      }}>
+                      <div className="spn-overlay">
                         <div style={{
                           width: 16, height: 16, border: '2px solid #fff',
                           borderTopColor: 'transparent', borderRadius: 999,
@@ -984,12 +967,7 @@ function PrintUploader({
                       </div>
                     )}
                     {it.status === 'failed' && (
-                      <div style={{
-                        position: 'absolute', inset: 0,
-                        background: 'rgba(163,45,45,0.6)', backdropFilter: 'blur(2px)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        color: '#fff', fontSize: 15, fontWeight: 700,
-                      }}>
+                      <div className="spn-overlay" style={{ color: 'var(--color-error)', fontSize: 15, fontWeight: 700 }}>
                         !
                       </div>
                     )}
@@ -1015,11 +993,10 @@ function PrintUploader({
                   {it.status === 'failed' && (
                     <button
                       onClick={() => retryPrint(it.localId)}
+                      className="spn-ghost"
                       style={{
-                        padding: '6px 10px', fontSize: 11, borderRadius: 6,
-                        background: 'transparent', color: '#e57373',
-                        border: '0.5px solid rgba(163,45,45,0.4)',
-                        cursor: 'pointer',
+                        height: 28, padding: '0 10px', fontSize: 11,
+                        color: 'var(--color-error)', borderColor: 'var(--color-error-border)',
                       }}
                     >
                       ↻ Reenviar
@@ -1045,7 +1022,7 @@ function PrintUploader({
                   </button>
                 </div>
                 {it.status === 'failed' && it.error && (
-                  <div style={{ padding: '0 12px 10px 78px', fontSize: 11, color: '#e57373', lineHeight: 1.4 }}>
+                  <div style={{ padding: '0 12px 10px 78px', fontSize: 11, color: 'var(--color-error)', lineHeight: 1.4 }}>
                     {it.error}
                   </div>
                 )}

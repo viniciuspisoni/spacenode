@@ -6,7 +6,7 @@
 import { MAX_LOCAL_ADJUSTMENTS, type FinalizeDoc, type LocalAdjustment } from '@/lib/finalizar/types'
 import { makeId } from '@/lib/finalizar/composition'
 import type { BrushSettings, MaskOverlayColor } from '../CanvasViewport'
-import { ActiveDot, Chip, Section, SliderRow, Seg } from '../ui'
+import { ActiveDot, Chip, ConfirmSheet, Section, SliderRow, Seg } from '../ui'
 import { useState } from 'react'
 
 export type QuickMask = 'brush' | 'linear' | 'radial' | 'sky' | 'windows' | 'shadows'
@@ -43,6 +43,8 @@ export function MasksPanel(props: MasksPanelProps) {
   const [openList, setOpenList] = useState(true)
   const [openBrush, setOpenBrush] = useState(true)
   const [openAdjust, setOpenAdjust] = useState(true)
+  // Remover máscara perguntava por window.confirm — agora é folha.
+  const [pendingDelete, setPendingDelete] = useState<LocalAdjustment | null>(null)
 
   const active = doc.locals.find((l) => l.id === activeLocalId) ?? null
   const full = doc.locals.length >= MAX_LOCAL_ADJUSTMENTS
@@ -61,6 +63,19 @@ export function MasksPanel(props: MasksPanelProps) {
 
   return (
     <div>
+      <ConfirmSheet
+        open={pendingDelete !== null}
+        title="Remover máscara"
+        message={<>A máscara <b>{pendingDelete?.name}</b> e os ajustes presos a ela saem da imagem. Dá para desfazer com Ctrl+Z.</>}
+        confirmLabel="Remover"
+        onConfirm={() => {
+          const l = pendingDelete
+          if (!l) return
+          patch(`Remover ${l.name}`, (d) => ({ ...d, locals: d.locals.filter((x) => x.id !== l.id) }))
+          if (activeLocalId === l.id) onSelectLocal(null)
+        }}
+        onClose={() => setPendingDelete(null)}
+      />
       <Section title="Nova máscara" open={openList} onToggle={() => setOpenList((v) => !v)}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           <Chip onClick={() => onAddLocal('brush')} disabled={full} title="Pinte a área que recebe os ajustes">Pincel</Chip>
@@ -116,9 +131,7 @@ export function MasksPanel(props: MasksPanelProps) {
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation()
-                      if (!window.confirm(`Remover a máscara "${l.name}"?`)) return
-                      patch(`Remover ${l.name}`, (d) => ({ ...d, locals: d.locals.filter((x) => x.id !== l.id) }))
-                      if (isActive) onSelectLocal(null)
+                      setPendingDelete(l)
                     }}
                     title="Remover máscara"
                     style={miniBtn}
@@ -143,6 +156,7 @@ export function MasksPanel(props: MasksPanelProps) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {(active.shape.kind === 'linear' || active.shape.kind === 'radial') && (
               <Seg
+                label="Como editar a máscara"
                 options={[
                   { id: 'shape', label: 'Forma', title: 'Arraste no canvas para reposicionar o gradiente' },
                   { id: 'brush', label: 'Refinar', title: 'Pinte para adicionar ou apagar áreas' },
@@ -171,6 +185,7 @@ export function MasksPanel(props: MasksPanelProps) {
               </>
             )}
             <Seg
+              label="Modo do pincel"
               options={[
                 { id: 'paint', label: 'Pintar', title: 'Adiciona à área da máscara' },
                 { id: 'erase', label: 'Borracha', title: 'Remove da área da máscara' },

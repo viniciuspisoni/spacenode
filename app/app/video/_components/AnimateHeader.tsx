@@ -1,13 +1,16 @@
 'use client'
 
-// Header do Animar — título + promessa da ferramenta em uma linha.
-// O antigo seletor de 3 modos foi substituído pelo fluxo único com
-// presets de "Tipo de vídeo" no painel de configuração.
+// Header do Animar — título + uma linha.
+//
+// Este texto cai DIRETO no papel de parede (o render borrado do usuário), e
+// sobre o papel só sobrevive título e linha curta (docs/VIDRO-NO-APP.md §2.2).
+// A promessa longa que estava aqui foi para o estado vazio do palco, que é
+// vidro — lá ela tem contraste e o leitor tem tempo de ler.
 
 export default function AnimateHeader() {
   return (
     <div style={{
-      padding:    '20px 28px 14px',
+      padding:    '18px 12px 12px 4px',
       flexShrink: 0,
     }}>
       <div style={{
@@ -23,10 +26,8 @@ export default function AnimateHeader() {
         color:         'var(--color-text-tertiary)',
         marginTop:     3,
         letterSpacing: '-0.005em',
-        lineHeight:    1.5,
       }}>
-        Transforme imagens de projeto em vídeos curtos e cinematográficos —
-        prontos para propostas, redes sociais e apresentações.
+        De uma imagem de projeto a um vídeo de apresentação.
       </div>
     </div>
   )

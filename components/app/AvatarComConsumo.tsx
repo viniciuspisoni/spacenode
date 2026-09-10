@@ -92,17 +92,16 @@ export function AvatarComConsumo({
     <div style={{ position: 'relative' }} ref={popoverRef}>
       <button
         onClick={() => setOpen(o => !o)}
+        className={expanded ? 'spn-glass spn-glass--raised' : undefined}
         style={{
           display: 'flex', alignItems: 'center', justifyContent: expanded ? 'flex-start' : 'center', gap: 10,
           padding: expanded ? '0 10px' : 0,
           height: 38,
-          borderRadius: 12,
-          background: expanded ? 'var(--color-surface)' : 'transparent',
-          border: expanded ? '0.5px solid var(--color-border)' : '0.5px solid transparent',
-          boxShadow: expanded ? 'inset 0 1px 0 rgba(255,255,255,0.03)' : 'none',
+          borderRadius: 'var(--r-inner)',
+          background: expanded ? undefined : 'transparent',
+          border: expanded ? undefined : '0.5px solid transparent',
           width: expanded ? '100%' : 42,
           textAlign: 'left',
-          transition: 'background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease',
         }}
       >
         <AvatarRing
@@ -286,21 +285,16 @@ function BalancePopover({ planId, planBalance, planTotal, extraBalance, graceDay
   const pillLabel = inGrace ? 'Cortesia'             : noQuota ? 'Gratuito' : stateLabel[state]
 
   return (
-    <div style={{
+    <div className="spn-glass spn-glass--chrome" style={{
       position: 'absolute', bottom: 56, left: 0,
       width: 248, padding: 16, zIndex: 50,
-      background: 'var(--color-bg-elevated)',
-      border: '0.5px solid var(--color-border-strong)',
-      borderRadius: 14,
-      boxShadow: 'var(--shadow-xl)',
+      borderRadius: 'var(--r-card)',
+      boxShadow: 'var(--shadow-float)',
       display: 'flex', flexDirection: 'column', gap: 14,
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <div style={{
-            fontSize: 9, fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase',
-            color: 'var(--color-text-tertiary)',
-          }}>
+          <div className="spn-field-label" style={{ fontSize: 9, marginBottom: 0 }}>
             Plano {planName}
           </div>
           <div style={{
@@ -343,27 +337,13 @@ function BalancePopover({ planId, planBalance, planTotal, extraBalance, graceDay
       )}
 
       <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
-        <Link
-          href="/app/billing"
-          onClick={onClose}
-          style={{
-            flex: 1, padding: '9px 12px', borderRadius: 8,
-            background: 'var(--color-surface-hover)', color: 'var(--color-text-secondary)',
-            border: '0.5px solid var(--color-border-strong)',
-            fontSize: 11, fontWeight: 500, textAlign: 'center',
-          }}
-        >
+        <Link href="/app/billing" onClick={onClose} className="spn-ghost"
+              style={{ flex: 1, textAlign: 'center', lineHeight: '34px', padding: 0, textDecoration: 'none' }}>
           Comprar avulso
         </Link>
-        <Link
-          href="/app/billing"
-          onClick={onClose}
-          style={{
-            flex: 1, padding: '9px 12px', borderRadius: 8,
-            background: '#1D9E75', color: '#042818',
-            fontSize: 11, fontWeight: 600, textAlign: 'center',
-          }}
-        >
+        {/* Era #1D9E75 literal — o verde que o contrato tirou da ação. */}
+        <Link href="/app/billing" onClick={onClose} className="spn-cta"
+              style={{ flex: 1, width: 'auto', minHeight: 34, fontSize: 11.5, padding: '0 12px', textDecoration: 'none' }}>
           Ver planos
         </Link>
       </div>

@@ -52,7 +52,7 @@ export default async function PackPage({
     : null
 
   return (
-    <main style={{ flex: 1, overflowY: 'auto', background: 'var(--color-bg)' }}>
+    <main style={{ flex: 1, overflowY: 'auto' }}>
       <PackEditor
         space={space}
         vistas={vistas}

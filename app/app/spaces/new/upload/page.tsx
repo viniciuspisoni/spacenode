@@ -24,7 +24,7 @@ export default async function NewSpaceUploadPage({
   const sourceUrl = sp.source && /^https:\/\//i.test(sp.source) ? sp.source : undefined
 
   return (
-    <main style={{ flex: 1, overflowY: 'auto', background: 'var(--color-bg)' }}>
+    <main style={{ flex: 1, overflowY: 'auto' }}>
       <NewSpaceFlow initialBalance={balance} sourceUrl={sourceUrl} />
     </main>
   )

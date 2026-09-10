@@ -16,6 +16,11 @@ import comercial from '@/public/gallery-comercial-before.jpg'
 //
 // Gotcha do acervo: nos pares casa/comercial os arquivos estão trocados no
 // disco — o RENDER deles é o `-before.jpg` (ver marketing/BRIEF.md).
+//
+// O CSS de .spn-ambient / .spn-ambient-img vive em app/globals.css (seção
+// "Papel de parede"): desde que o /app passou a usar a mesma camada, uma
+// definição só serve landing e app — e os dois fallbacks de vidro (@supports
+// e prefers-reduced-transparency) alcançam as duas pelo nome da classe.
 const WALLPAPERS = [casa, living, comercial]
 
 export function Ambient() {
@@ -72,61 +77,6 @@ export function Ambient() {
           style={{ backgroundImage: `url(${wall.blurDataURL})` }}
         />
       ))}
-
-      <style jsx>{`
-        .spn-ambient {
-          position: fixed;
-          inset: 0;
-          z-index: 0;
-          overflow: hidden;
-          pointer-events: none;
-          background: var(--color-bg);
-        }
-        /* Degradê de base: segura o mesmo papel quando o blurDataURL não
-           existe (SVG no acervo, build sem otimização de imagem). Metade da
-           intensidade do painel do plugin — aqui ele SOMA com o render e os
-           dois hotspots caem no alto do viewport, justamente onde há texto
-           passando; junto com o papel de parede estourariam o teto de
-           luminância que o contraste do terciário exige. */
-        .spn-ambient::before {
-          content: '';
-          position: absolute;
-          inset: -20%;
-          background:
-            radial-gradient(60% 50% at 20% 0%, rgba(120, 140, 180, 0.10), transparent 70%),
-            radial-gradient(50% 40% at 90% 20%, rgba(180, 140, 120, 0.08), transparent 70%);
-        }
-        /* Mesmo tratamento do painel v1 do plugin. A camada é fixa e não se
-           move: o borrão é rasterizado uma vez e depois só composto — rolar
-           a página não refaz o filtro. O tamanho de 150% existe porque a
-           aresta de um elemento borrado desbota; sem a folga, apareceria
-           uma moldura clara em volta do viewport. */
-        .spn-ambient-img {
-          position: absolute;
-          inset: -25%;
-          width: 150%;
-          height: 150%;
-          background-size: cover;
-          background-position: center;
-          filter: blur(48px) saturate(1.7);
-          opacity: 0;
-          transform: scale(1.1);
-          transition: opacity 900ms var(--ease);
-        }
-        .spn-ambient-img[data-on='true'] {
-          opacity: var(--ambient-opacity);
-        }
-        /* Véu: o que garante contraste AA do texto sobre o papel de parede. */
-        .spn-ambient::after {
-          content: '';
-          position: absolute;
-          inset: 0;
-          background: var(--ambient-veil);
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .spn-ambient-img { transition: none; }
-        }
-      `}</style>
     </div>
   )
 }

@@ -5,6 +5,7 @@
 // recorte normalizado (0–1) ou null (usar imagem inteira).
 
 import { useEffect, useRef, useState } from 'react'
+import { Sheet } from '@/components/app/glass'
 
 interface Box { x: number; y: number; w: number; h: number } // px de exibição
 
@@ -25,14 +26,16 @@ export function ReferenceFocusModal({ imageUrl, onConfirm, onClose }: {
     const img = new Image()
     img.crossOrigin = 'anonymous'
     img.onload = () => {
-      const maxW = 560, maxH = 440
+      // A folha tem 560px no desktop e o corpo dela come 32px de padding:
+      // 470 é o maior palco que cabe sem a imagem sangrar pra fora.
+      const maxW = 470, maxH = 380
       const r = img.naturalWidth / img.naturalHeight
       let w = maxW, h = Math.round(w / r)
       if (h > maxH) { h = maxH; w = Math.round(h * r) }
       setDisp({ w, h })
       setBox({ x: w * 0.3, y: h * 0.3, w: w * 0.4, h: h * 0.4 }) // padrão centralizado
     }
-    img.onerror = () => setDisp({ w: 480, h: 360 })
+    img.onerror = () => setDisp({ w: 440, h: 330 })
     img.src = imageUrl
   }, [imageUrl])
 
@@ -66,62 +69,54 @@ export function ReferenceFocusModal({ imageUrl, onConfirm, onClose }: {
   function useWhole() { setBusy(true); onConfirm(null) }
 
   return (
-    <div onClick={onClose} style={{
-      position: 'fixed', inset: 0, zIndex: 90, padding: 24,
-      background: 'rgba(10,10,10,0.8)', backdropFilter: 'blur(8px)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }}>
-      <div onClick={e => e.stopPropagation()} style={{
-        background: 'var(--color-bg-elevated)', border: '0.5px solid var(--color-border-strong)',
-        borderRadius: 14, padding: 20, width: '100%', maxWidth: 640,
-        display: 'flex', flexDirection: 'column', gap: 12,
-      }}>
-        <div>
-          <h2 style={{ fontSize: 15, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.015em', margin: 0 }}>
-            Focar a referência
-          </h2>
-          <p style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginTop: 4 }}>
-            Arraste para marcar só o elemento desejado (ex.: a planta). O modelo recebe apenas essa área — não a vista inteira.
-          </p>
-        </div>
+    <Sheet open title="Focar a referência" onClose={onClose} doneLabel="Cancelar">
+      <p className="spn-hint" style={{ marginTop: 0, marginBottom: 12 }}>
+        Arraste para marcar só o elemento desejado (ex.: a planta). O modelo recebe
+        apenas essa área — não a vista inteira.
+      </p>
 
-        {disp ? (
-          <div
-            ref={wrapRef}
-            onPointerDown={onDown}
-            onPointerMove={onMove}
-            onPointerUp={onUp}
-            style={{
-              position: 'relative', width: disp.w, height: disp.h, margin: '0 auto',
-              cursor: 'crosshair', touchAction: 'none', userSelect: 'none',
-              borderRadius: 8, overflow: 'hidden',
-            }}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={imageUrl} alt="referência" draggable={false}
-              style={{ width: '100%', height: '100%', objectFit: 'fill', display: 'block', pointerEvents: 'none' }} />
-            {box && box.w > 0 && (
-              <div style={{
-                position: 'absolute', left: box.x, top: box.y, width: box.w, height: box.h,
-                border: '2px solid #1D9E75', boxShadow: '0 0 0 9999px rgba(0,0,0,0.5)', pointerEvents: 'none',
-              }} />
-            )}
-          </div>
-        ) : (
-          <div style={{ textAlign: 'center', padding: 40, color: 'var(--color-text-tertiary)', fontSize: 12 }}>carregando…</div>
-        )}
-
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-          <button type="button" onClick={useWhole} disabled={busy}
-            className="spn-action spn-action--ghost" style={{ width: 'auto', padding: '9px 16px', fontSize: 12 }}>
-            Usar imagem inteira
-          </button>
-          <button type="button" onClick={useArea} disabled={busy}
-            className="spn-action spn-action--primary" style={{ width: 'auto', padding: '9px 16px', fontSize: 12 }}>
-            Usar área selecionada
-          </button>
+      {disp ? (
+        // Sem vidro nenhum neste palco: o retângulo é redesenhado a cada
+        // pointermove, e um borrão por cima faria o navegador recompor a
+        // camada inteira a cada quadro do arrasto.
+        <div
+          ref={wrapRef}
+          onPointerDown={onDown}
+          onPointerMove={onMove}
+          onPointerUp={onUp}
+          style={{
+            position: 'relative', width: disp.w, height: disp.h, margin: '0 auto',
+            cursor: 'crosshair', touchAction: 'none', userSelect: 'none',
+            borderRadius: 'var(--r-inner)', overflow: 'hidden',
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={imageUrl} alt="referência" draggable={false}
+            style={{ width: '100%', height: '100%', objectFit: 'fill', display: 'block', pointerEvents: 'none' }} />
+          {box && box.w > 0 && (
+            <div style={{
+              position: 'absolute', left: box.x, top: box.y, width: box.w, height: box.h,
+              // Verde aqui é ESTADO (o que está selecionado), não ação — é o
+              // único uso que a regra do CTA preserva.
+              border: '2px solid var(--color-accent-green)',
+              boxShadow: '0 0 0 9999px var(--color-scrim)',
+              pointerEvents: 'none',
+            }} />
+          )}
         </div>
+      ) : (
+        <div className="spn-empty">carregando…</div>
+      )}
+
+      <div style={{ marginTop: 14, display: 'grid', gap: 8 }}>
+        <button type="button" className="spn-cta" onClick={useArea} disabled={busy}>
+          Usar área selecionada
+        </button>
+        <button type="button" className="spn-ghost" onClick={useWhole} disabled={busy}
+                style={{ width: '100%' }}>
+          Usar imagem inteira
+        </button>
       </div>
-    </div>
+    </Sheet>
   )
 }
