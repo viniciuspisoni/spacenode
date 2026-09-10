@@ -127,6 +127,10 @@ interface Props {
   onWandPick: (shape: WandShape) => void
   /** Avisa que laço/polígono/retângulo mudaram a seleção desenhada. */
   onRegionsChange: (hasRegions: boolean) => void
+  /** A varinha virou raster (Shift/Alt somam e subtraem, e formas não somam):
+   *  o pai solta a forma, que agora vive dentro das regiões. NÃO mexe nos
+   *  traços — pincel e borracha continuam valendo por cima. */
+  onWandAbsorbed: () => void
   /** A seleção foi crescida e virou uma região única: traços e varinha já
    *  estão dentro dela e devem ser zerados no pai, sob pena de contarem duas
    *  vezes (e de o Desmarcar deixar sobras). */
@@ -176,6 +180,25 @@ function wandSampleRadius(index: ColorIndex, docWidth: number): number {
  * (ou a que o usuário escolheu no controle); reajustar de novo faria o resultado
  * mudar sozinho a cada re-rasterização.
  */
+function maskToCanvas(index: ColorIndex, mask: Uint8Array): HTMLCanvasElement | null {
+  const src = document.createElement('canvas')
+  src.width = index.width
+  src.height = index.height
+  const sctx = src.getContext('2d')
+  if (!sctx) return null
+  const img = sctx.createImageData(index.width, index.height)
+  for (let i = 0; i < mask.length; i++) {
+    const o = i * 4
+    const v = mask[i] > 127 ? 255 : 0
+    img.data[o] = v
+    img.data[o + 1] = v
+    img.data[o + 2] = v
+    img.data[o + 3] = v
+  }
+  sctx.putImageData(img, 0, 0)
+  return src
+}
+
 function rasterizeWand(
   index: ColorIndex,
   shape: WandShape,
@@ -193,21 +216,8 @@ function rasterizeWand(
       sampleRadius: wandSampleRadius(index, docWidth),
     },
   )
-  const src = document.createElement('canvas')
-  src.width = index.width
-  src.height = index.height
-  const sctx = src.getContext('2d')
-  if (!sctx) return null
-  const img = sctx.createImageData(index.width, index.height)
-  for (let i = 0; i < mask.length; i++) {
-    const o = i * 4
-    const v = mask[i] > 127 ? 255 : 0
-    img.data[o] = v
-    img.data[o + 1] = v
-    img.data[o + 2] = v
-    img.data[o + 3] = v
-  }
-  sctx.putImageData(img, 0, 0)
+  const src = maskToCanvas(index, mask)
+  if (!src) return null
   if (src.width === w && src.height === h) return src
   const out = document.createElement('canvas')
   out.width = w
@@ -237,6 +247,10 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
    *  acumuladas em branco na resolução do documento. Vivem aqui e não no
    *  documento porque a seleção é transitória: some quando a edição roda. */
   const editRegionsRef = useRef<HTMLCanvasElement | null>(null)
+  /** As regiões contêm APENAS varinha somada? Se sim, um clique simples de
+   *  varinha pode zerá-las (é o "substituir seleção" de qualquer editor). Se
+   *  um laço ou polígono entrou ali, não: seria apagar trabalho à mão. */
+  const wandOnlyRegionsRef = useRef(true)
   const editPolyRef = useRef<{ points: { x: number; y: number }[]; erase: boolean } | null>(null)
   /** Quantos vértices o polígono em curso tem. É estado, e não só o ref, porque
    *  o botão "Fechar área" precisa aparecer — o ref sozinho não re-renderiza. */
@@ -1139,11 +1153,18 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
 
         // Varinha: um CLIQUE seleciona; ela não pinta. Pincel e borracha
         // continuam pintando por cima do que ela selecionou.
+        //
+        // Shift SOMA e Alt SUBTRAI — é o que transforma "um clique, uma
+        // tentativa" em ferramenta de verdade, e uma seleção difícil em três
+        // cliques fáceis. Some por um tempo na fusão com o Finalizar: a
+        // varinha virou uma forma paramétrica única, e forma não soma com
+        // forma. Volta pelo raster, que é onde soma e subtração são a mesma
+        // operação.
         if (sub === 'wand') {
           const pt = toImage(e.clientX, e.clientY)
           const index = colorIndexRef.current
           if (pt && index) {
-            const { tolerance } = magicWandAuto(
+            const { mask, tolerance } = magicWandAuto(
               index,
               pt.x * index.width,
               pt.y * index.height,
@@ -1153,6 +1174,19 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
                 sampleRadius: wandSampleRadius(index, docRef.current.width),
               },
             )
+            if (e.shiftKey || alt) {
+              bakeWandShape()
+              mergeWandMask(index, mask, alt)
+              scheduleDraw()
+              return
+            }
+            // Clique simples SUBSTITUI, como em qualquer editor — mas só
+            // apaga as regiões se elas vieram da própria varinha.
+            if (wandOnlyRegionsRef.current && editRegionsRef.current) {
+              const rctx = editRegionsRef.current.getContext('2d')
+              rctx?.clearRect(0, 0, editRegionsRef.current.width, editRegionsRef.current.height)
+              p2.onRegionsChange(false)
+            }
             p2.onWandPick({
               kind: 'wand',
               seed: pt,
@@ -1417,7 +1451,42 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
     ctx.closePath()
     ctx.fill()
     ctx.restore()
+    wandOnlyRegionsRef.current = false
     propsRef.current.onRegionsChange(true)
+  }
+
+  /** Soma (ou subtrai, com Alt) uma máscara de varinha nas regiões. É o que
+   *  devolve a seleção múltipla: formas paramétricas não somam, raster soma. */
+  function mergeWandMask(index: ColorIndex, mask: Uint8Array, erase: boolean) {
+    const regions = editRegions()
+    const src = maskToCanvas(index, mask)
+    const ctx = regions?.getContext('2d')
+    if (!regions || !src || !ctx) return
+    ctx.save()
+    ctx.globalCompositeOperation = erase ? 'destination-out' : 'source-over'
+    ctx.drawImage(src, 0, 0, regions.width, regions.height)
+    ctx.restore()
+    propsRef.current.onRegionsChange(true)
+  }
+
+  /** Assa a forma de varinha ativa dentro das regiões e avisa o pai para
+   *  soltá-la. Precisa acontecer ANTES de somar ou subtrair: enquanto ela for
+   *  forma, o subtrair não a alcança (a composição só sabe somar formas). */
+  function bakeWandShape() {
+    const shape = propsRef.current.editWand
+    const index = colorIndexRef.current
+    if (!shape || !index) return
+    const d = docRef.current
+    const c = rasterizeWand(index, shape, d.width, d.height, d.width)
+    const regions = editRegions()
+    const ctx = regions?.getContext('2d')
+    if (c && regions && ctx) {
+      ctx.save()
+      ctx.globalCompositeOperation = 'source-over'
+      ctx.drawImage(c, 0, 0, regions.width, regions.height)
+      ctx.restore()
+    }
+    propsRef.current.onWandAbsorbed()
   }
 
   /** Retângulo a partir de dois cantos. */
@@ -1521,6 +1590,7 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
     clearEditRegions: () => {
       editRegionsRef.current = null
       editPolyRef.current = null
+      wandOnlyRegionsRef.current = true
       propsRef.current.onRegionsChange(false)
       scheduleDraw()
     },
@@ -1590,6 +1660,7 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
       rctx.drawImage(src, 0, 0, regions.width, regions.height)
 
       editPolyRef.current = null
+      wandOnlyRegionsRef.current = false
       propsRef.current.onRegionsChange(true)
       propsRef.current.onSelectionGrown()
       scheduleDraw()

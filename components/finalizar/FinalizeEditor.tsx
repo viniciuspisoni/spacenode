@@ -87,7 +87,7 @@ const PANEL_TITLE: Record<EditorTool, string> = {
 const AUTO_UNIFORM_MAX_COVERAGE = 0.12
 
 const EDIT_HINTS: Record<EditSubTool, string> = {
-  wand: 'Clique numa superfície para selecioná-la inteira · Pincel e borracha ajustam',
+  wand: 'Clique numa superfície para selecioná-la inteira · Shift soma outra, Alt subtrai',
   brush: 'Pinte a área a alterar — ela fica marcada em vermelho',
   eraser: 'Pinte para tirar da seleção',
   lasso: 'Arraste para contornar a área à mão livre · Alt subtrai',
@@ -1194,6 +1194,7 @@ export function FinalizeEditor({
           editWand={editWand}
           editSubTool={editSubTool}
           onRegionsChange={setHasEditRegions}
+          onWandAbsorbed={() => setEditWand(null)}
           onSelectionGrown={() => { setEditStrokes([]); setEditWand(null) }}
           wandTolerance={wandTolerance}
           wandContiguous={wandContiguous}
