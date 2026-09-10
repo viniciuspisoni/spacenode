@@ -73,13 +73,12 @@ const PLAN_DISPLAY: Record<SellablePlanId, PlanDisplay> = {
   studio: {
     rendersHD: 350, renders2K: 175, renders4K: 87,
     monthlyAnnualLabel: '3.490', meterPct: 100, featured: false, badge: '',
+    // Sem segunda linha de propósito (decisão do dono, 2026-09-10): detalhar
+    // o prioritário viraria promessa operacional com hora marcada, e hoje o
+    // suporte é uma pessoa só. O rótulo já existia; só não vira contrato.
     features: [
       { label: 'Tudo do Pro' },
-      {
-        label: 'Suporte prioritário',
-        gloss: 'sua mensagem entra na frente da fila',
-        gain: true,
-      },
+      { label: 'Suporte prioritário', gain: true },
     ],
   },
 }
