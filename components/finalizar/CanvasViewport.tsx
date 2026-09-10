@@ -23,10 +23,12 @@ import type {
   CropRect, ElementTransform, FinalizeDoc, LocalAdjustment, MaskShape, MaskStroke, WandShape,
 } from '@/lib/finalizar/types'
 import { isGeometryIdentity } from '@/lib/finalizar/composition'
-import { buildColorIndex, magicWandAuto, magicWandSelect, type ColorIndex } from '@/lib/selection/magic-wand'
+import {
+  buildColorIndex, growSelectionAuto, magicWandAuto, magicWandSelect, type ColorIndex,
+} from '@/lib/selection/magic-wand'
 import { FinalizeRenderer } from '@/lib/finalizar/engine/renderer'
 import { computeHistogram, type Histogram } from '@/lib/finalizar/engine/color-math'
-import { computeSkyMask, MASK_SCALE, type LiveStroke } from '@/lib/finalizar/engine/masks'
+import { computeSkyMask, MASK_SCALE, selectionMaskPngCanvas, type LiveStroke } from '@/lib/finalizar/engine/masks'
 
 const MIN_ZOOM = 1
 const MAX_ZOOM = 8
@@ -84,6 +86,10 @@ export interface CanvasViewportHandle {
   wandAvailable(): boolean
   /** Apaga as regiões desenhadas (laço/polígono/retângulo). */
   clearEditRegions(): void
+  /** Cresce a seleção de edição até o material inteiro. Devolve a fração da
+   *  imagem que a seleção passou a cobrir, ou null quando não há o que crescer
+   *  (sem seleção, ou varinha indisponível). */
+  growEditSelection(): { coverage: number; before: number } | null
   baseImage(): HTMLImageElement | null
   webglSupported(): boolean
 }
@@ -115,6 +121,10 @@ interface Props {
   onWandPick: (shape: WandShape) => void
   /** Avisa que laço/polígono/retângulo mudaram a seleção desenhada. */
   onRegionsChange: (hasRegions: boolean) => void
+  /** A seleção foi crescida e virou uma região única: traços e varinha já
+   *  estão dentro dela e devem ser zerados no pai, sob pena de contarem duas
+   *  vezes (e de o Desmarcar deixar sobras). */
+  onSelectionGrown: () => void
   wbPicking: boolean
   onZoomChange: (pct: number) => void
   onStrokeCommit: (target: StrokeTarget, stroke: MaskStroke) => void
@@ -1507,6 +1517,71 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
       editPolyRef.current = null
       propsRef.current.onRegionsChange(false)
       scheduleDraw()
+    },
+    // Crescer a seleção até o material inteiro.
+    //
+    // Só existe com geometria identidade — a mesma razão da varinha: os traços
+    // vivem em espaço de EXIBIÇÃO e o índice de cor em espaço de ORIGEM, e
+    // enquanto a geometria é identidade os dois coincidem. Com perspectiva
+    // aplicada seria preciso deformar o raster pela inversa da homografia.
+    //
+    // O resultado vira uma REGIÃO (raster), porque uma área crescida não cabe
+    // nos parâmetros de uma WandShape: ela nasce de traços, varinha e regiões
+    // ao mesmo tempo. Depois disso a seleção é uma coisa só.
+    growEditSelection: () => {
+      const index = colorIndexRef.current
+      const d = docRef.current
+      if (!index || !isGeometryIdentity(d.geometry)) return null
+
+      // A seleção inteira de hoje, na resolução do índice de cor.
+      const base = editSelectionBase(index.width, index.height)
+      const full = selectionMaskPngCanvas(base, propsRef.current.editStrokes, index.width, index.height)
+      const fctx = full.getContext('2d', { willReadFrequently: true })
+      if (!fctx) return null
+      const px = fctx.getImageData(0, 0, index.width, index.height).data
+      const n = index.width * index.height
+      const seedMask = new Uint8Array(n)
+      let marked = 0
+      // O PNG da máscara é branco sobre preto e opaco: quem manda é o canal R.
+      for (let i = 0; i < n; i++) {
+        if (px[i * 4] > 127) { seedMask[i] = 255; marked++ }
+      }
+      if (marked === 0) return null
+
+      const { mask } = growSelectionAuto(index, seedMask, {
+        tolerance: propsRef.current.wandTolerance,
+        contiguous: propsRef.current.wandContiguous,
+        sampleRadius: wandSampleRadius(index, d.width),
+      })
+
+      // Grava como região, no tamanho do documento.
+      const src = document.createElement('canvas')
+      src.width = index.width
+      src.height = index.height
+      const sctx = src.getContext('2d')
+      if (!sctx) return null
+      const img = sctx.createImageData(index.width, index.height)
+      for (let i = 0; i < n; i++) {
+        const v = mask[i] > 127 ? 255 : 0
+        const o = i * 4
+        img.data[o] = v; img.data[o + 1] = v; img.data[o + 2] = v; img.data[o + 3] = v
+      }
+      sctx.putImageData(img, 0, 0)
+
+      const regions = editRegions()
+      if (!regions) return null
+      const rctx = regions.getContext('2d')
+      if (!rctx) return null
+      rctx.clearRect(0, 0, regions.width, regions.height)
+      rctx.drawImage(src, 0, 0, regions.width, regions.height)
+
+      editPolyRef.current = null
+      propsRef.current.onRegionsChange(true)
+      propsRef.current.onSelectionGrown()
+      scheduleDraw()
+      let after = 0
+      for (let i = 0; i < n; i++) if (mask[i] > 127) after++
+      return { coverage: after / n, before: marked / n }
     },
     // (mantido no handle para uso interno/testes; a TELA decide por
     //  `canSample` + geometria, sem ler ref durante o render.)

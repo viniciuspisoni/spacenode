@@ -58,6 +58,10 @@ export interface EditPanelProps {
   hasWand: boolean
   hasSelection: boolean
   onClearSelection: () => void
+  /** Dá para crescer a seleção agora? (precisa do índice de cor e de geometria
+   *  identidade — as mesmas condições da varinha). */
+  canGrow: boolean
+  onGrow: () => void
 
   referenceUrl: string | null
   onPickReference: () => void
@@ -143,34 +147,42 @@ export function EditPanel(props: EditPanelProps) {
             ? 'A ferramenta fica na barra sobre a imagem. A varinha pega a superfície inteira num clique; laço, polígono e retângulo desenham a área; Alt subtrai.'
             : 'A varinha fica indisponível com geometria aplicada — ajuste a perspectiva depois de editar. Laço, polígono, retângulo e pincel seguem valendo.'}
         </p>
-        {props.subTool === 'wand' && props.wandAvailable ? (
-          <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {(props.subTool === 'brush' || props.subTool === 'eraser') && (
             <SliderRow
-              label="Tolerância" value={props.tolerance} min={0} max={100} defaultValue={11}
-              format={v => `${v}`}
-              title="Baixa mira o material exato; alta abraça variações de cor"
-              onChange={props.onTolerance}
-            />
-            <Seg
-              label="Alcance"
-              options={[
-                { id: 'perto', label: 'Área conectada' },
-                { id: 'toda', label: 'Toda a imagem' },
-              ]}
-              value={props.contiguous ? 'perto' : 'toda'}
-              onChange={v => props.onContiguous(v === 'perto')}
-            />
-          </div>
-        ) : (
-          <div style={{ marginTop: 8 }}>
-            <SliderRow
-              label="Tamanho" value={props.brushSize} min={8} max={240} defaultValue={64}
+              label="Tamanho do pincel" value={props.brushSize} min={8} max={240} defaultValue={64}
               format={v => `${v}`} onChange={props.onBrushSize}
             />
-          </div>
-        )}
+          )}
+          {props.wandAvailable && (
+            <>
+              <SliderRow
+                label="Tolerância de cor" value={props.tolerance} min={0} max={100} defaultValue={11}
+                format={v => `${v}`}
+                title="Vale para a varinha e para o Expandir. Baixa mira o material exato; alta abraça variações de cor"
+                onChange={props.onTolerance}
+              />
+              <Seg
+                label="Alcance"
+                options={[
+                  { id: 'perto', label: 'Área conectada' },
+                  { id: 'toda', label: 'Toda a imagem' },
+                ]}
+                value={props.contiguous ? 'perto' : 'toda'}
+                onChange={v => props.onContiguous(v === 'perto')}
+              />
+            </>
+          )}
+        </div>
 
-        <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+        <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+          <Chip
+            onClick={props.onGrow}
+            disabled={!props.hasSelection || !props.canGrow}
+            title="Cresce o que você marcou até a superfície inteira — a IA conserta a peça toda de uma vez, em vez de deixar um remendo"
+          >
+            Expandir p/ o material
+          </Chip>
           <Chip onClick={props.onClearSelection} disabled={!props.hasSelection} title="Limpa a seleção">
             Desmarcar
           </Chip>

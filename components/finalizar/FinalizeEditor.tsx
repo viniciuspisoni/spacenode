@@ -1167,6 +1167,7 @@ export function FinalizeEditor({
           editWand={editWand}
           editSubTool={editSubTool}
           onRegionsChange={setHasEditRegions}
+          onSelectionGrown={() => { setEditStrokes([]); setEditWand(null) }}
           wandTolerance={wandTolerance}
           wandContiguous={wandContiguous}
           onWandPick={(shape) => {
@@ -1305,6 +1306,35 @@ export function FinalizeEditor({
                     setEditWand((w) => (w ? { ...w, contiguous: v } : w))
                   }}
                   wandAvailable={canSample && isGeometryIdentity(doc.geometry)}
+                  canGrow={canSample && isGeometryIdentity(doc.geometry)}
+                  onGrow={() => {
+                    const r = viewportRef.current?.growEditSelection() ?? null
+                    if (!r) {
+                      setEditMsg({ kind: 'error', text: 'Marque a área primeiro; depois expanda para o material.' })
+                      return
+                    }
+                    // A cobertura vai na mensagem porque é o único jeito de a
+                    // pessoa saber se pegou a peça ou meia cena — a marcação
+                    // vermelha em cima da imagem engana quando a área é grande.
+                    const pct = Math.round(r.coverage * 1000) / 10
+                    const cresceu = r.coverage > r.before * 1.2
+                    // A ordem importa: quando a seleção já cobre um quarto da
+                    // cena, o que a pessoa precisa saber é ISSO — não se o
+                    // passo de crescimento acrescentou pouco.
+                    setEditMsg(
+                      r.coverage > 0.25
+                        ? {
+                            kind: 'error',
+                            text: `A seleção cobre ${pct}% da imagem — bem mais que uma peça. Baixe a tolerância de cor, desmarque e refaça.`,
+                          }
+                        : {
+                            kind: 'info',
+                            text: cresceu
+                              ? `Seleção crescida para a superfície inteira (${pct}% da imagem) — a IA trata a peça como um todo.`
+                              : `Não achei mais desse material em volta (${pct}% da imagem). Suba a tolerância de cor e expanda de novo.`,
+                          },
+                    )
+                  }}
                   hasWand={editWand !== null}
                   hasSelection={editWand !== null || editStrokes.length > 0 || hasEditRegions}
                   onClearSelection={() => {
