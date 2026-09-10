@@ -42,6 +42,7 @@ import {
 } from '@/lib/ai/fidelity/geometry-score'
 import { fetchStorageBuffer, assertSafeFetchUrl } from '@/lib/storage/fetch'
 import { nearestSupportedAspectRatio } from '@/lib/ai/aspect-ratio'
+import { seedreamCheapSize, seedreamCheapTierEnabled } from '@/lib/ai/seedream-size'
 import { analyzeImage } from '@/lib/fidelity-engine'
 import { DIRECT_UPLOAD_AREAS, downloadDirectUpload } from '@/lib/storage/direct-upload'
 import { normalizeSourceImage } from '@/lib/storage/normalize-image'
@@ -82,7 +83,7 @@ const FAL_TIMEOUT_MS: Record<EngineId, number> = {
 // Vega   (Gemini 3 Pro Image edit) → `resolution` ∈ '1K'|'2K'|'4K'
 // Pulsar (Nano Banana 2 edit)      → `resolution` ∈ '1K'|'2K'|'4K'
 //   HD interno mapeia para '1K' na Fal.ai (NB2 não tem rótulo "HD" nativo).
-// Quasar (Seedream 5.0 Pro edit)   → `image_size` = 'auto_2K'
+// Quasar (Seedream 5.0 Pro edit)   → `image_size` = 'auto_2K' (ou WxH da faixa barata)
 //   'auto_*' segue o aspecto da imagem de entrada. O endpoint tem teto de
 //   2048×2048, por isso o Quasar só oferece 2K (lib/engines). Schema da FAL
 //   sem seed/quality/aspect_ratio.
@@ -91,12 +92,19 @@ function falParamsForEngine(
   engine:      EngineId,
   resolution:  Resolution,
   aspectRatio: string | null = null,
+  sourceSize:  { width: number; height: number } | null = null,
 ): Record<string, unknown> {
   if (engine === 'quasar') {
     // Seedream 5.0 Pro Edit: só campos do schema (conferido 2026-09-04).
     // 'auto_2K' preserva a proporção do input no maior tamanho do endpoint.
+    // Com SEEDREAM_CHEAP_TIER=1 pedimos WxH explícito no teto da faixa barata
+    // de preço (lib/ai/seedream-size): metade do custo nos dois provedores e
+    // 76% do lado. Sem as dimensões do original, segue o 'auto_2K'.
+    const cheap = seedreamCheapTierEnabled()
+      ? seedreamCheapSize(sourceSize?.width, sourceSize?.height)
+      : null
     return {
-      image_size:    'auto_2K',
+      image_size:    cheap ?? 'auto_2K',
       num_images:    1,
       // Master lossless — alinha o caminho FAL com o GCP/Vertex (que já
       // devolve PNG). JPEG aqui criava uma geração de perda logo na origem
@@ -493,10 +501,14 @@ export async function POST(req: NextRequest) {
       }
     }
     let aspectRatio: string | null = null
+    // Dimensões do original: além do pino de aspecto, dão o WxH da faixa barata
+    // do Seedream (Quasar) — sem elas o Quasar segue no 'auto_2K'.
+    let sourceSize: { width: number; height: number } | null = null
     if (originalBuffer) {
       try {
         const meta = await sharp(originalBuffer).metadata()
         aspectRatio = nearestSupportedAspectRatio(meta.width ?? null, meta.height ?? null)
+        if (meta.width && meta.height) sourceSize = { width: meta.width, height: meta.height }
       } catch { /* sem pino — motor segue o formato do input */ }
     }
     devLog('[generate] aspect     :', aspectRatio ?? 'auto (sem pino)')
@@ -699,7 +711,7 @@ export async function POST(req: NextRequest) {
       const falInput = {
         prompt:     finalPrompt,
         image_urls: imageUrls,
-        ...falParamsForEngine(engine, resolution, aspectRatio),
+        ...falParamsForEngine(engine, resolution, aspectRatio, sourceSize),
         // Reprodutibilidade nos DOIS caminhos: NB2/Pro na FAL expõem `seed`
         // (schema conferido 2026-08-17); Quasar (Seedream 5.0 Pro edit) não.
         ...(engine !== 'quasar' ? { seed: attemptSeed } : {}),
@@ -964,7 +976,7 @@ export async function POST(req: NextRequest) {
         request_id:     falRequestId,
         engine,
         resolution,
-        parameters:  falParamsForEngine(engine, resolution, aspectRatio),
+        parameters:  falParamsForEngine(engine, resolution, aspectRatio, sourceSize),
         // Reprodutibilidade: seed BASE do request (os dois caminhos recebem;
         // a seed efetiva por tentativa fica em fidelity.attempts[].seed).
         seed:            generationSeed,
