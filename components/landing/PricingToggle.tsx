@@ -14,6 +14,14 @@ import { formatBRL } from '@/lib/launch-offer'
 // era a única parte da landing que exigia saber o nome dos motores para ser
 // lida. Quem precisa do detalhe encontra no app, na hora de gerar.
 
+/** Item da lista. `gain` = o que este plano tem A MAIS que o de baixo. */
+interface PlanFeature {
+  label: string
+  /** Segunda linha, só nos ganhos: sem ela "white-label" não diz nada. */
+  gloss?: string
+  gain?: boolean
+}
+
 interface PlanDisplay {
   rendersHD: number
   renders2K: number
@@ -22,27 +30,57 @@ interface PlanDisplay {
   meterPct: number
   featured: boolean
   badge: string
-  features: string[]
+  features: PlanFeature[]
 }
 
 // Renders calculados com engine padrão por resolução: HD→Pulsar (10 nodes),
 // 2K→Vega (20), 4K→Vega (40). meterPct é proporcional ao maior plano
 // exibido (Studio=100%). Nodes extras valem p/ qualquer plano pago.
+//
+// Escada cumulativa (2026-09-10). Antes os três cartões repetiam a MESMA
+// lista, e o Pro era literalmente igual ao Starter — o único motivo para
+// subir era volume de nodes, o que faz o preço parecer caro em vez de
+// parecer um plano melhor. Agora cada degrau herda o de baixo ("Tudo do
+// Starter") e mostra só o que ganha.
+//
+// O ganho do Pro NÃO é invenção de marketing: white-label existe e está em
+// produção desde antes disto, gated em pro/studio/office
+// (app/app/settings/identity/page.tsx) e lido em app/p/[slug]/page.tsx, que
+// esconde o "criado com spacenode" do rodapé do link do cliente. A landing
+// simplesmente nunca contou. Starter não perde nada: nunca teve.
 const PLAN_DISPLAY: Record<SellablePlanId, PlanDisplay> = {
   starter: {
     rendersHD: 75,  renders2K: 37,  renders4K: 18,
     monthlyAnnualLabel: '890', meterPct: 21, featured: false, badge: '',
-    features: ['Acesso a todos os motores', 'Nodes extras disponíveis', 'Suporte por e-mail'],
+    features: [
+      { label: 'Acesso a todos os motores' },
+      { label: 'Nodes extras disponíveis' },
+      { label: 'Suporte por e-mail' },
+    ],
   },
   pro: {
     rendersHD: 180, renders2K: 90,  renders4K: 45,
     monthlyAnnualLabel: '1.990', meterPct: 51, featured: true, badge: 'recomendado',
-    features: ['Acesso a todos os motores', 'Nodes extras disponíveis', 'Suporte por e-mail'],
+    features: [
+      { label: 'Tudo do Starter' },
+      {
+        label: 'Apresentação com a sua marca',
+        gloss: 'o link que vai pro cliente sai sem o nosso nome no rodapé',
+        gain: true,
+      },
+    ],
   },
   studio: {
     rendersHD: 350, renders2K: 175, renders4K: 87,
     monthlyAnnualLabel: '3.490', meterPct: 100, featured: false, badge: '',
-    features: ['Acesso a todos os motores', 'Nodes extras disponíveis', 'Suporte prioritário'],
+    features: [
+      { label: 'Tudo do Pro' },
+      {
+        label: 'Suporte prioritário',
+        gloss: 'sua mensagem entra na frente da fila',
+        gain: true,
+      },
+    ],
   },
 }
 
@@ -66,6 +104,14 @@ async function startCheckout(id: PaidPlanId, billing: BillingCycle) {
 const CheckIcon = () => (
   <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }} aria-hidden>
     <path d="M2 7l3.5 3.5L12 3.5" />
+  </svg>
+)
+
+// O ganho do degrau ganha "+" em vez de check, e em primário: é a única
+// coisa nova do cartão, e o olho precisa achá-la sem depender de cor.
+const PlusIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="var(--color-text-primary)" strokeWidth="1.5" strokeLinecap="round" aria-hidden style={{ flexShrink: 0 }}>
+    <path d="M7 2.5v9M2.5 7h9" />
   </svg>
 )
 
@@ -115,7 +161,13 @@ function PlanCard({ planId, billing, loading, onSelect }: {
 
       <ul className="spn-plan-features">
         {d.features.map(feat => (
-          <li key={feat}><CheckIcon />{feat}</li>
+          <li key={feat.label} data-gain={feat.gain === true}>
+            {feat.gain ? <PlusIcon /> : <CheckIcon />}
+            <span>
+              {feat.label}
+              {feat.gloss && <small>{feat.gloss}</small>}
+            </span>
+          </li>
         ))}
       </ul>
 
@@ -240,11 +292,27 @@ function PlanCard({ planId, billing, loading, onSelect }: {
         }
         .spn-plan-features li {
           display: flex;
-          align-items: center;
+          align-items: flex-start;
           gap: 10px;
           font-size: 12px;
+          line-height: 1.35;
           letter-spacing: -0.005em;
           color: var(--color-text-secondary);
+        }
+        /* O ganho do degrau: primário e um pouco mais pesado. Junto com o
+           "+" no lugar do check, é o que faz o cartão dizer o que ele tem
+           A MAIS — sem precisar de cor. */
+        .spn-plan-features li[data-gain='true'] {
+          color: var(--color-text-primary);
+          font-weight: 500;
+        }
+        .spn-plan-features li small {
+          display: block;
+          margin-top: 3px;
+          font-size: 11px;
+          font-weight: 400;
+          line-height: 1.45;
+          color: var(--color-text-tertiary);
         }
         .spn-plan-cta {
           width: 100%;
