@@ -21,7 +21,7 @@ import {
   buildColorIndex,
   magicWandSelect,
   selectionCoverage,
-} from '../components/edit-v4/selection/magic-wand'
+} from '../lib/selection/magic-wand'
 
 interface Caso {
   arquivo: string

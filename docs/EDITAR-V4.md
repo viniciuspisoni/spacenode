@@ -1,4 +1,4 @@
-# Editar V4 — seleção precisa sobre o motor Seedream
+# Editar — edição por IA e pós-produção na mesma ferramenta
 
 Reconstrução do Modo Editar (2026-09-10). Roda **em paralelo** ao V3, atrás de
 flag e dormente por padrão: com as flags desligadas, nada muda para ninguém.
@@ -20,6 +20,69 @@ resolve num clique o que o pincel leva um minuto para fazer pior.
 **A margem.** O preço em nodes é derivado do custo do provider. O V3 mirava
 50%; o V4 mira 80%, e chega lá porque o Seedream pela ModelArk custa US$ 0,045
 por edição contra US$ 0,12 do Gemini.
+
+## A fusão com o Finalizar (2026-09-10)
+
+O módulo de pós-produção existia desde 10/07 com 9.294 linhas, motor WebGL2 e a
+lista inteira de ajustes de Lightroom e Photoshop. E tinha **3 projetos, de 1
+usuário, nenhum nos últimos 30 dias** — contra 2.381 renders gerados.
+
+Não era qualidade: a PR #187 (vidro) já o cobria. Era **acesso**. A página dele
+aceitava `?source=` — o handoff estava construído — e nada no produto apontava
+para lá; os dois únicos links do app inteiro estavam no Histórico, e serviam
+para reabrir projeto existente. Ele era um DESTINO num produto onde as pessoas
+seguem o fluxo, e a barra lateral tinha "Editar" e "Finalizar" lado a lado.
+
+Por isso viraram um. A direção da absorção não é óbvia e importa: **o Editar
+entrou na arquitetura do Finalizar**, não o contrário. O motivo é uma linha que
+já existia lá:
+
+```ts
+patch('Limpeza IA', (d) => ({ ...d, baseUrl: resultUrl }))
+```
+
+O documento já modelava o que a fusão precisa — `baseUrl` é a imagem de trabalho
+que **avança após ação de IA**, `originalBaseUrl` nunca muda, e os ajustes
+continuam por cima. Edição por IA já era operação de primeira classe ali, com
+entrada no histórico. A fusão foi estender de UMA ação (Limpeza, motor v1,
+pincel) para CINCO (motor Seedream, varinha mágica).
+
+**A varinha virou uma `MaskShape`.** Foi o encaixe que tornou tudo barato: a
+máscara da edição já era um `LocalAdjustment` sintético com
+`shape: { kind: 'brush' }`. Bastou a forma `wand` entrar pelo mesmo caminho
+raster que o céu já usava, e varinha + pincel + borracha passaram a compor sem
+que a lib de máscaras saiba que a varinha existe. De quebra, ajustes locais
+ganham a varinha pelo mesmo mecanismo — clicar no céu e graduar só o céu.
+
+**O que não muda:** motor, renderer, shaders, documento, histórico, exportação,
+persistência, os painéis de Ajustes/Cor/Máscaras/Geometria/Elementos. Tudo
+intocado.
+
+### A tolerância não é uma constante
+
+A calibração offline dizia 11. Na tela, clicar no piso de uma sala com 11
+selecionava **metade da cena** — porque a parede terracota e a madeira do piso se
+encontram numa faixa de tons intermediários que serve de PONTE, e o preenchimento
+atravessa. A mesma tolerância, na mesma imagem, era correta em outros pontos.
+
+Então o clique passou a se **auto-ajustar** (`magicWandAuto`). E a régua não pode
+ser cobertura absoluta — 50% é vazamento numa sala e um céu legítimo num
+exterior. O que separa os dois é a **derivada**: se baixar um degrau de tolerância
+derruba a cobertura à metade, a seleção estava presa por uma ponte estreita, não
+grande de verdade. Medido na tela: 11 → 7, cobertura 51,8% → 9,9%, e o controle
+passa a mostrar o 7 (o número na tela não pode mentir sobre o que aconteceu).
+
+Quando o usuário mexe no controle, vale o que ele pediu — ali a intenção é
+explícita e a ferramenta não discorda.
+
+### Limite conhecido
+
+A varinha lê a imagem ORIGINAL; traços e overlay vivem no espaço já corrigido
+pela geometria. Enquanto a geometria é identidade os dois coincidem. Com
+perspectiva ou corte aplicados, reconciliar exigiria deformar o raster pela
+inversa da homografia — trabalho que só se paga se alguém precisar, e a ordem do
+trilho (Editar primeiro, Geometria depois) diz que raramente vai. Até lá a
+varinha se desliga e a tela explica, em vez de entregar seleção torta.
 
 ## Princípios (mantidos do brief do fundador)
 

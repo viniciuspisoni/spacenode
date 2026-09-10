@@ -3,7 +3,7 @@
 // ToolRail — barra lateral esquerda de ferramentas do Finalizar.
 // Verde apenas no estado ativo (regra do design system).
 
-export type EditorTool = 'adjust' | 'color' | 'masks' | 'cleanup' | 'geometry' | 'elements' | 'history'
+export type EditorTool = 'edit' | 'adjust' | 'color' | 'masks' | 'geometry' | 'elements' | 'history'
 
 interface ToolDef {
   id: EditorTool
@@ -14,22 +14,25 @@ interface ToolDef {
 
 const sw = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round' } as const
 
+// A ordem é o roteiro do trabalho: primeiro muda-se o CONTEÚDO da cena (IA),
+// depois trata-se a IMAGEM (ajustes, cor, máscaras, geometria, camadas). Por
+// isso Editar abre o trilho — é por onde a pessoa entra.
 const TOOLS: ToolDef[] = [
   {
-    id: 'adjust', label: 'Ajustes', shortcut: '1',
+    id: 'edit', label: 'Editar', shortcut: '1',
+    icon: <svg width="17" height="17" viewBox="0 0 24 24" {...sw}><path d="m5 16 3.5-1.2L19.3 4a1.8 1.8 0 0 0-2.5-2.5L6 12.3 5 16Z" transform="translate(0 2)" /><path d="M4 21h16" /><path d="m14.5 5.5 2.5 2.5" transform="translate(0 2)" /></svg>,
+  },
+  {
+    id: 'adjust', label: 'Ajustes', shortcut: '2',
     icon: <svg width="17" height="17" viewBox="0 0 24 24" {...sw}><path d="M4 8h10M18 8h2M4 16h2M10 16h10" /><circle cx="16" cy="8" r="2.2" /><circle cx="8" cy="16" r="2.2" /></svg>,
   },
   {
-    id: 'color', label: 'Cor', shortcut: '2',
+    id: 'color', label: 'Cor', shortcut: '3',
     icon: <svg width="17" height="17" viewBox="0 0 24 24" {...sw}><path d="M12 21a9 9 0 1 1 9-9c0 2-1.5 3-3 3h-2a2.5 2.5 0 0 0-2 4c.5.7 0 2-2 2z" /><circle cx="8" cy="10" r="0.6" /><circle cx="12" cy="7.5" r="0.6" /><circle cx="16" cy="10" r="0.6" /></svg>,
   },
   {
-    id: 'masks', label: 'Máscaras', shortcut: '3',
+    id: 'masks', label: 'Máscaras', shortcut: '4',
     icon: <svg width="17" height="17" viewBox="0 0 24 24" {...sw}><circle cx="12" cy="12" r="8" strokeDasharray="3.5 3.5" /><circle cx="12" cy="12" r="3" /></svg>,
-  },
-  {
-    id: 'cleanup', label: 'Limpeza', shortcut: '4',
-    icon: <svg width="17" height="17" viewBox="0 0 24 24" {...sw}><path d="M19 12l-7 7a3 3 0 0 1-4.2 0L5 16.2a3 3 0 0 1 0-4.2l7-7L19 12z" /><path d="M9 8l7 7" /><path d="M8 20h9" /></svg>,
   },
   {
     id: 'geometry', label: 'Geometria', shortcut: '5',

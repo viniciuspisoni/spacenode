@@ -9,7 +9,7 @@
 // Interações por ferramenta:
 //   adjust/color — pan/zoom; conta-gotas de dominante quando ativo
 //   masks        — pincel (traços) ou redefinição de gradiente (arrasto)
-//   cleanup      — pincel da área de remoção (overlay de aviso)
+//   edit         — seleção da edição por IA: varinha + pincel (overlay de aviso)
 //   geometry     — corte interativo com alças + grade de terços
 //   elements     — selecionar/mover/escalar/rotacionar; pincel de máscara
 //
@@ -20,8 +20,10 @@ import {
   forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState,
 } from 'react'
 import type {
-  CropRect, ElementTransform, FinalizeDoc, LocalAdjustment, MaskShape, MaskStroke,
+  CropRect, ElementTransform, FinalizeDoc, LocalAdjustment, MaskShape, MaskStroke, WandShape,
 } from '@/lib/finalizar/types'
+import { isGeometryIdentity } from '@/lib/finalizar/composition'
+import { buildColorIndex, magicWandAuto, magicWandSelect, type ColorIndex } from '@/lib/selection/magic-wand'
 import { FinalizeRenderer } from '@/lib/finalizar/engine/renderer'
 import { computeHistogram, type Histogram } from '@/lib/finalizar/engine/color-math'
 import { computeSkyMask, MASK_SCALE, type LiveStroke } from '@/lib/finalizar/engine/masks'
@@ -29,8 +31,21 @@ import { computeSkyMask, MASK_SCALE, type LiveStroke } from '@/lib/finalizar/eng
 const MIN_ZOOM = 1
 const MAX_ZOOM = 8
 const WORK_LONG_SIDE = 2304
+/** Raio (px da imagem) da média que lê a cor do ponto clicado. Um pixel só
+ *  deixa um respingo de ruído definir a seleção inteira. */
+const WAND_SAMPLE_RADIUS_IMAGE_PX = 4
 
-export type ViewportTool = 'adjust' | 'color' | 'masks' | 'cleanup' | 'geometry' | 'elements'
+/** Resolução do índice de cor da varinha.
+ *
+ *  Tem que ser a MESMA ordem de grandeza em que a tolerância foi calibrada
+ *  (scripts/editar-wand-calibrate.mts, imagens de ~1 MP). Medido na prática:
+ *  construir o índice em meia resolução faz a varinha vazar pela cena inteira
+ *  no mesmo número de tolerância — reduzir a imagem mistura pixels vizinhos e
+ *  fabrica exatamente as cores intermediárias que servem de ponte para o
+ *  preenchimento atravessar a borda entre dois materiais. */
+const WAND_INDEX_LONG_SIDE = WORK_LONG_SIDE
+
+export type ViewportTool = 'edit' | 'adjust' | 'color' | 'masks' | 'geometry' | 'elements'
 
 export interface BrushSettings {
   /** Diâmetro em px de TELA. */
@@ -40,7 +55,7 @@ export interface BrushSettings {
   erase: boolean
 }
 
-export type StrokeTarget = { kind: 'local'; id: string } | { kind: 'element'; id: string } | { kind: 'cleanup' }
+export type StrokeTarget = { kind: 'local'; id: string } | { kind: 'element'; id: string } | { kind: 'edit' }
 
 /** Comparação persistente além do "segurar": divisor arrastável ou lado a lado. */
 export type CompareMode = 'none' | 'split' | 'side'
@@ -54,6 +69,12 @@ export interface CanvasViewportHandle {
   resultHistogram(): Histogram | null
   /** Máscara de céu heurística (branco=céu) na resolução de máscara, ou null. */
   makeSkyMask(): HTMLCanvasElement | null
+  /** Raster da varinha da seleção de edição, em ESPAÇO DE ORIGEM e na resolução
+   *  de máscara. null quando não há varinha ativa. */
+  wandMask(): HTMLCanvasElement | null
+  /** A varinha pode ser usada agora? Falsa com geometria aplicada — ver o
+   *  comentário de `pickWand`. */
+  wandAvailable(): boolean
   baseImage(): HTMLImageElement | null
   webglSupported(): boolean
 }
@@ -72,7 +93,17 @@ interface Props {
   compareMode: CompareMode
   showMaskOverlay: boolean
   maskOverlayColor: MaskOverlayColor
-  cleanupStrokes: MaskStroke[]
+  /** Traços de pincel/borracha da seleção de edição (espaço de EXIBIÇÃO). */
+  editStrokes: MaskStroke[]
+  /** Varinha da seleção de edição; compõe com os traços por baixo deles. */
+  editWand: WandShape | null
+  /** A varinha é a subferramenta ativa (um clique seleciona em vez de pintar). */
+  wandActive: boolean
+  /** Tolerância pedida (TETO — o clique pode entregar menos; ver magicWandAuto). */
+  wandTolerance: number
+  wandContiguous: boolean
+  /** Recebe a forma JÁ resolvida, com a tolerância que de fato valeu. */
+  onWandPick: (shape: WandShape) => void
   wbPicking: boolean
   onZoomChange: (pct: number) => void
   onStrokeCommit: (target: StrokeTarget, stroke: MaskStroke) => void
@@ -82,8 +113,10 @@ interface Props {
   onPickWb: (rgb: [number, number, number]) => void
   onSelectElement: (id: string | null) => void
   onError: (msg: string) => void
-  /** Disparado quando a imagem base termina de carregar (histograma etc.). */
-  onBaseReady?: () => void
+  /** Disparado quando a imagem base termina de carregar (histograma etc.).
+   *  `canSample` diz se os pixels puderam ser lidos — falso em imagem sem CORS,
+   *  e é o que decide se a varinha existe para esta imagem. */
+  onBaseReady?: (canSample: boolean) => void
 }
 
 type DragState =
@@ -96,14 +129,73 @@ type DragState =
   | { kind: 'element-scale'; pointerId: number; id: string; t0: ElementTransform; center: { x: number; y: number }; startDist: number }
   | { kind: 'element-rotate'; pointerId: number; id: string; t0: ElementTransform; center: { x: number; y: number }; startAngle: number }
 
+/** Raio de amostragem no espaço do ÍNDICE, que pode estar reduzido. */
+function wandSampleRadius(index: ColorIndex, docWidth: number): number {
+  const k = index.width / Math.max(1, docWidth)
+  return Math.max(1, Math.round(WAND_SAMPLE_RADIUS_IMAGE_PX * k))
+}
+
+/**
+ * Roda a varinha sobre o índice da imagem-base e devolve o raster
+ * (branco = selecionado), na resolução pedida.
+ *
+ * Vive no escopo do módulo, e não dentro do componente, porque só depende dos
+ * argumentos: assim não entra em lista de dependências de hook nenhuma.
+ *
+ * Trabalha em ESPAÇO DE ORIGEM, porque é a imagem original que a IA edita. Não
+ * há auto-ajuste aqui — a forma já chega com a tolerância resolvida no clique
+ * (ou a que o usuário escolheu no controle); reajustar de novo faria o resultado
+ * mudar sozinho a cada re-rasterização.
+ */
+function rasterizeWand(
+  index: ColorIndex,
+  shape: WandShape,
+  w: number,
+  h: number,
+  docWidth: number,
+): HTMLCanvasElement | null {
+  const mask = magicWandSelect(
+    index,
+    shape.seed.x * index.width,
+    shape.seed.y * index.height,
+    {
+      tolerance: shape.tolerance,
+      contiguous: shape.contiguous,
+      sampleRadius: wandSampleRadius(index, docWidth),
+    },
+  )
+  const src = document.createElement('canvas')
+  src.width = index.width
+  src.height = index.height
+  const sctx = src.getContext('2d')
+  if (!sctx) return null
+  const img = sctx.createImageData(index.width, index.height)
+  for (let i = 0; i < mask.length; i++) {
+    const o = i * 4
+    const v = mask[i] > 127 ? 255 : 0
+    img.data[o] = v
+    img.data[o + 1] = v
+    img.data[o + 2] = v
+    img.data[o + 3] = v
+  }
+  sctx.putImageData(img, 0, 0)
+  if (src.width === w && src.height === h) return src
+  const out = document.createElement('canvas')
+  out.width = w
+  out.height = h
+  out.getContext('2d')?.drawImage(src, 0, 0, w, h)
+  return out
+}
+
 export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function CanvasViewport(props, ref) {
   const {
     doc, tool, activeLocalId, activeElementId, brush, maskInteraction, elementMaskMode,
-    compare, compareMode, showMaskOverlay, maskOverlayColor, cleanupStrokes, wbPicking,
+    compare, compareMode, showMaskOverlay, maskOverlayColor, editStrokes, editWand, wbPicking,
     onZoomChange, onStrokeCommit, onShapeChange, onElementChange, onCropChange,
     onPickWb, onSelectElement, onError,
   } = props
 
+  const colorIndexRef = useRef<ColorIndex | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const screenRef = useRef<HTMLCanvasElement | null>(null)
   const glCanvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -139,6 +231,12 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
       scheduleDraw()
     })
     rendererRef.current = renderer
+    // A lib de máscaras não sabe ler pixels de imagem; quem sabe é o viewport,
+    // que é dono da base e do índice de cor. Ela só pede o raster pronto.
+    renderer.masks.wandSampler = (shape, w, h) => {
+      const index = colorIndexRef.current
+      return index ? rasterizeWand(index, shape, w, h, docRef.current.width) : null
+    }
     if (!renderer.isSupported()) setGlOk(false)
     return () => {
       renderer.dispose()
@@ -164,9 +262,33 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
         renderer.setBaseImage(img, img.naturalWidth, img.naturalHeight)
       }
       needsGlRef.current = true
+
+      // Índice de cor da base, para a varinha. Construído UMA vez por imagem.
+      // Uma ação de IA troca a base e dispara este efeito de novo; o
+      // `baseEpoch` invalida a máscara em cache.
+      colorIndexRef.current = null
+      try {
+        const kw = Math.min(1, WAND_INDEX_LONG_SIDE / Math.max(img.naturalWidth, img.naturalHeight))
+        const iw = Math.max(2, Math.round(img.naturalWidth * kw))
+        const ih = Math.max(2, Math.round(img.naturalHeight * kw))
+        const c = document.createElement('canvas')
+        c.width = iw
+        c.height = ih
+        const cx = c.getContext('2d', { willReadFrequently: true })
+        if (cx) {
+          cx.drawImage(img, 0, 0, iw, ih)
+          colorIndexRef.current = buildColorIndex(cx.getImageData(0, 0, iw, ih).data, iw, ih)
+        }
+      } catch {
+        // Imagem sem CORS: tudo segue funcionando, menos a varinha.
+        colorIndexRef.current = null
+      }
+      const r = rendererRef.current
+      if (r) r.masks.baseEpoch += 1
+
       setBaseReady(true)
       scheduleDraw()
-      propsRef.current.onBaseReady?.()
+      propsRef.current.onBaseReady?.(colorIndexRef.current !== null)
     }
     img.onerror = () => {
       if (!cancelled) onError('Não foi possível carregar a imagem base.')
@@ -336,8 +458,11 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
         const local = d.locals.find((l) => l.id === p.activeLocalId)
         if (local) drawMaskOverlay(ctx, v, local)
       }
-      if (p.tool === 'cleanup' && (p.cleanupStrokes.length > 0 || dragRef.current?.kind === 'stroke')) {
-        drawCleanupOverlay(ctx, v)
+      // A varinha entra na condição: uma seleção pode existir SEM nenhum traço
+      // (um clique e pronto), e sem isto o overlay ficava invisível justo no
+      // caminho mais curto da ferramenta.
+      if (p.tool === 'edit' && (p.editWand !== null || p.editStrokes.length > 0 || dragRef.current?.kind === 'stroke')) {
+        drawEditOverlay(ctx, v)
       }
       if (p.tool === 'geometry') drawCropUI(ctx)
       if (p.tool === 'elements' && !p.elementMaskMode) drawElementGizmo(ctx)
@@ -360,7 +485,7 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
   // overlays dependem de props de UI
   useEffect(() => {
     scheduleDraw()
-  }, [tool, activeLocalId, activeElementId, compare, compareMode, showMaskOverlay, maskOverlayColor, cleanupStrokes, elementMaskMode, wbPicking, brush, scheduleDraw])
+  }, [tool, activeLocalId, activeElementId, compare, compareMode, showMaskOverlay, maskOverlayColor, editStrokes, editWand, elementMaskMode, wbPicking, brush, scheduleDraw])
 
   // resize
   useEffect(() => {
@@ -480,15 +605,16 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
     ctx.globalAlpha = 1
   }
 
-  function drawCleanupOverlay(ctx: CanvasRenderingContext2D, v: ViewTransform) {
+  function drawEditOverlay(ctx: CanvasRenderingContext2D, v: ViewTransform) {
     const renderer = rendererRef.current
     const d = docRef.current
     if (!renderer) return
     const drag = dragRef.current
-    const live = drag?.kind === 'stroke' && drag.target.kind === 'cleanup' ? drag.stroke : null
+    const live = drag?.kind === 'stroke' && drag.target.kind === 'edit' ? drag.stroke : null
     const pseudo: LocalAdjustment = {
-      id: '__cleanup__', name: '', enabled: true, invert: false,
-      shape: { kind: 'brush' }, strokes: propsRef.current.cleanupStrokes,
+      id: '__edit__', name: '', enabled: true, invert: false,
+      shape: propsRef.current.editWand ?? { kind: 'brush' },
+      strokes: propsRef.current.editStrokes,
       values: { exposure: 0, contrast: 0, highlights: 0, shadows: 0, temperature: 0, tint: 0, saturation: 0, clarity: 0, sharpness: 0 },
       feather: 0, density: 100,
     }
@@ -616,7 +742,7 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
     if (!cur || spaceRef.current) return
     const painting =
       (p.tool === 'masks' && p.activeLocalId && p.maskInteraction === 'brush')
-      || p.tool === 'cleanup'
+      || p.tool === 'edit'
       || (p.tool === 'elements' && p.activeElementId && p.elementMaskMode)
     if (!painting) return
     const r = (p.brush.size * devicePixelRatio) / 2
@@ -627,7 +753,7 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
     ctx.stroke()
     ctx.beginPath()
     ctx.arc(cur.x, cur.y, r, 0, Math.PI * 2)
-    ctx.strokeStyle = p.brush.erase ? 'rgba(255,255,255,0.95)' : p.tool === 'cleanup' ? 'rgba(224,88,74,0.95)' : accentGreen()
+    ctx.strokeStyle = p.brush.erase ? 'rgba(255,255,255,0.95)' : p.tool === 'edit' ? 'rgba(224,88,74,0.95)' : accentGreen()
     ctx.lineWidth = 1.25
     ctx.stroke()
   }
@@ -804,9 +930,37 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
         }
         return
       }
-      case 'cleanup':
-        startStroke(e, { kind: 'cleanup' })
+      case 'edit': {
+        // Varinha: um CLIQUE seleciona; ela não pinta. Pincel e borracha
+        // continuam pintando por cima do que ela selecionou.
+        const p2 = propsRef.current
+        if (p2.wandActive) {
+          const pt = toImage(e.clientX, e.clientY)
+          const index = colorIndexRef.current
+          if (pt && index) {
+            const { tolerance } = magicWandAuto(
+              index,
+              pt.x * index.width,
+              pt.y * index.height,
+              {
+                tolerance: p2.wandTolerance,
+                contiguous: p2.wandContiguous,
+                sampleRadius: wandSampleRadius(index, docRef.current.width),
+              },
+            )
+            p2.onWandPick({
+              kind: 'wand',
+              seed: pt,
+              tolerance,
+              contiguous: p2.wandContiguous,
+              sampleRadius: WAND_SAMPLE_RADIUS_IMAGE_PX,
+            })
+          }
+          return
+        }
+        startStroke(e, { kind: 'edit' })
         return
+      }
       case 'geometry': {
         const mode = hitCropHandle(px, py)
         const pt = toImage(e.clientX, e.clientY)
@@ -910,7 +1064,7 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
           const pt = toImage(ev.clientX, ev.clientY)
           if (pt) drag.stroke.points.push(pt)
         }
-        if (drag.target.kind === 'cleanup') {
+        if (drag.target.kind === 'edit') {
           // overlay 2D é redesenhado; motor não precisa
         } else {
           needsGlRef.current = true
@@ -1061,13 +1215,37 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
     },
     baseImage: () => baseImgRef.current,
     webglSupported: () => glOk,
+    wandMask: () => {
+      const shape = propsRef.current.editWand
+      const index = colorIndexRef.current
+      if (!shape || !index) return null
+      const d = docRef.current
+      return rasterizeWand(
+        index,
+        shape,
+        Math.max(2, Math.round(d.width * MASK_SCALE)),
+        Math.max(2, Math.round(d.height * MASK_SCALE)),
+        d.width,
+      )
+    },
+    // (mantido no handle para uso interno/testes; a TELA decide por
+    //  `canSample` + geometria, sem ler ref durante o render.)
+    // A varinha lê a imagem ORIGINAL; os traços e o overlay vivem no espaço já
+    // corrigido pela geometria. Enquanto a geometria é identidade os dois
+    // espaços coincidem e não há o que reconciliar. Com perspectiva ou corte
+    // aplicados, reconciliar exigiria deformar o raster pela inversa da
+    // homografia — trabalho que só se paga se alguém precisar, e a ordem do
+    // trilho (Editar primeiro, Geometria depois) diz que raramente vai
+    // precisar. Até lá, a varinha se desliga e a tela explica por quê, em vez
+    // de entregar uma seleção silenciosamente torta.
+    wandAvailable: () => colorIndexRef.current !== null && isGeometryIdentity(docRef.current.geometry),
   }), [baseReady, glOk, onZoomChange, scheduleDraw])
 
   // ── Cursor CSS ───────────────────────────────────────────────────────────
 
   const painting = compareMode === 'none' && (
     (tool === 'masks' && activeLocalId && maskInteraction === 'brush')
-    || tool === 'cleanup'
+    || tool === 'edit'
     || (tool === 'elements' && activeElementId && elementMaskMode)
   )
   const cursorStyle = compareMode === 'split'

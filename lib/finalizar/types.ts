@@ -128,6 +128,26 @@ export interface MaskStroke {
   erase: boolean
 }
 
+/** Parâmetros da varinha mágica. Guardamos a SEMENTE e os controles, não o
+ *  raster: a máscara é recomputável a partir da imagem-base em ~50 ms, e o
+ *  documento continua pequeno o bastante para caber no jsonb sem drama.
+ *
+ *  Consequência assumida: depois de uma ação de IA — que faz `baseUrl` avançar —
+ *  a varinha é recalculada sobre a imagem NOVA. Para um ajuste local isso é o
+ *  comportamento desejável (a máscara acompanha a imagem); se algum dia for
+ *  preciso congelar, o caminho é o mesmo do céu, que fixa um `bakedUrl`. */
+export interface WandShape {
+  kind: 'wand'
+  /** Ponto clicado, em coordenadas NORMALIZADAS da imagem (0–1). */
+  seed: { x: number; y: number }
+  /** 0–100. */
+  tolerance: number
+  /** true = só a mancha conectada; false = todo pixel parecido da imagem. */
+  contiguous: boolean
+  /** Raio (px da imagem) da média que lê a cor da semente. */
+  sampleRadius: number
+}
+
 /** Forma-base da máscara; traços de pincel refinam qualquer forma. */
 export type MaskShape =
   | { kind: 'brush' }
@@ -135,6 +155,7 @@ export type MaskShape =
   | { kind: 'radial'; cx: number; cy: number; rx: number; ry: number; feather: number }
   | { kind: 'luminosity'; min: number; max: number; smooth: number }
   | { kind: 'sky'; bakedUrl: string | null }
+  | WandShape
 
 export interface LocalAdjustment {
   id: string

@@ -1,4 +1,4 @@
-// components/edit-v4/selection/contours.ts
+// lib/selection/contours.ts
 //
 // Extrai o contorno da seleção como polilinhas fechadas — o que permite os
 // "marching ants" (o tracejado animado que todo editor de imagem tem).

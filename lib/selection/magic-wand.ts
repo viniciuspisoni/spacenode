@@ -1,4 +1,4 @@
-// components/edit-v4/selection/magic-wand.ts
+// lib/selection/magic-wand.ts
 //
 // A varinha mágica: clique num ponto, saia com a área inteira selecionada.
 // Funções puras sobre arrays tipados — sem React, sem canvas, sem rede. Roda no
@@ -282,6 +282,64 @@ export function applySelectionOp(
 export function invertSelection(mask: Uint8Array): Uint8Array {
   for (let i = 0; i < mask.length; i++) mask[i] = mask[i] > 127 ? 0 : 255
   return mask
+}
+
+/** Acima disto uma seleção deixou de ser "esta superfície" e virou "a cena".
+ *  Generoso de propósito: um céu de exterior pode passar de 40% legitimamente. */
+/** Passo de redução do auto-ajuste e quantas vezes ele tenta. */
+const AUTO_STEPS = 6
+const AUTO_FACTOR = 0.65
+/** Abaixo desta cobertura a seleção já é pequena e não há penhasco a procurar:
+ *  cair pela metade ali é normal e encolher mais só tira material legítimo. */
+const AUTO_MIN_COVERAGE = 0.25
+/** Queda que denuncia o penhasco: baixar um degrau de tolerância derrubar a
+ *  cobertura à METADE ou menos só acontece quando o preenchimento estava
+ *  escapando por uma ponte estreita entre dois materiais. */
+const AUTO_CLIFF_DROP = 0.5
+/** Rede de segurança para o caso degenerado (selecionou tudo). */
+const AUTO_HARD_CEILING = 0.85
+
+/**
+ * Seleção com tolerância AUTO-AJUSTADA — é o que roda no clique.
+ *
+ * A calibração contra imagens reais mostrou que cada imagem tem um PENHASCO: a
+ * partir de certa tolerância o preenchimento acha caminho pelos degradês e
+ * escapa para a cena inteira. O que ela NÃO mostrou — e só a tela mostrou — é
+ * que a altura desse penhasco muda por imagem E por ponto clicado. Não existe
+ * constante certa; existe "a maior tolerância que ainda não caiu do penhasco
+ * NESTE clique".
+ *
+ * Procurar por COBERTURA ABSOLUTA não serve: 50% pode ser vazamento numa sala
+ * e um céu legítimo num exterior. O que distingue os dois é a DERIVADA — se
+ * baixar um degrau de tolerância derruba a cobertura à metade, a seleção estava
+ * presa por uma ponte estreita e não por ser grande de verdade.
+ *
+ * O valor pedido é o TETO. Quando o usuário mexe no controle, o chamador usa
+ * magicWandSelect direto: ali a intenção é explícita e a ferramenta não discorda.
+ */
+export function magicWandAuto(
+  index: ColorIndex,
+  seedX: number,
+  seedY: number,
+  opts: WandOptions,
+): { mask: Uint8Array; tolerance: number } {
+  let tolerance = Math.max(0, opts.tolerance)
+  let mask = magicWandSelect(index, seedX, seedY, { ...opts, tolerance })
+  let cov = selectionCoverage(mask)
+
+  for (let i = 0; i < AUTO_STEPS && tolerance > 1; i++) {
+    if (cov <= AUTO_MIN_COVERAGE) break
+    const next = Math.max(1, Math.round(tolerance * AUTO_FACTOR))
+    if (next === tolerance) break
+    const nextMask = magicWandSelect(index, seedX, seedY, { ...opts, tolerance: next })
+    const nextCov = selectionCoverage(nextMask)
+    const caiuDoPenhasco = nextCov <= cov * AUTO_CLIFF_DROP
+    if (!caiuDoPenhasco && cov <= AUTO_HARD_CEILING) break
+    tolerance = next
+    mask = nextMask
+    cov = nextCov
+  }
+  return { mask, tolerance }
 }
 
 /** Fração selecionada (0–1) — alimenta o aviso de "seleção cobre a imagem toda". */

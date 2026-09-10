@@ -14,9 +14,14 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   type CropRect, type ElementTransform, type FinalizeDoc, type FinalizeProject,
-  type FinalizeProjectSummary, type MaskShape, type MaskStroke,
+  type FinalizeProjectSummary, type MaskShape, type MaskStroke, type WandShape,
   MAX_ELEMENTS, MAX_LOCAL_ADJUSTMENTS, MAX_SNAPSHOTS,
 } from '@/lib/finalizar/types'
+import type {
+  EditV4Action, EditV4EdgeSoftness, EditV4Intensity, EditV4Preservation,
+} from '@/lib/edit-v4/types'
+import { DEFAULT_EDGE_SOFTNESS } from '@/lib/edit-v4/types'
+import { DEFAULT_WAND_OPTIONS } from '@/lib/selection/magic-wand'
 import {
   compactStroke, createDocument, deserializeDocument, isGeometryIdentity,
   makeId, newElementLayer, newLocalAdjustment, serializeDocument,
@@ -26,7 +31,7 @@ import {
   adjustmentsSummary, downloadBlob, renderExport,
 } from '@/lib/finalizar/export'
 import { computeColorMatch, displayToSource, imageStats, solveNeutral, type Histogram } from '@/lib/finalizar/engine/color-math'
-import { estimateStrokeCoverage, strokesMaskPngCanvas } from '@/lib/finalizar/engine/masks'
+import { selectionMaskPngCanvas } from '@/lib/finalizar/engine/masks'
 import { uploadDirect } from '@/lib/storage/direct-upload-client'
 import {
   CanvasViewport,
@@ -42,7 +47,7 @@ import { FinalizeImportModal } from './FinalizeImportModal'
 import { AdjustPanel, type QuickFix } from './panels/AdjustPanel'
 import { ColorPanel } from './panels/ColorPanel'
 import { MasksPanel, type QuickMask } from './panels/MasksPanel'
-import { CleanupPanel, type CleanupPreview } from './panels/CleanupPanel'
+import { EditPanel, EDIT_ACTIONS, type EditSubTool } from './panels/EditPanel'
 import { GeometryPanel } from './panels/GeometryPanel'
 import { ElementsPanel } from './panels/ElementsPanel'
 import { HistoryPanel } from './panels/HistoryPanel'
@@ -51,13 +56,18 @@ interface Props {
   initialProject?: FinalizeProject | null
   initialSourceUrl?: string | null
   savedProjects?: FinalizeProjectSummary[]
+  /** Saldo do PAGADOR, já resolvido no servidor. Evita a ida à rede só para
+   *  descobrir quanto a pessoa tem. */
+  initialBalance?: number | null
+  /** Preço de uma edição por IA, derivado em lib/edit-v4/pricing. */
+  nodesPerEdit?: number
 }
 
 const PANEL_TITLE: Record<EditorTool, string> = {
+  edit: 'Editar com IA',
   adjust: 'Ajustes',
   color: 'Cor e atmosfera',
   masks: 'Máscaras e ajustes locais',
-  cleanup: 'Limpeza (IA)',
   geometry: 'Geometria',
   elements: 'Elementos',
   history: 'Histórico e versões',
@@ -75,7 +85,10 @@ function toStableStorageUrl(url: string): string {
   return noQuery.replace('/storage/v1/object/sign/', '/storage/v1/object/public/')
 }
 
-export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects = [] }: Props) {
+export function FinalizeEditor({
+  initialProject, initialSourceUrl, savedProjects = [],
+  initialBalance = null, nodesPerEdit = 18,
+}: Props) {
   const router = useRouter()
   const viewportRef = useRef<CanvasViewportHandle | null>(null)
   const historyRef = useRef(new DocHistory())
@@ -159,14 +172,27 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
   )
 
   // ── limpeza (IA) ───────────────────────────────────────────────────────────
-  const [cleanupStrokes, setCleanupStrokes] = useState<MaskStroke[]>([])
-  const [cleanupMode, setCleanupMode] = useState<'remove' | 'fix'>('remove')
-  const [cleanupPrompt, setCleanupPrompt] = useState('')
-  const [cleanupPreview, setCleanupPreview] = useState<CleanupPreview | null>(null)
-  const [cleanupPreviewLoading, setCleanupPreviewLoading] = useState(false)
-  const [cleanupBusy, setCleanupBusy] = useState(false)
-  const [cleanupMsg, setCleanupMsg] = useState<{ text: string; kind: 'error' | 'info' } | null>(null)
-  const [balance, setBalance] = useState<number | null>(null)
+  // Seleção da edição por IA: a varinha é a FORMA (raster) e os traços de
+  // pincel/borracha refinam por cima — a mesma composição que uma máscara local
+  // usa, então o overlay e o que é enviado à IA são o mesmo desenho.
+  const [editStrokes, setEditStrokes] = useState<MaskStroke[]>([])
+  const [editWand, setEditWand] = useState<WandShape | null>(null)
+  const [editSubTool, setEditSubTool] = useState<EditSubTool>('wand')
+  const [wandTolerance, setWandTolerance] = useState(DEFAULT_WAND_OPTIONS.tolerance)
+  const [wandContiguous, setWandContiguous] = useState(DEFAULT_WAND_OPTIONS.contiguous)
+  const [editAction, setEditAction] = useState<EditV4Action>('swap_material')
+  const [editInstruction, setEditInstruction] = useState('')
+  const [editReferenceUrl, setEditReferenceUrl] = useState<string | null>(null)
+  const [editReferenceBusy, setEditReferenceBusy] = useState(false)
+  const [editPreservation, setEditPreservation] = useState<EditV4Preservation>('maximum')
+  const [editIntensity, setEditIntensity] = useState<EditV4Intensity>('standard')
+  const [editEdge, setEditEdge] = useState<EditV4EdgeSoftness | null>(null)
+  /** A base atual permite ler pixels? (imagem sem CORS derruba a varinha.) */
+  const [canSample, setCanSample] = useState(false)
+  const [editBusy, setEditBusy] = useState(false)
+  const [editMsg, setEditMsg] = useState<{ text: string; kind: 'error' | 'info' } | null>(null)
+  const referenceInputRef = useRef<HTMLInputElement | null>(null)
+  const [balance, setBalance] = useState<number | null>(initialBalance)
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Mutação do documento + histórico
@@ -229,7 +255,10 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
       setImportPurpose(null)
       setActiveLocalId(null)
       setActiveElementId(null)
-      setCleanupStrokes([])
+      setEditStrokes([])
+      setEditWand(null)
+      setEditReferenceUrl(null)
+      setEditMsg(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Falha ao carregar imagem.')
     }
@@ -274,9 +303,9 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
   const onStrokeCommit = useCallback((target: StrokeTarget, rawStroke: MaskStroke) => {
     // Enxuga o traço antes de persistir (jsonb pequeno, sem perda visual).
     const stroke = compactStroke(rawStroke)
-    if (target.kind === 'cleanup') {
-      setCleanupStrokes((prev) => [...prev, stroke])
-      setCleanupMsg(null)
+    if (target.kind === 'edit') {
+      setEditStrokes((prev) => [...prev, stroke])
+      setEditMsg(null)
       return
     }
     if (target.kind === 'local') {
@@ -594,98 +623,75 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
   // Limpeza (IA) — única parte que consome Nodes
   // ═══════════════════════════════════════════════════════════════════════════
 
-  // saldo ao entrar na ferramenta
+  // saldo ao entrar na ferramenta (só se o servidor não tiver mandado)
   useEffect(() => {
-    if (tool !== 'cleanup' || balance !== null) return
+    if (tool !== 'edit' || balance !== null) return
     fetch('/api/users/me/balance')
       .then((r) => r.json())
       .then((j) => { if (typeof j?.total_balance === 'number') setBalance(j.total_balance) })
       .catch(() => {})
   }, [tool, balance])
 
-  // preview de custo (debounced; autoritativo no servidor)
-  useEffect(() => {
-    if (tool !== 'cleanup' || cleanupStrokes.length === 0 || !doc) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- limpa o preview quando a máscara some
-      setCleanupPreview(null)
-      setCleanupPreviewLoading(false)
+  // O preço não é mais consultado por rede: ele é constante por edição e desce
+  // do servidor em `nodesPerEdit` (lib/edit-v4/pricing). O preview do v1 existia
+  // porque lá o custo variava com cobertura da máscara e resolução.
+
+  /**
+   * Edição por IA. É a única operação da ferramenta que consome Nodes.
+   *
+   * O resultado NÃO substitui o projeto: ele avança a imagem de trabalho
+   * (`baseUrl`) e todos os ajustes — exposição, cor, curva, máscaras locais,
+   * geometria, camadas — continuam aplicados por cima. É o que faz IA e
+   * pós-produção conviverem no mesmo documento em vez de serem duas etapas
+   * que se atropelam.
+   */
+  const runEdit = useCallback(async () => {
+    const cur = docRef.current
+    if (!cur || editBusy) return
+    const def = EDIT_ACTIONS.find((a2) => a2.id === editAction) ?? EDIT_ACTIONS[0]
+    const hasSelection = editStrokes.length > 0 || editWand !== null
+    if (def.requiresSelection && !hasSelection) {
+      setEditMsg({ kind: 'error', text: editAction === 'insert_element'
+        ? 'Marque o lugar onde o elemento entra.'
+        : 'Marque o objeto que será trocado.' })
       return
     }
-    setCleanupPreviewLoading(true)
-    const abort = new AbortController()
-    const t = setTimeout(async () => {
-      try {
-        const coverage = estimateStrokeCoverage(cleanupStrokes, doc.width, doc.height)
-        const res = await fetch('/api/edits/preview', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          signal: abort.signal,
-          body: JSON.stringify({
-            has_mask: true,
-            mask_coverage: coverage,
-            mode: cleanupMode === 'remove' ? 'remove' : 'fix',
-            prompt: cleanupMode === 'fix' ? cleanupPrompt : '',
-            quality: 'hd',
-            source_type: 'upload',
-            image_megapixels: (doc.width * doc.height) / 1e6,
-          }),
-        })
-        const j = await res.json().catch(() => null)
-        if (abort.signal.aborted) return
-        if (res.ok && j && typeof j.cost_nodes === 'number') {
-          setCleanupPreview({
-            cost: j.cost_nodes,
-            isFree: Boolean(j.is_free_fix),
-            label: typeof j.label === 'string' ? j.label : '',
-            explanation: typeof j.explanation === 'string' ? j.explanation : '',
-          })
-        } else {
-          // Falha ao precificar → sem preview, botão desabilita (nunca custo velho).
-          setCleanupPreview(null)
-        }
-      } catch {
-        if (!abort.signal.aborted) setCleanupPreview(null)
-      } finally {
-        if (!abort.signal.aborted) setCleanupPreviewLoading(false)
-      }
-    }, 350)
-    return () => {
-      abort.abort()
-      clearTimeout(t)
+    if (!hasSelection && !editInstruction.trim() && !editReferenceUrl) {
+      setEditMsg({ kind: 'error', text: 'Descreva a mudança ou marque uma área.' })
+      return
     }
-  }, [tool, cleanupStrokes, cleanupMode, cleanupPrompt, doc])
-
-  const runCleanup = useCallback(async () => {
-    const cur = docRef.current
-    if (!cur || cleanupStrokes.length === 0 || cleanupBusy) return
-    setCleanupBusy(true)
-    setCleanupMsg(null)
+    setEditBusy(true)
+    setEditMsg(null)
     try {
-      // 1. máscara nas dimensões EXATAS da imagem (exigência do /api/edits).
-      //    Os traços foram desenhados sobre a imagem JÁ CORRIGIDA (geometria);
-      //    a IA edita a imagem ORIGINAL → mapeia cada ponto de volta.
-      const aspect = cur.width / Math.max(1, cur.height)
-      const mappedStrokes = isGeometryIdentity(cur.geometry)
-        ? cleanupStrokes
-        : cleanupStrokes.map((s) => ({
-            ...s,
-            points: s.points.map((p) => displayToSource(p, cur.geometry, aspect)),
-          }))
-      const maskCanvas = strokesMaskPngCanvas(mappedStrokes, cur.width, cur.height)
-      const maskBlob = await new Promise<Blob | null>((r) => maskCanvas.toBlob(r, 'image/png'))
-      if (!maskBlob) throw new Error('Falha ao gerar a máscara neste navegador. Tente novamente.')
-      // Upload DIRETO browser→Storage (rotas da Vercel rejeitam corpo >4,5MB —
-      // era a causa do "Falha ao enviar a máscara" em imagens grandes).
-      let maskUrl: string
-      try {
-        const up = await uploadDirect(maskBlob, 'retocar-asset', { kind: 'mask' })
-        if (!up.url) throw new Error('sem URL')
-        maskUrl = up.url
-      } catch (e) {
-        throw new Error(`Falha ao enviar a máscara (${e instanceof Error ? e.message : 'conexão'}). Sua seleção foi mantida — toque em Tentar novamente.`)
+      // 1. seleção → PNG nas dimensões EXATAS da imagem.
+      //    Os traços foram desenhados sobre a imagem JÁ CORRIGIDA pela
+      //    geometria; a IA edita a ORIGINAL → mapeia ponto a ponto de volta. O
+      //    raster da varinha já nasce em espaço de origem (por isso ela se
+      //    desliga quando há geometria aplicada — ver wandAvailable no viewport).
+      let maskUrl: string | undefined
+      if (hasSelection) {
+        const aspect = cur.width / Math.max(1, cur.height)
+        const mapped = isGeometryIdentity(cur.geometry)
+          ? editStrokes
+          : editStrokes.map((st) => ({
+              ...st,
+              points: st.points.map((p) => displayToSource(p, cur.geometry, aspect)),
+            }))
+        const wandCanvas = viewportRef.current?.wandMask() ?? null
+        const maskCanvas = selectionMaskPngCanvas(wandCanvas, mapped, cur.width, cur.height)
+        const maskBlob = await new Promise<Blob | null>((r) => maskCanvas.toBlob(r, 'image/png'))
+        if (!maskBlob) throw new Error('Falha ao gerar a seleção neste navegador. Tente novamente.')
+        // Upload DIRETO browser→Storage: rotas da Vercel rejeitam corpo >4,5 MB.
+        try {
+          const up = await uploadDirect(maskBlob, 'retocar-asset', { kind: 'mask' })
+          if (!up.url) throw new Error('sem URL')
+          maskUrl = up.url
+        } catch (e) {
+          throw new Error(`Falha ao enviar a seleção (${e instanceof Error ? e.message : 'conexão'}). Sua marcação foi mantida — tente de novo.`)
+        }
       }
 
-      // 2. imagem fonte: precisa ser URL absoluta alcançável pelo servidor
+      // 2. a imagem fonte precisa ser URL absoluta alcançável pelo servidor
       let sourceUrl = cur.baseUrl
       if (sourceUrl.startsWith('/')) {
         const baseImg = viewportRef.current?.baseImage()
@@ -696,64 +702,71 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
         c.getContext('2d')?.drawImage(baseImg, 0, 0)
         const blob = await new Promise<Blob | null>((r) => c.toBlob(r, 'image/png'))
         if (!blob) throw new Error('Falha ao preparar a imagem (CORS). Recarregue a página.')
-        try {
-          const up = await uploadDirect(blob, 'retocar-asset', { kind: 'source' })
-          if (!up.url) throw new Error('sem URL')
-          sourceUrl = up.url
-        } catch (e) {
-          throw new Error(`Falha ao preparar a imagem (${e instanceof Error ? e.message : 'conexão'}). Sua seleção foi mantida — toque em Tentar novamente.`)
-        }
+        const up = await uploadDirect(blob, 'retocar-asset', { kind: 'source' })
+        if (!up.url) throw new Error('Falha ao preparar a imagem. Tente de novo.')
+        sourceUrl = up.url
       }
 
-      // 3. execução — o servidor debita e reembolsa em falha/rejeição
-      const coverage = estimateStrokeCoverage(cleanupStrokes, cur.width, cur.height)
-      const res = await fetch('/api/edits', {
+      // 3. execução — o servidor só debita no sucesso
+      const res = await fetch('/api/edit-v4', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          action: editAction,
           source_image_url: sourceUrl,
-          mask_url: maskUrl,
-          prompt: cleanupMode === 'fix' ? cleanupPrompt.trim() : '',
-          mode: cleanupMode === 'remove' ? 'remove' : 'fix',
-          quality: 'hd',
-          source_type: 'upload',
-          mask_coverage: coverage,
-          image_megapixels: (cur.width * cur.height) / 1e6,
+          ...(maskUrl ? { mask_url: maskUrl } : {}),
+          instruction: editInstruction.trim(),
+          preservation: editPreservation,
+          intensity: editIntensity,
+          edge_softness: editEdge ?? DEFAULT_EDGE_SOFTNESS[editAction],
+          references: def.ref && editReferenceUrl ? [{ kind: def.ref, url: editReferenceUrl }] : [],
         }),
       })
       const j = await res.json().catch(() => null)
 
-      const applyBalance = (b: unknown) => {
-        const total = (b as { total_balance?: number } | null)?.total_balance
-        if (typeof total === 'number') setBalance(total)
-      }
-
-      if (j?.rejected) {
-        applyBalance(j.balance_after)
-        setCleanupMsg({ kind: 'error', text: j.message ?? 'O resultado foi rejeitado pelo controle de qualidade. Os Nodes foram devolvidos.' })
+      if (j?.rejected === true) {
+        setEditMsg({ kind: 'error', text: `${j.reasons?.[0] ?? 'A edição foi descartada.'} Nenhum node foi consumido.` })
         return
       }
       if (res.status === 402) {
-        if (typeof j?.available === 'number') setBalance(j.available)
-        setCleanupMsg({ kind: 'error', text: j?.message ?? 'Saldo insuficiente.' })
+        setEditMsg({ kind: 'error', text: j?.error ?? 'Saldo insuficiente.' })
         return
       }
       if (!res.ok || typeof j?.result_url !== 'string') {
-        throw new Error(j?.message ?? j?.error ?? 'Falha ao processar a limpeza.')
+        throw new Error(j?.error ?? 'Falha ao aplicar a edição.')
       }
 
-      applyBalance(j.balance_after)
+      if (j?.charge?.debited === true && typeof j.nodes_cost === 'number') {
+        setBalance((prev) => (prev === null ? prev : Math.max(0, prev - j.nodes_cost)))
+      }
       // URL assinada expira — persiste a forma ESTÁVEL (pública/proxy).
-      const resultUrl = toStableStorageUrl(j.result_url as string)
-      patch('Limpeza IA', (d) => ({ ...d, baseUrl: resultUrl }))
-      setCleanupStrokes([])
-      setCleanupMsg({ kind: 'info', text: 'Pronto — área substituída. Use Desfazer para voltar.' })
+      patch(`Editar — ${def.short}`, (d) => ({ ...d, baseUrl: toStableStorageUrl(j.result_url as string) }))
+      setEditStrokes([])
+      setEditWand(null)
+      setEditMsg({ kind: 'info', text: j?.warning ?? 'Pronto — seus ajustes continuam por cima. Use Desfazer para voltar.' })
     } catch (e) {
-      setCleanupMsg({ kind: 'error', text: e instanceof Error ? e.message : 'Falha ao processar a limpeza.' })
+      setEditMsg({ kind: 'error', text: e instanceof Error ? e.message : 'Falha ao aplicar a edição.' })
     } finally {
-      setCleanupBusy(false)
+      setEditBusy(false)
     }
-  }, [cleanupStrokes, cleanupBusy, cleanupMode, cleanupPrompt, patch])
+  }, [
+    editAction, editBusy, editEdge, editInstruction, editIntensity, editPreservation,
+    editReferenceUrl, editStrokes, editWand, patch,
+  ])
+
+  /** Envia a imagem de referência (material ou objeto) da ação atual. */
+  const pickReference = useCallback(async (fileInput: File) => {
+    setEditReferenceBusy(true)
+    try {
+      const up = await uploadDirect(fileInput, 'retocar-reference', {}, { confirm: true })
+      if (!up.url) throw new Error('sem URL')
+      setEditReferenceUrl(up.url)
+    } catch (e) {
+      setEditMsg({ kind: 'error', text: e instanceof Error ? e.message : 'Falha ao enviar a referência.' })
+    } finally {
+      setEditReferenceBusy(false)
+    }
+  }, [])
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Salvar / autosave
@@ -822,10 +835,10 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
     if (!doc || !projectId || !dirtyRef.current) return
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
     autosaveTimer.current = setTimeout(() => {
-      if (dirtyRef.current && !cleanupBusy) void saveRef.current({ auto: true })
+      if (dirtyRef.current && !editBusy) void saveRef.current({ auto: true })
     }, AUTOSAVE_DELAY)
     return () => { if (autosaveTimer.current) clearTimeout(autosaveTimer.current) }
-  }, [doc, name, projectId, cleanupBusy, saveEpoch])
+  }, [doc, name, projectId, editBusy, saveEpoch])
 
   // aviso ao fechar com alterações pendentes
   useEffect(() => {
@@ -963,7 +976,7 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
       } else if (e.key === '-') {
         viewportRef.current?.zoomBy(1 / 1.25)
       } else if (['1', '2', '3', '4', '5', '6', '7'].includes(e.key)) {
-        const tools: EditorTool[] = ['adjust', 'color', 'masks', 'cleanup', 'geometry', 'elements', 'history']
+        const tools: EditorTool[] = ['edit', 'adjust', 'color', 'masks', 'geometry', 'elements', 'history']
         setTool(tools[Number(e.key) - 1])
       }
     }
@@ -1068,8 +1081,10 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
         ? maskInteraction === 'shape'
           ? 'Arraste no canvas para posicionar o gradiente'
           : 'Pinte para adicionar à máscara · Borracha remove'
-        : tool === 'cleanup'
-          ? 'Pinte sobre o que deseja remover — a área fica marcada em vermelho'
+        : tool === 'edit'
+          ? editSubTool === 'wand'
+            ? 'Clique numa superfície para selecioná-la inteira · Pincel e borracha ajustam'
+            : 'Pinte a área a alterar — ela fica marcada em vermelho'
           : tool === 'elements'
             ? elementMaskMode
               ? 'Pinte para revelar/ocultar partes do elemento'
@@ -1118,14 +1133,26 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
           tool={viewportTool}
           activeLocalId={activeLocalId}
           activeElementId={activeElementId}
-          brush={brush}
+          brush={tool === 'edit' ? { ...brush, erase: editSubTool === 'eraser' } : brush}
           maskInteraction={maskInteraction}
           elementMaskMode={elementMaskMode}
           compare={compare}
           compareMode={compareMode}
           showMaskOverlay={showMaskOverlay && tool === 'masks'}
           maskOverlayColor={maskOverlayColor}
-          cleanupStrokes={cleanupStrokes}
+          editStrokes={editStrokes}
+          editWand={editWand}
+          wandActive={editSubTool === 'wand'}
+          wandTolerance={wandTolerance}
+          wandContiguous={wandContiguous}
+          onWandPick={(shape) => {
+            setEditWand(shape)
+            // O clique pode ter baixado a tolerância para não engolir a cena;
+            // o controle passa a mostrar o valor que de fato valeu, senão o
+            // número na tela mente sobre o que aconteceu.
+            setWandTolerance(shape.tolerance)
+            setEditMsg(null)
+          }}
           wbPicking={wbPicking}
           onZoomChange={setZoomPct}
           onStrokeCommit={onStrokeCommit}
@@ -1135,7 +1162,7 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
           onPickWb={onPickWb}
           onSelectElement={setActiveElementId}
           onError={setError}
-          onBaseReady={() => setBaseTick((n) => n + 1)}
+          onBaseReady={(ok) => { setBaseTick((n) => n + 1); setCanSample(ok) }}
         />
 
         {panelsOpen && (
@@ -1233,23 +1260,46 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
                   skyBusy={skyBusy}
                 />
               )}
-              {tool === 'cleanup' && (
-                <CleanupPanel
-                  strokes={cleanupStrokes}
-                  onClearStrokes={() => { setCleanupStrokes([]); setCleanupMsg(null) }}
-                  brush={brush}
-                  onBrush={setBrush}
-                  mode={cleanupMode}
-                  onMode={setCleanupMode}
-                  prompt={cleanupPrompt}
-                  onPrompt={setCleanupPrompt}
-                  preview={cleanupPreview}
-                  previewLoading={cleanupPreviewLoading}
+              {tool === 'edit' && (
+                <EditPanel
+                  action={editAction}
+                  onAction={(a2) => { setEditAction(a2); setEditEdge(null); setEditReferenceUrl(null) }}
+                  instruction={editInstruction}
+                  onInstruction={setEditInstruction}
+                  subTool={editSubTool}
+                  onSubTool={setEditSubTool}
+                  brushSize={brush.size}
+                  onBrushSize={(v) => setBrush({ ...brush, size: v })}
+                  tolerance={wandTolerance}
+                  onTolerance={(v) => {
+                    setWandTolerance(v)
+                    setEditWand((w) => (w ? { ...w, tolerance: v } : w))
+                  }}
+                  contiguous={wandContiguous}
+                  onContiguous={(v) => {
+                    setWandContiguous(v)
+                    setEditWand((w) => (w ? { ...w, contiguous: v } : w))
+                  }}
+                  wandAvailable={canSample && isGeometryIdentity(doc.geometry)}
+                  hasWand={editWand !== null}
+                  hasSelection={editWand !== null || editStrokes.length > 0}
+                  onClearSelection={() => { setEditStrokes([]); setEditWand(null); setEditMsg(null) }}
+                  referenceUrl={editReferenceUrl}
+                  onPickReference={() => referenceInputRef.current?.click()}
+                  onClearReference={() => setEditReferenceUrl(null)}
+                  referenceBusy={editReferenceBusy}
+                  preservation={editPreservation}
+                  onPreservation={setEditPreservation}
+                  intensity={editIntensity}
+                  onIntensity={setEditIntensity}
+                  edge={editEdge ?? DEFAULT_EDGE_SOFTNESS[editAction]}
+                  onEdge={setEditEdge}
+                  nodes={nodesPerEdit}
                   balance={balance}
-                  busy={cleanupBusy}
-                  onExecute={() => void runCleanup()}
-                  message={cleanupMsg?.text ?? null}
-                  messageKind={cleanupMsg?.kind ?? null}
+                  busy={editBusy}
+                  onExecute={() => void runEdit()}
+                  message={editMsg?.text ?? null}
+                  messageKind={editMsg?.kind ?? null}
                 />
               )}
               {tool === 'geometry' && <GeometryPanel doc={doc} patch={patch} />}
@@ -1294,6 +1344,17 @@ export function FinalizeEditor({ initialProject, initialSourceUrl, savedProjects
         imageHeight={croppedH}
         canSaveToProject={projectId !== null}
         onExport={onExport}
+      />
+      <input
+        ref={referenceInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        hidden
+        onChange={(e) => {
+          const f = e.target.files?.[0]
+          if (f) void pickReference(f)
+          e.currentTarget.value = ''
+        }}
       />
       <ConfirmSheet
         open={leaving}
