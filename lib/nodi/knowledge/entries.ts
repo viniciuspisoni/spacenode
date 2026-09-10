@@ -17,6 +17,7 @@
 
 import { SELLABLE_PLANS } from '@/lib/plans'
 import { EXTRA_NODE_PACKS } from '@/lib/extra-nodes'
+import { NODES_GRACE_DAYS, NODES_ROLLOVER_COPY } from '@/lib/billing/nodes'
 import { ENGINES, ENGINE_ORDER } from '@/lib/engines'
 import { listAvailableVideoModels } from '@/lib/video/models'
 import { SUPPORT_EMAIL, SUPPORT_PHONE_DISPLAY, supportWhatsAppUrl } from '@/lib/support'
@@ -71,7 +72,26 @@ export const KB_ENTRIES: KBEntry[] = [
         'Nodes são a unidade de consumo das gerações — cada ferramenta debita um valor conforme motor, resolução ou duração. ' +
         'O custo exato aparece sempre antes de você confirmar. ' +
         'Se uma geração falha depois do débito, os nodes voltam automaticamente pro saldo. ' +
+        NODES_ROLLOVER_COPY + ' ' +
         'Em equipe, o consumo sai da bolsa do dono do workspace.',
+      actions: [ACT.planos],
+    }),
+  },
+  {
+    id: 'nodes-acumulam',
+    title: 'Nodes que sobram no mês acumulam?',
+    keywords: ['acumula', 'acumulam', 'acumular', 'sobrou', 'sobram', 'expira', 'expiram', 'validade', 'perco', 'perde', 'zera', 'virada do mes', 'renovacao'],
+    patterns: [/nodes.*(acumul|expir|sobr)/, /(perco|perde|zera).*nodes/, /nodes.*(validade|vencem)/],
+    modules: ['planos'],
+    faq: true,
+    build: () => ({
+      text:
+        NODES_ROLLOVER_COPY + ' ' +
+        'Na renovação, os nodes do plano são SOMADOS ao que sobrou — nada é zerado na virada do mês. ' +
+        `Encerrada a assinatura, o saldo já adquirido continua disponível por ${NODES_GRACE_DAYS} dias. ` +
+        'Reassinando dentro desse prazo, o saldo é preservado por inteiro e a expiração é cancelada — ' +
+        `e se essa nova assinatura for encerrada, começa um novo prazo de ${NODES_GRACE_DAYS} dias. ` +
+        'Nodes extras (avulsos) não expiram nunca.',
       actions: [ACT.planos],
     }),
   },
@@ -209,7 +229,8 @@ export const KB_ENTRIES: KBEntry[] = [
         SELLABLE_PLANS.map(p =>
           `• ${p.name}: ${p.nodes.toLocaleString('pt-BR')} nodes/mês — ${brl(p.monthlyPrice)}/mês (ou ${brl(p.annualMonthlyPrice)}/mês no anual)`,
         ).join('\n') +
-        '\nO cadastro concede nodes de cortesia para testar com um projeto real. Upgrade e downgrade ficam em Planos.' +
+        '\n' + NODES_ROLLOVER_COPY + ' O que sobra de um mês soma com os nodes do mês seguinte.' +
+        '\nO cadastro concede nodes de cortesia para testar com um projeto real. Upgrade e downgrade ficam em Planos — trocar de plano não zera o saldo acumulado.' +
         '\nO plano Office foi aposentado para novas assinaturas — quem já assina mantém todos os benefícios até trocar ou cancelar.',
       actions: [ACT.planos],
     }),

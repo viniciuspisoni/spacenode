@@ -12,6 +12,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { recommendPlan, getPlanById, type PlanId } from '@/lib/plans'
+import { NODES_ROLLOVER_COPY } from '@/lib/billing/nodes'
 
 interface Props {
   count:        number
@@ -186,7 +187,7 @@ export function InsufficientBalancePanel({ count, costPer, total, available, cur
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.55 }}>
               {upgradeNeeded
                 ? `${recommended.nodes} nodes/mês por R$ ${recommended.monthlyPrice}/mês.
-                   Vale se você gera muito mais do que cabe no plano atual.`
+                   ${NODES_ROLLOVER_COPY} Vale se você gera muito mais do que cabe no plano atual.`
                 : pooled
                 ? 'Este saldo é do workspace — o plano e os pacotes são gerenciados pelo dono da conta.'
                 : 'Veja os planos — Nodes extras ficam disponíveis em qualquer plano pago.'}

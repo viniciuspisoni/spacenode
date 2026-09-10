@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react'
 import { ANNUAL_BILLING_ENABLED, SELLABLE_PLANS, recommendPlan, type SellablePlanId, type PaidPlanId, type BillingCycle } from '@/lib/plans'
 import { EXTRA_NODE_PACKS } from '@/lib/extra-nodes'
+import { NODES_GRACE_DAYS, NODES_POLICY_COPY } from '@/lib/billing/nodes'
 import { SUPPORT_EMAIL, supportWhatsAppUrl } from '@/lib/support'
 import { formatBRL } from '@/lib/launch-offer'
 
@@ -52,8 +53,15 @@ const PLAN_DISPLAY: Record<SellablePlanId, PlanDisplay> = {
   starter: {
     rendersHD: 75,  renders2K: 37,  renders4K: 18,
     monthlyAnnualLabel: '890', meterPct: 21, featured: false, badge: '',
+    // O acúmulo entra AQUI e só aqui: é fato de plataforma, vale para todo
+    // plano pago, então mora na base da escada e sobe por herança ("Tudo do
+    // Starter"). Repeti-lo nos três cartões traria de volta exatamente a
+    // redundância que a escada acabou de tirar. Fica ao lado de "Nodes
+    // extras" porque os dois falam da mesma coisa: o que acontece com o
+    // saldo. A frase inteira da política está no bloco sob o subtítulo.
     features: [
       { label: 'Acesso a todos os motores' },
+      { label: 'Nodes não utilizados acumulam' },
       { label: 'Nodes extras disponíveis' },
       { label: 'Suporte por e-mail' },
     ],
@@ -384,8 +392,14 @@ export function PricingToggle() {
       <div className="spn-pricing-head">
         <h2 className="spn-pricing-title">escolha seu volume de geração.</h2>
         <p className="spn-pricing-sub">
-          Nodes são os créditos de geração. Renovam todo mês — e no plano
-          mensal você cancela quando quiser.
+          Nodes são os créditos de geração. Renovam todo mês e{' '}
+          <b>acumulam</b> — no plano mensal, você cancela quando quiser.
+        </p>
+        {/* A regra do acúmulo em destaque: é a objeção nº 1 de quem tem mês
+            fraco de projeto e some da assinatura pra não "perder" nodes. As
+            duas frases andam juntas — prometer só o acúmulo esconde o prazo. */}
+        <p className="spn-pricing-rollover spn-glass">
+          {NODES_POLICY_COPY}
         </p>
 
         {/* Billing toggle — some junto com a pausa do ciclo anual */}
@@ -462,6 +476,7 @@ export function PricingToggle() {
           Fale com a gente
         </a>
         {' '}— ou comece grátis com 80 nodes e assine quando o volume pedir.
+        Cancelou? Os nodes acumulados ficam disponíveis por mais {NODES_GRACE_DAYS} dias.
         Dúvidas: <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
       </p>
 
@@ -491,6 +506,16 @@ export function PricingToggle() {
           line-height: 1.6;
           max-width: 460px;
           margin: 0 auto;
+        }
+        .spn-pricing-rollover {
+          display: inline-block;
+          margin: 14px auto 0;
+          padding: 8px 16px;
+          border-radius: var(--radius-full);
+          font-size: 12px;
+          line-height: 1.5;
+          letter-spacing: -0.005em;
+          color: var(--color-text-secondary);
         }
         .spn-pricing-toggle {
           display: inline-flex;
