@@ -25,6 +25,50 @@ O que só um plugin dentro do modelo consegue:
 - **Voltar à vista** — cada render guarda a câmera; um clique restaura o
   enquadramento exato no SketchUp.
 
+## O que mudou na 1.0.5 — materiais por superfície
+
+Pergunta do dono olhando o painel: "essa aba de materiais do modelo é de fato
+útil para alguma coisa?". O motor é: a textura escolhida sobe como imagem de
+referência e entra no prompt como `Image #N — MATERIAL SAMPLE for the floor
+(reproduce this exact material on that surface only)`. É o controle de
+material mais forte do produto. A INTERFACE é que não servia.
+
+`list_materials` faz `model.materials.each` — todos os materiais do arquivo,
+não os da vista — e mostrava 40 linhas com o nome cru do SketchUp
+(`Smrk`, `Material8`, `[Wood_Cherry_Original]1`), cada uma pedindo "de qual
+superfície isto é?". A pergunta certa é a inversa e tem 7 respostas.
+
+- **A lista virou do avesso**: uma linha por superfície (Piso, Paredes,
+  Teto, Marcenaria, Bancadas, Portas e caixilhos, Elementos especiais — vêm do
+  catálogo como `{id,label}`), cada uma com um select de materiais.
+- **`model.materialSel` ({material: superfície}) virou `model.materialByField`**
+  ({superfície: material}). `materialSelArray()` continua devolvendo
+  `[{name, field}]`: o contrato com `upload_materials` e com `/api/generate`
+  não mudou. `restorePanelState` migra o formato antigo.
+- **O mesmo material pode servir duas superfícies** — paredes e teto com o
+  mesmo revestimento era impossível com a chave por nome. `upload_materials`
+  agrupa por nome: exporta e sobe UMA vez e reusa a URL nos demais campos (o
+  servidor deduplica por campo, então as duas entradas seguem valendo).
+- Material de formato não suportado virou `<option disabled>` com o motivo ao
+  lado do nome, em vez de sumir da lista.
+
+Achado da revisão adversarial que vale como regra: **poda de estado que roda
+dentro de um render é destrutiva por acidente.** A primeira versão apagava a
+escolha de superfície que não existe no tipo de projeto corrente ("teto" ao ir
+pro exterior). Como `renderModelMaterials` é chamada por `renderControls` e
+`onSelectionChanged` termina em `persistStateSoon`, a exclusão ia pro disco —
+e o `panel_state` é global, não por `.skp`. Dois toques (Exterior, Interior)
+apagavam paredes, teto e marcenaria para sempre; e `applyStylePreset` roda
+sozinho uma vez por sessão quando o `.skp` tem estilo travado, então dava pra
+perder tudo sem tocar em nada. A poda também não comprava nada: como
+`materialSelArray()` passou a iterar `currentMaterialFields()`, escolha órfã
+já não vira envio fantasma — o bug que ela guardava morreu na própria
+inversão.
+
+**Ainda em aberto** (não entrou nesta versão): miniatura da textura ao lado do
+nome e filtrar a lista pelo que está na vista. São os dois que resolvem
+*escolher*; esta versão resolveu *quantas decisões*.
+
 ## O que mudou na 1.0.4 — os quatro primeiros da varredura
 
 Varredura de 13 concorrentes (set/2026) apontou que o que mais dói não é

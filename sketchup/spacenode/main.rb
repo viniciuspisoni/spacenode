@@ -27,7 +27,7 @@ module SpaceNode
   module SketchUp
     extend self
 
-    VERSION = '1.0.4'
+    VERSION = '1.0.5'
     PREFERENCES_KEY = 'com.spacenode.sketchup'
     DEFAULT_API_BASE_URL = 'https://spacenode.app'
     MIN_SKETCHUP_MAJOR = 21          # Ruby 2.7+; recomendado 2024+
@@ -3066,7 +3066,12 @@ module SpaceNode
       end
 
       model = ::Sketchup.active_model
-      jobs = []
+
+      # Um material pode servir mais de uma superfície (paredes e teto com o
+      # mesmo revestimento). Agrupa por nome: exporta e sobe UMA vez e reusa a
+      # URL nos demais campos — senão o mesmo arquivo subiria N vezes, e no
+      # lote isso se repete a cada cena.
+      por_nome = {}
       selection.each do |item|
         next unless item.is_a?(Hash)
 
@@ -3075,13 +3080,19 @@ module SpaceNode
         next if name.empty? || field.empty?
 
         report[:requested] += 1
+        por_nome[name] ||= []
+        por_nome[name] << field unless por_nome[name].include?(field)
+      end
+
+      jobs = []
+      por_nome.each do |name, fields|
         exported = export_material_texture(model, name)
         if exported[:error]
           report[:skipped] << { :name => name, :reason => exported[:error] }
           next
         end
 
-        jobs << { :path => exported[:path], :field => field, :mime => exported[:mime], :name => name }
+        jobs << { :path => exported[:path], :fields => fields, :mime => exported[:mime], :name => name }
       end
 
       results = []
@@ -3094,8 +3105,10 @@ module SpaceNode
           upload_direct(job[:path], job[:mime] || 'image/png', 'render-material', true, epoch, :optional => true) do |_key, url|
             delete_quiet(job[:path])
             if url && !url.empty?
-              results << { :field => job[:field], :url => url }
-              report[:sent] += 1
+              # Uma URL, um item por superfície escolhida — o servidor
+              # deduplica por campo, então as duas entradas seguem valendo.
+              job[:fields].each { |f| results << { :field => f, :url => url } }
+              report[:sent] += job[:fields].length
             else
               report[:skipped] << { :name => job[:name], :reason => 'upload_failed' }
             end
