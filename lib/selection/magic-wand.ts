@@ -289,9 +289,14 @@ export function invertSelection(mask: Uint8Array): Uint8Array {
 /** Passo de redução do auto-ajuste e quantas vezes ele tenta. */
 const AUTO_STEPS = 6
 const AUTO_FACTOR = 0.65
-/** Abaixo desta cobertura a seleção já é pequena e não há penhasco a procurar:
- *  cair pela metade ali é normal e encolher mais só tira material legítimo. */
-const AUTO_MIN_COVERAGE = 0.25
+/** Abaixo desta cobertura o auto-ajuste não encosta na seleção.
+ *
+ *  Calibrado contra a medição real, não escolhido: nas imagens do acervo as
+ *  seleções LEGÍTIMAS ficam entre 10% e 31% (piso, parede, céu, laje) e os
+ *  vazamentos entre 51% e 80%. Um piso em 25% cortava no meio da faixa boa — um
+ *  céu de 25,3%, que é seleção correta, era encolhido sem precisar. Em 45% os
+ *  dois grupos ficam de lados opostos com folga. */
+const AUTO_MIN_COVERAGE = 0.45
 /** Queda que denuncia o penhasco: baixar um degrau de tolerância derrubar a
  *  cobertura à METADE ou menos só acontece quando o preenchimento estava
  *  escapando por uma ponte estreita entre dois materiais. */

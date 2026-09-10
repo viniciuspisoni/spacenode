@@ -13,6 +13,7 @@
 import { useState } from 'react'
 import type { EditV4Action } from '@/lib/edit-v4/types'
 import { Chip, Label, Section, Seg, SliderRow } from '../ui'
+import type { EditSubTool } from '../CanvasViewport'
 
 export interface EditActionDef {
   id: EditV4Action
@@ -32,8 +33,6 @@ export const EDIT_ACTIONS: EditActionDef[] = [
   { id: 'refine_area', short: 'Refinar', placeholder: 'Ex.: corrigir a textura da parede do fundo', ref: null, refLabel: '', requiresSelection: false },
 ]
 
-export type EditSubTool = 'wand' | 'brush' | 'eraser'
-
 export interface EditPanelProps {
   action: EditV4Action
   onAction: (a: EditV4Action) => void
@@ -41,7 +40,6 @@ export interface EditPanelProps {
   onInstruction: (v: string) => void
 
   subTool: EditSubTool
-  onSubTool: (t: EditSubTool) => void
   brushSize: number
   onBrushSize: (v: number) => void
 
@@ -134,20 +132,9 @@ export function EditPanel(props: EditPanelProps) {
       <Section title="Onde" open={openArea} onToggle={() => setOpenArea(v => !v)}>
         <p style={{ fontSize: 11.5, color: 'var(--color-text-quaternary)', lineHeight: 1.55, marginBottom: 10 }}>
           {props.wandAvailable
-            ? 'Clique com a varinha numa superfície e ela vem inteira — com sombra, parando no material vizinho. Pincel e borracha ajustam por cima.'
-            : 'Pinte a área a alterar. A varinha fica indisponível com geometria aplicada: ajuste a perspectiva depois de editar.'}
+            ? 'A ferramenta fica na barra sobre a imagem. A varinha pega a superfície inteira num clique; laço, polígono e retângulo desenham a área; Alt subtrai.'
+            : 'A varinha fica indisponível com geometria aplicada — ajuste a perspectiva depois de editar. Laço, polígono, retângulo e pincel seguem valendo.'}
         </p>
-        <Seg
-          label="Ferramenta"
-          options={[
-            { id: 'wand', label: 'Varinha', title: props.wandAvailable ? 'Um clique seleciona a superfície' : 'Indisponível com geometria aplicada' },
-            { id: 'brush', label: 'Pincel', title: 'Soma à seleção' },
-            { id: 'eraser', label: 'Borracha', title: 'Tira da seleção' },
-          ].filter(o => o.id !== 'wand' || props.wandAvailable) as { id: EditSubTool; label: string; title?: string }[]}
-          value={props.subTool === 'wand' && !props.wandAvailable ? 'brush' : props.subTool}
-          onChange={props.onSubTool}
-        />
-
         {props.subTool === 'wand' && props.wandAvailable ? (
           <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
             <SliderRow

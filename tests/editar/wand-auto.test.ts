@@ -106,3 +106,23 @@ describe('seleção pequena', () => {
     expect(tolerance).toBe(2)
   })
 })
+
+describe('seleção do tamanho de um céu', () => {
+  /** Uma faixa que ocupa ~30% da imagem, separada por borda dura do resto —
+   *  o formato de um céu de exterior ou de um piso visto em perspectiva. */
+  function cenaComFaixa(): Uint8ClampedArray {
+    const CEU: RGB = [120, 150, 200]
+    const CHAO: RGB = [80, 110, 60]
+    return paint((_x, y) => (y < 12 ? CEU : CHAO))
+  }
+
+  it('não é encolhida — 30% é seleção legítima, não vazamento', () => {
+    // A regressão que isto tranca: o piso do auto-ajuste estava em 25%, no meio
+    // da faixa em que as seleções CORRETAS vivem (10–31% nas imagens do
+    // acervo). Um céu de 25,3% — seleção certa — era encolhido sem precisar.
+    const index = buildColorIndex(cenaComFaixa(), W, H)
+    const { tolerance, mask } = magicWandAuto(index, 40, 5, opts)
+    expect(tolerance).toBe(opts.tolerance)
+    expect(selectionCoverage(mask)).toBeCloseTo(0.3, 1)
+  })
+})

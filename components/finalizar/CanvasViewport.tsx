@@ -31,6 +31,9 @@ import { computeSkyMask, MASK_SCALE, type LiveStroke } from '@/lib/finalizar/eng
 const MIN_ZOOM = 1
 const MAX_ZOOM = 8
 const WORK_LONG_SIDE = 2304
+/** Distância, em px de tela, para o clique fechar o polígono no ponto inicial. */
+const POLY_CLOSE_PX = 14
+
 /** Raio (px da imagem) da média que lê a cor do ponto clicado. Um pixel só
  *  deixa um respingo de ruído definir a seleção inteira. */
 const WAND_SAMPLE_RADIUS_IMAGE_PX = 4
@@ -62,6 +65,11 @@ export type CompareMode = 'none' | 'split' | 'side'
 
 export type MaskOverlayColor = 'green' | 'red' | 'white'
 
+/** Ferramentas de seleção da aba Editar. Varinha e pincel escrevem no mesmo
+ *  lugar que laço, polígono e retângulo — o que a pessoa vê marcado é o que
+ *  vai para a IA, venha de onde vier. */
+export type EditSubTool = 'wand' | 'brush' | 'eraser' | 'lasso' | 'polygon' | 'rect'
+
 export interface CanvasViewportHandle {
   fit(): void
   zoomBy(factor: number): void
@@ -72,9 +80,10 @@ export interface CanvasViewportHandle {
   /** Raster da varinha da seleção de edição, em ESPAÇO DE ORIGEM e na resolução
    *  de máscara. null quando não há varinha ativa. */
   wandMask(): HTMLCanvasElement | null
-  /** A varinha pode ser usada agora? Falsa com geometria aplicada — ver o
-   *  comentário de `pickWand`. */
+  /** A varinha pode ser usada agora? Falsa com geometria aplicada. */
   wandAvailable(): boolean
+  /** Apaga as regiões desenhadas (laço/polígono/retângulo). */
+  clearEditRegions(): void
   baseImage(): HTMLImageElement | null
   webglSupported(): boolean
 }
@@ -97,13 +106,15 @@ interface Props {
   editStrokes: MaskStroke[]
   /** Varinha da seleção de edição; compõe com os traços por baixo deles. */
   editWand: WandShape | null
-  /** A varinha é a subferramenta ativa (um clique seleciona em vez de pintar). */
-  wandActive: boolean
+  /** Qual ferramenta de seleção está ativa na aba Editar. */
+  editSubTool: EditSubTool
   /** Tolerância pedida (TETO — o clique pode entregar menos; ver magicWandAuto). */
   wandTolerance: number
   wandContiguous: boolean
   /** Recebe a forma JÁ resolvida, com a tolerância que de fato valeu. */
   onWandPick: (shape: WandShape) => void
+  /** Avisa que laço/polígono/retângulo mudaram a seleção desenhada. */
+  onRegionsChange: (hasRegions: boolean) => void
   wbPicking: boolean
   onZoomChange: (pct: number) => void
   onStrokeCommit: (target: StrokeTarget, stroke: MaskStroke) => void
@@ -123,6 +134,8 @@ type DragState =
   | { kind: 'split'; pointerId: number }
   | { kind: 'pan'; pointerId: number; startX: number; startY: number; panX: number; panY: number }
   | { kind: 'stroke'; pointerId: number; target: StrokeTarget; stroke: LiveStroke }
+  | { kind: 'edit-lasso'; pointerId: number; points: { x: number; y: number }[]; erase: boolean }
+  | { kind: 'edit-rect'; pointerId: number; from: { x: number; y: number }; to: { x: number; y: number }; erase: boolean }
   | { kind: 'shape'; pointerId: number; localId: string; shapeKind: 'linear' | 'radial'; start: { x: number; y: number } }
   | { kind: 'crop'; pointerId: number; mode: string; start: { x: number; y: number }; crop0: CropRect; ratio: number | null }
   | { kind: 'element-move'; pointerId: number; id: string; start: { x: number; y: number }; t0: ElementTransform }
@@ -190,7 +203,7 @@ function rasterizeWand(
 export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function CanvasViewport(props, ref) {
   const {
     doc, tool, activeLocalId, activeElementId, brush, maskInteraction, elementMaskMode,
-    compare, compareMode, showMaskOverlay, maskOverlayColor, editStrokes, editWand, wbPicking,
+    compare, compareMode, showMaskOverlay, maskOverlayColor, editStrokes, editWand, editSubTool, wbPicking,
     onZoomChange, onStrokeCommit, onShapeChange, onElementChange, onCropChange,
     onPickWb, onSelectElement, onError,
   } = props
@@ -204,6 +217,14 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
   /** A imagem de quando o projeto começou. É o "Antes" da comparação — ver o
    *  efeito que a carrega. */
   const originalImgRef = useRef<HTMLImageElement | null>(null)
+  /** Regiões desenhadas da seleção de edição (laço, polígono, retângulo),
+   *  acumuladas em branco na resolução do documento. Vivem aqui e não no
+   *  documento porque a seleção é transitória: some quando a edição roda. */
+  const editRegionsRef = useRef<HTMLCanvasElement | null>(null)
+  const editPolyRef = useRef<{ points: { x: number; y: number }[]; erase: boolean } | null>(null)
+  /** Quantos vértices o polígono em curso tem. É estado, e não só o ref, porque
+   *  o botão "Fechar área" precisa aparecer — o ref sozinho não re-renderiza. */
+  const [polyCount, setPolyCount] = useState(0)
   const [baseReady, setBaseReady] = useState(false)
   const [glOk, setGlOk] = useState(true)
 
@@ -462,6 +483,71 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
       drawView(glCanvas, glCanvas.width, glCanvas.height)
     }
 
+    // ── gesto de seleção em andamento (laço, retângulo, polígono) ──
+    //
+    // Vetorial, direto na tela, sem tocar no raster: o traço só vira região
+    // quando o gesto termina. É o que o V4 fazia, com a diferença de que lá o
+    // contexto estava transformado em coordenadas de imagem e aqui pintamos em
+    // px de tela — daí o toScreen em cada ponto.
+    if (p.tool === 'edit' && p.compareMode === 'none' && !p.compare) {
+      const drag = dragRef.current
+      const poly = editPolyRef.current
+      const line = (pts: { x: number; y: number }[], close: boolean) => {
+        ctx.beginPath()
+        let started = false
+        for (const pt of pts) {
+          const q = toScreen(pt.x, pt.y)
+          if (!q) continue
+          if (!started) { ctx.moveTo(q.x, q.y); started = true } else ctx.lineTo(q.x, q.y)
+        }
+        if (close) ctx.closePath()
+        ctx.stroke()
+      }
+      ctx.save()
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+      ctx.lineWidth = 1.5 * devicePixelRatio
+      ctx.setLineDash([5 * devicePixelRatio, 4 * devicePixelRatio])
+
+      if (drag?.kind === 'edit-lasso' && drag.points.length > 1) {
+        ctx.strokeStyle = drag.erase ? 'rgba(255,120,120,0.95)' : accentGreen()
+        line(drag.points, true)
+      } else if (drag?.kind === 'edit-rect') {
+        const a = toScreen(Math.min(drag.from.x, drag.to.x), Math.min(drag.from.y, drag.to.y))
+        const b = toScreen(Math.max(drag.from.x, drag.to.x), Math.max(drag.from.y, drag.to.y))
+        if (a && b) {
+          ctx.strokeStyle = drag.erase ? 'rgba(255,120,120,0.95)' : accentGreen()
+          ctx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y)
+        }
+      } else if (poly && poly.points.length > 0) {
+        ctx.strokeStyle = poly.erase ? 'rgba(255,120,120,0.95)' : accentGreen()
+        const cur = cursorRef.current
+        const pts = [...poly.points]
+        line(pts, false)
+        // Segmento elástico até o cursor, para a pessoa ver onde o próximo
+        // vértice cai antes de clicar.
+        if (cur && pts.length > 0) {
+          const last = toScreen(pts[pts.length - 1].x, pts[pts.length - 1].y)
+          if (last) {
+            ctx.beginPath()
+            ctx.moveTo(last.x, last.y)
+            ctx.lineTo(cur.x, cur.y)
+            ctx.stroke()
+          }
+        }
+        // Ponto inicial destacado: é o alvo do clique que fecha a área.
+        const first = toScreen(pts[0].x, pts[0].y)
+        if (first) {
+          ctx.setLineDash([])
+          ctx.fillStyle = accentGreen()
+          ctx.beginPath()
+          ctx.arc(first.x, first.y, 4 * devicePixelRatio, 0, Math.PI * 2)
+          ctx.fill()
+        }
+      }
+      ctx.restore()
+    }
+
     // ── overlays (fora dos modos de comparação) ──
     if (!p.compare && p.compareMode === 'none') {
       if (p.tool === 'masks' && p.showMaskOverlay && p.activeLocalId) {
@@ -471,7 +557,11 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
       // A varinha entra na condição: uma seleção pode existir SEM nenhum traço
       // (um clique e pronto), e sem isto o overlay ficava invisível justo no
       // caminho mais curto da ferramenta.
-      if (p.tool === 'edit' && (p.editWand !== null || p.editStrokes.length > 0 || dragRef.current?.kind === 'stroke')) {
+      if (
+        p.tool === 'edit' &&
+        (p.editWand !== null || p.editStrokes.length > 0 || editRegionsRef.current !== null ||
+          editPolyRef.current !== null || dragRef.current !== null)
+      ) {
         drawEditOverlay(ctx, v)
       }
       if (p.tool === 'geometry') drawCropUI(ctx)
@@ -520,7 +610,7 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
   // overlays dependem de props de UI
   useEffect(() => {
     scheduleDraw()
-  }, [tool, activeLocalId, activeElementId, compare, compareMode, showMaskOverlay, maskOverlayColor, editStrokes, editWand, elementMaskMode, wbPicking, brush, scheduleDraw])
+  }, [tool, activeLocalId, activeElementId, compare, compareMode, showMaskOverlay, maskOverlayColor, editStrokes, editWand, editSubTool, elementMaskMode, wbPicking, brush, scheduleDraw])
 
   // resize
   useEffect(() => {
@@ -646,6 +736,9 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
     if (!renderer) return
     const drag = dragRef.current
     const live = drag?.kind === 'stroke' && drag.target.kind === 'edit' ? drag.stroke : null
+    // A base do overlay é a MESMA que vai para a IA (varinha ∪ regiões), então
+    // o que aparece marcado é exatamente o que será editado — a única
+    // propriedade que uma ferramenta de seleção precisa garantir.
     const pseudo: LocalAdjustment = {
       id: '__edit__', name: '', enabled: true, invert: false,
       shape: propsRef.current.editWand ?? { kind: 'brush' },
@@ -662,8 +755,25 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
     tctx.drawImage(rg, 0, 0)
     const id = tctx.getImageData(0, 0, tint.width, tint.height)
     const dt = id.data
+
+    // Laço, polígono e retângulo vivem num raster à parte (não são forma nem
+    // traço), e entram aqui somando ao canal de "adicionar". Sem isto o
+    // desenho ficava gravado mas invisível — o que é o mesmo que não existir.
+    let regionAlpha: Uint8ClampedArray | null = null
+    const regions = editRegionsRef.current
+    if (regions) {
+      const rc = document.createElement('canvas')
+      rc.width = tint.width
+      rc.height = tint.height
+      const rctx = rc.getContext('2d', { willReadFrequently: true })
+      if (rctx) {
+        rctx.drawImage(regions, 0, 0, tint.width, tint.height)
+        regionAlpha = rctx.getImageData(0, 0, tint.width, tint.height).data
+      }
+    }
+
     for (let i = 0; i < dt.length; i += 4) {
-      const add = dt[i]
+      const add = Math.max(dt[i], regionAlpha ? regionAlpha[i + 3] : 0)
       const erase = dt[i + 1]
       const m = Math.max(0, add - erase)
       dt[i] = 224; dt[i + 1] = 88; dt[i + 2] = 74; dt[i + 3] = Math.round(m * 0.55)
@@ -775,9 +885,13 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
     const p = propsRef.current
     const cur = cursorRef.current
     if (!cur || spaceRef.current) return
+    // Na aba Editar só pincel e borracha pintam; varinha, laço, polígono e
+    // retângulo não têm raio, então mostrar o círculo do pincel neles era
+    // prometer um gesto que a ferramenta não faz.
+    const editPaints = p.editSubTool === 'brush' || p.editSubTool === 'eraser'
     const painting =
       (p.tool === 'masks' && p.activeLocalId && p.maskInteraction === 'brush')
-      || p.tool === 'edit'
+      || (p.tool === 'edit' && editPaints)
       || (p.tool === 'elements' && p.activeElementId && p.elementMaskMode)
     if (!painting) return
     const r = (p.brush.size * devicePixelRatio) / 2
@@ -966,10 +1080,50 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
         return
       }
       case 'edit': {
+        const p2 = propsRef.current
+        const sub = p2.editSubTool
+        const alt = e.altKey
+
+        if (sub === 'lasso') {
+          const pt = toImage(e.clientX, e.clientY)
+          if (pt) dragRef.current = { kind: 'edit-lasso', pointerId: e.pointerId, points: [pt], erase: alt }
+          return
+        }
+        if (sub === 'rect') {
+          const pt = toImage(e.clientX, e.clientY)
+          if (pt) dragRef.current = { kind: 'edit-rect', pointerId: e.pointerId, from: pt, to: pt, erase: alt }
+          return
+        }
+        if (sub === 'polygon') {
+          const pt = toImage(e.clientX, e.clientY)
+          if (!pt) return
+          const poly = editPolyRef.current
+          if (poly && poly.points.length >= 3) {
+            // Clique perto do primeiro ponto fecha a área — a convenção de
+            // qualquer ferramenta de polígono.
+            const v0 = getView()
+            const first = poly.points[0]
+            const d0 = docRef.current
+            if (v0) {
+              const dx = (pt.x - first.x) * d0.width * v0.s
+              const dy = (pt.y - first.y) * d0.height * v0.s
+              if (Math.hypot(dx, dy) <= POLY_CLOSE_PX * devicePixelRatio) {
+                closeEditPolygon()
+                return
+              }
+            }
+          }
+          const nextPoly = poly ?? { points: [] as { x: number; y: number }[], erase: alt }
+          nextPoly.points.push(pt)
+          editPolyRef.current = nextPoly
+          setPolyCount(nextPoly.points.length)
+          scheduleDraw()
+          return
+        }
+
         // Varinha: um CLIQUE seleciona; ela não pinta. Pincel e borracha
         // continuam pintando por cima do que ela selecionou.
-        const p2 = propsRef.current
-        if (p2.wandActive) {
+        if (sub === 'wand') {
           const pt = toImage(e.clientX, e.clientY)
           const index = colorIndexRef.current
           if (pt && index) {
@@ -1106,6 +1260,16 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
         }
         break
       }
+      case 'edit-lasso': {
+        const pt = toImage(e.clientX, e.clientY)
+        if (pt) drag.points.push(pt)
+        break
+      }
+      case 'edit-rect': {
+        const pt = toImage(e.clientX, e.clientY)
+        if (pt) drag.to = pt
+        break
+      }
       case 'shape': {
         const pt = toImage(e.clientX, e.clientY)
         if (!pt) break
@@ -1180,6 +1344,14 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
         needsGlRef.current = true
         break
       }
+      case 'edit-lasso': {
+        fillEditRegion(drag.points, drag.erase)
+        break
+      }
+      case 'edit-rect': {
+        fillEditRect(drag.from, drag.to, drag.erase)
+        break
+      }
       case 'element-move':
       case 'element-scale':
       case 'element-rotate': {
@@ -1192,6 +1364,81 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
         break
     }
     scheduleDraw()
+  }
+
+  /** Canvas das regiões, criado sob demanda no tamanho do documento. */
+  function editRegions(): HTMLCanvasElement | null {
+    const d = docRef.current
+    if (!d.width || !d.height) return null
+    let c = editRegionsRef.current
+    if (!c || c.width !== d.width || c.height !== d.height) {
+      c = document.createElement('canvas')
+      c.width = d.width
+      c.height = d.height
+      editRegionsRef.current = c
+    }
+    return c
+  }
+
+  /** Preenche um polígono (laço, polígono ou retângulo) nas regiões.
+   *  `erase` recorta em vez de somar — é o Alt de qualquer editor. */
+  function fillEditRegion(points: { x: number; y: number }[], erase: boolean) {
+    const c = editRegions()
+    const d = docRef.current
+    if (!c || points.length < 3) return
+    const ctx = c.getContext('2d')
+    if (!ctx) return
+    ctx.save()
+    ctx.globalCompositeOperation = erase ? 'destination-out' : 'source-over'
+    ctx.fillStyle = '#ffffff'
+    ctx.beginPath()
+    points.forEach((p, i) => {
+      const x = p.x * d.width
+      const y = p.y * d.height
+      if (i === 0) ctx.moveTo(x, y)
+      else ctx.lineTo(x, y)
+    })
+    ctx.closePath()
+    ctx.fill()
+    ctx.restore()
+    propsRef.current.onRegionsChange(true)
+  }
+
+  /** Retângulo a partir de dois cantos. */
+  function fillEditRect(a: { x: number; y: number }, b: { x: number; y: number }, erase: boolean) {
+    const x0 = Math.min(a.x, b.x)
+    const y0 = Math.min(a.y, b.y)
+    const x1 = Math.max(a.x, b.x)
+    const y1 = Math.max(a.y, b.y)
+    if (x1 - x0 < 0.002 || y1 - y0 < 0.002) return
+    fillEditRegion([{ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }], erase)
+  }
+
+  /** Fecha o polígono em curso e o transforma em região. */
+  function closeEditPolygon() {
+    const poly = editPolyRef.current
+    if (poly && poly.points.length >= 3) fillEditRegion(poly.points, poly.erase)
+    editPolyRef.current = null
+    setPolyCount(0)
+    scheduleDraw()
+  }
+
+  /** Base da seleção de edição: varinha ∪ regiões desenhadas, no tamanho pedido. */
+  function editSelectionBase(w: number, h: number): HTMLCanvasElement | null {
+    const shape = propsRef.current.editWand
+    const index = colorIndexRef.current
+    const regions = editRegionsRef.current
+    const wand = shape && index ? rasterizeWand(index, shape, w, h, docRef.current.width) : null
+    if (!wand && !regions) return null
+    if (wand && !regions) return wand
+    const out = document.createElement('canvas')
+    out.width = w
+    out.height = h
+    const ctx = out.getContext('2d')
+    if (!ctx) return wand
+    if (wand) ctx.drawImage(wand, 0, 0, w, h)
+    if (regions) ctx.drawImage(regions, 0, 0, w, h)
+    return out
   }
 
   // ── API imperativa ───────────────────────────────────────────────────────
@@ -1250,18 +1497,16 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
     },
     baseImage: () => baseImgRef.current,
     webglSupported: () => glOk,
+    // Resolução CHEIA: este raster vai para a IA, não para a tela.
     wandMask: () => {
-      const shape = propsRef.current.editWand
-      const index = colorIndexRef.current
-      if (!shape || !index) return null
       const d = docRef.current
-      return rasterizeWand(
-        index,
-        shape,
-        Math.max(2, Math.round(d.width * MASK_SCALE)),
-        Math.max(2, Math.round(d.height * MASK_SCALE)),
-        d.width,
-      )
+      return editSelectionBase(d.width, d.height)
+    },
+    clearEditRegions: () => {
+      editRegionsRef.current = null
+      editPolyRef.current = null
+      propsRef.current.onRegionsChange(false)
+      scheduleDraw()
     },
     // (mantido no handle para uso interno/testes; a TELA decide por
     //  `canSample` + geometria, sem ler ref durante o render.)
@@ -1280,7 +1525,7 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
 
   const painting = compareMode === 'none' && (
     (tool === 'masks' && activeLocalId && maskInteraction === 'brush')
-    || tool === 'edit'
+    || (tool === 'edit' && (editSubTool === 'brush' || editSubTool === 'eraser'))
     || (tool === 'elements' && activeElementId && elementMaskMode)
   )
   const cursorStyle = compareMode === 'split'
@@ -1310,6 +1555,7 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
         onPointerLeave={(e) => { cursorRef.current = null; endDrag(e) }}
+        onDoubleClick={() => { if (polyCount >= 3) closeEditPolygon() }}
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', touchAction: 'none', cursor: cursorStyle }}
       />
       {!glOk && (
@@ -1322,6 +1568,20 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
       )}
       {glOk && !baseReady && (
         <div style={overlayMsg}>Carregando imagem…</div>
+      )}
+      {polyCount >= 3 && (
+        <button
+          type="button"
+          onClick={closeEditPolygon}
+          className="spn-glass spn-glass--raised"
+          style={{
+            position: 'absolute', left: '50%', bottom: 16, transform: 'translateX(-50%)',
+            padding: '7px 14px', borderRadius: 999, fontSize: 12.5,
+            color: 'var(--color-text-primary)', cursor: 'pointer', zIndex: 3,
+          }}
+        >
+          Fechar área
+        </button>
       )}
     </div>
   )

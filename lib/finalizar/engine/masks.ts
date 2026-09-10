@@ -409,16 +409,22 @@ export function selectionMaskPngCanvas(
   outW: number,
   outH: number,
 ): HTMLCanvasElement {
-  const w = Math.max(2, Math.round(outW * MASK_SCALE))
-  const h = Math.max(2, Math.round(outH * MASK_SCALE))
-  const add = makeCanvas(w, h)
-  const erase = makeCanvas(w, h)
+  // RESOLUÇÃO CHEIA, ao contrário do preview de tela.
+  //
+  // As máscaras de ajuste local vivem em ½ (indistinguível quando o efeito é
+  // uma mudança de exposição). Esta aqui é outra coisa: é o recorte que decide
+  // quais pixels a IA reescreve, e meia resolução upscalada arredonda
+  // exatamente as arestas duras que a seleção existe para respeitar — o
+  // encontro do piso com o rodapé, o contorno do céu contra a laje. Acontece
+  // uma vez por edição; pagar resolução cheia aqui é barato.
+  const add = makeCanvas(outW, outH)
+  const erase = makeCanvas(outW, outH)
   const addCtx = add.getContext('2d')!
   const eraseCtx = erase.getContext('2d')!
-  if (base) addCtx.drawImage(base, 0, 0, w, h)
-  for (const s of strokes) applyStroke(addCtx, eraseCtx, s, w, h, MASK_SCALE)
+  if (base) addCtx.drawImage(base, 0, 0, outW, outH)
+  for (const s of strokes) applyStroke(addCtx, eraseCtx, s, outW, outH, 1)
 
-  const solved = makeCanvas(w, h)
+  const solved = makeCanvas(outW, outH)
   const sctx = solved.getContext('2d')!
   sctx.drawImage(add, 0, 0)
   sctx.globalCompositeOperation = 'destination-out'
@@ -429,7 +435,7 @@ export function selectionMaskPngCanvas(
   const octx = out.getContext('2d')!
   octx.fillStyle = '#000000'
   octx.fillRect(0, 0, outW, outH)
-  octx.drawImage(solved, 0, 0, outW, outH)
+  octx.drawImage(solved, 0, 0)
   return out
 }
 

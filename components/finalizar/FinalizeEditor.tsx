@@ -36,7 +36,7 @@ import { uploadDirect } from '@/lib/storage/direct-upload-client'
 import {
   CanvasViewport,
   type BrushSettings, type CanvasViewportHandle, type CompareMode,
-  type MaskOverlayColor, type StrokeTarget,
+  type EditSubTool, type MaskOverlayColor, type StrokeTarget,
 } from './CanvasViewport'
 import { TopBar, StatusStrip, type SaveStatus } from './TopBar'
 import { ToolRail, type EditorTool } from './ToolRail'
@@ -47,7 +47,8 @@ import { FinalizeImportModal } from './FinalizeImportModal'
 import { AdjustPanel, type QuickFix } from './panels/AdjustPanel'
 import { ColorPanel } from './panels/ColorPanel'
 import { MasksPanel, type QuickMask } from './panels/MasksPanel'
-import { EditPanel, EDIT_ACTIONS, type EditSubTool } from './panels/EditPanel'
+import { EditPanel, EDIT_ACTIONS } from './panels/EditPanel'
+import { EditToolRail } from './EditToolRail'
 import { GeometryPanel } from './panels/GeometryPanel'
 import { ElementsPanel } from './panels/ElementsPanel'
 import { HistoryPanel } from './panels/HistoryPanel'
@@ -71,6 +72,17 @@ const PANEL_TITLE: Record<EditorTool, string> = {
   geometry: 'Geometria',
   elements: 'Elementos',
   history: 'Histórico e versões',
+}
+
+/** Cada ferramenta de seleção explica o próprio gesto na barra de status —
+ *  é o único lugar onde ela cabe sem virar mais texto no painel. */
+const EDIT_HINTS: Record<EditSubTool, string> = {
+  wand: 'Clique numa superfície para selecioná-la inteira · Pincel e borracha ajustam',
+  brush: 'Pinte a área a alterar — ela fica marcada em vermelho',
+  eraser: 'Pinte para tirar da seleção',
+  lasso: 'Arraste para contornar a área à mão livre · Alt subtrai',
+  polygon: 'Clique para cravar cada canto · duplo-clique ou "Fechar área" encerra · Alt subtrai',
+  rect: 'Arraste uma caixa sobre a área · Alt subtrai',
 }
 
 const AUTOSAVE_DELAY = 3500
@@ -178,6 +190,8 @@ export function FinalizeEditor({
   const [editStrokes, setEditStrokes] = useState<MaskStroke[]>([])
   const [editWand, setEditWand] = useState<WandShape | null>(null)
   const [editSubTool, setEditSubTool] = useState<EditSubTool>('wand')
+  /** Há laço/polígono/retângulo desenhados? (o raster vive no viewport). */
+  const [hasEditRegions, setHasEditRegions] = useState(false)
   const [wandTolerance, setWandTolerance] = useState(DEFAULT_WAND_OPTIONS.tolerance)
   const [wandContiguous, setWandContiguous] = useState(DEFAULT_WAND_OPTIONS.contiguous)
   const [editAction, setEditAction] = useState<EditV4Action>('swap_material')
@@ -257,6 +271,7 @@ export function FinalizeEditor({
       setActiveElementId(null)
       setEditStrokes([])
       setEditWand(null)
+      viewportRef.current?.clearEditRegions()
       setEditReferenceUrl(null)
       setEditMsg(null)
     } catch (e) {
@@ -649,7 +664,7 @@ export function FinalizeEditor({
     const cur = docRef.current
     if (!cur || editBusy) return
     const def = EDIT_ACTIONS.find((a2) => a2.id === editAction) ?? EDIT_ACTIONS[0]
-    const hasSelection = editStrokes.length > 0 || editWand !== null
+    const hasSelection = editStrokes.length > 0 || editWand !== null || hasEditRegions
     if (def.requiresSelection && !hasSelection) {
       setEditMsg({ kind: 'error', text: editAction === 'insert_element'
         ? 'Marque o lugar onde o elemento entra.'
@@ -743,6 +758,7 @@ export function FinalizeEditor({
       patch(`Editar — ${def.short}`, (d) => ({ ...d, baseUrl: toStableStorageUrl(j.result_url as string) }))
       setEditStrokes([])
       setEditWand(null)
+      viewportRef.current?.clearEditRegions()
       setEditMsg({ kind: 'info', text: j?.warning ?? 'Pronto — seus ajustes continuam por cima. Use Desfazer para voltar.' })
     } catch (e) {
       setEditMsg({ kind: 'error', text: e instanceof Error ? e.message : 'Falha ao aplicar a edição.' })
@@ -751,7 +767,7 @@ export function FinalizeEditor({
     }
   }, [
     editAction, editBusy, editEdge, editInstruction, editIntensity, editPreservation,
-    editReferenceUrl, editStrokes, editWand, patch,
+    editReferenceUrl, editStrokes, editWand, hasEditRegions, patch,
   ])
 
   /** Envia a imagem de referência (material ou objeto) da ação atual. */
@@ -1082,9 +1098,7 @@ export function FinalizeEditor({
           ? 'Arraste no canvas para posicionar o gradiente'
           : 'Pinte para adicionar à máscara · Borracha remove'
         : tool === 'edit'
-          ? editSubTool === 'wand'
-            ? 'Clique numa superfície para selecioná-la inteira · Pincel e borracha ajustam'
-            : 'Pinte a área a alterar — ela fica marcada em vermelho'
+          ? EDIT_HINTS[editSubTool]
           : tool === 'elements'
             ? elementMaskMode
               ? 'Pinte para revelar/ocultar partes do elemento'
@@ -1127,6 +1141,15 @@ export function FinalizeEditor({
       <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
         <ToolRail tool={tool} onTool={setTool} />
 
+        <div style={{ position: 'relative', flex: 1, minWidth: 0, minHeight: 0, display: 'flex' }}>
+        {tool === 'edit' && (
+          <EditToolRail
+            tool={editSubTool}
+            onTool={setEditSubTool}
+            wandAvailable={canSample && isGeometryIdentity(doc.geometry)}
+            disabled={editBusy}
+          />
+        )}
         <CanvasViewport
           ref={viewportRef}
           doc={doc}
@@ -1142,7 +1165,8 @@ export function FinalizeEditor({
           maskOverlayColor={maskOverlayColor}
           editStrokes={editStrokes}
           editWand={editWand}
-          wandActive={editSubTool === 'wand'}
+          editSubTool={editSubTool}
+          onRegionsChange={setHasEditRegions}
           wandTolerance={wandTolerance}
           wandContiguous={wandContiguous}
           onWandPick={(shape) => {
@@ -1164,6 +1188,7 @@ export function FinalizeEditor({
           onError={setError}
           onBaseReady={(ok) => { setBaseTick((n) => n + 1); setCanSample(ok) }}
         />
+        </div>
 
         {panelsOpen && (
           <div
@@ -1267,7 +1292,6 @@ export function FinalizeEditor({
                   instruction={editInstruction}
                   onInstruction={setEditInstruction}
                   subTool={editSubTool}
-                  onSubTool={setEditSubTool}
                   brushSize={brush.size}
                   onBrushSize={(v) => setBrush({ ...brush, size: v })}
                   tolerance={wandTolerance}
@@ -1282,8 +1306,13 @@ export function FinalizeEditor({
                   }}
                   wandAvailable={canSample && isGeometryIdentity(doc.geometry)}
                   hasWand={editWand !== null}
-                  hasSelection={editWand !== null || editStrokes.length > 0}
-                  onClearSelection={() => { setEditStrokes([]); setEditWand(null); setEditMsg(null) }}
+                  hasSelection={editWand !== null || editStrokes.length > 0 || hasEditRegions}
+                  onClearSelection={() => {
+                    setEditStrokes([])
+                    setEditWand(null)
+                    viewportRef.current?.clearEditRegions()
+                    setEditMsg(null)
+                  }}
                   referenceUrl={editReferenceUrl}
                   onPickReference={() => referenceInputRef.current?.click()}
                   onClearReference={() => setEditReferenceUrl(null)}
