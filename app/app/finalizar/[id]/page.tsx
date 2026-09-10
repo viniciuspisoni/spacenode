@@ -2,6 +2,7 @@
 // Next 16: params é Promise (await). Carrega via cliente user-scoped (RLS).
 
 import { createClient } from '@/lib/supabase/server'
+import { editV4Enabled } from '@/lib/edit-v4/flags'
 import { notFound, redirect } from 'next/navigation'
 import { FinalizeEditor } from '@/components/finalizar/FinalizeEditor'
 import { mediaProxyUrl, mediaProxyDeep } from '@/lib/storage/signed'
@@ -45,7 +46,7 @@ export default async function FinalizarProjectPage({
 
   return (
     <div style={{ flex: 1, minHeight: 0, display: 'flex', background: 'var(--color-bg)' }}>
-      <FinalizeEditor initialProject={project} />
+      <FinalizeEditor initialProject={project} aiEnabled={editV4Enabled()} />
     </div>
   )
 }

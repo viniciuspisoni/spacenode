@@ -28,7 +28,7 @@ import { FinalizeEditor } from '@/components/finalizar/FinalizeEditor'
 import { signRows } from '@/lib/storage/signed'
 import { assertSafeImageUrl } from '@/lib/edit-v3/ssrf'
 import { nodesForEdit } from '@/lib/edit-v4/pricing'
-import { editV4Route } from '@/lib/edit-v4/flags'
+import { editV4Enabled, editV4Route } from '@/lib/edit-v4/flags'
 import type { FinalizeProjectSummary } from '@/lib/finalizar/types'
 
 /** `?source=` só é aceito se apontar para uma origem da casa — a MESMA
@@ -81,6 +81,7 @@ export default async function EditarPage({
           initialSourceUrl={safeSource((await searchParams).source)}
           initialBalance={balance}
           nodesPerEdit={nodesForEdit({ provider: editV4Route() })}
+          aiEnabled={editV4Enabled()}
         />
       </div>
     )

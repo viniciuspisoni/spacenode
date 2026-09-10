@@ -17,7 +17,7 @@ import { notFound, redirect } from 'next/navigation'
 import { FinalizeEditor } from '@/components/finalizar/FinalizeEditor'
 import { mediaProxyUrl, mediaProxyDeep, signRows } from '@/lib/storage/signed'
 import { nodesForEdit } from '@/lib/edit-v4/pricing'
-import { editV4Route } from '@/lib/edit-v4/flags'
+import { editV4Enabled, editV4Route } from '@/lib/edit-v4/flags'
 import type { FinalizeProject, FinalizeProjectSummary } from '@/lib/finalizar/types'
 
 export default async function EditarProjetoPage({
@@ -74,6 +74,7 @@ export default async function EditarProjetoPage({
         savedProjects={savedProjects}
         initialBalance={payerBalance.totalBalance}
         nodesPerEdit={nodesForEdit({ provider: editV4Route() })}
+        aiEnabled={editV4Enabled()}
       />
     </div>
   )

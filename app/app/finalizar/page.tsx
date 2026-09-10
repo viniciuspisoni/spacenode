@@ -2,6 +2,7 @@
 // Server Component: só auth. NÃO busca saldo/Nodes (a ferramenta é gratuita).
 
 import { createClient } from '@/lib/supabase/server'
+import { editV4Enabled } from '@/lib/edit-v4/flags'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { FinalizeEditor } from '@/components/finalizar/FinalizeEditor'
@@ -29,7 +30,16 @@ export default async function FinalizarPage({
 
   return (
     <div style={{ flex: 1, minHeight: 0, display: 'flex', background: 'var(--color-bg)' }}>
-      <FinalizeEditor savedProjects={savedProjects} initialSourceUrl={sp.source ?? null} />
+      {/* A aba de IA só aparece se a ROTA estiver ligada. As duas flags são
+          independentes: NEXT_PUBLIC_EDIT_V4 decide qual editor a página monta,
+          EDIT_V4_ENABLED decide se /api/edit-v4 existe. Sem esta checagem o
+          /app/finalizar de produção — onde a rota responde 404 — abriria numa
+          aba que só sabe falhar depois da pessoa marcar a área. */}
+      <FinalizeEditor
+        savedProjects={savedProjects}
+        initialSourceUrl={sp.source ?? null}
+        aiEnabled={editV4Enabled()}
+      />
     </div>
   )
 }

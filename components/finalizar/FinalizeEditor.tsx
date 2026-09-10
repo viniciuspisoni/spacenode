@@ -42,7 +42,7 @@ import {
   type EditSubTool, type MaskOverlayColor, type SelectionOp, type StrokeTarget,
 } from './CanvasViewport'
 import { TopBar, StatusStrip, type SaveStatus } from './TopBar'
-import { ToolRail, type EditorTool } from './ToolRail'
+import { ToolRail, visibleTools, type EditorTool } from './ToolRail'
 import { ConfirmSheet } from './ui'
 import { useAmbient } from '@/components/app/glass'
 import { ExportDialog, type ExportOptions } from './ExportDialog'
@@ -65,6 +65,11 @@ interface Props {
   initialBalance?: number | null
   /** Preço de uma edição por IA, derivado em lib/edit-v4/pricing. */
   nodesPerEdit?: number
+  /** A edição por IA está ligada neste ambiente (EDIT_V4_ENABLED no servidor)?
+   *  FAIL-SAFE em false: sem isto, o mesmo componente serve o /app/finalizar de
+   *  produção — onde a rota responde 404 — e abriria numa aba que só sabe
+   *  falhar. Com false ele é o editor de pós-produção de sempre. */
+  aiEnabled?: boolean
 }
 
 const PANEL_TITLE: Record<EditorTool, string> = {
@@ -128,7 +133,7 @@ function toStableStorageUrl(url: string): string {
 
 export function FinalizeEditor({
   initialProject, initialSourceUrl, savedProjects = [],
-  initialBalance = null, nodesPerEdit = 18,
+  initialBalance = null, nodesPerEdit = 18, aiEnabled = false,
 }: Props) {
   const router = useRouter()
   const viewportRef = useRef<CanvasViewportHandle | null>(null)
@@ -159,10 +164,10 @@ export function FinalizeEditor({
   }, [])
 
   // ── UI ─────────────────────────────────────────────────────────────────────
-  const [tool, setTool] = useState<EditorTool>('edit')
+  const [tool, setTool] = useState<EditorTool>(aiEnabled ? 'edit' : 'adjust')
   // O undo é chamado de dentro de callbacks estáveis; ler a aba por ref evita
   // recriar o callback (e a fiação do topo) a cada troca de painel.
-  const toolRef = useRef<EditorTool>('edit')
+  const toolRef = useRef<EditorTool>(aiEnabled ? 'edit' : 'adjust')
   useEffect(() => { toolRef.current = tool }, [tool])
   const [panelsOpen, setPanelsOpen] = useState(true)
   const [leaving, setLeaving] = useState(false)
@@ -1211,9 +1216,10 @@ export function FinalizeEditor({
         // então não brigam com nada nas outras abas.
         e.preventDefault()
         setEditSubTool(EDIT_TOOL_KEYS[e.key.toLowerCase()])
-      } else if (['1', '2', '3', '4', '5', '6', '7'].includes(e.key)) {
-        const tools: EditorTool[] = ['edit', 'adjust', 'color', 'masks', 'geometry', 'elements', 'history']
-        setTool(tools[Number(e.key) - 1])
+      } else if (/^[1-7]$/.test(e.key)) {
+        const tools = visibleTools(aiEnabled)
+        const alvo = tools[Number(e.key) - 1]
+        if (alvo) setTool(alvo)
       }
     }
     const onKeyUp = (e: KeyboardEvent) => {
@@ -1225,7 +1231,7 @@ export function FinalizeEditor({
       window.removeEventListener('keydown', onKey)
       window.removeEventListener('keyup', onKeyUp)
     }
-  }, [undo, redo, tool, refineSelection])
+  }, [undo, redo, tool, refineSelection, aiEnabled])
 
   // A ferramenta unificada mora em /app/editar. Mandar para /app/finalizar
    // era herança do módulo antigo — e levava a pessoa para uma segunda porta
@@ -1362,7 +1368,7 @@ export function FinalizeEditor({
       />
 
       <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
-        <ToolRail tool={tool} onTool={setTool} />
+        <ToolRail tool={tool} onTool={setTool} aiEnabled={aiEnabled} />
 
         <div style={{ position: 'relative', flex: 1, minWidth: 0, minHeight: 0, display: 'flex' }}>
         {tool === 'edit' && (

@@ -48,12 +48,21 @@ const TOOLS: ToolDef[] = [
   },
 ]
 
+/** As abas visíveis agora. Fonte ÚNICA: o trilho e os atalhos 1..7 leem
+ *  daqui, senão o dígito abriria uma aba que a barra não mostra. */
+export function visibleTools(aiEnabled: boolean): EditorTool[] {
+  return TOOLS.filter((t) => t.id !== 'edit' || aiEnabled).map((t) => t.id)
+}
+
 interface Props {
   tool: EditorTool
   onTool: (t: EditorTool) => void
+  /** A edição por IA está disponível neste ambiente? Com a rota desligada a
+   *  aba existiria só para falhar com 404 depois da pessoa marcar a área. */
+  aiEnabled: boolean
 }
 
-export function ToolRail({ tool, onTool }: Props) {
+export function ToolRail({ tool, onTool, aiEnabled }: Props) {
   return (
     <nav
       aria-label="Ferramentas"
@@ -64,7 +73,9 @@ export function ToolRail({ tool, onTool }: Props) {
         flexShrink: 0, position: 'relative', zIndex: 2,
       }}
     >
-      {TOOLS.map((t) => {
+      {/* O número mostrado é POSICIONAL entre as visíveis: escondendo o
+          Editar, Ajustes vira a tecla 1 — e a dica na barra não mente. */}
+      {TOOLS.filter((t) => t.id !== 'edit' || aiEnabled).map((t, i) => {
         const active = tool === t.id
         // Ativo = controle elevado, o mesmo material do polegar do segmentado.
         // O verde continua sendo só a marca de estado, na linha lateral.
@@ -73,7 +84,7 @@ export function ToolRail({ tool, onTool }: Props) {
             key={t.id}
             type="button"
             onClick={() => onTool(t.id)}
-            title={`${t.label} — tecla ${t.shortcut}`}
+            title={`${t.label} — tecla ${i + 1}`}
             aria-pressed={active}
             className={active ? 'spn-glass spn-glass--raised' : undefined}
             style={{
