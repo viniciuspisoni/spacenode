@@ -4,6 +4,7 @@
 // Sem dependências de DOM: roda no servidor (validação) e no cliente.
 
 import {
+  ELEMENT_CATEGORIES,
   HSL_BANDS,
   MAX_ELEMENTS,
   MAX_LOCAL_ADJUSTMENTS,
@@ -29,6 +30,7 @@ import {
   type ProjectVersion,
   type Vignette,
 } from './types'
+import { sanitizeTextSpec } from './text-layer'
 
 /** id curto e estável o suficiente para chaves (sem libs externas). */
 export function makeId(prefix: string): string {
@@ -118,6 +120,7 @@ export function newElementLayer({ url, name, category = 'imagem', width = 1 }: N
     maskStrokes: [],
     maskUrl: null,
     colorMatch: null,
+    text: null,
   }
 }
 
@@ -133,6 +136,9 @@ export function createDocument(baseUrl: string, width: number, height: number): 
     adjust: defaultAdjustments(),
     vignette: defaultVignette(),
     curve: defaultCurve(),
+    curveR: defaultCurve(),
+    curveG: defaultCurve(),
+    curveB: defaultCurve(),
     hsl: defaultHsl(),
     grading: defaultGrading(),
     colorMatch: null,
@@ -304,11 +310,18 @@ function sanitizeTransform(raw: unknown): ElementTransform {
   }
 }
 
-const ELEMENT_CATEGORY_IDS: ElementCategory[] = ['imagem', 'ceu', 'vegetacao', 'pessoas', 'veiculos', 'logo']
+// Derivada da lista da UI, e não repetida à mão: eram duas listas que
+// precisavam concordar, e a segunda foi esquecida quando 'texto' entrou — o
+// saneamento rebaixava toda camada de texto para 'imagem' ao abrir o projeto.
+const ELEMENT_CATEGORY_IDS: ElementCategory[] = ELEMENT_CATEGORIES.map((c) => c.id)
 
 function sanitizeElement(raw: unknown, i: number): ElementLayer | null {
   const e = (raw ?? {}) as Partial<ElementLayer>
-  if (typeof e.url !== 'string' || !e.url) return null
+  const text = sanitizeTextSpec(e.text)
+  // Camada de texto chega SEM url: o raster é derivado do texto e recomputado
+  // na carga. Exigir url aqui apagaria toda camada de texto de todo projeto
+  // salvo, silenciosamente.
+  if (!text && (typeof e.url !== 'string' || !e.url)) return null
   const cm = e.colorMatch
   const tri = (arr: unknown, fb: number, lo: number, hi: number): [number, number, number] => {
     const a = Array.isArray(arr) ? arr : []
@@ -317,7 +330,9 @@ function sanitizeElement(raw: unknown, i: number): ElementLayer | null {
   return {
     id: typeof e.id === 'string' ? e.id : makeId('e'),
     name: typeof e.name === 'string' && e.name.trim() ? e.name : `Elemento ${i + 1}`,
-    url: e.url,
+    // Um data URL nunca é persistido: se veio um, é resíduo — o raster do
+    // texto é reconstruído por hydrateTextLayers.
+    url: typeof e.url === 'string' && !e.url.startsWith('data:') ? e.url : '',
     category: ELEMENT_CATEGORY_IDS.includes(e.category as ElementCategory) ? (e.category as ElementCategory) : 'imagem',
     visible: e.visible !== false,
     opacity: clamp01(e.opacity, 1),
@@ -327,6 +342,7 @@ function sanitizeElement(raw: unknown, i: number): ElementLayer | null {
     maskFill: e.maskFill === 'empty' ? 'empty' : 'full',
     maskStrokes: sanitizeStrokes(e.maskStrokes),
     maskUrl: typeof e.maskUrl === 'string' ? e.maskUrl : null,
+    text,
     colorMatch: cm && typeof cm === 'object' && Array.isArray((cm as { gain?: unknown }).gain)
       ? {
           gain: tri((cm as { gain: unknown }).gain, 1, 0.25, 4),
@@ -452,6 +468,7 @@ export function migrateV1(v1: LegacyCompositionV1): FinalizeDoc {
       maskStrokes: [],
       maskUrl: typeof l.maskUrl === 'string' ? l.maskUrl : null,
       colorMatch: null,
+      text: null,
     }))
   return doc
 }
@@ -490,6 +507,9 @@ export function deserializeDocument(raw: unknown): FinalizeDoc | null {
       feather: num((d.vignette as Partial<Vignette> | undefined)?.feather, 60, 0, 100),
     },
     curve: sanitizeCurve(d.curve),
+    curveR: sanitizeCurve(d.curveR),
+    curveG: sanitizeCurve(d.curveG),
+    curveB: sanitizeCurve(d.curveB),
     hsl: sanitizeHsl(d.hsl),
     grading: sanitizeGrading(d.grading),
     colorMatch: sanitizeColorMatch(d.colorMatch),

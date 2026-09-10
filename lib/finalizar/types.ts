@@ -189,9 +189,10 @@ export const MAX_ELEMENTS = 24
 // Camadas de elementos (composição)
 // ═══════════════════════════════════════════════════════════════════════════
 
-export type ElementCategory = 'imagem' | 'ceu' | 'vegetacao' | 'pessoas' | 'veiculos' | 'logo'
+export type ElementCategory = 'imagem' | 'ceu' | 'vegetacao' | 'pessoas' | 'veiculos' | 'logo' | 'texto'
 
 export const ELEMENT_CATEGORIES: { id: ElementCategory; label: string }[] = [
+  { id: 'texto', label: 'Texto' },
   { id: 'imagem', label: 'Imagem' },
   { id: 'ceu', label: 'Céu' },
   { id: 'vegetacao', label: 'Vegetação' },
@@ -212,6 +213,8 @@ export interface ElementTransform {
   flipH: boolean
   flipV: boolean
 }
+
+import type { TextSpec } from './text-layer'
 
 export interface ElementLayer {
   id: string
@@ -234,6 +237,11 @@ export interface ElementLayer {
   /** Correspondência de cor automática com a base (gain/offset pré-computados;
    *  amount 0..100). null = desligada. */
   colorMatch: { gain: [number, number, number]; offset: [number, number, number]; amount: number } | null
+  /** Camada de TEXTO: o conteúdo vive aqui como parâmetro e o `url` é só o
+   *  raster derivado, recomputado na carga e a cada edição — nunca persistido
+   *  (um data URL de PNG no JSON do projeto seria enorme). null = camada de
+   *  imagem comum. Ver lib/finalizar/text-layer.ts. */
+  text: TextSpec | null
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -311,6 +319,13 @@ export interface FinalizeDoc {
   vignette: Vignette
   /** Curva de luminosidade — pontos ordenados por x; [0,0]..[1,1] = identidade. */
   curve: CurvePoint[]
+  /** Curvas por CANAL. A de luminosidade acima muda o brilho preservando a
+   *  cor; estas mudam a COR — é com elas que se corrige uma dominante que a
+   *  temperatura não pega (o verde do LED de obra, o azul do céu na sombra) e
+   *  se faz split-tone puxando o vermelho nas luzes e o azul nas sombras. */
+  curveR: CurvePoint[]
+  curveG: CurvePoint[]
+  curveB: CurvePoint[]
   hsl: HslMap
   grading: ColorGrading
   colorMatch: ColorMatch | null

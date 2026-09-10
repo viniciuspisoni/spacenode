@@ -28,6 +28,9 @@ import {
 } from '@/lib/finalizar/composition'
 import { DocHistory } from '@/lib/finalizar/history'
 import {
+  defaultTextSpec, hydrateTextLayers, renderTextToDataUrl, type TextSpec,
+} from '@/lib/finalizar/text-layer'
+import {
   adjustmentsSummary, downloadBlob, renderExport,
 } from '@/lib/finalizar/export'
 import { computeColorMatch, displayToSource, imageStats, solveNeutral, type Histogram } from '@/lib/finalizar/engine/color-math'
@@ -135,7 +138,8 @@ export function FinalizeEditor({
   // ── documento ──────────────────────────────────────────────────────────────
   const [doc, setDoc] = useState<FinalizeDoc | null>(() => {
     if (!initialProject) return null
-    const d = deserializeDocument(initialProject.document)
+    const d0 = deserializeDocument(initialProject.document)
+    const d = d0 ? hydrateTextLayers(d0) : null
     if (d) return d
     if (initialProject.base_image_url && initialProject.width && initialProject.height) {
       return createDocument(initialProject.base_image_url, initialProject.width, initialProject.height)
@@ -526,6 +530,69 @@ export function FinalizeEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [patch])
 
+  /**
+   * Cria uma camada de TEXTO.
+   *
+   * Não passa pelo importador de imagem porque não há imagem: o raster nasce
+   * do próprio texto. A largura inicial sai da proporção do raster contra a
+   * base, para o corpo pedido em `size` (fração da ALTURA) valer de verdade —
+   * senão "6% da altura" viraria qualquer coisa dependendo de quantas letras a
+   * pessoa digitou.
+   */
+  const addTextLayer = useCallback(() => {
+    setError(null)
+    const cur = docRef.current
+    if (!cur) return
+    if (cur.elements.length >= MAX_ELEMENTS) {
+      setError(`Limite de ${MAX_ELEMENTS} elementos por projeto.`)
+      return
+    }
+    const spec = defaultTextSpec()
+    const r = renderTextToDataUrl(spec)
+    if (!r) return
+    const alturaAlvo = spec.size * cur.height
+    const larguraAlvo = (r.width / r.height) * alturaAlvo
+    const el = {
+      ...newElementLayer({ url: r.url, name: 'Texto', category: 'texto' as const, width: 1 }),
+      text: spec,
+      transform: {
+        x: 0.5, y: 0.5,
+        width: Math.max(0.02, Math.min(1, larguraAlvo / cur.width)),
+        rotation: 0, flipH: false, flipV: false,
+      },
+    }
+    patch('Adicionar texto', (d) => ({ ...d, elements: [...d.elements, el] }))
+    setActiveElementId(el.id)
+    setTool('elements')
+    setElementMaskMode(false)
+  }, [patch])
+
+  /** Reescreve o texto de uma camada e o raster junto. A largura acompanha,
+   *  senão trocar "Sala" por "Sala de estar" esticaria as letras. */
+  const updateTextLayer = useCallback((id: string, spec: TextSpec) => {
+    const cur = docRef.current
+    if (!cur) return
+    const r = renderTextToDataUrl(spec)
+    patch('Texto', (d) => ({
+      ...d,
+      elements: d.elements.map((e) => {
+        if (e.id !== id) return e
+        if (!r) return { ...e, text: spec }
+        const alturaAlvo = spec.size * d.height
+        const larguraAlvo = (r.width / r.height) * alturaAlvo
+        return {
+          ...e,
+          text: spec,
+          url: r.url,
+          transform: {
+            ...e.transform,
+            width: Math.max(0.02, Math.min(2, larguraAlvo / d.width)),
+          },
+        }
+      }),
+    }), `texto-${id}`)
+  }, [patch])
+
   // ═══════════════════════════════════════════════════════════════════════════
   // Tratamento: copiar/colar entre projetos (consistência entre vistas)
   // ═══════════════════════════════════════════════════════════════════════════
@@ -536,6 +603,10 @@ export function FinalizeEditor({
     try {
       window.localStorage.setItem(TREATMENT_CLIPBOARD_KEY, JSON.stringify({
         adjust: d.adjust, vignette: d.vignette, curve: d.curve,
+        // As curvas por canal são tratamento como qualquer outro: sem elas o
+        // "colar" levaria metade da atmosfera e a vista seguinte sairia com
+        // outra dominante que a primeira.
+        curveR: d.curveR, curveG: d.curveG, curveB: d.curveB,
         hsl: d.hsl, grading: d.grading, treatmentAmount: d.treatmentAmount,
       }))
       setPasteAvailable(true)
@@ -551,7 +622,8 @@ export function FinalizeEditor({
       const t = JSON.parse(raw) as Record<string, unknown>
       patch('Colar tratamento', (d) => {
         // O sanitizador do documento garante shape/limites do que veio do storage.
-        const merged = deserializeDocument({ ...d, ...t, snapshots: d.snapshots, versions: d.versions })
+        const m0 = deserializeDocument({ ...d, ...t, snapshots: d.snapshots, versions: d.versions })
+        const merged = m0 ? hydrateTextLayers(m0) : null
         return merged ?? d
       })
     } catch {
@@ -1498,6 +1570,8 @@ export function FinalizeEditor({
                   activeElementId={activeElementId}
                   onSelectElement={setActiveElementId}
                   onAddElement={() => setImportPurpose('element')}
+                  onAddText={addTextLayer}
+                  onUpdateText={updateTextLayer}
                   elementMaskMode={elementMaskMode}
                   onElementMaskMode={setElementMaskMode}
                   brush={brush}

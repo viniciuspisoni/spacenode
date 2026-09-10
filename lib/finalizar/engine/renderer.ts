@@ -67,6 +67,8 @@ export class FinalizeRenderer {
 
   private curveTex: WebGLTexture | null = null
   private curveKey = ''
+  private curveRgbTex: WebGLTexture | null = null
+  private curveRgbKey = ''
   private dummyTex: WebGLTexture | null = null
   private localTex: (WebGLTexture | null)[] = new Array(N).fill(null)
   /** Última fonte enviada por slot — o rasterizador devolve o MESMO canvas
@@ -192,6 +194,8 @@ export class FinalizeRenderer {
     this.baseTex = null
     this.curveTex = null
     this.curveKey = ''
+    this.curveRgbTex = null
+    this.curveRgbKey = ''
     this.dummyTex = null
     this.localTex = new Array(N).fill(null)
     this.localTexSrc = new Array(N).fill(null)
@@ -363,6 +367,9 @@ export class FinalizeRenderer {
     // ── 3. Curva LUT ─────────────────────────────────────────────────────────
     const curveActive = !isCurveIdentity(doc.curve)
     if (curveActive) this.ensureCurve(doc)
+    const curveRgbActive = !isCurveIdentity(doc.curveR)
+      || !isCurveIdentity(doc.curveG) || !isCurveIdentity(doc.curveB)
+    if (curveRgbActive) this.ensureCurveRgb(doc)
 
     // ── 4. COLOR → fbo[2] ───────────────────────────────────────────────────
     const colorIdx = sceneIdx === 2 ? 3 : 2
@@ -371,7 +378,11 @@ export class FinalizeRenderer {
       const p = this.use('color')
       this.bindTex(p, 'uTex', 0, sceneTex)
       this.bindTex(p, 'uCurveLut', 1, curveActive ? this.curveTex! : this.dummyTex!)
+      // As máscaras locais ocupam as unidades 2..9 (MAX_LOCAL_ADJUSTMENTS = 8);
+      // a LUT por canal entra na 10.
       this.setLocalUniforms(p, localData, 2)
+      this.bindTex(p, 'uCurveRgb', 10, curveRgbActive ? this.curveRgbTex! : this.dummyTex!)
+      gl.uniform1f(this.u(p, 'uCurveRgbActive'), curveRgbActive ? 1 : 0)
 
       const a = doc.adjust
       gl.uniform4f(this.u(p, 'uAdjA'), a.exposure / 100, a.contrast / 100, a.highlights / 100, a.shadows / 100)
@@ -567,6 +578,32 @@ export class FinalizeRenderer {
     gl.uniform4fv(this.u(p, 'uLocalAdjA[0]'), adjA)
     gl.uniform4fv(this.u(p, 'uLocalAdjB[0]'), adjB)
     gl.uniform4fv(this.u(p, 'uLocalAdjC[0]'), adjC)
+  }
+
+  /** LUT RGBA 256x1 com as três curvas de canal — uma textura para os três,
+   *  reconstruída só quando algum ponto muda (a chave é o traçado inteiro). */
+  private ensureCurveRgb(doc: FinalizeDoc) {
+    const gl = this.gl!
+    const key = [doc.curveR, doc.curveG, doc.curveB]
+      .map((cv) => cv.map((pt) => `${pt.x.toFixed(4)},${pt.y.toFixed(4)}`).join(';'))
+      .join('|')
+    if (this.curveRgbTex && this.curveRgbKey === key) return
+    const r = curveToLut(doc.curveR, 256)
+    const g = curveToLut(doc.curveG, 256)
+    const b = curveToLut(doc.curveB, 256)
+    const rgba = new Uint8Array(256 * 4)
+    for (let i = 0; i < 256; i++) {
+      rgba[i * 4] = r[i]
+      rgba[i * 4 + 1] = g[i]
+      rgba[i * 4 + 2] = b[i]
+      rgba[i * 4 + 3] = 255
+    }
+    if (!this.curveRgbTex) this.curveRgbTex = gl.createTexture()
+    gl.bindTexture(gl.TEXTURE_2D, this.curveRgbTex)
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 256, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, rgba)
+    setTexParams(gl)
+    this.curveRgbKey = key
   }
 
   private ensureCurve(doc: FinalizeDoc) {

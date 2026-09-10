@@ -10,8 +10,16 @@ import {
   type BlendMode, type ElementLayer, type FinalizeDoc,
 } from '@/lib/finalizar/types'
 import { makeId } from '@/lib/finalizar/composition'
+import { TEXT_FONTS, type TextSpec } from '@/lib/finalizar/text-layer'
 import type { BrushSettings } from '../CanvasViewport'
 import { ActiveDot, Chip, ConfirmSheet, Section, Seg, SliderRow } from '../ui'
+
+/** Estilo do <select> do painel — mesmo do seletor de mesclagem. */
+const selectStyle: React.CSSProperties = {
+  fontSize: 12, padding: '5px 8px', borderRadius: 8,
+  background: 'var(--color-surface)', color: 'var(--color-text-primary)',
+  border: '0.5px solid var(--color-border)',
+}
 
 export interface ElementsPanelProps {
   doc: FinalizeDoc
@@ -19,6 +27,10 @@ export interface ElementsPanelProps {
   activeElementId: string | null
   onSelectElement: (id: string | null) => void
   onAddElement: () => void
+  /** Cria uma camada de texto (sem passar pelo importador de imagem). */
+  onAddText: () => void
+  /** Reescreve o texto de uma camada — e o raster junto. */
+  onUpdateText: (id: string, spec: TextSpec) => void
   elementMaskMode: boolean
   onElementMaskMode: (b: boolean) => void
   brush: BrushSettings
@@ -29,7 +41,7 @@ export interface ElementsPanelProps {
 
 export function ElementsPanel(props: ElementsPanelProps) {
   const {
-    doc, patch, activeElementId, onSelectElement, onAddElement,
+    doc, patch, activeElementId, onSelectElement, onAddElement, onAddText, onUpdateText,
     elementMaskMode, onElementMaskMode, brush, onBrush, onAutoColorMatch,
   } = props
   const [openList, setOpenList] = useState(true)
@@ -95,9 +107,14 @@ export function ElementsPanel(props: ElementsPanelProps) {
         open={openList}
         onToggle={() => setOpenList((v) => !v)}
         right={
-          <Chip onClick={onAddElement} disabled={full} title={full ? `Limite de ${MAX_ELEMENTS} elementos por projeto` : 'Adicionar imagem, céu, vegetação, pessoas ou logo como camada'}>
-            + Adicionar
-          </Chip>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <Chip onClick={onAddText} disabled={full} title={full ? `Limite de ${MAX_ELEMENTS} elementos por projeto` : 'Assinar a prancha, nomear o ambiente, marcar "estudo preliminar"'}>
+              + Texto
+            </Chip>
+            <Chip onClick={onAddElement} disabled={full} title={full ? `Limite de ${MAX_ELEMENTS} elementos por projeto` : 'Adicionar imagem, céu, vegetação, pessoas ou logo como camada'}>
+              + Imagem
+            </Chip>
+          </div>
         }
       >
         {ordered.length === 0 && (
@@ -181,6 +198,74 @@ export function ElementsPanel(props: ElementsPanelProps) {
 
       {active && (
         <Section title={`Propriedades · ${active.name}`} open={openProps} onToggle={() => setOpenProps((v) => !v)}>
+          {active.text && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+              <textarea
+                className="spn-textarea"
+                aria-label="Texto da camada"
+                rows={2}
+                value={active.text.content}
+                onChange={(e) => onUpdateText(active.id, { ...active.text!, content: e.target.value })}
+                placeholder="Escreva aqui"
+              />
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                <select
+                  value={active.text.font}
+                  onChange={(e) => onUpdateText(active.id, { ...active.text!, font: e.target.value })}
+                  aria-label="Fonte"
+                  style={selectStyle}
+                >
+                  {TEXT_FONTS.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
+                </select>
+                <Chip
+                  active={active.text.weight === 700}
+                  onClick={() => onUpdateText(active.id, { ...active.text!, weight: active.text!.weight === 700 ? 400 : 700 })}
+                  title="Negrito"
+                >
+                  <b>B</b>
+                </Chip>
+                {(['left', 'center', 'right'] as const).map((a) => (
+                  <Chip
+                    key={a}
+                    active={active.text!.align === a}
+                    onClick={() => onUpdateText(active.id, { ...active.text!, align: a })}
+                    title={a === 'left' ? 'Alinhar à esquerda' : a === 'center' ? 'Centralizar' : 'Alinhar à direita'}
+                  >
+                    {a === 'left' ? '⇤' : a === 'center' ? '↔' : '⇥'}
+                  </Chip>
+                ))}
+                <label
+                  title="Cor do texto"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: 'var(--color-text-tertiary)' }}
+                >
+                  Cor
+                  <input
+                    type="color"
+                    value={active.text.color}
+                    onChange={(e) => onUpdateText(active.id, { ...active.text!, color: e.target.value })}
+                    style={{ width: 26, height: 22, padding: 0, border: 0, background: 'none', cursor: 'pointer' }}
+                  />
+                </label>
+              </div>
+              <SliderRow
+                label="Corpo" value={Math.round(active.text.size * 1000)} min={5} max={400} defaultValue={60}
+                format={(v) => `${(v / 10).toFixed(1)}%`}
+                title="Altura das letras em % da altura da imagem — acompanha o render, não o zoom da tela"
+                onChange={(v) => onUpdateText(active.id, { ...active.text!, size: v / 1000 })}
+              />
+              <SliderRow
+                label="Entrelinha" value={Math.round(active.text.lineHeight * 100)} min={70} max={300} defaultValue={125}
+                format={(v) => `${(v / 100).toFixed(2)}`}
+                onChange={(v) => onUpdateText(active.id, { ...active.text!, lineHeight: v / 100 })}
+              />
+              <SliderRow
+                label="Espacejamento" value={Math.round(active.text.tracking * 100)} min={-30} max={100} defaultValue={0}
+                format={(v) => `${v}`}
+                title="Espaço entre letras. Positivo abre — o que dá cara de legenda de prancha"
+                onChange={(v) => onUpdateText(active.id, { ...active.text!, tracking: v / 100 })}
+              />
+            </div>
+          )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <SliderRow
               label="Opacidade" value={Math.round(active.opacity * 100)} min={0} max={100} defaultValue={100}

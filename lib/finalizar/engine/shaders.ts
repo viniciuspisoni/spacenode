@@ -221,6 +221,8 @@ export const FRAG_COLOR = `#version 300 es
 ${COMMON}
 uniform sampler2D uTex;
 uniform sampler2D uCurveLut;
+uniform sampler2D uCurveRgb;   // LUT RGBA: R/G/B = curva de cada canal
+uniform float uCurveRgbActive;
 
 // globais (normalizados: -1..1, exceto onde indicado)
 uniform vec4 uAdjA;   // exposure, contrast, highlights, shadows
@@ -349,6 +351,17 @@ void main() {
     float L = clamp(luma(c), 0.0, 1.0);
     float Lc = texture(uCurveLut, vec2(L, 0.5)).r;
     c *= (Lc + 1e-4) / (L + 1e-4);
+  }
+  // Curvas por canal, DEPOIS da de luminosidade: é a ordem do Lightroom e a
+  // que faz sentido — primeiro se resolve o brilho, depois a cor. Cada canal
+  // lê a própria linha da mesma LUT RGBA, então custa uma textura só.
+  if (uCurveRgbActive > 0.5) {
+    vec3 q = clamp(c, 0.0, 1.0);
+    c = vec3(
+      texture(uCurveRgb, vec2(q.r, 0.5)).r,
+      texture(uCurveRgb, vec2(q.g, 0.5)).g,
+      texture(uCurveRgb, vec2(q.b, 0.5)).b
+    );
   }
   if (uAdjC.w > 0.5) c = applyHsl(c);
   if (uGradeActive > 0.5) c = applyGrading(c);

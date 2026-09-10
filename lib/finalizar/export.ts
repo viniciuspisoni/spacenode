@@ -207,6 +207,7 @@ export function adjustmentsSummary(doc: FinalizeDoc): string {
     if (v !== 0) parts.push(`${label[k] ?? k} ${v > 0 ? '+' : ''}${v}`)
   }
   if (doc.curve.length > 2) parts.push('curva')
+  if (doc.curveR.length > 2 || doc.curveG.length > 2 || doc.curveB.length > 2) parts.push('curva RGB')
   if (Object.values(doc.hsl).some((b) => b.hue !== 0 || b.sat !== 0 || b.lum !== 0)) parts.push('HSL')
   if (doc.colorMatch) parts.push('correspondência de cor')
   if (doc.locals.length > 0) parts.push(`${doc.locals.length} máscara${doc.locals.length > 1 ? 's' : ''}`)
