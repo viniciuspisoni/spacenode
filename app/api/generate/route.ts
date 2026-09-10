@@ -7,6 +7,8 @@ import { refundNodes } from '@/lib/billing/refund-nodes'
 import {
   buildFidelityPrompt,
   materialSurfaceEn,
+  PRESERVE,
+  isPreserved,
   type GenerateOptions,
   type ProjectMaterials,
   type BriefingArquitetonico,
@@ -374,8 +376,11 @@ export async function POST(req: NextRequest) {
     const hasAnchor = Boolean(anchorUrl)
     const options: GenerateOptions = {
       projectType,
-      segment:       segment       ?? 'Residencial',
-      environment:   environment   ?? '',
+      // O fallback do servidor era 'Residencial': um cliente antigo que não
+      // mandasse segmento acabava com a cena descrita como residencial no
+      // prompt. Agora o silêncio significa silêncio.
+      segment:       segment       ?? PRESERVE,
+      environment:   environment   ?? PRESERVE,
       lighting:      lighting      ?? '',
       background:    background    ?? 'Preservar Original',
       sceneElements: sceneElements ?? [],
@@ -931,7 +936,10 @@ export async function POST(req: NextRequest) {
       input_url:       inputUrl ?? null,
       output_url:      outputUrl,
       prompt:          finalPrompt,
-      ambient:         environment ?? segment ?? projectType,
+      // Rótulo do histórico. "Preservar Original" não é nome de ambiente —
+      // quando os dois estão preservados, o tipo de projeto é o que sobra de
+      // verdadeiro para etiquetar a geração.
+      ambient:         [environment, segment].find(v => !isPreserved(v)) ?? projectType,
       style:           projectType,
       lighting:        lighting ?? 'default',
       engine,
