@@ -1,6 +1,9 @@
 // lib/edit-v3/persist.ts
 //
-// Persistência RESILIENTE dos jobs do Editar V3 na tabela edit_v3_jobs.
+// Persistência RESILIENTE dos jobs de edição na tabela edit_v3_jobs — usada
+// pelo Editar V3 E pelo V4 (o nome da tabela ficou; é dela que a aba Edições do
+// Histórico lê, e trocar por uma tabela nova custaria refazer aquela integração
+// inteira para não ganhar nada).
 // Best-effort por construção: se a migration ainda não foi aplicada (tabela
 // ausente) ou qualquer erro de telemetria ocorrer, a edição NUNCA quebra — só
 // loga. A rota funciona com OU sem a tabela (a migration aguarda aprovação do
@@ -14,7 +17,14 @@ type Admin = SupabaseClient
 /** Insere o job inicial (status 'processing'); devolve o id ou null. */
 export async function insertJobResilient(
   admin: Admin,
-  row: Partial<EditV3JobRecord> & { user_id: string; action_type: string; status: EditV3Status },
+  // `action_type` fica como string: o V4 grava 'replace_object', que não existe
+  // no vocabulário do V3 (o CHECK do banco aceita os dois desde a migration
+  // 20260910040000).
+  row: Omit<Partial<EditV3JobRecord>, 'action_type'> & {
+    user_id: string
+    action_type: string
+    status: EditV3Status
+  },
 ): Promise<string | null> {
   const res = await admin.from('edit_v3_jobs').insert(row).select('id').single()
   if (res.error) {

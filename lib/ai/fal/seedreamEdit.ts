@@ -62,6 +62,12 @@ export interface SeedreamEditImageInput {
   prompt: string
   /** 1K mira o piso do envelope (1024²); 2K/4K o teto (2048² — o endpoint não tem 4K). */
   resolution?: SeedreamEditResolution
+  /** Tamanho de saída EXPLÍCITO, quando o chamador sabe melhor que o preset.
+   *  O Editar V4 usa isto para dimensionar a saída pelo crop da seleção (ver
+   *  lib/edit-v4/engine.ts): crop pequeno sai perto do piso do envelope e volta
+   *  bem mais rápido, pelo mesmo preço. Quem não passa (Editar V3) cai no
+   *  preset de sempre — comportamento inalterado. */
+  outputSize?: { width: number; height: number }
 }
 
 export interface SeedreamEditImageOutput {
@@ -118,7 +124,7 @@ interface SeedreamOutput {
 export async function editImageWithSeedream(input: SeedreamEditImageInput): Promise<SeedreamEditImageOutput> {
   ensureConfigured()
   const startedAt = Date.now()
-  const size = seedreamOutputSize(input.imageWidth, input.imageHeight, input.resolution ?? '2K')
+  const size = input.outputSize ?? seedreamOutputSize(input.imageWidth, input.imageHeight, input.resolution ?? '2K')
   const imageUrls = [input.imageUrl, ...(input.references ?? []).map(r => r.url)]
 
   let result: { data: unknown; requestId?: string }
