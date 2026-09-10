@@ -2,7 +2,7 @@
 //
 // O conceito "Lumens" foi aposentado em 2026-08-31: todo crédito é "Node".
 // Nodes MENSAIS renovam com o plano (profiles.credits) e, desde 2026-09-10,
-// ACUMULAM — cada renovação soma ao saldo, que só expira 30 dias depois do
+// ACUMULAM — cada renovação soma ao saldo, que só expira 90 dias depois do
 // fim da assinatura (ver lib/billing/nodes.ts).
 // Nodes EXTRAS são comprados avulsos e não expiram nunca (tabela lumen_packs —
 // nome interno preservado; ver migration 20260831190000). O consumo usa

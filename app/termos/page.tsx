@@ -13,7 +13,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { LegalShell, LegalSection, P, UL, LI, Callout, Strong } from '@/components/legal/LegalShell'
 import { LEGAL_CNPJ, LEGAL_NAME, SUPPORT_EMAIL, SUPPORT_PHONE_DISPLAY, SUPPORT_WHATSAPP_URL } from '@/lib/support'
-import { NODES_GRACE_DAYS } from '@/lib/billing/nodes'
+import { NODES_GRACE_DAYS, NODES_GRACE_DAYS_WRITTEN } from '@/lib/billing/nodes'
 
 export const metadata: Metadata = {
   title: 'Termos de Uso · SpaceNode',
@@ -35,8 +35,9 @@ export default function TermosPage() {
           partir do material que você envia. As imagens geradas são suas, mas têm natureza{' '}
           <Strong>ilustrativa</Strong> — não substituem projeto técnico nem responsabilidade profissional.
           Os créditos do plano renovam todo mês e <Strong>acumulam enquanto a assinatura estiver
-          ativa</Strong>; se você cancelar, o saldo restante fica disponível por mais {NODES_GRACE_DAYS} dias.
-          O plano anual é pago antecipadamente. Este resumo não substitui o texto completo abaixo.
+          ativa</Strong>; após o cancelamento, o saldo restante fica disponível por mais{' '}
+          {NODES_GRACE_DAYS} dias. O plano anual é pago antecipadamente. Este resumo não substitui o
+          texto completo abaixo.
         </>
       }
     >
@@ -106,10 +107,15 @@ export default function TermosPage() {
           </LI>
           <LI>
             <Strong>Encerrada a assinatura</Strong> — por cancelamento ou falta de pagamento —, o saldo de
-            nodes mensais já adquirido permanece disponível por <Strong>{NODES_GRACE_DAYS} (trinta) dias
-            corridos</Strong> contados do fim da assinatura. Terminado esse prazo, o saldo mensal remanescente
-            expira, sem direito a reembolso ou conversão. Reassinar dentro do prazo preserva o saldo
-            acumulado.
+            nodes mensais já adquirido permanece disponível por <Strong>{NODES_GRACE_DAYS} ({NODES_GRACE_DAYS_WRITTEN})
+            dias corridos</Strong> contados do fim da assinatura. Terminado esse prazo, o saldo mensal
+            remanescente expira, sem direito a reembolso ou conversão.
+          </LI>
+          <LI>
+            Se você <Strong>reativar ou contratar uma nova assinatura dentro desse prazo</Strong>, o saldo
+            acumulado é <Strong>preservado integralmente</Strong> e a expiração é cancelada. Caso essa nova
+            assinatura seja posteriormente encerrada, um novo prazo de {NODES_GRACE_DAYS} dias corridos
+            passa a contar a partir do novo encerramento.
           </LI>
           <LI>
             Os <Strong>nodes extras</Strong> são créditos avulsos, comprados separadamente, <Strong>sem prazo

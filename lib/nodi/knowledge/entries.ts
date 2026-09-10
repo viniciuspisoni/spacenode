@@ -88,8 +88,10 @@ export const KB_ENTRIES: KBEntry[] = [
       text:
         NODES_ROLLOVER_COPY + ' ' +
         'Na renovação, os nodes do plano são SOMADOS ao que sobrou — nada é zerado na virada do mês. ' +
-        `Se a assinatura for encerrada, o saldo já adquirido continua disponível por ${NODES_GRACE_DAYS} dias; ` +
-        'reassinando dentro desse prazo, você mantém tudo. Nodes extras (avulsos) não expiram nunca.',
+        `Encerrada a assinatura, o saldo já adquirido continua disponível por ${NODES_GRACE_DAYS} dias. ` +
+        'Reassinando dentro desse prazo, o saldo é preservado por inteiro e a expiração é cancelada — ' +
+        `e se essa nova assinatura for encerrada, começa um novo prazo de ${NODES_GRACE_DAYS} dias. ` +
+        'Nodes extras (avulsos) não expiram nunca.',
       actions: [ACT.planos],
     }),
   },

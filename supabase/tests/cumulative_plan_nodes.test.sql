@@ -89,24 +89,24 @@ END $$;
 DO $$
 DECLARE u UUID; bal INTEGER; exp TIMESTAMPTZ;
 BEGIN
-  RAISE NOTICE '── 3. Cancelamento preserva o saldo por 30 dias ──';
+  RAISE NOTICE '── 3. Cancelamento preserva o saldo por 90 dias ──';
   INSERT INTO public.profiles (email, credits, plan, stripe_subscription_id)
     VALUES ('cancela@nodes-test.invalid', 0, 'free', NULL) RETURNING id INTO u;
   PERFORM public.grant_plan_nodes(u, 3500, 'studio', 'grant_plan', 'sub_C');
 
-  PERFORM public.start_nodes_grace(u, NOW() + INTERVAL '30 days');
+  PERFORM public.start_nodes_grace(u, NOW() + INTERVAL '90 days');
   SELECT credits, nodes_expire_at INTO bal, exp FROM public.profiles WHERE id = u;
   PERFORM pg_temp.assert_eq(bal, 3500, 'cancelamento NÃO zera o saldo');
   PERFORM pg_temp.assert_eq((SELECT plan FROM public.profiles WHERE id = u), 'free', 'plano volta pra free');
-  PERFORM pg_temp.assert_eq(exp > NOW() + INTERVAL '29 days', TRUE, 'prazo de 30 dias gravado');
+  PERFORM pg_temp.assert_eq(exp > NOW() + INTERVAL '89 days', TRUE, 'prazo de 90 dias gravado');
 
   -- Dentro da janela ainda dá pra gastar
   PERFORM public.consume_nodes_v2(u, 500);
   SELECT credits INTO bal FROM public.profiles WHERE id = u;
-  PERFORM pg_temp.assert_eq(bal, 3000, 'consumo funciona dentro da cortesia');
+  PERFORM pg_temp.assert_eq(bal, 3000, 'consumo funciona dentro da janela');
 
   -- Reentrega do subscription.deleted não empurra o prazo pra frente
-  PERFORM public.start_nodes_grace(u, NOW() + INTERVAL '30 days');
+  PERFORM public.start_nodes_grace(u, NOW() + INTERVAL '90 days');
   PERFORM pg_temp.assert_eq((SELECT nodes_expire_at FROM public.profiles WHERE id = u), exp,
                     'reentrega do cancelamento mantém o prazo original');
 END $$;
@@ -115,7 +115,7 @@ END $$;
 DO $$
 DECLARE u UUID; bal INTEGER; res JSON;
 BEGIN
-  RAISE NOTICE '── 4. Passados os 30 dias, o saldo expira ──';
+  RAISE NOTICE '── 4. Passados os 90 dias, o saldo expira ──';
   INSERT INTO public.profiles (email, credits, plan) VALUES ('expira@nodes-test.invalid', 0, 'free')
     RETURNING id INTO u;
   PERFORM public.grant_plan_nodes(u, 1800, 'pro', 'grant_plan', 'sub_D');
@@ -161,12 +161,71 @@ BEGIN
   INSERT INTO public.profiles (email, credits, plan) VALUES ('volta@nodes-test.invalid', 0, 'free')
     RETURNING id INTO u;
   PERFORM public.grant_plan_nodes(u, 1800, 'pro', 'grant_plan', 'sub_E');
-  PERFORM public.start_nodes_grace(u, NOW() + INTERVAL '20 days');
+  PERFORM public.start_nodes_grace(u, NOW() + INTERVAL '60 days');
 
   res := public.grant_plan_nodes(u, 1800, 'pro', 'grant_plan', 'sub_E2');
   PERFORM pg_temp.assert_eq((res->>'balance')::int, 3600, 'saldo antigo + novo plano');
   PERFORM pg_temp.assert_eq((SELECT nodes_expire_at FROM public.profiles WHERE id = u), NULL::timestamptz,
                     'prazo removido');
+END $$;
+
+-- ─────────────────────────────────────────────────────────────
+DO $$
+DECLARE u UUID; exp1 TIMESTAMPTZ; exp2 TIMESTAMPTZ;
+BEGIN
+  RAISE NOTICE '── 5b. Cancelar de novo abre uma janela NOVA ──';
+  INSERT INTO public.profiles (email, credits, plan) VALUES ('ciclo@nodes-test.invalid', 0, 'free')
+    RETURNING id INTO u;
+
+  -- 1º ciclo: assina, cancela.
+  PERFORM public.grant_plan_nodes(u, 1000, 'pro', 'grant_plan', 'sub_F1');
+  PERFORM public.start_nodes_grace(u, NOW() + INTERVAL '90 days');
+  SELECT nodes_expire_at INTO exp1 FROM public.profiles WHERE id = u;
+
+  -- Reassina dentro da janela: saldo preservado, expiração cancelada.
+  PERFORM public.grant_plan_nodes(u, 1000, 'pro', 'grant_plan', 'sub_F2');
+  PERFORM pg_temp.assert_eq((SELECT credits FROM public.profiles WHERE id = u), 2000,
+                    'reassinatura preserva o acumulado integralmente');
+  PERFORM pg_temp.assert_eq((SELECT nodes_expire_at FROM public.profiles WHERE id = u), NULL::timestamptz,
+                    'expiração cancelada pela reassinatura');
+
+  -- Cancela a assinatura NOVA 40 dias depois: janela nova, contada do novo fim.
+  PERFORM public.start_nodes_grace(u, NOW() + INTERVAL '40 days' + INTERVAL '90 days');
+  SELECT nodes_expire_at INTO exp2 FROM public.profiles WHERE id = u;
+  PERFORM pg_temp.assert_eq(exp2 > exp1, TRUE,
+                    'a 2ª janela vai além da 1ª (não ficou presa ao vencimento antigo)');
+  PERFORM pg_temp.assert_eq(exp2 > NOW() + INTERVAL '129 days', TRUE,
+                    'a 2ª janela tem 90 dias cheios a partir do novo encerramento');
+  PERFORM pg_temp.assert_eq((SELECT credits FROM public.profiles WHERE id = u), 2000,
+                    'e o saldo segue intacto no segundo cancelamento');
+END $$;
+
+-- ─────────────────────────────────────────────────────────────
+DO $$
+DECLARE u UUID; exp1 TIMESTAMPTZ;
+BEGIN
+  RAISE NOTICE '── 5c. Invariante: assinatura ativa ⇒ saldo sem prazo ──';
+  INSERT INTO public.profiles (email, credits, plan) VALUES ('invariante@nodes-test.invalid', 0, 'free')
+    RETURNING id INTO u;
+  PERFORM public.grant_plan_nodes(u, 500, 'pro', 'grant_plan', 'sub_G1');
+  PERFORM public.start_nodes_grace(u, NOW() + INTERVAL '90 days');
+
+  -- Grant REENTREGUE (mesma chave): não soma, mas ainda assim tem de cancelar
+  -- a expiração — senão a conta volta a ser assinante com prazo de morte.
+  PERFORM public.grant_plan_nodes(u, 500, 'pro', 'grant_plan', 'sub_G1');
+  PERFORM pg_temp.assert_eq((SELECT credits FROM public.profiles WHERE id = u), 500,
+                    'reentrega não soma');
+  PERFORM pg_temp.assert_eq((SELECT nodes_expire_at FROM public.profiles WHERE id = u), NULL::timestamptz,
+                    'reentrega ainda assim cancela a expiração');
+
+  -- Ajuste manual do suporte NÃO é prova de assinatura: herda o prazo vigente.
+  PERFORM public.start_nodes_grace(u, NOW() + INTERVAL '90 days');
+  SELECT nodes_expire_at INTO exp1 FROM public.profiles WHERE id = u;
+  PERFORM public.grant_plan_nodes(u, 50, NULL, 'adjustment', 'ticket_123');
+  PERFORM pg_temp.assert_eq((SELECT credits FROM public.profiles WHERE id = u), 550,
+                    'ajuste manual soma');
+  PERFORM pg_temp.assert_eq((SELECT nodes_expire_at FROM public.profiles WHERE id = u), exp1,
+                    'ajuste manual NÃO torna eterno o saldo de conta cancelada');
 END $$;
 
 -- ─────────────────────────────────────────────────────────────
@@ -215,7 +274,7 @@ END $$;
 DO $$
 DECLARE u UUID; extras INTEGER;
 BEGIN
-  RAISE NOTICE '── 8. Nodes EXTRAS nunca expiram, nem na cortesia vencida ──';
+  RAISE NOTICE '── 8. Nodes EXTRAS nunca expiram, nem com a janela vencida ──';
   INSERT INTO public.profiles (email, credits, plan) VALUES ('extras@nodes-test.invalid', 0, 'free')
     RETURNING id INTO u;
   PERFORM public.grant_plan_nodes(u, 500, 'pro', 'grant_plan', 'sub_H');

@@ -5,7 +5,7 @@ import { ANNUAL_BILLING_ENABLED, SELLABLE_PLANS, type PaidPlanId, type BillingCy
 import { getPlanDisplayName } from '@/lib/plan-display'
 import { EXTRA_NODE_PACKS, type ExtraPackSize } from '@/lib/extra-nodes'
 import {
-  NODES_GRACE_DAYS,
+  NODES_POLICY_COPY,
   NODES_ROLLOVER_COPY,
   graceDaysLeft,
 } from '@/lib/billing/nodes'
@@ -39,7 +39,7 @@ interface BillingClientProps {
   plan:    string
   balance: { plan: number; extra: number; total: number }
   /**
-   * Fim da janela de cortesia pós-cancelamento (ISO), quando os Nodes mensais
+   * Fim da janela de validade pós-cancelamento (ISO), quando os Nodes mensais
    * acumulados expiram. null = assinatura ativa, saldo sem prazo.
    */
   nodesExpireAt?: string | null
@@ -112,7 +112,7 @@ export function BillingClient({ plan, balance, nodesExpireAt, extras, pooled, of
   const canManage = plan !== 'free' && !pooled
   // Só no mensal: o desconto é da primeira mensalidade.
   const showOffer = Boolean(offerEligible) && billing === 'monthly' && isLaunchOfferOpen()
-  // Cancelou e ainda tem saldo acumulado: a contagem regressiva dos 30 dias.
+  // Cancelou e ainda tem saldo acumulado: a contagem regressiva da janela.
   const graceLeft = graceDaysLeft(nodesExpireAt)
   const inGrace   = graceLeft > 0 && balance.plan > 0
 
@@ -183,15 +183,15 @@ export function BillingClient({ plan, balance, nodesExpireAt, extras, pooled, of
               Sua assinatura foi encerrada. Os Nodes que você já tinha continuam
               disponíveis por mais <strong style={{ color: 'var(--color-text-primary)' }}>
               {graceLeft} dia{graceLeft === 1 ? '' : 's'}</strong> — depois disso o
-              saldo mensal expira. Reassine dentro do prazo para manter tudo.
+              saldo mensal expira. Reassine dentro do prazo e o saldo é preservado
+              integralmente.
             </p>
           ) : (
             <p style={{
               fontSize: 12.5, color: 'var(--color-text-tertiary)',
               lineHeight: 1.6, letterSpacing: '-0.005em', marginTop: 12,
             }}>
-              {NODES_ROLLOVER_COPY} Se cancelar, o que sobrou continua disponível
-              por {NODES_GRACE_DAYS} dias.
+              {NODES_POLICY_COPY}
             </p>
           )}
 

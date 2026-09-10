@@ -31,9 +31,10 @@ export interface PayerBalance {
   totalBalance: number
   extraPacks: number
   /**
-   * Fim da janela de cortesia pós-cancelamento (ISO) — 30 dias depois do fim
+   * Fim da janela de validade pós-cancelamento (ISO) — 90 dias depois do fim
    * da assinatura, quando o saldo mensal ainda existente expira. null enquanto
-   * a assinatura está ativa (o saldo não tem prazo).
+   * a assinatura está ativa (o saldo não tem prazo) e depois de uma
+   * reassinatura, que cancela a expiração.
    */
   planNodesExpireAt: string | null
 }

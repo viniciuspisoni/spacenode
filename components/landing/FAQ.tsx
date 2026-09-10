@@ -21,7 +21,7 @@ const faqs: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: 'O que são Nodes?',
-    a: `São os créditos de uso. Cada geração, edição ou ampliação consome nodes conforme o motor e a resolução — um render HD parte de 10 nodes; 2K, de 15; 4K, de 25. ${NODES_ROLLOVER_COPY} O que sobrar de um mês soma com os nodes do mês seguinte, e se você cancelar o saldo continua disponível por ${NODES_GRACE_DAYS} dias. Os Nodes extras, comprados avulsos, não expiram — e o consumo usa primeiro os mensais.`,
+    a: `São os créditos de uso. Cada geração, edição ou ampliação consome nodes conforme o motor e a resolução — um render HD parte de 10 nodes; 2K, de 15; 4K, de 25. ${NODES_ROLLOVER_COPY} O que sobrar de um mês soma com os nodes do mês seguinte, e se você cancelar o saldo continua disponível por ${NODES_GRACE_DAYS} dias — reassinando dentro do prazo, você mantém tudo. Os Nodes extras, comprados avulsos, não expiram — e o consumo usa primeiro os mensais.`,
   },
   {
     q: 'Consigo usar as imagens com clientes?',

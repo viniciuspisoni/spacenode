@@ -26,7 +26,7 @@ export const dynamic = 'force-dynamic'
 //                                                    de proporcional.
 //
 // E o cancelamento não zera mais nada: `start_nodes_grace` preserva o saldo e
-// agenda a expiração para 30 dias depois do fim da assinatura.
+// agenda a expiração para 90 dias depois do fim da assinatura.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Stripe SDK retorna `string | Object | null` em vários campos relacionais.
@@ -615,7 +615,7 @@ export async function POST(req: NextRequest) {
   //
   // O plano volta a 'free' na hora (os benefícios do plano acabam com a
   // assinatura, como sempre), mas os nodes JÁ ADQUIRIDOS não são confiscados:
-  // ficam gastáveis por mais 30 dias. `start_nodes_grace` grava o prazo em
+  // ficam gastáveis por mais 90 dias. `start_nodes_grace` grava o prazo em
   // profiles.nodes_expire_at; a expiração em si é do cron (e da checagem
   // preguiçosa no consumo, se o cron falhar).
   //

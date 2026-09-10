@@ -37,8 +37,8 @@ export function AvatarComConsumo({
   const [extraBalance, setExtraBalance] = useState(initialExtraBalance)
   const [planId, setPlanId]             = useState<PlanId>(initialPlanId)
   // Preenchido só depois de um cancelamento: prazo em que o saldo acumulado
-  // ainda pode ser gasto. Chega do /api/users/me/balance, não do server render
-  // (o popover só abre depois do primeiro refresh).
+  // ainda pode ser gasto (90 dias). Chega do /api/users/me/balance, não do
+  // server render (o popover só abre depois do primeiro refresh).
   const [nodesExpireAt, setNodesExpireAt] = useState<string | null>(null)
   const [usageDays, setUsageDays]       = useState<{ day: string; nodes: number }[]>([])
   const [avgPerDay, setAvgPerDay]       = useState<number>(0)
@@ -265,7 +265,7 @@ function BalancePopover({ planId, planBalance, planTotal, extraBalance, graceDay
   planBalance:   number
   planTotal:     number
   extraBalance:  number
-  /** Dias restantes da cortesia pós-cancelamento (0 = sem cortesia em curso). */
+  /** Dias restantes da janela pós-cancelamento (0 = sem janela em curso). */
   graceDays:     number
   state:         BalanceState
   daysUntilEmpty: number | null
@@ -280,7 +280,7 @@ function BalancePopover({ planId, planBalance, planTotal, extraBalance, graceDay
     saudavel: 'Saudável', atencao: 'Atenção', critico: 'Crítico', zerado: 'Zerado',
   }
   // Conta gratuita não tem cota mensal: estado próprio (verde), em vez de "Zerado".
-  // Na cortesia pós-cancelamento o que importa é o prazo, não a cota — o
+  // Na janela pós-cancelamento o que importa é o prazo, não a cota — o
   // usuário está tecnicamente no free, mas ainda gastando saldo de assinante.
   const pillColor = inGrace ? BALANCE_COLORS.atencao : noQuota ? '#30d158' : BALANCE_COLORS[state]
   const pillLabel = inGrace ? 'Cortesia'             : noQuota ? 'Gratuito' : stateLabel[state]

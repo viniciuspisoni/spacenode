@@ -27,7 +27,7 @@ export async function GET() {
     total_balance: balance.totalBalance,
     plan_id:       balance.planId,
     // Preenchido só depois de um cancelamento: os nodes acumulados continuam
-    // gastáveis até esta data (30 dias após o fim da assinatura).
+    // gastáveis até esta data (90 dias após o fim da assinatura).
     nodes_expire_at: balance.planNodesExpireAt,
     state,
   })

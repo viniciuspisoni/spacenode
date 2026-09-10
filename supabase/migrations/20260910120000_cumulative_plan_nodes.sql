@@ -7,8 +7,13 @@
 --
 --   • Nodes mensais não expiram enquanto a assinatura estiver ativa.
 --   • Cada renovação SOMA os nodes do plano ao saldo existente.
---   • No cancelamento o saldo NÃO é zerado: fica disponível por mais
---     30 dias (profiles.nodes_expire_at) e só então expira.
+--   • No cancelamento o saldo NÃO é zerado: abre uma janela de 90 dias
+--     (profiles.nodes_expire_at) e só depois dela o saldo expira.
+--   • Reassinou dentro da janela: o saldo é preservado integralmente e a
+--     expiração é CANCELADA (nodes_expire_at volta a NULL).
+--   • Encerrada essa nova assinatura, nasce uma janela NOVA, contada do
+--     novo encerramento — consequência direta de a reassinatura ter
+--     limpado o prazo anterior.
 --
 -- O consumo por ferramenta não muda em nada — consume_nodes_v2 segue
 -- debitando mensais primeiro e extras (lumen_packs) depois.
@@ -23,7 +28,7 @@
 --   3. grant_plan_nodes — soma nodes ao saldo, idempotente pela chave
 --      do Stripe (subscription id na ativação, invoice id na renovação).
 --   4. start_nodes_grace — cancelamento: preserva o saldo e agenda a
---      expiração para 30 dias depois do fim da assinatura.
+--      expiração para 90 dias depois do fim da assinatura.
 --   5. expire_plan_nodes_for_user / expire_stale_plan_nodes — a
 --      expiração em si, preguiçosa (no consumo/grant) e em lote (cron).
 --   6. consume_nodes_v2 — expira o saldo vencido ANTES de debitar.
@@ -39,7 +44,7 @@
 -- ── 1. profiles.nodes_expire_at ───────────────────────────────
 --
 -- NULL = saldo mensal sem prazo (assinante ativo, conta gratuita com
--- os nodes de cadastro). Data no futuro = janela de cortesia pós
+-- os nodes de cadastro). Data no futuro = janela de validade pós
 -- cancelamento. Data no passado = saldo a expirar na próxima leitura.
 
 ALTER TABLE public.profiles
@@ -47,7 +52,8 @@ ALTER TABLE public.profiles
 
 COMMENT ON COLUMN public.profiles.nodes_expire_at IS
   'Quando o saldo de Nodes mensais (credits) expira. NULL = não expira '
-  '(assinatura ativa). Preenchido no cancelamento com fim da assinatura + 30 dias.';
+  '(assinatura ativa). Preenchido no cancelamento com fim da assinatura + 90 dias; '
+  'volta a NULL quando o usuário reassina.';
 
 -- Índice parcial pro cron de expiração — só as linhas com prazo.
 CREATE INDEX IF NOT EXISTS idx_profiles_nodes_expire_at
@@ -156,6 +162,11 @@ DECLARE
   expired_amount  INTEGER := 0;
   ledger_id       UUID;
   new_balance     INTEGER;
+  -- Só um grant de ASSINATURA prova que existe assinatura ativa, e portanto
+  -- só ele cancela a expiração. Um 'adjustment' (crédito manual do suporte)
+  -- numa conta cancelada herda o prazo que já está lá — do contrário um
+  -- ajuste de cortesia tornaria eterno um saldo que devia vencer.
+  clears_deadline BOOLEAN;
 BEGIN
   IF amount IS NULL OR amount <= 0 THEN
     RAISE EXCEPTION 'Invalid amount: %', amount
@@ -166,6 +177,8 @@ BEGIN
     RAISE EXCEPTION 'Invalid grant kind: %', kind_input
       USING ERRCODE = '22023';
   END IF;
+
+  clears_deadline := kind_input IN ('grant_plan', 'grant_renewal');
 
   -- Lock da linha: a soma é read-modify-write e duas entregas do Stripe
   -- podem chegar ao mesmo tempo.
@@ -193,6 +206,19 @@ BEGIN
     RETURNING id INTO ledger_id;
 
     IF ledger_id IS NULL THEN
+      -- Reentrega: não soma, mas ainda assim garante a invariante "assinatura
+      -- ativa ⇒ saldo sem prazo". Sem isto, um grant deduplicado deixaria uma
+      -- janela de expiração de pé numa conta que voltou a ser assinante — e o
+      -- saldo dela morreria no fim de um prazo que já não deveria existir.
+      IF clears_deadline THEN
+        UPDATE public.profiles
+           SET plan            = COALESCE(plan_name, plan),
+               nodes_expire_at = NULL
+         WHERE id = user_id_input
+           AND (nodes_expire_at IS NOT NULL
+                OR plan IS DISTINCT FROM COALESCE(plan_name, plan));
+      END IF;
+
       RETURN json_build_object(
         'success',  TRUE,
         'applied',  FALSE,
@@ -212,8 +238,10 @@ BEGIN
   UPDATE public.profiles
      SET credits         = new_balance,
          plan            = COALESCE(plan_name, plan),
-         -- Assinatura ativa de novo: o saldo volta a não ter prazo.
-         nodes_expire_at = NULL
+         -- Assinatura ativa (de novo): o saldo volta a não ter prazo. É esta
+         -- linha que cumpre "reassinou dentro da janela → preserva o saldo e
+         -- cancela a expiração". Ajuste manual não passa por aqui.
+         nodes_expire_at = CASE WHEN clears_deadline THEN NULL ELSE nodes_expire_at END
    WHERE id = user_id_input;
 
   UPDATE public.node_ledger
@@ -242,6 +270,16 @@ GRANT  EXECUTE ON FUNCTION public.grant_plan_nodes(uuid, integer, text, text, te
 --
 -- Idempotente: reentrega do mesmo evento não empurra o prazo pra frente
 -- (mantém o menor prazo já registrado) nem mexe no saldo.
+--
+-- É esse LEAST que separa os dois casos que parecem iguais:
+--   • reentrega do MESMO cancelamento → o prazo já está lá, e a segunda
+--     entrega (que chega com um `grace_until` calculado minutos depois)
+--     não pode esticar a janela;
+--   • cancelamento de uma assinatura NOVA → a reassinatura já havia
+--     zerado `nodes_expire_at` em grant_plan_nodes, então não há prazo
+--     anterior para comparar e a janela nasce inteira do novo
+--     encerramento. Sem aquele NULL na reassinatura, a segunda janela
+--     ficaria presa ao vencimento antigo.
 
 CREATE OR REPLACE FUNCTION public.start_nodes_grace(
   user_id_input UUID,
@@ -387,7 +425,7 @@ BEGIN
       USING ERRCODE = 'P0002';
   END IF;
 
-  -- Janela de cortesia vencida: o saldo mensal não existe mais. Sem isto,
+  -- Janela de validade vencida: o saldo mensal não existe mais. Sem isto,
   -- um saldo pós-cancelamento seguiria gastável indefinidamente.
   --
   -- Atenção ao alcance disto: se o débito abaixo levantar P0001 (saldo
@@ -496,7 +534,7 @@ SELECT
      ELSE p.credits
    END + COALESCE(SUM(lp.nodes_remaining), 0))::INTEGER                      AS total_balance,
   COUNT(lp.id) FILTER (WHERE lp.status = 'active' AND lp.expires_at > NOW()) AS active_lumen_packs,
-  -- Prazo da janela de cortesia pós-cancelamento (NULL = saldo sem prazo).
+  -- Prazo da janela de validade pós-cancelamento (NULL = saldo sem prazo).
   p.nodes_expire_at                                                          AS plan_nodes_expire_at
 FROM public.profiles p
 LEFT JOIN public.lumen_packs lp

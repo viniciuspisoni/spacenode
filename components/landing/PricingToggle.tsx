@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react'
 import { ANNUAL_BILLING_ENABLED, SELLABLE_PLANS, recommendPlan, type SellablePlanId, type PaidPlanId, type BillingCycle } from '@/lib/plans'
 import { EXTRA_NODE_PACKS } from '@/lib/extra-nodes'
-import { NODES_GRACE_DAYS, NODES_ROLLOVER_COPY } from '@/lib/billing/nodes'
+import { NODES_GRACE_DAYS, NODES_POLICY_COPY } from '@/lib/billing/nodes'
 import { SUPPORT_EMAIL, supportWhatsAppUrl } from '@/lib/support'
 import { formatBRL } from '@/lib/launch-offer'
 
@@ -314,9 +314,10 @@ export function PricingToggle() {
           <b>acumulam</b> — no plano mensal, você cancela quando quiser.
         </p>
         {/* A regra do acúmulo em destaque: é a objeção nº 1 de quem tem mês
-            fraco de projeto e some da assinatura pra não "perder" nodes. */}
+            fraco de projeto e some da assinatura pra não "perder" nodes. As
+            duas frases andam juntas — prometer só o acúmulo esconde o prazo. */}
         <p className="spn-pricing-rollover spn-glass">
-          {NODES_ROLLOVER_COPY}
+          {NODES_POLICY_COPY}
         </p>
 
         {/* Billing toggle — some junto com a pausa do ciclo anual */}

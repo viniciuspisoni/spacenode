@@ -7,8 +7,13 @@
 //
 //   • Nodes mensais não expiram enquanto a assinatura estiver ativa.
 //   • Cada renovação SOMA os nodes do plano ao que sobrou.
-//   • Cancelou: o saldo já adquirido continua gastável por mais
-//     NODES_GRACE_DAYS dias depois do fim da assinatura, e só então expira.
+//   • Encerrada a assinatura, abre uma janela de NODES_GRACE_DAYS dias para
+//     gastar o saldo acumulado; passada a janela, ele expira.
+//   • Reassinou dentro da janela: o saldo é preservado INTEGRALMENTE e a
+//     expiração é cancelada (o prazo volta a não existir).
+//   • Encerrada essa nova assinatura, abre uma janela NOVA, contada do novo
+//     encerramento. Como a reassinatura limpou o prazo anterior, é o que
+//     acontece naturalmente — ver graceDeadline e start_nodes_grace.
 //
 // O consumo por ferramenta é o mesmo de sempre — nada aqui mexe em custo de
 // geração. Quem soma é grant_plan_nodes (idempotente pela chave do Stripe);
@@ -17,8 +22,11 @@
 // As constantes de texto vivem aqui porque a mesma frase precisa aparecer na
 // landing, no billing, no FAQ e nos Termos. Uma frase, um lugar.
 
-/** Dias de cortesia depois do fim da assinatura antes de o saldo expirar. */
-export const NODES_GRACE_DAYS = 30
+/** Dias de validade do saldo acumulado depois do fim da assinatura. */
+export const NODES_GRACE_DAYS = 90
+
+/** O mesmo número por extenso — os Termos pedem a forma "90 (noventa) dias". */
+export const NODES_GRACE_DAYS_WRITTEN = 'noventa'
 
 /** A promessa, como o usuário lê. Landing, billing, FAQ, app. */
 export const NODES_ROLLOVER_COPY =
@@ -26,16 +34,22 @@ export const NODES_ROLLOVER_COPY =
 
 /** A contrapartida, sempre junto da promessa onde houver espaço. */
 export const NODES_GRACE_COPY =
-  `Se cancelar, o saldo acumulado continua disponível por ${NODES_GRACE_DAYS} dias.`
+  `Após o cancelamento, seu saldo permanece disponível por ${NODES_GRACE_DAYS} dias.`
+
+/** As duas frases juntas — a explicação completa da política, em um lugar só. */
+export const NODES_POLICY_COPY = `${NODES_ROLLOVER_COPY} ${NODES_GRACE_COPY}`
 
 /**
- * Fim da janela de cortesia: `NODES_GRACE_DAYS` depois do fim da assinatura.
+ * Fim da janela de validade: `NODES_GRACE_DAYS` depois do fim da assinatura.
  *
  * O `customer.subscription.deleted` chega no fim do período já pago (o
  * cancelamento no portal é sempre "ao fim do ciclo"), então `endedAt` costuma
  * ser ~agora. Ele é respeitado mesmo assim porque o Stripe também cancela
  * assinaturas por inadimplência, e nesse caso o fim do período é no passado —
- * contar a partir de "agora" daria cortesia maior do que a regra promete.
+ * contar a partir de "agora" daria validade maior do que a regra promete.
+ *
+ * É também o que faz a janela NOVA de uma reassinatura encerrada nascer do
+ * encerramento NOVO: cada cancelamento traz o próprio `endedAt`.
  */
 export function graceDeadline(endedAt: Date | null | undefined, now: Date = new Date()): Date {
   const base = endedAt && Number.isFinite(endedAt.getTime()) ? endedAt : now
@@ -50,7 +64,7 @@ export function graceDaysLeft(deadline: Date | string | null | undefined, now: D
   return Math.max(0, Math.ceil((end.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)))
 }
 
-/** O saldo mensal está dentro da janela de cortesia pós-cancelamento? */
+/** O saldo mensal está dentro da janela de validade pós-cancelamento? */
 export function isInGracePeriod(
   expiresAt: string | Date | null | undefined,
   now: Date = new Date()
