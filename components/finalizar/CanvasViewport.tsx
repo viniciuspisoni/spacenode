@@ -551,45 +551,63 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
         ctx.stroke()
       }
       ctx.save()
-      ctx.lineCap = 'round'
-      ctx.lineJoin = 'round'
-      ctx.lineWidth = 1.5 * devicePixelRatio
-      ctx.setLineDash([5 * devicePixelRatio, 4 * devicePixelRatio])
+      ctx.lineCap = 'butt'
+      ctx.lineJoin = 'miter'
+
+      // Marquee de duas passadas, a convenção de qualquer editor: um tracejado
+      // ESCURO por baixo e um CLARO por cima, com a fase trocada. Um traço de
+      // 1 px lê sobre a madeira clara e sobre o vidro escuro da mesma cena, e
+      // não pinta o render de verde — o verde de 1,5 px competia com a imagem
+      // justamente onde a pessoa precisa enxergar a borda que está marcando.
+      const DASH = 4 * devicePixelRatio
+      const marquee = (traco: () => void, erase: boolean) => {
+        ctx.lineWidth = devicePixelRatio
+        ctx.setLineDash([DASH, DASH])
+        ctx.lineDashOffset = 0
+        ctx.strokeStyle = 'rgba(0,0,0,0.5)'
+        traco()
+        ctx.lineDashOffset = DASH
+        ctx.strokeStyle = erase ? 'rgba(255,146,146,0.95)' : 'rgba(255,255,255,0.95)'
+        traco()
+      }
 
       if (drag?.kind === 'edit-lasso' && drag.points.length > 1) {
-        ctx.strokeStyle = drag.erase ? 'rgba(255,120,120,0.95)' : accentGreen()
-        line(drag.points, true)
+        marquee(() => line(drag.points, true), drag.erase)
       } else if (drag?.kind === 'edit-rect') {
         const a = toScreen(Math.min(drag.from.x, drag.to.x), Math.min(drag.from.y, drag.to.y))
         const b = toScreen(Math.max(drag.from.x, drag.to.x), Math.max(drag.from.y, drag.to.y))
-        if (a && b) {
-          ctx.strokeStyle = drag.erase ? 'rgba(255,120,120,0.95)' : accentGreen()
-          ctx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y)
-        }
-      } else if (poly && poly.points.length > 0) {
-        ctx.strokeStyle = poly.erase ? 'rgba(255,120,120,0.95)' : accentGreen()
+        if (a && b) marquee(() => ctx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y), drag.erase)
+      } else if (poly && poly.points.length > 0 && p.editSubTool === 'polygon') {
         const cur = cursorRef.current
         const pts = [...poly.points]
-        line(pts, false)
-        // Segmento elástico até o cursor, para a pessoa ver onde o próximo
-        // vértice cai antes de clicar.
-        if (cur && pts.length > 0) {
-          const last = toScreen(pts[pts.length - 1].x, pts[pts.length - 1].y)
-          if (last) {
-            ctx.beginPath()
-            ctx.moveTo(last.x, last.y)
-            ctx.lineTo(cur.x, cur.y)
-            ctx.stroke()
+        marquee(() => {
+          line(pts, false)
+          // Segmento elástico até o cursor, para a pessoa ver onde o próximo
+          // vértice cai antes de clicar.
+          if (cur && pts.length > 0) {
+            const last = toScreen(pts[pts.length - 1].x, pts[pts.length - 1].y)
+            if (last) {
+              ctx.beginPath()
+              ctx.moveTo(last.x, last.y)
+              ctx.lineTo(cur.x, cur.y)
+              ctx.stroke()
+            }
           }
-        }
-        // Ponto inicial destacado: é o alvo do clique que fecha a área.
+        }, poly.erase)
+
+        // Ponto inicial: é o alvo do clique que fecha a área. Branco com anel
+        // escuro, pelo mesmo motivo do tracejado — precisa aparecer sobre
+        // qualquer fundo sem virar o elemento mais forte da tela.
         const first = toScreen(pts[0].x, pts[0].y)
         if (first) {
           ctx.setLineDash([])
-          ctx.fillStyle = accentGreen()
           ctx.beginPath()
-          ctx.arc(first.x, first.y, 4 * devicePixelRatio, 0, Math.PI * 2)
+          ctx.arc(first.x, first.y, 3.5 * devicePixelRatio, 0, Math.PI * 2)
+          ctx.fillStyle = 'rgba(255,255,255,0.95)'
           ctx.fill()
+          ctx.lineWidth = devicePixelRatio
+          ctx.strokeStyle = 'rgba(0,0,0,0.55)'
+          ctx.stroke()
         }
       }
       ctx.restore()
@@ -1608,6 +1626,17 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
     }
     return writeSelection(index, out, n, before)
   }
+
+  // Trocar de ferramenta abandona o polígono em curso. Enquanto isso não
+  // existia, o traço de um polígono esquecido seguia na tela sob a varinha —
+  // uma marcação que a ferramenta ativa não sabia explicar nem apagar.
+  useEffect(() => {
+    if (editSubTool === 'polygon') return
+    if (!editPolyRef.current) return
+    editPolyRef.current = null
+    setPolyCount(0)
+    scheduleDraw()
+  }, [editSubTool, scheduleDraw])
 
   // ── API imperativa ───────────────────────────────────────────────────────
 
