@@ -64,10 +64,58 @@ CREATE INDEX IF NOT EXISTS idx_profiles_nodes_expire_at
 -- O lockdown de colunas de profiles (20260703120000) já restringe o UPDATE
 -- do usuário a um conjunto fixo de colunas, então nada a fazer aqui.
 
--- ── 2. Idempotência do grant no node_ledger ───────────────────
+-- ── 2. node_ledger — garantir que existe ──────────────────────
 --
--- O índice existente (uq_node_ledger_kind_job) cobre movimentos ligados a
--- um JOB. Grants de assinatura não têm job — a chave deles é o objeto do
+-- O livro-razão é PRÉ-REQUISITO desta migration: é nele que o grant reserva
+-- o movimento antes de somar, e é essa reserva que torna a soma idempotente.
+--
+-- A tabela foi definida em 20260703150000_node_ledger_ai_cost_log.sql, mas
+-- essa migration nunca chegou a ser aplicada em produção (conferido em
+-- 2026-09-10: pg_tables não tinha node_ledger). O código conviveu com isso
+-- porque a única escrita existente era best-effort — lib/billing/refund-nodes.ts
+-- engole o 42P01 de propósito, o que deixou a ausência invisível.
+--
+-- Aqui ela deixa de ser tolerável: sem a tabela, o índice único abaixo não
+-- existe e grant_plan_nodes creditaria o mesmo mês a cada reentrega do
+-- Stripe. Por isso a criação vem junto, idempotente e idêntica à definição
+-- original — se 20260703150000 for aplicada depois, vira no-op.
+--
+-- `ai_cost_log`, a outra tabela daquela migration, NÃO entra: nada aqui
+-- depende dela, e trazê-la seria alargar esta mudança sem motivo.
+
+CREATE TABLE IF NOT EXISTS public.node_ledger (
+  id              uuid primary key default gen_random_uuid(),
+  user_id         uuid not null references public.profiles(id) on delete cascade,
+  payer_id        uuid references public.profiles(id) on delete set null,
+  workspace_id    uuid,
+  delta           integer not null,   -- negativo = débito; positivo = crédito/refund
+  kind            text not null check (kind in
+                    ('debit','refund','grant_signup','grant_plan','grant_renewal',
+                     'grant_lumen','expiry','adjustment')),
+  source          text,               -- módulo de origem (ex.: 'generate','video')
+  job_table       text,
+  job_id          text,
+  stripe_event_id text,
+  balance_after   integer,
+  created_at      timestamptz not null default now()
+);
+
+-- Previne DUPLICATA do mesmo movimento (refund/débito repetido do mesmo job).
+CREATE UNIQUE INDEX IF NOT EXISTS uq_node_ledger_kind_job
+  ON public.node_ledger (kind, job_table, job_id)
+  WHERE job_table IS NOT NULL AND job_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_node_ledger_user_created
+  ON public.node_ledger (user_id, created_at DESC);
+
+ALTER TABLE public.node_ledger ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.node_ledger FROM anon, authenticated;
+GRANT  ALL ON public.node_ledger TO service_role;
+
+-- ── 2b. Idempotência do grant no node_ledger ──────────────────
+--
+-- O índice acima (uq_node_ledger_kind_job) cobre movimentos ligados a um
+-- JOB. Grants de assinatura não têm job — a chave deles é o objeto do
 -- Stripe. Índice parcial próprio, para não colidir com o outro.
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_node_ledger_kind_stripe_event
