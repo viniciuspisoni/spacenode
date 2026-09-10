@@ -461,7 +461,7 @@ let gcpKnobsRejected = false
 // lib/spaces/engines (que só consome tipos/labels), e sharp não tem build de
 // browser — o next build quebra em 'fs'. Best-effort: formato desconhecido
 // devolve nulls (o Preserve V2 já trata aspecto nulo).
-function imageDims(buf: Buffer): { width: number | null; height: number | null } {
+export function imageDims(buf: Buffer): { width: number | null; height: number | null } {
   try {
     // PNG: assinatura de 8 bytes + chunk IHDR → width/height BE nos offsets 16/20.
     if (buf.length > 24 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) {
@@ -491,7 +491,7 @@ function imageDims(buf: Buffer): { width: number | null; height: number | null }
 
 // Sobe o resultado pro Storage e devolve a URL pública — mesma convenção de
 // chave do rehost/uploadEditAsset (`${userId}/${area}/…`), mesmo bucket.
-async function uploadToStorage(buf: Buffer, mime: string, userId: string, area: string): Promise<string> {
+export async function uploadToStorage(buf: Buffer, mime: string, userId: string, area: string): Promise<string> {
   const admin = createAdminClient()
   const ext = ((mime.split('/')[1] ?? 'png').split(';')[0] || 'png').replace('jpeg', 'jpg')
   const rand = Math.random().toString(36).slice(2, 8)

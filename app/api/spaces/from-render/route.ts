@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isEngineId, type EngineId } from '@/lib/engines'
+import { isInternalRenderRow } from '@/lib/orion/config'
 import { isSpaceCategory } from '@/lib/spaces/types'
 import { signRow } from '@/lib/storage/signed'
 
@@ -73,6 +74,18 @@ export async function POST(req: NextRequest) {
   if (!render.output_url) {
     return NextResponse.json(
       { error: 'Render sem imagem final — não pode virar Vista Mestre' },
+      { status: 409 },
+    )
+  }
+
+  // Piloto Orion não vira Space. A decisão (isInternalRenderRow) olha o MOTOR
+  // DO RESULTADO persistido, não o card que estava selecionado na hora — quem
+  // promove pode ser outra tela, outro dia, ou uma chamada forjada direto na
+  // API. `spaces.engine` só conhece os motores públicos, e o piloto não deve
+  // contaminar DNA, vistas nem cobrança de Spaces.
+  if (isInternalRenderRow(render)) {
+    return NextResponse.json(
+      { error: 'Renders do motor experimental Orion não podem virar projeto.' },
       { status: 409 },
     )
   }

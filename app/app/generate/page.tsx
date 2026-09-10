@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getPayerBalance } from '@/lib/workspaces/balance'
 import { redirect } from 'next/navigation'
+import { canUseOrion } from '@/lib/orion/access'
+import { orionProvider, orionProviderReady } from '@/lib/orion/provider'
 import GenerateClient from './GenerateClient'
 
 const DEFAULT_CREDITS = 80
@@ -59,8 +61,17 @@ export default async function GeneratePage({
 
   const renderCount = await renderCountPromise
 
+  // Piloto Orion: mesmo gate da API (ORION_INTERNAL_ENABLED + isInternalStaff).
+  // Checado AQUI, no servidor — o client só recebe um booleano já decidido, e
+  // a rota /api/generate re-valida em toda geração. Sem credencial do
+  // fornecedor ativo o card nem aparece: ofereceria uma geração que falharia.
+  const orionAllowed =
+    (await canUseOrion(admin, { id: user.id, email: user.email })) && orionProviderReady()
+
   return (
     <GenerateClient
+      orionEnabled={orionAllowed}
+      orionProvider={orionAllowed ? orionProvider() : undefined}
       // Saldo TOTAL da bolsa (mensais + extras) — é o que consume_workspace_nodes
       // debita, então é o que gateia o CTA e alimenta o contador de renders.
       initialCredits={balance.totalBalance}
