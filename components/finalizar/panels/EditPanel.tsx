@@ -14,7 +14,7 @@ import { useState } from 'react'
 import { ChoiceGroup } from '@/components/app/glass'
 import type { EditV4Action } from '@/lib/edit-v4/types'
 import { Chip, Label, Section, Seg, SliderRow } from '../ui'
-import type { EditSubTool } from '../CanvasViewport'
+import type { EditSubTool, SelectionOp } from '../CanvasViewport'
 
 export interface EditActionDef {
   id: EditV4Action
@@ -67,6 +67,12 @@ export interface EditPanelProps {
    *  identidade — as mesmas condições da varinha). */
   canGrow: boolean
   onGrow: () => void
+  /** Ajustes locais da seleção (morfologia). Nenhum consome node. */
+  onRefine: (op: SelectionOp) => void
+  /** "Colar na borda": re-estima a seleção usando a imagem como guia. Roda no
+   *  servidor mas é 100% aritmética local lá — zero nodes. */
+  onSnapEdges: () => void
+  snapBusy: boolean
   /** Deixar a seleção crescer sozinha até a peça, nas ações de superfície. */
   uniform: boolean
   onUniform: (v: boolean) => void
@@ -214,10 +220,53 @@ export function EditPanel(props: EditPanelProps) {
           >
             Expandir p/ o material
           </Chip>
-          <Chip onClick={props.onClearSelection} disabled={!props.hasSelection} title="Limpa a seleção">
+          <Chip onClick={props.onClearSelection} disabled={!props.hasSelection} title="Limpa a seleção (Ctrl+D)">
             Desmarcar
           </Chip>
-          {props.hasWand && <span style={{ fontSize: 11, color: 'var(--color-text-quaternary)', alignSelf: 'center' }}>varinha ativa</span>}
+        </div>
+
+        {/* Ajustes finos da seleção. Em archviz é quase todo o resultado: o que
+            denuncia uma edição não é o material novo, é a linha torta onde ele
+            encontra o antigo. */}
+        <div style={{ marginTop: 12 }}>
+          <span className="spn-field-label">Ajustar a seleção</span>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+            <Chip onClick={props.onSnapEdges} disabled={!props.hasSelection || props.snapBusy || !props.canGrow}
+              title="Re-estima a borda usando a imagem como guia: ela gruda no rodapé, na esquadria, na quina da marcenaria">
+              {props.snapBusy ? 'Colando…' : 'Colar na borda'}
+            </Chip>
+            <Chip onClick={() => props.onRefine('expand')} disabled={!props.hasSelection || !props.canGrow}
+              title="Cresce 2 px — some com o fiapo do material antigo que sobra em volta">
+              Expandir 2px
+            </Chip>
+            <Chip onClick={() => props.onRefine('contract')} disabled={!props.hasSelection || !props.canGrow}
+              title="Encolhe 2 px — quando a seleção invadiu o vizinho">
+              Contrair 2px
+            </Chip>
+            <Chip onClick={() => props.onRefine('smooth')} disabled={!props.hasSelection || !props.canGrow}
+              title="Fecha frestas e come as pontas finas do pincel, sem mudar o volume">
+              Suavizar
+            </Chip>
+            <Chip onClick={() => props.onRefine('fillHoles')} disabled={!props.hasSelection || !props.canGrow}
+              title="Tapa buracos fechados — o reflexo claro no meio do piso que ficou de fora">
+              Tapar buracos
+            </Chip>
+            <Chip onClick={() => props.onRefine('cleanIslands')} disabled={!props.hasSelection || !props.canGrow}
+              title="Some com o salpico que a varinha deixa longe do clique em textura ruidosa">
+              Limpar respingos
+            </Chip>
+            <Chip onClick={() => props.onRefine('invert')} disabled={!props.hasSelection || !props.canGrow}
+              title="Troca o dentro pelo fora (Ctrl+Shift+I)">
+              Inverter
+            </Chip>
+            <Chip onClick={() => props.onRefine('selectAll')} disabled={!props.canGrow}
+              title="Seleciona a imagem inteira">
+              Selecionar tudo
+            </Chip>
+          </div>
+          <p style={{ fontSize: 11, color: 'var(--color-text-quaternary)', marginTop: 8, lineHeight: 1.5 }}>
+            Ajustar a seleção não consome nenhum node.
+          </p>
         </div>
       </Section>
 

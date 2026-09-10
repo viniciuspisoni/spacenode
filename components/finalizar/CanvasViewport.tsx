@@ -24,10 +24,15 @@ import type {
 } from '@/lib/finalizar/types'
 import { isGeometryIdentity } from '@/lib/finalizar/composition'
 import {
-  buildColorIndex, growSelectionAuto, magicWandAuto, magicWandSelect, type ColorIndex,
+  buildColorIndex, growSelectionAuto, invertSelection, magicWandAuto, magicWandSelect,
+  type ColorIndex,
 } from '@/lib/selection/magic-wand'
 import { FinalizeRenderer } from '@/lib/finalizar/engine/renderer'
 import { computeHistogram, type Histogram } from '@/lib/finalizar/engine/color-math'
+import {
+  contractSelection, expandSelection, fillSelectionHoles,
+  removeSmallIslands, smoothSelection,
+} from '@/lib/selection/mask-raster'
 import { computeSkyMask, MASK_SCALE, selectionMaskPngCanvas, type LiveStroke } from '@/lib/finalizar/engine/masks'
 
 const MIN_ZOOM = 1
@@ -51,6 +56,10 @@ const WAND_SAMPLE_RADIUS_IMAGE_PX = 4
 const WAND_INDEX_LONG_SIDE = WORK_LONG_SIDE
 
 export type ViewportTool = 'edit' | 'adjust' | 'color' | 'masks' | 'geometry' | 'elements'
+
+/** Operações locais sobre a seleção — todas grátis, todas instantâneas. */
+export type SelectionOp =
+  | 'expand' | 'contract' | 'smooth' | 'fillHoles' | 'cleanIslands' | 'invert' | 'selectAll'
 
 export interface BrushSettings {
   /** Diâmetro em px de TELA. */
@@ -96,6 +105,14 @@ export interface CanvasViewportHandle {
    *  Devolve null quando não há o que crescer (sem seleção, ou varinha
    *  indisponível). */
   growEditSelection(opts?: { maxCoverage?: number }): { coverage: number; before: number; applied: boolean } | null
+  /** Ajusta a seleção no lugar (morfologia). Devolve a cobertura resultante, ou
+   *  null quando não há seleção. `px` só vale para expandir/contrair/suavizar. */
+  refineSelection(op: SelectionOp, px?: number): { coverage: number; before: number; applied: boolean } | null
+  /** Substitui a seleção inteira por uma máscara pronta (o retorno do
+   *  "Colar na borda", que vem do servidor já casada com a imagem). */
+  loadSelectionMask(url: string): Promise<boolean>
+  /** A seleção de hoje como PNG branco-sobre-preto, no tamanho do documento. */
+  selectionBlob(): Promise<Blob | null>
   baseImage(): HTMLImageElement | null
   webglSupported(): boolean
 }
@@ -1526,6 +1543,72 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
     return out
   }
 
+  /** A seleção completa de hoje (varinha ∪ regiões ∪ traços) como máscara
+   *  binária na resolução do índice de cor. null = não há índice, geometria
+   *  aplicada, ou nada marcado. */
+  function composeSelectionMask(): { index: ColorIndex; mask: Uint8Array; marked: number } | null {
+    const index = colorIndexRef.current
+    const d = docRef.current
+    if (!index || !isGeometryIdentity(d.geometry)) return null
+    const base = editSelectionBase(index.width, index.height)
+    const full = selectionMaskPngCanvas(base, propsRef.current.editStrokes, index.width, index.height)
+    const fctx = full.getContext('2d', { willReadFrequently: true })
+    if (!fctx) return null
+    const px = fctx.getImageData(0, 0, index.width, index.height).data
+    const n = index.width * index.height
+    const mask = new Uint8Array(n)
+    let marked = 0
+    // O PNG da máscara é branco sobre preto e opaco: quem manda é o canal R.
+    for (let i = 0; i < n; i++) if (px[i * 4] > 127) { mask[i] = 255; marked++ }
+    return { index, mask, marked }
+  }
+
+  /** Grava uma máscara como a seleção inteira: vira região única, a forma da
+   *  varinha e os traços são absorvidos. */
+  function writeSelection(
+    index: ColorIndex,
+    mask: Uint8Array,
+    n: number,
+    before: number,
+  ): { coverage: number; before: number; applied: boolean } | null {
+    const src = maskToCanvas(index, mask)
+    const regions = editRegions()
+    const rctx = regions?.getContext('2d')
+    if (!src || !regions || !rctx) return null
+    rctx.clearRect(0, 0, regions.width, regions.height)
+    rctx.drawImage(src, 0, 0, regions.width, regions.height)
+
+    let after = 0
+    for (let i = 0; i < n; i++) if (mask[i] > 127) after++
+    editPolyRef.current = null
+    wandOnlyRegionsRef.current = false
+    propsRef.current.onRegionsChange(true)
+    propsRef.current.onSelectionGrown()
+    scheduleDraw()
+    return { coverage: after / n, before, applied: true }
+  }
+
+  /** Compõe → transforma → grava. É o caminho único de toda operação sobre a
+   *  seleção; `maxCoverage` faz a transformação ser DESCARTADA se estourar. */
+  function transformSelection(
+    fn: (mask: Uint8Array, index: ColorIndex) => Uint8Array | undefined,
+    maxCoverage?: number,
+  ): { coverage: number; before: number; applied: boolean } | null {
+    const composed = composeSelectionMask()
+    if (!composed || composed.marked === 0) return null
+    const { index, mask, marked } = composed
+    const n = index.width * index.height
+    const out = fn(mask, index)
+    if (!out) return null
+    const before = marked / n
+    if (maxCoverage !== undefined) {
+      let after = 0
+      for (let i = 0; i < n; i++) if (out[i] > 127) after++
+      if (after / n > maxCoverage) return { coverage: after / n, before, applied: false }
+    }
+    return writeSelection(index, out, n, before)
+  }
+
   // ── API imperativa ───────────────────────────────────────────────────────
 
   useImperativeHandle(ref, () => ({
@@ -1604,68 +1687,96 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
     // O resultado vira uma REGIÃO (raster), porque uma área crescida não cabe
     // nos parâmetros de uma WandShape: ela nasce de traços, varinha e regiões
     // ao mesmo tempo. Depois disso a seleção é uma coisa só.
-    growEditSelection: (opts) => {
-      const index = colorIndexRef.current
-      const d = docRef.current
-      if (!index || !isGeometryIdentity(d.geometry)) return null
-
-      // A seleção inteira de hoje, na resolução do índice de cor.
-      const base = editSelectionBase(index.width, index.height)
-      const full = selectionMaskPngCanvas(base, propsRef.current.editStrokes, index.width, index.height)
-      const fctx = full.getContext('2d', { willReadFrequently: true })
-      if (!fctx) return null
-      const px = fctx.getImageData(0, 0, index.width, index.height).data
-      const n = index.width * index.height
-      const seedMask = new Uint8Array(n)
-      let marked = 0
-      // O PNG da máscara é branco sobre preto e opaco: quem manda é o canal R.
-      for (let i = 0; i < n; i++) {
-        if (px[i * 4] > 127) { seedMask[i] = 255; marked++ }
-      }
-      if (marked === 0) return null
-
-      const { mask } = growSelectionAuto(index, seedMask, {
+    growEditSelection: (opts) => transformSelection((mask, index) => {
+      const { mask: grown } = growSelectionAuto(index, mask, {
         tolerance: propsRef.current.wandTolerance,
         contiguous: propsRef.current.wandContiguous,
-        sampleRadius: wandSampleRadius(index, d.width),
+        sampleRadius: wandSampleRadius(index, docRef.current.width),
       })
+      return grown
+    }, opts?.maxCoverage),
 
-      let after = 0
-      for (let i = 0; i < n; i++) if (mask[i] > 127) after++
-      const coverage = after / n
-      const before = marked / n
-      if (opts?.maxCoverage !== undefined && coverage > opts.maxCoverage) {
-        return { coverage, before, applied: false }
+    // Ajustes da seleção — expandir, contrair, suavizar, tapar buraco, limpar
+    // respingo, inverter, selecionar tudo.
+    //
+    // Existiam no V4 e sumiram na fusão junto com o raster: eram operações de
+    // morfologia sobre `Uint8Array`, e a varinha virou forma paramétrica. A
+    // biblioteca (`lib/selection/mask-raster`) nunca saiu do repositório —
+    // ficou órfã, com testes passando e ninguém chamando. Voltam pelo mesmo
+    // caminho do crescimento: compõe tudo num raster, transforma, grava de
+    // volta como região.
+    //
+    // Nenhuma delas consome node. São aritmética de browser.
+    refineSelection: (op, px = 2) => {
+      if (op === 'selectAll') {
+        const index = colorIndexRef.current
+        const d = docRef.current
+        if (!index || !isGeometryIdentity(d.geometry)) return null
+        const n = index.width * index.height
+        const all = new Uint8Array(n).fill(255)
+        return writeSelection(index, all, n, 0)
       }
+      return transformSelection((mask, index) => {
+        const { width: w, height: h } = index
+        switch (op) {
+          case 'expand':       return expandSelection(mask, w, h, px)
+          case 'contract':     return contractSelection(mask, w, h, px)
+          case 'smooth':       return smoothSelection(mask, w, h, px)
+          case 'fillHoles':    return fillSelectionHoles(mask, w, h)
+          // O piso de tamanho acompanha a imagem: 0,002% do total. Numa de 4 MP
+          // são ~85 px — some com o salpico da varinha em textura ruidosa e
+          // preserva qualquer coisa que alguém tenha marcado de propósito.
+          case 'cleanIslands': return removeSmallIslands(mask, w, h, Math.max(24, Math.round(w * h * 0.00002)))
+          case 'invert':       return invertSelection(new Uint8Array(mask))
+        }
+      })
+    },
+    // A seleção como PNG branco-sobre-preto, no tamanho do documento — é o que
+    // o "Colar na borda" manda ao servidor.
+    selectionBlob: async () => {
+      const d = docRef.current
+      const base = editSelectionBase(d.width, d.height)
+      if (!base && propsRef.current.editStrokes.length === 0) return null
+      const canvas = selectionMaskPngCanvas(base, propsRef.current.editStrokes, d.width, d.height)
+      return new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
+    },
 
-      // Grava como região, no tamanho do documento.
-      const src = document.createElement('canvas')
-      src.width = index.width
-      src.height = index.height
-      const sctx = src.getContext('2d')
-      if (!sctx) return null
-      const img = sctx.createImageData(index.width, index.height)
-      for (let i = 0; i < n; i++) {
-        const v = mask[i] > 127 ? 255 : 0
-        const o = i * 4
-        img.data[o] = v; img.data[o + 1] = v; img.data[o + 2] = v; img.data[o + 3] = v
-      }
-      sctx.putImageData(img, 0, 0)
-
+    // Substitui a seleção pela máscara refinada que voltou do servidor. Ela
+    // nasce casada com a imagem (mesmas dimensões), então entra como região
+    // única e absorve forma e traços — igual a qualquer outra transformação.
+    loadSelectionMask: async (url: string) => {
       const regions = editRegions()
-      if (!regions) return null
-      const rctx = regions.getContext('2d')
-      if (!rctx) return null
+      const rctx = regions?.getContext('2d')
+      if (!regions || !rctx) return false
+      const img = await new Promise<HTMLImageElement | null>((resolve) => {
+        const im = new Image()
+        im.crossOrigin = 'anonymous'
+        im.onload = () => resolve(im)
+        im.onerror = () => resolve(null)
+        im.src = url
+      })
+      if (!img) return false
       rctx.clearRect(0, 0, regions.width, regions.height)
-      rctx.drawImage(src, 0, 0, regions.width, regions.height)
+      rctx.drawImage(img, 0, 0, regions.width, regions.height)
+      // O PNG vem branco sobre PRETO opaco; a região precisa de alpha, senão o
+      // preto de fora conta como selecionado. Converte no lugar.
+      const id = rctx.getImageData(0, 0, regions.width, regions.height)
+      const dt = id.data
+      for (let i = 0; i < dt.length; i += 4) {
+        const on = dt[i] > 127
+        const v = on ? 255 : 0
+        dt[i] = v; dt[i + 1] = v; dt[i + 2] = v; dt[i + 3] = v
+      }
+      rctx.putImageData(id, 0, 0)
 
       editPolyRef.current = null
       wandOnlyRegionsRef.current = false
       propsRef.current.onRegionsChange(true)
       propsRef.current.onSelectionGrown()
       scheduleDraw()
-      return { coverage, before, applied: true }
+      return true
     },
+
     // (mantido no handle para uso interno/testes; a TELA decide por
     //  `canSample` + geometria, sem ler ref durante o render.)
     // A varinha lê a imagem ORIGINAL; os traços e o overlay vivem no espaço já
@@ -1677,6 +1788,12 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
     // precisar. Até lá, a varinha se desliga e a tela explica por quê, em vez
     // de entregar uma seleção silenciosamente torta.
     wandAvailable: () => colorIndexRef.current !== null && isGeometryIdentity(docRef.current.geometry),
+    // composeSelectionMask/writeSelection/transformSelection são declarações de
+    // função do corpo do componente: mudam de identidade a cada render, mas só
+    // leem refs (docRef, propsRef, colorIndexRef, editRegionsRef). Listá-las
+    // recriaria o handle a cada render sem ganho nenhum; omiti-las não deixa o
+    // handle velho, porque não há estado capturado nelas.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [baseReady, glOk, onZoomChange, scheduleDraw])
 
   // ── Cursor CSS ───────────────────────────────────────────────────────────

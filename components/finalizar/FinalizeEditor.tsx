@@ -36,7 +36,7 @@ import { uploadDirect } from '@/lib/storage/direct-upload-client'
 import {
   CanvasViewport,
   type BrushSettings, type CanvasViewportHandle, type CompareMode,
-  type EditSubTool, type MaskOverlayColor, type StrokeTarget,
+  type EditSubTool, type MaskOverlayColor, type SelectionOp, type StrokeTarget,
 } from './CanvasViewport'
 import { TopBar, StatusStrip, type SaveStatus } from './TopBar'
 import { ToolRail, type EditorTool } from './ToolRail'
@@ -85,6 +85,22 @@ const PANEL_TITLE: Record<EditorTool, string> = {
  *  descartado e vale o que foi marcado; o botão manual continua permitindo ir
  *  além, aí com a pessoa vendo o resultado antes de gastar node. */
 const AUTO_UNIFORM_MAX_COVERAGE = 0.12
+
+/** Letra de cada ferramenta de seleção, como no V4 e como no Photoshop. */
+const EDIT_TOOL_KEYS: Record<string, EditSubTool> = {
+  v: 'wand', b: 'brush', e: 'eraser', l: 'lasso', p: 'polygon', r: 'rect',
+}
+
+/** Nome de cada ajuste na mensagem de retorno. */
+const SELECTION_OP_LABEL: Record<SelectionOp, string> = {
+  expand: 'Seleção expandida',
+  contract: 'Seleção contraída',
+  smooth: 'Seleção suavizada',
+  fillHoles: 'Buracos tapados',
+  cleanIslands: 'Respingos removidos',
+  invert: 'Seleção invertida',
+  selectAll: 'Imagem inteira selecionada',
+}
 
 const EDIT_HINTS: Record<EditSubTool, string> = {
   wand: 'Clique numa superfície para selecioná-la inteira · Shift soma outra, Alt subtrai',
@@ -139,7 +155,7 @@ export function FinalizeEditor({
   }, [])
 
   // ── UI ─────────────────────────────────────────────────────────────────────
-  const [tool, setTool] = useState<EditorTool>('adjust')
+  const [tool, setTool] = useState<EditorTool>('edit')
   const [panelsOpen, setPanelsOpen] = useState(true)
   const [leaving, setLeaving] = useState(false)
   // A largura do painel vive em DUAS camadas de propósito. Em repouso é
@@ -206,6 +222,7 @@ export function FinalizeEditor({
    *  editar. Ligado por padrão: é a diferença entre um conserto e um remendo,
    *  e ninguém vai pensar "preciso marcar mais do que o defeito". */
   const [editUniform, setEditUniform] = useState(true)
+  const [snapBusy, setSnapBusy] = useState(false)
   const [wandTolerance, setWandTolerance] = useState(DEFAULT_WAND_OPTIONS.tolerance)
   const [wandContiguous, setWandContiguous] = useState(DEFAULT_WAND_OPTIONS.contiguous)
   const [editAction, setEditAction] = useState<EditV4Action>('swap_material')
@@ -674,6 +691,65 @@ export function FinalizeEditor({
    * pós-produção conviverem no mesmo documento em vez de serem duas etapas
    * que se atropelam.
    */
+  /**
+   * "Colar na borda" — re-estima a seleção usando a própria imagem como guia
+   * (guided filter). Onde existe contraste visual — encontro de materiais,
+   * rodapé, esquadria, quina de marcenaria — a borda gruda no contorno real.
+   *
+   * É a diferença entre "mais ou menos ali" e acertar o rodapé no pixel, e em
+   * archviz isso é quase todo o resultado. Roda no servidor mas é aritmética
+   * local lá (sharp + imagens integrais, O(N)): ZERO nodes, quantas vezes
+   * quiser. A rota já existia desde o V4 e ficou órfã na fusão.
+   */
+  const snapEdges = useCallback(async () => {
+    const cur = docRef.current
+    const vp = viewportRef.current
+    if (!cur || !vp || snapBusy) return
+    setSnapBusy(true)
+    setEditMsg(null)
+    try {
+      const blob = await vp.selectionBlob()
+      if (!blob) {
+        setEditMsg({ kind: 'error', text: 'Marque uma área primeiro.' })
+        return
+      }
+      const up = await uploadDirect(blob, 'retocar-asset', { kind: 'mask' })
+      if (!up.url) throw new Error('sem URL')
+      const res = await fetch('/api/edit-v4/mask/refine', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image_url: cur.originalBaseUrl, mask_url: up.url }),
+      })
+      const j = await res.json().catch(() => null)
+      if (!res.ok || !j?.mask_url) {
+        setEditMsg({ kind: 'error', text: j?.error ?? 'Não foi possível ajustar a borda.' })
+        return
+      }
+      const ok = await vp.loadSelectionMask(j.mask_url as string)
+      if (!ok) setEditMsg({ kind: 'error', text: 'Não foi possível carregar a borda ajustada.' })
+      else setEditMsg({
+        kind: 'info',
+        text: j.changed === false
+          ? 'A borda já estava boa — nada mudou.'
+          : 'Borda colada no contorno real. Não consumiu nodes.',
+      })
+    } catch {
+      setEditMsg({ kind: 'error', text: 'Falha de conexão ao ajustar a borda.' })
+    } finally {
+      setSnapBusy(false)
+    }
+  }, [snapBusy])
+
+  const refineSelection = useCallback((op: SelectionOp) => {
+    const r = viewportRef.current?.refineSelection(op) ?? null
+    if (!r) {
+      setEditMsg({ kind: 'error', text: 'Marque uma área primeiro.' })
+      return
+    }
+    const pct = Math.round(r.coverage * 1000) / 10
+    setEditMsg({ kind: 'info', text: `${SELECTION_OP_LABEL[op]} — ${pct}% da imagem.` })
+  }, [])
+
   const runEdit = useCallback(async () => {
     const cur = docRef.current
     if (!cur || editBusy) return
@@ -1002,6 +1078,18 @@ export function FinalizeEditor({
       } else if (mod && e.key.toLowerCase() === 'e') {
         e.preventDefault()
         setExportOpen(true)
+      } else if (mod && e.shiftKey && e.key.toLowerCase() === 'i') {
+        // Inverter seleção — o atalho do V4, e o de qualquer editor.
+        e.preventDefault()
+        if (tool === 'edit') refineSelection('invert')
+      } else if (mod && e.key.toLowerCase() === 'd') {
+        e.preventDefault()
+        if (tool === 'edit') {
+          setEditStrokes([])
+          setEditWand(null)
+          viewportRef.current?.clearEditRegions()
+          setEditMsg(null)
+        }
       } else if (mod) {
         // Demais combinações com Ctrl/Cmd são do navegador.
       } else if (e.key === '[' || e.key === ']') {
@@ -1018,6 +1106,11 @@ export function FinalizeEditor({
         viewportRef.current?.zoomBy(1.25)
       } else if (e.key === '-') {
         viewportRef.current?.zoomBy(1 / 1.25)
+      } else if (tool === 'edit' && !mod && EDIT_TOOL_KEYS[e.key.toLowerCase()]) {
+        // V/B/E/L/P/R trocam a ferramenta de seleção — só valem na aba Editar,
+        // então não brigam com nada nas outras abas.
+        e.preventDefault()
+        setEditSubTool(EDIT_TOOL_KEYS[e.key.toLowerCase()])
       } else if (['1', '2', '3', '4', '5', '6', '7'].includes(e.key)) {
         const tools: EditorTool[] = ['edit', 'adjust', 'color', 'masks', 'geometry', 'elements', 'history']
         setTool(tools[Number(e.key) - 1])
@@ -1032,7 +1125,7 @@ export function FinalizeEditor({
       window.removeEventListener('keydown', onKey)
       window.removeEventListener('keyup', onKeyUp)
     }
-  }, [undo, redo])
+  }, [undo, redo, tool, refineSelection])
 
   const goBack = useCallback(() => {
     if (dirtyRef.current) { setLeaving(true); return }
@@ -1337,6 +1430,9 @@ export function FinalizeEditor({
                   uniform={editUniform}
                   onUniform={setEditUniform}
                   canGrow={canSample && isGeometryIdentity(doc.geometry)}
+                  snapBusy={snapBusy}
+                  onRefine={refineSelection}
+                  onSnapEdges={() => { void snapEdges() }}
                   onGrow={() => {
                     const r = viewportRef.current?.growEditSelection() ?? null
                     if (!r) {
