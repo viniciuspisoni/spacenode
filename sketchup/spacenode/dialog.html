@@ -2374,9 +2374,9 @@
       var eng = currentEngine();
       var res = currentResolution();
       var parts = [];
-      if (model.segment) parts.push(model.segment);
-      if (model.environment) parts.push(model.environment);
-      if (model.lighting && model.lighting !== 'Preservar Original') parts.push(model.lighting);
+      if (!isPreserved(model.segment)) parts.push(model.segment);
+      if (!isPreserved(model.environment)) parts.push(model.environment);
+      if (!isPreserved(model.lighting)) parts.push(model.lighting);
       if (eng) parts.push(eng.name + (res ? ' ' + res.label : ''));
       return parts.join(' · ');
     }
@@ -2901,7 +2901,9 @@
       } else {
         scenes.forEach(function (s) { if (['facade', 'exterior', 'detail', 'static'].indexOf(s.id) < 0) cands.push(s); });
       }
-      var texts = [normText(model.environment), normText(model.segment)];
+      var texts = [model.environment, model.segment]
+        .filter(function (v) { return !isPreserved(v); })
+        .map(normText);
       for (var i = 0; i < texts.length; i++) {
         if (!texts[i]) continue;
         for (var j = 0; j < cands.length; j++) {
@@ -3858,16 +3860,25 @@
       var b = el.querySelector('b');
       return (b ? b.textContent : el.textContent).trim();
     }
+    // "Preservar Original" é a primeira opção (e o default) de Segmento,
+    // Espaço, Iluminação e Entorno — quem não escolhe, não impõe. Nos RESUMOS
+    // ele não entra: uma linha que diz "Preservar Original · Preservar
+    // Original" gasta a largura do painel para não informar nada.
+    function isPreserved(v) { return !v || v === 'Preservar Original'; }
     function joinParts(parts) {
       return parts.filter(function (p) { return p && String(p).length; }).join(' · ');
     }
     function updateRows() {
       var eng = currentEngine();
       var res = currentResolution();
-      var bg = model.background && model.background !== 'Preservar Original' ? pLabel(model.background) : '';
+      var bg = isPreserved(model.background) ? '' : pLabel(model.background);
+      // Com tudo preservado a linha ficaria muda; dizer "Preservar original"
+      // é mais honesto, porque essa É a configuração ativa.
       $s('rowSceneValue').textContent = joinParts([
-        model.segment ? pLabel(model.segment) : '', model.environment ? pLabel(model.environment) : '', bg
-      ]);
+        isPreserved(model.segment) ? '' : pLabel(model.segment),
+        isPreserved(model.environment) ? '' : pLabel(model.environment),
+        bg
+      ]) || pLabel('Preservar Original');
       var sunLabel = model.sunPreset && model.sunPreset !== 'atual' ? activePillText('sunPills') : '';
       $s('rowLightValue').textContent = joinParts([
         model.lighting ? pLabel(model.lighting) : '', sunLabel
@@ -3904,9 +3915,9 @@
     function styleSummary(preset) {
       if (!preset) return '';
       return joinParts([
-        preset.segment ? pLabel(preset.segment) : '',
-        preset.environment ? pLabel(preset.environment) : '',
-        preset.lighting ? pLabel(preset.lighting) : ''
+        isPreserved(preset.segment) ? '' : pLabel(preset.segment),
+        isPreserved(preset.environment) ? '' : pLabel(preset.environment),
+        isPreserved(preset.lighting) ? '' : pLabel(preset.lighting)
       ]);
     }
     function currentResultSeed() {
