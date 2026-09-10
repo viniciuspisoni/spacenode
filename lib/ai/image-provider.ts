@@ -49,7 +49,7 @@
 //   única região com o Pro), ARK_SEEDREAM_PRO_MODEL (default
 //   dola-seedream-5-0-pro-260628), SEEDREAM_ARK_FAST=1 (modo rápido de prompt),
 //   SEEDREAM_ARK_HEDGE_MS (default 0 = fallback sequencial; >0 liga a corrida),
-//   IMAGE_ARK_TIMEOUT_MS (teto da ModelArk, default 150 s).
+//   IMAGE_ARK_TIMEOUT_MS (teto da ModelArk, default 180 s).
 //   Corrida ModelArk × FAL: a maioria dos 2K volta em 40–58 s, mas há pedidos
 //   de ~2 min (imagem 2,6:1 com pessoas, pico em Singapura). O hedge nasceu
 //   disso — só que, medido em produção, ele não ganhava: cobrava. Hoje vem
@@ -868,7 +868,12 @@ export async function generateImage(args: GenerateImageArgs): Promise<GenerateIm
   // espera a FAL em voo; os dois falham → sobe o erro traduzível).
   if (arkAvailableFor(args.falEndpoint)) {
     const fallback = imageFallbackEnabled()
-    const arkBudget = Math.min(args.timeoutMs, Number(process.env.IMAGE_ARK_TIMEOUT_MS) || 150_000)
+    // 180 s (era 150): sem hedge não se reserva mais tempo pra uma perna
+    // paralela da FAL, então a ark pode usar quase todo o orçamento. A cauda
+    // medida em prod é 134–145 s — a 150 s os lentos morriam a segundos do fim
+    // e viravam falha + estorno; agora entregam. Não custa nada: é a MESMA
+    // chamada, só esperando mais.
+    const arkBudget = Math.min(args.timeoutMs, Number(process.env.IMAGE_ARK_TIMEOUT_MS) || 180_000)
     const hedgeMs = fallback && ARK_HEDGE_MS > 0 && ARK_HEDGE_MS < arkBudget &&
       args.timeoutMs - ARK_HEDGE_MS >= FAL_FALLBACK_MIN_MS
       ? ARK_HEDGE_MS

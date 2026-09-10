@@ -60,7 +60,12 @@ const devLog = (...args: unknown[]) => {
 // A Vercel mata a função no maxDuration. Precisa cobrir o maior FAL_TIMEOUT_MS
 // abaixo com folga, senão a geração lenta morre antes da nossa race e o usuário
 // recebe um 504 opaco em vez da mensagem tratada (+ refund).
-export const maxDuration = 300
+// 360 s (era 300) desde 2026-09-10: com o hedge da ModelArk desligado, o
+// caminho lento virou SEQUENCIAL (ark até 180 s → FAL com o que sobra), e a
+// soma não cabia em 300. Decisão do dono: esperar mais de 3 min por uma imagem
+// é aceitável; falhar e pagar duas vezes, não. Teto do plano Pro é maior que
+// isto; o custo de função é por CPU ativa, e esperar rede é quase de graça.
+export const maxDuration = 360
 
 // Teto de latência da 1ª tentativa pra valer um retry de fidelidade
 // (RENDER_FIDELITY_RETRY_MAX_ATTEMPT_MS). Acima disso — ou se ela veio do
@@ -72,10 +77,14 @@ const RETRY_ONLY_IF_ATTEMPT_UNDER_MS = Math.max(10_000, Number(process.env.RENDE
 // tamanho da imagem, sobretudo em 4K. Pulsar (Nano Banana 2) é rápido. O cap de 90s
 // era curto demais pro Vega e fazia a geração falhar com "tente uma resolução menor"
 // mesmo com imagem pequena. (O resto do código usa 150s pra esse mesmo endpoint.)
+// Quasar 300 s (era 180): é o orçamento TOTAL do provider na tentativa, e no
+// caminho ModelArk ele é gasto em série — ark até 180 s e, se ela falhar ou
+// estourar, a FAL ainda precisa de ~120 s (medido: 120–138 s neste endpoint)
+// pra salvar o render em vez de devolver erro. Vega e Pulsar seguem iguais.
 const FAL_TIMEOUT_MS: Record<EngineId, number> = {
   vega:   180_000,
   pulsar:  90_000,
-  quasar: 180_000,
+  quasar: 300_000,
 }
 
 // ── Mapping de resolução interna → param da Fal.ai por engine ────────────────
