@@ -86,10 +86,16 @@ export interface CanvasViewportHandle {
   wandAvailable(): boolean
   /** Apaga as regiões desenhadas (laço/polígono/retângulo). */
   clearEditRegions(): void
-  /** Cresce a seleção de edição até o material inteiro. Devolve a fração da
-   *  imagem que a seleção passou a cobrir, ou null quando não há o que crescer
-   *  (sem seleção, ou varinha indisponível). */
-  growEditSelection(): { coverage: number; before: number } | null
+  /** Cresce a seleção de edição até o material inteiro.
+   *
+   *  `maxCoverage` é uma condição, não um limite: se o resultado passar dela, o
+   *  crescimento é DESCARTADO e a seleção fica como estava (`applied: false`).
+   *  Existe para o caminho automático — melhor não crescer do que consertar
+   *  meia cena sem ninguém ter pedido.
+   *
+   *  Devolve null quando não há o que crescer (sem seleção, ou varinha
+   *  indisponível). */
+  growEditSelection(opts?: { maxCoverage?: number }): { coverage: number; before: number; applied: boolean } | null
   baseImage(): HTMLImageElement | null
   webglSupported(): boolean
 }
@@ -1528,7 +1534,7 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
     // O resultado vira uma REGIÃO (raster), porque uma área crescida não cabe
     // nos parâmetros de uma WandShape: ela nasce de traços, varinha e regiões
     // ao mesmo tempo. Depois disso a seleção é uma coisa só.
-    growEditSelection: () => {
+    growEditSelection: (opts) => {
       const index = colorIndexRef.current
       const d = docRef.current
       if (!index || !isGeometryIdentity(d.geometry)) return null
@@ -1553,6 +1559,14 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
         contiguous: propsRef.current.wandContiguous,
         sampleRadius: wandSampleRadius(index, d.width),
       })
+
+      let after = 0
+      for (let i = 0; i < n; i++) if (mask[i] > 127) after++
+      const coverage = after / n
+      const before = marked / n
+      if (opts?.maxCoverage !== undefined && coverage > opts.maxCoverage) {
+        return { coverage, before, applied: false }
+      }
 
       // Grava como região, no tamanho do documento.
       const src = document.createElement('canvas')
@@ -1579,9 +1593,7 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
       propsRef.current.onRegionsChange(true)
       propsRef.current.onSelectionGrown()
       scheduleDraw()
-      let after = 0
-      for (let i = 0; i < n; i++) if (mask[i] > 127) after++
-      return { coverage: after / n, before: marked / n }
+      return { coverage, before, applied: true }
     },
     // (mantido no handle para uso interno/testes; a TELA decide por
     //  `canSample` + geometria, sem ler ref durante o render.)

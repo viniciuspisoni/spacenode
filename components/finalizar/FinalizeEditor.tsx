@@ -76,6 +76,16 @@ const PANEL_TITLE: Record<EditorTool, string> = {
 
 /** Cada ferramenta de seleção explica o próprio gesto na barra de status —
  *  é o único lugar onde ela cabe sem virar mais texto no painel. */
+/** Teto do crescimento AUTOMÁTICO da seleção, em fração da imagem.
+ *
+ *  Medido em scripts/editar-grow-calibrate.mts: uma peça de mobiliário cresce
+ *  para 2–4%, uma superfície grande (piso, parede) para 9–30%. Doze por cento
+ *  cobre a peça e a superfície pequena e deixa de fora "metade da cena" — que é
+ *  o que não pode acontecer sem ninguém ter pedido. Acima disso o crescimento é
+ *  descartado e vale o que foi marcado; o botão manual continua permitindo ir
+ *  além, aí com a pessoa vendo o resultado antes de gastar node. */
+const AUTO_UNIFORM_MAX_COVERAGE = 0.12
+
 const EDIT_HINTS: Record<EditSubTool, string> = {
   wand: 'Clique numa superfície para selecioná-la inteira · Pincel e borracha ajustam',
   brush: 'Pinte a área a alterar — ela fica marcada em vermelho',
@@ -192,6 +202,10 @@ export function FinalizeEditor({
   const [editSubTool, setEditSubTool] = useState<EditSubTool>('wand')
   /** Há laço/polígono/retângulo desenhados? (o raster vive no viewport). */
   const [hasEditRegions, setHasEditRegions] = useState(false)
+  /** Nas ações de superfície, deixar a seleção crescer até a peça antes de
+   *  editar. Ligado por padrão: é a diferença entre um conserto e um remendo,
+   *  e ninguém vai pensar "preciso marcar mais do que o defeito". */
+  const [editUniform, setEditUniform] = useState(true)
   const [wandTolerance, setWandTolerance] = useState(DEFAULT_WAND_OPTIONS.tolerance)
   const [wandContiguous, setWandContiguous] = useState(DEFAULT_WAND_OPTIONS.contiguous)
   const [editAction, setEditAction] = useState<EditV4Action>('swap_material')
@@ -677,6 +691,16 @@ export function FinalizeEditor({
     }
     setEditBusy(true)
     setEditMsg(null)
+    // Cresce a seleção ANTES de gastar node. A pessoa marcou o defeito; o que
+    // precisa ser reescrito é a superfície inteira, senão o conserto não
+    // combina com o resto da peça — e a emenda continua visível, só que agora
+    // entre "consertado" e "original". O teto é uma CONDIÇÃO: se crescer passar
+    // dele, desiste e vale o que foi marcado. Melhor não uniformizar do que
+    // refazer meia cena que ninguém pediu.
+    let uniformizou: { coverage: number; applied: boolean } | null = null
+    if (def.uniformizes && editUniform && hasSelection) {
+      uniformizou = viewportRef.current?.growEditSelection({ maxCoverage: AUTO_UNIFORM_MAX_COVERAGE }) ?? null
+    }
     try {
       // 1. seleção → PNG nas dimensões EXATAS da imagem.
       //    Os traços foram desenhados sobre a imagem JÁ CORRIGIDA pela
@@ -759,7 +783,10 @@ export function FinalizeEditor({
       setEditStrokes([])
       setEditWand(null)
       viewportRef.current?.clearEditRegions()
-      setEditMsg({ kind: 'info', text: j?.warning ?? 'Pronto — seus ajustes continuam por cima. Use Desfazer para voltar.' })
+      const nota = uniformizou?.applied
+        ? `Tratei a peça inteira (${Math.round(uniformizou.coverage * 1000) / 10}% da imagem) para não ficar remendo. `
+        : ''
+      setEditMsg({ kind: 'info', text: nota + (j?.warning ?? 'Pronto — seus ajustes continuam por cima. Use Desfazer para voltar.') })
     } catch (e) {
       setEditMsg({ kind: 'error', text: e instanceof Error ? e.message : 'Falha ao aplicar a edição.' })
     } finally {
@@ -767,7 +794,7 @@ export function FinalizeEditor({
     }
   }, [
     editAction, editBusy, editEdge, editInstruction, editIntensity, editPreservation,
-    editReferenceUrl, editStrokes, editWand, hasEditRegions, patch,
+    editReferenceUrl, editStrokes, editUniform, editWand, hasEditRegions, patch,
   ])
 
   /** Envia a imagem de referência (material ou objeto) da ação atual. */
@@ -1306,6 +1333,8 @@ export function FinalizeEditor({
                     setEditWand((w) => (w ? { ...w, contiguous: v } : w))
                   }}
                   wandAvailable={canSample && isGeometryIdentity(doc.geometry)}
+                  uniform={editUniform}
+                  onUniform={setEditUniform}
                   canGrow={canSample && isGeometryIdentity(doc.geometry)}
                   onGrow={() => {
                     const r = viewportRef.current?.growEditSelection() ?? null

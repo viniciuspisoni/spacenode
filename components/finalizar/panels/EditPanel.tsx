@@ -26,6 +26,11 @@ export interface EditActionDef {
    *  uma edição paga em 10/09. Dica de hover não resolveria: quem não sabe que
    *  há diferença não passa o mouse para descobrir. */
   note: string
+  /** A ação trata uma SUPERFÍCIE (material, textura, acabamento) e não um
+   *  objeto. Nessas, consertar ou trocar só um retalho sempre produz um
+   *  remendo visível — então a seleção cresce sozinha até a peça inteira.
+   *  Em remover/inserir/substituir seria errado: ali a marcação É o alvo. */
+  uniformizes: boolean
   placeholder: string
   ref: 'material' | 'object' | null
   refLabel: string
@@ -33,11 +38,11 @@ export interface EditActionDef {
 }
 
 export const EDIT_ACTIONS: EditActionDef[] = [
-  { id: 'swap_material', short: 'Material', note: 'troca o acabamento', placeholder: 'Ex.: trocar o piso por porcelanato amadeirado', ref: 'material', refLabel: 'Material de referência', requiresSelection: false },
-  { id: 'remove', short: 'Remover', note: 'tira o objeto, refaz o fundo', placeholder: 'Ex.: retirar o tapete da sala', ref: null, refLabel: '', requiresSelection: false },
-  { id: 'insert_element', short: 'Inserir', note: 'acrescenta algo novo', placeholder: 'Ex.: inserir um vaso com planta no canto', ref: 'object', refLabel: 'Objeto de referência', requiresSelection: true },
-  { id: 'replace_object', short: 'Substituir', note: 'um objeto por outro', placeholder: 'Ex.: trocar este sofá por um de couro caramelo', ref: 'object', refLabel: 'Objeto de referência', requiresSelection: true },
-  { id: 'refine_area', short: 'Refinar', note: 'conserta textura ou emenda', placeholder: 'Ex.: alisar a costura do estofado', ref: null, refLabel: '', requiresSelection: false },
+  { id: 'swap_material', short: 'Material', note: 'troca o acabamento', uniformizes: true, placeholder: 'Ex.: trocar o piso por porcelanato amadeirado', ref: 'material', refLabel: 'Material de referência', requiresSelection: false },
+  { id: 'remove', short: 'Remover', note: 'tira o objeto, refaz o fundo', uniformizes: false, placeholder: 'Ex.: retirar o tapete da sala', ref: null, refLabel: '', requiresSelection: false },
+  { id: 'insert_element', short: 'Inserir', note: 'acrescenta algo novo', uniformizes: false, placeholder: 'Ex.: inserir um vaso com planta no canto', ref: 'object', refLabel: 'Objeto de referência', requiresSelection: true },
+  { id: 'replace_object', short: 'Substituir', note: 'um objeto por outro', uniformizes: false, placeholder: 'Ex.: trocar este sofá por um de couro caramelo', ref: 'object', refLabel: 'Objeto de referência', requiresSelection: true },
+  { id: 'refine_area', short: 'Refinar', note: 'conserta textura ou emenda', uniformizes: true, placeholder: 'Ex.: alisar a costura do estofado', ref: null, refLabel: '', requiresSelection: false },
 ]
 
 export interface EditPanelProps {
@@ -62,6 +67,9 @@ export interface EditPanelProps {
    *  identidade — as mesmas condições da varinha). */
   canGrow: boolean
   onGrow: () => void
+  /** Deixar a seleção crescer sozinha até a peça, nas ações de superfície. */
+  uniform: boolean
+  onUniform: (v: boolean) => void
 
   referenceUrl: string | null
   onPickReference: () => void
@@ -175,11 +183,33 @@ export function EditPanel(props: EditPanelProps) {
           )}
         </div>
 
-        <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+        {def.uniformizes && props.canGrow && (
+          <label
+            style={{
+              display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 10, cursor: 'pointer',
+            }}
+            title="Marque só o defeito. Antes de editar, a seleção cresce sozinha até a superfície inteira — é o que impede o conserto de virar um remendo com emenda visível."
+          >
+            <input
+              type="checkbox"
+              checked={props.uniform}
+              onChange={(e) => props.onUniform(e.target.checked)}
+              style={{ marginTop: 1, accentColor: 'var(--color-chip-active)' }}
+            />
+            <span style={{ fontSize: 11.5, color: 'var(--color-text-tertiary)', lineHeight: 1.45 }}>
+              Tratar a peça inteira
+              <span style={{ display: 'block', color: 'var(--color-text-quaternary)', fontSize: 11 }}>
+                marque só o defeito — a área cresce sozinha até a superfície
+              </span>
+            </span>
+          </label>
+        )}
+
+        <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
           <Chip
             onClick={props.onGrow}
             disabled={!props.hasSelection || !props.canGrow}
-            title="Cresce o que você marcou até a superfície inteira — a IA conserta a peça toda de uma vez, em vez de deixar um remendo"
+            title="Cresce o que você marcou até a superfície inteira, agora — o mesmo que a edição faz sozinha, para você conferir antes"
           >
             Expandir p/ o material
           </Chip>
