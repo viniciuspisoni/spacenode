@@ -158,14 +158,15 @@ export function EditPanel(props: EditPanelProps) {
         <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
           {(props.subTool === 'brush' || props.subTool === 'eraser') && (
             <SliderRow
-              label="Tamanho do pincel" value={props.brushSize} min={8} max={240} defaultValue={64}
+              label="Espessura" value={props.brushSize} min={8} max={240} defaultValue={64}
+              title="Diâmetro do pincel e da borracha, em pixels de tela"
               format={v => `${v}`} onChange={props.onBrushSize}
             />
           )}
           {props.wandAvailable && (
             <>
               <SliderRow
-                label="Tolerância de cor" value={props.tolerance} min={0} max={100} defaultValue={11}
+                label="Tolerância" value={props.tolerance} min={0} max={100} defaultValue={11}
                 format={v => `${v}`}
                 title="Vale para a varinha e para o Expandir. Baixa mira o material exato; alta abraça variações de cor"
                 onChange={props.onTolerance}
