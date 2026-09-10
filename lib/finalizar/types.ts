@@ -42,6 +42,13 @@ export interface Adjustments {
   clarity: number
   sharpen: number
   noiseReduction: number
+  /** Tirar neblina. Positivo dissolve o véu atmosférico; negativo devolve
+   *  atmosfera. Em archviz vale quase sempre pela vista da janela: o fundo
+   *  urbano ou a serra saem do render leitosos. */
+  dehaze: number
+  /** Glow nas janelas: sangra luz das áreas estouradas para o entorno. É o
+   *  que separa "render com janela branca" de "interior com luz entrando". */
+  glow: number
 }
 
 /** Subconjunto aplicável dentro de uma máscara local. 0 = identidade. */

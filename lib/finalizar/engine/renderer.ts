@@ -414,7 +414,12 @@ export class FinalizeRenderer {
 
     // ── 5. Detalhe: blur fino (full) + grosso (¼) ───────────────────────────
     const anyLocalDetail = locals.some((l, i) => localData[i].mode !== 0 && (l.values.sharpness !== 0 || l.values.clarity !== 0))
-    const detailActive = doc.adjust.sharpen > 0 || doc.adjust.noiseReduction > 0 || doc.adjust.clarity !== 0 || anyLocalDetail
+    // Neblina e glow leem o blur GROSSO, que só é calculado neste passo —
+    // por isso entram na condição, senão o efeito sai mudo com todo o resto
+    // do Detalhe zerado.
+    const detailActive = doc.adjust.sharpen > 0 || doc.adjust.noiseReduction > 0
+      || doc.adjust.clarity !== 0 || doc.adjust.dehaze !== 0 || doc.adjust.glow > 0
+      || anyLocalDetail
     let fineTex = this.dummyTex!
     let coarseTex = this.dummyTex!
     if (detailActive) {
@@ -453,6 +458,11 @@ export class FinalizeRenderer {
         doc.adjust.noiseReduction / 100,
         doc.adjust.clarity / 100,
         detailActive ? 1 : 0,
+      )
+      gl.uniform2f(
+        this.u(p, 'uExtra'),
+        doc.adjust.dehaze / 100,
+        doc.adjust.glow / 100,
       )
       const v = doc.vignette
       gl.uniform4f(

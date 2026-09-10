@@ -400,6 +400,7 @@ uniform sampler2D uScene;   // cena original (p/ máscara de luminosidade)
 uniform sampler2D uFine;    // blur fino
 uniform sampler2D uCoarse;  // blur grosso (1/4 res, upsample bilinear)
 uniform vec4 uDetail;       // sharpen 0..1, nr 0..1, clarity -1..1, detailActive
+uniform vec2 uExtra;        // dehaze -1..1, glow 0..1
 uniform vec4 uVignette;     // amount -1..1, size 0..1, feather 0..1, active
 uniform float uTreatment;   // 0..1 — intensidade global (mistura com a cena)
 
@@ -446,6 +447,34 @@ ${Array.from({ length: N }, (_, i) => `    {
     if (abs(clarityAmt) > 0.001) {
       float lc = luma(c) - luma(coarse);
       c += lc * clarityAmt * 0.55;
+    }
+
+    // Tirar neblina. O véu atmosférico tem uma assinatura: é CLARO e CHAPADO —
+    // luminância alta com croma baixo. Ponderar por essa assinatura é o que faz
+    // o efeito morder o fundo enevoado da janela e deixar quieta a parede
+    // branca iluminada do primeiro plano, que também é clara mas não é véu.
+    // Três movimentos, os mesmos que o olho faz para "furar" a bruma:
+    // contraste local de volta, ponto preto para baixo, croma recuperado.
+    float dz = uExtra.x;
+    if (abs(dz) > 0.001) {
+      float lc = luma(c);
+      float mx = max(max(c.r, c.g), c.b);
+      float mn = min(min(c.r, c.g), c.b);
+      float veu = smoothstep(0.32, 0.88, lc) * (1.0 - smoothstep(0.03, 0.26, mx - mn));
+      c += (c - coarse) * dz * 0.85 * veu;
+      c -= dz * 0.055 * veu;
+      c = mix(vec3(lc), c, 1.0 + dz * 0.45 * veu);
+    }
+
+    // Glow: sangra luz das áreas estouradas para o entorno, usando o blur
+    // grosso como fonte. O limiar é fixo e alto de propósito — em archviz o
+    // que estoura é a janela, e um limiar baixo transformaria a parede clara
+    // em névoa. Sem isto a janela fica um retângulo branco recortado; com
+    // isto ela ilumina o batente, que é o que a câmera faz.
+    float gw = uExtra.y;
+    if (gw > 0.001) {
+      float w = smoothstep(0.70, 0.95, luma(coarse));
+      c += coarse * w * gw * 0.55;
     }
   }
 

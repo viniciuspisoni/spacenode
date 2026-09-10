@@ -201,7 +201,7 @@ export function adjustmentsSummary(doc: FinalizeDoc): string {
     exposure: 'exposição', contrast: 'contraste', highlights: 'realces', shadows: 'sombras',
     whites: 'brancos', blacks: 'pretos', temperature: 'temperatura', tint: 'matiz',
     saturation: 'saturação', vibrance: 'vibração', clarity: 'clareza', sharpen: 'nitidez',
-    noiseReduction: 'ruído',
+    noiseReduction: 'ruído', dehaze: 'neblina', glow: 'glow',
   }
   for (const [k, v] of Object.entries(a)) {
     if (v !== 0) parts.push(`${label[k] ?? k} ${v > 0 ? '+' : ''}${v}`)

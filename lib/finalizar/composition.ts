@@ -42,6 +42,7 @@ export function defaultAdjustments(): Adjustments {
     exposure: 0, contrast: 0, highlights: 0, shadows: 0, whites: 0, blacks: 0,
     temperature: 0, tint: 0, saturation: 0, vibrance: 0,
     clarity: 0, sharpen: 0, noiseReduction: 0,
+    dehaze: 0, glow: 0,
   }
 }
 
@@ -186,6 +187,8 @@ function sanitizeAdjustments(raw: unknown): Adjustments {
     clarity: num(a.clarity, 0, -100, 100),
     sharpen: num(a.sharpen, 0, 0, 100),
     noiseReduction: num(a.noiseReduction, 0, 0, 100),
+    dehaze: num(a.dehaze, 0, -100, 100),
+    glow: num(a.glow, 0, 0, 100),
   }
 }
 
