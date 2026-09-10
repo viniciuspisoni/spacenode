@@ -31,7 +31,7 @@ import { FinalizeRenderer } from '@/lib/finalizar/engine/renderer'
 import { computeHistogram, type Histogram } from '@/lib/finalizar/engine/color-math'
 import {
   contractSelection, expandSelection, fillSelectionHoles,
-  removeSmallIslands, smoothSelection,
+  removeSmallIslands, rleDecode, rleEncode, smoothSelection,
 } from '@/lib/selection/mask-raster'
 import { computeSkyMask, MASK_SCALE, selectionMaskPngCanvas, type LiveStroke } from '@/lib/finalizar/engine/masks'
 
@@ -40,6 +40,9 @@ const MAX_ZOOM = 8
 const WORK_LONG_SIDE = 2304
 /** Distância, em px de tela, para o clique fechar o polígono no ponto inicial. */
 const POLY_CLOSE_PX = 14
+
+/** Teto de passos de undo da seleção. Em RLE cada um custa alguns KB. */
+const SELECTION_HISTORY_LIMIT = 24
 
 /** Raio (px da imagem) da média que lê a cor do ponto clicado. Um pixel só
  *  deixa um respingo de ruído definir a seleção inteira. */
@@ -105,6 +108,10 @@ export interface CanvasViewportHandle {
    *  Devolve null quando não há o que crescer (sem seleção, ou varinha
    *  indisponível). */
   growEditSelection(opts?: { maxCoverage?: number }): { coverage: number; before: number; applied: boolean } | null
+  /** Desfaz/refaz o ÚLTIMO gesto de seleção. Devolve false quando não há o
+   *  que desfazer — é o sinal para o Ctrl+Z cair no histórico do documento. */
+  undoSelection(): boolean
+  redoSelection(): boolean
   /** Ajusta a seleção no lugar (morfologia). Devolve a cobertura resultante, ou
    *  null quando não há seleção. `px` só vale para expandir/contrair/suavizar. */
   refineSelection(op: SelectionOp, px?: number): { coverage: number; before: number; applied: boolean } | null
@@ -148,6 +155,9 @@ interface Props {
    *  o pai solta a forma, que agora vive dentro das regiões. NÃO mexe nos
    *  traços — pincel e borracha continuam valendo por cima. */
   onWandAbsorbed: () => void
+  /** Quantos passos de seleção dá para desfazer/refazer agora — o topo usa
+   *  para acender a seta, e o Ctrl+Z para saber a quem obedecer. */
+  onSelectionHistory: (canUndo: boolean, canRedo: boolean) => void
   /** A seleção foi crescida e virou uma região única: traços e varinha já
    *  estão dentro dela e devem ser zerados no pai, sob pena de contarem duas
    *  vezes (e de o Desmarcar deixar sobras). */
@@ -264,6 +274,21 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
    *  acumuladas em branco na resolução do documento. Vivem aqui e não no
    *  documento porque a seleção é transitória: some quando a edição roda. */
   const editRegionsRef = useRef<HTMLCanvasElement | null>(null)
+  /**
+   * Undo da SELEÇÃO, em RLE.
+   *
+   * Existia no V4 e morreu na fusão junto com o raster — e some justamente na
+   * hora em que faz falta: um clique de varinha que abraça meia cena não tinha
+   * volta, só "Desmarcar e começar de novo". As funções de RLE nunca saíram do
+   * repositório (`lib/selection/mask-raster`), ficaram órfãs com teste
+   * passando, como o resto do que a fusão desligou.
+   *
+   * RLE porque uma máscara de 2 MP crua custa 2 MB por passo; comprimida, uma
+   * seleção típica cabe em alguns KB — 24 passos ficam na casa das centenas de
+   * KB, não das dezenas de MB.
+   */
+  const selUndoRef = useRef<Int32Array[]>([])
+  const selRedoRef = useRef<Int32Array[]>([])
   /** As regiões contêm APENAS varinha somada? Se sim, um clique simples de
    *  varinha pode zerá-las (é o "substituir seleção" de qualquer editor). Se
    *  um laço ou polígono entrou ali, não: seria apagar trabalho à mão. */
@@ -1209,6 +1234,7 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
                 sampleRadius: wandSampleRadius(index, docRef.current.width),
               },
             )
+            pushSelectionUndo()
             if (e.shiftKey || alt) {
               bakeWandShape()
               mergeWandMask(index, mask, alt)
@@ -1232,6 +1258,9 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
           }
           return
         }
+        // Pincel e borracha também são gesto de seleção: cada traço vira um
+        // passo de undo, senão Ctrl+Z pularia direto por cima de todos eles.
+        pushSelectionUndo()
         startStroke(e, { kind: 'edit' })
         return
       }
@@ -1471,6 +1500,7 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
     const c = editRegions()
     const d = docRef.current
     if (!c || points.length < 3) return
+    pushSelectionUndo()
     const ctx = c.getContext('2d')
     if (!ctx) return
     ctx.save()
@@ -1614,6 +1644,7 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
   ): { coverage: number; before: number; applied: boolean } | null {
     const composed = composeSelectionMask()
     if (!composed || composed.marked === 0) return null
+    pushSelectionUndo()
     const { index, mask, marked } = composed
     const n = index.width * index.height
     const out = fn(mask, index)
@@ -1637,6 +1668,31 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
     setPolyCount(0)
     scheduleDraw()
   }, [editSubTool, scheduleDraw])
+
+  /** Empilha a seleção ATUAL. Chamar ANTES de qualquer coisa que a mude. */
+  function pushSelectionUndo() {
+    const composed = composeSelectionMask()
+    // Sem índice de cor (imagem sem CORS) não há como compor — a seleção segue
+    // funcionando, só não ganha undo próprio.
+    if (!composed) return
+    selUndoRef.current.push(rleEncode(composed.mask))
+    if (selUndoRef.current.length > SELECTION_HISTORY_LIMIT) selUndoRef.current.shift()
+    selRedoRef.current = []
+    propsRef.current.onSelectionHistory(true, false)
+  }
+
+  /** Devolve a máscara guardada para a tela, como região única. */
+  function restoreSelection(rle: Int32Array): boolean {
+    const index = colorIndexRef.current
+    if (!index) return false
+    const n = index.width * index.height
+    const ok = writeSelection(index, rleDecode(rle, n), n, 0)
+    propsRef.current.onSelectionHistory(
+      selUndoRef.current.length > 0,
+      selRedoRef.current.length > 0,
+    )
+    return ok !== null
+  }
 
   // ── API imperativa ───────────────────────────────────────────────────────
 
@@ -1700,6 +1756,11 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
       return editSelectionBase(d.width, d.height)
     },
     clearEditRegions: () => {
+      // Desmarcar TAMBÉM é um gesto: sem empilhar, quem limpa sem querer não
+      // tem volta — que é exatamente a reclamação que trouxe este undo.
+      if (editRegionsRef.current || propsRef.current.editWand || propsRef.current.editStrokes.length > 0) {
+        pushSelectionUndo()
+      }
       editRegionsRef.current = null
       editPolyRef.current = null
       wandOnlyRegionsRef.current = true
@@ -1716,6 +1777,20 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
     // O resultado vira uma REGIÃO (raster), porque uma área crescida não cabe
     // nos parâmetros de uma WandShape: ela nasce de traços, varinha e regiões
     // ao mesmo tempo. Depois disso a seleção é uma coisa só.
+    undoSelection: () => {
+      const anterior = selUndoRef.current.pop()
+      if (!anterior) return false
+      const atual = composeSelectionMask()
+      if (atual) selRedoRef.current.push(rleEncode(atual.mask))
+      return restoreSelection(anterior)
+    },
+    redoSelection: () => {
+      const proximo = selRedoRef.current.pop()
+      if (!proximo) return false
+      const atual = composeSelectionMask()
+      if (atual) selUndoRef.current.push(rleEncode(atual.mask))
+      return restoreSelection(proximo)
+    },
     growEditSelection: (opts) => transformSelection((mask, index) => {
       const { mask: grown } = growSelectionAuto(index, mask, {
         tolerance: propsRef.current.wandTolerance,
@@ -1743,6 +1818,9 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
         if (!index || !isGeometryIdentity(d.geometry)) return null
         const n = index.width * index.height
         const all = new Uint8Array(n).fill(255)
+        // Selecionar tudo não passa pelo transformSelection (não depende de haver
+        // seleção antes), então empilha aqui — senão seria o único gesto sem volta.
+        pushSelectionUndo()
         return writeSelection(index, all, n, 0)
       }
       return transformSelection((mask, index) => {
@@ -1777,6 +1855,7 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
       const regions = editRegions()
       const rctx = regions?.getContext('2d')
       if (!regions || !rctx) return false
+      pushSelectionUndo()
       const img = await new Promise<HTMLImageElement | null>((resolve) => {
         const im = new Image()
         im.crossOrigin = 'anonymous'

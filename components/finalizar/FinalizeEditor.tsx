@@ -160,6 +160,10 @@ export function FinalizeEditor({
 
   // ── UI ─────────────────────────────────────────────────────────────────────
   const [tool, setTool] = useState<EditorTool>('edit')
+  // O undo é chamado de dentro de callbacks estáveis; ler a aba por ref evita
+  // recriar o callback (e a fiação do topo) a cada troca de painel.
+  const toolRef = useRef<EditorTool>('edit')
+  useEffect(() => { toolRef.current = tool }, [tool])
   const [panelsOpen, setPanelsOpen] = useState(true)
   const [leaving, setLeaving] = useState(false)
   // A largura do painel vive em DUAS camadas de propósito. Em repouso é
@@ -227,6 +231,9 @@ export function FinalizeEditor({
    *  e ninguém vai pensar "preciso marcar mais do que o defeito". */
   const [editUniform, setEditUniform] = useState(true)
   const [snapBusy, setSnapBusy] = useState(false)
+  /** Histórico da SELEÇÃO (vive no viewport; aqui só o que a tela precisa
+   *  saber para acender a seta e para o Ctrl+Z decidir a quem obedecer). */
+  const [selHistory, setSelHistory] = useState({ canUndo: false, canRedo: false })
   const [wandTolerance, setWandTolerance] = useState(DEFAULT_WAND_OPTIONS.tolerance)
   const [wandContiguous, setWandContiguous] = useState(DEFAULT_WAND_OPTIONS.contiguous)
   const [editAction, setEditAction] = useState<EditV4Action>('swap_material')
@@ -275,8 +282,20 @@ export function FinalizeEditor({
     setActiveElementId((id) => (id && d.elements.some((e) => e.id === id) ? id : null))
   }, [markDirty, syncHistoryUi])
 
-  const undo = useCallback(() => applyHistoryDoc(historyRef.current.undo()), [applyHistoryDoc])
-  const redo = useCallback(() => applyHistoryDoc(historyRef.current.redo()), [applyHistoryDoc])
+  const undoDoc = useCallback(() => applyHistoryDoc(historyRef.current.undo()), [applyHistoryDoc])
+  const redoDoc = useCallback(() => applyHistoryDoc(historyRef.current.redo()), [applyHistoryDoc])
+
+  // A seta do topo e o Ctrl+Z têm que fazer a MESMA coisa. Antes a seta ia
+  // direto ao histórico do documento, então ela ficava apagada com uma seleção
+  // acabada de fazer na tela — que foi a reclamação.
+  const undo = useCallback(() => {
+    if (toolRef.current === 'edit' && viewportRef.current?.undoSelection()) return
+    undoDoc()
+  }, [undoDoc])
+  const redo = useCallback(() => {
+    if (toolRef.current === 'edit' && viewportRef.current?.redoSelection()) return
+    redoDoc()
+  }, [redoDoc])
 
   // ── nova base ──────────────────────────────────────────────────────────────
   const loadDims = (url: string) => new Promise<{ w: number; h: number }>((resolve, reject) => {
@@ -1140,10 +1159,19 @@ export function FinalizeEditor({
 
       if (mod && e.key.toLowerCase() === 'z') {
         e.preventDefault()
-        if (e.shiftKey) redo(); else undo()
+        // Na aba Editar, o Ctrl+Z desfaz primeiro o GESTO DE SELEÇÃO. É o que
+        // a pessoa acabou de fazer e o que ela quer de volta — o histórico do
+        // documento (ajustes, camadas, geometria) só entra quando não há mais
+        // gesto de seleção para desfazer. Se a seleção não estivesse aqui,
+        // Ctrl+Z depois de uma varinha que abraçou meia cena não faria nada.
+        if (e.shiftKey) {
+          if (!(tool === 'edit' && viewportRef.current?.redoSelection())) redo()
+        } else if (!(tool === 'edit' && viewportRef.current?.undoSelection())) {
+          undo()
+        }
       } else if (mod && e.key.toLowerCase() === 'y') {
         e.preventDefault()
-        redo()
+        if (!(tool === 'edit' && viewportRef.current?.redoSelection())) redo()
       } else if (mod && e.key.toLowerCase() === 's') {
         e.preventDefault()
         void saveRef.current({})
@@ -1313,8 +1341,8 @@ export function FinalizeEditor({
         onName={(n) => { setName(n); markDirty() }}
         onBack={goBack}
         status={saveStatus}
-        canUndo={historyUi.canUndo}
-        canRedo={historyUi.canRedo}
+        canUndo={historyUi.canUndo || (tool === 'edit' && selHistory.canUndo)}
+        canRedo={historyUi.canRedo || (tool === 'edit' && selHistory.canRedo)}
         onUndo={undo}
         onRedo={redo}
         compare={compare}
@@ -1364,6 +1392,7 @@ export function FinalizeEditor({
           onRegionsChange={setHasEditRegions}
           onWandAbsorbed={() => setEditWand(null)}
           onSelectionGrown={() => { setEditStrokes([]); setEditWand(null) }}
+          onSelectionHistory={(canUndo, canRedo) => setSelHistory({ canUndo, canRedo })}
           wandTolerance={wandTolerance}
           wandContiguous={wandContiguous}
           onWandPick={(shape) => {
