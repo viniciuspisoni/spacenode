@@ -1,0 +1,9 @@
+O comparador antes/depois vem no painel.
+
+Depois do render, um botão abre o slider sobre a própria vista: modelo de um lado, render do outro, sem exportar nada e sem sair do SketchUp.
+
+Plugin oficial da SpaceNode para SketchUp — grátis, usa os Nodes da conta.
+
+Veja no seu próprio projeto — link na bio.
+
+#sketchup #plugin #render #archviz #visualizacaoarquitetonica

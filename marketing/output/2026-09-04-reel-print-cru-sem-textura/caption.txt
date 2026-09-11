@@ -1,0 +1,49 @@
+O modelo pode subir cru. Material, luz e contexto entram na intenção, não no arquivo.
+
+O quarto acima é um print do SketchUp: paredes brancas, luz chapada, só a madeira padrão do modelo. O render sai com a mesma câmera, a mesma cama e o mesmo armário — o que muda é material, luz e acabamento.
+
+Na plataforma, a intenção é uma escolha, não um prompt: motor, resolução, atmosfera e materialidade. Escolhas de arquiteto. É por isso que o print do SketchUp não precisa estar preparado para render.
+
+Gerado em minutos, com a geometria preservada. O cadastro é grátis e vem com 80 nodes, sem cartão — dá para testar com um print seu.
+
+Comece grátis — link na bio.
+
+#sketchup #archviz #renderizacao #visualizacaoarquitetonica #projetodearquitetura
+
+---------------------------------------------------------------
+QUAL ARQUIVO SERVE A QUAL USO
+---------------------------------------------------------------
+Existe UM único mp4 e ele atende os três usos — não há corte alternativo nem pasta `-ad`.
+
+C:\Users\Pisoni\spacenode\marketing\output\2026-09-04-reel-print-cru-sem-textura\2026-09-04-reel-print-cru-sem-textura.mp4
+  · FEED (Reel orgânico) — 9,00 s, 1080×1920, som off. Legenda = o bloco no topo deste arquivo
+    (gancho + 4 parágrafos + CTA "Comece grátis — link na bio" + 5 hashtags).
+  · STORIES — mesmo arquivo, mesmo enquadramento. Todo o texto vive entre y=220 e y=1600, então
+    nada colide com a barra de perfil (topo) nem com o "Enviar mensagem" (base). Sem sticker por
+    cima do card final; se for usar link sticker, posicionar entre y=1600 e y=1750.
+  · ANÚNCIO (Meta, botão SIGN_UP) — mesmo arquivo. Cabe no ≤15 s, é mudo por construção e traz
+    hook, apoio e CTA embutidos na arte. As copies pagas estão no bloco abaixo.
+
+---------------------------------------------------------------
+VERSÃO PAGA (Meta · mesmo mp4 de 9 s · som off · botão SIGN_UP "Cadastre-se")
+---------------------------------------------------------------
+
+A · fidelidade
+Texto primário: Suba o print cru. O render sai com a mesma câmera e a mesma geometria.
+                Material e luz entram na intenção. 80 nodes grátis, sem cartão.
+Título: Mesma câmera. Mesma geometria.
+Descrição: 80 nodes grátis, sem cartão
+Botão: SIGN_UP
+
+B · prazo
+Texto primário: Não precisa preparar o modelo. Suba o print cru, o render sai em minutos com a geometria no lugar.
+                Cadastro grátis, sem cartão.
+Título: Do print cru ao render, em minutos
+Descrição: Cadastro grátis, sem cartão
+Botão: SIGN_UP
+
+C · apresentação
+Texto primário: O cliente não vê paredes brancas. Vê o quarto com material, luz e acabamento — no mesmo modelo que você já tem.
+Título: Apresente o modelo que você já tem
+Descrição: 80 nodes grátis, sem cartão
+Botão: SIGN_UP

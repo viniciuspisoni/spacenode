@@ -1,0 +1,79 @@
+{
+ "slug": "spaces-quarto-bear-quatro-cameras",
+ "title": "Quarto Bear: quatro câmeras, a mesma madeira",
+ "pillar": "coerencia-entre-angulos",
+ "angle": "Interior residencial em escala íntima: o mesmo quarto de sótão (Space Quarto Bear, 27/05) em quatro câmeras — ampla, lado da cama, cabeceira, canto de leitura. A prova de coerência é objeto a objeto: ripado de madeira, edredom de linho, luminária esfera, urso de pelúcia, cordão de luzes na escada, gato no tapete. Resolução 6656×2560 em três das vistas permite recorte 9:16 full-bleed nítido.",
+ "format": "tres_angulos",
+ "duration_s": 12,
+ "hook_text": "Quatro câmeras. A mesma madeira.",
+ "hook_visual": "Full-bleed 9:16. Recorte 1440×2560 do original 6656×2560 centrado na cama + janelão: entra o print do SketchUp #715 (cama branca, urso no chão, poltrona, escada, lousa 'I DON'T CARE', teto e paredes chapados) recortado na mesma janela, e uma régua vertical linear (2,0s) revela #714: ripado de madeira no teto inclinado, esquadria de madeira do janelão com árvores de outono e prédios, edredom de linho, gato no tapete cinza, luminária esfera acesa, cordão de luzes na escada. Hook no terço superior (abaixo dos 220px) sobre scrim leve.",
+ "scenes": [
+  {
+   "t": "0.0–2.8",
+   "visual": "Full-bleed: print #715 → régua vertical → vista #714 (mesma câmera ampla do quarto: cama à esquerda, janelão em duas águas ao centro, poltrona e escada de luzes à direita). Print entra apenas 0,8s antes da régua começar.",
+   "text_on_screen": "Quatro câmeras. A mesma madeira.",
+   "asset_idx": [
+    715,
+    714
+   ]
+  },
+  {
+   "t": "2.8–5.0",
+   "visual": "#705 recorte 720×1280 do original 3328×1280 centrado na cama: edredom branco amassado, gato deitado no tapete cinza, criado de madeira com luminária esfera e urso na borda esquerda, janela com prédios e árvores de outono à direita. Push-in de 3%.",
+   "text_on_screen": "eyebrow: CÂMERA 02",
+   "asset_idx": [
+    705
+   ]
+  },
+  {
+   "t": "5.0–7.2",
+   "visual": "#716 recorte 1440×2560 no terço esquerdo do original 6656×2560: luminária esfera acesa em haste dourada, urso de pelúcia sentado no piso de tábuas, quadros encostados no criado de madeira, edredom de linho caindo da cama. Push-in de 3%.",
+   "text_on_screen": "eyebrow: CÂMERA 03 · apoio: A Vista Mestre define. As outras seguem.",
+   "asset_idx": [
+    716
+   ]
+  },
+  {
+   "t": "7.2–9.8",
+   "visual": "#718 recorte 1440×2560 com pan lento da esquerda para a direita: começa na poltrona de madeira com almofada cinza e almofada amarela e mesa lateral com pilha de livros (janela com parque ao fundo) e termina na escada com cordão de luzes aceso e no nicho hexagonal com o quadro do urso.",
+   "text_on_screen": "eyebrow: CÂMERA 04",
+   "asset_idx": [
+    718
+   ]
+  },
+  {
+   "t": "9.8–12.0",
+   "visual": "#714 (mesmo recorte do hook) escurecido com scrim. Card final: wordmark SPACENODE monocromático + CTA com sublinhado verde funcional.",
+   "text_on_screen": "Veja no seu próprio projeto",
+   "asset_idx": [
+    714
+   ]
+  }
+ ],
+ "assets": [
+  715,
+  714,
+  705,
+  716,
+  718
+ ],
+ "cta": "Veja no seu próprio projeto",
+ "caption": "Mesmo quarto, quatro câmeras. A madeira do teto, a luminária e o urso continuam onde o modelo colocou.\n\nCada câmera entrou como um print do SketchUp. A Vista Mestre, a primeira imagem do projeto, define materiais, luz e atmosfera. Cada vista nova segue essa referência.\n\nPara apresentar um ambiente, uma imagem só não fecha a leitura: o cliente precisa ver o quarto inteiro, a cabeceira e o canto de leitura como o mesmo lugar.\n\nGeradas em minutos, a partir do seu modelo.\n\nVeja no seu próprio projeto — link na bio.\n\n#designdeinteriores #archviz #sketchup #visualizacaoarquitetonica",
+ "hashtags": [
+  "#designdeinteriores",
+  "#archviz",
+  "#sketchup",
+  "#visualizacaoarquitetonica"
+ ],
+ "paid": {
+  "primary": "Quatro câmeras do mesmo quarto, cada uma a partir do seu print. Madeira, luz e objetos no mesmo lugar em todas.",
+  "headline": "Mesmo quarto, quatro vistas",
+  "description": "Do print à apresentação",
+  "button": "SIGN_UP",
+  "cutdown_note": "Já nasce em 12s (≤15s). Para anúncio: manter os 12s, subir o card CTA para 9,4s (2,6s de leitura) e reforçar o scrim atrás do texto para o feed claro; legenda embutida = texto primário. Versão 6s para bumper: hook (0–2,8s) + #716 (2,0s) + CTA (1,2s)."
+ },
+ "why_converts": "O hook é o mais 'antes/depois' dos quatro (print chapado → quarto pronto em vertical full-bleed), mas o que segura até o fim é a curiosidade de conferir os objetos: urso, luminária, gato e cordão de luzes reaparecem câmera a câmera — o espectador faz a checagem sozinho e isso vale mais do que qualquer adjetivo. Público de interiores/reforma, o mais numeroso entre arquitetos no Instagram. Funil: 'Veja no seu próprio projeto' leva ao cadastro grátis sem cartão; quem sobe um print e recebe a primeira vista tende a testar o segundo ângulo na sequência, e é nesse segundo ângulo que o Spaces mostra o valor que justifica o plano mensal (o escritório que apresenta quartos e livings inteiros consome vistas, não renders isolados).",
+ "production_notes": "Originais: 0715-vista-before.jpg (2207×857 — o recorte 9:16 sobe 2,2×; é um print de linhas chapadas, aceitar a suavidade e usar lanczos; ele fica em tela só 0,8s parado + 2,0s de régua), 0714/0716/0718-vista-after.jpg (6656×2560 — recorte 1440×2560 desce para 1080×1920, nítido), 0705-vista-after.jpg (3328×1280 — recorte 720×1280 sobe 1,5×; opcional passar #705 pelo Ampliar 2× antes, sem alterar conteúdo). Régua vertical linear entre #715 e #714 no MESMO recorte (alinhar pela cama e pela esquadria). Full-bleed exige scrim em camada própria para os textos; nada de texto nos 220px do topo nem nos 320px da base. Eyebrow uppercase com letterspacing largo, ponto verde funcional. Geist, ≤2 pesos. Export 1080×1920 30fps H.264 crf 18 yuv420p sem áudio. #712 e #711 duplicam a câmera de #714 — não usar no mesmo Reel; #123 é o render-mestre real do Space na mesma câmera (3328 px) se o editor preferir o par #124→#123 no hook.",
+ "risks": "NÃO prometer: 'nada mudou' de forma absoluta (em #705 a cama aparece pelo lado oposto e o enquadramento não é o do print da Vista Mestre; em #718 o urso é um quadro, não o boneco — o roteiro fala em madeira e luz, não em 'o mesmo urso em todas'); 'fotografia' ou 'foto real'; tempo total por projeto (só 'gerado em minutos' por imagem). Não dar zoom na lousa 'I DON'T CARE' nem nas lombadas dos livros (texto gerado). Não usar 'fidelidade perfeita' — a régua do hook mostra o que bate, a legenda não extrapola.",
+ "gated": ""
+}

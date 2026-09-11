@@ -1,0 +1,39 @@
+LEGENDA — ORGÂNICO (Instagram Reels · @spacenode.app)
+
+tirou o espelho. não a parede — a edição ficou dentro da área marcada.
+
+no Editar você marca a região e diz o que muda. o ambiente não é gerado de novo e não precisa voltar ao modelo 3D: a parede, os quadros, o piso e a luz seguem os mesmos da imagem original.
+
+antes e depois aqui são o mesmo render, mesma câmera. o plano aberto no fim entra justamente pra você olhar o resto da sala e conferir por conta própria.
+
+é assim que tratamos render com IA em visualização arquitetônica: alteração localizada, sem refazer o que já estava aprovado.
+
+Veja no seu próprio projeto — link na bio.
+
+#arquitetura #visualizacaoarquitetonica #renderizacao #sketchup #arquiteturadeinteriores
+
+
+================================================================
+VERSÃO PAGA (Meta Ads · mesmo mp4, 9,7 s, som off, legenda embutida)
+================================================================
+
+--- Ângulo 1 · FIDELIDADE ---
+Texto primário:
+tirou o espelho. não a parede. no Editar a alteração fica na área que você marca — parede, quadros e luz seguem os mesmos. render com IA que não refaz a imagem que já estava certa.
+Título (≤40):        a edição fica onde você marcou.
+Descrição (≤30):     sem regerar o ambiente
+Botão:               LEARN_MORE
+
+--- Ângulo 2 · PRAZO ---
+Texto primário:
+o cliente pediu pra tirar um objeto da cena. você marca a área, diz o que muda e recebe a imagem em minutos — sem reabrir o modelo e sem fila de render.
+Título (≤40):        ajuste pontual, em minutos.
+Descrição (≤30):     80 nodes grátis, sem cartão
+Botão:               SIGN_UP
+
+--- Ângulo 3 · APRESENTAÇÃO ---
+Texto primário:
+a imagem já estava aprovada e só um item precisava sair. dá pra corrigir sem gerar o ambiente de novo e sem voltar ao modelo — a apresentação segue a mesma, com uma ressalva a menos pra explicar.
+Título (≤40):        corrige a imagem, não o projeto.
+Descrição (≤30):     visualização arquitetônica
+Botão:               LEARN_MORE

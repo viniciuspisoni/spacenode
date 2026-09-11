@@ -1,0 +1,108 @@
+{
+ "slug": "2026-09-04-reel-ampliar-zoom-do-cliente",
+ "title": "O cliente deu zoom. Ampliar segura.",
+ "pillar": "demonstracao-de-ferramentas",
+ "angle": "Ampliar como o passo entre o render aprovado e a entrega: prancha impressa, portfólio, o arquivo 'em alta' que o cliente pede e o pinch-zoom no tablet. Mesma fachada, mesmo recorte: no render em 2K os cabos do guarda-corpo e as ripas do brise borram; na ampliação (o dobro da resolução) aparecem cabo a cabo, ripa a ripa. Um módulo, um problema: detalhe que não sobrevive ao zoom.",
+ "format": "produto",
+ "duration_s": 12.6,
+ "hook_text": "Render aprovado. Agora o cliente deu zoom.",
+ "hook_visual": "Fachada ampliada (#177, verificado na miniatura) em quadro inteiro: casa de dois pavimentos com volume superior em concreto e ripado escuro, corpo branco em balanço com varanda envidraçada e guarda-corpo de cabos, escada externa corten à esquerda, garagem de concreto, sedã prata à direita, pinheiros altos e céu azul. Banda 16:9 (crop central do panorâmico 2,6:1: escada, varanda e garagem no quadro), nítida, 1,5 s. Eyebrow 'AMPLIAR' + hook.",
+ "scenes": [
+  {
+   "t": "0.0–1.5",
+   "visual": "#177 (ampliação, 3328×1280) em banda 16:9; parado; brilho −0.08; scrim",
+   "text_on_screen": "AMPLIAR / Render aprovado. Agora o cliente deu zoom.",
+   "asset_idx": [
+    177
+   ]
+  },
+  {
+   "t": "1.5–2.0",
+   "visual": "fade 0,5 s para o recorte do guarda-corpo (simula o pinch-zoom do cliente)",
+   "text_on_screen": "",
+   "asset_idx": [
+    177,
+    178
+   ]
+  },
+  {
+   "t": "2.0–4.2",
+   "visual": "#178 (render original, 1664×640) recorte crop=320:180:780:280 ampliado 3× por lanczos: varanda com guarda-corpo de cabos, ripado vertical, cortinas e reflexo dos pinheiros no vidro — visivelmente macio, cabos borrados (é a resolução real do arquivo, não filtro); parado",
+   "text_on_screen": "chip: antes · zoom no guarda-corpo",
+   "asset_idx": [
+    178
+   ]
+  },
+  {
+   "t": "4.2–4.7",
+   "visual": "wipeleft com régua branca sobre o mesmo recorte: atrás da régua os cabos ficam nítidos",
+   "text_on_screen": "",
+   "asset_idx": [
+    178,
+    177
+   ]
+  },
+  {
+   "t": "4.7–8.0",
+   "visual": "#177 mesmo recorte em coordenadas 2× (crop=640:360:1560:560) reduzido 1,5×: cabos do guarda-corpo individualizados, ripas distintas, reflexo das copas nítido, junta do concreto legível; Ken Burns 1.00→1.03. Verificado em crop lado a lado",
+   "text_on_screen": "Cabo a cabo. Ripa a ripa. / Ampliar: o dobro da {resolução}, mesma imagem.",
+   "asset_idx": [
+    177
+   ]
+  },
+  {
+   "t": "8.0–8.4",
+   "visual": "fade 0,4 s",
+   "text_on_screen": "",
+   "asset_idx": [
+    177
+   ]
+  },
+  {
+   "t": "8.4–11.2",
+   "visual": "#177 de volta ao quadro inteiro em banda 16:9; Ken Burns 1.00→1.04; sem zoom no carro",
+   "text_on_screen": "Pra prancha, portfólio e o zoom do cliente.",
+   "asset_idx": [
+    177
+   ]
+  },
+  {
+   "t": "11.2–11.4",
+   "visual": "corte seco",
+   "text_on_screen": "",
+   "asset_idx": [
+    177
+   ]
+  },
+  {
+   "t": "11.4–12.6",
+   "visual": "card final: logo monocromático + CTA + spacenode.app",
+   "text_on_screen": "Comece grátis",
+   "asset_idx": []
+  }
+ ],
+ "assets": [
+  177,
+  178
+ ],
+ "cta": "Comece grátis",
+ "caption": "Render aprovado. Aí o cliente deu zoom no guarda-corpo. Ampliar: o dobro da resolução, mesma imagem.\n\nO render em 2K resolve a reunião. A prancha impressa, o portfólio e o pinch-zoom no tablet pedem mais. Ampliar dobra a resolução do arquivo mantendo enquadramento, geometria e materiais: cabo do guarda-corpo, ripa do brise, reflexo dos pinheiros no vidro.\n\nO antes e o depois aqui são o mesmo recorte da mesma fachada: um vem do render, o outro da ampliação.\n\nUm passo, no mesmo lugar do render, quando pedem o arquivo \"em alta\".\n\nComece grátis — link na bio.\n\n#arquitetura #renderizacao #visualizacaoarquitetonica #archviz #projetodearquitetura",
+ "hashtags": [
+  "#arquitetura",
+  "#renderizacao",
+  "#visualizacaoarquitetonica",
+  "#archviz",
+  "#projetodearquitetura"
+ ],
+ "paid": {
+  "primary": "Render aprovado. Aí o cliente deu zoom no guarda-corpo. Ampliar: o dobro da resolução, a mesma imagem.\nPra prancha, portfólio e o arquivo \"em alta\" que sempre pedem. Cadastro grátis, sem cartão.",
+  "headline": "O dobro da resolução, mesma imagem",
+  "description": "Ampliar em um passo",
+  "button": "SIGN_UP",
+  "cutdown_note": "Já ≤15 s (12,6 s). Versão 9,8 s: cortar a cena 7 (volta ao quadro inteiro) e ir do recorte ampliado ao card final. A régua sobre o mesmo recorte é o momento que segura sem som."
+ },
+ "why_converts": "Atinge quem já renderiza (aqui ou fora) e trava na entrega: impressão, portfólio, cliente pedindo 'em alta'. É um problema de fim de projeto, ou seja, de quem tem cliente pagando, não de curioso. A prova é literal (mesmo recorte, régua no meio) e não pede confiança. 'Comece grátis' converte porque o cadastro sem cartão permite ampliar um render próprio de imediato; quem usa Ampliar entrega projeto com frequência e é o perfil que passa do saldo gratuito para Starter/Pro pelo ritmo de entregas, não por impulso.",
+ "production_notes": "Arquivos: .../scratchpad/assets/0178-upscale-before.jpg (1664×640, render vega 2k) e .../assets/0177-upscale-after.png (3328×1280, ampliação 2× de 2026-05-20). Recortes com coordenadas correspondentes: antes crop=320:180:780:280, depois crop=640:360:1560:560, ambos escalados para 960×540 com lanczos; a maciez do 'antes' é a resolução real do arquivo magnificada como o zoom do cliente faria — NUNCA aplicar blur artificial. Prova em .../checks/c4_fachada_ampliar.jpg (o par de cama #63→#62 foi testado e descartado: diferença sutil demais em tela de celular). Panorâmico 2,6:1 → banda 16:9: garantir no --plan que escada corten e varanda ficam no crop central. O sedã traz logotipo de terceiro: fica pequeno no quadro inteiro, sem zoom nele. Não citar provider nem fator além de 'o dobro'.",
+ "risks": "NÃO prometer 4×/8×, 'pronto para impressão em qualquer tamanho', 'sem nenhum artefato' ou 'recupera detalhe perdido' (é ampliação, não reconstrução). Não afirmar que resolve aprovação ou fecha contrato. Não citar pixels do arquivo no vídeo (só 'o dobro', que é verificável). Evitar zoom no carro (marca) e nas pessoas (não há). Ampliação de maio/2026: módulo segue ativo, mas o dono deve confirmar que o resultado atual é equivalente antes de dar como referência de qualidade.",
+ "gated": ""
+}

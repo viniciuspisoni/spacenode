@@ -41,8 +41,12 @@ export const ENGINES: Record<EngineId, EngineConfig> = {
   quasar: {
     id:          'quasar',
     name:        'Quasar',
-    tagline:     'Especial',
-    description: 'Tipografia, multi-referência e diversificação de provedor.',
+    tagline:     'Especial · ~2 min',
+    // A descrição é o que o usuário lê pra escolher (folha "Saída" no web e
+    // no plugin). "Tipografia, multi-referência e diversificação de provedor"
+    // era o motivo de ele ter entrado no catálogo — não ajuda ninguém a
+    // decidir, ainda mais sendo o motor PADRÃO.
+    description: 'Padrão da casa: acabamento e fidelidade em equilíbrio. Leva cerca de 2 minutos.',
     // Seedream 5.0 Pro Edit (ByteDance via fal.ai) — padrão desde 2026-09-05,
     // substituiu o GPT Image 2 ('openai/gpt-image-2/edit') após teste em prod.
     // Só FAL (sem mapeamento GCP). Schema conferido em 2026-09-04: prompt,
@@ -53,14 +57,25 @@ export const ENGINES: Record<EngineId, EngineConfig> = {
     // só oferece 2K.
     falEndpoint: 'bytedance/seedream/v5/pro/edit',
     resolutions: ['2k'],
-    nodes:       { '2k': 28 },
+    // 28 → 20 em 2026-09-10, quando o Quasar virou o motor padrão. O custo
+    // de origem caiu junto: a rota direta na ModelArk (SEEDREAM_ROUTE=ark,
+    // em prod desde 06/09) é ~2× mais barata que a fal, que era a base do 28.
+    // A 20 ele empata com o Vega 2K — o "Especial" deixou de custar mais que
+    // o premium, o que é a consequência de ser o padrão.
+    nodes:       { '2k': 20 },
   },
 }
 
 // ── Defaults / ordem de exibição ─────────────────────────────────────────────
 
 export const ENGINE_ORDER:       EngineId[]  = ['vega', 'pulsar', 'quasar']
-export const DEFAULT_ENGINE:     EngineId    = 'vega'
+// Quasar (Seedream 5.0 Pro Edit) é o padrão desde 2026-09-09. Vale para quem
+// tem assinatura e para o catálogo que o plugin lê; conta gratuita continua
+// caindo no econômico (ECONOMY_ENGINE em GenerateClient), senão os 80 nodes
+// do cadastro renderiam 2 imagens em vez de 8.
+// A resolução padrão não muda: 2K é a ÚNICA que o Quasar oferece (teto de
+// 2048×2048 no endpoint Pro da fal), então a combinação já nasce válida.
+export const DEFAULT_ENGINE:     EngineId    = 'quasar'
 export const DEFAULT_RESOLUTION: Resolution  = '2k'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

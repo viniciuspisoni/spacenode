@@ -1,0 +1,223 @@
+{
+  "_nota": [
+    "PORTE do reel 2026-09-09-uso/spaces.json (reel-kit) para a língua do filme 'antes da primeira imagem.'",
+    "As cenas, a ordem e os RECORTES são os mesmos já auditados. O que mudou é a gramática visual:",
+    "chapa clara #FAFAFA em vez de preto, banda (contain/inset 0) em vez de recorte, texto em tema",
+    "claro sobre a chapa, cartelas 'line' em minúsculas com ponto final, entrada e saída em fade.",
+    "",
+    "O cinema-kit não tem segmento 'grid' (é do reel-kit), então a cena de abertura virou um STILL:",
+    "o mosaico 2x3 foi montado uma vez com ffmpeg, com a MESMA lista e a MESMA ordem de renders do",
+    "spec antigo, célula 960x540 em cover e vão de 12 px pintado de #FAFAFA para o mosaico encostar",
+    "na chapa sem costura. Comando reproduzível:",
+    "  ffmpeg -i banheiro.jpg -i casa.jpg -i comercial.jpg -i coworking.jpg -i industrial.jpg -i living.jpg",
+    "  -filter_complex '[N]scale=960:540:force_original_aspect_ratio=increase,crop=960:540[x] (x6);",
+    "   color=c=0xFAFAFA:s=1932x1644[bg]; overlay em (0,0)(972,0)(0,552)(972,552)(0,1104)(972,1104)'",
+    "  -> marketing/output/2026-09-09-uso-cinema/src/mosaico-seis-projetos.png",
+    "",
+    "Privacidade: o recorte da lista de Spaces é o auditado — pega só a imagem do card e os selos",
+    "VEGA / DNA TRAVADO, e termina 40 px acima da linha do nome do projeto. Nenhum saldo, nome,",
+    "e-mail ou avatar entra em quadro em nenhuma cena.",
+    "",
+    "Verde: uma única palavra na peça inteira, o {80} da cartela final — igual ao filme. Por isso o",
+    "'8 nodes' da cena da Vista Mestre é texto normal, e quem o prova é o rodapé do próprio painel."
+  ],
+  "slug": "2026-09-09-reel-uso-spaces-cinema",
+  "frame": {
+    "w": 1080,
+    "h": 1920
+  },
+  "segments": [
+    {
+      "_cena": "seis renders de seis projetos sem parentesco — o estado do mundo antes de Spaces.",
+      "type": "still",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-09-uso-cinema/src/mosaico-seis-projetos.png",
+      "dur": 2.8,
+      "fit": "contain",
+      "inset": 0,
+      "bg": "light",
+      "reserveBottom": 300,
+      "zoom": [
+        1,
+        1.02
+      ]
+    },
+    {
+      "_cena": "etapa 1 de 2: criar o projeto. Recorte auditado do painel (1618x445).",
+      "type": "still",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-08-tutoriais/src/spaces/02-escolher-subir.png",
+      "crop": [
+        180,
+        55,
+        1618,
+        445
+      ],
+      "dur": 2.8,
+      "fit": "contain",
+      "inset": 0,
+      "bg": "light",
+      "zoom": [
+        1,
+        1
+      ]
+    },
+    {
+      "_cena": "a Vista Mestre e os dois caminhos. O recorte termina cravado no rodapé 'a extração de DNA custa 8 nodes' — é ele que prova o número. Câmera parada: é prova, e prova não se mexe.",
+      "type": "still",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-08-tutoriais/src/spaces/01-etapa-1.png",
+      "crop": [
+        180,
+        150,
+        1618,
+        910
+      ],
+      "dur": 4.2,
+      "fit": "contain",
+      "inset": 0,
+      "bg": "light",
+      "zoom": [
+        1,
+        1
+      ]
+    },
+    {
+      "_cena": "um card da lista com os selos VEGA e DNA TRAVADO. Recorte auditado: para acima do nome do projeto.",
+      "type": "still",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-08-tutoriais/src/spaces-existente/01-lista-de-spaces.png",
+      "crop": [
+        256,
+        1620,
+        734,
+        520
+      ],
+      "dur": 3,
+      "fit": "contain",
+      "inset": 0,
+      "bg": "light",
+      "zoom": [
+        1,
+        1
+      ]
+    },
+    {
+      "_cena": "a vista que nasce do DNA. Único plano com respiração de câmera.",
+      "type": "still",
+      "src": "C:/Users/Pisoni/spacenode/marketing/renders/depois/living.jpg",
+      "dur": 3,
+      "fit": "contain",
+      "inset": 0,
+      "bg": "light",
+      "zoom": [
+        1,
+        1.03
+      ]
+    },
+    {
+      "type": "card",
+      "card": "final",
+      "dur": 2.8,
+      "bg": "light"
+    }
+  ],
+  "transitions": [
+    {
+      "type": "fade",
+      "dur": 0.4
+    },
+    {
+      "type": "cut"
+    },
+    {
+      "type": "fade",
+      "dur": 0.4
+    },
+    {
+      "type": "fade",
+      "dur": 0.4
+    },
+    {
+      "type": "fade",
+      "dur": 0.5
+    }
+  ],
+  "_transicoes_nota": "xfade=dissolve no ffmpeg é dissolução por PIXEL ALEATÓRIO: sobre a chapa lisa #FAFAFA ela lê como chuvisco digital, não como corte de cinema (o QA pegou isso no primeiro render). Numa peça toda clara a transição certa é `fade`, o crossfade linear.",
+  "_cards_nota": "Tudo em tema claro: as cinco cartelas caem na chapa #FAFAFA abaixo da banda, e branco sobre #FAFAFA é invisível. Quebra de linha explícita com <br> para nenhuma frase ir ao limite dos 920 px da coluna.",
+  "cards": {
+    "a": {
+      "layout": "line",
+      "theme": "light",
+      "anchor": "bottom",
+      "eyebrow": "spaces",
+      "big": "seis imagens.<br>[seis projetos diferentes.]",
+      "px": 62
+    },
+    "b": {
+      "layout": "line",
+      "theme": "light",
+      "anchor": "bottom",
+      "big": "comece pelo projeto.<br>[não pela imagem.]",
+      "px": 62
+    },
+    "c": {
+      "layout": "line",
+      "theme": "light",
+      "anchor": "bottom",
+      "big": "a vista mestre<br>é a origem do projeto.",
+      "small": "[extrair o DNA custa 8 nodes.]",
+      "px": 62
+    },
+    "d": {
+      "layout": "line",
+      "theme": "light",
+      "anchor": "bottom",
+      "big": "o DNA fica travado<br>no projeto.",
+      "px": 62
+    },
+    "e": {
+      "layout": "line",
+      "theme": "light",
+      "anchor": "bottom",
+      "big": "as próximas vistas<br>nascem dele.",
+      "small": "[estilo, materiais e atmosfera se mantêm.]",
+      "px": 62
+    },
+    "final": {
+      "layout": "final",
+      "theme": "light",
+      "cta": "Testar grátis",
+      "micro": "{80} nodes grátis · sem cartão · spacenode.app"
+    }
+  },
+  "_overlays_nota": "Tempos GLOBAIS de --plan. Cada cartela entra depois que a banda se estabeleceu e sai antes do corte.",
+  "overlays": [
+    {
+      "card": "a",
+      "from": 0.3,
+      "to": 2.3,
+      "fade": 0.4
+    },
+    {
+      "card": "b",
+      "from": 2.95,
+      "to": 5.1,
+      "fade": 0.4
+    },
+    {
+      "card": "c",
+      "from": 5.6,
+      "to": 8.95,
+      "fade": 0.4
+    },
+    {
+      "card": "d",
+      "from": 9.55,
+      "to": 11.55,
+      "fade": 0.4
+    },
+    {
+      "card": "e",
+      "from": 12.05,
+      "to": 14.05,
+      "fade": 0.4
+    }
+  ]
+}

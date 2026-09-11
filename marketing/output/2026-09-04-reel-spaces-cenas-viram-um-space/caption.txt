@@ -1,0 +1,41 @@
+mesmo projeto, quatro vistas. a luz muda, a câmera muda — a identidade não.
+
+um Space é isso: várias vistas do mesmo projeto com a mesma identidade visual. cada cena do modelo vira uma vista, e a marcenaria, o carpete, a poltrona e o caixilho continuam os mesmos em todas.
+
+o primeiro quadro é o print da cena no SketchUp. o segundo é a mesma câmera, renderizada. depois entram outras cenas do mesmo escritório: a de sol alto, a de persiana levantada, a que abre para o estar. luz e atmosfera variam de vista para vista; o projeto, não.
+
+é render com IA a partir do SketchUp, e é por isso que a apresentação para de parecer uma colagem de imagens soltas. as quatro cenas são do mesmo escritório, geradas aqui no mesmo dia, sem pós-produção.
+
+Renderize seu projeto — cadastro grátis, sem cartão, no link da bio.
+
+#arquitetura #archviz #sketchup #visualizacaoarquitetonica #apresentacaodeprojeto
+
+──────────────────────────────────────────────────────────────────────
+VERSÃO PAGA (Meta · objetivo cadastro · som off · legenda embutida no vídeo)
+
+Arquivo: o MESMO mp4 da orgânica — marketing/output/2026-09-04-reel-spaces-cenas-viram-um-space/2026-09-04-reel-spaces-cenas-viram-um-space.mp4 (11,3 s ≤ 15 s).
+Motivo: cabe no teto de 15 s, o texto já está embutido, o card final já traz um CTA da lista
+("Renderize seu projeto →") e o par de botão SIGN_UP. Não há cutdown separado.
+
+Botão: SIGN_UP ("Cadastre-se"). Enquanto o evento de cadastro do Pixel/Google Ads não existir,
+rodar como LEARN_MORE ("Saiba mais").
+
+A · fidelidade
+  Texto primário: quatro vistas do mesmo escritório: marcenaria, carpete e poltrona continuam as mesmas em todas.
+  Cada cena do seu modelo vira uma vista com a mesma identidade. Cadastro grátis, sem cartão.
+  Título (≤40): mesmo projeto, quatro vistas.        [29]
+  Descrição (≤30): cadastro grátis, sem cartão        [27]
+
+B · prazo
+  Texto primário: a cena do SketchUp vira imagem de apresentação em minutos — e a próxima sai no mesmo padrão.
+  Sem fila de render, sem refazer o projeto a cada vista. Cadastro grátis, sem cartão.
+  Título (≤40): da cena do SketchUp à vista final     [33]
+  Descrição (≤30): sem cartão para começar            [23]
+
+C · apresentação
+  Texto primário: o cliente percorre o projeto inteiro, não uma imagem solta.
+  Várias vistas do mesmo projeto, com a mesma materialidade e o mesmo padrão de imagem. Cadastro grátis, sem cartão.
+  Título (≤40): o projeto inteiro, não uma imagem     [33]
+  Descrição (≤30): cadastro grátis, sem cartão        [27]
+
+Nota: as três variações rodam sobre o MESMO vídeo; só o texto primário/título/descrição muda.

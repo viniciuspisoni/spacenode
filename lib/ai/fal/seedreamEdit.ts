@@ -18,6 +18,7 @@
 
 import { fal } from '@fal-ai/client'
 import { detectMaskBoundingBox } from '@/lib/spaces/edit-crop'
+import { seedreamCheapSize, seedreamCheapTierEnabled } from '@/lib/ai/seedream-size'
 
 export const SEEDREAM_EDIT_ENDPOINT = 'bytedance/seedream/v5/pro/edit'
 const TIMEOUT_MS = 180_000
@@ -61,6 +62,12 @@ export interface SeedreamEditImageInput {
   prompt: string
   /** 1K mira o piso do envelope (1024²); 2K/4K o teto (2048² — o endpoint não tem 4K). */
   resolution?: SeedreamEditResolution
+  /** Tamanho de saída EXPLÍCITO, quando o chamador sabe melhor que o preset.
+   *  O Editar V4 usa isto para dimensionar a saída pelo crop da seleção (ver
+   *  lib/edit-v4/engine.ts): crop pequeno sai perto do piso do envelope e volta
+   *  bem mais rápido, pelo mesmo preço. Quem não passa (Editar V3) cai no
+   *  preset de sempre — comportamento inalterado. */
+  outputSize?: { width: number; height: number }
 }
 
 export interface SeedreamEditImageOutput {
@@ -92,6 +99,13 @@ export function seedreamOutputSize(
   height: number,
   resolution: SeedreamEditResolution = '2K',
 ): { width: number; height: number } {
+  // SEEDREAM_CHEAP_TIER=1: mira o teto da faixa BARATA de preço (1536² = 2,36 MP)
+  // em vez do teto do endpoint (2048² = 4,2 MP). Metade do preço por imagem, e
+  // aqui quase de graça: o recompose já reduz o resultado pro tamanho do crop.
+  if (resolution !== '1K' && seedreamCheapTierEnabled()) {
+    const cheap = seedreamCheapSize(width, height)
+    if (cheap) return cheap
+  }
   const aspect = Math.max(1 / 16, Math.min(16, width / Math.max(1, height)))
   const target = resolution === '1K' ? MIN_PIXELS * 1.06 : MAX_PIXELS * 0.97
   const round16 = (v: number) => Math.max(16, Math.round(v / 16) * 16)
@@ -110,7 +124,7 @@ interface SeedreamOutput {
 export async function editImageWithSeedream(input: SeedreamEditImageInput): Promise<SeedreamEditImageOutput> {
   ensureConfigured()
   const startedAt = Date.now()
-  const size = seedreamOutputSize(input.imageWidth, input.imageHeight, input.resolution ?? '2K')
+  const size = input.outputSize ?? seedreamOutputSize(input.imageWidth, input.imageHeight, input.resolution ?? '2K')
   const imageUrls = [input.imageUrl, ...(input.references ?? []).map(r => r.url)]
 
   let result: { data: unknown; requestId?: string }

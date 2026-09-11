@@ -1,13 +1,14 @@
 -- ─────────────────────────────────────────────────────────────
 -- Orion · vira motor público, cobrando nodes (2026-09-11)
 --
--- Migration ADITIVA. NÃO aplicada em produção nesta tarefa.
+-- Migration ADITIVA. APLICADA EM PRODUÇÃO em 2026-09-11, via Management API
+-- (POST /v1/projects/{ref}/database/query). Nunca `supabase db push` neste
+-- repo: ele aplicaria as migrations que estão paradas de propósito.
 --
 -- Pré-requisito: 20260910120000 (coluna is_internal_test, engine aceita
 -- 'orion', renders_nodes_charged_rule) já está em produção. A 20260911120000
--- (4K no piloto) NÃO está — esta migration já cobre 2K+4K, então aplicar as
--- duas juntas (ou só esta, que é estritamente mais permissiva) resolve os
--- dois casos de uma vez.
+-- (4K no piloto) foi aplicada logo antes; esta é estritamente mais permissiva
+-- e cobriria 2K+4K de qualquer forma.
 --
 -- O que muda: `renders_orion_internal_only` (que EXIGIA is_internal_test=true
 -- e nodes_charged=0 em toda linha 'orion') dá lugar a uma regra só de

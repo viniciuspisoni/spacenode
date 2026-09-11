@@ -1,0 +1,103 @@
+{
+ "slug": "serie-tres-antes-das-14h-ep01-sala-de-jantar",
+ "title": "Série «Três antes das 14h» — Ep. 01: sala de jantar em três acabamentos",
+ "pillar": "produtividade",
+ "angle": "MECÂNICA DA SÉRIE (toda segunda de manhã, o dia da reunião): um print do SketchUp e três leituras de acabamento do MESMO ambiente, mesma câmera, cortes secos numerados 01/02/03, recap rápido dos três e fecho na opção mais luminosa. A promessa é operacional, não estética: chegar na reunião com opção em vez de promessa. Assinatura fixa: eyebrow «TRÊS ANTES DAS 14H · EP. NN», print de abertura 1,4s, wipe único para a opção 01, cortes secos para 02 e 03, rótulos «01 · material», «02 · material», «03 · material» em Geist 500 no canto inferior esquerdo, recap de 3 × 0,4s, CTA sobre a opção 03. Ep. 01 = sala de jantar #430 → #429 (sanca quente, cortina bege, mesa de nogueira) / #431 (paredes de cimento queimado, piso escuro, pendentes dourados) / #435 (piso de mármore polido, mesa de madeira escura, louça preta) — os três «depois» vêm do mesmo arquivo de print (#430 = #432 = #436, hash idêntico conferido). Próximos episódios com assets reais: Ep. 02 loja masculina #404 → #403 sol rasante / #405 clean / #411 terrazzo+nogueira; Ep. 03 living Projeto color #309 → #318 esmeralda / #308 sálvia / #303 greige (três paletas, quase quadrado); Ep. 04 escritório de diretoria via Editar #28 → #791 parede gelo → #790 painel em MDF → #789 parede em MDF (a variante «o cliente pediu outra parede», mesma câmera, edição localizada); Ep. 05 quarto #75 concreto vs #760 madeira (Editar, troca de piso).",
+ "format": "serie",
+ "duration_s": 11.5,
+ "hook_text": "Reunião às 14h. Três acabamentos.",
+ "hook_visual": "Frame 0: o print SketchUp da sala de jantar (#430) — teto cinza com recesso retangular, cortinas achatadas, mesa oval preta com base listrada, oito cadeiras pretas em malha wireframe, piso com grade de linhas, flores rosas no centro — em retrato ocupando quase toda a largura, com a headline em branco sobre scrim. Aos 1,4s a régua atravessa e a sala vira a opção 01 (#429): sanca de LED quente, cortinas de linho bege, mesa de nogueira posta, cadeiras cinza escuro. Aos 3,6s corte seco para a opção 02 (#431) em cimento queimado com piso preto. Print + duas opções dentro dos 3,6 primeiros segundos.",
+ "scenes": [
+  {
+   "t": "0,0–1,4s",
+   "visual": "Print #430 (739×835) reescalado para 1080×1221 centrado (y≈350–1571) sobre fundo #0a0a0a. Sem movimento. Eyebrow com hairline + headline sobre scrim no topo da imagem.",
+   "text_on_screen": "TRÊS ANTES DAS 14H · EP. 01 | Reunião às 14h. Três acabamentos.",
+   "asset_idx": [
+    430
+   ]
+  },
+  {
+   "t": "1,4–1,7s",
+   "visual": "xfade wipeleft (0,3s) para a opção 01 #429 no mesmo enquadramento (976×1104 → 1080×1221; proporções batem em 0,88). Headline sai em corte; rótulo entra.",
+   "text_on_screen": "rótulo: 01 · sanca quente",
+   "asset_idx": [
+    430,
+    429
+   ]
+  },
+  {
+   "t": "1,7–3,6s",
+   "visual": "Hold em #429: teto com sanca de LED quente, cortinas bege translúcidas, mesa oval de nogueira com louça, oito cadeiras cinza escuro, tapete geométrico, piso claro.",
+   "text_on_screen": "rótulo: 01 · sanca quente",
+   "asset_idx": [
+    429
+   ]
+  },
+  {
+   "t": "3,6–5,5s",
+   "visual": "Corte seco para a opção 02 #431: paredes em cimento queimado, piso de porcelanato preto, mesa de nogueira, cadeiras cinza, pendentes dourados, jardim visível pela porta central.",
+   "text_on_screen": "rótulo: 02 · cimento queimado",
+   "asset_idx": [
+    431
+   ]
+  },
+  {
+   "t": "5,5–7,4s",
+   "visual": "Corte seco para a opção 03 #435: piso de mármore branco polido, mesa de madeira escura com veios fortes, louça preta, cadeiras cinza, sanca de LED, cortinas bege — a mais luminosa das três.",
+   "text_on_screen": "rótulo: 03 · mármore polido",
+   "asset_idx": [
+    435
+   ]
+  },
+  {
+   "t": "7,4–8,6s",
+   "visual": "Recap em cortes secos no beat: #429 (0,4s) → #431 (0,4s) → #435 (0,4s), rótulos acompanhando. Sem texto além dos rótulos.",
+   "text_on_screen": "rótulos: 01 · 02 · 03",
+   "asset_idx": [
+    429,
+    431,
+    435
+   ]
+  },
+  {
+   "t": "8,6–10,0s",
+   "visual": "Hold na opção 03 #435. Apoio na base sobre scrim gradiente, com «minutos» em #30d158, e CTA abaixo.",
+   "text_on_screen": "Mesmo print. Gerado em minutos. | Comece agora | rótulo: 03 · mármore polido",
+   "asset_idx": [
+    435
+   ]
+  },
+  {
+   "t": "10,0–11,5s",
+   "visual": "Card final: fundo #0a0a0a, símbolo + wordmark monocromáticos. Sem URL.",
+   "text_on_screen": "",
+   "asset_idx": []
+  }
+ ],
+ "assets": [
+  430,
+  429,
+  431,
+  435
+ ],
+ "cta": "Comece agora",
+ "caption": "Reunião às 14h e o cliente quer ver três acabamentos. Mesmo print, três salas de jantar, gerado em minutos.\n\nEp. 01 da série Três antes das 14h. A regra: um print do SketchUp, três leituras de acabamento, mesma câmera, mesmas cadeiras, mesmo pendente.\n\n01 sanca quente e cortina bege. 02 cimento queimado e piso escuro. 03 mármore polido e mesa de madeira escura. Nenhuma delas exigiu voltar ao modelo.\n\nToda segunda, um ambiente novo em três acabamentos, para a reunião da semana ter opção em vez de promessa.\n\nComece agora — link na bio.\n\n#designdeinteriores #apresentacaodeprojeto #render #arquitetura #archviz",
+ "hashtags": [
+  "#designdeinteriores",
+  "#apresentacaodeprojeto",
+  "#render",
+  "#arquitetura",
+  "#archviz"
+ ],
+ "paid": {
+  "primary": "Reunião às 14h, três acabamentos da mesma sala. Um print, três opções, gerado em minutos.",
+  "headline": "Três acabamentos antes da reunião",
+  "description": "Mesmo print, mesma câmera",
+  "button": "SIGN_UP",
+  "cutdown_note": "Corte orgânico tem 11,5s (≤15s). Para o anúncio: cortar o recap (7,4–8,6s) e reduzir cada hold de 1,9s para 1,5s, com apoio+CTA entrando já sobre a opção 03 aos 5,5s e segurando 3s. Total ≈ 9,5s. Remover o eyebrow de episódio; manter os rótulos 01/02/03 (são a legenda embutida). Variar o público: interiores/reforma responde melhor a este episódio do que fachada."
+ },
+ "why_converts": "A dor é concreta e datada («reunião às 14h»), o que é mais forte do que qualquer adjetivo: o arquiteto reconhece a cena de pedir três opções e não ter tempo de renderizar três cenas. O print no início mostra que as três opções saíram do mesmo modelo, sem retrabalho — o argumento de produtividade com prova. O caminho: cadastro grátis → repetir o episódio no próprio ambiente. Aqui a matemática favorece a ativação: três gerações Vega 2K são 60 nodes, cabem inteiras na cota grátis vigente (80), então o primeiro projeto de qualquer pessoa reproduz a série de graça — e o segundo projeto da semana seguinte já pede o Starter. Publicar toda segunda encaixa a peça no dia em que a reunião existe, o que aproxima o clique da necessidade real.",
+ "production_notes": "Print #430 (739×835, 0,885) e opções #429/#431/#435 (976×1104, 0,884): mesma proporção — reescalar todos para 1080×1221 e conferir que a mesa e o pendente batem entre print e opção 01 no frame de QA (o wipe alinha pela mesa, não pelas bordas). Imagem ocupa y≈350–1571; textos sobre a imagem com scrim em camada separada (headline em y≈480; apoio+CTA em y≈1380–1470), sem nada acima de y=220 nem abaixo de y=1600. Rótulos numerados em Geist 500, 28px, canto inferior esquerdo com inset 36px. Verde só em «minutos». Cortes secos sem fade; recap via concat de três trechos de 0,4s com setsar=1. Reaproveitar reel-impacto.mjs estendido para N «depois» (o mesmo reel-serie.mjs do Ep. 01 de «Um print, cinco climas»). Preferir #435 como fecho porque o fundo claro pede o scrim mais forte (gradiente 60%) para o CTA branco — testar legibilidade no frame de QA aos 9,0s.",
+ "risks": "NÃO dizer que «o arquiteto pediu» os três acabamentos nem citar instrução de prompt — os registros do banco não guardam o pedido (campo vazio); descrever apenas o que se vê. NÃO afirmar tempo total («20 minutos», «13h40») — só «gerado em minutos»; «reunião às 14h» é dispositivo narrativo, não medição. Os pisos mudam entre as três opções (claro / preto / mármore) e em relação ao print (cinza com grade): isso é o que se demonstra, mas o texto não pode chamar de «só trocar o acabamento» como se fosse um controle preciso do material. Não sugerir que a plataforma escolhe o acabamento sozinha — quem decide é o arquiteto. Não usar #433 (piso mudou para madeira além do pedido) nem misturar #427 (base da mesa mudou de forma) neste episódio.",
+ "gated": ""
+}

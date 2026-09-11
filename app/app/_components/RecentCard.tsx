@@ -59,7 +59,7 @@ export function RecentCard({ render: r }: { render: RecentRender }) {
   const out       = r.output_url ?? ''
 
   return (
-    <div className="spn-dash-recent-card">
+    <div className="spn-dash-recent-card spn-glass">
       <div className="spn-dash-recent-thumb">
         {display && (
           // eslint-disable-next-line @next/next/no-img-element
@@ -94,6 +94,15 @@ export function RecentCard({ render: r }: { render: RecentRender }) {
             {reusable && (
               <Link className="spn-dash-recent-act" href={`/app/upscale?source=${encodeURIComponent(out)}`} title="Ampliar">
                 Ampliar
+              </Link>
+            )}
+            {/* Editar faltava aqui, e o buraco era medível: 2.381 renders
+                contra 3 projetos de pós-produção em dois meses. Não era
+                qualidade da ferramenta — era que nada no produto apontava
+                para ela, e as pessoas seguem o fluxo. */}
+            {reusable && (
+              <Link className="spn-dash-recent-act" href={`/app/editar?source=${encodeURIComponent(out)}&source_type=render&source_id=${r.id}`} title="Editar">
+                Editar
               </Link>
             )}
             {r.output_url && (

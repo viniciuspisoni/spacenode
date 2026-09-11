@@ -1,0 +1,9 @@
+o render já aprovado sobe de resolução sem ser gerado de novo.
+
+gerar de novo devolve outra imagem. no Ampliar você sobe o arquivo que já está aprovado, a plataforma lê a resolução e recomenda o modo — Alta Fidelidade preserva geometria, materiais e luz — e você escolhe 2×, 4× ou 8× do original.
+
+o custo aparece antes do clique.
+
+teste grátis no link da bio.
+
+#arquitetura #render #sketchup #archviz #arquiteto #renderizacao #iaparaarquitetos #upscale

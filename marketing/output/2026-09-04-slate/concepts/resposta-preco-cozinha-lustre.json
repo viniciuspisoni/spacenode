@@ -1,0 +1,83 @@
+{
+ "slug": "resposta-preco-cozinha-lustre",
+ "title": "Testar é grátis (cozinha, lustre)",
+ "pillar": "antes-e-depois",
+ "angle": "Objeção: preço / 'quanto custa testar?'. Prova visual: print escuro e chato de cozinha vira imagem de capa de revista com wipe de cima para baixo (o lustre acende primeiro). Resposta direta e transparente: testar é grátis (80 nodes, sem cartão) e depois planos a partir de R$89/mês — números conferidos no código.",
+ "format": "video_anuncio",
+ "duration_s": 12,
+ "hook_text": "Testar é grátis. Sem cartão.",
+ "hook_visual": "Full-bleed 9:16 do print SketchUp da cozinha (#426): armários pretos foscos ocupando a parede, lustre de argolas e espiral de cobre apagado sob o trilho, backsplash de mármore preto, ilha de quartzito rajado com torneira, duas cadeiras bege de pernas pretas, vaso de flores rosa, cortina cinza e voile branco à direita; piso cinza com linhas de grade. Aos 1,2 s um wipe de cima para baixo (0,9 s) troca para o render (#425): o lustre acende com bulbos quentes, spots do trilho ligados, veios do quartzito, luz de sol atravessando o voile com jardim ao fundo, cadeiras e flores no mesmo lugar. Headline aos 2,3 s.",
+ "scenes": [
+  {
+   "t": "0.0–1.2",
+   "visual": "#426 full-bleed (crop 9:16 centrado na ilha + lustre; cadeiras e cortina à direita entram no quadro). Push-in mínimo 1,00→1,02. Sem texto.",
+   "text_on_screen": "",
+   "asset_idx": [
+    426
+   ]
+  },
+  {
+   "t": "1.2–2.1",
+   "visual": "xfade wipedown linear 0,9 s de #426 para #425 no mesmo crop (alinhar pela ilha e pelo trilho de spots). O lustre aceso é o primeiro elemento revelado.",
+   "text_on_screen": "",
+   "asset_idx": [
+    426,
+    425
+   ]
+  },
+  {
+   "t": "2.1–5.0",
+   "visual": "Hold em #425 com push-in 1,00→1,06 para o lustre/ilha. Scrim inferior. Headline aos 2,3 s, apoio aos 3,3 s.",
+   "text_on_screen": "Testar é grátis. Sem cartão. / 80 nodes no cadastro. Depois, R$89/mês.",
+   "asset_idx": [
+    425
+   ]
+  },
+  {
+   "t": "5.0–8.0",
+   "visual": "Continua em #425: zoom lento até 1,5× no detalhe do lustre de cobre com os bulbos acesos e a face rajada da ilha de quartzito. Texto permanece.",
+   "text_on_screen": "Testar é grátis. Sem cartão. / 80 nodes no cadastro. Depois, R$89/mês.",
+   "asset_idx": [
+    425
+   ]
+  },
+  {
+   "t": "8.0–10.5",
+   "visual": "Volta ao enquadramento 1,06×; headline e apoio saem em corte; entra o bloco de CTA no terço inferior com sublinhado verde.",
+   "text_on_screen": "Comece grátis / 80 nodes no cadastro · sem cartão",
+   "asset_idx": [
+    425
+   ]
+  },
+  {
+   "t": "10.5–12.0",
+   "visual": "Card final #0a0a0a: logo monocromático, 'Comece grátis' com sublinhado verde, micro-linha '80 nodes no cadastro · sem cartão'. Sem URL.",
+   "text_on_screen": "Comece grátis / 80 nodes no cadastro · sem cartão",
+   "asset_idx": []
+  }
+ ],
+ "assets": [
+  426,
+  425
+ ],
+ "cta": "Comece grátis",
+ "caption": "Testar custa zero: o cadastro já vem com 80 nodes, sem cartão. Depois, planos a partir de R$89/mês.\n\nEste print de SketchUp virou a imagem de apresentação em minutos — armários, ilha de quartzito, lustre, cadeiras, forno e trilho de spots onde estavam no modelo.\n\n80 nodes dão para quatro renders em 2K no motor padrão. Roda no navegador, sem placa de vídeo nova.\n\nSe fizer sentido para o escritório, o Starter é R$89/mês com 750 nodes.\n\nComece grátis no link da bio.\n\n#renderizacao #designdeinteriores #sketchup #archviz #apresentacaodeprojeto",
+ "hashtags": [
+  "#renderizacao",
+  "#designdeinteriores",
+  "#sketchup",
+  "#archviz",
+  "#apresentacaodeprojeto"
+ ],
+ "paid": {
+  "primary": "Cadastro grátis com 80 nodes, sem cartão: quatro renders em 2K do seu próprio modelo. Depois, a partir de R$89/mês.\n\nO print de SketchUp vira imagem de apresentação em minutos, com cada peça onde você modelou.",
+  "headline": "Teste grátis com 80 nodes",
+  "description": "A partir de R$89/mês",
+  "button": "SIGN_UP",
+  "cutdown_note": "Já nasce ≤15 s (12 s). Cutdown de 7 s: cenas 1–3 (print → wipedown → hold com headline e apoio até 5,0 s) + CTA sobre a imagem de 5,0 a 7,0 s; sem zoom no detalhe e sem card final. O botão SIGN_UP do Meta carrega o destino."
+ },
+ "why_converts": "Preço é a segunda objeção depois da fidelidade, e o público (escritório pequeno, freelancer, estudante) compara com R$150–600 por imagem terceirizada e com licença/hardware de render tradicional. A peça responde com dois números conferidos no código — testar é grátis (80 nodes) e o plano de entrada custa R$89/mês — e prova qualidade antes de falar de dinheiro: o lustre acendendo no wipe é o scroll-stop. Transparência de preço pré-qualifica o clique: quem chega ao cadastro já sabe o custo do passo seguinte, então o salto free → Starter é curto. O CTA SIGN_UP com 'sem cartão' derruba a última barreira de quem só quer conferir se funciona no próprio modelo.",
+ "production_notes": "Specs iguais ao conceito 1 (1080×1920, 30 fps, H.264, sem áudio, zona segura 220–1600, Geist 600/400, verde só no sublinhado). Originais: #426 = 731×837, #425 = 960×1104 (aspecto ~0,87 nos dois). Crop 9:16 centrado na ilha + lustre (cortar um pouco da parede de armários à esquerda e da cortina à direita); escala lanczos a partir dos originais em assets/. Alinhar o par pelo tampo da ilha e pelo trilho antes do xfade wipedown. O zoom de 1,5× a partir de 960 px fica no limite — usar zoompan alimentado em 2× (regra do kit) e não passar de 1,5×; se ficar mole no QA, reduzir para 1,3×. Scrim próprio, mais forte no antes (cinza médio) que no depois (imagem já escura embaixo). Preço na arte: 'R$89/mês' vem de lib/plans.ts monthlyPrice 89; '80 nodes' vem do DEFAULT 80 de profiles.credits (migration 20260728); 'quatro renders em 2K' = 80 ÷ 20 nodes do Vega 2K (lib/engines.ts) — se qualquer um mudar, a peça sai do ar. setsar=1; card final 1,5 s sem URL. QA em 4 frames: 0,6 s / 2,0 s / 4,0 s / 9,0 s.",
+ "risks": "NÃO pode prometer: 'grátis para sempre', 'plano gratuito', 'trial', 'teste 30 dias', 'ilimitado'; não dizer 'quatro renders' sem o qualificador 'em 2K no motor padrão' (em Pulsar HD são 8, em 4K são 2); não citar a oferta de 50% do primeiro mês (encerrou em 31/08); nunca 'Lumens'; não dizer 'cancele quando quiser' sem o dono confirmar a política; não comparar nominalmente com concorrente nem com renderista (o alvo é o custo/fila, não a pessoa). 'Sem cartão' e 'sem placa de vídeo nova' são verdadeiros (web app, cadastro só com login) mas não estão na landing — dono confirma a redação. A imagem é de 28/04/2026, original pequeno (960 px): aceitar leve suavidade no zoom. O anúncio não pode sugerir que R$89 compra renders ilimitados: são 750 nodes/mês.",
+ "gated": ""
+}

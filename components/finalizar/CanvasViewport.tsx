@@ -9,7 +9,7 @@
 // Interações por ferramenta:
 //   adjust/color — pan/zoom; conta-gotas de dominante quando ativo
 //   masks        — pincel (traços) ou redefinição de gradiente (arrasto)
-//   cleanup      — pincel da área de remoção (overlay de aviso)
+//   edit         — seleção da edição por IA: varinha + pincel (overlay de aviso)
 //   geometry     — corte interativo com alças + grade de terços
 //   elements     — selecionar/mover/escalar/rotacionar; pincel de máscara
 //
@@ -20,17 +20,49 @@ import {
   forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState,
 } from 'react'
 import type {
-  CropRect, ElementTransform, FinalizeDoc, LocalAdjustment, MaskShape, MaskStroke,
+  CropRect, ElementTransform, FinalizeDoc, LocalAdjustment, MaskShape, MaskStroke, WandShape,
 } from '@/lib/finalizar/types'
+import { isGeometryIdentity } from '@/lib/finalizar/composition'
+import {
+  buildColorIndex, growSelectionAuto, invertSelection, magicWandAuto, magicWandSelect,
+  type ColorIndex,
+} from '@/lib/selection/magic-wand'
 import { FinalizeRenderer } from '@/lib/finalizar/engine/renderer'
 import { computeHistogram, type Histogram } from '@/lib/finalizar/engine/color-math'
-import { computeSkyMask, MASK_SCALE, type LiveStroke } from '@/lib/finalizar/engine/masks'
+import {
+  contractSelection, expandSelection, fillSelectionHoles,
+  removeSmallIslands, rleDecode, rleEncode, smoothSelection,
+} from '@/lib/selection/mask-raster'
+import { computeSkyMask, MASK_SCALE, selectionMaskPngCanvas, type LiveStroke } from '@/lib/finalizar/engine/masks'
 
 const MIN_ZOOM = 1
 const MAX_ZOOM = 8
 const WORK_LONG_SIDE = 2304
+/** Distância, em px de tela, para o clique fechar o polígono no ponto inicial. */
+const POLY_CLOSE_PX = 14
 
-export type ViewportTool = 'adjust' | 'color' | 'masks' | 'cleanup' | 'geometry' | 'elements'
+/** Teto de passos de undo da seleção. Em RLE cada um custa alguns KB. */
+const SELECTION_HISTORY_LIMIT = 24
+
+/** Raio (px da imagem) da média que lê a cor do ponto clicado. Um pixel só
+ *  deixa um respingo de ruído definir a seleção inteira. */
+const WAND_SAMPLE_RADIUS_IMAGE_PX = 4
+
+/** Resolução do índice de cor da varinha.
+ *
+ *  Tem que ser a MESMA ordem de grandeza em que a tolerância foi calibrada
+ *  (scripts/editar-wand-calibrate.mts, imagens de ~1 MP). Medido na prática:
+ *  construir o índice em meia resolução faz a varinha vazar pela cena inteira
+ *  no mesmo número de tolerância — reduzir a imagem mistura pixels vizinhos e
+ *  fabrica exatamente as cores intermediárias que servem de ponte para o
+ *  preenchimento atravessar a borda entre dois materiais. */
+const WAND_INDEX_LONG_SIDE = WORK_LONG_SIDE
+
+export type ViewportTool = 'edit' | 'adjust' | 'color' | 'masks' | 'geometry' | 'elements'
+
+/** Operações locais sobre a seleção — todas grátis, todas instantâneas. */
+export type SelectionOp =
+  | 'expand' | 'contract' | 'smooth' | 'fillHoles' | 'cleanIslands' | 'invert' | 'selectAll'
 
 export interface BrushSettings {
   /** Diâmetro em px de TELA. */
@@ -40,12 +72,17 @@ export interface BrushSettings {
   erase: boolean
 }
 
-export type StrokeTarget = { kind: 'local'; id: string } | { kind: 'element'; id: string } | { kind: 'cleanup' }
+export type StrokeTarget = { kind: 'local'; id: string } | { kind: 'element'; id: string } | { kind: 'edit' }
 
 /** Comparação persistente além do "segurar": divisor arrastável ou lado a lado. */
 export type CompareMode = 'none' | 'split' | 'side'
 
 export type MaskOverlayColor = 'green' | 'red' | 'white'
+
+/** Ferramentas de seleção da aba Editar. Varinha e pincel escrevem no mesmo
+ *  lugar que laço, polígono e retângulo — o que a pessoa vê marcado é o que
+ *  vai para a IA, venha de onde vier. */
+export type EditSubTool = 'wand' | 'brush' | 'eraser' | 'lasso' | 'polygon' | 'rect'
 
 export interface CanvasViewportHandle {
   fit(): void
@@ -54,6 +91,35 @@ export interface CanvasViewportHandle {
   resultHistogram(): Histogram | null
   /** Máscara de céu heurística (branco=céu) na resolução de máscara, ou null. */
   makeSkyMask(): HTMLCanvasElement | null
+  /** Raster da varinha da seleção de edição, em ESPAÇO DE ORIGEM e na resolução
+   *  de máscara. null quando não há varinha ativa. */
+  wandMask(): HTMLCanvasElement | null
+  /** A varinha pode ser usada agora? Falsa com geometria aplicada. */
+  wandAvailable(): boolean
+  /** Apaga as regiões desenhadas (laço/polígono/retângulo). */
+  clearEditRegions(): void
+  /** Cresce a seleção de edição até o material inteiro.
+   *
+   *  `maxCoverage` é uma condição, não um limite: se o resultado passar dela, o
+   *  crescimento é DESCARTADO e a seleção fica como estava (`applied: false`).
+   *  Existe para o caminho automático — melhor não crescer do que consertar
+   *  meia cena sem ninguém ter pedido.
+   *
+   *  Devolve null quando não há o que crescer (sem seleção, ou varinha
+   *  indisponível). */
+  growEditSelection(opts?: { maxCoverage?: number }): { coverage: number; before: number; applied: boolean } | null
+  /** Desfaz/refaz o ÚLTIMO gesto de seleção. Devolve false quando não há o
+   *  que desfazer — é o sinal para o Ctrl+Z cair no histórico do documento. */
+  undoSelection(): boolean
+  redoSelection(): boolean
+  /** Ajusta a seleção no lugar (morfologia). Devolve a cobertura resultante, ou
+   *  null quando não há seleção. `px` só vale para expandir/contrair/suavizar. */
+  refineSelection(op: SelectionOp, px?: number): { coverage: number; before: number; applied: boolean } | null
+  /** Substitui a seleção inteira por uma máscara pronta (o retorno do
+   *  "Colar na borda", que vem do servidor já casada com a imagem). */
+  loadSelectionMask(url: string): Promise<boolean>
+  /** A seleção de hoje como PNG branco-sobre-preto, no tamanho do documento. */
+  selectionBlob(): Promise<Blob | null>
   baseImage(): HTMLImageElement | null
   webglSupported(): boolean
 }
@@ -72,7 +138,30 @@ interface Props {
   compareMode: CompareMode
   showMaskOverlay: boolean
   maskOverlayColor: MaskOverlayColor
-  cleanupStrokes: MaskStroke[]
+  /** Traços de pincel/borracha da seleção de edição (espaço de EXIBIÇÃO). */
+  editStrokes: MaskStroke[]
+  /** Varinha da seleção de edição; compõe com os traços por baixo deles. */
+  editWand: WandShape | null
+  /** Qual ferramenta de seleção está ativa na aba Editar. */
+  editSubTool: EditSubTool
+  /** Tolerância pedida (TETO — o clique pode entregar menos; ver magicWandAuto). */
+  wandTolerance: number
+  wandContiguous: boolean
+  /** Recebe a forma JÁ resolvida, com a tolerância que de fato valeu. */
+  onWandPick: (shape: WandShape) => void
+  /** Avisa que laço/polígono/retângulo mudaram a seleção desenhada. */
+  onRegionsChange: (hasRegions: boolean) => void
+  /** A varinha virou raster (Shift/Alt somam e subtraem, e formas não somam):
+   *  o pai solta a forma, que agora vive dentro das regiões. NÃO mexe nos
+   *  traços — pincel e borracha continuam valendo por cima. */
+  onWandAbsorbed: () => void
+  /** Quantos passos de seleção dá para desfazer/refazer agora — o topo usa
+   *  para acender a seta, e o Ctrl+Z para saber a quem obedecer. */
+  onSelectionHistory: (canUndo: boolean, canRedo: boolean) => void
+  /** A seleção foi crescida e virou uma região única: traços e varinha já
+   *  estão dentro dela e devem ser zerados no pai, sob pena de contarem duas
+   *  vezes (e de o Desmarcar deixar sobras). */
+  onSelectionGrown: () => void
   wbPicking: boolean
   onZoomChange: (pct: number) => void
   onStrokeCommit: (target: StrokeTarget, stroke: MaskStroke) => void
@@ -82,33 +171,132 @@ interface Props {
   onPickWb: (rgb: [number, number, number]) => void
   onSelectElement: (id: string | null) => void
   onError: (msg: string) => void
-  /** Disparado quando a imagem base termina de carregar (histograma etc.). */
-  onBaseReady?: () => void
+  /** Disparado quando a imagem base termina de carregar (histograma etc.).
+   *  `canSample` diz se os pixels puderam ser lidos — falso em imagem sem CORS,
+   *  e é o que decide se a varinha existe para esta imagem. */
+  onBaseReady?: (canSample: boolean) => void
 }
 
 type DragState =
   | { kind: 'split'; pointerId: number }
   | { kind: 'pan'; pointerId: number; startX: number; startY: number; panX: number; panY: number }
   | { kind: 'stroke'; pointerId: number; target: StrokeTarget; stroke: LiveStroke }
+  | { kind: 'edit-lasso'; pointerId: number; points: { x: number; y: number }[]; erase: boolean }
+  | { kind: 'edit-rect'; pointerId: number; from: { x: number; y: number }; to: { x: number; y: number }; erase: boolean }
   | { kind: 'shape'; pointerId: number; localId: string; shapeKind: 'linear' | 'radial'; start: { x: number; y: number } }
   | { kind: 'crop'; pointerId: number; mode: string; start: { x: number; y: number }; crop0: CropRect; ratio: number | null }
   | { kind: 'element-move'; pointerId: number; id: string; start: { x: number; y: number }; t0: ElementTransform }
   | { kind: 'element-scale'; pointerId: number; id: string; t0: ElementTransform; center: { x: number; y: number }; startDist: number }
   | { kind: 'element-rotate'; pointerId: number; id: string; t0: ElementTransform; center: { x: number; y: number }; startAngle: number }
 
+/** Raio de amostragem no espaço do ÍNDICE, que pode estar reduzido. */
+function wandSampleRadius(index: ColorIndex, docWidth: number): number {
+  const k = index.width / Math.max(1, docWidth)
+  return Math.max(1, Math.round(WAND_SAMPLE_RADIUS_IMAGE_PX * k))
+}
+
+/**
+ * Roda a varinha sobre o índice da imagem-base e devolve o raster
+ * (branco = selecionado), na resolução pedida.
+ *
+ * Vive no escopo do módulo, e não dentro do componente, porque só depende dos
+ * argumentos: assim não entra em lista de dependências de hook nenhuma.
+ *
+ * Trabalha em ESPAÇO DE ORIGEM, porque é a imagem original que a IA edita. Não
+ * há auto-ajuste aqui — a forma já chega com a tolerância resolvida no clique
+ * (ou a que o usuário escolheu no controle); reajustar de novo faria o resultado
+ * mudar sozinho a cada re-rasterização.
+ */
+function maskToCanvas(index: ColorIndex, mask: Uint8Array): HTMLCanvasElement | null {
+  const src = document.createElement('canvas')
+  src.width = index.width
+  src.height = index.height
+  const sctx = src.getContext('2d')
+  if (!sctx) return null
+  const img = sctx.createImageData(index.width, index.height)
+  for (let i = 0; i < mask.length; i++) {
+    const o = i * 4
+    const v = mask[i] > 127 ? 255 : 0
+    img.data[o] = v
+    img.data[o + 1] = v
+    img.data[o + 2] = v
+    img.data[o + 3] = v
+  }
+  sctx.putImageData(img, 0, 0)
+  return src
+}
+
+function rasterizeWand(
+  index: ColorIndex,
+  shape: WandShape,
+  w: number,
+  h: number,
+  docWidth: number,
+): HTMLCanvasElement | null {
+  const mask = magicWandSelect(
+    index,
+    shape.seed.x * index.width,
+    shape.seed.y * index.height,
+    {
+      tolerance: shape.tolerance,
+      contiguous: shape.contiguous,
+      sampleRadius: wandSampleRadius(index, docWidth),
+    },
+  )
+  const src = maskToCanvas(index, mask)
+  if (!src) return null
+  if (src.width === w && src.height === h) return src
+  const out = document.createElement('canvas')
+  out.width = w
+  out.height = h
+  out.getContext('2d')?.drawImage(src, 0, 0, w, h)
+  return out
+}
+
 export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function CanvasViewport(props, ref) {
   const {
     doc, tool, activeLocalId, activeElementId, brush, maskInteraction, elementMaskMode,
-    compare, compareMode, showMaskOverlay, maskOverlayColor, cleanupStrokes, wbPicking,
+    compare, compareMode, showMaskOverlay, maskOverlayColor, editStrokes, editWand, editSubTool, wbPicking,
     onZoomChange, onStrokeCommit, onShapeChange, onElementChange, onCropChange,
     onPickWb, onSelectElement, onError,
   } = props
 
+  const colorIndexRef = useRef<ColorIndex | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const screenRef = useRef<HTMLCanvasElement | null>(null)
   const glCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const rendererRef = useRef<FinalizeRenderer | null>(null)
   const baseImgRef = useRef<HTMLImageElement | null>(null)
+  /** A imagem de quando o projeto começou. É o "Antes" da comparação — ver o
+   *  efeito que a carrega. */
+  const originalImgRef = useRef<HTMLImageElement | null>(null)
+  /** Regiões desenhadas da seleção de edição (laço, polígono, retângulo),
+   *  acumuladas em branco na resolução do documento. Vivem aqui e não no
+   *  documento porque a seleção é transitória: some quando a edição roda. */
+  const editRegionsRef = useRef<HTMLCanvasElement | null>(null)
+  /**
+   * Undo da SELEÇÃO, em RLE.
+   *
+   * Existia no V4 e morreu na fusão junto com o raster — e some justamente na
+   * hora em que faz falta: um clique de varinha que abraça meia cena não tinha
+   * volta, só "Desmarcar e começar de novo". As funções de RLE nunca saíram do
+   * repositório (`lib/selection/mask-raster`), ficaram órfãs com teste
+   * passando, como o resto do que a fusão desligou.
+   *
+   * RLE porque uma máscara de 2 MP crua custa 2 MB por passo; comprimida, uma
+   * seleção típica cabe em alguns KB — 24 passos ficam na casa das centenas de
+   * KB, não das dezenas de MB.
+   */
+  const selUndoRef = useRef<Int32Array[]>([])
+  const selRedoRef = useRef<Int32Array[]>([])
+  /** As regiões contêm APENAS varinha somada? Se sim, um clique simples de
+   *  varinha pode zerá-las (é o "substituir seleção" de qualquer editor). Se
+   *  um laço ou polígono entrou ali, não: seria apagar trabalho à mão. */
+  const wandOnlyRegionsRef = useRef(true)
+  const editPolyRef = useRef<{ points: { x: number; y: number }[]; erase: boolean } | null>(null)
+  /** Quantos vértices o polígono em curso tem. É estado, e não só o ref, porque
+   *  o botão "Fechar área" precisa aparecer — o ref sozinho não re-renderiza. */
+  const [polyCount, setPolyCount] = useState(0)
   const [baseReady, setBaseReady] = useState(false)
   const [glOk, setGlOk] = useState(true)
 
@@ -139,6 +327,12 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
       scheduleDraw()
     })
     rendererRef.current = renderer
+    // A lib de máscaras não sabe ler pixels de imagem; quem sabe é o viewport,
+    // que é dono da base e do índice de cor. Ela só pede o raster pronto.
+    renderer.masks.wandSampler = (shape, w, h) => {
+      const index = colorIndexRef.current
+      return index ? rasterizeWand(index, shape, w, h, docRef.current.width) : null
+    }
     if (!renderer.isSupported()) setGlOk(false)
     return () => {
       renderer.dispose()
@@ -164,9 +358,33 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
         renderer.setBaseImage(img, img.naturalWidth, img.naturalHeight)
       }
       needsGlRef.current = true
+
+      // Índice de cor da base, para a varinha. Construído UMA vez por imagem.
+      // Uma ação de IA troca a base e dispara este efeito de novo; o
+      // `baseEpoch` invalida a máscara em cache.
+      colorIndexRef.current = null
+      try {
+        const kw = Math.min(1, WAND_INDEX_LONG_SIDE / Math.max(img.naturalWidth, img.naturalHeight))
+        const iw = Math.max(2, Math.round(img.naturalWidth * kw))
+        const ih = Math.max(2, Math.round(img.naturalHeight * kw))
+        const c = document.createElement('canvas')
+        c.width = iw
+        c.height = ih
+        const cx = c.getContext('2d', { willReadFrequently: true })
+        if (cx) {
+          cx.drawImage(img, 0, 0, iw, ih)
+          colorIndexRef.current = buildColorIndex(cx.getImageData(0, 0, iw, ih).data, iw, ih)
+        }
+      } catch {
+        // Imagem sem CORS: tudo segue funcionando, menos a varinha.
+        colorIndexRef.current = null
+      }
+      const r = rendererRef.current
+      if (r) r.masks.baseEpoch += 1
+
       setBaseReady(true)
       scheduleDraw()
-      propsRef.current.onBaseReady?.()
+      propsRef.current.onBaseReady?.(colorIndexRef.current !== null)
     }
     img.onerror = () => {
       if (!cancelled) onError('Não foi possível carregar a imagem base.')
@@ -260,7 +478,14 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
     const dw = v.vis.w * d.width * v.s
     const dh = v.vis.h * d.height * v.s
 
-    const img = baseImgRef.current
+    // O "Antes" da comparação é a imagem ORIGINAL do projeto, não a base atual.
+    //
+    // A distinção só passou a existir quando a edição por IA entrou na mesma
+    // ferramenta: ela AVANÇA `baseUrl`, então comparar contra a base virou
+    // comparar a imagem nova com ela mesma — os dois lados idênticos. Enquanto
+    // ninguém rodou IA as duas URLs são a mesma e nada muda; depois de rodar,
+    // "antes" volta a significar o que a palavra diz.
+    const img = originalImgRef.current ?? baseImgRef.current
     const drawView = (src: CanvasImageSource, srcW: number, srcH: number, clip?: { x: number; w: number }) => {
       ctx.save()
       if (clip) {
@@ -330,14 +555,104 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
       drawView(glCanvas, glCanvas.width, glCanvas.height)
     }
 
+    // ── gesto de seleção em andamento (laço, retângulo, polígono) ──
+    //
+    // Vetorial, direto na tela, sem tocar no raster: o traço só vira região
+    // quando o gesto termina. É o que o V4 fazia, com a diferença de que lá o
+    // contexto estava transformado em coordenadas de imagem e aqui pintamos em
+    // px de tela — daí o toScreen em cada ponto.
+    if (p.tool === 'edit' && p.compareMode === 'none' && !p.compare) {
+      const drag = dragRef.current
+      const poly = editPolyRef.current
+      const line = (pts: { x: number; y: number }[], close: boolean) => {
+        ctx.beginPath()
+        let started = false
+        for (const pt of pts) {
+          const q = toScreen(pt.x, pt.y)
+          if (!q) continue
+          if (!started) { ctx.moveTo(q.x, q.y); started = true } else ctx.lineTo(q.x, q.y)
+        }
+        if (close) ctx.closePath()
+        ctx.stroke()
+      }
+      ctx.save()
+      ctx.lineCap = 'butt'
+      ctx.lineJoin = 'miter'
+
+      // Marquee de duas passadas, a convenção de qualquer editor: um tracejado
+      // ESCURO por baixo e um CLARO por cima, com a fase trocada. Um traço de
+      // 1 px lê sobre a madeira clara e sobre o vidro escuro da mesma cena, e
+      // não pinta o render de verde — o verde de 1,5 px competia com a imagem
+      // justamente onde a pessoa precisa enxergar a borda que está marcando.
+      const DASH = 4 * devicePixelRatio
+      const marquee = (traco: () => void, erase: boolean) => {
+        ctx.lineWidth = devicePixelRatio
+        ctx.setLineDash([DASH, DASH])
+        ctx.lineDashOffset = 0
+        ctx.strokeStyle = 'rgba(0,0,0,0.5)'
+        traco()
+        ctx.lineDashOffset = DASH
+        ctx.strokeStyle = erase ? 'rgba(255,146,146,0.95)' : 'rgba(255,255,255,0.95)'
+        traco()
+      }
+
+      if (drag?.kind === 'edit-lasso' && drag.points.length > 1) {
+        marquee(() => line(drag.points, true), drag.erase)
+      } else if (drag?.kind === 'edit-rect') {
+        const a = toScreen(Math.min(drag.from.x, drag.to.x), Math.min(drag.from.y, drag.to.y))
+        const b = toScreen(Math.max(drag.from.x, drag.to.x), Math.max(drag.from.y, drag.to.y))
+        if (a && b) marquee(() => ctx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y), drag.erase)
+      } else if (poly && poly.points.length > 0 && p.editSubTool === 'polygon') {
+        const cur = cursorRef.current
+        const pts = [...poly.points]
+        marquee(() => {
+          line(pts, false)
+          // Segmento elástico até o cursor, para a pessoa ver onde o próximo
+          // vértice cai antes de clicar.
+          if (cur && pts.length > 0) {
+            const last = toScreen(pts[pts.length - 1].x, pts[pts.length - 1].y)
+            if (last) {
+              ctx.beginPath()
+              ctx.moveTo(last.x, last.y)
+              ctx.lineTo(cur.x, cur.y)
+              ctx.stroke()
+            }
+          }
+        }, poly.erase)
+
+        // Ponto inicial: é o alvo do clique que fecha a área. Branco com anel
+        // escuro, pelo mesmo motivo do tracejado — precisa aparecer sobre
+        // qualquer fundo sem virar o elemento mais forte da tela.
+        const first = toScreen(pts[0].x, pts[0].y)
+        if (first) {
+          ctx.setLineDash([])
+          ctx.beginPath()
+          ctx.arc(first.x, first.y, 3.5 * devicePixelRatio, 0, Math.PI * 2)
+          ctx.fillStyle = 'rgba(255,255,255,0.95)'
+          ctx.fill()
+          ctx.lineWidth = devicePixelRatio
+          ctx.strokeStyle = 'rgba(0,0,0,0.55)'
+          ctx.stroke()
+        }
+      }
+      ctx.restore()
+    }
+
     // ── overlays (fora dos modos de comparação) ──
     if (!p.compare && p.compareMode === 'none') {
       if (p.tool === 'masks' && p.showMaskOverlay && p.activeLocalId) {
         const local = d.locals.find((l) => l.id === p.activeLocalId)
         if (local) drawMaskOverlay(ctx, v, local)
       }
-      if (p.tool === 'cleanup' && (p.cleanupStrokes.length > 0 || dragRef.current?.kind === 'stroke')) {
-        drawCleanupOverlay(ctx, v)
+      // A varinha entra na condição: uma seleção pode existir SEM nenhum traço
+      // (um clique e pronto), e sem isto o overlay ficava invisível justo no
+      // caminho mais curto da ferramenta.
+      if (
+        p.tool === 'edit' &&
+        (p.editWand !== null || p.editStrokes.length > 0 || editRegionsRef.current !== null ||
+          editPolyRef.current !== null || dragRef.current !== null)
+      ) {
+        drawEditOverlay(ctx, v)
       }
       if (p.tool === 'geometry') drawCropUI(ctx)
       if (p.tool === 'elements' && !p.elementMaskMode) drawElementGizmo(ctx)
@@ -357,10 +672,35 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
     scheduleDraw()
   }, [doc, scheduleDraw])
 
+  // Imagem original do projeto, só para a comparação. Não entra no renderer
+  // nem no índice da varinha — é textura de leitura, carregada uma vez e
+  // apenas quando difere da base (projeto sem nenhuma ação de IA não paga nada).
+  useEffect(() => {
+    const original = doc.originalBaseUrl
+    if (!original || original === doc.baseUrl) {
+      originalImgRef.current = null
+      return
+    }
+    let cancelled = false
+    const im = new Image()
+    im.crossOrigin = 'anonymous'
+    im.onload = () => {
+      if (cancelled) return
+      originalImgRef.current = im
+      scheduleDraw()
+    }
+    im.onerror = () => {
+      if (!cancelled) originalImgRef.current = null
+    }
+    im.src = original
+    return () => { cancelled = true }
+  }, [doc.originalBaseUrl, doc.baseUrl, scheduleDraw])
+
+
   // overlays dependem de props de UI
   useEffect(() => {
     scheduleDraw()
-  }, [tool, activeLocalId, activeElementId, compare, compareMode, showMaskOverlay, maskOverlayColor, cleanupStrokes, elementMaskMode, wbPicking, brush, scheduleDraw])
+  }, [tool, activeLocalId, activeElementId, compare, compareMode, showMaskOverlay, maskOverlayColor, editStrokes, editWand, editSubTool, elementMaskMode, wbPicking, brush, scheduleDraw])
 
   // resize
   useEffect(() => {
@@ -480,15 +820,19 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
     ctx.globalAlpha = 1
   }
 
-  function drawCleanupOverlay(ctx: CanvasRenderingContext2D, v: ViewTransform) {
+  function drawEditOverlay(ctx: CanvasRenderingContext2D, v: ViewTransform) {
     const renderer = rendererRef.current
     const d = docRef.current
     if (!renderer) return
     const drag = dragRef.current
-    const live = drag?.kind === 'stroke' && drag.target.kind === 'cleanup' ? drag.stroke : null
+    const live = drag?.kind === 'stroke' && drag.target.kind === 'edit' ? drag.stroke : null
+    // A base do overlay é a MESMA que vai para a IA (varinha ∪ regiões), então
+    // o que aparece marcado é exatamente o que será editado — a única
+    // propriedade que uma ferramenta de seleção precisa garantir.
     const pseudo: LocalAdjustment = {
-      id: '__cleanup__', name: '', enabled: true, invert: false,
-      shape: { kind: 'brush' }, strokes: propsRef.current.cleanupStrokes,
+      id: '__edit__', name: '', enabled: true, invert: false,
+      shape: propsRef.current.editWand ?? { kind: 'brush' },
+      strokes: propsRef.current.editStrokes,
       values: { exposure: 0, contrast: 0, highlights: 0, shadows: 0, temperature: 0, tint: 0, saturation: 0, clarity: 0, sharpness: 0 },
       feather: 0, density: 100,
     }
@@ -501,8 +845,25 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
     tctx.drawImage(rg, 0, 0)
     const id = tctx.getImageData(0, 0, tint.width, tint.height)
     const dt = id.data
+
+    // Laço, polígono e retângulo vivem num raster à parte (não são forma nem
+    // traço), e entram aqui somando ao canal de "adicionar". Sem isto o
+    // desenho ficava gravado mas invisível — o que é o mesmo que não existir.
+    let regionAlpha: Uint8ClampedArray | null = null
+    const regions = editRegionsRef.current
+    if (regions) {
+      const rc = document.createElement('canvas')
+      rc.width = tint.width
+      rc.height = tint.height
+      const rctx = rc.getContext('2d', { willReadFrequently: true })
+      if (rctx) {
+        rctx.drawImage(regions, 0, 0, tint.width, tint.height)
+        regionAlpha = rctx.getImageData(0, 0, tint.width, tint.height).data
+      }
+    }
+
     for (let i = 0; i < dt.length; i += 4) {
-      const add = dt[i]
+      const add = Math.max(dt[i], regionAlpha ? regionAlpha[i + 3] : 0)
       const erase = dt[i + 1]
       const m = Math.max(0, add - erase)
       dt[i] = 224; dt[i + 1] = 88; dt[i + 2] = 74; dt[i + 3] = Math.round(m * 0.55)
@@ -614,9 +975,13 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
     const p = propsRef.current
     const cur = cursorRef.current
     if (!cur || spaceRef.current) return
+    // Na aba Editar só pincel e borracha pintam; varinha, laço, polígono e
+    // retângulo não têm raio, então mostrar o círculo do pincel neles era
+    // prometer um gesto que a ferramenta não faz.
+    const editPaints = p.editSubTool === 'brush' || p.editSubTool === 'eraser'
     const painting =
       (p.tool === 'masks' && p.activeLocalId && p.maskInteraction === 'brush')
-      || p.tool === 'cleanup'
+      || (p.tool === 'edit' && editPaints)
       || (p.tool === 'elements' && p.activeElementId && p.elementMaskMode)
     if (!painting) return
     const r = (p.brush.size * devicePixelRatio) / 2
@@ -627,7 +992,7 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
     ctx.stroke()
     ctx.beginPath()
     ctx.arc(cur.x, cur.y, r, 0, Math.PI * 2)
-    ctx.strokeStyle = p.brush.erase ? 'rgba(255,255,255,0.95)' : p.tool === 'cleanup' ? 'rgba(224,88,74,0.95)' : accentGreen()
+    ctx.strokeStyle = p.brush.erase ? 'rgba(255,255,255,0.95)' : p.tool === 'edit' ? 'rgba(224,88,74,0.95)' : accentGreen()
     ctx.lineWidth = 1.25
     ctx.stroke()
   }
@@ -804,9 +1169,101 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
         }
         return
       }
-      case 'cleanup':
-        startStroke(e, { kind: 'cleanup' })
+      case 'edit': {
+        const p2 = propsRef.current
+        const sub = p2.editSubTool
+        const alt = e.altKey
+
+        if (sub === 'lasso') {
+          const pt = toImage(e.clientX, e.clientY)
+          if (pt) dragRef.current = { kind: 'edit-lasso', pointerId: e.pointerId, points: [pt], erase: alt }
+          return
+        }
+        if (sub === 'rect') {
+          const pt = toImage(e.clientX, e.clientY)
+          if (pt) dragRef.current = { kind: 'edit-rect', pointerId: e.pointerId, from: pt, to: pt, erase: alt }
+          return
+        }
+        if (sub === 'polygon') {
+          const pt = toImage(e.clientX, e.clientY)
+          if (!pt) return
+          const poly = editPolyRef.current
+          if (poly && poly.points.length >= 3) {
+            // Clique perto do primeiro ponto fecha a área — a convenção de
+            // qualquer ferramenta de polígono.
+            const v0 = getView()
+            const first = poly.points[0]
+            const d0 = docRef.current
+            if (v0) {
+              const dx = (pt.x - first.x) * d0.width * v0.s
+              const dy = (pt.y - first.y) * d0.height * v0.s
+              if (Math.hypot(dx, dy) <= POLY_CLOSE_PX * devicePixelRatio) {
+                closeEditPolygon()
+                return
+              }
+            }
+          }
+          const nextPoly = poly ?? { points: [] as { x: number; y: number }[], erase: alt }
+          nextPoly.points.push(pt)
+          editPolyRef.current = nextPoly
+          setPolyCount(nextPoly.points.length)
+          scheduleDraw()
+          return
+        }
+
+        // Varinha: um CLIQUE seleciona; ela não pinta. Pincel e borracha
+        // continuam pintando por cima do que ela selecionou.
+        //
+        // Shift SOMA e Alt SUBTRAI — é o que transforma "um clique, uma
+        // tentativa" em ferramenta de verdade, e uma seleção difícil em três
+        // cliques fáceis. Some por um tempo na fusão com o Finalizar: a
+        // varinha virou uma forma paramétrica única, e forma não soma com
+        // forma. Volta pelo raster, que é onde soma e subtração são a mesma
+        // operação.
+        if (sub === 'wand') {
+          const pt = toImage(e.clientX, e.clientY)
+          const index = colorIndexRef.current
+          if (pt && index) {
+            const { mask, tolerance } = magicWandAuto(
+              index,
+              pt.x * index.width,
+              pt.y * index.height,
+              {
+                tolerance: p2.wandTolerance,
+                contiguous: p2.wandContiguous,
+                sampleRadius: wandSampleRadius(index, docRef.current.width),
+              },
+            )
+            pushSelectionUndo()
+            if (e.shiftKey || alt) {
+              bakeWandShape()
+              mergeWandMask(index, mask, alt)
+              scheduleDraw()
+              return
+            }
+            // Clique simples SUBSTITUI, como em qualquer editor — mas só
+            // apaga as regiões se elas vieram da própria varinha.
+            if (wandOnlyRegionsRef.current && editRegionsRef.current) {
+              const rctx = editRegionsRef.current.getContext('2d')
+              rctx?.clearRect(0, 0, editRegionsRef.current.width, editRegionsRef.current.height)
+              p2.onRegionsChange(false)
+            }
+            p2.onWandPick({
+              kind: 'wand',
+              seed: pt,
+              tolerance,
+              contiguous: p2.wandContiguous,
+              sampleRadius: WAND_SAMPLE_RADIUS_IMAGE_PX,
+            })
+          }
+          return
+        }
+        // Pincel e borracha também são gesto de seleção: cada traço vira um
+        // passo de undo, senão Ctrl+Z pularia direto por cima de todos eles.
+        pushSelectionUndo()
+        startStroke(e, { kind: 'edit' })
         return
+      }
       case 'geometry': {
         const mode = hitCropHandle(px, py)
         const pt = toImage(e.clientX, e.clientY)
@@ -910,11 +1367,21 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
           const pt = toImage(ev.clientX, ev.clientY)
           if (pt) drag.stroke.points.push(pt)
         }
-        if (drag.target.kind === 'cleanup') {
+        if (drag.target.kind === 'edit') {
           // overlay 2D é redesenhado; motor não precisa
         } else {
           needsGlRef.current = true
         }
+        break
+      }
+      case 'edit-lasso': {
+        const pt = toImage(e.clientX, e.clientY)
+        if (pt) drag.points.push(pt)
+        break
+      }
+      case 'edit-rect': {
+        const pt = toImage(e.clientX, e.clientY)
+        if (pt) drag.to = pt
         break
       }
       case 'shape': {
@@ -991,6 +1458,14 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
         needsGlRef.current = true
         break
       }
+      case 'edit-lasso': {
+        fillEditRegion(drag.points, drag.erase)
+        break
+      }
+      case 'edit-rect': {
+        fillEditRect(drag.from, drag.to, drag.erase)
+        break
+      }
       case 'element-move':
       case 'element-scale':
       case 'element-rotate': {
@@ -1003,6 +1478,220 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
         break
     }
     scheduleDraw()
+  }
+
+  /** Canvas das regiões, criado sob demanda no tamanho do documento. */
+  function editRegions(): HTMLCanvasElement | null {
+    const d = docRef.current
+    if (!d.width || !d.height) return null
+    let c = editRegionsRef.current
+    if (!c || c.width !== d.width || c.height !== d.height) {
+      c = document.createElement('canvas')
+      c.width = d.width
+      c.height = d.height
+      editRegionsRef.current = c
+    }
+    return c
+  }
+
+  /** Preenche um polígono (laço, polígono ou retângulo) nas regiões.
+   *  `erase` recorta em vez de somar — é o Alt de qualquer editor. */
+  function fillEditRegion(points: { x: number; y: number }[], erase: boolean) {
+    const c = editRegions()
+    const d = docRef.current
+    if (!c || points.length < 3) return
+    pushSelectionUndo()
+    const ctx = c.getContext('2d')
+    if (!ctx) return
+    ctx.save()
+    ctx.globalCompositeOperation = erase ? 'destination-out' : 'source-over'
+    ctx.fillStyle = '#ffffff'
+    ctx.beginPath()
+    points.forEach((p, i) => {
+      const x = p.x * d.width
+      const y = p.y * d.height
+      if (i === 0) ctx.moveTo(x, y)
+      else ctx.lineTo(x, y)
+    })
+    ctx.closePath()
+    ctx.fill()
+    ctx.restore()
+    wandOnlyRegionsRef.current = false
+    propsRef.current.onRegionsChange(true)
+  }
+
+  /** Soma (ou subtrai, com Alt) uma máscara de varinha nas regiões. É o que
+   *  devolve a seleção múltipla: formas paramétricas não somam, raster soma. */
+  function mergeWandMask(index: ColorIndex, mask: Uint8Array, erase: boolean) {
+    const regions = editRegions()
+    const src = maskToCanvas(index, mask)
+    const ctx = regions?.getContext('2d')
+    if (!regions || !src || !ctx) return
+    ctx.save()
+    ctx.globalCompositeOperation = erase ? 'destination-out' : 'source-over'
+    ctx.drawImage(src, 0, 0, regions.width, regions.height)
+    ctx.restore()
+    propsRef.current.onRegionsChange(true)
+  }
+
+  /** Assa a forma de varinha ativa dentro das regiões e avisa o pai para
+   *  soltá-la. Precisa acontecer ANTES de somar ou subtrair: enquanto ela for
+   *  forma, o subtrair não a alcança (a composição só sabe somar formas). */
+  function bakeWandShape() {
+    const shape = propsRef.current.editWand
+    const index = colorIndexRef.current
+    if (!shape || !index) return
+    const d = docRef.current
+    const c = rasterizeWand(index, shape, d.width, d.height, d.width)
+    const regions = editRegions()
+    const ctx = regions?.getContext('2d')
+    if (c && regions && ctx) {
+      ctx.save()
+      ctx.globalCompositeOperation = 'source-over'
+      ctx.drawImage(c, 0, 0, regions.width, regions.height)
+      ctx.restore()
+    }
+    propsRef.current.onWandAbsorbed()
+  }
+
+  /** Retângulo a partir de dois cantos. */
+  function fillEditRect(a: { x: number; y: number }, b: { x: number; y: number }, erase: boolean) {
+    const x0 = Math.min(a.x, b.x)
+    const y0 = Math.min(a.y, b.y)
+    const x1 = Math.max(a.x, b.x)
+    const y1 = Math.max(a.y, b.y)
+    if (x1 - x0 < 0.002 || y1 - y0 < 0.002) return
+    fillEditRegion([{ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }], erase)
+  }
+
+  /** Fecha o polígono em curso e o transforma em região. */
+  function closeEditPolygon() {
+    const poly = editPolyRef.current
+    if (poly && poly.points.length >= 3) fillEditRegion(poly.points, poly.erase)
+    editPolyRef.current = null
+    setPolyCount(0)
+    scheduleDraw()
+  }
+
+  /** Base da seleção de edição: varinha ∪ regiões desenhadas, no tamanho pedido. */
+  function editSelectionBase(w: number, h: number): HTMLCanvasElement | null {
+    const shape = propsRef.current.editWand
+    const index = colorIndexRef.current
+    const regions = editRegionsRef.current
+    const wand = shape && index ? rasterizeWand(index, shape, w, h, docRef.current.width) : null
+    if (!wand && !regions) return null
+    if (wand && !regions) return wand
+    const out = document.createElement('canvas')
+    out.width = w
+    out.height = h
+    const ctx = out.getContext('2d')
+    if (!ctx) return wand
+    if (wand) ctx.drawImage(wand, 0, 0, w, h)
+    if (regions) ctx.drawImage(regions, 0, 0, w, h)
+    return out
+  }
+
+  /** A seleção completa de hoje (varinha ∪ regiões ∪ traços) como máscara
+   *  binária na resolução do índice de cor. null = não há índice, geometria
+   *  aplicada, ou nada marcado. */
+  function composeSelectionMask(): { index: ColorIndex; mask: Uint8Array; marked: number } | null {
+    const index = colorIndexRef.current
+    const d = docRef.current
+    if (!index || !isGeometryIdentity(d.geometry)) return null
+    const base = editSelectionBase(index.width, index.height)
+    const full = selectionMaskPngCanvas(base, propsRef.current.editStrokes, index.width, index.height)
+    const fctx = full.getContext('2d', { willReadFrequently: true })
+    if (!fctx) return null
+    const px = fctx.getImageData(0, 0, index.width, index.height).data
+    const n = index.width * index.height
+    const mask = new Uint8Array(n)
+    let marked = 0
+    // O PNG da máscara é branco sobre preto e opaco: quem manda é o canal R.
+    for (let i = 0; i < n; i++) if (px[i * 4] > 127) { mask[i] = 255; marked++ }
+    return { index, mask, marked }
+  }
+
+  /** Grava uma máscara como a seleção inteira: vira região única, a forma da
+   *  varinha e os traços são absorvidos. */
+  function writeSelection(
+    index: ColorIndex,
+    mask: Uint8Array,
+    n: number,
+    before: number,
+  ): { coverage: number; before: number; applied: boolean } | null {
+    const src = maskToCanvas(index, mask)
+    const regions = editRegions()
+    const rctx = regions?.getContext('2d')
+    if (!src || !regions || !rctx) return null
+    rctx.clearRect(0, 0, regions.width, regions.height)
+    rctx.drawImage(src, 0, 0, regions.width, regions.height)
+
+    let after = 0
+    for (let i = 0; i < n; i++) if (mask[i] > 127) after++
+    editPolyRef.current = null
+    wandOnlyRegionsRef.current = false
+    propsRef.current.onRegionsChange(true)
+    propsRef.current.onSelectionGrown()
+    scheduleDraw()
+    return { coverage: after / n, before, applied: true }
+  }
+
+  /** Compõe → transforma → grava. É o caminho único de toda operação sobre a
+   *  seleção; `maxCoverage` faz a transformação ser DESCARTADA se estourar. */
+  function transformSelection(
+    fn: (mask: Uint8Array, index: ColorIndex) => Uint8Array | undefined,
+    maxCoverage?: number,
+  ): { coverage: number; before: number; applied: boolean } | null {
+    const composed = composeSelectionMask()
+    if (!composed || composed.marked === 0) return null
+    pushSelectionUndo()
+    const { index, mask, marked } = composed
+    const n = index.width * index.height
+    const out = fn(mask, index)
+    if (!out) return null
+    const before = marked / n
+    if (maxCoverage !== undefined) {
+      let after = 0
+      for (let i = 0; i < n; i++) if (out[i] > 127) after++
+      if (after / n > maxCoverage) return { coverage: after / n, before, applied: false }
+    }
+    return writeSelection(index, out, n, before)
+  }
+
+  // Trocar de ferramenta abandona o polígono em curso. Enquanto isso não
+  // existia, o traço de um polígono esquecido seguia na tela sob a varinha —
+  // uma marcação que a ferramenta ativa não sabia explicar nem apagar.
+  useEffect(() => {
+    if (editSubTool === 'polygon') return
+    if (!editPolyRef.current) return
+    editPolyRef.current = null
+    setPolyCount(0)
+    scheduleDraw()
+  }, [editSubTool, scheduleDraw])
+
+  /** Empilha a seleção ATUAL. Chamar ANTES de qualquer coisa que a mude. */
+  function pushSelectionUndo() {
+    const composed = composeSelectionMask()
+    // Sem índice de cor (imagem sem CORS) não há como compor — a seleção segue
+    // funcionando, só não ganha undo próprio.
+    if (!composed) return
+    selUndoRef.current.push(rleEncode(composed.mask))
+    if (selUndoRef.current.length > SELECTION_HISTORY_LIMIT) selUndoRef.current.shift()
+    selRedoRef.current = []
+    propsRef.current.onSelectionHistory(true, false)
+  }
+
+  /** Devolve a máscara guardada para a tela, como região única. */
+  function restoreSelection(rle: Int32Array): boolean {
+    const index = colorIndexRef.current
+    if (!index) return false
+    const n = index.width * index.height
+    const ok = writeSelection(index, rleDecode(rle, n), n, 0)
+    propsRef.current.onSelectionHistory(
+      selUndoRef.current.length > 0,
+      selRedoRef.current.length > 0,
+    )
+    return ok !== null
   }
 
   // ── API imperativa ───────────────────────────────────────────────────────
@@ -1061,13 +1750,165 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
     },
     baseImage: () => baseImgRef.current,
     webglSupported: () => glOk,
+    // Resolução CHEIA: este raster vai para a IA, não para a tela.
+    wandMask: () => {
+      const d = docRef.current
+      return editSelectionBase(d.width, d.height)
+    },
+    clearEditRegions: () => {
+      // Desmarcar TAMBÉM é um gesto: sem empilhar, quem limpa sem querer não
+      // tem volta — que é exatamente a reclamação que trouxe este undo.
+      if (editRegionsRef.current || propsRef.current.editWand || propsRef.current.editStrokes.length > 0) {
+        pushSelectionUndo()
+      }
+      editRegionsRef.current = null
+      editPolyRef.current = null
+      wandOnlyRegionsRef.current = true
+      propsRef.current.onRegionsChange(false)
+      scheduleDraw()
+    },
+    // Crescer a seleção até o material inteiro.
+    //
+    // Só existe com geometria identidade — a mesma razão da varinha: os traços
+    // vivem em espaço de EXIBIÇÃO e o índice de cor em espaço de ORIGEM, e
+    // enquanto a geometria é identidade os dois coincidem. Com perspectiva
+    // aplicada seria preciso deformar o raster pela inversa da homografia.
+    //
+    // O resultado vira uma REGIÃO (raster), porque uma área crescida não cabe
+    // nos parâmetros de uma WandShape: ela nasce de traços, varinha e regiões
+    // ao mesmo tempo. Depois disso a seleção é uma coisa só.
+    undoSelection: () => {
+      const anterior = selUndoRef.current.pop()
+      if (!anterior) return false
+      const atual = composeSelectionMask()
+      if (atual) selRedoRef.current.push(rleEncode(atual.mask))
+      return restoreSelection(anterior)
+    },
+    redoSelection: () => {
+      const proximo = selRedoRef.current.pop()
+      if (!proximo) return false
+      const atual = composeSelectionMask()
+      if (atual) selUndoRef.current.push(rleEncode(atual.mask))
+      return restoreSelection(proximo)
+    },
+    growEditSelection: (opts) => transformSelection((mask, index) => {
+      const { mask: grown } = growSelectionAuto(index, mask, {
+        tolerance: propsRef.current.wandTolerance,
+        contiguous: propsRef.current.wandContiguous,
+        sampleRadius: wandSampleRadius(index, docRef.current.width),
+      })
+      return grown
+    }, opts?.maxCoverage),
+
+    // Ajustes da seleção — expandir, contrair, suavizar, tapar buraco, limpar
+    // respingo, inverter, selecionar tudo.
+    //
+    // Existiam no V4 e sumiram na fusão junto com o raster: eram operações de
+    // morfologia sobre `Uint8Array`, e a varinha virou forma paramétrica. A
+    // biblioteca (`lib/selection/mask-raster`) nunca saiu do repositório —
+    // ficou órfã, com testes passando e ninguém chamando. Voltam pelo mesmo
+    // caminho do crescimento: compõe tudo num raster, transforma, grava de
+    // volta como região.
+    //
+    // Nenhuma delas consome node. São aritmética de browser.
+    refineSelection: (op, px = 2) => {
+      if (op === 'selectAll') {
+        const index = colorIndexRef.current
+        const d = docRef.current
+        if (!index || !isGeometryIdentity(d.geometry)) return null
+        const n = index.width * index.height
+        const all = new Uint8Array(n).fill(255)
+        // Selecionar tudo não passa pelo transformSelection (não depende de haver
+        // seleção antes), então empilha aqui — senão seria o único gesto sem volta.
+        pushSelectionUndo()
+        return writeSelection(index, all, n, 0)
+      }
+      return transformSelection((mask, index) => {
+        const { width: w, height: h } = index
+        switch (op) {
+          case 'expand':       return expandSelection(mask, w, h, px)
+          case 'contract':     return contractSelection(mask, w, h, px)
+          case 'smooth':       return smoothSelection(mask, w, h, px)
+          case 'fillHoles':    return fillSelectionHoles(mask, w, h)
+          // O piso de tamanho acompanha a imagem: 0,002% do total. Numa de 4 MP
+          // são ~85 px — some com o salpico da varinha em textura ruidosa e
+          // preserva qualquer coisa que alguém tenha marcado de propósito.
+          case 'cleanIslands': return removeSmallIslands(mask, w, h, Math.max(24, Math.round(w * h * 0.00002)))
+          case 'invert':       return invertSelection(new Uint8Array(mask))
+        }
+      })
+    },
+    // A seleção como PNG branco-sobre-preto, no tamanho do documento — é o que
+    // o "Colar na borda" manda ao servidor.
+    selectionBlob: async () => {
+      const d = docRef.current
+      const base = editSelectionBase(d.width, d.height)
+      if (!base && propsRef.current.editStrokes.length === 0) return null
+      const canvas = selectionMaskPngCanvas(base, propsRef.current.editStrokes, d.width, d.height)
+      return new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
+    },
+
+    // Substitui a seleção pela máscara refinada que voltou do servidor. Ela
+    // nasce casada com a imagem (mesmas dimensões), então entra como região
+    // única e absorve forma e traços — igual a qualquer outra transformação.
+    loadSelectionMask: async (url: string) => {
+      const regions = editRegions()
+      const rctx = regions?.getContext('2d')
+      if (!regions || !rctx) return false
+      pushSelectionUndo()
+      const img = await new Promise<HTMLImageElement | null>((resolve) => {
+        const im = new Image()
+        im.crossOrigin = 'anonymous'
+        im.onload = () => resolve(im)
+        im.onerror = () => resolve(null)
+        im.src = url
+      })
+      if (!img) return false
+      rctx.clearRect(0, 0, regions.width, regions.height)
+      rctx.drawImage(img, 0, 0, regions.width, regions.height)
+      // O PNG vem branco sobre PRETO opaco; a região precisa de alpha, senão o
+      // preto de fora conta como selecionado. Converte no lugar.
+      const id = rctx.getImageData(0, 0, regions.width, regions.height)
+      const dt = id.data
+      for (let i = 0; i < dt.length; i += 4) {
+        const on = dt[i] > 127
+        const v = on ? 255 : 0
+        dt[i] = v; dt[i + 1] = v; dt[i + 2] = v; dt[i + 3] = v
+      }
+      rctx.putImageData(id, 0, 0)
+
+      editPolyRef.current = null
+      wandOnlyRegionsRef.current = false
+      propsRef.current.onRegionsChange(true)
+      propsRef.current.onSelectionGrown()
+      scheduleDraw()
+      return true
+    },
+
+    // (mantido no handle para uso interno/testes; a TELA decide por
+    //  `canSample` + geometria, sem ler ref durante o render.)
+    // A varinha lê a imagem ORIGINAL; os traços e o overlay vivem no espaço já
+    // corrigido pela geometria. Enquanto a geometria é identidade os dois
+    // espaços coincidem e não há o que reconciliar. Com perspectiva ou corte
+    // aplicados, reconciliar exigiria deformar o raster pela inversa da
+    // homografia — trabalho que só se paga se alguém precisar, e a ordem do
+    // trilho (Editar primeiro, Geometria depois) diz que raramente vai
+    // precisar. Até lá, a varinha se desliga e a tela explica por quê, em vez
+    // de entregar uma seleção silenciosamente torta.
+    wandAvailable: () => colorIndexRef.current !== null && isGeometryIdentity(docRef.current.geometry),
+    // composeSelectionMask/writeSelection/transformSelection são declarações de
+    // função do corpo do componente: mudam de identidade a cada render, mas só
+    // leem refs (docRef, propsRef, colorIndexRef, editRegionsRef). Listá-las
+    // recriaria o handle a cada render sem ganho nenhum; omiti-las não deixa o
+    // handle velho, porque não há estado capturado nelas.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [baseReady, glOk, onZoomChange, scheduleDraw])
 
   // ── Cursor CSS ───────────────────────────────────────────────────────────
 
   const painting = compareMode === 'none' && (
     (tool === 'masks' && activeLocalId && maskInteraction === 'brush')
-    || tool === 'cleanup'
+    || (tool === 'edit' && (editSubTool === 'brush' || editSubTool === 'eraser'))
     || (tool === 'elements' && activeElementId && elementMaskMode)
   )
   const cursorStyle = compareMode === 'split'
@@ -1097,6 +1938,7 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
         onPointerLeave={(e) => { cursorRef.current = null; endDrag(e) }}
+        onDoubleClick={() => { if (polyCount >= 3) closeEditPolygon() }}
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', touchAction: 'none', cursor: cursorStyle }}
       />
       {!glOk && (
@@ -1109,6 +1951,20 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
       )}
       {glOk && !baseReady && (
         <div style={overlayMsg}>Carregando imagem…</div>
+      )}
+      {polyCount >= 3 && (
+        <button
+          type="button"
+          onClick={closeEditPolygon}
+          className="spn-glass spn-glass--raised"
+          style={{
+            position: 'absolute', left: '50%', bottom: 16, transform: 'translateX(-50%)',
+            padding: '7px 14px', borderRadius: 999, fontSize: 12.5,
+            color: 'var(--color-text-primary)', cursor: 'pointer', zIndex: 3,
+          }}
+        >
+          Fechar área
+        </button>
       )}
     </div>
   )

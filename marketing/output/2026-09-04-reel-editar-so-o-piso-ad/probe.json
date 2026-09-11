@@ -1,0 +1,50 @@
+{
+  "slug": "2026-09-04-reel-editar-so-o-piso-ad",
+  "reel": "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-editar-so-o-piso-ad\\2026-09-04-reel-editar-so-o-piso-ad.mp4",
+  "banda": "1080×810 @ y=556",
+  "segments": [
+    {
+      "i": 0,
+      "type": "still",
+      "dur": 2,
+      "start": 0,
+      "crop": "3328×1280 → 1707×1280"
+    },
+    {
+      "i": 1,
+      "type": "still",
+      "dur": 4.5,
+      "start": 1.5,
+      "crop": "3328×1280 → 1707×1280"
+    },
+    {
+      "i": 2,
+      "type": "card",
+      "dur": 1.2,
+      "start": 6,
+      "crop": null
+    }
+  ],
+  "width": 1080,
+  "height": 1920,
+  "fps": "30/1",
+  "pix_fmt": "yuv420p",
+  "codec": "h264",
+  "duration": "7.20",
+  "sizeMB": "1.86",
+  "esperado": {
+    "width": 1080,
+    "height": 1920,
+    "fps": "30/1",
+    "duration": "7.20"
+  },
+  "qaFrames": [
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-editar-so-o-piso-ad\\qa-frames\\t0.70s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-editar-so-o-piso-ad\\qa-frames\\t1.75s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-editar-so-o-piso-ad\\qa-frames\\t2.30s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-editar-so-o-piso-ad\\qa-frames\\t4.50s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-editar-so-o-piso-ad\\qa-frames\\t5.90s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-editar-so-o-piso-ad\\qa-frames\\t6.60s.png"
+  ],
+  "qaSheet": "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-editar-so-o-piso-ad\\qa-sheet.jpg"
+}

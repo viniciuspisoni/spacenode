@@ -1,0 +1,107 @@
+{
+ "slug": "pisca-fachada-geminada",
+ "title": "Pisca: a casa não se mexe",
+ "pillar": "fidelidade-geometrica",
+ "angle": "Corte seco alternado print/render, cada vez mais rápido, sem transição para esconder nada, com marcas de registro fixas nos cantos dos volumes — se a geometria derivasse, o pisca denunciaria.",
+ "format": "transformacao",
+ "duration_s": 9,
+ "hook_text": "Pisca. A casa não se mexe.",
+ "hook_visual": "Elevação frontal de duas casas geminadas em print do SketchUp (dois cubos brancos envidraçados, muro de concreto, abrigo de carro, pinheiros de biblioteca, céu branco) em faixa 16:9, com quatro marcas de registro hairline nos cantos externos dos cubos. A partir de 1,0s a imagem pisca entre print e render em cadência acelerada (0,8 → 0,3s): céu, pinheiros e piso mudam; os dois cubos, o muro e a escada ficam cravados nas marcas.",
+ "scenes": [
+  {
+   "t": "0.0–1.0",
+   "visual": "Print #382 em faixa 16:9 1080×593 (y 664–1257) sobre fundo desfocado escurecido. Quatro marcas de registro (cruz hairline de 24px, branco 70%) nos cantos externos dos dois cubos brancos (x≈27% e 72%, y≈30% e 61% da imagem). Headline 70px acima da faixa aos 0,15s.",
+   "text_on_screen": "Pisca. A casa não se mexe.",
+   "asset_idx": [
+    382
+   ]
+  },
+  {
+   "t": "1.0–1.8",
+   "visual": "Corte seco → render #381 (0,8s). Marcas de registro não se movem.",
+   "text_on_screen": "Pisca. A casa não se mexe.",
+   "asset_idx": [
+    381
+   ]
+  },
+  {
+   "t": "1.8–2.4",
+   "visual": "Corte seco → print (0,6s).",
+   "text_on_screen": "Pisca. A casa não se mexe.",
+   "asset_idx": [
+    382
+   ]
+  },
+  {
+   "t": "2.4–2.9",
+   "visual": "Corte seco → render (0,5s).",
+   "text_on_screen": "Pisca. A casa não se mexe.",
+   "asset_idx": [
+    381
+   ]
+  },
+  {
+   "t": "2.9–3.3",
+   "visual": "Corte seco → print (0,4s).",
+   "text_on_screen": "Pisca. A casa não se mexe.",
+   "asset_idx": [
+    382
+   ]
+  },
+  {
+   "t": "3.3–3.6",
+   "visual": "Corte seco → render (0,3s).",
+   "text_on_screen": "Pisca. A casa não se mexe.",
+   "asset_idx": [
+    381
+   ]
+  },
+  {
+   "t": "3.6–3.9",
+   "visual": "Corte seco → print (0,3s) — último pisca.",
+   "text_on_screen": "Pisca. A casa não se mexe.",
+   "asset_idx": [
+    382
+   ]
+  },
+  {
+   "t": "3.9–7.2",
+   "visual": "Render preso. Apoio entra aos 4,0s (60px abaixo da faixa); marcas de registro somem aos 4,4s. Ken Burns 1,00→1,05 com centro entre os dois cubos (nunca no carro).",
+   "text_on_screen": "Pisca. A casa não se mexe. / Mesma câmera, mesmos vãos, mesma escada.",
+   "asset_idx": [
+    381
+   ]
+  },
+  {
+   "t": "7.2–9.0",
+   "visual": "Scrim + CTA + wordmark monocromático.",
+   "text_on_screen": "Teste com um projeto real",
+   "asset_idx": [
+    381
+   ]
+  }
+ ],
+ "assets": [
+  382,
+  381
+ ],
+ "cta": "Teste com um projeto real",
+ "caption": "Corte seco entre print e render, sem transição para esconder nada. Se a geometria mexesse, você veria.\n\nCasas geminadas, elevação frontal. Sete cortes secos, cada vez mais rápidos, entre o print do SketchUp e a imagem gerada. Marcas de registro nos cantos dos dois volumes — não saem do lugar.\n\nVãos, muro, abrigo do carro e escada de acesso na mesma posição. O entorno muda (céu, pinheiros, piso), porque entorno é cena. A casa é projeto.\n\nFidelidade tem limite honesto: material e vegetação são lidos, não copiados. Por isso o teste que vale é no seu próprio modelo.\n\nTeste com um projeto real — link na bio.\n#archviz #sketchup #renderizacao #projetodearquitetura #arquitetura",
+ "hashtags": [
+  "#archviz",
+  "#sketchup",
+  "#renderizacao",
+  "#projetodearquitetura",
+  "#arquitetura"
+ ],
+ "paid": {
+  "primary": "Corte seco entre print e render. Se a geometria mexesse, você veria. Comece grátis, sem cartão.",
+  "headline": "A casa não se mexe. A luz, sim.",
+  "description": "Sem cartão de crédito",
+  "button": "SIGN_UP",
+  "cutdown_note": "Já tem 9s — serve como anúncio sem cortes. Se precisar de 6s: manter 0–3,9s (o pisca inteiro é o gancho) e entrar direto no CTA sobre o render aos 4,0s com o apoio embutido no card."
+ },
+ "why_converts": "O pisca é o formato de prova mais barato de entender em tela pequena e sem som: o cérebro detecta movimento de borda involuntariamente, então 'nada se mexeu' é percebido, não lido. A cadência acelerada segura os 3 primeiros segundos e provoca rewatch (o viewer volta para pegar o pisca). A copy nomeia o limite honesto (entorno muda, casa não), o que é exatamente o que o cético precisa ouvir para confiar. O CTA 'Teste com um projeto real' converte o ceticismo em ação de custo zero (cadastro sem cartão); a assinatura vem quando o próprio pisca no modelo dele confirma o que viu — e ele precisa de volume para a entrega.",
+ "production_notes": "Recorte: #382 (1567×857, 1,83:1) e #381 (2784×1536, 1,81:1) cortados para o mesmo 1,81:1 alinhando pelos cubos; QA de blend 50/50 é OBRIGATÓRIO aqui (o pisca amplifica qualquer desalinhamento — tolerância 3px em 1080; se estourar, aplicar leve escala ao print). Corte seco puro: nenhum xfade, nenhum fade — o device é a ausência de transição. Escurecimento do fundo desfocado calibrado por lado (print tem céu branco; render, céu azul) para o pisca não virar flash de luminância; se ainda pulsar, colocar a faixa sobre #0a0a0a liso. Marcas de registro em card SVG transparente, fixas em tempo global 0–4,4s. Palavra em verde: 'não se mexe'. Ken Burns máx. 1,05 e centrado nos cubos — o carro tem a estrela da Mercedes na grade (marca de terceiro): não aproximar. Alternativas pagas: (b) prazo — 'Print às 9h, elevação renderizada às 9h07. Mesma casa, mesmos vãos.' / 'Elevação pronta em minutos'; (c) tradicional-vs — 'Sem fila de renderista: sobe o print, confere a geometria, apresenta.' / 'Sem fila, sem espera'.",
+ "risks": "NÃO prometer: que o entorno seja preservado (pinheiros de biblioteca viraram pinheiros reais, asfalto virou piso intertravado, encosta ganhou rochas); contagem exata de montantes dos cubos (não verificada — o texto fala em 'vãos', não em número); 'IA que não erra'; plugin/importação direta (gated); nenhum número. O carro traz logotipo de terceiro — sem zoom e sem menção. Se o QA de blend acusar deriva no muro ou na escada, trocar 'mesma escada' por 'mesmo muro' ou abandonar o par por #445←#446."
+}

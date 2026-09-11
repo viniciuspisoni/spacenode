@@ -1,0 +1,9 @@
+Render dentro do SketchUp. O painel da SpaceNode abre ao lado do modelo: captura a vista, gera, e o antes/depois fica no próprio painel.
+
+Mesma câmera, mesmo modelo — o render sai da vista que você já enquadrou. Proporção, lente, altura do olho e verticais retas viram parte do resultado.
+
+Plugin oficial para SketchUp 2021 ou superior, grátis: os renders usam os Nodes da sua conta. Extensão (.rbz) no site.
+
+Instale o plugin — link na bio.
+
+#sketchup #plugin #render #archviz #arquitetura #renderizacao

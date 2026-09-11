@@ -32,6 +32,17 @@ import {
 import { DNA_EXTRACTION_COST, getVistaGenerationCost, getAvailableQualities } from '@/lib/spaces/economy'
 import { getUpscaleCostNodes, scaleToFactor, MAX_OUTPUT_MP, type ModeId, type Scale } from '@/lib/upscale'
 import { PRESET_LABELS_EN } from '@/lib/sketchup/preset-labels-en'
+import { PLUGIN_VERSION, PLUGIN_RBZ_PATH, PLUGIN_RELEASE_NOTE } from '@/lib/sketchup/plugin-release'
+import {
+  APRESENTAR_TOOLS,
+  HUMANIZED_PLAN_PROJECT_TYPES,
+  HUMANIZED_PLAN_STYLES,
+  HUMANIZED_PLAN_LEVELS,
+  HUMANIZED_PLAN_DEFAULT_OPTIONS,
+} from '@/lib/apresentar/config'
+import { ORION_CONFIG } from '@/lib/orion/config'
+import { canUseOrion } from '@/lib/orion/access'
+import { orionProviderReady } from '@/lib/orion/provider'
 
 // i18n EN do painel do plugin: presets (mapa gerado, valor enviado à API
 // segue pt-BR) + rótulos estruturais do catálogo. O chrome do painel
@@ -41,7 +52,18 @@ const CATALOG_I18N_EN = {
   ui: {
     projectTypes: { interior: 'Interior', exterior: 'Exterior' } as Record<string, string>,
     backgroundLabels: { interior: 'Visual context', exterior: 'Surroundings' } as Record<string, string>,
-    engineTaglines: { vega: 'Premium', pulsar: 'Fast', quasar: 'Special' } as Record<string, string>,
+    // Sem entrada pro Orion: o painel resolve `catUi(…)[id] || e.tagline`, e os
+    // dois lados estão vazios de propósito — o cartão dele mostra só o nome.
+    engineTaglines: { vega: 'Premium', pulsar: 'Fast', quasar: 'Special · ~2 min' } as Record<string, string>,
+    // Desde a v8 o cartão de TODO motor carrega só o nome (as taglines acima
+    // ficam de reserva pra painel antigo): quem explica a escolha é esta
+    // linha, que muda com a seleção — igual ao /app/generate.
+    engineDescriptions: {
+      vega:   'Absolute fidelity. Final delivery; editing preserves the project pixel by pixel.',
+      pulsar: 'Iteration and volume. Fast exploration at high speed.',
+      quasar: 'The house default: finish and fidelity in balance. Takes about 2 minutes.',
+      orion:  'High-fidelity engine with a fast response.',
+    } as Record<string, string>,
     resolutionNotes: {
       hd: 'Quick tests',
       '2k': 'Ideal for presentations',
@@ -63,6 +85,23 @@ const CATALOG_I18N_EN = {
       conceito: 'Concept',
     } as Record<string, string>,
     upscaleModes: { fidelity: 'Fidelity' } as Record<string, string>,
+    plan: {
+      projectTypes: {
+        apartamento: 'Apartment', casa: 'House', comercial: 'Retail',
+        corporativo: 'Office', paisagismo: 'Landscape',
+      } as Record<string, string>,
+      styles: {
+        clean_tecnico: 'Clean technical', imobiliario_premium: 'Premium listing',
+        editorial_minimalista: 'Editorial minimal', aquarelado: 'Watercolour',
+        contemporaneo: 'Contemporary',
+      } as Record<string, string>,
+      levels: { leve: 'Light', equilibrado: 'Balanced', completo: 'Full' } as Record<string, string>,
+      options: {
+        addFurniture: 'Furniture', addVegetation: 'Planting',
+        applyFloorTextures: 'Floor textures', addSoftShadows: 'Soft shadows',
+        preserveLines: 'Keep the technical linework', addRoomLabels: 'Room names',
+      } as Record<string, string>,
+    },
     animar: {
       videoTypes: {
         cinematic: { label: 'Presentation', tagline: 'Subtle, elegant motion that brings the render to life.' },
@@ -172,6 +211,11 @@ export async function GET(req: NextRequest) {
   const { user } = await getRequestUser(req)
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
+  // Mesmo gate da página e da rota de geração — decidido no SERVIDOR. O
+  // painel do plugin só mostra o que vier aqui.
+  const orionAllowed =
+    (await canUseOrion({ id: user.id, email: user.email })) && orionProviderReady()
+
   // Ampliar: grade derivada DA PRÓPRIA função de custo (zero drift). O
   // surcharge por megapixel é do INPUT: derivado por sondas na mesma função.
   const upscaleModes: { id: ModeId; label: string; scales: Scale[] }[] = [
@@ -215,25 +259,89 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({
-    version: 6,
+    // v9: plan — presets da Planta humanizada (o painel captura a planta do
+    // modelo e chama a mesma rota do site).
+    // v8: engines[].description — o painel explica o motor embaixo da grade,
+    // em vez de deixar a escolha por conta de um chavão no cartão.
+    // v7: pluginLatest. Distribuímos .rbz fora do Extension Warehouse, então
+    // não existe atualização automática — sem isto, quem instalou uma vez
+    // nunca fica sabendo que saiu versão nova. O plugin compara com a VERSION
+    // dele e avisa; nunca bloqueia.
+    version: 9,
+    pluginLatest: {
+      version: PLUGIN_VERSION,
+      path: PLUGIN_RBZ_PATH,
+      note: PLUGIN_RELEASE_NOTE,
+    },
     i18n: { en: CATALOG_I18N_EN },
     upscale,
     spaces,
     animar: buildAnimarCatalog(),
-    engines: ENGINE_ORDER.map(id => {
-      const e = ENGINES[id]
-      return {
-        id,
-        name: e.name,
-        tagline: e.tagline,
-        resolutions: e.resolutions.map(r => ({
-          id: r,
-          label: RESOLUTION_LABELS[r].label,
-          note: RESOLUTION_LABELS[r].note,
-          nodes: e.nodes[r] ?? 0,
-        })),
-      }
-    }),
+    // Planta humanizada: o plugin captura a planta DO MODELO (topo, projeção
+    // paralela, corte) e manda pra mesma rota que o site usa. Os presets vêm
+    // daqui pra não existir uma segunda lista em Ruby.
+    plan: {
+      nodes: APRESENTAR_TOOLS.humanized_plan.nodes ?? 0,
+      cutHeightM: 1.2,
+      projectTypes: HUMANIZED_PLAN_PROJECT_TYPES,
+      styles: HUMANIZED_PLAN_STYLES.map(s => ({ id: s.id, label: s.label, desc: s.desc })),
+      levels: HUMANIZED_PLAN_LEVELS.map(l => ({ id: l.id, label: l.label, desc: l.desc })),
+      defaults: {
+        projectType: 'casa',
+        style: 'clean_tecnico',
+        level: 'equilibrado',
+        options: HUMANIZED_PLAN_DEFAULT_OPTIONS,
+      },
+      optionOrder: Object.keys(HUMANIZED_PLAN_DEFAULT_OPTIONS),
+      optionLabels: {
+        addFurniture: 'Mobiliário',
+        addVegetation: 'Vegetação',
+        applyFloorTextures: 'Texturas de piso',
+        addSoftShadows: 'Sombras suaves',
+        preserveLines: 'Preservar o traço técnico',
+        addRoomLabels: 'Nomes dos ambientes',
+      } as Record<string, string>,
+    },
+    engines: [
+      ...ENGINE_ORDER.map(id => {
+        const e = ENGINES[id]
+        return {
+          id,
+          name: e.name,
+          tagline: e.tagline,
+          // v8: o painel mostra a descrição embaixo da grade de motores —
+          // sem ela o cartão era um nome de astronomia e um chavão.
+          description: e.description,
+          resolutions: e.resolutions.map(r => ({
+            id: r,
+            label: RESOLUTION_LABELS[r].label,
+            note: RESOLUTION_LABELS[r].note,
+            nodes: e.nodes[r] ?? 0,
+          })),
+        }
+      }),
+      // Orion vive FORA do catálogo público (lib/engines) e só entra na
+      // resposta quando o servidor autoriza: flag + credencial do fornecedor,
+      // o mesmo gate da página /app/generate. Sem isso o painel ofereceria um
+      // motor que o /api/generate recusaria com 404. O plugin monta os cards
+      // a partir desta lista, então nenhum .rbz novo é necessário.
+      ...(orionAllowed
+        ? [{
+            id: ORION_CONFIG.id,
+            name: ORION_CONFIG.name,
+            tagline: ORION_CONFIG.tagline,
+            description: ORION_CONFIG.description,
+            resolutions: ORION_CONFIG.resolutions.map(r => ({
+              id: r,
+              label: RESOLUTION_LABELS[r].label,
+              // O "4K" do Orion é UHD (3840 no lado maior, teto do
+              // fornecedor), não os 4096 px de Vega/Pulsar.
+              note: RESOLUTION_LABELS[r].note,
+              nodes: ORION_CONFIG.nodes[r] ?? 0,
+            })),
+          }]
+        : []),
+    ],
     // Sem `fidelityLevels`/`defaults.fidelityLevel` desde a v5: o seletor
     // foi descontinuado (fidelidade é sempre máxima). O plugin v0.5.2 em
     // campo lê `fidelityLevels || []` e renderiza a seção vazia — inofensivo.

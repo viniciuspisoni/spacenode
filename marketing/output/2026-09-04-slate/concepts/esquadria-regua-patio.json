@@ -1,0 +1,85 @@
+{
+ "slug": "esquadria-regua-patio",
+ "title": "A esquadria continua onde você desenhou",
+ "pillar": "fidelidade-geometrica",
+ "angle": "Contorno fino da esquadria traçado no print + régua vertical revelando o render por baixo + zoom em detalhe no vão do térreo — montante e caixilho encaixados no mesmo lugar.",
+ "format": "transformacao",
+ "duration_s": 11,
+ "hook_text": "Esquadria no lugar. Guarda-corpo no lugar.",
+ "hook_visual": "Print do SketchUp de um pátio com piscina (céu azul chapado, casa em L de concreto e madeira, três espreguiçadeiras, escada da piscina) em banda 4:5 quase full-bleed. Um contorno hairline desenha o vão envidraçado do térreo, a linha do guarda-corpo do balcão e a janela superior. Aos 1,4s uma régua vertical atravessa da esquerda para a direita e o render aparece por baixo — o contorno não sai do lugar.",
+ "scenes": [
+  {
+   "t": "0.0–1.4",
+   "visual": "Print #396 em banda 4:5 1080×1281 (y 320–1601) sobre #0a0a0a. Contorno hairline branco (2px, 70%) desenha em 0,6s: retângulo do vão envidraçado do térreo à esquerda (x 4–44%, y 43–63% da imagem) com seus dois montantes, linha superior do guarda-corpo de vidro do balcão (y≈29%), janela do pavimento superior à direita (x 73–94%, y 27–32%). Headline sobre o céu chapado (y≈380–470 do frame) com scrim leve de 20%.",
+   "text_on_screen": "Esquadria no lugar. Guarda-corpo no lugar.",
+   "asset_idx": [
+    396
+   ]
+  },
+  {
+   "t": "1.4–2.6",
+   "visual": "xfade=wipeleft linear de 1,2s print→render com régua vertical hairline (2px, tique superior e inferior) acompanhando a borda. Imagens paradas; só a borda anda. O contorno fica imóvel por cima.",
+   "text_on_screen": "Esquadria no lugar. Guarda-corpo no lugar.",
+   "asset_idx": [
+    396,
+    395
+   ]
+  },
+  {
+   "t": "2.6–4.2",
+   "visual": "Render #395 com o contorno preso por 1,6s — caixilhos pretos, guarda-corpo e janela caem dentro do traço. Apoio entra aos 2,8s na base da banda, sobre a grama (scrim 30%).",
+   "text_on_screen": "Esquadria no lugar. Guarda-corpo no lugar. / Do print à apresentação, em minutos.",
+   "asset_idx": [
+    395
+   ]
+  },
+  {
+   "t": "4.2–4.6",
+   "visual": "Contorno some (0,2s). Corte seco de 0,4s de volta ao print (confere), depois corte seco para o render.",
+   "text_on_screen": "Do print à apresentação, em minutos.",
+   "asset_idx": [
+    396,
+    395
+   ]
+  },
+  {
+   "t": "4.6–8.5",
+   "visual": "Ken Burns push 1,00→1,22 em 3,9s com centro no vão do térreo à esquerda (x≈24%, y≈54% da imagem): montantes, caixilho preto e a mesa de reunião atrás do vidro. Headline sai aos 6,5s.",
+   "text_on_screen": "Do print à apresentação, em minutos.",
+   "asset_idx": [
+    395
+   ]
+  },
+  {
+   "t": "8.5–11.0",
+   "visual": "Scrim + CTA + wordmark monocromático.",
+   "text_on_screen": "Veja no seu próprio projeto",
+   "asset_idx": [
+    395
+   ]
+  }
+ ],
+ "assets": [
+  396,
+  395
+ ],
+ "cta": "Veja no seu próprio projeto",
+ "caption": "A pergunta certa não é \"ficou bonito?\". É: a esquadria continua onde você desenhou?\n\nPátio com piscina, print do modelo com o céu chapado do SketchUp. A régua atravessa a imagem e o contorno da esquadria — traçado no print — segue encaixado no render: vão do térreo, guarda-corpo de vidro, janela do pavimento superior.\n\nDepois, zoom no vão da sala. Montante, caixilho e a mesa lá dentro no mesmo lugar. A câmera não foi reposicionada para \"ficar melhor\".\n\nVegetação, água e reflexos são interpretação — é o que a cena pede. O que é projeto, fica.\n\nVeja no seu próprio projeto — link na bio.\n#arquitetura #sketchup #render #visualizacaoarquitetonica #projetodearquitetura",
+ "hashtags": [
+  "#arquitetura",
+  "#sketchup",
+  "#render",
+  "#visualizacaoarquitetonica",
+  "#projetodearquitetura"
+ ],
+ "paid": {
+  "primary": "A esquadria continua onde você desenhou. Print do modelo → imagem de apresentação, em minutos. Cadastro grátis.",
+  "headline": "Geometria travada, câmera travada",
+  "description": "Teste com um projeto real",
+  "button": "SIGN_UP",
+  "cutdown_note": "Versão ≤15s: manter 0–4,2s intactos (contorno + régua é o gancho), cortar o corte de volta, push de 2s em vez de 3,9s e CTA aos 7s — total 9s. Retrato 4:5 lê bem em feed e Reels; nada de texto fora do terço central."
+ },
+ "why_converts": "Fala a língua do ofício (esquadria, montante, guarda-corpo, caixilho) — quem se reconhece nesse vocabulário é o comprador com projeto real na mão, não o curioso. A régua é o device da marca e o contorno traçado no print é prova verificável, não promessa. A legenda transfere o critério: 'a pergunta certa é X' — e a única forma de responder é subir o próprio print, o que o cadastro grátis (sem cartão) permite sem atrito. Quando o arquiteto vê a própria esquadria preservada, o valor está demonstrado no projeto dele; a assinatura entra quando ele precisa de mais imagens do que o saldo gratuito cobre para uma apresentação de cliente.",
+ "production_notes": "Recorte: #396 (733×867) e #395 (944×1120) têm o mesmo aspecto (~0,845) — cortar minimamente para 1080×1281 e alinhar pela quina da laje superior; QA de blend 50/50 antes de traçar o contorno (montantes do térreo a ≤4px). Contorno: SVG transparente sobre a banda; usar o traçado do PRINT, nunca redesenhar sobre o render. Régua: hairline 2px #f5f5f7 com 2 tiques; xfade linear (não usar ease). Palavra em verde: 'Esquadria'. Headline sobre o céu chapado (área vazia nas duas imagens) com scrim ≤20%; CTA sobre a grama com scrim 40%. Zona segura respeitada: banda ocupa 320–1601, textos entre 380 e 1560. Se a contagem de montantes bater 1:1 no QA, a variação de legenda 'Conte os montantes no print. Agora conte no render.' pode substituir o gancho (mais rewatch). Alternativas pagas: (b) prazo — 'Imagem de apresentação em minutos, com a esquadria onde você desenhou.' / 'Do print à reunião em minutos'; (c) controle — 'Você decide a câmera. A imagem respeita.' / 'Sua câmera, sua geometria'.",
+ "risks": "NÃO prometer: 'nada mudou' (o render adicionou plantas no primeiro plano, mudou grama, água e reflexos — isso é cena, não projeto); coerência de montantes 1:1 sem o QA de blend; 'câmera idêntica' em número (ex.: 'mesmo ângulo de 35mm') — não temos esse dado; plugin/importação direta (gated); nenhum número de tempo além de 'em minutos'. Rótulo 'Fachada Residencial' no banco é impreciso — não exibir metadados. Mesma casa de #443/#441: não reusar as duas no mesmo lote para não parecer repetição."
+}

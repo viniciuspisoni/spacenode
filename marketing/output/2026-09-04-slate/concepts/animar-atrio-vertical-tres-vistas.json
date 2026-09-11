@@ -1,0 +1,102 @@
+{
+ "slug": "animar-atrio-vertical-tres-vistas",
+ "title": "Três vistas e um vídeo vertical",
+ "pillar": "coerencia-entre-angulos",
+ "angle": "O kit inteiro de apresentação de um átrio corporativo saindo do mesmo projeto: três vistas coerentes do Spaces e um vídeo que já nasce vertical (preset Reels de Projeto) — o payoff é o único clipe 9:16 nativo do acervo ocupando a tela inteira, sem barras.",
+ "format": "serie",
+ "duration_s": 14,
+ "hook_text": "Mesmo projeto. Três vistas. Um vídeo vertical.",
+ "hook_visual": "0–0,9s: print SketchUp #584 em faixa 16:9 full-width (1080×608) sobre #0a0a0a — átrio cinza com claraboia em grelha, lajes curvas, gramado marrom, escada rolante à direita. 0,9–1,2s: wipe para a vista #583 na mesma câmera (lajes brancas com fita de LED, vitrines, jardim tropical central, escada rolante no mesmo lugar); headline entra. Cortes secos para as vistas 2 e 3 a cada 1,2s; aos 4,8s o vídeo vertical #42 toma a tela inteira.",
+ "scenes": [
+  {
+   "t": "0,0–0,9s",
+   "visual": "Print #584 (2207×857) recortado em 16:9 centrado no átrio, faixa full-width no terço médio.",
+   "text_on_screen": "label: print",
+   "asset_idx": [
+    584
+   ]
+  },
+  {
+   "t": "0,9–1,2s",
+   "visual": "xfade wipeleft 0,3s para a vista #583 (3328×1280), mesmo recorte 16:9 alinhado pela claraboia e pela escada rolante.",
+   "text_on_screen": "Mesmo projeto. Três vistas. Um vídeo vertical.",
+   "asset_idx": [
+    584,
+    583
+   ]
+  },
+  {
+   "t": "1,2–2,4s",
+   "visual": "Vista #583 parada: claraboia em grelha de vidro, lajes curvas brancas com LED nas bordas, vitrines de vidro, jardim central, escada rolante à direita.",
+   "text_on_screen": "label: vista 1",
+   "asset_idx": [
+    583
+   ]
+  },
+  {
+   "t": "2,4–3,6s",
+   "visual": "Corte seco para #589 (3328×1280): corredor simétrico sob a claraboia, balcões com vegetação pendente, gramado central, pessoas caminhando ao longe.",
+   "text_on_screen": "label: vista 2",
+   "asset_idx": [
+    589
+   ]
+  },
+  {
+   "t": "3,6–4,8s",
+   "visual": "Corte seco para #585 (3328×1280): contra-plongée entre os balcões curvos até a claraboia, vidro refletindo o exterior arborizado. Headline sai aos 4,5s.",
+   "text_on_screen": "label: vista 3",
+   "asset_idx": [
+    585
+   ]
+  },
+  {
+   "t": "4,8–11,0s",
+   "visual": "Corte seco para o vídeo #42 (Veo, 1080×1920 nativo, 4s) FULL-BLEED, sem faixa nem fundo: claraboia de vidro com a torre espelhada atrás, lajes curvas com LED, árvores e forrações em primeiro plano; travelling lateral suave para a direita com parallax nas plantas. Reproduzir a 0,5× com interpolação (4s → 8s, usar 6,2s) ou ping-pong 4s+4s. Apoio entra aos 6,5s.",
+   "text_on_screen": "label: vídeo · 9:16 · apoio: Vertical, pronto para o seu perfil. Gerado em minutos.",
+   "asset_idx": [
+    42
+   ]
+  },
+  {
+   "t": "11,0–12,0s",
+   "visual": "Último frame congela; apoio sai.",
+   "text_on_screen": "",
+   "asset_idx": [
+    42
+   ]
+  },
+  {
+   "t": "12,0–14,0s",
+   "visual": "Card final: logo monocromático + CTA.",
+   "text_on_screen": "Renderize seu projeto",
+   "asset_idx": []
+  }
+ ],
+ "assets": [
+  584,
+  583,
+  589,
+  585,
+  42
+ ],
+ "cta": "Renderize seu projeto",
+ "caption": "Átrio corporativo: três vistas do Spaces e um vídeo vertical do Animar, gerados em minutos sobre os prints do modelo.\n\nAs três vistas vieram de câmeras diferentes do mesmo modelo, com a mesma luz, o mesmo LED nas bordas das lajes e o mesmo jardim central — é isso que o Spaces garante entre ângulos.\n\nO vídeo foi gerado a partir da primeira vista já em 9:16: travelling lateral suave, plantas em parallax, torre atrás da claraboia. Sai vertical direto da plataforma e vai para o seu Reel sem reenquadrar.\n\nClaraboia e lajes curvas no lugar nas três vistas e no vídeo.\n\nRenderize seu projeto — link na bio.\n\n#arquitetura #archviz #renderizacao #projetodearquitetura #visualizacaoarquitetonica",
+ "hashtags": [
+  "#arquitetura",
+  "#archviz",
+  "#renderizacao",
+  "#projetodearquitetura",
+  "#visualizacaoarquitetonica"
+ ],
+ "paid": {
+  "primary": "Três vistas do mesmo átrio e um vídeo já vertical, gerados em minutos a partir dos prints do modelo. Mesma luz, mesmo LED, mesmo jardim em todos os ângulos.",
+  "headline": "Vistas e vídeo do mesmo projeto",
+  "description": "Vertical, sem barras",
+  "button": "LEARN_MORE",
+  "cutdown_note": "≤15s já cabe (14s). Corte de 8s para tráfego: abrir direto no vídeo vertical #42 a 0,5× com headline aos 0,4s; aos 5s inserir as três vistas como três cortes de 0,6s em faixa; CTA sobre o último frame do vídeo."
+ },
+ "why_converts": "Fala com o público de maior ticket (corporativo/comercial, quem entrega várias vistas por projeto) e mostra dois módulos resolvendo um problema real cada: coerência entre ângulos (Spaces) e conteúdo vertical para o próprio perfil do escritório (Animar em 9:16) — arquiteto que posta o próprio trabalho é dor concreta. LEARN_MORE em vez de SIGN_UP porque esse comprador avalia capacidade antes de cadastrar: a landing mostra planos e o plugin. Funil: o cadastro grátis cobre a primeira vista; série de vistas mais um vídeo Cinemático vertical excede o saldo inicial por natureza — o volume que a peça exibe é o argumento do Pro/Studio, não do Starter.",
+ "production_notes": "O vídeo #42 é o ÚNICO clipe 9:16 nativo do acervo — é o único trecho full-bleed sem barras; as imagens ficam em faixa 16:9 de propósito, para o contraste 'faixa → tela inteira' ser o payoff. #43 (video_src) é a mesma imagem de #583; o vídeo vertical foi gerado da vista panorâmica reenquadrada em 9:16 pelo próprio Animar (preset Reels de Projeto, saída 1080×1920). Clipe de 4s a 0,5×: usar minterpolate (mi_mode=mci) e conferir artefato nas folhas; se aparecer, cair para ping-pong. Labels pequenos, mesmo canto. Verde #30d158 no máximo na palavra 'vertical' ou 'minutos'. As três vistas são do Space CENTRO CORPORATIVO (14/06/2026); vídeo de 06/07/2026, motor Cinemático (Veo 3.1). Sem áudio.",
+ "risks": "O modelo do átrio tem cara de modelo de terceiros (possível 3D Warehouse) — mesma família de Space que tem marca d'água 'designed by fan_1988' em outra folha; confirmar direito de uso antes de publicar. O vídeo é um reenquadramento vertical da vista panorâmica, não a mesma câmera pixel a pixel: escrever 'gerado a partir da vista 1', nunca 'mesma câmera'. A escada rolante não aparece no recorte vertical — o argumento 'no lugar' vale para claraboia e lajes. Pessoas em #589 são pequenas e plausíveis; não dar zoom. #585 abriu paredes opacas do modelo em vidro (divergência conhecida). O que o vídeo NÃO pode prometer: que todo vídeo sai vertical de uma panorâmica sem reenquadrar, coerência pixel-exata entre vistas, quantidade de vistas por plano, vídeo grátis com o motor Cinemático, 4K.",
+ "gated": "Confirmar origem e direito de uso do modelo 3D do átrio (Space CENTRO CORPORATIVO, prints #584/#590/#586) — se for modelo de terceiros sem licença, não publicar."
+}

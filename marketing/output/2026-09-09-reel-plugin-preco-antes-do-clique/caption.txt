@@ -1,0 +1,9 @@
+O preço aparece antes do clique. No painel do SketchUp você escolhe o ambiente, a luz e o motor — e o botão "Gerar render" já mostra quantos Nodes aquele render vai custar.
+
+Sem surpresa na conta: o custo de cada render com IA fica visível antes de gerar, e muda conforme o motor e a resolução que você escolheu.
+
+Plugin oficial da SpaceNode para SketchUp 2021 ou superior, grátis: os renders usam os Nodes da sua conta. Extensão (.rbz) no site.
+
+Instale o plugin — link na bio.
+
+#sketchup #plugin #render #archviz #arquitetura #renderizacao

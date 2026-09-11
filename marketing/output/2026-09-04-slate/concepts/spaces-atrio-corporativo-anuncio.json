@@ -1,0 +1,96 @@
+{
+ "slug": "spaces-atrio-corporativo-anuncio",
+ "title": "Átrio corporativo: quatro ângulos, um só DNA",
+ "pillar": "coerencia-entre-angulos",
+ "angle": "Anúncio ≤15s para público de arquitetura corporativa/empreendimentos: o átrio do Space CENTRO CORPORATIVO (14/06) em quatro ângulos gerados dos prints do SketchUp, herdando luz e materiais da Vista Mestre — que aqui é a fachada (#54). Gancho em movimento com o vídeo vertical nativo do Animar (#42) do mesmo átrio; depois uma batida por ângulo e o fechamento na fachada que originou o DNA. Vende a coerência exterior↔interior de um mesmo edifício.",
+ "format": "video_anuncio",
+ "duration_s": 15,
+ "hook_text": "Quatro ângulos do átrio. Um só DNA.",
+ "hook_visual": "Vídeo #42 nativo 1080×1920 (veo3.1, 4s), usar 0–3,0s: travelling lateral suave no átrio — claraboia em grelha de vidro com a torre espelhada ao fundo, balcões curvos brancos com fitas de LED, vitrines de vidro, árvores e samambaias em primeiro plano com parallax; sem pessoas. Movimento real nos 3 primeiros segundos, full-bleed sem barras. Hook no terço superior sobre scrim leve.",
+ "scenes": [
+  {
+   "t": "0.0–3.0",
+   "visual": "#42 vídeo vertical do átrio (0–3,0s do clipe): câmera desliza lateralmente, folhagem em primeiro plano passa com parallax, lajes curvas com LED e claraboia se revelam.",
+   "text_on_screen": "Quatro ângulos do átrio. Um só DNA.",
+   "asset_idx": [
+    42
+   ]
+  },
+  {
+   "t": "3.0–5.0",
+   "visual": "#46 (Ampliar 4× da câmera do átrio, 13312×5120) recorte 9:16 (2880×5120) no terço direito: escada rolante, lajes curvas brancas com fita de LED, vitrines de vidro, canteiro tropical, claraboia. Push-in lento de 3%.",
+   "text_on_screen": "eyebrow: ÂNGULO 01",
+   "asset_idx": [
+    46
+   ]
+  },
+  {
+   "t": "5.0–7.0",
+   "visual": "#589 recorte central 720×1280: corredor simétrico sob a claraboia, gramado central, balcões com vegetação pendente e LED nas bordas, pessoas pequenas ao fundo. Push-in de 3% (a simetria segura o vertical).",
+   "text_on_screen": "eyebrow: ÂNGULO 02",
+   "asset_idx": [
+    589
+   ]
+  },
+  {
+   "t": "7.0–9.0",
+   "visual": "#585 recorte central 720×1280 com tilt de baixo para cima: vidro do térreo refletindo o exterior arborizado, balcões ajardinados em contra-plongée, termina na claraboia.",
+   "text_on_screen": "eyebrow: ÂNGULO 03",
+   "asset_idx": [
+    585
+   ]
+  },
+  {
+   "t": "9.0–10.8",
+   "visual": "#587 recorte 720×1280 deslocado à esquerda: galeria envidraçada com pessoas circulando em escala pequena, plantas, lajes curvas com LED e o óculo da claraboia ao fundo. Sem zoom nas pessoas.",
+   "text_on_screen": "eyebrow: ÂNGULO 04",
+   "asset_idx": [
+    587
+   ]
+  },
+  {
+   "t": "10.8–12.4",
+   "visual": "#54 render mestre (fachada) recorte 720×1280 deslocado à esquerda do centro (x≈28–50% da largura) para segurar o pódio ondulado com marquise iluminada e a base da torre esquerda, deixando o totem central fora do quadro; palmeiras e calçada. Push-out leve.",
+   "text_on_screen": "eyebrow: VISTA MESTRE · apoio: A fachada foi a Vista Mestre. O átrio seguiu.",
+   "asset_idx": [
+    54
+   ]
+  },
+  {
+   "t": "12.4–15.0",
+   "visual": "#54 escurecido com scrim. Card final: wordmark SPACENODE monocromático + CTA com sublinhado verde funcional.",
+   "text_on_screen": "Comece grátis",
+   "asset_idx": [
+    54
+   ]
+  }
+ ],
+ "assets": [
+  42,
+  46,
+  589,
+  585,
+  587,
+  54
+ ],
+ "cta": "Comece grátis",
+ "caption": "Quatro ângulos do mesmo átrio, gerados dos prints do SketchUp com a luz e os materiais da fachada.\n\nA Vista Mestre deste projeto é a fachada. Os prints do átrio entraram depois, um por câmera, e cada vista saiu com as fitas de luz nas lajes, o vidro e o paisagismo da mesma família.\n\nPara um empreendimento, isso é o que sustenta a apresentação: exterior e interior lendo como o mesmo edifício.\n\nGerado em minutos, a partir do seu modelo.\n\nComece grátis — link na bio.\n\n#archviz #arquiteturacorporativa #sketchup #visualizacaoarquitetonica #apresentacaodeprojeto",
+ "hashtags": [
+  "#archviz",
+  "#arquiteturacorporativa",
+  "#sketchup",
+  "#visualizacaoarquitetonica",
+  "#apresentacaodeprojeto"
+ ],
+ "paid": {
+  "primary": "O átrio inteiro em quatro ângulos, todos com a luz e os materiais da fachada. Do seu SketchUp, gerado em minutos.",
+  "headline": "Vários ângulos, um projeto",
+  "description": "Comece grátis, sem cartão",
+  "button": "SIGN_UP",
+  "cutdown_note": "Já nasce em 15s. Versão 6s (Stories/bumper): #42 (0–3,0s com o hook) + #589 (1,5s) + CTA (1,5s). Versão 10s: cortar #587 e reduzir o card final para 2,0s. Legenda embutida = texto primário; som off; texto fora dos 220px do topo e 320px da base."
+ },
+ "why_converts": "Pago exige parar o polegar em 1s: movimento real (vídeo nativo vertical do átrio) faz isso melhor do que qualquer wipe estático, e o conteúdo depois entrega informação nova a cada 2s (retenção até o botão). O ângulo corporativo alcança um público com projeto contínuo e orçamento de apresentação (incorporadoras, escritórios de porte), onde um único empreendimento gera dezenas de vistas — exatamente o consumo que converte cadastro em assinatura Pro/Studio, não só Starter. Funil: SIGN_UP → cadastro grátis sem cartão → o usuário reproduz o fluxo (fachada como Vista Mestre + prints do interior) e esbarra no limite do grant no momento em que já tem o exterior e o primeiro interior coerentes. Retarget: quem assistiu ≥75% recebe o conceito 3 (demonstrativo do café) como segundo toque.",
+ "production_notes": "Originais: 0042-video-video_out.mp4 (1080×1920, 4s, usar 0–3,0s em velocidade nativa; não fazer loop), 0046-upscale-after.jpg (13312×5120 — recorte 2880×5120 no terço direito, nítido), 0589/0585/0587/0054 (3328×1280 — recorte 720×1280 sobe 1,5×; opcional passar #589/#585 pelo Ampliar 2× antes, sem alterar conteúdo). Full-bleed em todas as batidas; scrim em camada própria para hook/eyebrow/CTA; Geist ≤2 pesos; verde só no ponto do eyebrow e no sublinhado do CTA; wordmark monocromático. Transições em corte seco (anúncio), push-in/tilt via zoompan em 2×; setsar=1 antes do concat; card PNG com -loop 1 -framerate 30 -t. Export 1080×1920 30fps H.264 crf 18 yuv420p sem áudio; ffprobe + frames de QA. Legenda do Reel orgânico e texto primário do anúncio seguem a mesma voz. Não usar os 'antes' #563/#565 (marca d'água de terceiro) nem o totem de sinalização de #54 em close.",
+ "risks": "NÃO prometer: que o átrio saiu 'idêntico ao modelo' (em #585 as paredes opacas viraram vidro; em #587 a perspectiva abriu e as paredes creme viraram vitrines — o anúncio fala de linguagem/DNA, não de fidelidade geométrica); que o vídeo é 'câmera no projeto' (é o Animar sobre a vista, e a câmera do vídeo é um reenquadramento vertical); 'pessoas reais'; tempo total por projeto (só 'gerado em minutos' por imagem); resultado comercial ('aprove o empreendimento mais rápido' é proibido). Não citar preço, nodes ou quantidade do grant no anúncio. Mídia paga entra PAUSADA; ativação é decisão do dono.",
+ "gated": "Confirmar origem e direito de uso do modelo SketchUp antes de publicar: a fachada #54 traz letreiro 'THE…' e torres de coroa ondulada que sugerem empreendimento real/modelo de terceiro (mesmo Space tem irmãos com marca d'água 'designed by fan_1988' no antes). Sem essa confirmação, trocar o conceito para o Corporativo (conceito) #737/#735/#729 ou não publicar."
+}

@@ -1,0 +1,12 @@
+2026-09-04-reel-um-print-cinco-climas-ad.mp4 — 1080×1920 · 30 fps · 8,50 s · sem áudio.
+
+USO: anúncio pago no Meta (objetivo tráfego/cadastro, botão SIGN_UP, som off, legenda embutida
+nas pílulas de clima). Card final sólido de 1,2 s no fim para o botão do anúncio pousar sobre
+fundo liso. NÃO publicar no orgânico — para feed e Stories use a versão de 10,0 s em
+marketing/output/2026-09-04-reel-um-print-cinco-climas/.
+
+Textos do anúncio (texto primário, título, descrição e as variantes A/B):
+marketing/output/2026-09-04-reel-um-print-cinco-climas/caption.txt, bloco "VERSÃO PAGA".
+
+QA das duas peças (assets, timeline, conferência frame a frame, ressalvas):
+marketing/output/2026-09-04-reel-um-print-cinco-climas/QA.md

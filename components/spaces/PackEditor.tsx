@@ -10,6 +10,7 @@ import type {
 } from '@/lib/spaces/types'
 import { getAccentColor } from '@/lib/spaces/identity'
 import { getVisualDna } from '@/lib/spaces/dna'
+import { useAmbient } from '@/components/app/glass'
 
 const NARRATIVES: { id: PackNarrative; label: string; description: string }[] = [
   { id: 'tour',      label: 'Tour',         description: 'Apresentação completa em ordem natural' },
@@ -53,6 +54,10 @@ export function PackEditor({ space, vistas, initialPack, identity }: Props) {
 
   const dna = getVisualDna(space.dna)
   const accent = getAccentColor(identity, dna)
+  const [notice, setNotice] = useState<string | null>(null)
+
+  // O pack é sobre ESTE projeto: a Vista Mestre vira o papel de parede.
+  useAmbient(space.vista_mestre_url)
 
   const orderedIds = pack?.vistas_ordered ?? []
   const orderedVistas = useMemo(
@@ -110,7 +115,9 @@ export function PackEditor({ space, vistas, initialPack, identity }: Props) {
     if (!pack) return
     const res = await fetch(`/api/packs/${pack.id}/export-pdf`, { method: 'POST' })
     const data = await res.json()
-    alert(data.message ?? 'Exportação em PDF estará disponível em breve.')
+    // Sem `alert`: a resposta da rota (hoje, "em breve") vira aviso na própria
+    // tela, do mesmo jeito que qualquer outra mensagem do editor.
+    setNotice(data.message ?? 'Exportação em PDF estará disponível em breve.')
   }
 
   function copy(text: string) {
@@ -188,7 +195,7 @@ export function PackEditor({ space, vistas, initialPack, identity }: Props) {
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             onClick={exportPdf}
-            className="spn-action spn-action--ghost"
+            className="spn-ghost"
             style={{ width: 'auto', padding: '10px 16px', fontSize: 12 }}
           >
             Exportar PDF
@@ -196,7 +203,7 @@ export function PackEditor({ space, vistas, initialPack, identity }: Props) {
           <button
             onClick={generateShare}
             disabled={generatingShare || orderedVistas.length === 0}
-            className="spn-action spn-action--primary"
+            className="spn-cta"
             style={{ width: 'auto', padding: '10px 16px', fontSize: 12 }}
           >
             {generatingShare ? '…' : (shareUrl ? 'Renovar link' : 'Gerar link compartilhável')}
@@ -209,10 +216,10 @@ export function PackEditor({ space, vistas, initialPack, identity }: Props) {
         <div style={{
           marginBottom: 24,
           padding: '14px 16px', borderRadius: 12,
-          background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.3)',
+          background: 'var(--color-accent-green-bg)', border: '0.5px solid var(--color-accent-green-border)',
           display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
         }}>
-          <span style={{ fontSize: 11, color: '#46d191', fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+          <span style={{ fontSize: 11, color: 'var(--color-accent-green)', fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
             Link público
           </span>
           <code style={{
@@ -224,22 +231,26 @@ export function PackEditor({ space, vistas, initialPack, identity }: Props) {
           }}>
             {shareUrl}
           </code>
-          <button onClick={() => copy(shareUrl)} className="spn-action spn-action--ghost" style={{ width: 'auto', padding: '6px 12px', fontSize: 11 }}>
+          <button onClick={() => copy(shareUrl)} className="spn-ghost" style={{ width: 'auto', padding: '6px 12px', fontSize: 11 }}>
             {copied ? 'Copiado' : 'Copiar'}
           </button>
-          <a href={shareUrl} target="_blank" rel="noopener noreferrer" className="spn-action spn-action--ghost" style={{ width: 'auto', padding: '6px 12px', fontSize: 11 }}>
+          <a href={shareUrl} target="_blank" rel="noopener noreferrer" className="spn-ghost" style={{ width: 'auto', padding: '6px 12px', fontSize: 11 }}>
             Abrir →
           </a>
         </div>
       )}
 
-      {error && (
-        <div style={{
-          marginBottom: 16, padding: '10px 14px', borderRadius: 8,
-          background: 'rgba(163,45,45,0.12)', border: '0.5px solid rgba(163,45,45,0.3)',
-          color: '#e57373', fontSize: 13,
+      {error && <div className="spn-error" style={{ marginBottom: 16 }}>{error}</div>}
+
+      {notice && (
+        <div className="spn-glass" style={{
+          marginBottom: 16, padding: '11px 13px', borderRadius: 'var(--r-inner)',
+          fontSize: 12.5, color: 'var(--color-text-secondary)',
+          display: 'flex', alignItems: 'center', gap: 10,
         }}>
-          {error}
+          <span style={{ flex: 1 }}>{notice}</span>
+          <button type="button" className="spn-icon-btn" aria-label="Fechar aviso"
+                  onClick={() => setNotice(null)}>×</button>
         </div>
       )}
 

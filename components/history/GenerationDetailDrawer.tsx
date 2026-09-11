@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, type CSSProperties, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
+import { Sheet } from '@/components/app/glass'
 import {
   normalizeGeneration,
   authorInitials,
@@ -11,12 +12,17 @@ import {
   type GenerationKind,
 } from '@/lib/history/generation-detail'
 
-// ── Painel lateral "Detalhes da geração" ───────────────────────────────────────
+// ── "Detalhes da geração" ──────────────────────────────────────────────────────
 //
-// Drawer à direita, aberto ao clicar em qualquer card do Histórico. Busca os
+// Aberto ao clicar em qualquer card do Histórico ou do dashboard. Busca os
 // dados sob demanda (a grid continua leve) e exibe o arquivo técnico da
 // geração: preview, autoria, configuração, custo/desempenho e log técnico.
 // Gerações antigas sem metadados mostram fallbacks — nunca quebram.
+//
+// Era um drawer lateral próprio, com overlay, cabeçalho, botão de fechar e
+// Esc só dele. Virou a <Sheet> do kit: no desktop a folha já é um painel
+// flutuante centrado e faz o mesmo papel — com uma peça a menos no sistema,
+// e com o foco preso, o scrim e a trava de rolagem vindo de graça.
 
 interface Props {
   kind:    GenerationKind
@@ -38,6 +44,8 @@ export function GenerationDetailDrawer({ kind, id, onClose }: Props) {
   const router = useRouter()
   const [detail,  setDetail]  = useState<GenerationDetail | null>(null)
   const [failed,  setFailed]  = useState(false)
+  // A folha é montada já com o conteúdo, mas fechada: a animação de entrada
+  // precisa de um frame com data-open="false" antes de virar true.
   const [entered, setEntered] = useState(false)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [showLog,      setShowLog]      = useState(false)
@@ -52,13 +60,11 @@ export function GenerationDetailDrawer({ kind, id, onClose }: Props) {
     return () => { alive = false }
   }, [kind, id])
 
-  // Slide-in + fechar com Esc
+  // Só a entrada: Esc, scrim e foco são da folha.
   useEffect(() => {
     const t = requestAnimationFrame(() => setEntered(true))
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', onKey)
-    return () => { cancelAnimationFrame(t); window.removeEventListener('keydown', onKey) }
-  }, [onClose])
+    return () => cancelAnimationFrame(t)
+  }, [])
 
   const copy = useCallback(async (text: string, which: 'briefing' | 'log') => {
     try {
@@ -81,27 +87,16 @@ export function GenerationDetailDrawer({ kind, id, onClose }: Props) {
   const logText = d?.technicalLog ? JSON.stringify(d.technicalLog, null, 2) : ''
 
   return (
-    <div style={T.overlay} onClick={onClose}>
-      <aside
-        style={{ ...T.drawer, transform: entered ? 'translateX(0)' : 'translateX(24px)', opacity: entered ? 1 : 0 }}
-        onClick={e => e.stopPropagation()}
-        aria-label="Detalhes da geração"
-      >
-        {/* ── Header ── */}
-        <div style={T.header}>
-          <div style={T.headerKicker}>Detalhes da geração</div>
-          <button onClick={onClose} style={T.close} aria-label="Fechar">✕</button>
-        </div>
-
-        <div style={T.body}>
+    <Sheet open={entered} title="Detalhes da geração" onClose={onClose} doneLabel="Fechar">
+      <>
           {failed && (
-            <div style={T.errorBox}>
+            <div className="spn-error">
               Configuração indisponível para esta geração.
             </div>
           )}
 
           {!failed && !d && (
-            <div style={T.loading}>carregando…</div>
+            <div className="spn-empty">carregando…</div>
           )}
 
           {d && (
@@ -138,31 +133,33 @@ export function GenerationDetailDrawer({ kind, id, onClose }: Props) {
                 )}
               </div>
 
-              {/* Ações */}
+              {/* Ações — um CTA primário só (baixar); o resto é fantasma. */}
               <div style={T.actionsGrid}>
                 {downloadHref && (
-                  <a href={downloadHref} style={T.actionPrimary}>{d.isVideo ? 'Baixar vídeo' : 'Baixar imagem'}</a>
+                  <a href={downloadHref} className="spn-cta" style={T.actionPrimary}>
+                    {d.isVideo ? 'Baixar vídeo' : 'Baixar imagem'}
+                  </a>
                 )}
                 {d.reuseHref && (
-                  <button style={T.action} onClick={() => router.push(d.reuseHref!)}>
+                  <button className="spn-ghost" style={T.action} onClick={() => router.push(d.reuseHref!)}>
                     Reutilizar configuração
                   </button>
                 )}
                 {d.variationHref && (
-                  <button style={T.action} onClick={() => router.push(d.variationHref!)}>
+                  <button className="spn-ghost" style={T.action} onClick={() => router.push(d.variationHref!)}>
                     Criar variação
                   </button>
                 )}
                 {d.editHref && (
-                  <button style={T.action} onClick={() => router.push(d.editHref!)}>
+                  <button className="spn-ghost" style={T.action} onClick={() => router.push(d.editHref!)}>
                     Enviar para edição
                   </button>
                 )}
-                <button style={T.action} onClick={() => copy(buildBriefingText(d), 'briefing')}>
+                <button className="spn-ghost" style={T.action} onClick={() => copy(buildBriefingText(d), 'briefing')}>
                   {copied === 'briefing' ? 'Briefing copiado ✓' : 'Copiar briefing'}
                 </button>
                 {d.privileged && d.technicalLog && (
-                  <button style={T.action} onClick={() => copy(logText, 'log')}>
+                  <button className="spn-ghost" style={T.action} onClick={() => copy(logText, 'log')}>
                     {copied === 'log' ? 'Log copiado ✓' : 'Copiar log técnico'}
                   </button>
                 )}
@@ -213,7 +210,7 @@ export function GenerationDetailDrawer({ kind, id, onClose }: Props) {
 
                 {d.config.some(c => c.advanced) && (
                   <>
-                    <button style={T.expandBtn} onClick={() => setShowAdvanced(v => !v)}>
+                    <button className="spn-ghost" style={T.expandBtn} onClick={() => setShowAdvanced(v => !v)}>
                       {showAdvanced ? 'Ocultar avançado' : 'Mostrar avançado'}
                       <Chevron open={showAdvanced} />
                     </button>
@@ -253,7 +250,7 @@ export function GenerationDetailDrawer({ kind, id, onClose }: Props) {
               {/* ── Seção 5: Diagnóstico técnico (somente admin/suporte) ── */}
               {d.privileged && d.technicalLog && (
                 <Section title="Diagnóstico técnico">
-                  <button style={T.expandBtn} onClick={() => setShowLog(v => !v)}>
+                  <button className="spn-ghost" style={T.expandBtn} onClick={() => setShowLog(v => !v)}>
                     {showLog ? 'Ocultar diagnóstico' : 'Ver diagnóstico completo'}
                     <Chevron open={showLog} />
                   </button>
@@ -269,9 +266,8 @@ export function GenerationDetailDrawer({ kind, id, onClose }: Props) {
               )}
             </>
           )}
-        </div>
-      </aside>
-    </div>
+      </>
+    </Sheet>
   )
 }
 
@@ -343,18 +339,11 @@ function FolderGlyph() {
 // ── Styles ─────────────────────────────────────────────────────────────────────
 
 const T: Record<string, CSSProperties> = {
-  overlay:      { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100, backdropFilter: 'blur(2px)' },
-  drawer:       { position: 'fixed', top: 0, right: 0, bottom: 0, width: 'min(440px, 100vw)', background: 'var(--color-bg-elevated)', borderLeft: '0.5px solid var(--color-border-strong)', boxShadow: '-24px 0 80px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', transition: 'transform 0.22s ease, opacity 0.22s ease' },
-  header:       { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px 14px', borderBottom: '0.5px solid var(--color-border)', flexShrink: 0 },
-  headerKicker: { fontSize: 10, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'var(--color-text-tertiary)', fontWeight: 500 },
-  close:        { background: 'none', border: 'none', color: 'var(--color-text-tertiary)', fontSize: 14, cursor: 'pointer', padding: 4, lineHeight: 1 },
-  body:         { flex: 1, overflowY: 'auto', padding: '18px 20px 40px' },
-
-  loading:      { padding: 48, textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 12 },
-  errorBox:     { padding: '14px 16px', borderRadius: 10, border: '0.5px solid var(--color-border-strong)', background: 'var(--color-surface)', fontSize: 12, color: 'var(--color-text-secondary)' },
+  // Overlay, casca do drawer, cabeçalho e botão de fechar saíram: quem faz
+  // isso agora é a <Sheet>. O que sobrou é só o miolo do arquivo técnico.
   fallbackText: { fontSize: 12, color: 'var(--color-text-quaternary)' },
 
-  previewWrap:  { borderRadius: 12, overflow: 'hidden', background: 'var(--color-surface)', border: '0.5px solid var(--color-border)', marginBottom: 14 },
+  previewWrap:  { borderRadius: 'var(--r-inner)', overflow: 'hidden', background: 'var(--color-preview-bg)', border: '0.5px solid var(--glass-line)', marginBottom: 14 },
   previewImg:   { display: 'block', width: '100%', maxHeight: 300, objectFit: 'contain', background: '#000' },
   previewEmpty: { padding: '48px 0', textAlign: 'center', fontSize: 12, color: 'var(--color-text-quaternary)' },
 
@@ -365,14 +354,14 @@ const T: Record<string, CSSProperties> = {
   contextLink:  { color: 'var(--color-text-secondary)', textDecoration: 'underline', textUnderlineOffset: 2 },
 
   actionsGrid:  { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, margin: '14px 0 4px' },
-  actionPrimary:{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px 10px', background: 'var(--color-text-primary)', color: 'var(--color-bg)', border: 'none', borderRadius: 8, fontSize: 11.5, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '-0.01em', textDecoration: 'none' },
-  action:       { display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px 10px', background: 'var(--color-bg)', color: 'var(--color-text-primary)', border: '0.5px solid var(--color-border-strong)', borderRadius: 8, fontSize: 11.5, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '-0.01em' },
+  actionPrimary:{ minHeight: 36, fontSize: 11.5, textDecoration: 'none' },
+  action:       { height: 36, width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11.5 },
 
-  section:      { marginTop: 22, paddingTop: 18, borderTop: '0.5px solid var(--color-border)' },
+  section:      { marginTop: 22, paddingTop: 18, borderTop: '0.5px solid var(--glass-line)' },
   sectionTitle: { fontSize: 10, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--color-text-tertiary)', fontWeight: 500, marginBottom: 12 },
 
   authorRow:    { display: 'flex', alignItems: 'center', gap: 11 },
-  avatar:       { width: 32, height: 32, borderRadius: '50%', background: 'var(--color-surface)', border: '0.5px solid var(--color-border-strong)', color: 'var(--color-text-secondary)', fontSize: 11, fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, letterSpacing: '0.02em' },
+  avatar:       { width: 32, height: 32, borderRadius: '50%', background: 'var(--color-chip)', border: '0.5px solid var(--glass-line)', color: 'var(--color-text-secondary)', fontSize: 11, fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, letterSpacing: '0.02em' },
   authorName:   { fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   authorEmail:  { fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   authorTeam:   { fontSize: 10, color: 'var(--color-text-quaternary)', marginTop: 3, letterSpacing: '0.02em' },
@@ -382,11 +371,11 @@ const T: Record<string, CSSProperties> = {
   kvLabel:      { fontSize: 11, color: 'var(--color-text-tertiary)', letterSpacing: '-0.005em', flexShrink: 0, marginBottom: 4 },
   kvValue:      { fontSize: 12, textAlign: 'right', letterSpacing: '-0.01em', overflowWrap: 'anywhere' },
 
-  baseThumb:    { width: 96, height: 72, objectFit: 'cover', borderRadius: 8, border: '0.5px solid var(--color-border-strong)', display: 'block' },
+  baseThumb:    { width: 96, height: 72, objectFit: 'cover', borderRadius: 8, border: '0.5px solid var(--glass-line)', display: 'block' },
 
-  expandBtn:    { display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 12, padding: '6px 10px', background: 'none', border: '0.5px dashed var(--color-border-strong)', borderRadius: 7, fontSize: 11, color: 'var(--color-text-secondary)', cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '-0.01em' },
+  expandBtn:    { display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 12, height: 30, fontSize: 11 },
 
-  promptBlock:  { padding: '10px 12px', borderRadius: 8, background: 'var(--color-surface)', border: '0.5px solid var(--color-border)', fontSize: 11, lineHeight: 1.6, color: 'var(--color-text-secondary)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', maxHeight: 180, overflowY: 'auto' },
+  promptBlock:  { padding: '10px 12px', borderRadius: 'var(--r-inner)', background: 'var(--color-input)', border: '0.5px solid var(--glass-line)', fontSize: 11, lineHeight: 1.6, color: 'var(--color-text-secondary)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', maxHeight: 180, overflowY: 'auto' },
 
-  logBlock:     { marginTop: 10, padding: '12px 14px', borderRadius: 8, background: '#0a0a0a', border: '0.5px solid var(--color-border)', fontSize: 10, lineHeight: 1.55, color: 'var(--color-text-secondary)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', maxHeight: 320, overflowY: 'auto' },
+  logBlock:     { marginTop: 10, padding: '12px 14px', borderRadius: 'var(--r-inner)', background: 'var(--color-preview-bg)', border: '0.5px solid var(--glass-line)', fontSize: 10, lineHeight: 1.55, color: 'var(--color-text-secondary)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', maxHeight: 320, overflowY: 'auto' },
 }

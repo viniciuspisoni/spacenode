@@ -46,40 +46,28 @@ export default function VideoGenerationTimeline({ preview, modelId, elapsed, con
         <div style={{
           position:     'relative',
           width:        '100%',
-          borderRadius: 12,
+          borderRadius: 'var(--r-card)',
           overflow:     'hidden',
         }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={preview}
             alt="render"
-            style={{ width: '100%', display: 'block', maxHeight: 360, objectFit: 'cover', filter: 'brightness(0.3)' }}
+            style={{ width: '100%', display: 'block', maxHeight: 360, objectFit: 'cover' }}
           />
-          <div style={{
-            position:       'absolute',
-            inset:          0,
-            display:        'flex',
-            flexDirection:  'column',
-            alignItems:     'center',
-            justifyContent: 'center',
-            gap:            12,
-          }}>
+          {/* Mesmo véu do resto do app (.spn-overlay), no lugar do
+              brightness(0.3) que apagava a imagem em vez do fundo do texto. */}
+          <div className="spn-overlay" style={{ gap: 12 }}>
             <div style={{
               width:      36, height: 36, borderRadius: '50%',
               border:     '2px solid rgba(255,255,255,0.12)',
               borderTop:  '2px solid rgba(255,255,255,0.7)',
               animation:  'spin 0.9s linear infinite',
             }} />
-            <div style={{
-              fontSize: 13, color: 'rgba(255,255,255,0.85)',
-              letterSpacing: '0.01em', fontWeight: 500,
-            }}>
+            <div style={{ fontSize: 13, letterSpacing: '0.01em', fontWeight: 500 }}>
               {currentStep.text}
             </div>
-            <div style={{
-              fontSize: 11, color: 'rgba(255,255,255,0.45)',
-              fontVariantNumeric: 'tabular-nums',
-            }}>
+            <div style={{ fontSize: 11, opacity: 0.6, fontVariantNumeric: 'tabular-nums' }}>
               {formatElapsed(elapsed)}
             </div>
           </div>
@@ -90,8 +78,8 @@ export default function VideoGenerationTimeline({ preview, modelId, elapsed, con
         <div style={{
           height:     4,
           width:      '100%',
-          background: 'var(--color-surface)',
-          borderRadius: 2,
+          background: 'var(--color-chip)',
+          borderRadius: 999,
           overflow:   'hidden',
         }}>
           <div style={{

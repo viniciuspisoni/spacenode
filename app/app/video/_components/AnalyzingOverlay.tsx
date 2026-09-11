@@ -28,7 +28,7 @@ export default function AnalyzingOverlay({ preview }: Props) {
     <div style={{
       position:       'relative',
       width:          '100%',
-      borderRadius:   12,
+      borderRadius:   'var(--r-card)',
       overflow:       'hidden',
     }}>
       {preview && (
@@ -36,31 +36,23 @@ export default function AnalyzingOverlay({ preview }: Props) {
         <img
           src={preview}
           alt="preview"
-          style={{ width: '100%', display: 'block', filter: 'brightness(0.35) saturate(0.7)' }}
+          style={{ width: '100%', display: 'block' }}
         />
       )}
-      <div style={{
-        position:       'absolute',
-        inset:          0,
-        display:        'flex',
-        flexDirection:  'column',
-        alignItems:     'center',
-        justifyContent: 'center',
-        gap:            14,
-      }}>
+      {/* .spn-overlay é o véu único sobre imagem: escuro sempre, porque a
+          imagem embaixo não segue o tema. O brightness que estava no <img>
+          escurecia a foto em si — e não o texto que precisa de contraste. */}
+      <div className="spn-overlay" style={{ gap: 14 }}>
         <div style={{
           width:      32, height: 32, borderRadius: '50%',
           border:     '2px solid rgba(255,255,255,0.12)',
           borderTop:  '2px solid rgba(255,255,255,0.7)',
           animation:  'spin 0.9s linear infinite',
         }} />
-        <div style={{
-          fontSize: 13, color: 'rgba(255,255,255,0.85)',
-          letterSpacing: '-0.005em', fontWeight: 500,
-        }}>
+        <div style={{ fontSize: 13, letterSpacing: '-0.005em', fontWeight: 500 }}>
           {LOADING_TEXTS[textIdx]}
         </div>
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
+        <div style={{ fontSize: 11, opacity: 0.55 }}>
           Levamos cerca de 10 segundos.
         </div>
       </div>

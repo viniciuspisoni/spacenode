@@ -53,5 +53,7 @@ tests/fidelity/bench/last-run.json
 tests/fidelity/bench/runs.json
 tests/fidelity/bench/outputs/
 
-# Saída da fábrica de Reels (mp4, frames de QA): centenas de MB, regenerável a partir dos specs
-/marketing/output/
+# Scratch do CLI do Supabase (cache de checagem de versão). Aparece em
+# qualquer clone onde alguém rode `supabase`/`npx supabase` — é do CLI, não
+# do projeto. As migrations, essas sim, continuam versionadas.
+supabase/.temp/

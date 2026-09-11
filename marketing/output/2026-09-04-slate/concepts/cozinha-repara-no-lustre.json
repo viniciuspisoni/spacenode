@@ -1,0 +1,69 @@
+{
+ "slug": "cozinha-repara-no-lustre",
+ "title": "Repara no lustre",
+ "pillar": "antes-e-depois",
+ "angle": "Mecânica de retenção: a abertura já mostra os dois estados ao mesmo tempo (metade de cima em clay com o lustre apagado, metade de baixo com a ilha de quartzito já em imagem final), e a instrução 'repara no lustre' obriga a assistir até a régua subir e o lustre espiral acender. Cozinha é o ambiente de maior alcance em interiores no Instagram e o que o cliente mais pede para 'ver de verdade'.",
+ "format": "transformacao",
+ "duration_s": 10,
+ "hook_text": "Repara no lustre.",
+ "hook_visual": "Imagem 4:5 (crop 883x1104 do lado esquerdo do original 960x1104, mantendo a coluna de fornos; escalada para 1080x1350 centralizada, faixas #0a0a0a de 285px). Divisor horizontal a 50% com hairline branca: metade de cima = print #426 (armários cinza-chumbo chapados, trilho de spots com linhas pretas, lustre de anéis e fitas de cobre apagado, cortina cinza lisa, backsplash de mármore preto); metade de baixo = render #425 (ilha de quartzito com veios cinza e caramelo, cadeiras bege, flores rosa em vaso de vidro, piso cinza refletindo). Headline branca sobre a metade de cima, na área dos armários escuros.",
+ "scenes": [
+  {
+   "t": "0.0–2.5s",
+   "visual": "Split 50/50 parado: clay em cima (#426), render embaixo (#425), mesmo enquadramento, mesmo zoompan (1.00→1.03) nos dois. Headline em corte no frame 0. O contraste é o gancho: metade da cozinha já 'pronta'.",
+   "asset_idx": [
+    426,
+    425
+   ],
+   "text_on_screen": "Repara no lustre."
+  },
+  {
+   "t": "2.5–6.0s",
+   "visual": "Régua sobe de 50% a 0% em 3,5s, linear (imagens paradas, só a borda anda; hairline branca acompanha): revela bancada e torneira preta, cafeteira branca à esquerda, backsplash de mármore com veios brancos, armários pretos foscos, os cinco pontos do lustre espiral acendendo em dourado (~4.8–5.5s) e, por último, o trilho de spots aceso e a cortina voile com o jardim iluminado à direita. Headline sai em corte em 4.0s.",
+   "asset_idx": [
+    426,
+    425
+   ],
+   "text_on_screen": "Repara no lustre. (até 4.0s)"
+  },
+  {
+   "t": "6.0–8.5s",
+   "visual": "#425 inteiro, zoompan 1.03→1.06 puxando levemente para o lustre e a ilha. Apoio entra em 6.3s no terço central inferior, sobre o piso cinza.",
+   "asset_idx": [
+    425
+   ],
+   "text_on_screen": "Cafeteira, torneira, flores: no lugar."
+  },
+  {
+   "t": "8.5–10.0s",
+   "visual": "Overlay de fechamento sobre o render: logo monocromático + CTA com sublinhado hairline verde. Apoio some em 8.5s. Loop reinicia no split — quem não olhou o lustre da primeira vez olha na segunda.",
+   "asset_idx": [
+    425
+   ],
+   "text_on_screen": "Teste com um projeto real"
+  }
+ ],
+ "assets": [
+  426,
+  425
+ ],
+ "cta": "Teste com um projeto real",
+ "caption": "Cozinha em print escuro do SketchUp. Repara no lustre: a imagem sobe do piso ao teto e ele acende no fim.\n\nArmários pretos, backsplash de mármore, ilha de quartzito, cadeiras, flores, cafeteira e torneira: tudo onde o projeto colocou. Nem o trilho de spots saiu do lugar.\n\nQuem entrega cozinha sabe: é o ambiente em que o cliente mais pede para 'ver de verdade'. A imagem sai do print que você já tem, em minutos, sem remodelar nada.\n\nTeste com um projeto real — link na bio.\n\n#designdeinteriores #arquitetura #sketchup #archviz #renderizacao",
+ "hashtags": [
+  "#designdeinteriores",
+  "#arquitetura",
+  "#sketchup",
+  "#archviz",
+  "#renderizacao"
+ ],
+ "paid": {
+  "primary": "Print escuro do SketchUp, imagem de apresentação em minutos. Cafeteira, torneira e lustre onde o projeto colocou.",
+  "headline": "A cozinha do projeto, não outra",
+  "description": "Cadastro grátis, sem cartão",
+  "button": "LEARN_MORE",
+  "cutdown_note": "Versão anúncio 8s: split de 1,5s, régua de 2,5s, hold de 1,5s com o apoio, botão do anúncio no lugar do overlay (2,5s). Público frio de interiores → LEARN_MORE para a landing; se a campanha for de cadastro direto, trocar para SIGN_UP sem mudar a arte."
+ },
+ "why_converts": "Topo de funil largo: cozinha é o ambiente com mais alcance em interiores e o público de #designdeinteriores tem escritórios pequenos com ciclo rápido de cliente — o perfil do Starter. A instrução 'repara no lustre' eleva taxa de conclusão (o algoritmo distribui mais) e o split desde o frame 0 evita o abandono típico do 'antes' cinza. O apoio nomeia objetos pequenos (cafeteira, torneira, flores) que qualquer arquiteto confere no celular e reconhece como prova de fidelidade sem adjetivo. 'Teste com um projeto real' fala com quem tem uma cozinha em andamento agora: link na bio → cadastro grátis sem cartão → primeiro render no próprio print → precisa de duas ou três variações de acabamento para a reunião → estoura o grátis → Starter.",
+ "risks": "O vídeo NÃO pode prometer: 'cada veio do quartzito é o mesmo do modelo' (a textura do print é um mármore genérico; o render interpreta os veios), 'jardim/cortina iguais' (o voile e o jardim iluminado atrás são interpretação da cortina cinza chapada), 'o lustre é o último a acender' de forma literal (spots e forro acendem junto no fim — na arte a régua faz o trabalho, na legenda dizer 'acende no fim'). Não citar minutos com número. O print traz linhas amarelas de guia no piso (SketchUp) — não retocar o 'antes', é o insumo honesto. Fornos ficam na borda esquerda do crop: manter o crop a partir de x=0 do original para não perder a coluna.",
+ "production_notes": "Crop 4:5 = x 0–883 do original 960x1104 (mantém fornos e cafeteira; perde só ~77px da cortina à direita); escalar para 1080x1350 e centralizar (y 285–1635), faixas #0a0a0a. Split e régua não são xfade: render como overlay sobre o print com crop de altura animada por expressão em t (h = ih*q(t), q = 0,5 fixo até 2,5s, depois linear 0,5→1,0 até 6,0s; overlay em y = ih−h) — as duas imagens paradas, só a borda anda; hairline branca 2px na borda. zoompan idêntico nos dois ramos (1.00→1.06 no total), máx. 1.08. Headline sobre o clay escuro no topo: scrim leve em camada própria; apoio sobre o piso cinza do render — testar contraste nos 4 frames de QA. Texto sempre em corte. Overlay final com logo monocromático + CTA, sem URL, sem card preto (loop). setsar=1, 30fps, sem áudio, ffprobe de conferência."
+}

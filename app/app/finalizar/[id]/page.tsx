@@ -2,6 +2,7 @@
 // Next 16: params é Promise (await). Carrega via cliente user-scoped (RLS).
 
 import { createClient } from '@/lib/supabase/server'
+import { editV4Enabled } from '@/lib/edit-v4/flags'
 import { notFound, redirect } from 'next/navigation'
 import { FinalizeEditor } from '@/components/finalizar/FinalizeEditor'
 import { mediaProxyUrl, mediaProxyDeep } from '@/lib/storage/signed'
@@ -13,6 +14,11 @@ export default async function FinalizarProjectPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
+  // Uma ferramenta, uma porta: com o Editar unificado ligado, o projeto salvo
+  // abre em /app/editar/[id]. Este redirect é o que mantém vivos os links já
+  // publicados (Histórico, e os projetos que existem desde julho).
+  if (process.env.NEXT_PUBLIC_EDIT_V4 === '1') redirect(`/app/editar/${id}`)
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -40,7 +46,7 @@ export default async function FinalizarProjectPage({
 
   return (
     <div style={{ flex: 1, minHeight: 0, display: 'flex', background: 'var(--color-bg)' }}>
-      <FinalizeEditor initialProject={project} />
+      <FinalizeEditor initialProject={project} aiEnabled={editV4Enabled()} />
     </div>
   )
 }

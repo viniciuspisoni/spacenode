@@ -1,0 +1,54 @@
+{
+  "slug": "2026-09-04-reel-entre-duas-reunioes",
+  "reel": "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-entre-duas-reunioes\\2026-09-04-reel-entre-duas-reunioes.mp4",
+  "banda": "1080×608 @ y=656",
+  "segments": [
+    {
+      "i": 0,
+      "type": "still",
+      "dur": 1.95,
+      "start": 0,
+      "crop": "contain 1080×1242 @ y=340"
+    },
+    {
+      "i": 1,
+      "type": "still",
+      "dur": 7,
+      "start": 1.5,
+      "crop": "contain 1080×1242 @ y=340"
+    },
+    {
+      "i": 2,
+      "type": "card",
+      "dur": 2.5,
+      "start": 8.5,
+      "crop": null
+    }
+  ],
+  "width": 1080,
+  "height": 1920,
+  "fps": "30/1",
+  "pix_fmt": "yuv420p",
+  "codec": "h264",
+  "duration": "11.00",
+  "sizeMB": "2.33",
+  "esperado": {
+    "width": 1080,
+    "height": 1920,
+    "fps": "30/1",
+    "duration": "11.00"
+  },
+  "qaFrames": [
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-entre-duas-reunioes\\qa-frames\\t0.50s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-entre-duas-reunioes\\qa-frames\\t1.50s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-entre-duas-reunioes\\qa-frames\\t1.72s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-entre-duas-reunioes\\qa-frames\\t1.95s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-entre-duas-reunioes\\qa-frames\\t2.50s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-entre-duas-reunioes\\qa-frames\\t3.50s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-entre-duas-reunioes\\qa-frames\\t5.00s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-entre-duas-reunioes\\qa-frames\\t7.00s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-entre-duas-reunioes\\qa-frames\\t8.40s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-entre-duas-reunioes\\qa-frames\\t9.50s.png"
+  ],
+  "qaSheet": "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-entre-duas-reunioes\\qa-sheet.jpg"
+}

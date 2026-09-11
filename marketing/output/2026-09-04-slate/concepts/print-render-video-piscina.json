@@ -1,0 +1,79 @@
+{
+ "slug": "print-render-video-piscina",
+ "title": "Print, render, vídeo",
+ "pillar": "demonstracao-de-ferramentas",
+ "angle": "Encadeamento honesto de dois módulos no mesmo projeto: o print da casa com piscina vira imagem (régua com um 'passo atrás' sobre as três espreguiçadeiras, como um dedo conferindo) e a imagem vira o take do Animar em que a água se mexe. Movimento real no fim = scroll-stop e compartilhamento; o loop volta ao print e reconta a cadeia.",
+ "format": "transformacao",
+ "duration_s": 12,
+ "hook_text": "Um print. Uma imagem. Um vídeo.",
+ "hook_visual": "Frame inteiro do print #396 (944x1120 → 1080x1281 centralizado, faixas #0a0a0a de 320px): SketchUp com céu azul chapado, casa em L de dois pavimentos com ripado de madeira e concreto, vidro de piso a teto mostrando mesa de jantar e estante, piscina de água azul lisa em primeiro plano, deck com três espreguiçadeiras pretas, escada de inox, balizadores e grama verde chapada com pedras. Headline branca no terço central sobre o ripado/céu.",
+ "scenes": [
+  {
+   "t": "0.0–1.2s",
+   "visual": "#396 parado, zoompan 1.00→1.02. Headline em corte no frame 0.",
+   "asset_idx": [
+    396
+   ],
+   "text_on_screen": "Um print. Uma imagem. Um vídeo."
+  },
+  {
+   "t": "1.2–3.6s",
+   "visual": "Régua horizontal com passo atrás (imagens paradas; só a borda anda): #395 entra pela esquerda até 75% da largura (1.2–2.4s), recua para 55% (2.4–2.9s) exatamente sobre as três espreguiçadeiras — plástico preto do print vira fibra trançada, mesma posição — e completa até 100% (2.9–3.6s). Hairline branca 2px na borda. Revelado: concreto com marcas de fôrma, ripado com veio, interiores mobiliados atrás do vidro, água com cáusticas, deck de madeira, vegetação tropical. Headline sai em 4.0s (corte).",
+   "asset_idx": [
+    396,
+    395
+   ],
+   "text_on_screen": "Um print. Uma imagem. Um vídeo. (até 4.0s)"
+  },
+  {
+   "t": "3.6–5.6s",
+   "visual": "#395 inteiro, zoompan 1.02→1.05 puxando para o deck. Apoio entra em 4.2s no terço central inferior, sobre a grama.",
+   "asset_idx": [
+    395
+   ],
+   "text_on_screen": "Piscina, deck e espreguiçadeiras onde você desenhou."
+  },
+  {
+   "t": "5.6–10.64s",
+   "visual": "Corte invisível para o vídeo #169 (5,04s, 1320x1568 escalado para 1080x1283 na mesma caixa): o primeiro frame do clipe é o próprio render #395/#170, então a imagem simplesmente começa a se mexer — cáusticas na água, push-in lento em direção ao deck, volumes, vidros e espreguiçadeiras iguais. Apoio sai em 6.4s.",
+   "asset_idx": [
+    169,
+    170
+   ],
+   "text_on_screen": ""
+  },
+  {
+   "t": "9.0–12.0s",
+   "visual": "Overlay de fechamento sobre o vídeo (a partir de 9.0s) e depois sobre o último frame congelado (10.64–12.0s): logo monocromático + CTA com sublinhado hairline verde. O loop reinicia no print — a cadeia print→imagem→vídeo se repete.",
+   "asset_idx": [
+    169
+   ],
+   "text_on_screen": "Comece grátis"
+  }
+ ],
+ "assets": [
+  396,
+  395,
+  169,
+  170
+ ],
+ "cta": "Comece grátis",
+ "caption": "Do print do SketchUp à imagem, e da imagem ao vídeo. Mesma casa, mesma piscina, mesmo deck.\n\nPrimeiro a imagem de apresentação: concreto aparente, ripado de madeira, três espreguiçadeiras e a piscina exatamente onde foram desenhados.\n\nDepois o Animar pega essa mesma imagem e devolve um take curto: a água se mexe, a câmera avança devagar, o projeto continua o mesmo.\n\nDois passos sobre o mesmo print, em minutos. O vídeo vai direto para a apresentação ou para o story do escritório.\n\nComece grátis — sem cartão, no link da bio.\n\n#arquitetura #archviz #sketchup #apresentacaodeprojeto #visualizacaoarquitetonica",
+ "hashtags": [
+  "#arquitetura",
+  "#archviz",
+  "#sketchup",
+  "#apresentacaodeprojeto",
+  "#visualizacaoarquitetonica"
+ ],
+ "paid": {
+  "primary": "Do print à imagem e da imagem ao vídeo, sem sair do projeto. Piscina, deck e espreguiçadeiras no lugar. Comece grátis.",
+  "headline": "Imagem e vídeo do mesmo print",
+  "description": "Sem cartão para começar",
+  "button": "SIGN_UP",
+  "cutdown_note": "Versão anúncio 9s: régua reta de 1,2s (sem passo atrás), hold do render 1,0s, vídeo cortado nos primeiros 3,5s (a água já se mexe desde o frame 1), botão do anúncio no lugar do overlay; headline no frame 0."
+ },
+ "why_converts": "Movimento é o que mais para o scroll no feed de arquitetura, e aqui ele é produto real, não motion graphics. A peça mostra em 12s o pacote que a assinatura compra: imagem para o cliente e vídeo para a apresentação/story, sobre o print que o arquiteto já tem. Funil: 'Comece grátis' → cadastro sem cartão → o primeiro render é o passo barato que prova fidelidade no próprio projeto; o vídeo é o 'segundo uau' que dá motivo para voltar com plano (é onde a maior parte dos cadastros grátis para, e a peça deixa claro o que existe além). Também é a única peça do lote com apelo direto ao story do escritório — o arquiteto se imagina publicando o próprio take.",
+ "risks": "O vídeo NÃO pode prometer: 'câmera parada' (o clipe faz push-in e reenquadra levemente), 'sem alterações' (textura da madeira sai mais lisa porque a fonte tem 944x1120), 'tempo real' ou 'sem cortes', duração de vídeo além do que o produto entrega (o take tem ~5s); não nomear provedor/motor de vídeo na peça (detalhe de stack é proibido em conteúdo público). Não escrever 'em minutos' com número. #396 → #395 tem pequenas reinterpretações honestas (as pedras soltas da grama viraram vegetação; o arbusto virou dois vasos) — falar só do que se sustenta: piscina, deck, espreguiçadeiras, escada, balizadores.",
+ "production_notes": "Caixa única 1080x1281 centralizada (y 320–1601) para os três assets: #396 e #395 (944x1120, mesmo aspecto do vídeo 1320x1568 → 1080x1283, diferença de 1px). Régua com passo atrás não é xfade: usar o render como overlay sobre o print com crop de largura animada por expressão em t (w = iw*p(t), p linear por trechos 0→0,75→0,55→1,0) e overlay em x=0 — as duas imagens ficam paradas e só a borda anda (o que o BRIEF exige); hairline branca 2px desenhada na borda. Casar o crop do vídeo com o still pela escada de inox para o corte em 5.6s ficar invisível; conferir que o frame 1 do #169 bate com #395 (mesma fonte, id 1c49d327…). Congelar o último frame do clipe de 10.64 a 12.0 (tpad). Texto em corte, scrim em camada própria, zoompan ≤1.08, setsar=1. Sem áudio."
+}

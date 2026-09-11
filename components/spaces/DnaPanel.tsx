@@ -44,12 +44,10 @@ function DnaStrip({ dna }: { dna: ProjectDNA }) {
       gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
     }}>
       {items.map(it => (
-        <div key={it.label} style={{
+        <div key={it.label} className="spn-glass" style={{
           display: 'flex', alignItems: 'center', gap: 10,
           padding: '12px 14px',
-          background: 'var(--color-bg-elevated)',
-          border: '0.5px solid var(--color-border)',
-          borderRadius: 10,
+          borderRadius: 'var(--r-inner)',
         }}>
           <CheckIcon />
           <div style={{ minWidth: 0, flex: 1 }}>
@@ -80,11 +78,9 @@ function CardShell({ title, children, badge }: {
   badge?:   string
 }) {
   return (
-    <div style={{
+    <div className="spn-glass" style={{
       padding: '20px 22px',
-      background: 'var(--color-bg-elevated)',
-      border: '0.5px solid var(--color-border)',
-      borderRadius: 12,
+      borderRadius: 'var(--r-card)',
       display: 'flex', flexDirection: 'column', gap: 14,
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
@@ -97,7 +93,7 @@ function CardShell({ title, children, badge }: {
         {badge && (
           <span style={{
             fontSize: 10, fontWeight: 500, letterSpacing: '0.02em',
-            color: '#46d191', background: 'rgba(29,158,117,0.14)',
+            color: 'var(--color-accent-green)', background: 'var(--color-accent-green-bg)',
             padding: '3px 8px', borderRadius: 4,
           }}>
             {badge}
@@ -210,8 +206,8 @@ function CheckIcon() {
     <span style={{
       width: 18, height: 18, flexShrink: 0,
       borderRadius: 999,
-      background: 'rgba(29,158,117,0.16)',
-      color: '#46d191',
+      background: 'var(--color-accent-green-bg)',
+      color: 'var(--color-accent-green)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">

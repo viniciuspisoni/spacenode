@@ -1,7 +1,17 @@
 'use client'
 
-import { useState, useRef } from 'react'
-import Link from 'next/link'
+import { useRef, useState } from 'react'
+import {
+  ChoiceGroup,
+  PillGroup,
+  RowIcon,
+  SettingGroup,
+  SettingRow,
+  Sheet,
+  summarize,
+  useAmbient,
+} from '@/components/app/glass'
+import { CostDock, DownloadIcon, formatFileSize, SourceDrop, StageLoading, ToolHeader } from '../_shell/ToolShell'
 import {
   APRESENTAR_TOOLS,
   ISOMETRIC_ORIGINS,
@@ -11,6 +21,7 @@ import {
   type IsometricType,
   type IsometricStyle,
 } from '@/lib/apresentar/config'
+import { useObjectUrls } from '@/lib/browser/object-url'
 
 interface Props {
   initialCredits: number
@@ -26,35 +37,47 @@ const LOADING_TEXTS = [
   'Finalizando…',
 ]
 
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
+/* As pílulas do kit mostram a própria string que recebem; os presets são
+   pares id/label. Converte-se nas bordas — o id é o que viaja na API. */
+const ORIGIN_LABELS = ISOMETRIC_ORIGINS.map(o => o.label)
+
+type SheetId = 'vista' | 'estilo' | 'origem'
 
 export default function IsometricasClient({ initialCredits }: Props) {
-  // Upload
+  // Entrada
   const [imageFile,       setImageFile]       = useState<File | null>(null)
   const [imagePreview,    setImagePreview]    = useState<string | null>(null)
+  // Governa as URLs de blob das prévias: revoga a que sai e varre o resto
+  // ao desmontar (uma object URL segura o arquivo em memória até alguém soltar).
+  const objectUrls = useObjectUrls()
   const [imageDimensions, setImageDimensions] = useState<{ w: number; h: number } | null>(null)
-  const [isDragging,      setIsDragging]      = useState(false)
 
-  // Parameters
+  // Parâmetros — mesmos nomes e tipos que viajam para /api/apresentar/isometric
   const [origin, setOrigin] = useState<IsometricOrigin>('sketchup')
   const [type,   setType]   = useState<IsometricType>('mobiliada')
   const [style,  setStyle]  = useState<IsometricStyle>('premium_clean')
 
-  // Generation
+  const [sheet, setSheet] = useState<SheetId | null>(null)
+
+  // Geração
   const [isLoading,   setIsLoading]   = useState(false)
   const [loadingText, setLoadingText] = useState(LOADING_TEXTS[0])
   const [resultUrl,   setResultUrl]   = useState<string | null>(null)
   const [credits,     setCredits]     = useState(initialCredits)
   const [error,       setError]       = useState<string | null>(null)
 
-  const fileInputRef    = useRef<HTMLInputElement>(null)
   const loadingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const nodeCost  = TOOL.nodes ?? 0
   const canSubmit = !!imageFile && credits >= nodeCost && !isLoading
+
+  // O papel de parede é o trabalho em foco: a isométrica que saiu, ou a vista
+  // que entrou.
+  useAmbient(resultUrl ?? imagePreview)
+
+  const typeLabel   = ISOMETRIC_TYPES.find(t => t.id === type)?.label ?? ''
+  const styleLabel  = ISOMETRIC_STYLES.find(s => s.id === style)?.label ?? ''
+  const originLabel = ISOMETRIC_ORIGINS.find(o => o.id === origin)?.label ?? ''
 
   function loadImageFile(file: File) {
     if (!file.type.startsWith('image/')) { setError('O arquivo deve ser uma imagem.'); return }
@@ -65,18 +88,20 @@ export default function IsometricasClient({ initialCredits }: Props) {
     setError(null)
     setImageDimensions(null)
 
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      const dataUrl = e.target?.result as string
-      setImagePreview(dataUrl)
-      const img = new Image()
-      img.onload = () => setImageDimensions({ w: img.naturalWidth, h: img.naturalHeight })
-      img.src = dataUrl
-    }
-    reader.readAsDataURL(file)
+    // Object URL, não data URL: a mesma foto vira um ponteiro de 60
+    // caracteres em vez de ~27 MB de base64 no DOM — e o papel de parede
+    // (useAmbient) deixa de decodificar o arquivo uma segunda vez só para
+    // borrá-lo. Ver lib/browser/object-url.ts.
+    objectUrls.revoke(imagePreview)
+    const url = objectUrls.create(file)
+    setImagePreview(url)
+    const img = new Image()
+    img.onload = () => setImageDimensions({ w: img.naturalWidth, h: img.naturalHeight })
+    img.src = url
   }
 
   function resetImage() {
+    objectUrls.revoke(imagePreview)
     setImageFile(null)
     setImagePreview(null)
     setResultUrl(null)
@@ -131,316 +156,141 @@ export default function IsometricasClient({ initialCredits }: Props) {
   }
 
   return (
-    <div style={{ display: 'flex', width: '100%', height: '100%', overflow: 'hidden', background: 'var(--color-bg)', color: 'var(--color-text-primary)' }}>
-      <style>{`
-        @keyframes spin   { to { transform: rotate(360deg); } }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-      `}</style>
+    <div className="spn-tool">
+      {/* ── Painel ─────────────────────────────────────────────────────────── */}
+      <div className="spn-tool-panel spn-glass spn-glass--chrome">
+        <ToolHeader
+          title={TOOL.name}
+          desc="Uma vista do seu modelo vira isométrica de apresentação — volumetria, corte ou explodida."
+        />
 
-      {/* ── Left panel ──────────────────────────────────────────────────────── */}
-      <div style={{
-        width: 420, flexShrink: 0,
-        display: 'flex', flexDirection: 'column',
-        borderRight: '0.5px solid var(--color-border)',
-        overflow: 'hidden',
-      }}>
+        <div className="spn-tool-panel-body">
+          {/* A vista é o trabalho: fica na superfície, e sem ela o CTA não liga. */}
+          <div className="spn-field">
+            <span className="spn-field-label">Imagem base</span>
+            <SourceDrop
+              preview={imagePreview}
+              label="Envie um screenshot ou vista do modelo"
+              note="PNG, JPG, WEBP — até 20 MB"
+              meta={[
+                imageDimensions ? `${imageDimensions.w}×${imageDimensions.h}px` : '',
+                imageFile ? formatFileSize(imageFile.size) : '',
+              ].filter(Boolean).join(' · ')}
+              onFile={loadImageFile}
+              onClear={resetImage}
+            />
+          </div>
 
-        {/* Header */}
-        <div style={{ padding: '24px 24px 16px', borderBottom: '0.5px solid var(--color-border)', flexShrink: 0 }}>
-          <Breadcrumb />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--color-text-primary)' }}>{TOOL.name}</div>
-            <Pill tone="green">novo</Pill>
-          </div>
-          <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4, lineHeight: 1.5 }}>
-            {TOOL.longDesc}
-          </div>
+          <SettingGroup>
+            <SettingRow icon={<RowIcon name="photo" />} title="Vista"
+                        value={summarize([typeLabel])}
+                        onOpen={() => setSheet('vista')} />
+            <SettingRow icon={<RowIcon name="materials" />} title="Estilo"
+                        value={summarize([styleLabel])}
+                        onOpen={() => setSheet('estilo')} />
+            <SettingRow icon={<RowIcon name="precision" />} title="Origem"
+                        value={summarize([originLabel])}
+                        onOpen={() => setSheet('origem')} />
+          </SettingGroup>
+
+          <p className="spn-hint" style={{ marginTop: 14 }}>
+            Vista em câmera paralela ou isométrica exportada do SketchUp/Revit dá o resultado mais fiel.
+          </p>
+
+          {error ? <div className="spn-error" style={{ marginTop: 14 }}>{error}</div> : null}
         </div>
 
-        {/* Scrollable */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 24 }}>
-
-          {/* Upload */}
-          <Section label="Imagem base">
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
-              onDragLeave={() => setIsDragging(false)}
-              onDrop={(e) => { e.preventDefault(); setIsDragging(false); const f = e.dataTransfer.files[0]; if (f) loadImageFile(f) }}
-              style={{
-                border: `1.5px dashed ${isDragging ? 'var(--color-border-focus)' : imageFile ? 'var(--color-border-strong)' : 'var(--color-border-strong)'}`,
-                borderRadius: 10, overflow: 'hidden', cursor: 'pointer',
-                transition: 'border-color 0.15s, background 0.15s',
-                background: isDragging ? 'var(--color-surface)' : 'transparent',
-                minHeight: imageFile ? 0 : 130,
-                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                padding: imageFile ? 0 : '28px 20px',
-              }}
-            >
-              {imageFile && imagePreview ? (
-                <img src={imagePreview} alt="preview" style={{ width: '100%', display: 'block', maxHeight: 220, objectFit: 'contain', background: 'var(--color-preview-bg)' }} />
-              ) : (
-                <>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-quaternary)" strokeWidth="1.5" strokeLinecap="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                    <polyline points="17 8 12 3 7 8"/>
-                    <line x1="12" y1="3" x2="12" y2="15"/>
-                  </svg>
-                  <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 10 }}>
-                    Envie um screenshot ou vista do modelo
-                  </span>
-                  <span style={{ fontSize: 10, color: 'var(--color-text-quaternary)', marginTop: 4 }}>PNG, JPG, WEBP — até 20 MB</span>
-                </>
-              )}
-            </div>
-
-            {imageFile && (
-              <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', display: 'flex', gap: 8 }}>
-                  {imageDimensions && <span>{imageDimensions.w}×{imageDimensions.h}px</span>}
-                  <span>{formatFileSize(imageFile.size)}</span>
-                </div>
-                <button onClick={(e) => { e.stopPropagation(); resetImage() }}
-                  style={{ fontSize: 10, color: 'var(--color-text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                  Trocar imagem
-                </button>
-              </div>
-            )}
-
-            <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }}
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) loadImageFile(f) }} />
-          </Section>
-
-          {/* Hint */}
-          <div style={{
-            padding: '10px 12px', borderRadius: 8,
-            background: 'var(--color-surface)',
-            border: '1px solid var(--color-border)',
-          }}>
-            <div style={{ fontSize: 10, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
-              <strong style={{ fontWeight: 600, color: 'var(--color-text-secondary)' }}>Dica de fidelidade:</strong>{' '}
-              para resultado mais fiel, envie uma vista em câmera paralela ou isométrica
-              exportada do SketchUp/Revit.
-            </div>
-          </div>
-
-          {/* Origin */}
-          <Section label="Origem da imagem">
-            <PillRow
-              items={ISOMETRIC_ORIGINS}
-              selected={origin}
-              onSelect={(id) => setOrigin(id as IsometricOrigin)}
-            />
-          </Section>
-
-          {/* Type */}
-          <Section label="Tipo de isométrica">
-            <CardList
-              items={ISOMETRIC_TYPES}
-              selected={type}
-              onSelect={(id) => setType(id as IsometricType)}
-            />
-          </Section>
-
-          {/* Style */}
-          <Section label="Estilo">
-            <CardList
-              items={ISOMETRIC_STYLES}
-              selected={style}
-              onSelect={(id) => setStyle(id as IsometricStyle)}
-            />
-          </Section>
-
-          {error && (
-            <div style={{ padding: '10px 12px', borderRadius: 8, background: 'var(--color-error-bg)', border: '0.5px solid var(--color-error-border)', fontSize: 11, color: 'var(--color-error)' }}>
-              {error}
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div style={{ padding: '16px 24px', borderTop: '0.5px solid var(--color-border)', flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
-              Custo: <span style={{ color: 'var(--color-text-secondary)', fontWeight: 500 }}>{nodeCost} Nodes</span>
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
-              Saldo: <span style={{ color: credits > 0 ? 'var(--color-text-secondary)' : 'var(--color-error)', fontWeight: 500 }}>{credits} Nodes</span>
-            </div>
-          </div>
-          <button onClick={handleSubmit} disabled={!canSubmit}
-            style={{
-              width: '100%', padding: '12px 20px', borderRadius: 8, border: 'none',
-              background: canSubmit ? 'var(--color-inverse)' : 'var(--color-surface-hover)',
-              color: canSubmit ? 'var(--color-inverse-foreground)' : 'var(--color-text-quaternary)',
-              fontSize: 13, fontWeight: 600, cursor: canSubmit ? 'pointer' : 'not-allowed',
-              transition: 'background 0.15s, color 0.15s', letterSpacing: '-0.01em',
-            }}
-          >
-            {isLoading ? loadingText : credits < nodeCost ? 'Sem Nodes suficientes' : TOOL.ctaLabel}
+        <CostDock cost={nodeCost} balance={credits}>
+          <button type="button" className="spn-cta" onClick={handleSubmit} disabled={!canSubmit}>
+            {isLoading ? 'Gerando…' : credits < nodeCost ? 'Saldo insuficiente' : TOOL.ctaLabel}
           </button>
-        </div>
+        </CostDock>
       </div>
 
-      {/* ── Right panel ─────────────────────────────────────────────────────── */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, overflow: 'hidden' }}>
+      {/* ── Palco ──────────────────────────────────────────────────────────── */}
+      <div className="spn-tool-stage spn-glass">
+        {isLoading ? <StageLoading label={loadingText} /> : null}
 
-        {isLoading && (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-            <div style={{ width: 40, height: 40, borderRadius: '50%', border: '2px solid var(--color-border-strong)', borderTop: '2px solid var(--color-text-secondary)', animation: 'spin 0.9s linear infinite' }} />
-            <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', letterSpacing: '0.02em' }}>{loadingText}</div>
-          </div>
-        )}
-
-        {!isLoading && resultUrl && (
-          <div style={{ width: '100%', maxWidth: 760, animation: 'fadeIn 0.3s ease' }}>
-            <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--color-border)' }}>
-              <img src={resultUrl} alt="Isométrica" style={{ width: '100%', display: 'block' }} />
-            </div>
-            <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' as const }}>
-              <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', letterSpacing: '0.04em' }}>
-                Isométrica · {ISOMETRIC_TYPES.find(t => t.id === type)?.label} · {ISOMETRIC_STYLES.find(s => s.id === style)?.label}
-              </div>
+        {!isLoading && resultUrl ? (
+          <div style={{
+            alignSelf: 'stretch', flex: 1, minHeight: 0, overflowY: 'auto',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: 20,
+          }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={resultUrl} alt="Isométrica"
+                 style={{ maxWidth: '100%', borderRadius: 'var(--r-inner)', display: 'block' }} />
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              gap: 12, flexWrap: 'wrap', width: '100%', maxWidth: 860,
+            }}>
+              <span className="spn-hint" style={{ marginTop: 0 }}>
+                Isométrica · {typeLabel} · {styleLabel}
+              </span>
               {/* Proxy /api/download força attachment — o atributo download é
                   ignorado cross-origin e abriria a imagem fora do site. */}
-              <a href={`/api/download?url=${encodeURIComponent(resultUrl)}&filename=spacenode-isometrica.jpg`}
-                style={{ fontSize: 11, fontWeight: 500, color: 'var(--color-text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 6, border: '1px solid var(--color-border-strong)', background: 'var(--color-surface)' }}
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                  <polyline points="7 10 12 15 17 10"/>
-                  <line x1="12" y1="15" x2="12" y2="3"/>
-                </svg>
+              <a className="spn-ghost"
+                 style={{ display: 'inline-flex', alignItems: 'center', gap: 7, textDecoration: 'none' }}
+                 href={`/api/download?url=${encodeURIComponent(resultUrl)}&filename=spacenode-isometrica.jpg`}>
+                <DownloadIcon />
                 Baixar
               </a>
             </div>
           </div>
-        )}
+        ) : null}
 
-        {!isLoading && !resultUrl && (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, animation: 'fadeIn 0.2s ease' }}>
-            <div style={{ opacity: 0.16 }}>
-              <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="0.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2L3 7v10l9 5 9-5V7l-9-5z"/>
-                <path d="M3 7l9 5 9-5M12 12v10"/>
-              </svg>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', fontWeight: 500, letterSpacing: '-0.01em' }}>
-                Sua isométrica aparecerá aqui
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--color-text-quaternary)', marginTop: 5, lineHeight: 1.5, maxWidth: 320 }}>
-                Envie uma vista do seu modelo, escolha o tipo e o estilo de apresentação.
-              </div>
-            </div>
+        {!isLoading && !resultUrl ? (
+          <div className="spn-empty" style={{ maxWidth: 360 }}>
+            Sua isométrica aparece aqui.
+            <br />
+            Envie uma vista do modelo e escolha o tipo.
           </div>
-        )}
+        ) : null}
       </div>
-    </div>
-  )
-}
 
-// ── Sub-components ───────────────────────────────────────────────────────────
+      {/* ── Folhas ─────────────────────────────────────────────────────────── */}
+      <Sheet open={sheet === 'vista'} title="Vista" onClose={() => setSheet(null)}>
+        <div className="spn-field">
+          <span className="spn-field-label">Tipo de isométrica</span>
+          <ChoiceGroup
+            label="Tipo de isométrica"
+            cols={2}
+            value={type}
+            onChange={setType}
+            options={ISOMETRIC_TYPES.map(t => ({ value: t.id, title: t.label, note: t.desc }))}
+          />
+        </div>
+      </Sheet>
 
-function Breadcrumb() {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: 'var(--color-text-tertiary)', letterSpacing: '0.04em', textTransform: 'uppercase' as const }}>
-      <Link href="/app/apresentar" style={{ color: 'var(--color-text-tertiary)', textDecoration: 'none' }}>
-        Apresentar
-      </Link>
-      <span>›</span>
-      <span style={{ color: 'var(--color-text-secondary)' }}>Isométricas</span>
-    </div>
-  )
-}
+      <Sheet open={sheet === 'estilo'} title="Estilo" onClose={() => setSheet(null)}>
+        <div className="spn-field">
+          <span className="spn-field-label">Acabamento</span>
+          <ChoiceGroup
+            label="Acabamento"
+            cols={2}
+            value={style}
+            onChange={setStyle}
+            options={ISOMETRIC_STYLES.map(s => ({ value: s.id, title: s.label, note: s.desc }))}
+          />
+        </div>
+      </Sheet>
 
-function Section({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 10 }}>
-        {label}
-      </label>
-      {children}
-    </div>
-  )
-}
-
-function Pill({ tone = 'green', children }: { tone?: 'green' | 'muted'; children: React.ReactNode }) {
-  const color = tone === 'green' ? 'var(--color-accent-green)' : 'var(--color-text-tertiary)'
-  const bg    = tone === 'green' ? 'var(--color-accent-green-bg)' : 'var(--color-chip)'
-  return (
-    <span style={{
-      fontSize: 8, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' as const,
-      color, background: bg, padding: '2px 6px', borderRadius: 999,
-    }}>
-      {children}
-    </span>
-  )
-}
-
-function PillRow<T extends string>({ items, selected, onSelect }: {
-  items: { id: T; label: string }[]
-  selected: T
-  onSelect: (id: T) => void
-}) {
-  return (
-    <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 6 }}>
-      {items.map(it => {
-        const isSel = selected === it.id
-        return (
-          <button key={it.id} onClick={() => onSelect(it.id)}
-            style={{
-              padding: '6px 11px', borderRadius: 6,
-              border: `1px solid ${isSel ? 'var(--color-border-focus)' : 'var(--color-border)'}`,
-              background: isSel ? 'var(--color-surface-hover)' : 'transparent',
-              fontSize: 11, color: isSel ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
-              cursor: 'pointer', transition: 'all 0.15s',
+      <Sheet open={sheet === 'origem'} title="Origem" onClose={() => setSheet(null)}>
+        <div className="spn-field">
+          <span className="spn-field-label">De onde veio a imagem</span>
+          <PillGroup
+            label="Origem da imagem"
+            options={ORIGIN_LABELS}
+            value={originLabel}
+            onChange={(label) => {
+              const found = ISOMETRIC_ORIGINS.find(o => o.label === label)
+              if (found) setOrigin(found.id)
             }}
-          >
-            {it.label}
-          </button>
-        )
-      })}
-    </div>
-  )
-}
-
-function CardList<T extends string>({ items, selected, onSelect }: {
-  items: { id: T; label: string; desc: string }[]
-  selected: T
-  onSelect: (id: T) => void
-}) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      {items.map(it => {
-        const isSel = selected === it.id
-        return (
-          <button key={it.id} onClick={() => onSelect(it.id)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              padding: '10px 12px', borderRadius: 8,
-              border: `1px solid ${isSel ? 'var(--color-border-strong)' : 'var(--color-border)'}`,
-              background: isSel ? 'var(--color-surface)' : 'transparent',
-              cursor: 'pointer', textAlign: 'left', width: '100%',
-              transition: 'border-color 0.15s, background 0.15s',
-            }}
-          >
-            <div style={{
-              width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-              background: isSel ? 'var(--color-text-primary)' : 'var(--color-text-quaternary)',
-              transition: 'background 0.15s',
-            }} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 12, fontWeight: 500, color: isSel ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', letterSpacing: '-0.01em' }}>
-                {it.label}
-              </div>
-              <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
-                {it.desc}
-              </div>
-            </div>
-          </button>
-        )
-      })}
+          />
+          <p className="spn-hint">
+            Saber a origem melhora a fidelidade: cada software entrega linhas e sombras diferentes.
+          </p>
+        </div>
+      </Sheet>
     </div>
   )
 }

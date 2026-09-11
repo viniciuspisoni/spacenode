@@ -57,10 +57,12 @@ export default function VideoHistoryCarousel({ onReuse }: Props) {
   if (items.length === 0) return null
 
   return (
-    <div style={{
-      borderTop:  '0.5px solid var(--color-border)',
-      padding:    '14px 28px 16px',
-      flexShrink: 0,
+    // Cartão de vidro próprio, não uma faixa colada no rodapé do palco: no
+    // layout novo ele é a segunda peça da coluna, e precisa da própria borda.
+    <div className="spn-glass" style={{
+      borderRadius: 'var(--r-card)',
+      padding:      '12px 14px 14px',
+      flexShrink:   0,
     }}>
       <div style={{
         display:        'flex',
@@ -141,11 +143,11 @@ function HistoryCard({
         position:     'relative',
         width:        '100%',
         height:       106,
-        borderRadius: 8,
+        borderRadius: 'var(--r-inner)',
         overflow:     'hidden',
         background:   'var(--color-preview-bg)',
-        border:       `1px solid ${hovered ? 'var(--color-border-strong)' : 'var(--color-border)'}`,
-        transition:   'border-color 0.15s',
+        border:       `0.5px solid ${hovered ? 'var(--glass-line-strong)' : 'var(--glass-line)'}`,
+        transition:   'border-color 160ms var(--ease)',
       }}>
         {item.output_url && !failed ? (
           <video
@@ -176,15 +178,13 @@ function HistoryCard({
             {failed ? 'Falhou' : 'Sem vídeo'}
           </div>
         )}
-        <div style={{
+        <div className="spn-glass spn-glass--raised" style={{
           position: 'absolute', top: 6, right: 6,
-          padding: '2px 6px', borderRadius: 4,
-          background: 'var(--color-scrim)',
-          color: 'rgba(255,255,255,0.85)',
+          padding: '2px 7px', borderRadius: 999,
+          color: 'var(--color-text-secondary)',
           fontSize: 9.5,
           fontWeight: 600,
           letterSpacing: '0.04em',
-          backdropFilter: 'blur(4px)',
         }}>
           {item.lighting}
         </div>

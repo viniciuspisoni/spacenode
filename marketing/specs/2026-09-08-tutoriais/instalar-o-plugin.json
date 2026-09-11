@@ -1,0 +1,165 @@
+{
+ "slug": "2026-09-08-reel-tutorial-instalar-o-plugin",
+ "accent": false,
+ "segments": [
+  {
+   "type": "still",
+   "src": "$REPO/marketing/output/2026-09-08-tutoriais/src/crops2/su-baixar.png",
+   "dur": 2.1,
+   "fit": "contain",
+   "inset": 240,
+   "bg": "dark",
+   "kenburns": [
+    1,
+    1.03
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$REPO/marketing/output/2026-09-08-tutoriais/src/crops2/su-como-instalar.png",
+   "dur": 2.7,
+   "fit": "contain",
+   "inset": 240,
+   "bg": "dark",
+   "kenburns": [
+    1,
+    1.04
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$REPO/marketing/output/2026-09-07-reel-plugin-no-sketchup/src/panel-00-estado-inicial-sem-saldo.png",
+   "dur": 1.8,
+   "fit": "contain",
+   "inset": 200,
+   "bg": "dark",
+   "kenburns": [
+    1,
+    1
+   ]
+  },
+  {
+   "type": "video",
+   "src": "$REPO/marketing/output/2026-09-07-reel-plugin-no-sketchup/src/gerando-timelapse-sem-saldo.mp4",
+   "dur": 3.2,
+   "start": 0,
+   "fit": "cover"
+  },
+  {
+   "type": "still",
+   "src": "$REPO/marketing/output/2026-09-07-reel-plugin-no-sketchup/src/panel-11-resultado-novo-sem-saldo.png",
+   "dur": 1.9,
+   "fit": "contain",
+   "inset": 200,
+   "bg": "dark",
+   "kenburns": [
+    1,
+    1
+   ]
+  },
+  {
+   "type": "card",
+   "card": "final",
+   "dur": 1.2
+  }
+ ],
+ "transitions": [
+  {
+   "type": "fade",
+   "dur": 0.3
+  },
+  {
+   "type": "fade",
+   "dur": 0.3
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "fade",
+   "dur": 0.3
+  }
+ ],
+ "cards": {
+  "a": {
+   "layout": "hook-fixed",
+   "hook": "renderize de dentro do SketchUp.",
+   "top": 250,
+   "size": 54
+  },
+  "b": {
+   "layout": "hook-fixed",
+   "hook": "instale em 3 passos.",
+   "top": 250,
+   "size": 58,
+   "sub": "a extensão é grátis.",
+   "bottom": 330,
+   "subSize": 34
+  },
+  "c": {
+   "layout": "hook-fixed",
+   "hook": "conecte sua conta.",
+   "top": 250,
+   "size": 58
+  },
+  "d": {
+   "layout": "hook-fixed",
+   "hook": "capture a vista e gere.",
+   "top": 250,
+   "size": 56,
+   "sub": "o custo aparece no botão antes de clicar.",
+   "bottom": 330,
+   "subSize": 32
+  },
+  "e": {
+   "layout": "hook-fixed",
+   "hook": "o render volta no painel.",
+   "top": 250,
+   "size": 56
+  },
+  "final": {
+   "layout": "final",
+   "cta": "Instale o plugin",
+   "micro": "sketchup 2021+ · grátis · usa os nodes da sua conta"
+  }
+ },
+ "overlays": [
+  {
+   "card": "a",
+   "from": 0,
+   "to": 1.8
+  },
+  {
+   "card": "b",
+   "from": 1.8,
+   "to": 4.2
+  },
+  {
+   "card": "c",
+   "from": 4.2,
+   "to": 6
+  },
+  {
+   "card": "d",
+   "from": 6,
+   "to": 9.2
+  },
+  {
+   "card": "e",
+   "from": 9.2,
+   "to": 10.8
+  }
+ ],
+ "qa": [
+  1,
+  3,
+  5.2,
+  7.5,
+  8.9,
+  10.2,
+  11.5
+ ]
+}

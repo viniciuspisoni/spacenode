@@ -15,7 +15,7 @@ export const DNA_EXTRACTION_COST = 8
 const GENERATION_COST: Record<EngineId, Partial<Record<Quality, number>>> = {
   pulsar: { hd: 10, '2k': 15, '4k': 25 },
   vega:   {         '2k': 20, '4k': 40 },
-  quasar: {         '2k': 28 },
+  quasar: {         '2k': 20 },
 }
 
 export function getVistaGenerationCost(engine: EngineId, quality: Quality): number {

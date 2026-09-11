@@ -1,0 +1,79 @@
+{
+  "slug": "2026-09-04-reel-um-print-cinco-climas",
+  "reel": "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-um-print-cinco-climas\\2026-09-04-reel-um-print-cinco-climas.mp4",
+  "banda": "1080×720 @ y=600",
+  "segments": [
+    {
+      "i": 0,
+      "type": "still",
+      "dur": 1.2,
+      "start": 0,
+      "crop": "1342×833 → 1250×833"
+    },
+    {
+      "i": 1,
+      "type": "still",
+      "dur": 1.3,
+      "start": 1.2,
+      "crop": "1312×816 → 1224×816"
+    },
+    {
+      "i": 2,
+      "type": "still",
+      "dur": 1.3,
+      "start": 2.5,
+      "crop": "1312×816 → 1224×816"
+    },
+    {
+      "i": 3,
+      "type": "still",
+      "dur": 1.3,
+      "start": 3.8,
+      "crop": "1312×816 → 1224×816"
+    },
+    {
+      "i": 4,
+      "type": "still",
+      "dur": 1.3,
+      "start": 5.1,
+      "crop": "1312×816 → 1224×816"
+    },
+    {
+      "i": 5,
+      "type": "still",
+      "dur": 3.6,
+      "start": 6.4,
+      "crop": "1312×816 → 1224×816"
+    }
+  ],
+  "width": 1080,
+  "height": 1920,
+  "fps": "30/1",
+  "pix_fmt": "yuv420p",
+  "codec": "h264",
+  "duration": "10.00",
+  "sizeMB": "2.71",
+  "esperado": {
+    "width": 1080,
+    "height": 1920,
+    "fps": "30/1",
+    "duration": "10.00"
+  },
+  "qaFrames": [
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-um-print-cinco-climas\\qa-frames\\t0.50s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-um-print-cinco-climas\\qa-frames\\t1.17s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-um-print-cinco-climas\\qa-frames\\t1.20s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-um-print-cinco-climas\\qa-frames\\t2.47s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-um-print-cinco-climas\\qa-frames\\t2.50s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-um-print-cinco-climas\\qa-frames\\t3.77s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-um-print-cinco-climas\\qa-frames\\t3.80s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-um-print-cinco-climas\\qa-frames\\t5.07s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-um-print-cinco-climas\\qa-frames\\t5.10s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-um-print-cinco-climas\\qa-frames\\t6.37s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-um-print-cinco-climas\\qa-frames\\t6.40s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-um-print-cinco-climas\\qa-frames\\t8.37s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-um-print-cinco-climas\\qa-frames\\t8.40s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-um-print-cinco-climas\\qa-frames\\t9.20s.png"
+  ],
+  "qaSheet": "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-um-print-cinco-climas\\qa-sheet.jpg"
+}

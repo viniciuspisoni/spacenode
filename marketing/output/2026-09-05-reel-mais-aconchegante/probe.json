@@ -1,0 +1,47 @@
+{
+  "slug": "2026-09-05-reel-mais-aconchegante",
+  "reel": "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-05-reel-mais-aconchegante\\2026-09-05-reel-mais-aconchegante.mp4",
+  "banda": "1080×654 @ y=634",
+  "segments": [
+    {
+      "i": 0,
+      "type": "still",
+      "dur": 1.8,
+      "start": 0,
+      "crop": "1157×700 → 1157×700"
+    },
+    {
+      "i": 1,
+      "type": "still",
+      "dur": 3.6,
+      "start": 1.3,
+      "crop": "1328×800 → 1322×800"
+    },
+    {
+      "i": 2,
+      "type": "card",
+      "dur": 1,
+      "start": 4.6,
+      "crop": null
+    }
+  ],
+  "width": 1080,
+  "height": 1920,
+  "fps": "30/1",
+  "pix_fmt": "yuv420p",
+  "codec": "h264",
+  "duration": "5.60",
+  "sizeMB": "1.16",
+  "esperado": {
+    "width": 1080,
+    "height": 1920,
+    "fps": "30/1",
+    "duration": "5.60"
+  },
+  "qaFrames": [
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-05-reel-mais-aconchegante\\qa-frames\\t0.90s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-05-reel-mais-aconchegante\\qa-frames\\t3.10s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-05-reel-mais-aconchegante\\qa-frames\\t5.10s.png"
+  ],
+  "qaSheet": "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-05-reel-mais-aconchegante\\qa-sheet.jpg"
+}

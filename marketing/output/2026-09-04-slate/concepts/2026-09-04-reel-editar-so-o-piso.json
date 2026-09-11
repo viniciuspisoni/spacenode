@@ -1,0 +1,92 @@
+{
+ "slug": "2026-09-04-reel-editar-so-o-piso",
+ "title": "Trocou o piso. Não o render.",
+ "pillar": "demonstracao-de-ferramentas",
+ "angle": "Editar → Trocar material. O render já foi aprovado e o cliente muda o acabamento do piso. O arquiteto contorna o piso, descreve (ou anexa) o material e a plataforma refaz só aquela área — câmera, luz, cama, tapete e a sombra da persiana ficam onde estavam. Um módulo, um problema: mudança pós-aprovação sem voltar pra fila do render.",
+ "format": "transformacao",
+ "duration_s": 10.2,
+ "hook_text": "Cliente pediu o piso em madeira.",
+ "hook_visual": "Render aprovado da suíte (#75, verificado na miniatura): quarto escuro com marcenaria grafite, cama baixa branca com abajur duplo aceso, tapete cru, piso de concreto cinza e a fachada de persianas à direita riscando o piso com listras de sol. Faixa 16:9 centrada no 9:16 sobre a própria imagem desfocada, levemente escurecida, parada por 1,5 s. Eyebrow 'EDITAR · TROCAR MATERIAL' acima da banda e o hook em uma linha.",
+ "scenes": [
+  {
+   "t": "0.0–1.5",
+   "visual": "#75 (render, 3328×1280) em banda 16:9 (crop lateral central; cama centrada, persiana à direita dentro do quadro); Ken Burns parado; brilho −0.12; scrim próprio",
+   "text_on_screen": "EDITAR · TROCAR MATERIAL / Cliente pediu o piso em madeira.",
+   "asset_idx": [
+    75
+   ]
+  },
+  {
+   "t": "1.5–2.0",
+   "visual": "wipe da esquerda para a direita (xfade wipeleft) com régua branca fina atravessando só a imagem; o texto some no corte, nunca é wipado",
+   "text_on_screen": "",
+   "asset_idx": [
+    75,
+    760
+   ]
+  },
+  {
+   "t": "2.0–5.6",
+   "visual": "#760 (edição, 3328×1280, mesma câmera): piso agora em tábuas de madeira clara em perspectiva correta, listras da persiana projetadas sobre a madeira, tapete, cama, abajur e marcenaria idênticos; Ken Burns 1.00→1.04",
+   "text_on_screen": "Só o piso mudou. / Sem regenerar o {ambiente}.",
+   "asset_idx": [
+    760
+   ]
+  },
+  {
+   "t": "5.6–6.0",
+   "visual": "fade 0,4 s para o recorte de detalhe",
+   "text_on_screen": "",
+   "asset_idx": [
+    760
+   ]
+  },
+  {
+   "t": "6.0–8.8",
+   "visual": "still do recorte empilhado (corte do original com ffmpeg, não geração nova): faixa de cima = #75 recorte piso+persiana em concreto, faixa de baixo = #760 mesmo recorte em madeira, fio branco de 4 px entre elas (aspecto ~1,34, dentro do limite 4:3); Ken Burns sincronizado 1.00→1.03. Verificado em crop: as listras de sombra caem no mesmo lugar nos dois, tapete intacto",
+   "text_on_screen": "Mesma sombra, mesmo tapete, mesma {câmera}.",
+   "asset_idx": [
+    75,
+    760
+   ]
+  },
+  {
+   "t": "8.8–9.0",
+   "visual": "corte seco",
+   "text_on_screen": "",
+   "asset_idx": [
+    760
+   ]
+  },
+  {
+   "t": "9.0–10.2",
+   "visual": "card final: logo monocromático + CTA + spacenode.app",
+   "text_on_screen": "Veja no seu próprio projeto",
+   "asset_idx": []
+  }
+ ],
+ "assets": [
+  75,
+  760
+ ],
+ "cta": "Veja no seu próprio projeto",
+ "caption": "O cliente aprovou o render e pediu o piso em madeira. Ninguém regenerou o ambiente.\n\nEditar, Trocar material: você contorna o piso, escreve o material (ou anexa uma referência de textura) e a plataforma refaz só aquela área. Câmera, luz, tapete e a sombra da persiana ficam onde estavam.\n\nÉ a diferença entre \"volta pro render\" e \"resolvo antes da próxima reunião\". Serve para piso, parede, painel, bancada, marcenaria, pedra ou metal.\n\nAntes e depois são a mesma imagem, gerada e editada aqui.\n\nVeja no seu próprio projeto — link na bio.\n\n#arquitetura #designdeinteriores #renderizacao #archviz #projetodearquitetura",
+ "hashtags": [
+  "#arquitetura",
+  "#designdeinteriores",
+  "#renderizacao",
+  "#archviz",
+  "#projetodearquitetura"
+ ],
+ "paid": {
+  "primary": "O cliente pediu o piso em madeira depois do render aprovado. Você troca o piso, não o render.\nEditar: contorne a área, descreva o material, pronto em minutos. Cadastro grátis, sem cartão.",
+  "headline": "Troque o piso, não o render",
+  "description": "Cadastro grátis, sem cartão",
+  "button": "SIGN_UP",
+  "cutdown_note": "Já cabe em ≤15 s (10,2 s). Versão 7,2 s para anúncio: cortar as cenas 4–5 (recorte empilhado) e ir do #760 direto ao card final; legenda embutida = hook + 'Só o piso mudou.'; som off por padrão. Alternativa B para teste A/B: par #68→#798 (madeira escura → porcelanato bege), só com copy 'piso e tapete trocados' porque o tapete sumiu nessa edição."
+ },
+ "why_converts": "O gancho é uma situação que todo arquiteto viveu (pedido de mudança depois da aprovação), então o scroll para por reconhecimento, não por promessa. O payoff mostra uma capacidade concreta em vez de adjetivo, e o recorte empilhado prova fidelidade (sombra e tapete) para o público cético, o mais valioso. O CTA leva ao link da bio → cadastro grátis sem cartão → a primeira edição em um render próprio. Quem chega pelo Editar já renderiza e está no meio de um projeto com cliente: é o perfil que consome nodes mês a mês (render + iteração), e por isso o que mais converte de cadastro grátis em assinatura.",
+ "production_notes": "Arquivos: C:/Users/Pisoni/AppData/Local/Temp/claude/C--Users-Pisoni-spacenode/19988837-c924-4b30-b28f-e9e7dc6696fa/scratchpad/assets/0075-render-after.jpg (3328×1280, render vega 2k de 2026-06-04) e .../assets/0760-edit-after.png (3328×1280, edição 2026-06-10, prompt real 'trocar piso por piso de madeira conforme textura de referência', máscara ~13% da imagem). Mesmo aspecto 2,6:1 → o kit clampa a banda em 16:9 (crop lateral central): conferir no --plan/qa-frames que a persiana direita fica no quadro. Recorte de detalhe: crop=1340:500:1980:780 nos DOIS originais (coordenadas idênticas), empilhado com fio branco; a prova está em .../checks/c1_piso_persiana.jpg. Scrim como overlay próprio 0–8,8 s; verde só em '{ambiente}' e '{câmera}' (um por card); nada de texto acima de y=220 ou abaixo de y=1600. Não usar #758 no mesmo Reel (gêmeo). Motor da época era o editor v1; não citar motor nem provider.",
+ "risks": "O vídeo NÃO pode prometer que a máscara nunca vaza (o par gêmeo #798 removeu o tapete junto com o piso; por isso o escolhido é #760, onde o tapete ficou). Não dizer 'em segundos', nem 'preserva 100%': dizer só o que se vê (sombra, tapete e câmera iguais). Não citar custo em nodes por edição. A referência de textura pode ser citada porque o recurso existe no Editar atual ('Usar referência de material'), mas sem prometer reprodução exata da textura. Imagem do acervo do próprio dono; confirmar que o modelo da suíte não é projeto de cliente sem permissão registrada.",
+ "gated": ""
+}

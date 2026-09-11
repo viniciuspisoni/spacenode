@@ -1,0 +1,84 @@
+{
+ "slug": "zoom-cozinha-cada-peca",
+ "title": "Forno, cafeteira, torneira: mesma posição",
+ "pillar": "fidelidade-geometrica",
+ "angle": "Zoom em detalhe: quatro marcadores cravados no print (forno, cafeteira, torneira, lustre) que caem sobre as mesmas peças no render, seguidos de print e render empilhados no mesmo recorte e mesmo zoom.",
+ "format": "transformacao",
+ "duration_s": 12,
+ "hook_text": "Forno, cafeteira, torneira. Mesma posição.",
+ "hook_visual": "Print do SketchUp de uma cozinha com ilha de quartzito, armários pretos, backsplash de mármore preto, lustre espiral e as guias amarelas do SketchUp ainda no piso, em banda retrato quase full-bleed. Quatro marcadores circulares finos entram em cascata sobre forno, cafeteira, torneira e lustre. Aos 1,2s: corte seco para o render (lustre aceso, luz da janela, veios do quartzito) — cada marcador continua em cima da sua peça.",
+ "scenes": [
+  {
+   "t": "0.0–1.2",
+   "visual": "Print #426 em banda 1080×1242 (y 339–1581) sobre #0a0a0a; guias amarelas do SketchUp no piso ficam visíveis (é o print honesto). Quatro marcadores circulares hairline (⌀40px, branco 70%) entram em cascata de 0,15s: forno (x≈5%, y≈48% da imagem), cafeteira (13%, 56%), torneira (37%, 56%), lustre (46%, 33%). Headline no topo da banda, sobre o forro, com scrim 30%.",
+   "text_on_screen": "Forno, cafeteira, torneira. Mesma posição.",
+   "asset_idx": [
+    426
+   ]
+  },
+  {
+   "t": "1.2–4.0",
+   "visual": "Corte seco → render #425, mesmo recorte; marcadores presos caem sobre forno duplo, cafeteira, torneira preta e lustre espiral aceso. Apoio entra aos 1,6s na base da banda (sobre o piso, scrim 30%).",
+   "text_on_screen": "Forno, cafeteira, torneira. Mesma posição. / O que você modelou, onde você modelou.",
+   "asset_idx": [
+    425
+   ]
+  },
+  {
+   "t": "4.0–4.5",
+   "visual": "Marcadores somem em 0,3s; corte para o split empilhado.",
+   "text_on_screen": "Forno, cafeteira, torneira. Mesma posição. / O que você modelou, onde você modelou.",
+   "asset_idx": [
+    425
+   ]
+  },
+  {
+   "t": "4.5–8.0",
+   "visual": "Split empilhado: em cima o recorte do PRINT, embaixo o mesmo recorte do RENDER (região forno + cafeteira + backsplash de mármore + torneira: x 0–52%, y 38–66% da imagem), cada metade 1080×~640 separadas por hairline; push sincronizado 1,00→1,08 nas duas. Micro-eyebrow 'PRINT' / 'RENDER' (uppercase, tracking 0.28em, canto superior esquerdo de cada metade) — opcional. Headline sai aos 5,0s.",
+   "text_on_screen": "O que você modelou, onde você modelou.",
+   "asset_idx": [
+    426,
+    425
+   ]
+  },
+  {
+   "t": "8.0–9.8",
+   "visual": "Corte seco → render completo; Ken Burns 1,00→1,04 com centro no lustre e na ilha. Apoio sai aos 9,0s.",
+   "text_on_screen": "O que você modelou, onde você modelou.",
+   "asset_idx": [
+    425
+   ]
+  },
+  {
+   "t": "9.8–12.0",
+   "visual": "Scrim + CTA + wordmark monocromático.",
+   "text_on_screen": "Comece grátis",
+   "asset_idx": [
+    425
+   ]
+  }
+ ],
+ "assets": [
+  426,
+  425
+ ],
+ "cta": "Comece grátis",
+ "caption": "O print já tinha forno, cafeteira e torneira. A imagem manteve cada um no lugar onde você colocou.\n\nCozinha com ilha, print do SketchUp com as guias amarelas ainda no piso. Marcamos quatro pontos no print — forno, cafeteira, torneira, lustre — e seguramos as marcas sobre o render. Cada uma cai em cima da peça.\n\nDepois, print e render empilhados no mesmo recorte, mesmo zoom: backsplash de mármore, coifa, trilho de spots. O que você especificou aparece com luz e material de verdade, no lugar que você especificou.\n\nNão é redesenho do ambiente; é a apresentação do seu projeto, gerada em minutos.\n\nComece grátis — link na bio.\n#designdeinteriores #sketchup #render #archviz #apresentacaodeprojeto",
+ "hashtags": [
+  "#designdeinteriores",
+  "#sketchup",
+  "#render",
+  "#archviz",
+  "#apresentacaodeprojeto"
+ ],
+ "paid": {
+  "primary": "Forno, cafeteira, torneira: cada peça do seu modelo continua onde você colocou. Render em minutos.",
+  "headline": "Seu modelo, iluminado — não redesenhado",
+  "description": "Cadastro grátis",
+  "button": "SIGN_UP",
+  "cutdown_note": "Versão ≤15s: manter 0–4,0s (marcadores + corte seco) e o split de 4,5–8,0s; cortar o Ken Burns final e entrar no CTA aos 8,0s — total 10s. Retrato quase full-bleed: ideal para Reels e Stories pagos; textos no terço central."
+ },
+ "why_converts": "É o par que fala com quem faz interiores — o público mais próximo do repertório do arquiteto brasileiro de escritório pequeno, e o que mais sofre com render genérico trocando eletros, luminárias e torneiras de lugar. Os marcadores tornam a prova objeto a objeto, e o split empilhado responde à objeção 'mas no detalhe deve derivar' sem precisar de texto. O print com guias amarelas do SketchUp mostra que o insumo é o dia a dia dele, não um modelo de vitrine. O CTA 'Comece grátis' fecha o funil direto: sem cartão, o arquiteto sobe a própria cozinha, confere as suas peças e o valor fica demonstrado; a assinatura acontece quando o cliente pede mais vistas do mesmo projeto e o saldo gratuito não cobre a entrega.",
+ "production_notes": "Recorte: #426 (731×837) e #425 (960×1104) têm o mesmo aspecto (~0,87) — cortar para 1080×1242 e alinhar pela quina da ilha; QA de blend 50/50 conferindo lustre, torneira e portas do forno (≤4px). Coordenadas normalizadas dos marcadores foram medidas nos originais e coincidem nas duas imagens dentro de ~2% — recalcular depois do crop final. Marcadores em SVG transparente (círculo hairline 2px, sem preenchimento, sem glow). Split empilhado é recurso do reel-spec.mjs ('split antes/depois empilhado') — usar o MESMO zoompan nas duas metades. Palavra em verde: 'Mesma posição'. Headline sobre o forro (escuro no print, bege no render — scrim 30% equaliza), apoio e CTA sobre o piso cinza. Banda ocupa 339–1581: textos entre 400 e 1560, dentro da zona segura. Alternativas pagas: (b) prazo — 'Cozinha modelada de manhã, imagem de apresentação antes do almoço. Cada peça no lugar.' / 'Apresente a cozinha hoje'; (c) apresentação — 'O cliente vê a cozinha dele. Você vê o seu projeto respeitado.' / 'Imagem que o cliente entende'.",
+ "risks": "NÃO prometer: que a iluminação/forro sejam do modelo (o render clareou o forro, acendeu spots e lustre, colocou luz de janela — é interpretação); que 'todos os objetos' do modelo sempre fiquem (aqui ficaram; falar dos quatro marcados); 'redesenho zero' como regra geral — usar 'não é redesenho do ambiente' só sobre esta imagem; plugin/importação direta (gated); nenhum número. Não exibir metadados do banco. O print já era texturizado (mármore e lustre modelados): não vender como 'do clay ao render' — a proposta é luz e material reais sobre decisões já tomadas."
+}

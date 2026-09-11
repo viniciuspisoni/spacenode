@@ -1,0 +1,50 @@
+{
+  "gastoUsd": 4,
+  "clipes": [
+    {
+      "id": "concreto-luz",
+      "modelo": "fal-ai/veo3.1",
+      "duracao": 4,
+      "custoUsd": 0.8,
+      "prompt": "Macro cinematográfico de uma parede de concreto aparente, com as marcas das fôrmas de madeira e os furos dos espaçadores visíveis. Um facho estreito de luz natural varre a superfície muito devagar, da esquerda para a direita, revelando a textura e a granulação do concreto em relevo raso. Profundidade de campo curta, lente de 85mm, luz quente de fim de tarde, poeira fina suspensa no ar. Câmera praticamente parada, apenas a luz se move. Sem pessoas, sem texto, sem objetos reconhecíveis.",
+      "geracaoS": 91,
+      "arquivo": "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-09-filme\\ambientacao\\concreto-luz.mp4"
+    },
+    {
+      "id": "poeira-facho",
+      "modelo": "fal-ai/veo3.1",
+      "duracao": 4,
+      "custoUsd": 0.8,
+      "prompt": "Macro cinematografico, lente 100 mm, num ambiente escuro quase preto. Um unico facho estreito de luz dura entra na diagonal pelo canto superior direito e acende a poeira fina suspensa no ar, que gira muito devagar dentro do facho. O quadro esta completamente vazio do primeiro ao ultimo frame: existe apenas ar escuro e as particulas acesas. Nao ha parede, piso, teto, canto, quina, janela, porta, movel, planta, veiculo, predio nem horizonte em lugar nenhum do plano, e nada nem ninguem entra no quadro em nenhum momento. O facho nao encosta em nenhuma superficie: ele atravessa o ar e se perde no preto. A camera fica absolutamente parada; o unico movimento do plano e o das particulas. Profundidade de campo rasissima, grao fino de filme 35 mm, luz branca neutra e fria, fundo preto puro, 16:9. Um plano unico e continuo, sem corte, sem zoom, sem pan, sem tremor e sem mudanca de lente. Sem pessoas, sem maos, sem rostos, sem animais, sem texto, sem letras, sem numeros, sem logotipo e sem marca dagua. Nada no quadro se deforma nem muda de forma.",
+      "geracaoS": 112,
+      "arquivo": "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-09-filme\\ambientacao\\poeira-facho.mp4"
+    },
+    {
+      "id": "concreto-chapado",
+      "modelo": "fal-ai/veo3.1",
+      "duracao": 4,
+      "custoUsd": 0.8,
+      "prompt": "Macro cinematografico, lente 100 mm, de uma parede de concreto aparente vista de frente e completamente chapada, com as marcas horizontais da forma de madeira e os furos dos espacadores. A superficie preenche 100 por cento do quadro do primeiro ao ultimo frame e nao tem profundidade nem ponto de fuga: e um plano frontal, paralelo ao sensor. A camera fica absolutamente parada; o unico movimento do plano e o de uma sombra de borda dura que atravessa a superficie da esquerda para a direita, muito devagar, como sol de fim de tarde passando. Luz baixa, ambiente escuro, o lado sem sombra apenas levemente aceso, e uma poeira fina de cimento brilhando de leve rente a parede. A superficie e continua e sem interrupcao: nao aparece nenhuma quina, canto, aresta, rodape, esquadria, janela, porta, movel, objeto ou referencia de escala, e nada nem ninguem entra no quadro em nenhum momento. Contraste alto, paleta cinza neutra, 16:9. Um plano unico e continuo, sem corte, sem zoom, sem pan, sem tremor e sem mudanca de lente. Sem pessoas, sem maos, sem rostos, sem animais, sem texto, sem letras, sem numeros, sem logotipo. O concreto nao se deforma nem muda de textura.",
+      "geracaoS": 108,
+      "arquivo": "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-09-filme\\ambientacao\\concreto-chapado.mp4"
+    },
+    {
+      "id": "pedra-rasante",
+      "modelo": "fal-ai/veo3.1",
+      "duracao": 4,
+      "custoUsd": 0.8,
+      "prompt": "Macro cinematografico, lente 100 mm, de um bloco de pedra bruta seca, granito cinza com veio claro e poro aberto, que preenche 100 por cento do quadro do primeiro ao ultimo frame. A camera fica absolutamente parada; o unico movimento do plano e o de uma luz dura e rasante que varre a superficie de cima para baixo em poucos graus, fazendo o relevo, o poro e a microssombra aparecerem e sumirem devagar. A superficie e continua e sem interrupcao: nao ha junta construtiva, argamassa, rejunte, quina, aresta de parede, moldura, bancada, piso, movel, planta nem qualquer objeto que de escala, e nada nem ninguem entra no quadro em nenhum momento. Nao da para dizer se o quadro tem um metro ou um centimetro de pedra. Contraste alto, cor dessaturada, ambiente escuro, 16:9. Um plano unico e continuo, sem corte, sem zoom, sem pan, sem tremor e sem mudanca de lente. Sem pessoas, sem maos, sem rostos, sem animais, sem texto, sem letras, sem numeros, sem logotipo. A pedra nao se deforma nem muda de forma.",
+      "geracaoS": 123,
+      "arquivo": "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-09-filme\\ambientacao\\pedra-rasante.mp4"
+    },
+    {
+      "id": "fenda-luz",
+      "modelo": "fal-ai/veo3.1",
+      "duracao": 4,
+      "custoUsd": 0.8,
+      "prompt": "Macro cinematografico, lente 85 mm, de uma parede lisa de reboco branco levemente imperfeito, vista de frente, que preenche 100 por cento do quadro do primeiro ao ultimo frame. O plano comeca quase preto. Uma faixa de luz nasce no centro do quadro e vai abrindo e alargando muito devagar sobre o reboco, saindo do quase-preto e chegando a um branco limpo e forte; no ultimo segundo a luz continua crescendo ate estourar e tomar o quadro inteiro, de modo que no frame final nao sobra nenhuma imagem legivel, apenas branco. A fonte da luz esta fora de quadro e nunca aparece. A superficie e continua: nao ha porta, fresta, janela, esquadria, batente, quina, canto, rodape, movel nem objeto em lugar nenhum do plano, e nada nem ninguem entra no quadro em nenhum momento. A camera fica absolutamente parada; o unico movimento do plano e o da luz crescendo. Paleta quase monocromatica, 16:9. Um plano unico e continuo, sem corte, sem zoom, sem pan, sem tremor e sem mudanca de lente. Sem pessoas, sem maos, sem rostos, sem animais, sem texto, sem letras, sem numeros, sem logotipo. A parede nao se deforma.",
+      "geracaoS": 86,
+      "arquivo": "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-09-filme\\ambientacao\\fenda-luz.mp4"
+    }
+  ]
+}

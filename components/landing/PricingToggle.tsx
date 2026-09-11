@@ -1,20 +1,28 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { ENGINES, ENGINE_ORDER, type Resolution } from '@/lib/engines'
 import { ANNUAL_BILLING_ENABLED, SELLABLE_PLANS, recommendPlan, type SellablePlanId, type PaidPlanId, type BillingCycle } from '@/lib/plans'
 import { EXTRA_NODE_PACKS } from '@/lib/extra-nodes'
+import { NODES_GRACE_DAYS, NODES_POLICY_COPY } from '@/lib/billing/nodes'
 import { SUPPORT_EMAIL, supportWhatsAppUrl } from '@/lib/support'
 import { formatBRL } from '@/lib/launch-offer'
 
 // A vitrine (Starter / Pro / Studio) vem de SELLABLE_PLANS — o Office é
 // legado (2026-08-31): fora de venda, mas segue no catálogo p/ assinantes
 // existentes (billing/webhook).
+//
+// A tabela "consumo por motor de IA" saiu na reforma de vidro (2026-09-09):
+// era a única parte da landing que exigia saber o nome dos motores para ser
+// lida. Quem precisa do detalhe encontra no app, na hora de gerar.
 
-// UI-specific data por plano: features, badge, breakdown de renders.
-// Renders calculados com engine padrão por resolução: HD→Pulsar (10 nodes),
-// 2K→Vega (20), 4K→Vega (40). meterPct é proporcional ao maior plano
-// exibido (Studio=100%). Nodes extras valem p/ qualquer plano pago.
+/** Item da lista. `gain` = o que este plano tem A MAIS que o de baixo. */
+interface PlanFeature {
+  label: string
+  /** Segunda linha, só nos ganhos: sem ela "white-label" não diz nada. */
+  gloss?: string
+  gain?: boolean
+}
+
 interface PlanDisplay {
   rendersHD: number
   renders2K: number
@@ -23,24 +31,63 @@ interface PlanDisplay {
   meterPct: number
   featured: boolean
   badge: string
-  features: string[]
+  features: PlanFeature[]
 }
 
+// Renders calculados com engine padrão por resolução: HD→Pulsar (10 nodes),
+// 2K→Vega (20), 4K→Vega (40). meterPct é proporcional ao maior plano
+// exibido (Studio=100%). Nodes extras valem p/ qualquer plano pago.
+//
+// Escada cumulativa (2026-09-10). Antes os três cartões repetiam a MESMA
+// lista, e o Pro era literalmente igual ao Starter — o único motivo para
+// subir era volume de nodes, o que faz o preço parecer caro em vez de
+// parecer um plano melhor. Agora cada degrau herda o de baixo ("Tudo do
+// Starter") e mostra só o que ganha.
+//
+// O ganho do Pro NÃO é invenção de marketing: white-label existe e está em
+// produção desde antes disto, gated em pro/studio/office
+// (app/app/settings/identity/page.tsx) e lido em app/p/[slug]/page.tsx, que
+// esconde o "criado com spacenode" do rodapé do link do cliente. A landing
+// simplesmente nunca contou. Starter não perde nada: nunca teve.
 const PLAN_DISPLAY: Record<SellablePlanId, PlanDisplay> = {
   starter: {
     rendersHD: 75,  renders2K: 37,  renders4K: 18,
     monthlyAnnualLabel: '890', meterPct: 21, featured: false, badge: '',
-    features: ['Acesso a todos os motores', 'Nodes extras disponíveis', 'Suporte por e-mail'],
+    // O acúmulo entra AQUI e só aqui: é fato de plataforma, vale para todo
+    // plano pago, então mora na base da escada e sobe por herança ("Tudo do
+    // Starter"). Repeti-lo nos três cartões traria de volta exatamente a
+    // redundância que a escada acabou de tirar. Fica ao lado de "Nodes
+    // extras" porque os dois falam da mesma coisa: o que acontece com o
+    // saldo. A frase inteira da política está no bloco sob o subtítulo.
+    features: [
+      { label: 'Acesso a todos os motores' },
+      { label: 'Nodes não utilizados acumulam' },
+      { label: 'Nodes extras disponíveis' },
+      { label: 'Suporte por e-mail' },
+    ],
   },
   pro: {
     rendersHD: 180, renders2K: 90,  renders4K: 45,
     monthlyAnnualLabel: '1.990', meterPct: 51, featured: true, badge: 'recomendado',
-    features: ['Acesso a todos os motores', 'Nodes extras disponíveis', 'Suporte por e-mail'],
+    features: [
+      { label: 'Tudo do Starter' },
+      {
+        label: 'Apresentação com a sua marca',
+        gloss: 'o link que vai pro cliente sai sem o nosso nome no rodapé',
+        gain: true,
+      },
+    ],
   },
   studio: {
     rendersHD: 350, renders2K: 175, renders4K: 87,
     monthlyAnnualLabel: '3.490', meterPct: 100, featured: false, badge: '',
-    features: ['Acesso a todos os motores', 'Nodes extras disponíveis', 'Suporte prioritário'],
+    // Sem segunda linha de propósito (decisão do dono, 2026-09-10): detalhar
+    // o prioritário viraria promessa operacional com hora marcada, e hoje o
+    // suporte é uma pessoa só. O rótulo já existia; só não vira contrato.
+    features: [
+      { label: 'Tudo do Pro' },
+      { label: 'Suporte prioritário', gain: true },
+    ],
   },
 }
 
@@ -58,12 +105,28 @@ async function startCheckout(id: PaidPlanId, billing: BillingCycle) {
   if (data.url) window.location.href = data.url
 }
 
+// Check neutro, não verde: o item da lista é FATO ("acesso a todos os
+// motores"), não estado de sucesso. Em terciário ele fica atrás do rótulo,
+// que é quem carrega a informação.
 const CheckIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, color: 'var(--color-accent-green)' }}>
-    <path d="M2 7l3.5 3.5L12 3.5"/>
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }} aria-hidden>
+    <path d="M2 7l3.5 3.5L12 3.5" />
   </svg>
 )
 
+// O ganho do degrau ganha "+" em vez de check, e em primário: é a única
+// coisa nova do cartão, e o olho precisa achá-la sem depender de cor.
+const PlusIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="var(--color-text-primary)" strokeWidth="1.5" strokeLinecap="round" aria-hidden style={{ flexShrink: 0 }}>
+    <path d="M7 2.5v9M2.5 7h9" />
+  </svg>
+)
+
+// Antes o plano recomendado se distinguia por ser o único cartão PRETO numa
+// landing clara. Com a landing inteira escura isso deixou de existir, e por
+// um tempo ele se marcou com verde (aresta, selo, medidor). Desde 2026-09-10
+// a marcação é a mesma que o resto da seção já usava para "isto aqui é a
+// ação": vidro mais claro, aresta forte, e o selo no branco opaco do CTA.
 function PlanCard({ planId, billing, loading, onSelect }: {
   planId: SellablePlanId
   billing: BillingCycle
@@ -72,202 +135,229 @@ function PlanCard({ planId, billing, loading, onSelect }: {
 }) {
   const plan = SELLABLE_PLANS.find(p => p.id === planId)!
   const d = PLAN_DISPLAY[planId]
-  const [hovered, setHovered] = useState(false)
   const price = billing === 'annual' ? plan.annualMonthlyPrice : plan.monthlyPrice
-  const f = d.featured
 
   return (
-    <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        background: f ? '#1a1a1a' : 'var(--color-bg-elevated)',
-        border: `0.5px solid ${f ? 'rgba(255,255,255,0.1)' : 'var(--color-border-strong)'}`,
-        borderTop: f ? '2px solid #30d158' : '0.5px solid var(--color-border-strong)',
-        borderRadius: 14, padding: '28px 24px 24px',
-        display: 'flex', flexDirection: 'column',
-        position: 'relative', overflow: 'hidden',
-        boxShadow: hovered ? (f ? '0 8px 40px rgba(0,0,0,0.5)' : 'var(--shadow-md)') : (f ? 'var(--shadow-md)' : 'none'),
-        transform: hovered ? 'translateY(-2px)' : 'translateY(0)',
-        transition: 'box-shadow 0.2s, transform 0.2s',
-      }}
-    >
-      {d.badge && (
-        <div style={{
-          position: 'absolute', top: 16, right: 16,
-          fontSize: 9, fontWeight: 500, letterSpacing: '0.14em',
-          textTransform: 'uppercase' as const,
-          background: 'rgba(48,209,88,0.15)', color: '#30d158',
-          padding: '3px 8px', borderRadius: 20,
-          border: '0.5px solid rgba(48,209,88,0.25)',
-        }}>
-          {d.badge}
-        </div>
+    <div className="spn-plan spn-glass" data-featured={d.featured}>
+      {d.badge && <span className="spn-plan-badge">{d.badge}</span>}
+
+      <span className="spn-plan-name">{plan.name}</span>
+
+      <div className="spn-plan-price">
+        <span className="spn-plan-currency">R$</span>
+        <span className="spn-plan-amount">{formatBRL(price)}</span>
+        <span className="spn-plan-period">/mês</span>
+      </div>
+
+      {billing === 'annual' && (
+        <p className="spn-plan-annual">R$ {d.monthlyAnnualLabel} cobrado anualmente</p>
       )}
 
-      <div style={{
-        fontSize: 10, fontWeight: 500, letterSpacing: '0.18em',
-        textTransform: 'uppercase' as const,
-        color: f ? 'rgba(255,255,255,0.4)' : 'var(--color-text-tertiary)',
-        marginBottom: 20,
-      }}>
-        {plan.name}
+      <div className="spn-plan-nodes">
+        <span className="spn-plan-nodes-n">{plan.nodes.toLocaleString('pt-BR')}</span>
+        <span className="spn-plan-nodes-l">nodes / mês</span>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, marginBottom: 3 }}>
-        <span style={{ fontSize: 15, fontWeight: 500, color: f ? 'rgba(255,255,255,0.5)' : 'var(--color-text-tertiary)' }}>R$</span>
-        <span style={{
-          fontSize: 42, fontWeight: 500,
-          color: f ? '#fafafa' : 'var(--color-text-primary)',
-          letterSpacing: '-0.04em', lineHeight: 1,
-          fontVariantNumeric: 'tabular-nums' as const,
-        }}>
-          {formatBRL(price)}
-        </span>
-        <span style={{ fontSize: 13, color: f ? 'rgba(255,255,255,0.4)' : 'var(--color-text-tertiary)', letterSpacing: '-0.005em' }}>
-          /mês
-        </span>
-      </div>
-
-      {billing === 'annual' ? (
-        <p style={{ fontSize: 10.5, letterSpacing: '-0.005em', marginBottom: 14, color: f ? 'rgba(255,255,255,0.3)' : 'var(--color-text-tertiary)' }}>
-          R$ {d.monthlyAnnualLabel} cobrado anualmente
-        </p>
-      ) : (
-        <div style={{ marginBottom: 14 }} />
-      )}
-
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 14 }}>
-        <span style={{
-          fontSize: 15, fontWeight: 500,
-          color: f ? 'rgba(255,255,255,0.7)' : 'var(--color-text-primary)',
-          letterSpacing: '-0.01em', fontVariantNumeric: 'tabular-nums' as const,
-        }}>
-          {plan.nodes.toLocaleString('pt-BR')}
-        </span>
-        <span style={{ fontSize: 11, color: f ? 'rgba(255,255,255,0.35)' : 'var(--color-text-tertiary)', letterSpacing: '-0.005em' }}>
-          nodes / mês
-        </span>
-      </div>
-
-      <p style={{
-        fontSize: 10.5, letterSpacing: '-0.005em', marginBottom: 20,
-        lineHeight: 1.55,
-        color: f ? 'rgba(255,255,255,0.28)' : 'var(--color-text-tertiary)',
-      }}>
-        <span style={{ color: f ? 'rgba(255,255,255,0.75)' : 'var(--color-text-primary)', fontWeight: 500 }}>{d.rendersHD} renders HD</span>
-        &nbsp;·&nbsp;
-        <span style={{ color: f ? 'rgba(255,255,255,0.75)' : 'var(--color-text-primary)', fontWeight: 500 }}>{d.renders2K} renders 2K</span>
-        &nbsp;·&nbsp;
-        <span style={{ color: f ? 'rgba(255,255,255,0.75)' : 'var(--color-text-primary)', fontWeight: 500 }}>{d.renders4K} renders 4K</span>
+      <p className="spn-plan-renders">
+        <b>{d.rendersHD}</b> HD&nbsp;·&nbsp;<b>{d.renders2K}</b> 2K&nbsp;·&nbsp;<b>{d.renders4K}</b> 4K
       </p>
 
-      <div style={{ marginBottom: 20 }}>
-        <div style={{
-          height: 2, borderRadius: 2, overflow: 'hidden',
-          background: f ? 'rgba(255,255,255,0.08)' : 'var(--color-border-strong)',
-        }}>
-          <div style={{
-            height: '100%', borderRadius: 2,
-            background: f ? '#30d158' : 'var(--color-text-primary)',
-            width: `${d.meterPct}%`,
-          }} />
-        </div>
+      <div className="spn-plan-meter">
+        <span style={{ width: `${d.meterPct}%` }} />
       </div>
 
-      <div style={{ height: 0.5, background: f ? 'rgba(255,255,255,0.08)' : 'var(--color-border-strong)', marginBottom: 20 }} />
-
-      <ul style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 28, flex: 1, listStyle: 'none', padding: 0 }}>
+      <ul className="spn-plan-features">
         {d.features.map(feat => (
-          <li key={feat} style={{
-            display: 'flex', alignItems: 'center', gap: 10,
-            fontSize: 12, letterSpacing: '-0.005em',
-            color: f ? 'rgba(255,255,255,0.7)' : 'var(--color-text-primary)',
-          }}>
-            {f ? (
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#30d158" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                <path d="M2 7l3.5 3.5L12 3.5"/>
-              </svg>
-            ) : <CheckIcon />}
-            {feat}
+          <li key={feat.label} data-gain={feat.gain === true}>
+            {feat.gain ? <PlusIcon /> : <CheckIcon />}
+            <span>
+              {feat.label}
+              {feat.gloss && <small>{feat.gloss}</small>}
+            </span>
           </li>
         ))}
       </ul>
 
       <button
+        type="button"
         onClick={() => onSelect(plan.id)}
         disabled={loading !== null}
-        style={{
-          width: '100%', padding: '11px 16px', borderRadius: 8,
-          fontFamily: 'inherit', fontSize: 12, fontWeight: 500, letterSpacing: '0.01em',
-          cursor: loading ? 'wait' : 'pointer', transition: 'all 0.15s',
-          border: f ? 'none' : '0.5px solid var(--color-border-strong)',
-          background: f ? '#fafafa' : 'var(--color-surface)',
-          color: f ? '#0a0a0a' : 'var(--color-text-primary)',
-          opacity: loading && loading !== plan.id ? 0.5 : 1,
-        }}
+        className="spn-plan-cta"
+        style={{ opacity: loading && loading !== plan.id ? 0.5 : 1 }}
       >
-        {loading === plan.id ? 'Redirecionando...' : plan.cta}
+        {loading === plan.id ? 'Redirecionando…' : plan.cta}
       </button>
+
+      <style jsx>{`
+        .spn-plan {
+          position: relative;
+          display: flex;
+          flex-direction: column;
+          padding: 28px 24px 24px;
+          border-radius: var(--r-card);
+          transition: transform 200ms var(--ease), box-shadow 200ms var(--ease);
+        }
+        .spn-plan:hover {
+          transform: translateY(-2px);
+          box-shadow: var(--shadow-float);
+        }
+        .spn-plan[data-featured='true'] {
+          background: var(--glass-raised);
+          border-color: var(--glass-line-strong);
+          box-shadow: var(--shadow-float), inset 0 0.5px 0 var(--glass-spec);
+        }
+        /* Selo no mesmo branco opaco do CTA: o cartão passa a ter dois
+           pontos claros na diagonal (selo em cima, botão embaixo) e a cor
+           que diz "é por aqui" é uma só na seção inteira. */
+        .spn-plan-badge {
+          position: absolute;
+          top: 16px;
+          right: 16px;
+          font-size: 9px;
+          font-weight: 500;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          background: var(--color-inverse);
+          color: var(--color-inverse-foreground);
+          padding: 3px 8px;
+          border-radius: var(--radius-full);
+        }
+        .spn-plan-name {
+          font-size: 10px;
+          font-weight: 500;
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
+          color: var(--color-text-tertiary);
+          margin-bottom: 20px;
+        }
+        .spn-plan-price {
+          display: flex;
+          align-items: baseline;
+          gap: 5px;
+          margin-bottom: 14px;
+        }
+        .spn-plan-currency { font-size: 15px; font-weight: 500; color: var(--color-text-tertiary); }
+        .spn-plan-amount {
+          font-size: 42px;
+          font-weight: 500;
+          letter-spacing: -0.04em;
+          line-height: 1;
+          color: var(--color-text-primary);
+          font-variant-numeric: tabular-nums;
+        }
+        .spn-plan-period { font-size: 13px; color: var(--color-text-tertiary); }
+        .spn-plan-annual {
+          font-size: 10.5px;
+          color: var(--color-text-tertiary);
+          margin: -10px 0 14px;
+        }
+        .spn-plan-nodes {
+          display: flex;
+          align-items: baseline;
+          gap: 6px;
+          margin-bottom: 10px;
+        }
+        .spn-plan-nodes-n {
+          font-size: 15px;
+          font-weight: 500;
+          letter-spacing: -0.01em;
+          color: var(--color-text-primary);
+          font-variant-numeric: tabular-nums;
+        }
+        .spn-plan-nodes-l { font-size: 11px; color: var(--color-text-tertiary); }
+        .spn-plan-renders {
+          font-size: 11px;
+          line-height: 1.55;
+          color: var(--color-text-tertiary);
+          margin: 0 0 18px;
+        }
+        .spn-plan-renders b { color: var(--color-text-primary); font-weight: 500; }
+        .spn-plan-meter {
+          height: 2px;
+          border-radius: 2px;
+          overflow: hidden;
+          background: var(--glass-line-strong);
+          margin-bottom: 20px;
+        }
+        .spn-plan-meter span {
+          display: block;
+          height: 100%;
+          border-radius: 2px;
+          background: var(--color-text-primary);
+        }
+        /* O medidor compara volume ENTRE os planos — trocar a cor só no
+           recomendado quebrava a comparação, que é o trabalho dele. */
+        .spn-plan-features {
+          list-style: none;
+          padding: 20px 0 0;
+          margin: 0 0 26px;
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          border-top: 0.5px solid var(--glass-line);
+        }
+        .spn-plan-features li {
+          display: flex;
+          align-items: flex-start;
+          gap: 10px;
+          font-size: 12px;
+          line-height: 1.35;
+          letter-spacing: -0.005em;
+          color: var(--color-text-secondary);
+        }
+        /* O ganho do degrau: primário e um pouco mais pesado. Junto com o
+           "+" no lugar do check, é o que faz o cartão dizer o que ele tem
+           A MAIS — sem precisar de cor. */
+        .spn-plan-features li[data-gain='true'] {
+          color: var(--color-text-primary);
+          font-weight: 500;
+        }
+        .spn-plan-features li small {
+          display: block;
+          margin-top: 3px;
+          font-size: 11px;
+          font-weight: 400;
+          line-height: 1.45;
+          color: var(--color-text-tertiary);
+        }
+        .spn-plan-cta {
+          width: 100%;
+          padding: 13px 16px;
+          min-height: 46px;
+          border-radius: var(--r-inner);
+          font-family: inherit;
+          font-size: 12.5px;
+          font-weight: 500;
+          letter-spacing: 0.01em;
+          cursor: pointer;
+          border: 0.5px solid var(--glass-line-strong);
+          background: var(--glass-raised);
+          color: var(--color-text-primary);
+          transition: background 150ms var(--ease), border-color 150ms var(--ease);
+        }
+        .spn-plan[data-featured='true'] .spn-plan-cta {
+          background: var(--color-inverse);
+          color: var(--color-inverse-foreground);
+          border-color: transparent;
+        }
+        .spn-plan-cta:hover:not(:disabled) { border-color: var(--color-border-focus); }
+        .spn-plan-cta:disabled { cursor: wait; }
+        .spn-plan-cta:focus-visible {
+          outline: 1.5px solid var(--color-border-focus);
+          outline-offset: 2px;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .spn-plan { transition: none; }
+          .spn-plan:hover { transform: none; }
+        }
+      `}</style>
     </div>
   )
 }
 
-function ConsumptionTable() {
-  const resolutions: Resolution[] = ['hd', '2k', '4k']
-  const headCellBase = {
-    fontSize: 10, fontWeight: 500,
-    letterSpacing: '0.14em', textTransform: 'uppercase' as const,
-    color: 'var(--color-text-tertiary)',
-    padding: '0 16px 14px', borderBottom: '0.5px solid var(--color-border-strong)',
-  }
-  const bodyCellBase = {
-    padding: '14px 16px', fontSize: 13, color: 'var(--color-text-primary)',
-    fontVariantNumeric: 'tabular-nums' as const,
-    borderBottom: '0.5px solid var(--color-border)',
-  }
-  return (
-    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-      <thead>
-        <tr>
-          <th style={{ ...headCellBase, textAlign: 'left' }}>Motor</th>
-          {resolutions.map(r => (
-            <th key={r} style={{ ...headCellBase, textAlign: 'right' }}>{r.toUpperCase()}</th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {ENGINE_ORDER.map((eid, idx) => {
-          const e = ENGINES[eid]
-          const isLast = idx === ENGINE_ORDER.length - 1
-          const cellStyle = isLast ? { ...bodyCellBase, borderBottom: 'none' } : bodyCellBase
-          return (
-            <tr key={eid}>
-              <td style={{ ...cellStyle, textAlign: 'left' }}>
-                <span style={{ fontWeight: 500 }}>{e.name}</span>
-                <span style={{ color: 'var(--color-text-tertiary)', marginLeft: 8, fontSize: 11 }}>
-                  · {e.tagline}
-                </span>
-              </td>
-              {resolutions.map(r => {
-                const cost = e.nodes[r]
-                return (
-                  <td key={r} style={{ ...cellStyle, textAlign: 'right' }}>
-                    {cost !== undefined
-                      ? <span><span style={{ fontWeight: 500 }}>{cost}</span> <span style={{ color: 'var(--color-text-tertiary)', fontSize: 11 }}>nodes</span></span>
-                      : <span style={{ color: 'var(--color-text-tertiary)' }}>—</span>}
-                  </td>
-                )
-              })}
-            </tr>
-          )
-        })}
-      </tbody>
-    </table>
-  )
-}
-
 const TOP_PLAN_NODES = SELLABLE_PLANS[SELLABLE_PLANS.length - 1].nodes
+const QUALITIES = [{ label: 'HD', cost: 10 }, { label: '2K', cost: 20 }, { label: '4K', cost: 40 }]
 
 export function PricingToggle() {
   const [billing, setBilling]         = useState<BillingCycle>('monthly')
@@ -275,13 +365,14 @@ export function PricingToggle() {
   const [renders, setRenders]         = useState(40)
   const [qualityCost, setQualityCost] = useState(10)
 
-  const totalNodes      = renders * qualityCost
-  const recommended     = recommendPlan(totalNodes)
-  const overflow        = totalNodes > TOP_PLAN_NODES
-  const overflowAmount  = overflow ? totalNodes - TOP_PLAN_NODES : 0
-  const suggestedExtra  = overflow
+  const totalNodes     = renders * qualityCost
+  const recommended    = recommendPlan(totalNodes)
+  const overflow       = totalNodes > TOP_PLAN_NODES
+  const overflowAmount = overflow ? totalNodes - TOP_PLAN_NODES : 0
+  const suggestedExtra = overflow
     ? (EXTRA_NODE_PACKS.find(p => p.nodes >= overflowAmount) ?? EXTRA_NODE_PACKS[EXTRA_NODE_PACKS.length - 1])
     : null
+  const suggestion = overflow ? `${recommended.name} + ${suggestedExtra!.name}` : recommended.name
 
   const handleSelect = async (id: PaidPlanId) => {
     setLoading(id)
@@ -297,334 +388,308 @@ export function PricingToggle() {
   }, [])
 
   return (
-    <section id="planos" className="spn-pricing" style={{ background: 'var(--color-bg)' }}>
-      <div style={{ maxWidth: 1000, margin: '0 auto' }}>
+    <section id="planos" className="spn-pricing">
+      <div className="spn-pricing-head">
+        <h2 className="spn-pricing-title">escolha seu volume de geração.</h2>
+        <p className="spn-pricing-sub">
+          Nodes são os créditos de geração. Renovam todo mês e{' '}
+          <b>acumulam</b> — no plano mensal, você cancela quando quiser.
+        </p>
+        {/* A regra do acúmulo em destaque: é a objeção nº 1 de quem tem mês
+            fraco de projeto e some da assinatura pra não "perder" nodes. As
+            duas frases andam juntas — prometer só o acúmulo esconde o prazo. */}
+        <p className="spn-pricing-rollover spn-glass">
+          {NODES_POLICY_COPY}
+        </p>
 
-        {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: 48 }}>
-          <div style={{
-            fontSize: 10, fontWeight: 500, letterSpacing: '0.22em',
-            textTransform: 'uppercase' as const, color: 'var(--color-text-tertiary)',
-            marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-          }}>
-            <span style={{ display: 'block', width: 32, height: 0.5, background: 'var(--color-border-strong)', flexShrink: 0 }} />
-            planos
-            <span style={{ display: 'block', width: 32, height: 0.5, background: 'var(--color-border-strong)', flexShrink: 0 }} />
-          </div>
-          <h2 className="spn-pricing-title">
-            escolha seu volume de geração.
-          </h2>
-          <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)', letterSpacing: '-0.005em', lineHeight: 1.6, maxWidth: 520, margin: '0 auto' }}>
-            Nodes são os créditos usados para gerar, editar ou ampliar imagens
-            na plataforma. Renovam todo mês — e no plano mensal você cancela
-            quando quiser.
-          </p>
-
-          {/* Billing toggle — some junto com a pausa do ciclo anual */}
-          {ANNUAL_BILLING_ENABLED && (
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', marginTop: 24,
-            background: 'var(--color-bg-elevated)',
-            border: '0.5px solid var(--color-border-strong)',
-            borderRadius: 40, padding: 4,
-          }}>
-            <button
-              onClick={() => setBilling('monthly')}
-              style={{
-                fontFamily: 'inherit', fontSize: 11, fontWeight: 500, letterSpacing: '-0.005em',
-                color: billing === 'monthly' ? 'var(--color-bg)' : 'var(--color-text-tertiary)',
-                background: billing === 'monthly' ? 'var(--color-text-primary)' : 'transparent',
-                border: 'none', borderRadius: 32, padding: '7px 16px',
-                cursor: 'pointer', transition: 'all 0.18s', whiteSpace: 'nowrap' as const,
-              }}
-            >
+        {/* Billing toggle — some junto com a pausa do ciclo anual */}
+        {ANNUAL_BILLING_ENABLED && (
+          <div className="spn-pricing-toggle spn-glass">
+            <button type="button" onClick={() => setBilling('monthly')} data-on={billing === 'monthly'}>
               Mensal
             </button>
-            <button
-              onClick={() => setBilling('annual')}
-              style={{
-                fontFamily: 'inherit', fontSize: 11, fontWeight: 500, letterSpacing: '-0.005em',
-                color: billing === 'annual' ? 'var(--color-bg)' : 'var(--color-text-tertiary)',
-                background: billing === 'annual' ? 'var(--color-text-primary)' : 'transparent',
-                border: 'none', borderRadius: 32, padding: '7px 16px',
-                cursor: 'pointer', transition: 'all 0.18s', whiteSpace: 'nowrap' as const,
-                display: 'flex', alignItems: 'center', gap: 7,
-              }}
-            >
+            <button type="button" onClick={() => setBilling('annual')} data-on={billing === 'annual'}>
               Anual
-              <span style={{
-                fontSize: 9, fontWeight: 500, letterSpacing: '0.08em',
-                textTransform: 'uppercase' as const,
-                background: 'var(--color-accent-green-bg)', color: 'var(--color-accent-green)',
-                padding: '2px 7px', borderRadius: 20,
-                border: '0.5px solid var(--color-accent-green-border)',
-              }}>
-                2 meses grátis
-              </span>
+              <span className="spn-pricing-toggle-tag">2 meses grátis</span>
             </button>
           </div>
-          )}
+        )}
+      </div>
+
+      <div className="spn-pricing-grid">
+        {SELLABLE_PLANS.map(p => (
+          <PlanCard key={p.id} planId={p.id} billing={billing} loading={loading} onSelect={handleSelect} />
+        ))}
+      </div>
+
+      {/* Calculadora: o caminho inverso dos cartões — de quantos renders por
+          mês para qual plano. Volume acima do topo cai em Studio + pack. */}
+      <div className="spn-calc spn-glass">
+        <div className="spn-calc-head">
+          <span className="spn-calc-label">quantos renders por mês?</span>
+          <span className="spn-calc-pick spn-glass--raised">
+            plano ideal <b>{suggestion}</b>
+          </span>
         </div>
 
-        {/* Plan cards: Starter / Pro (recomendado, central) / Studio */}
-        <div
-          className="spn-pricing-grid"
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-            gap: 12, alignItems: 'start',
-          }}
-        >
-          {SELLABLE_PLANS.map(p => (
-            <PlanCard key={p.id} planId={p.id} billing={billing} loading={loading} onSelect={handleSelect} />
-          ))}
-        </div>
-
-        {/* Volume maior → conversa (substitui o antigo plano Office na vitrine) */}
-        <p style={{
-          textAlign: 'center', marginTop: 20,
-          fontSize: 12, color: 'var(--color-text-secondary)', letterSpacing: '-0.005em',
-        }}>
-          Precisa de mais volume para o seu escritório?{' '}
-          <a
-            href={supportWhatsAppUrl('Olá! Preciso de mais volume de nodes para o meu escritório.')}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ color: 'var(--color-text-primary)', textDecoration: 'underline', textUnderlineOffset: 3 }}
-          >
-            Fale com a gente
-          </a>.
-        </p>
-
-        {/* Risk-reduction microcopy */}
-        <p style={{
-          textAlign: 'center', marginTop: 8,
-          fontSize: 12, color: 'var(--color-text-tertiary)', letterSpacing: '-0.005em',
-        }}>
-          Ainda em dúvida?{' '}
-          <a href="/login?mode=signup" style={{ color: 'var(--color-text-primary)', textDecoration: 'underline', textUnderlineOffset: 3 }}>
-            Comece grátis com 80 nodes
-          </a>
-          {' '}— assine quando o volume pedir.
-        </p>
-
-        {/* Engine × resolution table */}
-        <div style={{ marginTop: 40 }}>
-          <div style={{
-            fontSize: 10, fontWeight: 500, letterSpacing: '0.18em',
-            textTransform: 'uppercase' as const, color: 'var(--color-text-tertiary)',
-            textAlign: 'center', marginBottom: 16,
-          }}>
-            consumo por motor de IA
-          </div>
-          <div
-            className="spn-pricing-engines"
-            style={{
-              background: 'var(--color-bg-elevated)',
-              border: '0.5px solid var(--color-border-strong)',
-              borderRadius: 14, padding: '8px 12px 4px',
-            }}
-          >
-            <ConsumptionTable />
-          </div>
-        </div>
-
-        {/* Calculator */}
-        <div
-          className="spn-pricing-calc"
-          style={{
-            marginTop: 40,
-            background: 'var(--color-bg-elevated)',
-            border: '0.5px solid var(--color-border-strong)',
-            borderRadius: 14, padding: '28px 32px',
-          }}
-        >
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            marginBottom: 24, flexWrap: 'wrap' as const, gap: 12,
-          }}>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.01em' }}>
-                Calculadora de Nodes
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', letterSpacing: '-0.005em' }}>
-                Descubra qual plano se encaixa no seu fluxo
-              </div>
-            </div>
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              background: 'var(--color-surface)',
-              border: '0.5px solid var(--color-border-strong)',
-              color: 'var(--color-text-primary)',
-              padding: '8px 14px', borderRadius: 8,
-              fontSize: 12, fontWeight: 500, letterSpacing: '-0.01em', whiteSpace: 'nowrap' as const,
-            }}>
-              {overflow
-                ? <>Sugestão:&nbsp;<span style={{ color: 'var(--color-accent-green)', fontWeight: 400 }}>{recommended.name} + {suggestedExtra!.name}</span></>
-                : <>Plano recomendado:&nbsp;<span style={{ color: 'var(--color-accent-green)', fontWeight: 400 }}>{recommended.name}</span></>}
-            </div>
+        <div className="spn-calc-grid">
+          <div>
+            <div className="spn-calc-value">{renders} renders</div>
+            <input
+              type="range" min="5" max="200" step="5" value={renders}
+              onChange={handleRenders}
+              aria-label="Renders por mês"
+              className="spn-calc-range"
+            />
+            <div className="spn-calc-scale"><span>5</span><span>200+</span></div>
           </div>
 
-          <div className="spn-pricing-calc-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
-            <div>
-              <label style={{
-                display: 'block', fontSize: 10, fontWeight: 500, letterSpacing: '0.14em',
-                textTransform: 'uppercase' as const, color: 'var(--color-text-tertiary)', marginBottom: 10,
-              }}>
-                Renders por mês
-              </label>
-              <div style={{ fontSize: 20, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.03em', marginBottom: 4 }}>
-                {renders} renders
-              </div>
-              <input
-                type="range" min="5" max="200" step="5" value={renders}
-                onChange={handleRenders}
-                aria-label="Renders por mês"
-                style={{ width: '100%', marginBottom: 8, cursor: 'pointer', accentColor: 'var(--color-accent-green)' }}
-              />
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--color-text-tertiary)' }}>
-                <span>5</span><span>200+</span>
-              </div>
-            </div>
-
-            <div>
-              <label style={{
-                display: 'block', fontSize: 10, fontWeight: 500, letterSpacing: '0.14em',
-                textTransform: 'uppercase' as const, color: 'var(--color-text-tertiary)', marginBottom: 10,
-              }}>
-                Qualidade predominante
-              </label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
-                {[{ label: 'HD', cost: 10 }, { label: '2K', cost: 20 }, { label: '4K', cost: 40 }].map(q => (
-                  <button
-                    key={q.label}
-                    onClick={() => setQualityCost(q.cost)}
-                    style={{
-                      padding: '8px 6px', borderRadius: 7, fontFamily: 'inherit',
-                      fontSize: 11, fontWeight: 500, letterSpacing: '-0.005em',
-                      cursor: 'pointer', transition: 'all 0.15s', textAlign: 'center' as const,
-                      border: `0.5px solid ${qualityCost === q.cost ? 'var(--color-text-primary)' : 'var(--color-border-strong)'}`,
-                      background: qualityCost === q.cost ? 'var(--color-text-primary)' : 'var(--color-surface)',
-                      color: qualityCost === q.cost ? 'var(--color-bg)' : 'var(--color-text-tertiary)',
-                    }}
-                  >
-                    {q.label}
-                    <small style={{ display: 'block', fontSize: 9, fontWeight: 400, opacity: 0.6, marginTop: 1 }}>{q.cost} nodes</small>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Result strip */}
-          <div
-            className="spn-pricing-result"
-            style={{
-              background: 'var(--color-surface)', borderRadius: 8, padding: '14px 16px',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              flexWrap: 'wrap' as const, gap: 12,
-            }}
-          >
-            {([
-              { label: 'renders / mês',     value: String(renders),                                       green: false },
-              { label: 'nodes / render',    value: String(qualityCost),                                   green: false },
-              { label: 'nodes necessários', value: totalNodes.toLocaleString('pt-BR'),                    green: false },
-              { label: 'plano ideal',       value: overflow ? `${recommended.name} + ${suggestedExtra!.name}` : recommended.name, green: true },
-            ]).map((item, i, arr) => (
-              <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', letterSpacing: '0.05em', textTransform: 'uppercase' as const }}>
-                    {item.label}
-                  </span>
-                  <span style={{
-                    fontSize: 16, fontWeight: 500, letterSpacing: '-0.03em',
-                    fontVariantNumeric: 'tabular-nums' as const,
-                    color: item.green ? 'var(--color-accent-green)' : 'var(--color-text-primary)',
-                  }}>
-                    {item.value}
-                  </span>
-                </div>
-                {i < arr.length - 1 && (
-                  <div style={{ width: 0.5, height: 28, background: 'var(--color-border-strong)' }} />
-                )}
-              </div>
+          <div className="spn-calc-quality">
+            {QUALITIES.map(q => (
+              <button
+                key={q.label}
+                type="button"
+                onClick={() => setQualityCost(q.cost)}
+                data-on={qualityCost === q.cost}
+                aria-pressed={qualityCost === q.cost}
+              >
+                {q.label}
+                <small>{q.cost} nodes</small>
+              </button>
             ))}
           </div>
         </div>
 
-        {/* Footer */}
-        <div style={{ textAlign: 'center', marginTop: 32 }}>
-          <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', letterSpacing: '-0.005em', lineHeight: 1.7 }}>
-            Nodes renovam mensalmente e não acumulam para o mês seguinte.<br />
-            Nodes extras (avulsos, sem validade) ficam disponíveis em qualquer plano pago.<br />
-            Dúvidas?{' '}
-            <a
-              href={supportWhatsAppUrl('Olá! Tenho uma dúvida sobre os planos da SpaceNode.')}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ color: 'var(--color-text-primary)', textDecoration: 'underline', textUnderlineOffset: 3 }}
-            >
-              chame no WhatsApp
-            </a>
-            {' '}ou escreva para{' '}
-            <a href={`mailto:${SUPPORT_EMAIL}`} style={{ color: 'var(--color-text-primary)', textDecoration: 'underline', textUnderlineOffset: 3 }}>
-              {SUPPORT_EMAIL}
-            </a>.
-          </p>
-        </div>
-
+        <p className="spn-calc-result">
+          {renders} renders × {qualityCost} nodes ={' '}
+          <b>{totalNodes.toLocaleString('pt-BR')} nodes / mês</b>
+        </p>
       </div>
+
+      <p className="spn-pricing-note">
+        Precisa de mais volume para o escritório?{' '}
+        <a
+          href={supportWhatsAppUrl('Olá! Preciso de mais volume de nodes para o meu escritório.')}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Fale com a gente
+        </a>
+        {' '}— ou comece grátis com 80 nodes e assine quando o volume pedir.
+        Cancelou? Os nodes acumulados ficam disponíveis por mais {NODES_GRACE_DAYS} dias.
+        Dúvidas: <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
+      </p>
 
       <style jsx>{`
         .spn-pricing {
-          padding: 96px 24px;
+          position: relative;
+          z-index: 1;
+          padding: 0 24px 96px;
+          max-width: 1000px;
+          margin: 0 auto;
+        }
+        .spn-pricing-head {
+          text-align: center;
+          margin-bottom: 28px;
         }
         .spn-pricing-title {
-          font-size: 28px;
-          font-weight: 500;
-          color: var(--color-text-primary);
-          letter-spacing: -0.03em;
+          font-size: clamp(22px, 3.6vw, 30px);
+          font-weight: 400;
+          letter-spacing: -0.035em;
           line-height: 1.2;
-          margin-bottom: 10px;
+          margin: 0 0 10px;
+          color: var(--color-text-primary);
         }
-        .spn-pricing-engines {
-          overflow-x: auto;
-          -webkit-overflow-scrolling: touch;
+        .spn-pricing-sub {
+          font-size: 14px;
+          color: var(--color-text-tertiary);
+          line-height: 1.6;
+          max-width: 460px;
+          margin: 0 auto;
+        }
+        .spn-pricing-rollover {
+          display: inline-block;
+          margin: 14px auto 0;
+          padding: 8px 16px;
+          border-radius: var(--radius-full);
+          font-size: 12px;
+          line-height: 1.5;
+          letter-spacing: -0.005em;
+          color: var(--color-text-secondary);
+        }
+        .spn-pricing-toggle {
+          display: inline-flex;
+          align-items: center;
+          margin-top: 22px;
+          border-radius: var(--radius-full);
+          padding: 4px;
+        }
+        .spn-pricing-toggle button {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          font-family: inherit;
+          font-size: 11px;
+          font-weight: 500;
+          letter-spacing: -0.005em;
+          color: var(--color-text-tertiary);
+          background: transparent;
+          border: none;
+          border-radius: var(--radius-full);
+          padding: 7px 16px;
+          cursor: pointer;
+          white-space: nowrap;
+          transition: background 180ms var(--ease), color 180ms var(--ease);
+        }
+        .spn-pricing-toggle button[data-on='true'] {
+          background: var(--color-inverse);
+          color: var(--color-inverse-foreground);
+        }
+        .spn-pricing-toggle-tag {
+          font-size: 9px;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          background: var(--color-surface);
+          color: var(--color-text-primary);
+          border: 0.5px solid var(--glass-line-strong);
+          padding: 2px 7px;
+          border-radius: var(--radius-full);
+        }
+
+        .spn-pricing-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+          gap: 12px;
+          align-items: stretch;
+        }
+
+        .spn-calc {
+          margin-top: 12px;
+          padding: 24px 26px;
+          border-radius: var(--r-card);
+        }
+        .spn-calc-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 12px;
+          margin-bottom: 18px;
+        }
+        .spn-calc-label {
+          font-size: 10px;
+          font-weight: 500;
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
+          color: var(--color-text-tertiary);
+        }
+        .spn-calc-pick {
+          font-size: 11px;
+          letter-spacing: 0.01em;
+          color: var(--color-text-tertiary);
+          padding: 7px 13px;
+          border-radius: var(--radius-full);
+          white-space: nowrap;
+        }
+        .spn-calc-pick b {
+          color: var(--color-text-primary);
+          font-weight: 500;
+        }
+        .spn-calc-grid {
+          display: grid;
+          grid-template-columns: 1fr 200px;
+          gap: 24px;
+          align-items: start;
+        }
+        .spn-calc-value {
+          font-size: 20px;
+          font-weight: 500;
+          letter-spacing: -0.03em;
+          color: var(--color-text-primary);
+          font-variant-numeric: tabular-nums;
+          margin-bottom: 6px;
+        }
+        .spn-calc-range {
+          width: 100%;
+          cursor: pointer;
+          accent-color: var(--color-text-primary);
+        }
+        .spn-calc-scale {
+          display: flex;
+          justify-content: space-between;
+          font-size: 10px;
+          color: var(--color-text-tertiary);
+          margin-top: 4px;
+        }
+        .spn-calc-quality {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 6px;
+        }
+        .spn-calc-quality button {
+          padding: 9px 6px;
+          border-radius: var(--r-inner);
+          font-family: inherit;
+          font-size: 11px;
+          font-weight: 500;
+          text-align: center;
+          cursor: pointer;
+          border: 0.5px solid var(--glass-line-strong);
+          background: var(--glass-raised);
+          color: var(--color-text-tertiary);
+          transition: background 150ms var(--ease), color 150ms var(--ease);
+        }
+        .spn-calc-quality button[data-on='true'] {
+          background: var(--color-inverse);
+          color: var(--color-inverse-foreground);
+          border-color: transparent;
+        }
+        .spn-calc-quality small {
+          display: block;
+          font-size: 9px;
+          font-weight: 400;
+          opacity: 0.6;
+          margin-top: 1px;
+        }
+        .spn-calc-result {
+          margin: 18px 0 0;
+          padding-top: 16px;
+          border-top: 0.5px solid var(--glass-line);
+          font-size: 12.5px;
+          color: var(--color-text-tertiary);
+          font-variant-numeric: tabular-nums;
+        }
+        .spn-calc-result b { color: var(--color-text-primary); font-weight: 500; }
+        .spn-calc-quality button:focus-visible,
+        .spn-calc-range:focus-visible,
+        .spn-pricing-toggle button:focus-visible {
+          outline: 1.5px solid var(--color-border-focus);
+          outline-offset: 2px;
+        }
+
+        .spn-pricing-note {
+          text-align: center;
+          margin: 20px auto 0;
+          max-width: 620px;
+          font-size: 12px;
+          line-height: 1.7;
+          color: var(--color-text-tertiary);
+        }
+        .spn-pricing-note a {
+          color: var(--color-text-primary);
+          text-decoration: underline;
+          text-underline-offset: 3px;
         }
 
         @media (max-width: 768px) {
-          .spn-pricing {
-            padding: 72px 20px !important;
-          }
-          .spn-pricing-title {
-            font-size: 24px;
-          }
-          .spn-pricing-grid {
-            grid-template-columns: 1fr !important;
-            gap: 12px !important;
-          }
-          .spn-pricing-calc {
-            padding: 22px 20px !important;
-          }
-          .spn-pricing-calc-grid {
-            grid-template-columns: 1fr !important;
-            gap: 22px !important;
-          }
-          .spn-pricing-result {
-            flex-direction: column !important;
-            align-items: stretch !important;
-            gap: 0 !important;
-          }
-          .spn-pricing-result > div {
-            width: 100%;
-            justify-content: space-between !important;
-            padding: 10px 4px;
-            border-bottom: 0.5px solid var(--color-border);
-          }
-          .spn-pricing-result > div:last-child { border-bottom: none; }
-          .spn-pricing-result > div > div:not(:first-child) {
-            display: none !important;
-          }
+          .spn-pricing { padding: 0 16px 64px; }
+          .spn-pricing-grid { grid-template-columns: 1fr; }
+          .spn-calc { padding: 20px 18px; }
+          .spn-calc-grid { grid-template-columns: 1fr; gap: 20px; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .spn-pricing-toggle button,
+          .spn-calc-quality button { transition: none; }
         }
       `}</style>
     </section>

@@ -28,6 +28,10 @@ import { ReferencesPanel, suggestPromptForRole, downscaleImageForUpload, type Re
 import { ReferenceFocusModal, type NormCrop } from './ReferenceFocusModal'
 import { SurfaceSelectModal, SurfaceSelectionBar, type SurfaceSelection } from './SurfaceSelectModal'
 import { uploadDirect } from '@/lib/storage/direct-upload-client'
+import { SurfaceConfirmSheet } from './SurfaceConfirmSheet'
+import {
+  Segmented, Sheet, SettingGroup, SettingRow, RowIcon, summarize,
+} from '@/components/app/glass'
 
 // Debug: mostra a imagem REJEITADA pelo quality gate (sem salvar). Só dev/staging.
 const SHOW_REJECTED_DEBUG =
@@ -782,56 +786,22 @@ export function RetocarStandaloneFlow({ initialBalance }: Props) {
         />
       )}
 
-      {/* Camada de SUPERFÍCIE (Fase 1): confirmação antes de aplicar na superfície inteira */}
-      {segConfirm && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 115,
-          background: 'rgba(0,0,0,0.74)', backdropFilter: 'blur(6px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
-        }}>
-          <div style={{
-            background: 'var(--color-bg-elevated)', border: '0.5px solid var(--color-border-strong)',
-            borderRadius: 14, padding: 18, maxWidth: 760, width: '100%',
-            display: 'flex', flexDirection: 'column', gap: 12, maxHeight: '90vh', overflowY: 'auto',
-          }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>
-              Detectamos a superfície inteira
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
-              Em vez de aplicar só no que você pintou, dá pra aplicar o material em <strong>toda a superfície destacada em verde</strong> — até onde ela termina de verdade. <strong>Confira que só a superfície ficou em verde</strong>: se pegou tapete, cama ou móveis (porque o pincel passou por cima deles), use <strong>“Usar só o que pintei”</strong> e pinte de novo evitando os objetos.
-            </div>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={segConfirm.previewUrl} alt="superfície detectada"
-              style={{ width: '100%', maxHeight: 360, objectFit: 'contain', borderRadius: 8, border: '0.5px solid var(--color-border)' }} />
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 2 }}>
-              <button type="button" onClick={confirmSurface} className="spn-action"
-                style={{ flex: 1, minWidth: 220, width: 'auto', padding: '11px 18px', background: '#1D9E75', color: '#042818', border: '0.5px solid rgba(0,0,0,0.18)' }}>
-                Aplicar na superfície — {segConfirm.surfaceCost} nodes
-              </button>
-              <button type="button"
-                onClick={() => {
-                  // Caminho 2: a detecção saiu ~90% certa → refina por cliques em
-                  // vez de aceitar/recusar. Confirmou no modal → vira surfaceSel e
-                  // o usuário gera de novo (o preço já reflete a nova área).
-                  setSurfacePicker({ initial: { maskUrl: segConfirm.surfaceMaskUrl, previewUrl: segConfirm.previewUrl, coverage: segConfirm.surfaceCoverage } })
-                  setSegConfirm(null)
-                }}
-                className="spn-action spn-action--ghost"
-                style={{ width: 'auto', padding: '11px 16px', fontSize: 12 }}>
-                Refinar seleção
-              </button>
-              <button type="button" onClick={useBlobOnly} className="spn-action spn-action--ghost"
-                style={{ width: 'auto', padding: '11px 16px', fontSize: 12 }}>
-                Usar só o que pintei
-              </button>
-              <button type="button" onClick={() => { setSegConfirm(null); setSubmitting(false) }} className="spn-action spn-action--ghost"
-                style={{ width: 'auto', padding: '11px 14px', fontSize: 12 }}>
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Camada de SUPERFÍCIE (Fase 1): confirmação antes de aplicar na
+          superfície inteira. Mesma peça do overlay dentro do projeto — antes
+          eram duas cópias literais do mesmo aviso. */}
+      <SurfaceConfirmSheet
+        data={segConfirm}
+        onRefine={d => {
+          // Caminho 2: a detecção saiu ~90% certa → refina por cliques em vez
+          // de aceitar/recusar. Confirmou na folha → vira surfaceSel e o
+          // usuário gera de novo (o preço já reflete a nova área).
+          setSurfacePicker({ initial: { maskUrl: d.surfaceMaskUrl, previewUrl: d.previewUrl, coverage: d.surfaceCoverage } })
+          setSegConfirm(null)
+        }}
+        onApply={confirmSurface}
+        onBlobOnly={useBlobOnly}
+        onCancel={() => { setSegConfirm(null); setSubmitting(false) }}
+      />
 
       {/* Seleção de SUPERFÍCIE por clique (V2 — clique-primeiro no Trocar material) */}
       {surfacePicker && sourceUrl && (
@@ -926,16 +896,7 @@ function EmptyStep({ onUpload, onImport, fileInputRef, onFilePicked, error }: {
         </button>
       </div>
 
-      {error && (
-        <div style={{
-          maxWidth: 540, margin: '14px auto 0',
-          padding: '10px 14px', borderRadius: 8,
-          background: 'rgba(163,45,45,0.12)', border: '0.5px solid rgba(163,45,45,0.3)',
-          color: '#e57373', fontSize: 13,
-        }}>
-          {error}
-        </div>
-      )}
+      {error && <div className="spn-error" style={{ maxWidth: 540, margin: '14px auto 0' }}>{error}</div>}
     </>
   )
 }
@@ -1060,6 +1021,11 @@ function EditingStep(props: {
   // de superfície) e atrás da flag de segmentação.
   const showSurfaceBar = intent === 'swap_material' && SURFACE_SEGMENTATION_ENABLED
 
+  // Qual folha está aberta. Três famílias saíram da superfície do painel —
+  // Preservação, Saída e Referências — e cada uma virou UMA linha que já
+  // mostra o valor resolvido. Quem aceita o default nunca abre nada.
+  const [sheet, setSheet] = useState<null | 'preservacao' | 'saida' | 'referencias'>(null)
+
   // Contextual hint for the mask state.
   let maskHint: string
   if (surfaceSel) {
@@ -1092,10 +1058,10 @@ function EditingStep(props: {
           />
         </div>
 
-        <div style={{
-          background: 'var(--color-bg-elevated)',
-          border: '0.5px solid var(--color-border)',
-          borderRadius: 12, padding: 16,
+        {/* Vidro AO LADO do canvas, não por cima: o RetocarCanvas repinta a
+            máscara a cada pointermove. */}
+        <div className="spn-glass" style={{
+          borderRadius: 'var(--r-card)', padding: 16,
           display: 'flex', flexDirection: 'column', gap: 12,
         }}>
           {/* Intenção ativa — escolhida ANTES do prompt (intenção-primeiro). */}
@@ -1139,25 +1105,17 @@ function EditingStep(props: {
             disabled={submitting}
           />
 
-          {error && (
-            <div style={{
-              padding: '10px 14px', borderRadius: 8,
-              background: 'rgba(163,45,45,0.12)', border: '0.5px solid rgba(163,45,45,0.3)',
-              color: '#e57373', fontSize: 13,
-            }}>
-              {error}
-            </div>
-          )}
+          {error && <div className="spn-error">{error}</div>}
 
           {qualityGate && (
             <div style={{
-              padding: '12px 14px', borderRadius: 8,
-              background: 'rgba(186,117,23,0.12)', border: '0.5px solid rgba(186,117,23,0.35)',
-              color: '#e0a766', fontSize: 12.5, lineHeight: 1.5,
+              padding: '12px 14px', borderRadius: 'var(--r-inner)',
+              background: 'var(--color-warning-bg)', border: '0.5px solid var(--color-warning-border)',
+              color: 'var(--color-warning)', fontSize: 12.5, lineHeight: 1.5,
               display: 'flex', flexDirection: 'column', gap: 8,
             }}>
               <span style={{ fontWeight: 500 }}>A edição foi rejeitada para preservar sua imagem.</span>
-              <span style={{ fontSize: 11, color: '#1D9E75' }}>Nenhum node foi consumido.</span>
+              <span style={{ fontSize: 11, color: 'var(--color-accent-green)' }}>Nenhum node foi consumido.</span>
               {references.length > 0 && (
                 <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
                   Dica: aumente um pouco a máscara ao redor do objeto para dar mais contexto à referência.
@@ -1177,7 +1135,7 @@ function EditingStep(props: {
                 <button
                   type="button"
                   onClick={onDismissGate}
-                  className="spn-action spn-action--ghost"
+                  className="spn-ghost"
                   style={{ width: 'auto', padding: '7px 14px', fontSize: 12 }}
                 >
                   Tentar novamente
@@ -1185,7 +1143,7 @@ function EditingStep(props: {
                 <button
                   type="button"
                   onClick={onTryPremium}
-                  className="spn-action spn-action--ghost"
+                  className="spn-ghost"
                   style={{ width: 'auto', padding: '7px 14px', fontSize: 12 }}
                 >
                   Tentar com edição premium
@@ -1200,7 +1158,7 @@ function EditingStep(props: {
           }}>
             <span>{maskHint}</span>
             {largeMask && (
-              <span style={{ color: '#e0a766' }}>
+              <span style={{ color: 'var(--color-warning)' }}>
                 ⚠ Área grande pode comprometer coerência
               </span>
             )}
@@ -1218,66 +1176,64 @@ function EditingStep(props: {
       </div>
 
       {/* Painel lateral direito */}
-      <aside style={{
-        background: 'var(--color-bg-elevated)',
-        border: '0.5px solid var(--color-border)',
-        borderRadius: 12, padding: 16,
-        display: 'flex', flexDirection: 'column', gap: 16,
+      <aside className="spn-glass spn-glass--chrome" style={{
+        borderRadius: 'var(--r-card)',
+        display: 'flex', flexDirection: 'column',
         alignSelf: 'start',
         position: 'sticky', top: 24,
+        overflow: 'hidden',
       }}>
-        {/* Ferramentas de máscara */}
-        <PanelSection label="Ferramentas">
-          <MaskToolbar
-            brush={brush}
-            setBrush={setBrush}
-            tool={tool}
-            setTool={setTool}
-            maskVisible={maskVisible}
-            setMaskVisible={setMaskVisible}
-            onClear={() => canvasRef.current?.clearMask()}
-            onInvert={() => canvasRef.current?.invertMask()}
-            disabled={submitting}
-          />
-        </PanelSection>
-
-        {/* Preservação — toggle simples (ON = máxima fidelidade) */}
-        {intentMeta.geometryToggle && (
-          <PanelSection label="Preservação do projeto">
-            <GeometryToggle
-              value={fidelity === 'max'}
-              onChange={on => setFidelity(on ? 'max' : 'balanced')}
+        <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Na superfície fica só o que o usuário manipula o tempo todo: o
+              pincel. O resto virou linha. */}
+          <PanelSection label="Ferramentas">
+            <MaskToolbar
+              brush={brush}
+              setBrush={setBrush}
+              tool={tool}
+              setTool={setTool}
+              maskVisible={maskVisible}
+              setMaskVisible={setMaskVisible}
+              onClear={() => canvasRef.current?.clearMask()}
+              onInvert={() => canvasRef.current?.invertMask()}
               disabled={submitting}
             />
           </PanelSection>
-        )}
 
-        {/* Resolução final */}
-        <PanelSection label="Resolução final">
-          <ResolutionControl value={quality} onChange={setQuality} disabled={submitting} />
-          <p style={{
-            fontSize: 10, color: 'var(--color-text-quaternary)',
-            lineHeight: 1.5, marginTop: 6,
-          }}>
-            Para finalização em alta resolução, envie o resultado para Ampliar.
-          </p>
-        </PanelSection>
+          <SettingGroup>
+            {intentMeta.geometryToggle && (
+              <SettingRow
+                icon={<RowIcon name="precision" />}
+                title="Preservação"
+                value={fidelity === 'max' ? 'Máxima' : fidelity === 'balanced' ? 'Equilibrado' : 'Criativo'}
+                onOpen={() => setSheet('preservacao')}
+                disabled={submitting}
+              />
+            )}
+            <SettingRow
+              icon={<RowIcon name="output" />}
+              title="Saída"
+              value={quality === 'hd' ? 'Manter atual' : quality.toUpperCase()}
+              onOpen={() => setSheet('saida')}
+              disabled={submitting}
+            />
+            <SettingRow
+              icon={<RowIcon name="materials" />}
+              title="Referências"
+              // "Nenhuma" é o default e não vira resumo — a linha fica só com
+              // o título, que já é a mensagem certa.
+              value={summarize([references.length > 0 && `${references.length} imagem${references.length === 1 ? '' : 's'}`])}
+              onOpen={() => setSheet('referencias')}
+              disabled={submitting}
+            />
+          </SettingGroup>
+        </div>
 
-        {/* Referências da edição (V1) */}
-        <ReferencesPanel
-          references={references}
-          onAdd={onAddReference}
-          onRemove={onRemoveReference}
-          onClearAll={onClearReferences}
-          primaryRole={mode === 'material' ? 'material_texture' : mode === 'replace' || mode === 'add' ? 'object_reference' : null}
-          disabled={submitting}
-        />
-
-        {/* Saldo + ação principal */}
-        <div style={{
-          marginTop: 'auto', paddingTop: 14,
-          borderTop: '0.5px solid var(--color-border)',
+        {/* Dock: o CTA colado no rodapé do painel — nunca some no scroll. */}
+        <div className="spn-dock spn-glass spn-glass--chrome" style={{
+          marginTop: 'auto',
           display: 'flex', flexDirection: 'column', gap: 10,
+          borderColor: 'var(--glass-line)',
         }}>
           <div style={{
             display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
@@ -1285,7 +1241,7 @@ function EditingStep(props: {
           }}>
             <span>Saldo</span>
             <span style={{
-              color: balanceShort ? '#e57373' : 'var(--color-text-primary)',
+              color: balanceShort ? 'var(--color-error)' : 'var(--color-text-primary)',
               fontWeight: 500,
             }}>
               {balance} nodes
@@ -1293,19 +1249,10 @@ function EditingStep(props: {
           </div>
           {/* Edição rápida (Google padrão) — botão principal */}
           <button
+            type="button"
             onClick={() => onGenerate(false)}
             disabled={disabledBtn}
-            className="spn-action"
-            style={{
-              background: '#1D9E75', color: '#042818',
-              border: '0.5px solid rgba(0,0,0,0.18)',
-              opacity: disabledBtn ? 0.5 : 1,
-              cursor: disabledBtn ? 'not-allowed' : 'pointer',
-              boxShadow: !disabledBtn
-                ? 'inset 0 1px 0 rgba(255,255,255,0.18), 0 8px 24px rgba(29,158,117,0.22)'
-                : 'none',
-              padding: '13px 16px',
-            }}
+            className="spn-cta"
           >
             {submitting
               ? (segmenting ? 'Detectando superfície…' : validating ? 'Validando…' : 'Aplicando edição com IA…')
@@ -1315,15 +1262,12 @@ function EditingStep(props: {
           </button>
           {/* Edição premium — opt-in explícito, nunca automático */}
           <button
+            type="button"
             onClick={() => onGenerate(true)}
             disabled={disabledPremium}
-            className="spn-action spn-action--ghost"
+            className="spn-ghost"
             title="Modelo de máxima qualidade para pedidos complexos."
-            style={{
-              padding: '11px 16px', fontSize: 12,
-              opacity: disabledPremium ? 0.5 : 1,
-              cursor: disabledPremium ? 'not-allowed' : 'pointer',
-            }}
+            style={{ width: '100%', height: 40 }}
           >
             {premiumPreview
               ? `✦ Edição premium — ${premiumPreview.costNodes} nodes`
@@ -1331,7 +1275,7 @@ function EditingStep(props: {
           </button>
           {!submitting && routePreview?.explanation && (
             <p style={{
-              fontSize: 10.5, color: routePreview.isFreeFix ? '#1D9E75' : 'var(--color-text-tertiary)',
+              fontSize: 10.5, color: routePreview.isFreeFix ? 'var(--color-accent-green)' : 'var(--color-text-tertiary)',
               lineHeight: 1.5, textAlign: 'center', margin: 0,
             }}>
               {routePreview.explanation}
@@ -1350,6 +1294,45 @@ function EditingStep(props: {
             Trocar imagem original
           </button>
         </div>
+
+        {/* Um controle só para `fidelity`. O `FidelityControl` (Máxima /
+            Equilibrado / Criativo) nunca foi renderizado nesta tela — ligá-lo
+            aqui passaria a mandar `fidelity_mode: 'creative'` pra /api/edits,
+            que o cliente nunca enviou, e deixaria DOIS controles escrevendo o
+            mesmo estado na mesma folha (escolher "Criativo" e depois mexer no
+            toggle descartava a escolha em silêncio). Contrato §4: geometryLock
+            continua fixo. */}
+        <Sheet open={sheet === 'preservacao'} title="Preservação" onClose={() => setSheet(null)}>
+          <div className="spn-field">
+            <span className="spn-field-label">Geometria</span>
+            <GeometryToggle
+              value={fidelity === 'max'}
+              onChange={on => setFidelity(on ? 'max' : 'balanced')}
+              disabled={submitting}
+            />
+          </div>
+        </Sheet>
+
+        <Sheet open={sheet === 'saida'} title="Saída" onClose={() => setSheet(null)}>
+          <div className="spn-field">
+            <span className="spn-field-label">Resolução final</span>
+            <ResolutionControl value={quality} onChange={setQuality} disabled={submitting} />
+            <p className="spn-hint">
+              Para finalização em alta resolução, envie o resultado para Ampliar.
+            </p>
+          </div>
+        </Sheet>
+
+        <Sheet open={sheet === 'referencias'} title="Referências" onClose={() => setSheet(null)}>
+          <ReferencesPanel
+            references={references}
+            onAdd={onAddReference}
+            onRemove={onRemoveReference}
+            onClearAll={onClearReferences}
+            primaryRole={mode === 'material' ? 'material_texture' : mode === 'replace' || mode === 'add' ? 'object_reference' : null}
+            disabled={submitting}
+          />
+        </Sheet>
       </aside>
     </div>
   )
@@ -1374,26 +1357,17 @@ export function MaskToolbar({
 }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      {/* Brush / eraser toggle */}
-      <div style={{
-        display: 'flex', gap: 3, padding: 3,
-        background: 'var(--color-surface)', borderRadius: 8,
-      }}>
-        <ToolToggle
-          active={tool === 'brush'}
-          disabled={disabled}
-          onClick={() => setTool('brush')}
-          label="Pincel"
-          icon={<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21l3-3 9.5-9.5a2.1 2.1 0 0 0-3-3L3 15v6z"/><line x1="11" y1="6" x2="18" y2="13"/></svg>}
-        />
-        <ToolToggle
-          active={tool === 'eraser'}
-          disabled={disabled}
-          onClick={() => setTool('eraser')}
-          label="Borracha"
-          icon={<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 20H7l-4-4 11-11 9 9-3 6z"/><line x1="9" y1="9" x2="17" y2="17"/></svg>}
-        />
-      </div>
+      {/* Pincel / borracha — segmentado, como todos os outros do app. */}
+      <Segmented
+        label="Ferramenta de máscara"
+        value={tool}
+        onChange={setTool}
+        items={[
+          { value: 'brush', label: 'Pincel', disabled },
+          { value: 'eraser', label: 'Borracha', disabled },
+        ]}
+        className="spn-glass--raised"
+      />
 
       {/* Brush size slider */}
       <div>
@@ -1410,7 +1384,7 @@ export function MaskToolbar({
           value={brush}
           onChange={e => setBrush(Number(e.target.value))}
           disabled={disabled}
-          style={{ width: '100%', accentColor: '#1D9E75' }}
+          style={{ width: '100%', accentColor: 'var(--color-accent-green)' }}
         />
       </div>
 
@@ -1435,7 +1409,7 @@ export function MaskToolbar({
       <button
         onClick={onClear}
         disabled={disabled}
-        className="spn-action spn-action--ghost"
+        className="spn-ghost"
         style={{ width: '100%', padding: '8px 14px', fontSize: 12 }}
       >
         Limpar máscara
@@ -1451,37 +1425,6 @@ export function MaskToolbar({
         <kbd style={kbdStyle}>[</kbd> <kbd style={kbdStyle}>]</kbd> ajusta pincel
       </div>
     </div>
-  )
-}
-
-function ToolToggle({ active, disabled, onClick, label, icon }: {
-  active:   boolean
-  disabled: boolean
-  onClick:  () => void
-  label:    string
-  icon:     React.ReactNode
-}) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      style={{
-        flex: 1, padding: '7px 4px', borderRadius: 6,
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-        background: active ? 'var(--color-bg-elevated)' : 'transparent',
-        color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-        fontSize: 11, fontWeight: active ? 500 : 400,
-        letterSpacing: '-0.005em',
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        boxShadow: active ? 'inset 0 0 0 0.5px var(--color-border-strong)' : 'none',
-        opacity: disabled && !active ? 0.5 : 1,
-        fontFamily: 'inherit',
-      }}
-    >
-      {icon}
-      <span>{label}</span>
-    </button>
   )
 }
 
@@ -1570,45 +1513,20 @@ export function FidelityControl({ value, onChange, disabled }: {
   disabled: boolean
 }) {
   const meta = FIDELITY_LABELS[value]
-  const options: FidelityMode[] = ['max', 'balanced', 'creative']
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{
-        display: 'flex', gap: 3, padding: 3,
-        background: 'var(--color-surface)', borderRadius: 8,
-      }}>
-        {options.map(o => {
-          const active = o === value
-          const short  = o === 'max' ? 'Máxima' : o === 'balanced' ? 'Equilibrado' : 'Criativo'
-          return (
-            <button
-              key={o}
-              type="button"
-              disabled={disabled}
-              onClick={() => onChange(o)}
-              style={{
-                flex: 1, padding: '7px 4px', borderRadius: 6,
-                background: active ? 'var(--color-bg-elevated)' : 'transparent',
-                color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                fontSize: 11, fontWeight: active ? 500 : 400,
-                letterSpacing: '-0.005em',
-                cursor: disabled ? 'not-allowed' : 'pointer',
-                boxShadow: active ? 'inset 0 0 0 0.5px var(--color-border-strong)' : 'none',
-                opacity: disabled && !active ? 0.5 : 1,
-                fontFamily: 'inherit',
-              }}
-            >
-              {short}
-            </button>
-          )
-        })}
-      </div>
-      <p style={{
-        fontSize: 10, color: 'var(--color-text-quaternary)',
-        lineHeight: 1.55,
-      }}>
-        {meta.description}
-      </p>
+      <Segmented
+        label="Fidelidade ao original"
+        value={value}
+        onChange={onChange}
+        items={[
+          { value: 'max', label: 'Máxima', disabled },
+          { value: 'balanced', label: 'Equilibrado', disabled },
+          { value: 'creative', label: 'Criativo', disabled },
+        ]}
+        className="spn-glass--raised"
+      />
+      <p className="spn-hint" style={{ marginTop: 0 }}>{meta.description}</p>
     </div>
   )
 }
@@ -1620,42 +1538,18 @@ export function ResolutionControl({ value, onChange, disabled }: {
   onChange: (q: Quality) => void
   disabled: boolean
 }) {
-  const options: { id: Quality; label: string }[] = [
-    { id: 'hd', label: 'Manter atual' },
-    { id: '2k', label: '2K' },
-    { id: '4k', label: '4K' },
-  ]
   return (
-    <div style={{
-      display: 'flex', gap: 3, padding: 3,
-      background: 'var(--color-surface)', borderRadius: 8,
-    }}>
-      {options.map(o => {
-        const active = o.id === value
-        return (
-          <button
-            key={o.id}
-            type="button"
-            disabled={disabled}
-            onClick={() => onChange(o.id)}
-            style={{
-              flex: 1, padding: '7px 4px', borderRadius: 6,
-              background: active ? 'var(--color-bg-elevated)' : 'transparent',
-              color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-              fontSize: 11, fontWeight: active ? 500 : 400,
-              letterSpacing: '-0.005em',
-              cursor: disabled ? 'not-allowed' : 'pointer',
-              boxShadow: active ? 'inset 0 0 0 0.5px var(--color-border-strong)' : 'none',
-              opacity: disabled && !active ? 0.5 : 1,
-              fontFamily: 'inherit',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {o.label}
-          </button>
-        )
-      })}
-    </div>
+    <Segmented
+      label="Resolução final"
+      value={value}
+      onChange={onChange}
+      items={[
+        { value: 'hd' as Quality, label: 'Manter atual', disabled },
+        { value: '2k' as Quality, label: '2K', disabled },
+        { value: '4k' as Quality, label: '4K', disabled },
+      ]}
+      className="spn-glass--raised"
+    />
   )
 }
 
@@ -1676,8 +1570,8 @@ export function GeometryToggle({ value, onChange, disabled }: {
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
           padding: '9px 12px', borderRadius: 8,
-          background: value ? 'rgba(29,158,117,0.12)' : 'var(--color-surface)',
-          border: value ? '0.5px solid rgba(29,158,117,0.5)' : '0.5px solid var(--color-border-strong)',
+          background: value ? 'var(--color-accent-green-bg)' : 'var(--color-surface)',
+          border: value ? '0.5px solid var(--color-accent-green-border)' : '0.5px solid var(--glass-line)',
           color: 'var(--color-text-primary)', fontSize: 12, fontFamily: 'inherit',
           cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1,
           letterSpacing: '-0.005em', textAlign: 'left',
@@ -1686,7 +1580,7 @@ export function GeometryToggle({ value, onChange, disabled }: {
         <span>Preservar geometria, perspectiva e iluminação original</span>
         <span style={{
           fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', whiteSpace: 'nowrap',
-          color: value ? '#1D9E75' : 'var(--color-text-quaternary)',
+          color: value ? 'var(--color-accent-green)' : 'var(--color-text-quaternary)',
         }}>
           {value ? 'ATIVADO' : 'DESATIVADO'}
         </span>
@@ -1767,7 +1661,7 @@ function ExplicitReferenceFields({ sourceUrl, references, onAddReference, onRemo
               type="button"
               disabled={disabled}
               onClick={() => onAddReference('object')}
-              className="spn-action spn-action--ghost"
+              className="spn-ghost"
               style={{ width: '100%', padding: '18px 10px', fontSize: 11 }}
             >
               + Adicionar referência
@@ -1800,7 +1694,7 @@ function ExplicitReferenceFields({ sourceUrl, references, onAddReference, onRemo
               type="button"
               disabled={disabled}
               onClick={() => onAddReference('project_render')}
-              className="spn-action spn-action--ghost"
+              className="spn-ghost"
               style={{ width: '100%', padding: '18px 10px', fontSize: 11 }}
             >
               + Vista do projeto
@@ -1811,7 +1705,7 @@ function ExplicitReferenceFields({ sourceUrl, references, onAddReference, onRemo
       <p style={{
         fontSize: 10.5, color: 'var(--color-text-tertiary)', lineHeight: 1.5, margin: 0,
         padding: '7px 10px', borderRadius: 7,
-        background: 'rgba(29,158,117,0.06)', border: '0.5px solid rgba(29,158,117,0.22)',
+        background: 'var(--color-accent-green-bg)', border: '0.5px solid var(--color-accent-green-border)',
       }}>
         A referência não será editada — ela serve apenas como guia visual para a
         área selecionada na imagem principal.
@@ -1860,8 +1754,8 @@ function ResultStep({
       {driftWarning !== null && (
         <div style={{
           marginBottom: 14, padding: '10px 14px', borderRadius: 8,
-          background: 'rgba(186,117,23,0.12)', border: '0.5px solid rgba(186,117,23,0.3)',
-          color: '#e0a766', fontSize: 12, letterSpacing: '-0.005em',
+          background: 'var(--color-warning-bg)', border: '0.5px solid var(--color-warning-border)',
+          color: 'var(--color-warning)', fontSize: 12, letterSpacing: '-0.005em',
         }}>
           ⚠ O motor alterou {(driftWarning * 100).toFixed(1)}% dos pixels fora da máscara
           (acima do limite recomendado de 2%). Considere refazer ou ajustar a máscara.
@@ -1890,18 +1784,18 @@ function ResultStep({
         marginTop: 18, display: 'flex', gap: 10, justifyContent: 'space-between',
         alignItems: 'center', flexWrap: 'wrap',
       }}>
-        <button onClick={onDiscard} className="spn-action spn-action--ghost"
-          style={{ width: 'auto', padding: '10px 18px', fontSize: 12, color: '#e57373' }}>
+        <button onClick={onDiscard} className="spn-ghost"
+          style={{ width: 'auto', padding: '10px 18px', fontSize: 12, color: 'var(--color-error)' }}>
           Descartar
         </button>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <button onClick={onEditAgain} className="spn-action spn-action--ghost"
+          <button onClick={onEditAgain} className="spn-ghost"
             style={{ width: 'auto', padding: '10px 18px', fontSize: 12 }}>
             ✦ Editar de novo
           </button>
           <a
             href={resultUrl} download="editar-result.jpg" target="_blank" rel="noopener noreferrer"
-            className="spn-action spn-action--primary"
+            className="spn-cta"
             style={{ width: 'auto', padding: '10px 18px', fontSize: 12, textDecoration: 'none' }}
           >
             ⤓ Download
@@ -2057,9 +1951,9 @@ function VersionThumb({ version, active, onPick, onUseAsBase }: {
           position: 'relative', width: 96, height: 72,
           padding: 0, borderRadius: 8, overflow: 'hidden',
           background: 'var(--color-bg)',
-          border: active ? '1.5px solid #1D9E75' : '0.5px solid var(--color-border-strong)',
+          border: active ? '1.5px solid var(--color-accent-green)' : '0.5px solid var(--glass-line)',
           cursor: 'pointer',
-          boxShadow: active ? '0 0 0 2px rgba(29,158,117,0.18)' : 'none',
+          boxShadow: active ? '0 0 0 2px var(--color-accent-green-border)' : 'none',
         }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}

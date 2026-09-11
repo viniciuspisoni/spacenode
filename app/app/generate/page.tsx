@@ -61,10 +61,10 @@ export default async function GeneratePage({
 
   const renderCount = await renderCountPromise
 
-  // Orion: mesmo gate da API (ORION_INTERNAL_ENABLED). Checado AQUI, no
-  // servidor — o client só recebe um booleano já decidido, e a rota
-  // /api/generate re-valida em toda geração. Sem credencial do fornecedor
-  // ativo o card nem aparece: ofereceria uma geração que falharia.
+  // Orion: mesmo gate da API (ORION_INTERNAL_ENABLED + usuário autenticado).
+  // Checado AQUI, no servidor — o client só recebe um booleano já decidido, e
+  // a rota /api/generate re-valida em toda geração. Sem credencial do
+  // fornecedor ativo o card nem aparece: ofereceria uma geração que falharia.
   const orionAllowed =
     (await canUseOrion({ id: user.id, email: user.email })) && orionProviderReady()
 
@@ -75,9 +75,6 @@ export default async function GeneratePage({
       // Saldo TOTAL da bolsa (mensais + extras) — é o que consume_workspace_nodes
       // debita, então é o que gateia o CTA e alimenta o contador de renders.
       initialCredits={balance.totalBalance}
-      // Sem assinatura ativa, o default de motor×qualidade é o econômico
-      // (Pulsar + HD) — config persistida do usuário continua vencendo.
-      isSubscriber={balance.planId !== 'free'}
       initialMaterials={profile.project_materials ?? undefined}
       initialConfig={profile.project_config ?? undefined}
       initialSourceUrl={sp.source}

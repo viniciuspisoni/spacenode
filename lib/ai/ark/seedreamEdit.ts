@@ -19,6 +19,7 @@
 // de privacidade precisa nomear a operadora antes de isto ir pra produção.
 
 import { SeedreamEditError, type SeedreamEditImageInput, type SeedreamEditImageOutput } from '@/lib/ai/fal/seedreamEdit'
+import { seedreamCheapSize, seedreamCheapTierEnabled } from '@/lib/ai/seedream-size'
 
 export const ARK_SEEDREAM_PRO_MODEL = 'dola-seedream-5-0-pro-260628'
 const DEFAULT_BASE_URL = 'https://ark.ap-southeast.bytepluses.com/api/v3'
@@ -58,7 +59,17 @@ export async function editImageWithSeedreamArk(input: SeedreamEditImageInput): P
   const imageUrls = [input.imageUrl, ...(input.references ?? []).map(r => r.url)]
   // '1K' ≈ 1 MP (faixa barata); '2K' = teto do modelo (~4,2 MP em 16:9). O modelo
   // segue a proporção da imagem enviada — o recompose redimensiona pro crop.
-  const size = (input.resolution ?? '2K') === '1K' ? '1K' : '2K'
+  // Com SEEDREAM_CHEAP_TIER=1, WxH explícito no teto da faixa barata (2,36 MP,
+  // o limite da fal): US$ 0,045 em vez de 0,09, e o mesmo pedido serve às duas
+  // rotas. Sem dimensões da imagem enviada, cai no preset de antes.
+  const cheap = (input.resolution ?? '2K') !== '1K' && seedreamCheapTierEnabled()
+    ? seedreamCheapSize(input.imageWidth, input.imageHeight)
+    : null
+  const size = input.outputSize
+    ? `${input.outputSize.width}x${input.outputSize.height}`
+    : cheap
+      ? `${cheap.width}x${cheap.height}`
+      : (input.resolution ?? '2K') === '1K' ? '1K' : '2K'
   const body: Record<string, unknown> = {
     model: modelId(),
     prompt: input.prompt,

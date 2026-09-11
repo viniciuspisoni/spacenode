@@ -1,0 +1,24 @@
+{
+  "slug": "2026-07-29-reel-transformacao-casa",
+  "roteiro": "preco",
+  "par": "casa",
+  "reel": "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-07-29-reel-transformacao-casa\\2026-07-29-reel-transformacao-casa.mp4",
+  "banda": "1080×608 @ y=656 (aspect 1.778)",
+  "crop": {
+    "antes": "1567×857 → 1524×857+22+0",
+    "depois": "2784×1536 → 2731×1536+27+0"
+  },
+  "width": 1080,
+  "height": 1920,
+  "fps": "30/1",
+  "pix_fmt": "yuv420p",
+  "codec": "h264",
+  "duration": "10.00",
+  "sizeMB": "3.68",
+  "esperado": {
+    "width": 1080,
+    "height": 1920,
+    "fps": "30/1",
+    "duration": "10.00"
+  }
+}

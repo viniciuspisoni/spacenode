@@ -10,6 +10,7 @@ import Link from 'next/link'
 import { getBalanceState, BALANCE_COLORS, type BalanceState } from '@/lib/spaces/balance'
 import type { PlanId } from '@/lib/plans'
 import { getPlanDisplayName } from '@/lib/plan-display'
+import { graceDaysLeft } from '@/lib/billing/nodes'
 
 interface Props {
   userName:   string
@@ -35,6 +36,10 @@ export function AvatarComConsumo({
   const [planTotal, setPlanTotal]       = useState(initialPlanTotal)
   const [extraBalance, setExtraBalance] = useState(initialExtraBalance)
   const [planId, setPlanId]             = useState<PlanId>(initialPlanId)
+  // Preenchido só depois de um cancelamento: prazo em que o saldo acumulado
+  // ainda pode ser gasto (90 dias). Chega do /api/users/me/balance, não do
+  // server render (o popover só abre depois do primeiro refresh).
+  const [nodesExpireAt, setNodesExpireAt] = useState<string | null>(null)
   const [usageDays, setUsageDays]       = useState<{ day: string; nodes: number }[]>([])
   const [avgPerDay, setAvgPerDay]       = useState<number>(0)
   const popoverRef = useRef<HTMLDivElement | null>(null)
@@ -59,6 +64,7 @@ export function AvatarComConsumo({
         setPlanBalance(bal.plan_balance ?? 0)
         setPlanTotal(bal.plan_total ?? 0)
         setExtraBalance(bal.extra_balance ?? 0)
+        setNodesExpireAt(bal.nodes_expire_at ?? null)
         if (bal.plan_id) setPlanId(bal.plan_id as PlanId)
       }
       if (usage) {
@@ -86,17 +92,16 @@ export function AvatarComConsumo({
     <div style={{ position: 'relative' }} ref={popoverRef}>
       <button
         onClick={() => setOpen(o => !o)}
+        className={expanded ? 'spn-glass spn-glass--raised' : undefined}
         style={{
           display: 'flex', alignItems: 'center', justifyContent: expanded ? 'flex-start' : 'center', gap: 10,
           padding: expanded ? '0 10px' : 0,
           height: 38,
-          borderRadius: 12,
-          background: expanded ? 'var(--color-surface)' : 'transparent',
-          border: expanded ? '0.5px solid var(--color-border)' : '0.5px solid transparent',
-          boxShadow: expanded ? 'inset 0 1px 0 rgba(255,255,255,0.03)' : 'none',
+          borderRadius: 'var(--r-inner)',
+          background: expanded ? undefined : 'transparent',
+          border: expanded ? undefined : '0.5px solid transparent',
           width: expanded ? '100%' : 42,
           textAlign: 'left',
-          transition: 'background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease',
         }}
       >
         <AvatarRing
@@ -133,6 +138,7 @@ export function AvatarComConsumo({
           planBalance={planBalance}
           planTotal={planTotal}
           extraBalance={extraBalance}
+          graceDays={graceDaysLeft(nodesExpireAt)}
           state={state}
           daysUntilEmpty={daysUntilEmpty}
           usageDays={usageDays}
@@ -253,11 +259,13 @@ function UpgradePill({ state }: { state: BalanceState }) {
 
 // ── Popover ───────────────────────────────────────────────────
 
-function BalancePopover({ planId, planBalance, planTotal, extraBalance, state, daysUntilEmpty, usageDays, onClose }: {
+function BalancePopover({ planId, planBalance, planTotal, extraBalance, graceDays, state, daysUntilEmpty, usageDays, onClose }: {
   planId:        PlanId
   planBalance:   number
   planTotal:     number
   extraBalance:  number
+  /** Dias restantes da janela pós-cancelamento (0 = sem janela em curso). */
+  graceDays:     number
   state:         BalanceState
   daysUntilEmpty: number | null
   usageDays:     { day: string; nodes: number }[]
@@ -265,29 +273,28 @@ function BalancePopover({ planId, planBalance, planTotal, extraBalance, state, d
 }) {
   const planName = getPlanDisplayName(planId)
   const noQuota = planTotal <= 0
+  // Cancelou e ainda tem saldo mensal: o prazo importa mais que o plano.
+  const inGrace = graceDays > 0 && planBalance > 0
   const stateLabel: Record<BalanceState, string> = {
     saudavel: 'Saudável', atencao: 'Atenção', critico: 'Crítico', zerado: 'Zerado',
   }
   // Conta gratuita não tem cota mensal: estado próprio (verde), em vez de "Zerado".
-  const pillColor = noQuota ? '#30d158' : BALANCE_COLORS[state]
-  const pillLabel = noQuota ? 'Gratuito' : stateLabel[state]
+  // Na janela pós-cancelamento o que importa é o prazo, não a cota — o
+  // usuário está tecnicamente no free, mas ainda gastando saldo de assinante.
+  const pillColor = inGrace ? BALANCE_COLORS.atencao : noQuota ? '#30d158' : BALANCE_COLORS[state]
+  const pillLabel = inGrace ? 'Cortesia'             : noQuota ? 'Gratuito' : stateLabel[state]
 
   return (
-    <div style={{
+    <div className="spn-glass spn-glass--chrome" style={{
       position: 'absolute', bottom: 56, left: 0,
       width: 248, padding: 16, zIndex: 50,
-      background: 'var(--color-bg-elevated)',
-      border: '0.5px solid var(--color-border-strong)',
-      borderRadius: 14,
-      boxShadow: 'var(--shadow-xl)',
+      borderRadius: 'var(--r-card)',
+      boxShadow: 'var(--shadow-float)',
       display: 'flex', flexDirection: 'column', gap: 14,
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <div style={{
-            fontSize: 9, fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase',
-            color: 'var(--color-text-tertiary)',
-          }}>
+          <div className="spn-field-label" style={{ fontSize: 9, marginBottom: 0 }}>
             Plano {planName}
           </div>
           <div style={{
@@ -296,9 +303,11 @@ function BalancePopover({ planId, planBalance, planTotal, extraBalance, state, d
             {planBalance + extraBalance} <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', fontWeight: 400 }}>nodes</span>
           </div>
           <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>
-            {noQuota
-              ? <>Sem assinatura ativa{extraBalance > 0 && <> · {extraBalance} extras</>}</>
-              : <>{planBalance} de {planTotal} mensais{extraBalance > 0 && <> · {extraBalance} extras</>}</>}
+            {inGrace
+              ? <>{planBalance} mensais expiram em {graceDays} dia{graceDays === 1 ? '' : 's'}{extraBalance > 0 && <> · {extraBalance} extras</>}</>
+              : noQuota
+                ? <>Sem assinatura ativa{extraBalance > 0 && <> · {extraBalance} extras</>}</>
+                : <>{planBalance} mensais acumulados{extraBalance > 0 && <> · {extraBalance} extras</>}</>}
           </div>
         </div>
         <span style={{
@@ -314,33 +323,27 @@ function BalancePopover({ planId, planBalance, planTotal, extraBalance, state, d
       <Sparkline days={usageDays} />
 
       <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.5 }}>
-        {daysUntilEmpty !== null
-          ? <>No ritmo atual, zera em ~{daysUntilEmpty} dia{daysUntilEmpty === 1 ? '' : 's'}.</>
-          : 'Sem consumo recente registrado.'}
+        {inGrace
+          ? <>Reassine em até {graceDays} dia{graceDays === 1 ? '' : 's'} para manter o saldo acumulado.</>
+          : daysUntilEmpty !== null
+            ? <>No ritmo atual, zera em ~{daysUntilEmpty} dia{daysUntilEmpty === 1 ? '' : 's'}.</>
+            : 'Sem consumo recente registrado.'}
       </div>
+      {!noQuota && (
+        <div style={{ fontSize: 10.5, color: 'var(--color-text-tertiary)', lineHeight: 1.5 }}>
+          O que não for usado no mês continua no saldo — nodes acumulam
+          enquanto a assinatura estiver ativa.
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
-        <Link
-          href="/app/billing"
-          onClick={onClose}
-          style={{
-            flex: 1, padding: '9px 12px', borderRadius: 8,
-            background: 'var(--color-surface-hover)', color: 'var(--color-text-secondary)',
-            border: '0.5px solid var(--color-border-strong)',
-            fontSize: 11, fontWeight: 500, textAlign: 'center',
-          }}
-        >
+        <Link href="/app/billing" onClick={onClose} className="spn-ghost"
+              style={{ flex: 1, textAlign: 'center', lineHeight: '34px', padding: 0, textDecoration: 'none' }}>
           Comprar avulso
         </Link>
-        <Link
-          href="/app/billing"
-          onClick={onClose}
-          style={{
-            flex: 1, padding: '9px 12px', borderRadius: 8,
-            background: '#1D9E75', color: '#042818',
-            fontSize: 11, fontWeight: 600, textAlign: 'center',
-          }}
-        >
+        {/* Era #1D9E75 literal — o verde que o contrato tirou da ação. */}
+        <Link href="/app/billing" onClick={onClose} className="spn-cta"
+              style={{ flex: 1, width: 'auto', minHeight: 34, fontSize: 11.5, padding: '0 12px', textDecoration: 'none' }}>
           Ver planos
         </Link>
       </div>

@@ -30,14 +30,26 @@ function isIdentityCurve(points: CurvePoint[]): boolean {
     && points[1].x === 1 && points[1].y === 1
 }
 
+/** Cor do traçado por canal. O canal editado precisa se anunciar SEM legenda:
+ *  quem abre a folha e vê uma linha vermelha sabe na hora que mexer ali mexe no
+ *  vermelho, e não no brilho. */
+const CURVE_STROKE: Record<string, string> = {
+  luma: 'var(--color-text-primary)',
+  r: '#e0584a',
+  g: '#4aa96c',
+  b: '#4a7fe0',
+}
+
 export interface CurveEditorProps {
   /** Pontos ordenados por x, em 0..1; primeiro/último são os extremos. */
   points: CurvePoint[]
   onChange: (points: CurvePoint[]) => void
   histogram?: { luma: Uint32Array; max: number } | null
+  /** Qual curva está sendo editada — só muda a cor do traçado. */
+  channel?: 'luma' | 'r' | 'g' | 'b'
 }
 
-export function CurveEditor({ points, onChange, histogram }: CurveEditorProps): React.ReactElement {
+export function CurveEditor({ points, onChange, histogram, channel = 'luma' }: CurveEditorProps): React.ReactElement {
   const svgRef = useRef<SVGSVGElement | null>(null)
   const [dragIdx, setDragIdx] = useState<number | null>(null)
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
@@ -213,7 +225,7 @@ export function CurveEditor({ points, onChange, histogram }: CurveEditorProps): 
         {/* Curva suave (mesma LUT do motor) */}
         <path
           d={curvePath}
-          style={{ fill: 'none', stroke: 'var(--color-text-primary)', strokeWidth: 1.5 }}
+          style={{ fill: 'none', stroke: CURVE_STROKE[channel], strokeWidth: 1.5 }}
         />
 
         {/* Pontos de controle */}
@@ -227,7 +239,7 @@ export function CurveEditor({ points, onChange, histogram }: CurveEditorProps): 
               r={4.5}
               style={{
                 fill: 'var(--color-bg-elevated)',
-                stroke: active ? 'var(--color-accent-green)' : 'var(--color-text-primary)',
+                stroke: active ? 'var(--color-accent-green)' : CURVE_STROKE[channel],
                 strokeWidth: 1.5,
               }}
             />

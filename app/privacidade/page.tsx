@@ -1,17 +1,16 @@
 // /privacidade — Política de Privacidade da SpaceNode (LGPD).
 //
 // Redigida para refletir o tratamento REAL de dados do produto: Supabase
-// (auth/banco/storage), Vercel (hospedagem), Google Cloud, fal.ai e OpenAI
-// (IA — OpenAI entrou em 2026-09-11 com o motor Orion, que virou público),
+// (auth/banco/storage), Vercel (hospedagem), Google Cloud, fal.ai, BytePlus e
+// OpenAI (IA — a BytePlus/ModelArk entrou em 2026-09 com os modelos Seedream,
+// via SEEDREAM_ROUTE=ark / EDIT_V3_SEEDREAM_ROUTE=ark, processa em Singapura;
+// a OpenAI entrou em 2026-09 com o GPT Image 2.5 do motor Orion, atrás de
+// ORION_INTERNAL_ENABLED, processa nos EUA e retém log de abuso por 30 dias),
 // Stripe (pagamentos), zero analytics/pixel de TERCEIROS (cookies essenciais +
 // tema em localStorage + cookie PRÓPRIO de atribuição de campanha
 // sn_attribution — first-party, sem dados pessoais, citado na cláusula 7 em
 // 2026-07-18). Se algum tracker de terceiro for adicionado no futuro, a
 // cláusula 7 PRECISA ser atualizada junto (e consentimento, quando exigido).
-//
-// Regra do repo (mesmo procedimento aplicado à BytePlus): todo novo
-// suboperador que processa imagem/conteúdo de USUÁRIO precisa entrar aqui
-// (cláusulas 4-6) ANTES de sair do modo interno/staff-only.
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { LegalShell, LegalSection, P, UL, LI, Strong } from '@/components/legal/LegalShell'
@@ -24,7 +23,7 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 }
 
-const UPDATED_AT = '11 de setembro de 2026'
+const UPDATED_AT = '10 de setembro de 2026'
 
 export default function PrivacidadePage() {
   return (
@@ -118,8 +117,15 @@ export default function PrivacidadePage() {
       <LegalSection n={4} title="Suas imagens e a inteligência artificial">
         <P>
           Para gerar os resultados, as imagens e instruções que você envia são transmitidas de forma segura a
-          provedores de IA contratados — atualmente Google Cloud (Vertex AI/Gemini), fal.ai e OpenAI —
+          provedores de IA contratados — atualmente Google Cloud (Vertex AI/Gemini), fal.ai, BytePlus
+          (plataforma ModelArk, com os modelos Seedream, da ByteDance) e OpenAI (modelos GPT Image) —
           exclusivamente para processar a sua solicitação.
+        </P>
+        <P>
+          Cada solicitação envia ao provedor apenas o necessário para gerá-la: a imagem de origem, a área que
+          você selecionou (quando houver) e a instrução de texto correspondente. Não enviamos aos provedores
+          de IA seus dados de cadastro, como nome e e-mail. Os provedores mantêm esses arquivos apenas pelo
+          tempo necessário para entregar o resultado, conforme os termos de cada um.
         </P>
         <P>
           <Strong>Não usamos o seu conteúdo para treinar modelos de IA próprios</Strong>, e contratamos os
@@ -134,8 +140,9 @@ export default function PrivacidadePage() {
         <UL>
           <LI><Strong>Supabase</Strong> — banco de dados, autenticação e armazenamento de arquivos;</LI>
           <LI><Strong>Vercel</Strong> — hospedagem e infraestrutura da aplicação;</LI>
-          <LI><Strong>Google Cloud</Strong>, <Strong>fal.ai</Strong> e <Strong>OpenAI</Strong> — processamento de IA
-          das suas gerações;</LI>
+          <LI><Strong>Google Cloud</Strong> e <Strong>fal.ai</Strong> — processamento de IA das suas gerações;</LI>
+          <LI><Strong>BytePlus Pte. Ltd.</Strong> (ModelArk, modelos Seedream da ByteDance) — processamento de IA de gerações e edições de imagem;</LI>
+          <LI><Strong>OpenAI</Strong> (modelos GPT Image) — processamento de IA de gerações de imagem;</LI>
           <LI><Strong>Stripe</Strong> — processamento de pagamentos.</LI>
         </UL>
         <P>
@@ -147,10 +154,21 @@ export default function PrivacidadePage() {
 
       <LegalSection n={6} title="Transferência internacional">
         <P>
-          Os provedores acima processam dados em servidores localizados fora do Brasil (como Estados Unidos e
-          União Europeia). Essas transferências são realizadas com as salvaguardas do art. 33 da LGPD,
-          incluindo cláusulas contratuais de proteção de dados e os padrões de segurança adotados por esses
-          provedores.
+          Os provedores acima processam dados em servidores localizados fora do Brasil — nos Estados Unidos e
+          na União Europeia e, no caso da BytePlus, em Singapura. Essas transferências são realizadas com as
+          salvaguardas do art. 33 da LGPD, incluindo cláusulas contratuais de proteção de dados e os padrões
+          de segurança adotados por esses provedores.
+        </P>
+        <P>
+          Para as imagens processadas pela BytePlus, a transferência limita-se ao conteúdo necessário para
+          gerar o resultado (imagem, seleção e instrução), sem dados de identificação da sua conta, e os
+          arquivos são mantidos pelo provedor apenas pelo prazo necessário à entrega.
+        </P>
+        <P>
+          As imagens processadas pela OpenAI são tratadas nos Estados Unidos. Conforme os termos da API da
+          OpenAI, o conteúdo enviado <Strong>não é usado para treinar os modelos dela</Strong> e é retido por
+          até 30 dias apenas para monitoramento de abuso, sendo excluído em seguida. Também aqui enviamos
+          somente o necessário para gerar o resultado, sem os seus dados de cadastro.
         </P>
       </LegalSection>
 

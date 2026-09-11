@@ -1,0 +1,219 @@
+{
+  "cenas": [
+    {
+      "n": 1,
+      "dur_s": 3,
+      "classe": "AMBIENTACAO",
+      "src": "",
+      "imagem": "ABRE O FILME NO ESCURO. Preto quase absoluto. Um facho estreito de luz dura entra na diagonal pelo canto superior direito e acende poeira fina suspensa, que gira devagar dentro do facho. Nenhuma superfície é tocada pelo facho: só ar, escuridão e partículas. CÂMERA PARADA — o clipe já vem com o único movimento que existe (a poeira). Full-bleed 1920x1080, sem Ken Burns adicionado, sem legenda. Gerado a 4 s, usados os 3,0 s iniciais.",
+      "copy_tela": "",
+      "transicao": "abre em fade do preto (0,6 s); sai em dissolve para preto (0,5 s)"
+    },
+    {
+      "n": 2,
+      "dur_s": 2.2,
+      "classe": "CARTELA",
+      "src": "",
+      "imagem": "Campo #0A0A0A pleno. Uma linha em Geist SemiBold #FFFFFF, corpo médio, ALINHADA À ESQUERDA no terço central do quadro (x = 260 px), com muito respiro. Sem símbolo, sem movimento. Este é o eixo tipográfico da metade escura — a cartela 16 volta a ele.",
+      "copy_tela": "isto roda há meses.",
+      "transicao": "entra em dissolve (0,5 s); sai em dissolve (0,4 s)"
+    },
+    {
+      "n": 3,
+      "dur_s": 2.8,
+      "classe": "AMBIENTACAO",
+      "src": "",
+      "imagem": "Macro de parede de concreto aparente CHAPADA E FRONTAL, marcas horizontais da fôrma de madeira e furos de espaçador, preenchendo 100% do quadro. Câmera parada; o único movimento é uma sombra de borda dura atravessando a superfície da esquerda para a direita, devagar. Sem quina, sem canto, sem profundidade, sem ponto de fuga. Full-bleed, sem legenda. Gerado a 4 s, usados 2,8 s. FALLBACK DE CUSTO ZERO se a geração falhar: marketing/output/2026-09-09-filme/ambientacao/concreto-luz-corte.mp4 (4 s, 1920x1080, já pago em 09/09) — perde a frontalidade chapada, mas passa no mesmo crivo.",
+      "copy_tela": "",
+      "transicao": "corte seco na entrada; sai em dissolve para preto (0,5 s)"
+    },
+    {
+      "n": 4,
+      "dur_s": 2.6,
+      "classe": "AMBIENTACAO",
+      "src": "",
+      "imagem": "Macro extremo de pedra bruta seca (granito cinza com veio claro) preenchendo o quadro inteiro. Câmera parada; uma luz dura e rasante varre de cima para baixo em poucos graus e faz relevo, poro e microssombra aparecerem e sumirem. Nenhuma junta, rejunte, quina ou objeto que dê escala — não dá para dizer se é um metro ou um centímetro de pedra. Full-bleed, sem legenda. Gerado a 4 s, usados 2,6 s.",
+      "copy_tela": "",
+      "transicao": "entra em dissolve (0,5 s); sai em dissolve para preto (0,4 s)"
+    },
+    {
+      "n": 5,
+      "dur_s": 2.4,
+      "classe": "AMBIENTACAO",
+      "src": "",
+      "imagem": "A DOBRADIÇA DO FILME. Reboco branco liso preenchendo o quadro. Começa quase preto; uma faixa de luz nasce no centro e vai abrindo até estourar em branco. Câmera parada, só a luz se move. TRAVA OBRIGATÓRIA DE MONTAGEM: os últimos 0,25 s (7 frames a 30 fps) são rampados em pós para #FAFAFA CHAPADO, sem imagem legível nenhuma. O corte para a cena 6 acontece nesse frame branco — assim o último quadro gerado antes da primeira imagem de produto não contém pixel algum que possa ser lido como render. Não é preferência estética: é o que fecha a adjacência. Full-bleed, sem legenda. Gerado a 4 s, usados 2,4 s.",
+      "copy_tela": "",
+      "transicao": "corte seco na entrada; SAI EM CORTE SECO cravado no frame branco chapado — única emenda que a montagem precisa acertar"
+    },
+    {
+      "n": 6,
+      "dur_s": 3.4,
+      "classe": "PROVA",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-07-reel-plugin-no-sketchup/src/su-169-center.png",
+      "imagem": "Viewport REAL do SketchUp (1714x964 → full-bleed 1920x1080, upscale 1,12x). As duas barras de ferramentas ficam à mostra no topo de propósito: são a prova de que isto é software de projeto, não imagem. Sala de jantar em modelo cru — coluna preta, forro ripado, painel ripado ao fundo, muro de pedra à direita, piso cinza chapado. Conferido: sem barra de título, sem nome de arquivo, sem nome de usuário, sem e-mail. CÂMERA ABSOLUTAMENTE PARADA — mexer numa captura de software denuncia truque. Copy em chapa #FAFAFA a 92%, canto inferior esquerdo, tipografia #0A0A0A, dentro da margem segura.",
+      "copy_tela": "você já modelou isto. [falta a imagem.]",
+      "transicao": "corte seco na entrada e na saída"
+    },
+    {
+      "n": 7,
+      "dur_s": 2.6,
+      "classe": "CARTELA",
+      "src": "",
+      "imagem": "CARTÃO DE MARCA — enxerto do tratamento A: ele cai DEPOIS do problema (o modelo cinza) e ANTES da prova (o render), então a marca se apresenta resolvendo, não avisando. Campo #FAFAFA pleno. Símbolo ConstellationN de marketing/brand/spacenode-symbol.svg recolorido para #0A0A0A (stroke e fill), ~120 px de altura, centralizado no alto; wordmark 'spacenode' em Geist SemiBold #0A0A0A logo abaixo. A frase entra 0,4 s depois do símbolo. É a única cartela centralizada do filme — o eixo muda porque é a apresentação. Sem selo, sem badge, sem data, sem verde. Serve também de quebra de continuidade: separa o viewport da sala de jantar do par de sala de estar, que é outro projeto.",
+      "copy_tela": "este é o spacenode.",
+      "transicao": "corte seco na entrada e na saída"
+    },
+    {
+      "n": 8,
+      "dur_s": 1.3,
+      "classe": "PROVA",
+      "src": "C:/Users/Pisoni/spacenode/marketing/renders/antes/living.jpg",
+      "imagem": "Modelo cru de SketchUp da sala de estar (1336x749). Apresentado em BANDA 1664x936 centrada em (128, 72) sobre campo #FAFAFA — banda, não full-bleed, porque o arquivo tem 749 px de altura e o full-bleed exigiria 1,44x de upscale; na banda o fator cai para 1,25x. IMAGEM ABSOLUTAMENTE PARADA, sem Ken Burns: é uma prova de geometria, e qualquer movimento de quadro destrói a comparação. Hold curto de propósito (o 'antes' não passa de 1,5 s, regra do BRIEF). Sem copy.",
+      "copy_tela": "",
+      "transicao": "corte seco na entrada; sai em wipe horizontal (xfade wipeleft, 0,3 s, régua LINEAR) atravessando SÓ a banda da imagem — o texto nunca é wipado"
+    },
+    {
+      "n": 9,
+      "dur_s": 3.4,
+      "classe": "PROVA",
+      "src": "C:/Users/Pisoni/spacenode/marketing/renders/depois/living.jpg",
+      "imagem": "O render da MESMA sala (1376x768), na MESMA banda 1664x936 e no mesmo centro da cena 8 — a moldura não se mexe, só o conteúdo. Conferi item por item nos dois arquivos: rádio, passarinho branco, bonequinho, livros, nicho arqueado azul-acinzentado, lustre de esferas, painel terracota, TV no recesso, pôster do busto clássico com respingo laranja (mesma arte, mesma posição), poltrona concha azul, sofá e poltronas de bouclé, mesa de centro oval de pedra, tapete redondo, luminária de piso de cúpula preta, banquinho à esquerda, vaso de rosas brancas — tudo no mesmo lugar. É o único par do acervo que sobrevive a alguém pausar o vídeo, e por isso é AQUI que o filme faz a afirmação de geometria. Imagem parada. Copy no campo #FAFAFA, abaixo da banda, tipografia #0A0A0A.",
+      "copy_tela": "[os mesmos móveis,] no mesmo lugar.",
+      "transicao": "entra pelo wipe (0,3 s); sai em corte seco"
+    },
+    {
+      "n": 10,
+      "dur_s": 3.2,
+      "classe": "PROVA",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-09-tutoriais/src/spaces-existente-wide/02-abrir-primeiro.png",
+      "imagem": "RECORTE OBRIGATÓRIO, MEDIDO E CONFERIDO HOJE: extract left:48 top:15 width:522 height:1170 do arquivo 3840x2160. Entrega a barra lateral real: logo ConstellationN + wordmark, o bloco PROJETOS e, sob CRIAR, exatamente OITO itens — Renderizar, Spaces, Editar, Ampliar, Animar, Finalizar, Planta humanizada, Blocos 3D — terminando cravado em Blocos 3D. Três verificações feitas em pixel: (a) o rodapé com nome do dono e saldo fica em y~2064, FORA; (b) a barra verde de item ativo do Spaces ocupa x 38–43, e por isso o recorte começa em x=48 — varredura no recorte final acusa ZERO pixel verde; (c) o recorte NÃO inclui a seção ESCRITÓRIO, senão a cartela 'oito módulos' apareceria sobre uma coluna de dezesseis linhas. Exibido como coluna 418x936 centrada em (751, 72) sobre campo #FAFAFA (downscale 0,8x de uma captura dSF2 — fica mais nítido que nativo). Coluna PARADA, entrando com fade de 0,4 s. Copy à direita da coluna, alinhada à esquerda, #0A0A0A.",
+      "copy_tela": "oito módulos. [um crédito só: node.]",
+      "transicao": "corte seco na entrada e na saída"
+    },
+    {
+      "n": 11,
+      "dur_s": 2.8,
+      "classe": "PROVA",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-08-tutoriais/src/renderizar/06-botao-gerar-com-preco.png",
+      "imagem": "Campo #FAFAFA pleno. No centro, o botão real do Renderizar em recorte nativo 902x98, ESCALA 1:1, SEM UPSCALE, posicionado em (509, 491): 'gerar render' à esquerda, '20 Nodes por render' à direita. O pixel tem que ler como interface, não como arte — por isso nada de moldura inventada, nada de sombra, nada de Ken Burns. O recorte é nativo e limpo: não contém saldo, avatar, nome nem e-mail. Hold longo e parado: é o argumento comercial do filme, e o número está queimado no pixel da UI, não escrito por mim. Copy abaixo do botão, com respiro grande, #0A0A0A.",
+      "copy_tela": "o preço aparece [antes do clique.]",
+      "transicao": "corte seco na entrada e na saída"
+    },
+    {
+      "n": 12,
+      "dur_s": 1.4,
+      "classe": "PROVA",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-09-filme/broll/base/casa-16x9.jpg",
+      "imagem": "Render real da casa contemporânea de dois volumes brancos entre pinheiros (2730x1536, 16:9 exato) — full-bleed, downscale para 1920x1080. Este arquivo é EXATAMENTE a imagem-base de casa-travelling.mp4, ou seja, o frame 0 do clipe da cena seguinte: o corte entre 12 e 13 é invisível e a imagem simplesmente começa a se mover. Resolve por construção o salto de reenquadramento que existiria se eu usasse marketing/renders/depois/casa.jpg. Imagem PARADA, sem copy.",
+      "copy_tela": "",
+      "transicao": "corte seco na entrada; sai em CORTE INVISÍVEL (a cena 13 abre no mesmo frame)"
+    },
+    {
+      "n": 13,
+      "dur_s": 6,
+      "classe": "PROVA",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-09-filme/broll/casa-travelling.mp4",
+      "imagem": "O clipe INTEIRO de 6 s (1920x1080, 24 fps, conformar para 30 fps; ffprobe confirma que não existe faixa de áudio no arquivo). Travelling lateral lentíssimo paralelo à fachada, com paralaxe real entre os pinheiros em primeiro plano e os dois volumes brancos. Fiel os 6 s inteiros — quem perde fidelidade a partir de ~2,5 s é sala-dolly.mp4, que NÃO entra neste filme. Gerado com Veo 3.1 via fal, que é o motor 'Cinemático' do módulo Animar (lib/video/models.ts), a partir de um render que já é output real da plataforma: é o produto usando o produto, não imagem externa. Full-bleed. Copy em chapa #FAFAFA a 92%, canto inferior esquerdo, entrando aos 0,8 s e saindo aos 4,6 s.",
+      "copy_tela": "o render também [vira vídeo.]",
+      "transicao": "corte seco na entrada e na saída"
+    },
+    {
+      "n": 14,
+      "dur_s": 1.6,
+      "classe": "PROVA",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-09-tutoriais/src/animar-wide/04-painel-reels.png",
+      "imagem": "ENXERTO DO TRATAMENTO B, com o recorte corrigido. RECORTE OBRIGATÓRIO, MEDIDO E CONFERIDO: extract left:16 top:1872 width:808 height:66 do arquivo 840x2160. Uma tira única da interface real do Animar: 'Custo desta geração' à esquerda, '210 Nodes' à direita, com os descendentes de 'geração' inteiros (o recorte de 58 px que o B propunha cortava o ç e o g). Conferido: a linha 'Saldo: 4763 Nodes' fica em y~1945 e está FORA. Exibida em ESCALA 1:1 (808x66) centrada em (556, 507) sobre campo #FAFAFA, parada, SEM copy adicionada — o pixel fecha sozinho a cadeia: o clipe da cena 13 tem 6 s, e Veo 3.1 a 6 s custa 210 nodes (lib/video/models.ts:107, costInNodes { '4': 140, '6': 210, '8': 280 }). Quatro coisas se corroboram: o footage, o preço na tela, o preço no código e a duração do preset.",
+      "copy_tela": "",
+      "transicao": "corte seco na entrada e na saída"
+    },
+    {
+      "n": 15,
+      "dur_s": 3.4,
+      "classe": "PROVA",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-09-tutoriais/src/historico-wide/02-grid-inteiro.png",
+      "imagem": "RECORTE OBRIGATÓRIO, MEDIDO NAS CALHAS DO GRID: extract left:220 top:662 width:2393 height:1346 (16:9) do arquivo 3840x2160. Entrega 4 colunas inteiras e 2 fileiras e meia de renders reais, com o rodapé de cada card legível — 'Sala de Estar · 07 de set. de 2026 · 28 NODES' (Quasar 2K) e 'Animação · Vídeo 6s · Cinemático · 210 NODES', que ecoa a cena 14. Conferido em pixel: o saldo do topo direito (y~57), a fileira de pastas com o sobrenome do dono (termina em y=645) e o avatar do rodapé (y>2100) estão TODOS fora; as colunas começam e terminam em calha, sem card cortado nas laterais. MÁSCARA OBRIGATÓRIA ANTES DE MONTAR: o selo redondo 'VP' (iniciais do dono, Ø 38 px) aparece em todas as 8 miniaturas do recorte, nos centros x ∈ {286, 878, 1468, 2060} e y ∈ {1077, 1653} do arquivo original. Cobrir cada um com um disco chapado de Ø 44 px na própria cor de fundo do selo (~#3E3E3E na mesma opacidade): o avatar continua lá, em branco, e a inicial some. Sem máscara, a peça publica dado pessoal e viola prohibited-content §6. Apresentado em banda 1664x936 centrada em (128, 72) sobre #FAFAFA — um retângulo escuro flutuando na luz; a UI é dark, não recolorir. Quadro PARADO. Copy abaixo da banda, #0A0A0A.",
+      "copy_tela": "saiu tudo da plataforma.",
+      "transicao": "corte seco na entrada; sai em dissolve (0,5 s)"
+    },
+    {
+      "n": 16,
+      "dur_s": 2.4,
+      "classe": "CARTELA",
+      "src": "",
+      "imagem": "ENXERTO DO TRATAMENTO B, no lugar da cartela que o vencedor perdeu ('novo aqui é só o filme.', cortada por pôr a palavra novo na tela e por acenar para a referência). Campo #FAFAFA pleno, texto ALINHADO À ESQUERDA no mesmo eixo da cartela 2 (x = 260 px) — o leitor volta ao ponto do quadro onde o filme disse 'isto roda há meses.' e recebe o fecho da mesma ideia. 'tudo isto' em cinza terciário, 'já está no ar.' em Geist SemiBold #0A0A0A: a inversão da promessa de lançamento fica no peso tipográfico, não no volume. Sem símbolo, sem movimento.",
+      "copy_tela": "[tudo isto] já está no ar.",
+      "transicao": "entra pelo dissolve (0,5 s); sai em corte seco"
+    },
+    {
+      "n": 17,
+      "dur_s": 4,
+      "classe": "CARTELA",
+      "src": "",
+      "imagem": "Cartão final, no CLARO — o filme termina do lado da prova, não volta para o preto. Campo #FAFAFA pleno. No alto, centralizado, o lockup horizontal de marketing/brand/spacenode-logo-horizontal.svg recolorido para #0A0A0A. No meio, a linha de CTA em Geist SemiBold: o número 80 em #30D158, a ÚNICA aplicação de verde da peça inteira, e o resto em #0A0A0A. Embaixo, em corpo miúdo e cinza terciário, 'sem cartão · spacenode.app' — literal do site (components/Hero.tsx e components/FinalCTA.tsx trazem '80 nodes grátis · sem cartão · em português'). Sem botão desenhado, sem selo, sem badge, sem emoji. Os últimos 0,8 s ficam estáticos para servir de thumbnail.",
+      "copy_tela": "{80} nodes grátis. [sem cartão · spacenode.app]",
+      "transicao": "corte seco na entrada; fecha em fade para #FAFAFA (0,4 s) depois de 0,8 s estáticos"
+    }
+  ],
+  "como_resolve_o_novo": "A estrutura de anúncio fica inteira — atmosfera de marca, apresentação, produto, CTA — e o que muda é o TEMPO VERBAL. Onde o formato de lançamento promete futuro, este filme entrega presente, e resolve a armadilha em três beats separados, nenhum deles copiando frase de ninguém.\n\nBeat 1, aos 5,2 s, na metade escura: \"isto roda há meses.\" Antes de qualquer imagem de produto o filme já desarmou a expectativa de estreia — e o faz com um fato conferível (Stripe live desde 16/07/2026, per BRIEF.md).\n\nBeat 2, aos 19,0 s: \"este é o spacenode.\" É apresentação, não relançamento — e a posição importa mais que a palavra. O cartão cai DEPOIS do problema (o viewport real do SketchUp: você já modelou isto, falta a imagem) e ANTES da resposta (o render). Assim a marca se apresenta RESOLVENDO, não avisando. É o enxerto do tratamento A, e não custa uma palavra alterada.\n\nBeat 3, no fecho: \"[tudo isto] já está no ar.\" — a melhor linha da rodada, do tratamento B, importada sem o erro de gênero dela (a casa escreve o SPACENODE, masculino). Onde um filme de lançamento diria que algo chegou, este diz que já estava aqui. É literalmente verdadeiro e é retoricamente mais forte que a promessa que o formato costuma fazer.\n\nO ângulo visual diz a mesma coisa sem falar: o filme tem uma metade escura e abstrata e uma metade clara e nítida, e a dobradiça entre elas é uma luz abrindo sobre uma superfície que já estava lá. O que muda no filme é a luz sobre a coisa, não a coisa — que é exatamente a diferença entre apresentar e relançar.\n\nAs palavras novo, lançamento, chegou, agora, conheça, versão e estreia não aparecem em nenhuma cartela. Não há selo, não há v2, não há data na tela, não há contagem. Nenhum quadro cita, mostra, imita frase reconhecível ou aponta para concorrente algum.",
+  "custo_estimado_usd": 3.2,
+  "duracao_total_s": 48.5,
+  "logline": "Um filme de apresentação em duas metades. A primeira é escura, abstrata e gerada — matéria e luz, nenhum projeto dentro dela. A segunda é clara, nítida e 100% material real da plataforma: o modelo cinza no SketchUp, o mesmo ambiente virando render com os móveis todos no lugar, os oito módulos, o preço queimado no pixel do botão, o render virando vídeo e o custo desse vídeo lido na própria interface. O corte entre as metades é o argumento: o que muda é a luz sobre uma coisa que já estava lá.",
+  "prompts_geracao": [
+    {
+      "cena_n": 1,
+      "id": "poeira-facho",
+      "duracao_s": 4,
+      "prompt": "Macro cinematografico, lente 100 mm, num ambiente escuro quase preto. Um unico facho estreito de luz dura entra na diagonal pelo canto superior direito e acende a poeira fina suspensa no ar, que gira muito devagar dentro do facho. O quadro esta completamente vazio do primeiro ao ultimo frame: existe apenas ar escuro e as particulas acesas. Nao ha parede, piso, teto, canto, quina, janela, porta, movel, planta, veiculo, predio nem horizonte em lugar nenhum do plano, e nada nem ninguem entra no quadro em nenhum momento. O facho nao encosta em nenhuma superficie: ele atravessa o ar e se perde no preto. A camera fica absolutamente parada; o unico movimento do plano e o das particulas. Profundidade de campo rasissima, grao fino de filme 35 mm, luz branca neutra e fria, fundo preto puro, 16:9. Um plano unico e continuo, sem corte, sem zoom, sem pan, sem tremor e sem mudanca de lente. Sem pessoas, sem maos, sem rostos, sem animais, sem texto, sem letras, sem numeros, sem logotipo e sem marca dagua. Nada no quadro se deforma nem muda de forma.",
+      "por_que_nao_confunde": "O SPACENODE entrega sempre a imagem de um PROJETO: um ambiente ou um volume construido legivel, com escala, esquadria e mobiliario. Neste plano nao ha superficie nenhuma — so ar, escuridao e poeira acesa. Nao existe arquitetura dentro do quadro para alguem atribuir a plataforma, e nao existe par antes/depois que permita monta-lo como resultado. Alem disso ele roda 16 s antes de qualquer imagem de produto, abre o filme sem uma unica palavra na tela e nao encosta em nenhuma cartela de claim."
+    },
+    {
+      "cena_n": 3,
+      "id": "concreto-chapado",
+      "duracao_s": 4,
+      "prompt": "Macro cinematografico, lente 100 mm, de uma parede de concreto aparente vista de frente e completamente chapada, com as marcas horizontais da forma de madeira e os furos dos espacadores. A superficie preenche 100 por cento do quadro do primeiro ao ultimo frame e nao tem profundidade nem ponto de fuga: e um plano frontal, paralelo ao sensor. A camera fica absolutamente parada; o unico movimento do plano e o de uma sombra de borda dura que atravessa a superficie da esquerda para a direita, muito devagar, como sol de fim de tarde passando. Luz baixa, ambiente escuro, o lado sem sombra apenas levemente aceso, e uma poeira fina de cimento brilhando de leve rente a parede. A superficie e continua e sem interrupcao: nao aparece nenhuma quina, canto, aresta, rodape, esquadria, janela, porta, movel, objeto ou referencia de escala, e nada nem ninguem entra no quadro em nenhum momento. Contraste alto, paleta cinza neutra, 16:9. Um plano unico e continuo, sem corte, sem zoom, sem pan, sem tremor e sem mudanca de lente. Sem pessoas, sem maos, sem rostos, sem animais, sem texto, sem letras, sem numeros, sem logotipo. O concreto nao se deforma nem muda de textura.",
+      "por_que_nao_confunde": "Superficie frontal e chapada preenchendo o quadro inteiro, sem canto, sem quina, sem profundidade e sem escala: e uma amostra de material, nao um ambiente, e o produto sempre entrega ambiente. A frontalidade e pedida no prompt justamente para matar a leitura de 'parede de um comodo' — sem ponto de fuga nao ha espaco a reconstruir. Roda antes do primeiro sinal de produto, sem legenda e cercado de preto dos dois lados."
+    },
+    {
+      "cena_n": 4,
+      "id": "pedra-rasante",
+      "duracao_s": 4,
+      "prompt": "Macro cinematografico, lente 100 mm, de um bloco de pedra bruta seca, granito cinza com veio claro e poro aberto, que preenche 100 por cento do quadro do primeiro ao ultimo frame. A camera fica absolutamente parada; o unico movimento do plano e o de uma luz dura e rasante que varre a superficie de cima para baixo em poucos graus, fazendo o relevo, o poro e a microssombra aparecerem e sumirem devagar. A superficie e continua e sem interrupcao: nao ha junta construtiva, argamassa, rejunte, quina, aresta de parede, moldura, bancada, piso, movel, planta nem qualquer objeto que de escala, e nada nem ninguem entra no quadro em nenhum momento. Nao da para dizer se o quadro tem um metro ou um centimetro de pedra. Contraste alto, cor dessaturada, ambiente escuro, 16:9. Um plano unico e continuo, sem corte, sem zoom, sem pan, sem tremor e sem mudanca de lente. Sem pessoas, sem maos, sem rostos, sem animais, sem texto, sem letras, sem numeros, sem logotipo. A pedra nao se deforma nem muda de forma.",
+      "por_que_nao_confunde": "Sem junta, sem quina e sem nenhuma referencia de escala, o plano e textura pura — nao ha como saber se e uma pedra de mao ou um paramento, muito menos que ambiente seria. O produto nunca entrega textura sem espaco. E, como as outras, entra e sai sem legenda, longe de qualquer afirmacao sobre o produto."
+    },
+    {
+      "cena_n": 5,
+      "id": "fenda-luz",
+      "duracao_s": 4,
+      "prompt": "Macro cinematografico, lente 85 mm, de uma parede lisa de reboco branco levemente imperfeito, vista de frente, que preenche 100 por cento do quadro do primeiro ao ultimo frame. O plano comeca quase preto. Uma faixa de luz nasce no centro do quadro e vai abrindo e alargando muito devagar sobre o reboco, saindo do quase-preto e chegando a um branco limpo e forte; no ultimo segundo a luz continua crescendo ate estourar e tomar o quadro inteiro, de modo que no frame final nao sobra nenhuma imagem legivel, apenas branco. A fonte da luz esta fora de quadro e nunca aparece. A superficie e continua: nao ha porta, fresta, janela, esquadria, batente, quina, canto, rodape, movel nem objeto em lugar nenhum do plano, e nada nem ninguem entra no quadro em nenhum momento. A camera fica absolutamente parada; o unico movimento do plano e o da luz crescendo. Paleta quase monocromatica, 16:9. Um plano unico e continuo, sem corte, sem zoom, sem pan, sem tremor e sem mudanca de lente. Sem pessoas, sem maos, sem rostos, sem animais, sem texto, sem letras, sem numeros, sem logotipo. A parede nao se deforma.",
+      "por_que_nao_confunde": "E uma superficie e uma luz, sem um unico elemento construtivo no quadro — nem porta, nem janela, nem quina. E este e o plano gerado que fica colado na primeira imagem de produto do filme, entao ele tem duas travas em vez de uma: o prompt manda o plano terminar estourado, sem imagem legivel, e a montagem ainda rampa os ultimos 0,25 s para branco chapado. No frame do corte nao existe pixel nenhum que possa ser confundido com render de projeto — a adjacencia fica resolvida por construcao, nao por esperanca sobre o que o modelo vai entregar."
+    }
+  ],
+  "riscos": [
+    "MÁSCARA DE PRIVACIDADE (BLOQUEANTE). O selo redondo 'VP' — iniciais do dono — aparece nas 8 miniaturas do recorte do Histórico (cena 15). Medi: Ø 38 px, centros em x ∈ {286, 878, 1468, 2060} e y ∈ {1077, 1653} do arquivo 3840x2160. Cobrir cada um com disco chapado de Ø 44 px na cor do próprio selo (~#3E3E3E, mesma opacidade): o avatar fica em branco, a inicial some, e nada da UI é inventado. Sem isso a peça publica dado pessoal e viola prohibited-content §6. Conferir num frame de QA a 100% antes de exportar.",
+    "RECORTES SÃO OBRIGAÇÃO, NÃO SUGESTÃO — e foram medidos hoje, não estimados. Sidebar: left:48 top:15 522x1170 (o recorte termina cravado em Blocos 3D; se pegar a seção ESCRITÓRIO junto, a cartela 'oito módulos' passa a mentir sobre uma coluna de dezesseis linhas — foi o erro do tratamento A). Animar: left:16 top:1872 808x66 (com 66 px os descendentes de 'geração' ficam inteiros; com 58 px cortam). Histórico: left:220 top:662 2393x1346, começando e terminando em calha do grid. Montar com qualquer PNG cru desses três é violação de privacidade imediata: todos trazem saldo, avatar e, no do Spaces, o nome completo do dono.",
+    "VERDE: a varredura do recorte final da sidebar acusa ZERO pixel verde. A barra de item ativo do Spaces vive em x 38–43 e é exatamente por isso que o recorte começa em x=48. O único verde do filme inteiro é o número 80 do cartão final (#30D158). Se alguém reabrir o recorte para 'mostrar a sidebar inteira', o verde volta e a regra de uma palavra verde por peça cai junto.",
+    "O PAR sala-de71 FOI CORTADO DO FILME INTEIRO, não apenas descaptionado. A medição de hoje mostrou ~22 ripas no painel do modelo contra ~30 no render, e os pendentes viraram de gaiola para globo liso: o par não aguenta close. O vencedor ainda o mantinha na cena 10 mesmo depois de mover o claim de geometria para o living; sem claim, ele era risco sem função. Ficou só o viewport su-169-center.png, que é do mesmo projeto mas não é comparado com render nenhum — e a afirmação de geometria mora no par living, que confiro item por item e sobrevive a alguém pausar o vídeo.",
+    "PROJETOS DIFERENTES EM SEQUÊNCIA. A cena 6 é o viewport de uma sala de jantar; as cenas 8–9 são uma sala de estar; as 12–13 são uma casa. Ninguém afirma que um virou o outro, e o cartão de marca (cena 7) separa o viewport do par — mas se a montagem tirar o cartão dali, a cena 6 encosta na cena 8 e passa a sugerir continuidade falsa. A posição do cartão não é decorativa: ela é o que mantém a leitura honesta, além de fazer o trabalho dramático.",
+    "A DOBRADIÇA DEPENDE DE UM FRAME, e por isso ela não depende do modelo. A cena 5 precisa terminar sem imagem legível para o corte na primeira tela de produto significar alguma coisa. O prompt pede o estouro, mas a trava real é de montagem: rampar os últimos 0,25 s para #FAFAFA chapado. Se o Veo devolver a luz abrindo e fechando, a rampa salva a emenda mesmo assim — e ainda assim vale regerar, é o único clipe que justifica gastar da reserva.",
+    "ÁUDIO: verificado, não suposto. ffprobe nos clipes existentes (casa-travelling.mp4, concreto-luz.mp4) mostra faixa de vídeo apenas, sem stream de áudio — e a ambientação do Veo 3.1 texto→vídeo na fal também sai muda. O master sai mudo de propósito, como todo o pipeline do BRIEF. Isso é decisão, não pendência. Se o dono depois puser trilha, ela precisa ser tão seca quanto o texto: música épica de biblioteca sobre a metade escura destrói a peça, e locução tornaria as cartelas 2 e 16 redundantes.",
+    "CONFORMAÇÃO DE FRAME RATE: os cinco clipes de vídeo são 24 fps e o master é 30 fps. Conformar no spec (fps + setsar=1 antes do concat — o zoompan devolve SAR 19200:19201 e o concat recusa juntar com os cards, gotcha já pago pelo reel-kit). Sem isso o corte invisível entre as cenas 12 e 13 ganha um solavanco justamente onde a imagem deveria só começar a se mover.",
+    "RESOLUÇÃO: marketing/renders/antes/living.jpg tem 1336x749, abaixo de 1080p. Por isso o par não vai full-bleed: na banda 1664x936 o upscale cai de 1,44x para 1,25x, e o 'depois' (1376x768) sobe 1,22x — quase o mesmo fator, então o wipe não denuncia diferença de nitidez. Se aplicar sharpen, aplicar IGUAL nos dois lados: sharpen só no 'antes' é maquiagem de antes/depois, proibida por prohibited-content §4.",
+    "MARCA DE TERCEIRO NO QUADRO: o render da casa (cenas 12–13) tem um carro com emblema Mercedes-Benz na garagem, ~15 px de largura no master. É um render real da conta do dono, não um posicionamento — mas é logotipo de terceiro numa peça pública. Risco baixo e conhecido; se o dono preferir zero exposição, o beat inteiro (12+13+14) sai e o filme cai para 39,5 s, ainda dentro da faixa, perdendo a prova do Animar e os 210 nodes.",
+    "OBRA DE ARTE NO MODELO: A Noite Estrelada aparece como textura de parede no viewport do SketchUp e em duas miniaturas do Histórico. Van Gogh, 1889 — domínio público, sem liberação necessária. Registrado só para não virar dúvida na revisão.",
+    "'isto roda há meses.' é verdadeira mas tem prazo de validade curto para trás: Stripe live em 16/07/2026, hoje 09/09/2026 — quase dois meses de venda em produção, além do período anterior de beta. Se a peça for publicada muito depois, a frase só melhora; se alguém quiser risco zero hoje, a troca é 'isto já está rodando.', que perde a resolução da armadilha e por isso não foi a escolha.",
+    "'saiu tudo da plataforma.' (cena 15) foi escrita neutra de propósito: o Histórico mostrado é de UMA conta, a do dono, e 'isto tudo saiu daqui' poderia ser lido como base de clientes. A frase atual fala de onde as imagens saíram, não de quantas pessoas as fizeram. Não trocar por nada que implique volume de usuários — não existe medição auditada disso.",
+    "A CENA 10 DEPENDE DE PIXEL QUE ENVELHECE. Reconferi hoje lib/nav/modules-config.ts: exatamente 8 módulos habilitados, na ordem que aparece na captura (Renderizar, Spaces, Editar, Ampliar, Animar, Finalizar, Planta humanizada, Blocos 3D), com Isométricas, Prancha IA e Moodboard em enabled:false. 'Estudar' não está no arquivo — o anexo de 04/09 do BRIEF.md ainda o cita e está desatualizado. Se qualquer módulo for ligado ou desligado, a cartela 'oito módulos' passa a mentir sobre uma captura antiga: reconferir o arquivo antes de publicar.",
+    "AS DATAS DO HISTÓRICO (05 a 07 de set. de 2026) hoje ajudam — reforçam 'já está no ar'. Daqui a alguns meses passam a datar a peça. Reaproveitar em 2027 exige recaptura do Histórico, não retoque das datas.",
+    "O FILME NÃO TEM NENHUM SER HUMANO. Não existe no acervo imagem de pessoa, mão, mesa de trabalho ou escritório, e o achado do dia sobre o Veo (uma mão entrou no quadro mesmo com negative_prompt) confirma que pedir gente ao gerador é justamente o que não se deve fazer. Uma peça 100% matéria e interface pode soar fria para um público que compra de gente. É lacuna real, assumida.",
+    "O DIFERENCIAL TÉCNICO MAIS FORTE FICOU DE FORA DE PROPÓSITO. O Renderizar roda em modo estrutural render_only e a plataforma confere a geometria depois de gerar, mas há caminhos em que ela não refaz — qualquer cartela do tipo 'se não bate, o render é refeito' seria promessa. O filme abre mão do melhor argumento técnico para não mentir. Se essa cartela for proposta numa revisão, a resposta é não enquanto o comportamento não for incondicional.",
+    "NENHUM CLAIM DE TEMPO, DE PREÇO EM REAIS OU DE COMPARAÇÃO com render terceirizado, porque não existe medição auditada. A peça abre mão do gancho comercial mais óbvio do público (custo e prazo) e fica só com o preço em nodes — verdadeiro, e lido no pixel da própria UI (20 Nodes no botão, 210 Nodes na tira do Animar, 28 e 210 nos cards do Histórico), mas exige que o espectador conheça a moeda. Nenhum número foi escrito por mim em cartela: todos aparecem dentro de captura de interface.",
+    "PROVA FINA PARA METADE DOS MÓDULOS: Editar, Ampliar, Finalizar, Spaces, Planta humanizada e Blocos 3D só aparecem como NOME na barra lateral. É honesto (nenhuma copy promete resultado deles), mas um arquiteto cético vê oito nomes e três provas. Existe material de Editar em disco, mas o recorte limpo dele traz um custo em nodes fora da lista conferida e não há par antes/depois de Editar verificado — por isso ficou fora, e não por falta de espaço.",
+    "ORÇAMENTO, NAS DUAS LEITURAS. Geração: 4 clipes x 4 s x US$ 0,20 = US$ 3,20 (Veo 3.1 texto→vídeo na fal, 1080p, 24 fps, sem áudio). Leitura estrita do teto, somando TODAS as durações do filme x 0,20: 48,5 x 0,20 = US$ 9,70. Abaixo de US$ 12,60 nas duas contas. Os outros 35,7 s saem de material que já está em disco e não custam nada — inclusive casa-travelling.mp4, cujos US$ 1,20 já foram pagos em 09/09 e estão no livro-caixa broll/gasto.json. A folga de US$ 9,40 é reserva deliberada para regerar clipe que derivar, sobretudo a cena 5.",
+    "COMO OS PROMPTS FORAM ESCRITOS, e por quê: o LEIA-ME da ambientação registra que negative_prompt NÃO funciona no texto→vídeo do Veo na fal (uma mão entrou no quadro mesmo listada como proibida). Por isso todos os quatro prompts descrevem o vazio no POSITIVO ('o quadro está completamente vazio', 'nada nem ninguém entra em nenhum momento') antes de qualquer lista negativa, e todos pedem CÂMERA PARADA com a luz se movendo — pedir a câmera para trás faz o modelo inventar o que estava fora do quadro, que foi o que estragou o sala-dolly. Quatro segundos em vez de seis pelo mesmo motivo: menos tempo, menos deriva.",
+    "FALLBACK DE CUSTO ZERO PARA A CENA 3: marketing/output/2026-09-09-filme/ambientacao/concreto-luz-corte.mp4 (4 s, 1920x1080, já gerado e pago) passa no mesmo crivo e pode substituir a geração se ela falhar. Perde a frontalidade chapada que o prompt novo pede — o clipe existente tem uma parede em leve fuga —, então é substituto, não preferência.",
+    "REGRA DE ACEITE DURA PARA O QA DA AMBIENTAÇÃO, e ela vale mais que os prompts: extrair 4 frames de cada clipe (início, dois no meio, fim) e olhar. Se em QUALQUER frame alguém conseguir dizer que ambiente é aquele — se aparecer canto, esquadria, móvel, reflexo de janela, horizonte ou qualquer coisa que dê escala —, o clipe está errado e se refaz. Não aceitar clipe 'só porque ficou bonito': é exatamente assim que uma cena de ambientação vira prova falsa.",
+    "MONTAGEM/GRAMÁTICA A NÃO DESFAZER: no filme só se movem a luz (os quatro clipes gerados) e um plano só de produto (casa-travelling, que é output real animado pelo motor do próprio Animar). Toda captura de interface e todo par antes/depois ficam ABSOLUTAMENTE PARADOS. Isso não é economia de efeito: Ken Burns numa captura de software lê como truque, e qualquer movimento de quadro no par living destrói a única prova de geometria do filme. O wipe atravessa a imagem, nunca o texto — o texto troca em corte (regra já paga pelo reel-impacto).",
+    "FORMATO E ONDE ISSO VIRA SPEC: master 1920x1080, 30 fps, H.264 (libx264, crf 18, yuv420p), SEM áudio, 48,5 s. As durações da tabela são hold líquido em tela; os dissolves são consumidos das cenas adjacentes, então o master fecha em 48,5 s ±0,3 s. Renderizador: marketing/scripts/cinema.mjs; spec sugerida em marketing/specs/2026-09-09-filme-apresentacao/isto-roda-ha-meses.json. NÃO existe corte 9:16 nesta rodada — as bandas e os recortes 1:1 de interface foram calculados para 16:9, e um vertical exige recorte próprio (o PROGRAMA.md do filme anterior já registra por quê)."
+  ],
+  "titulo": "isto roda há meses."
+}

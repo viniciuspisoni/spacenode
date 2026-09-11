@@ -1,0 +1,40 @@
+{
+  "slug": "2026-09-04-reel-print-render-video-piscina",
+  "reel": "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-print-render-video-piscina\\2026-09-04-reel-print-render-video-piscina.mp4",
+  "banda": "1080×608 @ y=656",
+  "segments": [
+    {
+      "i": 0,
+      "type": "video",
+      "dur": 12,
+      "start": 0,
+      "crop": "1080×1920 12.0s"
+    }
+  ],
+  "width": 1080,
+  "height": 1920,
+  "fps": "30/1",
+  "pix_fmt": "yuv420p",
+  "codec": "h264",
+  "duration": "12.00",
+  "sizeMB": "7.27",
+  "esperado": {
+    "width": 1080,
+    "height": 1920,
+    "fps": "30/1",
+    "duration": "12.00"
+  },
+  "qaFrames": [
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-print-render-video-piscina\\qa-frames\\t0.60s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-print-render-video-piscina\\qa-frames\\t2.40s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-print-render-video-piscina\\qa-frames\\t2.90s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-print-render-video-piscina\\qa-frames\\t3.80s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-print-render-video-piscina\\qa-frames\\t4.90s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-print-render-video-piscina\\qa-frames\\t5.55s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-print-render-video-piscina\\qa-frames\\t5.80s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-print-render-video-piscina\\qa-frames\\t7.50s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-print-render-video-piscina\\qa-frames\\t9.50s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-print-render-video-piscina\\qa-frames\\t11.50s.png"
+  ],
+  "qaSheet": "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-print-render-video-piscina\\qa-sheet.jpg"
+}

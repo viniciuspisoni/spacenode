@@ -1,0 +1,197 @@
+{
+ "scores": [
+  {
+   "slug": "alcance-organico/lavabo-conta-o-que-saiu-do-lugar",
+   "score": 8.5,
+   "rationale": "Mecânica honesta (posição, não material) com a única mudança entregue na legenda antes que o cético aponte; CTA da lista, hashtags técnicas, verde só no sublinhado. Único senão: o 'Nada.' em tela pesa um pouco quando tapetes viraram lajotas — a legenda salva, a arte por si só não."
+  },
+  {
+   "slug": "alcance-organico/um-print-cinco-climas",
+   "score": 7,
+   "rationale": "Antes/depois honesto (mesmo print, cinco gerações) e limites bem listados nos riscos, mas a legenda escorrega em 'decidir com o cliente na hora' (sabor de resultado prometido) e 'Mesmo carro. Mesma escada.' quando #517 tem pessoas extras e #513 muda o enquadramento."
+  },
+  {
+   "slug": "alcance-organico/print-render-video-piscina",
+   "score": 8,
+   "rationale": "Cadeia print→imagem→vídeo verificável (frame 1 do clipe = render), sem provider na peça, sem número de tempo; voz seca e específica. Ligeira generalização em 'vai direto para a apresentação', mas nada inventado."
+  },
+  {
+   "slug": "alcance-organico/cozinha-repara-no-lustre",
+   "score": 7.5,
+   "rationale": "Prova por objetos pequenos e reconhece que veios/cortina são interpretação; CTA e hashtags corretos. Perde por 'o ambiente em que o cliente mais pede' (generalização sem base) e 'Nem o trilho de spots saiu do lugar' vendendo como fidelidade algo que é o print já texturizado."
+  },
+  {
+   "slug": "resposta-direta/resposta-nada-sai-do-lugar-drone",
+   "score": 9,
+   "rationale": "O mais disciplinado do lote: headline fala de posição e não de identidade, 80 nodes/sem cartão conferidos no código, 'IA' banido explicitamente, pavers que mudaram ficam fora dos marcadores. Voz de arquiteto sênior sem um adjetivo."
+  },
+  {
+   "slug": "resposta-direta/resposta-preco-cozinha-lustre",
+   "score": 8,
+   "rationale": "Preço e nodes rastreados a lib/plans.ts e à migration, 'quatro renders' sempre qualificado por motor/resolução, oferta de 50% corretamente excluída. 'Sem placa de vídeo nova' é claim não conferido na landing (o próprio risco admite) e o zoom 1,5× numa fonte de 960px flerta com imagem mole."
+  },
+  {
+   "slug": "resposta-direta/resposta-prazo-cinco-climas",
+   "score": 8,
+   "rationale": "Claim de tempo por imagem ('cada um'), print parado na faixa de cima como prova contínua, sem nomear controle da interface não conferido. Honesto sobre pessoas e enquadramento divergentes; headline curta e sem hype."
+  },
+  {
+   "slug": "resposta-direta/resposta-alteracao-so-a-parede",
+   "score": 9,
+   "rationale": "Par 3040×1408 pixel-alinhado, jargão de máscara/inpaint proibido na arte, 'marcar a área' é a linguagem real da UI, ressalva de origem do espelho. Pequena tensão: o pan mostra a parede do sofá também em cimento enquanto a headline diz 'só a parede'."
+  },
+  {
+   "slug": "fidelidade-tecnica/linhas-de-fuga-forro-caixotado",
+   "score": 6,
+   "rationale": "O corpo é honesto ('acabamento e iluminação são interpretação') e não exibe metadados, mas a variação paga (b) inventa 'às 9h, imagem às 9h07' — número de tempo que os próprios riscos proíbem. Acento verde em duas palavras e 'nenhuma saiu do eixo' condicionado a QA ainda não feito."
+  },
+  {
+   "slug": "fidelidade-tecnica/esquadria-regua-patio",
+   "score": 8.5,
+   "rationale": "'A pergunta certa não é ficou bonito?' é voz de arquiteto sênior pura; contorno traçado no print (nunca no render), limite honesto declarado, plugin corretamente não citado. Verde numa palavra, CTA da lista, alternativas pagas sem número inventado."
+  },
+  {
+   "slug": "fidelidade-tecnica/pisca-fachada-geminada",
+   "score": 6,
+   "rationale": "Corte seco sem transição é o formato mais honesto possível e a copy nomeia o limite (entorno muda). Cai pela variação paga 'Print às 9h, elevação às 9h07' (tempo inventado) e por 'não se mexe' em verde (três palavras, não uma)."
+  },
+  {
+   "slug": "fidelidade-tecnica/zoom-cozinha-cada-peca",
+   "score": 8,
+   "rationale": "Prova objeto a objeto com coordenadas medidas, print com guias amarelas mantido como insumo honesto, 'não é redesenho' restrito a esta imagem. A variação 'antes do almoço' é tolerável mas roça em claim de horário; verde em duas palavras."
+  },
+  {
+   "slug": "spaces-coerencia/spaces-casa-piscina-seis-angulos",
+   "score": 8,
+   "rationale": "Fala de coerência como direção e não garantia, exclui #654/#648 por honestidade, nenhum preço ou nodes na arte. 'Os mesmos materiais' na headline é um pouco forte dado o piso escuro→pedra clara admitido nos riscos."
+  },
+  {
+   "slug": "spaces-coerencia/spaces-quarto-bear-quatro-cameras",
+   "score": 7,
+   "rationale": "Roteiro se limita a 'madeira e luz' e proíbe zoom na lousa com texto gerado; CTA e hashtags corretos. Mas 'Quatro câmeras' com #705 num enquadramento que não é o do print e #718 com urso virando quadro estica a coerência mais do que a legenda confessa."
+  },
+  {
+   "slug": "spaces-coerencia/spaces-cafe-print-por-angulo",
+   "score": 8,
+   "rationale": "Mostrar o print antes de cada vista é a prova mais honesta do pilar; exclui explicitamente os pares em que a câmera não seguiu o print e os relights. Legenda descreve o fluxo real (Vista Mestre) sem 'garantia'; pessoas geradas mantidas em plano aberto."
+  },
+  {
+   "slug": "spaces-coerencia/spaces-atrio-corporativo-anuncio",
+   "score": 4,
+   "rationale": "Gated por modelo de terceiro (família com marca d'água 'designed by fan_1988' e letreiro real), 'DNA' vira jargão de produto na headline, e um Ampliar (#46) é rotulado 'ÂNGULO 01'. Paredes opacas viraram vidro em #585 — antes/depois que não sustenta o argumento de coerência."
+  },
+  {
+   "slug": "animar-video/animar-lareira-fogo-se-move",
+   "score": 8,
+   "rationale": "Corta o clipe antes do sofá inventado, distingue 'fogo se move' de 'lareira acende', não promete vídeo grátis no motor Cinemático nem 4K. Voz seca; LEARN_MORE coerente com o funil honesto."
+  },
+  {
+   "slug": "animar-video/animar-casa-concreto-comecou-print",
+   "score": 7.5,
+   "rationale": "Legenda admite que luz e reflexos são do motor e que só a câmera inicial bate com o print; 'seis segundos' é a duração real. Autoria do modelo profissional não confirmada fica só em risco, não em gate — deveria bloquear."
+  },
+  {
+   "slug": "animar-video/animar-fechamento-apresentacao-piscina",
+   "score": 6,
+   "rationale": "Distingue 'mesma casa' de 'mesmo print' e evita 'aprove mais rápido', mas 'O cliente aprova o que entende' e 'cinco segundos encerram a apresentação' beiram promessa de resultado, e o mesmo footage abre e fecha a peça."
+  },
+  {
+   "slug": "animar-video/animar-atrio-vertical-tres-vistas",
+   "score": 4,
+   "rationale": "Legenda diz 'é isso que o Spaces garante entre ângulos' — claim de garantia que os demais conceitos corretamente evitam — sobre um Space com #585 abrindo paredes em vidro e modelo de terceiro gated. 'Sai vertical direto' sobre um reenquadramento também é escorregadio."
+  },
+  {
+   "slug": "editar-ferramenta/2026-09-04-reel-editar-so-o-piso",
+   "score": 7,
+   "rationale": "Honestidade exemplar (escolheu #760 porque #798 apagou o tapete, crops verificados), mas o card final grava 'spacenode.app' na arte — violação direta de 'não escrever URL na arte'. Lista de materiais ('pedra ou metal') generaliza além do demonstrado."
+  },
+  {
+   "slug": "editar-ferramenta/2026-09-04-reel-editar-parede-quadros-no-lugar",
+   "score": 7,
+   "rationale": "Duas edições paralelas apresentadas como paralelas (nunca 'por cima'), pôsteres com pseudo-texto sem zoom, 'IA' banido. Mesma falha do grupo: URL 'spacenode.app' no card final, proibida pelas diretrizes."
+  },
+  {
+   "slug": "editar-ferramenta/2026-09-04-reel-editar-tres-acabamentos",
+   "score": 6.5,
+   "rationale": "Admite que o passo 1 clareou mesa e marcenaria além do pedido e renomeia o painel para 'claro' em vez de 'MDF' — ótimo. Perde pela URL na arte e pelo passo 2 quase ilegível em celular, que o próprio risco sugere cortar."
+  },
+  {
+   "slug": "editar-ferramenta/2026-09-04-reel-ampliar-zoom-do-cliente",
+   "score": 7,
+   "rationale": "'O dobro' é o único número, verificável; maciez do antes é resolução real sem blur artificial; sem provider. URL na arte reprova pela regra; 'Ampliar de maio/2026' como referência de qualidade atual ainda depende do dono."
+  },
+  {
+   "slug": "plugin-sketchup/plugin-de-dentro-do-sketchup",
+   "score": 6,
+   "rationale": "É o conceito que mais soa como a landing (minúsculas com ponto, 'geometria, sol e lente do modelo vão junto') e lista o que o plugin NÃO faz. Mas está triplamente gated (.rbz não assinado, smoke pendente, origem de #2/#0 não confirmada) e a legenda vira tour de features."
+  },
+  {
+   "slug": "plugin-sketchup/plugin-tres-cenas-um-lote",
+   "score": 5,
+   "rationale": "Prova de lote com #28 em paleta diferente dos outros dois e origem dos renders não confirmada (podem ser individuais) — antes/depois que ainda não sustenta 'lote'. Voz correta, mas o conceito pede regeração antes de existir honestamente."
+  },
+  {
+   "slug": "plugin-sketchup/plugin-arestas-guiam-o-render",
+   "score": 5,
+   "rationale": "O traço branco desenhado à mão ilustra um 'mapa de arestas' que o espectador vai ler como o arquivo do plugin — o próprio roteiro admite que não é. 'Guiam' em vez de 'garantem' é cuidado real, mas gated e com o talude/muro inventado fora do zoom."
+  },
+  {
+   "slug": "plugin-sketchup/plugin-luz-por-onde-o-modelo-diz",
+   "score": 6,
+   "rationale": "Admite que os prints estavam com sombras desligadas e que o claim vale só em 'Preservar original' — honesto e específico. Gated até assinatura/smoke, e 'A luz entra por onde o modelo diz' sobre uma janela que já estava lá é prova fraca."
+  },
+  {
+   "slug": "tradicional-vs/entre-duas-reunioes",
+   "score": 8,
+   "rationale": "'Não é culpa de quem renderiza — é o tamanho da fila' cumpre à risca a regra de nunca desmerecer o renderista; 'em geral' hedgeia o prazo de terceiros; sem horário na arte. Números de mercado ficam fora da peça."
+  },
+  {
+   "slug": "tradicional-vs/briefing-fila-ajuste-semana",
+   "score": 8,
+   "rationale": "Headline nas 8 palavras exatas, crítica ao processo e não à pessoa, exclui #427 por deriva de geometria e proíbe 'mesmas cadeiras'. Antes/depois com md5 idêntico do print — honestidade verificada."
+  },
+  {
+   "slug": "tradicional-vs/o-cliente-pediu-cimento-queimado",
+   "score": 6,
+   "rationale": "Legenda cita 'R$150 a R$600' por imagem terceirizada — dado de mercado sem fonte, o tipo de número que a regra de invenções proíbe mesmo com 'em geral'. 'Isso é outra imagem cobrada' na arte também tangencia o renderista; permissão do apartamento #52 em dúvida."
+  },
+  {
+   "slug": "tradicional-vs/planta-seca-vs-humanizada",
+   "score": 6,
+   "rationale": "Módulo ativo, honesto sobre o estilo imobiliário não preservar cotas e sobre 'sem escala'. Gated por planta-padrão de incorporadora (carimbo visível) — sem permissão registrada não pode ir ao ar."
+  },
+  {
+   "slug": "serie-formato/serie-um-print-cinco-climas-ep01",
+   "score": 8,
+   "rationale": "Texto se limita a 'mesma câmera, mesmo modelo' e proíbe 'só o clima muda'; não descreve interface não conferida; verde numa palavra. Compromisso de cadência semanal é promessa editorial, não de produto — aceitável."
+  },
+  {
+   "slug": "serie-formato/serie-9h-19h-ep01-cafe",
+   "score": 7,
+   "rationale": "Rótulos 9h/19h são leitura da luz, não dado — o roteiro admite e oferece 'manhã/anoitecer'; deveria já adotar. 'Mesmas pessoas, mesma câmera' se sustenta; sem preço, sem 'ilimitado'."
+  },
+  {
+   "slug": "serie-formato/serie-adivinhe-o-antes-ep01-lavabo",
+   "score": 8.5,
+   "rationale": "Mostra o print inteiro sem cortar nada e a legenda declara o limite ('geometria intacta, material interpretado') — é exatamente o antes/depois honesto que a diretriz pede. Sem verde por padrão, rótulo errado do banco ignorado."
+  },
+  {
+   "slug": "serie-formato/serie-tres-antes-das-14h-ep01-sala-de-jantar",
+   "score": 7,
+   "rationale": "Não inventa o pedido do arquiteto (campo vazio no banco) nem tempo total, exclui #433/#427. 'Reunião às 14h' é dispositivo narrativo que leitor pode tomar por medição; pisos mudando entre opções contra 'só trocar o acabamento' fica bem tratado."
+  }
+ ],
+ "top10": [
+  "resposta-direta/resposta-nada-sai-do-lugar-drone",
+  "resposta-direta/resposta-alteracao-so-a-parede",
+  "fidelidade-tecnica/esquadria-regua-patio",
+  "alcance-organico/lavabo-conta-o-que-saiu-do-lugar",
+  "serie-formato/serie-adivinhe-o-antes-ep01-lavabo",
+  "spaces-coerencia/spaces-cafe-print-por-angulo",
+  "resposta-direta/resposta-prazo-cinco-climas",
+  "resposta-direta/resposta-preco-cozinha-lustre",
+  "animar-video/animar-lareira-fogo-se-move",
+  "tradicional-vs/entre-duas-reunioes"
+ ],
+ "notes": "Lente: marca e honestidade (prohibited-content.md + editorial-guidelines.md + CONTEXT). Violações sistêmicas encontradas: (1) os 4 conceitos editar-ferramenta gravam 'spacenode.app' no card final — regra 'não escrever URL na arte'; (2) linhas-de-fuga e pisca-fachada inventam horário ('9h → 9h07') nas variações pagas, contradizendo os próprios riscos e o claim aprovado 'em minutos'; (3) animar-atrio-vertical usa 'garante' para coerência entre vistas; (4) o-cliente-pediu-cimento-queimado cita R$150–600 de terceiros sem fonte; (5) os dois conceitos do átrio e o de planta dependem de modelo/planta de terceiro sem permissão registrada; (6) os 4 de plugin estão corretamente gated (.rbz não assinado, smoke pendente) e não podem ir ao ar hoje, apesar de serem os que melhor reproduzem a linguagem da landing (minúsculas com ponto). Nenhum conceito usou léxico proibido, 'Lumens', Office, módulos desligados, hashtag de hype ou 'IA' como assunto; CTAs todos da lista aprovada; botões só SIGN_UP/LEARN_MORE. Ponto de estilo transversal: fora do grupo plugin, quase nenhum hook segue o padrão 'minúsculas com ponto, duas frases' pedido pelo dono em 04/09 — recomendo normalizar na produção."
+}

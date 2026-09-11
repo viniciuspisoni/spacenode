@@ -1,0 +1,72 @@
+{
+  "slug": "2026-09-08-reel-tutorial-instalar-o-plugin",
+  "reel": "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-08-reel-tutorial-instalar-o-plugin\\2026-09-08-reel-tutorial-instalar-o-plugin.mp4",
+  "banda": "1080×608 @ y=656",
+  "segments": [
+    {
+      "i": 0,
+      "type": "still",
+      "dur": 2.1,
+      "start": 0,
+      "crop": "contain 1078×486 @ y=718"
+    },
+    {
+      "i": 1,
+      "type": "still",
+      "dur": 2.7,
+      "start": 1.8,
+      "crop": "contain 1080×230 @ y=846"
+    },
+    {
+      "i": 2,
+      "type": "still",
+      "dur": 1.8,
+      "start": 4.2,
+      "crop": "contain 666×1180 @ y=370"
+    },
+    {
+      "i": 3,
+      "type": "video",
+      "dur": 3.2,
+      "start": 6,
+      "crop": "1080×1920 4.4s"
+    },
+    {
+      "i": 4,
+      "type": "still",
+      "dur": 1.9,
+      "start": 9.2,
+      "crop": "contain 666×1180 @ y=370"
+    },
+    {
+      "i": 5,
+      "type": "card",
+      "dur": 1.2,
+      "start": 10.8,
+      "crop": null
+    }
+  ],
+  "width": 1080,
+  "height": 1920,
+  "fps": "30/1",
+  "pix_fmt": "yuv420p",
+  "codec": "h264",
+  "duration": "12.00",
+  "sizeMB": "0.93",
+  "esperado": {
+    "width": 1080,
+    "height": 1920,
+    "fps": "30/1",
+    "duration": "12.00"
+  },
+  "qaFrames": [
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-08-reel-tutorial-instalar-o-plugin\\qa-frames\\t1.00s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-08-reel-tutorial-instalar-o-plugin\\qa-frames\\t3.00s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-08-reel-tutorial-instalar-o-plugin\\qa-frames\\t5.20s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-08-reel-tutorial-instalar-o-plugin\\qa-frames\\t7.50s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-08-reel-tutorial-instalar-o-plugin\\qa-frames\\t8.90s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-08-reel-tutorial-instalar-o-plugin\\qa-frames\\t10.20s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-08-reel-tutorial-instalar-o-plugin\\qa-frames\\t11.50s.png"
+  ],
+  "qaSheet": "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-08-reel-tutorial-instalar-o-plugin\\qa-sheet.jpg"
+}

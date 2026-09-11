@@ -1,0 +1,24 @@
+{
+  "slug": "2026-07-29-reel-impacto-casa",
+  "versao": "impacto",
+  "roteiro": "preco",
+  "par": "casa",
+  "banda": "1080×608 @ y=656",
+  "crop": {
+    "antes": "1567×857 → 1524×857",
+    "depois": "2784×1536 → 2731×1536"
+  },
+  "width": 1080,
+  "height": 1920,
+  "fps": "30/1",
+  "pix_fmt": "yuv420p",
+  "codec": "h264",
+  "duration": "8.60",
+  "sizeMB": "3.46",
+  "esperado": {
+    "width": 1080,
+    "height": 1920,
+    "fps": "30/1",
+    "duration": "8.60"
+  }
+}

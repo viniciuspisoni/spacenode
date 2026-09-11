@@ -1,0 +1,197 @@
+{
+ "scores": [
+  {
+   "slug": "alcance-organico/lavabo-conta-o-que-saiu-do-lugar",
+   "score": 9,
+   "rationale": "Gancho é uma instrução ('conta o que saiu do lugar') que obriga o olho a trabalhar, e o loop reinicia no print com a pergunta — rewatch construído na mecânica. 9,5s, imagem 3:4 quase inteira, texto no terço central; único risco é a headline sobre o clay quase preto."
+  },
+  {
+   "slug": "alcance-organico/um-print-cinco-climas",
+   "score": 9,
+   "rationale": "Três imagens diferentes nos 3 primeiros segundos e corte a cada 1,3s seguram até o fim sem som; o corte noite→print branco no loop vira gancho de novo. Faixa 4:3 grande o bastante, texto acima/abaixo da faixa dentro da zona segura."
+  },
+  {
+   "slug": "alcance-organico/print-render-video-piscina",
+   "score": 7,
+   "rationale": "O movimento real (água, push-in) é o maior scroll-stop do lote, mas só chega em 5,6s — os 3 primeiros segundos são still + régua. Loop print→vídeo funciona; 12s é o limite para transformação."
+  },
+  {
+   "slug": "alcance-organico/cozinha-repara-no-lustre",
+   "score": 8,
+   "rationale": "Split 50/50 desde o frame 0 evita o abandono do 'antes' cinza e a instrução 'repara no lustre' cria segunda volta explícita. 4:5 grande, apoio nomeia objetos conferíveis no celular; o lustre acendendo é legível em 6''."
+  },
+  {
+   "slug": "resposta-direta/resposta-nada-sai-do-lugar-drone",
+   "score": 7,
+   "rationale": "Vista de drone é rara no feed e as cantoneiras presas no wipe leem sem som, mas a headline só entra em 2,4s e o card final de 1,5s mata o loop. 11,5s ok para anúncio; orgânico perde um pouco sem gancho verbal cedo."
+  },
+  {
+   "slug": "resposta-direta/resposta-preco-cozinha-lustre",
+   "score": 4,
+   "rationale": "Gancho de preço ('Testar é grátis') não dá motivo de salvar ou compartilhar entre arquitetos e o zoom de 3s no lustre (5–8s) é tempo morto. Texto com R$89 e 80 nodes pesa na tela de celular; 12s com card final sem loop."
+  },
+  {
+   "slug": "resposta-direta/resposta-prazo-cinco-climas",
+   "score": 6,
+   "rationale": "Cortes de 0,6s dão ritmo e a pergunta 'Render pronto?' é relatável, mas duas faixas empilhadas (uma de 500px, outra 4:3) encolhem a casa em 6'' e a headline chega só em 1,8s. Hold longo (5–8,5s) + card final esticam para 13s."
+  },
+  {
+   "slug": "resposta-direta/resposta-alteracao-so-a-parede",
+   "score": 7,
+   "rationale": "Wipe em 0,6s e headline em 1,2s é o gancho mais rápido do lote, e a galeria de quadros é o 'detector' mais legível sem som. Mudança branco→cimento é menos chamativa que SketchUp→render, e pan+zoom+card levam a 12s sem loop."
+  },
+  {
+   "slug": "fidelidade-tecnica/linhas-de-fuga-forro-caixotado",
+   "score": 8,
+   "rationale": "As linhas de fuga são a régua que o arquiteto usaria — alto valor de compartilhar entre colegas e o olho volta para conferir (rewatch). Faixa 1080×651 é média em 6'', e o corte de volta ao print em 5,0s funciona como 'confere' silencioso."
+  },
+  {
+   "slug": "fidelidade-tecnica/esquadria-regua-patio",
+   "score": 7,
+   "rationale": "Contorno hairline + régua lê sem som e a banda 4:5 é grande, mas o gancho verbal ('Esquadria no lugar. Guarda-corpo no lugar.') é menos convidativo que uma instrução ou pergunta. Push a 1,22 ajuda a segurar até o CTA; 11s ok."
+  },
+  {
+   "slug": "fidelidade-tecnica/pisca-fachada-geminada",
+   "score": 9,
+   "rationale": "O pisca acelerado é percebido involuntariamente (borda que não se mexe), segura os 3s e provoca rewatch para 'pegar' o corte; 9s é a duração ideal. Faixa 16:9 de 593px é pequena, mas o device sobrevive ao tamanho; risco de flash de luminância é o único cuidado."
+  },
+  {
+   "slug": "fidelidade-tecnica/zoom-cozinha-cada-peca",
+   "score": 8,
+   "rationale": "Marcadores em cascata + corte seco em 1,2s dão prova objeto a objeto sem som, e o split empilhado dá motivo de salvar (interiores, público mais numeroso). Banda retrato quase full-bleed; 12s um pouco longo para transformação."
+  },
+  {
+   "slug": "spaces-coerencia/spaces-casa-piscina-seis-angulos",
+   "score": 5,
+   "rationale": "Depois do hook, seis panorâmicas em faixa 16:9 com pans lentos de 2,2s cada — pouco contraste entre batidas e imagens pequenas em 6''. 16s com card final é longo para o que o formato entrega; eyebrows 'VISTA 02 · 06' são a única informação nova."
+  },
+  {
+   "slug": "spaces-coerencia/spaces-quarto-bear-quatro-cameras",
+   "score": 8,
+   "rationale": "Full-bleed 9:16 (o melhor formato para Reels) com print→régua→quarto pronto em 2,8s, e os objetos recorrentes (urso, gato, luminária) fazem o espectador conferir sozinho — rewatch natural. 12s e scrim próprio para o texto na zona segura."
+  },
+  {
+   "slug": "spaces-coerencia/spaces-cafe-print-por-angulo",
+   "score": 4,
+   "rationale": "Os 3 primeiros segundos são um render parado com push-in e texto — nenhum evento visual antes de 3,0s. 17,5s de demonstrativo com recapitulação repete imagens já vistas; salva pouco e compartilha menos."
+  },
+  {
+   "slug": "spaces-coerencia/spaces-atrio-corporativo-anuncio",
+   "score": 6,
+   "rationale": "Vídeo vertical nativo nos 3 primeiros segundos para o dedo, e cada still full-bleed entrega algo novo a cada 2s. Público corporativo tem menos alcance orgânico, 15s está no limite e a peça é gated — nota reflete retenção, não publicabilidade."
+  },
+  {
+   "slug": "animar-video/animar-lareira-fogo-se-move",
+   "score": 8,
+   "rationale": "A imagem parada começa a se mexer em 2,6s — o gancho é o próprio movimento, sem depender de texto ou som. Faixa 4:5 bem dimensionada, 9,5s certos; o fogo tremulando é legível em 6''."
+  },
+  {
+   "slug": "animar-video/animar-casa-concreto-comecou-print",
+   "score": 8,
+   "rationale": "Vídeo full-bleed desde o frame 0 com sol estourando em 1,8s e uma headline-pergunta que só o fim responde — retenção até o CTA. Upscale 1,78× pode ficar mole no celular e a volta ao print em faixa 16:9 encolhe; sem loop por causa do card."
+  },
+  {
+   "slug": "animar-video/animar-fechamento-apresentacao-piscina",
+   "score": 5,
+   "rationale": "O mesmo footage de água abre e fecha a peça, e a sequência de 'slides' numerados é didática mas pouco surpreendente. 16s para orgânico é aceitável, mas as batidas de 1,5s em faixa 4:5 têm pouco contraste entre si."
+  },
+  {
+   "slug": "animar-video/animar-atrio-vertical-tres-vistas",
+   "score": 5,
+   "rationale": "Abre em faixa 16:9 pequena (print 0,9s + três stills de 1,2s) e o payoff full-bleed só chega em 4,8s; o vídeo a 0,5× com interpolação pode artefatar nas folhas. 14s ok; gancho verbal de 7 palavras não tira o olho do scroll."
+  },
+  {
+   "slug": "editar-ferramenta/2026-09-04-reel-editar-so-o-piso",
+   "score": 7,
+   "rationale": "Gancho por reconhecimento ('Cliente pediu o piso em madeira') e wipe em 1,5s; concreto→madeira lê bem sem som. Faixa 16:9 cortada de um panorâmico 2,6:1 fica pequena em 6'', e o recorte empilhado é a prova que segura."
+  },
+  {
+   "slug": "editar-ferramenta/2026-09-04-reel-editar-parede-quadros-no-lugar",
+   "score": 6,
+   "rationale": "Primeiro beat forte (galeria de quadros no lugar), mas o segundo (remover espelho, em recorte 4:3) é sutil demais em 6'' e leva a 15s cravados — longo para transformação. Duas revelações diluem o rewatch de uma só."
+  },
+  {
+   "slug": "editar-ferramenta/2026-09-04-reel-editar-tres-acabamentos",
+   "score": 4,
+   "rationale": "Passo 2 (painel greige) é quase invisível em tela de celular e o grid 2×2 de 960×577 vira quatro miniaturas ilegíveis; 17s com eyebrow + chips + payoff é texto demais. O hook 'Aprovado em nogueira' é bom, o resto perde o dedo."
+  },
+  {
+   "slug": "editar-ferramenta/2026-09-04-reel-ampliar-zoom-do-cliente",
+   "score": 3,
+   "rationale": "A diferença de resolução é justamente o que o Instagram destrói na compressão — em 6'' o 'antes' borrado e o 'depois' nítido ficam quase iguais, e o payoff some. Gancho relatável, mas sem prova visível não há motivo de reassistir nem compartilhar."
+  },
+  {
+   "slug": "plugin-sketchup/plugin-de-dentro-do-sketchup",
+   "score": 8,
+   "rationale": "Chama em movimento nos 3 primeiros segundos com 'isto saiu de dentro do SketchUp' é novidade que o usuário de SketchUp compartilha e salva. Recorte 4:5 do vídeo bem dimensionado; 15s está no limite, e o retorno ao mesmo take em 9s repete footage (gated, mas a retenção é boa)."
+  },
+  {
+   "slug": "plugin-sketchup/plugin-tres-cenas-um-lote",
+   "score": 3,
+   "rationale": "Três faixas de 360px de altura são ilegíveis em 6'' e três wipes sequenciais de 3,5s cada repetem o mesmo evento — o segundo e o terceiro já não seguram. 17s para o que é uma ideia de 8s."
+  },
+  {
+   "slug": "plugin-sketchup/plugin-arestas-guiam-o-render",
+   "score": 4,
+   "rationale": "Faixa 2,6:1 de 415px de altura deixa a casa minúscula no celular, e o stroke animado de 2,2s sobre um print branco é gancho lento para feed. Argumento técnico tem valor de compartilhar entre céticos, mas o formato não entrega legibilidade."
+  },
+  {
+   "slug": "plugin-sketchup/plugin-luz-por-onde-o-modelo-diz",
+   "score": 4,
+   "rationale": "Mesma faixa 2,6:1 de 415px — as listras de sol no piso, que são o argumento, ficam pequenas demais em 6''; o reenquadramento 4:5 vem só em 6s. Segundo par em 1,5s é rápido demais para ler o quarto infantil."
+  },
+  {
+   "slug": "tradicional-vs/entre-duas-reunioes",
+   "score": 7,
+   "rationale": "Retrato 1080×1242 grande, wipe em 1,5s e um par de frases que qualquer escritório reconhece — lê sem som. Não tem device de rewatch (só régua + zoom) e o card final de 2,5s quebra o loop; 11s certo."
+  },
+  {
+   "slug": "tradicional-vs/briefing-fila-ajuste-semana",
+   "score": 5,
+   "rationale": "Headline de 8 palavras com dois-pontos sobre um wireframe em 1,4s é leitura demais para o primeiro segundo no celular, embora o wireframe seja visualmente distinto. Quatro acabamentos em cortes secos ajudam, mas a volta a #429 por 4s e o card levam a 16s."
+  },
+  {
+   "slug": "tradicional-vs/o-cliente-pediu-cimento-queimado",
+   "score": 5,
+   "rationale": "Duas headlines de texto antes de qualquer evento visual — o wipe só chega em 3,8s, já depois da janela do gancho. Segundo exemplo em faixa 16:9 pequena e 16s total; a prova dos quadros é boa mas chega tarde."
+  },
+  {
+   "slug": "tradicional-vs/planta-seca-vs-humanizada",
+   "score": 7,
+   "rationale": "Planta CAD preta sobre branco é um scroll-stop por contraste com o feed de renders, e planta humanizada é conteúdo que arquiteto salva. Rótulos de ~13px exigem o zoom 1,18 para ler em 6''; sem device de rewatch, card final, 12s ok."
+  },
+  {
+   "slug": "serie-formato/serie-um-print-cinco-climas-ep01",
+   "score": 8,
+   "rationale": "Mesma mecânica vencedora do 'cinco climas' (três imagens em 3s, cortes no beat) com rótulos de clima que reforçam leitura sem som e formato de série que traz retorno. Perde meio ponto para o original pela faixa menor (675px) e pelo eyebrow a mais na tela; é quase duplicata."
+  },
+  {
+   "slug": "serie-formato/serie-9h-19h-ep01-cafe",
+   "score": 8,
+   "rationale": "Quadrado 1080×1080 ocupa bem a tela, as mesmas pessoas nas mesmas cadeiras com luz oposta é um 'como assim?' que pede segunda olhada, e o ping-pong em 6–7s entrega o rewatch dentro da peça. Wipe em 2,5s está no limite da janela do gancho."
+  },
+  {
+   "slug": "serie-formato/serie-adivinhe-o-antes-ep01-lavabo",
+   "score": 7,
+   "rationale": "Pergunta com resposta no fim eleva conclusão e comentários, mas 5s de render parado com uma hairline enchendo antes da revelação é tempo arriscado no feed. 4:5 grande e corte seco de volta são bons; a versão 'conta o que saiu do lugar' resolve o mesmo com evento mais cedo."
+  },
+  {
+   "slug": "serie-formato/serie-tres-antes-das-14h-ep01-sala-de-jantar",
+   "score": 7,
+   "rationale": "Print → wipe em 1,4s → segunda opção em 3,6s mantém ritmo e o recap em cortes de 0,4s dá um mini-rewatch interno. Retrato 1080×1221 legível; rótulos numerados leem sem som; sem loop por causa do card final."
+  }
+ ],
+ "top10": [
+  "fidelidade-tecnica/pisca-fachada-geminada",
+  "alcance-organico/lavabo-conta-o-que-saiu-do-lugar",
+  "alcance-organico/um-print-cinco-climas",
+  "alcance-organico/cozinha-repara-no-lustre",
+  "spaces-coerencia/spaces-quarto-bear-quatro-cameras",
+  "animar-video/animar-casa-concreto-comecou-print",
+  "animar-video/animar-lareira-fogo-se-move",
+  "serie-formato/serie-9h-19h-ep01-cafe",
+  "fidelidade-tecnica/zoom-cozinha-cada-peca",
+  "fidelidade-tecnica/linhas-de-fuga-forro-caixotado"
+ ],
+ "notes": "Lente: retenção orgânica no Instagram (gancho em 3s, motivo de reassistir/salvar/compartilhar entre arquitetos, som off, duração por formato, texto na zona segura e legível em 6''). Padrões que separaram os melhores dos piores: (1) evento visual antes de 3s — pisca, régua em ≤1,5s ou movimento real — bate qualquer headline; peças que abrem com texto sobre imagem parada (cafe-print-por-angulo, cliente-pediu-cimento, adivinhe-o-antes) perdem a janela. (2) Device de rewatch embutido (instrução 'conta/repara', pisca, ping-pong, loop sem card final) vale mais que um segundo exemplo. (3) Tamanho da imagem em 6'': full-bleed 9:16, 4:5 e retratos inteiros vencem; faixas 2,6:1 de 415px (plugin arestas/luz) e três faixas de 360px (plugin lote) são ilegíveis no celular e derrubaram essas peças mesmo com bons argumentos. (4) Provas que a compressão do Instagram apaga (Ampliar, painel greige do passo 2 dos três acabamentos, espelho removido em 4:3) não seguram. (5) Duração: 9–12s para transformação foi o sweet spot; 15–17s só se cada 2s trouxer imagem nova, o que quase nenhum demonstrativo cumpriu. plugin-de-dentro-do-sketchup ficou com 8 pela retenção mas fora do top 10 por ser quase empatado e gated; serie-um-print-cinco-climas é quase duplicata do 'um-print-cinco-climas' e por isso não entrou junto. Notas não consideram publicabilidade (gated/direitos), só retenção."
+}

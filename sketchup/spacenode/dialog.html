@@ -5,7 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SPACENODE</title>
   <style>
-    /* Tokens — espelho exato de app/globals.css (dark). Não inventar valores. */
+    /* ═══════════════════════════════════════════════════════════════════════
+       SPACENODE 1.0 — material de vidro
+       Tokens de cor: espelho exato de app/globals.css (não inventar valores).
+       Sobre eles, uma camada de vidro: superfícies translúcidas que borram o
+       que passa por trás, com brilho especular na borda de cima e sombra na
+       de baixo. O painel ganha um fundo ambiente (o próprio render, borrado)
+       — sem nada atrás, vidro é só uma cor chapada.
+       ═════════════════════════════════════════════════════════════════════ */
     @font-face {
       font-family: 'Geist';
       src: url('assets/geist-latin.woff2') format('woff2');
@@ -42,18 +49,38 @@
       --warning: #d4a327;
       --shadow-sm: 0 2px 8px rgba(0,0,0,0.22);
       --shadow-md: 0 8px 24px rgba(0,0,0,0.32);
-      /* Tokens que o painel usava como cor fixa e viravam bloco preto no claro */
-      --text-4: #3a3a3c;                    /* --color-text-quaternary */
-      --preview-bg: #101010;                /* --color-preview-bg */
-      --scrollbar: rgba(255,255,255,0.14);  /* --color-scrollbar */
-      --chip-active-fg-dim: rgba(10,10,10,0.6); /* subtítulo sobre chip ativo */
-      /* Constantes entre temas: véus sobre imagem (regra do design system —
-         scrim é sempre escuro porque a imagem embaixo não segue o tema). */
+      --text-4: #3a3a3c;
+      --preview-bg: #101010;
+      --scrollbar: rgba(255,255,255,0.14);
+      --chip-active-fg-dim: rgba(10,10,10,0.6);
+      /* Véus sobre imagem: sempre escuros — a imagem embaixo não segue o tema. */
       --scrim: rgba(0,0,0,0.55);
       --scrim-strong: rgba(0,0,0,0.75);
+
+      /* ── Vidro ──────────────────────────────────────────────────────────
+         --glass        superfície padrão (cartões, linhas, folhas)
+         --glass-strong superfície que precisa segurar leitura (chrome fixo)
+         --glass-line   borda do vidro
+         --glass-spec   brilho especular na aresta de cima
+         --glass-shade  sombra interna na aresta de baixo
+         --ambient-*    intensidade do papel de parede que fica atrás   */
+      --glass: rgba(30,30,32,0.55);
+      --glass-strong: rgba(22,22,24,0.72);
+      --glass-raised: rgba(58,58,62,0.55);
+      --glass-line: rgba(255,255,255,0.11);
+      --glass-line-strong: rgba(255,255,255,0.20);
+      --glass-spec: rgba(255,255,255,0.18);
+      --glass-shade: rgba(0,0,0,0.28);
+      --glass-blur: 24px;
+      --ambient-opacity: 0.55;
+      --ambient-veil: rgba(10,10,10,0.62);
+      --shadow-float: 0 10px 34px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.30);
+      --shadow-sheet: 0 -18px 60px rgba(0,0,0,0.55);
+      /* Curva de mola da Apple: sai rápido, chega devagar, sem overshoot. */
+      --ease: cubic-bezier(0.32, 0.72, 0, 1);
+      --r-card: 18px;
+      --r-inner: 12px;
     }
-    /* Tema claro — espelho EXATO de html.light em app/globals.css. Não
-       inventar valores: se o app mudar, mudar aqui junto. */
     html.light {
       color-scheme: light;
       --bg: #fafafa;
@@ -88,7 +115,20 @@
       --preview-bg: #e9e9e7;
       --scrollbar: rgba(0,0,0,0.18);
       --chip-active-fg-dim: rgba(250,250,250,0.65);
+
+      --glass: rgba(255,255,255,0.62);
+      --glass-strong: rgba(250,250,250,0.80);
+      --glass-raised: rgba(255,255,255,0.92);
+      --glass-line: rgba(0,0,0,0.08);
+      --glass-line-strong: rgba(0,0,0,0.16);
+      --glass-spec: rgba(255,255,255,0.90);
+      --glass-shade: rgba(0,0,0,0.05);
+      --ambient-opacity: 0.42;
+      --ambient-veil: rgba(250,250,250,0.66);
+      --shadow-float: 0 10px 30px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06);
+      --shadow-sheet: 0 -18px 50px rgba(0,0,0,0.16);
     }
+
     * { box-sizing: border-box; }
     html, body { height: 100%; }
     body {
@@ -102,79 +142,143 @@
       overflow: hidden;
       -webkit-font-smoothing: antialiased;
     }
-    button, input, textarea { font: inherit; letter-spacing: inherit; color: inherit; }
+    button, input, textarea, select { font: inherit; letter-spacing: inherit; color: inherit; }
     button { border: 0; background: none; cursor: pointer; padding: 0; }
     button:disabled { cursor: default; }
-    :focus-visible { outline: 1.5px solid var(--border-focus); outline-offset: 2px; border-radius: 6px; }
+    :focus-visible { outline: 1.5px solid var(--border-focus); outline-offset: 2px; border-radius: 8px; }
 
-    .shell { height: 100vh; display: grid; grid-template-rows: auto 1fr auto auto; }
+    /* ── Fundo ambiente ──────────────────────────────────────────────────
+       O render (ou a captura) vira papel de parede borrado: é o que dá o
+       que refratar ao vidro e faz o painel assumir a paleta do projeto.
+       Sem imagem, um degradê neutro segura o mesmo papel.                */
+    .ambient { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+    .ambient::before {
+      content: ''; position: absolute; inset: -20%;
+      background:
+        radial-gradient(60% 50% at 20% 0%, rgba(120,140,180,0.20), transparent 70%),
+        radial-gradient(50% 40% at 90% 20%, rgba(180,140,120,0.16), transparent 70%);
+    }
+    #ambientImage {
+      position: absolute; inset: -25%; width: 150%; height: 150%;
+      object-fit: cover; opacity: 0; transform: scale(1.1);
+      filter: blur(48px) saturate(1.7);
+      transition: opacity 900ms var(--ease);
+    }
+    #ambientImage.is-visible { opacity: var(--ambient-opacity); }
+    .ambient::after {
+      content: ''; position: absolute; inset: 0;
+      background: var(--ambient-veil);
+    }
+    /* Sem backdrop-filter (CEF antigo) o vidro vira superfície sólida e o
+       papel de parede sai de cena — legibilidade acima do efeito. */
+    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+      #ambientImage { display: none; }
+      :root { --glass: #141416; --glass-strong: #0e0e10; --glass-raised: #2a2a2e; }
+      html.light { --glass: #ffffff; --glass-strong: #fbfbfd; --glass-raised: #ffffff; }
+    }
+
+    /* ── Material ─────────────────────────────────────────────────────────
+       .glass  = translúcido + borrão + aresta especular. Tudo que flutua no
+       painel usa esta classe (chrome, cartões, folhas, botões).           */
+    .glass {
+      background: var(--glass);
+      -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+      backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+      border: 0.5px solid var(--glass-line);
+      box-shadow: inset 0 0.5px 0 var(--glass-spec), inset 0 -0.5px 0 var(--glass-shade);
+    }
+    .glass--chrome {
+      background: var(--glass-strong);
+      -webkit-backdrop-filter: blur(30px) saturate(190%);
+      backdrop-filter: blur(30px) saturate(190%);
+    }
+
+    /* ── Casca ────────────────────────────────────────────────────────────
+       O conteúdo rola POR BAIXO do chrome de vidro (topo e dock fixos) —
+       é o que faz o material aparecer: sempre há algo passando atrás.     */
+    .scroll {
+      position: absolute; inset: 0; z-index: 1;
+      overflow-y: auto; overflow-x: hidden;
+      padding: 60px 14px 116px;
+    }
+    .scroll::-webkit-scrollbar { width: 8px; }
+    .scroll::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 999px; }
+    .scroll::-webkit-scrollbar-track { background: transparent; }
 
     header {
-      display: flex; align-items: center; justify-content: space-between; gap: 10px;
-      padding: 13px 16px 12px;
-      border-bottom: 0.5px solid var(--border);
+      position: fixed; top: 0; left: 0; right: 0; z-index: 40;
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      height: 52px; padding: 0 14px;
+      border-width: 0 0 0.5px;
     }
-    .brand { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; letter-spacing: -0.02em; }
-    .brand svg { width: 21px; height: 21px; }
+    .brand { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 550; letter-spacing: -0.02em; }
+    .brand svg { width: 20px; height: 20px; }
+    .header-actions { display: flex; align-items: center; gap: 6px; }
+
     .balance {
-      display: none; align-items: center; gap: 7px;
-      padding: 6px 10px; border-radius: 999px;
-      background: var(--chip); border: 0.5px solid var(--border-strong);
+      display: none; align-items: center; gap: 6px;
+      height: 28px; padding: 0 4px 0 10px; border-radius: 999px;
+      background: var(--glass-raised);
+      border: 0.5px solid var(--glass-line);
+      box-shadow: inset 0 0.5px 0 var(--glass-spec);
     }
     .balance.is-visible { display: inline-flex; }
     .balance .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green-glow); }
     .balance b { font-size: 12px; font-weight: 650; font-variant-numeric: tabular-nums; }
     .balance span { font-size: 11px; color: var(--text-3); }
-    .balance a { font-size: 11px; color: var(--text-3); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
-    .balance a:hover { color: var(--text-2); }
-
-    /* CEF 112 não tem scrollbar-width/scrollbar-color (Chromium 121+) —
-       estilo via ::-webkit-scrollbar, que cobre todas as versões alvo. */
-    main { overflow-y: auto; padding: 14px 16px 20px; }
-    main::-webkit-scrollbar { width: 8px; }
-    main::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 999px; }
-    main::-webkit-scrollbar-track { background: transparent; }
-
-    /* ── Conexão ── */
-    .connection {
-      display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px;
-      padding: 10px 12px; border: 0.5px solid var(--border); border-radius: 12px;
-      background: var(--surface-subtle); margin-bottom: 12px;
+    .balance a {
+      font-size: 11px; color: var(--text-2); cursor: pointer;
+      height: 22px; display: inline-flex; align-items: center; padding: 0 8px;
+      border-radius: 999px; background: var(--chip);
     }
-    .conn-status { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 12px; font-weight: 520; }
-    .conn-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-3); flex: 0 0 7px; }
-    .conn-dot.is-on { background: var(--green); box-shadow: 0 0 10px var(--green-glow); }
-    .conn-sub { margin-top: 2px; color: var(--text-3); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .conn-actions { display: flex; gap: 6px; }
+    .balance a:hover { background: var(--chip-hover); color: var(--text); }
 
-    .ghost {
-      height: 30px; padding: 0 12px; border-radius: 9px;
-      background: var(--bg-elevated); color: var(--text-2);
-      border: 0.5px solid var(--border-strong); font-size: 12px;
+    /* Botão de ícone — o vidro dos botões: cápsula translúcida com aresta
+       especular; ao pressionar, encolhe e o brilho sobe (efeito de lente). */
+    .icon-btn {
+      width: 30px; height: 30px; border-radius: 999px;
+      display: inline-flex; align-items: center; justify-content: center;
+      color: var(--text-2);
+      background: var(--glass-raised);
+      border: 0.5px solid var(--glass-line);
+      box-shadow: inset 0 0.5px 0 var(--glass-spec);
+      transition: transform 180ms var(--ease), background 180ms var(--ease), color 180ms var(--ease);
     }
-    .ghost:hover:not(:disabled) { background: var(--surface-hover); color: var(--text); }
-    .ghost:disabled { opacity: 0.4; }
+    .icon-btn svg { width: 15px; height: 15px; }
+    .icon-btn:hover:not(:disabled) { color: var(--text); background: var(--chip-hover); }
+    .icon-btn:active:not(:disabled) { transform: scale(0.9); }
+    .icon-btn:disabled { opacity: 0.4; }
+    .icon-btn.is-on { color: var(--text); border-color: var(--glass-line-strong); }
 
-    /* ── Preview ── */
+    /* ── Palco: o preview ────────────────────────────────────────────────── */
+    .stage { margin-bottom: 10px; }
+    /* Palco vazio (sem captura e sem render): o quadro 4/3 ocupava 620 px dos
+       780 do painel e empurrava TODA a configuração pra fora da primeira
+       tela. Vazio ele é uma faixa; cresce quando tem o que mostrar. */
+    .stage.is-empty .preview { aspect-ratio: auto; height: 108px; }
+    .stage.is-empty .empty-preview { padding: 12px; gap: 3px; }
+    .stage.is-empty .empty-preview svg { width: 20px; height: 20px; margin-bottom: 0; }
     .preview {
       position: relative; width: 100%; aspect-ratio: 4 / 3;
-      border-radius: 12px; overflow: hidden; background: var(--preview-bg);
-      border: 0.5px solid var(--border); margin-bottom: 8px;
+      border-radius: var(--r-card); overflow: hidden;
+      background: var(--preview-bg);
+      border: 0.5px solid var(--glass-line);
+      box-shadow: var(--shadow-float), inset 0 0.5px 0 var(--glass-spec);
     }
     .preview img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: none; }
     .preview img.is-visible { display: block; }
     .empty-preview {
       position: absolute; inset: 0; display: flex; flex-direction: column;
       align-items: center; justify-content: center; gap: 6px;
-      color: var(--text-3); font-size: 12px; text-align: center; padding: 20px;
+      color: var(--text-3); font-size: 12px; text-align: center; padding: 22px;
     }
-    /* Comparador antes/depois: resultado por baixo, captura recortada por cima. */
+    .empty-preview svg { width: 26px; height: 26px; opacity: 0.5; margin-bottom: 2px; }
     .compare-clip { position: absolute; inset: 0; overflow: hidden; display: none; }
     .compare-clip img { display: block; position: absolute; top: 0; left: 0; }
     .preview.is-comparing .compare-clip { display: block; }
     .compare-handle {
-      position: absolute; top: 0; bottom: 0; width: 1.5px; background: rgba(255,255,255,0.85);
-      display: none; pointer-events: none; box-shadow: 0 0 8px rgba(0,0,0,0.6);
+      position: absolute; top: 0; bottom: 0; width: 1.5px; background: rgba(255,255,255,0.9);
+      display: none; pointer-events: none; box-shadow: 0 0 10px rgba(0,0,0,0.7);
     }
     .preview.is-comparing .compare-handle { display: block; }
     .compare-range {
@@ -183,176 +287,396 @@
     }
     .preview.is-comparing .compare-range { display: block; }
     .preview-tag {
-      position: absolute; top: 8px; padding: 3px 8px; border-radius: 6px;
-      background: var(--scrim); color: #f5f5f7; /* sobre imagem: sempre claro no escuro */
-      font-size: 9px; font-weight: 600; letter-spacing: 0.17em; text-transform: uppercase;
+      position: absolute; top: 9px; padding: 3px 9px; border-radius: 999px;
+      background: rgba(0,0,0,0.45);
+      -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+      border: 0.5px solid rgba(255,255,255,0.16);
+      color: #f5f5f7;
+      font-size: 9px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase;
       display: none; pointer-events: none;
     }
     .preview.is-comparing .preview-tag { display: block; }
-    #tagBefore { left: 8px; }
-    #tagAfter { right: 8px; }
+    #tagBefore { left: 9px; }
+    #tagAfter { right: 9px; }
     .preview-overlay {
       position: absolute; inset: 0; display: none; flex-direction: column;
       align-items: center; justify-content: center; gap: 12px;
-      background: var(--scrim-strong); backdrop-filter: blur(4px);
+      background: var(--scrim-strong);
+      -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
     }
     .preview-overlay.is-visible { display: flex; }
     .constellation { width: 34px; height: 34px; animation: pulse 2.2s ease-in-out infinite; }
     @keyframes pulse { 0%,100% { opacity: 0.35 } 50% { opacity: 1 } }
-    @media (prefers-reduced-motion: reduce) { .constellation { animation: none; } * { transition: none !important; } }
-    /* Sobre o véu escuro a cor NÃO segue o tema (senão some no claro). */
     .overlay-text { font-size: 12px; color: #a1a1a6; }
     .overlay-elapsed { font-size: 11px; color: #6e6e73; font-variant-numeric: tabular-nums; }
-    .overlay-cancel { font-size: 11px; color: #6e6e73; text-decoration: underline; text-underline-offset: 2px; }
-    .overlay-cancel:hover { color: #a1a1a6; }
+    .overlay-cancel {
+      font-size: 11px; color: #d0d0d2; height: 26px; padding: 0 12px; border-radius: 999px;
+      background: rgba(255,255,255,0.10); border: 0.5px solid rgba(255,255,255,0.18);
+    }
+    .overlay-cancel:hover { background: rgba(255,255,255,0.18); color: #fff; }
+    /* Guias de composição sobre a captura. */
+    .guides { position: absolute; inset: 0; display: none; pointer-events: none; }
+    .preview.has-guides .guides { display: block; }
+    .guides line.halo { stroke: rgba(0,0,0,0.35); stroke-width: 0.6; }
+    .guides line.line { stroke: rgba(255,255,255,0.55); stroke-width: 0.3; }
 
-    .preview-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 2px; }
-    .preview-actions .ghost { flex: 1; min-width: 110px; }
+    /* Barra de ferramentas: o que se usa ENQUADRANDO (nivelar, guias, sol,
+       espelho, virar cena) mora aqui, a um toque, e não dentro das folhas. */
+    .tools {
+      display: flex; gap: 3px; padding: 4px; border-radius: 999px; margin-top: 8px;
+      box-shadow: inset 0 0.5px 0 var(--glass-spec), var(--shadow-sm);
+    }
+    .tool {
+      flex: 1; min-width: 0; height: 44px; border-radius: 999px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+      color: var(--text-2); font-size: 9.5px; font-weight: 500; letter-spacing: -0.005em;
+      border: 0.5px solid transparent;
+      transition: transform 180ms var(--ease), background 180ms var(--ease), color 180ms var(--ease);
+    }
+    .tool svg { width: 16px; height: 16px; flex: 0 0 16px; }
+    .tool span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tool:hover:not(:disabled):not(.is-on) { background: var(--chip-hover); color: var(--text); }
+    .tool:active:not(:disabled) { transform: scale(0.94); }
+    .tool.is-on {
+      background: var(--glass-raised); color: var(--text);
+      border-color: var(--glass-line);
+      box-shadow: inset 0 0.5px 0 var(--glass-spec), 0 1px 4px rgba(0,0,0,0.18);
+    }
+    .tool:disabled { opacity: 0.35; }
+    /* A barra sozinha não se explica: "Nivelar" e "Guias" não dizem o que
+       fazem com a captura. Esta linha conta — no hover, o que aquele botão
+       faz; no clique, o que passou a valer; parada, o estado atual. */
+    .tools-hint {
+      margin: 7px 2px 0; min-height: 15px;
+      font-size: 11px; line-height: 1.35; color: var(--text-3);
+      transition: color 180ms var(--ease);
+    }
+    .tools-hint.is-tip { color: var(--text-2); }
+    .tools-hint.is-action { cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+    .tools-hint.is-action:hover { color: var(--text-2); }
 
-    /* ── Seções ── */
-    .section { border-top: 0.5px solid var(--border); padding-top: 13px; margin-top: 13px; }
-    .section-label {
-      display: block; margin-bottom: 9px;
-      font-size: 10px; font-weight: 600; letter-spacing: 0.17em; text-transform: uppercase;
+    /* Barra de ações flutuante sobre o palco. */
+    .stage-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+    .stage-actions .ghost { flex: 1; min-width: 104px; }
+
+    /* ── Botões de vidro ─────────────────────────────────────────────────── */
+    .ghost {
+      height: 32px; padding: 0 14px; border-radius: 999px;
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      color: var(--text); font-size: 12px; font-weight: 500;
+      background: var(--glass-raised);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      backdrop-filter: blur(20px) saturate(180%);
+      border: 0.5px solid var(--glass-line);
+      box-shadow: inset 0 0.5px 0 var(--glass-spec), 0 1px 3px rgba(0,0,0,0.10);
+      transition: transform 180ms var(--ease), background 180ms var(--ease), box-shadow 180ms var(--ease);
+    }
+    .ghost:hover:not(:disabled) {
+      background: var(--chip-hover);
+      box-shadow: inset 0 0.5px 0 var(--glass-spec), 0 3px 10px rgba(0,0,0,0.14);
+    }
+    .ghost:active:not(:disabled) { transform: scale(0.96); }
+    .ghost:disabled { opacity: 0.38; }
+    .ghost.is-active { background: var(--chip-active); color: var(--chip-active-fg); border-color: transparent; }
+
+    /* ── Controle segmentado (abas) ───────────────────────────────────────
+       Cápsula de vidro com um polegar que desliza. O polegar é um elemento
+       real (translate + width em JS) — dá o movimento contínuo da Apple.  */
+    .tabs {
+      position: sticky; top: 60px; z-index: 25;
+      display: flex; padding: 3px; border-radius: 999px; margin-bottom: 12px;
+      box-shadow: inset 0 0.5px 0 var(--glass-spec), var(--shadow-sm);
+    }
+    .tabs-track { position: relative; display: flex; width: 100%; }
+    .seg-thumb {
+      position: absolute; top: 0; left: 0; height: 100%; width: 0;
+      border-radius: 999px; background: var(--glass-raised);
+      border: 0.5px solid var(--glass-line);
+      box-shadow: inset 0 0.5px 0 var(--glass-spec), 0 1px 4px rgba(0,0,0,0.18);
+      transition: transform 380ms var(--ease), width 380ms var(--ease);
+      pointer-events: none;
+    }
+    .seg {
+      position: relative; z-index: 1; flex: 1;
+      height: 28px; border-radius: 999px;
+      font-size: 12px; font-weight: 500; color: var(--text-3);
+      transition: color 200ms var(--ease);
+      white-space: nowrap;
+    }
+    .seg.is-active { color: var(--text); font-weight: 600; }
+    .seg:disabled { opacity: 0.35; }
+
+    .tabpanel { display: none; }
+    .tabpanel.is-active { display: block; animation: fade 260ms var(--ease); }
+    @keyframes fade { from { opacity: 0; transform: translateY(4px) } to { opacity: 1; transform: none } }
+
+    /* ── Lista de ajustes (linhas que abrem folhas) ──────────────────────── */
+    .group {
+      border-radius: var(--r-card); overflow: hidden; margin-bottom: 12px;
+    }
+    .group-label {
+      display: block; margin: 0 0 7px 4px;
+      font-size: 10px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase;
       color: var(--text-3);
     }
+    .row {
+      display: flex; align-items: center; gap: 10px; width: 100%;
+      padding: 12px 13px; text-align: left;
+      border-bottom: 0.5px solid var(--glass-line);
+      transition: background 160ms var(--ease);
+    }
+    .row:last-child { border-bottom: 0; }
+    .row:hover:not(:disabled) { background: var(--chip-hover); }
+    .row:active:not(:disabled) { background: var(--chip-active-press, var(--chip-hover)); }
+    .row:disabled { opacity: 0.45; }
+    .row .row-ico { width: 16px; height: 16px; flex: 0 0 16px; color: var(--text-2); }
+    .row .row-title { font-size: 13px; font-weight: 500; flex: 0 0 auto; }
+    .row .row-value {
+      margin-left: auto; color: var(--text-3); font-size: 12px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right;
+    }
+    .row .chev { flex: 0 0 auto; color: var(--text-4); width: 7px; height: 12px; }
+
+    /* ── Estilo do projeto ───────────────────────────────────────────────── */
+    .style-card { border-radius: var(--r-card); padding: 13px; margin-bottom: 12px; }
+    .style-head { display: flex; align-items: center; gap: 10px; }
+    .style-thumb {
+      width: 38px; height: 38px; border-radius: 10px; flex: 0 0 38px;
+      object-fit: cover; background: var(--preview-bg);
+      border: 0.5px solid var(--glass-line); display: none;
+    }
+    .style-thumb.is-visible { display: block; }
+    .style-mark {
+      width: 38px; height: 38px; border-radius: 10px; flex: 0 0 38px;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--chip); color: var(--text-3);
+      border: 0.5px solid var(--glass-line);
+    }
+    .style-mark svg { width: 17px; height: 17px; }
+    .style-card.is-locked .style-mark { color: var(--green); background: var(--green-bg); border-color: var(--green-border); }
+    .style-texts { min-width: 0; flex: 1; }
+    .style-title { font-size: 13px; font-weight: 560; display: flex; align-items: center; gap: 6px; }
+    .style-seed {
+      font-size: 9.5px; font-weight: 600; letter-spacing: 0.06em;
+      color: var(--text-3); background: var(--chip); border-radius: 5px; padding: 1px 5px;
+      font-variant-numeric: tabular-nums; display: none;
+    }
+    .style-card.is-locked .style-seed { display: inline-block; }
+    .style-sub { font-size: 11px; color: var(--text-3); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .style-actions { display: flex; gap: 6px; margin-top: 11px; }
+    .style-actions .ghost { flex: 1; height: 30px; font-size: 11.5px; padding: 0 10px; }
+
+    /* ── Folhas (sheets) ─────────────────────────────────────────────────── */
+    .scrim {
+      position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,0.42);
+      opacity: 0; pointer-events: none; transition: opacity 320ms var(--ease);
+    }
+    .scrim.is-open { opacity: 1; pointer-events: auto; }
+    .sheet {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 61;
+      max-height: 82vh; display: flex; flex-direction: column;
+      border-radius: 22px 22px 0 0;
+      border-width: 0.5px 0 0;
+      box-shadow: var(--shadow-sheet), inset 0 0.5px 0 var(--glass-spec);
+      transform: translateY(101%);
+      transition: transform 420ms var(--ease);
+      visibility: hidden;
+    }
+    .sheet.is-open { transform: translateY(0); visibility: visible; }
+    .sheet-grabber {
+      width: 34px; height: 4px; border-radius: 999px; background: var(--glass-line-strong);
+      margin: 7px auto 0; flex: 0 0 auto;
+    }
+    .sheet-head {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      padding: 9px 14px 10px; flex: 0 0 auto;
+    }
+    .sheet-title { font-size: 15px; font-weight: 600; letter-spacing: -0.02em; }
+    .sheet-done { height: 28px; padding: 0 13px; border-radius: 999px; font-size: 12px; font-weight: 560; background: var(--chip); }
+    .sheet-done:hover { background: var(--chip-hover); }
+    .sheet-body { overflow-y: auto; padding: 0 14px 18px; }
+    .sheet-body::-webkit-scrollbar { width: 8px; }
+    .sheet-body::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 999px; }
+    .field { margin-bottom: 16px; }
+    .field:last-child { margin-bottom: 4px; }
+    .field-label {
+      display: block; margin-bottom: 8px;
+      font-size: 10px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase;
+      color: var(--text-3);
+    }
+    .field-hint { margin-top: 7px; font-size: 11px; color: var(--text-3); }
+
+    /* ── Chips e cartões de escolha ──────────────────────────────────────── */
     .pills { display: flex; flex-wrap: wrap; gap: 6px; }
     .pill {
-      padding: 6px 13px; border-radius: 999px;
-      border: 0.5px solid var(--border-strong); background: var(--chip);
-      color: var(--text-2); font-size: 11px; letter-spacing: -0.005em;
-      transition: transform 150ms ease, background 150ms ease;
+      padding: 7px 13px; border-radius: 999px;
+      color: var(--text-2); font-size: 11.5px; letter-spacing: -0.005em;
+      background: var(--chip);
+      border: 0.5px solid var(--glass-line);
+      box-shadow: inset 0 0.5px 0 var(--glass-spec);
+      transition: transform 180ms var(--ease), background 180ms var(--ease), color 180ms var(--ease);
     }
-    .pill:hover:not(.is-active):not(:disabled) { background: var(--chip-hover); transform: translateY(-1px); }
-    .pill.is-active { background: var(--chip-active); color: var(--chip-active-fg); font-weight: 560; box-shadow: var(--shadow-sm); }
-    .pill:disabled { opacity: 0.45; }
+    .pill:hover:not(.is-active):not(:disabled) { background: var(--chip-hover); color: var(--text); }
+    .pill:active:not(:disabled) { transform: scale(0.95); }
+    .pill.is-active {
+      background: var(--chip-active); color: var(--chip-active-fg); font-weight: 560;
+      border-color: transparent; box-shadow: 0 2px 8px rgba(0,0,0,0.20);
+    }
+    .pill:disabled { opacity: 0.42; }
 
     .cards { display: grid; gap: 7px; }
     .cards.cols-2 { grid-template-columns: 1fr 1fr; }
     .cards.cols-3 { grid-template-columns: repeat(3, 1fr); }
     .card {
-      border-radius: 12px; padding: 11px 9px; text-align: center;
-      border: 0.5px solid var(--border-strong);
-      background: linear-gradient(180deg, var(--surface), var(--surface-subtle));
-      transition: transform 150ms ease;
+      border-radius: var(--r-inner); padding: 11px 9px; text-align: center;
+      background: var(--chip);
+      border: 0.5px solid var(--glass-line);
+      box-shadow: inset 0 0.5px 0 var(--glass-spec);
+      transition: transform 180ms var(--ease), background 180ms var(--ease);
     }
-    .card:hover:not(.is-active):not(:disabled) { transform: translateY(-1px); background: var(--surface-hover); }
-    .card.is-active { background: var(--chip-active); color: var(--chip-active-fg); box-shadow: var(--shadow-sm); }
-    .card b { display: block; font-size: 11px; font-weight: 560; }
+    .card:hover:not(.is-active):not(:disabled) { background: var(--chip-hover); }
+    .card:active:not(:disabled) { transform: scale(0.97); }
+    .card.is-active {
+      background: var(--chip-active); color: var(--chip-active-fg);
+      border-color: transparent; box-shadow: 0 2px 10px rgba(0,0,0,0.22);
+    }
+    .card b { display: block; font-size: 11.5px; font-weight: 560; }
     .card span { display: block; margin-top: 3px; font-size: 10px; color: var(--text-3); }
     .card.is-active span { color: var(--chip-active-fg-dim); }
     .card:disabled { opacity: 0.45; }
 
     textarea {
-      width: 100%; min-height: 74px; resize: vertical;
-      padding: 10px 12px; border-radius: 10px;
-      border: 0.5px solid var(--border-strong); background: var(--input); color: var(--text);
-      font-size: 12px; outline: none;
+      width: 100%; min-height: 76px; resize: vertical;
+      padding: 11px 13px; border-radius: var(--r-inner);
+      border: 0.5px solid var(--glass-line);
+      background: var(--input); color: var(--text);
+      font-size: 12.5px; outline: none;
+      box-shadow: inset 0 0.5px 0 var(--glass-spec);
+      transition: border-color 180ms var(--ease);
     }
     textarea:focus { border-color: var(--border-focus); }
-    .hint { margin-top: 6px; font-size: 10px; color: var(--text-3); }
+    .hint { margin-top: 7px; font-size: 11px; color: var(--text-3); }
 
-    details { border-top: 0.5px solid var(--border); margin-top: 13px; }
-    details summary {
-      list-style: none; cursor: pointer; padding: 13px 0 0;
-      font-size: 10px; font-weight: 600; letter-spacing: 0.17em; text-transform: uppercase; color: var(--text-3);
-      display: flex; align-items: center; justify-content: space-between;
-    }
-    details summary::-webkit-details-marker { display: none; }
-    details summary::after { content: '+'; font-size: 13px; color: var(--text-3); }
-    details[open] summary::after { content: '–'; }
-    details .details-body { padding-top: 11px; }
-
-    /* ── CTA ── */
-    .cta {
-      width: 100%; height: 44px; margin-top: 15px;
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 0 15px; border-radius: 12px;
-      background: var(--inverse); color: var(--inverse-fg);
-      font-size: 13px; font-weight: 650; box-shadow: var(--shadow-md);
-      transition: opacity 150ms ease, transform 150ms ease;
-    }
-    .cta:hover:not(:disabled) { opacity: 0.88; }
-    .cta:active:not(:disabled) { transform: scale(0.985); }
-    .cta:disabled { opacity: 0.38; }
-    .cta .meta { font-size: 11px; font-weight: 500; opacity: 0.65; font-variant-numeric: tabular-nums; }
-    .reach { margin-top: 8px; font-size: 11px; color: var(--text-3); text-align: center; }
-
-    /* ── Dock: o botão Gerar mora numa barra fixa acima do rodapé — antes
-       ficava abaixo de 10 seções e cada render exigia rolar até o fim. ── */
+    /* ── Dock ─────────────────────────────────────────────────────────────
+       O botão de gerar mora numa barra fixa: nunca some no scroll.        */
     .dock {
-      padding: 10px 16px 8px; border-top: 0.5px solid var(--border);
-      background: var(--bg); box-shadow: 0 -8px 20px rgba(0,0,0,0.06);
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+      padding: 10px 14px 12px;
+      border-width: 0.5px 0 0;
     }
-    .dock .cta { margin-top: 0; }
-    .dock .reach { margin-top: 6px; }
-    .dock .insufficient { margin: 0 0 10px; }
     .dock-summary {
-      display: block; width: 100%; margin: 0 0 8px; text-align: left;
+      display: flex; align-items: center; gap: 6px; width: 100%; margin: 0 0 8px;
       font-size: 11px; color: var(--text-3); letter-spacing: -0.005em;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .dock-summary:hover { color: var(--text-2); }
     .dock-summary:empty { display: none; }
+    .dock-summary::before {
+      content: ''; width: 5px; height: 5px; border-radius: 50%; flex: 0 0 auto;
+      background: var(--green); box-shadow: 0 0 8px var(--green-glow); display: none;
+    }
+    .dock-summary.is-locked::before { display: block; }
+    .cta {
+      width: 100%; height: 46px;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 18px; border-radius: 999px;
+      background: var(--inverse); color: var(--inverse-fg);
+      font-size: 13.5px; font-weight: 650;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.28), inset 0 0.5px 0 rgba(255,255,255,0.30);
+      transition: opacity 180ms var(--ease), transform 180ms var(--ease);
+    }
+    .cta:hover:not(:disabled) { opacity: 0.90; }
+    .cta:active:not(:disabled) { transform: scale(0.975); }
+    .cta:disabled { opacity: 0.34; }
+    .cta .meta { font-size: 11.5px; font-weight: 500; opacity: 0.62; font-variant-numeric: tabular-nums; }
     .cta-right { display: inline-flex; align-items: center; gap: 8px; }
     .kbd {
       font: inherit; font-size: 9.5px; font-weight: 500; opacity: 0.45;
-      border: 0.5px solid currentColor; border-radius: 4px; padding: 1px 5px;
+      border: 0.5px solid currentColor; border-radius: 5px; padding: 1px 5px;
       letter-spacing: 0.02em;
     }
+    .reach { margin-top: 7px; font-size: 11px; color: var(--text-3); text-align: center; }
+    /* O CTA do dock é o da ABA ATIVA — um botão preto por vez. Antes o
+       "Gerar render" ficava fixo e ativo mesmo em Editar/Animar/Cenas: três
+       pretos na mesma tela, cada um gerando (e cobrando) coisa diferente. */
+    .dock-cta > .cta { display: none; }
+    .dock-cta > .cta.is-current { display: flex; }
+    .dock-cta > .cta--sheet { height: 46px; font-size: 13.5px; margin-top: 0; }
+    /* Dock auxiliar (Editar/Animar): resumo, alcance e aviso de saldo falam
+       do custo do RENDER — ao lado do botão de outra ação viram legenda errada. */
+    .dock.is-aux .dock-summary, .dock.is-aux .reach, .dock.is-aux .insufficient { display: none !important; }
+    .dock.is-batch .reach { display: none; }
+    /* Criar Space é o passo seguinte do caderno, não um segundo botão
+       principal: perde o preto e vira ação secundária de largura total. */
+    #spaceButton { width: 100%; height: 36px; justify-content: space-between; margin-top: 14px; }
+    #spaceButton .meta { font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+    .cta--sheet { height: 40px; font-size: 12.5px; margin-top: 14px; }
 
-    /* ── Notice / erro ── */
+    /* ── Avisos ──────────────────────────────────────────────────────────── */
     .notice {
-      display: none; margin-top: 12px; padding: 11px 12px; border-radius: 12px;
-      border: 0.5px solid var(--border); background: var(--surface);
+      display: none; margin-top: 12px; padding: 11px 13px; border-radius: var(--r-inner);
+      border: 0.5px solid var(--glass-line);
+      background: var(--glass);
+      -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
       color: var(--text-2); font-size: 12px; overflow-wrap: anywhere;
     }
     .notice.is-error { display: block; color: var(--error); border-color: var(--error-border); background: var(--error-bg); }
     .notice.is-success { display: block; color: var(--text); border-color: var(--green-border); background: var(--green-bg); }
     .notice.is-warn { display: block; color: var(--text); border-color: var(--border-strong); background: var(--surface); }
-    .material-row.is-unsupported { opacity: 0.5; }
-    /* Animar: o painel NÃO reproduz vídeo (CEF sem H.264) — pôster + ações. */
-    .video-card { margin: 8px 0; }
-    .video-poster-wrap { position: relative; min-height: 96px; border-radius: 8px; overflow: hidden; background: var(--preview-bg); }
-    #videoPoster { width: 100%; display: block; filter: brightness(0.85); }
-    .video-play {
-      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-      font-size: 28px; color: #f5f5f7; text-shadow: 0 1px 6px rgba(0,0,0,0.5); pointer-events: none;
-    }
-    .video-caption { font-size: 11px; margin: 6px 0 4px; color: var(--text-2); }
     .notice .notice-action { margin-top: 8px; }
     .notice .notice-action button { font-size: 12px; color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
 
     .insufficient {
-      display: none; margin-top: 12px; padding: 13px 14px; border-radius: 12px;
-      border: 0.5px solid var(--border-strong); background: var(--surface-subtle);
+      display: none; margin-top: 12px; padding: 13px 14px; border-radius: var(--r-inner);
+      border: 0.5px solid var(--glass-line); background: var(--glass);
+      -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
     }
     .insufficient.is-visible { display: block; }
     .insufficient b { display: block; font-size: 12.5px; font-weight: 600; }
     .insufficient .math { margin-top: 3px; font-size: 11px; color: var(--text-3); }
     .insufficient .buy {
-      margin-top: 10px; width: 100%; height: 34px; border-radius: 9px;
+      margin-top: 10px; width: 100%; height: 34px; border-radius: 999px;
       background: var(--inverse); color: var(--inverse-fg); font-size: 12px; font-weight: 600;
     }
     .insufficient .alt { margin-top: 8px; font-size: 11px; color: var(--text-3); text-align: center; }
     .insufficient .alt button { color: var(--text-2); text-decoration: underline; text-underline-offset: 2px; font-size: 11px; }
+    .dock .insufficient { margin: 0 0 10px; }
 
-    /* ── Resultado ── */
-    .result-actions { display: none; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 8px; }
+    /* ── Conexão ─────────────────────────────────────────────────────────── */
+    .connection {
+      display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px;
+      padding: 12px 13px; border-radius: var(--r-card); margin-bottom: 12px;
+    }
+    .conn-status { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 12.5px; font-weight: 520; }
+    .conn-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-3); flex: 0 0 7px; }
+    .conn-dot.is-on { background: var(--green); box-shadow: 0 0 10px var(--green-glow); }
+    .conn-sub { margin-top: 2px; color: var(--text-3); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .conn-actions { display: flex; gap: 6px; }
+    .conn-actions .ghost { height: 30px; font-size: 11.5px; padding: 0 12px; }
+
+    /* ── Resultado / histórico / lote ────────────────────────────────────── */
+    .result-actions { display: none; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
     .result-actions.is-visible { display: grid; }
-    .result-actions .ghost { height: 34px; }
+    .result-actions .ghost { height: 30px; font-size: 11.5px; padding: 0 10px; }
+    /* O atalho "Animar este render" virou ABA — mantê-lo aqui seria a mesma
+       ação duas vezes na mesma tela. O JS acima ainda o liga/desliga
+       conforme há resultado; quem manda no que aparece é esta regra. */
+    #animarShortcutButton { display: none !important; }
+    /* Depois do render eram oito pílulas brancas idênticas empilhadas antes
+       de qualquer outra coisa. Ficam duas à vista; o resto abre num toque. */
+    .result-more { display: none; grid-column: 1 / -1; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .result-more.is-open { display: grid; }
 
-    /* ── Histórico ── */
     .history-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
     .history-grid img {
-      width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px;
-      border: 0.5px solid var(--border); cursor: pointer; display: block; background: var(--preview-bg);
+      width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px;
+      border: 0.5px solid var(--glass-line); cursor: pointer; display: block; background: var(--preview-bg);
+      transition: transform 200ms var(--ease);
     }
-    .history-grid img:hover { border-color: var(--border-focus); }
-    .history-more { margin-top: 8px; width: 100%; height: 30px; }
-    .history-empty { font-size: 11px; color: var(--text-3); }
+    .history-grid img:hover { transform: scale(1.03); border-color: var(--border-focus); }
+    .history-more { margin-top: 8px; width: 100%; }
+    .history-empty { font-size: 11.5px; color: var(--text-3); }
 
-    /* ── Máscara de edição por área ── */
     .mask-canvas {
       position: absolute; inset: 0; width: 100%; height: 100%;
       display: none; cursor: crosshair; touch-action: none; z-index: 3;
@@ -361,20 +685,23 @@
     .preview.is-masking { cursor: crosshair; }
     .mask-tools { display: flex; gap: 6px; margin-top: 10px; }
     .mask-tools .ghost { flex: 1; }
-    #maskToggle.is-active { background: var(--chip-active); color: var(--chip-active-fg); border-color: var(--chip-active); }
+    #maskToggle.is-active { background: var(--chip-active); color: var(--chip-active-fg); border-color: transparent; }
     .mask-hint {
-      position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: 4;
-      text-align: center; font-size: 10px; color: #f5f5f7;
-      background: var(--scrim); border-radius: 6px; padding: 4px 8px;
+      position: absolute; left: 9px; right: 9px; bottom: 9px; z-index: 4;
+      text-align: center; font-size: 10.5px; color: #f5f5f7;
+      background: rgba(0,0,0,0.5);
+      -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+      border-radius: 999px; padding: 5px 10px;
       pointer-events: none; display: none;
     }
     .preview.is-masking .mask-hint { display: block; }
 
-    /* ── Cenas em lote / materiais ── */
-    .scenes-count { letter-spacing: 0; text-transform: none; font-weight: 500; }
-    .cta--batch { margin-top: 12px; height: 38px; font-size: 12px; }
-    .batch-note { margin-top: 7px; font-size: 10px; color: var(--text-3); }
-    .batch-progress { margin-top: 10px; display: flex; flex-direction: column; gap: 4px; }
+    .scenes-count { letter-spacing: 0; text-transform: none; font-weight: 500; color: var(--text-3); font-size: 11px; }
+    .batch-note { margin-top: 8px; font-size: 10.5px; color: var(--text-3); }
+    .batch-actions { display: none; gap: 6px; margin-top: 10px; }
+    .batch-actions.is-visible { display: flex; flex-wrap: wrap; }
+    .batch-actions .ghost { flex: 1; min-width: 120px; height: 32px; font-size: 11.5px; }
+    .batch-progress { margin-top: 10px; display: flex; flex-direction: column; gap: 5px; }
     .batch-row { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--text-2); }
     .batch-row .st { width: 6px; height: 6px; border-radius: 50%; background: var(--text-3); flex: 0 0 6px; }
     .batch-row.is-done .st { background: var(--green); }
@@ -382,28 +709,45 @@
     .batch-row.is-active .st { background: var(--warning); }
     .batch-row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .batch-row .msg { color: var(--text-3); font-size: 10.5px; margin-left: auto; }
-    .material-row { display: grid; grid-template-columns: 1fr 150px; gap: 7px; align-items: center; margin-bottom: 6px; }
+
+    .material-row { display: grid; grid-template-columns: 1fr 148px; gap: 7px; align-items: center; margin-bottom: 6px; }
     .material-row .mname { font-size: 11.5px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .material-row select {
-      height: 30px; border-radius: 8px; font-size: 11px;
+      height: 30px; border-radius: 9px; font-size: 11px;
       background: var(--input); color: var(--text);
-      border: 0.5px solid var(--border-strong); outline: none; padding: 0 6px;
+      border: 0.5px solid var(--glass-line); outline: none; padding: 0 6px;
     }
     .material-row select:focus { border-color: var(--border-focus); }
+    .material-row.is-unsupported { opacity: 0.5; }
 
-    /* ── Configurações ── */
-    .settings-field label { display: block; margin-bottom: 6px; font-size: 11px; color: var(--text-3); }
+    /* Animar: o painel NÃO reproduz vídeo (CEF sem H.264) — pôster + ações. */
+    .video-card { margin: 10px 0; }
+    .video-poster-wrap { position: relative; min-height: 96px; border-radius: var(--r-inner); overflow: hidden; background: var(--preview-bg); }
+    #videoPoster { width: 100%; display: block; filter: brightness(0.85); }
+    .video-play {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      font-size: 28px; color: #f5f5f7; text-shadow: 0 1px 6px rgba(0,0,0,0.5); pointer-events: none;
+    }
+    .video-caption { font-size: 11px; margin: 7px 0 4px; color: var(--text-2); }
+
+    .settings-field label { display: block; margin-bottom: 7px; font-size: 11px; color: var(--text-3); }
     .settings-field input {
-      width: 100%; height: 34px; padding: 0 11px; border-radius: 9px;
-      border: 0.5px solid var(--border-strong); background: var(--input); font-size: 12px; outline: none;
+      width: 100%; height: 34px; padding: 0 12px; border-radius: 10px;
+      border: 0.5px solid var(--glass-line); background: var(--input); font-size: 12px; outline: none;
     }
     .settings-field input:focus { border-color: var(--border-focus); }
-    .settings-row { display: flex; gap: 6px; margin-top: 8px; }
+    .settings-row { display: flex; gap: 6px; margin-top: 10px; }
 
+    /* Rodapé: linha de estado dentro do dock (etapa da geração, versão). */
     footer {
-      min-height: 30px; border-top: 0.5px solid var(--border);
-      color: var(--text-3); font-size: 11px; padding: 8px 16px;
+      display: block; margin-top: 5px;
+      color: var(--text-3); font-size: 10px; text-align: center;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .constellation { animation: none; }
+      * { transition: none !important; animation: none !important; }
     }
   </style>
   <script>
@@ -418,51 +762,72 @@
   </script>
 </head>
 <body>
-  <div class="shell">
-    <header>
-      <div class="brand">
-        <svg viewBox="0 0 64 64" aria-hidden="true">
-          <g stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none">
-            <line x1="16" y1="16" x2="16" y2="48"/><line x1="16" y1="16" x2="48" y2="48"/><line x1="48" y1="16" x2="48" y2="48"/>
-          </g>
-          <g fill="currentColor">
-            <circle cx="16" cy="16" r="3"/><circle cx="16" cy="48" r="3"/><circle cx="48" cy="48" r="3"/><circle cx="48" cy="16" r="3"/>
-          </g>
-        </svg>
-        <span>spacenode</span>
-      </div>
+  <!-- Papel de parede: o render atual, borrado. É o que o vidro refrata. -->
+  <div class="ambient" aria-hidden="true"><img id="ambientImage" alt=""></div>
+
+  <header class="glass glass--chrome">
+    <div class="brand">
+      <svg viewBox="0 0 64 64" aria-hidden="true">
+        <g stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none">
+          <line x1="16" y1="16" x2="16" y2="48"/><line x1="16" y1="16" x2="48" y2="48"/><line x1="48" y1="16" x2="48" y2="48"/>
+        </g>
+        <g fill="currentColor">
+          <circle cx="16" cy="16" r="3"/><circle cx="16" cy="48" r="3"/><circle cx="48" cy="48" r="3"/><circle cx="48" cy="16" r="3"/>
+        </g>
+      </svg>
+      <span>spacenode</span>
+    </div>
+    <div class="header-actions">
       <div class="balance" id="balanceChip">
         <span class="dot"></span><b id="balanceValue">–</b><span>nodes</span><a id="balanceRecharge">Recarregar</a>
       </div>
-    </header>
+      <button class="icon-btn" id="themeToggle" type="button" title="Tema" aria-label="Tema"></button>
+      <button class="icon-btn" id="historyOpen" type="button" title="Histórico" aria-label="Histórico">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>
+        </svg>
+      </button>
+      <button class="icon-btn" id="settingsOpen" type="button" title="Preferências" aria-label="Preferências">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+          <path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/>
+        </svg>
+      </button>
+    </div>
+  </header>
 
-    <main id="main">
-      <section class="connection">
-        <div>
-          <div class="conn-status"><span class="conn-dot" id="connDot"></span><span id="connTitle">Desconectado</span></div>
-          <div class="conn-sub" id="connSub" aria-live="polite">Conecte sua conta SPACENODE</div>
-        </div>
-        <div class="conn-actions">
-          <button class="ghost" id="disconnectButton" style="display:none" title="Sair da conta"><span id='signOutLabel'>Sair</span></button>
-          <button class="ghost" id="connectButton">Conectar</button>
-        </div>
-      </section>
-
-      <div class="insufficient" id="pairingBox">
-        <b id="pairingTitle">Conecte no navegador</b>
-        <div class="math" id="pairingHint">Confirme este código na página que abriu:</div>
-        <div id="pairingCode" style="margin-top:10px;text-align:center;font-size:26px;font-weight:650;letter-spacing:0.22em"></div>
-        <div class="alt" style="margin-top:10px">
-          <button id="pairingReopen">abrir o navegador de novo</button>
-          <span style="color:var(--text-4)"> · </span>
-          <button id="pairingCancel">cancelar</button>
-        </div>
+  <div class="scroll" id="scroll">
+    <!-- Conexão: mora aqui enquanto está desconectado; conectado, o JS move
+         pra folha de Preferências (o painel fica com o render, não com um
+         cabeçalho de conta). -->
+    <section class="connection glass" id="connection">
+      <div>
+        <div class="conn-status"><span class="conn-dot" id="connDot"></span><span id="connTitle">Desconectado</span></div>
+        <div class="conn-sub" id="connSub" aria-live="polite">Conecte sua conta SPACENODE</div>
       </div>
+      <div class="conn-actions">
+        <button class="ghost" id="disconnectButton" style="display:none" title="Sair da conta"><span id="signOutLabel">Sair</span></button>
+        <button class="ghost" id="connectButton">Conectar</button>
+      </div>
+    </section>
 
+    <div class="insufficient" id="pairingBox">
+      <b id="pairingTitle">Conecte no navegador</b>
+      <div class="math" id="pairingHint">Confirme este código na página que abriu:</div>
+      <div id="pairingCode" style="margin-top:10px;text-align:center;font-size:26px;font-weight:650;letter-spacing:0.22em"></div>
+      <div class="alt" style="margin-top:10px">
+        <button id="pairingReopen">abrir o navegador de novo</button>
+        <span style="color:var(--text-4)"> · </span>
+        <button id="pairingCancel">cancelar</button>
+      </div>
+    </div>
+
+    <!-- ── Palco ────────────────────────────────────────────────────────── -->
+    <div class="stage">
       <div class="preview" id="preview">
         <img id="resultImage" alt="Render SPACENODE">
         <div class="compare-clip" id="compareClip"><img id="captureCompareImage" alt=""></div>
         <img id="captureImage" alt="Vista capturada">
+        <svg class="guides" id="guidesSvg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
         <div class="compare-handle" id="compareHandle"></div>
         <span class="preview-tag" id="tagBefore">Antes</span>
         <span class="preview-tag" id="tagAfter">Depois</span>
@@ -470,6 +835,9 @@
         <canvas class="mask-canvas" id="maskCanvas"></canvas>
         <div class="mask-hint" id="maskHint">Pinte sobre a área a editar</div>
         <div class="empty-preview" id="emptyPreview">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 16.5V7.5l9-4.5 9 4.5v9l-9 4.5-9-4.5Z"/><path d="M3 7.5l9 4.5 9-4.5M12 12v9"/>
+          </svg>
           <span>A vista atual do SketchUp vira o seu render.</span>
           <span style="font-size:11px">Capture pra conferir o enquadramento — ou clique em Gerar direto.</span>
         </div>
@@ -488,19 +856,56 @@
         </div>
       </div>
 
-      <div class="preview-actions">
+      <div class="tools glass" id="quickTools" role="toolbar" aria-label="Ferramentas da vista">
+        <button class="tool" type="button" id="toolLevel">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M7 4v16M17 4v16"/><path d="M3.5 12h2M18.5 12h2"/>
+          </svg>
+          <span id="toolLevelLabel">Nivelar</span>
+        </button>
+        <button class="tool" type="button" id="toolGuides">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+            <rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M9.2 4.5v15M14.8 4.5v15M3.5 9.5h17M3.5 14.5h17"/>
+          </svg>
+          <span id="toolGuidesLabel">Guias</span>
+        </button>
+        <button class="tool" type="button" id="toolSun">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="3.6"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.5 5.5l1.4 1.4M17.1 17.1l1.4 1.4M18.5 5.5l-1.4 1.4M6.9 17.1l-1.4 1.4"/>
+          </svg>
+          <span id="toolSunLabel">Sol</span>
+        </button>
+        <button class="tool" type="button" id="toolMirror">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="5.5" y="3.5" width="13" height="17" rx="4"/><path d="M9 16.5L15.5 8M12.5 17.5l3-4"/>
+          </svg>
+          <span id="toolMirrorLabel">Espelho</span>
+        </button>
+        <button class="tool" type="button" id="toolScene">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M20.5 13.5V7.5a2 2 0 0 0-2-2h-13a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h8"/><path d="M3.5 14l4-3.5 3.5 3"/><path d="M17.5 15.5v5M15 18h5"/>
+          </svg>
+          <span id="toolSceneLabel">Nova cena</span>
+        </button>
+      </div>
+      <div class="tools-hint" id="toolsHint" aria-live="polite"></div>
+
+      <div class="stage-actions">
         <button class="ghost" id="captureButton">Capturar vista</button>
         <button class="ghost" id="compareButton" style="display:none">Comparar antes/depois</button>
       </div>
 
       <div class="result-actions" id="resultActions">
         <button class="ghost" id="downloadButton">Baixar imagem</button>
-        <button class="ghost" id="openResultButton">Abrir no site</button>
-        <button class="ghost" id="upscale2xButton">Ampliar 2x</button>
-        <button class="ghost" id="upscale4xButton">Ampliar 4x</button>
-        <button class="ghost" id="animarShortcutButton" style="grid-column:1 / -1;display:none">Animar este render</button>
-        <button class="ghost" id="variationButton" style="grid-column:1 / -1">Gerar variação deste render</button>
-        <button class="ghost" id="restoreCameraButton" style="display:none;grid-column:1 / -1">Voltar à vista deste render</button>
+        <button class="ghost" id="resultMoreToggle">Mais ações</button>
+        <div class="result-more" id="resultMore">
+          <button class="ghost" id="openResultButton">Abrir no site</button>
+          <button class="ghost" id="upscale2xButton">Ampliar 2x</button>
+          <button class="ghost" id="upscale4xButton">Ampliar 4x</button>
+          <button class="ghost" id="animarShortcutButton" style="grid-column:1 / -1;display:none">Animar este render</button>
+          <button class="ghost" id="variationButton" style="grid-column:1 / -1">Gerar variação deste render</button>
+          <button class="ghost" id="restoreCameraButton" style="display:none;grid-column:1 / -1">Voltar à vista deste render</button>
+        </div>
       </div>
 
       <div class="video-card" id="videoCard" style="display:none">
@@ -514,198 +919,374 @@
         </div>
         <div class="hint" id="videoHint"></div>
       </div>
-
-      <details id="editSection" style="display:none">
-        <summary id="L_edit">Editar este render</summary>
-        <div class="details-body">
-          <div class="pills" id="editActionPills" role="radiogroup" aria-label="Tipo de edição"></div>
-          <div class="mask-tools">
-            <button class="ghost" id="maskToggle">Selecionar área</button>
-            <button class="ghost" id="maskClear" style="display:none">Limpar seleção</button>
-          </div>
-          <textarea id="editInstruction" style="margin-top:10px;min-height:60px" placeholder="Ex.: trocar o piso por carvalho claro / remover o pendente sobre a bancada"></textarea>
-          <div id="editMaterialRow" style="display:none;margin-top:8px" class="material-row">
-            <span class="mname">Amostra do modelo (opcional)</span>
-            <select id="editMaterialSelect"></select>
-          </div>
-          <button class="cta cta--batch" id="editButton" disabled>
-            <span id="editLabel">Aplicar edição</span>
-            <span class="meta" id="editMeta"></span>
-          </button>
-          <div class="batch-note">Só a alteração pedida muda — todo o resto do render é preservado. Edição recusada pelo controle de qualidade não é cobrada.</div>
-        </div>
-      </details>
-
-      <details id="animarSection" style="display:none">
-        <summary id="L_animar">Animar este render</summary>
-        <div class="details-body">
-          <div class="hint" id="L_animarType">Tipo de vídeo</div>
-          <div class="pills" id="animarTypePills" role="radiogroup" aria-label="Tipo de vídeo"></div>
-          <div class="hint" id="animarTypeHint" style="margin:4px 0 8px"></div>
-          <div class="hint" id="L_animarQuality">Qualidade</div>
-          <div class="pills" id="animarEnginePills" role="radiogroup" aria-label="Qualidade"></div>
-          <div class="hint" id="L_animarDuration" style="margin-top:6px">Duração</div>
-          <div class="pills" id="animarDurationPills" role="radiogroup" aria-label="Duração"></div>
-          <div class="batch-note" id="animarRatioNote" style="display:none"></div>
-          <button class="cta cta--batch" id="animarButton" disabled>
-            <span id="animarLabel">Animar este render</span>
-            <span class="meta" id="animarMeta"></span>
-          </button>
-          <div class="batch-note" id="animarNote"></div>
-          <div class="insufficient" id="animarInsufficient">
-            <b id="animarInsufficientTitle"></b>
-            <div class="math" id="animarInsufficientMath"></div>
-            <button class="buy" id="animarInsufficientBuy">ver planos</button>
-            <div class="alt" id="animarInsufficientAlt"></div>
-          </div>
-        </div>
-      </details>
-
-      <details id="scenesSection">
-        <summary><span id="L_scenes">Cenas do modelo</span> <span class="scenes-count" id="scenesCount"></span></summary>
-        <div class="details-body">
-          <div class="pills" id="scenesPills"></div>
-          <div class="history-empty" id="scenesEmpty" style="display:none">Crie cenas no SketchUp pra gerar o caderno inteiro de uma vez.</div>
-          <button class="cta cta--batch" id="batchButton" disabled>
-            <span id="batchLabel">Gerar cenas</span>
-            <span class="meta" id="batchMeta"></span>
-          </button>
-          <div class="batch-note" id="batchNote">Todas as cenas com os mesmos presets e a mesma semente — coerência de material e estilo no conjunto.</div>
-          <div class="batch-progress" id="batchProgress"></div>
-          <div class="history-grid" id="batchResults" style="margin-top:8px"></div>
-        </div>
-      </details>
-
-      <details id="spaceSection">
-        <summary id="L_space">Criar Space das cenas</summary>
-        <div class="details-body">
-          <div class="hint" style="margin:0 0 8px">A vista atual vira a identidade do projeto (DNA); as cenas selecionadas acima viram vistas coerentes entre si.</div>
-          <div class="settings-field">
-            <label for="spaceName">Nome do Space</label>
-            <input id="spaceName" spellcheck="false" maxlength="80" placeholder="Nome do projeto">
-          </div>
-          <div class="pills" id="spaceCategoryPills" role="radiogroup" aria-label="Categoria" style="margin-top:8px"></div>
-          <button class="cta cta--batch" id="spaceButton" disabled>
-            <span id="spaceLabel">Criar Space</span>
-            <span class="meta" id="spaceMeta"></span>
-          </button>
-          <div class="batch-note" id="spaceNote"></div>
-          <div class="batch-progress" id="spaceProgress"></div>
-          <div class="history-grid" id="spaceResults" style="margin-top:8px"></div>
-          <button class="ghost history-more" id="openSpaceButton" style="display:none">Abrir o Space no site</button>
-        </div>
-      </details>
-
-      <section class="section">
-        <span class="section-label" id="L_projectType">Tipo de projeto</span>
-        <div class="cards cols-2" id="projectTypeCards" role="radiogroup" aria-label="Tipo de projeto"></div>
-      </section>
-
-      <section class="section">
-        <span class="section-label" id="L_segment">Segmento</span>
-        <div class="pills" id="segmentPills" role="radiogroup" aria-label="Segmento"></div>
-      </section>
-
-      <section class="section">
-        <span class="section-label" id="L_environment">Espaço</span>
-        <div class="pills" id="environmentPills" role="radiogroup" aria-label="Espaço"></div>
-      </section>
-
-      <section class="section">
-        <span class="section-label" id="L_lighting">Iluminação</span>
-        <div class="pills" id="lightingPills" role="radiogroup" aria-label="Iluminação"></div>
-      </section>
-
-      <section class="section">
-        <span class="section-label" id="backgroundLabel">Contexto visual</span>
-        <div class="pills" id="backgroundPills" role="radiogroup" aria-label="Contexto"></div>
-      </section>
-
-      <section class="section">
-        <span class="section-label" id="L_sun">Sol na captura</span>
-        <div class="pills" id="sunPills" role="radiogroup" aria-label="Sol na captura"></div>
-        <div class="hint">Usa o sol real do modelo (data, hora e localização) — as sombras da captura guiam a luz do render.</div>
-      </section>
-
-      <section class="section">
-        <span class="section-label" id="L_description">Descrição <span style="letter-spacing:0;text-transform:none;font-weight:500">· opcional</span></span>
-        <textarea id="prompt" placeholder="Direções específicas — ex.: piso de madeira clara, paredes off-white, decoração minimalista"></textarea>
-        <div class="hint">O que você não pedir aqui é preservado do jeito que está no modelo.</div>
-      </section>
-
-      <details id="advanced">
-        <summary id="L_advanced">Avançado</summary>
-        <div class="details-body">
-          <span class="section-label" id="L_elements">Elementos na cena</span>
-          <div class="pills" id="elementsPills" aria-label="Elementos na cena"></div>
-          <div id="modelMaterialsBlock" style="display:none;margin-top:14px">
-            <span class="section-label" id="L_modelMaterials">Materiais do modelo</span>
-            <div class="hint" style="margin:0 0 8px">Use as texturas reais do seu modelo como referência de material (até 4).</div>
-            <div id="materialsList"></div>
-          </div>
-        </div>
-      </details>
-
-      <section class="section">
-        <span class="section-label" id="L_engine">Motor de IA</span>
-        <div class="cards cols-3" id="engineCards" role="radiogroup" aria-label="Motor"></div>
-      </section>
-
-      <section class="section">
-        <span class="section-label" id="L_resolution">Qualidade de saída</span>
-        <div class="cards cols-3" id="resolutionCards" role="radiogroup" aria-label="Qualidade"></div>
-      </section>
-
-      <div class="notice" id="notice" role="status" aria-live="polite"></div>
-
-      <details id="historySection">
-        <summary id="L_history">Histórico</summary>
-        <div class="details-body">
-          <div class="history-grid" id="historyGrid"></div>
-          <div class="history-empty" id="historyEmpty" style="display:none">Seus renders aparecem aqui.</div>
-          <button class="ghost history-more" id="historyMore" style="display:none">Carregar mais</button>
-        </div>
-      </details>
-
-      <details id="settingsSection">
-        <summary id="L_settings">Preferências</summary>
-        <div class="details-body">
-          <div class="settings-field">
-            <label id="L_theme">Tema</label>
-            <div class="pills" id="themePills" role="radiogroup" aria-label="Tema"></div>
-            <div class="hint" id="themeHint" style="margin:6px 0 10px">Automático segue a preferência da sua conta SPACENODE — ou, sem ela, o tema do sistema.</div>
-            <label id="L_language">Idioma</label>
-            <div class="pills" id="languagePills" role="radiogroup" aria-label="Idioma" style="margin-bottom:10px"></div>
-            <label id="L_videoSave">Vídeos</label>
-            <div class="pills" id="videoSavePills" role="radiogroup" aria-label="Vídeos" style="margin-bottom:10px"></div>
-            <label for="apiBaseUrl" id="L_server">Servidor</label>
-            <input id="apiBaseUrl" spellcheck="false">
-          </div>
-          <div class="settings-row">
-            <button class="ghost" id="saveSettingsButton" style="flex:1">Salvar</button>
-          </div>
-        </div>
-      </details>
-    </main>
-
-    <div class="dock" id="dock">
-      <button class="dock-summary" id="dockSummary" type="button" title="Ir para a configuração"></button>
-      <div class="insufficient" id="insufficient">
-        <b id="insufficientTitle">Faltam nodes pra gerar</b>
-        <div class="math" id="insufficientMath"></div>
-        <button class="buy" id="insufficientBuy">ver planos</button>
-        <div class="alt" id="insufficientAlt"></div>
-      </div>
-      <button class="cta" id="generateButton" disabled title="Ctrl+Enter">
-        <span id="generateLabel">Gerar render</span>
-        <span class="cta-right"><span class="meta" id="generateMeta"></span><kbd class="kbd" id="generateKbd">Ctrl+Enter</kbd></span>
-      </button>
-      <div class="reach" id="reachLine"></div>
     </div>
 
-    <footer id="footer">SPACENODE para SketchUp</footer>
+    <!-- ── Abas ─────────────────────────────────────────────────────────── -->
+    <div class="tabs glass" role="tablist" aria-label="Modo">
+      <div class="tabs-track" id="tabsTrack">
+        <span class="seg-thumb" id="segThumb" aria-hidden="true"></span>
+        <button class="seg is-active" type="button" role="tab" data-tab="render" id="tabBtnRender">Render</button>
+        <button class="seg" type="button" role="tab" data-tab="edit" id="tabBtnEdit">Editar</button>
+        <button class="seg" type="button" role="tab" data-tab="animar" id="tabBtnAnimar">Animar</button>
+        <button class="seg" type="button" role="tab" data-tab="scenes" id="tabBtnScenes">Cenas</button>
+        <button class="seg" type="button" role="tab" data-tab="plan" id="tabBtnPlan">Planta</button>
+      </div>
+    </div>
+
+    <div class="notice" id="notice" role="status" aria-live="polite"></div>
+
+    <!-- ── Aba: Render ──────────────────────────────────────────────────── -->
+    <div class="tabpanel is-active" id="tabRender" role="tabpanel">
+      <div class="style-card glass" id="styleCard">
+        <div class="style-head">
+          <img class="style-thumb" id="styleThumb" alt="">
+          <span class="style-mark" id="styleMark">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="4.5" y="10.5" width="15" height="10" rx="3"/><path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3"/>
+            </svg>
+          </span>
+          <div class="style-texts">
+            <div class="style-title"><span id="styleTitle">Estilo do projeto</span><span class="style-seed" id="styleSeed"></span></div>
+            <div class="style-sub" id="styleSub">Trave o estilo pra manter a mesma paleta em todas as vistas.</div>
+          </div>
+        </div>
+        <div class="style-actions" id="styleActions">
+          <button class="ghost" id="styleLockButton">Travar estilo</button>
+          <button class="ghost" id="styleApplyButton" style="display:none">Aplicar ajustes</button>
+          <button class="ghost" id="styleUnlockButton" style="display:none">Destravar</button>
+        </div>
+      </div>
+
+      <div class="group glass">
+        <button class="row" type="button" data-sheet="sheetScene" id="rowScene">
+          <svg class="row-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 16.5V7.5l9-4.5 9 4.5v9l-9 4.5-9-4.5Z"/><path d="M3 7.5l9 4.5 9-4.5M12 12v9"/>
+          </svg>
+          <span class="row-title" id="rowSceneTitle">Cena</span>
+          <span class="row-value" id="rowSceneValue"></span>
+          <svg class="chev" viewBox="0 0 8 14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 1l6 6-6 6"/></svg>
+        </button>
+        <button class="row" type="button" data-sheet="sheetLight" id="rowLight">
+          <svg class="row-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.2 5.2l1.6 1.6M17.2 17.2l1.6 1.6M18.8 5.2l-1.6 1.6M6.8 17.2l-1.6 1.6"/>
+          </svg>
+          <span class="row-title" id="rowLightTitle">Luz</span>
+          <span class="row-value" id="rowLightValue"></span>
+          <svg class="chev" viewBox="0 0 8 14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 1l6 6-6 6"/></svg>
+        </button>
+        <button class="row" type="button" data-sheet="sheetPhoto" id="rowPhoto">
+          <svg class="row-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 8.5h3l1.5-2.5h9L18 8.5h3v10H3v-10Z"/><circle cx="12" cy="13" r="3.4"/>
+          </svg>
+          <span class="row-title" id="rowPhotoTitle">Fotografia</span>
+          <span class="row-value" id="rowPhotoValue"></span>
+          <svg class="chev" viewBox="0 0 8 14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 1l6 6-6 6"/></svg>
+        </button>
+        <button class="row" type="button" data-sheet="sheetOutput" id="rowOutput">
+          <svg class="row-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 3.2l1.9 4.4 4.4 1.9-4.4 1.9L12 15.8l-1.9-4.4L5.7 9.5l4.4-1.9L12 3.2Z"/><path d="M18 15.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9.9-2.1Z"/>
+          </svg>
+          <span class="row-title" id="rowOutputTitle">Saída</span>
+          <span class="row-value" id="rowOutputValue"></span>
+          <svg class="chev" viewBox="0 0 8 14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 1l6 6-6 6"/></svg>
+        </button>
+      </div>
+
+      <div class="field">
+        <span class="field-label" id="L_description">Descrição <span>· opcional</span></span>
+        <textarea id="prompt" placeholder="Direções específicas — ex.: piso de madeira clara, paredes off-white, decoração minimalista"></textarea>
+        <div class="hint">O que você não pedir aqui é preservado do jeito que está no modelo.</div>
+      </div>
+
+    </div>
+
+    <!-- ── Aba: Editar ──────────────────────────────────────────────────── -->
+    <div class="tabpanel" id="tabEdit" role="tabpanel">
+      <div id="editSection">
+        <span class="field-label" id="L_edit">Editar este render</span>
+        <div class="pills" id="editActionPills" role="radiogroup" aria-label="Tipo de edição"></div>
+        <div class="mask-tools">
+          <button class="ghost" id="maskToggle">Selecionar área</button>
+          <button class="ghost" id="maskClear" style="display:none">Limpar seleção</button>
+        </div>
+        <textarea id="editInstruction" style="margin-top:10px;min-height:60px" placeholder="Ex.: trocar o piso por carvalho claro / remover o pendente sobre a bancada"></textarea>
+        <div id="editMaterialRow" style="display:none;margin-top:8px" class="material-row">
+          <span class="mname">Amostra do modelo (opcional)</span>
+          <select id="editMaterialSelect"></select>
+        </div>
+        <div class="batch-note">Só a alteração pedida muda — todo o resto do render é preservado. Edição recusada pelo controle de qualidade não é cobrada.</div>
+      </div>
+    </div>
+
+    <!-- ── Aba: Animar ──────────────────────────────────────────────────── -->
+    <div class="tabpanel" id="tabAnimar" role="tabpanel">
+      <div id="animarSection">
+        <div class="field">
+          <span class="field-label" id="L_animarType">Tipo de vídeo</span>
+          <div class="pills" id="animarTypePills" role="radiogroup" aria-label="Tipo de vídeo"></div>
+          <div class="hint" id="animarTypeHint"></div>
+        </div>
+        <div class="field">
+          <span class="field-label" id="L_animarQuality">Qualidade</span>
+          <div class="pills" id="animarEnginePills" role="radiogroup" aria-label="Qualidade"></div>
+        </div>
+        <div class="field">
+          <span class="field-label" id="L_animarDuration">Duração</span>
+          <div class="pills" id="animarDurationPills" role="radiogroup" aria-label="Duração"></div>
+          <div class="batch-note" id="animarRatioNote" style="display:none"></div>
+        </div>
+        <div class="batch-note" id="animarNote"></div>
+        <div class="insufficient" id="animarInsufficient">
+          <b id="animarInsufficientTitle"></b>
+          <div class="math" id="animarInsufficientMath"></div>
+          <button class="buy" id="animarInsufficientBuy">ver planos</button>
+          <div class="alt" id="animarInsufficientAlt"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Aba: Cenas ───────────────────────────────────────────────────── -->
+    <div class="tabpanel" id="tabScenes" role="tabpanel">
+      <div id="scenesSection">
+        <span class="field-label"><span id="L_scenes">Cenas do modelo</span> <span class="scenes-count" id="scenesCount"></span></span>
+        <div class="pills" id="scenesPills"></div>
+        <div class="history-empty" id="scenesEmpty" style="display:none">Crie cenas no SketchUp pra gerar o caderno inteiro de uma vez.</div>
+        <div class="batch-note" id="batchNote">Todas as cenas com os mesmos presets e a mesma semente — coerência de material e estilo no conjunto.</div>
+        <div class="batch-progress" id="batchProgress"></div>
+        <div class="history-grid" id="batchResults" style="margin-top:8px"></div>
+        <div class="batch-actions" id="batchActions">
+          <button class="ghost" id="batchSaveButton">Salvar as imagens</button>
+          <button class="ghost" id="batchResumeButton" style="display:none">Retomar</button>
+          <button class="ghost" id="batchBuyButton" style="display:none">Comprar Nodes</button>
+        </div>
+        <div class="batch-note" id="batchSaveNote"></div>
+      </div>
+
+      <div id="spaceSection" style="margin-top:20px">
+        <span class="field-label" id="L_space">Criar Space das cenas</span>
+        <div class="hint" style="margin:0 0 10px">A vista atual vira a identidade do projeto (DNA); as cenas selecionadas acima viram vistas coerentes entre si.</div>
+        <div class="settings-field">
+          <label for="spaceName">Nome do Space</label>
+          <input id="spaceName" spellcheck="false" maxlength="80" placeholder="Nome do projeto">
+        </div>
+        <div class="pills" id="spaceCategoryPills" role="radiogroup" aria-label="Categoria" style="margin-top:10px"></div>
+        <button class="ghost" id="spaceButton" disabled>
+          <span id="spaceLabel">Criar Space</span>
+          <span class="meta" id="spaceMeta"></span>
+        </button>
+        <div class="batch-note" id="spaceNote"></div>
+        <div class="batch-progress" id="spaceProgress"></div>
+        <div class="history-grid" id="spaceResults" style="margin-top:8px"></div>
+        <button class="ghost history-more" id="openSpaceButton" style="display:none">Abrir o Space no site</button>
+      </div>
+    </div>
+
+    <!-- ── Aba: Planta ──────────────────────────────────────────────────── -->
+    <div class="tabpanel" id="tabPlan" role="tabpanel">
+      <div id="planSection">
+        <div class="hint" id="planIntro">A planta sai do próprio modelo: vista de cima, projeção paralela e um corte a 1,20 m do piso. Nada pra exportar.</div>
+        <div class="field">
+          <span class="field-label" id="L_planType">Tipo de projeto</span>
+          <div class="pills" id="planTypePills" role="radiogroup" aria-label="Tipo de projeto"></div>
+        </div>
+        <div class="field">
+          <span class="field-label" id="L_planStyle">Estilo</span>
+          <div class="pills" id="planStylePills" role="radiogroup" aria-label="Estilo"></div>
+          <div class="hint" id="planStyleHint"></div>
+        </div>
+        <div class="field">
+          <span class="field-label" id="L_planLevel">Nível de humanização</span>
+          <div class="pills" id="planLevelPills" role="radiogroup" aria-label="Nível"></div>
+          <div class="hint" id="planLevelHint"></div>
+        </div>
+        <div class="field">
+          <span class="field-label" id="L_planOptions">O que entra</span>
+          <div class="pills" id="planOptionPills" aria-label="O que entra"></div>
+        </div>
+        <div class="field">
+          <span class="field-label" id="L_planInstructions">Instruções <span style="letter-spacing:0;text-transform:none;font-weight:500">· opcional</span></span>
+          <textarea id="planInstructions" style="min-height:56px" placeholder="Ex.: nomear os ambientes em português, piso de madeira na suíte"></textarea>
+        </div>
+        <div class="batch-note" id="planNote"></div>
+      </div>
+    </div>
   </div>
 
+  <!-- ── Dock ───────────────────────────────────────────────────────────── -->
+  <div class="dock glass glass--chrome" id="dock">
+    <button class="dock-summary" id="dockSummary" type="button" title="Ir para a configuração"></button>
+    <div class="insufficient" id="insufficient">
+      <b id="insufficientTitle">Faltam nodes pra gerar</b>
+      <div class="math" id="insufficientMath"></div>
+      <button class="buy" id="insufficientBuy">ver planos</button>
+      <div class="alt" id="insufficientAlt"></div>
+    </div>
+    <!-- Um CTA por vez: o da aba ativa (ver TAB_CTA / updateDockCta). -->
+    <div class="dock-cta" id="dockCta">
+      <button class="cta" id="generateButton" disabled title="Ctrl+Enter">
+        <span id="generateLabel">Gerar render</span>
+        <span class="cta-right"><span class="meta" id="generateMeta"></span><span class="kbd" id="generateKbd">Ctrl+Enter</span></span>
+      </button>
+      <button class="cta cta--sheet" id="editButton" disabled>
+        <span id="editLabel">Aplicar edição</span>
+        <span class="meta" id="editMeta"></span>
+      </button>
+      <button class="cta cta--sheet" id="animarButton" disabled>
+        <span id="animarLabel">Animar este render</span>
+        <span class="meta" id="animarMeta"></span>
+      </button>
+      <button class="cta cta--sheet" id="batchButton" disabled>
+        <span id="batchLabel">Gerar cenas</span>
+        <span class="meta" id="batchMeta"></span>
+      </button>
+      <button class="cta cta--sheet" id="planButton" disabled>
+        <span id="planLabel">Gerar planta humanizada</span>
+        <span class="meta" id="planMeta"></span>
+      </button>
+    </div>
+    <div class="reach" id="reachLine"></div>
+    <footer id="footer"></footer>
+  </div>
+
+  <!-- ── Folhas ─────────────────────────────────────────────────────────── -->
+  <div class="scrim" id="scrim"></div>
+
+  <div class="sheet glass glass--chrome" id="sheetScene" role="dialog" aria-modal="true">
+    <div class="sheet-grabber"></div>
+    <div class="sheet-head"><span class="sheet-title" id="sheetSceneTitle">Cena</span><button class="sheet-done" type="button" data-close="1">Concluído</button></div>
+    <div class="sheet-body">
+      <div class="field">
+        <span class="field-label" id="L_projectType">Tipo de projeto</span>
+        <div class="cards cols-2" id="projectTypeCards" role="radiogroup" aria-label="Tipo de projeto"></div>
+      </div>
+      <div class="field">
+        <span class="field-label" id="L_segment">Segmento</span>
+        <div class="pills" id="segmentPills" role="radiogroup" aria-label="Segmento"></div>
+      </div>
+      <div class="field">
+        <span class="field-label" id="L_environment">Espaço</span>
+        <div class="pills" id="environmentPills" role="radiogroup" aria-label="Espaço"></div>
+      </div>
+      <div class="field">
+        <span class="field-label" id="backgroundLabel">Contexto visual</span>
+        <div class="pills" id="backgroundPills" role="radiogroup" aria-label="Contexto"></div>
+      </div>
+      <div class="field">
+        <span class="field-label" id="L_elements">Elementos na cena</span>
+        <div class="pills" id="elementsPills" aria-label="Elementos na cena"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sheet glass glass--chrome" id="sheetLight" role="dialog" aria-modal="true">
+    <div class="sheet-grabber"></div>
+    <div class="sheet-head"><span class="sheet-title" id="sheetLightTitle">Luz</span><button class="sheet-done" type="button" data-close="1">Concluído</button></div>
+    <div class="sheet-body">
+      <div class="field">
+        <span class="field-label" id="L_lighting">Iluminação</span>
+        <div class="pills" id="lightingPills" role="radiogroup" aria-label="Iluminação"></div>
+      </div>
+      <div class="field">
+        <span class="field-label" id="L_sun">Sol na captura</span>
+        <div class="pills" id="sunPills" role="radiogroup" aria-label="Sol na captura"></div>
+        <div class="hint">Usa o sol real do modelo (data, hora e localização) — as sombras da captura guiam a luz do render.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sheet glass glass--chrome" id="sheetPhoto" role="dialog" aria-modal="true">
+    <div class="sheet-grabber"></div>
+    <div class="sheet-head">
+      <span class="sheet-title"><span id="L_photo">Fotografia</span> <span class="scenes-count" id="photoHud"></span></span>
+      <button class="sheet-done" type="button" data-close="1">Concluído</button>
+    </div>
+    <div class="sheet-body" id="photoSection">
+      <div class="field">
+        <span class="field-label" id="L_photoAspect">Proporção</span>
+        <div class="pills" id="aspectPills" role="radiogroup" aria-label="Proporção"></div>
+        <div class="hint" id="aspectHint" style="display:none"></div>
+      </div>
+      <div class="field">
+        <span class="field-label" id="L_photoLens">Lente</span>
+        <div class="pills" id="lensPills" role="radiogroup" aria-label="Lente"></div>
+      </div>
+      <div class="field">
+        <span class="field-label" id="L_photoEye">Altura do olho</span>
+        <div class="pills" id="eyePills" aria-label="Altura do olho"></div>
+        <div class="hint" id="eyeHint" style="display:none"></div>
+      </div>
+      <div class="field">
+        <span class="field-label" id="L_photoLevel">Verticais</span>
+        <div class="pills" id="levelPills" role="radiogroup" aria-label="Verticais"></div>
+        <div class="hint" id="levelHint"></div>
+      </div>
+      <div class="field">
+        <span class="field-label" id="L_photoGuide">Guias de composição</span>
+        <div class="pills" id="guidePills" role="radiogroup" aria-label="Guias de composição"></div>
+        <div class="hint" id="guideHint"></div>
+      </div>
+      <div class="field">
+        <span class="field-label" id="L_photoMirror">Espelhos e vidros</span>
+        <div class="pills" id="mirrorPills" aria-label="Espelhos e vidros"></div>
+        <div class="hint" id="mirrorHint"></div>
+      </div>
+      <div class="batch-note" id="photoNote"></div>
+    </div>
+  </div>
+
+  <div class="sheet glass glass--chrome" id="sheetOutput" role="dialog" aria-modal="true">
+    <div class="sheet-grabber"></div>
+    <div class="sheet-head"><span class="sheet-title" id="sheetOutputTitle">Saída</span><button class="sheet-done" type="button" data-close="1">Concluído</button></div>
+    <div class="sheet-body" id="advanced">
+      <div class="field">
+        <span class="field-label" id="L_engine">Motor de IA</span>
+        <div class="cards cols-3" id="engineCards" role="radiogroup" aria-label="Motor"></div>
+        <div class="hint" id="engineHint"></div>
+      </div>
+      <div class="field">
+        <span class="field-label" id="L_resolution">Qualidade de saída</span>
+        <div class="cards cols-3" id="resolutionCards" role="radiogroup" aria-label="Qualidade"></div>
+        <div class="hint" id="resolutionHint"></div>
+      </div>
+      <div class="field" id="modelMaterialsBlock" style="display:none">
+        <span class="field-label" id="L_modelMaterials">Materiais do modelo</span>
+        <div class="hint" style="margin:0 0 9px">Use as texturas reais do seu modelo como referência de material (até 4).</div>
+        <div id="materialsList"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sheet glass glass--chrome" id="sheetHistory" role="dialog" aria-modal="true">
+    <div class="sheet-grabber"></div>
+    <div class="sheet-head"><span class="sheet-title" id="L_history">Histórico</span><button class="sheet-done" type="button" data-close="1">Concluído</button></div>
+    <div class="sheet-body" id="historySection">
+      <div class="history-grid" id="historyGrid"></div>
+      <div class="history-empty" id="historyEmpty" style="display:none">Seus renders aparecem aqui.</div>
+      <button class="ghost history-more" id="historyMore" style="display:none">Carregar mais</button>
+    </div>
+  </div>
+
+  <div class="sheet glass glass--chrome" id="sheetSettings" role="dialog" aria-modal="true">
+    <div class="sheet-grabber"></div>
+    <div class="sheet-head"><span class="sheet-title" id="L_settings">Preferências</span><button class="sheet-done" type="button" data-close="1">Concluído</button></div>
+    <div class="sheet-body">
+      <div id="accountSlot"></div>
+      <div class="settings-field">
+        <label id="L_theme">Tema</label>
+        <div class="pills" id="themePills" role="radiogroup" aria-label="Tema"></div>
+        <div class="hint" id="themeHint" style="margin:7px 0 14px">Automático segue a preferência da sua conta SPACENODE — ou, sem ela, o tema do sistema.</div>
+        <label id="L_language">Idioma</label>
+        <div class="pills" id="languagePills" role="radiogroup" aria-label="Idioma" style="margin-bottom:14px"></div>
+        <label id="L_videoSave">Vídeos</label>
+        <div class="pills" id="videoSavePills" role="radiogroup" aria-label="Vídeos" style="margin-bottom:14px"></div>
+        <label for="apiBaseUrl" id="L_server">Servidor</label>
+        <input id="apiBaseUrl" spellcheck="false">
+      </div>
+      <div class="settings-row">
+        <button class="ghost" id="saveSettingsButton" style="flex:1">Salvar</button>
+      </div>
+    </div>
+  </div>
   <script>
     'use strict';
 
@@ -717,6 +1298,7 @@
       accountTheme: null,     // preferência da conta (profiles.theme_preference) via /api/sketchup/session
       video: null,            // último take (cartão) — independe de model.result
       animarType: null, animarEngine: null, animarDuration: null,
+      planType: null, planStyle: null, planLevel: null, planOptions: null,
       videoSave: 'project',   // project | ask (Preferências)
       apiBaseUrl: 'https://spacenode.app',
       catalog: null,
@@ -742,11 +1324,28 @@
       userEmail: null,
       version: '',
       sunPreset: 'atual',
+      // Fotografia: proporção (largura/altura; 0 = livre), nivelar verticais
+      // na captura, guia de composição; `camera` são os fatos vivos do Ruby.
+      photoAspect: 0,
+      photoLevel: false,
+      photoGuide: 'none',
+      camera: null,
+      guidesOverlay: false,
+      captureSize: null,
+      // Espelhos marcados no modelo (vem do Ruby: contagem por tipo).
+      mirrors: null,
       scenes: [],
       selectedScenes: [],
       modelMaterials: [],
       materialSel: {},
       batchRunning: false,
+      // Resultados do último lote (pra salvar tudo de uma vez) e o que ficou
+      // pendente quando ele morreu no meio (saldo/sessão).
+      batchResults: [],
+      batchPending: 0,
+      batchInsufficient: false,
+      batchUncertain: 0,
+      batchSaving: false,
       editAction: 'swap_material',
       editQuoteId: 0,
       editNodes: null,
@@ -812,6 +1411,16 @@
         batchLabel: function (n) { return n > 0 ? 'Gerar ' + n + ' cena' + (n === 1 ? '' : 's') : 'Gerar cenas'; },
         batchRunning: 'gerando cenas…',
         batchNote: 'Todas as cenas com os mesmos presets e a mesma semente — coerência de material e estilo no conjunto.',
+        batchSave: function (n) { return 'Salvar as ' + n + ' imagens'; },
+        batchSaving: function (d, t) { return 'Salvando ' + d + ' de ' + t + '…'; },
+        batchSaved: function (n, dir) { return n + (n === 1 ? ' imagem salva' : ' imagens salvas') + ' em ' + dir; },
+        batchSavedPartial: function (n, bad) { return n + ' salvas · ' + bad + (bad === 1 ? ' falhou' : ' falharam') + '. As que falharam seguem no Histórico.'; },
+        batchResume: function (n) { return 'Retomar ' + n + (n === 1 ? ' cena' : ' cenas'); },
+        batchResumeNote: function (n) { return n + (n === 1 ? ' cena não saiu' : ' cenas não saíram') + '. Retomar gera só o que falta — o que já saiu não é cobrado de novo.'; },
+        buyNodes: 'Comprar Nodes',
+        batchUncertain: function (n) { return n + (n === 1 ? ' delas caiu' : ' delas caíram') + ' com a rede — confira o Histórico antes de retomar, pra não gerar de novo o que já saiu.'; },
+        updateTitle: function (v) { return 'Versão ' + v + ' disponível'; },
+        updateAction: 'Baixar',
         batchInsufficient: function (t, h) { return 'Saldo insuficiente pro lote: custa ' + t + ' · você tem ' + h + '.'; },
         sceneOf: function (i, t, nm) { return 'Cena ' + i + ' de ' + t + (nm ? ' — ' + nm : '') + '…'; },
         batchOk: function (n) { return n + ' cena' + (n === 1 ? '' : 's') + ' gerada' + (n === 1 ? '' : 's') + '. Clique nas miniaturas pra revisar.'; },
@@ -848,8 +1457,68 @@
         cancel: 'cancelar',
         capturingOverlay: 'Capturando a vista…',
         nodesPerImage: function (n) { return n + ' Nodes por imagem'; },
+        L_planType: 'Tipo de projeto', L_planStyle: 'Estilo',
+        L_planLevel: 'Nível de humanização', L_planOptions: 'O que entra',
+        L_planInstructions: 'Instruções',
+        planCta: 'Gerar planta humanizada', planRunning: 'gerando a planta…',
+        planNote: 'A planta sai do modelo aberto: o pavimento onde a câmera está, cortado a 1,20 m do piso.',
+        planInsufficient: function (cost, bal) { return 'A planta custa ' + cost + ' nodes e você tem ' + bal + '.'; },
+        planDone: function (n, origem) { return 'Planta pronta · ' + n + ' Nodes · ' + origem; },
+        planSectionModel: 'corte do próprio arquivo',
+        planSectionTemp: 'corte temporário a 1,20 m',
+        soleResolution: function (label, nodes, engine) {
+          return label + ' · ' + nodes + ' nodes — única resolução do ' + engine + '.';
+        },
         sun: { atual: 'Atual', manha: 'Manhã', meiodia: 'Meio-dia', tarde: 'Entardecer', golden: 'Golden hour' },
-        editActions: { swap_material: 'Trocar material', remove: 'Remover', refine_area: 'Refinar área' },
+        L_photo: 'Fotografia', L_photoAspect: 'Proporção', L_photoLens: 'Lente', L_photoEye: 'Altura do olho',
+        cropSides: 'laterais fora', cropTopBottom: 'topo e base fora',
+        cropHintSides: function (a) {
+          return 'A tela está em ' + a + ' — mais larga que o quadro escolhido, então as laterais ficam fora da captura. A moldura na viewport mostra o que entra.';
+        },
+        cropHintTopBottom: function (a) {
+          return 'A tela está em ' + a + ' — mais estreita que o quadro escolhido, então o topo e a base ficam fora da captura. A moldura na viewport mostra o que entra.';
+        },
+        L_photoLevel: 'Verticais', L_photoGuide: 'Guias de composição',
+        aspectFree: 'Livre',
+        lensMm: function (mm) { return mm + ' mm'; },
+        eye: { seated: 'Sentado · 1,20 m', standing: 'Em pé · 1,60 m' },
+        eyeNoFloor: 'Sem piso abaixo da câmera — não dá pra medir nem ajustar a altura do olho.',
+        eyeParallel: 'Em projeção paralela a altura do olho não muda a imagem.',
+        level: { asis: 'Como está', level: 'Nivelar (2 pontos)' },
+        levelFlat: 'Câmera nivelada — as verticais já saem paralelas.',
+        levelTilted: function (deg, up) { return 'Câmera inclinada ' + deg + '° para ' + (up ? 'cima' : 'baixo') + ' — as verticais convergem.'; },
+        levelWill: 'Na captura a câmera é nivelada e o quadro recortado: verticais paralelas, enquadramento preservado.',
+        levelSteep: function (max) { return 'Inclinação grande demais pra nivelar com esta lente (limite ~' + max + '°) — aponte a câmera mais reto ou feche a lente.'; },
+        levelParallel: 'Projeção paralela — nivelar só se aplica em perspectiva.',
+        guide: { none: 'Nenhuma', thirds: 'Terços', golden: 'Áurea', center: 'Centro', diagonals: 'Diagonais' },
+        guideOverlayOn: 'As guias aparecem no preview e na viewport do SketchUp (não saem no render).',
+        guideOverlayOff: 'As guias aparecem no preview da captura. No SketchUp 2023 ou mais novo, também na viewport.',
+        hudParallel: 'projeção paralela',
+        hudLens: function (mm, fov) { return mm + ' mm · ' + fov + '°'; },
+        hudEye: function (m) { return 'olho a ' + m + ' m'; },
+        hudCeiling: function (m) { return 'pé-direito ' + m + ' m'; },
+        hudTilt: function (deg, up) { return (up ? '↑' : '↓') + ' ' + deg + '°'; },
+        photoNote: 'A IA preserva o que vê: proporção, lente, altura do olho e verticais retas viram parte do render.',
+        levelReasons: { too_steep: 'inclinação acima do limite', render_failed: 'o recorte da captura falhou', level_mismatch: 'o mapa de arestas não casou', degenerate: 'câmera apontando reto para cima ou para baixo', error: 'erro ao calcular o nivelamento' },
+        condNoLevel: function (reason) { return 'A captura não saiu nivelada (' + reason + ') — as verticais ficaram como na vista.'; },
+        L_photoMirror: 'Espelhos e vidros',
+        mirrorMark: 'Marcar espelho', mirrorMarkGlass: 'Marcar vidro', mirrorUnmark: 'Desmarcar seleção', mirrorClear: 'Limpar todos',
+        mirrorNone: 'Nenhuma face marcada. Selecione a face do espelho no SketchUp (entre no grupo com dois cliques) e clique em Marcar.',
+        mirrorCount: function (m, g) {
+          var parts = [];
+          if (m) parts.push(m + (m === 1 ? ' espelho' : ' espelhos'));
+          if (g) parts.push(g + (g === 1 ? ' vidro' : ' vidros'));
+          return parts.join(' e ') + ' — o reflexo real entra em toda captura, calculado pra câmera do momento. Nada fica gravado no modelo.';
+        },
+        mirrorStale: function (n) { return n + (n === 1 ? ' marcação aponta' : ' marcações apontam') + ' pra face que não existe mais (ignorada).'; },
+        mirrorUnsupported: 'Reflexos exigem SketchUp 2018 ou mais novo.',
+        hudMirrors: function (n) { return n + (n === 1 ? ' espelho' : ' espelhos'); },
+        mirrorReasons: { behind_camera: 'atrás da câmera', off_screen: 'fora do quadro', too_small: 'pequeno demais no quadro', render_failed: 'o render do reflexo falhou', crop_failed: 'o recorte falhou', texture_failed: 'a textura não carregou', pin_failed: 'a textura não assentou na face', degenerate: 'face degenerada', too_many_planes: 'mais de 6 planos', shared_definition: 'componente repetido cruzando o plano', no_imagerep: 'SketchUp sem ImageRep', camera: 'câmera inválida' },
+        condMirrors: function (applied, requested, reasons) {
+          return 'Reflexo em ' + applied + ' de ' + requested + (requested === 1 ? ' face marcada' : ' faces marcadas') + (reasons ? ' (' + reasons + ')' : '') + '.';
+        },
+        editActions: { swap_material: 'Trocar material', remove: 'Remover', refine_area: 'Refinar área', insert_element: 'Inserir' },
+        editInsertHint: 'Marque a área onde o elemento entra e descreva o que é.',
         lang: { auto: 'Auto', pt: 'Português', en: 'English' },
         theme: { auto: 'Automático', light: 'Claro', dark: 'Escuro' },
         L_animar: 'Animar este render', L_animarType: 'Tipo de vídeo', L_animarQuality: 'Qualidade', L_animarDuration: 'Duração',
@@ -925,6 +1594,16 @@
         batchLabel: function (n) { return n > 0 ? 'Generate ' + n + ' scene' + (n === 1 ? '' : 's') : 'Generate scenes'; },
         batchRunning: 'generating scenes…',
         batchNote: 'Every scene with the same presets and the same seed — consistent materials and style across the set.',
+        batchSave: function (n) { return 'Save the ' + n + ' images'; },
+        batchSaving: function (d, t) { return 'Saving ' + d + ' of ' + t + '…'; },
+        batchSaved: function (n, dir) { return n + (n === 1 ? ' image saved' : ' images saved') + ' to ' + dir; },
+        batchSavedPartial: function (n, bad) { return n + ' saved · ' + bad + ' failed. The failed ones are still in History.'; },
+        batchResume: function (n) { return 'Resume ' + n + (n === 1 ? ' scene' : ' scenes'); },
+        batchResumeNote: function (n) { return n + (n === 1 ? ' scene did not finish' : ' scenes did not finish') + '. Resuming generates only what is missing — what already came out is not charged again.'; },
+        buyNodes: 'Buy Nodes',
+        batchUncertain: function (n) { return n + ' of them dropped on the network — check History before resuming, so you do not regenerate what already came out.'; },
+        updateTitle: function (v) { return 'Version ' + v + ' available'; },
+        updateAction: 'Download',
         batchInsufficient: function (t, h) { return 'Not enough balance for the batch: costs ' + t + ' · you have ' + h + '.'; },
         sceneOf: function (i, t, nm) { return 'Scene ' + i + ' of ' + t + (nm ? ' — ' + nm : '') + '…'; },
         batchOk: function (n) { return n + ' scene' + (n === 1 ? '' : 's') + ' generated. Click the thumbnails to review.'; },
@@ -961,8 +1640,68 @@
         cancel: 'cancel',
         capturingOverlay: 'Capturing the view…',
         nodesPerImage: function (n) { return n + ' Nodes per image'; },
+        L_planType: 'Project type', L_planStyle: 'Style',
+        L_planLevel: 'Humanisation level', L_planOptions: 'What goes in',
+        L_planInstructions: 'Instructions',
+        planCta: 'Generate humanised plan', planRunning: 'generating the plan…',
+        planNote: 'The plan comes from the open model: the storey the camera is on, cut 1.20 m above the floor.',
+        planInsufficient: function (cost, bal) { return 'The plan costs ' + cost + ' nodes and you have ' + bal + '.'; },
+        planDone: function (n, origin) { return 'Plan ready · ' + n + ' Nodes · ' + origin; },
+        planSectionModel: 'section from the file itself',
+        planSectionTemp: 'temporary section at 1.20 m',
+        soleResolution: function (label, nodes, engine) {
+          return label + ' · ' + nodes + ' nodes — the only resolution ' + engine + ' offers.';
+        },
         sun: { atual: 'Current', manha: 'Morning', meiodia: 'Midday', tarde: 'Late afternoon', golden: 'Golden hour' },
-        editActions: { swap_material: 'Swap material', remove: 'Remove', refine_area: 'Refine area' },
+        L_photo: 'Photography', L_photoAspect: 'Aspect ratio', L_photoLens: 'Lens', L_photoEye: 'Eye height',
+        cropSides: 'sides cropped', cropTopBottom: 'top and bottom cropped',
+        cropHintSides: function (a) {
+          return 'The screen is ' + a + ' — wider than the chosen frame, so the sides fall outside the capture. The frame on the viewport shows what goes in.';
+        },
+        cropHintTopBottom: function (a) {
+          return 'The screen is ' + a + ' — narrower than the chosen frame, so the top and bottom fall outside the capture. The frame on the viewport shows what goes in.';
+        },
+        L_photoLevel: 'Verticals', L_photoGuide: 'Composition guides',
+        aspectFree: 'Free',
+        lensMm: function (mm) { return mm + ' mm'; },
+        eye: { seated: 'Seated · 1.20 m', standing: 'Standing · 1.60 m' },
+        eyeNoFloor: 'No floor below the camera — the eye height cannot be measured or adjusted.',
+        eyeParallel: 'In parallel projection the eye height does not change the image.',
+        level: { asis: 'As is', level: 'Level (2-point)' },
+        levelFlat: 'Camera is level — verticals already come out parallel.',
+        levelTilted: function (deg, up) { return 'Camera tilted ' + deg + '° ' + (up ? 'up' : 'down') + ' — verticals converge.'; },
+        levelWill: 'At capture the camera is levelled and the frame cropped: parallel verticals, framing preserved.',
+        levelSteep: function (max) { return 'Tilt too large to level with this lens (limit ~' + max + '°) — aim the camera closer to horizontal or use a longer lens.'; },
+        levelParallel: 'Parallel projection — levelling only applies to perspective.',
+        guide: { none: 'None', thirds: 'Thirds', golden: 'Golden', center: 'Center', diagonals: 'Diagonals' },
+        guideOverlayOn: 'Guides show on the preview and in the SketchUp viewport (never in the render).',
+        guideOverlayOff: 'Guides show on the capture preview. On SketchUp 2023 or newer they also show in the viewport.',
+        hudParallel: 'parallel projection',
+        hudLens: function (mm, fov) { return mm + ' mm · ' + fov + '°'; },
+        hudEye: function (m) { return 'eye at ' + m + ' m'; },
+        hudCeiling: function (m) { return 'ceiling ' + m + ' m'; },
+        hudTilt: function (deg, up) { return (up ? '↑' : '↓') + ' ' + deg + '°'; },
+        photoNote: 'The AI preserves what it sees: aspect ratio, lens, eye height and straight verticals become part of the render.',
+        levelReasons: { too_steep: 'tilt above the limit', render_failed: 'the capture crop failed', level_mismatch: 'the edge map did not match', degenerate: 'camera pointing straight up or down', error: 'error computing the levelling' },
+        condNoLevel: function (reason) { return 'The capture was not levelled (' + reason + ') — verticals stayed as in the view.'; },
+        L_photoMirror: 'Mirrors and glass',
+        mirrorMark: 'Mark mirror', mirrorMarkGlass: 'Mark glass', mirrorUnmark: 'Unmark selection', mirrorClear: 'Clear all',
+        mirrorNone: 'No face marked. Select the mirror face in SketchUp (double-click into the group) and click Mark.',
+        mirrorCount: function (m, g) {
+          var parts = [];
+          if (m) parts.push(m + (m === 1 ? ' mirror' : ' mirrors'));
+          if (g) parts.push(g + (g === 1 ? ' glass surface' : ' glass surfaces'));
+          return parts.join(' and ') + ' — the true reflection goes into every capture, computed for that moment\'s camera. Nothing is written into the model.';
+        },
+        mirrorStale: function (n) { return n + (n === 1 ? ' mark points' : ' marks point') + ' to a face that no longer exists (ignored).'; },
+        mirrorUnsupported: 'Reflections require SketchUp 2018 or newer.',
+        hudMirrors: function (n) { return n + (n === 1 ? ' mirror' : ' mirrors'); },
+        mirrorReasons: { behind_camera: 'behind the camera', off_screen: 'outside the frame', too_small: 'too small in the frame', render_failed: 'the reflection render failed', crop_failed: 'the crop failed', texture_failed: 'the texture did not load', pin_failed: 'the texture did not fit the face', degenerate: 'degenerate face', too_many_planes: 'more than 6 planes', shared_definition: 'repeated component crossing the plane', no_imagerep: 'SketchUp without ImageRep', camera: 'invalid camera' },
+        condMirrors: function (applied, requested, reasons) {
+          return 'Reflection on ' + applied + ' of ' + requested + (requested === 1 ? ' marked face' : ' marked faces') + (reasons ? ' (' + reasons + ')' : '') + '.';
+        },
+        editActions: { swap_material: 'Swap material', remove: 'Remove', refine_area: 'Refine area', insert_element: 'Insert' },
+        editInsertHint: 'Mark the area where the element goes and describe what it is.',
         lang: { auto: 'Auto', pt: 'Português', en: 'English' },
         theme: { auto: 'Automatic', light: 'Light', dark: 'Dark' },
         L_animar: 'Animate this render', L_animarType: 'Video type', L_animarQuality: 'Quality', L_animarDuration: 'Duration',
@@ -1013,7 +1752,9 @@
     function localizeStatic() {
       ['L_projectType','L_segment','L_environment','L_lighting','L_sun','L_elements','L_modelMaterials',
        'L_engine','L_resolution','L_advanced','L_history','L_settings','L_edit','L_space',
-       'L_scenes','L_theme','L_language','L_server','L_animar','L_animarType','L_animarQuality','L_animarDuration','L_videoSave'].forEach(function (id) {
+       'L_scenes','L_theme','L_language','L_server','L_animar','L_animarType','L_animarQuality','L_animarDuration','L_videoSave',
+       'L_photo','L_photoAspect','L_photoLens','L_photoEye','L_photoLevel','L_photoGuide','L_photoMirror',
+       'L_planType','L_planStyle','L_planLevel','L_planOptions','L_planInstructions'].forEach(function (id) {
         var el = document.getElementById(id);
         if (el) el.textContent = tt(id);
       });
@@ -1100,6 +1841,7 @@
     function applyTheme() {
       var resolved = resolveTheme();
       document.documentElement.classList.toggle('light', resolved === 'light');
+      if (typeof renderThemeToggle === 'function') renderThemeToggle();
       try { localStorage.setItem('com.spacenode.sketchup.theme', resolved); } catch (e) {}
       // Segue o SO só enquanto nada mais decidir (setting e conta em "auto").
       var followsOs = !(model.themeSetting === 'light' || model.themeSetting === 'dark') &&
@@ -1141,7 +1883,26 @@
     }
 
     var SUN_OPTIONS = ['atual', 'manha', 'meiodia', 'tarde', 'golden'];
-    var EDIT_ACTIONS = ['swap_material', 'remove', 'refine_area'];
+    var ASPECT_OPTIONS = [
+      { id: 'free', value: 0 }, { id: '3:2', value: 1.5 }, { id: '4:3', value: 4 / 3 }, { id: '16:9', value: 16 / 9 },
+      { id: '1:1', value: 1 }, { id: '4:5', value: 0.8 }, { id: '9:16', value: 9 / 16 }
+    ];
+    // Focal equivalente full-frame pela ALTURA do sensor (bate com a lente
+    // real num quadro 3:2) — o Ruby converte em fov vertical.
+    var LENS_OPTIONS = [16, 20, 24, 28, 35, 50];
+    var EYE_OPTIONS = [{ id: 'seated', m: 1.2 }, { id: 'standing', m: 1.6 }];
+    var GUIDE_OPTIONS = ['none', 'thirds', 'golden', 'center', 'diagonals'];
+    var LEVEL_MAX_DEG = 40;
+    var LEVEL_FOV_MAX_DEG = 118; // fov' = fov + 2·inclinação precisa caber (espelho do Ruby)
+    // Nivelar "não aplicado" sem ser falha: a imagem já sai com verticais retas.
+    var LEVEL_SOFT_REASONS = ['already_level', 'not_perspective', 'native_2d'];
+    function levelFailed(report) {
+      return !!(report && report.levelRequested && !report.levelApplied && LEVEL_SOFT_REASONS.indexOf(report.levelReason) < 0);
+    }
+    var EDIT_ACTIONS = ['swap_material', 'remove', 'refine_area', 'insert_element'];
+    // Inserir exige os DOIS: a máscara diz onde, o texto diz o quê (é o
+    // contrato do REQUIRES_MASK no servidor).
+    var INSERT_ACTION = 'insert_element';
 
     var generatingTimer = null;
     var elapsedTimer = null;
@@ -1151,6 +1912,9 @@
     ['balanceChip','balanceValue','balanceRecharge','connDot','connTitle','connSub','connectButton','disconnectButton',
      'preview','captureImage','captureCompareImage','resultImage','compareClip','compareHandle','compareRange','emptyPreview',
      'previewOverlay','overlayText','overlayElapsed','cancelButton','captureButton','compareButton','resultActions',
+     'resultMore','resultMoreToggle','dockCta','engineHint','resolutionHint',
+     'planSection','planIntro','planTypePills','planStylePills','planStyleHint','planLevelPills','planLevelHint',
+     'planOptionPills','planInstructions','planNote','planButton','planLabel','planMeta',
      'downloadButton','openResultButton','projectTypeCards','segmentPills','environmentPills','lightingPills',
      'backgroundLabel','backgroundPills','prompt','elementsPills','engineCards','resolutionCards',
      'notice','insufficient','insufficientTitle','insufficientMath','insufficientBuy','insufficientAlt',
@@ -1160,11 +1924,14 @@
      'animarInsufficient','animarInsufficientTitle','animarInsufficientMath','animarInsufficientBuy','animarInsufficientAlt',
      'apiBaseUrl','saveSettingsButton','footer','advanced',
      'restoreCameraButton','scenesSection','scenesCount','scenesPills','scenesEmpty','batchButton','batchLabel','batchMeta',
-     'batchNote','batchProgress','batchResults','sunPills','modelMaterialsBlock','materialsList',
+     'batchNote','batchProgress','batchResults','batchActions','batchSaveButton','batchResumeButton','batchBuyButton','batchSaveNote',
+     'sunPills','modelMaterialsBlock','materialsList',
      'upscale2xButton','upscale4xButton','editSection','editActionPills','editInstruction','editMaterialRow',
      'editMaterialSelect','editButton','editLabel','editMeta','maskCanvas','maskHint','maskToggle','maskClear',
      'spaceSection','spaceName','spaceCategoryPills',
-     'spaceButton','spaceLabel','spaceMeta','spaceNote','spaceProgress','spaceResults','openSpaceButton'
+     'spaceButton','spaceLabel','spaceMeta','spaceNote','spaceProgress','spaceResults','openSpaceButton',
+     'photoSection','photoHud','aspectPills','aspectHint','lensPills','eyePills','eyeHint','levelPills','levelHint','guidePills','guideHint','photoNote','guidesSvg',
+     'mirrorPills','mirrorHint'
     ].forEach(function (id) { els[id] = $(id); });
 
     function callSketchUp(name, arg) {
@@ -1256,6 +2023,11 @@
       b.addEventListener('click', onClick);
       return b;
     }
+    function hideIfSingle(container) {
+      if (!container || !container.closest) return;
+      var field = container.closest('.field');
+      if (field) field.style.display = container.children.length > 1 ? '' : 'none';
+    }
     function fill(container, nodes) {
       container.innerHTML = '';
       nodes.forEach(function (n) { container.appendChild(n); });
@@ -1309,18 +2081,42 @@
         return b;
       }));
 
-      fill(els.engineCards, (model.catalog.engines || []).map(function (e) {
-        return cardButton(e.name, (catUi('engineTaglines') || {})[e.id] || e.tagline, e.id === model.engine, function () {
+      // Os cartões do motor carregam só o NOME: o que cada um faz está na
+      // linha abaixo, que muda com a seleção (mesma decisão do /app/generate).
+      // Com o Orion liberado são quatro — a grade vira 2x2 em vez de deixar
+      // um cartão órfão embaixo de uma fileira de três.
+      var engineList = model.catalog.engines || [];
+      els.engineCards.className = 'cards ' + (engineList.length >= 4 ? 'cols-2' : 'cols-3');
+      fill(els.engineCards, engineList.map(function (e) {
+        return cardButton(e.name, '', e.id === model.engine, function () {
           model.engine = e.id; onSelectionChanged();
         });
       }));
 
       var engine = currentEngine();
-      fill(els.resolutionCards, ((engine && engine.resolutions) || []).map(function (r) {
+      // description vem do catálogo v8; taglines seguem de reserva pra painel
+      // novo contra servidor antigo.
+      els.engineHint.textContent = engine
+        ? ((catUi('engineDescriptions') || {})[engine.id] || engine.description ||
+           (catUi('engineTaglines') || {})[engine.id] || engine.tagline || '')
+        : '';
+
+      var resList = (engine && engine.resolutions) || [];
+      // Resolução única (o caso do Quasar): um cartão sozinho e sempre marcado
+      // é um controle que não se opera — vira ruído com aparência de escolha.
+      // Some como cartão e volta como linha, com o preço, que era o que ele
+      // tinha de útil.
+      var soleRes = resList.length === 1 ? resList[0] : null;
+      els.resolutionCards.style.display = soleRes ? 'none' : '';
+      fill(els.resolutionCards, soleRes ? [] : resList.map(function (r) {
         return cardButton(r.label, tt('nodesPerImage', r.nodes), r.id === model.resolution, function () {
           model.resolution = r.id; onSelectionChanged();
         });
       }));
+      var resNow = currentResolution();
+      els.resolutionHint.textContent = soleRes
+        ? tt('soleResolution', soleRes.label, soleRes.nodes, engine ? engine.name : '')
+        : ((resNow && resNow.note) || '');
 
       fill(els.sunPills, SUN_OPTIONS.map(function (id) {
         return pillButton(tt('sun')[id] || id, id === model.sunPreset, function () {
@@ -1328,13 +2124,117 @@
         });
       }));
 
+      // Campo de opção única não é escolha: com Segmento "Preservar Original",
+      // "Espaço" mostrava uma pílula sozinha e imóvel.
+      hideIfSingle(els.environmentPills);
+      hideIfSingle(els.backgroundPills);
+      hideIfSingle(els.elementsPills);
+
+      renderPlanControls();
       renderModelMaterials();
       renderScenes();
       renderEditControls();
       renderSpaceControls();
       renderAnimarControls();
+      renderPhotoControls();
       updateGenerateState();
     }
+
+    // ── Planta humanizada ───────────────────────────────────────────────────
+    // Presets vêm do catálogo (v9) — a lista não vive aqui nem no Ruby, pra
+    // não existir uma terceira cópia do que o servidor aceita.
+    function planCfg() { return model.catalog && model.catalog.plan; }
+    function planUi(section) { return (catUi('plan') || {})[section] || {}; }
+    function planLabel(section, item) {
+      return planUi(section)[item.id] || item.label || item.id;
+    }
+    function ensurePlanDefaults() {
+      var cfg = planCfg();
+      if (!cfg) return;
+      var d = cfg.defaults || {};
+      var has = function (list, id) {
+        return (list || []).some(function (i) { return i.id === id; });
+      };
+      if (!has(cfg.projectTypes, model.planType)) model.planType = d.projectType || (cfg.projectTypes || [])[0] && cfg.projectTypes[0].id;
+      if (!has(cfg.styles, model.planStyle)) model.planStyle = d.style || (cfg.styles || [])[0] && cfg.styles[0].id;
+      if (!has(cfg.levels, model.planLevel)) model.planLevel = d.level || (cfg.levels || [])[0] && cfg.levels[0].id;
+      if (!model.planOptions) {
+        model.planOptions = {};
+        (cfg.optionOrder || []).forEach(function (k) {
+          model.planOptions[k] = !!(d.options && d.options[k]);
+        });
+      }
+    }
+    function renderPlanControls() {
+      if (!els.planTypePills) return;
+      var cfg = planCfg();
+      if (!cfg) return;
+      ensurePlanDefaults();
+
+      fill(els.planTypePills, (cfg.projectTypes || []).map(function (p) {
+        return pillButton(planLabel('projectTypes', p), p.id === model.planType, function () {
+          model.planType = p.id; renderPlanControls(); persistStateSoon();
+        });
+      }));
+      fill(els.planStylePills, (cfg.styles || []).map(function (s) {
+        return pillButton(planLabel('styles', s), s.id === model.planStyle, function () {
+          model.planStyle = s.id; renderPlanControls(); persistStateSoon();
+        });
+      }));
+      fill(els.planLevelPills, (cfg.levels || []).map(function (l) {
+        return pillButton(planLabel('levels', l), l.id === model.planLevel, function () {
+          model.planLevel = l.id; renderPlanControls(); persistStateSoon();
+        });
+      }));
+      var pick = function (list, id) {
+        var found = null;
+        (list || []).forEach(function (i) { if (i.id === id) found = i; });
+        return found;
+      };
+      var style = pick(cfg.styles, model.planStyle);
+      var level = pick(cfg.levels, model.planLevel);
+      els.planStyleHint.textContent = (style && style.desc) || '';
+      els.planLevelHint.textContent = (level && level.desc) || '';
+
+      fill(els.planOptionPills, (cfg.optionOrder || []).map(function (key) {
+        var label = (planUi('options')[key]) || (cfg.optionLabels || {})[key] || key;
+        var b = pillButton(label, !!model.planOptions[key], function () {
+          model.planOptions[key] = !model.planOptions[key];
+          renderPlanControls(); persistStateSoon();
+        });
+        b.setAttribute('role', 'checkbox');
+        return b;
+      }));
+
+      updatePlanButton();
+    }
+    function updatePlanButton() {
+      if (!els.planButton) return;
+      var cfg = planCfg();
+      var cost = cfg ? Number(cfg.nodes || 0) : null;
+      var bal = model.totalBalance;
+      var insufficient = model.authenticated && cost != null && bal != null && bal < cost;
+      els.planButton.disabled = model.generating || !model.authenticated || !cfg || insufficient;
+      els.planLabel.textContent = model.generating ? tt('planRunning') : tt('planCta');
+      els.planMeta.textContent = model.generating || !cost ? '' : cost + ' ' + tt('nodes');
+      els.planNote.textContent = insufficient ? tt('planInsufficient', cost, bal) : tt('planNote');
+    }
+    els.planButton.addEventListener('click', function () {
+      if (model.generating) return;
+      if (!(window.sketchup && typeof window.sketchup.generatePlan === 'function')) {
+        showError(tt('outsideSketchup'));
+        return;
+      }
+      showNotice('', 'success');
+      startGeneratingUi();
+      callSketchUp('generatePlan', JSON.stringify({
+        projectType: model.planType,
+        style: model.planStyle,
+        level: model.planLevel,
+        options: model.planOptions || {},
+        instructions: els.planInstructions.value
+      }));
+    });
 
     // ── Materiais do modelo ─────────────────────────────────────────────────
     function currentMaterialFields() {
@@ -1463,14 +2363,10 @@
         engine: model.engine,
         resolution: model.resolution,
         sunPreset: model.sunPreset,
-        materialSel: materialSelArray()
+        photo: photoPayload(),
+        materialSel: materialSelArray(),
+        seed: styleLocked() ? model.projectStyle.seed : null
       }));
-    });
-    els.scenesSection.addEventListener('toggle', function () {
-      if (els.scenesSection.open) callSketchUpQuiet('listScenes');
-    });
-    els.advanced.addEventListener('toggle', function () {
-      if (els.advanced.open && model.modelMaterials.length === 0) callSketchUpQuiet('listMaterials');
     });
     // ── Ampliar ─────────────────────────────────────────────────────────────
     function requestUpscale(scale) {
@@ -1519,9 +2415,13 @@
       var hasMask = model.maskStrokes.length > 0;
       var maskAction = model.editAction === 'remove' || model.editAction === 'refine_area';
       // Remover/refinar COM área marcada dispensam texto (a área diz onde).
-      var ready = hasInstruction || (hasMask && maskAction);
+      // Inserir é o inverso: precisa dos dois, senão o servidor recusa.
+      var inserting = model.editAction === INSERT_ACTION;
+      var ready = inserting ? (hasInstruction && hasMask) : (hasInstruction || (hasMask && maskAction));
       els.editButton.disabled = model.generating || !model.authenticated || !ready || !!(model.result && model.result._unverified);
       els.editLabel.textContent = model.generating ? tt('editing') : tt('applyEdit');
+      var editHintEl = document.querySelector('#editSection .batch-note');
+      if (editHintEl) editHintEl.textContent = inserting && !ready ? tt('editInsertHint') : tt('editHint');
       els.editMeta.textContent = model.editNodes != null && !model.generating ? model.editNodes + ' ' + tt('nodes') : '';
     }
     var editQuoteTimer = null;
@@ -1543,9 +2443,6 @@
       }, 700);
     }
     els.editInstruction.addEventListener('input', function () { scheduleEditQuote(); updateEditButton(); });
-    els.editSection.addEventListener('toggle', function () {
-      if (els.editSection.open && model.modelMaterials.length === 0) callSketchUpQuiet('listMaterials');
-    });
     els.editButton.addEventListener('click', function () {
       if (model.generating || !model.result) return;
       if (!ensureLiveResult()) return;
@@ -1768,9 +2665,9 @@
       var eng = currentEngine();
       var res = currentResolution();
       var parts = [];
-      if (model.segment) parts.push(model.segment);
-      if (model.environment) parts.push(model.environment);
-      if (model.lighting && model.lighting !== 'Preservar Original') parts.push(model.lighting);
+      if (!isPreserved(model.segment)) parts.push(model.segment);
+      if (!isPreserved(model.environment)) parts.push(model.environment);
+      if (!isPreserved(model.lighting)) parts.push(model.lighting);
       if (eng) parts.push(eng.name + (res ? ' ' + res.label : ''));
       return parts.join(' · ');
     }
@@ -1843,8 +2740,10 @@
       els.maskToggle.disabled = model.generating;
       els.maskClear.disabled = model.generating;
       updateBatchButton();
+      updatePlanButton();
       updateEditButton();
       updateSpaceButton();
+      if (shell) updateShell();
     }
 
     function cheapestOption() {
@@ -1860,7 +2759,245 @@
       return best;
     }
 
+    // ── Fotografia ──────────────────────────────────────────────────────────
+    function fmtNum(n, digits) {
+      var s = Number(n).toFixed(digits);
+      return model.locale === 'pt' ? s.replace('.', ',') : s;
+    }
+    function photoPayload() {
+      return { aspect: model.photoAspect || 0, level: !!model.photoLevel, guide: model.photoGuide || 'none' };
+    }
+    function syncPhoto() {
+      callSketchUpQuiet('setPhoto', JSON.stringify(photoPayload()));
+    }
+    // Segmentos (x1,y1,x2,y2) em fração do quadro — espelho de guide_segments no Ruby.
+    function guideSegments(guide) {
+      var phi = 0.381966;
+      if (guide === 'thirds') return [[1 / 3, 0, 1 / 3, 1], [2 / 3, 0, 2 / 3, 1], [0, 1 / 3, 1, 1 / 3], [0, 2 / 3, 1, 2 / 3]];
+      if (guide === 'golden') return [[phi, 0, phi, 1], [1 - phi, 0, 1 - phi, 1], [0, phi, 1, phi], [0, 1 - phi, 1, 1 - phi]];
+      if (guide === 'center') return [[0.5, 0, 0.5, 1], [0, 0.5, 1, 0.5]];
+      if (guide === 'diagonals') return [[0, 0, 1, 1], [1, 0, 0, 1]];
+      return [];
+    }
+    function drawGuides() {
+      var svg = els.guidesSvg;
+      if (!svg) return;
+      while (svg.firstChild) svg.removeChild(svg.firstChild);
+      var segs = guideSegments(model.photoGuide);
+      var ns = 'http://www.w3.org/2000/svg';
+      ['halo', 'line'].forEach(function (cls) {
+        segs.forEach(function (s) {
+          var line = document.createElementNS(ns, 'line');
+          line.setAttribute('x1', String(s[0] * 100)); line.setAttribute('y1', String(s[1] * 100));
+          line.setAttribute('x2', String(s[2] * 100)); line.setAttribute('y2', String(s[3] * 100));
+          line.setAttribute('class', cls);
+          svg.appendChild(line);
+        });
+      });
+      var resultVisible = els.resultImage.classList.contains('is-visible');
+      els.preview.classList.toggle('has-guides', segs.length > 0 && !resultVisible);
+    }
+    // O quadro do preview segue a proporção escolhida enquanto não há imagem;
+    // com imagem na tela, o quadro é o da imagem (a próxima captura atualiza).
+    function applyPreviewAspect() {
+      if (model.captureUrl || model.result) return;
+      if (model.photoAspect > 0) els.preview.style.aspectRatio = String(model.photoAspect);
+      else if (model.captureSize) setAspect(model.captureSize[0], model.captureSize[1]);
+      else els.preview.style.aspectRatio = '4 / 3';
+    }
+    function photoHudText(cam) {
+      if (!cam) return '';
+      if (!cam.perspective) return tt('hudParallel');
+      var parts = [];
+      if (cam.focalLengthMm) parts.push(tt('hudLens', cam.focalLengthMm, Math.round(cam.fovDeg || 0)));
+      if (typeof cam.eyeHeightM === 'number') parts.push(tt('hudEye', fmtNum(cam.eyeHeightM, 2)));
+      // Medido no modelo por raytest — o usuário vê o que a IA vai receber.
+      if (cam.room && typeof cam.room.ceilingM === 'number') parts.push(tt('hudCeiling', fmtNum(cam.room.ceilingM, 2)));
+      if (typeof cam.tiltDeg === 'number' && Math.abs(cam.tiltDeg) >= 0.5) parts.push(tt('hudTilt', fmtNum(Math.abs(cam.tiltDeg), 0), cam.tiltDeg > 0));
+      return parts.join(' · ');
+    }
+    // A captura NÃO é um print da viewport: ela re-renderiza no quadro
+    // escolhido preservando o campo de visão VERTICAL. Quando o quadro é mais
+    // fechado que a tela, sobra coisa de fora — e isso precisa aparecer ANTES
+    // de capturar, não depois.
+    function cropSide() {
+      var chosen = Number(model.photoAspect || 0);
+      if (!(chosen > 0)) return null;
+      var view = Number((model.camera && model.camera.viewAspect) || 0);
+      if (!(view > 0) || Math.abs(view - chosen) < 0.02) return null;
+      return view > chosen ? 'sides' : 'topbottom';
+    }
+    function fmtAspect(v) {
+      return (Math.round(v * 100) / 100).toString().replace('.', ',') + ':1';
+    }
+    function renderPhotoControls() {
+      if (!els.aspectPills) return;
+      var cam = model.camera;
+      var perspective = !cam || cam.perspective !== false;
+
+      fill(els.aspectPills, ASPECT_OPTIONS.map(function (o) {
+        var active = Math.abs((model.photoAspect || 0) - o.value) < 0.01;
+        return pillButton(o.id === 'free' ? tt('aspectFree') : o.id, active, function () {
+          model.photoAspect = o.value; syncPhoto(); applyPreviewAspect(); renderPhotoControls(); persistStateSoon();
+        });
+      }));
+
+      var side = cropSide();
+      els.aspectHint.textContent = side
+        ? tt(side === 'sides' ? 'cropHintSides' : 'cropHintTopBottom',
+             fmtAspect(Number(model.camera.viewAspect)))
+        : '';
+      els.aspectHint.style.display = side ? '' : 'none';
+
+      fill(els.lensPills, LENS_OPTIONS.map(function (mm) {
+        var active = !!(cam && cam.perspective && Math.abs((cam.focalLengthMm || 0) - mm) <= 1);
+        var b = pillButton(tt('lensMm', mm), active, function () {
+          callSketchUp('applyLens', JSON.stringify({ mm: mm }));
+        });
+        if (!perspective) b.disabled = true;
+        return b;
+      }));
+
+      var hasFloor = !!(cam && typeof cam.eyeHeightM === 'number');
+      fill(els.eyePills, EYE_OPTIONS.map(function (o) {
+        var active = hasFloor && Math.abs(cam.eyeHeightM - o.m) <= 0.05;
+        var b = pillButton(tt('eye')[o.id] || o.id, active, function () {
+          callSketchUp('applyEyeHeight', JSON.stringify({ meters: o.m }));
+        });
+        if (!hasFloor || !perspective) b.disabled = true;
+        return b;
+      }));
+      var eyeMsg = '';
+      if (!perspective) eyeMsg = tt('eyeParallel');
+      else if (cam && !hasFloor) eyeMsg = tt('eyeNoFloor');
+      els.eyeHint.textContent = eyeMsg;
+      els.eyeHint.style.display = eyeMsg ? '' : 'none';
+
+      fill(els.levelPills, ['asis', 'level'].map(function (id) {
+        var active = (id === 'level') === !!model.photoLevel;
+        var b = pillButton(tt('level')[id] || id, active, function () {
+          model.photoLevel = id === 'level'; syncPhoto(); renderPhotoControls(); persistStateSoon();
+        });
+        if (!perspective) b.disabled = true;
+        return b;
+      }));
+      var levelMsg = '';
+      if (!perspective) levelMsg = tt('levelParallel');
+      else if (cam) {
+        var tilt = typeof cam.tiltDeg === 'number' ? cam.tiltDeg : 0;
+        if (cam.twoPoint || Math.abs(tilt) < 0.5) levelMsg = tt('levelFlat');
+        else if (Math.abs(tilt) > LEVEL_MAX_DEG || (cam.fovDeg || 0) + 2 * Math.abs(tilt) > LEVEL_FOV_MAX_DEG) levelMsg = tt('levelSteep', LEVEL_MAX_DEG);
+        else {
+          levelMsg = tt('levelTilted', fmtNum(Math.abs(tilt), 0), tilt > 0);
+          if (model.photoLevel) levelMsg += ' ' + tt('levelWill');
+        }
+      } else if (model.photoLevel) levelMsg = tt('levelWill');
+      els.levelHint.textContent = levelMsg;
+
+      fill(els.guidePills, GUIDE_OPTIONS.map(function (id) {
+        return pillButton(tt('guide')[id] || id, id === model.photoGuide, function () {
+          model.photoGuide = id; syncPhoto(); drawGuides(); renderPhotoControls(); persistStateSoon();
+        });
+      }));
+      els.guideHint.textContent = tt(model.guidesOverlay ? 'guideOverlayOn' : 'guideOverlayOff');
+      renderMirrorControls();
+      els.photoNote.textContent = tt('photoNote');
+      var hud = photoHudText(cam);
+      if (model.mirrors && model.mirrors.count > 0) hud += (hud ? ' · ' : '') + tt('hudMirrors', model.mirrors.count);
+      els.photoHud.textContent = hud;
+      drawGuides();
+      // A linha "Fotografia" resume estes controles — sem isto ela só se
+      // atualizava quando OUTRO evento passasse pelo updateShell, e ficava
+      // dizendo "Livre" depois de o usuário já ter escolhido 16:9.
+      if (typeof shell !== 'undefined' && shell) {
+        try { updateRows(); } catch (e) {}
+      }
+    }
+    // Espelhos: ações sobre a seleção atual do SketchUp (o painel não
+    // enxerga o modelo — o Ruby lê model.selection na hora do clique).
+    function renderMirrorControls() {
+      if (!els.mirrorPills) return;
+      var m = model.mirrors;
+      var supported = !m || m.supported !== false;
+      var count = m ? (m.count || 0) : 0;
+      var actions = [
+        { label: tt('mirrorMark'), run: function () { callSketchUp('markMirror', JSON.stringify({ kind: 'mirror' })); } },
+        { label: tt('mirrorMarkGlass'), run: function () { callSketchUp('markMirror', JSON.stringify({ kind: 'glass' })); } }
+      ];
+      if (count > 0) {
+        actions.push({ label: tt('mirrorUnmark'), run: function () { callSketchUp('unmarkMirror', JSON.stringify({ scope: 'selection' })); } });
+        actions.push({ label: tt('mirrorClear'), run: function () { callSketchUp('unmarkMirror', JSON.stringify({ scope: 'all' })); } });
+      }
+      fill(els.mirrorPills, actions.map(function (a) {
+        var b = pillButton(a.label, false, a.run);
+        b.removeAttribute('role');
+        b.removeAttribute('aria-checked');
+        if (!supported) b.disabled = true;
+        return b;
+      }));
+      var msg = '';
+      if (!supported) msg = tt('mirrorUnsupported');
+      else if (count > 0) msg = tt('mirrorCount', m.mirror || 0, m.glass || 0);
+      else msg = tt('mirrorNone');
+      if (m && m.stale > 0) msg += ' ' + tt('mirrorStale', m.stale);
+      // Seis planos por captura é o teto do Ruby (MIRROR_MAX_PER_CAPTURE):
+      // acima disso o excedente é ignorado e cada plano custa um render.
+      if (count > 6) msg += ' ' + st('mirrorOverLimit').replace('%d', 6).replace('%d', 6);
+      els.mirrorHint.textContent = msg;
+    }
+
+    // ── Depois do lote: salvar tudo e retomar o que faltou ──────────────────
+    // Salvar era um savepanel por imagem; e saldo ou sessão caindo no meio
+    // matava o caderno inteiro, sem como continuar.
+    function renderBatchActions() {
+      if (!els.batchActions) return;
+      var temResultado = model.batchResults.length > 0;
+      var temPendente = model.batchPending > 0;
+      els.batchActions.classList.toggle('is-visible', (temResultado || temPendente) && !model.batchRunning);
+      els.batchSaveButton.style.display = temResultado ? '' : 'none';
+      els.batchSaveButton.textContent = tt('batchSave', model.batchResults.length);
+      els.batchSaveButton.disabled = model.batchSaving || model.generating;
+      els.batchResumeButton.style.display = temPendente ? '' : 'none';
+      els.batchResumeButton.textContent = tt('batchResume', model.batchPending);
+      els.batchResumeButton.disabled = model.generating || model.batchSaving;
+      els.batchBuyButton.style.display = temPendente && model.batchInsufficient ? '' : 'none';
+      els.batchBuyButton.textContent = tt('buyNodes');
+      if (!model.batchSaving) {
+        var nota = temPendente ? tt('batchResumeNote', model.batchPending) : '';
+        if (temPendente && model.batchUncertain > 0) nota += ' ' + tt('batchUncertain', model.batchUncertain);
+        els.batchSaveNote.textContent = nota;
+      }
+    }
+    els.batchSaveButton.addEventListener('click', function () {
+      if (!model.batchResults.length || model.batchSaving) return;
+      // Só o que tem URL viva: item sem outputUrl viraria erro de download.
+      var items = model.batchResults.filter(function (r) {
+        return r && typeof r.outputUrl === 'string' && /^https?:\/\//i.test(r.outputUrl);
+      }).map(function (r) {
+        return { url: r.outputUrl, sceneName: r.sceneName || '', renderId: r.renderId || null };
+      });
+      if (!items.length) return;
+      model.batchSaving = true;
+      renderBatchActions();
+      els.batchSaveNote.textContent = tt('batchSaving', 0, items.length);
+      callSketchUp('saveBatch', JSON.stringify({ items: items }));
+    });
+    els.batchResumeButton.addEventListener('click', function () {
+      if (model.generating || !model.batchPending) return;
+      callSketchUp('resumeBatch');
+    });
+    els.batchBuyButton.addEventListener('click', function () {
+      callSketchUp('openUrl', model.apiBaseUrl + '/app/billing');
+    });
+
     // ── Preview / comparador ────────────────────────────────────────────────
+    // O painel nunca rolava: quem estava na configuração (que é onde se mexe)
+    // recebia o render fora da tela e via só o aviso verde de nodes gastos.
+    function scrollToStage() {
+      var sc = document.getElementById('scroll');
+      if (!sc || sc.scrollTop <= 8) return;
+      try { sc.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) { sc.scrollTop = 0; }
+    }
     function setAspect(w, h) {
       if (w > 0 && h > 0) els.preview.style.aspectRatio = w + ' / ' + h;
     }
@@ -1873,6 +3010,9 @@
       els.preview.classList.remove('is-comparing');
       els.emptyPreview.style.display = 'none';
       els.compareButton.style.display = model.result ? '' : 'none';
+      drawGuides();
+      if (shell) updateShell();
+      scrollToStage();
     }
     function showResult(result) {
       model.result = result;
@@ -1892,6 +3032,11 @@
       renderEditControls();
       renderAnimarControls();
       updateGenerateState();
+      drawGuides();
+      // Cada resultado novo fecha o "Mais ações" — a lista longa não herda.
+      els.resultMore.classList.remove('is-open');
+      renderResultMore();
+      scrollToStage();
     }
     function toggleCompare() {
       if (!model.result || !model.captureUrl) return;
@@ -2114,9 +3259,8 @@
     els.animarInsufficientBuy.addEventListener('click', function () { callSketchUp('openUrl', model.apiBaseUrl + '/app/billing'); });
     els.animarShortcutButton.addEventListener('click', function () {
       if (!model.result) return;
-      els.animarSection.open = true;
       renderAnimarControls();
-      if (els.animarSection.scrollIntoView) els.animarSection.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      openTab('animar');
     });
 
     function normText(s) {
@@ -2135,7 +3279,9 @@
       } else {
         scenes.forEach(function (s) { if (['facade', 'exterior', 'detail', 'static'].indexOf(s.id) < 0) cands.push(s); });
       }
-      var texts = [normText(model.environment), normText(model.segment)];
+      var texts = [model.environment, model.segment]
+        .filter(function (v) { return !isPreserved(v); })
+        .map(normText);
       for (var i = 0; i < texts.length; i++) {
         if (!texts[i]) continue;
         for (var j = 0; j < cands.length; j++) {
@@ -2214,6 +3360,15 @@
         notes.push(tt('condMaterials', c.materialsSent, c.materialsRequested, names));
       }
       if (c.sunRequested && !c.sunApplied) notes.push(tt('condNoSun'));
+      if (levelFailed(c)) {
+        var lr = tt('levelReasons') || {};
+        notes.push(tt('condNoLevel', lr[c.levelReason] || c.levelReason || '—'));
+      }
+      if (c.mirrorsRequested > 0 && c.mirrorsApplied < c.mirrorsRequested) {
+        var mr = tt('mirrorReasons') || {};
+        var why = (c.mirrorReasons || []).map(function (r) { return mr[r] || r; }).join(', ');
+        notes.push(tt('condMirrors', c.mirrorsApplied || 0, c.mirrorsRequested, why));
+      }
       return notes;
     }
     function isSafeResult(r) {
@@ -2238,6 +3393,7 @@
           engine: model.engine,
           resolution: model.resolution,
           sunPreset: model.sunPreset,
+          photoAspect: model.photoAspect, photoLevel: !!model.photoLevel, photoGuide: model.photoGuide,
           animarType: model.animarType, animarEngine: model.animarEngine, animarDuration: model.animarDuration,
           materialSel: model.materialSel,
           prompt: els.prompt.value
@@ -2256,6 +3412,9 @@
       if (saved.engine) model.engine = saved.engine;
       if (saved.resolution) model.resolution = saved.resolution;
       if (saved.sunPreset) model.sunPreset = saved.sunPreset;
+      if (typeof saved.photoAspect === 'number' && saved.photoAspect >= 0) model.photoAspect = saved.photoAspect;
+      if (typeof saved.photoLevel === 'boolean') model.photoLevel = saved.photoLevel;
+      if (GUIDE_OPTIONS.indexOf(saved.photoGuide) >= 0) model.photoGuide = saved.photoGuide;
       if (saved.animarType) model.animarType = saved.animarType;
       if (saved.animarEngine) model.animarEngine = saved.animarEngine;
       if (saved.animarDuration) model.animarDuration = String(saved.animarDuration);
@@ -2278,7 +3437,16 @@
     els.disconnectButton.addEventListener('click', function () { callSketchUp('disconnect'); });
     els.captureButton.addEventListener('click', function () {
       showNotice('', 'success');
-      callSketchUp('captureViewport');
+      callSketchUp('captureViewport', JSON.stringify({ photo: photoPayload() }));
+    });
+    function renderResultMore() {
+      var open = els.resultMore.classList.contains('is-open');
+      els.resultMoreToggle.textContent = st(open ? 'resultLess' : 'resultMore');
+      els.resultMoreToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    els.resultMoreToggle.addEventListener('click', function () {
+      els.resultMore.classList.toggle('is-open');
+      renderResultMore();
     });
     els.compareButton.addEventListener('click', toggleCompare);
     els.cancelButton.addEventListener('click', function () {
@@ -2293,7 +3461,11 @@
     });
     els.generateButton.addEventListener('click', function () { submitGenerate(false); });
     document.addEventListener('keydown', function (ev) {
-      if ((ev.ctrlKey || ev.metaKey) && ev.key === 'Enter' && !els.generateButton.disabled) submitGenerate(false);
+      if (!(ev.ctrlKey || ev.metaKey) || ev.key !== 'Enter') return;
+      // O atalho segue o CTA da aba ativa: senão geraria um render enquanto o
+      // botão à vista diz "Aplicar edição".
+      var btn = els[(shell && TAB_CTA[shell.tab]) || 'generateButton'];
+      if (btn && !btn.disabled) btn.click();
     });
 
     function submitGenerate(variation) {
@@ -2319,18 +3491,17 @@
         engine: model.engine,
         resolution: model.resolution,
         sunPreset: model.sunPreset,
+        photo: photoPayload(),
         materialSel: materialSelArray(),
         useAnchor: asVariation,
         anchorUrl: asVariation ? (model.result.outputUrl || null) : null,
         anchorCamera: asVariation ? (model.result.camera || null) : null,
-        seed: asVariation && model.result.seed != null ? model.result.seed : null
+        seed: asVariation && model.result.seed != null ? model.result.seed
+          : (styleLocked() ? model.projectStyle.seed : null)
       }));
     }
     els.variationButton.addEventListener('click', function () { submitGenerate(true); });
-    els.dockSummary.addEventListener('click', function () {
-      var target = document.getElementById('L_projectType');
-      if (target && target.scrollIntoView) target.scrollIntoView({ block: 'start', behavior: 'smooth' });
-    });
+    els.dockSummary.addEventListener('click', function () { openSheet('sheetScene'); });
 
     // ── Resultado vivo: URLs assinadas vencem em 1 h ────────────────────────
     var RESULT_TTL_MS = 50 * 60 * 1000;
@@ -2409,9 +3580,6 @@
     var historyLoaded = false;
     var historyLoading = false;
     var historyAppend = false;
-    els.historySection.addEventListener('toggle', function () {
-      if (els.historySection.open && !historyLoaded) loadHistory(null);
-    });
     els.historyMore.addEventListener('click', function () { loadHistory(model.historyCursor); });
     function loadHistory(cursor) {
       if (!model.authenticated) { els.historyEmpty.style.display = ''; return; }
@@ -2508,7 +3676,15 @@
           if ((wasAuthenticated && !model.authenticated) || (previousEmail && model.userEmail && previousEmail !== model.userEmail)) {
             resetHistory();
           }
-          if (payload.panelState && !model.catalog) restorePanelState(payload.panelState);
+          if ('guidesOverlay' in payload) model.guidesOverlay = !!payload.guidesOverlay;
+          if (payload.panelState && !model.catalog) {
+            restorePanelState(payload.panelState);
+            // Os ajustes de foto vivem no painel; o Ruby precisa deles pra
+            // moldura/overlay/captura antes mesmo do catálogo chegar.
+            syncPhoto();
+          }
+          applyPreviewAspect();
+          renderPhotoControls();
           model.videoSave = payload.videoSave === 'ask' ? 'ask' : 'project';
           renderVideoSavePills();
           if (!model.authenticated) showVideo(null);
@@ -2533,9 +3709,61 @@
         }
 
         if (event === 'capture') {
-          if (payload.width && payload.height) setAspect(payload.width, payload.height);
+          if (payload.width && payload.height) {
+            model.captureSize = [payload.width, payload.height];
+            setAspect(payload.width, payload.height);
+          }
           showCapture(payload.imageDataUrl);
           if (!model.generating) setFooter(tt('captured'));
+          // Captura manual: avisa na hora se o nivelamento pedido não saiu
+          // (na geração o mesmo aviso vai nas notas do resultado).
+          var pr = payload.photo;
+          if (!model.generating && levelFailed(pr)) {
+            var lr2 = tt('levelReasons') || {};
+            showNotice(tt('condNoLevel', lr2[pr.levelReason] || pr.levelReason || '—'), 'error');
+          }
+          if (!model.generating && pr && pr.mirrorsRequested > 0 && pr.mirrorsApplied < pr.mirrorsRequested) {
+            var mr2 = tt('mirrorReasons') || {};
+            var why2 = (pr.mirrorReasons || []).map(function (r) { return mr2[r] || r; }).join(', ');
+            var mirrorMsg = tt('condMirrors', pr.mirrorsApplied || 0, pr.mirrorsRequested, why2);
+            var existing = els.notice.textContent;
+            showNotice(existing ? existing + ' ' + mirrorMsg : mirrorMsg, existing ? 'error' : 'warn');
+          }
+        }
+
+        if (event === 'camera') {
+          model.camera = payload;
+          if ('overlay' in payload) model.guidesOverlay = !!payload.overlay;
+          renderPhotoControls();
+        }
+
+        // A planta capturada aparece no palco antes de subir: o usuário vê o
+        // desenho que a IA vai receber, e descobre ali se o corte pegou o
+        // pavimento errado — não depois de gastar os nodes.
+        if (event === 'planCapture') {
+          if (payload.imageDataUrl) showCapture(payload.imageDataUrl);
+          model.planSection = payload.section || null;
+        }
+
+        if (event === 'planResult') {
+          stopGeneratingUi();
+          showResult({
+            outputUrl: payload.outputUrl,
+            previewUrl: payload.outputUrl,
+            renderId: payload.renderId,
+            nodesCharged: payload.nodesCharged,
+            totalBalance: payload.totalBalance,
+            signedAt: Math.floor(Date.now() / 1000)
+          });
+          if (typeof payload.totalBalance === 'number') model.totalBalance = payload.totalBalance;
+          showNotice(tt('planDone', payload.nodesCharged || 0,
+            payload.section === 'model' ? tt('planSectionModel') : tt('planSectionTemp')), 'success');
+          updateGenerateState();
+        }
+
+        if (event === 'mirrors') {
+          model.mirrors = payload;
+          renderPhotoControls();
         }
 
         if (event === 'status') {
@@ -2597,6 +3825,17 @@
         }
 
         if (event === 'batchStart') {
+          // Retomada NÃO apaga o que já saiu (e já foi pago): as miniaturas e
+          // os resultados do lote anterior seguem, e o batchDone concatena.
+          if (!payload.resumed) {
+            model.batchResults = [];
+            els.batchResults.innerHTML = '';
+          }
+          model.batchPending = 0;
+          model.batchInsufficient = false;
+          model.batchSaving = false;
+          els.batchSaveNote.textContent = '';
+          renderBatchActions();
           model.batchRunning = true;
           els.batchProgress.innerHTML = '';
           els.batchResults.innerHTML = '';
@@ -2724,6 +3963,11 @@
           });
           var ok = Array.isArray(payload.results) ? payload.results.length : 0;
           var bad = Array.isArray(payload.errors) ? payload.errors.length : 0;
+          model.batchResults = Array.isArray(payload.results) ? payload.results : [];
+          model.batchPending = payload.pending || 0;
+          model.batchInsufficient = !!payload.insufficient;
+          model.batchUncertain = payload.uncertain || 0;
+          renderBatchActions();
           if (payload.aborted && payload.abortMessage) {
             // O erro fatal já chegou pelo evento 'error'.
           } else if (payload.cancelled) {
@@ -2734,6 +3978,29 @@
             showNotice(tt('batchOk', ok), 'success');
           }
           updateGenerateState();
+        }
+
+        if (event === 'batchSaveProgress') {
+          els.batchSaveNote.textContent = tt('batchSaving', payload.done || 0, payload.total || 0);
+        }
+
+        if (event === 'batchSaveDone') {
+          model.batchSaving = false;
+          var falhas = Array.isArray(payload.failed) ? payload.failed.length : 0;
+          els.batchSaveNote.textContent = '';
+          renderBatchActions();
+          if (falhas > 0) showNotice(tt('batchSavedPartial', payload.saved || 0, falhas), 'warn');
+          else showNotice(tt('batchSaved', payload.saved || 0, payload.dir || ''), 'success');
+        }
+
+        // Distribuímos .rbz fora do Extension Warehouse: sem este aviso, quem
+        // instalou uma vez nunca fica sabendo que saiu versão nova. Brando, e
+        // nunca por cima de uma geração em andamento.
+        if (event === 'pluginUpdate' && !model.generating) {
+          showNotice(tt('updateTitle', payload.version) + (payload.note ? ' — ' + payload.note : ''), 'warn', {
+            label: tt('updateAction'),
+            onClick: function () { callSketchUp('openUrl', payload.url); }
+          });
         }
 
         if (event === 'resultRefreshed') {
@@ -2780,6 +4047,13 @@
         }
 
         if (event === 'error') {
+          // Erro no meio do salvamento destravaria nada: sem isto o painel
+          // ficaria "salvando" pra sempre, matando Salvar e Retomar juntos.
+          if (model.batchSaving) {
+            model.batchSaving = false;
+            els.batchSaveNote.textContent = '';
+            renderBatchActions();
+          }
           // Só erros que encerram uma geração (generation:true) destravam a
           // UI de "gerando" — um erro paralelo (histórico, sessão) não pode
           // soltar o overlay de uma geração em andamento.
@@ -2825,6 +4099,627 @@
         }
       }
     };
+
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       Casca 1.0 — abas, folhas, fundo ambiente e Estilo do projeto.
+       Roda depois de todo o código acima (mesmo escopo): reusa model, els,
+       renderControls, updateGenerateState, callSketchUp e a ponte.
+       ═════════════════════════════════════════════════════════════════════ */
+
+    // ── i18n da casca ────────────────────────────────────────────────────
+    // Dicionário próprio pra não mexer no UI acima (que é grande e estável).
+    var SHELL_UI = {
+      pt: {
+        tabRender: 'Render', tabEdit: 'Editar', tabAnimar: 'Animar', tabScenes: 'Cenas', tabPlan: 'Planta',
+        rowScene: 'Cena', rowLight: 'Luz', rowPhoto: 'Fotografia', rowOutput: 'Saída',
+        sheetScene: 'Cena', sheetLight: 'Luz', sheetOutput: 'Saída',
+        done: 'Concluído', history: 'Histórico', settings: 'Preferências',
+        styleIdle: 'Estilo do projeto', styleOn: 'Estilo travado',
+        styleIdleSub: 'Trave o estilo pra que toda vista deste arquivo saia com a mesma paleta.',
+        styleNeedRender: 'Gere um render primeiro — é dele que sai a semente do estilo.',
+        styleOnSub: 'Toda geração deste arquivo repete esta semente.',
+        styleLock: 'Travar estilo', styleUpdate: 'Atualizar', styleApply: 'Aplicar', styleUnlock: 'Destravar',
+        styleSaved: 'Estilo travado neste arquivo — as próximas vistas repetem a paleta, os materiais e a atmosfera deste render.',
+        styleCleared: 'Estilo destravado. Cada render volta a sortear a própria semente.',
+        styleApplied: 'Ajustes do estilo aplicados ao painel.',
+        styleRestored: 'Este arquivo tem um estilo travado — os ajustes dele voltaram.',
+        lockedTag: 'Estilo travado',
+        toolLevel: 'Nivelar', toolGuides: 'Guias', toolSun: 'Sol', toolMirror: 'Espelho', toolScene: 'Nova cena',
+        toolLevelTip: 'Verticais retas na captura (correção de 2 pontos)',
+        toolGuidesTip: 'Guias de terços sobre o quadro',
+        toolSunTip: 'Abre a folha Luz pra escolher o sol da captura',
+        tabNeedsRender: 'Gere um render primeiro',
+        resultMore: 'Mais ações', resultLess: 'Menos ações',
+        toolMirrorTip: 'Marca a face selecionada no SketchUp como espelho',
+        toolSceneTip: 'Cria uma cena do SketchUp com a vista atual',
+        sceneAdded: 'Cena "%s" criada — já entra no lote e no Space.',
+        toolsHint: 'Estes cinco ajustam a CAPTURA — e a IA preserva o que ela vê.',
+        tipLevel: 'Nivelar: endireita as verticais na captura, como numa foto de arquitetura.',
+        tipGuides: 'Guias: grade de terços sobre o quadro, pra posicionar o que importa.',
+        tipSun: 'Sol: na folha Luz, a hora do sol do modelo aplicada só na captura — atual, manhã, meio-dia, entardecer, golden.',
+        tipMirror: 'Espelho: dois cliques pra entrar no grupo, clique só na FACE do espelho e toque aqui.',
+        mirrorReview: '%s — toque pra revisar',
+        mirrorOverLimit: 'Acima de %d planos por captura só os %d primeiros entram — limpe o que não for espelho.',
+        tipScene: 'Nova cena: salva esta vista como cena do SketchUp, pra usar no lote e no Space.',
+        onLevel: 'Verticais retas na próxima captura.',
+        offLevel: 'Verticais ficam como estão na vista.',
+        onGuides: 'Guias de terços ligadas.',
+        offGuides: 'Guias desligadas.',
+        sunNow: 'Sol da captura: %s.',
+        themeToLight: 'Mudar para o tema claro',
+        themeToDark: 'Mudar para o tema escuro'
+      },
+      en: {
+        tabRender: 'Render', tabEdit: 'Edit', tabAnimar: 'Animate', tabScenes: 'Scenes', tabPlan: 'Plan',
+        rowScene: 'Scene', rowLight: 'Light', rowPhoto: 'Photography', rowOutput: 'Output',
+        sheetScene: 'Scene', sheetLight: 'Light', sheetOutput: 'Output',
+        done: 'Done', history: 'History', settings: 'Preferences',
+        styleIdle: 'Project style', styleOn: 'Style locked',
+        styleIdleSub: 'Lock the style so every view of this file keeps the same palette.',
+        styleNeedRender: 'Generate a render first — the style seed comes from it.',
+        styleOnSub: 'Every generation in this file reuses this seed.',
+        styleLock: 'Lock style', styleUpdate: 'Update', styleApply: 'Apply', styleUnlock: 'Unlock',
+        styleSaved: 'Style locked into this file — the next views repeat the palette, materials and mood of this render.',
+        styleCleared: 'Style unlocked. Each render draws its own seed again.',
+        styleApplied: 'Style settings applied to the panel.',
+        styleRestored: 'This file has a locked style — its settings are back.',
+        lockedTag: 'Style locked',
+        toolLevel: 'Level', toolGuides: 'Guides', toolSun: 'Sun', toolMirror: 'Mirror', toolScene: 'New scene',
+        toolLevelTip: 'Straight verticals in the capture (two-point correction)',
+        toolGuidesTip: 'Rule-of-thirds guides over the frame',
+        toolSunTip: 'Opens the Light sheet to pick the capture sun',
+        tabNeedsRender: 'Generate a render first',
+        resultMore: 'More actions', resultLess: 'Fewer actions',
+        toolMirrorTip: 'Marks the face selected in SketchUp as a mirror',
+        toolSceneTip: 'Creates a SketchUp scene from the current view',
+        sceneAdded: 'Scene "%s" created — it joins the batch and the Space.',
+        toolsHint: 'These five shape the CAPTURE — and the AI preserves what it sees.',
+        tipLevel: 'Level: straightens the verticals in the capture, like an architectural photo.',
+        tipGuides: 'Guides: rule-of-thirds grid over the frame, to place what matters.',
+        tipSun: 'Sun: in the Light sheet, the model sun hour applied to the capture only — current, morning, noon, late afternoon, golden.',
+        tipMirror: 'Mirror: double-click into the group, select the mirror FACE only, then tap here.',
+        mirrorReview: '%s — tap to review',
+        mirrorOverLimit: 'Above %d planes per capture only the first %d are used — clear whatever is not a mirror.',
+        tipScene: 'New scene: saves this view as a SketchUp scene, for the batch and the Space.',
+        onLevel: 'Verticals will be straight in the next capture.',
+        offLevel: 'Verticals stay as they are in the view.',
+        onGuides: 'Rule-of-thirds guides on.',
+        offGuides: 'Guides off.',
+        sunNow: 'Capture sun: %s.',
+        themeToLight: 'Switch to the light theme',
+        themeToDark: 'Switch to the dark theme'
+      }
+    };
+    function st(key) {
+      var dict = SHELL_UI[model.locale === 'en' ? 'en' : 'pt'] || SHELL_UI.pt;
+      return dict[key] !== undefined ? dict[key] : SHELL_UI.pt[key];
+    }
+
+    var shell = {
+      tab: 'render',
+      sheet: null,
+      ambientUrl: null,
+      styleApplied: false
+    };
+
+    function $s(id) { return document.getElementById(id); }
+
+    // ── Abas ─────────────────────────────────────────────────────────────
+    var TAB_PANELS = { render: 'tabRender', edit: 'tabEdit', animar: 'tabAnimar', scenes: 'tabScenes', plan: 'tabPlan' };
+    function tabEnabled(id) {
+      if (id === 'edit') return editTabAvailable();
+      if (id === 'animar') return animarTabAvailable();
+      return true;
+    }
+    // As seções de Editar/Animar já eram mostradas/escondidas pelo código
+    // acima (display none/'' conforme há resultado) — a aba segue esse sinal.
+    function editTabAvailable() { return els.editSection ? els.editSection.style.display !== 'none' : false; }
+    function animarTabAvailable() { return els.animarSection ? els.animarSection.style.display !== 'none' : false; }
+
+    function openTab(id) {
+      if (!TAB_PANELS[id]) return;
+      if (!tabEnabled(id)) id = 'render';
+      shell.tab = id;
+      Object.keys(TAB_PANELS).forEach(function (key) {
+        var panel = $s(TAB_PANELS[key]);
+        if (panel) panel.classList.toggle('is-active', key === id);
+        var btn = document.querySelector('.seg[data-tab="' + key + '"]');
+        if (btn) {
+          btn.classList.toggle('is-active', key === id);
+          btn.setAttribute('aria-selected', key === id ? 'true' : 'false');
+        }
+      });
+      layoutThumb();
+      updateDockCta();
+      if (id === 'scenes') callSketchUpQuiet('listScenes');
+      if (id === 'edit' && model.modelMaterials.length === 0) callSketchUpQuiet('listMaterials');
+      if (id === 'animar') renderAnimarControls();
+    }
+    // Um CTA por aba, sempre no dock. Os botões são os MESMOS de antes (mesmo
+    // id, mesmo listener, mesmo rótulo) — só moraram de mudança.
+    var TAB_CTA = { render: 'generateButton', edit: 'editButton', animar: 'animarButton', scenes: 'batchButton', plan: 'planButton' };
+    function updateDockCta() {
+      var currentId = TAB_CTA[shell.tab] || TAB_CTA.render;
+      Object.keys(TAB_CTA).forEach(function (key) {
+        var btn = els[TAB_CTA[key]];
+        if (btn) btn.classList.toggle('is-current', TAB_CTA[key] === currentId);
+      });
+      var dock = $s('dock');
+      if (dock) {
+        // A Planta entra no dock auxiliar junto com Editar e Animar: o resumo
+        // ("Quasar 2K") e o alcance falam do custo do RENDER, e ao lado do
+        // botão da planta viravam legenda de outra coisa.
+        dock.classList.toggle('is-aux', shell.tab === 'edit' || shell.tab === 'animar' || shell.tab === 'plan');
+        dock.classList.toggle('is-batch', shell.tab === 'scenes');
+      }
+    }
+    function layoutThumb() {
+      var btn = document.querySelector('.seg.is-active');
+      var thumb = $s('segThumb');
+      if (!btn || !thumb) return;
+      thumb.style.width = btn.offsetWidth + 'px';
+      thumb.style.transform = 'translateX(' + btn.offsetLeft + 'px)';
+    }
+    // As abas não somem mais: o trilho mudava de forma no meio do uso (duas
+    // antes do primeiro render, quatro depois) e obrigava a redescobrir onde
+    // as coisas estavam. Ficam desabilitadas, dizendo o que falta.
+    function updateTabs() {
+      ['edit', 'animar'].forEach(function (id) {
+        var btn = document.querySelector('.seg[data-tab="' + id + '"]');
+        if (!btn) return;
+        var on = tabEnabled(id);
+        btn.disabled = !on;
+        btn.title = on ? '' : st('tabNeedsRender');
+        if (!on && shell.tab === id) openTab('render');
+      });
+    }
+    Array.prototype.forEach.call(document.querySelectorAll('.seg'), function (btn) {
+      btn.addEventListener('click', function () { openTab(btn.getAttribute('data-tab')); });
+    });
+    window.addEventListener('resize', layoutThumb);
+
+    // ── Folhas ───────────────────────────────────────────────────────────
+    function openSheet(id) {
+      var sheetEl = $s(id);
+      if (!sheetEl) return;
+      if (shell.sheet && shell.sheet !== id) closeSheet();
+      shell.sheet = id;
+      sheetEl.classList.add('is-open');
+      $s('scrim').classList.add('is-open');
+      if (id === 'sheetOutput' && model.modelMaterials.length === 0) callSketchUpQuiet('listMaterials');
+      if (id === 'sheetScene' && model.modelMaterials.length === 0) callSketchUpQuiet('listMaterials');
+      if (id === 'sheetHistory' && !historyLoaded) loadHistory(null);
+    }
+    function closeSheet() {
+      if (!shell.sheet) return;
+      var sheetEl = $s(shell.sheet);
+      if (sheetEl) sheetEl.classList.remove('is-open');
+      $s('scrim').classList.remove('is-open');
+      shell.sheet = null;
+    }
+    Array.prototype.forEach.call(document.querySelectorAll('[data-sheet]'), function (row) {
+      row.addEventListener('click', function () { openSheet(row.getAttribute('data-sheet')); });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-close]'), function (btn) {
+      btn.addEventListener('click', closeSheet);
+    });
+    $s('scrim').addEventListener('click', closeSheet);
+    $s('historyOpen').addEventListener('click', function () { openSheet('sheetHistory'); });
+    $s('settingsOpen').addEventListener('click', function () { openSheet('sheetSettings'); });
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape' && shell.sheet) { ev.preventDefault(); closeSheet(); }
+    });
+
+    // ── Fundo ambiente ───────────────────────────────────────────────────
+    // O render (ou a captura) vira papel de parede borrado. Falha de carga
+    // só apaga a camada — nunca é erro visível pro usuário.
+    function updateAmbient() {
+      var img = $s('ambientImage');
+      if (!img) return;
+      var url = (model.result && (model.result.previewUrl || model.result.outputUrl)) || model.captureUrl || '';
+      if (url === shell.ambientUrl) return;
+      shell.ambientUrl = url;
+      if (!url) { img.classList.remove('is-visible'); img.removeAttribute('src'); return; }
+      img.onload = function () { img.classList.add('is-visible'); };
+      img.onerror = function () { img.classList.remove('is-visible'); };
+      img.src = url;
+    }
+
+    // ── Conta: mora na folha de Preferências quando conectado ────────────
+    function syncAccountPlacement() {
+      var conn = $s('connection');
+      var slot = $s('accountSlot');
+      var scroll = $s('scroll');
+      if (!conn || !slot || !scroll) return;
+      var wantSlot = model.authenticated;
+      if (wantSlot && conn.parentNode !== slot) slot.appendChild(conn);
+      else if (!wantSlot && conn.parentNode !== scroll) scroll.insertBefore(conn, scroll.firstChild);
+    }
+
+    // ── Resumos das linhas ───────────────────────────────────────────────
+    function activePillText(containerId) {
+      var el = document.querySelector('#' + containerId + ' .pill.is-active, #' + containerId + ' .card.is-active');
+      if (!el) return '';
+      var b = el.querySelector('b');
+      return (b ? b.textContent : el.textContent).trim();
+    }
+    // "Preservar Original" é a primeira opção (e o default) de Segmento,
+    // Espaço, Iluminação e Entorno — quem não escolhe, não impõe. Nos RESUMOS
+    // ele não entra: uma linha que diz "Preservar Original · Preservar
+    // Original" gasta a largura do painel para não informar nada.
+    function isPreserved(v) { return !v || v === 'Preservar Original'; }
+    function joinParts(parts) {
+      return parts.filter(function (p) { return p && String(p).length; }).join(' · ');
+    }
+    function updateRows() {
+      var eng = currentEngine();
+      var res = currentResolution();
+      var bg = isPreserved(model.background) ? '' : pLabel(model.background);
+      // Com tudo preservado a linha ficaria muda; dizer "Preservar original"
+      // é mais honesto, porque essa É a configuração ativa.
+      $s('rowSceneValue').textContent = joinParts([
+        isPreserved(model.segment) ? '' : pLabel(model.segment),
+        isPreserved(model.environment) ? '' : pLabel(model.environment),
+        bg
+      ]) || pLabel('Preservar Original');
+      var sunLabel = model.sunPreset && model.sunPreset !== 'atual' ? activePillText('sunPills') : '';
+      $s('rowLightValue').textContent = joinParts([
+        model.lighting ? pLabel(model.lighting) : '', sunLabel
+      ]);
+      var cropSideNow = cropSide();
+      $s('rowPhotoValue').textContent = joinParts([
+        activePillText('aspectPills'),
+        cropSideNow ? tt(cropSideNow === 'sides' ? 'cropSides' : 'cropTopBottom') : '',
+        activePillText('lensPills'),
+        model.photoLevel ? activePillText('levelPills') : ''
+      ]);
+      // O preço vinha só dentro da folha, no cartão de Qualidade — e mudava
+      // quando se trocava de motor. Na linha ele fica à vista sem abrir nada.
+      $s('rowOutputValue').textContent = joinParts([
+        [eng ? eng.name : '', res ? res.label : ''].filter(Boolean).join(' '),
+        res && res.nodes != null ? res.nodes + ' ' + tt('nodes') : ''
+      ]);
+    }
+
+    // ── Estilo do projeto ────────────────────────────────────────────────
+    // Semente + presets gravados NO ARQUIVO (.skp). Enquanto travado, toda
+    // geração deste modelo repete a mesma semente: é o que segura a paleta,
+    // os materiais e a atmosfera entre vistas diferentes do mesmo projeto.
+    function styleLocked() {
+      return !!(model.projectStyle && model.projectStyle.seed != null);
+    }
+    function stylePresetFromPanel() {
+      return {
+        projectType: model.projectType,
+        segment: model.segment,
+        environment: model.environment,
+        lighting: model.lighting,
+        background: model.background,
+        sceneElements: (model.sceneElements || []).slice(),
+        engine: model.engine,
+        resolution: model.resolution,
+        sunPreset: model.sunPreset,
+        prompt: els.prompt.value
+      };
+    }
+    function styleSummary(preset) {
+      if (!preset) return '';
+      return joinParts([
+        isPreserved(preset.segment) ? '' : pLabel(preset.segment),
+        isPreserved(preset.environment) ? '' : pLabel(preset.environment),
+        isPreserved(preset.lighting) ? '' : pLabel(preset.lighting)
+      ]);
+    }
+    function currentResultSeed() {
+      return model.result && model.result.seed != null ? model.result.seed : null;
+    }
+    function renderStyleCard() {
+      var card = $s('styleCard');
+      var locked = styleLocked();
+      var seed = currentResultSeed();
+      card.classList.toggle('is-locked', locked);
+      $s('styleTitle').textContent = locked ? st('styleOn') : st('styleIdle');
+      $s('styleSeed').textContent = locked ? '#' + String(model.projectStyle.seed).slice(-6) : '';
+      var sub;
+      if (locked) sub = styleSummary(model.projectStyle.preset) || st('styleOnSub');
+      else if (seed == null) sub = st('styleNeedRender');
+      else sub = st('styleIdleSub');
+      $s('styleSub').textContent = sub;
+
+      var thumb = $s('styleThumb');
+      var thumbUrl = locked ? (model.projectStyle.thumb || '') : '';
+      if (thumbUrl) {
+        if (thumb.getAttribute('src') !== thumbUrl) thumb.src = thumbUrl;
+        thumb.classList.add('is-visible');
+        thumb.onerror = function () { thumb.classList.remove('is-visible'); };
+        $s('styleMark').style.display = 'none';
+      } else {
+        thumb.classList.remove('is-visible');
+        $s('styleMark').style.display = '';
+      }
+
+      var lockBtn = $s('styleLockButton');
+      var applyBtn = $s('styleApplyButton');
+      var unlockBtn = $s('styleUnlockButton');
+      var canRelock = seed != null && (!locked || seed !== model.projectStyle.seed);
+      lockBtn.style.display = canRelock || !locked ? '' : 'none';
+      lockBtn.textContent = locked ? st('styleUpdate') : st('styleLock');
+      lockBtn.disabled = seed == null || model.generating;
+      applyBtn.style.display = locked ? '' : 'none';
+      applyBtn.textContent = st('styleApply');
+      applyBtn.disabled = model.generating;
+      unlockBtn.style.display = locked ? '' : 'none';
+      unlockBtn.textContent = st('styleUnlock');
+      unlockBtn.disabled = model.generating;
+    }
+    function lockStyle() {
+      var seed = currentResultSeed();
+      if (seed == null) { showNotice(st('styleNeedRender'), 'warn'); return; }
+      model.projectStyle = {
+        seed: seed,
+        preset: stylePresetFromPanel(),
+        thumb: (model.result && (model.result.previewUrl || model.result.outputUrl)) || null,
+        renderId: (model.result && model.result.renderId) || null,
+        createdAt: Date.now()
+      };
+      shell.styleApplied = true;
+      callSketchUpQuiet('saveProjectStyle', JSON.stringify(model.projectStyle));
+      renderStyleCard();
+      updateGenerateState();
+      showNotice(st('styleSaved'), 'success');
+    }
+    function unlockStyle() {
+      model.projectStyle = null;
+      callSketchUpQuiet('clearProjectStyle');
+      renderStyleCard();
+      updateGenerateState();
+      showNotice(st('styleCleared'), 'warn');
+    }
+    function applyStylePreset(quiet) {
+      if (!styleLocked() || !model.projectStyle.preset || !model.catalog) return false;
+      var p = model.projectStyle.preset;
+      if (p.projectType) model.projectType = p.projectType;
+      if (p.segment) model.segment = p.segment;
+      if (p.environment) model.environment = p.environment;
+      if (p.lighting) model.lighting = p.lighting;
+      if (p.background) model.background = p.background;
+      if (p.sceneElements) model.sceneElements = p.sceneElements.slice();
+      if (p.engine) model.engine = p.engine;
+      if (p.resolution) model.resolution = p.resolution;
+      if (p.sunPreset) model.sunPreset = p.sunPreset;
+      if (typeof p.prompt === 'string') els.prompt.value = p.prompt;
+      onSelectionChanged();
+      if (!quiet) showNotice(st('styleApplied'), 'success');
+      return true;
+    }
+    $s('styleLockButton').addEventListener('click', lockStyle);
+    $s('styleUnlockButton').addEventListener('click', unlockStyle);
+    $s('styleApplyButton').addEventListener('click', function () { applyStylePreset(false); });
+
+    // ── Barra de ferramentas ─────────────────────────────────────────────
+    // Nivelar, guias, sol, espelho e virar cena são decisões que se tomam
+    // ENQUADRANDO — estavam todas atrás de uma folha. Aqui mexem no mesmo
+    // estado que os controles completos, que continuam existindo.
+    function renderQuickTools() {
+      var lvl = $s('toolLevel'), gd = $s('toolGuides'), sun = $s('toolSun');
+      var mr = $s('toolMirror'), sc = $s('toolScene');
+      if (!lvl) return;
+      lvl.classList.toggle('is-on', !!model.photoLevel);
+      gd.classList.toggle('is-on', !!(model.photoGuide && model.photoGuide !== 'none'));
+      var sunOn = !!(model.sunPreset && model.sunPreset !== 'atual');
+      sun.classList.toggle('is-on', sunOn);
+      $s('toolSunLabel').textContent = sunOn ? ((tt('sun') || {})[model.sunPreset] || st('toolSun')) : st('toolSun');
+      mr.classList.toggle('is-on', !!(model.mirrors && model.mirrors.count > 0));
+      // SketchUp sem persistent_id (2016-) não resolve marcação de face.
+      mr.disabled = model.generating || !!(model.mirrors && model.mirrors.supported === false);
+      [lvl, gd, sun, sc].forEach(function (b) { b.disabled = model.generating; });
+    }
+    $s('toolLevel').addEventListener('click', function () {
+      model.photoLevel = !model.photoLevel;
+      syncPhoto(); renderPhotoControls(); persistStateSoon(); renderQuickTools();
+      setToolsHint(st(model.photoLevel ? 'onLevel' : 'offLevel'), true);
+    });
+    $s('toolGuides').addEventListener('click', function () {
+      model.photoGuide = (model.photoGuide && model.photoGuide !== 'none') ? 'none' : 'thirds';
+      syncPhoto(); drawGuides(); renderPhotoControls(); persistStateSoon(); renderQuickTools();
+      setToolsHint(st(model.photoGuide === 'none' ? 'offGuides' : 'onGuides'), true);
+    });
+    // Eram cinco estados num stepper cego: clicar avançava pro próximo sem
+    // mostrar a lista, então achar "golden" custava quatro cliques às cegas.
+    // O botão abre a folha Luz, onde os cinco estão à vista; o estado ligado
+    // continua aparecendo no próprio botão.
+    $s('toolSun').addEventListener('click', function () {
+      openSheet('sheetLight');
+      setToolsHint(st('tipSun'), true);
+    });
+    // Espelho e cena agem sobre o MODELO (seleção viva / câmera viva): quem
+    // lê o SketchUp é o Ruby, no instante do clique.
+    $s('toolMirror').addEventListener('click', function () {
+      callSketchUp('markMirror', JSON.stringify({ kind: 'mirror' }));
+    });
+    $s('toolsHint').addEventListener('click', function () {
+      if ($s('toolsHint').classList.contains('is-action')) openSheet('sheetPhoto');
+    });
+    $s('toolScene').addEventListener('click', function () {
+      callSketchUp('addScene');
+    });
+
+    // ── A barra se explica ───────────────────────────────────────────────
+    // Hover/foco conta o que o botão faz; clique conta o que passou a valer
+    // (por 3 s); parada, a linha mostra o que está ligado. Sem tooltip como
+    // única fonte: no CEF ela demora e some.
+    var toolsHintTimer = null;
+    function toolsStateText() {
+      var parts = [];
+      if (model.photoLevel) parts.push(st('onLevel').replace(/\.$/, ''));
+      if (model.photoGuide && model.photoGuide !== 'none') parts.push(activePillText('guidePills'));
+      if (model.sunPreset && model.sunPreset !== 'atual') {
+        parts.push(st('sunNow').replace('%s', (tt('sun') || {})[model.sunPreset] || model.sunPreset).replace(/\.$/, ''));
+      }
+      if (model.mirrors && model.mirrors.count > 0) {
+        parts.push(st('mirrorReview').replace('%s', tt('hudMirrors', model.mirrors.count)));
+      }
+      return parts.length ? parts.join(' · ') : st('toolsHint');
+    }
+    function setToolsHint(text, sticky) {
+      var el = $s('toolsHint');
+      if (!el) return;
+      clearTimeout(toolsHintTimer);
+      el.textContent = text || toolsStateText();
+      el.classList.toggle('is-tip', !!text);
+      var revisavel = !text && !!(model.mirrors && model.mirrors.count > 0);
+      el.classList.toggle('is-action', revisavel);
+      el.setAttribute('role', revisavel ? 'button' : 'status');
+      if (text && sticky) toolsHintTimer = setTimeout(function () { setToolsHint(null); }, 3000);
+    }
+    [['toolLevel', 'tipLevel'], ['toolGuides', 'tipGuides'], ['toolSun', 'tipSun'],
+     ['toolMirror', 'tipMirror'], ['toolScene', 'tipScene']].forEach(function (pair) {
+      var el = $s(pair[0]);
+      if (!el) return;
+      var show = function () { setToolsHint(st(pair[1]), false); };
+      var hide = function () { setToolsHint(null); };
+      el.addEventListener('mouseenter', show);
+      el.addEventListener('focus', show);
+      el.addEventListener('mouseleave', hide);
+      el.addEventListener('blur', hide);
+    });
+
+    // ── Tema no topo ─────────────────────────────────────────────────────
+    // O seletor de três estados (automático/claro/escuro) segue em
+    // Preferências; aqui é o gesto de um toque, que é o que se usa.
+    var THEME_ICON = {
+      sun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/></svg>',
+      moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.2A8.2 8.2 0 0 1 9.8 4a8.4 8.4 0 1 0 10.2 10.2Z"/></svg>'
+    };
+    function renderThemeToggle() {
+      var btn = $s('themeToggle');
+      if (!btn) return;
+      var dark = !document.documentElement.classList.contains('light');
+      btn.innerHTML = dark ? THEME_ICON.sun : THEME_ICON.moon;
+      btn.title = dark ? st('themeToLight') : st('themeToDark');
+      btn.setAttribute('aria-label', btn.title);
+    }
+    $s('themeToggle').addEventListener('click', function () {
+      var next = document.documentElement.classList.contains('light') ? 'dark' : 'light';
+      model.themeSetting = next;
+      applyTheme();
+      renderThemePills();
+      callSketchUp('saveSettings', JSON.stringify({ theme: next }));
+    });
+
+    // ── Textos da casca ──────────────────────────────────────────────────
+    function localizeShell() {
+      var map = {
+        tabBtnRender: 'tabRender', tabBtnEdit: 'tabEdit', tabBtnAnimar: 'tabAnimar', tabBtnScenes: 'tabScenes',
+        tabBtnPlan: 'tabPlan',
+        rowSceneTitle: 'rowScene', rowLightTitle: 'rowLight', rowPhotoTitle: 'rowPhoto', rowOutputTitle: 'rowOutput',
+        sheetSceneTitle: 'sheetScene', sheetLightTitle: 'sheetLight', sheetOutputTitle: 'sheetOutput',
+        toolLevelLabel: 'toolLevel', toolGuidesLabel: 'toolGuides', toolMirrorLabel: 'toolMirror', toolSceneLabel: 'toolScene'
+      };
+      Object.keys(map).forEach(function (id) {
+        var el = $s(id);
+        if (el) el.textContent = st(map[id]);
+      });
+      Array.prototype.forEach.call(document.querySelectorAll('.sheet-done'), function (b) { b.textContent = st('done'); });
+      var hist = $s('L_history'); if (hist) hist.textContent = st('history');
+      var prefs = $s('L_settings'); if (prefs) prefs.textContent = st('settings');
+      $s('historyOpen').title = st('history');
+      $s('settingsOpen').title = st('settings');
+      renderStyleCard();
+      renderQuickTools();
+      renderThemeToggle();
+      setToolsHint(null);
+      [['toolLevel', 'toolLevelTip'], ['toolGuides', 'toolGuidesTip'], ['toolSun', 'toolSunTip'],
+       ['toolMirror', 'toolMirrorTip'], ['toolScene', 'toolSceneTip']].forEach(function (pair) {
+        var el = $s(pair[0]);
+        if (el) el.title = st(pair[1]);
+      });
+      layoutThumb();
+    }
+
+    // ── Sincronia geral ──────────────────────────────────────────────────
+    // O palco vazio encolhe e o cartão de Estilo só aparece quando há semente
+    // (antes do primeiro render ele é um botão desabilitado ocupando a
+    // primeira tela).
+    function updateStage() {
+      var empty = !model.captureUrl && !(model.result && model.result.outputUrl);
+      var stage = document.querySelector('.stage');
+      if (stage) stage.classList.toggle('is-empty', empty);
+      var card = $s('styleCard');
+      if (card) card.style.display = (styleLocked() || currentResultSeed() != null) ? '' : 'none';
+    }
+    function updateShell() {
+      updateTabs();
+      updateRows();
+      updateAmbient();
+      syncAccountPlacement();
+      renderStyleCard();
+      updateStage();
+      updateDockCta();
+      renderResultMore();
+      renderQuickTools();
+      if (!$s('toolsHint').classList.contains('is-tip')) setToolsHint(null);
+      var locked = styleLocked();
+      els.dockSummary.classList.toggle('is-locked', locked);
+      els.dockSummary.textContent = joinParts([locked ? st('lockedTag') : '', dockSummaryText()]);
+    }
+
+    // A ponte do Ruby continua sendo a de cima; aqui só reagimos depois dela.
+    (function () {
+      var inner = window.SpaceNodeBridge.receive;
+      window.SpaceNodeBridge.receive = function (event, payload) {
+        inner.call(this, event, payload);
+        try { shellOnEvent(event, payload || {}); } catch (e) {}
+      };
+    })();
+
+    function shellOnEvent(event, payload) {
+      if (event === 'state') {
+        if ('projectStyle' in payload) model.projectStyle = payload.projectStyle || null;
+        localizeShell();
+      }
+      if (event === 'projectStyle') {
+        model.projectStyle = payload.style || null;
+        // Salvo/destravado pelo próprio painel não reaplica nada. Vindo de
+        // troca de modelo (saved:false), o arquivo recém-aberto manda nos
+        // ajustes — é o que faz o estilo viajar junto com o .skp.
+        shell.styleApplied = !!payload.saved;
+      }
+      // O estilo do arquivo manda nos ajustes: ao abrir o painel (ou trocar
+      // de modelo) os presets gravados no .skp voltam sozinhos — é o sentido
+      // de "estilo do projeto". Uma vez por sessão, só com catálogo pronto.
+      if ((event === 'state' || event === 'catalog' || event === 'projectStyle') &&
+          !shell.styleApplied && styleLocked() && model.catalog) {
+        shell.styleApplied = true;
+        if (applyStylePreset(true)) showNotice(st('styleRestored'), 'success');
+      }
+      if (event === 'sceneAdded') showNotice(st('sceneAdded').replace('%s', payload.name || ''), 'success');
+      if (event === 'runGenerate') runGenerateWhenReady(0);
+      if (event === 'pairing') closeSheet();
+      if (event === 'result' || event === 'capture') closeSheet();
+      updateShell();
+    }
+
+    // "Gerar render" da toolbar nativa. A ordem pode chegar antes do catálogo
+    // (painel recém-aberto pelo próprio botão): espera o CTA liberar por até
+    // ~3 s e desiste em silêncio — o painel já está na frente mostrando o
+    // motivo (conectar, saldo insuficiente).
+    function runGenerateWhenReady(tries) {
+      if (model.generating) return;
+      // A ordem vem do botão "Gerar render" da toolbar do SketchUp: o painel
+      // volta pra aba Render, senão o CTA do dock continuaria mostrando outra
+      // ação enquanto a geração acontece.
+      if (shell.tab !== 'render') openTab('render');
+      if (!els.generateButton.disabled) { submitGenerate(false); return; }
+      if (tries >= 12) return;
+      setTimeout(function () { runGenerateWhenReady(tries + 1); }, 250);
+    }
+
+    // Primeira pintura: o Ruby ainda não respondeu, mas a casca já existe.
+    localizeShell();
+    updateShell();
+    openTab('render');
 
     document.addEventListener('DOMContentLoaded', function () {
       setFooter('');

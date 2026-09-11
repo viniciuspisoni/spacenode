@@ -48,12 +48,12 @@
 //   Envs: ARK_API_KEY (obrigatória), ARK_BASE_URL (default ap-southeast-1 — a
 //   única região com o Pro), ARK_SEEDREAM_PRO_MODEL (default
 //   dola-seedream-5-0-pro-260628), SEEDREAM_ARK_FAST=1 (modo rápido de prompt),
-//   SEEDREAM_ARK_HEDGE_MS (default 60 s; 0 = fallback sequencial),
-//   IMAGE_ARK_TIMEOUT_MS (teto da ModelArk, default 150 s).
+//   SEEDREAM_ARK_HEDGE_MS (default 0 = fallback sequencial; >0 liga a corrida),
+//   IMAGE_ARK_TIMEOUT_MS (teto da ModelArk, default 180 s).
 //   Corrida ModelArk × FAL: a maioria dos 2K volta em 40–58 s, mas há pedidos
-//   de ~2 min (imagem 2,6:1 com pessoas, pico em Singapura); com fallback
-//   sequencial a FAL sobrava com 45 s e falhava. Depois do hedge a FAL entra em
-//   paralelo e a primeira vence — nos casos lentos os dois cobram.
+//   de ~2 min (imagem 2,6:1 com pessoas, pico em Singapura). O hedge nasceu
+//   disso — só que, medido em produção, ele não ganhava: cobrava. Hoje vem
+//   DESLIGADO (ver ARK_HEDGE_MS) e a FAL entra quando a ark FALHA.
 //   A ModelArk devolve a URL do resultado (response_format url, expira em 24 h);
 //   esta camada baixa os bytes na hora (URL do provider, não do usuário — sem
 //   allowlist) e segue a MESMA entrega do GCP abaixo (re-host no Storage ou
@@ -176,9 +176,27 @@ const FAL_FALLBACK_MIN_MS = 45_000
 // isso. 0 desliga (volta ao fallback sequencial).
 const GCP_HEDGE_MS = Math.max(0, Number(process.env.IMAGE_GCP_HEDGE_MS ?? 45_000) || 0)
 
-// Hedge da rota ModelArk (Seedream/Quasar) — mesma ideia do GCP acima, com
-// gatilho mais tarde porque a ModelArk normal é ~50 s. 0 desliga (sequencial).
-const ARK_HEDGE_MS = Math.max(0, Number(process.env.SEEDREAM_ARK_HEDGE_MS ?? 60_000) || 0)
+// Hedge da rota ModelArk (Seedream/Quasar) — mesma ideia do GCP acima. Era
+// 60 s (a ModelArk parecia ~50 s no protótipo), mas em prod o Seedream 5.0
+// Pro 2K leva 114–119 s na ModelArk e 120–138 s na fal (8 renders, 05–07/09):
+// o hedge disparava em TODA geração, a fal nunca vencia e o perdedor não é
+// cancelado → cobrança dupla (US$0,09 ARK + US$0,135 fal) sem ganho de
+// tempo. 130 s só pega cauda real da ModelArk. 0 desliga (sequencial).
+// Hedge da ModelArk: dispara a FAL em paralelo depois deste tempo. DESLIGADO
+// (0 = fallback sequencial) desde 2026-09-10, porque com os orçamentos de hoje
+// a perna da FAL não tem COMO vencer — só cobrar. A conta: o teto do Quasar é
+// 180 s (FAL_TIMEOUT_MS na rota), o guard abaixo exige FAL_FALLBACK_MIN_MS
+// (45 s) pra perna da FAL — logo qualquer hedge acima de 135 s já virava
+// sequencial sozinho — e a FAL leva 120–138 s neste endpoint (medido nos
+// renders de prod). Disparando aos 130 s ela recebia 50 s e nunca terminava:
+// 1 em cada 3 renders pagava US$ 0,0675–0,135 à toa.
+// O que protegia de verdade continua ligado: ERRO da ark (401, filtro de
+// conteúdo, 404 de modelo) dispara a FAL na hora, com o orçamento quase
+// inteiro — foi o que salvou o incidente da chave errada em 06/09.
+// Pra ter de novo uma corrida que possa ser VENCIDA, não basta mexer aqui:
+// tem que subir o teto do engine junto (ex.: FAL_TIMEOUT_MS.quasar 260 s +
+// hedge 145 s, deixando ~115 s pra FAL) — ao custo de o usuário esperar mais.
+const ARK_HEDGE_MS = Math.max(0, Number(process.env.SEEDREAM_ARK_HEDGE_MS ?? 0) || 0)
 
 const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))
 
@@ -859,7 +877,12 @@ export async function generateImage(args: GenerateImageArgs): Promise<GenerateIm
   // espera a FAL em voo; os dois falham → sobe o erro traduzível).
   if (arkAvailableFor(args.falEndpoint)) {
     const fallback = imageFallbackEnabled()
-    const arkBudget = Math.min(args.timeoutMs, Number(process.env.IMAGE_ARK_TIMEOUT_MS) || 150_000)
+    // 180 s (era 150): sem hedge não se reserva mais tempo pra uma perna
+    // paralela da FAL, então a ark pode usar quase todo o orçamento. A cauda
+    // medida em prod é 134–145 s — a 150 s os lentos morriam a segundos do fim
+    // e viravam falha + estorno; agora entregam. Não custa nada: é a MESMA
+    // chamada, só esperando mais.
+    const arkBudget = Math.min(args.timeoutMs, Number(process.env.IMAGE_ARK_TIMEOUT_MS) || 180_000)
     const hedgeMs = fallback && ARK_HEDGE_MS > 0 && ARK_HEDGE_MS < arkBudget &&
       args.timeoutMs - ARK_HEDGE_MS >= FAL_FALLBACK_MIN_MS
       ? ARK_HEDGE_MS

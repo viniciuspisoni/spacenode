@@ -27,7 +27,7 @@ module SpaceNode
   module SketchUp
     extend self
 
-    VERSION = '0.7.0'
+    VERSION = '1.3.0'
     PREFERENCES_KEY = 'com.spacenode.sketchup'
     DEFAULT_API_BASE_URL = 'https://spacenode.app'
     MIN_SKETCHUP_MAJOR = 21          # Ruby 2.7+; recomendado 2024+
@@ -36,7 +36,7 @@ module SpaceNode
     UPLOAD_TIMEOUT_SECONDS = 120     # sign/PUT/confirm (Sketchup::Http não tem timeout)
     DOWNLOAD_TIMEOUT_SECONDS = 180   # download_to_file (render/vídeo) — não tinha watchdog
     VIDEO_STAGE_TIMEOUT_SECONDS = 60 # GET do preview antes de animar (mesmo valor do quote do Ampliar)
-    CATALOG_MIN_VERSION = 6          # cache em disco mais velho que isso é descartado (bloco animar)
+    CATALOG_MIN_VERSION = 9          # cache em disco mais velho que isso é descartado (v9 = presets da planta)
 
     # Strings do Ruby visíveis no painel (etapas/erros centrais). O grosso da
     # UI é traduzido no dialog; mensagens vindas do SERVIDOR seguem em pt-BR.
@@ -51,7 +51,37 @@ module SpaceNode
         :renewing => 'Renovando sessão…',
         :cancelled => 'Geração cancelada.',
         :view_restored => 'Vista do render restaurada.',
+        :no_floor => 'Não achei piso abaixo da câmera pra medir a altura do olho.',
+        :mirror_select_face => 'Selecione no SketchUp a face do espelho (ou vidro) e clique de novo.',
+        :mirror_select_inside => 'Entre no grupo com dois cliques e selecione a FACE do espelho — não o grupo inteiro.',
+        :mirror_marked => 'Face marcada como espelho — o reflexo entra em toda captura.',
+        :mirror_marked_glass => 'Face marcada como vidro — reflexo suave, com o que há atrás visível.',
+        :mirror_marked_n => '%d faces marcadas como espelho.',
+        :mirror_marked_glass_n => '%d faces marcadas como vidro.',
+        :mirror_over_limit => 'Cada plano vira um render extra na captura — acima de %d, só os %d primeiros entram. Limpe o que não for espelho em Fotografia.',
         :downloading => 'Baixando o render…',
+        :style_no_seed => 'Este render não tem semente — gere um novo pra travar o estilo.',
+        :scene_base_name => 'Vista',
+        :batch_save_empty => 'Nenhuma imagem do lote pra salvar.',
+        :batch_save_no_dir => 'Salve o arquivo .skp primeiro — as imagens vão pra uma pasta ao lado dele.',
+        :batch_save_busy => 'Já estou salvando as imagens deste lote.',
+        :batch_saved_n => '%d imagens salvas ao lado do projeto.',
+        :batch_resume_empty => 'Não há cenas pendentes pra retomar.',
+        :batch_resume_other_model => 'As cenas pendentes são de outro arquivo. Abra o projeto do lote pra retomar.',
+        :edit_mask_failed => 'Não consegui enviar a área marcada — Inserir precisa dela. Tente marcar de novo.',
+        :scene_no_model => 'Nenhum modelo aberto pra criar a cena.',
+        :scene_failed => 'Não consegui criar a cena.',
+        :tb_panel => 'SPACENODE',
+        :tb_panel_hint => 'Abrir o painel da SPACENODE',
+        :tb_capture => 'Capturar vista',
+        :tb_capture_hint => 'Capturar a vista atual no painel da SPACENODE',
+        :tb_generate => 'Gerar render',
+        :tb_generate_hint => 'Gerar o render da vista atual com os ajustes do painel',
+        :tb_scene => 'Nova cena',
+        :tb_scene_hint => 'Criar uma cena do SketchUp com a vista atual',
+        :tb_scene_done => 'Cena criada: %s',
+        :tb_mirror => 'Marcar espelho',
+        :tb_mirror_hint => 'Marcar a face selecionada como espelho (o reflexo entra na captura)',
         :reconciling => 'Conexão instável — verificando se o render foi concluído…',
         :connect_first => 'Conecte sua conta SPACENODE primeiro.',
         :busy => 'Já existe uma geração em andamento.',
@@ -60,6 +90,15 @@ module SpaceNode
         :pairing_expired => 'O código expirou. Clique em Conectar pra gerar outro.',
         :pairing_failed => 'Não foi possível conectar. Tente de novo.',
         :save_title => 'Salvar render',
+        :notif_plan_ready => 'Planta humanizada pronta',
+        :plan_capturing => 'Desenhando a planta do modelo…',
+        :plan_generating => 'Humanizando a planta na SPACENODE…',
+        :plan_no_model => 'Nenhum modelo aberto no SketchUp.',
+        :plan_empty => 'O modelo está vazio — não há planta pra desenhar.',
+        :plan_failed => 'Não foi possível desenhar a planta do modelo.',
+        :plan_no_catalog => 'Reconecte pra atualizar o catálogo da planta.',
+        :plan_invalid => 'Opção de planta inválida. Feche e reabra o painel pra atualizar o catálogo.',
+        :plan_lost => 'A planta demorou demais. Confira o Histórico antes de tentar de novo.',
         :animar_prep => 'Preparando o vídeo…',
         :animar_sending => 'Enviando o render…',
         :animating => 'Animando na SPACENODE…',
@@ -82,7 +121,37 @@ module SpaceNode
         :renewing => 'Renewing session…',
         :cancelled => 'Generation cancelled.',
         :view_restored => 'Render view restored.',
+        :no_floor => 'No floor found below the camera to measure the eye height.',
+        :mirror_select_face => 'Select the mirror (or glass) face in SketchUp and click again.',
+        :mirror_select_inside => 'Double-click into the group and select the mirror FACE — not the whole group.',
+        :mirror_marked => 'Face marked as a mirror — the reflection goes into every capture.',
+        :mirror_marked_glass => 'Face marked as glass — soft reflection, with what is behind still visible.',
+        :mirror_marked_n => '%d faces marked as mirrors.',
+        :mirror_marked_glass_n => '%d faces marked as glass.',
+        :mirror_over_limit => 'Each plane is one extra render in the capture — above %d, only the first %d are used. Clear what is not a mirror under Photography.',
         :downloading => 'Downloading the render…',
+        :style_no_seed => 'This render has no seed — generate a new one to lock the style.',
+        :scene_base_name => 'View',
+        :batch_save_empty => 'No batch images to save.',
+        :batch_save_no_dir => 'Save the .skp file first — the images go to a folder next to it.',
+        :batch_save_busy => 'Already saving the images from this batch.',
+        :batch_saved_n => '%d images saved next to the project.',
+        :batch_resume_empty => 'No pending scenes to resume.',
+        :batch_resume_other_model => 'The pending scenes belong to another file. Open the batch project to resume.',
+        :edit_mask_failed => 'Could not upload the marked area — Insert needs it. Try marking it again.',
+        :scene_no_model => 'No open model to create the scene in.',
+        :scene_failed => 'Could not create the scene.',
+        :tb_panel => 'SPACENODE',
+        :tb_panel_hint => 'Open the SPACENODE panel',
+        :tb_capture => 'Capture view',
+        :tb_capture_hint => 'Capture the current view into the SPACENODE panel',
+        :tb_generate => 'Generate render',
+        :tb_generate_hint => 'Render the current view with the panel settings',
+        :tb_scene => 'New scene',
+        :tb_scene_hint => 'Create a SketchUp scene from the current view',
+        :tb_scene_done => 'Scene created: %s',
+        :tb_mirror => 'Mark mirror',
+        :tb_mirror_hint => 'Mark the selected face as a mirror (the reflection goes into the capture)',
         :reconciling => 'Unstable connection — checking if the render finished…',
         :connect_first => 'Connect your SPACENODE account first.',
         :busy => 'A generation is already running.',
@@ -91,6 +160,15 @@ module SpaceNode
         :pairing_expired => 'The code expired. Click Connect to get a new one.',
         :pairing_failed => 'Could not connect. Try again.',
         :save_title => 'Save render',
+        :notif_plan_ready => 'Humanised plan ready',
+        :plan_capturing => 'Drawing the plan from the model…',
+        :plan_generating => 'Humanising the plan at SPACENODE…',
+        :plan_no_model => 'No model open in SketchUp.',
+        :plan_empty => 'The model is empty — there is no plan to draw.',
+        :plan_failed => 'Could not draw the plan from the model.',
+        :plan_no_catalog => 'Reconnect to refresh the plan catalogue.',
+        :plan_invalid => 'Invalid plan option. Close and reopen the panel to refresh the catalogue.',
+        :plan_lost => 'The plan took too long. Check History before trying again.',
         :animar_prep => 'Preparing the video…',
         :animar_sending => 'Uploading the render…',
         :animating => 'Animating on SPACENODE…',
@@ -109,6 +187,74 @@ module SpaceNode
     # 4096 px — capturar menos que isso pra 2K/4K joga fora o sinal
     # geométrico que o motor de fidelidade precisa.
     CAPTURE_EDGE = { 'hd' => 2048, '2k' => 3072, '4k' => 4096 }.freeze
+
+    # ── Fotografia (0.8.0) ───────────────────────────────────────────────
+    # Convenções: o fov do SketchUp é o ângulo VERTICAL (fov_is_height?);
+    # "lente" no painel é a focal equivalente full-frame medida pela ALTURA
+    # do sensor (24 mm) — f = 12 / tan(fov_v / 2). Isso bate com a lente real
+    # num quadro 3:2 e evita o número inflado que o SketchUp mostra (ele usa
+    # a LARGURA de 36 mm sobre o fov vertical: 35° viram "57 mm", quando na
+    # foto isso é um 38 mm).
+    PHOTO_SENSOR_HALF_HEIGHT_MM = 12.0
+    PHOTO_LENS_RANGE_MM = (8.0..400.0)
+    PHOTO_ASPECT_RANGE = (0.3..4.0)
+    PHOTO_EYE_RANGE_M = (0.2..12.0)
+    # Nivelar (2 pontos): inclinação mínima pra valer a pena e máxima que o
+    # fov de 120° do SketchUp comporta com folga (fov' = fov + 2·inclinação).
+    PHOTO_LEVEL_MIN_DEG = 0.5
+    PHOTO_LEVEL_MAX_DEG = 40.0
+    PHOTO_FOV_MAX_DEG = 118.0
+    PHOTO_GUIDES = %w[none thirds golden center diagonals].freeze
+    INCH_PER_M = 39.3700787
+    # Medidas do ambiente (1.2.0): faixas de sanidade. Raio que não acerta
+    # nada (vista externa) ou acerta fora da faixa não vira fato — medida
+    # errada no prompt é pior que medida nenhuma.
+    ROOM_RAY_RANGE_M = (0.4..40.0)
+    ROOM_CEILING_RANGE_M = (1.8..20.0)
+
+    # ── Planta do modelo (1.3.0) ──────────────────────────────────────────
+    #
+    # A Planta humanizada já existe no site, e lá ela exige que o usuário TENHA
+    # a planta como imagem: exportar do CAD, achar o arquivo, subir. Quem está
+    # dentro do SketchUp já tem o desenho — falta só olhar de cima.
+    #
+    # A captura é o que um arquiteto chama de planta: câmera no topo em
+    # projeção PARALELA (sem fuga), corte horizontal 1,20 m acima do piso e
+    # render em linha escondida. É a planta técnica que a rota espera.
+    PLAN_RENDER_MODE = 1              # hidden line — planta é desenho de linha
+    PLAN_MARGIN = 1.06                # folga em volta do pavimento
+    PLAN_CUT_HEIGHT_M = 1.2
+    PLAN_CAPTURE_OPTIONS = {
+      'RenderMode' => PLAN_RENDER_MODE,
+      'DisplaySectionPlanes' => false,  # o retângulo do plano sujaria o desenho
+      'DisplaySectionCuts' => true,     # ...mas o CORTE tem que aparecer
+      'SectionCutFilled' => true,       # parede cortada cheia: é o que lê como parede
+      'EdgeType' => 0,
+      'JitterEdges' => false,
+      'ExtendLines' => false,
+      'DrawDepthQue' => false,
+      'DrawLineEnds' => false,
+      'DisplayFog' => false,
+      'HideConstructionGeometry' => true,
+      'DisplayColorByLayer' => false,
+      'DisplayWatermarks' => false,
+      'DisplaySketchAxes' => false,
+      'DisplayInstanceAxes' => false,
+      'DisplayText' => false,
+      'DisplayDims' => false
+    }.freeze
+
+    # ── Espelhos (0.9.0) ──────────────────────────────────────────────────
+    # Reflexo calculado NA CAPTURA: câmera refletida pelo plano da face,
+    # render do que ela vê (geometria atrás do plano escondida), recorte da
+    # região do espelho e textura projetada na face — tudo dentro de uma
+    # operação abortada no fim (nada fica no modelo, nunca envelhece).
+    MIRROR_KINDS = %w[mirror glass].freeze
+    MIRROR_ALPHA = { 'mirror' => 1.0, 'glass' => 0.45 }.freeze
+    MIRROR_PLANE_EPS_IN = 0.4          # ~1 cm: coplanar/atrás = escondido no render refletido
+    MIRROR_REFLECTION_EDGE = 2048      # lado maior do render refletido (o viewport mostra texturas até 1024)
+    MIRROR_MAX_PER_CAPTURE = 6         # planos distintos por captura (um render cada)
+    MIRROR_MAX_ENTITIES = 400_000      # teto da varredura de ocultação
 
     # Higiene de captura: opções que poluem a imagem que a IA vê (sketchy
     # edges, extensão de linha, névoa, guias, grade de seção). Salvas e
@@ -236,7 +382,10 @@ module SpaceNode
       dialog.set_on_closed do
         # Só limpa se ainda somos o dialog corrente (um dialog antigo fechando
         # tarde não pode anular o novo).
-        @dialog = nil if @dialog.equal?(dialog)
+        if @dialog.equal?(dialog)
+          @dialog = nil
+          detach_photo_observers
+        end
       end
       @dialog = dialog
       dialog.show
@@ -254,9 +403,54 @@ module SpaceNode
           emit_error(e.message)
         end
       end
-      dialog.add_action_callback('captureViewport') do |_ctx|
+      dialog.add_action_callback('captureViewport') do |_ctx, raw|
         begin
-          handle_capture
+          handle_capture(raw)
+        rescue StandardError => e
+          emit_error(e.message)
+        end
+      end
+      # Fotografia: ajustes persistentes (proporção/nivelar/guias) e ações
+      # pontuais na câmera viva (lente, altura do olho).
+      dialog.add_action_callback('setPhoto') do |_ctx, raw|
+        begin
+          handle_set_photo(raw)
+        rescue StandardError => e
+          emit_error(e.message)
+        end
+      end
+      dialog.add_action_callback('applyLens') do |_ctx, raw|
+        begin
+          handle_apply_lens(raw)
+        rescue StandardError => e
+          emit_error(e.message)
+        end
+      end
+      dialog.add_action_callback('applyEyeHeight') do |_ctx, raw|
+        begin
+          handle_apply_eye_height(raw)
+        rescue StandardError => e
+          emit_error(e.message)
+        end
+      end
+      dialog.add_action_callback('cameraFacts') do |_ctx|
+        begin
+          emit_camera_facts
+        rescue StandardError => e
+          emit_error(e.message)
+        end
+      end
+      # Espelhos: marca/desmarca as faces selecionadas no SketchUp.
+      dialog.add_action_callback('markMirror') do |_ctx, raw|
+        begin
+          handle_mark_mirror(raw)
+        rescue StandardError => e
+          emit_error(e.message)
+        end
+      end
+      dialog.add_action_callback('unmarkMirror') do |_ctx, raw|
+        begin
+          handle_unmark_mirror(raw)
         rescue StandardError => e
           emit_error(e.message)
         end
@@ -284,6 +478,31 @@ module SpaceNode
           # generation:true: o painel armou a UI de lote no clique e um erro
           # aqui encerra a tentativa — precisa desarmar.
           emit_error(e.message, false, true)
+        end
+      end
+      dialog.add_action_callback('saveBatch') do |_ctx, raw|
+        begin
+          handle_save_batch(raw)
+        rescue StandardError => e
+          # O painel fica em "salvando" até ouvir batchSaveDone — recusa que
+          # só emitisse erro mataria os botões Salvar e Retomar pelo resto
+          # da sessão.
+          emit('batchSaveDone', { :saved => 0, :failed => [], :total => 0, :dir => '', :error => e.message })
+          emit_error(e.message)
+        end
+      end
+      dialog.add_action_callback('resumeBatch') do |_ctx|
+        begin
+          handle_resume_batch
+        rescue StandardError => e
+          emit_error(e.message, false, true)
+        end
+      end
+      dialog.add_action_callback('addScene') do |_ctx|
+        begin
+          handle_add_scene
+        rescue StandardError => e
+          emit_error(e.message)
         end
       end
       dialog.add_action_callback('listScenes') do |_ctx|
@@ -392,6 +611,20 @@ module SpaceNode
           emit_error(e.message)
         end
       end
+      dialog.add_action_callback('saveProjectStyle') do |_ctx, raw|
+        begin
+          handle_save_project_style(raw)
+        rescue StandardError => e
+          emit_error(e.message)
+        end
+      end
+      dialog.add_action_callback('clearProjectStyle') do |_ctx|
+        begin
+          handle_clear_project_style
+        rescue StandardError => e
+          emit_error(e.message)
+        end
+      end
       dialog.add_action_callback('persistState') do |_ctx, raw|
         write_json_default('panel_state', raw.to_s)
       end
@@ -412,6 +645,14 @@ module SpaceNode
       dialog.add_action_callback('animar') do |_ctx, raw|
         begin
           handle_animar(raw)
+        rescue StandardError => e
+          emit_error(e.message, false, true)
+        end
+      end
+
+      dialog.add_action_callback('generatePlan') do |_ctx, raw|
+        begin
+          handle_generate_plan(raw)
         rescue StandardError => e
           emit_error(e.message, false, true)
         end
@@ -440,9 +681,21 @@ module SpaceNode
 
     def on_panel_ready
       send_state
+      attach_photo_observers
+      emit_camera_facts
+      emit_mirrors
       ensure_catalog
       list_scenes
       check_session if authenticated?
+      # Ação disparada na toolbar com o painel fechado: roda agora que ele
+      # existe — capturar/gerar sem painel seria trabalho invisível.
+      pending = @pending_toolbar_action
+      @pending_toolbar_action = nil
+      begin
+        pending.call if pending
+      rescue StandardError => e
+        emit_error(e.message)
+      end
     end
 
     # ── HTTP assíncrono (Sketchup::Http) ────────────────────────────────────
@@ -787,10 +1040,58 @@ module SpaceNode
     def ensure_catalog
       cached = cached_catalog
       if cached
-        emit('catalog', cached)
+        emit_catalog(cached)
         return
       end
       refresh_catalog
+    end
+
+    # Distribuímos .rbz FORA do Extension Warehouse: não existe atualização
+    # automática, e quem instalou uma vez ficaria preso naquela versão pra
+    # sempre. O catálogo (v7) carrega pluginLatest; aqui comparamos com a
+    # nossa VERSION e avisamos UMA vez por sessão. Nunca bloqueia nada.
+    def emit_catalog(data)
+      emit('catalog', data)
+      check_plugin_update(data)
+    end
+
+    def check_plugin_update(data)
+      return if @update_notified
+      return unless data.is_a?(Hash)
+
+      latest = data['pluginLatest']
+      return unless latest.is_a?(Hash)
+
+      version = latest['version'].to_s
+      return unless version_newer?(version, VERSION)
+
+      @update_notified = true
+      path = latest['path'].to_s
+      url = path.start_with?('/') ? "#{api_base_url}#{path}" : path
+      emit('pluginUpdate', {
+        :version => version,
+        :current => VERSION,
+        :url => url,
+        :note => latest['note'].to_s
+      })
+    rescue StandardError
+      nil
+    end
+
+    # Comparação NUMÉRICA por segmento — string comparison diria que "1.0.9"
+    # é maior que "1.0.10".
+    def version_newer?(a, b)
+      pa = a.to_s.split('.').map(&:to_i)
+      pb = b.to_s.split('.').map(&:to_i)
+      return false if a.to_s.strip.empty?
+
+      [pa.length, pb.length].max.times do |i|
+        x = pa[i] || 0
+        y = pb[i] || 0
+        return true if x > y
+        return false if x < y
+      end
+      false
     end
 
     def refresh_catalog
@@ -809,7 +1110,7 @@ module SpaceNode
         rescue StandardError
           nil
         end
-        emit('catalog', data)
+        emit_catalog(data)
       end
     end
 
@@ -850,10 +1151,1183 @@ module SpaceNode
 
     # ── Captura ──────────────────────────────────────────────────────────────
 
-    def handle_capture
-      capture = capture_viewport('2k')
+    def handle_capture(raw = nil)
+      payload = parse_json(raw)
+      capture = capture_viewport('2k', :photo => photo_settings_from(payload['photo']))
       @last_capture_path = capture[:path]
-      emit('capture', capture_event_payload(capture[:path]))
+      emit('capture', capture_event_payload(capture[:path]).merge(:photo => capture[:photo_report]))
+    end
+
+    # ── Fotografia ───────────────────────────────────────────────────────────
+    #
+    # Princípio: a IA preserva o que vê — então o que dá realismo é a CAPTURA
+    # sair como uma fotografia de arquitetura: proporção escolhida, lente
+    # coerente, olho na altura de uma pessoa e verticais paralelas. Proporção
+    # e lente mexem na câmera viva (o SketchUp mostra a moldura); "nivelar"
+    # é só na captura (câmera temporária + recorte), sem tocar na vista do
+    # usuário.
+
+    # Ajustes persistentes vindos do painel: { aspect, level, guide }.
+    # aspect: Float (largura/altura) ou 0 = livre (segue a viewport).
+    def handle_set_photo(raw)
+      payload = parse_json(raw)
+      settings = photo_settings_from(payload)
+      @photo = settings
+      begin
+        model = ::Sketchup.active_model
+        if model
+          camera = model.active_view.camera
+          apply_camera_aspect(camera, settings[:aspect])
+          sync_guides_overlay(model, settings)
+          model.active_view.invalidate
+        end
+      rescue StandardError
+        nil
+      end
+      emit_camera_facts
+    end
+
+    def photo_settings_from(value)
+      base = @photo || { :aspect => 0.0, :level => false, :guide => 'none' }
+      return base unless value.is_a?(Hash)
+
+      out = base.dup
+      if value.key?('aspect')
+        aspect = value['aspect'].to_f
+        out[:aspect] = PHOTO_ASPECT_RANGE.cover?(aspect) ? aspect : 0.0
+      end
+      out[:level] = value['level'] == true if value.key?('level')
+      if value.key?('guide')
+        guide = value['guide'].to_s
+        out[:guide] = PHOTO_GUIDES.include?(guide) ? guide : 'none'
+      end
+      out
+    end
+
+    # Livre (0) só limpa a moldura que o PAINEL pôs — uma moldura que o
+    # usuário definiu por conta própria no SketchUp fica como está.
+    def apply_camera_aspect(camera, aspect)
+      return unless camera.respond_to?(:aspect_ratio=)
+
+      target = aspect.to_f > 0 ? aspect.to_f : 0.0
+      current = camera.aspect_ratio.to_f
+      if target > 0
+        camera.aspect_ratio = target if (current - target).abs > 0.001
+        @panel_aspect = target
+      elsif @panel_aspect && (current - @panel_aspect).abs < 0.001
+        camera.aspect_ratio = 0.0
+        @panel_aspect = nil
+      end
+    rescue StandardError
+      nil
+    end
+
+    # Lente: focal equivalente full-frame (pela altura do sensor) → fov
+    # vertical do SketchUp. Mantém olho, alvo e up.
+    def handle_apply_lens(raw)
+      payload = parse_json(raw)
+      mm = payload['mm'].to_f
+      raise 'Lente fora do intervalo (8–400 mm).' unless PHOTO_LENS_RANGE_MM.cover?(mm)
+
+      model = ::Sketchup.active_model
+      raise 'Nenhum modelo aberto no SketchUp.' unless model
+
+      view = model.active_view
+      camera = view.camera
+      raise 'A lente só se aplica em perspectiva (a câmera está em projeção paralela).' unless camera.perspective?
+
+      fov_v = 2.0 * Math.atan(PHOTO_SENSOR_HALF_HEIGHT_MM / mm) * 180.0 / Math::PI
+      set_vertical_fov(camera, fov_v, frame_aspect(view, camera))
+      view.invalidate
+      emit_camera_facts
+    end
+
+    # Altura do olho: raio pra baixo a partir do olho acha o piso (geometria
+    # visível); move olho E alvo juntos — a direção não muda.
+    def handle_apply_eye_height(raw)
+      payload = parse_json(raw)
+      meters = payload['meters'].to_f
+      raise 'Altura fora do intervalo (0,2–12 m).' unless PHOTO_EYE_RANGE_M.cover?(meters)
+
+      model = ::Sketchup.active_model
+      raise 'Nenhum modelo aberto no SketchUp.' unless model
+
+      view = model.active_view
+      camera = view.camera
+      floor_z = floor_under(model, camera.eye)
+      raise t(:no_floor) unless floor_z
+
+      dz = (floor_z + meters * INCH_PER_M) - camera.eye.z
+      shift = ::Geom::Vector3d.new(0, 0, dz)
+      camera.set(camera.eye.offset(shift), camera.target.offset(shift), camera.up)
+      view.invalidate
+      emit_camera_facts
+    end
+
+    # Cota z do primeiro elemento visível abaixo do ponto (polegadas) ou nil.
+    # ── Medidas do ambiente (raytest a partir do olho) ──────────────────────
+    #
+    # A imagem sozinha não dá escala: é por isso que um render inventa
+    # pé-direito de 4 m numa sala de 2,70 m, porta de 2,40 m e bancada na
+    # altura errada. O plugin está DENTRO do modelo e pode simplesmente medir.
+    # Já fazíamos isso para a altura do olho; aqui vão o pé-direito (piso até
+    # teto sob a câmera) e a largura parede a parede na altura do olho.
+    #
+    # Honestidade do fato: tudo é medido NO PONTO DA CÂMERA, e o prompt diz
+    # isso. Um raio lateral pode acertar uma estante em vez da parede — o erro
+    # é da ordem da profundidade do móvel, e a faixa de sanidade descarta o
+    # resto. Sem acerto (câmera fora da edificação) não mandamos nada.
+    def ray_distance_m(model, origin, vector)
+      hit = model.raytest([origin, vector], true)
+      return nil unless hit && hit[0]
+
+      meters = origin.distance(hit[0]) / INCH_PER_M
+      ROOM_RAY_RANGE_M.cover?(meters) ? meters : nil
+    rescue StandardError
+      nil
+    end
+
+    def room_facts(model, camera)
+      eye = camera.eye
+      room = {}
+
+      up = ray_distance_m(model, eye, ::Geom::Vector3d.new(0, 0, 1))
+      floor_z = floor_under(model, eye)
+      down = floor_z ? (eye.z - floor_z) / INCH_PER_M : nil
+      if up && down && down > 0
+        ceiling = up + down
+        room[:ceilingM] = ceiling.round(2) if ROOM_CEILING_RANGE_M.cover?(ceiling)
+      end
+
+      dir = camera.direction
+      flat = ::Geom::Vector3d.new(dir.x, dir.y, 0)
+      if flat.length > 1e-6
+        flat.normalize!
+        # Vector3d#* é produto VETORIAL (o escalar é %): dá a perpendicular
+        # horizontal à direção da vista.
+        side = flat * ::Geom::Vector3d.new(0, 0, 1)
+        if side.length > 1e-6
+          side.normalize!
+          left = ray_distance_m(model, eye, side)
+          right = ray_distance_m(model, eye, side.reverse)
+          if left && right
+            width = left + right
+            room[:widthM] = width.round(2) if ROOM_RAY_RANGE_M.cover?(width)
+          end
+        end
+      end
+
+      room.empty? ? nil : room
+    rescue StandardError
+      nil
+    end
+
+    def floor_under(model, point)
+      hit = model.raytest([point, ::Geom::Vector3d.new(0, 0, -1)], true)
+      return nil unless hit && hit[0]
+
+      z = hit[0].z
+      return nil if z > point.z
+
+      z
+    rescue StandardError
+      nil
+    end
+
+    # Proporção efetiva do quadro: a moldura da câmera, se houver; senão a
+    # viewport.
+    def frame_aspect(view, camera)
+      begin
+        ar = camera.aspect_ratio.to_f
+        return ar if ar > 0
+      rescue StandardError
+        nil
+      end
+      vpw = [view.vpwidth.to_f, 1.0].max
+      vph = [view.vpheight.to_f, 1.0].max
+      vpw / vph
+    end
+
+    def fov_is_height?(camera)
+      camera.respond_to?(:fov_is_height?) ? camera.fov_is_height? : true
+    rescue StandardError
+      true
+    end
+
+    # fov vertical em graus, qualquer que seja o eixo em que o SketchUp mede.
+    def vertical_fov_deg(camera, aspect)
+      fov = camera.fov.to_f
+      return fov if fov_is_height?(camera)
+
+      half = Math.atan(Math.tan(fov * Math::PI / 360.0) / [aspect.to_f, 0.01].max)
+      half * 360.0 / Math::PI
+    end
+
+    def set_vertical_fov(camera, fov_v_deg, aspect)
+      value = fov_v_deg.to_f
+      unless fov_is_height?(camera)
+        half = Math.atan(Math.tan(value * Math::PI / 360.0) * [aspect.to_f, 0.01].max)
+        value = half * 360.0 / Math::PI
+      end
+      value = 1.0 if value < 1.0
+      value = 120.0 if value > 120.0
+      camera.fov = value
+    end
+
+    # Focal equivalente (full-frame, pela altura) a partir do fov vertical.
+    def lens_mm_for(fov_v_deg)
+      half = [fov_v_deg.to_f, 0.5].max * Math::PI / 360.0
+      PHOTO_SENSOR_HALF_HEIGHT_MM / Math.tan(half)
+    end
+
+    # Inclinação da câmera em graus (+ olhando pra cima).
+    def camera_tilt_deg(camera)
+      z = camera.direction.z.to_f
+      z = 1.0 if z > 1.0
+      z = -1.0 if z < -1.0
+      Math.asin(z) * 180.0 / Math::PI
+    end
+
+    # Fatos de câmera pro HUD do painel e pro prompt. two_point força o valor
+    # (captura nivelada); nil deduz da câmera (modo 2 pontos do SketchUp ou
+    # direção horizontal).
+    def camera_facts(view, camera, two_point = nil)
+      facts = { :perspective => camera.perspective? ? true : false }
+      begin
+        facts[:aspect] = camera.aspect_ratio.to_f
+      rescue StandardError
+        facts[:aspect] = 0.0
+      end
+      # Proporção da VIEWPORT (não a da câmera): é contra ela que o painel
+      # compara o quadro escolhido pra dizer o que fica fora da captura.
+      begin
+        facts[:viewAspect] = (view.vpwidth.to_f / [view.vpheight.to_f, 1.0].max).round(4)
+      rescue StandardError
+        nil
+      end
+      if camera.perspective?
+        aspect = frame_aspect(view, camera)
+        fov_v = vertical_fov_deg(camera, aspect)
+        tilt = camera_tilt_deg(camera)
+        native_2d = camera.respond_to?(:is_2d?) && camera.is_2d?
+        facts[:fovDeg] = fov_v.round(1)
+        facts[:focalLengthMm] = lens_mm_for(fov_v).round
+        facts[:tiltDeg] = tilt.round(1)
+        facts[:twoPoint] = two_point.nil? ? (native_2d || tilt.abs < PHOTO_LEVEL_MIN_DEG) : (two_point ? true : false)
+      end
+      begin
+        model = ::Sketchup.active_model
+        floor_z = model ? floor_under(model, camera.eye) : nil
+        if floor_z
+          meters = (camera.eye.z - floor_z) / INCH_PER_M
+          facts[:eyeHeightM] = meters.round(2) if PHOTO_EYE_RANGE_M.cover?(meters)
+        end
+        # Medidas do ambiente: vão pro HUD do painel e, na captura, pro
+        # bloco MODEL FACTS do prompt.
+        room = model ? room_facts(model, camera) : nil
+        facts[:room] = room if room
+      rescue StandardError
+        nil
+      end
+      facts
+    rescue StandardError
+      nil
+    end
+
+    def emit_camera_facts
+      model = ::Sketchup.active_model
+      return unless model && @dialog
+
+      view = model.active_view
+      facts = camera_facts(view, view.camera)
+      return unless facts
+
+      facts[:overlay] = guides_overlay_supported?
+      emit('camera', facts)
+    rescue StandardError
+      nil
+    end
+
+    # Observers: câmera mudou → HUD do painel (com debounce — o orbit dispara
+    # dezenas de vezes por segundo); modelo trocou → religa overlay/observer.
+    def attach_photo_observers
+      model = ::Sketchup.active_model
+      return unless model
+
+      view = model.active_view
+      unless @view_observer && @observed_view.equal?(view)
+        detach_view_observer
+        @view_observer = PhotoViewObserver.new(self)
+        view.add_observer(@view_observer)
+        @observed_view = view
+      end
+      unless @app_observer
+        @app_observer = PhotoAppObserver.new(self)
+        ::Sketchup.add_observer(@app_observer)
+      end
+      sync_guides_overlay(model, @photo || photo_settings_from(nil))
+    rescue StandardError
+      nil
+    end
+
+    def detach_view_observer
+      return unless @view_observer && @observed_view
+
+      begin
+        @observed_view.remove_observer(@view_observer)
+      rescue StandardError
+        nil
+      end
+      @view_observer = nil
+      @observed_view = nil
+    end
+
+    def detach_photo_observers
+      detach_view_observer
+      if @app_observer
+        begin
+          ::Sketchup.remove_observer(@app_observer)
+        rescue StandardError
+          nil
+        end
+        @app_observer = nil
+      end
+      begin
+        overlay = @guides_overlay
+        overlay.enabled = false if overlay && overlay.respond_to?(:valid?) && overlay.valid?
+      rescue StandardError
+        nil
+      end
+    end
+
+    # Chamado pelo ViewObserver a cada mudança de câmera; coalesce num timer.
+    # A moldura do quadro mora na CÂMERA (camera.aspect_ratio) — é ela que faz
+    # o SketchUp desenhar as barras, em qualquer versão (a overlay exige 2023+).
+    # Só que trocar de cena troca a câmera, e a moldura sumia da tela sem que o
+    # painel mudasse de ideia: o usuário voltava a ver a viewport inteira e a
+    # captura continuava recortando no quadro escolhido. Reaplica sempre que a
+    # vista muda. Converge: reaplicar dispara onViewChanged, mas na segunda
+    # passada a câmera já está com o valor e apply_camera_aspect não escreve.
+    def reapply_camera_frame
+      settings = @photo
+      return unless settings && settings[:aspect].to_f > 0
+
+      model = ::Sketchup.active_model
+      return unless model
+
+      apply_camera_aspect(model.active_view.camera, settings[:aspect])
+    rescue StandardError
+      nil
+    end
+
+    def camera_changed
+      return unless @dialog
+      return if @camera_timer
+
+      @camera_timer = ::UI.start_timer(0.25, false) do
+        @camera_timer = nil
+        reapply_camera_frame
+        emit_camera_facts
+      end
+    rescue StandardError
+      @camera_timer = nil
+    end
+
+    def model_switched
+      @guides_overlay = nil
+      detach_view_observer
+      attach_photo_observers
+      reapply_camera_frame
+      emit_camera_facts
+      emit_mirrors
+      emit_project_style(false)
+    rescue StandardError
+      nil
+    end
+
+    # ── Espelhos ─────────────────────────────────────────────────────────────
+    #
+    # O SketchUp mostra o espelho como uma face chapada e a IA inventa o
+    # reflexo. Os concorrentes gravam uma textura na face amarrada a UMA cena
+    # (fica velha ao mover a câmera; precisa "apagar reflexos"). Aqui o
+    # reflexo é recalculado em toda captura, pra câmera daquela captura, e
+    # some com abort_operation — o modelo do usuário nunca muda.
+    #
+    # Marcação: o usuário seleciona a(s) face(s) no SketchUp (entrando no
+    # grupo) e clica em Marcar; guardamos persistent_id da face + o caminho
+    # de instâncias (active_path) no .skp, e um atributo na própria face.
+
+    def handle_mark_mirror(raw)
+      payload = parse_json(raw)
+      kind = payload['kind'].to_s
+      kind = 'mirror' unless MIRROR_KINDS.include?(kind)
+
+      model = ::Sketchup.active_model
+      raise 'Nenhum modelo aberto no SketchUp.' unless model
+
+      selection = model.selection.to_a
+      faces = selection.select { |e| e.is_a?(::Sketchup::Face) }
+      if faces.empty?
+        has_container = selection.any? { |e| e.is_a?(::Sketchup::Group) || e.is_a?(::Sketchup::ComponentInstance) }
+        raise t(has_container ? :mirror_select_inside : :mirror_select_face)
+      end
+
+      path_pids = Array(model.active_path).map { |inst| inst.persistent_id }
+      entries = mirror_entries(model)
+      model.start_operation('SPACENODE: marcar espelho', true)
+      begin
+        faces.each do |face|
+          pid = face.persistent_id
+          face.set_attribute('spacenode', 'mirror', kind)
+          entries.reject! { |e| e['pid'] == pid }
+          entries << { 'pid' => pid, 'path' => path_pids, 'kind' => kind }
+        end
+        save_mirror_entries(model, entries)
+        model.commit_operation
+      rescue StandardError
+        model.abort_operation
+        raise
+      end
+      emit_mirrors
+      # Quantas: marcar em lote (seleção que pegou o grupo inteiro por dentro)
+      # tem que ser VISÍVEL na hora, senão o usuário só descobre no render.
+      message = if faces.length > 1
+                  format(t(kind == 'glass' ? :mirror_marked_glass_n : :mirror_marked_n), faces.length)
+                else
+                  t(kind == 'glass' ? :mirror_marked_glass : :mirror_marked)
+                end
+      total = mirror_entries(model).length
+      if total > MIRROR_MAX_PER_CAPTURE
+        message += ' ' + format(t(:mirror_over_limit), MIRROR_MAX_PER_CAPTURE, MIRROR_MAX_PER_CAPTURE)
+      end
+      emit('status', { :stage => 'idle', :message => message })
+    end
+
+    # 'selection' desmarca as faces selecionadas; 'all' limpa tudo.
+    def handle_unmark_mirror(raw)
+      payload = parse_json(raw)
+      scope = payload['scope'].to_s
+
+      model = ::Sketchup.active_model
+      raise 'Nenhum modelo aberto no SketchUp.' unless model
+
+      entries = mirror_entries(model)
+      model.start_operation('SPACENODE: desmarcar espelho', true)
+      begin
+        if scope == 'all'
+          resolve_mirror_entries(model, entries, false).each do |r|
+            begin
+              r[:face].delete_attribute('spacenode', 'mirror')
+            rescue StandardError
+              nil
+            end
+          end
+          entries = []
+        else
+          pids = model.selection.to_a.select { |e| e.is_a?(::Sketchup::Face) }.map(&:persistent_id)
+          raise t(:mirror_select_face) if pids.empty?
+
+          model.selection.to_a.each do |e|
+            next unless e.is_a?(::Sketchup::Face)
+
+            begin
+              e.delete_attribute('spacenode', 'mirror')
+            rescue StandardError
+              nil
+            end
+          end
+          entries.reject! { |e| pids.include?(e['pid']) }
+        end
+        save_mirror_entries(model, entries)
+        model.commit_operation
+      rescue StandardError
+        model.abort_operation
+        raise
+      end
+      emit_mirrors
+    end
+
+    def mirror_entries(model)
+      raw = model.get_attribute('spacenode', 'mirrors', nil)
+      list = raw.is_a?(String) && !raw.empty? ? JSON.parse(raw) : []
+      list.select { |e| e.is_a?(Hash) && e['pid'].is_a?(Integer) }
+    rescue StandardError
+      []
+    end
+
+    def save_mirror_entries(model, entries)
+      model.set_attribute('spacenode', 'mirrors', JSON.generate(entries))
+    end
+
+    # Resolve pids → faces vivas com a transformação de mundo do caminho.
+    # visible_only pula faces/instâncias ocultas ou em tags invisíveis.
+    def resolve_mirror_entries(model, entries, visible_only = true)
+      return [] if entries.empty?
+      return [] unless model.respond_to?(:find_entity_by_persistent_id)
+
+      ids = entries.flat_map { |e| Array(e['path']) + [e['pid']] }.uniq
+      found = model.find_entity_by_persistent_id(ids)
+      by_id = {}
+      ids.each_with_index { |id, i| by_id[id] = found[i] }
+
+      out = []
+      entries.each do |e|
+        face = by_id[e['pid']]
+        next unless face.is_a?(::Sketchup::Face) && face.valid?
+
+        instances = Array(e['path']).map { |id| by_id[id] }
+        next unless instances.all? { |i| (i.is_a?(::Sketchup::Group) || i.is_a?(::Sketchup::ComponentInstance)) && i.valid? }
+
+        if visible_only
+          next if entity_invisible?(face) || instances.any? { |i| entity_invisible?(i) }
+        end
+        tr = ::Geom::Transformation.new
+        instances.each { |i| tr = tr * i.transformation }
+        out << { :face => face, :transform => tr, :kind => MIRROR_KINDS.include?(e['kind'].to_s) ? e['kind'].to_s : 'mirror', :pid => e['pid'] }
+      end
+      out
+    rescue StandardError
+      []
+    end
+
+    def entity_invisible?(entity)
+      return true if entity.hidden?
+
+      layer = entity.layer
+      return true if layer && !layer.visible?
+
+      false
+    rescue StandardError
+      false
+    end
+
+    def emit_mirrors
+      model = ::Sketchup.active_model
+      return unless model && @dialog
+
+      entries = mirror_entries(model)
+      resolved = resolve_mirror_entries(model, entries, false)
+      emit('mirrors', {
+        :count => resolved.length,
+        :mirror => resolved.count { |r| r[:kind] == 'mirror' },
+        :glass => resolved.count { |r| r[:kind] == 'glass' },
+        :stale => entries.length - resolved.length,
+        :supported => model.respond_to?(:find_entity_by_persistent_id) && defined?(::Sketchup::ImageRep) ? true : false
+      })
+    rescue StandardError
+      nil
+    end
+
+    # ── Reflexo na captura ───────────────────────────────────────────────────
+
+    # Parâmetros da câmera que vai renderizar a imagem (a do usuário ou a
+    # temporária nivelada), normalizados pra projeção manual de pontos.
+    def render_camera_params(view, camera, plan, width, height)
+      if plan
+        eye = plan[:eye]
+        dir = plan[:target] - eye
+        up = ::Geom::Vector3d.new(0, 0, 1)
+        fov_v = plan[:fov_v].to_f
+        w = plan[:width].to_i
+        h = plan[:render_h].to_i
+      else
+        eye = camera.eye
+        dir = camera.direction
+        up = camera.up
+        w = width.to_i
+        h = height.to_i
+        fov_v = vertical_fov_deg(camera, w.to_f / h)
+      end
+      dir = dir.clone
+      dir.normalize!
+      right = dir * up
+      return nil if right.length < 1e-9
+
+      right.normalize!
+      up2 = right * dir
+      up2.normalize!
+      tan_v = Math.tan(fov_v * Math::PI / 360.0)
+      { :eye => eye, :dir => dir, :right => right, :up => up2, :fov_v => fov_v,
+        :tan_v => tan_v, :tan_h => tan_v * (w.to_f / h), :w => w, :h => h }
+    rescue StandardError
+      nil
+    end
+
+    # Pixel (x, y, profundidade) de um ponto do mundo na imagem da câmera.
+    def project_pixel(cam, point)
+      q = point - cam[:eye]
+      z = q % cam[:dir]
+      return nil if z <= 1e-6
+
+      x = (q % cam[:right]) / z
+      y = (q % cam[:up]) / z
+      [cam[:w] * (0.5 + x / (2.0 * cam[:tan_h])), cam[:h] * (0.5 - y / (2.0 * cam[:tan_v])), z]
+    end
+
+    def reflect_point(point, p0, n)
+      d = (point - p0) % n
+      point.offset(n, -2.0 * d)
+    end
+
+    def reflect_vector(vector, n)
+      d = vector % n
+      out = ::Geom::Vector3d.new(vector.x - 2.0 * d * n.x, vector.y - 2.0 * d * n.y, vector.z - 2.0 * d * n.z)
+      out
+    end
+
+    # Normal (Newell) do polígono já em coordenadas de mundo.
+    def polygon_normal(points)
+      nx = ny = nz = 0.0
+      points.each_with_index do |a, i|
+        b = points[(i + 1) % points.length]
+        nx += (a.y - b.y) * (a.z + b.z)
+        ny += (a.z - b.z) * (a.x + b.x)
+        nz += (a.x - b.x) * (a.y + b.y)
+      end
+      v = ::Geom::Vector3d.new(nx, ny, nz)
+      return nil if v.length < 1e-9
+
+      v.normalize!
+      v
+    end
+
+    # Esconde (dentro da operação aberta) tudo que está atrás do plano ou
+    # sobre ele: é o que a câmera refletida não pode ver. Instâncias que
+    # cruzam o plano são abertas só se a definição tem UMA instância
+    # (esconder uma face de definição compartilhada esconderia nas outras).
+    def hide_behind_plane(entities, tr, p0, n, list, stats, depth)
+      entities.each do |e|
+        stats[:visited] += 1
+        break if stats[:visited] > MIRROR_MAX_ENTITIES
+
+        begin
+          next if e.hidden?
+        rescue StandardError
+          next
+        end
+        case e
+        when ::Sketchup::Face, ::Sketchup::Edge
+          pts = e.vertices.map { |v| v.position.transform(tr) }
+          if pts.all? { |pt| (pt - p0) % n <= MIRROR_PLANE_EPS_IN }
+            e.hidden = true
+            list << e
+          end
+        when ::Sketchup::Group, ::Sketchup::ComponentInstance, ::Sketchup::Image
+          bb = e.bounds
+          ds = (0..7).map { |i| (bb.corner(i).transform(tr) - p0) % n }
+          if ds.max <= MIRROR_PLANE_EPS_IN
+            e.hidden = true
+            list << e
+          elsif ds.min >= -MIRROR_PLANE_EPS_IN
+            next
+          elsif (e.is_a?(::Sketchup::Group) || e.is_a?(::Sketchup::ComponentInstance)) && depth < 8
+            definition = e.definition
+            if definition.instances.length == 1
+              hide_behind_plane(definition.entities, tr * e.transformation, p0, n, list, stats, depth + 1)
+            else
+              stats[:straddle] += 1
+            end
+          end
+        end
+      end
+    rescue StandardError
+      nil
+    end
+
+    # Recorte retangular (linhas E colunas) via ImageRep → arquivo de textura.
+    def crop_image_rect(src_path, dst_path, x0, y0, cw, ch)
+      return false unless defined?(::Sketchup::ImageRep)
+
+      rep = ::Sketchup::ImageRep.new
+      rep.load_file(src_path)
+      w = rep.width.to_i
+      h = rep.height.to_i
+      bpp = rep.bits_per_pixel.to_i
+      pad = rep.row_padding.to_i
+      return false if w <= 0 || h <= 0 || ![24, 32].include?(bpp)
+
+      bytes = bpp / 8
+      stride = (w * bytes) + pad
+      data = rep.data
+      return false unless data && data.bytesize >= stride * h
+
+      x0 = [[x0, 0].max, w - 1].min
+      y0 = [[y0, 0].max, h - 1].min
+      cw = [[cw, 1].max, w - x0].min
+      ch = [[ch, 1].max, h - y0].min
+      top_down = imagerep_top_down?(rep, data, stride, bpp, w, h)
+      rows = []
+      ch.times do |i|
+        r = y0 + i
+        mem = top_down ? r : (h - 1 - r)
+        rows << data.byteslice((mem * stride) + (x0 * bytes), cw * bytes)
+      end
+      rows.reverse! unless top_down
+      out = ::Sketchup::ImageRep.new
+      out.set_data(cw, ch, bpp, 0, rows.join.force_encoding('ASCII-8BIT'))
+      out.save_file(dst_path)
+      File.exist?(dst_path)
+    rescue StandardError
+      false
+    end
+
+    # Abre a operação, renderiza o reflexo de cada plano marcado e aplica a
+    # textura projetada nas faces. Devolve o estado pra end_mirrors (que
+    # SEMPRE aborta a operação). Nunca levanta: qualquer falha vira relatório.
+    def begin_mirrors(model, view, camera, plan, width, height, stamp)
+      state = { :operation => false, :requested => 0, :applied => 0, :skipped => [], :files => [], :kinds => [] }
+      entries = mirror_entries(model)
+      return state if entries.empty?
+
+      resolved = resolve_mirror_entries(model, entries, true)
+      state[:requested] = resolved.length
+      return state if resolved.empty?
+      unless defined?(::Sketchup::ImageRep)
+        state[:skipped] << 'no_imagerep'
+        return state
+      end
+
+      cam = render_camera_params(view, camera, plan, width, height)
+      unless cam
+        state[:skipped] << 'camera'
+        return state
+      end
+
+      # Agrupa por plano (normal + distância) — um render refletido por plano.
+      groups = []
+      resolved.each do |r|
+        pts = r[:face].outer_loop.vertices.map { |v| v.position.transform(r[:transform]) }
+        next if pts.length < 3
+
+        normal = polygon_normal(pts)
+        next unless normal
+
+        p0 = pts[0]
+        # Lado espelhado = o que encara a câmera.
+        front_side = ((cam[:eye] - p0) % normal) >= 0
+        n = front_side ? normal : normal.reverse
+        r[:points] = pts
+        r[:front] = front_side
+        group = groups.find { |g| (g[:n] % n) > 0.9995 && ((p0 - g[:p0]) % g[:n]).abs < MIRROR_PLANE_EPS_IN }
+        if group
+          group[:faces] << r
+        else
+          groups << { :n => n, :p0 => p0, :faces => [r] }
+        end
+      end
+      if groups.length > MIRROR_MAX_PER_CAPTURE
+        state[:skipped] << 'too_many_planes'
+        groups = groups.first(MIRROR_MAX_PER_CAPTURE)
+      end
+      return state if groups.empty?
+
+      model.start_operation('SPACENODE: reflexo (temporário)', true)
+      state[:operation] = true
+
+      original_camera = view.camera
+      original_state = camera_state_of(view)
+      groups.each_with_index do |g, gi|
+        n = g[:n]
+        p0 = g[:p0]
+
+        # Região do espelho na imagem (todas as faces do plano) → recorte.
+        xs = []
+        ys = []
+        behind = false
+        g[:faces].each do |r|
+          r[:points].each do |pt|
+            px = project_pixel(cam, pt)
+            if px.nil?
+              behind = true
+              break
+            end
+            xs << px[0]
+            ys << px[1]
+          end
+          break if behind
+        end
+        if behind || xs.empty?
+          state[:skipped] << 'behind_camera'
+          next
+        end
+        if xs.max < 0 || ys.max < 0 || xs.min > cam[:w] || ys.min > cam[:h]
+          state[:skipped] << 'off_screen'
+          next
+        end
+
+        # Teto pelo lado MAIOR (retrato 9:16 tem a altura como lado maior).
+        long_edge = [cam[:w], cam[:h]].max
+        s = long_edge > MIRROR_REFLECTION_EDGE ? MIRROR_REFLECTION_EDGE.to_f / long_edge : 1.0
+        ref_w = [(cam[:w] * s).round, 1].max
+        ref_h = [(cam[:h] * s).round, 1].max
+        # Coordenadas na imagem refletida: x espelhado (a câmera refletida
+        # inverte a horizontal), y igual.
+        rx0 = ((cam[:w] - xs.max) * s).floor
+        rx1 = ((cam[:w] - xs.min) * s).ceil
+        ry0 = (ys.min * s).floor
+        ry1 = (ys.max * s).ceil
+        margin = [((rx1 - rx0) * 0.03).ceil, ((ry1 - ry0) * 0.03).ceil, 2].max
+        rx0 = [rx0 - margin, 0].max
+        ry0 = [ry0 - margin, 0].max
+        rx1 = [rx1 + margin, ref_w].min
+        ry1 = [ry1 + margin, ref_h].min
+        cw = rx1 - rx0
+        chh = ry1 - ry0
+        if cw < 4 || chh < 4
+          state[:skipped] << 'too_small'
+          next
+        end
+
+        # Câmera refletida.
+        eye2 = reflect_point(cam[:eye], p0, n)
+        dir2 = reflect_vector(cam[:dir], n)
+        up2 = reflect_vector(cam[:up], n)
+        target2 = eye2.offset(dir2, 100.0)
+        reflected = ::Sketchup::Camera.new(eye2, target2, up2)
+        reflected.perspective = true
+        set_vertical_fov(reflected, cam[:fov_v], cam[:w].to_f / cam[:h])
+        begin
+          reflected.aspect_ratio = cam[:w].to_f / cam[:h]
+        rescue StandardError
+          nil
+        end
+
+        hidden = []
+        stats = { :visited => 0, :straddle => 0 }
+        raw_path = File.join(Dir.tmpdir, "spacenode-reflect-#{stamp}-#{gi}.png")
+        tex_path = File.join(Dir.tmpdir, "spacenode-reflect-#{stamp}-#{gi}-tex.png")
+        ok = false
+        begin
+          hide_behind_plane(model.entities, ::Geom::Transformation.new, p0, n, hidden, stats, 0)
+          view.camera = reflected
+          ok = view.write_image(:filename => raw_path, :width => ref_w, :height => ref_h, :antialias => true)
+        rescue StandardError
+          ok = false
+        ensure
+          restore_view_camera(view, original_camera, original_state)
+          hidden.each do |e|
+            begin
+              e.hidden = false
+            rescue StandardError
+              nil
+            end
+          end
+        end
+        state[:files] << raw_path
+        unless ok && File.exist?(raw_path)
+          state[:skipped] << 'render_failed'
+          next
+        end
+        unless crop_image_rect(raw_path, tex_path, rx0, ry0, cw, chh)
+          state[:skipped] << 'crop_failed'
+          next
+        end
+        state[:files] << tex_path
+        state[:skipped] << 'shared_definition' if stats[:straddle] > 0
+
+        kind = g[:faces].first[:kind]
+        material = nil
+        begin
+          material = model.materials.add("SPACENODE reflexo #{gi + 1}")
+          material.texture = tex_path
+          material.alpha = MIRROR_ALPHA[kind] || 1.0
+        rescue StandardError
+          state[:skipped] << 'texture_failed'
+          next
+        end
+
+        g[:faces].each do |r|
+          face = r[:face]
+          # 4 cantos do retângulo envolvente da face NO PLANO → pinos
+          # (projeção perspectiva de um plano é uma homografia: 4 pares
+          # definem o mapeamento exato, seja qual for o contorno).
+          e1 = r[:points][1] - r[:points][0]
+          if e1.length < 1e-6
+            state[:skipped] << 'degenerate'
+            next
+          end
+
+          e1.normalize!
+          e2 = n * e1
+          e2.normalize!
+          origin = r[:points][0]
+          st = r[:points].map { |pt| v = pt - origin; [v % e1, v % e2] }
+          smin = st.map(&:first).min
+          smax = st.map(&:first).max
+          tmin = st.map(&:last).min
+          tmax = st.map(&:last).max
+          corners = [[smin, tmin], [smax, tmin], [smax, tmax], [smin, tmax]].map do |sv, tv|
+            origin.offset(e1, sv).offset(e2, tv)
+          end
+          inverse = r[:transform].inverse
+          pins = []
+          bad = false
+          corners.each do |c|
+            px = project_pixel(cam, c)
+            if px.nil?
+              bad = true
+              break
+            end
+            u = (((cam[:w] - px[0]) * s) - rx0) / cw
+            v = 1.0 - (((px[1] * s) - ry0) / chh)
+            pins << c.transform(inverse) << ::Geom::Point3d.new(u, v, 0)
+          end
+          if bad
+            state[:skipped] << 'behind_camera'
+            next
+          end
+          previous = r[:front] ? face.material : face.back_material
+          begin
+            if r[:front]
+              face.material = material
+            else
+              face.back_material = material
+            end
+            placed = face.position_material(material, pins, r[:front])
+            if placed
+              state[:applied] += 1
+              state[:kinds] << kind
+            else
+              if r[:front]
+                face.material = previous
+              else
+                face.back_material = previous
+              end
+              state[:skipped] << 'pin_failed'
+            end
+          rescue StandardError
+            state[:skipped] << 'pin_failed'
+          end
+        end
+      end
+      state
+    rescue StandardError => e
+      state[:skipped] << "error:#{e.class.name}"
+      state
+    end
+
+    def end_mirrors(model, state)
+      return unless state
+
+      if state[:operation]
+        begin
+          model.abort_operation
+        rescue StandardError
+          nil
+        end
+        state[:operation] = false
+      end
+      Array(state[:files]).each { |f| delete_quiet(f) }
+    rescue StandardError
+      nil
+    end
+
+    def guides_overlay_supported?
+      defined?(::Sketchup::Overlay) ? true : false
+    end
+
+    # Overlay é por modelo: (re)adiciona quando necessário e liga/desliga
+    # conforme a guia escolhida. Sem Overlay (SketchUp < 2023) as guias
+    # existem só no preview do painel.
+    def sync_guides_overlay(model, settings)
+      return unless guides_overlay_supported? && model.respond_to?(:overlays)
+
+      overlay = @guides_overlay
+      unless overlay && overlay.respond_to?(:valid?) && overlay.valid? && overlay.model_id == model.object_id
+        overlay = nil
+        begin
+          model.overlays.each { |o| overlay = o if o.is_a?(GuidesOverlay) }
+        rescue StandardError
+          overlay = nil
+        end
+        unless overlay
+          overlay = GuidesOverlay.new
+          model.overlays.add(overlay)
+        end
+        overlay.model_id = model.object_id
+        @guides_overlay = overlay
+      end
+      overlay.guide = settings[:guide].to_s
+      overlay.aspect = settings[:aspect].to_f
+      # Liga também quando só há proporção escolhida — o draw decide se tem o
+      # que desenhar (quadro igual à viewport não desenha nada).
+      wanted = overlay.guide != 'none' || overlay.aspect > 0
+      overlay.enabled = wanted if overlay.enabled? != wanted
+      model.active_view.invalidate
+    rescue StandardError
+      nil
+    end
+
+    # Segmentos (x1, y1, x2, y2) em fração do quadro — compartilhado com o
+    # painel (mesma tabela em JS).
+    def self.guide_segments(guide)
+      phi = 0.381966
+      case guide.to_s
+      when 'thirds'
+        [[1 / 3.0, 0, 1 / 3.0, 1], [2 / 3.0, 0, 2 / 3.0, 1], [0, 1 / 3.0, 1, 1 / 3.0], [0, 2 / 3.0, 1, 2 / 3.0]]
+      when 'golden'
+        [[phi, 0, phi, 1], [1 - phi, 0, 1 - phi, 1], [0, phi, 1, phi], [0, 1 - phi, 1, 1 - phi]]
+      when 'center'
+        [[0.5, 0, 0.5, 1], [0, 0.5, 1, 0.5]]
+      when 'diagonals'
+        [[0, 0, 1, 1], [1, 0, 0, 1]]
+      else
+        []
+      end
+    end
+
+    # Plano de captura nivelada ("shift" de lente): câmera temporária com a
+    # direção horizontal e fov vertical maior (fov + 2·inclinação), render
+    # mais alto e recorte da faixa que corresponde ao quadro original. As
+    # verticais saem paralelas e o enquadramento vertical é preservado (a
+    # cobertura horizontal fica um pouco mais larga — geometria do plano
+    # vertical). nil = nada a fazer; { :reason } = não dá.
+    # Razões "brandas" (nada a fazer, a imagem já sai certa): not_perspective,
+    # native_2d, already_level — o painel não avisa nesses casos.
+    def level_plan(view, camera, width, height)
+      return { :reason => 'not_perspective' } unless camera.perspective?
+      return { :reason => 'native_2d' } if camera.respond_to?(:is_2d?) && camera.is_2d?
+
+      tilt_deg = camera_tilt_deg(camera)
+      return { :reason => 'already_level', :tilt => tilt_deg.round(1) } if tilt_deg.abs < PHOTO_LEVEL_MIN_DEG
+      return { :reason => 'too_steep', :tilt => tilt_deg.round(1) } if tilt_deg.abs > PHOTO_LEVEL_MAX_DEG
+
+      aspect = width.to_f / height
+      fv = vertical_fov_deg(camera, frame_aspect(view, camera)) * Math::PI / 180.0
+      tilt = tilt_deg * Math::PI / 180.0
+      half = tilt.abs + fv / 2.0
+      fov2_deg = half * 360.0 / Math::PI
+      return { :reason => 'too_steep', :tilt => tilt_deg.round(1) } if fov2_deg > PHOTO_FOV_MAX_DEG
+
+      span = Math.tan(tilt + fv / 2.0) - Math.tan(tilt - fv / 2.0)
+      return { :reason => 'degenerate' } if span <= 0
+
+      render_h = (2.0 * height * Math.tan(half) / span).ceil
+      render_h = height if render_h < height
+      top = ((render_h / 2.0) * (1.0 - Math.tan(tilt + fv / 2.0) / Math.tan(half))).round
+      top = 0 if top < 0
+      top = render_h - height if top > render_h - height
+
+      dir = camera.direction
+      flat = ::Geom::Vector3d.new(dir.x, dir.y, 0)
+      return { :reason => 'degenerate' } if flat.length < 1e-6
+
+      flat.normalize!
+      dist = camera.eye.distance(camera.target)
+      dist = 100.0 if dist < 1e-3
+      target = camera.eye.offset(flat, dist)
+      {
+        :eye => camera.eye, :target => target,
+        :fov_v => fov2_deg, :width => width, :render_h => render_h,
+        :top => top, :height => height, :tilt => tilt_deg.round(1), :aspect => aspect
+      }
+    rescue StandardError
+      { :reason => 'error' }
+    end
+
+    def leveled_camera_for(plan)
+      camera = ::Sketchup::Camera.new(plan[:eye], plan[:target], ::Geom::Vector3d.new(0, 0, 1))
+      camera.perspective = true
+      render_aspect = plan[:width].to_f / plan[:render_h]
+      set_vertical_fov(camera, plan[:fov_v], render_aspect)
+      camera.aspect_ratio = render_aspect if camera.respond_to?(:aspect_ratio=)
+      camera
+    end
+
+    # Renderiza com a câmera nivelada e recorta a faixa. Devolve true se o
+    # arquivo em `path` ficou pronto; false mantém a captura normal.
+    def write_leveled_image(view, plan, path, options)
+      original = view.camera
+      original_state = camera_state_of(view)
+      temp = leveled_camera_for(plan)
+      scale = options[:height].to_f / plan[:height]
+      scale = 1.0 if scale <= 0
+      render_h = (plan[:render_h] * scale).round
+      top = (plan[:top] * scale).round
+      height = options[:height].to_i
+      render_h = height if render_h < height
+      top = render_h - height if top > render_h - height
+      top = 0 if top < 0
+
+      write_options = options.merge(:height => render_h)
+      begin
+        view.camera = temp
+        ok = view.write_image(write_options)
+      ensure
+        restore_view_camera(view, original, original_state)
+      end
+      return false unless ok && File.exist?(path)
+
+      crop_rows(path, top, height)
+    rescue StandardError
+      false
+    end
+
+    # Recorte vertical no lugar via ImageRep (SketchUp 2018+). A ordem das
+    # linhas do buffer não é documentada — detectamos comparando as bordas
+    # com color_at_uv (v=0 é a base da imagem, por doc).
+    def crop_rows(path, top, height)
+      return false unless defined?(::Sketchup::ImageRep)
+
+      rep = ::Sketchup::ImageRep.new
+      rep.load_file(path)
+      w = rep.width.to_i
+      h = rep.height.to_i
+      bpp = rep.bits_per_pixel.to_i
+      pad = rep.row_padding.to_i
+      return false if w <= 0 || h <= 0 || ![8, 24, 32].include?(bpp)
+      return true if top <= 0 && height >= h
+
+      stride = ((w * bpp) / 8) + pad
+      data = rep.data
+      return false unless data && data.bytesize >= stride * h
+
+      height = h - top if top + height > h
+      first = imagerep_top_down?(rep, data, stride, bpp, w, h) ? top : (h - top - height)
+      sliced = data.byteslice(first * stride, height * stride)
+      return false unless sliced && sliced.bytesize == height * stride
+
+      out = ::Sketchup::ImageRep.new
+      out.set_data(w, height, bpp, pad, sliced.force_encoding('ASCII-8BIT'))
+      out.save_file(path)
+      File.exist?(path)
+    rescue StandardError
+      false
+    end
+
+    def imagerep_top_down?(rep, data, stride, bpp, w, h)
+      return true if h < 2 || bpp < 24
+
+      bytes = bpp / 8
+      columns = [0.1, 0.3, 0.5, 0.7, 0.9].map { |f| [(w * f).floor, w - 1].min }
+      score_top_down = 0
+      score_bottom_up = 0
+      columns.each do |x|
+        first = data.byteslice(x * bytes, 3)
+        last = data.byteslice((h - 1) * stride + x * bytes, 3)
+        next unless first && last
+
+        u = (x + 0.5) / w
+        top_color = rep.color_at_uv(u, 1.0 - (0.5 / h), false)
+        bottom_color = rep.color_at_uv(u, 0.5 / h, false)
+        next unless top_color && bottom_color
+
+        score_top_down += 1 if pixel_matches?(first, top_color) || pixel_matches?(last, bottom_color)
+        score_bottom_up += 1 if pixel_matches?(first, bottom_color) || pixel_matches?(last, top_color)
+      end
+      score_top_down >= score_bottom_up
+    rescue StandardError
+      true
+    end
+
+    def pixel_matches?(raw, color)
+      b = raw.bytes
+      return false if b.length < 3
+
+      r, g, bl = color.red, color.green, color.blue
+      close = ->(x, y) { (x - y).abs <= 3 }
+      (close.call(b[0], r) && close.call(b[1], g) && close.call(b[2], bl)) ||
+        (close.call(b[0], bl) && close.call(b[1], g) && close.call(b[2], r))
     end
 
     # ── Sol / câmera / fatos do modelo ──────────────────────────────────────
@@ -965,6 +2439,58 @@ module SpaceNode
       end
     end
 
+    # view.camera devolve a câmera VIVA da vista. Guardar essa referência e
+    # reatribuí-la depois pode não restaurar nada (o SketchUp escreve os
+    # valores no próprio objeto), e aí a viewport fica na câmera temporária —
+    # a refletida do espelho ou a nivelada. Guardamos os números JUNTO com a
+    # referência: restaura pela referência, que preserva estados que um
+    # Camera.new não reproduz (perspectiva de 2 pontos nativa, por exemplo), e
+    # só remonta a partir dos números se a vista não tiver voltado.
+    def camera_state_of(view)
+      c = view.camera
+      {
+        :eye => c.eye, :target => c.target, :up => c.up,
+        :perspective => c.perspective? ? true : false,
+        :fov => (c.perspective? ? c.fov : nil),
+        :height => (c.perspective? ? nil : c.height),
+        :aspect_ratio => (c.respond_to?(:aspect_ratio) ? c.aspect_ratio.to_f : nil)
+      }
+    rescue StandardError
+      nil
+    end
+
+    def camera_matches?(camera, state)
+      return true unless state
+      return false unless camera
+      camera.eye.distance(state[:eye]) < 1e-3 && camera.target.distance(state[:target]) < 1e-3
+    rescue StandardError
+      false
+    end
+
+    def restore_view_camera(view, original, state)
+      begin
+        view.camera = original if original
+      rescue StandardError
+        nil
+      end
+      return true if camera_matches?(view.camera, state)
+
+      begin
+        cam = ::Sketchup::Camera.new(state[:eye], state[:target], state[:up])
+        cam.perspective = state[:perspective] ? true : false
+        if state[:perspective]
+          cam.fov = state[:fov] if state[:fov]
+        elsif state[:height]
+          cam.height = state[:height]
+        end
+        cam.aspect_ratio = state[:aspect_ratio] if state[:aspect_ratio] && cam.respond_to?(:aspect_ratio=)
+        view.camera = cam
+        true
+      rescue StandardError
+        false
+      end
+    end
+
     def snapshot_camera(view)
       camera = view.camera
       data = {
@@ -1026,23 +2552,23 @@ module SpaceNode
     # Fatos medidos do modelo pro prompt (câmera + sol) — best-effort: nil
     # em qualquer falha; o servidor sanitiza de novo. Lê o estado VIGENTE
     # (chamado dentro da captura, com override de sol ainda aplicado).
-    def collect_model_facts
+    def collect_model_facts(view = nil, camera = nil, two_point = nil)
       model = ::Sketchup.active_model
       return nil unless model
 
       facts = {}
       begin
-        camera = model.active_view.camera
+        view ||= model.active_view
+        camera ||= view.camera
         if camera.perspective?
-          cam = { :fovDeg => camera.fov.round(1) }
-          begin
-            cam[:focalLengthMm] = camera.focal_length.round
-          rescue StandardError
-            nil
-          end
-          up = camera.up
-          cam[:twoPoint] = true if up && up.z.abs > 0.999 && camera.direction.z.abs < 0.98
-          facts[:camera] = cam
+          cf = camera_facts(view, camera, two_point) || {}
+          cam = {}
+          cam[:fovDeg] = cf[:fovDeg] if cf[:fovDeg]
+          cam[:focalLengthMm] = cf[:focalLengthMm] if cf[:focalLengthMm]
+          cam[:twoPoint] = true if cf[:twoPoint]
+          cam[:eyeHeightM] = cf[:eyeHeightM] if cf[:eyeHeightM]
+          facts[:camera] = cam unless cam.empty?
+          facts[:room] = cf[:room] if cf[:room].is_a?(Hash) && !cf[:room].empty?
         end
       rescue StandardError
         nil
@@ -1075,7 +2601,157 @@ module SpaceNode
       facts.empty? ? nil : facts
     end
 
+    # Altura do corte: 1,20 m acima do PISO onde a câmera está (é o pavimento
+    # que o usuário está vendo). Sem piso sob a câmera — vista externa, câmera
+    # no ar — cai pra base do modelo, que é o térreo.
+    def plan_cut_z(model, view)
+      eye = view.camera.eye
+      floor_z = floor_under(model, eye)
+      base = floor_z || model.bounds.min.z
+      base + PLAN_CUT_HEIGHT_M * INCH_PER_M
+    rescue StandardError
+      model.bounds.min.z + PLAN_CUT_HEIGHT_M * INCH_PER_M
+    end
+
+    # Câmera de planta: topo, paralela, enquadrando o modelo inteiro. Em
+    # projeção paralela o "zoom" é camera.height (altura de vista em polegadas)
+    # — não existe fov.
+    def plan_camera_for(bounds, aspect)
+      center = bounds.center
+      eye = ::Geom::Point3d.new(center.x, center.y, bounds.max.z + 1000.0)
+      target = ::Geom::Point3d.new(center.x, center.y, bounds.min.z)
+      cam = ::Sketchup::Camera.new(eye, target, ::Geom::Vector3d.new(0, 1, 0))
+      cam.perspective = false
+      plan_w = bounds.width.to_f * PLAN_MARGIN
+      plan_h = bounds.height.to_f * PLAN_MARGIN
+      cam.height = [plan_h, aspect > 0 ? plan_w / aspect : plan_h].max
+      begin
+        cam.aspect_ratio = aspect if cam.respond_to?(:aspect_ratio=) && aspect > 0
+      rescue StandardError
+        nil
+      end
+      cam
+    end
+
+    # Devolve { :path, :section } — section conta DE ONDE veio o corte, porque
+    # é o que o usuário precisa saber se a planta sair errada: 'model' = o
+    # corte que já estava ativo no arquivo (respeitamos, não mexemos), 'temp' =
+    # criamos um e desfizemos, 'none' = não deu (e aí a planta mostra o telhado).
+    def capture_plan(spec)
+      model = ::Sketchup.active_model
+      raise t(:plan_no_model) unless model
+
+      view = model.active_view
+      bounds = model.bounds
+      raise t(:plan_empty) if bounds.nil? || bounds.width.to_f <= 0 || bounds.height.to_f <= 0
+
+      plan_w = bounds.width.to_f * PLAN_MARGIN
+      plan_h = bounds.height.to_f * PLAN_MARGIN
+      aspect = plan_h > 0 ? plan_w / plan_h : 1.0
+      edge = CAPTURE_EDGE['2k']
+      if aspect >= 1.0
+        width = edge
+        height = [(edge / aspect).round, 1].max
+      else
+        height = edge
+        width = [(edge * aspect).round, 1].max
+      end
+
+      stamp = "#{Time.now.strftime('%Y%m%d-%H%M%S')}-#{SecureRandom.hex(3)}"
+      path = File.join(Dir.tmpdir, "spacenode-planta-#{stamp}.png")
+
+      camera_state = camera_state_of(view)
+      original_camera = view.camera
+      rendering = model.rendering_options
+      clean_saved = nil
+      section_source = 'none'
+      operation = false
+      previous_section = nil
+      temp_plane = nil
+
+      begin
+        # Corte que o arquivo JÁ tem manda: quem mantém uma cena de planta no
+        # .skp cortou onde queria, e sobrescrever isso seria trocar o projeto
+        # do usuário pelo nosso palpite.
+        existing = begin
+          model.active_section_plane
+        rescue StandardError
+          nil
+        end
+
+        if existing
+          section_source = 'model'
+        else
+          begin
+            model.start_operation('SPACENODE: planta (temporário)', true)
+            operation = true
+            cut_z = plan_cut_z(model, view)
+            center = bounds.center
+            plane = [::Geom::Point3d.new(center.x, center.y, cut_z), ::Geom::Vector3d.new(0, 0, 1)]
+            temp_plane = model.entities.add_section_plane(plane)
+            if temp_plane
+              previous_section = model.active_section_plane
+              # A normal aponta pro lado que SOME: (0,0,1) esconde o que está
+              # acima do corte, que é o telhado. Se um dia sair invertido, é
+              # este vetor.
+              temp_plane.activate if temp_plane.respond_to?(:activate)
+              model.active_section_plane = temp_plane if model.respond_to?(:active_section_plane=)
+              section_source = 'temp'
+            end
+          rescue StandardError
+            section_source = 'none'
+          end
+        end
+
+        clean_saved = apply_rendering_options(rendering, PLAN_CAPTURE_OPTIONS)
+        view.camera = plan_camera_for(bounds, width.to_f / height)
+        ok = view.write_image(:filename => path, :width => width, :height => height, :antialias => true)
+        raise t(:plan_failed) unless ok && File.exist?(path)
+      ensure
+        restore_rendering_options(rendering, clean_saved) if clean_saved
+        begin
+          model.active_section_plane = previous_section if section_source == 'temp' && model.respond_to?(:active_section_plane=)
+        rescue StandardError
+          nil
+        end
+        # abort_operation desfaz o plano criado; RenderingOptions e câmera não
+        # entram em operação e são restaurados à mão (acima e abaixo).
+        begin
+          model.abort_operation if operation
+        rescue StandardError
+          nil
+        end
+        restore_view_camera(view, original_camera, camera_state)
+      end
+
+      { :path => path, :section => section_source, :width => width, :height => height }
+    end
+
     # ── Cenas / materiais do modelo ─────────────────────────────────────────
+
+    # Nova cena com a vista atual. O lote e o Space vivem de cenas — e criar
+    # cena é trabalho manual no SketchUp (menu, nomear, conferir). pages.add
+    # captura a câmera viva e já seleciona a página nova.
+    def handle_add_scene
+      model = ::Sketchup.active_model
+      raise t(:scene_no_model) unless model
+
+      pages = model.pages
+      page = pages.add(unique_page_name(pages, t(:scene_base_name)))
+      raise t(:scene_failed) unless page
+
+      emit('sceneAdded', { :name => page.name.to_s })
+      list_scenes
+      page.name.to_s
+    end
+
+    def unique_page_name(pages, base)
+      taken = {}
+      pages.each { |p| taken[p.name.to_s] = true }
+      index = pages.count + 1
+      index += 1 while taken["#{base} #{index}"]
+      "#{base} #{index}"
+    end
 
     def list_scenes
       model = ::Sketchup.active_model
@@ -1166,6 +2842,8 @@ module SpaceNode
     #   :sun_preset — 'atual'|'manha'|'meiodia'|'tarde'|'golden' (sol aplicado
     #                 só durante a captura, com restauro manual do ShadowInfo)
     #   :edge_map   — true captura também o hidden-line da MESMA câmera
+    #   :photo      — { :aspect, :level } (proporção do quadro; nivelar
+    #                 verticais com câmera temporária + recorte)
     # Retorna { :path, :edge_path } e preenche @last_capture_size/mime/camera.
     def capture_viewport(resolution, opts = {})
       model = ::Sketchup.active_model
@@ -1175,12 +2853,52 @@ module SpaceNode
       vpw = [view.vpwidth.to_i, 1].max
       vph = [view.vpheight.to_i, 1].max
 
+      photo = opts[:photo] || @photo || photo_settings_from(nil)
+      capture_camera = view.camera
+      aspect = photo[:aspect].to_f
+      if aspect <= 0
+        # Livre: se o usuário já pôs uma moldura na câmera (Advanced Camera
+        # Tools etc.), a captura segue ELA; senão, a viewport.
+        own = begin
+          capture_camera.aspect_ratio.to_f
+        rescue StandardError
+          0.0
+        end
+        aspect = own > 0 ? own : vpw.to_f / vph
+      end
+      # Quadro: lado maior = alvo da resolução; o outro segue a proporção.
+      # A moldura (aspect_ratio) é aplicada na câmera antes do write_image
+      # pra pixels e quadro concordarem; sem moldura escolhida, o quadro é a
+      # viewport (comportamento anterior).
       target_edge = CAPTURE_EDGE[resolution.to_s] || CAPTURE_EDGE['2k']
-      scale = target_edge.to_f / [vpw, vph].max
+      if aspect >= 1.0
+        width = target_edge
+        height = [(target_edge / aspect).round, 1].max
+      else
+        height = target_edge
+        width = [(target_edge * aspect).round, 1].max
+      end
+      frame_px = [vpw.to_f / vph >= aspect ? vph * aspect : vpw, vpw.to_f / vph >= aspect ? vph : vpw / aspect]
+      scale = width.to_f / [frame_px[0], 1.0].max
       scale = 1.0 if scale < 1.0
       scale = 4.0 if scale > 4.0
-      width = [(vpw * scale).round, 1].max
-      height = [(vph * scale).round, 1].max
+
+      aspect_saved = nil
+      if photo[:aspect].to_f > 0 && capture_camera.respond_to?(:aspect_ratio=)
+        begin
+          aspect_saved = capture_camera.aspect_ratio.to_f
+          capture_camera.aspect_ratio = aspect if (aspect_saved - aspect).abs > 0.001
+        rescue StandardError
+          aspect_saved = nil
+        end
+      end
+      level_requested = photo[:level] ? true : false
+      plan = level_requested ? level_plan(view, capture_camera, width, height) : nil
+      level_reason = plan && plan[:reason] ? plan[:reason] : nil
+      plan = nil if level_reason
+      level_applied = false
+      # "Voltar à vista" restaura a câmera do USUÁRIO — nunca a temporária.
+      @last_capture_camera = snapshot_camera(view)
 
       stamp = "#{Time.now.strftime('%Y%m%d-%H%M%S')}-#{SecureRandom.hex(3)}"
       path = File.join(Dir.tmpdir, "spacenode-viewport-#{stamp}.png")
@@ -1202,8 +2920,13 @@ module SpaceNode
       end
       clean_saved = apply_rendering_options(rendering, clean)
       edge_reason = opts[:edge_map] ? 'write_failed' : 'not_requested'
+      mirrors = nil
 
       begin
+        # Reflexos: render refletido + textura projetada, dentro de uma
+        # operação que end_mirrors aborta no ensure (modelo intocado).
+        mirrors = begin_mirrors(model, view, capture_camera, plan, width, height, stamp) unless opts[:skip_mirrors]
+
         options = {
           :filename => path,
           :width => width,
@@ -1212,8 +2935,14 @@ module SpaceNode
         }
         options[:scale_factor] = scale if scale > 1.0
 
-        ok = view.write_image(options)
-        raise 'Não foi possível capturar a vista atual.' unless ok && File.exist?(path)
+        if plan
+          level_applied = write_leveled_image(view, plan, path, options)
+          level_reason = 'render_failed' unless level_applied
+        end
+        unless level_applied
+          ok = view.write_image(options)
+          raise 'Não foi possível capturar a vista atual.' unless ok && File.exist?(path)
+        end
 
         # Um viewport 4K em PNG pode passar do teto da área de upload — cai
         # pra JPEG de alta qualidade antes de falhar. O teto é da ÁREA de
@@ -1221,13 +2950,24 @@ module SpaceNode
         max_bytes = opts[:max_bytes] || 14_000_000
         if File.size(path) > max_bytes
           jpg = path.sub(/\.png\z/, '.jpg')
-          view.write_image(
-            :filename => jpg,
-            :width => width,
-            :height => height,
-            :antialias => true,
-            :compression => 0.92
-          )
+          if level_applied
+            # Já recortado: reencoda o próprio arquivo (ImageRep salva jpg).
+            begin
+              rep = ::Sketchup::ImageRep.new
+              rep.load_file(path)
+              rep.save_file(jpg)
+            rescue StandardError
+              nil
+            end
+          else
+            view.write_image(
+              :filename => jpg,
+              :width => width,
+              :height => height,
+              :antialias => true,
+              :compression => 0.92
+            )
+          end
           if File.exist?(jpg)
             begin
               File.delete(path)
@@ -1240,23 +2980,32 @@ module SpaceNode
 
         # Segunda captura pequena só pro preview do painel — nunca injetamos
         # o arquivo cheio (megabytes de base64 dentro de execute_script
-        # travam o CEF).
+        # travam o CEF). Mesmo quadro (proporção e nivelamento) da captura.
         preview = "#{path}.preview.jpg"
-        preview_scale = 900.0 / [vpw, vph].max
+        preview_scale = 900.0 / [width, height].max
         preview_scale = 1.0 if preview_scale > 1.0
-        view.write_image(
+        preview_w = [(width * preview_scale).round, 1].max
+        preview_h = [(height * preview_scale).round, 1].max
+        preview_options = {
           :filename => preview,
-          :width => [(vpw * preview_scale).round, 1].max,
-          :height => [(vph * preview_scale).round, 1].max,
+          :width => preview_w,
+          :height => preview_h,
           :antialias => true,
           :compression => 0.85
-        )
+        }
+        preview_done = false
+        if level_applied
+          preview_done = write_leveled_image(view, plan, preview, preview_options)
+        end
+        view.write_image(preview_options) unless preview_done
         @last_preview_path = File.exist?(preview) ? preview : nil
 
         # Fatos do modelo coletados AQUI, com o override de sol ainda
         # aplicado — coletar depois do ensure descreveria o sol restaurado,
-        # contradizendo as sombras realmente visíveis na captura.
-        facts = collect_model_facts
+        # contradizendo as sombras realmente visíveis na captura. A câmera
+        # descrita é a do usuário (lente/altura); twoPoint só é verdade se
+        # a captura saiu nivelada (ou a câmera já era).
+        facts = collect_model_facts(view, capture_camera, level_applied ? true : nil)
 
         # Edge map nativo: hidden-line da MESMA câmera, MESMO tamanho (o
         # condicionamento estrutural exige alinhamento pixel a pixel).
@@ -1282,7 +3031,15 @@ module SpaceNode
               :antialias => true
             }
             edge_options[:scale_factor] = scale if scale > 1.0
-            view.write_image(edge_options)
+            # Mesmo plano nivelado da captura — o edge map precisa casar
+            # pixel a pixel; se o recorte falhar aqui, segue sem edge map.
+            edge_done = level_applied ? write_leveled_image(view, plan, candidate, edge_options) : false
+            if level_applied && !edge_done
+              delete_quiet(candidate)
+              edge_reason = 'level_mismatch'
+            elsif !level_applied
+              view.write_image(edge_options)
+            end
             if File.exist?(candidate)
               if File.size(candidate) <= 14_000_000
                 edge_path = candidate
@@ -1307,20 +3064,49 @@ module SpaceNode
           end
         end
       ensure
+        end_mirrors(model, mirrors)
         restore_rendering_options(rendering, clean_saved)
         restore_sun_override(model, sun_saved)
+        # Moldura temporária (só quando a câmera não tinha a escolhida).
+        # Restaurada na câmera VIVA: se algum passo (espelho, nivelamento)
+        # trocou o objeto da vista, capture_camera virou cópia solta e
+        # escrever nela deixaria a moldura presa na viewport do usuário.
+        if aspect_saved && (aspect_saved - aspect).abs > 0.001
+          begin
+            live = view.camera
+            live.aspect_ratio = aspect_saved if live.respond_to?(:aspect_ratio=)
+          rescue StandardError
+            nil
+          end
+        end
       end
 
       @last_capture_size = [width, height]
       @last_capture_mime = path.end_with?('.jpg') ? 'image/jpeg' : 'image/png'
-      @last_capture_camera = snapshot_camera(view)
+      photo_report = {
+        :aspect => photo[:aspect].to_f > 0 ? photo[:aspect].to_f.round(4) : 0,
+        :levelRequested => level_requested,
+        :levelApplied => level_applied,
+        :levelReason => level_reason,
+        :tiltDeg => plan ? plan[:tilt] : (level_requested ? camera_tilt_deg(capture_camera).round(1) : nil),
+        :mirrorsRequested => mirrors ? mirrors[:requested].to_i : 0,
+        :mirrorsApplied => mirrors ? mirrors[:applied].to_i : 0,
+        :mirrorReasons => mirrors ? mirrors[:skipped].uniq : []
+      }
+      if facts.is_a?(Hash) && mirrors && mirrors[:applied].to_i > 0
+        facts[:mirrors] = {
+          :count => mirrors[:applied].to_i,
+          :glass => mirrors[:kinds].count { |k| k == 'glass' }
+        }
+      end
       {
         :path => path, :edge_path => edge_path, :facts => facts,
         # Relatório honesto do que a captura conseguiu — vai pro painel no
         # resultado (o usuário paga o máximo e precisa saber se recebeu).
         :edge_reason => edge_reason,
         :sun_requested => sun_requested,
-        :sun_applied => sun_requested && !sun_saved.nil?
+        :sun_applied => sun_requested && !sun_saved.nil?,
+        :photo_report => photo_report
       }
     end
 
@@ -1405,7 +3191,7 @@ module SpaceNode
       ensure_fresh_session(true) { run_batch(payload, entries) }
     end
 
-    def run_batch(payload, entries)
+    def run_batch(payload, entries, opts = {})
       model = ::Sketchup.active_model
       raise 'Nenhum modelo aberto no SketchUp.' unless model
 
@@ -1426,13 +3212,18 @@ module SpaceNode
         :queue => entries.dup,
         :total => entries.length,
         :done => 0,
-        :results => [],
+        # Retomada carrega o que o lote anterior já entregou: sem isto,
+        # "Salvar as imagens" gravaria só o pedaço retomado do caderno.
+        :results => Array(opts[:results]),
         :errors => [],
         :payload => payload,
-        :shared_seed => nil,
+        # Entradas que falharam, pra "Retomar" saber o que refazer.
+        :failed_entries => [],
+        :current_entry => nil,
+        :shared_seed => (payload['seed'].to_s =~ /\A\d+\z/ ? payload['seed'].to_i : nil),
         :original_scene => original
       }
-      emit('batchStart', { :total => entries.length })
+      emit('batchStart', { :total => entries.length, :resumed => opts[:resumed] ? true : false })
       process_next_scene
     end
 
@@ -1452,6 +3243,7 @@ module SpaceNode
       end
 
       entry = ctx[:queue].shift
+      ctx[:current_entry] = entry
       index = entry.is_a?(Hash) ? entry['index'].to_i : entry.to_i
       expected_name = entry.is_a?(Hash) ? entry['name'].to_s : ''
       pages = model.pages
@@ -1472,6 +3264,9 @@ module SpaceNode
       unless page
         label = expected_name.empty? ? "Cena #{index + 1}" : expected_name
         ctx[:errors] << { :scene => label, :message => 'Cena não encontrada no modelo.' }
+        # Cena apagada do modelo não volta no Retomar — retomar geraria o
+        # mesmo erro pra sempre.
+        ctx[:current_entry] = nil
         emit('batchProgress', {
           :done => ctx[:done], :total => ctx[:total],
           :sceneName => label, :status => 'error',
@@ -1523,20 +3318,29 @@ module SpaceNode
       capture = capture_viewport(
         resolution,
         :sun_preset => payload['sunPreset'],
-        :edge_map => want_edge
+        :edge_map => want_edge,
+        :photo => photo_settings_from(payload['photo'])
       )
       @last_capture_path = capture[:path]
-      emit('capture', capture_event_payload(capture[:path]))
+      emit('capture', capture_event_payload(capture[:path]).merge(:photo => capture[:photo_report]))
 
       facts = capture[:facts]
       camera = @last_capture_camera
       mime = @last_capture_mime || 'image/png'
+      report = capture[:photo_report] || {}
       conditioning = {
         :edgeRequested => want_edge,
         :edgeMap => false,
         :edgeReason => capture[:edge_reason],
         :sunRequested => capture[:sun_requested] ? true : false,
         :sunApplied => capture[:sun_applied] ? true : false,
+        :levelRequested => report[:levelRequested] ? true : false,
+        :levelApplied => report[:levelApplied] ? true : false,
+        :levelReason => report[:levelReason],
+        :tiltDeg => report[:tiltDeg],
+        :mirrorsRequested => report[:mirrorsRequested].to_i,
+        :mirrorsApplied => report[:mirrorsApplied].to_i,
+        :mirrorReasons => report[:mirrorReasons] || [],
         :materialsRequested => 0,
         :materialsSent => 0,
         :skipped => []
@@ -1973,6 +3777,8 @@ module SpaceNode
       if ctx && ctx[:mode] == :batch
         ctx[:shared_seed] ||= result[:seed]
         ctx[:done] += 1
+        # A cena entregou: sai de "em voo" pra não voltar no Retomar.
+        ctx[:current_entry] = nil
         ctx[:results] << result
         emit('batchProgress', {
           :done => ctx[:done], :total => ctx[:total],
@@ -2065,7 +3871,8 @@ module SpaceNode
       if ctx && ctx[:mode] == :batch
         emit('batchDone', {
           :results => ctx[:results], :errors => ctx[:errors],
-          :total => ctx[:total], :cancelled => true
+          :total => ctx[:total], :cancelled => true,
+          :pending => remember_batch_pending(ctx)
         })
       end
       if ctx && ctx[:mode] == :space
@@ -2087,10 +3894,15 @@ module SpaceNode
       @generate_request = nil
 
       if ctx && ctx[:mode] == :batch
+        @batch_insufficient = true if status == 402
+        # Falha SEM status (rede caiu depois do POST) pode ter sido cobrada:
+        # o Retomar avisa em vez de fingir que é seguro regerar.
+        ctx[:uncertain] = (ctx[:uncertain] || 0) + 1 if status.nil?
         if auth_expired || status == 402
           # A cena corrente vira erro visível antes do encerramento — senão
           # a linha dela fica presa como "em andamento" num lote morto.
           ctx[:errors] << { :scene => ctx[:current_scene].to_s, :message => message.to_s }
+          ctx[:failed_entries] << ctx[:current_entry] if ctx[:current_entry]
           emit('batchProgress', {
             :done => ctx[:done], :total => ctx[:total],
             :sceneName => ctx[:current_scene], :status => 'error',
@@ -2099,6 +3911,7 @@ module SpaceNode
           finalize_batch(message, auth_expired)
         else
           ctx[:errors] << { :scene => ctx[:current_scene].to_s, :message => message.to_s }
+          ctx[:failed_entries] << ctx[:current_entry] if ctx[:current_entry]
           emit('batchProgress', {
             :done => ctx[:done], :total => ctx[:total],
             :sceneName => ctx[:current_scene], :status => 'error',
@@ -2110,7 +3923,7 @@ module SpaceNode
         @generating = false
         @generation_context = nil
         restore_original_scene(ctx) if ctx && ctx[:original_scene]
-        notify_video(t(:notif_video_failed)) if ctx && ctx[:mode] == :animar
+        notify_panel(t(:notif_video_failed)) if ctx && ctx[:mode] == :animar
         emit_error(message, auth_expired, true)
       end
     end
@@ -2129,9 +3942,78 @@ module SpaceNode
         :errors => ctx[:errors],
         :total => ctx[:total],
         :aborted => abort_message ? true : false,
-        :abortMessage => abort_message
+        :abortMessage => abort_message,
+        :pending => remember_batch_pending(ctx),
+        :insufficient => @batch_insufficient ? true : false,
+        :uncertain => ctx[:uncertain] || 0
       })
+      @batch_insufficient = false
       emit_error(abort_message, auth_expired, true) if abort_message
+    end
+
+    # Cenas que não entregaram = as que sobraram na fila + as que falharam.
+    # Saldo ou sessão caindo no meio não podem obrigar o arquiteto a refazer
+    # o caderno inteiro — nem a pagar de novo pelas que já saíram.
+    def remember_batch_pending(ctx)
+      return 0 unless ctx && ctx[:mode] == :batch
+
+      # current_entry só sobrevive aqui quando a cena NÃO entregou nem falhou
+      # (sessão caiu ou cancelaram no meio dela) — finish_generation e o ramo
+      # de cena inexistente zeram. Ela é pendente como qualquer outra.
+      em_voo = ctx[:current_entry]
+      pending = (Array(ctx[:queue]) + Array(ctx[:failed_entries]) + [em_voo]).compact
+      if pending.empty?
+        @batch_pending = nil
+        return 0
+      end
+      payload = ctx[:payload].is_a?(Hash) ? ctx[:payload].dup : {}
+      payload['seed'] = ctx[:shared_seed] if ctx[:shared_seed]
+      @batch_pending = {
+        :payload => payload,
+        :entries => pending,
+        # Retomar noutro arquivo geraria (e cobraria) cenas do projeto errado.
+        :model => batch_model_key,
+        :results => Array(ctx[:results])
+      }
+      pending.length
+    end
+
+    # Chave do modelo ativo: guid quando existe (não muda ao salvar), path
+    # como reserva.
+    def batch_model_key
+      model = ::Sketchup.active_model
+      return nil unless model
+
+      key = model.respond_to?(:guid) ? model.guid.to_s : ''
+      key = model.path.to_s if key.empty?
+      key.empty? ? nil : key
+    rescue StandardError
+      nil
+    end
+
+    def handle_resume_batch
+      raise t(:busy) if @generating
+
+      pending = @batch_pending
+      raise t(:batch_resume_empty) unless pending && !Array(pending[:entries]).empty?
+
+      if pending[:model] && batch_model_key && pending[:model] != batch_model_key
+        raise t(:batch_resume_other_model)
+      end
+
+      unless authenticated?
+        emit_error(t(:connect_first), true, true)
+        return
+      end
+
+      # @batch_pending só é limpa QUANDO o lote realmente recomeça: se a
+      # renovação de sessão falhar aqui, o botão Retomar tem que continuar
+      # valendo — senão a pendência morre com o clique.
+      ensure_fresh_session(true) do
+        @batch_pending = nil
+        run_batch(pending[:payload], pending[:entries],
+                  :resumed => true, :results => Array(pending[:results]))
+      end
     end
 
     def restore_original_scene(ctx)
@@ -2298,6 +4180,133 @@ module SpaceNode
         :eta_s => engine['estimatedSeconds'].to_i,
         :max_bytes => limits['maxSourceBytes'].to_i
       }
+    end
+
+    # ── Planta humanizada ───────────────────────────────────────────────────
+    def handle_generate_plan(raw)
+      payload = parse_json(raw)
+      raise t(:connect_first) unless authenticated?
+      raise t(:busy) if @generating
+
+      catalog = cached_catalog
+      cfg = catalog && catalog['plan']
+      raise t(:plan_no_catalog) unless cfg.is_a?(Hash)
+
+      spec = plan_spec_from_catalog(cfg, payload)
+      ensure_fresh_session(true) { execute_plan(spec) }
+    end
+
+    # O painel só manda ids; quem diz quais existem é o catálogo. Id fora da
+    # lista não vira request — a rota recusaria depois de cobrar o caminho.
+    def plan_spec_from_catalog(cfg, payload)
+      invalid = t(:plan_invalid)
+      pick = proc do |key, value|
+        list = cfg[key].is_a?(Array) ? cfg[key] : []
+        found = list.find { |i| i.is_a?(Hash) && i['id'].to_s == value.to_s }
+        raise invalid unless found
+
+        found['id'].to_s
+      end
+
+      wanted = payload['options'].is_a?(Hash) ? payload['options'] : {}
+      options = {}
+      (cfg['optionOrder'].is_a?(Array) ? cfg['optionOrder'] : []).each do |key|
+        options[key.to_s] = wanted[key.to_s] ? true : false
+      end
+
+      {
+        :project_type => pick.call('projectTypes', payload['projectType']),
+        :style => pick.call('styles', payload['style']),
+        :level => pick.call('levels', payload['level']),
+        :options => options,
+        :instructions => payload['instructions'].to_s.strip[0, 400].to_s,
+        :nodes => cfg['nodes'].to_i
+      }
+    end
+
+    def execute_plan(spec)
+      return emit_error(t(:busy)) if @generating
+
+      @generating = true
+      @generation_epoch = (@generation_epoch || 0) + 1
+      @generation_started_at = Time.now
+      @generation_context = { :mode => :plan, :spec => spec, :posted => false }
+      epoch = @generation_epoch
+
+      emit('status', { :stage => 'capture', :message => t(:plan_capturing) })
+      plan = capture_plan(spec)
+      emit('planCapture', {
+        :imageDataUrl => thumbnail_data_url(plan[:path]),
+        :section => plan[:section]
+      })
+
+      emit('status', { :stage => 'upload', :message => t(:sending) })
+      upload_direct(plan[:path], 'image/png', 'render-source', false, epoch) do |source_key, _url|
+        delete_quiet(plan[:path])
+        request_plan(source_key, spec, plan, epoch)
+      end
+    rescue StandardError => e
+      fail_generation(e.message)
+    end
+
+    def request_plan(source_key, spec, plan, epoch)
+      return unless generation_alive?(epoch)
+
+      body = {
+        :sourceKey => source_key,
+        :projectType => spec[:project_type],
+        :style => spec[:style],
+        :level => spec[:level],
+        :options => spec[:options]
+      }
+      body[:additionalInstructions] = spec[:instructions] unless spec[:instructions].empty?
+
+      ctx = @generation_context
+      ctx[:posted] = true if ctx
+      emit('status', { :stage => 'generate', :message => t(:plan_generating) })
+
+      request = json_request(:post, '/api/apresentar/humanized-plan', body, generation_error_handler_for(epoch)) do |data|
+        finish_plan(data, spec, plan) if generation_alive?(epoch)
+      end
+      @generate_request = request
+
+      ::UI.start_timer(GENERATE_TIMEOUT_SECONDS, false) do
+        if generation_alive?(epoch) && @generate_request.equal?(request)
+          begin
+            request.cancel
+          rescue StandardError
+            nil
+          end
+          fail_generation(t(:plan_lost))
+        end
+      end
+    end
+
+    def finish_plan(data, spec, plan)
+      @generating = false
+      @generation_context = nil
+      result = {
+        :outputUrl => data['url'].to_s,
+        :originalUrl => data['originalUrl'].to_s,
+        :renderId => data['renderId'],
+        :nodesCharged => data['nodesCharged'].to_i,
+        :totalBalance => data['creditsRemaining'],
+        :section => plan[:section],
+        :style => spec[:style],
+        :level => spec[:level]
+      }
+      @generate_request = nil
+      # Mesmo contrato do Animar: saldo vem na resposta quando o servidor sabe
+      # dizer; senão pergunta pra sessão (nunca deixa o chip desatualizado).
+      if data['creditsRemaining'].is_a?(Numeric)
+        @balance = { 'totalBalance' => data['creditsRemaining'] }
+      else
+        check_session
+      end
+      emit('planResult', result)
+      notify_panel(t(:notif_plan_ready))
+    rescue StandardError => e
+      fail_generation(e.message)
     end
 
     def execute_animar(spec)
@@ -2485,13 +4494,13 @@ module SpaceNode
         check_session
       end
       emit('videoResult', video)
-      notify_video("#{t(:notif_video_ready)} · #{spec[:duration]} s")
+      notify_panel("#{t(:notif_video_ready)} · #{spec[:duration]} s")
       auto_save_video(video) if video_save_mode == 'project'
     end
 
     # Notificação nativa do SketchUp (o arquiteto pode estar modelando com o
     # painel atrás). SketchUp sem UI::Notification só não avisa.
-    def notify_video(message)
+    def notify_panel(message)
       return unless defined?(::UI::Notification)
 
       ext = defined?(EXTENSION) ? EXTENSION : nil
@@ -2603,14 +4612,15 @@ module SpaceNode
       nil
     end
 
-    # Nunca sobrescreve: -2, -3…
+    # Nunca sobrescreve: -2, -3… Serve vídeo e render (extensão preservada).
     def unique_path(path)
       return path unless File.exist?(path)
 
-      base = path.sub(/\.mp4\z/i, '')
+      ext = File.extname(path)
+      base = ext.empty? ? path : path[0...-ext.length]
       i = 2
-      i += 1 while File.exist?("#{base}-#{i}.mp4")
-      "#{base}-#{i}.mp4"
+      i += 1 while File.exist?("#{base}-#{i}#{ext}")
+      "#{base}-#{i}#{ext}"
     end
 
     def auto_save_video(video)
@@ -2760,7 +4770,9 @@ module SpaceNode
             download_to_file(absolute_url(location, url), target, hops - 1, opts.merge(:state => state))
           else
             state[:done] = true
-            if kind == :video
+            if opts[:on_finish]
+              opts[:on_finish].call(false, 'redirecionamento inválido')
+            elsif kind == :video
               download_failed(kind, url, opts, 'redirecionamento inválido', status)
             else
               emit_error('Não foi possível baixar o render. Tente pelo site.')
@@ -2776,14 +4788,20 @@ module SpaceNode
         if status >= 200 && status < 300 && valid
           begin
             File.open(target, 'wb') { |f| f.write(body) }
-            if kind == :video
+            if opts[:on_finish]
+              opts[:on_finish].call(true, target)
+            elsif kind == :video
               remember_local_video(target)
               emit('saved', { :path => target, :kind => 'video', :auto => opts[:auto] ? true : false })
             else
               emit('saved', { :path => target, :kind => 'image' })
             end
           rescue StandardError => e
-            emit_error("Não foi possível salvar o arquivo: #{e.message}")
+            if opts[:on_finish]
+              opts[:on_finish].call(false, e.message)
+            else
+              emit_error("Não foi possível salvar o arquivo: #{e.message}")
+            end
           end
         else
           # Diagnóstico embutido: o motivo exato aparece pro usuário (e pra
@@ -2811,6 +4829,8 @@ module SpaceNode
             else
               emit_error('O download do vídeo travou. Tente "Salvar vídeo…" de novo.')
             end
+          elsif opts[:on_finish]
+            opts[:on_finish].call(false, 'o download travou')
           else
             emit_error('O download travou. Tente de novo.')
           end
@@ -2819,6 +4839,10 @@ module SpaceNode
     end
 
     def download_failed(kind, url, opts, reason, status)
+      # Quem passou on_finish cuida do próprio erro — sem isto, uma falha no
+      # meio do caderno abriria N abas do navegador.
+      return opts[:on_finish].call(false, reason) if opts[:on_finish]
+
       if kind == :video
         if opts[:auto]
           emit('videoSaveFailed', { :message => "Não foi possível salvar o vídeo ao lado do projeto (#{reason}). Use \"Salvar vídeo…\"." })
@@ -2881,6 +4905,94 @@ module SpaceNode
       return true if bytes[0, 4] == [0x52, 0x49, 0x46, 0x46] && bytes[8, 4] == [0x57, 0x45, 0x42, 0x50]
 
       false
+    end
+
+    # ── Salvar o caderno ─────────────────────────────────────────────────────
+    #
+    # O lote devolve N imagens e, até aqui, tirá-las do painel era um
+    # savepanel por imagem: clicar na miniatura, esperar virar o resultado
+    # ativo, "Baixar imagem", escolher pasta e nome. Oito vezes. O VÍDEO já
+    # caía sozinho ao lado do .skp; a imagem, que é o produto principal, não.
+    # Sequencial de propósito: N downloads simultâneos competiriam com a
+    # próxima geração e o Sketchup::Http não tem controle de concorrência.
+
+    def renders_dir
+      model = ::Sketchup.active_model
+      return nil unless model && !model.path.to_s.empty?
+
+      dir = File.join(File.dirname(model.path), 'spacenode-renders')
+      FileUtils.mkdir_p(dir) unless File.directory?(dir)
+      dir
+    rescue StandardError
+      nil
+    end
+
+    # <cena>-<data>.png. A extensão sai da URL quando reconhecível — o render
+    # em prod é PNG, mas Ampliar/Editar podem devolver outro formato.
+    def render_file_name(item, index)
+      scene = video_slug(item['sceneName'].to_s)
+      scene = format('vista-%02d', index + 1) if scene.empty?
+      ext = item['url'].to_s.split('?').first.to_s[/\.(png|jpe?g|webp)\z/i]
+      ext = ext ? ext.downcase : '.png'
+      "#{scene}-#{Time.now.strftime('%Y%m%d')}#{ext}"
+    end
+
+    def handle_save_batch(raw)
+      payload = parse_json(raw)
+      raise t(:batch_save_busy) if @batch_save
+
+      items = Array(payload['items']).select do |i|
+        i.is_a?(Hash) && i['url'].to_s =~ %r{\Ahttps?://}
+      end
+      raise t(:batch_save_empty) if items.empty?
+
+      dir = renders_dir
+      raise t(:batch_save_no_dir) unless dir
+
+      @batch_save = {
+        :queue => items.dup, :dir => dir, :total => items.length,
+        :saved => 0, :failed => [], :index => 0
+      }
+      emit('batchSaveProgress', { :done => 0, :total => items.length })
+      save_next_render
+    end
+
+    def save_next_render
+      st = @batch_save
+      return unless st
+
+      item = st[:queue].shift
+      unless item
+        @batch_save = nil
+        emit('batchSaveDone', {
+          :saved => st[:saved], :failed => st[:failed],
+          :total => st[:total], :dir => st[:dir]
+        })
+        notify_panel(format(t(:batch_saved_n), st[:saved])) if st[:saved] > 0
+        return
+      end
+
+      index = st[:index]
+      st[:index] += 1
+      target = unique_path(File.join(st[:dir], render_file_name(item, index)))
+      done = proc do |ok, info|
+        if ok
+          st[:saved] += 1
+        else
+          st[:failed] << { :scene => item['sceneName'].to_s, :message => info.to_s }
+        end
+        emit('batchSaveProgress', { :done => st[:saved] + st[:failed].length, :total => st[:total] })
+        save_next_render
+      end
+      download_to_file(item['url'].to_s, target, 3, :kind => :image, :on_finish => done)
+    rescue StandardError => e
+      st = @batch_save
+      @batch_save = nil
+      emit('batchSaveDone', {
+        :saved => st ? st[:saved] : 0, :failed => st ? st[:failed] : [],
+        :total => st ? st[:total] : 0, :dir => st ? st[:dir] : '', :error => e.message
+      })
+      emit_error(e.message)
     end
 
     # ── Ampliar (upscale) ────────────────────────────────────────────────────
@@ -3156,6 +5268,15 @@ module SpaceNode
     end
 
     def request_edit(payload, source, reference_url, mask_url, epoch)
+      # O upload da máscara é :optional (uma falha não derruba a edição), mas
+      # insert_element EXIGE máscara no servidor (REQUIRES_MASK): sem esta
+      # checagem o usuário levaria um erro que se contradiz — "marque a área"
+      # com a área marcada.
+      if payload['action'].to_s == 'insert_element' && mask_url.to_s.empty?
+        fail_generation(t(:edit_mask_failed))
+        return
+      end
+
       return unless generation_alive?(epoch)
 
       has_mask = mask_url && !mask_url.empty?
@@ -3225,7 +5346,9 @@ module SpaceNode
 
     def build_edit_body(payload, source, dry_run, has_mask = false)
       action = payload['action'].to_s
-      return nil unless %w[remove swap_material refine_area].include?(action)
+      # insert_element exige máscara (REQUIRES_MASK no servidor) E instrução:
+      # a área diz ONDE, o texto diz O QUÊ. O painel espelha essa regra.
+      return nil unless %w[remove swap_material refine_area insert_element].include?(action)
 
       instruction = payload['instruction'].to_s.strip
       # remove/refine COM área selecionada não exigem instrução — a máscara já
@@ -3529,6 +5652,93 @@ module SpaceNode
       send_state
     end
 
+    # ── Estilo do projeto ────────────────────────────────────────────────────
+    #
+    # A dor nº 1 de quem renderiza com IA é o conjunto: cinco vistas do mesmo
+    # projeto voltam como cinco projetos diferentes. Aqui a semente do render
+    # aprovado + os presets que o geraram ficam gravados NO ARQUIVO (dicionário
+    # 'spacenode', chave 'style'). Enquanto travado, toda geração deste .skp
+    # repete a mesma semente — e quem abre o arquivo (outra máquina, outro
+    # projetista) herda o estilo junto com o modelo.
+    #
+    # O painel é quem manda a semente no payload; aqui só guardamos, devolvemos
+    # e validamos. Miniatura é URL assinada (vence em ~1 h): serve pra sessão,
+    # e o painel esconde sozinho quando o link morre.
+    PROJECT_STYLE_KEY = 'style'
+
+    def project_style
+      model = ::Sketchup.active_model
+      return nil unless model
+
+      raw = model.get_attribute('spacenode', PROJECT_STYLE_KEY, nil)
+      return nil unless raw.is_a?(String) && !raw.empty?
+
+      style = JSON.parse(raw)
+      return nil unless style.is_a?(Hash) && style['seed'].to_s =~ /\A\d+\z/
+
+      style
+    rescue StandardError
+      nil
+    end
+
+    def handle_save_project_style(raw)
+      payload = parse_json(raw)
+      seed = payload['seed']
+      unless seed.is_a?(Numeric) || seed.to_s =~ /\A\d+\z/
+        raise t(:style_no_seed)
+      end
+
+      preset = payload['preset'].is_a?(Hash) ? payload['preset'] : {}
+      style = {
+        'seed' => seed.to_i,
+        'preset' => preset,
+        # Corta o que não cabe num atributo de modelo por engano (URL longa,
+        # texto colado gigante): o arquivo do usuário não é depósito.
+        'thumb' => payload['thumb'].to_s[0, 2048],
+        'renderId' => payload['renderId'].to_s[0, 128],
+        'createdAt' => Time.now.to_i,
+        'version' => VERSION
+      }
+      write_project_style(JSON.generate(style))
+      emit('projectStyle', { :style => style, :saved => true })
+    end
+
+    def handle_clear_project_style
+      write_project_style(nil)
+      emit('projectStyle', { :style => nil, :saved => true })
+    end
+
+    def emit_project_style(saved)
+      emit('projectStyle', { :style => project_style, :saved => saved })
+    rescue StandardError
+      nil
+    end
+
+    # Operação transparente: gravar o estilo não vira um passo de desfazer na
+    # pilha do usuário (mesmo tratamento do último resultado).
+    def write_project_style(json)
+      model = ::Sketchup.active_model
+      return unless model
+
+      begin
+        model.start_operation('SPACENODE', true, false, true)
+        if json
+          model.set_attribute('spacenode', PROJECT_STYLE_KEY, json)
+        else
+          dict = model.attribute_dictionary('spacenode')
+          dict.delete_key(PROJECT_STYLE_KEY) if dict
+        end
+        model.commit_operation
+      rescue StandardError
+        begin
+          model.abort_operation
+        rescue StandardError
+          nil
+        end
+        raise
+      end
+    end
+
     # ── Configurações ────────────────────────────────────────────────────────
 
     def handle_save_settings(raw)
@@ -3632,7 +5842,10 @@ module SpaceNode
         :panelState => panel_state,
         :lastResult => @last_result || model_result,
         :videoSave => video_save_mode,
-        :lastVideo => last_video_state
+        :lastVideo => last_video_state,
+        :photo => @photo,
+        :projectStyle => project_style,
+        :guidesOverlay => guides_overlay_supported?
       })
     end
 
@@ -3675,28 +5888,238 @@ module SpaceNode
       emit_error('URL inválida.')
     end
 
+    # ── Fotografia: overlay de guias e observers ─────────────────────────────
+
+    # Guias de composição desenhadas na viewport (SketchUp 2023+). Overlay é
+    # passivo: não toma cliques nem a ferramenta ativa, e não sai no export.
+    if defined?(::Sketchup::Overlay)
+      class GuidesOverlay < ::Sketchup::Overlay
+        attr_accessor :guide, :aspect, :model_id
+
+        def initialize
+          super('com.spacenode.sketchup.guides', 'SPACENODE · Moldura e guias',
+                description: 'A moldura do que a captura vai ver, e as guias de composição dentro dela.')
+          @guide = 'none'
+          @aspect = 0.0
+          @model_id = nil
+        end
+
+        def draw(view)
+          w = view.vpwidth.to_f
+          h = view.vpheight.to_f
+          return if w < 2 || h < 2
+
+          x0 = 0.0
+          y0 = 0.0
+          fw = w
+          fh = h
+          if @aspect.to_f > 0
+            if w / h > @aspect
+              fw = h * @aspect
+              x0 = (w - fw) / 2.0
+            else
+              fh = w / @aspect
+              y0 = (h - fh) / 2.0
+            end
+          end
+
+          # A captura NÃO é um print da viewport: ela re-renderiza no quadro
+          # escolhido preservando o campo de visão VERTICAL. Numa viewport
+          # 2,6:1 com 16:9 escolhido, ~32% da largura fica fora — e até aqui
+          # nada na tela dizia isso (a moldura só era desenhada junto com uma
+          # guia de composição, e as barras nativas do SketchUp só existem
+          # DURANTE o write_image). O que fica fora sai escurecido.
+          if fw < w - 1 || fh < h - 1
+            # Quando a própria câmera já está com a moldura, o SketchUp desenha
+            # as barras cinza — escurecer de novo por cima seria ruído. Aí a
+            # overlay entra só com a borda (e as guias, abaixo).
+            native = begin
+              view.camera.aspect_ratio.to_f
+            rescue StandardError
+              0.0
+            end
+            bands = []
+            if (native - @aspect.to_f).abs > 0.001
+              if x0 > 0.5
+                bands << [[0.0, 0.0], [x0, 0.0], [x0, h], [0.0, h]]
+                bands << [[x0 + fw, 0.0], [w, 0.0], [w, h], [x0 + fw, h]]
+              end
+              if y0 > 0.5
+                bands << [[0.0, 0.0], [w, 0.0], [w, y0], [0.0, y0]]
+                bands << [[0.0, y0 + fh], [w, y0 + fh], [w, h], [0.0, h]]
+              end
+            end
+            unless bands.empty?
+              view.drawing_color = ::Sketchup::Color.new(0, 0, 0, 92)
+              bands.each do |b|
+                view.draw2d(::GL_QUADS, b.map { |p| ::Geom::Point3d.new(p[0], p[1], 0) })
+              end
+            end
+            border = [[x0, y0], [x0 + fw, y0], [x0 + fw, y0 + fh], [x0, y0 + fh], [x0, y0]]
+              .map { |p| ::Geom::Point3d.new(p[0], p[1], 0) }
+            view.line_stipple = ''
+            view.line_width = 3
+            view.drawing_color = ::Sketchup::Color.new(0, 0, 0, 70)
+            view.draw2d(::GL_LINE_STRIP, border)
+            view.line_width = 1
+            view.drawing_color = ::Sketchup::Color.new(255, 255, 255, 220)
+            view.draw2d(::GL_LINE_STRIP, border)
+          end
+
+          segments = SpaceNode::SketchUp.guide_segments(@guide)
+          return if segments.empty?
+
+          points = []
+          segments.each do |s|
+            points << ::Geom::Point3d.new(x0 + s[0] * fw, y0 + s[1] * fh, 0)
+            points << ::Geom::Point3d.new(x0 + s[2] * fw, y0 + s[3] * fh, 0)
+          end
+          view.line_stipple = ''
+          # Halo escuro + linha clara: legível sobre céu branco e sombra.
+          view.line_width = 3
+          view.drawing_color = ::Sketchup::Color.new(0, 0, 0, 70)
+          view.draw2d(::GL_LINES, points)
+          view.line_width = 1
+          view.drawing_color = ::Sketchup::Color.new(255, 255, 255, 200)
+          view.draw2d(::GL_LINES, points)
+        rescue StandardError
+          nil
+        end
+      end
+    end
+
+    class PhotoViewObserver < ::Sketchup::ViewObserver
+      def initialize(owner)
+        @owner = owner
+      end
+
+      def onViewChanged(_view)
+        @owner.camera_changed
+      rescue StandardError
+        nil
+      end
+    end
+
+    class PhotoAppObserver < ::Sketchup::AppObserver
+      def initialize(owner)
+        @owner = owner
+      end
+
+      def onNewModel(_model)
+        @owner.model_switched
+      rescue StandardError
+        nil
+      end
+
+      def onOpenModel(_model)
+        @owner.model_switched
+      rescue StandardError
+        nil
+      end
+
+      def onActivateModel(_model)
+        @owner.model_switched
+      rescue StandardError
+        nil
+      end
+
+      def expectsStartupModelNotifications
+        false
+      end
+    end
+
+    # ── Toolbar nativa ───────────────────────────────────────────────────────
+    #
+    # O painel resolve tudo, mas quem está modelando quer as ações de um
+    # clique. Capturar e Gerar PRECISAM do painel (é ele que mostra progresso,
+    # custo e resultado): fechado, ele abre e a ação espera o 'ready'. Nova
+    # cena e Marcar espelho agem no modelo e valem sozinhas — sem painel, o
+    # retorno vai pra barra de status.
+    def panel_open?
+      !!(@dialog && @dialog.respond_to?(:visible?) && @dialog.visible?)
+    rescue StandardError
+      false
+    end
+
+    def selection_empty?
+      model = ::Sketchup.active_model
+      model.nil? || model.selection.empty?
+    rescue StandardError
+      false
+    end
+
+    def with_panel(&block)
+      if panel_open?
+        @dialog.bring_to_front if @dialog.respond_to?(:bring_to_front)
+        block.call
+      else
+        @pending_toolbar_action = block
+        activate
+      end
+    rescue StandardError => e
+      ::UI.messagebox(e.message)
+    end
+
+    def toolbar_capture
+      with_panel { handle_capture }
+    end
+
+    def toolbar_generate
+      with_panel { emit('runGenerate') }
+    end
+
+    def toolbar_add_scene
+      name = handle_add_scene
+      ::Sketchup.status_text = format(t(:tb_scene_done), name) unless panel_open?
+    rescue StandardError => e
+      ::UI.messagebox(e.message)
+    end
+
+    def toolbar_mark_mirror
+      handle_mark_mirror(JSON.generate({ 'kind' => 'mirror' }))
+      ::Sketchup.status_text = t(:mirror_marked) unless panel_open?
+    rescue StandardError => e
+      ::UI.messagebox(e.message)
+    end
+
+    # PNG nas DUAS plataformas: o renderizador de SVG do SketchUp no Windows
+    # exibe ícones feitos só de stroke (sem fill) em branco — o botão parecia
+    # inexistente. Caminho absoluto, e o 48 cai pro 24 se faltar.
+    def build_command(label, hint, icon, &block)
+      command = ::UI::Command.new(label) { block.call }
+      command.tooltip = label
+      command.status_bar_text = hint
+      base = File.join(__dir__, 'assets')
+      small = File.join(base, "#{icon}-24.png")
+      large = File.join(base, "#{icon}-48.png")
+      if File.exist?(small)
+        command.small_icon = small
+        command.large_icon = File.exist?(large) ? large : small
+      end
+      command
+    end
+
     # ── Registro de UI ───────────────────────────────────────────────────────
 
     unless file_loaded?(__FILE__)
-      command = ::UI::Command.new('SPACENODE') { SpaceNode::SketchUp.activate }
-      command.tooltip = 'SPACENODE'
-      command.status_bar_text = 'Renderizar a vista atual com a SPACENODE'
+      commands = [
+        build_command(t(:tb_panel), t(:tb_panel_hint), 'spacenode') { SpaceNode::SketchUp.activate },
+        build_command(t(:tb_capture), t(:tb_capture_hint), 'toolbar-capture') { SpaceNode::SketchUp.toolbar_capture },
+        build_command(t(:tb_generate), t(:tb_generate_hint), 'toolbar-generate') { SpaceNode::SketchUp.toolbar_generate },
+        build_command(t(:tb_scene), t(:tb_scene_hint), 'toolbar-scene') { SpaceNode::SketchUp.toolbar_add_scene },
+        build_command(t(:tb_mirror), t(:tb_mirror_hint), 'toolbar-mirror') { SpaceNode::SketchUp.toolbar_mark_mirror }
+      ]
+      # Marcar espelho age sobre a seleção: cinza quando não há nada
+      # selecionado (a proc roda a cada refresh de UI — só uma checagem).
+      commands.last.set_validation_proc { SpaceNode::SketchUp.selection_empty? ? MF_GRAYED : MF_ENABLED }
 
-      # PNG nas DUAS plataformas: o renderizador de SVG do SketchUp no Windows
-      # exibe ícones feitos só de stroke (sem fill) em branco/preto — o botão
-      # parecia inexistente. PNG rasterizado é confiável. Caminho absoluto.
-      icon_base = File.join(__dir__, 'assets')
-      small_icon = File.join(icon_base, 'spacenode-24.png')
-      large_icon = File.join(icon_base, 'spacenode-48.png')
-      if File.exist?(small_icon)
-        command.small_icon = small_icon
-        command.large_icon = File.exist?(large_icon) ? large_icon : small_icon
-      end
-
-      ::UI.menu('Extensions').add_item(command)
+      menu = ::UI.menu('Extensions').add_submenu('SPACENODE')
+      commands.each { |c| menu.add_item(c) }
 
       toolbar = ::UI::Toolbar.new('SPACENODE')
-      toolbar.add_item(command)
+      toolbar.add_item(commands.first)
+      toolbar.add_separator
+      commands.drop(1).each { |c| toolbar.add_item(c) }
       # restore sozinho NÃO exibe no primeiro load (get_last_state
       # TB_NEVER_SHOWN) — só reposiciona se já foi mostrada antes. show força
       # a exibição na estreia; nas próximas sessões restore respeita a escolha

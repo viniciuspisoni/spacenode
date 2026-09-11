@@ -1,0 +1,28 @@
+Modelo, render e vídeo da mesma sala. O que muda é luz, fogo e realismo. O painel fica onde estava.
+
+O modelo já tinha materiais. O render com IA acrescentou o que o print não mostra: a luz da lareira no mármore, o reflexo na TV, a profundidade do painel. Gerado em minutos.
+
+Depois, o Animar pega esse mesmo render e devolve um take curto: o fogo se mexe, a câmera abre devagar, o projeto continua o mesmo. É o fechamento da apresentação, sem sair do projeto.
+
+Veja no seu próprio projeto — grátis, sem cartão, no link da bio.
+
+#arquitetura #archviz #renderizacao #apresentacaodeprojeto #designdeinteriores
+
+────────────────────────────────────────
+VERSÃO PAGA (Meta · objetivo cadastro · botão SIGN_UP "Cadastre-se")
+Mesmo mp4 da orgânica (10,8 s ≤ 15 s, texto embutido, CTA no card final, som off).
+
+A · apresentação
+  Texto primário: Do print ao render e do render ao vídeo, na mesma sala. Feche a apresentação com movimento. Veja no seu próprio projeto.
+  Título: Render e vídeo do mesmo projeto
+  Descrição: Sem cartão para começar
+
+B · fidelidade
+  Texto primário: Luz, fogo e reflexo entram. Painel, TV e bancada ficam onde você desenhou. Veja no seu próprio projeto.
+  Título: O render respeita o seu projeto
+  Descrição: Grátis, sem cartão
+
+C · prazo
+  Texto primário: Render em minutos e um take curto para a apresentação, do print que você já tem. Veja no seu próprio projeto.
+  Título: Do print ao vídeo em minutos
+  Descrição: Em português, sem cartão

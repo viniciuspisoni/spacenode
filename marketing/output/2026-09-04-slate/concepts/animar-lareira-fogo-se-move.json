@@ -1,0 +1,84 @@
+{
+ "slug": "animar-lareira-fogo-se-move",
+ "title": "O fogo se move, a marcenaria não",
+ "pillar": "demonstracao-de-ferramentas",
+ "angle": "Animar como terceiro estado do mesmo projeto: print → render → vídeo, mesmo painel de TV, mesma câmera; a única coisa que passa a se mover é a chama da lareira (com um recuo lento de câmera). Formato forward, o 'acende' acontece dentro dos 3 primeiros segundos.",
+ "format": "transformacao",
+ "duration_s": 9.5,
+ "hook_text": "O fogo se move. A marcenaria, não.",
+ "hook_visual": "Faixa 4:5 (1080×1350) centrada no quadro 9:16 sobre #0a0a0a. 0–1,0s: print do SketchUp #3 recortado no painel de TV + lareira (painel bege chapado, TV preta, chama chapada sobre bancada de mármore escuro, ripado escuro à direita). 1,0–1,3s: wipe para o render #2 no mesmo recorte (laca bege com luz, mármore verde-escuro com veios, livros na bancada, chama com brilho). 2,6s: corte seco para o vídeo #0 — a chama começa a tremular e a câmera recua devagar. É o gancho: a imagem parada passa a se mover antes dos 3s.",
+ "scenes": [
+  {
+   "t": "0,0–1,0s",
+   "visual": "Print SketchUp #3 (3072×1228) em faixa 4:5: recorte central de 1535×1228 centrado no painel de TV e na lareira (prateleiras da esquerda ficam de fora). Fundo #0a0a0a acima e abaixo da faixa.",
+   "text_on_screen": "label discreto no canto da faixa: print",
+   "asset_idx": [
+    3
+   ]
+  },
+  {
+   "t": "1,0–1,3s",
+   "visual": "xfade wipeleft (linear, 0,3s) do print para o render #2 (3264×1312), mesmo recorte escalado pela altura — alinhar pelas juntas do painel e pela bancada, não pelas bordas.",
+   "text_on_screen": "",
+   "asset_idx": [
+    3,
+    2
+   ]
+  },
+  {
+   "t": "1,3–2,6s",
+   "visual": "Render #2 parado. Headline entra em corte no terço central, acima da faixa (abaixo dos 220px de topo).",
+   "text_on_screen": "O fogo se move. A marcenaria, não.",
+   "asset_idx": [
+    2
+   ]
+  },
+  {
+   "t": "2,6–6,6s",
+   "visual": "Corte seco para o vídeo #0 (1920×1080, Veo, 6s) — usar só os primeiros 4,0s. Recorte 4:5 central (1350×1080 → 1080×1350, leve downscale): a chama tremula sobre o queimador, o livro e o mármore ficam, a câmera recua lentamente. Cortar ANTES de 4,2s: aos ~4,5s entram encostos de sofá inventados na base do quadro. Headline permanece até 4,6s.",
+   "text_on_screen": "label: vídeo · (headline sai aos 4,6s)",
+   "asset_idx": [
+    0
+   ]
+  },
+  {
+   "t": "5,0–7,5s",
+   "visual": "Apoio entra abaixo da faixa (acima dos 320px da base) enquanto o vídeo roda; aos 6,6s o último frame usado congela por 0,9s.",
+   "text_on_screen": "Print → render → vídeo. Gerado em minutos.",
+   "asset_idx": [
+    0
+   ]
+  },
+  {
+   "t": "7,5–9,5s",
+   "visual": "Card final: fundo #0a0a0a, símbolo ConstellationN + wordmark monocromáticos, CTA em Geist. Verde #30d158 só na palavra 'minutos' do apoio anterior ou em nada.",
+   "text_on_screen": "Veja no seu próprio projeto",
+   "asset_idx": []
+  }
+ ],
+ "assets": [
+  3,
+  2,
+  0
+ ],
+ "cta": "Veja no seu próprio projeto",
+ "caption": "Print, render e vídeo do mesmo painel. A marcenaria não saiu do lugar em nenhum dos três.\n\nPainel de TV com lareira, direto do SketchUp. O render dá veio ao mármore e brilho à chama; o Animar coloca o fogo em movimento com um recuo lento de câmera. Portas, nichos e bancada ficam onde o projeto colocou.\n\nServe para o fim da reunião: depois da imagem parada, o cliente vê o ambiente em movimento por alguns segundos. Sem sair da plataforma, sem remontar a cena.\n\nGerado em minutos, sobre o seu próprio print.\n\nVeja no seu próprio projeto — link na bio.\n\n#designdeinteriores #renderizacao #sketchup #archviz #apresentacaodeprojeto",
+ "hashtags": [
+  "#designdeinteriores",
+  "#renderizacao",
+  "#sketchup",
+  "#archviz",
+  "#apresentacaodeprojeto"
+ ],
+ "paid": {
+  "primary": "Print, render e vídeo do mesmo painel de TV. A marcenaria não sai do lugar. Gerado em minutos, sobre o seu SketchUp — sem remontar a cena.",
+  "headline": "Do print ao vídeo, em minutos",
+  "description": "Mesmo projeto, mesma câmera",
+  "button": "LEARN_MORE",
+  "cutdown_note": "Já cabe em ≤15s (9,5s). Versão de 6s para tráfego: pular o print, abrir no render #2 com wipe de 0,3s para o vídeo #0 aos 0,8s, headline aos 0,4s, card CTA nos últimos 1,5s."
+ },
+ "why_converts": "O espectador é arquiteto que já faz print de painel e já pediu render; a peça mostra um terceiro entregável (vídeo) saindo do MESMO insumo, sem trabalho novo — valor percebido alto, esforço percebido zero. Funil: LEARN_MORE leva à landing onde o cadastro grátis existe; com os nodes do cadastro dá para reproduzir print → render e um clipe no motor Rápido, mas o motor Cinemático (o que gerou este clipe) custa mais que o saldo inicial — o desejo de repetir exatamente o que viu vira o gatilho natural para o Starter. A peça não promete vídeo grátis, então não gera frustração no primeiro uso.",
+ "production_notes": "Specs do BRIEF: 1080×1920, 30fps, H.264 crf 18 yuv420p, sem áudio; nada de texto nos 220px do topo nem nos 320px da base. Faixa 4:5 em vez de full-bleed: o painel e a lareira são horizontais e o recorte 9:16 do vídeo (608×1080) cortaria a TV e exigiria upscale 1,78×; a faixa 4:5 pede só downscale. Alinhamento print↔render↔vídeo: #1 (1600×643, webp) é o recorte exato que alimentou o Animar — usar #1 como gabarito para que o primeiro frame do vídeo case com o render #2 (o corte seco render→vídeo precisa ser invisível). Scrim como camada própria; xfade linear; setsar=1 antes do concat. Verde #30d158 no máximo em uma palavra. Labels 'print / render / vídeo' em Geist Regular pequeno, opcionais — se poluir, remover. Motor do clipe: Cinemático (Veo 3.1, 6s, 04/09/2026 — qualidade atual do produto).",
+ "risks": "Aos ~4,5s o clipe inventa encostos de sofá em primeiro plano — cortar em 4,0s; se usar mais, o argumento 'a marcenaria não muda' quebra. Entre render e vídeo a câmera recua e a luz muda levemente: não escrever 'nada muda', só 'a marcenaria não'. O print já traz chama chapada — não dizer 'a lareira acende', dizer 'o fogo se move'. O que o vídeo NÃO pode prometer: fidelidade total do Animar (o fim do clipe prova o contrário), vídeo incluído no cadastro grátis com o motor Cinemático, tempo de geração além de 'minutos', saída em 4K (é 1080p).",
+ "gated": ""
+}

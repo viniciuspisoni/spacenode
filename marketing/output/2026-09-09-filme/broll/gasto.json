@@ -1,0 +1,25 @@
+{
+  "gastoUsd": 2.4000000000000004,
+  "clipes": [
+    {
+      "id": "sala-dolly",
+      "modelo": "fal-ai/veo3.1/image-to-video",
+      "duracao": 6,
+      "custoUsd": 1.2000000000000002,
+      "imagem": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-09-filme/broll/base/sala-16x9.png",
+      "prompt": "Plano cinematografico de arquitetura, camera em dolly lento e retilineo avancando em direcao a mesa de jantar. O movimento revela paralaxe real entre a coluna escura em primeiro plano, o forro ripado de madeira que converge no teto, a parede ripada ao fundo e o muro de pedra a direita. A arquitetura permanece exatamente como esta: nenhuma linha, esquadria, movel, luminaria ou proporcao muda de lugar ou de forma. Luz natural constante de fim de tarde entrando pela esquerda. Sem pessoas, sem texto, sem corte, sem mudanca de lente.",
+      "geracaoS": 137,
+      "arquivo": "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-09-filme\\broll\\sala-dolly.mp4"
+    },
+    {
+      "id": "casa-travelling",
+      "modelo": "fal-ai/veo3.1/image-to-video",
+      "duracao": 6,
+      "custoUsd": 1.2000000000000002,
+      "imagem": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-09-filme/broll/base/casa-16x9.jpg",
+      "prompt": "Plano cinematografico de arquitetura, camera em travelling lateral muito lento da esquerda para a direita, paralelo a fachada. O movimento cria paralaxe entre os pinheiros em primeiro plano e os dois volumes brancos da casa ao fundo. A arquitetura permanece identica: nenhuma esquadria, laje, guarda-corpo ou proporcao muda. Folhagem com brisa minima. Luz de golden hour constante. Sem pessoas, sem texto, sem corte.",
+      "geracaoS": 145,
+      "arquivo": "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-09-filme\\broll\\casa-travelling.mp4"
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "slug": "2026-09-05-reel-espera-o-final",
+  "reel": "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-05-reel-espera-o-final\\2026-09-05-reel-espera-o-final.mp4",
+  "banda": "1080×608 @ y=656",
+  "segments": [
+    {
+      "i": 0,
+      "type": "video",
+      "dur": 3,
+      "start": 0,
+      "crop": "1920×1080 4.0s"
+    },
+    {
+      "i": 1,
+      "type": "video",
+      "dur": 3,
+      "start": 3,
+      "crop": "1920×1080 6.0s"
+    },
+    {
+      "i": 2,
+      "type": "still",
+      "dur": 2,
+      "start": 6,
+      "crop": "1600×640 → 1138×640"
+    },
+    {
+      "i": 3,
+      "type": "card",
+      "dur": 1,
+      "start": 7.7,
+      "crop": null
+    }
+  ],
+  "width": 1080,
+  "height": 1920,
+  "fps": "30/1",
+  "pix_fmt": "yuv420p",
+  "codec": "h264",
+  "duration": "8.70",
+  "sizeMB": "7.27",
+  "esperado": {
+    "width": 1080,
+    "height": 1920,
+    "fps": "30/1",
+    "duration": "8.70"
+  },
+  "qaFrames": [
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-05-reel-espera-o-final\\qa-frames\\t1.50s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-05-reel-espera-o-final\\qa-frames\\t4.50s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-05-reel-espera-o-final\\qa-frames\\t7.00s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-05-reel-espera-o-final\\qa-frames\\t8.20s.png"
+  ],
+  "qaSheet": "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-05-reel-espera-o-final\\qa-sheet.jpg"
+}

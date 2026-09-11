@@ -35,7 +35,7 @@ describe('isolamento do catálogo público', () => {
   it('preços dos motores públicos ficam intactos', () => {
     expect(ENGINES.vega.nodes).toEqual({ '2k': 20, '4k': 40 })
     expect(ENGINES.pulsar.nodes).toEqual({ hd: 10, '2k': 15, '4k': 25 })
-    expect(ENGINES.quasar.nodes).toEqual({ '2k': 28 })
+    expect(ENGINES.quasar.nodes).toEqual({ '2k': 20 })
     // Quasar continua no Seedream — o piloto não mexe nele.
     expect(ENGINES.quasar.falEndpoint).toBe('bytedance/seedream/v5/pro/edit')
   })

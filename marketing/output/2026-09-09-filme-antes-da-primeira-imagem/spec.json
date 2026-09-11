@@ -1,0 +1,495 @@
+{
+  "_nota": "Filme de apresentação no formato anúncio. Duas metades: a primeira ESCURA e gerada (matéria e luz, nenhum projeto dentro), a segunda CLARA e 100% material real da plataforma. O corte entre elas é o argumento. Nenhuma cena gerada carrega claim de produto — regra do BRIEF §4. Roteiro: roteiro-isto-roda-ha-meses.json. Copy da abertura e do fecho revista pelo dono em 09/09.",
+  "slug": "2026-09-09-filme-antes-da-primeira-imagem",
+  "frame": {
+    "w": 1920,
+    "h": 1080
+  },
+  "segments": [
+    {
+      "_ato": "1 — a metade escura. Tudo aqui é gerado: matéria, luz, nada mais.",
+      "type": "black",
+      "dur": 0.8,
+      "bg": "dark"
+    },
+    {
+      "type": "video",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-09-filme/ambientacao/poeira-facho.mp4",
+      "dur": 3
+    },
+    {
+      "type": "card",
+      "card": "c2",
+      "dur": 2.2,
+      "bg": "dark"
+    },
+    {
+      "type": "video",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-09-filme/ambientacao/concreto-chapado.mp4",
+      "dur": 2.8
+    },
+    {
+      "type": "video",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-09-filme/ambientacao/pedra-rasante.mp4",
+      "dur": 2.6
+    },
+    {
+      "_nota": "A DOBRADIÇA: este clipe estoura em branco, e é nesse branco que o filme corta para a primeira imagem de produto.",
+      "type": "video",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-09-filme/ambientacao/fenda-luz.mp4",
+      "dur": 2.4
+    },
+    {
+      "_ato": "2 — a metade clara. Daqui em diante, só material real. Todo claim acontece aqui.",
+      "type": "still",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-07-reel-plugin-no-sketchup/src/su-169-center.png",
+      "dur": 3.4,
+      "fit": "cover",
+      "zoom": [
+        1.02,
+        1
+      ]
+    },
+    {
+      "type": "card",
+      "card": "c7",
+      "dur": 2.6,
+      "bg": "light"
+    },
+    {
+      "_nota": "Par antes/depois na MESMA moldura: os dois recortados para 16:9 exato antes do encaixe, para a banda não se mexer 4 px entre um e outro e denunciar o wipe. Sem Ken Burns: é prova de geometria, e câmera parada é parte da prova.",
+      "type": "still",
+      "src": "C:/Users/Pisoni/spacenode/marketing/renders/antes/living.jpg",
+      "crop": [
+        2,
+        0,
+        1331,
+        749
+      ],
+      "dur": 1.3,
+      "fit": "contain",
+      "inset": 128,
+      "bg": "light",
+      "zoom": [
+        1,
+        1
+      ]
+    },
+    {
+      "type": "still",
+      "src": "C:/Users/Pisoni/spacenode/marketing/renders/depois/living.jpg",
+      "crop": [
+        5,
+        0,
+        1365,
+        768
+      ],
+      "dur": 3.4,
+      "fit": "contain",
+      "inset": 128,
+      "bg": "light",
+      "zoom": [
+        1,
+        1
+      ]
+    },
+    {
+      "_nota": "Recorte medido: termina cravado em Blocos 3D. Se pegar a seção ESCRITÓRIO junto, a cartela 'oito módulos' passa a mentir sobre uma coluna de dezesseis linhas.",
+      "type": "still",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-09-tutoriais/src/spaces-existente-wide/02-abrir-primeiro.png",
+      "crop": [
+        48,
+        15,
+        522,
+        1170
+      ],
+      "dur": 3.2,
+      "fit": "contain",
+      "bg": "light",
+      "posX": 0.8,
+      "zoom": [
+        1,
+        1.02
+      ]
+    },
+    {
+      "_nota": "Escala 1:1, sem upscale. O pixel tem que ler como interface, não como arte.",
+      "type": "still",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-08-tutoriais/src/renderizar/06-botao-gerar-com-preco.png",
+      "dur": 2.8,
+      "fit": "contain",
+      "nativo": true,
+      "bg": "light",
+      "zoom": [
+        1,
+        1
+      ]
+    },
+    {
+      "_nota": "Esta imagem é o frame 0 do clipe seguinte: o corte é invisível e a imagem simplesmente começa a se mover.",
+      "type": "still",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-09-filme/broll/base/casa-16x9.jpg",
+      "dur": 1.4,
+      "fit": "cover",
+      "zoom": [
+        1,
+        1
+      ]
+    },
+    {
+      "type": "video",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-09-filme/broll/casa-travelling.mp4",
+      "dur": 6
+    },
+    {
+      "_nota": "Tira nativa da interface do Animar: o preço do vídeo que acabou de rodar.",
+      "type": "still",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-09-tutoriais/src/animar-wide/04-painel-reels.png",
+      "crop": [
+        16,
+        1872,
+        808,
+        66
+      ],
+      "dur": 1.6,
+      "fit": "contain",
+      "nativo": true,
+      "bg": "light",
+      "zoom": [
+        1,
+        1
+      ]
+    },
+    {
+      "_nota": "Versão MASCARADA: o selo de autoria do dono foi clonado do piso ao lado nas 8 miniaturas (prohibited-content §6).",
+      "type": "still",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-09-tutoriais/src/historico-wide/masked/02-grid-inteiro.png",
+      "crop": [
+        220,
+        662,
+        2393,
+        1346
+      ],
+      "dur": 3.4,
+      "fit": "cover",
+      "zoom": [
+        1,
+        1.02
+      ]
+    },
+    {
+      "type": "card",
+      "card": "c16",
+      "dur": 2.4,
+      "bg": "light"
+    },
+    {
+      "type": "card",
+      "card": "final",
+      "dur": 4,
+      "bg": "light"
+    }
+  ],
+  "transitions": [
+    {
+      "type": "fade",
+      "dur": 0.6
+    },
+    {
+      "type": "dissolve",
+      "dur": 0.5
+    },
+    {
+      "type": "cut"
+    },
+    {
+      "type": "dissolve",
+      "dur": 0.5
+    },
+    {
+      "type": "dissolve",
+      "dur": 0.5
+    },
+    {
+      "type": "cut"
+    },
+    {
+      "type": "cut"
+    },
+    {
+      "type": "cut"
+    },
+    {
+      "type": "wipeleft",
+      "dur": 0.3
+    },
+    {
+      "type": "cut"
+    },
+    {
+      "type": "cut"
+    },
+    {
+      "type": "cut"
+    },
+    {
+      "type": "cut"
+    },
+    {
+      "type": "cut"
+    },
+    {
+      "type": "cut"
+    },
+    {
+      "type": "dissolve",
+      "dur": 0.5
+    },
+    {
+      "type": "cut"
+    }
+  ],
+  "cards": {
+    "c2": {
+      "layout": "line",
+      "align": "left",
+      "big": "todo projeto existe<br>[antes da primeira imagem.]",
+      "px": 76
+    },
+    "c7": {
+      "layout": "line",
+      "theme": "light",
+      "logo": "symbol",
+      "big": "este é o spacenode.",
+      "px": 72
+    },
+    "c16": {
+      "layout": "line",
+      "theme": "light",
+      "align": "left",
+      "big": "[oito ferramentas.]<br>um projeto só.",
+      "px": 76
+    },
+    "final": {
+      "layout": "final",
+      "theme": "light",
+      "cta": "Testar grátis",
+      "micro": "{80} nodes grátis · sem cartão · spacenode.app"
+    },
+    "s6": {
+      "layout": "line",
+      "anchor": "bottom",
+      "scrim": true,
+      "big": "você já modelou isto.",
+      "small": "[falta a imagem.]",
+      "px": 62
+    },
+    "s9": {
+      "layout": "line",
+      "anchor": "bottom",
+      "big": "[os mesmos móveis,] no mesmo lugar.",
+      "px": 58
+    },
+    "s10": {
+      "layout": "line",
+      "theme": "light",
+      "align": "left",
+      "maxw": 900,
+      "big": "um crédito só.",
+      "small": "[node paga render, vista, edição e vídeo.]",
+      "px": 62
+    },
+    "s11": {
+      "layout": "line",
+      "theme": "light",
+      "anchor": "bottom",
+      "big": "o preço aparece [antes do clique.]",
+      "px": 58
+    },
+    "s13": {
+      "layout": "line",
+      "anchor": "bottom",
+      "scrim": true,
+      "big": "o render também [vira vídeo.]",
+      "px": 58
+    },
+    "s15": {
+      "layout": "line",
+      "anchor": "bottom",
+      "scrim": true,
+      "big": "saiu tudo da plataforma.",
+      "px": 58
+    }
+  },
+  "_overlays_nota": "Tempos GLOBAIS, tirados de `--plan`. Cada cartela entra depois que a imagem já se estabeleceu e sai antes do corte, para o texto nunca ser atravessado por transição.",
+  "overlays": [
+    {
+      "card": "s6",
+      "from": 12.1,
+      "to": 14.8,
+      "fade": 0.4
+    },
+    {
+      "card": "s9",
+      "from": 19.3,
+      "to": 21.8,
+      "fade": 0.4
+    },
+    {
+      "card": "s10",
+      "from": 22.5,
+      "to": 25,
+      "fade": 0.4
+    },
+    {
+      "card": "s11",
+      "from": 25.7,
+      "to": 27.8,
+      "fade": 0.4
+    },
+    {
+      "card": "s13",
+      "from": 30.4,
+      "to": 34.8,
+      "fade": 0.5
+    },
+    {
+      "card": "s15",
+      "from": 37.5,
+      "to": 39.9,
+      "fade": 0.4
+    }
+  ],
+  "_vertical_nota": [
+    "Corte 9:16 como patch do mesmo arquivo. Quatro decisões:",
+    "1. As cenas de AMBIENTAÇÃO seguem em `cover`, cheias na tela. São matéria e luz abstratas —",
+    "   não há enquadramento de arquiteto para preservar, e num celular a textura cheia bate mais.",
+    "2. Tudo que é PROVA vai para banda (`contain`, `inset: 0`): ali existe enquadramento, e um 16:9",
+    "   recortado em 9:16 perde 69% da largura junto com ele.",
+    "3. O TEMA DO TEXTO INVERTE em quase toda a metade clara. No master as cenas são full-bleed e o",
+    "   texto branco cai sobre a imagem; em banda ele cai sobre a CHAPA CLARA em volta, e branco",
+    "   sobre #FAFAFA é invisível. Por isso s6, s9, s11 e s13 viram tema claro no corte vertical.",
+    "4. O Histórico ganha recorte próprio, 2 colunas x 2 fileiras em vez de 4 x 2. A banda 16:9 do",
+    "   master viraria uma tira de 607 px e o rodapé de cada card (onde está o custo em nodes, que é",
+    "   o ponto da cena) ficaria ilegível no celular."
+  ],
+  "vertical": {
+    "slug": "2026-09-09-filme-antes-da-primeira-imagem-vertical",
+    "frame": {
+      "w": 1080,
+      "h": 1920
+    },
+    "segmentPatch": {
+      "6": {
+        "fit": "contain",
+        "inset": 0,
+        "bg": "light"
+      },
+      "8": {
+        "fit": "contain",
+        "inset": 0
+      },
+      "9": {
+        "fit": "contain",
+        "inset": 0
+      },
+      "10": {
+        "fit": "contain",
+        "inset": 0,
+        "posX": 0.5,
+        "reserveBottom": 360
+      },
+      "12": {
+        "fit": "contain",
+        "inset": 0
+      },
+      "13": {
+        "fit": "contain",
+        "bg": "light"
+      },
+      "15": {
+        "crop": [
+          220,
+          662,
+          1184,
+          1152
+        ],
+        "fit": "contain",
+        "inset": 0,
+        "bg": "dark"
+      }
+    },
+    "cards": {
+      "c2": {
+        "layout": "line",
+        "align": "left",
+        "big": "todo projeto existe<br>[antes da primeira imagem.]",
+        "px": 64
+      },
+      "c7": {
+        "layout": "line",
+        "theme": "light",
+        "logo": "symbol",
+        "big": "este é o spacenode.",
+        "px": 68
+      },
+      "c16": {
+        "layout": "line",
+        "theme": "light",
+        "align": "left",
+        "big": "[oito ferramentas.]<br>um projeto só.",
+        "px": 72
+      },
+      "final": {
+        "layout": "final",
+        "theme": "light",
+        "cta": "Testar grátis",
+        "micro": "{80} nodes grátis · sem cartão · spacenode.app"
+      },
+      "s6": {
+        "layout": "line",
+        "theme": "light",
+        "anchor": "bottom",
+        "big": "você já modelou isto.",
+        "small": "[falta a imagem.]",
+        "px": 62
+      },
+      "s9": {
+        "layout": "line",
+        "theme": "light",
+        "anchor": "bottom",
+        "big": "[os mesmos móveis,]<br>no mesmo lugar.",
+        "px": 62
+      },
+      "s10": {
+        "layout": "line",
+        "theme": "light",
+        "anchor": "bottom",
+        "big": "um crédito só.",
+        "small": "[node paga render, vista, edição e vídeo.]",
+        "px": 62
+      },
+      "s11": {
+        "layout": "line",
+        "theme": "light",
+        "anchor": "bottom",
+        "big": "o preço aparece<br>[antes do clique.]",
+        "px": 60
+      },
+      "s13": {
+        "layout": "line",
+        "theme": "light",
+        "anchor": "bottom",
+        "big": "o render também<br>[vira vídeo.]",
+        "px": 62
+      },
+      "s15": {
+        "layout": "line",
+        "anchor": "bottom",
+        "scrim": true,
+        "big": "saiu tudo da plataforma.",
+        "px": 62
+      }
+    }
+  }
+}

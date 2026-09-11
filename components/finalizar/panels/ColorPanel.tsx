@@ -17,7 +17,7 @@ import type {
 } from '@/lib/finalizar/types'
 import { HSL_BANDS, HSL_BAND_META } from '@/lib/finalizar/types'
 import { CurveEditor } from '@/components/finalizar/CurveEditor'
-import { Chip, Section, SliderRow, sectionLabel } from '@/components/finalizar/ui'
+import { Chip, Seg, Section, SliderRow, sectionLabel } from '@/components/finalizar/ui'
 
 export interface ColorPanelProps {
   doc: FinalizeDoc
@@ -29,6 +29,16 @@ export interface ColorPanelProps {
   onCopyTreatment: () => void
   onPasteTreatment: () => void
   pasteAvailable: boolean
+}
+
+type CurveChannel = 'luma' | 'r' | 'g' | 'b'
+
+/** Campo do documento de cada canal. */
+const CURVE_FIELD: Record<CurveChannel, 'curve' | 'curveR' | 'curveG' | 'curveB'> = {
+  luma: 'curve', r: 'curveR', g: 'curveG', b: 'curveB',
+}
+const CURVE_LABEL: Record<CurveChannel, string> = {
+  luma: 'Curva de brilho', r: 'Curva do vermelho', g: 'Curva do verde', b: 'Curva do azul',
 }
 
 type SectionKey = 'treatment' | 'curve' | 'hsl' | 'grading' | 'match'
@@ -66,6 +76,7 @@ export function ColorPanel(props: ColorPanelProps): React.ReactElement {
     match: false,
   })
   const [band, setBand] = useState<HslBand>('blue')
+  const [curveChannel, setCurveChannel] = useState<CurveChannel>('luma')
   const fileRef = useRef<HTMLInputElement | null>(null)
 
   const toggle = (key: SectionKey) => setOpen((o) => ({ ...o, [key]: !o[key] }))
@@ -100,15 +111,35 @@ export function ColorPanel(props: ColorPanelProps): React.ReactElement {
         </div>
       </Section>
 
-      {/* ── 1. Curva de luminosidade ─────────────────────────────────────── */}
-      <Section title="Curva de luminosidade" open={open.curve} onToggle={() => toggle('curve')}>
-        <CurveEditor
-          points={doc.curve}
-          histogram={histogram}
-          onChange={(pts: CurvePoint[]) =>
-            patch('Curva', (d) => ({ ...d, curve: pts }), 'curve')
-          }
+      {/* ── 1. Curvas ────────────────────────────────────────────────────── */}
+      <Section title="Curvas" open={open.curve} onToggle={() => toggle('curve')}>
+        <Seg
+          label="Canal da curva"
+          options={[
+            { id: 'luma', label: 'Brilho', title: 'Muda o brilho preservando a cor' },
+            { id: 'r', label: 'R', title: 'Vermelho — subir nas luzes esquenta; descer nas sombras esfria' },
+            { id: 'g', label: 'G', title: 'Verde — é aqui que se mata a dominante do LED de obra' },
+            { id: 'b', label: 'B', title: 'Azul — subir nas sombras dá o azul de sombra fotográfico' },
+          ]}
+          value={curveChannel}
+          onChange={setCurveChannel}
         />
+        <div style={{ marginTop: 10 }}>
+          <CurveEditor
+            key={curveChannel}
+            channel={curveChannel}
+            points={CURVE_FIELD[curveChannel] === 'curve' ? doc.curve : doc[CURVE_FIELD[curveChannel]]}
+            histogram={curveChannel === 'luma' ? histogram : null}
+            onChange={(pts: CurvePoint[]) => {
+              const field = CURVE_FIELD[curveChannel]
+              patch(CURVE_LABEL[curveChannel], (d) => ({ ...d, [field]: pts }), `curve-${curveChannel}`)
+            }}
+          />
+        </div>
+        <p style={{ fontSize: 11, color: 'var(--color-text-quaternary)', lineHeight: 1.5, marginTop: 8 }}>
+          Brilho muda a luz sem mexer na cor. R, G e B mudam a COR — é com eles
+          que se corrige uma dominante que a temperatura não pega.
+        </p>
       </Section>
 
       {/* ── 2. Cores (HSL) ───────────────────────────────────────────────── */}

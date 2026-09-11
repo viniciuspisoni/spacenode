@@ -57,8 +57,30 @@ export interface ModelFacts {
   camera?: {
     focalLengthMm?: number
     fovDeg?:        number
-    /** up travado no eixo Z — perspectiva de dois pontos, verticais paralelas */
+    /** Câmera NIVELADA (direção horizontal) ou modo 2 pontos do SketchUp —
+     *  verticais paralelas. Só é verdade quando a captura foi feita assim;
+     *  câmera inclinada NÃO é 2 pontos (as verticais convergem). */
     twoPoint?:      boolean
+    /** Altura do olho acima do piso sob a câmera, em metros (raytest do
+     *  plugin) — fato de escala que a imagem sozinha não dá. */
+    eyeHeightM?:    number
+  }
+  /** Medidas lidas do MODELO 3D pelo plugin (raytest a partir da câmera).
+   *  A imagem sozinha não dá escala — sem isto o motor escolhe o pé-direito
+   *  que quiser. Só chega o que passou na faixa de sanidade do plugin. */
+  room?: {
+    /** Piso até teto sob a câmera, em metros. */
+    ceilingM?: number
+    /** Parede a parede na altura do olho, atravessando a vista, em metros. */
+    widthM?:   number
+  }
+  /** Espelhos/vidros marcados no plugin: a captura JÁ traz o reflexo real
+   *  (câmera refletida pelo plano da face, textura projetada). O modelo
+   *  precisa saber que aquilo é espelho — senão vira janela/quadro. */
+  mirrors?: {
+    count:  number
+    /** quantos dos `count` são vidro (reflexo suave, fundo visível) */
+    glass?: number
   }
   sun?: {
     azimuthDeg?:     number
@@ -170,6 +192,25 @@ export const EXTERIOR_ENVIRONMENTS: Record<string, string[]> = {
     'Jardim Sensorial', 'Área de Convivência',
     'Paisagismo Residencial', 'Paisagismo Comercial',
   ],
+}
+
+// ── "Preservar Original" ───────────────────────────────────────────────────────
+
+/** O valor que significa "não escolhi — a imagem de referência decide".
+ *
+ *  Iluminação e Entorno já nasceram com ele. Segmento e Espaço não tinham:
+ *  o default era Residencial + Sala de Estar, e isso ENTRAVA no prompt
+ *  (buildSceneContextBlock) mesmo quando o usuário nunca abriu a folha. Numa
+ *  cozinha comercial enviada por quem não mexeu em nada, o modelo era
+ *  informado de que aquilo era uma sala de estar residencial.
+ *
+ *  Agora é a primeira opção e o default dos quatro. Quem não escolhe, não
+ *  impõe. */
+export const PRESERVE = 'Preservar Original'
+
+/** Vazio e PRESERVE são a mesma coisa para quem monta prompt: nada a dizer. */
+export function isPreserved(value: string | null | undefined): boolean {
+  return !value || value === PRESERVE
 }
 
 // ── Lighting ───────────────────────────────────────────────────────────────────
@@ -820,7 +861,42 @@ function buildModelFactsBlock(facts?: ModelFacts, includeSun: boolean = true): s
     if (cam.fovDeg) lens.push(`${Math.round(cam.fovDeg)}° field of view`)
     let line = `Camera: ${lens.join(', ')}`.replace(/: $/, ': unknown')
     if (cam.twoPoint) line += '; two-point perspective — vertical lines are perfectly parallel, keep them parallel (no keystone)'
+    if (typeof cam.eyeHeightM === 'number' && cam.eyeHeightM > 0) {
+      line += `; camera ${cam.eyeHeightM.toFixed(2).replace(/\.?0+$/, '')} m above the floor` +
+        (cam.eyeHeightM >= 1.3 && cam.eyeHeightM <= 1.9 ? ' (standing eye level)' : '') +
+        ' — keep scale cues (door heights, counters, furniture) consistent with this viewpoint'
+    }
     parts.push(line + '.')
+  }
+
+  // Escala medida no modelo. Vem depois da câmera porque é a mesma família de
+  // fato (o que a foto não conta) e antes dos espelhos, que são sobre material.
+  const room = facts.room
+  if (room && (room.ceilingM || room.widthM)) {
+    const m = (v: number) => v.toFixed(2).replace(/\.?0+$/, '')
+    const bits: string[] = []
+    if (room.ceilingM) bits.push(`floor-to-ceiling height ${m(room.ceilingM)} m`)
+    if (room.widthM) bits.push(`about ${m(room.widthM)} m wall to wall across the view`)
+    parts.push(
+      `Room, measured in the 3D model at the camera position: ${bits.join('; ')} — ` +
+      'keep every scale cue consistent with these real dimensions (door and window heights, ' +
+      'counter and table heights, furniture, steps, ceiling details); never stretch the space ' +
+      'taller or wider than it is to make the composition look grander.',
+    )
+  }
+
+  const mirrors = facts.mirrors
+  if (mirrors && mirrors.count > 0) {
+    const glass = Math.min(mirrors.glass ?? 0, mirrors.count)
+    const solid = mirrors.count - glass
+    const bits: string[] = []
+    if (solid > 0) bits.push(`${solid} mirror surface${solid > 1 ? 's' : ''}`)
+    if (glass > 0) bits.push(`${glass} glass surface${glass > 1 ? 's' : ''} (semi-transparent, faint reflection)`)
+    parts.push(
+      `Mirrors: ${bits.join(' and ')} in view already show the TRUE reflection of this room, computed from the 3D model — ` +
+      'render them as real reflective surfaces with exactly that reflected content (same furniture, walls and light, mirrored); ' +
+      'never turn a mirror into a window, painting, TV or blank panel, and do not invent different reflected content.',
+    )
   }
 
   // Quando o usuário pediu uma iluminação diferente da capturada, o bloco de
@@ -919,7 +995,9 @@ function transformationBlock(briefing: BriefingArquitetonico, level: FidelityLev
 // contradizer a referência). Usamos só o substantivo inicial ("living room"),
 // nunca a lista de acabamentos.
 function shortEnvName(environment?: string): string {
-  if (!environment) return ''
+  // O `!environment` é redundante com isPreserved, mas é ele que estreita o
+  // tipo para string no resto da função.
+  if (!environment || isPreserved(environment)) return ''
   const desc = ENV_EN[environment]
   if (!desc) return environment
   return (desc.split(' with ')[0] ?? desc).split(',')[0].trim()
@@ -934,7 +1012,10 @@ function buildSceneContextBlock(
   segment:     string,
   environment?: string,
 ): string {
-  const segDesc = SEG_EN[segment] ?? (segment ? segment.toLowerCase() : '')
+  // Preservado = nada a dizer. Sem esta guarda, SEG_EN não tem a chave e o
+  // fallback `segment.toLowerCase()` despejaria "preservar original" —
+  // português cru — dentro de um prompt em inglês.
+  const segDesc = isPreserved(segment) ? '' : (SEG_EN[segment] ?? segment.toLowerCase())
   const envName = shortEnvName(environment)
   const kind    = projectType === 'exterior' ? 'exterior' : 'interior'
   const scene   = [segDesc, kind, envName ? `— ${envName}` : '']
@@ -980,7 +1061,7 @@ export function buildFidelityPrompt(
   const negative   = buildNegativePromptForFidelity(level)
 
   const lightDesc  = LIGHT_EN[lighting] ?? lighting
-  const segDesc    = SEG_EN[segment]    ?? segment.toLowerCase()
+  const segDesc    = isPreserved(segment) ? '' : (SEG_EN[segment] ?? segment.toLowerCase())
 
   const elemParts = sceneElements.map(e => ELEM_EN[e] ?? e.toLowerCase()).filter(Boolean)
   // Wrapper enfatiza que isso é ADIÇÃO (não substituição) e proíbe explicitamente
@@ -1026,9 +1107,11 @@ export function buildFidelityPrompt(
   //    converter CGI→foto. Frame explícito de "re-render fotográfico do MESMO
   //    prédio", separando realismo de superfície/luz de qualquer redesign.
   // Em balanced/creative: template descritivo arquitetônico.
-  const kind   = projectType === 'exterior'
-    ? `${segDesc} architectural exterior photograph`
-    : `${segDesc} architectural interior photograph`
+  // filter(Boolean): com o segmento preservado o segDesc é vazio, e a
+  // interpolação crua deixaria um espaço solto no começo da frase.
+  const kind   = [segDesc, projectType === 'exterior'
+    ? 'architectural exterior photograph'
+    : 'architectural interior photograph'].filter(Boolean).join(' ')
   // Só balanced/creative — na Máxima o intent (CGI→foto ou re-render fiel)
   // vem do buildRenderOnlySystemHead.
   const intent = `Transform this reference image as a photorealistic ${kind}. `
@@ -1155,18 +1238,32 @@ export function buildGenerationPrompt(options: GenerateOptions): string {
 
 // ── Accessor helpers ───────────────────────────────────────────────────────────
 
+// PRESERVE entra pelos getters, não pelos catálogos: assim as listas cruas
+// continuam sendo a taxonomia de verdade, e os DOIS consumidores (o web app e
+// o catálogo que o plugin lê) herdam a opção de uma vez. Como os dois escolhem
+// o primeiro item como default — firstOf() no GenerateClient, segs[0] no
+// normalizeSelections do painel —, pôr PRESERVE na frente já muda o default
+// dos dois sem tocar em nenhum dos dois.
 export function getSegments(projectType: ProjectType): string[] {
-  return projectType === 'interior' ? INTERIOR_SEGMENTS : EXTERIOR_SEGMENTS
+  return [PRESERVE, ...(projectType === 'interior' ? INTERIOR_SEGMENTS : EXTERIOR_SEGMENTS)]
 }
 
 export function getEnvironments(projectType: ProjectType, segment: string): string[] {
+  // Sem segmento não existe lista de espaços que faça sentido: "Sala de Estar"
+  // só existe dentro de Residencial, "Área de Piscina" dentro do exterior
+  // residencial. Preservar o segmento preserva o espaço junto.
+  if (isPreserved(segment)) return [PRESERVE]
   const map = projectType === 'interior' ? INTERIOR_ENVIRONMENTS : EXTERIOR_ENVIRONMENTS
-  return map[segment] ?? []
+  return [PRESERVE, ...(map[segment] ?? [])]
 }
 
 export function getLighting(projectType: ProjectType, segment: string): string[] {
   const map = projectType === 'interior' ? INTERIOR_LIGHTING : EXTERIOR_LIGHTING
-  return map[segment] ?? ['Diurno']
+  // A luz não depende do que o espaço É, então com o segmento preservado a
+  // lista residencial — a mais neutra das sete — continua servindo. O antigo
+  // fallback ['Diurno'] deixaria o usuário com uma opção só, e ainda por cima
+  // uma que IMPÕE luz (o oposto do que preservar quer dizer).
+  return map[segment] ?? map['Residencial'] ?? [PRESERVE]
 }
 
 export function getBackgrounds(projectType: ProjectType): string[] {

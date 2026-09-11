@@ -30,7 +30,10 @@ export default async function IdentityPage() {
     planId === 'pro' || planId === 'studio' || planId === 'office'
 
   return (
-    <main style={{ flex: 1, overflowY: 'auto', background: 'var(--color-bg)' }}>
+    // Sem fundo chapado: o <Ambient/> do shell é o que o vidro refrata.
+    // O preview do IdentityEditor continua CLARO e fora do vidro de propósito —
+    // ele simula um artefato IMPRESSO, que não segue o tema da interface.
+    <main style={{ flex: 1, overflowY: 'auto' }}>
       <IdentityEditor
         initialIdentity={identity}
         planId={planId}

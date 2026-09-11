@@ -2,19 +2,19 @@
 
 // components/finalizar/ui.tsx — primitivos visuais do editor Finalizar.
 //
-// Direção visual: interface NEUTRA (pretos/brancos/cinzas) com verde em ~2% —
-// apenas estado ativo real, sucesso e ação prioritária. Sliders profissionais
-// (trilho cinza, knob claro; verde só em hover/foco/arraste — ver .spn-slider).
+// O editor inteiro é montado com quatro peças daqui (Seg, Chip, IconBtn,
+// Section). Por isso a conversão para o vidro acontece NESTE arquivo e não
+// painel a painel: trocar a receita de cada primitivo reveste os sete painéis
+// de uma vez, e nenhum deles precisa saber que material está por baixo.
+//
+// O que continua valendo do desenho anterior: interface neutra, verde só em
+// estado real (ActiveDot, sucesso). O que muda: superfície, borda e curva
+// saem dos tokens de vidro (--glass-*, --r-inner, --ease) em vez de valores
+// literais, e o estado ativo passa a ser `aria-checked`/`aria-pressed` — o
+// mesmo atributo que o CSS lê e que o leitor de tela anuncia.
 
-import { useEffect, useId, useRef, useState } from 'react'
-
-export const panelCard: React.CSSProperties = {
-  border: '0.5px solid var(--color-border)',
-  borderRadius: 'var(--radius-md)',
-  background: 'var(--color-panel)',
-  boxShadow: 'var(--shadow-sm)',
-  padding: 14,
-}
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { Segmented, Sheet } from '@/components/app/glass'
 
 export const sectionLabel: React.CSSProperties = {
   fontSize: 10.5,
@@ -25,7 +25,7 @@ export const sectionLabel: React.CSSProperties = {
 }
 
 export function Label({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
-  return <div style={{ ...sectionLabel, marginBottom: 10, ...style }}>{children}</div>
+  return <div className="spn-field-label" style={style}>{children}</div>
 }
 
 // ── SliderRow ────────────────────────────────────────────────────────────────
@@ -106,6 +106,7 @@ export function SliderRow({ label, value, min, max, step = 1, onChange, defaultV
       {editing ? (
         <input
           ref={inputRef}
+          className="spn-input"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={commitDraft}
@@ -116,10 +117,8 @@ export function SliderRow({ label, value, min, max, step = 1, onChange, defaultV
           }}
           inputMode="numeric"
           style={{
-            width: 40, fontSize: 11.5, textAlign: 'right', padding: '1px 3px',
-            borderRadius: 5, border: '1px solid var(--color-input-border)',
-            background: 'var(--color-input)', color: 'var(--color-text-primary)',
-            outline: 'none', fontVariantNumeric: 'tabular-nums', flexShrink: 0,
+            width: 44, fontSize: 11.5, textAlign: 'right', padding: '2px 4px',
+            fontVariantNumeric: 'tabular-nums', flexShrink: 0,
           }}
         />
       ) : (
@@ -128,7 +127,7 @@ export function SliderRow({ label, value, min, max, step = 1, onChange, defaultV
           onClick={() => { setDraft(String(value)); setEditing(true) }}
           title="Clique para digitar o valor"
           style={{
-            width: 40, textAlign: 'right', fontSize: 11.5, fontVariantNumeric: 'tabular-nums',
+            width: 44, textAlign: 'right', fontSize: 11.5, fontVariantNumeric: 'tabular-nums',
             color: changed ? 'var(--color-text-secondary)' : 'var(--color-text-quaternary)',
             flexShrink: 0, background: 'transparent', border: 'none', cursor: 'text', padding: 0,
           }}
@@ -140,47 +139,44 @@ export function SliderRow({ label, value, min, max, step = 1, onChange, defaultV
   )
 }
 
-// ── Segmentado (neutro; sem verde) ───────────────────────────────────────────
+// ── Segmentado ───────────────────────────────────────────────────────────────
+//
+// Mesma cápsula de vidro do <Segmented> do kit (o polegar é um elemento real,
+// medido em JS — é isso que dá o deslize contínuo). O que impede reusar o
+// componente pronto é o `title` de cada célula: no editor cada opção explica o
+// que faz ao passar o mouse ("Remove o que está marcado e reconstrói o fundo"),
+// e o kit não tem esse campo. Perder as dicas custaria mais do que repetir a
+// medição.
 
+/**
+ * Segmentado do editor. Casca fina sobre a peça do kit — antes daqui havia
+ * uma cópia do mesmo desenho que anunciava role="radiogroup" sem nome e sem
+ * navegação por seta: prometia o padrão ARIA e não entregava. O kit tem as
+ * duas coisas, então o que sobra aqui é só a adaptação de nomes de campo
+ * ({id} do editor → {value} do kit) e a largura por conteúdo.
+ */
 interface SegProps<T extends string> {
-  options: { id: T; label: string; title?: string }[]
+  options: { id: T; label: string; title?: string; disabled?: boolean }[]
   value: T
   onChange: (id: T) => void
+  /** Nome do grupo para o leitor de tela. Ex.: "Modo de limpeza". */
+  label: string
 }
 
-export function Seg<T extends string>({ options, value, onChange }: SegProps<T>) {
+export function Seg<T extends string>({ options, value, onChange, label }: SegProps<T>) {
   return (
-    <div style={{
-      display: 'flex', gap: 3, padding: 3, background: 'var(--color-surface)',
-      borderRadius: 9, border: '0.5px solid var(--color-border)', width: 'fit-content',
-    }}>
-      {options.map((o) => {
-        const active = o.id === value
-        return (
-          <button
-            key={o.id}
-            type="button"
-            title={o.title}
-            onClick={() => onChange(o.id)}
-            style={{
-              padding: '5px 12px', borderRadius: 7, fontSize: 12,
-              fontWeight: active ? 500 : 400,
-              border: `1px solid ${active ? 'var(--color-border-focus)' : 'transparent'}`,
-              background: active ? 'var(--color-surface-hover)' : 'transparent',
-              color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-              cursor: 'pointer',
-              transition: 'background var(--duration-fast), color var(--duration-fast)',
-            }}
-          >
-            {o.label}
-          </button>
-        )
-      })}
+    <div style={{ width: 'fit-content' }}>
+      <Segmented
+        label={label}
+        value={value}
+        onChange={onChange}
+        items={options.map(o => ({ value: o.id, label: o.label, title: o.title, disabled: o.disabled }))}
+      />
     </div>
   )
 }
 
-// ── Chip / IconBtn (neutros) ─────────────────────────────────────────────────
+// ── Chip / IconBtn ───────────────────────────────────────────────────────────
 
 interface ChipProps {
   active?: boolean
@@ -191,21 +187,20 @@ interface ChipProps {
 }
 
 export function Chip({ active, onClick, children, title, disabled }: ChipProps) {
+  // Metade dos chips do editor é ESCOLHA ("Forma"/"Refinar") e metade é AÇÃO
+  // ("Recuperar janelas"). Só a primeira ganha role/aria-checked: anunciar
+  // "opção não marcada" num botão que dispara uma correção mente para o leitor
+  // de tela. O CSS lê aria-checked, então a ação nunca acende — que é o certo.
+  const isChoice = active !== undefined
   return (
     <button
       type="button"
+      className="spn-pill"
+      role={isChoice ? 'radio' : undefined}
+      aria-checked={isChoice ? active : undefined}
       onClick={onClick}
       title={title}
       disabled={disabled}
-      style={{
-        fontSize: 12, padding: '5px 10px', borderRadius: 8,
-        border: `1px solid ${active ? 'var(--color-border-focus)' : 'var(--color-border)'}`,
-        background: active ? 'var(--color-surface-hover)' : 'transparent',
-        color: disabled ? 'var(--color-text-quaternary)' : active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-        cursor: disabled ? 'default' : 'pointer',
-        transition: 'all var(--duration-fast)',
-        whiteSpace: 'nowrap',
-      }}
     >
       {children}
     </button>
@@ -222,22 +217,26 @@ interface IconBtnProps {
 }
 
 export function IconBtn({ onClick, title, active, disabled, children, size = 30 }: IconBtnProps) {
+  // Ativo = controle elevado, não retângulo cinza. É a mesma leitura do
+  // polegar do segmentado e do chip ligado — um material, não uma cor.
+  //
+  // Mesma regra do Chip: só quem TEM estado ganha `aria-pressed`. Seis dos
+  // oito IconBtn do editor (voltar, desfazer, refazer, zoom+, zoom−, ajustar)
+  // são ação pura — anunciá-los como botão de alternância "não pressionado"
+  // mente para o leitor de tela do mesmo jeito que o `aria-checked` numa ação.
   return (
     <button
       type="button"
+      className={active ? 'spn-icon-btn spn-glass spn-glass--raised' : 'spn-icon-btn'}
       onClick={onClick}
       title={title}
       disabled={disabled}
+      aria-pressed={active === undefined ? undefined : active}
       style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        width: size, height: size, borderRadius: 8, flexShrink: 0,
-        border: `1px solid ${active ? 'var(--color-border-focus)' : 'transparent'}`,
-        background: active ? 'var(--color-surface-hover)' : 'transparent',
-        color: disabled
-          ? 'var(--color-text-quaternary)'
-          : active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+        width: size, height: size, flex: `0 0 ${size}px`,
+        opacity: disabled ? 0.38 : 1,
         cursor: disabled ? 'default' : 'pointer',
-        transition: 'background var(--duration-fast), color var(--duration-fast)',
+        color: active ? 'var(--color-text-primary)' : undefined,
       }}
     >
       {children}
@@ -251,7 +250,7 @@ export function ActiveDot({ on }: { on: boolean }) {
     <span style={{
       width: 6, height: 6, borderRadius: 999, flexShrink: 0,
       background: on ? 'var(--color-accent-green)' : 'transparent',
-      border: on ? 'none' : '1px solid var(--color-border)',
+      border: on ? 'none' : '0.5px solid var(--glass-line-strong)',
       transition: 'background var(--duration-fast)',
     }} />
   )
@@ -259,8 +258,8 @@ export function ActiveDot({ on }: { on: boolean }) {
 
 export function Divider({ vertical }: { vertical?: boolean }) {
   return vertical
-    ? <div style={{ width: 1, alignSelf: 'stretch', background: 'var(--color-border)', flexShrink: 0 }} />
-    : <div style={{ height: 1, width: '100%', background: 'var(--color-border)', flexShrink: 0 }} />
+    ? <div style={{ width: 1, alignSelf: 'stretch', background: 'var(--glass-line)', flexShrink: 0 }} />
+    : <div style={{ height: 1, width: '100%', background: 'var(--glass-line)', flexShrink: 0 }} />
 }
 
 // ── Seção recolhível do painel contextual ────────────────────────────────────
@@ -275,7 +274,7 @@ interface SectionProps {
 
 export function Section({ title, children, open, onToggle, right }: SectionProps) {
   return (
-    <div style={{ borderBottom: '0.5px solid var(--color-border)' }}>
+    <div style={{ borderBottom: '0.5px solid var(--glass-line)' }}>
       <div
         role="button"
         tabIndex={0}
@@ -291,12 +290,12 @@ export function Section({ title, children, open, onToggle, right }: SectionProps
           strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"
           style={{
             color: 'var(--color-text-quaternary)', flexShrink: 0,
-            transform: open ? 'rotate(90deg)' : 'none', transition: 'transform var(--duration-fast)',
+            transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 200ms var(--ease)',
           }}
         >
           <polyline points="9 18 15 12 9 6" />
         </svg>
-        <span style={{ ...sectionLabel, flex: 1 }}>{title}</span>
+        <span className="spn-field-label" style={{ flex: 1, marginBottom: 0 }}>{title}</span>
         {right}
       </div>
       {open && <div style={{ padding: '4px 14px 16px' }}>{children}</div>}
@@ -304,8 +303,90 @@ export function Section({ title, children, open, onToggle, right }: SectionProps
   )
 }
 
+// ── Confirmar e nomear ───────────────────────────────────────────────────────
+//
+// O editor perguntava por `window.confirm`/`window.prompt` em seis pontos
+// (excluir predefinição, remover elemento, remover máscara, apagar snapshot,
+// nomear predefinição, nomear snapshot). Um diálogo do navegador ignora o
+// tema, abre fora da janela do app e pode ser suprimido pelo próprio usuário
+// no Chrome — aí a pergunta não acontece e a ação some sem explicação. Estas
+// duas folhas cobrem os seis casos.
+
+export function ConfirmSheet({ open, title, message, confirmLabel = 'Excluir', destructive = true, onConfirm, onClose }: {
+  open: boolean
+  title: string
+  message: React.ReactNode
+  confirmLabel?: string
+  destructive?: boolean
+  onConfirm: () => void
+  onClose: () => void
+}) {
+  return (
+    <Sheet open={open} title={title} onClose={onClose} doneLabel="Cancelar">
+      <p style={{ fontSize: 12.5, lineHeight: 1.55, color: 'var(--color-text-secondary)', margin: '0 0 16px' }}>
+        {message}
+      </p>
+      <button
+        type="button"
+        className="spn-cta"
+        onClick={() => { onConfirm(); onClose() }}
+        style={destructive ? { background: 'var(--color-error-bg)', color: 'var(--color-error)' } : undefined}
+      >
+        {confirmLabel}
+      </button>
+    </Sheet>
+  )
+}
+
+export function PromptSheet({ open, title, label, placeholder, initialValue = '', confirmLabel = 'Salvar', onSubmit, onClose }: {
+  open: boolean
+  title: string
+  label: string
+  placeholder?: string
+  initialValue?: string
+  confirmLabel?: string
+  onSubmit: (value: string) => void
+  onClose: () => void
+}) {
+  const [value, setValue] = useState(initialValue)
+  // Cada abertura começa do valor inicial: reaproveitar o texto da vez
+  // anterior faria salvar duas predefinições com o mesmo nome sem perceber.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset deliberado a cada abertura da folha
+    if (open) setValue(initialValue)
+  }, [open, initialValue])
+
+  const submit = () => {
+    const v = value.trim()
+    if (!v) return
+    onSubmit(v)
+    onClose()
+  }
+
+  return (
+    <Sheet open={open} title={title} onClose={onClose} doneLabel="Cancelar">
+      <div className="spn-field">
+        <span className="spn-field-label">{label}</span>
+        <input
+          className="spn-input"
+          value={value}
+          placeholder={placeholder}
+          onChange={(e) => setValue(e.target.value)}
+          // Sem stopPropagation: o evento sintético precisa chegar à <Sheet>,
+          // que é quem prende o Tab dentro da folha. Os atalhos do editor já
+          // ignoram campo de texto (FinalizeEditor: guarda `isTyping`).
+          onKeyDown={(e) => { if (e.key === 'Enter') submit() }}
+        />
+      </div>
+      <button type="button" className="spn-cta" onClick={submit} disabled={!value.trim()}>
+        {confirmLabel}
+      </button>
+    </Sheet>
+  )
+}
+
 export const kbdStyle: React.CSSProperties = {
   padding: '1px 5px', borderRadius: 4, fontSize: 10.5, fontFamily: 'inherit',
-  border: '0.5px solid var(--color-border)', background: 'var(--color-surface)',
+  border: '0.5px solid var(--glass-line)', background: 'var(--glass-raised)',
   color: 'var(--color-text-tertiary)',
 }

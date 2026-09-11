@@ -1,0 +1,68 @@
+{
+ "slug": "lavabo-conta-o-que-saiu-do-lugar",
+ "title": "Conta o que saiu do lugar",
+ "pillar": "fidelidade-geometrica",
+ "angle": "Alcance orgânico com mecânica de reassistir: o gancho pede que o arquiteto conte o que saiu do lugar enquanto ainda vê o print escuro; a régua desce do teto ao piso 'acendendo' o lavabo; a resposta ('Nada.') chega no fim e obriga a segunda visualização para conferir. A legenda admite a única mudança real (material do piso e dos tapetes) — honestidade que o público técnico compartilha.",
+ "format": "transformacao",
+ "duration_s": 9.5,
+ "hook_text": "Conta o que saiu do lugar.",
+ "hook_visual": "Frame 3:4 inteiro do print #476 (912x1168 escalado para 1080x1383, centralizado, faixas #0a0a0a de 268px em cima e embaixo — coincidem com as zonas cobertas pela UI). Na tela: lavabo em SketchUp quase preto — paredes cinza-chumbo, bacia suspensa branca à esquerda, ducha e misturador pretos na parede esquerda, porta de vidro de piso a teto ao centro com jardim vertical (grade de bambu, trepadeira com flores brancas, folhas de bananeira e uma bacia de pedra à direita), dois tapetes pretos ovais no piso de porcelanato escuro, exaustor e um spot no forro. Headline branca Geist 600 no terço central, sobre a parede escura (scrim quase nulo).",
+ "scenes": [
+  {
+   "t": "0.0–1.5s",
+   "visual": "#476 parado, zoompan 1.00→1.03 (Ken Burns lento, centro no vão da porta de vidro). Headline entra em corte no frame 0 (sem fade — o feed corta os primeiros décimos).",
+   "asset_idx": [
+    476
+   ],
+   "text_on_screen": "Conta o que saiu do lugar."
+  },
+  {
+   "t": "1.5–4.5s",
+   "visual": "xfade=wipedown de 3,0s, linear, do #476 para o #475 (imagens paradas, só a borda anda; hairline branca 2px acompanhando a borda). Ordem de revelação: sanca de luz quente no forro → vapor da ducha e trepadeira florida iluminada por baixo → bananeiras e samambaias → seixos e lajotas de pedra → piso de madeira. zoompan segue em sincronia nos dois ramos (1.03→1.06). Headline fica até 2.5s e sai em corte (texto nunca 'wipa').",
+   "asset_idx": [
+    476,
+    475
+   ],
+   "text_on_screen": "Conta o que saiu do lugar. (até 2.5s)"
+  },
+  {
+   "t": "4.5–7.8s",
+   "visual": "#475 inteiro, zoompan 1.06→1.08 puxando para o jardim iluminado. Em 5.0s entra em corte a resposta como apoio, centralizada no terço central sobre a parede de microcimento à direita da porta (scrim suave só atrás do texto, camada separada).",
+   "asset_idx": [
+    475
+   ],
+   "text_on_screen": "Nada. Mesma câmera, mesma esquadria."
+  },
+  {
+   "t": "7.8–9.5s",
+   "visual": "Mesmo frame do #475 com overlay de fechamento (fade 0.3s): símbolo + wordmark spacenode monocromático pequeno (y≈1400) e o CTA logo abaixo (y≈1480–1540, sublinhado hairline verde #30d158 — único verde da peça). Apoio some em 7.8s. O loop reinicia no print com a pergunta: quem quer conferir reassiste.",
+   "asset_idx": [
+    475
+   ],
+   "text_on_screen": "Veja no seu próprio projeto"
+  }
+ ],
+ "assets": [
+  476,
+  475
+ ],
+ "cta": "Veja no seu próprio projeto",
+ "caption": "Lavabo com jardim de bambu. Antes de ver o depois, conta o que saiu do lugar.\n\nBacia suspensa, ducha preta, esquadria e jardim vertical: mesma posição, mesma câmera. O print saiu escuro do SketchUp; a imagem de apresentação voltou com sanca de luz, vapor da ducha e o jardim iluminado por baixo.\n\nRégua na mão: o piso saiu em madeira e os dois tapetes viraram lajotas de pedra sobre seixos. Mesma posição, outro material. Se o porcelanato tem que voltar, o Editar troca o material sem regenerar o ambiente.\n\nGerado em minutos, a partir do print que você já tem.\n\nVeja no seu próprio projeto — cadastro grátis, sem cartão, no link da bio.\n\n#arquitetura #archviz #sketchup #designdeinteriores #visualizacaoarquitetonica",
+ "hashtags": [
+  "#arquitetura",
+  "#archviz",
+  "#sketchup",
+  "#designdeinteriores",
+  "#visualizacaoarquitetonica"
+ ],
+ "paid": {
+  "primary": "Sobe o print do seu modelo e confere: bacia, ducha, esquadria e jardim no mesmo lugar. Cadastro grátis, sem cartão.",
+  "headline": "Render que respeita o seu modelo",
+  "description": "Cadastro grátis, sem cartão",
+  "button": "SIGN_UP",
+  "cutdown_note": "Já cabe em ≤15s (9,5s). Para anúncio: encurtar o hold do 'Nada.' para 1,2s e subir o overlay de CTA em 6,5s → 8,5s. Headline visível desde o frame 0 (sem fade), porque o feed e o Ads cortam os décimos iniciais. Trocar o CTA do overlay pelo botão do anúncio (não duplicar CTA na arte)."
+ },
+ "why_converts": "Público-alvo é o cético técnico — o mais difícil e o mais valioso. A mecânica de contar faz ele procurar erro com os próprios olhos e encontrar geometria no lugar; a legenda entrega a única mudança (material) antes que ele aponte, o que vira confiança e compartilhamento entre colegas ('olha, eles assumem'). O CTA 'Veja no seu próprio projeto' converte a dúvida em teste: link na bio → cadastro grátis sem cartão → ele sobe o próprio print de banheiro/lavabo, ambiente pequeno que rende bem no Vega 2K (80 nodes grátis dão ~4 renders). Quem verificou fidelidade no próprio projeto tem o motivo de compra pronto (entregar ao cliente) e estoura os nodes grátis já no segundo ambiente → Starter R$89.",
+ "risks": "O vídeo NÃO pode prometer: 'nada mudou' ou 'material preservado' (piso porcelanato→madeira e tapetes→lajotas de pedra: mesma posição, outro material — dizer só 'nada saiu do lugar'); tempo em minutos específico; vapor/luz como simulação física; 'sem retoque'. Não citar quantidade de nodes na arte (só na legenda se o dono confirmar 80 no código). Rótulo do banco diz 'Suíte Master' — é lavabo/banheiro; não usar o rótulo. Clay muito escuro: conferir legibilidade da headline nos 4 frames de QA; se precisar, scrim leve só atrás do texto (camada própria).",
+ "production_notes": "1080x1920 30fps H.264 crf18 yuv420p sem áudio. Imagem inteira 3:4 (912x1168 → 1080x1383) centralizada; faixas #0a0a0a de 268px (nada de texto nelas). Cards de texto em HTML/Geist via Playwright (dSF 2 → lanczos); textos trocam em corte, nunca no wipe; scrim em camada separada. Wipe = xfade=wipedown linear (imagens paradas), hairline branca 2px na borda; zoompan idêntico nos dois ramos, máx. 1.08; setsar=1 antes do concat. Fechamento como overlay sobre o render (logo monocromático + CTA), sem card preto separado e sem URL na arte — preserva o loop; se o dono exigir o card final do BRIEF, acrescentar 1,0s depois do overlay e aceitar o custo no loop. QA: extrair 4 frames (0.5s, 3.0s, 5.5s, 8.5s) e ffprobe."
+}

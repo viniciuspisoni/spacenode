@@ -1,0 +1,78 @@
+﻿conjunto,camada,onde no Gerenciador,item (buscar exatamente assim),regra,observação
+SN_META_PROSPECCAO_ARQUITETO_RENDER,0 · base,Público → Mudar para opções de público original,Advantage+ público DESLIGADO,obrigatório,"Sem isso, interesses viram só sugestão"
+SN_META_PROSPECCAO_ARQUITETO_RENDER,0 · base,Locais,"Brasil — ""Pessoas que moram neste local""",obrigatório,"Não usar ""presença ou interesse"""
+SN_META_PROSPECCAO_ARQUITETO_RENDER,0 · base,Idade / Idiomas,24–50 / Português (Brasil),obrigatório,
+SN_META_PROSPECCAO_ARQUITETO_RENDER,1 · profissão (OU),Direcionamento detalhado → Interesses,Arquitetura,incluir se existir,Camada 1 = qualquer um destes
+SN_META_PROSPECCAO_ARQUITETO_RENDER,1 · profissão (OU),Direcionamento detalhado → Interesses,Design de interiores,incluir se existir,Camada 1 = qualquer um destes
+SN_META_PROSPECCAO_ARQUITETO_RENDER,1 · profissão (OU),Direcionamento detalhado → Interesses,Arquitetura e Construção,incluir se existir,Camada 1 = qualquer um destes
+SN_META_PROSPECCAO_ARQUITETO_RENDER,1 · profissão (OU),Direcionamento detalhado → Interesses,Estilo arquitetônico,incluir se existir,Camada 1 = qualquer um destes
+SN_META_PROSPECCAO_ARQUITETO_RENDER,1 · profissão (OU),Direcionamento detalhado → Interesses,Arquitetura de interiores,incluir se existir,Camada 1 = qualquer um destes
+SN_META_PROSPECCAO_ARQUITETO_RENDER,1 · profissão (OU),Direcionamento detalhado → Interesses,Paisagismo,incluir se existir,Camada 1 = qualquer um destes
+SN_META_PROSPECCAO_ARQUITETO_RENDER,1 · profissão (OU),Direcionamento detalhado → Interesses,Urbanismo,incluir se existir,Camada 1 = qualquer um destes
+SN_META_PROSPECCAO_ARQUITETO_RENDER,1 · profissão (OU),Direcionamento detalhado → Dados demográficos → Educação → Áreas de estudo,Arquitetura e urbanismo,incluir se existir,Mesma camada 1
+SN_META_PROSPECCAO_ARQUITETO_RENDER,1 · profissão (OU),Direcionamento detalhado → Dados demográficos → Educação → Áreas de estudo,Arquitetura,incluir se existir,Mesma camada 1
+SN_META_PROSPECCAO_ARQUITETO_RENDER,1 · profissão (OU),Direcionamento detalhado → Dados demográficos → Educação → Áreas de estudo,Design de interiores,incluir se existir,Mesma camada 1
+SN_META_PROSPECCAO_ARQUITETO_RENDER,1 · profissão (OU),Direcionamento detalhado → Dados demográficos → Educação → Áreas de estudo,Engenharia civil,incluir se existir,Mesma camada 1
+SN_META_PROSPECCAO_ARQUITETO_RENDER,1 · profissão (OU),Direcionamento detalhado → Dados demográficos → Trabalho → Cargos,Arquiteto,incluir se existir,"Cargos foram muito podados; anotar se não existir"
+SN_META_PROSPECCAO_ARQUITETO_RENDER,1 · profissão (OU),Direcionamento detalhado → Dados demográficos → Trabalho → Cargos,Arquiteta,incluir se existir,"Cargos foram muito podados; anotar se não existir"
+SN_META_PROSPECCAO_ARQUITETO_RENDER,1 · profissão (OU),Direcionamento detalhado → Dados demográficos → Trabalho → Cargos,Designer de interiores,incluir se existir,"Cargos foram muito podados; anotar se não existir"
+SN_META_PROSPECCAO_ARQUITETO_RENDER,1 · profissão (OU),Direcionamento detalhado → Dados demográficos → Trabalho → Cargos,Projetista,incluir se existir,"Cargos foram muito podados; anotar se não existir"
+SN_META_PROSPECCAO_ARQUITETO_RENDER,2 · ferramenta (E),"Direcionamento detalhado → ""Restringir público"" → Interesses",Desenho assistido por computador,incluir se existir,Camada 2 = restringe a camada 1 (quem usa software 3D/CAD)
+SN_META_PROSPECCAO_ARQUITETO_RENDER,2 · ferramenta (E),"Direcionamento detalhado → ""Restringir público"" → Interesses",3ds Max,incluir se existir,Camada 2 = restringe a camada 1 (quem usa software 3D/CAD)
+SN_META_PROSPECCAO_ARQUITETO_RENDER,2 · ferramenta (E),"Direcionamento detalhado → ""Restringir público"" → Interesses",AutoCAD,incluir se existir,Camada 2 = restringe a camada 1 (quem usa software 3D/CAD)
+SN_META_PROSPECCAO_ARQUITETO_RENDER,2 · ferramenta (E),"Direcionamento detalhado → ""Restringir público"" → Interesses",Autodesk,incluir se existir,Camada 2 = restringe a camada 1 (quem usa software 3D/CAD)
+SN_META_PROSPECCAO_ARQUITETO_RENDER,2 · ferramenta (E),"Direcionamento detalhado → ""Restringir público"" → Interesses",Rhinoceros 3D,incluir se existir,Camada 2 = restringe a camada 1 (quem usa software 3D/CAD)
+SN_META_PROSPECCAO_ARQUITETO_RENDER,2 · ferramenta (E),"Direcionamento detalhado → ""Restringir público"" → Interesses",Archicad,incluir se existir,Camada 2 = restringe a camada 1 (quem usa software 3D/CAD)
+SN_META_PROSPECCAO_ARQUITETO_RENDER,2 · ferramenta (E),"Direcionamento detalhado → ""Restringir público"" → Interesses",Modelagem 3D,incluir se existir,Camada 2 = restringe a camada 1 (quem usa software 3D/CAD)
+SN_META_PROSPECCAO_ARQUITETO_RENDER,2 · ferramenta (E),"Direcionamento detalhado → ""Restringir público"" → Interesses",Computação gráfica 3D,incluir se existir,Camada 2 = restringe a camada 1 (quem usa software 3D/CAD)
+SN_META_PROSPECCAO_ARQUITETO_RENDER,2 · ferramenta (E),"Direcionamento detalhado → ""Restringir público"" → Interesses",Renderização 3D,incluir se existir,Camada 2 = restringe a camada 1 (quem usa software 3D/CAD)
+SN_META_PROSPECCAO_ARQUITETO_RENDER,2 · ferramenta (E),"Direcionamento detalhado → ""Restringir público"" → Interesses",Building information modeling,incluir se existir,Camada 2 = restringe a camada 1 (quem usa software 3D/CAD)
+SN_META_PROSPECCAO_ARQUITETO_RENDER,2 · ferramenta (E),Direcionamento detalhado,"""Alcançar pessoas além das suas seleções…"" (Advantage+ direcionamento detalhado)",DESLIGADO,Se estiver ligado a camada 2 não filtra
+SN_META_PROSPECCAO_ARQUITETO_RENDER,3 · tamanho,"Painel ""Tamanho estimado do público""",meta: 300 mil – 2 milhões,conferir,"Abaixo de 150 mil: tirar Cargos/Educação da camada 2; acima de 3 milhões: camada 2 ficou solta"
+SN_META_PROSPECCAO_ARQUITETO_RENDER,4 · posicionamentos,Posicionamentos → Manuais,"Só Instagram: Feed, Stories, Reels",obrigatório,"Sem Facebook, Explorar, Threads, Audience Network, Messenger"
+SN_META_PROSPECCAO_ARQUITETO_PLUGIN,0 · base,Público → Mudar para opções de público original,Advantage+ público DESLIGADO,obrigatório,"Sem isso, interesses viram só sugestão"
+SN_META_PROSPECCAO_ARQUITETO_PLUGIN,0 · base,Locais,"Brasil — ""Pessoas que moram neste local""",obrigatório,"Não usar ""presença ou interesse"""
+SN_META_PROSPECCAO_ARQUITETO_PLUGIN,0 · base,Idade / Idiomas,24–50 / Português (Brasil),obrigatório,
+SN_META_PROSPECCAO_ARQUITETO_PLUGIN,1 · profissão (OU),Direcionamento detalhado → Interesses,Arquitetura,incluir se existir,Camada 1 = qualquer um destes
+SN_META_PROSPECCAO_ARQUITETO_PLUGIN,1 · profissão (OU),Direcionamento detalhado → Interesses,Design de interiores,incluir se existir,Camada 1 = qualquer um destes
+SN_META_PROSPECCAO_ARQUITETO_PLUGIN,1 · profissão (OU),Direcionamento detalhado → Interesses,Arquitetura e Construção,incluir se existir,Camada 1 = qualquer um destes
+SN_META_PROSPECCAO_ARQUITETO_PLUGIN,1 · profissão (OU),Direcionamento detalhado → Interesses,Estilo arquitetônico,incluir se existir,Camada 1 = qualquer um destes
+SN_META_PROSPECCAO_ARQUITETO_PLUGIN,1 · profissão (OU),Direcionamento detalhado → Interesses,Arquitetura de interiores,incluir se existir,Camada 1 = qualquer um destes
+SN_META_PROSPECCAO_ARQUITETO_PLUGIN,1 · profissão (OU),Direcionamento detalhado → Interesses,Paisagismo,incluir se existir,Camada 1 = qualquer um destes
+SN_META_PROSPECCAO_ARQUITETO_PLUGIN,1 · profissão (OU),Direcionamento detalhado → Interesses,Urbanismo,incluir se existir,Camada 1 = qualquer um destes
+SN_META_PROSPECCAO_ARQUITETO_PLUGIN,1 · profissão (OU),Direcionamento detalhado → Dados demográficos → Educação → Áreas de estudo,Arquitetura e urbanismo,incluir se existir,Mesma camada 1
+SN_META_PROSPECCAO_ARQUITETO_PLUGIN,1 · profissão (OU),Direcionamento detalhado → Dados demográficos → Educação → Áreas de estudo,Arquitetura,incluir se existir,Mesma camada 1
+SN_META_PROSPECCAO_ARQUITETO_PLUGIN,1 · profissão (OU),Direcionamento detalhado → Dados demográficos → Educação → Áreas de estudo,Design de interiores,incluir se existir,Mesma camada 1
+SN_META_PROSPECCAO_ARQUITETO_PLUGIN,1 · profissão (OU),Direcionamento detalhado → Dados demográficos → Educação → Áreas de estudo,Engenharia civil,incluir se existir,Mesma camada 1
+SN_META_PROSPECCAO_ARQUITETO_PLUGIN,1 · profissão (OU),Direcionamento detalhado → Dados demográficos → Trabalho → Cargos,Arquiteto,incluir se existir,"Cargos foram muito podados; anotar se não existir"
+SN_META_PROSPECCAO_ARQUITETO_PLUGIN,1 · profissão (OU),Direcionamento detalhado → Dados demográficos → Trabalho → Cargos,Arquiteta,incluir se existir,"Cargos foram muito podados; anotar se não existir"
+SN_META_PROSPECCAO_ARQUITETO_PLUGIN,1 · profissão (OU),Direcionamento detalhado → Dados demográficos → Trabalho → Cargos,Designer de interiores,incluir se existir,"Cargos foram muito podados; anotar se não existir"
+SN_META_PROSPECCAO_ARQUITETO_PLUGIN,1 · profissão (OU),Direcionamento detalhado → Dados demográficos → Trabalho → Cargos,Projetista,incluir se existir,"Cargos foram muito podados; anotar se não existir"
+SN_META_PROSPECCAO_ARQUITETO_PLUGIN,2 · ferramenta (E),"Direcionamento detalhado → ""Restringir público"" → Interesses",Desenho assistido por computador,incluir se existir,Camada 2 = restringe a camada 1 (quem usa software 3D/CAD)
+SN_META_PROSPECCAO_ARQUITETO_PLUGIN,2 · ferramenta (E),"Direcionamento detalhado → ""Restringir público"" → Interesses",3ds Max,incluir se existir,Camada 2 = restringe a camada 1 (quem usa software 3D/CAD)
+SN_META_PROSPECCAO_ARQUITETO_PLUGIN,2 · ferramenta (E),"Direcionamento detalhado → ""Restringir público"" → Interesses",AutoCAD,incluir se existir,Camada 2 = restringe a camada 1 (quem usa software 3D/CAD)
+SN_META_PROSPECCAO_ARQUITETO_PLUGIN,2 · ferramenta (E),"Direcionamento detalhado → ""Restringir público"" → Interesses",Autodesk,incluir se existir,Camada 2 = restringe a camada 1 (quem usa software 3D/CAD)
+SN_META_PROSPECCAO_ARQUITETO_PLUGIN,2 · ferramenta (E),"Direcionamento detalhado → ""Restringir público"" → Interesses",Rhinoceros 3D,incluir se existir,Camada 2 = restringe a camada 1 (quem usa software 3D/CAD)
+SN_META_PROSPECCAO_ARQUITETO_PLUGIN,2 · ferramenta (E),"Direcionamento detalhado → ""Restringir público"" → Interesses",Archicad,incluir se existir,Camada 2 = restringe a camada 1 (quem usa software 3D/CAD)
+SN_META_PROSPECCAO_ARQUITETO_PLUGIN,2 · ferramenta (E),"Direcionamento detalhado → ""Restringir público"" → Interesses",Modelagem 3D,incluir se existir,Camada 2 = restringe a camada 1 (quem usa software 3D/CAD)
+SN_META_PROSPECCAO_ARQUITETO_PLUGIN,2 · ferramenta (E),"Direcionamento detalhado → ""Restringir público"" → Interesses",Computação gráfica 3D,incluir se existir,Camada 2 = restringe a camada 1 (quem usa software 3D/CAD)
+SN_META_PROSPECCAO_ARQUITETO_PLUGIN,2 · ferramenta (E),"Direcionamento detalhado → ""Restringir público"" → Interesses",Renderização 3D,incluir se existir,Camada 2 = restringe a camada 1 (quem usa software 3D/CAD)
+SN_META_PROSPECCAO_ARQUITETO_PLUGIN,2 · ferramenta (E),"Direcionamento detalhado → ""Restringir público"" → Interesses",Building information modeling,incluir se existir,Camada 2 = restringe a camada 1 (quem usa software 3D/CAD)
+SN_META_PROSPECCAO_ARQUITETO_PLUGIN,2 · ferramenta (E),Direcionamento detalhado,"""Alcançar pessoas além das suas seleções…"" (Advantage+ direcionamento detalhado)",DESLIGADO,Se estiver ligado a camada 2 não filtra
+SN_META_PROSPECCAO_ARQUITETO_PLUGIN,3 · tamanho,"Painel ""Tamanho estimado do público""",meta: 300 mil – 2 milhões,conferir,"Abaixo de 150 mil: tirar Cargos/Educação da camada 2; acima de 3 milhões: camada 2 ficou solta"
+SN_META_PROSPECCAO_ARQUITETO_PLUGIN,4 · posicionamentos,Posicionamentos → Manuais,"Só Instagram: Feed, Stories, Reels",obrigatório,"Sem Facebook, Explorar, Threads, Audience Network, Messenger"
+SN_META_SEGUIDORES_ARQUITETO_QUENTE,0 · base,Campanha,"Objetivo Engajamento → Local de conversão Instagram → Meta de desempenho ""Maximizar o número de visitas ao perfil do Instagram""",obrigatório,"Se a meta não aparecer, usar Tráfego → Perfil do Instagram"
+SN_META_SEGUIDORES_ARQUITETO_QUENTE,0 · base,Público → opções originais,Advantage+ público DESLIGADO,obrigatório,
+SN_META_SEGUIDORES_ARQUITETO_QUENTE,0 · base,Locais / Idade / Idiomas,Brasil (moram) / 22–55 / Português (Brasil),obrigatório,Faixa um pouco mais ampla que a de prospecção: seguidor não precisa pagar hoje
+SN_META_SEGUIDORES_ARQUITETO_QUENTE,1 · quente (OU),Públicos personalizados → criar antes em Públicos,"Instagram — todas as pessoas que interagiram com esta conta profissional, 365 dias",obrigatório,"Fonte Meta, 1ª parte, sem LGPD"
+SN_META_SEGUIDORES_ARQUITETO_QUENTE,1 · quente (OU),Públicos personalizados → criar antes em Públicos,"Vídeo — pessoas que assistiram pelo menos 50% de qualquer vídeo, 365 dias",obrigatório,Marcar TODOS os Reels/anúncios da conta
+SN_META_SEGUIDORES_ARQUITETO_QUENTE,2 · profissão (E),Direcionamento detalhado → Interesses,Arquitetura,incluir se existir,Restringe o quente a quem tem sinal de profissão
+SN_META_SEGUIDORES_ARQUITETO_QUENTE,2 · profissão (E),Direcionamento detalhado → Interesses,Design de interiores,incluir se existir,Restringe o quente a quem tem sinal de profissão
+SN_META_SEGUIDORES_ARQUITETO_QUENTE,2 · profissão (E),Direcionamento detalhado → Interesses,Arquitetura e Construção,incluir se existir,Restringe o quente a quem tem sinal de profissão
+SN_META_SEGUIDORES_ARQUITETO_QUENTE,2 · profissão (E),Direcionamento detalhado → Interesses,Estilo arquitetônico,incluir se existir,Restringe o quente a quem tem sinal de profissão
+SN_META_SEGUIDORES_ARQUITETO_QUENTE,2 · profissão (E),Direcionamento detalhado → Interesses,Arquitetura de interiores,incluir se existir,Restringe o quente a quem tem sinal de profissão
+SN_META_SEGUIDORES_ARQUITETO_QUENTE,2 · profissão (E),Direcionamento detalhado → Interesses,Paisagismo,incluir se existir,Restringe o quente a quem tem sinal de profissão
+SN_META_SEGUIDORES_ARQUITETO_QUENTE,2 · profissão (E),Direcionamento detalhado → Interesses,Urbanismo,incluir se existir,Restringe o quente a quem tem sinal de profissão
+SN_META_SEGUIDORES_ARQUITETO_QUENTE,3 · tamanho,"Painel ""Tamanho estimado""",aceitar de 5 mil para cima,conferir,Se < 5 mil: remover camada 2 e manter só o quente
+SN_META_SEGUIDORES_ARQUITETO_QUENTE,4 · posicionamentos,Manuais,"Só Instagram: Reels, Feed, Stories",obrigatório,
+SN_META_SEGUIDORES_ARQUITETO_QUENTE,5 · leitura,Semanal,Amostra de 20 seguidores novos: bio com arquitet/design/interiores/CAU/SketchUp,meta ≥ 60%,Abaixo de 40% em 2 semanas seguidas → pausar campanha

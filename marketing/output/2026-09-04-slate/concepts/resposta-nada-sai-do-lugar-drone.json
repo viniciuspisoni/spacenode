@@ -1,0 +1,94 @@
+{
+ "slug": "resposta-nada-sai-do-lugar-drone",
+ "title": "Nada sai do lugar (drone → chão)",
+ "pillar": "fidelidade-geometrica",
+ "angle": "Objeção: 'o render vai inventar o meu projeto'. Resposta visual antes de qualquer texto: vista zenital do SketchUp com três marcadores hairline sobre espreguiçadeiras, escada e vaso; o wipe revela o render e os marcadores continuam encaixando. Depois a mesma casa vista do chão como payoff. Oferta: cadastro grátis, 80 nodes, sem cartão.",
+ "format": "video_anuncio",
+ "duration_s": 11.5,
+ "hook_text": "Nada sai do lugar.",
+ "hook_visual": "Full-bleed 9:16 do print SketchUp em vista de drone (#442): deck de madeira clara, três espreguiçadeiras marrom-escuras em diagonal, escada preta da piscina no canto inferior esquerdo, água azul chapada, pavers cinza sobre grama no topo esquerdo, vaso preto pequeno, muro de concreto à direita. Aos 0,6 s aparecem três cantoneiras hairline brancas (espreguiçadeiras, escada, vaso). Aos 1,4 s um wipe linear da esquerda para a direita (0,9 s) troca para o render (#441): mesma câmera, espreguiçadeiras de fibra, escada cromada, palmeira no vaso, travertino sobre grama, cáusticas na água — as cantoneiras seguem exatamente sobre os mesmos objetos. Headline entra só aos 2,4 s.",
+ "scenes": [
+  {
+   "t": "0.0–1.4",
+   "visual": "#442 full-bleed (crop 9:16 centrado no deck: espreguiçadeiras, escada e vaso dentro do quadro; pavers no topo, piscina embaixo). Sem movimento. Aos 0,6 s fade-in de 3 cantoneiras hairline brancas (1,5 px) em volta das espreguiçadeiras, da escada e do vaso. Sem texto.",
+   "text_on_screen": "",
+   "asset_idx": [
+    442
+   ]
+  },
+  {
+   "t": "1.4–2.3",
+   "visual": "xfade wipeleft linear 0,9 s de #442 para #441 no mesmo crop (alinhar pela borda do deck e pela escada). As cantoneiras não se movem e continuam emoldurando os mesmos objetos, agora fotorrealistas.",
+   "text_on_screen": "",
+   "asset_idx": [
+    442,
+    441
+   ]
+  },
+  {
+   "t": "2.3–5.5",
+   "visual": "Hold em #441 com push-in 1,00→1,06. Scrim inferior suave (camada própria). Headline aos 2,4 s, apoio aos 3,4 s. Cantoneiras somem em fade aos 4,6 s.",
+   "text_on_screen": "Nada sai do lugar. / Espreguiçadeiras, escada e vaso: onde você modelou.",
+   "asset_idx": [
+    441
+   ]
+  },
+  {
+   "t": "5.5–6.0",
+   "visual": "Corte seco para #444: print SketchUp da mesma casa vista do chão (crop 9:16 centrado no deck com as três espreguiçadeiras, piscina e volume de concreto à direita). Céu azul chapado, grama verde lisa.",
+   "text_on_screen": "",
+   "asset_idx": [
+    444
+   ]
+  },
+  {
+   "t": "6.0–6.8",
+   "visual": "xfade wipeleft 0,8 s para #443 (mesmo crop): concreto aparente, ripado de madeira, guarda-corpo de vidro, piscina com cáusticas, vegetação tropical, espreguiçadeiras no mesmo ponto do deck.",
+   "text_on_screen": "",
+   "asset_idx": [
+    444,
+    443
+   ]
+  },
+  {
+   "t": "6.8–10.0",
+   "visual": "Hold em #443 com push-in 1,00→1,05 em direção ao deck. Aos 8,0 s entra o bloco de CTA sobre o terço inferior (scrim): 'Comece grátis' com sublinhado verde #30d158 (único verde da peça) e micro-linha em cinza #a1a1a6.",
+   "text_on_screen": "Comece grátis / 80 nodes no cadastro · sem cartão",
+   "asset_idx": [
+    443
+   ]
+  },
+  {
+   "t": "10.0–11.5",
+   "visual": "Card final #0a0a0a: ConstellationN + wordmark monocromáticos centrados, 'Comece grátis' com sublinhado verde, micro-linha '80 nodes no cadastro · sem cartão'. Sem URL.",
+   "text_on_screen": "Comece grátis / 80 nodes no cadastro · sem cartão",
+   "asset_idx": []
+  }
+ ],
+ "assets": [
+  442,
+  441,
+  444,
+  443
+ ],
+ "cta": "Comece grátis",
+ "caption": "Três espreguiçadeiras, uma escada e um vaso. No render, exatamente onde você colocou no modelo.\n\nO print é uma vista de drone do SketchUp, sem textura. O render sai com a mesma câmera, o mesmo deck e cada peça na mesma posição — o que muda é material e luz.\n\nDepois, a mesma casa vista do chão: concreto aparente, ripado, piscina. Mesmo modelo, mesma geometria, gerado em minutos.\n\nO cadastro é grátis e já vem com 80 nodes, sem cartão — dá para testar com um projeto seu.\n\nComece grátis no link da bio.\n\n#archviz #sketchup #visualizacaoarquitetonica #renderizacao #projetodearquitetura",
+ "hashtags": [
+  "#archviz",
+  "#sketchup",
+  "#visualizacaoarquitetonica",
+  "#renderizacao",
+  "#projetodearquitetura"
+ ],
+ "paid": {
+  "primary": "Suba o print do SketchUp. O render sai com cada peça onde você modelou — e o cadastro vem com 80 nodes, sem cartão.\n\nMesma câmera, mesmo deck, mesma piscina. Gerado em minutos, do seu próprio modelo.",
+  "headline": "Render fiel ao seu modelo",
+  "description": "80 nodes grátis, sem cartão",
+  "button": "SIGN_UP",
+  "cutdown_note": "Já nasce ≤15 s (11,5 s). Cutdown de 6 s para placements curtos: cenas 1–3 (drone antes → wipe → hold com headline) e o CTA entra aos 4,0 s sobre #441; sem o par do chão e sem card final (o botão do Meta faz o papel). Cutdown 8,5 s: manter o par do chão, cortar o card final."
+ },
+ "why_converts": "A objeção número um de quem nunca testou é 'vai inventar o meu projeto'. A peça não argumenta — mostra: três objetos fáceis de conferir num celular (espreguiçadeiras, escada, vaso) ficam dentro dos mesmos marcadores antes e depois do wipe. A leitura é instantânea e com som desligado. O par do chão dá o impacto que segura até o CTA. A oferta tira o atrito de cadastro (grátis, sem cartão, 80 nodes = 4 renders em 2K no motor padrão): o usuário testa com o próprio modelo e vê a mesma fidelidade que viu no anúncio. Quem gasta os 80 nodes num projeto real já está no fluxo de assinatura Starter (R$89/mês, 750 nodes) — o anúncio pré-qualifica pela fidelidade, não pelo hype.",
+ "production_notes": "Specs: 1080×1920, 30 fps, H.264 crf 18, yuv420p, sem áudio. Texto só na zona segura (y 220–1600). Geist 600 para headline (~76 px) e Geist 400 para apoio (~40 px) — 2 pesos, 3 níveis. Verde só no sublinhado do CTA (<5% da área). Crops: #442 (728×872) e #441 (944×1136) têm o mesmo aspecto (~0,83): recortar 9:16 a partir do centro-esquerdo (manter escada e pavers no quadro), escalar cada um para 1080×1920 com lanczos — o antes sobe ~2,2× mas é SketchUp de cores chapadas e aguenta; renderizar a partir dos ORIGINAIS em assets/, nunca das thumbs. Alinhar o par pela borda do deck + escada antes do xfade (as cantoneiras só funcionam se o alinhamento for exato). #444 (733×867) e #443 (944×1120): mesmo procedimento, alinhar pelo volume de concreto e pela borda da piscina. As cantoneiras são um overlay separado (PNG via Playwright) que fica parado durante o wipe — regra do kit: o wipe atravessa a imagem, nunca o overlay/texto. Não marcar os pavers (mudaram de tamanho no render) nem o escritório do térreo em #443. Scrim como camada própria; escurecimento diferente para antes (cinza médio) e depois (mais escuro) para não dar flash no corte seco. setsar=1 antes do concat. Card final 1,5 s, logo monocromático, sem URL. Montar via marketing/scripts/reel-spec.mjs (stills + wipes + overlays em tempo global). QA: extrair 4 frames (0,7 s / 2,0 s / 4,0 s / 8,5 s) e conferir cantoneiras encaixadas, texto legível e dentro da zona segura.",
+ "risks": "NÃO pode prometer: 'idêntico', 'pixel a pixel' ou 'nada muda' (os pavers ficaram maiores/mais regulares e o interior do escritório em #443 virou reflexo/vegetação — a headline fala de POSIÇÃO dos objetos, não de identidade absoluta); 'sempre', 'em segundos', 'sem retoque'. Não usar a palavra 'IA' na arte nem na legenda (a tecnologia não é o assunto). 'Sem cartão' é verdadeiro (cadastro só com login; saldo inicial vem do DEFAULT 80 de profiles.credits) mas não aparece na landing — dono deve confirmar que quer esse claim na peça; se preferir, trocar a micro-linha por '80 nodes no cadastro'. Ambos os pares são de 28/04/2026 (motor vega 2k, qualidade atual, mas originais pequenos: 944 px de largura — aceitar leve suavidade; nunca passar por upscale para 'melhorar' material de marketing sem deixar registrado). Confirmar autoria do modelo SketchUp (a casa com piscina) antes de veicular como pago.",
+ "gated": ""
+}

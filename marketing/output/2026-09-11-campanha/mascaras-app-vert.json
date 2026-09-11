@@ -1,0 +1,21 @@
+{
+  "saida": "masked",
+  "grupos": [
+    {
+      "arquivos": ["$REPO/marketing/output/2026-09-11-campanha-app-vert-tutoriais/src/renderizar/02-referencia-carregada.png"],
+      "porque": "pílula de saldo (6205 nodes), 'saldo para ~310 renders' e avatar do dono",
+      "rects": [
+        { "x": 735, "y": 50, "w": 215, "h": 72, "amostra": [560, 84] },
+        { "x": 200, "y": 2650, "w": 275, "h": 92, "amostra": [532, 2702] },
+        { "x": 28, "y": 2664, "w": 104, "h": 110, "amostra": [77, 2604] }
+      ]
+    },
+    {
+      "arquivos": ["$REPO/marketing/output/2026-09-11-campanha-app-vert-tutoriais/src/spaces/01-lista.png"],
+      "porque": "avatar do dono",
+      "rects": [
+        { "x": 28, "y": 2664, "w": 104, "h": 110, "amostra": [77, 2604] }
+      ]
+    }
+  ]
+}

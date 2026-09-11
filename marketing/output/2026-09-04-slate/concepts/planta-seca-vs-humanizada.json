@@ -1,0 +1,84 @@
+{
+ "slug": "planta-seca-vs-humanizada",
+ "title": "A reunião trava na planta",
+ "pillar": "tradicional-vs-spacenode",
+ "angle": "O custo invisível de apresentar planta seca: o cliente leigo lê cotas, não lê a casa. Planta humanizada, em geral, é mais uma tarde de pós-produção manual ou mais um item no orçamento de visualização; aqui sai da imagem da própria planta em minutos, com paredes, cotas e nomes no lugar — em dois estilos. Comparação de processo com o método de apresentar sem visualização.",
+ "format": "transformacao",
+ "duration_s": 12,
+ "hook_text": "A reunião trava aqui.",
+ "hook_visual": "Planta CAD de apartamento de 3 dormitórios em linha preta sobre branco (#128): cotas em vermelho, portas com arco de abertura, mobiliário em linha (sofá, mesa com 6 cadeiras, camas, louças), varanda em ângulo à esquerda, carimbo 'PLANTA PADRÃO FINAL 01 E 03 · SEM ESCALA' no canto inferior direito (a ser cortado). Exibida numa faixa 1080x~700 sobre fundo #0a0a0a, com zoom-in lento na sala/cozinha para as cotas ficarem legíveis. Aos 1,6s a régua horizontal revela #127: a mesma planta humanizada em estilo editorial — piso de madeira, sofá cinza, mesa de jantar, plantas na varanda, nomes 'Sala', 'Cozinha', 'Suíte', 'Quarto', 'Varanda', 'Circulação' e as cotas preservadas.",
+ "scenes": [
+  {
+   "t": "0.0–1.6s",
+   "visual": "#128 (planta CAD) recortada sem o carimbo (cortar ~12% inferior), faixa centralizada sobre #0a0a0a, Ken Burns 1.00→1.06 centrado na sala/cozinha. Headline no terço superior.",
+   "text_on_screen": "A reunião trava aqui.",
+   "asset_idx": [
+    128
+   ]
+  },
+  {
+   "t": "1.6–1.9s",
+   "visual": "Régua horizontal (xfade wipeleft, 0,3s, linear) revela #127 (estilo editorial minimalista) sobre #128 — mesmo recorte sem carimbo, mesma escala, paredes alinhadas.",
+   "text_on_screen": "",
+   "asset_idx": [
+    128,
+    127
+   ]
+  },
+  {
+   "t": "1.9–6.0s",
+   "visual": "#127 segura com Ken Burns 1.06→1.18 puxando para a sala/varanda para que os nomes dos ambientes e as cotas fiquem legíveis no celular. Headline em 1,9s; apoio em 3,0s.",
+   "text_on_screen": "Planta humanizada, a partir da sua planta. / apoio (3,0s): Paredes, cotas e nomes no lugar. Gerado em minutos.",
+   "asset_idx": [
+    127
+   ]
+  },
+  {
+   "t": "6.0–6.3s",
+   "visual": "Corte seco para #129 (estilo imobiliário): vista de topo com sombra, paredes escuras, piso de madeira, mobília com volume, nomes em caixa alta (COZINHA, SALA, SUÍTE, BANHEIRO, QUARTO, CIRCULAÇÃO); sem cotas nem carimbo (escolha do estilo). Faixa 1080x~800.",
+   "text_on_screen": "",
+   "asset_idx": [
+    129
+   ]
+  },
+  {
+   "t": "6.3–9.5s",
+   "visual": "#129 segura com zoom lento 1.00→1.08. Headline troca em corte; sem apoio nesta cena (o estilo imobiliário não mantém cotas — não afirmar isso sobre ele).",
+   "text_on_screen": "Dois estilos. A mesma planta.",
+   "asset_idx": [
+    129
+   ]
+  },
+  {
+   "t": "9.5–12.0s",
+   "visual": "Card final #0a0a0a com logo monocromático e CTA (sublinhado verde).",
+   "text_on_screen": "Comece grátis",
+   "asset_idx": []
+  }
+ ],
+ "assets": [
+  128,
+  127,
+  129
+ ],
+ "cta": "Comece grátis",
+ "caption": "A reunião trava na planta seca. O cliente lê cotas; ele queria ler a casa.\n\nPlanta humanizada, em geral, é mais uma tarde de pós-produção manual — ou mais um item no orçamento de visualização. Por isso tanta reunião acontece com a planta técnica na mesa e o cliente perdido nela.\n\nAqui você sobe a imagem da planta e escolhe o estilo. Paredes, esquadrias, cotas e nomes dos ambientes ficam no lugar; mobiliário, piso e vegetação entram por cima. Dois estilos da mesma planta: editorial, que mantém as cotas, e imobiliário, com sombra e volume.\n\nGerado em minutos, a partir da planta que você já tem.\n\nComece grátis — cadastro sem cartão. Link na bio.\n\n#arquitetura #plantahumanizada #apresentacaodeprojeto #projetodearquitetura #designdeinteriores",
+ "hashtags": [
+  "#arquitetura",
+  "#plantahumanizada",
+  "#apresentacaodeprojeto",
+  "#projetodearquitetura",
+  "#designdeinteriores"
+ ],
+ "paid": {
+  "primary": "A reunião trava na planta seca. Planta humanizada a partir da sua planta, com paredes, cotas e nomes no lugar — em minutos.\nDois estilos da mesma planta, sem tarde de pós-produção. Cadastro grátis, sem cartão.",
+  "headline": "Planta humanizada em minutos",
+  "description": "Da planta que você já tem",
+  "button": "SIGN_UP",
+  "cutdown_note": "Já cabe em ≤15s (12s). Versão de 9s para anúncio: cortar #129 (cenas 4–5) e ir de #127 (segurar até 6,5s) direto ao card CTA — um estilo só, o que preserva cotas."
+ },
+ "why_converts": "Abre um ponto de entrada diferente dos renders: todo projeto tem planta, nem todo projeto tem modelo 3D pronto para renderizar — atinge o arquiteto que 'apresenta sem visualização' (público explícito do pilar) e que nunca se viu como cliente de render. Fricção mínima: a imagem da planta que ele já tem é o insumo, sem modelar nada — por isso o CTA 'Comece grátis' (cadastro sem cartão, 80 nodes). O gancho 'a reunião trava aqui' nomeia uma cena que todo arquiteto viveu com cliente leigo; a prova (cotas e nomes preservados) responde ao ceticismo técnico. A assinatura vem por recorrência: planta humanizada em todo projeto + render das vistas principais no mesmo lugar (Starter R$89 / 750 nodes).",
+ "risks": "O vídeo NÃO pode prometer: planta 'em escala' ou utilizável para execução (é imagem de apresentação — o próprio carimbo diz 'sem escala'); que todos os estilos preservam cotas (o imobiliário #129 removeu cotas e carimbo — o apoio de fidelidade só aparece sobre #127); tempo de terceiros sem 'em geral'. Não dizer 'Photoshop' na arte. Não citar custo em nodes da planta (não conferido). Par de 26/05/2026 (vega/2k). Cortar o carimbo em #128/#127 antes de publicar: além do direito de uso, o texto miúdo '*FINAL 03 APENAS ILUSTRATIVO…' vira ruído no celular.",
+ "production_notes": "#128 1755x1240 (1,41:1), #127 2464x1728 (1,43:1), #129 2400x1792 (1,34:1). Cortar a faixa inferior com carimbo e nota (~12%) em #128 e #127 no mesmo recorte relativo para o wipe alinhar; escalar os dois para a mesma janela (alinhar pelas paredes externas). Faixa centralizada em 1080 de largura sobre fundo #0a0a0a chapado (planta lê melhor sobre preto liso que sobre fundo desfocado); rótulos de ambiente ficam com ~13px a 1080 — por isso o Ken Burns chega a 1.18 sobre a sala. Headline e apoio nas zonas seguras (fora dos 220px do topo e 320px da base), sem sobrepor a planta. Verde só no sublinhado do CTA. 1080x1920, 30fps, H.264, sem áudio.",
+ "gated": "Publicar só depois de confirmar o direito de uso da planta: o carimbo 'PLANTA PADRÃO FINAL 01 E 03' sugere planta-padrão de incorporadora, não projeto autoral do dono. Se for de terceiro, registrar autorização (content_projects.permission_status = granted) ou substituir por uma planta própria gerada no módulo; em qualquer caso cortar o carimbo da arte."
+}

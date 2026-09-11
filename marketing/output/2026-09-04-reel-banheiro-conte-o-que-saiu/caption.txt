@@ -1,0 +1,37 @@
+Banheiro com jardim vertical. Antes de ver o depois, marque a posição da bacia, da ducha e da esquadria.
+
+Bacia suspensa, ducha, nicho, esquadria, as lajotas sobre os seixos e o piso: mesma posição, mesma câmera. Até as gotas do chuveiro de teto, que já estavam no modelo, continuam lá.
+
+A sanca também já estava modelada — o que ela ganhou foi luz. Luz e acabamento vieram da intenção definida na geração; a geometria veio do modelo. Nada saiu do lugar.
+
+Visualização arquitetônica a partir do que você já tem: o print da vista, o modelo, uma referência. Gerado em minutos.
+
+Veja no seu próprio projeto — cadastro grátis, sem cartão, no link da bio.
+
+#arquitetura #archviz #sketchup #designdeinteriores #visualizacaoarquitetonica
+
+----------------------------------------------------------------------
+VERSÃO PAGA (Meta · som off · 8,5 s · legenda embutida na peça)
+arquivo: C:/Users/Pisoni/spacenode/marketing/output/2026-09-04-reel-banheiro-conte-o-que-saiu-ad/2026-09-04-reel-banheiro-conte-o-que-saiu-ad.mp4
+
+Botão nas três variações: SIGN_UP ("Cadastre-se"). O objetivo é cadastro grátis, e
+manter o mesmo botão nos três criativos deixa o teste de ÂNGULO limpo. Se o conjunto
+for otimizado para tráfego em público frio, trocar só a variação C por LEARN_MORE.
+
+A · fidelidade
+  Texto primário: Marque no print onde estão a bacia, a ducha e a esquadria. Confira no render: nada saiu do lugar.
+  Título (34): Geometria do seu modelo, no lugar.
+  Descrição (27): Cadastro grátis, sem cartão
+  Botão: SIGN_UP
+
+B · prazo
+  Texto primário: Do print escuro do modelo à imagem de apresentação em minutos. Mesma câmera, mesma esquadria.
+  Título (29): Do print à imagem, em minutos
+  Descrição (26): Comece com 80 nodes grátis
+  Botão: SIGN_UP
+
+C · apresentação
+  Texto primário: O jardim vertical que o cliente não enxergava no print, iluminado — e exatamente onde você modelou.
+  Título (32): O cliente vê o que você projetou
+  Descrição (24): Sem cartão, em português
+  Botão: SIGN_UP

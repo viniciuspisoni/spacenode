@@ -14,23 +14,31 @@
 //   Vega   (Gemini 3 Pro Image edit) → `resolution` ∈ '1K'|'2K'|'4K'
 //   Pulsar (Nano Banana 2 edit)      → `resolution` ∈ '1K'|'2K'|'4K'
 //     HD interno mapeia para '1K' na Fal.ai (NB2 não tem rótulo "HD" nativo).
-//   Quasar (Seedream 5.0 Pro edit)   → `image_size` = 'auto_2K'
+//   Quasar (Seedream 5.0 Pro edit)   → `image_size` = 'auto_2K' (ou WxH da faixa barata)
 //     'auto_*' segue o aspecto da imagem de entrada. O endpoint tem teto de
 //     2048×2048, por isso o Quasar só oferece 2K (lib/engines). Schema da FAL
 //     sem seed/quality/aspect_ratio.
 
 import type { EngineId, Resolution } from '@/lib/engines'
+import { seedreamCheapSize, seedreamCheapTierEnabled } from '@/lib/ai/seedream-size'
 
 export function falParamsForEngine(
   engine:      EngineId,
   resolution:  Resolution,
   aspectRatio: string | null = null,
+  sourceSize:  { width: number; height: number } | null = null,
 ): Record<string, unknown> {
   if (engine === 'quasar') {
     // Seedream 5.0 Pro Edit: só campos do schema (conferido 2026-09-04).
     // 'auto_2K' preserva a proporção do input no maior tamanho do endpoint.
+    // Com SEEDREAM_CHEAP_TIER=1 pedimos WxH explícito no teto da faixa barata
+    // de preço (lib/ai/seedream-size): metade do custo nos dois provedores e
+    // 76% do lado. Sem as dimensões do original, segue o 'auto_2K'.
+    const cheap = seedreamCheapTierEnabled()
+      ? seedreamCheapSize(sourceSize?.width, sourceSize?.height)
+      : null
     return {
-      image_size:    'auto_2K',
+      image_size:    cheap ?? 'auto_2K',
       num_images:    1,
       // Master lossless — alinha o caminho FAL com o GCP/Vertex (que já
       // devolve PNG). JPEG aqui criava uma geração de perda logo na origem

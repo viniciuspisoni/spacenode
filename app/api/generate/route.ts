@@ -7,6 +7,8 @@ import { refundNodes } from '@/lib/billing/refund-nodes'
 import {
   buildFidelityPrompt,
   materialSurfaceEn,
+  PRESERVE,
+  isPreserved,
   type GenerateOptions,
   type ProjectMaterials,
   type BriefingArquitetonico,
@@ -81,7 +83,12 @@ const devLog = (...args: unknown[]) => {
 // A Vercel mata a função no maxDuration. Precisa cobrir o maior FAL_TIMEOUT_MS
 // abaixo com folga, senão a geração lenta morre antes da nossa race e o usuário
 // recebe um 504 opaco em vez da mensagem tratada (+ refund).
-export const maxDuration = 300
+// 360 s (era 300) desde 2026-09-10: com o hedge da ModelArk desligado, o
+// caminho lento virou SEQUENCIAL (ark até 180 s → FAL com o que sobra), e a
+// soma não cabia em 300. Decisão do dono: esperar mais de 3 min por uma imagem
+// é aceitável; falhar e pagar duas vezes, não. Teto do plano Pro é maior que
+// isto; o custo de função é por CPU ativa, e esperar rede é quase de graça.
+export const maxDuration = 360
 
 // Teto de latência da 1ª tentativa pra valer um retry de fidelidade
 // (RENDER_FIDELITY_RETRY_MAX_ATTEMPT_MS). Acima disso — ou se ela veio do
@@ -93,10 +100,14 @@ const RETRY_ONLY_IF_ATTEMPT_UNDER_MS = Math.max(10_000, Number(process.env.RENDE
 // tamanho da imagem, sobretudo em 4K. Pulsar (Nano Banana 2) é rápido. O cap de 90s
 // era curto demais pro Vega e fazia a geração falhar com "tente uma resolução menor"
 // mesmo com imagem pequena. (O resto do código usa 150s pra esse mesmo endpoint.)
+// Quasar 300 s (era 180): é o orçamento TOTAL do provider na tentativa, e no
+// caminho ModelArk ele é gasto em série — ark até 180 s e, se ela falhar ou
+// estourar, a FAL ainda precisa de ~120 s (medido: 120–138 s neste endpoint)
+// pra salvar o render em vez de devolver erro. Vega e Pulsar seguem iguais.
 const FAL_TIMEOUT_MS: Record<EngineId, number> = {
   vega:   180_000,
   pulsar:  90_000,
-  quasar: 180_000,
+  quasar: 300_000,
 }
 
 // Orion (piloto interno): teto próprio, ajustável sem redeploy de código.
@@ -159,7 +170,28 @@ function sanitizeModelFacts(raw: unknown): ModelFacts | undefined {
     if (focal) camera.focalLengthMm = focal
     if (fov) camera.fovDeg = fov
     if (cam.twoPoint === true) camera.twoPoint = true
+    const eye = num(cam.eyeHeightM, 0.2, 12)
+    if (eye !== undefined) camera.eyeHeightM = Math.round(eye * 100) / 100
     if (Object.keys(camera).length > 0) out.camera = camera
+  }
+  const room = src.room as Record<string, unknown> | undefined
+  if (room && typeof room === 'object') {
+    const r: NonNullable<ModelFacts['room']> = {}
+    // Mesmas faixas do plugin (ROOM_CEILING_RANGE_M / ROOM_RAY_RANGE_M): o
+    // cliente é quem mede, então o servidor não confia — reclampa.
+    const ceiling = num(room.ceilingM, 1.8, 20)
+    const width = num(room.widthM, 0.4, 40)
+    if (ceiling !== undefined) r.ceilingM = Math.round(ceiling * 100) / 100
+    if (width !== undefined) r.widthM = Math.round(width * 100) / 100
+    if (Object.keys(r).length > 0) out.room = r
+  }
+  const mirrors = src.mirrors as Record<string, unknown> | undefined
+  if (mirrors && typeof mirrors === 'object') {
+    const count = num(mirrors.count, 0, 50)
+    if (count !== undefined && count >= 1) {
+      const glass = num(mirrors.glass, 0, count)
+      out.mirrors = { count: Math.round(count), ...(glass ? { glass: Math.round(glass) } : {}) }
+    }
   }
   const sun = src.sun as Record<string, unknown> | undefined
   if (sun && typeof sun === 'object') {
@@ -177,7 +209,7 @@ function sanitizeModelFacts(raw: unknown): ModelFacts | undefined {
     if (sun.shadowsVisible === true) s.shadowsVisible = true
     if (s.elevationDeg !== undefined) out.sun = s
   }
-  return out.camera || out.sun ? out : undefined
+  return out.camera || out.sun || out.mirrors || out.room ? out : undefined
 }
 
 function truncateErr(err: unknown): string {
@@ -294,7 +326,7 @@ export async function POST(req: NextRequest) {
     // plugin, requisição forjada, config antiga salva no perfil ou reuso de
     // render. Variante e qualidade não são mais escolha do cliente: o
     // servidor sempre usa Flare/high (ver lib/orion/config) — nada do que o
-    // cliente manda influencia isso.
+    // cliente manda (custo, endpoint, permissão) é levado em conta.
     const orionVariant: OrionVariant = DEFAULT_ORION_VARIANT
     const orionQuality: OrionQuality = DEFAULT_ORION_QUALITY
     if (isOrion) {
@@ -397,8 +429,11 @@ export async function POST(req: NextRequest) {
     const hasAnchor = Boolean(anchorUrl)
     const options: GenerateOptions = {
       projectType,
-      segment:       segment       ?? 'Residencial',
-      environment:   environment   ?? '',
+      // O fallback do servidor era 'Residencial': um cliente antigo que não
+      // mandasse segmento acabava com a cena descrita como residencial no
+      // prompt. Agora o silêncio significa silêncio.
+      segment:       segment       ?? PRESERVE,
+      environment:   environment   ?? PRESERVE,
       lighting:      lighting      ?? '',
       background:    background    ?? 'Preservar Original',
       sceneElements: sceneElements ?? [],
@@ -451,21 +486,21 @@ export async function POST(req: NextRequest) {
     } else {
       originalBuffer = sourceBuffer!
       const ext = sourceMime === 'image/png' ? 'png' : 'jpg'
-      if (isOrion) {
+      // Uint8Array novo: BlobPart exige ArrayBuffer próprio (o let Buffer|null
+      // alarga pra ArrayBufferLike e o File recusa).
+      const imageFile  = new File([new Uint8Array(originalBuffer)], `input.${ext}`, { type: sourceMime })
+      inputUrl = isOrion
         // Piloto: o input vai pro armazenamento do PRÓPRIO SpaceNode. É o que
         // deixa a rota direta da OpenAI funcionar sem FAL_KEY — os bytes saem
-        // daqui pelo fetchStorageBytes (que já valida a allowlist de SSRF e usa
-        // service_role em bucket privado). O caminho fal assina a mesma URL.
-        inputUrl = await uploadToStorage(originalBuffer, sourceMime, user.id, 'render-source')
-      } else {
-        // Uint8Array novo: BlobPart exige ArrayBuffer próprio (o let Buffer|null
-        // alarga pra ArrayBufferLike e o File recusa).
-        const imageFile  = new File([new Uint8Array(originalBuffer)], `input.${ext}`, { type: sourceMime })
-        inputUrl = await fal.storage.upload(imageFile)
-      }
+        // daqui pelo fetchStorageBytes (allowlist de SSRF + service_role em
+        // bucket privado). O caminho fal assina a mesma URL.
+        ? await uploadToStorage(originalBuffer, sourceMime, user.id, 'render-source')
+        : await fal.storage.upload(imageFile)
       devLog('[generate] inputUrl   :', inputUrl)
     }
 
+    // Anchor vai PRIMEIRO em image_urls — Gemini/NB2/Seedream extraem
+    // materiais e atmosfera dela antes de processar a geometria do input.
     // Hospedagem das imagens AUXILIARES (edge map). Orion nunca passa pelo
     // fal.storage — a rota direta precisa rodar sem FAL_KEY.
     const hostAuxImage = async (buf: Buffer, mime: string, name: string): Promise<string> =>
@@ -473,8 +508,6 @@ export async function POST(req: NextRequest) {
         ? uploadToStorage(buf, mime, user.id, 'render-source')
         : fal.storage.upload(new File([new Uint8Array(buf)], name, { type: mime }))
 
-    // Anchor vai PRIMEIRO em image_urls — Gemini/NB2/Seedream extraem
-    // materiais e atmosfera dela antes de processar a geometria do input.
     const baseImageUrls = (anchorUrl && anchorUrl !== inputUrl)
       ? [anchorUrl, inputUrl]
       : [inputUrl]
@@ -535,14 +568,14 @@ export async function POST(req: NextRequest) {
       }
     }
     let aspectRatio: string | null = null
-    // Dimensões do original: alimentam o pino de aspecto dos motores públicos
-    // e, no Orion, a dimensão explícita pedida à Image API.
-    let originalDims: { width: number; height: number } | null = null
+    // Dimensões do original: além do pino de aspecto, dão o WxH da faixa barata
+    // do Seedream (Quasar) — sem elas o Quasar segue no 'auto_2K'.
+    let sourceSize: { width: number; height: number } | null = null
     if (originalBuffer) {
       try {
         const meta = await sharp(originalBuffer).metadata()
         aspectRatio = nearestSupportedAspectRatio(meta.width ?? null, meta.height ?? null)
-        if (meta.width && meta.height) originalDims = { width: meta.width, height: meta.height }
+        if (meta.width && meta.height) sourceSize = { width: meta.width, height: meta.height }
       } catch { /* sem pino — motor segue o formato do input */ }
     }
     devLog('[generate] aspect     :', aspectRatio ?? 'auto (sem pino)')
@@ -627,13 +660,14 @@ export async function POST(req: NextRequest) {
     const attemptLogs: FidelityAttemptLog[] = []
 
     // Orion: dimensão EXPLÍCITA derivada do aspecto do original (nunca 'auto',
-    // nunca upscale silencioso), no preset (2K/4K) escolhido. O que foi
-    // PEDIDO e o que o fornecedor ENTREGOU vão os dois pro generation_log.
+    // nunca upscale silencioso), no preset (2K/4K) escolhido. Reusa o
+    // `sourceSize` que a rota já calcula pra faixa barata do Seedream. Pedido e
+    // entregue vão os dois pro generation_log.
     // Cast seguro: isOrion só chega aqui depois de isOrionResolution(resolution)
-    // validado lá em cima (linha ~317) — resolution só pode ser '2k'|'4k'.
+    // validado lá em cima — resolution só pode ser '2k'|'4k'.
     const orionSize = orionTargetSize(
-      originalDims?.width ?? null,
-      originalDims?.height ?? null,
+      sourceSize?.width ?? null,
+      sourceSize?.height ?? null,
       isOrion ? (resolution as '2k' | '4k') : '2k',
     )
     let orionGen: OrionGenerateResult | null = null
@@ -764,7 +798,7 @@ export async function POST(req: NextRequest) {
       const falInput = isOrion ? null : {
         prompt:     finalPrompt,
         image_urls: imageUrls,
-        ...falParamsForEngine(engine, resolution, aspectRatio),
+        ...falParamsForEngine(engine, resolution, aspectRatio, sourceSize),
         // Reprodutibilidade nos DOIS caminhos: NB2/Pro na FAL expõem `seed`
         // (schema conferido 2026-08-17); Quasar (Seedream 5.0 Pro edit) não.
         ...(engine !== 'quasar' ? { seed: attemptSeed } : {}),
@@ -1040,7 +1074,10 @@ export async function POST(req: NextRequest) {
       input_url:       inputUrl ?? null,
       output_url:      outputUrl,
       prompt:          finalPrompt,
-      ambient:         environment ?? segment ?? projectType,
+      // Rótulo do histórico. "Preservar Original" não é nome de ambiente —
+      // quando os dois estão preservados, o tipo de projeto é o que sobra de
+      // verdadeiro para etiquetar a geração.
+      ambient:         [environment, segment].find(v => !isPreserved(v)) ?? projectType,
       style:           projectType,
       lighting:        lighting ?? 'default',
       engine,
@@ -1065,8 +1102,8 @@ export async function POST(req: NextRequest) {
       duration_ms:  generationDurationMs,
       retry_count:  retryCount,
       // Orion cobra nodes normalmente desde 2026-09-11 — nunca é teste
-      // interno por si só. A coluna segue existindo pra uso futuro de QA
-      // interna gratuita (nenhum motor grava true hoje).
+      // interno por si só. A coluna (migration 20260910120000) segue existindo
+      // pra uso futuro de QA interna gratuita; nenhum motor grava true hoje.
       is_internal_test: false,
       generation_log: {
         provider:       gen.provider,
@@ -1079,15 +1116,15 @@ export async function POST(req: NextRequest) {
         resolution,
         parameters: isOrion
           ? {
-              model:      ORION_MODELS[orionVariant],
-              variant:    orionVariant,
-              quality:    orionQuality,
-              size:       orionSizeParam(orionSize),
+              model:       ORION_MODELS[orionVariant],
+              variant:     orionVariant,
+              quality:     orionQuality,
+              size:        orionSizeParam(orionSize),
               size_source: orionSize.source,
-              n:          1,
+              n:           1,
               output_format: orionGen?.outputFormat ?? 'png',
             }
-          : falParamsForEngine(engine, resolution, aspectRatio),
+          : falParamsForEngine(engine, resolution, aspectRatio, sourceSize),
         // Reprodutibilidade: seed BASE do request (os dois caminhos recebem;
         // a seed efetiva por tentativa fica em fidelity.attempts[].seed).
         seed:            generationSeed,

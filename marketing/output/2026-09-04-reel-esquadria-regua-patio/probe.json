@@ -1,0 +1,62 @@
+{
+  "slug": "2026-09-04-reel-esquadria-regua-patio",
+  "reel": "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-esquadria-regua-patio\\2026-09-04-reel-esquadria-regua-patio.mp4",
+  "banda": "1080×608 @ y=656",
+  "segments": [
+    {
+      "i": 0,
+      "type": "still",
+      "dur": 2.6,
+      "start": 0,
+      "crop": "contain 1080×1280 @ y=320"
+    },
+    {
+      "i": 1,
+      "type": "still",
+      "dur": 2.8,
+      "start": 1.4,
+      "crop": "contain 1080×1280 @ y=320"
+    },
+    {
+      "i": 2,
+      "type": "still",
+      "dur": 0.4,
+      "start": 4.2,
+      "crop": "contain 1080×1280 @ y=320"
+    },
+    {
+      "i": 3,
+      "type": "video",
+      "dur": 6.4,
+      "start": 4.6,
+      "crop": "1080×1920 6.4s"
+    }
+  ],
+  "width": 1080,
+  "height": 1920,
+  "fps": "30/1",
+  "pix_fmt": "yuv420p",
+  "codec": "h264",
+  "duration": "11.00",
+  "sizeMB": "3.19",
+  "esperado": {
+    "width": 1080,
+    "height": 1920,
+    "fps": "30/1",
+    "duration": "11.00"
+  },
+  "qaFrames": [
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-esquadria-regua-patio\\qa-frames\\t0.55s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-esquadria-regua-patio\\qa-frames\\t0.80s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-esquadria-regua-patio\\qa-frames\\t1.10s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-esquadria-regua-patio\\qa-frames\\t2.00s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-esquadria-regua-patio\\qa-frames\\t2.55s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-esquadria-regua-patio\\qa-frames\\t3.40s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-esquadria-regua-patio\\qa-frames\\t4.40s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-esquadria-regua-patio\\qa-frames\\t5.20s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-esquadria-regua-patio\\qa-frames\\t6.80s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-esquadria-regua-patio\\qa-frames\\t8.20s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-esquadria-regua-patio\\qa-frames\\t9.60s.png"
+  ],
+  "qaSheet": "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-esquadria-regua-patio\\qa-sheet.jpg"
+}

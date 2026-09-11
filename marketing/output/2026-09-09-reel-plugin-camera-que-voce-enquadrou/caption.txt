@@ -1,0 +1,9 @@
+A câmera do render é a que você enquadrou no SketchUp.
+
+Na aba Fotografia do plugin: proporção, lente, altura do olho, verticais retas, guias de terços e faces de espelho e vidro marcadas. A captura já sai com as guias, e o render com IA preserva o que a captura mostra.
+
+Plugin oficial da SpaceNode para SketchUp 2021 ou superior, grátis: os renders usam os Nodes da sua conta. Extensão (.rbz) no site.
+
+Instale o plugin — link na bio.
+
+#sketchup #plugin #render #archviz #arquitetura #renderizacao

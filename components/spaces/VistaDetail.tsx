@@ -23,6 +23,7 @@ function engineDisplayName(engine: string, fallback: EngineId): string {
 import { getUpscaleCost, DNA_EXTRACTION_COST } from '@/lib/spaces/economy'
 import { getVisualDna } from '@/lib/spaces/dna'
 import { spacesPreserveV2Enabled } from '@/lib/spaces/preserve-flags'
+import { Sheet, Segmented, useAmbient } from '@/components/app/glass'
 import { RetocarOverlay } from './RetocarOverlay'
 
 interface OtherVista {
@@ -53,6 +54,14 @@ export function VistaDetail({ space, vista, others, initialBalance }: Props) {
   const [isDnaReference, setIsDnaReference] = useState(Boolean(vista.dna))
   // Trocar Vista Mestre: esta vista já é a mestre atual do Space?
   const [isCurrentMestre, setIsCurrentMestre] = useState(space.vista_mestre_vista_id === vista.id)
+  // As duas confirmações desta tela (promover, descartar) eram `confirm()`
+  // do navegador. Agora são folha: mesma peça do resto do app, e o texto do
+  // aviso cabe inteiro em vez de virar uma linha de alerta do sistema.
+  const [confirmKind, setConfirmKind] = useState<null | 'promote' | 'delete'>(null)
+
+  // A imagem em foco vira o papel de parede — é o que faz o vidro desta tela
+  // assumir a paleta da própria vista, como no painel do plugin.
+  useAmbient(vista.image_url ?? space.vista_mestre_url)
 
   const opt = vista.axis && vista.axis_value ? findAxisOption(vista.axis, vista.axis_value) : null
 
@@ -142,18 +151,20 @@ export function VistaDetail({ space, vista, others, initialBalance }: Props) {
     }
   }
 
-  async function handlePromoteMestre() {
+  // Só abre a folha: quem gasta node é handlePromoteMestre, depois do sim.
+  function askPromoteMestre() {
     if (isCurrentMestre || vista.status !== 'completed') return
-    const needsExtract = !isDnaReference
-    if (needsExtract && balance < DNA_EXTRACTION_COST) {
+    if (!isDnaReference && balance < DNA_EXTRACTION_COST) {
       setError(`Saldo insuficiente pra extração de DNA. Necessários ${DNA_EXTRACTION_COST} nodes.`)
       return
     }
-    const confirmMsg = needsExtract
-      ? `Definir esta vista como Vista Mestre? O DNA dela será extraído primeiro (${DNA_EXTRACTION_COST} nodes) e a mestre atual vai pro histórico do projeto.`
-      : 'Definir esta vista como Vista Mestre? A mestre atual vai pro histórico do projeto.'
-    if (!confirm(confirmMsg)) return
+    setConfirmKind('promote')
+  }
 
+  async function handlePromoteMestre() {
+    if (isCurrentMestre || vista.status !== 'completed') return
+    const needsExtract = !isDnaReference
+    setConfirmKind(null)
     setSubmitting('promote')
     setError(null)
     try {
@@ -186,7 +197,7 @@ export function VistaDetail({ space, vista, others, initialBalance }: Props) {
   }
 
   async function handleDelete() {
-    if (!confirm('Descartar esta vista? Esta ação não pode ser desfeita.')) return
+    setConfirmKind(null)
     setSubmitting('delete')
     try {
       const res = await fetch(`/api/vistas/${vista.id}`, { method: 'DELETE' })
@@ -320,26 +331,22 @@ export function VistaDetail({ space, vista, others, initialBalance }: Props) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         {canUpscale ? (
           <button
+            type="button"
             onClick={handleUpscale}
             disabled={submitting !== null}
-            className="spn-action"
-            style={{
-              width: 'auto', minWidth: 220, padding: '11px 22px',
-              background: '#1D9E75', color: '#042818',
-              border: '0.5px solid rgba(0,0,0,0.18)',
-              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18), 0 8px 24px rgba(29,158,117,0.18)',
-            }}
+            className="spn-cta"
+            style={{ width: 'auto', minWidth: 220 }}
           >
             {submitting === 'upscale'
               ? 'Aplicando upscale…'
-              : `Upscale ${upscaleTarget.toUpperCase()} · ${upscaleCost} nodes`}
+              : <>Upscale {upscaleTarget.toUpperCase()} <span className="spn-cta-meta">{upscaleCost} nodes</span></>}
           </button>
         ) : (
           <span style={{
-            padding: '11px 18px', borderRadius: 10,
-            background: 'var(--color-bg-elevated)',
+            padding: '11px 18px', borderRadius: 'var(--r-inner)',
+            background: 'var(--color-chip)',
             color: 'var(--color-text-quaternary)',
-            border: '0.5px solid var(--color-border-strong)',
+            border: '0.5px solid var(--glass-line)',
             fontSize: 12,
           }}>
             Já em {vista.quality.toUpperCase()}
@@ -384,7 +391,7 @@ export function VistaDetail({ space, vista, others, initialBalance }: Props) {
               ★ Vista Mestre atual
             </span>
           ) : (
-            <ActionGhost onClick={handlePromoteMestre} disabled={submitting === 'promote'}>
+            <ActionGhost onClick={askPromoteMestre} disabled={submitting === 'promote'}>
               {submitting === 'promote'
                 ? 'Trocando…'
                 : isDnaReference
@@ -393,25 +400,51 @@ export function VistaDetail({ space, vista, others, initialBalance }: Props) {
             </ActionGhost>
           )
         )}
-        <ActionGhost onClick={() => alert('Em breve.')}>+ Pack</ActionGhost>
+        {/* Sem `alert`: um botão que ainda não faz nada se anuncia desligado,
+            não com uma caixa do navegador dizendo "em breve". */}
+        <ActionGhost onClick={() => {}} disabled title="Disponível em breve">+ Pack</ActionGhost>
         <ActionGhost onClick={handleFavorite} disabled={submitting === 'fav'}>
           {favorited ? '★ Favoritada' : '☆ Favoritar'}
         </ActionGhost>
         <ActionGhost onClick={handleDownload}>Download</ActionGhost>
-        <ActionGhost onClick={handleDelete} danger disabled={submitting === 'delete'}>
+        <ActionGhost onClick={() => setConfirmKind('delete')} danger disabled={submitting === 'delete'}>
           {submitting === 'delete' ? 'Removendo…' : 'Descartar'}
         </ActionGhost>
       </div>
 
-      {error && (
-        <div style={{
-          padding: '10px 14px', borderRadius: 8,
-          background: 'rgba(163,45,45,0.12)', border: '0.5px solid rgba(163,45,45,0.3)',
-          color: '#e57373', fontSize: 13,
-        }}>
-          {error}
-        </div>
-      )}
+      {error && <div className="spn-error">{error}</div>}
+
+      <Sheet
+        open={confirmKind === 'promote'}
+        title="Definir como Vista Mestre?"
+        onClose={() => setConfirmKind(null)}
+        doneLabel="Cancelar"
+      >
+        <p className="spn-hint" style={{ marginTop: 0, marginBottom: 16 }}>
+          {isDnaReference
+            ? 'A mestre atual vai pro histórico do projeto — nada é apagado.'
+            : `O DNA desta vista será extraído primeiro (${DNA_EXTRACTION_COST} nodes) e a mestre atual vai pro histórico do projeto.`}
+        </p>
+        <button type="button" className="spn-cta" onClick={handlePromoteMestre}>
+          {isDnaReference
+            ? 'Definir como Vista Mestre'
+            : <>Extrair DNA e definir <span className="spn-cta-meta">{DNA_EXTRACTION_COST} nodes</span></>}
+        </button>
+      </Sheet>
+
+      <Sheet
+        open={confirmKind === 'delete'}
+        title="Descartar esta vista?"
+        onClose={() => setConfirmKind(null)}
+        doneLabel="Cancelar"
+      >
+        <p className="spn-hint" style={{ marginTop: 0, marginBottom: 16 }}>
+          Esta ação não pode ser desfeita. Os nodes já gastos nesta vista não voltam.
+        </p>
+        <button type="button" className="spn-cta" onClick={handleDelete}>
+          Descartar vista
+        </button>
+      </Sheet>
 
       {showRetocar && (
         <RetocarOverlay
@@ -498,7 +531,7 @@ function ComparisonSection({
       display: 'grid', gap: 14,
       gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
     }}>
-      <ComparisonCard label={referenceLabel} color="#1D9E75" imageUrl={referenceUrl} subLabel={preserveV2 ? 'referência' : undefined} />
+      <ComparisonCard label={referenceLabel} color="var(--color-accent-green)" imageUrl={referenceUrl} subLabel={preserveV2 ? 'referência' : undefined} />
       <ComparisonCard label={variationLabel} color={variationColor} imageUrl={variationUrl} subLabel={variationSub} />
     </div>
   )
@@ -509,30 +542,22 @@ function ComparisonSection({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {/* Barra: toggle de modo + selo "original preservada" */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--color-surface)', borderRadius: 9 }}>
-          {(['split', 'flip'] as const).map(m => (
-            <button
-              key={m}
-              onClick={() => setMode(m)}
-              style={{
-                padding: '6px 12px', borderRadius: 6, fontSize: 11, fontWeight: 500,
-                cursor: 'pointer', letterSpacing: '-0.005em',
-                background: mode === m ? 'var(--color-bg-elevated)' : 'transparent',
-                color: mode === m ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
-                boxShadow: mode === m ? 'inset 0 0 0 0.5px var(--color-border-strong)' : 'none',
-              }}
-            >
-              {m === 'split' ? 'Lado a lado' : 'Sobrepor'}
-            </button>
-          ))}
-        </div>
+        <Segmented
+          label="Modo de comparação"
+          value={mode}
+          onChange={setMode}
+          items={[
+            { value: 'split', label: 'Lado a lado' },
+            { value: 'flip', label: 'Sobrepor' },
+          ]}
+        />
         <span
           title="A referência original nunca é sobrescrita — cada variação é salva separadamente."
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
             padding: '5px 11px', borderRadius: 999,
-            background: 'rgba(29,158,117,0.12)', color: '#46d191',
-            border: '0.5px solid rgba(70,209,145,0.25)',
+            background: 'var(--color-accent-green-bg)', color: 'var(--color-accent-green)',
+            border: '0.5px solid var(--color-accent-green-border)',
             fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase',
           }}
         >
@@ -545,35 +570,29 @@ function ComparisonSection({
           {/* Imagem única que alterna Antes/Depois */}
           <ComparisonCard
             label={side === 'antes' ? `Antes · ${referenceLabel}` : `Depois · ${variationLabel}`}
-            color={side === 'antes' ? '#1D9E75' : variationColor}
+            color={side === 'antes' ? 'var(--color-accent-green)' : variationColor}
             imageUrl={side === 'antes' ? referenceUrl : variationUrl}
             subLabel={side === 'depois' ? variationSub : 'referência'}
           />
-          <div style={{ display: 'flex', gap: 4, padding: 4, marginTop: 10, background: 'var(--color-surface)', borderRadius: 9, width: 'fit-content' }}>
-            {(['antes', 'depois'] as const).map(s => (
-              <button
-                key={s}
-                onClick={() => setSide(s)}
-                style={{
-                  padding: '6px 16px', borderRadius: 6, fontSize: 11, fontWeight: 500,
-                  cursor: 'pointer', textTransform: 'capitalize',
-                  background: side === s ? 'var(--color-bg-elevated)' : 'transparent',
-                  color: side === s ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
-                  boxShadow: side === s ? 'inset 0 0 0 0.5px var(--color-border-strong)' : 'none',
-                }}
-              >
-                {s}
-              </button>
-            ))}
+          <div style={{ marginTop: 10, width: 'fit-content' }}>
+            <Segmented
+              label="Lado exibido"
+              value={side}
+              onChange={setSide}
+              items={[
+                { value: 'antes', label: 'Antes' },
+                { value: 'depois', label: 'Depois' },
+              ]}
+            />
           </div>
         </div>
       )}
 
       {preservationWarning && (
         <div style={{
-          padding: '10px 14px', borderRadius: 8,
-          background: 'rgba(186,117,23,0.12)', border: '0.5px solid rgba(186,117,23,0.3)',
-          color: '#e0a766', fontSize: 12, lineHeight: 1.5,
+          padding: '10px 14px', borderRadius: 'var(--r-inner)',
+          background: 'var(--color-warning-bg)', border: '0.5px solid var(--color-warning-border)',
+          color: 'var(--color-warning)', fontSize: 12, lineHeight: 1.5,
         }}>
           Possível alteração além do solicitado nesta variação — registrada para auditoria.
           Compare com a referência acima; se necessário, gere novamente.
@@ -590,10 +609,8 @@ function ComparisonCard({ label, color, imageUrl, subLabel }: {
   subLabel?: string
 }) {
   return (
-    <div style={{
-      borderRadius: 14, overflow: 'hidden',
-      background: 'var(--color-bg-elevated)',
-      border: '0.5px solid var(--color-border)',
+    <div className="spn-glass" style={{
+      borderRadius: 'var(--r-card)', overflow: 'hidden',
       position: 'relative', aspectRatio: '4 / 3',
     }}>
       {imageUrl ? (
@@ -613,21 +630,19 @@ function ComparisonCard({ label, color, imageUrl, subLabel }: {
         position: 'absolute', top: 14, left: 14, right: 14,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
       }}>
-        <span style={{
+        <span className="spn-glass spn-glass--raised" style={{
           display: 'inline-flex', alignItems: 'center', gap: 6,
-          padding: '5px 10px', borderRadius: 5,
-          background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)',
-          fontSize: 10, color: '#fff', letterSpacing: '0.06em', textTransform: 'uppercase',
-          fontWeight: 600,
+          padding: '5px 10px', borderRadius: 999,
+          fontSize: 10, color: 'var(--color-text-primary)',
+          letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 600,
         }}>
           <span style={{ width: 8, height: 8, borderRadius: 999, background: color }} />
           {label}
         </span>
         {subLabel && (
-          <span style={{
-            padding: '4px 8px', borderRadius: 4,
-            background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)',
-            fontSize: 9, color: '#fff', letterSpacing: '0.04em',
+          <span className="spn-glass spn-glass--raised" style={{
+            padding: '4px 8px', borderRadius: 999,
+            fontSize: 9, color: 'var(--color-text-secondary)', letterSpacing: '0.04em',
           }}>
             {subLabel}
           </span>
@@ -644,15 +659,13 @@ function DnaPreservationPanel({ passed, verification }: { passed: boolean; verif
     { label: 'Paleta',    key: 'paleta' },
     { label: 'Contexto',  key: 'contexto' },
   ]
-  const accent = passed ? '#46d191' : '#e0a766'
-  const accentBg = passed ? 'rgba(29,158,117,0.14)' : 'rgba(186,117,23,0.16)'
+  const accent = passed ? 'var(--color-accent-green)' : 'var(--color-warning)'
+  const accentBg = passed ? 'var(--color-accent-green-bg)' : 'var(--color-warning-bg)'
   const passedCount = checks.filter(c => verification.scores[c.key] >= 0.85).length
 
   return (
-    <div style={{
-      padding: '18px 22px', borderRadius: 14,
-      background: 'var(--color-bg-elevated)',
-      border: '0.5px solid var(--color-border)',
+    <div className="spn-glass" style={{
+      padding: '18px 22px', borderRadius: 'var(--r-card)',
       display: 'flex', flexDirection: 'column', gap: 14,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -702,8 +715,8 @@ function DnaPreservationPanel({ passed, verification }: { passed: boolean; verif
             }}>
               <span style={{
                 width: 16, height: 16, borderRadius: 999,
-                background: ok ? 'rgba(29,158,117,0.18)' : 'rgba(186,117,23,0.2)',
-                color: ok ? '#46d191' : '#e0a766',
+                background: ok ? 'var(--color-accent-green-bg)' : 'var(--color-warning-bg)',
+                color: ok ? 'var(--color-accent-green)' : 'var(--color-warning)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 flexShrink: 0,
               }}>
@@ -740,22 +753,23 @@ function DnaPreservationPanel({ passed, verification }: { passed: boolean; verif
   )
 }
 
-function ActionGhost({ children, onClick, disabled, danger }: {
+function ActionGhost({ children, onClick, disabled, danger, title }: {
   children: React.ReactNode
   onClick:  () => void
   disabled?: boolean
   danger?:   boolean
+  title?:    string
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       disabled={disabled}
-      className="spn-action spn-action--ghost"
+      title={title}
+      className="spn-ghost"
       style={{
-        width: 'auto', minWidth: 0, padding: '10px 16px',
-        fontSize: 12, opacity: disabled ? 0.45 : 1,
-        color: danger ? '#e57373' : undefined,
-        borderColor: danger ? 'rgba(163,45,45,0.3)' : undefined,
+        color: danger ? 'var(--color-error)' : undefined,
+        borderColor: danger ? 'var(--color-error-border)' : undefined,
       }}
     >
       {children}

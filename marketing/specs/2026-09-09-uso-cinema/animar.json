@@ -1,0 +1,104 @@
+{
+  "_nota": [
+    "PORTE do reel 2026-09-09-reel-uso-animar (reel-kit) para a língua do filme 'antes da primeira imagem.'.",
+    "As cenas, a ordem e os recortes são os MESMOS já auditados; o que mudou foi a gramática visual:",
+    "chapa clara #FAFAFA em toda cena de produto, banda (contain/inset 0) em vez de recorte, texto em",
+    "tema claro sobre a chapa, cartelas 'line' em minúsculas com ponto final, interface em escala 1:1",
+    "(nativo) e texto entrando/saindo em fade. Câmera parada em tudo: cada plano aqui é prova.",
+    "Único verde da peça: o {80} da cartela final, como no filme."
+  ],
+  "slug": "2026-09-09-reel-uso-animar-cinema",
+  "frame": { "w": 1080, "h": 1920 },
+
+  "segments": [
+    {
+      "_nota": "O render que abre. reserveBottom sobe a imagem e abre faixa de chapa clara embaixo para a cartela — sem isso o texto cairia dentro do render. Câmera PARADA: o argumento da cena é justamente que a imagem está parada.",
+      "type": "still",
+      "src": "$REPO/marketing/output/2026-09-04-reel-esquadria-regua-patio/src/render-1080x1280.png",
+      "dur": 2.4, "fit": "contain", "inset": 0, "reserveBottom": 380, "bg": "light", "zoom": [1, 1]
+    },
+
+    {
+      "_nota": "Estado vazio do Animar, recorte auditado [220,1100,700,660] de 1800×2800. Escala 1:1: a captura é 2x, então 700px nativos leem no celular no tamanho real do app. Fora do recorte ficam avatar, saldo e miniaturas de projeto.",
+      "type": "still",
+      "src": "$REPO/marketing/output/2026-09-08-tutoriais/src/animar/01-vazio.png",
+      "crop": [220, 1100, 700, 660],
+      "dur": 2.2, "fit": "contain", "nativo": true, "bg": "light", "zoom": [1, 1]
+    },
+
+    {
+      "_nota": "TIPO DE VÍDEO com os cinco tipos inteiros e 'Movimento Cinematográfico' marcado. O recorte termina cravado embaixo de 'Detalhe Arquitetônico': se cortasse um item, a cartela 'cinco tipos' mentiria.",
+      "type": "still",
+      "src": "$REPO/marketing/output/2026-09-08-tutoriais/src/animar/02-painel-default.png",
+      "crop": [40, 220, 760, 730],
+      "dur": 1.9, "fit": "contain", "nativo": true, "bg": "light", "zoom": [1, 1]
+    },
+
+    {
+      "_nota": "Mesmo enquadramento, outro estado: 'Reels de Projeto' marcado. Corte seco entre os dois para a troca de seleção ler como clique.",
+      "type": "still",
+      "src": "$REPO/marketing/output/2026-09-08-tutoriais/src/animar/04-painel-reels.png",
+      "crop": [40, 220, 760, 730],
+      "dur": 2.1, "fit": "contain", "nativo": true, "bg": "light", "zoom": [1, 1]
+    },
+
+    {
+      "_nota": "FORMATO + DURAÇÃO na mesma banda: 9:16 Vertical e 6s marcados sozinhos pelo preset, com 4s=140 / 6s=210 / 8s=280 legíveis ao lado. É a prova da cartela seguinte.",
+      "type": "still",
+      "src": "$REPO/marketing/output/2026-09-08-tutoriais/src/animar/04-painel-reels.png",
+      "crop": [40, 1590, 760, 500],
+      "dur": 2.4, "fit": "contain", "nativo": true, "bg": "light", "zoom": [1, 1]
+    },
+
+    {
+      "_nota": "Tira nativa da interface: só a linha do custo. Medido no arquivo — a tinta de 'Custo desta geração / 210 Nodes' ocupa y 2537..2560 e a linha 'Saldo:' só começa em y=2582; o recorte fecha em 2578, com 4px de branco puro de folga. Saldo NUNCA entra no quadro. O recorte de 216px do reel antigo trazia junto uma legenda solta e o TOPO CORTADO do campo Direção Criativa, que lia como defeito de render. Bônus: o fundo do painel é exatamente #FAFAFA, a mesma chapa do filme — a tira não tem borda, o texto do app pousa direto na chapa.",
+      "type": "still",
+      "src": "$REPO/marketing/output/2026-09-08-tutoriais/src/animar/04-painel-reels.png",
+      "crop": [40, 2519, 760, 60],
+      "dur": 2.4, "fit": "contain", "nativo": true, "bg": "light", "zoom": [1, 1]
+    },
+
+    {
+      "_nota": "O vídeo real do Animar, mesma casa do render que abriu — e na MESMA banda: 844×1000 em x=118, y=270, exatamente onde o render entrou no segmento 0. A imagem que estava parada volta no mesmo lugar do quadro, agora andando. A fonte foi re-enquadrada por dois motivos: (1) o mp4 do acervo é 1080×1920 com o conteúdo gerado só em 1080×1280 @ y=320 e BLUR nas duas faixas — gramática do reel-kit, que o filme proíbe; (2) renderVideo não tem inset nem reserveBottom, então a banda precisa vir assada na própria fonte para abrir chapa limpa embaixo. Os pixels gerados estão intactos, só reposicionados.",
+      "type": "video",
+      "src": "$REPO/marketing/output/2026-09-09-reel-uso-animar-cinema/src/animar-reels-6s-banda.mp4",
+      "start": 2.8, "dur": 3.4, "fit": "contain", "bg": "light"
+    },
+
+    { "type": "card", "card": "final", "dur": 2.2, "bg": "light" }
+  ],
+
+  "transitions": [
+    { "type": "dissolve", "dur": 0.4 },
+    { "type": "cut" },
+    { "type": "cut" },
+    { "type": "cut" },
+    { "type": "cut" },
+    { "type": "dissolve", "dur": 0.5 },
+    { "type": "dissolve", "dur": 0.5 }
+  ],
+
+  "cards": {
+    "a": { "layout": "line", "theme": "light", "anchor": "bottom", "eyebrow": "animar", "big": "render pronto.<br>[e parado.]", "px": 72 },
+    "b": { "layout": "line", "theme": "light", "anchor": "bottom", "big": "sobe o render.<br>[ou pega um do histórico.]", "px": 60 },
+    "c": { "layout": "line", "theme": "light", "anchor": "bottom", "big": "cinco tipos de vídeo.", "px": 66 },
+    "d": { "layout": "line", "theme": "light", "anchor": "bottom", "big": "escolhe [reels de projeto.]", "px": 64 },
+    "e": { "layout": "line", "theme": "light", "anchor": "bottom", "big": "ele já marca<br>[9:16 e 6 segundos.]", "px": 62 },
+    "f": { "layout": "line", "theme": "light", "anchor": "bottom", "big": "210 nodes.", "small": "o custo desta geração, antes de gerar.", "px": 68 },
+    "g": { "layout": "line", "theme": "light", "anchor": "bottom", "big": "a mesma imagem,<br>agora [em movimento.]", "small": "geometria, materiais e mobiliário preservados.", "px": 60 },
+    "final": { "layout": "final", "theme": "light", "cta": "Testar grátis", "micro": "{80} nodes grátis · sem cartão · spacenode.app" }
+  },
+
+  "_overlays_nota": "Tempos GLOBAIS do --plan. Cada cartela nasce depois da imagem se estabelecer e morre antes do corte.",
+  "overlays": [
+    { "card": "a", "from": 0.30, "to": 1.95, "fade": 0.4 },
+    { "card": "b", "from": 2.35, "to": 4.10, "fade": 0.4 },
+    { "card": "c", "from": 4.40, "to": 6.00, "fade": 0.35 },
+    { "card": "d", "from": 6.30, "to": 8.10, "fade": 0.4 },
+    { "card": "e", "from": 8.40, "to": 10.50, "fade": 0.4 },
+    { "card": "f", "from": 10.80, "to": 12.45, "fade": 0.4 },
+    { "card": "g", "from": 13.20, "to": 15.35, "fade": 0.45 }
+  ],
+
+  "qa": [1.10, 3.20, 5.20, 7.20, 9.40, 11.60, 14.20, 16.60]
+}

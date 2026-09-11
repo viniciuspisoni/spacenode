@@ -1,0 +1,54 @@
+O cliente pediu três acabamentos para a reunião das 14h. Mesmo print, mesma câmera, gerado em minutos.
+
+Ep. 01 da série Três antes das 14h. A regra: um print do modelo, três leituras de acabamento, mesma câmera, mesma geometria.
+
+01 sanca quente e cortina bege. 02 cimento queimado e piso escuro. 03 mármore polido e mesa de madeira escura. Nenhuma delas exigiu voltar ao modelo.
+
+Um ambiente novo em três acabamentos, para a reunião da semana ter opção em vez de promessa.
+
+Comece agora — link na bio.
+
+#designdeinteriores #apresentacaodeprojeto #render #arquitetura #archviz
+
+
+=== VERSÃO PAGA (Meta · som off · botão SIGN_UP) — arquivo: 2026-09-04-reel-tres-antes-das-14h-ep01-ad.mp4 (9,5 s) ===
+
+A · prazo
+  Texto primário: Reunião às 14h, três acabamentos da mesma sala. Um print, três opções, gerado em minutos.
+  Título: três acabamentos antes da reunião.
+  Descrição: mesmo print, mesma câmera.
+  Botão: SIGN_UP (Cadastre-se)
+
+B · fidelidade
+  Texto primário: Mesma câmera, mesma geometria, três acabamentos. Um print, gerado em minutos.
+  Título: três acabamentos antes da reunião.
+  Descrição: cadastro grátis, sem cartão.
+  Botão: SIGN_UP (Cadastre-se)
+
+C · apresentação
+  Texto primário: O cliente pediu opções. Três leituras da mesma sala, do mesmo print, gerado em minutos.
+  Título: três leituras da mesma sala.
+  Descrição: cadastro grátis, sem cartão.
+  Botão: SIGN_UP (Cadastre-se)
+
+Público: frio, design de interiores / reforma BR (campanha B · Cadastro — interiores).
+Enquanto o evento de cadastro do pixel não existir: rodar como tráfego com LEARN_MORE e trocar para SIGN_UP depois.
+
+
+=== ARQUIVOS E USO (qual peça serve a quê) ===
+
+1) FEED (Reels orgânico) — arquivo:
+   marketing/output/2026-09-04-reel-tres-antes-das-14h-ep01/2026-09-04-reel-tres-antes-das-14h-ep01.mp4
+   1080×1920 · 30 fps · 11,5 s · sem áudio. Usa a legenda do topo deste arquivo (gancho + corpo + 5 hashtags).
+   Trilha: escolher no app do IG (cortes em 1,4 / 3,6 / 5,5 / 7,4 / 7,8 / 8,2 s).
+
+2) STORIES — mesmo arquivo do feed (item 1). Sem alteração: o texto todo vive entre y=270 e y=1586,
+   fora da área de interface do Stories (topo 250 / base 250). Publicar com sticker de link para spacenode.app
+   (a arte não traz URL). Sem legenda escrita: o texto embutido já se sustenta com som off.
+
+3) ANÚNCIO (Meta · som off · SIGN_UP, ou LEARN_MORE enquanto o evento de cadastro do pixel não existir) — arquivo:
+   marketing/output/2026-09-04-reel-tres-antes-das-14h-ep01-ad/2026-09-04-reel-tres-antes-das-14h-ep01-ad.mp4
+   1080×1920 · 30 fps · 9,5 s · sem áudio (cutdown sem recap e sem o eyebrow de episódio).
+   Usa as copies A/B/C do bloco "VERSÃO PAGA" acima — nunca a legenda orgânica.
+   GATING: só subir depois de o dono confirmar por escrito a autoria/permissão do modelo da sala de jantar
+   (prohibited §6 · permission_status = granted). Ver QA.md.

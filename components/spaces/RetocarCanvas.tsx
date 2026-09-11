@@ -462,14 +462,9 @@ export const RetocarCanvas = forwardRef<RetocarCanvasHandle, Props>(function Ret
             }} />
           )}
           {loading && (
-            <div style={{
-              position: 'absolute', inset: 0,
-              background: 'rgba(10,10,10,0.62)',
-              backdropFilter: 'blur(4px)',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-              gap: 12, color: 'var(--color-text-primary)',
-              fontSize: 13, letterSpacing: '-0.005em',
-            }}>
+            // Vidro aqui é seguro: este véu só existe enquanto a imagem
+            // carrega — o canvas está PARADO, ninguém está pintando máscara.
+            <div className="spn-overlay" style={{ fontSize: 13, letterSpacing: '-0.005em' }}>
               <svg width="32" height="32" viewBox="0 0 32 32" className="constellation-loading">
                 <circle cx="16" cy="16" r="3" fill="currentColor" />
                 <circle cx="16" cy="48" r="3" fill="currentColor" />

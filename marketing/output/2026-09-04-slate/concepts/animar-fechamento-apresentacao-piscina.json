@@ -1,0 +1,101 @@
+{
+ "slug": "animar-fechamento-apresentacao-piscina",
+ "title": "O último slide se move",
+ "pillar": "educativo-apresentacao",
+ "angle": "Vídeo como fechamento de apresentação: o Reel simula a sequência final de uma reunião de aprovação — print, vista da piscina, vista de cima — e o último slide entra em movimento (água viva, câmera avançando). A ordem das imagens decide a reunião; o vídeo encerra.",
+ "format": "demonstrativo",
+ "duration_s": 16,
+ "hook_text": "O último slide da apresentação se move.",
+ "hook_visual": "Faixa 4:5 (1080×1350) centrada sobre #0a0a0a. 0–2,5s: trecho final (2,5–5,0s) do vídeo #169 — casa em L de concreto aparente e ripado de madeira, três espreguiçadeiras no deck, piscina com cáusticas em movimento, jantar e sala iluminados atrás do vidro; a câmera já avançou. Headline entra aos 0,4s sobre água em movimento. Aos 2,5s corte seco para 'slide 1' (o print).",
+ "scenes": [
+  {
+   "t": "0,0–2,5s",
+   "visual": "Vídeo #169 (Kling 2.5, 1320×1568), trecho 2,5–5,0s, recorte 4:5 (1254×1568 → 1080×1350): água com cáusticas viva, push-in suave, reflexos no vidro. Headline no terço superior, acima da faixa.",
+   "text_on_screen": "O último slide da apresentação se move.",
+   "asset_idx": [
+    169
+   ]
+  },
+  {
+   "t": "2,5–4,2s",
+   "visual": "Corte seco para o print SketchUp #444 (733×867, escalado para a faixa 4:5 com leve crop): casa em L com ripado marrom chapado, laje branca, piscina azul lisa, três espreguiçadeiras, grama com folhas espalhadas, céu chapado. Headline sai.",
+   "text_on_screen": "label: 1 · o print",
+   "asset_idx": [
+    444
+   ]
+  },
+  {
+   "t": "4,2–4,5s",
+   "visual": "xfade wipeleft 0,3s para o render #340 (944×1120, mesma câmera): concreto com marcas de fôrma, ripado com veio, sala de jantar e estante visíveis pelo vidro, palmeiras junto à esquadria, água com cáusticas, deck de madeira.",
+   "text_on_screen": "label: 2 · a vista",
+   "asset_idx": [
+    444,
+    340
+   ]
+  },
+  {
+   "t": "4,5–6,0s",
+   "visual": "Render #340 parado. Apoio entra abaixo da faixa.",
+   "text_on_screen": "A ordem das imagens decide a reunião.",
+   "asset_idx": [
+    340
+   ]
+  },
+  {
+   "t": "6,0–7,5s",
+   "visual": "Corte seco para #441 (944×1136, drone): deck de madeira visto de cima com três espreguiçadeiras de fibra escura, escada de inox, água azul-clara com cáusticas, placas de pedra sobre grama, palmeira em vaso — mesma casa, outra câmera.",
+   "text_on_screen": "label: 3 · de cima",
+   "asset_idx": [
+    441
+   ]
+  },
+  {
+   "t": "7,5–12,5s",
+   "visual": "Corte seco para o vídeo #169 completo (0–5,0s): o primeiro frame é exatamente o render #340 (#170 = #340), então a imagem parada começa a se mover — push-in lento, água viva, reflexos. Apoio troca aos 8,0s.",
+   "text_on_screen": "label: 4 · o vídeo · apoio: Print → render → vídeo. Gerado em minutos.",
+   "asset_idx": [
+    169
+   ]
+  },
+  {
+   "t": "12,5–14,0s",
+   "visual": "Último frame do vídeo congela; apoio sai.",
+   "text_on_screen": "",
+   "asset_idx": [
+    169
+   ]
+  },
+  {
+   "t": "14,0–16,0s",
+   "visual": "Card final: logo monocromático + CTA.",
+   "text_on_screen": "Comece agora",
+   "asset_idx": []
+  }
+ ],
+ "assets": [
+  169,
+  444,
+  340,
+  441
+ ],
+ "cta": "Comece agora",
+ "caption": "Numa reunião de aprovação, a ordem das imagens decide. Aqui, a sequência termina em movimento.\n\nSequência usada: o print do SketchUp, a vista da piscina renderizada na mesma câmera, a vista de cima do deck e, por último, o vídeo — a câmera avança devagar, a água se mexe, a sala aparece pelo vidro.\n\nO cliente aprova o que entende. Duas vistas paradas explicam o projeto; cinco segundos em movimento encerram a apresentação.\n\nTudo do mesmo projeto, gerado em minutos. Espreguiçadeiras, escada da piscina e esquadrias no lugar em todas as quatro.\n\nComece agora — link na bio.\n\n#apresentacaodeprojeto #arquitetura #render #sketchup #archviz",
+ "hashtags": [
+  "#apresentacaodeprojeto",
+  "#arquitetura",
+  "#render",
+  "#sketchup",
+  "#archviz"
+ ],
+ "paid": {
+  "primary": "O último slide da apresentação se move. Print, duas vistas e um vídeo da mesma casa, gerados em minutos. Espreguiçadeiras e esquadrias no lugar em todos.",
+  "headline": "Feche a apresentação com vídeo",
+  "description": "Do seu print, em minutos",
+  "button": "SIGN_UP",
+  "cutdown_note": "≤15s: remover o hook repetido — abrir direto no print #444 aos 0s com wipe de 0,3s para o render #340 aos 0,8s (o wipe é o gancho), 1,0s por slide, vídeo inteiro (5s) e card; fica ~11s. Headline sobre o vídeo."
+ },
+ "why_converts": "Enquadramento educativo (como apresentar) baixa a resistência de topo/meio de funil e posiciona a plataforma como parte do método, não como novidade. A sequência é literalmente o entregável que um escritório pequeno produz para uma reunião — o espectador se vê no fluxo. SIGN_UP porque print → render → vídeo é reproduzível uma única vez com o saldo do cadastro usando o motor Rápido (o mesmo deste clipe), e é exatamente esse primeiro uso que revela o limite: segunda vista, segundo vídeo ou o motor Cinemático já pedem plano. A peça vende o hábito (fechar toda reunião com vídeo), e hábito é assinatura.",
+ "production_notes": "Usar #340 como 'a vista' (não #443, que é outro render do mesmo print): #340 é pixel-idêntico ao frame de partida do vídeo (#170), o que torna o corte parado→movimento invisível. Faixa 4:5 em tudo para ler como 'slides'; sobra 285px em cima e embaixo, compatível com as zonas seguras. O print #444 tem 733×867 — upscale 1,47× na faixa, aceitável por ser chapado; conferir no QA. Labels numerados '1 · o print … 4 · o vídeo' em Geist Regular pequeno, mesmo canto sempre. Verde #30d158 só na palavra 'minutos' do apoio. Motor do clipe: Rápido (Kling 2.5 Turbo, 5s, 22/05/2026). Sem áudio no arquivo.",
+ "risks": "O vídeo #169 repete no hook e no fim (mesmo footage) — é um recurso comum de Reel, mas se incomodar, usar o cutdown. #441 vem de OUTRO print do mesmo modelo (#442), não do #444: escrever 'mesma casa', nunca 'mesmo print'. Entre #444 e #340 o interior foi mobiliado e entraram plantas — não dizer 'nada mudou', dizer 'espreguiçadeiras, escada e esquadrias no lugar'. Textura da madeira levemente lisa no vídeo (fonte de 944px). O que o vídeo NÃO pode prometer: resultado de aprovação ('aprove mais rápido', 'dobre aprovações' — proibido), vídeo grátis com o motor Cinemático, número de vistas ilimitado, que a vista de cima saiu do mesmo print, 4K.",
+ "gated": ""
+}

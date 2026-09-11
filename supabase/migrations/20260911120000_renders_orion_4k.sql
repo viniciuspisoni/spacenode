@@ -1,7 +1,8 @@
 -- ─────────────────────────────────────────────────────────────
 -- Orion · habilita 4K no piloto interno (2026-09-11)
 --
--- Migration ADITIVA. NÃO aplicada em produção nesta tarefa — a migration
+-- Migration ADITIVA. APLICADA EM PRODUÇÃO em 2026-09-11 (Management API) — a
+-- migration
 -- 20260910120000 já está em produção e criou `renders_orion_internal_only`
 -- exigindo resolution = '2k' pra toda linha 'orion'. Sem este ajuste, gerar
 -- em 4K entrega a imagem mas o INSERT do histórico falha na CHECK.

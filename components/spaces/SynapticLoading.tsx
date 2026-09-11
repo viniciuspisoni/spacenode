@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react'
 import { ENGINES, type EngineId } from '@/lib/engines'
 import type { Quality } from '@/lib/spaces/types'
+import { FULLSCREEN_OVERLAY } from './fullscreen'
 
 interface Props {
   spaceName:  string
@@ -32,20 +33,19 @@ export function SynapticLoading({ spaceName, count, totalNodes, engine, quality,
   }, [])
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 100,
-      background: 'rgba(10,10,10,0.92)', backdropFilter: 'blur(18px)',
-      display: 'flex', flexDirection: 'column', alignItems: 'center',
-      justifyContent: 'center', padding: 24,
-    }}>
+    // `.spn-overlay` traz o borrão COM os dois fallbacks de acessibilidade;
+    // o que resta inline é geometria e o token do véu. O texto herda o claro
+    // do overlay em vez dos tokens de tema: o véu é sempre escuro, então no
+    // tema claro os tokens do app ficariam invisíveis aqui.
+    <div className="spn-overlay" style={{ ...FULLSCREEN_OVERLAY, zIndex: 100, padding: 24 }}>
       {/* Top context */}
       <div style={{
         position: 'absolute', top: 28, left: 0, right: 0,
-        textAlign: 'center', fontSize: 11, color: 'var(--color-text-tertiary)',
+        textAlign: 'center', fontSize: 11, opacity: 0.7,
         letterSpacing: '0.04em', textTransform: 'uppercase',
       }}>
         Projeto {spaceName} · gerando {count} variaç{count === 1 ? 'ão' : 'ões'}
-        <div style={{ fontSize: 10, color: 'var(--color-text-quaternary)', marginTop: 4 }}>
+        <div style={{ fontSize: 10, opacity: 0.72, marginTop: 4 }}>
           {ENGINES[engine].name} · {quality.toUpperCase()} · {totalNodes} nodes
         </div>
       </div>
@@ -53,21 +53,21 @@ export function SynapticLoading({ spaceName, count, totalNodes, engine, quality,
       {/* Synaptic logo — 5 nodes + 3 connectors */}
       <svg width="160" height="160" viewBox="0 0 160 160" style={{ marginBottom: 36 }}>
         {/* Connectors */}
-        <line x1="40" y1="80" x2="80" y2="40" stroke="rgba(70,209,145,0.3)" strokeWidth="1.5" className="syn-line syn-l1" />
-        <line x1="80" y1="40" x2="120" y2="80" stroke="rgba(70,209,145,0.3)" strokeWidth="1.5" className="syn-line syn-l2" />
-        <line x1="80" y1="40" x2="80" y2="120" stroke="rgba(70,209,145,0.3)" strokeWidth="1.5" className="syn-line syn-l3" />
+        <line x1="40" y1="80" x2="80" y2="40" strokeWidth="1.5" className="syn-line syn-l1" />
+        <line x1="80" y1="40" x2="120" y2="80" strokeWidth="1.5" className="syn-line syn-l2" />
+        <line x1="80" y1="40" x2="80" y2="120" strokeWidth="1.5" className="syn-line syn-l3" />
 
         {/* Nodes */}
-        <circle cx="40"  cy="80"  r="6" fill="#46d191" className="syn-node syn-n1" />
-        <circle cx="80"  cy="40"  r="6" fill="#46d191" className="syn-node syn-n2" />
-        <circle cx="120" cy="80"  r="6" fill="#46d191" className="syn-node syn-n3" />
-        <circle cx="80"  cy="120" r="6" fill="#46d191" className="syn-node syn-n4" />
-        <circle cx="80"  cy="80"  r="7" fill="#46d191" className="syn-node syn-n5" />
+        <circle cx="40"  cy="80"  r="6" className="syn-node syn-n1" />
+        <circle cx="80"  cy="40"  r="6" className="syn-node syn-n2" />
+        <circle cx="120" cy="80"  r="6" className="syn-node syn-n3" />
+        <circle cx="80"  cy="120" r="6" className="syn-node syn-n4" />
+        <circle cx="80"  cy="80"  r="7" className="syn-node syn-n5" />
       </svg>
 
       {/* Phase text */}
       <div style={{
-        fontSize: 14, fontWeight: 500, color: 'var(--color-text-primary)',
+        fontSize: 14, fontWeight: 500,
         letterSpacing: '-0.01em', marginBottom: 32, height: 22,
         textAlign: 'center', minWidth: 280,
       }}>
@@ -79,27 +79,21 @@ export function SynapticLoading({ spaceName, count, totalNodes, engine, quality,
         {PHASES.map((_, i) => (
           <span key={i} style={{
             width: i === phase ? 18 : 5, height: 5, borderRadius: 999,
-            background: i === phase ? '#46d191' : 'rgba(255,255,255,0.18)',
+            background: i === phase ? 'var(--color-accent-green)' : 'rgba(255,255,255,0.18)',
             transition: 'all 0.3s',
           }} />
         ))}
       </div>
 
       {onCancel && (
-        <button
-          onClick={onCancel}
-          style={{
-            background: 'transparent', border: '0.5px solid var(--color-border-strong)',
-            padding: '8px 18px', borderRadius: 8,
-            color: 'var(--color-text-tertiary)', fontSize: 12,
-          }}
-        >
+        <button type="button" onClick={onCancel} className="spn-ghost">
           Cancelar
         </button>
       )}
 
       <style>{`
         .syn-node {
+          fill: var(--color-accent-green);
           transform-origin: center;
           animation: synPulse 1.6s ease-in-out infinite;
         }
@@ -110,6 +104,8 @@ export function SynapticLoading({ spaceName, count, totalNodes, engine, quality,
         .syn-n5 { animation-delay: 0.72s; }
 
         .syn-line {
+          stroke: var(--color-accent-green);
+          opacity: 0.3;
           stroke-dasharray: 4 6;
           animation: synLineFlow 2.2s linear infinite;
         }

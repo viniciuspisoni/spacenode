@@ -1,0 +1,92 @@
+{
+ "slug": "animar-casa-concreto-comecou-print",
+ "title": "Isso começou como um print",
+ "pillar": "antes-e-depois",
+ "angle": "Reveal reverso: abrir no vídeo em movimento (câmera entra sob a laje, sol estoura na borda do concreto) e só depois mostrar o render e o print do SketchUp da mesma câmera — a prova vem depois da experiência, e o 'antes' fecha a peça em vez de abri-la.",
+ "format": "video_anuncio",
+ "duration_s": 11,
+ "hook_text": "Isso começou como um print.",
+ "hook_visual": "Vídeo #190 full-bleed 9:16 (recorte central 608×1080 → 1080×1920) desde o frame 0: casa de concreto aparente com laje-pergolado sobre pilares pretos, espelho d'água com luminárias cilíndricas em primeiro plano, passarela de madeira, figura em silhueta no corredor ao fundo. A câmera avança e entre ~1,5s e 2,5s um sol estoura sobre a borda da laje com flare — é o scroll-stop. Headline entra aos 0,5s.",
+ "scenes": [
+  {
+   "t": "0,0–0,5s",
+   "visual": "Vídeo #190 (Veo, 6s, 1920×1080), recorte 9:16 centrado na passarela e na figura. Sem texto.",
+   "text_on_screen": "",
+   "asset_idx": [
+    190
+   ]
+  },
+  {
+   "t": "0,5–3,5s",
+   "visual": "Vídeo continua: push-in pela passarela, sol estoura na borda do concreto (~1,8s), reflexos das luminárias no espelho d'água. Headline no terço central, acima da linha da laje.",
+   "text_on_screen": "Isso começou como um print.",
+   "asset_idx": [
+    190
+   ]
+  },
+  {
+   "t": "3,5–6,0s",
+   "visual": "Câmera passa sob a laje: pilares pretos, vaso com planta à esquerda, deck de madeira, brise ripado à direita, figura caminhando ao fundo. Headline sai em corte aos 3,5s. Clipe termina no frame limpo sob o pergolado.",
+   "text_on_screen": "",
+   "asset_idx": [
+    190
+   ]
+  },
+  {
+   "t": "6,0–7,0s",
+   "visual": "Corte seco para fundo #0a0a0a com o render #463 (1664×640) em recorte 16:9 full-width (1080×608) centrado na passarela — é o mesmo enquadramento do primeiro frame do vídeo (#191 = fonte). Faixa no terço médio.",
+   "text_on_screen": "label: render",
+   "asset_idx": [
+    463
+   ]
+  },
+  {
+   "t": "7,0–7,3s",
+   "visual": "xfade wipeleft 0,3s do render para o print #464 (2207×857), mesmo recorte 16:9: SketchUp cinza com laje, pilares pretos, silhueta preta no corredor, balizadores dourados no espelho d'água, árvores 2D.",
+   "text_on_screen": "label: print do SketchUp",
+   "asset_idx": [
+    463,
+    464
+   ]
+  },
+  {
+   "t": "7,3–9,0s",
+   "visual": "Print #464 parado. Apoio abaixo da faixa.",
+   "text_on_screen": "Render e vídeo gerados em minutos, sobre este print.",
+   "asset_idx": [
+    464
+   ]
+  },
+  {
+   "t": "9,0–11,0s",
+   "visual": "Card final: logo monocromático + CTA.",
+   "text_on_screen": "Teste com um projeto real",
+   "asset_idx": []
+  }
+ ],
+ "assets": [
+  190,
+  463,
+  464
+ ],
+ "cta": "Teste com um projeto real",
+ "caption": "Render e vídeo desta casa saíram do mesmo print do SketchUp, na mesma câmera, em minutos.\n\nCasa de concreto com laje-pergolado e espelho d'água. O render mantém pilares, balizadores e até a pessoa na passarela onde o modelo colocou. O Animar entra pela mesma câmera: avança sob a laje, o sol rasga a borda do concreto, a figura segue no corredor.\n\nSeis segundos de projeto em movimento, sem remodelar nada. Luz e reflexos são interpretação do motor; a geometria é a sua.\n\nTeste com um projeto real — link na bio.\n\n#arquitetura #archviz #sketchup #visualizacaoarquitetonica #render",
+ "hashtags": [
+  "#arquitetura",
+  "#archviz",
+  "#sketchup",
+  "#visualizacaoarquitetonica",
+  "#render"
+ ],
+ "paid": {
+  "primary": "Isso começou como um print do SketchUp. Render e vídeo saíram dele, na mesma câmera, em minutos. Pilares, balizadores e passarela onde o projeto colocou.",
+  "headline": "Do SketchUp ao vídeo, na mesma câmera",
+  "description": "Geometria do seu projeto",
+  "button": "SIGN_UP",
+  "cutdown_note": "Já é ≤15s (11s). Corte de 6s: só o vídeo #190 inteiro com headline aos 0,5s e CTA sobreposto nos 2 últimos segundos, sem a volta ao render/print — o texto primário do anúncio carrega a prova do 'antes'."
+ },
+ "why_converts": "Movimento + sol estourando param o dedo; a headline abre uma pergunta ('começou como um print?') que só o fim do vídeo responde, então a retenção até o CTA é alta. O 'antes' revelado é exatamente o insumo que o público-alvo já tem no computador (print do SketchUp) — a distância entre 'vi' e 'posso fazer' é zero. SIGN_UP porque a primeira metade (print → render) é reproduzível no cadastro grátis; o clipe do motor Cinemático não cabe no saldo inicial, e é isso que a peça vende: o plano é o preço de 'seis segundos que encerram a reunião'.",
+ "production_notes": "Full-bleed no vídeo (upscale 1,78× de 608×1080 — validar nitidez no QA de frames; se ficar mole, cair para faixa 16:9 full-width com fundo desfocado, perdendo impacto) e faixa 16:9 nas duas imagens de prova, como 'documento'. #191 (video_src) é o frame exato de partida do clipe = render #463; o print #464 tem 857px de altura e NÃO aguenta recorte vertical — por isso vai em faixa. O corte do fim do clipe (sob a laje) para o render (câmera aberta) é intencional: o match mental é com o primeiro frame do vídeo, e o label 'render' + wipe para 'print' fazem a leitura. Sem trilha no arquivo. Verde #30d158 opcional na palavra 'minutos' do apoio. Motor: Cinemático (Veo 3.1), clipe de 12/05/2026.",
+ "risks": "O estouro de sol e o flare no meio do clipe são do motor, não do render (o render tem sol alto, o vídeo inventa o estouro na borda) — nunca escrever 'luz igual ao render'. Reflexos no espelho d'água oscilam levemente durante o movimento. A figura é silhueta em contraluz (coerente, sem rosto). O modelo SketchUp parece profissional: confirmar que é do dono ou licenciado antes de publicar. O que o vídeo NÃO pode prometer: que 'nada muda' (luz e sol mudam), vídeo grátis no cadastro com o motor Cinemático, tempo específico além de 'minutos', 4K (é 1080p), câmera final do vídeo igual à do print (só a inicial é).",
+ "gated": ""
+}

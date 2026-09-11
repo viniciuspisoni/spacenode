@@ -9,6 +9,7 @@ import type { ExportFormat } from '@/lib/finalizar/types'
 import { ASPECT_PRESETS } from '@/lib/finalizar/types'
 import type { ExportScale } from '@/lib/finalizar/export'
 import { EXPORT_SCALES, slugify } from '@/lib/finalizar/export'
+import { Sheet } from '@/components/app/glass'
 import { Label, SliderRow, Chip } from '@/components/finalizar/ui'
 
 export interface ExportOptions {
@@ -136,18 +137,12 @@ export function ExportDialog({
     }
   }, [open, defaultName])
 
-  // ESC fecha (enquanto não estiver exportando).
-  useEffect(() => {
-    if (!open) return
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape' && !busy) onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open, busy, onClose])
+  // O ESC e a trava de rolagem do fundo são da <Sheet>; aqui só o guarda de
+  // exportação em curso, que não pode ser interrompida no meio de um lote.
+  const close = () => { if (!busy) onClose() }
 
-  if (!open) return null
-
+  // Sem `if (!open) return null`: a <Sheet> precisa continuar no DOM para
+  // animar a saída — quem esconde é o data-open dela.
   const dims = finalDims(imageWidth, imageHeight, aspectRatio, scale)
 
   async function run() {
@@ -190,195 +185,150 @@ export function ExportDialog({
   }
 
   return (
-    <div
-      onClick={() => { if (!busy) onClose() }}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 95, background: 'var(--color-scrim)',
-        display: 'grid', placeItems: 'center', padding: 24,
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: 'min(460px, 100%)', background: 'var(--color-bg-elevated)',
-          border: '0.5px solid var(--color-border-strong)', borderRadius: 16, overflow: 'hidden',
-        }}
-      >
-        <div style={{ padding: '15px 18px', borderBottom: '0.5px solid var(--color-border)', fontSize: 15, fontWeight: 600 }}>
-          Exportar imagem
-        </div>
-
-        <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 16, maxHeight: '76vh', overflowY: 'auto' }}>
-          {/* Predefinições de saída */}
-          <div>
-            <Label>Predefinições de saída</Label>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {OUTPUT_PRESETS.map((p) => (
-                <Chip key={p.id} active={batchSel.has(p.id)} onClick={() => (batchSel.size > 0 ? toggleBatch(p.id) : applyPreset(p))} title={`${p.hint} — clique para configurar; use o lote abaixo para exportar várias`}>
-                  {p.label}
-                </Chip>
-              ))}
-            </div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, cursor: 'pointer', userSelect: 'none' }}>
-              <input
-                type="checkbox"
-                checked={batchSel.size > 0}
-                onChange={(e) => setBatchSel(e.target.checked ? new Set(OUTPUT_PRESETS.map((p) => p.id)) : new Set())}
-                disabled={busy}
-                style={{ accentColor: 'var(--color-accent-green)', flexShrink: 0 }}
-              />
-              <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
-                Exportar em lote — marque as predefinições desejadas acima
-              </span>
-            </label>
-            {batchSel.size > 0 && (
-              <p style={{ fontSize: 11, color: 'var(--color-text-quaternary)', marginTop: 6, lineHeight: 1.5 }}>
-                {batchSel.size} arquivo{batchSel.size > 1 ? 's' : ''} com sufixo automático
-                (ex.: {(fileName.trim() || slugify(defaultName) || 'composicao')}-instagram.jpg). Os campos abaixo são ignorados no lote.
-              </p>
-            )}
-          </div>
-
-          {/* Formato */}
-          <div style={{ opacity: batchSel.size > 0 ? 0.45 : 1, pointerEvents: batchSel.size > 0 ? 'none' : 'auto' }}>
-            <Label>Formato</Label>
-            <div style={{ display: 'flex', gap: 6 }}>
-              {FORMAT_OPTIONS.map((o) => {
-                const active = format === o.id
-                return (
-                  <button
-                    key={o.id}
-                    type="button"
-                    onClick={() => setFormat(o.id)}
-                    style={{
-                      flex: 1, padding: '10px 8px', borderRadius: 10, fontSize: 13, fontWeight: 500,
-                      border: `0.5px solid ${active ? 'var(--color-border-strong)' : 'var(--color-border)'}`,
-                      background: active ? 'var(--color-surface-hover)' : 'transparent',
-                      color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                      cursor: 'pointer', fontFamily: 'inherit',
-                      transition: 'background var(--duration-fast), border-color var(--duration-fast)',
-                    }}
-                  >
-                    {o.label}
-                    <span style={{ display: 'block', fontSize: 10.5, fontWeight: 400, color: 'var(--color-text-quaternary)', marginTop: 2 }}>
-                      {o.sub}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* Qualidade (só formatos com compressão) */}
-          {(format === 'jpg' || format === 'webp') && batchSel.size === 0 && (
-            <SliderRow
-              label="Qualidade"
-              value={quality}
-              min={50}
-              max={100}
-              onChange={setQuality}
-              defaultValue={92}
-              format={(v) => `${v}%`}
-            />
-          )}
-
-          {/* Resolução */}
-          <div style={{ opacity: batchSel.size > 0 ? 0.45 : 1, pointerEvents: batchSel.size > 0 ? 'none' : 'auto' }}>
-            <Label>Resolução</Label>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {EXPORT_SCALES.map((s) => (
-                <Chip key={s.id} active={scale === s.id} onClick={() => setScale(s.id)}>
-                  {s.label}
-                </Chip>
-              ))}
-            </div>
-            <div style={{ marginTop: 8, fontSize: 11.5, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>
-              {dims.w} × {dims.h} px{dims.upscaled ? ' · ampliada' : ''}
-            </div>
-          </div>
-
-          {/* Proporção */}
-          <div style={{ opacity: batchSel.size > 0 ? 0.45 : 1, pointerEvents: batchSel.size > 0 ? 'none' : 'auto' }}>
-            <Label>Proporção</Label>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              <Chip active={aspectRatio === null} onClick={() => setAspectRatio(null)} title="Mantém o corte do documento">
-                Corte atual
+    <Sheet open={open} title="Exportar imagem" onClose={close} doneLabel="Fechar">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {/* Predefinições de saída */}
+        <div>
+          <Label>Predefinições de saída</Label>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {OUTPUT_PRESETS.map((p) => (
+              <Chip key={p.id} active={batchSel.has(p.id)} onClick={() => (batchSel.size > 0 ? toggleBatch(p.id) : applyPreset(p))} title={`${p.hint} — clique para configurar; use o lote abaixo para exportar várias`}>
+                {p.label}
               </Chip>
-              {ASPECT_OPTIONS.map((p) => (
-                <Chip
-                  key={p.id}
-                  active={aspectRatio === p.ratio}
-                  onClick={() => setAspectRatio(p.ratio)}
-                  title={p.hint}
-                >
-                  {p.label}
-                </Chip>
-              ))}
-            </div>
+            ))}
           </div>
-
-          {/* Nome do arquivo */}
-          <div>
-            <Label>Nome do arquivo</Label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <input
-                type="text"
-                value={fileName}
-                onChange={(e) => setFileName(e.target.value)}
-                disabled={busy}
-                style={{
-                  flex: 1, minWidth: 0, padding: '8px 10px',
-                  background: 'var(--color-input)', border: '1px solid var(--color-input-border)',
-                  borderRadius: 8, fontSize: 12.5, color: 'var(--color-text-primary)',
-                  outline: 'none', fontFamily: 'inherit',
-                }}
-              />
-              <span style={{ fontSize: 12, color: 'var(--color-text-quaternary)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
-                .{format}
-              </span>
-            </div>
-          </div>
-
-          {/* Salvar como versão no projeto */}
-          {canSaveToProject && (
-            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 9, cursor: 'pointer', userSelect: 'none' }}>
-              <input
-                type="checkbox"
-                checked={saveChecked}
-                onChange={(e) => setSaveChecked(e.target.checked)}
-                disabled={busy}
-                style={{ accentColor: 'var(--color-accent-green)', marginTop: 2, flexShrink: 0 }}
-              />
-              <span>
-                <span style={{ display: 'block', fontSize: 13, color: 'var(--color-text-primary)' }}>
-                  Salvar como versão no projeto
-                </span>
-                <span style={{ display: 'block', fontSize: 11, color: 'var(--color-text-quaternary)', marginTop: 2 }}>
-                  A versão aparece no histórico do projeto com data e ajustes.
-                </span>
-              </span>
-            </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, cursor: 'pointer', userSelect: 'none' }}>
+            <input
+              type="checkbox"
+              checked={batchSel.size > 0}
+              onChange={(e) => setBatchSel(e.target.checked ? new Set(OUTPUT_PRESETS.map((p) => p.id)) : new Set())}
+              disabled={busy}
+              style={{ accentColor: 'var(--color-accent-green)', flexShrink: 0 }}
+            />
+            <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
+              Exportar em lote — marque as predefinições desejadas acima
+            </span>
+          </label>
+          {batchSel.size > 0 && (
+            <p style={{ fontSize: 11, color: 'var(--color-text-quaternary)', marginTop: 6, lineHeight: 1.5 }}>
+              {batchSel.size} arquivo{batchSel.size > 1 ? 's' : ''} com sufixo automático
+              (ex.: {(fileName.trim() || slugify(defaultName) || 'composicao')}-instagram.jpg). Os campos abaixo são ignorados no lote.
+            </p>
           )}
+        </div>
 
-          {error && (
-            <div style={{ fontSize: 12.5, color: 'var(--color-error)' }}>{error}</div>
-          )}
-
-          {/* Rodapé */}
-          <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-            <button type="button" className="spn-action spn-action--ghost" onClick={onClose} disabled={busy} style={{ flex: 1 }}>
-              Cancelar
-            </button>
-            <button type="button" className="spn-action spn-action--primary" onClick={run} disabled={busy} style={{ flex: 1 }}>
-              {busy
-                ? batchProgress ? `Exportando ${batchProgress}…` : 'Exportando…'
-                : batchSel.size > 1
-                  ? `Exportar ${batchSel.size} versões`
-                  : batchSel.size === 1 ? 'Exportar 1 versão' : 'Exportar'}
-            </button>
+        {/* Formato */}
+        <div style={{ opacity: batchSel.size > 0 ? 0.45 : 1, pointerEvents: batchSel.size > 0 ? 'none' : 'auto' }}>
+          <Label>Formato</Label>
+          <div className="spn-choices" data-cols="3" role="radiogroup" aria-label="Formato">
+            {FORMAT_OPTIONS.map((o) => (
+              <button key={o.id} type="button" role="radio" className="spn-choice"
+                      aria-checked={format === o.id} onClick={() => setFormat(o.id)}>
+                <b>{o.label}</b>
+                <span>{o.sub}</span>
+              </button>
+            ))}
           </div>
         </div>
+
+        {/* Qualidade (só formatos com compressão) */}
+        {(format === 'jpg' || format === 'webp') && batchSel.size === 0 && (
+          <SliderRow
+            label="Qualidade"
+            value={quality}
+            min={50}
+            max={100}
+            onChange={setQuality}
+            defaultValue={92}
+            format={(v) => `${v}%`}
+          />
+        )}
+
+        {/* Resolução */}
+        <div style={{ opacity: batchSel.size > 0 ? 0.45 : 1, pointerEvents: batchSel.size > 0 ? 'none' : 'auto' }}>
+          <Label>Resolução</Label>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {EXPORT_SCALES.map((s) => (
+              <Chip key={s.id} active={scale === s.id} onClick={() => setScale(s.id)}>
+                {s.label}
+              </Chip>
+            ))}
+          </div>
+          <div style={{ marginTop: 8, fontSize: 11.5, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>
+            {dims.w} × {dims.h} px{dims.upscaled ? ' · ampliada' : ''}
+          </div>
+        </div>
+
+        {/* Proporção */}
+        <div style={{ opacity: batchSel.size > 0 ? 0.45 : 1, pointerEvents: batchSel.size > 0 ? 'none' : 'auto' }}>
+          <Label>Proporção</Label>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <Chip active={aspectRatio === null} onClick={() => setAspectRatio(null)} title="Mantém o corte do documento">
+              Corte atual
+            </Chip>
+            {ASPECT_OPTIONS.map((p) => (
+              <Chip
+                key={p.id}
+                active={aspectRatio === p.ratio}
+                onClick={() => setAspectRatio(p.ratio)}
+                title={p.hint}
+              >
+                {p.label}
+              </Chip>
+            ))}
+          </div>
+        </div>
+
+        {/* Nome do arquivo */}
+        <div>
+          <Label>Nome do arquivo</Label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="text"
+              value={fileName}
+              onChange={(e) => setFileName(e.target.value)}
+              disabled={busy}
+              className="spn-input"
+              style={{ flex: 1, minWidth: 0 }}
+            />
+            <span style={{ fontSize: 12, color: 'var(--color-text-quaternary)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
+              .{format}
+            </span>
+          </div>
+        </div>
+
+        {/* Salvar como versão no projeto */}
+        {canSaveToProject && (
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 9, cursor: 'pointer', userSelect: 'none' }}>
+            <input
+              type="checkbox"
+              checked={saveChecked}
+              onChange={(e) => setSaveChecked(e.target.checked)}
+              disabled={busy}
+              style={{ accentColor: 'var(--color-accent-green)', marginTop: 2, flexShrink: 0 }}
+            />
+            <span>
+              <span style={{ display: 'block', fontSize: 13, color: 'var(--color-text-primary)' }}>
+                Salvar como versão no projeto
+              </span>
+              <span style={{ display: 'block', fontSize: 11, color: 'var(--color-text-quaternary)', marginTop: 2 }}>
+                A versão aparece no histórico do projeto com data e ajustes.
+              </span>
+            </span>
+          </label>
+        )}
+
+        {error && <div className="spn-error">{error}</div>}
+
+        {/* Um CTA primário só: "Cancelar" já é o "Fechar" do cabeçalho da folha. */}
+        <button type="button" className="spn-cta" onClick={run} disabled={busy} style={{ marginTop: 4 }}>
+          {busy
+            ? batchProgress ? `Exportando ${batchProgress}…` : 'Exportando…'
+            : batchSel.size > 1
+              ? `Exportar ${batchSel.size} versões`
+              : batchSel.size === 1 ? 'Exportar 1 versão' : 'Exportar'}
+        </button>
       </div>
-    </div>
+    </Sheet>
   )
 }

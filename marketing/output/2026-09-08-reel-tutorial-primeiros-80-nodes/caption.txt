@@ -1,0 +1,9 @@
+Como começar na SpaceNode: você cria a conta e entra com 80 nodes grátis, sem cartão.
+
+Nodes são os créditos que a plataforma usa para gerar, editar e ampliar. Cada qualidade tem um preço: HD custa 10 nodes, 2K custa 20, 4K custa 40. Ou seja, os 80 nodes de boas-vindas dão 8 renders em HD, ou 4 em 2K.
+
+O render do final saiu de um print de SketchUp, com a mesma câmera do modelo.
+
+Teste com um projeto real — link na bio.
+
+#arquitetura #render #archviz #sketchup #renderizacao #arquiteturabrasileira

@@ -1,0 +1,102 @@
+{
+ "slug": "briefing-fila-ajuste-semana",
+ "title": "Briefing, fila, ajuste, semana",
+ "pillar": "tradicional-vs-spacenode",
+ "angle": "Comparação de processo: render externo, em geral, é briefing → fila → ajuste → semana; aqui é upload → iteração → reunião. A prova é a mesma sala de jantar em quatro acabamentos (mesmo print, mesma câmera), cada um gerado em minutos — o ajuste do cliente deixa de ser uma rodada e vira uma geração. Sem desmerecer renderistas: o assunto é a espera.",
+ "format": "serie",
+ "duration_s": 16,
+ "hook_text": "Render externo, em geral: briefing, fila, ajuste, semana.",
+ "hook_visual": "Print do SketchUp da sala de jantar em modo wireframe (#428): cadeiras pretas em malha de arame, mesa oval preta com linhas de triangulação, tapete com grade, cortinas cinza, forro com luminárias lineares brancas e pendentes pretos — gráfico e imediatamente 'de arquiteto'. Retrato 739x835 exibido inteiro numa faixa 1080x1220 sobre fundo desfocado. Aos 1,4s a régua horizontal revela #429: a mesma sala com mesa de nogueira posta, cadeiras cinza-escuro, cortinas bege e sanca de LED quente.",
+ "scenes": [
+  {
+   "t": "0.0–1.4s",
+   "visual": "#428 (wireframe da sala de jantar) inteiro na faixa 1080x1220, Ken Burns 1.00→1.03, fundo desfocado. Headline sobre scrim no terço superior.",
+   "text_on_screen": "Render externo, em geral: briefing, fila, ajuste, semana.",
+   "asset_idx": [
+    428
+   ]
+  },
+  {
+   "t": "1.4–1.7s",
+   "visual": "Régua horizontal (xfade wipeleft, 0,3s, linear) revela #429 sobre #428. Texto troca em corte.",
+   "text_on_screen": "",
+   "asset_idx": [
+    428,
+    429
+   ]
+  },
+  {
+   "t": "1.7–5.0s",
+   "visual": "#429 (nogueira + sanca quente) inteiro, zoom lento 1.03→1.06.",
+   "text_on_screen": "Aqui: upload, iteração, reunião.",
+   "asset_idx": [
+    429
+   ]
+  },
+  {
+   "t": "5.0–6.5s",
+   "visual": "Corte seco para #431: paredes em cimento queimado, piso porcelanato preto, jardim visível pela porta central, pendentes dourados. Mesma câmera. Apoio entra em 5,0s e fica até 13,5s.",
+   "text_on_screen": "Quatro acabamentos, mesma câmera, cada um em minutos.",
+   "asset_idx": [
+    431
+   ]
+  },
+  {
+   "t": "6.5–8.0s",
+   "visual": "Corte seco para #435: piso de mármore branco polido, mesa de jacarandá com veios fortes, louça preta, cortinas bege, sanca de LED.",
+   "text_on_screen": "Quatro acabamentos, mesma câmera, cada um em minutos.",
+   "asset_idx": [
+    435
+   ]
+  },
+  {
+   "t": "8.0–9.5s",
+   "visual": "Corte seco para #433: piso de madeira escura de alto brilho com reflexos, mesa com tampo em marchetaria, cadeiras em tweed cinza, flores brancas. (É a de maior resolução, 1248x1408.)",
+   "text_on_screen": "Quatro acabamentos, mesma câmera, cada um em minutos.",
+   "asset_idx": [
+    433
+   ]
+  },
+  {
+   "t": "9.5–13.5s",
+   "visual": "Volta para #429 e segura com zoom lento 1.04→1.08 — fecha o ciclo na versão de abertura para reforçar que é a mesma sala.",
+   "text_on_screen": "Quatro acabamentos, mesma câmera, cada um em minutos.",
+   "asset_idx": [
+    429
+   ]
+  },
+  {
+   "t": "13.5–16.0s",
+   "visual": "Card final #0a0a0a com logo monocromático e CTA (sublinhado verde).",
+   "text_on_screen": "Teste com um projeto real",
+   "asset_idx": []
+  }
+ ],
+ "assets": [
+  428,
+  429,
+  431,
+  435,
+  433
+ ],
+ "cta": "Teste com um projeto real",
+ "caption": "Render externo, em geral: briefing, fila, ajuste, semana. Aqui: upload, iteração, reunião.\n\nA mesma sala de jantar, quatro acabamentos: nogueira com sanca quente, cimento queimado, mármore polido, madeira clássica. Mesma câmera, mesmo layout, os mesmos pendentes — só muda o que você pediu.\n\nO que muda de verdade é o processo. Cada ajuste do cliente, em geral, é outra rodada na fila. Aqui é outra geração: minutos, não dias. Não é sobre quem renderiza; é sobre a espera.\n\nVocê chega na reunião com as opções, não com a promessa delas.\n\nTeste com um projeto real — cadastro grátis, sem cartão. Link na bio.\n\n#arquitetura #visualizacaoarquitetonica #designdeinteriores #render #apresentacaodeprojeto",
+ "hashtags": [
+  "#arquitetura",
+  "#visualizacaoarquitetonica",
+  "#designdeinteriores",
+  "#render",
+  "#apresentacaodeprojeto"
+ ],
+ "paid": {
+  "primary": "Render externo, em geral: briefing, fila, ajuste, semana. Aqui: upload, iteração, reunião.\nQuatro acabamentos da mesma sala de jantar, mesma câmera, cada um gerado em minutos. Cadastro grátis, sem cartão.",
+  "headline": "Cada ajuste, em minutos",
+  "description": "Sem fila, sem nova rodada",
+  "button": "SIGN_UP",
+  "cutdown_note": "Versão ≤15s (12s): cena 1 em 1,2s, cena 3 em 2,5s, três acabamentos em 1,3s cada (#431, #435, #433), sem a volta para #429, card CTA de 2s. O apoio 'Quatro acabamentos…' entra junto com o primeiro corte."
+ },
+ "why_converts": "Fala com quem terceiriza render — público de meio de funil com dor concreta: o ajuste do cliente custa uma rodada inteira. As quatro versões em 8 segundos quebram o modelo mental 'cada versão é uma semana' sem precisar de número inventado (o claim é só 'minutos', que é real por geração). O CTA 'Teste com um projeto real' casa com o cadastro grátis: 80 nodes cobrem exatamente quatro gerações Vega 2K (20 nodes cada) — o teste grátis permite reproduzir o que o vídeo mostra. A assinatura entra quando o arquiteto percebe que cada rodada com cliente consome 3–4 gerações: Starter (R$89, 750 nodes) absorve isso num mês por menos, em geral, do que uma imagem terceirizada.",
+ "risks": "O vídeo NÃO pode prometer: que qualquer print gera quatro variações 'perfeitas' de primeira; prazo de terceiros sem 'em geral'; qualidade artística superior a render profissional (a comparação é de processo, não de arte). Não usar #427 na série: a base da mesa mudou de bloco retangular para cilindro canelado (deriva de geometria) — as quatro escolhidas (#429/#431/#435/#433) preservam a base. Em #433 o piso mudou de porcelanato para madeira e em #435 para mármore: são acabamentos pedidos, não erro, mas não dizer 'nada mudou' — dizer 'mesma câmera, mesmo layout'. Cadeiras mudam de tecido entre versões: não escrever 'mesmas cadeiras'. Série de 28/04/2026, vega/2k. Os cinco 'depois' vêm do MESMO arquivo de antes (md5 idêntico em #428/#430/#432/#434/#436) — a régua é honesta.",
+ "production_notes": "Retratos ~0,885:1: #428 739x835, #429/#431/#435 976x1104, #433 1248x1408. Exibir inteiros numa faixa 1080x1220 (sem crop), fundo = imagem desfocada/escurecida; escalar #428 para o quadro de #429 antes do wipe (mesma câmera — alinhar pela mesa). Cortes secos entre acabamentos no beat; sem crossfade (crossfade lê como erro de fidelidade). Texto sempre no terço central, fora das zonas de UI (220px topo / 320px base). Headline ≤8 palavras (a de abertura tem exatamente 8). Verde só no sublinhado do CTA. 1080x1920, 30fps, H.264, sem áudio.",
+ "gated": ""
+}

@@ -51,10 +51,11 @@ export function TopBar(p: Props) {
   const showDot = p.status === 'saved' || p.status === 'autosaved'
 
   return (
-    <header style={{
+    // Chrome fixo sobre o palco: precisa segurar leitura por cima de
+    // qualquer render, então é a variante --chrome e não o vidro padrão.
+    <header className="spn-glass spn-glass--chrome" style={{
       display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
-      borderBottom: '0.5px solid var(--color-border)', flexShrink: 0,
-      background: 'var(--color-bg)',
+      borderWidth: '0 0 0.5px', flexShrink: 0, position: 'relative', zIndex: 2,
     }}>
       <IconBtn onClick={p.onBack} title="Voltar para os projetos" size={32}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
@@ -67,10 +68,10 @@ export function TopBar(p: Props) {
         style={{
           fontSize: 14, fontWeight: 500, letterSpacing: '-0.01em',
           color: 'var(--color-text-primary)', background: 'transparent',
-          border: '0.5px solid transparent', borderRadius: 8, padding: '5px 8px',
+          border: '0.5px solid transparent', borderRadius: 'var(--r-inner)', padding: '5px 8px',
           minWidth: 140, maxWidth: 300, outline: 'none',
         }}
-        onFocus={(e) => (e.target.style.border = '0.5px solid var(--color-border-strong)')}
+        onFocus={(e) => (e.target.style.border = '0.5px solid var(--glass-line-strong)')}
         onBlur={(e) => (e.target.style.border = '0.5px solid transparent')}
       />
 
@@ -81,7 +82,7 @@ export function TopBar(p: Props) {
 
       <div style={{ flex: 1 }} />
       {p.error && (
-        <span style={{ fontSize: 12, color: 'var(--color-error)', maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={p.error}>
+        <span className="spn-error" style={{ maxWidth: 320, padding: '5px 10px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={p.error}>
           {p.error}
         </span>
       )}
@@ -102,14 +103,16 @@ export function TopBar(p: Props) {
         onPointerUp={() => p.onCompare(false)}
         onPointerLeave={() => p.compare && p.onCompare(false)}
         onClick={(e) => e.preventDefault()}
-        title="Segure para ver a imagem sem os ajustes (tecla \)"
+        // "Original" e não "sem os ajustes": desde que a edição por IA passou a
+        // viver na mesma ferramenta, o Antes reverte TAMBÉM as ações de IA — é a
+        // imagem com que a pessoa começou, que é o que ela quer ver.
+        title="Segure para ver a imagem original (tecla \)"
+        className="spn-ghost"
+        aria-pressed={p.compare}
         style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 11px',
-          borderRadius: 8, fontSize: 12, userSelect: 'none',
-          border: '0.5px solid var(--color-border-strong)',
-          background: p.compare ? 'var(--color-surface-hover)' : 'transparent',
-          color: p.compare ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-          cursor: 'pointer', whiteSpace: 'nowrap',
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          color: p.compare ? 'var(--color-text-primary)' : undefined,
+          userSelect: 'none', whiteSpace: 'nowrap',
         }}
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 3v18" /></svg>
@@ -168,12 +171,13 @@ export function TopBar(p: Props) {
 
       <Divider vertical />
 
-      <button type="button" className="spn-action spn-action--ghost" onClick={p.onSave} disabled={p.saving}
-        style={{ width: 'auto', padding: '8px 14px', fontSize: 12.5 }} title="Salvar projeto (Ctrl+S)">
+      <button type="button" className="spn-ghost" onClick={p.onSave} disabled={p.saving}
+        title="Salvar projeto (Ctrl+S)">
         {p.saving ? 'Salvando…' : 'Salvar'}
       </button>
-      <button type="button" className="spn-action spn-action--primary" onClick={p.onExport}
-        style={{ width: 'auto', padding: '8px 16px', fontSize: 12.5 }} title="Exportar imagem (Ctrl+E)">
+      {/* O único CTA primário do editor. */}
+      <button type="button" className="spn-cta" onClick={p.onExport}
+        style={{ width: 'auto', minHeight: 34, padding: '0 18px' }} title="Exportar imagem (Ctrl+E)">
         Exportar
       </button>
     </header>
@@ -182,9 +186,9 @@ export function TopBar(p: Props) {
 
 export function StatusStrip({ hint }: { hint: string | null }) {
   return (
-    <div style={{
+    <div className="spn-glass spn-glass--chrome" style={{
       display: 'flex', alignItems: 'center', gap: 12, padding: '5px 14px',
-      borderTop: '0.5px solid var(--color-border)', flexShrink: 0,
+      borderWidth: '0.5px 0 0', flexShrink: 0,
       fontSize: 11, color: 'var(--color-text-quaternary)', minHeight: 26,
     }}>
       {hint}

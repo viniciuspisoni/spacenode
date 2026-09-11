@@ -254,7 +254,7 @@ function GalleryStep({ gallery, onPick }: {
                 padding: 0, cursor: 'pointer', textAlign: 'left',
                 transition: 'transform 0.18s, border-color 0.18s, box-shadow 0.18s',
               }}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = 'rgba(29,158,117,0.5)' }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = 'var(--color-accent-green-border)' }}
               onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'var(--color-border)' }}
             >
               <div style={{
@@ -264,12 +264,11 @@ function GalleryStep({ gallery, onPick }: {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={r.output_url} alt={r.ambient ?? ''}
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                <div style={{
+                <div className="spn-glass spn-glass--raised" style={{
                   position: 'absolute', top: 8, left: 8,
                   display: 'inline-flex', alignItems: 'center', gap: 6,
-                  padding: '4px 8px', borderRadius: 5,
-                  background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)',
-                  fontSize: 9, fontWeight: 600, color: '#fff',
+                  padding: '4px 8px', borderRadius: 999,
+                  fontSize: 9, fontWeight: 600, color: 'var(--color-text-primary)',
                   letterSpacing: '0.06em', textTransform: 'uppercase',
                 }}>
                   {ENGINES[r.engine].name}
@@ -350,26 +349,20 @@ function ConfigStep(props: {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={render.output_url} alt=""
           style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        <div style={{
+        <div className="spn-glass spn-glass--raised" style={{
           position: 'absolute', top: 14, left: 14,
           display: 'inline-flex', alignItems: 'center', gap: 6,
-          padding: '5px 10px', borderRadius: 4,
-          background: 'rgba(29,158,117,0.18)', color: '#46d191',
+          padding: '5px 10px', borderRadius: 999,
+          color: 'var(--color-accent-green)',
           fontSize: 9, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase',
-          backdropFilter: 'blur(8px)',
-          border: '0.5px solid rgba(29,158,117,0.3)',
         }}>
           ✦ origem: Renderizar
         </div>
         <button
+          type="button"
           onClick={onChangeRender}
-          style={{
-            position: 'absolute', top: 14, right: 14,
-            padding: '6px 12px', borderRadius: 6,
-            background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)',
-            border: '0.5px solid rgba(255,255,255,0.18)',
-            color: '#fff', fontSize: 11, cursor: 'pointer',
-          }}
+          className="spn-ghost"
+          style={{ position: 'absolute', top: 14, right: 14 }}
         >
           Trocar render
         </button>
@@ -468,8 +461,8 @@ function ConfigStep(props: {
           <div>
             <div style={{
               padding: '10px 14px', borderRadius: 8, marginBottom: 10,
-              background: 'rgba(186,117,23,0.10)', border: '0.5px solid rgba(186,117,23,0.3)',
-              fontSize: 11, color: '#e0a766', lineHeight: 1.55,
+              background: 'var(--color-warning-bg)', border: '0.5px solid var(--color-warning-border)',
+              fontSize: 11, color: 'var(--color-warning)', lineHeight: 1.55,
             }}>
               ⚠ Trocar o motor exige re-extração de DNA. A render herda o motor
               de origem por padrão pra manter coerência visual.
@@ -500,7 +493,7 @@ function ConfigStep(props: {
                     <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary)' }}>
                       {cfg.name}
                       {eId === inheritedEngine && (
-                        <span style={{ fontSize: 9, color: '#46d191', marginLeft: 6 }}>(herdado)</span>
+                        <span style={{ fontSize: 9, color: 'var(--color-accent-green)', marginLeft: 6 }}>(herdado)</span>
                       )}
                     </span>
                   </button>
@@ -521,15 +514,7 @@ function ConfigStep(props: {
         )}
       </Section>
 
-      {error && (
-        <div style={{
-          padding: '10px 14px', borderRadius: 8, marginTop: 16,
-          background: 'rgba(163,45,45,0.12)', border: '0.5px solid rgba(163,45,45,0.3)',
-          color: '#e57373', fontSize: 13,
-        }}>
-          {error}
-        </div>
-      )}
+      {error && <div className="spn-error" style={{ marginTop: 16 }}>{error}</div>}
 
       <div style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -541,18 +526,10 @@ function ConfigStep(props: {
         <button
           onClick={onConfirm}
           disabled={!name.trim() || balanceShort || submitting}
-          className="spn-action"
-          style={{
-            width: 'auto', minWidth: 240, padding: '12px 24px',
-            background: '#1D9E75', color: '#042818',
-            border: '0.5px solid rgba(0,0,0,0.18)',
-            opacity: !name.trim() || balanceShort ? 0.5 : 1,
-            boxShadow: name.trim() && !balanceShort
-              ? 'inset 0 1px 0 rgba(255,255,255,0.18), 0 8px 24px rgba(29,158,117,0.18)'
-              : 'none',
-          }}
+          className="spn-cta"
+          style={{ width: 'auto', minWidth: 240 }}
         >
-          {submitting ? 'Criando…' : `Extrair DNA · ${DNA_EXTRACTION_COST} nodes →`}
+          {submitting ? 'Criando…' : <>Extrair DNA <span className="spn-cta-meta">{DNA_EXTRACTION_COST} nodes</span></>}
         </button>
       </div>
     </>
@@ -574,11 +551,11 @@ function RevealStep({ dna, render, onLock, submitting, error }: {
         <div style={{
           display: 'inline-flex', alignItems: 'center', gap: 8,
           padding: '5px 11px', borderRadius: 999,
-          background: 'rgba(29,158,117,0.14)', color: '#46d191',
+          background: 'var(--color-accent-green-bg)', color: 'var(--color-accent-green)',
           fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase',
           marginBottom: 14,
         }}>
-          <span style={{ width: 6, height: 6, borderRadius: 999, background: '#46d191' }} />
+          <span style={{ width: 6, height: 6, borderRadius: 999, background: 'var(--color-accent-green)' }} />
           DNA verificado · origem: Renderizar
         </div>
         <h1 style={{
@@ -606,15 +583,7 @@ function RevealStep({ dna, render, onLock, submitting, error }: {
 
       <DnaPanel dna={dna} variant="reveal" />
 
-      {error && (
-        <div style={{
-          marginTop: 16, padding: '10px 14px', borderRadius: 8,
-          background: 'rgba(163,45,45,0.12)', border: '0.5px solid rgba(163,45,45,0.3)',
-          color: '#e57373', fontSize: 13,
-        }}>
-          {error}
-        </div>
-      )}
+      {error && <div className="spn-error" style={{ marginTop: 16 }}>{error}</div>}
 
       <div style={{
         display: 'flex', justifyContent: 'flex-end', alignItems: 'center',
@@ -623,13 +592,8 @@ function RevealStep({ dna, render, onLock, submitting, error }: {
         <button
           onClick={onLock}
           disabled={submitting}
-          className="spn-action"
-          style={{
-            width: 'auto', minWidth: 240, padding: '12px 24px',
-            background: '#1D9E75', color: '#042818',
-            border: '0.5px solid rgba(0,0,0,0.18)',
-            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18), 0 8px 24px rgba(29,158,117,0.18)',
-          }}
+          className="spn-cta"
+          style={{ width: 'auto', minWidth: 240 }}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 8 }}>
             <rect x="4" y="11" width="16" height="10" rx="1.5"/>

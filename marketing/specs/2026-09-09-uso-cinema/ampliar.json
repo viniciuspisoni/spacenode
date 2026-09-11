@@ -1,0 +1,84 @@
+{
+  "_nota": [
+    "PORTE do reel de uso do Ampliar (specs/2026-09-09-uso/ampliar.json) para a gramática do",
+    "filme 'antes da primeira imagem.'. As cenas, a ordem e os recortes vêm auditados de lá:",
+    "as capturas 02/03/04 são o MESMO arquivo (md5 5424f215...), só recortado em alturas",
+    "diferentes do painel de 1800×2800.",
+    "O que muda é a língua: chapa clara #FAFAFA em todas as telas de produto, banda em vez de",
+    "recorte (contain + inset 0), texto em tema claro sobre a chapa, cartelas 'line' em",
+    "minúsculas com ponto final, entrada e saída em fade, câmera parada em tudo que é prova.",
+    "Uma única palavra verde na peça inteira: o {80} da cartela final."
+  ],
+  "slug": "2026-09-09-reel-uso-ampliar-cinema",
+  "frame": { "w": 1080, "h": 1920 },
+
+  "segments": [
+    { "_cena": "O render aprovado, inteiro. Banda 16:9 sobre a chapa clara — é o arquivo que vai entrar no Ampliar, e o único plano da peça com movimento.",
+      "type": "still", "src": "$REPO/marketing/renders/depois/casa.jpg",
+      "dur": 3.0, "fit": "contain", "inset": 0, "bg": "light", "zoom": [1, 1.03] },
+
+    { "_cena": "Estado vazio do Ampliar: 'Arraste ou clique para enviar / PNG, JPG, WEBP — até 20 MB'. A tela faz o claim do formato sozinha, a cartela não repete.",
+      "type": "still", "src": "$REPO/marketing/output/2026-09-08-tutoriais/src/ampliar/01-entrada-vazia.png",
+      "crop": [185, 265, 830, 545], "dur": 2.4, "fit": "contain", "inset": 0, "bg": "light", "zoom": [1, 1] },
+
+    { "_cena": "Mesmo recorte com o arquivo dentro: o render da cena 0 vira miniatura e o app escreve 2784×1536px · JPG · 1.7 MB. O wipe entre as duas é o upload.",
+      "type": "still", "src": "$REPO/marketing/output/2026-09-08-tutoriais/src/ampliar/02-imagem-carregada.png",
+      "crop": [185, 265, 830, 545], "dur": 2.1, "fit": "contain", "inset": 0, "bg": "light", "zoom": [1, 1] },
+
+    { "_cena": "Caixa verde de recomendação. O verde já está na interface — por isso nenhuma cartela desta peça usa a palavra verde.",
+      "type": "still", "src": "$REPO/marketing/output/2026-09-08-tutoriais/src/ampliar/03-recomendacao.png",
+      "crop": [185, 875, 830, 175], "dur": 2.0, "fit": "contain", "inset": 0, "bg": "light", "zoom": [1, 1] },
+
+    { "_cena": "MODO: os dois cartões, Alta Fidelidade marcado. Câmera parada: a cartela paráfrasea o texto que está na tela e o leitor confere.",
+      "type": "still", "src": "$REPO/marketing/output/2026-09-08-tutoriais/src/ampliar/04-modo-alta-fidelidade.png",
+      "crop": [185, 1060, 830, 395], "dur": 2.3, "fit": "contain", "inset": 0, "bg": "light", "zoom": [1, 1] },
+
+    { "_cena": "ESCALA: 2× / 4× / 8× (Ultra travado). Os números da cartela são os que estão nos botões.",
+      "type": "still", "src": "$REPO/marketing/output/2026-09-08-tutoriais/src/ampliar/04-modo-alta-fidelidade.png",
+      "crop": [185, 1750, 830, 245], "dur": 2.0, "fit": "contain", "inset": 0, "bg": "light", "zoom": [1, 1] },
+
+    { "_cena": "Linha de custo do rodapé. O recorte para em x=690 de propósito: o 'Saldo: … Nodes' começa em x=780 e não pode aparecer (BRIEF §6). Aqui NÃO uso `nativo`: medido, 500×74 em escala 1:1 dentro de 1080 vira texto ilegível no celular — ver nota no retorno.",
+      "type": "still", "src": "$REPO/marketing/output/2026-09-08-tutoriais/src/ampliar/02-imagem-carregada.png",
+      "crop": [190, 2596, 500, 74], "dur": 1.8, "fit": "contain", "inset": 0, "bg": "light", "zoom": [1, 1] },
+
+    { "_cena": "O botão, em escala 1:1. 830×138 dentro de 1080 lê como software, e é a última coisa antes da marca. Sem cartela: o botão fala.",
+      "type": "still", "src": "$REPO/marketing/output/2026-09-08-tutoriais/src/ampliar/02-imagem-carregada.png",
+      "crop": [185, 2662, 830, 138], "dur": 1.3, "fit": "contain", "nativo": true, "bg": "light", "zoom": [1, 1] },
+
+    { "type": "card", "card": "final", "dur": 2.2, "bg": "light" }
+  ],
+
+  "transitions": [
+    { "type": "dissolve", "dur": 0.5 },
+    { "type": "wipeleft", "dur": 0.3 },
+    { "type": "cut" },
+    { "type": "cut" },
+    { "type": "cut" },
+    { "type": "cut" },
+    { "type": "cut" },
+    { "type": "dissolve", "dur": 0.5 }
+  ],
+
+  "cards": {
+    "a": { "layout": "line", "theme": "light", "anchor": "bottom", "eyebrow": "ampliar",
+           "big": "esse render já foi aprovado.", "small": "[gerar de novo devolve outra imagem.]", "px": 62 },
+    "b": { "layout": "line", "theme": "light", "anchor": "bottom", "big": "você só sobe o arquivo.", "px": 64 },
+    "c": { "layout": "line", "theme": "light", "anchor": "bottom", "big": "ele lê a resolução.", "px": 64 },
+    "d": { "layout": "line", "theme": "light", "anchor": "bottom", "big": "e recomenda o modo<br>[para esta imagem.]", "px": 62 },
+    "e": { "layout": "line", "theme": "light", "anchor": "bottom", "big": "alta fidelidade preserva<br>[geometria, materiais e luz.]", "px": 58 },
+    "f": { "layout": "line", "theme": "light", "anchor": "bottom", "big": "2×, 4× ou 8× do original.", "px": 62 },
+    "g": { "layout": "line", "theme": "light", "anchor": "bottom", "big": "o custo aparece<br>[antes do clique.]", "px": 62 },
+    "final": { "layout": "final", "theme": "light", "cta": "Testar grátis", "micro": "{80} nodes grátis · sem cartão · spacenode.app" }
+  },
+
+  "_overlays_nota": "Tempos GLOBAIS do --plan. Cada cartela entra depois que a imagem se estabeleceu e sai antes do corte seguinte, para nenhum texto ser atravessado por transição.",
+  "overlays": [
+    { "card": "a", "from": 0.30,  "to": 2.45,  "fade": 0.4 },
+    { "card": "b", "from": 2.95,  "to": 4.55,  "fade": 0.4 },
+    { "card": "c", "from": 4.95,  "to": 6.65,  "fade": 0.4 },
+    { "card": "d", "from": 6.90,  "to": 8.65,  "fade": 0.4 },
+    { "card": "e", "from": 8.90,  "to": 10.95, "fade": 0.4 },
+    { "card": "f", "from": 11.20, "to": 12.95, "fade": 0.4 },
+    { "card": "g", "from": 13.20, "to": 14.75, "fade": 0.4 }
+  ]
+}

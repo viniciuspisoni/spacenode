@@ -1,0 +1,87 @@
+{
+  "slug": "2026-09-04-reel-pisca-fachada-geminada-ad",
+  "reel": "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-pisca-fachada-geminada-ad\\2026-09-04-reel-pisca-fachada-geminada-ad.mp4",
+  "banda": "1080×810 @ y=556",
+  "segments": [
+    {
+      "i": 0,
+      "type": "still",
+      "dur": 1,
+      "start": 0,
+      "crop": "1567×857 → 1143×857"
+    },
+    {
+      "i": 1,
+      "type": "still",
+      "dur": 0.8,
+      "start": 1,
+      "crop": "2784×1536 → 2048×1536"
+    },
+    {
+      "i": 2,
+      "type": "still",
+      "dur": 0.6,
+      "start": 1.8,
+      "crop": "1567×857 → 1143×857"
+    },
+    {
+      "i": 3,
+      "type": "still",
+      "dur": 0.5,
+      "start": 2.4,
+      "crop": "2784×1536 → 2048×1536"
+    },
+    {
+      "i": 4,
+      "type": "still",
+      "dur": 0.4,
+      "start": 2.9,
+      "crop": "1567×857 → 1143×857"
+    },
+    {
+      "i": 5,
+      "type": "still",
+      "dur": 0.3,
+      "start": 3.3,
+      "crop": "2784×1536 → 2048×1536"
+    },
+    {
+      "i": 6,
+      "type": "still",
+      "dur": 0.3,
+      "start": 3.6,
+      "crop": "1567×857 → 1143×857"
+    },
+    {
+      "i": 7,
+      "type": "still",
+      "dur": 2.1,
+      "start": 3.9,
+      "crop": "2784×1536 → 2048×1536"
+    }
+  ],
+  "width": 1080,
+  "height": 1920,
+  "fps": "30/1",
+  "pix_fmt": "yuv420p",
+  "codec": "h264",
+  "duration": "6.00",
+  "sizeMB": "1.97",
+  "esperado": {
+    "width": 1080,
+    "height": 1920,
+    "fps": "30/1",
+    "duration": "6.00"
+  },
+  "qaFrames": [
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-pisca-fachada-geminada-ad\\qa-frames\\t0.50s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-pisca-fachada-geminada-ad\\qa-frames\\t1.40s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-pisca-fachada-geminada-ad\\qa-frames\\t2.10s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-pisca-fachada-geminada-ad\\qa-frames\\t3.75s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-pisca-fachada-geminada-ad\\qa-frames\\t4.10s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-pisca-fachada-geminada-ad\\qa-frames\\t4.70s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-pisca-fachada-geminada-ad\\qa-frames\\t5.00s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-pisca-fachada-geminada-ad\\qa-frames\\t5.90s.png"
+  ],
+  "qaSheet": "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-pisca-fachada-geminada-ad\\qa-sheet.jpg"
+}
