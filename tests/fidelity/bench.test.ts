@@ -20,7 +20,10 @@
 //   FIDELITY_BENCH=1 BENCH_ENGINE=orion-sunburst \
 //     npx vitest run tests/fidelity/bench.test.ts
 //   BENCH_ENGINE aceita orion-sunburst | orion-flare; BENCH_ORION_QUALITY
-//   escolhe high (default) ou medium; ORION_IMAGE_PROVIDER=fal troca a rota.
+//   escolhe high (default) ou medium; BENCH_RESOLUTION=4k mede o preset 4K
+//   (3840 no lado maior — teto real da Image API, não os 4096 px do "4K" de
+//   Vega/Pulsar); qualquer outro valor cai em 2K. ORION_IMAGE_PROVIDER=fal
+//   troca a rota.
 //   Rodar as quatro células — orion-sunburst, orion-flare, quasar, vega — com
 //   os MESMOS inputs dá a tabela de comparação (o last-run.json guarda
 //   tokens e custo estimado por caso).
@@ -112,10 +115,10 @@ function benchCell(): BenchCell {
 }
 
 function benchResolution(cell: BenchCell): Resolution {
-  // Orion só roda 2K no piloto.
-  if (cell.kind === 'orion') return '2k'
   const raw = process.env.BENCH_RESOLUTION
   const res = isResolution(raw) ? raw : '2k'
+  // Orion só roda 2K/4K no piloto — HD cai pra 2K.
+  if (cell.kind === 'orion') return res === '4k' ? '4k' : '2k'
   return ENGINES[cell.engine].resolutions.includes(res) ? res : '2k'
 }
 
@@ -191,7 +194,7 @@ describe.runIf(BENCH_ON)('fidelity bench (API real — FIDELITY_BENCH=1)', () =>
     if (cell.kind === 'orion') {
       const provider = orionProvider()
       const quality = benchOrionQuality()
-      const size = orionTargetSize(meta.width ?? null, meta.height ?? null)
+      const size = orionTargetSize(meta.width ?? null, meta.height ?? null, resolution === '4k' ? '4k' : '2k')
       // Rota direta: data: URL basta (fetchStorageBytes aceita e o corpo vai
       // em bytes) — sem FAL_KEY. Rota fal: a fal precisa BUSCAR a imagem.
       const mime = meta.format === 'png' ? 'image/png' : 'image/jpeg'

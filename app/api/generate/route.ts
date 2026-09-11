@@ -27,14 +27,13 @@ import {
 } from '@/lib/engines'
 import { falParamsForEngine } from '@/lib/ai/engine-params'
 import {
+  DEFAULT_ORION_QUALITY,
+  DEFAULT_ORION_VARIANT,
   ORION_CONFIG,
   ORION_MODELS,
-  ORION_NODES_COST,
-  isOrionQuality,
+  getOrionNodesCost,
   isOrionResolution,
-  isOrionVariant,
   isRenderEngineId,
-  orionResolutionOrDefault,
   orionSizeParam,
   orionTargetSize,
   type OrionQuality,
@@ -249,8 +248,6 @@ export async function POST(req: NextRequest) {
       seed: providedSeed,
       edgeMapKey,
       modelFacts: rawModelFacts,
-      orionVariant: rawOrionVariant,
-      orionQuality: rawOrionQuality,
     } = body as {
       imageBase64?:    string
       sourceKey?:      string
@@ -282,10 +279,6 @@ export async function POST(req: NextRequest) {
       edgeMapKey?:      string
       /** Fatos medidos do modelo 3D (câmera/sol) — sanitizados abaixo. */
       modelFacts?:      unknown
-      /** Piloto Orion (equipe interna): variante e qualidade do GPT Image 2.5.
-       *  Validados por lista fechada e só depois da autorização. */
-      orionVariant?:    unknown
-      orionQuality?:    unknown
     }
 
     // Fidelidade é SEMPRE máxima. Os níveis "Equilibrado"/"Criativo" foram
@@ -320,30 +313,23 @@ export async function POST(req: NextRequest) {
     //
     // Vale pra TODA entrada capaz de executar Orion — browser, Bearer do
     // plugin, requisição forjada, config antiga salva no perfil ou reuso de
-    // render. Nada do que o cliente manda (custo, endpoint, permissão) é
-    // levado em conta: a decisão é do servidor.
-    let orionVariant: OrionVariant = 'sunburst'
-    let orionQuality: OrionQuality = 'high'
+    // render. Variante e qualidade não são mais escolha do cliente: o
+    // servidor sempre usa Flare/high (ver lib/orion/config) — nada do que o
+    // cliente manda (custo, endpoint, permissão) é levado em conta.
+    const orionVariant: OrionVariant = DEFAULT_ORION_VARIANT
+    const orionQuality: OrionQuality = DEFAULT_ORION_QUALITY
     if (isOrion) {
-      if (!(await canUseOrion(admin, { id: user.id, email: user.email }))) {
-        // 404: pra quem não é da equipe, o motor simplesmente não existe.
-        console.warn('[generate] orion recusado (flag desligada ou usuário sem acesso interno)')
+      if (!(await canUseOrion({ id: user.id, email: user.email }))) {
+        // 404: com a flag desligada, o motor simplesmente não existe.
+        console.warn('[generate] orion recusado (flag desligada)')
         return NextResponse.json({ error: 'Engine inválida ou ausente.' }, { status: 404 })
-      }
-      if (rawOrionVariant !== undefined && !isOrionVariant(rawOrionVariant)) {
-        return NextResponse.json({ error: 'Variante Orion inválida.' }, { status: 400 })
-      }
-      if (rawOrionQuality !== undefined && !isOrionQuality(rawOrionQuality)) {
-        return NextResponse.json({ error: 'Qualidade Orion inválida.' }, { status: 400 })
       }
       if (!isOrionResolution(resolution)) {
         return NextResponse.json(
-          { error: `Combinação inválida: ${ORION_CONFIG.name} só roda em 2K no piloto.` },
+          { error: `Combinação inválida: ${ORION_CONFIG.name} só roda em 2K ou 4K.` },
           { status: 400 },
         )
       }
-      if (isOrionVariant(rawOrionVariant)) orionVariant = rawOrionVariant
-      if (isOrionQuality(rawOrionQuality)) orionQuality = rawOrionQuality
     } else if (!isValidCombination(engine, resolution)) {
       return NextResponse.json(
         { error: `Combinação inválida: ${ENGINES[engine].name} não suporta ${resolution.toUpperCase()}.` },
@@ -351,10 +337,11 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Custo: Orion é teste interno e não cobra — a decisão acontece AQUI, no
-    // servidor, depois da autorização. Motores públicos seguem a tabela
-    // comercial de lib/engines, intocada.
-    nodesToCharge = isOrion ? ORION_NODES_COST : getNodesCost(engine, resolution)
+    // Custo: Orion cobra nodes como os motores públicos (tabela em
+    // lib/orion/config, decidida em 2026-09-11 a partir do custo real medido
+    // contra a OpenAI). A decisão acontece AQUI, no servidor, depois da
+    // autorização — o cliente nunca manda o preço.
+    nodesToCharge = isOrion ? getOrionNodesCost(resolution as '2k' | '4k') : getNodesCost(engine, resolution)
     const falEndpoint = isOrion ? null : getFalEndpoint(engine)
 
     // ── Aquisição + normalização do input ANTES do débito ────────────────────
@@ -394,12 +381,6 @@ export async function POST(req: NextRequest) {
     // consume_nodes_v2 debita do plano primeiro, depois de Lumens FIFO. Falha
     // por exception com SQLSTATE específico — P0001 = saldo insuficiente
     // (mapeado para 402); resto vira 500.
-
-    // Orion (0 nodes): não debita NEM refunda — nada de débito fictício
-    // seguido de estorno. O saldo do usuário fica literalmente inalterado.
-    if (nodesToCharge === 0) {
-      console.log('[generate] orion: teste interno — 0 nodes, sem débito e sem refund')
-    }
 
     const { data: debitData, error: debitError } = nodesToCharge > 0
       ? await admin.rpc('consume_workspace_nodes', {
@@ -668,12 +649,15 @@ export async function POST(req: NextRequest) {
     const attemptLogs: FidelityAttemptLog[] = []
 
     // Orion: dimensão EXPLÍCITA derivada do aspecto do original (nunca 'auto',
-    // nunca upscale silencioso). Reusa o `sourceSize` que a rota já calcula pra
-    // faixa barata do Seedream. Pedido e entregue vão os dois pro generation_log.
+    // nunca upscale silencioso), no preset (2K/4K) escolhido. Reusa o
+    // `sourceSize` que a rota já calcula pra faixa barata do Seedream. Pedido e
+    // entregue vão os dois pro generation_log.
+    // Cast seguro: isOrion só chega aqui depois de isOrionResolution(resolution)
+    // validado lá em cima — resolution só pode ser '2k'|'4k'.
     const orionSize = orionTargetSize(
       sourceSize?.width ?? null,
       sourceSize?.height ?? null,
-      orionResolutionOrDefault(resolution),
+      isOrion ? (resolution as '2k' | '4k') : '2k',
     )
     let orionGen: OrionGenerateResult | null = null
     if (isOrion) {
@@ -1069,10 +1053,6 @@ export async function POST(req: NextRequest) {
       // Fase 2 do plugin SketchUp: telemetria do condicionamento nativo.
       edge_map_native: edgeMapNative || undefined,
       model_facts:     options.modelFacts ?? undefined,
-      // Piloto Orion: marcador dentro do snapshot também, pra que "Reutilizar
-      // configuração" no Histórico não ressuscite Orion pra quem perdeu o
-      // acesso — a rota re-checa canUseOrion de qualquer jeito.
-      internal_test:   isOrion || undefined,
       orion:           isOrion
         ? { variant: orionVariant, quality: orionQuality, provider: orionGen?.provider ?? orionProvider() }
         : undefined,
@@ -1110,12 +1090,10 @@ export async function POST(req: NextRequest) {
       user_prompt:  refinementText?.trim() || null,
       duration_ms:  generationDurationMs,
       retry_count:  retryCount,
-      // Marcador interno (migration 20260910120000): gravado pelo SERVIDOR a
-      // partir do motor que REALMENTE rodou — o cliente não manda esse campo.
-      // A CHECK da migration exige is_internal_test=true em toda linha 'orion'
-      // (com nodes_charged=0 e 2K), então nem um bug de código consegue gravar
-      // uma geração do piloto como se fosse comercial.
-      is_internal_test: isOrion,
+      // Orion cobra nodes normalmente desde 2026-09-11 — nunca é teste
+      // interno por si só. A coluna (migration 20260910120000) segue existindo
+      // pra uso futuro de QA interna gratuita; nenhum motor grava true hoje.
+      is_internal_test: false,
       generation_log: {
         provider:       gen.provider,
         provider_model: gen.providerModel,
@@ -1217,18 +1195,8 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (insertResult.error && (insertResult.error.code === 'PGRST204' || insertResult.error.code === '42703')) {
-      if (isOrion) {
-        // Nada de regravar sem o marcador: uma linha 'orion' sem
-        // is_internal_test é exatamente o que a migration existe pra impedir.
-        console.error(
-          '[generate] orion: colunas do piloto ausentes — aplique supabase/migrations/' +
-          '20260910120000_renders_orion_internal_test.sql antes de rodar o teste interno:',
-          insertResult.error.message,
-        )
-      } else {
-        console.warn('[generate] colunas de metadados ausentes — regravando com colunas base:', insertResult.error.message)
-        insertResult = await admin.from('renders').insert(baseRow).select('id').single()
-      }
+      console.warn('[generate] colunas de metadados ausentes — regravando com colunas base:', insertResult.error.message)
+      insertResult = await admin.from('renders').insert(baseRow).select('id').single()
     }
 
     const renderId = insertResult.data?.id ?? null
@@ -1301,10 +1269,9 @@ export async function POST(req: NextRequest) {
       // Seed usada (caminho GCP) — o client reenvia no "Corrigir drift" pra
       // manter a mesma amostra e mudar só o condicionamento.
       seed:             generationSeed,
-      // Piloto Orion: o resultado precisa dizer com quem foi gerado. Só o que
-      // a equipe interna precisa ver — sem tokens, custo ou prompt (isso mora
-      // no Diagnóstico técnico do Histórico, atrás de isInternalStaff).
-      internalTest: isOrion || undefined,
+      // Orion: o resultado precisa dizer com quem foi gerado e o que saiu de
+      // fato — sem tokens, custo ou prompt (isso mora no Diagnóstico técnico
+      // do Histórico, atrás de isInternalStaff).
       orion: isOrion && orionGen
         ? {
             provider: orionGen.provider,

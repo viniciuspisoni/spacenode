@@ -10,8 +10,14 @@
 // lê env privada nem importa nada de servidor. A escolha de fornecedor
 // (ORION_IMAGE_PROVIDER) vive em lib/orion/provider.ts, que é server-only.
 //
-// Piloto: 2K ou 4K, uma imagem por solicitação, ZERO nodes — a decisão de não
-// cobrar acontece no SERVIDOR, depois da autorização (app/api/generate/route.ts).
+// Motor público (2026-09-11): 2K ou 4K, uma imagem por solicitação, cobrando
+// nodes como Vega/Pulsar/Quasar (ver ORION_NODES abaixo). Variante e
+// qualidade não são mais escolha do usuário — o servidor sempre usa Flare
+// (empiricamente mais rápida, mesma tarifa e fidelidade estatisticamente
+// igual à Sunburst — ver docs/ORION-PILOTO-2026-09-10.md §3) em qualidade
+// `high` (única testada com variância aceitável). 4K é 4K UHD (3840 no lado
+// maior, teto real da Image API) — não os 4096 px do rótulo "4K" de
+// Vega/Pulsar.
 
 import { ENGINES, isEngineId, type EngineId, type Resolution } from '@/lib/engines'
 
@@ -30,9 +36,14 @@ export const ORION_MODELS: Record<OrionVariant, string> = {
 export const ORION_VARIANT_ORDER: OrionVariant[] = ['sunburst', 'flare']
 export const ORION_QUALITY_ORDER: OrionQuality[] = ['high', 'medium']
 
-export const DEFAULT_ORION_VARIANT: OrionVariant = 'sunburst'
-/** `high` é o padrão do piloto; `medium` é a alternativa de comparação.
- *  `auto` NUNCA é usado — o teste precisa saber o que pediu. */
+/** Flare: mesma tarifa da Sunburst, ~9s mais rápida e sem diferença de
+ *  fidelidade que se sustente estatisticamente (n=24, Δ cruza zero — ver
+ *  docs/ORION-PILOTO-2026-09-10.md §3). Único valor usado — não há mais
+ *  seletor de variante na UI. */
+export const DEFAULT_ORION_VARIANT: OrionVariant = 'flare'
+/** `high` é o único valor usado em produção — `medium` desaba no pior caso
+ *  (amplitude 3× maior, ver mesma doc). `auto` NUNCA é usado — precisa saber
+ *  o que foi pedido pra registrar custo e dimensão corretamente. */
 export const DEFAULT_ORION_QUALITY: OrionQuality = 'high'
 
 export const ORION_VARIANT_LABEL: Record<OrionVariant, string> = {
@@ -45,47 +56,54 @@ export const ORION_QUALITY_LABEL: Record<OrionQuality, string> = {
   medium: 'Média',
 }
 
-/** Custo do piloto: zero nodes, sempre. Motores públicos preservam a tabela
- *  comercial de lib/engines — nada aqui os toca. */
-export const ORION_NODES_COST = 0
+/** Preço em nodes por resolução — calculado contra o custo real medido (US$
+ *  0,04–0,09/imagem em 2K, US$ 0,07–0,14 em 4K, pior caso = retrato) e o piso
+ *  de receita por node (Studio, R$0,0997; legado Office anual, R$0,0729).
+ *  Margem no pior caso medido: 66–90% nos dois pisos — larga folga acima dos
+ *  50% mínimos usados no Animar. Mesmo valor por MP que Vega (2k=20, 4k=40),
+ *  o que já é conservador porque o Orion é bem mais barato de gerar. */
+export const ORION_NODES: Record<'2k' | '4k', number> = {
+  '2k': 20,
+  '4k': 40,
+}
 
 export const ORION_CONFIG = {
   id:          'orion' as const,
   name:        'Orion',
   tagline:     'Experimental',
-  description: 'Teste interno de geração e preservação do projeto. Não cobra nodes.',
+  description: 'Motor de alta fidelidade e resposta rápida do Renderizar.',
   resolutions: ['2k', '4k'] as Resolution[],
-  nodes:       { '2k': ORION_NODES_COST, '4k': ORION_NODES_COST } as Partial<Record<Resolution, number>>,
+  nodes:       { '2k': ORION_NODES['2k'], '4k': ORION_NODES['4k'] } as Partial<Record<Resolution, number>>,
 }
 
-// ── Dimensões explícitas do preset 2K ────────────────────────────────────────
+/** Espelha getNodesCost() de lib/engines — mesma forma, catálogo separado. */
+export function getOrionNodesCost(resolution: '2k' | '4k'): number {
+  return ORION_NODES[resolution]
+}
+
+// ── Dimensões explícitas dos presets 2K/4K ───────────────────────────────────
 //
 // A Image API da OpenAI aceita `size` = 'auto' | preset | 'LARGURAxALTURA' com
 // os dois lados múltiplos de 16, aspecto entre 1:3 e 3:1 e no máximo 3840 px
 // por lado (doc de 2026-09-10). O piloto NUNCA manda 'auto': a comparação
 // precisa saber a dimensão pedida, e o histórico registra a ENTREGUE.
 //
-// Mapeamento do "2K" do SpaceNode: lado maior 2048 px (mesmo nominal do '2K'
-// de Vega/Pulsar), lado menor derivado do aspecto do original e arredondado
-// PRA CIMA no múltiplo de 16 — arredondar pra cima só reduz o aspecto, então
-// o teto de 3:1 nunca é estourado pelo arredondamento.
+// Mapeamento do SpaceNode: lado maior 2048 (2K, mesmo nominal do '2K' de
+// Vega/Pulsar) ou 3840 (4K — TETO por lado da Image API; a OpenAI não chega
+// nos 4096 px do "4K" de Vega/Pulsar, então isso é 4K UHD, não o mesmo
+// rótulo). Lado menor derivado do aspecto do original e arredondado PRA CIMA
+// no múltiplo de 16 — arredondar pra cima só reduz o aspecto, então o teto de
+// 3:1 nunca é estourado pelo arredondamento.
 
 export const ORION_LONG_EDGE_2K = 2048
-/** 3840 é o TETO por lado da Image API — não dá pra alcançar os 4096 do "4K"
- *  de Vega/Pulsar. 3840 no lado maior é o 4K UHD (3840×2160 em 16:9). */
 export const ORION_LONG_EDGE_4K = 3840
-const OPENAI_MAX_EDGE = 3840
-const OPENAI_MIN_EDGE = 512
-const OPENAI_MAX_ASPECT = 3
-
-/** Lado maior por preset. ATENÇÃO ao custo: a Image API cobra por token de
- *  saída, que sobe com o número de PIXELS — e como fixamos o lado MAIOR, um
- *  4K em retrato tem muito mais pixel (e custa muito mais) que um 4K em
- *  paisagem. Ver docs/ORION-PILOTO-2026-09-10.md. */
 export const ORION_LONG_EDGE: Record<'2k' | '4k', number> = {
   '2k': ORION_LONG_EDGE_2K,
   '4k': ORION_LONG_EDGE_4K,
 }
+const OPENAI_MAX_EDGE = 3840
+const OPENAI_MIN_EDGE = 512
+const OPENAI_MAX_ASPECT = 3
 
 export interface OrionSize {
   width:  number
@@ -98,14 +116,15 @@ export interface OrionSize {
 const ceil16  = (n: number) => Math.max(16, Math.ceil(n / 16) * 16)
 const floor16 = (n: number) => Math.max(16, Math.floor(n / 16) * 16)
 
-/** Dimensões explícitas do preset para um original de `width`×`height`.
- *  Preserva a proporção; sem dimensões, cai no quadrado do preset (nunca 'auto'). */
+/** Dimensões explícitas do preset (2K ou 4K) para um original de
+ *  `width`×`height`. Preserva a proporção; sem dimensões, cai no quadrado do
+ *  preset pedido (nunca 'auto'). Default '2k' — ninguém paga 4K sem pedir. */
 export function orionTargetSize(
   width: number | null | undefined,
   height: number | null | undefined,
-  resolution: '2k' | '4k' = '2k',
+  preset: '2k' | '4k' = '2k',
 ): OrionSize {
-  const longEdge = ORION_LONG_EDGE[resolution] ?? ORION_LONG_EDGE_2K
+  const longEdge = ORION_LONG_EDGE[preset]
   if (!width || !height || width <= 0 || height <= 0) {
     return { width: longEdge, height: longEdge, source: 'fallback' }
   }
@@ -122,8 +141,8 @@ export function orionTargetSize(
     h = long
     w = ceil16(long * clamped)
   }
-  // Guardas defensivas: com o lado maior no teto (3840) e aspecto ≤ 3:1 o
-  // lado menor cai em [1280, 3840]; nenhuma delas dispara nos presets atuais.
+  // Guardas defensivas: com lado maior 2048/3840 e aspecto ≤ 3:1 o lado menor
+  // nunca dispara — ficam pra caso o preset mude.
   w = Math.min(OPENAI_MAX_EDGE, Math.max(OPENAI_MIN_EDGE, w))
   h = Math.min(OPENAI_MAX_EDGE, Math.max(OPENAI_MIN_EDGE, h))
   w = w > OPENAI_MAX_EDGE ? floor16(OPENAI_MAX_EDGE) : ceil16(w)
@@ -166,15 +185,9 @@ export function isOrionProvider(value: unknown): value is OrionProvider {
   return value === 'openai' || value === 'fal'
 }
 
-/** Resoluções liberadas no piloto. O servidor recusa qualquer outra — HD não
- *  entra: 1024 px de lado maior não é entrega de apresentação. */
-export function isOrionResolution(value: unknown): value is Resolution {
+/** Resolução liberada no piloto. O servidor recusa qualquer outra. */
+export function isOrionResolution(value: unknown): value is '2k' | '4k' {
   return value === '2k' || value === '4k'
-}
-
-/** Estreita a Resolution do catálogo pro par que o preset de tamanho conhece. */
-export function orionResolutionOrDefault(value: unknown): '2k' | '4k' {
-  return value === '4k' ? '4k' : '2k'
 }
 
 export function getRenderEngineConfig(engine: RenderEngineId) {

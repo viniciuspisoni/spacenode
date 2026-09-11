@@ -61,12 +61,12 @@ export default async function GeneratePage({
 
   const renderCount = await renderCountPromise
 
-  // Piloto Orion: mesmo gate da API (ORION_INTERNAL_ENABLED + isInternalStaff).
+  // Orion: mesmo gate da API (ORION_INTERNAL_ENABLED + usuário autenticado).
   // Checado AQUI, no servidor — o client só recebe um booleano já decidido, e
   // a rota /api/generate re-valida em toda geração. Sem credencial do
   // fornecedor ativo o card nem aparece: ofereceria uma geração que falharia.
   const orionAllowed =
-    (await canUseOrion(admin, { id: user.id, email: user.email })) && orionProviderReady()
+    (await canUseOrion({ id: user.id, email: user.email })) && orionProviderReady()
 
   return (
     <GenerateClient

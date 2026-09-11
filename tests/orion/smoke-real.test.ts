@@ -12,17 +12,19 @@
 // Uso:
 //   ORION_SMOKE=1 npx vitest run tests/orion/smoke-real.test.ts
 //
-//   ORION_SMOKE_VARIANT   sunburst (default) | flare
-//   ORION_SMOKE_QUALITY   high (default) | medium
-//   ORION_SMOKE_RESOLUTION 2k (default) | 4k  — 4k = lado maior 3840 (teto da API)
-//   ORION_SMOKE_INPUT     caminho da imagem base (default _batch_base.jpg)
-//   ORION_SMOKE_OUT       diretório de saída (default o diretório atual)
-//   ORION_IMAGE_PROVIDER  openai (default) | fal
+//   ORION_SMOKE_VARIANT    sunburst (default) | flare
+//   ORION_SMOKE_QUALITY    high (default) | medium
+//   ORION_SMOKE_RESOLUTION 2k (default) | 4k — 4K é 3840 no lado maior, teto
+//                          real da Image API (não os 4096 px do "4K" de
+//                          Vega/Pulsar)
+//   ORION_SMOKE_INPUT      caminho da imagem base (default _batch_base.jpg)
+//   ORION_SMOKE_OUT        diretório de saída (default o diretório atual)
+//   ORION_IMAGE_PROVIDER   openai (default) | fal
 //
 // A chave sai do .env.local (o vitest não carrega .env sozinho) e NUNCA é
 // impressa. A saída vai como data: URL — sem Storage, sem Supabase.
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { buildFidelityPrompt, type GenerateOptions } from '@/lib/prompts'
@@ -40,18 +42,15 @@ describe.runIf(SMOKE_ON)('Orion · smoke real (ORION_SMOKE=1 — chamada paga)',
 
     const variant = isOrionVariant(process.env.ORION_SMOKE_VARIANT) ? process.env.ORION_SMOKE_VARIANT : 'sunburst'
     const quality = isOrionQuality(process.env.ORION_SMOKE_QUALITY) ? process.env.ORION_SMOKE_QUALITY : 'high'
+    const resolution = process.env.ORION_SMOKE_RESOLUTION?.trim().toLowerCase() === '4k' ? '4k' : '2k'
     const inputPath = process.env.ORION_SMOKE_INPUT ?? join(process.cwd(), '_batch_base.jpg')
     const outDir = process.env.ORION_SMOKE_OUT ?? process.cwd()
-    // Diretório pedido por env pode não existir — criar antes, senão a geração
-    // (que JÁ foi paga) se perde no writeFileSync.
-    mkdirSync(outDir, { recursive: true })
 
     expect(existsSync(inputPath), `imagem de entrada não encontrada: ${inputPath}`).toBe(true)
     const inputBuf = readFileSync(inputPath)
 
     const sharp = (await import('sharp')).default
     const meta = await sharp(inputBuf).metadata()
-    const resolution: '2k' | '4k' = process.env.ORION_SMOKE_RESOLUTION === '4k' ? '4k' : '2k'
     const size = orionTargetSize(meta.width ?? null, meta.height ?? null, resolution)
 
     // MESMO prompt da produção (Máxima, sem briefing — o smoke mede o motor).
@@ -81,13 +80,13 @@ describe.runIf(SMOKE_ON)('Orion · smoke real (ORION_SMOKE=1 — chamada paga)',
       prompt,
       imageUrls: [inputUrl],
       timeoutMs: 240_000,
-      context: `smoke:${variant}:${quality}`,
+      context: `smoke:${variant}:${quality}:${resolution}`,
       deliver: { kind: 'dataUrl' },
     })
     const wallMs = Date.now() - started
 
     const outBuf = Buffer.from(gen.images[0].url.slice(gen.images[0].url.indexOf(',') + 1), 'base64')
-    const outPath = join(outDir, `_orion_${variant}_${quality}.png`)
+    const outPath = join(outDir, `_orion_${variant}_${quality}_${resolution}.png`)
     writeFileSync(outPath, outBuf)
 
     const geometry = await computeGeometryScore(inputBuf, outBuf)
@@ -95,7 +94,7 @@ describe.runIf(SMOKE_ON)('Orion · smoke real (ORION_SMOKE=1 — chamada paga)',
     const delivered = gen.deliveredSize ? `${gen.deliveredSize.width}x${gen.deliveredSize.height}` : 'desconhecida'
 
     console.log(
-      `\n[orion:smoke] ${variant}/${quality} via ${gen.provider} (${gen.providerModel})\n` +
+      `\n[orion:smoke] ${variant}/${quality}/${resolution} via ${gen.provider} (${gen.providerModel})\n` +
       `  entrada    : ${meta.width}x${meta.height}\n` +
       `  pedido     : ${orionSizeParam(size)} (${size.source})\n` +
       `  entregue   : ${delivered}\n` +
@@ -123,6 +122,7 @@ describe.runIf(SMOKE_ON)('Orion · smoke real (ORION_SMOKE=1 — chamada paga)',
       model: gen.providerModel,
       variant,
       quality,
+      resolution,
       qualityReported: gen.qualityReported,
       input: `${meta.width}x${meta.height}`,
       requestedSize: orionSizeParam(size),

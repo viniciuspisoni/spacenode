@@ -7,9 +7,10 @@
 import { describe, expect, it } from 'vitest'
 import { ENGINE_ORDER, ENGINES, isEngineId } from '@/lib/engines'
 import {
-  ORION_CONFIG, ORION_LONG_EDGE_2K, ORION_MODELS, ORION_NODES_COST,
+  DEFAULT_ORION_QUALITY, DEFAULT_ORION_VARIANT,
+  ORION_CONFIG, ORION_LONG_EDGE_2K, ORION_LONG_EDGE_4K, ORION_MODELS, ORION_NODES,
   ORION_QUALITY_ORDER, ORION_VARIANT_ORDER,
-  ORION_LONG_EDGE_4K, orionResolutionOrDefault,
+  getOrionNodesCost,
   isInternalRenderRow,
   isOrionProvider, isOrionQuality, isOrionResolution, isOrionVariant, isRenderEngineId,
   orionSizeParam, orionTargetSize, parseOrionSizeParam,
@@ -48,10 +49,17 @@ describe('catálogo do piloto', () => {
     })
   })
 
-  it('2K e 4K, zero nodes nos dois', () => {
+  it('2K e 4K, preço público (2026-09-11)', () => {
     expect(ORION_CONFIG.resolutions).toEqual(['2k', '4k'])
-    expect(ORION_CONFIG.nodes).toEqual({ '2k': 0, '4k': 0 })
-    expect(ORION_NODES_COST).toBe(0)
+    expect(ORION_CONFIG.nodes).toEqual({ '2k': 20, '4k': 40 })
+    expect(ORION_NODES).toEqual({ '2k': 20, '4k': 40 })
+    expect(getOrionNodesCost('2k')).toBe(20)
+    expect(getOrionNodesCost('4k')).toBe(40)
+  })
+
+  it('Flare é o default (mais rápida, mesma tarifa, fidelidade equivalente à Sunburst)', () => {
+    expect(DEFAULT_ORION_VARIANT).toBe('flare')
+    expect(DEFAULT_ORION_QUALITY).toBe('high')
   })
 
   it('listas fechadas de variante, qualidade, fornecedor e resolução', () => {
@@ -74,10 +82,13 @@ describe('catálogo do piloto', () => {
     expect(isOrionResolution('2k')).toBe(true)
     expect(isOrionResolution('4k')).toBe(true)
     expect(isOrionResolution('hd')).toBe(false)
+    for (const bad of ['HD', '2K', '', null, undefined, 1]) {
+      expect(isOrionResolution(bad), JSON.stringify(bad)).toBe(false)
+    }
   })
 })
 
-describe('preset 2K → dimensão explícita', () => {
+describe('preset 2K/4K → dimensão explícita', () => {
   const LIMITS = { minEdge: 512, maxEdge: 3840, maxAspect: 3 }
 
   function assertValidForOpenAi(w: number, h: number) {
@@ -89,13 +100,17 @@ describe('preset 2K → dimensão explícita', () => {
     expect(aspect, `aspecto ${w}x${h}`).toBeLessThanOrEqual(LIMITS.maxAspect)
   }
 
-  it('preserva a proporção com lado maior 2048', () => {
+  it('2K é o default quando o preset não é passado', () => {
+    expect(orionTargetSize(1920, 1080)).toEqual(orionTargetSize(1920, 1080, '2k'))
+  })
+
+  it('preserva a proporção com lado maior 2048 (2K)', () => {
     const cases: [number, number][] = [
       [1920, 1080], [3840, 2160], [4000, 3000], [1000, 1000],
       [1080, 1920], [2400, 1600], [1600, 2400], [5000, 2500],
     ]
     for (const [w, h] of cases) {
-      const size = orionTargetSize(w, h)
+      const size = orionTargetSize(w, h, '2k')
       assertValidForOpenAi(size.width, size.height)
       expect(Math.max(size.width, size.height)).toBe(ORION_LONG_EDGE_2K)
       // Proporção preservada dentro do erro do arredondamento de 16 px.
@@ -106,24 +121,47 @@ describe('preset 2K → dimensão explícita', () => {
     }
   })
 
-  it('aspecto extremo é cortado no limite do fornecedor, não rejeitado', () => {
-    for (const [w, h] of [[6000, 1000], [1000, 6000]] as [number, number][]) {
-      const size = orionTargetSize(w, h)
+  it('preserva a proporção com lado maior 3840 (4K — teto real da Image API)', () => {
+    const cases: [number, number][] = [
+      [1920, 1080], [3840, 2160], [4000, 3000], [1000, 1000],
+      [1080, 1920], [2400, 1600], [1600, 2400], [5000, 2500],
+    ]
+    for (const [w, h] of cases) {
+      const size = orionTargetSize(w, h, '4k')
       assertValidForOpenAi(size.width, size.height)
-      expect(size.source).toBe('clamped')
+      expect(Math.max(size.width, size.height)).toBe(ORION_LONG_EDGE_4K)
+      const before = w / h
+      const after = size.width / size.height
+      expect(Math.abs(after - before) / before, `${w}x${h}`).toBeLessThan(0.02)
+      expect(size.source).toBe('aspect')
     }
   })
 
-  it('sem dimensões cai no quadrado 2K — nunca "auto"', () => {
+  it('aspecto extremo é cortado no limite do fornecedor, não rejeitado (2K e 4K)', () => {
+    for (const preset of ['2k', '4k'] as const) {
+      for (const [w, h] of [[6000, 1000], [1000, 6000]] as [number, number][]) {
+        const size = orionTargetSize(w, h, preset)
+        assertValidForOpenAi(size.width, size.height)
+        expect(size.source).toBe('clamped')
+      }
+    }
+  })
+
+  it('sem dimensões cai no quadrado do preset pedido — nunca "auto"', () => {
     for (const bad of [[null, null], [0, 100], [100, 0], [undefined, undefined]] as [number | null | undefined, number | null | undefined][]) {
-      const size = orionTargetSize(bad[0], bad[1])
-      expect(size).toEqual({ width: 2048, height: 2048, source: 'fallback' })
-      expect(orionSizeParam(size)).not.toBe('auto')
+      const size2k = orionTargetSize(bad[0], bad[1], '2k')
+      expect(size2k).toEqual({ width: 2048, height: 2048, source: 'fallback' })
+      expect(orionSizeParam(size2k)).not.toBe('auto')
+
+      const size4k = orionTargetSize(bad[0], bad[1], '4k')
+      expect(size4k).toEqual({ width: 3840, height: 3840, source: 'fallback' })
+      expect(orionSizeParam(size4k)).not.toBe('auto')
     }
   })
 
   it('orionSizeParam usa o formato LARGURAxALTURA da Image API', () => {
     expect(orionSizeParam(orionTargetSize(1920, 1080))).toBe('2048x1152')
+    expect(orionSizeParam(orionTargetSize(1920, 1080, '4k'))).toBe('3840x2160')
   })
 
   it('parseOrionSizeParam devolve null (não zero) pro que não entende', () => {
@@ -161,34 +199,5 @@ describe('isInternalRenderRow — bloqueio de promoção pro Spaces', () => {
     expect(isInternalRenderRow({ engine: 'vega', config_snapshot: { internal_test: 1 } })).toBe(false)
     // …mas o motor 'orion' sozinho já basta.
     expect(isInternalRenderRow({ engine: 'orion', is_internal_test: false })).toBe(true)
-  })
-})
-
-describe('preset 4K (teto de 3840 px por lado da Image API)', () => {
-  it('lado maior 3840 — não os 4096 do "4K" de Vega/Pulsar', () => {
-    expect(ORION_LONG_EDGE_4K).toBe(3840)
-    const s = orionTargetSize(1920, 1080, '4k')
-    expect(orionSizeParam(s)).toBe('3840x2160')   // 4K UHD exato em 16:9
-  })
-
-  it('4K tem ~3,5× os pixels do 2K em qualquer aspecto', () => {
-    for (const [w, h] of [[2207, 857], [1920, 1080], [1280, 1600], [1000, 1000]] as [number, number][]) {
-      const a = orionTargetSize(w, h, '2k')
-      const b = orionTargetSize(w, h, '4k')
-      const ratio = (b.width * b.height) / (a.width * a.height)
-      expect(ratio, `${w}x${h}`).toBeGreaterThan(3.3)
-      expect(ratio, `${w}x${h}`).toBeLessThan(3.7)
-      // Continua válido pro fornecedor: múltiplo de 16 e dentro do teto.
-      expect(b.width % 16).toBe(0)
-      expect(b.height % 16).toBe(0)
-      expect(Math.max(b.width, b.height)).toBeLessThanOrEqual(3840)
-    }
-  })
-
-  it('default continua 2K — quem não pede resolução não paga 4K sem querer', () => {
-    expect(orionTargetSize(1920, 1080)).toEqual(orionTargetSize(1920, 1080, '2k'))
-    expect(orionResolutionOrDefault(undefined)).toBe('2k')
-    expect(orionResolutionOrDefault('hd')).toBe('2k')
-    expect(orionResolutionOrDefault('4k')).toBe('4k')
   })
 })

@@ -24,22 +24,19 @@ import {
   Segmented, PillGroup, MultiPillGroup, ChoiceGroup, RowIcon, useAmbient,
 } from '@/components/app/glass'
 import {
-  ORION_CONFIG, ORION_LONG_EDGE, ORION_NODES_COST,
-  ORION_QUALITY_LABEL, ORION_QUALITY_ORDER,
-  ORION_VARIANT_LABEL, ORION_VARIANT_ORDER,
-  DEFAULT_ORION_QUALITY, DEFAULT_ORION_VARIANT,
-  type OrionProvider, type OrionQuality, type OrionVariant, type RenderEngineId,
+  ORION_CONFIG, ORION_LONG_EDGE, getOrionNodesCost,
+  type OrionProvider, type OrionVariant, type RenderEngineId,
 } from '@/lib/orion/config'
 
 interface GenerateClientProps {
   /** Saldo total da bolsa (mensais + extras) — mesmo pool que o débito consome. */
   initialCredits:    number
-  /** Piloto interno Orion liberado pra ESTE usuário. Decidido no servidor
-   *  (page.tsx: ORION_INTERNAL_ENABLED + isInternalStaff + credencial do
-   *  fornecedor); aqui só governa a exibição. A rota /api/generate re-valida
-   *  em toda geração — este booleano não autoriza nada. */
+  /** Motor Orion liberado pra ESTE usuário. Decidido no servidor (page.tsx:
+   *  ORION_INTERNAL_ENABLED + credencial do fornecedor); aqui só governa a
+   *  exibição. A rota /api/generate re-valida em toda geração — este booleano
+   *  não autoriza nada. */
   orionEnabled?:     boolean
-  /** Fornecedor ativo do piloto (env privada do servidor) — exibição apenas. */
+  /** Fornecedor ativo do Orion (env privada do servidor) — exibição apenas. */
   orionProvider?:    OrionProvider
   initialMaterials?: ProjectMaterials
   initialConfig?:    ProjectConfig | null
@@ -85,9 +82,7 @@ interface GenerateResult {
   semanticWarning?: boolean
   /** Seed usada na geração (caminho GCP) — reenviada no "Corrigir drift". */
   seed?: number
-  /** true quando a geração foi do piloto interno (Orion) — 0 nodes. */
-  internalTest?: boolean
-  /** Identidade real do piloto na entrega: com quem foi gerado e o que saiu. */
+  /** Identidade real do Orion na entrega: com quem foi gerado e o que saiu. */
   orion?: {
     provider:      OrionProvider
     variant:       OrionVariant
@@ -301,15 +296,13 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
   // ── Parâmetros técnicos
   const geometryLock = 85
   const fidelityMode = 'strict' as const
-  // RenderEngineId (não EngineId): 'orion' só existe no Renderizar e só pra
-  // equipe interna. resolveInitialConfig nunca devolve 'orion' — config salva
-  // não ressuscita o piloto pra quem perdeu o acesso.
+  // RenderEngineId (não EngineId): 'orion' vive fora do catálogo público.
+  // resolveInitialConfig nunca devolve 'orion' — config salva não ressuscita
+  // o Orion sozinha (a rota re-checa canUseOrion de qualquer jeito).
   const [selectedEngine,     setSelectedEngine]     = useState<RenderEngineId>(init.selectedEngine)
   const isOrion = selectedEngine === 'orion'
-  const [orionVariant, setOrionVariant] = useState<OrionVariant>(DEFAULT_ORION_VARIANT)
-  const [orionQuality, setOrionQuality] = useState<OrionQuality>(DEFAULT_ORION_QUALITY)
   // Último motor PÚBLICO escolhido — é ele que vai pro profiles.project_config
-  // (o piloto não pode virar default compartilhado com Spaces/plugin/Nodi).
+  // (Orion não pode virar default compartilhado com Spaces/plugin/Nodi).
   const lastPublicEngineRef = useRef<EngineId>(init.selectedEngine)
   const [selectedResolution, setSelectedResolution] = useState<Resolution>(init.selectedResolution)
 
@@ -478,7 +471,12 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
   // ── Cascade: engine → resolução suportada
   const handleEngineChange = (eid: RenderEngineId) => {
     setSelectedEngine(eid)
-    if (eid === 'orion') { setSelectedResolution('2k'); return }
+    // Orion oferece 2K e 4K — se a resolução atual for HD (só Pulsar tem),
+    // cai pra 2K como nos demais.
+    if (eid === 'orion') {
+      if (!ORION_CONFIG.resolutions.includes(selectedResolution)) setSelectedResolution('2k')
+      return
+    }
     lastPublicEngineRef.current = eid
     // Se a resolução atual não é suportada, cai pra 2K.
     if (!ENGINES[eid].resolutions.includes(selectedResolution)) {
@@ -709,10 +707,6 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
           geometryLock,
           fidelityMode,
           engine:        selectedEngine,
-          // Piloto interno: variante e qualidade viajam só quando Orion está
-          // selecionado. O servidor valida por lista fechada — e antes disso
-          // re-checa a autorização; mandar isso sem acesso não muda nada.
-          ...(isOrion ? { orionVariant, orionQuality } : {}),
           resolution:    resolutionOverride ?? selectedResolution,
           materials:     Object.values(materials).some(v => v) ? materials : undefined,
           materialRefs:  materialRefEntries.length > 0 ? materialRefEntries : undefined,
@@ -885,7 +879,9 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
   // ORION_CONFIG expõe name/description/resolutions/nodes com a MESMA forma do
   // catálogo público — folha e resumo não precisam saber a diferença.
   const currentEngine = isOrion ? ORION_CONFIG : ENGINES[selectedEngine]
-  const nodeCost      = isOrion ? ORION_NODES_COST : getNodesCost(selectedEngine, selectedResolution)
+  const nodeCost      = isOrion
+    ? getOrionNodesCost(selectedResolution === '4k' ? '4k' : '2k')
+    : getNodesCost(selectedEngine, selectedResolution)
   const segments      = getSegments(projectType)
   const environments  = getEnvironments(projectType, segment)
   const lightingOpts  = getLighting(projectType, segment)
@@ -895,7 +891,8 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
   const noNodes       = credits < nodeCost
   // Quantos renders o saldo total cobre na config atual — recalcula client-side
   // a cada troca de motor/qualidade e após cada geração (credits é estado).
-  // Orion custa 0: a divisão sairia Infinity, então o contador não se aplica.
+  // Guarda do zero: nenhum motor custa 0 hoje, mas a divisão sairia Infinity
+  // se um dia voltar a custar — aí o contador simplesmente não se aplica.
   const rendersAfford = nodeCost > 0 ? Math.floor(credits / nodeCost) : null
 
   // Melhor combinação motor × resolução que ainda cabe no saldo — a saída
@@ -1265,11 +1262,9 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
               {lastOrion && (
                 <div className="spn-glass" style={S.nextStep}>
                   <span style={{ display: 'grid', gap: 2 }}>
-                    <b style={{ fontSize: 12, fontWeight: 560 }}>Orion · Experimental — teste interno (0 nodes)</b>
+                    <b style={{ fontSize: 12, fontWeight: 560 }}>Orion</b>
                     <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
                       {lastOrion.provider === 'fal' ? 'fal.ai' : 'OpenAI'}
-                      {' · '}{ORION_VARIANT_LABEL[lastOrion.variant]}
-                      {' · qualidade '}{lastOrion.quality}
                       {' · '}{lastOrion.deliveredSize ?? 'dimensão não informada'}
                       {lastOrion.deliveredSize && lastOrion.deliveredSize !== lastOrion.requestedSize
                         ? ` (pedido ${lastOrion.requestedSize})`
@@ -1279,9 +1274,9 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
                 </div>
               )}
 
-              {/* Resultado do piloto não vira projeto: a decisão olha o motor
-                  do RESULTADO, não o card selecionado agora. O servidor recusa
-                  igual (409 em /api/spaces/from-render). */}
+              {/* Resultado do Orion ainda não vira projeto: a decisão olha o
+                  motor do RESULTADO, não o card selecionado agora. O servidor
+                  recusa igual (409 em /api/spaces/from-render). */}
               {lastRenderId && !lastOrion && (
                 <Link
                   href={`/app/spaces/new/from-render?render_id=${lastRenderId}`}
@@ -1496,7 +1491,9 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
                 value: eid as RenderEngineId,
                 title: ENGINES[eid].name,
               })),
-              // Piloto interno: só existe quando o servidor autorizou.
+              // Orion: só existe quando o servidor autorizou (flag +
+              // credencial do fornecedor). Fora do catálogo público de
+              // lib/engines, que é compartilhado com Spaces/plugin/Nodi.
               ...(orionEnabled
                 ? [{ value: 'orion' as RenderEngineId, title: ORION_CONFIG.name, note: ORION_CONFIG.tagline }]
                 : []),
@@ -1505,40 +1502,13 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
           <p className="spn-hint">{currentEngine.description}</p>
         </div>
 
+        {/* Variante e qualidade não são mais escolha do usuário: o servidor
+            sempre usa Flare/high (ver lib/orion/config). Resta a nota do que
+            o motor ainda não faz. */}
         {orionEnabled && isOrion && (
-          <>
-            <div className="spn-field">
-              <span className="spn-field-label">Variante</span>
-              <ChoiceGroup
-                label="Variante"
-                cols={2}
-                value={orionVariant}
-                onChange={setOrionVariant}
-                options={ORION_VARIANT_ORDER.map(v => ({
-                  value: v,
-                  title: ORION_VARIANT_LABEL[v],
-                  note:  v === DEFAULT_ORION_VARIANT ? 'padrão do teste' : 'comparação',
-                }))}
-              />
-            </div>
-            <div className="spn-field">
-              <span className="spn-field-label">Qualidade do motor</span>
-              <ChoiceGroup
-                label="Qualidade do motor"
-                cols={2}
-                value={orionQuality}
-                onChange={setOrionQuality}
-                options={ORION_QUALITY_ORDER.map(q => ({
-                  value: q,
-                  title: ORION_QUALITY_LABEL[q],
-                  note:  q === DEFAULT_ORION_QUALITY ? 'padrão do teste' : 'alternativa',
-                }))}
-              />
-              <p className="spn-hint">
-                Fornecedor {orionProvider === 'fal' ? 'fal.ai' : 'OpenAI'} · o resultado não vira projeto no Spaces.
-              </p>
-            </div>
-          </>
+          <p className="spn-hint">
+            Fornecedor {orionProvider === 'fal' ? 'fal.ai' : 'OpenAI'} · o resultado ainda não vira projeto no Spaces.
+          </p>
         )}
         <div className="spn-field">
           <span className="spn-field-label">Qualidade</span>
@@ -1550,9 +1520,7 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
             <p className="spn-hint" style={{ marginTop: 0 }}>
               <b style={{ color: 'var(--color-text-primary)', fontWeight: 560 }}>
                 {selectedResolution.toUpperCase()}
-                {isOrion
-                  ? ' · teste interno, 0 nodes'
-                  : ` · ${currentEngine.nodes[selectedResolution] ?? 0} nodes`}
+                {` · ${currentEngine.nodes[selectedResolution] ?? 0} nodes`}
               </b>
               {' — '}{RESOLUTION_DESC[selectedResolution]}
               {' · única resolução do '}{currentEngine.name}
@@ -1567,10 +1535,11 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
                 options={currentEngine.resolutions.map(res => ({
                   value: res,
                   title: res.toUpperCase(),
-                  // No piloto os dois custam 0 nodes — repetir "0 nodes" nos dois
-                  // cartões não informa nada. O que difere é o tamanho entregue.
+                  // Orion: o "4K" dele é UHD (3840 no lado maior, teto da Image
+                  // API), não os 4096 px de Vega/Pulsar — por isso o tamanho
+                  // entregue aparece junto do preço.
                   note:  isOrion
-                    ? `lado maior ${ORION_LONG_EDGE[res === '4k' ? '4k' : '2k']} px`
+                    ? `${currentEngine.nodes[res] ?? 0} nodes · ${ORION_LONG_EDGE[res === '4k' ? '4k' : '2k']} px`
                     : `${currentEngine.nodes[res] ?? 0} nodes`,
                 }))}
               />

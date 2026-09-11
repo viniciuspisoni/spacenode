@@ -1,5 +1,37 @@
 # Orion · piloto interno do GPT Image 2.5
 
+> **Atualização 2026-09-11 — o piloto acabou.** Orion é motor **público e
+> pago**: 20 nodes em 2K, 40 em 4K (mesmo valor por megapixel do Vega,
+> calculado contra o custo real medido no §3). O que mudou em relação ao que
+> está escrito abaixo:
+>
+> - `canUseOrion` não checa mais `isInternalStaff` — o único gate é a flag
+>   `ORION_INTERNAL_ENABLED` (nome preservado pra não exigir troca de env nos
+>   ambientes já configurados) + usuário autenticado.
+> - O débito passa pelo caminho normal (`consume_workspace_nodes`) e
+>   `is_internal_test` grava sempre `false`. A migration
+>   `20260911130000_renders_orion_public_pricing.sql` troca a CHECK que exigia
+>   teste interno + zero nodes por uma regra só de resolução.
+> - Variante e qualidade saíram da UI: o servidor sempre usa **Flare/high**
+>   (ver `lib/orion/config.ts` e §3 — Flare é ~9 s mais rápida, mesma tarifa,
+>   fidelidade estatisticamente empatada com a Sunburst).
+> - A OpenAI está nas cláusulas 4-6 de `/privacidade`, então imagem de cliente
+>   pode passar pelo motor.
+> - O **plugin SketchUp** oferece o Orion pelo `/api/sketchup/catalog` (mesmo
+>   gate do web app), sem `.rbz` novo — o painel monta os cards de motor a
+>   partir do catálogo remoto.
+> - O que **não** mudou: render do Orion ainda não vira projeto no Spaces
+>   (409 em `/api/spaces/from-render`), e Editar/Spaces/Nodi seguem sem ele.
+>
+> O resto do documento (contrato dos fornecedores, presets 2K/4K, medições de
+> custo) continua válido; as partes sobre acesso só da equipe e cobrança zero
+> são **históricas**.
+
+**Status (2026-09-11):** em PRODUÇÃO. Medido contra a API real (32 gerações,
+US$ 1,56 — ver §3), migrations aplicadas e o motor ligado pela flag nos três
+ambientes da Vercel. O parágrafo abaixo descreve o estado do PILOTO, em
+2026-09-10, e fica como registro.
+
 **Status (2026-09-10):** implementado e **medido contra a API real** (32
 gerações, US$ 1,56 — ver §3). Ligado **só na máquina do dono** via `.env.local`;
 migration preparada e **NÃO aplicada** em lugar nenhum. Nada commitado, nada
