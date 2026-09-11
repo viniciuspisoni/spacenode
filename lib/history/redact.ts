@@ -51,7 +51,9 @@ export async function selectRenderList(
   opts: { cursor?: string | null; limit: number },
 ): Promise<RenderListResult> {
   const run = (cols: string, s: HistoryScope): PromiseLike<RenderListResult> => {
-    let q = applyHistoryScope(sb.from('renders').select(cols), s)
+    // excludeInternalTest: `renders` é a tabela do piloto interno (Orion), e o
+    // histórico de escritório é superfície de equipe — ver applyHistoryScope.
+    let q = applyHistoryScope(sb.from('renders').select(cols), s, { excludeInternalTest: true })
     if (opts.cursor) q = q.lt('created_at', opts.cursor)
     return q.order('created_at', { ascending: false }).limit(opts.limit)
   }

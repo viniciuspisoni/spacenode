@@ -62,7 +62,10 @@ export default async function HistoryPage() {
   /* eslint-disable @typescript-eslint/no-explicit-any */
   const countScoped = (narrow?: (q: any) => any) =>
     runScopedQuery(scope, s => {
-      const q = applyHistoryScope(readSb.from('renders').select('id', { count: 'exact', head: true }), s)
+      const q = applyHistoryScope(
+        readSb.from('renders').select('id', { count: 'exact', head: true }), s,
+        { excludeInternalTest: true },  // mesmo recorte da grade, ou a conta não bate
+      )
       return (narrow ? narrow(q) : q) as PromiseLike<{ count: number | null; error: { code?: string } | null }>
     })
   /* eslint-enable @typescript-eslint/no-explicit-any */

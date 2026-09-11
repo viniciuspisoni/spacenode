@@ -163,7 +163,7 @@ export async function GET(req: NextRequest) {
   // kind 'edit' cobre dois storages: `edits` (editor v1) e `edit_v3_jobs`
   // (Editar V3, padrão em produção). Id ausente na primeira → tenta a segunda,
   // já traduzida pro vocabulário do painel. edit_v3_jobs ganhou workspace_id na
-  // migration 20260911120000, então a regra abaixo (dono OU colega de
+  // migration 20260911140000, então a regra abaixo (dono OU colega de
   // workspace) vale igual para os dois; antes dela a coluna vem indefinida e o
   // job cai no caso "sem workspace_id" — só o dono acessa, como era.
   if (!row && kind === 'edit') {

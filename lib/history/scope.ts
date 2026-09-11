@@ -101,8 +101,21 @@ type ScopedQuery = { eq: (c: string, v: string) => any; or: (f: string) => any }
  * workspace_id nulo, e trocar o filtro por workspace_id puro sumiria com ela do
  * histórico do próprio dono. Regressão silenciosa, e justo pra quem está há
  * mais tempo na casa.
+ *
+ * `excludeInternalTest` só vale pra `renders`, a única tabela com a coluna
+ * (migration 20260910120000, piloto do Orion). Ligue nas superfícies de equipe:
+ * workspace_generations e workspace_member_usage já filtram `NOT
+ * is_internal_test`, e o histórico de escritório é a terceira superfície da
+ * mesma família — teste interno de colega não é produção do escritório. O
+ * recorte é só na perna do workspace: na minha perna a linha continua vindo,
+ * porque no histórico pessoal ela sempre apareceu (é o próprio teste de quem
+ * testou).
  */
-export function applyHistoryScope<Q>(query: Q, scope: HistoryScope): Q {
+export function applyHistoryScope<Q>(
+  query: Q,
+  scope: HistoryScope,
+  opts: { excludeInternalTest?: boolean } = {},
+): Q {
   // Q sem `extends ScopedQuery` de propósito: checar o builder do supabase-js
   // contra uma constraint estrutural estoura o limite de profundidade do TS
   // (TS2589) nas projeções longas. Sem a constraint, Q infere direto do
@@ -110,7 +123,10 @@ export function applyHistoryScope<Q>(query: Q, scope: HistoryScope): Q {
   // fica no cast local.
   const q = query as unknown as ScopedQuery
   if (scope.kind === 'own') return q.eq('user_id', scope.userId) as Q
-  return q.or(`workspace_id.eq.${scope.workspaceId},user_id.eq.${scope.userId}`) as Q
+  const office = opts.excludeInternalTest
+    ? `and(workspace_id.eq.${scope.workspaceId},is_internal_test.is.false)`
+    : `workspace_id.eq.${scope.workspaceId}`
+  return q.or(`${office},user_id.eq.${scope.userId}`) as Q
 }
 
 /**

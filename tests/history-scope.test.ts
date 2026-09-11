@@ -126,6 +126,28 @@ describe('applyHistoryScope — o filtro que substitui a RLS', () => {
     applyHistoryScope(q, { kind: 'workspace', userId: OWNER, workspaceId: WS })
     expect(calls.or[0]).toBe(`workspace_id.eq.${WS},user_id.eq.${OWNER}`)
   })
+
+  it('teste interno (Orion) não entra como produção do escritório', () => {
+    const { q, calls } = spyQuery()
+    applyHistoryScope(q, { kind: 'workspace', userId: OWNER, workspaceId: WS }, { excludeInternalTest: true })
+    expect(calls.or[0]).toBe(`and(workspace_id.eq.${WS},is_internal_test.is.false),user_id.eq.${OWNER}`)
+  })
+
+  it('mas o próprio teste continua no histórico de quem testou', () => {
+    const { q, calls } = spyQuery()
+    applyHistoryScope(q, { kind: 'workspace', userId: OWNER, workspaceId: WS }, { excludeInternalTest: true })
+    // A perna do próprio user_id não leva o recorte: é o histórico pessoal
+    // dentro do de escritório, e lá a linha sempre apareceu.
+    expect(calls.or[0]).toContain(`user_id.eq.${OWNER}`)
+    expect(calls.or[0].split('),')[1]).toBe(`user_id.eq.${OWNER}`)
+  })
+
+  it('no escopo pessoal o recorte não muda nada — a coluna nem é citada', () => {
+    const { q, calls } = spyQuery()
+    applyHistoryScope(q, { kind: 'own', userId: MEMBER }, { excludeInternalTest: true })
+    expect(calls.eq).toEqual([['user_id', MEMBER]])
+    expect(calls.or).toEqual([])
+  })
 })
 
 describe('historyReadClient — escopo e client andam juntos', () => {

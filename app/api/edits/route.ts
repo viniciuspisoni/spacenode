@@ -455,7 +455,7 @@ export async function GET(req: NextRequest) {
   // descartado.
   //
   // runScopedQuery em volta das duas: `edit_v3_jobs.workspace_id` só existe a
-  // partir da migration 20260911120000 — antes dela a query escopada devolve
+  // partir da migration 20260911140000 — antes dela a query escopada devolve
   // 42703 e cai pro escopo pessoal em vez de derrubar a aba.
   const [v1Res, v3Res] = await Promise.all([
     runScopedQuery(scope, s => applyHistoryScope(
