@@ -252,6 +252,12 @@
 
     /* ── Palco: o preview ────────────────────────────────────────────────── */
     .stage { margin-bottom: 10px; }
+    /* Palco vazio (sem captura e sem render): o quadro 4/3 ocupava 620 px dos
+       780 do painel e empurrava TODA a configuração pra fora da primeira
+       tela. Vazio ele é uma faixa; cresce quando tem o que mostrar. */
+    .stage.is-empty .preview { aspect-ratio: auto; height: 108px; }
+    .stage.is-empty .empty-preview { padding: 12px; gap: 3px; }
+    .stage.is-empty .empty-preview svg { width: 20px; height: 20px; margin-bottom: 0; }
     .preview {
       position: relative; width: 100%; aspect-ratio: 4 / 3;
       border-radius: var(--r-card); overflow: hidden;
@@ -590,6 +596,20 @@
       letter-spacing: 0.02em;
     }
     .reach { margin-top: 7px; font-size: 11px; color: var(--text-3); text-align: center; }
+    /* O CTA do dock é o da ABA ATIVA — um botão preto por vez. Antes o
+       "Gerar render" ficava fixo e ativo mesmo em Editar/Animar/Cenas: três
+       pretos na mesma tela, cada um gerando (e cobrando) coisa diferente. */
+    .dock-cta > .cta { display: none; }
+    .dock-cta > .cta.is-current { display: flex; }
+    .dock-cta > .cta--sheet { height: 46px; font-size: 13.5px; margin-top: 0; }
+    /* Dock auxiliar (Editar/Animar): resumo, alcance e aviso de saldo falam
+       do custo do RENDER — ao lado do botão de outra ação viram legenda errada. */
+    .dock.is-aux .dock-summary, .dock.is-aux .reach, .dock.is-aux .insufficient { display: none !important; }
+    .dock.is-batch .reach { display: none; }
+    /* Criar Space é o passo seguinte do caderno, não um segundo botão
+       principal: perde o preto e vira ação secundária de largura total. */
+    #spaceButton { width: 100%; height: 36px; justify-content: space-between; margin-top: 14px; }
+    #spaceButton .meta { font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
     .cta--sheet { height: 40px; font-size: 12.5px; margin-top: 14px; }
 
     /* ── Avisos ──────────────────────────────────────────────────────────── */
@@ -642,6 +662,10 @@
        ação duas vezes na mesma tela. O JS acima ainda o liga/desliga
        conforme há resultado; quem manda no que aparece é esta regra. */
     #animarShortcutButton { display: none !important; }
+    /* Depois do render eram oito pílulas brancas idênticas empilhadas antes
+       de qualquer outra coisa. Ficam duas à vista; o resto abre num toque. */
+    .result-more { display: none; grid-column: 1 / -1; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .result-more.is-open { display: grid; }
 
     .history-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
     .history-grid img {
@@ -873,12 +897,15 @@
 
       <div class="result-actions" id="resultActions">
         <button class="ghost" id="downloadButton">Baixar imagem</button>
-        <button class="ghost" id="openResultButton">Abrir no site</button>
-        <button class="ghost" id="upscale2xButton">Ampliar 2x</button>
-        <button class="ghost" id="upscale4xButton">Ampliar 4x</button>
-        <button class="ghost" id="animarShortcutButton" style="grid-column:1 / -1;display:none">Animar este render</button>
-        <button class="ghost" id="variationButton" style="grid-column:1 / -1">Gerar variação deste render</button>
-        <button class="ghost" id="restoreCameraButton" style="display:none;grid-column:1 / -1">Voltar à vista deste render</button>
+        <button class="ghost" id="resultMoreToggle">Mais ações</button>
+        <div class="result-more" id="resultMore">
+          <button class="ghost" id="openResultButton">Abrir no site</button>
+          <button class="ghost" id="upscale2xButton">Ampliar 2x</button>
+          <button class="ghost" id="upscale4xButton">Ampliar 4x</button>
+          <button class="ghost" id="animarShortcutButton" style="grid-column:1 / -1;display:none">Animar este render</button>
+          <button class="ghost" id="variationButton" style="grid-column:1 / -1">Gerar variação deste render</button>
+          <button class="ghost" id="restoreCameraButton" style="display:none;grid-column:1 / -1">Voltar à vista deste render</button>
+        </div>
       </div>
 
       <div class="video-card" id="videoCard" style="display:none">
@@ -986,10 +1013,6 @@
           <span class="mname">Amostra do modelo (opcional)</span>
           <select id="editMaterialSelect"></select>
         </div>
-        <button class="cta cta--sheet" id="editButton" disabled>
-          <span id="editLabel">Aplicar edição</span>
-          <span class="meta" id="editMeta"></span>
-        </button>
         <div class="batch-note">Só a alteração pedida muda — todo o resto do render é preservado. Edição recusada pelo controle de qualidade não é cobrada.</div>
       </div>
     </div>
@@ -1011,10 +1034,6 @@
           <div class="pills" id="animarDurationPills" role="radiogroup" aria-label="Duração"></div>
           <div class="batch-note" id="animarRatioNote" style="display:none"></div>
         </div>
-        <button class="cta cta--sheet" id="animarButton" disabled>
-          <span id="animarLabel">Animar este render</span>
-          <span class="meta" id="animarMeta"></span>
-        </button>
         <div class="batch-note" id="animarNote"></div>
         <div class="insufficient" id="animarInsufficient">
           <b id="animarInsufficientTitle"></b>
@@ -1031,10 +1050,6 @@
         <span class="field-label"><span id="L_scenes">Cenas do modelo</span> <span class="scenes-count" id="scenesCount"></span></span>
         <div class="pills" id="scenesPills"></div>
         <div class="history-empty" id="scenesEmpty" style="display:none">Crie cenas no SketchUp pra gerar o caderno inteiro de uma vez.</div>
-        <button class="cta cta--sheet" id="batchButton" disabled>
-          <span id="batchLabel">Gerar cenas</span>
-          <span class="meta" id="batchMeta"></span>
-        </button>
         <div class="batch-note" id="batchNote">Todas as cenas com os mesmos presets e a mesma semente — coerência de material e estilo no conjunto.</div>
         <div class="batch-progress" id="batchProgress"></div>
         <div class="history-grid" id="batchResults" style="margin-top:8px"></div>
@@ -1054,7 +1069,7 @@
           <input id="spaceName" spellcheck="false" maxlength="80" placeholder="Nome do projeto">
         </div>
         <div class="pills" id="spaceCategoryPills" role="radiogroup" aria-label="Categoria" style="margin-top:10px"></div>
-        <button class="cta cta--sheet" id="spaceButton" disabled>
+        <button class="ghost" id="spaceButton" disabled>
           <span id="spaceLabel">Criar Space</span>
           <span class="meta" id="spaceMeta"></span>
         </button>
@@ -1075,10 +1090,25 @@
       <button class="buy" id="insufficientBuy">ver planos</button>
       <div class="alt" id="insufficientAlt"></div>
     </div>
-    <button class="cta" id="generateButton" disabled title="Ctrl+Enter">
-      <span id="generateLabel">Gerar render</span>
-      <span class="cta-right"><span class="meta" id="generateMeta"></span><span class="kbd" id="generateKbd">Ctrl+Enter</span></span>
-    </button>
+    <!-- Um CTA por vez: o da aba ativa (ver TAB_CTA / updateDockCta). -->
+    <div class="dock-cta" id="dockCta">
+      <button class="cta" id="generateButton" disabled title="Ctrl+Enter">
+        <span id="generateLabel">Gerar render</span>
+        <span class="cta-right"><span class="meta" id="generateMeta"></span><span class="kbd" id="generateKbd">Ctrl+Enter</span></span>
+      </button>
+      <button class="cta cta--sheet" id="editButton" disabled>
+        <span id="editLabel">Aplicar edição</span>
+        <span class="meta" id="editMeta"></span>
+      </button>
+      <button class="cta cta--sheet" id="animarButton" disabled>
+        <span id="animarLabel">Animar este render</span>
+        <span class="meta" id="animarMeta"></span>
+      </button>
+      <button class="cta cta--sheet" id="batchButton" disabled>
+        <span id="batchLabel">Gerar cenas</span>
+        <span class="meta" id="batchMeta"></span>
+      </button>
+    </div>
     <div class="reach" id="reachLine"></div>
     <footer id="footer"></footer>
   </div>
@@ -1175,10 +1205,12 @@
       <div class="field">
         <span class="field-label" id="L_engine">Motor de IA</span>
         <div class="cards cols-3" id="engineCards" role="radiogroup" aria-label="Motor"></div>
+        <div class="hint" id="engineHint"></div>
       </div>
       <div class="field">
         <span class="field-label" id="L_resolution">Qualidade de saída</span>
         <div class="cards cols-3" id="resolutionCards" role="radiogroup" aria-label="Qualidade"></div>
+        <div class="hint" id="resolutionHint"></div>
       </div>
       <div class="field" id="modelMaterialsBlock" style="display:none">
         <span class="field-label" id="L_modelMaterials">Materiais do modelo</span>
@@ -1388,6 +1420,9 @@
         cancel: 'cancelar',
         capturingOverlay: 'Capturando a vista…',
         nodesPerImage: function (n) { return n + ' Nodes por imagem'; },
+        soleResolution: function (label, nodes, engine) {
+          return label + ' · ' + nodes + ' nodes — única resolução do ' + engine + '.';
+        },
         sun: { atual: 'Atual', manha: 'Manhã', meiodia: 'Meio-dia', tarde: 'Entardecer', golden: 'Golden hour' },
         L_photo: 'Fotografia', L_photoAspect: 'Proporção', L_photoLens: 'Lente', L_photoEye: 'Altura do olho',
         L_photoLevel: 'Verticais', L_photoGuide: 'Guias de composição',
@@ -1551,6 +1586,9 @@
         cancel: 'cancel',
         capturingOverlay: 'Capturing the view…',
         nodesPerImage: function (n) { return n + ' Nodes per image'; },
+        soleResolution: function (label, nodes, engine) {
+          return label + ' · ' + nodes + ' nodes — the only resolution ' + engine + ' offers.';
+        },
         sun: { atual: 'Current', manha: 'Morning', meiodia: 'Midday', tarde: 'Late afternoon', golden: 'Golden hour' },
         L_photo: 'Photography', L_photoAspect: 'Aspect ratio', L_photoLens: 'Lens', L_photoEye: 'Eye height',
         L_photoLevel: 'Verticals', L_photoGuide: 'Composition guides',
@@ -1802,6 +1840,7 @@
     ['balanceChip','balanceValue','balanceRecharge','connDot','connTitle','connSub','connectButton','disconnectButton',
      'preview','captureImage','captureCompareImage','resultImage','compareClip','compareHandle','compareRange','emptyPreview',
      'previewOverlay','overlayText','overlayElapsed','cancelButton','captureButton','compareButton','resultActions',
+     'resultMore','resultMoreToggle','dockCta','engineHint','resolutionHint',
      'downloadButton','openResultButton','projectTypeCards','segmentPills','environmentPills','lightingPills',
      'backgroundLabel','backgroundPills','prompt','elementsPills','engineCards','resolutionCards',
      'notice','insufficient','insufficientTitle','insufficientMath','insufficientBuy','insufficientAlt',
@@ -1910,6 +1949,11 @@
       b.addEventListener('click', onClick);
       return b;
     }
+    function hideIfSingle(container) {
+      if (!container || !container.closest) return;
+      var field = container.closest('.field');
+      if (field) field.style.display = container.children.length > 1 ? '' : 'none';
+    }
     function fill(container, nodes) {
       container.innerHTML = '';
       nodes.forEach(function (n) { container.appendChild(n); });
@@ -1963,24 +2007,54 @@
         return b;
       }));
 
-      fill(els.engineCards, (model.catalog.engines || []).map(function (e) {
-        return cardButton(e.name, (catUi('engineTaglines') || {})[e.id] || e.tagline, e.id === model.engine, function () {
+      // Os cartões do motor carregam só o NOME: o que cada um faz está na
+      // linha abaixo, que muda com a seleção (mesma decisão do /app/generate).
+      // Com o Orion liberado são quatro — a grade vira 2x2 em vez de deixar
+      // um cartão órfão embaixo de uma fileira de três.
+      var engineList = model.catalog.engines || [];
+      els.engineCards.className = 'cards ' + (engineList.length >= 4 ? 'cols-2' : 'cols-3');
+      fill(els.engineCards, engineList.map(function (e) {
+        return cardButton(e.name, '', e.id === model.engine, function () {
           model.engine = e.id; onSelectionChanged();
         });
       }));
 
       var engine = currentEngine();
-      fill(els.resolutionCards, ((engine && engine.resolutions) || []).map(function (r) {
+      // description vem do catálogo v8; taglines seguem de reserva pra painel
+      // novo contra servidor antigo.
+      els.engineHint.textContent = engine
+        ? ((catUi('engineDescriptions') || {})[engine.id] || engine.description ||
+           (catUi('engineTaglines') || {})[engine.id] || engine.tagline || '')
+        : '';
+
+      var resList = (engine && engine.resolutions) || [];
+      // Resolução única (o caso do Quasar): um cartão sozinho e sempre marcado
+      // é um controle que não se opera — vira ruído com aparência de escolha.
+      // Some como cartão e volta como linha, com o preço, que era o que ele
+      // tinha de útil.
+      var soleRes = resList.length === 1 ? resList[0] : null;
+      els.resolutionCards.style.display = soleRes ? 'none' : '';
+      fill(els.resolutionCards, soleRes ? [] : resList.map(function (r) {
         return cardButton(r.label, tt('nodesPerImage', r.nodes), r.id === model.resolution, function () {
           model.resolution = r.id; onSelectionChanged();
         });
       }));
+      var resNow = currentResolution();
+      els.resolutionHint.textContent = soleRes
+        ? tt('soleResolution', soleRes.label, soleRes.nodes, engine ? engine.name : '')
+        : ((resNow && resNow.note) || '');
 
       fill(els.sunPills, SUN_OPTIONS.map(function (id) {
         return pillButton(tt('sun')[id] || id, id === model.sunPreset, function () {
           model.sunPreset = id; onSelectionChanged();
         });
       }));
+
+      // Campo de opção única não é escolha: com Segmento "Preservar Original",
+      // "Espaço" mostrava uma pílula sozinha e imóvel.
+      hideIfSingle(els.environmentPills);
+      hideIfSingle(els.backgroundPills);
+      hideIfSingle(els.elementsPills);
 
       renderModelMaterials();
       renderScenes();
@@ -2716,6 +2790,13 @@
     });
 
     // ── Preview / comparador ────────────────────────────────────────────────
+    // O painel nunca rolava: quem estava na configuração (que é onde se mexe)
+    // recebia o render fora da tela e via só o aviso verde de nodes gastos.
+    function scrollToStage() {
+      var sc = document.getElementById('scroll');
+      if (!sc || sc.scrollTop <= 8) return;
+      try { sc.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) { sc.scrollTop = 0; }
+    }
     function setAspect(w, h) {
       if (w > 0 && h > 0) els.preview.style.aspectRatio = w + ' / ' + h;
     }
@@ -2729,6 +2810,8 @@
       els.emptyPreview.style.display = 'none';
       els.compareButton.style.display = model.result ? '' : 'none';
       drawGuides();
+      if (shell) updateShell();
+      scrollToStage();
     }
     function showResult(result) {
       model.result = result;
@@ -2749,6 +2832,10 @@
       renderAnimarControls();
       updateGenerateState();
       drawGuides();
+      // Cada resultado novo fecha o "Mais ações" — a lista longa não herda.
+      els.resultMore.classList.remove('is-open');
+      renderResultMore();
+      scrollToStage();
     }
     function toggleCompare() {
       if (!model.result || !model.captureUrl) return;
@@ -3151,6 +3238,15 @@
       showNotice('', 'success');
       callSketchUp('captureViewport', JSON.stringify({ photo: photoPayload() }));
     });
+    function renderResultMore() {
+      var open = els.resultMore.classList.contains('is-open');
+      els.resultMoreToggle.textContent = st(open ? 'resultLess' : 'resultMore');
+      els.resultMoreToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    els.resultMoreToggle.addEventListener('click', function () {
+      els.resultMore.classList.toggle('is-open');
+      renderResultMore();
+    });
     els.compareButton.addEventListener('click', toggleCompare);
     els.cancelButton.addEventListener('click', function () {
       var elapsed = model.generateStartedAt ? (Date.now() - model.generateStartedAt) / 1000 : 0;
@@ -3164,7 +3260,11 @@
     });
     els.generateButton.addEventListener('click', function () { submitGenerate(false); });
     document.addEventListener('keydown', function (ev) {
-      if ((ev.ctrlKey || ev.metaKey) && ev.key === 'Enter' && !els.generateButton.disabled) submitGenerate(false);
+      if (!(ev.ctrlKey || ev.metaKey) || ev.key !== 'Enter') return;
+      // O atalho segue o CTA da aba ativa: senão geraria um render enquanto o
+      // botão à vista diz "Aplicar edição".
+      var btn = els[(shell && TAB_CTA[shell.tab]) || 'generateButton'];
+      if (btn && !btn.disabled) btn.click();
     });
 
     function submitGenerate(variation) {
@@ -3803,14 +3903,16 @@
         toolLevel: 'Nivelar', toolGuides: 'Guias', toolSun: 'Sol', toolMirror: 'Espelho', toolScene: 'Nova cena',
         toolLevelTip: 'Verticais retas na captura (correção de 2 pontos)',
         toolGuidesTip: 'Guias de terços sobre o quadro',
-        toolSunTip: 'Alterna o sol aplicado na captura',
+        toolSunTip: 'Abre a folha Luz pra escolher o sol da captura',
+        tabNeedsRender: 'Gere um render primeiro',
+        resultMore: 'Mais ações', resultLess: 'Menos ações',
         toolMirrorTip: 'Marca a face selecionada no SketchUp como espelho',
         toolSceneTip: 'Cria uma cena do SketchUp com a vista atual',
         sceneAdded: 'Cena "%s" criada — já entra no lote e no Space.',
         toolsHint: 'Estes cinco ajustam a CAPTURA — e a IA preserva o que ela vê.',
         tipLevel: 'Nivelar: endireita as verticais na captura, como numa foto de arquitetura.',
         tipGuides: 'Guias: grade de terços sobre o quadro, pra posicionar o que importa.',
-        tipSun: 'Sol: troca a hora do sol do modelo só na captura — atual, manhã, meio-dia, entardecer, golden.',
+        tipSun: 'Sol: na folha Luz, a hora do sol do modelo aplicada só na captura — atual, manhã, meio-dia, entardecer, golden.',
         tipMirror: 'Espelho: dois cliques pra entrar no grupo, clique só na FACE do espelho e toque aqui.',
         mirrorReview: '%s — toque pra revisar',
         mirrorOverLimit: 'Acima de %d planos por captura só os %d primeiros entram — limpe o que não for espelho.',
@@ -3841,14 +3943,16 @@
         toolLevel: 'Level', toolGuides: 'Guides', toolSun: 'Sun', toolMirror: 'Mirror', toolScene: 'New scene',
         toolLevelTip: 'Straight verticals in the capture (two-point correction)',
         toolGuidesTip: 'Rule-of-thirds guides over the frame',
-        toolSunTip: 'Cycles the sun applied to the capture',
+        toolSunTip: 'Opens the Light sheet to pick the capture sun',
+        tabNeedsRender: 'Generate a render first',
+        resultMore: 'More actions', resultLess: 'Fewer actions',
         toolMirrorTip: 'Marks the face selected in SketchUp as a mirror',
         toolSceneTip: 'Creates a SketchUp scene from the current view',
         sceneAdded: 'Scene "%s" created — it joins the batch and the Space.',
         toolsHint: 'These five shape the CAPTURE — and the AI preserves what it sees.',
         tipLevel: 'Level: straightens the verticals in the capture, like an architectural photo.',
         tipGuides: 'Guides: rule-of-thirds grid over the frame, to place what matters.',
-        tipSun: 'Sun: changes the model sun hour for the capture only — current, morning, noon, late afternoon, golden.',
+        tipSun: 'Sun: in the Light sheet, the model sun hour applied to the capture only — current, morning, noon, late afternoon, golden.',
         tipMirror: 'Mirror: double-click into the group, select the mirror FACE only, then tap here.',
         mirrorReview: '%s — tap to review',
         mirrorOverLimit: 'Above %d planes per capture only the first %d are used — clear whatever is not a mirror.',
@@ -3902,9 +4006,25 @@
         }
       });
       layoutThumb();
+      updateDockCta();
       if (id === 'scenes') callSketchUpQuiet('listScenes');
       if (id === 'edit' && model.modelMaterials.length === 0) callSketchUpQuiet('listMaterials');
       if (id === 'animar') renderAnimarControls();
+    }
+    // Um CTA por aba, sempre no dock. Os botões são os MESMOS de antes (mesmo
+    // id, mesmo listener, mesmo rótulo) — só moraram de mudança.
+    var TAB_CTA = { render: 'generateButton', edit: 'editButton', animar: 'animarButton', scenes: 'batchButton' };
+    function updateDockCta() {
+      var currentId = TAB_CTA[shell.tab] || TAB_CTA.render;
+      Object.keys(TAB_CTA).forEach(function (key) {
+        var btn = els[TAB_CTA[key]];
+        if (btn) btn.classList.toggle('is-current', TAB_CTA[key] === currentId);
+      });
+      var dock = $s('dock');
+      if (dock) {
+        dock.classList.toggle('is-aux', shell.tab === 'edit' || shell.tab === 'animar');
+        dock.classList.toggle('is-batch', shell.tab === 'scenes');
+      }
     }
     function layoutThumb() {
       var btn = document.querySelector('.seg.is-active');
@@ -3913,18 +4033,18 @@
       thumb.style.width = btn.offsetWidth + 'px';
       thumb.style.transform = 'translateX(' + btn.offsetLeft + 'px)';
     }
+    // As abas não somem mais: o trilho mudava de forma no meio do uso (duas
+    // antes do primeiro render, quatro depois) e obrigava a redescobrir onde
+    // as coisas estavam. Ficam desabilitadas, dizendo o que falta.
     function updateTabs() {
-      var changed = false;
       ['edit', 'animar'].forEach(function (id) {
         var btn = document.querySelector('.seg[data-tab="' + id + '"]');
         if (!btn) return;
         var on = tabEnabled(id);
-        var was = btn.style.display !== 'none';
-        btn.style.display = on ? '' : 'none';
-        if (was !== on) changed = true;
-        if (!on && shell.tab === id) { openTab('render'); changed = false; }
+        btn.disabled = !on;
+        btn.title = on ? '' : st('tabNeedsRender');
+        if (!on && shell.tab === id) openTab('render');
       });
-      if (changed) layoutThumb();
     }
     Array.prototype.forEach.call(document.querySelectorAll('.seg'), function (btn) {
       btn.addEventListener('click', function () { openTab(btn.getAttribute('data-tab')); });
@@ -4022,8 +4142,11 @@
       $s('rowPhotoValue').textContent = joinParts([
         activePillText('aspectPills'), activePillText('lensPills'), model.photoLevel ? activePillText('levelPills') : ''
       ]);
+      // O preço vinha só dentro da folha, no cartão de Qualidade — e mudava
+      // quando se trocava de motor. Na linha ele fica à vista sem abrir nada.
       $s('rowOutputValue').textContent = joinParts([
-        eng ? eng.name : '', res ? res.label : ''
+        [eng ? eng.name : '', res ? res.label : ''].filter(Boolean).join(' '),
+        res && res.nodes != null ? res.nodes + ' ' + tt('nodes') : ''
       ]);
     }
 
@@ -4170,12 +4293,13 @@
       syncPhoto(); drawGuides(); renderPhotoControls(); persistStateSoon(); renderQuickTools();
       setToolsHint(st(model.photoGuide === 'none' ? 'offGuides' : 'onGuides'), true);
     });
+    // Eram cinco estados num stepper cego: clicar avançava pro próximo sem
+    // mostrar a lista, então achar "golden" custava quatro cliques às cegas.
+    // O botão abre a folha Luz, onde os cinco estão à vista; o estado ligado
+    // continua aparecendo no próprio botão.
     $s('toolSun').addEventListener('click', function () {
-      var i = SUN_OPTIONS.indexOf(model.sunPreset);
-      model.sunPreset = SUN_OPTIONS[(i + 1) % SUN_OPTIONS.length];
-      onSelectionChanged();
-      renderQuickTools();
-      setToolsHint(st('sunNow').replace('%s', (tt('sun') || {})[model.sunPreset] || model.sunPreset), true);
+      openSheet('sheetLight');
+      setToolsHint(st('tipSun'), true);
     });
     // Espelho e cena agem sobre o MODELO (seleção viva / câmera viva): quem
     // lê o SketchUp é o Ruby, no instante do clique.
@@ -4282,12 +4406,25 @@
     }
 
     // ── Sincronia geral ──────────────────────────────────────────────────
+    // O palco vazio encolhe e o cartão de Estilo só aparece quando há semente
+    // (antes do primeiro render ele é um botão desabilitado ocupando a
+    // primeira tela).
+    function updateStage() {
+      var empty = !model.captureUrl && !(model.result && model.result.outputUrl);
+      var stage = document.querySelector('.stage');
+      if (stage) stage.classList.toggle('is-empty', empty);
+      var card = $s('styleCard');
+      if (card) card.style.display = (styleLocked() || currentResultSeed() != null) ? '' : 'none';
+    }
     function updateShell() {
       updateTabs();
       updateRows();
       updateAmbient();
       syncAccountPlacement();
       renderStyleCard();
+      updateStage();
+      updateDockCta();
+      renderResultMore();
       renderQuickTools();
       if (!$s('toolsHint').classList.contains('is-tip')) setToolsHint(null);
       var locked = styleLocked();
@@ -4337,6 +4474,10 @@
     // motivo (conectar, saldo insuficiente).
     function runGenerateWhenReady(tries) {
       if (model.generating) return;
+      // A ordem vem do botão "Gerar render" da toolbar do SketchUp: o painel
+      // volta pra aba Render, senão o CTA do dock continuaria mostrando outra
+      // ação enquanto a geração acontece.
+      if (shell.tab !== 'render') openTab('render');
       if (!els.generateButton.disabled) { submitGenerate(false); return; }
       if (tries >= 12) return;
       setTimeout(function () { runGenerateWhenReady(tries + 1); }, 250);

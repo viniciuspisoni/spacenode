@@ -27,7 +27,7 @@ module SpaceNode
   module SketchUp
     extend self
 
-    VERSION = '1.0.4'
+    VERSION = '1.1.0'
     PREFERENCES_KEY = 'com.spacenode.sketchup'
     DEFAULT_API_BASE_URL = 'https://spacenode.app'
     MIN_SKETCHUP_MAJOR = 21          # Ruby 2.7+; recomendado 2024+
@@ -36,7 +36,7 @@ module SpaceNode
     UPLOAD_TIMEOUT_SECONDS = 120     # sign/PUT/confirm (Sketchup::Http não tem timeout)
     DOWNLOAD_TIMEOUT_SECONDS = 180   # download_to_file (render/vídeo) — não tinha watchdog
     VIDEO_STAGE_TIMEOUT_SECONDS = 60 # GET do preview antes de animar (mesmo valor do quote do Ampliar)
-    CATALOG_MIN_VERSION = 7          # cache em disco mais velho que isso é descartado (v7 = pluginLatest)
+    CATALOG_MIN_VERSION = 8          # cache em disco mais velho que isso é descartado (v8 = engines[].description)
 
     # Strings do Ruby visíveis no painel (etapas/erros centrais). O grosso da
     # UI é traduzido no dialog; mensagens vindas do SERVIDOR seguem em pt-BR.

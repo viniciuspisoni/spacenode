@@ -42,7 +42,11 @@ export const ENGINES: Record<EngineId, EngineConfig> = {
     id:          'quasar',
     name:        'Quasar',
     tagline:     'Especial · ~2 min',
-    description: 'Tipografia, multi-referência e diversificação de provedor.',
+    // A descrição é o que o usuário lê pra escolher (folha "Saída" no web e
+    // no plugin). "Tipografia, multi-referência e diversificação de provedor"
+    // era o motivo de ele ter entrado no catálogo — não ajuda ninguém a
+    // decidir, ainda mais sendo o motor PADRÃO.
+    description: 'Padrão da casa: acabamento e fidelidade em equilíbrio. Leva cerca de 2 minutos.',
     // Seedream 5.0 Pro Edit (ByteDance via fal.ai) — padrão desde 2026-09-05,
     // substituiu o GPT Image 2 ('openai/gpt-image-2/edit') após teste em prod.
     // Só FAL (sem mapeamento GCP). Schema conferido em 2026-09-04: prompt,
