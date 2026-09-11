@@ -25,6 +25,72 @@ O que só um plugin dentro do modelo consegue:
 - **Voltar à vista** — cada render guarda a câmera; um clique restaura o
   enquadramento exato no SketchUp.
 
+## O que mudou na 1.1.0 — um botão de gerar por vez
+
+Feedback de campo: "dificuldade com a usabilidade" e "não consegui escolher o
+motor". O painel não tinha pouca coisa — tinha coisa demais disputando o mesmo
+lugar. Medido no painel real (440×780), antes desta versão:
+
+- **Três CTAs pretos na mesma tela.** O dock é fixo e o "Gerar render" ficava
+  ativo em TODAS as abas: na aba Cenas apareciam "Gerar 2 cenas · 40 nodes",
+  "Criar Space · 48 nodes" e "Gerar render · 20 nodes" ao mesmo tempo, cada um
+  gerando (e cobrando) coisa diferente. Na aba Editar o "Aplicar edição" estava
+  cinza enquanto o botão preto do dock gerava outra coisa.
+- **Nenhuma configuração na primeira tela.** O palco vazio ocupava 620 px dos
+  780; as linhas Cena/Luz/Fotografia/Saída começavam por volta de y≈1000.
+- **Oito pílulas brancas idênticas** depois do render, antes de qualquer
+  outra coisa.
+- **O painel nunca rolava até o resultado** — `scrollIntoView` aparecia zero
+  vezes no arquivo. Quem estava na configuração (que é onde se mexe) recebia o
+  render fora da tela e via só o aviso verde de nodes gastos.
+- **O motor não se explicava.** Cartões de 133 px com um nome de astronomia e
+  um chavão, sem preço — o preço só aparecia no cartão de Qualidade, abaixo, e
+  mudava ao trocar de motor. A `description` que o /app/generate mostra já
+  existia em `lib/engines.ts`; o catálogo do plugin não enviava. E a
+  "Qualidade" do Quasar era um cartão sozinho e sempre marcado — o padrão que o
+  web tinha acabado de deletar por ser "um controle que não se opera".
+
+### O que passou a valer
+
+- **Um CTA por aba, sempre no dock.** `TAB_CTA` mapeia aba → botão; os botões
+  são os mesmos de antes (mesmo id, mesmo listener, mesmo rótulo), só mudaram de
+  endereço. Em Editar/Animar o dock perde resumo, alcance e aviso de saldo —
+  os três falam do custo do RENDER. Ctrl+Enter passou a seguir a aba ativa, e o
+  botão "Gerar render" da toolbar nativa volta pra aba Render antes de disparar.
+- **Criar Space** deixa de ser um segundo botão principal e vira ação secundária
+  do caderno.
+- **Palco vazio vira uma faixa de 108 px** e o cartão "Estilo do projeto" só
+  aparece quando há semente (antes do primeiro render ele era um botão
+  desabilitado ocupando a primeira tela). A configuração inteira passa a caber
+  sem rolar: medido, a linha "Saída" termina em 525 px e o dock começa em 645.
+- **"Mais ações"** guarda Abrir no site, Ampliar 2x/4x, variação e voltar à
+  vista; ficam à mostra Baixar e Comparar.
+- **O resultado rola até a tela** quando chega — e a captura também.
+- **Motor e qualidade:** o catálogo virou **v8** e envia `engines[].description`;
+  o cartão carrega só o NOME (grade 2×2 quando o Orion está liberado, igual à
+  decisão da PR #203 no web) e a linha embaixo explica, mudando com a seleção;
+  resolução única vira linha com o preço; a linha "Saída" passou a dizer
+  "Quasar 2K · 20 nodes". `CATALOG_MIN_VERSION` subiu pra 8 — cache v7 em disco
+  não tem descrição e seria servido por até 6 h.
+- **Campo de opção única some.** Com Segmento "Preservar Original", "Espaço"
+  mostrava uma pílula sozinha e imóvel; "Elementos na cena" vinha vazio.
+- **As abas não mudam mais de forma.** Eram duas antes do primeiro render e
+  quatro depois; agora as quatro ficam sempre, com Editar e Animar
+  desabilitadas dizendo "Gere um render primeiro".
+- **O Sol deixa de ser stepper cego.** Eram cinco estados avançando um por
+  clique, sem lista: achar "golden" custava quatro cliques às cegas. O botão
+  abre a folha Luz, onde os cinco estão à vista; o estado ligado continua no
+  próprio botão.
+
+### O .rbz tinha drifado da fonte
+
+O `.rbz` publicado (`public/downloads/` e `dist/`) estava atrás do código desde
+a PR #191: o `isPreserved` dos resumos nunca foi reempacotado, então em campo o
+dock ainda dizia "Preservar Original · Preservar Original" — o painel que o
+repositório descrevia não era o que rodava. Como a `VERSION` não mudou junto, o
+aviso de versão da própria 1.0.4 não tinha como detectar. Os dois `.rbz` foram
+regerados nesta versão e conferidos byte a byte contra `sketchup/`.
+
 ## O que mudou na 1.0.4 — os quatro primeiros da varredura
 
 Varredura de 13 concorrentes (set/2026) apontou que o que mais dói não é

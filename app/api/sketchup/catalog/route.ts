@@ -48,6 +48,15 @@ const CATALOG_I18N_EN = {
     // Sem entrada pro Orion: o painel resolve `catUi(…)[id] || e.tagline`, e os
     // dois lados estão vazios de propósito — o cartão dele mostra só o nome.
     engineTaglines: { vega: 'Premium', pulsar: 'Fast', quasar: 'Special · ~2 min' } as Record<string, string>,
+    // Desde a v8 o cartão de TODO motor carrega só o nome (as taglines acima
+    // ficam de reserva pra painel antigo): quem explica a escolha é esta
+    // linha, que muda com a seleção — igual ao /app/generate.
+    engineDescriptions: {
+      vega:   'Absolute fidelity. Final delivery; editing preserves the project pixel by pixel.',
+      pulsar: 'Iteration and volume. Fast exploration at high speed.',
+      quasar: 'The house default: finish and fidelity in balance. Takes about 2 minutes.',
+      orion:  'High-fidelity engine with a fast response.',
+    } as Record<string, string>,
     resolutionNotes: {
       hd: 'Quick tests',
       '2k': 'Ideal for presentations',
@@ -226,11 +235,13 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({
+    // v8: engines[].description — o painel explica o motor embaixo da grade,
+    // em vez de deixar a escolha por conta de um chavão no cartão.
     // v7: pluginLatest. Distribuímos .rbz fora do Extension Warehouse, então
     // não existe atualização automática — sem isto, quem instalou uma vez
     // nunca fica sabendo que saiu versão nova. O plugin compara com a VERSION
     // dele e avisa; nunca bloqueia.
-    version: 7,
+    version: 8,
     pluginLatest: {
       version: PLUGIN_VERSION,
       path: PLUGIN_RBZ_PATH,
@@ -247,6 +258,9 @@ export async function GET(req: NextRequest) {
           id,
           name: e.name,
           tagline: e.tagline,
+          // v8: o painel mostra a descrição embaixo da grade de motores —
+          // sem ela o cartão era um nome de astronomia e um chavão.
+          description: e.description,
           resolutions: e.resolutions.map(r => ({
             id: r,
             label: RESOLUTION_LABELS[r].label,
@@ -265,6 +279,7 @@ export async function GET(req: NextRequest) {
             id: ORION_CONFIG.id,
             name: ORION_CONFIG.name,
             tagline: ORION_CONFIG.tagline,
+            description: ORION_CONFIG.description,
             resolutions: ORION_CONFIG.resolutions.map(r => ({
               id: r,
               label: RESOLUTION_LABELS[r].label,
