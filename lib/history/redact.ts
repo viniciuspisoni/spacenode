@@ -12,6 +12,7 @@
 // (getVideoDisplayLabel/getUpscaleDisplayLabel aceitam a label traduzida).
 
 import { videoEngineLabel, upscaleProviderLabel } from '@/lib/renderLabels'
+import { applyHistoryScope, runScopedQuery, type HistoryScope } from './scope'
 
 // Colunas que a grid de renders realmente usa (HistoryClient). Sem prompt,
 // sem fal_request_id, sem config_snapshot/upscale_meta/generation_log.
@@ -29,22 +30,37 @@ export const RENDER_LIST_COLUMNS =
 export const RENDER_LIST_COLUMNS_LEGACY =
   'id, user_id, input_url, output_url, ambient, style, lighting, status, cost_credits, nodes_charged, engine, resolution, folder_id, created_at'
 
+/** Resposta das duas superfícies de listagem — linhas não-tipadas (a projeção
+ *  varia com o fallback) + o error do PostgREST, cujo `code` é o que decide os
+ *  retries. */
+export interface RenderListResult {
+  data:  Record<string, unknown>[] | null
+  error: { code?: string; message?: string } | null
+}
+
 /** SELECT do histórico com fallback de projeção: tenta com preview_url e cai
  *  pra projeção legada se a coluna ainda não existir. Usado pela página do
- *  Histórico e pelo /api/renders/list — uma fonte, duas superfícies. */
+ *  Histórico e pelo /api/renders/list — uma fonte, duas superfícies.
+ *
+ *  Quem decide QUAIS linhas entram é o `scope` (lib/history/scope.ts): as da
+ *  própria pessoa, ou as do escritório inteiro quando quem lê é owner/admin.
+ *  O client tem que combinar com o escopo — use historyReadClient(). */
 export async function selectRenderList(
   sb: { from: (t: string) => any },  // eslint-disable-line @typescript-eslint/no-explicit-any -- aceita client SSR e admin
-  userId: string,
+  scope: HistoryScope,
   opts: { cursor?: string | null; limit: number },
-): Promise<{ data: Record<string, unknown>[] | null; error: { code?: string; message?: string } | null }> {
-  const run = (cols: string) => {
-    let q = sb.from('renders').select(cols).eq('user_id', userId)
+): Promise<RenderListResult> {
+  const run = (cols: string, s: HistoryScope): PromiseLike<RenderListResult> => {
+    let q = applyHistoryScope(sb.from('renders').select(cols), s)
     if (opts.cursor) q = q.lt('created_at', opts.cursor)
     return q.order('created_at', { ascending: false }).limit(opts.limit)
   }
-  let res = await run(RENDER_LIST_COLUMNS)
+  // Dois 42703 possíveis e independentes: a coluna preview_url (projeção) e a
+  // coluna workspace_id (escopo). runScopedQuery cuida do segundo; o retry de
+  // projeção abaixo, do primeiro — e roda dentro do escopo que sobrou.
+  let res = await runScopedQuery(scope, s => run(RENDER_LIST_COLUMNS, s))
   if (res.error && res.error.code === '42703') {
-    res = await run(RENDER_LIST_COLUMNS_LEGACY)
+    res = await runScopedQuery(scope, s => run(RENDER_LIST_COLUMNS_LEGACY, s))
   }
   return res
 }

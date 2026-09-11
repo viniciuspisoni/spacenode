@@ -80,9 +80,21 @@ interface Props {
   folders:       Folder[]
   authors:       Record<string, AuthorInfo>  // user_id → perfil (autoria/equipes)
   currentUserId: string
+  /** Histórico em escopo de ESCRITÓRIO: a grade traz o que a equipe inteira
+   *  produziu, não só o de quem abriu. Só muda a linguagem da tela — quem
+   *  decide as linhas é o servidor (lib/history/scope.ts). */
+  teamView:      boolean
 }
 
 type FolderFilter = 'all' | 'none' | string  // string = folder id
+
+/** Sufixo do pedido de escopo nas listagens. As rotas são pessoais por padrão
+ *  (o plugin SketchUp e os modais de importação dependem disso) — é o Histórico
+ *  que pede o escritório, e só o servidor decide se pode. Ver
+ *  lib/history/scope.ts. */
+function scopeQuery(teamView: boolean, sep: '?' | '&' = '?'): string {
+  return teamView ? `${sep}scope=office` : ''
+}
 
 // Aba de filtro aberta (a folha que a linha correspondente abre).
 type FilterSheet = 'conteudo' | 'origem' | 'ordem' | null
@@ -182,6 +194,7 @@ export function HistoryClient({
   folders,
   authors,
   currentUserId,
+  teamView,
 }: Props) {
   const router = useRouter()
 
@@ -210,7 +223,7 @@ export function HistoryClient({
     if (!last) return
     setLoadingMore(true)
     try {
-      const res = await fetch(`/api/renders/list?cursor=${encodeURIComponent(last.created_at)}`)
+      const res = await fetch(`/api/renders/list?cursor=${encodeURIComponent(last.created_at)}${scopeQuery(teamView, '&')}`)
       if (!res.ok) {
         const { error } = await res.json().catch(() => ({ error: 'Falha ao carregar' }))
         await askAlert('Não deu para carregar', error || 'Falha ao carregar')
@@ -351,14 +364,38 @@ export function HistoryClient({
   // nele, e o chip da pasta-mãe continua visível/clicável pra "subir" de novo.
   const expandedParentId = activeFolder ? (activeFolder.parent_id ?? activeFolder.id) : null
 
+  // ── Quem pode MEXER no quê ───────────────────────────────────────────────────
+  // Ver o trabalho do escritório é uma coisa; apagar e arquivar o trabalho dos
+  // outros é outra, e não foi o que se decidiu. /api/renders/batch continua
+  // filtrando por user_id no servidor (delete e move), então mandar o id do
+  // colega não apagaria nada — só que a UI teria acabado de dizer "N renders
+  // serão apagados para sempre" e dado refresh. Falha silenciosa em ação
+  // destrutiva. A seleção então só alcança o que é de quem está olhando; as
+  // pastas, idem, são pessoais.
+  const canManage = useCallback(
+    (r: Render) => !r.user_id || r.user_id === currentUserId,
+    [currentUserId],
+  )
+
   const selectedRenders = useMemo(
     () => loaded.filter(r => selected.has(r.id)),
     [loaded, selected],
   )
 
+  // Ids que podem ir pro /api/renders/batch. Delete e move viajam DAQUI, nunca
+  // do `selected` cru: se um id de colega entrasse na seleção por qualquer
+  // caminho, o servidor o descartaria em silêncio depois do "apagados para
+  // sempre". Aqui ele nem sai.
+  const selectedManageableIds = useMemo(
+    () => selectedRenders.filter(canManage).map(r => r.id),
+    [selectedRenders, canManage],
+  )
+
   const enterSelectMode = () => { setSelectMode(true); setSelected(new Set()) }
   const exitSelectMode  = () => { setSelectMode(false); setSelected(new Set()) }
 
+  // Só é chamado por card gerenciável (a grid passa manageable={canManage(r)});
+  // a rede de segurança de verdade está em selectedManageableIds.
   const toggleOne = useCallback((id: string) => {
     setSelected(prev => {
       const next = new Set(prev)
@@ -379,7 +416,7 @@ export function HistoryClient({
     })
   }, [])
 
-  const selectAllVisible = () => setSelected(new Set(filtered.map(r => r.id)))
+  const selectAllVisible = () => setSelected(new Set(filtered.filter(canManage).map(r => r.id)))
   const clearSelection   = () => setSelected(new Set())
 
   // ── Ações em lote ───────────────────────────────────────────────────────────
@@ -408,8 +445,8 @@ export function HistoryClient({
   }
 
   const handleDelete = async () => {
-    if (selectedRenders.length === 0 || busy) return
-    const n = selectedRenders.length
+    if (selectedManageableIds.length === 0 || busy) return
+    const n = selectedManageableIds.length
     const ok = await askConfirm(
       'Excluir renders',
       `${n} render${n !== 1 ? 's' : ''} ${n !== 1 ? 'serão apagados' : 'será apagado'} para sempre. Esta ação não pode ser desfeita.`,
@@ -421,7 +458,7 @@ export function HistoryClient({
       const res = await fetch('/api/renders/batch', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ ids: [...selected], action: 'delete' }),
+        body:    JSON.stringify({ ids: selectedManageableIds, action: 'delete' }),
       })
       if (!res.ok) {
         const { error } = await res.json().catch(() => ({ error: 'Falha ao excluir' }))
@@ -436,13 +473,13 @@ export function HistoryClient({
   }
 
   const handleMove = async (folderId: string | null) => {
-    if (selectedRenders.length === 0 || busy) return
+    if (selectedManageableIds.length === 0 || busy) return
     setBusy(true)
     try {
       const res = await fetch('/api/renders/batch', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ ids: [...selected], action: 'move', folder_id: folderId }),
+        body:    JSON.stringify({ ids: selectedManageableIds, action: 'move', folder_id: folderId }),
       })
       if (!res.ok) {
         const { error } = await res.json().catch(() => ({ error: 'Falha ao mover' }))
@@ -516,7 +553,8 @@ export function HistoryClient({
     }
   }
 
-  const allVisibleSelected = filtered.length > 0 && filtered.every(r => selected.has(r.id))
+  const manageableVisible  = filtered.filter(canManage)
+  const allVisibleSelected = manageableVisible.length > 0 && manageableVisible.every(r => selected.has(r.id))
 
   return (
     <div style={S.main}>
@@ -540,9 +578,13 @@ export function HistoryClient({
           <div>
             <h1 style={S.headerTitle}>Histórico</h1>
             <p style={S.headerSub}>
-              {historyTab === 'renders'   && 'Seus renders salvos e prontos para reutilizar.'}
-              {historyTab === 'edits'     && 'Edições localizadas geradas no Editar.'}
-              {historyTab === 'vistas'    && 'Vistas geradas dentro dos seus Spaces.'}
+              {/* No escritório a mesma grade mostra o trabalho da equipe — dizer
+                  isso na primeira linha evita a leitura errada de que o
+                  Histórico encolheu ou inchou sozinho. Blocos 3D e Finalizar
+                  seguem pessoais (ver nota em app/api/vistas/list). */}
+              {historyTab === 'renders'   && (teamView ? 'Renders do escritório — seus e da sua equipe, prontos para reutilizar.' : 'Seus renders salvos e prontos para reutilizar.')}
+              {historyTab === 'edits'     && (teamView ? 'Edições localizadas feitas no Editar por você e pela sua equipe.' : 'Edições localizadas geradas no Editar.')}
+              {historyTab === 'vistas'    && (teamView ? 'Vistas geradas nos Spaces do escritório.' : 'Vistas geradas dentro dos seus Spaces.')}
               {historyTab === 'finalizar' && 'Versões exportadas dos seus projetos do Finalizar.'}
               {historyTab === 'blocos3d'  && 'Modelos 3D gerados no Blocos 3D.'}
             </p>
@@ -593,8 +635,8 @@ export function HistoryClient({
         />
 
         {/* ── Tabs alternativas: Edições + Vistas + Finalizar + Blocos 3D ── */}
-        {historyTab === 'edits'     && <EditsTabView  authors={authors} onOpenDetail={openDetail} />}
-        {historyTab === 'vistas'    && <VistasTabView authors={authors} onOpenDetail={openDetail} />}
+        {historyTab === 'edits'     && <EditsTabView  authors={authors} teamView={teamView} onOpenDetail={openDetail} />}
+        {historyTab === 'vistas'    && <VistasTabView authors={authors} teamView={teamView} onOpenDetail={openDetail} />}
         {historyTab === 'finalizar' && <FinalizarTabView />}
         {historyTab === 'blocos3d'  && <Blocos3DTabView />}
 
@@ -749,6 +791,7 @@ export function HistoryClient({
                       key={r.id}
                       render={r}
                       author={r.user_id ? authors[r.user_id] ?? null : null}
+                      manageable={canManage(r)}
                       selectMode={selectMode}
                       selected={selected.has(r.id)}
                       onToggle={() => toggleOne(r.id)}
@@ -983,11 +1026,11 @@ function authorLabel(
 // custava um backdrop-filter POR CARTÃO (×200 na grade). Fica o véu, sai o
 // filtro. Escuro fixo porque a imagem embaixo não segue o tema — é a mesma
 // razão do .spn-overlay.
-function AuthorChip({ author }: { author: AuthorInfo | null }) {
+function AuthorChip({ author, title }: { author: AuthorInfo | null; title?: string }) {
   const name = author?.name || author?.email || null
   return (
     <span
-      title={name ? `Gerado por ${name}` : 'Autor não registrado'}
+      title={title ?? (name ? `Gerado por ${name}` : 'Autor não registrado')}
       style={S.authorChip}
     >
       {name ? authorInitials({ name: author!.name, email: author!.email }) : '—'}
@@ -1035,9 +1078,10 @@ function FolderChip({
 // ── EditsTabView ───────────────────────────────────────────────────────────────
 
 function EditsTabView({
-  authors, onOpenDetail,
+  authors, teamView, onOpenDetail,
 }: {
   authors: Record<string, AuthorInfo>
+  teamView: boolean
   onOpenDetail: (kind: GenerationKind, id: string) => void
 }) {
   const [items, setItems] = useState<Edit[] | null>(null)
@@ -1046,7 +1090,7 @@ function EditsTabView({
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true)
-    fetch('/api/edits')
+    fetch(`/api/edits${scopeQuery(teamView)}`)
       .then(r => r.ok ? r.json() : null)
       .then(d => setItems((d?.edits ?? []) as Edit[]))
       .finally(() => setLoading(false))
@@ -1108,34 +1152,27 @@ interface VistaListItem {
 }
 
 function VistasTabView({
-  authors, onOpenDetail,
+  authors, teamView, onOpenDetail,
 }: {
   authors: Record<string, AuthorInfo>
+  teamView: boolean
   onOpenDetail: (kind: GenerationKind, id: string) => void
 }) {
   const [items, setItems] = useState<VistaListItem[] | null>(null)
   const [loading, setLoading] = useState(true)
 
+  // Via rota (/api/vistas/list) e não mais direto do banco: é lá que o escopo
+  // do Histórico decide entre "minhas vistas" e "as do escritório", e é lá que
+  // a image_url sai assinada. Ver app/api/vistas/list/route.ts.
   useEffect(() => {
-    const sb = createClient()
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true)
-    sb.from('vistas')
-      .select('id, space_id, user_id, image_url, axis_label, quality, is_edited, created_at')
-      .eq('status', 'completed')
-      .not('image_url', 'is', null)
-      .order('created_at', { ascending: false })
-      .limit(60)
-      .then(({ data }) => setItems((data ?? []) as VistaListItem[]))
+    fetch(`/api/vistas/list${scopeQuery(teamView)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setItems((d?.vistas ?? []) as VistaListItem[]))
       .then(undefined, () => setItems([]))
-      // .finally(() => setLoading(false))  -- supabase-js 2.x query doesn't have finally
-    // Workaround pra setLoading sem finally: marca terminado quando items mudam
+      .finally(() => setLoading(false))
   }, [])
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (items !== null) setLoading(false)
-  }, [items])
 
   if (loading)                       return <TabLoading />
   if ((items ?? []).length === 0)    return (
@@ -1159,8 +1196,11 @@ function VistasTabView({
           style={S.tabCard}
         >
           <div style={S.tabThumb}>
+            {/* URL já assinada na rota — nada de toMediaProxyUrl aqui: o proxy
+                exige chave no namespace de quem pede e devolveria 403 na
+                imagem do colega. Mesmo caminho de renders e edições. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={toMediaProxyUrl(v.image_url) ?? undefined} alt={v.axis_label ?? ''} style={S.tabImg} />
+            <img src={v.image_url ?? undefined} alt={v.axis_label ?? ''} style={S.tabImg} />
             <AuthorChip author={v.user_id ? authors[v.user_id] ?? null : null} />
             {/* Verde aqui é ESTADO ("foi editada"), não ação — o contrato
                 permite exatamente este uso. */}
@@ -1376,10 +1416,13 @@ function TabEmpty({ message, action }: { message: string; action?: { href: strin
 // ── RenderCard ─────────────────────────────────────────────────────────────────
 
 function RenderCard({
-  render, author, selectMode, selected, onToggle, onActivateSelect, onOpenDetail,
+  render, author, manageable, selectMode, selected, onToggle, onActivateSelect, onOpenDetail,
 }: {
   render: Render
   author: AuthorInfo | null
+  /** Render de quem está olhando — só esses podem ser selecionados para apagar
+   *  ou mover. No histórico de escritório o cartão do colega é de leitura. */
+  manageable: boolean
   selectMode: boolean
   selected: boolean
   onToggle: () => void
@@ -1420,7 +1463,7 @@ function RenderCard({
   // alterna o checkbox. Entrar em seleção não depende mais de duplo clique
   // (conflitava com o clique simples abrindo o painel) — agora é o checkbox
   // que aparece no hover, canto superior esquerdo (mesmo padrão do Google/Apple Fotos).
-  const handleCardClick = () => { if (selectMode) onToggle(); else onOpenDetail() }
+  const handleCardClick = () => { if (selectMode && manageable) onToggle(); else onOpenDetail() }
 
   return (
     <div
@@ -1480,14 +1523,21 @@ function RenderCard({
             este card (substitui o antigo duplo clique, que conflitava com
             o clique simples abrindo o painel de detalhes). */}
         {selectMode ? (
-          <div style={{ ...S.checkbox, ...(selected ? S.checkboxOn : null) }}>
-            {selected && (
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-            )}
-          </div>
-        ) : hovered && (
+          manageable ? (
+            <div style={{ ...S.checkbox, ...(selected ? S.checkboxOn : null) }}>
+              {selected && (
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              )}
+            </div>
+          ) : (
+            // Sem caixa: a ausência já diz que não entra na seleção, e o cartão
+            // segue clicável para abrir os detalhes. Fica o chip de autoria, que
+            // responde de quem é e, no title, por que não dá pra marcar.
+            <AuthorChip author={author} title="Só quem gerou pode apagar ou mover este render" />
+          )
+        ) : hovered && manageable && (
           <button
             type="button"
             onClick={e => { e.stopPropagation(); onActivateSelect() }}
