@@ -27,7 +27,7 @@ module SpaceNode
   module SketchUp
     extend self
 
-    VERSION = '1.1.0'
+    VERSION = '1.1.1'
     PREFERENCES_KEY = 'com.spacenode.sketchup'
     DEFAULT_API_BASE_URL = 'https://spacenode.app'
     MIN_SKETCHUP_MAJOR = 21          # Ruby 2.7+; recomendado 2024+
@@ -1278,6 +1278,13 @@ module SpaceNode
       rescue StandardError
         facts[:aspect] = 0.0
       end
+      # Proporção da VIEWPORT (não a da câmera): é contra ela que o painel
+      # compara o quadro escolhido pra dizer o que fica fora da captura.
+      begin
+        facts[:viewAspect] = (view.vpwidth.to_f / [view.vpheight.to_f, 1.0].max).round(4)
+      rescue StandardError
+        nil
+      end
       if camera.perspective?
         aspect = frame_aspect(view, camera)
         fov_v = vertical_fov_deg(camera, aspect)
@@ -1370,12 +1377,32 @@ module SpaceNode
     end
 
     # Chamado pelo ViewObserver a cada mudança de câmera; coalesce num timer.
+    # A moldura do quadro mora na CÂMERA (camera.aspect_ratio) — é ela que faz
+    # o SketchUp desenhar as barras, em qualquer versão (a overlay exige 2023+).
+    # Só que trocar de cena troca a câmera, e a moldura sumia da tela sem que o
+    # painel mudasse de ideia: o usuário voltava a ver a viewport inteira e a
+    # captura continuava recortando no quadro escolhido. Reaplica sempre que a
+    # vista muda. Converge: reaplicar dispara onViewChanged, mas na segunda
+    # passada a câmera já está com o valor e apply_camera_aspect não escreve.
+    def reapply_camera_frame
+      settings = @photo
+      return unless settings && settings[:aspect].to_f > 0
+
+      model = ::Sketchup.active_model
+      return unless model
+
+      apply_camera_aspect(model.active_view.camera, settings[:aspect])
+    rescue StandardError
+      nil
+    end
+
     def camera_changed
       return unless @dialog
       return if @camera_timer
 
       @camera_timer = ::UI.start_timer(0.25, false) do
         @camera_timer = nil
+        reapply_camera_frame
         emit_camera_facts
       end
     rescue StandardError
@@ -1386,6 +1413,7 @@ module SpaceNode
       @guides_overlay = nil
       detach_view_observer
       attach_photo_observers
+      reapply_camera_frame
       emit_camera_facts
       emit_mirrors
       emit_project_style(false)
@@ -1773,6 +1801,7 @@ module SpaceNode
       state[:operation] = true
 
       original_camera = view.camera
+      original_state = camera_state_of(view)
       groups.each_with_index do |g, gi|
         n = g[:n]
         p0 = g[:p0]
@@ -1851,11 +1880,7 @@ module SpaceNode
         rescue StandardError
           ok = false
         ensure
-          begin
-            view.camera = original_camera
-          rescue StandardError
-            nil
-          end
+          restore_view_camera(view, original_camera, original_state)
           hidden.each do |e|
             begin
               e.hidden = false
@@ -2000,7 +2025,9 @@ module SpaceNode
       end
       overlay.guide = settings[:guide].to_s
       overlay.aspect = settings[:aspect].to_f
-      wanted = overlay.guide != 'none'
+      # Liga também quando só há proporção escolhida — o draw decide se tem o
+      # que desenhar (quadro igual à viewport não desenha nada).
+      wanted = overlay.guide != 'none' || overlay.aspect > 0
       overlay.enabled = wanted if overlay.enabled? != wanted
       model.active_view.invalidate
     rescue StandardError
@@ -2087,6 +2114,7 @@ module SpaceNode
     # arquivo em `path` ficou pronto; false mantém a captura normal.
     def write_leveled_image(view, plan, path, options)
       original = view.camera
+      original_state = camera_state_of(view)
       temp = leveled_camera_for(plan)
       scale = options[:height].to_f / plan[:height]
       scale = 1.0 if scale <= 0
@@ -2102,11 +2130,7 @@ module SpaceNode
         view.camera = temp
         ok = view.write_image(write_options)
       ensure
-        begin
-          view.camera = original
-        rescue StandardError
-          nil
-        end
+        restore_view_camera(view, original, original_state)
       end
       return false unless ok && File.exist?(path)
 
@@ -2288,6 +2312,58 @@ module SpaceNode
         model.active_view.camera = page.camera if uses_camera
       rescue StandardError
         nil
+      end
+    end
+
+    # view.camera devolve a câmera VIVA da vista. Guardar essa referência e
+    # reatribuí-la depois pode não restaurar nada (o SketchUp escreve os
+    # valores no próprio objeto), e aí a viewport fica na câmera temporária —
+    # a refletida do espelho ou a nivelada. Guardamos os números JUNTO com a
+    # referência: restaura pela referência, que preserva estados que um
+    # Camera.new não reproduz (perspectiva de 2 pontos nativa, por exemplo), e
+    # só remonta a partir dos números se a vista não tiver voltado.
+    def camera_state_of(view)
+      c = view.camera
+      {
+        :eye => c.eye, :target => c.target, :up => c.up,
+        :perspective => c.perspective? ? true : false,
+        :fov => (c.perspective? ? c.fov : nil),
+        :height => (c.perspective? ? nil : c.height),
+        :aspect_ratio => (c.respond_to?(:aspect_ratio) ? c.aspect_ratio.to_f : nil)
+      }
+    rescue StandardError
+      nil
+    end
+
+    def camera_matches?(camera, state)
+      return true unless state
+      return false unless camera
+      camera.eye.distance(state[:eye]) < 1e-3 && camera.target.distance(state[:target]) < 1e-3
+    rescue StandardError
+      false
+    end
+
+    def restore_view_camera(view, original, state)
+      begin
+        view.camera = original if original
+      rescue StandardError
+        nil
+      end
+      return true if camera_matches?(view.camera, state)
+
+      begin
+        cam = ::Sketchup::Camera.new(state[:eye], state[:target], state[:up])
+        cam.perspective = state[:perspective] ? true : false
+        if state[:perspective]
+          cam.fov = state[:fov] if state[:fov]
+        elsif state[:height]
+          cam.height = state[:height]
+        end
+        cam.aspect_ratio = state[:aspect_ratio] if state[:aspect_ratio] && cam.respond_to?(:aspect_ratio=)
+        view.camera = cam
+        true
+      rescue StandardError
+        false
       end
     end
 
@@ -2741,9 +2817,13 @@ module SpaceNode
         restore_rendering_options(rendering, clean_saved)
         restore_sun_override(model, sun_saved)
         # Moldura temporária (só quando a câmera não tinha a escolhida).
+        # Restaurada na câmera VIVA: se algum passo (espelho, nivelamento)
+        # trocou o objeto da vista, capture_camera virou cópia solta e
+        # escrever nela deixaria a moldura presa na viewport do usuário.
         if aspect_saved && (aspect_saved - aspect).abs > 0.001
           begin
-            capture_camera.aspect_ratio = aspect_saved
+            live = view.camera
+            live.aspect_ratio = aspect_saved if live.respond_to?(:aspect_ratio=)
           rescue StandardError
             nil
           end
@@ -5439,17 +5519,14 @@ module SpaceNode
         attr_accessor :guide, :aspect, :model_id
 
         def initialize
-          super('com.spacenode.sketchup.guides', 'SPACENODE · Guias de composição',
-                description: 'Terços, proporção áurea, centro ou diagonais sobre a vista, dentro da moldura escolhida.')
+          super('com.spacenode.sketchup.guides', 'SPACENODE · Moldura e guias',
+                description: 'A moldura do que a captura vai ver, e as guias de composição dentro dela.')
           @guide = 'none'
           @aspect = 0.0
           @model_id = nil
         end
 
         def draw(view)
-          segments = SpaceNode::SketchUp.guide_segments(@guide)
-          return if segments.empty?
-
           w = view.vpwidth.to_f
           h = view.vpheight.to_f
           return if w < 2 || h < 2
@@ -5467,6 +5544,53 @@ module SpaceNode
               y0 = (h - fh) / 2.0
             end
           end
+
+          # A captura NÃO é um print da viewport: ela re-renderiza no quadro
+          # escolhido preservando o campo de visão VERTICAL. Numa viewport
+          # 2,6:1 com 16:9 escolhido, ~32% da largura fica fora — e até aqui
+          # nada na tela dizia isso (a moldura só era desenhada junto com uma
+          # guia de composição, e as barras nativas do SketchUp só existem
+          # DURANTE o write_image). O que fica fora sai escurecido.
+          if fw < w - 1 || fh < h - 1
+            # Quando a própria câmera já está com a moldura, o SketchUp desenha
+            # as barras cinza — escurecer de novo por cima seria ruído. Aí a
+            # overlay entra só com a borda (e as guias, abaixo).
+            native = begin
+              view.camera.aspect_ratio.to_f
+            rescue StandardError
+              0.0
+            end
+            bands = []
+            if (native - @aspect.to_f).abs > 0.001
+              if x0 > 0.5
+                bands << [[0.0, 0.0], [x0, 0.0], [x0, h], [0.0, h]]
+                bands << [[x0 + fw, 0.0], [w, 0.0], [w, h], [x0 + fw, h]]
+              end
+              if y0 > 0.5
+                bands << [[0.0, 0.0], [w, 0.0], [w, y0], [0.0, y0]]
+                bands << [[0.0, y0 + fh], [w, y0 + fh], [w, h], [0.0, h]]
+              end
+            end
+            unless bands.empty?
+              view.drawing_color = ::Sketchup::Color.new(0, 0, 0, 92)
+              bands.each do |b|
+                view.draw2d(::GL_QUADS, b.map { |p| ::Geom::Point3d.new(p[0], p[1], 0) })
+              end
+            end
+            border = [[x0, y0], [x0 + fw, y0], [x0 + fw, y0 + fh], [x0, y0 + fh], [x0, y0]]
+              .map { |p| ::Geom::Point3d.new(p[0], p[1], 0) }
+            view.line_stipple = ''
+            view.line_width = 3
+            view.drawing_color = ::Sketchup::Color.new(0, 0, 0, 70)
+            view.draw2d(::GL_LINE_STRIP, border)
+            view.line_width = 1
+            view.drawing_color = ::Sketchup::Color.new(255, 255, 255, 220)
+            view.draw2d(::GL_LINE_STRIP, border)
+          end
+
+          segments = SpaceNode::SketchUp.guide_segments(@guide)
+          return if segments.empty?
+
           points = []
           segments.each do |s|
             points << ::Geom::Point3d.new(x0 + s[0] * fw, y0 + s[1] * fh, 0)

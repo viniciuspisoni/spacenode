@@ -1169,6 +1169,7 @@
       <div class="field">
         <span class="field-label" id="L_photoAspect">Proporção</span>
         <div class="pills" id="aspectPills" role="radiogroup" aria-label="Proporção"></div>
+        <div class="hint" id="aspectHint" style="display:none"></div>
       </div>
       <div class="field">
         <span class="field-label" id="L_photoLens">Lente</span>
@@ -1425,6 +1426,13 @@
         },
         sun: { atual: 'Atual', manha: 'Manhã', meiodia: 'Meio-dia', tarde: 'Entardecer', golden: 'Golden hour' },
         L_photo: 'Fotografia', L_photoAspect: 'Proporção', L_photoLens: 'Lente', L_photoEye: 'Altura do olho',
+        cropSides: 'laterais fora', cropTopBottom: 'topo e base fora',
+        cropHintSides: function (a) {
+          return 'A tela está em ' + a + ' — mais larga que o quadro escolhido, então as laterais ficam fora da captura. A moldura na viewport mostra o que entra.';
+        },
+        cropHintTopBottom: function (a) {
+          return 'A tela está em ' + a + ' — mais estreita que o quadro escolhido, então o topo e a base ficam fora da captura. A moldura na viewport mostra o que entra.';
+        },
         L_photoLevel: 'Verticais', L_photoGuide: 'Guias de composição',
         aspectFree: 'Livre',
         lensMm: function (mm) { return mm + ' mm'; },
@@ -1591,6 +1599,13 @@
         },
         sun: { atual: 'Current', manha: 'Morning', meiodia: 'Midday', tarde: 'Late afternoon', golden: 'Golden hour' },
         L_photo: 'Photography', L_photoAspect: 'Aspect ratio', L_photoLens: 'Lens', L_photoEye: 'Eye height',
+        cropSides: 'sides cropped', cropTopBottom: 'top and bottom cropped',
+        cropHintSides: function (a) {
+          return 'The screen is ' + a + ' — wider than the chosen frame, so the sides fall outside the capture. The frame on the viewport shows what goes in.';
+        },
+        cropHintTopBottom: function (a) {
+          return 'The screen is ' + a + ' — narrower than the chosen frame, so the top and bottom fall outside the capture. The frame on the viewport shows what goes in.';
+        },
         L_photoLevel: 'Verticals', L_photoGuide: 'Composition guides',
         aspectFree: 'Free',
         lensMm: function (mm) { return mm + ' mm'; },
@@ -1856,7 +1871,7 @@
      'editMaterialSelect','editButton','editLabel','editMeta','maskCanvas','maskHint','maskToggle','maskClear',
      'spaceSection','spaceName','spaceCategoryPills',
      'spaceButton','spaceLabel','spaceMeta','spaceNote','spaceProgress','spaceResults','openSpaceButton',
-     'photoSection','photoHud','aspectPills','lensPills','eyePills','eyeHint','levelPills','levelHint','guidePills','guideHint','photoNote','guidesSvg',
+     'photoSection','photoHud','aspectPills','aspectHint','lensPills','eyePills','eyeHint','levelPills','levelHint','guidePills','guideHint','photoNote','guidesSvg',
      'mirrorPills','mirrorHint'
     ].forEach(function (id) { els[id] = $(id); });
 
@@ -2642,6 +2657,20 @@
       if (typeof cam.tiltDeg === 'number' && Math.abs(cam.tiltDeg) >= 0.5) parts.push(tt('hudTilt', fmtNum(Math.abs(cam.tiltDeg), 0), cam.tiltDeg > 0));
       return parts.join(' · ');
     }
+    // A captura NÃO é um print da viewport: ela re-renderiza no quadro
+    // escolhido preservando o campo de visão VERTICAL. Quando o quadro é mais
+    // fechado que a tela, sobra coisa de fora — e isso precisa aparecer ANTES
+    // de capturar, não depois.
+    function cropSide() {
+      var chosen = Number(model.photoAspect || 0);
+      if (!(chosen > 0)) return null;
+      var view = Number((model.camera && model.camera.viewAspect) || 0);
+      if (!(view > 0) || Math.abs(view - chosen) < 0.02) return null;
+      return view > chosen ? 'sides' : 'topbottom';
+    }
+    function fmtAspect(v) {
+      return (Math.round(v * 100) / 100).toString().replace('.', ',') + ':1';
+    }
     function renderPhotoControls() {
       if (!els.aspectPills) return;
       var cam = model.camera;
@@ -2653,6 +2682,13 @@
           model.photoAspect = o.value; syncPhoto(); applyPreviewAspect(); renderPhotoControls(); persistStateSoon();
         });
       }));
+
+      var side = cropSide();
+      els.aspectHint.textContent = side
+        ? tt(side === 'sides' ? 'cropHintSides' : 'cropHintTopBottom',
+             fmtAspect(Number(model.camera.viewAspect)))
+        : '';
+      els.aspectHint.style.display = side ? '' : 'none';
 
       fill(els.lensPills, LENS_OPTIONS.map(function (mm) {
         var active = !!(cam && cam.perspective && Math.abs((cam.focalLengthMm || 0) - mm) <= 1);
@@ -2711,6 +2747,12 @@
       if (model.mirrors && model.mirrors.count > 0) hud += (hud ? ' · ' : '') + tt('hudMirrors', model.mirrors.count);
       els.photoHud.textContent = hud;
       drawGuides();
+      // A linha "Fotografia" resume estes controles — sem isto ela só se
+      // atualizava quando OUTRO evento passasse pelo updateShell, e ficava
+      // dizendo "Livre" depois de o usuário já ter escolhido 16:9.
+      if (typeof shell !== 'undefined' && shell) {
+        try { updateRows(); } catch (e) {}
+      }
     }
     // Espelhos: ações sobre a seleção atual do SketchUp (o painel não
     // enxerga o modelo — o Ruby lê model.selection na hora do clique).
@@ -4139,8 +4181,12 @@
       $s('rowLightValue').textContent = joinParts([
         model.lighting ? pLabel(model.lighting) : '', sunLabel
       ]);
+      var cropSideNow = cropSide();
       $s('rowPhotoValue').textContent = joinParts([
-        activePillText('aspectPills'), activePillText('lensPills'), model.photoLevel ? activePillText('levelPills') : ''
+        activePillText('aspectPills'),
+        cropSideNow ? tt(cropSideNow === 'sides' ? 'cropSides' : 'cropTopBottom') : '',
+        activePillText('lensPills'),
+        model.photoLevel ? activePillText('levelPills') : ''
       ]);
       // O preço vinha só dentro da folha, no cartão de Qualidade — e mudava
       // quando se trocava de motor. Na linha ele fica à vista sem abrir nada.
