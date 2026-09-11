@@ -33,6 +33,9 @@ import { DNA_EXTRACTION_COST, getVistaGenerationCost, getAvailableQualities } fr
 import { getUpscaleCostNodes, scaleToFactor, MAX_OUTPUT_MP, type ModeId, type Scale } from '@/lib/upscale'
 import { PRESET_LABELS_EN } from '@/lib/sketchup/preset-labels-en'
 import { PLUGIN_VERSION, PLUGIN_RBZ_PATH, PLUGIN_RELEASE_NOTE } from '@/lib/sketchup/plugin-release'
+import { ORION_CONFIG } from '@/lib/orion/config'
+import { canUseOrion } from '@/lib/orion/access'
+import { orionProviderReady } from '@/lib/orion/provider'
 
 // i18n EN do painel do plugin: presets (mapa gerado, valor enviado à API
 // segue pt-BR) + rótulos estruturais do catálogo. O chrome do painel
@@ -42,7 +45,7 @@ const CATALOG_I18N_EN = {
   ui: {
     projectTypes: { interior: 'Interior', exterior: 'Exterior' } as Record<string, string>,
     backgroundLabels: { interior: 'Visual context', exterior: 'Surroundings' } as Record<string, string>,
-    engineTaglines: { vega: 'Premium', pulsar: 'Fast', quasar: 'Special · ~2 min' } as Record<string, string>,
+    engineTaglines: { vega: 'Premium', pulsar: 'Fast', quasar: 'Special · ~2 min', orion: 'Experimental' } as Record<string, string>,
     resolutionNotes: {
       hd: 'Quick tests',
       '2k': 'Ideal for presentations',
@@ -173,6 +176,11 @@ export async function GET(req: NextRequest) {
   const { user } = await getRequestUser(req)
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
+  // Mesmo gate da página e da rota de geração — decidido no SERVIDOR. O
+  // painel do plugin só mostra o que vier aqui.
+  const orionAllowed =
+    (await canUseOrion({ id: user.id, email: user.email })) && orionProviderReady()
+
   // Ampliar: grade derivada DA PRÓPRIA função de custo (zero drift). O
   // surcharge por megapixel é do INPUT: derivado por sondas na mesma função.
   const upscaleModes: { id: ModeId; label: string; scales: Scale[] }[] = [
@@ -230,20 +238,42 @@ export async function GET(req: NextRequest) {
     upscale,
     spaces,
     animar: buildAnimarCatalog(),
-    engines: ENGINE_ORDER.map(id => {
-      const e = ENGINES[id]
-      return {
-        id,
-        name: e.name,
-        tagline: e.tagline,
-        resolutions: e.resolutions.map(r => ({
-          id: r,
-          label: RESOLUTION_LABELS[r].label,
-          note: RESOLUTION_LABELS[r].note,
-          nodes: e.nodes[r] ?? 0,
-        })),
-      }
-    }),
+    engines: [
+      ...ENGINE_ORDER.map(id => {
+        const e = ENGINES[id]
+        return {
+          id,
+          name: e.name,
+          tagline: e.tagline,
+          resolutions: e.resolutions.map(r => ({
+            id: r,
+            label: RESOLUTION_LABELS[r].label,
+            note: RESOLUTION_LABELS[r].note,
+            nodes: e.nodes[r] ?? 0,
+          })),
+        }
+      }),
+      // Orion vive FORA do catálogo público (lib/engines) e só entra na
+      // resposta quando o servidor autoriza: flag + credencial do fornecedor,
+      // o mesmo gate da página /app/generate. Sem isso o painel ofereceria um
+      // motor que o /api/generate recusaria com 404. O plugin monta os cards
+      // a partir desta lista, então nenhum .rbz novo é necessário.
+      ...(orionAllowed
+        ? [{
+            id: ORION_CONFIG.id,
+            name: ORION_CONFIG.name,
+            tagline: ORION_CONFIG.tagline,
+            resolutions: ORION_CONFIG.resolutions.map(r => ({
+              id: r,
+              label: RESOLUTION_LABELS[r].label,
+              // O "4K" do Orion é UHD (3840 no lado maior, teto do
+              // fornecedor), não os 4096 px de Vega/Pulsar.
+              note: RESOLUTION_LABELS[r].note,
+              nodes: ORION_CONFIG.nodes[r] ?? 0,
+            })),
+          }]
+        : []),
+    ],
     // Sem `fidelityLevels`/`defaults.fidelityLevel` desde a v5: o seletor
     // foi descontinuado (fidelidade é sempre máxima). O plugin v0.5.2 em
     // campo lê `fidelityLevels || []` e renderiza a seção vazia — inofensivo.

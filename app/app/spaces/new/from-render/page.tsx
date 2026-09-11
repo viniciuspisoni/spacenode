@@ -28,6 +28,10 @@ export default async function FromRenderPage({
       .eq('status', 'completed')
       .neq('ambient', 'upscale')
       .neq('ambient', 'video')
+      // Piloto interno (Orion) fica fora da galeria: o Space herda o motor da
+      // render e `spaces.engine` só conhece os públicos. A rota
+      // /api/spaces/from-render recusa igual, para chamada forjada.
+      .neq('engine', 'orion')
       .not('output_url', 'is', null)
       .order('created_at', { ascending: false })
       .limit(60),
@@ -47,7 +51,9 @@ export default async function FromRenderPage({
   const gallery     = (await signRows(admin, galleryRes.data ?? [], ['output_url'])) as RenderGalleryItem[]
   const balance     = payerBalance.totalBalance
   const preselectedRaw = (preselectedRes.data ?? null) as RenderGalleryItem | null
-  const preselected: RenderGalleryItem | null = preselectedRaw
+  // ?render_id apontando pra uma render do piloto cai na galeria comum em vez
+  // de pré-selecionar um resultado que a API vai recusar.
+  const preselected: RenderGalleryItem | null = preselectedRaw && (preselectedRaw.engine as string) !== 'orion'
     ? { ...preselectedRaw, output_url: (await signStorageUrl(admin, preselectedRaw.output_url)) ?? preselectedRaw.output_url }
     : null
 
