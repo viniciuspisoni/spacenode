@@ -87,11 +87,31 @@ function num(v: unknown): number | null {
   return typeof v === 'number' && Number.isFinite(v) ? v : null
 }
 
+/** Id do motor como fica PERSISTIDO na coluna (renders/vistas/edits.engine).
+ *  Match exato, sem heurística — é a fonte mais confiável e tem precedência. */
+const ENGINE_ID_LABELS: Record<string, string> = {
+  vega:   'Vega',
+  pulsar: 'Pulsar',
+  quasar: 'Quasar',
+  orion:  'Orion',
+}
+
 export function engineDisplayLabel(raw: string | null | undefined): string | null {
   if (!raw) return null
-  const v = raw.toLowerCase()
+  const v = raw.trim().toLowerCase()
+
+  // 1. Motor persistido primeiro. Era a heurística de substring abaixo que
+  //    carimbava "Quasar" em QUALQUER string com 'gpt-image' — inclusive nos
+  //    modelos do Orion (gpt-image-2.5-*), que não são o Quasar.
+  const byId = ENGINE_ID_LABELS[v]
+  if (byId) return byId
+
+  // 2. Modelo/endpoint cru (Editar V3 grava o modelo; admin vê o endpoint).
+  //    'gpt-image-2.5' ANTES do 'gpt-image' genérico — o 2.5 contém o 2.
+  if (v.includes('gpt-image-2.5'))                          return 'Orion'
   if (v.includes('nano-banana-pro') || v.includes('vega'))   return 'Vega'
-  // 'gpt-image' = renders antigos (Quasar era GPT Image 2 até 2026-09-05).
+  // 'gpt-image' sem o 2.5 = renders ANTIGOS: o Quasar era GPT Image 2 até
+  // 2026-09-05, e esses registros continuam se identificando como Quasar.
   if (v.includes('seedream') || v.includes('gpt-image') || v.includes('quasar')) return 'Quasar'
   if (v.includes('nano-banana')     || v.includes('pulsar')) return 'Pulsar'
   // Editar V3 grava o modelo Google cru (gemini-*-image); mesmos motores das

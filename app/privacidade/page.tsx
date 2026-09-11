@@ -1,12 +1,17 @@
 // /privacidade — Política de Privacidade da SpaceNode (LGPD).
 //
 // Redigida para refletir o tratamento REAL de dados do produto: Supabase
-// (auth/banco/storage), Vercel (hospedagem), Google Cloud e fal.ai (IA),
+// (auth/banco/storage), Vercel (hospedagem), Google Cloud, fal.ai e OpenAI
+// (IA — OpenAI entrou em 2026-09-11 com o motor Orion, que virou público),
 // Stripe (pagamentos), zero analytics/pixel de TERCEIROS (cookies essenciais +
 // tema em localStorage + cookie PRÓPRIO de atribuição de campanha
 // sn_attribution — first-party, sem dados pessoais, citado na cláusula 7 em
 // 2026-07-18). Se algum tracker de terceiro for adicionado no futuro, a
 // cláusula 7 PRECISA ser atualizada junto (e consentimento, quando exigido).
+//
+// Regra do repo (mesmo procedimento aplicado à BytePlus): todo novo
+// suboperador que processa imagem/conteúdo de USUÁRIO precisa entrar aqui
+// (cláusulas 4-6) ANTES de sair do modo interno/staff-only.
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { LegalShell, LegalSection, P, UL, LI, Strong } from '@/components/legal/LegalShell'
@@ -19,7 +24,7 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 }
 
-const UPDATED_AT = '18 de julho de 2026'
+const UPDATED_AT = '11 de setembro de 2026'
 
 export default function PrivacidadePage() {
   return (
@@ -113,8 +118,8 @@ export default function PrivacidadePage() {
       <LegalSection n={4} title="Suas imagens e a inteligência artificial">
         <P>
           Para gerar os resultados, as imagens e instruções que você envia são transmitidas de forma segura a
-          provedores de IA contratados — atualmente Google Cloud (Vertex AI/Gemini) e fal.ai — exclusivamente
-          para processar a sua solicitação.
+          provedores de IA contratados — atualmente Google Cloud (Vertex AI/Gemini), fal.ai e OpenAI —
+          exclusivamente para processar a sua solicitação.
         </P>
         <P>
           <Strong>Não usamos o seu conteúdo para treinar modelos de IA próprios</Strong>, e contratamos os
@@ -129,7 +134,8 @@ export default function PrivacidadePage() {
         <UL>
           <LI><Strong>Supabase</Strong> — banco de dados, autenticação e armazenamento de arquivos;</LI>
           <LI><Strong>Vercel</Strong> — hospedagem e infraestrutura da aplicação;</LI>
-          <LI><Strong>Google Cloud</Strong> e <Strong>fal.ai</Strong> — processamento de IA das suas gerações;</LI>
+          <LI><Strong>Google Cloud</Strong>, <Strong>fal.ai</Strong> e <Strong>OpenAI</Strong> — processamento de IA
+          das suas gerações;</LI>
           <LI><Strong>Stripe</Strong> — processamento de pagamentos.</LI>
         </UL>
         <P>

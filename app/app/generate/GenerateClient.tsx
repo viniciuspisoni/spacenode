@@ -12,6 +12,10 @@ import {
   type EngineId, type Resolution,
   getNodesCost, isEngineId, isResolution, isValidCombination,
 } from '@/lib/engines'
+import {
+  ORION_CONFIG, getOrionNodesCost,
+  type OrionProvider, type OrionVariant, type RenderEngineId,
+} from '@/lib/orion/config'
 import { EngineIcon } from '@/components/icons/engines'
 import InsufficientNodesCta from '@/components/app/InsufficientNodesCta'
 import { consumeHandoff } from '@/components/nodi/actions-bus'
@@ -33,6 +37,13 @@ interface GenerateClientProps {
   returnTo?:         'spaces/new'
   /** true = a conta nunca gerou uma render — o Guia da primeira imagem abre sozinho. */
   firstRender?:      boolean
+  /** Motor Orion liberado pra ESTE usuário. Decidido no servidor (page.tsx:
+   *  ORION_INTERNAL_ENABLED + credencial do fornecedor); aqui só governa a
+   *  exibição do card. A rota /api/generate re-valida em toda geração — este
+   *  booleano não autoriza nada. */
+  orionEnabled?:     boolean
+  /** Fornecedor ativo do Orion (env privada do servidor) — exibição apenas. */
+  orionProvider?:    OrionProvider
 }
 
 // Persisted last-used render config (profiles.project_config — JSONB).
@@ -69,6 +80,14 @@ interface GenerateResult {
   semanticWarning?: boolean
   /** Seed usada na geração (caminho GCP) — reenviada no "Corrigir drift". */
   seed?: number
+  /** Identidade real do Orion na entrega: com quem foi gerado e o que saiu. */
+  orion?: {
+    provider:      OrionProvider
+    variant:       OrionVariant
+    quality:       string
+    requestedSize: string
+    deliveredSize: string | null
+  } | null
   prompt?:   string
   error?:    string
 }
@@ -245,7 +264,7 @@ function ProjectTypeGlyph({ type }: { type: ProjectType }) {
   )
 }
 
-export function GenerateClient({ initialCredits, isSubscriber = false, initialMaterials, initialConfig, initialSourceUrl, returnTo, firstRender = false }: GenerateClientProps) {
+export function GenerateClient({ initialCredits, isSubscriber = false, initialMaterials, initialConfig, initialSourceUrl, returnTo, firstRender = false, orionEnabled = false, orionProvider }: GenerateClientProps) {
   const init = resolveInitialConfig(initialConfig, isSubscriber)
   const fromSpacesNew = returnTo === 'spaces/new'
   const supabase = createClient()
@@ -273,8 +292,15 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
   // ── Parâmetros técnicos
   const geometryLock = 85
   const fidelityMode = 'strict' as const
-  const [selectedEngine,     setSelectedEngine]     = useState<EngineId>(init.selectedEngine)
+  // RenderEngineId (não EngineId): 'orion' vive fora do catálogo público.
+  // resolveInitialConfig nunca devolve 'orion' — config salva não ressuscita
+  // o Orion sozinha (a rota re-checa canUseOrion de qualquer jeito).
+  const [selectedEngine,     setSelectedEngine]     = useState<RenderEngineId>(init.selectedEngine)
   const [selectedResolution, setSelectedResolution] = useState<Resolution>(init.selectedResolution)
+  const isOrion = selectedEngine === 'orion'
+  // Último motor PÚBLICO escolhido — é ele que vai pro profiles.project_config
+  // (Orion não pode virar default compartilhado com Spaces/plugin/Nodi).
+  const lastPublicEngineRef = useRef<EngineId>(init.selectedEngine)
 
   // ── Materiais
   const [materiaisAberto, setMateriaisAberto] = useState(false)
@@ -308,6 +334,9 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
   // Id da última render persistida — usado pelo CTA "Criar Space" pra
   // ligar o Space novo à render como Vista Mestre.
   const [lastRenderId,      setLastRenderId]      = useState<string | null>(null)
+  // Identidade Orion do ÚLTIMO RESULTADO (não do card selecionado agora):
+  // rótulo do resultado e bloqueio da promoção pro Spaces leem daqui.
+  const [lastOrion,         setLastOrion]         = useState<GenerateResult['orion']>(null)
   const [sliderPos,         setSliderPos]         = useState(50)
   const [isDraggingSlider,  setIsDraggingSlider]  = useState(false)
   const [isDraggingFile,    setIsDraggingFile]    = useState(false)
@@ -511,16 +540,21 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
       try {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return
+        // Orion NUNCA é persistido como configuração padrão: project_config é
+        // lido por outros fluxos (e por qualquer sessão futura, inclusive sem
+        // acesso interno). Grava o último motor público escolhido.
         const config: ProjectConfig = {
           projectType, segment, environment, lighting, background,
-          sceneElements, selectedEngine, selectedResolution,
+          sceneElements,
+          selectedEngine:     isOrion ? lastPublicEngineRef.current : selectedEngine,
+          selectedResolution: isOrion ? DEFAULT_RESOLUTION : selectedResolution,
         }
         await supabase.from('profiles').update({ project_config: config }).eq('id', user.id)
       } catch (e) { console.error('Erro ao salvar config:', e) }
     }, 1500)
   }, [
     projectType, segment, environment, lighting, background,
-    sceneElements, selectedEngine, selectedResolution,
+    sceneElements, selectedEngine, selectedResolution, isOrion,
     supabase,
   ])
 
@@ -689,6 +723,9 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
       setFidelityScore(typeof data.fidelityScore === 'number' ? data.fidelityScore : null)
       setFidelityWarning(Boolean(data.fidelityWarning) || Boolean(data.semanticWarning))
       setLastSeed(typeof data.seed === 'number' ? data.seed : null)
+      // Identidade do resultado (não do card selecionado agora): é ela que
+      // decide o rótulo e o bloqueio da promoção pro Spaces.
+      setLastOrion(data.orion ?? null)
       setScale(1); setPan({ x: 0, y: 0 })
       if (refinementText.trim()) setRefinementText('')
     } catch (err: unknown) {
@@ -841,8 +878,11 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
     const v = materials[field]
     return v && v.trim()
   })
-  const currentEngine = ENGINES[selectedEngine]
-  const nodeCost      = getNodesCost(selectedEngine, selectedResolution)
+  // ORION_CONFIG expõe name/tagline/resolutions/nodes com a MESMA forma do
+  // catálogo público — o card e a grade de qualidade não precisam saber a
+  // diferença.
+  const currentEngine = isOrion ? ORION_CONFIG : ENGINES[selectedEngine]
+  const nodeCost      = isOrion ? getOrionNodesCost(selectedResolution as '2k' | '4k') : getNodesCost(selectedEngine, selectedResolution)
   const segments      = getSegments(projectType)
   const environments  = getEnvironments(projectType, segment)
   const lightingOpts  = getLighting(projectType, segment)
@@ -853,7 +893,7 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
   const noNodes       = credits < nodeCost
   // Quantos renders o saldo total cobre na config atual — recalcula client-side
   // a cada troca de motor/qualidade e após cada geração (credits é estado).
-  const rendersAfford = Math.floor(credits / nodeCost)
+  const rendersAfford = nodeCost > 0 ? Math.floor(credits / nodeCost) : null
 
   // Melhor combinação motor × resolução que ainda cabe no saldo — a saída
   // honesta pra quem está sem nodes: gerar com menos qualidade em vez de pagar.
@@ -1067,6 +1107,7 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
                   style={{...S.motorOpt, ...(active ? S.motorOptActive : {})}}
                   onClick={() => {
                     setSelectedEngine(eid)
+                    lastPublicEngineRef.current = eid
                     // Se a resolução atual não é suportada, cai pra 2K.
                     if (!e.resolutions.includes(selectedResolution)) {
                       setSelectedResolution('2k')
@@ -1081,8 +1122,49 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
                 </div>
               )
             })}
+
+            {/* Orion. O card só existe quando o servidor autorizou
+                (ORION_INTERNAL_ENABLED + credencial do fornecedor). Mesmo
+                desenho dos demais; o glifo é local porque Orion não entra no
+                set de ícones de produto. */}
+            {orionEnabled && (
+              <div
+                role="button"
+                aria-pressed={isOrion}
+                aria-label={`Motor ${ORION_CONFIG.name} · ${ORION_CONFIG.tagline}`}
+                title={ORION_CONFIG.description}
+                style={{...S.motorOpt, ...(isOrion ? S.motorOptActive : {})}}
+                onClick={() => {
+                  setSelectedEngine('orion')
+                  setSelectedResolution('2k')
+                }}
+              >
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{flexShrink:0}}>
+                  <circle cx="7"  cy="6"  r="1.5" fill="currentColor" />
+                  <circle cx="17" cy="8"  r="1.5" fill="currentColor" />
+                  <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+                  <circle cx="8"  cy="18" r="1.5" fill="currentColor" />
+                  <circle cx="18" cy="17" r="1.5" fill="currentColor" />
+                  <path d="M7 6l5 6M17 8l-5 4M12 12l-4 6M12 12l6 5" stroke="currentColor" strokeWidth="1" opacity="0.5" />
+                </svg>
+                <div style={{display:'flex', flexDirection:'column', minWidth:0}}>
+                  <div style={{...S.motorName, ...(isOrion ? {color:'var(--color-bg)'} : {})}}>{ORION_CONFIG.name}</div>
+                  <div style={{...S.motorDesc, ...(isOrion ? {color:'var(--color-bg)', opacity:0.6} : {})}}>{ORION_CONFIG.tagline}</div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
+
+        {/* 11 — Orion: nota. Variante e qualidade não são mais escolha do
+            usuário (servidor sempre usa Flare/high — ver lib/orion/config);
+            resolução (2K/4K) é escolhida na seção "Qualidade de Saída" abaixo,
+            igual aos motores públicos. */}
+        {orionEnabled && isOrion && (
+          <div style={{fontSize:10, color:'var(--color-text-tertiary)', marginTop:-4, marginBottom:4, lineHeight:1.5}}>
+            Fornecedor {orionProvider === 'fal' ? 'fal.ai' : 'OpenAI'} · resultado ainda não vira projeto no Spaces
+          </div>
+        )}
 
         {/* 12 — Qualidade de Saída */}
         <div style={S.section}>
@@ -1097,7 +1179,9 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
                   onClick={() => setSelectedResolution(res)}
                 >
                   <div style={{...S.qualityRes, ...(active ? {color:'var(--color-bg)'} : {})}}>{res.toUpperCase()}</div>
-                  <div style={{...S.motorDesc, ...(active ? {color:'var(--color-bg)', opacity:0.6} : {})}}>{cost} Nodes por imagem</div>
+                  <div style={{...S.motorDesc, ...(active ? {color:'var(--color-bg)', opacity:0.6} : {})}}>
+                    {cost === 0 ? 'Teste interno · 0 Nodes' : `${cost} Nodes por imagem`}
+                  </div>
                   <div style={{...S.motorDesc, ...(active ? {color:'var(--color-bg)', opacity:0.6} : {})}}>{RESOLUTION_DESC[res]}</div>
                 </div>
               )
@@ -1199,6 +1283,10 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
             >
               ver planos
             </Link>
+          </div>
+        ) : rendersAfford === null ? (
+          <div style={S.balanceReach}>
+            teste interno — não consome nodes
           </div>
         ) : (
           <div style={S.balanceReach}>
@@ -1380,8 +1468,36 @@ export function GenerateClient({ initialCredits, isSubscriber = false, initialMa
               </div>
             )}
 
-            {/* CTA Spaces — induz o próximo passo natural após a render. */}
-            {lastRenderId && (
+            {/* Orion: o resultado diz com quem foi gerado e o que saiu de fato
+                (fornecedor e dimensão entregue — que pode divergir da
+                pedida). Variante/qualidade não aparecem mais: não são mais
+                escolha do usuário. */}
+            {lastOrion && (
+              <div style={{
+                marginTop: 10, padding: '10px 12px', borderRadius: 8,
+                border: '0.5px solid var(--color-border-strong)',
+                background: 'var(--color-bg-elevated)',
+                fontSize: 11, color: 'var(--color-text-secondary)', lineHeight: 1.6,
+              }}>
+                <div style={{color:'var(--color-text-primary)', fontWeight:500}}>
+                  Orion
+                </div>
+                <div>
+                  {lastOrion.provider === 'fal' ? 'fal.ai' : 'OpenAI'} ·
+                  {' '}{lastOrion.deliveredSize ?? 'dimensão não informada'}
+                  {lastOrion.deliveredSize && lastOrion.deliveredSize !== lastOrion.requestedSize
+                    ? ` (pedido ${lastOrion.requestedSize})`
+                    : ''}
+                  {' '}· resultado ainda não vira projeto no Spaces
+                </div>
+              </div>
+            )}
+
+            {/* CTA Spaces — induz o próximo passo natural após a render.
+                Resultado do Orion não vira projeto: a decisão olha o motor do
+                RESULTADO, não o card selecionado agora (o usuário pode ter
+                trocado de card depois de gerar). O servidor recusa igual. */}
+            {lastRenderId && !lastOrion && (
               <a
                 href={`/app/spaces/new/from-render?render_id=${lastRenderId}`}
                 className="render-to-space-cta"

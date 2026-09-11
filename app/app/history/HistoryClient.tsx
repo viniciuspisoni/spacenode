@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { toMediaProxyUrl } from '@/lib/storage/media-url'
 import { GenerationDetailDrawer } from '@/components/history/GenerationDetailDrawer'
 import { authorInitials, type GenerationKind } from '@/lib/history/generation-detail'
+import { isInternalRenderRow } from '@/lib/orion/config'
 import type { Edit } from '@/lib/spaces/types'
 import { BLOCOS3D_ENGINES } from '@/lib/blocos3d/config'
 import type { Blocos3DJobView } from '@/lib/blocos3d/types'
@@ -88,11 +89,23 @@ function qualityLabel(nodes: number): string | null {
   return null
 }
 
+// Mesma régua de lib/history/generation-detail: motor PERSISTIDO primeiro
+// (match exato), heurística de substring só pro modelo/endpoint cru dos
+// registros antigos. 'gpt-image-2.5' (Orion) antes de 'gpt-image' (o Quasar
+// era GPT Image 2 até 2026-09-05 e continua se identificando como Quasar).
+const ENGINE_ID_LABELS: Record<string, string> = {
+  vega: 'Vega', pulsar: 'Pulsar', quasar: 'Quasar', orion: 'Orion',
+}
+
 function engineLabel(model: string | null | undefined): string | null {
   if (!model) return null
-  if (model.includes('nano-banana-pro') || model.includes('vega'))   return 'Vega'
-  if (model.includes('seedream') || model.includes('gpt-image') || model.includes('quasar')) return 'Quasar'
-  if (model.includes('nano-banana')     || model.includes('pulsar')) return 'Pulsar'
+  const v = model.trim().toLowerCase()
+  const byId = ENGINE_ID_LABELS[v]
+  if (byId) return byId
+  if (v.includes('gpt-image-2.5'))                            return 'Orion'
+  if (v.includes('nano-banana-pro') || v.includes('vega'))     return 'Vega'
+  if (v.includes('seedream') || v.includes('gpt-image') || v.includes('quasar')) return 'Quasar'
+  if (v.includes('nano-banana')     || v.includes('pulsar'))   return 'Pulsar'
   return null
 }
 
@@ -1272,7 +1285,13 @@ function RenderCard({
     if (!hovered || selectMode) setMenuOpen(false)
   }, [hovered, selectMode])
 
-  const isCreateSpaceEligible = render.ambient !== 'upscale' && render.ambient !== 'video' && !!render.output_url
+  // Piloto interno (Orion) não vira Space: mesma regra do servidor
+  // (isInternalRenderRow), que olha o motor do RESULTADO persistido e não o
+  // card selecionado na hora. /api/spaces/from-render recusa igual, então
+  // chamada forjada também não passa.
+  const isCreateSpaceEligible =
+    render.ambient !== 'upscale' && render.ambient !== 'video' && !!render.output_url &&
+    !isInternalRenderRow({ engine: renderEngineRaw(render) })
 
   const date      = formatDate(render.created_at)
   const isUpscale = render.ambient === 'upscale'
