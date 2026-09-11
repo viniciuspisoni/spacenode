@@ -27,7 +27,7 @@ module SpaceNode
   module SketchUp
     extend self
 
-    VERSION = '1.2.0'
+    VERSION = '1.3.0'
     PREFERENCES_KEY = 'com.spacenode.sketchup'
     DEFAULT_API_BASE_URL = 'https://spacenode.app'
     MIN_SKETCHUP_MAJOR = 21          # Ruby 2.7+; recomendado 2024+
@@ -36,7 +36,7 @@ module SpaceNode
     UPLOAD_TIMEOUT_SECONDS = 120     # sign/PUT/confirm (Sketchup::Http não tem timeout)
     DOWNLOAD_TIMEOUT_SECONDS = 180   # download_to_file (render/vídeo) — não tinha watchdog
     VIDEO_STAGE_TIMEOUT_SECONDS = 60 # GET do preview antes de animar (mesmo valor do quote do Ampliar)
-    CATALOG_MIN_VERSION = 8          # cache em disco mais velho que isso é descartado (v8 = engines[].description)
+    CATALOG_MIN_VERSION = 9          # cache em disco mais velho que isso é descartado (v9 = presets da planta)
 
     # Strings do Ruby visíveis no painel (etapas/erros centrais). O grosso da
     # UI é traduzido no dialog; mensagens vindas do SERVIDOR seguem em pt-BR.
@@ -90,6 +90,15 @@ module SpaceNode
         :pairing_expired => 'O código expirou. Clique em Conectar pra gerar outro.',
         :pairing_failed => 'Não foi possível conectar. Tente de novo.',
         :save_title => 'Salvar render',
+        :notif_plan_ready => 'Planta humanizada pronta',
+        :plan_capturing => 'Desenhando a planta do modelo…',
+        :plan_generating => 'Humanizando a planta na SPACENODE…',
+        :plan_no_model => 'Nenhum modelo aberto no SketchUp.',
+        :plan_empty => 'O modelo está vazio — não há planta pra desenhar.',
+        :plan_failed => 'Não foi possível desenhar a planta do modelo.',
+        :plan_no_catalog => 'Reconecte pra atualizar o catálogo da planta.',
+        :plan_invalid => 'Opção de planta inválida. Feche e reabra o painel pra atualizar o catálogo.',
+        :plan_lost => 'A planta demorou demais. Confira o Histórico antes de tentar de novo.',
         :animar_prep => 'Preparando o vídeo…',
         :animar_sending => 'Enviando o render…',
         :animating => 'Animando na SPACENODE…',
@@ -151,6 +160,15 @@ module SpaceNode
         :pairing_expired => 'The code expired. Click Connect to get a new one.',
         :pairing_failed => 'Could not connect. Try again.',
         :save_title => 'Save render',
+        :notif_plan_ready => 'Humanised plan ready',
+        :plan_capturing => 'Drawing the plan from the model…',
+        :plan_generating => 'Humanising the plan at SPACENODE…',
+        :plan_no_model => 'No model open in SketchUp.',
+        :plan_empty => 'The model is empty — there is no plan to draw.',
+        :plan_failed => 'Could not draw the plan from the model.',
+        :plan_no_catalog => 'Reconnect to refresh the plan catalogue.',
+        :plan_invalid => 'Invalid plan option. Close and reopen the panel to refresh the catalogue.',
+        :plan_lost => 'The plan took too long. Check History before trying again.',
         :animar_prep => 'Preparing the video…',
         :animar_sending => 'Uploading the render…',
         :animating => 'Animating on SPACENODE…',
@@ -193,6 +211,38 @@ module SpaceNode
     # errada no prompt é pior que medida nenhuma.
     ROOM_RAY_RANGE_M = (0.4..40.0)
     ROOM_CEILING_RANGE_M = (1.8..20.0)
+
+    # ── Planta do modelo (1.3.0) ──────────────────────────────────────────
+    #
+    # A Planta humanizada já existe no site, e lá ela exige que o usuário TENHA
+    # a planta como imagem: exportar do CAD, achar o arquivo, subir. Quem está
+    # dentro do SketchUp já tem o desenho — falta só olhar de cima.
+    #
+    # A captura é o que um arquiteto chama de planta: câmera no topo em
+    # projeção PARALELA (sem fuga), corte horizontal 1,20 m acima do piso e
+    # render em linha escondida. É a planta técnica que a rota espera.
+    PLAN_RENDER_MODE = 1              # hidden line — planta é desenho de linha
+    PLAN_MARGIN = 1.06                # folga em volta do pavimento
+    PLAN_CUT_HEIGHT_M = 1.2
+    PLAN_CAPTURE_OPTIONS = {
+      'RenderMode' => PLAN_RENDER_MODE,
+      'DisplaySectionPlanes' => false,  # o retângulo do plano sujaria o desenho
+      'DisplaySectionCuts' => true,     # ...mas o CORTE tem que aparecer
+      'SectionCutFilled' => true,       # parede cortada cheia: é o que lê como parede
+      'EdgeType' => 0,
+      'JitterEdges' => false,
+      'ExtendLines' => false,
+      'DrawDepthQue' => false,
+      'DrawLineEnds' => false,
+      'DisplayFog' => false,
+      'HideConstructionGeometry' => true,
+      'DisplayColorByLayer' => false,
+      'DisplayWatermarks' => false,
+      'DisplaySketchAxes' => false,
+      'DisplayInstanceAxes' => false,
+      'DisplayText' => false,
+      'DisplayDims' => false
+    }.freeze
 
     # ── Espelhos (0.9.0) ──────────────────────────────────────────────────
     # Reflexo calculado NA CAPTURA: câmera refletida pelo plano da face,
@@ -595,6 +645,14 @@ module SpaceNode
       dialog.add_action_callback('animar') do |_ctx, raw|
         begin
           handle_animar(raw)
+        rescue StandardError => e
+          emit_error(e.message, false, true)
+        end
+      end
+
+      dialog.add_action_callback('generatePlan') do |_ctx, raw|
+        begin
+          handle_generate_plan(raw)
         rescue StandardError => e
           emit_error(e.message, false, true)
         end
@@ -2543,6 +2601,132 @@ module SpaceNode
       facts.empty? ? nil : facts
     end
 
+    # Altura do corte: 1,20 m acima do PISO onde a câmera está (é o pavimento
+    # que o usuário está vendo). Sem piso sob a câmera — vista externa, câmera
+    # no ar — cai pra base do modelo, que é o térreo.
+    def plan_cut_z(model, view)
+      eye = view.camera.eye
+      floor_z = floor_under(model, eye)
+      base = floor_z || model.bounds.min.z
+      base + PLAN_CUT_HEIGHT_M * INCH_PER_M
+    rescue StandardError
+      model.bounds.min.z + PLAN_CUT_HEIGHT_M * INCH_PER_M
+    end
+
+    # Câmera de planta: topo, paralela, enquadrando o modelo inteiro. Em
+    # projeção paralela o "zoom" é camera.height (altura de vista em polegadas)
+    # — não existe fov.
+    def plan_camera_for(bounds, aspect)
+      center = bounds.center
+      eye = ::Geom::Point3d.new(center.x, center.y, bounds.max.z + 1000.0)
+      target = ::Geom::Point3d.new(center.x, center.y, bounds.min.z)
+      cam = ::Sketchup::Camera.new(eye, target, ::Geom::Vector3d.new(0, 1, 0))
+      cam.perspective = false
+      plan_w = bounds.width.to_f * PLAN_MARGIN
+      plan_h = bounds.height.to_f * PLAN_MARGIN
+      cam.height = [plan_h, aspect > 0 ? plan_w / aspect : plan_h].max
+      begin
+        cam.aspect_ratio = aspect if cam.respond_to?(:aspect_ratio=) && aspect > 0
+      rescue StandardError
+        nil
+      end
+      cam
+    end
+
+    # Devolve { :path, :section } — section conta DE ONDE veio o corte, porque
+    # é o que o usuário precisa saber se a planta sair errada: 'model' = o
+    # corte que já estava ativo no arquivo (respeitamos, não mexemos), 'temp' =
+    # criamos um e desfizemos, 'none' = não deu (e aí a planta mostra o telhado).
+    def capture_plan(spec)
+      model = ::Sketchup.active_model
+      raise t(:plan_no_model) unless model
+
+      view = model.active_view
+      bounds = model.bounds
+      raise t(:plan_empty) if bounds.nil? || bounds.width.to_f <= 0 || bounds.height.to_f <= 0
+
+      plan_w = bounds.width.to_f * PLAN_MARGIN
+      plan_h = bounds.height.to_f * PLAN_MARGIN
+      aspect = plan_h > 0 ? plan_w / plan_h : 1.0
+      edge = CAPTURE_EDGE['2k']
+      if aspect >= 1.0
+        width = edge
+        height = [(edge / aspect).round, 1].max
+      else
+        height = edge
+        width = [(edge * aspect).round, 1].max
+      end
+
+      stamp = "#{Time.now.strftime('%Y%m%d-%H%M%S')}-#{SecureRandom.hex(3)}"
+      path = File.join(Dir.tmpdir, "spacenode-planta-#{stamp}.png")
+
+      camera_state = camera_state_of(view)
+      original_camera = view.camera
+      rendering = model.rendering_options
+      clean_saved = nil
+      section_source = 'none'
+      operation = false
+      previous_section = nil
+      temp_plane = nil
+
+      begin
+        # Corte que o arquivo JÁ tem manda: quem mantém uma cena de planta no
+        # .skp cortou onde queria, e sobrescrever isso seria trocar o projeto
+        # do usuário pelo nosso palpite.
+        existing = begin
+          model.active_section_plane
+        rescue StandardError
+          nil
+        end
+
+        if existing
+          section_source = 'model'
+        else
+          begin
+            model.start_operation('SPACENODE: planta (temporário)', true)
+            operation = true
+            cut_z = plan_cut_z(model, view)
+            center = bounds.center
+            plane = [::Geom::Point3d.new(center.x, center.y, cut_z), ::Geom::Vector3d.new(0, 0, 1)]
+            temp_plane = model.entities.add_section_plane(plane)
+            if temp_plane
+              previous_section = model.active_section_plane
+              # A normal aponta pro lado que SOME: (0,0,1) esconde o que está
+              # acima do corte, que é o telhado. Se um dia sair invertido, é
+              # este vetor.
+              temp_plane.activate if temp_plane.respond_to?(:activate)
+              model.active_section_plane = temp_plane if model.respond_to?(:active_section_plane=)
+              section_source = 'temp'
+            end
+          rescue StandardError
+            section_source = 'none'
+          end
+        end
+
+        clean_saved = apply_rendering_options(rendering, PLAN_CAPTURE_OPTIONS)
+        view.camera = plan_camera_for(bounds, width.to_f / height)
+        ok = view.write_image(:filename => path, :width => width, :height => height, :antialias => true)
+        raise t(:plan_failed) unless ok && File.exist?(path)
+      ensure
+        restore_rendering_options(rendering, clean_saved) if clean_saved
+        begin
+          model.active_section_plane = previous_section if section_source == 'temp' && model.respond_to?(:active_section_plane=)
+        rescue StandardError
+          nil
+        end
+        # abort_operation desfaz o plano criado; RenderingOptions e câmera não
+        # entram em operação e são restaurados à mão (acima e abaixo).
+        begin
+          model.abort_operation if operation
+        rescue StandardError
+          nil
+        end
+        restore_view_camera(view, original_camera, camera_state)
+      end
+
+      { :path => path, :section => section_source, :width => width, :height => height }
+    end
+
     # ── Cenas / materiais do modelo ─────────────────────────────────────────
 
     # Nova cena com a vista atual. O lote e o Space vivem de cenas — e criar
@@ -3996,6 +4180,133 @@ module SpaceNode
         :eta_s => engine['estimatedSeconds'].to_i,
         :max_bytes => limits['maxSourceBytes'].to_i
       }
+    end
+
+    # ── Planta humanizada ───────────────────────────────────────────────────
+    def handle_generate_plan(raw)
+      payload = parse_json(raw)
+      raise t(:connect_first) unless authenticated?
+      raise t(:busy) if @generating
+
+      catalog = cached_catalog
+      cfg = catalog && catalog['plan']
+      raise t(:plan_no_catalog) unless cfg.is_a?(Hash)
+
+      spec = plan_spec_from_catalog(cfg, payload)
+      ensure_fresh_session(true) { execute_plan(spec) }
+    end
+
+    # O painel só manda ids; quem diz quais existem é o catálogo. Id fora da
+    # lista não vira request — a rota recusaria depois de cobrar o caminho.
+    def plan_spec_from_catalog(cfg, payload)
+      invalid = t(:plan_invalid)
+      pick = proc do |key, value|
+        list = cfg[key].is_a?(Array) ? cfg[key] : []
+        found = list.find { |i| i.is_a?(Hash) && i['id'].to_s == value.to_s }
+        raise invalid unless found
+
+        found['id'].to_s
+      end
+
+      wanted = payload['options'].is_a?(Hash) ? payload['options'] : {}
+      options = {}
+      (cfg['optionOrder'].is_a?(Array) ? cfg['optionOrder'] : []).each do |key|
+        options[key.to_s] = wanted[key.to_s] ? true : false
+      end
+
+      {
+        :project_type => pick.call('projectTypes', payload['projectType']),
+        :style => pick.call('styles', payload['style']),
+        :level => pick.call('levels', payload['level']),
+        :options => options,
+        :instructions => payload['instructions'].to_s.strip[0, 400].to_s,
+        :nodes => cfg['nodes'].to_i
+      }
+    end
+
+    def execute_plan(spec)
+      return emit_error(t(:busy)) if @generating
+
+      @generating = true
+      @generation_epoch = (@generation_epoch || 0) + 1
+      @generation_started_at = Time.now
+      @generation_context = { :mode => :plan, :spec => spec, :posted => false }
+      epoch = @generation_epoch
+
+      emit('status', { :stage => 'capture', :message => t(:plan_capturing) })
+      plan = capture_plan(spec)
+      emit('planCapture', {
+        :imageDataUrl => thumbnail_data_url(plan[:path]),
+        :section => plan[:section]
+      })
+
+      emit('status', { :stage => 'upload', :message => t(:sending) })
+      upload_direct(plan[:path], 'image/png', 'render-source', false, epoch) do |source_key, _url|
+        delete_quiet(plan[:path])
+        request_plan(source_key, spec, plan, epoch)
+      end
+    rescue StandardError => e
+      fail_generation(e.message)
+    end
+
+    def request_plan(source_key, spec, plan, epoch)
+      return unless generation_alive?(epoch)
+
+      body = {
+        :sourceKey => source_key,
+        :projectType => spec[:project_type],
+        :style => spec[:style],
+        :level => spec[:level],
+        :options => spec[:options]
+      }
+      body[:additionalInstructions] = spec[:instructions] unless spec[:instructions].empty?
+
+      ctx = @generation_context
+      ctx[:posted] = true if ctx
+      emit('status', { :stage => 'generate', :message => t(:plan_generating) })
+
+      request = json_request(:post, '/api/apresentar/humanized-plan', body, generation_error_handler_for(epoch)) do |data|
+        finish_plan(data, spec, plan) if generation_alive?(epoch)
+      end
+      @generate_request = request
+
+      ::UI.start_timer(GENERATE_TIMEOUT_SECONDS, false) do
+        if generation_alive?(epoch) && @generate_request.equal?(request)
+          begin
+            request.cancel
+          rescue StandardError
+            nil
+          end
+          fail_generation(t(:plan_lost))
+        end
+      end
+    end
+
+    def finish_plan(data, spec, plan)
+      @generating = false
+      @generation_context = nil
+      result = {
+        :outputUrl => data['url'].to_s,
+        :originalUrl => data['originalUrl'].to_s,
+        :renderId => data['renderId'],
+        :nodesCharged => data['nodesCharged'].to_i,
+        :totalBalance => data['creditsRemaining'],
+        :section => plan[:section],
+        :style => spec[:style],
+        :level => spec[:level]
+      }
+      @generate_request = nil
+      # Mesmo contrato do Animar: saldo vem na resposta quando o servidor sabe
+      # dizer; senão pergunta pra sessão (nunca deixa o chip desatualizado).
+      if data['creditsRemaining'].is_a?(Numeric)
+        @balance = { 'totalBalance' => data['creditsRemaining'] }
+      else
+        check_session
+      end
+      emit('planResult', result)
+      notify_panel(t(:notif_plan_ready))
+    rescue StandardError => e
+      fail_generation(e.message)
     end
 
     def execute_animar(spec)

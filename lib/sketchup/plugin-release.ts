@@ -8,11 +8,11 @@
 // (VERSION) + em sketchup/spacenode.rb (EXTENSION.version), e regerar o .rbz.
 // Os três precisam bater — o plugin compara a SUA VERSION com esta.
 
-export const PLUGIN_VERSION = '1.2.0'
+export const PLUGIN_VERSION = '1.3.0'
 
 /** Caminho relativo ao site; o plugin resolve contra o api_base_url dele. */
 export const PLUGIN_RBZ_PATH = '/downloads/spacenode-sketchup.rbz'
 
 /** Uma linha, mostrada dentro do painel de quem está atrasado. */
 export const PLUGIN_RELEASE_NOTE =
-  'O plugin mede o ambiente no modelo — pé-direito e largura entram no render como fato.'
+  'Planta humanizada direto do modelo, e o pé-direito medido entrando no render como fato.'

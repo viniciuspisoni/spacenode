@@ -25,6 +25,55 @@ O que só um plugin dentro do modelo consegue:
 - **Voltar à vista** — cada render guarda a câmera; um clique restaura o
   enquadramento exato no SketchUp.
 
+## O que mudou na 1.3.0 — planta humanizada sem exportar nada
+
+A Planta humanizada existe no site e vende desde sempre. Lá ela começa com um
+obstáculo que não é do produto: **o usuário precisa TER a planta como imagem**
+— exportar do CAD, achar o arquivo, subir. Quem está dentro do SketchUp já tem
+o desenho; falta só olhar de cima.
+
+A aba **Planta** desenha a planta do modelo aberto e manda pra mesma rota que o
+site usa:
+
+- **Câmera no topo, projeção paralela** — planta não tem fuga.
+- **Corte horizontal a 1,20 m do piso** do pavimento onde a câmera está. Sem
+  corte, a vista de cima mostra o telhado.
+- **Render em linha escondida**, com o corte preenchido: é o que lê como parede.
+
+### O corte do arquivo manda
+
+Se o modelo já tem um plano de corte ativo, ele é usado **como está** — quem
+mantém uma cena de planta no .skp cortou onde queria, e sobrescrever isso seria
+trocar o projeto do usuário pelo nosso palpite. Só quando não existe corte
+ativo o plugin cria um temporário e desfaz no fim (`abort_operation`; a câmera
+e as RenderingOptions voltam à mão, porque não entram em operação).
+
+O painel conta qual dos dois aconteceu no aviso do resultado: *"corte do
+próprio arquivo"* ou *"corte temporário a 1,20 m"*. Se a planta sair do
+pavimento errado, é essa linha que diz por quê.
+
+### Presets sem terceira cópia
+
+Tipo de projeto, estilo, nível e o que entra (mobiliário, vegetação, texturas,
+sombras, traço técnico, nomes dos ambientes) vêm do **catálogo v9**, que lê
+`lib/apresentar/config.ts` — a mesma fonte do site. Nem o Ruby nem o painel
+guardam a lista do que o servidor aceita.
+
+### A rota passou a atender os dois
+
+`/api/apresentar/humanized-plan` trocou o cookie puro por `getRequestUser` (o
+mesmo portão do `/api/generate`), o que deixa o token de dispositivo do plugin
+entrar, e ganhou uma segunda entrada: além do multipart do site, aceita **JSON
+com `sourceKey`** — a planta sobe pro Storage pela mesma área do Renderizar e
+a chave viaja no corpo. Montar multipart de dentro do Ruby seria escrever
+boundary e binário na mão.
+
+O resultado cai no palco como qualquer render: baixar, ampliar e abrir no site
+vêm de graça.
+
+**Ainda sem smoke real:** a captura de planta (corte, projeção paralela,
+enquadramento) só roda dentro do SketchUp.
+
 ## O que mudou na 1.2.0 — o modelo conta o tamanho do ambiente
 
 Uma imagem não tem escala. É por isso que um render inventa pé-direito de 4 m

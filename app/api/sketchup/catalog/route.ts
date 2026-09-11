@@ -33,6 +33,13 @@ import { DNA_EXTRACTION_COST, getVistaGenerationCost, getAvailableQualities } fr
 import { getUpscaleCostNodes, scaleToFactor, MAX_OUTPUT_MP, type ModeId, type Scale } from '@/lib/upscale'
 import { PRESET_LABELS_EN } from '@/lib/sketchup/preset-labels-en'
 import { PLUGIN_VERSION, PLUGIN_RBZ_PATH, PLUGIN_RELEASE_NOTE } from '@/lib/sketchup/plugin-release'
+import {
+  APRESENTAR_TOOLS,
+  HUMANIZED_PLAN_PROJECT_TYPES,
+  HUMANIZED_PLAN_STYLES,
+  HUMANIZED_PLAN_LEVELS,
+  HUMANIZED_PLAN_DEFAULT_OPTIONS,
+} from '@/lib/apresentar/config'
 import { ORION_CONFIG } from '@/lib/orion/config'
 import { canUseOrion } from '@/lib/orion/access'
 import { orionProviderReady } from '@/lib/orion/provider'
@@ -78,6 +85,23 @@ const CATALOG_I18N_EN = {
       conceito: 'Concept',
     } as Record<string, string>,
     upscaleModes: { fidelity: 'Fidelity' } as Record<string, string>,
+    plan: {
+      projectTypes: {
+        apartamento: 'Apartment', casa: 'House', comercial: 'Retail',
+        corporativo: 'Office', paisagismo: 'Landscape',
+      } as Record<string, string>,
+      styles: {
+        clean_tecnico: 'Clean technical', imobiliario_premium: 'Premium listing',
+        editorial_minimalista: 'Editorial minimal', aquarelado: 'Watercolour',
+        contemporaneo: 'Contemporary',
+      } as Record<string, string>,
+      levels: { leve: 'Light', equilibrado: 'Balanced', completo: 'Full' } as Record<string, string>,
+      options: {
+        addFurniture: 'Furniture', addVegetation: 'Planting',
+        applyFloorTextures: 'Floor textures', addSoftShadows: 'Soft shadows',
+        preserveLines: 'Keep the technical linework', addRoomLabels: 'Room names',
+      } as Record<string, string>,
+    },
     animar: {
       videoTypes: {
         cinematic: { label: 'Presentation', tagline: 'Subtle, elegant motion that brings the render to life.' },
@@ -235,13 +259,15 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({
+    // v9: plan — presets da Planta humanizada (o painel captura a planta do
+    // modelo e chama a mesma rota do site).
     // v8: engines[].description — o painel explica o motor embaixo da grade,
     // em vez de deixar a escolha por conta de um chavão no cartão.
     // v7: pluginLatest. Distribuímos .rbz fora do Extension Warehouse, então
     // não existe atualização automática — sem isto, quem instalou uma vez
     // nunca fica sabendo que saiu versão nova. O plugin compara com a VERSION
     // dele e avisa; nunca bloqueia.
-    version: 8,
+    version: 9,
     pluginLatest: {
       version: PLUGIN_VERSION,
       path: PLUGIN_RBZ_PATH,
@@ -251,6 +277,31 @@ export async function GET(req: NextRequest) {
     upscale,
     spaces,
     animar: buildAnimarCatalog(),
+    // Planta humanizada: o plugin captura a planta DO MODELO (topo, projeção
+    // paralela, corte) e manda pra mesma rota que o site usa. Os presets vêm
+    // daqui pra não existir uma segunda lista em Ruby.
+    plan: {
+      nodes: APRESENTAR_TOOLS.humanized_plan.nodes ?? 0,
+      cutHeightM: 1.2,
+      projectTypes: HUMANIZED_PLAN_PROJECT_TYPES,
+      styles: HUMANIZED_PLAN_STYLES.map(s => ({ id: s.id, label: s.label, desc: s.desc })),
+      levels: HUMANIZED_PLAN_LEVELS.map(l => ({ id: l.id, label: l.label, desc: l.desc })),
+      defaults: {
+        projectType: 'casa',
+        style: 'clean_tecnico',
+        level: 'equilibrado',
+        options: HUMANIZED_PLAN_DEFAULT_OPTIONS,
+      },
+      optionOrder: Object.keys(HUMANIZED_PLAN_DEFAULT_OPTIONS),
+      optionLabels: {
+        addFurniture: 'Mobiliário',
+        addVegetation: 'Vegetação',
+        applyFloorTextures: 'Texturas de piso',
+        addSoftShadows: 'Sombras suaves',
+        preserveLines: 'Preservar o traço técnico',
+        addRoomLabels: 'Nomes dos ambientes',
+      } as Record<string, string>,
+    },
     engines: [
       ...ENGINE_ORDER.map(id => {
         const e = ENGINES[id]

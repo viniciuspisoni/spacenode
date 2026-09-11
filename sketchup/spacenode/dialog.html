@@ -929,6 +929,7 @@
         <button class="seg" type="button" role="tab" data-tab="edit" id="tabBtnEdit">Editar</button>
         <button class="seg" type="button" role="tab" data-tab="animar" id="tabBtnAnimar">Animar</button>
         <button class="seg" type="button" role="tab" data-tab="scenes" id="tabBtnScenes">Cenas</button>
+        <button class="seg" type="button" role="tab" data-tab="plan" id="tabBtnPlan">Planta</button>
       </div>
     </div>
 
@@ -1079,6 +1080,36 @@
         <button class="ghost history-more" id="openSpaceButton" style="display:none">Abrir o Space no site</button>
       </div>
     </div>
+
+    <!-- ── Aba: Planta ──────────────────────────────────────────────────── -->
+    <div class="tabpanel" id="tabPlan" role="tabpanel">
+      <div id="planSection">
+        <div class="hint" id="planIntro">A planta sai do próprio modelo: vista de cima, projeção paralela e um corte a 1,20 m do piso. Nada pra exportar.</div>
+        <div class="field">
+          <span class="field-label" id="L_planType">Tipo de projeto</span>
+          <div class="pills" id="planTypePills" role="radiogroup" aria-label="Tipo de projeto"></div>
+        </div>
+        <div class="field">
+          <span class="field-label" id="L_planStyle">Estilo</span>
+          <div class="pills" id="planStylePills" role="radiogroup" aria-label="Estilo"></div>
+          <div class="hint" id="planStyleHint"></div>
+        </div>
+        <div class="field">
+          <span class="field-label" id="L_planLevel">Nível de humanização</span>
+          <div class="pills" id="planLevelPills" role="radiogroup" aria-label="Nível"></div>
+          <div class="hint" id="planLevelHint"></div>
+        </div>
+        <div class="field">
+          <span class="field-label" id="L_planOptions">O que entra</span>
+          <div class="pills" id="planOptionPills" aria-label="O que entra"></div>
+        </div>
+        <div class="field">
+          <span class="field-label" id="L_planInstructions">Instruções <span style="letter-spacing:0;text-transform:none;font-weight:500">· opcional</span></span>
+          <textarea id="planInstructions" style="min-height:56px" placeholder="Ex.: nomear os ambientes em português, piso de madeira na suíte"></textarea>
+        </div>
+        <div class="batch-note" id="planNote"></div>
+      </div>
+    </div>
   </div>
 
   <!-- ── Dock ───────────────────────────────────────────────────────────── -->
@@ -1107,6 +1138,10 @@
       <button class="cta cta--sheet" id="batchButton" disabled>
         <span id="batchLabel">Gerar cenas</span>
         <span class="meta" id="batchMeta"></span>
+      </button>
+      <button class="cta cta--sheet" id="planButton" disabled>
+        <span id="planLabel">Gerar planta humanizada</span>
+        <span class="meta" id="planMeta"></span>
       </button>
     </div>
     <div class="reach" id="reachLine"></div>
@@ -1263,6 +1298,7 @@
       accountTheme: null,     // preferência da conta (profiles.theme_preference) via /api/sketchup/session
       video: null,            // último take (cartão) — independe de model.result
       animarType: null, animarEngine: null, animarDuration: null,
+      planType: null, planStyle: null, planLevel: null, planOptions: null,
       videoSave: 'project',   // project | ask (Preferências)
       apiBaseUrl: 'https://spacenode.app',
       catalog: null,
@@ -1421,6 +1457,15 @@
         cancel: 'cancelar',
         capturingOverlay: 'Capturando a vista…',
         nodesPerImage: function (n) { return n + ' Nodes por imagem'; },
+        L_planType: 'Tipo de projeto', L_planStyle: 'Estilo',
+        L_planLevel: 'Nível de humanização', L_planOptions: 'O que entra',
+        L_planInstructions: 'Instruções',
+        planCta: 'Gerar planta humanizada', planRunning: 'gerando a planta…',
+        planNote: 'A planta sai do modelo aberto: o pavimento onde a câmera está, cortado a 1,20 m do piso.',
+        planInsufficient: function (cost, bal) { return 'A planta custa ' + cost + ' nodes e você tem ' + bal + '.'; },
+        planDone: function (n, origem) { return 'Planta pronta · ' + n + ' Nodes · ' + origem; },
+        planSectionModel: 'corte do próprio arquivo',
+        planSectionTemp: 'corte temporário a 1,20 m',
         soleResolution: function (label, nodes, engine) {
           return label + ' · ' + nodes + ' nodes — única resolução do ' + engine + '.';
         },
@@ -1595,6 +1640,15 @@
         cancel: 'cancel',
         capturingOverlay: 'Capturing the view…',
         nodesPerImage: function (n) { return n + ' Nodes per image'; },
+        L_planType: 'Project type', L_planStyle: 'Style',
+        L_planLevel: 'Humanisation level', L_planOptions: 'What goes in',
+        L_planInstructions: 'Instructions',
+        planCta: 'Generate humanised plan', planRunning: 'generating the plan…',
+        planNote: 'The plan comes from the open model: the storey the camera is on, cut 1.20 m above the floor.',
+        planInsufficient: function (cost, bal) { return 'The plan costs ' + cost + ' nodes and you have ' + bal + '.'; },
+        planDone: function (n, origin) { return 'Plan ready · ' + n + ' Nodes · ' + origin; },
+        planSectionModel: 'section from the file itself',
+        planSectionTemp: 'temporary section at 1.20 m',
         soleResolution: function (label, nodes, engine) {
           return label + ' · ' + nodes + ' nodes — the only resolution ' + engine + ' offers.';
         },
@@ -1699,7 +1753,8 @@
       ['L_projectType','L_segment','L_environment','L_lighting','L_sun','L_elements','L_modelMaterials',
        'L_engine','L_resolution','L_advanced','L_history','L_settings','L_edit','L_space',
        'L_scenes','L_theme','L_language','L_server','L_animar','L_animarType','L_animarQuality','L_animarDuration','L_videoSave',
-       'L_photo','L_photoAspect','L_photoLens','L_photoEye','L_photoLevel','L_photoGuide','L_photoMirror'].forEach(function (id) {
+       'L_photo','L_photoAspect','L_photoLens','L_photoEye','L_photoLevel','L_photoGuide','L_photoMirror',
+       'L_planType','L_planStyle','L_planLevel','L_planOptions','L_planInstructions'].forEach(function (id) {
         var el = document.getElementById(id);
         if (el) el.textContent = tt(id);
       });
@@ -1858,6 +1913,8 @@
      'preview','captureImage','captureCompareImage','resultImage','compareClip','compareHandle','compareRange','emptyPreview',
      'previewOverlay','overlayText','overlayElapsed','cancelButton','captureButton','compareButton','resultActions',
      'resultMore','resultMoreToggle','dockCta','engineHint','resolutionHint',
+     'planSection','planIntro','planTypePills','planStylePills','planStyleHint','planLevelPills','planLevelHint',
+     'planOptionPills','planInstructions','planNote','planButton','planLabel','planMeta',
      'downloadButton','openResultButton','projectTypeCards','segmentPills','environmentPills','lightingPills',
      'backgroundLabel','backgroundPills','prompt','elementsPills','engineCards','resolutionCards',
      'notice','insufficient','insufficientTitle','insufficientMath','insufficientBuy','insufficientAlt',
@@ -2073,6 +2130,7 @@
       hideIfSingle(els.backgroundPills);
       hideIfSingle(els.elementsPills);
 
+      renderPlanControls();
       renderModelMaterials();
       renderScenes();
       renderEditControls();
@@ -2081,6 +2139,102 @@
       renderPhotoControls();
       updateGenerateState();
     }
+
+    // ── Planta humanizada ───────────────────────────────────────────────────
+    // Presets vêm do catálogo (v9) — a lista não vive aqui nem no Ruby, pra
+    // não existir uma terceira cópia do que o servidor aceita.
+    function planCfg() { return model.catalog && model.catalog.plan; }
+    function planUi(section) { return (catUi('plan') || {})[section] || {}; }
+    function planLabel(section, item) {
+      return planUi(section)[item.id] || item.label || item.id;
+    }
+    function ensurePlanDefaults() {
+      var cfg = planCfg();
+      if (!cfg) return;
+      var d = cfg.defaults || {};
+      var has = function (list, id) {
+        return (list || []).some(function (i) { return i.id === id; });
+      };
+      if (!has(cfg.projectTypes, model.planType)) model.planType = d.projectType || (cfg.projectTypes || [])[0] && cfg.projectTypes[0].id;
+      if (!has(cfg.styles, model.planStyle)) model.planStyle = d.style || (cfg.styles || [])[0] && cfg.styles[0].id;
+      if (!has(cfg.levels, model.planLevel)) model.planLevel = d.level || (cfg.levels || [])[0] && cfg.levels[0].id;
+      if (!model.planOptions) {
+        model.planOptions = {};
+        (cfg.optionOrder || []).forEach(function (k) {
+          model.planOptions[k] = !!(d.options && d.options[k]);
+        });
+      }
+    }
+    function renderPlanControls() {
+      if (!els.planTypePills) return;
+      var cfg = planCfg();
+      if (!cfg) return;
+      ensurePlanDefaults();
+
+      fill(els.planTypePills, (cfg.projectTypes || []).map(function (p) {
+        return pillButton(planLabel('projectTypes', p), p.id === model.planType, function () {
+          model.planType = p.id; renderPlanControls(); persistStateSoon();
+        });
+      }));
+      fill(els.planStylePills, (cfg.styles || []).map(function (s) {
+        return pillButton(planLabel('styles', s), s.id === model.planStyle, function () {
+          model.planStyle = s.id; renderPlanControls(); persistStateSoon();
+        });
+      }));
+      fill(els.planLevelPills, (cfg.levels || []).map(function (l) {
+        return pillButton(planLabel('levels', l), l.id === model.planLevel, function () {
+          model.planLevel = l.id; renderPlanControls(); persistStateSoon();
+        });
+      }));
+      var pick = function (list, id) {
+        var found = null;
+        (list || []).forEach(function (i) { if (i.id === id) found = i; });
+        return found;
+      };
+      var style = pick(cfg.styles, model.planStyle);
+      var level = pick(cfg.levels, model.planLevel);
+      els.planStyleHint.textContent = (style && style.desc) || '';
+      els.planLevelHint.textContent = (level && level.desc) || '';
+
+      fill(els.planOptionPills, (cfg.optionOrder || []).map(function (key) {
+        var label = (planUi('options')[key]) || (cfg.optionLabels || {})[key] || key;
+        var b = pillButton(label, !!model.planOptions[key], function () {
+          model.planOptions[key] = !model.planOptions[key];
+          renderPlanControls(); persistStateSoon();
+        });
+        b.setAttribute('role', 'checkbox');
+        return b;
+      }));
+
+      updatePlanButton();
+    }
+    function updatePlanButton() {
+      if (!els.planButton) return;
+      var cfg = planCfg();
+      var cost = cfg ? Number(cfg.nodes || 0) : null;
+      var bal = model.totalBalance;
+      var insufficient = model.authenticated && cost != null && bal != null && bal < cost;
+      els.planButton.disabled = model.generating || !model.authenticated || !cfg || insufficient;
+      els.planLabel.textContent = model.generating ? tt('planRunning') : tt('planCta');
+      els.planMeta.textContent = model.generating || !cost ? '' : cost + ' ' + tt('nodes');
+      els.planNote.textContent = insufficient ? tt('planInsufficient', cost, bal) : tt('planNote');
+    }
+    els.planButton.addEventListener('click', function () {
+      if (model.generating) return;
+      if (!(window.sketchup && typeof window.sketchup.generatePlan === 'function')) {
+        showError(tt('outsideSketchup'));
+        return;
+      }
+      showNotice('', 'success');
+      startGeneratingUi();
+      callSketchUp('generatePlan', JSON.stringify({
+        projectType: model.planType,
+        style: model.planStyle,
+        level: model.planLevel,
+        options: model.planOptions || {},
+        instructions: els.planInstructions.value
+      }));
+    });
 
     // ── Materiais do modelo ─────────────────────────────────────────────────
     function currentMaterialFields() {
@@ -2586,6 +2740,7 @@
       els.maskToggle.disabled = model.generating;
       els.maskClear.disabled = model.generating;
       updateBatchButton();
+      updatePlanButton();
       updateEditButton();
       updateSpaceButton();
       if (shell) updateShell();
@@ -3582,6 +3737,30 @@
           renderPhotoControls();
         }
 
+        // A planta capturada aparece no palco antes de subir: o usuário vê o
+        // desenho que a IA vai receber, e descobre ali se o corte pegou o
+        // pavimento errado — não depois de gastar os nodes.
+        if (event === 'planCapture') {
+          if (payload.imageDataUrl) showCapture(payload.imageDataUrl);
+          model.planSection = payload.section || null;
+        }
+
+        if (event === 'planResult') {
+          stopGeneratingUi();
+          showResult({
+            outputUrl: payload.outputUrl,
+            previewUrl: payload.outputUrl,
+            renderId: payload.renderId,
+            nodesCharged: payload.nodesCharged,
+            totalBalance: payload.totalBalance,
+            signedAt: Math.floor(Date.now() / 1000)
+          });
+          if (typeof payload.totalBalance === 'number') model.totalBalance = payload.totalBalance;
+          showNotice(tt('planDone', payload.nodesCharged || 0,
+            payload.section === 'model' ? tt('planSectionModel') : tt('planSectionTemp')), 'success');
+          updateGenerateState();
+        }
+
         if (event === 'mirrors') {
           model.mirrors = payload;
           renderPhotoControls();
@@ -3932,7 +4111,7 @@
     // Dicionário próprio pra não mexer no UI acima (que é grande e estável).
     var SHELL_UI = {
       pt: {
-        tabRender: 'Render', tabEdit: 'Editar', tabAnimar: 'Animar', tabScenes: 'Cenas',
+        tabRender: 'Render', tabEdit: 'Editar', tabAnimar: 'Animar', tabScenes: 'Cenas', tabPlan: 'Planta',
         rowScene: 'Cena', rowLight: 'Luz', rowPhoto: 'Fotografia', rowOutput: 'Saída',
         sheetScene: 'Cena', sheetLight: 'Luz', sheetOutput: 'Saída',
         done: 'Concluído', history: 'Histórico', settings: 'Preferências',
@@ -3972,7 +4151,7 @@
         themeToDark: 'Mudar para o tema escuro'
       },
       en: {
-        tabRender: 'Render', tabEdit: 'Edit', tabAnimar: 'Animate', tabScenes: 'Scenes',
+        tabRender: 'Render', tabEdit: 'Edit', tabAnimar: 'Animate', tabScenes: 'Scenes', tabPlan: 'Plan',
         rowScene: 'Scene', rowLight: 'Light', rowPhoto: 'Photography', rowOutput: 'Output',
         sheetScene: 'Scene', sheetLight: 'Light', sheetOutput: 'Output',
         done: 'Done', history: 'History', settings: 'Preferences',
@@ -4027,7 +4206,7 @@
     function $s(id) { return document.getElementById(id); }
 
     // ── Abas ─────────────────────────────────────────────────────────────
-    var TAB_PANELS = { render: 'tabRender', edit: 'tabEdit', animar: 'tabAnimar', scenes: 'tabScenes' };
+    var TAB_PANELS = { render: 'tabRender', edit: 'tabEdit', animar: 'tabAnimar', scenes: 'tabScenes', plan: 'tabPlan' };
     function tabEnabled(id) {
       if (id === 'edit') return editTabAvailable();
       if (id === 'animar') return animarTabAvailable();
@@ -4059,7 +4238,7 @@
     }
     // Um CTA por aba, sempre no dock. Os botões são os MESMOS de antes (mesmo
     // id, mesmo listener, mesmo rótulo) — só moraram de mudança.
-    var TAB_CTA = { render: 'generateButton', edit: 'editButton', animar: 'animarButton', scenes: 'batchButton' };
+    var TAB_CTA = { render: 'generateButton', edit: 'editButton', animar: 'animarButton', scenes: 'batchButton', plan: 'planButton' };
     function updateDockCta() {
       var currentId = TAB_CTA[shell.tab] || TAB_CTA.render;
       Object.keys(TAB_CTA).forEach(function (key) {
@@ -4430,6 +4609,7 @@
     function localizeShell() {
       var map = {
         tabBtnRender: 'tabRender', tabBtnEdit: 'tabEdit', tabBtnAnimar: 'tabAnimar', tabBtnScenes: 'tabScenes',
+        tabBtnPlan: 'tabPlan',
         rowSceneTitle: 'rowScene', rowLightTitle: 'rowLight', rowPhotoTitle: 'rowPhoto', rowOutputTitle: 'rowOutput',
         sheetSceneTitle: 'sheetScene', sheetLightTitle: 'sheetLight', sheetOutputTitle: 'sheetOutput',
         toolLevelLabel: 'toolLevel', toolGuidesLabel: 'toolGuides', toolMirrorLabel: 'toolMirror', toolSceneLabel: 'toolScene'

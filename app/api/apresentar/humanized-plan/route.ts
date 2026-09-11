@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { fal } from '@fal-ai/client'
-import { createClient } from '@/lib/supabase/server'
+import { getRequestUser } from '@/lib/auth/request-user'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { DIRECT_UPLOAD_AREAS, downloadDirectUpload } from '@/lib/storage/direct-upload'
 import { getPayerId } from '@/lib/workspaces/context'
 import { refundNodes } from '@/lib/billing/refund-nodes'
 import { APRESENTAR_TOOLS } from '@/lib/apresentar/config'
@@ -65,8 +66,10 @@ const VALID_STYLES:        HumanizedPlanStyle[]       = ['clean_tecnico','imobil
 const VALID_LEVELS:        HumanizedPlanLevel[]       = ['leve','equilibrado','completo']
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  // getRequestUser em vez do cookie puro: é o mesmo portão do /api/generate e
+  // do catálogo, e é o que deixa o painel do SketchUp entrar com o token de
+  // dispositivo. O site continua entrando pelo cookie, pelo mesmo caminho.
+  const { user } = await getRequestUser(req)
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
   const admin = createAdminClient()
@@ -77,14 +80,49 @@ export async function POST(req: NextRequest) {
   let outputUrl: string | undefined
 
   try {
-    const formData    = await req.formData()
-    const imageFile   = formData.get('image')       as File   | null
-    const projectType = formData.get('projectType') as string | null
-    const style       = formData.get('style')       as string | null
-    const level       = formData.get('level')       as string | null
-    const optionsRaw  = formData.get('options')     as string | null
-    const additionalInstructionsRaw = formData.get('additionalInstructions') as string | null
-    const additionalInstructions    = additionalInstructionsRaw?.trim().slice(0, 400) || null
+    // Duas entradas, um pipeline: o site manda multipart com o arquivo; o
+    // painel do SketchUp manda JSON com `sourceKey` (a planta já subiu direto
+    // pro Storage, como o /api/generate faz com a captura). Montar multipart
+    // de dentro do Ruby seria escrever boundary e binário na mão.
+    const isJson = (req.headers.get('content-type') || '').includes('application/json')
+
+    let imageFile:   File   | null = null
+    let projectType: string | null = null
+    let style:       string | null = null
+    let level:       string | null = null
+    let optionsRaw:  string | null = null
+    let additionalInstructionsRaw: string | null = null
+
+    if (isJson) {
+      const body = await req.json().catch(() => null) as Record<string, unknown> | null
+      if (!body) return NextResponse.json({ error: 'Corpo inválido' }, { status: 400 })
+
+      const sourceKey = typeof body.sourceKey === 'string' ? body.sourceKey : ''
+      if (!sourceKey) return NextResponse.json({ error: 'Imagem obrigatória' }, { status: 400 })
+
+      // A mesma área do Renderizar: valida dono, tamanho e mime antes de virar
+      // arquivo. Chave de outro usuário não passa.
+      const src = await downloadDirectUpload(
+        admin, DIRECT_UPLOAD_AREAS['render-source'], user.id, {}, sourceKey,
+      )
+      if (!src.ok) return NextResponse.json({ error: src.message }, { status: src.status })
+
+      imageFile   = new File([new Uint8Array(src.buffer)], 'planta.png', { type: src.mime })
+      projectType = typeof body.projectType === 'string' ? body.projectType : null
+      style       = typeof body.style       === 'string' ? body.style       : null
+      level       = typeof body.level       === 'string' ? body.level       : null
+      optionsRaw  = body.options && typeof body.options === 'object' ? JSON.stringify(body.options) : null
+      additionalInstructionsRaw = typeof body.additionalInstructions === 'string' ? body.additionalInstructions : null
+    } else {
+      const formData = await req.formData()
+      imageFile   = formData.get('image')       as File   | null
+      projectType = formData.get('projectType') as string | null
+      style       = formData.get('style')       as string | null
+      level       = formData.get('level')       as string | null
+      optionsRaw  = formData.get('options')     as string | null
+      additionalInstructionsRaw = formData.get('additionalInstructions') as string | null
+    }
+    const additionalInstructions = additionalInstructionsRaw?.trim().slice(0, 400) || null
 
     // ── Validações ────────────────────────────────────────────────────────────
     if (!imageFile) {
