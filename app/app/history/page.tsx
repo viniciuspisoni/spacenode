@@ -3,6 +3,13 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { sanitizeRenderListRow, selectRenderList } from '@/lib/history/redact'
+import {
+  applyHistoryScope,
+  historyReadClient,
+  resolveHistoryScope,
+  runScopedQuery,
+  scopeAuthorIds,
+} from '@/lib/history/scope'
 import { getPayerBalance } from '@/lib/workspaces/balance'
 import { signRows } from '@/lib/storage/signed'
 import { HistoryClient } from './HistoryClient'
@@ -16,34 +23,74 @@ export default async function HistoryPage() {
   if (!user) redirect('/login')
 
   const admin = createAdminClient()
-  const [balance, { data: renders }, { data: folders }, { data: allFolderIds }] = await Promise.all([
+
+  // ── Escopo ───────────────────────────────────────────────────────────────────
+  // Pessoal por padrão; escritório inteiro quando quem abre é owner/admin de um
+  // workspace 'office'. O escopo escolhe também o client de leitura: em
+  // escritório a RLS por user_id não deixa passar a linha do colega, então a
+  // leitura vai de service-role com o filtro de escopo no lugar da RLS.
+  // Ver lib/history/scope.ts. O 'office' aqui é o PEDIDO desta tela — as outras
+  // superfícies que usam as mesmas listagens (plugin SketchUp, modais de
+  // importação) não pedem, e seguem pessoais.
+  const scope  = await resolveHistoryScope(admin, user.id, 'office')
+  const readSb = historyReadClient(scope, supabase, admin)
+
+  const [balance, { data: renders }, { data: folders }] = await Promise.all([
     // Saldo da bolsa (dono do workspace) — é dele que a geração debita.
     getPayerBalance(admin, user.id),
     // Projeção explícita + tradução de campos de provider: as linhas viram
     // props do client component (serializam no payload RSC) — nada de prompt
     // final, fal_request_id ou endpoints aqui. Ver lib/history/redact.ts
     // (selectRenderList tem fallback pra janela pré-migration do preview_url).
-    selectRenderList(supabase, user.id, { limit: PAGE_SIZE }),
+    selectRenderList(readSb, scope, { limit: PAGE_SIZE }),
     // parent_id: null = pasta de topo (cliente), preenchido = subpasta (projeto).
+    // Pastas seguem PESSOAIS mesmo no histórico de escritório: são organização
+    // de quem abre a tela, e ninguém arquiva na pasta do outro.
     supabase.from('render_folders').select('id, name, parent_id, created_at').eq('user_id', user.id).order('created_at', { ascending: false }),
-    supabase.from('renders').select('folder_id').eq('user_id', user.id),
+  ])
+
+  // ── Contagens dos chips ──────────────────────────────────────────────────────
+  // count exato no servidor (head: true — zero linha no payload), no MESMO
+  // escopo da grade: se "Todos" contar uma coisa e a grade mostrar outra, o
+  // "carregar mais" some no meio do histórico (hasMore compara os dois).
+  //
+  // Antes isto trazia UMA LINHA POR RENDER só pra contar no Node. Além do
+  // desperdício, o PostgREST corta a resposta no teto de linhas do projeto
+  // (Max rows, 1000 por padrão no Supabase) — a conta empacava em 1000 e o
+  // histórico parecia terminar ali. Com um usuário só isso era um teto
+  // distante; somando o escritório inteiro, deixa de ser.
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const countScoped = (narrow?: (q: any) => any) =>
+    runScopedQuery(scope, s => {
+      const q = applyHistoryScope(
+        readSb.from('renders').select('id', { count: 'exact', head: true }), s,
+        { excludeInternalTest: true },  // mesmo recorte da grade, ou a conta não bate
+      )
+      return (narrow ? narrow(q) : q) as PromiseLike<{ count: number | null; error: { code?: string } | null }>
+    })
+  /* eslint-enable @typescript-eslint/no-explicit-any */
+
+  const [totalRes, unfiledRes, ...folderCountRes] = await Promise.all([
+    countScoped(),
+    countScoped(q => q.is('folder_id', null)),
+    ...(folders ?? []).map(f => countScoped(q => q.eq('folder_id', f.id))),
   ])
 
   const counts: Record<string, number> = {}
-  let unfiled = 0
-  for (const r of allFolderIds ?? []) {
-    if (r.folder_id) counts[r.folder_id] = (counts[r.folder_id] ?? 0) + 1
-    else unfiled++
-  }
-  const total = (allFolderIds ?? []).length
+  ;(folders ?? []).forEach((f, i) => { counts[f.id] = folderCountRes[i]?.count ?? 0 })
+  const unfiled = unfiledRes.count ?? 0
+  const total   = totalRes.count ?? 0
 
   // ── Autoria ──────────────────────────────────────────────────────────────────
-  // Mapa user_id → perfil para o chip "Gerado por" na grid. Hoje a listagem é
-  // por user_id (só o próprio), mas o mapa já cobre o cenário de equipes: quando
-  // a listagem passar a incluir o workspace, os autores dos colegas resolvem
-  // aqui sem mudança na UI. Admin client porque a RLS de profiles não permite
+  // Mapa user_id → perfil para o chip "Gerado por" na grid. Em escopo de
+  // escritório o mapa cobre TODOS os membros ativos, não só os autores da
+  // primeira página: quem só aparece depois do "carregar mais" cairia como
+  // "Autor não registrado". Admin client porque a RLS de profiles não permite
   // ler perfis de outros membros.
-  const authorIds = Array.from(new Set([user.id, ...(renders ?? []).map(r => r.user_id).filter(Boolean)]))
+  const authorIds = Array.from(new Set([
+    ...(await scopeAuthorIds(admin, scope)),
+    ...(renders ?? []).map(r => r.user_id as string).filter(Boolean),
+  ]))
   const { data: authorRows } = await admin
     .from('profiles')
     .select('id, full_name, email')
@@ -69,6 +116,7 @@ export default async function HistoryPage() {
       folders={folders ?? []}
       authors={authors}
       currentUserId={user.id}
+      teamView={scope.kind === 'workspace'}
     />
   )
 }

@@ -19,6 +19,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getRequestAuthContext } from '@/lib/auth/request-user'
 import { getPayerId } from '@/lib/workspaces/context'
+import { applyHistoryScope, historyReadClient, requestedScope, resolveHistoryScope, runScopedQuery } from '@/lib/history/scope'
 import { isQuality, isEditSourceType, type Quality } from '@/lib/spaces/types'
 import { isEditMode, dispatchEndpoint, type EditMode } from '@/lib/spaces/engines'
 import { composeRouterPrompt, isFidelityMode, type FidelityMode } from '@/lib/spaces/edit-prompts'
@@ -428,11 +429,22 @@ export async function GET(req: NextRequest) {
   const { user, supabase } = await getRequestAuthContext(req)
   if (!user || !supabase) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
+  const admin = createAdminClient()
+
+  // Escopo: pessoal por padrão, escritório inteiro só com ?scope=office E se
+  // quem lê for owner/admin (lib/history/scope.ts). O padrão pessoal importa
+  // aqui: além da aba Edições do Histórico, esta rota alimenta os modais de
+  // importação do Finalizar/Editar/Retocar, que não têm chip de autor. Em
+  // escritório a leitura vai de service-role — a RLS por user_id não deixa
+  // passar a edição do colega, e quem autoriza passa a ser o escopo.
+  const scope  = await resolveHistoryScope(admin, user.id, requestedScope(req.nextUrl.searchParams))
+  const readSb = historyReadClient(scope, supabase, admin)
+
   // Projeção explícita: sem fal_request_id/generation_log. engine guarda o
   // endpoint do provider — sai daqui como label de produto (mesma redação do
   // /api/history/detail). Consumidores: tab Edições do Histórico e os modais
   // de importação (Finalizar/Retocar/EditV2 — usam result_image_url).
-  // Defesa em profundidade: filtra explicitamente por user_id em vez de confiar
+  // Defesa em profundidade: o filtro de escopo é explícito em vez de confiar
   // só na RLS da tabela `edits` (cuja DDL/policy não está versionada no repo —
   // CR-3 da auditoria 2026-07-03). Mesmo padrão de renders/list e folders/[id].
   //
@@ -441,21 +453,29 @@ export async function GET(req: NextRequest) {
   // invisível no Histórico — bug reportado por usuária em 2026-07-17. Jobs
   // rejeitados/falhos ficam de fora: não foram cobrados e o resultado foi
   // descartado.
+  //
+  // runScopedQuery em volta das duas: `edit_v3_jobs.workspace_id` só existe a
+  // partir da migration 20260911140000 — antes dela a query escopada devolve
+  // 42703 e cai pro escopo pessoal em vez de derrubar a aba.
   const [v1Res, v3Res] = await Promise.all([
-    supabase
-      .from('edits')
-      .select('id, user_id, source_image_url, result_image_url, mask_url, prompt, quality, nodes_cost, engine, source_type, source_id, mask_coverage, created_at')
-      .eq('user_id', user.id)
+    runScopedQuery(scope, s => applyHistoryScope(
+      readSb
+        .from('edits')
+        .select('id, user_id, source_image_url, result_image_url, mask_url, prompt, quality, nodes_cost, engine, source_type, source_id, mask_coverage, created_at'),
+      s,
+    )
       .order('created_at', { ascending: false })
-      .limit(60),
-    supabase
-      .from('edit_v3_jobs')
-      .select('id, user_id, action_type, source_image_url, result_image_url, mask_url, prompt, instruction, quality_mode, nodes_cost, model, mask_coverage, created_at')
-      .eq('user_id', user.id)
+      .limit(60)),
+    runScopedQuery(scope, s => applyHistoryScope(
+      readSb
+        .from('edit_v3_jobs')
+        .select('id, user_id, action_type, source_image_url, result_image_url, mask_url, prompt, instruction, quality_mode, nodes_cost, model, mask_coverage, created_at'),
+      s,
+    )
       .eq('status', 'completed')
       .not('result_image_url', 'is', null)
       .order('created_at', { ascending: false })
-      .limit(60),
+      .limit(60)),
   ])
   if (v1Res.error) {
     return NextResponse.json({ error: 'Erro ao listar edições' }, { status: 500 })
@@ -487,7 +507,7 @@ export async function GET(req: NextRequest) {
     .slice(0, 60)
 
   const edits = await signRows(
-    createAdminClient(),
+    admin,
     merged,
     ['source_image_url', 'result_image_url', 'mask_url'],
   )
