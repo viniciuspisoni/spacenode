@@ -4247,7 +4247,10 @@
       });
       var dock = $s('dock');
       if (dock) {
-        dock.classList.toggle('is-aux', shell.tab === 'edit' || shell.tab === 'animar');
+        // A Planta entra no dock auxiliar junto com Editar e Animar: o resumo
+        // ("Quasar 2K") e o alcance falam do custo do RENDER, e ao lado do
+        // botão da planta viravam legenda de outra coisa.
+        dock.classList.toggle('is-aux', shell.tab === 'edit' || shell.tab === 'animar' || shell.tab === 'plan');
         dock.classList.toggle('is-batch', shell.tab === 'scenes');
       }
     }
