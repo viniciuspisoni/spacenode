@@ -1,0 +1,77 @@
+{
+  "slug": "2026-09-11-exemplo-fidelidade",
+  "kind": "organic",
+  "objective": "Mostrar que a SpaceNode não reinterpreta o projeto — a geometria do arquiteto sobrevive ao render.",
+  "audience": "Arquiteto que já usa SketchUp e desconfia que IA vai inventar o projeto dele.",
+  "concept": "A mesma casa, a mesma câmera, duas qualidades. A régua atravessa e nada se move de lugar.",
+  "hook": "O render mudou. O projeto não.",
+  "cta": "Teste grátis no link da bio",
+  "duration": 12,
+  "takes": 2,
+
+  "format": { "aspect": "9x16", "width": 1080, "height": 1920, "fps": 30 },
+
+  "shots": [
+    {
+      "id": "s01_antes",
+      "start": 0,
+      "end": 3,
+      "source": "$REPO/marketing/renders/antes/casa.jpg",
+      "camera": "Ken Burns lento, push-in 4%, centro no peitoril",
+      "model": "reel-kit",
+      "text": "O render mudou."
+    },
+    {
+      "id": "s02_wipe",
+      "start": 3,
+      "end": 7,
+      "source": "$REPO/marketing/renders/depois/casa.jpg",
+      "camera": "Wipe com régua branca, mesma câmera do shot anterior",
+      "model": "reel-kit",
+      "text": "O projeto não."
+    },
+    {
+      "id": "s03_vida",
+      "start": 7,
+      "end": 11,
+      "source": "$REPO/marketing/renders/depois/casa.jpg",
+      "camera": "Câmera parada. Só a luz da tarde muda e a folhagem respira.",
+      "model": "fal-ai/kling-video/v3/pro/image-to-video",
+      "generate": {
+        "endpoint": "fal-ai/kling-video/v3/pro/image-to-video",
+        "seconds": 5,
+        "res": "720p",
+        "aspect": "9x16",
+        "takes": 2,
+        "inputs": {
+          "image_url": "@source",
+          "prompt": "Static locked-off camera. Nothing in the architecture moves. Only the late afternoon light shifts warmer across the wall and the foliage outside sways gently in a light breeze. Preserve every window frame, every straight line, every material exactly as in the source image.",
+          "duration": "5"
+        }
+      },
+      "text": "—"
+    },
+    {
+      "id": "s04_cta",
+      "start": 11,
+      "end": 12,
+      "model": "card",
+      "camera": "Card estático, fundo #0A0A0A",
+      "text": "Teste grátis no link da bio"
+    }
+  ],
+
+  "motion_design": "Texto entra por opacity + translateY com spring, stagger de 4 frames. Saída mais rápida que a entrada. A régua do wipe é a única coisa que corta a imagem.",
+  "sound_design": "Sem áudio — entra no app do Instagram.",
+
+  "assembly": {
+    "kit": "reel-kit",
+    "spec": "spec.json"
+  },
+
+  "notes": [
+    "s03 é o ÚNICO shot pago. Sem ele a peça custa US$ 0,00 e ainda funciona.",
+    "generate.seconds = 5 é o que se PAGA; o shot ocupa 4s na timeline e 1s é aparado na montagem. Os dois valores podem divergir, mas generate.seconds tem que bater com inputs.duration — senão a estimativa mente.",
+    "duration do input do Kling é string no schema — confira com genmedia schema antes de rodar."
+  ]
+}
