@@ -25,6 +25,100 @@ O que só um plugin dentro do modelo consegue:
 - **Voltar à vista** — cada render guarda a câmera; um clique restaura o
   enquadramento exato no SketchUp.
 
+## O que mudou na 1.3.0 — planta humanizada sem exportar nada
+
+A Planta humanizada existe no site e vende desde sempre. Lá ela começa com um
+obstáculo que não é do produto: **o usuário precisa TER a planta como imagem**
+— exportar do CAD, achar o arquivo, subir. Quem está dentro do SketchUp já tem
+o desenho; falta só olhar de cima.
+
+A aba **Planta** desenha a planta do modelo aberto e manda pra mesma rota que o
+site usa:
+
+- **Câmera no topo, projeção paralela** — planta não tem fuga.
+- **Corte horizontal a 1,20 m do piso** do pavimento onde a câmera está. Sem
+  corte, a vista de cima mostra o telhado.
+- **Render em linha escondida**, com o corte preenchido: é o que lê como parede.
+
+### O corte do arquivo manda
+
+Se o modelo já tem um plano de corte ativo, ele é usado **como está** — quem
+mantém uma cena de planta no .skp cortou onde queria, e sobrescrever isso seria
+trocar o projeto do usuário pelo nosso palpite. Só quando não existe corte
+ativo o plugin cria um temporário e desfaz no fim (`abort_operation`; a câmera
+e as RenderingOptions voltam à mão, porque não entram em operação).
+
+O painel conta qual dos dois aconteceu no aviso do resultado: *"corte do
+próprio arquivo"* ou *"corte temporário a 1,20 m"*. Se a planta sair do
+pavimento errado, é essa linha que diz por quê.
+
+### Presets sem terceira cópia
+
+Tipo de projeto, estilo, nível e o que entra (mobiliário, vegetação, texturas,
+sombras, traço técnico, nomes dos ambientes) vêm do **catálogo v9**, que lê
+`lib/apresentar/config.ts` — a mesma fonte do site. Nem o Ruby nem o painel
+guardam a lista do que o servidor aceita.
+
+### A rota passou a atender os dois
+
+`/api/apresentar/humanized-plan` trocou o cookie puro por `getRequestUser` (o
+mesmo portão do `/api/generate`), o que deixa o token de dispositivo do plugin
+entrar, e ganhou uma segunda entrada: além do multipart do site, aceita **JSON
+com `sourceKey`** — a planta sobe pro Storage pela mesma área do Renderizar e
+a chave viaja no corpo. Montar multipart de dentro do Ruby seria escrever
+boundary e binário na mão.
+
+O resultado cai no palco como qualquer render: baixar, ampliar e abrir no site
+vêm de graça.
+
+**Ainda sem smoke real:** a captura de planta (corte, projeção paralela,
+enquadramento) só roda dentro do SketchUp.
+
+## O que mudou na 1.2.0 — o modelo conta o tamanho do ambiente
+
+Uma imagem não tem escala. É por isso que um render inventa pé-direito de 4 m
+numa sala de 2,70, porta de 2,40 e bancada na altura errada — o motor escolhe
+a proporção que fizer a composição parecer grandiosa, porque nada na entrada
+diz o contrário. Quem está **dentro do modelo** não precisa adivinhar: mede.
+
+O plugin já media a altura do olho por `raytest` (piso sob a câmera). A 1.2.0
+mede mais duas coisas no mesmo gesto e manda no bloco MODEL FACTS:
+
+- **Pé-direito** — piso até teto sob a câmera.
+- **Largura** — parede a parede na altura do olho, atravessando a vista.
+
+No prompt vira uma linha que diz de onde veio o número:
+
+> Room, measured in the 3D model at the camera position: floor-to-ceiling
+> height 2.7 m; about 4.25 m wall to wall across the view — keep every scale
+> cue consistent with these real dimensions (…); never stretch the space taller
+> or wider than it is to make the composition look grander.
+
+### Honestidade do fato
+
+Medida errada no prompt é pior que medida nenhuma, então tudo passa por porta:
+
+- Cada raio só vale entre **0,4 e 40 m** (`ROOM_RAY_RANGE_M`); o pé-direito,
+  entre **1,8 e 20 m**. Fora disso, não vira fato.
+- Raio que não acerta nada não manda nada — é o caso da **vista externa**, que
+  naturalmente fica de fora sem precisar de flag.
+- A largura é medida **na altura do olho**: um raio lateral pode acertar uma
+  estante em vez da parede, e o erro é da ordem da profundidade do móvel. Por
+  isso o prompt diz "about" e "at the camera position" — o texto não promete
+  mais precisão do que a medida tem.
+- O servidor não confia no cliente: `sanitizeModelFacts` reclampa nas mesmas
+  faixas antes de qualquer coisa entrar no prompt.
+
+### O que aparece no painel
+
+O HUD da folha Fotografia passou a mostrar o que foi medido, ao lado da lente
+e da altura do olho: `35 mm · 38° · olho a 1,60 m · pé-direito 2,70 m`. Se a
+medida não passou na porta, a linha some — o painel não mostra número que não
+foi mandado.
+
+**Ainda sem medição de campo:** que o número melhore o render é a tese, não um
+resultado. O A/B pago é do dono.
+
 ## O que mudou na 1.1.1 — a moldura da captura fica na tela
 
 Relato de campo: "após clicar em capturar vista, ele muda o ponto de visão da

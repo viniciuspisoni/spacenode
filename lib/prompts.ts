@@ -65,6 +65,15 @@ export interface ModelFacts {
      *  plugin) — fato de escala que a imagem sozinha não dá. */
     eyeHeightM?:    number
   }
+  /** Medidas lidas do MODELO 3D pelo plugin (raytest a partir da câmera).
+   *  A imagem sozinha não dá escala — sem isto o motor escolhe o pé-direito
+   *  que quiser. Só chega o que passou na faixa de sanidade do plugin. */
+  room?: {
+    /** Piso até teto sob a câmera, em metros. */
+    ceilingM?: number
+    /** Parede a parede na altura do olho, atravessando a vista, em metros. */
+    widthM?:   number
+  }
   /** Espelhos/vidros marcados no plugin: a captura JÁ traz o reflexo real
    *  (câmera refletida pelo plano da face, textura projetada). O modelo
    *  precisa saber que aquilo é espelho — senão vira janela/quadro. */
@@ -858,6 +867,22 @@ function buildModelFactsBlock(facts?: ModelFacts, includeSun: boolean = true): s
         ' — keep scale cues (door heights, counters, furniture) consistent with this viewpoint'
     }
     parts.push(line + '.')
+  }
+
+  // Escala medida no modelo. Vem depois da câmera porque é a mesma família de
+  // fato (o que a foto não conta) e antes dos espelhos, que são sobre material.
+  const room = facts.room
+  if (room && (room.ceilingM || room.widthM)) {
+    const m = (v: number) => v.toFixed(2).replace(/\.?0+$/, '')
+    const bits: string[] = []
+    if (room.ceilingM) bits.push(`floor-to-ceiling height ${m(room.ceilingM)} m`)
+    if (room.widthM) bits.push(`about ${m(room.widthM)} m wall to wall across the view`)
+    parts.push(
+      `Room, measured in the 3D model at the camera position: ${bits.join('; ')} — ` +
+      'keep every scale cue consistent with these real dimensions (door and window heights, ' +
+      'counter and table heights, furniture, steps, ceiling details); never stretch the space ' +
+      'taller or wider than it is to make the composition look grander.',
+    )
   }
 
   const mirrors = facts.mirrors
