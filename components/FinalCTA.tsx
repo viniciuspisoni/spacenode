@@ -1,92 +1,130 @@
+'use client';
+import Image from 'next/image';
+
 export default function FinalCTA() {
   return (
     <section className="spn-final">
-      <span
-        style={{
-          fontSize: 10,
-          letterSpacing: "0.28em",
-          color: "var(--color-text-tertiary)",
-          textTransform: "uppercase",
-          fontWeight: 500,
-          marginBottom: 20,
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 10,
-        }}
-      >
+      <div className="spn-final-inner">
         <span
           style={{
-            width: 5,
-            height: 5,
-            borderRadius: "50%",
-            background: "var(--color-accent-green)",
-            boxShadow: "0 0 8px var(--color-accent-green-glow)",
-          }}
-        />
-        PRÓXIMO PROJETO
-      </span>
-
-      <h2 className="spn-final-title">
-        apresente melhor seus projetos,{" "}
-        <br className="spn-final-br" />
-        sem perder o controle sobre eles.
-      </h2>
-
-      <p className="spn-final-sub">
-        Comece com uma imagem base e veja o que muda no fluxo de visualização
-        do seu escritório.
-      </p>
-
-      <div className="spn-final-ctas">
-        <a
-          href="/login?mode=signup"
-          className="spn-final-primary"
-          style={{
-            background: "var(--color-text-primary)",
-            color: "var(--color-bg)",
-            borderRadius: 12,
+            fontSize: 10,
+            letterSpacing: "0.28em",
+            color: "var(--color-text-tertiary)",
+            textTransform: "uppercase",
             fontWeight: 500,
-            letterSpacing: "-0.005em",
+            marginBottom: 20,
             display: "inline-flex",
             alignItems: "center",
-            justifyContent: "center",
-            gap: 8,
-            textDecoration: "none",
-            transition: "opacity 0.2s",
+            gap: 10,
           }}
         >
-          Testar grátis →
-        </a>
-        <a
-          href="#planos"
-          className="spn-final-secondary"
-          style={{
-            color: "var(--color-text-secondary)",
-            textDecoration: "none",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 6,
-            borderRadius: 12,
-            border: "0.5px solid var(--color-border)",
-            letterSpacing: "-0.005em",
-            transition: "border-color 0.2s",
-          }}
-        >
-          Ver planos
-        </a>
+          <span
+            style={{
+              width: 5,
+              height: 5,
+              borderRadius: "50%",
+              background: "var(--color-accent-green)",
+              boxShadow: "0 0 8px var(--color-accent-green-glow)",
+            }}
+          />
+          PRÓXIMO PROJETO
+        </span>
+
+        <h2 className="spn-final-title">
+          apresente melhor seus projetos,{" "}
+          <br className="spn-final-br" />
+          sem perder o controle sobre eles.
+        </h2>
+
+        <p className="spn-final-sub">
+          Comece com uma imagem base e veja o que muda no fluxo de visualização
+          do seu escritório.
+        </p>
+
+        <div className="spn-final-ctas">
+          <a
+            href="/login?mode=signup"
+            className="spn-final-primary"
+            style={{
+              background: "var(--color-text-primary)",
+              color: "var(--color-bg)",
+              borderRadius: 12,
+              fontWeight: 500,
+              letterSpacing: "-0.005em",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              textDecoration: "none",
+              transition: "opacity 0.2s",
+            }}
+          >
+            Testar grátis →
+          </a>
+          <a
+            href="#planos"
+            className="spn-final-secondary"
+            style={{
+              color: "var(--color-text-secondary)",
+              textDecoration: "none",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              borderRadius: 12,
+              border: "0.5px solid var(--color-border)",
+              letterSpacing: "-0.005em",
+              transition: "border-color 0.2s",
+            }}
+          >
+            Ver planos
+          </a>
+        </div>
+
+        <p style={{ color: "var(--color-text-tertiary)", fontSize: 11, marginTop: 4 }}>
+          80 nodes grátis · sem cartão · em português
+        </p>
       </div>
 
-      <p style={{ color: "var(--color-text-tertiary)", fontSize: 11, marginTop: 4 }}>
-        80 nodes grátis · sem cartão · em português
-      </p>
+      <div className="spn-final-image">
+        <Image
+          src="/final-cta-bg.jpg"
+          alt="Projeto em render — exemplo do resultado final"
+          fill
+          priority
+          sizes="(max-width: 768px) 100vw, 1200px"
+          style={{
+            objectFit: 'cover',
+          }}
+        />
+      </div>
 
       <style jsx>{`
         .spn-final {
+          position: relative;
           padding: 140px 40px;
           background: var(--color-bg);
           color: var(--color-text-primary);
           text-align: center;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 48px;
+          align-items: center;
+        }
+        .spn-final-inner {
+          position: relative;
+          z-index: 2;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+        }
+        .spn-final-image {
+          position: relative;
+          width: 100%;
+          aspect-ratio: 4 / 5;
+          border-radius: 14px;
+          overflow: hidden;
+          box-shadow: 0 20px 64px rgba(0, 0, 0, 0.3);
         }
         .spn-final-title {
           color: var(--color-text-primary);
@@ -124,7 +162,12 @@ export default function FinalCTA() {
 
         @media (max-width: 768px) {
           .spn-final {
-            padding: 80px 20px 200px;
+            grid-template-columns: 1fr;
+            padding: 60px 20px;
+            gap: 32px;
+          }
+          .spn-final-inner {
+            align-items: center;
           }
           .spn-final-br {
             display: none;
@@ -149,6 +192,9 @@ export default function FinalCTA() {
             padding: 16px 22px;
             font-size: 15px;
             min-height: 54px;
+          }
+          .spn-final-image {
+            aspect-ratio: 3 / 4;
           }
         }
       `}</style>
