@@ -1481,9 +1481,13 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
       <Sheet open={sheet === 'saida'} title="Saída" onClose={closeSheet}>
         <div className="spn-field">
           <span className="spn-field-label">Motor</span>
+          {/* Com o Orion ligado são 4 motores: grade 2×2 (Vega·Pulsar /
+              Quasar·Orion), cartões idênticos e SEM nota — o que o motor faz
+              está na linha abaixo, que já muda com a seleção. Sem Orion
+              continuam 3 numa fileira só, como sempre. */}
           <ChoiceGroup
             label="Motor"
-            cols={3}
+            cols={orionEnabled ? 2 : 3}
             value={selectedEngine}
             onChange={handleEngineChange}
             options={[
@@ -1495,7 +1499,7 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
               // credencial do fornecedor). Fora do catálogo público de
               // lib/engines, que é compartilhado com Spaces/plugin/Nodi.
               ...(orionEnabled
-                ? [{ value: 'orion' as RenderEngineId, title: ORION_CONFIG.name, note: ORION_CONFIG.tagline }]
+                ? [{ value: 'orion' as RenderEngineId, title: ORION_CONFIG.name }]
                 : []),
             ]}
           />

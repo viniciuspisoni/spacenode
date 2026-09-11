@@ -2904,7 +2904,7 @@ html.light .spn-app {
 }
 .spn-pill:disabled { opacity: 0.42; cursor: default; }
 
-.spn-choices { display: grid; gap: 7px; }
+.spn-choices { display: grid; gap: 8px; }
 .spn-choices[data-cols='2'] { grid-template-columns: 1fr 1fr; }
 .spn-choices[data-cols='3'] { grid-template-columns: repeat(3, 1fr); }
 .spn-choice {
