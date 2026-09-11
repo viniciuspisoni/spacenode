@@ -1268,7 +1268,11 @@
       scenes: [],
       selectedScenes: [],
       modelMaterials: [],
-      materialSel: {},
+      // Chaveado por SUPERFÍCIE (piso, paredes…), não por material: é a
+      // pergunta que o arquiteto faz ("qual material é o piso?"), e libera o
+      // mesmo material servir duas superfícies — o que a chave por nome
+      // tornava impossível.
+      materialByField: {},
       batchRunning: false,
       // Resultados do último lote (pra salvar tudo de uma vez) e o que ficou
       // pendente quando ele morreu no meio (saldo/sessão).
@@ -1324,6 +1328,7 @@
         condMaterials: function (sent, req, names) { return sent + ' de ' + req + ' materiais enviados' + (names ? ' — ' + names : '') + '.'; },
         condNoSun: 'O preset de sol não foi aplicado — a captura saiu com o sol atual do modelo.',
         matUnsupported: 'Textura fora de jpg/png — não dá pra enviar como amostra.',
+        matUnsupportedShort: 'formato não suportado',
         matReason: { not_found: 'não encontrado', unsupported_format: 'formato não suportado', too_large: 'acima de 7,8 MB', export_failed: 'falha ao exportar', upload_failed: 'falha no envio' },
         historyOpen: 'Trazer para o painel',
         resultExpired: 'O link deste render venceu. Gere de novo ou abra pelo Histórico.',
@@ -1487,6 +1492,7 @@
         condMaterials: function (sent, req, names) { return sent + ' of ' + req + ' materials sent' + (names ? ' — ' + names : '') + '.'; },
         condNoSun: 'The sun preset was not applied — the capture used the model current sun.',
         matUnsupported: 'Texture is not jpg/png — it cannot be sent as a sample.',
+        matUnsupportedShort: 'unsupported format',
         matReason: { not_found: 'not found', unsupported_format: 'unsupported format', too_large: 'over 7.8 MB', export_failed: 'export failed', upload_failed: 'upload failed' },
         historyOpen: 'Bring into the panel',
         resultExpired: 'This render link expired. Generate again or open it from History.',
@@ -1996,62 +2002,86 @@
       var pt = currentProjectType();
       return (pt && pt.materialFields) || [];
     }
+    // Continua devolvendo [{name, field}] — o contrato com o Ruby e com o
+    // /api/generate é o mesmo; só a pergunta na tela virou do avesso.
     function materialSelArray() {
       var out = [];
-      Object.keys(model.materialSel).forEach(function (name) {
-        var field = model.materialSel[name];
-        if (field) out.push({ name: name, field: field });
+      currentMaterialFields().forEach(function (f) {
+        var name = model.materialByField[f.id];
+        if (name) out.push({ name: name, field: f.id });
       });
       return out.slice(0, 4);
+    }
+    function materialByName(name) {
+      var found = null;
+      model.modelMaterials.forEach(function (m) { if (m.name === name) found = m; });
+      return found;
     }
     function renderModelMaterials() {
       var fields = currentMaterialFields();
       var show = fields.length > 0 && model.modelMaterials.length > 0;
       els.modelMaterialsBlock.style.display = show ? '' : 'none';
       if (!show) return;
+
+      // Escolha de superfície que não existe no tipo de projeto atual (teto
+      // no exterior, fachada no interior) fica GUARDADA e inerte: só as
+      // superfícies do tipo corrente viram payload, porque materialSelArray()
+      // itera currentMaterialFields(). Apagar aqui destruía o trabalho de quem
+      // só foi espiar o outro tipo — e destruía no disco, já que o panel_state
+      // é global e persistStateSoon roda logo depois deste render.
       els.materialsList.innerHTML = '';
-      model.modelMaterials.forEach(function (mat) {
+      fields.forEach(function (f) {
+        var escolhido = model.materialByField[f.id] || '';
+        // Material que sumiu do modelo (ou virou formato não suportado) não
+        // pode continuar preso à superfície.
+        var mat = escolhido ? materialByName(escolhido) : null;
+        if (escolhido && (!mat || mat.unsupported)) {
+          delete model.materialByField[f.id];
+          escolhido = '';
+        }
+
         var row = document.createElement('div');
-        row.className = 'material-row' + (mat.unsupported ? ' is-unsupported' : '');
+        row.className = 'material-row';
         var nameEl = document.createElement('span');
         nameEl.className = 'mname';
-        nameEl.textContent = mat.displayName || mat.name;
-        nameEl.title = mat.unsupported ? tt('matUnsupported') : (mat.displayName || mat.name);
+        nameEl.textContent = (catUi('materialFields') || {})[f.id] || f.label;
+        nameEl.title = nameEl.textContent;
+
         var select = document.createElement('select');
-        select.disabled = model.generating || !!mat.unsupported;
-        if (mat.unsupported) { select.title = tt('matUnsupported'); delete model.materialSel[mat.name]; }
+        select.disabled = model.generating;
         var none = document.createElement('option');
         none.value = '';
         none.textContent = '—';
         select.appendChild(none);
-        fields.forEach(function (f) {
+        model.modelMaterials.forEach(function (m) {
           var opt = document.createElement('option');
-          opt.value = f.id;
-          opt.textContent = (catUi('materialFields') || {})[f.id] || f.label;
+          opt.value = m.name;
+          opt.textContent = m.displayName || m.name;
+          if (m.unsupported) {
+            // Textura fora de jpg/png não sobe: aparece, mas não escolhe.
+            opt.disabled = true;
+            opt.textContent += ' · ' + tt('matUnsupportedShort');
+          }
           select.appendChild(opt);
         });
-        select.value = model.materialSel[mat.name] || '';
+        select.value = escolhido;
+
         select.addEventListener('change', function () {
-          var field = select.value;
-          if (field) {
-            // Uma superfície por material: tira o campo de quem o tinha.
-            Object.keys(model.materialSel).forEach(function (other) {
-              if (other !== mat.name && model.materialSel[other] === field) {
-                delete model.materialSel[other];
-              }
-            });
-            if (materialSelArray().length >= 4 && !model.materialSel[mat.name]) {
+          var nome = select.value;
+          if (nome) {
+            if (!model.materialByField[f.id] && materialSelArray().length >= 4) {
               select.value = '';
               showNotice(tt('matCap'), 'error');
               return;
             }
-            model.materialSel[mat.name] = field;
+            model.materialByField[f.id] = nome;
           } else {
-            delete model.materialSel[mat.name];
+            delete model.materialByField[f.id];
           }
           renderModelMaterials();
           persistStateSoon();
         });
+
         row.appendChild(nameEl);
         row.appendChild(select);
         els.materialsList.appendChild(row);
@@ -3107,7 +3137,7 @@
           sunPreset: model.sunPreset,
           photoAspect: model.photoAspect, photoLevel: !!model.photoLevel, photoGuide: model.photoGuide,
           animarType: model.animarType, animarEngine: model.animarEngine, animarDuration: model.animarDuration,
-          materialSel: model.materialSel,
+          materialByField: model.materialByField,
           prompt: els.prompt.value
         };
         callSketchUpQuiet('persistState', JSON.stringify(snapshot));
@@ -3130,8 +3160,16 @@
       if (saved.animarType) model.animarType = saved.animarType;
       if (saved.animarEngine) model.animarEngine = saved.animarEngine;
       if (saved.animarDuration) model.animarDuration = String(saved.animarDuration);
-      if (saved.materialSel && typeof saved.materialSel === 'object' && !Array.isArray(saved.materialSel)) {
-        model.materialSel = saved.materialSel;
+      if (saved.materialByField && typeof saved.materialByField === 'object' && !Array.isArray(saved.materialByField)) {
+        model.materialByField = saved.materialByField;
+      } else if (saved.materialSel && typeof saved.materialSel === 'object' && !Array.isArray(saved.materialSel)) {
+        // Estado salvo pela versão anterior vinha {material: superfície};
+        // inverter aqui evita zerar a escolha de quem já tinha uma.
+        model.materialByField = {};
+        Object.keys(saved.materialSel).forEach(function (nome) {
+          var campo = saved.materialSel[nome];
+          if (campo && !model.materialByField[campo]) model.materialByField[campo] = nome;
+        });
       }
       if (typeof saved.prompt === 'string') els.prompt.value = saved.prompt;
     }
@@ -3494,7 +3532,9 @@
           // Seleções de materiais que não existem mais no modelo caem fora.
           var names = {};
           model.modelMaterials.forEach(function (m) { names[m.name] = true; });
-          Object.keys(model.materialSel).forEach(function (n) { if (!names[n]) delete model.materialSel[n]; });
+          Object.keys(model.materialByField).forEach(function (campo) {
+            if (!names[model.materialByField[campo]]) delete model.materialByField[campo];
+          });
           renderModelMaterials();
           renderEditControls();
         }
