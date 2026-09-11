@@ -25,6 +25,59 @@ O que só um plugin dentro do modelo consegue:
 - **Voltar à vista** — cada render guarda a câmera; um clique restaura o
   enquadramento exato no SketchUp.
 
+## O que mudou na 1.1.1 — a moldura da captura fica na tela
+
+Relato de campo: "após clicar em capturar vista, ele muda o ponto de visão da
+captura". Não mudava a câmera — mudava o QUADRO, e nada na tela dizia isso.
+
+**"Capturar vista" não é um print da viewport.** É um render novo no quadro
+escolhido, e o SketchUp preserva o campo de visão. Com a viewport em ~2,6:1 e
+16:9 escolhido na folha Fotografia, cerca de **32% da largura fica fora** — o
+render parece "aproximado" em relação à tela.
+
+A moldura que mostraria isso existia em dois lugares, e os dois falhavam:
+
+- A `GuidesOverlay` desenhava o quadro, mas o `draw` saía fora na primeira
+  linha quando o guia de composição era "none" — que é o padrão. Quem não usa
+  guias nunca via moldura nenhuma. E `Sketchup::Overlay` só existe no
+  **SketchUp 2023+**: em 2021/2022 ela nunca foi opção.
+- A moldura nativa (`camera.aspect_ratio`, as barras cinza que o SketchUp
+  desenha sozinho) até era aplicada quando o usuário escolhia a proporção —
+  mas mora na CÂMERA, e **trocar de cena troca a câmera**. A moldura sumia da
+  tela sem que o painel mudasse de ideia, e a captura seguia recortando.
+
+### O que passou a valer
+
+- **A moldura é reaplicada sempre que a vista muda** (`reapply_camera_frame` em
+  `camera_changed` e em `model_switched`). É a moldura nativa, então funciona
+  em toda versão suportada, inclusive 2021/2022. Converge sozinha: reaplicar
+  dispara `onViewChanged`, e na segunda passada `apply_camera_aspect` não
+  escreve mais nada.
+- **A overlay desenha o quadro mesmo sem guia de composição** (2023+), com o
+  que fica de fora escurecido. Quando as barras nativas já estão na tela ela
+  não escurece de novo — entra só com a borda, pra não empilhar cinza.
+- **O painel conta o corte antes de capturar.** `camera_facts` passou a mandar
+  `viewAspect` (a proporção da VIEWPORT, que o painel não tinha), a linha
+  "Fotografia" virou `16:9 · laterais fora · 35 mm` e a folha explica com o
+  número da tela. E a linha passou a se atualizar na hora: antes ela só
+  mudava quando outro evento passasse pelo `updateShell`, então continuava
+  dizendo "Livre" depois de o usuário já ter escolhido 16:9.
+
+### Restauro de câmera verificado
+
+`view.camera` devolve a câmera VIVA. O espelho e o nivelamento guardavam essa
+referência e reatribuíam depois — se o SketchUp escreve os valores no próprio
+objeto, isso não restaura nada e a viewport fica na câmera temporária (a
+refletida, no caso dos espelhos). Agora guardamos os números junto com a
+referência: restaura pela referência, que preserva o que um `Camera.new` não
+reproduz (perspectiva de 2 pontos nativa), e só remonta a partir dos números se
+a vista não tiver voltado. Conservador de propósito — o caminho que já
+funcionava não muda.
+
+Na mesma linha, a moldura temporária da captura passou a ser desfeita na câmera
+VIVA: se algum passo trocou o objeto da vista, escrever no `capture_camera`
+deixaria a moldura presa na viewport do usuário.
+
 ## O que mudou na 1.1.0 — um botão de gerar por vez
 
 Feedback de campo: "dificuldade com a usabilidade" e "não consegui escolher o
