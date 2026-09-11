@@ -27,7 +27,7 @@ module SpaceNode
   module SketchUp
     extend self
 
-    VERSION = '1.1.1'
+    VERSION = '1.2.0'
     PREFERENCES_KEY = 'com.spacenode.sketchup'
     DEFAULT_API_BASE_URL = 'https://spacenode.app'
     MIN_SKETCHUP_MAJOR = 21          # Ruby 2.7+; recomendado 2024+
@@ -188,6 +188,11 @@ module SpaceNode
     PHOTO_FOV_MAX_DEG = 118.0
     PHOTO_GUIDES = %w[none thirds golden center diagonals].freeze
     INCH_PER_M = 39.3700787
+    # Medidas do ambiente (1.2.0): faixas de sanidade. Raio que não acerta
+    # nada (vista externa) ou acerta fora da faixa não vira fato — medida
+    # errada no prompt é pior que medida nenhuma.
+    ROOM_RAY_RANGE_M = (0.4..40.0)
+    ROOM_CEILING_RANGE_M = (1.8..20.0)
 
     # ── Espelhos (0.9.0) ──────────────────────────────────────────────────
     # Reflexo calculado NA CAPTURA: câmera refletida pelo plano da face,
@@ -1202,6 +1207,63 @@ module SpaceNode
     end
 
     # Cota z do primeiro elemento visível abaixo do ponto (polegadas) ou nil.
+    # ── Medidas do ambiente (raytest a partir do olho) ──────────────────────
+    #
+    # A imagem sozinha não dá escala: é por isso que um render inventa
+    # pé-direito de 4 m numa sala de 2,70 m, porta de 2,40 m e bancada na
+    # altura errada. O plugin está DENTRO do modelo e pode simplesmente medir.
+    # Já fazíamos isso para a altura do olho; aqui vão o pé-direito (piso até
+    # teto sob a câmera) e a largura parede a parede na altura do olho.
+    #
+    # Honestidade do fato: tudo é medido NO PONTO DA CÂMERA, e o prompt diz
+    # isso. Um raio lateral pode acertar uma estante em vez da parede — o erro
+    # é da ordem da profundidade do móvel, e a faixa de sanidade descarta o
+    # resto. Sem acerto (câmera fora da edificação) não mandamos nada.
+    def ray_distance_m(model, origin, vector)
+      hit = model.raytest([origin, vector], true)
+      return nil unless hit && hit[0]
+
+      meters = origin.distance(hit[0]) / INCH_PER_M
+      ROOM_RAY_RANGE_M.cover?(meters) ? meters : nil
+    rescue StandardError
+      nil
+    end
+
+    def room_facts(model, camera)
+      eye = camera.eye
+      room = {}
+
+      up = ray_distance_m(model, eye, ::Geom::Vector3d.new(0, 0, 1))
+      floor_z = floor_under(model, eye)
+      down = floor_z ? (eye.z - floor_z) / INCH_PER_M : nil
+      if up && down && down > 0
+        ceiling = up + down
+        room[:ceilingM] = ceiling.round(2) if ROOM_CEILING_RANGE_M.cover?(ceiling)
+      end
+
+      dir = camera.direction
+      flat = ::Geom::Vector3d.new(dir.x, dir.y, 0)
+      if flat.length > 1e-6
+        flat.normalize!
+        # Vector3d#* é produto VETORIAL (o escalar é %): dá a perpendicular
+        # horizontal à direção da vista.
+        side = flat * ::Geom::Vector3d.new(0, 0, 1)
+        if side.length > 1e-6
+          side.normalize!
+          left = ray_distance_m(model, eye, side)
+          right = ray_distance_m(model, eye, side.reverse)
+          if left && right
+            width = left + right
+            room[:widthM] = width.round(2) if ROOM_RAY_RANGE_M.cover?(width)
+          end
+        end
+      end
+
+      room.empty? ? nil : room
+    rescue StandardError
+      nil
+    end
+
     def floor_under(model, point)
       hit = model.raytest([point, ::Geom::Vector3d.new(0, 0, -1)], true)
       return nil unless hit && hit[0]
@@ -1302,6 +1364,10 @@ module SpaceNode
           meters = (camera.eye.z - floor_z) / INCH_PER_M
           facts[:eyeHeightM] = meters.round(2) if PHOTO_EYE_RANGE_M.cover?(meters)
         end
+        # Medidas do ambiente: vão pro HUD do painel e, na captura, pro
+        # bloco MODEL FACTS do prompt.
+        room = model ? room_facts(model, camera) : nil
+        facts[:room] = room if room
       rescue StandardError
         nil
       end
@@ -2444,6 +2510,7 @@ module SpaceNode
           cam[:twoPoint] = true if cf[:twoPoint]
           cam[:eyeHeightM] = cf[:eyeHeightM] if cf[:eyeHeightM]
           facts[:camera] = cam unless cam.empty?
+          facts[:room] = cf[:room] if cf[:room].is_a?(Hash) && !cf[:room].empty?
         end
       rescue StandardError
         nil

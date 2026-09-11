@@ -25,6 +25,51 @@ O que só um plugin dentro do modelo consegue:
 - **Voltar à vista** — cada render guarda a câmera; um clique restaura o
   enquadramento exato no SketchUp.
 
+## O que mudou na 1.2.0 — o modelo conta o tamanho do ambiente
+
+Uma imagem não tem escala. É por isso que um render inventa pé-direito de 4 m
+numa sala de 2,70, porta de 2,40 e bancada na altura errada — o motor escolhe
+a proporção que fizer a composição parecer grandiosa, porque nada na entrada
+diz o contrário. Quem está **dentro do modelo** não precisa adivinhar: mede.
+
+O plugin já media a altura do olho por `raytest` (piso sob a câmera). A 1.2.0
+mede mais duas coisas no mesmo gesto e manda no bloco MODEL FACTS:
+
+- **Pé-direito** — piso até teto sob a câmera.
+- **Largura** — parede a parede na altura do olho, atravessando a vista.
+
+No prompt vira uma linha que diz de onde veio o número:
+
+> Room, measured in the 3D model at the camera position: floor-to-ceiling
+> height 2.7 m; about 4.25 m wall to wall across the view — keep every scale
+> cue consistent with these real dimensions (…); never stretch the space taller
+> or wider than it is to make the composition look grander.
+
+### Honestidade do fato
+
+Medida errada no prompt é pior que medida nenhuma, então tudo passa por porta:
+
+- Cada raio só vale entre **0,4 e 40 m** (`ROOM_RAY_RANGE_M`); o pé-direito,
+  entre **1,8 e 20 m**. Fora disso, não vira fato.
+- Raio que não acerta nada não manda nada — é o caso da **vista externa**, que
+  naturalmente fica de fora sem precisar de flag.
+- A largura é medida **na altura do olho**: um raio lateral pode acertar uma
+  estante em vez da parede, e o erro é da ordem da profundidade do móvel. Por
+  isso o prompt diz "about" e "at the camera position" — o texto não promete
+  mais precisão do que a medida tem.
+- O servidor não confia no cliente: `sanitizeModelFacts` reclampa nas mesmas
+  faixas antes de qualquer coisa entrar no prompt.
+
+### O que aparece no painel
+
+O HUD da folha Fotografia passou a mostrar o que foi medido, ao lado da lente
+e da altura do olho: `35 mm · 38° · olho a 1,60 m · pé-direito 2,70 m`. Se a
+medida não passou na porta, a linha some — o painel não mostra número que não
+foi mandado.
+
+**Ainda sem medição de campo:** que o número melhore o render é a tese, não um
+resultado. O A/B pago é do dono.
+
 ## O que mudou na 1.1.1 — a moldura da captura fica na tela
 
 Relato de campo: "após clicar em capturar vista, ele muda o ponto de visão da

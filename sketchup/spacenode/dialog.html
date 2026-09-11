@@ -1451,6 +1451,7 @@
         hudParallel: 'projeção paralela',
         hudLens: function (mm, fov) { return mm + ' mm · ' + fov + '°'; },
         hudEye: function (m) { return 'olho a ' + m + ' m'; },
+        hudCeiling: function (m) { return 'pé-direito ' + m + ' m'; },
         hudTilt: function (deg, up) { return (up ? '↑' : '↓') + ' ' + deg + '°'; },
         photoNote: 'A IA preserva o que vê: proporção, lente, altura do olho e verticais retas viram parte do render.',
         levelReasons: { too_steep: 'inclinação acima do limite', render_failed: 'o recorte da captura falhou', level_mismatch: 'o mapa de arestas não casou', degenerate: 'câmera apontando reto para cima ou para baixo', error: 'erro ao calcular o nivelamento' },
@@ -1624,6 +1625,7 @@
         hudParallel: 'parallel projection',
         hudLens: function (mm, fov) { return mm + ' mm · ' + fov + '°'; },
         hudEye: function (m) { return 'eye at ' + m + ' m'; },
+        hudCeiling: function (m) { return 'ceiling ' + m + ' m'; },
         hudTilt: function (deg, up) { return (up ? '↑' : '↓') + ' ' + deg + '°'; },
         photoNote: 'The AI preserves what it sees: aspect ratio, lens, eye height and straight verticals become part of the render.',
         levelReasons: { too_steep: 'tilt above the limit', render_failed: 'the capture crop failed', level_mismatch: 'the edge map did not match', degenerate: 'camera pointing straight up or down', error: 'error computing the levelling' },
@@ -2654,6 +2656,8 @@
       var parts = [];
       if (cam.focalLengthMm) parts.push(tt('hudLens', cam.focalLengthMm, Math.round(cam.fovDeg || 0)));
       if (typeof cam.eyeHeightM === 'number') parts.push(tt('hudEye', fmtNum(cam.eyeHeightM, 2)));
+      // Medido no modelo por raytest — o usuário vê o que a IA vai receber.
+      if (cam.room && typeof cam.room.ceilingM === 'number') parts.push(tt('hudCeiling', fmtNum(cam.room.ceilingM, 2)));
       if (typeof cam.tiltDeg === 'number' && Math.abs(cam.tiltDeg) >= 0.5) parts.push(tt('hudTilt', fmtNum(Math.abs(cam.tiltDeg), 0), cam.tiltDeg > 0));
       return parts.join(' · ');
     }

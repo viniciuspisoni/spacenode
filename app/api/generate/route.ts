@@ -174,6 +174,17 @@ function sanitizeModelFacts(raw: unknown): ModelFacts | undefined {
     if (eye !== undefined) camera.eyeHeightM = Math.round(eye * 100) / 100
     if (Object.keys(camera).length > 0) out.camera = camera
   }
+  const room = src.room as Record<string, unknown> | undefined
+  if (room && typeof room === 'object') {
+    const r: NonNullable<ModelFacts['room']> = {}
+    // Mesmas faixas do plugin (ROOM_CEILING_RANGE_M / ROOM_RAY_RANGE_M): o
+    // cliente é quem mede, então o servidor não confia — reclampa.
+    const ceiling = num(room.ceilingM, 1.8, 20)
+    const width = num(room.widthM, 0.4, 40)
+    if (ceiling !== undefined) r.ceilingM = Math.round(ceiling * 100) / 100
+    if (width !== undefined) r.widthM = Math.round(width * 100) / 100
+    if (Object.keys(r).length > 0) out.room = r
+  }
   const mirrors = src.mirrors as Record<string, unknown> | undefined
   if (mirrors && typeof mirrors === 'object') {
     const count = num(mirrors.count, 0, 50)
@@ -198,7 +209,7 @@ function sanitizeModelFacts(raw: unknown): ModelFacts | undefined {
     if (sun.shadowsVisible === true) s.shadowsVisible = true
     if (s.elevationDeg !== undefined) out.sun = s
   }
-  return out.camera || out.sun || out.mirrors ? out : undefined
+  return out.camera || out.sun || out.mirrors || out.room ? out : undefined
 }
 
 function truncateErr(err: unknown): string {
