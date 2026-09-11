@@ -23,10 +23,21 @@ import {
   Sheet, SettingGroup, SettingRow, summarize,
   Segmented, PillGroup, MultiPillGroup, ChoiceGroup, RowIcon, useAmbient,
 } from '@/components/app/glass'
+import {
+  ORION_CONFIG, ORION_LONG_EDGE, getOrionNodesCost,
+  type OrionProvider, type OrionVariant, type RenderEngineId,
+} from '@/lib/orion/config'
 
 interface GenerateClientProps {
   /** Saldo total da bolsa (mensais + extras) — mesmo pool que o débito consome. */
   initialCredits:    number
+  /** Motor Orion liberado pra ESTE usuário. Decidido no servidor (page.tsx:
+   *  ORION_INTERNAL_ENABLED + credencial do fornecedor); aqui só governa a
+   *  exibição. A rota /api/generate re-valida em toda geração — este booleano
+   *  não autoriza nada. */
+  orionEnabled?:     boolean
+  /** Fornecedor ativo do Orion (env privada do servidor) — exibição apenas. */
+  orionProvider?:    OrionProvider
   initialMaterials?: ProjectMaterials
   initialConfig?:    ProjectConfig | null
   /** URL https de uma render existente a pré-carregar como input (ex.: "Reutilizar" no dashboard). */
@@ -71,6 +82,14 @@ interface GenerateResult {
   semanticWarning?: boolean
   /** Seed usada na geração (caminho GCP) — reenviada no "Corrigir drift". */
   seed?: number
+  /** Identidade real do Orion na entrega: com quem foi gerado e o que saiu. */
+  orion?: {
+    provider:      OrionProvider
+    variant:       OrionVariant
+    quality:       string
+    requestedSize: string
+    deliveredSize: string | null
+  } | null
   prompt?:   string
   error?:    string
 }
@@ -245,7 +264,7 @@ function resolveInitialConfig(cfg: ProjectConfig | null | undefined) {
   }
 }
 
-export function GenerateClient({ initialCredits, initialMaterials, initialConfig, initialSourceUrl, returnTo, firstRender = false }: GenerateClientProps) {
+export function GenerateClient({ initialCredits, initialMaterials, initialConfig, initialSourceUrl, returnTo, firstRender = false, orionEnabled = false, orionProvider }: GenerateClientProps) {
   const init = resolveInitialConfig(initialConfig)
   const fromSpacesNew = returnTo === 'spaces/new'
   const supabase = createClient()
@@ -277,7 +296,14 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
   // ── Parâmetros técnicos
   const geometryLock = 85
   const fidelityMode = 'strict' as const
-  const [selectedEngine,     setSelectedEngine]     = useState<EngineId>(init.selectedEngine)
+  // RenderEngineId (não EngineId): 'orion' vive fora do catálogo público.
+  // resolveInitialConfig nunca devolve 'orion' — config salva não ressuscita
+  // o Orion sozinha (a rota re-checa canUseOrion de qualquer jeito).
+  const [selectedEngine,     setSelectedEngine]     = useState<RenderEngineId>(init.selectedEngine)
+  const isOrion = selectedEngine === 'orion'
+  // Último motor PÚBLICO escolhido — é ele que vai pro profiles.project_config
+  // (Orion não pode virar default compartilhado com Spaces/plugin/Nodi).
+  const lastPublicEngineRef = useRef<EngineId>(init.selectedEngine)
   const [selectedResolution, setSelectedResolution] = useState<Resolution>(init.selectedResolution)
 
   // ── Materiais
@@ -315,6 +341,8 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
   // Id da última render persistida — usado pelo CTA "Criar Space" pra
   // ligar o Space novo à render como Vista Mestre.
   const [lastRenderId,      setLastRenderId]      = useState<string | null>(null)
+  // Identidade Orion do ÚLTIMO RESULTADO: rótulo e bloqueio do Spaces leem daqui.
+  const [lastOrion,         setLastOrion]         = useState<GenerateResult['orion']>(null)
   const [sliderPos,         setSliderPos]         = useState(50)
   const [isDraggingSlider,  setIsDraggingSlider]  = useState(false)
   const [isDraggingFile,    setIsDraggingFile]    = useState(false)
@@ -441,8 +469,15 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
   }
 
   // ── Cascade: engine → resolução suportada
-  const handleEngineChange = (eid: EngineId) => {
+  const handleEngineChange = (eid: RenderEngineId) => {
     setSelectedEngine(eid)
+    // Orion oferece 2K e 4K — se a resolução atual for HD (só Pulsar tem),
+    // cai pra 2K como nos demais.
+    if (eid === 'orion') {
+      if (!ORION_CONFIG.resolutions.includes(selectedResolution)) setSelectedResolution('2k')
+      return
+    }
+    lastPublicEngineRef.current = eid
     // Se a resolução atual não é suportada, cai pra 2K.
     if (!ENGINES[eid].resolutions.includes(selectedResolution)) {
       setSelectedResolution('2k')
@@ -508,16 +543,21 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
       try {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return
+        // Orion NUNCA é persistido como configuração padrão: project_config é
+        // lido por outros fluxos (e por qualquer sessão futura, inclusive sem
+        // acesso interno). Grava o último motor público escolhido.
         const config: ProjectConfig = {
           projectType, segment, environment, lighting, background,
-          sceneElements, selectedEngine, selectedResolution,
+          sceneElements,
+          selectedEngine:     isOrion ? lastPublicEngineRef.current : selectedEngine,
+          selectedResolution: isOrion ? DEFAULT_RESOLUTION : selectedResolution,
         }
         await supabase.from('profiles').update({ project_config: config }).eq('id', user.id)
       } catch (e) { console.error('Erro ao salvar config:', e) }
     }, 1500)
   }, [
     projectType, segment, environment, lighting, background,
-    sceneElements, selectedEngine, selectedResolution,
+    sceneElements, selectedEngine, selectedResolution, isOrion,
     supabase,
   ])
 
@@ -686,6 +726,9 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
       setFidelityScore(typeof data.fidelityScore === 'number' ? data.fidelityScore : null)
       setFidelityWarning(Boolean(data.fidelityWarning) || Boolean(data.semanticWarning))
       setLastSeed(typeof data.seed === 'number' ? data.seed : null)
+      // Identidade do RESULTADO (não do card selecionado agora): é ela que
+      // decide o rótulo e o bloqueio da promoção pro Spaces.
+      setLastOrion(data.orion ?? null)
       setScale(1); setPan({ x: 0, y: 0 })
       if (refinementText.trim()) setRefinementText('')
     } catch (err: unknown) {
@@ -833,8 +876,12 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
     return !!(v && v.trim())
   }).length
   const materialSamples = visibleMaterialFields.filter(({ field }) => materialRefs[field]).length
-  const currentEngine = ENGINES[selectedEngine]
-  const nodeCost      = getNodesCost(selectedEngine, selectedResolution)
+  // ORION_CONFIG expõe name/description/resolutions/nodes com a MESMA forma do
+  // catálogo público — folha e resumo não precisam saber a diferença.
+  const currentEngine = isOrion ? ORION_CONFIG : ENGINES[selectedEngine]
+  const nodeCost      = isOrion
+    ? getOrionNodesCost(selectedResolution === '4k' ? '4k' : '2k')
+    : getNodesCost(selectedEngine, selectedResolution)
   const segments      = getSegments(projectType)
   const environments  = getEnvironments(projectType, segment)
   const lightingOpts  = getLighting(projectType, segment)
@@ -844,7 +891,9 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
   const noNodes       = credits < nodeCost
   // Quantos renders o saldo total cobre na config atual — recalcula client-side
   // a cada troca de motor/qualidade e após cada geração (credits é estado).
-  const rendersAfford = Math.floor(credits / nodeCost)
+  // Guarda do zero: nenhum motor custa 0 hoje, mas a divisão sairia Infinity
+  // se um dia voltar a custar — aí o contador simplesmente não se aplica.
+  const rendersAfford = nodeCost > 0 ? Math.floor(credits / nodeCost) : null
 
   // Melhor combinação motor × resolução que ainda cabe no saldo — a saída
   // honesta pra quem está sem nodes: gerar com menos qualidade em vez de pagar.
@@ -964,9 +1013,11 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
               <div className="spn-cost-figures">
                 <div className="spn-cost-main">{nodeCost} nodes</div>
                 <div className="spn-cost-sub">
-                  {imagePreview
-                    ? `saldo para ~${rendersAfford} render${rendersAfford === 1 ? '' : 's'}`
-                    : 'envie uma imagem para começar'}
+                  {!imagePreview
+                    ? 'envie uma imagem para começar'
+                    : rendersAfford === null
+                      ? 'teste interno — não consome nodes'
+                      : `saldo para ~${rendersAfford} render${rendersAfford === 1 ? '' : 's'}`}
                 </div>
               </div>
               <button
@@ -1208,7 +1259,25 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
 
               {/* Próximo passo natural depois da render. Sem verde: verde é
                   estado, nunca ação (contrato do vidro, §2.3). */}
-              {lastRenderId && (
+              {lastOrion && (
+                <div className="spn-glass" style={S.nextStep}>
+                  <span style={{ display: 'grid', gap: 2 }}>
+                    <b style={{ fontSize: 12, fontWeight: 560 }}>Orion</b>
+                    <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+                      {lastOrion.provider === 'fal' ? 'fal.ai' : 'OpenAI'}
+                      {' · '}{lastOrion.deliveredSize ?? 'dimensão não informada'}
+                      {lastOrion.deliveredSize && lastOrion.deliveredSize !== lastOrion.requestedSize
+                        ? ` (pedido ${lastOrion.requestedSize})`
+                        : ''}
+                    </span>
+                  </span>
+                </div>
+              )}
+
+              {/* Resultado do Orion ainda não vira projeto: a decisão olha o
+                  motor do RESULTADO, não o card selecionado agora. O servidor
+                  recusa igual (409 em /api/spaces/from-render). */}
+              {lastRenderId && !lastOrion && (
                 <Link
                   href={`/app/spaces/new/from-render?render_id=${lastRenderId}`}
                   className="spn-glass spn-glass--raised"
@@ -1417,13 +1486,30 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
             cols={3}
             value={selectedEngine}
             onChange={handleEngineChange}
-            options={ENGINE_ORDER.map(eid => ({
-              value: eid,
-              title: ENGINES[eid].name,
-            }))}
+            options={[
+              ...ENGINE_ORDER.map(eid => ({
+                value: eid as RenderEngineId,
+                title: ENGINES[eid].name,
+              })),
+              // Orion: só existe quando o servidor autorizou (flag +
+              // credencial do fornecedor). Fora do catálogo público de
+              // lib/engines, que é compartilhado com Spaces/plugin/Nodi.
+              ...(orionEnabled
+                ? [{ value: 'orion' as RenderEngineId, title: ORION_CONFIG.name, note: ORION_CONFIG.tagline }]
+                : []),
+            ]}
           />
           <p className="spn-hint">{currentEngine.description}</p>
         </div>
+
+        {/* Variante e qualidade não são mais escolha do usuário: o servidor
+            sempre usa Flare/high (ver lib/orion/config). Resta a nota do que
+            o motor ainda não faz. */}
+        {orionEnabled && isOrion && (
+          <p className="spn-hint">
+            Fornecedor {orionProvider === 'fal' ? 'fal.ai' : 'OpenAI'} · o resultado ainda não vira projeto no Spaces.
+          </p>
+        )}
         <div className="spn-field">
           <span className="spn-field-label">Qualidade</span>
           {/* Motor de resolução única (é o caso do Quasar, que só entrega 2K):
@@ -1433,7 +1519,8 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
           {currentEngine.resolutions.length === 1 ? (
             <p className="spn-hint" style={{ marginTop: 0 }}>
               <b style={{ color: 'var(--color-text-primary)', fontWeight: 560 }}>
-                {selectedResolution.toUpperCase()} · {currentEngine.nodes[selectedResolution] ?? 0} nodes
+                {selectedResolution.toUpperCase()}
+                {` · ${currentEngine.nodes[selectedResolution] ?? 0} nodes`}
               </b>
               {' — '}{RESOLUTION_DESC[selectedResolution]}
               {' · única resolução do '}{currentEngine.name}
@@ -1448,7 +1535,12 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
                 options={currentEngine.resolutions.map(res => ({
                   value: res,
                   title: res.toUpperCase(),
-                  note:  `${currentEngine.nodes[res] ?? 0} nodes`,
+                  // Orion: o "4K" dele é UHD (3840 no lado maior, teto da Image
+                  // API), não os 4096 px de Vega/Pulsar — por isso o tamanho
+                  // entregue aparece junto do preço.
+                  note:  isOrion
+                    ? `${currentEngine.nodes[res] ?? 0} nodes · ${ORION_LONG_EDGE[res === '4k' ? '4k' : '2k']} px`
+                    : `${currentEngine.nodes[res] ?? 0} nodes`,
                 }))}
               />
               <p className="spn-hint">{RESOLUTION_DESC[selectedResolution]}</p>

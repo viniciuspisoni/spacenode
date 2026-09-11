@@ -22,11 +22,33 @@ import {
   type Resolution,
   getFalEndpoint,
   getNodesCost,
-  isEngineId,
   isResolution,
   isValidCombination,
 } from '@/lib/engines'
-import { generateImage, type GenerateImageResult } from '@/lib/ai/image-provider'
+import { falParamsForEngine } from '@/lib/ai/engine-params'
+import {
+  DEFAULT_ORION_QUALITY,
+  DEFAULT_ORION_VARIANT,
+  ORION_CONFIG,
+  ORION_MODELS,
+  getOrionNodesCost,
+  isOrionResolution,
+  isRenderEngineId,
+  orionSizeParam,
+  orionTargetSize,
+  type OrionQuality,
+  type OrionVariant,
+  type RenderEngineId,
+} from '@/lib/orion/config'
+import { canUseOrion } from '@/lib/orion/access'
+import {
+  generateOrionImage,
+  orionProvider,
+  ORION_DEFAULT_TIMEOUT_MS,
+  type OrionGenerateResult,
+} from '@/lib/orion/provider'
+import { buildOrionCostRecord } from '@/lib/orion/pricing'
+import { generateImage, uploadToStorage } from '@/lib/ai/image-provider'
 import {
   getRenderFidelityConfig,
   getFidelityAttemptParams,
@@ -44,7 +66,6 @@ import {
 } from '@/lib/ai/fidelity/geometry-score'
 import { fetchStorageBuffer, assertSafeFetchUrl } from '@/lib/storage/fetch'
 import { nearestSupportedAspectRatio } from '@/lib/ai/aspect-ratio'
-import { seedreamCheapSize, seedreamCheapTierEnabled } from '@/lib/ai/seedream-size'
 import { analyzeImage } from '@/lib/fidelity-engine'
 import { DIRECT_UPLOAD_AREAS, downloadDirectUpload } from '@/lib/storage/direct-upload'
 import { normalizeSourceImage } from '@/lib/storage/normalize-image'
@@ -89,52 +110,25 @@ const FAL_TIMEOUT_MS: Record<EngineId, number> = {
   quasar: 300_000,
 }
 
-// ── Mapping de resolução interna → param da Fal.ai por engine ────────────────
-//
-// Vega   (Gemini 3 Pro Image edit) → `resolution` ∈ '1K'|'2K'|'4K'
-// Pulsar (Nano Banana 2 edit)      → `resolution` ∈ '1K'|'2K'|'4K'
-//   HD interno mapeia para '1K' na Fal.ai (NB2 não tem rótulo "HD" nativo).
-// Quasar (Seedream 5.0 Pro edit)   → `image_size` = 'auto_2K' (ou WxH da faixa barata)
-//   'auto_*' segue o aspecto da imagem de entrada. O endpoint tem teto de
-//   2048×2048, por isso o Quasar só oferece 2K (lib/engines). Schema da FAL
-//   sem seed/quality/aspect_ratio.
+// Orion (piloto interno): teto próprio, ajustável sem redeploy de código.
+// O orçamento da ROTA continua mandando — a chamada recebe o menor dos dois.
+const ORION_TIMEOUT_MS = Math.max(30_000, Number(process.env.ORION_TIMEOUT_MS) || ORION_DEFAULT_TIMEOUT_MS)
 
-function falParamsForEngine(
-  engine:      EngineId,
-  resolution:  Resolution,
-  aspectRatio: string | null = null,
-  sourceSize:  { width: number; height: number } | null = null,
-): Record<string, unknown> {
-  if (engine === 'quasar') {
-    // Seedream 5.0 Pro Edit: só campos do schema (conferido 2026-09-04).
-    // 'auto_2K' preserva a proporção do input no maior tamanho do endpoint.
-    // Com SEEDREAM_CHEAP_TIER=1 pedimos WxH explícito no teto da faixa barata
-    // de preço (lib/ai/seedream-size): metade do custo nos dois provedores e
-    // 76% do lado. Sem as dimensões do original, segue o 'auto_2K'.
-    const cheap = seedreamCheapTierEnabled()
-      ? seedreamCheapSize(sourceSize?.width, sourceSize?.height)
-      : null
-    return {
-      image_size:    cheap ?? 'auto_2K',
-      num_images:    1,
-      // Master lossless — alinha o caminho FAL com o GCP/Vertex (que já
-      // devolve PNG). JPEG aqui criava uma geração de perda logo na origem
-      // da cadeia render → editar → ampliar.
-      output_format: 'png',
-    }
-  }
-  // vega | pulsar
-  const map: Record<Resolution, string> = { hd: '1K', '2k': '2K', '4k': '4K' }
-  return {
-    resolution:    map[resolution],
-    num_images:    1,
-    output_format: 'png',
-    // Pino de formato (lib/ai/aspect-ratio): presente só quando o aspecto do
-    // original bate (≤2%) com um valor suportado — previne o drift de
-    // enquadramento em vez de puni-lo depois via aspectDelta. Ausente, o
-    // motor segue o formato do input (default 'auto').
-    ...(aspectRatio ? { aspect_ratio: aspectRatio } : {}),
-  }
+// (falParamsForEngine mora em lib/ai/engine-params — compartilhado com o
+// benchmark de fidelidade, que antes montava os params por conta própria e
+// ficava desatualizado a cada troca de motor.)
+
+/** Saída de UMA tentativa, no vocabulário comum aos dois caminhos (camada de
+ *  providers dos motores públicos e o piloto Orion). */
+interface AttemptOutcome {
+  images:        { url: string; width: number | null; height: number | null }[]
+  provider:      string
+  providerModel: string
+  requestId:     string | null
+  fallbackUsed:  boolean
+  hedgeUsed:     boolean
+  latencyMs:     number
+  errorMessage:  string | null
 }
 
 // Teto do briefing de visão inline (PROJECT FACTS). analyzeImage nunca lança
@@ -305,24 +299,50 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    if (!isEngineId(rawEngine)) {
+    if (!isRenderEngineId(rawEngine)) {
       return NextResponse.json({ error: 'Engine inválida ou ausente.' }, { status: 400 })
     }
     if (!isResolution(rawResolution)) {
       return NextResponse.json({ error: 'Resolução inválida ou ausente.' }, { status: 400 })
     }
-    const engine:     EngineId   = rawEngine
-    const resolution: Resolution = rawResolution
+    const engine:     RenderEngineId = rawEngine
+    const resolution: Resolution     = rawResolution
+    const isOrion = engine === 'orion'
 
-    if (!isValidCombination(engine, resolution)) {
+    // ── Orion: autorização ANTES de qualquer upload, débito ou chamada paga ──
+    //
+    // Vale pra TODA entrada capaz de executar Orion — browser, Bearer do
+    // plugin, requisição forjada, config antiga salva no perfil ou reuso de
+    // render. Variante e qualidade não são mais escolha do cliente: o
+    // servidor sempre usa Flare/high (ver lib/orion/config) — nada do que o
+    // cliente manda (custo, endpoint, permissão) é levado em conta.
+    const orionVariant: OrionVariant = DEFAULT_ORION_VARIANT
+    const orionQuality: OrionQuality = DEFAULT_ORION_QUALITY
+    if (isOrion) {
+      if (!(await canUseOrion({ id: user.id, email: user.email }))) {
+        // 404: com a flag desligada, o motor simplesmente não existe.
+        console.warn('[generate] orion recusado (flag desligada)')
+        return NextResponse.json({ error: 'Engine inválida ou ausente.' }, { status: 404 })
+      }
+      if (!isOrionResolution(resolution)) {
+        return NextResponse.json(
+          { error: `Combinação inválida: ${ORION_CONFIG.name} só roda em 2K ou 4K.` },
+          { status: 400 },
+        )
+      }
+    } else if (!isValidCombination(engine, resolution)) {
       return NextResponse.json(
         { error: `Combinação inválida: ${ENGINES[engine].name} não suporta ${resolution.toUpperCase()}.` },
         { status: 400 }
       )
     }
 
-    nodesToCharge = getNodesCost(engine, resolution)
-    const falEndpoint = getFalEndpoint(engine)
+    // Custo: Orion cobra nodes como os motores públicos (tabela em
+    // lib/orion/config, decidida em 2026-09-11 a partir do custo real medido
+    // contra a OpenAI). A decisão acontece AQUI, no servidor, depois da
+    // autorização — o cliente nunca manda o preço.
+    nodesToCharge = isOrion ? getOrionNodesCost(resolution as '2k' | '4k') : getNodesCost(engine, resolution)
+    const falEndpoint = isOrion ? null : getFalEndpoint(engine)
 
     // ── Aquisição + normalização do input ANTES do débito ────────────────────
     //
@@ -362,10 +382,12 @@ export async function POST(req: NextRequest) {
     // por exception com SQLSTATE específico — P0001 = saldo insuficiente
     // (mapeado para 402); resto vira 500.
 
-    const { data: debitData, error: debitError } = await admin.rpc('consume_workspace_nodes', {
-      user_id_input: user.id,
-      amount:        nodesToCharge,
-    })
+    const { data: debitData, error: debitError } = nodesToCharge > 0
+      ? await admin.rpc('consume_workspace_nodes', {
+          user_id_input: user.id,
+          amount:        nodesToCharge,
+        })
+      : { data: null, error: null }
     if (debitError) {
       console.error('[generate] consume_nodes_v2 RPC error:', debitError)
       if (debitError.code === 'P0001') {
@@ -382,9 +404,12 @@ export async function POST(req: NextRequest) {
       from_plan:          number
       from_lumens:        number
       plan_balance_after: number
-    }
-    debited = true
-    if (debit.from_lumens > 0) {
+    } | null
+    // Só marca `debited` quando o débito REALMENTE aconteceu — é essa flag que
+    // libera o refund no catch. Com 0 nodes ela fica false e nenhum estorno
+    // fantasma é emitido.
+    debited = nodesToCharge > 0
+    if (debit && debit.from_lumens > 0) {
       console.log('[generate] débito misto:', debit.from_plan, 'plano +', debit.from_lumens, 'lumens')
     }
 
@@ -428,9 +453,13 @@ export async function POST(req: NextRequest) {
     const minScore = refinementText?.trim()
       ? fidelityCfg.minScore * fidelityCfg.refinementRelaxFactor
       : fidelityCfg.minScore
-    const maxAttempts = renderOnlyActive ? fidelityCfg.maxAttempts : 1
+    // Orion entrega UMA imagem final por solicitação: o ladder de retry não
+    // roda (o score continua sendo calculado — é local e gratuito — só pra
+    // alimentar a comparação). Isso também impede o piloto de gastar duas
+    // gerações pagas por request.
+    const maxAttempts = isOrion ? 1 : (renderOnlyActive ? fidelityCfg.maxAttempts : 1)
 
-    console.log('[generate] engine     :', engine, '→', falEndpoint)
+    console.log('[generate] engine     :', engine, '→', falEndpoint ?? `${orionProvider()}:${ORION_MODELS[orionVariant]}`)
     console.log('[generate] resolution :', resolution, '→', nodesToCharge, 'nodes')
     console.log('[generate] fidelity   :', `${fidelityLevel}${briefing ? ' (+briefing)' : ''}${renderOnlyActive ? ` [render_only min=${minScore.toFixed(2)} max_attempts=${maxAttempts}]` : ''}`)
     devLog('[generate] anchor     :', hasAnchor ? anchorUrl : 'none')
@@ -449,12 +478,25 @@ export async function POST(req: NextRequest) {
       // Uint8Array novo: BlobPart exige ArrayBuffer próprio (o let Buffer|null
       // alarga pra ArrayBufferLike e o File recusa).
       const imageFile  = new File([new Uint8Array(originalBuffer)], `input.${ext}`, { type: sourceMime })
-      inputUrl = await fal.storage.upload(imageFile)
+      inputUrl = isOrion
+        // Piloto: o input vai pro armazenamento do PRÓPRIO SpaceNode. É o que
+        // deixa a rota direta da OpenAI funcionar sem FAL_KEY — os bytes saem
+        // daqui pelo fetchStorageBytes (allowlist de SSRF + service_role em
+        // bucket privado). O caminho fal assina a mesma URL.
+        ? await uploadToStorage(originalBuffer, sourceMime, user.id, 'render-source')
+        : await fal.storage.upload(imageFile)
       devLog('[generate] inputUrl   :', inputUrl)
     }
 
     // Anchor vai PRIMEIRO em image_urls — Gemini/NB2/Seedream extraem
     // materiais e atmosfera dela antes de processar a geometria do input.
+    // Hospedagem das imagens AUXILIARES (edge map). Orion nunca passa pelo
+    // fal.storage — a rota direta precisa rodar sem FAL_KEY.
+    const hostAuxImage = async (buf: Buffer, mime: string, name: string): Promise<string> =>
+      isOrion
+        ? uploadToStorage(buf, mime, user.id, 'render-source')
+        : fal.storage.upload(new File([new Uint8Array(buf)], name, { type: mime }))
+
     const baseImageUrls = (anchorUrl && anchorUrl !== inputUrl)
       ? [anchorUrl, inputUrl]
       : [inputUrl]
@@ -603,8 +645,27 @@ export async function POST(req: NextRequest) {
     let edgeMapUrl: string | null = null
     let depthMapUrl: string | null = null
     let finalPrompt = ''
-    let best: { gen: GenerateImageResult; prompt: string; score: number | null; buffer: Buffer | null } | null = null
+    let best: { gen: AttemptOutcome; prompt: string; score: number | null; buffer: Buffer | null } | null = null
     const attemptLogs: FidelityAttemptLog[] = []
+
+    // Orion: dimensão EXPLÍCITA derivada do aspecto do original (nunca 'auto',
+    // nunca upscale silencioso), no preset (2K/4K) escolhido. Reusa o
+    // `sourceSize` que a rota já calcula pra faixa barata do Seedream. Pedido e
+    // entregue vão os dois pro generation_log.
+    // Cast seguro: isOrion só chega aqui depois de isOrionResolution(resolution)
+    // validado lá em cima — resolution só pode ser '2k'|'4k'.
+    const orionSize = orionTargetSize(
+      sourceSize?.width ?? null,
+      sourceSize?.height ?? null,
+      isOrion ? (resolution as '2k' | '4k') : '2k',
+    )
+    let orionGen: OrionGenerateResult | null = null
+    if (isOrion) {
+      console.log(
+        `[generate] orion      : ${orionProvider()} ${ORION_MODELS[orionVariant]} quality=${orionQuality} ` +
+        `size=${orionSizeParam(orionSize)} (${orionSize.source})`,
+      )
+    }
 
     // Edge map NATIVO (plugin SketchUp): captura hidden-line da MESMA câmera,
     // subida por upload direto — verdade geométrica de origem, superior ao
@@ -624,9 +685,7 @@ export async function POST(req: NextRequest) {
               console.warn('[generate:fidelity] edge map nativo rejeitado (segue derivado):', edge.message)
               return null
             }
-            return fal.storage.upload(
-              new File([new Uint8Array(edge.buffer)], 'edge-map.png', { type: edge.mime || 'image/png' }),
-            )
+            return hostAuxImage(edge.buffer, edge.mime || 'image/png', 'edge-map.png')
           })(),
           new Promise<null>(resolve => setTimeout(() => resolve(null), 15_000)),
         ])
@@ -671,7 +730,7 @@ export async function POST(req: NextRequest) {
           if (!originalBuffer) originalBuffer = await fetchStorageBuffer(inputUrl)
           if (!edgeMapUrl) {
             const edgePng = await buildEdgeMapPng(originalBuffer)
-            edgeMapUrl = await fal.storage.upload(new File([new Uint8Array(edgePng)], 'edge-map.png', { type: 'image/png' }))
+            edgeMapUrl = await hostAuxImage(edgePng, 'image/png', 'edge-map.png')
           }
           imageUrls = [...baseImageUrls, edgeMapUrl]
           edgeMapImageIndex = imageUrls.length
@@ -688,7 +747,10 @@ export async function POST(req: NextRequest) {
       // e pontos de fuga que o edge map não segura. Uma chamada FAL por request
       // (URL cacheada entre tentativas); falha NUNCA derruba a geração.
       let depthMapImageIndex: number | null = null
-      if (renderOnlyActive && depthMapConditioningEnabled() && !hasAnchor) {
+      // Orion fica de fora: o depth map é uma chamada FAL PAGA e auxiliar —
+      // o piloto evita custo acessório e depende do FAL_KEY que a rota direta
+      // não deve exigir. O generation_log registra o que foi mesmo usado.
+      if (!isOrion && renderOnlyActive && depthMapConditioningEnabled() && !hasAnchor) {
         try {
           if (!depthMapUrl) {
             const depthOut = await Promise.race([
@@ -722,7 +784,7 @@ export async function POST(req: NextRequest) {
       devLog('[generate] prompt     :', finalPrompt)
 
       const attemptSeed = generationSeed + params.seedOffset
-      const falInput = {
+      const falInput = isOrion ? null : {
         prompt:     finalPrompt,
         image_urls: imageUrls,
         ...falParamsForEngine(engine, resolution, aspectRatio, sourceSize),
@@ -734,28 +796,69 @@ export async function POST(req: NextRequest) {
         // GCP o provider converte em thinkingConfig.
         ...(engine === 'pulsar' && params.thinkingLevel ? { thinking_level: params.thinkingLevel } : {}),
       }
-      devLog('[generate] FAL INPUT  :', JSON.stringify(falInput))
+      if (falInput) devLog('[generate] FAL INPUT  :', JSON.stringify(falInput))
 
       // Camada única de provider (lib/ai/image-provider): GCP/Vertex primário
       // quando IMAGE_PROVIDER_PRIMARY=gcp, fallback FAL transparente. Saída GCP
       // é re-hospedada no Storage; saída FAL continua sendo a URL da CDN.
-      const attemptTimeoutMs = Math.min(FAL_TIMEOUT_MS[engine], Math.max(30_000, remainingMs() - 15_000))
-      let gen: GenerateImageResult
+      const attemptTimeoutMs = Math.min(
+        isOrion ? ORION_TIMEOUT_MS : FAL_TIMEOUT_MS[engine],
+        Math.max(30_000, remainingMs() - 15_000),
+      )
+      let gen: AttemptOutcome
       try {
-        gen = await generateImage({
-          falEndpoint,
-          falInput,
-          imageLabels,
-          timeoutMs: attemptTimeoutMs,
-          context:   attempt === 1 ? 'generate' : `generate#${attempt}`,
-          deliver:   { kind: 'url', userId: user.id, area: 'renders' },
-          gcpConfig: {
-            temperature: params.temperature,
-            seed:        attemptSeed,
-            ...(params.thinkingLevel   ? { thinkingLevel:   params.thinkingLevel }   : {}),
-            ...(params.mediaResolution ? { mediaResolution: params.mediaResolution } : {}),
-          },
-        })
+        if (isOrion) {
+          // Sem seed, sem thinking_level, sem resolution: nada de parâmetro de
+          // Gemini/Seedream/GPT Image 2 num schema que não os tem. As
+          // INSTRUÇÕES são as mesmas dos outros motores (mesmo
+          // buildFidelityPrompt, mesma ordem de imagens) — é o que torna a
+          // comparação honesta.
+          orionGen = await generateOrionImage({
+            variant:   orionVariant,
+            quality:   orionQuality,
+            size:      orionSize,
+            prompt:    finalPrompt,
+            imageUrls,
+            timeoutMs: attemptTimeoutMs,
+            context:   'generate:orion',
+            deliver:   { kind: 'url', userId: user.id, area: 'renders' },
+          })
+          gen = {
+            images:        orionGen.images,
+            provider:      orionGen.provider,
+            providerModel: orionGen.providerModel,
+            requestId:     orionGen.requestId,
+            fallbackUsed:  false,   // piloto não tem fallback entre fornecedores
+            hedgeUsed:     false,   // nem corrida paralela
+            latencyMs:     orionGen.latencyMs,
+            errorMessage:  null,
+          }
+        } else {
+          const raw = await generateImage({
+            falEndpoint: falEndpoint!,
+            falInput:    falInput!,
+            imageLabels,
+            timeoutMs: attemptTimeoutMs,
+            context:   attempt === 1 ? 'generate' : `generate#${attempt}`,
+            deliver:   { kind: 'url', userId: user.id, area: 'renders' },
+            gcpConfig: {
+              temperature: params.temperature,
+              seed:        attemptSeed,
+              ...(params.thinkingLevel   ? { thinkingLevel:   params.thinkingLevel }   : {}),
+              ...(params.mediaResolution ? { mediaResolution: params.mediaResolution } : {}),
+            },
+          })
+          gen = {
+            images:        raw.images,
+            provider:      raw.provider,
+            providerModel: raw.providerModel,
+            requestId:     raw.requestId,
+            fallbackUsed:  raw.fallbackUsed,
+            hedgeUsed:     raw.hedgeUsed ?? false,
+            latencyMs:     raw.latencyMs,
+            errorMessage:  raw.errorMessage,
+          }
+        }
       } catch (genErr) {
         // Retry é best-effort: se JÁ existe imagem válida de tentativa
         // anterior, falha aqui não pode virar erro+refund pro usuário.
@@ -791,7 +894,7 @@ export async function POST(req: NextRequest) {
         seed:             attemptSeed,
         edge_map_used:  edgeMapImageIndex !== null,
         fallback_used:  gen.fallbackUsed,
-        hedge_used:     gen.hedgeUsed ?? false,
+        hedge_used:     gen.hedgeUsed,
         duration_ms:    gen.latencyMs,
         geometry,
         ...(scoreError ? { score_error: scoreError } : {}),
@@ -950,6 +1053,9 @@ export async function POST(req: NextRequest) {
       // Fase 2 do plugin SketchUp: telemetria do condicionamento nativo.
       edge_map_native: edgeMapNative || undefined,
       model_facts:     options.modelFacts ?? undefined,
+      orion:           isOrion
+        ? { variant: orionVariant, quality: orionQuality, provider: orionGen?.provider ?? orionProvider() }
+        : undefined,
     }
 
     const baseRow = {
@@ -984,6 +1090,10 @@ export async function POST(req: NextRequest) {
       user_prompt:  refinementText?.trim() || null,
       duration_ms:  generationDurationMs,
       retry_count:  retryCount,
+      // Orion cobra nodes normalmente desde 2026-09-11 — nunca é teste
+      // interno por si só. A coluna (migration 20260910120000) segue existindo
+      // pra uso futuro de QA interna gratuita; nenhum motor grava true hoje.
+      is_internal_test: false,
       generation_log: {
         provider:       gen.provider,
         provider_model: gen.providerModel,
@@ -993,7 +1103,17 @@ export async function POST(req: NextRequest) {
         request_id:     falRequestId,
         engine,
         resolution,
-        parameters:  falParamsForEngine(engine, resolution, aspectRatio, sourceSize),
+        parameters: isOrion
+          ? {
+              model:       ORION_MODELS[orionVariant],
+              variant:     orionVariant,
+              quality:     orionQuality,
+              size:        orionSizeParam(orionSize),
+              size_source: orionSize.source,
+              n:           1,
+              output_format: orionGen?.outputFormat ?? 'png',
+            }
+          : falParamsForEngine(engine, resolution, aspectRatio, sourceSize),
         // Reprodutibilidade: seed BASE do request (os dois caminhos recebem;
         // a seed efetiva por tentativa fica em fidelity.attempts[].seed).
         seed:            generationSeed,
@@ -1017,6 +1137,52 @@ export async function POST(req: NextRequest) {
               // Auditoria de visão (volumetria/aberturas/câmera/materiais) —
               // null quando não rodou (caminho feliz ou desligada).
               semantic_audit: preservationAudit,
+            }
+          : null,
+        // ── Piloto Orion: tudo que a comparação precisa ────────────────────
+        //
+        // Uma tentativa por request (sem ladder, sem fallback, sem hedge), mas
+        // o array `attempts` existe pra que qualquer tentativa observável seja
+        // contabilizada. Uso de token e custo saem de lib/orion/pricing —
+        // dado não informado fica `null`, NUNCA 0. Nada de prompt, URL privada
+        // ou chave entra aqui (AL-9).
+        orion: isOrion
+          ? {
+              provider:        orionGen?.provider ?? orionProvider(),
+              variant:         orionVariant,
+              model:           orionGen?.providerModel ?? ORION_MODELS[orionVariant],
+              quality_requested: orionQuality,
+              quality_reported:  orionGen?.qualityReported ?? null,
+              size_requested:  orionSizeParam(orionSize),
+              size_source:     orionSize.source,
+              size_delivered:  orionGen?.deliveredSize
+                ? `${orionGen.deliveredSize.width}x${orionGen.deliveredSize.height}`
+                : null,
+              reference_count: orionGen?.imageCount ?? baseImageUrls.length,
+              request_id:      orionGen?.requestId ?? null,
+              status:          orionGen ? 'completed' : 'failed',
+              duration_ms:     orionGen?.latencyMs ?? null,
+              attempts:        attemptLogs.length,
+              // Condicionamentos EFETIVAMENTE usados (o piloto corta o depth
+              // map, que é chamada FAL paga e auxiliar).
+              conditioning: {
+                briefing_source: briefingSource,
+                anchor_used:     hasAnchor,
+                edge_map_used:   attemptLogs.some(a => a.edge_map_used),
+                edge_map_native: edgeMapNative,
+                depth_map_used:  false,
+                material_refs:   materialSamples.length,
+                semantic_audit_ran: preservationAudit !== null,
+              },
+              cost: orionGen
+                ? buildOrionCostRecord({
+                    provider: orionGen.provider,
+                    variant:  orionGen.variant,
+                    model:    orionGen.providerModel,
+                    usage:    orionGen.usage,
+                    usageRaw: orionGen.usageRaw,
+                  })
+                : null,
             }
           : null,
       },
@@ -1103,6 +1269,20 @@ export async function POST(req: NextRequest) {
       // Seed usada (caminho GCP) — o client reenvia no "Corrigir drift" pra
       // manter a mesma amostra e mudar só o condicionamento.
       seed:             generationSeed,
+      // Orion: o resultado precisa dizer com quem foi gerado e o que saiu de
+      // fato — sem tokens, custo ou prompt (isso mora no Diagnóstico técnico
+      // do Histórico, atrás de isInternalStaff).
+      orion: isOrion && orionGen
+        ? {
+            provider: orionGen.provider,
+            variant:  orionGen.variant,
+            quality:  orionGen.qualityReported ?? orionGen.quality,
+            requestedSize: orionSizeParam(orionSize),
+            deliveredSize: orionGen.deliveredSize
+              ? `${orionGen.deliveredSize.width}x${orionGen.deliveredSize.height}`
+              : null,
+          }
+        : undefined,
       // O prompt final (buildFidelityPrompt) é proprietário e o GenerateClient
       // nunca o consumia — não viaja mais na resposta.
     })

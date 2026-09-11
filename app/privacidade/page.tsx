@@ -1,9 +1,11 @@
 // /privacidade — Política de Privacidade da SpaceNode (LGPD).
 //
 // Redigida para refletir o tratamento REAL de dados do produto: Supabase
-// (auth/banco/storage), Vercel (hospedagem), Google Cloud, fal.ai e BytePlus
-// (IA — a BytePlus/ModelArk entrou em 2026-09 com os modelos Seedream, via
-// SEEDREAM_ROUTE=ark / EDIT_V3_SEEDREAM_ROUTE=ark; processa em Singapura),
+// (auth/banco/storage), Vercel (hospedagem), Google Cloud, fal.ai, BytePlus e
+// OpenAI (IA — a BytePlus/ModelArk entrou em 2026-09 com os modelos Seedream,
+// via SEEDREAM_ROUTE=ark / EDIT_V3_SEEDREAM_ROUTE=ark, processa em Singapura;
+// a OpenAI entrou em 2026-09 com o GPT Image 2.5 do motor Orion, atrás de
+// ORION_INTERNAL_ENABLED, processa nos EUA e retém log de abuso por 30 dias),
 // Stripe (pagamentos), zero analytics/pixel de TERCEIROS (cookies essenciais +
 // tema em localStorage + cookie PRÓPRIO de atribuição de campanha
 // sn_attribution — first-party, sem dados pessoais, citado na cláusula 7 em
@@ -21,7 +23,7 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 }
 
-const UPDATED_AT = '6 de setembro de 2026'
+const UPDATED_AT = '10 de setembro de 2026'
 
 export default function PrivacidadePage() {
   return (
@@ -115,9 +117,9 @@ export default function PrivacidadePage() {
       <LegalSection n={4} title="Suas imagens e a inteligência artificial">
         <P>
           Para gerar os resultados, as imagens e instruções que você envia são transmitidas de forma segura a
-          provedores de IA contratados — atualmente Google Cloud (Vertex AI/Gemini), fal.ai e BytePlus
-          (plataforma ModelArk, com os modelos Seedream, da ByteDance) — exclusivamente para processar a sua
-          solicitação.
+          provedores de IA contratados — atualmente Google Cloud (Vertex AI/Gemini), fal.ai, BytePlus
+          (plataforma ModelArk, com os modelos Seedream, da ByteDance) e OpenAI (modelos GPT Image) —
+          exclusivamente para processar a sua solicitação.
         </P>
         <P>
           Cada solicitação envia ao provedor apenas o necessário para gerá-la: a imagem de origem, a área que
@@ -140,6 +142,7 @@ export default function PrivacidadePage() {
           <LI><Strong>Vercel</Strong> — hospedagem e infraestrutura da aplicação;</LI>
           <LI><Strong>Google Cloud</Strong> e <Strong>fal.ai</Strong> — processamento de IA das suas gerações;</LI>
           <LI><Strong>BytePlus Pte. Ltd.</Strong> (ModelArk, modelos Seedream da ByteDance) — processamento de IA de gerações e edições de imagem;</LI>
+          <LI><Strong>OpenAI</Strong> (modelos GPT Image) — processamento de IA de gerações de imagem;</LI>
           <LI><Strong>Stripe</Strong> — processamento de pagamentos.</LI>
         </UL>
         <P>
@@ -160,6 +163,12 @@ export default function PrivacidadePage() {
           Para as imagens processadas pela BytePlus, a transferência limita-se ao conteúdo necessário para
           gerar o resultado (imagem, seleção e instrução), sem dados de identificação da sua conta, e os
           arquivos são mantidos pelo provedor apenas pelo prazo necessário à entrega.
+        </P>
+        <P>
+          As imagens processadas pela OpenAI são tratadas nos Estados Unidos. Conforme os termos da API da
+          OpenAI, o conteúdo enviado <Strong>não é usado para treinar os modelos dela</Strong> e é retido por
+          até 30 dias apenas para monitoramento de abuso, sendo excluído em seguida. Também aqui enviamos
+          somente o necessário para gerar o resultado, sem os seus dados de cadastro.
         </P>
       </LegalSection>
 
