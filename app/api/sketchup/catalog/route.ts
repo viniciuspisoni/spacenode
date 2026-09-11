@@ -45,7 +45,9 @@ const CATALOG_I18N_EN = {
   ui: {
     projectTypes: { interior: 'Interior', exterior: 'Exterior' } as Record<string, string>,
     backgroundLabels: { interior: 'Visual context', exterior: 'Surroundings' } as Record<string, string>,
-    engineTaglines: { vega: 'Premium', pulsar: 'Fast', quasar: 'Special · ~2 min', orion: 'Experimental' } as Record<string, string>,
+    // Sem entrada pro Orion: o painel resolve `catUi(…)[id] || e.tagline`, e os
+    // dois lados estão vazios de propósito — o cartão dele mostra só o nome.
+    engineTaglines: { vega: 'Premium', pulsar: 'Fast', quasar: 'Special · ~2 min' } as Record<string, string>,
     resolutionNotes: {
       hd: 'Quick tests',
       '2k': 'Ideal for presentations',

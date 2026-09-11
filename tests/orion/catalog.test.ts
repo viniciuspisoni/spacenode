@@ -24,10 +24,14 @@ const { GET } = await import('@/app/api/sketchup/catalog/route')
 
 const req = () => new NextRequest('https://spacenode.app.br/api/sketchup/catalog')
 
-async function engines() {
+async function catalog() {
   const res = await GET(req())
-  const body = await res.json()
-  return body.engines as { id: string; name: string; resolutions: { id: string; nodes: number }[] }[]
+  return await res.json()
+}
+
+async function engines() {
+  const body = await catalog()
+  return body.engines as { id: string; name: string; tagline: string; resolutions: { id: string; nodes: number }[] }[]
 }
 
 beforeEach(() => {
@@ -66,6 +70,18 @@ describe('/api/sketchup/catalog · motores', () => {
     ])
     // Zero jargão técnico: nada de modelo/fornecedor/endpoint no payload.
     expect(JSON.stringify(orion)).not.toMatch(/openai|gpt-image|fal|flare|sunburst/i)
+  })
+
+  it('o cartão do Orion não carrega selo — nem em pt, nem na tradução EN', async () => {
+    process.env.ORION_INTERNAL_ENABLED = '1'
+    const body = await catalog()
+    const orion = (body.engines as { id: string; tagline: string }[]).at(-1)!
+    expect(orion.id).toBe('orion')
+    // O painel monta o cartão com `catUi('engineTaglines')[id] || tagline`:
+    // com os dois vazios ele não desenha a segunda linha.
+    expect(orion.tagline).toBe('')
+    expect(body.i18n.en.ui.engineTaglines.orion).toBeUndefined()
+    expect(JSON.stringify(body)).not.toMatch(/experimental/i)
   })
 
   it('flag ligada sem credencial do fornecedor NÃO oferece o motor', async () => {

@@ -70,7 +70,12 @@ export const ORION_NODES: Record<'2k' | '4k', number> = {
 export const ORION_CONFIG = {
   id:          'orion' as const,
   name:        'Orion',
-  tagline:     'Experimental',
+  /** Vazio de propósito: Orion é motor público como os outros, e
+   *  "Experimental" virou selo sem função. O cartão do Renderizar e o do
+   *  painel do plugin mostram só o nome; o que o motor faz está na
+   *  `description`. O campo continua existindo porque a forma espelha
+   *  EngineConfig — quem lê trata string vazia como "sem nota". */
+  tagline:     '',
   description: 'Motor de alta fidelidade e resposta rápida do Renderizar.',
   resolutions: ['2k', '4k'] as Resolution[],
   nodes:       { '2k': ORION_NODES['2k'], '4k': ORION_NODES['4k'] } as Partial<Record<Resolution, number>>,
