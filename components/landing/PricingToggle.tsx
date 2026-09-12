@@ -7,9 +7,9 @@ import { NODES_GRACE_DAYS, NODES_POLICY_COPY } from '@/lib/billing/nodes'
 import { SUPPORT_EMAIL, supportWhatsAppUrl } from '@/lib/support'
 import { formatBRL } from '@/lib/launch-offer'
 
-// A vitrine (Starter / Pro / Studio) vem de SELLABLE_PLANS — o Office é
-// legado (2026-08-31): fora de venda, mas segue no catálogo p/ assinantes
-// existentes (billing/webhook).
+// A vitrine (Essence / Pro / Studio) vem de SELLABLE_PLANS — Office e
+// Starter são legados (2026-08-31 e 2026-09-12): fora de venda, mas seguem
+// no catálogo p/ assinantes existentes (billing/webhook).
 //
 // A tabela "consumo por motor de IA" saiu na reforma de vidro (2026-09-09):
 // era a única parte da landing que exigia saber o nome dos motores para ser
@@ -39,23 +39,23 @@ interface PlanDisplay {
 // exibido (Studio=100%). Nodes extras valem p/ qualquer plano pago.
 //
 // Escada cumulativa (2026-09-10). Antes os três cartões repetiam a MESMA
-// lista, e o Pro era literalmente igual ao Starter — o único motivo para
-// subir era volume de nodes, o que faz o preço parecer caro em vez de
+// lista, e o Pro era literalmente igual ao plano de entrada — o único motivo
+// para subir era volume de nodes, o que faz o preço parecer caro em vez de
 // parecer um plano melhor. Agora cada degrau herda o de baixo ("Tudo do
-// Starter") e mostra só o que ganha.
+// Essence") e mostra só o que ganha.
 //
 // O ganho do Pro NÃO é invenção de marketing: white-label existe e está em
 // produção desde antes disto, gated em pro/studio/office
 // (app/app/settings/identity/page.tsx) e lido em app/p/[slug]/page.tsx, que
 // esconde o "criado com spacenode" do rodapé do link do cliente. A landing
-// simplesmente nunca contou. Starter não perde nada: nunca teve.
+// simplesmente nunca contou. Essence não perde nada: nunca teve.
 const PLAN_DISPLAY: Record<SellablePlanId, PlanDisplay> = {
-  starter: {
-    rendersHD: 75,  renders2K: 37,  renders4K: 18,
-    monthlyAnnualLabel: '890', meterPct: 21, featured: false, badge: '',
+  essence: {
+    rendersHD: 80,  renders2K: 40,  renders4K: 20,
+    monthlyAnnualLabel: '990', meterPct: 23, featured: false, badge: '',
     // O acúmulo entra AQUI e só aqui: é fato de plataforma, vale para todo
     // plano pago, então mora na base da escada e sobe por herança ("Tudo do
-    // Starter"). Repeti-lo nos três cartões traria de volta exatamente a
+    // Essence"). Repeti-lo nos três cartões traria de volta exatamente a
     // redundância que a escada acabou de tirar. Fica ao lado de "Nodes
     // extras" porque os dois falam da mesma coisa: o que acontece com o
     // saldo. A frase inteira da política está no bloco sob o subtítulo.
@@ -70,7 +70,7 @@ const PLAN_DISPLAY: Record<SellablePlanId, PlanDisplay> = {
     rendersHD: 180, renders2K: 90,  renders4K: 45,
     monthlyAnnualLabel: '1.990', meterPct: 51, featured: true, badge: 'recomendado',
     features: [
-      { label: 'Tudo do Starter' },
+      { label: 'Tudo do Essence' },
       {
         label: 'Apresentação com a sua marca',
         gloss: 'o link que vai pro cliente sai sem o nosso nome no rodapé',

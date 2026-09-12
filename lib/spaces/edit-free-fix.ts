@@ -14,10 +14,13 @@ import type { UserPlan } from './edit-router'
 const FALLBACK_PLAN: UserPlan = 'beta'
 
 // Teto mensal de quick fixes grátis. Chaveado por nome de plano do BANCO
-// (free/starter/pro/studio/office) e também 'beta' (plano só-da-spec + fallback).
+// (free/starter/essence/pro/studio/office) e também 'beta' (plano só-da-spec
+// + fallback). Starter é legado (2026-09-12): mantém o teto de sempre para
+// quem já assina; Essence entra no lugar dele na vitrine com o mesmo teto.
 export const MONTHLY_FREE_FIX_LIMIT: Record<string, number> = {
   free:    2,
-  starter: 10,   // spec: 'start'
+  starter: 10,   // spec: 'start' — legado, só assinantes existentes
+  essence: 10,   // spec: 'start'
   pro:     25,
   studio:  60,
   office:  80,
@@ -32,7 +35,8 @@ export function monthlyFreeFixLimit(plan: string): number {
 export function specUserPlanFromPlanId(plan: string): UserPlan {
   switch (plan) {
     case 'free':    return 'free'
-    case 'starter': return 'start'
+    case 'starter': return 'start'  // legado — só assinantes existentes
+    case 'essence': return 'start'
     case 'pro':     return 'pro'
     case 'studio':  return 'studio'
     case 'office':  return 'beta'   // placeholder temporário — ver nota no topo

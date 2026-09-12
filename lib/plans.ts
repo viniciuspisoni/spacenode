@@ -1,14 +1,17 @@
-// Catálogo de planos da Pricing v2.1.
+// Catálogo de planos da Pricing v2.2 (Essence, 2026-09-12).
 //
 // Os Stripe price IDs ficam em env vars server-side, não no array
 // (mantém o padrão atual do .env.local: STRIPE_PRICE_ID_X_Y, sem
 // NEXT_PUBLIC_). getStripePriceId() resolve o ID dinamicamente em
 // rotas de servidor.
 
-export type PlanId       = 'free' | 'starter' | 'pro' | 'studio' | 'office'
+export type PlanId       = 'free' | 'starter' | 'essence' | 'pro' | 'studio' | 'office'
 export type PaidPlanId   = Exclude<PlanId, 'free'>
-/** Planos que aceitam NOVAS assinaturas — 'office' virou legado em 2026-08-31. */
-export type SellablePlanId = Exclude<PaidPlanId, 'office'>
+/**
+ * Planos que aceitam NOVAS assinaturas — 'office' virou legado em 2026-08-31,
+ * 'starter' virou legado em 2026-09-12 (substituído por 'essence' na vitrine).
+ */
+export type SellablePlanId = Exclude<PaidPlanId, 'office' | 'starter'>
 export type BillingCycle = 'monthly' | 'annual'
 
 /**
@@ -52,6 +55,18 @@ export const PLANS: Plan[] = [
     description:        'Estudante / freelancer testando',
     recommended:        false,
     cta:                'Começar com Starter',
+    legacy:             true, // aposentado 2026-09-12 — substituído pelo Essence na vitrine
+  },
+  {
+    id:                 'essence',
+    name:               'Essence',
+    monthlyPrice:       99,
+    annualMonthlyPrice: 83,
+    annualTotal:        990,
+    nodes:              800,
+    description:        'Autônomo começando a produzir',
+    recommended:        false,
+    cta:                'Começar com Essence',
   },
   {
     id:                 'pro',
@@ -90,7 +105,8 @@ export const PLANS: Plan[] = [
 ]
 
 /** Vitrine: só planos que aceitam novas assinaturas (landing e /app/billing).
- *  O predicate estreita o id — invariante: todo plano legado é o Office. */
+ *  O predicate estreita o id — invariante: todo plano legado tem `legacy: true`
+ *  (Office e, desde 2026-09-12, Starter). */
 export const SELLABLE_PLANS = PLANS.filter(
   (p): p is Plan & { id: SellablePlanId } => !p.legacy
 )
@@ -100,12 +116,19 @@ export function getPlanById(id: PlanId): Plan | undefined {
 }
 
 export function isPaidPlanId(value: unknown): value is PaidPlanId {
-  return value === 'starter' || value === 'pro' || value === 'studio' || value === 'office'
+  return (
+    value === 'starter' || value === 'essence' || value === 'pro' ||
+    value === 'studio'  || value === 'office'
+  )
 }
 
-/** Aceita novas assinaturas? ('office' é pago mas legado — só renova, não vende.) */
+/**
+ * Aceita novas assinaturas? ('office' e 'starter' são pagos mas legados —
+ * só renovam/trocam, não vendem. Quem sai de um plano legado não pode
+ * recontratá-lo: ele nunca mais aparece como opção de compra.)
+ */
 export function isSellablePlanId(value: unknown): value is SellablePlanId {
-  return value === 'starter' || value === 'pro' || value === 'studio'
+  return value === 'essence' || value === 'pro' || value === 'studio'
 }
 
 /**

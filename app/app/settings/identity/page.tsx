@@ -25,7 +25,7 @@ export default async function IdentityPage() {
     ? { ...rawIdentity, logo_url: await signStorageUrl(createAdminClient(), rawIdentity.logo_url) }
     : null
   const planId   = (profRes.data?.plan as PlanId | undefined) ?? 'free'
-  // White-label disponível em Pro/Studio/Office; Starter e free não têm.
+  // White-label disponível em Pro/Studio/Office; Essence, Starter e free não têm.
   const whiteLabelAllowed =
     planId === 'pro' || planId === 'studio' || planId === 'office'
 
