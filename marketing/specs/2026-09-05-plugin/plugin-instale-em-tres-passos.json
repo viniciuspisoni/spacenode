@@ -1,0 +1,123 @@
+{
+ "slug": "2026-09-05-reel-plugin-instale-em-tres-passos",
+ "accent": false,
+ "segments": [
+  {
+   "type": "card",
+   "card": "p1",
+   "dur": 1.8
+  },
+  {
+   "type": "card",
+   "card": "p2",
+   "dur": 1.8
+  },
+  {
+   "type": "card",
+   "card": "p3",
+   "dur": 1.8
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/plugin/shots/s1-conectado.png",
+   "dur": 1.6,
+   "fit": "contain",
+   "inset": 200,
+   "bg": "dark",
+   "kenburns": [
+    1,
+    1
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/plugin/shots/s4-resultado.png",
+   "dur": 1.6,
+   "fit": "contain",
+   "inset": 200,
+   "bg": "dark",
+   "kenburns": [
+    1,
+    1
+   ]
+  },
+  {
+   "type": "card",
+   "card": "final",
+   "dur": 1
+  }
+ ],
+ "transitions": [
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "fade",
+   "dur": 0.3
+  }
+ ],
+ "cards": {
+  "p1": {
+   "layout": "statement",
+   "theme": "light",
+   "transparent": false,
+   "big": "baixe a extensão (.rbz) no site.",
+   "eyebrow": "instale em três passos · 01",
+   "small": "SketchUp 2021 ou superior. grátis — os renders usam os Nodes da sua conta."
+  },
+  "p2": {
+   "layout": "statement",
+   "theme": "light",
+   "transparent": false,
+   "big": "Window → Extension Manager → Install Extension.",
+   "eyebrow": "02",
+   "small": "aponte para o arquivo .rbz que você baixou."
+  },
+  "p3": {
+   "layout": "statement",
+   "theme": "light",
+   "transparent": false,
+   "big": "abra a barra SPACENODE e clique em Conectar.",
+   "eyebrow": "03",
+   "small": "a conta é a mesma do site. o saldo aparece no painel."
+  },
+  "a": {
+   "layout": "hook-fixed",
+   "hook": "conectado.",
+   "top": 250,
+   "size": 58
+  },
+  "b": {
+   "layout": "hook-fixed",
+   "hook": "render de dentro do SketchUp.",
+   "top": 250,
+   "size": 58
+  },
+  "final": {
+   "layout": "final",
+   "cta": "Comece agora",
+   "micro": "plugin oficial · grátis · usa os nodes da sua conta"
+  }
+ },
+ "overlays": [
+  {
+   "card": "a",
+   "from": 5.4,
+   "to": 7
+  },
+  {
+   "card": "b",
+   "from": 7,
+   "to": 8.6
+  }
+ ]
+}

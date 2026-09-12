@@ -1,0 +1,33 @@
+o cliente pediu o piso em madeira depois do render aprovado. ninguém regenerou o ambiente.
+
+Editar, Trocar material: você contorna o piso, escreve o material (ou anexa uma referência de material) e a plataforma refaz só aquela área. Câmera, luz, tapete e a sombra da persiana ficam onde estavam.
+
+É a diferença entre "volta pro render" e "resolvo antes da próxima reunião". O mesmo vale para parede, bancada ou marcenaria.
+
+Antes e depois são a mesma imagem, gerada e editada aqui.
+
+Veja no seu próprio projeto — link na bio.
+
+#arquitetura #designdeinteriores #renderizacao #archviz #projetodearquitetura
+
+
+=== VERSÃO PAGA (Meta · objetivo cadastro · botão SIGN_UP · som off · legenda embutida no vídeo) ===
+Arquivo: marketing/output/2026-09-04-reel-editar-so-o-piso-ad/2026-09-04-reel-editar-so-o-piso-ad.mp4 (7,2 s)
+
+Título (≤40): Só o piso mudou.
+Descrição (≤30): Cadastro grátis, sem cartão
+Botão: SIGN_UP ("Cadastre-se")
+
+Texto primário — A · situação (≤125 visíveis na 1ª linha):
+O cliente pediu o piso em madeira depois do render aprovado. Você troca o piso, não o render.
+Editar: contorne a área, descreva o material, pronto em minutos. Cadastro grátis, sem cartão.
+
+Texto primário — B · fidelidade:
+Sombra da persiana, tapete e câmera no lugar. Só o piso mudou.
+Editar: contorne a área, descreva o material. Cadastro grátis, sem cartão.
+
+Texto primário — C · prazo:
+Mudança depois da aprovação, sem voltar pra fila do render.
+Editar: contorne o piso, descreva o material, pronto em minutos. Cadastro grátis, sem cartão.
+
+Nota: A/B só varia o texto primário sobre o MESMO vídeo. O card final do anúncio usa "Comece grátis →" (par do botão SIGN_UP); o orgânico usa "Veja no seu próprio projeto →".

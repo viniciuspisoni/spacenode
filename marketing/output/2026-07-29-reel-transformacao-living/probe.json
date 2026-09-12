@@ -1,0 +1,24 @@
+{
+  "slug": "2026-07-29-reel-transformacao-living",
+  "roteiro": "entrega",
+  "par": "living",
+  "reel": "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-07-29-reel-transformacao-living\\2026-07-29-reel-transformacao-living.mp4",
+  "banda": "1080×608 @ y=656 (aspect 1.778)",
+  "crop": {
+    "antes": "1336×749 → 1332×749+2+0",
+    "depois": "1376×768 → 1365×768+6+0"
+  },
+  "width": 1080,
+  "height": 1920,
+  "fps": "30/1",
+  "pix_fmt": "yuv420p",
+  "codec": "h264",
+  "duration": "10.00",
+  "sizeMB": "1.71",
+  "esperado": {
+    "width": 1080,
+    "height": 1920,
+    "fps": "30/1",
+    "duration": "10.00"
+  }
+}

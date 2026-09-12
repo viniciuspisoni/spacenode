@@ -1,0 +1,167 @@
+{
+  "slug": "2026-09-09-reel-plugin-o-render-chegou",
+  "accent": false,
+  "band": {
+    "aspect": 1.3333
+  },
+  "segments": [
+    {
+      "type": "still",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-07-reel-plugin-no-sketchup/src/masked/panel-11-resultado-novo.png",
+      "dur": 2.2,
+      "fit": "contain",
+      "inset": 200,
+      "bg": "dark",
+      "kenburns": [
+        1,
+        1
+      ]
+    },
+    {
+      "type": "still",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-07-reel-plugin-no-sketchup/src/masked/crop-11-acoes.png",
+      "dur": 3,
+      "fit": "contain",
+      "inset": 200,
+      "bg": "dark",
+      "kenburns": [
+        1,
+        1.04
+      ]
+    },
+    {
+      "type": "still",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-07-reel-plugin-no-sketchup/src/masked/panel-12-comparar2-100.png",
+      "dur": 0.7,
+      "fit": "contain",
+      "inset": 200,
+      "bg": "dark",
+      "kenburns": [
+        1,
+        1
+      ]
+    },
+    {
+      "type": "still",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-07-reel-plugin-no-sketchup/src/masked/panel-13-comparar2-050.png",
+      "dur": 0.6,
+      "fit": "contain",
+      "inset": 200,
+      "bg": "dark",
+      "kenburns": [
+        1,
+        1
+      ]
+    },
+    {
+      "type": "still",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-07-reel-plugin-no-sketchup/src/masked/panel-14-comparar2-000.png",
+      "dur": 1.1,
+      "fit": "contain",
+      "inset": 200,
+      "bg": "dark",
+      "kenburns": [
+        1,
+        1
+      ]
+    },
+    {
+      "type": "still",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-07-reel-plugin-no-sketchup/src/sala-de71-depois.png",
+      "dur": 2.4,
+      "fit": "band",
+      "kenburns": [
+        1,
+        1.05
+      ]
+    },
+    {
+      "type": "card",
+      "card": "final",
+      "dur": 1.2
+    }
+  ],
+  "transitions": [
+    {
+      "type": "cut"
+    },
+    {
+      "type": "cut"
+    },
+    {
+      "type": "cut"
+    },
+    {
+      "type": "cut"
+    },
+    {
+      "type": "fade",
+      "dur": 0.3
+    },
+    {
+      "type": "fade",
+      "dur": 0.3
+    }
+  ],
+  "cards": {
+    "a": {
+      "layout": "hook-fixed",
+      "hook": "o render chegou no painel. e agora?",
+      "top": 250,
+      "size": 54
+    },
+    "b": {
+      "layout": "hook-fixed",
+      "hook": "baixar · abrir no site · ampliar 2× e 4× · animar",
+      "top": 250,
+      "size": 44
+    },
+    "c": {
+      "layout": "hook-fixed",
+      "hook": "comparar antes e depois.",
+      "top": 250,
+      "size": 54
+    },
+    "scrim": {
+      "layout": "scrim"
+    },
+    "d": {
+      "layout": "hook-sub",
+      "hook": "tudo no mesmo painel.",
+      "eyebrow": "render · quasar 2k",
+      "sub": "sem exportar. sem trocar de programa."
+    },
+    "final": {
+      "layout": "final",
+      "cta": "Instale o plugin",
+      "micro": "plugin oficial · grátis · usa os nodes da sua conta"
+    }
+  },
+  "overlays": [
+    {
+      "card": "a",
+      "from": 0,
+      "to": 2.2
+    },
+    {
+      "card": "b",
+      "from": 2.2,
+      "to": 5.2
+    },
+    {
+      "card": "c",
+      "from": 5.2,
+      "to": 7.3
+    },
+    {
+      "card": "scrim",
+      "from": 7.3,
+      "to": 9.4
+    },
+    {
+      "card": "d",
+      "from": 7.3,
+      "to": 9.4
+    }
+  ]
+}

@@ -1,0 +1,197 @@
+{
+ "scores": [
+  {
+   "slug": "alcance-organico/lavabo-conta-o-que-saiu-do-lugar",
+   "score": 7,
+   "rationale": "SIGN_UP e 'cadastro grátis, sem cartão' corretos e 9,5s cabe; mas o gancho é um enigma de texto sobre um print quase preto (prova só a partir de 1,5s) e a mecânica de 'contar' pede atenção que público frio pago não dá."
+  },
+  {
+   "slug": "alcance-organico/um-print-cinco-climas",
+   "score": 8,
+   "rationale": "Objeção real ('e à noite?'), prova visual por cortes rítmicos que lê perfeitamente sem som, print na abertura filtra o público de arquitetura; falta só o '80 nodes' na copy (tem 'sem cartão')."
+  },
+  {
+   "slug": "alcance-organico/print-render-video-piscina",
+   "score": 6,
+   "rationale": "Movimento para o dedo e SIGN_UP/'sem cartão' estão certos, mas vende vídeo (feature de 'uau') sem tratar objeção concreta e atrai curioso de IA; o take de 5s ocupa quase metade do anúncio."
+  },
+  {
+   "slug": "alcance-organico/cozinha-repara-no-lustre",
+   "score": 6,
+   "rationale": "Split desde o frame 0 é ótima prova sem som e a copy tem 'cadastro grátis, sem cartão', porém o botão sugerido é LEARN_MORE numa campanha de cadastro e o hook ('repara no lustre') é instrução, não oferta nem objeção."
+  },
+  {
+   "slug": "resposta-direta/resposta-nada-sai-do-lugar-drone",
+   "score": 9,
+   "rationale": "Melhor peça para cadastro: prova visual antes de qualquer texto (cantoneiras + wipe aos 1,4s), ataca a objeção nº1 (fidelidade), oferta explícita na arte e na copy ('80 nodes no cadastro · sem cartão'), SIGN_UP, 11,5s com cutdowns de 6/8,5s."
+  },
+  {
+   "slug": "resposta-direta/resposta-preco-cozinha-lustre",
+   "score": 9,
+   "rationale": "Única peça que resolve a objeção de preço com números conferidos (grátis/80 nodes/R$89) depois de mostrar o lustre acendendo; pré-qualifica o clique e derruba a barreira do cadastro — leve risco de puxar caçador de grátis, mas 'depois R$89/mês' filtra."
+  },
+  {
+   "slug": "resposta-direta/resposta-prazo-cinco-climas",
+   "score": 8,
+   "rationale": "Objeção de prazo concreta, print parado como prova contínua, cortes secos que leem sem som, oferta '80 nodes · sem cartão' na arte e SIGN_UP; perde meio ponto pelo layout de duas faixas (mais denso no celular) e 13s."
+  },
+  {
+   "slug": "resposta-direta/resposta-alteracao-so-a-parede",
+   "score": 9,
+   "rationale": "O wipe aos 0,6s é o anúncio inteiro (quadros como detector de fidelidade), trata o loop de alteração que só quem tem cliente conhece, oferta explícita '80 nodes · sem cartão', SIGN_UP, cutdown de 6s pronto; filtra o curioso por natureza."
+  },
+  {
+   "slug": "fidelidade-tecnica/linhas-de-fuga-forro-caixotado",
+   "score": 7,
+   "rationale": "Vocabulário e linhas de fuga filtram o público certo e SIGN_UP/'sem cartão' estão corretos, mas texto e prova entram juntos no frame 0 e hairlines finas numa faixa 16:9 podem não ler em tela pequena; oferta não aparece na arte."
+  },
+  {
+   "slug": "fidelidade-tecnica/esquadria-regua-patio",
+   "score": 7,
+   "rationale": "Contorno + régua é prova verificável e a linguagem de ofício filtra bem; porém a descrição do anúncio não traz a oferta ('Teste com um projeto real' em vez de 'sem cartão') e o par repete a casa de outros conceitos."
+  },
+  {
+   "slug": "fidelidade-tecnica/pisca-fachada-geminada",
+   "score": 8,
+   "rationale": "O pisca é a prova mais barata de ler sem som (o olho detecta borda sozinho), 9s serve direto como anúncio, SIGN_UP e 'sem cartão' na copy; faltou '80 nodes' e depende de QA de alinhamento a 3px."
+  },
+  {
+   "slug": "fidelidade-tecnica/zoom-cozinha-cada-peca",
+   "score": 7,
+   "rationale": "Marcadores objeto a objeto + split empilhado provam fidelidade para o público de interiores, SIGN_UP correto; oferta só como 'Cadastro grátis' sem 'sem cartão', e print já texturizado enfraquece o salto visual do hook."
+  },
+  {
+   "slug": "spaces-coerencia/spaces-casa-piscina-seis-angulos",
+   "score": 6,
+   "rationale": "Régua de abertura boa e copy com 'sem cartão', mas 16s exige cutdown e a promessa (coerência entre 6 vistas) é sutil demais para público frio ler em silêncio; proíbe citar oferta na arte por decisão própria."
+  },
+  {
+   "slug": "spaces-coerencia/spaces-quarto-bear-quatro-cameras",
+   "score": 5,
+   "rationale": "Antes/depois vertical forte no hook, porém a descrição paga ('Do print à apresentação') não traz cadastro grátis nem 'sem cartão', o argumento de coerência exige conferir objetos câmera a câmera e há divergências (urso vira quadro)."
+  },
+  {
+   "slug": "spaces-coerencia/spaces-cafe-print-por-angulo",
+   "score": 4,
+   "rationale": "17,5s demonstrativo, hook de 3s sem prova (render puro), LEARN_MORE numa campanha de cadastro e oferta ausente da copy — é peça de consideração orgânica, não de conversão paga."
+  },
+  {
+   "slug": "spaces-coerencia/spaces-atrio-corporativo-anuncio",
+   "score": 5,
+   "rationale": "Vídeo nativo para o dedo e 'Comece grátis, sem cartão' na descrição, mas 'DNA' é jargão, não há prova de fidelidade (paredes viraram vidro), o modelo é gated por direito de uso e a estética de vídeo bonito atrai curioso de IA."
+  },
+  {
+   "slug": "animar-video/animar-lareira-fogo-se-move",
+   "score": 4,
+   "rationale": "Fogo se mexendo é isca de curioso genérico, LEARN_MORE em vez de SIGN_UP, oferta ausente da copy e o motor Cinemático não é reproduzível com os 80 nodes — gera frustração no primeiro uso."
+  },
+  {
+   "slug": "animar-video/animar-casa-concreto-comecou-print",
+   "score": 5,
+   "rationale": "Sol estourando segura o dedo e SIGN_UP está certo, mas a prova ('o print') só chega aos 6s, nenhuma menção a cadastro grátis/sem cartão na copy paga e o vídeo Cinemático não cabe no grant."
+  },
+  {
+   "slug": "animar-video/animar-fechamento-apresentacao-piscina",
+   "score": 4,
+   "rationale": "16s educativo com quatro 'slides' e footage repetido; oferta ausente da copy, CTA 'Comece agora' genérico, e o argumento (ordem da apresentação) não é objeção que faz alguém cadastrar num anúncio de 15s."
+  },
+  {
+   "slug": "animar-video/animar-atrio-vertical-tres-vistas",
+   "score": 3,
+   "rationale": "Gated por direito de uso do modelo, LEARN_MORE, descrição 'Vertical, sem barras' sem oferta, vende volume Pro/Studio (não cadastro) e mistura dois módulos em 14s — o oposto de um anúncio de cadastro claro."
+  },
+  {
+   "slug": "editar-ferramenta/2026-09-04-reel-editar-so-o-piso",
+   "score": 8,
+   "rationale": "Situação reconhecível no hook, wipe aos 1,5s e recorte empilhado que prova sombra/tapete sem som, SIGN_UP com 'cadastro grátis, sem cartão' na copy, 10,2s com cutdown; só a oferta não está na arte."
+  },
+  {
+   "slug": "editar-ferramenta/2026-09-04-reel-editar-parede-quadros-no-lugar",
+   "score": 7,
+   "rationale": "Mesmo par do conceito 'só a parede' com prova igualmente forte e copy correta, mas fecha em 15s cravados com dois beats e a descrição paga não traz a oferta — versão mais lenta de uma ideia que já existe mais afiada."
+  },
+  {
+   "slug": "editar-ferramenta/2026-09-04-reel-editar-tres-acabamentos",
+   "score": 7,
+   "rationale": "Dor de variação pós-aprovação e SIGN_UP com 'cadastro grátis, sem cartão'; pesa o 17s (cutdown obrigatório), o passo 2 quase invisível no celular e o passo 1 que alterou mais que a parede (copy precisa admitir)."
+  },
+  {
+   "slug": "editar-ferramenta/2026-09-04-reel-ampliar-zoom-do-cliente",
+   "score": 6,
+   "rationale": "Prova literal (mesmo recorte, régua no meio) e copy correta, mas upscale é dor de fim de projeto e de nicho — não é a objeção que faz um arquiteto frio cadastrar, e o 'antes' borrado pode ser lido como bug no feed."
+  },
+  {
+   "slug": "plugin-sketchup/plugin-de-dentro-do-sketchup",
+   "score": 6,
+   "rationale": "Filtra perfeitamente o público (viewport do SketchUp) com promessa operacional e SIGN_UP, mas está gated (rbz não assinado, smoke pendente), abre com vídeo Cinemático que não cabe no grant e a descrição 'Grátis. Renders usam Nodes.' é ambígua sobre a oferta."
+  },
+  {
+   "slug": "plugin-sketchup/plugin-tres-cenas-um-lote",
+   "score": 4,
+   "rationale": "Três faixas de 360px são ilegíveis no celular, o lote tem paleta inconsistente entre as cenas (nogueira vs carvalho), gated e sem oferta na copy — anúncio que exige explicação."
+  },
+  {
+   "slug": "plugin-sketchup/plugin-arestas-guiam-o-render",
+   "score": 4,
+   "rationale": "Mecanismo técnico em faixa 2,6:1 de 415px (prova não lê em tela pequena), LEARN_MORE, gated e o traço desenhado não é o mapa real — para conversão paga é abstrato demais."
+  },
+  {
+   "slug": "plugin-sketchup/plugin-luz-por-onde-o-modelo-diz",
+   "score": 4,
+   "rationale": "Faixa 2,6:1 minúscula para uma prova de listra de sol, claim que só vale com 'Preservar original' (ressalva que o anúncio não cabe), gated e sem 'sem cartão' na copy."
+  },
+  {
+   "slug": "tradicional-vs/entre-duas-reunioes",
+   "score": 8,
+   "rationale": "Régua aos 1,5s numa cozinha retrato que ocupa bem o 9:16, frase de dia real de escritório, SIGN_UP com 'cadastro grátis, sem cartão' no primário e na descrição, 11s; a oferta ainda não está na arte."
+  },
+  {
+   "slug": "tradicional-vs/briefing-fila-ajuste-semana",
+   "score": 7,
+   "rationale": "Wireframe é gancho inconfundível de arquiteto e os quatro acabamentos provam iteração sem som; mas abre com headline de 8 palavras antes da prova, tem 16s (cutdown obrigatório) e a oferta fica só na copy."
+  },
+  {
+   "slug": "tradicional-vs/o-cliente-pediu-cimento-queimado",
+   "score": 7,
+   "rationale": "Mesma dor e mesmo par do 'só a parede', com copy correta e custo de terceiros como contraste; porém a régua só entra aos 3,8s (dois textos antes da prova) e a peça tem 16s — versão mais lenta de um conceito melhor."
+  },
+  {
+   "slug": "tradicional-vs/planta-seca-vs-humanizada",
+   "score": 6,
+   "rationale": "Ponto de entrada novo (toda planta é insumo, filtra arquiteto na hora), régua aos 1,6s e copy correta com SIGN_UP; perde por rótulos de ~13px ilegíveis no celular, planta gated por direito de uso e promessa menos ligada à assinatura."
+  },
+  {
+   "slug": "serie-formato/serie-um-print-cinco-climas-ep01",
+   "score": 8,
+   "rationale": "Mesma força do 'cinco climas' com rótulos de clima como legenda embutida, 9,8s, SIGN_UP e 'cadastro grátis, sem cartão'; cutdown já prevê tirar o eyebrow de episódio, que não ajuda público frio."
+  },
+  {
+   "slug": "serie-formato/serie-9h-19h-ep01-cafe",
+   "score": 5,
+   "rationale": "Prova sem 'antes' (dois renders com pessoas geradas) não demonstra 'seu projeto', a copy paga não menciona cadastro grátis nem sem cartão, e a mecânica de série (quinta às 19h) é orgânica, não de anúncio."
+  },
+  {
+   "slug": "serie-formato/serie-adivinhe-o-antes-ep01-lavabo",
+   "score": 4,
+   "rationale": "Revelação só aos 5s (4s no cutdown) com contagem de hairline — tempo demais sem prova para tráfego pago, LEARN_MORE por escolha, oferta ausente; formato de curiosidade, não de cadastro."
+  },
+  {
+   "slug": "serie-formato/serie-tres-antes-das-14h-ep01-sala-de-jantar",
+   "score": 7,
+   "rationale": "Dor datada ('reunião às 14h'), print e duas opções em 3,6s, SIGN_UP e o fato de 3 gerações caberem nos 80 nodes; falta a oferta na copy (descrição 'Mesmo print, mesma câmera') e o eyebrow de série precisa sair."
+  }
+ ],
+ "top10": [
+  "resposta-direta/resposta-nada-sai-do-lugar-drone",
+  "resposta-direta/resposta-alteracao-so-a-parede",
+  "resposta-direta/resposta-preco-cozinha-lustre",
+  "resposta-direta/resposta-prazo-cinco-climas",
+  "alcance-organico/um-print-cinco-climas",
+  "fidelidade-tecnica/pisca-fachada-geminada",
+  "tradicional-vs/entre-duas-reunioes",
+  "editar-ferramenta/2026-09-04-reel-editar-so-o-piso",
+  "serie-formato/serie-um-print-cinco-climas-ep01",
+  "fidelidade-tecnica/zoom-cozinha-cada-peca"
+ ],
+ "notes": "Lente única: conversão em tráfego pago Meta com objetivo cadastro. Padrão que separou o topo: (1) prova visual antes do texto dentro de 1,5s; (2) oferta explícita 'cadastro grátis · 80 nodes · sem cartão' na arte OU pelo menos no primário+descrição; (3) SIGN_UP; (4) objeção real de arquiteto (fidelidade, alteração pós-aprovação, prazo, preço) em vez de feature. Os quatro 'resposta-direta' são os únicos que colocam a oferta na própria arte e dominam o top. Penalizados de forma consistente: LEARN_MORE em campanha de cadastro (cozinha-lustre, café, lareira, arestas, adivinhe), vídeo de Animar como hook (atrai curioso de IA e o motor Cinemático não cabe nos 80 nodes), peças >15s que dependem de cutdown, faixas 2,6:1/360px ilegíveis no celular, e conceitos gated (plugin sem rbz assinado; modelos de terceiros; planta de incorporadora) — para pago a publicabilidade pesa. Redundâncias: 'só a parede' (#8) > 'parede-quadros' > 'cimento queimado' usam o mesmo par; 'cinco climas' orgânico e Ep.01 são quase a mesma peça — usar uma delas no A/B, não as duas. Sugestão de A/B inicial: drone (fidelidade) vs preço (cozinha) vs só a parede (Editar), todos com a mesma microcopy de oferta."
+}

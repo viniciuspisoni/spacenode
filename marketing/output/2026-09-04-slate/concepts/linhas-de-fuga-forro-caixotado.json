@@ -1,0 +1,83 @@
+{
+ "slug": "linhas-de-fuga-forro-caixotado",
+ "title": "Linhas de fuga presas no forro caixotado",
+ "pillar": "fidelidade-geometrica",
+ "angle": "Sobrepor seis linhas de fuga no print do SketchUp e segurar as mesmas linhas sobre o render no mesmo enquadramento — a régua confirma que a câmera e a perspectiva não mudaram.",
+ "format": "transformacao",
+ "duration_s": 10,
+ "hook_text": "Mesma câmera. Mesmas linhas de fuga.",
+ "hook_visual": "Print do SketchUp de uma loja masculina (forro caixotado, vitrine à esquerda, arara, nicho de sapatos, duas poltronas mostarda) em faixa 1080×651 sobre fundo desfocado. Seis hairlines brancas partem de um ponto de fuga marcado e correm até a borda do quadro. Aos 1,5s: corte seco para o render com sol rasante entrando pela vitrine — as linhas continuam exatamente onde estavam.",
+ "scenes": [
+  {
+   "t": "0.0–1.5",
+   "visual": "Print #404 em faixa 1080×651 (y 634–1285) sobre fundo desfocado/escurecido da própria imagem. Seis hairlines brancas (2px, 65% opacidade) partem do ponto de fuga (~x 52%, y 46% da imagem; confirmar prolongando duas vigas do forro) até a borda: duas vigas longitudinais do forro caixotado, encontro parede/forro à esquerda e à direita, aresta da plataforma da vitrine à esquerda, base da parede de nogueira à direita. Círculo de 14px no ponto de fuga. Fade-in 0,3s (ou traço 0,5s se o kit animar linha).",
+   "text_on_screen": "Mesma câmera. Mesmas linhas de fuga.",
+   "asset_idx": [
+    404
+   ]
+  },
+  {
+   "t": "1.5–4.5",
+   "visual": "Corte seco → render #403, mesmo recorte. Linhas e ponto de fuga presos, sem mover um pixel. Aos 2,0s entra o apoio 60px abaixo da faixa.",
+   "text_on_screen": "Mesma câmera. Mesmas linhas de fuga. / Forro, vitrine e arara: tudo no lugar.",
+   "asset_idx": [
+    403
+   ]
+  },
+  {
+   "t": "4.5–5.0",
+   "visual": "Linhas e ponto de fuga fazem fade-out em 0,5s. Headline e apoio permanecem.",
+   "text_on_screen": "Mesma câmera. Mesmas linhas de fuga. / Forro, vitrine e arara: tudo no lugar.",
+   "asset_idx": [
+    403
+   ]
+  },
+  {
+   "t": "5.0–5.4",
+   "visual": "Corte seco de volta ao print (0,4s), sem linhas — o 'confere' do arquiteto.",
+   "text_on_screen": "Mesma câmera. Mesmas linhas de fuga.",
+   "asset_idx": [
+    404
+   ]
+  },
+  {
+   "t": "5.4–8.5",
+   "visual": "Corte seco → render. Ken Burns lento 1,00→1,06 com centro no forro caixotado e nas listras de sol no piso. Headline sai aos 7,0s, apoio aos 7,5s.",
+   "text_on_screen": "Forro, vitrine e arara: tudo no lugar.",
+   "asset_idx": [
+    403
+   ]
+  },
+  {
+   "t": "8.5–10.0",
+   "visual": "Scrim escuro sobre o render + CTA + wordmark SPACENODE monocromático.",
+   "text_on_screen": "Veja no seu próprio projeto",
+   "asset_idx": [
+    403
+   ]
+  }
+ ],
+ "assets": [
+  404,
+  403
+ ],
+ "cta": "Veja no seu próprio projeto",
+ "caption": "Se as linhas de fuga se mexem, o render não é mais do seu projeto. Aqui elas ficam onde estavam.\n\nLoja masculina, print direto do SketchUp. Sobrepusemos seis linhas de fuga no print — forro caixotado, encontro das paredes, base da vitrine — e seguramos as mesmas linhas sobre a imagem gerada. Nenhuma saiu do eixo.\n\nForro, vitrine, arara, nicho de sapatos e as duas poltronas estão na mesma coordenada. O que mudou foi o que você espera que mude: material, luz, o sol entrando pela vitrine.\n\nOnde a fidelidade tem limite, a gente diz: acabamento e iluminação são interpretação da cena, não cópia do modelo. Geometria e câmera, não.\n\nVeja no seu próprio projeto — link na bio.\n#archviz #sketchup #visualizacaoarquitetonica #designdeinteriores #arquitetura",
+ "hashtags": [
+  "#archviz",
+  "#sketchup",
+  "#visualizacaoarquitetonica",
+  "#designdeinteriores",
+  "#arquitetura"
+ ],
+ "paid": {
+  "primary": "Linhas de fuga no lugar. Esquadria no lugar. Imagem de apresentação em minutos, a partir do print do seu SketchUp.",
+  "headline": "Render que respeita seu projeto",
+  "description": "Comece grátis, sem cartão",
+  "button": "SIGN_UP",
+  "cutdown_note": "Já cabe em ≤15s. Para anúncio: cortar a cena 5.0–5.4 (corte de volta), encurtar o Ken Burns para 1,8s e trazer o CTA para 6,5s — total 8s. Legenda embutida: headline + apoio já estão na arte; som off por natureza."
+ },
+ "why_converts": "O arquiteto cético não compra adjetivo, compra prova: as linhas de fuga são a régua que ele mesmo usaria para desmontar um render genérico. Vê-las paradas sobre o render gera a pergunta 'e no meu modelo?' — que é exatamente o CTA. O cadastro é grátis e sem cartão, então o custo de responder à pergunta é zero; o primeiro render do próprio print é o momento de conversão real (ele vê a própria geometria preservada). A assinatura vem quando o teste vira entrega: ao esgotar os nodes gratuitos num projeto de cliente, o Starter (R$89) custa menos que um render terceirizado. O dispositivo das linhas também puxa rewatch (o olho volta para conferir), o que ajuda alcance orgânico.",
+ "production_notes": "Kit: marketing/scripts/reel-spec.mjs (REEL-KIT.md) — stills com Ken Burns, corte seco, overlays em tempo global, cards HTML via Playwright. Recorte: cortar #404 (1157×700) e #403 (1328×800) no mesmo aspecto 1,66:1 pela casa, não pelas bordas; QA obrigatório = exportar um frame de blend 50/50 print+render e conferir que vigas do forro e caixilho da vitrine coincidem (tolerância 4px em 1080); se não, ajustar o crop antes de desenhar as linhas. Linhas: SVG em card transparente, traço 2px #f5f5f7 a 65%, sem glow. Única palavra em verde #30d158: 'linhas de fuga' na headline (via accentuate). Zona segura: headline 70px acima da faixa (y≈500–600), apoio 60px abaixo (y≈1345–1420), CTA no terço central. Fundo desfocado com escurecimento diferente por lado (print é cinza médio, render é claro/quente) para o corte seco não dar flash. Sem trilha épica; áudio adicionado no app. Variações pagas alternativas (3 por peça): (b) prazo — 'Print do modelo às 9h, imagem de apresentação às 9h07 — com as linhas de fuga no lugar.' / título 'Do print à apresentação em minutos'; (c) apresentação — 'O cliente entende a imagem. Você confere as linhas de fuga. Os dois saem da reunião com o mesmo projeto.' / título 'Apresente sem trair o projeto'.",
+ "risks": "O vídeo NÃO pode prometer: fidelidade 'pixel a pixel' ou '100%'; que materiais/luz do modelo sejam preservados (aqui paredes brancas viraram microcimento bege, carpete laranja virou bege, sol da vitrine é interpretação); 'importação direta do SketchUp' (é upload do print; o plugin existe mas está gated até o dono assinar o .rbz — não citar); nenhum número (% , horas). O rótulo 'Quarto' no banco está errado — nunca mostrar metadados. 'Nenhuma saiu do eixo' na legenda depende do QA de blend 50/50: se alguma linha desviar, trocar por 'as seis continuam sobre as mesmas arestas'. Conferir autoria do modelo (se for de biblioteca de terceiros, não publicar)."
+}

@@ -1,0 +1,81 @@
+/**
+ * R9 · print, render, vídeo — "cama" visual composta em ffmpeg (nota de produção do slate:
+ * a régua com passo atrás não é xfade linear; o clipe do Animar precisa ficar na MESMA caixa
+ * dos stills para o corte still→vídeo ser invisível). O kit (reel-spec.mjs) recebe este mp4
+ * como um único segmento `video` (fit cover = passthrough 1080×1920) e faz cards/overlays/QA.
+ *
+ *   node make-bed.mjs organico   → bed-organico.mp4 (12.00 s)
+ *   node make-bed.mjs ad         → bed-ad.mp4 (7.40 s; o kit acrescenta fade + card final = 9.0 s)
+ */
+import { mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
+import { ffmpeg, probe } from '../../scripts/lib/tools.mjs';
+
+const S = 'C:/Users/Pisoni/AppData/Local/Temp/claude/C--Users-Pisoni-spacenode/19988837-c924-4b30-b28f-e9e7dc6696fa/scratchpad';
+const PRINT = `${S}/assets/0396-render-before.jpg`;   // #396 733×867
+const RENDER = `${S}/assets/0395-render-after.jpg`;   // #395 944×1120
+const CLIP = `${S}/assets/0169-video-video_out.mp4`;  // #169 1320×1568 24fps 5.04s (frame 0 = #395/#170)
+const OUT = import.meta.dirname;
+const TMP = join(process.env.TEMP || '/tmp', 'spacenode-marketing', 'r9-bed');
+await mkdir(TMP, { recursive: true });
+
+const W = 1080, H = 1920, FPS = 30, DARK = '0x1a1a1a';
+// Caixa única (geometria "contain" do render #395 no kit): 1080×1282 em y=320.
+const BW = 1080, BH = 1282, BY = 320;
+const mode = process.argv[2] || 'organico';
+const T = mode === 'ad'
+  ? { hold1: 1.2, ruler: 1.2, hold2: 1.0, clip: 4.0, freeze: 0 }
+  : { hold1: 1.2, ruler: 2.4, hold2: 2.0, clip: 5.04, freeze: 1.36 };
+
+const fill = `scale=${BW}:${BH}:force_original_aspect_ratio=increase:flags=lanczos,crop=${BW}:${BH}`;
+const frame = (label) => `color=c=${DARK}:s=${W}x${H}:r=${FPS}[bg${label}]`;
+
+// 1) quadros inteiros (1080×1920) do print e do render, parados
+const printFull = join(TMP, 'print-full.png'), renderFull = join(TMP, 'render-full.png');
+for (const [src, dest] of [[PRINT, printFull], [RENDER, renderFull]]) {
+  await ffmpeg(['-f', 'lavfi', '-i', `color=c=${DARK}:s=${W}x${H}`, '-i', src, '-filter_complex',
+    `[1:v]${fill}[box];[0:v][box]overlay=0:${BY}:format=auto,format=rgb24[out]`, '-map', '[out]', '-frames:v', '1', dest]);
+}
+
+const enc = ['-r', String(FPS), '-c:v', 'libx264', '-crf', '16', '-preset', 'medium', '-pix_fmt', 'yuv420p'];
+const still = async (png, dur, dest) => ffmpeg(['-loop', '1', '-framerate', String(FPS), '-t', String(dur), '-i', png,
+  '-vf', `fps=${FPS},setsar=1,format=yuv420p`, '-t', String(dur), ...enc, dest]);
+
+const seg1 = join(TMP, 'seg1-print.mp4'), seg2 = join(TMP, 'seg2-ruler.mp4'), seg3 = join(TMP, 'seg3-render.mp4'), seg4 = join(TMP, 'seg4-clip.mp4');
+await still(printFull, T.hold1, seg1);
+await still(renderFull, T.hold2, seg3);
+
+// 2) régua: o render (B) entra pela esquerda até a fração f(P) da largura; o print (A) fica à direita.
+//    Orgânico: passo atrás 0→78 % (1,2 s) → 40 % (0,5 s) → 100 % (0,7 s). Ad: reta.
+const D = T.ruler;
+const fP = mode === 'ad'
+  ? 'P'
+  : 'if(lt(P,0.5),1.56*P,if(lt(P,0.70833),0.78-1.824*(P-0.5),0.4+2.0571*(P-0.70833)))';
+const fT = mode === 'ad'
+  ? `(t/${D})`
+  : `if(lt(t/${D},0.5),1.56*(t/${D}),if(lt(t/${D},0.70833),0.78-1.824*(t/${D}-0.5),0.4+2.0571*(t/${D}-0.70833)))`;
+const LW = 4;
+const line = join(TMP, 'line.png');
+await ffmpeg(['-f', 'lavfi', '-i', `color=c=white:s=${LW}x${H}`, '-frames:v', '1', line]);
+await ffmpeg(['-loop', '1', '-framerate', String(FPS), '-t', String(D), '-i', printFull,
+  '-loop', '1', '-framerate', String(FPS), '-t', String(D), '-i', renderFull,
+  '-loop', '1', '-framerate', String(FPS), '-t', String(D), '-i', line,
+  '-filter_complex', [
+    `[0:v]fps=${FPS},format=yuv420p,setsar=1[a]`, `[1:v]fps=${FPS},format=yuv420p,setsar=1[b]`,
+    `[a][b]xfade=transition=custom:expr='if(lt(X,W*(${fP})),B,A)':duration=${D}:offset=0[x]`,
+    `[x][2:v]overlay=x='${W}*(${fT})-${LW / 2}':y=${BY}:enable='between(t,0,${D})',setsar=1,format=yuv420p[out]`,
+  ].join(';'), '-map', '[out]', '-t', String(D), ...enc, seg2]);
+
+// 3) clipe do Animar na mesma caixa (scale-to-fill 1080×1283 → crop 1282), 24→30 fps, congela o último frame
+const freeze = T.freeze > 0 ? `,tpad=stop_mode=clone:stop_duration=${T.freeze}` : '';
+await ffmpeg(['-f', 'lavfi', '-i', `color=c=${DARK}:s=${W}x${H}:r=${FPS}`, '-i', CLIP, '-filter_complex',
+  `[1:v]${fill},fps=${FPS}${freeze}[box];[0:v][box]overlay=0:${BY}:shortest=1,setsar=1,format=yuv420p[out]`,
+  '-map', '[out]', '-t', String(T.clip + T.freeze), '-an', ...enc, seg4]);
+
+// 4) concat
+const bed = join(OUT, `bed-${mode}.mp4`);
+await ffmpeg(['-i', seg1, '-i', seg2, '-i', seg3, '-i', seg4, '-filter_complex',
+  '[0:v][1:v][2:v][3:v]concat=n=4:v=1:a=0,setsar=1,format=yuv420p[out]', '-map', '[out]', ...enc, '-movflags', '+faststart', bed]);
+const p = await probe(bed);
+console.log(bed, p.streams[0].width + 'x' + p.streams[0].height, p.streams[0].r_frame_rate, Number(p.format.duration).toFixed(2) + 's',
+  'starts:', { ruler: T.hold1, render: T.hold1 + T.ruler, clip: T.hold1 + T.ruler + T.hold2, freeze: T.hold1 + T.ruler + T.hold2 + T.clip });

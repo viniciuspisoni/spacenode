@@ -1,0 +1,180 @@
+{
+  "slug": "2026-09-04-reel-drone-nada-sai-do-lugar",
+  "segments": [
+    {
+      "type": "still",
+      "src": "$REPO/marketing/output/2026-09-04-reel-drone-nada-sai-do-lugar/derived/p1-antes.jpg",
+      "dur": 2.3,
+      "fit": "contain",
+      "kenburns": [
+        1,
+        1
+      ],
+      "brightness": -0.3
+    },
+    {
+      "type": "still",
+      "src": "$REPO/marketing/output/2026-09-04-reel-drone-nada-sai-do-lugar/derived/p1-depois.jpg",
+      "dur": 4.1,
+      "fit": "contain",
+      "kenburns": [
+        1,
+        1
+      ],
+      "brightness": -0.3
+    },
+    {
+      "type": "still",
+      "src": "$REPO/marketing/output/2026-09-04-reel-drone-nada-sai-do-lugar/derived/p2-antes.jpg",
+      "dur": 1.34,
+      "fit": "contain",
+      "kenburns": [
+        1,
+        1
+      ],
+      "brightness": -0.3
+    },
+    {
+      "type": "still",
+      "src": "$REPO/marketing/output/2026-09-04-reel-drone-nada-sai-do-lugar/derived/p2-depois.jpg",
+      "dur": 4.4,
+      "fit": "contain",
+      "kenburns": [
+        1,
+        1.05
+      ],
+      "brightness": -0.3
+    },
+    {
+      "type": "card",
+      "card": "final",
+      "dur": 1.5
+    }
+  ],
+  "transitions": [
+    {
+      "type": "wiperight",
+      "dur": 0.9,
+      "ruler": true
+    },
+    {
+      "type": "fade",
+      "dur": 0.04
+    },
+    {
+      "type": "wiperight",
+      "dur": 0.8,
+      "ruler": true
+    },
+    {
+      "type": "fade",
+      "dur": 0.4
+    }
+  ],
+  "cards": {
+    "faixas": {
+      "layout": "html",
+      "body": "<div style='position:absolute;left:0;right:0;top:0;height:320px;background:#1a1a1a'></div>\n<div style='position:absolute;left:0;right:0;top:1602px;bottom:0;background:#1a1a1a'></div>"
+    },
+    "marcas50": {
+      "layout": "html",
+      "body": "<div style='position:absolute;left:235px;top:520px;width:675px;height:710px'>\n    <i style='position:absolute;width:34px;height:34px;border:0 solid rgba(255,255,255,0.5);left:0;top:0;border-top-width:1.5px;border-left-width:1.5px'></i>\n    <i style='position:absolute;width:34px;height:34px;border:0 solid rgba(255,255,255,0.5);right:0;top:0;border-top-width:1.5px;border-right-width:1.5px'></i>\n    <i style='position:absolute;width:34px;height:34px;border:0 solid rgba(255,255,255,0.5);left:0;bottom:0;border-bottom-width:1.5px;border-left-width:1.5px'></i>\n    <i style='position:absolute;width:34px;height:34px;border:0 solid rgba(255,255,255,0.5);right:0;bottom:0;border-bottom-width:1.5px;border-right-width:1.5px'></i></div><div style='position:absolute;left:252px;top:1047px;width:183px;height:240px'>\n    <i style='position:absolute;width:26px;height:26px;border:0 solid rgba(255,255,255,0.5);left:0;top:0;border-top-width:1.5px;border-left-width:1.5px'></i>\n    <i style='position:absolute;width:26px;height:26px;border:0 solid rgba(255,255,255,0.5);right:0;top:0;border-top-width:1.5px;border-right-width:1.5px'></i>\n    <i style='position:absolute;width:26px;height:26px;border:0 solid rgba(255,255,255,0.5);left:0;bottom:0;border-bottom-width:1.5px;border-left-width:1.5px'></i>\n    <i style='position:absolute;width:26px;height:26px;border:0 solid rgba(255,255,255,0.5);right:0;bottom:0;border-bottom-width:1.5px;border-right-width:1.5px'></i></div><div style='position:absolute;left:97px;top:806px;width:97px;height:86px'>\n    <i style='position:absolute;width:18px;height:18px;border:0 solid rgba(255,255,255,0.5);left:0;top:0;border-top-width:1.5px;border-left-width:1.5px'></i>\n    <i style='position:absolute;width:18px;height:18px;border:0 solid rgba(255,255,255,0.5);right:0;top:0;border-top-width:1.5px;border-right-width:1.5px'></i>\n    <i style='position:absolute;width:18px;height:18px;border:0 solid rgba(255,255,255,0.5);left:0;bottom:0;border-bottom-width:1.5px;border-left-width:1.5px'></i>\n    <i style='position:absolute;width:18px;height:18px;border:0 solid rgba(255,255,255,0.5);right:0;bottom:0;border-bottom-width:1.5px;border-right-width:1.5px'></i></div>"
+    },
+    "marcas": {
+      "layout": "html",
+      "body": "<div style='position:absolute;left:235px;top:520px;width:675px;height:710px'>\n    <i style='position:absolute;width:34px;height:34px;border:0 solid rgba(255,255,255,0.94);left:0;top:0;border-top-width:1.5px;border-left-width:1.5px'></i>\n    <i style='position:absolute;width:34px;height:34px;border:0 solid rgba(255,255,255,0.94);right:0;top:0;border-top-width:1.5px;border-right-width:1.5px'></i>\n    <i style='position:absolute;width:34px;height:34px;border:0 solid rgba(255,255,255,0.94);left:0;bottom:0;border-bottom-width:1.5px;border-left-width:1.5px'></i>\n    <i style='position:absolute;width:34px;height:34px;border:0 solid rgba(255,255,255,0.94);right:0;bottom:0;border-bottom-width:1.5px;border-right-width:1.5px'></i></div><div style='position:absolute;left:252px;top:1047px;width:183px;height:240px'>\n    <i style='position:absolute;width:26px;height:26px;border:0 solid rgba(255,255,255,0.94);left:0;top:0;border-top-width:1.5px;border-left-width:1.5px'></i>\n    <i style='position:absolute;width:26px;height:26px;border:0 solid rgba(255,255,255,0.94);right:0;top:0;border-top-width:1.5px;border-right-width:1.5px'></i>\n    <i style='position:absolute;width:26px;height:26px;border:0 solid rgba(255,255,255,0.94);left:0;bottom:0;border-bottom-width:1.5px;border-left-width:1.5px'></i>\n    <i style='position:absolute;width:26px;height:26px;border:0 solid rgba(255,255,255,0.94);right:0;bottom:0;border-bottom-width:1.5px;border-right-width:1.5px'></i></div><div style='position:absolute;left:97px;top:806px;width:97px;height:86px'>\n    <i style='position:absolute;width:18px;height:18px;border:0 solid rgba(255,255,255,0.94);left:0;top:0;border-top-width:1.5px;border-left-width:1.5px'></i>\n    <i style='position:absolute;width:18px;height:18px;border:0 solid rgba(255,255,255,0.94);right:0;top:0;border-top-width:1.5px;border-right-width:1.5px'></i>\n    <i style='position:absolute;width:18px;height:18px;border:0 solid rgba(255,255,255,0.94);left:0;bottom:0;border-bottom-width:1.5px;border-left-width:1.5px'></i>\n    <i style='position:absolute;width:18px;height:18px;border:0 solid rgba(255,255,255,0.94);right:0;bottom:0;border-bottom-width:1.5px;border-right-width:1.5px'></i></div>"
+    },
+    "scrimTop": {
+      "layout": "html",
+      "body": "<div style='position:absolute;left:0;right:0;top:320px;height:280px;background:linear-gradient(180deg,rgba(26,26,26,0.86) 0%,rgba(26,26,26,0.62) 45%,rgba(26,26,26,0) 100%)'></div>"
+    },
+    "scrimBottom": {
+      "layout": "html",
+      "body": "<div style='position:absolute;left:0;right:0;top:1222px;height:380px;background:linear-gradient(0deg,rgba(26,26,26,0.90) 0%,rgba(26,26,26,0.70) 40%,rgba(26,26,26,0) 100%)'></div>"
+    },
+    "hook": {
+      "layout": "html",
+      "body": "<div style='position:absolute;left:80px;width:920px;top:372px;text-align:center;font-size:64px;font-weight:500;line-height:1.12;letter-spacing:-0.035em;color:#f5f5f7'>nada sai do lugar.</div>"
+    },
+    "sub": {
+      "layout": "html",
+      "body": "<div style='position:absolute;left:80px;width:920px;bottom:360px;text-align:center;font-size:38px;font-weight:400;line-height:1.3;letter-spacing:-0.02em;color:#f5f5f7;text-wrap:balance'>espreguiçadeiras, escada e planta:<br>onde você modelou.</div>"
+    },
+    "cta": {
+      "layout": "html",
+      "body": "<div style='position:absolute;left:80px;width:920px;bottom:360px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:26px'>\n  <span style='display:inline-block;padding-bottom:14px;border-bottom:2px solid #30d158;font-size:54px;font-weight:500;letter-spacing:-0.03em;line-height:1.1;color:#f5f5f7'>Comece grátis</span>\n  <span style='font-size:26px;font-weight:400;letter-spacing:0.01em;color:#a1a1a6'>80 nodes grátis · sem cartão · em português</span></div>"
+    },
+    "final": {
+      "layout": "final",
+      "cta": "Comece grátis"
+    }
+  },
+  "overlays": [
+    {
+      "card": "faixas",
+      "from": 0,
+      "to": 11.5
+    },
+    {
+      "card": "marcas50",
+      "from": 0.55,
+      "to": 0.7
+    },
+    {
+      "card": "marcas",
+      "from": 0.7,
+      "to": 4.6
+    },
+    {
+      "card": "marcas50",
+      "from": 4.6,
+      "to": 4.75
+    },
+    {
+      "card": "scrimTop",
+      "from": 2.3,
+      "to": 5.5
+    },
+    {
+      "card": "scrimBottom",
+      "from": 2.3,
+      "to": 5.5
+    },
+    {
+      "card": "hook",
+      "from": 2.4,
+      "to": 5.5
+    },
+    {
+      "card": "sub",
+      "from": 3.4,
+      "to": 5.5
+    },
+    {
+      "card": "scrimBottom",
+      "from": 6.8,
+      "to": 10
+    },
+    {
+      "card": "cta",
+      "from": 8,
+      "to": 10
+    }
+  ],
+  "qa": [
+    0.3,
+    0.9,
+    1.85,
+    2.2,
+    3,
+    4.2,
+    5.2,
+    5.7,
+    6.4,
+    7.4,
+    8.6,
+    9.8,
+    10.2,
+    11
+  ]
+}

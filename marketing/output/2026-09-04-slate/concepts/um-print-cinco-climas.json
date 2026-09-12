@@ -1,0 +1,87 @@
+{
+ "slug": "um-print-cinco-climas",
+ "title": "Um print, cinco climas",
+ "pillar": "antes-e-depois",
+ "angle": "Loop contínuo tipo timelapse: o mesmo print do SketchUp gera dia, contraluz, entardecer, chuva e noite com a câmera travada. Cortes secos a cada ~1,3s com um único zoompan atravessando as seis imagens — lê como uma foto em que só a luz muda. Ataca a pergunta que todo cliente faz ('e à noite?') e que no fluxo tradicional custa um render novo.",
+ "format": "serie",
+ "duration_s": 10,
+ "hook_text": "Um print. Cinco climas.",
+ "hook_visual": "Faixa 4:3 (1080x810) centralizada com o print #514: sobrado em hidden-line do SketchUp, céu branco, lâmina de concreto vertical ao centro, ripado de madeira, cortinas brancas atrás do vidro do pavimento superior, escada de acesso à direita, carro preto na rua à esquerda, duas árvores de biblioteca nas bordas, asfalto cinza com faixa. Fundo full-bleed = a mesma imagem desfocada e escurecida. Headline branca acima da faixa (y≈430).",
+ "scenes": [
+  {
+   "t": "0.0–1.2s",
+   "visual": "#514 (print) na faixa 4:3; fundo desfocado do mesmo print. zoompan único começa (1.00) e vai correr sem reset por todas as imagens. Headline em corte no frame 0.",
+   "asset_idx": [
+    514
+   ],
+   "text_on_screen": "Um print. Cinco climas."
+  },
+  {
+   "t": "1.2–2.5s",
+   "visual": "Corte seco para #517 (diurno): céu azul, sombras coerentes, três pessoas na calçada, carro preto no mesmo ponto, árvores reais. Headline continua até 2.5s.",
+   "asset_idx": [
+    517
+   ],
+   "text_on_screen": "Um print. Cinco climas. (até 2.5s)"
+  },
+  {
+   "t": "2.5–3.8s",
+   "visual": "Corte seco para #521 (sol/contraluz): sol rasante entrando pela direita, raios volumétricos e flare, madeira dourada, mesma casa e carro.",
+   "asset_idx": [
+    521
+   ],
+   "text_on_screen": ""
+  },
+  {
+   "t": "3.8–5.1s",
+   "visual": "Corte seco para #519 (entardecer): céu rosado, interior aceso atrás das cortinas, sombras longas, madeira quente.",
+   "asset_idx": [
+    519
+   ],
+   "text_on_screen": ""
+  },
+  {
+   "t": "5.1–6.4s",
+   "visual": "Corte seco para #515 (chuva): céu de tempestade, riscos de chuva, asfalto espelhado com reflexo do carro, madeira escurecida.",
+   "asset_idx": [
+    515
+   ],
+   "text_on_screen": ""
+  },
+  {
+   "t": "6.4–10.0s",
+   "visual": "Corte seco para #513 (noturno): céu azul-escuro, luz quente vazando pelas cortinas, fita de LED sob o beiral, lâmina de concreto lavada de luz, jardim baixo iluminado, carro na rua. Apoio entra em 6.8s abaixo da faixa; em 8.4s entra o overlay de fechamento (logo monocromático + CTA, sublinhado hairline verde). O loop reinicia no print branco — noite → print é o corte de maior contraste, vira gancho de novo.",
+   "asset_idx": [
+    513
+   ],
+   "text_on_screen": "Mesma câmera. Mesmo carro. Mesma escada. (6.8–8.4s) → Renderize seu projeto (8.4–10.0s)"
+  }
+ ],
+ "assets": [
+  514,
+  517,
+  521,
+  519,
+  515,
+  513
+ ],
+ "cta": "Renderize seu projeto",
+ "caption": "O cliente pergunta 'e à noite?'. Mesmo print do SketchUp, cinco climas, mesma câmera.\n\nDia, contraluz, entardecer, chuva e noite. Concreto, ripado, escada e o carro na rua ficam onde estavam no modelo; o que muda é a luz.\n\nNo fluxo tradicional essa pergunta custa um render inteiro de novo. Aqui é outra geração sobre o mesmo print, em minutos, sem remodelar e sem trocar de câmera.\n\nCinco versões para levar à reunião e decidir com o cliente na hora.\n\nRenderize seu projeto — link na bio.\n\n#arquitetura #render #sketchup #projetodearquitetura #archviz",
+ "hashtags": [
+  "#arquitetura",
+  "#render",
+  "#sketchup",
+  "#projetodearquitetura",
+  "#archviz"
+ ],
+ "paid": {
+  "primary": "'E à noite?' Mesmo print do SketchUp, cinco climas, mesma câmera. Gerado em minutos, sem remodelar.",
+  "headline": "Cinco climas do mesmo print",
+  "description": "Comece grátis, sem cartão",
+  "button": "SIGN_UP",
+  "cutdown_note": "Versão anúncio 8,5s: 1,0s por clima (print 1,0 → dia → sol → entardecer → chuva → noite 2,5s) e CTA do botão substitui o overlay; headline visível desde o frame 0."
+ },
+ "why_converts": "Vende o hábito que consome nodes: iteração. O arquiteto reconhece a dor (revisão de luz = render novo, dias de fila) e vê a resposta em segundos; o corte rítmico segura retenção até o fim e o loop print↔noite gera segunda volta. Funil: 'Renderize seu projeto' → link na bio → cadastro grátis sem cartão → ele testa 1–2 climas no próprio print (Vega 2K = 20 nodes cada; 80 grátis cobrem até 4) → o gosto pela variação estoura o grátis na primeira reunião com cliente (5 climas = 100 nodes) → Starter R$89 com 750 nodes. Também serve como remarketing para quem já cadastrou e parou no primeiro render.",
+ "risks": "O vídeo NÃO pode prometer: 'a mesma imagem relit' (são cinco gerações separadas sobre o mesmo print, não um relight de um render — dizer 'mesmo print', nunca 'mesma imagem'); nada de 'Preservar original' como nome de recurso na peça; nenhum número de minutos; 'fila' como crítica ao processo, nunca a renderistas. Divergências honestas entre os cinco: #517 tem três pessoas que os outros não têm; #513 não tem a árvore da esquerda e vem em enquadramento diferente (1200x896); #515 é mais escuro. Não prometer 'idênticas pixel a pixel' — 'mesma câmera, mesmo carro, mesma escada' é o que se sustenta.",
+ "production_notes": "Faixa 4:3 (1080x810) centralizada (y 555–1365); fundo = mesma imagem escalada para cobrir 1080x1920 + boxblur forte + escurecimento (o print branco e o noturno têm luminância muito diferente — calibrar o escurecimento por imagem para não dar flash no corte). Alinhamento: #514 (1342x833) e #515/#517/#519/#521 (1312x816) têm o mesmo aspecto — normalizar para 1312x816 e cortar 1088x816 alinhado pela lâmina de concreto e pela quina da laje; #513 (1200x896, mais céu e mais rua) precisa de escala ~0,95 e reposicionamento pela lâmina e pela laje até bater; por isso fica em último lugar (se sobrar 1% de desvio, lê como beat final). Um único zoompan (1.00→1.06) atravessando os seis clipes sem reset — é o que faz parecer 'uma câmera, luz mudando'. Texto acima e abaixo da faixa, dentro de 220–1600px; scrim leve em camada própria. setsar=1 em todos os ramos antes do concat. Sem áudio no arquivo; os cortes ficam em ~1,3s para casarem com beat de trilha adicionada no app."
+}

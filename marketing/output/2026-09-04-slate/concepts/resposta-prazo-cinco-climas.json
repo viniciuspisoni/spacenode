@@ -1,0 +1,100 @@
+{
+ "slug": "resposta-prazo-cinco-climas",
+ "title": "Um print, cinco climas",
+ "pillar": "demonstracao-de-ferramentas",
+ "angle": "Objeção: prazo / 'isso demora?'. Layout empilhado: o print do SketchUp fica parado na faixa de cima o tempo todo; na faixa de baixo a mesma casa troca de clima em cortes secos de 0,6 s (noturno, chuva, dia, entardecer, sol) — cinco renders reais do MESMO print. Claim de tempo aprovado: 'cada um gerado em minutos'.",
+ "format": "video_anuncio",
+ "duration_s": 13,
+ "hook_text": "Apresentação amanhã. Render pronto?",
+ "hook_visual": "Duas faixas empilhadas sobre fundo #0a0a0a. Faixa de cima (1080×500): print SketchUp da fachada (#514) — sobrado de laje branca em balanço, pilar de concreto central, ripado de madeira, cortinas brancas no vidro do pavimento superior, carro preto na rua, duas árvores de biblioteca, céu branco. Faixa de baixo (1080×810, 4:3): começa com o mesmo print e aos 0,8 s um wipe de 0,8 s revela o noturno (#513): céu azul-marinho, luz quente vazando pelas cortinas, fita de LED sob o beiral, madeira acesa, asfalto molhado, carro no mesmo ponto. Headline entra aos 1,8 s acima da faixa de cima.",
+ "scenes": [
+  {
+   "t": "0.0–0.8",
+   "visual": "Faixa de cima: #514 estático (crop ~2,16:1 centrado na casa). Faixa de baixo: #514 no crop 4:3 centrado na casa. Fundo #0a0a0a, hairline entre as faixas. Sem texto.",
+   "text_on_screen": "",
+   "asset_idx": [
+    514
+   ]
+  },
+  {
+   "t": "0.8–1.6",
+   "visual": "Faixa de baixo: xfade wipeleft 0,8 s de #514 para #513 (noturno). Faixa de cima não muda.",
+   "text_on_screen": "",
+   "asset_idx": [
+    514,
+    513
+   ]
+  },
+  {
+   "t": "1.6–2.6",
+   "visual": "Hold no noturno. Headline aos 1,8 s no espaço acima da faixa de cima (y ≈ 280–400).",
+   "text_on_screen": "Apresentação amanhã. Render pronto?",
+   "asset_idx": [
+    513
+   ]
+  },
+  {
+   "t": "2.6–5.0",
+   "visual": "Faixa de baixo em cortes secos de 0,6 s: #515 chuva (céu de tempestade, asfalto espelhado) → #517 dia (céu azul, três pessoas na calçada) → #519 entardecer (céu rosado, interior aceso) → #521 sol (contraluz com raios). Casa, carro e câmera no mesmo lugar em todos. Apoio aos 2,8 s, logo abaixo da headline.",
+   "text_on_screen": "Apresentação amanhã. Render pronto? / Mesmo print. Cada clima gerado em minutos.",
+   "asset_idx": [
+    515,
+    517,
+    519,
+    521
+   ]
+  },
+  {
+   "t": "5.0–8.5",
+   "visual": "Hold em #519 (entardecer) com push-in 1,00→1,05 na faixa de baixo. Faixa de cima segue com o print. Texto permanece.",
+   "text_on_screen": "Apresentação amanhã. Render pronto? / Mesmo print. Cada clima gerado em minutos.",
+   "asset_idx": [
+    519,
+    514
+   ]
+  },
+  {
+   "t": "8.5–11.5",
+   "visual": "Headline e apoio saem em corte. Bloco de CTA sobre scrim no terço inferior da faixa de baixo (ainda #519): 'Comece grátis' com sublinhado verde + micro-linha.",
+   "text_on_screen": "Comece grátis / 80 nodes no cadastro · sem cartão",
+   "asset_idx": [
+    519,
+    514
+   ]
+  },
+  {
+   "t": "11.5–13.0",
+   "visual": "Card final #0a0a0a: logo monocromático, 'Comece grátis' com sublinhado verde, micro-linha. Sem URL.",
+   "text_on_screen": "Comece grátis / 80 nodes no cadastro · sem cartão",
+   "asset_idx": []
+  }
+ ],
+ "assets": [
+  514,
+  513,
+  515,
+  517,
+  519,
+  521
+ ],
+ "cta": "Comece grátis",
+ "caption": "Apresentação amanhã e o cliente quer ver de noite, de dia e na chuva? Um print, cinco climas, cada um em minutos.\n\nO mesmo print de SketchUp gerou cinco versões: noturno, chuva, dia, entardecer e sol forte. Câmera, volumes, carro e escada iguais em todas — só o clima muda.\n\nCada imagem sai em minutos no motor padrão. Não precisa remodelar nem reconfigurar: sobe o print, pede a versão que o cliente quer, gera.\n\nO cadastro é grátis e vem com 80 nodes, sem cartão.\n\nComece grátis no link da bio.\n\n#sketchup #renderizacao #archviz #projetodearquitetura #apresentacaodeprojeto",
+ "hashtags": [
+  "#sketchup",
+  "#renderizacao",
+  "#archviz",
+  "#projetodearquitetura",
+  "#apresentacaodeprojeto"
+ ],
+ "paid": {
+  "primary": "Um print do SketchUp, cinco climas: noite, chuva, dia, entardecer e sol. Cada render em minutos, com a mesma câmera.\n\nCadastro grátis com 80 nodes, sem cartão. Teste com um projeto real.",
+  "headline": "Cinco climas do mesmo print",
+  "description": "Cada render em minutos",
+  "button": "SIGN_UP",
+  "cutdown_note": "Já nasce ≤15 s (13 s). Cutdown de 7 s: cenas 1–4 até 5,0 s (print → noturno → quatro cortes) + CTA sobre #519 de 5,0 a 7,0 s; sem hold longo e sem card final. Cutdown 10 s: cortar só o card final e encurtar o hold para 2 s."
+ },
+ "why_converts": "A dor de prazo é concreta: o cliente pede 'e de noite?' na véspera. A peça mostra, com som desligado, o que essa pergunta custa hoje na plataforma — cinco versões do mesmo print, câmera travada, cada uma gerada em minutos. O print parado na faixa de cima é a prova contínua de que ninguém remodelou nada; os cortes de 0,6 s dão ritmo de timelapse sem trilha. O claim de tempo é o único aprovado pelo dono ('gerado em minutos') e é por imagem, não pelo lote — honesto e verificável no cadastro grátis. Funil: quem tem entrega amanhã cadastra hoje (80 nodes = 4 renders em 2K), usa no projeto que está na mesa e descobre que o gargalo do escritório vira assinatura de R$89/mês em vez de madrugada.",
+ "production_notes": "Specs iguais (1080×1920, 30 fps, H.264, sem áudio, Geist 600/400, verde só no sublinhado). Layout: headline y ≈ 280–400 (Geist 600 ~68 px), apoio logo abaixo (~38 px); faixa de cima 1080×500 em y 420–920 (crop 2,16:1 de #514 centrado na casa); hairline rgba(255,255,255,.08); faixa de baixo 1080×810 em y 936–1746 (crop 4:3). Imagem pode passar de 1600 — a zona segura é para TEXTO; o bloco de CTA fica em y ≈ 1440–1580, dentro da zona. Atenção ao aspecto: #513 é 1200×896 (1,34:1), os outros são 1312×816 (1,61:1) e o print 1342×833 — recortar todos para o mesmo 4:3 ALINHANDO pela laje em balanço e pelo carro (não pelas bordas), senão a casa 'pula' nos cortes. Confirmar pixel a pixel que os quatro 'antes' #516/#518/#520/#522 são o mesmo arquivo de #514 (a folha diz que sim) — usar só #514. Cortes secos, sem xfade entre climas (o ritmo é o argumento). #515 (chuva) é a mais escura: checar legibilidade no frame de QA com brilho de celular. Card final 1,5 s sem URL. setsar=1 nos ramos. QA em 4 frames: 1,4 s / 3,0 s / 4,6 s / 10,0 s.",
+ "risks": "NÃO pode prometer: 'cinco renders em minutos' (o claim é POR imagem — 'cada um'), 'em segundos', 'tempo real', 'render instantâneo', 'qualquer clima'; não dizer 'idênticas' (materiais variam levemente entre climas — em #509/#507 o gradil muda; aqui falar em 'câmera, volumes e carro iguais'); não nomear controle da interface ('seletor de clima') que não foi conferido — a legenda diz 'pede a versão que o cliente quer'. Não usar 'IA' na arte. 'Sem cartão' — mesma ressalva dos outros conceitos. Renders de 27/04/2026 (vega 2k): qualidade atual, mas originais de ~1300 px — a faixa 4:3 de 1080 px fica dentro do limite sem upscale agressivo. Confirmar autoria do modelo SketchUp do sobrado antes de veicular pago.",
+ "gated": ""
+}

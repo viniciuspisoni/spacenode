@@ -1,0 +1,110 @@
+{
+ "slug": "o-cliente-pediu-cimento-queimado",
+ "title": "O cliente pediu cimento queimado",
+ "pillar": "tradicional-vs-spacenode",
+ "angle": "O ajuste do cliente é o passo mais caro do render externo: em geral, cada versão é outra imagem cobrada (R$150–600) e outra rodada na fila. No Editar, o ajuste é localizado — só a parede vira cimento queimado, só o piso vira madeira — e o resto do render aprovado fica onde estava. Comparação de processo + custo por versão; sem desmerecer quem renderiza.",
+ "format": "demonstrativo",
+ "duration_s": 16,
+ "hook_text": "O cliente pediu cimento queimado.",
+ "hook_visual": "Render fotorrealista de apartamento compacto brasileiro (#52): parede-galeria com dezenas de quadros e um violão, mesa bistrô de madeira com cadeiras thonet, cozinha com azulejo verde e marcenaria de madeira ao fundo, sofá amarelo-mostarda com almofadas, plantas, tapete redondo de juta, janela com a cidade. Recorte 4:5 (1080x1350) tirado do centro-esquerda do panorâmico (galeria + cozinha + metade do sofá), com pan lateral lento. Aos 3,8s a régua vertical desce e a parede branca da galeria e do sofá vira cimento queimado (#797) — quadros, violão e móveis no mesmo lugar.",
+ "scenes": [
+  {
+   "t": "0.0–2.0s",
+   "visual": "#52 em recorte 4:5 (1080x1350) do centro-esquerda do panorâmico: galeria de quadros + cozinha + sofá amarelo. Pan lateral lento da esquerda para a direita (Ken Burns), fundo desfocado nas faixas restantes. Headline sobre scrim no terço superior.",
+   "text_on_screen": "O cliente pediu cimento queimado.",
+   "asset_idx": [
+    52
+   ]
+  },
+  {
+   "t": "2.0–3.8s",
+   "visual": "#52 continua o pan. Headline troca em corte.",
+   "text_on_screen": "Em geral, isso é outra imagem cobrada.",
+   "asset_idx": [
+    52
+   ]
+  },
+  {
+   "t": "3.8–4.1s",
+   "visual": "Régua vertical (xfade wipedown, 0,3s) revela #797 sobre #52 — mesmo recorte, mesmo pan. As paredes viram cimento queimado com manchado sutil.",
+   "text_on_screen": "",
+   "asset_idx": [
+    52,
+    797
+   ]
+  },
+  {
+   "t": "4.1–8.0s",
+   "visual": "#797 segura o recorte 4:5 com zoom lento 1.00→1.05. Headline entra em 4,1s; apoio em 5,0s.",
+   "text_on_screen": "Aqui: só a parede. / apoio (5,0s): Quadros, violão, sofá — tudo onde estava.",
+   "asset_idx": [
+    797
+   ]
+  },
+  {
+   "t": "8.0–9.5s",
+   "visual": "Corte para detalhe de #797: recorte 1080x1350 em escala 1:1 (sem upscale — fonte 3040x1408) centrado na parede-galeria com o violão, mostrando os quadros intactos sobre o cimento queimado.",
+   "text_on_screen": "Quadros, violão, sofá — tudo onde estava.",
+   "asset_idx": [
+    797
+   ]
+  },
+  {
+   "t": "9.5–10.8s",
+   "visual": "Corte para #75: suíte minimalista escura com cama baixa branca, abajures duplos acesos, painel grafite, persianas à direita projetando listras de sol, piso de concreto cinza e tapete. Panorâmico 2,6:1 recortado ao centro em 16:9 (2276x1280 → 1080x608), faixa centralizada, fundo desfocado.",
+   "text_on_screen": "Outro cliente: piso de madeira.",
+   "asset_idx": [
+    75
+   ]
+  },
+  {
+   "t": "10.8–11.1s",
+   "visual": "Régua horizontal (xfade wipeleft, 0,3s) revela #760 sobre #75: o piso de concreto vira tábuas de madeira clara em perspectiva, com as sombras das persianas preservadas; cama, tapete, criados e abajures idênticos.",
+   "text_on_screen": "",
+   "asset_idx": [
+    75,
+    760
+   ]
+  },
+  {
+   "t": "11.1–13.5s",
+   "visual": "#760 segura a faixa 16:9 com zoom lento 1.00→1.06 puxando para o piso junto às persianas.",
+   "text_on_screen": "Cama, tapete, persianas — intocados.",
+   "asset_idx": [
+    760
+   ]
+  },
+  {
+   "t": "13.5–16.0s",
+   "visual": "Card final #0a0a0a com logo monocromático e CTA (sublinhado verde).",
+   "text_on_screen": "Veja no seu próprio projeto",
+   "asset_idx": []
+  }
+ ],
+ "assets": [
+  52,
+  797,
+  75,
+  760
+ ],
+ "cta": "Veja no seu próprio projeto",
+ "caption": "O cliente pediu cimento queimado na parede. Em geral, isso é outra imagem cobrada — R$150 a R$600.\n\nÉ o ajuste que mais custa no render externo: não a imagem, a rodada. Briefing de novo, fila de novo, prazo de novo — e o que já estava aprovado volta pra mesa.\n\nNo Editar você marca a área e diz o material. A parede vira cimento queimado; quadros, violão, sofá e cozinha ficam exatamente onde estavam. Na suíte, o piso de concreto virou madeira clara — cama, tapete e persianas seguem intocados.\n\nDuas edições reais, sobre renders reais, em minutos cada. Não é sobre quem renderiza; é sobre não voltar pra fila a cada pedido.\n\nVeja no seu próprio projeto — cadastro grátis, sem cartão. Link na bio.\n\n#arquitetura #designdeinteriores #renderizacao #archviz #projetodearquitetura",
+ "hashtags": [
+  "#arquitetura",
+  "#designdeinteriores",
+  "#renderizacao",
+  "#archviz",
+  "#projetodearquitetura"
+ ],
+ "paid": {
+  "primary": "O cliente pediu cimento queimado na parede. Em geral, isso é outra imagem na fila. Aqui, é só a parede — em minutos.\nQuadros, violão, sofá e cozinha ficam onde estavam. Edição localizada sobre o seu render. Cadastro grátis, sem cartão.",
+  "headline": "Ajuste sem refazer o render",
+  "description": "Só a parede. O resto fica.",
+  "button": "SIGN_UP",
+  "cutdown_note": "Versão ≤15s (12s): cortar o segundo exemplo (#75→#760, cenas 6–8) e ir do detalhe da galeria (8,0–9,5s) direto para o card CTA (2,5s). Mantém hook, custo 'em geral' e a prova de fidelidade num só ambiente."
+ },
+ "why_converts": "Ataca a dor mais cara e mais frequente de quem terceiriza: o loop de ajuste. A frase do cliente ('pediu cimento queimado') é literal e universal no escritório brasileiro; o custo por versão (R$150–600, sempre 'em geral') dá o contraste sem inventar métrica. A prova de fidelidade (quadros e violão no mesmo lugar) responde à objeção do arquiteto cético. Caminho de ativação mais curto dos quatro conceitos: o Editar aceita imagem enviada (components/edit-v3/EditV3Flow.tsx tem upload), então o arquiteto pode testar 'no seu próprio projeto' sobre um render que ele já tem, sem modelar nada — o cadastro grátis (80 nodes, sem cartão) já paga esse primeiro teste. A assinatura vem quando ele conta quantas rodadas de ajuste faz por mês: Starter (R$89, 750 nodes) custa menos, em geral, que uma imagem terceirizada.",
+ "risks": "O vídeo NÃO pode prometer: que toda edição muda 'só' a área marcada (por isso NÃO usar #798, que removeu o tapete junto com o piso — #760 é o limpo); que edição substitui re-render quando a mudança é de geometria; preço fixo de terceiros (sempre 'em geral'). Não dizer 'sem retoque' nem 'perfeito'. Conferir em resolução cheia, antes de publicar, a junção parede/prateleira em #797 (na miniatura está limpa, ~9% da imagem mudou) e as bordas do tapete em #760. #52 é de 17/06/2026 (vega/2k) e a edição #797 de 03/07; #75 de 04/06 e #760 de 10/06. Confirmar com o dono que o apartamento do sofá amarelo (#52) é projeto dele e não de conta de cortesia (parede-galeria + violão lembram o projeto 'Muda Teste' #720, que exige autorização). Não expor no vídeo prompt, máscara ou tela com dado de usuário.",
+ "production_notes": "#52/#797 são 3040x1408 (2,16:1): recorte 4:5 (1080x1350) com escala 1408→1350 (quase 1:1, nítido), janela do recorte no centro-esquerda (x ≈ 25–60% da largura) com pan lento; o detalhe da galeria (cena 5) é recorte 1:1 sem upscale. #75/#760 são 3328x1280 (2,6:1): recortar ao centro em 16:9 e escalar para 1080x608 — a faixa fica pequena, por isso este exemplo é o segundo e não o hook. Wipes atravessam só a imagem; textos trocam em corte. Cada cena tem no máximo 1 headline + 1 apoio; se a revisão pedir menos texto, cortar o apoio da cena 8. Verde só no sublinhado do CTA. 1080x1920, 30fps, H.264, sem áudio.",
+ "gated": ""
+}

@@ -1,0 +1,197 @@
+{
+ "scores": [
+  {
+   "slug": "alcance-organico/lavabo-conta-o-que-saiu-do-lugar",
+   "score": 9,
+   "rationale": "Par #476/#475 em retrato, alinhado (blend 50/50 limpo), upscale mínimo (912→1080); wipedown lento + overlay de CTA são kit/ffmpeg puro (só a hairline do wipedown precisa de ajuste, o kit desenha régua apenas em wipeleft/right). Dois assets, 9,5s: esforço mínimo."
+  },
+  {
+   "slug": "alcance-organico/um-print-cinco-climas",
+   "score": 7,
+   "rationale": "Cinco climas alinhados com o print (#514/#517 limpo), mas #513 (noturno) está em enquadramento diferente (blend duplica a casa) e exige escala+reposição manual; zoompan contínuo atravessando seis clipes e faixa 4:3 que corta carro/árvore são trabalho fora do kit. Viável, com mais horas."
+  },
+  {
+   "slug": "alcance-organico/print-render-video-piscina",
+   "score": 8,
+   "rationale": "#396/#395 alinhados e o frame 1 do vídeo #169 é o próprio #395 (md5 idêntico ao #170), então o corte still→vídeo fica invisível; vídeo já em retrato 1320×1568. A 'régua com passo atrás' é crop animado por expressão (fora do kit, mas simples em ffmpeg)."
+  },
+  {
+   "slug": "alcance-organico/cozinha-repara-no-lustre",
+   "score": 8,
+   "rationale": "#426/#425 alinhados, crop 4:5 com upscale 1,22×; o split parado + régua subindo sai com um PNG composto e um xfade wipeup nativo (metade inferior já idêntica). Só a hairline vertical e o overlay de CTA são custom leve."
+  },
+  {
+   "slug": "resposta-direta/resposta-nada-sai-do-lugar-drone",
+   "score": 7,
+   "rationale": "Dois pares alinhados (#442/#441 e #444/#443, blends limpos) e cantoneiras são PNG estático via Playwright. O problema é o full-bleed 9:16 de originais 728×872/944×1136: upscale 1,7–2,2× e perda de 33% da largura para caber espreguiçadeiras+escada+vaso — fica macio."
+  },
+  {
+   "slug": "resposta-direta/resposta-preco-cozinha-lustre",
+   "score": 6,
+   "rationale": "Par alinhado, mas full-bleed 9:16 de um 960×1104 (crop 621 px de largura, 1,74×) e ainda zoom 1,5× por cima = magnificação ~2,6× de fonte pequena; vai sair mole no QA. Números na arte (R$89/80 nodes) ainda exigem revalidar a cada mudança de preço."
+  },
+  {
+   "slug": "resposta-direta/resposta-prazo-cinco-climas",
+   "score": 6,
+   "rationale": "Mesmos assets do 'cinco climas' (com o #513 desalinhado a corrigir), mas o layout de duas faixas de alturas diferentes (500 + 810) não existe no kit (o split é simétrico) — composição ffmpeg própria; cortes secos são fáceis. Esforço médio para um resultado parecido com o orgânico."
+  },
+  {
+   "slug": "resposta-direta/resposta-alteracao-so-a-parede",
+   "score": 8,
+   "rationale": "#52/#797 são 3040×1408 idênticos em pixel, o par mais fácil do acervo; janela 792×1408 → 1080×1920 sem perda. Pan e zoom são crop animado (fora do 'cover' central do kit, mas trivial). Único ponto: o cimento queimado é sutil na miniatura — em full-bleed com a parede como assunto, lê."
+  },
+  {
+   "slug": "fidelidade-tecnica/linhas-de-fuga-forro-caixotado",
+   "score": 7,
+   "rationale": "#404/#403 alinham melhor do que a diferença de tamanho sugere (blend limpo); faixa 1080×651 sem upscale. As seis linhas de fuga são SVG estático (Playwright), mas exigem achar o ponto de fuga à mão e QA de blend — trabalho manual com risco de retrabalho se desviar."
+  },
+  {
+   "slug": "fidelidade-tecnica/esquadria-regua-patio",
+   "score": 8,
+   "rationale": "#396/#395 alinhados (blend limpo), banda 4:5 com upscale aceitável; contorno é SVG estático e a régua wipeleft com hairline é nativa do kit. Só o push 1,22× descentrado (vão à esquerda) foge do zoompan centrado/máx 1,08 do kit — expressão custom pequena."
+  },
+  {
+   "slug": "fidelidade-tecnica/pisca-fachada-geminada",
+   "score": 9,
+   "rationale": "#382/#381 alinhados (blend limpo), faixa 16:9 sem upscale (2784 px), sete cortes secos = sequência de stills com transição 'cut' nativa do kit; marcas de registro são um PNG estático. Provavelmente o Reel mais rápido de montar do lote."
+  },
+  {
+   "slug": "fidelidade-tecnica/zoom-cozinha-cada-peca",
+   "score": 8,
+   "rationale": "#426/#425 alinhados, banda 1080×1242 com upscale 1,12×; marcadores circulares são overlay estático. O split empilhado de um recorte parcial (forno+cafeteira) pede PNGs pré-cortados alimentando o modo split do kit (spec-wide) ou uma composição própria — moderado, sem risco."
+  },
+  {
+   "slug": "spaces-coerencia/spaces-casa-piscina-seis-angulos",
+   "score": 7,
+   "rationale": "#92/#91 alinhados e as cinco vistas são 3328×1280 nítidas, mas todas em 2,6:1: a faixa 16:9 corta 38% da largura e cada batida depende de pan lateral (crop animado, o kit só faz zoompan centrado). Sete assets e 16s = o mais trabalhoso dos viáveis."
+  },
+  {
+   "slug": "spaces-coerencia/spaces-quarto-bear-quatro-cameras",
+   "score": 4,
+   "rationale": "O gancho quebra: o print #715 e a vista #714 NÃO são a mesma câmera (blend 50/50 mostra cama, janela e escada duplicadas; o par alternativo #124/#123 também ghosteia). A régua full-bleed em recorte 1440×2560 de um print 2207×857 (upscale 2,2×) mostraria geometria pulando. As vistas 4K em si são ótimas."
+  },
+  {
+   "slug": "spaces-coerencia/spaces-cafe-print-por-angulo",
+   "score": 4,
+   "rationale": "Os dois pares print→vista (#581/#580 e #598/#597) estão desalinhados no blend (mesas e balcão duplicados): a régua contradiz a tese 'a geometria é dele'. Resolução e faixa 16:9 são adequadas, mas 17,5s e cinco assets para um device que não se sustenta."
+  },
+  {
+   "slug": "spaces-coerencia/spaces-atrio-corporativo-anuncio",
+   "score": 5,
+   "rationale": "Produção é fácil (vídeo #42 nativo 9:16, #46 13312 px nítido, cortes secos), mas #589/#585/#587/#54 exigem upscale 1,5× em retrato e tilt custom; e a peça está gated pela origem do modelo (letreiro 'THE…', irmãos com marca d'água de terceiro) — não publica hoje."
+  },
+  {
+   "slug": "animar-video/animar-lareira-fogo-se-move",
+   "score": 8,
+   "rationale": "Par #3/#2 alinhado (blend limpo) e o mais recente do acervo (04/09); vídeo #0 1920×1080 cabe na faixa 4:5 só com downscale, e #1 serve de gabarito para casar render↔frame 1. Corte obrigatório em 4,0s (sofá inventado) já mapeado. Kit cobre quase tudo."
+  },
+  {
+   "slug": "animar-video/animar-casa-concreto-comecou-print",
+   "score": 7,
+   "rationale": "#464/#463 alinhados e frames do #190 confirmam passarela/figura centradas para o crop 9:16; porém o full-bleed é upscale 1,78× de um recorte 608×1080 de vídeo — vai amolecer (o próprio conceito prevê cair para faixa). Fallback deixa a peça segura."
+  },
+  {
+   "slug": "animar-video/animar-fechamento-apresentacao-piscina",
+   "score": 6,
+   "rationale": "Erro de asset: #340 é md5-idêntico a #395/#170, ou seja, é o render do print #396, não do #444 — o blend #444/#340 ghosteia e o wipe 'mesma câmera' não bate (usar #396 corrige). Vídeo #169 em retrato e corte still→vídeo invisível são pontos fortes; footage repetido no hook e no fim."
+  },
+  {
+   "slug": "animar-video/animar-atrio-vertical-tres-vistas",
+   "score": 5,
+   "rationale": "O wipe de abertura #584→#583 está desalinhado (blend com lajes duplicadas), o 0,5× com minterpolate é lento e artefata em folhagem, e a peça herda o gate de direito de uso do átrio. Só o vídeo #42 nativo 9:16 é um asset perfeito."
+  },
+  {
+   "slug": "editar-ferramenta/2026-09-04-reel-editar-so-o-piso",
+   "score": 9,
+   "rationale": "#75/#760 3328×1280 pixel-alinhados, diferença óbvia (concreto→madeira) e prova de detalhe já cortada em checks/c1; banda 16:9, wipeleft com régua nativa, recorte empilhado é um PNG. Montável no reel-spec quase sem código novo."
+  },
+  {
+   "slug": "editar-ferramenta/2026-09-04-reel-editar-parede-quadros-no-lugar",
+   "score": 8,
+   "rationale": "Três derivados de #52 alinhados pixel a pixel, recortes conferidos (c2_galeria/c2_mirror). Ressalva: o cimento queimado e a remoção do espelho são sutis na banda 16:9 inteira — o roteiro compensa com os recortes 4:3, que precisam ser PNGs pré-cortados. 15s cravados."
+  },
+  {
+   "slug": "editar-ferramenta/2026-09-04-reel-editar-tres-acabamentos",
+   "score": 8,
+   "rationale": "Cadeia real de 01/09 (#28→#791→#790→#789) com o mesmo crop, cortes secos batem pixel a pixel; grid 2×2 é um PNG estático. Passo 2 (painel) é sutil em celular, mas o próprio roteiro tem o corte para 'duas versões'. Material mais recente do acervo."
+  },
+  {
+   "slug": "editar-ferramenta/2026-09-04-reel-ampliar-zoom-do-cliente",
+   "score": 8,
+   "rationale": "#178/#177 com coordenadas correspondentes e a prova c4 mostra diferença nítida (cabos do guarda-corpo); tudo é crop+lanczos e uma régua wipeleft nativa. Único cuidado é não aplicar blur e manter o carro pequeno. Simples e honesto."
+  },
+  {
+   "slug": "plugin-sketchup/plugin-de-dentro-do-sketchup",
+   "score": 4,
+   "rationale": "Assets ótimos (#3/#2 alinhados, vídeo #0 recente) e montagem simples, mas a peça é 'não publicar' por três gates (rbz sem assinatura Trimble, smoke da 0.7 pendente, origem de #2/#0 no painel não confirmada). Hoje não sai do disco."
+  },
+  {
+   "slug": "plugin-sketchup/plugin-tres-cenas-um-lote",
+   "score": 3,
+   "rationale": "Três faixas 1080×360 deslizando com wipes independentes e opacidade por faixa é composição ffmpeg própria (o kit não tem multi-banda), o crop 3:1 esmaga as cenas, #28 destoa em paleta e ainda há três gates (assinatura, smoke de lote, confirmar que saíram do lote). Muito esforço para algo que não pode ir ao ar."
+  },
+  {
+   "slug": "plugin-sketchup/plugin-arestas-guiam-o-render",
+   "score": 3,
+   "rationale": "Par #25/#24 alinhado, mas a faixa 2,6:1 vira 415 px de altura no 9:16 e o traço animado (stroke-dashoffset) exige sequência de PNGs por frame — o item de maior custo técnico do lote — para um Reel gated pela assinatura do plugin e pelo smoke."
+  },
+  {
+   "slug": "plugin-sketchup/plugin-luz-por-onde-o-modelo-diz",
+   "score": 4,
+   "rationale": "Pares #15/#14 e #21/#20 alinhados e recentes (03/09), montagem nativa do kit; mas ambos em 2,6:1 (faixa de 415 px, a listra de sol fica minúscula no celular) e a peça está gated (rbz, smoke, confirmar 'Preservar original'). Fácil de montar, impossível de publicar hoje."
+  },
+  {
+   "slug": "tradicional-vs/entre-duas-reunioes",
+   "score": 9,
+   "rationale": "É literalmente o pipeline reel-impacto com o par #426/#425 (alinhado, banda 1080×1242 com upscale 1,12×), wipedown 0,3s e card final do kit. Zero código novo, dois assets, 11s."
+  },
+  {
+   "slug": "tradicional-vs/briefing-fila-ajuste-semana",
+   "score": 9,
+   "rationale": "Cinco imagens da mesma câmera (o 'antes' é o mesmo arquivo, md5 idêntico; blend #428/#429 limpo), retratos exibidos inteiros na banda, cortes secos nativos; #433 tem aspecto igual apesar do tamanho maior. 16s montáveis só com spec."
+  },
+  {
+   "slug": "tradicional-vs/o-cliente-pediu-cimento-queimado",
+   "score": 7,
+   "rationale": "Dois pares pixel-alinhados (#52/#797 e #75/#760), mas o primeiro exige crop 4:5 descentrado com pan (custom) e o segundo cai numa faixa 16:9 de 608 px; o cimento queimado é o efeito mais sutil do acervo e ainda há pendência de autoria do apartamento. Viável, médio esforço."
+  },
+  {
+   "slug": "tradicional-vs/planta-seca-vs-humanizada",
+   "score": 5,
+   "rationale": "#128/#127 alinham perfeitamente (blend limpo) e cortar o carimbo é trivial, mas o Ken Burns 1,18 e o fundo chapado fogem do kit, os rótulos ficam ~13 px em 1080, e a peça está gated pelo direito de uso ('PLANTA PADRÃO FINAL' de incorporadora). Só publica após confirmação."
+  },
+  {
+   "slug": "serie-formato/serie-um-print-cinco-climas-ep01",
+   "score": 8,
+   "rationale": "Versão mais simples do 'cinco climas': imagens 1,6:1 inteiras na faixa, um wipe e cortes secos nativos, sem zoompan contínuo. Resta só o recorte manual do #513 (câmera diferente, blend ghosteia) — o roteiro já dá as coordenadas."
+  },
+  {
+   "slug": "serie-formato/serie-9h-19h-ep01-cafe",
+   "score": 8,
+   "rationale": "#593/#582 são a mesma câmera (blend 50/50 limpo) e ambos 3328×1280, recorte 1:1 conferido em crops; wipe 0,8s + ping-pong por concat são nativos. Só o rótulo trocando no meio da régua precisa de dois overlays em tempo global. Barato e sólido."
+  },
+  {
+   "slug": "serie-formato/serie-adivinhe-o-antes-ep01-lavabo",
+   "score": 8,
+   "rationale": "Mesmo par alinhado #475/#476 em 4:5, wipedown 0,4s nativo e corte seco; a hairline de progresso de 2s é um overlay de linha com x animado por expressão — simples. Sem verde e sem card custom, 11s."
+  },
+  {
+   "slug": "serie-formato/serie-tres-antes-das-14h-ep01-sala-de-jantar",
+   "score": 9,
+   "rationale": "#430 é o mesmo arquivo dos outros 'antes' (blend #430/#429 limpo), três opções da mesma câmera, tudo retrato inteiro na banda, um wipe + cortes secos + recap por concat — 100% dentro do kit. Quatro assets, 11,5s."
+  }
+ ],
+ "top10": [
+  "editar-ferramenta/2026-09-04-reel-editar-so-o-piso",
+  "fidelidade-tecnica/pisca-fachada-geminada",
+  "tradicional-vs/entre-duas-reunioes",
+  "alcance-organico/lavabo-conta-o-que-saiu-do-lugar",
+  "tradicional-vs/briefing-fila-ajuste-semana",
+  "serie-formato/serie-tres-antes-das-14h-ep01-sala-de-jantar",
+  "editar-ferramenta/2026-09-04-reel-ampliar-zoom-do-cliente",
+  "editar-ferramenta/2026-09-04-reel-editar-tres-acabamentos",
+  "serie-formato/serie-9h-19h-ep01-cafe",
+  "fidelidade-tecnica/zoom-cozinha-cada-peca"
+ ],
+ "notes": "Lente: viabilidade de produção hoje. Método: abri miniaturas de todos os 90 idx citados (folhas de contato em scratchpad/judge/g1–g14.jpg), extraí frames dos 4 vídeos (judge/videos.jpg) e fiz blends 50/50 de 30 pares antes/depois (judge/blends1–4.jpg) para checar câmera. Achados que mudam nota: (1) pares DESALINHADOS — #715/#714 e #124/#123 (Quarto Bear), #581/#580 e #598/#597 (Café), #584/#583 (átrio), #514/#513 (noturno, corrigível por crop); (2) erro de asset no 'animar-fechamento': #340 é md5-idêntico a #395/#170 (render do print #396), não do #444 — trocar #444 por #396 resolve; (3) frame 1 do vídeo #169 = #395 confirmado (md5); (4) os 4 conceitos de plugin e 3 de átrio/planta estão gated (rbz sem assinatura Trimble / direito de uso) — montáveis, mas não publicáveis hoje; (5) limites do kit reel-spec: zoompan só centrado (máx 1,08), régua só em wipeleft/right, split simétrico, sem pan — conceitos com pan/tilt, faixas assimétricas, crop animado ou stroke animado exigem ffmpeg/Playwright custom (viável, custa horas); (6) edições #797 (cimento queimado) e #795 (espelho) são sutis em banda inteira — dependem dos recortes de detalhe já previstos."
+}

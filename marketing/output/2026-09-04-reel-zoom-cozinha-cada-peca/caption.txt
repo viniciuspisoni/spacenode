@@ -1,0 +1,59 @@
+=====================================================================
+PUBLICAR — copie SÓ o bloco abaixo (legenda + hashtags).
+Serve para: FEED (Reels) e STORIES do @spacenode.app.
+Peça: 2026-09-04-reel-zoom-cozinha-cada-peca.mp4 (12,00 s, orgânica).
+=====================================================================
+
+O print já tinha forno, cafeteira e torneira. O render manteve cada um onde você colocou.
+
+Cozinha com ilha, print do SketchUp com as guias amarelas ainda no piso. Marcamos quatro pontos no print — forno, cafeteira, torneira, lustre — e seguramos as marcas sobre o render. Cada uma cai em cima da peça.
+
+Depois, modelo e render empilhados no mesmo recorte e no mesmo zoom: forno duplo, cafeteira, coifa e torneira caem na mesma coordenada nas duas metades. Luz, acabamento e reflexo são leitura do render; a posição das peças, não.
+
+É visualização arquitetônica a partir do que você já tem aberto: renderizar o print do SketchUp, sem remodelar nada.
+
+A ilha, os armários e as peças são os seus. A imagem de apresentação sai em minutos.
+
+Comece grátis — link na bio.
+
+#designdeinteriores #sketchup #render #archviz #apresentacaodeprojeto
+
+=====================================================================
+FIM DO QUE SE PUBLICA. Nada abaixo desta linha vai para o Instagram.
+=====================================================================
+
+
+=====================================================================
+[INTERNO — NÃO PUBLICAR] VERSÃO PAGA — Meta (Reels/Stories, som off,
+legenda embutida)
+Serve para: ANÚNCIO (Meta Ads).
+Peça: 2026-09-04-reel-zoom-cozinha-cada-peca-ad.mp4 (10,00 s, CTA aos 8,0 s).
+Regra de claim desta peça: só POSIÇÃO. Nenhuma linha pode afirmar que
+material, acabamento ou geometria das peças foram mantidos (ver QA.md,
+"Ressalvas e gating").
+=====================================================================
+
+A · ângulo FIDELIDADE
+  Texto primário: Forno, cafeteira, torneira: cada peça continua onde você colocou. Render em minutos, sem remodelar.
+  Título (38): seu modelo, iluminado. peças no lugar.
+  Descrição (27): Cadastro grátis, sem cartão
+  Botão: SIGN_UP
+
+B · ângulo PRAZO
+  Texto primário: Cozinha modelada de manhã, imagem de apresentação em minutos. Forno, cafeteira e torneira no lugar.
+  Título (24): Apresente a cozinha hoje
+  Descrição (27): Cadastro grátis, sem cartão
+  Botão: SIGN_UP
+
+C · ângulo APRESENTAÇÃO
+  Texto primário: O cliente vê a cozinha dele. Você vê o seu projeto respeitado — mesma ilha, mesmo lustre, cada peça no lugar.
+  Título (28): Imagem que o cliente entende
+  Descrição (27): Cadastro grátis, sem cartão
+  Botão: LEARN_MORE
+
+Observações de veiculação:
+- Sem URL na arte; destino = spacenode.app (cadastro grátis, sem cartão).
+- Nenhum número além de "80 nodes grátis" (microcopy do card final, valor vigente em lib/plans.ts).
+- Sem oferta ou desconto (a campanha de 50 % encerrou em 31/08), sem moeda antiga, sem plano
+  aposentado, sem citar a extensão de SketchUp. SketchUp aparece só como insumo do arquiteto
+  (#sketchup e o rótulo MODELO).

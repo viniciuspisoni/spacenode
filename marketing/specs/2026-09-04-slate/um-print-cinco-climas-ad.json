@@ -1,0 +1,203 @@
+{
+  "slug": "2026-09-04-reel-um-print-cinco-climas-ad",
+  "band": {
+    "aspect": 1.5
+  },
+  "segments": [
+    {
+      "type": "still",
+      "src": "$ACERVO/assets/0514-render-before.jpg",
+      "dur": 1,
+      "fit": "band",
+      "kenburns": [
+        1,
+        1.0041
+      ],
+      "brightness": -0.58
+    },
+    {
+      "type": "still",
+      "src": "$ACERVO/assets/0517-render-after.jpg",
+      "dur": 1,
+      "fit": "band",
+      "kenburns": [
+        1.0041,
+        1.0082
+      ],
+      "brightness": -0.42
+    },
+    {
+      "type": "still",
+      "src": "$ACERVO/assets/0515-render-after.jpg",
+      "dur": 1,
+      "fit": "band",
+      "kenburns": [
+        1.0082,
+        1.0123
+      ],
+      "brightness": -0.22
+    },
+    {
+      "type": "still",
+      "src": "$ACERVO/assets/0519-render-after.jpg",
+      "dur": 1,
+      "fit": "band",
+      "kenburns": [
+        1.0123,
+        1.0164
+      ],
+      "brightness": -0.36
+    },
+    {
+      "type": "still",
+      "src": "$ACERVO/assets/0507-render-after.jpg",
+      "dur": 1,
+      "fit": "band",
+      "kenburns": [
+        1.0164,
+        1.0205
+      ],
+      "brightness": -0.18
+    },
+    {
+      "type": "still",
+      "src": "$ACERVO/assets/0511-render-after.jpg",
+      "dur": 2.3,
+      "fit": "band",
+      "kenburns": [
+        1.0205,
+        1.03
+      ],
+      "brightness": -0.06
+    },
+    {
+      "type": "card",
+      "card": "final",
+      "dur": 1.2
+    }
+  ],
+  "transitions": [
+    {
+      "type": "cut"
+    },
+    {
+      "type": "cut"
+    },
+    {
+      "type": "cut"
+    },
+    {
+      "type": "cut"
+    },
+    {
+      "type": "cut"
+    },
+    {
+      "type": "cut"
+    }
+  ],
+  "cards": {
+    "scrim": {
+      "layout": "scrim"
+    },
+    "hook": {
+      "layout": "hook-sub",
+      "hook": "um print. {cinco} climas."
+    },
+    "modelo": {
+      "layout": "html",
+      "body": "<div style=\"position:absolute;left:24px;top:1256px\"><span style=\"display:inline-block;padding:8px 16px;border-radius:999px;background:rgba(10,10,10,0.62);border:1px solid rgba(255,255,255,0.22);font-size:20px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:#F5F5F7\">Modelo</span></div>"
+    },
+    "dia": {
+      "layout": "html",
+      "body": "<div style=\"position:absolute;left:24px;top:1256px\"><span style=\"display:inline-block;padding:8px 16px;border-radius:999px;background:rgba(10,10,10,0.62);border:1px solid rgba(255,255,255,0.22);font-size:20px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:#F5F5F7\">Dia</span></div>"
+    },
+    "chuva": {
+      "layout": "html",
+      "body": "<div style=\"position:absolute;left:24px;top:1256px\"><span style=\"display:inline-block;padding:8px 16px;border-radius:999px;background:rgba(10,10,10,0.62);border:1px solid rgba(255,255,255,0.22);font-size:20px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:#F5F5F7\">Chuva</span></div>"
+    },
+    "entardecer": {
+      "layout": "html",
+      "body": "<div style=\"position:absolute;left:24px;top:1256px\"><span style=\"display:inline-block;padding:8px 16px;border-radius:999px;background:rgba(10,10,10,0.62);border:1px solid rgba(255,255,255,0.22);font-size:20px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:#F5F5F7\">Entardecer</span></div>"
+    },
+    "horaazul": {
+      "layout": "html",
+      "body": "<div style=\"position:absolute;left:24px;top:1256px\"><span style=\"display:inline-block;padding:8px 16px;border-radius:999px;background:rgba(10,10,10,0.62);border:1px solid rgba(255,255,255,0.22);font-size:20px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:#F5F5F7\">Hora azul</span></div>"
+    },
+    "noite": {
+      "layout": "html",
+      "body": "<div style=\"position:absolute;left:24px;top:1256px\"><span style=\"display:inline-block;padding:8px 16px;border-radius:999px;background:rgba(10,10,10,0.62);border:1px solid rgba(255,255,255,0.22);font-size:20px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:#F5F5F7\">Noite</span></div>"
+    },
+    "apoio": {
+      "layout": "hook-sub",
+      "sub": "gerado em minutos. sem remodelar."
+    },
+    "final": {
+      "layout": "final",
+      "cta": "Comece grátis"
+    }
+  },
+  "overlays": [
+    {
+      "card": "scrim",
+      "from": 0,
+      "to": 7.266
+    },
+    {
+      "card": "hook",
+      "from": 0,
+      "to": 7.266
+    },
+    {
+      "card": "modelo",
+      "from": 0,
+      "to": 0.966
+    },
+    {
+      "card": "dia",
+      "from": 1,
+      "to": 1.966
+    },
+    {
+      "card": "chuva",
+      "from": 2,
+      "to": 2.966
+    },
+    {
+      "card": "entardecer",
+      "from": 3,
+      "to": 3.966
+    },
+    {
+      "card": "horaazul",
+      "from": 4,
+      "to": 4.966
+    },
+    {
+      "card": "noite",
+      "from": 5,
+      "to": 7.266
+    },
+    {
+      "card": "apoio",
+      "from": 5.3,
+      "to": 7.266
+    }
+  ],
+  "qa": [
+    0.5,
+    0.966,
+    1,
+    1.966,
+    2,
+    2.966,
+    3,
+    3.966,
+    4,
+    4.966,
+    5,
+    7.266,
+    7.3,
+    8.1
+  ]
+}

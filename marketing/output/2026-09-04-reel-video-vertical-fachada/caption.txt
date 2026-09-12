@@ -1,0 +1,41 @@
+=== USO DOS ARQUIVOS (ler antes de publicar) ===
+- FEED (Reel orgânico) e ANÚNCIO: `marketing/output/2026-09-04-reel-video-vertical-fachada-ad/2026-09-04-reel-video-vertical-fachada-ad.mp4` — 6,9 s, com card final "Comece grátis →". O mesmo arquivo serve aos dois usos.
+- STORIES (1 tela, 6 s): `marketing/output/2026-09-04-reel-video-vertical-fachada/2026-09-04-reel-video-vertical-fachada.mp4` — 6,0 s, sem card final. O CTA entra pelo sticker de link "Comece grátis" por cima do story. NÃO publicar este corte como Reel de feed.
+
+--- LEGENDA (Reel de feed orgânico · usa o mp4 da pasta -ad) ---
+
+a imagem vira o take. o projeto continua.
+
+O render da fachada que você já apresenta vira um take curto no Animar: a câmera avança devagar, as pessoas atravessam a praça, o vidro segue aceso. Volumes, esquadrias e pórtico continuam os do projeto.
+
+É o fechamento de apresentação que a imagem parada não dá — um vídeo em 9:16 que vai direto para o story do escritório ou para o último slide da reunião. Visualização arquitetônica gerada em minutos, a partir do render que você já tem.
+
+O cadastro é grátis e vem com 80 nodes, sem cartão.
+
+Comece grátis no link da bio.
+
+#archviz #visualizacaoarquitetonica #renderizacao #animacaoarquitetonica #projetodearquitetura
+
+--- STORIES (1 tela, 6 s · usa o mp4 desta pasta) ---
+Arquivo: marketing/output/2026-09-04-reel-video-vertical-fachada/2026-09-04-reel-video-vertical-fachada.mp4 (6,0 s, sem card final)
+Sticker de link: "Comece grátis" → spacenode.app (o CTA vive no sticker, não na arte).
+Texto opcional por cima (fora da zona do hook e do apoio): nenhum. A tela já traz hook + apoio embutidos.
+
+--- VARIANTE PAGA (Meta · botão SIGN_UP · placement Reels + Stories · som off, legenda embutida na arte) ---
+Veicular só após o dono confirmar permissão do modelo do centro corporativo (#137/#138).
+Arquivo: marketing/output/2026-09-04-reel-video-vertical-fachada-ad/2026-09-04-reel-video-vertical-fachada-ad.mp4 (6,9 s, card final "Comece grátis →")
+
+A · ferramentas
+  Texto primário: O render que você já tem vira um take curto no Animar. Fachada, esquadrias e volumes do projeto. Comece grátis.
+  Título: Do render ao vídeo, no mesmo projeto
+  Descrição: 80 nodes grátis, sem cartão
+
+B · apresentação
+  Texto primário: Feche a apresentação com um take, não com uma imagem parada. Vídeo a partir do render, gerado em minutos.
+  Título: Vídeo para fechar a apresentação
+  Descrição: Cadastro grátis, sem cartão
+
+C · fidelidade
+  Texto primário: A câmera avança devagar e o projeto continua o mesmo: volumes, vidros, pórtico. Vídeo a partir do render. Comece grátis.
+  Título: O take respeita o projeto
+  Descrição: Sem cartão para começar

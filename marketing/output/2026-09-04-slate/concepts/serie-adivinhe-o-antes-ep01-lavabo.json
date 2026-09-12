@@ -1,0 +1,82 @@
+{
+ "slug": "serie-adivinhe-o-antes-ep01-lavabo",
+ "title": "Série «Adivinhe o antes» — Ep. 01: lavabo com jardim de bambu",
+ "pillar": "fidelidade-geometrica",
+ "angle": "MECÂNICA DA SÉRIE (toda sexta): inverte a ordem clássica — o resultado abre o Reel, uma hairline de progresso enche a base da imagem por 2s como contagem regressiva sem números, e só então o print do modelo é revelado em wipe vertical; corte seco de volta ao render para o CTA. A pergunta implícita («de que print saiu isso?») é o gancho, e a revelação honesta do print inteiro é a prova. Assinatura fixa: eyebrow «ADIVINHE O ANTES · EP. NN», resultado em retrato full-bleed, hairline de progresso branca 60% na base da imagem, wipe sempre de cima para baixo, apoio da revelação sempre «Este é o print.», fecho sempre com três «mesma/mesmo» concretos do projeto. Regra editorial da série: o print aparece inteiro, sem recorte que esconda nada, e a legenda declara onde o material foi interpretado. Ep. 01 = lavabo #475 ← #476 (print escuro e chapado com tapetes pretos → banheiro-spa com sanca quente, vapor e jardim iluminado). Próximos episódios com assets reais: Ep. 02 sala de jantar #427 ← #428 (o print é wireframe com cadeiras em malha — o «antes» mais surpreendente do acervo; base da mesa mudou de forma, declarar); Ep. 03 cozinha #425 ← #426 (print escuro, lustre espiral idêntico); Ep. 04 elevação #24 ← #25 (print em hidden-line, panorâmica — usar faixa); evitar #365 ← #366 (réplica reconhecível da Farnsworth) e #720 ← #721 (conta de cortesia, precisa de permissão registrada).",
+ "format": "serie",
+ "duration_s": 11,
+ "hook_text": "Adivinhe o antes.",
+ "hook_visual": "Frame 0: o lavabo em retrato quase full-bleed (#475) — paredes em pedra escura com luz quente de sanca, esquadria preta de piso a teto abrindo para um jardim de bambu com bananeiras e trepadeiras floridas iluminadas por baixo, vapor descendo da ducha, bacia suspensa branca no canto inferior esquerdo, pedras de passo sobre seixos. Push-in lento. Headline «Adivinhe o antes.» sobre scrim no terço superior; uma hairline começa a encher a base da imagem. A intriga (qual print gerou isso?) segura os 3 primeiros segundos sem precisar de corte.",
+ "scenes": [
+  {
+   "t": "0,0–3,0s",
+   "visual": "#475 recortado em 4:5 (912×1140 a partir de y=14; recorte conferido em crops/lavabo475_45.jpg) exibido em 1080×1350 centrado (y≈285–1635). Push-in 1,00→1,05. Eyebrow com hairline + headline sobre scrim de 25% no topo da imagem.",
+   "text_on_screen": "ADIVINHE O ANTES · EP. 01 | Adivinhe o antes.",
+   "asset_idx": [
+    475
+   ]
+  },
+  {
+   "t": "3,0–5,0s",
+   "visual": "Hold no render; hairline de progresso (2px, branco 60%) enche a base da imagem da esquerda para a direita em exatamente 2s — a contagem regressiva da série, sem números. Headline permanece.",
+   "text_on_screen": "Adivinhe o antes.",
+   "asset_idx": [
+    475
+   ]
+  },
+  {
+   "t": "5,0–5,4s",
+   "visual": "xfade wipedown (0,4s, linear) de cima para baixo revelando o print #476 no mesmo recorte e escala (669×856, mesma proporção do render): paredes cinza sem textura, porta de vidro para o jardim com metade escura, dois tapetes pretos no piso, bacia branca chapada. Texto troca em corte, não wipa.",
+   "text_on_screen": "Este é o print.",
+   "asset_idx": [
+    475,
+    476
+   ]
+  },
+  {
+   "t": "5,4–7,0s",
+   "visual": "Hold no print #476, sem movimento, imagem inteira (nada recortado para esconder).",
+   "text_on_screen": "Este é o print.",
+   "asset_idx": [
+    476
+   ]
+  },
+  {
+   "t": "7,0–9,5s",
+   "visual": "Corte seco de volta ao render #475 (o flash escuro→quente é o clímax). Apoio na base sobre scrim gradiente e CTA logo abaixo; «esquadria» pode ficar em branco, o verde fica só em «minutos» se o dono quiser a palavra — por padrão sem verde nesta peça.",
+   "text_on_screen": "Mesma câmera, mesma esquadria, mesma bacia. | Veja no seu próprio projeto",
+   "asset_idx": [
+    475
+   ]
+  },
+  {
+   "t": "9,5–11,0s",
+   "visual": "Card final: fundo #0a0a0a, símbolo + wordmark monocromáticos. Sem URL.",
+   "text_on_screen": "",
+   "asset_idx": []
+  }
+ ],
+ "assets": [
+  475,
+  476
+ ],
+ "cta": "Veja no seu próprio projeto",
+ "caption": "Adivinhe o antes: de que print saiu este lavabo? A resposta está no fim do vídeo.\n\nEp. 01 da série Adivinhe o antes. Toda sexta, um resultado primeiro e o print do modelo depois.\n\nNeste lavabo, câmera, esquadria, bacia suspensa e ducha estão no mesmo lugar do print. O que entrou foi luz de sanca, vapor e o jardim iluminado que já estava desenhado atrás do vidro.\n\nFidelidade tem limite honesto: o piso saiu em madeira e os tapetes viraram pedras sobre seixos. Geometria intacta, material interpretado. É por isso que a série mostra o print inteiro, sem cortar nada.\n\nVeja no seu próprio projeto — link na bio.\n\n#sketchup #archviz #designdeinteriores #projetodearquitetura",
+ "hashtags": [
+  "#sketchup",
+  "#archviz",
+  "#designdeinteriores",
+  "#projetodearquitetura"
+ ],
+ "paid": {
+  "primary": "Adivinhe o print que virou este lavabo. Mesma câmera, mesma esquadria, mesma bacia — gerado em minutos.",
+  "headline": "De que print saiu este lavabo?",
+  "description": "Veja no seu próprio projeto",
+  "button": "LEARN_MORE",
+  "cutdown_note": "Corte orgânico tem 11s (≤15s). Para o anúncio: encurtar a contagem da hairline de 2s para 1s (revelação aos 4s em vez de 5s), manter o corte seco de volta e segurar o render com CTA por 3s. Total ≈ 9,5s. Remover o eyebrow de episódio. Botão LEARN_MORE porque a peça é de curiosidade/consideração; se o objetivo da campanha for cadastro direto, trocar por SIGN_UP sem mudar o vídeo."
+ },
+ "why_converts": "Formato de pergunta com resposta no fim eleva a taxa de conclusão e puxa comentário («era SketchUp?», «e o piso?»), o que dá alcance orgânico barato. O público-alvo do pilar é o cético: mostrar o print inteiro, escuro e chapado, e admitir na legenda onde o material foi interpretado é o que faz esse arquiteto confiar — e confiança é o pré-requisito do cadastro. O CTA «Veja no seu próprio projeto» converte o raciocínio natural do espectador («se funcionou naquele print, funciona no meu») em teste grátis com o próprio modelo. A assinatura vem depois, quando o primeiro resultado no projeto real vira a apresentação de cliente — o pilar de fidelidade é o que reduz churn, porque quem ficou foi por resultado e não por hype.",
+ "production_notes": "Render #475 (912×1168) e print #476 (669×856) têm a mesma proporção (~0,78); recortar os dois em 4:5 pela mesma regra (tirar 14px do topo e 14px da base no render; proporcional no print) e reescalar para 1080×1350 — assim o wipe vertical alinha bacia, esquadria e ducha. Imagem ocupa y≈285–1635; todo texto vai sobre a imagem com scrim em camada própria, respeitando y>220 e y<1600 (headline em y≈430; apoio+CTA em y≈1420–1500). Hairline de progresso desenhada via overlay animado (não drawtext), 2px, branco 60%, na base interna da imagem (y≈1620 já fica na zona da UI — usar y≈1590). xfade wipedown 0,4s linear; corte seco de volta ao render sem fade. Sem verde nesta peça (ou só em «minutos» se o dono quiser a palavra no apoio). Reaproveitar o pipeline de reel-impacto.mjs trocando wipeleft por wipedown. QA em 1,0s / 4,5s / 6,0s / 8,0s: conferir alinhamento da bacia entre print e render.",
+ "risks": "NUNCA dizer «nada mudou»: o piso de porcelanato virou madeira e os dois tapetes pretos viraram lajotas de pedra sobre seixos (reinterpretação de material, não de geometria); o vapor é efeito. O texto em tela se limita a «mesma câmera, mesma esquadria, mesma bacia», que são verificáveis no par. Não prometer «spa real» nem que o resultado não precisa de revisão. Não transformar a pergunta em quiz com opções na arte (texto mínimo). O rótulo do banco diz «Suíte Master», mas a imagem é um lavabo — não usar o rótulo na peça.",
+ "gated": ""
+}

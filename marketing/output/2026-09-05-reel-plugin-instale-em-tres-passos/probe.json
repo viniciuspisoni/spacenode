@@ -1,0 +1,71 @@
+{
+  "slug": "2026-09-05-reel-plugin-instale-em-tres-passos",
+  "reel": "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-05-reel-plugin-instale-em-tres-passos\\2026-09-05-reel-plugin-instale-em-tres-passos.mp4",
+  "banda": "1080×608 @ y=656",
+  "segments": [
+    {
+      "i": 0,
+      "type": "card",
+      "dur": 1.8,
+      "start": 0,
+      "crop": null
+    },
+    {
+      "i": 1,
+      "type": "card",
+      "dur": 1.8,
+      "start": 1.8,
+      "crop": null
+    },
+    {
+      "i": 2,
+      "type": "card",
+      "dur": 1.8,
+      "start": 3.6,
+      "crop": null
+    },
+    {
+      "i": 3,
+      "type": "still",
+      "dur": 1.6,
+      "start": 5.4,
+      "crop": "contain 666×1180 @ y=370"
+    },
+    {
+      "i": 4,
+      "type": "still",
+      "dur": 1.6,
+      "start": 7,
+      "crop": "contain 666×1180 @ y=370"
+    },
+    {
+      "i": 5,
+      "type": "card",
+      "dur": 1,
+      "start": 8.3,
+      "crop": null
+    }
+  ],
+  "width": 1080,
+  "height": 1920,
+  "fps": "30/1",
+  "pix_fmt": "yuv420p",
+  "codec": "h264",
+  "duration": "9.30",
+  "sizeMB": "0.27",
+  "esperado": {
+    "width": 1080,
+    "height": 1920,
+    "fps": "30/1",
+    "duration": "9.30"
+  },
+  "qaFrames": [
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-05-reel-plugin-instale-em-tres-passos\\qa-frames\\t0.90s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-05-reel-plugin-instale-em-tres-passos\\qa-frames\\t2.70s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-05-reel-plugin-instale-em-tres-passos\\qa-frames\\t4.50s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-05-reel-plugin-instale-em-tres-passos\\qa-frames\\t6.20s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-05-reel-plugin-instale-em-tres-passos\\qa-frames\\t7.80s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-05-reel-plugin-instale-em-tres-passos\\qa-frames\\t8.80s.png"
+  ],
+  "qaSheet": "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-05-reel-plugin-instale-em-tres-passos\\qa-sheet.jpg"
+}

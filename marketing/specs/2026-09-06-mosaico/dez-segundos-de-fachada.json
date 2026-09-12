@@ -1,0 +1,76 @@
+{
+ "slug": "2026-09-06-reel-dez-segundos-de-fachada",
+ "accent": false,
+ "band": {
+  "aspect": 1.7777777777777777
+ },
+ "segments": [
+  {
+   "type": "video",
+   "src": "$ACERVO/assets/0133-video-video_out.mp4",
+   "dur": 5.6,
+   "start": 0.4
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0134-video-video_src.jpg",
+   "dur": 1.9,
+   "kenburns": [
+    1,
+    1
+   ],
+   "brightness": -0.12
+  },
+  {
+   "type": "card",
+   "card": "final",
+   "dur": 1
+  }
+ ],
+ "transitions": [
+  {
+   "type": "cut"
+  },
+  {
+   "type": "fade",
+   "dur": 0.3
+  }
+ ],
+ "cards": {
+  "scrim": {
+   "layout": "scrim"
+  },
+  "a": {
+   "layout": "hook-sub",
+   "hook": "dez segundos de fachada.",
+   "eyebrow": "animar · vídeo do render"
+  },
+  "b": {
+   "layout": "hook-sub",
+   "hook": "saiu desta imagem.",
+   "eyebrow": "render",
+   "sub": "Animar: a imagem que você já tem, em movimento."
+  },
+  "final": {
+   "layout": "final",
+   "cta": "Veja no seu próprio projeto"
+  }
+ },
+ "overlays": [
+  {
+   "card": "scrim",
+   "from": 0,
+   "to": 7.2
+  },
+  {
+   "card": "a",
+   "from": 0,
+   "to": 5.6
+  },
+  {
+   "card": "b",
+   "from": 5.6,
+   "to": 7.2
+  }
+ ]
+}

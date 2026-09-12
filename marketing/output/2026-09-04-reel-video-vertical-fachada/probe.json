@@ -1,0 +1,34 @@
+{
+  "slug": "2026-09-04-reel-video-vertical-fachada",
+  "reel": "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-video-vertical-fachada\\2026-09-04-reel-video-vertical-fachada.mp4",
+  "banda": "1080×608 @ y=656",
+  "segments": [
+    {
+      "i": 0,
+      "type": "video",
+      "dur": 6,
+      "start": 0,
+      "crop": "1080×1920 6.0s"
+    }
+  ],
+  "width": 1080,
+  "height": 1920,
+  "fps": "30/1",
+  "pix_fmt": "yuv420p",
+  "codec": "h264",
+  "duration": "6.00",
+  "sizeMB": "9.58",
+  "esperado": {
+    "width": 1080,
+    "height": 1920,
+    "fps": "30/1",
+    "duration": "6.00"
+  },
+  "qaFrames": [
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-video-vertical-fachada\\qa-frames\\t0.20s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-video-vertical-fachada\\qa-frames\\t0.50s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-video-vertical-fachada\\qa-frames\\t3.00s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-video-vertical-fachada\\qa-frames\\t5.90s.png"
+  ],
+  "qaSheet": "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-video-vertical-fachada\\qa-sheet.jpg"
+}

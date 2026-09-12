@@ -1,0 +1,131 @@
+{
+ "slug": "2026-09-05-reel-plugin-cenas-viram-um-space",
+ "accent": false,
+ "segments": [
+  {
+   "type": "still",
+   "src": "$ACERVO/plugin/shots/s5c-lote-concluido.png",
+   "dur": 1.8,
+   "fit": "contain",
+   "inset": 200,
+   "bg": "dark",
+   "kenburns": [
+    1,
+    1
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/plugin/shots/s6-space.png",
+   "dur": 1.8,
+   "fit": "contain",
+   "inset": 200,
+   "bg": "dark",
+   "kenburns": [
+    1,
+    1
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0559-vista-after.png",
+   "dur": 1,
+   "kenburns": [
+    1,
+    1.02
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0561-vista-after.png",
+   "dur": 1,
+   "kenburns": [
+    1,
+    1.02
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0026-render-after.png",
+   "dur": 1,
+   "kenburns": [
+    1,
+    1.02
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0028-render-after.png",
+   "dur": 1.4,
+   "kenburns": [
+    1,
+    1.03
+   ]
+  },
+  {
+   "type": "card",
+   "card": "final",
+   "dur": 1
+  }
+ ],
+ "transitions": [
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "fade",
+   "dur": 0.3
+  }
+ ],
+ "cards": {
+  "a": {
+   "layout": "hook-fixed",
+   "hook": "cenas viram um Space.",
+   "top": 250,
+   "size": 58
+  },
+  "scrim": {
+   "layout": "scrim"
+  },
+  "b": {
+   "layout": "hook-sub",
+   "hook": "mesma identidade em todas as vistas.",
+   "eyebrow": "space",
+   "sub": "um clique cria o Space com a identidade do projeto."
+  },
+  "final": {
+   "layout": "final",
+   "cta": "Teste com um projeto real",
+   "micro": "plugin oficial · grátis · usa os nodes da sua conta"
+  }
+ },
+ "overlays": [
+  {
+   "card": "a",
+   "from": 0,
+   "to": 3.6
+  },
+  {
+   "card": "scrim",
+   "from": 3.6,
+   "to": 8
+  },
+  {
+   "card": "b",
+   "from": 3.6,
+   "to": 8
+  }
+ ]
+}

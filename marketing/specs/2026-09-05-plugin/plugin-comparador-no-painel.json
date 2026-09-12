@@ -1,0 +1,120 @@
+{
+ "slug": "2026-09-05-reel-plugin-comparador-no-painel",
+ "accent": false,
+ "segments": [
+  {
+   "type": "still",
+   "src": "$ACERVO/plugin/shots/s4-resultado.png",
+   "dur": 1.4,
+   "fit": "contain",
+   "inset": 200,
+   "bg": "dark",
+   "kenburns": [
+    1,
+    1
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/plugin/shots/s4c-comparar-28.png",
+   "dur": 1.2,
+   "fit": "contain",
+   "inset": 200,
+   "bg": "dark",
+   "kenburns": [
+    1,
+    1
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/plugin/shots/s4b-comparar.png",
+   "dur": 1.2,
+   "fit": "contain",
+   "inset": 200,
+   "bg": "dark",
+   "kenburns": [
+    1,
+    1
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/plugin/shots/s4d-comparar-72.png",
+   "dur": 1.4,
+   "fit": "contain",
+   "inset": 200,
+   "bg": "dark",
+   "kenburns": [
+    1,
+    1
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/plugin/shots/s4-resultado.png",
+   "dur": 1.2,
+   "fit": "contain",
+   "inset": 200,
+   "bg": "dark",
+   "kenburns": [
+    1,
+    1
+   ]
+  },
+  {
+   "type": "card",
+   "card": "final",
+   "dur": 1
+  }
+ ],
+ "transitions": [
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "fade",
+   "dur": 0.3
+  }
+ ],
+ "cards": {
+  "a": {
+   "layout": "hook-fixed",
+   "hook": "o comparador vem no painel.",
+   "top": 250,
+   "size": 58
+  },
+  "b": {
+   "layout": "hook-fixed",
+   "hook": "antes e depois, sem sair do modelo.",
+   "top": 250,
+   "size": 58
+  },
+  "final": {
+   "layout": "final",
+   "cta": "Veja no seu próprio projeto",
+   "micro": "plugin oficial · grátis · usa os nodes da sua conta"
+  }
+ },
+ "overlays": [
+  {
+   "card": "a",
+   "from": 0,
+   "to": 3.8
+  },
+  {
+   "card": "b",
+   "from": 3.8,
+   "to": 6.4
+  }
+ ]
+}

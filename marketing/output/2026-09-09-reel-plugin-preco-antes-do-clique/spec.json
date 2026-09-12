@@ -1,0 +1,158 @@
+{
+  "slug": "2026-09-09-reel-plugin-preco-antes-do-clique",
+  "accent": false,
+  "band": {
+    "aspect": 1.3333
+  },
+  "segments": [
+    {
+      "type": "still",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-07-reel-plugin-no-sketchup/src/masked/panel-08-presets.png",
+      "dur": 2.4,
+      "fit": "contain",
+      "inset": 200,
+      "bg": "dark",
+      "kenburns": [
+        1,
+        1
+      ]
+    },
+    {
+      "type": "still",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-07-reel-plugin-no-sketchup/src/masked/panel-09-motor.png",
+      "dur": 2.6,
+      "fit": "contain",
+      "inset": 200,
+      "bg": "dark",
+      "kenburns": [
+        1,
+        1
+      ]
+    },
+    {
+      "type": "still",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-07-reel-plugin-no-sketchup/src/masked/crop-09-rodape-preco.png",
+      "dur": 2.6,
+      "fit": "contain",
+      "inset": 200,
+      "bg": "dark",
+      "kenburns": [
+        1,
+        1.04
+      ]
+    },
+    {
+      "type": "video",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-07-reel-plugin-no-sketchup/src/gerando-timelapse-sem-saldo.mp4",
+      "dur": 3,
+      "start": 0,
+      "fit": "cover"
+    },
+    {
+      "type": "still",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-07-reel-plugin-no-sketchup/src/sala-de71-depois.png",
+      "dur": 2.6,
+      "fit": "band",
+      "kenburns": [
+        1,
+        1.05
+      ]
+    },
+    {
+      "type": "card",
+      "card": "final",
+      "dur": 1.2
+    }
+  ],
+  "transitions": [
+    {
+      "type": "cut"
+    },
+    {
+      "type": "cut"
+    },
+    {
+      "type": "cut"
+    },
+    {
+      "type": "fade",
+      "dur": 0.3
+    },
+    {
+      "type": "fade",
+      "dur": 0.3
+    }
+  ],
+  "cards": {
+    "a": {
+      "layout": "hook-fixed",
+      "hook": "ambiente e luz: escolha no painel.",
+      "top": 250,
+      "size": 54
+    },
+    "b": {
+      "layout": "hook-fixed",
+      "hook": "motor: vega, pulsar ou quasar.",
+      "top": 250,
+      "size": 54
+    },
+    "c": {
+      "layout": "hook-fixed",
+      "hook": "o preço aparece antes do clique.",
+      "top": 250,
+      "size": 54
+    },
+    "d": {
+      "layout": "hook-fixed",
+      "hook": "gerar. o render volta no painel.",
+      "top": 250,
+      "size": 54
+    },
+    "scrim": {
+      "layout": "scrim"
+    },
+    "e": {
+      "layout": "hook-sub",
+      "hook": "sem surpresa na conta.",
+      "eyebrow": "render · quasar 2k",
+      "sub": "o custo de cada render, antes de gerar."
+    },
+    "final": {
+      "layout": "final",
+      "cta": "Instale o plugin",
+      "micro": "plugin oficial · grátis · usa os nodes da sua conta"
+    }
+  },
+  "overlays": [
+    {
+      "card": "a",
+      "from": 0,
+      "to": 2.4
+    },
+    {
+      "card": "b",
+      "from": 2.4,
+      "to": 5
+    },
+    {
+      "card": "c",
+      "from": 5,
+      "to": 7.6
+    },
+    {
+      "card": "d",
+      "from": 7.6,
+      "to": 10.3
+    },
+    {
+      "card": "scrim",
+      "from": 10.3,
+      "to": 12.6
+    },
+    {
+      "card": "e",
+      "from": 10.3,
+      "to": 12.6
+    }
+  ]
+}

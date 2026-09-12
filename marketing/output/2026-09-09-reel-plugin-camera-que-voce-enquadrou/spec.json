@@ -1,0 +1,164 @@
+{
+  "slug": "2026-09-09-reel-plugin-camera-que-voce-enquadrou",
+  "accent": false,
+  "band": {
+    "aspect": 1.3333
+  },
+  "segments": [
+    {
+      "type": "still",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-07-reel-plugin-no-sketchup/src/su-43-center.png",
+      "dur": 1.6,
+      "fit": "band",
+      "kenburns": [
+        1,
+        1.03
+      ]
+    },
+    {
+      "type": "still",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-07-reel-plugin-no-sketchup/src/masked/panel-07-fotografia.png",
+      "dur": 3.2,
+      "fit": "contain",
+      "inset": 200,
+      "bg": "dark",
+      "kenburns": [
+        1,
+        1
+      ]
+    },
+    {
+      "type": "still",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-07-reel-plugin-no-sketchup/src/masked/crop-07-guias-espelhos.png",
+      "dur": 2.4,
+      "fit": "contain",
+      "inset": 200,
+      "bg": "dark",
+      "kenburns": [
+        1,
+        1.04
+      ]
+    },
+    {
+      "type": "still",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-07-reel-plugin-no-sketchup/src/masked/panel-01-apos-capturar.png",
+      "dur": 2,
+      "fit": "contain",
+      "inset": 200,
+      "bg": "dark",
+      "kenburns": [
+        1,
+        1
+      ]
+    },
+    {
+      "type": "still",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-07-reel-plugin-no-sketchup/src/sala-de71-depois.png",
+      "dur": 2.6,
+      "fit": "band",
+      "kenburns": [
+        1,
+        1.05
+      ]
+    },
+    {
+      "type": "card",
+      "card": "final",
+      "dur": 1.2
+    }
+  ],
+  "transitions": [
+    {
+      "type": "fade",
+      "dur": 0.25
+    },
+    {
+      "type": "cut"
+    },
+    {
+      "type": "cut"
+    },
+    {
+      "type": "fade",
+      "dur": 0.3
+    },
+    {
+      "type": "fade",
+      "dur": 0.3
+    }
+  ],
+  "cards": {
+    "a": {
+      "layout": "hook-fixed",
+      "hook": "enquadrou no SketchUp?",
+      "top": 250,
+      "size": 58,
+      "eyebrow": "modelo · sketchup",
+      "bottom": 330
+    },
+    "b": {
+      "layout": "hook-fixed",
+      "hook": "proporção, lente, altura do olho.",
+      "top": 250,
+      "size": 54
+    },
+    "c": {
+      "layout": "hook-fixed",
+      "hook": "guias de terços. espelhos e vidros marcados.",
+      "top": 250,
+      "size": 46
+    },
+    "d": {
+      "layout": "hook-fixed",
+      "hook": "a captura já sai com as guias.",
+      "top": 250,
+      "size": 54
+    },
+    "scrim": {
+      "layout": "scrim"
+    },
+    "e": {
+      "layout": "hook-sub",
+      "hook": "a mesma câmera no render.",
+      "eyebrow": "render · quasar 2k",
+      "sub": "a IA preserva o que a captura mostra."
+    },
+    "final": {
+      "layout": "final",
+      "cta": "Instale o plugin",
+      "micro": "plugin oficial · grátis · usa os nodes da sua conta"
+    }
+  },
+  "overlays": [
+    {
+      "card": "a",
+      "from": 0,
+      "to": 1.35
+    },
+    {
+      "card": "b",
+      "from": 1.35,
+      "to": 4.55
+    },
+    {
+      "card": "c",
+      "from": 4.55,
+      "to": 6.95
+    },
+    {
+      "card": "d",
+      "from": 6.95,
+      "to": 8.65
+    },
+    {
+      "card": "scrim",
+      "from": 8.65,
+      "to": 10.95
+    },
+    {
+      "card": "e",
+      "from": 8.65,
+      "to": 10.95
+    }
+  ]
+}

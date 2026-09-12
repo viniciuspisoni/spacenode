@@ -1,0 +1,9 @@
+Cenas viram um Space. Um clique, e todas as vistas com a mesma identidade.
+
+Depois do lote, o plugin cria o Space do projeto: cada cena vira uma vista coerente com as outras — luz, materiais e paleta iguais.
+
+É a coerência entre vistas da SpaceNode, de dentro do SketchUp.
+
+Teste com um projeto real — link na bio.
+
+#sketchup #plugin #render #archviz #visualizacaoarquitetonica

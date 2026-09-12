@@ -1,0 +1,33 @@
+Corte seco entre print e render, sem transição para esconder nada. Se a geometria mexesse, você veria.
+
+Dois volumes gêmeos, elevação frontal. Sete cortes secos entre o print do SketchUp e a imagem gerada, cada vez mais rápidos. As marcas de registro nos cantos dos volumes não saem do lugar.
+
+Vãos, muro, abrigo do carro e escada de acesso na mesma posição. O entorno muda — céu, pinheiros, piso — porque entorno é cena. A casa é projeto.
+
+Fidelidade tem limite honesto: material e vegetação são lidos, não copiados. Por isso renderizar SketchUp aqui começa pela geometria, e o teste que vale é no seu próprio modelo.
+
+Teste com um projeto real — link na bio. 80 nodes grátis, sem cartão.
+
+#archviz #sketchup #renderizacao #projetodearquitetura #arquitetura
+
+---
+
+VERSÃO PAGA (Meta · vídeo de 6s: 2026-09-04-reel-pisca-fachada-geminada-ad.mp4)
+
+A · fidelidade
+Texto primário: Corte seco entre print e render. Se a geometria mexesse, você veria. Teste com um projeto real — sem cartão.
+Título: A casa não se mexe. A luz, sim.
+Descrição: 80 nodes grátis, sem cartão
+Botão: SIGN_UP
+
+B · prazo
+Texto primário: Sobe o print do modelo, a elevação sai em minutos. Mesma câmera, mesmos vãos, mesma escada.
+Título: Elevação renderizada em minutos
+Descrição: Cadastro grátis, sem cartão
+Botão: SIGN_UP
+
+C · apresentação
+Texto primário: Apresente a elevação sem que o cliente veja o projeto mudar: sobe o print, confere a geometria, apresenta.
+Título: Apresente sem perder o projeto
+Descrição: Teste com seu próprio modelo
+Botão: LEARN_MORE

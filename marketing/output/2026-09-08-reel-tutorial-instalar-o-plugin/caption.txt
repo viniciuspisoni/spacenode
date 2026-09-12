@@ -1,0 +1,13 @@
+Como instalar o plugin da SpaceNode no SketchUp — são 3 passos.
+
+1. Baixe o arquivo .rbz na página do plugin.
+2. No SketchUp: Window → Extension Manager → Install Extension.
+3. Abra a barra de ferramentas SPACENODE e clique em Conectar.
+
+Depois é só capturar a vista e gerar: o custo em nodes aparece no botão antes de você clicar, e o render volta para o próprio painel, com a mesma câmera do modelo.
+
+Funciona no SketchUp 2021 ou superior. A extensão é grátis — os renders usam os Nodes da sua conta.
+
+Instale o plugin — link na bio.
+
+#sketchup #plugin #render #archviz #arquitetura #tutorial

@@ -1,0 +1,85 @@
+{
+  "slug": "2026-09-11-dogfood-cozinha-muda",
+  "kind": "organic",
+  "objective": "Primeira peça da tese nova: projeto real de escritório real, com crédito. Dogfood do pipeline com o mínimo de geração paga que ainda exercita o caminho pago inteiro.",
+  "audience": "Arquiteto que usa SketchUp e desconfia que IA vai reinterpretar o projeto dele. Estágio: consciente do problema, cético quanto à solução.",
+  "concept": "O ladrilho hidráulico é a prova. Padrão complexo, repetitivo, e atravessa o render inteiro sem mudar um desenho.",
+  "hook": "Repare no chão.",
+  "cta": "Teste grátis no link da bio",
+  "duration": 12,
+  "takes": 1,
+
+  "format": { "aspect": "9x16", "width": 1080, "height": 1920, "fps": 30 },
+
+  "credits": [
+    { "author": "muda arquitetura", "channel": "organic", "pair": "cozinha-ceramica" }
+  ],
+
+  "shots": [
+    {
+      "id": "s01_modelo",
+      "start": 0,
+      "end": 3,
+      "source": "$REPO/public/proj-cozinha-ceramica-base.jpg",
+      "camera": "Ken Burns, push-in lento de 5% mirando o piso e a bancada. fit: band — o arquivo é 1,896:1 e o enquadramento de quem projetou é preservado.",
+      "model": "reel-kit",
+      "text": "Repare no chão."
+    },
+    {
+      "id": "s02_render",
+      "start": 3,
+      "end": 6.5,
+      "source": "$REPO/public/proj-cozinha-ceramica-render.jpg",
+      "camera": "Mesma câmera, mesmo enquadramento (1,893:1 — 0,2% de diferença da base). Entra pelo wipe com a régua branca. Sem movimento próprio: a imagem precisa poder ser conferida parada.",
+      "model": "reel-kit",
+      "text": "Mesmo desenho. Mesmo ladrilho."
+    },
+    {
+      "id": "s03_vida",
+      "start": 6.5,
+      "end": 9.5,
+      "source": "$REPO/public/proj-cozinha-ceramica-render.jpg",
+      "camera": "Câmera travada, zero movimento. Só a luz da manhã na bancada.",
+      "model": "xai/grok-imagine-video/image-to-video",
+      "generate": {
+        "endpoint": "xai/grok-imagine-video/image-to-video",
+        "seconds": 6,
+        "res": "720p",
+        "takes": 1,
+        "inputs": {
+          "image_url": "@source",
+          "prompt": "Locked-off static camera, absolutely no camera movement. The kitchen remains exactly as it is: the patterned encaustic floor tiles keep their exact geometric pattern with no warping, swimming or drifting, and the cabinet fronts, the white refrigerator with its magnets, the green door and every object on the open shelves stay identical and rigid. Only the morning daylight from the window shifts very slightly warmer across the countertop. No new objects, no people, no zoom, no pan, no orbit.",
+          "resolution": "720p",
+          "duration": 6
+        }
+      },
+      "text": "—"
+    },
+    {
+      "id": "s04_credito",
+      "start": 9.5,
+      "end": 12,
+      "model": "card",
+      "camera": "Card estático, fundo #0A0A0A, logo monocromático. O crédito é o elemento principal, o CTA vem abaixo e menor.",
+      "text": "projeto muda arquitetura\nTeste grátis no link da bio"
+    }
+  ],
+
+  "motion_design": "O wipe com régua branca acontece na fronteira s01→s02 — assinatura visual da fidelidade e única coisa que corta a imagem. O crédito 'muda arquitetura' entra como overlay inferior persistente a partir de s02 e permanece até o fim, além do card final: legenda some no repost, crédito na peça não. Texto em overlay global, nunca dentro do segmento.",
+  "sound_design": "Sem áudio — entra no app do Instagram.",
+
+  "assembly": {
+    "kit": "reel-kit",
+    "spec": "spec.json"
+  },
+
+  "notes": [
+    "TESE NOVA: projeto real de cliente, não imagem genérica. Par vindo de public/proj-cozinha-ceramica-{base,render}.jpg, os mesmos que a landing serve — fonte única, sem duplicar em marketing/.",
+    "CRÉDITO: 'muda arquitetura' é minúsculo de propósito, é a marca deles. Escrever 'Muda Arquitetura' erra o nome do cliente.",
+    "AUTORIZAÇÃO: marketing/AUTORIZACOES.md tem a landing como ✅ e o orgânico como ❓. Esta peça é orgânica — confirmar com muda arquitetura ANTES de publicar. O dogfood (gerar + montar) pode rodar; a PUBLICAÇÃO é que depende do aceite.",
+    "STRESS TEST DELIBERADO: o ladrilho é a prova da peça E é exatamente o que modelo de vídeo costuma derreter (padrão repetitivo = texture swim). Escolhi de propósito o caso mais difícil: por US$ 0,30 a gente descobre onde está o teto. Minha expectativa honesta é que esse take tem chance real de REPROVAR no bloco ARQUITETURA.",
+    "FALLBACK SEM CUSTO: se s03 reprovar, corta-se o shot e estende-se s02 até 9,5s. A peça continua de pé e passa a custar US$ 0,00.",
+    "takes=1 é deliberadamente abaixo da doutrina (2+). O objetivo é validar a máquina, não garantir take aproveitável. O linter vai avisar — o aviso está certo.",
+    "duration=6 é o default do schema do Grok (integer). Chutar 5 economizaria US$ 0,10 e arriscaria um 422, que É cobrado. O shot ocupa 3s e 3s são aparados: seconds é o que se PAGA."
+  ]
+}

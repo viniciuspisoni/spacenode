@@ -1,0 +1,98 @@
+{
+ "slug": "2026-09-05-reel-nove-e-vinte-e-uma",
+ "accent": false,
+ "segments": [
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0469-render-after.jpg",
+   "dur": 2.2,
+   "kenburns": [
+    1,
+    1.04
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0471-render-after.jpg",
+   "dur": 2.2,
+   "kenburns": [
+    1,
+    1.04
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0470-render-before.jpg",
+   "dur": 1.8,
+   "kenburns": [
+    1,
+    1
+   ],
+   "brightness": -0.12
+  },
+  {
+   "type": "card",
+   "card": "final",
+   "dur": 1
+  }
+ ],
+ "transitions": [
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "fade",
+   "dur": 0.3
+  }
+ ],
+ "cards": {
+  "scrim": {
+   "layout": "scrim"
+  },
+  "a": {
+   "layout": "hook-sub",
+   "hook": "mesma sala. 9h.",
+   "eyebrow": "sala de estar"
+  },
+  "b": {
+   "layout": "hook-sub",
+   "hook": "21h.",
+   "eyebrow": "sala de estar"
+  },
+  "c": {
+   "layout": "hook-sub",
+   "hook": "e o modelo.",
+   "eyebrow": "sketchup",
+   "sub": "mesma câmera. duas luzes. minutos."
+  },
+  "final": {
+   "layout": "final",
+   "cta": "Teste com um projeto real"
+  }
+ },
+ "overlays": [
+  {
+   "card": "scrim",
+   "from": 0,
+   "to": 5.9
+  },
+  {
+   "card": "a",
+   "from": 0,
+   "to": 2.2
+  },
+  {
+   "card": "b",
+   "from": 2.2,
+   "to": 4.4
+  },
+  {
+   "card": "c",
+   "from": 4.4,
+   "to": 5.9
+  }
+ ]
+}

@@ -1,0 +1,24 @@
+{
+  "slug": "2026-07-29-reel-impacto-banheiro",
+  "versao": "impacto",
+  "roteiro": "base",
+  "par": "banheiro",
+  "banda": "1080×702 @ y=610",
+  "crop": {
+    "antes": "1343×838 → 1289×838",
+    "depois": "1280×832 → 1280×832"
+  },
+  "width": 1080,
+  "height": 1920,
+  "fps": "30/1",
+  "pix_fmt": "yuv420p",
+  "codec": "h264",
+  "duration": "8.60",
+  "sizeMB": "1.59",
+  "esperado": {
+    "width": 1080,
+    "height": 1920,
+    "fps": "30/1",
+    "duration": "8.60"
+  }
+}

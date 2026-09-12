@@ -1,0 +1,62 @@
+{
+  "slug": "2026-09-04-reel-zoom-cozinha-cada-peca",
+  "reel": "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-zoom-cozinha-cada-peca\\2026-09-04-reel-zoom-cozinha-cada-peca.mp4",
+  "banda": "1080×1048 @ y=436",
+  "segments": [
+    {
+      "i": 0,
+      "type": "still",
+      "dur": 1.2,
+      "start": 0,
+      "crop": "contain 1080×1242 @ y=340"
+    },
+    {
+      "i": 1,
+      "type": "still",
+      "dur": 3.3,
+      "start": 1.2,
+      "crop": "contain 1080×1242 @ y=340"
+    },
+    {
+      "i": 2,
+      "type": "split",
+      "dur": 3.5,
+      "start": 4.5,
+      "crop": "top 400×251 → 400×251 · bottom 528×331 → 528×331"
+    },
+    {
+      "i": 3,
+      "type": "still",
+      "dur": 4,
+      "start": 8,
+      "crop": "contain 1080×1242 @ y=340"
+    }
+  ],
+  "width": 1080,
+  "height": 1920,
+  "fps": "30/1",
+  "pix_fmt": "yuv420p",
+  "codec": "h264",
+  "duration": "12.00",
+  "sizeMB": "1.93",
+  "esperado": {
+    "width": 1080,
+    "height": 1920,
+    "fps": "30/1",
+    "duration": "12.00"
+  },
+  "qaFrames": [
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-zoom-cozinha-cada-peca\\qa-frames\\t0.40s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-zoom-cozinha-cada-peca\\qa-frames\\t0.90s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-zoom-cozinha-cada-peca\\qa-frames\\t1.50s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-zoom-cozinha-cada-peca\\qa-frames\\t3.00s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-zoom-cozinha-cada-peca\\qa-frames\\t4.10s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-zoom-cozinha-cada-peca\\qa-frames\\t4.70s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-zoom-cozinha-cada-peca\\qa-frames\\t6.20s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-zoom-cozinha-cada-peca\\qa-frames\\t7.90s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-zoom-cozinha-cada-peca\\qa-frames\\t8.60s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-zoom-cozinha-cada-peca\\qa-frames\\t9.40s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-zoom-cozinha-cada-peca\\qa-frames\\t10.80s.png"
+  ],
+  "qaSheet": "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-04-reel-zoom-cozinha-cada-peca\\qa-sheet.jpg"
+}

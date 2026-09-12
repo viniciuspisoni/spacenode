@@ -1,0 +1,79 @@
+{
+  "_nota": [
+    "PORTE do reel auditado 2026-09-09-reel-uso-editar (reel-kit) para a gramática do filme",
+    "'antes da primeira imagem.' (cinema-kit). Cenas, ordem e RECORTES são os mesmos — foram",
+    "medidos abrindo os arquivos e reconferidos aqui. O que mudou é a língua visual:",
+    "  1. chapa clara (#FAFAFA) em toda cena de produto, e o texto vira tema claro junto;",
+    "  2. banda em vez de recorte: contain + inset 0, o enquadramento inteiro na tela;",
+    "  3. cartelas 'line', minúsculas com ponto, [terciário] nos apoios, uma só palavra verde",
+    "     na peça inteira — o {80} da cartela final;",
+    "  4. o texto entra e sai em fade de alpha, não em corte seco;",
+    "  5. câmera quase parada, e completamente parada nas cenas que são prova."
+  ],
+  "slug": "2026-09-09-reel-uso-editar-cinema",
+  "frame": { "w": 1080, "h": 1920 },
+
+  "segments": [
+    { "_cena": "estado vazio do Editar. O recorte corta acima da linha 'Saldo: N nodes' (y=112 na fonte 3840×2160) — nenhum saldo entra no quadro.",
+      "type": "still", "src": "$REPO/marketing/output/2026-09-09-tutoriais/src/editar-wide/01-estado-vazio.png",
+      "crop": [1240, 95, 1540, 1000], "dur": 2.6, "fit": "contain", "inset": 0, "reserveBottom": 262, "bg": "light", "zoom": [1, 1.02] },
+
+    { "_cena": "os quatro tipos de mudança: Remover · Material · Inserir · Refinar.",
+      "type": "still", "src": "$REPO/marketing/output/2026-09-09-tutoriais/src/editar-wide/06-ferramenta-laco.png",
+      "crop": [2725, 112, 615, 405], "dur": 2.4, "fit": "contain", "inset": 0, "reserveBottom": 272, "bg": "light", "zoom": [1, 1.02] },
+
+    { "_cena": "o pedido escrito em português, na caixa 'Descreva a mudança'.",
+      "type": "still", "src": "$REPO/marketing/output/2026-09-09-tutoriais/src/editar-wide/06-ferramenta-laco.png",
+      "crop": [2725, 555, 615, 470], "dur": 2.2, "fit": "contain", "inset": 0, "reserveBottom": 386, "bg": "light", "zoom": [1, 1.02] },
+
+    { "_cena": "PROVA: o laço ativo na barra de ferramentas, sobre o render. Câmera parada.",
+      "type": "still", "src": "$REPO/marketing/output/2026-09-09-tutoriais/src/editar-wide/06-ferramenta-laco.png",
+      "crop": [674, 115, 1141, 932], "dur": 2.2, "fit": "contain", "inset": 0, "reserveBottom": 442, "bg": "light", "zoom": [1, 1] },
+
+    { "_cena": "PROVA: o botão e a linha de custo, escala 1:1. É a tela real, não arte.",
+      "type": "still", "src": "$REPO/marketing/output/2026-09-09-tutoriais/src/editar-wide/06-ferramenta-laco.png",
+      "crop": [2725, 1045, 615, 320], "dur": 2.8, "fit": "contain", "nativo": true, "bg": "light", "zoom": [1, 1] },
+
+    { "_cena": "PROVA: o render inteiro em banda 16:9. Câmera parada — o fecho fala de enquadramento preservado, e mover a câmera aqui contradiria a frase.",
+      "type": "still", "src": "$REPO/marketing/output/2026-09-09-tutoriais/src/editar-wide/06-ferramenta-laco.png",
+      "crop": [831, 323, 1850, 1041], "dur": 3.4, "fit": "contain", "inset": 0, "reserveBottom": 168, "bg": "light", "zoom": [1, 1] },
+
+    { "type": "card", "card": "final", "dur": 2.6, "bg": "light" }
+  ],
+
+  "transitions": [
+    { "type": "cut" },
+    { "type": "cut" },
+    { "type": "cut" },
+    { "type": "cut" },
+    { "type": "dissolve", "dur": 0.4 },
+    { "type": "dissolve", "dur": 0.5 }
+  ],
+
+  "cards": {
+    "a": { "layout": "line", "theme": "light", "anchor": "bottom", "eyebrow": "editar",
+           "big": "mudar uma coisa<br>[sem refazer o render.]", "px": 66 },
+    "b": { "layout": "line", "theme": "light", "anchor": "bottom",
+           "big": "escolha o tipo de mudança.", "small": "[remover · material · inserir · refinar.]", "px": 62 },
+    "c": { "layout": "line", "theme": "light", "anchor": "bottom",
+           "big": "descreva a mudança<br>[em português.]", "px": 62 },
+    "d": { "layout": "line", "theme": "light", "anchor": "bottom",
+           "big": "quer precisão?<br>[marque a área com o laço.]", "px": 60 },
+    "e": { "layout": "line", "theme": "light", "anchor": "bottom",
+           "big": "o custo aparece<br>[antes de aplicar.]", "small": "[varia com a qualidade e o tamanho.]", "px": 62 },
+    "f": { "layout": "line", "theme": "light", "anchor": "bottom",
+           "big": "muda o que você pediu,<br>[não o projeto.]",
+           "small": "[câmera, proporções e enquadramento preservados ao máximo.]", "px": 62 },
+    "final": { "layout": "final", "theme": "light", "cta": "Testar grátis", "micro": "{80} nodes grátis · sem cartão · spacenode.app" }
+  },
+
+  "_overlays_nota": "Tempos GLOBAIS do --plan. Cada cartela nasce depois que a imagem se estabeleceu e morre antes do corte, para nenhuma transição atravessar o texto.",
+  "overlays": [
+    { "card": "a", "from": 0.20, "to": 2.45, "fade": 0.40 },
+    { "card": "b", "from": 2.80, "to": 4.85, "fade": 0.40 },
+    { "card": "c", "from": 5.20, "to": 7.05, "fade": 0.40 },
+    { "card": "d", "from": 7.40, "to": 9.25, "fade": 0.40 },
+    { "card": "e", "from": 9.70, "to": 11.75, "fade": 0.40 },
+    { "card": "f", "from": 12.30, "to": 14.60, "fade": 0.45 }
+  ]
+}

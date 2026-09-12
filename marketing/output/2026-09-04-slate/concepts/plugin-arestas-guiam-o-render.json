@@ -1,0 +1,66 @@
+{
+ "slug": "plugin-arestas-guiam-o-render",
+ "title": "As arestas do modelo guiam o render",
+ "pillar": "fidelidade-geometrica",
+ "angle": "Geometria como verdade: a extensão captura cada cena duas vezes — a vista e um mapa de arestas hidden-line da mesma câmera — e o motor recebe a estrutura medida do modelo em vez de inferi-la do pixel. A prova é uma fachada em desnível com três lajes escalonadas, pilares finos e guarda-corpo: cada montante continua onde o modelo diz.",
+ "format": "transformacao",
+ "duration_s": 12,
+ "hook_text": "as arestas do modelo guiam o render.",
+ "hook_visual": "0,0–3,0 s: print #25 do viewport em faixa 2,6:1 (1080×415, y 752–1167) sobre fundo desfocado: casa de três volumes escalonados com lajes brancas finas, muito vidro cinza, pedra cinza no embasamento, painel ripado em madeira laranja, deck e guarda-corpos, sobre gramado verde chapado e céu branco — leitura inconfundível de SketchUp. De 0,4 a 2,6 s, linhas brancas de 1,5 px se desenham progressivamente sobre as arestas principais (bordas das três lajes, pilares, montantes das esquadrias, linha do guarda-corpo, ripado) — o traço 'nasce' da esquerda para a direita. Headline em y 600–680, acima da faixa.",
+ "scenes": [
+  {
+   "t": "0,0–3,0",
+   "visual": "Print #25 na faixa; traço branco fino se desenha sobre lajes, pilares, montantes e guarda-corpo (stroke animado, 2,2 s). Headline entra em 0,6 s.",
+   "text_on_screen": "as arestas do modelo guiam o render.",
+   "asset_idx": [
+    25
+   ]
+  },
+  {
+   "t": "3,0–6,5",
+   "visual": "Wipe vertical de cima para baixo de #25 para #24 na mesma faixa, com o traço branco mantido por cima: lajes brancas com sombra real, vidro refletindo céu azul, pedra com textura, brise de madeira, guarda-corpos amarelos, gramado com relevo. O traço continua batendo nas mesmas bordas; em 5,5 s ele some em fade e sobra o render.",
+   "text_on_screen": "as arestas do modelo guiam o render.",
+   "asset_idx": [
+    25,
+    24
+   ]
+  },
+  {
+   "t": "6,5–9,5",
+   "visual": "Ken Burns 1,0→1,7× no terço esquerdo de #24 (laje em balanço, pilares pretos finos, guarda-corpo amarelo, brise) reenquadrado como faixa 16:9 (1080×608). Em 7,0 s o headline dá lugar ao apoio.",
+   "text_on_screen": "mapa de arestas da mesma câmera, junto com a vista.",
+   "asset_idx": [
+    24
+   ]
+  },
+  {
+   "t": "9,5–12,0",
+   "visual": "Cartão de fechamento #0a0a0a: wordmark monocromático, eyebrow 'geometria como verdade · extensão para SketchUp', CTA com sublinhado #30d158, 'link na bio'.",
+   "text_on_screen": "Veja no seu próprio projeto",
+   "asset_idx": []
+  }
+ ],
+ "assets": [
+  24,
+  25
+ ],
+ "cta": "Veja no seu próprio projeto",
+ "caption": "A extensão captura a cena duas vezes: a vista e um mapa de arestas da mesma câmera. O render segue as linhas do modelo.\n\nRender genérico adivinha a geometria pelo pixel. Aqui o motor recebe a estrutura medida do modelo — lajes, pilares, esquadrias, guarda-corpo — e trabalha em cima dela.\n\nFachada em desnível, três volumes escalonados, muito vidro. No render, cada laje e cada montante continuam onde o modelo diz.\n\nLimite honesto: entorno e materiais são interpretados; a geometria da casa, não.\n\nVeja no seu próprio projeto — link na bio.\n\n#sketchup #archviz #visualizacaoarquitetonica #projetodearquitetura",
+ "hashtags": [
+  "#sketchup",
+  "#archviz",
+  "#visualizacaoarquitetonica",
+  "#projetodearquitetura"
+ ],
+ "paid": {
+  "primary": "O render segue as arestas do seu modelo. A extensão SPACENODE para SketchUp captura a vista e um mapa de arestas da mesma câmera — geometria como dado medido, não como palpite do pixel.",
+  "headline": "Geometria do modelo, preservada",
+  "description": "Mapa de arestas da cena",
+  "button": "LEARN_MORE",
+  "cutdown_note": "Já cabe em 15 s (12 s). Para 8 s: 0–2,5 s print com traço; 2,5–5,5 s wipe com traço; 5,5–8 s CTA. Sem o zoom. Botão LEARN_MORE aponta para /sketchup — o público cético quer ler antes de se cadastrar."
+ },
+ "why_converts": "Fala com o arquiteto técnico e cético — o público mais difícil e o que mais vale, porque quando converte fica. O argumento não é adjetivo, é mecanismo: o motor recebe o mapa de arestas do modelo. O traço branco sobre o antes e sobre o depois é a régua que esse público usa para julgar, e a peça oferece a régua antes de pedir qualquer coisa. Quem se convence pela geometria testa no próprio projeto (CTA), e o teste é grátis e dentro do SketchUp — barreira zero. A conversão para plano vem depois, quando o render passa no crivo dele e vira parte da entrega; o limite honesto na legenda reduz o churn de quem esperava mágica.",
+ "gated": "NÃO PUBLICAR até: (1) .rbz assinado no portal da Trimble e publicado; (2) smoke da v0.7.0 validado (fidelidade máxima é o único modo agora — o edge map nativo exige exatamente isso e sem âncora, que é o caso de um render novo); (3) idealmente o dono exportar do mesmo .skp, na mesma cena, uma captura em estilo Hidden Line (sombras off) para usar como cena 1 no lugar do traço desenhado — prova real em vez de device gráfico.",
+ "production_notes": "Faixa 2,6:1 completa (1080×415) — não cortar em 16:9 na cena de wipe, a casa ocupa a largura inteira. Traço branco 1,5 px, opacidade 85%, desenhado como stroke-dashoffset animado (HTML→PNG via lib/cards.mjs); traçar só bordas principais (≈25 segmentos), não o modelo inteiro. O traço é elemento gráfico permitido pelo BRIEF (linhas de fuga/régua) — não rotular como 'o mapa de arestas do plugin' na arte; o apoio fala do mecanismo, o traço ilustra. Zoom: terço esquerdo de #24 (laje em balanço + pilares + guarda-corpo amarelo) — evitar o terço inferior, onde o render acrescentou muro de contenção/talude que não está no print. Verde só no CTA.",
+ "risks": "O vídeo NÃO pode prometer: fidelidade perfeita/absoluta (o entorno mudou — gramado chapado virou talude com muro de concreto; materiais e céu são interpretação); que o mapa de arestas vale para variação a partir de um resultado (aí o servidor volta ao edge map derivado do pixel); que o traço na tela É o arquivo que o plugin manda. Nunca usar 'régua' para atacar concorrente nominal. Não dar zoom nos reflexos internos do vidro (embaralhados) nem no embasamento frontal. Headline usa 'guiam' — não usar 'garantem'."
+}

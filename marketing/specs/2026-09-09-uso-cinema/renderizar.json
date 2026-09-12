@@ -1,0 +1,73 @@
+{
+  "_nota": "Porte do Reel de uso RENDERIZAR (2026-09-09-uso/renderizar.json) do reel-kit para o cinema-kit. As cenas, a ordem e os recortes são os já auditados; o que muda é a gramática visual: chapa clara #FAFAFA em vez de preto, banda (contain/inset 0) em vez de recorte, texto em tema claro entrando e saindo em fade, câmera quase parada e cartela final do filme. Todos os recortes desta peça são de UI de tema CLARO ou de render claro — por isso nenhum segmento usa bg dark.",
+  "slug": "2026-09-09-reel-uso-renderizar-cinema",
+  "frame": { "w": 1080, "h": 1920 },
+
+  "_geometria": "reserveBottom: 380 em TODOS os segmentos de imagem. Não encolhe nada (a largura é sempre o limite), só trava o centro óptico da imagem em y=770 do primeiro ao último plano e reserva a faixa de baixo (≈1330→1560) só para o texto. Assim a banda nunca se mexe entre cortes e nenhuma cartela cai em cima da interface.",
+
+  "segments": [
+    { "_cena": "1 — a entrada do fluxo: a zona de upload vazia. Recorte auditado, UI de tema claro sobre chapa clara: a borda do card some no #FAFAFA e a interface flutua.",
+      "type": "still", "src": "$REPO/marketing/output/2026-09-09-tutoriais/src/renderizar-wide/02-upload-vazio.png",
+      "crop": [966, 672, 620, 390], "dur": 2.6,
+      "fit": "contain", "inset": 0, "bg": "light", "reserveBottom": 380, "zoom": [1, 1.03] },
+
+    { "_cena": "2 — a taxonomia: ESPAÇO / ILUMINAÇÃO / ENTORNO em lista. É o argumento de 'sem prompt', e o recorte tem que caber inteiro. 940 px de fonte para 1080 de quadro: 1,15× de upscale, ainda lê como software.",
+      "type": "still", "src": "$REPO/marketing/output/2026-09-08-tutoriais/src/renderizar/04-controles-cenario.png",
+      "crop": [30, 690, 940, 728], "dur": 2.8,
+      "fit": "contain", "inset": 0, "bg": "light", "reserveBottom": 380, "zoom": [1, 1.03] },
+
+    { "_cena": "3 — motor e qualidade de saída. O card 2K diz '20 Nodes por imagem' e o 4K diz '40': a cartela só repete o que está na tela.",
+      "type": "still", "src": "$REPO/marketing/output/2026-09-08-tutoriais/src/renderizar/04-controles-cenario.png",
+      "crop": [30, 1925, 940, 455], "dur": 3.2,
+      "fit": "contain", "inset": 0, "bg": "light", "reserveBottom": 380, "zoom": [1, 1.02] },
+
+    { "_cena": "4 — o botão com o preço. Escala 1:1 (nativo, 940×130 dentro de 1080): o pixel tem que ler como software, senão a prova vira arte. Câmera parada pela mesma razão.",
+      "type": "still", "src": "$REPO/marketing/output/2026-09-08-tutoriais/src/renderizar/04-controles-cenario.png",
+      "crop": [30, 2370, 940, 130], "dur": 2.8,
+      "fit": "contain", "nativo": true, "bg": "light", "reserveBottom": 380, "zoom": [1, 1] },
+
+    { "_cena": "5 — ANTES. Recorte só para casar a proporção com o 'depois' (1552×856 = 1,8131, contra os 1,8125 nativos do render): assim os dois caem em 1080×596 @ 0,472 e a banda não pula 6 px no wipe, denunciando o corte. Câmera parada: é prova de geometria.",
+      "type": "still", "src": "$REPO/marketing/renders/antes/casa.jpg",
+      "crop": [7, 0, 1552, 856], "dur": 1.8,
+      "fit": "contain", "inset": 0, "bg": "light", "reserveBottom": 380, "zoom": [1, 1] },
+
+    { "_cena": "6 — DEPOIS. Mesma moldura, mesmo enquadramento, sem recorte (o arquivo já é 16:9 exato). Parada também.",
+      "type": "still", "src": "$REPO/marketing/renders/depois/casa.jpg",
+      "dur": 3.4,
+      "fit": "contain", "inset": 0, "bg": "light", "reserveBottom": 380, "zoom": [1, 1] },
+
+    { "type": "card", "card": "final", "dur": 2.4, "bg": "light" }
+  ],
+
+  "transitions": [
+    { "type": "dissolve", "dur": 0.4 },
+    { "type": "cut" },
+    { "type": "cut" },
+    { "type": "dissolve", "dur": 0.45 },
+    { "type": "wipeleft", "dur": 0.35 },
+    { "type": "dissolve", "dur": 0.5 }
+  ],
+
+  "_cards_nota": "Tudo em tema claro: cada cena desta peça é chapa #FAFAFA, e branco sobre #FAFAFA é invisível. Ancoradas na base, dentro da faixa reservada pelo reserveBottom. A peça tem UMA palavra verde só, e é o 80 da cartela final — o mesmo do filme. O 20 no corpo é preço real da UI, mas verde é acento, não ênfase: dois verdes em 10 s tiram o peso do fecho.",
+  "cards": {
+    "s1": { "layout": "line", "theme": "light", "anchor": "bottom", "big": "você sobe o print<br>do sketchup.", "px": 68 },
+    "s2": { "layout": "line", "theme": "light", "anchor": "bottom", "big": "e não escreve<br>[prompt nenhum.]", "px": 68 },
+    "s3": { "layout": "line", "theme": "light", "anchor": "bottom", "big": "vega em 2k sai por<br>20 nodes.", "small": "[4k, por 40.]", "px": 68 },
+    "s4": { "layout": "line", "theme": "light", "anchor": "bottom", "big": "o preço fica no botão.", "small": "[você lê antes de clicar.]", "px": 66 },
+    "s5": { "layout": "line", "theme": "light", "anchor": "bottom", "eyebrow": "antes", "big": "o modelo que você mandou.", "px": 62 },
+    "s6": { "layout": "line", "theme": "light", "anchor": "bottom", "eyebrow": "depois", "big": "o render que voltou.", "small": "[mesma câmera, mesma geometria.]", "px": 62 },
+    "final": { "layout": "final", "theme": "light", "cta": "Testar grátis", "micro": "{80} nodes grátis · sem cartão · spacenode.app" }
+  },
+
+  "_overlays_nota": "Tempos GLOBAIS, tirados de --plan. Cada cartela entra depois que a imagem se estabeleceu e sai antes da transição, para o texto nunca ser atravessado por um corte.",
+  "overlays": [
+    { "card": "s1", "from": 0.20, "to": 2.25, "fade": 0.4 },
+    { "card": "s2", "from": 2.55, "to": 4.90, "fade": 0.4 },
+    { "card": "s3", "from": 5.25, "to": 8.10, "fade": 0.4 },
+    { "card": "s4", "from": 8.45, "to": 10.55, "fade": 0.4 },
+    { "card": "s5", "from": 10.80, "to": 12.05, "fade": 0.3 },
+    { "card": "s6", "from": 12.45, "to": 14.90, "fade": 0.45 }
+  ],
+
+  "qa": [1.2, 3.6, 6.6, 9.6, 11.4, 13.6, 16.2]
+}

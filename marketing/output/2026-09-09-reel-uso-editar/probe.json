@@ -1,0 +1,79 @@
+{
+  "slug": "2026-09-09-reel-uso-editar",
+  "reel": "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-09-reel-uso-editar\\2026-09-09-reel-uso-editar.mp4",
+  "banda": "1080×608 @ y=656",
+  "segments": [
+    {
+      "i": 0,
+      "type": "still",
+      "dur": 2,
+      "start": 0,
+      "crop": "contain 1080×702 @ y=610"
+    },
+    {
+      "i": 1,
+      "type": "still",
+      "dur": 2.6,
+      "start": 2,
+      "crop": "contain 1080×712 @ y=604"
+    },
+    {
+      "i": 2,
+      "type": "still",
+      "dur": 2.8,
+      "start": 4.6,
+      "crop": "contain 1080×826 @ y=548"
+    },
+    {
+      "i": 3,
+      "type": "still",
+      "dur": 2.4,
+      "start": 7.4,
+      "crop": "contain 1080×882 @ y=520"
+    },
+    {
+      "i": 4,
+      "type": "still",
+      "dur": 3,
+      "start": 9.8,
+      "crop": "contain 1080×562 @ y=680"
+    },
+    {
+      "i": 5,
+      "type": "still",
+      "dur": 2.6,
+      "start": 12.5,
+      "crop": "1850×1041 → 1850×1041"
+    },
+    {
+      "i": 6,
+      "type": "card",
+      "dur": 1.3,
+      "start": 14.8,
+      "crop": null
+    }
+  ],
+  "width": 1080,
+  "height": 1920,
+  "fps": "30/1",
+  "pix_fmt": "yuv420p",
+  "codec": "h264",
+  "duration": "16.10",
+  "sizeMB": "1.72",
+  "esperado": {
+    "width": 1080,
+    "height": 1920,
+    "fps": "30/1",
+    "duration": "16.10"
+  },
+  "qaFrames": [
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-09-reel-uso-editar\\qa-frames\\t1.00s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-09-reel-uso-editar\\qa-frames\\t3.30s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-09-reel-uso-editar\\qa-frames\\t6.00s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-09-reel-uso-editar\\qa-frames\\t8.60s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-09-reel-uso-editar\\qa-frames\\t11.30s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-09-reel-uso-editar\\qa-frames\\t13.80s.png",
+    "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-09-reel-uso-editar\\qa-frames\\t15.45s.png"
+  ],
+  "qaSheet": "C:\\Users\\Pisoni\\spacenode\\marketing\\output\\2026-09-09-reel-uso-editar\\qa-sheet.jpg"
+}

@@ -1,0 +1,90 @@
+{
+  "slug": "2026-09-06-reel-seis-angulos-uma-visita",
+  "accent": false,
+  "segments": [
+    {
+      "type": "grid",
+      "srcs": [
+        "C:/Users/Pisoni/AppData/Local/Temp/claude/C--Users-Pisoni-spacenode/19988837-c924-4b30-b28f-e9e7dc6696fa/scratchpad/assets/0521-render-after.jpg",
+        "C:/Users/Pisoni/AppData/Local/Temp/claude/C--Users-Pisoni-spacenode/19988837-c924-4b30-b28f-e9e7dc6696fa/scratchpad/assets/0523-render-after.jpg",
+        "C:/Users/Pisoni/AppData/Local/Temp/claude/C--Users-Pisoni-spacenode/19988837-c924-4b30-b28f-e9e7dc6696fa/scratchpad/assets/0525-render-after.jpg",
+        "C:/Users/Pisoni/AppData/Local/Temp/claude/C--Users-Pisoni-spacenode/19988837-c924-4b30-b28f-e9e7dc6696fa/scratchpad/assets/0527-render-after.jpg",
+        "C:/Users/Pisoni/AppData/Local/Temp/claude/C--Users-Pisoni-spacenode/19988837-c924-4b30-b28f-e9e7dc6696fa/scratchpad/assets/0529-render-after.jpg",
+        "C:/Users/Pisoni/AppData/Local/Temp/claude/C--Users-Pisoni-spacenode/19988837-c924-4b30-b28f-e9e7dc6696fa/scratchpad/assets/0533-render-after.jpg"
+      ],
+      "dur": 4.4,
+      "cols": 2,
+      "rows": 3,
+      "cellAspect": 1.7777777777777777,
+      "hold": 1.3,
+      "gap": 8,
+      "fill": true,
+      "reserveTop": 300,
+      "zoom": [
+        1,
+        1.03
+      ]
+    },
+    {
+      "type": "still",
+      "src": "C:/Users/Pisoni/AppData/Local/Temp/claude/C--Users-Pisoni-spacenode/19988837-c924-4b30-b28f-e9e7dc6696fa/scratchpad/assets/0521-render-after.jpg",
+      "dur": 2.2,
+      "kenburns": [
+        1,
+        1.06
+      ]
+    },
+    {
+      "type": "card",
+      "card": "final",
+      "dur": 1
+    }
+  ],
+  "transitions": [
+    {
+      "type": "cut"
+    },
+    {
+      "type": "fade",
+      "dur": 0.3
+    }
+  ],
+  "cards": {
+    "a": {
+      "layout": "hook-fixed",
+      "hook": "seis ângulos. uma visita.",
+      "top": 250,
+      "scrim": true
+    },
+    "scrim": {
+      "layout": "scrim"
+    },
+    "b": {
+      "layout": "hook-sub",
+      "hook": "o cliente anda pela casa antes da obra.",
+      "eyebrow": "render",
+      "sub": "mesmo modelo, seis câmeras, minutos."
+    },
+    "final": {
+      "layout": "final",
+      "cta": "Teste com um projeto real"
+    }
+  },
+  "overlays": [
+    {
+      "card": "a",
+      "from": 0,
+      "to": 4.4
+    },
+    {
+      "card": "scrim",
+      "from": 4.4,
+      "to": 6.3
+    },
+    {
+      "card": "b",
+      "from": 4.4,
+      "to": 6.3
+    }
+  ]
+}

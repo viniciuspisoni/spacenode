@@ -1,0 +1,265 @@
+{
+  "slug": "2026-09-09-reel-uso-ampliar",
+  "band": {
+    "aspect": 1.7778
+  },
+  "segments": [
+    {
+      "type": "still",
+      "src": "C:/Users/Pisoni/spacenode/marketing/renders/depois/casa.jpg",
+      "dur": 1.9,
+      "fit": "band",
+      "kenburns": [
+        1,
+        1.03
+      ]
+    },
+    {
+      "type": "still",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-08-tutoriais/src/ampliar/01-entrada-vazia.png",
+      "crop": [
+        185,
+        265,
+        830,
+        545
+      ],
+      "dur": 1.7,
+      "fit": "contain",
+      "bg": "dark",
+      "kenburns": [
+        1,
+        1
+      ]
+    },
+    {
+      "type": "still",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-08-tutoriais/src/ampliar/02-imagem-carregada.png",
+      "crop": [
+        185,
+        265,
+        830,
+        545
+      ],
+      "dur": 1.9,
+      "fit": "contain",
+      "bg": "dark",
+      "kenburns": [
+        1,
+        1.03
+      ]
+    },
+    {
+      "type": "still",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-08-tutoriais/src/ampliar/03-recomendacao.png",
+      "crop": [
+        185,
+        875,
+        830,
+        175
+      ],
+      "dur": 2,
+      "fit": "contain",
+      "bg": "dark",
+      "kenburns": [
+        1,
+        1.02
+      ]
+    },
+    {
+      "type": "still",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-08-tutoriais/src/ampliar/04-modo-alta-fidelidade.png",
+      "crop": [
+        185,
+        1060,
+        830,
+        395
+      ],
+      "dur": 2.4,
+      "fit": "contain",
+      "bg": "dark",
+      "kenburns": [
+        1,
+        1.03
+      ]
+    },
+    {
+      "type": "still",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-08-tutoriais/src/ampliar/04-modo-alta-fidelidade.png",
+      "crop": [
+        185,
+        1750,
+        830,
+        245
+      ],
+      "dur": 2.1,
+      "fit": "contain",
+      "bg": "dark",
+      "kenburns": [
+        1,
+        1.02
+      ]
+    },
+    {
+      "type": "still",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-08-tutoriais/src/ampliar/02-imagem-carregada.png",
+      "crop": [
+        190,
+        2596,
+        500,
+        74
+      ],
+      "dur": 1.7,
+      "fit": "contain",
+      "bg": "dark",
+      "kenburns": [
+        1,
+        1.02
+      ]
+    },
+    {
+      "type": "still",
+      "src": "C:/Users/Pisoni/spacenode/marketing/output/2026-09-08-tutoriais/src/ampliar/02-imagem-carregada.png",
+      "crop": [
+        185,
+        2662,
+        830,
+        138
+      ],
+      "dur": 1.2,
+      "fit": "contain",
+      "bg": "dark",
+      "kenburns": [
+        1,
+        1.02
+      ]
+    },
+    {
+      "type": "card",
+      "card": "final",
+      "dur": 1.3
+    }
+  ],
+  "transitions": [
+    {
+      "type": "fade",
+      "dur": 0.3
+    },
+    {
+      "type": "wipeleft",
+      "dur": 0.4,
+      "ruler": true
+    },
+    {
+      "type": "cut"
+    },
+    {
+      "type": "cut"
+    },
+    {
+      "type": "cut"
+    },
+    {
+      "type": "cut"
+    },
+    {
+      "type": "cut"
+    },
+    {
+      "type": "fade",
+      "dur": 0.3
+    }
+  ],
+  "cards": {
+    "scrim": {
+      "layout": "scrim"
+    },
+    "a": {
+      "layout": "hook-sub",
+      "eyebrow": "Ampliar",
+      "hook": "esse render já foi aprovado.",
+      "sub": "gerar de novo devolve outra imagem."
+    },
+    "b": {
+      "layout": "hook-fixed",
+      "hook": "aqui você só sobe o arquivo. [png, jpg ou webp]",
+      "top": 290,
+      "size": 50
+    },
+    "c": {
+      "layout": "hook-fixed",
+      "hook": "ele lê a resolução do arquivo.",
+      "top": 290,
+      "size": 54
+    },
+    "d": {
+      "layout": "hook-fixed",
+      "hook": "e {recomenda} o modo pra essa imagem.",
+      "top": 290,
+      "size": 50
+    },
+    "e": {
+      "layout": "hook-fixed",
+      "hook": "alta fidelidade preserva geometria, materiais e luz.",
+      "top": 290,
+      "size": 50
+    },
+    "f": {
+      "layout": "hook-fixed",
+      "hook": "2×, 4× ou 8× do original.",
+      "top": 290,
+      "size": 54
+    },
+    "g": {
+      "layout": "hook-fixed",
+      "hook": "o custo aparece antes do clique.",
+      "top": 290,
+      "size": 52
+    },
+    "final": {
+      "layout": "final",
+      "cta": "Teste com um render seu"
+    }
+  },
+  "overlays": [
+    {
+      "card": "scrim",
+      "from": 0,
+      "to": 1.6
+    },
+    {
+      "card": "a",
+      "from": 0,
+      "to": 1.6
+    },
+    {
+      "card": "b",
+      "from": 1.6,
+      "to": 2.9
+    },
+    {
+      "card": "c",
+      "from": 2.9,
+      "to": 4.8
+    },
+    {
+      "card": "d",
+      "from": 4.8,
+      "to": 6.8
+    },
+    {
+      "card": "e",
+      "from": 6.8,
+      "to": 9.2
+    },
+    {
+      "card": "f",
+      "from": 9.2,
+      "to": 11.3
+    },
+    {
+      "card": "g",
+      "from": 11.3,
+      "to": 13
+    }
+  ]
+}

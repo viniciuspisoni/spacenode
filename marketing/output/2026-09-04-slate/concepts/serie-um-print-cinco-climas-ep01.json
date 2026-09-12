@@ -1,0 +1,103 @@
+{
+ "slug": "serie-um-print-cinco-climas-ep01",
+ "title": "Série «Um print, cinco climas» — Ep. 01: casa de concreto e ripado",
+ "pillar": "antes-e-depois",
+ "angle": "MECÂNICA DA SÉRIE (toda terça, mesmo horário): um único print do SketchUp abre o Reel por 1,2s e depois passa por cinco climas em cortes secos no beat, sempre na MESMA ordem (dia → entardecer → chuva → sol → noite) e sempre fechando na noite, que é o frame mais escuro e mais legível para o CTA em branco. Assinatura fixa: eyebrow «UM PRINT, CINCO CLIMAS · EP. NN», faixa 1,6:1 sobre fundo #0a0a0a, rótulo de uma palavra no canto inferior esquerdo da faixa (dia/entardecer/chuva/sol/noite), wipe só na primeira revelação e cortes secos no resto. O hábito vem da previsibilidade: o público aprende que na terça tem um projeto novo passando pelos cinco climas. Ep. 01 = fachada concreto + ripado, todos os cinco renders vêm do MESMO arquivo de print (#514 = #516 = #518 = #520 = #522, hash idêntico conferido). Próximos episódios com assets reais: Ep. 02 casa na encosta #207 → #206 dia / #208 golden / #212 chuva / #214 noite; Ep. 03 sobrado #506 → #507 anoitecer / #505 blue hour / #509 noturno / #511 noite fechada (todos crepusculares, menos contraste entre si); Ep. 04 pavilhão #368 → #367 hora azul / #371 golden / #373 contraluz / #377 manhã (2,6:1, exige faixa mais baixa); Ep. 05 Casa Lake View #604 → #603 tempestade / #605 noite / #578 golden.",
+ "format": "serie",
+ "duration_s": 9.8,
+ "hook_text": "Um print. Cinco climas.",
+ "hook_visual": "Frame 0: o print cru do SketchUp (#514) — casa de dois pavimentos com pilar central de concreto, ripado de madeira, cortinas brancas atrás do vidro, carro preto na rua, duas árvores de biblioteca — numa faixa 1,6:1 sobre fundo escuro, com a headline em branco acima da faixa. Aos 1,2s a régua atravessa a imagem da esquerda para a direita e a casa vira dia ensolarado (#517); aos 2,8s corte seco para o entardecer rosado (#519). Três imagens diferentes dentro dos 3 primeiros segundos — o scroll para porque a casa não sai do lugar e a luz muda.",
+ "scenes": [
+  {
+   "t": "0,0–1,2s",
+   "visual": "Print SketchUp #514 em faixa 1,6:1 (1080×675, centrada em y≈622–1297) sobre fundo do próprio print desfocado (blur 40px) e escurecido 55%. Sem movimento. Eyebrow uppercase com hairline acima da headline.",
+   "text_on_screen": "UM PRINT, CINCO CLIMAS · EP. 01 | Um print. Cinco climas.",
+   "asset_idx": [
+    514
+   ]
+  },
+  {
+   "t": "1,2–1,5s",
+   "visual": "xfade wipeleft (0,3s, linear) do print para o render diurno #517 — céu azul, sombras duras, três pessoas na calçada, carro preto no mesmo ponto. O texto NÃO wipa, fica parado.",
+   "text_on_screen": "Um print. Cinco climas. | rótulo: dia",
+   "asset_idx": [
+    514,
+    517
+   ]
+  },
+  {
+   "t": "1,5–2,8s",
+   "visual": "Hold no diurno #517, zoompan mínimo (1,00→1,03).",
+   "text_on_screen": "Um print. Cinco climas. | rótulo: dia",
+   "asset_idx": [
+    517
+   ]
+  },
+  {
+   "t": "2,8–3,9s",
+   "visual": "Corte seco para o entardecer #519 — céu rosa-alaranjado, madeira quente, interior aceso atrás das cortinas, sombras longas. Headline sai em corte; entra o apoio.",
+   "text_on_screen": "Mesma câmera. Mesmo modelo. | rótulo: entardecer",
+   "asset_idx": [
+    519
+   ]
+  },
+  {
+   "t": "3,9–5,0s",
+   "visual": "Corte seco para a chuva #515 — céu de tempestade, riscos de chuva, asfalto espelhado com reflexo do carro, madeira escurecida.",
+   "text_on_screen": "Mesma câmera. Mesmo modelo. | rótulo: chuva",
+   "asset_idx": [
+    515
+   ]
+  },
+  {
+   "t": "5,0–6,1s",
+   "visual": "Corte seco para o sol rasante #521 — sol entrando pela direita com raios volumétricos e flare, árvore da direita em contraluz.",
+   "text_on_screen": "Mesma câmera. Mesmo modelo. | rótulo: sol",
+   "asset_idx": [
+    521
+   ]
+  },
+  {
+   "t": "6,1–8,3s",
+   "visual": "Corte seco para o noturno #513 (recortado para 1,6:1 e reescalado para que o pilar central e a laje batam com os outros quatro) — céu azul-marinho, fita de LED sob o beiral, luz quente vazando pelas cortinas, jardim baixo iluminado, sem pessoas. Hold 2,2s. CTA entra aos 6,6s com scrim sutil na base da faixa. A única palavra em #30d158 é «minutos».",
+   "text_on_screen": "Gerado em minutos. | Teste com um projeto real | rótulo: noite",
+   "asset_idx": [
+    513
+   ]
+  },
+  {
+   "t": "8,3–9,8s",
+   "visual": "Card final: fundo #0a0a0a, símbolo ConstellationN + wordmark monocromáticos centrados. Sem URL.",
+   "text_on_screen": "",
+   "asset_idx": []
+  }
+ ],
+ "assets": [
+  514,
+  517,
+  519,
+  515,
+  521,
+  513
+ ],
+ "cta": "Teste com um projeto real",
+ "caption": "Um print do SketchUp. Cinco climas. Mesma casa de dia, no entardecer, na chuva, no sol e à noite.\n\nEp. 01 da série Um print, cinco climas. O modelo é o mesmo, a câmera é a mesma: o que muda é a luz que o cliente vai ver na apresentação.\n\nNo fluxo tradicional, cada clima é uma cena nova para configurar e renderizar de novo. Aqui o print entrou uma vez e saiu em cinco versões, gerado em minutos.\n\nToda terça um projeto novo passa pelos cinco climas. Se quiser ver o seu, o cadastro é grátis e não pede cartão.\n\nTeste com um projeto real — link na bio.\n\n#archviz #sketchup #renderizacao #arquitetura #visualizacaoarquitetonica",
+ "hashtags": [
+  "#archviz",
+  "#sketchup",
+  "#renderizacao",
+  "#arquitetura",
+  "#visualizacaoarquitetonica"
+ ],
+ "paid": {
+  "primary": "Um print do SketchUp, cinco climas da mesma casa. Mesma câmera, mesma geometria, gerado em minutos.",
+  "headline": "Cinco climas do mesmo print",
+  "description": "Cadastro grátis, sem cartão",
+  "button": "SIGN_UP",
+  "cutdown_note": "O corte orgânico já tem 9,8s (≤15s). Para o anúncio: remover o eyebrow «EP. 01» (contexto de série não ajuda em público frio), estender o hold da noite de 2,2s para 3,2s com o CTA visível desde o primeiro frame dela, manter o card final. Total 10,8s. Os 3 primeiros segundos ficam idênticos ao orgânico (print → wipe → entardecer), pois é o trecho que segura a retenção; legenda embutida = os próprios textos em tela, sem áudio."
+ },
+ "why_converts": "Topo do funil: o print cru na abertura é o sinal de honestidade que o arquiteto cético procura (ele reconhece o SketchUp na hora) e os cortes de clima criam ritmo sem trilha. A série gera retorno semanal (hábito) e, no orgânico, uma audiência de retargeting barata para a versão paga. O passo seguinte é o cadastro grátis sem cartão para «testar com um projeto real», que é exatamente o que o Reel acabou de mostrar. A conversão para assinatura vem da própria mecânica: reproduzir o episódio no próprio projeto são cinco gerações Vega 2K (5 × 20 = 100 nodes), e a cota grátis vigente (80 nodes) cobre quatro — quem completa o quinto clima já está no Starter. Nada disso precisa ser dito na peça: o formato ensina o uso repetido, e uso repetido é assinatura.",
+ "production_notes": "Reaproveitar marketing/scripts/reel-impacto.mjs como base e criar reel-serie.mjs aceitando N «depois» (array) com um único wipe na primeira revelação e concat com cortes secos depois; manter setsar=1 em todos os ramos e o escurecimento de fundo diferente para print (−55%) e renders (−35%). Recortes: #517/#519/#515/#521 são 1312×816 (1,6:1) — usar inteiros; #514 (1342×833) recortar para 1,6:1 centrado; #513 é 1200×896 com a casa menor no quadro — recortar ~1120×700 a partir de (40,60) e conferir nos frames de QA que o pilar central e a linha da laje batem com #517 (alinhar pela casa, não pelas bordas). Faixa 1080×675 centrada verticalmente; headline em Geist 600 acima da faixa (y≈470, dentro da zona segura), apoio+CTA abaixo da faixa (y≈1380–1450, acima dos 320px da base). Rótulos de clima: Geist 500, 26px, uppercase, tracking 0,2em, branco 70%, inset 32px no canto inferior esquerdo da faixa. Verde #30d158 apenas na palavra «minutos». 1080×1920, 30fps, H.264 crf 18, yuv420p, sem áudio. QA: extrair frames em 0,5s / 2,0s / 4,5s / 7,0s e conferir alinhamento do pilar e legibilidade dos rótulos.",
+ "risks": "O vídeo NÃO pode prometer que «só o clima muda»: #517 e #521 acrescentam pessoas e flare, #513 veio com enquadramento diferente e sem pessoas, plantas e cortinas variam entre versões — o texto fala em «mesma câmera, mesmo modelo», nunca em «nada mais mudou». Não citar tempo além de «gerado em minutos». Não sugerir botão ou preset de clima (o campo de ambiente foi preenchido pelo usuário com Noturno/Chuva/etc., mas não vamos descrever a interface). Os rótulos dia/sol/entardecer são leitura da imagem, não metadado. Antes de publicar, confirmar com o dono a autoria do modelo .skp (não há marca d'água visível em #514, ao contrário do lote corporativo #564/#566).",
+ "gated": ""
+}

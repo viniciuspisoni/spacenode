@@ -1,0 +1,84 @@
+{
+ "slug": "serie-9h-19h-ep01-cafe",
+ "title": "Série «9h / 19h» — Ep. 01: o mesmo café de manhã e ao anoitecer",
+ "pillar": "demonstracao-de-ferramentas",
+ "angle": "MECÂNICA DA SÉRIE (toda quinta às 19h, publicada na hora em que o frame noturno «acontece»): um ambiente, duas horas do dia, câmera travada. O Reel abre no frame da manhã com o rótulo da hora no canto superior esquerdo, uma hairline vertical atravessa a imagem e a mesma vista aparece à noite; depois um ping-pong de dois cortes secos (manhã/noite) prova que nada saiu do lugar. Assinatura fixa: recorte 1:1 centrado (1080×1080), rótulo de hora em Geist 500 no canto da imagem, eyebrow «9h / 19h · EP. NN», wipe único de 0,8s, ping-pong de 0,6s+0,6s, CTA sempre sobre o frame noturno. O que se demonstra é a vista de iluminação do Spaces: a vista aprovada vira a versão noturna sem refazer a cena. Ep. 01 = café corporativo (#593 manhã com sol rasante nas persianas → #582 blue hour com a cidade acesa), o par mais literal do acervo porque as pessoas, as xícaras e as cadeiras estão nas mesmas posições. Próximos episódios com assets reais: Ep. 02 Casa Concret #683 nascer do sol → #684 noite com o living aceso (recorte 4:5 1050×1312 a partir de x=800 já conferido — o frame mais dramático do acervo, rotular «7h / 19h»); Ep. 03 casas geminadas #381 dia → #350 entardecer (vista de iluminação do mestre #345); Ep. 04 lobby corporativo #499 dia → #501 golden hour; Ep. 05 sala terracota #471 dia → #469 fim de tarde (são duas gerações do mesmo print, o piso muda de pedra para madeira — rotular como «duas gerações» e não como relight).",
+ "format": "serie",
+ "duration_s": 10.5,
+ "hook_text": "O mesmo café às 9h e às 19h.",
+ "hook_visual": "Frame 0: recorte quadrado do café (#593) — persianas de madeira da esquerda ao centro com sol baixo desenhando listras douradas no piso de concreto, duas mulheres conversando na mesa redonda preta em primeiro plano, cadeiras de couro caramelo, sancas de luz quente no forro, balcão de madeira ao fundo. Rótulo «9h» no canto superior esquerdo e a headline sobre um scrim leve. Aos 2,5s uma hairline branca atravessa a imagem e as persianas ficam azuis com a cidade acesa atrás (#582): mesmas pessoas, mesmas xícaras, luz oposta. O evento acontece dentro dos 3 primeiros segundos.",
+ "scenes": [
+  {
+   "t": "0,0–2,5s",
+   "visual": "#593 recortado em 1:1 (1280×1280 a partir de x=250, y=0) exibido em 1080×1080 centrado (y≈420–1500). Push-in lento 1,00→1,04. Rótulo de hora no canto superior esquerdo da imagem; eyebrow com hairline acima da headline, ambos sobre scrim de 25% no topo da imagem.",
+   "text_on_screen": "9h / 19h · EP. 01 | O mesmo café às 9h e às 19h. | rótulo: 9h",
+   "asset_idx": [
+    593
+   ]
+  },
+  {
+   "t": "2,5–3,3s",
+   "visual": "xfade wipeleft de 0,8s (linear) para #582 no MESMO recorte 1:1 — a borda anda como uma hairline vertical; as persianas passam de dourado para azul, as sancas parecem mais quentes, o skyline acende. Texto não wipa; o rótulo troca em corte no meio da régua.",
+   "text_on_screen": "O mesmo café às 9h e às 19h. | rótulo: 19h",
+   "asset_idx": [
+    593,
+    582
+   ]
+  },
+  {
+   "t": "3,3–6,0s",
+   "visual": "Hold no noturno #582 sem movimento. Headline sai; entra o apoio na base da imagem sobre scrim gradiente.",
+   "text_on_screen": "Mesmas mesas, mesmas pessoas, mesma câmera. | rótulo: 19h",
+   "asset_idx": [
+    582
+   ]
+  },
+  {
+   "t": "6,0–7,2s",
+   "visual": "Ping-pong: corte seco para #593 (0,6s) e corte seco de volta para #582 (0,6s), rótulo acompanhando (9h → 19h). O apoio permanece fixo — só a luz pisca de manhã para noite.",
+   "text_on_screen": "Mesmas mesas, mesmas pessoas, mesma câmera. | rótulos: 9h → 19h",
+   "asset_idx": [
+    593,
+    582
+   ]
+  },
+  {
+   "t": "7,2–9,0s",
+   "visual": "Hold no noturno #582. Apoio troca para o fecho com a palavra «minutos» em #30d158 e o CTA entra abaixo.",
+   "text_on_screen": "Gerado em minutos. | Renderize seu projeto | rótulo: 19h",
+   "asset_idx": [
+    582
+   ]
+  },
+  {
+   "t": "9,0–10,5s",
+   "visual": "Card final: fundo #0a0a0a, símbolo + wordmark monocromáticos. Sem URL.",
+   "text_on_screen": "",
+   "asset_idx": []
+  }
+ ],
+ "assets": [
+  593,
+  582
+ ],
+ "cta": "Renderize seu projeto",
+ "caption": "O mesmo café às 9h e às 19h. Mesmas mesas, mesmas pessoas, mesma câmera. O que muda é a luz.\n\nEp. 01 da série 9h / 19h. O cliente sempre pergunta como o espaço fica à noite. A resposta costumava ser: outra cena, outro render, outro prazo.\n\nNo Spaces, a vista aprovada vira a referência e a versão noturna sai com a mesma geometria e a mesma linguagem de materiais — gerado em minutos.\n\nToda quinta às 19h, um projeto em dois horários. Vale para fachada, living, loja.\n\nRenderize seu projeto — link na bio.\n\n#archviz #designdeinteriores #apresentacaodeprojeto #renderizacao #arquitetura",
+ "hashtags": [
+  "#archviz",
+  "#designdeinteriores",
+  "#apresentacaodeprojeto",
+  "#renderizacao",
+  "#arquitetura"
+ ],
+ "paid": {
+  "primary": "O mesmo café às 9h e às 19h. A vista aprovada vira a versão noturna sem refazer a cena.",
+  "headline": "Mesma vista, 9h e 19h",
+  "description": "Gerado em minutos",
+  "button": "SIGN_UP",
+  "cutdown_note": "Corte orgânico tem 10,5s (≤15s). Para o anúncio: manter os 3,3s iniciais idênticos (manhã → régua → noite), cortar o ping-pong (6,0–7,2s) para que o apoio e o CTA entrem já aos 4,5s, segurar o noturno com CTA por 3s e fechar no card. Total ≈ 9s. Remover o eyebrow de episódio; rótulos 9h/19h ficam porque são a legenda embutida da ideia."
+ },
+ "why_converts": "A pergunta «como fica à noite?» é uma dor semanal real de quem apresenta projeto, e o Reel responde com prova em vez de promessa: as mesmas pessoas nas mesmas cadeiras eliminam a suspeita de «é outra imagem». A publicação sempre às 19h de quinta cria o compromisso de retorno e um público quente para o retargeting. O caminho de conversão é direto: quem tem uma vista aprovada quer ver a própria versão noturna → cadastro grátis → primeira vista de iluminação no Spaces com o próprio projeto. A assinatura vem porque a vista de iluminação é uma variação por vista aprovada, e cada projeto tem várias vistas: o uso do Spaces é naturalmente recorrente (uma vista nova por ângulo e por hora), o que consome a cota grátis rápido e leva ao Starter sem argumento de venda na peça.",
+ "production_notes": "Recorte conferido em crop real (crops/cafe593_sq.jpg e cafe582_sq.jpg): 1280×1280 a partir de x=250, y=0 nas duas imagens (originais 3328×1280, mesma câmera) — mantém persianas, as duas mulheres, a mesa em primeiro plano e o balcão ao fundo; rostos e mãos passaram na inspeção em 800px. Compor a 1080×1080 no centro do 9:16 (y≈420–1500), fundo #0a0a0a puro (não usar imagem desfocada aqui: o quadrado grande já preenche). Texto sobre a própria imagem com scrim em camada separada (topo 25% para eyebrow+headline; base gradiente para apoio+CTA), nunca fora das zonas seguras (nada acima de y=220 nem abaixo de y=1600). Rótulos 9h/19h em Geist 500, 30px, canto superior esquerdo com inset 40px. xfade linear de 0,8s; ping-pong via concat de dois trechos de 0,6s com setsar=1. Verde apenas em «minutos». QA em 1,0s / 2,9s / 6,3s / 8,0s: conferir que a régua atravessa a imagem e não o texto, e que o rótulo troca no meio da régua.",
+ "risks": "NÃO dizer «pixel a pixel» nem «a foto continua a mesma»: há diferenças pequenas entre os dois frames (a cesta da mesa muda de pães para laranjas, xícaras e talheres variam, o balcão ao fundo muda de detalhe). O texto fica em «mesmas mesas, mesmas pessoas, mesma câmera». Os horários 9h/19h são leitura da luz (sol baixo de manhã / blue hour), não metadado — se o dono preferir rigor absoluto, trocar por «manhã / anoitecer». Não prometer que toda vista de iluminação sai perfeita nem que o Spaces «nunca» altera nada; não citar «grátis ilimitado». Pessoas são geradas: evitar zoom além do recorte 1:1 conferido.",
+ "gated": ""
+}

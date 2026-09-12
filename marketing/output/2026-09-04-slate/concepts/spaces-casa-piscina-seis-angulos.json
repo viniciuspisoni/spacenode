@@ -1,0 +1,98 @@
+{
+ "slug": "spaces-casa-piscina-seis-angulos",
+ "title": "Casa de piscina: seis ângulos, os mesmos materiais",
+ "pillar": "coerencia-entre-angulos",
+ "angle": "Passeio do exterior para o interior por seis câmeras do mesmo pavilhão de piscina (Space CASA PISCINA, 30/05). Cada vista foi gerada a partir do print do SketchUp daquele ângulo, com o DNA da Vista Mestre (#91): laje escura em balanço, travertino, bar de madeira com prateleiras retroiluminadas, banquetas verdes, cadeiras de corda, palmeiras. O argumento é o sistema, não a imagem isolada: seis imagens que leem como um único projeto.",
+ "format": "serie",
+ "duration_s": 16,
+ "hook_text": "Seis ângulos. Os mesmos materiais.",
+ "hook_visual": "Faixa 16:9 (1080×608) centrada sobre fundo desfocado escuro. Entra o print do SketchUp #92 (bar em travertino com banquetas verdes, mesa redonda de concreto, vidro do living à direita, laje escura) e uma régua vertical linear (xfade wipeleft, 2,2s) revela #91 na mesma câmera: travertino, madeira, pendentes pretos acesos, banquetas verdes, mesa com cadeiras de corda, sofá e palmeiras atrás do vidro. Hook 70px acima da faixa; troca em corte, nunca wipado.",
+ "scenes": [
+  {
+   "t": "0.0–3.0",
+   "visual": "Faixa 16:9: print #92 → régua linear → render #91 (mesma câmera do bar/jantar da varanda coberta). Fundo desfocado com escurecimento diferente por lado (print cinza médio vs render escuro).",
+   "text_on_screen": "Seis ângulos. Os mesmos materiais.",
+   "asset_idx": [
+    92,
+    91
+   ]
+  },
+  {
+   "t": "3.0–5.2",
+   "visual": "#656 elevação frontal completa do pavilhão: laje escura em balanço, adega/bar à esquerda, mesa de jantar ao centro, sofá branco com fire bowl à direita, palmeiras altas, piso de pedra clara. Janela 16:9 percorre a panorâmica da esquerda para a direita (pan lento, ~30% da largura).",
+   "text_on_screen": "eyebrow: VISTA 02 · 06 (ponto verde funcional)",
+   "asset_idx": [
+    656
+   ]
+  },
+  {
+   "t": "5.2–7.4",
+   "visual": "#650 vista frontal pelo vidro: cortinas sheer, mesa de jantar de pedra com cadeiras de corda à esquerda, sofá modular branco com fire bowl à direita, bananeiras nas laterais, interior aceso ao fundo. Pan da direita para a esquerda.",
+   "text_on_screen": "eyebrow: VISTA 03 · 06 · apoio abaixo da faixa: Cada vista a partir do seu print.",
+   "asset_idx": [
+    650
+   ]
+  },
+  {
+   "t": "7.4–9.6",
+   "visual": "#652 bar visto pelo canto do pavilhão: porta de madeira, bar com prateleiras retroiluminadas, três banquetas verdes, estrelícia em vaso, mesa de jantar contra o living envidraçado, lanterna preta no piso. Push-in leve (3%) centrado no bar.",
+   "text_on_screen": "eyebrow: VISTA 04 · 06",
+   "asset_idx": [
+    652
+   ]
+  },
+  {
+   "t": "9.6–11.8",
+   "visual": "#658 piscina de pastilha verde com duas chaises brancas na prainha, deck de madeira à esquerda, muro de travertino intercalado com painéis verdes, guarda-sol e daybed, bananeiras, céu rosado de fim de tarde. Pan da esquerda para a direita.",
+   "text_on_screen": "eyebrow: VISTA 05 · 06",
+   "asset_idx": [
+    658
+   ]
+  },
+  {
+   "t": "11.8–14.0",
+   "visual": "#660 piscina vista do deck lateral: quatro espreguiçadeiras cinza sobre deck de madeira, chaises brancas ao fundo, muro de travertino, pavilhão com bar à direita, palmeiras. Pan da direita para a esquerda terminando no pavilhão (fecha o circuito).",
+   "text_on_screen": "eyebrow: VISTA 06 · 06",
+   "asset_idx": [
+    660
+   ]
+  },
+  {
+   "t": "14.0–16.0",
+   "visual": "#660 congelado e escurecido (scrim). Card final: wordmark SPACENODE monocromático + CTA com sublinhado verde funcional. Sem URL.",
+   "text_on_screen": "Renderize seu projeto",
+   "asset_idx": [
+    660
+   ]
+  }
+ ],
+ "assets": [
+  92,
+  91,
+  656,
+  650,
+  652,
+  658,
+  660
+ ],
+ "cta": "Renderize seu projeto",
+ "caption": "Seis ângulos da mesma casa de piscina. Travertino, madeira e vidro não mudam de vista para vista.\n\nCada ângulo nasceu de um print do SketchUp daquele ponto de vista. A Vista Mestre define materiais, luz e atmosfera; as vistas seguintes seguem essa referência em vez de recomeçar do zero.\n\nÉ o que o cliente precisa ler: o pavilhão, o bar, a piscina e o deck como um único projeto, não como seis imagens de origens diferentes.\n\nGeradas em minutos, sobre o seu próprio modelo.\n\nRenderize seu projeto — link na bio.\n\n#archviz #visualizacaoarquitetonica #sketchup #projetodearquitetura #renderizacao",
+ "hashtags": [
+  "#archviz",
+  "#visualizacaoarquitetonica",
+  "#sketchup",
+  "#projetodearquitetura",
+  "#renderizacao"
+ ],
+ "paid": {
+  "primary": "Seis ângulos da mesma casa de piscina, cada um a partir do seu print do SketchUp. Mesmos materiais, um só projeto.",
+  "headline": "Várias vistas, um só projeto",
+  "description": "Cadastro grátis, sem cartão",
+  "button": "SIGN_UP",
+  "cutdown_note": "Versão ≤15s: manter o hook (#92→#91, 3,0s) e só quatro vistas (#656, #652, #658, #660 a 2,0s cada, pans mais curtos) + card CTA 2,5s = 13,5s. Texto embutido na zona segura (220px topo / 320px base), som off, mesma legenda embutida como apoio."
+ },
+ "why_converts": "Topo: a régua print→render é o device da marca e para o scroll em 3s; depois cada batida de 2,2s entrega informação nova (outro ângulo), o que sustenta retenção até o CTA. Meio: a mensagem não vende uma imagem, vende o sistema — um ambiente apresentado precisa de 5–7 vistas coerentes, e isso é exatamente o que separa um teste avulso de um uso recorrente. Funil: cadastro grátis sem cartão (80 nodes) dá Vista Mestre + 2–3 vistas em Vega 2K; o momento de valor (a segunda vista batendo com a primeira) acontece dentro do grant e o limite chega logo depois, empurrando para o Starter. No pago, SIGN_UP direto; 'print do SketchUp' no texto primário filtra público fora do ofício.",
+ "production_notes": "Originais em scratchpad/assets/ (0092-render-before.jpg 2048×795; 0091-render-after.jpg e vistas 3328×1280). Layout do reel-impacto/lib/reel-cards.mjs: faixa 1080 de largura limitada a 16:9 (as fontes são 2,6:1), hook 70px acima e apoio 60px abaixo, bandGeometry() valida a zona segura. Pans: janela 1280×720 do original deslizando sobre a panorâmica (zoompan alimentado em 2×, downsample lanczos, setsar=1 antes do concat). Régua = xfade wipeleft linear entre #92 e #91 recortados no mesmo aspecto; texto troca em corte. Cards HTML→PNG via Playwright headless (dSF 2), Geist, ≤2 pesos; verde só no ponto do eyebrow e no sublinhado do CTA. PNG de card com -loop 1 -framerate 30 -t <dur>. Export 1080×1920 30fps H.264 crf 18 yuv420p sem áudio; conferir com ffprobe e extrair frames de QA. Não usar #654 (duplica a câmera de #91) nem #648 (luz de anoitecer destoa do resto do passeio).",
+ "risks": "NÃO prometer: 'idêntico em todas as vistas' ou 'sem nenhuma diferença' (há deriva de material: piso escuro→pedra clara e teto liso→ripado em #650; #654 e #91 quase duplicados); 'todas as vistas em minutos' (o claim aprovado é por imagem: 'gerado em minutos'); 'coerência perfeita' — falar em coerência entre vistas como direção do produto; não sugerir que a plataforma cria os ângulos sozinha (cada ângulo veio de um print do próprio modelo). Não citar preço, nodes ou quantidade de imagens grátis na arte/legenda. Não redesenhar as imagens para caber no 9:16 — só recorte/pan.",
+ "gated": ""
+}

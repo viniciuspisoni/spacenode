@@ -1,0 +1,119 @@
+{
+ "slug": "2026-09-06-reel-uma-imagem-quatro-opcoes",
+ "accent": false,
+ "segments": [
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0266-render-before.jpg",
+   "dur": 1.6,
+   "kenburns": [
+    1,
+    1
+   ],
+   "brightness": -0.1
+  },
+  {
+   "type": "grid",
+   "srcs": [
+    "$ACERVO/assets/0265-render-after.jpg",
+    "$ACERVO/assets/0267-render-after.jpg",
+    "$ACERVO/assets/0269-render-after.jpg",
+    "$ACERVO/assets/0263-render-after.jpg"
+   ],
+   "dur": 3.4,
+   "cols": 2,
+   "rows": 2,
+   "cellAspect": 1.3333333333333333,
+   "hold": 1.4,
+   "gap": 8,
+   "fill": true,
+   "reserveTop": 300,
+   "zoom": [
+    1,
+    1.03
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0267-render-after.jpg",
+   "dur": 1.8,
+   "kenburns": [
+    1,
+    1.05
+   ]
+  },
+  {
+   "type": "card",
+   "card": "final",
+   "dur": 1
+  }
+ ],
+ "transitions": [
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "fade",
+   "dur": 0.3
+  }
+ ],
+ "cards": {
+  "scrim": {
+   "layout": "scrim"
+  },
+  "a": {
+   "layout": "hook-sub",
+   "hook": "uma imagem base.",
+   "eyebrow": "imagem base"
+  },
+  "b": {
+   "layout": "hook-fixed",
+   "hook": "quatro opções pra reunião.",
+   "top": 250,
+   "scrim": true
+  },
+  "scrim2": {
+   "layout": "scrim"
+  },
+  "c": {
+   "layout": "hook-sub",
+   "hook": "quatro opções pra reunião.",
+   "eyebrow": "render",
+   "sub": "o cliente escolhe. você não refaz nada."
+  },
+  "final": {
+   "layout": "final",
+   "cta": "Comece agora"
+  }
+ },
+ "overlays": [
+  {
+   "card": "scrim",
+   "from": 0,
+   "to": 1.6
+  },
+  {
+   "card": "a",
+   "from": 0,
+   "to": 1.6
+  },
+  {
+   "card": "b",
+   "from": 1.6,
+   "to": 5
+  },
+  {
+   "card": "scrim2",
+   "from": 5,
+   "to": 6.8
+  },
+  {
+   "card": "c",
+   "from": 5,
+   "to": 6.8
+  }
+ ]
+}

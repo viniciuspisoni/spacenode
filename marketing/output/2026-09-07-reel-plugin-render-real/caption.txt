@@ -1,0 +1,9 @@
+Um clique dentro do SketchUp e o render chega no painel. Sem exportar, sem trocar de programa.
+
+A geração é real: captura a vista, manda o modelo, e em poucos minutos o antes/depois aparece no próprio painel — mesma câmera, mesmo modelo. Proporção, lente, altura do olho e verticais retas viram parte do resultado.
+
+Plugin oficial para SketchUp 2021 ou superior, grátis: os renders usam os Nodes da sua conta. Extensão (.rbz) no site.
+
+Instale o plugin — link na bio.
+
+#sketchup #plugin #render #archviz #arquitetura #renderizacao

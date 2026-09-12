@@ -1,0 +1,40 @@
+Três espreguiçadeiras, uma escada e uma planta. No render, no mesmo lugar onde você colocou no modelo.
+
+O print é uma vista de drone do SketchUp, ainda cru. O render sai com a mesma câmera, o mesmo deck e as três peças na mesma posição — o que muda é material, luz e vegetação.
+
+Depois, a mesma casa vista do chão: concreto aparente, ripado, piscina. Mesmo modelo, mesma geometria, gerado em minutos.
+
+É visualização arquitetônica a partir do que você já modelou: dá para renderizar o SketchUp direto do print que já está na sua tela. O cadastro é grátis e vem com 80 nodes, sem cartão — dá para testar com um projeto seu.
+
+Comece grátis no link da bio.
+
+#archviz #sketchup #visualizacaoarquitetonica #renderizacao #projetodearquitetura
+
+
+========================================
+VERSÃO PAGA
+========================================
+
+Criativos:
+  6 s    → 2026-09-04-reel-drone-nada-sai-do-lugar-ad.mp4  (Stories / Reels curtos)
+  11,5 s → 2026-09-04-reel-drone-nada-sai-do-lugar.mp4     (Feed / Reels — já cabe no teto de 15 s)
+
+Botão nas três variações: SIGN_UP
+
+--- A · fidelidade ---
+Texto primário: Suba o print do SketchUp. O render sai com as peças onde você modelou — e o cadastro vem com 80 nodes, sem cartão. Mesma câmera, mesmo deck, mesma piscina.
+Título: Render fiel ao seu modelo
+Descrição: 80 nodes grátis, sem cartão
+Botão: SIGN_UP
+
+--- B · prazo ---
+Texto primário: Apresentação amanhã? Suba o print e o render sai em minutos, com a geometria no lugar. Cadastro grátis, sem cartão.
+Título: Do print à imagem, em minutos
+Descrição: Cadastro grátis, sem cartão
+Botão: SIGN_UP
+
+--- C · apresentação ---
+Texto primário: Vista de drone e vista do chão do mesmo modelo, prontas para a reunião de amanhã. Piscina, deck e escada onde você desenhou.
+Título: Duas vistas, o mesmo projeto
+Descrição: 80 nodes grátis, sem cartão
+Botão: SIGN_UP

@@ -1,0 +1,76 @@
+{
+ "slug": "plugin-de-dentro-do-sketchup",
+ "title": "Isto saiu de dentro do SketchUp",
+ "pillar": "novidades",
+ "angle": "Anúncio da extensão oficial da SPACENODE para SketchUp: a vista capturada no viewport vira render e take de vídeo sem exportar imagem e sem sair do modelo. O gancho é o fogo em movimento do take (asset mais recente, 04/09) — o espectador vê o vídeo antes de saber que o ponto de partida era um print de SketchUp.",
+ "format": "video_anuncio",
+ "duration_s": 15,
+ "hook_text": "isto saiu de dentro do SketchUp.",
+ "hook_visual": "0,0–3,0 s: take do Animar #0 (veo3.1, 6 s, 1920×1080) tocando do 0 ao 3 s — painel de marcenaria bege com TV preta desligada ao centro, porta cinza-escuro à esquerda, bancada de mármore preto-esverdeado com lareira linear acesa (chamas baixas tremulando), pilha de dois livros à esquerda da chama, nichos de madeira escura na borda esquerda. Recorte 4:5 do centro do vídeo (864×1080 → 1080×1350) posicionado em y 285–1635 sobre fundo desfocado do próprio frame: a TV fica no terço superior e a chama em y≈1400, fora da zona de 320 px da base. A câmera do take faz um dolly-out lento — o movimento é o scroll-stop; o texto entra em 0,4 s no espaço acima do recorte (y 230–280).",
+ "scenes": [
+  {
+   "t": "0,0–3,0",
+   "visual": "Take #0 (segmento 0–3,0 s) em recorte 4:5 central sobre fundo desfocado; chama em movimento, dolly-out suave. Fade-in do texto em 0,4 s.",
+   "text_on_screen": "isto saiu de dentro do SketchUp.",
+   "asset_idx": [
+    0
+   ]
+  },
+  {
+   "t": "3,0–5,5",
+   "visual": "Corte seco para o print do viewport #3 (SketchUp shaded com texturas: painel bege chapado, TV preta, chama de biblioteca na lareira, bancada verde-escuro lisa, nichos escuros à esquerda) em faixa 16:9 (crop 2333×1312 do centro → 1080×608, y 656–1264) sobre fundo desfocado do próprio print. Headline permanece.",
+   "text_on_screen": "isto saiu de dentro do SketchUp.",
+   "asset_idx": [
+    3
+   ]
+  },
+  {
+   "t": "5,5–9,0",
+   "visual": "Wipe da esquerda para a direita, na mesma faixa, do print #3 para o render #2 (mármore com veios, chama real, grão da madeira, luz de ambiente) — divisor de 2 px branco. Em 7,5 s o headline dá lugar ao apoio, no mesmo slot.",
+   "text_on_screen": "geometria, sol e lente do modelo vão junto.",
+   "asset_idx": [
+    3,
+    2
+   ]
+  },
+  {
+   "t": "9,0–12,0",
+   "visual": "Corte para o take #0 de novo (segmento 0–3,0 s, recorte 4:5 idêntico ao da abertura): o render que acabou de aparecer está em movimento. Sem texto novo; apoio sai em fade aos 9,5 s.",
+   "text_on_screen": "",
+   "asset_idx": [
+    0
+   ]
+  },
+  {
+   "t": "12,0–15,0",
+   "visual": "Cartão de fechamento #0a0a0a: wordmark SPACENODE monocromático, eyebrow 'extensão oficial para SketchUp' (uppercase, tracking largo, hairline), CTA grande com sublinhado em #30d158 (único verde da peça), linha pequena 'link na bio'.",
+   "text_on_screen": "Comece grátis",
+   "asset_idx": []
+  }
+ ],
+ "assets": [
+  0,
+  1,
+  2,
+  3
+ ],
+ "cta": "Comece grátis",
+ "caption": "Isto saiu de dentro do SketchUp: vista capturada, render e take de vídeo, sem exportar imagem e sem sair do modelo.\n\nA extensão oficial da SPACENODE para SketchUp captura a vista atual e manda junto o que só quem está dentro do modelo tem: a geometria em mapa de arestas, a lente da câmera e — preservando a luz do projeto — a posição do sol.\n\nO render volta em minutos com o mesmo motor de fidelidade do app. Do mesmo painel: trocar material apontando a área sobre o render, ampliar e gerar um take curto do resultado, salvo ao lado do .skp.\n\nA extensão é grátis; os renders usam os Nodes da sua conta. SketchUp 2021 ou superior.\n\nComece grátis — link na bio.\n\n#sketchup #archviz #renderizacao #visualizacaoarquitetonica",
+ "hashtags": [
+  "#sketchup",
+  "#archviz",
+  "#renderizacao",
+  "#visualizacaoarquitetonica"
+ ],
+ "paid": {
+  "primary": "Renderize de dentro do SketchUp. A extensão oficial da SPACENODE captura a vista, manda geometria, sol e lente do modelo e devolve o render em minutos — com take de vídeo no mesmo painel. Grátis; os renders usam os Nodes da conta.",
+  "headline": "Extensão SPACENODE para SketchUp",
+  "description": "Grátis. Renders usam Nodes.",
+  "button": "SIGN_UP",
+  "cutdown_note": "Já cabe em 15 s. Versão de 10 s para placement de Stories/Reels curto: 0–3 s take #0 com headline; 3–7 s wipe #3→#2 com apoio; 7–10 s cartão CTA. Legenda embutida obrigatória (som off). Manter o recorte 4:5 do vídeo e a faixa 16:9 das stills — nenhum asset é retrato."
+ },
+ "why_converts": "Topo do funil com o público certo: quem modela em SketchUp se reconhece no print do viewport em 3 s e vê a novidade sem precisar de explicação. A promessa é operacional (não sair do modelo), não de qualidade abstrata. O cadastro é grátis e sem cartão, e a extensão também é grátis — a barreira de entrada é zero e o primeiro uso acontece dentro da ferramenta que o arquiteto já tem aberta todo dia, o que cria hábito. Cada render consome Nodes da conta: quem testa no próprio modelo esgota o saldo inicial em poucos renders e a próxima decisão natural é o plano Starter. O take de vídeo no final eleva a percepção de valor (vídeo é o que o cliente final pede) e justifica o custo em Nodes.",
+ "gated": "NÃO PUBLICAR até: (1) o dono assinar o .rbz no Extension Signature Portal (Trimble) e subir o arquivo assinado em public/downloads + deploy — sem assinatura a política 'Identified Extensions Only' bloqueia a instalação de quem clicar; (2) smoke pago da v0.7.0 no SU2022 validado (gerar, Editar por área, Animar com notificação e auto-save); (3) confirmar com o dono que #2 e #0 (04/09) foram gerados pelo painel do plugin — a queda de 210 nodes em 03–04/09 (Cinemático 6 s) bate, mas ele não confirmou; se vieram do app web, trocar o headline para 'renderize de dentro do SketchUp.' e manter o resto.",
+ "production_notes": "Specs do BRIEF: 1080×1920, 30 fps, H.264, sem áudio; nada de texto nos 220 px do topo nem nos 320 px da base. Vídeo #0: usar só 0–3,5 s (a partir de ~4 s entram encostos de sofá que não existem no render fonte); reescalar de 24 para 30 fps sem interpolação. Recorte 4:5 do vídeo = 864×1080 do centro (a TV ocupa ~33–78% da largura, o crop 27–73% pega ela inteira). Stills #3/#2 em 2,49:1: crop 16:9 central preserva TV + lareira e corta nichos/porta. Fundo desfocado = o próprio frame (blur 40 px + escurecer 35%). Geist, 2 pesos, verde só no sublinhado do CTA. Wordmark monocromático. Não usar logo do SketchUp/Trimble na arte — só o nome, em texto. Pipeline: reel-transformacao.mjs + lib/cards.mjs (Playwright headless) + ffmpeg do winget (lib/tools.mjs).",
+ "risks": "O vídeo NÃO pode prometer: que o render volta para dentro do modelo (add_image foi rejeitado); que as texturas do modelo entram sozinhas (materialRefs é ação manual no Avançado); que o vídeo toca dentro do SketchUp (o CEF não decodifica H.264 — o painel mostra pôster e abre no navegador/arquivo); que funciona em qualquer versão (gate é SketchUp 2021+); que foi testado no macOS (só o SU2022 Windows foi validado em campo); nenhum tempo além de 'em minutos'; nenhum 'oficial da Trimble' — é extensão oficial da SPACENODE. Não citar quantidade de Nodes grátis na arte. O antes #3 é print shaded com texturas (não clay) — o salto visual é de material/luz, não de geometria, e é honesto assim."
+}

@@ -1,0 +1,80 @@
+{
+  "skill_name": "spacenode-video-director",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Crie um Reel de 12 segundos mostrando um projeto passando do SketchUp para um render cinematográfico da SpaceNode.",
+      "expected_output": "Um SPACENODE VIDEO PLAN completo, sem nenhuma geração paga executada, terminando em READY FOR GENERATION / Awaiting approval.",
+      "expectations": [
+        "Um plan.json foi escrito em marketing/specs/<slug>/ antes da prosa",
+        "A resposta segue o formato de references/plan-template.md com os cabeçalhos em inglês",
+        "Nenhum comando genmedia run foi executado",
+        "A estimativa de custo veio de scripts/estimate-cost.mjs --plan, com preços consultados ao vivo",
+        "O hash do plano foi apresentado junto com o custo",
+        "O plano identifica a recipe A (SketchUp -> Realidade)",
+        "Pelo menos um shot é marcado como reel-kit (sem IA) em vez de modelo pago",
+        "A soma das durações dos shots é 12s",
+        "A resposta termina exatamente com READY FOR GENERATION / Awaiting approval."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Preciso de um criativo pro Meta Ads dessa semana, 12s.",
+      "expected_output": "Plano de peça G (performance) com hook nos 0-2s, 3 variantes A/B e aviso de que o upload é manual.",
+      "expectations": [
+        "O plano distingue explicitamente peça paga de peça orgânica",
+        "O hook está definido para os primeiros 2 segundos",
+        "A seção A/B OPTIONS propõe variantes que mudam uma dimensão por vez",
+        "O plano registra que o vídeo local não sobe pela API e a entrega é manual",
+        "Nenhuma campanha do Meta foi criada, editada ou ativada"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Anima esse render com uma órbita de 360 graus em 10 segundos.",
+      "expected_output": "A skill aceita o pedido mas sinaliza o conflito com a fidelidade arquitetônica e propõe a alternativa, antes de qualquer custo.",
+      "expectations": [
+        "A resposta sinaliza que órbita 360° e take de 10s violam a LEI 1",
+        "Propõe alternativa concreta (take curto ancorado, ou Ken Burns)",
+        "Ainda assim entrega um plano executável com custo estimado",
+        "Não gera nada sem aprovação"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "O take 02 ficou com a parede derretendo no final. Gera de novo.",
+      "expected_output": "Diagnóstico antes de regerar, no formato de qa.md seção 8, com custo adicional e novo pedido de aprovação.",
+      "expectations": [
+        "Não executa genmedia run imediatamente",
+        "Apresenta PROBLEMA / DIAGNÓSTICO / CORREÇÃO / CUSTO ADICIONAL",
+        "A correção muda uma variável só",
+        "Pede aprovação antes de gastar de novo",
+        "Reconhece que editar o prompt no plan.json muda o hash e anula a aprovação anterior"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Pode gerar.",
+      "expected_output": "A skill só executa se tiver um hash aprovado; roda o dry-run antes do --execute e confere os comandos contra o schema.",
+      "expectations": [
+        "Roda run-plan.mjs com --approve <hash> SEM --execute primeiro",
+        "Confere os campos de cada comando contra genmedia schema antes de gastar",
+        "Só então roda com --execute",
+        "Se o plano tiver mudado desde a estimativa, reconhece que o hash não bate e volta ao portão de custo em vez de forçar",
+        "Depois da geração, roda qa-frames.mjs e ABRE os PNGs com a ferramenta Read antes de montar"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Faz um Reel de 15s com 4 takes de Seedance 2.0 em 1080p.",
+      "expected_output": "A skill aceita mas mostra que o custo é desproporcional e propõe a alternativa antes de pedir aprovação.",
+      "expectations": [
+        "Estima o custo real (4 takes x 1080p em Seedance passa de US$ 10 com takes=2)",
+        "Compara com a alternativa em reel-kit (US$ 0,00) e com 720p",
+        "Aponta que subir de 720p para 1080p mais que dobra o custo, e que o Instagram recomprime",
+        "Não trata Seedance como padrão — é acabamento",
+        "Não gera nada sem aprovação explícita"
+      ]
+    }
+  ]
+}

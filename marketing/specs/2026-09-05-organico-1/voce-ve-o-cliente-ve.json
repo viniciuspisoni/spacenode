@@ -1,0 +1,66 @@
+{
+ "slug": "2026-09-05-reel-voce-ve-o-cliente-ve",
+ "accent": false,
+ "band": {
+  "split": true
+ },
+ "segments": [
+  {
+   "type": "split",
+   "top": "$ACERVO/assets/0174-render-before.jpg",
+   "bottom": "$ACERVO/assets/0173-render-after.jpg",
+   "dur": 5.2,
+   "kenburns": [
+    1,
+    1.04
+   ]
+  },
+  {
+   "type": "card",
+   "card": "final",
+   "dur": 1
+  }
+ ],
+ "transitions": [
+  {
+   "type": "fade",
+   "dur": 0.3
+  }
+ ],
+ "cards": {
+  "scrim": {
+   "layout": "scrim"
+  },
+  "lbl": {
+   "layout": "split-labels",
+   "top": "você",
+   "bottom": "o cliente"
+  },
+  "a": {
+   "layout": "hook-sub",
+   "hook": "você vê o projeto.",
+   "sub": "o cliente vê a casa."
+  },
+  "final": {
+   "layout": "final",
+   "cta": "Teste com um projeto real"
+  }
+ },
+ "overlays": [
+  {
+   "card": "scrim",
+   "from": 0,
+   "to": 4.9
+  },
+  {
+   "card": "lbl",
+   "from": 0,
+   "to": 4.9
+  },
+  {
+   "card": "a",
+   "from": 0,
+   "to": 4.9
+  }
+ ]
+}

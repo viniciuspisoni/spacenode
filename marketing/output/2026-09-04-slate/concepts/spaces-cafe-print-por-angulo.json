@@ -1,0 +1,97 @@
+{
+ "slug": "spaces-cafe-print-por-angulo",
+ "title": "Café: um print por ângulo, a luz da Vista Mestre",
+ "pillar": "coerencia-entre-angulos",
+ "angle": "Demonstrativo do mecanismo do Spaces em projeto comercial (Space Café, 12–23/06): para cada novo ângulo, o arquiteto sobe o print do SketchUp daquela câmera e a vista sai com a luz das persianas, as sancas quentes e a madeira da Vista Mestre. Três ângulos do mesmo café (salão ao pôr do sol, mesas com balcão, balcão frontal) lendo como uma única obra. Formato print→vista por batida, para o público que ainda desconfia que 'cada vista sai de um projeto diferente'.",
+ "format": "demonstrativo",
+ "duration_s": 17.5,
+ "hook_text": "Novo print, novo ângulo. Mesmo café.",
+ "hook_visual": "Full-bleed 9:16 com recorte 1440×2560 do original 4K #56 (6656×2560) no terço esquerdo: duas mulheres conversando na mesa junto às persianas, listras de sol projetadas no piso de concreto, cadeiras de couro caramelo, sancas de luz no forro, planta ao fundo. Push-in lento de 4% em 3s. Hook no terço superior sobre scrim leve.",
+ "scenes": [
+  {
+   "t": "0.0–3.0",
+   "visual": "Full-bleed: #56 (salão do café ao pôr do sol) recortado nas duas mulheres à esquerda com as listras da persiana no piso; push-in lento. É a Vista Mestre do projeto.",
+   "text_on_screen": "Novo print, novo ângulo. Mesmo café.",
+   "asset_idx": [
+    56
+   ]
+  },
+  {
+   "t": "3.0–4.2",
+   "visual": "Corte seco para faixa 16:9 sobre fundo desfocado: print do SketchUp #581 (mesas redondas pretas com cadeiras, persianas em linhas, balcão de madeira com prateleiras à direita, forro cinza chapado).",
+   "text_on_screen": "eyebrow: NOVA VISTA · PRINT DO ÂNGULO 02",
+   "asset_idx": [
+    581
+   ]
+  },
+  {
+   "t": "4.2–7.2",
+   "visual": "Régua linear (2,0s) revela #580 na mesma câmera: luz dourada entrando pelas persianas, sancas curvas iluminadas, mesas redondas de tampo preto, cadeiras de couro caramelo, pessoas conversando, balcão de madeira ao fundo à direita. Segura 1,0s parado.",
+   "text_on_screen": "apoio abaixo da faixa: A luz e os materiais vêm da Vista Mestre.",
+   "asset_idx": [
+    580
+   ]
+  },
+  {
+   "t": "7.2–8.4",
+   "visual": "Faixa 16:9: print #598 (balcão frontal em SketchUp: ilha de madeira, prateleiras com cardápio, luminária linear, banquetas à direita, nicho com quadro).",
+   "text_on_screen": "eyebrow: NOVA VISTA · PRINT DO ÂNGULO 03",
+   "asset_idx": [
+    598
+   ]
+  },
+  {
+   "t": "8.4–11.4",
+   "visual": "Régua linear (2,0s) revela #597: balcão em madeira clara, parede ripada, prateleiras retroiluminadas, pendentes lineares, luz lateral pela janela à esquerda com vegetação, banquetas de couro caramelo. Segura 1,0s.",
+   "text_on_screen": "(sem texto)",
+   "asset_idx": [
+    597
+   ]
+  },
+  {
+   "t": "11.4–14.4",
+   "visual": "Recapitulação em cortes secos de 1,0s na faixa 16:9: #56 (salão) → #580 (mesas e balcão) → #597 (balcão frontal). Mesma sanca, mesma madeira, mesma luz de fim de tarde.",
+   "text_on_screen": "eyebrow: TRÊS ÂNGULOS · UM CAFÉ",
+   "asset_idx": [
+    56,
+    580,
+    597
+   ]
+  },
+  {
+   "t": "14.4–17.5",
+   "visual": "#597 escurecido com scrim. Card final: wordmark SPACENODE monocromático + CTA com sublinhado verde funcional.",
+   "text_on_screen": "Teste com um projeto real",
+   "asset_idx": [
+    597
+   ]
+  }
+ ],
+ "assets": [
+  56,
+  581,
+  580,
+  598,
+  597
+ ],
+ "cta": "Teste com um projeto real",
+ "caption": "Cada ângulo do café entrou como um print do SketchUp. A luz das persianas e a madeira vieram da Vista Mestre.\n\nO fluxo do Spaces é este: a primeira imagem do projeto vira Vista Mestre. Para cada novo ângulo, você sobe o print daquela câmera e a plataforma gera a vista com a mesma luz, os mesmos materiais e a mesma atmosfera.\n\nSalão, mesas e balcão lendo como um único café. Sem refazer o clima a cada imagem, sem uma vista parecer de outro projeto.\n\nGerado em minutos, a partir do seu modelo.\n\nTeste com um projeto real — link na bio.\n\n#archviz #projetocomercial #sketchup #visualizacaoarquitetonica #apresentacaodeprojeto",
+ "hashtags": [
+  "#archviz",
+  "#projetocomercial",
+  "#sketchup",
+  "#visualizacaoarquitetonica",
+  "#apresentacaodeprojeto"
+ ],
+ "paid": {
+  "primary": "Um print por ângulo, uma só linguagem: salão, mesas e balcão do mesmo café com a luz e os materiais da Vista Mestre.",
+  "headline": "Vários ângulos, mesma luz",
+  "description": "Teste com um projeto real",
+  "button": "LEARN_MORE",
+  "cutdown_note": "Versão ≤15s: cortar a recapitulação (11,4–14,4s). Fica hook #56 (0–3,0s) → print #581 (1,0s) → régua para #580 (2,5s) → print #598 (1,0s) → régua para #597 (2,5s) → CTA (3,0s) = 13s. Legenda embutida, som off, botão LEARN_MORE apontando para a página do Spaces/landing."
+ },
+ "why_converts": "É o conceito que responde à objeção do arquiteto cético: 'e o segundo ângulo, sai de outro projeto?'. Mostrar o print do SketchUp antes de cada vista prova que a geometria é dele e que só a luz e os materiais vêm da referência — argumento técnico, com régua, sem adjetivo. Projeto comercial amplia o público (arquitetura corporativa, food service) que hoje quase não aparece no feed. Funil: LEARN_MORE/legenda leva à landing, onde o cadastro grátis sem cartão permite repetir exatamente o fluxo mostrado (Vista Mestre + um ou dois prints de ângulo); quem chega a apresentar um comercial precisa de salão, balcão e fachada em série, e é esse volume por projeto que sustenta a assinatura.",
+ "production_notes": "Originais: 0056-render-after.jpg (6656×2560 — recorte 1440×2560 no terço esquerdo, push-in em 2×), 0581-vista-before.jpg e 0598-vista-before.jpg (2207×857 — prints, exibir só na faixa 16:9, nunca full-bleed), 0580/0597-vista-after.jpg (3328×1280). Print e vista recortados no MESMO aspecto/janela para a régua alinhar (mesa central em #581/#580; ilha do balcão em #598/#597). Régua = xfade wipeleft linear; texto troca em corte, nunca wipado; scrim em camada própria. Transição do hook full-bleed para a faixa: corte seco com o fundo desfocado já escurecido (evita flash claro). Eyebrows uppercase com ponto verde funcional; Geist ≤2 pesos; zona segura 220/320. Export 1080×1920 30fps H.264 crf 18 yuv420p sem áudio. NÃO usar #593/#595/#601 como 'novo ângulo por print' — o 'antes' deles (#594/#596/#602) é um print de outra câmera e o resultado não segue essa geometria; #599 duplica a câmera de #580 (sem pessoas). Os relights #579/#582 (ação Luz) ficam para um Reel próprio de iluminação.",
+ "risks": "NÃO prometer: que o print vira a vista 'sem retoque' ou 'sem ajuste' (o forro recortado do modelo virou sancas curvas em #580; cadeiras extras entraram); 'pessoas reais' (as pessoas são geradas — não dar zoom em rostos/mãos, sobretudo no casal ao fundo de #56); 'cardápio legível' (texto das prateleiras em #597 é ilegível — manter em plano aberto); tempo total por projeto (só 'gerado em minutos' por imagem); que qualquer print de qualquer câmera sempre sai fiel (o próprio acervo tem casos em que a câmera não seguiu o print — falar de coerência entre vistas como direção, não como garantia).",
+ "gated": ""
+}

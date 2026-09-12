@@ -1,0 +1,184 @@
+{
+  "slug": "2026-09-04-reel-zoom-cozinha-cada-peca-ad",
+  "band": {
+    "split": true,
+    "aspect": 1.595
+  },
+  "segments": [
+    {
+      "type": "still",
+      "src": "$ACERVO/prep_r7/print-728x837.png",
+      "dur": 1.2,
+      "fit": "contain",
+      "kenburns": [
+        1,
+        1
+      ]
+    },
+    {
+      "type": "still",
+      "src": "$ACERVO/assets/0425-render-after.jpg",
+      "dur": 3.3,
+      "fit": "contain",
+      "kenburns": [
+        1,
+        1
+      ]
+    },
+    {
+      "type": "split",
+      "top": "$ACERVO/prep_r7/print-split.png",
+      "bottom": "$ACERVO/prep_r7/render-split.png",
+      "dur": 3.5,
+      "kenburns": [
+        1,
+        1.04
+      ]
+    },
+    {
+      "type": "still",
+      "src": "$ACERVO/assets/0425-render-after.jpg",
+      "dur": 2,
+      "fit": "contain",
+      "kenburns": [
+        1,
+        1.03
+      ]
+    }
+  ],
+  "transitions": [
+    {
+      "type": "cut"
+    },
+    {
+      "type": "cut"
+    },
+    {
+      "type": "cut"
+    }
+  ],
+  "cards": {
+    "scrimTop": {
+      "layout": "html",
+      "body": "<div style=\"position:absolute;left:0;right:0;top:0;height:720px;background:linear-gradient(180deg,rgba(26,26,26,0.62) 0%,rgba(26,26,26,0.62) 78%,rgba(26,26,26,0) 100%)\"></div>"
+    },
+    "scrimBase": {
+      "layout": "html",
+      "body": "<div style=\"position:absolute;left:0;right:0;top:1240px;height:680px;background:linear-gradient(0deg,rgba(26,26,26,0.66) 0%,rgba(26,26,26,0.66) 50%,rgba(26,26,26,0) 100%)\"></div>"
+    },
+    "labels": {
+      "layout": "html",
+      "body": "<div style=\"position:absolute;left:145px;top:456px\"><span style=\"display:inline-block;padding:8px 16px;border-radius:999px;background:rgba(26,26,26,0.62);border:1px solid rgba(255,255,255,0.22);font-size:20px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:#f5f5f7\">Modelo</span></div><div style=\"position:absolute;left:145px;top:984px\"><span style=\"display:inline-block;padding:8px 16px;border-radius:999px;background:rgba(26,26,26,0.62);border:1px solid rgba(255,255,255,0.22);font-size:20px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:#f5f5f7\">Render</span></div>"
+    },
+    "cta": {
+      "layout": "html",
+      "body": "<div style=\"position:absolute;inset:0;background:rgba(26,26,26,0.7)\"></div><div class=\"final\"><svg width=\"176\" height=\"48\" viewBox=\"0 0 176 48\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"spacenode\" shape-rendering=\"geometricPrecision\">\r\n  <title>spacenode — lockup horizontal (símbolo + wordmark), monocromático</title>\r\n  <!-- Espelha components/brand/Logo.tsx com symbolSize=48: gap 12px, wordmark 22.99px peso 500, letter-spacing -0.025em -->\r\n  <g transform=\"scale(0.75)\">\r\n    <g stroke=\"#FFFFFF\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" fill=\"none\">\r\n      <line x1=\"16\" y1=\"16\" x2=\"16\" y2=\"48\" />\r\n      <line x1=\"16\" y1=\"16\" x2=\"48\" y2=\"48\" />\r\n      <line x1=\"48\" y1=\"16\" x2=\"48\" y2=\"48\" />\r\n    </g>\r\n    <g fill=\"#FFFFFF\">\r\n      <circle cx=\"16\" cy=\"16\" r=\"3\" />\r\n      <circle cx=\"16\" cy=\"48\" r=\"3\" />\r\n      <circle cx=\"48\" cy=\"48\" r=\"3\" />\r\n      <circle cx=\"48\" cy=\"16\" r=\"3\" />\r\n    </g>\r\n  </g>\r\n  <text x=\"60\" y=\"24\" fill=\"#FFFFFF\" font-family=\"GeistLocal\" font-size=\"22.99\" font-weight=\"500\" letter-spacing=\"-0.575\" dominant-baseline=\"central\">spacenode</text>\r\n</svg>\r\n<div class=\"cta\">Comece grátis<span>→</span></div><div class=\"micro\" style=\"color:#a1a1a6\">80 nodes grátis · sem cartão · em português</div></div>"
+    },
+    "hook": {
+      "layout": "hook-fixed",
+      "hook": "forno, cafeteira, torneira.<br>mesma {posição}.",
+      "top": 390,
+      "size": 60
+    },
+    "apoio": {
+      "layout": "hook-fixed",
+      "sub": "o que você modelou, onde você modelou.",
+      "bottom": 360,
+      "subSize": 38
+    },
+    "m1": {
+      "layout": "html",
+      "body": "<div title=\"forno\" style=\"position:absolute;left:28px;top:879px;width:52px;height:52px;border:2.5px solid rgba(255,255,255,0.92);border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,0.41), inset 0 0 0 1px rgba(0,0,0,0.41)\"></div>"
+    },
+    "m2": {
+      "layout": "html",
+      "body": "<div title=\"cafeteira\" style=\"position:absolute;left:114px;top:1010px;width:52px;height:52px;border:2.5px solid rgba(255,255,255,0.92);border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,0.41), inset 0 0 0 1px rgba(0,0,0,0.41)\"></div>"
+    },
+    "m3": {
+      "layout": "html",
+      "body": "<div title=\"torneira\" style=\"position:absolute;left:374px;top:1010px;width:52px;height:52px;border:2.5px solid rgba(255,255,255,0.92);border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,0.41), inset 0 0 0 1px rgba(0,0,0,0.41)\"></div>"
+    },
+    "m4": {
+      "layout": "html",
+      "body": "<div title=\"lustre\" style=\"position:absolute;left:471px;top:724px;width:52px;height:52px;border:2.5px solid rgba(255,255,255,0.92);border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,0.41), inset 0 0 0 1px rgba(0,0,0,0.41)\"></div>"
+    },
+    "mFade1": {
+      "layout": "html",
+      "body": "<div title=\"forno\" style=\"position:absolute;left:28px;top:879px;width:52px;height:52px;border:2.5px solid rgba(255,255,255,0.5);border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,0.23), inset 0 0 0 1px rgba(0,0,0,0.23)\"></div><div title=\"cafeteira\" style=\"position:absolute;left:114px;top:1010px;width:52px;height:52px;border:2.5px solid rgba(255,255,255,0.5);border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,0.23), inset 0 0 0 1px rgba(0,0,0,0.23)\"></div><div title=\"torneira\" style=\"position:absolute;left:374px;top:1010px;width:52px;height:52px;border:2.5px solid rgba(255,255,255,0.5);border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,0.23), inset 0 0 0 1px rgba(0,0,0,0.23)\"></div><div title=\"lustre\" style=\"position:absolute;left:471px;top:724px;width:52px;height:52px;border:2.5px solid rgba(255,255,255,0.5);border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,0.23), inset 0 0 0 1px rgba(0,0,0,0.23)\"></div>"
+    },
+    "mFade2": {
+      "layout": "html",
+      "body": "<div title=\"forno\" style=\"position:absolute;left:28px;top:879px;width:52px;height:52px;border:2.5px solid rgba(255,255,255,0.22);border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,0.10), inset 0 0 0 1px rgba(0,0,0,0.10)\"></div><div title=\"cafeteira\" style=\"position:absolute;left:114px;top:1010px;width:52px;height:52px;border:2.5px solid rgba(255,255,255,0.22);border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,0.10), inset 0 0 0 1px rgba(0,0,0,0.10)\"></div><div title=\"torneira\" style=\"position:absolute;left:374px;top:1010px;width:52px;height:52px;border:2.5px solid rgba(255,255,255,0.22);border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,0.10), inset 0 0 0 1px rgba(0,0,0,0.10)\"></div><div title=\"lustre\" style=\"position:absolute;left:471px;top:724px;width:52px;height:52px;border:2.5px solid rgba(255,255,255,0.22);border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,0.10), inset 0 0 0 1px rgba(0,0,0,0.10)\"></div>"
+    }
+  },
+  "overlays": [
+    {
+      "card": "scrimTop",
+      "from": 0,
+      "to": 4.5
+    },
+    {
+      "card": "hook",
+      "from": 0,
+      "to": 4.5
+    },
+    {
+      "card": "m1",
+      "from": 0.15,
+      "to": 4
+    },
+    {
+      "card": "m2",
+      "from": 0.3,
+      "to": 4
+    },
+    {
+      "card": "m3",
+      "from": 0.45,
+      "to": 4
+    },
+    {
+      "card": "m4",
+      "from": 0.6,
+      "to": 4
+    },
+    {
+      "card": "mFade1",
+      "from": 4.034,
+      "to": 4.15
+    },
+    {
+      "card": "mFade2",
+      "from": 4.167,
+      "to": 4.3
+    },
+    {
+      "card": "scrimBase",
+      "from": 1.6,
+      "to": 8
+    },
+    {
+      "card": "apoio",
+      "from": 1.6,
+      "to": 8
+    },
+    {
+      "card": "labels",
+      "from": 4.5,
+      "to": 8
+    },
+    {
+      "card": "cta",
+      "from": 8,
+      "to": 10
+    }
+  ],
+  "qa": [
+    0.9,
+    1.5,
+    3,
+    6.2,
+    7.9,
+    9
+  ]
+}

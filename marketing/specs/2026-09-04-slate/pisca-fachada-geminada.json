@@ -1,0 +1,189 @@
+{
+  "slug": "2026-09-04-reel-pisca-fachada-geminada",
+  "band": {
+    "aspect": 1.3333333
+  },
+  "segments": [
+    {
+      "type": "still",
+      "src": "$ACERVO/assets/0382-render-before.jpg",
+      "dur": 1,
+      "fit": "band",
+      "kenburns": [
+        1,
+        1
+      ]
+    },
+    {
+      "type": "still",
+      "src": "$ACERVO/assets/0381-render-after.jpg",
+      "dur": 0.8,
+      "fit": "band",
+      "kenburns": [
+        1,
+        1
+      ]
+    },
+    {
+      "type": "still",
+      "src": "$ACERVO/assets/0382-render-before.jpg",
+      "dur": 0.6,
+      "fit": "band",
+      "kenburns": [
+        1,
+        1
+      ]
+    },
+    {
+      "type": "still",
+      "src": "$ACERVO/assets/0381-render-after.jpg",
+      "dur": 0.5,
+      "fit": "band",
+      "kenburns": [
+        1,
+        1
+      ]
+    },
+    {
+      "type": "still",
+      "src": "$ACERVO/assets/0382-render-before.jpg",
+      "dur": 0.4,
+      "fit": "band",
+      "kenburns": [
+        1,
+        1
+      ]
+    },
+    {
+      "type": "still",
+      "src": "$ACERVO/assets/0381-render-after.jpg",
+      "dur": 0.3,
+      "fit": "band",
+      "kenburns": [
+        1,
+        1
+      ]
+    },
+    {
+      "type": "still",
+      "src": "$ACERVO/assets/0382-render-before.jpg",
+      "dur": 0.3,
+      "fit": "band",
+      "kenburns": [
+        1,
+        1
+      ]
+    },
+    {
+      "type": "still",
+      "src": "$ACERVO/assets/0381-render-after.jpg",
+      "dur": 0.5,
+      "fit": "band",
+      "kenburns": [
+        1,
+        1
+      ]
+    },
+    {
+      "type": "still",
+      "src": "$ACERVO/assets/0381-render-after.jpg",
+      "dur": 4.6,
+      "fit": "band",
+      "kenburns": [
+        1,
+        1.05
+      ]
+    }
+  ],
+  "transitions": [
+    {
+      "type": "cut"
+    },
+    {
+      "type": "cut"
+    },
+    {
+      "type": "cut"
+    },
+    {
+      "type": "cut"
+    },
+    {
+      "type": "cut"
+    },
+    {
+      "type": "cut"
+    },
+    {
+      "type": "cut"
+    },
+    {
+      "type": "cut"
+    }
+  ],
+  "cards": {
+    "moldura": {
+      "layout": "html",
+      "body": "<div style=\"position:absolute;left:0;top:0;width:1080px;height:556px;background:#1a1a1a\"></div><div style=\"position:absolute;left:0;top:1366px;width:1080px;height:554px;background:#1a1a1a\"></div>"
+    },
+    "marcas": {
+      "layout": "html",
+      "css": ".rm{position:absolute;width:44px;height:44px;margin:-22px 0 0 -22px;opacity:0.85}.rm:before,.rm:after{content:'';position:absolute;background:#30d158}.rm:before{left:20px;top:0;width:3px;height:44px}.rm:after{top:20px;left:0;width:44px;height:3px}",
+      "body": "<div class=\"rm\" style=\"left:198px;top:797px\"></div><div class=\"rm\" style=\"left:857px;top:797px\"></div><div class=\"rm\" style=\"left:198px;top:1037px\"></div><div class=\"rm\" style=\"left:857px;top:1037px\"></div>"
+    },
+    "hook": {
+      "layout": "hook-sub",
+      "hook": "pisca.<br>a casa não se mexe."
+    },
+    "payoff": {
+      "layout": "hook-sub",
+      "hook": "pisca.<br>a casa não se mexe.",
+      "eyebrow": "fidelidade geométrica",
+      "sub": "mesma câmera, mesmos vãos, mesma escada."
+    },
+    "cta": {
+      "layout": "html",
+      "css": ".scrim-full{background:rgba(26,26,26,0.80)}",
+      "body": "<div class=\"scrim-full\"></div><div class=\"final\"><svg width=\"176\" height=\"48\" viewBox=\"0 0 176 48\" xmlns=\"http://www.w3.org/2000/svg\"><g transform=\"scale(0.75)\"><g stroke=\"#FFFFFF\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" fill=\"none\"><line x1=\"16\" y1=\"16\" x2=\"16\" y2=\"48\"/><line x1=\"16\" y1=\"16\" x2=\"48\" y2=\"48\"/><line x1=\"48\" y1=\"16\" x2=\"48\" y2=\"48\"/></g><g fill=\"#FFFFFF\"><circle cx=\"16\" cy=\"16\" r=\"3\"/><circle cx=\"16\" cy=\"48\" r=\"3\"/><circle cx=\"48\" cy=\"48\" r=\"3\"/><circle cx=\"48\" cy=\"16\" r=\"3\"/></g></g><text x=\"60\" y=\"24\" fill=\"#FFFFFF\" font-family=\"GeistLocal\" font-size=\"22.99\" font-weight=\"500\" letter-spacing=\"-0.575\" dominant-baseline=\"central\">spacenode</text></svg><div class=\"cta\">Teste com um projeto real<span>→</span></div><div class=\"micro\">80 nodes grátis · sem cartão · em português</div></div>"
+    }
+  },
+  "overlays": [
+    {
+      "card": "moldura",
+      "from": 0,
+      "to": 9
+    },
+    {
+      "card": "marcas",
+      "from": 0,
+      "to": 4.4
+    },
+    {
+      "card": "hook",
+      "from": 0.15,
+      "to": 4
+    },
+    {
+      "card": "payoff",
+      "from": 4,
+      "to": 7.2
+    },
+    {
+      "card": "cta",
+      "from": 7.2,
+      "to": 9
+    }
+  ],
+  "qa": [
+    0.5,
+    1.4,
+    2.1,
+    3.45,
+    3.75,
+    4.2,
+    5.5,
+    7,
+    8.1,
+    8.9
+  ]
+}

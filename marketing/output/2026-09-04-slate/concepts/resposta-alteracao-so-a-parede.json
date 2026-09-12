@@ -1,0 +1,83 @@
+{
+ "slug": "resposta-alteracao-so-a-parede",
+ "title": "Só a parede (Editar)",
+ "pillar": "demonstracao-de-ferramentas",
+ "angle": "Objeção: retrabalho / 'e quando o cliente pede alteração?'. Prova visual: no render pronto do apartamento (sofá amarelo, parede-galeria), um wipe troca a parede branca por cimento queimado enquanto cada quadro, o violão e a prateleira ficam no lugar. É o Editar (edição localizada por área) mostrado sem jargão: 'só a parede, sem refazer o render'.",
+ "format": "video_anuncio",
+ "duration_s": 12,
+ "hook_text": "Cliente pediu cimento queimado. Só a parede.",
+ "hook_visual": "Full-bleed 9:16 recortado do render pronto (#52), janela centrada na parede-galeria: parede branca com dezenas de quadros em molduras variadas, violão pendurado à esquerda, mesa redonda de madeira com cadeiras thonet e fruteira, azulejo verde da cozinha aparecendo na borda direita, piso de madeira. Aos 0,6 s um wipe linear da esquerda para a direita (1,0 s) revela #797: a MESMA imagem com a parede em cimento queimado manchado — quadros, violão, molduras e prateleira exatamente onde estavam. Headline entra aos 1,2 s, ainda durante o wipe.",
+ "scenes": [
+  {
+   "t": "0.0–0.6",
+   "visual": "#52 full-bleed (crop 9:16 = 792×1408 do original 3040×1408, janela em x ≈ 18–44% da largura: violão, parede-galeria, mesa com cadeiras, borda do azulejo verde). Estático. Sem texto.",
+   "text_on_screen": "",
+   "asset_idx": [
+    52
+   ]
+  },
+  {
+   "t": "0.6–1.6",
+   "visual": "xfade wipeleft linear 1,0 s de #52 para #797 no mesmo crop (os dois originais têm 3040×1408 — alinhamento pixel a pixel). A textura de cimento queimado avança pela parede; molduras e violão não se mexem. Headline aos 1,2 s sobre scrim inferior.",
+   "text_on_screen": "Cliente pediu cimento queimado. Só a parede.",
+   "asset_idx": [
+    52,
+    797
+   ]
+  },
+  {
+   "t": "1.6–5.5",
+   "visual": "Hold em #797 com pan lento para a direita (a janela 9:16 desliza do eixo da galeria até o sofá amarelo, passando pela cozinha de azulejo verde) — mostra que a parede atrás do sofá também recebeu o cimento e que cozinha, teto e marcenaria ficaram iguais. Apoio aos 2,6 s.",
+   "text_on_screen": "Cliente pediu cimento queimado. Só a parede. / Cada quadro no lugar. Sem refazer o render.",
+   "asset_idx": [
+    797
+   ]
+  },
+  {
+   "t": "5.5–8.5",
+   "visual": "Corte para a janela de volta na galeria, zoom lento 1,0→1,4× nos quadros sobre o cimento queimado (original de 3040 px aguenta). Texto permanece.",
+   "text_on_screen": "Cliente pediu cimento queimado. Só a parede. / Cada quadro no lugar. Sem refazer o render.",
+   "asset_idx": [
+    797
+   ]
+  },
+  {
+   "t": "8.5–10.5",
+   "visual": "Headline e apoio saem em corte; bloco de CTA no terço inferior com sublinhado verde.",
+   "text_on_screen": "Comece grátis / 80 nodes no cadastro · sem cartão",
+   "asset_idx": [
+    797
+   ]
+  },
+  {
+   "t": "10.5–12.0",
+   "visual": "Card final #0a0a0a: logo monocromático, 'Comece grátis' com sublinhado verde, micro-linha. Sem URL.",
+   "text_on_screen": "Comece grátis / 80 nodes no cadastro · sem cartão",
+   "asset_idx": []
+  }
+ ],
+ "assets": [
+  52,
+  797
+ ],
+ "cta": "Comece grátis",
+ "caption": "Cliente pediu cimento queimado na parede. Trocou só a parede — cada quadro, o violão e a prateleira ficaram no lugar.\n\nIsso é o Editar: você marca a área no render pronto e diz o que muda. O resto fica como estava — teto, marcenaria, sofá, cozinha.\n\nSem voltar ao SketchUp, sem gerar tudo de novo, sem perder a câmera que o cliente já aprovou.\n\nCadastro grátis com 80 nodes, sem cartão — dá para renderizar e editar um projeto seu.\n\nComece grátis no link da bio.\n\n#designdeinteriores #renderizacao #archviz #apresentacaodeprojeto #projetodearquitetura",
+ "hashtags": [
+  "#designdeinteriores",
+  "#renderizacao",
+  "#archviz",
+  "#apresentacaodeprojeto",
+  "#projetodearquitetura"
+ ],
+ "paid": {
+  "primary": "O cliente pediu cimento queimado. Trocou só a parede — quadros, violão e prateleira no lugar, sem refazer o render.\n\nMarque a área, diga o que muda. Cadastro grátis com 80 nodes, sem cartão.",
+  "headline": "Troque a parede, não o render",
+  "description": "80 nodes grátis, sem cartão",
+  "button": "SIGN_UP",
+  "cutdown_note": "Já nasce ≤15 s (12 s). Cutdown de 6 s: cenas 1–2 (wipe com headline) + 2 s de pan + CTA de 4,0 a 6,0 s; sem zoom e sem card final. O wipe é o anúncio inteiro — em placements de 6 s ele sozinho carrega a mensagem."
+ },
+ "why_converts": "Quem já renderiza (ou terceiriza) conhece o custo real: não é a primeira imagem, é a terceira rodada de 'muda a parede'. A peça mostra a alteração acontecendo sobre o render aprovado, com a prova de que nada mais mudou (os quadros são o 'detector' visual mais fácil de ler no celular). É um argumento de retenção mostrado como aquisição: o usuário entende que a plataforma cobre o ciclo inteiro — render e ajuste — e não só a imagem bonita. Isso puxa o perfil que assina (escritório com cliente exigente), não o curioso. Funil: cadastro grátis → renderiza o projeto da mesa → primeira alteração pedida pelo cliente resolve no Editar → o valor do Starter fica óbvio na primeira semana.",
+ "production_notes": "Specs iguais (1080×1920, 30 fps, H.264, sem áudio, zona segura 220–1600, Geist 600/400, verde só no sublinhado). #52 e #797 são 3040×1408 ambos — o par mais fácil de alinhar do acervo; recortar a mesma janela 792×1408 nos dois (x inicial ≈ 550–600 px) e escalar 1,36× para 1080×1920, sem perda. O pan da cena 3 é um deslocamento da janela de recorte sobre #797 (crop animado), não zoompan: velocidade constante, ~1.100 px em 3,9 s. O zoom da cena 4 pode ir a 1,4× porque o original tem 3040 px. Headline entra DURANTE o wipe (1,2 s) — exceção consciente à regra 'prova antes do texto', porque aqui não existe o choque SketchUp→render: o próprio wipe é a prova e o texto dá o contexto. Scrim próprio, leve (a imagem é clara). Não mostrar a edição 'remover espelho' (#795) na mesma peça — outra ideia, outra peça. Card final 1,5 s sem URL. setsar=1. QA em 4 frames: 0,4 s / 1,1 s / 3,5 s / 7,0 s (checar molduras nítidas sobre o cimento e texto dentro da zona segura).",
+ "risks": "NÃO pode prometer: 'pixel a pixel' ou 'o resto não muda nada' em sentido absoluto (edições localizadas re-encodam a imagem; a olho nu não muda, mas não vira claim técnico); 'qualquer material', 'qualquer alteração', 'em segundos'; não dizer que o Editar aceita foto/render externo sem conferir (a legenda fala em 'renderizar e editar um projeto seu' — fluxo confirmado dentro da plataforma); não usar 'máscara', 'inpaint' ou jargão na arte — a UI é 'marcar a área'. Ressalva de origem: #797 foi editado a partir de #52 (render de 17/06/2026, motor vega 2k) — o espelho ainda está na parede da esquerda (fora da janela de recorte, mas aparece se o pan for longe demais para a esquerda: não passar do violão). 'Sem cartão' — mesma ressalva. Confirmar que o apartamento (sofá amarelo, parede-galeria) é modelo do dono e não de cliente sem permissão registrada antes de veicular pago.",
+ "gated": ""
+}

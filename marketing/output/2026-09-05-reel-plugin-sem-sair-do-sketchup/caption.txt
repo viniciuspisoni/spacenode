@@ -1,0 +1,9 @@
+Renderize sem sair do SketchUp. A vista atual vira o render, no mesmo painel.
+
+Conecta a conta, captura a vista, escolhe o ambiente e a luz, gera. O render volta para o painel — com a mesma câmera do modelo.
+
+Plugin oficial da SpaceNode para SketchUp, grátis: os renders usam os Nodes da sua conta. Extensão (.rbz) disponível no site.
+
+Comece agora — link na bio.
+
+#sketchup #plugin #render #archviz #arquitetura

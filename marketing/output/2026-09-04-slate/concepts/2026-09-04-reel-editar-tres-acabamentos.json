@@ -1,0 +1,128 @@
+{
+ "slug": "2026-09-04-reel-editar-tres-acabamentos",
+ "title": "Três acabamentos antes da reunião. Nenhum render novo.",
+ "pillar": "produtividade",
+ "angle": "Iteração de acabamento com o cliente depois do render, na mesma câmera, com Editar: nogueira (render aprovado) → parede em pintura cor gelo → painel da janela claro → parede inteira em MDF amadeirado. Cadeia real e sequencial de setembro/2026 (qualidade atual do produto). O problema resolvido: estudo de material sem refazer o render.",
+ "format": "serie",
+ "duration_s": 17,
+ "hook_text": "Aprovado em nogueira. Cliente quer ver claro.",
+ "hook_visual": "Escritório de diretoria (#28, verificado na miniatura) recortado nos dois terços da direita: mesa de trabalho clara com duas cadeiras giratórias de couro, poltrona lounge caramelo, pele de vidro com cidade e serra ao fundo, parede direita inteira em nogueira escura com quadro abstrato rosa/cinza, sofá bege com almofadas, carpete cinza. Banda ~1,66:1 centrada, levemente escurecida, 1,8 s. Eyebrow 'EDITAR · MESMA CÂMERA' + hook.",
+ "scenes": [
+  {
+   "t": "0.0–1.8",
+   "visual": "#28 (render vega 2k, 3328×1280) com crop=2128:1280:1200:0 (mesa, janela, parede direita e sofá); parado; brilho −0.10; scrim",
+   "text_on_screen": "EDITAR · MESMA CÂMERA / Aprovado em nogueira. Cliente quer ver claro.",
+   "asset_idx": [
+    28
+   ]
+  },
+  {
+   "t": "1.8–2.3",
+   "visual": "wipeleft com régua branca sobre a imagem",
+   "text_on_screen": "",
+   "asset_idx": [
+    28,
+    791
+   ]
+  },
+  {
+   "t": "2.3–5.0",
+   "visual": "#791 mesmo crop: parede direita em pintura branca cor gelo, mesa e marcenaria da esquerda mais claras, painel junto à janela ainda em madeira escura; poltrona, sofá, quadro, luminária de arco e vista idênticos; Ken Burns 1.00→1.03",
+   "text_on_screen": "chip: 1 · parede em pintura cor gelo",
+   "asset_idx": [
+    791
+   ]
+  },
+  {
+   "t": "5.0–5.3",
+   "visual": "corte seco (mesma câmera → lê como alternância entre opções)",
+   "text_on_screen": "",
+   "asset_idx": [
+    790
+   ]
+  },
+  {
+   "t": "5.3–7.8",
+   "visual": "#790 mesmo crop: painel vertical junto à janela agora claro (liso, tom greige), parede branca; resto idêntico; parado",
+   "text_on_screen": "chip: 2 · painel da janela claro",
+   "asset_idx": [
+    790
+   ]
+  },
+  {
+   "t": "7.8–8.1",
+   "visual": "corte seco",
+   "text_on_screen": "",
+   "asset_idx": [
+    789
+   ]
+  },
+  {
+   "t": "8.1–11.4",
+   "visual": "#789 mesmo crop: parede direita inteira e painel em MDF amadeirado claro com veio visível, quadro e sofá no lugar, luz mais quente; Ken Burns 1.00→1.04; aos 9,4 s entra o payoff",
+   "text_on_screen": "chip: 3 · parede em MDF amadeirado / Três versões. Mesma câmera. Nenhum render novo. / Editar: cada versão em {minutos}.",
+   "asset_idx": [
+    789
+   ]
+  },
+  {
+   "t": "11.4–11.8",
+   "visual": "fade 0,4 s",
+   "text_on_screen": "",
+   "asset_idx": [
+    789
+   ]
+  },
+  {
+   "t": "11.8–15.6",
+   "visual": "grid 2×2 com os quatro estados no mesmo crop (960×577 cada, fios brancos): #28 nogueira, #791 pintura gelo, #790 painel claro, #789 MDF; parado",
+   "text_on_screen": "Quatro opções, uma {reunião}.",
+   "asset_idx": [
+    28,
+    791,
+    790,
+    789
+   ]
+  },
+  {
+   "t": "15.6–15.8",
+   "visual": "corte seco",
+   "text_on_screen": "",
+   "asset_idx": [
+    789
+   ]
+  },
+  {
+   "t": "15.8–17.0",
+   "visual": "card final: logo monocromático + CTA + spacenode.app",
+   "text_on_screen": "Comece agora",
+   "asset_idx": []
+  }
+ ],
+ "assets": [
+  28,
+  791,
+  790,
+  789
+ ],
+ "cta": "Comece agora",
+ "caption": "Render aprovado em nogueira. O cliente pediu pra ver claro — e depois em MDF. Nenhum render novo.\n\nMesma câmera, mesmo escritório. Três edições em sequência no Editar: parede em pintura cor gelo (a mesa e a marcenaria clarearam junto), painel da janela claro, parede inteira em MDF amadeirado.\n\nCada versão sai em minutos, a partir da anterior. O que muda é o acabamento; poltrona, sofá, quadro, luminária e a vista continuam no lugar.\n\nEstudo de acabamento deixa de ser \"refaço o render\" e vira \"mando as opções antes da reunião\".\n\nComece agora — link na bio.\n\n#arquitetura #designdeinteriores #renderizacao #archviz #apresentacaodeprojeto",
+ "hashtags": [
+  "#arquitetura",
+  "#designdeinteriores",
+  "#renderizacao",
+  "#archviz",
+  "#apresentacaodeprojeto"
+ ],
+ "paid": {
+  "primary": "Render aprovado em nogueira. O cliente quer ver a parede clara. Depois em MDF. Você não refaz o render: edita.\nEditar: três versões da mesma câmera, cada uma em minutos. Cadastro grátis, sem cartão.",
+  "headline": "Três acabamentos, nenhum render novo",
+  "description": "Mesma câmera, em minutos",
+  "button": "SIGN_UP",
+  "cutdown_note": "Versão ≤15 s: tirar o grid 2×2 (cena 9) e segurar o #789 com o payoff → 12,9 s. Os cortes secos entre versões funcionam como alternância de opções e leem sem som; legenda embutida = hook + 'Três versões. Mesma câmera.'"
+ },
+ "why_converts": "Fala com a dor de prazo do escritório pequeno: o cliente pede variações depois da aprovação e cada uma custava um render novo. A série mostra uso repetido (três edições em sequência sobre o mesmo render), que é o padrão de consumo de quem assina, não de quem testa uma vez. É o material mais recente do acervo (setembro/2026), então representa a qualidade atual. 'Comece agora' leva ao cadastro grátis; quem entra por esse Reel chega com um render aprovado na mão e um pedido de variação pendente, o cenário em que os nodes gratuitos acabam rápido e a assinatura vira decisão de fluxo, não de curiosidade.",
+ "production_notes": "Arquivos: .../scratchpad/assets/0028-render-after.png, .../assets/0791-edit3-before.jpg, .../assets/0790-edit3-before.jpg, .../assets/0789-edit3-after.jpg (todos 3328×1280). Cadeia real e sequencial de 2026-09-01 (jobs swap_material, preservation_mode maximum): #28 → #791 (edd0f140, 'parede da direita atrás do quadro é pintura na cor gelo; MDF dos móveis mais claros e acetinados') → #790 (7b4aeed5, 'região da parede é em mdf') → #789 (573f119c, 'região da parede é em mdf'). Crop idêntico nos quatro: crop=2128:1280:1200:0 — por isso os cortes secos batem pixel a pixel. Provas em .../checks/c3_office_grid.jpg e .../checks/c3_panel.jpg. Chips ≤5 palavras no layout 'chip' abaixo da banda; hook e payoff nunca ao mesmo tempo na mesma altura. Grid 2×2 = 1924×1158 com fios de 4 px → cabe na banda 16:9. Não misturar #792/#30 (outra câmera) nesta peça.",
+ "risks": "O passo 1 (#791) clareou também a mesa e a marcenaria da esquerda, além da parede pedida: a copy diz 'clarearam junto' e NUNCA 'só a parede'. O passo 2 é sutil em tela de celular; se o QA mostrar que não lê, cortar para 'duas versões' (#791 → #789). O painel do passo 2 saiu liso e claro, não com veio: chamar de 'painel claro', não de 'MDF'. Não inventar horário de reunião nem tempo por versão além de 'em minutos'. Não citar custo em nodes por edição. Não prometer que a iteração é sempre a partir da anterior sem perda (aqui foi).",
+ "gated": ""
+}

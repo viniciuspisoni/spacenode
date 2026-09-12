@@ -1,0 +1,9 @@
+trocar o piso sem refazer o render inteiro.
+
+no Editar você sobe o render aprovado, escolhe a ação (remover, material, inserir ou refinar), descreve a mudança em português e marca a área com o laço se quiser precisão. o custo estimado aparece antes de você aplicar.
+
+muda o que você pediu, não o projeto: câmera, proporções e enquadramento são preservados ao máximo.
+
+teste grátis no link da bio.
+
+#arquitetura #render #sketchup #archviz #arquiteto #projetodeinteriores #renderizacao #iaparaarquitetos

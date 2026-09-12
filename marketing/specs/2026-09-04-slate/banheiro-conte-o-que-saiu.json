@@ -1,0 +1,105 @@
+{
+  "slug": "2026-09-04-reel-banheiro-conte-o-que-saiu",
+  "segments": [
+    {
+      "type": "still",
+      "src": "$ACERVO/assets/0474-render-before.jpg",
+      "dur": 4.5,
+      "fit": "contain",
+      "kenburns": [
+        1,
+        1.03
+      ],
+      "brightness": -0.3
+    },
+    {
+      "type": "still",
+      "src": "$ACERVO/assets/0473-render-after.jpg",
+      "dur": 8,
+      "fit": "contain",
+      "kenburns": [
+        1.01,
+        1.0633
+      ],
+      "brightness": -0.3
+    }
+  ],
+  "transitions": [
+    {
+      "type": "wipedown",
+      "dur": 3,
+      "ruler": true
+    }
+  ],
+  "cards": {
+    "bands": {
+      "layout": "html",
+      "body": "<div style=\"position:absolute;left:0;right:0;top:0;height:270px;background:#1a1a1a\"></div><div style=\"position:absolute;left:0;right:0;top:1650px;height:270px;background:#1a1a1a\"></div>"
+    },
+    "bandScrim": {
+      "layout": "html",
+      "body": "<div style=\"position:absolute;left:0;right:0;top:372px;height:222px;background:linear-gradient(180deg,rgba(26,26,26,0) 0%,rgba(26,26,26,0.46) 28%,rgba(26,26,26,0.46) 72%,rgba(26,26,26,0) 100%)\"></div>"
+    },
+    "hook": {
+      "layout": "hook-fixed",
+      "hook": "conte o que saiu do lugar.",
+      "top": 452,
+      "size": 60
+    },
+    "answer": {
+      "layout": "hook-fixed",
+      "hook": "nada.<br>[mesma câmera, mesma esquadria.]",
+      "top": 420,
+      "size": 60
+    },
+    "closing": {
+      "layout": "html",
+      "body": "\n<div style=\"position:absolute;left:0;right:0;top:1180px;height:740px;background:linear-gradient(180deg,rgba(26,26,26,0) 0%,rgba(26,26,26,0.62) 34%,rgba(26,26,26,0.86) 100%)\"></div>\n<div style=\"position:absolute;left:0;right:0;top:1372px;display:flex;flex-direction:column;align-items:center;gap:0\">\n  <div style=\"width:264px;height:72px;display:flex;justify-content:center\"><svg width=\"264\" height=\"72\" viewBox=\"0 0 176 48\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"spacenode\" shape-rendering=\"geometricPrecision\">\r\n  <title>spacenode — lockup horizontal (símbolo + wordmark), monocromático</title>\r\n  <!-- Espelha components/brand/Logo.tsx com symbolSize=48: gap 12px, wordmark 22.99px peso 500, letter-spacing -0.025em -->\r\n  <g transform=\"scale(0.75)\">\r\n    <g stroke=\"#FFFFFF\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" fill=\"none\">\r\n      <line x1=\"16\" y1=\"16\" x2=\"16\" y2=\"48\" />\r\n      <line x1=\"16\" y1=\"16\" x2=\"48\" y2=\"48\" />\r\n      <line x1=\"48\" y1=\"16\" x2=\"48\" y2=\"48\" />\r\n    </g>\r\n    <g fill=\"#FFFFFF\">\r\n      <circle cx=\"16\" cy=\"16\" r=\"3\" />\r\n      <circle cx=\"16\" cy=\"48\" r=\"3\" />\r\n      <circle cx=\"48\" cy=\"48\" r=\"3\" />\r\n      <circle cx=\"48\" cy=\"16\" r=\"3\" />\r\n    </g>\r\n  </g>\r\n  <text x=\"60\" y=\"24\" fill=\"#FFFFFF\" font-family=\"GeistLocal\" font-size=\"22.99\" font-weight=\"500\" letter-spacing=\"-0.575\" dominant-baseline=\"central\">spacenode</text>\r\n</svg>\r\n</div>\n  <div style=\"margin-top:22px;display:inline-flex;align-items:center;gap:16px;padding:20px 40px;border-radius:16px;background:#f5f5f7;color:#1a1a1a;font-size:32px;font-weight:500;letter-spacing:-0.01em\">Veja no seu próprio projeto<span>→</span></div>\n  <div style=\"margin-top:18px;font-size:22px;font-weight:400;letter-spacing:0.01em;color:#c7c7cc\">80 nodes grátis · sem cartão · em português</div>\n</div>"
+    }
+  },
+  "overlays": [
+    {
+      "card": "bands",
+      "from": 0,
+      "to": 10.5
+    },
+    {
+      "card": "bandScrim",
+      "from": 0,
+      "to": 2.5
+    },
+    {
+      "card": "hook",
+      "from": 0,
+      "to": 2.5
+    },
+    {
+      "card": "bandScrim",
+      "from": 5,
+      "to": 7.8
+    },
+    {
+      "card": "answer",
+      "from": 5,
+      "to": 7.8
+    },
+    {
+      "card": "closing",
+      "from": 7.8,
+      "to": 10.5
+    }
+  ],
+  "qa": [
+    0.5,
+    1.7,
+    2,
+    2.4,
+    3,
+    4,
+    4.7,
+    5.5,
+    7.7,
+    8.5,
+    9.4
+  ]
+}

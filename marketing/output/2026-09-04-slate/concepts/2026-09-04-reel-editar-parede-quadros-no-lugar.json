@@ -1,0 +1,126 @@
+{
+ "slug": "2026-09-04-reel-editar-parede-quadros-no-lugar",
+ "title": "Cimento queimado na parede. Nenhum quadro saiu do lugar.",
+ "pillar": "fidelidade-geometrica",
+ "angle": "Editar em duas ações sobre a mesma imagem de um apartamento compacto: Trocar material (parede da galeria e do sofá em cimento queimado) com prova de que cada quadro, o violão e a prateleira ficaram onde estavam; e Remover (o espelho ao lado da porta) com a parede reconstruída limpa. O argumento é fidelidade: a edição mexe onde foi marcada e em mais nada.",
+ "format": "demonstrativo",
+ "duration_s": 15,
+ "hook_text": "Pediram cimento queimado na parede da galeria.",
+ "hook_visual": "Render do apartamento compacto (#52, verificado na miniatura): parede branca com galeria de dezenas de quadros e um violão pendurado, mesa bistrô de madeira com cadeiras thonet, cozinha ao fundo com azulejo verde e prateleira de livros, sofá amarelo-mostarda com almofadas, plantas, tapete redondo de juta e janela com cidade à direita. Faixa 16:9 centrada (as duas paredes visíveis), levemente escurecida, 1,5 s. Eyebrow 'EDITAR · TROCAR MATERIAL' + hook em uma linha.",
+ "scenes": [
+  {
+   "t": "0.0–1.5",
+   "visual": "#52 (render, 3040×1408) em banda 16:9; parado; brilho −0.10; scrim",
+   "text_on_screen": "EDITAR · TROCAR MATERIAL / Pediram cimento queimado na parede da galeria.",
+   "asset_idx": [
+    52
+   ]
+  },
+  {
+   "t": "1.5–2.0",
+   "visual": "wipeleft com régua branca sobre a imagem; texto troca em corte",
+   "text_on_screen": "",
+   "asset_idx": [
+    52,
+    797
+   ]
+  },
+  {
+   "t": "2.0–5.2",
+   "visual": "#797 (edição, 3040×1408, mesma câmera): parede da galeria e parede do sofá em cimento queimado com manchado sutil; quadros, violão, prateleira com livros, plantas pendentes, sofá amarelo, cozinha e janela idênticos; Ken Burns 1.00→1.04",
+   "text_on_screen": "Nenhum quadro saiu do lugar.",
+   "asset_idx": [
+    797
+   ]
+  },
+  {
+   "t": "5.2–5.6",
+   "visual": "fade 0,4 s",
+   "text_on_screen": "",
+   "asset_idx": [
+    797
+   ]
+  },
+  {
+   "t": "5.6–9.2",
+   "visual": "recorte empilhado da parede-galeria (crop=760:680:620:280 nos dois originais): em cima #52 (parede branca), embaixo #797 (cimento queimado), fio branco entre as faixas; Ken Burns sincronizado 1.00→1.03. Verificado em crop: todos os quadros, o pendente, o violão e a jiboia na mesma posição",
+   "text_on_screen": "Cada quadro, o violão e a prateleira: no {lugar}.",
+   "asset_idx": [
+    52,
+    797
+   ]
+  },
+  {
+   "t": "9.2–9.5",
+   "visual": "corte seco para o segundo pedido",
+   "text_on_screen": "",
+   "asset_idx": [
+    52
+   ]
+  },
+  {
+   "t": "9.5–10.7",
+   "visual": "recorte 4:3 do terço esquerdo de #52 (crop=1400:1050:0:200): porta branca, espelho ornamentado de moldura de madeira acima do aparador, violão, mesa bistrô; parado; brilho −0.10",
+   "text_on_screen": "EDITAR · REMOVER / Segundo pedido: tirar o espelho.",
+   "asset_idx": [
+    52
+   ]
+  },
+  {
+   "t": "10.7–11.2",
+   "visual": "wipeleft com régua sobre o recorte",
+   "text_on_screen": "",
+   "asset_idx": [
+    52,
+    795
+   ]
+  },
+  {
+   "t": "11.2–13.5",
+   "visual": "mesmo recorte de #795 (edição, 3040×1408): espelho removido, parede branca reconstruída sem marca, interruptor, porta, aparador, violão e quadros intactos; Ken Burns 1.00→1.03",
+   "text_on_screen": "Parede limpa. Interruptor e porta {intactos}.",
+   "asset_idx": [
+    795
+   ]
+  },
+  {
+   "t": "13.5–13.8",
+   "visual": "corte seco",
+   "text_on_screen": "",
+   "asset_idx": [
+    795
+   ]
+  },
+  {
+   "t": "13.8–15.0",
+   "visual": "card final: logo monocromático + CTA + spacenode.app",
+   "text_on_screen": "Veja no seu próprio projeto",
+   "asset_idx": []
+  }
+ ],
+ "assets": [
+  52,
+  797,
+  795
+ ],
+ "cta": "Veja no seu próprio projeto",
+ "caption": "Pediram cimento queimado na parede da galeria. Nenhum dos quadros saiu do lugar.\n\nEditar, Trocar material: a máscara cobre a parede, o material vai na instrução e o resto da imagem fica como estava — quadros, violão, prateleira, luminária, sofá, cozinha.\n\nNa mesma imagem, outro pedido: tirar o espelho ao lado da porta. Remover, contorno no objeto, parede reconstruída sem marca. Interruptor e porta no lugar.\n\nÉ o tipo de ajuste que antes voltava pra fila do render. Agora é um passo entre duas reuniões.\n\nAntes e depois: a mesma imagem, editada aqui.\n\nVeja no seu próprio projeto — link na bio.\n\n#designdeinteriores #arquitetura #renderizacao #visualizacaoarquitetonica #archviz",
+ "hashtags": [
+  "#designdeinteriores",
+  "#arquitetura",
+  "#renderizacao",
+  "#visualizacaoarquitetonica",
+  "#archviz"
+ ],
+ "paid": {
+  "primary": "Pediram cimento queimado na parede da galeria. A parede mudou; os quadros, o violão e a prateleira ficaram onde estavam.\nEditar: contorne a área, descreva o material. Mesma imagem, mesma câmera. Cadastro grátis, sem cartão.",
+  "headline": "Troque o material, não a imagem",
+  "description": "Mesma câmera, mesmo projeto",
+  "button": "SIGN_UP",
+  "cutdown_note": "Para anúncio ≤15 s a peça já fecha em 15,0 s cravados; versão 11,9 s: cortar o beat do espelho (cenas 6–9) e ir do recorte da galeria ao card final. Legenda embutida = hook + 'Nenhum quadro saiu do lugar.'"
+ },
+ "why_converts": "A galeria de quadros é o pior caso para qualquer edição por área: dezenas de objetos pequenos colados à superfície que muda. Mostrar que todos ficaram no lugar responde, com imagem e não com adjetivo, à objeção número um do arquiteto técnico ('a IA vai bagunçar o que eu já aprovei'). O segundo beat (Remover) amplia o repertório sem tour de features: dois pedidos reais de cliente, uma imagem. Quem se convence por fidelidade entra no cadastro grátis já com um render próprio para testar, e o uso recorrente de edição (cada pedido de cliente vira uma ação) é exatamente o consumo que sustenta a assinatura.",
+ "production_notes": "Arquivos: .../scratchpad/assets/0052-render-after.jpg (3040×1408, render vega 2k de 2026-06-17), .../assets/0797-edit3-after.jpg (3040×1408, job swap_material 2026-07-03 'trocar parede por cimento queimado', preservation_mode maximum) e .../assets/0795-edit3-after.jpg (3040×1408, job remove 2026-07-03 'remover espelho'). As duas edições derivam de #52 em paralelo (não em sequência): o roteiro apresenta como 'dois pedidos na mesma imagem' e nunca como 'e por cima disso'. No beat do espelho a parede da porta é branca nos dois lados (o job do cimento não a tocou), então não há confusão de material. Provas em .../checks/c2_galeria.jpg e .../checks/c2_mirror.jpg. #796 é gêmeo de #795: usar só um. Os pôsteres da galeria têm pseudo-texto: não ampliar além do recorte indicado. Aspecto 2,16:1 → banda 16:9 com crop lateral leve.",
+ "risks": "NÃO prometer 'só a parede mudou' em porcentagem nem 'nada mais foi tocado pixel a pixel' (há re-encode global invisível a olho). Não dizer 'sem retoque, sempre': o espelho saiu limpo aqui, mas remoção depende do fundo. Não ampliar os pôsteres (texto ilegível). Não tratar 'IA' como assunto. Confirmar que o modelo do apartamento é do próprio dono (permissão registrada) antes de publicar.",
+ "gated": ""
+}

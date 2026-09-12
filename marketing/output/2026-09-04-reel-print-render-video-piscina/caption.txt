@@ -1,0 +1,52 @@
+Do print do SketchUp à imagem, e da imagem ao vídeo. Mesma casa, mesma piscina, mesmo deck.
+
+A régua volta um passo sobre as espreguiçadeiras porque é ali que dá para conferir: o material mudou, a posição não. Piscina, deck, escada e balizadores continuam onde foram desenhados.
+
+Depois o Animar pega essa mesma imagem e devolve um take curto de poucos segundos — a água se mexe, a câmera sobe devagar, o projeto continua o mesmo.
+
+É visualização arquitetônica feita sobre o projeto que já existe: dá para renderizar o SketchUp a partir do print que você já tem na tela, sem remodelar nada. A imagem vai para o cliente; o take, para a apresentação ou o story do escritório.
+
+Comece grátis — sem cartão, no link da bio.
+
+#arquitetura #archviz #sketchup #apresentacaodeprojeto #visualizacaoarquitetonica
+
+
+================================================================================
+VERSÃO PAGA — 2026-09-04-reel-print-render-video-piscina-ad.mp4 (9,00 s)
+================================================================================
+Mesma peça, corte de 9 s: régua reta (sem o passo atrás), hold do render de 1 s,
+take cortado nos primeiros 4 s e card final sólido no lugar do overlay de fecho.
+Som off, legenda embutida, sem URL na arte — o destino é o botão do anúncio.
+
+--------------------------------------------------------------------------------
+A · ângulo FIDELIDADE (o projeto não muda)
+--------------------------------------------------------------------------------
+Texto primário: Piscina, deck e espreguiçadeiras onde você desenhou. O render vira um take curto: a água se mexe, o projeto não.
+Título (33): Piscina e deck onde você desenhou
+Descrição (23): Sem cartão para começar
+Botão: SIGN_UP
+
+--------------------------------------------------------------------------------
+B · ângulo PRAZO (o caminho curto)
+--------------------------------------------------------------------------------
+Texto primário: Sobe o print do SketchUp e a imagem de apresentação sai em minutos. Depois o mesmo render vira um take curto.
+Título (28): Do print à imagem em minutos
+Descrição (27): 80 nodes grátis, sem cartão
+Botão: SIGN_UP
+
+--------------------------------------------------------------------------------
+C · ângulo APRESENTAÇÃO (o que vai para o cliente)
+--------------------------------------------------------------------------------
+Texto primário: Imagem para o cliente e um take curto para a apresentação, do mesmo print do SketchUp. Sem renderista, sem fila de render.
+Título (31): Imagem e vídeo do mesmo projeto
+Descrição (24): Em português, sem cartão
+Botão: LEARN_MORE
+
+--------------------------------------------------------------------------------
+Notas de veiculação
+--------------------------------------------------------------------------------
+- O júri do slate deu conversão 6 para esta peça (vende recurso, atrai curioso):
+  usar A e B em retargeting de quem já visitou/cadastrou e C em públicos frios.
+- Nenhuma variação promete "câmera parada", "sem alterações", "tempo real" nem
+  duração de vídeo maior que o take real (~5 s). Nenhuma nomeia motor/provedor.
+- "em minutos" é o único claim de tempo aprovado; não trocar por número.

@@ -1,0 +1,148 @@
+{
+ "slug": "2026-09-05-reel-quantas-vistas-cabem",
+ "accent": false,
+ "segments": [
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0564-vista-before.jpg",
+   "dur": 1.4,
+   "kenburns": [
+    1,
+    1
+   ],
+   "brightness": -0.12
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0563-vista-after.jpg",
+   "dur": 1.2,
+   "kenburns": [
+    1,
+    1.03
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0722-vista-after.jpg",
+   "dur": 0.7,
+   "kenburns": [
+    1,
+    1.02
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0724-vista-after.jpg",
+   "dur": 0.7,
+   "kenburns": [
+    1,
+    1.02
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0726-vista-after.jpg",
+   "dur": 0.7,
+   "kenburns": [
+    1,
+    1.02
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0729-vista-after.jpg",
+   "dur": 0.7,
+   "kenburns": [
+    1,
+    1.02
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0735-vista-after.jpg",
+   "dur": 2.2,
+   "kenburns": [
+    1,
+    1.05
+   ]
+  },
+  {
+   "type": "card",
+   "card": "final",
+   "dur": 1
+  }
+ ],
+ "transitions": [
+  {
+   "type": "wipeleft",
+   "dur": 0.5,
+   "ruler": true
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "fade",
+   "dur": 0.3
+  }
+ ],
+ "cards": {
+  "scrim": {
+   "layout": "scrim"
+  },
+  "a": {
+   "layout": "hook-sub",
+   "hook": "quantas vistas cabem numa reunião?",
+   "eyebrow": "modelo"
+  },
+  "b": {
+   "layout": "hook-sub",
+   "hook": "quantas vistas cabem numa reunião?",
+   "eyebrow": "space · corporativo"
+  },
+  "c": {
+   "layout": "hook-sub",
+   "hook": "todas.",
+   "eyebrow": "space · corporativo",
+   "sub": "um modelo, um Space, quantas vistas precisar."
+  },
+  "final": {
+   "layout": "final",
+   "cta": "Teste com um projeto real"
+  }
+ },
+ "overlays": [
+  {
+   "card": "scrim",
+   "from": 0,
+   "to": 6.8
+  },
+  {
+   "card": "a",
+   "from": 0,
+   "to": 1.4
+  },
+  {
+   "card": "b",
+   "from": 1.4,
+   "to": 4.9
+  },
+  {
+   "card": "c",
+   "from": 4.9,
+   "to": 6.8
+  }
+ ]
+}

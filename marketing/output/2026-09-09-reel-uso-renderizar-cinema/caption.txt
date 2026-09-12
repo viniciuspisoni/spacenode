@@ -1,0 +1,9 @@
+o print do SketchUp vira render sem você escrever prompt nenhum.
+
+você sobe a imagem, escolhe espaço, iluminação e entorno numa lista de arquiteto, escolhe o motor e a resolução — e o preço em nodes aparece no botão antes de você clicar. Vega em 2K sai por 20 nodes.
+
+o render volta com a mesma câmera, a mesma geometria e o mesmo layout do modelo que você mandou.
+
+teste grátis no link da bio — 80 nodes no cadastro, dá 4 renders no Vega 2K.
+
+#arquitetura #render #sketchup #archviz #arquiteto #renderizacao #iaparaarquitetos #projetodeinteriores

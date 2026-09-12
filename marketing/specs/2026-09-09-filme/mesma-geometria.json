@@ -1,0 +1,152 @@
+{
+  "_nota": "Filme de apresentação do SPACENODE. Tese: fidelidade geométrica — a única qualidade de imagem que exige TEMPO para ser verificada. Gramática de keynote: imagem cheia sem texto, corte para preto com uma frase, volta à imagem. Master 16:9 sem letterbox (barras comeriam 26% do quadro e quebrariam os planos de interface). Renderizado por marketing/scripts/cinema.mjs.",
+  "slug": "2026-09-09-filme-mesma-geometria",
+  "frame": { "w": 1920, "h": 1080 },
+
+  "segments": [
+    { "type": "black", "dur": 0.8 },
+
+    { "_ato": "1 — o modelo",
+      "type": "still", "src": "$REPO/marketing/output/2026-09-07-reel-plugin-no-sketchup/src/su-169-center.png",
+      "dur": 4.2, "fit": "cover", "zoom": [1.04, 1.0] },
+    { "type": "card", "card": "c1", "dur": 3.2 },
+
+    { "_ato": "2 — a prova. Recorte fracionário IDÊNTICO nos dois: as imagens têm resoluções diferentes (3072x2304 e 2368x1776) mas o mesmo aspecto 4:3 e a mesma câmera, então a fração alinha pixel a pixel.",
+      "type": "still", "src": "$REPO/marketing/output/2026-09-07-reel-plugin-no-sketchup/src/sala-de71-antes.png",
+      "cropFrac": [0, 0.06, 1, 0.75], "dur": 4.4, "fit": "cover", "zoom": [1, 1.02] },
+    { "type": "still", "src": "$REPO/marketing/output/2026-09-07-reel-plugin-no-sketchup/src/sala-de71-depois.png",
+      "cropFrac": [0, 0.06, 1, 0.75], "dur": 5.2, "fit": "cover", "zoom": [1, 1.03] },
+    { "type": "card", "card": "c2", "dur": 3.0 },
+
+    { "_nota": "O par de macros é o plano central do filme: mesma quina, mesma viga, mesma direção das ripas. Corte seco entre os dois — sem transição, para que o olho compare em vez de assistir.",
+      "type": "still", "src": "$REPO/marketing/output/2026-09-07-reel-plugin-no-sketchup/src/sala-de71-depois.png",
+      "cropFrac": [0.62, 0.16, 0.33, 0.2475], "dur": 3.4, "fit": "cover", "zoom": [1, 1.04] },
+    { "type": "still", "src": "$REPO/marketing/output/2026-09-07-reel-plugin-no-sketchup/src/sala-de71-antes.png",
+      "cropFrac": [0.62, 0.16, 0.33, 0.2475], "dur": 3.4, "fit": "cover", "zoom": [1, 1.04] },
+    { "type": "card", "card": "c3", "dur": 2.8 },
+
+    { "_ato": "3 — a luz. O b-roll é o render REAL animado pelo motor Cinemático do próprio Animar (Veo 3.1). Só 2,4 s: depois disso o modelo começa a inventar geometria (ver broll/LEIA-ME.md).",
+      "type": "video", "src": "$REPO/marketing/output/2026-09-09-filme/broll/sala-dolly.mp4",
+      "start": 0, "dur": 2.4 },
+    { "type": "still", "src": "$REPO/marketing/output/2026-09-07-reel-plugin-no-sketchup/src/sala-3d0d-depois.png",
+      "cropFrac": [0, 0.06, 1, 0.75], "dur": 4.8, "fit": "cover", "zoom": [1, 1.03] },
+    { "type": "card", "card": "c4", "dur": 3.0 },
+
+    { "_ato": "4 — a escala. Todos esses começaram num modelo cinza.",
+      "type": "video", "src": "$REPO/marketing/output/2026-09-09-filme/broll/casa-travelling.mp4",
+      "start": 0, "dur": 5.0 },
+    { "type": "still", "src": "$REPO/marketing/renders/depois/industrial.jpg", "dur": 4.0, "fit": "cover", "zoom": [1.03, 1.0] },
+    { "type": "still", "src": "$REPO/marketing/renders/depois/comercial.jpg", "dur": 4.0, "fit": "cover", "zoom": [1, 1.03] },
+    { "type": "card", "card": "c5", "dur": 3.0 },
+
+    { "_ato": "5 — o produto. Única interface do filme: o botão real do Renderizar, 902x98, flutuando no preto. O preço está queimado no pixel da UI — nenhum adjetivo em cima.",
+      "type": "still", "src": "$REPO/marketing/output/2026-09-08-tutoriais/src/renderizar/06-botao-gerar-com-preco.png",
+      "dur": 3.8, "fit": "contain", "inset": 300, "reserveBottom": 240, "zoom": [1, 1.03] },
+    { "type": "card", "card": "c6", "dur": 3.4 },
+    { "type": "card", "card": "final", "dur": 3.8 }
+  ],
+
+  "transitions": [
+    { "type": "fade", "dur": 0.5 },
+    { "type": "fade", "dur": 0.6 },
+    { "type": "fade", "dur": 0.5 },
+    { "type": "wipeleft", "dur": 1.2 },
+    { "type": "fade", "dur": 0.6 },
+    { "type": "fade", "dur": 0.5 },
+    { "type": "cut" },
+    { "type": "fade", "dur": 0.6 },
+    { "type": "fade", "dur": 0.5 },
+    { "type": "dissolve", "dur": 0.9 },
+    { "type": "fade", "dur": 0.6 },
+    { "type": "fade", "dur": 0.5 },
+    { "type": "fade", "dur": 0.5 },
+    { "type": "fade", "dur": 0.5 },
+    { "type": "fade", "dur": 0.6 },
+    { "type": "fade", "dur": 0.5 },
+    { "type": "fade", "dur": 0.6 },
+    { "type": "dissolve", "dur": 0.8 }
+  ],
+
+  "cards": {
+    "c1": { "layout": "line", "big": "o projeto já existe.", "small": "[a imagem dele, ainda não.]" },
+    "c2": { "layout": "line", "big": "mesma câmera.<br>[mesma geometria.]" },
+    "c3": { "layout": "line", "big": "nada foi reinterpretado." },
+    "c4": { "layout": "line", "big": "a luz muda.<br>[o projeto não.]" },
+    "c5": { "layout": "line", "big": "todos começaram<br>[num modelo cinza.]" },
+    "c6": { "layout": "line", "big": "visualização arquitetônica<br>[que respeita seu projeto.]" },
+    "botao": { "layout": "lower", "label": "renderizar", "text": "o preço aparece antes do clique." },
+    "final": { "layout": "final", "cta": "Testar com um projeto real", "micro": "{80} nodes grátis · sem cartão · em português" }
+  },
+
+  "_overlays_nota": "Tempo GLOBAL, tirado de `--plan`. O segmento 16 (o botão) roda de 47,50 s a 51,30 s.",
+  "overlays": [
+    { "card": "botao", "from": 47.9, "to": 50.9, "fade": 0.5 }
+  ],
+
+  "_vertical_nota": [
+    "Corte 9:16 como PATCH do mesmo arquivo — master e corte nunca saem de sincronia.",
+    "Três decisões:",
+    "1. Todo plano vai em `contain` com `inset: 0`: um 16:9 em `cover` dentro de 1080x1920 perde 69%",
+    "   da largura e leva junto o enquadramento do arquiteto. Banda sobre preto preserva a foto inteira.",
+    "2. Os planos abertos da sala perdem o `cropFrac` (viram null): sem ele a imagem usa o 4:3 nativo e",
+    "   ocupa 810 px de altura em vez de 607. Mais imagem na tela, mesma câmera.",
+    "3. O par de macros MANTÉM o `cropFrac` idêntico do master — é a prova da peça, não pode mudar.",
+    "O ato da escala perde o plano industrial (cena 13) para o corte caber em ~47 s de Reel."
+  ],
+  "vertical": {
+    "slug": "2026-09-09-filme-mesma-geometria-vertical",
+    "frame": { "w": 1080, "h": 1920 },
+    "segmentPatch": {
+      "1":  { "fit": "contain", "inset": 0, "dur": 3.4 },
+      "3":  { "fit": "contain", "inset": 0, "cropFrac": null, "dur": 3.8 },
+      "4":  { "fit": "contain", "inset": 0, "cropFrac": null, "dur": 4.6 },
+      "6":  { "fit": "contain", "inset": 0, "cropFrac": [0.62, 0.10, 0.36, 0.48], "dur": 3.0 },
+      "7":  { "fit": "contain", "inset": 0, "cropFrac": [0.62, 0.10, 0.36, 0.48], "dur": 3.0 },
+      "9":  { "fit": "contain", "dur": 2.4 },
+      "10": { "fit": "contain", "inset": 0, "cropFrac": null, "dur": 4.2 },
+      "12": { "fit": "contain", "dur": 4.4 },
+      "13": null,
+      "14": { "fit": "contain", "inset": 0, "dur": 3.6 },
+      "16": { "fit": "contain", "inset": 60, "reserveBottom": 0, "dur": 3.4 },
+      "0":  { "dur": 0.6 },
+      "2":  { "dur": 3.0 },
+      "5":  { "dur": 2.8 },
+      "8":  { "dur": 2.6 },
+      "11": { "dur": 2.8 },
+      "15": { "dur": 2.8 },
+      "17": { "dur": 3.2 },
+      "18": { "dur": 3.6 }
+    },
+    "transitions": [
+      { "type": "fade", "dur": 0.5 },
+      { "type": "fade", "dur": 0.6 },
+      { "type": "fade", "dur": 0.5 },
+      { "type": "wipeleft", "dur": 1.2 },
+      { "type": "fade", "dur": 0.6 },
+      { "type": "fade", "dur": 0.5 },
+      { "type": "cut" },
+      { "type": "fade", "dur": 0.6 },
+      { "type": "fade", "dur": 0.5 },
+      { "type": "dissolve", "dur": 0.9 },
+      { "type": "fade", "dur": 0.6 },
+      { "type": "fade", "dur": 0.5 },
+      { "type": "fade", "dur": 0.5 },
+      { "type": "fade", "dur": 0.6 },
+      { "type": "fade", "dur": 0.5 },
+      { "type": "fade", "dur": 0.6 },
+      { "type": "dissolve", "dur": 0.8 }
+    ],
+    "cards": {
+      "c1": { "layout": "line", "big": "o projeto já existe.", "small": "[a imagem dele, ainda não.]", "px": 76 },
+      "c2": { "layout": "line", "big": "mesma câmera.<br>[mesma geometria.]", "px": 80 },
+      "c3": { "layout": "line", "big": "nada foi reinterpretado.", "px": 70 },
+      "c4": { "layout": "line", "big": "a luz muda.<br>[o projeto não.]", "px": 80 },
+      "c5": { "layout": "line", "big": "todos começaram<br>[num modelo cinza.]", "px": 76 },
+      "c6": { "layout": "line", "big": "visualização arquitetônica<br>[que respeita seu projeto.]", "px": 64 }
+    },
+    "_overlays_nota": "Tempos do `--plan --vertical`: o botão é o segmento 15, de 38,40 s a 41,80 s.",
+    "overlays": [
+      { "card": "botao", "from": 38.8, "to": 41.4, "fade": 0.5 }
+    ]
+  }
+}

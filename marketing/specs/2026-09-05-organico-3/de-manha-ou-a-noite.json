@@ -1,0 +1,75 @@
+{
+ "slug": "2026-09-05-reel-de-manha-ou-a-noite",
+ "accent": false,
+ "segments": [
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0579-vista-after.jpg",
+   "dur": 2.2,
+   "kenburns": [
+    1,
+    1.04
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0582-vista-after.jpg",
+   "dur": 2.6,
+   "kenburns": [
+    1.04,
+    1.08
+   ]
+  },
+  {
+   "type": "card",
+   "card": "final",
+   "dur": 1
+  }
+ ],
+ "transitions": [
+  {
+   "type": "cut"
+  },
+  {
+   "type": "fade",
+   "dur": 0.3
+  }
+ ],
+ "cards": {
+  "scrim": {
+   "layout": "scrim"
+  },
+  "a": {
+   "layout": "hook-sub",
+   "hook": "seu cliente vai de manhã ou à noite?",
+   "eyebrow": "café · nascer do sol"
+  },
+  "b": {
+   "layout": "hook-sub",
+   "hook": "os dois.",
+   "eyebrow": "café · blue hour",
+   "sub": "mesmo café. mesma câmera. duas luzes."
+  },
+  "final": {
+   "layout": "final",
+   "cta": "Teste com um projeto real"
+  }
+ },
+ "overlays": [
+  {
+   "card": "scrim",
+   "from": 0,
+   "to": 4.5
+  },
+  {
+   "card": "a",
+   "from": 0,
+   "to": 2.2
+  },
+  {
+   "card": "b",
+   "from": 2.2,
+   "to": 4.5
+  }
+ ]
+}

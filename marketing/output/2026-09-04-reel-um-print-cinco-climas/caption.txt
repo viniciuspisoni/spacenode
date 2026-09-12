@@ -1,0 +1,36 @@
+ARQUIVOS E USO
+- Feed (Reel) + Stories · orgânico · 10,0 s:
+  marketing/output/2026-09-04-reel-um-print-cinco-climas/2026-09-04-reel-um-print-cinco-climas.mp4
+  → usa a legenda abaixo (bloco ORGÂNICO). Em Stories, entra o mesmo arquivo com sticker de link; o CTA já está impresso no fecho.
+- Anúncio pago (Meta · SIGN_UP · som off) · 8,5 s:
+  marketing/output/2026-09-04-reel-um-print-cinco-climas-ad/2026-09-04-reel-um-print-cinco-climas-ad.mp4
+  → usa o bloco VERSÃO PAGA. Não publicar essa versão no orgânico (hook fixo o vídeo inteiro e card final sólido para o botão do anúncio).
+
+---------------------------------------------------------------
+ORGÂNICO (feed + stories)
+
+O cliente pergunta "e à noite?". Mesmo print do SketchUp, mesma câmera, cinco respostas.
+
+Dia, chuva, entardecer, hora azul e noite. Concreto, ripado, escada e o carro na rua ficam onde estavam no modelo.
+
+No fluxo tradicional essa pergunta custa um render inteiro de novo. Aqui é outra geração sobre o mesmo print, em minutos: sobe o print, escolhe a atmosfera, gera. Sem remodelar, sem trocar de câmera.
+
+Cinco versões para levar à reunião.
+
+Renderize seu projeto — link na bio.
+
+#arquitetura #render #sketchup #projetodearquitetura #archviz
+
+---------------------------------------------------------------
+VERSÃO PAGA (Meta · SIGN_UP · som off · 2026-09-04-reel-um-print-cinco-climas-ad.mp4, 8,5 s)
+
+Texto primário (A · fidelidade, ≤125 visíveis):
+"E à noite?" Mesmo print do SketchUp, cinco climas, mesma câmera. Gerado em minutos, sem remodelar.
+
+Título (≤40): Cinco climas do mesmo print
+Descrição (≤30): Comece grátis, sem cartão
+Botão: Cadastre-se (SIGN_UP) → spacenode.app
+
+Alternativas de texto primário (teste A/B):
+B · prazo: Apresentação amanhã e o cliente quer ver de noite, de dia e na chuva? Um print, cinco climas, cada um gerado em minutos. · Título: Cinco climas antes da reunião · Descrição: Cada render em minutos
+C · apresentação: Dia, entardecer e noite do mesmo projeto, na mesma reunião. Mesmo print, mesma câmera, sem remodelar. · Título: Cinco versões para a reunião · Descrição: Cadastro grátis, sem cartão
