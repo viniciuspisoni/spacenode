@@ -27,7 +27,7 @@ module SpaceNode
   module SketchUp
     extend self
 
-    VERSION = '1.3.0'
+    VERSION = '1.3.1'
     PREFERENCES_KEY = 'com.spacenode.sketchup'
     DEFAULT_API_BASE_URL = 'https://spacenode.app'
     MIN_SKETCHUP_MAJOR = 21          # Ruby 2.7+; recomendado 2024+
@@ -89,6 +89,16 @@ module SpaceNode
         :pairing_waiting => 'Confirme o código no navegador…',
         :pairing_expired => 'O código expirou. Clique em Conectar pra gerar outro.',
         :pairing_failed => 'Não foi possível conectar. Tente de novo.',
+        :offline => 'Sem resposta de %s. Clique em "Testar conexão" — antivírus, firewall, proxy ou VPN costumam ser a causa.',
+        :diag_running => 'Testando a conexão…',
+        :diag_ok => 'O SketchUp está falando com a SPACENODE normalmente. Se o erro voltar, foi coisa passageira — clique em Conectar de novo.',
+        :diag_server => 'Chegamos até a SPACENODE, mas o servidor respondeu com erro. Não é a sua internet: tente de novo em alguns minutos.',
+        :diag_blocked_all => 'O SketchUp não está conseguindo sair pra internet nesta máquina. O navegador abrir o site normalmente NÃO descarta isto: antivírus com inspeção de HTTPS, firewall e proxy barram o SketchUp em separado. Libere o SketchUp neles — ou teste na rede do celular pra confirmar.',
+        :diag_blocked_host => 'A internet do SketchUp funciona, mas ele não chega em %s. Costuma ser DNS, VPN ou a rede do escritório bloqueando o endereço. Teste na rede do celular pra confirmar.',
+        :diag_no_answer => 'sem resposta',
+        :diag_timeout => 'tempo esgotado',
+        :diag_account_off => 'desconectada',
+        :diag_server_changed => 'alterado',
         :save_title => 'Salvar render',
         :notif_plan_ready => 'Planta humanizada pronta',
         :plan_capturing => 'Desenhando a planta do modelo…',
@@ -159,6 +169,16 @@ module SpaceNode
         :pairing_waiting => 'Confirm the code in your browser…',
         :pairing_expired => 'The code expired. Click Connect to get a new one.',
         :pairing_failed => 'Could not connect. Try again.',
+        :offline => 'No answer from %s. Click "Test connection" — antivirus, firewall, proxy or VPN are the usual cause.',
+        :diag_running => 'Testing the connection…',
+        :diag_ok => 'SketchUp is talking to SPACENODE normally. If the error comes back it was transient — click Connect again.',
+        :diag_server => 'We reached SPACENODE, but the server answered with an error. This is not your internet: try again in a few minutes.',
+        :diag_blocked_all => 'SketchUp cannot reach the internet on this machine. The browser opening the site does NOT rule this out: antivirus with HTTPS inspection, firewalls and proxies block SketchUp separately. Allow SketchUp in them — or test on your phone hotspot to confirm.',
+        :diag_blocked_host => 'SketchUp has internet, but it cannot reach %s. Usually DNS, a VPN or the office network blocking the address. Test on your phone hotspot to confirm.',
+        :diag_no_answer => 'no answer',
+        :diag_timeout => 'timed out',
+        :diag_account_off => 'signed out',
+        :diag_server_changed => 'changed',
         :save_title => 'Save render',
         :notif_plan_ready => 'Humanised plan ready',
         :plan_capturing => 'Drawing the plan from the model…',
@@ -581,6 +601,13 @@ module SpaceNode
           emit_error(e.message)
         end
       end
+      dialog.add_action_callback('diagnose') do |_ctx|
+        begin
+          run_diagnostics
+        rescue StandardError => e
+          emit_error(e.message)
+        end
+      end
       dialog.add_action_callback('cancelPairing') do |_ctx|
         stop_pairing
         emit('pairingDone', { :ok => false })
@@ -769,13 +796,151 @@ module SpaceNode
         elsif status == 413
           'Imagem grande demais pro envio direto. Tente novamente.'
         elsif status.zero?
-          'Não foi possível conectar à SPACENODE. Verifique sua internet.'
+          # status 0 do Sketchup::Http = NENHUMA resposta (DNS, TLS, conexão
+          # recusada). "Verifique sua internet" mandava procurar no lugar
+          # errado: o navegador da mesma máquina abre o site, e quem barra o
+          # SketchUp em separado é antivírus com inspeção de HTTPS, firewall
+          # ou proxy. Nomear o host e apontar o teste dá o próximo passo.
+          t(:offline) % api_host
         else
           "Erro HTTP #{status}"
         end
       error = ApiError.new(message, status)
       handle_auth_failure if status == 401
       on_error.call(error)
+    end
+
+    # ── Diagnóstico de conexão ──────────────────────────────────────────────
+    #
+    # Quando o plugin não fala com o servidor, o usuário só via uma frase que
+    # apontava pro lugar errado ("verifique sua internet") — e o suporte
+    # recebia print de painel sem um único dado. Duas sondas resolvem as duas
+    # coisas: uma no NOSSO host, outra numa URL neutra. Os quatro cruzamentos
+    # dizem de que lado está o bloqueio, e o relatório vai pro suporte em um
+    # clique, com versão, SketchUp, sistema, servidor e o tempo de cada sonda.
+
+    # 204 sem corpo, servido no mundo inteiro: é o mesmo endereço que o
+    # Android usa pra decidir se a rede tem saída. Vai SEM Authorization —
+    # nenhum token da conta pode viajar pra fora do nosso domínio.
+    NEUTRAL_PROBE_URL = 'https://www.google.com/generate_204'
+    PROBE_TIMEOUT_SECONDS = 12
+    PROBE_TIMEOUT_STATUS = -1
+
+    def run_diagnostics
+      return if @diagnosing
+
+      @diagnosing = true
+      emit('diagnosis', { :running => true, :message => t(:diag_running) })
+      probe("#{api_base_url}/api/sketchup/ping") do |ours|
+        probe(NEUTRAL_PROBE_URL) do |neutral|
+          @diagnosing = false
+          verdict = diagnosis_verdict(ours, neutral)
+          emit('diagnosis', {
+            :running => false,
+            :ok => verdict == :diag_ok,
+            :message => diagnosis_message(verdict),
+            :report => diagnosis_report(ours, neutral, verdict)
+          })
+        end
+      end
+    rescue StandardError => e
+      @diagnosing = false
+      emit_error(e.message)
+    end
+
+    # Uma sonda = uma tentativa, com veredito em PROBE_TIMEOUT_SECONDS no
+    # máximo. Sketchup::Http não tem timeout: sem o watchdog, um proxy que
+    # engole a conexão deixaria o diagnóstico rodando pra sempre — o pior
+    # resultado possível pra quem já está travado.
+    def probe(url, &done)
+      started = Time.now
+      settled = false
+      settle = proc do |status|
+        next if settled
+
+        settled = true
+        done.call({
+          :url => url,
+          :status => status.to_i,
+          :ms => ((Time.now - started) * 1000).round
+        })
+      end
+
+      request = begin
+        http_request(:get, url, { :auth => false }) { |response| settle.call(response.status_code) }
+      rescue StandardError
+        nil
+      end
+      return settle.call(0) unless request
+
+      ::UI.start_timer(PROBE_TIMEOUT_SECONDS, false) do
+        unless settled
+          begin
+            request.cancel
+          rescue StandardError
+            nil
+          end
+          settle.call(PROBE_TIMEOUT_STATUS)
+        end
+      end
+    end
+
+    # 2xx/3xx no nosso host = o caminho existe (o 3xx é redirect, que o
+    # Sketchup::Http não segue — pra sonda, chegar já basta).
+    def diagnosis_verdict(ours, neutral)
+      status = ours[:status]
+      return :diag_ok if status >= 200 && status < 400
+      return :diag_server if status >= 400
+
+      neutral[:status] >= 200 && neutral[:status] < 400 ? :diag_blocked_host : :diag_blocked_all
+    end
+
+    def diagnosis_message(verdict)
+      verdict == :diag_blocked_host ? (t(verdict) % api_host) : t(verdict)
+    end
+
+    def diagnosis_report(ours, neutral, verdict)
+      platform = begin
+        ::Sketchup.platform == :platform_win ? 'Windows' : 'macOS'
+      rescue StandardError
+        '?'
+      end
+      version = begin
+        ::Sketchup.version.to_s
+      rescue StandardError
+        '?'
+      end
+      account = if authenticated?
+                  email = ::Sketchup.read_default(PREFERENCES_KEY, 'user_email', '').to_s
+                  email.empty? ? 'ok' : email
+                else
+                  t(:diag_account_off)
+                end
+      custom = api_base_url == DEFAULT_API_BASE_URL ? '' : " (#{t(:diag_server_changed)})"
+
+      [
+        "SPACENODE #{VERSION} · SketchUp #{version} · #{platform} · #{locale}",
+        "#{api_base_url}#{custom} · #{account}",
+        probe_line(ours),
+        probe_line(neutral),
+        verdict.to_s
+      ].join("\n")
+    end
+
+    def probe_line(result)
+      status = result[:status]
+      label =
+        if status == PROBE_TIMEOUT_STATUS then t(:diag_timeout)
+        elsif status.zero? then t(:diag_no_answer)
+        else "HTTP #{status}"
+        end
+      "#{result[:url]} → #{label} (#{result[:ms]} ms)"
+    end
+
+    def api_host
+      URI.parse(api_base_url).host.to_s
+    rescue StandardError
+      'spacenode.app'
     end
 
     # ── Sessão (pareamento por código — device flow) ─────────────────────────
@@ -797,8 +962,15 @@ module SpaceNode
         'SketchUp'
       end
 
+      on_error = proc do |error|
+        emit_error(error.message)
+        # Clicar em Conectar é onde a falha de rede aparece primeiro. Rodar o
+        # diagnóstico aqui é o que separa "a internet caiu" de "o SketchUp
+        # está bloqueado nesta máquina" sem exigir que o usuário ache o botão.
+        run_diagnostics if error.respond_to?(:status) && error.status.to_i.zero?
+      end
       json_request(:post, '/api/sketchup/pair/start', { :deviceName => device_name },
-                   proc { |e| emit_error(e.message) }, :auth => false) do |data|
+                   on_error, :auth => false) do |data|
         device_id = data['deviceId'].to_s
         secret = data['deviceSecret'].to_s
         code = data['userCode'].to_s

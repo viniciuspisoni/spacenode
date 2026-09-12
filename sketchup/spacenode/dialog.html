@@ -641,6 +641,17 @@
     .insufficient .alt { margin-top: 8px; font-size: 11px; color: var(--text-3); text-align: center; }
     .insufficient .alt button { color: var(--text-2); text-decoration: underline; text-underline-offset: 2px; font-size: 11px; }
     .dock .insufficient { margin: 0 0 10px; }
+    /* Teste de conexão: o relatório existe pra ser COPIADO (vai pro suporte)
+       — monoespaçada, uma linha por sonda e seleção liberada. */
+    #diagMessage { line-height: 1.45; }
+    #diagBox.is-ok #diagMessage { color: var(--green); }
+    #diagReport {
+      margin-top: 9px; padding-top: 8px; border-top: 0.5px solid var(--glass-line);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 10px; line-height: 1.5; color: var(--text-4);
+      white-space: pre-line; word-break: break-all;
+      -webkit-user-select: text; user-select: text;
+    }
 
     /* ── Conexão ─────────────────────────────────────────────────────────── */
     .connection {
@@ -651,7 +662,7 @@
     .conn-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-3); flex: 0 0 7px; }
     .conn-dot.is-on { background: var(--green); box-shadow: 0 0 10px var(--green-glow); }
     .conn-sub { margin-top: 2px; color: var(--text-3); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .conn-actions { display: flex; gap: 6px; }
+    .conn-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
     .conn-actions .ghost { height: 30px; font-size: 11.5px; padding: 0 12px; }
 
     /* ── Resultado / histórico / lote ────────────────────────────────────── */
@@ -806,6 +817,7 @@
       </div>
       <div class="conn-actions">
         <button class="ghost" id="disconnectButton" style="display:none" title="Sair da conta"><span id="signOutLabel">Sair</span></button>
+        <button class="ghost" id="diagButton" title="Testar a conexão do SketchUp com a SPACENODE">Testar conexão</button>
         <button class="ghost" id="connectButton">Conectar</button>
       </div>
     </section>
@@ -818,6 +830,21 @@
         <button id="pairingReopen">abrir o navegador de novo</button>
         <span style="color:var(--text-4)"> · </span>
         <button id="pairingCancel">cancelar</button>
+      </div>
+    </div>
+
+    <!-- Teste de conexão: "verifique sua internet" era um beco sem saída —
+         o navegador da mesma máquina abre o site e o SketchUp não. O Ruby
+         sonda o nosso host e uma URL neutra; aqui sai o veredito em
+         português e o relatório que o suporte precisa. -->
+    <div class="insufficient" id="diagBox">
+      <b id="diagTitle">Teste de conexão</b>
+      <div class="math" id="diagMessage"></div>
+      <div id="diagReport"></div>
+      <div class="alt">
+        <button id="diagCopy">copiar relatório</button>
+        <span id="diagSep" style="color:var(--text-4)"> · </span>
+        <button id="diagClose">fechar</button>
       </div>
     </div>
 
@@ -1454,6 +1481,8 @@
         cancelledLate: 'Cancelado no painel. Se a geração já tinha sido enviada, o render pode aparecer no Histórico (Nodes debitados).',
         pairingTitle: 'Conecte no navegador', pairingHint: 'Confirme este código na página que abriu:',
         pairingReopen: 'abrir o navegador de novo', pairingCancel: 'cancelar',
+        diagButton: 'Testar conexão', diagTitle: 'Teste de conexão', diagRunning: 'Testando a conexão…',
+        diagCopy: 'copiar relatório', diagCopied: 'relatório copiado', diagClose: 'fechar',
         cancel: 'cancelar',
         capturingOverlay: 'Capturando a vista…',
         nodesPerImage: function (n) { return n + ' Nodes por imagem'; },
@@ -1637,6 +1666,8 @@
         cancelledLate: 'Cancelled in the panel. If the generation was already sent, the render may appear in History (Nodes charged).',
         pairingTitle: 'Connect in your browser', pairingHint: 'Confirm this code on the page that opened:',
         pairingReopen: 'open the browser again', pairingCancel: 'cancel',
+        diagButton: 'Test connection', diagTitle: 'Connection test', diagRunning: 'Testing the connection…',
+        diagCopy: 'copy report', diagCopied: 'report copied', diagClose: 'close',
         cancel: 'cancel',
         capturingOverlay: 'Capturing the view…',
         nodesPerImage: function (n) { return n + ' Nodes per image'; },
@@ -1918,6 +1949,7 @@
      'downloadButton','openResultButton','projectTypeCards','segmentPills','environmentPills','lightingPills',
      'backgroundLabel','backgroundPills','prompt','elementsPills','engineCards','resolutionCards',
      'notice','insufficient','insufficientTitle','insufficientMath','insufficientBuy','insufficientAlt',
+     'diagButton','diagBox','diagTitle','diagMessage','diagReport','diagCopy','diagSep','diagClose',
      'generateButton','generateLabel','generateMeta','generateKbd','dockSummary','variationButton','reachLine','historySection','historyGrid','historyEmpty','historyMore',
      'videoCard','videoPoster','videoCaption','videoOpenButton','videoSaveButton','videoRevealButton','videoSiteButton','videoHint','animarShortcutButton',
      'animarSection','animarTypePills','animarTypeHint','animarEnginePills','animarDurationPills','animarRatioNote','animarButton','animarLabel','animarMeta','animarNote',
@@ -2724,11 +2756,14 @@
       els.connDot.classList.toggle('is-on', model.authenticated);
       els.connTitle.textContent = model.authenticated ? tt('connTitleOn') : tt('connTitleOff');
       els.connectButton.textContent = model.authenticated ? tt('switchAccount') : tt('connect');
+      els.diagButton.textContent = tt('diagButton');
       els.disconnectButton.style.display = model.authenticated ? '' : 'none';
 
       els.captureButton.disabled = model.generating;
       els.connectButton.disabled = model.generating;
       els.disconnectButton.disabled = model.generating;
+      // diagButton fica de fora desta lista de propósito: uma geração travada
+      // é justamente quando se quer saber se a conexão ainda está de pé.
       var unverified = !!(model.result && model.result._unverified);
       els.downloadButton.disabled = model.generating || unverified;
       els.openResultButton.disabled = model.generating || unverified;
@@ -3435,6 +3470,57 @@
       document.getElementById('pairingBox').classList.remove('is-visible');
     });
     els.disconnectButton.addEventListener('click', function () { callSketchUp('disconnect'); });
+
+    // ── Teste de conexão ──────────────────────────────────────────────────
+    // A carta de conexão troca de lugar (topo quando desconectado, folha de
+    // Preferências quando conectado), então o clique fecha a folha antes: o
+    // resultado aparece no painel, não atrás dela.
+    function showDiag(message, report, ok) {
+      els.diagTitle.textContent = tt('diagTitle');
+      els.diagBox.classList.toggle('is-ok', !!ok);
+      els.diagMessage.textContent = message || '';
+      els.diagReport.textContent = report || '';
+      els.diagReport.style.display = report ? '' : 'none';
+      els.diagCopy.style.display = report ? '' : 'none';
+      els.diagSep.style.display = report ? '' : 'none';
+      els.diagCopy.textContent = tt('diagCopy');
+      els.diagClose.textContent = tt('diagClose');
+      els.diagBox.classList.add('is-visible');
+    }
+    els.diagButton.addEventListener('click', function () {
+      closeSheet();
+      showDiag(tt('diagRunning'), '');
+      callSketchUp('diagnose');
+    });
+    els.diagClose.addEventListener('click', function () { els.diagBox.classList.remove('is-visible'); });
+    els.diagCopy.addEventListener('click', function () {
+      var text = els.diagReport.textContent || '';
+      if (!text) return;
+      var copied = false;
+      try {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.top = '-1000px';
+        document.body.appendChild(ta);
+        ta.select();
+        copied = document.execCommand('copy');
+        document.body.removeChild(ta);
+      } catch (e) { copied = false; }
+      // Sem área de transferência (CEF sem permissão), seleciona o relatório:
+      // o Ctrl+C do usuário ainda resolve, e ninguém fica de mão vazia.
+      if (!copied) {
+        try {
+          var range = document.createRange();
+          range.selectNodeContents(els.diagReport);
+          var sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+        } catch (e2) { /* seleção indisponível: o texto continua na tela */ }
+      }
+      els.diagCopy.textContent = copied ? tt('diagCopied') : tt('diagCopy');
+    });
     els.captureButton.addEventListener('click', function () {
       showNotice('', 'success');
       callSketchUp('captureViewport', JSON.stringify({ photo: photoPayload() }));
@@ -4086,6 +4172,7 @@
         if (event === 'pairingDone') {
           model.pairing = null;
           document.getElementById('pairingBox').classList.remove('is-visible');
+          if (payload.ok) els.diagBox.classList.remove('is-visible');
           setFooter('');
         }
 
@@ -4096,6 +4183,10 @@
               onClick: function () { callSketchUp('refreshCatalog'); }
             });
           }
+        }
+
+        if (event === 'diagnosis') {
+          showDiag(payload.message || tt('diagRunning'), payload.running ? '' : (payload.report || ''), payload.ok);
         }
       }
     };

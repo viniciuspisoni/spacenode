@@ -25,6 +25,47 @@ O que só um plugin dentro do modelo consegue:
 - **Voltar à vista** — cada render guarda a câmera; um clique restaura o
   enquadramento exato no SketchUp.
 
+## O que mudou na 1.3.1 — o painel diz qual é o bloqueio
+
+Quando o plugin não falava com o servidor, o painel dizia sempre a mesma
+frase: *"Não foi possível conectar à SPACENODE. Verifique sua internet."* Ela
+aponta pro lugar errado na maioria dos casos — o navegador da mesma máquina
+abre o site normalmente, porque **antivírus com inspeção de HTTPS, firewall e
+proxy barram o SketchUp em separado**. O usuário conferia a internet, achava
+tudo certo e parava ali; o suporte recebia um print sem um único dado.
+
+**Testar conexão** — botão na carta de conexão (que, conectado, mora em
+Preferências) — dispara duas sondas:
+
+- `GET /api/sketchup/ping`, rota nova **sem auth e sem banco**, no servidor
+  configurado no painel;
+- uma URL neutra (`generate_204`), que responde no mundo inteiro e viaja
+  **sem `Authorization`** — nenhum token da conta sai do nosso domínio.
+
+O cruzamento das duas dá o veredito, em português:
+
+| nosso host | URL neutra | o que o painel diz |
+| --- | --- | --- |
+| responde | — | está tudo de pé; o erro foi passageiro |
+| erro HTTP | — | chegamos na SPACENODE, o problema é do servidor |
+| sem resposta | responde | o SketchUp tem internet, mas não chega em spacenode.app (DNS, VPN, rede do escritório) |
+| sem resposta | sem resposta | o SketchUp não está saindo desta máquina (antivírus, firewall, proxy) |
+
+Quem clica em **Conectar** e esbarra numa falha de rede não precisa achar o
+botão: nesse caso o diagnóstico roda sozinho. E a mensagem genérica virou
+específica — ela nomeia o host que não respondeu.
+
+Embaixo do veredito sai o **relatório** (versão, SketchUp, sistema, servidor,
+conta e o tempo de cada sonda), com botão de copiar: é o que o suporte precisa,
+em uma mensagem só.
+
+A sonda não usa `/api/sketchup/pair/start`: aquela rota cria dispositivo
+pendente no banco e tem limite de 10 por IP a cada 10 minutos — diagnosticar
+não pode gastar a cota de quem está tentando conectar. E como
+`Sketchup::Http` não tem timeout, cada sonda leva watchdog de 12 s: um proxy
+que engole a conexão fecha o teste com "tempo esgotado" em vez de rodar pra
+sempre.
+
 ## O que mudou na 1.3.0 — planta humanizada sem exportar nada
 
 A Planta humanizada existe no site e vende desde sempre. Lá ela começa com um

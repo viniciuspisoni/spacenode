@@ -8,11 +8,11 @@
 // (VERSION) + em sketchup/spacenode.rb (EXTENSION.version), e regerar o .rbz.
 // Os três precisam bater — o plugin compara a SUA VERSION com esta.
 
-export const PLUGIN_VERSION = '1.3.0'
+export const PLUGIN_VERSION = '1.3.1'
 
 /** Caminho relativo ao site; o plugin resolve contra o api_base_url dele. */
 export const PLUGIN_RBZ_PATH = '/downloads/spacenode-sketchup.rbz'
 
 /** Uma linha, mostrada dentro do painel de quem está atrasado. */
 export const PLUGIN_RELEASE_NOTE =
-  'Planta humanizada direto do modelo, e o pé-direito medido entrando no render como fato.'
+  'Testar conexão: quando o plugin não fala com a SPACENODE, o painel diz qual é o bloqueio.'
