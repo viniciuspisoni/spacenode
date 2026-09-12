@@ -25,6 +25,34 @@ O que só um plugin dentro do modelo consegue:
 - **Voltar à vista** — cada render guarda a câmera; um clique restaura o
   enquadramento exato no SketchUp.
 
+## O que mudou na 1.3.1 — o Editar sabe até onde vai
+
+Relato de campo, com exemplo: um render saiu bom, menos por uma caixa que no
+modelo é **pintura branca** e virou **concreto aparente**. Dentro do Editar do
+painel não deu pra selecionar só aquela caixa; no editor do site, a varinha
+mágica pegou a superfície inteira num clique e a edição saiu exata.
+
+O diagnóstico não é "falta ferramenta no painel" — é geometria de tela. O
+preview tem ~412 px mostrando uma imagem 2K: **cada pixel pintado vale uns
+cinco da imagem**. Mesmo portando a varinha, a seleção continuaria grosseira
+sem zoom e pan, e aí seria um segundo editor pra manter — o do site tem
+varinha com tolerância, área conectada, laço, polígono, expandir/contrair,
+além de ajustes, cor, máscaras, geometria e histórico.
+
+Então o painel passa a assumir o que ele é:
+
+- **É bom no que é INSTRUÇÃO** — "trocar o piso por carvalho claro", "remover o
+  pendente sobre a bancada". Isso continua igual, no painel, sem sair do
+  SketchUp.
+- **É ruim no que é SELEÇÃO** — área pequena, recorte exato. Para isso entrou
+  **"Editar no navegador"**, que abre `/app/editar?source=…` com este render já
+  carregado. Sem reenviar nada: a URL do resultado passa pela allowlist do
+  servidor (host do Storage e `*.fal.media`), que já existia.
+
+E uma honestidade de rótulo: **"Abrir no site" virou "Abrir a imagem"**. Ele
+sempre abriu o arquivo JPEG cru, não o site — o nome prometia uma coisa e
+entregava outra.
+
 ## O que mudou na 1.3.0 — planta humanizada sem exportar nada
 
 A Planta humanizada existe no site e vende desde sempre. Lá ela começa com um
