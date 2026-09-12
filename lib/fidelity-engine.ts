@@ -7,7 +7,9 @@
 // Antes via gateway FAL `any-llm/vision` (claude-3.5-sonnet, depois gpt-4o) —
 // migrado pro Gemini direto porque o gateway ficou instável e o claude morreu
 // lá (400). Ver lib/gemini.ts. analyzeImage continua à prova de falha:
-// qualquer erro cai no fallbackBriefing (não derruba o caller).
+// qualquer erro cai no fallbackBriefing (não derruba o caller). Esse fallback é
+// SILENCIOSO por design — quem precisa distinguir "análise real" de "genérico"
+// (telemetria, cache do briefing) usa analyzeImageDetailed e lê o .source.
 
 import { geminiVisionJson } from '@/lib/gemini'
 import type { BriefingArquitetonico } from '@/lib/prompts'
@@ -100,7 +102,16 @@ function parseBriefing(raw: string): BriefingArquitetonico {
   }
 }
 
-export async function analyzeImage(imageUrl: string): Promise<BriefingArquitetonico> {
+/** Briefing + PROCEDÊNCIA. 'fallback' = a visão falhou e o que volta é o
+ *  briefing genérico: o render segue, mas quem chama precisa saber pra não
+ *  registrar isso como análise real nem cachear o genérico. */
+export interface AnalyzeImageResult {
+  briefing: BriefingArquitetonico
+  source:   'vision' | 'fallback'
+}
+
+/** Igual ao analyzeImage, mas diz de onde veio o briefing. Nunca lança. */
+export async function analyzeImageDetailed(imageUrl: string): Promise<AnalyzeImageResult> {
   try {
     const output = await geminiVisionJson({
       system:    SYSTEM_PROMPT,
@@ -108,9 +119,13 @@ export async function analyzeImage(imageUrl: string): Promise<BriefingArquiteton
       imageUrl,
       timeoutMs: VISION_TIMEOUT_MS,
     })
-    return parseBriefing(output)
+    return { briefing: parseBriefing(output), source: 'vision' }
   } catch (err) {
     console.error('[fidelity-engine] análise falhou:', (err as Error).message)
-    return fallbackBriefing()
+    return { briefing: fallbackBriefing(), source: 'fallback' }
   }
+}
+
+export async function analyzeImage(imageUrl: string): Promise<BriefingArquitetonico> {
+  return (await analyzeImageDetailed(imageUrl)).briefing
 }
