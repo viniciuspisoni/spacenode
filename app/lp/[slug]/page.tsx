@@ -187,7 +187,7 @@ export default async function LandingCampaignPage({
             comece com 80 nodes grátis.
           </h2>
           <p className="mx-auto mt-3 max-w-md text-sm text-text-secondary">
-            Sem cartão para começar. Planos a partir de R$ 89/mês.
+            Sem cartão para começar. Planos a partir de R$ 99/mês.
           </p>
           <div className="mt-7">
             <LpCtaLink href={ctaHref} slug={slug} className={CTA_CLASSES}>

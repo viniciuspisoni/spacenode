@@ -52,13 +52,14 @@ describe('getPlanDisplayName — fonte única do nome do plano', () => {
   })
 
   it('nunca devolve "Beta" (status do produto não é plano)', () => {
-    for (const id of ['free', 'starter', 'pro', 'studio', 'office', null, undefined, 'x']) {
+    for (const id of ['free', 'starter', 'essence', 'pro', 'studio', 'office', null, undefined, 'x']) {
       expect(getPlanDisplayName(id as string | null | undefined)).not.toBe('Beta')
     }
   })
 
   it('planos pagos usam o nome do catálogo', () => {
     expect(getPlanDisplayName('starter')).toBe('Starter')
+    expect(getPlanDisplayName('essence')).toBe('Essence')
     expect(getPlanDisplayName('pro')).toBe('Pro')
     expect(getPlanDisplayName('studio')).toBe('Studio')
     expect(getPlanDisplayName('office')).toBe('Office')

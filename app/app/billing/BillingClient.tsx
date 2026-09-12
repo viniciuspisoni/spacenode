@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ANNUAL_BILLING_ENABLED, SELLABLE_PLANS, type PaidPlanId, type BillingCycle } from '@/lib/plans'
+import { ANNUAL_BILLING_ENABLED, SELLABLE_PLANS, getPlanById, type PaidPlanId, type PlanId, type BillingCycle } from '@/lib/plans'
 import { getPlanDisplayName } from '@/lib/plan-display'
 import { EXTRA_NODE_PACKS, type ExtraPackSize } from '@/lib/extra-nodes'
 import { RowIcon, Segmented, SettingGroup, SettingRow, Sheet, summarize } from '@/components/app/glass'
@@ -81,9 +81,15 @@ function daysUntil(date: string): number {
 export function BillingClient({ plan, balance, nodesExpireAt, extras, pooled, offerEligible, notice }: BillingClientProps) {
   // Extras para qualquer plano pago (Starter incluso desde 2026-08-31).
   const isExtraBlocked = plan === 'free'
-  // Assinante do Office (aposentado): a vitrine não o exibe, mas os
-  // benefícios seguem até troca/cancelamento — rotulado como plano legado.
-  const isLegacyPlan = plan === 'office'
+  // Assinante de um plano aposentado (Office desde 2026-08-31, Starter desde
+  // 2026-09-12): a vitrine não o exibe, mas os benefícios seguem até troca ou
+  // cancelamento — rotulado como plano legado. Quem sai de um desses planos
+  // não pode recontratá-lo (isSellablePlanId barra no checkout).
+  const legacyPlan   = getPlanById(plan as PlanId)
+  const isLegacyPlan = Boolean(legacyPlan?.legacy)
+  // Starter pede o rótulo "Legacy" (em inglês, por decisão de produto);
+  // os demais legados usam o rótulo genérico em português.
+  const legacyBadge  = plan === 'starter' ? 'Legacy' : 'plano legado'
   const [billing, setBilling] = useState<BillingCycle>('monthly')
   const [loading, setLoading] = useState<string | null>(null)
   const [error,   setError]   = useState<string | null>(null)
@@ -244,7 +250,7 @@ export function BillingClient({ plan, balance, nodesExpireAt, extras, pooled, of
               />
             )}
             <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
-              Plano atual: <strong style={{ color: 'var(--color-text-primary)' }}>{getPlanDisplayName(plan)}{isLegacyPlan && ' · plano legado'}</strong>
+              Plano atual: <strong style={{ color: 'var(--color-text-primary)' }}>{getPlanDisplayName(plan)}{isLegacyPlan && ` · ${legacyBadge}`}</strong>
             </span>
             {canManage && (
               <button
@@ -282,15 +288,18 @@ export function BillingClient({ plan, balance, nodesExpireAt, extras, pooled, of
               </span>
             </div>
           )}
-          {isLegacyPlan && (
+          {isLegacyPlan && legacyPlan && (
             <div className="spn-glass" style={{
               borderRadius: 'var(--r-card)', padding: '14px 18px', marginBottom: 14,
               fontSize: 12.5, color: 'var(--color-text-secondary)',
               lineHeight: 1.6, letterSpacing: '-0.005em',
             }}>
-              O plano <strong style={{ color: 'var(--color-text-primary)' }}>Office</strong> foi
-              aposentado para novas assinaturas, mas o seu segue valendo: os 8.000 nodes
-              mensais e todos os benefícios continuam até você trocar de plano ou cancelar.
+              O plano <strong style={{ color: 'var(--color-text-primary)' }}>{legacyPlan.name}</strong> foi
+              aposentado para novas assinaturas, mas o seu segue valendo: os{' '}
+              {legacyPlan.nodes.toLocaleString('pt-BR')} nodes mensais e todos os benefícios
+              continuam até você trocar de plano ou cancelar. Se cancelar, não será possível
+              contratar o {legacyPlan.name} novamente — a próxima assinatura escolhe entre{' '}
+              {SELLABLE_PLANS.map(p => p.name).join(', ')}.
             </div>
           )}
           <div style={{

@@ -17,7 +17,7 @@
 //
 // Este arquivo é deliberadamente SEM imports (autocontido) para ser fácil de
 // testar e portar. As pontes para o vocabulário do código existente
-// (EditMode 'fix'/'landscape', Quality 'hd'/'2k'/'4k', PlanId 'starter'/'office')
+// (EditMode 'fix'/'landscape', Quality 'hd'/'2k'/'4k', PlanId 'starter'/'essence'/'office')
 // ficam em edit-router-adapters.ts.
 
 // ── Vocabulário público (conforme spec de produto) ─────────────────────────────

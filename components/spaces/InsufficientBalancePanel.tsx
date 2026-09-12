@@ -7,7 +7,7 @@
 //   - Sem urgência manufaturada
 //   - Sempre mostrar a matemática
 //   - Sempre oferecer alternativa que NÃO gera receita (ajustar, esperar)
-//   - Recomendação honesta (não empurrar Pro se Starter cobre)
+//   - Recomendação honesta (não empurrar Pro se Essence cobre)
 
 import { useState } from 'react'
 import Link from 'next/link'
