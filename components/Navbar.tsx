@@ -11,10 +11,10 @@ import { Logo } from './brand';
 // contagem (ver .nav-links abaixo). '#como-funciona' saiu na reforma de
 // vidro — os três passos viraram uma tira dentro de '#produto'.
 const LINKS = [
-  { href: '#projetos', label: 'PROJETOS' },
-  { href: '#produto',  label: 'PRODUTO'  },
-  { href: '#sketchup', label: 'SKETCHUP' },
-  { href: '#planos',   label: 'PREÇOS'   },
+  { href: '#projetos', label: 'Projetos' },
+  { href: '#produto',  label: 'Produto'  },
+  { href: '#sketchup', label: 'SketchUp' },
+  { href: '#planos',   label: 'Preços'   },
   { href: '#faq',      label: 'FAQ'      },
 ];
 
@@ -229,7 +229,7 @@ export default function Navbar() {
                   textTransform: 'none',
                 }}
               >
-                {l.label.toLowerCase()}
+                {l.label}
               </a>
             ))}
           </nav>
@@ -314,9 +314,8 @@ export default function Navbar() {
           align-items: center;
           height: 34px;
           padding: 0 12px;
-          font-size: 10px;
-          letter-spacing: 0.18em;
-          text-transform: uppercase;
+          font-size: 12px;
+          letter-spacing: 0.01em;
           font-weight: 500;
           color: var(--color-text-secondary);
           text-decoration: none;

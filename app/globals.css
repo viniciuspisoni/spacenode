@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+/* marketing/ não usa Tailwind (Remotion, specs, output de vídeo/imagem) —
+   escaneá-lo custa tempo à toa e os JSON/MD gerados lá já quebraram o
+   scanner (RangeError: Invalid code point, 12/09/26). */
+@source not "../marketing";
+
 @theme {
   --font-sans: var(--font-geist), system-ui, -apple-system, sans-serif;
 
