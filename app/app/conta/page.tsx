@@ -30,10 +30,12 @@ export default async function ContaPage() {
     getPayerBalance(createAdminClient(), user.id),
   ])
 
-  // Office é plano legado (aposentado p/ novas assinaturas em 2026-08-31) —
+  // Office (2026-08-31) e Starter (2026-09-12) são planos legados —
   // o assinante existente mantém os benefícios e vê o rótulo explícito.
-  const planName  = getPlanDisplayName(balance.planId)
-    + (balance.planId === 'office' ? ' · plano legado' : '')
+  // Starter usa "Legacy" (decisão de produto); os demais, "plano legado".
+  const planName = getPlanDisplayName(balance.planId)
+    + (balance.planId === 'office'  ? ' · plano legado' : '')
+    + (balance.planId === 'starter' ? ' · Legacy'       : '')
   const fullName  = profileRes.data?.full_name ?? null
   const email     = user.email ?? ''
   const planNodes  = balance.planBalance

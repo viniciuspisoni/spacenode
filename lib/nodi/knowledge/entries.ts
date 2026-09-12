@@ -220,7 +220,7 @@ export const KB_ENTRIES: KBEntry[] = [
   {
     id: 'planos-precos',
     title: 'Quais são os planos e quantos nodes incluem?',
-    keywords: ['planos', 'plano', 'preco', 'precos', 'assinatura', 'mensalidade', 'starter', 'pro', 'studio', 'office', 'upgrade'],
+    keywords: ['planos', 'plano', 'preco', 'precos', 'assinatura', 'mensalidade', 'essence', 'starter', 'pro', 'studio', 'office', 'upgrade'],
     patterns: [/quais.*planos/, /pre[cs]o.*(plano|assinatura)/, /quanto custa.*(plano|assinatura|spacenode)/],
     modules: ['planos'],
     faq: true,

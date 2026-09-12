@@ -1,8 +1,10 @@
 // ── Setup LIVE do Stripe — rodar depois da ativação da conta ─────────────────
 //
-// Replica em modo live o que foi validado em teste (2026-07-15): catálogo
-// v2.1 (4 planos × mensal/anual + 3 Lumens), Billing Portal e webhook — e
-// grava os envs de produção na Vercel com o único método confiável (--value).
+// Replica em modo live o que foi validado em teste: catálogo v2.2 (5 planos
+// × mensal/anual + 3 Lumens — Essence entrou em 2026-09-12, Starter virou
+// legado mas segue no catálogo pois assinantes existentes ainda renovam por
+// ele), Billing Portal e webhook — e grava os envs de produção na Vercel com
+// o único método confiável (--value).
 //
 // RE-RUN é seguro: preços/portal existentes são REUTILIZADOS (nada duplica) e
 // o webhook endpoint é recriado (o whsec_ só existe na resposta de criação —
@@ -76,9 +78,13 @@ if (!account.charges_enabled) {
   console.error('  Conclua a ativação no Dashboard (KYB) e rode de novo.')
   process.exit(1)
 }
-// ── Catálogo v2.1 ─────────────────────────────────────────────────────────────
+// ── Catálogo v2.2 ─────────────────────────────────────────────────────────────
+// 'starter' e 'office' são legados (fora da vitrine, só renovam) — seguem
+// aqui porque assinantes existentes precisam do Price ID pra continuar
+// cobrando exatamente o mesmo valor. Nunca mude monthly/annual de um legado.
 const PLANS = [
   { id: 'starter', name: 'SPACENODE Starter', nodes: 750,  monthly: 8900,  annual: 89000  },
+  { id: 'essence', name: 'SPACENODE Essence', nodes: 800,  monthly: 9900,  annual: 99000  },
   { id: 'pro',     name: 'SPACENODE Pro',     nodes: 1800, monthly: 19900, annual: 199000 },
   { id: 'studio',  name: 'SPACENODE Studio',  nodes: 3500, monthly: 34900, annual: 349000 },
   { id: 'office',  name: 'SPACENODE Office',  nodes: 8000, monthly: 69900, annual: 699000 },
