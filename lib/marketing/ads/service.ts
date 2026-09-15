@@ -1838,7 +1838,7 @@ export async function recordAcquisitionEvent(
     const adId = event.ad_identifier ?? utmStr('utm_content') ?? utmStr('content')
     const campId = event.campaign_identifier ?? utmStr('utm_campaign') ?? utmStr('campaign')
 
-    const { error } = await mkt(admin).from('acquisition_events').insert({
+    const baseRow = {
       user_id: event.user_id ?? null,
       event_type: event.event_type,
       utm,
@@ -1849,7 +1849,20 @@ export async function recordAcquisitionEvent(
       plan_id: event.plan_id ?? null,
       value_cents: event.value_cents ?? null,
       metadata: event.metadata ?? {},
+    }
+    // Colunas da migration 20260818000000 (funil completo). Banco ainda sem a
+    // migration → 42703/PGRST204: regrava só com o shape antigo para eventos
+    // legados nunca se perderem por causa do deploy fora de ordem.
+    let { error } = await mkt(admin).from('acquisition_events').insert({
+      ...baseRow,
+      anonymous_id: event.anonymous_id ?? null,
+      page: event.page ?? null,
+      offer_id: event.offer_id ?? null,
+      dedupe_key: event.dedupe_key ?? null,
     })
+    if (error && (error.code === '42703' || error.code === 'PGRST204')) {
+      ;({ error } = await mkt(admin).from('acquisition_events').insert(baseRow))
+    }
     if (error && error.code !== '23505') {
       console.warn(`[marketing/ads] falha ao gravar evento ${event.event_type}: ${error.message}`)
     }
@@ -1861,12 +1874,15 @@ export async function recordAcquisitionEvent(
 /** Registra a atribuição do cadastro a partir do cookie sn_attribution
  *  (last-touch). Imutável: o índice parcial uq_mkt_acq_signup_per_user garante
  *  um único signup por usuário — conflito (23505) é sucesso silencioso.
- *  Cadastro sem snapshot também é gravado (orgânico) para o funil completo. */
+ *  Cadastro sem snapshot também é gravado (orgânico) para o funil completo.
+ *  `anonymousId` (cookie sn_aid) é o join que liga a jornada pré-cadastro ao
+ *  user_id — este evento é o ÚNICO ponto de associação anônimo→usuário. */
 export async function bindSignupAttribution(
   admin: SupabaseClient,
   userId: string,
   snapshot: AttributionSnapshot | null,
   meta?: Record<string, unknown>,
+  anonymousId?: string | null,
 ): Promise<void> {
   try {
     const last = snapshot?.last
@@ -1877,6 +1893,7 @@ export async function bindSignupAttribution(
       ad_identifier: last?.content ?? null,
       campaign_identifier: last?.campaign ?? null,
       referrer: last?.referrer ?? null,
+      anonymous_id: anonymousId ?? null,
       metadata: { ...(meta ?? {}), organic: !snapshot },
     })
   } catch (err) {
