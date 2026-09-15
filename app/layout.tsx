@@ -3,6 +3,8 @@ import localFont from "next/font/local";
 import { ThemeProvider } from "@/lib/theme/ThemeProvider";
 import UtmCapture from "@/components/marketing/UtmCapture";
 import GoogleTag from "@/components/GoogleTag";
+import MetaPixel from "@/components/analytics/MetaPixel";
+import ConsentBanner from "@/components/analytics/ConsentBanner";
 import "./globals.css";
 
 // Geist served from local woff2 — avoids the network fetch that next/font/google
@@ -78,6 +80,8 @@ export default function RootLayout({
         <UtmCapture />
         <ThemeProvider>{children}</ThemeProvider>
         <GoogleTag />
+        <MetaPixel />
+        <ConsentBanner />
       </body>
     </html>
   );

@@ -6,11 +6,13 @@
 // via SEEDREAM_ROUTE=ark / EDIT_V3_SEEDREAM_ROUTE=ark, processa em Singapura;
 // a OpenAI entrou em 2026-09 com o GPT Image 2.5 do motor Orion, atrás de
 // ORION_INTERNAL_ENABLED, processa nos EUA e retém log de abuso por 30 dias),
-// Stripe (pagamentos), zero analytics/pixel de TERCEIROS (cookies essenciais +
-// tema em localStorage + cookie PRÓPRIO de atribuição de campanha
-// sn_attribution — first-party, sem dados pessoais, citado na cláusula 7 em
-// 2026-07-18). Se algum tracker de terceiro for adicionado no futuro, a
-// cláusula 7 PRECISA ser atualizada junto (e consentimento, quando exigido).
+// Stripe (pagamentos). Terceiros de marketing (tag do Google Ads + Meta Pixel)
+// entram SOMENTE com consentimento explícito — cookie sn_consent, opt-in, ver
+// lib/analytics/consent.ts e components/analytics/ConsentBanner.tsx (2026-09-15).
+// Fora isso: cookies essenciais + tema em localStorage + cookie PRÓPRIO de
+// atribuição de campanha sn_attribution — first-party, sem dados pessoais,
+// citado na cláusula 7 em 2026-07-18. Se outro tracker de terceiro for
+// adicionado, a cláusula 7 PRECISA ser atualizada junto.
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { LegalShell, LegalSection, P, UL, LI, Strong } from '@/components/legal/LegalShell'
@@ -35,8 +37,9 @@ export default function PrivacidadePage() {
           Resumo em linguagem simples: coletamos o necessário para operar a plataforma — seus dados de
           cadastro, as imagens que você envia e registros técnicos de uso. Suas imagens são processadas por
           provedores de IA contratados <Strong>apenas para gerar os seus resultados</Strong>; não usamos seu
-          conteúdo para treinar modelos próprios nem vendemos dados. Pagamentos ficam com a Stripe. Não
-          usamos cookies de publicidade de terceiros. Este resumo não substitui o texto completo abaixo.
+          conteúdo para treinar modelos próprios nem vendemos dados. Pagamentos ficam com a Stripe. Cookies
+          de marketing de terceiros (Google e Meta) só carregam se você aceitar no aviso de cookies. Este
+          resumo não substitui o texto completo abaixo.
         </>
       }
     >
@@ -182,9 +185,15 @@ export default function PrivacidadePage() {
           dados pessoais e não é compartilhado com terceiros.
         </P>
         <P>
-          <Strong>Não usamos cookies de publicidade de terceiros nem rastreadores de terceiros.</Strong> Se
-          isso mudar, esta Política será atualizada antes e, quando exigido, o seu consentimento será
-          solicitado.
+          <Strong>Cookies de marketing de terceiros só entram com o seu consentimento.</Strong> Usamos duas
+          ferramentas de medição de campanha — a tag do Google Ads e o Meta Pixel — exclusivamente para
+          saber de qual anúncio veio um cadastro. Nenhuma das duas carrega antes de você clicar em
+          <Strong>Aceitar</Strong> no aviso de cookies: se você recusar, ou simplesmente não escolher, nada
+          é enviado ao Google nem à Meta e o site funciona igual. Sua escolha fica guardada por 180 dias no
+          cookie próprio <Strong>sn_consent</Strong> e pode ser trocada a qualquer momento — apague os
+          cookies do site e o aviso aparece de novo. Esses parceiros podem usar os dados de navegação
+          coletados após o consentimento para medir e segmentar publicidade; consulte as políticas do{' '}
+          <Strong>Google</Strong> e da <Strong>Meta</Strong> para detalhes.
         </P>
       </LegalSection>
 

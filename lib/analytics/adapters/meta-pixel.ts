@@ -25,7 +25,11 @@ export function metaPixelEnabled(): boolean {
 
 /** Eventos do catálogo → eventos padrão do Meta quando existe equivalente. */
 const STANDARD: Partial<Record<AnalyticsEvent, string>> = {
-  plans_viewed: 'ViewContent',
+  plans_viewed:     'ViewContent',
+  // Cadastro concluído. Não sai do coletor público (signup_completed é
+  // server-only em CLIENT_EVENTS) — quem chama é SignupConversionPing,
+  // direto no adapter, no mesmo gatilho '?signup=1' do Google Ads.
+  signup_completed: 'CompleteRegistration',
 }
 
 export function metaPixelTrack(event: AnalyticsEvent, props: AnalyticsProps): void {
