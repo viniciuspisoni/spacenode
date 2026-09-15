@@ -1,28 +1,79 @@
 // lib/analytics/consent.ts
 //
 // Ponto único de decisão sobre scripts/envios de MARKETING de terceiros
-// (GA4, Meta Pixel, Meta CAPI). O rastreamento first-party (cookies sn_* +
+// (Google Ads, GA4, Meta Pixel). O rastreamento first-party (cookies sn_* +
 // marketing.acquisition_events) NÃO passa por aqui — é infraestrutura própria,
-// sem terceiros, já coberta pela cláusula 7 da política de privacidade.
+// sem terceiros, coberta pela cláusula 7 da política de privacidade.
 //
-// MECANISMO ATUAL: o projeto não tem banner de consentimento; a política
-// (cláusula 7) promete que nenhum rastreador de terceiros entra sem a política
-// ser atualizada antes — e o Google tag (components/GoogleTag.tsx) já segue a
-// regra "só em produção". Este módulo espelha exatamente esse mecanismo:
-//   habilitado = produção + env var do adapter presente.
+// MECANISMO: escolha explícita do visitante, guardada no cookie sn_consent.
+//   • ausente  → ainda não escolheu; NADA de terceiro carrega (opt-in)
+//   • 'denied' → recusou; NADA de terceiro carrega
+//   • 'granted'→ aceitou; Google Ads e Meta Pixel podem carregar e disparar
 //
-// QUANDO EXISTIR BANNER/CMP: trocar a implementação AQUI (uma função no client,
-// uma no server) e todos os adapters passam a respeitá-lo automaticamente.
-// Antes de definir as envs dos adapters em produção, atualizar a cláusula 7 —
-// mesma pendência LGPD que hoje bloqueia a campanha de Search (o gtag do
-// Google Ads está em produção e a cláusula ainda promete "sem rastreadores").
+// É deliberadamente um gate mínimo, não uma CMP: uma escolha binária de
+// marketing, persistida, revogável trocando a escolha no banner. Não há
+// categorização por finalidade, nem vendor list, nem TCF.
+//
+// O ambiente continua sendo responsabilidade de quem injeta o script: o
+// GoogleTag só carrega em produção (o ID é fixo no código) e os adapters de
+// GA4/Meta só agem com a env var presente. Este módulo responde UMA pergunta —
+// "o visitante autorizou marketing de terceiros?" — e nada além disso.
 
-/** Client: pode carregar/enviar para scripts de marketing de terceiros? */
-export function marketingConsentClient(): boolean {
-  return process.env.NODE_ENV === 'production'
+export const CONSENT_COOKIE = 'sn_consent'
+export const CONSENT_MAX_AGE_DAYS = 180
+
+/** Evento disparado no window quando a escolha muda, para os componentes
+ *  montados reagirem sem recarregar a página. */
+export const CONSENT_EVENT = 'sn:consent'
+
+export type ConsentChoice = 'granted' | 'denied'
+
+/** Parse defensivo: o valor vem de cookie, que é entrada hostil. */
+export function parseConsentCookie(value: string | undefined | null): ConsentChoice | null {
+  if (value === 'granted' || value === 'denied') return value
+  return null
 }
 
-/** Server: pode enviar eventos a APIs de marketing de terceiros (CAPI/GA4 MP)? */
-export function marketingConsentServer(): boolean {
-  return process.env.NODE_ENV === 'production'
+function cookieFrom(header: string | undefined | null, name: string): string | undefined {
+  if (!header) return undefined
+  const prefix = `${name}=`
+  const found = header.split('; ').find((c) => c.startsWith(prefix))
+  return found ? found.slice(prefix.length) : undefined
+}
+
+/** Escolha atual no browser. `null` = ainda não escolheu. */
+export function readConsentChoice(): ConsentChoice | null {
+  if (typeof document === 'undefined') return null
+  return parseConsentCookie(cookieFrom(document.cookie, CONSENT_COOKIE))
+}
+
+/** Grava a escolha e avisa quem estiver ouvindo. Best-effort: sem cookie
+ *  disponível, o visitante segue sem terceiros — o lado seguro. */
+export function writeConsentChoice(choice: ConsentChoice): void {
+  try {
+    const maxAge = CONSENT_MAX_AGE_DAYS * 24 * 60 * 60
+    const secure = window.location.protocol === 'https:' ? '; Secure' : ''
+    document.cookie = `${CONSENT_COOKIE}=${choice}; Max-Age=${maxAge}; Path=/; SameSite=Lax${secure}`
+    window.dispatchEvent(new Event(CONSENT_EVENT))
+  } catch {
+    // Sem persistência a escolha não vale; nada de terceiro carrega.
+  }
+}
+
+/** Assina mudanças de escolha. Devolve o cancelador. */
+export function subscribeConsent(onChange: () => void): () => void {
+  if (typeof window === 'undefined') return () => {}
+  window.addEventListener(CONSENT_EVENT, onChange)
+  return () => window.removeEventListener(CONSENT_EVENT, onChange)
+}
+
+/** Client: o visitante autorizou scripts de marketing de terceiros? */
+export function marketingConsentClient(): boolean {
+  return readConsentChoice() === 'granted'
+}
+
+/** Server: idem, a partir do header Cookie da requisição. Sem o header não há
+ *  como afirmar consentimento — responde false. */
+export function marketingConsentServer(cookieHeader: string | undefined | null): boolean {
+  return parseConsentCookie(cookieFrom(cookieHeader, CONSENT_COOKIE)) === 'granted'
 }
