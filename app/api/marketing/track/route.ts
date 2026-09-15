@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { clientIp, rateLimit } from '@/lib/rate-limit'
 import { ATTRIBUTION_COOKIE, parseAttributionCookie } from '@/lib/marketing/ads/naming'
+import { ANON_COOKIE, INTENT_COOKIE, parseAnonymousId, parseIntentCookie } from '@/lib/analytics/attribution'
 import {
   bindSignupAttribution,
   getLandingPageBySlug,
@@ -18,9 +19,15 @@ import {
 // Tipos aceitos:
 //   • lp_cta_click — anônimo (sendBeacon do CTA); registra clique numa LP
 //     publicada. Sem user_id, sem IP, sem echo de dados.
-//   • bind_signup  — autenticado; o servidor lê o cookie sn_attribution da
-//     própria requisição e vincula a atribuição ao usuário (evento de signup
-//     imutável — on conflict do nothing no service).
+//   • bind_signup  — autenticado; o servidor lê os cookies first-party da
+//     própria requisição (sn_attribution + sn_aid + sn_intent) e vincula a
+//     atribuição ao usuário (evento de signup imutável — on conflict do
+//     nothing no service). Roda também para cadastro orgânico (sem cookie de
+//     campanha): o evento sai sem UTM, mas o funil conta o cadastro e o
+//     anonymous_id associa a jornada pré-login.
+//
+// O funil completo do produto usa /api/analytics/track (catálogo tipado em
+// lib/analytics/events.ts) — esta rota fica com os dois tipos legados acima.
 //
 // Erros de cliente viram 4xx; erro INTERNO vira {ok:false} 200 com
 // console.warn — rastreamento é best-effort e não deve poluir o console do
@@ -61,9 +68,14 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Muitas tentativas — aguarde um pouco' }, { status: 429 })
       }
       const snapshot = parseAttributionCookie(req.cookies.get(ATTRIBUTION_COOKIE)?.value)
-      // Sem cookie de atribuição → nada a vincular (visita orgânica direta).
-      if (!snapshot) return NextResponse.json({ ok: true })
-      await bindSignupAttribution(admin, user.id, snapshot)
+      const anonymousId = parseAnonymousId(req.cookies.get(ANON_COOKIE)?.value)
+      const intent = parseIntentCookie(req.cookies.get(INTENT_COOKIE)?.value)
+      // O timestamp do evento é o do bind (1º acesso ao /app) — a data REAL do
+      // cadastro vai no metadata para o funil não depender da hora do bind.
+      await bindSignupAttribution(admin, user.id, snapshot, {
+        account_created_at: user.created_at ?? null,
+        ...(intent ? { plan_intent: intent.plan, plan_intent_offer: intent.offer ?? null } : {}),
+      }, anonymousId)
       return NextResponse.json({ ok: true })
     }
 
@@ -84,6 +96,7 @@ export async function POST(req: NextRequest) {
           event_type: 'lp_cta_click',
           landing_page_id: page.id,
           utm: {},
+          anonymous_id: parseAnonymousId(req.cookies.get(ANON_COOKIE)?.value),
         })
       }
       return NextResponse.json({ ok: true })
