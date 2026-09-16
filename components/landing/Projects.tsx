@@ -22,15 +22,40 @@ import { BeforeAfter } from '@/components/landing/BeforeAfter'
 // meio-a-meio, metades diferentes da mesma cena parecem discrepância mesmo
 // quando o par está certo, e o inverso também engana.
 //
-// Ordem alternando cozinha e não-cozinha: duas das seis são cozinha, e lado
-// a lado elas leem como repetição.
+// Ordem alternando o tipo de ambiente: nenhum par encosta em outro do mesmo
+// tipo. Duas das oito são cozinha e três são living — lado a lado elas leem
+// como repetição, e na coluna única do mobile isso fica pior ainda.
+//
+// 2026-09-16: `hall-entrada` saiu (decisão do dono) e entraram três pares de
+// um lote novo da muda arquitetura — `living-estante`, `entrada-corredor` e
+// `sala-estar`. Aceite dela para a LANDING confirmado pelo dono na mesma data;
+// o ledger por canal (landing / orgânico / mídia paga) vive em
+// `marketing/AUTORIZACOES.md`, na branch onde a árvore `marketing/` existe.
+//
+// Duas armadilhas desse lote, que valem pra qualquer lote vindo do Drive:
+//
+//  1. O nome do arquivo NÃO diz qual é base e qual é render — o sufixo "(1)"
+//     da desduplicação cai ora num, ora no outro, e chegou a trocar de lado
+//     entre duas vistas da MESMA pasta. O que separa é a dimensão: o print do
+//     SketchUp sai maior (3000x1619 / 3500x1969) que o render da plataforma
+//     (2816x1504 / 2731x1536).
+//  2. Nome de pasta do lote é nome de CLIENTE, não crédito. `164_suellen`,
+//     `176_maite e luis` e `193_rafa` são os três da mesma autora. Perguntar
+//     quem assina antes de escrever o crédito.
+//
+// Base e render de cada par novo foram cortados na MESMA proporção antes de
+// entrar em `public/`. Eles saem da origem em ratios levemente diferentes e,
+// com `object-fit: cover` na célula 16/9, cada lado é cortado de um jeito e o
+// comparador desliza alguns pixels no meio da cena.
 const PAIRS = [
-  { slug: 'cozinha-ceramica', caption: 'Cozinha',          credit: 'muda arquitetura' },
-  { slug: 'sala-jantar',      caption: 'Sala de jantar',   credit: 'Paula Miolla' },
-  { slug: 'cozinha-ilha',     caption: 'Cozinha com ilha', credit: 'Nathalia Costa' },
-  { slug: 'living-jantar',    caption: 'Living integrado', credit: 'Bruna Plentz' },
-  { slug: 'home-office',      caption: 'Home office',      credit: 'Nathalia Costa' },
-  { slug: 'hall-entrada',     caption: 'Hall de entrada',  credit: 'muda arquitetura' },
+  { slug: 'cozinha-ceramica',  caption: 'Cozinha',            credit: 'muda arquitetura' },
+  { slug: 'sala-jantar',       caption: 'Sala de jantar',     credit: 'Paula Miolla' },
+  { slug: 'living-estante',    caption: 'Living com estante', credit: 'muda arquitetura' },
+  { slug: 'cozinha-ilha',      caption: 'Cozinha com ilha',   credit: 'Nathalia Costa' },
+  { slug: 'entrada-corredor',  caption: 'Corredor de entrada', credit: 'muda arquitetura' },
+  { slug: 'living-jantar',     caption: 'Living integrado',   credit: 'Bruna Plentz' },
+  { slug: 'sala-estar',        caption: 'Sala de estar',      credit: 'muda arquitetura' },
+  { slug: 'home-office',       caption: 'Home office',        credit: 'Nathalia Costa' },
 ]
 
 export function Projects() {
