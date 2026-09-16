@@ -36,6 +36,7 @@ import {
   type AnalyticsProps,
 } from './events'
 import { ANON_COOKIE, parseAnonymousId } from './attribution'
+import { isInternalTraffic } from './internal'
 
 export interface ServerEventInput {
   event: AnalyticsEvent
@@ -56,6 +57,12 @@ export interface ServerEventInput {
   page?: string | null
   /** Chave de idempotência (ex.: `checkout:{session.id}`). */
   dedupeKey?: string | null
+  /** Quando o FATO aconteceu (ISO), se não for agora — ex.: cadastro datado
+   *  por auth.users.created_at. Omitido = agora. */
+  occurredAt?: string | null
+  /** Força a marcação de tráfego interno. Omitido = decidido pelo host da
+   *  request e pelo ambiente de execução. */
+  isInternal?: boolean
   props?: AnalyticsProps
 }
 
@@ -109,6 +116,11 @@ export async function trackServerEvent(
       page: input.page ?? null,
       offer_id: input.offerId ?? null,
       dedupe_key: input.dedupeKey ?? null,
+      occurred_at: input.occurredAt ?? null,
+      // Evento nascido em dev/preview fica gravado, mas fora do relatório. O
+      // host da requisição é a fonte; sem request (webhook do Stripe, job),
+      // vale o ambiente de execução.
+      is_internal: input.isInternal ?? isInternalTraffic(input.req ?? null),
       metadata: props,
     })
   } catch (err) {

@@ -560,4 +560,17 @@ export interface NewAcquisitionEvent {
   offer_id?: string | null
   /** Idempotência server-side (índice único parcial — 23505 = já gravado). */
   dedupe_key?: string | null
+  // Colunas de confiabilidade (migration 20260916173000)
+  /** Quando o FATO aconteceu (ISO). Omitido = agora. Para signup é sempre
+   *  `auth.users.created_at`, nunca a hora do bind. */
+  occurred_at?: string | null
+  /** Origem classificada. `unknown` quando não há informação — jamais
+   *  `organic` por ausência de cookie. */
+  origin?: AcquisitionOrigin | null
+  /** Evento de dev/preview/conta interna: gravado, mas fora dos relatórios. */
+  is_internal?: boolean
 }
+
+/** Origem de um evento de aquisição. `unknown` é valor de primeira classe:
+ *  ausência de informação não vira origem inventada. */
+export type AcquisitionOrigin = 'paid' | 'organic' | 'unknown'

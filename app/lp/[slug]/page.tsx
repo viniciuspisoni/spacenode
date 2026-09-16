@@ -22,6 +22,7 @@ import ForceDarkScope from '@/lib/theme/ForceDarkScope'
 import LpCtaLink from '@/components/marketing/LpCtaLink'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getLandingPageBySlug, recordAcquisitionEvent } from '@/lib/marketing/ads/service'
+import { isBotUserAgent, isInternalHost, isNonProductionRuntime } from '@/lib/analytics/internal'
 import { getEnabledModules } from '@/lib/nav/modules-config'
 import { SELLABLE_PLANS } from '@/lib/plans'
 import { rateLimit } from '@/lib/rate-limit'
@@ -120,11 +121,21 @@ export default async function LandingCampaignPage({
     const ip = hdrs.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
     const rl = await rateLimit(createAdminClient(), `lp-view:${ip}`, 30, 60)
     if (rl.allowed) {
+      // Três coisas que não são visita de mercado, todas GRAVADAS e marcadas
+      // (nunca descartadas): dev server local apontando para o banco de
+      // produção, preview da Vercel, e rastreador de link — o do próprio Meta
+      // responde pela maior parte das "visitas" desta página (ver
+      // docs/VALIDACAO-FUNIL-2026-09-16.md).
+      const bot = isBotUserAgent(hdrs.get('user-agent'))
+      const ambiente = isInternalHost(hdrs.get('x-forwarded-host') ?? hdrs.get('host'))
+        || isNonProductionRuntime()
       await recordAcquisitionEvent(createAdminClient(), {
         event_type: 'lp_view',
         landing_page_id: page.id,
         utm,
         referrer: hdrs.get('referer')?.slice(0, 300) ?? null,
+        is_internal: bot || ambiente,
+        metadata: bot ? { nao_mercado: 'bot' } : ambiente ? { nao_mercado: 'ambiente' } : {},
       })
     }
   } catch (err) {
