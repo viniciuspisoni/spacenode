@@ -61,6 +61,24 @@ referrer `localhost`). As outras visitas de teste de 16/09 chegaram com
 referrer vazio e são indistinguíveis de visita real — ficam na base. A partir
 do deploy, o host resolve na origem.
 
+### E a contaminação maior: o rastreador do Meta
+
+Descoberto durante a validação (detalhe e números em
+`docs/VALIDACAO-FUNIL-2026-09-16.md`): nos dois dias de campanha, **a maior
+parte das "visitas" da landing page não é gente**. Em 16/09, 184 dos 217 IPs
+distintos que abriram a LP são da faixa `173.252.0.0/16`, do Meta — o
+rastreador que busca o destino do anúncio de várias máquinas ao mesmo tempo
+(uma rajada de 21 visitas em 12 segundos). Em 15/09, 221 de 259.
+
+Consequência direta para a leitura do funil: **`lp_view` não é audiência**, e
+qualquer conversão calculada sobre ele (visita → cadastro, custo por visita)
+está diluída por robô. O número de cadastros, esse, não é afetado — robô não
+cria conta.
+
+A partir desta PR o `lp_view` de rastreador conhecido nasce marcado
+(`is_internal = true`, `metadata.nao_mercado = 'bot'`) e sai dos relatórios. O
+histórico não tem conserto: o user agent nunca foi gravado.
+
 Ação que só o dono pode fazer (o e-mail não entra no repositório):
 
 ```sql
@@ -87,9 +105,11 @@ select marketing.mark_internal_actor('<e-mail da conta interna>', 'conta do dono
 - **6 de 8 geraram**, quase sempre em menos de 6 minutos depois do cadastro.
   A ativação é rápida — o produto entrega na primeira sessão.
 - **17 gerações, 17 concluídas, 0 falhas.** Ninguém parou por erro técnico.
-- **Retorno: praticamente nenhum.** Só U1 voltou (14/09 17:59 → 15/09 00:21,
-  intervalo de 6h22 — sessão nova, ainda dentro das primeiras 24h). Os outros
-  7 nunca reabriram depois da sessão de cadastro.
+- **Uma segunda sessão observada até agora.** U1 voltou (14/09 17:59 → 15/09
+  00:21, intervalo de 6h22 — ainda dentro das primeiras 24 h). Os outros 7 não
+  reabriram **até este levantamento**. Isso é o estado do contador, não uma
+  taxa de retenção: 7 dos 8 se cadastraram há menos de 24 h e a janela em que
+  um retorno espontâneo acontece nem passou.
 - **Zero checkouts.** `checkout_started` É instrumentado (22 eventos na base,
   o último em 15/09), então aqui a ausência é real, não cegueira.
 - U1 é o único perto do fim do saldo grátis: **2 nodes de 80**.
@@ -111,9 +131,13 @@ produto) nunca foram implantadas.
 
 ### Duas contas a confirmar antes de tratar como lead
 
-- **U6 (`pis***`)**: criada 12 minutos depois do deploy da #211, sem nenhuma
-  geração, saldo intocado. Tem cara de conta de verificação do próprio dono —
-  se for, é caso de `mark_internal_actor`, e a amostra real cai para 7.
+- **U6 (`pis***`) — possível conta interna, NÃO confirmada.** Criada 12 minutos
+  depois do deploy da #211, sem nenhuma geração, saldo intocado, prefixo de
+  e-mail parecido com o do dono. Nada disso é prova: não há evento vindo de
+  host de desenvolvimento nem qualquer outro rastro que feche a questão. Segue
+  como **suspeita em aberto** até o dono dizer. Se for interna, o caminho é
+  `mark_internal_actor` e a amostra real cai para 7; enquanto não for, ela
+  continua contada como cadastro e **não deve ser abordada**.
 - **U7 e U8 (`ete***`)**: entraram pela mesma LP paga com 16 minutos de
   diferença; e-mails diferentes, mas com o mesmo prefixo, o mesmo sufixo e
   distância de edição 4 em 17 caracteres. Pode ser a mesma pessoa criando uma
@@ -121,12 +145,28 @@ produto) nunca foram implantadas.
 
 ### O que NÃO dá para concluir
 
-A amostra é de 8 contas, 7 delas com menos de 24 horas de vida, num período em
-que o preço passou a aparecer na LP (PR #214) — mudança que, por previsão
-registrada, derruba volume de cadastro e sobe qualidade. **Zero assinaturas em
-8 cadastros não sustenta afirmação sobre conversão para pago.** O que os dados
-sustentam é mais modesto e mais útil: a ativação funciona (6/8 em minutos, sem
-falha) e o retorno ao segundo dia é o ponto fraco visível.
+A amostra é de 8 contas — uma delas de origem duvidosa (U6) e duas
+possivelmente da mesma pessoa —, 7 com menos de 24 horas de vida, num período
+em que o preço passou a aparecer na LP (PR #214), mudança que por previsão
+registrada derruba volume de cadastro e sobe qualidade.
+
+Com isso, **duas leituras estão fora de alcance por enquanto**:
+
+- **Conversão para pago.** Zero assinaturas em 8 cadastros não sustenta
+  afirmação nenhuma. A maioria nem gastou o saldo grátis; não houve ainda o
+  momento em que a decisão de pagar se coloca.
+- **Retenção.** Uma única segunda sessão observada também não sustenta
+  afirmação. Sete pessoas se cadastraram ontem à noite ou hoje: "não voltou"
+  aqui significa "ainda não voltou", e a diferença entre as duas frases é a
+  conclusão inteira.
+
+O que os dados sustentam, e só isso: **a ativação funciona** — 6 de 8 geraram
+em minutos e as 17 gerações concluíram sem uma única falha.
+
+Para fechar qualquer das duas leituras: reavaliar a mesma coorte em 7 e 14 dias
+(retorno e checkout), já com o funil corrigido, com tráfego interno fora e com
+as contas duvidosas resolvidas. Qualquer número antes disso é ruído de amostra
+nova.
 
 ---
 
@@ -140,8 +180,10 @@ lê e aprova cada mensagem antes de qualquer envio.
 ### Grupo A — geraram (U1, U2, U3, U5, U7, U8)
 
 O gancho é o resultado que a pessoa já fez, não o produto. Todas as gerações
-concluíram, então não há problema a consertar: o objetivo é **trazer de volta
-para a segunda sessão**, que é onde este grupo some.
+concluíram, então não há problema a consertar: o objetivo é **dar um motivo
+para a segunda sessão**. Note que isto é uma aposta, não uma correção de
+problema medido — ainda não dá para dizer que este grupo "some", só que a
+maioria ainda não voltou dentro de uma janela curta demais para julgar.
 
 - **Momento:** 48–72 h depois da última geração.
 - **Conteúdo:** o próprio render que a pessoa gerou + um próximo passo
@@ -153,7 +195,7 @@ para a segunda sessão**, que é onde este grupo some.
   está com **2 nodes de 80**. É o único com pergunta de plano natural, e a
   conversa começa pelo limite que ele já encostou, não por desconto.
 
-### Grupo B — não geraram (U4 e, se confirmado externo, U6)
+### Grupo B — não geraram (U4; U6 fica de fora enquanto a suspeita não fechar)
 
 **U4 é o caso que importa:** veio de campanha paga (o evento de signup tem
 marcador de campanha), criou conta, abriu o `/app` — o evento de signup só é
@@ -167,7 +209,8 @@ gerar, com os 80 nodes intactos.
 - **Valor do retorno é diagnóstico:** com 0 falhas técnicas na base inteira, a
   parada de U4 provavelmente não é bug, e sim primeira tela ou falta de
   arquivo à mão. A resposta dele vale mais que a conversão dele.
-- **U6:** não abordar até confirmar se é conta interna.
+- **U6:** não abordar. A suspeita de conta interna segue **sem confirmação**, e
+  abordar uma conta do próprio time é o único erro aqui que não tem desfazer.
 
 ### O que não fazer agora
 

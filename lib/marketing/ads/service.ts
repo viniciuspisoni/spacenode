@@ -1861,6 +1861,15 @@ export async function recordAcquisitionEvent(
     const adId = event.ad_identifier ?? utmStr('utm_content') ?? utmStr('content')
     const campId = event.campaign_identifier ?? utmStr('utm_campaign') ?? utmStr('campaign')
 
+    // Origem dos eventos que não são de cadastro (lp_view, cta, dinheiro): a
+    // mesma regra do backfill da migration — marcador de campanha é `paid`,
+    // o resto é `unknown`. Sem isto a coluna nasceria NULL só nas linhas
+    // novas, e um "group by origin" misturaria "sem informação" com "coluna
+    // não preenchida". Quem sabe classificar melhor (o cadastro) passa
+    // `origin` explícito e manda nesta decisão.
+    const origin: AcquisitionOrigin =
+      event.origin ?? (adId || campId ? 'paid' : 'unknown')
+
     const baseRow = {
       user_id: event.user_id ?? null,
       event_type: event.event_type,
@@ -1890,7 +1899,7 @@ export async function recordAcquisitionEvent(
       // occurred_at ausente = agora (default da coluna). Não mandar `null`:
       // a coluna é NOT NULL e o default só vale para coluna OMITIDA.
       ...(event.occurred_at ? { occurred_at: event.occurred_at } : {}),
-      origin: event.origin ?? null,
+      origin,
       is_internal: event.is_internal ?? false,
     })
     if (error && (error.code === '42703' || error.code === 'PGRST204')) {

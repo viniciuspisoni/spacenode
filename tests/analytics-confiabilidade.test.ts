@@ -20,6 +20,7 @@ import {
 } from '@/lib/marketing/ads/service'
 import type { AttributionSnapshot } from '@/lib/marketing/ads/naming'
 import {
+  isBotUserAgent,
   isInternalHost,
   isInternalRequest,
   isNonProductionRuntime,
@@ -145,6 +146,19 @@ describe('2 · origem nunca é inventada', () => {
     expect(rows[0].origin).toBe('unknown')
     expect((rows[0].metadata as Record<string, unknown>).organic).toBe(false)
   })
+
+  it('evento comum sem origem explícita: paid com marcador, unknown sem — nunca NULL', async () => {
+    // Se a coluna nascesse NULL nas linhas novas, um "group by origin"
+    // misturaria "sem informação" com "campo não preenchido".
+    const { admin, rows } = fakeAdmin()
+    await recordAcquisitionEvent(admin, {
+      event_type: 'lp_view',
+      utm: { utm_source: 'meta', utm_campaign: 'SN_META_AQUISICAO' },
+    })
+    await recordAcquisitionEvent(admin, { event_type: 'lp_view', utm: {} })
+    expect(rows[0].origin).toBe('paid')
+    expect(rows[1].origin).toBe('unknown')
+  })
 })
 
 // ── 3 · tráfego interno ───────────────────────────────────────────────────────
@@ -196,6 +210,33 @@ describe('3 · dev/preview separado do mercado', () => {
     expect(isNonProductionRuntime()).toBe(true)
     process.env.VERCEL_ENV = 'production'
     expect(isNonProductionRuntime()).toBe(false)
+  })
+
+  it('rastreador de link é robô, navegador de gente não é', () => {
+    // O rastreador do Meta respondeu por 184 dos 217 IPs distintos da landing
+    // page em 16/09/26 — e chega pelo host de PRODUÇÃO, então só o user agent
+    // o distingue.
+    for (const ua of [
+      'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)',
+      'meta-externalagent/1.1',
+      'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+      'Twitterbot/1.0',
+      'WhatsApp/2.23.20.0',
+      'Mozilla/5.0 HeadlessChrome/120.0.0.0',
+    ]) {
+      expect(isBotUserAgent(ua), ua).toBe(true)
+    }
+    for (const ua of [
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36',
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1',
+      'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/140.0 Mobile Safari/537.36 Instagram 300.0',
+    ]) {
+      expect(isBotUserAgent(ua), ua).toBe(false)
+    }
+    // Sem user agent NÃO é motivo para esconder visita: errar aqui some com
+    // gente de verdade e o erro não aparece em lugar nenhum.
+    expect(isBotUserAgent(null)).toBe(false)
+    expect(isBotUserAgent('')).toBe(false)
   })
 
   it('a marcação vai para a coluna, e o default é false', async () => {
