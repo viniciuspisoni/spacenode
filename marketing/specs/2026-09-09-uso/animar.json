@@ -1,0 +1,44 @@
+{
+ "slug": "2026-09-09-reel-uso-animar",
+ "accent": false,
+ "band": { "aspect": 1.3333 },
+ "segments": [
+  { "type": "still", "src": "$REPO/marketing/output/2026-09-04-reel-esquadria-regua-patio/src/render-1080x1280.png", "dur": 1.5, "fit": "contain", "inset": 300, "bg": "dark", "kenburns": [1, 1.04] },
+  { "type": "still", "src": "$REPO/marketing/output/2026-09-08-tutoriais/src/animar/01-vazio.png", "crop": [220, 1100, 700, 660], "dur": 2.2, "fit": "contain", "inset": 200, "bg": "dark", "kenburns": [1, 1] },
+  { "type": "still", "src": "$REPO/marketing/output/2026-09-08-tutoriais/src/animar/02-painel-default.png", "crop": [40, 220, 760, 730], "dur": 1.2, "fit": "contain", "inset": 200, "bg": "dark", "kenburns": [1, 1] },
+  { "type": "still", "src": "$REPO/marketing/output/2026-09-08-tutoriais/src/animar/04-painel-reels.png", "crop": [40, 220, 760, 730], "dur": 2.0, "fit": "contain", "inset": 200, "bg": "dark", "kenburns": [1, 1] },
+  { "type": "still", "src": "$REPO/marketing/output/2026-09-08-tutoriais/src/animar/04-painel-reels.png", "crop": [40, 1590, 760, 500], "dur": 2.4, "fit": "contain", "inset": 200, "bg": "dark", "kenburns": [1, 1] },
+  { "type": "still", "src": "$REPO/marketing/output/2026-09-08-tutoriais/src/animar/04-painel-reels.png", "crop": [40, 2350, 760, 216], "dur": 2.2, "fit": "contain", "inset": 200, "bg": "dark", "kenburns": [1, 1] },
+  { "type": "video", "src": "$REPO/marketing/output/2026-09-04-reel-esquadria-regua-patio/src/push-6s4.mp4", "start": 2.8, "dur": 3.6, "fit": "cover" },
+  { "type": "card", "card": "final", "dur": 1.3 }
+ ],
+ "transitions": [
+  { "type": "fade", "dur": 0.3 },
+  { "type": "cut" },
+  { "type": "cut" },
+  { "type": "cut" },
+  { "type": "cut" },
+  { "type": "fade", "dur": 0.35 },
+  { "type": "fade", "dur": 0.3 }
+ ],
+ "cards": {
+  "a": { "layout": "hook-fixed", "hook": "render pronto. e parado.", "top": 244, "size": 56, "eyebrow": "animar", "bottom": 350 },
+  "b": { "layout": "hook-fixed", "hook": "sobe o render — ou pega um do histórico.", "top": 244, "size": 48 },
+  "c": { "layout": "hook-fixed", "hook": "cinco tipos de vídeo.", "top": 244, "size": 56 },
+  "d": { "layout": "hook-fixed", "hook": "escolhe reels de projeto.", "top": 244, "size": 56 },
+  "e": { "layout": "hook-fixed", "hook": "ele já marca 9:16 e 6 segundos.", "top": 244, "size": 52 },
+  "f": { "layout": "hook-fixed", "hook": "210 nodes.", "top": 244, "size": 60, "sub": "o custo desta geração, antes de gerar.", "subSize": 38, "bottom": 350 },
+  "g": { "layout": "hook-fixed", "hook": "a mesma imagem, agora em movimento.", "top": 250, "size": 50, "scrim": true, "sub": "geometria, materiais e mobiliário preservados.", "subSize": 36, "bottom": 350 },
+  "final": { "layout": "final", "cta": "Teste grátis no link da bio", "micro": "4s, 6s ou 8s · vertical, horizontal ou original" }
+ },
+ "overlays": [
+  { "card": "a", "from": 0, "to": 1.35 },
+  { "card": "b", "from": 1.35, "to": 3.4 },
+  { "card": "c", "from": 3.4, "to": 4.6 },
+  { "card": "d", "from": 4.6, "to": 6.6 },
+  { "card": "e", "from": 6.6, "to": 9.0 },
+  { "card": "f", "from": 9.0, "to": 11.02 },
+  { "card": "g", "from": 11.02, "to": 14.15 }
+ ],
+ "qa": [0.7, 1.9, 2.9, 4.0, 5.6, 7.8, 10.1, 12.6, 14.8]
+}

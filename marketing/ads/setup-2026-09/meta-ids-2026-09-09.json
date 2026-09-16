@@ -1,0 +1,613 @@
+{
+  "_meta": {
+    "fase": 2,
+    "data": "2026-09-09",
+    "ad_account_id": "act_1591546965695524",
+    "ad_account_name": "SpaceNode Ads",
+    "moeda": "BRL",
+    "min_daily_budget_cents": 517,
+    "min_campaign_spend_cap_cents": 30000,
+    "tudo_paused": true,
+    "roteiro": "marketing/ads/setup-2026-09/meta-criar-por-api.md",
+    "page_id": "1300022283184438",
+    "instagram_business_id": "17841477062800156"
+  },
+
+  "audience_id": "120248746583720302",
+  "audience_video50_id": "120248746915670302",
+  "campaign_prospeccao_id": "120248746585550302",
+  "adset_render_id": "120248746594100302",
+  "adset_plugin_id": "120248746598050302",
+  "campaign_seguidores_id": "120248746783930302",
+  "adset_quente_id": "120248746788260302",
+  "renamed_engagement_campaign_id": "120248746588520302",
+
+  "quente_creatives": [
+    {
+      "id": "1429693589029377",
+      "name": "SN_META_SEGUIDORES_ARQUITETO_QUENTE_DRONE_COPY05",
+      "object_type": "VIDEO",
+      "video_id_pedido": "1536334921516197",
+      "video_id_gravado": "1393031766281356",
+      "video_origem": "2026-09-04-reel-drone-nada-sai-do-lugar-ad",
+      "duracao_s": 6,
+      "image_url_capa": "https://nucyyqmurhnakhldshwr.supabase.co/storage/v1/object/public/marketing-ads/2026-09/2026-09-04-reel-drone-nada-sai-do-lugar-ad-capa.jpg",
+      "call_to_action_type": "VIEW_INSTAGRAM_PROFILE",
+      "link_url_pedido": "https://www.instagram.com/spacenode.app/",
+      "link_url_gravado": null,
+      "title": "Render fiel ao SketchUp, toda semana",
+      "link_description": "@spacenode.app",
+      "body": "Render com IA para quem projeta no SketchUp: fidelidade ao modelo, bastidores do plugin, um Reel por semana.\nFeito por arquiteto, em portugues.",
+      "effective_object_story_id": "1300022283184438_122116715679402354",
+      "effective_instagram_media_id": "18114855878058868",
+      "status": "ACTIVE"
+    },
+    {
+      "id": "1091479190124588",
+      "name": "SN_META_SEGUIDORES_ARQUITETO_QUENTE_PLUGINNOSU_COPY05",
+      "object_type": "VIDEO",
+      "video_id_pedido": "1062578223193714",
+      "video_id_gravado": "3656717914504875",
+      "video_origem": "2026-09-07-reel-plugin-no-sketchup",
+      "duracao_s": 12.633,
+      "image_url_capa": "https://nucyyqmurhnakhldshwr.supabase.co/storage/v1/object/public/marketing-ads/2026-09/2026-09-07-reel-plugin-no-sketchup-capa.jpg",
+      "call_to_action_type": "VIEW_INSTAGRAM_PROFILE",
+      "link_url_pedido": "https://www.instagram.com/spacenode.app/",
+      "link_url_gravado": null,
+      "title": "Render fiel ao SketchUp, toda semana",
+      "link_description": "@spacenode.app",
+      "body": "Render com IA para quem projeta no SketchUp: fidelidade ao modelo, bastidores do plugin, um Reel por semana.\nFeito por arquiteto, em portugues.",
+      "status": "ACTIVE"
+    }
+  ],
+
+  "quente_ads": [
+    {
+      "id": "120248746796380302",
+      "name": "SN_META_SEGUIDORES_ARQUITETO_QUENTE_DRONE_COPY05",
+      "adset_id": "120248746788260302",
+      "creative_id": "1429693589029377",
+      "status": "PAUSED"
+    },
+    {
+      "id": "120248746796950302",
+      "name": "SN_META_SEGUIDORES_ARQUITETO_QUENTE_PLUGINNOSU_COPY05",
+      "adset_id": "120248746788260302",
+      "creative_id": "1091479190124588",
+      "status": "PAUSED"
+    }
+  ],
+
+  "advantage_plus_off_2026_09_09": {
+    "estado": "RESOLVIDO POR SUBSTITUICAO EM 2026-09-09 - ver bloco ads_noadv_2026_09_09. Os 8 anuncios antigos foram renomeados com o sufixo _DESCARTADO_ADV (seguem PAUSED com os criativos antigos) e 8 anuncios NOVOS foram criados nos mesmos conjuntos, com os nomes ORIGINAIS e os criativos _NOADV.",
+    "degrees_of_freedom_spec_aplicado": {
+      "creative_features_spec": {
+        "image_touchups": { "enroll_status": "OPT_OUT" },
+        "text_optimizations": { "enroll_status": "OPT_OUT" },
+        "image_animation": { "enroll_status": "OPT_OUT" },
+        "video_auto_crop": { "enroll_status": "OPT_OUT" },
+        "image_brightness_and_contrast": { "enroll_status": "OPT_OUT" },
+        "enhance_cta": { "enroll_status": "OPT_OUT" },
+        "adapt_to_placement": { "enroll_status": "OPT_OUT" },
+        "media_liquidity_animated_image": { "enroll_status": "OPT_OUT" },
+        "add_text_overlay": { "enroll_status": "OPT_OUT" },
+        "description_automation": { "enroll_status": "OPT_OUT" },
+        "site_extensions": { "enroll_status": "OPT_OUT" },
+        "profile_card": { "enroll_status": "OPT_OUT" }
+      }
+    },
+    "creative_map_old_to_new": {
+      "1129885812830766": "4513738412236130",
+      "3331136590428573": "1092814133193451",
+      "1889210712058630": "1067138529241816",
+      "1059743716770670": "926292543404061",
+      "1447188797462863": "2058822988330118",
+      "1786420299153206": "1782547519832677",
+      "1429693589029377": "1387206756934888",
+      "1091479190124588": "1589493629501002"
+    },
+    "por_anuncio": [
+      {
+        "ad_id": "120248746690680302",
+        "ad_name": "SN_META_PROSPECCAO_ARQUITETO_RENDER_DRONE_COPY01",
+        "creative_atual": "1129885812830766",
+        "creative_novo_noadv": "4513738412236130",
+        "creative_novo_name": "SN_META_PROSPECCAO_ARQUITETO_RENDER_DRONE_COPY01_NOADV",
+        "video_id": "1860407858665633",
+        "status": "PAUSED",
+        "effective_status": "PAUSED",
+        "repontado": false
+      },
+      {
+        "ad_id": "120248746692220302",
+        "ad_name": "SN_META_PROSPECCAO_ARQUITETO_RENDER_PISCAFACHADA_COPY01",
+        "creative_atual": "3331136590428573",
+        "creative_novo_noadv": "1092814133193451",
+        "creative_novo_name": "SN_META_PROSPECCAO_ARQUITETO_RENDER_PISCAFACHADA_COPY01_NOADV",
+        "video_id": "1113251988043007",
+        "status": "PAUSED",
+        "effective_status": "PAUSED",
+        "repontado": false
+      },
+      {
+        "ad_id": "120248746693820302",
+        "ad_name": "SN_META_PROSPECCAO_ARQUITETO_RENDER_DUASREUNIOES_COPY02",
+        "creative_atual": "1889210712058630",
+        "creative_novo_noadv": "1067138529241816",
+        "creative_novo_name": "SN_META_PROSPECCAO_ARQUITETO_RENDER_DUASREUNIOES_COPY02_NOADV",
+        "video_id": "1044613238415921",
+        "status": "PAUSED",
+        "effective_status": "PAUSED",
+        "repontado": false
+      },
+      {
+        "ad_id": "120248746694960302",
+        "ad_name": "SN_META_PROSPECCAO_ARQUITETO_PLUGIN_PLUGINRENDER_COPY03",
+        "creative_atual": "1059743716770670",
+        "creative_novo_noadv": "926292543404061",
+        "creative_novo_name": "SN_META_PROSPECCAO_ARQUITETO_PLUGIN_PLUGINRENDER_COPY03_NOADV",
+        "video_id": "944315155409380",
+        "status": "PAUSED",
+        "effective_status": "PAUSED",
+        "repontado": false
+      },
+      {
+        "ad_id": "120248746706490302",
+        "ad_name": "SN_META_PROSPECCAO_ARQUITETO_PLUGIN_PLUGINNOSU_COPY03",
+        "creative_atual": "1447188797462863",
+        "creative_novo_noadv": "2058822988330118",
+        "creative_novo_name": "SN_META_PROSPECCAO_ARQUITETO_PLUGIN_PLUGINNOSU_COPY03_NOADV",
+        "video_id": "1049696867988031",
+        "status": "PAUSED",
+        "effective_status": "PAUSED",
+        "repontado": false
+      },
+      {
+        "ad_id": "120248746707460302",
+        "ad_name": "SN_META_PROSPECCAO_ARQUITETO_PLUGIN_TRESCENAS_COPY04",
+        "creative_atual": "1786420299153206",
+        "creative_novo_noadv": "1782547519832677",
+        "creative_novo_name": "SN_META_PROSPECCAO_ARQUITETO_PLUGIN_TRESCENAS_COPY04_NOADV",
+        "video_id": "1482936533881119",
+        "status": "PAUSED",
+        "effective_status": "PAUSED",
+        "repontado": false
+      },
+      {
+        "ad_id": "120248746796380302",
+        "ad_name": "SN_META_SEGUIDORES_ARQUITETO_QUENTE_DRONE_COPY05",
+        "creative_atual": "1429693589029377",
+        "creative_novo_noadv": "1387206756934888",
+        "creative_novo_name": "SN_META_SEGUIDORES_ARQUITETO_QUENTE_DRONE_COPY05_NOADV",
+        "video_id": "1393031766281356",
+        "status": "PAUSED",
+        "effective_status": "PAUSED",
+        "repontado": false
+      },
+      {
+        "ad_id": "120248746796950302",
+        "ad_name": "SN_META_SEGUIDORES_ARQUITETO_QUENTE_PLUGINNOSU_COPY05",
+        "creative_atual": "1091479190124588",
+        "creative_novo_noadv": "1589493629501002",
+        "creative_novo_name": "SN_META_SEGUIDORES_ARQUITETO_QUENTE_PLUGINNOSU_COPY05_NOADV",
+        "video_id": "3656717914504875",
+        "status": "PAUSED",
+        "effective_status": "PAUSED",
+        "repontado": false
+      }
+    ]
+  },
+
+  "ads_noadv_2026_09_09": {
+    "_nota": "Substituicao dos 8 anuncios para os criativos _NOADV (Advantage+ desligado). O anuncio antigo foi renomeado com o sufixo _DESCARTADO_ADV e continua PAUSED com o criativo antigo; o anuncio novo herdou o nome ORIGINAL exato, no MESMO conjunto, apontando para o criativo _NOADV, criado PAUSED. Nada foi ativado.",
+    "SN_META_PROSPECCAO_ARQUITETO_RENDER_DRONE_COPY01": {
+      "old_ad_id": "120248746690680302",
+      "new_ad_id": "120248747047970302",
+      "creative_id": "4513738412236130",
+      "status": "PAUSED",
+      "adset_id": "120248746594100302",
+      "old_ad_name": "SN_META_PROSPECCAO_ARQUITETO_RENDER_DRONE_COPY01_DESCARTADO_ADV",
+      "old_creative_id": "1129885812830766",
+      "new_ad_effective_status": "IN_PROCESS"
+    },
+    "SN_META_PROSPECCAO_ARQUITETO_RENDER_PISCAFACHADA_COPY01": {
+      "old_ad_id": "120248746692220302",
+      "new_ad_id": "120248747048930302",
+      "creative_id": "1092814133193451",
+      "status": "PAUSED",
+      "adset_id": "120248746594100302",
+      "old_ad_name": "SN_META_PROSPECCAO_ARQUITETO_RENDER_PISCAFACHADA_COPY01_DESCARTADO_ADV",
+      "old_creative_id": "3331136590428573",
+      "new_ad_effective_status": "IN_PROCESS"
+    },
+    "SN_META_PROSPECCAO_ARQUITETO_RENDER_DUASREUNIOES_COPY02": {
+      "old_ad_id": "120248746693820302",
+      "new_ad_id": "120248747049430302",
+      "creative_id": "1067138529241816",
+      "status": "PAUSED",
+      "adset_id": "120248746594100302",
+      "old_ad_name": "SN_META_PROSPECCAO_ARQUITETO_RENDER_DUASREUNIOES_COPY02_DESCARTADO_ADV",
+      "old_creative_id": "1889210712058630",
+      "new_ad_effective_status": "IN_PROCESS"
+    },
+    "SN_META_PROSPECCAO_ARQUITETO_PLUGIN_PLUGINRENDER_COPY03": {
+      "old_ad_id": "120248746694960302",
+      "new_ad_id": "120248747050270302",
+      "creative_id": "926292543404061",
+      "status": "PAUSED",
+      "adset_id": "120248746598050302",
+      "old_ad_name": "SN_META_PROSPECCAO_ARQUITETO_PLUGIN_PLUGINRENDER_COPY03_DESCARTADO_ADV",
+      "old_creative_id": "1059743716770670",
+      "new_ad_effective_status": "IN_PROCESS"
+    },
+    "SN_META_PROSPECCAO_ARQUITETO_PLUGIN_PLUGINNOSU_COPY03": {
+      "old_ad_id": "120248746706490302",
+      "new_ad_id": "120248747051010302",
+      "creative_id": "2058822988330118",
+      "status": "PAUSED",
+      "adset_id": "120248746598050302",
+      "old_ad_name": "SN_META_PROSPECCAO_ARQUITETO_PLUGIN_PLUGINNOSU_COPY03_DESCARTADO_ADV",
+      "old_creative_id": "1447188797462863",
+      "new_ad_effective_status": "IN_PROCESS"
+    },
+    "SN_META_PROSPECCAO_ARQUITETO_PLUGIN_TRESCENAS_COPY04": {
+      "old_ad_id": "120248746707460302",
+      "new_ad_id": "120248747051320302",
+      "creative_id": "1782547519832677",
+      "status": "PAUSED",
+      "adset_id": "120248746598050302",
+      "old_ad_name": "SN_META_PROSPECCAO_ARQUITETO_PLUGIN_TRESCENAS_COPY04_DESCARTADO_ADV",
+      "old_creative_id": "1786420299153206",
+      "new_ad_effective_status": "IN_PROCESS"
+    },
+    "SN_META_SEGUIDORES_ARQUITETO_QUENTE_DRONE_COPY05": {
+      "old_ad_id": "120248746796380302",
+      "new_ad_id": "120248747051670302",
+      "creative_id": "1387206756934888",
+      "status": "PAUSED",
+      "adset_id": "120248746788260302",
+      "old_ad_name": "SN_META_SEGUIDORES_ARQUITETO_QUENTE_DRONE_COPY05_DESCARTADO_ADV",
+      "old_creative_id": "1429693589029377",
+      "new_ad_effective_status": "IN_PROCESS"
+    },
+    "SN_META_SEGUIDORES_ARQUITETO_QUENTE_PLUGINNOSU_COPY05": {
+      "old_ad_id": "120248746796950302",
+      "new_ad_id": "120248747051960302",
+      "creative_id": "1589493629501002",
+      "status": "PAUSED",
+      "adset_id": "120248746788260302",
+      "old_ad_name": "SN_META_SEGUIDORES_ARQUITETO_QUENTE_PLUGINNOSU_COPY05_DESCARTADO_ADV",
+      "old_creative_id": "1091479190124588",
+      "new_ad_effective_status": "IN_PROCESS"
+    }
+  },
+
+  "entidades": {
+    "SN_QUENTE_IG_365": {
+      "id": "120248746583720302",
+      "tipo": "custom_audience",
+      "subtype_pedido": "ENGAGEMENT",
+      "subtype_retornado": "PLATFORM",
+      "retention_days": 365,
+      "event_source": { "type": "ig_business", "id": "17841477062800156" },
+      "event": "ig_business_profile_all",
+      "delivery_status": "INACTIVE",
+      "operation_status_code": 441,
+      "approximate_count": "< 1000"
+    },
+    "SN_QUENTE_VIDEO50_365": {
+      "id": "120248746915670302",
+      "tipo": "custom_audience",
+      "criado_em": "2026-09-09T07:47:56-07:00",
+      "subtype_pedido": "ENGAGEMENT",
+      "subtype_retornado": "PLATFORM",
+      "retention_days": 365,
+      "retention_seconds": 31536000,
+      "description": "Pessoas que assistiram pelo menos 50% dos videos SpaceNode - retencao 365 dias",
+      "event_source": { "type": "ig_business", "id": "17841477062800156" },
+      "event": "video_view_50_percent",
+      "rule_gravada": "{\"inclusions\":{\"operator\":\"or\",\"rules\":[{\"event_sources\":[{\"type\":\"ig_business\",\"id\":17841477062800156}],\"retention_seconds\":31536000,\"filter\":{\"operator\":\"and\",\"filters\":[{\"field\":\"event\",\"operator\":\"eq\",\"value\":\"video_view_50_percent\"}]}}]}}",
+      "data_source": { "type": "EVENT_BASED", "sub_type": "IG_BUSINESS_EVENTS" },
+      "delivery_status": "INACTIVE",
+      "operation_status_code": 441,
+      "approximate_count_lower_bound": 1000,
+      "approximate_count_upper_bound": 1000,
+      "restricao_por_video_id": false,
+      "usado_no_adset": "120248746788260302"
+    },
+    "SN_META_PROSPECCAO_ARQUITETO": {
+      "id": "120248746585550302",
+      "tipo": "campaign",
+      "objective": "OUTCOME_TRAFFIC",
+      "buying_type": "AUCTION",
+      "orcamento": "ABO (sem orcamento na campanha)",
+      "special_ad_categories": [],
+      "spend_cap_cents": 100000,
+      "status": "PAUSED"
+    },
+    "SN_META_PROSPECCAO_ARQUITETO_RENDER": {
+      "id": "120248746594100302",
+      "tipo": "adset",
+      "campaign_id": "120248746585550302",
+      "billing_event": "IMPRESSIONS",
+      "optimization_goal": "LANDING_PAGE_VIEWS",
+      "bid_strategy": "LOWEST_COST_WITHOUT_CAP",
+      "daily_budget_cents": 1600,
+      "start_time": "2026-09-14T09:00:00-03:00",
+      "end_time": "2026-10-13T23:59:00-03:00",
+      "destination_type": "UNDEFINED",
+      "status": "PAUSED",
+      "targeting_efetivo": {
+        "age_min": 24,
+        "age_max": 50,
+        "geo_locations": {
+          "countries": ["BR"],
+          "location_types": ["frequently_in", "home"]
+        },
+        "locales": [16],
+        "flexible_spec": [
+          {
+            "interests": [
+              { "id": 6002920953955, "name": "Design de interiores (design)" },
+              { "id": 6003350422793, "name": "Design de interiores (arquitetura)" },
+              { "id": 6004140335706, "name": "Arquitetura (arquitetura)" }
+            ]
+          }
+        ],
+        "custom_audiences": [],
+        "publisher_platforms": ["instagram"],
+        "effective_publisher_platforms": ["instagram"],
+        "instagram_positions": ["stream", "story", "reels"],
+        "effective_instagram_positions": ["stream", "story", "reels"],
+        "device_platforms": ["mobile", "desktop"],
+        "targeting_automation": { "advantage_audience": 0 }
+      }
+    },
+    "SN_META_PROSPECCAO_ARQUITETO_PLUGIN": {
+      "id": "120248746598050302",
+      "tipo": "adset",
+      "campaign_id": "120248746585550302",
+      "billing_event": "IMPRESSIONS",
+      "optimization_goal": "LANDING_PAGE_VIEWS",
+      "bid_strategy": "LOWEST_COST_WITHOUT_CAP",
+      "daily_budget_cents": 1600,
+      "start_time": "2026-09-14T09:00:00-03:00",
+      "end_time": "2026-10-13T23:59:00-03:00",
+      "destination_type": "UNDEFINED",
+      "status": "PAUSED",
+      "targeting_efetivo": {
+        "age_min": 24,
+        "age_max": 50,
+        "geo_locations": {
+          "countries": ["BR"],
+          "location_types": ["frequently_in", "home"]
+        },
+        "locales": [16],
+        "flexible_spec": [
+          {
+            "interests": [
+              { "id": 6002920953955, "name": "Design de interiores (design)" },
+              { "id": 6003350422793, "name": "Design de interiores (arquitetura)" },
+              { "id": 6004140335706, "name": "Arquitetura (arquitetura)" }
+            ]
+          }
+        ],
+        "custom_audiences": [],
+        "publisher_platforms": ["instagram"],
+        "effective_publisher_platforms": ["instagram"],
+        "instagram_positions": ["stream", "story", "reels"],
+        "effective_instagram_positions": ["stream", "story", "reels"],
+        "device_platforms": ["mobile", "desktop"],
+        "targeting_automation": { "advantage_audience": 0 }
+      }
+    },
+    "SN_META_SEGUIDORES_ARQUITETO_ENGAJAMENTO_DESCARTADA": {
+      "id": "120248746588520302",
+      "tipo": "campaign",
+      "nome_anterior": "SN_META_SEGUIDORES_ARQUITETO",
+      "objective": "OUTCOME_ENGAGEMENT",
+      "buying_type": "AUCTION",
+      "orcamento": "ABO (sem orcamento na campanha)",
+      "special_ad_categories": [],
+      "spend_cap_cents": null,
+      "status": "PAUSED",
+      "estado": "VAZIA - sem conjuntos nem anuncios. Renomeada em 2026-09-09; mantida pausada para arquivo."
+    },
+    "SN_META_SEGUIDORES_ARQUITETO": {
+      "id": "120248746783930302",
+      "tipo": "campaign",
+      "objective": "OUTCOME_TRAFFIC",
+      "buying_type": "AUCTION",
+      "orcamento": "ABO (sem orcamento na campanha)",
+      "special_ad_categories": [],
+      "spend_cap_cents": 30000,
+      "spend_cap_lido": "R$300,00 BRL",
+      "status": "PAUSED",
+      "valid_optimization_goals": [
+        "CONVERSATIONS",
+        "IMPRESSIONS",
+        "LANDING_PAGE_VIEWS",
+        "LINK_CLICKS",
+        "OFFSITE_CONVERSIONS",
+        "POST_ENGAGEMENT",
+        "PROFILE_AND_PAGE_ENGAGEMENT",
+        "PROFILE_VISIT",
+        "QUALITY_CALL",
+        "REACH",
+        "REMINDERS_SET",
+        "THRUPLAY",
+        "VISIT_INSTAGRAM_PROFILE"
+      ]
+    },
+    "SN_META_SEGUIDORES_ARQUITETO_QUENTE": {
+      "id": "120248746788260302",
+      "tipo": "adset",
+      "campaign_id": "120248746783930302",
+      "billing_event": "IMPRESSIONS",
+      "optimization_goal": "VISIT_INSTAGRAM_PROFILE",
+      "destination_type": "INSTAGRAM_PROFILE",
+      "bid_strategy": "LOWEST_COST_WITHOUT_CAP",
+      "daily_budget_cents": 800,
+      "start_time": "2026-09-14T09:00:00-03:00",
+      "end_time": "2026-10-13T23:59:00-03:00",
+      "promoted_object": "nao exigido pela API",
+      "status": "PAUSED",
+      "targeting_efetivo": {
+        "age_min": 22,
+        "age_max": 55,
+        "geo_locations": {
+          "countries": ["BR"],
+          "location_types": ["home"]
+        },
+        "locales": [16],
+        "custom_audiences": [
+          {
+            "id": "120248746583720302",
+            "name": "SN_QUENTE_IG_365",
+            "subtype": "PLATFORM",
+            "data_source": { "type": "EVENT_BASED", "sub_type": "IG_BUSINESS_EVENTS" }
+          },
+          {
+            "id": "120248746915670302",
+            "name": "SN_QUENTE_VIDEO50_365",
+            "subtype": "PLATFORM",
+            "data_source": { "type": "EVENT_BASED", "sub_type": "IG_BUSINESS_EVENTS" },
+            "adicionado_em": "2026-09-09"
+          }
+        ],
+        "flexible_spec": [
+          {
+            "interests": [
+              { "id": 6002920953955, "name": "Design de interiores (design)" },
+              { "id": 6003350422793, "name": "Design de interiores (arquitetura)" },
+              { "id": 6004140335706, "name": "Arquitetura (arquitetura)" }
+            ]
+          }
+        ],
+        "publisher_platforms": ["instagram"],
+        "effective_publisher_platforms": ["instagram"],
+        "instagram_positions": ["stream", "story", "reels"],
+        "effective_instagram_positions": ["stream", "story", "reels"],
+        "device_platforms": ["mobile", "desktop"],
+        "effective_device_platforms": ["mobile", "desktop"],
+        "page_types": [
+          "instagramstream",
+          "instagramstory",
+          "instagramreels",
+          "instagramwebfeed"
+        ],
+        "targeting_automation": { "advantage_audience": 0 }
+      }
+    }
+  },
+
+  "warnings": [
+    {
+      "item": "T1",
+      "campo": "SN_QUENTE_VIDEO50_365 - variante 1 recusada (event_sources type \"video\" com os 8 video ids)",
+      "erro_exato": "error_category=VALIDATION, error_code=2654, error_message=\"Failed to create custom audience\", error_subcode=null, is_retryable=false. Regra enviada: {\"inclusions\":{\"operator\":\"or\",\"rules\":[{\"event_sources\":[{\"type\":\"video\",\"id\":\"1536334921516197\"}, ... 8 ids ...],\"retention_seconds\":31536000,\"filter\":{\"operator\":\"and\",\"filters\":[{\"field\":\"event\",\"operator\":\"eq\",\"value\":\"video_view_50_percent\"}]}}]}}",
+      "acao": "AVISO - o tipo de event_source \"video\" NAO consta na lista documentada da ferramenta ads_create_custom_audience (ig_business, page, shopping_page, shopping_ig, marketplace_listings, lead, ig_lead_generation, canvas). Nao ha caminho documentado para restringir o publico a video ids especificos."
+    },
+    {
+      "item": "T1",
+      "campo": "SN_QUENTE_VIDEO50_365 - variante 2 ACEITA (event_sources type ig_business + evento video_view_50_percent)",
+      "erro_exato": "Sem erro. audience_id 120248746915670302, subtype retornado PLATFORM, retention_days 365, rule confirmada na releitura.",
+      "acao": "LIMITACAO IMPORTANTE - o publico cobre quem assistiu >= 50% de QUALQUER video da conta @spacenode.app (fonte ig_business inteira), e NAO apenas os 8 video ids pedidos. A API nao aceita restricao por video id nesta ferramenta. Se a restricao por video for obrigatoria, criar na interface do Gerenciador (Publicos > Video > selecionar videos)."
+    },
+    {
+      "item": "T1",
+      "campo": "delivery_status do publico SN_QUENTE_VIDEO50_365",
+      "erro_exato": "delivery_status INACTIVE, operation_status_code 441, approximate_count_lower_bound = approximate_count_upper_bound = 1000",
+      "acao": "PENDENTE - mesmo estado do SN_QUENTE_IG_365: publico ainda nao entrega (441 = tamanho insuficiente / ainda populando). Conferir de novo em alguns dias."
+    },
+    {
+      "item": "T1",
+      "campo": "adset 120248746788260302 custom_audiences",
+      "erro_exato": "Sem erro. update success=true, status_forced_to_paused=false. Releitura confirma custom_audiences = [120248746583720302 SN_QUENTE_IG_365, 120248746915670302 SN_QUENTE_VIDEO50_365] e o resto do targeting identico (age 22-55, BR home puro, locales [16], 3 interesses, instagram stream/story/reels, mobile+desktop, advantage_audience 0). Conjunto continua PAUSED."
+    },
+    {
+      "item": "T2",
+      "campo": "degrees_of_freedom_spec.creative_features_spec.standard_enhancements = OPT_OUT",
+      "erro_exato": "error_category=VALIDATION, error_code=100, error_message=\"O criativo nao deve incluir aprimoramentos padrao: O recurso de inclusao do campo de aprimoramentos padrao no criativo foi descontinuado. Defina recursos individuais. Saiba mais aqui: https://fburl.com/hyth50xo\"",
+      "acao": "RESOLVIDO - o toggle mestre standard_enhancements foi descontinuado pela Meta. Passou-se a listar recursos individuais."
+    },
+    {
+      "item": "T2",
+      "campo": "creative_features_spec.music = OPT_OUT",
+      "erro_exato": "error_category=VALIDATION, error_code=100, error_message=\"Spec verification failed: Invalid Advantage+ creative feature \\\"music\\\"\"",
+      "acao": "RESOLVIDO - \"music\" nao e um nome valido de recurso Advantage+ nesta conta/versao da API. Removido. Os outros 12 nomes foram aceitos."
+    },
+    {
+      "item": "T2",
+      "campo": "criativos QUENTE sem link_url",
+      "erro_exato": "error_category=VALIDATION, error_code=100, error_message=\"O video_data do criativo do anuncio precisa de call_to_action para definir link_description: Para definir link_description em video_data, voce precisa especificar call_to_action.\"",
+      "acao": "RESOLVIDO - com CTA VIEW_INSTAGRAM_PROFILE e preciso enviar link_url (https://www.instagram.com/spacenode.app/) para que o call_to_action seja montado; sem ele a description e recusada. Reenviado com link_url e aceito."
+    },
+    {
+      "item": "T2",
+      "campo": "BLOQUEIO - repontar os 8 anuncios para os criativos novos",
+      "erro_exato": "Tentativa 1, fields={\"creative\":{\"creative_id\":\"4513738412236130\"}}: error_code=100, VALIDATION, \"Ad creatives are immutable and cannot be edited in place. To change media, primary text, headline, or call to action, create a new creative with ads_create_creative, then create a new ad with ads_create_ad that references the new creative_id.\" | Tentativa 2, fields={\"creative_id\":\"4513738412236130\"}: error_code=100, VALIDATION, \"Unsupported field(s) for entity_type=ad: creative_id. These are not editable fields at this level and would be ignored without changing anything.\"",
+      "acao": "RESOLVIDO EM 2026-09-09 pela saida (b): os 8 anuncios antigos foram renomeados com o sufixo _DESCARTADO_ADV (seguem PAUSED com os criativos antigos) e 8 anuncios novos foram criados com ads_create_ad nos mesmos conjuntos, com os nomes ORIGINAIS e os criativos _NOADV. Ver bloco ads_noadv_2026_09_09. Nada foi ativado."
+    },
+    {
+      "item": "T2",
+      "campo": "video_id usado nos criativos _NOADV",
+      "erro_exato": "Sem erro. Os criativos antigos gravaram copias em Reel dos videos de origem (ex.: drone 1536334921516197 -> 1860407858665633 na linha RENDER e -> 1393031766281356 na linha QUENTE). Os criativos _NOADV foram montados com o video_id EFETIVO lido de cada criativo antigo, para midia identica.",
+      "acao": "Nenhuma. Mapa video_id por anuncio em advantage_plus_off_2026_09_09.por_anuncio."
+    },
+    {
+      "item": "T2",
+      "campo": "verificacao do opt-out nos criativos _NOADV",
+      "erro_exato": "Sem erro na criacao, mas ads_get_creatives nao expoe degrees_of_freedom_spec / creative_features_spec entre os campos suportados (id, name, status, account_id, object_type, body, title, link_url, image_hash, image_url, video_id, thumbnail_url, call_to_action_type, object_story_id, effective_object_story_id, effective_instagram_media_id, product_set_id, child_attachments).",
+      "acao": "AVISO - o opt-out foi ACEITO pela API na criacao (a validacao rejeita nomes invalidos, o que prova que o spec foi lido), mas nao ha como reler o valor gravado por esta ferramenta. Confirmar visualmente no Gerenciador."
+    },
+    {
+      "item": "T3",
+      "campo": "effective_status dos 8 anuncios NOVOS",
+      "erro_exato": "Sem erro. Releitura dos 8 anuncios novos: status = PAUSED nos 8, effective_status = IN_PROCESS nos 8 (os antigos renomeados voltam PAUSED/PAUSED).",
+      "acao": "AVISO - IN_PROCESS e o estado de analise/processamento de anuncio recem-criado. Como o status e PAUSED, nada entrega. Reconferir em algumas horas se algum cair em DISAPPROVED / WITH_ISSUES antes de ativar."
+    },
+    {
+      "item": "T3",
+      "campo": "ads_update_entity para renomear os 8 anuncios antigos",
+      "erro_exato": "Sem erro. Os 8 updates devolveram success=true, sem active_errors, status_forced_to_paused=false. Releitura confirma os nomes com sufixo _DESCARTADO_ADV, os criativos antigos intactos e status/effective_status PAUSED.",
+      "acao": "Nenhuma."
+    },
+    {
+      "item": "5",
+      "campo": "geo_locations.location_types = [\"home\"] nos conjuntos de prospeccao 120248746594100302 e 120248746598050302",
+      "erro_exato": "Sem erro. As duas chamadas de update devolveram success:true, mas a releitura mostrou location_types = [\"frequently_in\",\"home\"] nos dois conjuntos. A API reexpandiu o valor em silencio.",
+      "acao": "AVISO - nao resolvido pela API. Se 'home' puro for obrigatorio na prospeccao, ajustar na interface do Gerenciador. Observacao: o conjunto _QUENTE (VISIT_INSTAGRAM_PROFILE + INSTAGRAM_PROFILE) aceitou e MANTEVE [\"home\"] puro, entao a expansao parece atrelada a meta LANDING_PAGE_VIEWS / destino de site, nao a conta."
+    },
+    {
+      "item": "4",
+      "campo": "video_id gravado no criativo != video_id enviado",
+      "erro_exato": "Sem erro. Enviei 1536334921516197 (drone) e 1062578223193714 (plugin no SketchUp); os criativos gravaram 1393031766281356 e 3656717914504875.",
+      "acao": "Comportamento esperado - a API publicou copias em Reel dos videos de origem ao montar o object_story_spec. Midia confirmada correta: as duracoes batem exatamente (6s do drone, 12,633s do plugin) e a previa do anuncio renderiza o Reel certo. Os ids de origem continuam validos na biblioteca da conta."
+    },
+    {
+      "item": "4",
+      "campo": "link_url = https://www.instagram.com/spacenode.app/ com call_to_action VIEW_INSTAGRAM_PROFILE",
+      "erro_exato": "Sem erro. CTA VIEW_INSTAGRAM_PROFILE aceito e confirmado na releitura dos dois criativos. O link_url nao foi gravado (volta ausente em ads_get_creatives).",
+      "acao": "Nenhuma. Com VIEW_INSTAGRAM_PROFILE o destino e resolvido internamente pela Meta para o perfil do instagram_user_id (17841477062800156); nao ha URL a armazenar. Previa em INSTAGRAM_STANDARD renderizou normalmente."
+    },
+    {
+      "item": "2",
+      "campo": "campaign_spend_cap = 30000",
+      "erro_exato": "Sem erro. Aceito e lido de volta como R$300,00 BRL.",
+      "acao": "Resolve o warning da fase 1 (25000 foi recusado por ser abaixo do minimo de R$300 nesta moeda)."
+    },
+    {
+      "item": "3",
+      "campo": "optimization_goal = VISIT_INSTAGRAM_PROFILE + destination_type INSTAGRAM_PROFILE",
+      "erro_exato": "Sem erro sob OUTCOME_TRAFFIC. A campanha nova listou VISIT_INSTAGRAM_PROFILE entre as metas validas e o conjunto foi criado na primeira tentativa, sem promoted_object.",
+      "acao": "Resolve o bloqueio da fase 1 (item E), que era da combinacao com OUTCOME_ENGAGEMENT, nao da conta. A campanha OUTCOME_ENGAGEMENT vazia ficou renomeada como _DESCARTADA."
+    },
+    {
+      "item": "A",
+      "campo": "delivery_status do publico SN_QUENTE_IG_365",
+      "erro_exato": "delivery_status INACTIVE, operation_status_code 441, tamanho aproximado abaixo de 1000",
+      "acao": "PENDENTE - publico com a regra correta, mas ainda pequeno demais para veicular (minimo de 1000 pessoas). O conjunto _QUENTE nao entrega enquanto isso nao crescer."
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "video_ids": {
+    "2026-09-04-reel-drone-nada-sai-do-lugar-ad": "1536334921516197",
+    "2026-09-04-reel-pisca-fachada-geminada-ad": "1904274857219726",
+    "2026-09-04-reel-entre-duas-reunioes-ad": "1270027631853661",
+    "2026-09-07-reel-plugin-render-real": "963464426799908",
+    "2026-09-07-reel-plugin-no-sketchup": "1062578223193714",
+    "2026-09-05-reel-plugin-tres-cenas-um-clique": "4530988740502821"
+  },
+  "creatives": {
+    "SN_META_PROSPECCAO_ARQUITETO_RENDER_DRONE_COPY01": "1129885812830766",
+    "SN_META_PROSPECCAO_ARQUITETO_RENDER_PISCAFACHADA_COPY01": "3331136590428573",
+    "SN_META_PROSPECCAO_ARQUITETO_RENDER_DUASREUNIOES_COPY02": "1889210712058630",
+    "SN_META_PROSPECCAO_ARQUITETO_PLUGIN_PLUGINRENDER_COPY03": "1059743716770670",
+    "SN_META_PROSPECCAO_ARQUITETO_PLUGIN_PLUGINNOSU_COPY03": "1447188797462863",
+    "SN_META_PROSPECCAO_ARQUITETO_PLUGIN_TRESCENAS_COPY04": "1786420299153206"
+  },
+  "ads": {
+    "SN_META_PROSPECCAO_ARQUITETO_RENDER_DRONE_COPY01": "120248746690680302",
+    "SN_META_PROSPECCAO_ARQUITETO_RENDER_PISCAFACHADA_COPY01": "120248746692220302",
+    "SN_META_PROSPECCAO_ARQUITETO_RENDER_DUASREUNIOES_COPY02": "120248746693820302",
+    "SN_META_PROSPECCAO_ARQUITETO_PLUGIN_PLUGINRENDER_COPY03": "120248746694960302",
+    "SN_META_PROSPECCAO_ARQUITETO_PLUGIN_PLUGINNOSU_COPY03": "120248746706490302",
+    "SN_META_PROSPECCAO_ARQUITETO_PLUGIN_TRESCENAS_COPY04": "120248746707460302"
+  },
+  "warnings": [
+    "Escopo executado: apenas as 6 linhas RENDER (conjunto 120248746594100302) e PLUGIN (conjunto 120248746598050302). As 2 linhas QUENTE nao foram criadas, conforme instrucao.",
+    "Os 6 anuncios estao com status=PAUSED confirmado via ads_get_ad_entities. O effective_status dos 6 volta como IN_PROCESS (revisao/processamento normal de anuncio recem-criado), nao ACTIVE. Nada foi ativado.",
+    "Upload: os 6 videos subiram por URL e ficaram video_status=ready. Na primeira verificacao, 2026-09-07-reel-plugin-no-sketchup e 2026-09-05-reel-plugin-tres-cenas-um-clique ainda estavam em processing; os criativos deles so foram criados depois de ficarem ready.",
+    "Criativos montados via ads_create_creative com page_id 1300022283184438 + instagram_user_id 17841477062800156, video_id, capa (image_url), message/headline/description e CTA SIGN_UP com o link da tabela (a ferramenta monta o object_story_spec.video_data; headline -> video_data.title, description -> video_data.link_description).",
+    "Nenhum video_id foi reaproveitado nesta fase: as pastas repetidas (drone e plugin-no-sketchup) so se repetiam nas linhas QUENTE, que ficaram de fora.",
+    "Previa Instagram Reels obtida para 1 RENDER e 1 PLUGIN: a imagem retornada pela ferramenta mostra so o quadro do video, sem o cabecalho de remetente/CTA renderizado. A identidade (Pagina SpaceNode + @spacenode.app) esta gravada no criativo, mas nao foi possivel confirmar visualmente o remetente pela imagem estatica - conferir abrindo o preview_url no navegador.",
+    "Pendencias de interface (fora do escopo desta fase): desligar aprimoramentos Advantage+ creative em cada anuncio e conferir previa de Reels/Feed."
+  ],
+  "preview_urls": {
+    "SN_META_PROSPECCAO_ARQUITETO_RENDER_DRONE_COPY01": "https://business.facebook.com/ads/api/preview_iframe.php?d=AQKumNhrp1vaJ8loQXSgbcMS3A68aPjJccZ_h6naOk1-NlPU_n4MXPZu-Rag2fgwAe5_Xi--zSN9Y1jWrMr9PwsMsED5Tqy-2UfiJInGLYXR-BWDfzVpuawGl5Gwv2_xGFayjd6nUNhXaQed7CM91UrgBMSJ3kLbZaG47h9rm-Y3I1GQyBIgold7N9haKxSMOqip-ksT3_encgIC_eM5VtY9&t=AQJzaBZ-i7eAEYKsPRg",
+    "SN_META_PROSPECCAO_ARQUITETO_PLUGIN_PLUGINRENDER_COPY03": "https://business.facebook.com/ads/api/preview_iframe.php?d=AQIMa3X3u3TPw_d26-N2lAc0KVVk1oDe2ULKdwb0C-adz2PE0cmAyCxeOPNPwVgI96aunM-ik_mB-hxNAmXkOeX473gwzEz2KpoMZnrI5rJSumZQf_zckY4D_mVFeFJiNSv0oiIuqyk5yZMJSyfyGz1-6Cd0xEvl64FdU521VnZnWP4k2AXHadpfLaaDO97i9ChpggQ1GqxaBW-2howPuopJ&t=AQL-RQFY8EnNxQ4Rm48"
+  }
+}

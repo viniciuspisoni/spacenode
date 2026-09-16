@@ -1,0 +1,5 @@
+﻿Campaign,Campaign Type,Campaign Status,Budget,Budget type,Bid Strategy Type,Networks,Languages,Location,Start Date,End Date,Ad Group,Ad Group Status,Ad Group Type,Max CPC,Ad rotation
+SN_GOOGLE_CAPTACAO_ARQUITETO,Search,Paused,25,Daily,Maximize clicks,Google search,pt,Brazil,2026-09-14,2026-10-13,,,,,Optimize
+SN_GOOGLE_CAPTACAO_ARQUITETO,Search,Paused,,,,,,,,,SN_GOOGLE_CAPTACAO_ARQUITETO_SKETCHUP,Enabled,Standard,3.00,
+SN_GOOGLE_CAPTACAO_ARQUITETO,Search,Paused,,,,,,,,,SN_GOOGLE_CAPTACAO_ARQUITETO_PLUGIN,Enabled,Standard,3.00,
+SN_GOOGLE_CAPTACAO_ARQUITETO,Search,Paused,,,,,,,,,SN_GOOGLE_CAPTACAO_ARQUITETO_PLANTAHUM,Enabled,Standard,3.00,

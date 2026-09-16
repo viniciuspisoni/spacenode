@@ -1,0 +1,242 @@
+{
+ "slug": "2026-09-07-reel-plugin-no-sketchup",
+ "accent": false,
+ "band": {
+  "aspect": 1.3333
+ },
+ "segments": [
+  {
+   "type": "still",
+   "src": "$REPO/marketing/output/2026-09-07-reel-plugin-no-sketchup/src/su-43-center.png",
+   "dur": 1.5,
+   "fit": "band",
+   "kenburns": [
+    1,
+    1.04
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$REPO/marketing/output/2026-09-07-reel-plugin-no-sketchup/src/masked/panel-00-estado-inicial.png",
+   "dur": 1.6,
+   "fit": "contain",
+   "inset": 200,
+   "bg": "dark",
+   "kenburns": [
+    1,
+    1
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$REPO/marketing/output/2026-09-07-reel-plugin-no-sketchup/src/masked/panel-06-comparar-100.png",
+   "dur": 0.7,
+   "fit": "contain",
+   "inset": 200,
+   "bg": "dark",
+   "kenburns": [
+    1,
+    1
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$REPO/marketing/output/2026-09-07-reel-plugin-no-sketchup/src/masked/panel-05-comparar-075.png",
+   "dur": 0.45,
+   "fit": "contain",
+   "inset": 200,
+   "bg": "dark",
+   "kenburns": [
+    1,
+    1
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$REPO/marketing/output/2026-09-07-reel-plugin-no-sketchup/src/masked/panel-04-comparar-050.png",
+   "dur": 0.45,
+   "fit": "contain",
+   "inset": 200,
+   "bg": "dark",
+   "kenburns": [
+    1,
+    1
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$REPO/marketing/output/2026-09-07-reel-plugin-no-sketchup/src/masked/panel-03-comparar-025.png",
+   "dur": 0.45,
+   "fit": "contain",
+   "inset": 200,
+   "bg": "dark",
+   "kenburns": [
+    1,
+    1
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$REPO/marketing/output/2026-09-07-reel-plugin-no-sketchup/src/masked/panel-02-comparar-000.png",
+   "dur": 1,
+   "fit": "contain",
+   "inset": 200,
+   "bg": "dark",
+   "kenburns": [
+    1,
+    1
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$REPO/marketing/output/2026-09-07-reel-plugin-no-sketchup/src/sala-3d0d-antes.png",
+   "dur": 1.3,
+   "fit": "band",
+   "kenburns": [
+    1,
+    1
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$REPO/marketing/output/2026-09-07-reel-plugin-no-sketchup/src/sala-3d0d-depois.png",
+   "dur": 3.4,
+   "fit": "band",
+   "kenburns": [
+    1,
+    1.05
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$REPO/marketing/output/2026-09-07-reel-plugin-no-sketchup/src/masked/panel-07-fotografia.png",
+   "dur": 2.3,
+   "fit": "contain",
+   "inset": 200,
+   "bg": "dark",
+   "kenburns": [
+    1,
+    1
+   ]
+  },
+  {
+   "type": "card",
+   "card": "final",
+   "dur": 1.2
+  }
+ ],
+ "transitions": [
+  {
+   "type": "fade",
+   "dur": 0.25
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "fade",
+   "dur": 0.3
+  },
+  {
+   "type": "wipeleft",
+   "dur": 0.6,
+   "ruler": true
+  },
+  {
+   "type": "fade",
+   "dur": 0.3
+  },
+  {
+   "type": "fade",
+   "dur": 0.3
+  }
+ ],
+ "cards": {
+  "a": {
+   "layout": "hook-fixed",
+   "hook": "render dentro do SketchUp.",
+   "top": 250,
+   "size": 58
+  },
+  "b": {
+   "layout": "hook-fixed",
+   "hook": "antes e depois no próprio painel.",
+   "top": 250,
+   "size": 54
+  },
+  "scrim": {
+   "layout": "scrim"
+  },
+  "c": {
+   "layout": "hook-sub",
+   "hook": "mesma câmera. mesmo modelo.",
+   "eyebrow": "render · quasar 2k",
+   "sub": "gerado em minutos."
+  },
+  "d": {
+   "layout": "hook-fixed",
+   "hook": "lente, altura do olho, verticais retas.",
+   "top": 250,
+   "size": 50,
+   "sub": "a IA preserva o que a captura mostra.",
+   "bottom": 330,
+   "subSize": 34
+  },
+  "final": {
+   "layout": "final",
+   "cta": "Instale o plugin",
+   "micro": "plugin oficial · grátis · usa os nodes da sua conta"
+  }
+ },
+ "overlays": [
+  {
+   "card": "a",
+   "from": 0,
+   "to": 2.85
+  },
+  {
+   "card": "b",
+   "from": 2.85,
+   "to": 5.6
+  },
+  {
+   "card": "scrim",
+   "from": 5.6,
+   "to": 9.4
+  },
+  {
+   "card": "c",
+   "from": 5.6,
+   "to": 9.4
+  },
+  {
+   "card": "d",
+   "from": 9.4,
+   "to": 11.4
+  }
+ ],
+ "qa": [
+  0.7,
+  2,
+  3.2,
+  4.2,
+  5.2,
+  6.4,
+  7.6,
+  8.8,
+  10.4,
+  11.9
+ ]
+}
