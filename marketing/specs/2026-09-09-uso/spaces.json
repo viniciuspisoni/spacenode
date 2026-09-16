@@ -1,0 +1,58 @@
+{
+ "slug": "2026-09-09-reel-uso-spaces",
+ "accent": false,
+ "band": { "aspect": 1.7778 },
+ "segments": [
+  {
+   "type": "grid",
+   "srcs": [
+    "$REPO/marketing/renders/depois/banheiro.jpg",
+    "$REPO/marketing/renders/depois/casa.jpg",
+    "$REPO/marketing/renders/depois/comercial.jpg",
+    "$REPO/marketing/renders/depois/coworking.jpg",
+    "$REPO/marketing/renders/depois/industrial.jpg",
+    "$REPO/marketing/renders/depois/living.jpg"
+   ],
+   "dur": 2.8,
+   "cols": 2,
+   "rows": 3,
+   "cellAspect": 1.7778,
+   "gap": 8,
+   "fill": true,
+   "reserveTop": 300,
+   "hold": 1.2,
+   "zoom": [1, 1.03]
+  },
+  { "type": "still", "src": "$REPO/marketing/output/2026-09-08-tutoriais/src/spaces/02-escolher-subir.png", "crop": [180, 55, 1618, 445], "dur": 2.6, "fit": "contain", "inset": 200, "bg": "dark", "kenburns": [1, 1.02] },
+  { "type": "still", "src": "$REPO/marketing/output/2026-09-08-tutoriais/src/spaces/01-etapa-1.png", "crop": [180, 150, 1618, 910], "dur": 4.4, "fit": "contain", "inset": 200, "bg": "dark", "kenburns": [1, 1.03] },
+  { "type": "still", "src": "$REPO/marketing/output/2026-09-08-tutoriais/src/spaces-existente/01-lista-de-spaces.png", "crop": [256, 1620, 734, 520], "dur": 2.6, "fit": "contain", "inset": 200, "bg": "dark", "kenburns": [1, 1.02] },
+  { "type": "still", "src": "$REPO/marketing/renders/depois/living.jpg", "dur": 2.4, "fit": "band", "kenburns": [1.03, 1.06] },
+  { "type": "card", "card": "final", "dur": 1.2 }
+ ],
+ "transitions": [
+  { "type": "fade", "dur": 0.3 },
+  { "type": "cut" },
+  { "type": "cut" },
+  { "type": "fade", "dur": 0.3 },
+  { "type": "fade", "dur": 0.3 }
+ ],
+ "cards": {
+  "a": { "layout": "hook-fixed", "hook": "seis imagens não são seis vistas do mesmo projeto.", "top": 250, "size": 50, "scrim": true },
+  "b": { "layout": "hook-fixed", "hook": "comece pelo projeto, não pela imagem.", "top": 250, "size": 54 },
+  "c": { "layout": "hook-fixed", "hook": "a Vista Mestre é a origem do projeto.", "top": 250, "size": 54 },
+  "d": { "layout": "hook-fixed", "hook": "extrair o DNA custa 8 nodes.", "top": 250, "size": 54 },
+  "e": { "layout": "hook-fixed", "hook": "o DNA fica travado no projeto.", "top": 250, "size": 54 },
+  "scrim": { "layout": "scrim" },
+  "f": { "layout": "hook-sub", "hook": "as próximas vistas nascem dele.", "eyebrow": "spaces · vista mestre", "sub": "estilo, materiais e atmosfera [se mantêm entre as vistas.]" },
+  "final": { "layout": "final", "cta": "Crie seu primeiro Space", "micro": "80 nodes grátis · sem cartão · em português" }
+ },
+ "overlays": [
+  { "card": "a", "from": 0, "to": 2.5 },
+  { "card": "b", "from": 2.5, "to": 5.1 },
+  { "card": "c", "from": 5.1, "to": 7.3 },
+  { "card": "d", "from": 7.3, "to": 9.5 },
+  { "card": "e", "from": 9.5, "to": 11.8 },
+  { "card": "scrim", "from": 11.8, "to": 13.9 },
+  { "card": "f", "from": 11.8, "to": 13.9 }
+ ]
+}

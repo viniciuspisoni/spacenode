@@ -1,0 +1,92 @@
+{
+  "slug": "2026-09-11-campanha",
+  "kind": "organic",
+  "objective": "Apresentar a SpaceNode, o Glass Mode do site e o plugin oficial para SketchUp a arquitetos e designers, com a mensagem: o profissional mantém a autoria e o controle; a SpaceNode ajuda a apresentar o projeto.",
+  "audience": "Arquiteto/designer de interiores que já modela (SketchUp) e desconfia que IA vai reinterpretar o projeto. Consciente do problema, cético quanto à solução.",
+  "concept": "Seu projeto, em cena: o mesmo enquadramento atravessa modelo, render, site, plugin e app — nada é reinterpretado.",
+  "hook": "começou com este modelo.",
+  "cta": "veja no seu próprio projeto.",
+  "duration": 35,
+  "takes": 1,
+
+  "format": { "aspect": "9x16", "width": 1080, "height": 1920, "fps": 30 },
+
+  "credits": [
+    { "author": "muda arquitetura", "channel": "organic", "pair": "cozinha-ceramica" }
+  ],
+
+  "shots": [
+    {
+      "id": "s01_gancho",
+      "start": 0,
+      "end": 3,
+      "source": "$REPO/public/proj-cozinha-ceramica-render.jpg",
+      "camera": "Cover 9:16 no canto da pia (ladrilho, planta, janela), push-in 1,00→1,06. Aos 1,6s corte seco para o modelo (proj-cozinha-ceramica-base.jpg) no MESMO enquadramento e no mesmo ponto do zoom.",
+      "model": "reel-kit",
+      "text": "começou com este modelo."
+    },
+    {
+      "id": "s02_resultado",
+      "start": 3,
+      "end": 8,
+      "source": "$REPO/public/proj-cozinha-ceramica-render.jpg",
+      "camera": "Régua branca revela o render sobre o modelo (0,5s). Segura o hero até 5,6s; depois corte para detalhe de materialidade (ladrilho + bancada de madeira) com deslocamento lateral suave. Crédito 'projeto · muda arquitetura' na peça.",
+      "model": "reel-kit",
+      "text": "projeto · muda arquitetura"
+    },
+    {
+      "id": "s03_plataforma",
+      "start": 8,
+      "end": 14,
+      "source": "$REPO/marketing/output/2026-09-11-campanha/src/site/mobile-landing-full.png",
+      "camera": "O render em tela cheia encolhe até a célula onde mora na landing (seção Projetos, comparador BASE/RESULTADO com crédito). O site aparece em volta num cartão de vidro e a câmera sobe, contínua, até o hero em Glass Mode.",
+      "model": "reel-kit",
+      "text": "conheça a SpaceNode."
+    },
+    {
+      "id": "s04_plugin",
+      "start": 14,
+      "end": 22,
+      "source": "$REPO/marketing/output/2026-09-07-reel-plugin-no-sketchup/src/su-43-center.png",
+      "camera": "Viewport real do SketchUp (projeto do dono — ver notas), painel do plugin na geometria do time-lapse gravado, clique em Capturar vista, guias de terços, time-lapse da geração (4,4s gravados comprimidos em 3s, com chip 'espera comprimida'), resultado no painel.",
+      "model": "reel-kit",
+      "text": "renderize de dentro do SketchUp."
+    },
+    {
+      "id": "s05_continuidade",
+      "start": 22,
+      "end": 29,
+      "source": "$REPO/marketing/output/2026-09-11-campanha-app-vert-tutoriais/src/renderizar/masked/02-referencia-carregada.png",
+      "camera": "App em Glass Mode (captura real, dados privados mascarados): Renderizar com a base carregada, aproximação suave até a referência, onde o render entra pela régua. Depois a lista Meus Spaces (organização).",
+      "model": "reel-kit",
+      "text": "do modelo à apresentação."
+    },
+    {
+      "id": "s06_fecho",
+      "start": 29,
+      "end": 35,
+      "source": "$REPO/public/proj-cozinha-ceramica-render.jpg",
+      "camera": "Render em tela cheia, push-in 1,00→1,05, escurece até a cartela: logo monocromático, chamada e URL. Crédito permanece.",
+      "model": "reel-kit",
+      "text": "veja no seu próprio projeto.\nspacenode.app"
+    }
+  ],
+
+  "motion_design": "Texto entra por opacity + translateY (spring), sai mais rápido do que entra; troca em corte, nunca atravessado pelo wipe. Um movimento por take. Ken Burns máx. 1,08 nos hero shots (1,86 só no detalhe de materialidade, que é recorte). Tipografia Geist, minúsculas com ponto final, uma ideia por tela. Sem verde: na landing em vidro o accent é o branco.",
+  "sound_design": "Trilha instrumental SINTETIZADA no repo (marketing/remotion/tools/synth-audio.mjs — pad em Ré menor, pulso a 84 BPM crescendo, sem melodia cantada; licença não se aplica, é nossa). Whoosh nas réguas, click nos botões, tick nas trocas de tela, UM impacto por peça na revelação do render. Normalizada a ≈ -18 LUFS / -1,3 dBTP. Versão MUDA entregue junto (orgânico entra mudo no Instagram, BRIEF.md).",
+
+  "assembly": {
+    "kit": "remotion",
+    "spec": "marketing/remotion/src/videos/V1.tsx"
+  },
+
+  "notes": [
+    "SEM GERAÇÃO PAGA: custo US$ 0,00. Tudo é acervo real (par da landing), captura real do site publicado e do app logado, e a gravação real do plugin de 07/09. Nenhuma imagem inventada por IA externa (LEI 3).",
+    "MONTADOR: Remotion (marketing/remotion), porque a peça precisa de UI se encaixando/rolando, régua dentro de um retângulo da UI real e marcações desenhadas — coisas que o reel-kit não faz. Renderizar: node marketing/remotion/render.mjs.",
+    "PROJETO PRINCIPAL: cozinha-ceramica (muda arquitetura). Escolhido por fidelidade conferida em cheio (porta de correr + batente, lava-louças/geladeira/estante, 7 portas de vidro) e pela materialidade (ladrilho hidráulico). A sala do dono (plugin) foi REJEITADA para prova de detalhe: pendentes de gaiola viraram globos lisos no render (memória de 09/09).",
+    "MATERIAL AUSENTE (declarado): não existe gravação do plugin com o modelo da cozinha — o .skp é da muda arquitetura e não está no repo. O trecho 14–22s usa a gravação real do plugin com o projeto do dono (sala), e o texto não afirma que é o mesmo projeto.",
+    "AUTORIZAÇÃO: marketing/AUTORIZACOES.md tem muda arquitetura com landing ✅ e orgânico/mídia paga ❓. A peça está montada; a PUBLICAÇÃO depende do aceite do canal. Crédito na peça: 'projeto · muda arquitetura' (minúsculo, é a marca).",
+    "As duas aberturas alternativas (A: resultado pronto → corte para o modelo; B: modelo → render revelado pela régua) são a prop `opening` da mesma composição — o resto da peça é idêntico byte a byte.",
+    "takes=1 porque não há shot pago; o linter avisa e o aviso está certo."
+  ]
+}

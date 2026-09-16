@@ -1,0 +1,24 @@
+{
+  "plan": "2026-09-11-dogfood-cozinha-muda",
+  "hash": "dc26a031dc98",
+  "estimate_usd": 0.30000000000000004,
+  "ceiling_usd": 0.36000000000000004,
+  "calls": [
+    {
+      "shot": "s03_vida",
+      "take": 1,
+      "endpoint": "xai/grok-imagine-video/image-to-video",
+      "cost_usd": 0.30000000000000004,
+      "basis": "6s x 0.05/s",
+      "status": "completed",
+      "at": "2026-09-11T11:44:35.958Z",
+      "request_id": "01a09048-a748-7b03-aaf2-de6d6cd64a60",
+      "files": [
+        "takes/s03_vida_t1_0.mp4"
+      ],
+      "note": "Download inicial falhou por bug do runner (--download= nao baixa em silencio). Arquivo recuperado depois via genmedia status --result --download (consulta gratuita, job ja pago). Runner corrigido.",
+      "qa_verdict": "REPROVADO — bloco ARQUITETURA: persiana rolo virou persiana horizontal de laminas (substituicao de material em elemento arquitetonico) + camera fez push-in apesar de proibido no prompt."
+    }
+  ],
+  "spent_usd": 0.30000000000000004
+}

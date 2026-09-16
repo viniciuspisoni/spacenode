@@ -1,0 +1,108 @@
+{
+  "_leia": "Plano de captura dos fluxos LOGADOS. Roda com: node marketing/scripts/produto/capturar.mjs --app. Passos com \"paga\": true sao PULADOS pelo script — nenhum node e gasto. Seletores vieram da leitura do codigo (workflow wf_a9e08de5-dfe); o primeiro run real vai mostrar quais precisam de ajuste.",
+  "grupos": [
+    {
+      "nome": "renderizar",
+      "url": "/app/generate",
+      "passos": [
+        { "nome": "painel-inteiro-vazio", "paginaInteira": true },
+        { "nome": "upload-vazio", "recorte": ".spn-upload-zone" },
+        { "nome": "referencia-carregada", "enviarArquivo": "$REPO/marketing/renders/antes/casa.jpg", "espera": 3500, "recorte": ".spn-generate-preview" },
+        { "nome": "controles-cenario", "recorte": ".spn-generate-controls" },
+        { "nome": "motor-vega", "clicar": "[aria-label=\"Motor Vega · Premium\"]", "recorte": ".spn-generate-controls" },
+        { "nome": "botao-gerar-com-preco", "recorte": "[data-guide=\"gerar\"]" },
+        { "nome": "painel-com-tudo-escolhido", "paginaInteira": true },
+        { "nome": "GERAR", "clicar": "[data-guide=\"gerar\"]", "paga": true }
+      ]
+    },
+    {
+      "nome": "historico",
+      "url": "/app/history",
+      "passos": [
+        { "nome": "grid", "paginaInteira": false },
+        { "nome": "grid-inteiro", "paginaInteira": true },
+        { "nome": "drawer-detalhes", "clicar": "div[title=\"Ver detalhes da geração\"]", "espera": 1500, "aguardar": "aside[aria-label=\"Detalhes da geração\"] >> text=Custo e desempenho" },
+        { "nome": "drawer-custo", "recorte": "aside[aria-label=\"Detalhes da geração\"]" }
+      ]
+    },
+    {
+      "nome": "ampliar",
+      "url": "/app/upscale",
+      "passos": [
+        { "nome": "entrada-vazia", "paginaInteira": true },
+        { "nome": "imagem-carregada", "enviarArquivo": "$REPO/marketing/renders/depois/casa.jpg", "espera": 3500 },
+        { "nome": "recomendacao", "paginaInteira": true },
+        { "nome": "modo-alta-fidelidade", "clicar": "button:has-text(\"Alta Fidelidade\")" },
+        { "nome": "rodape-custo", "recorte": "button:has-text(\"Ampliar Imagem\")" },
+        { "nome": "AMPLIAR", "clicar": "button:has-text(\"Ampliar Imagem\")", "paga": true }
+      ]
+    },
+    {
+      "nome": "editar",
+      "url": "/app/editar",
+      "passos": [
+        { "nome": "estado-vazio", "paginaInteira": true },
+        { "nome": "imagem-carregada", "enviarArquivo": "$REPO/marketing/renders/depois/living.jpg", "espera": 3500, "aguardar": "button:has-text(\"Material\")" },
+        { "nome": "canvas", "paginaInteira": true },
+        { "nome": "acao-material", "clicar": "button:has-text(\"Material\")", "espera": 800 },
+        { "nome": "instrucao-digitada", "campo": "textarea", "digitar": "trocar o piso por porcelanato amadeirado", "paginaInteira": true },
+        { "nome": "ferramenta-laco", "clicar": "button[aria-label=\"Laço\"]", "paginaInteira": true },
+        { "nome": "APLICAR", "clicar": "button:has-text(\"Aplicar\")", "paga": true }
+      ]
+    },
+    {
+      "nome": "animar",
+      "url": "/app/video",
+      "passos": [
+        { "nome": "vazio", "paginaInteira": true },
+        { "nome": "painel-default", "recorte": "aside.spn-animar-panel" },
+        { "nome": "tipo-reels", "clicar": "button:has-text(\"Reels de Projeto\")", "espera": 800 },
+        { "nome": "painel-reels", "recorte": "aside.spn-animar-panel" },
+        { "nome": "carrossel-videos", "paginaInteira": true },
+        { "nome": "GERAR-VIDEO", "clicar": "button:has-text(\"Gerar\")", "paga": true }
+      ]
+    },
+    {
+      "nome": "spaces",
+      "url": "/app/spaces/new",
+      "passos": [
+        { "nome": "etapa-1", "paginaInteira": true },
+        { "nome": "escolher-subir", "clicar": "text=Subir imagem", "espera": 2000, "paginaInteira": true },
+        { "nome": "nome-preenchido", "campo": "input[placeholder^=\"Ex: Casa Campo\"]", "digitar": "Residência Horizonte", "paginaInteira": true },
+        { "nome": "ANALISAR-DNA", "clicar": "button:has-text(\"Analisar\")", "paga": true }
+      ]
+    },
+    {
+      "nome": "spaces-existente",
+      "url": "/app/spaces",
+      "passos": [
+        { "nome": "lista-de-spaces", "paginaInteira": true },
+        { "nome": "abrir-primeiro", "clicar": "a[href^=\"/app/spaces/\"]", "espera": 2500, "paginaInteira": true }
+      ]
+    },
+    {
+      "nome": "planta-humanizada",
+      "url": "/app/apresentar/planta-humanizada",
+      "passos": [
+        { "nome": "modulo-vazio", "paginaInteira": true },
+        { "nome": "painel", "recorte": "div[style*=\"width:420px\"]" },
+        { "nome": "GERAR-PLANTA", "clicar": "button:has-text(\"Gerar\")", "paga": true }
+      ]
+    },
+    {
+      "nome": "painel-e-saldo",
+      "url": "/app",
+      "passos": [
+        { "nome": "painel-inicial", "paginaInteira": true },
+        { "nome": "card-nodes", "recorte": "[data-tour=\"nodes\"]" }
+      ]
+    },
+    {
+      "nome": "billing",
+      "url": "/app/billing",
+      "passos": [
+        { "nome": "saldo", "paginaInteira": true }
+      ]
+    }
+  ]
+}

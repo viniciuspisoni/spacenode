@@ -1,0 +1,101 @@
+﻿Negative keyword list,Keyword,Criterion Type
+SN_NEG_CAPTACAO_v2,curso,Negative Broad
+SN_NEG_CAPTACAO_v2,cursos,Negative Broad
+SN_NEG_CAPTACAO_v2,aula,Negative Broad
+SN_NEG_CAPTACAO_v2,aulas,Negative Broad
+SN_NEG_CAPTACAO_v2,tutorial,Negative Broad
+SN_NEG_CAPTACAO_v2,tutoriais,Negative Broad
+SN_NEG_CAPTACAO_v2,apostila,Negative Broad
+SN_NEG_CAPTACAO_v2,faculdade,Negative Broad
+SN_NEG_CAPTACAO_v2,tcc,Negative Broad
+SN_NEG_CAPTACAO_v2,passo a passo,Negative Phrase
+SN_NEG_CAPTACAO_v2,aprender,Negative Broad
+SN_NEG_CAPTACAO_v2,youtube,Negative Broad
+SN_NEG_CAPTACAO_v2,udemy,Negative Broad
+SN_NEG_CAPTACAO_v2,hotmart,Negative Broad
+SN_NEG_CAPTACAO_v2,videoaula,Negative Broad
+SN_NEG_CAPTACAO_v2,vídeo aula,Negative Phrase
+SN_NEG_CAPTACAO_v2,emprego,Negative Broad
+SN_NEG_CAPTACAO_v2,vaga,Negative Broad
+SN_NEG_CAPTACAO_v2,vagas,Negative Broad
+SN_NEG_CAPTACAO_v2,salário,Negative Broad
+SN_NEG_CAPTACAO_v2,salario,Negative Broad
+SN_NEG_CAPTACAO_v2,estágio,Negative Broad
+SN_NEG_CAPTACAO_v2,estagio,Negative Broad
+SN_NEG_CAPTACAO_v2,currículo,Negative Broad
+SN_NEG_CAPTACAO_v2,curriculo,Negative Broad
+SN_NEG_CAPTACAO_v2,download,Negative Broad
+SN_NEG_CAPTACAO_v2,baixar,Negative Broad
+SN_NEG_CAPTACAO_v2,apk,Negative Broad
+SN_NEG_CAPTACAO_v2,crack,Negative Broad
+SN_NEG_CAPTACAO_v2,crackeado,Negative Broad
+SN_NEG_CAPTACAO_v2,torrent,Negative Broad
+SN_NEG_CAPTACAO_v2,pirata,Negative Broad
+SN_NEG_CAPTACAO_v2,free download,Negative Phrase
+SN_NEG_CAPTACAO_v2,for free,Negative Phrase
+SN_NEG_CAPTACAO_v2,sem pagar,Negative Phrase
+SN_NEG_CAPTACAO_v2,ilimitado,Negative Broad
+SN_NEG_CAPTACAO_v2,estudante,Negative Broad
+SN_NEG_CAPTACAO_v2,estudantes,Negative Broad
+SN_NEG_CAPTACAO_v2,midjourney,Negative Broad
+SN_NEG_CAPTACAO_v2,dall-e,Negative Broad
+SN_NEG_CAPTACAO_v2,dalle,Negative Broad
+SN_NEG_CAPTACAO_v2,stable diffusion,Negative Phrase
+SN_NEG_CAPTACAO_v2,leonardo ai,Negative Phrase
+SN_NEG_CAPTACAO_v2,chatgpt,Negative Broad
+SN_NEG_CAPTACAO_v2,gemini,Negative Broad
+SN_NEG_CAPTACAO_v2,copilot,Negative Broad
+SN_NEG_CAPTACAO_v2,canva,Negative Broad
+SN_NEG_CAPTACAO_v2,firefly,Negative Broad
+SN_NEG_CAPTACAO_v2,krea,Negative Broad
+SN_NEG_CAPTACAO_v2,sora,Negative Broad
+SN_NEG_CAPTACAO_v2,lumion,Negative Broad
+SN_NEG_CAPTACAO_v2,vray,Negative Broad
+SN_NEG_CAPTACAO_v2,v-ray,Negative Broad
+SN_NEG_CAPTACAO_v2,v ray,Negative Phrase
+SN_NEG_CAPTACAO_v2,enscape,Negative Broad
+SN_NEG_CAPTACAO_v2,twinmotion,Negative Broad
+SN_NEG_CAPTACAO_v2,d5,Negative Broad
+SN_NEG_CAPTACAO_v2,d5 render,Negative Phrase
+SN_NEG_CAPTACAO_v2,corona,Negative Broad
+SN_NEG_CAPTACAO_v2,corona render,Negative Phrase
+SN_NEG_CAPTACAO_v2,chaos,Negative Broad
+SN_NEG_CAPTACAO_v2,podium,Negative Broad
+SN_NEG_CAPTACAO_v2,kerkythea,Negative Broad
+SN_NEG_CAPTACAO_v2,artlantis,Negative Broad
+SN_NEG_CAPTACAO_v2,keyshot,Negative Broad
+SN_NEG_CAPTACAO_v2,blender,Negative Broad
+SN_NEG_CAPTACAO_v2,unreal engine,Negative Phrase
+SN_NEG_CAPTACAO_v2,o que é,Negative Phrase
+SN_NEG_CAPTACAO_v2,significado,Negative Broad
+SN_NEG_CAPTACAO_v2,conceito,Negative Broad
+SN_NEG_CAPTACAO_v2,exemplo,Negative Broad
+SN_NEG_CAPTACAO_v2,exemplos,Negative Broad
+SN_NEG_CAPTACAO_v2,pinterest,Negative Broad
+SN_NEG_CAPTACAO_v2,wallpaper,Negative Broad
+SN_NEG_CAPTACAO_v2,png,Negative Broad
+SN_NEG_CAPTACAO_v2,jpg,Negative Broad
+SN_NEG_CAPTACAO_v2,pdf,Negative Broad
+SN_NEG_CAPTACAO_v2,dwg,Negative Broad
+SN_NEG_CAPTACAO_v2,pronta,Negative Broad
+SN_NEG_CAPTACAO_v2,prontas,Negative Broad
+SN_NEG_CAPTACAO_v2,modelo pronto,Negative Phrase
+SN_NEG_CAPTACAO_v2,logo,Negative Broad
+SN_NEG_CAPTACAO_v2,logotipo,Negative Broad
+SN_NEG_CAPTACAO_v2,tattoo,Negative Broad
+SN_NEG_CAPTACAO_v2,tatuagem,Negative Broad
+SN_NEG_CAPTACAO_v2,anime,Negative Broad
+SN_NEG_CAPTACAO_v2,jogo,Negative Broad
+SN_NEG_CAPTACAO_v2,jogos,Negative Broad
+SN_NEG_CAPTACAO_v2,bloco,Negative Broad
+SN_NEG_CAPTACAO_v2,blocos,Negative Broad
+SN_NEG_CAPTACAO_v2,warehouse,Negative Broad
+SN_NEG_CAPTACAO_v2,textura,Negative Broad
+SN_NEG_CAPTACAO_v2,texturas,Negative Broad
+SN_NEG_CAPTACAO_v2,vetor,Negative Broad
+SN_NEG_CAPTACAO_v2,decorar,Negative Broad
+SN_NEG_CAPTACAO_v2,decoração,Negative Broad
+SN_NEG_CAPTACAO_v2,decoracao,Negative Broad
+SN_NEG_CAPTACAO_v2,reforma,Negative Broad
+SN_NEG_CAPTACAO_v2,minha casa,Negative Phrase
+SN_NEG_CAPTACAO_v2,casa própria,Negative Phrase

@@ -1,0 +1,114 @@
+{
+  "account_id": "act_10202044711098425",
+  "campaign": {
+    "name": "SN_META_PROSPECCAO_ARQUITETO",
+    "id": "52601952235675",
+    "status": "PAUSED"
+  },
+  "adsets": [
+    {
+      "name": "SN_META_PROSPECCAO_ARQUITETO_FIDELIDADE",
+      "id": "52601952236075",
+      "status": "PAUSED",
+      "state": "pronto"
+    },
+    {
+      "name": "SN_META_PROSPECCAO_ARQUITETO_ROTINA",
+      "id": null,
+      "status": "PAUSED",
+      "state": "duplicar do FIDELIDADE"
+    }
+  ],
+  "ads": [
+    {
+      "adset": "SN_META_PROSPECCAO_ARQUITETO_FIDELIDADE",
+      "name": "SN_META_PROSPECCAO_ARQUITETO_FIDELIDADE_DRONE_COPY01",
+      "existing_ad_id": "52601952235875",
+      "video_path": "marketing/output/2026-09-04-reel-drone-nada-sai-do-lugar-ad/2026-09-04-reel-drone-nada-sai-do-lugar-ad.mp4",
+      "video_exists": true,
+      "video_bytes": 1212604,
+      "link_url": "https://spacenode.app/lp/print-do-sketchup?utm_source=meta&utm_medium=paid_social&utm_campaign=sn_meta_prospeccao_arquiteto&utm_content=sn_meta_prospeccao_arquiteto_fidelidade_drone_copy01&utm_term=arquiteto",
+      "display_link": "spacenode.app",
+      "body": "Nada sai do lugar: o print do SketchUp vira render fotorrealista, fiel ao seu modelo. Feito por arquiteto, em português.\nPlanos a partir de R$ 89/mês. Comece com 80 nodes grátis, sem cartão.",
+      "title": "Render fiel ao seu SketchUp",
+      "description": "80 nodes grátis · sem cartão",
+      "cta": "SIGN_UP",
+      "status": "PAUSED"
+    },
+    {
+      "adset": "SN_META_PROSPECCAO_ARQUITETO_FIDELIDADE",
+      "name": "SN_META_PROSPECCAO_ARQUITETO_FIDELIDADE_PISCAFACHADA_COPY01",
+      "existing_ad_id": null,
+      "video_path": "marketing/output/2026-09-04-reel-pisca-fachada-geminada-ad/2026-09-04-reel-pisca-fachada-geminada-ad.mp4",
+      "video_exists": true,
+      "video_bytes": 1969486,
+      "link_url": "https://spacenode.app/lp/print-do-sketchup?utm_source=meta&utm_medium=paid_social&utm_campaign=sn_meta_prospeccao_arquiteto&utm_content=sn_meta_prospeccao_arquiteto_fidelidade_piscafachada_copy01&utm_term=arquiteto",
+      "display_link": "spacenode.app",
+      "body": "Nada sai do lugar: o print do SketchUp vira render fotorrealista, fiel ao seu modelo. Feito por arquiteto, em português.\nPlanos a partir de R$ 89/mês. Comece com 80 nodes grátis, sem cartão.",
+      "title": "Render fiel ao seu SketchUp",
+      "description": "80 nodes grátis · sem cartão",
+      "cta": "SIGN_UP",
+      "status": "PAUSED"
+    },
+    {
+      "adset": "SN_META_PROSPECCAO_ARQUITETO_FIDELIDADE",
+      "name": "SN_META_PROSPECCAO_ARQUITETO_FIDELIDADE_BANHEIRO_COPY01",
+      "existing_ad_id": null,
+      "video_path": "marketing/output/2026-09-04-reel-banheiro-conte-o-que-saiu-ad/2026-09-04-reel-banheiro-conte-o-que-saiu-ad.mp4",
+      "video_exists": true,
+      "video_bytes": 3388509,
+      "link_url": "https://spacenode.app/lp/print-do-sketchup?utm_source=meta&utm_medium=paid_social&utm_campaign=sn_meta_prospeccao_arquiteto&utm_content=sn_meta_prospeccao_arquiteto_fidelidade_banheiro_copy01&utm_term=arquiteto",
+      "display_link": "spacenode.app",
+      "body": "Nada sai do lugar: o print do SketchUp vira render fotorrealista, fiel ao seu modelo. Feito por arquiteto, em português.\nPlanos a partir de R$ 89/mês. Comece com 80 nodes grátis, sem cartão.",
+      "title": "Render fiel ao seu SketchUp",
+      "description": "80 nodes grátis · sem cartão",
+      "cta": "SIGN_UP",
+      "status": "PAUSED"
+    },
+    {
+      "adset": "SN_META_PROSPECCAO_ARQUITETO_ROTINA",
+      "name": "SN_META_PROSPECCAO_ARQUITETO_ROTINA_DUASREUNIOES_COPY02",
+      "existing_ad_id": null,
+      "video_path": "marketing/output/2026-09-04-reel-entre-duas-reunioes-ad/2026-09-04-reel-entre-duas-reunioes-ad.mp4",
+      "video_exists": true,
+      "video_bytes": 1587306,
+      "link_url": "https://spacenode.app/lp/print-do-sketchup?utm_source=meta&utm_medium=paid_social&utm_campaign=sn_meta_prospeccao_arquiteto&utm_content=sn_meta_prospeccao_arquiteto_rotina_duasreunioes_copy02&utm_term=arquiteto",
+      "display_link": "spacenode.app",
+      "body": "Reunião de manhã com o print, reunião da tarde com a imagem. Render em minutos, no navegador, feito por arquiteto.\nPlanos a partir de R$ 89/mês. Comece com 80 nodes grátis, sem cartão.",
+      "title": "Do print à imagem, em minutos",
+      "description": "80 nodes grátis · sem cartão",
+      "cta": "SIGN_UP",
+      "status": "PAUSED"
+    },
+    {
+      "adset": "SN_META_PROSPECCAO_ARQUITETO_ROTINA",
+      "name": "SN_META_PROSPECCAO_ARQUITETO_ROTINA_TRESANTES14_COPY02",
+      "existing_ad_id": null,
+      "video_path": "marketing/output/2026-09-04-reel-tres-antes-das-14h-ep01-ad/2026-09-04-reel-tres-antes-das-14h-ep01-ad.mp4",
+      "video_exists": true,
+      "video_bytes": 1164908,
+      "link_url": "https://spacenode.app/lp/print-do-sketchup?utm_source=meta&utm_medium=paid_social&utm_campaign=sn_meta_prospeccao_arquiteto&utm_content=sn_meta_prospeccao_arquiteto_rotina_tresantes14_copy02&utm_term=arquiteto",
+      "display_link": "spacenode.app",
+      "body": "Reunião de manhã com o print, reunião da tarde com a imagem. Render em minutos, no navegador, feito por arquiteto.\nPlanos a partir de R$ 89/mês. Comece com 80 nodes grátis, sem cartão.",
+      "title": "Do print à imagem, em minutos",
+      "description": "80 nodes grátis · sem cartão",
+      "cta": "SIGN_UP",
+      "status": "PAUSED"
+    },
+    {
+      "adset": "SN_META_PROSPECCAO_ARQUITETO_ROTINA",
+      "name": "SN_META_PROSPECCAO_ARQUITETO_ROTINA_CINCOCLIMAS_COPY02",
+      "existing_ad_id": null,
+      "video_path": "marketing/output/2026-09-04-reel-um-print-cinco-climas-ad/2026-09-04-reel-um-print-cinco-climas-ad.mp4",
+      "video_exists": true,
+      "video_bytes": 2291777,
+      "link_url": "https://spacenode.app/lp/print-do-sketchup?utm_source=meta&utm_medium=paid_social&utm_campaign=sn_meta_prospeccao_arquiteto&utm_content=sn_meta_prospeccao_arquiteto_rotina_cincoclimas_copy02&utm_term=arquiteto",
+      "display_link": "spacenode.app",
+      "body": "Reunião de manhã com o print, reunião da tarde com a imagem. Render em minutos, no navegador, feito por arquiteto.\nPlanos a partir de R$ 89/mês. Comece com 80 nodes grátis, sem cartão.",
+      "title": "Do print à imagem, em minutos",
+      "description": "80 nodes grátis · sem cartão",
+      "cta": "SIGN_UP",
+      "status": "PAUSED"
+    }
+  ]
+}
