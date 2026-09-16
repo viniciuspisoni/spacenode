@@ -22,6 +22,7 @@ import ForceDarkScope from '@/lib/theme/ForceDarkScope'
 import LpCtaLink from '@/components/marketing/LpCtaLink'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getLandingPageBySlug, recordAcquisitionEvent } from '@/lib/marketing/ads/service'
+import { isInternalHost, isNonProductionRuntime } from '@/lib/analytics/internal'
 import { getEnabledModules } from '@/lib/nav/modules-config'
 import { SELLABLE_PLANS } from '@/lib/plans'
 import { rateLimit } from '@/lib/rate-limit'
@@ -125,6 +126,10 @@ export default async function LandingCampaignPage({
         landing_page_id: page.id,
         utm,
         referrer: hdrs.get('referer')?.slice(0, 300) ?? null,
+        // Dev server local (que aponta para o banco de PRODUÇÃO) e preview da
+        // Vercel geram visita que nunca existiu no mercado. Grava e marca.
+        is_internal: isInternalHost(hdrs.get('x-forwarded-host') ?? hdrs.get('host'))
+          || isNonProductionRuntime(),
       })
     }
   } catch (err) {

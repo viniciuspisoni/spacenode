@@ -109,14 +109,15 @@ describe('B · signup orgânico', () => {
 
   it('NÃO inventa atribuição: utm vazio e identificadores null', async () => {
     const { admin, rows } = fakeAdmin()
-    await bindSignupAttribution(admin, 'user-organico', null, {}, ANON)
+    await bindSignupAttribution(admin, 'user-organico', null, {}, ANON, { origin: 'organic' })
 
     const row = rows[0]
     expect(row.utm).toEqual({})
     expect(row.campaign_identifier).toBeNull()
     expect(row.ad_identifier).toBeNull()
     expect(row.referrer).toBeNull()
-    // `organic: true` é o marcador explícito — nunca um source fabricado.
+    // `organic` é marcador explícito — nunca um source fabricado.
+    expect(row.origin).toBe('organic')
     expect((row.metadata as Record<string, unknown>).organic).toBe(true)
   })
 })
@@ -224,9 +225,32 @@ describe('F · providers externos ausentes', () => {
 
 // ── Degradação quando a migration ainda não foi aplicada ──────────────────────
 
-describe('banco sem a migration 20260818000000', () => {
-  it('42703 na coluna nova → regrava com o shape antigo, evento não se perde', async () => {
-    const { admin, rows } = fakeAdmin([{ code: '42703', message: 'column does not exist' }])
+describe('banco atrás das migrations (deploy fora de ordem)', () => {
+  // A escada tem DOIS degraus, um por migration: primeiro cai para o shape do
+  // funil completo (20260818000000), só depois para o shape original. Um banco
+  // na versão intermediária não perde anonymous_id/dedupe_key por causa das
+  // colunas de confiabilidade (20260916173000).
+  it('sem as colunas de confiabilidade → mantém as do funil completo', async () => {
+    const { admin, rows } = fakeAdmin([{ code: '42703', message: 'column origin does not exist' }])
+    await recordAcquisitionEvent(admin, {
+      event_type: 'signup',
+      user_id: 'user-intermediario',
+      anonymous_id: ANON,
+      page: '/app',
+      origin: 'unknown',
+    })
+
+    expect(rows).toHaveLength(1)
+    expect(rows[0].anonymous_id).toBe(ANON)
+    expect(rows[0]).not.toHaveProperty('origin')
+    expect(rows[0]).not.toHaveProperty('is_internal')
+  })
+
+  it('sem nenhuma das duas → regrava com o shape antigo, evento não se perde', async () => {
+    const { admin, rows } = fakeAdmin([
+      { code: '42703', message: 'column origin does not exist' },
+      { code: '42703', message: 'column anonymous_id does not exist' },
+    ])
     await recordAcquisitionEvent(admin, {
       event_type: 'signup',
       user_id: 'user-legado',
@@ -242,7 +266,10 @@ describe('banco sem a migration 20260818000000', () => {
   })
 
   it('PGRST204 (cache do PostgREST) segue o mesmo caminho', async () => {
-    const { admin, rows } = fakeAdmin([{ code: 'PGRST204', message: 'schema cache' }])
+    const { admin, rows } = fakeAdmin([
+      { code: 'PGRST204', message: 'schema cache' },
+      { code: 'PGRST204', message: 'schema cache' },
+    ])
     await recordAcquisitionEvent(admin, { event_type: 'lp_view', anonymous_id: ANON })
     expect(rows).toHaveLength(1)
     expect(rows[0]).not.toHaveProperty('anonymous_id')

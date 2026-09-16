@@ -6,9 +6,11 @@ import { ATTRIBUTION_COOKIE, parseAttributionCookie } from '@/lib/marketing/ads/
 import { ANON_COOKIE, INTENT_COOKIE, parseAnonymousId, parseIntentCookie } from '@/lib/analytics/attribution'
 import {
   bindSignupAttribution,
+  classifySignupOrigin,
   getLandingPageBySlug,
   recordAcquisitionEvent,
 } from '@/lib/marketing/ads/service'
+import { isInternalTraffic } from '@/lib/analytics/internal'
 
 // POST /api/marketing/track — rastreamento first-party (rota pública, FORA do
 // namespace admin: é chamada pelo browser de visitantes anônimos e usuários
@@ -70,13 +72,23 @@ export async function POST(req: NextRequest) {
       const snapshot = parseAttributionCookie(req.cookies.get(ATTRIBUTION_COOKIE)?.value)
       const anonymousId = parseAnonymousId(req.cookies.get(ANON_COOKIE)?.value)
       const intent = parseIntentCookie(req.cookies.get(INTENT_COOKIE)?.value)
-      // O timestamp do evento é o do bind (1º acesso ao /app) — a data REAL do
-      // cadastro vai no metadata para o funil não depender da hora do bind.
-      await bindSignupAttribution(admin, user.id, snapshot, {
+      const origin = await classifySignupOrigin(admin, snapshot, anonymousId)
+      // occurred_at = data REAL do cadastro (auth.users.created_at); o
+      // created_at da linha continua sendo a hora deste bind, que acontece no
+      // 1º acesso ao /app e pode ser dias depois. As duas datas ficam
+      // separadas de propósito — uma é funil, a outra é auditoria.
+      const bound = await bindSignupAttribution(admin, user.id, snapshot, {
         account_created_at: user.created_at ?? null,
         ...(intent ? { plan_intent: intent.plan, plan_intent_offer: intent.offer ?? null } : {}),
-      }, anonymousId)
-      return NextResponse.json({ ok: true })
+      }, anonymousId, {
+        accountCreatedAt: user.created_at ?? null,
+        origin,
+        isInternal: isInternalTraffic(req),
+      })
+      // `bound` é o que autoriza o cliente a parar de tentar. Antes a resposta
+      // era sempre {ok:true} e uma falha de escrita tirava o cadastro do funil
+      // para sempre (o browser marcava "já vinculado" e nunca mais chamava).
+      return NextResponse.json({ ok: true, bound })
     }
 
     if (body.type === 'lp_cta_click') {
@@ -97,6 +109,7 @@ export async function POST(req: NextRequest) {
           landing_page_id: page.id,
           utm: {},
           anonymous_id: parseAnonymousId(req.cookies.get(ANON_COOKIE)?.value),
+          is_internal: isInternalTraffic(req),
         })
       }
       return NextResponse.json({ ok: true })

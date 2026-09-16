@@ -51,6 +51,7 @@ import {
 } from '../brand-check'
 import { getBrandRules, recordAutomationRun } from '../service'
 import type {
+  AcquisitionOrigin,
   Ad,
   AdAlert,
   AdAudience,
@@ -1178,14 +1179,30 @@ async function fetchPeriodEvents(
   periodEnd: string,
   campaignIdentifier?: string,
 ): Promise<AcqEventRow[]> {
-  let q = mkt(admin).from('acquisition_events')
-    .select('user_id, event_type, value_cents, campaign_identifier, ad_identifier')
-    .in('event_type', [...FUNNEL_EVENT_TYPES])
-    .gte('created_at', eventWindow(periodStart, periodEnd).from)
-    .lte('created_at', eventWindow(periodStart, periodEnd).to)
-    .limit(EVENTS_FETCH_LIMIT)
-  if (campaignIdentifier) q = q.eq('campaign_identifier', campaignIdentifier.toLowerCase())
-  const { data, error } = await q
+  // Recorte por occurred_at (QUANDO o fato aconteceu), não por created_at
+  // (quando a linha foi gravada): o evento de signup nasce no 1º acesso ao
+  // /app e pode chegar dias depois do cadastro — datar pelo registro empurra
+  // cadastro de um período para o outro. Ver migration 20260916173000.
+  const win = eventWindow(periodStart, periodEnd)
+  const run = async (dateColumn: 'occurred_at' | 'created_at', skipInternal: boolean) => {
+    let q = mkt(admin).from('acquisition_events')
+      .select('user_id, event_type, value_cents, campaign_identifier, ad_identifier')
+      .in('event_type', [...FUNNEL_EVENT_TYPES])
+      .gte(dateColumn, win.from)
+      .lte(dateColumn, win.to)
+      .limit(EVENTS_FETCH_LIMIT)
+    if (skipInternal) q = q.eq('is_internal', false)
+    if (campaignIdentifier) q = q.eq('campaign_identifier', campaignIdentifier.toLowerCase())
+    return q
+  }
+
+  let { data, error } = await run('occurred_at', true)
+  // Banco ainda sem a migration (deploy de código na frente do banco): cai
+  // para o comportamento antigo em vez de derrubar o painel inteiro.
+  if (error && (error.code === '42703' || error.code === 'PGRST204')) {
+    console.warn('[marketing/ads] sem occurred_at/is_internal — relatório usando created_at (aplicar a migration 20260916173000)')
+    ;({ data, error } = await run('created_at', false))
+  }
   if (error) throw new Error(`Falha ao ler eventos de aquisição: ${error.message}`)
   return (data ?? []) as AcqEventRow[]
 }
@@ -1821,11 +1838,17 @@ export async function saveReport(
 
 /** Grava um evento de aquisição. Best-effort: violação do índice único de
  *  signup/first_generation (23505) é sucesso silencioso; qualquer outro erro
- *  vira console.warn — o caller de produto nunca vê exceção daqui. */
+ *  vira console.warn — o caller de produto nunca vê exceção daqui.
+ *
+ *  Retorna `true` quando o evento está PERSISTIDO (linha nova ou já existente
+ *  pelo índice único) e `false` quando a gravação falhou. Quem decide parar de
+ *  tentar — o AttributionBinder, que grava um flag permanente no browser —
+ *  precisa dessa diferença: antes, falha de escrita devolvia `ok` ao cliente e
+ *  o cadastro ficava fora do funil para sempre. */
 export async function recordAcquisitionEvent(
   admin: SupabaseClient,
   event: NewAcquisitionEvent,
-): Promise<void> {
+): Promise<boolean> {
   try {
     // Deriva os identificadores do UTM cru quando o caller não os passou —
     // lp_view envia as chaves da URL (utm_campaign/utm_content) e o funil por
@@ -1850,43 +1873,112 @@ export async function recordAcquisitionEvent(
       value_cents: event.value_cents ?? null,
       metadata: event.metadata ?? {},
     }
-    // Colunas da migration 20260818000000 (funil completo). Banco ainda sem a
-    // migration → 42703/PGRST204: regrava só com o shape antigo para eventos
-    // legados nunca se perderem por causa do deploy fora de ordem.
-    let { error } = await mkt(admin).from('acquisition_events').insert({
+    // Colunas das migrations 20260818000000 (funil completo) e 20260916173000
+    // (confiabilidade). Banco ainda sem a migration → 42703/PGRST204: regrava
+    // só com o shape antigo para eventos legados nunca se perderem por causa
+    // de deploy fora de ordem. Duas quedas, uma por migration, para que um
+    // banco na versão intermediária não perca as colunas do funil completo.
+    const funnelRow = {
       ...baseRow,
       anonymous_id: event.anonymous_id ?? null,
       page: event.page ?? null,
       offer_id: event.offer_id ?? null,
       dedupe_key: event.dedupe_key ?? null,
+    }
+    let { error } = await mkt(admin).from('acquisition_events').insert({
+      ...funnelRow,
+      // occurred_at ausente = agora (default da coluna). Não mandar `null`:
+      // a coluna é NOT NULL e o default só vale para coluna OMITIDA.
+      ...(event.occurred_at ? { occurred_at: event.occurred_at } : {}),
+      origin: event.origin ?? null,
+      is_internal: event.is_internal ?? false,
     })
+    if (error && (error.code === '42703' || error.code === 'PGRST204')) {
+      ;({ error } = await mkt(admin).from('acquisition_events').insert(funnelRow))
+    }
     if (error && (error.code === '42703' || error.code === 'PGRST204')) {
       ;({ error } = await mkt(admin).from('acquisition_events').insert(baseRow))
     }
     if (error && error.code !== '23505') {
       console.warn(`[marketing/ads] falha ao gravar evento ${event.event_type}: ${error.message}`)
+      return false
     }
+    return true
   } catch (err) {
     console.warn('[marketing/ads] falha ao gravar evento de aquisição:', err instanceof Error ? err.message : err)
+    return false
   }
+}
+
+/** Classifica a origem de um cadastro SEM inventar nada.
+ *
+ *    paid     — há marcador de campanha no cookie de atribuição;
+ *    organic  — a jornada anônima (sn_aid) FOI observada e nenhum evento dela
+ *               tem marcador pago: evidência positiva de entrada não paga;
+ *    unknown  — não há cookie de campanha nem jornada para observar.
+ *
+ *  O terceiro caso era gravado como `organic` (metadata.organic = !snapshot) e
+ *  virava "cadastro orgânico" no relatório — ausência de informação contada
+ *  como origem. Falha de leitura também devolve `unknown`, nunca `organic`. */
+export async function classifySignupOrigin(
+  admin: SupabaseClient,
+  snapshot: AttributionSnapshot | null,
+  anonymousId: string | null,
+): Promise<AcquisitionOrigin> {
+  const last = snapshot?.last
+  const first = snapshot?.first
+  const paidMarker =
+    last?.campaign || last?.content || last?.source || first?.campaign || first?.source
+  if (paidMarker) return 'paid'
+  if (!anonymousId) return 'unknown'
+
+  try {
+    const { data, error } = await mkt(admin)
+      .from('acquisition_events')
+      .select('campaign_identifier, ad_identifier')
+      .eq('anonymous_id', anonymousId)
+      .limit(50)
+    if (error || !data || data.length === 0) return 'unknown'
+    const rows = data as Array<{ campaign_identifier: string | null; ad_identifier: string | null }>
+    const anyPaid = rows.some(r => r.campaign_identifier || r.ad_identifier)
+    return anyPaid ? 'paid' : 'organic'
+  } catch {
+    return 'unknown'
+  }
+}
+
+export interface BindSignupOptions {
+  /** `auth.users.created_at` — a data REAL do cadastro. Vira occurred_at; o
+   *  created_at da linha continua sendo a hora do bind (auditoria). */
+  accountCreatedAt?: string | null
+  /** Origem já classificada (classifySignupOrigin). Ausente = 'unknown'. */
+  origin?: AcquisitionOrigin | null
+  /** Evento de dev/preview/conta interna. */
+  isInternal?: boolean
 }
 
 /** Registra a atribuição do cadastro a partir do cookie sn_attribution
  *  (last-touch). Imutável: o índice parcial uq_mkt_acq_signup_per_user garante
  *  um único signup por usuário — conflito (23505) é sucesso silencioso.
- *  Cadastro sem snapshot também é gravado (orgânico) para o funil completo.
- *  `anonymousId` (cookie sn_aid) é o join que liga a jornada pré-cadastro ao
- *  user_id — este evento é o ÚNICO ponto de associação anônimo→usuário. */
+ *  Cadastro sem snapshot também é gravado, com a origem que `origin` disser
+ *  (nunca `organic` por ausência de cookie). `anonymousId` (cookie sn_aid) é o
+ *  join que liga a jornada pré-cadastro ao user_id — este evento é o ÚNICO
+ *  ponto de associação anônimo→usuário.
+ *
+ *  Retorna `true` só quando o evento está persistido: o chamador usa isso para
+ *  decidir se pode parar de tentar. */
 export async function bindSignupAttribution(
   admin: SupabaseClient,
   userId: string,
   snapshot: AttributionSnapshot | null,
   meta?: Record<string, unknown>,
   anonymousId?: string | null,
-): Promise<void> {
+  options?: BindSignupOptions,
+): Promise<boolean> {
   try {
     const last = snapshot?.last
-    await recordAcquisitionEvent(admin, {
+    const origin: AcquisitionOrigin = options?.origin ?? (snapshot ? 'paid' : 'unknown')
+    return await recordAcquisitionEvent(admin, {
       user_id: userId,
       event_type: 'signup',
       utm: snapshot ? ({ ...snapshot } as unknown as Record<string, unknown>) : {},
@@ -1894,9 +1986,15 @@ export async function bindSignupAttribution(
       campaign_identifier: last?.campaign ?? null,
       referrer: last?.referrer ?? null,
       anonymous_id: anonymousId ?? null,
-      metadata: { ...(meta ?? {}), organic: !snapshot },
+      occurred_at: options?.accountCreatedAt ?? null,
+      origin,
+      is_internal: options?.isInternal ?? false,
+      // `organic` continua no metadata só para não quebrar leitura antiga de
+      // dados; a verdade passou a ser a coluna `origin`.
+      metadata: { ...(meta ?? {}), organic: origin === 'organic', origin },
     })
   } catch (err) {
     console.warn('[marketing/ads] falha ao atribuir cadastro:', err instanceof Error ? err.message : err)
+    return false
   }
 }

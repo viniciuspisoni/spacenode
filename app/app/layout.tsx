@@ -90,8 +90,9 @@ export default async function AppLayout({
       </main>
       <WelcomeTour needsOnboarding={needsOnboarding} />
       {/* Vincula a atribuição de campanha (cookie first-party) ao cadastro —
-          uma única vez por navegador, best-effort. */}
-      <AttributionBinder />
+          uma única vez por CONTA (o flag por navegador engolia o cadastro de
+          quem criava a segunda conta na mesma máquina), best-effort. */}
+      <AttributionBinder userId={user.id} />
       <Suspense fallback={null}>
         <SignupConversionPing />
       </Suspense>

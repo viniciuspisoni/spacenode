@@ -367,14 +367,23 @@ export async function runAlertScan(
   }
 
   // ── lp_low_conversion — funil próprio das landing pages (janela cheia) ───────
-  const { data: lpEvents, error: lpErr } = await admin
-    .schema('marketing')
-    .from('acquisition_events')
-    .select('event_type, landing_page_id')
-    .in('event_type', ['lp_view', 'lp_cta_click'])
-    .not('landing_page_id', 'is', null)
-    .gte('created_at', fullWindowStartIso)
-    .limit(20000)
+  // Visita de dev server local (que aponta para o banco de PRODUÇÃO) e de
+  // preview inflavam a conversão da LP — ficam gravadas, fora da conta.
+  const lpQuery = (dateColumn: 'occurred_at' | 'created_at', skipInternal: boolean) => {
+    const q = admin
+      .schema('marketing')
+      .from('acquisition_events')
+      .select('event_type, landing_page_id')
+      .in('event_type', ['lp_view', 'lp_cta_click'])
+      .not('landing_page_id', 'is', null)
+      .gte(dateColumn, fullWindowStartIso)
+      .limit(20000)
+    return skipInternal ? q.eq('is_internal', false) : q
+  }
+  let { data: lpEvents, error: lpErr } = await lpQuery('occurred_at', true)
+  if (lpErr && (lpErr.code === '42703' || lpErr.code === 'PGRST204')) {
+    ;({ data: lpEvents, error: lpErr } = await lpQuery('created_at', false))
+  }
   if (lpErr) throw new Error(`Falha ao ler eventos de landing page: ${lpErr.message}`)
 
   const lpStats = new Map<string, { views: number; clicks: number }>()
