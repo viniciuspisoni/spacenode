@@ -1,0 +1,78 @@
+{
+ "slug": "2026-09-05-reel-todo-arquiteto-ja-mandou",
+ "accent": false,
+ "segments": [
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0019-render-before.png",
+   "dur": 1.8,
+   "kenburns": [
+    1,
+    1
+   ],
+   "brightness": -0.1
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0018-render-after.png",
+   "dur": 3.6,
+   "kenburns": [
+    1,
+    1.08
+   ]
+  },
+  {
+   "type": "card",
+   "card": "final",
+   "dur": 1
+  }
+ ],
+ "transitions": [
+  {
+   "type": "wipeleft",
+   "dur": 0.5,
+   "ruler": true
+  },
+  {
+   "type": "fade",
+   "dur": 0.3
+  }
+ ],
+ "cards": {
+  "scrim": {
+   "layout": "scrim"
+  },
+  "a": {
+   "layout": "hook-sub",
+   "hook": "todo arquiteto já mandou isso pro cliente.",
+   "eyebrow": "modelo"
+  },
+  "b": {
+   "layout": "hook-sub",
+   "hook": "e todo cliente preferia isso.",
+   "eyebrow": "render",
+   "sub": "mesmo quarto. mesma câmera. minutos."
+  },
+  "final": {
+   "layout": "final",
+   "cta": "Veja no seu próprio projeto"
+  }
+ },
+ "overlays": [
+  {
+   "card": "scrim",
+   "from": 0,
+   "to": 4.6
+  },
+  {
+   "card": "a",
+   "from": 0,
+   "to": 1.8
+  },
+  {
+   "card": "b",
+   "from": 1.8,
+   "to": 4.6
+  }
+ ]
+}

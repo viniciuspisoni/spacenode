@@ -1,0 +1,76 @@
+{
+ "slug": "2026-09-05-reel-nao-pisca",
+ "accent": false,
+ "band": {
+  "aspect": 1.7777777777777777
+ },
+ "segments": [
+  {
+   "type": "video",
+   "src": "$ACERVO/assets/0190-video-video_out.mp4",
+   "dur": 5.4,
+   "start": 0.3
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0191-video-video_src.jpg",
+   "dur": 1.8,
+   "kenburns": [
+    1,
+    1
+   ],
+   "brightness": -0.12
+  },
+  {
+   "type": "card",
+   "card": "final",
+   "dur": 1
+  }
+ ],
+ "transitions": [
+  {
+   "type": "cut"
+  },
+  {
+   "type": "fade",
+   "dur": 0.3
+  }
+ ],
+ "cards": {
+  "scrim": {
+   "layout": "scrim"
+  },
+  "a": {
+   "layout": "hook-sub",
+   "hook": "não pisca.",
+   "eyebrow": "animar · vídeo do render"
+  },
+  "b": {
+   "layout": "hook-sub",
+   "hook": "era uma imagem.",
+   "eyebrow": "render",
+   "sub": "Animar: do render ao take, sem sair do projeto."
+  },
+  "final": {
+   "layout": "final",
+   "cta": "Veja no seu próprio projeto"
+  }
+ },
+ "overlays": [
+  {
+   "card": "scrim",
+   "from": 0,
+   "to": 6.9
+  },
+  {
+   "card": "a",
+   "from": 0,
+   "to": 5.4
+  },
+  {
+   "card": "b",
+   "from": 5.4,
+   "to": 6.9
+  }
+ ]
+}

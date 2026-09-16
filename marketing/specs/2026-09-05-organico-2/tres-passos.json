@@ -1,0 +1,113 @@
+{
+ "slug": "2026-09-05-reel-tres-passos",
+ "accent": false,
+ "segments": [
+  {
+   "type": "card",
+   "card": "p1",
+   "dur": 1.6
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0017-render-before.png",
+   "dur": 1.4,
+   "kenburns": [
+    1,
+    1
+   ],
+   "brightness": -0.1
+  },
+  {
+   "type": "card",
+   "card": "p2",
+   "dur": 1.6
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0016-render-after.png",
+   "dur": 2.4,
+   "kenburns": [
+    1,
+    1.06
+   ]
+  },
+  {
+   "type": "card",
+   "card": "p3",
+   "dur": 1.4
+  },
+  {
+   "type": "card",
+   "card": "final",
+   "dur": 1
+  }
+ ],
+ "transitions": [
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "fade",
+   "dur": 0.3
+  }
+ ],
+ "cards": {
+  "p1": {
+   "layout": "statement",
+   "theme": "light",
+   "transparent": false,
+   "big": "envie seu projeto.",
+   "eyebrow": "três passos · 01",
+   "small": "prints do SketchUp, imagens base, referências."
+  },
+  "p2": {
+   "layout": "statement",
+   "theme": "light",
+   "transparent": false,
+   "big": "defina a intenção.",
+   "eyebrow": "02",
+   "small": "atmosfera, luz, materiais. escolhas de arquiteto, não prompts."
+  },
+  "p3": {
+   "layout": "statement",
+   "theme": "light",
+   "transparent": false,
+   "big": "gere, refine e apresente.",
+   "eyebrow": "03",
+   "small": "do estudo à apresentação, no mesmo projeto."
+  },
+  "chipA": {
+   "layout": "chip",
+   "text": "01 · modelo"
+  },
+  "chipB": {
+   "layout": "chip",
+   "text": "render · mesma câmera"
+  },
+  "final": {
+   "layout": "final",
+   "cta": "Comece agora"
+  }
+ },
+ "overlays": [
+  {
+   "card": "chipA",
+   "from": 1.6,
+   "to": 3
+  },
+  {
+   "card": "chipB",
+   "from": 4.6,
+   "to": 7
+  }
+ ]
+}

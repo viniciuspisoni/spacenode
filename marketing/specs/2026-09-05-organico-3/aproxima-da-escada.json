@@ -1,0 +1,105 @@
+{
+ "slug": "2026-09-05-reel-aproxima-da-escada",
+ "accent": false,
+ "segments": [
+  {
+   "type": "still",
+   "src": "$ACERVO/derived/0668-left169.png",
+   "dur": 3,
+   "kenburns": [
+    1,
+    2.2
+   ],
+   "pan": [
+    0.5,
+    0.04
+   ],
+   "panY": [
+    0.5,
+    0.55
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0664-vista-after.jpg",
+   "dur": 1.6,
+   "kenburns": [
+    1,
+    1.04
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0666-vista-after.jpg",
+   "dur": 1.8,
+   "kenburns": [
+    1,
+    1.04
+   ]
+  },
+  {
+   "type": "card",
+   "card": "final",
+   "dur": 1
+  }
+ ],
+ "transitions": [
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "fade",
+   "dur": 0.3
+  }
+ ],
+ "cards": {
+  "scrim": {
+   "layout": "scrim"
+  },
+  "a": {
+   "layout": "hook-sub",
+   "hook": "aproxima da escada.",
+   "eyebrow": "loft"
+  },
+  "b": {
+   "layout": "hook-sub",
+   "hook": "aguentou.",
+   "eyebrow": "loft · vista 02"
+  },
+  "c": {
+   "layout": "hook-sub",
+   "hook": "e o resto do loft também.",
+   "eyebrow": "loft · vista 03",
+   "sub": "render com detalhe pra reunião, não só pro feed."
+  },
+  "final": {
+   "layout": "final",
+   "cta": "Comece agora"
+  }
+ },
+ "overlays": [
+  {
+   "card": "scrim",
+   "from": 0,
+   "to": 6.1
+  },
+  {
+   "card": "a",
+   "from": 0,
+   "to": 3
+  },
+  {
+   "card": "b",
+   "from": 3,
+   "to": 4.6
+  },
+  {
+   "card": "c",
+   "from": 4.6,
+   "to": 6.1
+  }
+ ]
+}

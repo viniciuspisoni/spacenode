@@ -1,0 +1,90 @@
+{
+ "slug": "2026-09-06-reel-seis-versoes-uma-camera",
+ "accent": false,
+ "segments": [
+  {
+   "type": "grid",
+   "srcs": [
+    "$ACERVO/assets/0271-render-after.jpg",
+    "$ACERVO/assets/0273-render-after.jpg",
+    "$ACERVO/assets/0275-render-after.jpg",
+    "$ACERVO/assets/0281-render-after.jpg",
+    "$ACERVO/assets/0283-render-after.jpg",
+    "$ACERVO/assets/0285-render-after.jpg"
+   ],
+   "dur": 4.6,
+   "cols": 2,
+   "rows": 3,
+   "cellAspect": 1.3333333333333333,
+   "hold": 1.4,
+   "gap": 8,
+   "fill": true,
+   "reserveTop": 300,
+   "zoom": [
+    1,
+    1.03
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0283-render-after.jpg",
+   "dur": 2.2,
+   "kenburns": [
+    1.02,
+    1.08
+   ]
+  },
+  {
+   "type": "card",
+   "card": "final",
+   "dur": 1
+  }
+ ],
+ "transitions": [
+  {
+   "type": "cut"
+  },
+  {
+   "type": "fade",
+   "dur": 0.3
+  }
+ ],
+ "cards": {
+  "a": {
+   "layout": "hook-fixed",
+   "hook": "seis versões. uma câmera.",
+   "top": 250,
+   "scrim": true
+  },
+  "scrim": {
+   "layout": "scrim"
+  },
+  "b": {
+   "layout": "hook-sub",
+   "hook": "a mesma sala, seis vezes.",
+   "eyebrow": "render",
+   "sub": "mesmo modelo. mesma câmera. minutos."
+  },
+  "final": {
+   "layout": "final",
+   "cta": "Teste com um projeto real"
+  }
+ },
+ "overlays": [
+  {
+   "card": "a",
+   "from": 0,
+   "to": 4.6
+  },
+  {
+   "card": "scrim",
+   "from": 4.6,
+   "to": 6.5
+  },
+  {
+   "card": "b",
+   "from": 4.6,
+   "to": 6.5
+  }
+ ]
+}

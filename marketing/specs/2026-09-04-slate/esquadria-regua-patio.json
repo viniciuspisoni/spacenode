@@ -1,0 +1,149 @@
+{
+  "slug": "2026-09-04-reel-esquadria-regua-patio",
+  "band": {
+    "aspect": 1.7777777777777777
+  },
+  "segments": [
+    {
+      "type": "still",
+      "src": "$REPO/marketing/output/2026-09-04-reel-esquadria-regua-patio/src/print-1080x1280.png",
+      "fit": "contain",
+      "dur": 2.6,
+      "kenburns": [
+        1,
+        1
+      ],
+      "brightness": -0.2
+    },
+    {
+      "type": "still",
+      "src": "$REPO/marketing/output/2026-09-04-reel-esquadria-regua-patio/src/render-1080x1280.png",
+      "fit": "contain",
+      "dur": 2.8,
+      "kenburns": [
+        1,
+        1
+      ],
+      "brightness": -0.2
+    },
+    {
+      "type": "still",
+      "src": "$REPO/marketing/output/2026-09-04-reel-esquadria-regua-patio/src/print-1080x1280.png",
+      "fit": "contain",
+      "dur": 0.4,
+      "kenburns": [
+        1,
+        1
+      ],
+      "brightness": -0.2
+    },
+    {
+      "type": "video",
+      "src": "$REPO/marketing/output/2026-09-04-reel-esquadria-regua-patio/src/push-6s4.mp4",
+      "fit": "cover",
+      "dur": 6.4,
+      "start": 0
+    }
+  ],
+  "transitions": [
+    {
+      "type": "wiperight",
+      "dur": 1.2,
+      "ruler": true
+    },
+    {
+      "type": "cut"
+    },
+    {
+      "type": "cut"
+    }
+  ],
+  "cards": {
+    "scrim": {
+      "layout": "html",
+      "body": "<div style=\"position:absolute;left:0;right:0;top:0;height:720px;background:linear-gradient(180deg,rgba(26,26,26,0.90) 0%,rgba(26,26,26,0.66) 40%,rgba(26,26,26,0.26) 72%,rgba(26,26,26,0) 100%)\"></div><div style=\"position:absolute;left:0;right:0;bottom:0;height:760px;background:linear-gradient(0deg,rgba(26,26,26,0.94) 0%,rgba(26,26,26,0.80) 34%,rgba(26,26,26,0.42) 62%,rgba(26,26,26,0) 100%)\"></div>"
+    },
+    "hook": {
+      "layout": "hook-fixed",
+      "top": 250,
+      "size": 60,
+      "hook": "{esquadria} no lugar.<br>[guarda-corpo no lugar.]"
+    },
+    "apoio": {
+      "layout": "hook-fixed",
+      "bottom": 370,
+      "subSize": 38,
+      "sub": "do print à apresentação, em minutos."
+    },
+    "traco1": {
+      "layout": "html",
+      "css": ".tr { position:absolute; inset:0 } .tr .u { fill:none; stroke:rgba(0,0,0,0.50); stroke-width:7; stroke-linejoin:miter; stroke-linecap:butt } .tr .l { fill:none; stroke:#ffffff; stroke-opacity:0.95; stroke-width:3; stroke-linejoin:miter; stroke-linecap:butt }",
+      "body": "<svg class=\"tr\" viewBox=\"0 0 1080 1920\" xmlns=\"http://www.w3.org/2000/svg\"><g><polygon class=\"u\" points=\"48,872 461,894 461,1070 48,1111\"/><polygon class=\"l\" points=\"48,872 461,894 461,1070 48,1111\"/></g></svg>"
+    },
+    "traco2": {
+      "layout": "html",
+      "css": ".tr { position:absolute; inset:0 } .tr .u { fill:none; stroke:rgba(0,0,0,0.50); stroke-width:7; stroke-linejoin:miter; stroke-linecap:butt } .tr .l { fill:none; stroke:#ffffff; stroke-opacity:0.95; stroke-width:3; stroke-linejoin:miter; stroke-linecap:butt }",
+      "body": "<svg class=\"tr\" viewBox=\"0 0 1080 1920\" xmlns=\"http://www.w3.org/2000/svg\"><g><polygon class=\"u\" points=\"48,872 461,894 461,1070 48,1111\"/><line class=\"u\" x1=\"176\" y1=\"879\" x2=\"176\" y2=\"1098\"/><line class=\"u\" x1=\"14\" y1=\"688\" x2=\"243\" y2=\"740\"/><polygon class=\"l\" points=\"48,872 461,894 461,1070 48,1111\"/><line class=\"l\" x1=\"176\" y1=\"879\" x2=\"176\" y2=\"1098\"/><line class=\"l\" x1=\"14\" y1=\"688\" x2=\"243\" y2=\"740\"/></g></svg>"
+    },
+    "traco3": {
+      "layout": "html",
+      "css": ".tr { position:absolute; inset:0 } .tr .u { fill:none; stroke:rgba(0,0,0,0.50); stroke-width:7; stroke-linejoin:miter; stroke-linecap:butt } .tr .l { fill:none; stroke:#ffffff; stroke-opacity:0.95; stroke-width:3; stroke-linejoin:miter; stroke-linecap:butt }",
+      "body": "<svg class=\"tr\" viewBox=\"0 0 1080 1920\" xmlns=\"http://www.w3.org/2000/svg\"><g><polygon class=\"u\" points=\"48,872 461,894 461,1070 48,1111\"/><line class=\"u\" x1=\"176\" y1=\"879\" x2=\"176\" y2=\"1098\"/><line class=\"u\" x1=\"14\" y1=\"688\" x2=\"243\" y2=\"740\"/><polyline class=\"u\" points=\"782,708 782,643 999,632 999,672\"/><polygon class=\"l\" points=\"48,872 461,894 461,1070 48,1111\"/><line class=\"l\" x1=\"176\" y1=\"879\" x2=\"176\" y2=\"1098\"/><line class=\"l\" x1=\"14\" y1=\"688\" x2=\"243\" y2=\"740\"/><polyline class=\"l\" points=\"782,708 782,643 999,632 999,672\"/></g></svg>"
+    },
+    "cta": {
+      "layout": "html",
+      "css": ".scrim-full { background: rgba(26,26,26,0.80) } .final .micro { color: #c7c7cc }",
+      "body": "<div class=\"scrim-full\"></div><div class=\"final\"><svg width=\"176\" height=\"48\" viewBox=\"0 0 176 48\" xmlns=\"http://www.w3.org/2000/svg\"><g transform=\"scale(0.75)\"><g stroke=\"#FFFFFF\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" fill=\"none\"><line x1=\"16\" y1=\"16\" x2=\"16\" y2=\"48\"/><line x1=\"16\" y1=\"16\" x2=\"48\" y2=\"48\"/><line x1=\"48\" y1=\"16\" x2=\"48\" y2=\"48\"/></g><g fill=\"#FFFFFF\"><circle cx=\"16\" cy=\"16\" r=\"3\"/><circle cx=\"16\" cy=\"48\" r=\"3\"/><circle cx=\"48\" cy=\"48\" r=\"3\"/><circle cx=\"48\" cy=\"16\" r=\"3\"/></g></g><text x=\"60\" y=\"24\" fill=\"#FFFFFF\" font-family=\"GeistLocal\" font-size=\"22.99\" font-weight=\"500\" letter-spacing=\"-0.575\" dominant-baseline=\"central\">spacenode</text></svg><div class=\"cta\">Veja no seu próprio projeto<span>→</span></div><div class=\"micro\">80 nodes grátis · sem cartão · em português</div></div>"
+    }
+  },
+  "overlays": [
+    {
+      "card": "scrim",
+      "from": 0,
+      "to": 8.5
+    },
+    {
+      "card": "hook",
+      "from": 0,
+      "to": 6.5
+    },
+    {
+      "card": "apoio",
+      "from": 2.8,
+      "to": 8.5
+    },
+    {
+      "card": "traco1",
+      "from": 0.3,
+      "to": 0.62
+    },
+    {
+      "card": "traco2",
+      "from": 0.62,
+      "to": 0.94
+    },
+    {
+      "card": "traco3",
+      "from": 0.94,
+      "to": 4.2
+    },
+    {
+      "card": "cta",
+      "from": 8.5,
+      "to": 11
+    }
+  ],
+  "qa": [
+    0.55,
+    0.8,
+    1.1,
+    2,
+    2.55,
+    3.4,
+    4.4,
+    5.2,
+    6.8,
+    8.2,
+    9.6
+  ]
+}

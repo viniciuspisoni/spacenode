@@ -1,0 +1,33 @@
+{
+  "slug": "2026-09-04-reel-tres-antes-das-14h-ep01-ad",
+  "_nota": "Cutdown pago 9,5 s (slate R8): sem recap, holds de 1,5 s, apoio+CTA já sobre a opção 03 aos 5,5 s, sem eyebrow de episódio; etiquetas 01/02/03 ficam (legenda embutida, som off). Mesmos canvases da peça orgânica.",
+  "segments": [
+    { "type": "still", "src": "$REPO/marketing/output/2026-09-04-reel-tres-antes-das-14h-ep01/canvas/0430-render-before.png", "dur": 1.7, "fit": "contain", "kenburns": [1, 1], "brightness": -0.3 },
+    { "type": "still", "src": "$REPO/marketing/output/2026-09-04-reel-tres-antes-das-14h-ep01/canvas/0429-render-after.png", "dur": 1.5, "fit": "contain", "kenburns": [1, 1], "brightness": -0.3 },
+    { "type": "still", "src": "$REPO/marketing/output/2026-09-04-reel-tres-antes-das-14h-ep01/canvas/0431-render-after.png", "dur": 1.5, "fit": "contain", "kenburns": [1, 1], "brightness": -0.3 },
+    { "type": "still", "src": "$REPO/marketing/output/2026-09-04-reel-tres-antes-das-14h-ep01/canvas/0435-render-after.png", "dur": 3.6, "fit": "contain", "kenburns": [1, 1], "brightness": -0.3 },
+    { "type": "card", "card": "final", "dur": 1.5 }
+  ],
+  "transitions": [
+    { "type": "wipeleft", "dur": 0.3, "ruler": true },
+    { "type": "cut" }, { "type": "cut" }, { "type": "cut" }
+  ],
+  "cards": {
+    "frame": { "layout": "html", "body": "<div style='position:absolute;left:0;right:0;top:0;height:270px;background:#1a1a1a'></div><div style='position:absolute;left:0;right:0;top:1450px;height:470px;background:#1a1a1a'></div>" },
+    "hook": { "layout": "html", "body": "<div style='position:absolute;left:0;right:0;top:270px;height:600px;background:linear-gradient(180deg,rgba(26,26,26,0.94) 0%,rgba(26,26,26,0.72) 45%,rgba(26,26,26,0) 100%)'></div><div class='hook' style='bottom:auto;top:340px;font-size:60px'>reunião às 14h.<br>três acabamentos.</div>" },
+    "lbl01": { "layout": "html", "body": "<div style='position:absolute;left:54px;top:1368px'><span style='display:inline-block;padding:9px 18px;border-radius:999px;background:rgba(26,26,26,0.8);border:1px solid rgba(255,255,255,0.22);font-size:22px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:#f5f5f7'>01 · sanca quente</span></div>" },
+    "lbl02": { "layout": "html", "body": "<div style='position:absolute;left:54px;top:1368px'><span style='display:inline-block;padding:9px 18px;border-radius:999px;background:rgba(26,26,26,0.8);border:1px solid rgba(255,255,255,0.22);font-size:22px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:#f5f5f7'>02 · cimento queimado e piso escuro</span></div>" },
+    "lbl03": { "layout": "html", "body": "<div style='position:absolute;left:54px;top:1368px'><span style='display:inline-block;padding:9px 18px;border-radius:999px;background:rgba(26,26,26,0.8);border:1px solid rgba(255,255,255,0.22);font-size:22px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:#f5f5f7'>03 · mármore polido</span></div>" },
+    "cta": { "layout": "html", "body": "<div style='position:absolute;left:80px;width:920px;top:1470px;text-align:center;font-size:34px;font-weight:400;letter-spacing:-0.02em;line-height:1.2;color:#f5f5f7'>mesmo print. gerado em <span class='accent'>minutos</span>.</div><div style='position:absolute;left:0;right:0;top:1528px;text-align:center'><span style='display:inline-flex;align-items:center;gap:12px;padding:13px 30px;border-radius:999px;background:#f5f5f7;color:#1a1a1a;font-size:27px;font-weight:500;letter-spacing:-0.01em;line-height:1.2'>Comece agora<span>→</span></span></div>" },
+    "final": { "layout": "final", "cta": "Comece agora" }
+  },
+  "overlays": [
+    { "card": "frame", "from": 0, "to": 7.98 },
+    { "card": "hook", "from": 0, "to": 1.38 },
+    { "card": "lbl01", "from": 1.4, "to": 2.88 },
+    { "card": "lbl02", "from": 2.9, "to": 4.37 },
+    { "card": "lbl03", "from": 4.38, "to": 7.98 },
+    { "card": "cta", "from": 5.5, "to": 7.98 }
+  ],
+  "qa": [0.7, 1.55, 2.2, 3.6, 5.0, 6.8, 8.7]
+}
