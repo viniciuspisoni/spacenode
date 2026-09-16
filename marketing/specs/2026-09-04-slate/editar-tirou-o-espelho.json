@@ -1,0 +1,160 @@
+{
+  "slug": "2026-09-04-reel-editar-tirou-o-espelho",
+  "band": {
+    "aspect": 1.7778
+  },
+  "segments": [
+    {
+      "type": "still",
+      "src": "$ACERVO/derived-espelho/52-cover-9x16.png",
+      "dur": 1.9,
+      "fit": "cover",
+      "kenburns": [
+        1,
+        1
+      ]
+    },
+    {
+      "type": "still",
+      "src": "$ACERVO/derived-espelho/795-cover-9x16.png",
+      "dur": 3,
+      "fit": "cover",
+      "kenburns": [
+        1,
+        1.05
+      ]
+    },
+    {
+      "type": "still",
+      "src": "$ACERVO/derived-espelho/52-band-16x9.png",
+      "dur": 1.4,
+      "fit": "band",
+      "kenburns": [
+        1,
+        1
+      ],
+      "brightness": -0.16
+    },
+    {
+      "type": "still",
+      "src": "$ACERVO/derived-espelho/795-band-16x9.png",
+      "dur": 3.2,
+      "fit": "band",
+      "kenburns": [
+        1,
+        1.04
+      ],
+      "brightness": -0.16
+    },
+    {
+      "type": "card",
+      "card": "final",
+      "dur": 1.3
+    }
+  ],
+  "transitions": [
+    {
+      "type": "wipeleft",
+      "dur": 0.5,
+      "ruler": true
+    },
+    {
+      "type": "cut"
+    },
+    {
+      "type": "wipeleft",
+      "dur": 0.6,
+      "ruler": true
+    },
+    {
+      "type": "cut"
+    }
+  ],
+  "cards": {
+    "antes": {
+      "layout": "hook-fixed",
+      "scrim": true,
+      "top": 300,
+      "size": 60,
+      "bottom": 340,
+      "hook": "o espelho sai.",
+      "eyebrow": "Editar · Remover"
+    },
+    "veil": {
+      "layout": "hook-fixed",
+      "scrim": true,
+      "bottom": 340,
+      "eyebrow": "Editar · Remover"
+    },
+    "hook": {
+      "layout": "hook-fixed",
+      "scrim": true,
+      "top": 300,
+      "size": 60,
+      "bottom": 340,
+      "hook": "tirou o espelho.<br>[não a parede.]",
+      "eyebrow": "Editar · Remover"
+    },
+    "scrim": {
+      "layout": "scrim"
+    },
+    "eyebrowBand": {
+      "layout": "hook-sub",
+      "eyebrow": "Editar · Remover"
+    },
+    "resto": {
+      "layout": "hook-sub",
+      "hook": "o resto ficou.",
+      "eyebrow": "Editar · Remover",
+      "sub": "marcou a {área}, disse o que muda."
+    },
+    "final": {
+      "layout": "final",
+      "cta": "Veja no seu próprio projeto"
+    }
+  },
+  "overlays": [
+    {
+      "card": "antes",
+      "from": 0,
+      "to": 1.38
+    },
+    {
+      "card": "veil",
+      "from": 1.4,
+      "to": 1.88
+    },
+    {
+      "card": "hook",
+      "from": 1.9,
+      "to": 4.38
+    },
+    {
+      "card": "scrim",
+      "from": 4.4,
+      "to": 8.4
+    },
+    {
+      "card": "eyebrowBand",
+      "from": 4.4,
+      "to": 5.78
+    },
+    {
+      "card": "resto",
+      "from": 5.8,
+      "to": 8.4
+    }
+  ],
+  "qa": [
+    0.7,
+    1.65,
+    2.4,
+    4.35,
+    4.45,
+    5,
+    5.5,
+    6.4,
+    8,
+    9
+  ]
+}

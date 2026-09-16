@@ -1,0 +1,136 @@
+{
+ "slug": "2026-09-05-reel-plugin-sem-sair-do-sketchup",
+ "accent": false,
+ "segments": [
+  {
+   "type": "still",
+   "src": "$ACERVO/plugin/shots/s1-conectado.png",
+   "dur": 1.5,
+   "fit": "contain",
+   "inset": 200,
+   "bg": "dark",
+   "kenburns": [
+    1,
+    1
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/plugin/shots/s2-capturada.png",
+   "dur": 1.4,
+   "fit": "contain",
+   "inset": 200,
+   "bg": "dark",
+   "kenburns": [
+    1,
+    1
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/plugin/shots/s3-gerando.png",
+   "dur": 1.5,
+   "fit": "contain",
+   "inset": 200,
+   "bg": "dark",
+   "kenburns": [
+    1,
+    1
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/plugin/shots/s4-resultado.png",
+   "dur": 2.2,
+   "fit": "contain",
+   "inset": 200,
+   "bg": "dark",
+   "kenburns": [
+    1,
+    1
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0559-vista-after.png",
+   "dur": 2.4,
+   "kenburns": [
+    1,
+    1.05
+   ]
+  },
+  {
+   "type": "card",
+   "card": "final",
+   "dur": 1
+  }
+ ],
+ "transitions": [
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "fade",
+   "dur": 0.3
+  }
+ ],
+ "cards": {
+  "a": {
+   "layout": "hook-fixed",
+   "hook": "renderize sem sair do SketchUp.",
+   "top": 250,
+   "size": 58
+  },
+  "b": {
+   "layout": "hook-fixed",
+   "hook": "a vista vira o render.",
+   "top": 250,
+   "size": 58
+  },
+  "scrim": {
+   "layout": "scrim"
+  },
+  "c": {
+   "layout": "hook-sub",
+   "hook": "a vista vira o render.",
+   "eyebrow": "render · vega 2k",
+   "sub": "mesma câmera. mesmo modelo. minutos."
+  },
+  "final": {
+   "layout": "final",
+   "cta": "Comece agora",
+   "micro": "plugin oficial · grátis · usa os nodes da sua conta"
+  }
+ },
+ "overlays": [
+  {
+   "card": "a",
+   "from": 0,
+   "to": 4.4
+  },
+  {
+   "card": "b",
+   "from": 4.4,
+   "to": 6.6
+  },
+  {
+   "card": "scrim",
+   "from": 6.6,
+   "to": 8.7
+  },
+  {
+   "card": "c",
+   "from": 6.6,
+   "to": 8.7
+  }
+ ]
+}

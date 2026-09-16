@@ -1,0 +1,68 @@
+{
+ "slug": "2026-09-05-reel-isso-saiu-de-um-print",
+ "accent": false,
+ "segments": [
+  {
+   "type": "video",
+   "src": "$ACERVO/assets/0169-video-video_out.mp4",
+   "dur": 4,
+   "fit": "cover"
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0396-render-before.jpg",
+   "dur": 2,
+   "fit": "cover",
+   "kenburns": [
+    1,
+    1
+   ],
+   "brightness": -0.1
+  },
+  {
+   "type": "card",
+   "card": "final",
+   "dur": 1
+  }
+ ],
+ "transitions": [
+  {
+   "type": "cut"
+  },
+  {
+   "type": "fade",
+   "dur": 0.3
+  }
+ ],
+ "cards": {
+  "a": {
+   "layout": "hook-fixed",
+   "hook": "isso saiu de um print.",
+   "scrim": true,
+   "eyebrow": "animar · vídeo do render"
+  },
+  "b": {
+   "layout": "hook-fixed",
+   "hook": "deste.",
+   "scrim": true,
+   "eyebrow": "modelo",
+   "sub": "print → render → vídeo."
+  },
+  "final": {
+   "layout": "final",
+   "cta": "Comece agora"
+  }
+ },
+ "overlays": [
+  {
+   "card": "a",
+   "from": 0,
+   "to": 4
+  },
+  {
+   "card": "b",
+   "from": 4,
+   "to": 5.7
+  }
+ ]
+}

@@ -1,0 +1,29 @@
+{
+  "slug": "2026-09-04-reel-editar-so-o-piso",
+  "band": { "aspect": 1.3333333 },
+  "segments": [
+    { "type": "still", "src": "$ACERVO/assets/0075-render-after.jpg", "dur": 2.0, "fit": "band", "kenburns": [1, 1.0], "brightness": -0.18 },
+    { "type": "still", "src": "$ACERVO/assets/0760-edit-after.png", "dur": 4.5, "fit": "band", "kenburns": [1, 1.04], "brightness": -0.18 },
+    { "type": "still", "src": "$REPO/marketing/output/2026-09-04-reel-editar-so-o-piso/src/stacked-piso.png", "dur": 3.4, "fit": "band", "kenburns": [1, 1.03], "brightness": -0.22 },
+    { "type": "card", "card": "final", "dur": 1.2 }
+  ],
+  "transitions": [
+    { "type": "wipeleft", "dur": 0.5, "ruler": true },
+    { "type": "fade", "dur": 0.4 },
+    { "type": "cut" }
+  ],
+  "cards": {
+    "scrim": { "layout": "scrim" },
+    "antes": { "layout": "html", "body": "<div class=\"hook\"><div style=\"margin-bottom:30px\"><span class=\"eyebrow\"><i></i>Editar · Trocar material<i></i></span></div>cliente pediu o piso em madeira.</div>" },
+    "depois": { "layout": "hook-sub", "hook": "só o piso mudou.", "sub": "sem regenerar o {ambiente}." },
+    "prova": { "layout": "hook-sub", "hook": "mesma sombra, mesmo tapete, mesma {câmera}." },
+    "final": { "layout": "final", "cta": "Veja no seu próprio projeto" }
+  },
+  "overlays": [
+    { "card": "scrim", "from": 0, "to": 9.0 },
+    { "card": "antes", "from": 0, "to": 1.5 },
+    { "card": "depois", "from": 2.0, "to": 5.6 },
+    { "card": "prova", "from": 6.0, "to": 8.8 }
+  ],
+  "qa": [0.7, 1.75, 2.3, 4.0, 5.8, 7.0, 8.9, 9.6]
+}

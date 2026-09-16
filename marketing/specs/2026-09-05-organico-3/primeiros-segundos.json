@@ -1,0 +1,100 @@
+{
+ "slug": "2026-09-05-reel-primeiros-segundos",
+ "accent": false,
+ "segments": [
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0694-vista-before.jpg",
+   "dur": 1.6,
+   "kenburns": [
+    1,
+    1
+   ],
+   "brightness": -0.1
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0693-vista-after.jpg",
+   "dur": 2.4,
+   "kenburns": [
+    1,
+    1.05
+   ]
+  },
+  {
+   "type": "still",
+   "src": "$ACERVO/assets/0697-vista-after.jpg",
+   "dur": 1.8,
+   "kenburns": [
+    1,
+    1.04
+   ]
+  },
+  {
+   "type": "card",
+   "card": "final",
+   "dur": 1
+  }
+ ],
+ "transitions": [
+  {
+   "type": "wipeleft",
+   "dur": 0.5,
+   "ruler": true
+  },
+  {
+   "type": "cut"
+  },
+  {
+   "type": "fade",
+   "dur": 0.3
+  }
+ ],
+ "cards": {
+  "scrim": {
+   "layout": "scrim"
+  },
+  "a": {
+   "layout": "hook-sub",
+   "hook": "o cliente decide nos primeiros segundos.",
+   "eyebrow": "modelo"
+  },
+  "b": {
+   "layout": "hook-sub",
+   "hook": "mostre isso primeiro.",
+   "eyebrow": "render"
+  },
+  "c": {
+   "layout": "hook-sub",
+   "hook": "e isso.",
+   "eyebrow": "render · vista 02",
+   "sub": "mesmo modelo. mesma identidade. minutos."
+  },
+  "final": {
+   "layout": "final",
+   "cta": "Renderize seu projeto"
+  }
+ },
+ "overlays": [
+  {
+   "card": "scrim",
+   "from": 0,
+   "to": 5
+  },
+  {
+   "card": "a",
+   "from": 0,
+   "to": 1.6
+  },
+  {
+   "card": "b",
+   "from": 1.6,
+   "to": 3.5
+  },
+  {
+   "card": "c",
+   "from": 3.5,
+   "to": 5
+  }
+ ]
+}
