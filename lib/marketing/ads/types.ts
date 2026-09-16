@@ -117,11 +117,22 @@ export type LandingPageStatus = 'draft' | 'published' | 'archived'
  *  fechada — seção desconhecida é ignorada na renderização. */
 export type LandingSection =
   | { kind: 'value_props'; items: Array<{ title: string; body: string }> }
-  | { kind: 'before_after'; pairs: Array<{ before: string; after: string; label?: string }> }
+  // `credit` = quem projetou. Obrigatório sempre que o par vier da conta de um
+  // escritório cliente: a autorização registrada em marketing/AUTORIZACOES.md é
+  // de trabalho creditado, não de imagem anônima. Par de acervo próprio não usa.
+  | {
+      kind: 'before_after'
+      pairs: Array<{ before: string; after: string; label?: string; credit?: string }>
+    }
   | { kind: 'modules'; module_ids: string[] }               // ids de lib/nav/modules-config (só enabled)
   | { kind: 'how_it_works'; steps: Array<{ title: string; body: string }> }
   | { kind: 'faq'; items: Array<{ q: string; a: string }> }
   | { kind: 'quote'; text: string; attribution?: string }   // NUNCA depoimento inventado
+  // Preço na própria LP. Os valores NUNCA vêm do dado — são lidos de
+  // lib/plans.ts (SELLABLE_PLANS), que é a fonte única; o dado só escolhe
+  // QUAIS planos aparecem e a nota de rodapé. Assim uma LP publicada não
+  // congela um preço antigo quando a tabela muda.
+  | { kind: 'pricing'; plan_ids?: string[]; note?: string }
 
 export interface LandingPage {
   id: string

@@ -23,6 +23,7 @@ import LpCtaLink from '@/components/marketing/LpCtaLink'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getLandingPageBySlug, recordAcquisitionEvent } from '@/lib/marketing/ads/service'
 import { getEnabledModules } from '@/lib/nav/modules-config'
+import { SELLABLE_PLANS } from '@/lib/plans'
 import { rateLimit } from '@/lib/rate-limit'
 import type { LandingPage, LandingSection } from '@/lib/marketing/ads/types'
 
@@ -107,6 +108,7 @@ export default async function LandingCampaignPage({
   for (const [k, v] of Object.entries(utm)) qs.set(k, v)
   const ctaHref = `/login?${qs.toString()}`
   const ctaLabel = page.cta_label?.trim() || 'Começar agora'
+  const cheapestPlanPrice = Math.min(...SELLABLE_PLANS.map((p) => p.monthlyPrice))
 
   const sections: LandingSection[] = Array.isArray(page.sections) ? page.sections : []
 
@@ -179,7 +181,7 @@ export default async function LandingCampaignPage({
         </section>
 
         {/* Seções configuradas no painel, na ordem do array */}
-        {sections.map((section, index) => renderSection(section, index, page))}
+        {sections.map((section, index) => renderSection(section, index, page, ctaHref))}
 
         {/* CTA final */}
         <section className="mx-auto max-w-3xl px-5 py-16 text-center sm:px-10" style={{ borderTop: HAIRLINE }}>
@@ -187,7 +189,9 @@ export default async function LandingCampaignPage({
             comece com 80 nodes grátis.
           </h2>
           <p className="mx-auto mt-3 max-w-md text-sm text-text-secondary">
-            Sem cartão para começar. Planos a partir de R$ 99/mês.
+            {/* Preço lido da tabela, não escrito à mão: este texto já ficou
+                desatualizado uma vez quando o Starter saiu da vitrine. */}
+            Sem cartão para começar. Planos a partir de R$ {cheapestPlanPrice}/mês.
           </p>
           <div className="mt-7">
             <LpCtaLink href={ctaHref} slug={slug} className={CTA_CLASSES}>
@@ -219,7 +223,12 @@ export default async function LandingCampaignPage({
 
 // ── Seções ─────────────────────────────────────────────────────────────────────
 
-function renderSection(section: LandingSection, index: number, page: LandingPage): ReactNode {
+function renderSection(
+  section: LandingSection,
+  index: number,
+  page: LandingPage,
+  ctaHref: string,
+): ReactNode {
   switch (section.kind) {
     case 'value_props':
       return <ValuePropsSection key={index} items={section.items} />
@@ -233,6 +242,16 @@ function renderSection(section: LandingSection, index: number, page: LandingPage
       return <FaqSection key={index} items={section.items} />
     case 'quote':
       return <QuoteSection key={index} text={section.text} attribution={section.attribution} />
+    case 'pricing':
+      return (
+        <PricingSection
+          key={index}
+          planIds={section.plan_ids}
+          note={section.note}
+          slug={page.slug}
+          ctaHref={ctaHref}
+        />
+      )
     default:
       // Seção desconhecida (dado mais novo que o código) — ignorada em silêncio.
       return null
@@ -298,7 +317,7 @@ function BeforeAfterSection({
   pairs,
   pageName,
 }: {
-  pairs: Array<{ before: string; after: string; label?: string }>
+  pairs: Array<{ before: string; after: string; label?: string; credit?: string }>
   pageName: string
 }) {
   if (!Array.isArray(pairs) || pairs.length === 0) return null
@@ -341,6 +360,13 @@ function BeforeAfterSection({
               {pair.label && (
                 <span className="normal-case text-text-secondary" style={{ letterSpacing: '-0.005em' }}>
                   {pair.label}
+                  {/* O crédito vai colado no par, não numa lista no rodapé: é
+                      assim que a pessoa que projetou consegue se achar. A grafia
+                      vem exatamente como ela assina (ver AUTORIZACOES.md —
+                      "muda arquitetura" é minúsculo de propósito). */}
+                  {pair.credit && (
+                    <span className="text-text-tertiary"> · {pair.credit}</span>
+                  )}
                 </span>
               )}
               <span>Depois</span>
@@ -348,6 +374,12 @@ function BeforeAfterSection({
           </figure>
         ))}
       </div>
+      {pairs.some((p) => p.credit) && (
+        <p className="mt-6 text-xs leading-relaxed text-text-tertiary">
+          Projetos de escritórios que usam a plataforma. Publicado com autorização
+          de quem projetou.
+        </p>
+      )}
     </SectionShell>
   )
 }
@@ -441,6 +473,82 @@ function QuoteSection({ text, attribution }: { text: string; attribution?: strin
         {attribution && <footer className="mt-3 text-xs text-text-tertiary">— {attribution}</footer>}
       </blockquote>
     </section>
+  )
+}
+
+/**
+ * Preço na LP de campanha.
+ *
+ * Por que existe: até 2026-09-16 nenhuma LP paga mostrava preço. Quem clicava
+ * no anúncio só via "80 nodes grátis, sem cartão" e se cadastrava sabendo que
+ * era de graça — o Google mandou 62 cadastros e 0 assinaturas. Preço na página
+ * filtra antes do clique: quem chega no cadastro já sabe que a ferramenta é
+ * paga. Menos cadastro, cadastro mais qualificado — a métrica desta seção é
+ * assinatura, nunca volume de cadastro.
+ *
+ * Os valores vêm de SELLABLE_PLANS, nunca do dado da LP: preço editado à mão
+ * no painel vira preço errado no dia em que a tabela muda.
+ */
+function PricingSection({
+  planIds,
+  note,
+  slug,
+  ctaHref,
+}: {
+  planIds?: string[]
+  note?: string
+  slug: string
+  ctaHref: string
+}) {
+  const ids = Array.isArray(planIds) ? planIds : []
+  const plans = ids.length > 0 ? SELLABLE_PLANS.filter((p) => ids.includes(p.id)) : SELLABLE_PLANS
+  if (plans.length === 0) return null
+
+  return (
+    <SectionShell eyebrow="Planos" title="quanto custa.">
+      <div className={`grid grid-cols-1 gap-2 ${gridColsFor(plans.length)}`}>
+        {plans.map((plan) => (
+          <div
+            key={plan.id}
+            className="flex flex-col rounded-xl bg-bg-elevated p-5"
+            style={{
+              border: plan.recommended ? '0.5px solid var(--color-border-strong)' : HAIRLINE,
+            }}
+          >
+            <div
+              className="text-[10px] font-medium uppercase text-text-tertiary"
+              style={{ letterSpacing: '0.28em' }}
+            >
+              {plan.name}
+            </div>
+            <div className="mt-3 flex items-baseline gap-1">
+              <span className="text-xs text-text-tertiary">R$</span>
+              <span
+                className="text-[30px] font-light leading-none text-text-primary"
+                style={{ letterSpacing: '-0.03em' }}
+              >
+                {plan.monthlyPrice}
+              </span>
+              <span className="text-xs text-text-tertiary">/mês</span>
+            </div>
+            <div className="mt-2 text-[13px] text-text-secondary" style={{ letterSpacing: '-0.01em' }}>
+              {plan.nodes.toLocaleString('pt-BR')} nodes / mês
+            </div>
+            <p className="mt-1.5 text-xs leading-relaxed text-text-tertiary">{plan.description}</p>
+          </div>
+        ))}
+      </div>
+      <p className="mt-6 text-xs leading-relaxed text-text-tertiary">
+        {note ??
+          'Nodes são os créditos de geração e acumulam enquanto a assinatura estiver ativa. Começa grátis com 80 nodes, sem cartão — a assinatura entra quando o volume pedir.'}
+      </p>
+      <div className="mt-7">
+        <LpCtaLink href={ctaHref} slug={slug} className={CTA_CLASSES}>
+          Começar grátis
+          <CtaArrow />
+        </LpCtaLink>
+      </div>
+    </SectionShell>
   )
 }
 
