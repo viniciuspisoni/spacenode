@@ -161,6 +161,8 @@ end
 def file_loaded(_file); end
 
 MF_GRAYED = 0
+MF_CHECKED = 2
+MF_UNCHECKED = 3
 MF_ENABLED = 1
 TB_NEVER_SHOWN = -1
 

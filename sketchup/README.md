@@ -25,6 +25,69 @@ O que só um plugin dentro do modelo consegue:
 - **Voltar à vista** — cada render guarda a câmera; um clique restaura o
   enquadramento exato no SketchUp.
 
+## O que mudou na 1.6.0 — barra flutuante em vidro
+
+Direção visual aprovada no mockup: vidro fumê, transparência controlada,
+borda discreta, sombra suave, ícones finos, formatos horizontal e vertical.
+
+### A prova técnica veio antes do código (SketchUp 2026 / Windows)
+
+Três caminhos possíveis, testados no SketchUp real, não em navegador:
+
+| Caminho | Clique | Vidro / transparência | Moldura |
+|---|---|---|---|
+| `UI::Toolbar` nativa | sim, encaixa e ancora | não, é paleta cinza do Windows | do sistema |
+| `Sketchup::Overlay` | **não** (a API é passiva) | sim, desenha na viewport com alfa | nenhuma |
+| `UI::HtmlDialog` | sim | CSS completo, mas fundo opaco | do Qt |
+
+A tentativa de tirar a moldura do HtmlDialog foi até o fim e **falhou por
+limite da plataforma, com evidência**: a janela é do Qt — `GetClassNameW`
+devolve `Qt691QWindowToolSaveBits` — e o Qt reimpõe os próprios flags.
+`SetWindowLongPtrW` para remover `WS_CAPTION` "sucede" (`GetLastError=0`) e o
+estilo volta a `0x96C80000`; `SetLayeredWindowAttributes` devolve **0**, então
+`WS_EX_LAYERED` nunca gruda e não há transparência por cor-chave. Os três
+estilos (`STYLE_DIALOG`, `STYLE_WINDOW`, `STYLE_UTILITY`) abrem com barra de
+título e botão de fechar.
+
+**Escolha: HtmlDialog**, o único que junta o visual do mockup com clique real.
+As duas diferenças em relação ao mockup, explícitas:
+
+1. **Fica uma barra de título fina do Qt** (`STYLE_UTILITY`, a mais discreta).
+   Não existe HtmlDialog sem moldura no SketchUp/Windows.
+2. **O `backdrop-filter` existe no CEF** (confirmado na sonda) mas borra o
+   fundo DA PÁGINA, não a viewport atrás da janela — nenhuma janela do
+   SketchUp tem alfa por pixel. Para o vidro não ficar cinza sobre nada, a
+   página desenha o próprio fundo ambiente: o render atual do projeto,
+   borrado, igual ao painel. É o que o vidro refrata.
+
+Quem quiser transparência de verdade sobre o modelo só tem o Overlay, que não
+aceita clique — viraria enfeite. A toolbar nativa continua instalada e é ela
+quem encaixa/ancora; a flutuante é opcional, em **Extensions → SPACENODE →
+Barra flutuante** (item com marca de seleção).
+
+### O que a barra faz
+
+- **Marca + 4 ações ligadas aos comandos que já existiam**: abrir o painel
+  (`activate`), capturar (`toolbar_capture`), gerar (`toolbar_generate`),
+  nova cena (`toolbar_add_scene`) e editar (abre o painel na aba Editar).
+- **Horizontal e vertical**, dois cliques na marca giram; orientação e posição
+  ficam gravadas em `Sketchup.write_default` e voltam na próxima sessão.
+- **Estados**: hover, pressionado (escala 0,94), indisponível (Gerar sem conta
+  conectada, Editar sem render) e **processando** (o anel gira no lugar do
+  ícone, sem mudar a largura da barra).
+- **Dica embaixo de cada botão** — e a janela **reserva uma faixa** pra ela:
+  uma página não escapa dos limites da própria janela, então sem essa reserva
+  o tooltip nascia cortado. Botão indisponível mostra o motivo, não o nome.
+- **Legibilidade**: vidro escuro com ícone branco lê sobre modelo claro e
+  escuro. `@supports not (backdrop-filter)` cai pra superfície sólida. O
+  tamanho da janela vem do conteúdo medido (`set_content_size`, não
+  `set_size` — este inclui a barra de título e cortava a pílula por baixo),
+  então a escala de tela do Windows não corta a barra.
+
+**Testado no SketchUp 2026 real**: barra aberta sobre a viewport nos dois
+formatos, tooltip e hover, giro horizontal↔vertical com a janela
+redimensionando junto, e o fundo ambiente recebendo o render do projeto.
+
 ## O que mudou na 1.5.0 — a captura para de levar o desenho junto
 
 Relato de campo, com dois prints: *"a viewport tem linhas pretas muito fortes
