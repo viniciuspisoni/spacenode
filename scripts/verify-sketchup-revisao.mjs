@@ -36,8 +36,17 @@ const catalog = {
     backgrounds: ['Preservar Original'], materialFields: [],
     segments: [{ name: 'Preservar Original', environments: ['Preservar Original'], lighting: ['Preservar Original'], sceneElements: [] }],
   }],
-  engines: [{ id: 'quasar', name: 'Quasar', tagline: '', description: '', resolutions: [{ id: '2k', label: '2K', nodes: 20 }] }],
-  spaces: { maxPrints: 2, dnaCost: 3, categories: [{ id: 'residencial', label: 'Residencial' }], vistaCosts: [] },
+  engines: [
+    { id: 'quasar', name: 'Quasar', tagline: '', description: '', resolutions: [{ id: '2k', label: '2K', nodes: 20 }] },
+    { id: 'vega', name: 'Vega', tagline: '', description: '', resolutions: [{ id: '2k', label: '2K', nodes: 20 }, { id: '4k', label: '4K', nodes: 40 }] },
+  ],
+  spaces: {
+    maxPrints: 2, dnaCost: 3, categories: [{ id: 'residencial', label: 'Residencial' }],
+    vistaCosts: [
+      { engine: 'quasar', qualities: [{ id: '2k', nodes: 11 }] },
+      { engine: 'vega', qualities: [{ id: '2k', nodes: 11 }, { id: '4k', nodes: 17 }] },
+    ],
+  },
 };
 
 async function receive(page, event, payload) {
@@ -80,7 +89,7 @@ async function setup(context, { withResult = true } = {}) {
           if (typeof raw === 'string') { try { payload = JSON.parse(raw); } catch { /* string */ } }
           window.__calls.push({ name: String(name), payload });
           if (name === 'captureViewport') window.SpaceNodeBridge.receive('capture', { imageDataUrl: captureUrl, width: 1600, height: 900 });
-          if (name === 'listScenes') window.SpaceNodeBridge.receive('scenes', { scenes: [{ index: 0, name: 'Cozinha' }] });
+          if (name === 'listScenes') window.SpaceNodeBridge.receive('scenes', { scenes: [{ index: 0, name: 'Cozinha' }, { index: 1, name: 'Sala' }] });
         };
       },
     });
@@ -269,6 +278,56 @@ const cases = [
     sent = await calls(page);
     assert.equal(sent[0].name, 'openUrl');
     assert.match(sent[0].payload, /\/app\/editar\?source=/);
+    return { page, errors };
+  }],
+  ['scenes-output-chip-syncs-engine-and-cost', async (context) => {
+    const { page, errors } = await setup(context);
+    // Render: o chip mostra motor e resolução; o preço fica no CTA e na linha Saída.
+    assert.equal(await text(page, '#dockOutputText'), 'Quasar 2K');
+    assert.ok(await visible(page, '#dockOutput'));
+    await page.locator('.seg[data-tab="scenes"]').click();
+    await page.locator('#scenesPills button').nth(0).click();
+    await page.locator('#scenesPills button').nth(1).click();
+    assert.equal(await text(page, '#dockOutputText'), 'Quasar 2K · 20 nodes por cena', 'na aba Cenas o chip diz o preço por cena');
+    assert.equal(await text(page, '#batchMeta'), '40 nodes', 'total = 2 cenas × 20');
+    assert.equal(await text(page, '#spaceMeta'), '25 nodes', 'Space = DNA 3 + 2 × 11');
+    await page.locator('#dockOutput').click();
+    assert.ok(await page.evaluate(() => document.getElementById('sheetOutput').classList.contains('is-open')), 'o chip abre a folha Saída');
+    await page.locator('#engineCards button', { hasText: 'Vega' }).click();
+    await page.locator('#resolutionCards button', { hasText: '4K' }).click();
+    assert.equal(await text(page, '#dockOutputText'), 'Vega 4K · 40 nodes por cena');
+    assert.equal(await text(page, '#batchMeta'), '80 nodes', 'total recalculado sem sair da aba');
+    assert.equal(await text(page, '#spaceMeta'), '37 nodes', 'Space = DNA 3 + 2 × 17');
+    await page.locator('#sheetOutput [data-close]').click();
+    assert.equal(await page.evaluate(() => document.getElementById('sheetOutput').classList.contains('is-open')), false);
+    await calls(page);
+    await page.locator('#batchButton').click();
+    const sent = await calls(page);
+    const batch = sent.find((c) => c.name === 'generateBatch');
+    assert.ok(batch, 'gerar cenas enviado');
+    assert.equal(batch.payload.engine, 'vega', 'a requisição usa o motor exibido');
+    assert.equal(batch.payload.resolution, '4k', 'a requisição usa a resolução exibida');
+    assert.equal(batch.payload.scenes.length, 2);
+    await receive(page, 'batchDone', { results: [], errors: [], total: 2, cancelled: true });
+    // De volta ao Render: mesma escolha, chip sem "por cena", linha Saída e CTA batem.
+    await page.locator('.seg[data-tab="render"]').click();
+    assert.equal(await text(page, '#dockOutputText'), 'Vega 4K');
+    assert.match(await text(page, '#rowOutputValue'), /Vega 4K · 40 nodes/);
+    assert.equal(await text(page, '#generateMeta'), '40 nodes');
+    // Troca feita no Render vale em Cenas.
+    await page.locator('#rowOutput').click();
+    await page.locator('#engineCards button', { hasText: 'Quasar' }).click();
+    await page.locator('#sheetOutput [data-close]').click();
+    await page.locator('.seg[data-tab="scenes"]').click();
+    assert.equal(await text(page, '#dockOutputText'), 'Quasar 2K · 20 nodes por cena');
+    assert.equal(await text(page, '#batchMeta'), '40 nodes');
+    // Nenhuma folha ficou aberta e a aba Cenas é a ativa (a transição da
+    // folha e da aba leva ~300 ms; a captura espera passar).
+    assert.equal(await page.evaluate(() => document.getElementById('scrim').classList.contains('is-open')), false, 'scrim fechado');
+    assert.ok(await page.evaluate(() => document.getElementById('tabScenes').classList.contains('is-active')), 'aba Cenas ativa');
+    assert.equal(await page.locator('#scenesPills [aria-checked="true"]').count(), 2, 'as 2 cenas seguem selecionadas');
+    await page.waitForTimeout(500);
+    if (screenshotDir) await page.screenshot({ path: path.join(screenshotDir, 'scenes-output-chip.png') });
     return { page, errors };
   }],
   ['result-restored-from-file-uses-journal-base', async (context) => {

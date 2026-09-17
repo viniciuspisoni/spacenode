@@ -56,6 +56,20 @@ ser um fluxo inteiro, e não um pincel sobre um preview de 412 px:
 o painel diz isso na própria aba. Aplicar materiais ao modelo 3D é outra
 operação, fora desta versão.
 
+### Motor e resolução direto do dock (inclusive em Cenas)
+
+Feedback do teste da 1.4.0: "consigo trocar o motor em Render → Saída;
+quero fazer isso direto na aba Cenas". O resumo do dock virou duas partes na
+mesma linha: a cena ("Residencial · Sala", abre a folha Cena, como antes) e
+um **chip com seta** "Orion 2K ›" que abre a **mesma folha Saída**. Na aba
+Cenas o chip diz o preço por cena ("Orion 2K · 20 nodes por cena"), e o
+total do caderno e do Space no botão recalcula na hora — é o mesmo
+`model.engine`/`model.resolution` que o Render usa, então nada precisa
+sincronizar: trocar em qualquer aba vale para todas, e a requisição
+(`generateBatch`/`createSpace`/`generate`) manda exatamente o que o chip
+mostra. Em Editar, Animar e Planta o chip some com o resto do cabeçalho do
+dock (o custo ali não é do render).
+
 ### Como a seleção vira máscara (e por que assim)
 
 O id do objeto não produz uma máscara: falta a oclusão. A máscara nasce de

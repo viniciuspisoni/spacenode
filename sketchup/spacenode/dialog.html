@@ -564,13 +564,28 @@
       padding: 10px 14px 12px;
       border-width: 0.5px 0 0;
     }
+    /* Linha de cabeçalho do dock: resumo da cena (abre Cena) + chip de motor
+       e resolução (abre Saída). Mesma linha e mesma altura de antes. */
+    .dock-head { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; min-height: 24px; }
+    .dock-head.is-empty { display: none; }
     .dock-summary {
-      display: flex; align-items: center; gap: 6px; width: 100%; margin: 0 0 8px;
+      display: flex; align-items: center; gap: 6px; flex: 1 1 auto; min-width: 0; margin: 0;
       font-size: 11px; color: var(--text-3); letter-spacing: -0.005em;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .dock-summary:hover { color: var(--text-2); }
     .dock-summary:empty { display: none; }
+    .dock-output {
+      display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; margin-left: auto;
+      height: 24px; padding: 0 8px 0 10px; border-radius: 999px;
+      font-size: 11px; font-weight: 500; color: var(--text-2); white-space: nowrap;
+      background: var(--chip); border: 0.5px solid var(--glass-line);
+      transition: background 160ms var(--ease), color 160ms var(--ease);
+    }
+    .dock-output:hover { background: var(--chip-hover); color: var(--text); }
+    .dock-output:active { transform: scale(0.97); }
+    .dock-output .chev { width: 6px; height: 11px; color: var(--text-3); flex: 0 0 auto; }
+    .dock-output.is-empty { display: none; }
     .dock-summary::before {
       content: ''; width: 5px; height: 5px; border-radius: 50%; flex: 0 0 auto;
       background: var(--green); box-shadow: 0 0 8px var(--green-glow); display: none;
@@ -604,7 +619,7 @@
     .dock-cta > .cta--sheet { height: 46px; font-size: 13.5px; margin-top: 0; }
     /* Dock auxiliar (Editar/Animar): resumo, alcance e aviso de saldo falam
        do custo do RENDER — ao lado do botão de outra ação viram legenda errada. */
-    .dock.is-aux .dock-summary, .dock.is-aux .reach, .dock.is-aux .insufficient { display: none !important; }
+    .dock.is-aux .dock-head, .dock.is-aux .dock-summary, .dock.is-aux .reach, .dock.is-aux .insufficient { display: none !important; }
     .dock.is-batch .reach { display: none; }
     /* Criar Space é o passo seguinte do caderno, não um segundo botão
        principal: perde o preto e vira ação secundária de largura total. */
@@ -1152,7 +1167,16 @@
 
   <!-- ── Dock ───────────────────────────────────────────────────────────── -->
   <div class="dock glass glass--chrome" id="dock">
-    <button class="dock-summary" id="dockSummary" type="button" title="Ir para a configuração"></button>
+    <div class="dock-head">
+      <button class="dock-summary" id="dockSummary" type="button" title="Ir para a configuração"></button>
+      <!-- Motor e resolução como controle explícito (abre a folha Saída), em
+           qualquer aba do dock — inclusive Cenas, onde o custo do caderno
+           depende deles e antes só dava pra trocar voltando ao Render. -->
+      <button class="dock-output is-empty" id="dockOutput" type="button" title="Trocar motor e resolução">
+        <span id="dockOutputText"></span>
+        <svg class="chev" viewBox="0 0 8 14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 1l6 6-6 6"/></svg>
+      </button>
+    </div>
     <div class="insufficient" id="insufficient">
       <b id="insufficientTitle">Faltam nodes pra gerar</b>
       <div class="math" id="insufficientMath"></div>
@@ -1439,6 +1463,7 @@
         nodes: 'nodes', recharge: 'Recarregar',
         generateRender: 'Gerar render', generateVariation: 'Gerar variação deste render', generating: 'gerando…',
         dockGoto: 'Ir para a configuração', kbdHint: 'Ctrl+Enter',
+        dockOutputGoto: 'Trocar motor e resolução', perScene: 'por cena',
         anchorDropped: 'A câmera mudou desde o render anterior — gerado sem âncora.',
         condNoEdge: 'Sem mapa de arestas nesta geração (a estrutura veio da própria imagem).',
         condMaterials: function (sent, req, names) { return sent + ' de ' + req + ' materiais enviados' + (names ? ' — ' + names : '') + '.'; },
@@ -1640,6 +1665,7 @@
         nodes: 'nodes', recharge: 'Top up',
         generateRender: 'Generate render', generateVariation: 'Generate a variation of this render', generating: 'generating…',
         dockGoto: 'Go to the settings', kbdHint: 'Ctrl+Enter',
+        dockOutputGoto: 'Change engine and resolution', perScene: 'per scene',
         anchorDropped: 'The camera moved since the previous render — generated without anchor.',
         condNoEdge: 'No edge map in this generation (structure came from the image itself).',
         condMaterials: function (sent, req, names) { return sent + ' of ' + req + ' materials sent' + (names ? ' — ' + names : '') + '.'; },
@@ -1914,6 +1940,7 @@
       els.videoSiteButton.textContent = tt('videoSite');
       renderVideoSavePills();
       els.dockSummary.title = tt('dockGoto');
+      els.dockOutput.title = tt('dockOutputGoto');
       els.generateKbd.textContent = /mac/i.test(navigator.platform || '') ? '⌘⏎' : tt('kbdHint');
       els.generateButton.title = els.generateKbd.textContent;
       renderThemePills();
@@ -2013,7 +2040,7 @@
      'downloadButton','openResultButton','projectTypeCards','segmentPills','environmentPills','lightingPills',
      'backgroundLabel','backgroundPills','prompt','elementsPills','engineCards','resolutionCards',
      'notice','insufficient','insufficientTitle','insufficientMath','insufficientBuy','insufficientAlt',
-     'generateButton','generateLabel','generateMeta','generateKbd','dockSummary','variationButton','reachLine','historySection','historyGrid','historyEmpty','historyMore',
+     'generateButton','generateLabel','generateMeta','generateKbd','dockSummary','dockOutput','dockOutputText','variationButton','reachLine','historySection','historyGrid','historyEmpty','historyMore',
      'videoCard','videoPoster','videoCaption','videoOpenButton','videoSaveButton','videoRevealButton','videoSiteButton','videoHint','animarShortcutButton',
      'animarSection','animarTypePills','animarTypeHint','animarEnginePills','animarDurationPills','animarRatioNote','animarButton','animarLabel','animarMeta','animarNote',
      'animarInsufficient','animarInsufficientTitle','animarInsufficientMath','animarInsufficientBuy','animarInsufficientAlt',
@@ -2995,17 +3022,35 @@
     }
 
     // ── CTA / saldo ──────────────────────────────────────────────────────────
+    // Resumo da CENA (abre a folha Cena). Motor e resolução saíram daqui e
+    // viraram o chip ao lado (dockOutputText), que abre a folha Saída.
     function dockSummaryText() {
       if (!model.catalog) return '';
-      var seg = currentSegment();
-      var eng = currentEngine();
-      var res = currentResolution();
       var parts = [];
       if (!isPreserved(model.segment)) parts.push(model.segment);
       if (!isPreserved(model.environment)) parts.push(model.environment);
       if (!isPreserved(model.lighting)) parts.push(model.lighting);
-      if (eng) parts.push(eng.name + (res ? ' ' + res.label : ''));
       return parts.join(' · ');
+    }
+    // "Orion 2K" — e, na aba Cenas, o preço por cena ao lado, porque o total
+    // do caderno (no botão) é motor × resolução × quantidade de cenas.
+    function dockOutputText() {
+      if (!model.catalog) return '';
+      var eng = currentEngine();
+      var res = currentResolution();
+      if (!eng) return '';
+      var text = eng.name + (res ? ' ' + res.label : '');
+      var scenesTab = typeof shell !== 'undefined' && shell && shell.tab === 'scenes';
+      if (scenesTab && res && res.nodes != null) text += ' · ' + res.nodes + ' ' + tt('nodes') + ' ' + tt('perScene');
+      return text;
+    }
+    function updateDockOutput() {
+      if (!els.dockOutput) return;
+      var text = dockOutputText();
+      els.dockOutputText.textContent = text;
+      els.dockOutput.classList.toggle('is-empty', !text);
+      var head = els.dockOutput.parentNode;
+      if (head) head.classList.toggle('is-empty', !text && !els.dockSummary.textContent);
     }
     function updateGenerateState() {
       var cost = currentCost();
@@ -3023,6 +3068,7 @@
       els.variationButton.disabled = !canGenerate || !model.result || !model.result.outputUrl || !!model.result._unverified;
       els.variationButton.style.display = model.result && model.result.camera ? '' : 'none';
       els.dockSummary.textContent = dockSummaryText();
+      updateDockOutput();
       updateAnimarButton();
 
       if (balance != null && cost) {
@@ -3858,6 +3904,10 @@
     }
     els.variationButton.addEventListener('click', function () { submitGenerate(true); });
     els.dockSummary.addEventListener('click', function () { openSheet('sheetScene'); });
+    // Motor e resolução direto do dock, em qualquer aba: é a MESMA folha
+    // Saída e o MESMO model.engine/model.resolution que o Render usa — o que
+    // se troca aqui vale pra Cenas, Space e Render sem sincronizar nada.
+    els.dockOutput.addEventListener('click', function () { openSheet('sheetOutput'); });
 
     // ── Resultado vivo: URLs assinadas vencem em 1 h ────────────────────────
     var RESULT_TTL_MS = 50 * 60 * 1000;
@@ -4644,6 +4694,8 @@
         dock.classList.toggle('is-aux', shell.tab === 'edit' || shell.tab === 'animar' || shell.tab === 'plan');
         dock.classList.toggle('is-batch', shell.tab === 'scenes');
       }
+      // O chip ganha "· N nodes por cena" só na aba Cenas.
+      updateDockOutput();
     }
     function layoutThumb() {
       var btn = document.querySelector('.seg.is-active');
@@ -5054,6 +5106,7 @@
       var locked = styleLocked();
       els.dockSummary.classList.toggle('is-locked', locked);
       els.dockSummary.textContent = joinParts([locked ? st('lockedTag') : '', dockSummaryText()]);
+      updateDockOutput();
     }
 
     // A ponte do Ruby continua sendo a de cima; aqui só reagimos depois dela.
