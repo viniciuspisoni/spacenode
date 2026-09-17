@@ -52,6 +52,16 @@ export const NEGATIVE_BASE = [
 // Vetores extras do render_only — drift de cor/material/fixture e, novo, o
 // vetor de mobiliário/equipamento (sintoma reportado: sofá/mesa/bancada
 // trocados de lugar ou de modelo).
+// Vetor do TRAÇO: a entrada é uma viewport de CAD, e o modelo vinha copiando
+// a convenção de desenho (contorno preto em volta do volume, linha uniforme
+// em toda quina) como se fosse parte da arquitetura. A captura já desliga o
+// perfil grosso (plugin 1.5.0); estes negativos fecham o que sobra.
+export const LINE_WORK_NEGATIVES = [
+  'no line-art, no drawn outline, no black contour tracing the building or any volume',
+  'no uniform-width stroke along edges, corners or roofline (a photograph has no outline)',
+  'no cel-shaded, toon, comic, technical-drawing, diagram or illustration look',
+]
+
 export const RENDER_ONLY_EXTRA_NEGATIVES = [
   'no recoloring, restaining, repainting or replaced finishes on any wall, ceiling, floor, door, window frame, ceiling fan, light fixture or furniture (no concrete texture replacing painted walls, no industrial finish replacing flat paint)',
   'no altered geometry, hardware or proportions on doors, windows, fans or fixtures',
@@ -59,8 +69,14 @@ export const RENDER_ONLY_EXTRA_NEGATIVES = [
   'no added, removed, relocated, rotated, rescaled or redesigned furniture, cabinetry, millwork, countertops, appliances or equipment — every piece keeps its exact position, size, model and orientation',
 ]
 
-export function buildRenderOnlyNegatives(): string {
-  const all = [...NEGATIVE_BASE, ...RENDER_ONLY_EXTRA_NEGATIVES]
+export function buildRenderOnlyNegatives(hasAnchor = false): string {
+  // Com âncora a entrada já é um render fotorealista: não há traço de CAD pra
+  // combater, e o vetor de linha só gastaria atenção do modelo.
+  const all = [
+    ...NEGATIVE_BASE,
+    ...RENDER_ONLY_EXTRA_NEGATIVES,
+    ...(hasAnchor ? [] : LINE_WORK_NEGATIVES),
+  ]
   return `STRICTLY AVOID: ${all.join(', ')}, no reframe, no zoom, no rotation, no altered silhouette.`
 }
 
@@ -77,6 +93,52 @@ function buildIntent(projectNoun: 'building' | 'space', hasAnchor: boolean): str
     `This reference is a raw 3D / CAD / SketchUp model. Re-render it into a real photograph of the SAME ${projectNoun}: ` +
     'convert the flat CGI shading into real-world photographic materials and light, while keeping the exact design, ' +
     'geometry, layout, materials, colors and finishes shown. Photorealism of surfaces and light ONLY — never a redesign. '
+  )
+}
+
+/**
+ * LINE WORK — só pra entrada de CAD (sem âncora).
+ *
+ * O problema que este bloco resolve: a viewport do SketchUp desenha as arestas
+ * do modelo, e o GEOMETRY LOCK manda preservar "every edge". O modelo lia as
+ * duas coisas juntas e devolvia a arquitetura CONTORNADA, com cara de desenho.
+ * A linha da viewport não é um objeto: é uma convenção de desenho. O que ela
+ * DELIMITA (caixilho, junta, paginação, friso, pingadeira) é físico e tem
+ * espessura, material e sombra próprios.
+ *
+ * Exportado separado porque é o bloco que o A/B de prompt liga e desliga.
+ */
+export function buildLineWorkBlock(): string {
+  return (
+    'LINE WORK (how to read the reference): the reference is a shaded CAD viewport, so every surface ' +
+    'boundary is drawn as a thin dark line. Those lines are a DRAWING CONVENTION, not physical objects. ' +
+    'Reproduce what each line DELIMITS — window mullions and frames, panel and tile joints, paving pattern, ' +
+    'reveals, copings, handrails, floor lines — as real physical elements, each with its own material, ' +
+    'thickness, depth and cast shadow. Never reproduce the lines themselves as strokes drawn over the image. ' +
+    'The output is a photograph: volumes are separated by material, light, shadow and depth of field, ' +
+    'never by an outline. '
+  )
+}
+
+/**
+ * PHOTOGRAPHIC TRANSLATION — o que "virar fotografia" significa em concreto.
+ * Sem isto o contrato só dizia o que NÃO fazer; o modelo precisa saber o que
+ * colocar no lugar do sombreado chapado do CAD.
+ */
+export function buildPhotographicBlock(projectNoun: 'building' | 'space'): string {
+  const outdoor = projectNoun === 'building'
+  return (
+    'PHOTOGRAPHIC TRANSLATION: give every surface a real material with real micro-detail — ' +
+    'glass with plausible reflections of sky and surroundings plus a visible interior behind it, ' +
+    'metal with anisotropic highlights, concrete and stone with grain and subtle tonal variation, ' +
+    'wood with figure, render/plaster with slight unevenness. ' +
+    'Light must be physically coherent: one consistent sun direction, contact shadows where volumes meet, ' +
+    'soft ambient occlusion in recesses and under overhangs, and bounced light on shaded faces. ' +
+    (outdoor
+      ? 'Outdoor: natural sky gradient, atmospheric depth on distant volumes, believable vegetation and ground. '
+      : 'Indoor: believable light falloff from the openings and fixtures actually present in the scene. ') +
+    'Sharpness is natural and photographic — crisp where the lens focuses, never over-sharpened, ' +
+    'never an edge-enhancement halo around contours. '
   )
 }
 
@@ -192,8 +254,12 @@ export function buildRenderOnlySystemHead(opts: RenderOnlyHeadOpts): string {
     buildIntent(opts.projectNoun, opts.hasAnchor) +
     buildContract() +
     buildRenderOnlyEscalation(attempt) +
+    // Entrada de CAD: separar o traço do desenho do elemento físico ANTES do
+    // geometry lock, que é quem manda preservar "every edge".
+    (opts.hasAnchor ? '' : buildLineWorkBlock()) +
     buildGeometryLock(opts.hasAnchor) +
-    buildTextureLock(opts.hasAnchor)
+    buildTextureLock(opts.hasAnchor) +
+    (opts.hasAnchor ? '' : buildPhotographicBlock(opts.projectNoun))
   )
 }
 

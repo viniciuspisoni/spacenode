@@ -25,6 +25,105 @@ O que só um plugin dentro do modelo consegue:
 - **Voltar à vista** — cada render guarda a câmera; um clique restaura o
   enquadramento exato no SketchUp.
 
+## O que mudou na 1.5.0 — a captura para de levar o desenho junto
+
+Relato de campo, com dois prints: *"a viewport tem linhas pretas muito fortes
+e o resultado mantém contornos que dão à arquitetura um aspecto de desenho"*.
+Era hipótese; virou medida.
+
+### O que a medição achou (SketchUp 2026, projeto real de escritório)
+
+A higiene de captura já desligava sketchy edges, névoa, eixos, textos, cotas
+e marca d'água — mas **nunca tocou no PERFIL**. No `.skp` do teste o estilo
+estava com `DrawSilhouettes = true` e `SilhouetteWidth = 3`: todo volume ia
+pra IA com um contorno preto de 3 px. E o GEOMETRY LOCK do prompt manda
+preservar "every edge". As duas coisas juntas mandavam desenhar o contorno.
+
+Recorte da torre, mesma câmera, uma variável por vez (% de pixel escuro):
+
+| Captura | Luminância | Pixel escuro |
+|---|---|---|
+| como está hoje | 102,5 | **44,4%** |
+| sem perfil (`DrawSilhouettes=false`) | 144,0 | **21,2%** |
+| perfil em 1 px | 144,0 | 21,2% |
+| `EdgeColorMode=0` | 199,4 | 1,3% |
+| `TransparencySort=2` | 102,5 | 44,4% |
+
+Desligar o perfil **corta o traço pela metade e o caixilho continua inteiro**.
+As outras alavancas foram reprovadas na mesma bancada:
+
+- **`EdgeColorMode=0` apaga o projeto junto com o traço** (1,3% de pixel
+  escuro): a fachada vira um borrão claro, sem caixilho nem paginação. A cor
+  da aresta é escolha do estilo do usuário e fica como está.
+- **Aresta oculta (`EdgeDisplayMode=0`) perde o desenho do projeto** — foi o
+  outro lado da comparação pedida: sem aresta não há montante, junta nem
+  linha de piso. **Aresta fina ganha de aresta oculta.**
+- **Oclusão ambiente não serve aqui.** O SketchUp 2026 tem `AmbientOcclusion`
+  na API, mas ligá-la deixa o `write_image` IDÊNTICO (luminância 147,9 →
+  148,0): é efeito de viewport e não entra na captura. Fica registrado pra
+  ninguém tentar de novo.
+- **Sombra não é forçada.** Ela vive no `ShadowInfo` e é a intenção de luz do
+  usuário — quem mexe nisso é o preset de sol, que já existe e já restaura.
+
+### O que passou a valer na captura
+
+`CLEAN_CAPTURE_OPTIONS` ganhou `DrawSilhouettes=false`, `SilhouetteWidth=1`,
+`DrawProfilesOnly=false`, `DrawBackEdges=false`, `DrawHidden=false`,
+`DrawHiddenGeometry/Objects=false` e `ShowViewName=false`. A aresta fina fica.
+O mapa de arestas (o condicionamento estrutural) também perdeu o perfil de
+3 px — ele é estrutura, não desenho.
+
+Tudo isso continua valendo **só durante a captura**: as RenderingOptions são
+salvas chave a chave e restauradas no `ensure`, inclusive em erro e
+cancelamento (teste no harness Ruby). Geometria, materiais, seleção, câmera e
+estilos salvos não são tocados. Como vive em `capture_viewport`, vale igual
+no Render, em **cada cena do lote**, no Spaces e na Planta — e a máscara da
+seleção segue alinhada, porque ela usa o mesmo quadro.
+
+O modo de render virou `photo_capture_options`: promove wireframe, linha
+escondida, sombreado sem textura e monocromático pra texturizado; estilo fora
+dessa lista fica como está.
+
+### E o prompt: a linha é convenção, não objeto
+
+O contrato mandava "converta o CGI chapado em foto" e, logo abaixo,
+"preserve every edge". Faltava dizer o óbvio: **a linha da viewport não é um
+objeto.** Entraram dois blocos (só pra entrada de CAD — com âncora a entrada
+já é foto):
+
+- **LINE WORK**: as linhas são convenção de desenho; reproduza o que elas
+  DELIMITAM (montante, junta, paginação, friso, pingadeira) como elemento
+  físico com espessura, material e sombra próprios; numa foto o volume se
+  separa por material, luz e profundidade, nunca por contorno.
+- **PHOTOGRAPHIC TRANSLATION**: vidro com reflexo plausível e interior
+  visível, metal com brilho anisotrópico, concreto e pedra com grão, uma
+  direção de sol só, sombra de contato, nitidez natural sem halo.
+
+Mais três negativos de traço (`LINE_WORK_NEGATIVES`): nada de line-art, de
+contorno preto em volta do volume, de traço de largura uniforme, de cara de
+desenho técnico.
+
+### O A/B, com o motor real
+
+`scripts/capture-photoreal-ab.mts` roda o Orion de verdade com o prompt
+montado pelo `buildFidelityPrompt` do próprio repositório, uma variável por
+vez. O prompt "antigo" é o novo com os blocos novos recortados por string
+exata, então R2 → R3 isola só o texto.
+
+| Execução | Entrada | Prompt | Pixel escuro no resultado |
+|---|---|---|---|
+| R1 | captura atual | antigo | **39,5%** |
+| R2 | captura preparada | antigo | **13,6%** |
+| R3 | captura preparada | novo | **12,1%** |
+
+O resultado acompanha a entrada quase 1:1 — que é a confirmação da hipótese
+do relato. Na imagem: R1 mantém a grelha preta e o vidro chapado; R2 traz
+reflexo de céu e profundidade no caixilho; R3 acrescenta interior visível
+atrás do vidro e sombra de contato. **A captura é o salto; o prompt refina.**
+Nas três, a malha de caixilhos do projeto continua legível.
+
+Comparativos em `C:/Users/Pisoni/Desktop/spacenode-ab/entrega/`.
+
 ## O que mudou na 1.4.0 — revisão de materiais com controle
 
 Caso de uso: *"selecionei esta marcenaria e quero testar carvalho claro,

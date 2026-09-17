@@ -27,7 +27,7 @@ module SpaceNode
   module SketchUp
     extend self
 
-    VERSION = '1.4.0'
+    VERSION = '1.5.0'
     PREFERENCES_KEY = 'com.spacenode.sketchup'
     DEFAULT_API_BASE_URL = 'https://spacenode.app'
     MIN_SKETCHUP_MAJOR = 21          # Ruby 2.7+; recomendado 2024+
@@ -302,7 +302,34 @@ module SpaceNode
       'DisplayDims' => false,
       # Corte preenchido quando o usuário JÁ exibe cortes (não forçamos
       # DisplaySectionCuts: ligar um corte que ele escondeu mudaria a cena).
-      'SectionCutFilled' => true
+      'SectionCutFilled' => true,
+      # ── Traço gráfico (1.5.0) ────────────────────────────────────────────
+      # O PERFIL é o que fazia a IA devolver arquitetura com cara de desenho.
+      # Medido no SketchUp 2026 (projeto real de escritório, mesma câmera,
+      # recorte da torre): com perfil 3 px, 44,4% do recorte é pixel escuro;
+      # desligando o perfil, 21,2% — e caixilho, paginação e linha de piso
+      # continuam todos legíveis (a aresta FINA é que desenha o projeto).
+      # Só o perfil sai: a aresta fica.
+      'DrawSilhouettes' => false,
+      'SilhouetteWidth' => 1,
+      'DrawProfilesOnly' => false,
+      # Arestas de trás / geometria oculta viram linha fantasma sobre a face.
+      'DrawBackEdges' => false,
+      'DrawHidden' => false,
+      'DrawHiddenGeometry' => false,
+      'DrawHiddenObjects' => false,
+      # Nome da cena escrito sobre a vista — elemento auxiliar, não projeto.
+      'ShowViewName' => false
+      #
+      # MEDIDO E REJEITADO (não mexer, o teste está no README):
+      # - EdgeColorMode => 0: apaga o caixilho junto com o traço (44,4% → 1,3%
+      #   de pixel escuro; a fachada vira um borrão claro). A cor da aresta é
+      #   escolha do estilo do usuário e fica como está.
+      # - AmbientOcclusion => true: `write_image` sai IDÊNTICO (luminância
+      #   147,9 → 148,0). É efeito de viewport e não entra na captura.
+      # - TransparencySort => 2: sem efeito nenhum na imagem.
+      # - Sombras: NÃO são forçadas aqui. Elas vivem no ShadowInfo e são a
+      #   intenção de luz do usuário (o preset de sol já cuida disso).
     }.freeze
 
     # RenderMode do SketchUp: 0 wireframe, 1 hidden line, 2 shaded,
@@ -320,7 +347,12 @@ module SpaceNode
       'JitterEdges' => false,
       'ExtendLines' => false,
       'DrawLineEnds' => false,
-      'DisplayFog' => false
+      'DisplayFog' => false,
+      # O mapa é estrutura, não desenho: perfil de 3 px engrossa o contorno
+      # do volume e é exatamente o traço que não queremos reforçar.
+      'DrawSilhouettes' => false,
+      'SilhouetteWidth' => 1,
+      'ShowViewName' => false
     }.freeze
 
     # Presets de sol (hora local aplicada só durante a captura, com restauro).
@@ -3273,6 +3305,22 @@ module SpaceNode
       }
     end
 
+    # Preparação fotorrealista da captura: a higiene fixa (CLEAN_CAPTURE_OPTIONS)
+    # mais o modo de render, que depende do estilo VIGENTE — só promovemos pra
+    # texturizado quem está num modo conhecido que a IA leria como desenho
+    # (wireframe, linha escondida, sombreado sem textura, monocromático).
+    # Estilo fora dessa lista fica como está: é escolha do usuário.
+    def photo_capture_options(rendering)
+      clean = CLEAN_CAPTURE_OPTIONS.dup
+      begin
+        mode = rendering['RenderMode']
+        clean['RenderMode'] = PHOTO_RENDER_MODE if mode.is_a?(Integer) && mode != PHOTO_RENDER_MODE && [0, 1, 2, 5].include?(mode)
+      rescue StandardError
+        nil
+      end
+      clean
+    end
+
     # Aplica overrides de RenderingOptions devolvendo APENAS o que mudou (pra
     # restauração exata). Chave inexistente na versão (nil) é pulada.
     def apply_rendering_options(rendering, overrides)
@@ -3377,14 +3425,7 @@ module SpaceNode
       # Higiene salva/restaurada MANUALMENTE — RenderingOptions não são
       # registradas em operações (abort_operation não as reverte; só viraram
       # undoáveis no SketchUp 2026, e apenas no nível de Page).
-      clean = CLEAN_CAPTURE_OPTIONS.dup
-      begin
-        mode = rendering['RenderMode']
-        clean['RenderMode'] = PHOTO_RENDER_MODE if mode.is_a?(Integer) && mode != PHOTO_RENDER_MODE && [0, 1, 2, 5].include?(mode)
-      rescue StandardError
-        nil
-      end
-      clean_saved = apply_rendering_options(rendering, clean)
+      clean_saved = apply_rendering_options(rendering, photo_capture_options(rendering))
       edge_reason = opts[:edge_map] ? 'write_failed' : 'not_requested'
       mirrors = nil
 
