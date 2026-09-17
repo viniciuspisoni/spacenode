@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>SPACENODE</title>
+<!--
+  Toolbar flutuante em vidro fumê.
+
+  LIMITE DA PLATAFORMA (medido no SketchUp 2026 / Windows, ver README):
+  a janela do HtmlDialog é Qt (classe Qt691QWindowToolSaveBits) e o Qt
+  REIMPÕE os próprios flags — remover WS_CAPTION ou ligar WS_EX_LAYERED via
+  Win32 não gruda (o estilo volta ao valor anterior). Então a barra de título
+  fina do Qt fica, e o `backdrop-filter` (que o CEF suporta) borra o fundo
+  DESTA página, não a viewport atrás da janela. Para o vidro não ficar cinza
+  sobre nada, a página desenha seu próprio fundo ambiente.
+-->
+<style>
+  :root {
+    --glass: rgba(28,28,30,0.62);
+    --glass-hover: rgba(58,58,62,0.72);
+    --glass-press: rgba(90,90,96,0.80);
+    --line: rgba(255,255,255,0.20);
+    --edge: rgba(255,255,255,0.30);
+    --ico: rgba(255,255,255,0.92);
+    --ico-off: rgba(255,255,255,0.34);
+    --tip-bg: rgba(20,20,22,0.92);
+    --ease: cubic-bezier(.32,.72,0,1);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%; overflow: hidden;
+    font: 500 11.5px/1.2 "Segoe UI", -apple-system, system-ui, sans-serif;
+    color: #fff; user-select: none; cursor: default;
+    background: #0b0b0d;
+  }
+  /* Fundo ambiente: o vidro precisa de algo pra refratar. Recebe a captura
+     ou o render atual do painel; sem isso, um degradê neutro. */
+  #amb {
+    position: fixed; inset: -40px; z-index: 0;
+    background-size: cover; background-position: center;
+    filter: blur(28px) saturate(1.5) brightness(0.62);
+    transform: scale(1.12);
+  }
+  #amb.is-empty {
+    background: radial-gradient(120% 140% at 30% 0%, #3a3a40 0%, #141417 60%, #0b0b0d 100%);
+    filter: none; transform: none;
+  }
+  #veil { position: fixed; inset: 0; z-index: 1; background: rgba(10,10,12,0.30); }
+
+  .bar {
+    position: relative; z-index: 2;
+    display: flex; align-items: center; gap: 4px;
+    width: max-content; margin: 5px;
+    padding: 7px 10px; border-radius: 999px;
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(26px) saturate(1.7);
+    backdrop-filter: blur(26px) saturate(1.7);
+    border: 0.5px solid var(--line);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.42), inset 0 0.5px 0 var(--edge);
+  }
+  body.vertical .bar { flex-direction: column; padding: 10px 7px; margin-left: auto; }
+  @supports not ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
+    .bar { background: rgba(24,24,26,0.94); }
+  }
+
+  .btn {
+    position: relative; flex: 0 0 auto;
+    width: 38px; height: 38px; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: transparent; border: 0; border-radius: 13px;
+    color: var(--ico); cursor: pointer;
+    transition: background 140ms var(--ease), transform 140ms var(--ease), opacity 140ms var(--ease);
+  }
+  .btn svg { width: 21px; height: 21px; }
+  .btn:hover:not(:disabled) { background: var(--glass-hover); }
+  .btn:active:not(:disabled) { background: var(--glass-press); transform: scale(0.94); }
+  .btn.is-on { background: var(--glass-press); }
+  .btn:disabled { color: var(--ico-off); cursor: default; }
+  .btn:focus-visible { outline: 1.5px solid rgba(255,255,255,0.75); outline-offset: 1px; }
+
+  /* Marca: não é botão de ação, é a porta do painel. */
+  .brand { width: 34px; }
+  .brand svg { width: 20px; height: 20px; }
+  .sep { flex: 0 0 auto; width: 0.5px; height: 20px; background: var(--line); margin: 0 3px; }
+  body.vertical .sep { width: 20px; height: 0.5px; margin: 3px 0; }
+
+  /* Processando: o anel gira no lugar do ícone, sem trocar a largura. */
+  .btn.is-busy svg { opacity: 0; }
+  .btn.is-busy::after {
+    content: ''; position: absolute; width: 17px; height: 17px; border-radius: 50%;
+    border: 1.6px solid rgba(255,255,255,0.28); border-top-color: rgba(255,255,255,0.95);
+    animation: spin 720ms linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .tip {
+    position: fixed; z-index: 5; pointer-events: none;
+    padding: 5px 9px; border-radius: 8px; white-space: nowrap;
+    background: var(--tip-bg); color: #fff; font-size: 11px;
+    border: 0.5px solid rgba(255,255,255,0.14);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+    opacity: 0; transform: translateY(-2px);
+    transition: opacity 120ms var(--ease), transform 120ms var(--ease);
+  }
+  .tip.is-on { opacity: 1; transform: translateY(0); }
+</style>
+</head>
+<body>
+  <div id="amb" class="is-empty"></div>
+  <div id="veil"></div>
+
+  <div class="bar" id="bar">
+    <button class="btn brand" id="bPanel" type="button" data-tip="Abrir o painel · dois cliques giram a barra">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 19V5.6L19 18.4V5"/><circle cx="5" cy="19" r="1.5" fill="currentColor" stroke="none"/><circle cx="19" cy="5" r="1.5" fill="currentColor" stroke="none"/>
+      </svg>
+    </button>
+    <span class="sep"></span>
+    <button class="btn" id="bCapture" type="button" data-tip="Capturar vista">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 9V5.6C4 4.7 4.7 4 5.6 4H9"/><path d="M20 9V5.6C20 4.7 19.3 4 18.4 4H15"/>
+        <path d="M4 15v3.4c0 .9.7 1.6 1.6 1.6H9"/><path d="M20 15v3.4c0 .9-.7 1.6-1.6 1.6H15"/>
+        <circle cx="12" cy="12" r="2.3"/>
+      </svg>
+    </button>
+    <button class="btn" id="bGenerate" type="button" data-tip="Gerar render">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">
+        <path d="M12 3.4c.7 3.6 1.6 4.5 5.2 5.2-3.6.7-4.5 1.6-5.2 5.2-.7-3.6-1.6-4.5-5.2-5.2 3.6-.7 4.5-1.6 5.2-5.2Z"/>
+        <path d="M18 15.2c.35 1.8.8 2.25 2.6 2.6-1.8.35-2.25.8-2.6 2.6-.35-1.8-.8-2.25-2.6-2.6 1.8-.35 2.25-.8 2.6-2.6Z"/>
+      </svg>
+    </button>
+    <button class="btn" id="bScene" type="button" data-tip="Nova cena">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14.5 5H5.6C4.7 5 4 5.7 4 6.6v9.8c0 .9.7 1.6 1.6 1.6h9.8c.9 0 1.6-.7 1.6-1.6V9"/>
+        <path d="M19.5 4.5v5M22 7h-5"/>
+      </svg>
+    </button>
+    <button class="btn" id="bEdit" type="button" data-tip="Editar este render">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4.5 19.5l4.2-1.1L19 8.1a1.9 1.9 0 0 0 0-2.7l-.4-.4a1.9 1.9 0 0 0-2.7 0L5.6 15.3 4.5 19.5Z"/>
+      </svg>
+    </button>
+  </div>
+
+  <div class="tip" id="tip"></div>
+
+<script>
+(function () {
+  'use strict';
+  var els = {};
+  ['bar','tip','amb','bPanel','bCapture','bGenerate','bScene','bEdit'].forEach(function (id) {
+    els[id] = document.getElementById(id);
+  });
+  var state = { busy: null, disabled: {}, locale: 'pt' };
+  /** Altura (ou largura) reservada na janela pra dica caber. */
+  var TIP_LANE = 30;
+
+  var PT = {
+    panel: 'Abrir o painel · dois cliques giram a barra',
+    capture: 'Capturar vista', generate: 'Gerar render',
+    scene: 'Nova cena', edit: 'Editar este render',
+    needRender: 'Gere um render primeiro', busy: 'Gerando…',
+    offline: 'Conecte sua conta SPACENODE'
+  };
+  var EN = {
+    panel: 'Open the panel · double-click to rotate',
+    capture: 'Capture view', generate: 'Generate render',
+    scene: 'New scene', edit: 'Edit this render',
+    needRender: 'Generate a render first', busy: 'Generating…',
+    offline: 'Connect your SPACENODE account'
+  };
+  function t(k) { return (state.locale === 'en' ? EN : PT)[k] || k; }
+
+  function call(name, arg) {
+    var fn = window.sketchup && window.sketchup[name];
+    if (typeof fn === 'function') { arg === undefined ? fn() : fn(arg); }
+  }
+
+  // ── Tooltip: segue o botão, some no leave e no clique ──────────────────
+  var tipFor = null;
+  function showTip(btn) {
+    var label = btn.getAttribute('data-tip');
+    if (btn.disabled && btn.getAttribute('data-tip-off')) label = btn.getAttribute('data-tip-off');
+    if (!label) return;
+    tipFor = btn;
+    els.tip.textContent = label;
+    els.tip.classList.add('is-on');
+    var r = btn.getBoundingClientRect();
+    var vertical = document.body.classList.contains('vertical');
+    els.tip.style.visibility = 'hidden';
+    var tw = els.tip.offsetWidth, th = els.tip.offsetHeight;
+    var x, y;
+    if (vertical) {
+      x = r.left - tw - 8;
+      if (x < 4) x = r.right + 8;
+      y = r.top + (r.height - th) / 2;
+    } else {
+      x = r.left + (r.width - tw) / 2;
+      y = r.bottom + 7;
+      if (y + th > window.innerHeight - 2) y = r.top - th - 7;
+      if (x < 4) x = 4;
+      if (x + tw > window.innerWidth - 4) x = window.innerWidth - tw - 4;
+    }
+    els.tip.style.left = Math.round(x) + 'px';
+    els.tip.style.top = Math.round(y) + 'px';
+    els.tip.style.visibility = '';
+  }
+  function hideTip() { tipFor = null; els.tip.classList.remove('is-on'); }
+
+  var ACTIONS = [
+    ['bPanel', 'tbPanel', 'panel'],
+    ['bCapture', 'tbCapture', 'capture'],
+    ['bGenerate', 'tbGenerate', 'generate'],
+    ['bScene', 'tbScene', 'scene'],
+    ['bEdit', 'tbEdit', 'edit']
+  ];
+  ACTIONS.forEach(function (a) {
+    var btn = els[a[0]];
+    btn.addEventListener('mouseenter', function () { showTip(btn); });
+    btn.addEventListener('mouseleave', hideTip);
+    btn.addEventListener('focus', function () { showTip(btn); });
+    btn.addEventListener('blur', hideTip);
+    btn.addEventListener('click', function () {
+      if (btn.disabled) return;
+      hideTip();
+      call(a[1]);
+    });
+  });
+  // Dois cliques na marca giram a barra — o gesto está no tooltip dela.
+  els.bPanel.addEventListener('dblclick', function (ev) {
+    ev.preventDefault();
+    hideTip();
+    call('tbOrientation');
+  });
+
+  function applyLabels() {
+    els.bPanel.setAttribute('data-tip', t('panel'));
+    els.bCapture.setAttribute('data-tip', t('capture'));
+    els.bGenerate.setAttribute('data-tip', t('generate'));
+    els.bScene.setAttribute('data-tip', t('scene'));
+    els.bEdit.setAttribute('data-tip', t('edit'));
+    els.bEdit.setAttribute('data-tip-off', t('needRender'));
+    els.bGenerate.setAttribute('data-tip-off', t('offline'));
+  }
+  applyLabels();
+
+  // ── Estado vindo do Ruby ───────────────────────────────────────────────
+  window.SpaceNodeToolbar = {
+    receive: function (payload) {
+      if (!payload) return;
+      if (payload.locale) { state.locale = payload.locale; applyLabels(); }
+      if (payload.orientation) {
+        document.body.classList.toggle('vertical', payload.orientation === 'vertical');
+      }
+      if ('ambient' in payload) {
+        if (payload.ambient) {
+          els.amb.style.backgroundImage = 'url("' + payload.ambient + '")';
+          els.amb.classList.remove('is-empty');
+        } else {
+          els.amb.style.backgroundImage = '';
+          els.amb.classList.add('is-empty');
+        }
+      }
+      var busy = payload.busy || null;
+      [['bCapture', 'capture'], ['bGenerate', 'generate'], ['bScene', 'scene'], ['bEdit', 'edit']]
+        .forEach(function (p) {
+          var btn = els[p[0]];
+          var off = payload.disabled && payload.disabled.indexOf(p[1]) >= 0;
+          btn.disabled = !!off || (!!busy && busy !== p[1]);
+          btn.classList.toggle('is-busy', busy === p[1]);
+        });
+      els.bPanel.classList.toggle('is-on', !!payload.panelOpen);
+      if (tipFor) showTip(tipFor);
+    }
+  };
+
+  // O Ruby precisa do tamanho real do conteúdo pra encolher a janela até a
+  // pílula (a barra de título do Qt fica, mas a moldura para de sobrar).
+  function reportSize() {
+    var r = els.bar.getBoundingClientRect();
+    // A dica vive DENTRO da janela (uma página não escapa dos limites dela),
+    // então a janela reserva uma faixa pra ela: embaixo no horizontal, à
+    // esquerda no vertical. Sem essa reserva o tooltip nasce cortado.
+    var vertical = document.body.classList.contains('vertical');
+    call('tbSize', JSON.stringify({
+      width: Math.ceil(r.width + 10 + (vertical ? TIP_LANE : 0)),
+      height: Math.ceil(r.height + 10 + (vertical ? 0 : TIP_LANE))
+    }));
+  }
+  window.addEventListener('resize', function () { if (tipFor) showTip(tipFor); });
+  document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') hideTip(); });
+
+  call('tbReady');
+  setTimeout(reportSize, 60);
+  window.__spnToolbarReportSize = reportSize;
+})();
+</script>
+</body>
+</html>

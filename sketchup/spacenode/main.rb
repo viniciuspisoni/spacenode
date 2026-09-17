@@ -27,7 +27,7 @@ module SpaceNode
   module SketchUp
     extend self
 
-    VERSION = '1.5.0'
+    VERSION = '1.6.0'
     PREFERENCES_KEY = 'com.spacenode.sketchup'
     DEFAULT_API_BASE_URL = 'https://spacenode.app'
     MIN_SKETCHUP_MAJOR = 21          # Ruby 2.7+; recomendado 2024+
@@ -82,6 +82,8 @@ module SpaceNode
         :tb_scene_done => 'Cena criada: %s',
         :tb_mirror => 'Marcar espelho',
         :tb_mirror_hint => 'Marcar a face selecionada como espelho (o reflexo entra na captura)',
+        :tb_float => 'Barra flutuante',
+        :tb_float_hint => 'Mostrar ou esconder a barra flutuante em vidro',
         :reconciling => 'Conexão instável — verificando se o render foi concluído…',
         :connect_first => 'Conecte sua conta SPACENODE primeiro.',
         :mask_select_something => 'Selecione no SketchUp o grupo, o componente ou as faces que quer revisar e toque de novo.',
@@ -160,6 +162,8 @@ module SpaceNode
         :tb_scene_done => 'Scene created: %s',
         :tb_mirror => 'Mark mirror',
         :tb_mirror_hint => 'Mark the selected face as a mirror (the reflection goes into the capture)',
+        :tb_float => 'Floating bar',
+        :tb_float_hint => 'Show or hide the floating glass bar',
         :reconciling => 'Unstable connection — checking if the render finished…',
         :connect_first => 'Connect your SPACENODE account first.',
         :mask_select_something => 'Select in SketchUp the group, component or faces you want to revise, then tap again.',
@@ -6847,6 +6851,208 @@ module SpaceNode
       ::UI.messagebox(e.message)
     end
 
+    # ── Toolbar flutuante em vidro ───────────────────────────────────────────
+    #
+    # LIMITE DA PLATAFORMA, medido no SketchUp 2026/Windows (não é escolha de
+    # projeto): a janela do HtmlDialog é do Qt — classe
+    # `Qt691QWindowToolSaveBits` — e o Qt REIMPÕE os próprios flags. Tirar
+    # WS_CAPTION ou ligar WS_EX_LAYERED por Win32 (Fiddle) não gruda: o estilo
+    # volta a 0x96C80000 e `SetLayeredWindowAttributes` devolve 0. Por isso:
+    #   - a barra de título fina do Qt FICA (não existe HtmlDialog sem moldura);
+    #   - o `backdrop-filter` (que o CEF suporta) borra o fundo DA PÁGINA, não
+    #     a viewport — a página desenha o próprio fundo ambiente pro vidro ter
+    #     o que refratar.
+    # A `UI::Toolbar` nativa continua existindo e é quem encaixa/ancora; esta é
+    # a versão flutuante com a linguagem visual do produto.
+    TOOLBAR_ORIENTATIONS = %w[horizontal vertical].freeze
+    TOOLBAR_DEFAULT_SIZE = { 'horizontal' => [312, 108], 'vertical' => [108, 312] }.freeze
+
+    def toolbar_orientation
+      value = ::Sketchup.read_default(PREFERENCES_KEY, 'toolbar_orientation', 'horizontal').to_s
+      TOOLBAR_ORIENTATIONS.include?(value) ? value : 'horizontal'
+    end
+
+    def glass_toolbar_open?
+      @toolbar_dialog && @toolbar_dialog.respond_to?(:visible?) && @toolbar_dialog.visible? ? true : false
+    rescue StandardError
+      false
+    end
+
+    def toggle_glass_toolbar
+      glass_toolbar_open? ? close_glass_toolbar : show_glass_toolbar
+    rescue StandardError => e
+      ::UI.messagebox(e.message)
+    end
+
+    def show_glass_toolbar
+      if glass_toolbar_open?
+        @toolbar_dialog.bring_to_front if @toolbar_dialog.respond_to?(:bring_to_front)
+        return
+      end
+
+      size = TOOLBAR_DEFAULT_SIZE[toolbar_orientation]
+      dialog = ::UI::HtmlDialog.new(
+        :dialog_title => 'SPACENODE',
+        :preferences_key => "#{PREFERENCES_KEY}.toolbar",
+        :scrollable => false,
+        :resizable => false,
+        # UTILITY é a moldura mais fina que o Qt oferece — o mais perto de
+        # "sem moldura" que a plataforma permite.
+        :style => ::UI::HtmlDialog::STYLE_UTILITY,
+        :width => size[0],
+        :height => size[1]
+      )
+      attach_toolbar_callbacks(dialog)
+      dialog.set_file(File.join(__dir__, 'toolbar.html'))
+      dialog.set_on_closed do
+        if @toolbar_dialog.equal?(dialog)
+          remember_toolbar_position
+          @toolbar_dialog = nil
+        end
+      end
+      @toolbar_dialog = dialog
+      dialog.show
+      restore_toolbar_position
+    end
+
+    def close_glass_toolbar
+      remember_toolbar_position
+      @toolbar_dialog.close if @toolbar_dialog
+      @toolbar_dialog = nil
+    rescue StandardError
+      @toolbar_dialog = nil
+    end
+
+    def restore_toolbar_position
+      left = ::Sketchup.read_default(PREFERENCES_KEY, 'toolbar_left', nil)
+      top = ::Sketchup.read_default(PREFERENCES_KEY, 'toolbar_top', nil)
+      return unless left && top && @toolbar_dialog.respond_to?(:set_position)
+
+      @toolbar_dialog.set_position(left.to_i, top.to_i)
+    rescue StandardError
+      nil
+    end
+
+    # Não existe evento de "janela movida": a posição é guardada a cada ação e
+    # no fechamento, que cobre o uso real.
+    def remember_toolbar_position
+      return unless @toolbar_dialog && @toolbar_dialog.respond_to?(:get_position)
+
+      pos = @toolbar_dialog.get_position
+      return unless pos.is_a?(Array) && pos.length >= 2
+
+      ::Sketchup.write_default(PREFERENCES_KEY, 'toolbar_left', pos[0].to_i)
+      ::Sketchup.write_default(PREFERENCES_KEY, 'toolbar_top', pos[1].to_i)
+    rescue StandardError
+      nil
+    end
+
+    def attach_toolbar_callbacks(dialog)
+      dialog.add_action_callback('tbReady') { |_ctx| emit_toolbar_state }
+      dialog.add_action_callback('tbSize') do |_ctx, raw|
+        begin
+          data = parse_json(raw)
+          w = data['width'].to_i
+          h = data['height'].to_i
+          # A página sabe a largura real da pílula; a janela encolhe até ela.
+          # set_content_SIZE, não set_size: o segundo inclui a barra de título
+          # do Qt e o conteúdo sairia cortado por baixo.
+          if w > 40 && h > 40 && @toolbar_dialog
+            if @toolbar_dialog.respond_to?(:set_content_size)
+              @toolbar_dialog.set_content_size(w, h)
+            else
+              @toolbar_dialog.set_size(w, h)
+            end
+          end
+        rescue StandardError
+          nil
+        end
+      end
+      dialog.add_action_callback('tbPanel') { |_ctx| toolbar_action { activate } }
+      dialog.add_action_callback('tbCapture') { |_ctx| toolbar_action { toolbar_capture } }
+      dialog.add_action_callback('tbGenerate') { |_ctx| toolbar_action { toolbar_generate } }
+      dialog.add_action_callback('tbScene') { |_ctx| toolbar_action { toolbar_add_scene } }
+      dialog.add_action_callback('tbEdit') { |_ctx| toolbar_action { toolbar_edit } }
+      dialog.add_action_callback('tbOrientation') { |_ctx| toolbar_action { flip_toolbar_orientation } }
+    end
+
+    def toolbar_action(&block)
+      remember_toolbar_position
+      block.call
+      emit_toolbar_state
+    rescue StandardError => e
+      ::UI.messagebox(e.message)
+      emit_toolbar_state
+    end
+
+    def flip_toolbar_orientation
+      novo = toolbar_orientation == 'horizontal' ? 'vertical' : 'horizontal'
+      ::Sketchup.write_default(PREFERENCES_KEY, 'toolbar_orientation', novo)
+      size = TOOLBAR_DEFAULT_SIZE[novo]
+      if @toolbar_dialog
+        if @toolbar_dialog.respond_to?(:set_content_size)
+          @toolbar_dialog.set_content_size(size[0], size[1])
+        else
+          @toolbar_dialog.set_size(size[0], size[1])
+        end
+      end
+      emit_toolbar_state
+      # A página remede a pílula depois de trocar o eixo.
+      toolbar_script('window.__spnToolbarReportSize && window.__spnToolbarReportSize();')
+    end
+
+    # Editar é a única ação que depende de já existir render: leva ao painel,
+    # na aba Editar.
+    def toolbar_edit
+      with_panel { emit('openTab', { :tab => 'edit' }) }
+    end
+
+    def toolbar_script(script)
+      dialog = @toolbar_dialog
+      return unless dialog
+
+      dialog.execute_script(script)
+    rescue StandardError
+      nil
+    end
+
+    def emit_toolbar_state
+      return unless @toolbar_dialog
+
+      disabled = []
+      disabled << 'generate' unless authenticated?
+      disabled << 'edit' unless @last_result || stored_result?
+      busy = nil
+      if @generating
+        busy = @generation_context && @generation_context[:mode] == :edit ? 'edit' : 'generate'
+      end
+      payload = {
+        :locale => locale,
+        :orientation => toolbar_orientation,
+        :panelOpen => panel_open?,
+        :disabled => disabled,
+        :busy => busy,
+        :ambient => toolbar_ambient_url
+      }
+      toolbar_script("window.SpaceNodeToolbar && window.SpaceNodeToolbar.receive(#{JSON.generate(payload)});")
+    end
+
+    def stored_result?
+      model = ::Sketchup.active_model
+      raw = model && model.get_attribute('spacenode', 'last_result', nil)
+      raw.is_a?(String) && !raw.empty?
+    rescue StandardError
+      false
+    end
+
+    # O vidro precisa de algo pra refratar: usa a prévia do último resultado.
+    def toolbar_ambient_url
+      url = @last_result && (@last_result[:previewUrl] || @last_result[:outputUrl])
+      url.to_s =~ %r{\Ahttps?://} ? url.to_s : nil
+    rescue StandardError
+      nil
+    end
+
     def toolbar_capture
       with_panel { handle_capture }
     end
@@ -6900,8 +7106,19 @@ module SpaceNode
       # selecionado (a proc roda a cada refresh de UI — só uma checagem).
       commands.last.set_validation_proc { SpaceNode::SketchUp.selection_empty? ? MF_GRAYED : MF_ENABLED }
 
+      # A barra flutuante em vidro é OPCIONAL e mora no menu: a toolbar NATIVA
+      # continua sendo a que encaixa e ancora, e quem quiser a flutuante liga.
+      float_command = build_command(t(:tb_float), t(:tb_float_hint), 'spacenode') do
+        SpaceNode::SketchUp.toggle_glass_toolbar
+      end
+      float_command.set_validation_proc do
+        SpaceNode::SketchUp.glass_toolbar_open? ? MF_CHECKED : MF_UNCHECKED
+      end
+
       menu = ::UI.menu('Extensions').add_submenu('SPACENODE')
       commands.each { |c| menu.add_item(c) }
+      menu.add_separator
+      menu.add_item(float_command)
 
       toolbar = ::UI::Toolbar.new('SPACENODE')
       toolbar.add_item(commands.first)
