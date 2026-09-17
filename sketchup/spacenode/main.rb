@@ -27,7 +27,7 @@ module SpaceNode
   module SketchUp
     extend self
 
-    VERSION = '1.3.0'
+    VERSION = '1.3.1'
     PREFERENCES_KEY = 'com.spacenode.sketchup'
     DEFAULT_API_BASE_URL = 'https://spacenode.app'
     MIN_SKETCHUP_MAJOR = 21          # Ruby 2.7+; recomendado 2024+
