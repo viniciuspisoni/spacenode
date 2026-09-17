@@ -27,7 +27,7 @@ module SpaceNode
   module SketchUp
     extend self
 
-    VERSION = '1.6.0'
+    VERSION = '1.6.1'
     PREFERENCES_KEY = 'com.spacenode.sketchup'
     DEFAULT_API_BASE_URL = 'https://spacenode.app'
     MIN_SKETCHUP_MAJOR = 21          # Ruby 2.7+; recomendado 2024+
@@ -453,6 +453,15 @@ module SpaceNode
           on_panel_ready
         rescue StandardError => e
           emit_error(e.message)
+        end
+      end
+      # A página resolve o tema (escolha local → conta → SO); só ela sabe o
+      # resultado, então é ela que manda pintar a moldura.
+      dialog.add_action_callback('frameTheme') do |_ctx, raw|
+        begin
+          apply_window_chrome(parse_json(raw)['theme'])
+        rescue StandardError
+          nil
         end
       end
       dialog.add_action_callback('captureViewport') do |_ctx, raw|
@@ -6851,6 +6860,128 @@ module SpaceNode
       ::UI.messagebox(e.message)
     end
 
+    # ── Moldura das janelas (Windows) ────────────────────────────────────────
+    #
+    # Os window styles são do Qt e ele os reimpõe: pedir 0x96080000 (sem
+    # WS_CAPTION, sem WS_THICKFRAME) e forçar SetWindowPos(SWP_FRAMECHANGED)
+    # não adianta — a leitura IMEDIATA seguinte já devolve 0x96C80000. O Qt
+    # reverte dentro da própria chamada, então não existe HtmlDialog sem
+    # moldura aqui.
+    #
+    # Os atributos do DWM são outra coisa: não são window styles, são estado do
+    # compositor por HWND, e o Qt não mexe neles. Todos voltam S_OK e sobrevivem
+    # a mover e a trocar foco (medido). Com a barra de título na cor do fundo da
+    # página e o texto do título na MESMA cor (ou seja, invisível), a janela
+    # passa a ler como um objeto só, em vez de uma moldura clara do Windows em
+    # volta de um painel escuro. A moldura continua existindo — isto é o mais
+    # perto que a plataforma deixa chegar.
+    module Win32Chrome
+      module_function
+
+      # COLORREF é 0x00BBGGRR — não 0xRRGGBB.
+      def bgr(rgb)
+        ((rgb & 0xFF) << 16) | (rgb & 0xFF00) | ((rgb >> 16) & 0xFF)
+      end
+
+      def available?
+        return @available unless @available.nil?
+
+        @available = begin
+          if ::Sketchup.platform == :platform_win
+            require 'fiddle'
+            user32 = ::Fiddle.dlopen('user32.dll')
+            dwmapi = ::Fiddle.dlopen('dwmapi.dll')
+            ptr = ::Fiddle::TYPE_VOIDP
+            int = ::Fiddle::TYPE_INT
+            @find = ::Fiddle::Function.new(user32['FindWindowExW'], [ptr, ptr, ptr, ptr], ptr)
+            @classname = ::Fiddle::Function.new(user32['GetClassNameW'], [ptr, ptr, int], int)
+            @setpos = ::Fiddle::Function.new(user32['SetWindowPos'], [ptr, ptr, int, int, int, int, int], int)
+            @dwm = ::Fiddle::Function.new(dwmapi['DwmSetWindowAttribute'], [ptr, int, ptr, int], int)
+            true
+          else
+            false
+          end
+        rescue ::StandardError, ::LoadError
+          false
+        end
+      end
+
+      # O terminador precisa nascer dentro do encode: juntar UTF-16LE com uma
+      # string UTF-8 levanta Encoding::CompatibilityError.
+      def wide(text)
+        (text + " ").encode('UTF-16LE').force_encoding('BINARY')
+      end
+
+      def windows_named(title)
+        needle = ::Fiddle::Pointer[wide(title)]
+        nothing = ::Fiddle::Pointer[0]
+        previous = nothing
+        found = []
+        16.times do
+          handle = @find.call(nothing, previous, nothing, needle)
+          break if handle.null?
+
+          buffer = "\x00" * 512
+          length = @classname.call(handle, ::Fiddle::Pointer[buffer], 255)
+          name = begin
+            buffer[0, length * 2].force_encoding('UTF-16LE').encode('UTF-8')
+          rescue ::StandardError
+            ''
+          end
+          found << [handle, name]
+          previous = handle
+        end
+        found
+      end
+
+      def attribute(handle, id, value)
+        @dwm.call(handle, id, ::Fiddle::Pointer[[value].pack('L')], 4)
+      end
+
+      def paint(handle, color, dark)
+        attribute(handle, 20, dark ? 1 : 0) # USE_IMMERSIVE_DARK_MODE
+        attribute(handle, 35, color)        # CAPTION_COLOR
+        attribute(handle, 36, color)        # TEXT_COLOR: igual ao fundo = some
+        attribute(handle, 34, color)        # BORDER_COLOR
+        attribute(handle, 33, 2)            # WINDOW_CORNER_PREFERENCE = round
+        # NOSIZE|NOMOVE|NOZORDER|FRAMECHANGED — só recalcula a área não-cliente.
+        @setpos.call(handle, ::Fiddle::Pointer[0], 0, 0, 0, 0, 0x0027)
+      end
+
+      # A toolbar NATIVA também se chama SPACENODE, mas é pintada pelo Qt e
+      # ignora o DWM (medido) — cai aqui e não acontece nada, sem problema.
+      def apply(panel_rgb, bar_rgb, dark)
+        return false unless available?
+
+        panel = bgr(panel_rgb)
+        bar = bgr(bar_rgb)
+        windows_named('SPACENODE').each do |handle, klass|
+          if klass.include?('ToolSaveBits')
+            paint(handle, bar, true) # a toolbar.html não tem tema claro
+          else
+            paint(handle, panel, dark)
+          end
+        end
+        true
+      rescue ::StandardError
+        false
+      end
+    end
+
+    # Espelham --bg de dialog.html e o fundo de toolbar.html.
+    CHROME_PANEL_RGB = { 'dark' => 0x0A0A0A, 'light' => 0xFAFAFA }.freeze
+    CHROME_TOOLBAR_RGB = 0x0B0B0D
+
+    # Chamado pela página a cada applyTheme (inclusive quando o SO muda de tema)
+    # e depois de abrir a barra flutuante, que nasce com um HWND novo.
+    def apply_window_chrome(theme = nil)
+      resolved = theme.to_s == 'light' ? 'light' : 'dark'
+      @frame_theme = resolved
+      Win32Chrome.apply(CHROME_PANEL_RGB[resolved], CHROME_TOOLBAR_RGB, resolved != 'light')
+    rescue StandardError
+      false
+    end
+
     # ── Toolbar flutuante em vidro ───────────────────────────────────────────
     #
     # LIMITE DA PLATAFORMA, medido no SketchUp 2026/Windows (não é escolha de
@@ -6859,6 +6990,8 @@ module SpaceNode
     # WS_CAPTION ou ligar WS_EX_LAYERED por Win32 (Fiddle) não gruda: o estilo
     # volta a 0x96C80000 e `SetLayeredWindowAttributes` devolve 0. Por isso:
     #   - a barra de título fina do Qt FICA (não existe HtmlDialog sem moldura);
+    #     o que dá pra fazer é pintá-la na cor da página e apagar o texto do
+    #     título pelo DWM — ver Win32Chrome acima;
     #   - o `backdrop-filter` (que o CEF suporta) borra o fundo DA PÁGINA, não
     #     a viewport — a página desenha o próprio fundo ambiente pro vidro ter
     #     o que refratar.
@@ -6913,6 +7046,8 @@ module SpaceNode
       @toolbar_dialog = dialog
       dialog.show
       restore_toolbar_position
+      # O HWND só nasce no show, e o Qt ainda pode estar montando a janela.
+      ::UI.start_timer(0.2, false) { apply_window_chrome(@frame_theme) }
     end
 
     def close_glass_toolbar

@@ -25,6 +25,58 @@ O que só um plugin dentro do modelo consegue:
 - **Voltar à vista** — cada render guarda a câmera; um clique restaura o
   enquadramento exato no SketchUp.
 
+## O que mudou na 1.6.1 — a moldura deixou de brigar com o vidro
+
+A 1.6.0 entregou a barra em vidro, mas em cima dela ficava uma barra de título
+**clara** do Windows, com o texto "SPACENODE" e o X. O mesmo valia pro painel
+principal: conteúdo escuro dentro de uma moldura clara. Lia como duas coisas
+coladas, não como um objeto só.
+
+### O que mudou de fato: window style ≠ atributo do DWM
+
+A conclusão da 1.6.0 — "o Qt reimpõe os flags" — está certa e foi **reforçada**
+aqui. Refiz o teste incluindo o `SetWindowPos(SWP_FRAMECHANGED)` que faltava
+(sem ele o Windows nem recalcula a área não-cliente, e o sintoma se parece
+muito com "o Qt desfez"). Resultado medido:
+
+```
+tirando WS_CAPTION + WS_THICKFRAME
+  antes    = 0x96C80000
+  pedido   = 0x96080000
+  imediato = 0x96C80000   <- a leitura seguinte JÁ voltou
+```
+
+O Qt reverte **dentro da própria chamada**. Não existe HtmlDialog sem moldura,
+ponto final.
+
+Só que os **atributos do DWM não são window styles**: são estado do compositor
+por HWND, e o Qt não encosta neles. Todos voltaram `S_OK` e sobreviveram a
+mover a janela e a trocar o foco:
+
+| Atributo | Valor | Efeito |
+|---|---|---|
+| `USE_IMMERSIVE_DARK_MODE` (20) | 1 / 0 | botões do sistema claros no escuro |
+| `CAPTION_COLOR` (35) | `#0a0a0a` / `#fafafa` | barra de título na cor do painel |
+| `TEXT_COLOR` (36) | **a mesma cor** | o título some |
+| `BORDER_COLOR` (34) | a mesma cor | sem contorno claro |
+| `WINDOW_CORNER_PREFERENCE` (33) | 2 | canto arredondado |
+| `SYSTEMBACKDROP_TYPE` (38) | 3 | aceita, mas o CEF pinta opaco por cima |
+
+Pegadinha: `COLORREF` é `0x00BBGGRR`, **não** `0xRRGGBB` — trocar R por B
+"funciona" e sai com a cor errada. O teste
+`test_chrome_color_swaps_red_and_blue` usa `#0b0b0d` justamente porque tem
+R ≠ B.
+
+O tema quem resolve é a página (escolha local → conta → SO), então é ela que
+manda pintar, por `callSketchUpQuiet('frameTheme', …)` a cada `applyTheme` —
+inclusive quando o SO troca de tema sozinho. A barra flutuante fica sempre
+escura, porque `toolbar.html` não tem tema claro.
+
+**O que continua valendo:** a moldura existe, com o botão de fechar. O que
+mudou é que ela deixou de ser clara e deixou de repetir o nome. A `UI::Toolbar`
+nativa ignora o DWM (é o Qt que a pinta) e segue cinza — ela é a que encaixa e
+ancora; a flutuante é a que tem a linguagem do produto.
+
 ## O que mudou na 1.6.0 — barra flutuante em vidro
 
 Direção visual aprovada no mockup: vidro fumê, transparência controlada,
