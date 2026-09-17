@@ -6,7 +6,16 @@
 // o item dispara o evento `spn:tour:start`; de outras rotas, navega a /app#tour
 // e o tour abre ao chegar (pushState não emite hashchange, por isso o evento).
 // driver.js (~5 kB, sem dependências); popover tematizado em globals.css
-// (.spn-tour) com os tokens semânticos — acompanha os temas claro e escuro.
+// (.spn-tour) no material de vidro — acompanha os temas claro e escuro.
+//
+// A ordem das etapas é a narrativa do produto, não a da página: o Renderizar
+// abre o tour e fecha o CTA. Ele é a ferramenta mais forte e a única que leva
+// alguém de um print do SketchUp à primeira imagem sem decisão nenhuma no
+// caminho — o Space vem logo atrás, como o que acontece quando o projeto passa
+// a ter mais de uma vista pra manter coerente. Até 09/26 o tour começava pelos
+// Spaces e terminava mandando criar um: pedia ao recém-chegado a decisão mais
+// cara antes de ele ter visto uma imagem sair. O Space não perdeu espaço na
+// virada — perdeu a posição de pedágio.
 
 import { useCallback, useEffect, useRef } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
@@ -17,7 +26,7 @@ import { createClient } from '@/lib/supabase/client'
 export const TOUR_START_EVENT = 'spn:tour:start'
 
 const DASHBOARD = '/app'
-const NEW_PROJECT_URL = '/app/spaces/new'
+const GENERATE_URL = '/app/generate'
 const TOUR_HASH = '#tour'
 
 export default function WelcomeTour({ needsOnboarding }: { needsOnboarding: boolean }) {
@@ -57,8 +66,10 @@ export default function WelcomeTour({ needsOnboarding }: { needsOnboarding: bool
       stagePadding: 8,
       stageRadius: 14,
       popoverOffset: 12,
+      // Véu mais leve que o padrão da lib: o popover é de vidro e precisa ter
+      // o que borrar atrás dele — véu fechado demais e o material some.
       overlayColor: '#000',
-      overlayOpacity: 0.55,
+      overlayOpacity: 0.48,
       // Clique no véu não encerra: sair do onboarding é decisão explícita
       // (Pular tour, ×, Esc ou concluir) — evita "perder" o tour por engano.
       overlayClickBehavior: () => {},
@@ -68,7 +79,7 @@ export default function WelcomeTour({ needsOnboarding }: { needsOnboarding: bool
       progressText: '{{current}} de {{total}}',
       nextBtnText: 'Avançar',
       prevBtnText: 'Voltar',
-      doneBtnText: pendingPersistRef.current ? 'Criar meu primeiro Space' : 'Criar novo Space',
+      doneBtnText: pendingPersistRef.current ? 'Criar minha primeira imagem' : 'Abrir o Renderizar',
       // "Pular tour" discreto junto aos botões (o popover é reaproveitado entre
       // etapas — daí o dedupe e a remoção na última, onde concluir é o caminho).
       onPopoverRender: (popover, opts) => {
@@ -94,32 +105,36 @@ export default function WelcomeTour({ needsOnboarding }: { needsOnboarding: bool
       onDestroyed: () => markCompleted(),
       steps: [
         {
-          element: '[data-tour="projetos"]',
+          element: '[data-tour="renderizar"]',
           popover: {
-            title: 'Spaces',
+            title: 'Comece pelo Renderizar',
             description:
-              'Seus Spaces moram aqui. Cada um reúne as vistas do espaço e preserva o DNA do projeto entre uma geração e outra.',
-            side: 'bottom',
+              'Envie um print do SketchUp, uma foto ou uma planta e receba a imagem pronta. É o caminho mais curto do seu modelo à primeira visualização — e, na primeira vez, um guia de três passos acompanha você dentro da ferramenta.',
+            side: 'top',
+            align: 'start',
+          },
+        },
+        {
+          // Âncora no cartão do módulo, não na faixa "Continuar de onde parou":
+          // a faixa só existe em conta com Space, e o tour precisa rodar igual
+          // no primeiro acesso, quando o dashboard está vazio. É o cartão
+          // vizinho ao do Renderizar — a transição é de um passo.
+          element: '[data-tour="spaces"]',
+          popover: {
+            title: 'Depois, o Space',
+            description:
+              'A partir da segunda vista do mesmo espaço, o Space entra: ele guarda o DNA do projeto para que todas as imagens conversem entre si. Dá para criar um a partir de qualquer render — não precisa decidir isso agora.',
+            side: 'top',
             align: 'start',
           },
         },
         {
           element: '[data-tour="criar"]',
           popover: {
-            title: 'Criar',
+            title: 'O resto do atelier',
             description:
-              'As ferramentas do atelier: renderize a partir da sua referência, edite com precisão, amplie a resolução, anime e finalize para entrega. Na primeira imagem, o Renderizar abre um guia que acompanha cada passo.',
+              'Com a imagem na mão: Editar ajusta uma área sem mexer no resto, Ampliar leva à resolução de entrega, Animar transforma em vídeo, Finalizar exporta e a Planta humanizada veste a planta técnica com materiais reais.',
             side: 'top',
-            align: 'start',
-          },
-        },
-        {
-          element: '[data-tour="apresentar"]',
-          popover: {
-            title: 'Apresentar',
-            description:
-              'Prepare o projeto para o cliente — a Planta humanizada, por exemplo, veste a planta técnica com materiais e mobiliário reais.',
-            side: 'bottom',
             align: 'start',
           },
         },
@@ -144,7 +159,7 @@ export default function WelcomeTour({ needsOnboarding }: { needsOnboarding: bool
             onDoneClick: () => {
               markCompleted()
               d.destroy()
-              router.push(NEW_PROJECT_URL)
+              router.push(GENERATE_URL)
             },
           },
         },
@@ -170,9 +185,11 @@ export default function WelcomeTour({ needsOnboarding }: { needsOnboarding: bool
 
     // Espera as âncoras [data-tour] do dashboard estarem no DOM; o primeiro
     // acesso ganha uma pausa maior pra página assentar antes do overlay.
+    // A âncora esperada é a da PRIMEIRA etapa (o cartão do Renderizar): ela
+    // vem da lista de módulos, que é a mesma em conta nova e conta antiga.
     const timers: number[] = []
     const tryStart = (attempt: number) => {
-      if (document.querySelector('[data-tour="projetos"]')) {
+      if (document.querySelector('[data-tour="renderizar"]')) {
         startTour()
       } else if (attempt < 10) {
         timers.push(window.setTimeout(() => tryStart(attempt + 1), 150))

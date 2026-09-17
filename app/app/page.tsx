@@ -71,6 +71,16 @@ const MODULE_DESC: Record<string, string> = {
   moodboard:         'Atmosfera, paleta e referências em um só lugar.',
 }
 
+// Âncoras do tour de boas-vindas na grade de ferramentas — os dois módulos que
+// o tour explica um a um: o Renderizar (porta de entrada) e o Spaces (a
+// evolução, depois da primeira imagem). Ver components/app/WelcomeTour.tsx.
+// Eles são o 1º e o 2º cartão da grade, então o tour anda de vizinho a vizinho
+// antes de abrir o plano pra seção inteira. Módulo sem entrada → sem atributo.
+const MODULE_TOUR_ANCHOR: Record<string, string | undefined> = {
+  renderizar: 'renderizar',
+  spaces:     'spaces',
+}
+
 const MODULES: {
   id: string
   href: string
@@ -145,8 +155,15 @@ export default async function AppPage() {
             <h1 className="spn-dash-head-greeting">Olá, {firstName}</h1>
             <p className="spn-dash-head-sub">Seu atelier de visualização arquitetônica.</p>
           </div>
+          {/* Ação principal = Renderizar. O Space continua a um clique daqui,
+              como ghost: ele é a evolução da primeira imagem, não o pedágio
+              para chegar nela (ver components/app/WelcomeTour.tsx). */}
           <div className="spn-dash-head-actions">
-            <Link href="/app/spaces/new" className="spn-cta spn-dash-cta">
+            <Link href="/app/generate" className="spn-cta spn-dash-cta">
+              <IconGenerate size={14} />
+              Renderizar
+            </Link>
+            <Link href="/app/spaces/new" className="spn-ghost spn-dash-ghost">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
                 <line x1="12" y1="5" x2="12" y2="19"/>
                 <line x1="5" y1="12" x2="19" y2="12"/>
@@ -160,7 +177,7 @@ export default async function AppPage() {
         {spaces.length === 0 ? (
           <StartBlock />
         ) : (
-          <section data-tour="projetos">
+          <section>
             <div className="spn-dash-section-head">
               <div className="spn-dash-section-label">Continuar de onde parou</div>
               <Link href="/app/spaces" className="spn-dash-section-link">Todos os Spaces →</Link>
@@ -246,7 +263,7 @@ export default async function AppPage() {
                 key={m.href}
                 href={m.href}
                 className="spn-dash-module spn-glass"
-                data-tour={m.id === 'planta_humanizada' ? 'apresentar' : undefined}
+                data-tour={MODULE_TOUR_ANCHOR[m.id]}
               >
                 <div className="spn-dash-module-icon">
                   <m.Icon size={19} />
@@ -301,15 +318,15 @@ export default async function AppPage() {
 
 function StartBlock() {
   return (
-    <section className="spn-dash-start spn-glass" data-tour="projetos">
-      <h2 className="spn-dash-start-title">Comece seu primeiro Space</h2>
+    <section className="spn-dash-start spn-glass">
+      <h2 className="spn-dash-start-title">Comece pela sua primeira imagem</h2>
       <p className="spn-dash-start-sub">
-        Envie um print, modelo, planta ou referência para gerar a primeira visualização.
+        Envie um print do SketchUp, um modelo, uma planta ou uma foto — o Renderizar devolve a visualização pronta.
       </p>
       <div className="spn-dash-start-actions">
-        <Link href="/app/spaces/new" className="spn-cta spn-dash-cta">Criar novo Space</Link>
-        <Link href="/app/generate" className="spn-ghost" style={{ borderRadius: 'var(--radius-full)', display: 'inline-flex', alignItems: 'center' }}>
-          Renderizar imagem avulsa
+        <Link href="/app/generate" className="spn-cta spn-dash-cta">Renderizar primeira imagem</Link>
+        <Link href="/app/spaces/new" className="spn-ghost" style={{ borderRadius: 'var(--radius-full)', display: 'inline-flex', alignItems: 'center' }}>
+          Criar um Space
         </Link>
       </div>
       <div className="spn-dash-steps">
@@ -320,13 +337,13 @@ function StartBlock() {
         </div>
         <div className="spn-dash-step">
           <div className="spn-dash-step-num">02</div>
-          <div className="spn-dash-step-title">Escolha o tipo de visualização</div>
-          <div className="spn-dash-step-desc">Ambiente, estilo e enquadramento sob seu controle.</div>
+          <div className="spn-dash-step-title">Confira o cenário</div>
+          <div className="spn-dash-step-desc">Ambiente, estilo e luz já vêm decididos — mude só o que quiser.</div>
         </div>
         <div className="spn-dash-step">
           <div className="spn-dash-step-num">03</div>
-          <div className="spn-dash-step-title">Gere variações coerentes</div>
-          <div className="spn-dash-step-desc">Toda vista preserva o DNA do projeto.</div>
+          <div className="spn-dash-step-title">Gere e compare</div>
+          <div className="spn-dash-step-desc">Depois vire um Space e toda nova vista preserva o DNA.</div>
         </div>
       </div>
     </section>
