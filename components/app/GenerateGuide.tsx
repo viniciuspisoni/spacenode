@@ -123,7 +123,7 @@ export default function GenerateGuide({
             <strong>Primeira imagem pronta.</strong>{' '}
             {fromSpacesNew
               ? 'Arraste o divisor para comparar antes e depois. Para continuar seu Space com esta render, siga pelo cartão de projeto abaixo da imagem.'
-              : 'Arraste o divisor para comparar antes e depois. Daqui você pode baixar, gerar variações ou criar um Space a partir desta render.'}
+              : 'Arraste o divisor para comparar antes e depois. Daqui você baixa, gera variações — ou transforma esta render em um Space, e toda nova vista do projeto já nasce coerente com ela.'}
           </p>
         )}
       </div>
