@@ -35,6 +35,10 @@ const prepPath = arg('preparada')
 const outDir = arg('out', '.')
 const model = arg('model', 'gpt-image-2.5-flare')
 const quality = arg('quality', 'high')
+/** Lado maior da saída. 3840 = o "4K" do Orion (teto da Image API). */
+const longSide = Number(arg('long', '2048'))
+/** Só o A/B de PROMPT sobre uma captura só (a que o plugin mandou de verdade). */
+const promptOnly = arg('preparada') !== '' && arg('atual') === ''
 
 // Mesmos presets do painel na captura do usuário: exterior, tudo preservado.
 const PROMPT_OPTIONS = {
@@ -68,8 +72,8 @@ const promptAntigo = promptNovo
 function sizeFor(width: number, height: number): string {
   const round16 = (n: number) => Math.max(16, Math.ceil(n / 16) * 16)
   return width >= height
-    ? `${2048}x${round16((2048 * height) / width)}`
-    : `${round16((2048 * width) / height)}x${2048}`
+    ? `${longSide}x${round16((longSide * height) / width)}`
+    : `${round16((longSide * width) / height)}x${longSide}`
 }
 
 function pngSize(buf: Buffer): { width: number; height: number } {
@@ -121,6 +125,12 @@ async function main() {
   writeFileSync(path.join(outDir, 'prompt-antigo.txt'), promptAntigo)
   writeFileSync(path.join(outDir, 'prompt-novo.txt'), promptNovo)
 
+  if (promptOnly) {
+    // Uma captura só (a real do plugin): isola o PROMPT, nada mais muda.
+    await generate('P-prompt-antigo', prepPath, promptAntigo)
+    await generate('P-prompt-novo', prepPath, promptNovo)
+    return
+  }
   await generate('R1-captura-atual-prompt-antigo', atualPath, promptAntigo)
   await generate('R2-captura-preparada-prompt-antigo', prepPath, promptAntigo)
   await generate('R3-captura-preparada-prompt-novo', prepPath, promptNovo)
