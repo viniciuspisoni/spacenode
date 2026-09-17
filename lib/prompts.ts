@@ -782,7 +782,7 @@ export function buildMaterialSamplesBlock(
 
 // A lista NEGATIVE_BASE (compartilhada pelos três níveis) e os extras da
 // Máxima vivem em lib/ai/fidelity/render-only.ts.
-export function buildNegativePromptForFidelity(level: FidelityLevel): string {
+export function buildNegativePromptForFidelity(level: FidelityLevel, hasAnchor = false): string {
   if (level === 'creative') {
     // ainda preserva volumetria/aberturas/perspectiva, mas relaxa entorno e estilo
     const relaxed = NEGATIVE_BASE.filter(n =>
@@ -794,8 +794,9 @@ export function buildNegativePromptForFidelity(level: FidelityLevel): string {
     return `AVOID: ${NEGATIVE_BASE.join(', ')}.`
   }
   // maximum/render_only — base + extras contra drift de cor/material/fixture/
-  // mobiliário (fonte única no módulo de fidelidade)
-  return buildRenderOnlyNegatives()
+  // mobiliário (fonte única no módulo de fidelidade). Sem âncora entram
+  // também os negativos de TRAÇO: a entrada é viewport de CAD.
+  return buildRenderOnlyNegatives(hasAnchor)
 }
 
 // Pedido do usuário em texto livre. Dois regimes:
@@ -1058,7 +1059,7 @@ export function buildFidelityPrompt(
   const preserve   = briefing ? preservationBlock(briefing) : ''
   const allow      = briefing ? transformationBlock(briefing, level) : ''
   const matBlock   = buildMaterialsBlock(materials, projectType, level)
-  const negative   = buildNegativePromptForFidelity(level)
+  const negative   = buildNegativePromptForFidelity(level, Boolean(hasAnchor))
 
   const lightDesc  = LIGHT_EN[lighting] ?? lighting
   const segDesc    = isPreserved(segment) ? '' : (SEG_EN[segment] ?? segment.toLowerCase())

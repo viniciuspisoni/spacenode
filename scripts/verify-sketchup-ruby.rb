@@ -209,6 +209,32 @@ class FakeCamera
   end
 end
 
+# RenderingOptions de mentira: chave ausente lê nil (como no SketchUp antigo)
+# e grava o que foi escrito, pra provar que a preparação some no restauro.
+class FakeRenderingOptions
+  attr_reader :written
+
+  def initialize(values)
+    @values = values.dup
+    @written = []
+  end
+
+  def [](key)
+    @values[key]
+  end
+
+  def []=(key, value)
+    raise "chave inexistente: #{key}" unless @values.key?(key)
+
+    @written << key
+    @values[key] = value
+  end
+
+  def snapshot
+    @values.dup
+  end
+end
+
 class FakeModel
   attr_reader :ops
 
@@ -548,6 +574,72 @@ class SpaceNodeRubyTest < Minitest::Test
     assert_equal ['/api/sketchup/pair/refresh', '/api/sketchup/session'], @calls.map(&:first), 'sem GET do catálogo (cache) e sessão só depois de renovar'
     assert_equal 500, events('session').last['balance']['totalBalance']
     assert(events('state').any? { |s| s.key?('journal') }, 'o estado leva o diário')
+  end
+
+  # ── Preparação fotorrealista da captura ──────────────────────────────────
+
+  def test_capture_kills_the_graphic_stroke_and_keeps_the_thin_edge
+    opts = SpaceNode::SketchUp::CLEAN_CAPTURE_OPTIONS
+    # O perfil é o traço grosso que a IA copiava como contorno desenhado.
+    assert_equal false, opts['DrawSilhouettes']
+    assert_equal 1, opts['SilhouetteWidth']
+    assert_equal false, opts['DrawProfilesOnly']
+    # Geometria oculta/de trás vira linha fantasma sobre a face.
+    assert_equal false, opts['DrawBackEdges']
+    assert_equal false, opts['DrawHidden']
+    # Nome da cena escrito sobre a vista é elemento auxiliar, não projeto.
+    assert_equal false, opts['ShowViewName']
+    # A ARESTA FICA: é ela que desenha caixilho, junta e paginação. Sem
+    # EdgeDisplayMode/DisplayEdges na lista, o traço fino sobrevive.
+    refute opts.key?('EdgeDisplayMode'), 'desligar a aresta apaga o caixilho'
+    refute opts.key?('DisplayEdges'), 'desligar a aresta apaga o caixilho'
+    # Medidos e reprovados — ver README (§ preparação fotorrealista).
+    refute opts.key?('EdgeColorMode'), 'apaga o caixilho junto com o traço'
+    refute opts.key?('AmbientOcclusion'), 'não tem efeito no write_image'
+    refute opts.key?('TransparencySort'), 'não tem efeito na imagem'
+    # Sombra é intenção de luz do usuário: não se força na captura.
+    refute opts.key?('DisplayShadows')
+  end
+
+  def test_edge_map_does_not_carry_the_thick_profile
+    opts = SpaceNode::SketchUp::EDGE_CAPTURE_OPTIONS
+    assert_equal 1, opts['RenderMode'], 'o mapa segue em linha escondida'
+    assert_equal false, opts['DrawSilhouettes']
+    assert_equal 1, opts['SilhouetteWidth']
+  end
+
+  # A preparação vale durante a captura e some depois — inclusive em erro.
+  def test_rendering_options_round_trip_restores_every_key
+    ro = FakeRenderingOptions.new(
+      'DrawSilhouettes' => true, 'SilhouetteWidth' => 3, 'RenderMode' => 2,
+      'ShowViewName' => true, 'Texture' => false
+    )
+    antes = ro.snapshot
+    saved = PLUGIN.apply_rendering_options(ro, PLUGIN.photo_capture_options(ro))
+    assert_equal false, ro['DrawSilhouettes'], 'a preparação vale durante a captura'
+    assert_equal 1, ro['SilhouetteWidth']
+    assert_equal 3, ro['RenderMode'], 'sombreado sem textura (2) vira texturizado (3)'
+    assert_equal false, ro['ShowViewName']
+    PLUGIN.restore_rendering_options(ro, saved)
+    assert_equal antes, ro.snapshot, 'estado anterior restaurado chave a chave'
+  end
+
+  def test_rendering_options_skip_keys_absent_in_old_sketchup
+    # SketchUp antigo não tem DrawSilhouettes/ShowViewName: a leitura dá nil e
+    # a chave é PULADA (nunca escrita, nunca restaurada).
+    ro = FakeRenderingOptions.new('RenderMode' => 2)
+    saved = PLUGIN.apply_rendering_options(ro, PLUGIN.photo_capture_options(ro))
+    refute saved.key?('DrawSilhouettes')
+    refute ro.written.include?('DrawSilhouettes')
+    assert_equal 3, ro['RenderMode'], 'o que existe continua sendo aplicado'
+  end
+
+  # Estilo já fotográfico (3) ou fora da lista conhecida não é promovido.
+  def test_render_mode_only_promoted_from_known_drawing_modes
+    assert_equal 3, PLUGIN.photo_capture_options(FakeRenderingOptions.new('RenderMode' => 0))['RenderMode']
+    assert_equal 3, PLUGIN.photo_capture_options(FakeRenderingOptions.new('RenderMode' => 5))['RenderMode']
+    refute PLUGIN.photo_capture_options(FakeRenderingOptions.new('RenderMode' => 3)).key?('RenderMode')
+    refute PLUGIN.photo_capture_options(FakeRenderingOptions.new('RenderMode' => 7)).key?('RenderMode')
   end
 
   def test_version_gate_still_numeric

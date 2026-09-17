@@ -8,11 +8,11 @@
 // (VERSION) + em sketchup/spacenode.rb (EXTENSION.version), e regerar o .rbz.
 // Os três precisam bater — o plugin compara a SUA VERSION com esta.
 
-export const PLUGIN_VERSION = '1.4.0'
+export const PLUGIN_VERSION = '1.5.0'
 
 /** Caminho relativo ao site; o plugin resolve contra o api_base_url dele. */
 export const PLUGIN_RBZ_PATH = '/downloads/spacenode-sketchup.rbz'
 
 /** Uma linha, mostrada dentro do painel de quem está atrasado. */
 export const PLUGIN_RELEASE_NOTE =
-  'Revisão de materiais: a seleção do SketchUp vira a área editada, com custo antes de gerar e as revisões gravadas no arquivo.'
+  'A captura deixa de levar o traço do desenho: o render sai com material, reflexo e sombra de foto, sem contorno preto.'
