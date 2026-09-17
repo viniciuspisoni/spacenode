@@ -649,4 +649,26 @@ class SpaceNodeRubyTest < Minitest::Test
     refute PLUGIN.version_newer?('1.4.0', '1.4.0')
     assert PLUGIN.version_newer?('1.10.0', '1.9.0')
   end
+
+  # COLORREF é 0x00BBGGRR. Trocar R por B é o erro silencioso do DWM: a cor
+  # "funciona" e sai errada. #0b0b0d tem R≠B justamente pra pegar isso.
+  def test_chrome_color_swaps_red_and_blue
+    chrome = SpaceNode::SketchUp::Win32Chrome
+    assert_equal 0x0D0B0B, chrome.bgr(0x0B0B0D)
+    assert_equal 0x0A0A0A, chrome.bgr(0x0A0A0A)
+    assert_equal 0x00FF00, chrome.bgr(0x00FF00)
+    assert_equal 0xFF0000, chrome.bgr(0x0000FF)
+  end
+
+  # Fora do Windows tem que devolver false sem levantar — o painel chama isso
+  # a cada applyTheme, inclusive quando o SO troca de tema sozinho.
+  def test_window_chrome_is_a_no_op_off_windows
+    refute PLUGIN.apply_window_chrome('light')
+    assert_equal 'light', PLUGIN.instance_variable_get(:@frame_theme)
+    refute PLUGIN.apply_window_chrome('dark')
+    assert_equal 'dark', PLUGIN.instance_variable_get(:@frame_theme)
+    # Qualquer coisa que não seja 'light' cai em escuro, inclusive nil.
+    refute PLUGIN.apply_window_chrome(nil)
+    assert_equal 'dark', PLUGIN.instance_variable_get(:@frame_theme)
+  end
 end

@@ -1965,6 +1965,10 @@
       document.documentElement.classList.toggle('light', resolved === 'light');
       if (typeof renderThemeToggle === 'function') renderThemeToggle();
       try { localStorage.setItem('com.spacenode.sketchup.theme', resolved); } catch (e) {}
+      // A moldura da janela é do Windows, não da página: quem pinta a barra de
+      // título na cor do painel é o Ruby (Win32Chrome no main.rb). Quiet porque
+      // isto roda antes de a ponte existir na primeira passada.
+      callSketchUpQuiet('frameTheme', JSON.stringify({ theme: resolved }));
       // Segue o SO só enquanto nada mais decidir (setting e conta em "auto").
       var followsOs = !(model.themeSetting === 'light' || model.themeSetting === 'dark') &&
         !(model.accountTheme === 'light' || model.accountTheme === 'dark');
