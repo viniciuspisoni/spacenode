@@ -25,6 +25,123 @@ O que só um plugin dentro do modelo consegue:
 - **Voltar à vista** — cada render guarda a câmera; um clique restaura o
   enquadramento exato no SketchUp.
 
+## O que mudou na 1.4.0 — revisão de materiais com controle
+
+Caso de uso: *"selecionei esta marcenaria e quero testar carvalho claro,
+mantendo a disposição e os demais elementos"*. A resposta do plugin passa a
+ser um fluxo inteiro, e não um pincel sobre um preview de 412 px:
+
+1. **Escolher o render base** — a aba Editar mostra de onde parte
+   ("Base: Cozinha · 17/09 11:00") e "Trocar" abre o Histórico, que ganhou a
+   faixa **Neste arquivo**: renders e revisões gravados no `.skp`, com cena,
+   câmera e quadro. O Histórico da conta continua abaixo, mas ele não sabe de
+   cena nem de câmera — só o diário do arquivo sabe.
+2. **Usar a seleção do SketchUp** — selecione o grupo, o componente ou as
+   faces (dois cliques entram no grupo) e toque no botão: a área afetada
+   aparece em verde sobre o render, com contagem e cobertura
+   ("2 objetos · 17% da imagem — Marcenaria, Bancada"). Pintar por cima soma.
+3. **Dizer o acabamento** — instrução em texto e/ou uma amostra do próprio
+   modelo (textura exportada, como antes).
+4. **Ver o custo antes** — o botão diz "Aplicar edição · 18 nodes" via
+   dry-run do servidor; cobrança simulada no servidor aparece como "sem
+   cobrança" em vez de prometer um débito.
+5. **Comparar** — o comparador de uma revisão corre contra o **render
+   base** dela, não contra a captura.
+6. **Guardar** — cada revisão vai pro diário do arquivo com origem
+   (render base, cena, câmera, quadro), pedido (ação, instrução, amostra,
+   seleção com nomes e ids persistentes), resultado, custo, `job_id` do
+   servidor e status (concluída, recuperada, recusada, não confirmada).
+
+**A alteração acontece na imagem do render. O modelo do SketchUp não muda** —
+o painel diz isso na própria aba. Aplicar materiais ao modelo 3D é outra
+operação, fora desta versão.
+
+### Como a seleção vira máscara (e por que assim)
+
+O id do objeto não produz uma máscara: falta a oclusão. A máscara nasce de
+**dois renders pela câmera do render base e pelo mesmo quadro da captura**
+(proporção efetiva `photo.frameAspect` e nivelamento), com a seleção pintada
+em magenta num passe e em ciano no outro, dentro de uma operação
+`start_operation` **abortada** no fim. Onde os dois renders diferem é onde a
+seleção está visível — objetos na frente, vidro, componentes aninhados são
+resolvidos pelo renderizador do próprio SketchUp. Arestas ficam desligadas
+nos dois passes (uma linha preta idêntica nos dois viraria buraco), sombras
+também (velocidade), `RenderMode` sombreado sem textura.
+
+- **Componentes com várias instâncias** viram únicos (`make_unique`) antes
+  de pintar, senão as cópias entrariam na máscara; o abort devolve a
+  definição compartilhada. Faces selecionadas DENTRO de um componente com N
+  instâncias pintam em todas (a face é da definição): o painel avisa "N
+  cópias deste componente entram na seleção".
+- **Câmera movida depois do render**: a máscara usa a câmera guardada no
+  render (temporária, restaurada no `ensure`) e o painel avisa. Render sem
+  câmera (Histórico da conta) usa a vista atual, com aviso.
+- **Modelo mudado depois do render**: não há como detectar geometria a
+  custo aceitável; um `modelFingerprint` (contagem de entidades e
+  definições, diagonal do modelo) dispara um aviso quando muda. É aviso, não
+  garantia.
+- A máscara sai com lado maior de 1280 px na proporção do render; o servidor
+  a redimensiona à imagem (tolerância de 3% de aspecto) e recompõe fora da
+  seleção pixel a pixel (`recomposeMasked`), devolvendo `out_of_mask_delta`.
+- Exige `Sketchup::ImageRep` (2018+) — dentro do gate 2021+ do plugin.
+- Teto de 250 mil faces pintadas por seleção; acima disso o painel pede pra
+  selecionar só a peça.
+
+### Editar migrou pro V4
+
+O painel falava com `/api/edit-v3/google` (Google-first, dependente de
+variável de ambiente em produção, cobrando por resolução). Agora fala com
+`/api/edit-v4` — o motor do editor do site: custo fixo, preservação fora da
+máscara por recomposição no servidor, gate de deriva e cobrança só no
+sucesso. O contrato mudou: sem `quality`/`output_resolution`; entra
+`client_request_id`.
+
+### Falha e retentativa sem cobrar duas vezes
+
+- **Idempotência**: cada pedido leva um `client_request_id` (UUID) e o
+  repete em qualquer retentativa. O servidor devolve o job já concluído
+  (`replayed: true`, nada debitado) ou 409 se ainda está em andamento.
+  Depende da migration `20260917120000_edit_v3_jobs_client_request_id`
+  (coluna + índice único parcial); sem ela o código segue funcionando, só
+  sem a garantia no servidor.
+- **Reconciliação**: rede caindo depois do POST (status nulo) ou timeout do
+  cliente → o plugin consulta `GET /api/edits` a cada 15 s por até 150 s
+  procurando uma edição concluída DESTA fonte (comparação pelo caminho da
+  URL, sem a query da assinatura) criada depois do início. Achou → vira a
+  revisão com status "recuperada", sem novo POST. Não achou → status "não
+  confirmada" no diário e mensagem pedindo pra conferir antes de repetir.
+- Recusa do controle de qualidade também entra no diário (0 nodes).
+
+### Catálogo com sessão vencida (o "Could not load presets and costs")
+
+Causa confirmada no código e nos logs: ao abrir o painel, catálogo e sessão
+eram buscados com o access token guardado, sem passar pela renovação por
+dispositivo. Token de 1 h vencido → 401 nos dois → aviso genérico, e "Tentar
+de novo" repetia o mesmo token (nos logs: sessão 401, catálogo 401 três
+vezes seguidas, zero chamadas a `pair/refresh`). A renovação só rodava
+dentro de uma ação paga. Agora `on_panel_ready`, `refresh_catalog` e
+`check_session` passam por `ensure_fresh_session`; um 401 mesmo assim renova
+e tenta uma vez; na segunda o aviso vem com `authExpired` e oferece
+**Reconectar** em vez de "tentar de novo".
+
+### O que a próxima etapa (consistência entre cenas) já encontra pronto
+
+Cada revisão guarda `sceneName`, `camera`, `photo`, `selection.pids`,
+`referenceMaterial`, `instruction` e `baseRenderId`. Repetir a mesma revisão
+em outras cenas do ambiente é ler o diário, resolver os `pids` por
+`find_entity_by_persistent_id`, gerar a máscara pela câmera de cada cena e
+mandar a mesma instrução/amostra.
+
+### Verificação
+
+- `node scripts/verify-sketchup-revisao.mjs` — 7 casos offline no
+  dialog.html real (catálogo com sessão vencida, seleção → máscara →
+  payload, erro e limpeza, revisão + diário + comparador, apagar do diário,
+  resultado restaurado do arquivo).
+- `scripts/verify-sketchup-flow.mjs` (PR #218) descreve um painel de
+  etapas que não é o atual (1/7 passa na main) — ficou como estava.
+- `ruby -c`, `tsc`, `eslint` e vitest limpos.
+
 ## O que mudou na 1.3.0 — planta humanizada sem exportar nada
 
 A Planta humanizada existe no site e vende desde sempre. Lá ela começa com um

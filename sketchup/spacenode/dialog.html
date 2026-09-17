@@ -695,6 +695,30 @@
       pointer-events: none; display: none;
     }
     .preview.is-masking .mask-hint { display: block; }
+    /* Seleção vinda do SketchUp: a área fica visível sobre o render mesmo
+       fora do modo de pintura (sem tomar cliques); pintar por cima soma. */
+    .preview.has-selmask .mask-canvas { display: block; pointer-events: none; cursor: default; }
+    .preview.is-masking .mask-canvas { pointer-events: auto; }
+    .sel-line { margin-top: 8px; }
+    .sel-line .nm { white-space: normal; }
+    .edit-base { margin: 0 0 8px; display: flex; align-items: baseline; gap: 6px; }
+    .edit-base .link, .rev .link {
+      background: none; border: 0; padding: 0; font: inherit; font-size: 11px;
+      color: var(--text-2); text-decoration: underline; cursor: pointer;
+    }
+    .revisions, .journal { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+    .rev {
+      display: grid; grid-template-columns: 44px 1fr; gap: 9px; align-items: center;
+      padding: 6px; border-radius: 11px; background: var(--input); cursor: pointer;
+      border: 1px solid transparent;
+    }
+    .rev:hover { border-color: var(--border-focus); }
+    .rev.is-current { border-color: var(--border-focus); }
+    .rev img { width: 44px; height: 44px; object-fit: cover; border-radius: 8px; background: var(--chip); display: block; }
+    .rev .t { font-size: 11.5px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rev .s { font-size: 10.5px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; }
+    .rev .s .link { margin-left: 6px; }
+    .rev.is-rejected img { opacity: 0.4; }
 
     .scenes-count { letter-spacing: 0; text-transform: none; font-weight: 500; color: var(--text-3); font-size: 11px; }
     .batch-note { margin-top: 8px; font-size: 10.5px; color: var(--text-3); }
@@ -1005,16 +1029,30 @@
       <div id="editSection">
         <span class="field-label" id="L_edit">Editar este render</span>
         <div class="pills" id="editActionPills" role="radiogroup" aria-label="Tipo de edição"></div>
+        <div class="hint edit-base" id="editBaseLine"><span id="editBaseText"></span> <button class="link" id="editBaseChoose" type="button">Trocar</button></div>
         <div class="mask-tools">
-          <button class="ghost" id="maskToggle">Selecionar área</button>
+          <button class="ghost" id="selectionMaskButton">Usar seleção do SketchUp</button>
+        </div>
+        <div class="mask-tools" style="margin-top:6px">
+          <button class="ghost" id="maskToggle">Pintar área</button>
           <button class="ghost" id="maskClear" style="display:none">Limpar seleção</button>
         </div>
+        <div class="hint" id="selectionHint">Selecione no SketchUp o grupo, o componente ou as faces e toque no botão: a área afetada aparece sobre o render.</div>
+        <div class="batch-row is-done sel-line" id="selectionLine" style="display:none"><span class="st"></span><span class="nm" id="selectionText"></span></div>
         <textarea id="editInstruction" style="margin-top:10px;min-height:60px" placeholder="Ex.: trocar o piso por carvalho claro / remover o pendente sobre a bancada"></textarea>
         <div id="editMaterialRow" style="display:none;margin-top:8px" class="material-row">
           <span class="mname">Amostra do modelo (opcional)</span>
           <select id="editMaterialSelect"></select>
         </div>
         <div class="batch-note">Só a alteração pedida muda — todo o resto do render é preservado. Edição recusada pelo controle de qualidade não é cobrada.</div>
+        <div class="mask-tools" style="margin-top:8px">
+          <button class="ghost" id="editBrowserButton">Editar no navegador</button>
+        </div>
+        <div id="revisionsBlock" style="margin-top:14px">
+          <span class="field-label" id="L_revisions">Revisões deste arquivo</span>
+          <div class="revisions" id="revisionsList"></div>
+          <div class="history-empty" id="revisionsEmpty">As revisões deste arquivo aparecem aqui, com a cena e a seleção de origem.</div>
+        </div>
       </div>
     </div>
 
@@ -1260,6 +1298,11 @@
     <div class="sheet-grabber"></div>
     <div class="sheet-head"><span class="sheet-title" id="L_history">Histórico</span><button class="sheet-done" type="button" data-close="1">Concluído</button></div>
     <div class="sheet-body" id="historySection">
+      <div id="journalBlock" style="display:none">
+        <span class="field-label" id="L_journal">Neste arquivo</span>
+        <div class="journal" id="journalList"></div>
+        <span class="field-label" id="L_journalAccount" style="margin-top:12px">Na conta</span>
+      </div>
       <div class="history-grid" id="historyGrid"></div>
       <div class="history-empty" id="historyEmpty" style="display:none">Seus renders aparecem aqui.</div>
       <button class="ghost history-more" id="historyMore" style="display:none">Carregar mais</button>
@@ -1349,8 +1392,16 @@
       editAction: 'swap_material',
       editQuoteId: 0,
       editNodes: null,
+      editNodesSimulated: false,
       maskActive: false,
       maskStrokes: [],
+      // Seleção vinda do SketchUp: PNG (branco = editar) + sprite tingido
+      // pro overlay + o que o Ruby contou sobre ela (objetos, cobertura).
+      maskImage: null,
+      maskSprite: null,
+      maskInfo: null,
+      selectionBusy: false,
+      journal: [],
       spaceCategory: 'residencial',
       spaceRunning: false,
       lastSpace: null,
@@ -1427,11 +1478,29 @@
         batchPartial: function (ok, t, bad) { return ok + ' de ' + t + ' cenas geradas — ' + bad + ' falhou' + (bad === 1 ? '' : 'aram') + '. Nenhum node foi consumido nas que falharam.'; },
         batchCancelled: function (n) { return n + ' cena' + (n === 1 ? '' : 's') + ' gerada' + (n === 1 ? '' : 's') + ' antes do cancelamento.'; },
         failed: 'falhou',
-        editHint: 'Só a alteração pedida muda — todo o resto do render é preservado. Edição recusada pelo controle de qualidade não é cobrada.',
+        editHint: 'A alteração acontece na IMAGEM do render — o modelo do SketchUp não muda. Só o que você pedir muda; o resto é preservado. Edição recusada pelo controle de qualidade não é cobrada.',
         editPlaceholder: 'Ex.: trocar o piso por carvalho claro / remover o pendente sobre a bancada',
         editSample: 'Amostra do modelo (opcional)',
-        maskSelect: 'Selecionar área', maskDone: 'Concluir seleção', maskClear: 'Limpar seleção',
+        maskSelect: 'Pintar área', maskDone: 'Concluir seleção', maskClear: 'Limpar seleção',
         maskHint: 'Pinte sobre a área a editar',
+        selectionUse: 'Usar seleção do SketchUp', selectionBusy: 'Calculando…',
+        selectionHint: 'Selecione no SketchUp o grupo, o componente ou as faces (dois cliques entram no grupo) e toque no botão: a área afetada aparece sobre o render.',
+        selectionLine: function (n, pct) { return n + ' objeto' + (n === 1 ? '' : 's') + ' · ' + pct + '% da imagem'; },
+        selectionCameraMoved: 'A vista mudou desde o render — a área foi calculada pela câmera do render.',
+        selectionShared: function (n) { return n + ' cópia' + (n === 1 ? '' : 's') + ' deste componente entra' + (n === 1 ? '' : 'm') + ' na seleção.'; },
+        selectionModelChanged: 'O modelo mudou desde este render — confira se a área ainda bate com a imagem.',
+        selectionNoCamera: 'Este render não guardou a câmera — a área usa a vista atual do SketchUp.',
+        selectionNoResult: 'Gere ou escolha um render antes de usar a seleção.',
+        editBase: function (scene, when) { return 'Base: ' + (scene || 'render') + (when ? ' · ' + when : ''); },
+        editBaseChoose: 'Trocar', editBaseRevision: 'revisão',
+        editBrowser: 'Editar no navegador',
+        editCostFree: 'sem cobrança', editReplayed: 'Este pedido já tinha sido concluído — resultado reaproveitado, sem nova cobrança.',
+        revisionsTitle: 'Revisões deste arquivo', revisionsEmpty: 'As revisões deste arquivo aparecem aqui, com a cena e a seleção de origem.',
+        revisionSaved: 'Revisão salva neste arquivo.',
+        revisionStatus: { completed: 'concluída', reconciled: 'recuperada', rejected: 'recusada · 0 nodes', uncertain: 'não confirmada', failed: 'falhou' },
+        revisionOpen: 'Abrir', revisionDelete: 'Apagar do arquivo',
+        journalTitle: 'Neste arquivo', journalOnAccount: 'Na conta',
+        reconcilingOverlay: 'Confirmando a edição no servidor…',
         applyEdit: 'Aplicar edição', editing: 'editando…', editingOverlay: 'Editando na SPACENODE…',
         editRejectedFallback: 'Nada foi alterado — refazer é grátis.',
         spaceHint: 'A vista atual vira a identidade do projeto (DNA); as cenas selecionadas acima viram vistas coerentes entre si.',
@@ -1610,10 +1679,28 @@
         batchPartial: function (ok, t, bad) { return ok + ' of ' + t + ' scenes generated — ' + bad + ' failed. No nodes were charged for failures.'; },
         batchCancelled: function (n) { return n + ' scene' + (n === 1 ? '' : 's') + ' generated before cancelling.'; },
         failed: 'failed',
-        editHint: 'Only what you ask for changes — everything else in the render is preserved. Edits declined by quality control are not charged.',
+        editHint: 'The change happens in the render IMAGE — the SketchUp model does not change. Only what you ask for changes; the rest is preserved. Edits declined by quality control are not charged.',
+        selectionUse: 'Use SketchUp selection', selectionBusy: 'Computing…',
+        selectionHint: 'Select the group, component or faces in SketchUp (double-click to enter a group) and tap the button: the affected area shows over the render.',
+        selectionLine: function (n, pct) { return n + ' object' + (n === 1 ? '' : 's') + ' · ' + pct + '% of the image'; },
+        selectionCameraMoved: 'The view changed since the render — the area was computed from the render camera.',
+        selectionShared: function (n) { return n + ' cop' + (n === 1 ? 'y' : 'ies') + ' of this component join' + (n === 1 ? 's' : '') + ' the selection.'; },
+        selectionModelChanged: 'The model changed since this render — check that the area still matches the image.',
+        selectionNoCamera: 'This render did not store its camera — the area uses the current SketchUp view.',
+        selectionNoResult: 'Generate or pick a render before using the selection.',
+        editBase: function (scene, when) { return 'Base: ' + (scene || 'render') + (when ? ' · ' + when : ''); },
+        editBaseChoose: 'Change', editBaseRevision: 'revision',
+        editBrowser: 'Edit in the browser',
+        editCostFree: 'no charge', editReplayed: 'This request had already completed — result reused, nothing charged again.',
+        revisionsTitle: 'Revisions in this file', revisionsEmpty: 'Revisions of this file show up here, with their source scene and selection.',
+        revisionSaved: 'Revision saved in this file.',
+        revisionStatus: { completed: 'done', reconciled: 'recovered', rejected: 'declined · 0 nodes', uncertain: 'unconfirmed', failed: 'failed' },
+        revisionOpen: 'Open', revisionDelete: 'Remove from file',
+        journalTitle: 'In this file', journalOnAccount: 'On the account',
+        reconcilingOverlay: 'Confirming the edit on the server…',
         editPlaceholder: 'E.g. swap the floor to light oak / remove the pendant over the counter',
         editSample: 'Model sample (optional)',
-        maskSelect: 'Select area', maskDone: 'Done selecting', maskClear: 'Clear selection',
+        maskSelect: 'Paint area', maskDone: 'Done selecting', maskClear: 'Clear selection',
         maskHint: 'Paint over the area to edit',
         applyEdit: 'Apply edit', editing: 'editing…', editingOverlay: 'Editing on SPACENODE…',
         editRejectedFallback: 'Nothing was changed — retrying is free.',
@@ -1800,6 +1887,14 @@
       if (editSample) editSample.textContent = tt('editSample');
       els.maskToggle.textContent = model.maskActive ? tt('maskDone') : tt('maskSelect');
       els.maskClear.textContent = tt('maskClear');
+      els.selectionMaskButton.textContent = model.selectionBusy ? tt('selectionBusy') : tt('selectionUse');
+      els.selectionHint.textContent = tt('selectionHint');
+      els.editBaseChoose.textContent = tt('editBaseChoose');
+      els.editBrowserButton.textContent = tt('editBrowser');
+      els.L_revisions.textContent = tt('revisionsTitle');
+      els.revisionsEmpty.textContent = tt('revisionsEmpty');
+      els.L_journal.textContent = tt('journalTitle');
+      els.L_journalAccount.textContent = tt('journalOnAccount');
       els.maskHint.textContent = tt('maskHint');
       var spaceHint = document.querySelector('#spaceSection .hint');
       if (spaceHint) spaceHint.textContent = tt('spaceHint');
@@ -1928,6 +2023,8 @@
      'sunPills','modelMaterialsBlock','materialsList',
      'upscale2xButton','upscale4xButton','editSection','editActionPills','editInstruction','editMaterialRow',
      'editMaterialSelect','editButton','editLabel','editMeta','maskCanvas','maskHint','maskToggle','maskClear',
+     'selectionMaskButton','selectionHint','selectionLine','selectionText','editBaseLine','editBaseText','editBaseChoose',
+     'editBrowserButton','revisionsBlock','revisionsList','revisionsEmpty','journalBlock','journalList','L_revisions','L_journal','L_journalAccount',
      'spaceSection','spaceName','spaceCategoryPills',
      'spaceButton','spaceLabel','spaceMeta','spaceNote','spaceProgress','spaceResults','openSpaceButton',
      'photoSection','photoHud','aspectPills','aspectHint','lensPills','eyePills','eyeHint','levelPills','levelHint','guidePills','guideHint','photoNote','guidesSvg',
@@ -2408,11 +2505,24 @@
         });
         els.editMaterialSelect.value = current || '';
       }
+      renderEditBase();
+      renderRevisions();
       updateEditButton();
     }
+    // De onde esta edição parte: cena e data do render base (do diário) —
+    // ou "revisão" quando o que está na tela já é uma revisão anterior.
+    function renderEditBase() {
+      var r = model.result;
+      if (!r) { els.editBaseLine.style.display = 'none'; return; }
+      els.editBaseLine.style.display = '';
+      var scene = r.kind === 'revision' ? tt('editBaseRevision') + (r.sceneName ? ' · ' + r.sceneName : '') : (r.sceneName || null);
+      els.editBaseText.textContent = tt('editBase', scene, formatWhen(r.createdAt));
+      els.editBaseChoose.style.display = model.journal.length ? '' : 'none';
+    }
+    function hasSelectionMask() { return !!model.maskImage; }
     function updateEditButton() {
       var hasInstruction = els.editInstruction.value.trim().length > 0;
-      var hasMask = model.maskStrokes.length > 0;
+      var hasMask = model.maskStrokes.length > 0 || hasSelectionMask();
       var maskAction = model.editAction === 'remove' || model.editAction === 'refine_area';
       // Remover/refinar COM área marcada dispensam texto (a área diz onde).
       // Inserir é o inverso: precisa dos dois, senão o servidor recusa.
@@ -2422,16 +2532,22 @@
       els.editLabel.textContent = model.generating ? tt('editing') : tt('applyEdit');
       var editHintEl = document.querySelector('#editSection .batch-note');
       if (editHintEl) editHintEl.textContent = inserting && !ready ? tt('editInsertHint') : tt('editHint');
-      els.editMeta.textContent = model.editNodes != null && !model.generating ? model.editNodes + ' ' + tt('nodes') : '';
+      // O custo aparece ANTES de gerar, no próprio botão; cobrança simulada
+      // no servidor é dita como tal em vez de prometer um débito.
+      els.editMeta.textContent = model.editNodes != null && !model.generating
+        ? (model.editNodesSimulated ? tt('editCostFree') : model.editNodes + ' ' + tt('nodes')) : '';
+      els.selectionMaskButton.disabled = model.generating || model.selectionBusy || !model.result || !!(model.result && model.result._unverified);
+      els.selectionMaskButton.textContent = model.selectionBusy ? tt('selectionBusy') : tt('selectionUse');
+      els.editBrowserButton.disabled = model.generating || !(model.result && model.result.outputUrl) || !!(model.result && model.result._unverified);
     }
     var editQuoteTimer = null;
     function scheduleEditQuote() {
       clearTimeout(editQuoteTimer);
       model.editNodes = null;
       updateEditButton();
-      // O custo (dry-run) depende das dimensões da fonte x qualidade — não do
-      // texto nem da máscara; roda se houver instrução OU área marcada.
-      if (!model.result || (!els.editInstruction.value.trim() && !model.maskStrokes.length)) return;
+      // O custo (dry-run) é fixo por edição no V4 — não depende do texto nem
+      // da máscara; roda se houver instrução OU área marcada.
+      if (!model.result || (!els.editInstruction.value.trim() && !model.maskStrokes.length && !hasSelectionMask())) return;
       editQuoteTimer = setTimeout(function () {
         model.editQuoteId += 1;
         callSketchUpQuiet('editQuote', JSON.stringify({
@@ -2451,14 +2567,222 @@
       showNotice('', 'success');
       startGeneratingUi();
       els.overlayText.textContent = tt('editingOverlay');
+      var info = model.maskInfo;
+      var r = model.result;
+      // A revisão nasce sabendo de onde veio: render base, cena, câmera,
+      // quadro e a seleção que virou máscara. O mesmo clientRequestId em
+      // qualquer retentativa é o que impede cobrar duas vezes o mesmo pedido.
       callSketchUp('applyEdit', JSON.stringify({
         action: model.editAction,
         instruction: els.editInstruction.value,
         referenceMaterial: model.editAction === 'swap_material' ? els.editMaterialSelect.value : '',
         maskDataUrl: maskDataUrl,
-        sourceUrl: model.result.outputUrl
+        maskSource: maskDataUrl ? (hasSelectionMask() ? (model.maskStrokes.length ? 'selection+brush' : 'selection') : 'brush') : 'none',
+        sourceUrl: r.outputUrl,
+        baseId: r.id || r.renderId || null,
+        baseRenderId: r.renderId || null,
+        sceneName: r.sceneName || null,
+        camera: r.camera || null,
+        photo: r.photo || null,
+        selection: info ? { count: info.count, names: info.names || [], pids: info.pids || [], coverage: info.coverage } : null,
+        clientRequestId: uuid()
       }));
     });
+    function uuid() {
+      var s = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx';
+      return s.replace(/[xy]/g, function (c) {
+        var r = Math.random() * 16 | 0;
+        return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+      });
+    }
+    function formatWhen(iso) {
+      if (!iso) return '';
+      var d = new Date(iso);
+      if (isNaN(d.getTime())) return '';
+      var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+      return pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+    }
+
+    // ── Seleção do SketchUp → máscara ────────────────────────────────────────
+    // O Ruby renderiza a seleção pela câmera do render base e devolve um PNG
+    // (branco = área visível da seleção). Ele entra no mesmo caminho da
+    // máscara pintada: aparece tingido sobre o render e vai pro servidor
+    // composto com o que o usuário pintar por cima.
+    function requestSelectionMask() {
+      if (model.generating || model.selectionBusy) return;
+      if (!model.result) { showNotice(tt('selectionNoResult'), 'warn'); return; }
+      if (!ensureLiveResult()) return;
+      model.selectionBusy = true;
+      updateEditButton();
+      showNotice('', 'success');
+      callSketchUp('selectionMask', JSON.stringify({
+        baseId: model.result.id || model.result.renderId || null,
+        camera: model.result.camera || null,
+        photo: model.result.photo || null,
+        modelFingerprint: model.result.modelFingerprint || null
+      }));
+    }
+    function applySelectionMask(payload) {
+      model.selectionBusy = false;
+      if (!payload || !payload.ok || !payload.maskDataUrl) {
+        clearSelectionMask();
+        updateEditButton();
+        showNotice((payload && payload.message) || tt('editRejectedFallback'), 'error');
+        return;
+      }
+      var img = new Image();
+      img.onload = function () {
+        model.maskImage = img;
+        model.maskSprite = tintedSprite(img);
+        model.maskInfo = payload;
+        els.preview.classList.add('has-selmask');
+        sizeMaskCanvas();
+        redrawMaskOverlay();
+        els.selectionLine.style.display = '';
+        els.selectionText.textContent = tt('selectionLine', payload.count || 0, Math.round((payload.coverage || 0) * 100)) +
+          (payload.names && payload.names.length ? ' — ' + payload.names.slice(0, 3).join(', ') : '');
+        els.maskClear.style.display = '';
+        var notes = [];
+        if (payload.cameraMoved) notes.push(tt('selectionCameraMoved'));
+        if (payload.sharedInstances > 0) notes.push(tt('selectionShared', payload.sharedInstances));
+        if (payload.modelChanged) notes.push(tt('selectionModelChanged'));
+        if (!(model.result && model.result.camera)) notes.push(tt('selectionNoCamera'));
+        if (notes.length) showNotice(notes.join(' '), 'warn');
+        updateEditButton();
+        scheduleEditQuote();
+      };
+      img.onerror = function () {
+        clearSelectionMask();
+        updateEditButton();
+        showNotice(tt('editRejectedFallback'), 'error');
+      };
+      img.src = payload.maskDataUrl;
+    }
+    // Branco vira verde translúcido, preto vira transparente — o mesmo verde
+    // do pincel, pra área da seleção e área pintada lerem como uma coisa só.
+    function tintedSprite(img) {
+      var c = document.createElement('canvas');
+      c.width = img.naturalWidth; c.height = img.naturalHeight;
+      var ctx = c.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      var data = ctx.getImageData(0, 0, c.width, c.height);
+      var px = data.data;
+      for (var i = 0; i < px.length; i += 4) {
+        var on = px[i] > 127;
+        px[i] = 48; px[i + 1] = 209; px[i + 2] = 88; px[i + 3] = on ? 115 : 0;
+      }
+      ctx.putImageData(data, 0, 0);
+      return c;
+    }
+    function clearSelectionMask() {
+      model.maskImage = null;
+      model.maskSprite = null;
+      model.maskInfo = null;
+      els.preview.classList.remove('has-selmask');
+      els.selectionLine.style.display = 'none';
+      els.selectionText.textContent = '';
+    }
+    // Retângulo que a imagem ocupa no preview (object-fit: contain).
+    function previewFit() {
+      var img = els.resultImage;
+      var nw = img.naturalWidth, nh = img.naturalHeight;
+      var pw = els.maskCanvas.width, ph = els.maskCanvas.height;
+      if (!nw || !nh || !pw || !ph) return null;
+      var scale = Math.min(pw / nw, ph / nh);
+      return { scale: scale, offX: (pw - nw * scale) / 2, offY: (ph - nh * scale) / 2, w: nw * scale, h: nh * scale, nw: nw, nh: nh };
+    }
+
+    // ── Diário do arquivo (renders e revisões gravados no .skp) ─────────────
+    function journalRenders() { return model.journal.filter(function (e) { return e.kind !== 'revision'; }); }
+    function journalRevisions() { return model.journal.filter(function (e) { return e.kind === 'revision'; }); }
+    function entryToResult(e) {
+      var r = {};
+      Object.keys(e).forEach(function (k) { r[k] = e[k]; });
+      r.outputUrl = e.outputUrl || null;
+      r.previewUrl = e.previewUrl || e.outputUrl || null;
+      r.edited = e.kind === 'revision' ? (e.action || 'edit') : undefined;
+      r.originalUrl = e.kind === 'revision' ? (e.baseUrl || e.originalUrl || null) : undefined;
+      return r;
+    }
+    function openJournalEntry(e) {
+      if (model.generating) return;
+      var r = entryToResult(e);
+      if (!isSafeResult(r)) return;
+      showNotice('', 'success');
+      showResult(r);
+      // Render com URL assinada e antiga: vira acionável quando o servidor
+      // re-assina pelo renderId (mesmo caminho do resultado restaurado).
+      if (r.kind !== 'revision' && r.renderId && resultIsStale(r)) {
+        model.result._unverified = true;
+        setResultActionsEnabled(false);
+        requestResultRefresh();
+      }
+      closeSheet();
+      openTab('edit');
+    }
+    function revisionRow(e, current) {
+      var row = document.createElement('div');
+      row.className = 'rev' + (current ? ' is-current' : '') + (e.status === 'rejected' || e.status === 'uncertain' ? ' is-rejected' : '');
+      var img = document.createElement('img');
+      img.alt = '';
+      img.loading = 'lazy';
+      if (e.previewUrl || e.outputUrl) img.src = e.previewUrl || e.outputUrl;
+      img.addEventListener('error', function () { img.removeAttribute('src'); });
+      var text = document.createElement('div');
+      var t = document.createElement('div'); t.className = 't';
+      var s = document.createElement('div'); s.className = 's';
+      if (e.kind === 'revision') {
+        var action = (tt('editActions')[e.action] || e.action || '');
+        t.textContent = (e.instruction ? e.instruction : action) || tt('editBaseRevision');
+        var bits = [];
+        if (e.sceneName) bits.push(e.sceneName);
+        if (e.selection && e.selection.count) bits.push(tt('selectionLine', e.selection.count, Math.round((e.maskCoverage || 0) * 100)));
+        bits.push(formatWhen(e.createdAt));
+        var st = (tt('revisionStatus') || {})[e.status] || '';
+        if (st) bits.push(st);
+        if (e.nodesCharged) bits.push(e.nodesCharged + ' ' + tt('nodes'));
+        s.textContent = bits.filter(Boolean).join(' · ');
+      } else {
+        t.textContent = e.sceneName || (e.engine ? String(e.engine).toUpperCase() : 'Render');
+        var b2 = [formatWhen(e.createdAt)];
+        if (e.resolution) b2.push(String(e.resolution).toUpperCase());
+        if (e.nodesCharged) b2.push(e.nodesCharged + ' ' + tt('nodes'));
+        s.textContent = b2.filter(Boolean).join(' · ');
+      }
+      var del = document.createElement('button');
+      del.type = 'button'; del.className = 'link'; del.textContent = tt('revisionDelete');
+      del.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        callSketchUpQuiet('journalDelete', JSON.stringify({ id: e.id }));
+      });
+      s.appendChild(del);
+      text.appendChild(t); text.appendChild(s);
+      row.appendChild(img); row.appendChild(text);
+      if (e.outputUrl) row.addEventListener('click', function () { openJournalEntry(e); });
+      return row;
+    }
+    function renderRevisions() {
+      var list = journalRevisions();
+      var currentId = model.result && model.result.id;
+      els.revisionsList.innerHTML = '';
+      list.forEach(function (e) { els.revisionsList.appendChild(revisionRow(e, e.id === currentId)); });
+      els.revisionsEmpty.style.display = list.length ? 'none' : '';
+    }
+    function renderJournal() {
+      var list = model.journal;
+      els.journalBlock.style.display = list.length ? '' : 'none';
+      els.journalList.innerHTML = '';
+      var currentId = model.result && model.result.id;
+      list.forEach(function (e) { els.journalList.appendChild(revisionRow(e, e.id === currentId)); });
+      renderRevisions();
+      renderEditBase();
+    }
+    // Comparar: revisão contra o render BASE dela; render contra a captura.
+    function compareBaseUrl() {
+      var r = model.result;
+      if (r && r.edited && r.originalUrl) return r.originalUrl;
+      return model.captureUrl || null;
+    }
 
     // ── Máscara por área (pincel sobre o preview) ──────────────────────────
     var maskCtx = els.maskCanvas.getContext('2d');
@@ -2487,6 +2811,12 @@
     function redrawMaskOverlay() {
       if (!maskCtx) return;
       maskCtx.clearRect(0, 0, els.maskCanvas.width, els.maskCanvas.height);
+      // Seleção do SketchUp primeiro (sprite já tingido), no retângulo que a
+      // imagem ocupa; os traços do pincel somam por cima.
+      if (model.maskSprite) {
+        var fit = previewFit();
+        if (fit) maskCtx.drawImage(model.maskSprite, fit.offX, fit.offY, fit.w, fit.h);
+      }
       maskCtx.fillStyle = 'rgba(48,209,88,0.45)';
       maskCtx.strokeStyle = 'rgba(48,209,88,0.45)';
       model.maskStrokes.forEach(function (st) { drawStroke(maskCtx, st.points, st.radius); });
@@ -2509,6 +2839,7 @@
     }
     function clearMask() {
       model.maskStrokes = [];
+      clearSelectionMask();
       redrawMaskOverlay();
       els.maskClear.style.display = model.maskActive ? '' : 'none';
       updateEditButton();
@@ -2547,24 +2878,29 @@
     // com a proporção da imagem original. Traços mapeados do preview (que usa
     // object-fit: contain) pro espaço de pixels da fonte.
     function buildMaskDataUrl() {
-      if (!model.maskStrokes.length || !model.result) return '';
+      if ((!model.maskStrokes.length && !hasSelectionMask()) || !model.result) return '';
       var img = els.resultImage;
       var nw = img.naturalWidth, nh = img.naturalHeight;
       if (!nw || !nh) return '';
-      var pw = els.maskCanvas.width, ph = els.maskCanvas.height;
-      if (!pw || !ph) return '';
-      var scale = Math.min(pw / nw, ph / nh);
-      var offX = (pw - nw * scale) / 2, offY = (ph - nh * scale) / 2;
-      var inv = 1 / scale;
       var c = document.createElement('canvas');
       c.width = nw; c.height = nh;
       var ctx = c.getContext('2d');
       ctx.fillStyle = '#000'; ctx.fillRect(0, 0, nw, nh);
-      ctx.fillStyle = '#fff'; ctx.strokeStyle = '#fff';
-      model.maskStrokes.forEach(function (st) {
-        var mapped = st.points.map(function (p) { return { x: (p.x - offX) * inv, y: (p.y - offY) * inv }; });
-        drawStroke(ctx, mapped, st.radius * inv);
-      });
+      // A seleção do SketchUp tem a proporção do render (mesmo quadro da
+      // captura): esticar pra fonte é alinhamento 1:1, sem deslocamento.
+      if (model.maskImage) ctx.drawImage(model.maskImage, 0, 0, nw, nh);
+      if (model.maskStrokes.length) {
+        var pw = els.maskCanvas.width, ph = els.maskCanvas.height;
+        if (!pw || !ph) return model.maskImage ? c.toDataURL('image/png') : '';
+        var scale = Math.min(pw / nw, ph / nh);
+        var offX = (pw - nw * scale) / 2, offY = (ph - nh * scale) / 2;
+        var inv = 1 / scale;
+        ctx.fillStyle = '#fff'; ctx.strokeStyle = '#fff';
+        model.maskStrokes.forEach(function (st) {
+          var mapped = st.points.map(function (p) { return { x: (p.x - offX) * inv, y: (p.y - offY) * inv }; });
+          drawStroke(ctx, mapped, st.radius * inv);
+        });
+      }
       return c.toDataURL('image/png');
     }
 
@@ -3022,11 +3358,12 @@
       els.captureImage.classList.remove('is-visible');
       els.emptyPreview.style.display = 'none';
       els.resultActions.classList.add('is-visible');
-      els.compareButton.style.display = model.captureUrl ? '' : 'none';
+      els.compareButton.style.display = compareBaseUrl() ? '' : 'none';
       els.restoreCameraButton.style.display = result.camera ? '' : 'none';
       els.preview.classList.remove('is-comparing');
       // Novo resultado = nova imagem: a seleção anterior não se aplica mais.
       model.maskStrokes = [];
+      clearSelectionMask();
       exitMaskMode();
       els.maskClear.style.display = 'none';
       renderEditControls();
@@ -3039,7 +3376,10 @@
       scrollToStage();
     }
     function toggleCompare() {
-      if (!model.result || !model.captureUrl) return;
+      var base = compareBaseUrl();
+      if (!model.result || !base) return;
+      // Revisão compara com o render BASE dela (não com a captura).
+      if (els.captureCompareImage.getAttribute('src') !== base) els.captureCompareImage.src = base;
       var comparing = els.preview.classList.toggle('is-comparing');
       if (comparing) {
         els.resultImage.classList.add('is-visible');
@@ -3449,6 +3789,22 @@
       renderResultMore();
     });
     els.compareButton.addEventListener('click', toggleCompare);
+    els.selectionMaskButton.addEventListener('click', requestSelectionMask);
+    els.editBaseChoose.addEventListener('click', function () { openSheet('sheetHistory'); });
+    // O painel é bom no que é INSTRUÇÃO e na seleção que vem da geometria;
+    // pra recorte fino à mão (varinha, laço, zoom) o editor do site abre com
+    // este render já carregado — a URL passa pela allowlist do servidor.
+    els.editBrowserButton.addEventListener('click', function () {
+      if (!model.result || !model.result.outputUrl) return;
+      if (!ensureLiveResult()) return;
+      callSketchUp('openUrl', model.apiBaseUrl + '/app/editar?source=' + encodeURIComponent(model.result.outputUrl));
+    });
+    // A área da seleção acompanha o preview quando o painel muda de tamanho.
+    if (typeof ResizeObserver === 'function') {
+      new ResizeObserver(function () {
+        if (model.maskSprite && !model.maskActive) { sizeMaskCanvas(); redrawMaskOverlay(); }
+      }).observe(els.preview);
+    }
     els.cancelButton.addEventListener('click', function () {
       var elapsed = model.generateStartedAt ? (Date.now() - model.generateStartedAt) / 1000 : 0;
       callSketchUp('cancelGenerate');
@@ -3544,7 +3900,11 @@
     }
     // As dimensões do render (Reels só em retrato; proporção 0,4–2,5) só
     // existem depois do load.
-    els.resultImage.addEventListener('load', function () { renderAnimarControls(); });
+    els.resultImage.addEventListener('load', function () {
+      renderAnimarControls();
+      // Dimensões naturais conhecidas: a área da seleção pode ser posicionada.
+      if (model.maskSprite) { sizeMaskCanvas(); redrawMaskOverlay(); }
+    });
     els.resultImage.addEventListener('error', function () {
       if (!model.result || !els.resultImage.getAttribute('src')) return;
       if (!requestResultRefresh()) showNotice(tt('resultExpired'), 'warn');
@@ -3677,6 +4037,10 @@
             resetHistory();
           }
           if ('guidesOverlay' in payload) model.guidesOverlay = !!payload.guidesOverlay;
+          if (Array.isArray(payload.journal)) {
+            model.journal = payload.journal;
+            renderJournal();
+          }
           if (payload.panelState && !model.catalog) {
             restorePanelState(payload.panelState);
             // Os ajustes de foto vivem no painel; o Ruby precisa deles pra
@@ -3796,7 +4160,14 @@
           var notes = conditioningNotes(payload);
           var msg = cost + (payload.fidelityWarning ? tt('reviewFidelity') : '');
           if (notes.length) msg += ' ' + notes.join(' ');
-          showNotice(msg, payload.fidelityWarning ? 'error' : (notes.length ? 'warn' : 'success'));
+          if (payload.kind === 'revision') {
+            // Revisão: diz que foi gravada no arquivo e, quando o servidor
+            // reaproveitou um pedido já concluído, que nada foi cobrado de novo.
+            msg = cost + ' ' + tt('revisionSaved');
+            if (payload.replayed) msg += ' ' + tt('editReplayed');
+            if (payload.warning) msg += ' ' + payload.warning;
+          }
+          showNotice(msg, payload.fidelityWarning ? 'error' : (notes.length || payload.warning ? 'warn' : 'success'));
           setFooter(typeof payload.totalBalance === 'number' ? tt('nodesLeft', payload.totalBalance) : tt('renderDone'));
         }
 
@@ -3901,6 +4272,7 @@
         if (event === 'editQuote') {
           if (payload.quoteId === model.editQuoteId) {
             model.editNodes = typeof payload.nodes === 'number' ? payload.nodes : null;
+            model.editNodesSimulated = !!payload.simulated;
             updateEditButton();
           }
         }
@@ -4090,12 +4462,31 @@
         }
 
         if (event === 'catalogError') {
-          if (!model.catalog) {
+          if (payload.authExpired) {
+            // Sessão morta de verdade (renovação já tentada no Ruby): o caminho
+            // é reconectar, não "tentar de novo" com o mesmo token.
+            model.authenticated = false;
+            els.connSub.textContent = tt('connSubEmpty');
+            showNotice(tt('sessionGone'), 'error', {
+              label: tt('reconnect'),
+              onClick: function () { callSketchUp('connect'); }
+            });
+            updateGenerateState();
+          } else if (!model.catalog) {
             showNotice(tt('catalogError'), 'error', {
               label: tt('tryAgain'),
               onClick: function () { callSketchUp('refreshCatalog'); }
             });
           }
+        }
+
+        if (event === 'selectionMask') {
+          applySelectionMask(payload);
+        }
+
+        if (event === 'journal') {
+          model.journal = Array.isArray(payload.entries) ? payload.entries : [];
+          renderJournal();
         }
       }
     };

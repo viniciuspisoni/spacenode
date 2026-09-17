@@ -23,7 +23,8 @@ import { getRequestUser } from '@/lib/auth/request-user'
 import { uploadEditAsset } from '@/lib/spaces/edit-route-helpers'
 import { MaskImageMismatchError } from '@/lib/spaces/edit-crop'
 import { normalizeInstruction } from '@/lib/edit-v2/normalizer'
-import { insertJobResilient, updateJobResilient } from '@/lib/edit-v3/persist'
+import { JobConflictError, findJobByClientRequestId, insertJobResilient, updateJobResilient } from '@/lib/edit-v3/persist'
+import { decideReplay, parseClientRequestId } from '@/lib/edit-v4/idempotency'
 import { EditV3InputError } from '@/lib/edit-v3/ssrf'
 import {
   editV4ChargeEnabled,
@@ -69,6 +70,11 @@ interface Body {
   debug?: unknown
   /** true → valida e devolve o custo, sem nenhuma chamada paga. */
   dry_run?: unknown
+  /** Idempotência (plugin SketchUp): o mesmo pedido repete o mesmo id em toda
+   *  retentativa. Já concluído → devolve o resultado pago, sem gerar de novo;
+   *  em andamento → 409 e o cliente espera. Depende da coluna
+   *  edit_v3_jobs.client_request_id (migration 20260917); sem ela, ignorado. */
+  client_request_id?: unknown
 }
 
 /** Aceita no máximo UMA referência, e só se o papel bater com a ação. */
@@ -133,6 +139,7 @@ export async function POST(req: NextRequest) {
   const references = parseReferences(action, body.references)
   const debug = body.debug === true && editV4DebugAllowed()
   const dryRun = body.dry_run === true
+  const clientRequestId = parseClientRequestId(body.client_request_id)
 
   if (REQUIRES_MASK[action] && !maskUrl && !dryRun) {
     return NextResponse.json(
@@ -174,6 +181,32 @@ export async function POST(req: NextRequest) {
     const db = createAdminClient()
     admin = db
 
+    // ── Idempotência: o mesmo pedido nunca gera (nem cobra) duas vezes ──────
+    // O plugin SketchUp repete o client_request_id quando a rede caiu depois
+    // do POST. Job já concluído devolve o resultado pago; job em andamento
+    // devolve 409 e o cliente espera. Sem a coluna no banco a busca cai em
+    // null e o fluxo segue como sempre.
+    if (clientRequestId) {
+      const decision = decideReplay(await findJobByClientRequestId(db, userId, clientRequestId))
+      if (decision.kind === 'replay') {
+        console.log(`[edit-v4] replay user=${userId} job=${decision.job.id} (client_request_id repetido)`)
+        return NextResponse.json({
+          rejected: false,
+          replayed: true,
+          result_url: decision.job.result_image_url,
+          nodes_cost: decision.job.nodes_cost ?? nodes,
+          job_id: decision.job.id,
+          charge: { simulated: !chargeOn, debited: false },
+        })
+      }
+      if (decision.kind === 'in_progress') {
+        return NextResponse.json(
+          { error: 'Este pedido ainda está em andamento.', in_progress: true, job_id: decision.job.id },
+          { status: 409 },
+        )
+      }
+    }
+
     // ── Normalizador PT→EN ───────────────────────────────────────────────────
     // Instrução em português crua interpolada num prompt em inglês degrada a
     // obediência do modelo. Best-effort: falha do LLM cai na instrução original,
@@ -207,6 +240,7 @@ export async function POST(req: NextRequest) {
       preservation_mode: effectivePreservation,
       intensity_mode: intensity,
       reference_count: references.length,
+      ...(clientRequestId ? { client_request_id: clientRequestId } : {}),
     })
 
     const request: EditV4Request = {
@@ -251,6 +285,7 @@ export async function POST(req: NextRequest) {
         reasons: [rejectionMessage(run.rejectReasons, !!maskUrl)],
         message: 'Nenhum node foi consumido. Refazer é grátis.',
         nodes_cost: nodes,
+        job_id: jobId,
         charge: { simulated: !chargeOn, debited: false },
         ...(debug
           ? { debug: { route: primaryRoute, reject_reasons: run.rejectReasons, metrics: run.metrics, cost: run.cost } }
@@ -327,6 +362,10 @@ export async function POST(req: NextRequest) {
       rejected: false,
       result_url: run.resultUrl,
       nodes_cost: nodes,
+      // O id do job é o elo entre a revisão gravada no .skp do plugin e a
+      // linha do Histórico (aba Edições) — sem ele o plugin não tinha como
+      // reencontrar a própria edição no servidor.
+      job_id: jobId,
       charge: { simulated: !chargeOn, debited: charged },
       output: run.outputDims,
       ...(semanticWarning
@@ -360,6 +399,14 @@ export async function POST(req: NextRequest) {
         : {}),
     })
   } catch (err) {
+    // Dois POSTs do MESMO pedido em voo: o índice único barra o segundo
+    // insert; ele espera o primeiro em vez de gerar em paralelo.
+    if (err instanceof JobConflictError) {
+      return NextResponse.json(
+        { error: 'Este pedido ainda está em andamento.', in_progress: true },
+        { status: 409 },
+      )
+    }
     const message =
       err instanceof EditV3InputError
         ? err.message
