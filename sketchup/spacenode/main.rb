@@ -27,7 +27,7 @@ module SpaceNode
   module SketchUp
     extend self
 
-    VERSION = '1.3.0'
+    VERSION = '1.4.0'
     PREFERENCES_KEY = 'com.spacenode.sketchup'
     DEFAULT_API_BASE_URL = 'https://spacenode.app'
     MIN_SKETCHUP_MAJOR = 21          # Ruby 2.7+; recomendado 2024+
@@ -84,6 +84,14 @@ module SpaceNode
         :tb_mirror_hint => 'Marcar a face selecionada como espelho (o reflexo entra na captura)',
         :reconciling => 'Conexão instável — verificando se o render foi concluído…',
         :connect_first => 'Conecte sua conta SPACENODE primeiro.',
+        :mask_select_something => 'Selecione no SketchUp o grupo, o componente ou as faces que quer revisar e toque de novo.',
+        :mask_no_pixels => 'A seleção não aparece neste render: está fora do quadro ou totalmente coberta.',
+        :mask_rendering => 'Calculando a área da seleção…',
+        :mask_too_big => 'Seleção grande demais pra mapear (mais de 250 mil faces). Selecione só a peça.',
+        :mask_no_imagerep => 'Esta versão do SketchUp não expõe a imagem renderizada (ImageRep) — a máscara por seleção exige 2018 ou superior.',
+        :edit_reconciling => 'Confirmando a edição no servidor…',
+        :edit_unconfirmed => 'Não foi possível confirmar a edição. Confira Revisões ou o Histórico do site antes de tentar de novo — os Nodes podem ter sido usados.',
+        :edit_recovered => 'Edição recuperada do servidor — nada foi cobrado em dobro.',
         :busy => 'Já existe uma geração em andamento.',
         :session_expired => 'Sua sessão expirou. Conecte novamente.',
         :pairing_waiting => 'Confirme o código no navegador…',
@@ -154,6 +162,14 @@ module SpaceNode
         :tb_mirror_hint => 'Mark the selected face as a mirror (the reflection goes into the capture)',
         :reconciling => 'Unstable connection — checking if the render finished…',
         :connect_first => 'Connect your SPACENODE account first.',
+        :mask_select_something => 'Select in SketchUp the group, component or faces you want to revise, then tap again.',
+        :mask_no_pixels => 'The selection does not show in this render: it is outside the frame or fully hidden.',
+        :mask_rendering => 'Computing the selection area…',
+        :mask_too_big => 'Selection too large to map (over 250k faces). Select just the piece.',
+        :mask_no_imagerep => 'This SketchUp version does not expose the rendered image (ImageRep) — selection masks need 2018 or newer.',
+        :edit_reconciling => 'Confirming the edit on the server…',
+        :edit_unconfirmed => 'Could not confirm the edit. Check Revisions or the site History before trying again — Nodes may have been used.',
+        :edit_recovered => 'Edit recovered from the server — nothing was charged twice.',
         :busy => 'A generation is already running.',
         :session_expired => 'Your session expired. Connect again.',
         :pairing_waiting => 'Confirm the code in your browser…',
@@ -455,6 +471,22 @@ module SpaceNode
           emit_error(e.message)
         end
       end
+      # Revisão de materiais: a seleção do SketchUp vira máscara alinhada ao
+      # render base; o diário de revisões vive no .skp.
+      dialog.add_action_callback('selectionMask') do |_ctx, raw|
+        begin
+          handle_selection_mask(raw)
+        rescue StandardError => e
+          emit('selectionMask', { :ok => false, :message => e.message })
+        end
+      end
+      dialog.add_action_callback('journalDelete') do |_ctx, raw|
+        begin
+          handle_journal_delete(raw)
+        rescue StandardError => e
+          emit_error(e.message)
+        end
+      end
       dialog.add_action_callback('generate') do |_ctx, raw|
         begin
           handle_generate(raw)
@@ -684,9 +716,22 @@ module SpaceNode
       attach_photo_observers
       emit_camera_facts
       emit_mirrors
-      ensure_catalog
+      emit_journal
+      # Catálogo em cache sai na hora (não depende de rede nem de sessão).
+      # O que precisa do servidor passa pela renovação do dispositivo: antes,
+      # painel aberto com o token de 1 h vencido buscava catálogo e sessão com
+      # o token morto, levava 401 nos dois e mostrava "Não foi possível
+      # carregar os presets" — e "Tentar de novo" repetia o mesmo token.
+      # A renovação só rodava dentro de uma ação paga.
+      cached = cached_catalog
+      emit_catalog(cached) if cached
       list_scenes
-      check_session if authenticated?
+      if authenticated?
+        ensure_fresh_session(nil) do
+          refresh_catalog unless cached
+          check_session
+        end
+      end
       # Ação disparada na toolbar com o painel fechado: roda agora que ele
       # existe — capturar/gerar sem painel seria trabalho invisível.
       pending = @pending_toolbar_action
@@ -944,6 +989,10 @@ module SpaceNode
       end
 
       unless device_paired?
+        # Token antigo (sem dispositivo) vencido não tem como renovar: limpa
+        # de vez, senão o painel reabre "conectado" e cai aqui de novo.
+        clear_session
+        send_state
         session_step_failed(t(:session_expired), true, generation_scope)
         return
       end
@@ -1023,11 +1072,16 @@ module SpaceNode
     def check_session
       return unless authenticated?
 
-      json_request(:get, '/api/sketchup/session', nil, method(:emit_api_error)) do |data|
-        @balance = data['balance']
-        @account_theme = %w[light dark system].include?(data['theme']) ? data['theme'] : nil
-        emit('session', data)
-        send_state
+      # Token fresco antes de perguntar o saldo: um GET com token vencido
+      # deslogava o painel (401 → handle_auth_failure) mesmo com o dispositivo
+      # pareado e a renovação disponível.
+      ensure_fresh_session(nil) do
+        json_request(:get, '/api/sketchup/session', nil, method(:emit_api_error)) do |data|
+          @balance = data['balance']
+          @account_theme = %w[light dark system].include?(data['theme']) ? data['theme'] : nil
+          emit('session', data)
+          send_state
+        end
       end
     end
 
@@ -1094,23 +1148,36 @@ module SpaceNode
       false
     end
 
-    def refresh_catalog
+    # Sempre com token fresco (renova via pair/refresh quando pareado). Um
+    # 401 mesmo assim — token que morreu entre a checagem e o GET — renova e
+    # tenta UMA vez; na segunda o erro vai pro painel com authExpired, que
+    # oferece reconectar em vez de "tentar de novo" pra sempre.
+    def refresh_catalog(allow_retry = true)
       return unless authenticated?
 
-      on_fail = proc do |error|
-        # Sem catálogo o painel fica sem presets/custos — o painel mostra
-        # aviso com ação de tentar de novo (callback refreshCatalog).
-        emit('catalogError', { :message => error.message })
-      end
-      json_request(:get, '/api/sketchup/catalog', nil, on_fail) do |data|
-        @catalog = data
-        write_json_default('catalog_json', JSON.generate(data))
-        begin
-          ::Sketchup.write_default(PREFERENCES_KEY, 'catalog_at', Time.now.to_i)
-        rescue StandardError
-          nil
+      ensure_fresh_session(nil) do
+        on_fail = proc do |error|
+          status = error.respond_to?(:status) ? error.status.to_i : 0
+          if status == 401 && allow_retry && device_paired?
+            # handle_auth_failure já zerou expires_at: a próxima
+            # ensure_fresh_session renova de verdade antes do GET.
+            refresh_catalog(false)
+          else
+            # Sem catálogo o painel fica sem presets/custos — o painel mostra
+            # aviso com ação de tentar de novo (callback refreshCatalog).
+            emit('catalogError', { :message => error.message, :authExpired => status == 401 })
+          end
         end
-        emit_catalog(data)
+        json_request(:get, '/api/sketchup/catalog', nil, on_fail) do |data|
+          @catalog = data
+          write_json_default('catalog_json', JSON.generate(data))
+          begin
+            ::Sketchup.write_default(PREFERENCES_KEY, 'catalog_at', Time.now.to_i)
+          rescue StandardError
+            nil
+          end
+          emit_catalog(data)
+        end
       end
     end
 
@@ -2122,6 +2189,393 @@ module SpaceNode
       nil
     end
 
+    # ── Revisão de materiais: máscara a partir da seleção ───────────────────
+    #
+    # A seleção do SketchUp vira uma máscara 2D alinhada ao render base: dois
+    # renders pela MESMA câmera e o MESMO quadro da captura (proporção e
+    # nivelamento), com a seleção pintada em duas cores distintas, dentro de
+    # uma operação abortada no fim (modelo intacto, nada na pilha de desfazer).
+    # Onde os dois renders diferem é exatamente onde a seleção está VISÍVEL:
+    # oclusão por outros objetos, vidro na frente e componentes aninhados são
+    # resolvidos pelo próprio renderizador — projetar caixas ou IDs não daria
+    # a área ocluída certa. Componentes com várias instâncias são tornados
+    # únicos (make_unique) antes de pintar, senão as cópias entrariam na
+    # máscara; a operação abortada devolve a definição compartilhada.
+    SELECTION_MASK_EDGE = 1280            # lado maior da máscara (o servidor a redimensiona à imagem)
+    SELECTION_MASK_COLORS = [[255, 0, 255], [0, 255, 255]].freeze
+    SELECTION_MASK_DIFF_THRESHOLD = 48    # |ΔR|+|ΔG|+|ΔB| acima disso = a seleção está neste pixel
+    SELECTION_PAINT_MAX_FACES = 250_000
+    SELECTION_MASK_OPTIONS = {
+      'RenderMode' => 2,                  # sombreado sem texturas: cor chapada, render mais rápido
+      'EdgeDisplayMode' => 0,             # sem arestas: linha preta idêntica nos dois passes viraria buraco
+      'DrawSilhouettes' => false,
+      'DrawDepthQue' => false,
+      'DrawLineEnds' => false,
+      'DisplayFog' => false,
+      'ModelTransparency' => false
+    }.freeze
+
+    def handle_selection_mask(raw)
+      payload = parse_json(raw)
+      model = ::Sketchup.active_model
+      raise 'Nenhum modelo aberto no SketchUp.' unless model
+      raise t(:mask_no_imagerep) unless defined?(::Sketchup::ImageRep)
+      raise t(:busy) if @generating
+
+      targets = selection_targets(model)
+      raise t(:mask_select_something) if targets.empty?
+
+      view = model.active_view
+      emit('status', { :stage => 'capture', :message => t(:mask_rendering) })
+
+      # Câmera do render base (quando o painel a tem): a máscara é calculada
+      # pela vista do render, não pela vista atual — se o usuário orbitou
+      # depois de renderizar, ainda assim a área cai no lugar certo da imagem.
+      base_camera = payload['camera'].is_a?(Hash) ? payload['camera'] : nil
+      current = snapshot_camera(view)
+      camera_moved = base_camera && current ? camera_moved?(base_camera, current) : false
+      photo = photo_settings_from(payload['photo'])
+      frame_aspect = payload['photo'].is_a?(Hash) ? payload['photo']['frameAspect'].to_f : 0.0
+
+      original = view.camera
+      original_state = camera_state_of(view)
+      temp_applied = false
+      begin
+        if base_camera && camera_moved
+          temp = camera_from_hash(base_camera)
+          if temp
+            view.camera = temp
+            temp_applied = true
+          end
+        end
+        result = render_selection_mask(model, view, targets, photo, frame_aspect)
+      ensure
+        restore_view_camera(view, original, original_state) if temp_applied
+      end
+
+      shared = shared_instances_in_path(model)
+      fingerprint = model_fingerprint
+      stored = payload['modelFingerprint'].is_a?(Hash) ? payload['modelFingerprint'] : nil
+      model_changed = stored && fingerprint && (stored['entities'].to_i != fingerprint[:entities] || stored['definitions'].to_i != fingerprint[:definitions])
+
+      emit('status', { :stage => 'idle', :message => '' })
+      if result[:pixels].to_i <= 0
+        emit('selectionMask', { :ok => false, :message => t(:mask_no_pixels), :count => targets.length })
+        return
+      end
+      emit('selectionMask', {
+        :ok => true,
+        :maskDataUrl => "data:image/png;base64,#{Base64.strict_encode64(File.binread(result[:path]))}",
+        :width => result[:width],
+        :height => result[:height],
+        :coverage => result[:coverage].round(4),
+        :count => targets.length,
+        :names => targets.first(12).map { |e| entity_label(e) },
+        :pids => targets.first(64).map { |e| e.respond_to?(:persistent_id) ? e.persistent_id : nil }.compact,
+        :faces => result[:faces],
+        :uniqueMade => result[:unique],
+        :cameraMoved => camera_moved ? true : false,
+        :cameraAligned => temp_applied,
+        :sharedInstances => shared,
+        :modelChanged => model_changed ? true : false,
+        :level => result[:level] ? true : false
+      })
+    ensure
+      delete_quiet(result && result[:path]) if defined?(result) && result.is_a?(Hash)
+    end
+
+    def selection_targets(model)
+      model.selection.to_a.select do |e|
+        e.is_a?(::Sketchup::Face) || e.is_a?(::Sketchup::Group) || e.is_a?(::Sketchup::ComponentInstance)
+      end
+    rescue StandardError
+      []
+    end
+
+    def entity_label(entity)
+      if entity.is_a?(::Sketchup::ComponentInstance)
+        name = entity.name.to_s
+        name = entity.definition.name.to_s if name.empty?
+        name.empty? ? 'Componente' : name
+      elsif entity.is_a?(::Sketchup::Group)
+        name = entity.name.to_s
+        name.empty? ? 'Grupo' : name
+      else
+        'Face'
+      end
+    rescue StandardError
+      'Objeto'
+    end
+
+    # Quantas cópias a mais o contexto ativo tem: faces selecionadas dentro
+    # de um componente com N instâncias são pintadas em TODAS (a face é da
+    # definição). O painel avisa que as cópias entram junto.
+    def shared_instances_in_path(model)
+      Array(model.active_path).map do |inst|
+        inst.respond_to?(:definition) ? inst.definition.instances.length - 1 : 0
+      end.max || 0
+    rescue StandardError
+      0
+    end
+
+    def camera_from_hash(data)
+      eye = vector3(data['eye'])
+      target = vector3(data['target'])
+      up = vector3(data['up'])
+      return nil unless eye && target && up
+
+      camera = ::Sketchup::Camera.new(
+        ::Geom::Point3d.new(*eye),
+        ::Geom::Point3d.new(*target),
+        ::Geom::Vector3d.new(*up)
+      )
+      fov = data['fov']
+      if data['perspective'] == false
+        camera.perspective = false
+        height = data['height']
+        camera.height = height if height.is_a?(Numeric) && height > 0
+      elsif fov.is_a?(Numeric) && fov > 0
+        camera.fov = fov
+      end
+      camera
+    rescue StandardError
+      nil
+    end
+
+    # Mesma conta de quadro da captura (capture_viewport): proporção da foto,
+    # ou a moldura própria da câmera, ou a viewport; lado maior = alvo.
+    def capture_frame(view, camera, photo, target_edge, forced_aspect = 0.0)
+      vpw = [view.vpwidth.to_i, 1].max
+      vph = [view.vpheight.to_i, 1].max
+      aspect = forced_aspect.to_f
+      if aspect <= 0
+        aspect = photo[:aspect].to_f
+        if aspect <= 0
+          own = begin
+            camera.aspect_ratio.to_f
+          rescue StandardError
+            0.0
+          end
+          aspect = own > 0 ? own : vpw.to_f / vph
+        end
+      end
+      if aspect >= 1.0
+        width = target_edge
+        height = [(target_edge / aspect).round, 1].max
+      else
+        height = target_edge
+        width = [(target_edge * aspect).round, 1].max
+      end
+      frame_px = [vpw.to_f / vph >= aspect ? vph * aspect : vpw, vpw.to_f / vph >= aspect ? vph : vpw / aspect]
+      scale = width.to_f / [frame_px[0], 1.0].max
+      scale = 1.0 if scale < 1.0
+      scale = 4.0 if scale > 4.0
+      { :width => width, :height => height, :scale => scale, :aspect => aspect }
+    end
+
+    def render_selection_mask(model, view, targets, photo, frame_aspect)
+      camera = view.camera
+      frame = capture_frame(view, camera, photo, SELECTION_MASK_EDGE, frame_aspect)
+      width = frame[:width]
+      height = frame[:height]
+      aspect = frame[:aspect]
+
+      aspect_saved = nil
+      if (photo[:aspect].to_f > 0 || frame_aspect.to_f > 0) && camera.respond_to?(:aspect_ratio=)
+        begin
+          aspect_saved = camera.aspect_ratio.to_f
+          camera.aspect_ratio = aspect if (aspect_saved - aspect).abs > 0.001
+        rescue StandardError
+          aspect_saved = nil
+        end
+      end
+      plan = photo[:level] ? level_plan(view, camera, width, height) : nil
+      plan = nil if plan && plan[:reason]
+
+      rendering = model.rendering_options
+      clean = CLEAN_CAPTURE_OPTIONS.merge(SELECTION_MASK_OPTIONS)
+      clean_saved = apply_rendering_options(rendering, clean)
+      shadow_prev = nil
+      begin
+        shadow = model.shadow_info
+        shadow_prev = shadow['DisplayShadows'] ? true : nil
+        shadow['DisplayShadows'] = false if shadow_prev
+      rescue StandardError
+        shadow_prev = nil
+      end
+
+      stamp = "#{Time.now.strftime('%Y%m%d-%H%M%S')}-#{SecureRandom.hex(3)}"
+      path_a = File.join(Dir.tmpdir, "spacenode-selmask-a-#{stamp}.png")
+      path_b = File.join(Dir.tmpdir, "spacenode-selmask-b-#{stamp}.png")
+      path_out = File.join(Dir.tmpdir, "spacenode-selmask-#{stamp}.png")
+      stats = { :faces => 0, :unique => 0 }
+      operation = false
+      begin
+        model.start_operation('SPACENODE: máscara da seleção (temporário)', true)
+        operation = true
+        material = model.materials.add("SPACENODE_MASK_#{stamp}")
+        material.color = ::Sketchup::Color.new(*SELECTION_MASK_COLORS[0])
+        paint_selection_targets(targets, material, stats)
+        raise t(:mask_too_big) if stats[:faces] > SELECTION_PAINT_MAX_FACES
+
+        options = { :width => width, :height => height, :antialias => false }
+        options[:scale_factor] = frame[:scale] if frame[:scale] > 1.0
+        write_mask_pass(view, plan, path_a, options)
+        # Trocar a COR do material repinta tudo de uma vez — o segundo passe
+        # não precisa percorrer a seleção de novo.
+        material.color = ::Sketchup::Color.new(*SELECTION_MASK_COLORS[1])
+        write_mask_pass(view, plan, path_b, options)
+      ensure
+        if operation
+          begin
+            model.abort_operation
+          rescue StandardError
+            nil
+          end
+        end
+        restore_rendering_options(rendering, clean_saved)
+        if shadow_prev
+          begin
+            model.shadow_info['DisplayShadows'] = true
+          rescue StandardError
+            nil
+          end
+        end
+        if aspect_saved && (aspect_saved - aspect).abs > 0.001
+          begin
+            live = view.camera
+            live.aspect_ratio = aspect_saved if live.respond_to?(:aspect_ratio=)
+          rescue StandardError
+            nil
+          end
+        end
+      end
+
+      diff = diff_mask_files(path_a, path_b, path_out)
+      raise 'Não foi possível comparar os renders da seleção.' unless diff
+
+      diff.merge(:path => path_out, :faces => stats[:faces], :unique => stats[:unique], :level => plan ? true : false)
+    ensure
+      delete_quiet(path_a) if defined?(path_a)
+      delete_quiet(path_b) if defined?(path_b)
+    end
+
+    def write_mask_pass(view, plan, path, options)
+      opts = options.merge(:filename => path)
+      done = plan ? write_leveled_image(view, plan, path, opts) : false
+      unless done
+        ok = view.write_image(opts)
+        raise 'Não foi possível renderizar a seleção.' unless ok && File.exist?(path)
+      end
+      path
+    end
+
+    def paint_selection_targets(targets, material, stats)
+      targets.each do |entity|
+        if entity.is_a?(::Sketchup::Face)
+          paint_face(entity, material, stats)
+        else
+          paint_instance_tree(entity, material, stats, 0)
+        end
+      end
+    end
+
+    def paint_face(face, material, stats)
+      face.material = material
+      face.back_material = material
+      stats[:faces] += 1
+    rescue StandardError
+      nil
+    end
+
+    def paint_instance_tree(inst, material, stats, depth)
+      return if depth > 16 || stats[:faces] > SELECTION_PAINT_MAX_FACES
+
+      definition = inst.definition
+      # Definição compartilhada: pintar as faces pintaria TODAS as cópias.
+      # make_unique dentro da operação abortada devolve tudo ao fim.
+      if definition.instances.length > 1 && inst.respond_to?(:make_unique)
+        inst.make_unique
+        stats[:unique] += 1
+        definition = inst.definition
+      end
+      begin
+        inst.material = material
+      rescue StandardError
+        nil
+      end
+      definition.entities.each do |e|
+        if e.is_a?(::Sketchup::Face)
+          paint_face(e, material, stats)
+        elsif e.is_a?(::Sketchup::Group) || e.is_a?(::Sketchup::ComponentInstance)
+          paint_instance_tree(e, material, stats, depth + 1)
+        end
+      end
+    rescue StandardError
+      nil
+    end
+
+    # Diferença pixel a pixel dos dois passes → PNG branco (seleção visível)
+    # sobre preto, na mesma ordem de linhas do buffer de origem (o ImageRep
+    # grava o que recebe; os dois lados têm a mesma ordem).
+    def diff_mask_files(path_a, path_b, out_path)
+      rep_a = ::Sketchup::ImageRep.new
+      rep_a.load_file(path_a)
+      rep_b = ::Sketchup::ImageRep.new
+      rep_b.load_file(path_b)
+      w = rep_a.width.to_i
+      h = rep_a.height.to_i
+      bpp = rep_a.bits_per_pixel.to_i
+      return nil unless w > 0 && h > 0 && [24, 32].include?(bpp)
+      return nil unless rep_b.width.to_i == w && rep_b.height.to_i == h && rep_b.bits_per_pixel.to_i == bpp
+
+      bytes = bpp / 8
+      stride = (w * bytes) + rep_a.row_padding.to_i
+      stride_b = (w * bytes) + rep_b.row_padding.to_i
+      da = rep_a.data
+      db = rep_b.data
+      return nil unless da && db && da.bytesize >= stride * h && db.bytesize >= stride_b * h
+
+      white = "\xFF\xFF\xFF".b
+      black = "\x00\x00\x00".b
+      black_row = black * w
+      rows = Array.new(h)
+      count = 0
+      threshold = SELECTION_MASK_DIFF_THRESHOLD
+      h.times do |y|
+        ra = da.byteslice(y * stride, w * bytes)
+        rb = db.byteslice(y * stride_b, w * bytes)
+        if ra == rb
+          rows[y] = black_row
+          next
+        end
+        ua = ra.unpack('C*')
+        ub = rb.unpack('C*')
+        row = String.new(:capacity => w * 3)
+        i = 0
+        w.times do
+          d = (ua[i] - ub[i]).abs + (ua[i + 1] - ub[i + 1]).abs + (ua[i + 2] - ub[i + 2]).abs
+          if d > threshold
+            row << white
+            count += 1
+          else
+            row << black
+          end
+          i += bytes
+        end
+        rows[y] = row
+      end
+
+      out = ::Sketchup::ImageRep.new
+      out.set_data(w, h, 24, 0, rows.join.force_encoding('ASCII-8BIT'))
+      out.save_file(out_path)
+      return nil unless File.exist?(out_path)
+
+      { :coverage => count.to_f / (w * h), :width => w, :height => h, :pixels => count }
+    rescue StandardError
+      nil
+    end
+
     def guides_overlay_supported?
       defined?(::Sketchup::Overlay) ? true : false
     end
@@ -2753,6 +3207,18 @@ module SpaceNode
       "#{base} #{index}"
     end
 
+    # Nome da cena selecionada (nil fora de cena): vai no diário como origem
+    # do render e da revisão.
+    def current_scene_name
+      model = ::Sketchup.active_model
+      return nil unless model
+
+      page = model.pages.selected_page
+      page ? page.name.to_s : nil
+    rescue StandardError
+      nil
+    end
+
     def list_scenes
       model = ::Sketchup.active_model
       scenes = []
@@ -3085,6 +3551,9 @@ module SpaceNode
       @last_capture_mime = path.end_with?('.jpg') ? 'image/jpeg' : 'image/png'
       photo_report = {
         :aspect => photo[:aspect].to_f > 0 ? photo[:aspect].to_f.round(4) : 0,
+        # Proporção EFETIVA do quadro (inclui "Livre" = viewport ou moldura
+        # própria da câmera): é ela que a máscara da seleção reproduz.
+        :frameAspect => (width.to_f / height).round(4),
         :levelRequested => level_requested,
         :levelApplied => level_applied,
         :levelReason => level_reason,
@@ -3364,8 +3833,16 @@ module SpaceNode
                                :facts => facts,
                                :camera => camera,
                                :material_refs => material_refs,
-                               :scene_name => opts[:scene_name],
-                               :conditioning => conditioning)
+                               :scene_name => opts[:scene_name] || current_scene_name,
+                               :conditioning => conditioning,
+                               :photo => {
+                                 :aspect => report[:aspect],
+                                 :frameAspect => report[:frameAspect],
+                                 :level => report[:levelApplied] ? true : false
+                               },
+                               :engine => payload['engine'].to_s,
+                               :resolution => payload['resolution'].to_s,
+                               :fingerprint => model_fingerprint)
           end
         end
       end
@@ -3765,9 +4242,20 @@ module SpaceNode
       result[:sceneName] = extras[:scene_name] if extras[:scene_name]
       result[:conditioning] = extras[:conditioning] if extras[:conditioning]
       result[:anchorDropped] = true if extras[:anchor_dropped]
+      # Origem completa pro diário e pra revisão: quadro da captura (a máscara
+      # da seleção precisa da MESMA proporção e nivelamento), motor e a
+      # impressão digital do modelo naquele momento.
+      result[:photo] = extras[:photo] if extras[:photo]
+      result[:engine] = extras[:engine] if extras[:engine]
+      result[:resolution] = extras[:resolution] if extras[:resolution]
+      result[:modelFingerprint] = extras[:fingerprint] if extras[:fingerprint]
+      result[:kind] = 'render'
+      result[:id] = result[:renderId].to_s.empty? ? "r-#{SecureRandom.hex(6)}" : result[:renderId].to_s
+      result[:createdAt] = Time.now.iso8601
       # URLs assinadas duram 1 h (lib/storage/signed.ts): o painel usa isto
       # pra saber quando re-assinar por renderId em vez de mostrar imagem morta.
       result[:signedAt] = Time.now.to_i
+      journal_add(result)
 
       @last_result = result
       @balance = { 'totalBalance' => data['totalBalance'] } if data['totalBalance']
@@ -4053,6 +4541,98 @@ module SpaceNode
           nil
         end
       end
+    end
+
+    # ── Diário do arquivo: renders e revisões ───────────────────────────────
+    #
+    # O Histórico do servidor não sabe de cena, câmera nem quadro — isso só o
+    # plugin tem, e só na hora da captura. O diário grava no .skp (dicionário
+    # `spacenode`, chave `journal`) cada render e cada revisão com a origem
+    # completa: render base, cena, câmera, foto, seleção, amostra, instrução,
+    # resultado, custo e job. É o que permite reabrir o arquivo dias depois e
+    # saber de onde cada imagem saiu — e o que a próxima etapa (repetir a
+    # revisão em outras cenas do mesmo ambiente) vai consumir.
+    JOURNAL_MAX_ENTRIES = 40
+
+    def journal_entries(model = ::Sketchup.active_model)
+      return [] unless model
+
+      raw = model.get_attribute('spacenode', 'journal', nil)
+      return [] unless raw.is_a?(String) && !raw.empty?
+
+      list = JSON.parse(raw)
+      list.is_a?(Array) ? list.select { |e| e.is_a?(Hash) } : []
+    rescue StandardError
+      []
+    end
+
+    def save_journal(model, entries)
+      model.start_operation('SPACENODE', true, false, true)
+      model.set_attribute('spacenode', 'journal', JSON.generate(entries.first(JOURNAL_MAX_ENTRIES)))
+      model.commit_operation
+    rescue StandardError
+      begin
+        model.abort_operation
+      rescue StandardError
+        nil
+      end
+    end
+
+    def journal_add(entry)
+      model = ::Sketchup.active_model
+      return unless model && entry.is_a?(Hash)
+
+      # Chaves em string desde já: é assim que voltam do JSON do .skp, e o
+      # painel lê um formato só.
+      normalized = JSON.parse(JSON.generate(entry))
+      id = normalized['id'].to_s
+      id = normalized['clientRequestId'].to_s if id.empty?
+      id = "j-#{SecureRandom.hex(6)}" if id.empty?
+      normalized['id'] = id
+      normalized['createdAt'] ||= Time.now.iso8601
+      entries = journal_entries(model)
+      entries.reject! { |e| e['id'].to_s == id || (!normalized['clientRequestId'].to_s.empty? && e['clientRequestId'].to_s == normalized['clientRequestId'].to_s) }
+      entries.unshift(normalized)
+      save_journal(model, entries)
+      emit_journal(model)
+    rescue StandardError
+      nil
+    end
+
+    def emit_journal(model = ::Sketchup.active_model)
+      emit('journal', { :entries => journal_entries(model) })
+    rescue StandardError
+      nil
+    end
+
+    def handle_journal_delete(raw)
+      id = parse_json(raw)['id'].to_s
+      model = ::Sketchup.active_model
+      return if id.empty? || !model
+
+      entries = journal_entries(model).reject { |e| e['id'].to_s == id }
+      save_journal(model, entries)
+      emit_journal(model)
+    end
+
+    # Impressão digital barata do modelo: se a geometria mudou desde o render
+    # base, a máscara da seleção pode não bater com a imagem. Não é hash de
+    # geometria (custaria segundos num modelo grande) — é um aviso honesto.
+    def model_fingerprint
+      model = ::Sketchup.active_model
+      return nil unless model
+
+      {
+        :entities => model.entities.length,
+        :definitions => model.definitions.length,
+        :diag => begin
+          model.bounds.diagonal.to_f.round(1)
+        rescue StandardError
+          0.0
+        end
+      }
+    rescue StandardError
+      nil
     end
 
     # ── Histórico / download ─────────────────────────────────────────────────
@@ -5178,7 +5758,13 @@ module SpaceNode
       end
     end
 
-    # ── Editar (V3, por instrução) ──────────────────────────────────────────
+    # ── Editar (V4: seleção + recomposição no servidor) ─────────────────────
+    #
+    # Desde a 1.4.0 o painel fala com /api/edit-v4 — o mesmo motor do editor
+    # do site: com máscara, a recomposição no servidor devolve pixel a pixel
+    # tudo que está fora da seleção (drift medido e devolvido), e o custo é
+    # fixo por edição. A V3 (/api/edit-v3/google) ficou pra trás: dependia de
+    # variável de ambiente em produção e cobrava por resolução.
 
     def handle_edit_quote(raw)
       payload = parse_json(raw)
@@ -5192,8 +5778,15 @@ module SpaceNode
       return unless body
 
       quote_id = payload['quoteId']
-      json_request(:post, '/api/edit-v3/google', body, proc { |_e| emit('editQuote', { :quoteId => quote_id, :nodes => nil }) }) do |data|
-        emit('editQuote', { :quoteId => quote_id, :nodes => data['nodes_cost'] })
+      json_request(:post, '/api/edit-v4', body, proc { |_e| emit('editQuote', { :quoteId => quote_id, :nodes => nil }) }) do |data|
+        charge = data['charge'].is_a?(Hash) ? data['charge'] : {}
+        emit('editQuote', {
+          :quoteId => quote_id,
+          :nodes => data['nodes_cost'],
+          # Cobrança simulada (EDIT_V4_CHARGE desligada no servidor): o painel
+          # diz "sem cobrança" em vez de prometer um débito que não acontece.
+          :simulated => charge['simulated'] ? true : false
+        })
       end
     end
 
@@ -5214,7 +5807,9 @@ module SpaceNode
       @generating = true
       @generation_epoch = (@generation_epoch || 0) + 1
       @generation_started_at = Time.now
-      @generation_context = { :mode => :edit }
+      # started_at e source ficam no contexto: é por eles que uma queda de
+      # rede depois do POST reconcilia a edição em /api/edits (paga uma vez).
+      @generation_context = { :mode => :edit, :started_at => @generation_started_at, :source => source }
       epoch = @generation_epoch
 
       # Cadeia: máscara da área selecionada → amostra de material → requisição.
@@ -5298,36 +5893,42 @@ module SpaceNode
         emit('status', { :stage => 'generate', :message => 'Amostra não enviada — editando pela descrição…' })
       end
 
+      # Idempotência: o mesmo pedido leva o mesmo id em toda tentativa. O
+      # servidor devolve o resultado já pago em vez de gerar (e cobrar) de
+      # novo quando a coluna client_request_id existe; sem ela, a
+      # reconciliação por /api/edits abaixo cobre a queda de rede.
+      client_request_id = payload['clientRequestId'].to_s
+      client_request_id = SecureRandom.uuid if client_request_id.empty?
+      body[:client_request_id] = client_request_id
+      revision_seed = revision_seed_from(payload, source, mask_url, reference_url, client_request_id)
+
       emit('status', { :stage => 'generate', :message => t(:editing) })
-      request = json_request(:post, '/api/edit-v3/google', body, direct_error_handler_for(epoch, 'A conexão caiu durante a edição. Veja o Histórico antes de tentar de novo — os Nodes podem ter sido usados.')) do |data|
+      request = json_request(:post, '/api/edit-v4', body, edit_error_handler_for(epoch, revision_seed)) do |data|
         next unless generation_alive?(epoch)
 
-        @generating = false
-        @generation_context = nil
         if data['rejected']
+          @generating = false
+          @generation_context = nil
           # O motivo real vem em reasons[0]; message é o rodapé genérico.
           reason = Array(data['reasons']).first
-          emit('editRejected', { :message => [reason, data['message']].compact.join(' ').strip })
+          message = [reason, data['message']].compact.join(' ').strip
+          # A recusa também vira registro: quem reabrir o arquivo vê que a
+          # tentativa existiu, o que pediu e que custou zero.
+          journal_add(revision_seed.merge(:status => 'rejected', :nodesCharged => 0, :error => message))
+          emit('editRejected', { :message => message })
           emit('status', { :stage => 'idle', :message => '' })
         else
           url = data['result_url'].to_s
           if url.empty?
+            @generating = false
+            @generation_context = nil
             emit_error('A edição não devolveu resultado.', false, true)
           else
-            previous = @last_result || {}
-            result = {
-              :outputUrl => url,
-              :previewUrl => url,
-              :originalUrl => source,
-              :nodesCharged => data['nodes_cost'],
-              :seed => previous[:seed],
-              :camera => previous[:camera],
-              :edited => payload['action'].to_s
-            }
-            @last_result = result
-            persist_last_result(result)
-            emit('result', result)
-            check_session
+            charge = data['charge'].is_a?(Hash) ? data['charge'] : {}
+            finish_edit(revision_seed, url, data['nodes_cost'], data['job_id'],
+                        :charged => charge['debited'] ? true : false,
+                        :warning => data['warning'],
+                        :replayed => data['replayed'] ? true : false)
           end
         end
       end
@@ -5339,9 +5940,152 @@ module SpaceNode
           rescue StandardError
             nil
           end
-          fail_generation('A edição demorou demais. Veja o Histórico antes de tentar de novo — os Nodes podem ter sido usados.')
+          # O servidor tem maxDuration menor que este timeout: se o cliente
+          # desistiu, o servidor já terminou (e talvez cobrou). Reconcilia em
+          # vez de mandar o usuário "tentar de novo" às cegas.
+          reconcile_lost_edit(epoch, revision_seed)
         end
       end
+    end
+
+    # Handler de erro do POST /api/edit-v4. Status nil/0 = a rede caiu DEPOIS
+    # do envio: o servidor pode ter terminado e cobrado; procurar em
+    # /api/edits antes de declarar falha é o que evita pagar duas vezes.
+    def edit_error_handler_for(epoch, revision_seed)
+      proc do |error|
+        next unless generation_alive?(epoch)
+
+        status = error.respond_to?(:status) ? error.status : nil
+        if status.nil? || status.to_i.zero?
+          reconcile_lost_edit(epoch, revision_seed)
+        elsif status.to_i == 409
+          # Mesmo pedido ainda em andamento no servidor (client_request_id):
+          # espera o resultado em vez de abrir outra geração.
+          reconcile_lost_edit(epoch, revision_seed)
+        else
+          fail_generation(error.message, status == 401, status)
+        end
+      end
+    end
+
+    EDIT_RECONCILE_POLL_SECONDS = 15
+    EDIT_RECONCILE_MAX_SECONDS = 150
+
+    # Procura em /api/edits (Bearer) uma edição concluída DESTA fonte, criada
+    # depois do início do pedido. O servidor re-assina a URL da fonte, então
+    # a comparação é pelo caminho (sem a query da assinatura). Enquanto o
+    # servidor ainda processa, a lista não a tem — repete a cada 15 s por até
+    # 150 s (a edição leva ~1 min) e só então declara "não confirmada".
+    def reconcile_lost_edit(epoch, revision_seed, elapsed = 0)
+      return unless generation_alive?(epoch)
+
+      ctx = @generation_context || {}
+      started_at = ctx[:started_at] || @generation_started_at || Time.now
+      source_path = url_path_only(revision_seed[:baseUrl])
+      emit('status', { :stage => 'reconcile', :message => t(:edit_reconciling) })
+
+      retry_later = proc do
+        if elapsed + EDIT_RECONCILE_POLL_SECONDS <= EDIT_RECONCILE_MAX_SECONDS
+          ::UI.start_timer(EDIT_RECONCILE_POLL_SECONDS, false) do
+            reconcile_lost_edit(epoch, revision_seed, elapsed + EDIT_RECONCILE_POLL_SECONDS)
+          end
+        else
+          journal_add(revision_seed.merge(:status => 'uncertain', :error => t(:edit_unconfirmed)))
+          fail_generation(t(:edit_unconfirmed))
+        end
+      end
+      on_fail = proc { |_e| retry_later.call if generation_alive?(epoch) }
+      json_request(:get, '/api/edits', nil, on_fail) do |data|
+        next unless generation_alive?(epoch)
+
+        edits = data['edits'].is_a?(Array) ? data['edits'] : []
+        found = edits.find do |e|
+          begin
+            next false unless url_path_only(e['source_image_url']) == source_path
+            Time.parse(e['created_at'].to_s) >= started_at - 60
+          rescue StandardError
+            false
+          end
+        end
+        if found && !found['result_image_url'].to_s.empty?
+          finish_edit(revision_seed, found['result_image_url'].to_s, found['nodes_cost'], found['id'],
+                      :charged => true, :reconciled => true)
+        else
+          retry_later.call
+        end
+      end
+    end
+
+    def url_path_only(url)
+      uri = URI.parse(url.to_s)
+      "#{uri.host}#{uri.path}"
+    rescue StandardError
+      url.to_s.split('?').first.to_s
+    end
+
+    # O que a revisão sabe de si ANTES do servidor responder: origem (render
+    # base, cena, câmera, quadro), o que foi pedido (ação, instrução,
+    # amostra, seleção) e como a máscara nasceu. O resultado e o custo entram
+    # depois. É este registro que a próxima etapa (repetir a revisão em
+    # outras cenas) vai ler.
+    def revision_seed_from(payload, source, mask_url, reference_url, client_request_id)
+      previous = @last_result || {}
+      selection = payload['selection'].is_a?(Hash) ? payload['selection'] : nil
+      {
+        :kind => 'revision',
+        :clientRequestId => client_request_id,
+        :createdAt => Time.now.iso8601,
+        :baseId => payload['baseId'].to_s.empty? ? nil : payload['baseId'].to_s,
+        :baseRenderId => payload['baseRenderId'].to_s.empty? ? nil : payload['baseRenderId'].to_s,
+        :baseUrl => source,
+        :originalUrl => source,
+        :sceneName => payload['sceneName'].to_s.empty? ? previous[:sceneName] : payload['sceneName'].to_s,
+        :camera => payload['camera'].is_a?(Hash) ? payload['camera'] : previous[:camera],
+        :photo => payload['photo'].is_a?(Hash) ? payload['photo'] : previous[:photo],
+        :seed => previous[:seed],
+        :action => payload['action'].to_s,
+        :edited => payload['action'].to_s,
+        :instruction => payload['instruction'].to_s.strip,
+        :referenceMaterial => payload['referenceMaterial'].to_s,
+        :referenceSent => reference_url && !reference_url.empty? ? true : false,
+        :maskSource => mask_url && !mask_url.empty? ? payload['maskSource'].to_s : 'none',
+        :maskCoverage => selection && selection['coverage'].is_a?(Numeric) ? selection['coverage'] : nil,
+        :selection => selection ? {
+          :count => selection['count'].to_i,
+          :names => Array(selection['names']).first(12).map(&:to_s),
+          :pids => Array(selection['pids']).first(64)
+        } : nil,
+        :modelFingerprint => model_fingerprint
+      }
+    end
+
+    def finish_edit(revision_seed, url, nodes, job_id, extras = {})
+      @generating = false
+      @generation_context = nil
+      @generate_request = nil
+      entry_id = job_id.to_s.empty? ? "rev-#{SecureRandom.hex(6)}" : job_id.to_s
+      result = revision_seed.merge(
+        :id => entry_id,
+        :jobId => job_id.to_s.empty? ? nil : job_id.to_s,
+        :outputUrl => url,
+        :previewUrl => url,
+        :nodesCharged => nodes,
+        :charged => extras[:charged] ? true : false,
+        :status => extras[:reconciled] ? 'reconciled' : 'completed',
+        :warning => extras[:warning],
+        :replayed => extras[:replayed] ? true : false,
+        # O resultado da edição é URL pública do Storage (não assinada):
+        # sem signedAt o painel não a trata como vencida.
+        :signedAt => nil
+      )
+      @last_result = result
+      persist_last_result(result)
+      journal_add(result)
+      emit('result', result)
+      if extras[:reconciled]
+        emit('status', { :stage => 'idle', :message => t(:edit_recovered) })
+      end
+      check_session
     end
 
     def build_edit_body(payload, source, dry_run, has_mask = false)
@@ -5356,13 +6100,14 @@ module SpaceNode
       mask_action = has_mask && %w[remove refine_area].include?(action)
       return nil if instruction.empty? && !dry_run && !mask_action && payload['referenceMaterial'].to_s.empty?
 
+      # Contrato do /api/edit-v4: sem quality/resolução (a saída é recomposta
+      # na resolução da própria imagem); borda e dilatação são decididas no
+      # servidor por ação (swap_material mescla, remove/refine cortam).
       body = {
         :action => action,
         :source_image_url => source,
-        :quality => 'standard',
         :preservation => 'maximum',
-        :intensity => 'standard',
-        :output_resolution => 'source'
+        :intensity => 'standard'
       }
       body[:instruction] = instruction unless instruction.empty?
       body[:dry_run] = true if dry_run
@@ -5841,6 +6586,7 @@ module SpaceNode
         :balance => @balance,
         :panelState => panel_state,
         :lastResult => @last_result || model_result,
+        :journal => journal_entries,
         :videoSave => video_save_mode,
         :lastVideo => last_video_state,
         :photo => @photo,
