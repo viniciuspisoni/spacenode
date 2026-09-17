@@ -252,6 +252,83 @@ async function findProfileByStripeIds(
   return null
 }
 
+/**
+ * Trilha de auditoria — registra que o evento CHEGOU.
+ *
+ * `stripe_webhook_events.id` é o event id do Stripe e é a PK da tabela, então
+ * a reentrega não cria linha nova: o ON CONFLICT DO NOTHING devolve zero
+ * linhas e é assim que se sabe que aquele evento já tinha aparecido.
+ *
+ * Isto é OBSERVAÇÃO, não controle. A idempotência do dinheiro continua sendo
+ * a do `node_ledger` dentro de `grant_plan_nodes` — nada aqui decide se um
+ * crédito acontece. De propósito: uma trilha que também fosse o guarda-chave
+ * viraria um segundo lugar para errar.
+ *
+ * Best-effort: se a trilha falhar, o processamento segue. Perder um registro
+ * de auditoria é ruim; recusar uma renovação paga por causa dele seria pior.
+ */
+async function recordWebhookReceived(
+  supabase: SupabaseClient,
+  event: Stripe.Event
+): Promise<{ firstDelivery: boolean }> {
+  try {
+    const { data, error } = await supabase
+      .from('stripe_webhook_events')
+      .upsert(
+        {
+          id:      event.id,
+          type:    event.type,
+          payload: event as unknown as Record<string, unknown>,
+          status:  'received',
+        },
+        { onConflict: 'id', ignoreDuplicates: true },
+      )
+      .select('id')
+
+    if (error) {
+      console.warn('[stripe webhook] trilha: insert falhou (não crítico):', error.message)
+      return { firstDelivery: true }
+    }
+    return { firstDelivery: (data?.length ?? 0) > 0 }
+  } catch (err) {
+    console.warn('[stripe webhook] trilha: exceção no insert (não crítico):', (err as Error).message)
+    return { firstDelivery: true }
+  }
+}
+
+/**
+ * Fecha a linha da trilha com o desfecho do processamento.
+ *
+ * O `neq('status','processed')` impede que uma reentrega reescreva o
+ * `processed_at` de um evento que já tinha sido processado com sucesso — mas
+ * deixa passar o caso inverso, que é o que importa: um evento que falhou e
+ * foi reentregue com sucesso PRECISA sair de 'error' para 'processed'.
+ */
+async function markWebhookOutcome(
+  supabase: SupabaseClient,
+  eventId: string,
+  status: 'processed' | 'error',
+  detail?: string | null,
+): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('stripe_webhook_events')
+      .update({
+        status,
+        processed_at: new Date().toISOString(),
+        error_detail: detail ? detail.slice(0, 1000) : null,
+      })
+      .eq('id', eventId)
+      .neq('status', 'processed')
+
+    if (error) {
+      console.warn('[stripe webhook] trilha: update falhou (não crítico):', error.message)
+    }
+  } catch (err) {
+    console.warn('[stripe webhook] trilha: exceção no update (não crítico):', (err as Error).message)
+  }
+}
+
 export async function POST(req: NextRequest) {
   const stripe    = new Stripe(process.env.STRIPE_SECRET_KEY!)
   const body      = await req.text()
@@ -267,6 +344,33 @@ export async function POST(req: NextRequest) {
 
   const supabase = createAdminClient()
 
+  const { firstDelivery } = await recordWebhookReceived(supabase, event)
+  if (!firstDelivery) {
+    console.log(`[stripe webhook] ${event.id} (${event.type}) é reentrega — processando mesmo assim`)
+  }
+
+  try {
+    const response = await processEvent(stripe, supabase, event)
+    const ok = response.status === 200
+    await markWebhookOutcome(supabase, event.id, ok ? 'processed' : 'error', ok ? null : `HTTP ${response.status}`)
+    return response
+  } catch (err) {
+    // A exceção sobe (o Stripe reentrega), mas o motivo fica gravado.
+    await markWebhookOutcome(supabase, event.id, 'error', (err as Error).message)
+    throw err
+  }
+}
+
+/**
+ * O processamento em si. Separado do POST só para que a trilha consiga
+ * envolver TODAS as saídas — são mais de vinte `return` aqui dentro, e
+ * instrumentar um por um seria convite a esquecer algum.
+ */
+async function processEvent(
+  stripe: Stripe,
+  supabase: SupabaseClient,
+  event: Stripe.Event
+): Promise<NextResponse> {
   // ── Checkout pago: ativa plano OU adiciona Nodes extras ──────────────────
   //
   // Dois eventos caem aqui porque o Pix é assíncrono:

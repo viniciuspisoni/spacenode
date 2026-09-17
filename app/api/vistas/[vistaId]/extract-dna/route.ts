@@ -93,6 +93,10 @@ export async function POST(
       .update({
         dna:              payload,
         dna_extracted_at: new Date().toISOString(),
+        // Débito da extração — coluna PRÓPRIA, separada de `nodes_cost`,
+        // que é o custo de gerar a vista. São duas cobranças distintas
+        // sobre a mesma linha, e node_usage_daily conta as duas.
+        dna_nodes_cost:   DNA_EXTRACTION_COST,
         dna_extracting:   false,
       })
       .eq('id', vistaId)

@@ -100,6 +100,10 @@ export async function POST(
       .update({
         dna:              payload,
         dna_extracted_at: new Date().toISOString(),
+        // Registra o débito que já aconteceu lá em cima. Sem isto o
+        // consumo sai do saldo e não aparece em nenhum relatório —
+        // node_usage_daily lê esta coluna.
+        dna_nodes_cost:   DNA_EXTRACTION_COST,
         status:           'dna_extracted',
       })
       .eq('id', spaceId)
