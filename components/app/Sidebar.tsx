@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import React from 'react'
 import { ConstellationN, Logo } from '@/components/brand'
 import { AvatarComConsumo } from './AvatarComConsumo'
@@ -17,6 +17,13 @@ import {
 import { TOUR_START_EVENT } from './WelcomeTour'
 import { GUIDE_START_EVENT } from './GenerateGuide'
 import { getSidebarModules, type SidebarModule } from '@/lib/nav/modules-config'
+
+// Ouvido pelo WelcomeTour: a etapa "Do seu jeito" aponta pro seletor de tema,
+// que só existe visualmente com a sidebar expandida (rail: expande só no
+// hover, e toque não dispara hover — sem isso a etapa mira em um alvo de
+// altura zero em qualquer tela sem mouse). O tour força a expansão antes de
+// entrar na etapa e devolve ao normal ao sair dela.
+export const SIDEBAR_TOUR_EXPAND_EVENT = 'spn:sidebar:tour-expand'
 
 type NavItem = {
   label: string
@@ -124,9 +131,17 @@ export default function Sidebar({
   const pathname = usePathname()
   const [hovered, setHovered] = useState(false)
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
+  const [tourExpanded, setTourExpanded] = useState(false)
 
-  // Sem botões: rail por padrão; abre quando o cursor se aproxima da sidebar.
-  const expanded = hovered
+  useEffect(() => {
+    const onTourExpand = (e: Event) => setTourExpanded((e as CustomEvent<boolean>).detail)
+    window.addEventListener(SIDEBAR_TOUR_EXPAND_EVENT, onTourExpand)
+    return () => window.removeEventListener(SIDEBAR_TOUR_EXPAND_EVENT, onTourExpand)
+  }, [])
+
+  // Sem botões: rail por padrão; abre quando o cursor se aproxima da sidebar,
+  // ou quando o tour de boas-vindas força a etapa do tema.
+  const expanded = hovered || tourExpanded
 
   return (
     <aside
@@ -346,7 +361,7 @@ export default function Sidebar({
       </nav>
 
       {/* Aparência — visível quando expandida */}
-      <div style={{
+      <div data-tour="tema" style={{
         padding: expanded ? '8px 12px' : '8px 0 0',
         display: 'flex',
         justifyContent: 'center',
