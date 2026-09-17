@@ -115,6 +115,14 @@ export function buildLineWorkBlock(): string {
     'Reproduce what each line DELIMITS — window mullions and frames, panel and tile joints, paving pattern, ' +
     'reveals, copings, handrails, floor lines — as real physical elements, each with its own material, ' +
     'thickness, depth and cast shadow. Never reproduce the lines themselves as strokes drawn over the image. ' +
+    // Os três sintomas relatados em campo, nomeados: laje/cobertura, caixilho
+    // e superfície chapada. Genérico não bastou — o modelo devolvia a faixa
+    // branca com a linha preta embaixo.
+    'SLAB EDGES, BALCONY FRONTS AND ROOF FASCIAS are solid elements seen edge-on: each one shows a lit top ' +
+    'face, a real thickness, a shaded soffit underneath and a contact shadow on whatever is below — never a ' +
+    'flat pale band closed by a dark drawn line. ' +
+    'WINDOW AND CURTAIN-WALL FRAMES are extruded metal profiles: they sit in a reveal, catch a highlight on ' +
+    'one side and cast a small shadow on the glass — never a uniform dark rectangle traced around the opening. ' +
     'The output is a photograph: volumes are separated by material, light, shadow and depth of field, ' +
     'never by an outline. '
   )
@@ -166,7 +174,10 @@ function buildGeometryLock(hasAnchor: boolean): string {
     'built-in volumes; the surrounding context. OVERLAY RULE: the output must ' +
     'overlay the geometry reference — every edge, opening contour and object ' +
     'silhouette in the same position, at the same size, seen from the same ' +
-    'camera. '
+    // Sem esta ressalva a regra briga com o LINE WORK: "preserve every edge"
+    // era lida como "desenhe cada aresta", e o resultado vinha contornado.
+    'camera. This rule is about ALIGNMENT, not about drawing: match where ' +
+    'things are, never trace their contours. '
   )
 }
 

@@ -124,6 +124,56 @@ Nas três, a malha de caixilhos do projeto continua legível.
 
 Comparativos em `C:/Users/Pisoni/Desktop/spacenode-ab/entrega/`.
 
+### Segunda rodada — o que sobrou depois da captura limpa
+
+Feedback: *"o entorno está convincente, mas partes do prédio ainda parecem
+desenho — contornos das lajes e cobertura muito marcados, esquadrias
+excessivamente gráficas, superfícies com pouca profundidade"*. Rodada de
+diagnóstico no SketchUp 2026, no modelo em que o relato aconteceu
+(`modern commercial and retail complex.skp`, lote de 2 cenas, Orion 4K):
+
+- **Versão carregada: 1.5.0**, com `photo_capture_options` e o perfil já na
+  higiene. A captura que o plugin mandou (recuperada do temp) está limpa:
+  sem contorno, com textura. **A preparação não era mais o gargalo aqui** —
+  o estilo desse modelo já vinha com `DrawSilhouettes=false`.
+- **Backend: `https://spacenode.app`** — produção, que **não tem** os blocos
+  de prompt da 1.5.0 (a PR ainda não foi publicada). Ou seja: aquelas duas
+  cenas rodaram com o prompt ANTIGO. É a resposta à pergunta "os blocos
+  novos estão ativos nesse caminho?": **não estavam.**
+- **O lote NÃO perde a preparação.** Teste real: as 5 cenas do modelo têm
+  `use_style=true`; ativando a cena e aplicando a preparação, os valores
+  seguem valendo **depois do `write_image`** (`perfil=false largura=1
+  modo=3`) e voltam ao original no fim. `pages.selected_page=` aplica o
+  estilo de forma síncrona, e a preparação entra depois dele. A hipótese
+  era boa e está descartada com medida.
+- **Sombra desligada no modelo** (`DisplayShadows=false`) deixa os volumes
+  chapados. O preset de sol do painel resolve: ele liga a sombra durante a
+  captura e restaura depois (conferido no código e no teste). Com "atual" e
+  sombra desligada no arquivo, a captura sai sem sombra — é escolha do
+  usuário, e o painel não a sobrescreve.
+
+**Refino do prompt (rodada 2), medido na captura REAL do plugin:** os três
+sintomas foram nomeados no texto, porque o genérico não bastava —
+laje/peitoril/testada de cobertura como elemento sólido visto de topo (face
+iluminada, espessura, soffit sombreado e sombra de contato, nunca faixa
+clara fechada por linha escura) e caixilho como perfil metálico extrudado
+num rebaixo, com brilho de um lado e sombra no vidro, nunca retângulo
+escuro uniforme. A **instrução conflitante** também caiu: o OVERLAY RULE do
+geometry lock dizia "preserve every edge" e era lido como "desenhe cada
+aresta" — agora diz explicitamente que a regra é de ALINHAMENTO, não de
+desenho.
+
+A/B rodado com `--preparada=<captura real> --long=3840`, isolando só o
+prompt: a produção e o controle mantêm a faixa branca com linha preta sob a
+laje e a janela como retângulo chapado; o prompt novo devolve espessura e
+soffit na laje, perfil com brilho no caixilho, reflexo e interior no vidro e
+variação na pedra. Comparativos em
+`C:/Users/Pisoni/Desktop/spacenode-diag/prompt-v2/`.
+
+> **Publicação:** o ganho de prompt só chega ao usuário quando a PR for
+> mergeada e a Vercel publicar. A preparação de captura é do `.rbz` e já
+> vale offline.
+
 ## O que mudou na 1.4.0 — revisão de materiais com controle
 
 Caso de uso: *"selecionei esta marcenaria e quero testar carvalho claro,
