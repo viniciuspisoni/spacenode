@@ -138,6 +138,42 @@ mandar a mesma instrução/amostra.
   dialog.html real (catálogo com sessão vencida, seleção → máscara →
   payload, erro e limpeza, revisão + diário + comparador, apagar do diário,
   resultado restaurado do arquivo).
+- `C:/Ruby32-x64/bin/ruby scripts/verify-sketchup-ruby.rb` — 13 testes que
+  carregam o `main.rb` REAL com a API do SketchUp substituída por dublês:
+  diferença dos dois passes → máscara (cobertura, padding, 24/32 bpp),
+  quadro da máscara = quadro da captura, diário (dedupe por
+  clientRequestId, teto, apagar), reconciliação (adota só a edição criada
+  depois do início; desiste com "não confirmada"), catálogo com sessão
+  vencida (renova antes do GET; 401 renova e tenta UMA vez; sem
+  dispositivo limpa a sessão) e `on_panel_ready` (cache sem rede, sessão
+  só depois de renovar).
+- **O que só o SketchUp real prova** (checklist do smoke abaixo): os dois
+  `write_image` da seleção (cores, arestas desligadas, `make_unique` +
+  abort), o alinhamento visual da área sobre o render, uma edição paga de
+  18 nodes e a reabertura do arquivo com o diário.
+
+### Smoke no SketchUp (pendente — acesso à máquina foi negado nesta rodada)
+
+1. Instalar `dist/spacenode-sketchup.rbz` (Window → Extension Manager →
+   Install Extension) e **reiniciar o SketchUp** (sem reiniciar: painel novo
+   com Ruby velho — rodapé mostra a versão antiga e `selectionMask` não
+   existe).
+2. Abrir o painel com o token vencido (mais de 1 h desde a última vez): os
+   presets e custos têm que carregar sem "Could not load presets and costs".
+3. Num projeto real: gerar um render (ou abrir um do diário em Histórico →
+   Neste arquivo), selecionar a marcenaria (dois cliques entram no grupo,
+   clicar na peça), aba Editar → "Usar seleção do SketchUp": a área em
+   verde tem que cobrir a peça e só ela, com a linha "N objetos · X% da
+   imagem". Orbitar a câmera e repetir: a área continua no lugar do render
+   (aviso "a vista mudou").
+4. Escrever "carvalho claro", conferir "Aplicar edição · 18 nodes", aplicar.
+   Comparar (deve correr contra o render base), conferir no saldo os 18
+   nodes, e a revisão na lista "Revisões deste arquivo".
+5. Fechar e reabrir o SketchUp com o mesmo `.skp`: a revisão e o render
+   continuam no diário; abrir a revisão pelo diário; "Voltar à vista".
+6. Falha: desligar a rede logo após "Aplicar edição" e religar em ~30 s — o
+   painel deve mostrar "Confirmando a edição no servidor…" e recuperar a
+   revisão (status "recuperada"), sem segunda cobrança no Histórico do site.
 - `scripts/verify-sketchup-flow.mjs` (PR #218) descreve um painel de
   etapas que não é o atual (1/7 passa na main) — ficou como estava.
 - `ruby -c`, `tsc`, `eslint` e vitest limpos.
