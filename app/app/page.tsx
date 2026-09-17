@@ -333,7 +333,7 @@ function StartBlock() {
         <div className="spn-dash-step">
           <div className="spn-dash-step-num">01</div>
           <div className="spn-dash-step-title">Envie a referência</div>
-          <div className="spn-dash-step-desc">Print, modelo 3D, planta ou foto do espaço.</div>
+          <div className="spn-dash-step-desc">Print, render ou foto do espaço.</div>
         </div>
         <div className="spn-dash-step">
           <div className="spn-dash-step-num">02</div>
