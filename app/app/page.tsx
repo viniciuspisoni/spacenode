@@ -321,7 +321,7 @@ function StartBlock() {
     <section className="spn-dash-start spn-glass">
       <h2 className="spn-dash-start-title">Comece pela sua primeira imagem</h2>
       <p className="spn-dash-start-sub">
-        Envie um print do SketchUp, um modelo, uma planta ou uma foto — o Renderizar devolve a visualização pronta.
+        Envie um print do SketchUp, um render ou uma foto — o Renderizar devolve a visualização pronta.
       </p>
       <div className="spn-dash-start-actions">
         <Link href="/app/generate" className="spn-cta spn-dash-cta">Renderizar primeira imagem</Link>
