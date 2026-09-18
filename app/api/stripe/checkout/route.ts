@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { recordAcquisitionEvent } from '@/lib/marketing/ads/service'
+import { identityFromRequest, trackServerEvent } from '@/lib/analytics/server'
+import { attributionToStripeMetadata, marketingConsentSnapshot } from '@/lib/analytics/stripe-metadata'
+import { CONSENT_COOKIE } from '@/lib/analytics/consent'
 import {
   ANNUAL_BILLING_ENABLED,
   isPaidPlanId,
@@ -30,7 +32,9 @@ import {
 
 export const dynamic = 'force-dynamic'
 
-interface PlanCheckoutBody  { type: 'plan';  id: PaidPlanId;    billing: BillingCycle }
+/** `resume` = checkout aberto sozinho pelo billing depois do cadastro (intenção
+ *  capturada no CTA da landing). Só contexto de funil; não muda a cobrança. */
+interface PlanCheckoutBody  { type: 'plan';  id: PaidPlanId;    billing: BillingCycle; resume?: boolean }
 /** 'lumen' é o nome legado de Nodes extras — aceito por compatibilidade
  *  com abas abertas antes do deploy da unificação (2026-08-31). */
 interface ExtraCheckoutBody { type: 'extra' | 'lumen'; id: ExtraPackSize }
@@ -203,6 +207,19 @@ export async function POST(req: NextRequest) {
 
     // Fixado fora do closure: dentro dele o TS perde o narrowing de `body`.
     const billingCycle: BillingCycle = body.billing
+    const resumed = body.resume === true
+
+    // Identidade anônima, campanha e consentimento viajam no metadata da
+    // session (e da assinatura, por causa do Pix): é o único jeito de o
+    // webhook gravar `subscription_started` com a mesma origem do cadastro e
+    // de um adapter server-side saber se pode enviar a compra. Só
+    // identificadores e parâmetros de campanha — nada pessoal.
+    const identity = identityFromRequest(req)
+    const attributionMeta = attributionToStripeMetadata({
+      anonymousId: identity.anonymousId,
+      attribution: identity.attribution,
+      consent: marketingConsentSnapshot(req.cookies.get(CONSENT_COOKIE)?.value),
+    })
 
     // ── Pix Automático: teto do mandato ─────────────────────────────────
     // O valor que o cliente autoriza no app do banco precisa cobrir o que o
@@ -245,6 +262,7 @@ export async function POST(req: NextRequest) {
           billing_cycle: billingCycle,
           nodes_to_add:  String(plan.nodes),
           launch_offer:  withOffer ? 'applied' : 'none',
+          ...attributionMeta,
         },
         // Espelhado na assinatura porque a ativação por Pix acontece em
         // `invoice.paid` (subscription_create), e a Invoice não carrega o
@@ -255,6 +273,7 @@ export async function POST(req: NextRequest) {
             user_id:      user.id,
             plan_id:      plan.id,
             nodes_to_add: String(plan.nodes),
+            ...attributionMeta,
           },
         },
       })
@@ -303,12 +322,22 @@ export async function POST(req: NextRequest) {
       throw new Error('[checkout] session não criada após degradações')
     }
 
-    // Funil first-party (best-effort — recordAcquisitionEvent nunca lança).
-    await recordAcquisitionEvent(createAdminClient(), {
-      user_id: user.id,
-      event_type: 'checkout_started',
-      plan_id: plan.id,
-      metadata: { billing_cycle: body.billing, launch_offer: offerApplied, pix_offered: pixApplied },
+    // Funil first-party (best-effort — nunca lança). Pela request: leva o
+    // sn_aid e a atribuição do visitante, que ligam este checkout ao cadastro
+    // e à visita. Idempotente pela session — uma tentativa, um evento.
+    await trackServerEvent(createAdminClient(), {
+      event: 'checkout_started',
+      userId: user.id,
+      req,
+      planId: plan.id,
+      page: '/app/billing',
+      dedupeKey: `checkout:${session.id}`,
+      props: {
+        billing_cycle: billingCycle,
+        launch_offer: offerApplied,
+        pix_offered: pixApplied,
+        resume: resumed,
+      },
     })
 
     return NextResponse.json({ url: session.url })

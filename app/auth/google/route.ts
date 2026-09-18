@@ -2,8 +2,9 @@ import { createClient } from '@/lib/supabase/server'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { createHash, randomBytes } from 'crypto'
-import { safeNextPath } from '@/lib/auth/safe-next-path'
 import { LOGIN_NEXT_COOKIE, readLoginNextCookie } from '@/lib/auth/login-next-cookie'
+import { INTENT_COOKIE } from '@/lib/analytics/attribution'
+import { isNewUser, postAuthDestination } from '@/lib/analytics/auth-intent'
 
 // ── Login com Google via GIS (ux_mode: 'redirect') ─────────────────────────────
 //
@@ -76,7 +77,7 @@ export async function POST(request: Request) {
   // exato com a redirect URI autorizada). O destino pós-login viaja no cookie
   // sn_login_next mintado pela página de login; ?next= fica como fallback pra
   // POSTs same-site.
-  const next = safeNextPath(readLoginNextCookie(request.headers.get('cookie')) ?? searchParams.get('next'))
+  const next = readLoginNextCookie(request.headers.get('cookie')) ?? searchParams.get('next')
   const fail = () => NextResponse.redirect(`${origin}/login?error=google`, 303)
 
   let form: FormData
@@ -117,14 +118,23 @@ export async function POST(request: Request) {
   if (!nonce) return fail()
 
   const supabase = await createClient()
-  const { error } = await supabase.auth.signInWithIdToken({
+  const { data, error } = await supabase.auth.signInWithIdToken({
     provider: 'google',
     token: credential,
     nonce,
   })
   if (error) return fail()
 
-  const response = NextResponse.redirect(`${origin}${next}`, 303)
+  // Mesma regra do /auth/callback (next > intenção de plano > /app), e o
+  // `signup=1` de conta nova — este caminho redirecionava seco e o cadastro
+  // pelo Google nunca virava conversão. Ver lib/analytics/auth-intent.ts.
+  const { url } = postAuthDestination({
+    origin,
+    next,
+    intentCookie: cookieStore.get(INTENT_COOKIE)?.value ?? null,
+    newUser: isNewUser(data.user),
+  })
+  const response = NextResponse.redirect(url, 303)
   // Cookie de destino é de uso único.
   response.cookies.set(LOGIN_NEXT_COOKIE, '', { path: '/', maxAge: 0 })
   return response

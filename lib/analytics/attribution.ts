@@ -20,7 +20,7 @@
 // Isomórfico: no servidor, use os parsers com o valor cru do cookie; as
 // funções de escrita são no-op fora do browser.
 
-import { isPaidPlanId, type BillingCycle, type PaidPlanId } from '@/lib/plans'
+import { isPaidPlanId, isSellablePlanId, type BillingCycle, type PaidPlanId } from '@/lib/plans'
 
 export const ANON_COOKIE = 'sn_aid'
 export const INTENT_COOKIE = 'sn_intent'
@@ -119,12 +119,28 @@ export function writeIntentCookie(intent: PlanIntent): void {
   }
 }
 
+/** Intenção já gravada neste browser (null no servidor). */
+export function readIntentCookie(): PlanIntent | null {
+  return parseIntentCookie(readCookie(INTENT_COOKIE))
+}
+
 export function clearIntentCookie(): void {
   try {
     document.cookie = `${INTENT_COOKIE}=; Max-Age=0; Path=/; SameSite=Lax`
   } catch {
     // idem
   }
+}
+
+/** Intenção vinda da URL (`/login?plan=essence&billing=monthly`) — a
+ *  redundância do cookie para link aberto sem JS ou colado em outra aba. Só
+ *  plano VENDÁVEL: um `plan=starter` num link antigo não pode ressuscitar um
+ *  plano aposentado. */
+export function intentFromSearchParams(params: URLSearchParams): PlanIntent | null {
+  const plan = params.get('plan')
+  if (!isSellablePlanId(plan)) return null
+  const billing: BillingCycle = params.get('billing') === 'annual' ? 'annual' : 'monthly'
+  return { plan, billing }
 }
 
 /** Querystring de retomada pós-auth (/app/billing?…). Mantida numa função

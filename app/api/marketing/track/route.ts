@@ -84,6 +84,9 @@ export async function POST(req: NextRequest) {
         accountCreatedAt: user.created_at ?? null,
         origin,
         isInternal: isInternalTraffic(req),
+        // Por onde a pessoa ENTROU (primeiro toque): é o que responde
+        // "cadastros da LP X" sem depender do join anônimo.
+        page: snapshot?.first?.landing_path ?? snapshot?.last?.landing_path ?? null,
       })
       // `bound` é o que autoriza o cliente a parar de tentar. Antes a resposta
       // era sempre {ok:true} e uma falha de escrita tirava o cadastro do funil

@@ -3,25 +3,48 @@
 import { useEffect, useState } from 'react'
 
 // Barra fixa de conversão no mobile — aparece depois do hero.
-export function MobileCTA() {
+//
+// Convive com o banner de consentimento: os dois são fixos no rodapé, e o
+// banner (z-index 100) cobria a barra (z-index 40) por inteiro enquanto o
+// visitante não decidia — medido em produção em 18/09/26, o CTA ficava
+// invisível na página toda. O banner agora publica a própria altura em
+// `--sn-consent-h` (components/analytics/ConsentBanner.tsx) e a barra sobe
+// exatamente isso; quando o banner some, ela desce.
+//
+// Sem props, é o CTA de cadastro grátis da home. As landings de campanha
+// passam rótulo, destino e um onClick que grava a intenção de plano.
+export function MobileCTA({
+  href = '/login?mode=signup',
+  label = 'Testar grátis',
+  note = '80 nodes grátis · sem cartão · em português',
+  onClick,
+  revealAfter = 0.6,
+}: {
+  href?: string
+  label?: string
+  note?: string | null
+  onClick?: () => void
+  /** Fração da altura do viewport rolada a partir da qual a barra aparece. */
+  revealAfter?: number
+} = {}) {
   const [visible, setVisible] = useState(false)
 
   useEffect(() => {
-    const onScroll = () => setVisible(window.scrollY > window.innerHeight * 0.6)
+    const onScroll = () => setVisible(window.scrollY > window.innerHeight * revealAfter)
     onScroll()
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
-  }, [])
+  }, [revealAfter])
 
   return (
     <div className="spn-mcta spn-glass--chrome" data-visible={visible} aria-hidden={!visible}>
-      <a href="/login?mode=signup" className="spn-mcta-btn">
-        Testar grátis
+      <a href={href} onClick={onClick} className="spn-mcta-btn">
+        {label}
         <svg width="13" height="13" viewBox="0 0 12 12" fill="none" aria-hidden>
           <path d="M2 6h8M6.5 2.5L10 6l-3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </a>
-      <p className="spn-mcta-note">80 nodes grátis · sem cartão · em português</p>
+      {note && <p className="spn-mcta-note">{note}</p>}
 
       <style jsx>{`
         .spn-mcta { display: none; }
@@ -30,7 +53,7 @@ export function MobileCTA() {
           .spn-mcta {
             display: block;
             position: fixed;
-            bottom: 0;
+            bottom: var(--sn-consent-h, 0px);
             left: 0;
             right: 0;
             z-index: 40;
@@ -41,7 +64,8 @@ export function MobileCTA() {
             transform: translateY(100%);
             opacity: 0;
             pointer-events: none;
-            transition: transform 280ms var(--ease), opacity 280ms var(--ease);
+            transition: transform 280ms var(--ease), opacity 280ms var(--ease),
+              bottom 200ms var(--ease);
           }
           .spn-mcta[data-visible='true'] {
             transform: translateY(0);

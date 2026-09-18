@@ -1,7 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { ANNUAL_BILLING_ENABLED, SELLABLE_PLANS, getPlanById, type PaidPlanId, type PlanId, type BillingCycle } from '@/lib/plans'
+import { clearIntentCookie } from '@/lib/analytics/attribution'
 import { getPlanDisplayName } from '@/lib/plan-display'
 import { EXTRA_NODE_PACKS, type ExtraPackSize } from '@/lib/extra-nodes'
 import { RowIcon, Segmented, SettingGroup, SettingRow, Sheet, summarize } from '@/components/app/glass'
@@ -23,6 +25,13 @@ import {
 export interface CheckoutNotice {
   kind:    'ok' | 'pending'
   message: string
+}
+
+/** Checkout a retomar logo que a página abre — a intenção capturada no CTA
+ *  "Começar com <plano>" da landing, validada em page.tsx. */
+export interface ResumeCheckout {
+  plan:    PaidPlanId
+  billing: BillingCycle
 }
 
 export interface ExtraPackRow {
@@ -51,10 +60,12 @@ interface BillingClientProps {
   offerEligible?: boolean
   /** Resultado do checkout que trouxe o usuário de volta pra cá, se houve. */
   notice?: CheckoutNotice | null
+  /** Abre o checkout deste plano sozinho, uma vez, ao montar. */
+  resume?: ResumeCheckout | null
 }
 
 type CheckoutPayload =
-  | { type: 'plan';  id: PaidPlanId; billing: BillingCycle }
+  | { type: 'plan';  id: PaidPlanId; billing: BillingCycle; resume?: boolean }
   | { type: 'extra'; id: ExtraPackSize }
 
 async function startCheckout(payload: CheckoutPayload): Promise<{ url?: string; error?: string }> {
@@ -63,7 +74,12 @@ async function startCheckout(payload: CheckoutPayload): Promise<{ url?: string; 
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   })
-  if (res.status === 401) { window.location.href = '/login'; return {} }
+  if (res.status === 401) {
+    // Sessão caiu: volta para cá depois do login, com a query que houver.
+    const back = window.location.pathname + window.location.search
+    window.location.href = `/login?next=${encodeURIComponent(back)}`
+    return {}
+  }
   return await res.json() as { url?: string; error?: string }
 }
 
@@ -78,7 +94,8 @@ function daysUntil(date: string): number {
   return Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)))
 }
 
-export function BillingClient({ plan, balance, nodesExpireAt, extras, pooled, offerEligible, notice }: BillingClientProps) {
+export function BillingClient({ plan, balance, nodesExpireAt, extras, pooled, offerEligible, notice, resume }: BillingClientProps) {
+  const router = useRouter()
   // Extras para qualquer plano pago (Starter incluso desde 2026-08-31).
   const isExtraBlocked = plan === 'free'
   // Assinante de um plano aposentado (Office desde 2026-08-31, Starter desde
@@ -97,12 +114,31 @@ export function BillingClient({ plan, balance, nodesExpireAt, extras, pooled, of
   // mostra o total e abrem a folha com o extrato de cada um.
   const [extractOpen, setExtractOpen] = useState(false)
 
-  const handlePlan = async (id: PaidPlanId) => {
+  const handlePlan = async (id: PaidPlanId, cycle: BillingCycle = billing, resumed = false) => {
     setLoading(`plan-${id}`); setError(null)
-    const r = await startCheckout({ type: 'plan', id, billing })
+    const r = await startCheckout({ type: 'plan', id, billing: cycle, resume: resumed || undefined })
     if (r.error) { setError(r.error); setLoading(null); return }
     if (r.url) window.location.assign(r.url)
   }
+
+  // Retomada pós-cadastro: a pessoa clicou "Começar com <plano>" na landing,
+  // criou a conta e caiu aqui com ?plan=…&resume=1. Abre o checkout desse
+  // plano sem pedir um segundo clique. Uma vez só (ref), e a URL é limpa
+  // ANTES de sair para o Stripe: voltar do checkout não reabre o checkout.
+  // O cookie de intenção é consumido aqui — a única leitura que ainda faltava
+  // (o binder de atribuição, no layout) já aconteceu neste mesmo carregamento.
+  const resumedRef = useRef(false)
+  useEffect(() => {
+    if (!resume || resumedRef.current) return
+    resumedRef.current = true
+    clearIntentCookie()
+    setBilling(resume.billing)
+    router.replace('/app/billing', { scroll: false })
+    void handlePlan(resume.plan, resume.billing, true)
+    // handlePlan muda a cada render (fecha sobre billing); a retomada é um
+    // evento de montagem, não uma reação a estado.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resume])
   const handleExtra = async (id: ExtraPackSize) => {
     setLoading(`extra-${id}`); setError(null)
     const r = await startCheckout({ type: 'extra', id })

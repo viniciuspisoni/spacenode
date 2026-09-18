@@ -37,6 +37,9 @@ import {
 } from './events'
 import { ANON_COOKIE, parseAnonymousId } from './attribution'
 import { isInternalTraffic } from './internal'
+import { CONSENT_COOKIE } from './consent'
+import { forwardServerEvent } from './server-adapters'
+import { marketingConsentSnapshot, type MarketingConsentSnapshot } from './stripe-metadata'
 
 export interface ServerEventInput {
   event: AnalyticsEvent
@@ -63,6 +66,11 @@ export interface ServerEventInput {
   /** Força a marcação de tráfego interno. Omitido = decidido pelo host da
    *  request e pelo ambiente de execução. */
   isInternal?: boolean
+  /** Escolha de consentimento de marketing no momento do fato. Omitido =
+   *  lida do cookie sn_consent da request; sem request, 'unknown'. Só
+   *  governa os adapters server-side (server-adapters.ts) — o registro
+   *  first-party não depende dela. */
+  consent?: MarketingConsentSnapshot
   props?: AnalyticsProps
 }
 
@@ -101,7 +109,10 @@ export async function trackServerEvent(
     const props = sanitizeProps(input.props ?? {})
     if (input.feature) props.feature = input.feature
 
-    await recordAcquisitionEvent(admin, {
+    const consent: MarketingConsentSnapshot =
+      input.consent ?? (input.req ? marketingConsentSnapshot(cookieValue(input.req, CONSENT_COOKIE)) : 'unknown')
+
+    const persisted = await recordAcquisitionEvent(admin, {
       user_id: input.userId ?? null,
       // O alias de storage devolve sempre um nome presente no union — o cast
       // só encurta o caminho entre os dois catálogos (testado em tests/).
@@ -123,6 +134,24 @@ export async function trackServerEvent(
       is_internal: input.isInternal ?? isInternalTraffic(input.req ?? null),
       metadata: props,
     })
+
+    // Saída server-side para terceiros (Meta CAPI etc.) — registro vazio
+    // hoje. Só depois de persistir, e só o que o consentimento permitir.
+    // Evento interno (dev/preview) nunca sai.
+    if (persisted && !(input.isInternal ?? isInternalTraffic(input.req ?? null))) {
+      await forwardServerEvent({
+        event: input.event,
+        userId: input.userId ?? null,
+        anonymousId,
+        planId: input.planId ?? null,
+        valueCents: input.valueCents ?? null,
+        page: input.page ?? null,
+        occurredAt: input.occurredAt ?? null,
+        dedupeKey: input.dedupeKey ?? null,
+        consent,
+        props,
+      })
+    }
   } catch (err) {
     console.warn('[analytics] trackServerEvent falhou:', err instanceof Error ? err.message : err)
   }

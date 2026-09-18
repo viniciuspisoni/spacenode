@@ -3,12 +3,38 @@ import Stripe from 'stripe'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getPayerBalance } from '@/lib/workspaces/balance'
-import { BillingClient, type ExtraPackRow, type CheckoutNotice } from './BillingClient'
+import { ANNUAL_BILLING_ENABLED, isSellablePlanId, type BillingCycle } from '@/lib/plans'
+import { BillingClient, type ExtraPackRow, type CheckoutNotice, type ResumeCheckout } from './BillingClient'
 
 export const dynamic = 'force-dynamic'
 
 type Props = {
-  searchParams: Promise<{ session_id?: string; canceled?: string }>
+  searchParams: Promise<{
+    session_id?: string
+    canceled?: string
+    /** Retomada do checkout pós-cadastro (lib/analytics/attribution.ts →
+     *  intentResumePath): `plan`, `billing` e `resume=1`. */
+    plan?: string
+    billing?: string
+    resume?: string
+  }>
+}
+
+/**
+ * Pedido de retomada do checkout, validado no servidor: só plano VENDÁVEL,
+ * só para quem ainda está no free e paga a própria conta (membro de workspace
+ * não assina). Qualquer coisa fora disso vira `null` e a página abre normal —
+ * o pior caso de um parâmetro forjado é a pessoa ver a tela de planos.
+ */
+function resumeFrom(
+  sp: { plan?: string; billing?: string; resume?: string },
+  planId: string,
+  pooled: boolean,
+): ResumeCheckout | null {
+  if (sp.resume !== '1' || !isSellablePlanId(sp.plan)) return null
+  if (planId !== 'free' || pooled) return null
+  const billing: BillingCycle = sp.billing === 'annual' && ANNUAL_BILLING_ENABLED ? 'annual' : 'monthly'
+  return { plan: sp.plan, billing }
 }
 
 /**
@@ -85,12 +111,14 @@ export default async function BillingPage({ searchParams }: Props) {
     .single()
   const offerEligible = !balance.pooled && balance.planId === 'free' && !own?.stripe_customer_id
 
-  const { session_id } = await searchParams
-  const notice = await readCheckoutNotice(session_id, user.id)
+  const sp = await searchParams
+  const notice = await readCheckoutNotice(sp.session_id, user.id)
+  const resume = resumeFrom(sp, balance.planId, balance.pooled)
 
   return (
     <BillingClient
       notice={notice}
+      resume={resume}
       plan={balance.planId}
       balance={{
         plan:  balance.planBalance,
