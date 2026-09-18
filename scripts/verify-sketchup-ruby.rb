@@ -660,6 +660,45 @@ class SpaceNodeRubyTest < Minitest::Test
     assert_equal 0xFF0000, chrome.bgr(0x0000FF)
   end
 
+  # A posição guardada pode apontar pra um monitor que não existe mais. O que
+  # importa não é "está dentro", é sobrar barra de título pegável.
+  def with_screen(bounds)
+    chrome = SpaceNode::SketchUp::Win32Chrome
+    original = chrome.method(:virtual_screen)
+    chrome.define_singleton_method(:virtual_screen) { bounds }
+    yield
+  ensure
+    chrome.define_singleton_method(:virtual_screen) { original.call }
+  end
+
+  def test_offscreen_toolbar_comes_back_to_a_reachable_spot
+    with_screen([0, 0, 1920, 1080]) do
+      # Dentro da tela não se mexe.
+      assert_equal [300, 200], PLUGIN.onscreen_toolbar_spot(300, 200, 312, 108)
+      # Monitor desligado: x muito à direita volta deixando 96 px pegáveis.
+      assert_equal [1824, 200], PLUGIN.onscreen_toolbar_spot(5000, 200, 312, 108)
+      # Acima do topo (barra de título inalcançável) desce pro 0.
+      assert_equal [300, 0], PLUGIN.onscreen_toolbar_spot(300, -400, 312, 108)
+      # Abaixo do fundo sobe deixando 44 px.
+      assert_equal [300, 1036], PLUGIN.onscreen_toolbar_spot(300, 3000, 312, 108)
+    end
+  end
+
+  def test_second_monitor_to_the_left_is_a_valid_spot
+    # Com dois monitores o secundário tem x NEGATIVO. Testar contra o primário
+    # jogaria fora uma posição perfeitamente boa.
+    with_screen([-1920, 0, 3840, 1080]) do
+      assert_equal [-1800, 300], PLUGIN.onscreen_toolbar_spot(-1800, 300, 312, 108)
+      assert_equal [-1920, 300], PLUGIN.onscreen_toolbar_spot(-4000, 300, 312, 108)
+    end
+  end
+
+  def test_without_screen_info_the_saved_spot_is_honoured
+    with_screen(nil) do
+      assert_equal [742, 91], PLUGIN.onscreen_toolbar_spot(742, 91, 312, 108)
+    end
+  end
+
   # Fora do Windows tem que devolver false sem levantar — o painel chama isso
   # a cada applyTheme, inclusive quando o SO troca de tema sozinho.
   def test_window_chrome_is_a_no_op_off_windows

@@ -83,20 +83,39 @@ const union = (...ds) => Math.min(...ds);
 const subtract = (shape, hole) => Math.max(shape, -hole);
 
 // ── Rasterização ──────────────────────────────────────────────────────────
-function render(size, shape) {
+//
+// Camadas empilhadas em source-over, cada uma com a própria cor e alfa. O
+// ícone da marca precisa disso — chip escuro, borda clara e o N branco são
+// três cores no mesmo PNG. Os outros ícones passam uma camada só.
+function render(size, layers) {
   const n = size * SS;
   const unit = GRID / n;
-  const acc = new Float32Array(size * size);
+  const cov = layers.map(() => new Float32Array(size * size));
   for (let sy = 0; sy < n; sy++) {
     for (let sx = 0; sx < n; sx++) {
-      const a = Math.max(0, Math.min(1, 0.5 - shape((sx + 0.5) * unit, (sy + 0.5) * unit) / unit));
-      acc[Math.floor(sy / SS) * size + Math.floor(sx / SS)] += a;
+      const gx = (sx + 0.5) * unit, gy = (sy + 0.5) * unit;
+      for (let li = 0; li < layers.length; li++) {
+        const a = Math.max(0, Math.min(1, 0.5 - layers[li].shape(gx, gy) / unit));
+        cov[li][Math.floor(sy / SS) * size + Math.floor(sx / SS)] += a;
+      }
     }
   }
   const px = Buffer.alloc(size * size * 4);
   for (let i = 0; i < size * size; i++) {
-    px[i * 4] = COLOR[0]; px[i * 4 + 1] = COLOR[1]; px[i * 4 + 2] = COLOR[2];
-    px[i * 4 + 3] = Math.round((acc[i] / (SS * SS)) * 255);
+    let r = 0, g = 0, b = 0, a = 0;
+    for (let li = 0; li < layers.length; li++) {
+      const [lr, lg, lb] = layers[li].color;
+      const la = (cov[li][i] / (SS * SS)) * (layers[li].alpha === undefined ? 1 : layers[li].alpha);
+      const na = la + a * (1 - la);
+      if (na > 0) {
+        r = (lr * la + r * a * (1 - la)) / na;
+        g = (lg * la + g * a * (1 - la)) / na;
+        b = (lb * la + b * a * (1 - la)) / na;
+      }
+      a = na;
+    }
+    px[i * 4] = Math.round(r); px[i * 4 + 1] = Math.round(g); px[i * 4 + 2] = Math.round(b);
+    px[i * 4 + 3] = Math.round(a * 255);
   }
   return px;
 }
@@ -195,19 +214,56 @@ const mirror = (x, y) => union(
   sdSegment(x, y, 26, 44, 38, 28, S - 1.1)
 );
 
+// Marca: o ConstellationN num chip. O chip existe por LEGIBILIDADE, não por
+// enfeite — um N monocromático de #333 some numa toolbar escura, e a toolbar
+// do SketchUp muda de cor com o tema. No claro quem carrega é o chip escuro;
+// no escuro, a borda clara e o N branco. O desenho é o mesmo símbolo oficial
+// (spacenode.svg): três traços e quatro nós.
+//
+// A 24 px o traço ENGROSSA e o nó DIMINUI: mantendo as proporções de 48, os
+// nós encostam no traço e o miolo do N vira mancha.
+const brand = (size) => {
+  const small = size < 48;
+  const s = small ? 5.4 : 4.8;   // traço
+  const dot = small ? 4.5 : 5.5; // nó
+  const a = 16.5, b = 47.5;      // caixa do N dentro do chip
+  return [
+    { shape: (x, y) => sdRoundBox(x, y, 1, 1, 63, 63, 15), color: [0x17, 0x17, 0x1a] },
+    {
+      shape: (x, y) => sdRoundBoxOutline(x, y, 2.1, 2.1, 61.9, 61.9, 14.1, 2.4),
+      color: [0xff, 0xff, 0xff],
+      alpha: 0.34,
+    },
+    {
+      shape: (x, y) => union(
+        sdSegment(x, y, a, a, a, b, s),
+        sdSegment(x, y, a, a, b, b, s),
+        sdSegment(x, y, b, a, b, b, s),
+        sdDisc(x, y, a, a, dot), sdDisc(x, y, a, b, dot),
+        sdDisc(x, y, b, a, dot), sdDisc(x, y, b, b, dot)
+      ),
+      color: [0xff, 0xff, 0xff],
+    },
+  ];
+};
+
+// Um ícone é ou uma forma só (na cor padrão) ou uma função que devolve camadas.
+const mono = (shape) => () => [{ shape, color: COLOR }];
+
 const ICONS = {
-  'toolbar-capture': capture,
-  'toolbar-generate': generate,
-  'toolbar-scene': scene,
-  'toolbar-mirror': mirror,
+  spacenode: brand,
+  'toolbar-capture': mono(capture),
+  'toolbar-generate': mono(generate),
+  'toolbar-scene': mono(scene),
+  'toolbar-mirror': mono(mirror),
 };
 
 const outDir = process.argv[2] || path.join(import.meta.dirname, '..', 'sketchup', 'spacenode', 'assets');
 fs.mkdirSync(outDir, { recursive: true });
-for (const [name, shape] of Object.entries(ICONS)) {
+for (const [name, layersFor] of Object.entries(ICONS)) {
   for (const size of [24, 48]) {
     const file = path.join(outDir, `${name}-${size}.png`);
-    fs.writeFileSync(file, png(size, render(size, shape)));
+    fs.writeFileSync(file, png(size, render(size, layersFor(size))));
     console.log(file, fs.statSync(file).size + ' bytes');
   }
 }
