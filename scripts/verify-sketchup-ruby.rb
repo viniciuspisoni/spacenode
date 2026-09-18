@@ -710,4 +710,139 @@ class SpaceNodeRubyTest < Minitest::Test
     refute PLUGIN.apply_window_chrome(nil)
     assert_equal 'dark', PLUGIN.instance_variable_get(:@frame_theme)
   end
+
+  # ── Barra nativa (glass_bar.rb): a lógica pura, contra o atlas REAL ───────
+
+  GLASS = SpaceNode::SketchUp::GlassBar
+  GLASS_DIR = File.expand_path('../sketchup/spacenode/assets/glassbar', __dir__)
+
+  def glass_atlas
+    @glass_atlas ||= JSON.parse(File.read(File.join(GLASS_DIR, '1.json')))
+  end
+
+  # Fora do Windows (e no harness, onde Sketchup.platform nem existe) ela se
+  # declara indisponível sem levantar — é isso que manda o macOS pro HtmlDialog.
+  def test_glass_bar_is_off_outside_windows
+    refute GLASS.available?
+    refute GLASS.visible?
+  end
+
+  def test_glass_bar_picks_the_smallest_scale_that_covers_the_dpi
+    assert_equal 1, GLASS.pick_scale(96)
+    assert_equal 1.25, GLASS.pick_scale(120)
+    assert_equal 1.5, GLASS.pick_scale(144)
+    assert_equal 2, GLASS.pick_scale(192)
+    assert_equal 2, GLASS.pick_scale(288) # acima de 2x fica no 2x
+    assert_equal '1', GLASS.scale_name(1)
+    assert_equal '1.25', GLASS.scale_name(1.25)
+    assert_equal '2', GLASS.scale_name(2)
+  end
+
+  def test_glass_bar_hit_test_uses_the_real_layout
+    lay = glass_atlas['layout']['horizontal']
+    c = lay['cells']['capture']
+    assert_equal 'capture', GLASS.hit_test(lay, c['x'] + 5, c['y'] + 5)
+    # pontinhos e folgas são placa: arrastável
+    assert_equal :plate, GLASS.hit_test(lay, lay['plate']['x'] + 3, lay['plate']['y'] + 27)
+    # fora da placa é transparente ao mouse
+    assert_nil GLASS.hit_test(lay, 2, 2)
+    tip = { 'x' => 0, 'y' => 0, 'w' => 10, 'h' => 10 }
+    assert_equal :tip, GLASS.hit_test(lay, 2, 2, tip)
+    v = glass_atlas['layout']['vertical']
+    assert_equal 'edit', GLASS.hit_test(v, v['cells']['edit']['x'] + 1, v['cells']['edit']['y'] + 1)
+  end
+
+  def test_glass_bar_tip_and_disabled_follow_the_state
+    idle = { :disabled => %w[generate edit], :busy => nil }
+    assert_equal 'offline', GLASS.tip_key_for('generate', idle)
+    assert_equal 'needRender', GLASS.tip_key_for('edit', idle)
+    assert_equal 'capture', GLASS.tip_key_for('capture', idle)
+    assert GLASS.cell_disabled?('edit', idle)
+    refute GLASS.cell_disabled?('capture', idle)
+    busy = { :disabled => [], :busy => 'generate' }
+    assert_equal 'busy', GLASS.tip_key_for('generate', busy)
+    assert GLASS.cell_disabled?('capture', busy) # tudo trava enquanto gera
+    refute GLASS.cell_disabled?('generate', busy)
+    refute GLASS.cell_disabled?('panel', busy) # a marca nunca trava
+  end
+
+  def test_glass_bar_tip_caret_lands_on_the_button
+    lay = glass_atlas['layout']['horizontal']
+    s = glass_atlas['sprites']['tip_h_pt_capture']
+    c = lay['cells']['capture']
+    x, y = GLASS.tip_origin(lay, s, c)
+    assert_equal c['x'] + c['w'] / 2, x + s['caret']['x']
+    assert_equal lay['plate']['y'] + lay['plate']['h'] + lay['tip']['gap'], y + s['caret']['y']
+    v = glass_atlas['layout']['vertical']
+    sv = glass_atlas['sprites']['tip_v_en_edit']
+    cv = v['cells']['edit']
+    x, y = GLASS.tip_origin(v, sv, cv)
+    assert_equal v['plate']['x'] + v['plate']['w'] + v['tip']['gap'], x + sv['caret']['x']
+    assert_equal cv['y'] + cv['h'] / 2, y + sv['caret']['y']
+  end
+
+  # Cada escala precisa ter os MESMOS sprites e pixels do tamanho anunciado:
+  # é o que o Ruby copia direto pra DIB sem conferir nada.
+  def test_every_scale_ships_the_same_sprites_and_a_consistent_atlas
+    names = nil
+    %w[1 1.25 1.5 2].each do |scale|
+      json = JSON.parse(File.read(File.join(GLASS_DIR, "#{scale}.json")))
+      pixels = Zlib.inflate(File.binread(File.join(GLASS_DIR, "#{scale}.bin.z")))
+      assert_equal json['atlas']['w'] * json['atlas']['h'] * 4, pixels.bytesize, "escala #{scale}"
+      names ||= json['sprites'].keys.sort
+      assert_equal names, json['sprites'].keys.sort, "escala #{scale}"
+      json['sprites'].each_value do |s|
+        assert s['x'] + s['w'] <= json['atlas']['w'] && s['y'] + s['h'] <= json['atlas']['h'], "escala #{scale}"
+      end
+      %w[horizontal vertical].each do |o|
+        lay = json['layout'][o]
+        lay['cells'].each_value { |c| assert GLASS.inside?(lay['plate'], c['x'], c['y']), "#{scale}/#{o}" }
+      end
+    end
+  end
+
+  def with_glass_bar(available:, shown:)
+    originals = %i[available? visible? suggested_spot show].map { |m| [m, GLASS.method(m)] }
+    calls = []
+    GLASS.define_singleton_method(:available?) { available }
+    GLASS.define_singleton_method(:visible?) { false }
+    GLASS.define_singleton_method(:suggested_spot) { |_w, _h| [10, 20] }
+    GLASS.define_singleton_method(:show) { |*args, **_kw| calls << args[0, 3]; shown }
+    yield calls
+  ensure
+    originals.each { |m, orig| GLASS.define_singleton_method(m) { |*a, **k, &b| orig.call(*a, **k, &b) } }
+  end
+
+  # No Windows a barra nativa vem primeiro; se ela não nasce, o HtmlDialog
+  # assume no mesmo clique — o usuário nunca fica sem barra.
+  def test_show_glass_toolbar_prefers_the_native_bar_and_falls_back
+    fake = Class.new do
+      def initialize(*); end
+      def respond_to?(*); true; end
+      def method_missing(*); nil; end
+      def respond_to_missing?(*); true; end
+    end
+    fake.const_set(:STYLE_UTILITY, 2)
+    real_dialog = UI.send(:remove_const, :HtmlDialog)
+    UI.const_set(:HtmlDialog, fake)
+    PLUGIN.instance_variable_set(:@toolbar_dialog, nil)
+    Sketchup::PREFS.delete([PREF, 'toolbar_visible'])
+
+    with_glass_bar(available: true, shown: true) do |calls|
+      PLUGIN.show_glass_toolbar
+      assert_equal [[10, 20, 'horizontal']], calls
+      assert_equal true, Sketchup.read_default(PREF, 'toolbar_visible')
+      assert_nil PLUGIN.instance_variable_get(:@toolbar_dialog), 'nativa no ar: sem HtmlDialog'
+    end
+
+    with_glass_bar(available: true, shown: false) do |calls|
+      PLUGIN.show_glass_toolbar
+      assert_equal 1, calls.length
+      refute_nil PLUGIN.instance_variable_get(:@toolbar_dialog), 'nativa falhou: HtmlDialog assume'
+    end
+  ensure
+    UI.send(:remove_const, :HtmlDialog)
+    UI.const_set(:HtmlDialog, real_dialog)
+    PLUGIN.instance_variable_set(:@toolbar_dialog, nil)
+  end
 end

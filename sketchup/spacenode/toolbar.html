@@ -114,8 +114,16 @@
 
   <div class="bar" id="bar">
     <button class="btn brand" id="bPanel" type="button" data-tip="Abrir o painel · dois cliques giram a barra">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M5 19V5.6L19 18.4V5"/><circle cx="5" cy="19" r="1.5" fill="currentColor" stroke="none"/><circle cx="19" cy="5" r="1.5" fill="currentColor" stroke="none"/>
+      <!-- ConstellationN — geometria de assets/spacenode.svg, a adaptação
+           OFICIAL do símbolo pra toolbar (traço 5, nó r 6, grade 64). Antes
+           havia aqui um N redesenhado com dois pontos, que não era a marca. -->
+      <svg viewBox="0 0 64 64" shape-rendering="geometricPrecision">
+        <g stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none">
+          <line x1="16" y1="16" x2="16" y2="48"/><line x1="16" y1="16" x2="48" y2="48"/><line x1="48" y1="16" x2="48" y2="48"/>
+        </g>
+        <g fill="currentColor">
+          <circle cx="16" cy="16" r="6"/><circle cx="16" cy="48" r="6"/><circle cx="48" cy="16" r="6"/><circle cx="48" cy="48" r="6"/>
+        </g>
       </svg>
     </button>
     <span class="sep"></span>

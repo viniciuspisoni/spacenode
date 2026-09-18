@@ -220,13 +220,17 @@ const mirror = (x, y) => union(
 // no escuro, a borda clara e o N branco. O desenho é o mesmo símbolo oficial
 // (spacenode.svg): três traços e quatro nós.
 //
-// A 24 px o traço ENGROSSA e o nó DIMINUI: mantendo as proporções de 48, os
-// nós encostam no traço e o miolo do N vira mancha.
+// A geometria é a de sketchup/spacenode/assets/spacenode.svg — a adaptação
+// OFICIAL do símbolo pra toolbar: grade 64, nós em (16,16) (16,48) (48,16)
+// (48,48), traço 5, nó r 6. É o arquivo de que o conceito aprovado foi
+// desenhado (medido lá: razão nó/traço 2,6; aqui 2,4). Antes o traço vinha
+// do símbolo mestre (1,5) engrossado por um fator próprio, e o resultado era
+// ou um N com bolhas (nó grande demais) ou um N sem constelação.
 const brand = (size) => {
-  const small = size < 48;
-  const s = small ? 5.4 : 4.8;   // traço
-  const dot = small ? 4.5 : 5.5; // nó
-  const a = 16.5, b = 47.5;      // caixa do N dentro do chip
+  void size; // o mesmo desenho a 24 e a 48: o arquivo oficial já é pra 24
+  const s = 5;
+  const dot = 6;
+  const a = 16, b = 48;
   return [
     { shape: (x, y) => sdRoundBox(x, y, 1, 1, 63, 63, 15), color: [0x17, 0x17, 0x1a] },
     {

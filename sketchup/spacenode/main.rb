@@ -22,12 +22,14 @@ require 'time'
 require 'tmpdir'
 require 'fileutils'
 require 'uri'
+# Barra flutuante nativa (Windows): janela própria com alfa por pixel.
+require_relative 'glass_bar'
 
 module SpaceNode
   module SketchUp
     extend self
 
-    VERSION = '1.7.0'
+    VERSION = '1.8.0'
     PREFERENCES_KEY = 'com.spacenode.sketchup'
     DEFAULT_API_BASE_URL = 'https://spacenode.app'
     MIN_SKETCHUP_MAJOR = 21          # Ruby 2.7+; recomendado 2024+
@@ -85,7 +87,7 @@ module SpaceNode
         :tb_float => 'Barra flutuante',
         :tb_float_hint => 'Mostrar ou esconder a barra flutuante em vidro',
         :tb_open => 'Abrir SpaceNode',
-        :tb_open_hint => 'Abrir a barra flutuante da SpaceNode com as ferramentas',
+        :tb_open_hint => 'Mostrar ou esconder a barra flutuante da SpaceNode com as ferramentas',
         :reconciling => 'Conexão instável — verificando se o render foi concluído…',
         :connect_first => 'Conecte sua conta SPACENODE primeiro.',
         :mask_select_something => 'Selecione no SketchUp o grupo, o componente ou as faces que quer revisar e toque de novo.',
@@ -167,7 +169,7 @@ module SpaceNode
         :tb_float => 'Floating bar',
         :tb_float_hint => 'Show or hide the floating glass bar',
         :tb_open => 'Open SpaceNode',
-        :tb_open_hint => 'Open the SpaceNode floating bar with the tools',
+        :tb_open_hint => 'Show or hide the SpaceNode floating bar with the tools',
         :reconciling => 'Unstable connection — checking if the render finished…',
         :connect_first => 'Connect your SPACENODE account first.',
         :mask_select_something => 'Select in SketchUp the group, component or faces you want to revise, then tap again.',
@@ -1577,6 +1579,9 @@ module SpaceNode
 
     def mark_quitting
       @quitting = true
+      # A janela nativa morre ANTES do Ruby: assim o Windows não manda
+      # WM_DESTROY pra um closure que já não existe.
+      GlassBar.shutdown
     end
 
     # Observers: câmera mudou → HUD do painel (com debounce — o orbit dispara
@@ -6994,6 +6999,10 @@ module SpaceNode
         panel = bgr(panel_rgb)
         bar = bgr(bar_rgb)
         windows_named('SPACENODE').each do |handle, klass|
+          # A barra nativa (glass_bar.rb) também se chama SPACENODE, mas não
+          # tem moldura nenhuma pra pintar.
+          next if klass.include?(GlassBar::CLASS_NAME)
+
           if klass.include?('ToolSaveBits')
             paint(handle, bar, true) # a toolbar.html não tem tema claro
           else
@@ -7044,6 +7053,8 @@ module SpaceNode
     end
 
     def glass_toolbar_open?
+      return true if GlassBar.visible?
+
       @toolbar_dialog && @toolbar_dialog.respond_to?(:visible?) && @toolbar_dialog.visible? ? true : false
     rescue StandardError
       false
@@ -7055,12 +7066,11 @@ module SpaceNode
       ::UI.messagebox(e.message)
     end
 
-    # Porta de entrada do N na toolbar nativa. Se a barra já está aberta, vem
-    # pra frente — nunca uma segunda instância.
+    # Porta de entrada do N na toolbar nativa: mostra a barra e, se ela já
+    # está na tela, esconde. A janela nativa não tem ×, então o N é quem
+    # fecha — nunca uma segunda instância.
     def open_glass_toolbar
-      show_glass_toolbar
-    rescue StandardError => e
-      ::UI.messagebox(e.message)
+      toggle_glass_toolbar
     end
 
     # Só reabre se o usuário deixou aberta. Chamado por timer no load: abrir
@@ -7080,7 +7090,65 @@ module SpaceNode
       nil
     end
 
+    # ── Barra nativa (Windows): janela própria com alfa por pixel ────────────
+    # Ver glass_bar.rb. Devolve false quando a janela não pôde nascer, e aí o
+    # HtmlDialog abaixo assume — ele segue sendo a barra do macOS.
+    def show_native_glass_bar
+      if GlassBar.visible?
+        GlassBar.front
+        emit_toolbar_state
+        return true
+      end
+
+      spot = native_glass_bar_spot
+      shown = GlassBar.show(spot[0], spot[1], toolbar_orientation,
+                            File.join(__dir__, 'assets', 'glassbar'), locale,
+                            :on_action => method(:glass_bar_action),
+                            :on_moved => method(:remember_glass_bar_position))
+      return false unless shown
+
+      remember_toolbar_visible(true)
+      emit_toolbar_state
+      true
+    rescue StandardError
+      false
+    end
+
+    # Canto da PLACA em px de tela: a posição guardada, trazida de volta pra
+    # tela se o monitor sumiu; sem posição, centrada sobre o SketchUp.
+    def native_glass_bar_spot
+      left = ::Sketchup.read_default(PREFERENCES_KEY, 'toolbar_left', nil)
+      top = ::Sketchup.read_default(PREFERENCES_KEY, 'toolbar_top', nil)
+      vertical = toolbar_orientation == 'vertical'
+      w = vertical ? 54 : 274
+      h = vertical ? 274 : 54
+      spot = left && top ? onscreen_toolbar_spot(left.to_i, top.to_i, w, h) : nil
+      spot || GlassBar.suggested_spot(w, h)
+    end
+
+    # A janela nativa avisa quando o usuário solta o arrasto.
+    def remember_glass_bar_position(x, y)
+      ::Sketchup.write_default(PREFERENCES_KEY, 'toolbar_left', x.to_i)
+      ::Sketchup.write_default(PREFERENCES_KEY, 'toolbar_top', y.to_i)
+    rescue StandardError
+      nil
+    end
+
+    # Os mesmos comandos dos callbacks do toolbar.html.
+    def glass_bar_action(id)
+      case id.to_s
+      when 'panel' then toolbar_action { activate }
+      when 'capture' then toolbar_action { toolbar_capture }
+      when 'generate' then toolbar_action { toolbar_generate }
+      when 'scene' then toolbar_action { toolbar_add_scene }
+      when 'edit' then toolbar_action { toolbar_edit }
+      when 'orientation' then toolbar_action { flip_toolbar_orientation }
+      end
+    end
+
     def show_glass_toolbar
+      return if GlassBar.available? && show_native_glass_bar
+
       if glass_toolbar_open?
         @toolbar_dialog.bring_to_front if @toolbar_dialog.respond_to?(:bring_to_front)
         return
@@ -7135,6 +7203,11 @@ module SpaceNode
     end
 
     def close_glass_toolbar
+      if GlassBar.visible?
+        pos = GlassBar.position
+        remember_glass_bar_position(pos[0], pos[1]) if pos
+        GlassBar.hide
+      end
       remember_toolbar_position
       remember_toolbar_visible(false)
       @toolbar_dialog.close if @toolbar_dialog
@@ -7241,6 +7314,7 @@ module SpaceNode
     def flip_toolbar_orientation
       novo = toolbar_orientation == 'horizontal' ? 'vertical' : 'horizontal'
       ::Sketchup.write_default(PREFERENCES_KEY, 'toolbar_orientation', novo)
+      GlassBar.orientation = novo if GlassBar.visible?
       size = TOOLBAR_DEFAULT_SIZE[novo]
       if @toolbar_dialog
         if @toolbar_dialog.respond_to?(:set_content_size)
@@ -7270,7 +7344,7 @@ module SpaceNode
     end
 
     def emit_toolbar_state
-      return unless @toolbar_dialog
+      return unless @toolbar_dialog || GlassBar.visible?
 
       disabled = []
       disabled << 'generate' unless authenticated?
@@ -7279,6 +7353,11 @@ module SpaceNode
       if @generating
         busy = @generation_context && @generation_context[:mode] == :edit ? 'edit' : 'generate'
       end
+      if GlassBar.visible?
+        GlassBar.update(:locale => locale, :panel_open => panel_open?, :disabled => disabled, :busy => busy)
+      end
+      return unless @toolbar_dialog
+
       payload = {
         :locale => locale,
         :orientation => toolbar_orientation,
