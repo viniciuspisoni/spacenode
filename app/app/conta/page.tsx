@@ -16,6 +16,7 @@ import { getPayerBalance } from '@/lib/workspaces/balance'
 import { getPlanDisplayName } from '@/lib/plan-display'
 import { SUPPORT_EMAIL, SUPPORT_PHONE_DISPLAY, supportWhatsAppUrl } from '@/lib/support'
 import ThemeSelector from '@/components/app/ThemeSelector'
+import GlassIntensitySlider from '@/components/app/GlassIntensitySlider'
 
 export const dynamic = 'force-dynamic'
 
@@ -113,14 +114,26 @@ export default async function ContaPage() {
 
         {/* Aparência */}
         <Block title="Aparência">
-          <div className="spn-glass" style={{ borderRadius: 'var(--r-card)', padding: '18px 20px' }}>
-            <p style={{
-              fontSize: 13, color: 'var(--color-text-tertiary)',
-              lineHeight: 1.6, letterSpacing: '-0.005em', marginBottom: 14,
-            }}>
-              Tema da interface. &ldquo;Sistema&rdquo; acompanha a preferência do seu dispositivo.
-            </p>
-            <ThemeSelector variant="full" />
+          <div className="spn-glass" style={{ borderRadius: 'var(--r-card)', padding: '18px 20px', display: 'grid', gap: 22 }}>
+            <div>
+              <p style={{
+                fontSize: 13, color: 'var(--color-text-tertiary)',
+                lineHeight: 1.6, letterSpacing: '-0.005em', marginBottom: 14,
+              }}>
+                Tema da interface. &ldquo;Sistema&rdquo; acompanha a preferência do seu dispositivo.
+              </p>
+              <ThemeSelector variant="full" />
+            </div>
+            <div>
+              <p style={{
+                fontSize: 13, color: 'var(--color-text-tertiary)',
+                lineHeight: 1.6, letterSpacing: '-0.005em', marginBottom: 14,
+              }}>
+                Liquid Glass — o quanto as superfícies em vidro deixam ver o que está atrás.
+                Mais opaco favorece leitura; mais transparente favorece profundidade.
+              </p>
+              <GlassIntensitySlider />
+            </div>
           </div>
         </Block>
 

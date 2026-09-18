@@ -20,7 +20,7 @@ import GenerateGuide, {
   GUIDE_START_EVENT, GUIDE_DISMISSED_KEY, type GuidePhase,
 } from '@/components/app/GenerateGuide'
 import {
-  Sheet, SettingGroup, SettingRow, summarize,
+  ContextPanel, SettingGroup, SettingRow, summarize,
   Segmented, PillGroup, MultiPillGroup, ChoiceGroup, RowIcon, useAmbient,
 } from '@/components/app/glass'
 import {
@@ -951,6 +951,7 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
     : 'upload'
 
   const closeSheet = () => setSheet(null)
+  const toggleSheet = (id: SheetId) => setSheet(prev => (prev === id ? null : id))
 
   return (
     <div className="spn-tool">
@@ -980,17 +981,191 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
           />
 
           <SettingGroup>
-            <SettingRow icon={<RowIcon name="scene" />}     title="Cena"      value={cenaSummary}      onOpen={() => setSheet('cena')} />
-            <SettingRow icon={<RowIcon name="light" />}     title="Luz"       value={luzSummary}       onOpen={() => setSheet('luz')} />
-            <SettingRow icon={<RowIcon name="materials" />} title="Materiais" value={materiaisSummary} onOpen={() => setSheet('materiais')} />
-            <SettingRow icon={<RowIcon name="output" />}    title="Saída"     value={saidaSummary}     onOpen={() => setSheet('saida')} />
+            <SettingRow icon={<RowIcon name="scene" />}     title="Cena"      value={cenaSummary}      active={sheet === 'cena'}      controls="cena-painel"      onOpen={() => toggleSheet('cena')} />
+            <SettingRow icon={<RowIcon name="light" />}     title="Luz"       value={luzSummary}       active={sheet === 'luz'}        controls="luz-painel"       onOpen={() => toggleSheet('luz')} />
+            <SettingRow icon={<RowIcon name="materials" />} title="Materiais" value={materiaisSummary} active={sheet === 'materiais'}  controls="materiais-painel" onOpen={() => toggleSheet('materiais')} />
+            <SettingRow icon={<RowIcon name="output" />}    title="Saída"     value={saidaSummary}     active={sheet === 'saida'}      controls="saida-painel"     onOpen={() => toggleSheet('saida')} />
           </SettingGroup>
 
-          <p className="spn-hint">
-            Tudo já vem decidido. O que você não pedir aqui é preservado do jeito
-            que está no seu modelo.
-          </p>
+          {!sheet && (
+            <p className="spn-hint">
+              Tudo já vem decidido. O que você não pedir aqui é preservado do jeito
+              que está no seu modelo.
+            </p>
+          )}
         </div>
+
+        {/* Painel contextual: abre na própria sidebar, entre as linhas e o
+            dock — a imagem de referência nunca fica coberta. */}
+        <ContextPanel open={sheet === 'cena'} title="Cena" onClose={closeSheet} id="cena-painel">
+          <div className="spn-field">
+            <span className="spn-field-label">Segmento</span>
+            <PillGroup label="Segmento" options={segments} value={segment} onChange={handleSegmentChange} />
+          </div>
+          <div className="spn-field">
+            <span className="spn-field-label">Espaço</span>
+            <PillGroup label="Espaço" options={environments} value={environment} onChange={setEnvironment} />
+            {/* Com o segmento preservado a lista tem uma pílula só, e sem esta
+                linha ela parece um grupo morto — o usuário não descobre que é
+                o segmento que a acorda. */}
+            {isPreserved(segment) && (
+              <p className="spn-hint">Escolha um segmento acima para listar os espaços.</p>
+            )}
+          </div>
+          <div className="spn-field">
+            <span className="spn-field-label">{bgTitle}</span>
+            <PillGroup label={bgTitle} options={backgrounds} value={background} onChange={setBackground} />
+          </div>
+          <div className="spn-field">
+            <span className="spn-field-label">Elementos na cena</span>
+            <MultiPillGroup label="Elementos na cena" options={elementsOpts} values={sceneElements} onChange={setSceneElements} />
+            <p className="spn-hint">
+              Só o que você marcar entra na cena. Nada marcado = a cena fica como está no modelo.
+            </p>
+            {sceneElements.length > 0 && (
+              <button type="button" className="spn-ghost" style={{ marginTop: 10 }} onClick={() => setSceneElements([])}>
+                Limpar seleção
+              </button>
+            )}
+          </div>
+        </ContextPanel>
+
+        <ContextPanel open={sheet === 'luz'} title="Luz" onClose={closeSheet} id="luz-painel">
+          <div className="spn-field">
+            <span className="spn-field-label">Iluminação</span>
+            <PillGroup label="Iluminação" options={lightingOpts} value={lighting} onChange={setLighting} />
+            <p className="spn-hint">
+              &quot;Preservar Original&quot; mantém exatamente a luz que já está no seu modelo.
+            </p>
+          </div>
+        </ContextPanel>
+
+        <ContextPanel open={sheet === 'materiais'} title="Materiais" onClose={closeSheet} id="materiais-painel">
+          <p className="spn-hint" style={{ marginTop: 0, marginBottom: 16 }}>
+            Preencha apenas pra <strong>alterar</strong> materiais específicos. Em branco =
+            preserva todos do original. Anexe uma <strong>amostra</strong> (foto do produto)
+            pro material ser reproduzido com exatidão.
+          </p>
+          {sampleError && (
+            <div className="spn-error" role="alert" style={{ marginBottom: 16 }}>{sampleError}</div>
+          )}
+          {visibleMaterialFields.map(({ field, label, placeholder }) => (
+            <div key={field} className="spn-field">
+              <div style={S.materialHead}>
+                <span className="spn-field-label" style={{ marginBottom: 0 }}>{label}</span>
+                {/* Amostra visual: foto do produto real reproduzida fielmente
+                    na superfície — muito mais preciso que o texto sozinho. */}
+                {materialRefs[field] ? (
+                  <span style={S.matRefChip}>
+                    <img src={materialRefs[field]} alt={`Amostra de ${label}`} style={S.matRefThumb}/>
+                    <button
+                      type="button"
+                      style={S.matRefRemove}
+                      aria-label={`Remover amostra de ${label}`}
+                      onClick={() => setMaterialRefs(prev => { const next = { ...prev }; delete next[field]; return next })}
+                    >×</button>
+                  </span>
+                ) : (
+                  <label className="spn-pill" style={{ ...S.matRefAdd, ...(uploadingRef !== null ? { opacity: 0.5, cursor: 'wait' } : null) }}>
+                    {uploadingRef === field ? 'enviando…' : '+ amostra'}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      style={{ display: 'none' }}
+                      disabled={uploadingRef !== null}
+                      onChange={e => { const f = e.target.files?.[0]; if (f) handleMaterialRefUpload(field, f); e.target.value = '' }}
+                    />
+                  </label>
+                )}
+              </div>
+              <input
+                className="spn-input"
+                type="text"
+                value={materials[field] ?? ''}
+                placeholder={placeholder}
+                onChange={e => handleMaterialChange(field, e.target.value)}
+              />
+            </div>
+          ))}
+          <p className="spn-hint" aria-live="polite">
+            {salvando ? 'salvando…' : salvoOk ? 'salvo ✓' : 'salvo automaticamente'}
+          </p>
+        </ContextPanel>
+
+        <ContextPanel open={sheet === 'saida'} title="Saída" onClose={closeSheet} id="saida-painel">
+          <div className="spn-field">
+            <span className="spn-field-label">Motor</span>
+            {/* Com o Orion ligado são 4 motores: grade 2×2 (Vega·Pulsar /
+                Quasar·Orion), cartões idênticos e SEM nota — o que o motor faz
+                está na linha abaixo, que já muda com a seleção. Sem Orion
+                continuam 3 numa fileira só, como sempre. */}
+            <ChoiceGroup
+              label="Motor"
+              cols={orionEnabled ? 2 : 3}
+              value={selectedEngine}
+              onChange={handleEngineChange}
+              options={[
+                ...ENGINE_ORDER.map(eid => ({
+                  value: eid as RenderEngineId,
+                  title: ENGINES[eid].name,
+                })),
+                // Orion: só existe quando o servidor autorizou (flag +
+                // credencial do fornecedor). Fora do catálogo público de
+                // lib/engines, que é compartilhado com Spaces/plugin/Nodi.
+                ...(orionEnabled
+                  ? [{ value: 'orion' as RenderEngineId, title: ORION_CONFIG.name }]
+                  : []),
+              ]}
+            />
+            <p className="spn-hint">{currentEngine.description}</p>
+          </div>
+
+          {/* Variante e qualidade não são mais escolha do usuário: o servidor
+              sempre usa Flare/high (ver lib/orion/config). Resta a nota do que
+              o motor ainda não faz. */}
+          {orionEnabled && isOrion && (
+            <p className="spn-hint">
+              Fornecedor {orionProvider === 'fal' ? 'fal.ai' : 'OpenAI'} · o resultado ainda não vira projeto no Spaces.
+            </p>
+          )}
+          <div className="spn-field">
+            <span className="spn-field-label">Qualidade</span>
+            {/* Motor de resolução única (é o caso do Quasar, que só entrega 2K):
+                um cartão sozinho e sempre marcado é um controle que não se
+                opera — vira ruído com aparência de escolha. A informação
+                continua na tela, como linha. */}
+            {currentEngine.resolutions.length === 1 ? (
+              <p className="spn-hint" style={{ marginTop: 0 }}>
+                <b style={{ color: 'var(--color-text-primary)', fontWeight: 560 }}>
+                  {selectedResolution.toUpperCase()}
+                  {` · ${currentEngine.nodes[selectedResolution] ?? 0} nodes`}
+                </b>
+                {' — '}{RESOLUTION_DESC[selectedResolution]}
+                {' · única resolução do '}{currentEngine.name}
+              </p>
+            ) : (
+              <>
+                <ChoiceGroup
+                  label="Qualidade"
+                  cols={currentEngine.resolutions.length >= 3 ? 3 : 2}
+                  value={selectedResolution}
+                  onChange={setSelectedResolution}
+                  options={currentEngine.resolutions.map(res => ({
+                    value: res,
+                    title: res.toUpperCase(),
+                    // Orion: o "4K" dele é UHD (3840 no lado maior, teto da Image
+                    // API), não os 4096 px de Vega/Pulsar — por isso o tamanho
+                    // entregue aparece junto do preço.
+                    note:  isOrion
+                      ? `${currentEngine.nodes[res] ?? 0} nodes · ${ORION_LONG_EDGE[res === '4k' ? '4k' : '2k']} px`
+                      : `${currentEngine.nodes[res] ?? 0} nodes`,
+                  }))}
+                />
+                <p className="spn-hint">{RESOLUTION_DESC[selectedResolution]}</p>
+              </>
+            )}
+          </div>
+        </ContextPanel>
 
         {/* Dock: o CTA nunca some no scroll. */}
         <div className="spn-dock spn-glass spn-glass--chrome">
@@ -1376,182 +1551,6 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
         </div>
       </div>
 
-      {/* ── FOLHAS ────────────────────────────────────────────────────────────
-          A cascata (tipo → segmento → espaço/luz/elementos) continua inteira:
-          trocar segmento aqui dentro ainda reescreve espaço, luz e elementos,
-          e o auto-save de 1,5 s continua vendo só o estado final do batch. */}
-
-      <Sheet open={sheet === 'cena'} title="Cena" onClose={closeSheet}>
-        <div className="spn-field">
-          <span className="spn-field-label">Segmento</span>
-          <PillGroup label="Segmento" options={segments} value={segment} onChange={handleSegmentChange} />
-        </div>
-        <div className="spn-field">
-          <span className="spn-field-label">Espaço</span>
-          <PillGroup label="Espaço" options={environments} value={environment} onChange={setEnvironment} />
-          {/* Com o segmento preservado a lista tem uma pílula só, e sem esta
-              linha ela parece um grupo morto — o usuário não descobre que é
-              o segmento que a acorda. */}
-          {isPreserved(segment) && (
-            <p className="spn-hint">Escolha um segmento acima para listar os espaços.</p>
-          )}
-        </div>
-        <div className="spn-field">
-          <span className="spn-field-label">{bgTitle}</span>
-          <PillGroup label={bgTitle} options={backgrounds} value={background} onChange={setBackground} />
-        </div>
-        <div className="spn-field">
-          <span className="spn-field-label">Elementos na cena</span>
-          <MultiPillGroup label="Elementos na cena" options={elementsOpts} values={sceneElements} onChange={setSceneElements} />
-          <p className="spn-hint">
-            Só o que você marcar entra na cena. Nada marcado = a cena fica como está no modelo.
-          </p>
-          {sceneElements.length > 0 && (
-            <button type="button" className="spn-ghost" style={{ marginTop: 10 }} onClick={() => setSceneElements([])}>
-              Limpar seleção
-            </button>
-          )}
-        </div>
-      </Sheet>
-
-      <Sheet open={sheet === 'luz'} title="Luz" onClose={closeSheet}>
-        <div className="spn-field">
-          <span className="spn-field-label">Iluminação</span>
-          <PillGroup label="Iluminação" options={lightingOpts} value={lighting} onChange={setLighting} />
-          <p className="spn-hint">
-            &quot;Preservar Original&quot; mantém exatamente a luz que já está no seu modelo.
-          </p>
-        </div>
-      </Sheet>
-
-      <Sheet open={sheet === 'materiais'} title="Materiais" onClose={closeSheet}>
-        <p className="spn-hint" style={{ marginTop: 0, marginBottom: 16 }}>
-          Preencha apenas pra <strong>alterar</strong> materiais específicos. Em branco =
-          preserva todos do original. Anexe uma <strong>amostra</strong> (foto do produto)
-          pro material ser reproduzido com exatidão.
-        </p>
-        {/* A recusa da amostra tem de aparecer AQUI: o dock fica atrás do
-            scrim enquanto a folha está aberta. */}
-        {sampleError && (
-          <div className="spn-error" role="alert" style={{ marginBottom: 16 }}>{sampleError}</div>
-        )}
-        {visibleMaterialFields.map(({ field, label, placeholder }) => (
-          <div key={field} className="spn-field">
-            <div style={S.materialHead}>
-              <span className="spn-field-label" style={{ marginBottom: 0 }}>{label}</span>
-              {/* Amostra visual: foto do produto real reproduzida fielmente
-                  na superfície — muito mais preciso que o texto sozinho. */}
-              {materialRefs[field] ? (
-                <span style={S.matRefChip}>
-                  <img src={materialRefs[field]} alt={`Amostra de ${label}`} style={S.matRefThumb}/>
-                  <button
-                    type="button"
-                    style={S.matRefRemove}
-                    aria-label={`Remover amostra de ${label}`}
-                    onClick={() => setMaterialRefs(prev => { const next = { ...prev }; delete next[field]; return next })}
-                  >×</button>
-                </span>
-              ) : (
-                <label className="spn-pill" style={{ ...S.matRefAdd, ...(uploadingRef !== null ? { opacity: 0.5, cursor: 'wait' } : null) }}>
-                  {uploadingRef === field ? 'enviando…' : '+ amostra'}
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    style={{ display: 'none' }}
-                    disabled={uploadingRef !== null}
-                    onChange={e => { const f = e.target.files?.[0]; if (f) handleMaterialRefUpload(field, f); e.target.value = '' }}
-                  />
-                </label>
-              )}
-            </div>
-            <input
-              className="spn-input"
-              type="text"
-              value={materials[field] ?? ''}
-              placeholder={placeholder}
-              onChange={e => handleMaterialChange(field, e.target.value)}
-            />
-          </div>
-        ))}
-        <p className="spn-hint" aria-live="polite">
-          {salvando ? 'salvando…' : salvoOk ? 'salvo ✓' : 'salvo automaticamente'}
-        </p>
-      </Sheet>
-
-      <Sheet open={sheet === 'saida'} title="Saída" onClose={closeSheet}>
-        <div className="spn-field">
-          <span className="spn-field-label">Motor</span>
-          {/* Com o Orion ligado são 4 motores: grade 2×2 (Vega·Pulsar /
-              Quasar·Orion), cartões idênticos e SEM nota — o que o motor faz
-              está na linha abaixo, que já muda com a seleção. Sem Orion
-              continuam 3 numa fileira só, como sempre. */}
-          <ChoiceGroup
-            label="Motor"
-            cols={orionEnabled ? 2 : 3}
-            value={selectedEngine}
-            onChange={handleEngineChange}
-            options={[
-              ...ENGINE_ORDER.map(eid => ({
-                value: eid as RenderEngineId,
-                title: ENGINES[eid].name,
-              })),
-              // Orion: só existe quando o servidor autorizou (flag +
-              // credencial do fornecedor). Fora do catálogo público de
-              // lib/engines, que é compartilhado com Spaces/plugin/Nodi.
-              ...(orionEnabled
-                ? [{ value: 'orion' as RenderEngineId, title: ORION_CONFIG.name }]
-                : []),
-            ]}
-          />
-          <p className="spn-hint">{currentEngine.description}</p>
-        </div>
-
-        {/* Variante e qualidade não são mais escolha do usuário: o servidor
-            sempre usa Flare/high (ver lib/orion/config). Resta a nota do que
-            o motor ainda não faz. */}
-        {orionEnabled && isOrion && (
-          <p className="spn-hint">
-            Fornecedor {orionProvider === 'fal' ? 'fal.ai' : 'OpenAI'} · o resultado ainda não vira projeto no Spaces.
-          </p>
-        )}
-        <div className="spn-field">
-          <span className="spn-field-label">Qualidade</span>
-          {/* Motor de resolução única (é o caso do Quasar, que só entrega 2K):
-              um cartão sozinho e sempre marcado é um controle que não se
-              opera — vira ruído com aparência de escolha. A informação
-              continua na tela, como linha. */}
-          {currentEngine.resolutions.length === 1 ? (
-            <p className="spn-hint" style={{ marginTop: 0 }}>
-              <b style={{ color: 'var(--color-text-primary)', fontWeight: 560 }}>
-                {selectedResolution.toUpperCase()}
-                {` · ${currentEngine.nodes[selectedResolution] ?? 0} nodes`}
-              </b>
-              {' — '}{RESOLUTION_DESC[selectedResolution]}
-              {' · única resolução do '}{currentEngine.name}
-            </p>
-          ) : (
-            <>
-              <ChoiceGroup
-                label="Qualidade"
-                cols={currentEngine.resolutions.length >= 3 ? 3 : 2}
-                value={selectedResolution}
-                onChange={setSelectedResolution}
-                options={currentEngine.resolutions.map(res => ({
-                  value: res,
-                  title: res.toUpperCase(),
-                  // Orion: o "4K" dele é UHD (3840 no lado maior, teto da Image
-                  // API), não os 4096 px de Vega/Pulsar — por isso o tamanho
-                  // entregue aparece junto do preço.
-                  note:  isOrion
-                    ? `${currentEngine.nodes[res] ?? 0} nodes · ${ORION_LONG_EDGE[res === '4k' ? '4k' : '2k']} px`
-                    : `${currentEngine.nodes[res] ?? 0} nodes`,
-                }))}
-              />
-              <p className="spn-hint">{RESOLUTION_DESC[selectedResolution]}</p>
-            </>
-          )}
-        </div>
-      </Sheet>
     </div>
   )
 }

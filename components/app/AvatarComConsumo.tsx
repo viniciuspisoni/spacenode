@@ -285,11 +285,11 @@ function BalancePopover({ planId, planBalance, planTotal, extraBalance, graceDay
   const pillLabel = inGrace ? 'Cortesia'             : noQuota ? 'Gratuito' : stateLabel[state]
 
   return (
-    <div className="spn-glass spn-glass--chrome" style={{
+    <div className="spn-glass spn-glass--chrome spn-popover" style={{
       position: 'absolute', bottom: 56, left: 0,
       width: 248, padding: 16, zIndex: 50,
       borderRadius: 'var(--r-card)',
-      boxShadow: 'var(--shadow-float)',
+      transformOrigin: 'bottom left',
       display: 'flex', flexDirection: 'column', gap: 14,
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>

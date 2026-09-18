@@ -217,21 +217,95 @@ html.light {
 
    O vidro só existe se houver algo passando por trás: quem usa .spn-glass
    precisa de um fundo ambiente (ver components/landing/Ambient.tsx). Sobre
-   cor chapada ele vira cinza, não vidro.                                */
-:root {
-  --glass: rgba(30, 30, 32, 0.55);
-  --glass-strong: rgba(22, 22, 24, 0.72);
-  --glass-raised: rgba(58, 58, 62, 0.55);
-  --glass-line: rgba(255, 255, 255, 0.11);
-  --glass-line-strong: rgba(255, 255, 255, 0.20);
-  --glass-spec: rgba(255, 255, 255, 0.18);
-  --glass-shade: rgba(0, 0, 0, 0.28);
-  --glass-blur: 24px;
+   cor chapada ele vira cinza, não vidro.
 
-  --ambient-opacity: 0.55;
+   ── Intensidade (--glass-intensity) ──────────────────────────────────
+   Eixo único, 0..1, escrito como propriedade inline em <html> pela
+   Aparência (Conta) — ver lib/theme/GlassIntensityProvider.tsx e o
+   controle em components/app/GlassIntensitySlider.tsx. 0 = "mais opaco",
+   1 = "mais transparente"; o script anti-flash do layout aplica o valor
+   salvo antes do primeiro paint, do mesmo jeito que já faz com o tema.
+
+   Cada token de vidro vira um `calc()` entre dois extremos (--*-a-min em
+   0, --*-a-max em 1). Os pares foram escolhidos para que 0.5 — o default
+   de quem nunca abriu o controle — caia EXATAMENTE no valor de produção
+   de hoje: ninguém vê diferença sem mexer no slider. Duas famílias:
+     • alfa da superfície/borda cai com a transparência (fica mais fino);
+     • blur, brilho especular, sombra e papel de parede SOBEM com ela
+       (é o que mantém o conteúdo por trás legível e dá profundidade
+       quando o material fica mais fino) — o mesmo compromisso do
+       controle de transparência do iOS/macOS.
+   Consumidores (.spn-glass, .spn-row--active, .spn-context etc.) só leem
+   os tokens finais (--glass, --glass-blur, ...); nenhum precisa saber que
+   por trás existe um slider. */
+:root {
+  --glass-intensity: 0.5;
+
+  /* Recalibrado (2026-09): o 100% original ("max" abaixo) lia como um meio-
+     termo — a mesma curva linear, só que estreita demais entre os extremos.
+     Alargar os pares --min/--max SEM tocar a forma do calc() (arquitetura
+     intacta) empurra os dois fins pra mais longe do centro; o meio continua
+     batendo com a receita de produção porque cada par preserva a MESMA
+     média. "Mais opaco" fica mais chapado (0 quase sólido); "Mais
+     transparente" agora é dramático — blur, brilho e sombra sobem junto. */
+  --glass-a:             calc(0.94 + (0.16 - 0.94) * var(--glass-intensity));
+  --glass-strong-a:      calc(0.96 + (0.48 - 0.96) * var(--glass-intensity));
+  --glass-raised-a:      calc(0.94 + (0.16 - 0.94) * var(--glass-intensity));
+  --glass-line-a:        calc(0.20 + (0.02 - 0.20) * var(--glass-intensity));
+  --glass-line-strong-a: calc(0.34 + (0.06 - 0.34) * var(--glass-intensity));
+  --glass-spec-a:        calc(0.02 + (0.34 - 0.02) * var(--glass-intensity));
+  --glass-shade-a:       calc(0.14 + (0.42 - 0.14) * var(--glass-intensity));
+  --shadow-float-a1:     calc(0.33 + (0.57 - 0.33) * var(--glass-intensity));
+  --shadow-float-a2:     calc(0.20 + (0.40 - 0.20) * var(--glass-intensity));
+
+  --glass: rgb(30 30 32 / var(--glass-a));
+  --glass-strong: rgb(22 22 24 / var(--glass-strong-a));
+  --glass-raised: rgb(58 58 62 / var(--glass-raised-a));
+  --glass-line: rgb(255 255 255 / var(--glass-line-a));
+  --glass-line-strong: rgb(255 255 255 / var(--glass-line-strong-a));
+  --glass-spec: rgb(255 255 255 / var(--glass-spec-a));
+  --glass-shade: rgb(0 0 0 / var(--glass-shade-a));
+
+  /* Três blurs, uma régua só — .spn-glass / .spn-glass--chrome /
+     .spn-glass--raised partiam de 24 / 30 / 20px fixos; os três agora só
+     têm extremos diferentes, mas sobem e descem juntos. Faixa alargada:
+     38/44/34px no extremo transparente é blur CLARAMENTE perceptível, não
+     um borrão de fundo genérico. */
+  --glass-blur:        calc(10px + (38px - 10px) * var(--glass-intensity));
+  --glass-blur-chrome: calc(16px + (44px - 16px) * var(--glass-intensity));
+  --glass-blur-raised: calc(6px + (34px - 6px) * var(--glass-intensity));
+
+  --ambient-opacity: calc(0.30 + (0.80 - 0.30) * var(--glass-intensity));
   --ambient-veil: rgba(10, 10, 10, 0.62);
 
-  --shadow-float: 0 10px 34px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.30);
+  --shadow-float: 0 10px 34px rgb(0 0 0 / var(--shadow-float-a1)), 0 2px 8px rgb(0 0 0 / var(--shadow-float-a2));
+
+  /* ── Estados interativos: hover / pressed / selected ──────────────────
+     O que faz o vidro REAGIR (iOS/macOS): em repouso ele é discreto; ao
+     passar o cursor a aresta acende e o brilho especular sobe; ao pressionar
+     ele afunda (sombra interna + microescala); selecionado ele fica
+     nitidamente mais raso e mais definido que o vizinho. Tudo derivado dos
+     alfas base por soma, então segue --glass-intensity e o tema sozinho —
+     nenhum componente define seu próprio hover a partir daqui. */
+  --glass-hover-a:        calc(var(--glass-raised-a) + 0.08);
+  --glass-spec-hover-a:   calc(var(--glass-spec-a) + 0.16);
+  --glass-spec-press-a:   calc(var(--glass-spec-a) + 0.04);
+  --glass-line-hover-a:   calc(var(--glass-line-strong-a) + 0.10);
+  --glass-press-shade-a:  calc(var(--glass-shade-a) + 0.16);
+
+  --glass-hover:       rgb(72 72 78 / var(--glass-hover-a));
+  --glass-spec-hover:  rgb(255 255 255 / var(--glass-spec-hover-a));
+  --glass-spec-press:  rgb(255 255 255 / var(--glass-spec-press-a));
+  --glass-line-hover:  rgb(255 255 255 / var(--glass-line-hover-a));
+  --glass-press-shade: rgb(0 0 0 / var(--glass-press-shade-a));
+  /* Selecionado (pílula/cartão) usa o inverso do tema; o brilho e a sombra
+     interna dele precisam de cor própria porque o fundo já é o extremo. */
+  --glass-sel-spec:  rgba(255, 255, 255, 0.70);
+  --glass-sel-shade: rgba(0, 0, 0, 0.10);
+  --glass-hover-lift: 0 3px 10px rgb(0 0 0 / var(--shadow-float-a2));
+  --glass-press-scale: 0.965;
+  --dur-hover: 160ms;
+  --dur-press: 90ms;
 
   /* Curva de mola da Apple: sai rápido, chega devagar, sem overshoot. */
   --ease: cubic-bezier(0.32, 0.72, 0, 1);
@@ -240,18 +314,35 @@ html.light {
 }
 
 html.light {
-  --glass: rgba(255, 255, 255, 0.62);
-  --glass-strong: rgba(250, 250, 250, 0.80);
-  --glass-raised: rgba(255, 255, 255, 0.92);
-  --glass-line: rgba(0, 0, 0, 0.08);
-  --glass-line-strong: rgba(0, 0, 0, 0.16);
-  --glass-spec: rgba(255, 255, 255, 0.90);
-  --glass-shade: rgba(0, 0, 0, 0.05);
+  --glass-a:             calc(0.92 + (0.32 - 0.92) * var(--glass-intensity));
+  --glass-strong-a:      calc(0.98 + (0.62 - 0.98) * var(--glass-intensity));
+  --glass-raised-a:      calc(0.99 + (0.85 - 0.99) * var(--glass-intensity));
+  --glass-line-a:        calc(0.15 + (0.01 - 0.15) * var(--glass-intensity));
+  --glass-line-strong-a: calc(0.26 + (0.06 - 0.26) * var(--glass-intensity));
+  --glass-spec-a:        calc(0.81 + (0.99 - 0.81) * var(--glass-intensity));
+  --glass-shade-a:       calc(0.01 + (0.09 - 0.01) * var(--glass-intensity));
+  --shadow-float-a1:     calc(0.05 + (0.15 - 0.05) * var(--glass-intensity));
+  --shadow-float-a2:     calc(0.03 + (0.09 - 0.03) * var(--glass-intensity));
 
-  --ambient-opacity: 0.42;
+  --glass: rgb(255 255 255 / var(--glass-a));
+  --glass-strong: rgb(250 250 250 / var(--glass-strong-a));
+  --glass-raised: rgb(255 255 255 / var(--glass-raised-a));
+  --glass-line: rgb(0 0 0 / var(--glass-line-a));
+  --glass-line-strong: rgb(0 0 0 / var(--glass-line-strong-a));
+  --glass-spec: rgb(255 255 255 / var(--glass-spec-a));
+  --glass-shade: rgb(0 0 0 / var(--glass-shade-a));
+
+  --ambient-opacity: calc(0.22 + (0.62 - 0.22) * var(--glass-intensity));
   --ambient-veil: rgba(250, 250, 250, 0.66);
 
-  --shadow-float: 0 10px 30px rgba(0, 0, 0, 0.10), 0 1px 4px rgba(0, 0, 0, 0.06);
+  --shadow-float: 0 10px 30px rgb(0 0 0 / var(--shadow-float-a1)), 0 1px 4px rgb(0 0 0 / var(--shadow-float-a2));
+
+  /* Estados no claro: o hover ESCURECE de leve (branco sobre branco não
+     lê), a aresta é preta e o brilho especular continua branco. */
+  --glass-hover:       rgb(0 0 0 / calc(var(--glass-shade-a) + 0.03));
+  --glass-line-hover:  rgb(0 0 0 / var(--glass-line-hover-a));
+  --glass-sel-spec:  rgba(255, 255, 255, 0.22);
+  --glass-sel-shade: rgba(0, 0, 0, 0.35);
 }
 
 /* Translúcido + borrão + aresta especular. Tudo que flutua usa isto. */
@@ -266,8 +357,8 @@ html.light {
 /* Chrome fixo (navbar, barra de CTA): segura leitura sobre qualquer coisa. */
 .spn-glass--chrome {
   background: var(--glass-strong);
-  -webkit-backdrop-filter: blur(30px) saturate(190%);
-  backdrop-filter: blur(30px) saturate(190%);
+  -webkit-backdrop-filter: blur(var(--glass-blur-chrome)) saturate(190%);
+  backdrop-filter: blur(var(--glass-blur-chrome)) saturate(190%);
 }
 
 /* Controle elevado: pega mais luz que a superfície onde está apoiado. */
@@ -275,6 +366,33 @@ html.light {
   background: var(--glass-raised);
   border: 0.5px solid var(--glass-line);
   box-shadow: inset 0 0.5px 0 var(--glass-spec);
+}
+/* Só o vidro elevado que é CONTROLE reage (button/a); um chip estático com
+   a mesma classe fica parado. Hover: aresta acende + brilho sobe + sobe um
+   fio; pressed: afunda (sombra interna) e encolhe um pouco. */
+button.spn-glass--raised,
+a.spn-glass--raised {
+  transition:
+    background var(--dur-hover) var(--ease),
+    border-color var(--dur-hover) var(--ease),
+    box-shadow var(--dur-hover) var(--ease),
+    transform var(--dur-press) var(--ease);
+}
+button.spn-glass--raised:hover:not(:disabled),
+a.spn-glass--raised:hover {
+  background: var(--glass-hover);
+  border-color: var(--glass-line-hover);
+  box-shadow: inset 0 0.5px 0 var(--glass-spec-hover), var(--glass-hover-lift);
+}
+button.spn-glass--raised:active:not(:disabled),
+a.spn-glass--raised:active {
+  transform: scale(var(--glass-press-scale));
+  box-shadow: inset 0 0.5px 0 var(--glass-spec-press), inset 0 1px 3px var(--glass-press-shade);
+}
+button.spn-glass--raised:focus-visible,
+a.spn-glass--raised:focus-visible {
+  outline: 1.5px solid var(--glass-line-hover);
+  outline-offset: 1px;
 }
 
 /* Sem backdrop-filter, ou com transparência reduzida por acessibilidade, o
@@ -1721,39 +1839,26 @@ html.light {
 /* ── Seletor de aparência — cápsula de vidro (dark: fumê; light: vidro claro) ──
    Fallback: fundo mais opaco quando backdrop-filter não é suportado. */
 .spn-theme-seg {
-  /* vidro fumê (dark) */
-  --seg-glass: rgba(18, 18, 19, 0.62);
-  --seg-glass-blur: rgba(18, 18, 19, 0.34);
-  --seg-reflex: rgba(255, 255, 255, 0.07);
-  --seg-active-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.05));
-  --seg-active-ring: rgba(255, 255, 255, 0.14);
-  --seg-active-shadow: 0 1px 5px rgba(0, 0, 0, 0.35);
+  /* Tinha um jogo de tokens próprio (--seg-*) que ignorava o material
+     global — não seguia --glass-intensity nem os estados. Agora é o mesmo
+     vidro forte dos demais controles; só o degradê da peça ativa é local,
+     porque é o que dá o "encaixe" que os outros segmentados não têm. */
+  --seg-active-bg: linear-gradient(180deg, var(--glass-spec-hover), var(--glass-spec-press));
 
   position: relative;
   display: inline-flex;
   gap: 2px;
   padding: 3px;
   border-radius: 999px;
-  background: var(--seg-glass);
-  border: 0.5px solid var(--color-border-strong);
-  box-shadow: inset 0 1px 0 var(--seg-reflex), var(--shadow-sm);
+  background: var(--glass-strong);
+  border: 0.5px solid var(--glass-line-strong);
+  box-shadow: inset 0 0.5px 0 var(--glass-spec), inset 0 -0.5px 0 var(--glass-shade), var(--shadow-sm);
+  -webkit-backdrop-filter: blur(var(--glass-blur-raised)) saturate(180%);
+  backdrop-filter: blur(var(--glass-blur-raised)) saturate(180%);
   isolation: isolate;
 }
 html.light .spn-theme-seg {
-  /* vidro claro (light) */
-  --seg-glass: rgba(255, 255, 255, 0.72);
-  --seg-glass-blur: rgba(255, 255, 255, 0.48);
-  --seg-reflex: rgba(255, 255, 255, 0.75);
   --seg-active-bg: linear-gradient(180deg, #ffffff, #f3f3f1);
-  --seg-active-ring: rgba(0, 0, 0, 0.09);
-  --seg-active-shadow: 0 1px 4px rgba(0, 0, 0, 0.10);
-}
-@supports ((backdrop-filter: blur(14px)) or (-webkit-backdrop-filter: blur(14px))) {
-  .spn-theme-seg {
-    background: var(--seg-glass-blur);
-    -webkit-backdrop-filter: blur(14px) saturate(1.25);
-    backdrop-filter: blur(14px) saturate(1.25);
-  }
 }
 
 .spn-theme-seg-btn {
@@ -1771,28 +1876,41 @@ html.light .spn-theme-seg {
   letter-spacing: -0.005em;
   color: var(--color-text-tertiary);
   cursor: pointer;
-  transition: color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+  transition:
+    color var(--dur-hover) var(--ease),
+    background var(--dur-hover) var(--ease),
+    box-shadow var(--dur-hover) var(--ease),
+    transform var(--dur-press) var(--ease);
 }
 .spn-theme-seg-btn--compact { padding: 5px 10px; }
 .spn-theme-seg-btn--full    { padding: 6px 14px; }
 
 .spn-theme-seg-btn:hover:not([aria-checked='true']) {
   color: var(--color-text-secondary);
-  background: var(--color-surface);
+  background: var(--glass-hover);
+  box-shadow: inset 0 0.5px 0 var(--glass-spec-hover);
 }
+.spn-theme-seg-btn:active { transform: scale(0.96); }
 
-/* Peça de vidro encaixada — estado ativo */
+/* Peça de vidro encaixada — estado ativo: aresta acesa em anel + brilho,
+   mais uma sombra curta que a tira do trilho. */
 .spn-theme-seg-btn[aria-checked='true'] {
   color: var(--color-text-primary);
   background: var(--seg-active-bg);
   box-shadow:
-    inset 0 1px 0 var(--seg-reflex),
-    0 0 0 0.5px var(--seg-active-ring),
-    var(--seg-active-shadow);
+    inset 0 0.5px 0 var(--glass-spec-hover),
+    0 0 0 0.5px var(--glass-line-hover),
+    0 1px 4px rgba(0, 0, 0, 0.22);
+}
+.spn-theme-seg-btn[aria-checked='true']:active {
+  box-shadow:
+    inset 0 0.5px 0 var(--glass-spec-press),
+    inset 0 1px 3px var(--glass-press-shade),
+    0 0 0 0.5px var(--glass-line-hover);
 }
 
 .spn-theme-seg-btn:focus-visible {
-  outline: 1.5px solid var(--color-border-focus);
+  outline: 1.5px solid var(--glass-line-hover);
   outline-offset: 1px;
 }
 
@@ -2607,16 +2725,20 @@ html.light .spn-theme-seg {
    No app ele também aparece solto sobre o papel de parede (chip de saldo,
    botão de ícone), então precisa do seu próprio borrão. */
 .spn-glass--raised {
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--glass-blur-raised)) saturate(180%);
+  backdrop-filter: blur(var(--glass-blur-raised)) saturate(180%);
 }
 
 :root {
-  /* Sombra da folha: cai para CIMA, porque a folha sobe da base da tela. */
-  --shadow-sheet: 0 -18px 60px rgba(0, 0, 0, 0.55);
+  /* Sombra da folha: cai para CIMA, porque a folha sobe da base da tela.
+     Mesma régua de --glass-intensity dos demais tokens (ver :205), faixa
+     alargada junto com --shadow-float na recalibração de 2026-09. */
+  --shadow-sheet-a: calc(0.40 + (0.70 - 0.40) * var(--glass-intensity));
+  --shadow-sheet: 0 -18px 60px rgb(0 0 0 / var(--shadow-sheet-a));
 }
 html.light {
-  --shadow-sheet: 0 -18px 50px rgba(0, 0, 0, 0.16);
+  --shadow-sheet-a: calc(0.10 + (0.22 - 0.10) * var(--glass-intensity));
+  --shadow-sheet: 0 -18px 50px rgb(0 0 0 / var(--shadow-sheet-a));
 }
 
 /* ── Escopo do app ───────────────────────────────────────────────────────
@@ -2630,12 +2752,17 @@ html.light {
    No claro o papel já entra sob um véu branco de 0.66, que puxa tudo para
    cima: lá o problema é o oposto, e o terciário fica no #6e6e73 original. */
 .spn-app {
-  --ambient-opacity: 0.28;
+  /* Faixa mais contida que a régua base (:205): o papel de parede aqui é o
+     último render do PRÓPRIO usuário — pode ter céu estourado — então
+     mesmo no extremo "mais transparente" a opacidade fica longe do 0.55
+     que fundamentava o cálculo de contraste original. Alargada junto com
+     a régua base (2026-09), mas com folga menor por essa mesma razão. */
+  --ambient-opacity: calc(0.18 + (0.38 - 0.18) * var(--glass-intensity));
   --color-text-tertiary: #9a9aa0;
   --color-text-quaternary: #5a5a5e;
 }
 html.light .spn-app {
-  --ambient-opacity: 0.24;
+  --ambient-opacity: calc(0.17 + (0.31 - 0.17) * var(--glass-intensity));
   /* Custom property vence pela PROXIMIDADE, não pela especificidade: os
      valores de .spn-app (que é um div descendente) sobrepõem os de
      html.light para toda a subárvore. Sem redeclarar aqui, o app no claro
@@ -2659,14 +2786,25 @@ html.light .spn-app {
   pointer-events: none;
   background: var(--color-bg);
 }
-/* Degradê de base: segura o mesmo papel quando não há render nenhum. */
+/* Degradê de base: segura o mesmo papel quando não há render nenhum — e,
+   com o vidro mais transparente (--glass-intensity alto), fica visível
+   mesmo COM um render: é o que o vidro tem pra refratar quando o fundo real
+   é só o wallpaper borrado. Extremamente sutil de propósito (2026-09): o
+   claro precisa de alfa bem mais baixo que o escuro pra não sujar o branco. */
 .spn-ambient::before {
   content: '';
   position: absolute;
   inset: -20%;
   background:
-    radial-gradient(60% 50% at 20% 0%, rgba(120, 140, 180, 0.10), transparent 70%),
-    radial-gradient(50% 40% at 90% 20%, rgba(180, 140, 120, 0.08), transparent 70%);
+    radial-gradient(60% 50% at 20% 0%, rgba(120, 140, 180, 0.14), transparent 70%),
+    radial-gradient(50% 40% at 90% 20%, rgba(180, 140, 120, 0.11), transparent 70%),
+    radial-gradient(70% 60% at 50% 100%, rgba(90, 110, 150, 0.08), transparent 70%);
+}
+html.light .spn-ambient::before {
+  background:
+    radial-gradient(60% 50% at 20% 0%, rgba(120, 140, 190, 0.06), transparent 70%),
+    radial-gradient(50% 40% at 90% 20%, rgba(205, 165, 130, 0.05), transparent 70%),
+    radial-gradient(70% 60% at 50% 100%, rgba(140, 150, 185, 0.04), transparent 70%);
 }
 /* A camada é fixa e não se move: o borrão é rasterizado uma vez e depois só
    composto — rolar a página não refaz o filtro. Os 150% existem porque a
@@ -2719,11 +2857,34 @@ html.light .spn-app {
   font: inherit;
   cursor: pointer;
   border-bottom: 0.5px solid var(--glass-line);
-  transition: background 160ms var(--ease);
+  transition: background var(--dur-hover) var(--ease), box-shadow var(--dur-hover) var(--ease);
 }
 .spn-row:last-child { border-bottom: 0; }
-.spn-row:hover:not(:disabled) { background: var(--color-chip-hover); }
+.spn-row:hover:not(:disabled) {
+  background: var(--glass-hover);
+  box-shadow: inset 0 0.5px 0 var(--glass-spec-hover);
+}
+/* Linha de largura total não encolhe (ficaria torta no grupo): o pressed
+   é só o afundar da sombra interna. */
+.spn-row:active:not(:disabled) {
+  box-shadow: inset 0 0.5px 0 var(--glass-spec-press), inset 0 1px 3px var(--glass-press-shade);
+}
+.spn-row:focus-visible { outline: 1.5px solid var(--glass-line-hover); outline-offset: -2px; }
 .spn-row:disabled { opacity: 0.45; cursor: default; }
+/* Linha da família cujo painel contextual está aberto embaixo — precisa
+   ficar destacada, senão o painel parece flutuar solto sem dono. Usa o
+   MESMO par de tokens do próprio painel (--glass-raised + brilho + aresta
+   acesa): é o que faz a linha e o painel lerem como a mesma peça de vidro,
+   uma aberta e a outra fechada. O anel interno (--glass-line-hover) é o
+   que a separa de uma linha só em hover. */
+.spn-row--active,
+.spn-row--active:hover:not(:disabled) {
+  background: var(--glass-raised);
+  box-shadow: inset 0 0.5px 0 var(--glass-spec-hover), inset 0 0 0 0.5px var(--glass-line-hover);
+}
+.spn-row--active .spn-row-ico,
+.spn-row--active .spn-row-title { color: var(--color-text-primary); }
+.spn-row--active .spn-row-chev { transform: rotate(90deg); color: var(--color-text-secondary); }
 .spn-row-ico {
   width: 16px;
   height: 16px;
@@ -2750,6 +2911,7 @@ html.light .spn-app {
   color: var(--color-text-quaternary);
   width: 7px;
   height: 12px;
+  transition: transform 200ms var(--ease), color 200ms var(--ease);
 }
 
 /* ── Folhas ──────────────────────────────────────────────────────────────
@@ -2884,10 +3046,17 @@ html.light .spn-app {
   transform: translateX(var(--seg-x, 0px));
   border-radius: 999px;
   background: var(--glass-raised);
-  border: 0.5px solid var(--glass-line);
-  box-shadow: inset 0 0.5px 0 var(--glass-spec), 0 1px 4px rgba(0, 0, 0, 0.18);
-  transition: transform 380ms var(--ease), width 380ms var(--ease);
+  /* Peça encaixada: aresta e brilho já no nível "hover" — é o selecionado,
+     precisa ler como a única célula em relevo mesmo com o cursor longe. */
+  border: 0.5px solid var(--glass-line-hover);
+  box-shadow: inset 0 0.5px 0 var(--glass-spec-hover), inset 0 -0.5px 0 var(--glass-shade), 0 1px 4px rgba(0, 0, 0, 0.18);
+  transition: transform 380ms var(--ease), width 380ms var(--ease), box-shadow var(--dur-hover) var(--ease);
   pointer-events: none;
+}
+/* Pressionar em qualquer célula afunda o polegar (que é quem está em
+   relevo), não a célula — é o que faz o grupo inteiro parecer uma peça. */
+.spn-seg-track:active .spn-seg-thumb {
+  box-shadow: inset 0 0.5px 0 var(--glass-spec-press), inset 0 1px 3px var(--glass-press-shade);
 }
 .spn-seg-btn {
   position: relative;
@@ -2905,13 +3074,19 @@ html.light .spn-app {
   font-weight: 500;
   color: var(--color-text-tertiary);
   white-space: nowrap;
-  transition: color 200ms var(--ease);
+  transition: color var(--dur-hover) var(--ease), background var(--dur-hover) var(--ease), transform var(--dur-press) var(--ease);
 }
+.spn-seg-btn:hover:not([aria-checked='true']):not(:disabled) {
+  color: var(--color-text-secondary);
+  background: var(--glass-hover);
+}
+.spn-seg-btn:active:not(:disabled) { transform: scale(0.97); }
 .spn-seg-btn[aria-selected='true'],
 .spn-seg-btn[aria-checked='true'] {
   color: var(--color-text-primary);
   font-weight: 600;
 }
+.spn-seg-btn:focus-visible { outline: 1.5px solid var(--glass-line-hover); outline-offset: -1px; }
 .spn-seg-btn:disabled { opacity: 0.35; cursor: default; }
 @media (prefers-reduced-motion: reduce) {
   .spn-seg-thumb { transition: none; }
@@ -2930,25 +3105,48 @@ html.light .spn-app {
   background: var(--color-chip);
   border: 0.5px solid var(--glass-line);
   box-shadow: inset 0 0.5px 0 var(--glass-spec);
-  transition: transform 180ms var(--ease), background 180ms var(--ease), color 180ms var(--ease);
+  transition:
+    background var(--dur-hover) var(--ease),
+    border-color var(--dur-hover) var(--ease),
+    color var(--dur-hover) var(--ease),
+    box-shadow var(--dur-hover) var(--ease),
+    transform var(--dur-press) var(--ease);
 }
+/* `transform: none` explícito: o .spn-pill legado (:485) sobe a pílula 1px
+   no hover e, com isso, engolia a microescala do pressed. */
 .spn-pill:hover:not([aria-checked='true']):not([aria-current='page']):not(:disabled) {
-  background: var(--color-chip-hover);
+  background: var(--glass-hover);
+  border-color: var(--glass-line-hover);
   color: var(--color-text-primary);
+  box-shadow: inset 0 0.5px 0 var(--glass-spec-hover), var(--glass-hover-lift);
+  transform: none;
 }
-.spn-pill:active:not(:disabled) { transform: scale(0.95); }
+.spn-pill:active:not(:disabled) {
+  transform: scale(var(--glass-press-scale));
+  box-shadow: inset 0 0.5px 0 var(--glass-spec-press), inset 0 1px 3px var(--glass-press-shade);
+}
 /* Dois atributos, um estado: `aria-checked` quando a pílula é escolha
    dentro de um grupo, `aria-current` quando ela é um link para a página
    filtrada (equipe/membro). O visual é o mesmo; o que o leitor de tela
-   anuncia é que muda. */
+   anuncia é que muda. Selecionada = o inverso do tema, com o próprio brilho
+   de aresta e uma sombra que a levanta do grupo — nunca confundível com o
+   hover das vizinhas. */
 .spn-pill[aria-checked='true'],
 .spn-pill[aria-current='page'] {
   background: var(--color-chip-active);
   color: var(--color-chip-active-foreground);
   font-weight: 560;
   border-color: transparent;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.20);
+  box-shadow: inset 0 0.5px 0 var(--glass-sel-spec), 0 2px 8px rgba(0, 0, 0, 0.20);
 }
+.spn-pill[aria-checked='true']:hover:not(:disabled),
+.spn-pill[aria-current='page']:hover {
+  box-shadow: inset 0 0.5px 0 var(--glass-sel-spec), var(--glass-hover-lift), 0 2px 8px rgba(0, 0, 0, 0.20);
+}
+.spn-pill[aria-checked='true']:active:not(:disabled) {
+  box-shadow: inset 0 0.5px 0 var(--glass-sel-spec), inset 0 1px 3px var(--glass-sel-shade);
+}
+.spn-pill:focus-visible { outline: 1.5px solid var(--glass-line-hover); outline-offset: 1px; }
 .spn-pill:disabled { opacity: 0.42; cursor: default; }
 
 .spn-choices { display: grid; gap: 8px; }
@@ -2964,16 +3162,34 @@ html.light .spn-app {
   background: var(--color-chip);
   border: 0.5px solid var(--glass-line);
   box-shadow: inset 0 0.5px 0 var(--glass-spec);
-  transition: transform 180ms var(--ease), background 180ms var(--ease);
+  transition:
+    background var(--dur-hover) var(--ease),
+    border-color var(--dur-hover) var(--ease),
+    box-shadow var(--dur-hover) var(--ease),
+    transform var(--dur-press) var(--ease);
 }
-.spn-choice:hover:not([aria-checked='true']):not(:disabled) { background: var(--color-chip-hover); }
-.spn-choice:active:not(:disabled) { transform: scale(0.97); }
+.spn-choice:hover:not([aria-checked='true']):not(:disabled) {
+  background: var(--glass-hover);
+  border-color: var(--glass-line-hover);
+  box-shadow: inset 0 0.5px 0 var(--glass-spec-hover), var(--glass-hover-lift);
+}
+.spn-choice:active:not(:disabled) {
+  transform: scale(0.975);
+  box-shadow: inset 0 0.5px 0 var(--glass-spec-press), inset 0 1px 3px var(--glass-press-shade);
+}
 .spn-choice[aria-checked='true'] {
   background: var(--color-chip-active);
   color: var(--color-chip-active-foreground);
   border-color: transparent;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.22);
+  box-shadow: inset 0 0.5px 0 var(--glass-sel-spec), 0 2px 10px rgba(0, 0, 0, 0.22);
 }
+.spn-choice[aria-checked='true']:hover:not(:disabled) {
+  box-shadow: inset 0 0.5px 0 var(--glass-sel-spec), var(--glass-hover-lift), 0 2px 10px rgba(0, 0, 0, 0.22);
+}
+.spn-choice[aria-checked='true']:active:not(:disabled) {
+  box-shadow: inset 0 0.5px 0 var(--glass-sel-spec), inset 0 1px 3px var(--glass-sel-shade);
+}
+.spn-choice:focus-visible { outline: 1.5px solid var(--glass-line-hover); outline-offset: 1px; }
 .spn-choice b { display: block; font-size: 12px; font-weight: 560; }
 .spn-choice span { display: block; margin-top: 3px; font-size: 10.5px; color: var(--color-text-tertiary); }
 .spn-choice[aria-checked='true'] span { color: var(--color-chip-active-foreground); opacity: 0.62; }
@@ -3011,10 +3227,27 @@ html.light .spn-app {
   justify-content: center;
   cursor: pointer;
   color: var(--color-text-secondary);
-  transition: color 180ms var(--ease), transform 180ms var(--ease);
+  border: 0.5px solid transparent;
+  transition:
+    color var(--dur-hover) var(--ease),
+    background var(--dur-hover) var(--ease),
+    border-color var(--dur-hover) var(--ease),
+    box-shadow var(--dur-hover) var(--ease),
+    transform var(--dur-press) var(--ease);
 }
-.spn-icon-btn:hover { color: var(--color-text-primary); }
-.spn-icon-btn:active { transform: scale(0.94); }
+/* Em repouso é só o glifo; no hover um disco de vidro se materializa por
+   baixo dele — o botão "aparece" quando você chega. */
+.spn-icon-btn:hover:not(:disabled) {
+  color: var(--color-text-primary);
+  background: var(--glass-hover);
+  border-color: var(--glass-line-hover);
+  box-shadow: inset 0 0.5px 0 var(--glass-spec-hover);
+}
+.spn-icon-btn:active:not(:disabled) {
+  transform: scale(var(--glass-press-scale));
+  box-shadow: inset 0 0.5px 0 var(--glass-spec-press), inset 0 1px 3px var(--glass-press-shade);
+}
+.spn-icon-btn:focus-visible { outline: 1.5px solid var(--glass-line-hover); outline-offset: 1px; }
 .spn-icon-btn svg { width: 15px; height: 15px; }
 
 /* ── CTA ────────────────────────────────────────────────────────────────
@@ -3038,11 +3271,23 @@ html.light .spn-app {
   gap: 8px;
   background: var(--color-inverse);
   color: var(--color-inverse-foreground);
-  box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.22), var(--shadow-sm);
-  transition: transform 180ms var(--ease), opacity 180ms var(--ease);
+  box-shadow: inset 0 0.5px 0 var(--glass-sel-spec), var(--shadow-sm);
+  transition:
+    background var(--dur-hover) var(--ease),
+    box-shadow var(--dur-hover) var(--ease),
+    transform var(--dur-press) var(--ease);
 }
-.spn-cta:hover:not(:disabled) { opacity: 0.92; }
-.spn-cta:active:not(:disabled) { transform: scale(0.985); }
+/* Hover era `opacity: 0.92` — um botão que ESCURECE ao ser tocado é o
+   contrário de material pegando luz. Agora ele sobe e o brilho acende. */
+.spn-cta:hover:not(:disabled) {
+  background: var(--color-inverse-hover);
+  box-shadow: inset 0 0.5px 0 var(--glass-sel-spec), var(--glass-hover-lift), var(--shadow-sm);
+}
+.spn-cta:active:not(:disabled) {
+  transform: scale(0.985);
+  box-shadow: inset 0 0.5px 0 var(--glass-sel-spec), inset 0 1px 3px var(--glass-sel-shade);
+}
+.spn-cta:focus-visible { outline: 1.5px solid var(--glass-line-hover); outline-offset: 2px; }
 .spn-cta:disabled { opacity: 0.4; cursor: default; }
 .spn-cta-meta {
   font-size: 11.5px;
@@ -3134,12 +3379,141 @@ body[data-sheet-open='true'] { overflow: hidden; }
   overflow: hidden;
 }
 .spn-tool-panel-body {
-  flex: 1;
+  flex: 0 0 auto;
+  padding: 16px 16px 12px;
+}
+/* ── Painel contextual (Renderizar) ───────────────────────────────────────
+   Onde Cena/Luz/Materiais/Saída abrem, dentro da própria sidebar, entre as
+   quatro linhas e o dock — nunca sobre a imagem de referência. Ocupa o
+   espaço que sobrar na coluna (`flex: 1`) e é o ÚNICO nível com scroll
+   próprio (`.spn-context-body`): a lista de linhas em cima e o dock embaixo
+   ficam parados. Vazio, é só o espaçador que empurra o dock pro rodapé —
+   por isso não carrega `.spn-glass` até ter algo pra mostrar. */
+.spn-context {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+/* Camada própria, não .spn-glass genérico: usa --glass-raised (o mesmo tom
+   de "controle elevado" da linha ativa acima) + borda um degrau mais forte
+   (--glass-line-strong) que a superfície do painel-mãe — precisa se separar
+   de DOIS vidros ao mesmo tempo (a sidebar atrás dele, o papel de parede
+   atrás dela), então a aresta e a sombra fazem mais trabalho aqui do que num
+   .spn-glass solto. */
+.spn-context--open {
+  display: flex;
+  flex-direction: column;
+  margin: 0 16px 12px;
+  border-radius: var(--r-card);
+  overflow: hidden;
+  background: var(--glass-raised);
+  border: 0.5px solid var(--glass-line-strong);
+  box-shadow: var(--shadow-float), inset 0 0.5px 0 var(--glass-spec), inset 0 -0.5px 0 var(--glass-shade);
+  -webkit-backdrop-filter: blur(var(--glass-blur-raised)) saturate(180%);
+  backdrop-filter: blur(var(--glass-blur-raised)) saturate(180%);
+  animation: spn-context-in 260ms var(--ease);
+}
+.spn-context-inner {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+/* Véu (--glass-shade, a mesma sombra interna que já marca a aresta de baixo
+   do vidro) só no header: separa o título do corpo sem introduzir uma cor
+   nova — o painel continua sendo UMA superfície, com um degrau de luz. */
+.spn-context-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  flex: 0 0 auto;
+  background: var(--glass-shade);
+  border-bottom: 0.5px solid var(--glass-line-strong);
+  box-shadow: inset 0 0.5px 0 var(--glass-spec);
+}
+.spn-context-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--color-text-primary);
+}
+.spn-context-close {
+  height: 26px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 0.5px solid var(--glass-line);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 560;
+  cursor: pointer;
+  color: var(--color-text-primary);
+  background: var(--color-chip);
+  box-shadow: inset 0 0.5px 0 var(--glass-spec);
+  transition:
+    background var(--dur-hover) var(--ease),
+    border-color var(--dur-hover) var(--ease),
+    box-shadow var(--dur-hover) var(--ease),
+    transform var(--dur-press) var(--ease);
+}
+.spn-context-close:hover {
+  background: var(--glass-hover);
+  border-color: var(--glass-line-hover);
+  box-shadow: inset 0 0.5px 0 var(--glass-spec-hover), var(--glass-hover-lift);
+}
+.spn-context-close:active {
+  transform: scale(var(--glass-press-scale));
+  box-shadow: inset 0 0.5px 0 var(--glass-spec-press), inset 0 1px 3px var(--glass-press-shade);
+}
+.spn-context-close:focus-visible { outline: 1.5px solid var(--glass-line-hover); outline-offset: 1px; }
+.spn-context-body {
+  flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  padding: 16px;
+  overscroll-behavior: contain;
+  padding: 14px 14px 16px;
   scrollbar-width: thin;
   scrollbar-color: var(--color-scrollbar) transparent;
+}
+@keyframes spn-context-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spn-context--open { animation: none; }
+}
+
+/* ── Popover ─────────────────────────────────────────────────────────────
+   Cartão flutuante ancorado num controle (saldo da sidebar, Liquid Glass).
+   Vidro forte com aresta um degrau acima da base e entrada curta com
+   escala — ele "brota" do botão em vez de só aparecer. Geometria (posição,
+   largura) continua inline em quem o abre; aqui é só material. */
+.spn-popover {
+  border: 0.5px solid var(--glass-line-strong);
+  box-shadow: var(--shadow-float), inset 0 0.5px 0 var(--glass-spec-hover), inset 0 -0.5px 0 var(--glass-shade);
+  animation: spn-popover-in 180ms var(--ease);
+}
+@keyframes spn-popover-in {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
+}
+/* O popover do Liquid Glass já se posiciona com transform (portal): a
+   animação dele só anima opacidade, senão sobrescreveria o translate. */
+.spn-popover--anchored { animation: spn-popover-fade 180ms var(--ease); }
+@keyframes spn-popover-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Um só desligamento para tudo que encolhe/sobe ao interagir. */
+@media (prefers-reduced-motion: reduce) {
+  .spn-popover, .spn-popover--anchored { animation: none; }
+  .spn-pill, .spn-choice, .spn-ghost, .spn-icon-btn, .spn-cta, .spn-seg-btn,
+  .spn-theme-seg-btn, .spn-context-close,
+  button.spn-glass--raised, a.spn-glass--raised {
+    transition-duration: 0ms;
+    transform: none !important;
+  }
 }
 .spn-tool-stage {
   min-height: 0;
@@ -3219,15 +3593,26 @@ body[data-sheet-open='true'] { overflow: hidden; }
   background: var(--glass-raised);
   border: 0.5px solid var(--glass-line);
   box-shadow: inset 0 0.5px 0 var(--glass-spec), var(--shadow-sm);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  backdrop-filter: blur(20px) saturate(180%);
-  transition: transform 180ms var(--ease), color 180ms var(--ease), box-shadow 180ms var(--ease);
+  -webkit-backdrop-filter: blur(var(--glass-blur-raised)) saturate(180%);
+  backdrop-filter: blur(var(--glass-blur-raised)) saturate(180%);
+  transition:
+    background var(--dur-hover) var(--ease),
+    border-color var(--dur-hover) var(--ease),
+    color var(--dur-hover) var(--ease),
+    box-shadow var(--dur-hover) var(--ease),
+    transform var(--dur-press) var(--ease);
 }
 .spn-ghost:hover:not(:disabled) {
   color: var(--color-text-primary);
-  box-shadow: inset 0 0.5px 0 var(--glass-spec), 0 3px 10px rgba(0, 0, 0, 0.14);
+  background: var(--glass-hover);
+  border-color: var(--glass-line-hover);
+  box-shadow: inset 0 0.5px 0 var(--glass-spec-hover), var(--glass-hover-lift);
 }
-.spn-ghost:active:not(:disabled) { transform: scale(0.96); }
+.spn-ghost:active:not(:disabled) {
+  transform: scale(var(--glass-press-scale));
+  box-shadow: inset 0 0.5px 0 var(--glass-spec-press), inset 0 1px 3px var(--glass-press-shade);
+}
+.spn-ghost:focus-visible { outline: 1.5px solid var(--glass-line-hover); outline-offset: 1px; }
 .spn-ghost:disabled { opacity: 0.38; cursor: default; }
 
 /* ── Overlay sobre imagem ────────────────────────────────────────────────

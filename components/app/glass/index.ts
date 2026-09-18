@@ -15,6 +15,8 @@
 export { Ambient, setAmbient, useAmbient } from './Ambient'
 export { Sheet } from './Sheet'
 export type { SheetProps } from './Sheet'
+export { ContextPanel } from './ContextPanel'
+export type { ContextPanelProps } from './ContextPanel'
 export { SettingGroup, SettingRow, summarize } from './SettingRow'
 export type { SettingRowProps } from './SettingRow'
 export { Segmented } from './Segmented'
