@@ -58,7 +58,10 @@
     border: 0.5px solid var(--line);
     box-shadow: 0 10px 30px rgba(0,0,0,0.42), inset 0 0.5px 0 var(--edge);
   }
-  body.vertical .bar { flex-direction: column; padding: 10px 7px; margin-left: auto; }
+  /* Sem margin-left:auto: a janela cresce pra DIREITA quando a dica aparece,
+     então a pílula precisa ficar grudada na esquerda pra não escorregar
+     debaixo do cursor a cada hover. */
+  body.vertical .bar { flex-direction: column; padding: 10px 7px; }
   @supports not ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
     .bar { background: rgba(24,24,26,0.94); }
   }
@@ -185,14 +188,19 @@
     tipFor = btn;
     els.tip.textContent = label;
     els.tip.classList.add('is-on');
+    // Abre espaço ANTES de medir: o resize da janela chega depois e o
+    // listener lá embaixo re-chama showTip pra assentar a posição final.
+    reportSize();
     var r = btn.getBoundingClientRect();
     var vertical = document.body.classList.contains('vertical');
     els.tip.style.visibility = 'hidden';
     var tw = els.tip.offsetWidth, th = els.tip.offsetHeight;
     var x, y;
     if (vertical) {
-      x = r.left - tw - 8;
-      if (x < 4) x = r.right + 8;
+      // A faixa reservada fica à direita (é pra lá que a janela cresce), então
+      // é lá que a dica cabe; a esquerda é só o plano B.
+      x = r.right + 8;
+      if (x + tw > window.innerWidth - 4) x = r.left - tw - 8;
       y = r.top + (r.height - th) / 2;
     } else {
       x = r.left + (r.width - tw) / 2;
@@ -205,8 +213,13 @@
     els.tip.style.top = Math.round(y) + 'px';
     els.tip.style.visibility = '';
   }
-  function hideTip() { tipFor = null; els.tip.classList.remove('is-on'); }
+  function hideTip() {
+    tipFor = null;
+    els.tip.classList.remove('is-on');
+    reportSize(); // devolve a janela ao tamanho da pílula
+  }
 
+  var panelClick = null;
   var ACTIONS = [
     ['bPanel', 'tbPanel', 'panel'],
     ['bCapture', 'tbCapture', 'capture'],
@@ -223,12 +236,22 @@
     btn.addEventListener('click', function () {
       if (btn.disabled) return;
       hideTip();
+      // Na marca o clique espera: dois cliques giram a barra, e sem essa
+      // espera o dblclick abria o painel ANTES de girar (o navegador dispara
+      // os dois clicks e o dblclick). Nos outros botões não há gesto duplo,
+      // então eles disparam na hora.
+      if (btn === els.bPanel) {
+        clearTimeout(panelClick);
+        panelClick = setTimeout(function () { call(a[1]); }, 220);
+        return;
+      }
       call(a[1]);
     });
   });
   // Dois cliques na marca giram a barra — o gesto está no tooltip dela.
   els.bPanel.addEventListener('dblclick', function (ev) {
     ev.preventDefault();
+    clearTimeout(panelClick);
     hideTip();
     call('tbOrientation');
   });
@@ -276,23 +299,42 @@
 
   // O Ruby precisa do tamanho real do conteúdo pra encolher a janela até a
   // pílula (a barra de título do Qt fica, mas a moldura para de sobrar).
+  var lastSize = '';
   function reportSize() {
     var r = els.bar.getBoundingClientRect();
     // A dica vive DENTRO da janela (uma página não escapa dos limites dela),
-    // então a janela reserva uma faixa pra ela: embaixo no horizontal, à
-    // esquerda no vertical. Sem essa reserva o tooltip nasce cortado.
+    // então a janela precisa de uma faixa pra ela: embaixo no horizontal, à
+    // esquerda no vertical. Mas reservar essa faixa SEMPRE deixava um vão
+    // escuro permanente em volta da pílula. A janela só cresce enquanto a
+    // dica está no ar e volta ao tamanho da pílula quando ela some.
     var vertical = document.body.classList.contains('vertical');
-    call('tbSize', JSON.stringify({
-      width: Math.ceil(r.width + 10 + (vertical ? TIP_LANE : 0)),
-      height: Math.ceil(r.height + 10 + (vertical ? 0 : TIP_LANE))
-    }));
+    // No horizontal a faixa é ALTURA (a dica é baixa); no vertical é LARGURA,
+    // e aí 30 px não cobrem "Edit this render". Mede a dica de verdade.
+    var lane = 0;
+    if (tipFor) {
+      lane = vertical ? els.tip.offsetWidth + 14 : els.tip.offsetHeight + 12;
+      if (lane < TIP_LANE) lane = TIP_LANE;
+    }
+    var size = {
+      width: Math.ceil(r.width + 10 + (vertical ? lane : 0)),
+      height: Math.ceil(r.height + 10 + (vertical ? 0 : lane))
+    };
+    // Sem esta guarda, resize → showTip → reportSize → resize vira laço.
+    var key = size.width + 'x' + size.height;
+    if (key === lastSize) return;
+
+    lastSize = key;
+    call('tbSize', JSON.stringify(size));
   }
   window.addEventListener('resize', function () { if (tipFor) showTip(tipFor); });
   document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') hideTip(); });
 
   call('tbReady');
   setTimeout(reportSize, 60);
-  window.__spnToolbarReportSize = reportSize;
+  // Quando o Ruby redimensiona a janela por fora (girar a barra), o cache do
+  // último tamanho está velho — zera antes de remedir, senão a guarda engole
+  // o envio e a janela fica no tamanho padrão em vez do tamanho da pílula.
+  window.__spnToolbarReportSize = function () { lastSize = ''; reportSize(); };
 })();
 </script>
 </body>

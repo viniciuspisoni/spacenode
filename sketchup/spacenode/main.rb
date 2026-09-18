@@ -27,7 +27,7 @@ module SpaceNode
   module SketchUp
     extend self
 
-    VERSION = '1.6.1'
+    VERSION = '1.7.0'
     PREFERENCES_KEY = 'com.spacenode.sketchup'
     DEFAULT_API_BASE_URL = 'https://spacenode.app'
     MIN_SKETCHUP_MAJOR = 21          # Ruby 2.7+; recomendado 2024+
@@ -84,6 +84,8 @@ module SpaceNode
         :tb_mirror_hint => 'Marcar a face selecionada como espelho (o reflexo entra na captura)',
         :tb_float => 'Barra flutuante',
         :tb_float_hint => 'Mostrar ou esconder a barra flutuante em vidro',
+        :tb_open => 'Abrir SpaceNode',
+        :tb_open_hint => 'Abrir a barra flutuante da SpaceNode com as ferramentas',
         :reconciling => 'Conexão instável — verificando se o render foi concluído…',
         :connect_first => 'Conecte sua conta SPACENODE primeiro.',
         :mask_select_something => 'Selecione no SketchUp o grupo, o componente ou as faces que quer revisar e toque de novo.',
@@ -164,6 +166,8 @@ module SpaceNode
         :tb_mirror_hint => 'Mark the selected face as a mirror (the reflection goes into the capture)',
         :tb_float => 'Floating bar',
         :tb_float_hint => 'Show or hide the floating glass bar',
+        :tb_open => 'Open SpaceNode',
+        :tb_open_hint => 'Open the SpaceNode floating bar with the tools',
         :reconciling => 'Unstable connection — checking if the render finished…',
         :connect_first => 'Connect your SPACENODE account first.',
         :mask_select_something => 'Select in SketchUp the group, component or faces you want to revise, then tap again.',
@@ -1560,6 +1564,21 @@ module SpaceNode
       nil
     end
 
+    # Registrado já no load, não só quando o painel abre: quem usa só a barra
+    # flutuante também precisa do onQuit pra visibilidade não se perder.
+    def ensure_app_observer
+      return if @app_observer
+
+      @app_observer = PhotoAppObserver.new(self)
+      ::Sketchup.add_observer(@app_observer)
+    rescue StandardError
+      nil
+    end
+
+    def mark_quitting
+      @quitting = true
+    end
+
     # Observers: câmera mudou → HUD do painel (com debounce — o orbit dispara
     # dezenas de vezes por segundo); modelo trocou → religa overlay/observer.
     def attach_photo_observers
@@ -1573,10 +1592,7 @@ module SpaceNode
         view.add_observer(@view_observer)
         @observed_view = view
       end
-      unless @app_observer
-        @app_observer = PhotoAppObserver.new(self)
-        ::Sketchup.add_observer(@app_observer)
-      end
+      ensure_app_observer
       sync_guides_overlay(model, @photo || photo_settings_from(nil))
     rescue StandardError
       nil
@@ -6823,6 +6839,14 @@ module SpaceNode
         nil
       end
 
+      # Marca o encerramento pra distinguir "o usuário fechou a barra" de "o
+      # SketchUp está saindo" — o set_on_closed do diálogo dispara nos dois.
+      def onQuit
+        @owner.mark_quitting
+      rescue StandardError
+        nil
+      end
+
       def expectsStartupModelNotifications
         false
       end
@@ -6895,6 +6919,7 @@ module SpaceNode
             int = ::Fiddle::TYPE_INT
             @find = ::Fiddle::Function.new(user32['FindWindowExW'], [ptr, ptr, ptr, ptr], ptr)
             @classname = ::Fiddle::Function.new(user32['GetClassNameW'], [ptr, ptr, int], int)
+            @metrics = ::Fiddle::Function.new(user32['GetSystemMetrics'], [int], int)
             @setpos = ::Fiddle::Function.new(user32['SetWindowPos'], [ptr, ptr, int, int, int, int, int], int)
             @dwm = ::Fiddle::Function.new(dwmapi['DwmSetWindowAttribute'], [ptr, int, ptr, int], int)
             true
@@ -6936,6 +6961,19 @@ module SpaceNode
 
       def attribute(handle, id, value)
         @dwm.call(handle, id, ::Fiddle::Pointer[[value].pack('L')], 4)
+      end
+
+      # Retângulo que cobre TODOS os monitores (SM_*VIRTUALSCREEN), não só o
+      # primário: com dois monitores o secundário costuma ter x negativo, e um
+      # teste contra a tela primária jogaria fora uma posição perfeitamente
+      # válida. nil quando não é Windows.
+      def virtual_screen
+        return nil unless available?
+
+        rect = [@metrics.call(76), @metrics.call(77), @metrics.call(78), @metrics.call(79)]
+        rect[2] > 0 && rect[3] > 0 ? rect : nil
+      rescue ::StandardError
+        nil
       end
 
       def paint(handle, color, dark)
@@ -7017,10 +7055,46 @@ module SpaceNode
       ::UI.messagebox(e.message)
     end
 
+    # Porta de entrada do N na toolbar nativa. Se a barra já está aberta, vem
+    # pra frente — nunca uma segunda instância.
+    def open_glass_toolbar
+      show_glass_toolbar
+    rescue StandardError => e
+      ::UI.messagebox(e.message)
+    end
+
+    # Só reabre se o usuário deixou aberta. Chamado por timer no load: abrir
+    # um HtmlDialog enquanto o SketchUp ainda monta a UI o faz nascer atrás da
+    # janela principal.
+    def restore_glass_toolbar
+      return unless ::Sketchup.read_default(PREFERENCES_KEY, 'toolbar_visible', false)
+
+      show_glass_toolbar
+    rescue StandardError
+      nil
+    end
+
+    def remember_toolbar_visible(visible)
+      ::Sketchup.write_default(PREFERENCES_KEY, 'toolbar_visible', visible ? true : false)
+    rescue StandardError
+      nil
+    end
+
     def show_glass_toolbar
       if glass_toolbar_open?
         @toolbar_dialog.bring_to_front if @toolbar_dialog.respond_to?(:bring_to_front)
         return
+      end
+
+      # Janela morta com o objeto ainda vivo: fecha antes, senão sobra uma
+      # instância órfã sem ninguém pra fechar.
+      if @toolbar_dialog
+        begin
+          @toolbar_dialog.close
+        rescue StandardError
+          nil
+        end
+        @toolbar_dialog = nil
       end
 
       size = TOOLBAR_DEFAULT_SIZE[toolbar_orientation]
@@ -7040,18 +7114,29 @@ module SpaceNode
       dialog.set_on_closed do
         if @toolbar_dialog.equal?(dialog)
           remember_toolbar_position
+          # Fechar pode ser escolha do usuário OU o SketchUp encerrando, e o
+          # set_on_closed dispara igual nos dois. O onQuit NÃO resolve: ele
+          # chega depois do diálogo fechar (medido — a preferência ia pra
+          # false no encerramento mesmo com a guarda). O que separa os casos
+          # é o timer: durante o encerramento ele nunca roda, então a
+          # preferência fica como estava e a barra volta na sessão seguinte.
+          ::UI.start_timer(0.15, false) do
+            remember_toolbar_visible(false) unless @quitting
+          end
           @toolbar_dialog = nil
         end
       end
       @toolbar_dialog = dialog
       dialog.show
       restore_toolbar_position
+      remember_toolbar_visible(true)
       # O HWND só nasce no show, e o Qt ainda pode estar montando a janela.
       ::UI.start_timer(0.2, false) { apply_window_chrome(@frame_theme) }
     end
 
     def close_glass_toolbar
       remember_toolbar_position
+      remember_toolbar_visible(false)
       @toolbar_dialog.close if @toolbar_dialog
       @toolbar_dialog = nil
     rescue StandardError
@@ -7059,11 +7144,44 @@ module SpaceNode
     end
 
     def restore_toolbar_position
+      return unless @toolbar_dialog.respond_to?(:set_position)
+
       left = ::Sketchup.read_default(PREFERENCES_KEY, 'toolbar_left', nil)
       top = ::Sketchup.read_default(PREFERENCES_KEY, 'toolbar_top', nil)
-      return unless left && top && @toolbar_dialog.respond_to?(:set_position)
+      size = TOOLBAR_DEFAULT_SIZE[toolbar_orientation]
+      spot = left && top ? onscreen_toolbar_spot(left.to_i, top.to_i, size[0], size[1]) : nil
+      if spot
+        @toolbar_dialog.set_position(spot[0], spot[1])
+      elsif @toolbar_dialog.respond_to?(:center)
+        # Monitor desligado, resolução menor, notebook sem a dock: a posição
+        # guardada some da tela e a barra ficaria inalcançável.
+        @toolbar_dialog.center
+      end
+    rescue StandardError
+      nil
+    end
 
-      @toolbar_dialog.set_position(left.to_i, top.to_i)
+    # Quanto da janela precisa sobrar na tela pra ela continuar pegável: uma
+    # faixa de barra de título é o que basta pra arrastar de volta.
+    TOOLBAR_MIN_ONSCREEN = [96, 44].freeze
+
+    # Devolve a posição corrigida. Sem saber onde fica a tela (fora do
+    # Windows), devolve a guardada como está — melhor honrar a escolha do
+    # usuário do que centralizar por precaução.
+    def onscreen_toolbar_spot(left, top, width, height)
+      bounds = Win32Chrome.virtual_screen
+      return [left, top] if bounds.nil?
+
+      bx, by, bw, bh = bounds
+      keep_x = [TOOLBAR_MIN_ONSCREEN[0], width].min
+      keep_y = [TOOLBAR_MIN_ONSCREEN[1], height].min
+      x = left
+      x = bx if x < bx
+      x = bx + bw - keep_x if x > bx + bw - keep_x
+      y = top
+      y = by if y < by
+      y = by + bh - keep_y if y > by + bh - keep_y
+      [x, y]
     rescue StandardError
       nil
     end
@@ -7255,10 +7373,16 @@ module SpaceNode
       menu.add_separator
       menu.add_item(float_command)
 
+      # A toolbar NATIVA virou porta de entrada, não paleta: um botão só, o N.
+      # As ferramentas moram na barra flutuante, que é o acesso principal.
+      # Manter as cinco aqui era repetir a barra de vidro numa fileira cinza
+      # do Windows — e a fileira cinza é justamente o que não dá pra estilizar.
+      open_command = build_command(t(:tb_open), t(:tb_open_hint), 'spacenode') do
+        SpaceNode::SketchUp.open_glass_toolbar
+      end
+
       toolbar = ::UI::Toolbar.new('SPACENODE')
-      toolbar.add_item(commands.first)
-      toolbar.add_separator
-      commands.drop(1).each { |c| toolbar.add_item(c) }
+      toolbar.add_item(open_command)
       # restore sozinho NÃO exibe no primeiro load (get_last_state
       # TB_NEVER_SHOWN) — só reposiciona se já foi mostrada antes. show força
       # a exibição na estreia; nas próximas sessões restore respeita a escolha
@@ -7273,6 +7397,12 @@ module SpaceNode
       rescue StandardError
         toolbar.restore
       end
+
+      SpaceNode::SketchUp.ensure_app_observer
+      # A barra flutuante volta como o usuário deixou. Timer porque no load o
+      # SketchUp ainda está montando a UI e um HtmlDialog aberto agora nasce
+      # atrás da janela principal.
+      ::UI.start_timer(1.0, false) { SpaceNode::SketchUp.restore_glass_toolbar }
 
       file_loaded(__FILE__)
     end

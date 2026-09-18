@@ -25,6 +25,62 @@ O que só um plugin dentro do modelo consegue:
 - **Voltar à vista** — cada render guarda a câmera; um clique restaura o
   enquadramento exato no SketchUp.
 
+## O que mudou na 1.7.0 — a barra de vidro virou o acesso principal
+
+A `UI::Toolbar` nativa tinha as mesmas cinco ações da barra flutuante, numa
+fileira cinza do Windows — justo a parte que não dá pra estilizar. Agora ela
+tem **um botão só, o N** ("Abrir SpaceNode"), e ele abre a flutuante. O painel
+completo continua a um clique, pela marca dentro da flutuante.
+
+### Ícone: por que o N ganhou um chip
+
+O símbolo é monocromático `#333333`. Numa toolbar clara ele aparece; numa
+escura, some. Como a toolbar do SketchUp muda de cor com o tema, o ícone passou
+a carregar o próprio contraste: chip `#17171a`, borda branca a 34% e o
+ConstellationN em branco. No claro quem sustenta é o chip; no escuro, a borda e
+o N.
+
+O rasterizador de `scripts/sketchup-toolbar-icons.mjs` ganhou **camadas** por
+causa disso (antes era uma cor só, com alfa). E o desenho é **sensível ao
+tamanho**: a 24 px o traço engrossa (5,4 contra 4,8) e o nó diminui (4,5 contra
+5,5) — mantendo a proporção de 48, os nós encostam no traço e o miolo do N vira
+mancha.
+
+### A janela agora encolhe até a pílula
+
+A faixa da dica (`TIP_LANE`) era reservada **sempre**, então sobrava um vão
+escuro permanente em volta da pílula. Agora a janela só cresce enquanto a dica
+está no ar. Dois detalhes que só apareceram testando:
+
+- No vertical a faixa é LARGURA, e 30 px não cobrem "Edit this render" — a
+  faixa passou a ser medida pela dica de verdade (`offsetWidth + 14`).
+- A faixa vertical mudou de lado. Ela ficava à esquerda com o pílula em
+  `margin-left:auto`; como a janela cresce pra DIREITA, a pílula escorregava
+  debaixo do cursor a cada hover. Agora a pílula fica grudada na esquerda e a
+  dica sai à direita.
+
+### Persistência: o que separa "fechei" de "o SketchUp fechou"
+
+`set_on_closed` dispara igual nos dois casos. A primeira tentativa foi um
+`onQuit` no `AppObserver` — e **não funciona**: medido, o `onQuit` chega DEPOIS
+do diálogo fechar, e a preferência já foi pra `false`.
+
+O que separa de verdade é o **timer**: durante o encerramento ele nunca roda.
+A gravação do `toolbar_visible = false` virou `UI.start_timer(0.15)`. Fechar no
+X grava false (150 ms depois, com o app vivo); encerrar o SketchUp não grava
+nada, e a barra volta na sessão seguinte. As duas direções foram verificadas
+com reinício real.
+
+### Posição fora da tela
+
+`onscreen_toolbar_spot` usa `SM_*VIRTUALSCREEN` (todos os monitores — o
+secundário costuma ter x negativo) e garante 96 px de largura e 44 px de altura
+dentro da tela. Sem isso, um monitor desligado deixa a barra inalcançável.
+
+Medido: `get_position` do HtmlDialog devolveu `[560,300]` e `GetWindowRect`
+`[552,300]` — 8 px só em x, zero em y. É a **borda invisível** do Windows 11,
+não escala diferente; as unidades são as mesmas e o clamp mede certo.
+
 ## O que mudou na 1.6.1 — a moldura deixou de brigar com o vidro
 
 A 1.6.0 entregou a barra em vidro, mas em cima dela ficava uma barra de título
