@@ -7,6 +7,7 @@ import React from 'react'
 import { ConstellationN, Logo } from '@/components/brand'
 import { AvatarComConsumo } from './AvatarComConsumo'
 import ThemeSelector from './ThemeSelector'
+import GlassIntensityControl from './GlassIntensityControl'
 import type { PlanId } from '@/lib/plans'
 import {
   IconProjects, IconDashboard, IconHistory,
@@ -330,13 +331,20 @@ export default function Sidebar({
                 display: 'flex', alignItems: 'center', justifyContent: expanded ? 'flex-start' : 'center', gap: expanded ? 10 : 0,
                 padding: expanded ? '0 10px' : 0, height: 38, borderRadius: 12,
                 textDecoration: 'none', flexShrink: 0,
+                // Mesmo material dos demais controles de vidro (tokens de
+                // estado em globals.css :205): hover acende a aresta, ativo
+                // fica em relevo com anel — não mais dois cinzas chapados.
                 background: active
-                  ? 'var(--color-surface-hover)'
+                  ? 'var(--glass-raised)'
                   : isItemHovered
-                    ? 'var(--color-surface)'
+                    ? 'var(--glass-hover)'
                     : 'transparent',
-                boxShadow: 'none',
-                transition: 'background 0.18s ease',
+                boxShadow: active
+                  ? 'inset 0 0.5px 0 var(--glass-spec-hover), inset 0 0 0 0.5px var(--glass-line-hover)'
+                  : isItemHovered
+                    ? 'inset 0 0.5px 0 var(--glass-spec-hover)'
+                    : 'none',
+                transition: 'background var(--dur-hover) var(--ease), box-shadow var(--dur-hover) var(--ease)',
                 cursor: disabled ? 'default' : 'pointer',
                 opacity: disabled ? 0.5 : 1,
               }
@@ -364,7 +372,9 @@ export default function Sidebar({
       <div data-tour="tema" style={{
         padding: expanded ? '8px 12px' : '8px 0 0',
         display: 'flex',
+        alignItems: 'center',
         justifyContent: 'center',
+        gap: 8,
         opacity: expanded ? 1 : 0,
         height: expanded ? 'auto' : 0,
         overflow: 'hidden',
@@ -372,6 +382,7 @@ export default function Sidebar({
         flexShrink: 0,
       }}>
         <ThemeSelector variant="compact" />
+        <GlassIntensityControl expanded={expanded} />
       </div>
 
       {/* User com anel de consumo */}

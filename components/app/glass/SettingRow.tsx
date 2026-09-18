@@ -29,18 +29,21 @@ export interface SettingRowProps {
   value?: string
   onOpen: () => void
   disabled?: boolean
-  /** Id da folha que esta linha abre, para `aria-controls`. */
+  /** Id da folha (ou painel contextual) que esta linha abre, para `aria-controls`. */
   controls?: string
+  /** Painel contextual desta linha já aberto — acende a linha, sem trocar o resumo. */
+  active?: boolean
 }
 
-export function SettingRow({ icon, title, value, onOpen, disabled, controls }: SettingRowProps) {
+export function SettingRow({ icon, title, value, onOpen, disabled, controls, active }: SettingRowProps) {
   return (
     <button
       type="button"
-      className="spn-row"
+      className={`spn-row ${active ? 'spn-row--active' : ''}`.trim()}
       onClick={onOpen}
       disabled={disabled}
-      aria-haspopup="dialog"
+      aria-haspopup={active === undefined ? 'dialog' : undefined}
+      aria-expanded={active}
       aria-controls={controls}
     >
       <span className="spn-row-ico" aria-hidden>{icon}</span>

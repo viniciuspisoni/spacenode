@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { ThemeProvider } from "@/lib/theme/ThemeProvider";
+import { GlassIntensityProvider } from "@/lib/theme/GlassIntensityProvider";
 import UtmCapture from "@/components/marketing/UtmCapture";
 import GoogleTag from "@/components/GoogleTag";
 import MetaPixel from "@/components/analytics/MetaPixel";
@@ -71,14 +72,21 @@ export default function RootLayout({
             escuras entram na exceção: a landing, as LPs de campanha e todo
             o namespace /sketchup (a página do plugin, a de conexão e a de
             pareamento — o painel dentro do SketchUp é escuro, e a página
-            que o vende usa os mesmos tokens de vidro). */}
-        <script dangerouslySetInnerHTML={{__html: `try{var t=localStorage.getItem('theme');var light=t==='light'||((t===null||t==='system')&&window.matchMedia('(prefers-color-scheme: light)').matches);if(location.pathname==='/'||location.pathname.indexOf('/lp/')===0||location.pathname.indexOf('/sketchup')===0)light=false;document.documentElement.classList.toggle('light',light)}catch(e){}`}} />
+            que o vende usa os mesmos tokens de vidro).
+
+            Mesma ideia pra --glass-intensity: sem isto, quem salvou um
+            valor longe do meio veria o vidro "saltar" da receita padrão
+            (0.5, o :root de app/globals.css) pro valor salvo assim que o
+            GlassIntensityProvider montasse. */}
+        <script dangerouslySetInnerHTML={{__html: `try{var t=localStorage.getItem('theme');var light=t==='light'||((t===null||t==='system')&&window.matchMedia('(prefers-color-scheme: light)').matches);if(location.pathname==='/'||location.pathname.indexOf('/lp/')===0||location.pathname.indexOf('/sketchup')===0)light=false;document.documentElement.classList.toggle('light',light);var g=localStorage.getItem('glassIntensity');if(g!==null){var gn=parseFloat(g);if(!isNaN(gn))document.documentElement.style.setProperty('--glass-intensity',String(Math.max(0,Math.min(1,gn))))}}catch(e){}`}} />
       </head>
       <body className="antialiased">
         {/* Captura first-party de UTMs/click-ids em cookie (sem terceiros) —
             só grava quando a URL traz parâmetros de campanha. */}
         <UtmCapture />
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <GlassIntensityProvider>{children}</GlassIntensityProvider>
+        </ThemeProvider>
         <GoogleTag />
         <MetaPixel />
         <ConsentBanner />
