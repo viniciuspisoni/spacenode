@@ -64,3 +64,18 @@ try {
 }
 
 Write-Host "RBZ gerado em $resolvedOutput"
+
+# Quem o site SERVE e' public/downloads; dist/ e' so o artefato do build.
+# Gerar e commitar so o dist/ ja fez a pagina anunciar 1.7.0 enquanto o
+# download entregava 1.6.0. O script copia sozinho pra nao depender de alguem
+# lembrar dos dois lugares.
+#
+# Este arquivo e' ASCII puro de proposito: um travessao aqui quebrou o parser
+# do PowerShell (o .ps1 e' lido como ANSI e a string perde o terminador).
+$published = Join-Path $root "public\downloads\spacenode-sketchup.rbz"
+if (Test-Path (Split-Path -Parent $published)) {
+  Copy-Item -LiteralPath $resolvedOutput -Destination $published -Force
+  Write-Host "RBZ publicado em $published"
+} else {
+  Write-Warning "public/downloads nao existe; o site continuaria servindo o pacote velho"
+}
