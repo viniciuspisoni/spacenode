@@ -25,6 +25,124 @@ O que só um plugin dentro do modelo consegue:
 - **Voltar à vista** — cada render guarda a câmera; um clique restaura o
   enquadramento exato no SketchUp.
 
+## O que mudou na 1.8.0 — a barra flutuante virou uma janela de verdade
+
+A 1.6.0 e a 1.7.0 tinham medido o teto do `UI::HtmlDialog`: a janela é do Qt
+e reimpõe os próprios flags, então não existe HtmlDialog sem moldura nem com
+alfa por pixel. O que a 1.8.0 muda é a premissa — **a barra deixou de ser uma
+página**. No Windows ela é uma janela Win32 própria, criada por Fiddle (que
+vem no Ruby do SketchUp, sem DLL), com `WS_EX_LAYERED` e pintada por
+`UpdateLayeredWindow`. Resultado: transparência real sobre a viewport, sombra
+suave, sem faixa de título, sem ×, cantos suavizados. O HtmlDialog continua
+existindo como a barra do macOS e como plano B se a janela nativa não nascer.
+
+### A prova veio antes da barra (SketchUp 2026, 18/09/26)
+
+Antes de refazer qualquer coisa, uma sonda de 200 linhas no Console Ruby
+(`CreateWindowExW` + `UpdateLayeredWindow` + `WndProc` em `Fiddle::Closure`)
+mostrou, medido em pixel:
+
+- **alfa por pixel de verdade**: a margem transparente da janela tem a cor
+  exata da viewport (`#bfbfc6` = `#bfbfc6`); a pílula escurece o que está
+  atrás (`#9b9b9e` sobre o céu, `#3e3e42` sobre o chão);
+- **clique não atravessa**: com a figura do modelo embaixo da barra, o
+  `WM_LBUTTONDOWN` chegou ao Ruby em (145, 50) e a ferramenta Selecionar
+  continuou com seleção vazia; o foco não saiu do SketchUp (`MA_NOACTIVATE`);
+- **blur por trás existe, mas em retângulo**: `SetWindowCompositionAttribute`
+  (BLURBEHIND/ACRYLIC) funciona nessa janela e cobre o retângulo inteiro;
+  `SetWindowRgn` NÃO recorta o acento e `DWMWA_WINDOW_CORNER_PREFERENCE` só
+  arredonda a ~8 px. Além de ser API não documentada. **Decisão: sem blur.**
+
+### Como a barra é desenhada
+
+Nada é desenhado em Ruby. `scripts/sketchup-glassbar-atlas.mjs` gera, por
+escala de tela (1, 1.25, 1.5, 2), um **atlas de sprites**
+(`assets/glassbar/<escala>.json` + `.bin.z`): placa com sombra e fio luminoso
+(pontinhos de arrastar e traço já dentro), chips de hover/pressionado/ativo,
+os quatro ícones, a marca, oito quadros do spinner e **todas as dicas** (dois
+idiomas × duas orientações, com a seta apontando pro botão). O `.bin.z` é
+BGRA **pré-multiplicado**, linhas de cima pra baixo, zlib — o Ruby infla e
+copia direto pra uma DIB; nenhum laço de pixel, nenhuma decodificação de
+imagem. `glass_bar.rb` compõe com `AlphaBlend` (msimg32) numa DIB do tamanho
+da janela e entrega por `UpdateLayeredWindow`. Uma repintura são ~12 blits.
+
+A janela é maior que a placa: tem faixa pra dica (embaixo no horizontal, à
+direita no vertical) e margem pra sombra. Como o Windows **não entrega mouse
+em pixel com alfa 0** de janela layered, essa área extra é invisível e
+clicável através — a "faixa reservada" da 1.7.0, que deixava vão escuro,
+deixou de existir como problema.
+
+### Medidas (referência aprovada: retângulo de cantos suavizados)
+
+| | referência (48 px) | 1.8.0 (54 px) |
+|---|---|---|
+| raio da placa | ≈11 (24 %) | 13 |
+| botão / raio | 44 / ≈10 | 46 / 12 |
+| ícone / traço | — / ≈1,6 | 24 / 1,9 |
+| marca | — | 28, `assets/spacenode.svg` (traço 5, nó r 6) |
+| chip ativo | mais claro + aro | branco 0,22 + aro 0,36 |
+| dica | escura, com seta | `#121214` 0,94, r 8, seta 12×6 |
+
+A marca é a adaptação **oficial** do símbolo pra toolbar, o mesmo arquivo de
+que o conceito foi desenhado (medido lá: razão nó/traço 2,6; no arquivo 2,4).
+O PNG do botão nativo e o `toolbar.html` do macOS passaram a usar a mesma
+geometria — antes o `toolbar.html` tinha um N redesenhado com dois pontos.
+
+### Comportamento
+
+- **O N nativo virou liga/desliga.** A janela não tem ×; o N mostra a barra e,
+  se ela está na tela, esconde. O item Extensions → SPACENODE → Barra
+  flutuante faz o mesmo.
+- **Arrastar** pelos pontinhos ou por qualquer área da placa que não seja
+  botão (`WM_NCHITTEST` → `HTCAPTION`, o Windows faz o resto). O duplo clique
+  nessa área é engolido (senão o Windows tenta maximizar). A posição é gravada
+  no `WM_EXITSIZEMOVE` — a 1.7.0 gravava "a cada ação" porque o HtmlDialog não
+  avisa que foi movido.
+- **Dois cliques na marca giram** a barra; o clique simples espera 220 ms pra
+  não abrir o painel junto (mesma regra da 1.7.0, agora via `CS_DBLCLKS`).
+- **Hover** sobe a barra pro topo da pilha (`SetWindowPos` sem ativar): se o
+  painel cobriu a barra, passar o mouse resolve.
+- **Escala de tela**: `GetDpiForWindow` escolhe o atlas (menor escala que
+  cobre o DPI; acima de 2x fica em 2x) e `WM_DPICHANGED` troca de atlas ao
+  mudar de monitor.
+- **Estado** (`busy`, `disabled`, painel aberto, idioma) chega pelo mesmo
+  `emit_toolbar_state` da 1.7.0; enquanto gera, o botão em curso vira spinner
+  (timer de 90 ms) e os outros travam, como no toolbar.html.
+- **Encerramento**: `onQuit` destrói a janela antes do Ruby ir embora — um
+  `WM_DESTROY` chegando num closure já recolhido derrubaria o SketchUp.
+
+### Regras de sobrevivência do Win32 em Ruby
+
+- **Nenhuma exceção sai do WndProc.** Ela atravessaria frames C do Windows.
+  Tudo lá dentro é `rescue Exception`, com um registro de 20 erros em
+  `GlassBar.errors`.
+- **O closure e as strings UTF-16 vivem em ivars do módulo.** Se o GC recolher
+  o `Fiddle::Closure`, a janela chama memória liberada. `@proc ||=` sobrevive a
+  `load` do plugin na mesma sessão; `RegisterClassExW` repetido devolve
+  `ERROR_CLASS_ALREADY_EXISTS` (1410), que é ignorado.
+- **`WNDCLASSEXW` tem 80 bytes em x64**, `BLENDFUNCTION` vai por valor como um
+  `DWORD`, `TRACKMOUSEEVENT` tem 24 bytes (o último campo é preenchido).
+- **`WS_POPUP` é `0x80000000`** e `CreateWindowExW` recebe `int` com sinal:
+  `[v].pack('L').unpack1('l')`, o mesmo tropeço do `SetWindowLongW` da 1.6.1.
+- **Qualquer falha na criação marca `@broken`** e o `main.rb` cai no
+  HtmlDialog no mesmo clique — o usuário nunca fica sem barra.
+
+### Validado no SketchUp 2026 real
+
+Na instância de teste (modelo descartável; o arquivo do dono nunca foi tocado):
+abrir/fechar pelo N e pelo menu; hover com chip e dica; clique em "Nova cena"
+(status "Scene created: View 1", sem abrir o painel); duplo clique na marca
+girando pra horizontal e de volta; arrasto pelos pontinhos com a posição
+gravada ((700, 200) → (900, 351)); `busy` com spinner e trava dos outros
+botões; `disabled` esmaecido com a dica certa; `GlassBar.errors` vazio ao fim.
+Harness offline (`scripts/verify-sketchup-ruby.rb`) 30/30, com a lógica pura
+da barra testada contra o atlas real e a preferência nativa → HtmlDialog.
+
+**Não testado:** escala de tela ≠ 100 % (mudaria os dois monitores do dono
+durante o trabalho dele), SketchUp 2022 (Ruby 2.7 tem `Fiddle::Closure`, mas
+não foi exercitado) e o macOS (cai no HtmlDialog por `available?` → false,
+coberto só pelo harness).
+
 ## O que mudou na 1.7.0 — a barra de vidro virou o acesso principal
 
 A `UI::Toolbar` nativa tinha as mesmas cinco ações da barra flutuante, numa
