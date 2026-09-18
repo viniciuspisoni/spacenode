@@ -22,6 +22,7 @@ import ForceDarkScope from '@/lib/theme/ForceDarkScope'
 import LpCtaLink from '@/components/marketing/LpCtaLink'
 import LpViewPing from '@/components/marketing/LpViewPing'
 import LpStickyCta from '@/components/marketing/LpStickyCta'
+import { BeforeAfter } from '@/components/landing/BeforeAfter'
 import type { PlanIntent } from '@/lib/analytics/attribution'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getLandingPageBySlug, recordAcquisitionEvent } from '@/lib/marketing/ads/service'
@@ -126,6 +127,14 @@ export default async function LandingCampaignPage({
 
   const sections: LandingSection[] = Array.isArray(page.sections) ? page.sections : []
 
+  // MOBILE (2026-09-18): a prova visual sobe para o primeiro viewport. O
+  // primeiro par do `before_after` vira um comparador logo abaixo do título
+  // — no celular, o visitante que veio de um Reel abria a página e via só
+  // texto (o antes/depois começava em 712px de um viewport de 812). A seção
+  // de resultados mostra os pares restantes. No desktop nada muda: o hero
+  // segue sem imagem e a seção mostra todos os pares.
+  const heroPair = sections.flatMap((s) => (s.kind === 'before_after' && Array.isArray(s.pairs) ? s.pairs : []))[0] ?? null
+
   // Registro de visita — best-effort no fim do render: rate limit por IP
   // (o IP fica só na chave da janela, o evento é anônimo) e jamais quebra a
   // página por falha de rastreamento.
@@ -161,7 +170,7 @@ export default async function LandingCampaignPage({
       <LpViewPing slug={slug} />
 
       {/* Header mínimo — só o wordmark de volta pra home */}
-      <header className="mx-auto flex max-w-5xl items-center px-5 py-5 sm:px-10">
+      <header className="mx-auto flex max-w-5xl items-center px-5 py-3 sm:px-10 sm:py-5">
         <Link
           href="/"
           className="text-[13px] font-semibold text-text-primary no-underline"
@@ -173,35 +182,70 @@ export default async function LandingCampaignPage({
 
       <main>
         {/* Hero */}
-        <section className="mx-auto max-w-3xl px-5 pb-14 pt-14 text-center sm:px-10 sm:pt-24">
+        <section className="mx-auto max-w-3xl px-5 pb-8 pt-4 text-center sm:px-10 sm:pb-14 sm:pt-24">
+          {/* Eyebrow só no desktop: no celular é uma linha a mais entre a
+              pessoa e a imagem. */}
           <span
-            className="inline-block text-[10px] font-medium uppercase text-text-tertiary"
+            className="hidden text-[10px] font-medium uppercase text-text-tertiary sm:inline-block"
             style={{ letterSpacing: '0.28em' }}
           >
             Visualização arquitetônica
           </span>
           <h1
-            className="mx-auto mt-6 max-w-2xl text-[clamp(32px,6vw,52px)] font-light leading-[1.08] text-text-primary"
+            className="mx-auto max-w-2xl text-[29px] font-light leading-[1.08] text-text-primary sm:mt-6 sm:text-[clamp(32px,6vw,52px)]"
             style={{ letterSpacing: '-0.045em' }}
           >
             {page.headline ?? page.name}
           </h1>
+
+          {/* Prova visual no primeiro viewport — só mobile (ver heroPair). O
+              comparador é o mesmo da home (arraste), em 16:9 para caber
+              inteiro entre o título e o CTA. */}
+          {heroPair && (
+            <figure className="mx-auto mt-4 max-w-xl sm:hidden" style={{ margin: '16px auto 0' }}>
+              <div className="overflow-hidden rounded-2xl" style={{ border: HAIRLINE }}>
+                <BeforeAfter
+                  base={heroPair.before}
+                  render={heroPair.after}
+                  aspect="16 / 9"
+                  caption={heroPair.label}
+                  sizes="100vw"
+                />
+              </div>
+              <figcaption
+                className="mt-2 text-[10px] uppercase text-text-tertiary"
+                style={{ letterSpacing: '0.12em' }}
+              >
+                arraste para comparar
+                {heroPair.credit && (
+                  <span className="normal-case" style={{ letterSpacing: '0' }}> · projeto de {heroPair.credit}</span>
+                )}
+              </figcaption>
+            </figure>
+          )}
+
           {page.subheadline && (
             <p
-              className="mx-auto mt-5 max-w-xl text-[15px] leading-relaxed text-text-secondary sm:text-[17px]"
+              className="mx-auto mt-4 max-w-xl text-[14px] leading-relaxed text-text-secondary sm:mt-5 sm:text-[17px]"
               style={{ letterSpacing: '-0.01em' }}
             >
               {page.subheadline}
             </p>
           )}
-          <div className="mt-9">
+          <div className="mt-5 sm:mt-9">
             <LpCtaLink href={ctaHref} slug={slug} position="hero" className={CTA_CLASSES}>
               {ctaLabel}
               <CtaArrow />
             </LpCtaLink>
           </div>
-          <p className="mt-5 text-[11px] text-text-tertiary" style={{ letterSpacing: '0.02em' }}>
-            80 nodes grátis · sem cartão
+          {/* Âncora de preço no mobile: quem entra sabe desde o primeiro
+              viewport que a ferramenta é paga — a métrica desta página é
+              assinatura, não volume de cadastro. Desktop segue como estava. */}
+          <p className="mt-4 text-[11px] text-text-tertiary sm:mt-5" style={{ letterSpacing: '0.02em' }}>
+            <span className="sm:hidden">
+              80 nodes grátis, sem cartão · {entryPlan.name} a partir de R$ {entryPlan.monthlyPrice}/mês
+            </span>
+            <span className="hidden sm:inline">80 nodes grátis · sem cartão</span>
           </p>
         </section>
 
@@ -211,7 +255,7 @@ export default async function LandingCampaignPage({
         )}
 
         {/* CTA final */}
-        <section className="mx-auto max-w-3xl px-5 py-16 text-center sm:px-10" style={{ borderTop: HAIRLINE }}>
+        <section className="mx-auto max-w-3xl px-5 py-12 text-center sm:px-10 sm:py-16" style={{ borderTop: HAIRLINE }}>
           <h2 className="text-[26px] font-light text-text-primary" style={{ letterSpacing: '-0.03em' }}>
             comece com 80 nodes grátis.
           </h2>
@@ -291,6 +335,7 @@ function renderSection(
         <PricingSection
           key={index}
           planIds={section.plan_ids}
+          featuredPlanId={section.featured_plan_id}
           note={section.note}
           slug={page.slug}
           planCta={planCta}
@@ -312,8 +357,9 @@ function SectionShell({
   title: string
   children: ReactNode
 }) {
+  // Mobile mais denso (py-8, mb-5); desktop mantém py-12 / mb-8.
   return (
-    <section className="mx-auto max-w-4xl px-5 py-12 sm:px-10">
+    <section className="mx-auto max-w-4xl px-5 py-8 sm:px-10 sm:py-12">
       <span
         className="block text-[10px] font-medium uppercase text-text-tertiary"
         style={{ letterSpacing: '0.28em' }}
@@ -321,7 +367,7 @@ function SectionShell({
         {eyebrow}
       </span>
       <h2
-        className="mb-8 mt-3 text-[26px] font-light text-text-primary"
+        className="mb-5 mt-2 text-[24px] font-light text-text-primary sm:mb-8 sm:mt-3 sm:text-[26px]"
         style={{ letterSpacing: '-0.03em' }}
       >
         {title}
@@ -342,8 +388,20 @@ function gridColsFor(count: number): string {
 function ValuePropsSection({ items }: { items: Array<{ title: string; body: string }> }) {
   if (!Array.isArray(items) || items.length === 0) return null
   return (
-    <section className="mx-auto max-w-4xl px-5 py-10 sm:px-10">
-      <div className={`grid grid-cols-1 gap-2 ${gridColsFor(items.length)}`}>
+    <section className="mx-auto max-w-4xl px-5 py-6 sm:px-10 sm:py-10">
+      {/* Mobile: lista com hairline, sem cartão — os três argumentos cabem
+          em meia tela. Desktop: os cartões de sempre. */}
+      <ul className="m-0 list-none p-0 sm:hidden" style={{ borderTop: HAIRLINE }}>
+        {items.map((item, i) => (
+          <li key={i} className="py-3" style={{ borderBottom: HAIRLINE }}>
+            <span className="text-[13px] font-medium text-text-primary" style={{ letterSpacing: '-0.01em' }}>
+              {item.title}
+            </span>
+            <span className="text-xs text-text-tertiary"> — {item.body}</span>
+          </li>
+        ))}
+      </ul>
+      <div className={`hidden grid-cols-1 gap-2 sm:grid ${gridColsFor(items.length)}`}>
         {items.map((item, i) => (
           <div key={i} className="rounded-xl bg-bg-elevated p-5" style={{ border: HAIRLINE }}>
             <div className="text-[13px] font-medium text-text-primary" style={{ letterSpacing: '-0.01em' }}>
@@ -365,9 +423,33 @@ function BeforeAfterSection({
   pageName: string
 }) {
   if (!Array.isArray(pairs) || pairs.length === 0) return null
+  // Mobile: o primeiro par já está no hero (heroPair); aqui entram os
+  // restantes como comparadores 16:9 — um par por ~230px em vez de ~600px
+  // (duas imagens 4:3 empilhadas). Sem par restante, a seção some no mobile.
+  const mobilePairs = pairs.slice(1)
   return (
     <SectionShell eyebrow="Resultados" title="antes e depois.">
-      <div className="grid gap-8">
+      <div className={`grid gap-5 ${mobilePairs.length === 0 ? 'hidden' : ''} sm:hidden`}>
+        {mobilePairs.map((pair, i) => (
+          <figure key={i} className="m-0">
+            <div className="overflow-hidden rounded-2xl" style={{ border: HAIRLINE }}>
+              <BeforeAfter
+                base={pair.before}
+                render={pair.after}
+                aspect="16 / 9"
+                caption={pair.label}
+                sizes="100vw"
+              />
+            </div>
+            {pair.credit && (
+              <figcaption className="mt-1.5 text-[11px] text-text-tertiary" style={{ letterSpacing: '0.01em' }}>
+                {pair.credit}
+              </figcaption>
+            )}
+          </figure>
+        ))}
+      </div>
+      <div className="hidden gap-8 sm:grid">
         {pairs.map((pair, i) => (
           <figure key={i} className="m-0">
             {/* Divisor hairline: gap de 1px sobre fundo na cor da borda */}
@@ -419,7 +501,7 @@ function BeforeAfterSection({
         ))}
       </div>
       {pairs.some((p) => p.credit) && (
-        <p className="mt-6 text-xs leading-relaxed text-text-tertiary">
+        <p className="mt-4 text-xs leading-relaxed text-text-tertiary sm:mt-6">
           Projetos de escritórios que usam a plataforma. Publicado com autorização
           de quem projetou.
         </p>
@@ -458,7 +540,27 @@ function HowItWorksSection({ steps }: { steps: Array<{ title: string; body: stri
   if (!Array.isArray(steps) || steps.length === 0) return null
   return (
     <SectionShell eyebrow="Processo" title="como funciona.">
-      <ol className={`m-0 grid list-none gap-2 p-0 ${gridColsFor(steps.length)}`}>
+      {/* Mobile: lista numerada em linha, sem cartão. Desktop: cartões. */}
+      <ol className="m-0 list-none p-0 sm:hidden" style={{ borderTop: HAIRLINE }}>
+        {steps.map((step, i) => (
+          <li key={i} className="flex gap-3 py-3" style={{ borderBottom: HAIRLINE }}>
+            <span
+              aria-hidden
+              className="mt-0.5 inline-flex h-5 w-5 flex-none items-center justify-center rounded-full text-[10px] text-text-secondary"
+              style={{ border: '0.5px solid var(--color-border-strong)' }}
+            >
+              {i + 1}
+            </span>
+            <div>
+              <span className="text-[13px] font-medium text-text-primary" style={{ letterSpacing: '-0.01em' }}>
+                {step.title}
+              </span>
+              <p className="mt-0.5 text-xs leading-relaxed text-text-tertiary">{step.body}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+      <ol className={`m-0 hidden list-none gap-2 p-0 sm:grid ${gridColsFor(steps.length)}`}>
         {steps.map((step, i) => (
           <li key={i} className="rounded-xl bg-bg-elevated p-5" style={{ border: HAIRLINE }}>
             <span
@@ -535,11 +637,13 @@ function QuoteSection({ text, attribution }: { text: string; attribution?: strin
  */
 function PricingSection({
   planIds,
+  featuredPlanId,
   note,
   slug,
   planCta,
 }: {
   planIds?: string[]
+  featuredPlanId?: string
   note?: string
   slug: string
   planCta: PlanCta
@@ -548,8 +652,96 @@ function PricingSection({
   const plans = ids.length > 0 ? SELLABLE_PLANS.filter((p) => ids.includes(p.id)) : SELLABLE_PLANS
   if (plans.length === 0) return null
 
+  // MOBILE: um plano em destaque ("comece por aqui", com o CTA dentro do
+  // cartão) e os outros em linhas — o visitante decide entre "entro" e
+  // "não entro", não entre três cartões iguais. O destaque é o plano que o
+  // CTA da página vende (planCta), salvo `featured_plan_id` no dado.
+  const featured =
+    plans.find((p) => p.id === featuredPlanId) ??
+    plans.find((p) => p.id === planCta.intent.plan) ??
+    plans[0]
+  const secondary = plans.filter((p) => p.id !== featured.id)
+  const noteText =
+    note ??
+    'Nodes são os créditos de geração e acumulam enquanto a assinatura estiver ativa. Começa grátis com 80 nodes, sem cartão — a assinatura entra quando o volume pedir.'
+
   return (
     <SectionShell eyebrow="Planos" title="quanto custa.">
+      {/* ── Mobile ─────────────────────────────────────────────────── */}
+      <div className="sm:hidden">
+        <div
+          className="relative flex flex-col rounded-xl bg-bg-elevated p-5"
+          style={{ border: '0.5px solid var(--color-border-strong)' }}
+        >
+          <span
+            className="absolute right-4 top-4 rounded-full bg-inverse px-2 py-0.5 text-[9px] font-medium uppercase text-inverse-foreground"
+            style={{ letterSpacing: '0.14em' }}
+          >
+            comece por aqui
+          </span>
+          <div
+            className="text-[10px] font-medium uppercase text-text-tertiary"
+            style={{ letterSpacing: '0.28em' }}
+          >
+            {featured.name}
+          </div>
+          <div className="mt-3 flex items-baseline gap-1">
+            <span className="text-xs text-text-tertiary">R$</span>
+            <span
+              className="text-[34px] font-light leading-none text-text-primary"
+              style={{ letterSpacing: '-0.03em' }}
+            >
+              {featured.monthlyPrice}
+            </span>
+            <span className="text-xs text-text-tertiary">/mês</span>
+          </div>
+          <div className="mt-2 text-[13px] text-text-secondary" style={{ letterSpacing: '-0.01em' }}>
+            {featured.nodes.toLocaleString('pt-BR')} nodes / mês · cancele quando quiser
+          </div>
+          <p className="mt-1.5 text-xs leading-relaxed text-text-tertiary">{featured.description}</p>
+          <div className="mt-5">
+            <LpCtaLink
+              href={planCta.href}
+              slug={slug}
+              position="pricing"
+              intent={planCta.intent}
+              className={`${CTA_CLASSES} w-full`}
+            >
+              Começar com {featured.name}
+              <CtaArrow />
+            </LpCtaLink>
+          </div>
+        </div>
+
+        {secondary.length > 0 && (
+          <ul className="m-0 mt-3 list-none p-0" style={{ borderTop: HAIRLINE }}>
+            {secondary.map((plan) => (
+              <li
+                key={plan.id}
+                className="flex items-baseline justify-between gap-3 py-3"
+                style={{ borderBottom: HAIRLINE }}
+              >
+                <div className="min-w-0">
+                  <span className="text-[13px] font-medium text-text-primary" style={{ letterSpacing: '-0.01em' }}>
+                    {plan.name}
+                  </span>
+                  <span className="block text-[11px] text-text-tertiary">{plan.description}</span>
+                </div>
+                <div className="flex-none text-right">
+                  <span className="text-[13px] text-text-primary">R$ {plan.monthlyPrice}/mês</span>
+                  <span className="block text-[11px] text-text-tertiary">
+                    {plan.nodes.toLocaleString('pt-BR')} nodes
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="mt-4 text-xs leading-relaxed text-text-tertiary">{noteText}</p>
+      </div>
+
+      {/* ── Desktop (inalterado) ────────────────────────────────────── */}
+      <div className="hidden sm:block">
       <div className={`grid grid-cols-1 gap-2 ${gridColsFor(plans.length)}`}>
         {plans.map((plan) => (
           <div
@@ -582,10 +774,7 @@ function PricingSection({
           </div>
         ))}
       </div>
-      <p className="mt-6 text-xs leading-relaxed text-text-tertiary">
-        {note ??
-          'Nodes são os créditos de geração e acumulam enquanto a assinatura estiver ativa. Começa grátis com 80 nodes, sem cartão — a assinatura entra quando o volume pedir.'}
-      </p>
+      <p className="mt-6 text-xs leading-relaxed text-text-tertiary">{noteText}</p>
       {/* O CTA da seção de preço vende o plano de entrada, não o grátis: o
           clique grava a intenção e o cadastro termina no checkout dele. */}
       <div className="mt-7">
@@ -593,6 +782,7 @@ function PricingSection({
           Começar com {planCta.planName}
           <CtaArrow />
         </LpCtaLink>
+      </div>
       </div>
     </SectionShell>
   )

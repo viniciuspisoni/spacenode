@@ -132,7 +132,10 @@ export type LandingSection =
   // lib/plans.ts (SELLABLE_PLANS), que é a fonte única; o dado só escolhe
   // QUAIS planos aparecem e a nota de rodapé. Assim uma LP publicada não
   // congela um preço antigo quando a tabela muda.
-  | { kind: 'pricing'; plan_ids?: string[]; note?: string }
+  // `featured_plan_id` = o plano "comece por aqui" no mobile (cartão em
+  // destaque, com CTA; os demais viram linhas). Ausente = o primeiro de
+  // plan_ids, que na vitrine é o mais barato.
+  | { kind: 'pricing'; plan_ids?: string[]; note?: string; featured_plan_id?: string }
 
 export interface LandingPage {
   id: string
