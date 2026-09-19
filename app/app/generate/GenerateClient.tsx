@@ -1254,7 +1254,7 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
               </div>
               <div>
                 <div style={S.uploadTitle}>arraste sua imagem aqui</div>
-                <div style={S.uploadSub}>SketchUp · Render · 3D · JPG · PNG · até 15 MB</div>
+                <div style={S.uploadSub}>SketchUp · Render · Foto · JPG · PNG · até 15 MB</div>
               </div>
               <button type="button" className="spn-ghost" onClick={e => { e.stopPropagation(); fileInputRef.current?.click() }}>
                 escolher arquivo

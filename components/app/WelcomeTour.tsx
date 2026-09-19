@@ -147,7 +147,7 @@ export default function WelcomeTour({ needsOnboarding }: { needsOnboarding: bool
           popover: {
             title: 'Comece pelo Renderizar',
             description:
-              'Envie um print do SketchUp, uma foto ou uma planta e receba a imagem pronta. É o caminho mais curto do seu modelo à primeira visualização — e, na primeira vez, um guia de três passos acompanha você dentro da ferramenta.',
+              'Envie um print do SketchUp, um render ou uma foto e receba a imagem pronta. É o caminho mais curto do seu modelo à primeira visualização — e, na primeira vez, um guia de três passos acompanha você dentro da ferramenta.',
             side: 'top',
             align: 'start',
           },
