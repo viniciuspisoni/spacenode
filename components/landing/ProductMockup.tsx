@@ -76,13 +76,6 @@ const IconVideo = (p: IconProps = {}) => (
     <path d="M16 10l5.5-3.2v10.4L16 14" />
   </SVG>
 )
-const IconFinalizar = (p: IconProps = {}) => (
-  <SVG {...p}>
-    <rect x="3" y="3" width="18" height="18" rx="2.6" />
-    <path d="M8 12.2l2.8 2.8L16.5 9" />
-  </SVG>
-)
-
 // Marca — ConstellationN original, monocromático (a versão com nó de acento
 // verde foi aposentada; traço mais grosso que o oficial só pela legibilidade
 // nesta escala de miniatura)
@@ -143,7 +136,6 @@ const NAV_SECTIONS: { label: string; items: { Icon: (p?: IconProps) => React.Rea
       { Icon: IconRetocar,   label: 'Editar' },
       { Icon: IconEnhance,   label: 'Ampliar' },
       { Icon: IconVideo,     label: 'Animar' },
-      { Icon: IconFinalizar, label: 'Finalizar' },
     ],
   },
 ]
