@@ -30,7 +30,7 @@ import {
   type ProjectType,
 } from '@/lib/prompts'
 import { DNA_EXTRACTION_COST, getVistaGenerationCost, getAvailableQualities } from '@/lib/spaces/economy'
-import { getUpscaleCostNodes, scaleToFactor, MAX_OUTPUT_MP, type ModeId, type Scale } from '@/lib/upscale'
+import { getUpscaleCostNodes, effectiveFactor, MAX_OUTPUT_MP, type ModeId, type Scale } from '@/lib/upscale'
 import { PRESET_LABELS_EN } from '@/lib/sketchup/preset-labels-en'
 import { PLUGIN_VERSION, PLUGIN_RBZ_PATH, PLUGIN_RELEASE_NOTE } from '@/lib/sketchup/plugin-release'
 import {
@@ -240,7 +240,9 @@ export async function GET(req: NextRequest) {
       { maxMP: null, add: surchargeProbe(17) },
     ],
     maxOutputMP: MAX_OUTPUT_MP,
-    scaleFactor: { '2x': scaleToFactor('2x'), '4x': scaleToFactor('4x') },
+    // effectiveFactor, não scaleToFactor: o plugin nunca deve receber um fator
+    // que o motor não entrega (ver MAX_UPSCALE_FACTOR).
+    scaleFactor: { '2x': effectiveFactor('2x'), '4x': effectiveFactor('4x') },
   }
 
   const spaces = {

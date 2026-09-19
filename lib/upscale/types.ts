@@ -29,8 +29,8 @@ export type ObjectiveId =
   | 'recover'
   | 'final'
 
-// Numeric scale factor used by providers. 'ultra' is reserved/blocked until
-// we wire a tile-based pipeline that can push past 8×.
+// Fator NOMINAL pedido pela escala. É o que o usuário escreveu, não o que o
+// motor entrega — para isso use effectiveFactor().
 export function scaleToFactor(scale: Scale): number {
   switch (scale) {
     case 'none':  return 1
@@ -39,6 +39,32 @@ export function scaleToFactor(scale: Scale): number {
     case '8x':    return 8
     case 'ultra': return 8 // safety cap until a true 16× pipeline lands
   }
+}
+
+// ── Teto real dos motores ────────────────────────────────────────────────────
+//
+// Topaz e Clarity declaram os DOIS `upscale_factor` com `maximum: 4` no schema
+// FAL (conferido no OpenAPI de 2026-09-18). Isso não era respeitado: a UI
+// oferecia 8×, o custo cobrava 5× a base (50 nodes na Alta Fidelidade) e o
+// Topaz devolvia calado uma imagem 4× — enquanto o fallback Clarity, se
+// chamado, nem chegava a rodar (8 > maximum derruba o request). Quem pedia 8×
+// pagava 50 nodes por 20 nodes de trabalho.
+//
+// O teto agora é explícito e é a fonte única de: o que a UI oferece, o que o
+// custo cobra e o que a rota valida. Um 8× que chegue de um cliente antigo
+// (plugin não atualizado) roda a 4× e é COBRADO a 4×.
+export const MAX_UPSCALE_FACTOR = 4
+
+/** Fator que o motor do modo realmente entrega — nominal, limitado pelo teto.
+ *  Base do custo e da promessa de resolução final mostrada na UI. */
+export function effectiveFactor(scale: Scale): number {
+  return Math.min(scaleToFactor(scale), MAX_UPSCALE_FACTOR)
+}
+
+/** true quando a escala pedida não cabe no motor (UI/rota avisam em vez de
+ *  entregar menos caladas). */
+export function isScaleClamped(scale: Scale): boolean {
+  return scaleToFactor(scale) > MAX_UPSCALE_FACTOR
 }
 
 // ── Providers (interno) ───────────────────────────────────────────────────────

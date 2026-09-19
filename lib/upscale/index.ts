@@ -21,6 +21,9 @@ export type {
 
 export {
   scaleToFactor,
+  effectiveFactor,
+  isScaleClamped,
+  MAX_UPSCALE_FACTOR,
   PROVIDER_ENDPOINTS,
   UpscaleProviderError,
   UpscalePipelineError,
@@ -37,10 +40,16 @@ export {
 
 export {
   OBJECTIVE_PRESETS,
-  analyzeFile,
+  OFFERED_SCALES,
+  analyzeImage,
+  maxScaleForDimensions,
+  projectedDimensions,
+  resolveScale,
+  scaleExceedsCap,
+  type Dimensions,
   type ObjectivePreset,
   type FileRecommendation,
-  type FileSignal,
+  type ImageSignal,
 } from './recommendations'
 
 export {

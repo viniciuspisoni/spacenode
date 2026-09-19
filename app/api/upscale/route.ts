@@ -21,14 +21,18 @@ import { getRequestUser } from '@/lib/auth/request-user'
 import { refundNodes } from '@/lib/billing/refund-nodes'
 import { DIRECT_UPLOAD_AREAS, downloadDirectUpload } from '@/lib/storage/direct-upload'
 import { fetchStorageBuffer } from '@/lib/storage/fetch'
+// Server-only (sharp) — importado direto, nunca via lib/upscale/index, que o
+// componente cliente também importa.
+import { normalizeSource, type NormalizeNote } from '@/lib/upscale/normalize-source'
 import sharp from 'sharp'
 import {
   MAX_OUTPUT_MP,
   computeUpscaleCost,
+  effectiveFactor,
   finalProvider,
+  isScaleClamped,
   megapixelsFromDimensions,
   runUpscalePipeline,
-  scaleToFactor,
   type ModeId,
   type Scale,
   type UpscaleTab,
@@ -99,12 +103,24 @@ export async function POST(req: NextRequest) {
   // subdeclarar as dimensões pra pagar o piso enquanto envia uma imagem grande
   // (custo real alto). sharp mede a origem; o client só é fallback se o decode
   // falhar (caso raro — aí o provider provavelmente também falharia).
+  //
+  // Além de medir, NORMALIZA a orientação EXIF quando preciso (ver
+  // normalizeSource): a saída é PNG, formato sem tag de orientação, então uma
+  // foto deitada voltaria deitada e com a proporção trocada. Cor NÃO é tratada
+  // aqui, de propósito — está medido que o provider preserva o perfil ICC
+  // ponta a ponta (MEDICOES.md §7).
   let width:  number | null = null
   let height: number | null = null
+  let sourceBuffer = src.buffer
+  let sourceMime   = src.mime
+  let normalized: NormalizeNote = null
   try {
-    const meta = await sharp(src.buffer).metadata()
-    width  = meta.width  ?? null
-    height = meta.height ?? null
+    const norm = await normalizeSource(src.buffer, src.mime)
+    width        = norm.width
+    height       = norm.height
+    sourceBuffer = norm.buffer
+    sourceMime   = norm.mime
+    normalized   = norm.note
   } catch {
     console.warn('[upscale] sharp metadata falhou — usando dims do cliente (fallback)')
     width  = widthRaw  ? Number(widthRaw)  : null
@@ -112,15 +128,18 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Teto de resolução do output (antes de custo/débito) ────────────────────
-  const scaleFactor = scaleToFactor(scaleT)
+  // Fator EFETIVO: é o que o motor entrega e, portanto, o que se cobra. Um
+  // cliente antigo que ainda peça 8× roda e paga como 4× (MAX_UPSCALE_FACTOR).
+  const scaleFactor = effectiveFactor(scaleT)
   if (width && height) {
     const outputMp = (width * height * scaleFactor * scaleFactor) / 1_000_000
     if (outputMp > MAX_OUTPUT_MP) {
       return NextResponse.json(
         {
+          code:  'output_too_large',
           error:
-            `Essa combinação geraria ~${Math.round(outputMp)} MP — acima do limite de ${MAX_OUTPUT_MP} MP. ` +
-            'Use uma escala menor para esta imagem.',
+            `Esta imagem em ${scaleFactor}× daria ~${Math.round(outputMp)} MP, acima do limite de ${MAX_OUTPUT_MP} MP. ` +
+            'Escolha uma escala menor. Nenhum node foi cobrado.',
         },
         { status: 400 },
       )
@@ -147,18 +166,20 @@ export async function POST(req: NextRequest) {
     if (debitErr) {
       if (debitErr.code === 'P0001') {
         return NextResponse.json(
-          { error: 'insufficient_balance', required: cost, message: 'Saldo insuficiente' },
+          { code: 'insufficient_balance', error: 'insufficient_balance', required: cost, message: 'Saldo insuficiente' },
           { status: 402 },
         )
       }
       console.error('[upscale] consume_nodes_v2 RPC error:', debitErr)
-      return NextResponse.json({ error: 'Erro ao processar saldo' }, { status: 500 })
+      return NextResponse.json({ code: 'balance_error', error: 'Erro ao processar saldo' }, { status: 500 })
     }
     debited = true
 
-    // ── Upload da imagem para FAL (buffer já baixado do nosso Storage) ─────
+    // ── Upload da imagem para FAL (buffer normalizado, ver normalizeSource) ─
+    const baseName = sourceKey.split('/').pop() ?? 'source.jpg'
+    const fileName = sourceMime === 'image/png' ? baseName.replace(/\.[^.]+$/, '') + '.png' : baseName
     inputUrl = await fal.storage.upload(
-      new File([new Uint8Array(src.buffer)], sourceKey.split('/').pop() ?? 'source.jpg', { type: src.mime }),
+      new File([new Uint8Array(sourceBuffer)], fileName, { type: sourceMime }),
     )
 
     console.log('[upscale] tab=%s mode=%s scale=%s mp=%s', tabT, modeT, scaleT, megapixelsFromDimensions(width, height))
@@ -185,12 +206,16 @@ export async function POST(req: NextRequest) {
     // Best-effort: falha aqui nunca derruba a entrega.
     let outputWidth:  number | null = null
     let outputHeight: number | null = null
+    let outputBytes:  number | null = null
+    let outputFormat: string | null = null
     let achievedFactor: number | null = null
     try {
       const outBuf  = await fetchStorageBuffer(outputUrl)
       const outMeta = await sharp(outBuf).metadata()
       outputWidth  = outMeta.width  ?? null
       outputHeight = outMeta.height ?? null
+      outputBytes  = outBuf.byteLength
+      outputFormat = outMeta.format ?? null
       if (outputWidth && width) {
         achievedFactor = Math.round((outputWidth / width) * 100) / 100
         if (scaleFactor > 1 && achievedFactor < scaleFactor * 0.9) {
@@ -219,6 +244,12 @@ export async function POST(req: NextRequest) {
       input_dimensions:  width && height ? { width, height } : null,
       output_dimensions: outputWidth && outputHeight ? { width: outputWidth, height: outputHeight } : null,
       achieved_factor:   achievedFactor,
+      // Escala pedida × entregue: 'scale' guarda o rótulo do pedido, este
+      // guarda o fator que o motor de fato aplicou e pelo qual se cobrou.
+      effective_factor:  scaleFactor,
+      output_format:     outputFormat,
+      output_bytes:      outputBytes,
+      source_normalized: normalized,
       fallback_used:     fallbackUsed,
       total_duration_ms: result.totalDurationMs,
     }
@@ -255,7 +286,15 @@ export async function POST(req: NextRequest) {
       fallbackUsed,
       outputWidth,
       outputHeight,
+      outputBytes,
+      outputFormat,
       achievedFactor,
+      // A UI mostra a escala ENTREGUE, não a pedida — um cliente antigo que
+      // peça 8× precisa ver 4× no rodapé do resultado.
+      effectiveFactor: scaleFactor,
+      scaleClamped:    isScaleClamped(scaleT),
+      sourceNormalized: normalized,
+      nodesCharged:    cost,
       durationMs:   result.totalDurationMs,
     })
 
@@ -264,10 +303,33 @@ export async function POST(req: NextRequest) {
     console.error('[upscale] ERROR status:', e?.status)
     console.error('[upscale] ERROR body  :', JSON.stringify(e?.body ?? e?.message ?? err))
 
+    // O estorno acontece de todo jeito; o que muda é o usuário SABER disso.
+    // "Erro ao processar imagem" para tudo deixava a pessoa sem saber se
+    // perdeu node, se o problema é a imagem dela ou se adianta tentar de novo.
+    let refunded = false
     if (debited) {
       await refundNodes(admin, user.id, cost, { module: 'upscale' })
+      refunded = true
     }
 
-    return NextResponse.json({ error: 'Erro ao processar imagem. Tente novamente.' }, { status: 500 })
+    const raw      = `${e?.message ?? ''} ${JSON.stringify(e?.body ?? '')}`.toLowerCase()
+    const isTimeout = raw.includes('timeout')
+    const backNote  = refunded ? ` Seus ${cost} nodes foram devolvidos.` : ''
+
+    const { code, message, status } = isTimeout
+      ? {
+          code: 'provider_timeout',
+          status: 504,
+          message:
+            'O motor demorou demais para responder — normalmente é pico de uso.' +
+            ` Tente de novo em alguns minutos.${backNote}`,
+        }
+      : {
+          code: 'provider_failed',
+          status: 502,
+          message: `Não conseguimos processar esta imagem.${backNote} Se repetir, tente outra escala ou outro arquivo.`,
+        }
+
+    return NextResponse.json({ code, error: message, refunded }, { status })
   }
 }

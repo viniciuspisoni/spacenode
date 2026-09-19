@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useMemo, useEffect } from 'react'
-import BeforeAfter from '@/components/app/BeforeAfter'
+import UpscaleCompare from '@/components/app/UpscaleCompare'
 import { RetocarImportModal } from '@/components/spaces/RetocarImportModal'
 import {
   ChoiceGroup,
@@ -17,7 +17,12 @@ import {
   computeUpscaleCost,
   megapixelsFromDimensions,
   OBJECTIVE_PRESETS,
-  analyzeFile,
+  OFFERED_SCALES,
+  analyzeImage,
+  maxScaleForDimensions,
+  projectedDimensions,
+  resolveScale,
+  scaleExceedsCap,
   type UpscaleTab,
   type ModeId,
   type Scale,
@@ -38,7 +43,7 @@ interface ModeDef {
 
 const RESOLUTION_MODES: ModeDef[] = [
   { id: 'fidelity', label: 'Alta Fidelidade',        note: 'Preserva geometria e materiais' },
-  { id: 'recover',  label: 'Recuperar Imagem Baixa', note: 'Reconstrói o que a compressão comeu' },
+  { id: 'recover',  label: 'Recuperar Imagem Baixa', note: 'Trata artefato de compressão' },
 ]
 
 const ENHANCE_MODES: ModeDef[] = [
@@ -48,26 +53,12 @@ const ENHANCE_MODES: ModeDef[] = [
   { id: 'smart',   label: 'Melhoria Inteligente', note: 'Refino discreto' },
 ]
 
-interface ScaleDef {
-  value: Scale
-  label: string
-  sub:   string
-}
-
-// 'ultra' saiu. Era um cartão permanentemente desabilitado, com cadeado e
-// title="Em breve", na fileira mais importante da tela: um controle que nunca
-// habilita não é um controle. Quando o pipeline de tiles existir, ele volta.
-const RESOLUTION_SCALES: ScaleDef[] = [
-  { value: '2x', label: '2×', sub: '~4K'     },
-  { value: '4x', label: '4×', sub: '~8K'     },
-  { value: '8x', label: '8×', sub: 'até 16K' },
-]
-
-// Smart usa 2x/4x; denoise/deblur/restore ficam em 'none'.
-const SMART_SCALES: ScaleDef[] = [
-  { value: '2x', label: '2×', sub: 'discreto' },
-  { value: '4x', label: '4×', sub: 'forte'    },
-]
+// 'ultra' saiu porque nunca habilitava. '8x' saiu pelo mesmo motivo com um
+// agravante: ele ESTAVA habilitado e cobrava 5× a base, mas os dois motores
+// têm `upscale_factor` com máximo 4 no schema do FAL — o Topaz devolvia 4×
+// calado e o Clarity nem rodava. Quem pedia 8× pagava 50 nodes por 20 nodes de
+// trabalho. Ver MAX_UPSCALE_FACTOR em lib/upscale/types.ts.
+const SCALE_LABEL: Record<string, string> = { '2x': '2×', '4x': '4×' }
 
 // O objetivo é o único campo desta tela escrito na língua do arquiteto — e é
 // ele que preenche aba, modo e escala de uma vez (OBJECTIVE_PRESETS). Por isso
@@ -81,27 +72,15 @@ const OBJECTIVES: { value: ObjectiveId; title: string; note: string }[] = [
   { value: 'final',     title: 'Entrega final premium',     note: 'Máximo acabamento'           },
 ]
 
-const LOADING_TEXTS_RESOLUTION = [
-  'Enviando imagem...',
-  'Processando com IA...',
-  'Ampliando resolução...',
-  'Realçando texturas...',
-  'Finalizando...',
-]
-
-const LOADING_TEXTS_ENHANCE = [
-  'Enviando imagem...',
-  'Analisando detalhes...',
-  'Aprimorando qualidade...',
-  'Limpando imperfeições...',
-  'Finalizando...',
-]
-
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function formatPx(n: number): string {
+  return n.toLocaleString('pt-BR')
 }
 
 function defaultModeForTab(tab: UpscaleTab): ModeId {
@@ -111,6 +90,14 @@ function defaultModeForTab(tab: UpscaleTab): ModeId {
 function defaultScaleForMode(tab: UpscaleTab, modeId: ModeId): Scale {
   if (tab === 'resolution') return '4x'
   return modeId === 'smart' ? '2x' : 'none'
+}
+
+// Tempo esperado da geração, em segundos. Medido contra o FAL em 2026-09-18
+// (lib/upscale/MEDICOES.md): ~12 s de overhead + ~11 s por megapixel de
+// ENTRADA — e, o que surpreende, praticamente independente do fator: 2× e 4×
+// da mesma imagem levaram 32,4 s e 33,2 s.
+function estimateSeconds(megapixels: number | undefined): number {
+  return Math.round(12 + 11 * (megapixels ?? 1.5))
 }
 
 // ── Componente ───────────────────────────────────────────────────────────────
@@ -125,6 +112,14 @@ interface UpscaleClientProps {
 // objetivo já escolhido, e ele é quem define aba/modo/escala iniciais.
 const DEFAULT_OBJECTIVE: ObjectiveId = 'client'
 
+interface ResultMeta {
+  fallbackUsed: boolean
+  width:  number | null
+  height: number | null
+  bytes:  number | null
+  factor: number | null
+}
+
 export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClientProps) {
   // Image state
   const [imageFile,       setImageFile]       = useState<File | null>(null)
@@ -138,10 +133,12 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
   const [selectedModeId, setSelectedModeId] = useState<ModeId>(OBJECTIVE_PRESETS[DEFAULT_OBJECTIVE].modeId)
   const [selectedScale,  setSelectedScale]  = useState<Scale>(OBJECTIVE_PRESETS[DEFAULT_OBJECTIVE].scale)
   const [tuneOpen,       setTuneOpen]       = useState(false)
+  // O usuário mexeu na escala à mão? Enquanto não mexeu, ela é derivada da
+  // imagem (resolveScale) e se reajusta sozinha quando a imagem troca.
+  const [scalePinned,    setScalePinned]    = useState(false)
 
   // Recommendation
-  const [recommended, setRecommended] = useState<{ modeId: ModeId; reason: string } | null>(null)
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [recommendation, setRecommendation] = useState<string>('')
 
   // Import modal
   const [showImportModal, setShowImportModal] = useState(false)
@@ -149,27 +146,22 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
 
   // Submit
   const [isLoading,   setIsLoading]   = useState(false)
-  const [loadingText, setLoadingText] = useState(LOADING_TEXTS_RESOLUTION[0])
+  const [elapsedMs,   setElapsedMs]   = useState(0)
   const [resultUrl,   setResultUrl]   = useState<string | null>(null)
-  // true quando o provider primário do modo falhou e o resultado veio do
-  // fallback generativo (ex.: Alta Fidelidade Topaz → Clarity). O aviso na
-  // UI é o que impede o fallback de ser silencioso.
-  const [usedFallback, setUsedFallback] = useState(false)
-  // Dimensões REAIS medidas pelo servidor no output (o provider pode clampar
-  // o fator — ex.: Topaz vai só até 4×); null = verificação indisponível.
-  const [resultDims,   setResultDims]   = useState<{ w: number; h: number } | null>(null)
+  const [resultMeta,  setResultMeta]  = useState<ResultMeta | null>(null)
   const [credits,     setCredits]     = useState(initialCredits)
   const [error,       setError]       = useState<string | null>(null)
   const [isDownloading, setIsDownloading] = useState(false)
 
   const fileInputRef    = useRef<HTMLInputElement>(null)
-  const loadingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const analyzeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const elapsedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // O papel de parede passa a ser a imagem em jogo — o resultado assim que ele
   // sai, o original enquanto não há resultado. É o que faz o painel assumir a
   // paleta do projeto, como no plugin.
   useAmbient(resultUrl ?? imagePreview)
+
+  useEffect(() => () => { if (elapsedTimerRef.current) clearInterval(elapsedTimerRef.current) }, [])
 
   // ── Derivações ─────────────────────────────────────────────────────────────
 
@@ -179,13 +171,18 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
     [modes, selectedModeId],
   )
 
+  const dims = useMemo(
+    () => (imageDimensions ? { width: imageDimensions.w, height: imageDimensions.h } : null),
+    [imageDimensions],
+  )
+
   // Aba Aprimorar: escolha de escala depende do modo.
   //   - denoise / deblur / restore → fixo em 'none' (sem aumento; sem controle)
   //   - smart                     → escolha entre 2× e 4×
-  // Aba Resolução: sempre o conjunto completo (2/4/8).
-  const availableScales: ScaleDef[] = useMemo(() => {
-    if (tab === 'resolution') return RESOLUTION_SCALES
-    if (selectedModeId === 'smart') return SMART_SCALES
+  // Aba Resolução: sempre o conjunto oferecido.
+  const availableScales: Scale[] = useMemo(() => {
+    if (tab === 'resolution') return [...OFFERED_SCALES]
+    if (selectedModeId === 'smart') return [...OFFERED_SCALES]
     return []
   }, [tab, selectedModeId])
 
@@ -204,29 +201,39 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
     [tab, selectedModeId, selectedScale, megapixels],
   )
 
-  const nodeCost  = costBreakdown.total
-  const canSubmit = !!imageFile && credits >= nodeCost && !isLoading
+  const nodeCost = costBreakdown.total
 
-  const scaleLabel = selectedScale === 'none'
-    ? ''
-    : availableScales.find(s => s.value === selectedScale)?.label ?? selectedScale
+  // Resolução que este pedido entrega PARA ESTA IMAGEM. É o número que o
+  // arquiteto entende — "4×" só faz sentido para quem já sabe o tamanho de
+  // origem de cabeça.
+  const projected = useMemo(
+    () => (dims && selectedScale !== 'none' ? projectedDimensions(dims, selectedScale) : null),
+    [dims, selectedScale],
+  )
+
+  const overCap   = selectedScale !== 'none' && scaleExceedsCap(selectedScale, dims)
+  // Nenhuma escala cabe: o problema é o tamanho da ENTRADA, e mandar "escolha
+  // 2×" não resolveria nada.
+  const noScaleFits = tab === 'resolution' && dims !== null && maxScaleForDimensions(dims) === null
+  const canSubmit = !!imageFile && credits >= nodeCost && !isLoading && !overCap
+
+  const scaleLabel = selectedScale === 'none' ? '' : SCALE_LABEL[selectedScale] ?? selectedScale
   // Regra do resumo: entra o que o usuário ESCOLHEU. "Sem aumento" é o default
   // silencioso dos modos de Aprimorar — some, e a linha fica só com o modo.
   const tuneSummary = summarize([activeMode.label, scaleLabel])
 
   // O objetivo é a ETIQUETA de um preset de aba+modo+escala. Quem mexe no
-  // ajuste fino desfaz esse vínculo — e antes disso o HEAD zerava o objetivo
-  // (`setSelectedObjective(null)` em applyTab/applyObjective), de modo que
-  // `objectiveId` nunca viajava contradizendo o que foi de fato pedido. Aqui o
-  // objetivo continua na tela (é o eixo da superfície), então o que sai do
-  // payload é a etiqueta: `upscale_meta.objective_id` (app/api/upscale/route.ts)
-  // é o único sinal de POR QUE o usuário ampliou; gravar "Impressão" numa
+  // ajuste fino desfaz esse vínculo — e `objectiveId` nunca deve viajar
+  // contradizendo o que foi de fato pedido: `upscale_meta.objective_id` é o
+  // único sinal de POR QUE o usuário ampliou, e gravar "Impressão" numa
   // ampliação 2×/Recuperar envenena esse dado.
   const objectivePreset = OBJECTIVE_PRESETS[selectedObjective]
   const objectiveInSync =
     objectivePreset.tab === tab &&
     objectivePreset.modeId === selectedModeId &&
-    objectivePreset.scale === selectedScale
+    selectedScale === resolveScale(selectedObjective, dims)
+
+  const estimate = estimateSeconds(megapixels)
 
   // ── Handlers ───────────────────────────────────────────────────────────────
 
@@ -237,6 +244,7 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
     const nextScale = defaultScaleForMode(next, nextMode)
     setSelectedModeId(nextMode)
     setSelectedScale(nextScale)
+    setScalePinned(true)
   }
 
   function applyMode(next: ModeId) {
@@ -247,12 +255,18 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
     }
   }
 
-  function applyObjective(id: ObjectiveId) {
+  function applyScale(next: Scale) {
+    setSelectedScale(next)
+    setScalePinned(true)
+  }
+
+  function applyObjective(id: ObjectiveId, forDims = dims) {
     const preset = OBJECTIVE_PRESETS[id]
     setSelectedObjective(id)
     setTab(preset.tab)
     setSelectedModeId(preset.modeId)
-    setSelectedScale(preset.scale)
+    setSelectedScale(resolveScale(id, forDims))
+    setScalePinned(false)
   }
 
   function loadImageFile(file: File) {
@@ -261,45 +275,34 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
 
     setImageFile(file)
     setResultUrl(null)
+    setResultMeta(null)
     setError(null)
-    setRecommended(null)
+    setRecommendation('')
     setImageDimensions(null)
-    setIsAnalyzing(true)
 
     const reader = new FileReader()
     reader.onload = (e) => {
       const dataUrl = e.target?.result as string
       setImagePreview(dataUrl)
       const img = new Image()
-      img.onload = () => setImageDimensions({ w: img.naturalWidth, h: img.naturalHeight })
+      img.onload = () => {
+        const d = { width: img.naturalWidth, height: img.naturalHeight }
+        setImageDimensions({ w: d.width, h: d.height })
+
+        // A análise só fala quando tem o que dizer, e fala movendo o OBJETIVO
+        // — não três controles soltos. O sinal vem das dimensões e da
+        // densidade de bytes reais, não de palavra no nome do arquivo (que
+        // errava em "casa-antiga.jpg" e acertava por acaso).
+        const rec = analyzeImage({
+          fileName: file.name, fileSize: file.size, width: d.width, height: d.height,
+        })
+        setRecommendation(rec.reason)
+        if (rec.objectiveId) applyObjective(rec.objectiveId, d)
+        else if (!scalePinned) setSelectedScale(resolveScale(selectedObjective, d))
+      }
       img.src = dataUrl
     }
     reader.readAsDataURL(file)
-
-    if (analyzeTimerRef.current) clearTimeout(analyzeTimerRef.current)
-    analyzeTimerRef.current = setTimeout(() => {
-      const rec = analyzeFile({ fileName: file.name, fileSize: file.size })
-      setRecommended({ modeId: rec.modeId, reason: rec.reason })
-      // A análise agora fala a mesma língua da tela: move o OBJETIVO, não três
-      // controles soltos. E só age quando discorda de verdade — imagem
-      // comprimida pede Recuperar; nos demais casos o objetivo já resolveu.
-      if (rec.modeId === 'recover') applyObjective('recover')
-      setIsAnalyzing(false)
-    }, 400)
-  }
-
-  function startLoadingTexts() {
-    const list = tab === 'resolution' ? LOADING_TEXTS_RESOLUTION : LOADING_TEXTS_ENHANCE
-    let i = 0
-    setLoadingText(list[0])
-    loadingTimerRef.current = setInterval(() => {
-      i = (i + 1) % list.length
-      setLoadingText(list[i])
-    }, 1800)
-  }
-
-  function stopLoadingTexts() {
-    if (loadingTimerRef.current) clearInterval(loadingTimerRef.current)
   }
 
   async function handleImportPick(picked: { url: string }) {
@@ -343,7 +346,8 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
     setImageFile(null)
     setImagePreview(null)
     setResultUrl(null)
-    setRecommended(null)
+    setResultMeta(null)
+    setRecommendation('')
     setImageDimensions(null)
     setError(null)
     if (fileInputRef.current) fileInputRef.current.value = ''
@@ -361,7 +365,8 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
       const objectUrl = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = objectUrl
-      a.download = `spacenode-ampliado.${blob.type.split('/')[1] || 'jpg'}`
+      const dim = resultMeta?.width && resultMeta?.height ? `-${resultMeta.width}x${resultMeta.height}` : ''
+      a.download = `spacenode-ampliado${dim}.${blob.type.split('/')[1] || 'jpg'}`
       document.body.appendChild(a)
       a.click()
       a.remove()
@@ -379,7 +384,14 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
     setIsLoading(true)
     setError(null)
     setResultUrl(null)
-    startLoadingTexts()
+    setResultMeta(null)
+    setElapsedMs(0)
+
+    // Cronômetro real. O carrossel antigo trocava de frase a cada 1,8 s e
+    // chegava em "Finalizando…" aos 9 s — numa geração que leva 30 s ou mais,
+    // ele passava o resto do tempo mentindo.
+    const startedAt = Date.now()
+    elapsedTimerRef.current = setInterval(() => setElapsedMs(Date.now() - startedAt), 250)
 
     try {
       // Imagem sobe direto pro Storage (sem passar pela Vercel); a rota recebe a key.
@@ -399,35 +411,34 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
         }),
       })
       const data = await jsonOrNull(res)
-      if (!res.ok) { setError(errMsg(data, 'Erro desconhecido')); return }
+      if (!res.ok) { setError(errMsg(data, 'Não foi possível processar esta imagem.')); return }
       setResultUrl(data?.url as string)
-      setUsedFallback(Boolean(data?.fallbackUsed))
-      setResultDims(
-        typeof data?.outputWidth === 'number' && typeof data?.outputHeight === 'number'
-          ? { w: data.outputWidth, h: data.outputHeight }
-          : null,
-      )
-      setCredits(c => c - nodeCost)
+      setResultMeta({
+        fallbackUsed: Boolean(data?.fallbackUsed),
+        width:  typeof data?.outputWidth  === 'number' ? data.outputWidth  : null,
+        height: typeof data?.outputHeight === 'number' ? data.outputHeight : null,
+        bytes:  typeof data?.outputBytes  === 'number' ? data.outputBytes  : null,
+        factor: typeof data?.effectiveFactor === 'number' ? data.effectiveFactor : null,
+      })
+      setCredits(c => c - (typeof data?.nodesCharged === 'number' ? data.nodesCharged : nodeCost))
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Falha de conexão. Tente novamente.')
+      setError(e instanceof Error ? e.message : 'Falha de conexão. Nenhum node foi cobrado.')
     } finally {
-      stopLoadingTexts()
+      if (elapsedTimerRef.current) clearInterval(elapsedTimerRef.current)
       setIsLoading(false)
     }
   }
 
   const ext = imageFile?.name.split('.').pop()?.toUpperCase() ?? ''
 
-  // ── Texto do resultado (resolução final) ───────────────────────────────────
-  const factorOut = (() => {
-    switch (selectedScale) {
-      case '2x':    return 2
-      case '4x':    return 4
-      case '8x':    return 8
-      case 'ultra': return 8
-      default:      return 1
-    }
-  })()
+  // Fase do processamento, ancorada no tempo REAL contra a estimativa medida.
+  const elapsedS  = Math.floor(elapsedMs / 1000)
+  const progress  = Math.min(0.95, elapsedMs / (estimate * 1000))
+  const phaseText =
+    elapsedS < 4                   ? 'Enviando imagem…'
+    : elapsedS < estimate * 0.85   ? 'Reconstruindo detalhe em alta resolução…'
+    : elapsedS < estimate * 1.6    ? 'Finalizando a imagem…'
+    :                                'Ainda processando — imagens grandes levam mais tempo.'
 
   // .spn-ghost não fixa display — num <a> a altura só pega com flex.
   const ghostLink: React.CSSProperties = {
@@ -443,7 +454,7 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
 
       {/* ── Painel ──────────────────────────────────────────────────────────── */}
       <section className="spn-tool-panel spn-glass spn-glass--chrome">
-        <div className="spn-tool-panel-body">
+        <div className="spn-tool-panel-body spn-tool-panel-body--scroll">
           <h1 style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--color-text-primary)' }}>
             Ampliar
           </h1>
@@ -488,7 +499,7 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
             {imageFile && (
               <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
                 <span className="spn-hint" style={{ marginTop: 0 }}>
-                  {imageDimensions ? `${imageDimensions.w}×${imageDimensions.h}px · ` : ''}
+                  {imageDimensions ? `${formatPx(imageDimensions.w)}×${formatPx(imageDimensions.h)}px · ` : ''}
                   {ext ? `${ext} · ` : ''}
                   {formatFileSize(imageFile.size)}
                 </span>
@@ -512,13 +523,9 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
               {isImporting ? 'Importando…' : 'Importar do histórico'}
             </button>
 
-            {/* A análise do arquivo virou uma dica: ela sugere, o objetivo
-                decide. A faixa verde saiu — verde é estado, não recomendação. */}
-            {isAnalyzing ? (
-              <p className="spn-hint">Analisando a imagem…</p>
-            ) : recommended ? (
-              <p className="spn-hint">{recommended.reason}</p>
-            ) : null}
+            {/* A análise do arquivo é dica, não decreto: ela sugere, o objetivo
+                decide. Só aparece quando tem algo concreto a dizer. */}
+            {recommendation && <p className="spn-hint">{recommendation}</p>}
           </div>
 
           {/* Objetivo: o eixo da tela. */}
@@ -528,7 +535,7 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
               label="Objetivo"
               cols={2}
               value={selectedObjective}
-              onChange={applyObjective}
+              onChange={(id) => applyObjective(id)}
               options={OBJECTIVES}
             />
             {/* O cartão continua marcado depois de um ajuste manual — sem esta
@@ -538,6 +545,35 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
               <p className="spn-hint">Ajustado à mão — vale o que está em “Ajuste fino”.</p>
             )}
           </div>
+
+          {/* O que vai sair. Este bloco é a tradução do objetivo para a língua
+              de quem entrega prancha: pixels, não multiplicador. Sem ele, "4×"
+              exige que o usuário saiba de cabeça o tamanho da origem. */}
+          {projected && (
+            <div className="spn-field">
+              <div style={{
+                display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
+                gap: 10, padding: '10px 12px',
+                borderRadius: 'var(--r-inner)', background: 'var(--color-chip)',
+                border: '0.5px solid var(--glass-line-strong)',
+              }}>
+                <span style={{ fontSize: 11.5, color: 'var(--color-text-tertiary)' }}>Resultado</span>
+                <span style={{
+                  fontSize: 13, fontWeight: 560, color: 'var(--color-text-primary)',
+                  fontVariantNumeric: 'tabular-nums',
+                }}>
+                  {formatPx(projected.width)} × {formatPx(projected.height)} px
+                </span>
+              </div>
+              {overCap && (
+                <p className="spn-hint" style={{ color: 'var(--color-error)' }}>
+                  {noScaleFits
+                    ? 'Esta imagem já é grande demais para ser ampliada. Em “Ajuste fino”, use Aprimorar qualidade — ele melhora sem aumentar.'
+                    : 'Grande demais para o motor. Escolha 2× em “Ajuste fino”.'}
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Ajuste fino: os três efeitos do objetivo, numa linha só. */}
           <div className="spn-field">
@@ -561,12 +597,12 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
             <div className="spn-cost-figures">
               <div className="spn-cost-main">{nodeCost} nodes</div>
               <div className="spn-cost-sub" style={credits < nodeCost ? { color: 'var(--color-error)' } : undefined}>
-                Saldo: {credits} nodes
+                {imageFile && !isLoading ? `Saldo: ${credits} · ~${estimate}s` : `Saldo: ${credits} nodes`}
               </div>
             </div>
             <button type="button" className="spn-cta" onClick={handleSubmit} disabled={!canSubmit}>
               {isLoading
-                ? loadingText
+                ? `Processando · ${elapsedS}s`
                 : credits < nodeCost
                   ? 'Sem nodes'
                   : tab === 'resolution' ? 'Ampliar imagem' : 'Aprimorar imagem'}
@@ -578,30 +614,52 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
       {/* ── Palco ───────────────────────────────────────────────────────────── */}
       <section className="spn-tool-stage spn-glass">
         {isLoading && (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-            <div style={{ width: 40, height: 40, borderRadius: '50%', border: '2px solid var(--glass-line-strong)', borderTop: '2px solid var(--color-text-secondary)', animation: 'spin 0.9s linear infinite' }} />
-            <div style={{ fontSize: 12.5, color: 'var(--color-text-tertiary)' }}>{loadingText}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, width: '100%', maxWidth: 320, padding: 24 }}>
+            <div style={{ width: 36, height: 36, borderRadius: '50%', border: '2px solid var(--glass-line-strong)', borderTop: '2px solid var(--color-text-secondary)', animation: 'spin 0.9s linear infinite' }} />
+            <div style={{ fontSize: 12.5, color: 'var(--color-text-secondary)', textAlign: 'center' }}>{phaseText}</div>
+            {/* Barra ancorada na estimativa medida — para em 95% e espera o
+                resultado de verdade em vez de fingir 100%. */}
+            <div style={{ width: '100%', height: 3, borderRadius: 3, background: 'var(--glass-line-strong)', overflow: 'hidden' }}>
+              <div style={{
+                width: `${progress * 100}%`, height: '100%',
+                background: 'var(--color-text-secondary)',
+                transition: 'width 250ms linear',
+              }} />
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--color-text-quaternary)', fontVariantNumeric: 'tabular-nums' }}>
+              {elapsedS}s de aproximadamente {estimate}s
+            </div>
           </div>
         )}
 
         {!isLoading && resultUrl && imagePreview && (
-          <div style={{ width: '100%', maxWidth: 760, maxHeight: '100%', overflowY: 'auto', padding: 20, animation: 'fadeIn 0.3s ease' }}>
-            {usedFallback && (
+          <div style={{ width: '100%', maxWidth: 820, maxHeight: '100%', overflowY: 'auto', padding: 20, animation: 'fadeIn 0.3s ease' }}>
+            {resultMeta?.fallbackUsed && (
               <div className="spn-error" style={{ marginBottom: 12 }}>
                 O motor de alta fidelidade não respondeu e usamos o motor alternativo
                 nesta ampliação. Confira detalhes finos (esquadrias, textos, linhas) —
                 se notar diferenças, tente novamente em alguns minutos.
               </div>
             )}
-            <BeforeAfter beforeUrl={imagePreview} afterUrl={resultUrl} beforeLabel="ORIGINAL" afterLabel={tab === 'resolution' ? 'AMPLIADO' : 'APRIMORADO'} />
-            <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+            <UpscaleCompare
+              beforeUrl={imagePreview}
+              afterUrl={resultUrl}
+              aspect={imageDimensions ? imageDimensions.w / imageDimensions.h : 1.5}
+              outputWidth={resultMeta?.width}
+              outputHeight={resultMeta?.height}
+              beforeLabel="Original"
+              afterLabel={tab === 'resolution' ? 'Ampliado' : 'Aprimorado'}
+            />
+            <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
               <span className="spn-hint" style={{ marginTop: 0 }}>
-                Arraste para comparar · {selectedScale === 'none' ? 'sem aumento' : `${factorOut}×`} · {activeMode.label}
-                {/* Dimensões REAIS do output quando o servidor mediu; a estimativa
-                    (origem × fator) só como fallback — o provider pode clampar. */}
-                {resultDims
-                  ? <span> · {resultDims.w}×{resultDims.h}px</span>
-                  : imageDimensions && factorOut > 1 && <span> · {imageDimensions.w * factorOut}×{imageDimensions.h * factorOut}px</span>}
+                {/* Dimensões REAIS medidas no servidor; a projeção só entra
+                    quando a verificação do output falhou. */}
+                {resultMeta?.width && resultMeta?.height
+                  ? `${formatPx(resultMeta.width)}×${formatPx(resultMeta.height)}px`
+                  : projected ? `${formatPx(projected.width)}×${formatPx(projected.height)}px` : ''}
+                {resultMeta?.factor ? ` · ${resultMeta.factor}×` : ''}
+                {resultMeta?.bytes ? ` · ${formatFileSize(resultMeta.bytes)}` : ''}
+                {` · ${activeMode.label}`}
               </span>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <button type="button" className="spn-ghost" style={ghostLink} onClick={handleDownload} disabled={isDownloading}>
@@ -652,7 +710,7 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', fontWeight: 500 }}>O resultado aparecerá aqui</div>
               <div style={{ fontSize: 11.5, color: 'var(--color-text-quaternary)', marginTop: 5, lineHeight: 1.5 }}>
-                Envie uma imagem para comparar antes/depois em alta resolução.
+                Envie uma imagem para comparar antes/depois, inclusive pixel a pixel.
               </div>
             </div>
           </div>
@@ -691,10 +749,23 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
           {availableScales.length > 0 ? (
             <ChoiceGroup
               label="Escala"
-              cols={availableScales.length === 2 ? 2 : 3}
+              cols={2}
               value={selectedScale}
-              onChange={setSelectedScale}
-              options={availableScales.map(s => ({ value: s.value, title: s.label, note: s.sub }))}
+              onChange={applyScale}
+              // A nota de cada cartão é a resolução REAL que ele entrega nesta
+              // imagem; sem imagem ainda, é só o multiplicador. Uma escala que
+              // estoura o teto do motor aparece desabilitada com o motivo, em
+              // vez de falhar depois do upload.
+              options={availableScales.map(s => {
+                const over = scaleExceedsCap(s, dims)
+                const p    = dims ? projectedDimensions(dims, s) : null
+                return {
+                  value: s,
+                  title: SCALE_LABEL[s] ?? s,
+                  note: over ? 'Grande demais' : p ? `${formatPx(p.width)}×${formatPx(p.height)}px` : '',
+                  disabled: over,
+                }
+              })}
             />
           ) : (
             <p className="spn-hint" style={{ marginTop: 0 }}>
@@ -704,7 +775,8 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
         </div>
 
         <p className="spn-hint">
-          Os três já vêm resolvidos pelo objetivo. Mexer aqui vale só para esta imagem.
+          Os três já vêm resolvidos pelo objetivo, e a escala se ajusta ao tamanho
+          da sua imagem. Mexer aqui vale só para esta imagem.
         </p>
       </Sheet>
 

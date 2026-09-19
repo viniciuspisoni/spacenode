@@ -11,6 +11,7 @@
 // razoável para evitar débito surpresa.
 
 import {
+  effectiveFactor,
   scaleToFactor,
   type ModeId,
   type Scale,
@@ -33,14 +34,18 @@ const BASE_COST_BY_MODE: Record<ModeId, number> = {
 
 // ── Multiplicador de escala ───────────────────────────────────────────────────
 // Cada dobra de escala cresce ~linearmente em megapixels de saída. 'none'
-// não amplia. 'ultra' fica reservado.
+// não amplia.
+//
+// A tabela é indexada pelo fator EFETIVO (o que o motor entrega), não pela
+// escala pedida — ver effectiveFactor() em types.ts. Antes era indexada pela
+// escala e '8x' valia 5: um pedido 8× cobrava 50 nodes na Alta Fidelidade e o
+// Topaz devolvia 4× (o teto do schema), trabalho de 20 nodes. Agora 8× e 4×
+// custam o mesmo porque entregam o mesmo.
 
-const SCALE_MULTIPLIER: Record<Scale, number> = {
-  none:  1,
-  '2x':  1,
-  '4x':  2,
-  '8x':  5,
-  ultra: 8,
+const MULTIPLIER_BY_FACTOR: Record<number, number> = {
+  1: 1,
+  2: 1,
+  4: 2,
 }
 
 // ── Cap por megapixels da imagem de entrada ───────────────────────────────────
@@ -75,14 +80,15 @@ export interface CostBreakdown {
 
 export function computeUpscaleCost(input: CostInput): CostBreakdown {
   const base         = BASE_COST_BY_MODE[input.modeId]
-  const scaleFactor  = SCALE_MULTIPLIER[input.scale]
   const megapixelAdd = megapixelSurcharge(input.megapixels)
   const steps        = Math.max(1, input.steps ?? 1)
 
   // Aba Aprimorar com escala 'none' ignora multiplicador de escala — só vale
   // a base + surcharge de megapixel. Caso o usuário escolha 2x/4x para Smart,
   // o multiplicador entra normalmente.
-  const effectiveScaleMult = input.scale === 'none' ? 1 : scaleFactor
+  const effectiveScaleMult = input.scale === 'none'
+    ? 1
+    : MULTIPLIER_BY_FACTOR[effectiveFactor(input.scale)] ?? 1
 
   const perStep = Math.ceil(base * effectiveScaleMult) + megapixelAdd
   const total   = perStep * steps
