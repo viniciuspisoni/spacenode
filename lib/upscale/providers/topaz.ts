@@ -1,21 +1,37 @@
-// fal-ai/topaz/upscale/image — provider PRINCIPAL da aba Resolução "Alta Fidelidade".
+// fal-ai/topaz/upscale/image — motor de PRECISÃO do Ampliar.
 //
-// Preserva geometria, materiais e detalhes originais melhor que qualquer
-// outro upscaler disponível. É caro (custo FAL > Clarity) e pode falhar/timeout
-// em horários de pico — por isso o orchestrator cai para Clarity se o Topaz
-// não responder (fallback sinalizado na resposta da rota via fallbackOf).
+// Desde 2026-09-18 ele atende os três modos que ampliam (Alta Fidelidade,
+// Recuperar Imagem Baixa e Melhoria Inteligente). O Clarity, que era o
+// primário do Recuperar, virou só o fallback de emergência — a medição contra
+// verdade de campo está em MEDICOES.md deste diretório: num recorte degradado
+// (320×240, JPEG 35) recuperado a 2×, o Clarity devolveu geometry score 0,9307
+// e edge recall 0,9207 — ABAIXO de um Lanczos burro (0,9802 / 0,9825) — porque
+// funde as barras de um guarda-corpo num borrão. O Topaz High Fidelity V2 deu
+// 0,9821 / 0,9854 no mesmo teste, com quase metade do desvio de cor (ΔE médio
+// 1,90 contra 3,21) e 40% mais rápido.
 //
-// Params do endpoint:
-//   - image_url: string
-//   - upscale_factor: number — o schema aceita 1–4 (docs FAL 2026-08); acima
-//     disso o request falha e derruba o modo pro fallback generativo.
-//   - model: enum — default 'Standard V2' é o MAIS generativo da família,
-//     o oposto do contrato de "Alta Fidelidade". 'High Fidelity V2' é a
-//     variante de preservação de detalhe (não inventa textura nem linha) —
-//     a certa pra render arquitetônico.
+// Params do endpoint (schema FAL conferido em 2026-09-18):
+//   - upscale_factor: number, minimum 1, MAXIMUM 4 (ver MAX_UPSCALE_FACTOR).
+//   - model: enum. 'Standard V2' (default do FAL) é da família mais solta;
+//     'High Fidelity V2' é o preservador de detalhe — o certo pro contrato do
+//     módulo. 'CGI' foi TESTADO e REPROVADO: apesar da descrição da Topaz
+//     citar "rendered graphics", ele afina as linhas estruturais (barras de
+//     guarda-corpo perdem peso), estoura o contraste e mais que dobra o desvio
+//     de cor (ΔE médio 0,976 contra 0,414 do High Fidelity V2).
+//   - face_enhancement: boolean, DEFAULT true, com face_enhancement_strength
+//     0.8. Ninguém desligava. Render arquitetônico é cheio de figura humana de
+//     escala, e "melhorar rosto" é redesenhar rosto — exatamente o elemento
+//     inventado que o módulo promete não produzir. Vai explícito em false.
+//   - output_format: enum, DEFAULT 'jpeg'. Recomprimir em JPEG logo depois de
+//     pagar por detalhe é jogar fora o que se acabou de comprar: medido, o PNG
+//     sobe o geometry score de 0,9903 pra 0,9923 e derruba o desvio de cor de
+//     ΔE 0,514 pra 0,414 (−20%) no MESMO pedido.
+//   - crop_to_fill: boolean. Default já é false; vai explícito porque
+//     "preserva composição e proporções" é contrato, não sorte.
 
 import { fal } from '@fal-ai/client'
 import {
+  MAX_UPSCALE_FACTOR,
   PROVIDER_ENDPOINTS,
   UpscaleProviderError,
   type ProviderCall,
@@ -24,23 +40,47 @@ import {
 const ENDPOINT   = PROVIDER_ENDPOINTS.topaz
 const TIMEOUT_MS = 240_000   // Topaz roda mais devagar que Clarity
 
+// Acima disto o PNG deixa de ser entregável (um 4× de render 2 MP já dá ~40 MB;
+// 64 MP passariam de 150 MB e travam download, re-hospedagem e e-mail). Daí pra
+// cima o JPEG do provider é o mal menor — e só acontece em pedidos gigantes.
+const PNG_MAX_OUTPUT_MP = 64
+
 interface TopazOutput {
   image?:  { url?: string }
   images?: { url?: string }[]
 }
 
-export const callTopaz: ProviderCall = async ({ imageUrl, scale }) => {
-  // Clamp em 4: teto do schema FAL. Um 8x pedido roda a 4x no Topaz em vez de
-  // falhar direto pro Clarity (que "amplia mais" alucinando detalhe — pior
-  // troca no modo cujo contrato é fidelidade). requested_factor preserva a
-  // intenção original na telemetria (upscale_meta.steps[].params).
+export const callTopaz: ProviderCall = async ({ imageUrl, scale, params: overrides }) => {
+  // Clamp no teto do schema. A UI e o custo já trabalham com effectiveFactor,
+  // então isto só pega cliente antigo (plugin desatualizado) — e aí
+  // requested_factor guarda a intenção original na telemetria.
   const requested = scale ?? 2
-  const factor    = Math.max(1, Math.min(4, requested))
+  const factor    = Math.max(1, Math.min(MAX_UPSCALE_FACTOR, requested))
+
+  const outputMp = typeof overrides?.outputMegapixels === 'number'
+    ? overrides.outputMegapixels
+    : null
+
   const params: Record<string, unknown> = {
-    upscale_factor: factor,
-    model:          'High Fidelity V2',
+    upscale_factor:    factor,
+    model:             'High Fidelity V2',
+    // Preservação — os três que o default do FAL deixava contra nós.
+    face_enhancement:  false,
+    crop_to_fill:      false,
+    subject_detection: 'All',
+    output_format:     outputMp !== null && outputMp > PNG_MAX_OUTPUT_MP ? 'jpeg' : 'png',
   }
-  // Telemetria (nunca vai no payload FAL — campo desconhecido derrubaria o request).
+
+  // Overrides por modo (ex.: fix_compression no Recuperar). `outputMegapixels`
+  // é sinal interno de roteamento, não param do FAL — campo desconhecido no
+  // payload derruba o request.
+  if (overrides) {
+    for (const [k, v] of Object.entries(overrides)) {
+      if (k === 'outputMegapixels') continue
+      if (v !== undefined) params[k] = v
+    }
+  }
+
   const loggedParams = requested !== factor
     ? { ...params, requested_factor: requested }
     : params

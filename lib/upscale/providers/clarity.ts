@@ -1,18 +1,22 @@
-// fal-ai/clarity-upscaler — usado em DOIS contextos:
+// fal-ai/clarity-upscaler — hoje é SÓ O FALLBACK dos modos que ampliam.
 //
-//   1. Aba Resolução / "Recuperar Imagem Baixa"
-//   2. Aba Aprimorar  / "Melhoria Inteligente"
+// Era o primário de "Recuperar Imagem Baixa" e "Melhoria Inteligente" até
+// 2026-09-18, quando a medição contra verdade de campo (MEDICOES.md) mostrou
+// que ele é DESTRUTIVO na exata imagem que deveria salvar: recuperando um
+// recorte 320×240 em JPEG 35, devolveu edge recall 0,9207 — perdeu 8% das
+// arestas estruturais do original, fundindo as barras de um guarda-corpo num
+// borrão preto — contra 0,9854 do Topaz High Fidelity V2. É esperado: o
+// Clarity é Stable Diffusion, e difusão inventa quando falta informação. Esse
+// é justamente o contrato que o Ampliar promete não quebrar.
 //
-// Ambos usam o preset conservador. O upscale_factor varia conforme a escala:
-//   - "Recuperar Imagem Baixa" usa 2x ou 4x (definido pela escala da aba).
-//   - "Melhoria Inteligente" usa 2x ou 4x (definido pela sub-escala da aba).
-//
-// Também é o FALLBACK silencioso do Topaz (Alta Fidelidade) quando ele
-// falha. Nesse caso o orchestrator passa a mesma escala 2/4/8.
+// Fica porque um fallback ruim ainda é melhor que erro quando o Topaz cai — e
+// a UI avisa o usuário sempre que o resultado veio daqui (fallbackUsed).
+// O preset segue o conservador (creativity 0.15 / resemblance 0.85).
 
 import { fal } from '@fal-ai/client'
 import { buildClarityConservativeParams } from '../presets/clarity-conservative'
 import {
+  MAX_UPSCALE_FACTOR,
   PROVIDER_ENDPOINTS,
   UpscaleProviderError,
   type ProviderCall,
@@ -27,7 +31,10 @@ interface ClarityOutput {
 }
 
 export const callClarity: ProviderCall = async ({ imageUrl, scale }) => {
-  const factor = Math.max(1, Math.min(8, scale ?? 2))
+  // Teto 4: é o `maximum` do upscale_factor no schema do Clarity, igual ao do
+  // Topaz. O clamp antigo era 8 — ou seja, o fallback de um pedido 8× era
+  // rejeitado pelo próprio FAL antes de rodar, e o modo caía inteiro.
+  const factor = Math.max(1, Math.min(MAX_UPSCALE_FACTOR, scale ?? 2))
   const params = buildClarityConservativeParams({ upscaleFactor: factor })
 
   const t0 = Date.now()

@@ -3382,6 +3382,23 @@ body[data-sheet-open='true'] { overflow: hidden; }
   flex: 0 0 auto;
   padding: 16px 16px 12px;
 }
+/* Modificador para as telas cujo painel NÃO tem painel contextual e cuja
+   configuração é mais alta que a coluna (o Ampliar é o caso: preview da
+   imagem + cinco cartões de objetivo + resolução projetada + ajuste fino).
+   Sem ele o `overflow: hidden` do .spn-tool-panel simplesmente corta o que
+   não coube, e a última linha some atrás do dock — num notebook 1366×768 isso
+   engolia o "Ajuste fino" inteiro.
+
+   Por que não é o padrão: no Renderizar quem rola é o painel contextual
+   (.spn-context-body), de propósito — a lista de linhas em cima e o dock
+   embaixo ficam parados. Ligar scroll no corpo lá criaria dois níveis de
+   scroll aninhados. */
+.spn-tool-panel-body--scroll {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
 /* ── Painel contextual (Renderizar) ───────────────────────────────────────
    Onde Cena/Luz/Materiais/Saída abrem, dentro da própria sidebar, entre as
    quatro linhas e o dock — nunca sobre a imagem de referência. Ocupa o

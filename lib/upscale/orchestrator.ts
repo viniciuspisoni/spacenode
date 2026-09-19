@@ -7,11 +7,12 @@
 // basta estender PIPELINE_BY_MODE e a tipagem.
 //
 // Política de fallback:
-//   - "Alta Fidelidade" (Topaz) cai para Clarity conservador se falhar.
+//   - Os modos que AMPLIAM (Topaz) caem para o Clarity conservador se falharem.
 //     O fallback é registrado em steps[].fallbackOf e a rota o expõe na
 //     resposta (fallbackUsed) — a UI avisa o usuário que o resultado veio
 //     de um provider generativo, não do preservador do modo.
-//   - Demais modos NÃO têm fallback (failures sobem como erro).
+//   - Os modos que só limpam (NAFNet/restauração) NÃO têm fallback: não existe
+//     segundo motor equivalente, e cair num que amplia mudaria o pedido.
 //
 // O orchestrator NÃO toca nodes — débito/refund é responsabilidade da
 // rota. Ele apenas retorna o que aconteceu para a rota persistir +
@@ -22,7 +23,7 @@ import { callClarity }           from './providers/clarity'
 import { callNafnetDenoise, callNafnetDeblur } from './providers/nafnet'
 import { callPhotoRestoration } from './providers/photo-restoration'
 import {
-  scaleToFactor,
+  effectiveFactor,
   UpscalePipelineError,
   type ModeId,
   type ProviderCall,
@@ -40,15 +41,30 @@ interface StepDescriptor {
   provider: ProviderId
   /** Provider de fallback caso o primário falhe. null = sem fallback. */
   fallback: ProviderId | null
+  /** Overrides de param do provider primário (ver providers/topaz.ts). */
+  params?: Record<string, unknown>
 }
 
+// Os três modos que AMPLIAM passaram a usar o mesmo motor de precisão (Topaz
+// High Fidelity V2) — antes, dois deles entravam direto no Clarity, que é
+// difusão e reconstrói geometria quando falta informação (medições em
+// MEDICOES.md). O que muda entre eles é o tratamento de artefato de
+// compressão, não o motor:
+//
+//   - fidelity: fonte boa. Topaz decide sozinho quanto limpar (param omitido).
+//   - recover:  fonte sabidamente comprimida — fix_compression explícito.
+//   - smart:    refino discreto, mesma política do fidelity.
+//
+// Os modos da aba Aprimorar que NÃO ampliam seguem nos modelos especializados
+// (NAFNet/photo-restoration): eles operam na resolução original e o Topaz não
+// os substitui.
 const PIPELINE_BY_MODE: Record<ModeId, StepDescriptor[]> = {
   fidelity: [{ provider: 'topaz',             fallback: 'clarity' }],
-  recover:  [{ provider: 'clarity',           fallback: null      }],
+  recover:  [{ provider: 'topaz',             fallback: 'clarity', params: { fix_compression: 0.6 } }],
   denoise:  [{ provider: 'nafnet-denoise',    fallback: null      }],
   deblur:   [{ provider: 'nafnet-deblur',     fallback: null      }],
   restore:  [{ provider: 'photo-restoration', fallback: null      }],
-  smart:    [{ provider: 'clarity',           fallback: null      }],
+  smart:    [{ provider: 'topaz',             fallback: 'clarity' }],
 }
 
 const PROVIDER_REGISTRY: Record<ProviderId, ProviderCall> = {
@@ -65,14 +81,23 @@ export async function runUpscalePipeline(
   req: UpscaleRunRequest,
 ): Promise<UpscaleRunResult> {
   const pipeline = PIPELINE_BY_MODE[req.modeId]
-  const scaleFac = scaleToFactor(req.scale)
+  // Fator EFETIVO: o que o motor entrega. Mandar o nominal (8) fazia o Topaz
+  // clampar calado e o Clarity rejeitar o request inteiro.
+  const scaleFac = effectiveFactor(req.scale)
   const steps:   StepLog[] = []
+
+  // Megapixels de saída decidem o formato (PNG até o teto, JPEG acima) — quem
+  // sabe as dimensões de entrada é a rota, não o provider.
+  const outputMegapixels = req.inputDimensions
+    ? (req.inputDimensions.width * req.inputDimensions.height * scaleFac * scaleFac) / 1_000_000
+    : undefined
 
   let currentUrl = req.imageUrl
   const t0       = Date.now()
 
   for (const stepDef of pipeline) {
-    const primary = await runProvider(stepDef.provider, currentUrl, scaleFac, null)
+    const params = { ...stepDef.params, ...(outputMegapixels ? { outputMegapixels } : {}) }
+    const primary = await runProvider(stepDef.provider, currentUrl, scaleFac, null, params)
     steps.push(primary)
 
     if (primary.status === 'completed') {
@@ -80,10 +105,12 @@ export async function runUpscalePipeline(
       continue
     }
 
-    // Step falhou. Tenta fallback silencioso se configurado.
+    // Step falhou. Tenta fallback se configurado. O fallback NÃO herda os
+    // overrides do primário: eles são params do Topaz e o Clarity não os
+    // conhece — um campo desconhecido derrubaria também a segunda tentativa.
     if (stepDef.fallback) {
       console.warn(
-        '[upscale] %s falhou — caindo para %s (silencioso). Motivo: %s',
+        '[upscale] %s falhou — caindo para %s. Motivo: %s',
         stepDef.provider, stepDef.fallback, primary.error,
       )
       const fb = await runProvider(stepDef.fallback, currentUrl, scaleFac, stepDef.provider)
@@ -115,10 +142,11 @@ async function runProvider(
   imageUrl:    string,
   scale:       number,
   fallbackOf:  ProviderId | null,
+  params?:     Record<string, unknown>,
 ): Promise<StepLog & { outputUrl?: string }> {
   const call = PROVIDER_REGISTRY[provider]
   try {
-    const out = await call({ imageUrl, scale })
+    const out = await call({ imageUrl, scale, params })
     return {
       provider,
       endpoint:    out.endpoint,
