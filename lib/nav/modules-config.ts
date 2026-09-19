@@ -31,7 +31,10 @@ export const SIDEBAR_MODULES: SidebarModule[] = [
   { id: 'editar',           label: 'Editar',           href: '/app/editar',                        section: 'criar',      iconKey: 'retocar',       enabled: true },
   { id: 'ampliar',          label: 'Ampliar',          href: '/app/upscale',                       section: 'criar',      iconKey: 'enhance',       enabled: true },
   { id: 'animar',           label: 'Animar',           href: '/app/video',                         section: 'criar',      iconKey: 'video',         enabled: true },
-  { id: 'finalizar',        label: 'Finalizar',        href: '/app/finalizar',                     section: 'criar',      iconKey: 'finalizar',     enabled: true },
+  // Finalizar foi incorporado ao Editar (ferramenta de IA na mesma tela) — módulo
+  // separado deixou de fazer sentido na sidebar. Rota, componente e código
+  // seguem intactos, só não aparece mais na navegação nem no dashboard.
+  { id: 'finalizar',        label: 'Finalizar',        href: '/app/finalizar',                     section: 'criar',      iconKey: 'finalizar',     enabled: false },
   { id: 'planta_humanizada',label: 'Planta humanizada',href: '/app/apresentar/planta-humanizada',  section: 'criar',      iconKey: 'humanizedPlan', enabled: true },
   { id: 'blocos_3d',        label: 'Blocos 3D',        href: '/app/blocos-3d',                     section: 'criar',      iconKey: 'blocos3d',      enabled: true, beta: true },
 
