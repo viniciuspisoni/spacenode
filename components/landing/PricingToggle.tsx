@@ -52,7 +52,7 @@ interface PlanDisplay {
 const PLAN_DISPLAY: Record<SellablePlanId, PlanDisplay> = {
   essence: {
     rendersHD: 80,  renders2K: 40,  renders4K: 20,
-    monthlyAnnualLabel: '990', meterPct: 23, featured: false, badge: '',
+    monthlyAnnualLabel: '990', meterPct: 20, featured: false, badge: '',
     // O acúmulo entra AQUI e só aqui: é fato de plataforma, vale para todo
     // plano pago, então mora na base da escada e sobe por herança ("Tudo do
     // Essence"). Repeti-lo nos três cartões traria de volta exatamente a
@@ -68,7 +68,7 @@ const PLAN_DISPLAY: Record<SellablePlanId, PlanDisplay> = {
   },
   pro: {
     rendersHD: 180, renders2K: 90,  renders4K: 45,
-    monthlyAnnualLabel: '1.990', meterPct: 51, featured: true, badge: 'recomendado',
+    monthlyAnnualLabel: '1.990', meterPct: 45, featured: true, badge: 'recomendado',
     features: [
       { label: 'Tudo do Essence' },
       {
@@ -79,8 +79,8 @@ const PLAN_DISPLAY: Record<SellablePlanId, PlanDisplay> = {
     ],
   },
   studio: {
-    rendersHD: 350, renders2K: 175, renders4K: 87,
-    monthlyAnnualLabel: '3.490', meterPct: 100, featured: false, badge: '',
+    rendersHD: 400, renders2K: 200, renders4K: 100,
+    monthlyAnnualLabel: '3.990', meterPct: 100, featured: false, badge: '',
     // Sem segunda linha de propósito (decisão do dono, 2026-09-10): detalhar
     // o prioritário viraria promessa operacional com hora marcada, e hoje o
     // suporte é uma pessoa só. O rótulo já existia; só não vira contrato.
