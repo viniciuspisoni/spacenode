@@ -18,7 +18,7 @@
 // O <a> segue normalmente — sem JS o link ainda funciona, porque o href já
 // carrega `plan=` para a página de login gravar a intenção por conta própria.
 
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { track } from '@/lib/analytics/client'
 import { writeIntentCookie, type PlanIntent } from '@/lib/analytics/attribution'
 
@@ -32,6 +32,7 @@ interface LpCtaLinkProps {
   intent?: PlanIntent
   children: ReactNode
   className?: string
+  style?: CSSProperties
 }
 
 export function fireLpCta(slug: string, position: LpCtaPosition, intent?: PlanIntent): void {
@@ -54,9 +55,9 @@ export function fireLpCta(slug: string, position: LpCtaPosition, intent?: PlanIn
   }
 }
 
-export default function LpCtaLink({ href, slug, position, intent, children, className }: LpCtaLinkProps) {
+export default function LpCtaLink({ href, slug, position, intent, children, className, style }: LpCtaLinkProps) {
   return (
-    <a href={href} onClick={() => fireLpCta(slug, position, intent)} className={className}>
+    <a href={href} onClick={() => fireLpCta(slug, position, intent)} className={className} style={style}>
       {children}
     </a>
   )

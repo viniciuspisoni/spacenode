@@ -23,6 +23,7 @@ import LpCtaLink from '@/components/marketing/LpCtaLink'
 import LpViewPing from '@/components/marketing/LpViewPing'
 import LpStickyCta from '@/components/marketing/LpStickyCta'
 import { BeforeAfter } from '@/components/landing/BeforeAfter'
+import { Logo } from '@/components/brand'
 import type { PlanIntent } from '@/lib/analytics/attribution'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getLandingPageBySlug, recordAcquisitionEvent } from '@/lib/marketing/ads/service'
@@ -114,15 +115,22 @@ export default async function LandingCampaignPage({
   const ctaHref = `/login?${qs.toString()}`
   const ctaLabel = page.cta_label?.trim() || 'Começar agora'
 
-  // Plano de entrada = o mais barato da vitrine (Essence). O CTA de plano leva
-  // `plan=` na query além do cookie de intenção que o clique grava: com os
-  // dois, a página de login manda o cadastro terminar no checkout desse plano
-  // (lib/analytics/attribution.ts → intentResumePath) mesmo sem JS no clique.
+  // Um CTA por plano, cada um com a própria intenção (decisão do dono,
+  // 18/09/26: a landing não empurra o Essence — leva o visitante a ESCOLHER
+  // um plano). O CTA leva `plan=` na query além do cookie de intenção que o
+  // clique grava: com os dois, a página de login manda o cadastro terminar
+  // no checkout do plano escolhido (lib/analytics/attribution.ts →
+  // intentResumePath) mesmo sem JS no clique. O plano mais barato é o
+  // "comece por aqui" da seção de planos e a âncora de preço do hero.
+  const planLinks: PlanLinks = Object.fromEntries(
+    SELLABLE_PLANS.map((p) => {
+      const planQs = new URLSearchParams(qs)
+      planQs.set('plan', p.id)
+      const intent: PlanIntent = { plan: p.id, billing: 'monthly' }
+      return [p.id, { href: `/login?${planQs.toString()}`, intent }]
+    }),
+  )
   const entryPlan = SELLABLE_PLANS.reduce((a, b) => (b.monthlyPrice < a.monthlyPrice ? b : a))
-  const entryIntent: PlanIntent = { plan: entryPlan.id, billing: 'monthly' }
-  const planQs = new URLSearchParams(qs)
-  planQs.set('plan', entryPlan.id)
-  const planCtaHref = `/login?${planQs.toString()}`
   const cheapestPlanPrice = entryPlan.monthlyPrice
 
   const sections: LandingSection[] = Array.isArray(page.sections) ? page.sections : []
@@ -169,14 +177,12 @@ export default async function LandingCampaignPage({
       <ForceDarkScope />
       <LpViewPing slug={slug} />
 
-      {/* Header mínimo — só o wordmark de volta pra home */}
+      {/* Header mínimo — o logo oficial (símbolo + wordmark, components/brand)
+          de volta pra home. Antes era um wordmark solto em caixa-baixa
+          espaçada, fora da identidade. */}
       <header className="mx-auto flex max-w-5xl items-center px-5 py-3 sm:px-10 sm:py-5">
-        <Link
-          href="/"
-          className="text-[13px] font-semibold text-text-primary no-underline"
-          style={{ letterSpacing: '0.22em' }}
-        >
-          spacenode
+        <Link href="/" className="inline-flex text-text-primary no-underline" aria-label="SpaceNode — início">
+          <Logo symbolSize={30} />
         </Link>
       </header>
 
@@ -243,16 +249,14 @@ export default async function LandingCampaignPage({
               assinatura, não volume de cadastro. Desktop segue como estava. */}
           <p className="mt-4 text-[11px] text-text-tertiary sm:mt-5" style={{ letterSpacing: '0.02em' }}>
             <span className="sm:hidden">
-              80 nodes grátis, sem cartão · {entryPlan.name} a partir de R$ {entryPlan.monthlyPrice}/mês
+              80 nodes grátis, sem cartão · planos a partir de R$ {cheapestPlanPrice}/mês
             </span>
             <span className="hidden sm:inline">80 nodes grátis · sem cartão</span>
           </p>
         </section>
 
         {/* Seções configuradas no painel, na ordem do array */}
-        {sections.map((section, index) =>
-          renderSection(section, index, page, { href: planCtaHref, intent: entryIntent, planName: entryPlan.name }),
-        )}
+        {sections.map((section, index) => renderSection(section, index, page, planLinks))}
 
         {/* CTA final */}
         <section className="mx-auto max-w-3xl px-5 py-12 text-center sm:px-10 sm:py-16" style={{ borderTop: HAIRLINE }}>
@@ -273,14 +277,15 @@ export default async function LandingCampaignPage({
         </section>
       </main>
 
-      {/* Barra fixa (só mobile): vende o plano de entrada com o preço no
-          rótulo. Sobe quando o banner de consentimento está aberto. */}
+      {/* Barra fixa (só mobile): genérica, leva à seção de planos — lá cada
+          plano tem o próprio CTA. Some enquanto a seção está na tela e sobe
+          quando o banner de consentimento está aberto. */}
       <LpStickyCta
         slug={slug}
-        href={planCtaHref}
-        label={`Começar com ${entryPlan.name} · R$ ${entryPlan.monthlyPrice}/mês`}
-        note={`${entryPlan.nodes.toLocaleString('pt-BR')} nodes por mês · cancele quando quiser`}
-        intent={entryIntent}
+        href="#planos"
+        label="Escolher meu plano"
+        note={`planos a partir de R$ ${cheapestPlanPrice}/mês · cancele quando quiser`}
+        hideWhenVisibleId="planos"
       />
 
       {/* Footer mínimo */}
@@ -304,18 +309,20 @@ export default async function LandingCampaignPage({
 
 // ── Seções ─────────────────────────────────────────────────────────────────────
 
-/** CTA de plano (plano de entrada): destino com `plan=`, intenção e nome. */
-interface PlanCta {
-  href: string
-  intent: PlanIntent
-  planName: string
-}
+/** Por plano vendável: destino de cadastro com `plan=` e a intenção que o
+ *  clique grava. Cada CTA de plano preserva o SEU plano até o checkout. */
+type PlanLinks = Record<string, { href: string; intent: PlanIntent }>
+
+const CTA_GHOST_CLASSES =
+  'inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-bg-elevated px-5 ' +
+  'text-[13px] font-medium text-text-primary no-underline transition-colors hover:bg-bg-elevated-hover'
+const CTA_GHOST_STYLE = { border: '0.5px solid var(--color-border-strong)' } as const
 
 function renderSection(
   section: LandingSection,
   index: number,
   page: LandingPage,
-  planCta: PlanCta,
+  planLinks: PlanLinks,
 ): ReactNode {
   switch (section.kind) {
     case 'value_props':
@@ -338,7 +345,7 @@ function renderSection(
           featuredPlanId={section.featured_plan_id}
           note={section.note}
           slug={page.slug}
-          planCta={planCta}
+          planLinks={planLinks}
         />
       )
     default:
@@ -349,17 +356,19 @@ function renderSection(
 
 /** Cabeçalho padrão de seção: eyebrow uppercase + h2 minúsculo com ponto. */
 function SectionShell({
+  id,
   eyebrow,
   title,
   children,
 }: {
+  id?: string
   eyebrow: string
   title: string
   children: ReactNode
 }) {
   // Mobile mais denso (py-8, mb-5); desktop mantém py-12 / mb-8.
   return (
-    <section className="mx-auto max-w-4xl px-5 py-8 sm:px-10 sm:py-12">
+    <section id={id} className="mx-auto max-w-4xl px-5 py-8 sm:px-10 sm:py-12" style={id ? { scrollMarginTop: 12 } : undefined}>
       <span
         className="block text-[10px] font-medium uppercase text-text-tertiary"
         style={{ letterSpacing: '0.28em' }}
@@ -640,33 +649,33 @@ function PricingSection({
   featuredPlanId,
   note,
   slug,
-  planCta,
+  planLinks,
 }: {
   planIds?: string[]
   featuredPlanId?: string
   note?: string
   slug: string
-  planCta: PlanCta
+  planLinks: PlanLinks
 }) {
   const ids = Array.isArray(planIds) ? planIds : []
   const plans = ids.length > 0 ? SELLABLE_PLANS.filter((p) => ids.includes(p.id)) : SELLABLE_PLANS
   if (plans.length === 0) return null
 
-  // MOBILE: um plano em destaque ("comece por aqui", com o CTA dentro do
-  // cartão) e os outros em linhas — o visitante decide entre "entro" e
-  // "não entro", não entre três cartões iguais. O destaque é o plano que o
-  // CTA da página vende (planCta), salvo `featured_plan_id` no dado.
-  const featured =
-    plans.find((p) => p.id === featuredPlanId) ??
-    plans.find((p) => p.id === planCta.intent.plan) ??
-    plans[0]
+  // Cada plano tem o PRÓPRIO CTA, com a própria intenção (decisão do dono,
+  // 18/09/26): a página leva o visitante a escolher um plano, não a um plano
+  // em particular. O destaque "comece por aqui" é só hierarquia visual — no
+  // mobile o mais barato vira cartão e os outros linhas, cada linha com o
+  // seu botão. `featured_plan_id` no dado troca o destaque.
+  const cheapest = plans.reduce((a, b) => (b.monthlyPrice < a.monthlyPrice ? b : a))
+  const featured = plans.find((p) => p.id === featuredPlanId) ?? cheapest
   const secondary = plans.filter((p) => p.id !== featured.id)
   const noteText =
     note ??
     'Nodes são os créditos de geração e acumulam enquanto a assinatura estiver ativa. Começa grátis com 80 nodes, sem cartão — a assinatura entra quando o volume pedir.'
+  const linkFor = (id: string) => planLinks[id]
 
   return (
-    <SectionShell eyebrow="Planos" title="quanto custa.">
+    <SectionShell id="planos" eyebrow="Planos" title="quanto custa.">
       {/* ── Mobile ─────────────────────────────────────────────────── */}
       <div className="sm:hidden">
         <div
@@ -699,18 +708,20 @@ function PricingSection({
             {featured.nodes.toLocaleString('pt-BR')} nodes / mês · cancele quando quiser
           </div>
           <p className="mt-1.5 text-xs leading-relaxed text-text-tertiary">{featured.description}</p>
-          <div className="mt-5">
-            <LpCtaLink
-              href={planCta.href}
-              slug={slug}
-              position="pricing"
-              intent={planCta.intent}
-              className={`${CTA_CLASSES} w-full`}
-            >
-              Começar com {featured.name}
-              <CtaArrow />
-            </LpCtaLink>
-          </div>
+          {linkFor(featured.id) && (
+            <div className="mt-5">
+              <LpCtaLink
+                href={linkFor(featured.id).href}
+                slug={slug}
+                position="pricing"
+                intent={linkFor(featured.id).intent}
+                className={`${CTA_CLASSES} w-full`}
+              >
+                Começar com {featured.name}
+                <CtaArrow />
+              </LpCtaLink>
+            </div>
+          )}
         </div>
 
         {secondary.length > 0 && (
@@ -718,21 +729,30 @@ function PricingSection({
             {secondary.map((plan) => (
               <li
                 key={plan.id}
-                className="flex items-baseline justify-between gap-3 py-3"
+                className="flex items-center justify-between gap-3 py-3"
                 style={{ borderBottom: HAIRLINE }}
               >
                 <div className="min-w-0">
                   <span className="text-[13px] font-medium text-text-primary" style={{ letterSpacing: '-0.01em' }}>
                     {plan.name}
+                    <span className="font-normal text-text-secondary"> · R$ {plan.monthlyPrice}/mês</span>
                   </span>
-                  <span className="block text-[11px] text-text-tertiary">{plan.description}</span>
-                </div>
-                <div className="flex-none text-right">
-                  <span className="text-[13px] text-text-primary">R$ {plan.monthlyPrice}/mês</span>
                   <span className="block text-[11px] text-text-tertiary">
-                    {plan.nodes.toLocaleString('pt-BR')} nodes
+                    {plan.nodes.toLocaleString('pt-BR')} nodes / mês · {plan.description}
                   </span>
                 </div>
+                {linkFor(plan.id) && (
+                  <LpCtaLink
+                    href={linkFor(plan.id).href}
+                    slug={slug}
+                    position="pricing"
+                    intent={linkFor(plan.id).intent}
+                    className={`${CTA_GHOST_CLASSES} flex-none min-h-[40px] px-4 text-[12px]`}
+                    style={CTA_GHOST_STYLE}
+                  >
+                    Escolher
+                  </LpCtaLink>
+                )}
               </li>
             ))}
           </ul>
@@ -740,7 +760,7 @@ function PricingSection({
         <p className="mt-4 text-xs leading-relaxed text-text-tertiary">{noteText}</p>
       </div>
 
-      {/* ── Desktop (inalterado) ────────────────────────────────────── */}
+      {/* ── Desktop: os mesmos cartões, agora cada um com o próprio CTA ── */}
       <div className="hidden sm:block">
       <div className={`grid grid-cols-1 gap-2 ${gridColsFor(plans.length)}`}>
         {plans.map((plan) => (
@@ -770,19 +790,28 @@ function PricingSection({
             <div className="mt-2 text-[13px] text-text-secondary" style={{ letterSpacing: '-0.01em' }}>
               {plan.nodes.toLocaleString('pt-BR')} nodes / mês
             </div>
-            <p className="mt-1.5 text-xs leading-relaxed text-text-tertiary">{plan.description}</p>
+            <p className="mt-1.5 flex-1 text-xs leading-relaxed text-text-tertiary">{plan.description}</p>
+            {/* O CTA de cada cartão grava a intenção DESTE plano: o cadastro
+                termina no checkout dele. O destaque leva o botão cheio. */}
+            {linkFor(plan.id) && (
+              <div className="mt-5">
+                <LpCtaLink
+                  href={linkFor(plan.id).href}
+                  slug={slug}
+                  position="pricing"
+                  intent={linkFor(plan.id).intent}
+                  className={plan.id === featured.id ? `${CTA_CLASSES} w-full` : `${CTA_GHOST_CLASSES} w-full`}
+                  style={plan.id === featured.id ? undefined : CTA_GHOST_STYLE}
+                >
+                  Começar com {plan.name}
+                  <CtaArrow />
+                </LpCtaLink>
+              </div>
+            )}
           </div>
         ))}
       </div>
       <p className="mt-6 text-xs leading-relaxed text-text-tertiary">{noteText}</p>
-      {/* O CTA da seção de preço vende o plano de entrada, não o grátis: o
-          clique grava a intenção e o cadastro termina no checkout dele. */}
-      <div className="mt-7">
-        <LpCtaLink href={planCta.href} slug={slug} position="pricing" intent={planCta.intent} className={CTA_CLASSES}>
-          Começar com {planCta.planName}
-          <CtaArrow />
-        </LpCtaLink>
-      </div>
       </div>
     </SectionShell>
   )

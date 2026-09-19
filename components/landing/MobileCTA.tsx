@@ -19,6 +19,7 @@ export function MobileCTA({
   note = '80 nodes grátis · sem cartão · em português',
   onClick,
   revealAfter = 0.6,
+  suppressed = false,
 }: {
   href?: string
   label?: string
@@ -26,11 +27,15 @@ export function MobileCTA({
   onClick?: () => void
   /** Fração da altura do viewport rolada a partir da qual a barra aparece. */
   revealAfter?: number
+  /** true = esconde mesmo depois do ponto de revelação (ex.: a seção que a
+   *  barra aponta já está na tela). */
+  suppressed?: boolean
 } = {}) {
-  const [visible, setVisible] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
+  const visible = scrolled && !suppressed
 
   useEffect(() => {
-    const onScroll = () => setVisible(window.scrollY > window.innerHeight * revealAfter)
+    const onScroll = () => setScrolled(window.scrollY > window.innerHeight * revealAfter)
     onScroll()
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
