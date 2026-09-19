@@ -182,3 +182,134 @@ funciona (não cai no `window.open`). Medido em Chromium real:
 Ressalva honesta: um bitmap 8828×3428 decodificado ocupa ~121 MB de memória de
 raster, que **não** aparece em `performance.memory` (só o heap JS, 14 MB). O
 Chromium headless aguentou; aparelho de baixo custo é risco não medido.
+
+---
+
+# 9. Análise visual automática — o que paga e o que não paga (19/09/2026)
+
+Pergunta: vale uma camada que reconhece o TIPO da imagem (render, foto,
+desenho, planta, prancha com texto) e escolhe modelo, escala e parâmetros?
+E dá para passar isso ao provider como instrução textual?
+
+## 9.1 Instrução textual — via fechada
+
+No schema do Topaz, `prompt` e `autoprompt` "apply to Redefine model only".
+O Redefine é da família **Generative** ("adds prompt-guided creative
+detail", `creativity` 1–6 = "more hallucinated details"). Gerar um prompt
+interno significaria trocar o motor de precisão por um que inventa — o
+oposto do contrato. A análise, portanto, só pode **configurar o pipeline**.
+
+## 9.2 Modelos por classe, contra verdade de campo
+
+Cada classe: nítida (verdade) → degradada (metade + JPEG 70) → 2× em cada
+modelo → comparação contra a verdade. MAE = erro absoluto médio (0–255).
+
+**Fotorrealista** (recorte de `public/final-cta-bg.jpg`, 400×300 → 2×):
+
+| modelo | score | recall | ΔE méd | MAE |
+|---|---|---|---|---|
+| Lanczos | 0,9856 | 0,9841 | 0,672 | 5,63 |
+| **High Fidelity V2** | **0,9880** | **0,9932** | **0,433** | **5,34** |
+| HF V2 + fix_compression 0,6 | 0,9878 | 0,9930 | 0,432 | 5,38 |
+| Standard V2 | 0,9698 | 0,9834 | 0,518 | 7,99 |
+
+HF V2 vence; `fix_compression` não muda nada numa fonte boa; Standard V2
+(o default do FAL) fica abaixo do Lanczos. **Nada a rotear aqui.**
+
+**Planta baixa** (sintética, traço + rótulos de 11–22 px, 600×450 → 2×):
+
+| modelo | score | recall | ΔE méd | MAE |
+|---|---|---|---|---|
+| Lanczos | 0,9759 | 0,9677 | 0,202 | 4,14 |
+| High Fidelity V2 | 0,9567 | 0,9378 | 0,097 | 1,58 |
+| **Text Refine** | **0,9956** | **1,0000** | **0,061** | **1,03** |
+| CGI | 0,9937 | 1,0000 | 0,128 | 1,48 |
+
+Lido assim, o HF V2 pareceria comer 6% das arestas finas e o Text Refine
+recuperar 100%. **Não é isso que acontece** — ver 9.2-bis logo abaixo: o edge
+recall não serve para traço fino. O que sobrevive à métrica certa é um ganho
+modesto e consistente de precisão e MAE. **É a única classe que paga.**
+
+**Prancha** (render + bloco de texto, 600×450 → 2×):
+
+| modelo | score | recall | ΔE méd | MAE |
+|---|---|---|---|---|
+| Lanczos | 0,9317 | 0,8821 | 0,691 | 7,21 |
+| **High Fidelity V2** | **0,9526** | **0,9259** | 0,761 | 6,05 |
+| Text Refine | 0,8695 | 0,7895 | 0,614 | 4,72 |
+
+A armadilha: o MAE do Text Refine é melhor (fundo chapado e texto limpos),
+mas o **recall do render despenca para 0,79** — na inspeção 1:1 o tijolo
+vira mancha e o guarda-corpo perde o sombreado. E o texto miúdo da prancha
+(≈6 px na degradada) saiu ilegível nos DOIS motores: a degradação o
+destruiu, nenhum upscale o traz de volta.
+
+Conclusão: **"tem texto" é o sinal errado.** Uma prancha tem texto e NÃO
+pode ir pro Text Refine. O sinal certo é **"não tem meios-tons"** —
+desenho técnico puro.
+
+Render do SketchUp: já medido em §2 (HF V2 vence o CGI).
+
+### 9.2-bis Correção: o edge recall mente em traço fino
+
+A tabela da planta acima mostra o Text Refine com recall 1,000 contra 0,938
+do HF V2. Ao repetir o experimento numa **segunda planta** (a sintética do
+smoke test), o sinal **inverteu**: HF V2 0,9985 e Text Refine 0,9240. O
+geometry score foi calibrado em render, a 384 px de análise; em linha de
+1 px reduzida a 384 px o percentil de "borda forte" oscila e o recall vira
+ruído de ±7% — não mede o que parece medir nessa classe.
+
+Métrica feita para traço (tinta = cinza < 128; recall e precisão com
+tolerância de ±1 px), nas duas plantas:
+
+| planta | modelo | tinta-recall | tinta-precisão | MAE |
+|---|---|---|---|---|
+| eval | HF V2 | 0,9996 | 0,9605 | 1,58 |
+| eval | **Text Refine** | 0,9996 | **0,9876** | **1,03** |
+| smoke | HF V2 | 1,0000 | 0,9772 | 1,07 |
+| smoke | **Text Refine** | 1,0000 | **0,9876** | **0,65** |
+
+Leitura honesta: **nenhum dos dois perde linha** (recall ≈ 1,000 nos
+quatro). O que o Text Refine faz melhor, nas duas plantas, é **não inventar
+tinta em volta das linhas** (precisão 0,961/0,977 → 0,988 — é o halo do
+HF V2 que a inspeção 1:1 mostra) e errar 35–40% menos contra a verdade.
+
+O ganho é **modesto e consistente**, não o "0,938 → 1,000" que a primeira
+tabela sugeria. Continua valendo o roteamento porque custa zero (mesmo
+endpoint, mesmo preço, 15,1 s contra 15,0 s) e porque o classificador só
+dispara em desenho técnico puro, onde o risco de perder textura não existe.
+Se o ganho fosse pago em tempo ou dinheiro, não valeria.
+
+O smoke real do line-art (`tests/upscale/smoke-real.test.ts`) usa a métrica
+de traço, não o geometry score, por esse motivo.
+
+## 9.3 Classificador — local, não Gemini
+
+| | latência | custo | separa a classe que paga? |
+|---|---|---|---|
+| **heurística local (sharp)** | **40–90 ms** | 0 | sim, com margem (tabela em classify-source.ts) |
+| Gemini 2.5 Flash | 2,0–5,1 s | por imagem | sim — mas disse que o render do SketchUp "tem texto" (o quadro-negro), exatamente o falso positivo que misrotearia um render |
+
+A heurística usa três portões (fundo claro ≥ 80%, meios-tons ≤ 7%,
+saturação ≤ 0,03), todos obrigatórios. O negativo difícil — render sobre
+fundo branco — passa no primeiro e é barrado pelos outros dois. O erro
+possível é sempre o barato (planta fica no HF V2); nunca o caro (render vai
+pro Text Refine). Gemini acrescentaria 10–15% de latência a uma geração de
+30 s e uma dependência de rede para uma decisão que a heurística já toma.
+
+## 9.4 O que foi implementado
+
+- `classify-source.ts`: `'line-art'` | `'image'`, no servidor, depois da
+  normalização e antes do débito. Falha → `'image'` (fluxo de sempre).
+- Orchestrator: `kindParams` por step; `'line-art'` → `model: 'Text Refine'`
+  nos três modos que ampliam. **Se o Text Refine falhar, o primário roda de
+  novo com os params padrão antes de cair no Clarity** — um modelo
+  especializado indisponível nunca custa mais que o comportamento padrão.
+- Escala: continua derivada das dimensões (§ recommendations.ts).
+- Histórico: `source_kind` + `source_stats` em `upscale_meta`.
+- Custo e tempo: Text Refine é o mesmo endpoint, mesmo preço; 15,1 s contra
+  15,0 s do HF V2 na mesma imagem. A classificação custa < 0,1 s de CPU.
+
+O que NÃO foi implementado, e por quê: roteamento foto × render (HF V2
+vence nos dois), `fix_compression` automático (sem ganho medido em fonte
+boa; segue só no Recuperar), Gemini (§9.3), qualquer prompt (§9.1).
