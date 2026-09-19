@@ -92,18 +92,18 @@ BEGIN
   RAISE NOTICE '── 3. Cancelamento preserva o saldo por 90 dias ──';
   INSERT INTO public.profiles (email, credits, plan, stripe_subscription_id)
     VALUES ('cancela@nodes-test.invalid', 0, 'free', NULL) RETURNING id INTO u;
-  PERFORM public.grant_plan_nodes(u, 3500, 'studio', 'grant_plan', 'sub_C');
+  PERFORM public.grant_plan_nodes(u, 4000, 'studio', 'grant_plan', 'sub_C');
 
   PERFORM public.start_nodes_grace(u, NOW() + INTERVAL '90 days');
   SELECT credits, nodes_expire_at INTO bal, exp FROM public.profiles WHERE id = u;
-  PERFORM pg_temp.assert_eq(bal, 3500, 'cancelamento NÃO zera o saldo');
+  PERFORM pg_temp.assert_eq(bal, 4000, 'cancelamento NÃO zera o saldo');
   PERFORM pg_temp.assert_eq((SELECT plan FROM public.profiles WHERE id = u), 'free', 'plano volta pra free');
   PERFORM pg_temp.assert_eq(exp > NOW() + INTERVAL '89 days', TRUE, 'prazo de 90 dias gravado');
 
   -- Dentro da janela ainda dá pra gastar
   PERFORM public.consume_nodes_v2(u, 500);
   SELECT credits INTO bal FROM public.profiles WHERE id = u;
-  PERFORM pg_temp.assert_eq(bal, 3000, 'consumo funciona dentro da janela');
+  PERFORM pg_temp.assert_eq(bal, 3500, 'consumo funciona dentro da janela');
 
   -- Reentrega do subscription.deleted não empurra o prazo pra frente
   PERFORM public.start_nodes_grace(u, NOW() + INTERVAL '90 days');

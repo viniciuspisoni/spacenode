@@ -49,6 +49,24 @@ describe('vitrine vs. legado', () => {
     expect(essence!.nodes).toBe(800)
   })
 
+  // Reajuste de 2026-09-19: R$349/3.500 -> R$399/4.000. O Studio é o topo da
+  // vitrine, então é ele quem define o 100% do medidor da landing e o teto de
+  // recommendPlan — travar preço e franquia aqui pega as duas regressões.
+  it('Studio entra na vitrine com preço e nodes públicos', () => {
+    const studio = PLANS.find(p => p.id === 'studio')
+    expect(studio).toBeDefined()
+    expect(studio!.legacy).toBeFalsy()
+    expect(studio!.monthlyPrice).toBe(399)
+    expect(studio!.nodes).toBe(4000)
+  })
+
+  it('a vitrine é uma escada: preço e franquia sobem juntos', () => {
+    for (let i = 1; i < SELLABLE_PLANS.length; i++) {
+      expect(SELLABLE_PLANS[i].monthlyPrice).toBeGreaterThan(SELLABLE_PLANS[i - 1].monthlyPrice)
+      expect(SELLABLE_PLANS[i].nodes).toBeGreaterThan(SELLABLE_PLANS[i - 1].nodes)
+    }
+  })
+
   it('isPaidPlanId aceita planos legados (registros existentes); isSellablePlanId recusa (novas vendas)', () => {
     for (const id of ['office', 'starter']) {
       expect(isPaidPlanId(id)).toBe(true)
@@ -66,7 +84,7 @@ describe('vitrine vs. legado', () => {
     expect(recommendPlan(100).id).toBe('essence')
     expect(recommendPlan(800).id).toBe('essence')
     expect(recommendPlan(1800).id).toBe('pro')
-    expect(recommendPlan(3500).id).toBe('studio')
+    expect(recommendPlan(4000).id).toBe('studio')
     // volume que só o Office cobriria: a resposta é Studio (+ extras/conversa)
     expect(recommendPlan(5000).id).toBe('studio')
     expect(recommendPlan(50000).id).toBe('studio')

@@ -86,7 +86,7 @@ const PLANS = [
   { id: 'starter', name: 'SPACENODE Starter', nodes: 750,  monthly: 8900,  annual: 89000  },
   { id: 'essence', name: 'SPACENODE Essence', nodes: 800,  monthly: 9900,  annual: 99000  },
   { id: 'pro',     name: 'SPACENODE Pro',     nodes: 1800, monthly: 19900, annual: 199000 },
-  { id: 'studio',  name: 'SPACENODE Studio',  nodes: 3500, monthly: 34900, annual: 349000 },
+  { id: 'studio',  name: 'SPACENODE Studio',  nodes: 4000, monthly: 39900, annual: 399000 },
   { id: 'office',  name: 'SPACENODE Office',  nodes: 8000, monthly: 69900, annual: 699000 },
 ]
 const LUMENS = [
@@ -127,6 +127,16 @@ function assertPriceMatches(found, lookupKey, amount, interval /* null = avulso 
   process.exit(1)
 }
 
+// Nome/descrição/metadata do produto vêm do catálogo — um lugar só, porque
+// são lidos tanto na criação quanto na sincronização do produto reutilizado.
+function productParams(p) {
+  return {
+    name: p.name,
+    description: `Plano ${p.name.replace('SPACENODE ', '')} — ${p.nodes.toLocaleString('pt-BR')} nodes/mês`,
+    metadata: { plan_id: p.id, nodes: String(p.nodes), catalog: 'v2.1' },
+  }
+}
+
 // Reuso de produto por metadata cobre o run anterior que caiu entre criar o
 // produto e criar o preço (evita produto duplicado no catálogo live).
 async function findOrCreateProduct(query, params) {
@@ -153,11 +163,7 @@ for (const p of PLANS) {
     if (!productId) {
       productId = await findOrCreateProduct(
         `active:'true' AND metadata['plan_id']:'${p.id}' AND metadata['catalog']:'v2.1'`,
-        {
-          name: p.name,
-          description: `Plano ${p.name.replace('SPACENODE ', '')} — ${p.nodes.toLocaleString('pt-BR')} nodes/mês`,
-          metadata: { plan_id: p.id, nodes: String(p.nodes), catalog: 'v2.1' },
-        }
+        productParams(p)
       )
     }
     const price = await stripe.prices.create({
@@ -171,6 +177,15 @@ for (const p of PLANS) {
     })
     envs[envName] = price.id
     console.log(`✔ ${price.lookup_key} → ${price.id}`)
+  }
+
+  // O produto é REUTILIZADO entre runs (pelo lookup_key do preço ou pela
+  // metadata), então uma mudança de catálogo — preço novo, franquia nova —
+  // não chegava sozinha ao que o cliente lê no recibo e no Billing Portal:
+  // o produto seguia anunciando a franquia antiga. Sincroniza aqui, depois
+  // que productId foi resolvido por qualquer um dos dois caminhos.
+  if (productId) {
+    await stripe.products.update(productId, productParams(p))
   }
 }
 
