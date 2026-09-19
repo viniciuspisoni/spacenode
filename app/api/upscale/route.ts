@@ -24,6 +24,7 @@ import { fetchStorageBuffer } from '@/lib/storage/fetch'
 // Server-only (sharp) — importado direto, nunca via lib/upscale/index, que o
 // componente cliente também importa.
 import { normalizeSource, type NormalizeNote } from '@/lib/upscale/normalize-source'
+import { classifySource, type SourceStats } from '@/lib/upscale/classify-source'
 import sharp from 'sharp'
 import {
   MAX_OUTPUT_MP,
@@ -35,6 +36,7 @@ import {
   runUpscalePipeline,
   type ModeId,
   type Scale,
+  type SourceKind,
   type UpscaleTab,
 } from '@/lib/upscale'
 
@@ -127,6 +129,20 @@ export async function POST(req: NextRequest) {
     height = heightRaw ? Number(heightRaw) : null
   }
 
+  // ── Classe visual da origem (best-effort, 40–90 ms de CPU) ───────────────
+  // Desenho técnico puro vai pro Text Refine; todo o resto segue no motor
+  // padrão. Falha aqui NUNCA barra o pedido — cai em 'image', que é o
+  // comportamento de sempre. Ver lib/upscale/classify-source.ts e MEDICOES §9.
+  let sourceKind: SourceKind = 'image'
+  let sourceStats: SourceStats | null = null
+  try {
+    const c = await classifySource(sourceBuffer)
+    sourceKind  = c.kind
+    sourceStats = c.stats
+  } catch (e) {
+    console.warn('[upscale] classificação da origem falhou (segue como image):', (e as Error).message)
+  }
+
   // ── Teto de resolução do output (antes de custo/débito) ────────────────────
   // Fator EFETIVO: é o que o motor entrega e, portanto, o que se cobra. Um
   // cliente antigo que ainda peça 8× roda e paga como 4× (MAX_UPSCALE_FACTOR).
@@ -182,7 +198,7 @@ export async function POST(req: NextRequest) {
       new File([new Uint8Array(sourceBuffer)], fileName, { type: sourceMime }),
     )
 
-    console.log('[upscale] tab=%s mode=%s scale=%s mp=%s', tabT, modeT, scaleT, megapixelsFromDimensions(width, height))
+    console.log('[upscale] tab=%s mode=%s scale=%s mp=%s kind=%s', tabT, modeT, scaleT, megapixelsFromDimensions(width, height), sourceKind)
 
     // ── Pipeline ────────────────────────────────────────────────────────────
     const result = await runUpscalePipeline({
@@ -192,6 +208,7 @@ export async function POST(req: NextRequest) {
       objectiveId:     objectiveId as never,
       imageUrl:        inputUrl,
       inputDimensions: width && height ? { width, height } : null,
+      sourceKind,
     })
 
     const outputUrl   = result.outputUrl
@@ -250,6 +267,8 @@ export async function POST(req: NextRequest) {
       output_format:     outputFormat,
       output_bytes:      outputBytes,
       source_normalized: normalized,
+      source_kind:       sourceKind,
+      source_stats:      sourceStats,
       fallback_used:     fallbackUsed,
       total_duration_ms: result.totalDurationMs,
     }
@@ -294,6 +313,7 @@ export async function POST(req: NextRequest) {
       effectiveFactor: scaleFactor,
       scaleClamped:    isScaleClamped(scaleT),
       sourceNormalized: normalized,
+      sourceKind,
       nodesCharged:    cost,
       durationMs:   result.totalDurationMs,
     })

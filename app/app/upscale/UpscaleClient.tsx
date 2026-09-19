@@ -60,10 +60,10 @@ const ENHANCE_MODES: ModeDef[] = [
 // trabalho. Ver MAX_UPSCALE_FACTOR em lib/upscale/types.ts.
 const SCALE_LABEL: Record<string, string> = { '2x': '2×', '4x': '4×' }
 
-// O objetivo é o único campo desta tela escrito na língua do arquiteto — e é
-// ele que preenche aba, modo e escala de uma vez (OBJECTIVE_PRESETS). Por isso
-// virou a superfície, em cartão: título é o trabalho, nota é o que ele resolve.
-// Aba/modo/escala são o EFEITO dele e foram para a folha.
+// O objetivo era o eixo da superfície; agora é decidido sozinho e mora na
+// folha, como override. A superfície tem UMA ação: enviar a imagem e clicar.
+// O que o sistema decidiu aparece como consequência — a resolução final em
+// pixels e o resumo da linha "Ajuste fino" — não como pergunta.
 const OBJECTIVES: { value: ObjectiveId; title: string; note: string }[] = [
   { value: 'client',    title: 'Apresentação para cliente', note: 'Nítida na tela e no PDF'     },
   { value: 'portfolio', title: 'Portfólio / Instagram',     note: 'Aguenta o zoom do feed'      },
@@ -108,8 +108,9 @@ interface UpscaleClientProps {
   sourceUrl?: string
 }
 
-// Toda família tem de funcionar sem ninguém tocar nela: a tela abre com um
-// objetivo já escolhido, e ele é quem define aba/modo/escala iniciais.
+// A tela funciona sem ninguém tocar em nada: abre com um objetivo já
+// escolhido, e ele define aba/modo/escala. Com a imagem, a análise pode trocar
+// o objetivo (imagem comprimida → Recuperar) e a escala se ajusta ao tamanho.
 const DEFAULT_OBJECTIVE: ObjectiveId = 'client'
 
 interface ResultMeta {
@@ -118,6 +119,8 @@ interface ResultMeta {
   height: number | null
   bytes:  number | null
   factor: number | null
+  /** 'line-art' quando o servidor reconheceu desenho técnico e usou o modelo de traço. */
+  sourceKind: string | null
 }
 
 export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClientProps) {
@@ -127,7 +130,7 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
   const [imageDimensions, setImageDimensions] = useState<{ w: number; h: number } | null>(null)
   const [isDragging,      setIsDragging]      = useState(false)
 
-  // Objetivo (superfície) + os três efeitos dele (folha de ajuste fino).
+  // Objetivo (decidido sozinho) + os três efeitos dele (folha de ajuste fino).
   const [selectedObjective, setSelectedObjective] = useState<ObjectiveId>(DEFAULT_OBJECTIVE)
   const [tab,            setTab]            = useState<UpscaleTab>(OBJECTIVE_PRESETS[DEFAULT_OBJECTIVE].tab)
   const [selectedModeId, setSelectedModeId] = useState<ModeId>(OBJECTIVE_PRESETS[DEFAULT_OBJECTIVE].modeId)
@@ -419,6 +422,7 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
         height: typeof data?.outputHeight === 'number' ? data.outputHeight : null,
         bytes:  typeof data?.outputBytes  === 'number' ? data.outputBytes  : null,
         factor: typeof data?.effectiveFactor === 'number' ? data.effectiveFactor : null,
+        sourceKind: typeof data?.sourceKind === 'string' ? data.sourceKind : null,
       })
       setCredits(c => c - (typeof data?.nodesCharged === 'number' ? data.nodesCharged : nodeCost))
     } catch (e) {
@@ -459,10 +463,10 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
             Ampliar
           </h1>
           <p style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginTop: 4, marginBottom: 18, lineHeight: 1.5 }}>
-            Diga para que serve a imagem — o resto vem decidido.
+            Envie a imagem. O resto vem decidido.
           </p>
 
-          {/* Imagem: campo obrigatório, fica na superfície. */}
+          {/* Imagem: o único campo da superfície. */}
           <div className="spn-field">
             <span className="spn-field-label">Imagem</span>
             <div
@@ -523,32 +527,13 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
               {isImporting ? 'Importando…' : 'Importar do histórico'}
             </button>
 
-            {/* A análise do arquivo é dica, não decreto: ela sugere, o objetivo
-                decide. Só aparece quando tem algo concreto a dizer. */}
+            {/* A análise do arquivo é a decisão automática falando: só aparece
+                quando tem algo concreto a dizer. */}
             {recommendation && <p className="spn-hint">{recommendation}</p>}
           </div>
 
-          {/* Objetivo: o eixo da tela. */}
-          <div className="spn-field">
-            <span className="spn-field-label">Para que serve esta imagem</span>
-            <ChoiceGroup
-              label="Objetivo"
-              cols={2}
-              value={selectedObjective}
-              onChange={(id) => applyObjective(id)}
-              options={OBJECTIVES}
-            />
-            {/* O cartão continua marcado depois de um ajuste manual — sem esta
-                linha a superfície diria "Impressão / prancha" enquanto o que
-                vale é o que está na folha. */}
-            {!objectiveInSync && (
-              <p className="spn-hint">Ajustado à mão — vale o que está em “Ajuste fino”.</p>
-            )}
-          </div>
-
-          {/* O que vai sair. Este bloco é a tradução do objetivo para a língua
-              de quem entrega prancha: pixels, não multiplicador. Sem ele, "4×"
-              exige que o usuário saiba de cabeça o tamanho da origem. */}
+          {/* O que vai sair. É a tradução da decisão automática para a língua
+              de quem entrega prancha: pixels, não multiplicador. */}
           {projected && (
             <div className="spn-field">
               <div style={{
@@ -575,7 +560,8 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
             </div>
           )}
 
-          {/* Ajuste fino: os três efeitos do objetivo, numa linha só. */}
+          {/* Ajuste fino: o que foi decidido, numa linha — e a porta para
+              mudar. Quem confia no automático nunca abre. */}
           <div className="spn-field">
             <SettingGroup>
               <SettingRow
@@ -586,6 +572,11 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
                 onOpen={() => setTuneOpen(true)}
               />
             </SettingGroup>
+            {/* Sem esta linha a folha diria "Impressão / prancha" marcado
+                enquanto o que vale é o ajuste manual. */}
+            {!objectiveInSync && (
+              <p className="spn-hint">Ajustado à mão — vale o que está em “Ajuste fino”.</p>
+            )}
           </div>
 
           {error && <div className="spn-error">{error}</div>}
@@ -660,6 +651,10 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
                 {resultMeta?.factor ? ` · ${resultMeta.factor}×` : ''}
                 {resultMeta?.bytes ? ` · ${formatFileSize(resultMeta.bytes)}` : ''}
                 {` · ${activeMode.label}`}
+                {/* O servidor reconheceu desenho técnico e usou o modelo de
+                    traço — a única decisão automática que vale a pena nomear,
+                    porque explica por que a planta saiu tão limpa. */}
+                {resultMeta?.sourceKind === 'line-art' ? ' · Desenho técnico' : ''}
               </span>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <button type="button" className="spn-ghost" style={ghostLink} onClick={handleDownload} disabled={isDownloading}>
@@ -717,9 +712,24 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
         )}
       </section>
 
-      {/* Folha de ajuste fino: aba, modo e escala. Quem confia no objetivo
-          nunca abre isto. */}
+      {/* Folha de ajuste fino: objetivo, aba, modo e escala. Tudo já vem
+          decidido; quem abre isto está querendo algo específico. */}
       <Sheet id="upscale-tune" open={tuneOpen} title="Ajuste fino" onClose={() => setTuneOpen(false)}>
+        <div className="spn-field">
+          <span className="spn-field-label">Para que serve esta imagem</span>
+          <ChoiceGroup
+            label="Objetivo"
+            cols={2}
+            value={selectedObjective}
+            onChange={(id) => applyObjective(id)}
+            options={OBJECTIVES}
+          />
+          <p className="spn-hint">
+            Cada objetivo define tratamento, modo e escala de uma vez, ajustados ao
+            tamanho da sua imagem.
+          </p>
+        </div>
+
         <div className="spn-field">
           <span className="spn-field-label">Tratamento</span>
           <Segmented
@@ -775,8 +785,7 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
         </div>
 
         <p className="spn-hint">
-          Os três já vêm resolvidos pelo objetivo, e a escala se ajusta ao tamanho
-          da sua imagem. Mexer aqui vale só para esta imagem.
+          Mexer aqui vale só para esta imagem.
         </p>
       </Sheet>
 

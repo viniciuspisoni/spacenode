@@ -28,6 +28,7 @@ import {
   type ModeId,
   type ProviderCall,
   type ProviderId,
+  type SourceKind,
   type StepLog,
   type UpscaleRunRequest,
   type UpscaleRunResult,
@@ -43,6 +44,11 @@ interface StepDescriptor {
   fallback: ProviderId | null
   /** Overrides de param do provider primário (ver providers/topaz.ts). */
   params?: Record<string, unknown>
+  /** Overrides adicionais por classe visual da origem (SourceKind). Só o
+   *  primário os recebe; se ele falhar COM eles, roda de novo SEM eles antes
+   *  de cair no fallback — assim um modelo especializado indisponível nunca
+   *  custa mais que o comportamento padrão. */
+  kindParams?: Partial<Record<SourceKind, Record<string, unknown>>>
 }
 
 // Os três modos que AMPLIAM passaram a usar o mesmo motor de precisão (Topaz
@@ -58,13 +64,22 @@ interface StepDescriptor {
 // Os modos da aba Aprimorar que NÃO ampliam seguem nos modelos especializados
 // (NAFNet/photo-restoration): eles operam na resolução original e o Topaz não
 // os substitui.
+// Desenho técnico puro → Text Refine (MEDICOES.md §9): em duas plantas
+// degradadas, mesmas linhas preservadas que o High Fidelity V2, mas menos halo
+// (precisão da tinta 0,977/0,961 → 0,988) e 35–40% menos erro contra a
+// verdade. Ganho modesto, consistente, custo zero. Só para line-art: em
+// conteúdo misto (prancha) o mesmo modelo derruba o recall do render para
+// 0,790 — por isso a classe é decidida com portões conservadores em
+// classify-source.ts, nunca por "tem texto".
+const LINE_ART: StepDescriptor['kindParams'] = { 'line-art': { model: 'Text Refine' } }
+
 const PIPELINE_BY_MODE: Record<ModeId, StepDescriptor[]> = {
-  fidelity: [{ provider: 'topaz',             fallback: 'clarity' }],
-  recover:  [{ provider: 'topaz',             fallback: 'clarity', params: { fix_compression: 0.6 } }],
+  fidelity: [{ provider: 'topaz',             fallback: 'clarity', kindParams: LINE_ART }],
+  recover:  [{ provider: 'topaz',             fallback: 'clarity', params: { fix_compression: 0.6 }, kindParams: LINE_ART }],
   denoise:  [{ provider: 'nafnet-denoise',    fallback: null      }],
   deblur:   [{ provider: 'nafnet-deblur',     fallback: null      }],
   restore:  [{ provider: 'photo-restoration', fallback: null      }],
-  smart:    [{ provider: 'topaz',             fallback: 'clarity' }],
+  smart:    [{ provider: 'topaz',             fallback: 'clarity', kindParams: LINE_ART }],
 }
 
 const PROVIDER_REGISTRY: Record<ProviderId, ProviderCall> = {
@@ -96,9 +111,21 @@ export async function runUpscalePipeline(
   const t0       = Date.now()
 
   for (const stepDef of pipeline) {
-    const params = { ...stepDef.params, ...(outputMegapixels ? { outputMegapixels } : {}) }
-    const primary = await runProvider(stepDef.provider, currentUrl, scaleFac, null, params)
+    const baseParams = { ...stepDef.params, ...(outputMegapixels ? { outputMegapixels } : {}) }
+    const kindOverride = req.sourceKind ? stepDef.kindParams?.[req.sourceKind] : undefined
+    const params = kindOverride ? { ...baseParams, ...kindOverride } : baseParams
+
+    let primary = await runProvider(stepDef.provider, currentUrl, scaleFac, null, params)
     steps.push(primary)
+
+    if (primary.status !== 'completed' && kindOverride) {
+      // O modelo especializado falhou: repete o primário com os params padrão.
+      // É o comportamento que o usuário teria sem classificação — nunca pior.
+      console.warn('[upscale] %s com override de classe falhou — repetindo sem override. Motivo: %s',
+        stepDef.provider, primary.error)
+      primary = await runProvider(stepDef.provider, currentUrl, scaleFac, null, baseParams)
+      steps.push(primary)
+    }
 
     if (primary.status === 'completed') {
       currentUrl = (primary as StepLog & { outputUrl?: string }).outputUrl ?? currentUrl

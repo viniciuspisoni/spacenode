@@ -12,6 +12,7 @@ export type {
   Scale,
   ObjectiveId,
   ProviderId,
+  SourceKind,
   ProviderInput,
   ProviderOutput,
   UpscaleRunRequest,

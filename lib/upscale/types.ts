@@ -29,6 +29,13 @@ export type ObjectiveId =
   | 'recover'
   | 'final'
 
+// Classe visual da origem, decidida no servidor (classify-source.ts):
+//   - 'line-art': desenho técnico puro (traço sobre fundo claro, sem meios-tons)
+//                 → o Topaz roda no modelo Text Refine.
+//   - 'image':    todo o resto (render, foto, prancha) → High Fidelity V2.
+// Nunca vem do cliente: é medido nos pixels normalizados, antes do débito.
+export type SourceKind = 'line-art' | 'image'
+
 // Fator NOMINAL pedido pela escala. É o que o usuário escreveu, não o que o
 // motor entrega — para isso use effectiveFactor().
 export function scaleToFactor(scale: Scale): number {
@@ -119,6 +126,8 @@ export interface UpscaleRunRequest {
   objectiveId?:   ObjectiveId | null
   imageUrl:       string                       // FAL-hosted source URL
   inputDimensions?: { width: number; height: number } | null
+  /** Classe visual da origem; ausente = 'image' (comportamento padrão). */
+  sourceKind?:      SourceKind
 }
 
 export interface StepLog {
