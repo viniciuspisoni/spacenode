@@ -127,13 +127,27 @@ export function BillingClient({ plan, balance, nodesExpireAt, extras, pooled, of
   // ANTES de sair para o Stripe: voltar do checkout não reabre o checkout.
   // O cookie de intenção é consumido aqui — a única leitura que ainda faltava
   // (o binder de atribuição, no layout) já aconteceu neste mesmo carregamento.
+  //
+  // Segunda trava, por ABA (sessionStorage): o SignupConversionPing, montado
+  // no layout, também reescreve a URL no mesmo mount e pode devolver o
+  // `resume=1`; e o "voltar" do Stripe recarrega esta página com a URL que
+  // estava no histórico. Sem a trava, cada volta reabriria o checkout.
   const resumedRef = useRef(false)
   useEffect(() => {
     if (!resume || resumedRef.current) return
     resumedRef.current = true
+    const key = `sn_resume_done:${resume.plan}`
+    let alreadyDone = false
+    try {
+      alreadyDone = window.sessionStorage.getItem(key) === '1'
+      if (!alreadyDone) window.sessionStorage.setItem(key, '1')
+    } catch {
+      // Sem sessionStorage a trava por ref já cobre o mount; segue.
+    }
+    router.replace('/app/billing', { scroll: false })
+    if (alreadyDone) return
     clearIntentCookie()
     setBilling(resume.billing)
-    router.replace('/app/billing', { scroll: false })
     void handlePlan(resume.plan, resume.billing, true)
     // handlePlan muda a cada render (fecha sobre billing); a retomada é um
     // evento de montagem, não uma reação a estado.

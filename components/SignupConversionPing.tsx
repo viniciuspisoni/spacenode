@@ -66,21 +66,29 @@ export default function SignupConversionPing() {
 
     // Recusou: nenhum script de terceiro carrega, não há o que esperar —
     // limpa o parâmetro e sai.
+    // Ao limpar `signup`, limpa também `resume` (retomada do checkout em
+    // /app/billing). Os dois são de uso único e chegam juntos na URL
+    // pós-cadastro; o BillingClient já consumiu o `resume` no mesmo mount e
+    // reescreveu a URL limpa — este replace roda DEPOIS (o ping fica abaixo
+    // do <main> no layout) e, se reescrevesse `resume=1`, o "voltar" do
+    // Stripe reabriria o checkout sozinho.
+    const stripOneShot = (raw: string): string => {
+      const q = new URLSearchParams(raw)
+      q.delete('signup')
+      q.delete('resume')
+      const s = q.toString()
+      return s ? `?${s}` : window.location.pathname
+    }
+
     if (consent !== 'granted') {
-      const clean = new URLSearchParams(searchParams.toString())
-      clean.delete('signup')
-      const cleanQuery = clean.toString()
-      router.replace(cleanQuery ? `?${cleanQuery}` : window.location.pathname)
+      router.replace(stripOneShot(searchParams.toString()))
       return
     }
 
     const cancelGoogle = whenReady('gtag', reportSignupConversion)
     const cancelMeta = whenReady('fbq', () => metaPixelTrack('signup_completed', {}))
 
-    const params = new URLSearchParams(searchParams.toString())
-    params.delete('signup')
-    const query = params.toString()
-    router.replace(query ? `?${query}` : window.location.pathname)
+    router.replace(stripOneShot(searchParams.toString()))
 
     return () => {
       cancelGoogle()
