@@ -8,7 +8,9 @@
 // ORION_INTERNAL_ENABLED, processa nos EUA e retém log de abuso por 30 dias),
 // Stripe (pagamentos). Terceiros de marketing (tag do Google Ads + Meta Pixel)
 // entram SOMENTE com consentimento explícito — cookie sn_consent, opt-in, ver
-// lib/analytics/consent.ts e components/analytics/ConsentBanner.tsx (2026-09-15).
+// lib/analytics/consent.ts e components/analytics/ConsentBanner.tsx (2026-09-15;
+// em 2026-09-19 o aviso virou três categorias — Necessários, Análise e
+// desempenho, Marketing e atribuição — e a cláusula 7 passou a descrevê-las).
 // Fora isso: cookies essenciais + tema em localStorage + cookie PRÓPRIO de
 // atribuição de campanha sn_attribution — first-party, sem dados pessoais,
 // citado na cláusula 7 em 2026-07-18. Se outro tracker de terceiro for
@@ -25,7 +27,7 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 }
 
-const UPDATED_AT = '10 de setembro de 2026'
+const UPDATED_AT = '19 de setembro de 2026'
 
 export default function PrivacidadePage() {
   return (
@@ -185,15 +187,20 @@ export default function PrivacidadePage() {
           dados pessoais e não é compartilhado com terceiros.
         </P>
         <P>
-          <Strong>Cookies de marketing de terceiros só entram com o seu consentimento.</Strong> Usamos duas
-          ferramentas de medição de campanha — a tag do Google Ads e o Meta Pixel — exclusivamente para
-          saber de qual anúncio veio um cadastro. Nenhuma das duas carrega antes de você clicar em
-          <Strong>Aceitar</Strong> no aviso de cookies: se você recusar, ou simplesmente não escolher, nada
-          é enviado ao Google nem à Meta e o site funciona igual. Sua escolha fica guardada por 180 dias no
-          cookie próprio <Strong>sn_consent</Strong> e pode ser trocada a qualquer momento — apague os
-          cookies do site e o aviso aparece de novo. Esses parceiros podem usar os dados de navegação
-          coletados após o consentimento para medir e segmentar publicidade; consulte as políticas do{' '}
-          <Strong>Google</Strong> e da <Strong>Meta</Strong> para detalhes.
+          <Strong>Cookies de terceiros só entram com o seu consentimento.</Strong> O aviso de cookies
+          separa o que você autoriza em três categorias: <Strong>Necessários</Strong> (sempre ativos — são
+          os cookies próprios do parágrafo acima, sem terceiros), <Strong>Análise e desempenho</Strong> e{' '}
+          <Strong>Marketing e atribuição</Strong>. Hoje a única categoria com terceiros ativos é a de
+          marketing e atribuição, com duas ferramentas de medição de campanha — a tag do Google Ads e o
+          Meta Pixel —, usadas exclusivamente para saber de qual anúncio veio um cadastro. Nenhuma das
+          duas carrega antes de você liberar essa categoria, em <Strong>Aceitar todos</Strong> ou em{' '}
+          <Strong>Minhas opções</Strong>: se você escolher <Strong>Recusar opcionais</Strong>, ou
+          simplesmente não escolher, nada é enviado ao Google nem à Meta e o site funciona igual. Sua
+          escolha fica guardada por 180 dias no cookie próprio <Strong>sn_consent</Strong> e pode ser
+          trocada a qualquer momento — apague os cookies do site e o aviso aparece de novo. Esses
+          parceiros podem usar os dados de navegação coletados após o consentimento para medir e
+          segmentar publicidade; consulte as políticas do <Strong>Google</Strong> e da{' '}
+          <Strong>Meta</Strong> para detalhes.
         </P>
       </LegalSection>
 
