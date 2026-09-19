@@ -40,6 +40,23 @@ export const NODES_GRACE_COPY =
 export const NODES_POLICY_COPY = `${NODES_ROLLOVER_COPY} ${NODES_GRACE_COPY}`
 
 /**
+ * VITRINE PÚBLICA — provisório (2026-09-18), só a landing usa.
+ *
+ * A comunicação pública parou de prometer os NODES_GRACE_DAYS dias DEPOIS do
+ * cancelamento: passa a falar de uma validade de até 90 dias com a assinatura
+ * ATIVA. É copy e nada mais — a regra implementada (grant_plan_nodes,
+ * expire_stale_plan_nodes, graceDeadline), os Termos e a página de billing do
+ * app seguem exatamente como estavam e continuam valendo a promessa antiga.
+ *
+ * Ou seja: enquanto isto existir, a landing e os Termos dizem coisas
+ * diferentes. É deliberado e temporário, na frente da nova regra de créditos.
+ * Quando ela entrar, isto some e NODES_ROLLOVER_COPY / NODES_GRACE_COPY
+ * voltam a ser a frase única.
+ */
+export const NODES_ROLLOVER_COPY_LANDING =
+  `Nodes não utilizados acumulam enquanto sua assinatura estiver ativa, respeitando a validade de até ${NODES_GRACE_DAYS} dias.`
+
+/**
  * Fim da janela de validade: `NODES_GRACE_DAYS` depois do fim da assinatura.
  *
  * O `customer.subscription.deleted` chega no fim do período já pago (o

@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react'
 import { ANNUAL_BILLING_ENABLED, SELLABLE_PLANS, recommendPlan, type SellablePlanId, type PaidPlanId, type BillingCycle } from '@/lib/plans'
 import { EXTRA_NODE_PACKS } from '@/lib/extra-nodes'
-import { NODES_GRACE_DAYS, NODES_POLICY_COPY } from '@/lib/billing/nodes'
+import { NODES_GRACE_DAYS, NODES_ROLLOVER_COPY_LANDING } from '@/lib/billing/nodes'
 import { SUPPORT_EMAIL, supportWhatsAppUrl } from '@/lib/support'
 import { formatBRL } from '@/lib/launch-offer'
 
@@ -393,13 +393,15 @@ export function PricingToggle() {
         <h2 className="spn-pricing-title">escolha seu volume de geração.</h2>
         <p className="spn-pricing-sub">
           Nodes são os créditos de geração. Renovam todo mês e{' '}
-          <b>acumulam</b> — no plano mensal, você cancela quando quiser.
+          <b>podem acumular por até {NODES_GRACE_DAYS} dias</b> enquanto sua
+          assinatura estiver ativa. No plano mensal, você cancela quando quiser.
         </p>
         {/* A regra do acúmulo em destaque: é a objeção nº 1 de quem tem mês
-            fraco de projeto e some da assinatura pra não "perder" nodes. As
-            duas frases andam juntas — prometer só o acúmulo esconde o prazo. */}
+            fraco de projeto e some da assinatura pra não "perder" nodes.
+            Provisório (2026-09-18): a vitrine deixou de prometer o prazo
+            pós-cancelamento — ver NODES_ROLLOVER_COPY_LANDING. */}
         <p className="spn-pricing-rollover spn-glass">
-          {NODES_POLICY_COPY}
+          {NODES_ROLLOVER_COPY_LANDING}
         </p>
 
         {/* Billing toggle — some junto com a pausa do ciclo anual */}
@@ -476,7 +478,6 @@ export function PricingToggle() {
           Fale com a gente
         </a>
         {' '}— ou comece grátis com 80 nodes e assine quando o volume pedir.
-        Cancelou? Os nodes acumulados ficam disponíveis por mais {NODES_GRACE_DAYS} dias.
         Dúvidas: <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
       </p>
 
