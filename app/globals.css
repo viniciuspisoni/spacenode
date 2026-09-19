@@ -3767,71 +3767,281 @@ body[data-sheet-open='true'] { overflow: hidden; }
   .spn-sheet--wide { width: min(880px, calc(100vw - 64px)); }
 }
 
-/* ── Aviso de consentimento de marketing ─────────────────────────────────
-   Estilo em CSS à mão, como o resto dos blocos spn- deste arquivo, por
-   consistência — não mais por necessidade: o reset de elemento voltou para
-   `@layer base` (~l.324) e os utilitários do Tailwind já funcionam. O
-   contorno continua válido, mas o motivo original não existe mais. */
+/* ── Aviso de consentimento, duas camadas ────────────────────────────────
+   Classes .spn-* em CSS, como todos os blocos vizinhos deste arquivo — é a
+   convenção da casa para componente de chrome. (O motivo histórico era outro:
+   o reset `*` ficava FORA de layer e, no Tailwind v4, vencia as utilities
+   layered, zerando `p-4`/`px-4`. Isso foi corrigido em 2026-09-16 — o reset
+   mora em `@layer base`, ~l.453 — mas o bloco segue em CSS por consistência,
+   e nada aqui depende de utility.)
+
+   O reset zera margin e padding de tudo, então cada margem abaixo é
+   explícita, e `list-style` NÃO é resetado — as listas do painel desligam o
+   marcador na mão.
+
+   O cartão pega fundo, aresta e borrão de .spn-glass/.spn-glass--chrome: por
+   isso nada aqui define background nem border DELE. Estas regras vêm depois no
+   arquivo e venceriam o vidro.
+
+   Verde entra só como estado: o interruptor ligado e a etiqueta "Sempre
+   ativos". O botão primário continua sendo o inverso do tema. */
 .spn-consent {
   position: fixed;
   inset-inline: 0;
   bottom: 0;
   z-index: 100;
-  padding: 0 16px 16px;
+  padding: 0 16px calc(16px + env(safe-area-inset-bottom, 0px));
 }
 .spn-consent-card {
   margin: 0 auto;
-  max-width: 768px;
+  max-width: 560px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   padding: 16px;
-  border-radius: 12px;
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-elevated);
-  box-shadow: 0 10px 30px rgb(0 0 0 / 0.25);
+  border-radius: 14px;
+  box-shadow: var(--shadow-lg);
+  /* O teto é do CARTÃO, não só do painel: num celular curto (375×667) a soma
+     título + texto + categorias + ações passava da tela e o topo do cartão
+     saía por cima do viewport, cortando o título. Limitando aqui, quem cede
+     altura é o painel — que já rola. dvh por causa da barra do navegador
+     móvel, com vh antes como fallback. */
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+}
+.spn-consent-title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  color: var(--color-text-primary);
 }
 .spn-consent-text {
   font-size: 13px;
-  line-height: 1.45;
+  line-height: 1.5;
   color: var(--color-text-secondary);
 }
-.spn-consent-text a {
+.spn-consent-link {
   color: var(--color-text-primary);
   text-decoration: underline;
   text-underline-offset: 2px;
+  border-radius: 3px;
 }
+.spn-consent-link:focus-visible {
+  outline: 1.5px solid var(--glass-line-hover);
+  outline-offset: 2px;
+}
+
+/* ── 2ª camada: as categorias ─────────────────────────────────────────── */
+/* O teto existe só para telas curtas: com as descrições enxutas e uma linha
+   de serviços, as três categorias cabem inteiras em desktop e em celular
+   comum, sem scroll interno. Quem tem pouca altura ainda rola. */
+.spn-consent-panel {
+  display: grid;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 0.5px solid var(--glass-line);
+  max-height: min(52vh, 420px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* `min-height: 0` para o painel poder ENCOLHER dentro da coluna flex do
+     cartão quando o teto de altura dele entra em cena — sem isto o item flex
+     nunca desce abaixo do conteúdo e o cartão estoura de novo. */
+  min-height: 0;
+  flex: 0 1 auto;
+}
+/* O painel fica montado e some pelo atributo `hidden` — assim o
+   aria-controls de "Minhas opções" sempre aponta para um elemento que
+   existe. `display: grid` acima venceria o hidden do UA; daí esta linha. */
+.spn-consent-panel[hidden] { display: none; }
+.spn-consent-panel-title {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+.spn-consent-panel-title:focus-visible {
+  outline: 1.5px solid var(--glass-line-hover);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+.spn-consent-cats {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+}
+.spn-consent-cat {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 0.5px solid var(--glass-line);
+  background: var(--color-surface-subtle);
+}
+.spn-consent-cat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 26px;
+}
+.spn-consent-cat-title {
+  font-size: 13px;
+  font-weight: 560;
+  color: var(--color-text-primary);
+}
+.spn-consent-cat-desc {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+}
+/* Uma linha só: "Serviços: Google Ads · Meta". O rótulo fica na cor de apoio
+   e os nomes na de leitura — nada de nome de cookie nem de ID de medição, que
+   são detalhe técnico e moram na cláusula 7 de /privacidade. */
+.spn-consent-services {
+  margin-top: 5px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--color-text-secondary);
+}
+.spn-consent-service {
+  color: var(--color-text-primary);
+  font-weight: 540;
+}
+
+/* Etiqueta do que não se desliga. O verde entra como PONTO de estado, no
+   mesmo idioma do selo do hero (Hero.tsx:88) — texto em cor de leitura, e não
+   em verde: #30b46c (o verde do tema claro) sobre branco dá 2,7:1, abaixo do
+   mínimo de 4,5:1 para texto. O ponto carrega o sinal, o texto carrega a
+   informação. */
+.spn-consent-always {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 560;
+  white-space: nowrap;
+  color: var(--color-text-secondary);
+  background: var(--color-chip);
+  border: 0.5px solid var(--glass-line-strong);
+}
+.spn-consent-always-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-accent-green);
+  box-shadow: 0 0 8px var(--color-accent-green-glow);
+}
+
+/* ── Interruptor de categoria ──────────────────────────────────────────── */
+.spn-consent-switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 44px;
+  height: 26px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  background: var(--color-chip);
+  border: 0.5px solid var(--glass-line-strong);
+  transition:
+    background var(--dur-hover) var(--ease),
+    border-color var(--dur-hover) var(--ease);
+}
+.spn-consent-knob {
+  position: absolute;
+  top: 50%;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  margin-top: -10px;
+  border-radius: var(--radius-full);
+  background: var(--color-text-secondary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.28);
+  transition:
+    transform var(--dur-hover) var(--ease),
+    background var(--dur-hover) var(--ease);
+}
+.spn-consent-switch:hover { border-color: var(--glass-line-hover); }
+/* A aresta fica nos DOIS estados: no tema claro o verde tem só ~2,7:1 contra
+   o cartão branco, e sem borda o limite do controle sumiria (WCAG 1.4.11). O
+   que distingue ligado de desligado é a posição do botão + o preenchimento. */
+.spn-consent-switch[aria-checked='true'] {
+  background: var(--color-accent-green);
+}
+.spn-consent-switch[aria-checked='true'] .spn-consent-knob {
+  transform: translateX(18px);
+  background: var(--color-on-accent);
+}
+.spn-consent-switch:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+/* ── Ações ─────────────────────────────────────────────────────────────── */
 .spn-consent-actions {
   display: flex;
+  flex-direction: column;
   gap: 8px;
-  flex-shrink: 0;
+  margin-top: 2px;
 }
 .spn-consent-btn {
-  padding: 8px 16px;
-  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  border-radius: 10px;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 540;
+  line-height: 1.2;
   cursor: pointer;
   white-space: nowrap;
-  border: 1px solid transparent;
-  transition: opacity 120ms ease, background 120ms ease;
+  border: 0.5px solid transparent;
+  transition:
+    background var(--dur-hover) var(--ease),
+    border-color var(--dur-hover) var(--ease),
+    color var(--dur-hover) var(--ease),
+    box-shadow var(--dur-hover) var(--ease),
+    transform var(--dur-press) var(--ease);
+}
+.spn-consent-btn:active { transform: scale(var(--glass-press-scale)); }
+.spn-consent-btn:focus-visible {
+  outline: 1.5px solid var(--glass-line-hover);
+  outline-offset: 2px;
 }
 .spn-consent-btn--ghost {
-  border-color: var(--color-border);
+  border-color: var(--glass-line-strong);
   background: none;
   color: var(--color-text-secondary);
 }
-.spn-consent-btn--ghost:hover { background: var(--color-bg-elevated-hover); }
+.spn-consent-btn--ghost:hover {
+  background: var(--glass-hover);
+  border-color: var(--glass-line-hover);
+  color: var(--color-text-primary);
+}
 .spn-consent-btn--primary {
   background: var(--color-inverse);
   color: var(--color-inverse-foreground);
+  box-shadow: inset 0 0.5px 0 var(--glass-sel-spec), var(--shadow-sm);
 }
-.spn-consent-btn--primary:hover { opacity: 0.9; }
+.spn-consent-btn--primary:hover {
+  background: var(--color-inverse-hover);
+  box-shadow: inset 0 0.5px 0 var(--glass-sel-spec), var(--glass-hover-lift), var(--shadow-sm);
+}
 
-@media (min-width: 640px) {
-  .spn-consent-card {
+@media (min-width: 560px) {
+  .spn-consent-actions {
     flex-direction: row;
-    align-items: center;
-    gap: 16px;
+    justify-content: flex-end;
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spn-consent-btn,
+  .spn-consent-switch,
+  .spn-consent-knob {
+    transition: none !important;
+  }
+  .spn-consent-btn:active { transform: none !important; }
 }
