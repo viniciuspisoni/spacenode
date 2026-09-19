@@ -1,6 +1,6 @@
 'use client'
 
-// Tour de boas-vindas do /app — 6 etapas ancoradas no dashboard via [data-tour].
+// Tour de boas-vindas do /app — 5 etapas ancoradas no dashboard via [data-tour].
 // Abre sozinho no primeiro acesso (profiles.onboarding_completed_at IS NULL) e
 // pode ser revisto a qualquer momento pelo "Como usar" da sidebar: já no /app,
 // o item dispara o evento `spn:tour:start`; de outras rotas, navega a /app#tour
@@ -16,30 +16,14 @@
 // Spaces e terminava mandando criar um: pedia ao recém-chegado a decisão mais
 // cara antes de ele ter visto uma imagem sair. O Space não perdeu espaço na
 // virada — perdeu a posição de pedágio.
-//
-// Ordem: Renderizar → Space → resto do atelier → Histórico → Nodes → Tema →
-// CTA final. A etapa de Tema aponta pro seletor de aparência da sidebar, que
-// só existe visualmente com a sidebar expandida (rail: expande só no hover —
-// e toque não dispara hover, então em qualquer tela sem mouse o alvo teria
-// altura zero). Ao avançar da etapa Nodes, força a expansão via
-// SIDEBAR_TOUR_EXPAND_EVENT e SÓ ENTÃO avança — sem isso a medição do driver.js
-// pega a sidebar ainda no meio da transição de largura. Se mesmo assim o alvo
-// seguir sem tamanho (fallback), a etapa vira um card centralizado (dummy do
-// próprio driver.js) em vez de quebrar o tour.
 
 import { useCallback, useEffect, useRef } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { driver, type Driver } from 'driver.js'
 import 'driver.js/dist/driver.css'
 import { createClient } from '@/lib/supabase/client'
-import { SIDEBAR_TOUR_EXPAND_EVENT } from './Sidebar'
 
 export const TOUR_START_EVENT = 'spn:tour:start'
-
-// Tempo pra sidebar concluir a transição de largura (width 0.5s no Sidebar)
-// antes de o driver.js medir e posicionar a etapa de Tema. Sem essa folga o
-// popover mede a sidebar a meio caminho da animação e nasce no lugar errado.
-const SIDEBAR_EXPAND_SETTLE_MS = 520
 
 const DASHBOARD = '/app'
 const GENERATE_URL = '/app/generate'
@@ -52,21 +36,6 @@ export default function WelcomeTour({ needsOnboarding }: { needsOnboarding: bool
   const autoStartedRef = useRef(false)
   // Grava no perfil só a primeira conclusão; re-execuções via "Como usar" não escrevem.
   const pendingPersistRef = useRef(needsOnboarding)
-  // Timer do avanço adiado Nodes→Tema (ver SIDEBAR_EXPAND_SETTLE_MS). Não-nulo
-  // == avanço a caminho, e serve de trava contra duplo-clique em "Avançar"
-  // (o clique não tem debounce nativo do driver.js).
-  const sidebarExpandTimerRef = useRef<number | null>(null)
-
-  const setSidebarTourExpanded = useCallback((expand: boolean) => {
-    window.dispatchEvent(new CustomEvent(SIDEBAR_TOUR_EXPAND_EVENT, { detail: expand }))
-  }, [])
-
-  const clearSidebarExpandTimer = useCallback(() => {
-    if (sidebarExpandTimerRef.current !== null) {
-      window.clearTimeout(sidebarExpandTimerRef.current)
-      sidebarExpandTimerRef.current = null
-    }
-  }, [])
 
   const markCompleted = useCallback(() => {
     if (!pendingPersistRef.current) return
@@ -133,14 +102,7 @@ export default function WelcomeTour({ needsOnboarding }: { needsOnboarding: bool
       // Qualquer saída (pular, ×, Esc ou concluir) conta como onboarding visto.
       // Pular e concluir também marcam explicitamente (o hook depende do estado
       // interno da lib e não dispara num destroy muito precoce); é idempotente.
-      // Também desfaz a expansão forçada da sidebar — sair no meio da etapa de
-      // Tema (ou no avanço adiado que leva até ela) não pode deixar a sidebar
-      // aberta sem o cursor em cima dela.
-      onDestroyed: () => {
-        markCompleted()
-        clearSidebarExpandTimer()
-        setSidebarTourExpanded(false)
-      },
+      onDestroyed: () => markCompleted(),
       steps: [
         {
           element: '[data-tour="renderizar"]',
@@ -171,7 +133,7 @@ export default function WelcomeTour({ needsOnboarding }: { needsOnboarding: bool
           popover: {
             title: 'O resto do atelier',
             description:
-              'Com a imagem na mão: Editar ajusta uma área sem mexer no resto, Ampliar leva à resolução de entrega, Animar transforma em vídeo, Finalizar exporta e a Planta humanizada veste a planta técnica com materiais reais.',
+              'Com a imagem na mão: Editar ajusta uma área sem mexer no resto e também finaliza e exporta, Ampliar leva à resolução de entrega, Animar transforma em vídeo e a Planta humanizada veste a planta técnica com materiais reais.',
             side: 'top',
             align: 'start',
           },
@@ -194,46 +156,6 @@ export default function WelcomeTour({ needsOnboarding }: { needsOnboarding: bool
               'Nodes são o combustível das gerações — cada criação consome alguns. Acompanhe o saldo aqui e no anel do seu avatar, na barra lateral.',
             side: 'bottom',
             align: 'start',
-            // Etapa deixou de ser a última (agora é Tema) — antes de avançar,
-            // expande a sidebar e só chama moveNext depois que a transição de
-            // largura assenta (ver SIDEBAR_EXPAND_SETTLE_MS). A trava do timer
-            // ref ignora um segundo clique em "Avançar" nesse meio-tempo: sem
-            // ela, dois moveNext() em sequência pousam num índice que não
-            // existe e o driver.js entende isso como "acabou" — destrói o tour.
-            onNextClick: (_el, _step, opts) => {
-              if (sidebarExpandTimerRef.current !== null) return
-              setSidebarTourExpanded(true)
-              sidebarExpandTimerRef.current = window.setTimeout(() => {
-                sidebarExpandTimerRef.current = null
-                opts.driver.moveNext()
-              }, SIDEBAR_EXPAND_SETTLE_MS)
-            },
-          },
-        },
-        {
-          // Função em vez de seletor: só aponta pro controle se ele já tiver
-          // tamanho real (sidebar de fato expandida). Se por algum motivo
-          // ainda não tiver — retorna undefined e o driver.js cai sozinho no
-          // dummy central dele: popover aparece no meio da tela, sem stage
-          // destacado, mas o tour segue inteiro. Esse é o fallback pedido.
-          // O tipo de `element` do driver.js não admite undefined no retorno,
-          // mas a lib aceita em runtime — é exatamente o sinal que ela usa pra
-          // cair no dummy central. O cast documenta essa lacuna do typing.
-          element: (() => {
-            const el = document.querySelector('[data-tour="tema"]')
-            return el instanceof HTMLElement && el.offsetWidth > 0 && el.offsetHeight > 0
-              ? el
-              : undefined
-          }) as unknown as () => Element,
-          // Voltar pra Nodes também é saída desta etapa (fora do destroy) —
-          // devolve a sidebar ao normal.
-          onDeselected: () => setSidebarTourExpanded(false),
-          popover: {
-            title: 'Do seu jeito',
-            description:
-              'Prefere trabalhar no claro ou no escuro? Você pode alternar entre tema do sistema, claro e escuro a qualquer momento.',
-            side: 'right',
-            align: 'center',
             onDoneClick: () => {
               markCompleted()
               d.destroy()
@@ -246,7 +168,7 @@ export default function WelcomeTour({ needsOnboarding }: { needsOnboarding: bool
 
     driverRef.current = d
     d.drive()
-  }, [markCompleted, router, setSidebarTourExpanded, clearSidebarExpandTimer])
+  }, [markCompleted, router])
 
   // Abertura: automática no primeiro acesso ao dashboard, ou manual ao chegar
   // em /app#tour (vindo do "Como usar" em outra rota, ou por URL direta).
