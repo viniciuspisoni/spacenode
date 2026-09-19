@@ -66,7 +66,7 @@ import {
 } from '@/lib/ai/fidelity/geometry-score'
 import { fetchStorageBuffer, assertSafeFetchUrl } from '@/lib/storage/fetch'
 import { nearestSupportedAspectRatio } from '@/lib/ai/aspect-ratio'
-import { analyzeImage } from '@/lib/fidelity-engine'
+import { analyzeImageDetailed } from '@/lib/fidelity-engine'
 import { DIRECT_UPLOAD_AREAS, downloadDirectUpload } from '@/lib/storage/direct-upload'
 import { normalizeSourceImage } from '@/lib/storage/normalize-image'
 import { createDisplayPreview } from '@/lib/storage/preview'
@@ -131,7 +131,7 @@ interface AttemptOutcome {
   errorMessage:  string | null
 }
 
-// Teto do briefing de visão inline (PROJECT FACTS). analyzeImage nunca lança
+// Teto do briefing de visão inline (PROJECT FACTS). analyzeImageDetailed nunca lança
 // (fallback interno) — o race cobre lentidão extrema sem travar a geração.
 const BRIEFING_TIMEOUT_MS = 15_000
 
@@ -586,7 +586,10 @@ export async function POST(req: NextRequest) {
     // teto de 15s. (O antigo nível 'creative' pulava os FACTS; com a
     // fidelidade sempre máxima, o briefing entra sempre.)
     let resolvedBriefing: BriefingArquitetonico | undefined = briefing
-    let briefingSource: 'body' | 'cache' | 'vision' | 'none' = briefing ? 'body' : 'none'
+    // 'fallback' = a análise de visão falhou e o render seguiu com o briefing
+    // genérico. Antes isso era gravado como 'vision' e a degradação ficava
+    // invisível no histórico (incidente 07–09/09/26, 403 do projeto Google).
+    let briefingSource: 'body' | 'cache' | 'vision' | 'fallback' | 'none' = briefing ? 'body' : 'none'
     if (!resolvedBriefing) {
       if (providedInputUrl) {
         const { data: cachedRender } = await admin
@@ -606,11 +609,18 @@ export async function POST(req: NextRequest) {
       }
       if (!resolvedBriefing) {
         const briefingStartedAt = Date.now()
-        resolvedBriefing = await Promise.race([
-          analyzeImage(inputUrl),
+        const analysis = await Promise.race([
+          analyzeImageDetailed(inputUrl),
           new Promise<undefined>(resolve => setTimeout(() => resolve(undefined), BRIEFING_TIMEOUT_MS)),
         ])
-        if (resolvedBriefing) briefingSource = 'vision'
+        resolvedBriefing = analysis?.briefing
+        if (analysis) briefingSource = analysis.source
+        if (analysis?.source === 'fallback') {
+          // console.error de propósito: sobe pro agrupador de erros da Vercel
+          // com a rota junto. O log do lib/fidelity-engine sozinho não diz que
+          // um render saiu degradado.
+          console.error('[generate] briefing FALLBACK — análise de visão indisponível; render segue com briefing genérico')
+        }
         devLog('[generate] briefing   :', briefingSource, `(${Date.now() - briefingStartedAt}ms)`)
       }
     }
@@ -1059,8 +1069,10 @@ export async function POST(req: NextRequest) {
       // pelo Spaces (kit de materiais do projeto) e pelo histórico.
       material_refs: materialRefsUsed.length > 0 ? materialRefsUsed : null,
       // Briefing resolvido (body/cache/visão) — persistido aqui vira o cache
-      // das próximas gerações com o mesmo input_url.
-      briefing:      resolvedBriefing ?? null,
+      // das próximas gerações com o mesmo input_url. O genérico do fallback
+      // NUNCA é persistido: cacheado, ele seguiria servindo (como 'cache')
+      // mesmo depois do provedor de visão voltar.
+      briefing:      briefingSource === 'fallback' ? null : (resolvedBriefing ?? null),
       // Fase 2 do plugin SketchUp: telemetria do condicionamento nativo.
       edge_map_native: edgeMapNative || undefined,
       model_facts:     options.modelFacts ?? undefined,
