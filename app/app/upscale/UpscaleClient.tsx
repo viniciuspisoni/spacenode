@@ -60,10 +60,10 @@ const ENHANCE_MODES: ModeDef[] = [
 // trabalho. Ver MAX_UPSCALE_FACTOR em lib/upscale/types.ts.
 const SCALE_LABEL: Record<string, string> = { '2x': '2×', '4x': '4×' }
 
-// O objetivo era o eixo da superfície; agora é decidido sozinho e mora na
-// folha, como override. A superfície tem UMA ação: enviar a imagem e clicar.
-// O que o sistema decidiu aparece como consequência — a resolução final em
-// pixels e o resumo da linha "Ajuste fino" — não como pergunta.
+// Os objetivos moram na folha, como personalização opcional. A superfície
+// tem a imagem, UMA escolha simples (2× / 4×, com a recomendada já marcada),
+// o que vai sair em pixels e o CTA. O que o sistema decidiu aparece como
+// consequência, não como pergunta.
 const OBJECTIVES: { value: ObjectiveId; title: string; note: string }[] = [
   { value: 'client',    title: 'Apresentação para cliente', note: 'Nítida na tela e no PDF'     },
   { value: 'portfolio', title: 'Portfólio / Instagram',     note: 'Aguenta o zoom do feed'      },
@@ -110,7 +110,8 @@ interface UpscaleClientProps {
 
 // A tela funciona sem ninguém tocar em nada: abre com um objetivo já
 // escolhido, e ele define aba/modo/escala. Com a imagem, a análise pode trocar
-// o objetivo (imagem comprimida → Recuperar) e a escala se ajusta ao tamanho.
+// o objetivo (imagem comprimida → Recuperar) e a escala recomendada se ajusta
+// ao tamanho.
 const DEFAULT_OBJECTIVE: ObjectiveId = 'client'
 
 interface ResultMeta {
@@ -130,14 +131,15 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
   const [imageDimensions, setImageDimensions] = useState<{ w: number; h: number } | null>(null)
   const [isDragging,      setIsDragging]      = useState(false)
 
-  // Objetivo (decidido sozinho) + os três efeitos dele (folha de ajuste fino).
+  // Objetivo (decidido sozinho) + os efeitos dele. Aba e modo moram na folha;
+  // a escala é a única escolha da superfície.
   const [selectedObjective, setSelectedObjective] = useState<ObjectiveId>(DEFAULT_OBJECTIVE)
   const [tab,            setTab]            = useState<UpscaleTab>(OBJECTIVE_PRESETS[DEFAULT_OBJECTIVE].tab)
   const [selectedModeId, setSelectedModeId] = useState<ModeId>(OBJECTIVE_PRESETS[DEFAULT_OBJECTIVE].modeId)
   const [selectedScale,  setSelectedScale]  = useState<Scale>(OBJECTIVE_PRESETS[DEFAULT_OBJECTIVE].scale)
   const [tuneOpen,       setTuneOpen]       = useState(false)
-  // O usuário mexeu na escala à mão? Enquanto não mexeu, ela é derivada da
-  // imagem (resolveScale) e se reajusta sozinha quando a imagem troca.
+  // O usuário escolheu a escala à mão? Enquanto não escolheu, ela segue a
+  // recomendação (resolveScale) e se reajusta sozinha quando a imagem troca.
   const [scalePinned,    setScalePinned]    = useState(false)
 
   // Recommendation
@@ -214,27 +216,32 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
     [dims, selectedScale],
   )
 
+  // A escala recomendada é a que o objetivo (decidido sozinho) pede para esta
+  // imagem. É a que vem marcada; o controle da superfície deixa trocar.
+  const recommendedScale = useMemo(
+    () => resolveScale(selectedObjective, dims),
+    [selectedObjective, dims],
+  )
+
   const overCap   = selectedScale !== 'none' && scaleExceedsCap(selectedScale, dims)
   // Nenhuma escala cabe: o problema é o tamanho da ENTRADA, e mandar "escolha
   // 2×" não resolveria nada.
   const noScaleFits = tab === 'resolution' && dims !== null && maxScaleForDimensions(dims) === null
   const canSubmit = !!imageFile && credits >= nodeCost && !isLoading && !overCap
 
-  const scaleLabel = selectedScale === 'none' ? '' : SCALE_LABEL[selectedScale] ?? selectedScale
-  // Regra do resumo: entra o que o usuário ESCOLHEU. "Sem aumento" é o default
-  // silencioso dos modos de Aprimorar — some, e a linha fica só com o modo.
-  const tuneSummary = summarize([activeMode.label, scaleLabel])
+  // A linha "Ajuste fino" resume o que mora na folha (tratamento e modo). A
+  // escala já está na superfície, então não repete aqui.
+  const tuneSummary = summarize([tab === 'enhance' ? 'Aprimorar' : '', activeMode.label])
 
-  // O objetivo é a ETIQUETA de um preset de aba+modo+escala. Quem mexe no
-  // ajuste fino desfaz esse vínculo — e `objectiveId` nunca deve viajar
-  // contradizendo o que foi de fato pedido: `upscale_meta.objective_id` é o
-  // único sinal de POR QUE o usuário ampliou, e gravar "Impressão" numa
-  // ampliação 2×/Recuperar envenena esse dado.
+  // O objetivo é a ETIQUETA de um preset de aba+modo+escala. `objectiveId` só
+  // viaja quando ainda descreve o pedido inteiro: `upscale_meta.objective_id`
+  // é o único sinal de POR QUE o usuário ampliou, e gravar "Apresentação" numa
+  // ampliação 4× envenena esse dado.
   const objectivePreset = OBJECTIVE_PRESETS[selectedObjective]
-  const objectiveInSync =
+  const modeInSync =
     objectivePreset.tab === tab &&
-    objectivePreset.modeId === selectedModeId &&
-    selectedScale === resolveScale(selectedObjective, dims)
+    objectivePreset.modeId === selectedModeId
+  const objectiveInSync = modeInSync && selectedScale === recommendedScale
 
   const estimate = estimateSeconds(megapixels)
 
@@ -260,7 +267,8 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
 
   function applyScale(next: Scale) {
     setSelectedScale(next)
-    setScalePinned(true)
+    // Escolher a recomendada é voltar ao automático; escolher a outra é fixar.
+    setScalePinned(next !== recommendedScale)
   }
 
   function applyObjective(id: ObjectiveId, forDims = dims) {
@@ -300,8 +308,14 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
           fileName: file.name, fileSize: file.size, width: d.width, height: d.height,
         })
         setRecommendation(rec.reason)
-        if (rec.objectiveId) applyObjective(rec.objectiveId, d)
-        else if (!scalePinned) setSelectedScale(resolveScale(selectedObjective, d))
+        if (rec.objectiveId) {
+          applyObjective(rec.objectiveId, d)
+        } else if (!scalePinned || scaleExceedsCap(selectedScale, d)) {
+          // Sem escolha manual (ou com uma que não cabe nesta imagem), a
+          // escala volta a seguir a recomendação.
+          setSelectedScale(resolveScale(selectedObjective, d))
+          setScalePinned(false)
+        }
       }
       img.src = dataUrl
     }
@@ -444,6 +458,16 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
     : elapsedS < estimate * 1.6    ? 'Finalizando a imagem…'
     :                                'Ainda processando — imagens grandes levam mais tempo.'
 
+  // O que dizer sob o controle de escala. Com imagem: qual é a recomendada e
+  // por quê em pixels; sem imagem: nada a inventar.
+  const scaleHint = (() => {
+    if (!dims || availableScales.length === 0) return ''
+    const recLabel = SCALE_LABEL[recommendedScale] ?? recommendedScale
+    if (noScaleFits) return ''
+    if (selectedScale === recommendedScale) return `${recLabel} é o recomendado para esta imagem.`
+    return `Recomendado: ${recLabel}. A escolha vale só para esta imagem.`
+  })()
+
   // .spn-ghost não fixa display — num <a> a altura só pega com flex.
   const ghostLink: React.CSSProperties = {
     display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none',
@@ -463,10 +487,10 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
             Ampliar
           </h1>
           <p style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginTop: 4, marginBottom: 18, lineHeight: 1.5 }}>
-            Envie a imagem. O resto vem decidido.
+            Envie a imagem. O resto vem decidido — e dá para escolher a escala.
           </p>
 
-          {/* Imagem: o único campo da superfície. */}
+          {/* Imagem: o campo obrigatório. */}
           <div className="spn-field">
             <span className="spn-field-label">Imagem</span>
             <div
@@ -532,16 +556,45 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
             {recommendation && <p className="spn-hint">{recommendation}</p>}
           </div>
 
-          {/* O que vai sair. É a tradução da decisão automática para a língua
-              de quem entrega prancha: pixels, não multiplicador. */}
+          {/* Escala: a única escolha da superfície. Vidro (o Segmented já é
+              .spn-glass), com a recomendada marcada; a outra é um toque. Uma
+              escala que estoura o teto do motor aparece apagada com o motivo,
+              em vez de falhar depois do upload. */}
+          {availableScales.length > 0 && (
+            <div className="spn-field">
+              <span className="spn-field-label">Escala</span>
+              <Segmented
+                label="Escala"
+                value={selectedScale}
+                onChange={applyScale}
+                items={availableScales.map(s => {
+                  const over = scaleExceedsCap(s, dims)
+                  const p    = dims ? projectedDimensions(dims, s) : null
+                  return {
+                    value: s,
+                    label: SCALE_LABEL[s] ?? s,
+                    disabled: over,
+                    title: over
+                      ? 'Grande demais para o motor nesta imagem'
+                      : p ? `${formatPx(p.width)} × ${formatPx(p.height)} px` : undefined,
+                  }
+                })}
+              />
+              {scaleHint && <p className="spn-hint">{scaleHint}</p>}
+            </div>
+          )}
+
+          {/* O que vai sair, em vidro elevado: é a tradução da escolha para
+              a língua de quem entrega prancha — pixels, não multiplicador. */}
           {projected && (
             <div className="spn-field">
-              <div style={{
-                display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
-                gap: 10, padding: '10px 12px',
-                borderRadius: 'var(--r-inner)', background: 'var(--color-chip)',
-                border: '0.5px solid var(--glass-line-strong)',
-              }}>
+              <div
+                className="spn-glass spn-glass--raised"
+                style={{
+                  display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
+                  gap: 10, padding: '10px 12px', borderRadius: 'var(--r-inner)',
+                }}
+              >
                 <span style={{ fontSize: 11.5, color: 'var(--color-text-tertiary)' }}>Resultado</span>
                 <span style={{
                   fontSize: 13, fontWeight: 560, color: 'var(--color-text-primary)',
@@ -554,13 +607,13 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
                 <p className="spn-hint" style={{ color: 'var(--color-error)' }}>
                   {noScaleFits
                     ? 'Esta imagem já é grande demais para ser ampliada. Em “Ajuste fino”, use Aprimorar qualidade — ele melhora sem aumentar.'
-                    : 'Grande demais para o motor. Escolha 2× em “Ajuste fino”.'}
+                    : 'Grande demais para o motor. Escolha 2×.'}
                 </p>
               )}
             </div>
           )}
 
-          {/* Ajuste fino: o que foi decidido, numa linha — e a porta para
+          {/* Ajuste fino: o que mora na folha, numa linha — e a porta para
               mudar. Quem confia no automático nunca abre. */}
           <div className="spn-field">
             <SettingGroup>
@@ -572,9 +625,9 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
                 onOpen={() => setTuneOpen(true)}
               />
             </SettingGroup>
-            {/* Sem esta linha a folha diria "Impressão / prancha" marcado
-                enquanto o que vale é o ajuste manual. */}
-            {!objectiveInSync && (
+            {/* Só quando a FOLHA foi mexida (tratamento/modo) — trocar a
+                escala na superfície é uso normal, não ajuste manual. */}
+            {!modeInSync && (
               <p className="spn-hint">Ajustado à mão — vale o que está em “Ajuste fino”.</p>
             )}
           </div>
@@ -605,7 +658,10 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
       {/* ── Palco ───────────────────────────────────────────────────────────── */}
       <section className="spn-tool-stage spn-glass">
         {isLoading && (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, width: '100%', maxWidth: 320, padding: 24 }}>
+          <div
+            className="spn-glass spn-glass--raised"
+            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, width: '100%', maxWidth: 340, padding: '26px 24px', borderRadius: 'var(--r-card)' }}
+          >
             <div style={{ width: 36, height: 36, borderRadius: '50%', border: '2px solid var(--glass-line-strong)', borderTop: '2px solid var(--color-text-secondary)', animation: 'spin 0.9s linear infinite' }} />
             <div style={{ fontSize: 12.5, color: 'var(--color-text-secondary)', textAlign: 'center' }}>{phaseText}</div>
             {/* Barra ancorada na estimativa medida — para em 95% e espera o
@@ -712,8 +768,8 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
         )}
       </section>
 
-      {/* Folha de ajuste fino: objetivo, aba, modo e escala. Tudo já vem
-          decidido; quem abre isto está querendo algo específico. */}
+      {/* Folha de ajuste fino: objetivo, tratamento e modo — personalização
+          opcional. A escala já está na superfície. */}
       <Sheet id="upscale-tune" open={tuneOpen} title="Ajuste fino" onClose={() => setTuneOpen(false)}>
         <div className="spn-field">
           <span className="spn-field-label">Para que serve esta imagem</span>
@@ -725,8 +781,8 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
             options={OBJECTIVES}
           />
           <p className="spn-hint">
-            Cada objetivo define tratamento, modo e escala de uma vez, ajustados ao
-            tamanho da sua imagem.
+            Cada objetivo define tratamento, modo e a escala recomendada de uma vez,
+            ajustados ao tamanho da sua imagem.
           </p>
         </div>
 
@@ -752,33 +808,8 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
             onChange={applyMode}
             options={modes.map(m => ({ value: m.id, title: m.label, note: m.note }))}
           />
-        </div>
-
-        <div className="spn-field">
-          <span className="spn-field-label">{tab === 'resolution' ? 'Escala' : 'Tamanho final'}</span>
-          {availableScales.length > 0 ? (
-            <ChoiceGroup
-              label="Escala"
-              cols={2}
-              value={selectedScale}
-              onChange={applyScale}
-              // A nota de cada cartão é a resolução REAL que ele entrega nesta
-              // imagem; sem imagem ainda, é só o multiplicador. Uma escala que
-              // estoura o teto do motor aparece desabilitada com o motivo, em
-              // vez de falhar depois do upload.
-              options={availableScales.map(s => {
-                const over = scaleExceedsCap(s, dims)
-                const p    = dims ? projectedDimensions(dims, s) : null
-                return {
-                  value: s,
-                  title: SCALE_LABEL[s] ?? s,
-                  note: over ? 'Grande demais' : p ? `${formatPx(p.width)}×${formatPx(p.height)}px` : '',
-                  disabled: over,
-                }
-              })}
-            />
-          ) : (
-            <p className="spn-hint" style={{ marginTop: 0 }}>
+          {availableScales.length === 0 && (
+            <p className="spn-hint">
               Este modo entrega na resolução original — ele limpa, não amplia.
             </p>
           )}
