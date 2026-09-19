@@ -1,25 +1,32 @@
 // lib/analytics/auth-intent.ts
 //
-// Retomada da intenção de plano depois da autenticação — usado pelos DOIS
-// handlers de auth (/auth/callback e /auth/google) para decidir o destino
-// pós-login com a MESMA regra:
+// Destino pós-autenticação — usado pelos DOIS handlers de auth
+// (/auth/callback e /auth/google) para decidir para onde mandar o usuário
+// com a MESMA regra:
 //
-//   1. `next` explícito na URL (só caminho interno) tem precedência;
+//   1. `next` explícito (query ou cookie sn_login_next; só caminho interno)
+//      tem precedência — a página de login já embute nele a intenção de
+//      plano quando chega `?plan=`;
 //   2. senão, cookie sn_intent (CTA "Começar com <plano>") → /app/billing
-//      com o plano/ciclo/oferta escolhidos + resume=1 (o BillingClient abre
-//      o checkout sozinho, uma única vez);
+//      com plano/ciclo + resume=1 (o BillingClient abre o checkout sozinho,
+//      uma única vez). É a rede de segurança para quando o `next` se perde
+//      no caminho (allowlist do Supabase, aba nova, link de e-mail antigo);
 //   3. senão, /app.
 //
 // Contas recém-criadas (proxy: created_at há menos de 60s) ganham `signup=1`
-// no destino — é o gatilho do ping de conversão do Google Ads
-// (components/SignupConversionPing.tsx), agora TAMBÉM no caminho GIS, que
-// antes redirecionava seco para /app e perdia a conversão.
+// no destino — é o gatilho do ping de conversão (Google Ads + Meta Pixel,
+// components/SignupConversionPing.tsx). Até 18/09/26 só o /auth/callback
+// fazia isso; o caminho do Google redirecionava seco e o cadastro nunca
+// virava conversão.
 //
-// O cookie de intenção é sempre LIMPO na resposta (intenção é de uso único).
+// O cookie de intenção NÃO é limpo aqui de propósito: o AttributionBinder
+// ainda vai lê-lo no primeiro acesso ao /app para gravar `plan_intent` no
+// evento de cadastro. Quem o consome e apaga é o BillingClient, ao retomar o
+// checkout; o Max-Age de 24 h é o teto.
 
-import type { NextResponse } from 'next/server'
 import type { User } from '@supabase/supabase-js'
-import { INTENT_COOKIE, intentResumePath, parseIntentCookie, type PlanIntent } from './attribution'
+import { internalNextPath } from '@/lib/auth/safe-next-path'
+import { intentResumePath, parseIntentCookie, type PlanIntent } from './attribution'
 
 // Mesmo proxy de "acabou de se cadastrar" do /auth/callback original.
 const NEW_USER_WINDOW_MS = 60_000
@@ -29,12 +36,6 @@ export function isNewUser(user: User | null | undefined): boolean {
     !!user?.created_at &&
     Date.now() - new Date(user.created_at).getTime() < NEW_USER_WINDOW_MS
   )
-}
-
-// Só caminho interno absoluto — nunca URL externa (open redirect).
-function safeInternalPath(value: string | null): string | null {
-  if (!value || !value.startsWith('/') || value.startsWith('//')) return null
-  return value
 }
 
 export interface PostAuthDestination {
@@ -50,15 +51,10 @@ export function postAuthDestination(input: {
   newUser: boolean
 }): PostAuthDestination {
   const intent = parseIntentCookie(input.intentCookie)
-  const explicitNext = safeInternalPath(input.next ?? null)
+  const explicitNext = internalNextPath(input.next ?? null)
 
   const path = explicitNext ?? (intent ? intentResumePath(intent) : '/app')
   const url = new URL(path, input.origin)
   if (input.newUser) url.searchParams.set('signup', '1')
   return { url, intent }
-}
-
-/** Limpa o cookie de intenção na resposta (uso único). */
-export function clearIntentCookieOn(res: NextResponse): void {
-  res.cookies.set(INTENT_COOKIE, '', { maxAge: 0, path: '/' })
 }

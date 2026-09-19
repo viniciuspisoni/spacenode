@@ -39,6 +39,9 @@ import {
 } from '@/lib/analytics/consent'
 import { useConsentState } from './useMarketingConsent'
 
+/** Variável CSS (no <html>) com a altura do aviso enquanto ele está aberto. */
+export const CONSENT_HEIGHT_VAR = '--sn-consent-h'
+
 interface CategorySpec {
   /** `null` = necessários, que não têm interruptor. */
   key: ConsentCategory | null
@@ -92,14 +95,39 @@ export default function ConsentBanner() {
     if (detailsOpen) panelHeadingRef.current?.focus()
   }, [detailsOpen])
 
+  // Publica a própria altura em `--sn-consent-h` no <html>: qualquer elemento
+  // fixo no rodapé (a barra de CTA do mobile, components/landing/MobileCTA.tsx)
+  // usa a variável como `bottom` e sobe para não ficar escondido atrás do
+  // aviso — que cobria a barra por inteiro (medido em produção, 18/09/26).
+  // ResizeObserver porque a altura muda ao abrir "Minhas opções". Quando o
+  // aviso some, a variável volta a 0.
+  const open = saved === null
+  const rootRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const root = document.documentElement
+    const el = rootRef.current
+    if (!open || !el) {
+      root.style.setProperty(CONSENT_HEIGHT_VAR, '0px')
+      return
+    }
+    const publish = () => root.style.setProperty(CONSENT_HEIGHT_VAR, `${Math.round(el.offsetHeight)}px`)
+    publish()
+    const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(publish) : null
+    ro?.observe(el)
+    return () => {
+      ro?.disconnect()
+      root.style.setProperty(CONSENT_HEIGHT_VAR, '0px')
+    }
+  }, [open])
+
   // `null` no servidor e no primeiro render do cliente — o banner só aparece
   // depois da hidratação, quando dá pra ler o cookie de verdade.
-  if (saved !== null) return null
+  if (!open) return null
 
   const toggle = (key: ConsentCategory) => setDraft((prev) => ({ ...prev, [key]: !prev[key] }))
 
   return (
-    <div className="spn-consent">
+    <div ref={rootRef} className="spn-consent">
       <section
         role="region"
         aria-labelledby={titleId}

@@ -1,12 +1,18 @@
 'use client'
 
-import { Suspense, useState, useEffect, useRef } from 'react'
+import { Suspense, useState, useEffect, useMemo, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useTheme } from '@/lib/theme/ThemeProvider'
 import { Brandmark } from '@/components/brand'
-import { safeNextPath } from '@/lib/auth/safe-next-path'
+import { internalNextPath } from '@/lib/auth/safe-next-path'
 import { LOGIN_NEXT_COOKIE, LOGIN_NEXT_MAX_AGE } from '@/lib/auth/login-next-cookie'
+import {
+  intentFromSearchParams,
+  intentResumePath,
+  readIntentCookie,
+  writeIntentCookie,
+} from '@/lib/analytics/attribution'
 
 type Mode = 'login' | 'signup'
 
@@ -92,7 +98,27 @@ export default function LoginPage() {
 function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const nextPath = safeNextPath(searchParams.get('next'))
+
+  // Destino pós-login: `next` explícito > intenção de plano (`?plan=`, que o
+  // CTA "Começar com <plano>" da landing põe na URL) > cookie sn_intent que o
+  // mesmo CTA já gravou > /app. A intenção vira /app/billing?…&resume=1 — é
+  // assim que o cadastro termina no checkout do plano escolhido, e não no
+  // /app genérico. O destino viaja pelos três caminhos de auth abaixo (senha,
+  // e-mail de confirmação, Google) sem que nenhum precise conhecer a regra.
+  const planIntent = useMemo(() => intentFromSearchParams(searchParams), [searchParams])
+  const nextPath = useMemo(() => {
+    const explicit = internalNextPath(searchParams.get('next'))
+    if (explicit) return explicit
+    const intent = planIntent ?? readIntentCookie()
+    return intent ? intentResumePath(intent) : '/app'
+  }, [searchParams, planIntent])
+
+  // `?plan=` na URL grava o cookie de intenção mesmo quando o CTA não rodou
+  // JS (link colado, aba nova): o binder de atribuição lê esse cookie no
+  // primeiro acesso ao /app para registrar `plan_intent` no cadastro.
+  useEffect(() => {
+    if (planIntent) writeIntentCookie(planIntent)
+  }, [planIntent])
 
   // Destino pós-login pro caminho do GIS: o login_uri precisa ser FIXO (match
   // exato com a redirect URI autorizada no client OAuth), então o next viaja

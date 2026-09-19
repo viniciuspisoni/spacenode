@@ -1964,6 +1964,8 @@ export interface BindSignupOptions {
   origin?: AcquisitionOrigin | null
   /** Evento de dev/preview/conta interna. */
   isInternal?: boolean
+  /** Página de entrada da jornada (landing_path do primeiro toque). */
+  page?: string | null
 }
 
 /** Registra a atribuição do cadastro a partir do cookie sn_attribution
@@ -1995,6 +1997,7 @@ export async function bindSignupAttribution(
       campaign_identifier: last?.campaign ?? null,
       referrer: last?.referrer ?? null,
       anonymous_id: anonymousId ?? null,
+      page: options?.page ?? null,
       occurred_at: options?.accountCreatedAt ?? null,
       origin,
       is_internal: options?.isInternal ?? false,

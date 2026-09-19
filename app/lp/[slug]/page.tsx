@@ -20,6 +20,9 @@ import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import ForceDarkScope from '@/lib/theme/ForceDarkScope'
 import LpCtaLink from '@/components/marketing/LpCtaLink'
+import LpViewPing from '@/components/marketing/LpViewPing'
+import LpStickyCta from '@/components/marketing/LpStickyCta'
+import type { PlanIntent } from '@/lib/analytics/attribution'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getLandingPageBySlug, recordAcquisitionEvent } from '@/lib/marketing/ads/service'
 import { isBotUserAgent, isInternalHost, isNonProductionRuntime } from '@/lib/analytics/internal'
@@ -109,7 +112,17 @@ export default async function LandingCampaignPage({
   for (const [k, v] of Object.entries(utm)) qs.set(k, v)
   const ctaHref = `/login?${qs.toString()}`
   const ctaLabel = page.cta_label?.trim() || 'Começar agora'
-  const cheapestPlanPrice = Math.min(...SELLABLE_PLANS.map((p) => p.monthlyPrice))
+
+  // Plano de entrada = o mais barato da vitrine (Essence). O CTA de plano leva
+  // `plan=` na query além do cookie de intenção que o clique grava: com os
+  // dois, a página de login manda o cadastro terminar no checkout desse plano
+  // (lib/analytics/attribution.ts → intentResumePath) mesmo sem JS no clique.
+  const entryPlan = SELLABLE_PLANS.reduce((a, b) => (b.monthlyPrice < a.monthlyPrice ? b : a))
+  const entryIntent: PlanIntent = { plan: entryPlan.id, billing: 'monthly' }
+  const planQs = new URLSearchParams(qs)
+  planQs.set('plan', entryPlan.id)
+  const planCtaHref = `/login?${planQs.toString()}`
+  const cheapestPlanPrice = entryPlan.monthlyPrice
 
   const sections: LandingSection[] = Array.isArray(page.sections) ? page.sections : []
 
@@ -145,6 +158,7 @@ export default async function LandingCampaignPage({
   return (
     <div className="min-h-screen bg-bg text-text-primary">
       <ForceDarkScope />
+      <LpViewPing slug={slug} />
 
       {/* Header mínimo — só o wordmark de volta pra home */}
       <header className="mx-auto flex max-w-5xl items-center px-5 py-5 sm:px-10">
@@ -181,7 +195,7 @@ export default async function LandingCampaignPage({
             </p>
           )}
           <div className="mt-9">
-            <LpCtaLink href={ctaHref} slug={slug} className={CTA_CLASSES}>
+            <LpCtaLink href={ctaHref} slug={slug} position="hero" className={CTA_CLASSES}>
               {ctaLabel}
               <CtaArrow />
             </LpCtaLink>
@@ -192,7 +206,9 @@ export default async function LandingCampaignPage({
         </section>
 
         {/* Seções configuradas no painel, na ordem do array */}
-        {sections.map((section, index) => renderSection(section, index, page, ctaHref))}
+        {sections.map((section, index) =>
+          renderSection(section, index, page, { href: planCtaHref, intent: entryIntent, planName: entryPlan.name }),
+        )}
 
         {/* CTA final */}
         <section className="mx-auto max-w-3xl px-5 py-16 text-center sm:px-10" style={{ borderTop: HAIRLINE }}>
@@ -205,13 +221,23 @@ export default async function LandingCampaignPage({
             Sem cartão para começar. Planos a partir de R$ {cheapestPlanPrice}/mês.
           </p>
           <div className="mt-7">
-            <LpCtaLink href={ctaHref} slug={slug} className={CTA_CLASSES}>
+            <LpCtaLink href={ctaHref} slug={slug} position="final" className={CTA_CLASSES}>
               {ctaLabel}
               <CtaArrow />
             </LpCtaLink>
           </div>
         </section>
       </main>
+
+      {/* Barra fixa (só mobile): vende o plano de entrada com o preço no
+          rótulo. Sobe quando o banner de consentimento está aberto. */}
+      <LpStickyCta
+        slug={slug}
+        href={planCtaHref}
+        label={`Começar com ${entryPlan.name} · R$ ${entryPlan.monthlyPrice}/mês`}
+        note={`${entryPlan.nodes.toLocaleString('pt-BR')} nodes por mês · cancele quando quiser`}
+        intent={entryIntent}
+      />
 
       {/* Footer mínimo */}
       <footer
@@ -234,11 +260,18 @@ export default async function LandingCampaignPage({
 
 // ── Seções ─────────────────────────────────────────────────────────────────────
 
+/** CTA de plano (plano de entrada): destino com `plan=`, intenção e nome. */
+interface PlanCta {
+  href: string
+  intent: PlanIntent
+  planName: string
+}
+
 function renderSection(
   section: LandingSection,
   index: number,
   page: LandingPage,
-  ctaHref: string,
+  planCta: PlanCta,
 ): ReactNode {
   switch (section.kind) {
     case 'value_props':
@@ -260,7 +293,7 @@ function renderSection(
           planIds={section.plan_ids}
           note={section.note}
           slug={page.slug}
-          ctaHref={ctaHref}
+          planCta={planCta}
         />
       )
     default:
@@ -504,12 +537,12 @@ function PricingSection({
   planIds,
   note,
   slug,
-  ctaHref,
+  planCta,
 }: {
   planIds?: string[]
   note?: string
   slug: string
-  ctaHref: string
+  planCta: PlanCta
 }) {
   const ids = Array.isArray(planIds) ? planIds : []
   const plans = ids.length > 0 ? SELLABLE_PLANS.filter((p) => ids.includes(p.id)) : SELLABLE_PLANS
@@ -553,9 +586,11 @@ function PricingSection({
         {note ??
           'Nodes são os créditos de geração e acumulam enquanto a assinatura estiver ativa. Começa grátis com 80 nodes, sem cartão — a assinatura entra quando o volume pedir.'}
       </p>
+      {/* O CTA da seção de preço vende o plano de entrada, não o grátis: o
+          clique grava a intenção e o cadastro termina no checkout dele. */}
       <div className="mt-7">
-        <LpCtaLink href={ctaHref} slug={slug} className={CTA_CLASSES}>
-          Começar grátis
+        <LpCtaLink href={planCta.href} slug={slug} position="pricing" intent={planCta.intent} className={CTA_CLASSES}>
+          Começar com {planCta.planName}
           <CtaArrow />
         </LpCtaLink>
       </div>

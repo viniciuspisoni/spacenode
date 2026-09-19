@@ -5,6 +5,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { findPlanByStripePriceId, type BillingCycle } from '@/lib/plans'
 import { graceDeadline, prorationNodes } from '@/lib/billing/nodes'
 import { recordAcquisitionEvent } from '@/lib/marketing/ads/service'
+import { trackServerEvent } from '@/lib/analytics/server'
+import { attributionFromStripeMetadata } from '@/lib/analytics/stripe-metadata'
 
 export const dynamic = 'force-dynamic'
 
@@ -148,6 +150,9 @@ interface ActivationInput {
   /** Chave de idempotência de último recurso quando não há subscription id. */
   fallbackKey:    string
   eventMetadata?: Record<string, unknown>
+  /** Metadata da session/assinatura do Stripe — carrega sn_aid, campanha e
+   *  consentimento gravados no checkout (lib/analytics/stripe-metadata.ts). */
+  stripeMetadata?: Record<string, string | undefined> | null
 }
 
 /**
@@ -209,19 +214,33 @@ async function activatePlan(
     `(+${input.nodes} nodes → saldo ${grant.balance}, via ${input.source})`
   )
 
-  // Funil first-party (best-effort — recordAcquisitionEvent nunca lança).
+  // Funil first-party (best-effort — nunca lança).
   // `value_cents` é o valor efetivamente cobrado (já com o desconto de
   // lançamento, quando houve); `launch_offer` separa as duas coortes na
   // hora de medir retenção do 2º mês, que é o número que importa aqui.
-  await recordAcquisitionEvent(supabase, {
-    user_id:     input.userId,
-    event_type:  'subscription_started',
-    plan_id:     input.planId,
-    value_cents: input.valueCents,
-    metadata: {
+  //
+  // Identidade e campanha vêm do metadata que o checkout gravou no Stripe: o
+  // webhook não tem request do visitante, e sem isso a assinatura nascia sem
+  // origem. Idempotente pela assinatura — `applied` já barra a reentrega,
+  // a chave é a segunda trava.
+  const attr = attributionFromStripeMetadata(input.stripeMetadata)
+  const scalars: Record<string, string | number | boolean | null> = {}
+  for (const [k, v] of Object.entries(input.eventMetadata ?? {})) {
+    if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' || v === null) scalars[k] = v
+  }
+  await trackServerEvent(supabase, {
+    event:       'subscription_started',
+    userId:      input.userId,
+    anonymousId: attr.anonymousId,
+    attribution: attr.attribution,
+    consent:     attr.consent,
+    planId:      input.planId,
+    valueCents:  input.valueCents,
+    dedupeKey:   `subscription:${input.subscriptionId ?? input.fallbackKey}`,
+    props: {
       billing_cycle: input.billingCycle ?? null,
       activated_via: input.source,
-      ...(input.eventMetadata ?? {}),
+      ...scalars,
     },
   })
   return true
@@ -338,6 +357,7 @@ export async function POST(req: NextRequest) {
           stripe_session_id: session.id,
           launch_offer:      session.metadata?.launch_offer === 'applied',
         },
+        stripeMetadata: session.metadata,
       })
       // 500 → Stripe retenta a entrega; a RPC de grant é idempotente pelo
       // subscription id, então a retentativa não credita de novo
@@ -422,10 +442,12 @@ export async function POST(req: NextRequest) {
         // evento pode chegar antes de o checkout.session.completed ter gravado
         // o customer_id no profile.
         let userId: string | null = null
+        let subMetadata: Stripe.Metadata | null = null
         if (subscriptionId) {
           try {
             const sub = await stripe.subscriptions.retrieve(subscriptionId)
             userId = sub.metadata?.user_id ?? null
+            subMetadata = sub.metadata ?? null
           } catch (err) {
             console.error('[stripe webhook] falha ao ler metadata da assinatura:', err)
           }
@@ -454,6 +476,7 @@ export async function POST(req: NextRequest) {
           source:        'invoice',
           fallbackKey:   invoice.id ?? `invoice:${event.id}`,
           eventMetadata: { stripe_invoice_id: invoice.id },
+          stripeMetadata: subMetadata,
         })
         if (!ok) return NextResponse.json({ error: 'db' }, { status: 500 })
         return NextResponse.json({ received: true })

@@ -4037,6 +4037,17 @@ body[data-sheet-open='true'] { overflow: hidden; }
   }
 }
 
+/* Mobile: compacto. O aviso divide o rodapé com a barra de CTA fixa
+   (components/landing/MobileCTA.tsx sobe pela --sn-consent-h que o próprio
+   aviso publica), então cada pixel aqui é pixel a menos de página visível.
+   Depois das regras base de propósito: mesma especificidade, vence a última. */
+@media (max-width: 559px) {
+  .spn-consent { padding: 0 10px calc(10px + env(safe-area-inset-bottom, 0px)); }
+  .spn-consent-card { gap: 8px; padding: 12px 14px; }
+  .spn-consent-text { font-size: 12px; line-height: 1.35; }
+  .spn-consent-btn { padding: 8px 12px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .spn-consent-btn,
   .spn-consent-switch,
