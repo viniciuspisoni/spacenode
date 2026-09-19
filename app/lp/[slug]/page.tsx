@@ -22,6 +22,8 @@ import ForceDarkScope from '@/lib/theme/ForceDarkScope'
 import LpCtaLink from '@/components/marketing/LpCtaLink'
 import LpViewPing from '@/components/marketing/LpViewPing'
 import LpStickyCta from '@/components/marketing/LpStickyCta'
+import { BeforeAfter } from '@/components/landing/BeforeAfter'
+import { Logo } from '@/components/brand'
 import type { PlanIntent } from '@/lib/analytics/attribution'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getLandingPageBySlug, recordAcquisitionEvent } from '@/lib/marketing/ads/service'
@@ -113,18 +115,33 @@ export default async function LandingCampaignPage({
   const ctaHref = `/login?${qs.toString()}`
   const ctaLabel = page.cta_label?.trim() || 'Começar agora'
 
-  // Plano de entrada = o mais barato da vitrine (Essence). O CTA de plano leva
-  // `plan=` na query além do cookie de intenção que o clique grava: com os
-  // dois, a página de login manda o cadastro terminar no checkout desse plano
-  // (lib/analytics/attribution.ts → intentResumePath) mesmo sem JS no clique.
+  // Um CTA por plano, cada um com a própria intenção (decisão do dono,
+  // 18/09/26: a landing não empurra o Essence — leva o visitante a ESCOLHER
+  // um plano). O CTA leva `plan=` na query além do cookie de intenção que o
+  // clique grava: com os dois, a página de login manda o cadastro terminar
+  // no checkout do plano escolhido (lib/analytics/attribution.ts →
+  // intentResumePath) mesmo sem JS no clique. O plano mais barato é o
+  // "comece por aqui" da seção de planos e a âncora de preço do hero.
+  const planLinks: PlanLinks = Object.fromEntries(
+    SELLABLE_PLANS.map((p) => {
+      const planQs = new URLSearchParams(qs)
+      planQs.set('plan', p.id)
+      const intent: PlanIntent = { plan: p.id, billing: 'monthly' }
+      return [p.id, { href: `/login?${planQs.toString()}`, intent }]
+    }),
+  )
   const entryPlan = SELLABLE_PLANS.reduce((a, b) => (b.monthlyPrice < a.monthlyPrice ? b : a))
-  const entryIntent: PlanIntent = { plan: entryPlan.id, billing: 'monthly' }
-  const planQs = new URLSearchParams(qs)
-  planQs.set('plan', entryPlan.id)
-  const planCtaHref = `/login?${planQs.toString()}`
   const cheapestPlanPrice = entryPlan.monthlyPrice
 
   const sections: LandingSection[] = Array.isArray(page.sections) ? page.sections : []
+
+  // MOBILE (2026-09-18): a prova visual sobe para o primeiro viewport. O
+  // primeiro par do `before_after` vira um comparador logo abaixo do título
+  // — no celular, o visitante que veio de um Reel abria a página e via só
+  // texto (o antes/depois começava em 712px de um viewport de 812). A seção
+  // de resultados mostra os pares restantes. No desktop nada muda: o hero
+  // segue sem imagem e a seção mostra todos os pares.
+  const heroPair = sections.flatMap((s) => (s.kind === 'before_after' && Array.isArray(s.pairs) ? s.pairs : []))[0] ?? null
 
   // Registro de visita — best-effort no fim do render: rate limit por IP
   // (o IP fica só na chave da janela, o evento é anônimo) e jamais quebra a
@@ -160,58 +177,89 @@ export default async function LandingCampaignPage({
       <ForceDarkScope />
       <LpViewPing slug={slug} />
 
-      {/* Header mínimo — só o wordmark de volta pra home */}
-      <header className="mx-auto flex max-w-5xl items-center px-5 py-5 sm:px-10">
-        <Link
-          href="/"
-          className="text-[13px] font-semibold text-text-primary no-underline"
-          style={{ letterSpacing: '0.22em' }}
-        >
-          spacenode
+      {/* Header mínimo — o logo oficial (símbolo + wordmark, components/brand)
+          de volta pra home. Antes era um wordmark solto em caixa-baixa
+          espaçada, fora da identidade. */}
+      <header className="mx-auto flex max-w-5xl items-center px-5 py-3 sm:px-10 sm:py-5">
+        <Link href="/" className="inline-flex text-text-primary no-underline" aria-label="SpaceNode — início">
+          <Logo symbolSize={30} />
         </Link>
       </header>
 
       <main>
         {/* Hero */}
-        <section className="mx-auto max-w-3xl px-5 pb-14 pt-14 text-center sm:px-10 sm:pt-24">
+        <section className="mx-auto max-w-3xl px-5 pb-8 pt-4 text-center sm:px-10 sm:pb-14 sm:pt-24">
+          {/* Eyebrow só no desktop: no celular é uma linha a mais entre a
+              pessoa e a imagem. */}
           <span
-            className="inline-block text-[10px] font-medium uppercase text-text-tertiary"
+            className="hidden text-[10px] font-medium uppercase text-text-tertiary sm:inline-block"
             style={{ letterSpacing: '0.28em' }}
           >
             Visualização arquitetônica
           </span>
           <h1
-            className="mx-auto mt-6 max-w-2xl text-[clamp(32px,6vw,52px)] font-light leading-[1.08] text-text-primary"
+            className="mx-auto max-w-2xl text-[29px] font-light leading-[1.08] text-text-primary sm:mt-6 sm:text-[clamp(32px,6vw,52px)]"
             style={{ letterSpacing: '-0.045em' }}
           >
             {page.headline ?? page.name}
           </h1>
+
+          {/* Prova visual no primeiro viewport — só mobile (ver heroPair). O
+              comparador é o mesmo da home (arraste), em 16:9 para caber
+              inteiro entre o título e o CTA. */}
+          {heroPair && (
+            <figure className="mx-auto mt-4 max-w-xl sm:hidden" style={{ margin: '16px auto 0' }}>
+              <div className="overflow-hidden rounded-2xl" style={{ border: HAIRLINE }}>
+                <BeforeAfter
+                  base={heroPair.before}
+                  render={heroPair.after}
+                  aspect="16 / 9"
+                  caption={heroPair.label}
+                  sizes="100vw"
+                />
+              </div>
+              <figcaption
+                className="mt-2 text-[10px] uppercase text-text-tertiary"
+                style={{ letterSpacing: '0.12em' }}
+              >
+                arraste para comparar
+                {heroPair.credit && (
+                  <span className="normal-case" style={{ letterSpacing: '0' }}> · projeto de {heroPair.credit}</span>
+                )}
+              </figcaption>
+            </figure>
+          )}
+
           {page.subheadline && (
             <p
-              className="mx-auto mt-5 max-w-xl text-[15px] leading-relaxed text-text-secondary sm:text-[17px]"
+              className="mx-auto mt-4 max-w-xl text-[14px] leading-relaxed text-text-secondary sm:mt-5 sm:text-[17px]"
               style={{ letterSpacing: '-0.01em' }}
             >
               {page.subheadline}
             </p>
           )}
-          <div className="mt-9">
+          <div className="mt-5 sm:mt-9">
             <LpCtaLink href={ctaHref} slug={slug} position="hero" className={CTA_CLASSES}>
               {ctaLabel}
               <CtaArrow />
             </LpCtaLink>
           </div>
-          <p className="mt-5 text-[11px] text-text-tertiary" style={{ letterSpacing: '0.02em' }}>
-            80 nodes grátis · sem cartão
+          {/* Âncora de preço no mobile: quem entra sabe desde o primeiro
+              viewport que a ferramenta é paga — a métrica desta página é
+              assinatura, não volume de cadastro. Desktop segue como estava. */}
+          <p className="mt-4 text-[11px] text-text-tertiary sm:mt-5" style={{ letterSpacing: '0.02em' }}>
+            <span className="sm:hidden">
+              80 nodes grátis, sem cartão · planos a partir de R$ {cheapestPlanPrice}/mês
+            </span>
+            <span className="hidden sm:inline">80 nodes grátis · sem cartão</span>
           </p>
         </section>
 
         {/* Seções configuradas no painel, na ordem do array */}
-        {sections.map((section, index) =>
-          renderSection(section, index, page, { href: planCtaHref, intent: entryIntent, planName: entryPlan.name }),
-        )}
+        {sections.map((section, index) => renderSection(section, index, page, planLinks))}
 
         {/* CTA final */}
-        <section className="mx-auto max-w-3xl px-5 py-16 text-center sm:px-10" style={{ borderTop: HAIRLINE }}>
+        <section className="mx-auto max-w-3xl px-5 py-12 text-center sm:px-10 sm:py-16" style={{ borderTop: HAIRLINE }}>
           <h2 className="text-[26px] font-light text-text-primary" style={{ letterSpacing: '-0.03em' }}>
             comece com 80 nodes grátis.
           </h2>
@@ -229,14 +277,15 @@ export default async function LandingCampaignPage({
         </section>
       </main>
 
-      {/* Barra fixa (só mobile): vende o plano de entrada com o preço no
-          rótulo. Sobe quando o banner de consentimento está aberto. */}
+      {/* Barra fixa (só mobile): genérica, leva à seção de planos — lá cada
+          plano tem o próprio CTA. Some enquanto a seção está na tela e sobe
+          quando o banner de consentimento está aberto. */}
       <LpStickyCta
         slug={slug}
-        href={planCtaHref}
-        label={`Começar com ${entryPlan.name} · R$ ${entryPlan.monthlyPrice}/mês`}
-        note={`${entryPlan.nodes.toLocaleString('pt-BR')} nodes por mês · cancele quando quiser`}
-        intent={entryIntent}
+        href="#planos"
+        label="Escolher meu plano"
+        note={`planos a partir de R$ ${cheapestPlanPrice}/mês · cancele quando quiser`}
+        hideWhenVisibleId="planos"
       />
 
       {/* Footer mínimo */}
@@ -260,18 +309,20 @@ export default async function LandingCampaignPage({
 
 // ── Seções ─────────────────────────────────────────────────────────────────────
 
-/** CTA de plano (plano de entrada): destino com `plan=`, intenção e nome. */
-interface PlanCta {
-  href: string
-  intent: PlanIntent
-  planName: string
-}
+/** Por plano vendável: destino de cadastro com `plan=` e a intenção que o
+ *  clique grava. Cada CTA de plano preserva o SEU plano até o checkout. */
+type PlanLinks = Record<string, { href: string; intent: PlanIntent }>
+
+const CTA_GHOST_CLASSES =
+  'inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-bg-elevated px-5 ' +
+  'text-[13px] font-medium text-text-primary no-underline transition-colors hover:bg-bg-elevated-hover'
+const CTA_GHOST_STYLE = { border: '0.5px solid var(--color-border-strong)' } as const
 
 function renderSection(
   section: LandingSection,
   index: number,
   page: LandingPage,
-  planCta: PlanCta,
+  planLinks: PlanLinks,
 ): ReactNode {
   switch (section.kind) {
     case 'value_props':
@@ -291,9 +342,10 @@ function renderSection(
         <PricingSection
           key={index}
           planIds={section.plan_ids}
+          featuredPlanId={section.featured_plan_id}
           note={section.note}
           slug={page.slug}
-          planCta={planCta}
+          planLinks={planLinks}
         />
       )
     default:
@@ -304,16 +356,19 @@ function renderSection(
 
 /** Cabeçalho padrão de seção: eyebrow uppercase + h2 minúsculo com ponto. */
 function SectionShell({
+  id,
   eyebrow,
   title,
   children,
 }: {
+  id?: string
   eyebrow: string
   title: string
   children: ReactNode
 }) {
+  // Mobile mais denso (py-8, mb-5); desktop mantém py-12 / mb-8.
   return (
-    <section className="mx-auto max-w-4xl px-5 py-12 sm:px-10">
+    <section id={id} className="mx-auto max-w-4xl px-5 py-8 sm:px-10 sm:py-12" style={id ? { scrollMarginTop: 12 } : undefined}>
       <span
         className="block text-[10px] font-medium uppercase text-text-tertiary"
         style={{ letterSpacing: '0.28em' }}
@@ -321,7 +376,7 @@ function SectionShell({
         {eyebrow}
       </span>
       <h2
-        className="mb-8 mt-3 text-[26px] font-light text-text-primary"
+        className="mb-5 mt-2 text-[24px] font-light text-text-primary sm:mb-8 sm:mt-3 sm:text-[26px]"
         style={{ letterSpacing: '-0.03em' }}
       >
         {title}
@@ -342,8 +397,20 @@ function gridColsFor(count: number): string {
 function ValuePropsSection({ items }: { items: Array<{ title: string; body: string }> }) {
   if (!Array.isArray(items) || items.length === 0) return null
   return (
-    <section className="mx-auto max-w-4xl px-5 py-10 sm:px-10">
-      <div className={`grid grid-cols-1 gap-2 ${gridColsFor(items.length)}`}>
+    <section className="mx-auto max-w-4xl px-5 py-6 sm:px-10 sm:py-10">
+      {/* Mobile: lista com hairline, sem cartão — os três argumentos cabem
+          em meia tela. Desktop: os cartões de sempre. */}
+      <ul className="m-0 list-none p-0 sm:hidden" style={{ borderTop: HAIRLINE }}>
+        {items.map((item, i) => (
+          <li key={i} className="py-3" style={{ borderBottom: HAIRLINE }}>
+            <span className="text-[13px] font-medium text-text-primary" style={{ letterSpacing: '-0.01em' }}>
+              {item.title}
+            </span>
+            <span className="text-xs text-text-tertiary"> — {item.body}</span>
+          </li>
+        ))}
+      </ul>
+      <div className={`hidden grid-cols-1 gap-2 sm:grid ${gridColsFor(items.length)}`}>
         {items.map((item, i) => (
           <div key={i} className="rounded-xl bg-bg-elevated p-5" style={{ border: HAIRLINE }}>
             <div className="text-[13px] font-medium text-text-primary" style={{ letterSpacing: '-0.01em' }}>
@@ -365,9 +432,33 @@ function BeforeAfterSection({
   pageName: string
 }) {
   if (!Array.isArray(pairs) || pairs.length === 0) return null
+  // Mobile: o primeiro par já está no hero (heroPair); aqui entram os
+  // restantes como comparadores 16:9 — um par por ~230px em vez de ~600px
+  // (duas imagens 4:3 empilhadas). Sem par restante, a seção some no mobile.
+  const mobilePairs = pairs.slice(1)
   return (
     <SectionShell eyebrow="Resultados" title="antes e depois.">
-      <div className="grid gap-8">
+      <div className={`grid gap-5 ${mobilePairs.length === 0 ? 'hidden' : ''} sm:hidden`}>
+        {mobilePairs.map((pair, i) => (
+          <figure key={i} className="m-0">
+            <div className="overflow-hidden rounded-2xl" style={{ border: HAIRLINE }}>
+              <BeforeAfter
+                base={pair.before}
+                render={pair.after}
+                aspect="16 / 9"
+                caption={pair.label}
+                sizes="100vw"
+              />
+            </div>
+            {pair.credit && (
+              <figcaption className="mt-1.5 text-[11px] text-text-tertiary" style={{ letterSpacing: '0.01em' }}>
+                {pair.credit}
+              </figcaption>
+            )}
+          </figure>
+        ))}
+      </div>
+      <div className="hidden gap-8 sm:grid">
         {pairs.map((pair, i) => (
           <figure key={i} className="m-0">
             {/* Divisor hairline: gap de 1px sobre fundo na cor da borda */}
@@ -419,7 +510,7 @@ function BeforeAfterSection({
         ))}
       </div>
       {pairs.some((p) => p.credit) && (
-        <p className="mt-6 text-xs leading-relaxed text-text-tertiary">
+        <p className="mt-4 text-xs leading-relaxed text-text-tertiary sm:mt-6">
           Projetos de escritórios que usam a plataforma. Publicado com autorização
           de quem projetou.
         </p>
@@ -458,7 +549,27 @@ function HowItWorksSection({ steps }: { steps: Array<{ title: string; body: stri
   if (!Array.isArray(steps) || steps.length === 0) return null
   return (
     <SectionShell eyebrow="Processo" title="como funciona.">
-      <ol className={`m-0 grid list-none gap-2 p-0 ${gridColsFor(steps.length)}`}>
+      {/* Mobile: lista numerada em linha, sem cartão. Desktop: cartões. */}
+      <ol className="m-0 list-none p-0 sm:hidden" style={{ borderTop: HAIRLINE }}>
+        {steps.map((step, i) => (
+          <li key={i} className="flex gap-3 py-3" style={{ borderBottom: HAIRLINE }}>
+            <span
+              aria-hidden
+              className="mt-0.5 inline-flex h-5 w-5 flex-none items-center justify-center rounded-full text-[10px] text-text-secondary"
+              style={{ border: '0.5px solid var(--color-border-strong)' }}
+            >
+              {i + 1}
+            </span>
+            <div>
+              <span className="text-[13px] font-medium text-text-primary" style={{ letterSpacing: '-0.01em' }}>
+                {step.title}
+              </span>
+              <p className="mt-0.5 text-xs leading-relaxed text-text-tertiary">{step.body}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+      <ol className={`m-0 hidden list-none gap-2 p-0 sm:grid ${gridColsFor(steps.length)}`}>
         {steps.map((step, i) => (
           <li key={i} className="rounded-xl bg-bg-elevated p-5" style={{ border: HAIRLINE }}>
             <span
@@ -535,21 +646,122 @@ function QuoteSection({ text, attribution }: { text: string; attribution?: strin
  */
 function PricingSection({
   planIds,
+  featuredPlanId,
   note,
   slug,
-  planCta,
+  planLinks,
 }: {
   planIds?: string[]
+  featuredPlanId?: string
   note?: string
   slug: string
-  planCta: PlanCta
+  planLinks: PlanLinks
 }) {
   const ids = Array.isArray(planIds) ? planIds : []
   const plans = ids.length > 0 ? SELLABLE_PLANS.filter((p) => ids.includes(p.id)) : SELLABLE_PLANS
   if (plans.length === 0) return null
 
+  // Cada plano tem o PRÓPRIO CTA, com a própria intenção (decisão do dono,
+  // 18/09/26): a página leva o visitante a escolher um plano, não a um plano
+  // em particular. O destaque "comece por aqui" é só hierarquia visual — no
+  // mobile o mais barato vira cartão e os outros linhas, cada linha com o
+  // seu botão. `featured_plan_id` no dado troca o destaque.
+  const cheapest = plans.reduce((a, b) => (b.monthlyPrice < a.monthlyPrice ? b : a))
+  const featured = plans.find((p) => p.id === featuredPlanId) ?? cheapest
+  const secondary = plans.filter((p) => p.id !== featured.id)
+  const noteText =
+    note ??
+    'Nodes são os créditos de geração e acumulam enquanto a assinatura estiver ativa. Começa grátis com 80 nodes, sem cartão — a assinatura entra quando o volume pedir.'
+  const linkFor = (id: string) => planLinks[id]
+
   return (
-    <SectionShell eyebrow="Planos" title="quanto custa.">
+    <SectionShell id="planos" eyebrow="Planos" title="quanto custa.">
+      {/* ── Mobile ─────────────────────────────────────────────────── */}
+      <div className="sm:hidden">
+        <div
+          className="relative flex flex-col rounded-xl bg-bg-elevated p-5"
+          style={{ border: '0.5px solid var(--color-border-strong)' }}
+        >
+          <span
+            className="absolute right-4 top-4 rounded-full bg-inverse px-2 py-0.5 text-[9px] font-medium uppercase text-inverse-foreground"
+            style={{ letterSpacing: '0.14em' }}
+          >
+            comece por aqui
+          </span>
+          <div
+            className="text-[10px] font-medium uppercase text-text-tertiary"
+            style={{ letterSpacing: '0.28em' }}
+          >
+            {featured.name}
+          </div>
+          <div className="mt-3 flex items-baseline gap-1">
+            <span className="text-xs text-text-tertiary">R$</span>
+            <span
+              className="text-[34px] font-light leading-none text-text-primary"
+              style={{ letterSpacing: '-0.03em' }}
+            >
+              {featured.monthlyPrice}
+            </span>
+            <span className="text-xs text-text-tertiary">/mês</span>
+          </div>
+          <div className="mt-2 text-[13px] text-text-secondary" style={{ letterSpacing: '-0.01em' }}>
+            {featured.nodes.toLocaleString('pt-BR')} nodes / mês · cancele quando quiser
+          </div>
+          <p className="mt-1.5 text-xs leading-relaxed text-text-tertiary">{featured.description}</p>
+          {linkFor(featured.id) && (
+            <div className="mt-5">
+              <LpCtaLink
+                href={linkFor(featured.id).href}
+                slug={slug}
+                position="pricing"
+                intent={linkFor(featured.id).intent}
+                className={`${CTA_CLASSES} w-full`}
+              >
+                Começar com {featured.name}
+                <CtaArrow />
+              </LpCtaLink>
+            </div>
+          )}
+        </div>
+
+        {secondary.length > 0 && (
+          <ul className="m-0 mt-3 list-none p-0" style={{ borderTop: HAIRLINE }}>
+            {secondary.map((plan) => (
+              <li
+                key={plan.id}
+                className="flex items-center justify-between gap-3 py-3"
+                style={{ borderBottom: HAIRLINE }}
+              >
+                <div className="min-w-0">
+                  <span className="text-[13px] font-medium text-text-primary" style={{ letterSpacing: '-0.01em' }}>
+                    {plan.name}
+                    <span className="font-normal text-text-secondary"> · R$ {plan.monthlyPrice}/mês</span>
+                  </span>
+                  <span className="block text-[11px] text-text-tertiary">
+                    {plan.nodes.toLocaleString('pt-BR')} nodes / mês · {plan.description}
+                  </span>
+                </div>
+                {linkFor(plan.id) && (
+                  <LpCtaLink
+                    href={linkFor(plan.id).href}
+                    slug={slug}
+                    position="pricing"
+                    intent={linkFor(plan.id).intent}
+                    className={`${CTA_GHOST_CLASSES} flex-none min-h-[40px] px-4 text-[12px]`}
+                    style={CTA_GHOST_STYLE}
+                  >
+                    Escolher
+                  </LpCtaLink>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="mt-4 text-xs leading-relaxed text-text-tertiary">{noteText}</p>
+      </div>
+
+      {/* ── Desktop: os mesmos cartões, agora cada um com o próprio CTA ── */}
+      <div className="hidden sm:block">
       <div className={`grid grid-cols-1 gap-2 ${gridColsFor(plans.length)}`}>
         {plans.map((plan) => (
           <div
@@ -578,21 +790,28 @@ function PricingSection({
             <div className="mt-2 text-[13px] text-text-secondary" style={{ letterSpacing: '-0.01em' }}>
               {plan.nodes.toLocaleString('pt-BR')} nodes / mês
             </div>
-            <p className="mt-1.5 text-xs leading-relaxed text-text-tertiary">{plan.description}</p>
+            <p className="mt-1.5 flex-1 text-xs leading-relaxed text-text-tertiary">{plan.description}</p>
+            {/* O CTA de cada cartão grava a intenção DESTE plano: o cadastro
+                termina no checkout dele. O destaque leva o botão cheio. */}
+            {linkFor(plan.id) && (
+              <div className="mt-5">
+                <LpCtaLink
+                  href={linkFor(plan.id).href}
+                  slug={slug}
+                  position="pricing"
+                  intent={linkFor(plan.id).intent}
+                  className={plan.id === featured.id ? `${CTA_CLASSES} w-full` : `${CTA_GHOST_CLASSES} w-full`}
+                  style={plan.id === featured.id ? undefined : CTA_GHOST_STYLE}
+                >
+                  Começar com {plan.name}
+                  <CtaArrow />
+                </LpCtaLink>
+              </div>
+            )}
           </div>
         ))}
       </div>
-      <p className="mt-6 text-xs leading-relaxed text-text-tertiary">
-        {note ??
-          'Nodes são os créditos de geração e acumulam enquanto a assinatura estiver ativa. Começa grátis com 80 nodes, sem cartão — a assinatura entra quando o volume pedir.'}
-      </p>
-      {/* O CTA da seção de preço vende o plano de entrada, não o grátis: o
-          clique grava a intenção e o cadastro termina no checkout dele. */}
-      <div className="mt-7">
-        <LpCtaLink href={planCta.href} slug={slug} position="pricing" intent={planCta.intent} className={CTA_CLASSES}>
-          Começar com {planCta.planName}
-          <CtaArrow />
-        </LpCtaLink>
+      <p className="mt-6 text-xs leading-relaxed text-text-tertiary">{noteText}</p>
       </div>
     </SectionShell>
   )
