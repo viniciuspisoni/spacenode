@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { isModuleEnabled } from '@/lib/nav/modules-config'
 import { ConstellationN } from '@/components/brand'
 import {
   ProjectType, ProjectMaterials,
@@ -1451,8 +1452,10 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
 
               {/* Resultado do Orion ainda não vira projeto: a decisão olha o
                   motor do RESULTADO, não o card selecionado agora. O servidor
-                  recusa igual (409 em /api/spaces/from-render). */}
-              {lastRenderId && !lastOrion && (
+                  recusa igual (409 em /api/spaces/from-render).
+                  Spaces desativado temporariamente (lib/nav/modules-config.ts)
+                  — o CTA de promoção pro Space some junto. */}
+              {lastRenderId && !lastOrion && isModuleEnabled('spaces') && (
                 <Link
                   href={`/app/spaces/new/from-render?render_id=${lastRenderId}`}
                   className="spn-glass spn-glass--raised"

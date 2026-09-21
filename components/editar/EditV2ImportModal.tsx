@@ -16,6 +16,7 @@
 import { useEffect, useState } from 'react'
 import { toMediaProxyUrl } from '@/lib/storage/media-url'
 import { createClient } from '@/lib/supabase/client'
+import { isModuleEnabled } from '@/lib/nav/modules-config'
 
 type Tab = 'renders' | 'vistas' | 'edits'
 
@@ -182,9 +183,13 @@ export function EditV2ImportModal({ open, onClose, onSelect, includeUpscales }: 
           <button type="button" style={tabBtn(tab === 'renders')} onClick={() => setTab('renders')}>
             Renders{count('renders')}
           </button>
-          <button type="button" style={tabBtn(tab === 'vistas')} onClick={() => setTab('vistas')}>
-            Vistas{count('vistas')}
-          </button>
+          {/* Aba "Vistas" some enquanto o Spaces estiver desativado (ver
+              lib/nav/modules-config.ts) — consulta e estado seguem intactos. */}
+          {isModuleEnabled('spaces') && (
+            <button type="button" style={tabBtn(tab === 'vistas')} onClick={() => setTab('vistas')}>
+              Vistas{count('vistas')}
+            </button>
+          )}
           <button type="button" style={tabBtn(tab === 'edits')} onClick={() => setTab('edits')}>
             Edições{count('edits')}
           </button>

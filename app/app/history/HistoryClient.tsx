@@ -10,6 +10,7 @@ import { GenerationDetailDrawer } from '@/components/history/GenerationDetailDra
 import { authorInitials, type GenerationKind } from '@/lib/history/generation-detail'
 import { isInternalRenderRow } from '@/lib/orion/config'
 import type { Edit } from '@/lib/spaces/types'
+import { isModuleEnabled } from '@/lib/nav/modules-config'
 import { BLOCOS3D_ENGINES } from '@/lib/blocos3d/config'
 import type { Blocos3DJobView } from '@/lib/blocos3d/types'
 import {
@@ -1191,7 +1192,9 @@ function VistasTabView({
   if ((items ?? []).length === 0)    return (
     <TabEmpty
       message="Sem vistas geradas em projetos ainda."
-      action={{ href: '/app/spaces', label: 'Abrir Meus projetos →' }}
+      // Spaces desativado temporariamente (lib/nav/modules-config.ts) — sem
+      // CTA pra rota que redireciona pro Dashboard.
+      action={isModuleEnabled('spaces') ? { href: '/app/spaces', label: 'Abrir Meus projetos →' } : undefined}
     />
   )
 
@@ -1456,7 +1459,10 @@ function RenderCard({
   // (isInternalRenderRow), que olha o motor do RESULTADO persistido e não o
   // card selecionado na hora. /api/spaces/from-render recusa igual, então
   // chamada forjada também não passa.
+  // Spaces desativado temporariamente (lib/nav/modules-config.ts) — o kebab
+  // some por inteiro, já que "Criar Space" é hoje seu único item.
   const isCreateSpaceEligible =
+    isModuleEnabled('spaces') &&
     render.ambient !== 'upscale' && render.ambient !== 'video' && !!render.output_url &&
     !isInternalRenderRow({ engine: renderEngineRaw(render) })
 

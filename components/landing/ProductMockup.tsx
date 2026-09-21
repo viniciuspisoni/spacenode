@@ -49,12 +49,6 @@ const IconGenerate = (p: IconProps = {}) => (
     <path d="M21 14.5l-4.6-4-7.4 7" />
   </SVG>
 )
-const IconSpaces = (p: IconProps = {}) => (
-  <SVG {...p}>
-    <rect x="8" y="3" width="13" height="13" rx="2.2" />
-    <path d="M16 21H5.2A2.2 2.2 0 0 1 3 18.8V8" />
-  </SVG>
-)
 const IconRetocar = (p: IconProps = {}) => (
   <SVG {...p}>
     <path d="M12.5 20H21" />
@@ -130,7 +124,7 @@ const NAV_SECTIONS: { label: string; items: { Icon: (p?: IconProps) => React.Rea
   {
     label: 'PROJETOS',
     items: [
-      { Icon: IconProjects,  label: 'Meus projetos', active: true },
+      { Icon: IconProjects,  label: 'Meus projetos' },
       { Icon: IconDashboard, label: 'Dashboard' },
       { Icon: IconHistory,   label: 'Histórico' },
     ],
@@ -138,8 +132,7 @@ const NAV_SECTIONS: { label: string; items: { Icon: (p?: IconProps) => React.Rea
   {
     label: 'CRIAR',
     items: [
-      { Icon: IconGenerate,  label: 'Renderizar' },
-      { Icon: IconSpaces,    label: 'Spaces' },
+      { Icon: IconGenerate,  label: 'Renderizar', active: true },
       { Icon: IconRetocar,   label: 'Editar' },
       { Icon: IconEnhance,   label: 'Ampliar' },
       { Icon: IconVideo,     label: 'Animar' },
@@ -149,10 +142,10 @@ const NAV_SECTIONS: { label: string; items: { Icon: (p?: IconProps) => React.Rea
 ]
 
 const DNA_ITEMS = [
-  { label: 'Estilo',    value: 'Contemporâneo' },
-  { label: 'Materiais', value: '6 detectados' },
-  { label: 'Paleta',    value: '5 cores' },
-  { label: 'Contexto',  value: 'Serra · Golden hour' },
+  { label: 'Ambiente',   value: 'Sala de estar' },
+  { label: 'Estilo',     value: 'Contemporâneo' },
+  { label: 'Iluminação', value: 'Golden hour' },
+  { label: 'Modelo',     value: 'Vega' },
 ]
 
 const FILTER_PILLS = ['Todas', 'Favoritas', 'Iluminação', 'Detalhe']
@@ -162,7 +155,7 @@ const VISTAS = [
   { src: '/gallery-banheiro-after.jpg', badge: 'Banheiro suíte', dot: '#8fb7d4', meta: '1h · 2K' },
 ]
 
-// ── Miniaturas dos blocos da tela "Space em uso" ───────────────────────────────
+// ── Miniaturas dos blocos da tela do Renderizar ─────────────────────────────────
 
 function DnaStrip() {
   return (
@@ -255,14 +248,14 @@ function VistaMestreBanner({ compact = false }: { compact?: boolean }) {
       aspectRatio: compact ? '16 / 9' : '32 / 9',
       background: 'rgba(255,255,255,0.03)', border: hairline,
     }}>
-      <Image src="/demo-render.jpg" alt="Vista Mestre" fill sizes="(max-width: 768px) 90vw, 620px" style={{ objectFit: 'cover' }} />
+      <Image src="/demo-render.jpg" alt="Resultado" fill sizes="(max-width: 768px) 90vw, 620px" style={{ objectFit: 'cover' }} />
       <span style={{
         position: 'absolute', top: 8, left: 8,
         fontSize: 6.5, fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase',
         color: '#fff', background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)',
         padding: '3px 7px', borderRadius: 3,
       }}>
-        vista mestre
+        resultado
       </span>
       {!compact && (
         <span style={{
@@ -272,7 +265,7 @@ function VistaMestreBanner({ compact = false }: { compact?: boolean }) {
           backdropFilter: 'blur(6px)', border: '0.5px solid rgba(255,255,255,0.14)',
           padding: '3px 7px', borderRadius: 3,
         }}>
-          Trocar Vista Mestre
+          Baixar imagem
         </span>
       )}
     </div>
@@ -293,7 +286,7 @@ function DnaChip({ small = false }: { small?: boolean }) {
         <rect x="4" y="11" width="16" height="10" rx="1.5"/>
         <path d="M8 11V8a4 4 0 0 1 8 0v3"/>
       </svg>
-      DNA travado
+      Geometria travada
     </span>
   )
 }
@@ -313,7 +306,7 @@ function BalanceBadge() {
   )
 }
 
-// ── Desktop — shell do app: sidebar flutuante + tela "Space em uso" ───────────
+// ── Desktop — shell do app: sidebar flutuante + tela do Renderizar ────────────
 
 function DesktopMockup() {
   return (
@@ -344,7 +337,7 @@ function DesktopMockup() {
             flex: 1, background: 'rgba(255,255,255,0.06)', borderRadius: 5,
             padding: '4px 12px', fontSize: 10, color: 'rgba(255,255,255,0.3)', textAlign: 'center',
           }}>
-            spacenode.app/app/spaces
+            spacenode.app/app/generate
           </div>
           <div style={{ width: 48 }} />
         </div>
@@ -426,12 +419,12 @@ function DesktopMockup() {
             </div>
           </div>
 
-          {/* Conteúdo — tela "Space em uso" */}
+          {/* Conteúdo — tela do Renderizar */}
           <div style={{ flex: 1, minWidth: 0, padding: '14px 16px 14px 11px', display: 'flex', flexDirection: 'column', gap: 10 }}>
 
             {/* Breadcrumb */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 8, color: 'rgba(255,255,255,0.35)' }}>
-              <span>Meus projetos</span>
+              <span>Histórico</span>
               <span style={{ opacity: 0.4, fontSize: 6.5 }}>›</span>
               <span style={{ color: '#fafafa', fontWeight: 500 }}>Residência Horizonte</span>
             </div>
@@ -456,25 +449,25 @@ function DesktopMockup() {
                   background: 'rgba(255,255,255,0.03)', border: '0.5px solid rgba(255,255,255,0.12)',
                   fontSize: 8, fontWeight: 500, color: 'rgba(255,255,255,0.6)', whiteSpace: 'nowrap',
                 }}>
-                  Pack →
+                  Baixar →
                 </span>
               </div>
             </div>
 
-            {/* Vista Mestre banner */}
+            {/* Resultado */}
             <VistaMestreBanner />
 
-            {/* DNA strip */}
+            {/* Cenário */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-              <SectionLabel>DNA do projeto</SectionLabel>
+              <SectionLabel>Cenário</SectionLabel>
               <DnaStrip />
             </div>
 
-            {/* Vistas geradas */}
+            {/* Renders recentes */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <SectionLabel>Vistas geradas</SectionLabel>
-                <span style={{ fontSize: 7.5, color: 'rgba(255,255,255,0.3)' }}>DNA preservado em cada variação</span>
+                <SectionLabel>Renders recentes</SectionLabel>
+                <span style={{ fontSize: 7.5, color: 'rgba(255,255,255,0.3)' }}>Fidelidade geométrica em cada render</span>
               </div>
 
               {/* Filter pills */}
@@ -545,7 +538,7 @@ function MobileMockup() {
 
           {/* Breadcrumb + header */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 9, color: 'rgba(255,255,255,0.35)' }}>
-            <span>Meus projetos</span>
+            <span>Histórico</span>
             <span style={{ opacity: 0.4, fontSize: 7 }}>›</span>
             <span style={{ color: '#fafafa', fontWeight: 500 }}>Residência Horizonte</span>
           </div>
@@ -556,7 +549,7 @@ function MobileMockup() {
             <DnaChip small />
           </div>
 
-          {/* Vista Mestre */}
+          {/* Resultado */}
           <VistaMestreBanner compact />
 
           {/* Meta */}
@@ -565,16 +558,16 @@ function MobileMockup() {
               Vega · Residencial
             </span>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 8.5, color: 'var(--color-accent-green)' }}>
-              <GreenDot size={4} /> DNA preservado
+              <GreenDot size={4} /> Geometria preservada
             </span>
           </div>
 
           <div style={{ height: 0.5, background: 'rgba(255,255,255,0.07)' }} />
 
-          {/* Vistas */}
+          {/* Renders recentes */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <SectionLabel>Vistas geradas</SectionLabel>
-            <span style={{ fontSize: 7.5, color: 'rgba(255,255,255,0.3)' }}>2 de 3 concluídas</span>
+            <SectionLabel>Renders recentes</SectionLabel>
+            <span style={{ fontSize: 7.5, color: 'rgba(255,255,255,0.3)' }}>2 de 3 concluídos</span>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             {VISTAS.map(v => <VistaMiniCard key={v.badge} v={v} />)}
@@ -590,7 +583,7 @@ function MobileMockup() {
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             fontSize: 12.5, fontWeight: 500, letterSpacing: '-0.01em',
           }}>
-            Gerar variações
+            Baixar imagem
           </div>
         </div>
       </div>
@@ -608,7 +601,7 @@ const STEPS = [
 // Os módulos já aparecem nomeados na barra lateral do mockup — aqui viram só
 // pílulas. A grade com uma descrição para cada um era eco do que a própria
 // interface acima mostra.
-const MODULES = ['renderizar', 'spaces', 'editar', 'ampliar', 'animar', 'finalizar']
+const MODULES = ['renderizar', 'editar', 'ampliar', 'animar', 'finalizar']
 
 // ── Section wrapper ─────────────────────────────────────────────────────────
 
@@ -617,11 +610,12 @@ export function ProductMockup() {
     <section id="produto" className="spn-mockup">
       <div className="spn-mockup-head">
         <h2 className="spn-mockup-title">
-          um espaço de trabalho, não um gerador de imagens.
+          da referência à imagem, sem perder o projeto.
         </h2>
         <p className="spn-mockup-sub">
-          Cada projeto vira um Space: a Vista Mestre define o DNA — estilo,
-          materiais, paleta e contexto — e toda variação o preserva.
+          Envie um print do SketchUp, uma planta ou uma foto — a IA devolve a
+          visualização fotorrealista preservando geometria, proporções e
+          perspectiva do que você desenhou.
         </p>
       </div>
 

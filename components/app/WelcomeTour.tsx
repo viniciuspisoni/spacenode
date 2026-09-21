@@ -19,9 +19,10 @@
 
 import { useCallback, useEffect, useRef } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import { driver, type Driver } from 'driver.js'
+import { driver, type Driver, type DriveStep } from 'driver.js'
 import 'driver.js/dist/driver.css'
 import { createClient } from '@/lib/supabase/client'
+import { isModuleEnabled } from '@/lib/nav/modules-config'
 
 export const TOUR_START_EVENT = 'spn:tour:start'
 
@@ -60,6 +61,24 @@ export default function WelcomeTour({ needsOnboarding }: { needsOnboarding: bool
     // Qualquer tour iniciado conta como o auto-start do primeiro acesso —
     // impede reabertura automática com prop ainda desatualizada na sessão.
     autoStartedRef.current = true
+
+    // Spaces desativado temporariamente (ver lib/nav/modules-config.ts) —
+    // sem o módulo enabled não existe [data-tour="spaces"] no DOM, então a
+    // etapa some da lista em vez de travar o tour numa âncora inexistente.
+    const spacesStep: DriveStep | null = isModuleEnabled('spaces') ? {
+      // Âncora no cartão do módulo, não na faixa "Continuar de onde parou":
+      // a faixa só existe em conta com Space, e o tour precisa rodar igual
+      // no primeiro acesso, quando o dashboard está vazio. É o cartão
+      // vizinho ao do Renderizar — a transição é de um passo.
+      element: '[data-tour="spaces"]',
+      popover: {
+        title: 'Depois, o Space',
+        description:
+          'A partir da segunda vista do mesmo espaço, o Space entra: ele guarda o DNA do projeto para que todas as imagens conversem entre si. Dá para criar um a partir de qualquer render — não precisa decidir isso agora.',
+        side: 'top',
+        align: 'start',
+      },
+    } : null
 
     const d = driver({
       popoverClass: 'spn-tour',
@@ -114,20 +133,7 @@ export default function WelcomeTour({ needsOnboarding }: { needsOnboarding: bool
             align: 'start',
           },
         },
-        {
-          // Âncora no cartão do módulo, não na faixa "Continuar de onde parou":
-          // a faixa só existe em conta com Space, e o tour precisa rodar igual
-          // no primeiro acesso, quando o dashboard está vazio. É o cartão
-          // vizinho ao do Renderizar — a transição é de um passo.
-          element: '[data-tour="spaces"]',
-          popover: {
-            title: 'Depois, o Space',
-            description:
-              'A partir da segunda vista do mesmo espaço, o Space entra: ele guarda o DNA do projeto para que todas as imagens conversem entre si. Dá para criar um a partir de qualquer render — não precisa decidir isso agora.',
-            side: 'top',
-            align: 'start',
-          },
-        },
+        ...(spacesStep ? [spacesStep] : []),
         {
           element: '[data-tour="criar"]',
           popover: {

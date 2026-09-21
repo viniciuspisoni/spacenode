@@ -25,9 +25,10 @@ export interface SidebarModule {
 
 export const SIDEBAR_MODULES: SidebarModule[] = [
   { id: 'renderizar',       label: 'Renderizar',       href: '/app/generate',                     section: 'criar',      iconKey: 'generate',      enabled: true },
-  // Spaces de volta ao CRIAR por feedback de beta (Muda): "não fica muito
-  // claro que é uma ferramenta dali". Nomenclatura da UI: "Space(s)".
-  { id: 'spaces',           label: 'Spaces',           href: '/app/spaces/new',                    section: 'criar',      iconKey: 'spaces',        enabled: true },
+  // Spaces DESATIVADO TEMPORARIAMENTE (2026-09-20, pedido do dono) — rota,
+  // componente, API e migrations seguem intactos. Para reativar, virar
+  // `enabled: true` aqui e remover o redirect de /app/spaces em proxy.ts.
+  { id: 'spaces',           label: 'Spaces',           href: '/app/spaces/new',                    section: 'criar',      iconKey: 'spaces',        enabled: false },
   { id: 'editar',           label: 'Editar',           href: '/app/editar',                        section: 'criar',      iconKey: 'retocar',       enabled: true },
   { id: 'ampliar',          label: 'Ampliar',          href: '/app/upscale',                       section: 'criar',      iconKey: 'enhance',       enabled: true },
   { id: 'animar',           label: 'Animar',           href: '/app/video',                         section: 'criar',      iconKey: 'video',         enabled: true },
@@ -45,6 +46,11 @@ export const SIDEBAR_MODULES: SidebarModule[] = [
 
 export function getEnabledModules(section?: ModuleSection): SidebarModule[] {
   return SIDEBAR_MODULES.filter((m) => m.enabled && (section ? m.section === section : true))
+}
+
+/** Para gates fora do loop de módulos (dashboard, sidebar hardcoded, tour). */
+export function isModuleEnabled(id: string): boolean {
+  return SIDEBAR_MODULES.some((m) => m.id === id && m.enabled)
 }
 
 /** Módulos exibidos na sidebar — habilitados e sem hideInSidebar. */
