@@ -17,7 +17,7 @@ import {
 } from './sidebar-icons'
 import { TOUR_START_EVENT } from './WelcomeTour'
 import { GUIDE_START_EVENT } from './GenerateGuide'
-import { getSidebarModules, type SidebarModule } from '@/lib/nav/modules-config'
+import { getSidebarModules, isModuleEnabled, type SidebarModule } from '@/lib/nav/modules-config'
 
 // Ouvido pelo WelcomeTour: a etapa "Do seu jeito" aponta pro seletor de tema,
 // que só existe visualmente com a sidebar expandida (rail: expande só no
@@ -88,7 +88,9 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       // não confundir com os projetos/pastas do Histórico. O match exclui
       // /app/spaces/new, que volta a ser o dono do item "Spaces" do CRIAR.
       { label: 'Dashboard',     href: '/app',          exact: true,  Icon: IconDashboard },
-      { label: 'Meus Spaces',   href: '/app/spaces',   exact: false, match: (p) => p.startsWith('/app/spaces') && !p.startsWith('/app/spaces/new'), Icon: IconProjects },
+      // Spaces desativado temporariamente — some do PROJETOS junto com o item
+      // do CRIAR (ver lib/nav/modules-config.ts). Reverter junto.
+      ...(isModuleEnabled('spaces') ? [{ label: 'Meus Spaces', href: '/app/spaces', exact: false, match: (p: string) => p.startsWith('/app/spaces') && !p.startsWith('/app/spaces/new'), Icon: IconProjects }] : []),
       { label: 'Histórico',     href: '/app/history',  exact: false, Icon: IconHistory   },
     ],
   },

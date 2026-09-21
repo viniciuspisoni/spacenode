@@ -10,7 +10,7 @@ import {
   IconGenerate, IconSpaces, IconRetocar, IconEnhance,
   IconVideo, IconFinalizar, IconHumanizedPlan, IconBlocos3D, IconIsometric, IconBoard, IconMoodboard,
 } from '@/components/app/sidebar-icons'
-import { getEnabledModules, type SidebarModule } from '@/lib/nav/modules-config'
+import { getEnabledModules, isModuleEnabled, type SidebarModule } from '@/lib/nav/modules-config'
 import { RecentCard, type RecentRender } from './_components/RecentCard'
 
 type RecentSpace = {
@@ -102,6 +102,10 @@ export default async function AppPage() {
 
   const firstName = (user.user_metadata.full_name ?? user.email ?? 'usuário').split(' ')[0]
 
+  // Spaces desativado temporariamente (ver lib/nav/modules-config.ts) — não
+  // consulta spaces_with_counts, então a seção 2 sempre cai no StartBlock.
+  const spacesEnabled = isModuleEnabled('spaces')
+
   const admin = createAdminClient()
   const [payerBalance, recentResult, countResult, monthResult, spacesResult] = await Promise.all([
     // Saldo/plano da bolsa (dono do workspace) — é dele que a geração debita.
@@ -118,11 +122,13 @@ export default async function AppPage() {
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id)
       .gte('created_at', monthStart()),
-    supabase.from('spaces_with_counts')
-      .select('id, name, category, vista_mestre_url, vista_count, updated_at', { count: 'exact' })
-      .neq('status', 'archived')
-      .order('updated_at', { ascending: false })
-      .limit(PROJECT_LIMIT),
+    spacesEnabled
+      ? supabase.from('spaces_with_counts')
+          .select('id, name, category, vista_mestre_url, vista_count, updated_at', { count: 'exact' })
+          .neq('status', 'archived')
+          .order('updated_at', { ascending: false })
+          .limit(PROJECT_LIMIT)
+      : Promise.resolve({ data: [] as Record<string, unknown>[], count: 0, error: null }),
   ])
 
   const planId       = (payerBalance.planId as PlanId) ?? 'free'
@@ -163,19 +169,21 @@ export default async function AppPage() {
               <IconGenerate size={14} />
               Renderizar
             </Link>
-            <Link href="/app/spaces/new" className="spn-ghost spn-dash-ghost">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-                <line x1="12" y1="5" x2="12" y2="19"/>
-                <line x1="5" y1="12" x2="19" y2="12"/>
-              </svg>
-              Novo Space
-            </Link>
+            {spacesEnabled && (
+              <Link href="/app/spaces/new" className="spn-ghost spn-dash-ghost">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                  <line x1="12" y1="5" x2="12" y2="19"/>
+                  <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                Novo Space
+              </Link>
+            )}
           </div>
         </header>
 
         {/* ── 2 · Projetos: continuidade ou primeiro passo ──────────────────── */}
         {spaces.length === 0 ? (
-          <StartBlock />
+          <StartBlock spacesEnabled={spacesEnabled} />
         ) : (
           <section>
             <div className="spn-dash-section-head">
@@ -207,11 +215,13 @@ export default async function AppPage() {
             </div>
           </div>
 
-          <div className="spn-dash-stat">
-            <div className="spn-dash-stat-label">Spaces ativos</div>
-            <div className="spn-dash-stat-value">{totalSpaces}</div>
-            <div className="spn-dash-stat-sub">no seu atelier</div>
-          </div>
+          {spacesEnabled && (
+            <div className="spn-dash-stat">
+              <div className="spn-dash-stat-label">Spaces ativos</div>
+              <div className="spn-dash-stat-value">{totalSpaces}</div>
+              <div className="spn-dash-stat-sub">no seu atelier</div>
+            </div>
+          )}
 
           <div className="spn-dash-stat">
             <div className="spn-dash-stat-label">Imagens geradas</div>
@@ -316,7 +326,7 @@ export default async function AppPage() {
 
 // ── Empty state de projetos — primeiro passo do atelier ───────────────────────
 
-function StartBlock() {
+function StartBlock({ spacesEnabled }: { spacesEnabled: boolean }) {
   return (
     <section className="spn-dash-start spn-glass">
       <h2 className="spn-dash-start-title">Comece pela sua primeira imagem</h2>
@@ -325,9 +335,11 @@ function StartBlock() {
       </p>
       <div className="spn-dash-start-actions">
         <Link href="/app/generate" className="spn-cta spn-dash-cta">Renderizar primeira imagem</Link>
-        <Link href="/app/spaces/new" className="spn-ghost" style={{ borderRadius: 'var(--radius-full)', display: 'inline-flex', alignItems: 'center' }}>
-          Criar um Space
-        </Link>
+        {spacesEnabled && (
+          <Link href="/app/spaces/new" className="spn-ghost" style={{ borderRadius: 'var(--radius-full)', display: 'inline-flex', alignItems: 'center' }}>
+            Criar um Space
+          </Link>
+        )}
       </div>
       <div className="spn-dash-steps">
         <div className="spn-dash-step">
@@ -343,7 +355,9 @@ function StartBlock() {
         <div className="spn-dash-step">
           <div className="spn-dash-step-num">03</div>
           <div className="spn-dash-step-title">Gere e compare</div>
-          <div className="spn-dash-step-desc">Depois vire um Space e toda nova vista preserva o DNA.</div>
+          <div className="spn-dash-step-desc">
+            {spacesEnabled ? 'Depois vire um Space e toda nova vista preserva o DNA.' : 'Baixe, ajuste ou avance para os outros módulos do atelier.'}
+          </div>
         </div>
       </div>
     </section>

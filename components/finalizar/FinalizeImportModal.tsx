@@ -17,6 +17,7 @@ import { Segmented, Sheet } from '@/components/app/glass'
 import { createClient } from '@/lib/supabase/client'
 import { toMediaProxyUrl } from '@/lib/storage/media-url'
 import { uploadDirect } from '@/lib/storage/direct-upload-client'
+import { isModuleEnabled } from '@/lib/nav/modules-config'
 
 type Tab = 'renders' | 'vistas' | 'edits'
 
@@ -135,7 +136,9 @@ export function FinalizeImportModal({ open, purpose, onClose, onSelect }: Props)
           onChange={setTab}
           items={[
             { value: 'renders', label: `Renders${count('renders')}` },
-            { value: 'vistas', label: `Vistas${count('vistas')}` },
+            // Aba "Vistas" some enquanto o Spaces estiver desativado (ver
+            // lib/nav/modules-config.ts) — consulta e estado seguem intactos.
+            ...(isModuleEnabled('spaces') ? [{ value: 'vistas' as const, label: `Vistas${count('vistas')}` }] : []),
             { value: 'edits', label: `Edições${count('edits')}` },
           ]}
         />

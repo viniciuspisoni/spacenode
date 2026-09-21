@@ -371,8 +371,7 @@ export const KB_ENTRIES: KBEntry[] = [
     build: () => ({
       text:
         'O insumo é uma imagem: exporte um print do seu modelo (SketchUp, Revit, o que você usa) e envie no Renderizar — não há plugin ou importação direta de arquivo 3D. ' +
-        'O motor preserva geometria, perspectiva e proporções do seu projeto; você controla estilo e materiais pela direção criativa. ' +
-        'Para várias vistas do mesmo ambiente com coerência, crie um projeto em Spaces.',
+        'O motor preserva geometria, perspectiva e proporções do seu projeto; você controla estilo e materiais pela direção criativa.',
     }),
   },
 
@@ -386,7 +385,6 @@ export const KB_ENTRIES: KBEntry[] = [
       text:
         'O atelier hoje: ' +
         'Renderizar (do print do modelo à imagem fotorrealista, preservando geometria e perspectiva) · ' +
-        'Spaces (várias vistas do mesmo ambiente com um único DNA visual) · ' +
         'Editar (alteração localizada sem regenerar o resto) · ' +
         'Ampliar (mais resolução e nitidez na imagem aprovada) · ' +
         'Animar (vídeo de apresentação a partir da imagem) · ' +

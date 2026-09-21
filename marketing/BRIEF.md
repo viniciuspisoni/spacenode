@@ -1,12 +1,16 @@
 # BRIEF — Produção de conteúdo Instagram @spacenode.app
 
+> **Spaces DESATIVADO TEMPORARIAMENTE (2026-09-20)** — não citar como
+> ferramenta disponível em nenhuma peça nova até reativação (ver
+> `lib/nav/modules-config.ts` no app). Código/dados intactos, só saiu da
+> navegação e da comunicação pública.
+
 ## O que é o SPACENODE
 SaaS de renderização com IA para arquitetos brasileiros. O usuário sobe uma
 imagem do SketchUp e recebe um render fotorrealista em minutos. Diferenciais:
-Geometry Lock (slider que trava a geometria do projeto), Spaces (consistência
-entre imagens do mesmo projeto), workflow SketchUp-first, feito por um
-arquiteto brasileiro. **Já lançado e vendendo** — ver "Fase da campanha" no
-anexo, não confie em memória de fase.
+Geometry Lock (slider que trava a geometria do projeto), workflow
+SketchUp-first, feito por um arquiteto brasileiro. **Já lançado e vendendo**
+— ver "Fase da campanha" no anexo, não confie em memória de fase.
 
 ## Público-alvo
 Arquitetos e estudantes de arquitetura no Brasil, donos de escritório pequeno/
@@ -257,8 +261,9 @@ Vega 2K 20 / 4K 40; Quasar 2K 28 / 4K 56.
   portal da Trimble — peça sobre o plugin fica **gated** até o dono assinar e validar.
 - **Oferta de 50% no 1º mês ENCERROU em 31/08/2026.** Não citar.
 - Cadastro grátis = **80 nodes** (não 40). Planos: Starter R$89 / Pro R$199 / Studio R$349.
-- Módulos ativos hoje: Renderizar, Spaces, Editar, Ampliar, Animar, Finalizar, Estudar (beta),
-  Planta humanizada, Blocos 3D (beta). Isométricas/Prancha/Moodboard seguem OFF.
+- Módulos ativos hoje: Renderizar, Editar, Ampliar, Animar, Finalizar, Estudar (beta),
+  Planta humanizada, Blocos 3D (beta). Isométricas/Prancha/Moodboard seguem OFF. Spaces
+  DESATIVADO TEMPORARIAMENTE desde 20/09 (ver aviso no topo deste arquivo).
 
 ## Acervo real do dono (fonte para Reels a partir de agora)
 Além dos 6 pares de `marketing/renders/`, o banco de produção tem ~800 imagens geradas na conta
