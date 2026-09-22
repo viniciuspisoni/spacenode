@@ -39,9 +39,15 @@ export const APRESENTAR_TOOLS: Record<ApresentarToolId, ApresentarTool> = {
     longDesc:   'Humaniza uma planta baixa técnica com mobiliário, vegetação, texturas e nomes de ambientes — preservando paredes, aberturas e proporções.',
     status:     'novo',
     available:  true,
-    nodes:      20, // Vega (nano-banana-pro) @ 2K
+    // 20 nodes @ Quasar/2K. A troca de Vega (nano-banana-pro, US$0,134–0,150
+    // por imagem) pro Quasar (Seedream 5.0 Pro na faixa barata, US$0,045) é o
+    // que faz a ferramenta fechar a margem alvo de 80% no piso de receita por
+    // node (Office anual, R$0,0729/node @ FX 5,40) SEM mexer no preço. O que o
+    // nano-banana-pro fazia melhor era TIPOGRAFIA — e os nomes dos ambientes
+    // deixaram de sair do modelo de imagem (ver lib/apresentar/plan-labels).
+    nodes:      20,
     ctaLabel:   'Gerar planta humanizada',
-    engine:     'vega',
+    engine:     'quasar',
     resolution: '2k',
   },
   isometric: {
@@ -136,6 +142,130 @@ export const HUMANIZED_PLAN_DEFAULT_OPTIONS: HumanizedPlanOptions = {
   addSoftShadows:     true,
   preserveLines:      true,
   addRoomLabels:      true,
+}
+
+// ── Planta Humanizada · acabamentos (a superfície) ───────────────────────────
+//
+// O que o usuário decide virou UMA escolha. Antes eram 20 controles — nível (3)
+// + tipo de projeto (5) + estilo (5) + seis interruptores + texto livre — e
+// quase todos eram deriváveis da própria planta ou irrelevantes pro resultado.
+//
+// Cada acabamento é um pacote fechado de nível + estilo + elementos. Os campos
+// antigos continuam existindo porque a API ainda os aceita: o plugin do
+// SketchUp (1.8.0 em produção) manda projectType/style/level/options e não pode
+// quebrar. Quem manda `look` ganha o pacote; quem manda os campos soltos
+// continua sendo atendido como antes.
+//
+// O tipo de projeto saiu da interface de vez: quem lê isso na planta é o
+// leitor de visão (lib/apresentar/plan-reader), e ele acerta mais que o
+// usuário clicando num pill que ele não sabe pra que serve.
+
+export type HumanizedPlanLook = 'essencial' | 'apresentacao' | 'imobiliario'
+
+export interface HumanizedPlanLookSpec {
+  id:      HumanizedPlanLook
+  label:   string
+  desc:    string
+  level:   HumanizedPlanLevel
+  style:   HumanizedPlanStyle
+  options: HumanizedPlanOptions
+}
+
+export const HUMANIZED_PLAN_LOOKS: HumanizedPlanLookSpec[] = [
+  {
+    id:    'essencial',
+    label: 'Essencial',
+    desc:  'O traço técnico continua mandando. Mobiliário essencial e paleta neutra.',
+    level: 'leve',
+    style: 'clean_tecnico',
+    options: {
+      addFurniture:       true,
+      addVegetation:      false,
+      applyFloorTextures: false,
+      addSoftShadows:     false,
+      preserveLines:      true,
+      addRoomLabels:      true,
+    },
+  },
+  {
+    id:    'apresentacao',
+    label: 'Apresentação',
+    desc:  'O equilíbrio para mostrar ao cliente: mobiliário claro, texturas suaves e sombras.',
+    level: 'equilibrado',
+    style: 'contemporaneo',
+    options: {
+      addFurniture:       true,
+      addVegetation:      true,
+      applyFloorTextures: true,
+      addSoftShadows:     true,
+      preserveLines:      true,
+      addRoomLabels:      true,
+    },
+  },
+  {
+    id:    'imobiliario',
+    label: 'Imobiliário',
+    desc:  'Materialidade rica e vegetação — para anúncio, portfólio e material de venda.',
+    level: 'completo',
+    style: 'imobiliario_premium',
+    options: {
+      addFurniture:       true,
+      addVegetation:      true,
+      applyFloorTextures: true,
+      addSoftShadows:     true,
+      preserveLines:      true,
+      addRoomLabels:      true,
+    },
+  },
+]
+
+export const HUMANIZED_PLAN_DEFAULT_LOOK: HumanizedPlanLook = 'apresentacao'
+
+export function getHumanizedPlanLook(id: string | null | undefined): HumanizedPlanLookSpec | null {
+  return HUMANIZED_PLAN_LOOKS.find(l => l.id === id) ?? null
+}
+
+// ── Planta Humanizada · brief de leitura ─────────────────────────────────────
+//
+// O que o leitor de visão (lib/apresentar/plan-reader — SERVER) extrai da planta
+// técnica. Os TIPOS moram aqui, e não lá, porque o cliente precisa deles pra
+// desenhar os rótulos: config.ts é client-safe e plan-reader.ts importa o SDK
+// do Google.
+
+/** Categoria funcional do ambiente — dirige o repertório de mobiliário do
+ *  prompt e o peso tipográfico do rótulo. */
+export type PlanRoomKind =
+  | 'social' | 'cozinha' | 'dormitorio' | 'banho' | 'servico'
+  | 'circulacao' | 'externo' | 'trabalho' | 'comercial' | 'outro'
+
+export const PLAN_ROOM_KINDS: PlanRoomKind[] = [
+  'social', 'cozinha', 'dormitorio', 'banho', 'servico',
+  'circulacao', 'externo', 'trabalho', 'comercial', 'outro',
+]
+
+export interface PlanRoom {
+  /** Nome em PT-BR como aparece no rótulo (ex.: "Suíte", "Cozinha"). */
+  name: string
+  kind: PlanRoomKind
+  /** Centro do ambiente, normalizado 0..1 (x da esquerda, y do topo). */
+  cx: number
+  cy: number
+  /** Fração da largura/altura ocupada pelo ambiente — dimensiona o rótulo. */
+  w: number
+  h: number
+}
+
+export interface PlanBrief {
+  projectType: HumanizedPlanProjectType
+  rooms: PlanRoom[]
+  hasOutdoor: boolean
+  /** A planta já traz os nomes dos ambientes impressos. Quando true, NÃO
+   *  sobrepomos rótulo — dois textos no mesmo lugar é pior que nenhum. */
+  hasPrintedLabels: boolean
+  /** true = a leitura falhou; o pipeline segue sem brief. */
+  degraded: boolean
+  /** Motivo da degradação (telemetria). */
+  degradedReason?: string
 }
 
 // ── Isométricas · presets ────────────────────────────────────────────────────

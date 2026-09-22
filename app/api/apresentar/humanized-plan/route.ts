@@ -1,69 +1,149 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { fal } from '@fal-ai/client'
+import sharp from 'sharp'
 import { getRequestUser } from '@/lib/auth/request-user'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { DIRECT_UPLOAD_AREAS, downloadDirectUpload } from '@/lib/storage/direct-upload'
 import { getPayerId } from '@/lib/workspaces/context'
 import { refundNodes } from '@/lib/billing/refund-nodes'
-import { APRESENTAR_TOOLS } from '@/lib/apresentar/config'
-import { buildHumanizedPlanPrompt } from '@/lib/apresentar/prompts'
+import { APRESENTAR_TOOLS, getHumanizedPlanLook } from '@/lib/apresentar/config'
+import { buildHumanizedPlanPrompt } from '@/lib/apresentar/humanized-plan-prompt'
+import { degradedBrief, readPlan } from '@/lib/apresentar/plan-reader'
 import { getFalEndpoint, getNodesCost, type EngineId, type Resolution } from '@/lib/engines'
+import { falParamsForEngine } from '@/lib/ai/engine-params'
+import { nearestSupportedAspectRatio } from '@/lib/ai/aspect-ratio'
 import { generateImage, type GenerateImageResult } from '@/lib/ai/image-provider'
-import { computeGeometryScore, buildEdgeMapPng, type GeometryScoreBreakdown } from '@/lib/ai/fidelity/geometry-score'
-import { getFidelityAttemptParams } from '@/lib/ai/fidelity/render-only'
+import { buildEdgeMapPng } from '@/lib/ai/fidelity/geometry-score'
+import { computeInkScore, type InkScoreBreakdown } from '@/lib/ai/fidelity/ink-score'
 import { fetchStorageBuffer } from '@/lib/storage/fetch'
 import type {
   HumanizedPlanProjectType,
   HumanizedPlanStyle,
   HumanizedPlanLevel,
   HumanizedPlanOptions,
+  PlanBrief,
 } from '@/lib/apresentar/config'
 
 export const maxDuration = 300
 
 fal.config({ credentials: process.env.FAL_KEY })
 
-const FAL_TIMEOUT_MS = 90_000
+// 180 s: o Seedream Pro tem cauda medida de 134–145 s em produção (ver o
+// comentário do orçamento da ark em lib/ai/image-provider). Os 90 s antigos
+// eram do nano-banana-pro e matariam metade das gerações deste motor.
+const FAL_TIMEOUT_MS = 180_000
 
-// ── Gate de fidelidade da planta (envs com defaults; espelha o render_only) ──
+// ── Apresentar · Planta Humanizada ───────────────────────────────────────────
+//
+// Pipeline em quatro estágios (reescrito em 2026-09-22):
+//
+//   1. LEITURA (gemini-2.5-flash, ~US$0,002) — lê a planta técnica e devolve
+//      tipo de projeto, ambientes com nome PT-BR e caixa, e se já há texto
+//      impresso. Nunca derruba a geração: falha vira brief degradado.
+//   2. HUMANIZAÇÃO (Quasar / Seedream 5.0 Pro Edit, US$0,045 na faixa barata)
+//      com prompt POR AMBIENTE derivado do brief, e sem pedir tipografia.
+//   3. PORTÃO DE TINTA (local, custo zero) — computeInkScore no lugar do
+//      computeGeometryScore, que foi medido e reprovado para traço fino
+//      (bench do Ampliar, 19/09: em planta o edge recall a 384 px oscila ±7%
+//      entre fixtures e inverte o vencedor).
+//   4. RÓTULOS — desenhados pela aplicação em vetor, no cliente, a partir das
+//      posições do estágio 1. O modelo de imagem não escreve nada.
+//
+// Por que a troca de motor: o nano-banana-pro custava US$0,134–0,150 por
+// imagem contra receita de US$0,27 no piso (20 nodes × R$0,0729/node ÷ 5,40) —
+// 50% de margem numa tentativa e 0,7% quando o gate pedia a segunda. Na faixa
+// barata do Seedream a mesma imagem sai por US$0,045: 83% no piso. O que o
+// nano-banana-pro fazia melhor era TEXTO, e o texto saiu do modelo.
+//
+// ⚠️ A faixa barata depende de SEEDREAM_CHEAP_TIER=1 no ambiente. Sem a env o
+// pedido vai em 'auto_2K' e o custo DOBRA (US$0,09 na ark): a margem no piso
+// cai de 83% pra 67%. Ver lib/ai/seedream-size.ts.
+
+const TOOL = APRESENTAR_TOOLS.humanized_plan
+
+// Tipos válidos vindos do client/plugin (validação defensiva)
+const VALID_PROJECT_TYPES: HumanizedPlanProjectType[] = ['apartamento','casa','comercial','corporativo','paisagismo']
+const VALID_STYLES:        HumanizedPlanStyle[]       = ['clean_tecnico','imobiliario_premium','editorial_minimalista','aquarelado','contemporaneo']
+const VALID_LEVELS:        HumanizedPlanLevel[]       = ['leve','equilibrado','completo']
+
+const LEGACY_OPTIONS: HumanizedPlanOptions = {
+  addFurniture: true, addVegetation: true, applyFloorTextures: true,
+  addSoftShadows: true, preserveLines: true, addRoomLabels: true,
+}
+
+// ── Portão de fidelidade (envs com defaults) ─────────────────────────────────
 //
 //   HUMANIZED_PLAN_FIDELITY_GATE  '0' desliga validação+retry (rollback rápido)
-//   HUMANIZED_PLAN_MIN_SCORE      limite do geometry score (default 0.50)
+//   HUMANIZED_PLAN_MIN_INK_SCORE  limite do ink score (default 0.55)
 //   HUMANIZED_PLAN_MAX_ATTEMPTS   total de tentativas (default 2, cap 3)
 //
-// Motivação (feedback de beta — Muda, "leitura incorreta"): a planta humanizada
-// saía "bem diferente" da planta técnica original. Mesmo contrato do
-// render_only: paredes/aberturas/limites de ambientes são a autoridade; o gate
-// mede recall de bordas do original na saída e re-tenta com temperatura menor +
-// mapa de bordas anexado quando o score fica abaixo do limite.
+// O limite de 0,55 é conservador DE PROPÓSITO. Nas fixtures sintéticas a planta
+// fiel pontua 1,00 e as violações 0,36–0,56; saída de modelo real não alinha
+// pixel a pixel e vai pontuar abaixo de 1,00, e o retry custa uma geração
+// inteira: a 10% de disparo a margem no piso fica em 81%, a 50% cai pra 72%.
+// Subir o limite só depois de ver a distribuição real em `fidelity.attempts`.
 function getPlanFidelityConfig(): { enabled: boolean; minScore: number; maxAttempts: number } {
-  const rawScore    = Number(process.env.HUMANIZED_PLAN_MIN_SCORE)
+  const rawScore    = Number(process.env.HUMANIZED_PLAN_MIN_INK_SCORE)
   const rawAttempts = Number(process.env.HUMANIZED_PLAN_MAX_ATTEMPTS)
   return {
     enabled:     process.env.HUMANIZED_PLAN_FIDELITY_GATE !== '0',
-    minScore:    Number.isFinite(rawScore) && rawScore > 0 && rawScore < 1 ? rawScore : 0.5,
+    minScore:    Number.isFinite(rawScore) && rawScore > 0 && rawScore < 1 ? rawScore : 0.55,
     maxAttempts: Number.isFinite(rawAttempts) && rawAttempts >= 1 ? Math.min(Math.floor(rawAttempts), 3) : 2,
   }
 }
 
-// ── Apresentar · Planta Humanizada ───────────────────────────────────────────
-//
-// Pipeline (espelha /api/generate):
-//   1. Auth
-//   2. Validar payload + ler engine/resolution do config da ferramenta
-//   3. Debit atômico via `consume_nodes_v2`
-//   4. Upload imagem para Fal.ai
-//   5. Construir prompt fiel via buildHumanizedPlanPrompt
-//   6. fal.subscribe(falEndpoint, ...) com timeout race
-//   7. Insert em `renders` com config_snapshot { tool, ... }
-//   8. Refund best-effort em falha pós-débito
+/** Leitura ligada? Desligar volta ao prompt genérico e tira os rótulos. */
+function planReaderEnabled(): boolean {
+  return process.env.HUMANIZED_PLAN_READER !== '0'
+}
 
-const TOOL = APRESENTAR_TOOLS.humanized_plan
+interface ResolvedSettings {
+  projectType: HumanizedPlanProjectType
+  style:       HumanizedPlanStyle
+  level:       HumanizedPlanLevel
+  options:     HumanizedPlanOptions
+  look:        string | null
+}
 
-// Tipos válidos vindos do client (validação defensiva)
-const VALID_PROJECT_TYPES: HumanizedPlanProjectType[] = ['apartamento','casa','comercial','corporativo','paisagismo']
-const VALID_STYLES:        HumanizedPlanStyle[]       = ['clean_tecnico','imobiliario_premium','editorial_minimalista','aquarelado','contemporaneo']
-const VALID_LEVELS:        HumanizedPlanLevel[]       = ['leve','equilibrado','completo']
+interface RawSettings {
+  look?:        string | null
+  projectType?: string | null
+  style?:       string | null
+  level?:       string | null
+  options?:     HumanizedPlanOptions | null
+}
+
+/**
+ * Resolve as configurações a partir do `look` (web — uma escolha só) ou dos
+ * campos soltos (plugin do SketchUp 1.8.0, que está em produção e não pode
+ * quebrar). O `look` vence quando presente.
+ */
+function resolveSettings(raw: RawSettings): ResolvedSettings | { error: string } {
+  const lookSpec = getHumanizedPlanLook(raw.look)
+  if (raw.look && !lookSpec) return { error: 'Acabamento inválido' }
+
+  // projectType continua aceito (o plugin manda), mas virou apenas o palpite
+  // inicial: quem decide é o leitor de visão, que lê a planta de verdade.
+  const projectType = VALID_PROJECT_TYPES.includes(raw.projectType as HumanizedPlanProjectType)
+    ? raw.projectType as HumanizedPlanProjectType
+    : 'apartamento'
+
+  if (lookSpec) {
+    return { projectType, style: lookSpec.style, level: lookSpec.level, options: lookSpec.options, look: lookSpec.id }
+  }
+
+  // Caminho legado — exige os campos como sempre exigiu.
+  if (!VALID_STYLES.includes(raw.style as HumanizedPlanStyle)) return { error: 'Estilo inválido' }
+  if (!VALID_LEVELS.includes(raw.level as HumanizedPlanLevel)) return { error: 'Nível inválido' }
+
+  return {
+    projectType,
+    style:   raw.style as HumanizedPlanStyle,
+    level:   raw.level as HumanizedPlanLevel,
+    options: raw.options ?? LEGACY_OPTIONS,
+    look:    null,
+  }
+}
 
 export async function POST(req: NextRequest) {
   // getRequestUser em vez do cookie puro: é o mesmo portão do /api/generate e
@@ -82,16 +162,13 @@ export async function POST(req: NextRequest) {
   try {
     // Duas entradas, um pipeline: o site manda multipart com o arquivo; o
     // painel do SketchUp manda JSON com `sourceKey` (a planta já subiu direto
-    // pro Storage, como o /api/generate faz com a captura). Montar multipart
-    // de dentro do Ruby seria escrever boundary e binário na mão.
+    // pro Storage, como o /api/generate faz com a captura).
     const isJson = (req.headers.get('content-type') || '').includes('application/json')
 
-    let imageFile:   File   | null = null
-    let projectType: string | null = null
-    let style:       string | null = null
-    let level:       string | null = null
-    let optionsRaw:  string | null = null
+    let imageFile:  File   | null = null
+    let optionsRaw: string | null = null
     let additionalInstructionsRaw: string | null = null
+    const rawSettings: RawSettings = {}
 
     if (isJson) {
       const body = await req.json().catch(() => null) as Record<string, unknown> | null
@@ -107,19 +184,21 @@ export async function POST(req: NextRequest) {
       )
       if (!src.ok) return NextResponse.json({ error: src.message }, { status: src.status })
 
-      imageFile   = new File([new Uint8Array(src.buffer)], 'planta.png', { type: src.mime })
-      projectType = typeof body.projectType === 'string' ? body.projectType : null
-      style       = typeof body.style       === 'string' ? body.style       : null
-      level       = typeof body.level       === 'string' ? body.level       : null
+      imageFile = new File([new Uint8Array(src.buffer)], 'planta.png', { type: src.mime })
+      rawSettings.look        = typeof body.look        === 'string' ? body.look        : null
+      rawSettings.projectType = typeof body.projectType === 'string' ? body.projectType : null
+      rawSettings.style       = typeof body.style       === 'string' ? body.style       : null
+      rawSettings.level       = typeof body.level       === 'string' ? body.level       : null
       optionsRaw  = body.options && typeof body.options === 'object' ? JSON.stringify(body.options) : null
       additionalInstructionsRaw = typeof body.additionalInstructions === 'string' ? body.additionalInstructions : null
     } else {
       const formData = await req.formData()
-      imageFile   = formData.get('image')       as File   | null
-      projectType = formData.get('projectType') as string | null
-      style       = formData.get('style')       as string | null
-      level       = formData.get('level')       as string | null
-      optionsRaw  = formData.get('options')     as string | null
+      imageFile = formData.get('image') as File | null
+      rawSettings.look        = formData.get('look')        as string | null
+      rawSettings.projectType = formData.get('projectType') as string | null
+      rawSettings.style       = formData.get('style')       as string | null
+      rawSettings.level       = formData.get('level')       as string | null
+      optionsRaw  = formData.get('options') as string | null
       additionalInstructionsRaw = formData.get('additionalInstructions') as string | null
     }
     const additionalInstructions = additionalInstructionsRaw?.trim().slice(0, 400) || null
@@ -128,29 +207,24 @@ export async function POST(req: NextRequest) {
     if (!imageFile) {
       return NextResponse.json({ error: 'Imagem obrigatória' }, { status: 400 })
     }
-    if (!VALID_PROJECT_TYPES.includes(projectType as HumanizedPlanProjectType)) {
-      return NextResponse.json({ error: 'Tipo de projeto inválido' }, { status: 400 })
-    }
-    if (!VALID_STYLES.includes(style as HumanizedPlanStyle)) {
-      return NextResponse.json({ error: 'Estilo inválido' }, { status: 400 })
-    }
-    if (!VALID_LEVELS.includes(level as HumanizedPlanLevel)) {
-      return NextResponse.json({ error: 'Nível inválido' }, { status: 400 })
+    if (optionsRaw) {
+      try {
+        rawSettings.options = JSON.parse(optionsRaw) as HumanizedPlanOptions
+      } catch {
+        return NextResponse.json({ error: 'Opções inválidas' }, { status: 400 })
+      }
     }
 
-    let options: HumanizedPlanOptions
-    try {
-      options = optionsRaw ? JSON.parse(optionsRaw) : {}
-    } catch {
-      return NextResponse.json({ error: 'Opções inválidas' }, { status: 400 })
-    }
+    const resolved = resolveSettings(rawSettings)
+    if ('error' in resolved) return NextResponse.json({ error: resolved.error }, { status: 400 })
+    const { style, level, options, look } = resolved
 
     if (!TOOL.engine || !TOOL.resolution) {
       return NextResponse.json({ error: 'Ferramenta não configurada' }, { status: 500 })
     }
-    const engine     = TOOL.engine     as EngineId
-    const resolution = TOOL.resolution as Resolution
-    nodesToCharge    = getNodesCost(engine, resolution)
+    const engine      = TOOL.engine     as EngineId
+    const resolution  = TOOL.resolution as Resolution
+    nodesToCharge     = getNodesCost(engine, resolution)
     const falEndpoint = getFalEndpoint(engine)
 
     // ── Débito atômico ────────────────────────────────────────────────────────
@@ -170,47 +244,59 @@ export async function POST(req: NextRequest) {
     }
     debited = true
 
-    // ── Geração com gate de fidelidade (retry ladder) ─────────────────────────
-    const promptInput = {
-      projectType: projectType as HumanizedPlanProjectType,
-      style:       style       as HumanizedPlanStyle,
-      level:       level       as HumanizedPlanLevel,
-      options,
-      additionalInstructions,
-    }
-
     inputUrl = await fal.storage.upload(imageFile)
     // Buffer do original direto do upload — sem re-fetch.
     const originalBuffer = Buffer.from(await imageFile.arrayBuffer())
+    const srcMeta = await sharp(originalBuffer).metadata().catch(() => null)
+    const sourceSize = srcMeta?.width && srcMeta?.height
+      ? { width: srcMeta.width, height: srcMeta.height }
+      : null
 
-    console.log('[apresentar/humanized-plan] engine    :', engine, '→', falEndpoint)
-    console.log('[apresentar/humanized-plan] resolution:', resolution, '→', nodesToCharge, 'nodes')
-    console.log('[apresentar/humanized-plan] inputUrl  :', inputUrl)
+    // ── Estágio 1 · leitura da planta ────────────────────────────────────────
+    const readerStartedAt = Date.now()
+    const brief: PlanBrief = planReaderEnabled()
+      ? await readPlan(inputUrl, resolved.projectType)
+      : degradedBrief(resolved.projectType, 'reader desligado (HUMANIZED_PLAN_READER=0)')
+    const readerMs = Date.now() - readerStartedAt
 
-    // Vega (nano-banana-pro/edit): resolution param 1K/2K/4K
-    const resolutionMap: Record<Resolution, string> = { hd: '1K', '2k': '2K', '4k': '4K' }
+    // Só desenhamos rótulo quando temos POSIÇÃO e a planta ainda não traz texto
+    // impresso — dois textos no mesmo lugar é pior que nenhum.
+    const labelsDrawnLocally =
+      !!options.addRoomLabels && !brief.degraded && brief.rooms.length > 0 && !brief.hasPrintedLabels
 
+    console.log(
+      `[apresentar/humanized-plan] engine=${engine} → ${falEndpoint} | ${resolution} → ${nodesToCharge} nodes`
+    )
+    console.log(
+      `[apresentar/humanized-plan:reader] ${readerMs}ms tipo=${brief.projectType} ambientes=${brief.rooms.length} ` +
+      `textoImpresso=${brief.hasPrintedLabels} rotulosLocais=${labelsDrawnLocally}` +
+      (brief.degraded ? ` DEGRADADO(${brief.degradedReason})` : '')
+    )
+
+    // ── Estágios 2 e 3 · geração com portão de tinta ─────────────────────────
     const gate = getPlanFidelityConfig()
     const maxAttempts = gate.enabled ? gate.maxAttempts : 1
+
+    const aspectRatio = nearestSupportedAspectRatio(sourceSize?.width, sourceSize?.height)
+    const baseParams  = falParamsForEngine(engine, resolution, aspectRatio, sourceSize)
 
     let edgeMapUrl: string | null = null
     let prompt = ''
     let best: { gen: GenerateImageResult; prompt: string; score: number | null } | null = null
     const attemptLogs: {
       attempt: number; provider: string; provider_model: string | null
-      temperature: number; edge_map_used: boolean; duration_ms: number
-      geometry: GeometryScoreBreakdown | null; score_error?: string
+      edge_map_used: boolean; duration_ms: number
+      ink: InkScoreBreakdown | null; score_error?: string
     }[] = []
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      const params = getFidelityAttemptParams(attempt)
-
-      // Condicionamento estrutural nos retries: lineart da planta original
-      // anexado como imagem extra (upload único). Falha aqui NUNCA derruba a
-      // geração — segue sem o edge map.
+      // Condicionamento estrutural no retry: lineart da planta original anexado
+      // como imagem extra. Falha aqui NUNCA derruba a geração — segue sem ele.
+      // Custa +US$0,003 (ark) por imagem de entrada além da primeira, por isso
+      // só entra da segunda tentativa em diante.
       let imageUrls = [inputUrl]
       let edgeMapImageIndex: number | null = null
-      if (gate.enabled && params.useEdgeMap) {
+      if (gate.enabled && attempt >= 2) {
         try {
           if (!edgeMapUrl) {
             const edgePng = await buildEdgeMapPng(originalBuffer)
@@ -223,18 +309,16 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      prompt = buildHumanizedPlanPrompt(promptInput, { attempt, edgeMapImageIndex })
+      prompt = buildHumanizedPlanPrompt(
+        { brief, style, level, options, additionalInstructions, labelsDrawnLocally },
+        { attempt, edgeMapImageIndex },
+      )
 
-      const falInput = {
-        prompt,
-        image_urls:    imageUrls,
-        resolution:    resolutionMap[resolution],
-        num_images:    1,
-        output_format: 'jpeg',
-      }
+      // Parâmetros POR MOTOR (lib/ai/engine-params): o Quasar usa `image_size`
+      // e não aceita o `resolution` do Vega. A rota montava o payload do Vega
+      // na mão — era um bug latente esperando a troca de motor.
+      const falInput = { prompt, image_urls: imageUrls, ...baseParams }
 
-      // Camada única de provider (lib/ai/image-provider): GCP/Vertex primário
-      // quando ligado por env, fallback FAL transparente.
       let gen: GenerateImageResult
       try {
         gen = await generateImage({
@@ -243,11 +327,11 @@ export async function POST(req: NextRequest) {
           timeoutMs: FAL_TIMEOUT_MS,
           context:   attempt === 1 ? 'apresentar/humanized-plan' : `apresentar/humanized-plan#${attempt}`,
           deliver:   { kind: 'url', userId: user.id, area: 'apresentar' },
-          gcpConfig: { temperature: params.temperature },
+          gcpConfig: { temperature: 0.2 },
         })
       } catch (genErr) {
         // Retry é best-effort: com imagem válida de tentativa anterior, falha
-        // aqui não pode virar erro+refund pro usuário.
+        // aqui não pode virar erro+estorno pro usuário.
         if (attempt === 1 || !best) throw genErr
         console.warn(`[apresentar/humanized-plan] retry ${attempt} falhou — entregando a melhor tentativa anterior`)
         break
@@ -259,15 +343,15 @@ export async function POST(req: NextRequest) {
 
       // Validação estrutural pós-geração — nunca derruba a request: falha no
       // score vira log e a imagem é entregue.
-      let geometry: GeometryScoreBreakdown | null = null
+      let ink: InkScoreBreakdown | null = null
       let scoreError: string | undefined
       if (gate.enabled) {
         try {
           const generatedBuffer = await fetchStorageBuffer(gen.images[0].url)
-          geometry = await computeGeometryScore(originalBuffer, generatedBuffer)
+          ink = await computeInkScore(originalBuffer, generatedBuffer)
         } catch (scoreErr) {
           scoreError = (scoreErr as Error).message
-          console.warn('[apresentar/humanized-plan] geometry score indisponível:', scoreError)
+          console.warn('[apresentar/humanized-plan] ink score indisponível:', scoreError)
         }
       }
 
@@ -275,24 +359,27 @@ export async function POST(req: NextRequest) {
         attempt,
         provider:       gen.provider,
         provider_model: gen.providerModel,
-        temperature:    params.temperature,
         edge_map_used:  edgeMapImageIndex !== null,
         duration_ms:    gen.latencyMs,
-        geometry,
+        ink,
         ...(scoreError ? { score_error: scoreError } : {}),
       })
 
       console.log(
         `[apresentar/humanized-plan:fidelity] attempt=${attempt}/${maxAttempts} provider=${gen.provider} ` +
-        `temp=${params.temperature} edgeMap=${edgeMapImageIndex !== null} ` +
-        `score=${geometry ? geometry.score.toFixed(3) : 'n/a'} min=${gate.enabled ? gate.minScore.toFixed(2) : 'off'}`
+        `edgeMap=${edgeMapImageIndex !== null} score=${ink ? ink.score.toFixed(3) : 'n/a'} ` +
+        `(line=${ink ? ink.lineRecall.toFixed(3) : '—'} worst=${ink ? ink.worstRegionRecall.toFixed(3) : '—'}) ` +
+        `min=${gate.enabled ? gate.minScore.toFixed(2) : 'off'}`
       )
 
-      if (!best || (geometry?.score ?? -1) > (best.score ?? -1)) {
-        best = { gen, prompt, score: geometry?.score ?? null }
+      if (!best || (ink?.score ?? -1) > (best.score ?? -1)) {
+        best = { gen, prompt, score: ink?.score ?? null }
       }
 
-      const passed = !gate.enabled || geometry === null || geometry.score >= gate.minScore
+      // `ink === null` = o original não é desenho de traço (foto, render). Não
+      // há o que preservar: entrega sem retry, em vez de cobrar duas gerações
+      // por uma régua que não se aplica àquela entrada.
+      const passed = !gate.enabled || ink === null || ink.score >= gate.minScore
       if (passed) break
       if (attempt >= maxAttempts) {
         console.warn(`[apresentar/humanized-plan:fidelity] score abaixo do limite após ${attempt} tentativas — entregando a melhor (score=${best.score?.toFixed(3) ?? 'n/a'})`)
@@ -312,11 +399,21 @@ export async function POST(req: NextRequest) {
     const configSnapshot = {
       tool:        TOOL.id,
       module:      'apresentar',
-      projectType,
+      look,
+      projectType: brief.projectType,
       style,
       level,
       options,
       additionalInstructions,
+      plan_brief: {
+        rooms:                brief.rooms,
+        has_outdoor:          brief.hasOutdoor,
+        has_printed_labels:   brief.hasPrintedLabels,
+        degraded:             brief.degraded,
+        degraded_reason:      brief.degradedReason ?? null,
+        reader_ms:            readerMs,
+        labels_drawn_locally: labelsDrawnLocally,
+      },
       generation: {
         provider:       gen.provider,
         provider_model: gen.providerModel,
@@ -324,12 +421,15 @@ export async function POST(req: NextRequest) {
         provider_error: gen.errorMessage,
         latency_ms:     gen.latencyMs,
       },
-      // Observabilidade do gate de fidelidade da planta (attempts + scores).
+      // Observabilidade do portão de tinta (tentativas + scores). É esta série
+      // que calibra HUMANIZED_PLAN_MIN_INK_SCORE com dado real, em vez de
+      // chute — foi exatamente o que faltou no gate anterior.
       fidelity: {
-        gate_enabled:  getPlanFidelityConfig().enabled,
-        min_score:     getPlanFidelityConfig().minScore,
-        final_score:   best.score,
-        attempts:      attemptLogs,
+        metric:       'ink_score_v1',
+        gate_enabled: gate.enabled,
+        min_score:    gate.minScore,
+        final_score:  best.score,
+        attempts:     attemptLogs,
       },
     }
 
@@ -377,10 +477,15 @@ export async function POST(req: NextRequest) {
       extraBalance:     balance?.lumen_balance ?? 0,
       nodesCharged:     nodesToCharge,
       prompt,
+      // O cliente desenha os rótulos a partir daqui. Lista vazia = a planta já
+      // vinha com texto, o usuário desligou, ou a leitura degradou (e aí o
+      // próprio modelo escreveu).
+      rooms:            labelsDrawnLocally ? brief.rooms : [],
+      projectType:      brief.projectType,
     })
 
   } catch (err: unknown) {
-    // ── Refund best-effort ────────────────────────────────────────────────────
+    // ── Estorno best-effort ───────────────────────────────────────────────────
     if (debited && nodesToCharge > 0) {
       await refundNodes(admin, user.id, nodesToCharge, { module: 'apresentar/humanized-plan' })
     }
