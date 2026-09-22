@@ -278,7 +278,13 @@ export async function POST(req: NextRequest) {
     const maxAttempts = gate.enabled ? gate.maxAttempts : 1
 
     const aspectRatio = nearestSupportedAspectRatio(sourceSize?.width, sourceSize?.height)
-    const baseParams  = falParamsForEngine(engine, resolution, aspectRatio, sourceSize)
+    // `forceCheapTier`: a faixa barata do Seedream é pedida AQUI, não pela env
+    // global. `SEEDREAM_CHEAP_TIER` vale para todo o Quasar, que é o motor
+    // padrão do Renderizar — ligá-la para fechar a margem desta ferramenta
+    // encolheria toda imagem do Renderizar de ~4,2 MP para ~2,36 MP. Numa
+    // planta de apresentação 2,36 MP sobra; num render que o cliente amplia,
+    // não. Assim os 83% de margem no piso não dependem de env nenhuma.
+    const baseParams  = falParamsForEngine(engine, resolution, aspectRatio, sourceSize, { forceCheapTier: true })
 
     let edgeMapUrl: string | null = null
     let prompt = ''

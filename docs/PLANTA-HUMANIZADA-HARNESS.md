@@ -77,7 +77,8 @@ Quase tudo derivável da própria planta.
 | 3. **Portão de tinta** — black-hat morfológico + recall local; só então decide retry | `lib/ai/fidelity/ink-score.ts` | US$ 0 |
 | 4. **Rótulos vetoriais** — compostos no cliente nas posições do estágio 1, com a Geist embutida no PNG | `lib/apresentar/plan-labels.ts` | US$ 0 |
 
-**Total ~US$ 0,047 → 82,6% no piso, 87% no Studio**, a 20 nodes, sem mexer no preço.
+**Total ~US$ 0,047 → 82,6% no piso, 87% no Studio**, a 20 nodes, sem mexer no preço
+e sem depender de env nenhuma.
 
 O estágio 1 nunca derruba a geração: falha de visão vira brief `degraded` e o
 pipeline segue com o prompt genérico antigo (e aí, se o usuário pediu nomes, é o
@@ -100,10 +101,20 @@ era 0,08 — pior que a do geometry score. Com ele, passa de 0,5.
 
 ## 3. Envs
 
+A faixa barata do Seedream **não depende de env**: a rota pede por argumento
+(`falParamsForEngine(..., { forceCheapTier: true })`).
+
+Isso é deliberado. `SEEDREAM_CHEAP_TIER` é global e o Quasar é o motor **padrão
+do Renderizar** — ligar a env para fechar a margem desta ferramenta encolheria
+toda imagem do Renderizar de ~4,2 MP para ~2,36 MP (57% dos pixels), como efeito
+colateral invisível. Numa planta de apresentação 2,36 MP sobra; num render que o
+cliente amplia, não. O escopo está travado em
+`tests/apresentar/engine-params-cheap-tier.test.ts`.
+
 | env | default | efeito |
 |---|---|---|
-| `SEEDREAM_CHEAP_TIER` | *(off)* | **Precisa ser `1`.** Sem ela o pedido vai em `auto_2K` e o custo dobra (US$ 0,09): a margem no piso cai de 83% para 67%. |
 | `SEEDREAM_ROUTE` | `fal` | `ark` usa a ModelArk (mais barata e mais rápida). Já em prod. |
+| `SEEDREAM_CHEAP_TIER` | *(off)* | Global, para todo o Quasar. A Planta Humanizada **não precisa dela**. |
 | `HUMANIZED_PLAN_READER` | ligado | `0` desliga o estágio 1 (volta ao prompt genérico, sem rótulos). |
 | `HUMANIZED_PLAN_FIDELITY_GATE` | ligado | `0` desliga validação e retry. |
 | `HUMANIZED_PLAN_MIN_INK_SCORE` | `0.55` | Limite do portão de tinta. |
@@ -128,7 +139,6 @@ caminho novo para manter.
 - **Smoke pago logado** em `/app/apresentar/planta-humanizada` com plantas reais.
   Nada passou pela rota autenticada (débito `consume_workspace_nodes`, insert em
   `renders`) em nenhum ambiente.
-- **`SEEDREAM_CHEAP_TIER=1` na Vercel** — sem isso a margem alvo não é atingida.
 - **Bench comparativo** Quasar × Vega × Pulsar × Orion com plantas reais:
   `tests/fidelity/bench.test.ts` já roda as células; falta um caminho que use o
   ink score no lugar do geometry score para material de traço.
