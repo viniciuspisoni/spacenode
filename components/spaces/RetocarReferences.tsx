@@ -111,7 +111,7 @@ export function ReferencesPanel({ references, onAdd, onRemove, onClearAll, prima
           <div key={ref.id} style={{
             display: 'flex', gap: 8, alignItems: 'center', padding: 8,
             background: 'var(--color-bg)',
-            border: isPrimary ? '1px solid var(--color-accent-green-border)' : '0.5px solid var(--color-border)',
+            border: isPrimary ? '1px solid var(--color-accent-border)' : '0.5px solid var(--color-border)',
             borderRadius: 8,
           }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -124,7 +124,7 @@ export function ReferencesPanel({ references, onAdd, onRemove, onClearAll, prima
                 </span>
                 <span style={{
                   fontSize: 8.5, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase',
-                  color: 'var(--color-accent-green)', background: 'var(--color-accent-green-bg)',
+                  color: 'var(--color-accent)', background: 'var(--color-accent-bg)',
                   padding: '1px 5px', borderRadius: 4, whiteSpace: 'nowrap',
                 }}>
                   {isPrimary ? '● ativa · principal' : '● ativa'}

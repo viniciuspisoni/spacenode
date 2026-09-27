@@ -84,7 +84,7 @@ export function MetricsIngestForm() {
 
       {result && (
         <div className="mt-2 space-y-1 text-xs">
-          <p className={result.upserted > 0 ? 'text-accent-green' : 'text-text-secondary'}>
+          <p className={result.upserted > 0 ? 'text-accent' : 'text-text-secondary'}>
             {result.upserted} linha{result.upserted === 1 ? '' : 's'} importada{result.upserted === 1 ? '' : 's'}.
           </p>
           {result.errors.length > 0 && (

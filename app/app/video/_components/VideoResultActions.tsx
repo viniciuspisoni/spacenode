@@ -81,11 +81,11 @@ export default function VideoResultActions({
           <span style={{
             width: 18, height: 18, borderRadius: '50%',
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            background: 'var(--color-accent-green-bg)',
-            border: '1px solid var(--color-accent-green-border)',
+            background: 'var(--color-accent-bg)',
+            border: '1px solid var(--color-accent-border)',
           }}>
             <svg width="10" height="10" viewBox="0 0 16 16" fill="none"
-              stroke="var(--color-accent-green)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              stroke="var(--color-accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 8.5 L6.5 12 L13 4.5"/>
             </svg>
           </span>

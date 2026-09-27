@@ -7,7 +7,7 @@ import Link from 'next/link'
 import type { ArchitectIdentity, AccentColorMode } from '@/lib/spaces/types'
 import type { PlanId } from '@/lib/plans'
 
-const ACCENT_PRESETS = ['#1D9E75', '#2A4877', '#A33D3D', '#BA7517', '#5B5B5B', '#C2865B']
+const ACCENT_PRESETS = ['#BDC2C8', '#2A4877', '#A33D3D', '#BA7517', '#5B5B5B', '#C2865B', '#1D9E75']
 
 interface Props {
   initialIdentity:    ArchitectIdentity | null
@@ -104,7 +104,7 @@ export function IdentityEditor({ initialIdentity, planName, whiteLabelAllowed }:
   }
 
   // Preview accent (modo "derived" mostra default verde como exemplo)
-  const previewAccent = accentMode === 'fixed' ? accentFixed : 'var(--color-accent-green)'
+  const previewAccent = accentMode === 'fixed' ? accentFixed : 'var(--color-accent)'
 
   return (
     <div style={{ maxWidth: 980, margin: '0 auto', padding: '40px 32px 80px' }}>

@@ -60,10 +60,10 @@ export default function Topbar({ credits }: TopbarProps) {
           width: 5,
           height: 5,
           borderRadius: '50%',
-          background: lowNodes ? 'var(--color-error)' : 'var(--color-accent-green)',
+          background: lowNodes ? 'var(--color-error)' : 'var(--color-accent)',
           boxShadow: lowNodes
             ? '0 0 6px var(--color-error-border)'
-            : '0 0 6px var(--color-accent-green-glow)',
+            : '0 0 6px var(--color-accent-glow)',
           flexShrink: 0,
           display: 'inline-block',
         }} />

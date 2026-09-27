@@ -131,10 +131,10 @@ function OriginCard({
         position: 'relative',
         padding: '24px 22px',
         background: recommended
-          ? 'var(--color-accent-green-bg)'
+          ? 'var(--color-accent-bg)'
           : 'var(--color-bg-elevated)',
         border: recommended
-          ? '0.5px solid var(--color-accent-green-border)'
+          ? '0.5px solid var(--color-accent-border)'
           : '0.5px solid var(--color-border-strong)',
         borderRadius: 14,
         display: 'flex', flexDirection: 'column', gap: 14,
@@ -149,7 +149,7 @@ function OriginCard({
         <span style={{
           position: 'absolute', top: 12, right: 12,
           fontSize: 9, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase',
-          color: 'var(--color-accent-green)', background: 'var(--color-accent-green-bg)',
+          color: 'var(--color-accent)', background: 'var(--color-accent-bg)',
           padding: '4px 8px', borderRadius: 4,
         }}>
           ✦ recomendado
@@ -159,8 +159,8 @@ function OriginCard({
       <span style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         width: 44, height: 44, borderRadius: 11,
-        background: recommended ? 'var(--color-accent-green-bg)' : 'var(--color-surface)',
-        color: recommended ? 'var(--color-accent-green)' : 'var(--color-text-secondary)',
+        background: recommended ? 'var(--color-accent-bg)' : 'var(--color-surface)',
+        color: recommended ? 'var(--color-accent)' : 'var(--color-text-secondary)',
       }}>
         {icon}
       </span>
@@ -200,12 +200,12 @@ function OriginCard({
         }}>
           <span style={{
             fontSize: 10, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase',
-            color: recommended ? 'var(--color-accent-green)' : 'var(--color-text-quaternary)',
+            color: recommended ? 'var(--color-accent)' : 'var(--color-text-quaternary)',
           }}>
             {footer}
           </span>
           <span style={{
-            color: recommended ? 'var(--color-accent-green)' : 'var(--color-text-secondary)',
+            color: recommended ? 'var(--color-accent)' : 'var(--color-text-secondary)',
             fontSize: 14,
           }}>→</span>
         </div>

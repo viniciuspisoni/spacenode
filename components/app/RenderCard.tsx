@@ -15,8 +15,8 @@ export default function RenderCard({ render }: { render: RenderJob }) {
           style={{ textShadow: '0 1px 2px rgba(0,0,0,0.35)' }}
         >
           <span
-            className="w-[5px] h-[5px] rounded-full bg-[var(--color-accent-green)] shrink-0"
-            style={{ boxShadow: '0 0 4px var(--color-accent-green-glow)' }}
+            className="w-[5px] h-[5px] rounded-full bg-[var(--color-accent)] shrink-0"
+            style={{ boxShadow: '0 0 4px var(--color-accent-glow)' }}
           />
           pronto
         </span>

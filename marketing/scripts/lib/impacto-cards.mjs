@@ -55,7 +55,7 @@ const css = (band) => `
 }
 .eyebrow {
   font-size: 26px; font-weight: 500; text-transform: uppercase;
-  letter-spacing: 0.16em; color: #A1A1A6;
+  letter-spacing: 0.16em; color: #bdc2c8;
 }
 .payoff { font-size: 44px; font-weight: 500; letter-spacing: -0.015em; }
 `;
@@ -98,7 +98,7 @@ export function buildCards(roteiro, band) {
           gap: 44px;
         }
         .final svg { width: 460px; height: auto; }
-        .final .url { font-size: 34px; font-weight: 400; letter-spacing: 0.02em; color: #A1A1A6; }`,
+        .final .url { font-size: 34px; font-weight: 400; letter-spacing: 0.02em; color: #bdc2c8; }`,
       body: `<div class="final">${logoSvg()}<div class="url">spacenode.app</div></div>`,
     }),
   };

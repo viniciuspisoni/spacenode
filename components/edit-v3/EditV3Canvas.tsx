@@ -278,7 +278,7 @@ export const EditV3Canvas = forwardRef<EditV3CanvasHandle, Props>(
           }
           paintShapes(lctx, all, toDisplay, t.scale)
           lctx.globalCompositeOperation = 'source-in'
-          lctx.fillStyle = '#30d158'
+          lctx.fillStyle = '#ffffff'
           lctx.fillRect(0, 0, layer.width, layer.height)
           ctx.globalAlpha = 0.42
           ctx.drawImage(layer, 0, 0)
@@ -289,7 +289,7 @@ export const EditV3Canvas = forwardRef<EditV3CanvasHandle, Props>(
       const poly = polyRef.current
       if (poly && poly.points.length > 0) {
         ctx.save()
-        ctx.strokeStyle = 'rgba(48,209,88,0.95)'
+        ctx.strokeStyle = 'rgba(255,255,255,0.95)'
         ctx.lineWidth = 1.5
         ctx.setLineDash([5, 4])
         ctx.beginPath()
@@ -306,7 +306,7 @@ export const EditV3Canvas = forwardRef<EditV3CanvasHandle, Props>(
           const q = toDisplay(p.x, p.y)
           ctx.beginPath()
           ctx.arc(q.x, q.y, i === 0 ? 5 : 3.5, 0, Math.PI * 2)
-          ctx.fillStyle = i === 0 ? '#30d158' : 'rgba(255,255,255,0.92)'
+          ctx.fillStyle = i === 0 ? '#ffffff' : 'rgba(255,255,255,0.92)'
           ctx.fill()
         })
         ctx.restore()
@@ -316,7 +316,7 @@ export const EditV3Canvas = forwardRef<EditV3CanvasHandle, Props>(
       if (cur && isStrokeTool && !disabled) {
         ctx.beginPath()
         ctx.arc(cur.x, cur.y, brushSize / 2, 0, Math.PI * 2)
-        ctx.strokeStyle = active === 'eraser' ? 'rgba(255,255,255,0.9)' : 'rgba(48,209,88,0.95)'
+        ctx.strokeStyle = active === 'eraser' ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.95)'
         ctx.lineWidth = 1.5
         ctx.stroke()
       }

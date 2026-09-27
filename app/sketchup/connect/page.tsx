@@ -92,14 +92,14 @@ function SketchUpConnectInner() {
     <main style={S.main}>
       <section style={S.panel}>
         <div style={S.brand}>
-          <Brandmark variant="horizontal" size={26} color="#f5f5f7" accent />
+          <Brandmark variant="horizontal" size={26} tone="reverse" />
         </div>
 
         <div style={S.statusDotWrap}>
           <span style={{
             ...S.statusDot,
-            background: signedIn ? '#30d158' : state === 'signed-out' ? '#d4a327' : '#6e6e73',
-            boxShadow: signedIn ? '0 0 18px rgba(48,209,88,0.38)' : 'none',
+            background: signedIn ? '#ffffff' : state === 'signed-out' ? '#d4a327' : '#6e6e73',
+            boxShadow: signedIn ? '0 0 18px rgba(255,255,255,0.38)' : 'none',
           }} />
         </div>
 

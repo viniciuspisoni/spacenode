@@ -102,7 +102,7 @@ export function TeamManager({ members, invites }: Props) {
 
         {link && (
           <div style={{ marginTop: 14 }}>
-            <div style={{ fontSize: 12, color: emailed ? 'var(--color-accent-green)' : 'var(--color-text-tertiary)', marginBottom: 8 }}>
+            <div style={{ fontSize: 12, color: emailed ? 'var(--color-accent)' : 'var(--color-text-tertiary)', marginBottom: 8 }}>
               {emailed
                 ? '✓ Convite enviado por email. O link abaixo também funciona, se quiser enviar manualmente.'
                 : 'Link gerado — envie para a pessoa (WhatsApp, email…). Só o email convidado consegue aceitar.'}

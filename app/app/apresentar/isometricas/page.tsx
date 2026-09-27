@@ -5,7 +5,7 @@ import { getPayerBalance } from '@/lib/workspaces/balance'
 import IsometricasClient from './IsometricasClient'
 
 export const metadata = {
-  title: 'Isométricas — Spacenode',
+  title: 'Isométricas — SpaceNode',
 }
 
 export default async function IsometricasPage() {

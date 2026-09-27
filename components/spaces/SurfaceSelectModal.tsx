@@ -210,14 +210,14 @@ export function SurfaceSelectionBar({ selection, onOpen, onClear, disabled }: {
         style={{
           display: 'flex', alignItems: 'center', gap: 10,
           padding: '10px 12px', borderRadius: 'var(--r-inner)', width: '100%',
-          background: 'var(--color-accent-green-bg)',
-          border: '0.5px dashed var(--color-accent-green-border)',
+          background: 'var(--color-accent-bg)',
+          border: '0.5px dashed var(--color-accent-border)',
           color: 'var(--color-text-primary)', fontSize: 12, fontWeight: 500,
           letterSpacing: '-0.005em', cursor: disabled ? 'not-allowed' : 'pointer',
           fontFamily: 'inherit', textAlign: 'left', opacity: disabled ? 0.5 : 1,
         }}
       >
-        <span aria-hidden style={{ fontSize: 14, color: 'var(--color-accent-green)' }}>⊙</span>
+        <span aria-hidden style={{ fontSize: 14, color: 'var(--color-accent)' }}>⊙</span>
         <span style={{ flex: 1 }}>
           Selecionar superfície com 1 clique
           <span style={{ display: 'block', fontSize: 10.5, fontWeight: 400, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
@@ -231,8 +231,8 @@ export function SurfaceSelectionBar({ selection, onOpen, onClear, disabled }: {
     <div style={{
       display: 'flex', alignItems: 'center', gap: 10,
       padding: 8, borderRadius: 'var(--r-inner)',
-      background: 'var(--color-accent-green-bg)',
-      border: '0.5px solid var(--color-accent-green-border)',
+      background: 'var(--color-accent-bg)',
+      border: '0.5px solid var(--color-accent-border)',
     }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img

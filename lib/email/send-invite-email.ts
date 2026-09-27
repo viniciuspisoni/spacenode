@@ -7,7 +7,7 @@
 //
 // Env vars:
 //   RESEND_API_KEY  — chave da conta Resend (obrigatória pra enviar de verdade)
-//   RESEND_FROM     — remetente verificado, ex: "Spacenode <equipe@seudominio.com>"
+//   RESEND_FROM     — remetente verificado, ex: "SpaceNode <equipe@seudominio.com>"
 //                     Sem domínio verificado, o padrão "onboarding@resend.dev" só
 //                     entrega para o email DONO da conta Resend (modo de teste).
 
@@ -22,31 +22,31 @@ export async function sendInviteEmail(args: SendInviteArgs): Promise<{ sent: boo
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) return { sent: false, reason: 'no_api_key' }
 
-  const from = process.env.RESEND_FROM || 'Spacenode <onboarding@resend.dev>'
+  const from = process.env.RESEND_FROM || 'SpaceNode <onboarding@resend.dev>'
   const roleLabel = args.role === 'admin' ? 'administrador' : 'membro'
   const ws = escapeHtml(args.workspaceName)
   const url = escapeHtml(args.inviteUrl)
 
   const html = `
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0;padding:0;background:#f4f4f5;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0;padding:0;background:#f7f7f5;">
     <tr>
       <td align="center" style="padding:32px 16px;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
-        <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background:#ffffff;border:1px solid #e7e7ea;border-radius:16px;overflow:hidden;">
+        <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background:#ffffff;border:1px solid #e8e9e7;border-radius:16px;overflow:hidden;">
           <tr>
-            <td style="background:#0a0a0a;padding:22px 28px;">
-              <span style="color:#ffffff;font-size:20px;font-weight:600;letter-spacing:-0.02em;">spacenode</span><span style="display:inline-block;width:5px;height:5px;border-radius:1px;background:#30b46c;margin-left:3px;vertical-align:baseline;"></span>
+            <td style="background:#151618;padding:22px 28px;">
+              <img src="https://spacenode.app/brand/spacenode-logo-horizontal.png" width="176" height="32" alt="SpaceNode" style="display:block;border:0;max-width:100%;height:auto;">
             </td>
           </tr>
           <tr>
             <td style="padding:34px 28px 28px;">
-              <h1 style="margin:0 0 12px;font-size:21px;font-weight:600;color:#111111;letter-spacing:-0.02em;">Convite para ${ws}</h1>
-              <p style="margin:0 0 26px;font-size:14px;line-height:1.65;color:#52525b;">
-                Você foi convidado para participar do workspace <b style="color:#111111;">${ws}</b> no Spacenode como <b style="color:#111111;">${roleLabel}</b>.
+              <h1 style="margin:0 0 12px;font-size:21px;font-weight:500;color:#151618;letter-spacing:-0.02em;">Convite para ${ws}</h1>
+              <p style="margin:0 0 26px;font-size:14px;line-height:1.65;color:#60646b;">
+                Você foi convidado para participar do espaço <b style="color:#151618;">${ws}</b> na SpaceNode como <b style="color:#151618;">${roleLabel}</b>.
               </p>
               <table role="presentation" cellpadding="0" cellspacing="0">
                 <tr>
-                  <td style="border-radius:9px;background:#30b46c;">
-                    <a href="${url}" style="display:inline-block;padding:12px 26px;font-size:14px;font-weight:600;color:#06140d;text-decoration:none;border-radius:9px;">Aceitar convite</a>
+                  <td style="border-radius:9px;background:#151618;">
+                    <a href="${url}" style="display:inline-block;padding:12px 26px;font-size:14px;font-weight:500;color:#ffffff;text-decoration:none;border-radius:9px;">Aceitar convite</a>
                   </td>
                 </tr>
               </table>
@@ -57,8 +57,8 @@ export async function sendInviteEmail(args: SendInviteArgs): Promise<{ sent: boo
             </td>
           </tr>
           <tr>
-            <td style="padding:18px 28px;border-top:1px solid #e7e7ea;background:#fafafa;">
-              <span style="font-size:11px;color:#a1a1aa;">Spacenode · O hub criativo para arquitetos e designers de interiores</span>
+            <td style="padding:18px 28px;border-top:1px solid #e8e9e7;background:#f7f7f5;">
+              <span style="font-size:11px;color:#60646b;">SpaceNode · Visualize seus projetos.</span>
             </td>
           </tr>
         </table>
@@ -73,7 +73,7 @@ export async function sendInviteEmail(args: SendInviteArgs): Promise<{ sent: boo
       body:    JSON.stringify({
         from,
         to:      [args.to],
-        subject: `Convite para ${args.workspaceName} no Spacenode`,
+        subject: `Convite para ${args.workspaceName} na SpaceNode`,
         html,
       }),
     })

@@ -9,14 +9,14 @@ import {
 } from '@/lib/apresentar/config'
 
 export const metadata = {
-  title: 'Apresentar — Spacenode',
+  title: 'Apresentar — SpaceNode',
 }
 
 // Status é ESTADO, não ação: vira um ponto colorido num chip neutro, e não um
 // bloco de cor por cartão. Verde continua reservado a estado (ver o contrato
 // em docs/VIDRO-NO-APP.md, §2.3).
 const STATUS_TONE: Record<ApresentarStatus, { label: string; dot: string }> = {
-  'novo':     { label: 'Novo',     dot: 'var(--color-accent-green)' },
+  'novo':     { label: 'Novo',     dot: 'var(--color-accent)' },
   'beta':     { label: 'Beta',     dot: 'var(--color-warning)' },
   'em-breve': { label: 'Em breve', dot: 'var(--color-text-quaternary)' },
 }

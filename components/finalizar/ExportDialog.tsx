@@ -203,7 +203,7 @@ export function ExportDialog({
               checked={batchSel.size > 0}
               onChange={(e) => setBatchSel(e.target.checked ? new Set(OUTPUT_PRESETS.map((p) => p.id)) : new Set())}
               disabled={busy}
-              style={{ accentColor: 'var(--color-accent-green)', flexShrink: 0 }}
+              style={{ accentColor: 'var(--color-accent)', flexShrink: 0 }}
             />
             <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
               Exportar em lote — marque as predefinições desejadas acima
@@ -305,7 +305,7 @@ export function ExportDialog({
               checked={saveChecked}
               onChange={(e) => setSaveChecked(e.target.checked)}
               disabled={busy}
-              style={{ accentColor: 'var(--color-accent-green)', marginTop: 2, flexShrink: 0 }}
+              style={{ accentColor: 'var(--color-accent)', marginTop: 2, flexShrink: 0 }}
             />
             <span>
               <span style={{ display: 'block', fontSize: 13, color: 'var(--color-text-primary)' }}>

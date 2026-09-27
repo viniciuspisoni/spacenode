@@ -543,7 +543,7 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
                     display: 'flex', flexDirection: 'column', gap: 6,
                   }}>
                     <span style={{ fontWeight: 500 }}>A edição foi rejeitada para preservar sua imagem.</span>
-                    <span style={{ fontSize: 11, color: 'var(--color-accent-green)' }}>Nenhum node foi consumido.</span>
+                    <span style={{ fontSize: 11, color: 'var(--color-accent)' }}>Nenhum node foi consumido.</span>
                     {references.length > 0 && (
                       <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
                         Dica: aumente um pouco a máscara ao redor do objeto para dar mais contexto.
@@ -644,7 +644,7 @@ export function RetocarOverlay({ space, vista, dna, balance, onClose }: Props) {
                 <input
                   type="range" min={BRUSH_MIN} max={BRUSH_MAX} value={brush}
                   onChange={e => setBrush(Number(e.target.value))}
-                  style={{ width: '100%', accentColor: 'var(--color-accent-green)' }}
+                  style={{ width: '100%', accentColor: 'var(--color-accent)' }}
                 />
               </div>
 

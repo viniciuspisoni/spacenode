@@ -122,8 +122,8 @@ export default function FinalCTA() {
           width: 5px;
           height: 5px;
           border-radius: 50%;
-          background: var(--color-accent-green);
-          box-shadow: 0 0 8px var(--color-accent-green-glow);
+          background: var(--color-accent);
+          box-shadow: 0 0 8px var(--color-accent-glow);
         }
         .spn-final-title {
           font-size: clamp(28px, 4.6vw, 44px);

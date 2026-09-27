@@ -7,9 +7,7 @@ import Image, { type StaticImageData } from 'next/image'
 // (grande, com teclado) e na Gallery (pequeno, só ponteiro); aqui é um só,
 // e o tamanho é só uma variante.
 //
-// A `base` leva um tratamento leve (contraste/saturação/blur de 0.4px)
-// para ler como MODELO e não como foto: sem isso, em miniatura, os dois
-// lados parecem dois renders e a comparação perde o argumento.
+// As imagens são exibidas sem filtros para manter a comparação fiel ao par.
 //
 // As props são `base`/`render`, não before/after: no acervo antigo os pares
 // casa e comercial estão trocados no disco (o "-before" deles é o render) e
@@ -79,7 +77,6 @@ export function BeforeAfter({
         style={{
           objectFit: 'cover',
           pointerEvents: 'none',
-          filter: 'contrast(0.9) saturate(0.9) brightness(0.95) blur(0.4px)',
         }}
       />
       <Image
@@ -93,7 +90,6 @@ export function BeforeAfter({
           objectFit: 'cover',
           pointerEvents: 'none',
           clipPath: `inset(0 0 0 ${pos}%)`,
-          filter: 'contrast(1.05) saturate(1.05)',
         }}
       />
 

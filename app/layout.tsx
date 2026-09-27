@@ -21,9 +21,10 @@ const geist = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "SpaceNode · Visualização arquitetônica com IA que respeita seu projeto",
+  metadataBase: new URL("https://spacenode.app"),
+  title: "SpaceNode · Visualize seus projetos",
   description:
-    "Renderize projetos reais preservando geometria, proporções e perspectiva. Visualização arquitetônica com IA para arquitetos e designers de interiores — do estudo ao material de apresentação.",
+    "Renderize, explore e apresente projetos de arquitetura e interiores em um só lugar. Ferramentas de visualização desenvolvidas para respeitar a intenção de quem projeta.",
   keywords: [
     "render arquitetura",
     "IA para arquitetura",
@@ -36,9 +37,9 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "SpaceNode" }],
   openGraph: {
-    title: "SpaceNode · Visualização arquitetônica que respeita seu projeto",
+    title: "SpaceNode · Visualize seus projetos",
     description:
-      "Renderize projetos reais preservando geometria, proporções e perspectiva. Para arquitetos e designers de interiores.",
+      "Renderize, explore e apresente projetos de arquitetura e interiores em um só lugar.",
     url: "https://spacenode.app",
     siteName: "SpaceNode",
     locale: "pt_BR",
@@ -46,9 +47,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "SpaceNode · Visualização arquitetônica que respeita seu projeto",
+    title: "SpaceNode · Visualize seus projetos",
     description:
-      "Renderize projetos reais preservando geometria, proporções e perspectiva. Para arquitetos e designers de interiores.",
+      "Renderize, explore e apresente projetos de arquitetura e interiores em um só lugar.",
   },
   robots: {
     index: true,
@@ -57,7 +58,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#1a1a1a",
+  themeColor: "#151618",
 };
 
 export default function RootLayout({

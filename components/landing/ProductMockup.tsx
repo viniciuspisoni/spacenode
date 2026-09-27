@@ -1,5 +1,6 @@
 import React from 'react'
 import Image from 'next/image'
+import { StructuralN } from '@/components/brand'
 
 // ── Ícones — mesmo desenho de components/app/sidebar-icons.tsx, em escala
 //    de mockup (viewBox 24×24, stroke 1.5, terminações arredondadas) ─────────
@@ -77,32 +78,20 @@ const IconFinalizar = (p: IconProps = {}) => (
   </SVG>
 )
 
-// Marca — ConstellationN original, monocromático (a versão com nó de acento
-// verde foi aposentada; traço mais grosso que o oficial só pela legibilidade
-// nesta escala de miniatura)
+// Símbolo oficial da SpaceNode na versão micro.
 const Logo = ({ size = 14 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 64 64" aria-label="spacenode">
-    <g stroke="#fafafa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none">
-      <line x1="16" y1="16" x2="16" y2="48"/>
-      <line x1="16" y1="16" x2="48" y2="48"/>
-      <line x1="48" y1="16" x2="48" y2="48"/>
-    </g>
-    <circle cx="16" cy="16" r="4" fill="#fafafa"/>
-    <circle cx="16" cy="48" r="4" fill="#fafafa"/>
-    <circle cx="48" cy="48" r="4" fill="#fafafa"/>
-    <circle cx="48" cy="16" r="4" fill="#fafafa"/>
-  </svg>
+  <StructuralN size={size} color="#FFFFFF" aria-hidden />
 )
 
 // ── Bits compartilhados ────────────────────────────────────────────────────────
 
 const hairline = '0.5px solid rgba(255,255,255,0.07)'
 
-function GreenDot({ size = 5 }: { size?: number }) {
+function NeutralDot({ size = 5 }: { size?: number }) {
   return (
     <span style={{
       width: size, height: size, borderRadius: '50%', display: 'inline-block', flexShrink: 0,
-      background: 'var(--color-accent-green)',
+      background: 'var(--color-accent)',
     }} />
   )
 }
@@ -169,7 +158,7 @@ function DnaStrip() {
           minWidth: 0,
         }}>
           <svg width="9" height="9" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0 }}>
-            <path d="M2 6.2l2.6 2.6L10 3.4" stroke="var(--color-accent-green)" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M2 6.2l2.6 2.6L10 3.4" stroke="var(--color-accent)" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 6.5, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', marginBottom: 2 }}>
@@ -277,8 +266,8 @@ function DnaChip({ small = false }: { small?: boolean }) {
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 4,
       padding: small ? '2px 7px' : '3px 8px', borderRadius: 999,
-      background: 'rgba(48,209,88,0.09)', color: 'var(--color-accent-green)',
-      border: '0.5px solid rgba(48,209,88,0.22)',
+      background: 'rgba(255,255,255,0.09)', color: 'var(--color-accent)',
+      border: '0.5px solid rgba(255,255,255,0.22)',
       fontSize: small ? 6.5 : 7, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase',
       whiteSpace: 'nowrap' as const,
     }}>
@@ -299,7 +288,7 @@ function BalanceBadge() {
       background: 'rgba(255,255,255,0.03)', border: '0.5px solid rgba(255,255,255,0.12)',
       fontSize: 8, letterSpacing: '-0.005em', whiteSpace: 'nowrap' as const,
     }}>
-      <GreenDot size={4} />
+      <NeutralDot size={4} />
       <span style={{ color: '#fafafa', fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}>1.240</span>
       <span style={{ color: 'rgba(255,255,255,0.35)' }}>nodes</span>
     </span>
@@ -386,8 +375,8 @@ function DesktopMockup() {
                         <span style={{
                           position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)',
                           width: 2, height: 13, borderRadius: 999,
-                          background: 'var(--color-accent-green)',
-                          boxShadow: '0 0 8px rgba(48,209,88,0.45)',
+                          background: 'var(--color-accent)',
+                          boxShadow: '0 0 8px rgba(255,255,255,0.45)',
                         }} />
                       )}
                       <Icon />
@@ -402,7 +391,7 @@ function DesktopMockup() {
             <div style={{ marginTop: 'auto', borderTop: hairline, padding: '9px 10px', display: 'flex', alignItems: 'center', gap: 7 }}>
               <div style={{
                 width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
-                background: 'conic-gradient(var(--color-accent-green) 0deg 248deg, rgba(255,255,255,0.12) 248deg 360deg)',
+                background: 'conic-gradient(var(--color-accent) 0deg 248deg, rgba(255,255,255,0.12) 248deg 360deg)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
                 <div style={{
@@ -528,7 +517,7 @@ function MobileMockup() {
             <span style={{ fontSize: 13, color: '#fafafa', fontWeight: 500, letterSpacing: '-0.02em' }}>spacenode</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <GreenDot />
+            <NeutralDot />
             <span style={{ fontSize: 11, color: '#fafafa', fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}>1.240</span>
             <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>nodes</span>
           </div>
@@ -557,8 +546,8 @@ function MobileMockup() {
             <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
               Vega · Residencial
             </span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 8.5, color: 'var(--color-accent-green)' }}>
-              <GreenDot size={4} /> Geometria preservada
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 8.5, color: 'var(--color-accent)' }}>
+              <NeutralDot size={4} /> Geometria como referência
             </span>
           </div>
 
@@ -590,7 +579,8 @@ function MobileMockup() {
     </div>
   )
 }
-// ── Passos (absorve a antiga seção HowItWorks) ───────────────────────────────
+
+// ── Passos (absorve a antiga seção HowItWorks) ───────────────────────────────
 
 const STEPS = [
   { num: '01', title: 'envie',     desc: 'Print do SketchUp, estudo volumétrico ou referência.' },
@@ -610,11 +600,11 @@ export function ProductMockup() {
     <section id="produto" className="spn-mockup">
       <div className="spn-mockup-head">
         <h2 className="spn-mockup-title">
-          da referência à imagem, sem perder o projeto.
+          da referência à imagem, com o projeto em foco.
         </h2>
         <p className="spn-mockup-sub">
-          Envie um print do SketchUp, uma planta ou uma foto — a IA devolve a
-          visualização fotorrealista preservando geometria, proporções e
+          Envie um print do SketchUp, uma planta ou uma foto para criar uma
+          visualização fotorrealista guiada pela geometria, proporções e
           perspectiva do que você desenhou.
         </p>
       </div>
@@ -661,15 +651,15 @@ export function ProductMockup() {
           margin-bottom: 32px;
         }
         .spn-mockup-title {
-          font-size: clamp(22px, 3.6vw, 30px);
-          font-weight: 400;
+          font-size: clamp(32px, 3.6vw, 42px);
+          font-weight: 500;
           letter-spacing: -0.035em;
           line-height: 1.2;
           margin: 0 0 10px;
           color: var(--color-text-primary);
         }
         .spn-mockup-sub {
-          font-size: 14px;
+          font-size: 16px;
           color: var(--color-text-tertiary);
           letter-spacing: -0.005em;
           line-height: 1.6;

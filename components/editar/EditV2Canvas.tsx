@@ -339,7 +339,7 @@ export const EditV2Canvas = forwardRef<EditV2CanvasHandle, Props>(
           paintShapes(lctx, all, toDisplay, t.scale)
           // tinge: mantém só onde há seleção
           lctx.globalCompositeOperation = 'source-in'
-          lctx.fillStyle = '#30d158'
+          lctx.fillStyle = '#ffffff'
           lctx.fillRect(0, 0, layer.width, layer.height)
           ctx.globalAlpha = 0.42
           ctx.drawImage(layer, 0, 0)
@@ -351,7 +351,7 @@ export const EditV2Canvas = forwardRef<EditV2CanvasHandle, Props>(
       const poly = polyRef.current
       if (poly && poly.points.length > 0) {
         ctx.save()
-        ctx.strokeStyle = 'rgba(48,209,88,0.95)'
+        ctx.strokeStyle = 'rgba(255,255,255,0.95)'
         ctx.lineWidth = 1.5
         ctx.setLineDash([5, 4])
         ctx.beginPath()
@@ -368,7 +368,7 @@ export const EditV2Canvas = forwardRef<EditV2CanvasHandle, Props>(
           const q = toDisplay(p.x, p.y)
           ctx.beginPath()
           ctx.arc(q.x, q.y, i === 0 ? 5 : 3.5, 0, Math.PI * 2)
-          ctx.fillStyle = i === 0 ? '#30d158' : 'rgba(255,255,255,0.92)'
+          ctx.fillStyle = i === 0 ? '#ffffff' : 'rgba(255,255,255,0.92)'
           ctx.fill()
         })
         ctx.restore()
@@ -379,7 +379,7 @@ export const EditV2Canvas = forwardRef<EditV2CanvasHandle, Props>(
       if (cur && isStrokeTool && !disabled) {
         ctx.beginPath()
         ctx.arc(cur.x, cur.y, brushSize / 2, 0, Math.PI * 2)
-        ctx.strokeStyle = tool === 'eraser' ? 'rgba(255,255,255,0.9)' : 'rgba(48,209,88,0.95)'
+        ctx.strokeStyle = tool === 'eraser' ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.95)'
         ctx.lineWidth = 1.5
         ctx.stroke()
       }
@@ -757,7 +757,7 @@ export const EditV2Canvas = forwardRef<EditV2CanvasHandle, Props>(
                 max={BRUSH_MAX}
                 value={brushSize}
                 onChange={e => setBrushSize(Number(e.target.value))}
-                style={{ width: 110, accentColor: 'var(--color-accent-green)' }}
+                style={{ width: 110, accentColor: 'var(--color-accent)' }}
               />
             </label>
           )}

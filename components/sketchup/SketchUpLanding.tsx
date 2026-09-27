@@ -42,11 +42,11 @@ const FEATURES: { title: string; body: string }[] = [
   },
   {
     title: 'geometria como verdade.',
-    body: 'Um mapa de arestas da mesma câmera vai junto. O motor recebe a estrutura medida, não inferida do pixel.',
+    body: 'Um mapa de arestas da mesma câmera acompanha a vista para orientar a geração com a geometria do modelo.',
   },
   {
     title: 'sol e lente reais.',
-    body: 'Data, hora, local e lente do modelo entram como fato medido. Preservando a luz, o render respeita as sombras do projeto.',
+    body: 'Ao usar a luz original, data, hora, local e lente do modelo ajudam a orientar as sombras do render.',
   },
   {
     title: 'o estilo fica no arquivo.',
@@ -251,8 +251,8 @@ export function SketchUpLanding() {
           width: 5px;
           height: 5px;
           border-radius: 50%;
-          background: var(--color-accent-green);
-          box-shadow: 0 0 8px var(--color-accent-green-glow);
+          background: var(--color-accent);
+          box-shadow: 0 0 8px var(--color-accent-glow);
         }
         .spn-skp-h1 {
           font-size: clamp(34px, 5.4vw, 54px);

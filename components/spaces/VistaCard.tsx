@@ -117,7 +117,7 @@ export function VistaCard({ vista }: { vista: Vista }) {
               <div className="spn-glass spn-glass--raised" style={{
                 display: 'inline-flex', alignItems: 'center', gap: 4,
                 padding: '3px 7px', borderRadius: 999,
-                color: 'var(--color-accent-green)',
+                color: 'var(--color-accent)',
                 fontSize: 9, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase',
               }}>
                 ◈ referência
@@ -127,7 +127,7 @@ export function VistaCard({ vista }: { vista: Vista }) {
               <div className="spn-glass spn-glass--raised" style={{
                 display: 'inline-flex', alignItems: 'center', gap: 4,
                 padding: '3px 7px', borderRadius: 999,
-                color: 'var(--color-accent-green)',
+                color: 'var(--color-accent)',
                 fontSize: 9, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase',
               }}>
                 ✎ editada

@@ -14,9 +14,9 @@ const PILL = 'inline-flex items-center rounded-full border px-2.5 py-0.5 text-[1
 const CAMPAIGN_TONE: Record<string, string> = {
   draft:            'border-border text-text-secondary',
   pending_approval: 'border-warning-border bg-warning-bg text-warning',
-  approved:         'border-accent-green-border bg-accent-green-bg text-accent-green',
+  approved:         'border-accent-border bg-accent-bg text-accent',
   published_paused: 'border-border text-text-secondary',
-  active:           'border-accent-green-border bg-accent-green-bg text-accent-green',
+  active:           'border-accent-border bg-accent-bg text-accent',
   paused:           'border-warning-border bg-warning-bg text-warning',
   completed:        'border-border text-text-tertiary',
   archived:         'border-border text-text-tertiary',
@@ -26,9 +26,9 @@ const AD_TONE: Record<string, string> = {
   draft:            'border-border text-text-secondary',
   ready_for_review: 'border-warning-border bg-warning-bg text-warning',
   pending_approval: 'border-warning-border bg-warning-bg text-warning',
-  approved:         'border-accent-green-border bg-accent-green-bg text-accent-green',
+  approved:         'border-accent-border bg-accent-bg text-accent',
   published_paused: 'border-border text-text-secondary',
-  active:           'border-accent-green-border bg-accent-green-bg text-accent-green',
+  active:           'border-accent-border bg-accent-bg text-accent',
   paused:           'border-warning-border bg-warning-bg text-warning',
   ended:            'border-border text-text-tertiary',
   archived:         'border-border text-text-tertiary',
@@ -37,7 +37,7 @@ const AD_TONE: Record<string, string> = {
 const EXPERIMENT_TONE: Record<string, string> = {
   planned:      'border-border text-text-secondary',
   running:      'border-warning-border bg-warning-bg text-warning',
-  validated:    'border-accent-green-border bg-accent-green-bg text-accent-green',
+  validated:    'border-accent-border bg-accent-bg text-accent',
   invalidated:  'border-error-border bg-error-bg text-error',
   inconclusive: 'border-border text-text-tertiary',
   abandoned:    'border-border text-text-tertiary',
@@ -45,9 +45,9 @@ const EXPERIMENT_TONE: Record<string, string> = {
 
 const ACTION_TONE: Record<string, string> = {
   pending:  'border-warning-border bg-warning-bg text-warning',
-  approved: 'border-accent-green-border bg-accent-green-bg text-accent-green',
+  approved: 'border-accent-border bg-accent-bg text-accent',
   rejected: 'border-error-border bg-error-bg text-error',
-  executed: 'border-accent-green-border bg-accent-green-bg text-accent-green',
+  executed: 'border-accent-border bg-accent-bg text-accent',
   failed:   'border-error-border bg-error-bg text-error',
   canceled: 'border-border text-text-tertiary',
 }

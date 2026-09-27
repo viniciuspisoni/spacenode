@@ -1,6 +1,6 @@
 'use client'
 
-// Tabs horizontais de ação do modo Editar do Spacenode.
+// Tabs horizontais de ação do modo Editar do SpaceNode.
 //
 // O usuário escolhe uma intenção arquitetônica (Remover / Trocar material /
 // Substituir / Adicionar / Corrigir detalhes / Iluminação / Paisagismo); o

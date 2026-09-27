@@ -5,7 +5,7 @@ import { getPayerBalance } from '@/lib/workspaces/balance'
 import PranchaClient from './PranchaClient'
 
 export const metadata = {
-  title: 'Prancha IA — Carrossel Instagram — Spacenode',
+  title: 'Prancha IA — Carrossel Instagram — SpaceNode',
 }
 
 export default async function PranchaPage() {

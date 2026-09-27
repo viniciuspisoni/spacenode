@@ -45,8 +45,8 @@ export function EditIntentPicker({ onPick, compact = false, exclude = [] }: {
               transition: 'border-color 0.15s, background 0.15s, transform 0.15s',
             }}
             onMouseEnter={e => {
-              e.currentTarget.style.borderColor = 'var(--color-accent-green-border)'
-              e.currentTarget.style.background = 'var(--color-accent-green-bg)'
+              e.currentTarget.style.borderColor = 'var(--color-accent-border)'
+              e.currentTarget.style.background = 'var(--color-accent-bg)'
             }}
             onMouseLeave={e => {
               e.currentTarget.style.borderColor = 'var(--color-border-strong)'
@@ -92,11 +92,11 @@ export function ActiveIntentChip({ intent, onChange, disabled }: {
       <span style={{
         display: 'inline-flex', alignItems: 'center', gap: 7,
         padding: '6px 12px', borderRadius: 999,
-        background: 'var(--color-accent-green-bg)', border: '0.5px solid var(--color-accent-green-border)',
+        background: 'var(--color-accent-bg)', border: '0.5px solid var(--color-accent-border)',
         fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary)',
         letterSpacing: '-0.005em',
       }}>
-        <span aria-hidden style={{ fontSize: 12, color: 'var(--color-accent-green)' }}>{meta.icon}</span>
+        <span aria-hidden style={{ fontSize: 12, color: 'var(--color-accent)' }}>{meta.icon}</span>
         {meta.label}
       </span>
       <button

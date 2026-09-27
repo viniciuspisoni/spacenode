@@ -98,7 +98,7 @@ export function ReferenceFocusModal({ imageUrl, onConfirm, onClose }: {
               position: 'absolute', left: box.x, top: box.y, width: box.w, height: box.h,
               // Verde aqui é ESTADO (o que está selecionado), não ação — é o
               // único uso que a regra do CTA preserva.
-              border: '2px solid var(--color-accent-green)',
+              border: '2px solid var(--color-accent)',
               boxShadow: '0 0 0 9999px var(--color-scrim)',
               pointerEvents: 'none',
             }} />

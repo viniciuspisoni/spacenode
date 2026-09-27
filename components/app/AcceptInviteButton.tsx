@@ -39,7 +39,7 @@ export function AcceptInviteButton({ token }: { token: string }) {
         style={{
           display: 'inline-flex', alignItems: 'center', gap: 8,
           padding: '11px 20px', borderRadius: 9,
-          background: 'var(--color-accent-green)', color: '#06140d',
+          background: 'var(--color-accent)', color: 'var(--color-on-accent)',
           border: 'none', fontSize: 13.5, fontWeight: 600,
           letterSpacing: '-0.01em', cursor: loading ? 'default' : 'pointer',
           opacity: loading ? 0.7 : 1,

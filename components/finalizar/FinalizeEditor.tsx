@@ -192,7 +192,7 @@ export function FinalizeEditor({
   }, [])
   const [compare, setCompare] = useState(false)
   const [compareMode, setCompareMode] = useState<CompareMode>('none')
-  const [maskOverlayColor, setMaskOverlayColor] = useState<MaskOverlayColor>('green')
+  const [maskOverlayColor, setMaskOverlayColor] = useState<MaskOverlayColor>('graphite')
   const [pasteAvailable, setPasteAvailable] = useState(false)
   const [zoomPct, setZoomPct] = useState(100)
   const [activeLocalId, setActiveLocalId] = useState<string | null>(null)

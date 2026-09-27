@@ -77,7 +77,7 @@ export type StrokeTarget = { kind: 'local'; id: string } | { kind: 'element'; id
 /** Comparação persistente além do "segurar": divisor arrastável ou lado a lado. */
 export type CompareMode = 'none' | 'split' | 'side'
 
-export type MaskOverlayColor = 'green' | 'red' | 'white'
+export type MaskOverlayColor = 'graphite' | 'red' | 'white'
 
 /** Ferramentas de seleção da aba Editar. Varinha e pincel escrevem no mesmo
  *  lugar que laço, polígono e retângulo — o que a pessoa vê marcado é o que
@@ -798,7 +798,7 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
       const tctx = tint.getContext('2d')!
       tctx.drawImage(solved, 0, 0)
       tctx.globalCompositeOperation = 'multiply'
-      tctx.fillStyle = overlayColor === 'red' ? '#e0584a' : overlayColor === 'white' ? '#ffffff' : accentGreen()
+      tctx.fillStyle = overlayColor === 'red' ? '#e0584a' : overlayColor === 'white' ? '#ffffff' : graphiteOverlay()
       tctx.fillRect(0, 0, tint.width, tint.height)
       // preto (não selecionado) vira transparente
       const id = tctx.getImageData(0, 0, tint.width, tint.height)
@@ -992,7 +992,7 @@ export const CanvasViewport = forwardRef<CanvasViewportHandle, Props>(function C
     ctx.stroke()
     ctx.beginPath()
     ctx.arc(cur.x, cur.y, r, 0, Math.PI * 2)
-    ctx.strokeStyle = p.brush.erase ? 'rgba(255,255,255,0.95)' : p.tool === 'edit' ? 'rgba(224,88,74,0.95)' : accentGreen()
+    ctx.strokeStyle = p.brush.erase ? 'rgba(255,255,255,0.95)' : p.tool === 'edit' ? 'rgba(224,88,74,0.95)' : graphiteOverlay()
     ctx.lineWidth = 1.25
     ctx.stroke()
   }
@@ -1977,9 +1977,8 @@ const overlayMsg: React.CSSProperties = {
   color: 'var(--color-text-tertiary)', fontSize: 13, padding: 24,
 }
 
-function accentGreen(): string {
-  const v = getComputedStyle(document.documentElement).getPropertyValue('--color-accent-green').trim()
-  return v || '#30d158'
+function graphiteOverlay(): string {
+  return '#151618'
 }
 
 function clamp(n: number, lo: number, hi: number): number {

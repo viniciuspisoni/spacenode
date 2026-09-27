@@ -6,7 +6,7 @@
   <title>SPACENODE</title>
   <style>
     /* ═══════════════════════════════════════════════════════════════════════
-       SPACENODE 1.0 — material de vidro
+       SpaceNode — Manual da Marca v2.0
        Tokens de cor: espelho exato de app/globals.css (não inventar valores).
        Sobre eles, uma camada de vidro: superfícies translúcidas que borram o
        que passa por trás, com brilho especular na borda de cima e sombra na
@@ -21,35 +21,35 @@
     }
     :root {
       color-scheme: dark;
-      --bg: #0a0a0a;
-      --bg-elevated: #111111;
+      --bg: #151618;
+      --bg-elevated: #1c1d20;
       --surface: rgba(255,255,255,0.05);
       --surface-hover: rgba(255,255,255,0.08);
       --surface-subtle: rgba(255,255,255,0.02);
-      --text: #f5f5f7;
-      --text-2: #a1a1a6;
-      --text-3: #6e6e73;
+      --text: #ffffff;
+      --text-2: #bdc2c8;
+      --text-3: #8a8f97;
       --border: rgba(255,255,255,0.06);
       --border-strong: rgba(255,255,255,0.14);
       --border-focus: rgba(255,255,255,0.28);
       --input: rgba(255,255,255,0.05);
       --chip: rgba(255,255,255,0.06);
       --chip-hover: rgba(255,255,255,0.10);
-      --chip-active: #f5f5f7;
-      --chip-active-fg: #0a0a0a;
-      --inverse: #f5f5f7;
-      --inverse-fg: #0a0a0a;
-      --green: #30d158;
-      --green-bg: rgba(48,209,88,0.09);
-      --green-border: rgba(48,209,88,0.22);
-      --green-glow: rgba(48,209,88,0.45);
+      --chip-active: #ffffff;
+      --chip-active-fg: #151618;
+      --inverse: #ffffff;
+      --inverse-fg: #151618;
+      --accent: #ffffff;
+      --accent-bg: rgba(255,255,255,0.09);
+      --accent-border: rgba(255,255,255,0.22);
+      --accent-glow: rgba(255,255,255,0.45);
       --error: #e0584a;
       --error-bg: rgba(224,88,74,0.08);
       --error-border: rgba(224,88,74,0.20);
       --warning: #d4a327;
       --shadow-sm: 0 2px 8px rgba(0,0,0,0.22);
       --shadow-md: 0 8px 24px rgba(0,0,0,0.32);
-      --text-4: #3a3a3c;
+      --text-4: #53575e;
       --preview-bg: #101010;
       --scrollbar: rgba(255,255,255,0.14);
       --chip-active-fg-dim: rgba(10,10,10,0.6);
@@ -83,35 +83,35 @@
     }
     html.light {
       color-scheme: light;
-      --bg: #fafafa;
+      --bg: #f7f7f5;
       --bg-elevated: #ffffff;
-      --surface: #f5f5f7;
+      --surface: #ffffff;
       --surface-hover: #e8e8ed;
       --surface-subtle: rgba(0,0,0,0.02);
-      --text: #1a1a1a;
-      --text-2: #424245;
-      --text-3: #86868b;
+      --text: #151618;
+      --text-2: #60646b;
+      --text-3: #6a6e75;
       --border: rgba(0,0,0,0.07);
       --border-strong: rgba(0,0,0,0.15);
       --border-focus: rgba(0,0,0,0.32);
       --input: #ffffff;
       --chip: rgba(0,0,0,0.05);
       --chip-hover: rgba(0,0,0,0.08);
-      --chip-active: #1a1a1a;
-      --chip-active-fg: #fafafa;
-      --inverse: #1a1a1a;
-      --inverse-fg: #fafafa;
-      --green: #30b46c;
-      --green-bg: rgba(48,180,108,0.09);
-      --green-border: rgba(48,180,108,0.22);
-      --green-glow: rgba(48,180,108,0.45);
+      --chip-active: #151618;
+      --chip-active-fg: #f7f7f5;
+      --inverse: #151618;
+      --inverse-fg: #f7f7f5;
+      --accent: #151618;
+      --accent-bg: rgba(21,22,24,0.09);
+      --accent-border: rgba(21,22,24,0.22);
+      --accent-glow: rgba(21,22,24,0.45);
       --error: #c0392b;
       --error-bg: rgba(192,57,43,0.08);
       --error-border: rgba(192,57,43,0.20);
       --warning: #b8860b;
       --shadow-sm: 0 2px 8px rgba(0,0,0,0.08);
       --shadow-md: 0 8px 24px rgba(0,0,0,0.10);
-      --text-4: #c7c7cc;
+      --text-4: #bdc2c8;
       --preview-bg: #e9e9e7;
       --scrollbar: rgba(0,0,0,0.18);
       --chip-active-fg-dim: rgba(250,250,250,0.65);
@@ -178,19 +178,20 @@
     }
 
     /* ── Material ─────────────────────────────────────────────────────────
-       .glass  = translúcido + borrão + aresta especular. Tudo que flutua no
-       painel usa esta classe (chrome, cartões, folhas, botões).           */
+       Painéis de leitura são sólidos; navegação e controles sobre a vista
+       recebem vidro pontual. */
     .glass {
-      background: var(--glass);
-      -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
-      backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+      background: var(--bg-elevated);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
       border: 0.5px solid var(--glass-line);
-      box-shadow: inset 0 0.5px 0 var(--glass-spec), inset 0 -0.5px 0 var(--glass-shade);
+      box-shadow: none;
     }
-    .glass--chrome {
+    header.glass--chrome, .dock.glass--chrome, .tools.glass, .tabs.glass {
       background: var(--glass-strong);
       -webkit-backdrop-filter: blur(30px) saturate(190%);
       backdrop-filter: blur(30px) saturate(190%);
+      box-shadow: inset 0 0.5px 0 var(--glass-spec);
     }
 
     /* ── Casca ────────────────────────────────────────────────────────────
@@ -211,8 +212,9 @@
       height: 52px; padding: 0 14px;
       border-width: 0 0 0.5px;
     }
-    .brand { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 550; letter-spacing: -0.02em; }
-    .brand svg { width: 20px; height: 20px; }
+    .brand { display: inline-flex; align-items: center; }
+    .brand img { display: block; width: auto; height: 26px; }
+    html.light .brand-logo--reverse, html:not(.light) .brand-logo--primary { display: none; }
     .header-actions { display: flex; align-items: center; gap: 6px; }
 
     .balance {
@@ -223,7 +225,7 @@
       box-shadow: inset 0 0.5px 0 var(--glass-spec);
     }
     .balance.is-visible { display: inline-flex; }
-    .balance .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green-glow); }
+    .balance .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent-glow); }
     .balance b { font-size: 12px; font-weight: 650; font-variant-numeric: tabular-nums; }
     .balance span { font-size: 11px; color: var(--text-3); }
     .balance a {
@@ -291,7 +293,7 @@
       background: rgba(0,0,0,0.45);
       -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
       border: 0.5px solid rgba(255,255,255,0.16);
-      color: #f5f5f7;
+      color: #ffffff;
       font-size: 9px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase;
       display: none; pointer-events: none;
     }
@@ -305,10 +307,10 @@
       -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
     }
     .preview-overlay.is-visible { display: flex; }
-    .constellation { width: 34px; height: 34px; animation: pulse 2.2s ease-in-out infinite; }
+    .brand-loader { width: 34px; height: 34px; animation: pulse 2.2s ease-in-out infinite; }
     @keyframes pulse { 0%,100% { opacity: 0.35 } 50% { opacity: 1 } }
-    .overlay-text { font-size: 12px; color: #a1a1a6; }
-    .overlay-elapsed { font-size: 11px; color: #6e6e73; font-variant-numeric: tabular-nums; }
+    .overlay-text { font-size: 12px; color: #bdc2c8; }
+    .overlay-elapsed { font-size: 11px; color: #8a8f97; font-variant-numeric: tabular-nums; }
     .overlay-cancel {
       font-size: 11px; color: #d0d0d2; height: 26px; padding: 0 12px; border-radius: 999px;
       background: rgba(255,255,255,0.10); border: 0.5px solid rgba(255,255,255,0.18);
@@ -453,7 +455,7 @@
       border: 0.5px solid var(--glass-line);
     }
     .style-mark svg { width: 17px; height: 17px; }
-    .style-card.is-locked .style-mark { color: var(--green); background: var(--green-bg); border-color: var(--green-border); }
+    .style-card.is-locked .style-mark { color: var(--accent); background: var(--accent-bg); border-color: var(--accent-border); }
     .style-texts { min-width: 0; flex: 1; }
     .style-title { font-size: 13px; font-weight: 560; display: flex; align-items: center; gap: 6px; }
     .style-seed {
@@ -588,7 +590,7 @@
     .dock-output.is-empty { display: none; }
     .dock-summary::before {
       content: ''; width: 5px; height: 5px; border-radius: 50%; flex: 0 0 auto;
-      background: var(--green); box-shadow: 0 0 8px var(--green-glow); display: none;
+      background: var(--accent); box-shadow: 0 0 8px var(--accent-glow); display: none;
     }
     .dock-summary.is-locked::before { display: block; }
     .cta {
@@ -636,7 +638,7 @@
       color: var(--text-2); font-size: 12px; overflow-wrap: anywhere;
     }
     .notice.is-error { display: block; color: var(--error); border-color: var(--error-border); background: var(--error-bg); }
-    .notice.is-success { display: block; color: var(--text); border-color: var(--green-border); background: var(--green-bg); }
+    .notice.is-success { display: block; color: var(--text); border-color: var(--accent-border); background: var(--accent-bg); }
     .notice.is-warn { display: block; color: var(--text); border-color: var(--border-strong); background: var(--surface); }
     .notice .notice-action { margin-top: 8px; }
     .notice .notice-action button { font-size: 12px; color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
@@ -664,7 +666,7 @@
     }
     .conn-status { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 12.5px; font-weight: 520; }
     .conn-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-3); flex: 0 0 7px; }
-    .conn-dot.is-on { background: var(--green); box-shadow: 0 0 10px var(--green-glow); }
+    .conn-dot.is-on { background: var(--accent); box-shadow: 0 0 10px var(--accent-glow); }
     .conn-sub { margin-top: 2px; color: var(--text-3); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .conn-actions { display: flex; gap: 6px; }
     .conn-actions .ghost { height: 30px; font-size: 11.5px; padding: 0 12px; }
@@ -703,7 +705,7 @@
     #maskToggle.is-active { background: var(--chip-active); color: var(--chip-active-fg); border-color: transparent; }
     .mask-hint {
       position: absolute; left: 9px; right: 9px; bottom: 9px; z-index: 4;
-      text-align: center; font-size: 10.5px; color: #f5f5f7;
+      text-align: center; font-size: 10.5px; color: #ffffff;
       background: rgba(0,0,0,0.5);
       -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
       border-radius: 999px; padding: 5px 10px;
@@ -743,7 +745,7 @@
     .batch-progress { margin-top: 10px; display: flex; flex-direction: column; gap: 5px; }
     .batch-row { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--text-2); }
     .batch-row .st { width: 6px; height: 6px; border-radius: 50%; background: var(--text-3); flex: 0 0 6px; }
-    .batch-row.is-done .st { background: var(--green); }
+    .batch-row.is-done .st { background: var(--accent); }
     .batch-row.is-error .st { background: var(--error); }
     .batch-row.is-active .st { background: var(--warning); }
     .batch-row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -765,7 +767,7 @@
     #videoPoster { width: 100%; display: block; filter: brightness(0.85); }
     .video-play {
       position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-      font-size: 28px; color: #f5f5f7; text-shadow: 0 1px 6px rgba(0,0,0,0.5); pointer-events: none;
+      font-size: 28px; color: #ffffff; text-shadow: 0 1px 6px rgba(0,0,0,0.5); pointer-events: none;
     }
     .video-caption { font-size: 11px; margin: 7px 0 4px; color: var(--text-2); }
 
@@ -785,7 +787,7 @@
     }
 
     @media (prefers-reduced-motion: reduce) {
-      .constellation { animation: none; }
+      .brand-loader { animation: none; }
       * { transition: none !important; animation: none !important; }
     }
   </style>
@@ -806,15 +808,8 @@
 
   <header class="glass glass--chrome">
     <div class="brand">
-      <svg viewBox="0 0 64 64" aria-hidden="true">
-        <g stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none">
-          <line x1="16" y1="16" x2="16" y2="48"/><line x1="16" y1="16" x2="48" y2="48"/><line x1="48" y1="16" x2="48" y2="48"/>
-        </g>
-        <g fill="currentColor">
-          <circle cx="16" cy="16" r="3"/><circle cx="16" cy="48" r="3"/><circle cx="48" cy="48" r="3"/><circle cx="48" cy="16" r="3"/>
-        </g>
-      </svg>
-      <span>spacenode</span>
+      <img class="brand-logo--reverse" src="assets/spacenode-logo-horizontal.svg" alt="SpaceNode">
+      <img class="brand-logo--primary" src="assets/spacenode-logo-horizontal-dark.svg" alt="SpaceNode">
     </div>
     <div class="header-actions">
       <div class="balance" id="balanceChip">
@@ -881,14 +876,7 @@
           <span style="font-size:11px">Capture pra conferir o enquadramento — ou clique em Gerar direto.</span>
         </div>
         <div class="preview-overlay" id="previewOverlay">
-          <svg class="constellation" viewBox="0 0 64 64" aria-hidden="true">
-            <g stroke="#f5f5f7" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none">
-              <line x1="16" y1="16" x2="16" y2="48"/><line x1="16" y1="16" x2="48" y2="48"/><line x1="48" y1="16" x2="48" y2="48"/>
-            </g>
-            <g fill="#f5f5f7">
-              <circle cx="16" cy="16" r="3"/><circle cx="16" cy="48" r="3"/><circle cx="48" cy="48" r="3"/><circle cx="48" cy="16" r="3"/>
-            </g>
-          </svg>
+          <img class="brand-loader" src="assets/spacenode-symbol-reverse.svg" alt="">
           <span class="overlay-text" id="overlayText">Gerando…</span>
           <span class="overlay-elapsed" id="overlayElapsed"></span>
           <button class="overlay-cancel" id="cancelButton">cancelar</button>
@@ -2848,8 +2836,8 @@
         var fit = previewFit();
         if (fit) maskCtx.drawImage(model.maskSprite, fit.offX, fit.offY, fit.w, fit.h);
       }
-      maskCtx.fillStyle = 'rgba(48,209,88,0.45)';
-      maskCtx.strokeStyle = 'rgba(48,209,88,0.45)';
+      maskCtx.fillStyle = 'rgba(255,255,255,0.45)';
+      maskCtx.strokeStyle = 'rgba(255,255,255,0.45)';
       model.maskStrokes.forEach(function (st) { drawStroke(maskCtx, st.points, st.radius); });
     }
     function enterMaskMode() {

@@ -58,7 +58,7 @@ function parseSections(text: string): ParsedSections {
 
 const LP_TONE: Record<string, string> = {
   draft: 'border-border text-text-secondary',
-  published: 'border-accent-green-border bg-accent-green-bg text-accent-green',
+  published: 'border-accent-border bg-accent-bg text-accent',
   archived: 'border-border text-text-tertiary',
 }
 const LP_LABELS: Record<string, string> = {

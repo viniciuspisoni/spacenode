@@ -8,7 +8,7 @@
  * Um filme de keynote precisa de outra coisa:
  *
  *   quadro       → configurável (1920×1080 master, 1080×1920 corte vertical)
- *   fundo        → #0A0A0A do BRIEF (preto de marca), nunca a imagem desfocada
+ *   fundo        → #151618 do BRIEF (preto de marca), nunca a imagem desfocada
  *   texto        → entra e sai em FADE DE ALPHA com easing, sobre a imagem viva
  *   movimento    → zoompan com smoothstep (acelera e desacelera), nunca linear
  *   respiração   → segmento `black`: um beat de preto puro entre atos
@@ -33,15 +33,15 @@ const BRAND_DIR = resolve(import.meta.dirname, '../../brand');
 export const FPS = 30;
 
 /**
- * Os dois fundos do BRIEF.md. O escuro não é o #1a1a1a das faixas da landing: filme é
- * mais fundo. O claro é o mesmo #FAFAFA das faixas claras.
+ * Os dois fundos do BRIEF.md. O escuro não é o #151618 das faixas da landing: filme é
+ * mais fundo. O claro é o mesmo #f7f7f5 das faixas claras.
  *
  * Um filme pode virar de um para o outro no meio (é a gramática de "isto roda há meses":
  * metade escura de ambientação, metade clara de prova), então tema é por SEGMENTO e por
  * CARD, nunca global.
  */
-const BG = '#0A0A0A';
-const BG_LIGHT = '#FAFAFA';
+const BG = '#151618';
+const BG_LIGHT = '#f7f7f5';
 
 /** `bg` do segmento/card → cor de chapa. Aceita 'light', 'dark' ou um hex direto. */
 const plate = (v) => (v === 'light' ? BG_LIGHT : v === 'dark' || !v ? BG : v);
@@ -50,7 +50,7 @@ const hex0x = (c) => c.replace('#', '0x');
 const even = (n) => Math.round(n / 2) * 2;
 const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 
-/** `{palavra}` → única palavra em verde (#30D158). Máx. 1 por peça inteira. */
+/** `{palavra}` → única palavra em verde (#FFFFFF). Máx. 1 por peça inteira. */
 export const accentuate = (t) => String(t).replace(/\{([^}]+)\}/g, '<span class="accent">$1</span>');
 /** `[trecho]` → cinza terciário, como a 2ª linha do título do hero da landing. */
 const dim = (t) => String(t).replace(/\[([^\]]+)\]/g, '<span class="dim">$1</span>');
@@ -123,26 +123,26 @@ const cardCss = (F) => `
 .wrap.bottom { bottom: ${F.h - F.safeBottom + 40}px; }
 .wrap.top { top: ${F.safeTop + 40}px; }
 .eyebrow { display: inline-flex; align-items: center; gap: 18px; font-size: 22px; font-weight: 500;
-  text-transform: uppercase; letter-spacing: 0.22em; color: #a1a1a6; }
+  text-transform: uppercase; letter-spacing: 0.22em; color: #bdc2c8; }
 .eyebrow i { display: block; width: 34px; height: 1px; background: rgba(255,255,255,0.26); }
-.big { font-size: 88px; font-weight: 200; line-height: 1.07; letter-spacing: -0.045em;
-  color: #f5f5f7; text-wrap: balance; }
-.mid { font-size: 60px; font-weight: 300; line-height: 1.12; letter-spacing: -0.038em;
-  color: #f5f5f7; text-wrap: balance; }
+.big { font-size: 88px; font-weight: 500; line-height: 1.07; letter-spacing: -0.045em;
+  color: #ffffff; text-wrap: balance; }
+.mid { font-size: 60px; font-weight: 500; line-height: 1.12; letter-spacing: -0.038em;
+  color: #ffffff; text-wrap: balance; }
 .small { font-size: 34px; font-weight: 400; line-height: 1.45; letter-spacing: -0.012em;
-  color: #a1a1a6; text-wrap: balance; }
-/* #8a8a8f, não o #6e6e73 da landing: aqui o texto vive por cima de imagem, e o
+  color: #bdc2c8; text-wrap: balance; }
+/* #8a8a8f, não o #8a8f97 da landing: aqui o texto vive por cima de imagem, e o
    cinza terciário mais fechado desaparecia dentro da fachada. */
 .dim { color: #8a8a8f; }
-.accent { color: #30D158; }
+.accent { color: #FFFFFF; text-decoration: underline; text-decoration-thickness: .04em; text-underline-offset: .1em; }
 
 /* Lower-third: legenda de interface, ancorada à esquerda, com fio fino em cima. */
 .lower { position: absolute; left: ${F.margin}px; bottom: ${F.h - F.safeBottom + 40}px;
   max-width: ${Math.round(F.col * 0.72)}px; text-align: left; }
 .lower .rule { width: 64px; height: 1px; background: rgba(255,255,255,0.4); margin-bottom: 26px; }
 .lower .label { font-size: 20px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.22em;
-  color: #a1a1a6; display: block; margin-bottom: 16px; }
-.lower .text { font-size: 44px; font-weight: 300; line-height: 1.18; letter-spacing: -0.03em; color: #f5f5f7; }
+  color: #bdc2c8; display: block; margin-bottom: 16px; }
+.lower .text { font-size: 44px; font-weight: 500; line-height: 1.18; letter-spacing: -0.03em; color: #ffffff; }
 
 /* Scrim: contraste do texto sobre imagem clara. Camada própria, como no reel-kit. */
 .scrim-top, .scrim-bottom { position: absolute; left: 0; right: 0; }
@@ -161,24 +161,24 @@ const cardCss = (F) => `
   align-items: center; justify-content: center; gap: 44px; }
 .final svg { width: ${F.vertical ? 460 : 520}px; height: auto; margin-bottom: 20px; }
 .final .cta { display: inline-flex; align-items: center; gap: 18px; padding: 24px 46px; border-radius: 16px;
-  background: #f5f5f7; color: ${BG}; font-size: 34px; font-weight: 500; letter-spacing: -0.012em; }
-.final .micro { font-size: 24px; font-weight: 400; color: #6e6e73; letter-spacing: 0.005em; }
-.final .url { font-size: 28px; font-weight: 400; color: #a1a1a6; letter-spacing: 0.02em; }
+  background: #ffffff; color: ${BG}; font-size: 34px; font-weight: 500; letter-spacing: -0.012em; }
+.final .micro { font-size: 24px; font-weight: 400; color: #8a8f97; letter-spacing: 0.005em; }
+.final .url { font-size: 28px; font-weight: 400; color: #bdc2c8; letter-spacing: 0.02em; }
 
-/* Variante clara — espelha as faixas claras da landing (#fafafa / #1a1a1a / verde #30b46c).
-   O verde muda de tom porque o #30D158 do escuro não tem contraste suficiente sobre claro. */
-body.light .big, body.light .mid, body.light .lower .text { color: #1a1a1a; }
-body.light .small, body.light .eyebrow, body.light .lower .label { color: #6e6e73; }
-body.light .dim { color: #86868b; }
-body.light .accent { color: #30b46c; }
+/* Variante clara — espelha as faixas claras da landing (#f7f7f5 / #151618 / verde #151618).
+   O verde muda de tom porque o #FFFFFF do escuro não tem contraste suficiente sobre claro. */
+body.light .big, body.light .mid, body.light .lower .text { color: #151618; }
+body.light .small, body.light .eyebrow, body.light .lower .label { color: #8a8f97; }
+body.light .dim { color: #6a6e75; }
+body.light .accent { color: #151618; text-decoration: underline; text-decoration-thickness: .04em; text-underline-offset: .1em; }
 body.light .eyebrow i { background: rgba(0,0,0,0.20); }
 body.light .lower .rule { background: rgba(0,0,0,0.32); }
 body.light .scrim-top { background: linear-gradient(180deg, rgba(250,250,250,0.90) 0%, rgba(250,250,250,0.45) 58%, rgba(250,250,250,0) 100%); }
 body.light .scrim-bottom { background: linear-gradient(0deg, rgba(250,250,250,0.92) 0%, rgba(250,250,250,0.5) 58%, rgba(250,250,250,0) 100%); }
 body.light .scrim-full { background: rgba(250,250,250,0.55); }
-body.light .final .cta { background: #1a1a1a; color: ${BG_LIGHT}; }
-body.light .final .micro { color: #86868b; }
-body.light .final .url { color: #6e6e73; }
+body.light .final .cta { background: #151618; color: ${BG_LIGHT}; }
+body.light .final .micro { color: #6a6e75; }
+body.light .final .url { color: #8a8f97; }
 /* O SVG da marca é branco; no claro ele precisa virar escuro. */
 body.light .final svg, body.light .brand svg { filter: invert(1); }
 `;
@@ -192,7 +192,7 @@ ${fontFace('geist-latin-ext.woff2', true)}
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { width: ${F.w}px; height: ${F.h}px; }
 body { background: ${solid ? (light ? BG_LIGHT : BG) : 'transparent'}; font-family: 'GeistLocal', sans-serif;
-  color: ${light ? '#1a1a1a' : '#f5f5f7'};
+  color: ${light ? '#151618' : '#ffffff'};
   -webkit-font-smoothing: antialiased; position: relative; overflow: hidden; }
 ${cardCss(F)}
 </style></head><body class="${light ? 'light' : ''}">${body}</body></html>`;
@@ -243,7 +243,7 @@ export function cardFromSpec(c, F) {
       return cardHtml({ F, light: c.theme === 'light', solid: true, body });
     }
     case 'symbol':
-      // Só o símbolo ConstellationN respirando no preto — abertura de filme.
+      // Só o N estrutural respirando no Grafite — abertura de filme.
       return cardHtml({ F, light: c.theme === 'light', solid: c.solid !== false, body: `<div class="final" style="gap:0">${symbolSvg().replace('<svg', `<svg style="width:${c.size || 200}px"`)}</div>` });
     case 'html':
       return cardHtml({ F, light: c.theme === 'light', solid: c.solid === true, body: c.body || '' });

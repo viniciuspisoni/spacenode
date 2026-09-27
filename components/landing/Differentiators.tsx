@@ -4,11 +4,11 @@
 const ITEMS = [
   {
     title: 'fidelidade geométrica',
-    desc: 'Geometria, proporções e perspectiva do projeto preservadas. Nada é reinterpretado.',
+    desc: 'A geração usa o projeto como referência para manter geometria, proporções e perspectiva.',
   },
   {
     title: 'coerência entre vistas',
-    desc: 'Luz, câmera e atmosfera variam. A identidade do projeto, não.',
+    desc: 'Explore luz, câmera e atmosfera mantendo a identidade do projeto como referência.',
   },
   {
     title: 'velocidade com controle',
@@ -55,8 +55,8 @@ export function Differentiators() {
         }
         .spn-diff-title {
           text-align: center;
-          font-size: clamp(24px, 4.2vw, 34px);
-          font-weight: 400;
+          font-size: clamp(32px, 4.2vw, 42px);
+          font-weight: 500;
           letter-spacing: -0.035em;
           line-height: 1.2;
           margin: 0 0 32px;
@@ -83,7 +83,7 @@ export function Differentiators() {
           margin: 0 0 9px;
         }
         .spn-diff-card-desc {
-          font-size: 13.5px;
+          font-size: 16px;
           color: var(--color-text-secondary);
           line-height: 1.6;
           letter-spacing: -0.005em;

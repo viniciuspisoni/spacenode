@@ -87,9 +87,9 @@ export function FAQ() {
         }
         .spn-faq-title {
           text-align: center;
-          font-size: clamp(22px, 3.6vw, 30px);
-          font-weight: 400;
-          letter-spacing: -0.035em;
+          font-size: clamp(32px, 3.6vw, 48px);
+          font-weight: 500;
+          letter-spacing: -0.025em;
           line-height: 1.2;
           margin: 0 0 28px;
           color: var(--color-text-primary);
@@ -121,7 +121,7 @@ export function FAQ() {
           outline-offset: -3px;
         }
         .spn-faq-q-text {
-          font-size: 15px;
+          font-size: 16px;
           font-weight: 500;
           letter-spacing: -0.015em;
           color: var(--color-text-primary);
@@ -152,7 +152,7 @@ export function FAQ() {
         .spn-faq-a {
           overflow: hidden;
           margin: 0;
-          font-size: 13.5px;
+          font-size: 16px;
           line-height: 1.65;
           color: var(--color-text-secondary);
           padding: 0 24px;

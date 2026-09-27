@@ -3,7 +3,7 @@
  * atacam dores diferentes do público (custo de terceirizar, apresentação travada)
  * para o feed não repetir a mesma legenda com imagem trocada.
  *
- * `accent` marca a ÚNICA palavra que sai em #30D158 no vídeo.
+ * `accent` marca a ÚNICA palavra que sai em #FFFFFF no vídeo.
  * Hook do "antes" tem que fazer sentido olhando o modelo cinza do SketchUp.
  */
 export const ROTEIROS = {
@@ -25,7 +25,7 @@ export const ROTEIROS = {
     par: 'casa',
     hookAntes: 'Terceirizar esse render: R$150 a R$600.',
     hookDepois: 'Do seu próprio modelo: {minutos}.',
-    sub: 'Mesma geometria, mesma câmera, mesmo projeto.',
+    sub: 'Geometria e câmera do projeto orientam o resultado.',
   },
 
   apresentacao: {

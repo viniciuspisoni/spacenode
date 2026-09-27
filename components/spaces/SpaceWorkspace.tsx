@@ -186,8 +186,8 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId, p
                 <span style={{
                   display: 'inline-flex', alignItems: 'center', gap: 6,
                   padding: '5px 11px', borderRadius: 999,
-                  background: 'var(--color-accent-green-bg)', color: 'var(--color-accent-green)',
-                  border: '0.5px solid var(--color-accent-green-border)',
+                  background: 'var(--color-accent-bg)', color: 'var(--color-accent)',
+                  border: '0.5px solid var(--color-accent-border)',
                   fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase',
                 }}>
                   <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
@@ -203,8 +203,8 @@ export function SpaceWorkspace({ space, initialVistas, initialBalance, planId, p
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: 6,
                     padding: '5px 11px', borderRadius: 999,
-                    background: 'var(--color-accent-green-bg)', color: 'var(--color-accent-green)',
-                    border: '0.5px solid var(--color-accent-green-border)',
+                    background: 'var(--color-accent-bg)', color: 'var(--color-accent)',
+                    border: '0.5px solid var(--color-accent-border)',
                     fontSize: 10, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase',
                   }}
                 >
@@ -363,7 +363,7 @@ function Toast({ toast }: { toast: ToastState }) {
   // O toast é cromo flutuante: vidro pela classe (que traz os fallbacks), e a
   // cor do TEXTO diz o tom. Antes era um retângulo pintado de verde ou âmbar,
   // o que fazia o aviso competir com o CTA.
-  const fg = toast.type === 'success' ? 'var(--color-accent-green)' : 'var(--color-warning)'
+  const fg = toast.type === 'success' ? 'var(--color-accent)' : 'var(--color-warning)'
   return (
     <div className="spn-glass spn-glass--chrome" style={{
       position: 'fixed', bottom: 24, right: 24, zIndex: 90,

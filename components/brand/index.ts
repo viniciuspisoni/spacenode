@@ -1,3 +1,4 @@
 export { Brandmark } from './Brandmark';
-export { ConstellationN } from './ConstellationN';
+export { StructuralN } from './StructuralN';
+export { BrandLoader } from './BrandLoader';
 export { Logo } from './Logo';

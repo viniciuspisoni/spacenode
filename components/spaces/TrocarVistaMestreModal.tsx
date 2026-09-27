@@ -110,7 +110,7 @@ export function TrocarVistaMestreModal({
                     position: 'absolute', top: 7, left: 7,
                     padding: '3px 7px', borderRadius: 999,
                     fontSize: 9, fontWeight: 600, letterSpacing: '0.05em',
-                    textTransform: 'uppercase', color: 'var(--color-accent-green)',
+                    textTransform: 'uppercase', color: 'var(--color-accent)',
                   }}>
                     ◈ DNA extraído
                   </span>

@@ -65,7 +65,7 @@ export default function SketchUpPairPage() {
     <main style={S.main}>
       <section style={S.panel}>
         <div style={S.brand}>
-          <Brandmark variant="horizontal" size={26} color="#f5f5f7" />
+          <Brandmark variant="horizontal" size={26} tone="reverse" />
         </div>
 
         <h1 style={S.title}>
@@ -192,7 +192,7 @@ const S: Record<string, CSSProperties> = {
     width: 10,
     height: 10,
     borderRadius: '50%',
-    background: '#30d158',
-    boxShadow: '0 0 18px rgba(48,209,88,0.4)',
+    background: '#ffffff',
+    boxShadow: '0 0 18px rgba(255,255,255,0.4)',
   },
 }
