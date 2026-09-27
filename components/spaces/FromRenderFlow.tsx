@@ -254,7 +254,7 @@ function GalleryStep({ gallery, onPick }: {
                 padding: 0, cursor: 'pointer', textAlign: 'left',
                 transition: 'transform 0.18s, border-color 0.18s, box-shadow 0.18s',
               }}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = 'var(--color-accent-green-border)' }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = 'var(--color-accent-border)' }}
               onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'var(--color-border)' }}
             >
               <div style={{
@@ -353,7 +353,7 @@ function ConfigStep(props: {
           position: 'absolute', top: 14, left: 14,
           display: 'inline-flex', alignItems: 'center', gap: 6,
           padding: '5px 10px', borderRadius: 999,
-          color: 'var(--color-accent-green)',
+          color: 'var(--color-accent)',
           fontSize: 9, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase',
         }}>
           ✦ origem: Renderizar
@@ -493,7 +493,7 @@ function ConfigStep(props: {
                     <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary)' }}>
                       {cfg.name}
                       {eId === inheritedEngine && (
-                        <span style={{ fontSize: 9, color: 'var(--color-accent-green)', marginLeft: 6 }}>(herdado)</span>
+                        <span style={{ fontSize: 9, color: 'var(--color-accent)', marginLeft: 6 }}>(herdado)</span>
                       )}
                     </span>
                   </button>
@@ -551,11 +551,11 @@ function RevealStep({ dna, render, onLock, submitting, error }: {
         <div style={{
           display: 'inline-flex', alignItems: 'center', gap: 8,
           padding: '5px 11px', borderRadius: 999,
-          background: 'var(--color-accent-green-bg)', color: 'var(--color-accent-green)',
+          background: 'var(--color-accent-bg)', color: 'var(--color-accent)',
           fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase',
           marginBottom: 14,
         }}>
-          <span style={{ width: 6, height: 6, borderRadius: 999, background: 'var(--color-accent-green)' }} />
+          <span style={{ width: 6, height: 6, borderRadius: 999, background: 'var(--color-accent)' }} />
           DNA verificado · origem: Renderizar
         </div>
         <h1 style={{

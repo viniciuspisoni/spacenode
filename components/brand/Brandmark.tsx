@@ -1,58 +1,77 @@
-import React from 'react';
-import { ConstellationN } from './ConstellationN';
+import {
+  LOCKUP_COMPACT_MAX_PX,
+  LOCKUP_WIDTH,
+  N_GRID,
+  N_MICRO,
+  N_PRINCIPAL,
+  WORDMARK_PATH,
+} from './geometry';
+import { StructuralN } from './StructuralN';
+
+const TONES = {
+  primary: '#151618', // Grafite — fundos claros
+  reverse: '#FFFFFF', // Branco — fundos escuros
+} as const;
 
 type BrandmarkProps = {
-  variant?: 'horizontal' | 'vertical' | 'symbol' | 'reverse';
+  /** Altura da assinatura em px (grade 64). */
   size?: number;
-  color?: string;
-  accent?: boolean;
+  /** `horizontal` é a assinatura oficial; `symbol` isola o N estrutural. */
+  variant?: 'horizontal' | 'symbol';
+  /** `auto` herda a cor do texto (currentColor). */
+  tone?: 'auto' | 'primary' | 'reverse';
+  /** Esconde o nome mantendo a geometria da assinatura (ex.: sidebar recolhida). */
+  wordmarkHidden?: boolean;
   className?: string;
+  title?: string;
 };
 
+/**
+ * Assinatura oficial: N estrutural + wordmark em curvas, com as proporções do kit.
+ * Compacta (símbolo micro) de 144 a 191 px de largura; principal a partir de 192 px.
+ */
 export function Brandmark({
+  size = 32,
   variant = 'horizontal',
-  size = 24,
-  color,
-  accent = false,
+  tone = 'auto',
+  wordmarkHidden = false,
   className,
+  title = 'SpaceNode',
 }: BrandmarkProps) {
-  const resolvedColor = color ?? (variant === 'reverse' ? '#FAFAFA' : 'currentColor');
+  const color = tone === 'auto' ? 'currentColor' : TONES[tone];
 
   if (variant === 'symbol') {
-    return <ConstellationN size={size} color={resolvedColor} accent={accent} className={className} />;
+    return <StructuralN size={size} color={color} className={className} title={title} />;
   }
 
-  const wordmarkStyle: React.CSSProperties = {
-    fontFamily: 'var(--font-geist), Geist, ui-sans-serif, system-ui, sans-serif',
-    fontWeight: 500,
-    fontSize: variant === 'vertical' ? size * 0.55 : size * 0.72,
-    letterSpacing: '-0.025em',
-    lineHeight: 1,
-    color: resolvedColor,
-    userSelect: 'none',
-  };
-
-  const gap = size * 0.5;
-
-  if (variant === 'vertical') {
-    return (
-      <div
-        className={className}
-        style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap }}
-      >
-        <ConstellationN size={size} color={resolvedColor} accent={accent} aria-hidden />
-        <span style={wordmarkStyle}>spacenode</span>
-      </div>
-    );
-  }
+  const width = (size * LOCKUP_WIDTH) / N_GRID;
+  const compact = width <= LOCKUP_COMPACT_MAX_PX;
 
   return (
-    <div
+    <svg
+      width={width}
+      height={size}
+      viewBox={`0 0 ${LOCKUP_WIDTH} ${N_GRID}`}
+      fill={color}
+      xmlns="http://www.w3.org/2000/svg"
       className={className}
-      style={{ display: 'inline-flex', alignItems: 'center', gap }}
+      role="img"
+      aria-label={title}
+      style={{ display: 'block', flexShrink: 0, overflow: 'visible' }}
     >
-      <ConstellationN size={size} color={resolvedColor} accent={accent} aria-hidden />
-      <span style={wordmarkStyle}>spacenode</span>
-    </div>
+      {compact ? (
+        <path d={N_MICRO} />
+      ) : (
+        <>
+          <path d={N_PRINCIPAL.apoioEsquerdo} />
+          <path d={N_PRINCIPAL.ligacao} />
+          <path d={N_PRINCIPAL.apoioDireito} />
+        </>
+      )}
+      <path
+        d={WORDMARK_PATH}
+        style={{ opacity: wordmarkHidden ? 0 : 1, transition: 'opacity 180ms ease' }}
+      />
+    </svg>
   );
 }

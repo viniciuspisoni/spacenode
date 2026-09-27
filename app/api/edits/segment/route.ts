@@ -166,7 +166,7 @@ export async function POST(req: NextRequest) {
     const surfaceRatio = await maskWhiteRatio(mask)
     const surfaceMaskUrl = await uploadEditAsset(admin, user.id, mask, 'crop-mask')
 
-    // Overlay de preview: render com a superfície detectada tingida (verde Spacenode).
+    // Overlay de preview: render com a superfície detectada tingida (verde SpaceNode).
     const meta = await sharp(imgBuf).metadata()
     const W = meta.width ?? 0, H = meta.height ?? 0
     let previewUrl = imageUrl

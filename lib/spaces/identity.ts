@@ -3,7 +3,7 @@
 
 import type { ProjectDNA, ArchitectIdentity } from './types'
 
-export const DEFAULT_ACCENT = '#1D9E75'
+export const DEFAULT_ACCENT = '#BDC2C8'
 
 // Heurística: dado um array de hex codes, escolhe a cor com maior peso
 // percebido — saturação alta, longe de cinza-neutro, levemente tons quentes.

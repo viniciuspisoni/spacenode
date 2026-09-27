@@ -310,7 +310,7 @@ function PromptBlock({ label, text }: { label: string; text: string }) {
 function StatusPill({ status, label }: { status: string; label: string }) {
   const ok    = status === 'completed'
   const bad   = status === 'failed' || status.startsWith('rejected')
-  const color = ok ? 'var(--color-accent-green)' : bad ? 'var(--color-error)' : 'var(--color-text-secondary)'
+  const color = ok ? 'var(--color-accent)' : bad ? 'var(--color-error)' : 'var(--color-text-secondary)'
   return (
     <span style={{ ...T.statusPill, color }}>
       <span style={{ width: 5, height: 5, borderRadius: '50%', background: color, display: 'inline-block' }} />

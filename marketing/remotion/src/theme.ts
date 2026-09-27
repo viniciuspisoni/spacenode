@@ -4,12 +4,12 @@ import { Easing } from 'remotion';
 
 export const theme = {
   colors: {
-    bg: '#0A0A0A',
-    card: '#1A1A1A',
+    bg: '#151618',
+    card: '#1C1D20',
     text: '#FFFFFF',
-    text2: '#9A9AA0',
-    text3: '#6E6E76',
-    accent: '#30D158', // funcional, não decorativo — nesta campanha fica sem uso
+    text2: '#BDC2C8',
+    text3: '#8A8F97',
+    accent: '#FFFFFF',
     line: 'rgba(255,255,255,0.92)',
     glassFill: 'rgba(12,12,12,0.62)',
     glassBorder: 'rgba(255,255,255,0.14)',

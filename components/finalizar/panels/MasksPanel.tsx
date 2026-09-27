@@ -254,7 +254,7 @@ export function MasksPanel(props: MasksPanelProps) {
             {showMaskOverlay && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
                 <span style={{ fontSize: 11, color: 'var(--color-text-quaternary)' }}>Cor da visualização</span>
-                {([['green', 'Verde'], ['red', 'Vermelho'], ['white', 'Branco']] as [MaskOverlayColor, string][]).map(([c, label]) => (
+                {([['graphite', 'Grafite'], ['red', 'Vermelho'], ['white', 'Branco']] as [MaskOverlayColor, string][]).map(([c, label]) => (
                   <Chip key={c} active={maskOverlayColor === c} onClick={() => onMaskOverlayColor(c)} title={label}>
                     {label}
                   </Chip>

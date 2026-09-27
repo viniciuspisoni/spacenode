@@ -7,12 +7,12 @@ const BRIEF_TONE: Record<string, string> = {
   brief_draft:          'border-border text-text-secondary',
   awaiting_review:      'border-warning-border bg-warning-bg text-warning',
   changes_requested:    'border-warning-border bg-warning-bg text-warning',
-  approved:             'border-accent-green-border bg-accent-green-bg text-accent-green',
+  approved:             'border-accent-border bg-accent-bg text-accent',
   rejected:             'border-error-border bg-error-bg text-error',
-  ready_for_production: 'border-accent-green-border bg-accent-green-bg text-accent-green',
+  ready_for_production: 'border-accent-border bg-accent-bg text-accent',
   asset_production:     'border-border text-text-secondary',
   final_review:         'border-warning-border bg-warning-bg text-warning',
-  ready_to_schedule:    'border-accent-green-border bg-accent-green-bg text-accent-green',
+  ready_to_schedule:    'border-accent-border bg-accent-bg text-accent',
   scheduled:            'border-border text-text-secondary',
   published:            'border-border text-text-secondary',
   analyzed:             'border-border text-text-tertiary',
@@ -21,7 +21,7 @@ const BRIEF_TONE: Record<string, string> = {
 const IDEA_TONE: Record<string, string> = {
   open:        'border-border text-text-secondary',
   in_briefing: 'border-warning-border bg-warning-bg text-warning',
-  converted:   'border-accent-green-border bg-accent-green-bg text-accent-green',
+  converted:   'border-accent-border bg-accent-bg text-accent',
   archived:    'border-border text-text-tertiary',
 }
 

@@ -355,8 +355,8 @@ function LoginForm() {
         {success && (
           <div style={{
             width: '100%', padding: '11px 14px', borderRadius: 9, marginBottom: 16,
-            background: 'var(--color-accent-green-bg)', border: '0.5px solid var(--color-accent-green-border)',
-            fontSize: 13, color: 'var(--color-accent-green)', letterSpacing: '-0.01em', lineHeight: 1.5,
+            background: 'var(--color-accent-bg)', border: '0.5px solid var(--color-accent-border)',
+            fontSize: 13, color: 'var(--color-accent)', letterSpacing: '-0.01em', lineHeight: 1.5,
           }}>
             {success}
           </div>

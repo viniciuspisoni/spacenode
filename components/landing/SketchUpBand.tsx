@@ -17,11 +17,11 @@ const POINTS = [
   },
   {
     title: 'geometria como verdade',
-    desc: 'Cada cena é capturada duas vezes: a vista e um mapa de arestas da mesma câmera. O motor recebe a estrutura medida, não inferida do pixel.',
+    desc: 'A vista e um mapa de arestas da mesma câmera fornecem mais contexto geométrico para a geração.',
   },
   {
     title: 'o modelo entra como dado',
-    desc: 'Preservando a luz do projeto, a posição do sol — data, hora e local do modelo — e a lente da câmera vão no prompt como fato medido.',
+    desc: 'Ao usar a luz original, a posição do sol — data, hora e local do modelo — e a lente da câmera entram como dados da cena.',
   },
 ]
 
@@ -86,15 +86,15 @@ export function SketchUpBand() {
           margin-bottom: 14px;
         }
         .spn-skp-title {
-          font-size: clamp(22px, 3.6vw, 30px);
-          font-weight: 400;
+          font-size: clamp(32px, 3.6vw, 42px);
+          font-weight: 500;
           letter-spacing: -0.035em;
           line-height: 1.2;
           margin: 0 0 10px;
           color: var(--color-text-primary);
         }
         .spn-skp-sub {
-          font-size: 14.5px;
+          font-size: 16px;
           color: var(--color-text-secondary);
           line-height: 1.6;
           letter-spacing: -0.005em;
@@ -115,7 +115,7 @@ export function SketchUpBand() {
           margin: 0 0 7px;
         }
         .spn-skp-point-desc {
-          font-size: 13px;
+          font-size: 16px;
           color: var(--color-text-secondary);
           line-height: 1.55;
           margin: 0;

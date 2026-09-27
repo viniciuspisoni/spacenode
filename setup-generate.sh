@@ -667,7 +667,7 @@ const S: Record<string, React.CSSProperties> = {
   topbar:           { display:'flex', justifyContent:'space-between', alignItems:'center' },
   pageTitle:        { fontSize:10, letterSpacing:'0.22em', textTransform:'uppercase', color:'#86868b', fontWeight:500 },
   credits:          { display:'flex', alignItems:'center', gap:6, fontSize:11, color:'#86868b' },
-  creditDot:        { width:5, height:5, borderRadius:'50%', background:'#30b46c', boxShadow:'0 0 5px rgba(48,180,108,0.4)', display:'inline-block' },
+  creditDot:        { width:5, height:5, borderRadius:'50%', background:'#BDC2C8', boxShadow:'0 0 5px rgba(189,194,200,0.4)', display:'inline-block' },
   creditNum:        { color:'#1a1a1a', fontWeight:500, fontSize:12 },
   section:          { display:'flex', flexDirection:'column', gap:10 },
   label:            { fontSize:10, letterSpacing:'0.15em', textTransform:'uppercase', color:'#86868b', fontWeight:500 },

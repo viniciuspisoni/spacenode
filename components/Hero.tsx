@@ -53,7 +53,7 @@ export default function Hero() {
         <div className="spn-hero-media">
           <Image
             src={renderImg}
-            alt="Render fotorrealista gerado pela SpaceNode: casa de concreto e vidro ao entardecer, com a geometria e as proporções do modelo 3D preservadas"
+            alt="Visualização arquitetônica de uma casa de concreto e vidro ao entardecer"
             preload
             placeholder="blur"
             sizes="(max-width: 768px) 100vw, (max-width: 1248px) 95vw, 1132px"
@@ -90,8 +90,8 @@ export default function Hero() {
         }
         .spn-hero-title {
           font-size: clamp(40px, 5.8vw, 62px);
-          font-weight: 300;
-          letter-spacing: -0.045em;
+          font-weight: 500;
+          letter-spacing: -0.035em;
           line-height: 1.05;
           margin: 0 auto 16px;
           color: var(--color-text-primary);
@@ -182,7 +182,7 @@ export default function Hero() {
             margin-bottom: 18px;
           }
           .spn-hero-title {
-            font-size: clamp(34px, 10.4vw, 46px);
+            font-size: clamp(36px, 10.4vw, 48px);
             margin-bottom: 14px;
           }
           .spn-hero-sub { font-size: 15px; margin-bottom: 22px; }

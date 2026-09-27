@@ -1,6 +1,6 @@
 'use client'
 
-// Fluxo standalone do modo Editar do Spacenode (intenção-primeiro).
+// Fluxo standalone do modo Editar do SpaceNode (intenção-primeiro).
 //   empty   → upload da imagem (ou Importar do histórico)
 //   intent  → "O que você quer fazer?" — 8 intenções (EditIntentPicker)
 //   editing → canvas + brush + prompt + qualidade; a interface se adapta à
@@ -862,9 +862,9 @@ function EmptyStep({ onUpload, onImport, fileInputRef, onFilePicked, error }: {
         style={{
           maxWidth: 540, margin: '0 auto',
           aspectRatio: '4 / 3',
-          background: dragOver ? 'rgba(48,209,88,0.04)' : 'var(--color-bg-elevated)',
+          background: dragOver ? 'rgba(255,255,255,0.04)' : 'var(--color-bg-elevated)',
           border: dragOver
-            ? '1.5px dashed var(--color-accent-green)'
+            ? '1.5px dashed var(--color-accent)'
             : '0.5px dashed var(--color-border-strong)',
           borderRadius: 14,
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
@@ -1115,7 +1115,7 @@ function EditingStep(props: {
               display: 'flex', flexDirection: 'column', gap: 8,
             }}>
               <span style={{ fontWeight: 500 }}>A edição foi rejeitada para preservar sua imagem.</span>
-              <span style={{ fontSize: 11, color: 'var(--color-accent-green)' }}>Nenhum node foi consumido.</span>
+              <span style={{ fontSize: 11, color: 'var(--color-accent)' }}>Nenhum node foi consumido.</span>
               {references.length > 0 && (
                 <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
                   Dica: aumente um pouco a máscara ao redor do objeto para dar mais contexto à referência.
@@ -1275,7 +1275,7 @@ function EditingStep(props: {
           </button>
           {!submitting && routePreview?.explanation && (
             <p style={{
-              fontSize: 10.5, color: routePreview.isFreeFix ? 'var(--color-accent-green)' : 'var(--color-text-tertiary)',
+              fontSize: 10.5, color: routePreview.isFreeFix ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
               lineHeight: 1.5, textAlign: 'center', margin: 0,
             }}>
               {routePreview.explanation}
@@ -1384,7 +1384,7 @@ export function MaskToolbar({
           value={brush}
           onChange={e => setBrush(Number(e.target.value))}
           disabled={disabled}
-          style={{ width: '100%', accentColor: 'var(--color-accent-green)' }}
+          style={{ width: '100%', accentColor: 'var(--color-accent)' }}
         />
       </div>
 
@@ -1570,8 +1570,8 @@ export function GeometryToggle({ value, onChange, disabled }: {
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
           padding: '9px 12px', borderRadius: 8,
-          background: value ? 'var(--color-accent-green-bg)' : 'var(--color-surface)',
-          border: value ? '0.5px solid var(--color-accent-green-border)' : '0.5px solid var(--glass-line)',
+          background: value ? 'var(--color-accent-bg)' : 'var(--color-surface)',
+          border: value ? '0.5px solid var(--color-accent-border)' : '0.5px solid var(--glass-line)',
           color: 'var(--color-text-primary)', fontSize: 12, fontFamily: 'inherit',
           cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1,
           letterSpacing: '-0.005em', textAlign: 'left',
@@ -1580,7 +1580,7 @@ export function GeometryToggle({ value, onChange, disabled }: {
         <span>Preservar geometria, perspectiva e iluminação original</span>
         <span style={{
           fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', whiteSpace: 'nowrap',
-          color: value ? 'var(--color-accent-green)' : 'var(--color-text-quaternary)',
+          color: value ? 'var(--color-accent)' : 'var(--color-text-quaternary)',
         }}>
           {value ? 'ATIVADO' : 'DESATIVADO'}
         </span>
@@ -1705,7 +1705,7 @@ function ExplicitReferenceFields({ sourceUrl, references, onAddReference, onRemo
       <p style={{
         fontSize: 10.5, color: 'var(--color-text-tertiary)', lineHeight: 1.5, margin: 0,
         padding: '7px 10px', borderRadius: 7,
-        background: 'var(--color-accent-green-bg)', border: '0.5px solid var(--color-accent-green-border)',
+        background: 'var(--color-accent-bg)', border: '0.5px solid var(--color-accent-border)',
       }}>
         A referência não será editada — ela serve apenas como guia visual para a
         área selecionada na imagem principal.
@@ -1951,9 +1951,9 @@ function VersionThumb({ version, active, onPick, onUseAsBase }: {
           position: 'relative', width: 96, height: 72,
           padding: 0, borderRadius: 8, overflow: 'hidden',
           background: 'var(--color-bg)',
-          border: active ? '1.5px solid var(--color-accent-green)' : '0.5px solid var(--glass-line)',
+          border: active ? '1.5px solid var(--color-accent)' : '0.5px solid var(--glass-line)',
           cursor: 'pointer',
-          boxShadow: active ? '0 0 0 2px var(--color-accent-green-border)' : 'none',
+          boxShadow: active ? '0 0 0 2px var(--color-accent-border)' : 'none',
         }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}

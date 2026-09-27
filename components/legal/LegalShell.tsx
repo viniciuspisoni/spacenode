@@ -27,7 +27,7 @@ export function LegalShell({
         maxWidth: 760, margin: '0 auto', padding: '28px 24px 0',
       }}>
         <Link href="/" style={{ display: 'inline-flex', color: 'var(--color-text-primary)', textDecoration: 'none' }}>
-          <Brandmark size={22} />
+          <Brandmark size={26} />
         </Link>
       </header>
 

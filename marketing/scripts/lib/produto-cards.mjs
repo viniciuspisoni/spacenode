@@ -54,7 +54,7 @@ const css = (band) => `
 }
 .passo {
   font-size: 26px; font-weight: 500; text-transform: uppercase;
-  letter-spacing: 0.16em; color: #A1A1A6; display: block; margin-bottom: 14px;
+  letter-spacing: 0.16em; color: #bdc2c8; display: block; margin-bottom: 14px;
 }
 `;
 
@@ -79,7 +79,7 @@ export function buildCards({ hook, velocidade, marcas }, band) {
         .final { position: absolute; inset: 0; display: flex; flex-direction: column;
                  align-items: center; justify-content: center; gap: 44px; }
         .final svg { width: 460px; height: auto; }
-        .final .url { font-size: 34px; font-weight: 400; letter-spacing: 0.02em; color: #A1A1A6; }`,
+        .final .url { font-size: 34px; font-weight: 400; letter-spacing: 0.02em; color: #bdc2c8; }`,
       body: `<div class="final">${logoSvg()}<div class="url">spacenode.app</div></div>`,
     }),
   };

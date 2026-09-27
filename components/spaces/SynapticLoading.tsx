@@ -79,7 +79,7 @@ export function SynapticLoading({ spaceName, count, totalNodes, engine, quality,
         {PHASES.map((_, i) => (
           <span key={i} style={{
             width: i === phase ? 18 : 5, height: 5, borderRadius: 999,
-            background: i === phase ? 'var(--color-accent-green)' : 'rgba(255,255,255,0.18)',
+            background: i === phase ? 'var(--color-accent)' : 'rgba(255,255,255,0.18)',
             transition: 'all 0.3s',
           }} />
         ))}
@@ -93,7 +93,7 @@ export function SynapticLoading({ spaceName, count, totalNodes, engine, quality,
 
       <style>{`
         .syn-node {
-          fill: var(--color-accent-green);
+          fill: var(--color-accent);
           transform-origin: center;
           animation: synPulse 1.6s ease-in-out infinite;
         }
@@ -104,7 +104,7 @@ export function SynapticLoading({ spaceName, count, totalNodes, engine, quality,
         .syn-n5 { animation-delay: 0.72s; }
 
         .syn-line {
-          stroke: var(--color-accent-green);
+          stroke: var(--color-accent);
           opacity: 0.3;
           stroke-dasharray: 4 6;
           animation: synLineFlow 2.2s linear infinite;

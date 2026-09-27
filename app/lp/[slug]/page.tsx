@@ -41,7 +41,7 @@ const HAIRLINE = '0.5px solid var(--color-border)'
 // Descrições curtas dos módulos citáveis (fatos do produto — nada além do que
 // os módulos realmente fazem; léxico proibido em docs/marketing).
 const MODULE_DESCRIPTIONS: Record<string, string> = {
-  renderizar:        'Imagens fotorrealistas a partir de modelos, prints e referências — preservando geometria, proporções e perspectiva.',
+  renderizar:        'Imagens fotorrealistas a partir de modelos, prints e referências, guiadas pela geometria, proporções e perspectiva do projeto.',
   spaces:            'Variações do mesmo projeto com identidade consistente: iluminação, ângulos e detalhes.',
   editar:            'Ajustes pontuais na imagem, sem refazer o render.',
   ampliar:           'Mais resolução para a imagem final do projeto.',

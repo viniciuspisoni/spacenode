@@ -129,15 +129,15 @@ function iconSvg(id) {
   return svgDoc(ICON, ICON,
     '<g fill="none" stroke="#fff" stroke-opacity="0.95" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' + ICON_PATHS[id] + '</g>');
 }
-// ConstellationN — geometria de sketchup/spacenode/assets/spacenode.svg (a
-// adaptação oficial do símbolo pra toolbar: traço 5, nó r 6, grade 64).
+// N estrutural micro (28 px), lido do SVG oficial compartilhado.
 function markSvg() {
   const k = MARK / 64;
+  const source = fs.readFileSync(path.join(ROOT, 'public', 'brand', 'spacenode-symbol-micro.svg'), 'utf8');
+  const markPath = source.match(/<path d="([^"]+)"/)?.[1];
+  if (!markPath) throw new Error('N estrutural micro ausente');
   return svgDoc(MARK, MARK,
-    '<g transform="scale(' + k + ')">' +
-    '<g stroke="#fff" stroke-opacity="0.95" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none">' +
-    '<line x1="16" y1="16" x2="16" y2="48"/><line x1="16" y1="16" x2="48" y2="48"/><line x1="48" y1="16" x2="48" y2="48"/></g>' +
-    '<g fill="#fff" fill-opacity="0.95"><circle cx="16" cy="16" r="6"/><circle cx="16" cy="48" r="6"/><circle cx="48" cy="16" r="6"/><circle cx="48" cy="48" r="6"/></g>' +
+    '<g transform="scale(' + k + ')" fill="#fff" fill-opacity="0.95">' +
+    '<path d="' + markPath + '"/>' +
     '</g>');
 }
 function spinSvg(frame) {

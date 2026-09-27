@@ -172,7 +172,7 @@ function AvatarRing({ state, ratio, arcLen, noQuota, userAvatar, initials }: {
           /* Sem cota mensal (conta gratuita): anel verde sutil e decorativo. */
           <circle cx="21" cy="21" r={RADIUS}
             fill="none"
-            stroke="var(--color-accent-green-glow)"
+            stroke="var(--color-accent-glow)"
             strokeWidth="2.5" />
         ) : (
           <>
@@ -281,7 +281,7 @@ function BalancePopover({ planId, planBalance, planTotal, extraBalance, graceDay
   // Conta gratuita não tem cota mensal: estado próprio (verde), em vez de "Zerado".
   // Na janela pós-cancelamento o que importa é o prazo, não a cota — o
   // usuário está tecnicamente no free, mas ainda gastando saldo de assinante.
-  const pillColor = inGrace ? BALANCE_COLORS.atencao : noQuota ? '#30d158' : BALANCE_COLORS[state]
+  const pillColor = inGrace ? BALANCE_COLORS.atencao : noQuota ? '#ffffff' : BALANCE_COLORS[state]
   const pillLabel = inGrace ? 'Cortesia'             : noQuota ? 'Gratuito' : stateLabel[state]
 
   return (
@@ -371,7 +371,7 @@ function Sparkline({ days }: { days: { day: string; nodes: number }[] }) {
             <div key={i} style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
               <div style={{
                 width: '100%', height: `${Math.max(h, 4)}%`,
-                background: isToday ? 'var(--color-accent-green)' : 'var(--color-surface-hover)',
+                background: isToday ? 'var(--color-accent)' : 'var(--color-surface-hover)',
                 borderRadius: 2,
                 transition: 'height 0.4s',
               }} title={`${d.day}: ${d.nodes} nodes`} />

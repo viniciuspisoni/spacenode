@@ -43,7 +43,7 @@ export default async function ApprovalQueuePage() {
                   <span>{brief.format ?? 'sem formato'}</span>
                   <span>atualizado {new Date(brief.updated_at).toLocaleDateString('pt-BR')}</span>
                   {brief.brand_check && (
-                    <span className={brief.brand_check.approved ? 'text-accent-green' : 'text-warning'}>
+                    <span className={brief.brand_check.approved ? 'text-accent' : 'text-warning'}>
                       verificação: {brief.brand_check.score}/100
                     </span>
                   )}

@@ -1844,7 +1844,7 @@ const S: Record<string, CSSProperties> = {
   badgeRow:      { position: 'absolute', top: 10, right: 10, display: 'flex', gap: 5, zIndex: 2 },
   badge:         { fontSize: 9, letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 500, padding: '3px 7px', borderRadius: 5, background: 'var(--color-scrim)', color: 'rgba(255,255,255,0.88)' },
   badge3d:       { position: 'absolute', top: 8, right: 8, fontSize: 8, fontWeight: 700, letterSpacing: '0.08em', color: 'rgba(255,255,255,0.9)', background: 'var(--color-scrim)', border: '0.5px solid rgba(255,255,255,0.22)', padding: '2px 6px', borderRadius: 6 },
-  editedBadge:   { position: 'absolute', top: 8, right: 8, padding: '3px 8px', borderRadius: 5, background: 'var(--color-accent-green)', color: '#000', fontSize: 9, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' },
+  editedBadge:   { position: 'absolute', top: 8, right: 8, padding: '3px 8px', borderRadius: 5, background: 'var(--color-accent)', color: '#000', fontSize: 9, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' },
   authorChip:    { position: 'absolute', bottom: 8, left: 8, zIndex: 2, width: 20, height: 20, borderRadius: '50%', background: 'var(--color-scrim)', border: '0.5px solid rgba(255,255,255,0.22)', color: 'rgba(255,255,255,0.85)', fontSize: 7.5, fontWeight: 600, letterSpacing: '0.04em', display: 'flex', alignItems: 'center', justifyContent: 'center', userSelect: 'none' },
   thumbIconBtn:  { position: 'absolute', top: 8, right: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26, borderRadius: 7, border: 'none', background: 'var(--color-scrim)', color: '#ffffff', cursor: 'pointer' },
 

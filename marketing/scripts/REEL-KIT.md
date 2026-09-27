@@ -32,7 +32,7 @@ yuv420p, sem áudio), `qa-frames/*.png`, `probe.json`, `spec.json` (cópia do sp
   "cards": {
     "scrim":  { "layout": "scrim" },                                   // escurece topo/base fora da banda (camada própria!)
     "antes":  { "layout": "hook-sub", "hook": "Texto ≤8 palavras", "eyebrow": "Modelo SketchUp" },
-    "depois": { "layout": "hook-sub", "hook": "…", "sub": "Apoio com {uma} palavra verde" },
+    "depois": { "layout": "hook-sub", "hook": "…", "sub": "Apoio com {uma} palavra em destaque neutro" },
     "chip":   { "layout": "chip", "text": "Animar · vídeo do render" },   // pílula logo abaixo da banda
     "abre":   { "layout": "statement", "transparent": false, "eyebrow": "Spaces", "big": "Frase<br>grande", "small": "apoio" },
     "final":  { "layout": "final", "cta": "Teste com um projeto real" }  // logo monocromático + CTA + spacenode.app
@@ -60,7 +60,7 @@ yuv420p, sem áudio), `qa-frames/*.png`, `probe.json`, `spec.json` (cópia do sp
   1080×1920 do Animar, vistas em retrato) ou quando o recorte central é o assunto.
 - Vídeo em retrato (aspect < 1) vira cover automaticamente.
 - `kenburns: [de, até]` zoom linear na banda (máx. 1.08). `[1, 1]` = parado (bom para o "antes").
-- Texto: `{palavra}` = a única palavra em verde (#30D158). Máx. 1 por card. Sem emoji.
+- Texto: `{palavra}` = ênfase em branco ou grafite, conforme o tema. Máx. 1 por card. Sem emoji.
 - Todos os cards da mesma peça compartilham a geometria da banda (o hook fica 76px acima
   da banda; o sub 64px abaixo). `bandGeometry` levanta erro se invadir a zona segura.
 
@@ -74,13 +74,12 @@ yuv420p, sem áudio), `qa-frames/*.png`, `probe.json`, `spec.json` (cópia do sp
 - Antes/depois SEMPRE do mesmo projeto e mesma câmera. Nunca gerar imagem nova para o
   Reel: só o que está no acervo.
 - QA obrigatório: abrir os `qa-frames/` (Read) e conferir texto legível, zona segura,
-  verde só na palavra marcada, sem flash claro no corte, banda alinhada no wipe.
+  ênfase neutra só na palavra marcada, sem flash claro no corte, banda alinhada no wipe.
 
 ## Linguagem atual (set/2026) — já embutida nos cards
-- Cards sólidos usam `#1a1a1a` (faixa escura da landing). `"theme": "light"` em `statement`/`hook-sub`/`final`
-  espelha as faixas claras (#fafafa, texto #1a1a1a, verde #30b46c).
-- `[trecho]` dentro de qualquer texto vira cinza terciário (é a 2ª linha do título do hero:
-  `"big": "Visualização arquitetônica<br>[que respeita seu projeto.]"`). `{palavra}` continua sendo o verde.
+- Cards sólidos usam Grafite `#151618`. `"theme": "light"` em `statement`/`hook-sub`/`final`
+  usa Porcelana `#F7F7F5`, texto Grafite e ênfase neutra.
+- `[trecho]` dentro de qualquer texto vira cinza terciário. `{palavra}` recebe ênfase neutra por peso ou sublinhado.
 - `eyebrow` sai uppercase 0.22em com fios de 0.5px dos dois lados, como na landing.
 - `final`: logo monocromático + pílula `CTA →` + microcopy (default "80 nodes grátis · sem cartão · em português";
   `"micro": ""` remove). Sem URL na arte por padrão (`"url": "spacenode.app"` liga). Títulos em minúsculas com ponto final ("três passos. do estudo à apresentação.").
@@ -111,8 +110,7 @@ yuv420p, sem áudio), `qa-frames/*.png`, `probe.json`, `spec.json` (cópia do sp
   zoom em fração da folga (0 = esquerda/topo, 0.5 = centro, 1 = direita/base). Com `kenburns: [6, 1]`
   + `pan: [0.74, 0.5]` + `panY: [0.88, 0.5]` a peça abre num detalhe de textura e afasta até a imagem
   inteira — o "mistério" do Reel "o que é isso?".
-- `accent: false` no topo do spec neutraliza o verde de `{palavra}` em todos os cards (rodada orgânica
-  de 05/09 foi inteira sem verde, a pedido do dono).
+- `accent: false` no topo do spec desativa a ênfase de `{palavra}` em todos os cards.
 
 ## Specs versionados (`marketing/specs/`)
 - Caminhos de imagem usam `$ACERVO` (raiz do acervo baixado, fora do repo — `SPACENODE_ACERVO`,

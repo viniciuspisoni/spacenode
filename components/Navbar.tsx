@@ -148,7 +148,7 @@ export default function Navbar() {
     <>
       <nav className={`spn-nav ${scrolled ? 'is-scrolled' : ''}`} style={navStyle}>
         <span className="nav-logo">
-          <Logo symbolSize={48} />
+          <Logo symbolSize={36} />
         </span>
 
         <div className="nav-links">

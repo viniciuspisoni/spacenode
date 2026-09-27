@@ -565,7 +565,7 @@ export function EditCleanFlow({ initialBalance }: { initialBalance: number }) {
                             width: 5,
                             height: 5,
                             borderRadius: 99,
-                            background: 'var(--color-accent-green)',
+                            background: 'var(--color-accent)',
                           }}
                         />
                       )}

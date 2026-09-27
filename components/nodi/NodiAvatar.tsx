@@ -3,7 +3,7 @@
 // Personagem geométrico próprio do Nodi: quatro nós conectados em losango
 // (ciclo fechado = diálogo), irmão do "N" da constelação oficial — mesma
 // gramática (nós r=3, traço 1.5, monocromático), arranjo próprio. O logotipo
-// oficial (ConstellationN/Logo) segue intocado; este símbolo é só do Nodi.
+// oficial (N estrutural/assinatura) segue independente; este símbolo é só do Nodi.
 //
 // Estados animados (discretos, definidos em globals.css · seção "Nodi"):
 //   idle      — respiração sutil do nó superior

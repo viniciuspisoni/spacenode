@@ -361,8 +361,8 @@ export function VistaDetail({ space, vista, others, initialBalance }: Props) {
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6,
                 padding: '10px 16px', borderRadius: 10,
-                background: 'var(--color-accent-green-bg)', color: 'var(--color-accent-green)',
-                border: '0.5px solid var(--color-accent-green-border)',
+                background: 'var(--color-accent-bg)', color: 'var(--color-accent)',
+                border: '0.5px solid var(--color-accent-border)',
                 fontSize: 12, fontWeight: 500, letterSpacing: '-0.005em',
               }}
             >
@@ -383,8 +383,8 @@ export function VistaDetail({ space, vista, others, initialBalance }: Props) {
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6,
                 padding: '10px 16px', borderRadius: 10,
-                background: 'var(--color-accent-green-bg)', color: 'var(--color-accent-green)',
-                border: '0.5px solid var(--color-accent-green-border)',
+                background: 'var(--color-accent-bg)', color: 'var(--color-accent)',
+                border: '0.5px solid var(--color-accent-border)',
                 fontSize: 12, fontWeight: 500, letterSpacing: '-0.005em',
               }}
             >
@@ -531,7 +531,7 @@ function ComparisonSection({
       display: 'grid', gap: 14,
       gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
     }}>
-      <ComparisonCard label={referenceLabel} color="var(--color-accent-green)" imageUrl={referenceUrl} subLabel={preserveV2 ? 'referência' : undefined} />
+      <ComparisonCard label={referenceLabel} color="var(--color-accent)" imageUrl={referenceUrl} subLabel={preserveV2 ? 'referência' : undefined} />
       <ComparisonCard label={variationLabel} color={variationColor} imageUrl={variationUrl} subLabel={variationSub} />
     </div>
   )
@@ -556,8 +556,8 @@ function ComparisonSection({
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
             padding: '5px 11px', borderRadius: 999,
-            background: 'var(--color-accent-green-bg)', color: 'var(--color-accent-green)',
-            border: '0.5px solid var(--color-accent-green-border)',
+            background: 'var(--color-accent-bg)', color: 'var(--color-accent)',
+            border: '0.5px solid var(--color-accent-border)',
             fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase',
           }}
         >
@@ -570,7 +570,7 @@ function ComparisonSection({
           {/* Imagem única que alterna Antes/Depois */}
           <ComparisonCard
             label={side === 'antes' ? `Antes · ${referenceLabel}` : `Depois · ${variationLabel}`}
-            color={side === 'antes' ? 'var(--color-accent-green)' : variationColor}
+            color={side === 'antes' ? 'var(--color-accent)' : variationColor}
             imageUrl={side === 'antes' ? referenceUrl : variationUrl}
             subLabel={side === 'depois' ? variationSub : 'referência'}
           />
@@ -659,8 +659,8 @@ function DnaPreservationPanel({ passed, verification }: { passed: boolean; verif
     { label: 'Paleta',    key: 'paleta' },
     { label: 'Contexto',  key: 'contexto' },
   ]
-  const accent = passed ? 'var(--color-accent-green)' : 'var(--color-warning)'
-  const accentBg = passed ? 'var(--color-accent-green-bg)' : 'var(--color-warning-bg)'
+  const accent = passed ? 'var(--color-accent)' : 'var(--color-warning)'
+  const accentBg = passed ? 'var(--color-accent-bg)' : 'var(--color-warning-bg)'
   const passedCount = checks.filter(c => verification.scores[c.key] >= 0.85).length
 
   return (
@@ -715,8 +715,8 @@ function DnaPreservationPanel({ passed, verification }: { passed: boolean; verif
             }}>
               <span style={{
                 width: 16, height: 16, borderRadius: 999,
-                background: ok ? 'var(--color-accent-green-bg)' : 'var(--color-warning-bg)',
-                color: ok ? 'var(--color-accent-green)' : 'var(--color-warning)',
+                background: ok ? 'var(--color-accent-bg)' : 'var(--color-warning-bg)',
+                color: ok ? 'var(--color-accent)' : 'var(--color-warning)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 flexShrink: 0,
               }}>

@@ -289,7 +289,7 @@ export function BriefEditorClient({ initialDetail }: { initialDetail: BriefDetai
                 </div>
               </div>
               <div>
-                <label className={labelCls}>Direção visual (imagem real, enquadramento, verde funcional)</label>
+                <label className={labelCls}>Direção visual (imagem real, enquadramento, paleta neutra)</label>
                 <textarea value={form.visual_direction} onChange={set('visual_direction')} disabled={!editable} rows={3} className={`mt-1 ${inputCls}`} />
               </div>
             </div>
@@ -313,7 +313,7 @@ export function BriefEditorClient({ initialDetail }: { initialDetail: BriefDetai
             </div>
             {check ? (
               <div className="mt-3 space-y-2">
-                <div className={`text-2xl font-semibold ${check.approved ? 'text-accent-green' : check.score >= 60 ? 'text-warning' : 'text-error'}`}>
+                <div className={`text-2xl font-semibold ${check.approved ? 'text-accent' : check.score >= 60 ? 'text-warning' : 'text-error'}`}>
                   {check.score}<span className="text-sm text-text-tertiary">/100</span>
                 </div>
                 <div className="text-xs text-text-tertiary">
@@ -616,7 +616,7 @@ function ProjectsPanel({ briefId, projects, run, busy, onDone }: {
           {projects.map(link => (
             <li key={link.id} className="rounded-md border border-border px-3 py-2 text-xs">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className={`font-medium ${link.permission_status === 'granted' ? 'text-accent-green' : link.permission_status === 'denied' ? 'text-error' : 'text-warning'}`}>
+                <span className={`font-medium ${link.permission_status === 'granted' ? 'text-accent' : link.permission_status === 'denied' ? 'text-error' : 'text-warning'}`}>
                   {PERMISSION_LABELS[link.permission_status] ?? link.permission_status}
                 </span>
                 <select

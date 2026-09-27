@@ -18,31 +18,26 @@ médio. Dores: render tradicional é caro (R$150–600/imagem terceirizada),
 lento (madrugadas no V-Ray/Lumion) e exige hardware caro. Tom: "de arquiteto
 para arquiteto" — direto, honesto, zero hype de IA, zero corporativês.
 
-## Identidade visual (NUNCA desviar)
-- Fundo escuro: #0A0A0A (dark) / claro: #FAFAFA — sistema Apple-inspired
-- Verde de destaque: #30D158 (usar com parcimônia: CTAs, números, 1 palavra-chave)
-- Tipografia: Geist SemiBold para títulos, Geist Regular para corpo
-  (fonte em marketing/brand/; se faltar, baixar de vercel/geist no GitHub)
-- Logo: símbolo "ConstellationN" — um "N" formado por 3 traços lineares e 4 nós
-  (círculos) nos vértices, opcionalmente com o wordmark "spacenode" à direita.
-  Arquivos em marketing/brand/. **100% monocromático** (branco sobre escuro) —
-  a versão com nó de acento verde foi aposentada pelo dono em 2026-07-02.
-- Texto branco #FFFFFF sobre fundo escuro; nunca usar outras cores de destaque
-- Estética minimalista: muito respiro, sem sombras exageradas, sem gradientes
-  chamativos, sem emoji dentro das artes (emoji só em legenda)
+## Identidade visual (manual oficial v2.0)
+- Grafite `#151618`, Branco `#FFFFFF`, Porcelana `#F7F7F5`, Névoa `#E8E9E7`, Prata `#BDC2C8` e texto secundário `#60646B`.
+- Sem verde de marca. Ênfase por peso, contraste ou sublinhado; estados de sucesso usam ícone e texto neutros.
+- Geist Medium 500 para displays, títulos e rótulos; Geist Regular 400 para corpo.
+- Símbolo N estrutural e wordmark oficial em curvas, disponíveis em `marketing/brand/`.
+- Estética minimalista, espaço generoso e vidro apenas em navegação ou controles flutuantes.
+- Texto direto e sereno, sem promessas absolutas. Consulte `docs/BRAND.md` para regras completas.
 
 ## Especificações técnicas dos assets
 - Reels: 1080×1920 (9:16), 30 fps, H.264 (libx264, crf 18, yuv420p), SEM áudio
   (a música é adicionada no app do Instagram para pegar áudio em alta)
 - Feed/carrossel: 1080×1350 (4:5), PNG
-- Capas de highlight: 1080×1920, ícone centralizado em círculo, fundo #0A0A0A
+- Capas de highlight: 1080×1920, símbolo centralizado em círculo, fundo Grafite `#151618`
 - Zona segura nos Reels: nada de texto nos 220px do topo nem nos 320px da base
   (a UI do Instagram cobre essas áreas); texto sempre no terço central
 - Duração: Reels de transformação 8–12s; screen recording 20–30s; compilados 15s
 
 ## Pipeline de produção
 1. TEXTOS NA TELA: nunca usar drawtext do ffmpeg (kerning ruim). Gerar cada
-   card de texto como HTML (Geist, fundo transparente ou #0A0A0A) e capturar
+   card de texto como HTML (Geist, fundo transparente ou #151618) e capturar
    PNG 1080×1920 com Playwright (deviceScaleFactor 2, depois reduzir). Isso
    vale para slides de carrossel também — carrossel é HTML → screenshot.
 2. VÍDEO: montar com ffmpeg a partir dos PNGs e renders:
@@ -53,7 +48,7 @@ para arquiteto" — direto, honesto, zero hype de IA, zero corporativês.
 3. SCREEN RECORDING do produto: usar Playwright contra o app local
    (npm run dev), viewport 1920×1080, gravar o fluxo upload → ajustes →
    gerar → resultado. Acelerar 2x no ffmpeg (setpts=0.5*PTS) e compor dentro
-   do frame 9:16: vídeo no centro, fundo #0A0A0A, título em cima.
+   do frame 9:16: vídeo no centro, fundo #151618, título em cima.
    NUNCA gravar dados reais de usuários do beta — usar conta/projeto de demo.
 4. RENDERS: usar SOMENTE imagens de marketing/renders/ (material real do
    produto). NUNCA gerar renders com IA externa para fingir que são output
@@ -125,9 +120,8 @@ da landing (mesmo nome nos dois lados, conforme a regra dos pares):
 - `geist-latin.woff2` / `geist-latin-ext.woff2` — a mesma Geist que o app usa
   (`@font-face` local, sem CDN)
 
-Fonte de verdade da identidade em código: `components/brand/Logo.tsx`,
-`components/brand/ConstellationN.tsx` e os tokens de `app/globals.css`
-(`--color-accent-green: #30d158` no dark).
+Fonte de verdade da identidade em código: `components/brand/geometry.ts`,
+`components/brand/Brandmark.tsx`, `docs/BRAND.md` e os tokens de `app/globals.css`.
 
 ## Ferramental (instalado em 2026-07-29)
 
@@ -202,7 +196,7 @@ de QA e o `ffprobe` de conferência. `caption.txt` e `QA.md` são escritos à m�
 cada post (a legenda é editorial, não template).
 
 **Roteiros** ficam em `marketing/scripts/lib/roteiros.mjs` — hook do antes, hook do
-depois e subtexto, com `{palavra}` marcando a única palavra em verde. Já existem
+depois e subtexto, com `{palavra}` marcando a palavra de ênfase neutra. Já existem
 `base` (banheiro), `entrega` (living), `preco` (casa) e `apresentacao` (industrial).
 Novo Reel = nova entrada lá, não um script novo.
 

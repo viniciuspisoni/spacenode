@@ -101,7 +101,7 @@ export function ToolRail({ tool, onTool, aiEnabled }: Props) {
             {/* estado ativo: linha lateral verde de 2px — único verde do trilho */}
             <span style={{
               position: 'absolute', left: 0, top: 8, bottom: 6, width: 2, borderRadius: 2,
-              background: active ? 'var(--color-accent-green)' : 'transparent',
+              background: active ? 'var(--color-accent)' : 'transparent',
             }} />
             {t.icon}
             <span style={{ fontSize: 9, fontWeight: active ? 600 : 500, letterSpacing: '0.02em' }}>{t.label}</span>
