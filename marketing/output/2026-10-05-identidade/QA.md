@@ -7,4 +7,7 @@
 - [x] Sem imagem que simule resultado do produto ou dado de cliente.
 - [x] Story com textos principais e chamada dentro da área central segura.
 - [x] Legenda com palavras-chave e chamada para o site e teste grátis.
+- [x] Carrossel programado para 05/10/2026 às 10h05 em Instagram e Facebook; itens vistos no Planner do Meta Business Suite.
+- [x] Dois Stories por canal programados para 05/10/2026 às 10h10; quatro itens vistos na lista de Stories programados.
+- [x] Link clicável adicionado aos Stories do Facebook. No Instagram, o endereço está impresso nas artes porque o agendador da Meta não oferece link clicável.
 - [ ] Conferência de publicação nas contas da SpaceNode em 05/10/2026.
