@@ -1,8 +1,8 @@
-# Marca no código — Manual da Marca v2.1
+# Marca no código — Manual da Marca v2.2
 
-Fonte da verdade: [*SpaceNode — Manual da Marca v2.1, Revisão Cromática*](../marketing/brand/SpaceNode-Manual-da-Marca-v2.1.pdf) (29/09/2026).
+Fonte da verdade: [*SpaceNode — Manual da Marca v2.2, Paleta Digital*](../marketing/brand/SpaceNode-Manual-da-Marca-v2.2.pdf) (29/09/2026).
 A base da identidade foi aprovada em 25/09/2026. Sistema oficial: **N estrutural + Geist +
-neutros + vidro pontual.** Vento Gélido e Conforto ampliam a comunicação sem recolorir o logo.
+neutros + vidro pontual.** Três cores secundárias ampliam a comunicação sem recolorir o logo.
 Esta edição substitui as diretrizes anteriores de cor para a comunicação.
 
 ## Regras que mais aparecem no código
@@ -41,10 +41,13 @@ Os ícones do app (`app/icon.tsx`, `app/apple-icon.tsx`) e a imagem Open Graph
 Paleta fixa: `--color-grafite` #151618 · `--color-branco` #FFFFFF · `--color-porcelana` #F7F7F5 ·
 `--color-nevoa` #E8E9E7 · `--color-prata` #BDC2C8 · `--color-secundario` #60646B.
 
-Paleta secundária de comunicação: `--color-vento-gelido` **#BAC3C6** (Suvinil B395) e
-`--color-conforto` **#A3AEB0** (Suvinil C395). Usar em fundos, cards, faixas e detalhes de site,
-redes sociais e divulgação. Texto Grafite sobre ambas; CTA Grafite com texto branco. Não usar texto
-branco diretamente nessas cores. A interface funcional do produto mantém os tokens neutros.
+Paleta secundária de comunicação: `--color-sede-01` **#BAC3C6**,
+`--color-sede-02` **#A3AEB0** e `--color-azul-destaques` **#4D6685**
+(cor amostrada da captura dos destaques do Instagram em 29/09/2026).
+**Não citar os nomes das tintas nem o fabricante em materiais públicos**; usar apenas os nomes do manual.
+Usar as cores em fundos, cards, capas de destaque e detalhes de comunicação. Texto Grafite sobre
+as duas cores da sede; texto branco sobre o azul dos destaques (5,9:1). A assinatura permanece
+preta ou branca. A interface funcional do produto mantém os tokens neutros.
 
 Tema escuro (padrão, base Grafite) e tema claro (`html.light` ou a classe de seção `.sn-theme-light`,
 base Porcelana) usam os mesmos nomes:
@@ -62,7 +65,7 @@ base Porcelana) usam os mesmos nomes:
 
 ## Tipografia
 
-Geist Sans. Seguir os pesos especificados na página 11 do manual: Display e Título em Medium 500,
+Geist Sans. Seguir os pesos especificados na página 13 do manual: Display e Título em Medium 500,
 Corpo em Regular 400, Etiqueta em Medium 500. Semibold 600 fica disponível para casos pontuais.
 
 Classes: `.sn-display` (56–80 px, −0,035 em; 36–48 px em telas estreitas), `.sn-title` (32–48 px,

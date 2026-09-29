@@ -50,12 +50,13 @@ export default function IdentidadePage() {
       <section className={styles.palette} aria-labelledby="palette-title">
         <div className={styles.paletteIntro}>
           <p className={styles.eyebrow}>02 / A paleta</p>
-          <h2 id="palette-title">A cor da sede chega à comunicação.</h2>
-          <p>Vento Gélido e Conforto, da Suvinil, entram em fundos e detalhes de site, redes sociais e materiais de divulgação. A assinatura continua preta ou branca.</p>
+          <h2 id="palette-title">Da sede para o digital.</h2>
+          <p>Tons suaves do nosso espaço se encontram com o azul que já aparece nos destaques do Instagram. A assinatura continua preta ou branca.</p>
         </div>
         <div className={styles.swatches}>
-          <div className={styles.wind}><span>Vento Gélido</span><small>#BAC3C6</small></div>
-          <div className={styles.comfort}><span>Conforto</span><small>#A3AEB0</small></div>
+          <div className={styles.siteOne}><span>Sede / 01</span><small>#BAC3C6</small></div>
+          <div className={styles.siteTwo}><span>Sede / 02</span><small>#A3AEB0</small></div>
+          <div className={styles.highlight}><span>Destaques</span><small>#4D6685</small></div>
         </div>
       </section>
 

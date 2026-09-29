@@ -14,6 +14,7 @@ WHITE = "#FFFFFF"
 PORCELAIN = "#F7F7F5"
 WIND = "#BAC3C6"
 COMFORT = "#A3AEB0"
+HIGHLIGHT = "#4D6685"
 MUTED = "#60646B"
 FONT = ROOT / "node_modules/next/dist/compiled/@vercel/og/Geist-Regular.ttf"
 BRAND = ROOT / "public/brand"
@@ -88,13 +89,15 @@ d = ImageDraw.Draw(im)
 logo(im, dark=True)
 rule(d, 251, GRAPHITE)
 txt(d, (84, 303), "02  /  CORES SECUNDÁRIAS", 23)
-txt(d, (84, 386), "A cor da sede chega\nà comunicação.", 66, spacing=1.08)
-d.rounded_rectangle((84*S, 674*S, 996*S, 905*S), radius=20*S, fill=WIND)
-d.rounded_rectangle((84*S, 930*S, 996*S, 1161*S), radius=20*S, fill=COMFORT)
-txt(d, (118, 715), "Vento Gélido", 37)
-txt(d, (118, 827), "#BAC3C6", 24)
-txt(d, (118, 971), "Conforto", 37)
-txt(d, (118, 1083), "#A3AEB0", 24)
+txt(d, (84, 386), "Da sede para\no digital.", 66, spacing=1.08)
+for top, fill, label, hexa, on_color in [
+    (674, WIND, "SEDE / 01", "#BAC3C6", GRAPHITE),
+    (836, COMFORT, "SEDE / 02", "#A3AEB0", GRAPHITE),
+    (998, HIGHLIGHT, "DESTAQUES", "#4D6685", WHITE),
+]:
+    d.rounded_rectangle((84*S, top*S, 996*S, (top+146)*S), radius=20*S, fill=fill)
+    txt(d, (118, top+27), label, 23, on_color)
+    txt(d, (118, top+70), hexa, 37, on_color)
 txt(d, (84, 1221), "Assinatura sempre em grafite ou branco.", 24, MUTED)
 finish(im, "03-paleta.png")
 
@@ -117,7 +120,7 @@ im = card(height=1920, bg=WIND).convert("RGBA")
 d = ImageDraw.Draw(im)
 logo(im, dark=True, y=260, width=330)
 txt(d, (84, 522), "Nova identidade.\nMesmo propósito.", 81, spacing=1.05)
-n_mark(d, 236, 913, 608, GRAPHITE)
+n_mark(d, 236, 800, 608, GRAPHITE)
 txt(d, (84, 1475), "O projeto em primeiro plano.", 33)
 rule(d, 1545, GRAPHITE)
 txt(d, (84, 1580), "spacenode.app/identidade", 31)
@@ -126,13 +129,15 @@ finish(im, "story-01-reveal.png")
 im = card(height=1920, bg=GRAPHITE).convert("RGBA")
 d = ImageDraw.Draw(im)
 logo(im, dark=False, y=260, width=330)
-txt(d, (84, 485), "A cor da sede\nchega à comunicação.", 68, WHITE, spacing=1.08)
-d.rounded_rectangle((84*S, 811*S, 996*S, 1119*S), radius=24*S, fill=WIND)
-d.rounded_rectangle((84*S, 1146*S, 996*S, 1454*S), radius=24*S, fill=COMFORT)
-txt(d, (126, 861), "Vento Gélido", 38)
-txt(d, (126, 1001), "#BAC3C6", 27)
-txt(d, (126, 1196), "Conforto", 38)
-txt(d, (126, 1336), "#A3AEB0", 27)
+txt(d, (84, 485), "Da sede para\no digital.", 68, WHITE, spacing=1.08)
+for top, fill, label, hexa, on_color in [
+    (811, WIND, "SEDE / 01", "#BAC3C6", GRAPHITE),
+    (1025, COMFORT, "SEDE / 02", "#A3AEB0", GRAPHITE),
+    (1239, HIGHLIGHT, "DESTAQUES", "#4D6685", WHITE),
+]:
+    d.rounded_rectangle((84*S, top*S, 996*S, (top+196)*S), radius=24*S, fill=fill)
+    txt(d, (126, top+34), label, 30, on_color)
+    txt(d, (126, top+103), hexa, 39, on_color)
 txt(d, (84, 1545), "Conheça a nova SpaceNode", 34, WHITE)
 txt(d, (84, 1600), "spacenode.app/identidade", 28, WHITE)
 finish(im, "story-02-paleta.png")
