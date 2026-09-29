@@ -27,7 +27,7 @@ export default async function OgImage() {
           height: '100%',
           display: 'flex',
           position: 'relative',
-          background: '#151618',
+          background: '#BAC3C6',
         }}
       >
         <svg
@@ -37,14 +37,14 @@ export default async function OgImage() {
           style={{ position: 'absolute', top: 0, left: 0 }}
         >
           {/* Assinatura horizontal, reversa, 48 px de altura */}
-          <g transform="translate(64 48) scale(0.75)" fill="#FFFFFF">
+          <g transform="translate(64 48) scale(0.75)" fill="#151618">
             <path d={N_PRINCIPAL.apoioEsquerdo} />
             <path d={N_PRINCIPAL.ligacao} />
             <path d={N_PRINCIPAL.apoioDireito} />
             <path d={WORDMARK_PATH} />
           </g>
-          <path d={OG_LABEL_PATH} fill="#BDC2C8" />
-          <path d={OG_HEADLINE_PATH} fill="#FFFFFF" />
+          <path d={OG_LABEL_PATH} fill="#151618" />
+          <path d={OG_HEADLINE_PATH} fill="#151618" />
         </svg>
 
         <div

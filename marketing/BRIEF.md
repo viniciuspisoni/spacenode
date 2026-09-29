@@ -18,13 +18,14 @@ médio. Dores: render tradicional é caro (R$150–600/imagem terceirizada),
 lento (madrugadas no V-Ray/Lumion) e exige hardware caro. Tom: "de arquiteto
 para arquiteto" — direto, honesto, zero hype de IA, zero corporativês.
 
-## Identidade visual (manual oficial v2.0)
+## Identidade visual (manual oficial v2.1)
 - Grafite `#151618`, Branco `#FFFFFF`, Porcelana `#F7F7F5`, Névoa `#E8E9E7`, Prata `#BDC2C8` e texto secundário `#60646B`.
+- Cores secundárias para comunicação: Vento Gélido `#BAC3C6` e Conforto `#A3AEB0` (Suvinil). Use em fundos e detalhes de site, redes sociais e divulgação; mantenha o logotipo em grafite ou branco. A interface funcional do produto permanece neutra.
 - Sem verde de marca. Ênfase por peso, contraste ou sublinhado; estados de sucesso usam ícone e texto neutros.
 - Geist Medium 500 para displays, títulos e rótulos; Geist Regular 400 para corpo.
 - Símbolo N estrutural e wordmark oficial em curvas, disponíveis em `marketing/brand/`.
 - Estética minimalista, espaço generoso e vidro apenas em navegação ou controles flutuantes.
-- Texto direto e sereno, sem promessas absolutas. Consulte `docs/BRAND.md` para regras completas.
+- Texto direto e sereno, sem promessas absolutas. Consulte `docs/BRAND.md` e o PDF `marketing/brand/SpaceNode-Manual-da-Marca-v2.1.pdf` para regras completas.
 
 ## Especificações técnicas dos assets
 - Reels: 1080×1920 (9:16), 30 fps, H.264 (libx264, crf 18, yuv420p), SEM áudio

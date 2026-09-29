@@ -1,0 +1,21 @@
+.notice {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  padding: 20px 24px;
+  border: 1px solid rgba(255, 255, 255, .22);
+  border-radius: 16px;
+  background: rgba(21, 22, 24, .78);
+  color: #fff;
+}
+
+.label { font-size: 11px; text-transform: uppercase; letter-spacing: .11em; }
+.notice p { font-size: 15px; margin: 8px 0 0; }
+.notice a { color: inherit; white-space: nowrap; text-underline-offset: 4px; font-size: 14px; }
+.notice a:focus-visible { outline: 3px solid #fff; outline-offset: 5px; }
+
+@media (max-width: 640px) {
+  .notice { display: block; padding: 18px; }
+  .notice a { display: inline-block; margin-top: 16px; }
+}

@@ -1,8 +1,9 @@
-# Marca no código — Manual da Marca v2.0
+# Marca no código — Manual da Marca v2.1
 
-Fonte da verdade: *SpaceNode — Manual da Marca v2.0 Oficial* (aprovado em 25/09/2026).
-Sistema oficial: **N estrutural + Geist + neutros + vidro pontual.** Esta edição substitui a v1
-(Constellation N e verde `#30B46C`).
+Fonte da verdade: [*SpaceNode — Manual da Marca v2.1, Revisão Cromática*](../marketing/brand/SpaceNode-Manual-da-Marca-v2.1.pdf) (29/09/2026).
+A base da identidade foi aprovada em 25/09/2026. Sistema oficial: **N estrutural + Geist +
+neutros + vidro pontual.** Vento Gélido e Conforto ampliam a comunicação sem recolorir o logo.
+Esta edição substitui as diretrizes anteriores de cor para a comunicação.
 
 ## Regras que mais aparecem no código
 
@@ -21,8 +22,8 @@ Sistema oficial: **N estrutural + Geist + neutros + vidro pontual.** Esta ediç�
 
 | Componente | Uso |
 |---|---|
-| `<Brandmark size={28} />` | Assinatura horizontal oficial (N + wordmark em curvas). `size` = altura em px. Compacta (N micro) até 191 px de largura; principal a partir de 192 px. Mínimo: `size={26}` (144 px). `tone`: `auto` (currentColor) · `primary` (Grafite) · `reverse` (Branco). |
-| `<StructuralN size={24} />` | Símbolo isolado (avatar, favicon, espaços já identificados). Micro de 16 a 31 px; principal a partir de 32 px. |
+| `<Brandmark size={28} />` | Assinatura horizontal oficial (N + wordmark em curvas). Compacta de 144 a 191 px; principal desde 192 px. O N mantém o mesmo contorno. `tone`: `auto` (currentColor) · `primary` (Grafite) · `reverse` (Branco). |
+| `<StructuralN size={24} />` | Símbolo isolado (avatar, favicon, espaços já identificados). Mesma matriz vetorial em todos os tamanhos; se as juntas fecharem, ampliar. |
 | `<BrandLoader size={40} />` | Carregamento: os dois apoios e depois a ligação. Respeita movimento reduzido. |
 
 `geometry.ts` guarda a matriz vetorial extraída do manual (grade 64 × 64, forma útil 56 × 56) e o
@@ -39,6 +40,11 @@ Os ícones do app (`app/icon.tsx`, `app/apple-icon.tsx`) e a imagem Open Graph
 
 Paleta fixa: `--color-grafite` #151618 · `--color-branco` #FFFFFF · `--color-porcelana` #F7F7F5 ·
 `--color-nevoa` #E8E9E7 · `--color-prata` #BDC2C8 · `--color-secundario` #60646B.
+
+Paleta secundária de comunicação: `--color-vento-gelido` **#BAC3C6** (Suvinil B395) e
+`--color-conforto` **#A3AEB0** (Suvinil C395). Usar em fundos, cards, faixas e detalhes de site,
+redes sociais e divulgação. Texto Grafite sobre ambas; CTA Grafite com texto branco. Não usar texto
+branco diretamente nessas cores. A interface funcional do produto mantém os tokens neutros.
 
 Tema escuro (padrão, base Grafite) e tema claro (`html.light` ou a classe de seção `.sn-theme-light`,
 base Porcelana) usam os mesmos nomes:

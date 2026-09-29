@@ -13,6 +13,7 @@ import { SketchUpBand } from '@/components/landing/SketchUpBand'
 import { PricingToggle } from '@/components/landing/PricingToggle'
 import { FAQ } from '@/components/landing/FAQ'
 import { MobileCTA } from '@/components/landing/MobileCTA'
+import { IdentityLaunchBanner } from '@/components/IdentityLaunchBanner'
 
 export default function Home() {
   return (
@@ -33,6 +34,7 @@ export default function Home() {
       <Ambient />
 
       <Navbar />
+      <IdentityLaunchBanner />
       <Hero />
       <Projects />
       <Differentiators />
