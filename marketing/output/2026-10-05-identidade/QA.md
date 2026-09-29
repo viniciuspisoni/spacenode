@@ -12,5 +12,5 @@
 - [x] Carrossel programado para 05/10/2026 às 10h05 em Instagram e Facebook; itens vistos no Planner do Meta Business Suite.
 - [x] Dois Stories corrigidos por canal programados para 05/10/2026 às 10h11; quatro itens vistos na lista de Stories programados.
 - [x] Endereço da página de identidade impresso nas artes.
-- [ ] Excluir as quatro versões antigas das 10h10 após confirmação, pois o Meta informa que a exclusão é permanente.
+- [x] Quatro versões antigas das 10h10 excluídas no Meta Business Suite; calendário atualizado mostra somente os quatro Stories corrigidos das 10h11.
 - [ ] Conferência de publicação nas contas da SpaceNode em 05/10/2026.
