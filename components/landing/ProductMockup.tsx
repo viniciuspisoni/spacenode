@@ -1,6 +1,6 @@
 import React from 'react'
 import Image from 'next/image'
-import { StructuralN } from '@/components/brand'
+import { Brandmark } from '@/components/brand'
 
 // ── Ícones — mesmo desenho de components/app/sidebar-icons.tsx, em escala
 //    de mockup (viewBox 24×24, stroke 1.5, terminações arredondadas) ─────────
@@ -76,11 +76,6 @@ const IconFinalizar = (p: IconProps = {}) => (
     <rect x="3" y="3" width="18" height="18" rx="2.6" />
     <path d="M8 12.2l2.8 2.8L16.5 9" />
   </SVG>
-)
-
-// Símbolo oficial da SpaceNode na versão micro.
-const Logo = ({ size = 14 }: { size?: number }) => (
-  <StructuralN size={size} color="#FFFFFF" aria-hidden />
 )
 
 // ── Bits compartilhados ────────────────────────────────────────────────────────
@@ -347,8 +342,7 @@ function DesktopMockup() {
           }}>
             {/* Logo */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '14px 13px 11px' }}>
-              <Logo size={16} />
-              <span style={{ fontSize: 10.5, color: '#fafafa', fontWeight: 500, letterSpacing: '-0.02em' }}>spacenode</span>
+              <Brandmark size={20} tone="reverse" />
             </div>
             <div style={{ height: 0.5, background: 'rgba(255,255,255,0.1)', margin: '0 10px 8px' }} />
 
@@ -513,8 +507,7 @@ function MobileMockup() {
           borderBottom: hairline,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Logo size={17} />
-            <span style={{ fontSize: 13, color: '#fafafa', fontWeight: 500, letterSpacing: '-0.02em' }}>spacenode</span>
+            <Brandmark size={26} tone="reverse" />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
             <NeutralDot />

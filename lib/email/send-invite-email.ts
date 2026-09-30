@@ -50,9 +50,9 @@ export async function sendInviteEmail(args: SendInviteArgs): Promise<{ sent: boo
                   </td>
                 </tr>
               </table>
-              <p style="margin:26px 0 0;font-size:12px;line-height:1.65;color:#a1a1aa;">
+              <p style="margin:26px 0 0;font-size:12px;line-height:1.65;color:#60646b;">
                 Só o email convidado consegue aceitar. Problemas com o botão? Copie e cole:<br>
-                <span style="color:#71717a;word-break:break-all;">${url}</span>
+                <span style="color:#60646b;word-break:break-all;">${url}</span>
               </p>
             </td>
           </tr>
