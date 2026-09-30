@@ -4,7 +4,7 @@
 export type BalanceState = 'saudavel' | 'atencao' | 'critico' | 'zerado'
 
 export const BALANCE_COLORS: Record<BalanceState, string> = {
-  saudavel: '#1D9E75',
+  saudavel: '#BDC2C8',
   atencao:  '#BA7517',
   critico:  '#A32D2D',
   zerado:   '#3a3a3a',

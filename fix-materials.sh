@@ -595,7 +595,7 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
             </div>
             <div style={{display:'flex', alignItems:'center', gap:6}}>
               {salvando && <span style={{fontSize:9, color:'#86868b'}}>salvando...</span>}
-              {salvoOk  && <span style={{fontSize:9, color:'#30b46c'}}>salvo ✓</span>}
+              {salvoOk  && <span style={{fontSize:9, color:'#BDC2C8'}}>salvo ✓</span>}
               <span style={{fontSize:14, color:'#86868b', transform: materiaisAberto ? 'rotate(180deg)' : 'none', display:'inline-block', transition:'transform 0.2s'}}>▾</span>
             </div>
           </button>
@@ -730,7 +730,7 @@ export function GenerateClient({ initialCredits, initialMaterials }: GenerateCli
           <div style={S.promptLabel}>PROMPT GERADO</div>
           <div style={S.promptText}>
             <strong style={{color:'#1a1a1a', fontWeight:500}}>{getPromptLabel()}</strong>
-            {hasMaterials && <span style={{color:'#30b46c', fontSize:10, marginLeft:6}}>+ materiais do projeto</span>}
+            {hasMaterials && <span style={{color:'#BDC2C8', fontSize:10, marginLeft:6}}>+ materiais do projeto</span>}
             <br/>
             <span style={{color:'#86868b'}}>geometry: {geometryLock}% · {FAL_MODELS.find(m => m.id === selectedModel)?.name}</span>
           </div>
@@ -760,7 +760,7 @@ const S: Record<string, React.CSSProperties> = {
   topbar:            { display:'flex', justifyContent:'space-between', alignItems:'center' },
   pageTitle:         { fontSize:10, letterSpacing:'0.22em', textTransform:'uppercase', color:'#86868b', fontWeight:500 },
   credits:           { display:'flex', alignItems:'center', gap:6, fontSize:11, color:'#86868b' },
-  creditDot:         { width:5, height:5, borderRadius:'50%', background:'#30b46c', boxShadow:'0 0 5px rgba(48,180,108,0.4)', display:'inline-block' },
+  creditDot:         { width:5, height:5, borderRadius:'50%', background:'#BDC2C8', boxShadow:'0 0 5px rgba(189,194,200,0.4)', display:'inline-block' },
   creditNum:         { color:'#1a1a1a', fontWeight:500, fontSize:12 },
   section:           { display:'flex', flexDirection:'column', gap:10 },
   label:             { fontSize:10, letterSpacing:'0.15em', textTransform:'uppercase', color:'#86868b', fontWeight:500 },
@@ -772,7 +772,7 @@ const S: Record<string, React.CSSProperties> = {
   modeLabel:         { fontSize:10, fontWeight:500, color:'#1a1a1a', lineHeight:1.3 },
   infoNote:          { fontSize:11, color:'#86868b', lineHeight:1.6 },
   collapseBtn:       { display:'flex', justifyContent:'space-between', alignItems:'center', background:'none', border:'none', cursor:'pointer', padding:0, width:'100%', fontFamily:'inherit' },
-  materiaisBadge:    { fontSize:9, letterSpacing:'0.08em', textTransform:'uppercase', background:'rgba(48,180,108,0.1)', color:'#30b46c', padding:'2px 7px', borderRadius:10 },
+  materiaisBadge:    { fontSize:9, letterSpacing:'0.08em', textTransform:'uppercase', background:'rgba(189,194,200,0.1)', color:'#BDC2C8', padding:'2px 7px', borderRadius:10 },
   materiaisGrid:     { display:'flex', flexDirection:'column', gap:10, paddingTop:4 },
   materialField:     { display:'flex', flexDirection:'column', gap:5 },
   materialLabel:     { fontSize:10, color:'#86868b', letterSpacing:'0.05em' },

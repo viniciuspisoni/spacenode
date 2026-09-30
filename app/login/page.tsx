@@ -299,7 +299,7 @@ function LoginForm() {
     }}>
 
       {/* Placeholder color for dark inputs */}
-      <style>{`.spn-input::placeholder { color: var(--color-text-quaternary); }`}</style>
+      <style>{`.spn-input::placeholder { color: var(--color-text-tertiary); }`}</style>
 
       {/* Ambient glow */}
       <div style={{
@@ -355,8 +355,8 @@ function LoginForm() {
         {success && (
           <div style={{
             width: '100%', padding: '11px 14px', borderRadius: 9, marginBottom: 16,
-            background: 'var(--color-accent-green-bg)', border: '0.5px solid var(--color-accent-green-border)',
-            fontSize: 13, color: 'var(--color-accent-green)', letterSpacing: '-0.01em', lineHeight: 1.5,
+            background: 'var(--color-accent-bg)', border: '0.5px solid var(--color-accent-border)',
+            fontSize: 13, color: 'var(--color-accent)', letterSpacing: '-0.01em', lineHeight: 1.5,
           }}>
             {success}
           </div>
@@ -414,7 +414,7 @@ function LoginForm() {
             {mode === 'login' && (
               <div style={{ textAlign: 'right', marginTop: 2 }}>
                 <a href="/forgot-password" style={{
-                  fontSize: 11, color: 'var(--color-text-quaternary)',
+                  fontSize: 11, color: 'var(--color-text-tertiary)',
                   letterSpacing: '-0.005em', textDecoration: 'none',
                 }}>
                   Esqueci minha senha
@@ -430,7 +430,7 @@ function LoginForm() {
           margin: '24px 0 12px',
         }}>
           <div style={{ flex: 1, height: '0.5px', background: 'var(--color-border)' }} />
-          <span style={{ fontSize: 10, color: 'var(--color-text-quaternary)', letterSpacing: '0.06em', textTransform: 'uppercase' as const }}>ou</span>
+          <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase' as const }}>ou</span>
           <div style={{ flex: 1, height: '0.5px', background: 'var(--color-border)' }} />
         </div>
 
@@ -480,7 +480,7 @@ function LoginForm() {
 
         {/* Aceite legal — vínculo de concordância no cadastro/login */}
         <p style={{
-          fontSize: 11, color: 'var(--color-text-quaternary)',
+          fontSize: 11, color: 'var(--color-text-tertiary)',
           textAlign: 'center', lineHeight: 1.6, letterSpacing: '-0.005em',
           margin: '0 0 20px',
         }}>
@@ -497,7 +497,7 @@ function LoginForm() {
         {/* Trust signals */}
         <div style={{
           display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center',
-          gap: 8, fontSize: 10, color: 'var(--color-text-quaternary)', letterSpacing: '0.02em',
+          gap: 8, fontSize: 10, color: 'var(--color-text-tertiary)', letterSpacing: '0.02em',
         }}>
           {(['80 nodes grátis', 'Sem cartão', 'Suporte em português'] as const).map((item, i, arr) => (
             <span key={item} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

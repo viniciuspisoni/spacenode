@@ -5,7 +5,7 @@ import { getPayerBalance } from '@/lib/workspaces/balance'
 import PlantaHumanizadaClient from './PlantaHumanizadaClient'
 
 export const metadata = {
-  title: 'Planta Humanizada — Spacenode',
+  title: 'Planta Humanizada — SpaceNode',
 }
 
 export default async function PlantaHumanizadaPage() {

@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import React from 'react'
-import { ConstellationN, Logo } from '@/components/brand'
+import { StructuralN, Logo } from '@/components/brand'
 import { AvatarComConsumo } from './AvatarComConsumo'
 import ThemeSelector from './ThemeSelector'
 import GlassIntensityControl from './GlassIntensityControl'
@@ -201,7 +201,7 @@ export default function Sidebar({
             pointerEvents: 'none',
           }}
         >
-          <ConstellationN size={44} aria-hidden />
+          <StructuralN size={44} aria-hidden />
         </div>
 
         {/* Lockup horizontal compartilhado com a landing page — visível só expandido */}
@@ -211,7 +211,7 @@ export default function Sidebar({
           transition: expanded ? 'opacity 0.34s ease 0.16s' : 'opacity 0.16s ease',
           whiteSpace: 'nowrap',
         }}>
-          <Logo symbolSize={42} color="currentColor" />
+          <Logo symbolSize={36} color="currentColor" />
         </div>
       </Link>
 
@@ -274,7 +274,7 @@ export default function Sidebar({
 
               const badgeColor = badgeTone === 'muted'
                 ? { color: 'var(--color-text-tertiary)', bg: 'var(--color-chip)' }
-                : { color: 'var(--color-accent-green)', bg: 'var(--color-accent-green-bg)' }
+                : { color: 'var(--color-accent)', bg: 'var(--color-accent-bg)' }
 
               const inner = (
                 <>
@@ -282,8 +282,8 @@ export default function Sidebar({
                     <span aria-hidden style={{
                       position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)',
                       width: 3, height: expanded ? 20 : 22, borderRadius: 999,
-                      background: 'var(--color-accent-green)',
-                      boxShadow: '0 0 12px var(--color-accent-green-glow)',
+                      background: 'var(--color-accent)',
+                      boxShadow: '0 0 12px var(--color-accent-glow)',
                     }} />
                   )}
                   <div style={{

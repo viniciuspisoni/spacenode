@@ -121,7 +121,7 @@ function MestreCard({ vistaMestreUrl }: { vistaMestreUrl: string }) {
       className="spn-glass spn-card"
       style={{
         display: 'flex', flexDirection: 'column',
-        borderColor: 'var(--color-accent-green-border)',
+        borderColor: 'var(--color-accent-border)',
         overflow: 'hidden',
         textDecoration: 'none', color: 'inherit',
         transition: 'border-color 0.2s, transform 0.2s',
@@ -139,7 +139,7 @@ function MestreCard({ vistaMestreUrl }: { vistaMestreUrl: string }) {
           display: 'inline-flex', alignItems: 'center', gap: 6,
           padding: '4px 8px', borderRadius: 999,
           fontSize: 9, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase',
-          color: 'var(--color-accent-green)',
+          color: 'var(--color-accent)',
         }}>
           original
         </div>

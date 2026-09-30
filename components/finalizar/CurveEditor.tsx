@@ -239,7 +239,7 @@ export function CurveEditor({ points, onChange, histogram, channel = 'luma' }: C
               r={4.5}
               style={{
                 fill: 'var(--color-bg-elevated)',
-                stroke: active ? 'var(--color-accent-green)' : CURVE_STROKE[channel],
+                stroke: active ? 'var(--color-accent)' : CURVE_STROKE[channel],
                 strokeWidth: 1.5,
               }}
             />

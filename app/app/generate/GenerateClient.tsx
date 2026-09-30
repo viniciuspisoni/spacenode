@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { isModuleEnabled } from '@/lib/nav/modules-config'
-import { ConstellationN } from '@/components/brand'
+import { BrandLoader } from '@/components/brand'
 import {
   ProjectType, ProjectMaterials,
   getSegments, getEnvironments, getLighting, getBackgrounds, getSceneElements,
@@ -1531,9 +1531,7 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
             <div style={S.compareWrap}>
               <img src={imagePreview} alt="Input" style={{...S.compareImg, opacity:0.12, filter:'blur(6px)'}}/>
               <div className="spn-overlay">
-                <div className="constellation-loading" style={{color:'#fafafa'}}>
-                  <ConstellationN size={40} />
-                </div>
+                <BrandLoader size={40} color="#FFFFFF" label="Gerando imagem" />
                 <div style={{display:'flex', flexDirection:'column', alignItems:'center', gap:10}}>
                   <span style={{
                     fontSize: 12,
@@ -1599,7 +1597,7 @@ const S: Record<string, React.CSSProperties> = {
 
   postGen:           { display:'flex', flexDirection:'column', gap:12, flexShrink:0 },
   postGenGrid:       { display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 },
-  fidelityOk:        { fontSize:11, color:'var(--color-accent-green)', display:'flex', alignItems:'center', gap:6 },
+  fidelityOk:        { fontSize:11, color:'var(--color-accent)', display:'flex', alignItems:'center', gap:6 },
 
   nextStep:          { display:'flex', alignItems:'center', gap:12, padding:'13px 14px', borderRadius:'var(--r-inner)', textDecoration:'none' },
   nextStepIcon:      { width:32, height:32, flex:'0 0 32px', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--color-text-secondary)' },

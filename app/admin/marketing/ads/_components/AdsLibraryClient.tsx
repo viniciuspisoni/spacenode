@@ -78,7 +78,7 @@ function CheckPanel({ check }: { check: BrandCheckSnapshot }) {
     <div className="rounded-lg border border-border bg-surface p-3">
       <div className="text-xs font-medium">
         Verificação de marca:{' '}
-        <span className={check.approved ? 'text-accent-green' : 'text-warning'}>{check.score}/100</span>
+        <span className={check.approved ? 'text-accent' : 'text-warning'}>{check.score}/100</span>
         {!check.approved && <span className="ml-1 text-text-tertiary">— revisar antes de avançar</span>}
       </div>
       {check.issues.length > 0 && (
@@ -405,7 +405,7 @@ function AdCard({
             <span className="font-mono text-xs">{ad.identifier}</span>
             <AdStatusBadge status={ad.status} />
             {check && (
-              <span className={`text-[11px] ${check.approved ? 'text-accent-green' : 'text-warning'}`}>
+              <span className={`text-[11px] ${check.approved ? 'text-accent' : 'text-warning'}`}>
                 verificação: {check.score}/100
               </span>
             )}

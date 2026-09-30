@@ -249,7 +249,7 @@ export function ActiveDot({ on }: { on: boolean }) {
   return (
     <span style={{
       width: 6, height: 6, borderRadius: 999, flexShrink: 0,
-      background: on ? 'var(--color-accent-green)' : 'transparent',
+      background: on ? 'var(--color-accent)' : 'transparent',
       border: on ? 'none' : '0.5px solid var(--glass-line-strong)',
       transition: 'background var(--duration-fast)',
     }} />

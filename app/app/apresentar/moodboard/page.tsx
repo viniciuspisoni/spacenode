@@ -5,7 +5,7 @@ import { getPayerBalance } from '@/lib/workspaces/balance'
 import MoodboardClient from './MoodboardClient'
 
 export const metadata = {
-  title: 'Moodboard — Spacenode',
+  title: 'Moodboard — SpaceNode',
 }
 
 export default async function MoodboardPage() {

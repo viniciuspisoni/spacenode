@@ -1216,7 +1216,7 @@ coerente, olho na altura de uma pessoa e verticais paralelas. Nova seção
 - `spacenode/dialog.html` — painel com paridade do Renderizar: presets
   oficiais (segmento → espaço → iluminação → entorno), motores com custo em
   Nodes, comparador antes/depois, histórico e saldo.
-- `spacenode/assets/` — ConstellationN (SVG p/ Windows, PNG p/ macOS) e a
+- `spacenode/assets/` — N estrutural oficial (SVG p/ Windows, PNG p/ macOS) e a
   fonte Geist embarcada.
 
 Rotas web do plugin:

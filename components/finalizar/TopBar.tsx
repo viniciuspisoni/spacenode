@@ -76,7 +76,7 @@ export function TopBar(p: Props) {
       />
 
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: statusColor, whiteSpace: 'nowrap' }}>
-        {showDot && <span style={{ width: 6, height: 6, borderRadius: 999, background: 'var(--color-accent-green)', flexShrink: 0 }} />}
+        {showDot && <span style={{ width: 6, height: 6, borderRadius: 999, background: 'var(--color-accent)', flexShrink: 0 }} />}
         {STATUS_TEXT[p.status]}
       </span>
 

@@ -1,11 +1,16 @@
 import { LEGAL_CNPJ, LEGAL_NAME, SUPPORT_EMAIL, SUPPORT_WHATSAPP_URL } from '@/lib/support'
+import { Brandmark } from '@/components/brand'
+import Link from 'next/link'
 
 export default function Footer() {
   return (
     <footer className="spn-footer">
-      <span className="spn-footer-brand">
-        spacenode · 2026 · {LEGAL_NAME} · CNPJ {LEGAL_CNPJ}
-      </span>
+      <div className="spn-footer-brand">
+        <Link href="/" aria-label="SpaceNode — início" className="spn-footer-logo">
+          <Brandmark size={32} />
+        </Link>
+        <span>SpaceNode · 2026 · {LEGAL_NAME} · CNPJ {LEGAL_CNPJ}</span>
+      </div>
 
       <div className="spn-footer-links">
         <a href="/sketchup">PLUGIN SKETCHUP</a>
@@ -30,10 +35,15 @@ export default function Footer() {
           color: var(--color-text-tertiary);
         }
         .spn-footer-brand {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 12px;
           font-size: 11px;
           letter-spacing: -0.01em;
           font-weight: 400;
         }
+        .spn-footer-logo { color: var(--color-text-primary); }
         .spn-footer-links {
           display: flex;
           gap: 24px;
@@ -51,6 +61,7 @@ export default function Footer() {
         }
 
         @media (max-width: 768px) {
+          .spn-footer-brand { align-items: center; }
           .spn-footer {
             flex-direction: column;
             padding: 28px 20px 120px;

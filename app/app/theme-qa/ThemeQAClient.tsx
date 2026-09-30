@@ -37,10 +37,10 @@ export default function ThemeQAClient() {
             <button className="spn-btn-ghost">Ação secundária</button>
             <button style={{
               display: 'inline-flex', alignItems: 'center', gap: 8, padding: '11px 20px',
-              background: 'var(--color-accent-green)', color: 'var(--color-on-accent)',
+              background: 'var(--color-accent)', color: 'var(--color-on-accent)',
               borderRadius: 'var(--radius-md)', fontSize: 13, fontWeight: 500, border: 'none', cursor: 'pointer',
             }}>
-              CTA verde (raro)
+              Ênfase neutra
             </button>
             <button style={{
               display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 18px',
@@ -139,12 +139,12 @@ export default function ThemeQAClient() {
               </div>
             </div>
             <div style={{
-              background: 'var(--color-accent-green-bg)', border: '0.5px solid var(--color-accent-green-border)',
+              background: 'var(--color-accent-bg)', border: '0.5px solid var(--color-accent-border)',
               borderRadius: 14, padding: 18,
             }}>
-              <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-accent-green)' }}>Card de sucesso</div>
+              <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-accent)' }}>Card de sucesso</div>
               <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 6, lineHeight: 1.5 }}>
-                Verde apenas funcional — sucesso, estado ativo, CTA.
+                Sucesso com ícone e rótulo; seleção com contraste e contorno.
               </div>
             </div>
           </div>
@@ -279,7 +279,7 @@ export default function ThemeQAClient() {
         <Section title="Toasts">
           <Row>
             <div style={toastStyle}>
-              <span style={{ width: 6, height: 6, borderRadius: 999, background: 'var(--color-accent-green)', flexShrink: 0 }} />
+              <span style={{ width: 6, height: 6, borderRadius: 999, background: 'var(--color-accent)', flexShrink: 0 }} />
               Render concluído com sucesso.
             </div>
             <div style={{ ...toastStyle, borderColor: 'var(--color-error-border)' }}>

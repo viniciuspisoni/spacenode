@@ -364,7 +364,7 @@ export function GenerationFlow({
         <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 8 }}>
           <div style={{
             width: 108, aspectRatio: '4 / 3', borderRadius: 10, overflow: 'hidden',
-            border: '1.5px solid var(--color-accent-green)', flexShrink: 0,
+            border: '1.5px solid var(--color-accent)', flexShrink: 0,
             background: 'var(--color-surface)',
           }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -403,8 +403,8 @@ export function GenerationFlow({
                   title={h.label}
                   style={{
                     width: 108, padding: 0, overflow: 'hidden', textAlign: 'left',
-                    background: active ? 'var(--color-accent-green-bg)' : 'var(--color-bg)',
-                    border: active ? '1.5px solid var(--color-accent-green)' : '0.5px solid var(--color-border-strong)',
+                    background: active ? 'var(--color-accent-bg)' : 'var(--color-bg)',
+                    border: active ? '1.5px solid var(--color-accent)' : '0.5px solid var(--color-border-strong)',
                     borderRadius: 10, cursor: 'pointer',
                     transition: 'background 0.15s, border-color 0.15s',
                   }}
@@ -416,7 +416,7 @@ export function GenerationFlow({
                   </div>
                   <div style={{
                     padding: '6px 8px', fontSize: 10, fontWeight: 500,
-                    color: active ? 'var(--color-accent-green)' : 'var(--color-text-secondary)',
+                    color: active ? 'var(--color-accent)' : 'var(--color-text-secondary)',
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                   }}>
                     {active ? '✓ ' : ''}{h.label}
@@ -455,8 +455,8 @@ export function GenerationFlow({
               title={avail ? '' : 'Disponível com uma referência única (1 print)'}
               style={{
                 padding: '12px 14px', borderRadius: 10, textAlign: 'left',
-                background: active ? 'var(--color-accent-green-bg)' : 'var(--color-bg)',
-                border: active ? '1.5px solid var(--color-accent-green)' : '0.5px solid var(--color-border-strong)',
+                background: active ? 'var(--color-accent-bg)' : 'var(--color-bg)',
+                border: active ? '1.5px solid var(--color-accent)' : '0.5px solid var(--color-border-strong)',
                 color: active ? 'var(--color-text-primary)'
                   : avail ? 'var(--color-text-secondary)' : 'var(--color-text-quaternary)',
                 fontSize: 13, fontWeight: 500, letterSpacing: '-0.01em',
@@ -507,7 +507,7 @@ export function GenerationFlow({
                   width: '100%', marginTop: 10, padding: '10px 14px', borderRadius: 8,
                   background: 'var(--color-bg)',
                   border: customDirection.trim().length >= 3
-                    ? '1.5px solid var(--color-accent-green)'
+                    ? '1.5px solid var(--color-accent)'
                     : '0.5px solid var(--color-border-strong)',
                   color: 'var(--color-text-primary)', fontSize: 12.5,
                   letterSpacing: '-0.005em', outline: 'none',
@@ -539,7 +539,7 @@ export function GenerationFlow({
                   width: '100%', padding: '12px 14px', borderRadius: 10, resize: 'vertical',
                   background: 'var(--color-bg)',
                   border: materialInstruction.trim().length >= 3
-                    ? '1.5px solid var(--color-accent-green)'
+                    ? '1.5px solid var(--color-accent)'
                     : '0.5px solid var(--color-border-strong)',
                   color: 'var(--color-text-primary)', fontSize: 12.5, lineHeight: 1.55,
                   letterSpacing: '-0.005em', outline: 'none', fontFamily: 'inherit',
@@ -691,7 +691,7 @@ function StepHeader({ n, title, hint, done, dimmed }: {
       <span style={{
         width: 20, height: 20, borderRadius: 999, flexShrink: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: done ? 'var(--color-accent-green)' : 'transparent',
+        background: done ? 'var(--color-accent)' : 'transparent',
         border: done ? 'none' : '1px solid var(--color-border-strong)',
         color: done ? 'var(--color-bg)' : 'var(--color-text-tertiary)',
         fontSize: 10.5, fontWeight: 600,
@@ -733,8 +733,8 @@ function OptionCards({ options, selected, toggle }: {
             onClick={() => toggle(opt.value)}
             style={{
               textAlign: 'left', padding: '14px 16px',
-              background: isSelected ? 'var(--color-accent-green-bg)' : 'var(--color-bg)',
-              border: isSelected ? '1.5px solid var(--color-accent-green)' : '0.5px solid var(--color-border-strong)',
+              background: isSelected ? 'var(--color-accent-bg)' : 'var(--color-bg)',
+              border: isSelected ? '1.5px solid var(--color-accent)' : '0.5px solid var(--color-border-strong)',
               borderRadius: 10,
               display: 'flex', flexDirection: 'column', gap: 10,
               cursor: 'pointer', position: 'relative',
@@ -747,7 +747,7 @@ function OptionCards({ options, selected, toggle }: {
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 background: 'var(--color-surface)',
                 border: '0.5px solid var(--color-border)',
-                color: isSelected ? 'var(--color-accent-green)' : 'var(--color-text-secondary)',
+                color: isSelected ? 'var(--color-accent)' : 'var(--color-text-secondary)',
               }}>
                 <DetailIcon name={opt.icon} />
               </span>
@@ -766,7 +766,7 @@ function OptionCards({ options, selected, toggle }: {
               <span style={{
                 position: 'absolute', top: 10, right: 10,
                 width: 20, height: 20, borderRadius: 999,
-                background: 'var(--color-accent-green)', color: 'var(--color-bg)',
+                background: 'var(--color-accent)', color: 'var(--color-bg)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
@@ -906,11 +906,11 @@ function PrintUploader({
         disabled={limitReached}
         style={{
           width: '100%', padding: '22px 20px',
-          background: dragOver ? 'rgba(48,209,88,0.04)' : 'var(--color-bg)',
+          background: dragOver ? 'rgba(255,255,255,0.04)' : 'var(--color-bg)',
           border: limitReached
             ? '0.5px dashed var(--color-border-strong)'
             : dragOver
-              ? '1.5px dashed var(--color-accent-green)'
+              ? '1.5px dashed var(--color-accent)'
               : '0.5px dashed var(--color-border-strong)',
           borderRadius: 12,
           color: 'var(--color-text-tertiary)',

@@ -347,10 +347,10 @@ function EmptyLibrary() {
     }}>
       <div style={{
         width: 52, height: 52, borderRadius: '50%',
-        background: 'var(--color-accent-green-bg)',
-        border: '0.5px solid var(--color-accent-green-border)',
+        background: 'var(--color-accent-bg)',
+        border: '0.5px solid var(--color-accent-border)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        marginBottom: 20, color: 'var(--color-accent-green)',
+        marginBottom: 20, color: 'var(--color-accent)',
       }}>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="12" cy="12" r="3"/>

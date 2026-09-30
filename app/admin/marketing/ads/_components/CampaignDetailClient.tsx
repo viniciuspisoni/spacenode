@@ -73,7 +73,7 @@ const ADVANCE_LABELS: Record<string, string> = {
 
 // Verde só no vencedor (funcional); perdedor em erro; sem amostra é neutro.
 const VERDICT_TONE: Record<VerdictKind, string> = {
-  winner: 'border-accent-green-border bg-accent-green-bg text-accent-green',
+  winner: 'border-accent-border bg-accent-bg text-accent',
   loser: 'border-error-border bg-error-bg text-error',
   insufficient: 'border-border text-text-tertiary',
 }

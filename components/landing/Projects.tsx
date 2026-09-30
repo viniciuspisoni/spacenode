@@ -99,15 +99,15 @@ export function Projects() {
           margin-bottom: 28px;
         }
         .spn-projects-title {
-          font-size: clamp(22px, 3.6vw, 30px);
-          font-weight: 400;
-          letter-spacing: -0.035em;
+          font-size: clamp(32px, 3.6vw, 48px);
+          font-weight: 500;
+          letter-spacing: -0.025em;
           line-height: 1.2;
           margin: 0 0 8px;
           color: var(--color-text-primary);
         }
         .spn-projects-sub {
-          font-size: 14px;
+          font-size: 16px;
           line-height: 1.6;
           color: var(--color-text-tertiary);
           margin: 0 auto;

@@ -148,7 +148,7 @@ export default function Navbar() {
     <>
       <nav className={`spn-nav ${scrolled ? 'is-scrolled' : ''}`} style={navStyle}>
         <span className="nav-logo">
-          <Logo symbolSize={48} />
+          <Logo symbolSize={36} />
         </span>
 
         <div className="nav-links">
@@ -289,16 +289,8 @@ export default function Navbar() {
           align-items: center;
           flex: 0 0 auto;
         }
-        /* O Logo vem de outro componente: alcançamos suas partes via :global. */
-        .nav-logo :global(svg) {
-          transition: transform var(--duration-slow) cubic-bezier(0.34, 1.4, 0.64, 1);
-        }
-        .nav-logo :global(span > span) {
-          display: inline-block;
-          transition: transform var(--duration-slow) cubic-bezier(0.34, 1.4, 0.64, 1);
-        }
-        .nav-logo:hover :global(svg) { transform: scale(1.06) rotate(-1.5deg); }
-        .nav-logo:hover :global(span > span) { transform: translateX(1px); }
+        .nav-logo { transition: opacity var(--duration-base) ease; }
+        .nav-logo:hover { opacity: 0.8; }
 
         /* ── Links: o vidro mora aqui, e só no hover ──────────────────────── */
         /* padding 12 + gap 12 reproduz os 36px entre textos da barra original. */

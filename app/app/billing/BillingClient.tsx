@@ -193,8 +193,8 @@ export function BillingClient({ plan, balance, nodesExpireAt, extras, pooled, of
               display: 'flex', alignItems: 'flex-start', gap: 10,
               // Verde é ESTADO: "pago" é um estado, não uma ação — por isso
               // continua verde. "Processando" não é estado de sucesso: vidro.
-              background: notice.kind === 'ok' ? 'var(--color-accent-green-bg)' : undefined,
-              border: notice.kind === 'ok' ? '0.5px solid var(--color-accent-green-border)' : undefined,
+              background: notice.kind === 'ok' ? 'var(--color-accent-bg)' : undefined,
+              border: notice.kind === 'ok' ? '0.5px solid var(--color-accent-border)' : undefined,
               borderRadius: 'var(--r-card)', padding: '14px 18px', marginBottom: 24,
             }}
           >
@@ -202,7 +202,7 @@ export function BillingClient({ plan, balance, nodesExpireAt, extras, pooled, of
               fontSize: 10, fontWeight: 600, letterSpacing: '0.18em',
               textTransform: 'uppercase', whiteSpace: 'nowrap', paddingTop: 2,
               color: notice.kind === 'ok'
-                ? 'var(--color-accent-green)'
+                ? 'var(--color-accent)'
                 : 'var(--color-text-tertiary)',
             }}>
               {notice.kind === 'ok' ? 'pago' : 'processando'}
@@ -320,13 +320,13 @@ export function BillingClient({ plan, balance, nodesExpireAt, extras, pooled, of
           {showOffer && (
             <div style={{
               display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
-              background: 'var(--color-accent-green-bg)',
-              border: '0.5px solid var(--color-accent-green-border)',
+              background: 'var(--color-accent-bg)',
+              border: '0.5px solid var(--color-accent-border)',
               borderRadius: 'var(--r-card)', padding: '14px 18px', marginBottom: 14,
             }}>
               <span style={{
                 fontSize: 10, fontWeight: 600, letterSpacing: '0.18em',
-                textTransform: 'uppercase', color: 'var(--color-accent-green)',
+                textTransform: 'uppercase', color: 'var(--color-accent)',
               }}>
                 {LAUNCH_OFFER_HEADLINE}
               </span>
@@ -364,11 +364,11 @@ export function BillingClient({ plan, balance, nodesExpireAt, extras, pooled, of
                 <div key={p.id} className="spn-glass" style={{
                   borderRadius: 'var(--r-card)', padding: '20px 18px',
                   // Verde marca o plano ATUAL — estado, nunca ação.
-                  borderColor: current ? 'var(--color-accent-green)' : undefined,
+                  borderColor: current ? 'var(--color-accent)' : undefined,
                   display: 'flex', flexDirection: 'column',
                 }}>
                   <div className="spn-field-label">
-                    {p.name}{current && <span style={{ color: 'var(--color-accent-green)', marginLeft: 6 }}>· atual</span>}
+                    {p.name}{current && <span style={{ color: 'var(--color-accent)', marginLeft: 6 }}>· atual</span>}
                   </div>
                   <div style={{ fontSize: 28, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.04em', marginBottom: 2, fontVariantNumeric: 'tabular-nums' }}>
                     {p.nodes.toLocaleString('pt-BR')}
@@ -388,7 +388,7 @@ export function BillingClient({ plan, balance, nodesExpireAt, extras, pooled, of
                   </div>
                   {showOffer && (
                     <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginBottom: 12 }}>
-                      <span style={{ color: 'var(--color-accent-green)', fontWeight: 500 }}>no 1º mês</span>
+                      <span style={{ color: 'var(--color-accent)', fontWeight: 500 }}>no 1º mês</span>
                       {' '}· depois R$ {formatBRL(price)}/mês
                     </div>
                   )}
@@ -406,7 +406,7 @@ export function BillingClient({ plan, balance, nodesExpireAt, extras, pooled, of
                     <div style={{
                       textAlign: 'center', padding: '11px 14px', borderRadius: 'var(--r-inner)',
                       fontSize: 12, fontWeight: 500,
-                      background: 'var(--color-accent-green-bg)', color: 'var(--color-accent-green)',
+                      background: 'var(--color-accent-bg)', color: 'var(--color-accent)',
                     }}>
                       plano atual
                     </div>
@@ -518,7 +518,7 @@ export function BillingClient({ plan, balance, nodesExpireAt, extras, pooled, of
                 </div>
                 <div style={{ height: 2, background: 'var(--glass-line-strong)', borderRadius: 2, margin: '8px 0 6px', overflow: 'hidden' }}>
                   {/* Verde = quanto ainda existe. Estado, não ação. */}
-                  <div style={{ height: '100%', width: `${pct}%`, background: 'var(--color-accent-green)', borderRadius: 2 }} />
+                  <div style={{ height: '100%', width: `${pct}%`, background: 'var(--color-accent)', borderRadius: 2 }} />
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 11, color: 'var(--color-text-tertiary)' }}>
                   <span>Comprado em {new Date(p.purchased_at).toLocaleDateString('pt-BR')}</span>
@@ -560,7 +560,7 @@ function BalanceItem({ label, value, detail, green = false }: {
         {label}
       </div>
       <div style={{
-        fontSize: 28, fontWeight: 500, color: green ? 'var(--color-accent-green)' : 'var(--color-text-primary)',
+        fontSize: 28, fontWeight: 500, color: green ? 'var(--color-accent)' : 'var(--color-text-primary)',
         letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums',
       }}>
         {value.toLocaleString('pt-BR')}

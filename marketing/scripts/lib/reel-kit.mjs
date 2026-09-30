@@ -82,15 +82,15 @@ export function splitGeometry(aspect) {
 // ---------------------------------------------------------------- CARDS ----
 /**
  * Linguagem atual do SpaceNode (landing de set/2026, PRs #143/#147/#148):
- * faixa escura #1a1a1a (não #0a0a0a), texto #f5f5f7 / #a1a1a6 / #8a8a8f, Geist em
+ * faixa escura #151618 (não #151618), texto #ffffff / #bdc2c8 / #8a8a8f, Geist em
  * pesos 300–500 (título do hero é 300; títulos de seção 500), tracking apertado
  * (-0.03 a -0.045em), eyebrow uppercase 0.22em ladeado por fios de 0.5px, títulos
  * em minúsculas com ponto final ("três passos. do estudo à apresentação."),
  * CTA primário = pílula branca com texto escuro e seta, microcopy
- * "80 nodes grátis · sem cartão · em português". Verde #30d158 só funcional.
- * Variante light (#fafafa / #1a1a1a / verde #30b46c) espelha as faixas claras.
+ * "80 nodes grátis · sem cartão · em português". Verde #ffffff só funcional.
+ * Variante light (#f7f7f5 / #151618 / verde #151618) espelha as faixas claras.
  */
-const DARK = '#1a1a1a';
+const DARK = '#151618';
 const baseCss = (band) => `
 .scrim-top, .scrim-bottom { position: absolute; left: 0; right: 0; }
 .scrim-top { top: 0; height: ${band.y}px;
@@ -100,37 +100,37 @@ const baseCss = (band) => `
 .scrim-full { position: absolute; inset: 0; background: rgba(26,26,26,0.55); }
 .hook { position: absolute; bottom: ${FRAME_H - (band.y - band.gapAbove)}px; left: 80px; width: 920px;
   font-size: ${band.hookSize}px; font-weight: 500; line-height: 1.12; letter-spacing: -0.035em;
-  text-align: center; text-wrap: balance; color: #f5f5f7; }
+  text-align: center; text-wrap: balance; color: #ffffff; }
 .hook .dim { color: #8a8a8f; }
 .sub { position: absolute; top: ${band.y + band.height + band.gapBelow}px; left: 80px; width: 920px; text-align: center; }
 .eyebrow { display: inline-flex; align-items: center; gap: 16px; font-size: 22px; font-weight: 500; text-transform: uppercase;
-  letter-spacing: 0.22em; color: #a1a1a6; }
+  letter-spacing: 0.22em; color: #bdc2c8; }
 .eyebrow i { display: block; width: 32px; height: 1px; background: rgba(255,255,255,0.28); }
-.payoff { font-size: 42px; font-weight: 400; letter-spacing: -0.02em; line-height: 1.3; color: #f5f5f7; text-wrap: balance; }
+.payoff { font-size: 42px; font-weight: 400; letter-spacing: -0.02em; line-height: 1.3; color: #ffffff; text-wrap: balance; }
 .chip { position: absolute; left: 0; right: 0; text-align: center; top: ${band.y + band.height + 28}px; }
 .chip span { display: inline-block; padding: 12px 22px; border: 1px solid rgba(255,255,255,0.22); border-radius: 999px;
-  font-size: 22px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.18em; color: #f5f5f7; background: rgba(26,26,26,0.62); }
+  font-size: 22px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.18em; color: #ffffff; background: rgba(26,26,26,0.62); }
 .statement { position: absolute; left: 80px; width: 920px; top: 50%; transform: translateY(-50%);
   text-align: center; display: flex; flex-direction: column; gap: 40px; align-items: center; }
-.statement .big { font-size: 84px; font-weight: 300; line-height: 1.08; letter-spacing: -0.045em; color: #f5f5f7; text-wrap: balance; }
+.statement .big { font-size: 84px; font-weight: 500; line-height: 1.08; letter-spacing: -0.045em; color: #ffffff; text-wrap: balance; }
 .statement .big .dim { color: #8a8a8f; }
-.statement .small { font-size: 36px; font-weight: 400; color: #a1a1a6; line-height: 1.5; letter-spacing: -0.01em; text-wrap: balance; }
+.statement .small { font-size: 36px; font-weight: 400; color: #bdc2c8; line-height: 1.5; letter-spacing: -0.01em; text-wrap: balance; }
 .final { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 40px; }
 .final svg { width: 440px; height: auto; margin-bottom: 24px; }
 .final .cta { display: inline-flex; align-items: center; gap: 18px; padding: 26px 48px; border-radius: 18px;
-  background: #f5f5f7; color: ${DARK}; font-size: 36px; font-weight: 500; letter-spacing: -0.01em; }
+  background: #ffffff; color: ${DARK}; font-size: 36px; font-weight: 500; letter-spacing: -0.01em; }
 .final .micro { font-size: 24px; font-weight: 400; letter-spacing: 0.01em; color: #8a8a8f; }
-.final .url { font-size: 28px; font-weight: 400; letter-spacing: 0.02em; color: #a1a1a6; }
-body.light { background: #fafafa; color: ${DARK}; }
-body.light .accent { color: #30b46c; }
+.final .url { font-size: 28px; font-weight: 400; letter-spacing: 0.02em; color: #bdc2c8; }
+body.light { background: #f7f7f5; color: ${DARK}; }
+body.light .accent { color: #151618; text-decoration: underline; text-decoration-thickness: .04em; text-underline-offset: .1em; }
 body.light .statement .big, body.light .hook, body.light .payoff { color: ${DARK}; }
-body.light .statement .big .dim, body.light .hook .dim { color: #86868b; }
-body.light .statement .small { color: #424245; }
-body.light .eyebrow { color: #86868b; }
+body.light .statement .big .dim, body.light .hook .dim { color: #6a6e75; }
+body.light .statement .small { color: #60646b; }
+body.light .eyebrow { color: #6a6e75; }
 body.light .eyebrow i { background: rgba(0,0,0,0.18); }
-body.light .final .cta { background: ${DARK}; color: #fafafa; }
-body.light .final .micro { color: #86868b; }
-body.light .final .url { color: #424245; }
+body.light .final .cta { background: ${DARK}; color: #f7f7f5; }
+body.light .final .micro { color: #6a6e75; }
+body.light .final .url { color: #60646b; }
 body.light .final svg { filter: invert(1); }
 `;
 /** `[texto]` → trecho em cinza terciário (a 2ª linha do título do hero é assim). */
@@ -146,7 +146,7 @@ const logoSvg = () =>
 export function cardFromSpec(c, band, opts = {}) {
   const light = c.theme === 'light';
   const solid = c.transparent === false || c.layout === 'final';
-  // cards.mjs pinta #0A0A0A quando não é transparente; a faixa escura atual é #1a1a1a
+  // cards.mjs pinta #151618 quando não é transparente; a faixa escura atual é #151618
   // `accent: false` no spec (pedido do dono em 04/09 para a rodada orgânica): {palavra}
   // deixa de sair em verde e vira o mesmo branco/preto do texto ao redor.
   const noAccent = opts.accent === false ? '.accent { color: inherit; }' : '';
@@ -177,7 +177,7 @@ export function cardFromSpec(c, band, opts = {}) {
     case 'split-labels': {
       if (!band.split) throw new Error('split-labels exige band.split');
       const x = even((FRAME_W - band.bandW) / 2) + 20;
-      const lbl = (t, y) => `<div style="position:absolute;left:${x}px;top:${y}px"><span style="display:inline-block;padding:8px 16px;border-radius:999px;background:rgba(10,10,10,0.62);border:1px solid rgba(255,255,255,0.22);font-size:20px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:#F5F5F7">${accentuate(t)}</span></div>`;
+      const lbl = (t, y) => `<div style="position:absolute;left:${x}px;top:${y}px"><span style="display:inline-block;padding:8px 16px;border-radius:999px;background:rgba(10,10,10,0.62);border:1px solid rgba(255,255,255,0.22);font-size:20px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:#ffffff">${accentuate(t)}</span></div>`;
       return cardHtml({ css, body: `${lbl(c.top || 'Modelo', band.y + 20)}${lbl(c.bottom || 'Render', band.y + band.bandH + band.gap + 20)}` });
     }
     case 'statement':
@@ -200,7 +200,7 @@ export function cardFromSpec(c, band, opts = {}) {
 
 // ------------------------------------------------------------- SEGMENTOS ----
 /** Fundo full-bleed desfocado (a própria imagem). Contraste do texto vem do scrim.
- *  `bg = 'dark'` troca por #1a1a1a sólido (para capturas de UI clara, que desfocadas viram cinza sujo). */
+ *  `bg = 'dark'` troca por #151618 sólido (para capturas de UI clara, que desfocadas viram cinza sujo). */
 async function backdrop(src, dest, brightness = -0.2, bg) {
   if (bg === 'dark') {
     await ffmpeg(['-f', 'lavfi', '-i', `color=c=0x1a1a1a:s=${FRAME_W}x${FRAME_H}`, '-frames:v', '1', dest]);
@@ -373,7 +373,7 @@ export async function renderGrid(seg, tmp, i) {
   if (gridH > SAFE_BOTTOM - SAFE_TOP) throw new Error(`grid ${cols}×${rows} não cabe na zona segura (${gridH}px > ${SAFE_BOTTOM - SAFE_TOP})`);
   const x0 = Math.round((FRAME_W - gridW) / 2);
   const y0 = seg.y ?? Math.round((FRAME_H - gridH) / 2);
-  const bg = seg.bg === 'light' ? '#fafafa' : '#1a1a1a';
+  const bg = seg.bg === 'light' ? '#f7f7f5' : '#151618';
   const empty = seg.emptyCell === 'none' ? null : (seg.emptyCell || 'rgba(255,255,255,0.04)');
 
   // células escaladas uma vez; cada estágio só recompõe

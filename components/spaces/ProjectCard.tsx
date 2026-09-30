@@ -32,9 +32,9 @@ function dnaBadge(space: SpaceWithCounts): DnaBadge {
 
 const BADGE_TONE: Record<DnaBadge['tone'], React.CSSProperties> = {
   green: {
-    background: 'var(--color-accent-green-bg)',
-    color: 'var(--color-accent-green)',
-    border: '0.5px solid var(--color-accent-green-border)',
+    background: 'var(--color-accent-bg)',
+    color: 'var(--color-accent)',
+    border: '0.5px solid var(--color-accent-border)',
   },
   // Os dois tons neutros são vidro (classe .spn-glass--raised no elemento):
   // aqui fica só a cor do texto, porque o material vem da classe e é ela que

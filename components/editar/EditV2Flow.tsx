@@ -568,7 +568,7 @@ export function EditV2Flow({ initialBalance }: { initialBalance: number }) {
                   fontSize: 12.5,
                   border: '0.5px solid var(--color-border-strong)',
                   background: 'transparent',
-                  color: detecting ? 'var(--color-text-tertiary)' : 'var(--color-accent-green)',
+                  color: detecting ? 'var(--color-text-tertiary)' : 'var(--color-accent)',
                   cursor: detecting ? 'default' : 'pointer',
                 }}
               >
@@ -693,7 +693,7 @@ export function EditV2Flow({ initialBalance }: { initialBalance: number }) {
                             width: 5,
                             height: 5,
                             borderRadius: 99,
-                            background: 'var(--color-accent-green)',
+                            background: 'var(--color-accent)',
                           }}
                         />
                       )}

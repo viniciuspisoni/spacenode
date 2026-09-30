@@ -1,8 +1,11 @@
 import { ImageResponse } from 'next/og';
+import { N_PRINCIPAL } from '@/components/brand/geometry';
 
 export const size = { width: 180, height: 180 };
 export const contentType = 'image/png';
 
+// Ícone de aplicativo: N estrutural principal, reverso sobre Grafite.
+// Quadrado cheio — o iOS aplica a própria máscara de cantos.
 export default function AppleIcon() {
   return new ImageResponse(
     (
@@ -10,23 +13,18 @@ export default function AppleIcon() {
         style={{
           width: '100%',
           height: '100%',
-          background: '#1A1A1A',
+          background: '#151618',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          borderRadius: '22%',
         }}
       >
-        <svg width="120" height="120" viewBox="0 0 64 64">
-          <g stroke="#FAFAFA" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none">
-            <line x1="16" y1="16" x2="16" y2="48" />
-            <line x1="16" y1="16" x2="48" y2="48" />
-            <line x1="48" y1="16" x2="48" y2="48" />
+        <svg width="137" height="137" viewBox="0 0 64 64">
+          <g fill="#FFFFFF">
+            <path d={N_PRINCIPAL.apoioEsquerdo} />
+            <path d={N_PRINCIPAL.ligacao} />
+            <path d={N_PRINCIPAL.apoioDireito} />
           </g>
-          <circle cx="16" cy="16" r="3" fill="#FAFAFA" />
-          <circle cx="16" cy="48" r="3" fill="#FAFAFA" />
-          <circle cx="48" cy="48" r="3" fill="#FAFAFA" />
-          <circle cx="48" cy="16" r="3" fill="#FAFAFA" />
         </svg>
       </div>
     ),

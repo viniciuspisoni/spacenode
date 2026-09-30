@@ -72,7 +72,7 @@ export function InsufficientBalancePanel({ count, costPer, total, available, cur
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <span style={{
           fontSize: 9, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase',
-          color: 'var(--color-accent-green)', background: 'var(--color-accent-green-bg)',
+          color: 'var(--color-accent)', background: 'var(--color-accent-bg)',
           padding: '4px 8px', borderRadius: 4,
         }}>
           ✓ Salvo

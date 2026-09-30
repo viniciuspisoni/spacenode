@@ -2,7 +2,7 @@ import React from 'react';
 import { AbsoluteFill } from 'remotion';
 import { theme } from '../theme';
 
-/** Fundo da marca: #0A0A0A chapado. Sem mesh, sem gradiente — regra do brand.md. */
+/** Fundo Grafite da marca; superfícies de leitura permanecem sólidas. */
 export const Bg: React.FC<{ children?: React.ReactNode; color?: string }> = ({ children, color = theme.colors.bg }) => (
   <AbsoluteFill style={{ backgroundColor: color }}>{children}</AbsoluteFill>
 );
@@ -18,18 +18,18 @@ export const Scrim: React.FC<{
   opacity?: number;
 }> = ({ top = 0, bottom = 0, full = 0, opacity = 1 }) => (
   <AbsoluteFill style={{ pointerEvents: 'none', opacity }}>
-    {full > 0 && <AbsoluteFill style={{ backgroundColor: `rgba(10,10,10,${full})` }} />}
+    {full > 0 && <AbsoluteFill style={{ backgroundColor: `rgba(21,22,24,${full})` }} />}
     {top > 0 && (
       <AbsoluteFill
         style={{
-          background: `linear-gradient(180deg, rgba(10,10,10,${top}) 0%, rgba(10,10,10,${top * 0.75}) 18%, rgba(10,10,10,0) 42%)`,
+          background: `linear-gradient(180deg, rgba(21,22,24,${top}) 0%, rgba(21,22,24,${top * 0.75}) 18%, rgba(21,22,24,0) 42%)`,
         }}
       />
     )}
     {bottom > 0 && (
       <AbsoluteFill
         style={{
-          background: `linear-gradient(0deg, rgba(10,10,10,${bottom}) 0%, rgba(10,10,10,${bottom * 0.7}) 14%, rgba(10,10,10,0) 34%)`,
+          background: `linear-gradient(0deg, rgba(21,22,24,${bottom}) 0%, rgba(21,22,24,${bottom * 0.7}) 14%, rgba(21,22,24,0) 34%)`,
         }}
       />
     )}

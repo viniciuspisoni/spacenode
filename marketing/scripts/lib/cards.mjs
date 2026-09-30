@@ -36,14 +36,14 @@ ${fontFace('geist-latin-ext.woff2', true)}
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { width: ${FRAME_W}px; height: ${FRAME_H}px; }
 body {
-  background: ${transparent ? 'transparent' : '#0A0A0A'};
+  background: ${transparent ? 'transparent' : '#151618'};
   font-family: 'GeistLocal', sans-serif;
   color: #FFFFFF;
   -webkit-font-smoothing: antialiased;
   position: relative;
   overflow: hidden;
 }
-.accent { color: #30D158; }
+.accent { color: #FFFFFF; text-decoration: underline; text-decoration-thickness: .04em; text-underline-offset: .1em; }
 ${css}
 </style></head><body>${body}</body></html>`;
 }

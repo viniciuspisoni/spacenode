@@ -16,6 +16,7 @@
 import fs from 'node:fs';
 import zlib from 'node:zlib';
 import path from 'node:path';
+import sharp from 'sharp';
 
 const GRID = 64;
 const S = 4.4;              // traço padrão
@@ -214,48 +215,10 @@ const mirror = (x, y) => union(
   sdSegment(x, y, 26, 44, 38, 28, S - 1.1)
 );
 
-// Marca: o ConstellationN num chip. O chip existe por LEGIBILIDADE, não por
-// enfeite — um N monocromático de #333 some numa toolbar escura, e a toolbar
-// do SketchUp muda de cor com o tema. No claro quem carrega é o chip escuro;
-// no escuro, a borda clara e o N branco. O desenho é o mesmo símbolo oficial
-// (spacenode.svg): três traços e quatro nós.
-//
-// A geometria é a de sketchup/spacenode/assets/spacenode.svg — a adaptação
-// OFICIAL do símbolo pra toolbar: grade 64, nós em (16,16) (16,48) (48,16)
-// (48,48), traço 5, nó r 6. É o arquivo de que o conceito aprovado foi
-// desenhado (medido lá: razão nó/traço 2,6; aqui 2,4). Antes o traço vinha
-// do símbolo mestre (1,5) engrossado por um fator próprio, e o resultado era
-// ou um N com bolhas (nó grande demais) ou um N sem constelação.
-const brand = (size) => {
-  void size; // o mesmo desenho a 24 e a 48: o arquivo oficial já é pra 24
-  const s = 5;
-  const dot = 6;
-  const a = 16, b = 48;
-  return [
-    { shape: (x, y) => sdRoundBox(x, y, 1, 1, 63, 63, 15), color: [0x17, 0x17, 0x1a] },
-    {
-      shape: (x, y) => sdRoundBoxOutline(x, y, 2.1, 2.1, 61.9, 61.9, 14.1, 2.4),
-      color: [0xff, 0xff, 0xff],
-      alpha: 0.34,
-    },
-    {
-      shape: (x, y) => union(
-        sdSegment(x, y, a, a, a, b, s),
-        sdSegment(x, y, a, a, b, b, s),
-        sdSegment(x, y, b, a, b, b, s),
-        sdDisc(x, y, a, a, dot), sdDisc(x, y, a, b, dot),
-        sdDisc(x, y, b, a, dot), sdDisc(x, y, b, b, dot)
-      ),
-      color: [0xff, 0xff, 0xff],
-    },
-  ];
-};
-
 // Um ícone é ou uma forma só (na cor padrão) ou uma função que devolve camadas.
 const mono = (shape) => () => [{ shape, color: COLOR }];
 
 const ICONS = {
-  spacenode: brand,
   'toolbar-capture': mono(capture),
   'toolbar-generate': mono(generate),
   'toolbar-scene': mono(scene),
@@ -264,6 +227,21 @@ const ICONS = {
 
 const outDir = process.argv[2] || path.join(import.meta.dirname, '..', 'sketchup', 'spacenode', 'assets');
 fs.mkdirSync(outDir, { recursive: true });
+for (const size of [24, 48]) {
+  const source = size === 24
+    ? path.join(import.meta.dirname, '..', 'public', 'brand', 'spacenode-symbol-micro.svg')
+    : path.join(import.meta.dirname, '..', 'public', 'brand', 'spacenode-symbol.svg');
+  const paths = [...fs.readFileSync(source, 'utf8').matchAll(/<path d="([^"]+)"\/>/g)]
+    .map((match) => `<path d="${match[1]}"/>`).join('');
+  if (!paths) throw new Error('N estrutural ausente');
+  const raw = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+    <rect width="64" height="64" rx="12" fill="#151618"/>
+    <g transform="translate(10 10) scale(.6875)" fill="#FFFFFF">${paths}</g>
+  </svg>`;
+  const file = path.join(outDir, `spacenode-${size}.png`);
+  await sharp(Buffer.from(raw)).resize(size, size).png().toFile(file);
+  console.log(file, fs.statSync(file).size + ' bytes');
+}
 for (const [name, layersFor] of Object.entries(ICONS)) {
   for (const size of [24, 48]) {
     const file = path.join(outDir, `${name}-${size}.png`);

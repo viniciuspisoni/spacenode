@@ -448,7 +448,7 @@ export function EditV3Flow({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {/* Verde é ESTADO — aqui ele diz "deu certo", não "clique". */}
-            <span style={{ width: 24, height: 24, borderRadius: 99, background: 'var(--color-accent-green)', color: '#08140c', display: 'grid', placeItems: 'center', flexShrink: 0, fontSize: 14, fontWeight: 700 }}>✓</span>
+            <span style={{ width: 24, height: 24, borderRadius: 99, background: 'var(--color-accent)', color: 'var(--color-on-accent)', display: 'grid', placeItems: 'center', flexShrink: 0, fontSize: 14, fontWeight: 700 }}>✓</span>
             <h1 style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.02em' }}>Edição aplicada</h1>
           </div>
           <span style={{ fontSize: 12.5, color: 'var(--color-text-tertiary)' }}>
@@ -483,7 +483,7 @@ export function EditV3Flow({
               {history.map((h, i) => (
                 <div key={i} style={{ position: 'relative', flexShrink: 0 }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={h.url} alt={h.kind === 'original' ? 'Original' : `Versão ${i}`} style={{ width: 56, height: 40, objectFit: 'cover', borderRadius: 8, border: `0.5px solid ${h.url === result.url ? 'var(--color-accent-green)' : 'var(--glass-line-strong)'}` }} />
+                  <img src={h.url} alt={h.kind === 'original' ? 'Original' : `Versão ${i}`} style={{ width: 56, height: 40, objectFit: 'cover', borderRadius: 8, border: `0.5px solid ${h.url === result.url ? 'var(--color-accent)' : 'var(--glass-line-strong)'}` }} />
                   <span style={{ position: 'absolute', bottom: 2, left: 4, fontSize: 9, color: 'rgba(255,255,255,0.9)', background: 'rgba(0,0,0,0.5)', padding: '0 4px', borderRadius: 4 }}>
                     {h.kind === 'original' ? 'orig' : `v${i}`}
                   </span>
@@ -789,7 +789,7 @@ const EDV3_CSS = `
 .edv3-stage { display:flex; flex-direction:column; padding:12px; border-radius:var(--r-card); min-height:min(76vh,780px); }
 .edv3-selrow { display:flex; align-items:center; gap:8px; margin-top:12px; flex-wrap:wrap; }
 .edv3-seldot { width:6px; height:6px; border-radius:99px; flex-shrink:0; background:var(--color-text-tertiary); }
-.edv3-seldot[data-on='true'] { background:var(--color-accent-green); }
+.edv3-seldot[data-on='true'] { background:var(--color-accent); }
 .edv3-tools { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:10px; padding:8px 10px; border-radius:var(--r-inner); }
 .edv3-sep { width:1px; height:20px; background:var(--glass-line-strong); }
 .edv3-brush { display:flex; align-items:center; gap:8px; font-size:11.5px; color:var(--color-text-tertiary); }

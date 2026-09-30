@@ -1,8 +1,11 @@
 import { ImageResponse } from 'next/og';
+import { N_MICRO } from '@/components/brand/geometry';
 
 export const size = { width: 32, height: 32 };
 export const contentType = 'image/png';
 
+// Favicon: símbolo isolado na versão micro (16–31 px), reverso sobre Grafite,
+// com a proteção mínima do manual (14 unidades em torno da forma de 56).
 export default function Icon() {
   return new ImageResponse(
     (
@@ -10,22 +13,15 @@ export default function Icon() {
         style={{
           width: '100%',
           height: '100%',
-          background: '#1A1A1A',
+          background: '#151618',
+          borderRadius: 6,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
         }}
       >
-        <svg width="22" height="22" viewBox="0 0 64 64">
-          <g stroke="#FAFAFA" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none">
-            <line x1="16" y1="16" x2="16" y2="48" />
-            <line x1="16" y1="16" x2="48" y2="48" />
-            <line x1="48" y1="16" x2="48" y2="48" />
-          </g>
-          <circle cx="16" cy="16" r="4" fill="#FAFAFA" />
-          <circle cx="16" cy="48" r="4" fill="#FAFAFA" />
-          <circle cx="48" cy="48" r="4" fill="#FAFAFA" />
-          <circle cx="48" cy="16" r="4" fill="#FAFAFA" />
+        <svg width="24" height="24" viewBox="0 0 64 64">
+          <path d={N_MICRO} fill="#FFFFFF" />
         </svg>
       </div>
     ),

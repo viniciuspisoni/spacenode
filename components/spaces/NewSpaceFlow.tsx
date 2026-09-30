@@ -449,9 +449,9 @@ function UploadStep(props: {
         onClick={() => fileInputRef.current?.click()}
         style={{
           aspectRatio: '4 / 3',
-          background: dragOver ? 'rgba(48,209,88,0.04)' : 'var(--color-bg-elevated)',
+          background: dragOver ? 'rgba(255,255,255,0.04)' : 'var(--color-bg-elevated)',
           border: dragOver
-            ? '1.5px dashed var(--color-accent-green)'
+            ? '1.5px dashed var(--color-accent)'
             : '0.5px dashed var(--color-border-strong)',
           borderRadius: 14,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -536,7 +536,7 @@ function UploadStep(props: {
       {balanceShort && (
         <div style={{ marginTop: 12, textAlign: 'center', fontSize: 12, color: 'var(--color-text-tertiary)' }}>
           Você precisa de {DNA_EXTRACTION_COST} nodes pra extrair o DNA.{' '}
-          <Link href="/app/billing" style={{ color: 'var(--color-accent-green)' }}>
+          <Link href="/app/billing" style={{ color: 'var(--color-accent)' }}>
             Ver planos →
           </Link>
         </div>
@@ -580,7 +580,7 @@ function AnalyzingStep({ previewUrl }: { previewUrl: string | null }) {
         <div className="spn-glass spn-glass--raised" style={{
           position: 'absolute', top: 14, left: 14,
           fontSize: 10, fontWeight: 600, letterSpacing: '0.16em', textTransform: 'uppercase',
-          color: 'var(--color-accent-green)',
+          color: 'var(--color-accent)',
           padding: '5px 10px', borderRadius: 999,
         }}>
           analisando
@@ -608,9 +608,9 @@ function AnalyzingStep({ previewUrl }: { previewUrl: string | null }) {
              pela metade; --...-glow é justamente o 0,45 do original. */
           background: linear-gradient(180deg,
             transparent 0%,
-            var(--color-accent-green-border) 49%,
-            var(--color-accent-green-glow) 50%,
-            var(--color-accent-green-border) 51%,
+            var(--color-accent-border) 49%,
+            var(--color-accent-glow) 50%,
+            var(--color-accent-border) 51%,
             transparent 100%);
           background-size: 100% 200%;
           animation: dnaScanMove 2.4s linear infinite;
@@ -641,11 +641,11 @@ function RevealStep(props: {
         <div style={{
           display: 'inline-flex', alignItems: 'center', gap: 8,
           padding: '5px 11px', borderRadius: 999,
-          background: 'var(--color-accent-green-bg)', color: 'var(--color-accent-green)',
+          background: 'var(--color-accent-bg)', color: 'var(--color-accent)',
           fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase',
           marginBottom: 14,
         }}>
-          <span style={{ width: 6, height: 6, borderRadius: 999, background: 'var(--color-accent-green)' }} />
+          <span style={{ width: 6, height: 6, borderRadius: 999, background: 'var(--color-accent)' }} />
           DNA gerado
         </div>
         <h1 style={{

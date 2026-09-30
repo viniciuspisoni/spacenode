@@ -1,14 +1,14 @@
 // ── Nodi — a marca do assistente ──────────────────────────────────────────────
 //
 // Personagem geométrico próprio do Nodi: quatro nós conectados em losango
-// (ciclo fechado = diálogo), irmão do "N" da constelação oficial — mesma
-// gramática (nós r=3, traço 1.5, monocromático), arranjo próprio. O logotipo
-// oficial (ConstellationN/Logo) segue intocado; este símbolo é só do Nodi.
+// (ciclo fechado = diálogo), com gramática própria de nós e conexões.
+// Mantém o traço 1.5 e a cor neutra do restante da interface. O logotipo
+// oficial (N estrutural/assinatura) segue independente; este símbolo é só do Nodi.
 //
 // Estados animados (discretos, definidos em globals.css · seção "Nodi"):
 //   idle      — respiração sutil do nó superior
 //   thinking  — pulso sequencial percorrendo o ciclo (análise/espera)
-//   success   — nó superior acende em verde funcional (único acento)
+//   success   — nó superior ganha ênfase neutra
 //   error     — símbolo esmaecido, sem movimento (o painel comunica o erro)
 //   muted     — linhas tracejadas: conexão indisponível
 //

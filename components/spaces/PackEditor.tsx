@@ -216,10 +216,10 @@ export function PackEditor({ space, vistas, initialPack, identity }: Props) {
         <div style={{
           marginBottom: 24,
           padding: '14px 16px', borderRadius: 12,
-          background: 'var(--color-accent-green-bg)', border: '0.5px solid var(--color-accent-green-border)',
+          background: 'var(--color-accent-bg)', border: '0.5px solid var(--color-accent-border)',
           display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
         }}>
-          <span style={{ fontSize: 11, color: 'var(--color-accent-green)', fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+          <span style={{ fontSize: 11, color: 'var(--color-accent)', fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
             Link público
           </span>
           <code style={{

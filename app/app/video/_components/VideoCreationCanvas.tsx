@@ -143,7 +143,7 @@ export default function VideoCreationCanvas({
           textAlign:      'center',
         }}>
           <svg width="11" height="11" viewBox="0 0 16 16" fill="none"
-            stroke="var(--color-accent-green-dim)" strokeWidth="1.8"
+            stroke="var(--color-accent-dim)" strokeWidth="1.8"
             strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
             <path d="M3 8.5 L6.5 12 L13 4.5"/>
           </svg>

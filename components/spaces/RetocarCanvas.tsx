@@ -17,6 +17,7 @@ import {
   forwardRef, useCallback, useEffect, useImperativeHandle,
   useLayoutEffect, useRef, useState,
 } from 'react'
+import { BrandLoader } from '@/components/brand'
 
 const BRUSH_MIN = 10
 const BRUSH_MAX = 200
@@ -465,12 +466,7 @@ export const RetocarCanvas = forwardRef<RetocarCanvasHandle, Props>(function Ret
             // Vidro aqui é seguro: este véu só existe enquanto a imagem
             // carrega — o canvas está PARADO, ninguém está pintando máscara.
             <div className="spn-overlay" style={{ fontSize: 13, letterSpacing: '-0.005em' }}>
-              <svg width="32" height="32" viewBox="0 0 32 32" className="constellation-loading">
-                <circle cx="16" cy="16" r="3" fill="currentColor" />
-                <circle cx="16" cy="48" r="3" fill="currentColor" />
-                <circle cx="48" cy="48" r="3" fill="currentColor" />
-                <circle cx="48" cy="16" r="3" fill="currentColor" />
-              </svg>
+              <BrandLoader size={32} color="#FFFFFF" label="Carregando imagem" />
               <span>{loadingMessage}</span>
             </div>
           )}

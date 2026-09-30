@@ -5,19 +5,28 @@
    scanner (RangeError: Invalid code point, 12/09/26). */
 @source not "../marketing";
 
-@theme {
+@theme static {
   --font-sans: var(--font-geist), system-ui, -apple-system, sans-serif;
+  /* Manual v2.2: fundos e peças de comunicação. Controles usam os neutros. */
+  --color-sede-01: #bac3c6;
+  --color-sede-02: #a3aeb0;
+  --color-azul-destaques: #4d6685;
+  --color-accent: #ffffff;
+  --color-accent-dim: #bdc2c8;
+  --color-accent-bg: rgba(255,255,255,.08);
+  --color-accent-border: rgba(255,255,255,.22);
+  --color-accent-glow: rgba(255,255,255,.16);
 
   /* ── Core palette (dark-first) ── */
-  --color-bg: #0a0a0a;
-  --color-bg-elevated: #111111;
+  --color-bg: #151618;
+  --color-bg-elevated: #1c1d20;
   --color-surface: rgba(255, 255, 255, 0.05);
   --color-surface-hover: rgba(255, 255, 255, 0.08);
 
-  --color-text-primary: #f5f5f7;
-  --color-text-secondary: #a1a1a6;
-  --color-text-tertiary: #6e6e73;
-  --color-text-quaternary: #3a3a3c;
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #bdc2c8;
+  --color-text-tertiary: #8a8f97;
+  --color-text-quaternary: #53575e;
 
   --color-border: rgba(255, 255, 255, 0.06);
   --color-border-strong: rgba(255, 255, 255, 0.14);
@@ -27,25 +36,25 @@
   --color-surface-subtle: rgba(255, 255, 255, 0.02);
   --color-bg-elevated-hover: #131313;
   --color-sidebar: #050505;
-  --color-sidebar-foreground: #f5f5f7;
-  --color-panel: #111111;
-  --color-panel-foreground: #f5f5f7;
+  --color-sidebar-foreground: #ffffff;
+  --color-panel: #1c1d20;
+  --color-panel-foreground: #ffffff;
   --color-input: rgba(255, 255, 255, 0.05);
   --color-input-border: rgba(255, 255, 255, 0.14);
   --color-chip: rgba(255, 255, 255, 0.06);
   --color-chip-hover: rgba(255, 255, 255, 0.10);
-  --color-chip-active: #f5f5f7;
-  --color-chip-active-foreground: #0a0a0a;
+  --color-chip-active: #ffffff;
+  --color-chip-active-foreground: #151618;
   --color-upload-area: rgba(255, 255, 255, 0.03);
   --color-canvas: #0f0f0f;
   --color-preview-bg: #101010;
 
   /* Inverso do tema (botão primário "invertido": claro no dark, escuro no light) */
-  --color-inverse: #f5f5f7;
+  --color-inverse: #ffffff;
   --color-inverse-hover: #e8e8e6;
-  --color-inverse-foreground: #0a0a0a;
+  --color-inverse-foreground: #151618;
 
-  /* Constantes entre temas: texto sobre verde e véus sobre imagem */
+  /* Véus sobre imagem e texto sobre o acento neutro */
   --color-on-accent: #ffffff;
   --color-scrim: rgba(0, 0, 0, 0.55);
   --color-scrim-strong: rgba(0, 0, 0, 0.75);
@@ -54,14 +63,7 @@
   --color-scrollbar: rgba(255, 255, 255, 0.14);
   --color-scrollbar-hover: rgba(255, 255, 255, 0.22);
 
-  /* ── Accent: verde apenas como funcional ── */
-  --color-accent-green: #30d158;
-  --color-accent-green-dim: rgba(48, 209, 88, 0.72);
-  --color-accent-green-bg: rgba(48, 209, 88, 0.09);
-  --color-accent-green-border: rgba(48, 209, 88, 0.22);
-  --color-accent-green-glow: rgba(48, 209, 88, 0.45);
-
-  /* ── Status semântico ── */
+  /* ── Acento neutro da identidade ── */
   --color-error: #e0584a;
   --color-error-bg: rgba(224, 88, 74, 0.08);
   --color-error-border: rgba(224, 88, 74, 0.20);
@@ -91,15 +93,15 @@
 }
 
 html.light {
-  --color-bg: #fafafa;
+  --color-bg: #f7f7f5;
   --color-bg-elevated: #ffffff;
-  --color-surface: #f5f5f7;
+  --color-surface: #ffffff;
   --color-surface-hover: #e8e8ed;
 
-  --color-text-primary: #1a1a1a;
-  --color-text-secondary: #424245;
-  --color-text-tertiary: #86868b;
-  --color-text-quaternary: #c7c7cc;
+  --color-text-primary: #151618;
+  --color-text-secondary: #60646b;
+  --color-text-tertiary: #6a6e75;
+  --color-text-quaternary: #bdc2c8;
 
   --color-border: rgba(0, 0, 0, 0.07);
   --color-border-strong: rgba(0, 0, 0, 0.15);
@@ -108,22 +110,22 @@ html.light {
   --color-surface-subtle: rgba(0, 0, 0, 0.02);
   --color-bg-elevated-hover: #f6f6f4;
   --color-sidebar: #f4f4f2;
-  --color-sidebar-foreground: #1a1a1a;
+  --color-sidebar-foreground: #151618;
   --color-panel: #ffffff;
-  --color-panel-foreground: #1a1a1a;
+  --color-panel-foreground: #151618;
   --color-input: #ffffff;
   --color-input-border: rgba(0, 0, 0, 0.15);
   --color-chip: rgba(0, 0, 0, 0.05);
   --color-chip-hover: rgba(0, 0, 0, 0.08);
-  --color-chip-active: #1a1a1a;
-  --color-chip-active-foreground: #fafafa;
+  --color-chip-active: #151618;
+  --color-chip-active-foreground: #f7f7f5;
   --color-upload-area: rgba(0, 0, 0, 0.025);
   --color-canvas: #ececea;
   --color-preview-bg: #e9e9e7;
 
-  --color-inverse: #1a1a1a;
+  --color-inverse: #151618;
   --color-inverse-hover: #2e2e2e;
-  --color-inverse-foreground: #fafafa;
+  --color-inverse-foreground: #f7f7f5;
 
   --color-on-accent: #ffffff;
   --color-scrim: rgba(0, 0, 0, 0.55);
@@ -131,13 +133,6 @@ html.light {
 
   --color-scrollbar: rgba(0, 0, 0, 0.18);
   --color-scrollbar-hover: rgba(0, 0, 0, 0.28);
-
-  --color-accent-green: #30b46c;
-  --color-accent-green-dim: rgba(48, 180, 108, 0.72);
-  --color-accent-green-bg: rgba(48, 180, 108, 0.09);
-  --color-accent-green-border: rgba(48, 180, 108, 0.22);
-  --color-accent-green-glow: rgba(48, 180, 108, 0.45);
-
   --color-error: #c0392b;
   --color-error-bg: rgba(192, 57, 43, 0.08);
   --color-error-border: rgba(192, 57, 43, 0.20);
@@ -153,18 +148,18 @@ html.light {
 
 /* Escopo dark local — faixas pretas da landing light (header/hero, produto/
    interface, projetos reais, CTA final + footer). Não é cópia 1:1 do tema
-   dark do app: o preto de faixa é #1a1a1a (spec de marca da landing,
+   dark do app: o preto de faixa é #151618 (spec de marca da landing,
    2026-08-31) e o cinza terciário sobe p/ manter AA (4.5:1) sobre esse
-   fundo mais claro. Verde segue o do tema dark (#30d158) — só funcional. */
+   fundo mais claro. Acentos seguem neutros. */
 .spn-dark {
-  --color-bg: #1a1a1a;
+  --color-bg: #151618;
   --color-bg-elevated: #242424;
   --color-surface: rgba(255, 255, 255, 0.05);
   --color-surface-hover: rgba(255, 255, 255, 0.08);
 
-  --color-text-primary: #f5f5f7;
-  --color-text-secondary: #a1a1a6;
-  --color-text-tertiary: #8a8a8f; /* #6e6e73 caía a ~3.4:1 sobre #1a1a1a */
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #bdc2c8;
+  --color-text-tertiary: #8a8a8f; /* #8a8f97 caía a ~3.4:1 sobre #151618 */
   --color-text-quaternary: #4a4a4e;
 
   --color-border: rgba(255, 255, 255, 0.06);
@@ -175,22 +170,15 @@ html.light {
   --color-bg-elevated-hover: #2a2a2a;
   --color-chip: rgba(255, 255, 255, 0.06);
   --color-chip-hover: rgba(255, 255, 255, 0.10);
-  --color-chip-active: #f5f5f7;
-  --color-chip-active-foreground: #1a1a1a;
+  --color-chip-active: #ffffff;
+  --color-chip-active-foreground: #151618;
 
-  --color-inverse: #f5f5f7;
+  --color-inverse: #ffffff;
   --color-inverse-hover: #e8e8e6;
-  --color-inverse-foreground: #1a1a1a;
+  --color-inverse-foreground: #151618;
 
   --color-scrollbar: rgba(255, 255, 255, 0.14);
   --color-scrollbar-hover: rgba(255, 255, 255, 0.22);
-
-  --color-accent-green: #30d158;
-  --color-accent-green-dim: rgba(48, 209, 88, 0.72);
-  --color-accent-green-bg: rgba(48, 209, 88, 0.09);
-  --color-accent-green-border: rgba(48, 209, 88, 0.22);
-  --color-accent-green-glow: rgba(48, 209, 88, 0.45);
-
   --color-error: #e0584a;
   --color-warning: #d4a327;
 
@@ -425,7 +413,7 @@ a.spn-glass--raised:focus-visible {
      céu) chega a luminância 0.47. A 0.55 de opacidade o trecho de céu
      compõe um fundo de ~0.10 — texto secundário lá dá 2,8:1. A 0.16 o pico
      fica em ~0.03 e o secundário sobe para 5,2:1.
-   - --color-text-tertiary sobe de #6e6e73 para #9a9aa0. #6e6e73 dá 3,8:1
+   - --color-text-tertiary sobe de #8a8f97 para #9a9aa0. #8a8f97 dá 3,8:1
      mesmo sobre preto puro: não alcança AA em fundo NENHUM, e a landing
      usa terciário em texto corrido (legendas, microcopy, notas de plano).
      #9a9aa0 dá 4,6:1 no pior ponto do papel de parede e 5,2:1 sobre vidro.
@@ -500,16 +488,6 @@ a.spn-glass--raised:focus-visible {
   from { width: 0% }
   to   { width: 88% }
 }
-
-@keyframes node-pulse {
-  0%, 100% { opacity: 0.35; transform: scale(1); }
-  50%      { opacity: 1;    transform: scale(1.55); }
-}
-
-.constellation-loading circle:nth-child(1) { animation: node-pulse 1.8s ease-in-out 0s    infinite; transform-origin: 16px 16px; }
-.constellation-loading circle:nth-child(2) { animation: node-pulse 1.8s ease-in-out 0.45s infinite; transform-origin: 16px 48px; }
-.constellation-loading circle:nth-child(3) { animation: node-pulse 1.8s ease-in-out 0.9s  infinite; transform-origin: 48px 48px; }
-.constellation-loading circle:nth-child(4) { animation: node-pulse 1.8s ease-in-out 1.35s infinite; transform-origin: 48px 16px; }
 
 /* Post-render action buttons — premium, Apple-flavored */
 .spn-action {
@@ -765,8 +743,8 @@ a.spn-glass--raised:focus-visible {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--color-accent-green);
-  box-shadow: 0 0 8px var(--color-accent-green-glow);
+  background: var(--color-accent);
+  box-shadow: 0 0 8px var(--color-accent-glow);
   margin-right: 8px;
   vertical-align: 1px;
   animation: spn-guide-live 1.4s ease-in-out infinite;
@@ -872,9 +850,9 @@ a.spn-glass--raised:focus-visible {
   border-radius: var(--radius-xs);
 }
 .spn-badge--green {
-  background: var(--color-accent-green-bg);
-  color: var(--color-accent-green);
-  border: 0.5px solid var(--color-accent-green-border);
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  border: 0.5px solid var(--color-accent-border);
 }
 .spn-badge--neutral {
   background: var(--color-chip);
@@ -948,14 +926,14 @@ a.spn-glass--raised:focus-visible {
 .spn-slider:hover::-webkit-slider-thumb,
 .spn-slider:focus-visible::-webkit-slider-thumb,
 .spn-slider:active::-webkit-slider-thumb {
-  border-color: var(--color-accent-green);
-  box-shadow: 0 0 0 3px var(--color-accent-green-bg);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-bg);
 }
 .spn-slider:hover::-moz-range-thumb,
 .spn-slider:focus-visible::-moz-range-thumb,
 .spn-slider:active::-moz-range-thumb {
-  border-color: var(--color-accent-green);
-  box-shadow: 0 0 0 3px var(--color-accent-green-bg);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-bg);
 }
 
 /* Finalizar — alça de redimensionamento do painel contextual. */
@@ -1559,7 +1537,7 @@ a.spn-glass--raised:focus-visible {
   font-weight: 500;
   letter-spacing: -0.01em;
   text-decoration: none;
-  color: #fafafa;
+  color: #f7f7f5;
   background: rgba(255, 255, 255, 0.14);
   border: 0.5px solid rgba(255, 255, 255, 0.16);
   transition: background 160ms ease, color 160ms ease;
@@ -1675,7 +1653,7 @@ a.spn-glass--raised:focus-visible {
 }
 .spn-proj-action--primary {
   background: rgba(245, 245, 247, 0.94);
-  color: #0a0a0a;
+  color: #151618;
   border-color: transparent;
 }
 .spn-proj-action--primary:hover {
@@ -2079,7 +2057,7 @@ html.light .spn-theme-seg {
 .spn-nodi-avatar--thinking .spn-nodi-avatar__node:nth-of-type(3) { animation-delay: 0.6s; }
 .spn-nodi-avatar--thinking .spn-nodi-avatar__node:nth-of-type(4) { animation-delay: 0.9s; }
 .spn-nodi-avatar--success .spn-nodi-avatar__node--lead {
-  fill: var(--color-accent-green);
+  fill: var(--color-accent);
   animation: spn-nodi-pop 0.5s ease;
 }
 .spn-nodi-avatar--success .spn-nodi-avatar__links { opacity: 1; }
@@ -2342,7 +2320,7 @@ html.light .spn-theme-seg {
 }
 .spn-nodi-card > strong { font-size: 12.5px; font-weight: 600; letter-spacing: -0.01em; }
 .spn-nodi-card p { color: var(--color-text-secondary); }
-.spn-nodi-card--success { border-color: var(--color-accent-green-border); background: var(--color-accent-green-bg); }
+.spn-nodi-card--success { border-color: var(--color-accent-border); background: var(--color-accent-bg); }
 .spn-nodi-card--success > strong { color: var(--color-text-primary); }
 .spn-nodi-card textarea {
   width: 100%;
@@ -2391,14 +2369,14 @@ html.light .spn-theme-seg {
 .spn-nodi-actionbtn:disabled { opacity: 0.4; cursor: default; }
 .spn-nodi-actionbtn:focus-visible { outline: 2px solid var(--color-border-focus); outline-offset: 1px; }
 .spn-nodi-actionbtn--green {
-  background: var(--color-accent-green);
-  border-color: var(--color-accent-green);
-  color: #08140c;
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-on-accent);
   font-weight: 600;
 }
 .spn-nodi-actionbtn--green:hover:not(:disabled) {
-  background: var(--color-accent-green);
-  color: #08140c;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
   opacity: 0.88;
 }
 
@@ -2430,7 +2408,7 @@ html.light .spn-theme-seg {
   letter-spacing: 0.04em;
 }
 .spn-nodi-status { color: var(--color-text-tertiary); }
-.spn-nodi-status--completed { color: var(--color-accent-green-dim); }
+.spn-nodi-status--completed { color: var(--color-accent-dim); }
 .spn-nodi-status--failed { color: var(--color-error); }
 .spn-nodi-status--refunded { color: var(--color-warning); }
 
@@ -2457,8 +2435,8 @@ html.light .spn-theme-seg {
 }
 .spn-nodi-notice--success {
   color: var(--color-text-primary);
-  background: var(--color-accent-green-bg);
-  border: 0.5px solid var(--color-accent-green-border);
+  background: var(--color-accent-bg);
+  border: 0.5px solid var(--color-accent-border);
 }
 .spn-nodi-notice .spn-nodi-actionbtn { color: inherit; border-color: currentColor; opacity: 0.9; }
 
@@ -2485,7 +2463,7 @@ html.light .spn-theme-seg {
   border-radius: var(--radius-full);
 }
 .spn-nodi-badge--neutral { color: var(--color-text-tertiary); background: var(--color-chip); }
-.spn-nodi-badge--green { color: var(--color-accent-green); background: var(--color-accent-green-bg); }
+.spn-nodi-badge--green { color: var(--color-accent); background: var(--color-accent-bg); }
 
 /* Entrada */
 .spn-nodi-inputrow {
@@ -2540,7 +2518,7 @@ html.light .spn-theme-seg {
   transform: translateY(-1px);
   background: var(--color-text-quaternary);
 }
-.spn-nodi-sev--ok { background: var(--color-accent-green-dim); }
+.spn-nodi-sev--ok { background: var(--color-accent-dim); }
 .spn-nodi-sev--atencao { background: var(--color-warning); }
 .spn-nodi-sev--problema { background: var(--color-error); }
 
@@ -2595,9 +2573,9 @@ html.light .spn-theme-seg {
   gap: 6px;
   flex-shrink: 0;
   font-size: 10.5px;
-  color: var(--color-accent-green);
-  background: var(--color-accent-green-bg);
-  border: 0.5px solid var(--color-accent-green-border);
+  color: var(--color-accent);
+  background: var(--color-accent-bg);
+  border: 0.5px solid var(--color-accent-border);
   border-radius: var(--radius-full);
   padding: 5px 9px;
   white-space: nowrap;
@@ -2660,7 +2638,7 @@ html.light .spn-theme-seg {
   color: var(--color-text-secondary);
   background: var(--color-chip);
 }
-.spn-nodi-decision--aprovar { color: var(--color-accent-green); background: var(--color-accent-green-bg); }
+.spn-nodi-decision--aprovar { color: var(--color-accent); background: var(--color-accent-bg); }
 .spn-nodi-decision--editar_local,
 .spn-nodi-decision--melhorar { color: var(--color-warning); background: var(--color-warning-bg); }
 .spn-nodi-decision--regenerar { color: var(--color-error); background: var(--color-error-bg); }
@@ -2746,11 +2724,11 @@ html.light {
    fica sobre vidro; numa página inteira a saudação, os títulos de seção e a
    microcópia caem direto no papel de parede. Aqui o papel é um render do
    próprio usuário — pode ser uma fachada estourada de céu — então a
-   opacidade cai de 0.55 para 0.18 e o terciário sobe de #6e6e73 (3,8:1 mesmo
+   opacidade cai de 0.55 para 0.18 e o terciário sobe de #8a8f97 (3,8:1 mesmo
    sobre preto puro) para #9a9aa0.
 
    No claro o papel já entra sob um véu branco de 0.66, que puxa tudo para
-   cima: lá o problema é o oposto, e o terciário fica no #6e6e73 original. */
+   cima: lá o problema é o oposto, e o terciário fica no #8a8f97 original. */
 .spn-app {
   /* Faixa mais contida que a régua base (:205): o papel de parede aqui é o
      último render do PRÓPRIO usuário — pode ter céu estourado — então
@@ -2769,7 +2747,7 @@ html.light .spn-app {
      herdaria o terciário e o quaternário do escuro — e o quaternário
      (#5a5a5e) ficaria mais LEGÍVEL que o terciário, invertendo a hierarquia.
      No claro o papel de parede escurece um pouco o fundo, então os dois
-     descem junto: #86868b→#79797e (3,45:1 → 3,8:1) e #c7c7cc→#b4b4b9. */
+     descem junto: #6a6e75→#79797e (3,45:1 → 3,8:1) e #bdc2c8→#b4b4b9. */
   --color-text-tertiary: #79797e;
   --color-text-quaternary: #b4b4b9;
 }
@@ -3591,8 +3569,8 @@ body[data-sheet-open='true'] { overflow: hidden; }
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: var(--color-accent-green);
-  box-shadow: 0 0 6px var(--color-accent-green-glow);
+  background: var(--color-accent);
+  box-shadow: 0 0 6px var(--color-accent-glow);
 }
 
 /* ── Botão secundário ("ghost") ──────────────────────────────────────────
@@ -3647,7 +3625,7 @@ body[data-sheet-open='true'] { overflow: hidden; }
   background: var(--color-scrim);
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
-  color: #f5f5f7;
+  color: #ffffff;
   text-align: center;
 }
 
@@ -3910,7 +3888,7 @@ body[data-sheet-open='true'] { overflow: hidden; }
 
 /* Etiqueta do que não se desliga. O verde entra como PONTO de estado, no
    mesmo idioma do selo do hero (Hero.tsx:88) — texto em cor de leitura, e não
-   em verde: #30b46c (o verde do tema claro) sobre branco dá 2,7:1, abaixo do
+   em verde: #151618 (o verde do tema claro) sobre branco dá 2,7:1, abaixo do
    mínimo de 4,5:1 para texto. O ponto carrega o sinal, o texto carrega a
    informação. */
 .spn-consent-always {
@@ -3931,8 +3909,8 @@ body[data-sheet-open='true'] { overflow: hidden; }
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: var(--color-accent-green);
-  box-shadow: 0 0 8px var(--color-accent-green-glow);
+  background: var(--color-accent);
+  box-shadow: 0 0 8px var(--color-accent-glow);
 }
 
 /* ── Interruptor de categoria ──────────────────────────────────────────── */
@@ -3968,7 +3946,7 @@ body[data-sheet-open='true'] { overflow: hidden; }
    o cartão branco, e sem borda o limite do controle sumiria (WCAG 1.4.11). O
    que distingue ligado de desligado é a posição do botão + o preenchimento. */
 .spn-consent-switch[aria-checked='true'] {
-  background: var(--color-accent-green);
+  background: var(--color-accent);
 }
 .spn-consent-switch[aria-checked='true'] .spn-consent-knob {
   transform: translateX(18px);
@@ -4055,4 +4033,106 @@ body[data-sheet-open='true'] { overflow: hidden; }
     transition: none !important;
   }
   .spn-consent-btn:active { transform: none !important; }
+}
+
+
+/* BRAND V2 OFFICIAL
+   O N estrutural, Geist e a arquitetura orientam a interface. Vidro fica
+   restrito a navegação e controles flutuantes; painéis de leitura são sólidos. */
+:root {
+  --color-grafite: #151618;
+  --color-branco: #ffffff;
+  --color-porcelana: #f7f7f5;
+  --color-nevoa: #e8e9e7;
+  --color-prata: #bdc2c8;
+  --color-secundario: #60646b;
+  --color-bg: #151618;
+  --color-bg-elevated: #1c1d20;
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #bdc2c8;
+  --color-text-tertiary: #8a8f97;
+  --color-text-quaternary: #53575e;
+  --color-sidebar: #151618;
+  --color-panel: #1c1d20;
+  --color-inverse: #ffffff;
+  --color-inverse-foreground: #151618;
+  --color-accent: #ffffff;
+  --color-accent-dim: #bdc2c8;
+  --color-accent-bg: rgba(255,255,255,.08);
+  --color-accent-border: rgba(255,255,255,.22);
+  --color-accent-glow: rgba(255,255,255,.16);
+  --color-on-accent: #151618;
+  --color-border-focus: #ffffff;
+}
+html.light {
+  --color-bg: #f7f7f5;
+  --color-bg-elevated: #ffffff;
+  --color-text-primary: #151618;
+  --color-text-secondary: #60646b;
+  --color-text-tertiary: #6a6e75;
+  --color-text-quaternary: #bdc2c8;
+  --color-sidebar: #f7f7f5;
+  --color-panel: #ffffff;
+  --color-inverse: #151618;
+  --color-inverse-foreground: #ffffff;
+  --color-accent: #151618;
+  --color-accent-dim: #60646b;
+  --color-accent-bg: rgba(21,22,24,.06);
+  --color-accent-border: rgba(21,22,24,.22);
+  --color-accent-glow: rgba(21,22,24,.12);
+  --color-on-accent: #ffffff;
+  --color-border-focus: #151618;
+}
+.spn-dark {
+  --color-bg: #151618;
+  --color-bg-elevated: #1c1d20;
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #bdc2c8;
+  --color-text-tertiary: #8a8f97;
+  --color-accent: #ffffff;
+  --color-accent-dim: #bdc2c8;
+  --color-accent-bg: rgba(255,255,255,.08);
+  --color-accent-border: rgba(255,255,255,.22);
+  --color-accent-glow: rgba(255,255,255,.16);
+  --color-on-accent: #151618;
+}
+
+/* A assinatura usa a hierarquia tipográfica do manual. */
+.sn-display { font-size: clamp(2.25rem, 5vw, 5rem); font-weight: 500; letter-spacing: -.035em; line-height: 1.03; }
+.sn-title { font-size: clamp(2rem, 3vw, 3rem); font-weight: 500; letter-spacing: -.025em; line-height: 1.1; }
+.sn-body { font-size: clamp(1rem, 1.25vw, 1.25rem); font-weight: 400; line-height: 1.5; }
+.sn-label { font-size: 11px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; }
+
+@keyframes sn-build { 0%, 100% { opacity: .14; } 22%, 64% { opacity: 1; } }
+.sn-loader path { animation: sn-build 2.4s ease-in-out infinite both; }
+.sn-loader path:nth-child(2) { animation-delay: .24s; }
+.sn-loader path:nth-child(3) { animation-delay: .48s; }
+@media (prefers-reduced-motion: reduce) {
+  .sn-loader path { animation: none; opacity: 1; }
+}
+
+:focus-visible { outline: 2px solid var(--color-border-focus); outline-offset: 2px; }
+
+/* Superfícies de leitura e decisão não empilham vidro. */
+.spn-glass:not(.spn-glass--chrome):not(.spn-glass--raised) {
+  background: var(--color-bg-elevated);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+  border-color: var(--color-border-strong);
+}
+.spn-glass--raised:not(button):not(a) {
+  background: var(--color-bg-elevated);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.spn-tool-panel.spn-glass--chrome,
+.spn-sheet.spn-glass--chrome,
+.spn-popover.spn-glass--chrome {
+  background: var(--color-bg-elevated);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+@media (prefers-reduced-transparency: reduce) {
+  .spn-glass--chrome, .spn-glass--raised { -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
