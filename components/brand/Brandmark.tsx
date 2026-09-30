@@ -1,8 +1,6 @@
 import {
-  LOCKUP_COMPACT_MAX_PX,
   LOCKUP_WIDTH,
   N_GRID,
-  N_MICRO,
   N_PRINCIPAL,
   WORDMARK_PATH,
 } from './geometry';
@@ -27,8 +25,8 @@ type BrandmarkProps = {
 };
 
 /**
- * Assinatura oficial: N estrutural + wordmark em curvas, com as proporções do kit.
- * Compacta (símbolo micro) de 144 a 191 px de largura; principal a partir de 192 px.
+ * Assinatura oficial: N estrutural + wordmark em curvas, com as proporções do manual.
+ * A mesma matriz vetorial compõe a assinatura compacta e a principal.
  */
 export function Brandmark({
   size = 32,
@@ -45,8 +43,6 @@ export function Brandmark({
   }
 
   const width = (size * LOCKUP_WIDTH) / N_GRID;
-  const compact = width <= LOCKUP_COMPACT_MAX_PX;
-
   return (
     <svg
       width={width}
@@ -59,15 +55,9 @@ export function Brandmark({
       aria-label={title}
       style={{ display: 'block', flexShrink: 0, overflow: 'visible' }}
     >
-      {compact ? (
-        <path d={N_MICRO} />
-      ) : (
-        <>
-          <path d={N_PRINCIPAL.apoioEsquerdo} />
-          <path d={N_PRINCIPAL.ligacao} />
-          <path d={N_PRINCIPAL.apoioDireito} />
-        </>
-      )}
+      <path d={N_PRINCIPAL.apoioEsquerdo} />
+      <path d={N_PRINCIPAL.ligacao} />
+      <path d={N_PRINCIPAL.apoioDireito} />
       <path
         d={WORDMARK_PATH}
         style={{ opacity: wordmarkHidden ? 0 : 1, transition: 'opacity 180ms ease' }}

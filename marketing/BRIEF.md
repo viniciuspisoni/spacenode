@@ -18,19 +18,20 @@ médio. Dores: render tradicional é caro (R$150–600/imagem terceirizada),
 lento (madrugadas no V-Ray/Lumion) e exige hardware caro. Tom: "de arquiteto
 para arquiteto" — direto, honesto, zero hype de IA, zero corporativês.
 
-## Identidade visual (manual oficial v2.0)
+## Identidade visual (manual oficial v2.2)
 - Grafite `#151618`, Branco `#FFFFFF`, Porcelana `#F7F7F5`, Névoa `#E8E9E7`, Prata `#BDC2C8` e texto secundário `#60646B`.
+- Cores secundárias para comunicação: `#BAC3C6` e `#A3AEB0` (referências internas: tintas Suvinil da sede) e azul dos destaques do Instagram `#4D6685`. Use em fundos e detalhes de site, redes sociais e divulgação; mantenha o logotipo em grafite ou branco. **Nunca cite os nomes das tintas nem Suvinil em peças públicas.** A interface funcional do produto permanece neutra.
 - Sem verde de marca. Ênfase por peso, contraste ou sublinhado; estados de sucesso usam ícone e texto neutros.
 - Geist Medium 500 para displays, títulos e rótulos; Geist Regular 400 para corpo.
 - Símbolo N estrutural e wordmark oficial em curvas, disponíveis em `marketing/brand/`.
 - Estética minimalista, espaço generoso e vidro apenas em navegação ou controles flutuantes.
-- Texto direto e sereno, sem promessas absolutas. Consulte `docs/BRAND.md` para regras completas.
+- Texto direto e sereno, sem promessas absolutas. Consulte `docs/BRAND.md` e o PDF `marketing/brand/SpaceNode-Manual-da-Marca-v2.2.pdf` para regras completas.
 
 ## Especificações técnicas dos assets
 - Reels: 1080×1920 (9:16), 30 fps, H.264 (libx264, crf 18, yuv420p), SEM áudio
   (a música é adicionada no app do Instagram para pegar áudio em alta)
 - Feed/carrossel: 1080×1350 (4:5), PNG
-- Capas de highlight: 1080×1920, símbolo centralizado em círculo, fundo Grafite `#151618`
+- Capas de destaque: 1080×1920, círculo azul `#4D6685` centralizado na área visível do Instagram, sem gradiente
 - Zona segura nos Reels: nada de texto nos 220px do topo nem nos 320px da base
   (a UI do Instagram cobre essas áreas); texto sempre no terço central
 - Duração: Reels de transformação 8–12s; screen recording 20–30s; compilados 15s

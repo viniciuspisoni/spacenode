@@ -12,6 +12,7 @@ import {
 } from '@/components/app/sidebar-icons'
 import { getEnabledModules, isModuleEnabled, type SidebarModule } from '@/lib/nav/modules-config'
 import { RecentCard, type RecentRender } from './_components/RecentCard'
+import { IdentityProductNotice } from '@/components/app/IdentityProductNotice'
 
 type RecentSpace = {
   id: string
@@ -180,6 +181,8 @@ export default async function AppPage() {
             )}
           </div>
         </header>
+
+        <IdentityProductNotice />
 
         {/* ── 2 · Projetos: continuidade ou primeiro passo ──────────────────── */}
         {spaces.length === 0 ? (

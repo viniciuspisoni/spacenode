@@ -4,7 +4,7 @@ import { WORDMARK_PATH } from './geometry';
 
 type WordmarkSize = 'sm' | 'md' | 'lg'
 
-const HEIGHTS = { sm: 26, md: 32, lg: 40 } as const
+const HEIGHTS = { sm: 27, md: 32, lg: 40 } as const
 
 interface WordmarkProps {
   size?: WordmarkSize
