@@ -51,13 +51,15 @@ const TIMEOUT_MS: Record<GoogleImageModel, number> = {
   'gemini-3-pro-image': 150_000,
 }
 
-/** ID canônico → ID exposto na API. A chave do projeto só resolve as variantes
- *  -preview hoje (validação 2026-06-12); override por env quando o GA chegar. */
+/** ID canônico → ID exposto na API. Default = GA sem -preview: o GA já resolve
+ *  nesta chave (confirmado 2026-07-24) e os aliases -preview são efêmeros — já
+ *  foram aposentados no Vertex (lib/ai/image-provider). Override por env se o
+ *  id mudar. */
 const API_MODEL_NAME: Record<GoogleImageModel, string> = {
   'gemini-3.1-flash-image':
-    process.env.GEMINI_FLASH_IMAGE_MODEL?.trim() || 'gemini-3.1-flash-image-preview',
+    process.env.GEMINI_FLASH_IMAGE_MODEL?.trim() || 'gemini-3.1-flash-image',
   'gemini-3-pro-image':
-    process.env.GEMINI_PRO_IMAGE_MODEL?.trim() || 'gemini-3-pro-image-preview',
+    process.env.GEMINI_PRO_IMAGE_MODEL?.trim() || 'gemini-3-pro-image',
 }
 
 let _client: GoogleGenAI | null = null
