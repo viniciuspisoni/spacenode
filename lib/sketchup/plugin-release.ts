@@ -8,11 +8,11 @@
 // (VERSION) + em sketchup/spacenode.rb (EXTENSION.version), e regerar o .rbz.
 // Os três precisam bater — o plugin compara a SUA VERSION com esta.
 
-export const PLUGIN_VERSION = '1.8.0'
+export const PLUGIN_VERSION = '1.8.1'
 
 /** Caminho relativo ao site; o plugin resolve contra o api_base_url dele. */
 export const PLUGIN_RBZ_PATH = '/downloads/spacenode-sketchup.rbz'
 
 /** Uma linha, mostrada dentro do painel de quem está atrasado. */
 export const PLUGIN_RELEASE_NOTE =
-  'A barra flutuante agora é uma janela de verdade: transparente sobre a viewport, sem moldura, com cantos suaves e sombra.'
+  'Nova identidade SpaceNode: marca estrutural, temas neutros e cabeçalho adaptado às janelas compactas.'

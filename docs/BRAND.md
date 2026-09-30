@@ -1,8 +1,9 @@
-# Marca no código — Manual da Marca v2.0
+# Marca no código — Manual da Marca v2.2
 
-Fonte da verdade: *SpaceNode — Manual da Marca v2.0 Oficial* (aprovado em 25/09/2026).
-Sistema oficial: **N estrutural + Geist + neutros + vidro pontual.** Esta edição substitui a v1
-(Constellation N e verde `#30B46C`).
+Fonte da verdade: [*SpaceNode — Manual da Marca v2.2, Paleta Digital*](../marketing/brand/SpaceNode-Manual-da-Marca-v2.2.pdf) (29/09/2026).
+A base da identidade foi aprovada em 25/09/2026. Sistema oficial: **N estrutural + Geist +
+neutros + vidro pontual.** Três cores secundárias ampliam a comunicação sem recolorir o logo.
+Esta edição substitui as diretrizes anteriores de cor para a comunicação.
 
 ## Regras que mais aparecem no código
 
@@ -21,8 +22,8 @@ Sistema oficial: **N estrutural + Geist + neutros + vidro pontual.** Esta ediç�
 
 | Componente | Uso |
 |---|---|
-| `<Brandmark size={28} />` | Assinatura horizontal oficial (N + wordmark em curvas). `size` = altura em px. Compacta (N micro) até 191 px de largura; principal a partir de 192 px. Mínimo: `size={26}` (144 px). `tone`: `auto` (currentColor) · `primary` (Grafite) · `reverse` (Branco). |
-| `<StructuralN size={24} />` | Símbolo isolado (avatar, favicon, espaços já identificados). Micro de 16 a 31 px; principal a partir de 32 px. |
+| `<Brandmark size={28} />` | Assinatura horizontal oficial (N + wordmark em curvas). Compacta de 144 a 191 px; principal desde 192 px. O N mantém o mesmo contorno. `tone`: `auto` (currentColor) · `primary` (Grafite) · `reverse` (Branco). |
+| `<StructuralN size={24} />` | Símbolo isolado (avatar, favicon, espaços já identificados). Mesma matriz vetorial em todos os tamanhos; se as juntas fecharem, ampliar. |
 | `<BrandLoader size={40} />` | Carregamento: os dois apoios e depois a ligação. Respeita movimento reduzido. |
 
 `geometry.ts` guarda a matriz vetorial extraída do manual (grade 64 × 64, forma útil 56 × 56) e o
@@ -40,6 +41,14 @@ Os ícones do app (`app/icon.tsx`, `app/apple-icon.tsx`) e a imagem Open Graph
 Paleta fixa: `--color-grafite` #151618 · `--color-branco` #FFFFFF · `--color-porcelana` #F7F7F5 ·
 `--color-nevoa` #E8E9E7 · `--color-prata` #BDC2C8 · `--color-secundario` #60646B.
 
+Paleta secundária de comunicação: `--color-sede-01` **#BAC3C6**,
+`--color-sede-02` **#A3AEB0** e `--color-azul-destaques` **#4D6685**
+(cor amostrada da captura dos destaques do Instagram em 29/09/2026).
+**Não citar os nomes das tintas nem o fabricante em materiais públicos**; usar apenas os nomes do manual.
+Usar as cores em fundos, cards, capas de destaque e detalhes de comunicação. Texto Grafite sobre
+as duas cores da sede; texto branco sobre o azul dos destaques (5,9:1). A assinatura permanece
+preta ou branca. A interface funcional do produto mantém os tokens neutros.
+
 Tema escuro (padrão, base Grafite) e tema claro (`html.light` ou a classe de seção `.sn-theme-light`,
 base Porcelana) usam os mesmos nomes:
 
@@ -56,7 +65,7 @@ base Porcelana) usam os mesmos nomes:
 
 ## Tipografia
 
-Geist Sans. Seguir os pesos especificados na página 11 do manual: Display e Título em Medium 500,
+Geist Sans. Seguir os pesos especificados na página 13 do manual: Display e Título em Medium 500,
 Corpo em Regular 400, Etiqueta em Medium 500. Semibold 600 fica disponível para casos pontuais.
 
 Classes: `.sn-display` (56–80 px, −0,035 em; 36–48 px em telas estreitas), `.sn-title` (32–48 px,

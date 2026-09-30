@@ -7,6 +7,10 @@
 
 @theme static {
   --font-sans: var(--font-geist), system-ui, -apple-system, sans-serif;
+  /* Manual v2.2: fundos e peças de comunicação. Controles usam os neutros. */
+  --color-sede-01: #bac3c6;
+  --color-sede-02: #a3aeb0;
+  --color-azul-destaques: #4d6685;
   --color-accent: #ffffff;
   --color-accent-dim: #bdc2c8;
   --color-accent-bg: rgba(255,255,255,.08);
