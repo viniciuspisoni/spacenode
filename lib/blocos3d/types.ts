@@ -55,8 +55,10 @@ export interface Blocos3DJobView {
   inputUrl:     string | null
   thumbnailUrl: string | null
   modelUrls:    Partial<Record<ModelFormat, string>>
+  originalGlbUrl: string | null
   nodesCost:    number
   errorMessage: string | null
+  refunded:     boolean
   createdAt:    string
   completedAt:  string | null
 }

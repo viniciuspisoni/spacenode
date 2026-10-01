@@ -21,7 +21,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { refundNodes } from '@/lib/billing/refund-nodes'
 import { getProviderTask, TaskGoneError } from '@/lib/blocos3d/provider'
-import { rehostProviderOutputs } from '@/lib/blocos3d/rehost'
+import { InvalidGlbError, rehostProviderOutputs } from '@/lib/blocos3d/rehost'
 import { BLOCOS3D_JOB_COLUMNS, toJobView, type Blocos3DJobRow } from '@/lib/blocos3d/view'
 import type { Blocos3DProvider } from '@/lib/blocos3d/types'
 
@@ -40,11 +40,10 @@ type JobRowWithMeta = Blocos3DJobRow & {
   provider:         Blocos3DProvider
   engine:           string
   provider_task_id: string | null
-  refunded:         boolean
   charged:          boolean
 }
 
-const ROW_COLUMNS = `${BLOCOS3D_JOB_COLUMNS}, user_id, provider, engine, provider_task_id, refunded, charged`
+const ROW_COLUMNS = `${BLOCOS3D_JOB_COLUMNS}, user_id, provider, engine, provider_task_id, charged`
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -91,15 +90,25 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const task = await getProviderTask(job.provider, job.engine, job.provider_task_id)
 
     if (task.status === 'succeeded') {
-      // Re-hospeda ANTES da transição (keys determinísticas + upsert →
-      // idempotente entre retries/abas; falha parcial mantém a URL do provider
-      // como fallback — nunca perde o output).
-      const { modelKeys, thumbnailKey } = await rehostProviderOutputs(admin, {
+      // Re-hospeda ANTES da transição (keys determinísticas + upsert entre
+      // retries/abas). O GLB precisa estar durável antes de concluir.
+      const { modelKeys, thumbnailKey, originalGlbKey } = await rehostProviderOutputs(admin, {
         userId:       job.user_id,
         jobId:        job.id,
         modelUrls:    task.modelUrls,
         thumbnailUrl: task.thumbnailUrl,
+        optimizeForScenes: job.engine.startsWith('tripo3d/h3.1/'),
       })
+
+      // A URL do provider expira. Só concluir quando houver GLB válido no
+      // Storage privado; uma falha transitória de upload tenta no próximo poll.
+      if (!modelKeys.glb) {
+        if (Date.now() - new Date(job.created_at).getTime() > STALE_JOB_MS) {
+          await failJob(admin, job, 'Não foi possível preparar o modelo 3D')
+          return emitFresh(admin, job)
+        }
+        return NextResponse.json({ job: await toJobView(admin, job) })
+      }
 
       const { data: updated } = await admin
         .from('blocos3d_jobs')
@@ -114,6 +123,10 @@ export async function GET(_req: NextRequest, { params }: Params) {
           provider_model_urls: {
             ...task.modelUrls,
             ...(task.thumbnailUrl ? { thumbnail: task.thumbnailUrl } : {}),
+          },
+          options: {
+            ...(job.options ?? {}),
+            ...(originalGlbKey ? { original_glb_key: originalGlbKey } : {}),
           },
           completed_at: new Date().toISOString(),
         })
@@ -152,6 +165,10 @@ export async function GET(_req: NextRequest, { params }: Params) {
       job: await toJobView(admin, { ...job, progress: Math.max(job.progress ?? 0, progress ?? 0) }),
     })
   } catch (err: unknown) {
+    if (err instanceof InvalidGlbError) {
+      await failJob(admin, job, 'O modelo veio incompleto.')
+      return emitFresh(admin, job)
+    }
     if (err instanceof TaskGoneError) {
       // Task sumiu do provider — sem o que esperar.
       await failJob(admin, job, 'Task não encontrada no provider')

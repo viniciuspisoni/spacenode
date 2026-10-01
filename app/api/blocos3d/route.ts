@@ -12,6 +12,7 @@
 // GET — lista os últimos jobs do usuário (histórico do módulo).
 
 import { NextRequest, NextResponse } from 'next/server'
+import sharp from 'sharp'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getPayerId } from '@/lib/workspaces/context'
@@ -23,6 +24,7 @@ import {
   normalizeBlocos3DOptions,
   normalizeSourceKeys,
   countImages,
+  validViewSequence,
   VIEW_POSITION_ORDER,
 } from '@/lib/blocos3d/config'
 import { createProviderTask, engineAvailable } from '@/lib/blocos3d/provider'
@@ -52,11 +54,14 @@ export async function POST(req: NextRequest) {
 
   if (!sourceKeys) return NextResponse.json({ error: 'Imagem da frente obrigatória' }, { status: 400 })
   if (!options)    return NextResponse.json({ error: 'Opções inválidas' }, { status: 400 })
+  if (!validViewSequence(sourceKeys)) {
+    return NextResponse.json({ error: 'Adicione os ângulos na ordem: frente, esquerda, trás, direita.' }, { status: 400 })
+  }
 
   const engine = getBlocos3DEngine(options.quality)
   if (!engineAvailable(engine)) {
     return NextResponse.json(
-      { error: `Qualidade ${engine.label} indisponível no momento.` },
+      { error: 'Geração 3D indisponível no momento.' },
       { status: 503 },
     )
   }
@@ -78,6 +83,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: bad.res.message }, { status: bad.res.status })
   }
   const frontPublicUrl = (verified[0].res as { ok: true; url: string }).url
+
+  // Pré-checagem local e gratuita. Fotos pequenas ou arquivos com MIME falso
+  // tendem a desperdiçar uma chamada paga e geram um bloco inutilizável.
+  const { data: frontImage, error: sourceError } = await admin.storage
+    .from(area.bucket).download(sourceKeys.front)
+  if (sourceError || !frontImage) {
+    return NextResponse.json({ error: 'Não foi possível ler a foto. Envie-a novamente.' }, { status: 503 })
+  }
+  try {
+    const metadata = await sharp(Buffer.from(await frontImage.arrayBuffer()), { failOn: 'error' }).metadata()
+    if (!metadata.width || !metadata.height || Math.min(metadata.width, metadata.height) < 512 ||
+        !['jpeg', 'png', 'webp'].includes(metadata.format ?? '')) {
+      return NextResponse.json(
+        { error: 'Use uma foto JPG, PNG ou WebP com pelo menos 512 px em cada lado.' },
+        { status: 400 },
+      )
+    }
+  } catch {
+    return NextResponse.json({ error: 'Não foi possível abrir essa imagem. Envie outra foto.' }, { status: 400 })
+  }
 
   const nodesToCharge = engine.costInNodes
 
@@ -157,10 +182,10 @@ export async function POST(req: NextRequest) {
       const payerId = (await getPayerId(admin, user.id)) ?? user.id
       const { data: balance } = await admin
         .from('user_node_balance')
-        .select('plan_balance')
+        .select('total_balance')
         .eq('user_id', payerId)
         .single()
-      credits = balance?.plan_balance ?? undefined
+      credits = balance?.total_balance ?? undefined
     } catch (e) {
       console.warn('[blocos3d] leitura de saldo pós-débito falhou (não crítico):', (e as Error)?.message)
     }
