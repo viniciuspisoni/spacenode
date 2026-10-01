@@ -25,9 +25,8 @@ export interface SidebarModule {
 
 export const SIDEBAR_MODULES: SidebarModule[] = [
   { id: 'renderizar',       label: 'Renderizar',       href: '/app/generate',                     section: 'criar',      iconKey: 'generate',      enabled: true },
-  // Spaces DESATIVADO TEMPORARIAMENTE (2026-09-20, pedido do dono) — rota,
-  // componente, API e migrations seguem intactos. Para reativar, virar
-  // `enabled: true` aqui e remover o redirect de /app/spaces em proxy.ts.
+  // Spaces e Vistas descontinuados por inconsistência nos resultados visuais.
+  // Dados legados continuam no banco; novas operações são bloqueadas em proxy.ts.
   { id: 'spaces',           label: 'Spaces',           href: '/app/spaces/new',                    section: 'criar',      iconKey: 'spaces',        enabled: false },
   { id: 'editar',           label: 'Editar',           href: '/app/editar',                        section: 'criar',      iconKey: 'retocar',       enabled: true },
   { id: 'ampliar',          label: 'Ampliar',          href: '/app/upscale',                       section: 'criar',      iconKey: 'enhance',       enabled: true },
