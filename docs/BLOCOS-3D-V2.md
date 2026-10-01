@@ -30,7 +30,7 @@ Fontes verificadas em 2026-10-01:
 
 A [tabela oficial do H3.1](https://developers.tripo3d.ai/en/models/v3-1)
 marca 40 créditos para uma imagem ou multiview com textura detalhada; na
-[conversão publicada de 100 créditos por US$1](https://docs.tripo3d.ai/get-started/pricing.html),
+[conversão publicada de 100 créditos por US$1](https://developers.tripo3d.ai/en/pricing),
 isso equivale a US$0,40. A fal publica os mesmos US$0,40 para a mesma
 configuração. Geometria detalhada acrescenta 20 créditos/US$0,20 em ambas.
 Sem desconto contratado ou diferença real na fatura, migrar para a API
