@@ -19,7 +19,7 @@ export async function measurePlanLineRecall(source: Buffer, result: Buffer): Pro
   const width = ratio >= 1 ? 1024 : Math.round(1024 * ratio)
   const height = ratio >= 1 ? Math.round(1024 / ratio) : 1024
   const gray = async (bytes: Buffer) => sharp(bytes)
-    .resize(width, height, { fit: 'fill' }).grayscale().raw().toBuffer()
+    .resize(width, height, { fit: 'fill' }).removeAlpha().grayscale().raw().toBuffer()
   const [a, b] = await Promise.all([gray(source), gray(result)])
   const dark = (data: Buffer, p: number) => data[p] < 128
   const lines = new Uint8Array(width * height)
