@@ -10,7 +10,7 @@
 
 ## Novo fluxo e estados
 
-1. **Dashboard:** tour curto aponta Renderizar, continuidade da imagem e, quando habilitado, Space. O CTA final abre Renderizar. O empty state indica print do SketchUp, render básico ou foto.
+1. **Dashboard:** tour curto aponta Renderizar, continuidade da imagem e, quando habilitado, Space. O CTA final abre Renderizar e seu guia contextual. O item “Como usar” da sidebar reinicia esse percurso de qualquer tela do app. O empty state indica print do SketchUp, render básico ou foto.
 2. **Renderizar:** o guia segue o estado real (referência → visualização → geração). A referência clara e a preservação de geometria, proporções e perspectiva aparecem no momento da decisão.
 3. **Resultado:** comparação antes/depois e ações Editar, Finalizar, Ampliar, Animar e, quando habilitado, Space. Os links passam a imagem para a próxima ferramenta. A opção de planos aparece apenas quando o saldo restante não cobre outra render com a configuração atual.
 

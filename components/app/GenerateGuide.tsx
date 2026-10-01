@@ -8,8 +8,8 @@
 //
 // Abertura: automática quando a conta nunca gerou uma render (prop firstRender,
 // derivada da contagem server-side) e o guia não foi dispensado; manual via
-// /app/generate#guia ou pelo "Como usar" da sidebar (evento GUIDE_START_EVENT,
-// mesmo padrão do tour). Depois da primeira render a contagem passa a ser > 0
+// /app/generate#guia (destino do tour da sidebar ou acesso direto). Depois da
+// primeira render a contagem passa a ser > 0
 // e o guia deixa de se oferecer — não há coluna nova nem migration.
 //
 // O botão "Ir para Gerar render" (com rolagem programática e pulso no CTA)
@@ -17,7 +17,6 @@
 // uma coluna com 9 grupos empilhados. Agora o CTA mora num .spn-dock colado no
 // rodapé do painel e nunca sai da tela — apontar pra ele virou redundância.
 
-export const GUIDE_START_EVENT = 'spn:guide:start'
 export const GUIDE_DISMISSED_KEY = 'spn:generate-guide:dismissed'
 
 export type GuidePhase = 'upload' | 'configure' | 'generating' | 'done'
