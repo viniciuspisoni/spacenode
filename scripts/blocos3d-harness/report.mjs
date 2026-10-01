@@ -10,14 +10,17 @@ const scores = new Map(scoreRows.map(row => {
   const [object, model, ...numbers] = row.split(',')
   return [`${object}/${model}`, numbers.map(Number)]
 }))
-const names = ['h31', 'hunyuan', 'rodin']
+const names = ['h31', 'h31_direct', 'hunyuan', 'rodin']
 const rows = names.map(name => {
   const tasks = Object.entries(manifest).filter(([key]) => key.endsWith(`/${name}`))
   const completed = tasks.filter(([, row]) => row.status === 'completed')
   const graded = completed.map(([key]) => scores.get(key))
     .filter(values => values?.length === 4 && values.every(v => Number.isInteger(v) && v >= 1 && v <= 5))
   const average = idx => graded.length ? graded.reduce((n, score) => n + score[idx], 0) / graded.length : 0
-  const cost = tasks.reduce((n, [, row]) => n + (row.estimatedUsd ?? 0), 0)
+  const cost = tasks.reduce((n, [, row]) => n + (row.actualUsd ?? row.estimatedUsd ?? 0), 0)
+  const actual = tasks.length > 0 && tasks.every(([, row]) => Number.isFinite(row.actualUsd))
+  const durations = completed.map(([, row]) => row.durationMs).filter(Number.isFinite)
+  const avgMinutes = durations.length ? durations.reduce((sum, ms) => sum + ms, 0) / durations.length / 60_000 : null
   const perDelivered = completed.length ? cost / completed.length : 0
   // perDelivered já inclui pedidos cobrados que falharam: aplicar 12% outra
   // vez duplicaria a reserva de falhas e distorceria a margem observada.
@@ -28,14 +31,14 @@ const rows = names.map(name => {
     fourViews: tasks.filter(([, row]) => row.views === 4).length,
     fidelity: average(0), materials: average(1), geometry: average(2), scene: average(3),
     weighted: average(0) * 0.4 + average(1) * 0.25 + average(2) * 0.2 + average(3) * 0.15,
-    estimatedUsd: cost, nodes75: nodesAt(0.75), nodes80: nodesAt(0.80),
+    usd: cost, actual, avgMinutes, nodes75: nodesAt(0.75), nodes80: nodesAt(0.80),
   }
 }).filter(row => row.jobs).sort((a, b) => b.weighted - a.weighted)
 
-console.log('| Motor | Entregues | Notas | Fidelidade | Materiais | Geometria | Cena | Média ponderada | Nodes 75% | Nodes 80% |')
-console.log('| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |')
-for (const row of rows) console.log(`| ${row.model} | ${row.completed}/${row.jobs} | ${row.scored} | ${row.fidelity.toFixed(2)} | ${row.materials.toFixed(2)} | ${row.geometry.toFixed(2)} | ${row.scene.toFixed(2)} | ${row.weighted.toFixed(2)} | ${row.nodes75 ?? '—'} | ${row.nodes80 ?? '—'} |`)
-console.log('\nCusto em nodes: tarifa estimada de todos os pedidos submetidos dividida pelas entregas, câmbio de proteção R$6/US$, R$0,05 de storage e piso legado R$0,0729/node. Falhas cobradas já entram nessa conta; conciliar com a fatura fal.')
+console.log('| Motor | Entregues | Notas | Média (min) | Custo USD | Fidelidade | Materiais | Geometria | Cena | Média ponderada | Nodes 75% | Nodes 80% |')
+console.log('| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |')
+for (const row of rows) console.log(`| ${row.model} | ${row.completed}/${row.jobs} | ${row.scored} | ${row.avgMinutes?.toFixed(1) ?? '—'} | ${row.usd.toFixed(2)}${row.actual ? '' : '*'} | ${row.fidelity.toFixed(2)} | ${row.materials.toFixed(2)} | ${row.geometry.toFixed(2)} | ${row.scene.toFixed(2)} | ${row.weighted.toFixed(2)} | ${row.nodes75 ?? '—'} | ${row.nodes80 ?? '—'} |`)
+console.log('\n* Custo previsto quando a API não devolve cobrança por tarefa. Tripo direto usa créditos consumidos (100 créditos/US$1). Para fal, conciliar eventos faturados. Nodes: pedidos divididos pelas entregas, câmbio de proteção R$6/US$, R$0,05 de storage e piso legado R$0,0729/node. Submissões incertas exigem reconciliação manual; não reexecutar às cegas.')
 const samples = Math.max(...rows.map(row => row.jobs), 0)
 const fourViews = Math.max(...rows.map(row => row.fourViews), 0)
 if (samples < 10 || fourViews < 4 || rows.some(row => row.scored < 10)) {
