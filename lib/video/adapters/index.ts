@@ -1,11 +1,9 @@
 // Facade dos adapters. A API/UI consome só este módulo — quem cuida
 // de saber qual adapter usar para qual modelo é aqui.
 //
-// Veo "Cinemático" tem DOIS caminhos possíveis para o mesmo produto:
-//   - fal.ai (default de produção)
-//   - Vertex AI na conta GCP do dono (VERTEX_VEO_ENABLED=1 + credenciais)
-// Quando o Vertex está ligado e configurado, ele assume o Veo; se o submit
-// falhar, o próprio adapter cai de volta pro fal. Catálogo/preço não mudam.
+// O preço do Animar V1 é auditado contra a tarifa da fal. A seleção automática
+// do Vertex para o Veo completo fica suspensa até que seu custo seja medido e
+// incluído no guarda de margem; ele permanece exportado para uso interno.
 
 import { requireVideoModel } from '../models'
 import { falAdapter }         from './falAdapter'
@@ -17,15 +15,8 @@ import type { VideoAdapter }  from './types'
 export { falAdapter, googleFlowAdapter, omniAdapter, vertexVeoAdapter }
 export type { VideoAdapter, VideoGenerationRequest, VideoGenerationResult } from './types'
 
-const VEO_MODEL_ID = 'fal-ai/veo3.1/image-to-video'
-
 export function getAdapterForModel(modelId: string): VideoAdapter {
   const model = requireVideoModel(modelId)
-
-  // Override por engine: Veo via Vertex quando o gate estiver ligado.
-  if (model.id === VEO_MODEL_ID && vertexVeoAdapter.isAvailable()) {
-    return vertexVeoAdapter
-  }
 
   switch (model.provider) {
     case 'fal':    return falAdapter

@@ -24,8 +24,6 @@ interface Props {
   onPickFromHistory:  () => void
   onClearImage:       () => void
   onGenerateAgain:    () => void
-  onAdjust:           () => void
-  onUseAsReference:   () => void
   onClearError:       () => void
 }
 
@@ -37,8 +35,6 @@ export default function VideoCreationCanvas({
   onPickFromHistory,
   onClearImage,
   onGenerateAgain,
-  onAdjust,
-  onUseAsReference,
   onClearError,
 }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -147,7 +143,7 @@ export default function VideoCreationCanvas({
             strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
             <path d="M3 8.5 L6.5 12 L13 4.5"/>
           </svg>
-          Composição, materiais e mobiliário serão preservados no vídeo.
+          A geração prioriza a composição e os materiais do projeto. Revise o vídeo final.
         </div>
 
         {state.analysis?.fidelityNotes?.length ? (
@@ -179,7 +175,7 @@ export default function VideoCreationCanvas({
 
         {state.analysisError && (
           <p className="spn-hint" style={{ textAlign: 'center' }}>
-            {state.analysisError} Você pode configurar manualmente no painel ao lado.
+            {state.analysisError} A geração seguirá com um movimento suave.
           </p>
         )}
       </div>
@@ -229,8 +225,6 @@ export default function VideoCreationCanvas({
       <VideoResultActions
         result={state.result}
         onGenerateAgain={onGenerateAgain}
-        onAdjust={onAdjust}
-        onUseAsReference={onUseAsReference}
       />
     </div>
   )

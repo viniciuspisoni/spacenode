@@ -7,13 +7,12 @@
 
 import { useState } from 'react'
 import { Segmented } from '@/components/app/glass'
-import { getVideoModel } from '@/lib/video/models'
 import { CAMERA_MOTIONS } from '@/lib/video/cameraPresets'
 import { getVideoTypePreset } from '@/lib/video/videoPresets'
 // Os rótulos vêm de animateLabels — a ficha técnica do resultado tem de
 // dizer as MESMAS palavras que o painel disse antes de gerar. Havia aqui uma
 // segunda cópia de INTENSITY_LABELS e de formatLabel.
-import { INTENSITY_LABELS, formatLabel } from './animateLabels'
+import { formatLabel } from './animateLabels'
 import type { GenerationResult } from '../_hooks/useAnimateState'
 
 // Download pelo proxy /api/download (Content-Disposition: attachment). Link
@@ -26,15 +25,11 @@ function downloadHref(url: string): string {
 interface Props {
   result:           GenerationResult
   onGenerateAgain:  () => void
-  onAdjust:         () => void
-  onUseAsReference: () => void
 }
 
 export default function VideoResultActions({
   result,
   onGenerateAgain,
-  onAdjust,
-  onUseAsReference,
 }: Props) {
   const [view, setView] = useState<'video' | 'base'>('video')
   // Estado do player: alguns navegadores (extensões, tracking prevention,
@@ -50,7 +45,6 @@ export default function VideoResultActions({
     setPlayback('loading')
   }
 
-  const model  = getVideoModel(result.modelId)
   const motion = result.motionId ? CAMERA_MOTIONS[result.motionId] : undefined
   const preset = getVideoTypePreset(result.videoType)
 
@@ -59,10 +53,8 @@ export default function VideoResultActions({
     { label: 'Movimento',   value: motion?.label ?? 'Automático' },
     { label: 'Formato',     value: formatLabel(result.aspectRatio) },
     { label: 'Duração',     value: `${result.duration}s` },
-    { label: 'Intensidade', value: INTENSITY_LABELS[result.intensity] },
     { label: 'Consumo',     value: `${result.nodesCharged} Nodes` },
   ]
-  if (model) meta.splice(5, 0, { label: 'Motor', value: model.label })
 
   return (
     <div style={{
@@ -255,9 +247,7 @@ export default function VideoResultActions({
             </svg>
             Baixar vídeo
           </a>
-          <button type="button" className="spn-ghost" onClick={onGenerateAgain}>Gerar nova versão</button>
-          <button type="button" className="spn-ghost" onClick={onAdjust}>Ajustar configurações</button>
-          <button type="button" className="spn-ghost" onClick={onUseAsReference}>Continuar do último frame</button>
+          <button type="button" className="spn-ghost" onClick={onGenerateAgain}>Outra câmera · nova geração</button>
         </div>
 
         <div style={{

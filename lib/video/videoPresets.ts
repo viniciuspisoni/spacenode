@@ -40,15 +40,17 @@ export interface VideoTypePreset {
 }
 
 const VEO = 'fal-ai/veo3.1/image-to-video'
+const VEO_LITE = 'fal-ai/veo3.1/lite/image-to-video'
+const VEO_LITE_REELS = 'spacenode/veo3.1-lite-720/image-to-video'
 
 export const VIDEO_TYPE_PRESETS: Record<VideoTypeId, VideoTypePreset> = {
   cinematic: {
     id:       'cinematic',
-    label:    'Movimento Cinematográfico',
-    tagline:  'Movimento sutil e elegante para dar vida ao render.',
-    useCases: 'Portfólio, apresentações e redes profissionais',
+    label:    'Apresentação',
+    tagline:  'Movimento sutil em alta definição para mostrar o projeto.',
+    useCases: 'Portfólio, propostas e apresentações',
     defaults: {
-      modelId:      VEO,
+      modelId:      VEO_LITE,
       motionId:     'auto',
       duration:     '8',
       aspectRatio:  'auto',
@@ -74,15 +76,15 @@ export const VIDEO_TYPE_PRESETS: Record<VideoTypeId, VideoTypePreset> = {
 
   reels: {
     id:       'reels',
-    label:    'Reels de Projeto',
-    tagline:  'Vertical e dinâmico, pronto para Instagram e TikTok.',
+    label:    'Reels',
+    tagline:  'Vídeo vertical com movimento suave para redes sociais.',
     useCases: 'Reels, Stories e tráfego pago',
     defaults: {
-      modelId:      VEO,
-      motionId:     'social-loop',
-      duration:     '6',
+      modelId:      VEO_LITE_REELS,
+      motionId:     'auto',
+      duration:     '8',
       aspectRatio:  '9:16',
-      intensity:    'cinematic',
+      intensity:    'subtle',
       fidelityMode: 'max',
     },
   },
@@ -120,10 +122,7 @@ export const VIDEO_TYPE_PRESETS: Record<VideoTypeId, VideoTypePreset> = {
 
 export const VIDEO_TYPE_ORDER: VideoTypeId[] = [
   'cinematic',
-  'tour',
   'reels',
-  'commercial',
-  'detail',
 ]
 
 export const DEFAULT_VIDEO_TYPE: VideoTypeId = 'cinematic'

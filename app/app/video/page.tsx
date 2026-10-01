@@ -12,5 +12,5 @@ export default async function VideoPage() {
   // Saldo da bolsa (dono do workspace) — é dele que a geração debita.
   const balance = await getPayerBalance(createAdminClient(), user.id)
 
-  return <AnimateClient initialCredits={balance.planBalance} />
+  return <AnimateClient initialCredits={balance.totalBalance} />
 }

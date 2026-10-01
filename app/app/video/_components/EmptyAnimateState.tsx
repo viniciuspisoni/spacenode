@@ -67,8 +67,8 @@ export default function EmptyAnimateState({ onPick, onPickFromHistory, isDraggin
           letterSpacing: '-0.005em',
         }}>
           Envie um render, foto de obra ou imagem de maquete. A SpaceNode adiciona
-          movimento cinematográfico sem perder a essência do ambiente — composição,
-          materiais e mobiliário preservados.
+          movimento suave com foco na arquitetura. Revise sempre a composição,
+          os materiais e o mobiliário no resultado.
         </div>
 
         <div style={{

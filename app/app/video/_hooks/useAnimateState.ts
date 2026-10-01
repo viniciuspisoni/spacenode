@@ -85,6 +85,7 @@ export interface AnimateState {
   atmosphere:       string
   avoidPeople:      boolean
   userPrompt:       string
+  variation:        number
 
   // Geração
   status:           GenerationStatus
@@ -113,6 +114,7 @@ type Action =
   | { type: 'setAtmosphere';      atmosphere: string }
   | { type: 'setAvoidPeople';     avoidPeople: boolean }
   | { type: 'setUserPrompt';      userPrompt: string }
+  | { type: 'nextVariation' }
   | { type: 'startGenerating' }
   | { type: 'generationSuccess'; result: GenerationResult; newCredits: number }
   | { type: 'generationError';   message: string }
@@ -144,6 +146,7 @@ function initialState(credits: number): AnimateState {
     atmosphere:      '',
     avoidPeople:     false,
     userPrompt:      '',
+    variation:       0,
     status:          'idle',
     elapsed:         0,
     result:          null,
@@ -164,6 +167,7 @@ function reducer(state: AnimateState, action: Action): AnimateState {
         analysis:        null,
         analysisError:   null,
         result:          null,
+        variation:       0,
         error:           null,
         status:          'idle',
       }
@@ -208,6 +212,7 @@ function reducer(state: AnimateState, action: Action): AnimateState {
         motionChoice: defaults.motionId,
         intensity:    defaults.intensity,
         fidelityMode: defaults.fidelityMode,
+        variation:    0,
       }
     }
 
@@ -250,6 +255,9 @@ function reducer(state: AnimateState, action: Action): AnimateState {
     case 'setUserPrompt':
       return { ...state, userPrompt: action.userPrompt }
 
+    case 'nextVariation':
+      return { ...state, variation: state.variation + 1, status: 'ready', result: null, error: null }
+
     case 'startGenerating':
       return { ...state, status: 'generating', elapsed: 0, error: null, result: null }
 
@@ -286,6 +294,17 @@ function reducer(state: AnimateState, action: Action): AnimateState {
 // default do tipo de cena. Sempre devolve um movimento concreto.
 
 export function resolveMotion(state: AnimateState): CameraMotion {
+  if (state.videoType === 'cinematic' || state.videoType === 'reels') {
+    // O novo fluxo usa apenas deslocamentos de baixo risco para arquitetura.
+    // Sem análise, a aproximação suave não assume uma tipologia de ambiente.
+    const archetype = state.analysis?.architectureType
+    const order: CameraMotionId[] = archetype === 'facade'
+      ? ['dolly-out-soft', 'lateral-tracking', 'dolly-in-soft']
+      : archetype === 'exterior'
+        ? ['lateral-tracking', 'dolly-in-soft', 'dolly-out-soft']
+        : ['dolly-in-soft', 'lateral-tracking', 'dolly-out-soft']
+    return CAMERA_MOTIONS[order[state.variation % order.length]]
+  }
   if (state.motionChoice !== 'auto') {
     return CAMERA_MOTIONS[state.motionChoice]
   }

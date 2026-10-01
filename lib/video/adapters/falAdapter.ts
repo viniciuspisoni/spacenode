@@ -8,9 +8,11 @@ import type { VideoAdapter, VideoGenerationRequest, VideoGenerationResult } from
 
 const KLING_25 = 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video'
 const VEO_31   = 'fal-ai/veo3.1/image-to-video'
+const VEO_LITE = 'fal-ai/veo3.1/lite/image-to-video'
+const VEO_LITE_720 = 'spacenode/veo3.1-lite-720/image-to-video'
 const SEEDANCE = 'bytedance/seedance-2.0/image-to-video'
 
-function buildFalInput(req: VideoGenerationRequest): Record<string, unknown> {
+export function buildFalInput(req: VideoGenerationRequest): Record<string, unknown> {
   const { modelId, imageUrl, prompt, negativePrompt, duration, aspectRatio, resolution, generateAudio } = req
 
   if (modelId === KLING_25) {
@@ -23,13 +25,14 @@ function buildFalInput(req: VideoGenerationRequest): Record<string, unknown> {
     }
   }
 
-  if (modelId === VEO_31) {
+  if (modelId === VEO_31 || modelId === VEO_LITE || modelId === VEO_LITE_720) {
     return {
       image_url:       imageUrl,
       prompt,
       duration:        `${duration}s`,
-      resolution:      resolution    ?? '1080p',
-      aspect_ratio:    aspectRatio   ?? 'auto',
+      // SKU 720 e 1080 usam o mesmo endpoint; o catálogo determina o tier.
+      resolution:      modelId === VEO_LITE_720 ? '720p' : (resolution ?? '1080p'),
+      aspect_ratio:    modelId === VEO_LITE_720 ? '9:16' : (aspectRatio ?? 'auto'),
       generate_audio:  generateAudio ?? false,
       negative_prompt: negativePrompt,
     }
@@ -49,6 +52,10 @@ function buildFalInput(req: VideoGenerationRequest): Record<string, unknown> {
   }
 
   throw new Error(`Modelo não suportado pelo falAdapter: ${modelId}`)
+}
+
+export function falEndpointForModel(modelId: string): string {
+  return modelId === VEO_LITE_720 ? VEO_LITE : modelId
 }
 
 function extractVideoUrl(data: unknown): string | null {
@@ -84,7 +91,8 @@ export const falAdapter: VideoAdapter = {
     console.log('[falAdapter] model :', req.modelId)
     console.log('[falAdapter] input :', JSON.stringify(input))
 
-    const result = await fal.subscribe(req.modelId, { input })
+    const endpoint = falEndpointForModel(req.modelId)
+    const result = await fal.subscribe(endpoint, { input })
 
     console.log('[falAdapter] output:', JSON.stringify(result.data))
 

@@ -4,7 +4,8 @@ import { getRequestUser } from '@/lib/auth/request-user'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getPayerId } from '@/lib/workspaces/context'
 import { refundNodes } from '@/lib/billing/refund-nodes'
-import { requireVideoModel, getNodeCost } from '@/lib/video/models'
+import { requireVideoModel, DEFAULT_VIDEO_MODEL_ID } from '@/lib/video/models'
+import { videoEconomics, VIDEO_MARGIN_FLOOR } from '@/lib/video/videoPricing'
 import { buildArchitectureVideoPrompt, buildPromptFromLegacyInput, type FidelityMode } from '@/lib/video/promptBuilder'
 import { isSceneTypeId, type SceneTypeId } from '@/lib/video/scenes'
 import { isCameraMotionId, type CameraMotionId, type CameraIntensity } from '@/lib/video/cameraPresets'
@@ -24,7 +25,14 @@ fal.config({ credentials: process.env.FAL_KEY })
 export const maxDuration = 300
 
 // Default quando o cliente não envia engine (fluxo legacy).
-const DEFAULT_ENGINE_ID = 'fal-ai/veo3.1/image-to-video'
+const DEFAULT_ENGINE_ID = DEFAULT_VIDEO_MODEL_ID
+const LITE_ENGINE_IDS = new Set([
+  'fal-ai/veo3.1/lite/image-to-video',
+  'spacenode/veo3.1-lite-720/image-to-video',
+])
+const SAFE_CAMERA_MOTIONS = new Set<CameraMotionId>([
+  'dolly-in-soft', 'dolly-out-soft', 'lateral-tracking',
+])
 
 function pickFidelity(raw: string | null): FidelityMode {
   if (raw === 'balanced' || raw === 'creative') return raw
@@ -58,9 +66,12 @@ export async function POST(req: NextRequest) {
     const sourceKey    = str('sourceKey') ?? ''
     const engineId     = str('engine')      ?? DEFAULT_ENGINE_ID
     const duration     = str('duration')    ?? '8'
-    const sceneRaw     = str('scene')       ?? 'living'
+    const sceneRaw     = str('scene')       ?? ''
     const intensityRaw = str('intensity')
     const userPrompt   = str('prompt')      ?? ''
+    if (userPrompt.length > 500) {
+      return NextResponse.json({ error: 'Direção muito longa (máximo 500 caracteres).' }, { status: 400 })
+    }
 
     // ── Campos novos opcionais (UI v2) ───────────────────────────────────────
     const endKey       = str('endKey')
@@ -68,13 +79,47 @@ export async function POST(req: NextRequest) {
     const fidelityRaw  = str('fidelity')
     const atmosphere   = str('atmosphere')  ?? ''
     const aspectRatioRaw = str('aspectRatio') ?? undefined
-    const resolution   = str('resolution')  ?? undefined
     // ── Campos do fluxo por presets (2026-07) ────────────────────────────────
     const avoidPeople  = str('avoidPeople') === '1'
     const videoTypeRaw = str('videoType')   ?? ''
     const videoType    = isVideoTypeId(videoTypeRaw) ? videoTypeRaw : null
 
     if (!sourceKey) return NextResponse.json({ error: 'Imagem obrigatória' }, { status: 400 })
+
+    const model = (() => {
+      try { return requireVideoModel(engineId) } catch { return null }
+    })()
+    if (!model) return NextResponse.json({ error: 'Motor de vídeo inválido.' }, { status: 400 })
+    if (!model.isAvailable) {
+      return NextResponse.json({ error: `Modelo ${model.label} indisponível` }, { status: 400 })
+    }
+    if (!model.supportedDurations.includes(duration)) {
+      return NextResponse.json({ error: 'Duração inválida para este motor.' }, { status: 400 })
+    }
+    const isLite = LITE_ENGINE_IDS.has(engineId)
+    if (endKey && isLite) {
+      return NextResponse.json({ error: 'Frame final não disponível nesta modalidade.' }, { status: 400 })
+    }
+
+    // Preço e resolução vêm do catálogo no servidor. O cliente nunca pode
+    // pedir um tier mais caro (ex.: 1080p) mantendo o preço do 720p.
+    let quote
+    try {
+      quote = videoEconomics(engineId, duration)
+    } catch (err) {
+      console.error('[video] cotação inválida:', err)
+      return NextResponse.json({ error: 'Preço de vídeo indisponível.' }, { status: 503 })
+    }
+    if (!quote || quote.margin <= VIDEO_MARGIN_FLOOR) {
+      console.error('[video] bloqueio de margem:', { engineId, duration, margin: quote?.margin })
+      return NextResponse.json({ error: 'Esta modalidade está temporariamente indisponível.' }, { status: 503 })
+    }
+    nodesToCharge = quote.nodes
+    const resolution = quote.resolution
+    const adapter = getAdapterForModel(engineId)
+    if (!adapter.isAvailable()) {
+      return NextResponse.json({ error: 'Geração de vídeo indisponível agora.' }, { status: 503 })
+    }
 
     // ── Baixa os uploads diretos (valida dono/área/limites) ──────────────────
     const src = await downloadDirectUpload(
@@ -91,23 +136,13 @@ export async function POST(req: NextRequest) {
       end = d
     }
 
-    // ── Resolve modelo + custo ───────────────────────────────────────────────
-    const model = requireVideoModel(engineId)
-    if (!model.isAvailable) {
-      return NextResponse.json({ error: `Modelo ${model.label} indisponível` }, { status: 400 })
-    }
-
-    try {
-      nodesToCharge = getNodeCost(engineId, duration)
-    } catch {
-      return NextResponse.json({ error: 'Duração inválida para este motor' }, { status: 400 })
-    }
-
     // Formato: clamp ao que o motor suporta — nunca repassa valor que o
     // provider recusaria (evita 422 + refund por request malformado).
-    const aspectRatio = aspectRatioRaw && model.supportedAspectRatios.includes(aspectRatioRaw)
-      ? aspectRatioRaw
-      : undefined
+    const aspectRatio = model.supportedAspectRatios.length === 1
+      ? model.supportedAspectRatios[0]
+      : aspectRatioRaw && model.supportedAspectRatios.includes(aspectRatioRaw)
+        ? aspectRatioRaw
+        : 'auto'
 
     // ── Débito atômico ANTES da geração (padrão do /api/generate) ─────────────
     // consume_workspace_nodes cobra a bolsa do PAGADOR (dono do workspace) e é a
@@ -146,9 +181,14 @@ export async function POST(req: NextRequest) {
     // Senão, cai no caminho legacy (scene + intensity) que produz o mesmo
     // resultado dos prompts antigos.
     const sceneType: SceneTypeId | undefined = isSceneTypeId(sceneRaw) ? sceneRaw : undefined
-    const motionId: CameraMotionId | undefined = isCameraMotionId(cameraMotion) ? cameraMotion : undefined
-    const intensity = pickIntensity(intensityRaw)
-    const fidelity  = pickFidelity(fidelityRaw)
+    const requestedMotion = isCameraMotionId(cameraMotion) ? cameraMotion : undefined
+    // O novo produto oferece apenas movimentos contidos. Clientes antigos do
+    // plugin podem continuar usando o catálogo legado com seus parâmetros.
+    const motionId: CameraMotionId | undefined = isLite
+      ? requestedMotion && SAFE_CAMERA_MOTIONS.has(requestedMotion) ? requestedMotion : 'dolly-in-soft'
+      : requestedMotion
+    const intensity = isLite ? 'subtle' : pickIntensity(intensityRaw)
+    const fidelity = isLite ? 'max' : pickFidelity(fidelityRaw)
 
     const built = motionId
       ? buildArchitectureVideoPrompt({
@@ -160,7 +200,7 @@ export async function POST(req: NextRequest) {
           atmosphere,
           duration,
           hasEndFrame: !!endImageUrl,
-          avoidPeople,
+          avoidPeople: isLite || avoidPeople,
         })
       : buildPromptFromLegacyInput({
           scene:        sceneRaw,
@@ -169,9 +209,8 @@ export async function POST(req: NextRequest) {
         })
 
     // ── Chama o adapter ──────────────────────────────────────────────────────
-    // (Veo pode sair via fal OU via Vertex na conta GCP — ver adapters/index.)
+    // O roteamento atual usa fal para todos os modelos com preço auditado.
     const generationStartedAt = Date.now()
-    const adapter = getAdapterForModel(engineId)
     const { outputUrl, requestId: falRequestId, provider: usedProvider } = await adapter.generate({
       modelId:        engineId,
       imageUrl:       inputUrl,
@@ -267,7 +306,7 @@ export async function POST(req: NextRequest) {
       id:           insertResult.data?.id ?? null,
       url:          outputUrl,
       inputUrl,
-      credits:      bal?.plan_balance ?? undefined,
+      credits:      bal?.total_balance ?? undefined,
       totalBalance: bal?.total_balance ?? undefined,
       nodesCharged: nodesToCharge,
       createdAt:    baseRow.completed_at,

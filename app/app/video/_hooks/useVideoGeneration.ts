@@ -15,6 +15,7 @@ interface GenerateResponse {
   url:       string
   inputUrl:  string
   credits?:  number   // saldo real pós-débito (quando o servidor informa)
+  nodesCharged?: number
   error?:    string
 }
 
@@ -34,12 +35,6 @@ export function useVideoGeneration(
       // Imagens sobem direto pro Storage (sem passar pela Vercel — teto de
       // 4,5 MB de body não se aplica); a rota recebe as keys.
       const { key: sourceKey } = await uploadDirect(state.imageFile, 'animar-source', {}, { confirm: false })
-      let endKey: string | undefined
-      if (state.endImageFile) {
-        const end = await uploadDirect(state.endImageFile, 'animar-source', {}, { confirm: false })
-        endKey = end.key
-      }
-
       const res = await fetch('/api/video', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -47,19 +42,14 @@ export function useVideoGeneration(
           sourceKey,
           engine:       state.modelId,
           duration:     state.duration,
-          scene:        state.sceneType,
-          intensity:    state.intensity,
+          ...(state.analysis?.source === 'ai' ? { scene: state.analysis.sceneType } : {}),
+          intensity:    'subtle',
           prompt:       state.userPrompt,
           cameraMotion: motion.id,
-          fidelity:     state.fidelityMode,
+          fidelity:     'max',
           videoType:    state.videoType,
-          // Formato agora é escolha explícita do usuário — 'auto' mantém a
-          // proporção da imagem. (Antes era derivado do preset de movimento,
-          // o que podia gerar um 9:16 inesperado.)
           aspectRatio:  state.aspectRatio,
-          ...(state.avoidPeople ? { avoidPeople: '1' } : {}),
-          ...(state.atmosphere ? { atmosphere: state.atmosphere } : {}),
-          ...(endKey ? { endKey } : {}),
+          avoidPeople: '1',
         }),
       })
       const data = ((await jsonOrNull(res)) ?? {}) as unknown as GenerateResponse
@@ -81,7 +71,7 @@ export function useVideoGeneration(
           videoType:    state.videoType,
           motionId:     motion.id,
           sceneType:    state.sceneType,
-          nodesCharged: nodeCost,
+          nodesCharged: data.nodesCharged ?? nodeCost,
           createdAt:    Date.now(),
         },
         // Prefere o saldo real informado pelo servidor; senão estima local.
