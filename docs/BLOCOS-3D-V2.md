@@ -50,8 +50,12 @@ menos 512 px em cada eixo. Depois da geração, seleciona o GLB PBR da
 resposta, verifica a estrutura, geometria e textura do GLB, e só conclui
 quando o arquivo está salvo no Storage privado. Se o provider devolver um
 modelo inválido, o job falha e os nodes são estornados. Falhas transitórias
-de armazenamento são tentadas novamente pelo polling; após 1h, falham e
-estornam. Não há segunda geração paga automática.
+de armazenamento são tentadas novamente pelo polling e pelo cron de 10 em
+10 minutos; após 1h, falham e estornam. O cron finaliza também os jobs de
+quem saiu da página. O débito e a entrega deixam de depender da aba aberta.
+Não há segunda geração paga automática. Estornos cujo RPC falhar ficam
+registrados como `failed AND charged AND NOT refunded` para reconciliação
+operacional; o cron não os repete sem garantia de idempotência do débito.
 
 O GLB principal tenta simplificar a malha para aproximadamente 150 mil
 triângulos, preservando materiais e texturas, e guarda o original como download

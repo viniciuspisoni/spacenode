@@ -28,6 +28,12 @@ de cada resultado. Confira o GLB em várias vistas e importe-o no software de
 projeto: a prévia do provider não prova fidelidade dos lados ou escala.
 Não faz retries pagos. O teto é conferido pelo custo previsto de **todo** o
 plano antes da primeira submissão. Confira as tarifas no fal antes de executar.
+O H3.1 usa os mesmos parâmetros da produção, incluindo alinhamento da textura
+à imagem original. Para fotos públicas, registre autor, origem e licença junto
+do diretório; o [ABO](https://amazon-berkeley-objects.s3.amazonaws.com/index.html)
+oferece objetos com imagens de catálogo e séries 360° sob CC BY 4.0, com
+atribuição exigida. Fotos próprias de projetos reais continuam importantes
+para a decisão de lançamento.
 
 Avalie cada GLB visualmente e na ferramenta de cena. Em `scores.csv`, anote
 fidelidade à foto (peso 40%), materiais/PBR (25%), geometria/topologia (20%)
