@@ -164,6 +164,7 @@ describe('E · anti-spoof', () => {
       'signup_completed', 'checkout_started', 'checkout_completed',
       'subscription_started', 'subscription_cancelled', 'project_created',
       'generation_started', 'generation_completed', 'generation_failed',
+      'first_generation', 'second_tool_completed', 'image_uploaded',
     ] as const) {
       expect(CLIENT_EVENTS.has(serverOnly)).toBe(false)
     }

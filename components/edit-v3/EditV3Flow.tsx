@@ -118,9 +118,11 @@ const TOOLS: { id: EditV3Tool; label: string; Icon: typeof IconBrush }[] = [
 
 export function EditV3Flow({
   initialBalance,
+  initialSourceUrl = null,
   allowHighQuality = false,
 }: {
   initialBalance: number
+  initialSourceUrl?: string | null
   /** Alta precisão (Gemini Pro) é gated no servidor (EDIT_V3_ALLOW_PRO). Sem
    *  ela o cartão nem aparece: controle que só devolve 403 não é controle. */
   allowHighQuality?: boolean
@@ -244,6 +246,13 @@ export function EditV3Flow({
     setView('edit')
     if (!keepHistory) setHistory([{ url, kind: 'original' }])
   }, [])
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      if (initialSourceUrl) void applySource(initialSourceUrl)
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [initialSourceUrl, applySource])
 
   const handlePickSource = useCallback(
     async (file: File) => {

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ANNUAL_BILLING_ENABLED, SELLABLE_PLANS, getPlanById, type PaidPlanId, type PlanId, type BillingCycle } from '@/lib/plans'
 import { clearIntentCookie } from '@/lib/analytics/attribution'
+import { track } from '@/lib/analytics/client'
 import { getPlanDisplayName } from '@/lib/plan-display'
 import { EXTRA_NODE_PACKS, type ExtraPackSize } from '@/lib/extra-nodes'
 import { RowIcon, Segmented, SettingGroup, SettingRow, Sheet, summarize } from '@/components/app/glass'
@@ -96,6 +97,7 @@ function daysUntil(date: string): number {
 
 export function BillingClient({ plan, balance, nodesExpireAt, extras, pooled, offerEligible, notice, resume }: BillingClientProps) {
   const router = useRouter()
+  useEffect(() => { track('plans_viewed', { surface: 'app_billing' }) }, [])
   // Extras para qualquer plano pago (Starter incluso desde 2026-08-31).
   const isExtraBlocked = plan === 'free'
   // Assinante de um plano aposentado (Office desde 2026-08-31, Starter desde

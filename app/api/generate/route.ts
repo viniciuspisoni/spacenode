@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse, after } from 'next/server'
 import { fal } from '@fal-ai/client'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { trackServerEvent } from '@/lib/analytics/server'
 import { getRequestUser } from '@/lib/auth/request-user'
 import { getPayerId } from '@/lib/workspaces/context'
 import { refundNodes } from '@/lib/billing/refund-nodes'
@@ -385,6 +386,11 @@ export async function POST(req: NextRequest) {
       } catch {
         return NextResponse.json({ error: 'Imagem inválida ou corrompida.' }, { status: 400 })
       }
+      const uploadedAt = new Date().toISOString()
+      after(() => trackServerEvent(admin, {
+        event: 'image_uploaded', userId: user.id, req, feature: 'renderizar', occurredAt: uploadedAt,
+        props: { source: sourceKey ? 'direct_upload' : 'legacy' },
+      }))
     }
 
     // ── Débito atômico antes da chamada Fal.ai ────────────────────────────────
@@ -420,6 +426,11 @@ export async function POST(req: NextRequest) {
     // libera o refund no catch. Com 0 nodes ela fica false e nenhum estorno
     // fantasma é emitido.
     debited = nodesToCharge > 0
+    const generationStartedAt = new Date().toISOString()
+    after(() => trackServerEvent(admin, {
+      event: 'generation_started', userId: user.id, req, feature: 'renderizar', occurredAt: generationStartedAt,
+      props: { engine, resolution },
+    }))
     if (debit && debit.from_lumens > 0) {
       console.log('[generate] débito misto:', debit.from_plan, 'plano +', debit.from_lumens, 'lumens')
     }
@@ -1199,6 +1210,10 @@ export async function POST(req: NextRequest) {
       },
     }
 
+    const { data: previousRender } = await admin.from('renders')
+      .select('id').eq('user_id', user.id).eq('status', 'completed')
+      .in('style', ['interior', 'exterior']).limit(1).maybeSingle()
+
     let insertResult = await admin
       .from('renders')
       .insert(extendedRow)
@@ -1211,6 +1226,19 @@ export async function POST(req: NextRequest) {
     }
 
     const renderId = insertResult.data?.id ?? null
+    after(async () => {
+      await trackServerEvent(admin, {
+        event: 'generation_completed', userId: user.id, req, feature: 'renderizar',
+        occurredAt: baseRow.completed_at,
+        dedupeKey: renderId ? `render:${renderId}` : null,
+        props: { engine, resolution, first_render: !previousRender, nodes: nodesToCharge },
+      })
+      if (!previousRender) await trackServerEvent(admin, {
+        event: 'first_generation', userId: user.id, req, feature: 'renderizar',
+        occurredAt: baseRow.completed_at,
+        dedupeKey: `first-render:${user.id}`,
+      })
+    })
     if (insertResult.error) {
       console.error('[generate] DB INSERT FALHOU (imagem gerada e debitada — investigar):', {
         error:   insertResult.error,
@@ -1299,6 +1327,9 @@ export async function POST(req: NextRequest) {
     })
 
   } catch (err: unknown) {
+    if (debited) after(() => trackServerEvent(admin, {
+      event: 'generation_failed', userId: user.id, req, feature: 'renderizar',
+    }))
     // ── Refund best-effort em qualquer falha pós-débito ───────────────────────
     if (debited && nodesToCharge > 0) {
       await refundNodes(admin, user.id, nodesToCharge, { module: 'generate', jobTable: 'renders' })

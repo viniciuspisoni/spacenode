@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
+import { trackSecondTool } from '@/lib/analytics/activation'
 import { fal } from '@fal-ai/client'
 import { getRequestUser } from '@/lib/auth/request-user'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -263,6 +264,7 @@ export async function POST(req: NextRequest) {
     // Aditivo (o web ignora): id do render, saldo TOTAL (plano + extras — o
     // que o plugin SketchUp exibe) e createdAt pra reconciliação.
     const bal = (balance ?? null) as { plan_balance?: number | null; total_balance?: number | null } | null
+    after(() => trackSecondTool(admin, req, user.id, 'animar'))
     return NextResponse.json({
       id:           insertResult.data?.id ?? null,
       url:          outputUrl,
