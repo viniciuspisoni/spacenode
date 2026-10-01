@@ -10,7 +10,7 @@
 // O papel de parede passa a ser a imagem de origem: o vidro do painel refrata
 // o projeto do usuário, como no painel v1 do plugin.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { VIDEO_FLAGS } from '@/lib/video/flags'
 import { summarize, useAmbient } from '@/components/app/glass'
 import AnimateHeader from './_components/AnimateHeader'
@@ -32,9 +32,11 @@ import { toMediaProxyUrl } from '@/lib/storage/media-url'
 
 interface AnimateClientProps {
   initialCredits: number
+  initialSourceUrl?: string | null
 }
 
-export default function AnimateClient({ initialCredits }: AnimateClientProps) {
+export default function AnimateClient({ initialCredits, initialSourceUrl }: AnimateClientProps) {
+  const importedSourceRef = useRef<string | null>(null)
   const { state, dispatch, model, resolvedMotion, nodeCost } = useAnimateState(initialCredits)
   const { analyze }  = useReferenceAnalysis(dispatch)
   const { generate } = useVideoGeneration(state, dispatch, nodeCost)
@@ -115,6 +117,18 @@ export default function AnimateClient({ initialCredits }: AnimateClientProps) {
       })
     }
   }
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      if (initialSourceUrl && importedSourceRef.current !== initialSourceUrl) {
+        importedSourceRef.current = initialSourceUrl
+        void handleImportFromHistory(initialSourceUrl)
+      }
+    })
+    return () => cancelAnimationFrame(frame)
+    // A origem é uma intenção de navegação, aplicada apenas na montagem.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSourceUrl])
 
   async function handleUseAsReference() {
     if (!state.result?.outputUrl) return

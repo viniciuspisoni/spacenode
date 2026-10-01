@@ -45,6 +45,9 @@ describe('catálogo de eventos', () => {
       'generation_started',
       'generation_completed',
       'generation_failed',
+      'first_generation',
+      'second_tool_completed',
+      'image_uploaded',
       'project_created',
     ] as const) {
       expect(CLIENT_EVENTS.has(serverOnly)).toBe(false)

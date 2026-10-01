@@ -14,7 +14,8 @@
 //
 // Premium NUNCA é automático — só quando o usuário liga (body.premium).
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
+import { trackSecondTool } from '@/lib/analytics/activation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getRequestAuthContext } from '@/lib/auth/request-user'
@@ -385,6 +386,7 @@ export async function POST(req: NextRequest) {
           ['source_image_url', 'result_image_url', 'mask_url'],
         )
       : null
+    after(() => trackSecondTool(admin, req, user.id, 'editar'))
     return NextResponse.json({
       // Linha redigida: engine sai como label de produto e o request id do
       // provider não viaja (mesma regra do GET e do /api/history/detail).

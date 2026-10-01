@@ -738,6 +738,38 @@ a.spn-glass--raised:focus-visible {
   color: var(--color-text-primary);
   font-weight: 550;
 }
+.spn-guide-examples {
+  display: block;
+  margin-top: 6px;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+}
+.spn-generate-assurance {
+  margin: 0 0 10px;
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.spn-render-next-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 18px 0 12px;
+  color: var(--color-text-tertiary);
+  font-size: 12px;
+}
+.spn-render-next-head strong {
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: 600;
+}
+.spn-render-upgrade {
+  margin: 12px 0 0;
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.spn-render-upgrade a { color: var(--color-text-primary); }
 .spn-guide-live {
   display: inline-block;
   width: 6px;

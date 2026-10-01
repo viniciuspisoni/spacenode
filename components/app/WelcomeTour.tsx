@@ -1,6 +1,6 @@
 'use client'
 
-// Tour de boas-vindas do /app — 5 etapas ancoradas no dashboard via [data-tour].
+// Tour de boas-vindas do /app — orientação curta até a primeira imagem.
 // Abre sozinho no primeiro acesso (profiles.onboarding_completed_at IS NULL) e
 // pode ser revisto a qualquer momento pelo "Como usar" da sidebar: já no /app,
 // o item dispara o evento `spn:tour:start`; de outras rotas, navega a /app#tour
@@ -23,6 +23,7 @@ import { driver, type Driver, type DriveStep } from 'driver.js'
 import 'driver.js/dist/driver.css'
 import { createClient } from '@/lib/supabase/client'
 import { isModuleEnabled } from '@/lib/nav/modules-config'
+import { track } from '@/lib/analytics/client'
 
 export const TOUR_START_EVENT = 'spn:tour:start'
 
@@ -38,9 +39,10 @@ export default function WelcomeTour({ needsOnboarding }: { needsOnboarding: bool
   // Grava no perfil só a primeira conclusão; re-execuções via "Como usar" não escrevem.
   const pendingPersistRef = useRef(needsOnboarding)
 
-  const markCompleted = useCallback(() => {
+  const markCompleted = useCallback((outcome: 'dismissed' | 'skipped' | 'started_render' = 'dismissed') => {
     if (!pendingPersistRef.current) return
     pendingPersistRef.current = false
+    track('onboarding_completed', { surface: 'dashboard_tour', outcome })
     // Fire-and-forget, mesmo modelo do theme_preference (falhar não é fatal:
     // a coluna segue NULL e o tour volta a se oferecer no próximo acesso).
     void (async () => {
@@ -61,6 +63,7 @@ export default function WelcomeTour({ needsOnboarding }: { needsOnboarding: bool
     // Qualquer tour iniciado conta como o auto-start do primeiro acesso —
     // impede reabertura automática com prop ainda desatualizada na sessão.
     autoStartedRef.current = true
+    track('cta_clicked', { cta: 'onboarding_tour_started' })
 
     // Spaces desativado temporariamente (ver lib/nav/modules-config.ts) —
     // sem o módulo enabled não existe [data-tour="spaces"] no DOM, então a
@@ -73,8 +76,7 @@ export default function WelcomeTour({ needsOnboarding }: { needsOnboarding: bool
       element: '[data-tour="spaces"]',
       popover: {
         title: 'Depois, o Space',
-        description:
-          'A partir da segunda vista do mesmo espaço, o Space entra: ele guarda o DNA do projeto para que todas as imagens conversem entre si. Dá para criar um a partir de qualquer render — não precisa decidir isso agora.',
+        description: 'Quando o projeto tiver mais vistas, reúna as imagens em um Space para manter a linguagem visual coerente.',
         side: 'top',
         align: 'start',
       },
@@ -98,7 +100,7 @@ export default function WelcomeTour({ needsOnboarding }: { needsOnboarding: bool
       progressText: '{{current}} de {{total}}',
       nextBtnText: 'Avançar',
       prevBtnText: 'Voltar',
-      doneBtnText: pendingPersistRef.current ? 'Criar minha primeira imagem' : 'Abrir o Renderizar',
+      doneBtnText: 'Criar minha primeira imagem',
       // "Pular tour" discreto junto aos botões (o popover é reaproveitado entre
       // etapas — daí o dedupe e a remoção na última, onde concluir é o caminho).
       onPopoverRender: (popover, opts) => {
@@ -113,7 +115,8 @@ export default function WelcomeTour({ needsOnboarding }: { needsOnboarding: bool
         skip.className = 'spn-tour-skip'
         skip.textContent = 'Pular tour'
         skip.onclick = () => {
-          markCompleted()
+          markCompleted('skipped')
+          track('cta_clicked', { cta: 'onboarding_tour_skipped' })
           opts.driver.destroy()
         }
         popover.footerButtons.insertBefore(skip, popover.footerButtons.firstChild)
@@ -128,42 +131,32 @@ export default function WelcomeTour({ needsOnboarding }: { needsOnboarding: bool
           popover: {
             title: 'Comece pelo Renderizar',
             description:
-              'Envie um print do SketchUp, uma foto ou uma planta e receba a imagem pronta. É o caminho mais curto do seu modelo à primeira visualização — e, na primeira vez, um guia de três passos acompanha você dentro da ferramenta.',
+              'Envie um print do SketchUp, render básico ou foto do projeto. A primeira visualização começa por aqui.',
+            side: 'top',
+            align: 'start',
+          },
+        },
+        {
+          element: '[data-tour="criar"]',
+          popover: {
+            title: 'Continue na mesma imagem',
+            description:
+              'Depois da render, ajuste detalhes no Editar, finalize para entrega, amplie ou anime. Escolha o próximo passo quando vir o resultado.',
             side: 'top',
             align: 'start',
           },
         },
         ...(spacesStep ? [spacesStep] : []),
         {
-          element: '[data-tour="criar"]',
+          element: '[data-tour="renderizar"]',
           popover: {
-            title: 'O resto do atelier',
-            description:
-              'Com a imagem na mão: Editar ajusta uma área sem mexer no resto e também finaliza e exporta, Ampliar leva à resolução de entrega, Animar transforma em vídeo e a Planta humanizada veste a planta técnica com materiais reais.',
+            title: 'Seu primeiro projeto começa aqui',
+            description: 'No Renderizar, envie a referência e ajuste apenas o que quiser mudar. A geometria do projeto orienta o resultado.',
             side: 'top',
-            align: 'start',
-          },
-        },
-        {
-          element: '[data-tour="historico"]',
-          popover: {
-            title: 'Histórico',
-            description:
-              'Nada se perde: tudo o que você gera fica guardado. As criações recentes aparecem aqui; o acervo completo está em Histórico, na barra lateral.',
-            side: 'top',
-            align: 'start',
-          },
-        },
-        {
-          element: '[data-tour="nodes"]',
-          popover: {
-            title: 'Saldo de nodes',
-            description:
-              'Nodes são o combustível das gerações — cada criação consome alguns. Acompanhe o saldo aqui e no anel do seu avatar, na barra lateral.',
-            side: 'bottom',
             align: 'start',
             onDoneClick: () => {
-              markCompleted()
+              track('cta_clicked', { cta: 'onboarding_first_render' })
+              markCompleted('started_render')
               d.destroy()
               router.push(GENERATE_URL)
             },

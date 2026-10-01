@@ -17,7 +17,8 @@
 // dela que a aba Edições do Histórico lê. Tabela nova exigiria refazer aquela
 // integração inteira para ganhar nada.
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
+import { trackSecondTool } from '@/lib/analytics/activation'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getRequestUser } from '@/lib/auth/request-user'
 import { uploadEditAsset } from '@/lib/spaces/edit-route-helpers'
@@ -357,6 +358,8 @@ export async function POST(req: NextRequest) {
     // Com seleção o gate semântico é advisory: reprovou vira AVISO, não bloqueio
     // (o recompose já garantiu os pixels de fora; o aviso cobre o de dentro).
     const semanticWarning = run.semantic && !run.semantic.pass && !run.semantic.skipped
+
+    after(() => trackSecondTool(db, req, userId, 'editar'))
 
     return NextResponse.json({
       rejected: false,

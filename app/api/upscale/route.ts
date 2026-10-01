@@ -14,7 +14,8 @@
 // Débito: consume_nodes_v2 com refund_nodes em falha pós-débito.
 // Histórico: insere em `renders` com upscale_meta jsonb completo.
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
+import { trackSecondTool } from '@/lib/analytics/activation'
 import { fal } from '@fal-ai/client'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getRequestUser } from '@/lib/auth/request-user'
@@ -298,6 +299,7 @@ export async function POST(req: NextRequest) {
       await admin.from('renders').insert(upscaleRow as never)
     }
 
+    after(() => trackSecondTool(admin, req, user.id, 'ampliar'))
     return NextResponse.json({
       url:          outputUrl,
       originalUrl:  inputUrl,

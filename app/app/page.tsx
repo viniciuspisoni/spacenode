@@ -13,6 +13,7 @@ import {
 import { getEnabledModules, isModuleEnabled, type SidebarModule } from '@/lib/nav/modules-config'
 import { RecentCard, type RecentRender } from './_components/RecentCard'
 import { IdentityProductNotice } from '@/components/app/IdentityProductNotice'
+import DashboardViewPing from '@/components/app/DashboardViewPing'
 
 type RecentSpace = {
   id: string
@@ -154,6 +155,7 @@ export default async function AppPage() {
 
   return (
     <main style={{ flex: 1, overflowY: 'auto', padding: '0 32px 88px' }}>
+      <DashboardViewPing />
       <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 34 }}>
 
         {/* ── 1 · Topo: saudação + CTA principal ───────────────────────────── */}
@@ -334,7 +336,7 @@ function StartBlock({ spacesEnabled }: { spacesEnabled: boolean }) {
     <section className="spn-dash-start spn-glass">
       <h2 className="spn-dash-start-title">Comece pela sua primeira imagem</h2>
       <p className="spn-dash-start-sub">
-        Envie um print do SketchUp, um modelo, uma planta ou uma foto — o Renderizar devolve a visualização pronta.
+        Envie um print do SketchUp, render básico ou foto. A SpaceNode visualiza o projeto preservando sua geometria.
       </p>
       <div className="spn-dash-start-actions">
         <Link href="/app/generate" className="spn-cta spn-dash-cta">Renderizar primeira imagem</Link>
@@ -348,18 +350,18 @@ function StartBlock({ spacesEnabled }: { spacesEnabled: boolean }) {
         <div className="spn-dash-step">
           <div className="spn-dash-step-num">01</div>
           <div className="spn-dash-step-title">Envie a referência</div>
-          <div className="spn-dash-step-desc">Print, modelo 3D, planta ou foto do espaço.</div>
+          <div className="spn-dash-step-desc">Print do SketchUp, render básico ou foto do projeto.</div>
         </div>
         <div className="spn-dash-step">
           <div className="spn-dash-step-num">02</div>
-          <div className="spn-dash-step-title">Confira o cenário</div>
-          <div className="spn-dash-step-desc">Ambiente, estilo e luz já vêm decididos — mude só o que quiser.</div>
+          <div className="spn-dash-step-title">Defina a visualização</div>
+          <div className="spn-dash-step-desc">Ambiente e luz já vêm preparados. Mude só o que precisar.</div>
         </div>
         <div className="spn-dash-step">
           <div className="spn-dash-step-num">03</div>
-          <div className="spn-dash-step-title">Gere e compare</div>
+          <div className="spn-dash-step-title">Gere e continue</div>
           <div className="spn-dash-step-desc">
-            {spacesEnabled ? 'Depois vire um Space e toda nova vista preserva o DNA.' : 'Baixe, ajuste ou avance para os outros módulos do atelier.'}
+            {spacesEnabled ? 'Compare, edite e reúna outras vistas em um Space.' : 'Compare, edite, finalize, amplie ou anime a imagem.'}
           </div>
         </div>
       </div>

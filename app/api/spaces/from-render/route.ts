@@ -10,7 +10,8 @@
 // Cobrança: criar Space é grátis. Os 8 nodes da extração de DNA continuam
 // sendo cobrados na extract-dna como em qualquer outro fluxo.
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
+import { trackServerEvent } from '@/lib/analytics/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isEngineId, type EngineId } from '@/lib/engines'
@@ -124,6 +125,11 @@ export async function POST(req: NextRequest) {
     console.error('[spaces.from-render] insert failed:', spaceErr)
     return NextResponse.json({ error: 'Erro ao criar Space' }, { status: 500 })
   }
+
+  after(() => trackServerEvent(createAdminClient(), {
+    event: 'project_created', userId: user.id, req, feature: 'spaces',
+    dedupeKey: `space:${space.id}`, props: { source: 'render' },
+  }))
 
   // vista_mestre_url aqui é a output_url da render (FAL hoje → no-op; pronto p/ B3).
   const signedSpace = await signRow(createAdminClient(), space, ['vista_mestre_url'])

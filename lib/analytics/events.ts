@@ -28,7 +28,12 @@ export const ANALYTICS_EVENTS = [
   'signup_started',
   'signup_completed',
   'onboarding_completed',
+  'dashboard_viewed',
+  'renderizar_viewed',
+  'render_reference_selected',
   // Produto
+  'first_generation',
+  'second_tool_completed',
   'project_created',
   'image_uploaded',
   'generation_started',
@@ -66,7 +71,9 @@ export const CLIENT_EVENTS: ReadonlySet<AnalyticsEvent> = new Set([
   'plans_viewed',
   'signup_started',
   'onboarding_completed',
-  'image_uploaded',
+  'dashboard_viewed',
+  'renderizar_viewed',
+  'render_reference_selected',
   'result_approved',
   'result_rejected',
   'result_downloaded', // só o Editar V3 baixa client-side (blob); o resto passa por /api/download

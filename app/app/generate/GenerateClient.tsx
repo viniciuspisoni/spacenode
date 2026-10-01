@@ -18,6 +18,7 @@ import InsufficientNodesCta from '@/components/app/InsufficientNodesCta'
 import { RenderFeedback } from '@/components/app/RenderFeedback'
 import { consumeHandoff } from '@/components/nodi/actions-bus'
 import { uploadDirect } from '@/lib/storage/direct-upload-client'
+import { track } from '@/lib/analytics/client'
 import GenerateGuide, {
   GUIDE_START_EVENT, GUIDE_DISMISSED_KEY, type GuidePhase,
 } from '@/components/app/GenerateGuide'
@@ -278,6 +279,7 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
   const [loadingText,        setLoadingText]       = useState('')
   const [loadingTextVisible, setLoadingTextVisible] = useState(true)
   const [generationKey,      setGenerationKey]     = useState(0)
+  const [completedHere,      setCompletedHere]     = useState(0)
   const [error,              setError]             = useState<string | null>(null)
 
   // ── Qual folha está aberta. Uma de cada vez: as quatro famílias são
@@ -426,6 +428,10 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
       }
     })
     return () => cancelAnimationFrame(raf)
+  }, [firstRender])
+
+  useEffect(() => {
+    track('renderizar_viewed', { first_render: firstRender })
   }, [firstRender])
 
   // "Como usar" com o Renderizar já aberto: reabre o guia sem navegar.
@@ -582,9 +588,10 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
   // MIMEs que a área render-source aceita (lib/storage/direct-upload).
   const DIRECT_UPLOAD_MIMES = ['image/jpeg', 'image/png', 'image/webp']
 
-  const loadImage = (file: File) => {
+  const loadImage = (file: File, source: 'file' | 'existing_render' = 'file') => {
     if (!file.type.startsWith('image/')) return
     if (file.size > 15 * 1024 * 1024) { setError('Imagem muito grande. Máximo 15 MB.'); return }
+    track('render_reference_selected', { source })
     setOutputUrl(null); setError(null); setUseAnchor(true); setRefinementText('')
     setFidelityScore(null); setFidelityWarning(false); setShowDiff(false)
     setServerInputUrl(null); setBeforeAspect(null)
@@ -634,7 +641,7 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
         const blob = await res.blob()
         if (!blob.type.startsWith('image/')) throw new Error()
         const ext = blob.type.split('/')[1] || 'jpg'
-        loadImage(new File([blob], `reutilizar.${ext}`, { type: blob.type }))
+        loadImage(new File([blob], `reutilizar.${ext}`, { type: blob.type }), 'existing_render')
       } catch {
         setError('Não foi possível carregar a imagem selecionada.')
       }
@@ -723,6 +730,7 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
       const data: GenerateResult = await res.json()
       if (!res.ok || data.error) throw new Error(data.error ?? 'Erro na geração')
       setOutputUrl(data.outputUrl); setCredits(data.totalBalance ?? data.credits); setSliderPos(50)
+      setCompletedHere(count => count + 1)
       setLastRenderId(data.renderId ?? null)
       setShowDiff(false)
       setServerInputUrl(data.originalUrl ?? serverInputUrl ?? null)
@@ -953,6 +961,11 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
     : imagePreview ? 'configure'
     : 'upload'
 
+  const editSource = `/app/editar?source=${encodeURIComponent(outputUrl ?? '')}&source_type=render${lastRenderId ? `&source_id=${lastRenderId}` : ''}`
+  const finalSource = `/app/finalizar?source=${encodeURIComponent(outputUrl ?? '')}`
+  const upscaleSource = `/app/upscale?source=${encodeURIComponent(outputUrl ?? '')}`
+  const trackNext = (action: string) => track('cta_clicked', { cta: 'render_next_action', action })
+
   const closeSheet = () => setSheet(null)
   const toggleSheet = (id: SheetId) => setSheet(prev => (prev === id ? null : id))
 
@@ -1174,6 +1187,9 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
         <div className="spn-dock spn-glass spn-glass--chrome">
           {error && <div className="spn-error" style={{ marginBottom: 10 }}>{error}</div>}
 
+          {imagePreview && !outputUrl && !loading && (
+            <p className="spn-generate-assurance">A SpaceNode trabalha sobre o seu projeto, preservando geometria, proporções e perspectiva.</p>
+          )}
           {noNodes ? (
             <InsufficientNodesCta
               needed={nodeCost}
@@ -1464,6 +1480,7 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
                   href={`/app/spaces/new/from-render?render_id=${lastRenderId}`}
                   className="spn-glass spn-glass--raised"
                   style={S.nextStep}
+                  onClick={() => trackNext('space')}
                 >
                   <span style={S.nextStepIcon} aria-hidden="true">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -1487,21 +1504,25 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
                 </Link>
               )}
 
+              <div className="spn-render-next-head">
+                <strong>{firstRender && completedHere === 1 ? 'Sua primeira visualização está pronta.' : 'Visualização pronta.'}</strong>
+                <span>Continue trabalhando nesta imagem.</span>
+              </div>
               {/* O primário da tela é o do dock. Aqui tudo é secundário. */}
               <div style={S.postGenGrid}>
-                <button type="button" className="spn-ghost" onClick={() => downloadImage(outputUrl, outputFilename(outputUrl))}>
-                  Baixar imagem
-                </button>
-                <button type="button" className="spn-ghost" onClick={() => handleGenerate('2k')}>
-                  Melhorar qualidade (2K)
-                </button>
                 <a
                   className="spn-ghost"
                   style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-                  href={`/app/editar?source=${encodeURIComponent(outputUrl)}&source_type=render${lastRenderId ? `&source_id=${lastRenderId}` : ''}`}
+                  href={editSource}
+                  onClick={() => trackNext('editar')}
                 >
-                  Editar imagem
+                  Editar detalhes
                 </a>
+                <a className="spn-ghost" href={finalSource} onClick={() => trackNext('finalizar')}>Finalizar</a>
+                <a className="spn-ghost" href={upscaleSource} onClick={() => trackNext('ampliar')}>Ampliar</a>
+                <a className="spn-ghost" href={`/app/video?source=${encodeURIComponent(outputUrl)}`} onClick={() => trackNext('animar')}>Animar</a>
+                <button type="button" className="spn-ghost" onClick={() => { trackNext('download'); downloadImage(outputUrl, outputFilename(outputUrl)) }}>Baixar imagem</button>
+                <button type="button" className="spn-ghost" onClick={() => { trackNext('variation'); void handleGenerate('2k') }}>Gerar variação em 2K</button>
                 <button type="button" className="spn-ghost" onClick={handleNewRender}>
                   Iniciar novo render
                 </button>
@@ -1513,6 +1534,12 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
                   </button>
                 )}
               </div>
+              {credits < nodeCost && (
+                <p className="spn-render-upgrade">
+                  Seu projeto pode continuar. Veja os planos para receber novos Nodes mensais.{' '}
+                  <Link href="/app/billing" onClick={() => track('cta_clicked', { cta: 'render_result_plans' })}>Ver planos →</Link>
+                </p>
+              )}
             </div>
           )}
 
