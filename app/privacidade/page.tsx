@@ -27,7 +27,7 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 }
 
-const UPDATED_AT = '19 de setembro de 2026'
+const UPDATED_AT = '30 de setembro de 2026'
 
 export default function PrivacidadePage() {
   return (
@@ -67,6 +67,8 @@ export default function PrivacidadePage() {
           <LI>
             <Strong>Cadastro:</Strong> nome, e-mail e senha (armazenada de forma criptografada); no login com
             Google, recebemos nome, e-mail e foto de perfil da sua conta Google.
+            Na conclusão dos novos cadastros, solicitamos também seu número de WhatsApp e registramos
+            suas preferências de contato, a data da escolha e a versão do aviso apresentado.
           </LI>
           <LI>
             <Strong>Conteúdo:</Strong> imagens e materiais que você envia, instruções e configurações de
@@ -111,6 +113,9 @@ export default function PrivacidadePage() {
             <Strong>Comunicações operacionais</Strong> — confirmações, avisos de conta e de pagamento
             (execução de contrato). Comunicações de novidades e ofertas dependem de consentimento e podem ser
             desativadas a qualquer momento.
+            No WhatsApp, você escolhe separadamente se quer receber ajuda para começar e acompanhamento
+            de uso, e se quer receber novidades e ofertas. Essas duas escolhas são opcionais e podem ser
+            alteradas na página Conta. Informar o número não autoriza automaticamente esses contatos.
           </LI>
           <LI>
             <Strong>Cumprimento de obrigações legais</Strong>, fiscais e de ordens de autoridades (obrigação

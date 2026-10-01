@@ -17,6 +17,8 @@ import { getPlanDisplayName } from '@/lib/plan-display'
 import { SUPPORT_EMAIL, SUPPORT_PHONE_DISPLAY, supportWhatsAppUrl } from '@/lib/support'
 import ThemeSelector from '@/components/app/ThemeSelector'
 import GlassIntensitySlider from '@/components/app/GlassIntensitySlider'
+import ContactPreferencesForm from '@/components/app/ContactPreferencesForm'
+import { contactCaptureEnabled, readOwnContact } from '@/lib/customer-contact/server'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,6 +26,7 @@ export default async function ContaPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+  const contactResult = contactCaptureEnabled() ? await readOwnContact(supabase, user.id) : null
 
   // Nome é do próprio usuário; plano/saldo são da bolsa (dono do workspace).
   const [profileRes, balance] = await Promise.all([
@@ -91,6 +94,13 @@ export default async function ContaPage() {
         </Block>
 
         {/* Plano e saldo */}
+        {contactResult && <Block title="Seu WhatsApp e preferências">
+          <div className="spn-glass" style={{ borderRadius: 'var(--r-card)', padding: '18px 20px' }}>
+            {contactResult.unavailable ? <p role="alert">Não foi possível carregar suas preferências. Tente novamente em instantes.</p> :
+              <ContactPreferencesForm initial={contactResult.contact} />}
+          </div>
+        </Block>}
+
         <Block title="Plano e saldo">
           {balance.pooled && (
             <p style={{
