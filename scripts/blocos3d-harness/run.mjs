@@ -5,6 +5,7 @@ import { basename, extname, join, resolve } from 'node:path'
 import { fal } from '@fal-ai/client'
 import sharp from 'sharp'
 import { analyzeGlb } from './analyze.mjs'
+import { uploadTripoImage, submitTripo, getTripoTask, TRIPO_MODEL } from './tripo-direct.mjs'
 
 const root = resolve(import.meta.dirname)
 const args = process.argv.slice(2)
@@ -26,6 +27,12 @@ const models = {
       texture_alignment: 'original_image', auto_size: true }),
     glb: data => data.model_urls?.pbr_model?.url ?? data.model_urls?.glb?.url,
     preview: data => data.rendered_image?.url,
+  },
+  h31_direct: {
+    endpoint: n => `tripo-direct/${TRIPO_MODEL}/${n > 1 ? 'multiview' : 'image'}`,
+    price: () => 0.40,
+    glb: data => data.output?.model_url,
+    preview: data => data.output?.rendered_image_url,
   },
   hunyuan: {
     endpoint: () => 'fal-ai/hunyuan-3d/v3.1/pro/image-to-3d',
@@ -100,9 +107,10 @@ async function main() {
     tasks: tasks.length, estimatedUsd: Number(total.toFixed(3)), maxUsd, plan: tasks.map(t =>
       ({ id: t.id, views: t.files.length, endpoint: t.endpoint, usd: t.estimatedUsd })) }, null, 2))
   if (!execute) return
-  if (!process.env.FAL_KEY) throw new Error('FAL_KEY não configurada')
+  if (selected.some(name => name !== 'h31_direct') && !process.env.FAL_KEY) throw new Error('FAL_KEY não configurada')
+  if (selected.includes('h31_direct') && !process.env.TRIPO_API_KEY) throw new Error('TRIPO_API_KEY não configurada')
   if (!tasks.length || !maxUsd || total > maxUsd + 1e-9) throw new Error('Plano vazio ou acima do teto --max-usd')
-  fal.config({ credentials: process.env.FAL_KEY })
+  if (process.env.FAL_KEY) fal.config({ credentials: process.env.FAL_KEY })
   await mkdir(output, { recursive: true })
   for (const object of samples) {
     const referenceDir = join(output, 'references', object.name)
@@ -111,39 +119,88 @@ async function main() {
   }
   const manifestPath = join(output, 'manifest.json')
   const prior = await readFile(manifestPath, 'utf8').then(JSON.parse).catch(e => e.code === 'ENOENT' ? {} : Promise.reject(e))
+  for (const task of tasks) {
+    if (prior[task.id] && prior[task.id].endpoint !== task.endpoint) {
+      throw new Error(`${task.id}: endpoint mudou; use outro --out`)
+    }
+  }
+  const cumulative = Object.values(prior).reduce((sum, row) => sum + (row.estimatedUsd ?? 0), 0) +
+    tasks.filter(task => !prior[task.id]).reduce((sum, task) => sum + task.estimatedUsd, 0)
+  if (cumulative > maxUsd + 1e-9) throw new Error(`Teto cumulativo excedido no --out: US$${cumulative.toFixed(2)} > US$${maxUsd.toFixed(2)}`)
   const manifest = { ...prior }
   const save = () => writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n')
   const uploaded = new Map()
   for (const task of tasks) {
     const prev = manifest[task.id]
-    if (prev && prev.endpoint !== task.endpoint) throw new Error(`${task.id}: endpoint mudou; use outro --out`)
     if (prev?.status === 'completed' || prev?.status === 'failed') continue
-    // Um request_id já gravado é retomado; nenhum job é enviado duas vezes.
+    // Se o processo caiu após o POST e antes da resposta, uma nova submissão
+    // pode ser cobrada. Bloqueie o caso ambíguo para reconciliação manual.
+    if (prev?.status === 'submitting') {
+      console.warn(`${task.id}: submissão incerta; reconcilie no provider antes de repetir`)
+      continue
+    }
     if (!prev?.requestId) {
-      const urls = []
+      const inputs = []
       for (const file of task.files) {
-        if (!uploaded.has(file)) {
+        const uploadKey = `${task.name === 'h31_direct' ? 'tripo' : 'fal'}:${file}`
+        if (!uploaded.has(uploadKey)) {
           const data = await readFile(file)
-          uploaded.set(file, await fal.storage.upload(new File([data], basename(file), { type: mime[extname(file).toLowerCase()] })))
+          if (task.name === 'h31_direct') {
+            // Tripo documenta JPEG e PNG no upload; normalize WebP para PNG.
+            const webp = extname(file).toLowerCase() === '.webp'
+            uploaded.set(uploadKey, await uploadTripoImage(process.env.TRIPO_API_KEY,
+              webp ? await sharp(data).png().toBuffer() : data,
+              webp ? `${basename(file, extname(file))}.png` : basename(file),
+              webp ? 'image/png' : mime[extname(file).toLowerCase()]))
+          } else {
+            uploaded.set(uploadKey, await fal.storage.upload(new File([data], basename(file), { type: mime[extname(file).toLowerCase()] })))
+          }
         }
-        urls.push(uploaded.get(file))
+        inputs.push(uploaded.get(uploadKey))
       }
-      const submitted = await fal.queue.submit(task.endpoint, { input: models[task.name].input(urls) })
-      manifest[task.id] = { endpoint: task.endpoint, requestId: submitted.request_id,
+      manifest[task.id] = { endpoint: task.endpoint, estimatedUsd: task.estimatedUsd,
+        views: task.files.length, status: 'submitting', submittedAt: new Date().toISOString() }
+      await save()
+      const requestId = task.name === 'h31_direct'
+        ? await submitTripo(process.env.TRIPO_API_KEY, inputs)
+        : (await fal.queue.submit(task.endpoint, { input: models[task.name].input(inputs) })).request_id
+      if (!requestId) throw new Error(`${task.id}: submissão sem ID; reconcilie no provider`)
+      manifest[task.id] = { endpoint: task.endpoint, requestId,
         estimatedUsd: task.estimatedUsd, views: task.files.length,
         status: 'submitted', submittedAt: new Date().toISOString() }
       await save()
     }
     const row = manifest[task.id]
     const started = Date.now()
+    let result
     try {
       while (true) {
-        const status = await fal.queue.status(task.endpoint, { requestId: row.requestId, logs: false })
-        if (status.status === 'COMPLETED') break
+        if (task.name === 'h31_direct') {
+          const status = await getTripoTask(process.env.TRIPO_API_KEY, row.requestId)
+          if (status.status === 'success') {
+            result = status
+            break
+          }
+          if (['failed', 'cancelled', 'banned', 'expired'].includes(status.status)) {
+            manifest[task.id] = { ...row, status: 'failed',
+              ...(Number.isFinite(status.credits_consumed) ? { actualUsd: status.credits_consumed / 100 } : {}),
+              error: status.error_message ?? status.status,
+              durationMs: Date.now() - new Date(row.submittedAt).getTime() }
+            await save()
+            console.log(task.id, 'failed', manifest[task.id].error)
+            result = null
+            break
+          }
+          if (!['queued', 'running'].includes(status.status)) throw new Error(`Tripo status inesperado: ${status.status}`)
+        } else {
+          const status = await fal.queue.status(task.endpoint, { requestId: row.requestId, logs: false })
+          if (status.status === 'COMPLETED') break
+        }
         if (Date.now() - started > 30 * 60_000) throw new Error('Timeout: retome com o mesmo --out')
         await new Promise(done => setTimeout(done, 5000))
       }
-      const result = (await fal.queue.result(task.endpoint, { requestId: row.requestId })).data
+      if (result === null) continue
+      if (task.name !== 'h31_direct') result = (await fal.queue.result(task.endpoint, { requestId: row.requestId })).data
       const url = models[task.name].glb(result)
       if (!url) throw new Error('Resposta sem URL de GLB')
       const res = await fetch(url)
@@ -171,6 +228,8 @@ async function main() {
       }
       manifest[task.id] = { ...row, status: 'completed', file, ...metadata,
         analysis, preview,
+        ...(task.name === 'h31_direct' && Number.isFinite(result.credits_consumed)
+          ? { actualUsd: result.credits_consumed / 100 } : {}),
         durationMs: Date.now() - new Date(row.submittedAt).getTime(), completedAt: new Date().toISOString() }
     } catch (e) {
       // Preserve o request_id: uma falha de download pode ser retomada sem custo novo.
