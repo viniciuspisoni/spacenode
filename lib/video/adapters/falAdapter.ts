@@ -58,7 +58,7 @@ export function falEndpointForModel(modelId: string): string {
   return modelId === VEO_LITE_720 ? VEO_LITE : modelId
 }
 
-function extractVideoUrl(data: unknown): string | null {
+export function extractVideoUrl(data: unknown): string | null {
   const d = data as Record<string, unknown>
   // Kling, Veo, Seedance → { video: { url: string } }
   if (d?.video && typeof (d.video as Record<string, unknown>).url === 'string') {

@@ -66,4 +66,12 @@ describe('entrega técnica do Animar', () => {
     const result = await deliverGeneratedVideo(admin, provider, 'user-123', fetchVideo)
     expect(result).toMatchObject({ status: 'provider_fallback', storedUrl: null, storageKey: null })
   })
+
+  it('mantém um job assíncrono pendente quando a gravação durável falha', async () => {
+    const { admin, upload } = fakeStorage(new Error('Storage indisponível'))
+    const key = 'user-123/animar/job-456.mp4'
+    await expect(deliverGeneratedVideo(admin, provider, 'user-123', fetchVideo, key))
+      .rejects.toThrow('Storage indisponível')
+    expect(upload).toHaveBeenCalledWith(key, video, { contentType: 'video/mp4', upsert: true })
+  })
 })

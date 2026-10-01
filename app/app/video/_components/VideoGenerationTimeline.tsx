@@ -110,7 +110,7 @@ export default function VideoGenerationTimeline({ preview, modelId, elapsed, con
           textAlign:  'center',
           letterSpacing: '0.01em',
         }}>
-          Vídeos de arquitetura levam entre 1 e 4 minutos. Mantenha esta aba aberta.
+          Vídeos de arquitetura levam alguns minutos. Você pode voltar depois; o resultado fica no histórico.
         </div>
       </div>
     </div>

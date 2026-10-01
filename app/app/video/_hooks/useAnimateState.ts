@@ -89,6 +89,7 @@ export interface AnimateState {
 
   // Geração
   status:           GenerationStatus
+  activeJobId:      string | null
   elapsed:          number
   result:           GenerationResult | null
   error:            string | null
@@ -116,6 +117,8 @@ type Action =
   | { type: 'setUserPrompt';      userPrompt: string }
   | { type: 'nextVariation' }
   | { type: 'startGenerating' }
+  | { type: 'jobSubmitted'; jobId: string; nodesCharged: number; newCredits?: number | null }
+  | { type: 'resumeJob'; jobId: string; inputUrl: string | null }
   | { type: 'generationSuccess'; result: GenerationResult; newCredits: number }
   | { type: 'generationError';   message: string }
   | { type: 'tickElapsed' }
@@ -148,6 +151,7 @@ function initialState(credits: number): AnimateState {
     userPrompt:      '',
     variation:       0,
     status:          'idle',
+    activeJobId:     null,
     elapsed:         0,
     result:          null,
     error:           null,
@@ -170,6 +174,7 @@ function reducer(state: AnimateState, action: Action): AnimateState {
         variation:       0,
         error:           null,
         status:          'idle',
+        activeJobId:     null,
       }
 
     case 'setEndImage':
@@ -259,18 +264,33 @@ function reducer(state: AnimateState, action: Action): AnimateState {
       return { ...state, variation: state.variation + 1, status: 'ready', result: null, error: null }
 
     case 'startGenerating':
-      return { ...state, status: 'generating', elapsed: 0, error: null, result: null }
+      return { ...state, status: 'generating', activeJobId: null, elapsed: 0, error: null, result: null }
+
+    case 'jobSubmitted':
+      return {
+        ...state, status: 'generating', activeJobId: action.jobId,
+        credits: typeof action.newCredits === 'number'
+          ? action.newCredits : Math.max(0, state.credits - action.nodesCharged),
+      }
+
+    case 'resumeJob':
+      return {
+        ...state, status: 'generating', activeJobId: action.jobId,
+        imagePreview: state.imagePreview ?? action.inputUrl,
+        elapsed: 0, error: null,
+      }
 
     case 'generationSuccess':
       return {
         ...state,
         status:  'success',
+        activeJobId: null,
         result:  action.result,
         credits: action.newCredits,
       }
 
     case 'generationError':
-      return { ...state, status: 'error', error: action.message }
+      return { ...state, status: 'error', activeJobId: null, error: action.message }
 
     case 'tickElapsed':
       return { ...state, elapsed: state.elapsed + 1 }
