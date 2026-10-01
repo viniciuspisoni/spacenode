@@ -6,7 +6,7 @@
 // obrigatório — tudo já tinha default. O problema nunca foi falta de default,
 // era excesso de superfície: formato e intensidade são CONSEQUÊNCIA do tipo de
 // vídeo (o preset já os define) e mesmo assim ocupavam a tela, enquanto o
-// motor — o único controle que faz uma conta gratuita de 80 nodes caber —
+// motor — o único controle que faz uma conta gratuita de 40 nodes caber —
 // ficava enterrado nos "ajustes avançados".
 //
 // Agora só o tipo de vídeo fica exposto, porque é o único campo que o usuário
@@ -36,7 +36,7 @@ import {
 type SheetId = 'camera' | 'output' | 'direction' | null
 
 // Faixa de espera do motor. Dizer quanto tempo leva ANTES de o usuário
-// gastar 280 nodes é a informação que o rodapé antigo (CostSummary) trazia e
+// gastar 240 nodes é a informação que o rodapé antigo (CostSummary) trazia e
 // que o dock tinha perdido — depois do clique já é tarde para escolher outro.
 function estimateLabel(ms: number): string {
   if (ms <= 100_000) return '1–2 min'

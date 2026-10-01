@@ -16,7 +16,7 @@ import { useEffect, useState } from 'react'
 export function MobileCTA({
   href = '/login?mode=signup',
   label = 'Testar grátis',
-  note = '80 nodes grátis · sem cartão · em português',
+  note = '40 nodes grátis · sem cartão · em português',
   onClick,
   revealAfter = 0.6,
   suppressed = false,

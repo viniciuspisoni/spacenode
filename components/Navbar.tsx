@@ -263,7 +263,7 @@ export default function Navbar() {
               textAlign: 'center',
             }}
           >
-            80 nodes grátis · sem cartão · em português
+            40 nodes grátis · sem cartão · em português
           </p>
         </div>
       </div>
