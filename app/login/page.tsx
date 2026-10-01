@@ -13,6 +13,7 @@ import {
   readIntentCookie,
   writeIntentCookie,
 } from '@/lib/analytics/attribution'
+import { withSignupFlag } from '@/lib/analytics/auth-intent'
 
 type Mode = 'login' | 'signup'
 
@@ -265,7 +266,9 @@ function LoginForm() {
         setError(translateError(error.message))
         setLoading(false)
       } else if (data.session) {
-        router.push(nextPath)
+        // Sessão na hora = confirmação de e-mail desligada: o cadastro acabou
+        // aqui e não passa pelo /auth/callback, que marcaria signup=1.
+        router.push(withSignupFlag(nextPath))
       } else {
         setSuccess('Verifique seu email para confirmar o cadastro.')
         setLoading(false)

@@ -10,7 +10,7 @@
 //   • o cookie de intenção é entrada hostil: parse defensivo.
 
 import { describe, expect, it } from 'vitest'
-import { isNewUser, postAuthDestination } from '@/lib/analytics/auth-intent'
+import { isNewUser, postAuthDestination, withSignupFlag } from '@/lib/analytics/auth-intent'
 import {
   intentFromSearchParams,
   intentResumePath,
@@ -133,5 +133,53 @@ describe('isNewUser', () => {
     expect(isNewUser({ created_at: now } as never)).toBe(true)
     expect(isNewUser({ created_at: old } as never)).toBe(false)
     expect(isNewUser(null)).toBe(false)
+  })
+
+  // Cadastro por e-mail: auth.users.created_at é a hora do formulário, e o
+  // /auth/callback só roda quando a pessoa clica no link de confirmação —
+  // minutos ou horas depois. O que acabou de acontecer é a confirmação.
+  it('confirmação de e-mail minutos depois do cadastro ainda é conta nova', () => {
+    const signedUp = new Date(Date.now() - 7 * 60_000).toISOString()
+    const confirmedNow = new Date().toISOString()
+    expect(isNewUser({ created_at: signedUp, email_confirmed_at: confirmedNow } as never)).toBe(true)
+  })
+
+  it('o callback da confirmação tardia leva signup=1 ao destino', () => {
+    const user = {
+      created_at: new Date(Date.now() - 3 * 60 * 60_000).toISOString(),
+      email_confirmed_at: new Date(Date.now() - 2_000).toISOString(),
+    }
+    const { url } = postAuthDestination({
+      origin: ORIGIN,
+      next: '/app/billing?plan=essence&billing=monthly&resume=1',
+      newUser: isNewUser(user as never),
+    })
+    expect(url.searchParams.get('signup')).toBe('1')
+    expect(url.searchParams.get('resume')).toBe('1')
+  })
+
+  it('login de conta antiga, já confirmada, não é conta nova', () => {
+    const old = new Date(Date.now() - 3 * 24 * 60 * 60_000).toISOString()
+    expect(isNewUser({ created_at: old, email_confirmed_at: old } as never)).toBe(false)
+    expect(isNewUser({ created_at: old, email_confirmed_at: null } as never)).toBe(false)
+  })
+})
+
+describe('withSignupFlag (cadastro com sessão imediata)', () => {
+  it('marca signup=1 no /app', () => {
+    expect(withSignupFlag('/app')).toBe('/app?signup=1')
+  })
+
+  it('preserva a retomada do checkout', () => {
+    const path = withSignupFlag(intentResumePath({ plan: 'essence', billing: 'monthly' }))
+    const url = new URL(path, ORIGIN)
+    expect(url.pathname).toBe('/app/billing')
+    expect(url.searchParams.get('plan')).toBe('essence')
+    expect(url.searchParams.get('resume')).toBe('1')
+    expect(url.searchParams.get('signup')).toBe('1')
+  })
+
+  it('continua um caminho interno', () => {
+    expect(withSignupFlag('/app/billing?resume=1').startsWith('/app/billing?')).toBe(true)
   })
 })
