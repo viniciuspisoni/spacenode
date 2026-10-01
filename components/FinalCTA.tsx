@@ -19,7 +19,7 @@ import fechoImg from '@/public/close-vale.jpg'
 // sobraria só o piso do deck na parte visível.
 export default function FinalCTA() {
   return (
-    <section className="spn-final">
+    <section className="spn-final" data-cta-position="final">
       <div className="spn-final-media">
         <Image
           src={fechoImg}
@@ -40,23 +40,20 @@ export default function FinalCTA() {
         </span>
 
         <h2 className="spn-final-title">
-          apresente melhor seus projetos,{' '}
-          <span className="spn-final-title-dim">sem perder o controle sobre eles.</span>
+          Tem um projeto para apresentar?{' '}
+          <span className="spn-final-title-dim">Faça o primeiro teste com ele.</span>
         </h2>
 
         <div className="spn-final-ctas">
           <a href="/login?mode=signup" className="spn-final-primary">
-            Testar grátis
+            Testar no meu projeto grátis
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
               <path d="M2 6h8M6.5 2.5L10 6l-3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </a>
-          <a href="#planos" className="spn-final-secondary spn-glass--raised">
-            Ver planos
-          </a>
         </div>
 
-        <p className="spn-final-microcopy">80 nodes grátis · sem cartão · em português</p>
+        <p className="spn-final-microcopy">80 Nodes grátis · sem cartão · planos a partir de R$ 99/mês</p>
       </div>
 
       <style jsx>{`

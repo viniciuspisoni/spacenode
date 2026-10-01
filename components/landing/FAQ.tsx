@@ -6,14 +6,18 @@ import { NODES_ROLLOVER_COPY_LANDING } from '@/lib/billing/nodes'
 
 const faqLink = { color: 'var(--color-text-primary)', textDecoration: 'underline', textUnderlineOffset: 3 } as const
 
-// Quatro objeções — as que de fato travam a assinatura. Saíram na reforma
-// de vidro (2026-09-09): "o que é a SpaceNode" (a página inteira responde),
-// "posso cancelar" (agora está na própria seção de planos) e "como falo com
-// o suporte", que virou a linha de contato logo abaixo da lista.
 const faqs: { q: string; a: React.ReactNode }[] = [
   {
-    q: 'A IA altera o meu projeto?',
-    a: 'A plataforma é construída para preservar geometria, proporções, perspectiva e composição. Como toda ferramenta de IA, o resultado pode pedir ajustes — mas o objetivo é respeitar o projeto original, não criar uma imagem apenas "parecida".',
+    q: 'Preciso saber renderizar ou escrever comandos para a IA?',
+    a: 'Você começa com um print do projeto e escolhe as opções de luz, estilo e materiais na plataforma. Não precisa escrever um comando para a IA nem configurar uma cena de render do zero. Use os créditos grátis para experimentar esse caminho no seu projeto.',
+  },
+  {
+    q: 'Posso testar sem cartão? O teste vira uma assinatura?',
+    a: 'O cadastro oferece 80 Nodes grátis, sem pedir cartão. Eles são créditos de uso; a quantidade de imagens depende do motor, da resolução e das ações que você escolher. O teste não vira uma assinatura automaticamente. Para continuar com um plano mensal, você escolhe e confirma a compra.',
+  },
+  {
+    q: 'Como confiro se a imagem respeitou meu projeto?',
+    a: 'Faz sentido conferir os detalhes antes de mostrar ao cliente. A SpaceNode usa a imagem enviada como referência de geometria, proporções e perspectiva. Compare o resultado com o print original, como nos exemplos desta página. A IA pode alterar detalhes e o resultado pode precisar de ajustes; valide a imagem antes de usar na apresentação.',
   },
   {
     q: 'Funciona com o que eu já uso?',

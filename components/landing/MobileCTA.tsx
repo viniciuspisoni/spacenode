@@ -42,7 +42,7 @@ export function MobileCTA({
   }, [revealAfter])
 
   return (
-    <div className="spn-mcta spn-glass--chrome" data-visible={visible} aria-hidden={!visible}>
+    <div data-cta-position="sticky" className="spn-mcta spn-glass--chrome" data-visible={visible} aria-hidden={!visible}>
       <a href={href} onClick={onClick} className="spn-mcta-btn">
         {label}
         <svg width="13" height="13" viewBox="0 0 12 12" fill="none" aria-hidden>

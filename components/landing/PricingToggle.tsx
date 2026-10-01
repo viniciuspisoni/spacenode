@@ -159,7 +159,7 @@ function PlanCard({ planId, billing, loading, onSelect }: {
       </div>
 
       <p className="spn-plan-renders">
-        <b>{d.rendersHD}</b> HD&nbsp;·&nbsp;<b>{d.renders2K}</b> 2K&nbsp;·&nbsp;<b>{d.renders4K}</b> 4K
+        <b>{d.rendersHD}</b> HD ou <b>{d.renders2K}</b> 2K ou <b>{d.renders4K}</b> 4K
       </p>
 
       <div className="spn-plan-meter">
@@ -388,11 +388,12 @@ export function PricingToggle() {
   }, [])
 
   return (
-    <section id="planos" className="spn-pricing">
+    <section id="planos" className="spn-pricing" data-cta-position="pricing">
       <div className="spn-pricing-head">
-        <h2 className="spn-pricing-title">escolha seu volume de geração.</h2>
+        <h2 className="spn-pricing-title">Teste primeiro. Escolha um plano para continuar.</h2>
         <p className="spn-pricing-sub">
-          Nodes são os créditos de geração. Renovam todo mês e{' '}
+          Comece com 80 Nodes grátis, sem cartão. Quando precisar de mais imagens,
+          escolha seu volume mensal. Nodes são os créditos de geração e{' '}
           <b>podem acumular por até {NODES_GRACE_DAYS} dias</b> enquanto sua
           assinatura estiver ativa. No plano mensal, você cancela quando quiser.
         </p>
