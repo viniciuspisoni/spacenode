@@ -69,6 +69,16 @@ describe('conteúdo dinâmico (fonte de verdade)', () => {
     expect(text).toContain(`2K = ${ENGINES.vega.nodes['2k']} nodes`)
     expect(text).toContain(`4K = ${ENGINES.vega.nodes['4k']} nodes`)
     expect(text).toContain('Pulsar')
+    expect(text).not.toContain('Spaces')
+  })
+
+  it('responde corretamente a perguntas sobre Spaces e Vistas descontinuados', () => {
+    const match = matchKb('Spaces e Vistas ainda estão disponíveis?', null)[0]
+    expect(match?.entry.id).toBe('spaces-dna')
+    const { text } = buildKbAnswer(match.entry)
+    expect(text).toContain('descontinuados')
+    expect(text).toContain('Renderizar')
+    expect(getFaqIndex().map(entry => entry.id)).not.toContain('spaces-dna')
   })
 
   it('planos refletem a vitrine (SELLABLE_PLANS, sem Office)', () => {
