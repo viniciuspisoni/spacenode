@@ -1,5 +1,6 @@
 import { randomUUID, createHash } from 'node:crypto'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
+import { trackSecondTool } from '@/lib/analytics/activation'
 import { fal } from '@fal-ai/client'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getRequestUser } from '@/lib/auth/request-user'
@@ -132,6 +133,7 @@ export async function POST(req: NextRequest) {
       fal_request_id: result.steps.at(-1)?.requestId, duration_ms: result.totalDurationMs, upscale_meta: meta }
     const saved = await admin.from('renders').update(completed).eq('id', jobId).eq('user_id', user.id)
     if (saved.error) throw new Error('job_save_failed')
+    after(() => trackSecondTool(admin, req, user.id, 'ampliar'))
     return NextResponse.json(await upscaleJobResponse(admin, { ...completed, error_message: null }))
   } catch (error) {
     const raw = error instanceof Error ? error.message : 'unknown'

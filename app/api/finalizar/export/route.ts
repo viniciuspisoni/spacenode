@@ -13,7 +13,8 @@
 // warn (best-effort); o arquivo em si sobe normalmente e a versão fica no
 // document do projeto.
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
+import { trackSecondTool } from '@/lib/analytics/activation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { DIRECT_UPLOAD_AREAS, verifyDirectUpload } from '@/lib/storage/direct-upload'
@@ -47,6 +48,8 @@ export async function POST(req: NextRequest) {
     file_size_bytes: v.size,
   })
   if (insErr) console.warn('[finalizar.export] registro falhou (segue):', insErr.message)
+
+  after(() => trackSecondTool(admin, req, user.id, 'finalizar'))
 
   return NextResponse.json({ url: v.url })
 }

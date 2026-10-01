@@ -1,7 +1,8 @@
 // POST /api/spaces  → cria Space em status 'draft'
 // GET  /api/spaces  → lista do usuário (via spaces_with_counts)
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
+import { trackServerEvent } from '@/lib/analytics/server'
 import { getRequestAuthContext } from '@/lib/auth/request-user'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isEngineId } from '@/lib/engines'
@@ -49,6 +50,11 @@ export async function POST(req: NextRequest) {
     console.error('[spaces.create] insert failed:', error)
     return NextResponse.json({ error: 'Erro ao criar Space' }, { status: 500 })
   }
+
+  after(() => trackServerEvent(createAdminClient(), {
+    event: 'project_created', userId: user.id, req, feature: 'spaces',
+    dedupeKey: `space:${data.id}`, props: { source: 'new' },
+  }))
 
   return NextResponse.json({ space: data }, { status: 201 })
 }

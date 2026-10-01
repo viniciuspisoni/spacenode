@@ -94,7 +94,7 @@ export default async function EditarPage({
   return (
     <main style={{ flex: 1, overflowY: 'auto', background: 'var(--color-bg)' }}>
       {useV3 ? (
-        <EditV3Flow initialBalance={balance} />
+        <EditV3Flow initialBalance={balance} initialSourceUrl={safeSource((await searchParams).source)} />
       ) : useClean ? (
         <EditCleanFlow initialBalance={balance} />
       ) : useV2 ? (

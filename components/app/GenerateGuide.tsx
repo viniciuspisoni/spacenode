@@ -24,8 +24,8 @@ export type GuidePhase = 'upload' | 'configure' | 'generating' | 'done'
 
 const STEPS: { id: number; label: string }[] = [
   { id: 1, label: 'Referência' },
-  { id: 2, label: 'Cenário' },
-  { id: 3, label: 'Resultado' },
+  { id: 2, label: 'Visualização' },
+  { id: 3, label: 'Gerar' },
 ]
 
 // Índice do passo ativo por fase — 'generating' e 'done' vivem no passo 3.
@@ -97,33 +97,35 @@ export default function GenerateGuide({
 
       <div className="spn-guide-body">
         {phase === 'upload' && (
-          <p className="spn-guide-tip">
-            Comece enviando a imagem do seu projeto — print do SketchUp, render,
-            foto ou planta. É a base de tudo o que vem depois.
-          </p>
+          <div className="spn-guide-tip">
+            <strong>Envie seu projeto.</strong> Use um print do SketchUp, render básico ou foto.
+            Uma referência clara ajuda a preservar geometria, proporções e perspectiva.
+            <span className="spn-guide-examples">SketchUp · render básico · foto do projeto</span>
+          </div>
         )}
 
         {phase === 'configure' && (
           <p className="spn-guide-tip">
-            Referência no lugar. À esquerda, as quatro linhas já vêm decididas —
-            abra alguma só se quiser mudar. O botão <strong>Gerar render</strong> fica
-            fixo no rodapé do painel, sempre à vista.
+            <strong>Defina como quer visualizar.</strong> O cenário já vem preparado.
+            Ajuste ambiente, luz ou materiais só se precisar; o projeto continua sendo a referência.
+            Quando estiver pronto, use <strong>Gerar render</strong> no painel.
           </p>
         )}
 
         {phase === 'generating' && (
           <p className="spn-guide-tip">
             <span className="spn-guide-live" aria-hidden="true" />
-            Sua primeira imagem está a caminho — acompanhe aqui ao lado.
+            A SpaceNode trabalha sobre o seu projeto, preservando a geometria e a perspectiva.
+            Sua imagem está a caminho.
           </p>
         )}
 
         {phase === 'done' && (
           <p className="spn-guide-tip">
-            <strong>Primeira imagem pronta.</strong>{' '}
+            <strong>Sua primeira visualização está pronta.</strong>{' '}
             {fromSpacesNew
-              ? 'Arraste o divisor para comparar antes e depois. Para continuar seu Space com esta render, siga pelo cartão de projeto abaixo da imagem.'
-              : 'Arraste o divisor para comparar antes e depois. Daqui você baixa, edita ou gera variações.'}
+              ? 'Compare o antes e depois e continue seu Space com esta render.'
+              : 'Compare o antes e depois. Em seguida, continue trabalhando nesta imagem.'}
           </p>
         )}
       </div>

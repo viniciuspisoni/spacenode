@@ -13,7 +13,8 @@
 // Bypass de teste local (sem sessão de browser): header `x-edit-v3-test-user:
 // <uuid>` — aceito APENAS fora de produção e fora da Vercel.
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
+import { trackSecondTool } from '@/lib/analytics/activation'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getRequestUser } from '@/lib/auth/request-user'
 import { uploadEditAsset } from '@/lib/spaces/edit-route-helpers'
@@ -375,6 +376,8 @@ export async function POST(req: NextRequest) {
     // (o recompose já garantiu os pixels fora da seleção; o aviso cobre o
     // DENTRO — material errado, artefato — sem bloquear entrega legítima).
     const semanticWarning = run.semantic && !run.semantic.pass && !run.semantic.skipped
+
+    after(() => trackSecondTool(db, req, userId, 'editar'))
 
     return NextResponse.json({
       rejected: false,

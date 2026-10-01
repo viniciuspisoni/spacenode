@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { track } from '@/lib/analytics/client'
 import { ANNUAL_BILLING_ENABLED, SELLABLE_PLANS, recommendPlan, type SellablePlanId, type PaidPlanId, type BillingCycle } from '@/lib/plans'
 import { EXTRA_NODE_PACKS } from '@/lib/extra-nodes'
 import { NODES_GRACE_DAYS, NODES_ROLLOVER_COPY_LANDING } from '@/lib/billing/nodes'
@@ -360,6 +361,19 @@ const TOP_PLAN_NODES = SELLABLE_PLANS[SELLABLE_PLANS.length - 1].nodes
 const QUALITIES = [{ label: 'HD', cost: 10 }, { label: '2K', cost: 20 }, { label: '4K', cost: 40 }]
 
 export function PricingToggle() {
+  const pricingRef = useRef<HTMLElement>(null)
+  useEffect(() => {
+    const node = pricingRef.current
+    if (!node) return
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) {
+        track('plans_viewed', { surface: 'landing' })
+        observer.disconnect()
+      }
+    }, { threshold: 0.1 })
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [])
   const [billing, setBilling]         = useState<BillingCycle>('monthly')
   const [loading, setLoading]         = useState<string | null>(null)
   const [renders, setRenders]         = useState(40)
@@ -388,7 +402,7 @@ export function PricingToggle() {
   }, [])
 
   return (
-    <section id="planos" className="spn-pricing" data-cta-position="pricing">
+    <section ref={pricingRef} id="planos" className="spn-pricing" data-cta-position="pricing">
       <div className="spn-pricing-head">
         <h2 className="spn-pricing-title">Teste primeiro. Escolha um plano para continuar.</h2>
         <p className="spn-pricing-sub">

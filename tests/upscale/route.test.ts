@@ -6,6 +6,9 @@ const mock = vi.hoisted(() => ({ auth: vi.fn(), download: vi.fn(), normalize: vi
   rows: new Map<string, Record<string, unknown>>(), events: [] as string[],
   insertError: false, completionError: false }))
 
+vi.mock('next/server', async importOriginal => ({ ...await importOriginal<typeof import('next/server')>(), after: vi.fn() }))
+vi.mock('@/lib/analytics/activation', () => ({ trackSecondTool: vi.fn() }))
+
 vi.mock('@fal-ai/client', () => ({ fal: { config: vi.fn(), storage: { upload: vi.fn().mockResolvedValue('https://fal.media/source.png') } } }))
 vi.mock('@/lib/auth/request-user', () => ({ getRequestUser: mock.auth }))
 vi.mock('@/lib/billing/refund-nodes', () => ({ refundNodes: mock.refund }))
