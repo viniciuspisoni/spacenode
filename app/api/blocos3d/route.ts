@@ -12,7 +12,6 @@
 // GET — lista os últimos jobs do usuário (histórico do módulo).
 
 import { NextRequest, NextResponse } from 'next/server'
-import sharp from 'sharp'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getPayerId } from '@/lib/workspaces/context'
@@ -25,9 +24,9 @@ import {
   normalizeSourceKeys,
   countImages,
   validViewSequence,
-  VIEW_POSITION_LABEL,
   VIEW_POSITION_ORDER,
 } from '@/lib/blocos3d/config'
+import { validateBlocos3DImages } from '@/lib/blocos3d/validate-source'
 import { createProviderTask, engineAvailable } from '@/lib/blocos3d/provider'
 import { MeshyError } from '@/lib/blocos3d/meshy'
 import { BLOCOS3D_JOB_COLUMNS, toJobView, type Blocos3DJobRow } from '@/lib/blocos3d/view'
@@ -87,21 +86,8 @@ export async function POST(req: NextRequest) {
 
   // Verifica TODAS as vistas antes do débito: um ângulo corrompido ou pequeno
   // também desperdiça uma chamada paga, mesmo quando a frente está correta.
-  const checks = await Promise.all(positions.map(async p => {
-    const { data, error } = await admin.storage.from(area.bucket).download(sourceKeys[p]!)
-    if (error || !data) return { status: 503, error: `Não foi possível ler a foto (${VIEW_POSITION_LABEL[p]}). Envie-a novamente.` }
-    try {
-      const metadata = await sharp(Buffer.from(await data.arrayBuffer()), { failOn: 'error' }).metadata()
-      if (!metadata.width || !metadata.height || Math.min(metadata.width, metadata.height) < 512 ||
-          !['jpeg', 'png', 'webp'].includes(metadata.format ?? '')) {
-        return { status: 400, error: 'Use fotos JPG, PNG ou WebP com pelo menos 512 px em cada lado.' }
-      }
-    } catch {
-      return { status: 400, error: `Não foi possível abrir a foto (${VIEW_POSITION_LABEL[p]}). Envie outra.` }
-    }
-    return null
-  }))
-  const badImage = checks.find(result => result !== null)
+  const badImage = await validateBlocos3DImages(sourceKeys, positions,
+    key => admin.storage.from(area.bucket).download(key))
   if (badImage) return NextResponse.json({ error: badImage.error }, { status: badImage.status })
 
   const nodesToCharge = engine.costInNodes

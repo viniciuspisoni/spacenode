@@ -5,6 +5,8 @@ import {
 import { BLOCOS3D_NODES, estimatedMargin } from '@/lib/blocos3d/pricing'
 import { buildInput, extractOutputs, resolveFalEngineId } from '@/lib/blocos3d/fal'
 import { inspectGlb } from '@/lib/blocos3d/inspect-glb'
+import { validateBlocos3DImages } from '@/lib/blocos3d/validate-source'
+import sharp from 'sharp'
 
 describe('Blocos 3D V2: custo e roteamento', () => {
   it('usa o mesmo preço no client e no servidor e protege o piso legado', () => {
@@ -78,5 +80,33 @@ describe('inspeção do GLB antes da entrega', () => {
 
   it('recusa modelo sem textura, que não corresponde à saída cobrada', () => {
     expect(() => inspectGlb(glbFor({ ...valid, textures: [] }))).toThrow(/textura/)
+  })
+})
+
+describe('checagem das fotos antes da cobrança', () => {
+  it('recusa uma vista lateral pequena mesmo quando a frente é válida', async () => {
+    const good = new Blob([new Uint8Array(await sharp({ create: {
+      width: 600, height: 600, channels: 3, background: '#ffffff',
+    } }).png().toBuffer())])
+    const small = new Blob([new Uint8Array(await sharp({ create: {
+      width: 300, height: 600, channels: 3, background: '#ffffff',
+    } }).png().toBuffer())])
+    const download = async (key: string) => ({ data: key === 'front' ? good : small, error: null })
+    const result = await validateBlocos3DImages({ front: 'front', left: 'left' }, ['front', 'left'], download)
+    expect(result).toMatchObject({ status: 400 })
+    expect(result?.error).toContain('512 px')
+  })
+
+  it('aceita vistas válidas e recusa bytes que não são imagem', async () => {
+    const good = new Blob([new Uint8Array(await sharp({ create: {
+      width: 600, height: 600, channels: 3, background: '#ffffff',
+    } }).jpeg().toBuffer())])
+    const images = { front: 'front', left: 'left' }
+    const valid = await validateBlocos3DImages(images, ['front', 'left'], async () => ({ data: good, error: null }))
+    expect(valid).toBeNull()
+    const corrupt = await validateBlocos3DImages(images, ['front', 'left'], async key =>
+      ({ data: key === 'front' ? good : new Blob(['not-an-image']), error: null }))
+    expect(corrupt).toMatchObject({ status: 400 })
+    expect(corrupt?.error).toContain('Lado esquerdo')
   })
 })
