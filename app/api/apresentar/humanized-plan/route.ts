@@ -31,9 +31,9 @@ const FAL_TIMEOUT_MS = 90_000
 
 // ── Gate de fidelidade da planta (envs com defaults; espelha o render_only) ──
 //
-//   HUMANIZED_PLAN_FIDELITY_GATE  '0' desliga validação+retry (rollback rápido)
+//   HUMANIZED_PLAN_FIDELITY_GATE  '1' liga gate legado (default off: não calibrado para line-art)
 //   HUMANIZED_PLAN_MIN_SCORE      limite do geometry score (default 0.50)
-//   HUMANIZED_PLAN_MAX_ATTEMPTS   total de tentativas (default 2, cap 3)
+//   HUMANIZED_PLAN_MAX_ATTEMPTS   total de tentativas quando ligado (default 2, cap 3)
 //
 // Motivação (feedback de beta — Muda, "leitura incorreta"): a planta humanizada
 // saía "bem diferente" da planta técnica original. Mesmo contrato do
@@ -180,7 +180,7 @@ export async function POST(req: NextRequest) {
     }
     debited = true
 
-    // ── Geração com gate de fidelidade (retry ladder) ─────────────────────────
+    // ── V2: tentativa única com telemetria; legado: gate opt-in ──────────────
     inputUrl = await fal.storage.upload(imageFile)
     let planRead: PlanRead | null = null
     if (useV2 || !projectType) {
