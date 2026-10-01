@@ -243,7 +243,7 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
   const modeInSync =
     objectivePreset.tab === tab &&
     objectivePreset.modeId === selectedModeId
-  
+
 
   const estimate = estimateSeconds(megapixels)
 
