@@ -48,8 +48,10 @@ A troca de transporte exigiria uma chave `TRIPO_API_KEY`, adaptar submissão
 e polling, autorizar a origem dos arquivos da Tripo no rehost, registrar
 `provider=tripo` na persistência e preservar a reconciliação dos jobs fal
 existentes. A API direta limita H-series a três tarefas simultâneas por
-conta. Manter fal no PR e só considerar a troca após um teste lado a lado de
-custo faturado, latência, falhas e arquivos GLB no mesmo conjunto de fotos.
+conta. Manter fal na produção deste PR. O harness já pode comparar `h31` (fal)
+com `h31_direct` (Tripo), com os mesmos parâmetros, fotos, notas e teto
+cumulativo. Só considerar a troca após conciliar custo faturado, latência,
+falhas e arquivos GLB no mesmo conjunto de fotos.
 
 ### Alternativas recentes (consulta em 2026-10-01)
 
@@ -115,13 +117,13 @@ uso anterior do Tripo; ainda depende de avaliação visual com objetos reais.
 
 Antes de habilitar em produção: montar 10–12 objetos de arquitetura com
 fotos próprias/licenciadas (cadeira, sofá, mesa, luminária, vaso, peça
-vazada e elemento de fachada); pelo menos 4 com quatro vistas. Rodar H3.1
+vazada e elemento de fachada); pelo menos 4 com quatro vistas. Rodar H3.1 via fal e via Tripo direto
 contra Hunyuan3D 3.1 Pro e Rodin 2.5 com teto total de US$60, guardar
 provider, preço efetivo, tempo, falha e GLB. Avaliar às cegas as vistas do
 modelo contra a referência, importação em SketchUp, materiais e tamanho.
 Escolher o motor que passar o limiar de qualidade e a conta de margem;
 recalcular nodes antes de trocar endpoint. O run pago não foi realizado neste
-ambiente: não há `FAL_KEY` nem as fotos de teste aqui.
+ambiente: não há `FAL_KEY`, `TRIPO_API_KEY` nem as fotos de teste aqui.
 
 O runner e a régua de avaliação estão em `scripts/blocos3d-harness/README.md`.
 Ele conserva as fotos, tenta salvar a prévia de cada motor, inspeciona dimensões
