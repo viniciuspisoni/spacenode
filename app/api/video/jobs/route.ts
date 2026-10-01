@@ -52,19 +52,15 @@ export async function POST(req: NextRequest) {
   })
   const admin = createAdminClient()
 
-  // O arquivo é validado e enviado à fal ANTES de reservar os nodes. Uma falha
-  // de entrada não cobra o usuário. A RPC reserva o job e debita em uma única
-  // transação; requestId torna retries HTTP idempotentes.
+  // A entrada é validada antes do débito. A RPC reserva o job e debita em uma
+  // transação: após isso qualquer falha no upload da fal é estornada pela RPC
+  // de falha. Duplicatas retornam o mesmo job sem reenviar a imagem ao provider.
   const src = await downloadDirectUpload(admin, DIRECT_UPLOAD_AREAS['animar-source'], user.id, {}, sourceKey)
   if (!src.ok) return NextResponse.json({ error: src.message }, { status: src.status })
 
   let jobId: string | null = null
   let created = false
   try {
-    fal.config({ credentials: process.env.FAL_KEY })
-    const imageUrl = await fal.storage.upload(new File(
-      [new Uint8Array(src.buffer)], sourceKey.split('/').pop() ?? 'source.jpg', { type: src.mime },
-    ))
     const { data: reservation, error: reserveError } = await admin.rpc('reserve_video_job', {
       p_user_id: user.id, p_request_id: requestId,
       p_model_id: modelId, p_endpoint: modelId === 'spacenode/veo3.1-lite-720/image-to-video'
@@ -88,6 +84,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ jobId, job: await videoJobView(admin, job) })
     }
 
+    fal.config({ credentials: process.env.FAL_KEY })
+    const imageUrl = await fal.storage.upload(new File(
+      [new Uint8Array(src.buffer)], sourceKey.split('/').pop() ?? 'source.jpg', { type: src.mime },
+    ))
     const { requestId: providerRequestId } = await submitVideoTask({
       modelId, imageUrl, prompt: built.prompt, negativePrompt: built.negativePrompt,
       duration, aspectRatio: preset.defaults.aspectRatio, resolution: quote.resolution,
@@ -114,9 +114,16 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   const { user } = await getRequestUser(req)
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+  const requestId = req.nextUrl.searchParams.get('requestId')
+  if (requestId && !UUID_RE.test(requestId)) {
+    return NextResponse.json({ error: 'Identificador inválido' }, { status: 400 })
+  }
   const admin = createAdminClient()
-  const { data, error } = await admin.from('video_jobs').select('*')
-    .eq('user_id', user.id).in('status', ['submitting', 'processing'])
+  let query = admin.from('video_jobs').select('*').eq('user_id', user.id)
+  query = requestId
+    ? query.eq('client_request_id', requestId)
+    : query.in('status', ['submitting', 'processing'])
+  const { data, error } = await query
     .order('created_at', { ascending: false }).limit(1).maybeSingle()
   if (error) return NextResponse.json({ error: 'Falha ao consultar vídeo' }, { status: 500 })
   return NextResponse.json({ job: data ? await videoJobView(admin, data) : null })

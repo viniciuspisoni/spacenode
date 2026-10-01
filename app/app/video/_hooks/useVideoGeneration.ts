@@ -29,6 +29,7 @@ export function useVideoGeneration(
 ) {
   const creditsRef = useRef(state.credits)
   const startedRef = useRef(false)
+  const inFlightRef = useRef(false)
   useEffect(() => { creditsRef.current = state.credits }, [state.credits])
   useEffect(() => { if (state.imageFile) startedRef.current = true }, [state.imageFile])
 
@@ -60,6 +61,7 @@ export function useVideoGeneration(
         if (!active) return
         const job = response.ok ? data?.job : null
         if (job?.status === 'completed' && job.outputUrl) {
+          inFlightRef.current = false
           dispatch({
             type: 'generationSuccess',
             result: {
@@ -79,6 +81,7 @@ export function useVideoGeneration(
           return
         }
         if (job?.status === 'failed') {
+          inFlightRef.current = false
           if (typeof job.credits === 'number') dispatch({ type: 'setCredits', credits: job.credits })
           dispatch({ type: 'generationError', message: job.error ?? 'A geração falhou.' })
           return
@@ -94,13 +97,15 @@ export function useVideoGeneration(
   }, [state.activeJobId, dispatch])
 
   const generate = useCallback(async () => {
-    if (!state.imageFile || state.status === 'generating') return
+    if (!state.imageFile || state.status === 'generating' || inFlightRef.current) return
+    inFlightRef.current = true
     startedRef.current = true
     dispatch({ type: 'startGenerating' })
     const motion = resolveMotion(state)
+    let requestId: string | null = null
     try {
       const { key: sourceKey } = await uploadDirect(state.imageFile, 'animar-source', {}, { confirm: false })
-      const requestId = crypto.randomUUID()
+      requestId = crypto.randomUUID()
       const body = JSON.stringify({
         requestId,
         sourceKey,
@@ -133,10 +138,25 @@ export function useVideoGeneration(
       })
     } catch (error) {
       console.error('[useVideoGeneration] falhou:', error)
+      if (requestId) {
+        try {
+          const recovery = await fetch(`/api/video/jobs?requestId=${requestId}`, { cache: 'no-store' })
+          const data = (await jsonOrNull(recovery)) as { job?: JobView | null } | null
+          if (recovery.ok && data?.job) {
+            dispatch({
+              type: 'jobSubmitted', jobId: data.job.id,
+              nodesCharged: data.job.status === 'failed' ? 0 : data.job.nodesCharged,
+              newCredits: data.job.credits,
+            })
+            return
+          }
+        } catch { /* A retomada da página consulta os jobs ativos novamente. */ }
+      }
       dispatch({
         type: 'generationError',
         message: error instanceof Error && error.message ? error.message : 'Falha de conexão. Tente novamente.',
       })
+      inFlightRef.current = false
     }
   }, [state, dispatch, nodeCost])
 

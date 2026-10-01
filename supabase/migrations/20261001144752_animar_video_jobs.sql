@@ -45,6 +45,9 @@ create index if not exists video_jobs_pending_idx
 alter table public.video_jobs enable row level security;
 create policy video_jobs_select_own on public.video_jobs
   for select to authenticated using ((select auth.uid()) = user_id);
+-- A Data API pode exigir grants explícitos em projetos novos. Só as rotas com
+-- service_role consultam ou alteram jobs; não há escrita direta pelo browser.
+grant select, insert, update on public.video_jobs to service_role;
 
 alter table public.renders add column if not exists video_job_id uuid;
 create unique index if not exists renders_video_job_unique_idx
