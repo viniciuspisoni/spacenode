@@ -1,6 +1,6 @@
 # Validação do Ampliar — 01/10/2026
 
-Continuação da PR #256, sem merge ou alteração do banco remoto.
+Continuação da PR #256, com migração aplicada e verificada somente no banco `spacenode-dev`. A PR permanece em rascunho, sem merge.
 
 ## Correções finais
 
@@ -21,8 +21,15 @@ Continuação da PR #256, sem merge ou alteração do banco remoto.
 - Recarregar uma geração registrada disparou somente GET, sem repetir o POST. O PNG de 44 MiB também foi reutilizado como entrada pelo proxy privado no teste desktop.
 - Não houve erro de console ou overlay de erro nesses fluxos. A rota e as imagens temporárias de QA foram removidas da entrega.
 
+## Validação no banco de desenvolvimento
+
+- Projeto confirmado antes da aplicação: `spacenode-dev` (`aehmbapbbrefglsrkrgs`). O arquivo `20261001170000_upscale_pending_nodes.sql` foi aplicado com o nome `upscale_pending_nodes`; o histórico remoto registrou a versão `20261001202804`.
+- A constraint `renders_nodes_charged_check` está validada (`convalidated = true`). A expressão anterior `nodes_charged > 0` foi preservada; a exceção permite zero apenas quando `ambient = 'upscale'` e `status` é `pending` ou `failed`.
+- A expressão registrada no catálogo foi avaliada por SELECT no próprio Postgres em 96 combinações de módulo, status e cobrança, incluindo valores nulos. Resultado: zero divergências, somente dois casos com cobrança zero permitidos e nenhum valor negativo permitido. Essa verificação não inseriu gerações nem alterou saldos.
+- A migração não foi aplicada ao banco de produção.
+
 ## Pendências antes da ativação
 
-Aplicar `20261001170000_upscale_pending_nodes.sql` no ambiente escolhido e executar o smoke autenticado com upload direto, FAL, saldo, histórico e download. A aplicação no desenvolvimento foi rejeitada pela revisão automática de permissões por alterar a regra de cobrança; esta continuação usou um banco local descartável.
+Executar o smoke autenticado em um ambiente confirmado como ligado ao `spacenode-dev`, com upload direto, FAL, saldo, histórico e download. Não há uma sessão autenticada disponível para esse teste nesta validação, e o banco usado pelo preview ainda não foi confirmado como desenvolvimento. Antes da ativação em produção, aplicar `20261001170000_upscale_pending_nodes.sql` também no banco de produção.
 
 Não houve inferência FAL nem débito real nesta validação. O teste de UI não comprova qualidade do provider, RLS, consumo real de nodes ou capacidade de memória de um celular físico. O processamento continua síncrono: o registro recupera a resposta, mas não retoma uma execução encerrada abruptamente pela plataforma.
