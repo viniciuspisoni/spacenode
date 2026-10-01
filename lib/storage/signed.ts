@@ -40,9 +40,10 @@ export async function signStorageUrl(
   ttlSeconds = DEFAULT_TTL_SECONDS,
 ): Promise<string | null> {
   if (!url) return url ?? null
-  if (!privateStorageActive()) return url // inerte até o flip (STORAGE_PRIVATE=1)
   const parsed = parseSupabaseStoragePath(url)
   if (!parsed || !PRIVATE_BUCKETS.has(parsed.bucket)) return url
+  // spacenode-media nasceu privado: não depende do flip dos buckets legados.
+  if (!privateStorageActive() && parsed.bucket !== 'spacenode-media') return url
   const { data, error } = await admin.storage.from(parsed.bucket).createSignedUrl(parsed.key, ttlSeconds)
   if (error || !data?.signedUrl) {
     console.error('[storage-signed] createSignedUrl falhou:', error?.message)
@@ -114,9 +115,9 @@ export async function signDeep(
  *  por STORAGE_PRIVATE → no-op enquanto off. */
 export function mediaProxyUrl(url: string | null | undefined): string | null {
   if (!url) return url ?? null
-  if (!privateStorageActive()) return url
   const parsed = parseSupabaseStoragePath(url)
   if (!parsed || !PRIVATE_BUCKETS.has(parsed.bucket)) return url
+  if (!privateStorageActive() && parsed.bucket !== 'spacenode-media') return url
   return `/api/media?bucket=${encodeURIComponent(parsed.bucket)}&key=${encodeURIComponent(parsed.key)}`
 }
 

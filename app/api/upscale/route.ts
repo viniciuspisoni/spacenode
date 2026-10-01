@@ -1,355 +1,157 @@
-// POST /api/upscale — módulo Ampliar v2 (abas Resolução e Aprimorar).
-//
-// Contrato (JSON — a imagem sobe DIRETO pro Storage via uploadDirect, área
-// upscale-source; o binário não passa pela Vercel, teto de 4,5 MB não se aplica):
-//   - sourceKey:    string (key do upload direto, obrigatório)
-//   - tab:          'resolution' | 'enhance'
-//   - modeId:       'fidelity' | 'recover' | 'denoise' | 'deblur' | 'restore' | 'smart'
-//   - scale:        'none' | '2x' | '4x' | '8x' | 'ultra'
-//   - objectiveId?: 'client' | 'portfolio' | 'print' | 'recover' | 'final'
-//   - imageWidth?:  number  (origem; fallback se o decode server-side falhar)
-//   - imageHeight?: number
-//
-// Custo: computeUpscaleCost — único ponto de verdade.
-// Débito: consume_nodes_v2 com refund_nodes em falha pós-débito.
-// Histórico: insere em `renders` com upscale_meta jsonb completo.
-
+import { randomUUID, createHash } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { fal } from '@fal-ai/client'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getRequestUser } from '@/lib/auth/request-user'
 import { refundNodes } from '@/lib/billing/refund-nodes'
 import { DIRECT_UPLOAD_AREAS, downloadDirectUpload } from '@/lib/storage/direct-upload'
-import { fetchStorageBuffer } from '@/lib/storage/fetch'
-// Server-only (sharp) — importado direto, nunca via lib/upscale/index, que o
-// componente cliente também importa.
-import { normalizeSource, type NormalizeNote } from '@/lib/upscale/normalize-source'
-import { classifySource, type SourceStats } from '@/lib/upscale/classify-source'
-import sharp from 'sharp'
-import {
-  MAX_OUTPUT_MP,
-  computeUpscaleCost,
-  effectiveFactor,
-  finalProvider,
-  isScaleClamped,
-  megapixelsFromDimensions,
-  runUpscalePipeline,
-  type ModeId,
-  type Scale,
-  type SourceKind,
-  type UpscaleTab,
-} from '@/lib/upscale'
+import { normalizeSource } from '@/lib/upscale/normalize-source'
+import { classifySource } from '@/lib/upscale/classify-source'
+import { saveUpscaleOutput } from '@/lib/upscale/output'
+import { upscaleJobResponse } from '@/lib/upscale/job-response'
+import { withSignal } from '@/lib/upscale/providers/subscribe'
+import { UPSCALE_BUDGET_MS } from '@/lib/upscale/limits'
+import { MAX_OUTPUT_MP, computeUpscaleCost, effectiveFactor, finalProvider,
+  megapixelsFromDimensions, runUpscalePipeline, type ModeId, type Scale, type UpscaleTab } from '@/lib/upscale'
 
 export const maxDuration = 300
-
 fal.config({ credentials: process.env.FAL_KEY })
 
-const VALID_TABS:   UpscaleTab[] = ['resolution', 'enhance']
-const VALID_MODES:  ModeId[]     = ['fidelity', 'recover', 'denoise', 'deblur', 'restore', 'smart']
-const VALID_SCALES: Scale[]      = ['none', '2x', '4x', '8x', 'ultra']
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const MODES: Record<UpscaleTab, ModeId[]> = {
+  resolution: ['fidelity', 'recover'], enhance: ['denoise', 'deblur', 'restore', 'smart'],
+}
+const SCALES: Scale[] = ['none', '2x', '4x', '8x', 'ultra']
 
-// Teto do OUTPUT em MAX_OUTPUT_MP (lib/upscale): 256 MP ≈ 16K×16K — acima
-// disso o provider falha depois de minutos (refund, tempo perdido) ou devolve
-// resultado silenciosamente reduzido. Checado ANTES do custo/débito.
-
-// Constraint: aba × modo precisam combinar para evitar requisições inválidas.
-const ALLOWED_MODES_BY_TAB: Record<UpscaleTab, ModeId[]> = {
-  resolution: ['fidelity', 'recover'],
-  enhance:    ['denoise', 'deblur', 'restore', 'smart'],
+/** Consulta somente o job do usuário. Refresh/reconexão não repetem débito. */
+export async function GET(req: NextRequest) {
+  const { user } = await getRequestUser(req)
+  if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+  const id = req.nextUrl.searchParams.get('jobId') ?? ''
+  if (!UUID.test(id)) return NextResponse.json({ error: 'Geração inválida' }, { status: 400 })
+  const admin = createAdminClient()
+  const { data, error } = await admin.from('renders').select('*').eq('id', id)
+    .eq('user_id', user.id).eq('ambient', 'upscale').maybeSingle()
+  if (error) return NextResponse.json({ error: 'Não foi possível consultar a geração.' }, { status: 503 })
+  if (!data) return NextResponse.json({ error: 'Geração não encontrada' }, { status: 404 })
+  return NextResponse.json(await upscaleJobResponse(admin, data), {
+    status: ['pending', 'processing'].includes(data.status) ? 202 : 200,
+    headers: { 'Cache-Control': 'private, no-store' },
+  })
 }
 
 export async function POST(req: NextRequest) {
-  // Cookie (browser) ou Bearer (plugin SketchUp).
   const { user } = await getRequestUser(req)
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
-
-  // ── Parse + validação ──────────────────────────────────────────────────────
   const body = await req.json().catch(() => null)
-  const sourceKey   = typeof body?.sourceKey   === 'string' ? body.sourceKey   : ''
-  const tab         = typeof body?.tab         === 'string' ? body.tab         : 'resolution'
-  const modeId      = typeof body?.modeId      === 'string' ? body.modeId      : 'fidelity'
-  const scale       = typeof body?.scale       === 'string' ? body.scale       : '4x'
-  const objectiveId = typeof body?.objectiveId === 'string' ? body.objectiveId : null
-  const widthRaw    = body?.imageWidth  != null ? String(body.imageWidth)  : null
-  const heightRaw   = body?.imageHeight != null ? String(body.imageHeight) : null
-
-  if (!sourceKey) {
-    return NextResponse.json({ error: 'Imagem obrigatória' }, { status: 400 })
+  const sourceKey = typeof body?.sourceKey === 'string' ? body.sourceKey : ''
+  const tab = (body?.tab ?? 'resolution') as UpscaleTab
+  const modeId = (body?.modeId ?? 'fidelity') as ModeId
+  const scale = (body?.scale ?? '4x') as Scale
+  const kind = body?.sourceKind ?? 'auto'
+  const jobId = body?.requestId ?? randomUUID() // compatibilidade com plugin antigo
+  if (!sourceKey || typeof jobId !== 'string' || !UUID.test(jobId) ||
+      !['resolution', 'enhance'].includes(tab) || !MODES[tab].includes(modeId) || !SCALES.includes(scale) ||
+      !['auto', 'image', 'line-art'].includes(kind) ||
+      (tab === 'enhance' && modeId !== 'smart' && scale !== 'none')) {
+    return NextResponse.json({ error: 'Pedido de ampliação inválido.' }, { status: 400 })
   }
-  if (!VALID_TABS.includes(tab as UpscaleTab)) {
-    return NextResponse.json({ error: 'tab inválido' }, { status: 400 })
-  }
-  if (!VALID_MODES.includes(modeId as ModeId)) {
-    return NextResponse.json({ error: 'modeId inválido' }, { status: 400 })
-  }
-  if (!VALID_SCALES.includes(scale as Scale)) {
-    return NextResponse.json({ error: 'scale inválido' }, { status: 400 })
-  }
-  if (!ALLOWED_MODES_BY_TAB[tab as UpscaleTab].includes(modeId as ModeId)) {
-    return NextResponse.json({ error: 'combinação tab/modo inválida' }, { status: 400 })
-  }
-
-  const tabT    = tab    as UpscaleTab
-  const modeT   = modeId as ModeId
-  const scaleT  = scale  as Scale
-
-  // ── Origem: baixa o upload direto do Storage (valida dono/área/limites) ────
   const admin = createAdminClient()
-  const src = await downloadDirectUpload(
-    admin, DIRECT_UPLOAD_AREAS['upscale-source'], user.id, {}, sourceKey,
-  )
-  if (!src.ok) return NextResponse.json({ error: src.message }, { status: src.status })
-
-  // Dimensões REAIS medidas no servidor (AL-5): o custo do upscale é por
-  // megapixel; confiar no imageWidth/imageHeight do cliente permitia
-  // subdeclarar as dimensões pra pagar o piso enquanto envia uma imagem grande
-  // (custo real alto). sharp mede a origem; o client só é fallback se o decode
-  // falhar (caso raro — aí o provider provavelmente também falharia).
-  //
-  // Além de medir, NORMALIZA a orientação EXIF quando preciso (ver
-  // normalizeSource): a saída é PNG, formato sem tag de orientação, então uma
-  // foto deitada voltaria deitada e com a proporção trocada. Cor NÃO é tratada
-  // aqui, de propósito — está medido que o provider preserva o perfil ICC
-  // ponta a ponta (MEDICOES.md §7).
-  let width:  number | null = null
-  let height: number | null = null
-  let sourceBuffer = src.buffer
-  let sourceMime   = src.mime
-  let normalized: NormalizeNote = null
-  try {
-    const norm = await normalizeSource(src.buffer, src.mime)
-    width        = norm.width
-    height       = norm.height
-    sourceBuffer = norm.buffer
-    sourceMime   = norm.mime
-    normalized   = norm.note
-  } catch {
-    console.warn('[upscale] sharp metadata falhou — usando dims do cliente (fallback)')
-    width  = widthRaw  ? Number(widthRaw)  : null
-    height = heightRaw ? Number(heightRaw) : null
-  }
-
-  // ── Classe visual da origem (best-effort, 40–90 ms de CPU) ───────────────
-  // Desenho técnico puro vai pro Text Refine; todo o resto segue no motor
-  // padrão. Falha aqui NUNCA barra o pedido — cai em 'image', que é o
-  // comportamento de sempre. Ver lib/upscale/classify-source.ts e MEDICOES §9.
-  let sourceKind: SourceKind = 'image'
-  let sourceStats: SourceStats | null = null
-  try {
-    const c = await classifySource(sourceBuffer)
-    sourceKind  = c.kind
-    sourceStats = c.stats
-  } catch (e) {
-    console.warn('[upscale] classificação da origem falhou (segue como image):', (e as Error).message)
-  }
-
-  // ── Teto de resolução do output (antes de custo/débito) ────────────────────
-  // Fator EFETIVO: é o que o motor entrega e, portanto, o que se cobra. Um
-  // cliente antigo que ainda peça 8× roda e paga como 4× (MAX_UPSCALE_FACTOR).
-  const scaleFactor = effectiveFactor(scaleT)
-  if (width && height) {
-    const outputMp = (width * height * scaleFactor * scaleFactor) / 1_000_000
-    if (outputMp > MAX_OUTPUT_MP) {
-      return NextResponse.json(
-        {
-          code:  'output_too_large',
-          error:
-            `Esta imagem em ${scaleFactor}× daria ~${Math.round(outputMp)} MP, acima do limite de ${MAX_OUTPUT_MP} MP. ` +
-            'Escolha uma escala menor. Nenhum node foi cobrado.',
-        },
-        { status: 400 },
-      )
+  const fingerprint = createHash('sha256').update(JSON.stringify([sourceKey, tab, modeId, scale, kind])).digest('hex')
+  const existing = await admin.from('renders').select('*').eq('id', jobId).eq('user_id', user.id).maybeSingle()
+  if (existing.error) return NextResponse.json({ error: 'Não foi possível verificar a geração.' }, { status: 503 })
+  if (existing.data) {
+    if (existing.data.upscale_meta?.request_fingerprint !== fingerprint) {
+      return NextResponse.json({ error: 'Este pedido já pertence a outra geração.' }, { status: 409 })
     }
+    return NextResponse.json(await upscaleJobResponse(admin, existing.data), {
+      status: ['pending', 'processing'].includes(existing.data.status) ? 202 : 200,
+    })
   }
 
-  // ── Custo ──────────────────────────────────────────────────────────────────
-  const cost = computeUpscaleCost({
-    tab:        tabT,
-    modeId:     modeT,
-    scale:      scaleT,
-    megapixels: megapixelsFromDimensions(width, height),
-  }).total
-
-  // ── Débito (com refund em falha) ───────────────────────────────────────────
+  // Um orçamento para upload, tentativas e armazenamento; sobra margem para
+  // registrar falha/estorno antes do limite da plataforma. Não soma timeouts.
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(new Error('timeout')), UPSCALE_BUDGET_MS)
+  const signal = controller.signal
   let debited = false
-  let inputUrl:  string | undefined
-
+  let registered = false
+  let cost = 0
+  let meta: Record<string, unknown> = { request_fingerprint: fingerprint, source_key: sourceKey, tab, mode_id: modeId, scale }
   try {
-    const { error: debitErr } = await admin.rpc('consume_workspace_nodes', {
-      user_id_input: user.id,
-      amount:        cost,
-    })
-    if (debitErr) {
-      if (debitErr.code === 'P0001') {
-        return NextResponse.json(
-          { code: 'insufficient_balance', error: 'insufficient_balance', required: cost, message: 'Saldo insuficiente' },
-          { status: 402 },
-        )
-      }
-      console.error('[upscale] consume_nodes_v2 RPC error:', debitErr)
-      return NextResponse.json({ code: 'balance_error', error: 'Erro ao processar saldo' }, { status: 500 })
+    const src = await withSignal(signal, () => downloadDirectUpload(admin, DIRECT_UPLOAD_AREAS['upscale-source'], user.id, {}, sourceKey))
+    if (!src.ok) return NextResponse.json({ error: src.message }, { status: src.status })
+    const normalized = await normalizeSource(src.buffer, src.mime)
+    const width = normalized.width, height = normalized.height
+    if (!width || !height) return NextResponse.json({ error: 'Não foi possível ler esta imagem.' }, { status: 400 })
+    const factor = effectiveFactor(scale)
+    if (width * height * factor * factor > MAX_OUTPUT_MP * 1_000_000) {
+      return NextResponse.json({ code: 'output_too_large', error: 'A resolução final é grande demais. Escolha uma escala menor.' }, { status: 400 })
     }
+    let classification: Awaited<ReturnType<typeof classifySource>> | null = null
+    try { classification = await classifySource(normalized.buffer) } catch { /* usa preservação padrão */ }
+    const sourceKind = kind === 'auto' ? classification?.kind ?? 'image' : kind
+    cost = computeUpscaleCost({ tab, modeId, scale, megapixels: megapixelsFromDimensions(width, height) }).total
+    meta = { ...meta, input_dimensions: { width, height }, source_normalized: normalized.note,
+      source_kind: sourceKind, source_kind_origin: kind === 'auto' ? 'automatic' : 'manual', source_stats: classification?.stats ?? null }
+    const row = { id: jobId, user_id: user.id, input_url: src.url, prompt: `ampliar ${tab}/${modeId} ${scale}`,
+      ambient: 'upscale', style: `upscale:${modeId === 'denoise' ? 'nafnet-denoise' : modeId === 'deblur' ? 'nafnet-deblur' : modeId === 'restore' ? 'photo-restoration' : 'topaz'}`, lighting: scale, status: 'pending',
+      nodes_charged: 0, cost_credits: cost, upscale_meta: meta }
+    const inserted = await admin.from('renders').insert(row)
+    if (inserted.error) {
+      if (inserted.error.code === '23505') {
+        const concurrent = await admin.from('renders').select('*').eq('id', jobId).eq('user_id', user.id).maybeSingle()
+        if (concurrent.data?.upscale_meta?.request_fingerprint === fingerprint) {
+          return NextResponse.json(await upscaleJobResponse(admin, concurrent.data), { status: 202 })
+        }
+      }
+      throw new Error('job_save_failed')
+    }
+    registered = true
+    signal.throwIfAborted()
+    const debit = await admin.rpc('consume_workspace_nodes', { user_id_input: user.id, amount: cost })
+    if (debit.error) throw new Error(debit.error.code === 'P0001' ? 'insufficient_balance' : 'balance_error')
     debited = true
-
-    // ── Upload da imagem para FAL (buffer normalizado, ver normalizeSource) ─
-    const baseName = sourceKey.split('/').pop() ?? 'source.jpg'
-    const fileName = sourceMime === 'image/png' ? baseName.replace(/\.[^.]+$/, '') + '.png' : baseName
-    inputUrl = await fal.storage.upload(
-      new File([new Uint8Array(sourceBuffer)], fileName, { type: sourceMime }),
-    )
-
-    console.log('[upscale] tab=%s mode=%s scale=%s mp=%s kind=%s', tabT, modeT, scaleT, megapixelsFromDimensions(width, height), sourceKind)
-
-    // ── Pipeline ────────────────────────────────────────────────────────────
-    const result = await runUpscalePipeline({
-      tab:             tabT,
-      modeId:          modeT,
-      scale:           scaleT,
-      objectiveId:     objectiveId as never,
-      imageUrl:        inputUrl,
-      inputDimensions: width && height ? { width, height } : null,
-      sourceKind,
-    })
-
-    const outputUrl   = result.outputUrl
-    const usedProvider = finalProvider(result) ?? modeT
-    // Fallback (ex.: Topaz → Clarity na Alta Fidelidade) deixa de ser
-    // silencioso: a UI avisa que o resultado veio de um provider generativo,
-    // não do preservador prometido pelo modo.
-    const fallbackUsed = result.steps.some(s => s.status === 'completed' && s.fallbackOf !== null)
-
-    // ── Verificação do output: dimensões REAIS + fator atingido ──────────────
-    // (o provider pode clampar/reduzir sem avisar — ex.: Topaz vai só até 4×).
-    // Best-effort: falha aqui nunca derruba a entrega.
-    let outputWidth:  number | null = null
-    let outputHeight: number | null = null
-    let outputBytes:  number | null = null
-    let outputFormat: string | null = null
-    let achievedFactor: number | null = null
-    try {
-      const outBuf  = await fetchStorageBuffer(outputUrl)
-      const outMeta = await sharp(outBuf).metadata()
-      outputWidth  = outMeta.width  ?? null
-      outputHeight = outMeta.height ?? null
-      outputBytes  = outBuf.byteLength
-      outputFormat = outMeta.format ?? null
-      if (outputWidth && width) {
-        achievedFactor = Math.round((outputWidth / width) * 100) / 100
-        if (scaleFactor > 1 && achievedFactor < scaleFactor * 0.9) {
-          console.warn('[upscale] fator atingido abaixo do pedido:', achievedFactor, 'vs', scaleFactor)
-        }
-      }
-    } catch (verifyErr) {
-      console.warn('[upscale] verificação do output falhou (segue sem):', (verifyErr as Error).message)
+    const processing = await admin.from('renders').update({ status: 'processing', nodes_charged: cost }).eq('id', jobId).eq('user_id', user.id)
+    if (processing.error) throw new Error('job_save_failed')
+    const inputUrl = await withSignal(signal, () => fal.storage.upload(new File([new Uint8Array(normalized.buffer)], 'source.' + (normalized.mime.split('/')[1]), { type: normalized.mime })))
+    const result = await runUpscalePipeline({ tab, modeId, scale, imageUrl: inputUrl, sourceKind,
+      inputDimensions: { width, height }, signal, onRequestId: async (id, endpoint) => {
+        meta = { ...meta, provider_endpoint: endpoint }
+        const saved = await admin.from('renders').update({ fal_request_id: id, upscale_meta: meta }).eq('id', jobId).eq('user_id', user.id)
+        if (saved.error) throw new Error('job_save_failed')
+      } })
+    const output = await withSignal(signal, () => saveUpscaleOutput(admin, user.id, jobId, normalized.buffer, result.outputUrl, { width, height }, factor, signal))
+    meta = { ...meta, steps: result.steps, provider: finalProvider(result), achieved_factor: output.factor,
+      effective_factor: output.factor, output_dimensions: { width: output.width, height: output.height },
+      output_bytes: output.bytes, output_format: output.format, storage_key: output.key,
+      preview_url: output.previewUrl, before_preview_url: output.beforePreviewUrl,
+      total_duration_ms: result.totalDurationMs, fallback_used: false }
+    const completed = { ...row, style: `upscale:${finalProvider(result) ?? modeId}`, status: 'completed', nodes_charged: cost, output_url: output.url,
+      completed_at: new Date().toISOString(), preview_url: output.previewUrl,
+      fal_request_id: result.steps.at(-1)?.requestId, duration_ms: result.totalDurationMs, upscale_meta: meta }
+    const saved = await admin.from('renders').update(completed).eq('id', jobId).eq('user_id', user.id)
+    if (saved.error) throw new Error('job_save_failed')
+    return NextResponse.json(await upscaleJobResponse(admin, { ...completed, error_message: null }))
+  } catch (error) {
+    const raw = error instanceof Error ? error.message : 'unknown'
+    console.error('[upscale]', raw)
+    const refunded = debited ? await refundNodes(admin, user.id, cost, { module: 'upscale', jobTable: 'renders', jobId }) : false
+    const code = raw.includes('insufficient_balance') ? 'insufficient_balance' :
+      raw.includes('output_dimensions') ? 'output_dimensions_mismatch' :
+      raw.includes('output_too_large') ? 'output_too_large' :
+      raw.includes('job_save') ? 'history_error' : signal.aborted || raw.includes('timeout') ? 'provider_timeout' : 'provider_failed'
+    const message = code === 'insufficient_balance' ? 'Saldo insuficiente.' :
+      code === 'output_dimensions_mismatch' ? 'O motor não entregou a resolução e proporção solicitadas.' :
+      code === 'output_too_large' ? 'O resultado ultrapassou 50 MB. Tente uma escala menor.' :
+      code === 'history_error' ? 'Não foi possível salvar a geração no histórico.' :
+      code === 'provider_timeout' ? 'A geração excedeu o tempo disponível. Tente novamente.' : 'Não foi possível processar esta imagem.'
+    const note = refunded ? ` Seus ${cost} nodes foram devolvidos.` : debited ? ' Não conseguimos confirmar o estorno dos nodes. Entre em contato com o suporte informando esta geração.' : ''
+    if (registered) {
+      const saved = await admin.from('renders').update({ status: 'failed', error_message: message + note,
+        nodes_charged: debited && !refunded ? cost : 0, upscale_meta: { ...meta, refunded, error_code: code }, completed_at: new Date().toISOString() }).eq('id', jobId).eq('user_id', user.id)
+      if (saved.error) console.error('[upscale] falha ao registrar erro', saved.error.code)
     }
-    // Rastreabilidade: id do request fal do último step concluído (o que produziu
-    // o output). O detalhe por step também vai em upscale_meta.steps[].requestId.
-    const falRequestId = [...result.steps].reverse().find(s => s.status === 'completed')?.requestId ?? null
-
-    // ── Histórico ───────────────────────────────────────────────────────────
-    // Mantemos o padrão legado em ambient/style/lighting para compatibilidade
-    // com a UI de histórico atual; o detalhe rico vai em upscale_meta.
-    const styleKey = `upscale:${usedProvider}`
-    const lighting = scaleT === 'none' ? 'none' : scaleT
-
-    const upscaleMeta = {
-      tab:              tabT,
-      mode_id:          modeT,
-      objective_id:     objectiveId,
-      scale:            scaleT,
-      steps:            result.steps,
-      input_dimensions:  width && height ? { width, height } : null,
-      output_dimensions: outputWidth && outputHeight ? { width: outputWidth, height: outputHeight } : null,
-      achieved_factor:   achievedFactor,
-      // Escala pedida × entregue: 'scale' guarda o rótulo do pedido, este
-      // guarda o fator que o motor de fato aplicou e pelo qual se cobrou.
-      effective_factor:  scaleFactor,
-      output_format:     outputFormat,
-      output_bytes:      outputBytes,
-      source_normalized: normalized,
-      source_kind:       sourceKind,
-      source_stats:      sourceStats,
-      fallback_used:     fallbackUsed,
-      total_duration_ms: result.totalDurationMs,
-    }
-
-    // nodes_charged: o Histórico ("Detalhes da geração") lê daqui o custo real.
-    // duration_ms: idem para tempo de geração (coluna da migration 20260701;
-    // se ainda não aplicada, o insert cai no fallback sem ela).
-    const upscaleRow = {
-      user_id:      user.id,
-      input_url:    inputUrl,
-      output_url:   outputUrl,
-      prompt:       `ampliar ${tabT}/${modeT} ${scaleT}`,
-      ambient:      'upscale',
-      style:        styleKey,
-      lighting,
-      nodes_charged: cost,
-      fal_request_id: falRequestId,
-      status:       'completed',
-      completed_at: new Date().toISOString(),
-      upscale_meta: upscaleMeta,
-    }
-    const ins = await admin.from('renders').insert({
-      ...upscaleRow,
-      duration_ms: result.totalDurationMs ?? null,
-    } as never)
-    if (ins.error && (ins.error.code === 'PGRST204' || ins.error.code === '42703')) {
-      await admin.from('renders').insert(upscaleRow as never)
-    }
-
-    return NextResponse.json({
-      url:          outputUrl,
-      originalUrl:  inputUrl,
-      provider:     usedProvider,
-      fallbackUsed,
-      outputWidth,
-      outputHeight,
-      outputBytes,
-      outputFormat,
-      achievedFactor,
-      // A UI mostra a escala ENTREGUE, não a pedida — um cliente antigo que
-      // peça 8× precisa ver 4× no rodapé do resultado.
-      effectiveFactor: scaleFactor,
-      scaleClamped:    isScaleClamped(scaleT),
-      sourceNormalized: normalized,
-      sourceKind,
-      nodesCharged:    cost,
-      durationMs:   result.totalDurationMs,
-    })
-
-  } catch (err: unknown) {
-    const e = err as { status?: number; body?: unknown; message?: string }
-    console.error('[upscale] ERROR status:', e?.status)
-    console.error('[upscale] ERROR body  :', JSON.stringify(e?.body ?? e?.message ?? err))
-
-    // O estorno acontece de todo jeito; o que muda é o usuário SABER disso.
-    // "Erro ao processar imagem" para tudo deixava a pessoa sem saber se
-    // perdeu node, se o problema é a imagem dela ou se adianta tentar de novo.
-    let refunded = false
-    if (debited) {
-      await refundNodes(admin, user.id, cost, { module: 'upscale' })
-      refunded = true
-    }
-
-    const raw      = `${e?.message ?? ''} ${JSON.stringify(e?.body ?? '')}`.toLowerCase()
-    const isTimeout = raw.includes('timeout')
-    const backNote  = refunded ? ` Seus ${cost} nodes foram devolvidos.` : ''
-
-    const { code, message, status } = isTimeout
-      ? {
-          code: 'provider_timeout',
-          status: 504,
-          message:
-            'O motor demorou demais para responder — normalmente é pico de uso.' +
-            ` Tente de novo em alguns minutos.${backNote}`,
-        }
-      : {
-          code: 'provider_failed',
-          status: 502,
-          message: `Não conseguimos processar esta imagem.${backNote} Se repetir, tente outra escala ou outro arquivo.`,
-        }
-
-    return NextResponse.json({ code, error: message, refunded }, { status })
-  }
+    return NextResponse.json({ jobId, status: 'failed', code, error: message + note, refunded }, { status: code === 'insufficient_balance' ? 402 : 502 })
+  } finally { clearTimeout(timer) }
 }

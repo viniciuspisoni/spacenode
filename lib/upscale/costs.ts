@@ -25,11 +25,11 @@ import {
 
 const BASE_COST_BY_MODE: Record<ModeId, number> = {
   fidelity:  10,   // Topaz @ 2× referência
-  recover:   4,    // Clarity conservador @ 2×
+  recover:   10,   // Topaz @ 2×, com correção de compressão
   denoise:   3,    // NAFNet denoise (sem upscale)
   deblur:    3,    // NAFNet deblur  (sem upscale)
   restore:   6,    // Photo Restoration
-  smart:     4,    // Clarity conservador @ 2×
+  smart:     10,   // Mesmo pipeline Topaz da Alta Fidelidade
 }
 
 // ── Multiplicador de escala ───────────────────────────────────────────────────
@@ -111,6 +111,6 @@ export function megapixelsFromDimensions(w: number | null | undefined, h: number
 // Re-export para conveniência da UI
 // Teto do OUTPUT em megapixels (input × fator²) — fonte única pro /api/upscale
 // e pro catálogo do plugin SketchUp.
-export const MAX_OUTPUT_MP = 256
+export const MAX_OUTPUT_MP = 64
 
 export { scaleToFactor }

@@ -59,7 +59,7 @@ export async function normalizeSource(buffer: Buffer, mime: string): Promise<Nor
 
   // PNG na saída: re-encodar um JPEG em JPEG só para girar custaria uma
   // recompressão em cima da imagem que o usuário veio justamente melhorar.
-  const out     = await sharp(buffer).rotate().png().toBuffer()
+  const out     = await sharp(buffer).rotate().keepIccProfile().png().toBuffer()
   const outMeta = await sharp(out).metadata()
 
   console.log('[upscale] origem normalizada: orientation')
