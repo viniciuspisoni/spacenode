@@ -80,7 +80,7 @@ export default function VideoHistoryCarousel({ onReuse }: Props) {
           Seus últimos vídeos
         </div>
         <div style={{ fontSize: 10.5, color: 'var(--color-text-tertiary)' }}>
-          Clique para reutilizar a configuração
+          Clique para criar outro vídeo deste tipo
         </div>
       </div>
 

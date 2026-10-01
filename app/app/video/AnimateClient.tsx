@@ -23,10 +23,7 @@ import { useAnimateState } from './_hooks/useAnimateState'
 import { useImageUpload } from './_hooks/useImageUpload'
 import { useReferenceAnalysis } from './_hooks/useReferenceAnalysis'
 import { useVideoGeneration } from './_hooks/useVideoGeneration'
-import { useFrameExtractor } from './_hooks/useFrameExtractor'
-import { getVideoModel } from '@/lib/video/models'
-import { isCameraMotionId } from '@/lib/video/cameraPresets'
-import { isVideoTypeId, VIDEO_TYPE_PRESETS } from '@/lib/video/videoPresets'
+import { VIDEO_TYPE_PRESETS } from '@/lib/video/videoPresets'
 import { EditV2ImportModal } from '@/components/editar/EditV2ImportModal'
 import { toMediaProxyUrl } from '@/lib/storage/media-url'
 
@@ -38,7 +35,6 @@ export default function AnimateClient({ initialCredits }: AnimateClientProps) {
   const { state, dispatch, model, resolvedMotion, nodeCost } = useAnimateState(initialCredits)
   const { analyze }  = useReferenceAnalysis(dispatch)
   const { generate } = useVideoGeneration(state, dispatch, nodeCost)
-  const { extract: extractFrame } = useFrameExtractor()
   const [importOpen, setImportOpen] = useState(false)
 
   // O papel de parede é a imagem em foco. Depois de gerar, o resultado é um
@@ -86,13 +82,7 @@ export default function AnimateClient({ initialCredits }: AnimateClientProps) {
   }
 
   function handleGenerateAgain() {
-    dispatch({ type: 'resetResult' })
-    // Mantém todos os parâmetros — o usuário só clica em Gerar novamente
-  }
-
-  function handleAdjust() {
-    // Volta ao estado pronto mantendo a configuração — o painel já está ao lado
-    dispatch({ type: 'resetResult' })
+    dispatch({ type: 'nextVariation' })
   }
 
   async function handleImportFromHistory(url: string) {
@@ -116,44 +106,10 @@ export default function AnimateClient({ initialCredits }: AnimateClientProps) {
     }
   }
 
-  async function handleUseAsReference() {
-    if (!state.result?.outputUrl) return
-    const frame = await extractFrame(state.result.outputUrl, 'last')
-    if (!frame) {
-      dispatch({ type: 'analysisFailed', message: 'Não foi possível extrair o frame do vídeo.' })
-      return
-    }
-    // Carrega o último frame como nova imagem base — pronto para gerar
-    // uma continuação com a mesma configuração.
-    dispatch({ type: 'setImage', file: frame.file, preview: frame.preview, wasCropped: false })
-  }
-
-  // Reutilizar configuração de um vídeo do histórico. Com metadados
-  // (generation_log) restaura tudo; sem metadados (vídeos antigos),
-  // restaura motor + duração.
+  // O histórico antigo pode conter motores e presets que saíram da vitrine.
+  // Ao reutilizar, converte para um dos dois destinos atuais.
   function handleReuseHistory(item: VideoHistoryItem) {
-    const m = getVideoModel(item.style)
-    if (!m || !m.isAvailable) return
-
-    const s = item.settings
-    if (s?.video_type && isVideoTypeId(s.video_type)) {
-      dispatch({ type: 'applyPreset', videoType: s.video_type })
-    }
-    dispatch({ type: 'setModel', modelId: m.id })
-
-    const durationRaw = (s?.duration ?? item.lighting).replace(/s$/, '')
-    if (m.supportedDurations.includes(durationRaw)) {
-      dispatch({ type: 'setDuration', duration: durationRaw })
-    }
-    if (s?.aspect_ratio && m.supportedAspectRatios.includes(s.aspect_ratio)) {
-      dispatch({ type: 'setAspectRatio', aspectRatio: s.aspect_ratio })
-    }
-    if (s?.camera_motion && isCameraMotionId(s.camera_motion)) {
-      dispatch({ type: 'setMotionChoice', motionChoice: s.camera_motion })
-    }
-    if (s?.intensity === 'subtle' || s?.intensity === 'normal' || s?.intensity === 'cinematic' || s?.intensity === 'pronounced') {
-      dispatch({ type: 'setIntensity', intensity: s.intensity })
-    }
+    dispatch({ type: 'applyPreset', videoType: item.settings?.video_type === 'reels' ? 'reels' : 'cinematic' })
   }
 
   const configLine = summarize([
@@ -174,7 +130,6 @@ export default function AnimateClient({ initialCredits }: AnimateClientProps) {
           state={state}
           dispatch={dispatch}
           model={model}
-          resolvedMotion={resolvedMotion}
           nodeCost={nodeCost}
           onGenerate={generate}
         />
@@ -198,8 +153,6 @@ export default function AnimateClient({ initialCredits }: AnimateClientProps) {
                 onPickFromHistory={() => setImportOpen(true)}
                 onClearImage={handleClearImage}
                 onGenerateAgain={handleGenerateAgain}
-                onAdjust={handleAdjust}
-                onUseAsReference={handleUseAsReference}
                 onClearError={handleClearError}
               />
             </div>

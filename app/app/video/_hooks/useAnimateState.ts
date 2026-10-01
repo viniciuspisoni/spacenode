@@ -85,9 +85,11 @@ export interface AnimateState {
   atmosphere:       string
   avoidPeople:      boolean
   userPrompt:       string
+  variation:        number
 
   // Geração
   status:           GenerationStatus
+  activeJobId:      string | null
   elapsed:          number
   result:           GenerationResult | null
   error:            string | null
@@ -113,7 +115,10 @@ type Action =
   | { type: 'setAtmosphere';      atmosphere: string }
   | { type: 'setAvoidPeople';     avoidPeople: boolean }
   | { type: 'setUserPrompt';      userPrompt: string }
+  | { type: 'nextVariation' }
   | { type: 'startGenerating' }
+  | { type: 'jobSubmitted'; jobId: string; nodesCharged: number; newCredits?: number | null }
+  | { type: 'resumeJob'; jobId: string; inputUrl: string | null }
   | { type: 'generationSuccess'; result: GenerationResult; newCredits: number }
   | { type: 'generationError';   message: string }
   | { type: 'tickElapsed' }
@@ -144,7 +149,9 @@ function initialState(credits: number): AnimateState {
     atmosphere:      '',
     avoidPeople:     false,
     userPrompt:      '',
+    variation:       0,
     status:          'idle',
+    activeJobId:     null,
     elapsed:         0,
     result:          null,
     error:           null,
@@ -164,8 +171,10 @@ function reducer(state: AnimateState, action: Action): AnimateState {
         analysis:        null,
         analysisError:   null,
         result:          null,
+        variation:       0,
         error:           null,
         status:          'idle',
+        activeJobId:     null,
       }
 
     case 'setEndImage':
@@ -208,6 +217,7 @@ function reducer(state: AnimateState, action: Action): AnimateState {
         motionChoice: defaults.motionId,
         intensity:    defaults.intensity,
         fidelityMode: defaults.fidelityMode,
+        variation:    0,
       }
     }
 
@@ -250,19 +260,37 @@ function reducer(state: AnimateState, action: Action): AnimateState {
     case 'setUserPrompt':
       return { ...state, userPrompt: action.userPrompt }
 
+    case 'nextVariation':
+      return { ...state, variation: state.variation + 1, status: 'ready', result: null, error: null }
+
     case 'startGenerating':
-      return { ...state, status: 'generating', elapsed: 0, error: null, result: null }
+      return { ...state, status: 'generating', activeJobId: null, elapsed: 0, error: null, result: null }
+
+    case 'jobSubmitted':
+      return {
+        ...state, status: 'generating', activeJobId: action.jobId,
+        credits: typeof action.newCredits === 'number'
+          ? action.newCredits : Math.max(0, state.credits - action.nodesCharged),
+      }
+
+    case 'resumeJob':
+      return {
+        ...state, status: 'generating', activeJobId: action.jobId,
+        imagePreview: state.imagePreview ?? action.inputUrl,
+        elapsed: 0, error: null,
+      }
 
     case 'generationSuccess':
       return {
         ...state,
         status:  'success',
+        activeJobId: null,
         result:  action.result,
         credits: action.newCredits,
       }
 
     case 'generationError':
-      return { ...state, status: 'error', error: action.message }
+      return { ...state, status: 'error', activeJobId: null, error: action.message }
 
     case 'tickElapsed':
       return { ...state, elapsed: state.elapsed + 1 }
@@ -286,6 +314,17 @@ function reducer(state: AnimateState, action: Action): AnimateState {
 // default do tipo de cena. Sempre devolve um movimento concreto.
 
 export function resolveMotion(state: AnimateState): CameraMotion {
+  if (state.videoType === 'cinematic' || state.videoType === 'reels') {
+    // O novo fluxo usa apenas deslocamentos de baixo risco para arquitetura.
+    // Sem análise, a aproximação suave não assume uma tipologia de ambiente.
+    const archetype = state.analysis?.architectureType
+    const order: CameraMotionId[] = archetype === 'facade'
+      ? ['dolly-out-soft', 'lateral-tracking', 'dolly-in-soft']
+      : archetype === 'exterior'
+        ? ['lateral-tracking', 'dolly-in-soft', 'dolly-out-soft']
+        : ['dolly-in-soft', 'lateral-tracking', 'dolly-out-soft']
+    return CAMERA_MOTIONS[order[state.variation % order.length]]
+  }
   if (state.motionChoice !== 'auto') {
     return CAMERA_MOTIONS[state.motionChoice]
   }

@@ -58,20 +58,42 @@ export interface VideoModel {
 
 // ── Modelos via Fal ──────────────────────────────────────────────────────────
 //
-// Política de preço (revisão 2026-06-01). costInNodes é calibrado para manter
-// margem ≥ 50% no PIOR caso de receita por node — o plano Office anual
-// (R$ 0,0729/node = annualMonthlyPrice 583 ÷ 8000 nodes). Câmbio de trabalho
-// R$ 5,40/US$ (spot ~5,04 + buffer p/ spread, IOF e volatilidade; o BRL bateu
-// 5,72 nos últimos 12 meses). Áudio fica desligado na rota, então o Veo entra
-// no tier US$ 0,20/s. Resultado: ~56-58% de margem no piso e 70%+ nos planos
-// com node mais caro, segurando >50% mesmo se o dólar for à máxima recente.
-//
-// Custo real fal.ai (1080p, image-to-video, confirmado em 2026-06-01):
-//   Kling 2.5 Turbo Pro  US$ 0,07/s   (5s=0,35 · 10s=0,70)
-//   Veo 3.1              US$ 0,20/s   (4s=0,80 · 6s=1,20 · 8s=1,60)
-//   Seedance 2.0         US$ 0,682/s  (1080p) → margem negativa, oculto (ver abaixo)
-//
-// Ao mudar custo do provider, resolução, áudio ou câmbio, recalibre aqui.
+// Preços em nodes (2026-10-01) incluem folga para câmbio, falhas e entrega.
+// O servidor valida a margem de cada SKU antes do débito em videoPricing.ts.
+// Fontes dos custos: páginas oficiais fal.ai dos endpoints correspondentes.
+
+const VEO_LITE_720_ID = 'spacenode/veo3.1-lite-720/image-to-video'
+
+const VEO_LITE_1080: VideoModel = {
+  id:                    'fal-ai/veo3.1/lite/image-to-video',
+  provider:              'fal',
+  label:                 'Apresentação',
+  tag:                   'Veo 3.1 Lite · 1080p',
+  description:           'Movimento sutil em alta definição para apresentar o projeto.',
+  strengths:             ['Alta definição', 'Movimento contido', 'Bom custo-benefício'],
+  weaknesses:            ['A fidelidade deve ser revisada antes de apresentar ao cliente'],
+  supportedInputs:       ['image', 'text'],
+  supportedDurations:    ['8'],
+  supportedAspectRatios: ['auto', '16:9', '9:16'],
+  supportedResolutions:  ['1080p'],
+  costInNodes:           { '8': 250 },
+  estimatedGenerationMs: 180_000,
+  recommendedFor:        ['interior', 'exterior', 'facade', 'commercial', 'highFidelity'],
+  isAvailable:           true,
+  isBeta:                true,
+}
+
+const VEO_LITE_720: VideoModel = {
+  ...VEO_LITE_1080,
+  id:                    VEO_LITE_720_ID,
+  label:                 'Reels',
+  tag:                   'Veo 3.1 Lite · 720p',
+  description:           'Vídeo vertical para redes sociais, com movimento discreto.',
+  supportedAspectRatios: ['9:16'],
+  supportedResolutions:  ['720p'],
+  costInNodes:           { '8': 160 },
+  recommendedFor:        ['social'],
+}
 
 const KLING_25_TURBO_PRO: VideoModel = {
   id:                    'fal-ai/kling-video/v2.5-turbo/pro/image-to-video',
@@ -85,7 +107,7 @@ const KLING_25_TURBO_PRO: VideoModel = {
   supportedDurations:    ['5', '10'],
   supportedAspectRatios: ['auto'],
   supportedResolutions:  ['1080p'],
-  costInNodes:           { '5': 60, '10': 120 },   // US$0,07/s · ~57% margem no piso
+  costInNodes:           { '5': 220, '10': 430 },
   estimatedGenerationMs: 90_000,
   recommendedFor:        ['interior', 'social', 'motion'],
   isAvailable:           true,
@@ -104,12 +126,12 @@ const VEO_31: VideoModel = {
   supportedDurations:    ['4', '6', '8'],
   supportedAspectRatios: ['auto', '16:9', '9:16'],
   supportedResolutions:  ['1080p'],
-  costInNodes:           { '4': 140, '6': 210, '8': 280 },   // US$0,20/s · ~58% margem no piso
+  costInNodes:           { '4': 500, '6': 720, '8': 950 },
   estimatedGenerationMs: 180_000,
   recommendedFor:        ['interior', 'exterior', 'facade', 'commercial', 'highFidelity'],
   isAvailable:           true,
   isBeta:                false,
-  badge:                 { label: 'RECOMENDADO', tone: 'green' },
+  badge:                 { label: 'LEGADO', tone: 'muted' },
 }
 
 const SEEDANCE_20: VideoModel = {
@@ -185,6 +207,8 @@ const GEMINI_OMNI_PLACEHOLDER: VideoModel = {
 // ── Registro ─────────────────────────────────────────────────────────────────
 
 export const VIDEO_MODELS: Record<string, VideoModel> = {
+  [VEO_LITE_1080.id]:           VEO_LITE_1080,
+  [VEO_LITE_720.id]:            VEO_LITE_720,
   [KLING_25_TURBO_PRO.id]:      KLING_25_TURBO_PRO,
   [VEO_31.id]:                  VEO_31,
   [SEEDANCE_20.id]:             SEEDANCE_20,
@@ -192,10 +216,12 @@ export const VIDEO_MODELS: Record<string, VideoModel> = {
   [GEMINI_OMNI_PLACEHOLDER.id]: GEMINI_OMNI_PLACEHOLDER,
 }
 
-export const DEFAULT_VIDEO_MODEL_ID = VEO_31.id
+export const DEFAULT_VIDEO_MODEL_ID = VEO_LITE_1080.id
 
 // Ordem de exibição. Disponíveis primeiro, placeholders depois.
 export const VIDEO_MODEL_ORDER: string[] = [
+  VEO_LITE_1080.id,
+  VEO_LITE_720.id,
   VEO_31.id,
   KLING_25_TURBO_PRO.id,
   // SEEDANCE_20 omitido do catálogo visível — ver nota de "OCULTO" no modelo.

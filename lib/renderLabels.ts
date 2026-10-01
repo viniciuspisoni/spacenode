@@ -1,4 +1,6 @@
 const VIDEO_ENGINE_LABELS: Record<string, string> = {
+  'fal-ai/veo3.1/lite/image-to-video':                 'Apresentação',
+  'spacenode/veo3.1-lite-720/image-to-video':         'Reels',
   'fal-ai/kling-video/v2.5-turbo/pro/image-to-video':    'Rápido',
   'fal-ai/kling-video/v3/pro/image-to-video':             'Cinemático (legado)',
   'fal-ai/veo3.1/image-to-video':                         'Cinemático',

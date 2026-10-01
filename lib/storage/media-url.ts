@@ -6,9 +6,8 @@
 // renderizam `<img src={row.image_url}>` — nesses casos não há emissão
 // server-side pra assinar (signStorageUrl), então o proxy é a saída.
 //
-// Gated por NEXT_PUBLIC_STORAGE_PRIVATE: enquanto != '1' é NO-OP (devolve a URL
-// pública, que funciona). Setar '1' no MESMO passo do flip — junto da env server
-// STORAGE_PRIVATE=1 e da migration de privatização.
+// Os buckets antigos dependem de NEXT_PUBLIC_STORAGE_PRIVATE. spacenode-media
+// já é privado desde a criação e sempre passa pelo proxy.
 
 const PUBLIC_MARKER = '/storage/v1/object/public/'
 const PRIVATE_BUCKETS = new Set(['space-mestres', 'architect-identity', 'spacenode-media'])
@@ -27,10 +26,9 @@ function supabaseHost(): string {
 
 /** URL pública de bucket privado → `/api/media` (proxy autenticado que redireciona
  *  pra signed URL). FAL/externas/públicas e qualquer coisa fora do padrão passam
- *  direto. NO-OP enquanto NEXT_PUBLIC_STORAGE_PRIVATE != '1'. */
+ *  direto. Para os buckets antigos, é NO-OP até o flip global. */
 export function toMediaProxyUrl(url: string | null | undefined): string | null {
   if (!url) return url ?? null
-  if (!active()) return url
   let u: URL
   try { u = new URL(url) } catch { return url }
   if (u.host.toLowerCase() !== supabaseHost()) return url
@@ -42,5 +40,6 @@ export function toMediaProxyUrl(url: string | null | undefined): string | null {
   const bucket = rest.slice(0, slash)
   const key = rest.slice(slash + 1)
   if (!PRIVATE_BUCKETS.has(bucket)) return url
+  if (!active() && bucket !== 'spacenode-media') return url
   return `/api/media?bucket=${encodeURIComponent(bucket)}&key=${encodeURIComponent(key)}`
 }

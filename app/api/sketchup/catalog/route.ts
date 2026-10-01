@@ -10,8 +10,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestUser } from '@/lib/auth/request-user'
-import { listAvailableVideoModels } from '@/lib/video/models'
-import { VIDEO_TYPE_PRESETS, DEFAULT_VIDEO_TYPE, resolvePresetDefaults, type VideoTypeId } from '@/lib/video/videoPresets'
+import { DEFAULT_VIDEO_MODEL_ID, listAvailableVideoModels } from '@/lib/video/models'
+import { VIDEO_TYPE_ORDER, VIDEO_TYPE_PRESETS, DEFAULT_VIDEO_TYPE, resolvePresetDefaults, type VideoTypeId } from '@/lib/video/videoPresets'
 import { SCENE_TYPES, SCENE_TYPE_ORDER } from '@/lib/video/scenes'
 import { DIRECT_UPLOAD_AREAS } from '@/lib/storage/direct-upload'
 import {
@@ -105,12 +105,14 @@ const CATALOG_I18N_EN = {
     },
     animar: {
       videoTypes: {
-        cinematic: { label: 'Presentation', tagline: 'Subtle, elegant motion that brings the render to life.' },
+        cinematic: { label: 'Presentation', tagline: 'Subtle motion in high definition for your project.' },
         detail:    { label: 'Detail',       tagline: 'Highlights materials, light, textures and furniture.' },
         tour:      { label: 'Tour',         tagline: 'A smooth walk through the space, like a guided visit.' },
-        reels:     { label: 'Reels',        tagline: 'Vertical and dynamic, ready for Instagram and TikTok.' },
+        reels:     { label: 'Reels',        tagline: 'A vertical video with restrained motion for social media.' },
       } as Record<string, { label: string; tagline: string }>,
       engines: {
+        'fal-ai/veo3.1/lite/image-to-video': 'Presentation',
+        'spacenode/veo3.1-lite-720/image-to-video': 'Reels',
         'fal-ai/veo3.1/image-to-video': 'Cinematic',
         'fal-ai/kling-video/v2.5-turbo/pro/image-to-video': 'Fast',
       } as Record<string, string>,
@@ -167,19 +169,18 @@ function taxonomyFor(projectType: ProjectType) {
 // o `id` do motor é valor opaco exigido pelo /api/video.
 const PLUGIN_VIDEO_TYPES: { id: VideoTypeId; label: string; only: 'portrait' | 'interior' | null }[] = [
   { id: 'cinematic', label: 'Apresentação', only: null },
-  { id: 'detail',    label: 'Detalhe',      only: null },
-  { id: 'tour',      label: 'Tour',         only: 'interior' },
   { id: 'reels',     label: 'Reels',        only: 'portrait' },
 ]
 
 function buildAnimarCatalog() {
+  const directorModels = new Set(VIDEO_TYPE_ORDER.map(id => resolvePresetDefaults(VIDEO_TYPE_PRESETS[id]).modelId))
   return {
     // Placeholders Flow/Omni (provider 'google'/'omni') nunca entram: os adapters lançam erro.
-    engines: listAvailableVideoModels().filter(m => m.provider === 'fal').map(m => ({
+    engines: listAvailableVideoModels().filter(m => directorModels.has(m.id)).map(m => ({
       id: m.id,
       label: m.label,
       description: m.description,
-      recommended: !!m.badge,
+      recommended: m.id === DEFAULT_VIDEO_MODEL_ID,
       estimatedSeconds: Math.round(m.estimatedGenerationMs / 1000),
       durations: m.supportedDurations.map(d => ({ id: d, nodes: m.costInNodes[d] })),
       aspectRatios: m.supportedAspectRatios,

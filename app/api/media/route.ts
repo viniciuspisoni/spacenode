@@ -39,7 +39,11 @@ export async function GET(req: NextRequest) {
   }
 
   const admin = createAdminClient()
-  const { data, error } = await admin.storage.from(bucket).createSignedUrl(key, SIGNED_TTL_SECONDS)
+  const download = req.nextUrl.searchParams.get('download') === '1'
+  const { data, error } = await admin.storage.from(bucket).createSignedUrl(
+    key, SIGNED_TTL_SECONDS,
+    download ? { download: 'spacenode-animacao.mp4' } : undefined,
+  )
   if (error || !data?.signedUrl) {
     return NextResponse.json({ error: 'Arquivo não encontrado' }, { status: 404 })
   }
