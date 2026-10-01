@@ -12,6 +12,9 @@ import SignupConversionPing from '@/components/SignupConversionPing'
 import { getPlanById, type PlanId } from '@/lib/plans'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getPayerBalance } from '@/lib/workspaces/balance'
+import CompleteContact from '@/components/app/CompleteContact'
+import { contactCaptureEnabled, readOwnContact } from '@/lib/customer-contact/server'
+import { needsContactCapture } from '@/lib/customer-contact/validation'
 
 export default async function AppLayout({
   children,
@@ -24,6 +27,11 @@ export default async function AppLayout({
   } = await supabase.auth.getUser()
 
   if (!user) redirect('/login')
+
+  if (contactCaptureEnabled()) {
+    const { contact, unavailable } = await readOwnContact(supabase, user.id)
+    if (unavailable || needsContactCapture(contact)) return <CompleteContact unavailable={unavailable} />
+  }
 
   const userName   = user.user_metadata.full_name ?? user.email ?? 'usuário'
   const userAvatar = user.user_metadata.avatar_url ?? null
