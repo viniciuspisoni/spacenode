@@ -7,6 +7,19 @@ luminária, vaso, peça vazada, elemento de fachada); pelo menos quatro com as
 quatro vistas. Use fotos de um objeto isolado, com fundo simples e os lados
 consistentes. Os arquivos de entrada e resultados ficam fora do Git.
 
+Conjunto piloto pronto: 12 produtos de mobiliário e decoração do Amazon
+Berkeley Objects, com 24 fotografias e quatro conjuntos de quatro vistas.
+O script baixa os arquivos originais e grava licença CC BY 4.0, nome e URL
+de cada foto em `meta.json`. O padrão cria `objects/` (ignorado pelo Git):
+
+```bash
+node scripts/blocos3d-harness/fetch-abo.mjs
+```
+
+O conjunto também está disponível como arquivo compactado junto da revisão.
+Ele cobre produtos isolados de catálogo; fotos próprias de peças usadas em
+projetos reais continuam necessárias antes do lançamento.
+
 ```bash
 # Plano gratuito: mostra cada request, modelo e custo máximo previsto.
 node scripts/blocos3d-harness/run.mjs --max-usd=60
@@ -15,7 +28,8 @@ node scripts/blocos3d-harness/run.mjs --max-usd=60
 FAL_KEY=... node scripts/blocos3d-harness/run.mjs --execute --max-usd=60 --out=/caminho/run-01
 
 # Comparação do mesmo H3.1 via fal e Tripo direto, incluindo os demais motores.
-# Exemplo com 12 objetos e quatro conjuntos multiview: custo previsto ~US$21,30.
+# Conjunto ABO: 12 objetos, quatro conjuntos multiview, 48 tarefas;
+# custo máximo previsto de US$21,30, conferido no plano sem --execute.
 FAL_KEY=... TRIPO_API_KEY=... node scripts/blocos3d-harness/run.mjs \
   --models=h31,h31_direct,hunyuan,rodin --execute --max-usd=60 --out=/caminho/run-02
 
@@ -45,11 +59,8 @@ disponíveis (100 créditos = US$1). Para fal, usa a tarifa prevista até concil
 os eventos faturados da conta; não trate a comparação de preço como conclusiva
 sem essa conciliação.
 O H3.1 usa os mesmos parâmetros da produção, incluindo alinhamento da textura
-à imagem original. Para fotos públicas, registre autor, origem e licença junto
-do diretório; o [ABO](https://amazon-berkeley-objects.s3.amazonaws.com/index.html)
-oferece objetos com imagens de catálogo e séries 360° sob CC BY 4.0, com
-atribuição exigida. Fotos próprias de projetos reais continuam importantes
-para a decisão de lançamento.
+à imagem original. Para novas fotos públicas, registre autor, origem e licença
+junto do diretório.
 
 Avalie cada GLB visualmente e na ferramenta de cena. Em `scores.csv`, anote
 fidelidade à foto (peso 40%), materiais/PBR (25%), geometria/topologia (20%)
