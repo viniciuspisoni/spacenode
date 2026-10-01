@@ -26,6 +26,22 @@ Fontes verificadas em 2026-10-01:
 - [H3.1 multiview: preço](https://fal.ai/models/tripo3d/h3.1/multiview-to-3d)
 - [H3.1 multiview: ordem e schema](https://fal.ai/models/tripo3d/h3.1/multiview-to-3d/api)
 
+### Alternativas recentes (consulta em 2026-10-01)
+
+| Motor fal com PBR/textura | Custo por geração | Nodes para 80% no piso legado | Margem se cobrar 190 nodes |
+| --- | ---: | ---: | ---: |
+| H3.1 detailed | US$0,40 | 190 | 80,2% |
+| [Tripo P1 com textura](https://fal.ai/models/tripo3d/p1/image-to-3d) | US$0,50 | 235 | 75,4% |
+| [Tripo P2 detailed](https://fal.ai/models/tripo3d/p2/image-to-3d) | US$1,20 | 560 | 41,4% |
+| [Hi3D v3.0 quality](https://fal.ai/models/hitem3d/hi3d/v3.0/image-to-3d) | US$2,10 | 975 | -2,2% |
+
+A régua usa câmbio de proteção R$6/US$, reserva de 12%, R$0,05 por
+armazenamento, piso de R$0,0729/node e arredondamento para 5 nodes. O P1
+consultado na fal é single-image; não substitui diretamente as quatro vistas.
+P2 e Hi3D v3.0 podem entrar em um produto de preço diferente se superarem
+visualmente o H3.1, mas não cabem na cobrança atual. Não há avaliação de
+qualidade dessas alternativas no conjunto de objetos de arquitetura.
+
 `lib/blocos3d/pricing.ts` é a fonte da cobrança. Calcula no piso de
 R$0,0729/node (Office anual legado), câmbio de proteção R$6/US$,
 12% de reserva para gerações falhas estornadas e custo variável, além de
