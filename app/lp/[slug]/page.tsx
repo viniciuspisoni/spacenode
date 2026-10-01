@@ -135,13 +135,12 @@ export default async function LandingCampaignPage({
 
   const sections: LandingSection[] = Array.isArray(page.sections) ? page.sections : []
 
-  // MOBILE (2026-09-18): a prova visual sobe para o primeiro viewport. O
-  // primeiro par do `before_after` vira um comparador logo abaixo do título
-  // — no celular, o visitante que veio de um Reel abria a página e via só
-  // texto (o antes/depois começava em 712px de um viewport de 812). A seção
-  // de resultados mostra os pares restantes. No desktop nada muda: o hero
-  // segue sem imagem e a seção mostra todos os pares.
-  const heroPair = sections.flatMap((s) => (s.kind === 'before_after' && Array.isArray(s.pairs) ? s.pairs : []))[0] ?? null
+  // O primeiro resultado já é prova no hero mobile. Na campanha SketchUp,
+  // ele também aparece no desktop, onde antes havia uma dobra só de texto.
+  const heroSectionIndex = sections.findIndex((s) => s.kind === 'before_after' && Array.isArray(s.pairs) && s.pairs.length > 0)
+  const heroSection = sections[heroSectionIndex]
+  const heroPair = heroSection?.kind === 'before_after' ? heroSection.pairs[0] : null
+  const showDesktopHeroPair = slug === 'print-do-sketchup' && Boolean(heroPair)
 
   // Registro de visita — best-effort no fim do render: rate limit por IP
   // (o IP fica só na chave da janela, o evento é anônimo) e jamais quebra a
@@ -188,38 +187,38 @@ export default async function LandingCampaignPage({
 
       <main>
         {/* Hero */}
-        <section className="mx-auto max-w-3xl px-5 pb-8 pt-4 text-center sm:px-10 sm:pb-14 sm:pt-24">
+        <section className="mx-auto flex max-w-5xl flex-col items-center px-5 pb-8 pt-4 text-center sm:px-10 sm:pb-10 sm:pt-16">
           {/* Eyebrow só no desktop: no celular é uma linha a mais entre a
               pessoa e a imagem. */}
           <span
-            className="hidden text-[10px] font-medium uppercase text-text-tertiary sm:inline-block"
+            className="order-0 hidden text-[10px] font-medium uppercase text-text-tertiary sm:inline-block"
             style={{ letterSpacing: '0.28em' }}
           >
-            Visualização arquitetônica
+            {slug === 'print-do-sketchup' ? 'Visualização para SketchUp' : 'Visualização arquitetônica'}
           </span>
           <h1
-            className="mx-auto max-w-2xl text-[29px] font-light leading-[1.08] text-text-primary sm:mt-6 sm:text-[clamp(32px,6vw,52px)]"
+            className="order-1 mx-auto max-w-2xl text-[29px] font-light leading-[1.08] text-text-primary sm:mt-6 sm:text-[clamp(32px,6vw,52px)]"
             style={{ letterSpacing: '-0.045em' }}
           >
             {page.headline ?? page.name}
           </h1>
 
-          {/* Prova visual no primeiro viewport — só mobile (ver heroPair). O
-              comparador é o mesmo da home (arraste), em 16:9 para caber
-              inteiro entre o título e o CTA. */}
+          {/* Um único comparador responsivo. No mobile vem logo após o título;
+              no desktop fecha o hero abaixo do CTA, já visível na dobra. */}
           {heroPair && (
-            <figure className="mx-auto mt-4 max-w-xl sm:hidden" style={{ margin: '16px auto 0' }}>
+            <figure className={`order-2 mx-auto mt-4 w-full max-w-4xl sm:order-5 sm:mt-10 ${showDesktopHeroPair ? '' : 'sm:hidden'}`}>
               <div className="overflow-hidden rounded-2xl" style={{ border: HAIRLINE }}>
                 <BeforeAfter
                   base={heroPair.before}
                   render={heroPair.after}
                   aspect="16 / 9"
                   caption={heroPair.label}
-                  sizes="100vw"
+                  sizes="(max-width: 640px) calc(100vw - 40px), (max-width: 1024px) calc(100vw - 80px), 896px"
+                  priority
                 />
               </div>
               <figcaption
-                className="mt-2 text-[10px] uppercase text-text-tertiary"
+                className="mt-2 text-[10px] uppercase text-text-tertiary sm:text-[11px]"
                 style={{ letterSpacing: '0.12em' }}
               >
                 arraste para comparar
@@ -232,13 +231,13 @@ export default async function LandingCampaignPage({
 
           {page.subheadline && (
             <p
-              className="mx-auto mt-4 max-w-xl text-[14px] leading-relaxed text-text-secondary sm:mt-5 sm:text-[17px]"
+              className="order-3 mx-auto mt-4 max-w-xl text-[14px] leading-relaxed text-text-secondary sm:order-2 sm:mt-5 sm:text-[17px]"
               style={{ letterSpacing: '-0.01em' }}
             >
               {page.subheadline}
             </p>
           )}
-          <div className="mt-5 sm:mt-9">
+          <div className="order-4 mt-5 sm:order-3 sm:mt-9">
             <LpCtaLink href={ctaHref} slug={slug} position="hero" className={CTA_CLASSES}>
               {ctaLabel}
               <CtaArrow />
@@ -247,7 +246,7 @@ export default async function LandingCampaignPage({
           {/* Âncora de preço no mobile: quem entra sabe desde o primeiro
               viewport que a ferramenta é paga — a métrica desta página é
               assinatura, não volume de cadastro. Desktop segue como estava. */}
-          <p className="mt-4 text-[11px] text-text-tertiary sm:mt-5" style={{ letterSpacing: '0.02em' }}>
+          <p className="order-5 mt-4 text-[11px] text-text-tertiary sm:order-4 sm:mt-5" style={{ letterSpacing: '0.02em' }}>
             <span className="sm:hidden">
               80 nodes grátis, sem cartão · planos a partir de R$ {cheapestPlanPrice}/mês
             </span>
@@ -256,7 +255,7 @@ export default async function LandingCampaignPage({
         </section>
 
         {/* Seções configuradas no painel, na ordem do array */}
-        {sections.map((section, index) => renderSection(section, index, page, planLinks))}
+        {sections.map((section, index) => renderSection(section, index, page, planLinks, index === heroSectionIndex, showDesktopHeroPair))}
 
         {/* CTA final */}
         <section className="mx-auto max-w-3xl px-5 py-12 text-center sm:px-10 sm:py-16" style={{ borderTop: HAIRLINE }}>
@@ -323,12 +322,22 @@ function renderSection(
   index: number,
   page: LandingPage,
   planLinks: PlanLinks,
+  promotedMobilePair: boolean,
+  promotedDesktopPair: boolean,
 ): ReactNode {
   switch (section.kind) {
     case 'value_props':
       return <ValuePropsSection key={index} items={section.items} />
     case 'before_after':
-      return <BeforeAfterSection key={index} pairs={section.pairs} pageName={page.name} />
+      return (
+        <BeforeAfterSection
+          key={index}
+          pairs={section.pairs}
+          pageName={page.name}
+          promotedMobilePair={promotedMobilePair}
+          promotedDesktopPair={promotedMobilePair && promotedDesktopPair}
+        />
+      )
     case 'modules':
       return <ModulesSection key={index} moduleIds={section.module_ids} />
     case 'how_it_works':
@@ -427,18 +436,23 @@ function ValuePropsSection({ items }: { items: Array<{ title: string; body: stri
 function BeforeAfterSection({
   pairs,
   pageName,
+  promotedMobilePair,
+  promotedDesktopPair,
 }: {
   pairs: Array<{ before: string; after: string; label?: string; credit?: string }>
   pageName: string
+  promotedMobilePair: boolean
+  promotedDesktopPair: boolean
 }) {
   if (!Array.isArray(pairs) || pairs.length === 0) return null
-  // Mobile: o primeiro par já está no hero (heroPair); aqui entram os
-  // restantes como comparadores 16:9 — um par por ~230px em vez de ~600px
-  // (duas imagens 4:3 empilhadas). Sem par restante, a seção some no mobile.
-  const mobilePairs = pairs.slice(1)
+  // Evita repetir o par promovido ao hero; outros blocos antes/depois mantêm
+  // todos os próprios pares nas duas resoluções.
+  const mobilePairs = promotedMobilePair ? pairs.slice(1) : pairs
+  const desktopPairs = promotedDesktopPair ? pairs.slice(1) : pairs
   return (
-    <SectionShell eyebrow="Resultados" title="antes e depois.">
-      <div className={`grid gap-5 ${mobilePairs.length === 0 ? 'hidden' : ''} sm:hidden`}>
+    <div className={`${mobilePairs.length === 0 ? 'hidden sm:block' : ''} ${desktopPairs.length === 0 ? 'sm:hidden' : ''}`}>
+      <SectionShell eyebrow="Resultados" title="antes e depois.">
+        <div className={`grid gap-5 ${mobilePairs.length === 0 ? 'hidden' : ''} sm:hidden`}>
         {mobilePairs.map((pair, i) => (
           <figure key={i} className="m-0">
             <div className="overflow-hidden rounded-2xl" style={{ border: HAIRLINE }}>
@@ -457,9 +471,9 @@ function BeforeAfterSection({
             )}
           </figure>
         ))}
-      </div>
-      <div className="hidden gap-8 sm:grid">
-        {pairs.map((pair, i) => (
+        </div>
+        <div className="hidden gap-8 sm:grid">
+        {desktopPairs.map((pair, i) => (
           <figure key={i} className="m-0">
             {/* Divisor hairline: gap de 1px sobre fundo na cor da borda */}
             <div
@@ -508,14 +522,15 @@ function BeforeAfterSection({
             </figcaption>
           </figure>
         ))}
-      </div>
-      {pairs.some((p) => p.credit) && (
-        <p className="mt-4 text-xs leading-relaxed text-text-tertiary sm:mt-6">
-          Projetos de escritórios que usam a plataforma. Publicado com autorização
-          de quem projetou.
-        </p>
-      )}
-    </SectionShell>
+        </div>
+        {pairs.some((p) => p.credit) && (
+          <p className="mt-4 text-xs leading-relaxed text-text-tertiary sm:mt-6">
+            Projetos de escritórios que usam a plataforma. Publicado com autorização
+            de quem projetou.
+          </p>
+        )}
+      </SectionShell>
+    </div>
   )
 }
 
@@ -717,7 +732,7 @@ function PricingSection({
                 intent={linkFor(featured.id).intent}
                 className={`${CTA_CLASSES} w-full`}
               >
-                Começar com {featured.name}
+                Assinar {featured.name}
                 <CtaArrow />
               </LpCtaLink>
             </div>
@@ -750,7 +765,7 @@ function PricingSection({
                     className={`${CTA_GHOST_CLASSES} flex-none min-h-[40px] px-4 text-[12px]`}
                     style={CTA_GHOST_STYLE}
                   >
-                    Escolher
+                    Assinar {plan.name}
                   </LpCtaLink>
                 )}
               </li>
@@ -803,7 +818,7 @@ function PricingSection({
                   className={plan.id === featured.id ? `${CTA_CLASSES} w-full` : `${CTA_GHOST_CLASSES} w-full`}
                   style={plan.id === featured.id ? undefined : CTA_GHOST_STYLE}
                 >
-                  Começar com {plan.name}
+                  Assinar {plan.name}
                   <CtaArrow />
                 </LpCtaLink>
               </div>
