@@ -62,13 +62,12 @@ const FEATURES: { title: string; body: string }[] = [
   },
 ]
 
-// O resto do painel. São recursos reais e em produção, mas não são o
+// O resto do painel. São recursos ativos, mas não são o
 // argumento desta página — então ganham uma linha, não um cartão.
 const ALSO: { title: string; gloss: string }[] = [
   { title: 'enquadramento de fotógrafo', gloss: 'proporção, lente, altura do olho, verticais niveladas' },
   { title: 'edição por instrução', gloss: 'pinte a área, troque o material, veja o custo antes' },
   { title: 'render animado', gloss: 'um take curto, salvo ao lado do .skp' },
-  { title: 'cenas viram um Space', gloss: 'o projeto inteiro coerente dentro do app' },
 ]
 
 const STEPS: string[] = [
