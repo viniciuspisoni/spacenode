@@ -4,7 +4,7 @@
 //
 // O motor subiu para cá vindo do bloco recolhido, e essa é a mudança de
 // produto desta folha: ele é o ÚNICO controle que resolve "saldo
-// insuficiente". O cadastro dá 80 nodes, o preset default custa 280 — quem
+// insuficiente". O cadastro dá 40 nodes, o preset default custa 280 — quem
 // nunca abria os avançados só via o botão morto. Por isso os três campos
 // carregam o preço junto e a dica de baixo diz o que cabe no saldo.
 

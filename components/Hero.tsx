@@ -17,7 +17,7 @@ export default function Hero() {
           Testar no meu projeto grátis
           <span aria-hidden="true">→</span>
         </a>
-        <p className="spn-hero-note">80 Nodes grátis · sem cartão · em português</p>
+        <p className="spn-hero-note">40 Nodes grátis · sem cartão · em português</p>
         <p className="spn-hero-price">Para continuar: planos a partir de R$ {SELLABLE_PLANS[0].monthlyPrice}/mês.</p>
       </div>
       <figure className="spn-hero-proof">

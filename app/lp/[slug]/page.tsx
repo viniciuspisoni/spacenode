@@ -248,9 +248,9 @@ export default async function LandingCampaignPage({
               assinatura, não volume de cadastro. Desktop segue como estava. */}
           <p className="order-5 mt-4 text-[11px] text-text-tertiary sm:order-4 sm:mt-5" style={{ letterSpacing: '0.02em' }}>
             <span className="sm:hidden">
-              80 nodes grátis, sem cartão · planos a partir de R$ {cheapestPlanPrice}/mês
+              40 nodes grátis, sem cartão · planos a partir de R$ {cheapestPlanPrice}/mês
             </span>
-            <span className="hidden sm:inline">80 nodes grátis · sem cartão</span>
+            <span className="hidden sm:inline">40 nodes grátis · sem cartão</span>
           </p>
         </section>
 
@@ -260,7 +260,7 @@ export default async function LandingCampaignPage({
         {/* CTA final */}
         <section className="mx-auto max-w-3xl px-5 py-12 text-center sm:px-10 sm:py-16" style={{ borderTop: HAIRLINE }}>
           <h2 className="text-[26px] font-light text-text-primary" style={{ letterSpacing: '-0.03em' }}>
-            comece com 80 nodes grátis.
+            comece com 40 nodes grátis.
           </h2>
           <p className="mx-auto mt-3 max-w-md text-sm text-text-secondary">
             {/* Preço lido da tabela, não escrito à mão: este texto já ficou
@@ -650,7 +650,7 @@ function QuoteSection({ text, attribution }: { text: string; attribution?: strin
  * Preço na LP de campanha.
  *
  * Por que existe: até 2026-09-16 nenhuma LP paga mostrava preço. Quem clicava
- * no anúncio só via "80 nodes grátis, sem cartão" e se cadastrava sabendo que
+ * no anúncio só via "40 nodes grátis, sem cartão" e se cadastrava sabendo que
  * era de graça — o Google mandou 62 cadastros e 0 assinaturas. Preço na página
  * filtra antes do clique: quem chega no cadastro já sabe que a ferramenta é
  * paga. Menos cadastro, cadastro mais qualificado — a métrica desta seção é
@@ -686,7 +686,7 @@ function PricingSection({
   const secondary = plans.filter((p) => p.id !== featured.id)
   const noteText =
     note ??
-    'Nodes são os créditos de geração e acumulam enquanto a assinatura estiver ativa. Começa grátis com 80 nodes, sem cartão — a assinatura entra quando o volume pedir.'
+    'Nodes são os créditos de geração e acumulam enquanto a assinatura estiver ativa. Começa grátis com 40 nodes, sem cartão — a assinatura entra quando o volume pedir.'
   const linkFor = (id: string) => planLinks[id]
 
   return (

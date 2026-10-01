@@ -6,7 +6,7 @@ import { canUseOrion } from '@/lib/orion/access'
 import { orionProvider, orionProviderReady } from '@/lib/orion/provider'
 import GenerateClient from './GenerateClient'
 
-const DEFAULT_CREDITS = 80
+const DEFAULT_CREDITS = 40
 
 export default async function GeneratePage({
   searchParams,

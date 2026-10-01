@@ -125,7 +125,7 @@ export function motionLabels(ids: readonly CameraMotionId[]): string[] {
 }
 
 // ── A configuração mais barata que existe ────────────────────────────────────
-// O cadastro dá 80 nodes e o preset default custa 280: sem esta conta a conta
+// O cadastro dá 40 nodes e o preset default custa 280: sem esta conta a conta
 // gratuita bate em "Saldo insuficiente" sem saber que existe saída. É a razão
 // de o motor ter subido do bloco recolhido para a folha "Formato e custo".
 export function cheapestFit(credits: number): { label: string; duration: string; cost: number } | null {

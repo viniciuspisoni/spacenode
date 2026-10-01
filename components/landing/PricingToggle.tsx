@@ -392,7 +392,7 @@ export function PricingToggle() {
       <div className="spn-pricing-head">
         <h2 className="spn-pricing-title">Teste primeiro. Escolha um plano para continuar.</h2>
         <p className="spn-pricing-sub">
-          Comece com 80 Nodes grátis, sem cartão. Quando precisar de mais imagens,
+          Comece com 40 Nodes grátis, sem cartão. Quando precisar de mais imagens,
           escolha seu volume mensal. Nodes são os créditos de geração e{' '}
           <b>podem acumular por até {NODES_GRACE_DAYS} dias</b> enquanto sua
           assinatura estiver ativa. No plano mensal, você cancela quando quiser.
@@ -478,7 +478,7 @@ export function PricingToggle() {
         >
           Fale com a gente
         </a>
-        {' '}— ou comece grátis com 80 nodes e assine quando o volume pedir.
+        {' '}— ou comece grátis com 40 nodes e assine quando o volume pedir.
         Dúvidas: <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
       </p>
 

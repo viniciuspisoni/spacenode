@@ -241,7 +241,8 @@ function deriveDefaults(projectType: ProjectType, segment: string) {
 // Até 2026-09-10 havia um default econômico só para conta sem assinatura
 // (Pulsar + HD, 10 nodes). Ele saiu: o Quasar passou a ser o padrão para
 // todo mundo, e manter um fork com os dois ramos apontando para o mesmo
-// motor seria código que mente. O trial de 80 nodes rende 4 renders.
+// motor seria código que mente. O número de renders do trial depende do motor
+// e da resolução.
 function resolveInitialConfig(cfg: ProjectConfig | null | undefined) {
   const projectType: ProjectType =
     cfg?.projectType === 'interior' || cfg?.projectType === 'exterior'

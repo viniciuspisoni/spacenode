@@ -69,10 +69,8 @@ export const ENGINES: Record<EngineId, EngineConfig> = {
 // ── Defaults / ordem de exibição ─────────────────────────────────────────────
 
 export const ENGINE_ORDER:       EngineId[]  = ['vega', 'pulsar', 'quasar']
-// Quasar (Seedream 5.0 Pro Edit) é o padrão desde 2026-09-09. Vale para quem
-// tem assinatura e para o catálogo que o plugin lê; conta gratuita continua
-// caindo no econômico (ECONOMY_ENGINE em GenerateClient), senão os 80 nodes
-// do cadastro renderiam 2 imagens em vez de 8.
+// Quasar (Seedream 5.0 Pro Edit) é o padrão desde 2026-09-09, inclusive
+// para contas gratuitas. O custo de cada geração é mostrado antes do débito.
 // A resolução padrão não muda: 2K é a ÚNICA que o Quasar oferece (teto de
 // 2048×2048 no endpoint Pro da fal), então a combinação já nasce válida.
 export const DEFAULT_ENGINE:     EngineId    = 'quasar'
