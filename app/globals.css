@@ -3092,7 +3092,7 @@ html.light .spn-ambient::before {
 }
 /* `transform: none` explícito: o .spn-pill legado (:485) sobe a pílula 1px
    no hover e, com isso, engolia a microescala do pressed. */
-.spn-pill:hover:not([aria-checked='true']):not([aria-current='page']):not(:disabled) {
+.spn-pill:hover:not([aria-checked='true']):not([aria-pressed='true']):not([aria-current='page']):not(:disabled) {
   background: var(--glass-hover);
   border-color: var(--glass-line-hover);
   color: var(--color-text-primary);
@@ -3103,13 +3103,12 @@ html.light .spn-ambient::before {
   transform: scale(var(--glass-press-scale));
   box-shadow: inset 0 0.5px 0 var(--glass-spec-press), inset 0 1px 3px var(--glass-press-shade);
 }
-/* Dois atributos, um estado: `aria-checked` quando a pílula é escolha
-   dentro de um grupo, `aria-current` quando ela é um link para a página
-   filtrada (equipe/membro). O visual é o mesmo; o que o leitor de tela
-   anuncia é que muda. Selecionada = o inverso do tema, com o próprio brilho
+/* Atributos de estado: escolha (`aria-checked`), resposta (`aria-pressed`)
+   ou link filtrado (`aria-current`). Selecionada = o inverso do tema, com o próprio brilho
    de aresta e uma sombra que a levanta do grupo — nunca confundível com o
    hover das vizinhas. */
 .spn-pill[aria-checked='true'],
+.spn-pill[aria-pressed='true'],
 .spn-pill[aria-current='page'] {
   background: var(--color-chip-active);
   color: var(--color-chip-active-foreground);
@@ -3118,10 +3117,12 @@ html.light .spn-ambient::before {
   box-shadow: inset 0 0.5px 0 var(--glass-sel-spec), 0 2px 8px rgba(0, 0, 0, 0.20);
 }
 .spn-pill[aria-checked='true']:hover:not(:disabled),
+.spn-pill[aria-pressed='true']:hover:not(:disabled),
 .spn-pill[aria-current='page']:hover {
   box-shadow: inset 0 0.5px 0 var(--glass-sel-spec), var(--glass-hover-lift), 0 2px 8px rgba(0, 0, 0, 0.20);
 }
-.spn-pill[aria-checked='true']:active:not(:disabled) {
+.spn-pill[aria-checked='true']:active:not(:disabled),
+.spn-pill[aria-pressed='true']:active:not(:disabled) {
   box-shadow: inset 0 0.5px 0 var(--glass-sel-spec), inset 0 1px 3px var(--glass-sel-shade);
 }
 .spn-pill:focus-visible { outline: 1.5px solid var(--glass-line-hover); outline-offset: 1px; }
