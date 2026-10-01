@@ -5,6 +5,22 @@ import { safeNextPath } from '@/lib/auth/safe-next-path'
 import { isModuleEnabled } from '@/lib/nav/modules-config'
 
 export default async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl
+
+  // O módulo foi descontinuado. Dados antigos continuam disponíveis para
+  // leitura/exclusão, mas nenhuma rota legada pode iniciar novas operações.
+  if (
+    !isModuleEnabled('spaces') &&
+    (request.method === 'POST' || request.method === 'PUT' || request.method === 'PATCH') &&
+    (pathname === '/api/spaces' || pathname.startsWith('/api/spaces/') ||
+      pathname === '/api/vistas' || pathname.startsWith('/api/vistas/'))
+  ) {
+    return NextResponse.json(
+      { error: 'Spaces e Vistas foram descontinuados.' },
+      { status: 410 }
+    )
+  }
+
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -32,18 +48,14 @@ export default async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const { pathname } = request.nextUrl
-
   if (!user && (pathname === '/app' || pathname.startsWith('/app/'))) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
-  // Spaces desativado temporariamente (ver lib/nav/modules-config.ts) — a
-  // rota antiga continua existindo (código/dados intactos), só deixa de ser
-  // acessível: quem tinha o link direto cai no Dashboard. Reativar o módulo
-  // no config remove este redirect automaticamente.
+  // URLs antigas do módulo levam ao Dashboard; as rotas de leitura e exclusão
+  // dos dados legados permanecem disponíveis na API.
   if (user && !isModuleEnabled('spaces') && (pathname === '/app/spaces' || pathname.startsWith('/app/spaces/'))) {
     const url = request.nextUrl.clone()
     url.pathname = '/app'
