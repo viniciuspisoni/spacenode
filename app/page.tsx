@@ -8,7 +8,9 @@ import Footer from '@/components/Footer'
 import { Ambient } from '@/components/landing/Ambient'
 import { Projects } from '@/components/landing/Projects'
 import { Differentiators } from '@/components/landing/Differentiators'
-import { ProductMockup } from '@/components/landing/ProductMockup'
+import { HowItWorks } from '@/components/landing/HowItWorks'
+import LpViewPing from '@/components/marketing/LpViewPing'
+import { track } from '@/lib/analytics/client'
 import { SketchUpBand } from '@/components/landing/SketchUpBand'
 import { PricingToggle } from '@/components/landing/PricingToggle'
 import { FAQ } from '@/components/landing/FAQ'
@@ -17,34 +19,32 @@ import { IdentityLaunchBanner } from '@/components/IdentityLaunchBanner'
 
 export default function Home() {
   return (
-    <main className="spn-landing">
-      {/* Reforma de 2026-09-09: a landing deixou de ser clara com faixas
-          pretas e virou uma superfície escura CONTÍNUA — papel de parede
-          borrado atrás, todo o conteúdo em vidro. É a mesma linguagem da v1
-          do plugin de SketchUp, e a que o web app vai adotar.
-
-          Sem faixas, o ritmo da página não vem mais da troca de fundo: vem
-          do espaçamento entre os cartões e da troca lenta do papel de
-          parede conforme se rola. Por isso não há mais <Divider />.
-
-          O script do layout raiz já força dark na rota "/" (anti-flash
-          pré-paint); ForceDarkScope cobre a navegação client-side e
-          restaura o tema do usuário ao sair. */}
+    <main className="spn-landing" onClick={event => {
+      const target = event.target
+      if (!(target instanceof Element)) return
+      const link = target.closest('a[href="/login?mode=signup"]')
+      if (!link) return
+      track('cta_clicked', {
+        lp: 'home-presentation-v1',
+        cta: link.closest('[data-cta-position]')?.getAttribute('data-cta-position') ?? 'navigation',
+      })
+    }}>
       <ForceDarkScope />
       <Ambient />
 
       <Navbar />
-      <IdentityLaunchBanner />
+      <LpViewPing slug="home-presentation-v1" />
       <Hero />
+      <HowItWorks />
       <Projects />
       <Differentiators />
-      <ProductMockup />
-      <SketchUpBand />
       <PricingToggle />
+      <SketchUpBand />
       <FAQ />
       <FinalCTA />
+      <IdentityLaunchBanner />
       <Footer />
-      <MobileCTA />
+      <MobileCTA label="Testar no meu projeto grátis" />
 
       <style jsx>{`
         .spn-landing {

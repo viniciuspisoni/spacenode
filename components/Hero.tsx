@@ -1,211 +1,72 @@
 'use client'
 
-import Image from 'next/image'
-import renderImg from '@/public/demo-render.jpg'
+import { BeforeAfter } from '@/components/landing/BeforeAfter'
+import { SELLABLE_PLANS } from '@/lib/plans'
 
-// Hero da landing em vidro, composição centralizada em UMA coluna (à Apple):
-// badge → título → descrição → CTAs → uma imagem grande logo abaixo.
-//
-// 2026-09-19: o comparador antes/depois saiu daqui — ele continua na seção
-// Projetos, que é onde o visitante arrasta. No topo entra um render inteiro
-// da plataforma, na proporção nativa do arquivo (1632×656 ≈ 2,5:1, faixa
-// entre 21:9 e cinema), SEM recorte: a edificação inteira, não meia casa
-// atrás de um divisor. A imagem atual é provisória até o dono escolher a
-// definitiva entre os renders da própria plataforma.
-//
-// O espaçamento vertical foi apertado de propósito: com a navbar sticky de
-// 84px e o título em UMA linha, o topo da imagem fica a ~420px da borda
-// superior, o que deixa ~3/4 dela dentro do primeiro viewport de um notebook
-// (1366×768). No mobile tudo empilha e a imagem cabe inteira abaixo dos botões.
 export default function Hero() {
   return (
-    <section className="spn-hero">
+    <section className="spn-hero" data-cta-position="hero">
       <div className="spn-hero-copy">
-        <span className="spn-hero-badge spn-glass--raised">
-          Plataforma de visualização arquitetônica
-        </span>
-
-        <h1 className="spn-hero-title">Visualize seus projetos.</h1>
-
+        <span className="spn-hero-badge spn-glass--raised">Para arquitetos e designers de interiores</span>
+        <h1 className="spn-hero-title">Seu projeto está pronto. Falta a imagem para apresentar.</h1>
         <p className="spn-hero-sub">
-          Renderize, explore e apresente projetos de arquitetura e interiores
-          em um só lugar.
+          Transforme um print do SketchUp em uma imagem para a apresentação ao cliente.
+          Compare com o original e teste no projeto em que você já está trabalhando.
         </p>
-
-        <div className="spn-hero-ctas">
-          <a href="/login?mode=signup" className="spn-hero-primary">
-            Testar grátis
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
-              <path d="M2 6h8M6.5 2.5L10 6l-3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </a>
-          <a href="#projetos" className="spn-hero-secondary spn-glass--raised">
-            Ver projetos reais
-          </a>
-        </div>
+        <a href="/login?mode=signup" className="spn-hero-primary">
+          Testar no meu projeto grátis
+          <span aria-hidden="true">→</span>
+        </a>
+        <p className="spn-hero-note">80 Nodes grátis · sem cartão · em português</p>
+        <p className="spn-hero-price">Para continuar: planos a partir de R$ {SELLABLE_PLANS[0].monthlyPrice}/mês.</p>
       </div>
-
-      {/* A moldura é o vidro; a imagem passa por trás da aresta especular.
-          Sem `fill`/`object-fit`: o <img> segue a proporção nativa do arquivo
-          (largura 100%, altura automática), então nada é cortado em nenhuma
-          largura — no mobile ela só fica mais baixa, nunca pela metade. */}
-      <figure className="spn-hero-frame spn-glass">
-        <div className="spn-hero-media">
-          <Image
-            src={renderImg}
-            alt="Visualização arquitetônica de uma casa de concreto e vidro ao entardecer"
-            preload
-            placeholder="blur"
-            sizes="(max-width: 768px) 100vw, (max-width: 1248px) 95vw, 1132px"
-            style={{ width: '100%', height: 'auto', display: 'block' }}
+      <figure className="spn-hero-proof">
+        <div className="spn-hero-frame spn-glass">
+          <BeforeAfter
+            base="/proj-living-estante-base.jpg"
+            render="/proj-living-estante-render.jpg"
+            aspect="16 / 9"
+            priority
+            sizes="(max-width: 900px) 92vw, (max-width: 1248px) 48vw, 570px"
+            caption="Living com estante"
           />
         </div>
+        <figcaption className="spn-hero-caption">
+          <strong>Projeto real · muda arquitetura</strong>
+          <span>Arraste para comparar o print e o resultado. Publicado com autorização.</span>
+        </figcaption>
       </figure>
-
       <style jsx>{`
-        .spn-hero {
-          position: relative;
-          z-index: 1;
-          padding: 36px 24px 64px;
-          max-width: 1200px;
-          margin: 0 auto;
+        .spn-hero { position: relative; z-index: 1; display: grid; grid-template-columns: 1fr 1.12fr; align-items: center; gap: 40px; padding: 48px 24px 64px; max-width: 1200px; margin: 0 auto; }
+        .spn-hero-copy { min-width: 0; }
+        .spn-hero-badge { display: inline-flex; padding: 7px 12px; border-radius: var(--radius-full); font-size: 10.5px; line-height: 1.5; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--color-text-secondary); margin-bottom: 20px; }
+        .spn-hero-title { font-size: clamp(36px, 3.8vw, 52px); font-weight: 500; letter-spacing: -.035em; line-height: 1.08; margin: 0 0 20px; color: var(--color-text-primary); text-wrap: balance; }
+        .spn-hero-sub { font-size: 16px; color: var(--color-text-secondary); line-height: 1.6; margin: 0 0 24px; max-width: 480px; }
+        .spn-hero-primary { display: inline-flex; align-items: center; justify-content: center; gap: 12px; border-radius: var(--r-inner); text-decoration: none; font-weight: 500; min-height: 52px; padding: 15px 24px; font-size: 14px; background: var(--color-inverse); color: var(--color-inverse-foreground); box-shadow: var(--shadow-float); transition: transform 200ms var(--ease); }
+        .spn-hero-primary:hover { transform: translateY(-1px); }
+        .spn-hero-primary:focus-visible { outline: 1.5px solid var(--color-border-focus); outline-offset: 3px; }
+        .spn-hero-note { font-size: 12px; line-height: 1.6; color: var(--color-text-secondary); margin: 12px 0 4px; }
+        .spn-hero-price { font-size: 12px; line-height: 1.6; color: var(--color-text-tertiary); margin: 0; }
+        .spn-hero-proof { min-width: 0; margin: 0; }
+        .spn-hero-frame { padding: 7px; border-radius: calc(var(--r-inner) + 7px); box-shadow: var(--shadow-float); }
+        .spn-hero-caption { display: grid; gap: 6px; padding: 14px 4px 0; font-size: 12px; line-height: 1.5; color: var(--color-text-secondary); }
+        .spn-hero-caption strong { font-weight: 500; color: var(--color-text-primary); }
+        @media (max-width: 900px) {
+          .spn-hero { grid-template-columns: 1fr; gap: 24px; padding: 28px 16px 48px; }
+          .spn-hero-copy { max-width: 620px; margin: 0 auto; text-align: center; }
+          .spn-hero-title { font-size: clamp(32px, 6vw, 46px); }
+          .spn-hero-sub { margin-left: auto; margin-right: auto; font-size: 15px; }
+          .spn-hero-proof { width: 100%; max-width: 680px; margin: 0 auto; }
+          .spn-hero-caption { text-align: center; }
         }
-        /* CTAs → imagem: 36px, o piso da faixa de 36–48px pedida. */
-        .spn-hero-copy {
-          text-align: center;
-          max-width: 820px;
-          margin: 0 auto 36px;
+        @media (max-width: 480px) {
+          .spn-hero { padding-top: 20px; gap: 20px; }
+          .spn-hero-badge { font-size: 9px; margin-bottom: 14px; }
+          .spn-hero-title { font-size: 32px; margin-bottom: 14px; }
+          .spn-hero-sub { margin-bottom: 18px; }
+          .spn-hero-primary { width: 100%; padding: 16px 18px; }
         }
-        .spn-hero-badge {
-          display: inline-flex;
-          align-items: center;
-          padding: 7px 14px;
-          border-radius: var(--radius-full);
-          font-size: 10.5px;
-          font-weight: 500;
-          letter-spacing: 0.12em;
-          text-transform: uppercase;
-          color: var(--color-text-secondary);
-          margin-bottom: 18px;
-        }
-        .spn-hero-title {
-          font-size: clamp(40px, 5.8vw, 62px);
-          font-weight: 500;
-          letter-spacing: -0.035em;
-          line-height: 1.05;
-          margin: 0 auto 16px;
-          color: var(--color-text-primary);
-          text-wrap: balance;
-        }
-        .spn-hero-sub {
-          font-size: 16px;
-          color: var(--color-text-secondary);
-          line-height: 1.55;
-          letter-spacing: -0.01em;
-          margin: 0 auto 24px;
-          max-width: 520px;
-          text-wrap: balance;
-        }
-        .spn-hero-ctas {
-          display: flex;
-          gap: 10px;
-          justify-content: center;
-          align-items: center;
-          flex-wrap: wrap;
-        }
-        .spn-hero-primary,
-        .spn-hero-secondary {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          border-radius: var(--r-inner);
-          text-decoration: none;
-          white-space: nowrap;
-          letter-spacing: -0.01em;
-          font-weight: 500;
-          min-height: 52px;
-          padding: 15px 28px;
-          font-size: 14px;
-          transition: transform 200ms var(--ease), box-shadow 200ms var(--ease),
-            color 200ms var(--ease), border-color 200ms var(--ease);
-        }
-        .spn-hero-primary {
-          background: var(--color-inverse);
-          color: var(--color-inverse-foreground);
-          box-shadow: var(--shadow-float);
-        }
-        .spn-hero-primary:hover {
-          transform: translateY(-1px);
-          box-shadow: 0 14px 40px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
-        }
-        .spn-hero-secondary {
-          color: var(--color-text-secondary);
-          padding: 15px 22px;
-          font-size: 13px;
-        }
-        .spn-hero-secondary:hover {
-          color: var(--color-text-primary);
-          border-color: var(--glass-line-strong);
-        }
-        .spn-hero-primary:focus-visible,
-        .spn-hero-secondary:focus-visible {
-          outline: 1.5px solid var(--color-border-focus);
-          outline-offset: 2px;
-        }
-
-        /* O padding de 10px é o que deixa a aresta especular do vidro
-           visível em volta da imagem. */
-        .spn-hero-frame {
-          position: relative;
-          margin: 0;
-          padding: 10px;
-          border-radius: calc(var(--r-card) + 10px);
-          box-shadow: var(--shadow-float);
-        }
-        .spn-hero-media {
-          position: relative;
-          overflow: hidden;
-          border-radius: var(--r-card);
-          background: var(--color-preview-bg);
-        }
-
-        @media (max-width: 768px) {
-          .spn-hero { padding: 28px 16px 40px; }
-          .spn-hero-copy { margin-bottom: 36px; }
-          .spn-hero-badge {
-            font-size: 9.5px;
-            letter-spacing: 0.08em;
-            line-height: 1.45;
-            text-align: center;
-            padding: 6px 12px;
-            margin-bottom: 18px;
-          }
-          .spn-hero-title {
-            font-size: clamp(36px, 10.4vw, 48px);
-            margin-bottom: 14px;
-          }
-          .spn-hero-sub { font-size: 15px; margin-bottom: 22px; }
-          .spn-hero-ctas {
-            flex-direction: column;
-            align-items: stretch;
-            gap: 10px;
-          }
-          .spn-hero-primary,
-          .spn-hero-secondary {
-            width: 100%;
-            padding: 16px 22px;
-            font-size: 15px;
-            min-height: 54px;
-          }
-          .spn-hero-frame { padding: 6px; border-radius: calc(var(--r-inner) + 6px); }
-          .spn-hero-media { border-radius: var(--r-inner); }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .spn-hero-primary,
-          .spn-hero-secondary { transition: none; }
-          .spn-hero-primary:hover { transform: none; }
-        }
+        @media (prefers-reduced-motion: reduce) { .spn-hero-primary { transition: none; } .spn-hero-primary:hover { transform: none; } }
       `}</style>
     </section>
   )

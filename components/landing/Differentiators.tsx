@@ -3,16 +3,16 @@
 // uma linha e meia; o resto era eco do próprio título.
 const ITEMS = [
   {
-    title: 'fidelidade geométrica',
-    desc: 'A geração usa o projeto como referência para manter geometria, proporções e perspectiva.',
+    title: 'Seu projeto como referência',
+    desc: 'A imagem parte do que você desenhou. Compare geometria, proporções e perspectiva com o original antes de apresentar.',
   },
   {
-    title: 'coerência entre vistas',
-    desc: 'Explore luz, câmera e atmosfera mantendo a identidade do projeto como referência.',
+    title: 'Alternativas para conversar com o cliente',
+    desc: 'Explore luz e materiais para explicar suas escolhas e comparar possibilidades na apresentação.',
   },
   {
-    title: 'velocidade com controle',
-    desc: 'Minutos por imagem, com escolhas de arquiteto — motor, atmosfera, materialidade. Sem prompts.',
+    title: 'Comece com o que você já tem',
+    desc: 'Use um print e as opções da plataforma para gerar sua primeira imagem. Sem configurar uma cena de render do zero.',
   },
 ]
 
@@ -28,9 +28,9 @@ export function Differentiators() {
   return (
     <section className="spn-diff">
       <h2 className="spn-diff-title">
-        ferramentas genéricas criam imagens.
+        O cliente precisa entender sua ideia.
         <br />
-        <span className="spn-diff-title-dim">a SpaceNode trabalha com projetos.</span>
+        <span className="spn-diff-title-dim">Mostre as escolhas do seu projeto.</span>
       </h2>
 
       <div className="spn-diff-grid">

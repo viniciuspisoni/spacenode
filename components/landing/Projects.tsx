@@ -60,7 +60,7 @@ const PAIRS = [
 
 export function Projects() {
   return (
-    <section id="projetos" className="spn-projects">
+    <section id="projetos" className="spn-projects" data-cta-position="proof">
       <div className="spn-projects-head">
         <h2 className="spn-projects-title">projetos reais, de escritórios reais.</h2>
         <p className="spn-projects-sub">
@@ -86,6 +86,12 @@ export function Projects() {
         ))}
       </div>
 
+      <div className="spn-projects-action">
+        <p>Agora compare o resultado no seu próprio projeto.</p>
+        <a href="/login?mode=signup">Testar no meu projeto grátis <span aria-hidden="true">→</span></a>
+        <small>80 Nodes grátis · sem cartão</small>
+      </div>
+
       <style jsx>{`
         .spn-projects {
           position: relative;
@@ -94,6 +100,11 @@ export function Projects() {
           max-width: 1080px;
           margin: 0 auto;
         }
+        .spn-projects-action { text-align: center; margin-top: 28px; }
+        .spn-projects-action p { font-size: 16px; line-height: 1.5; margin: 0 0 16px; color: var(--color-text-secondary); }
+        .spn-projects-action a { display: inline-flex; justify-content: center; align-items: center; gap: 12px; min-height: 52px; padding: 15px 24px; border-radius: var(--r-inner); background: var(--color-inverse); color: var(--color-inverse-foreground); text-decoration: none; font-size: 14px; font-weight: 500; }
+        .spn-projects-action a:focus-visible { outline: 1.5px solid var(--color-border-focus); outline-offset: 3px; }
+        .spn-projects-action small { display: block; margin-top: 12px; color: var(--color-text-tertiary); font-size: 12px; }
         .spn-projects-head {
           text-align: center;
           margin-bottom: 28px;
