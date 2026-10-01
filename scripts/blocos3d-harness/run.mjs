@@ -61,7 +61,7 @@ if (!Number.isFinite(maxUsd) || maxUsd < 0) throw new Error('--max-usd deve ser 
 async function objects() {
   const dirs = await readdir(fixtures, { withFileTypes: true }).catch(e => e.code === 'ENOENT' ? [] : Promise.reject(e))
   const found = []
-  for (const dir of dirs.filter(d => d.isDirectory()).sort((a, b) => a.name.localeCompare(b.name))) {
+  for (const dir of dirs.filter(d => d.isDirectory() && !d.name.startsWith('.')).sort((a, b) => a.name.localeCompare(b.name))) {
     if (!/^[a-z0-9-]+$/.test(dir.name)) throw new Error(`${dir.name}: use um slug minúsculo com letras, números e hífens`)
     const folder = join(fixtures, dir.name)
     const filenames = await readdir(folder)
