@@ -28,7 +28,7 @@ import { track } from '@/lib/analytics/client'
 export const TOUR_START_EVENT = 'spn:tour:start'
 
 const DASHBOARD = '/app'
-const GENERATE_URL = '/app/generate'
+const GENERATE_URL = '/app/generate#guia'
 const TOUR_HASH = '#tour'
 
 export default function WelcomeTour({ needsOnboarding }: { needsOnboarding: boolean }) {
@@ -100,7 +100,7 @@ export default function WelcomeTour({ needsOnboarding }: { needsOnboarding: bool
       progressText: '{{current}} de {{total}}',
       nextBtnText: 'Avançar',
       prevBtnText: 'Voltar',
-      doneBtnText: 'Criar minha primeira imagem',
+      doneBtnText: pendingPersistRef.current ? 'Criar minha primeira imagem' : 'Abrir o Renderizar',
       // "Pular tour" discreto junto aos botões (o popover é reaproveitado entre
       // etapas — daí o dedupe e a remoção na última, onde concluir é o caminho).
       onPopoverRender: (popover, opts) => {

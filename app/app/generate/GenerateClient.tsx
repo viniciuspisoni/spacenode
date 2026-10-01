@@ -20,7 +20,7 @@ import { consumeHandoff } from '@/components/nodi/actions-bus'
 import { uploadDirect } from '@/lib/storage/direct-upload-client'
 import { track } from '@/lib/analytics/client'
 import GenerateGuide, {
-  GUIDE_START_EVENT, GUIDE_DISMISSED_KEY, type GuidePhase,
+  GUIDE_DISMISSED_KEY, type GuidePhase,
 } from '@/components/app/GenerateGuide'
 import {
   ContextPanel, SettingGroup, SettingRow, summarize,
@@ -407,7 +407,7 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
   }, [])
 
   // ── Guia da primeira imagem: abre sozinho pra conta que nunca gerou (e não
-  //    dispensou); manual via /app/generate#guia ou "Como usar" da sidebar.
+  //    dispensou); manual via /app/generate#guia, inclusive após refazer o tour.
   //    Estado inicia fechado e abre em effect — sem mismatch de hidratação.
   const [guideOpen, setGuideOpen] = useState(false)
 
@@ -433,13 +433,6 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
   useEffect(() => {
     track('renderizar_viewed', { first_render: firstRender })
   }, [firstRender])
-
-  // "Como usar" com o Renderizar já aberto: reabre o guia sem navegar.
-  useEffect(() => {
-    const onStart = () => setGuideOpen(true)
-    window.addEventListener(GUIDE_START_EVENT, onStart)
-    return () => window.removeEventListener(GUIDE_START_EVENT, onStart)
-  }, [])
 
   const dismissGuide = () => {
     setGuideOpen(false)
