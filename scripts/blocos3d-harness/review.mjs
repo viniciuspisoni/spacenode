@@ -14,7 +14,7 @@ for (const object of objects) {
   const sources = await readdir(referenceDir).catch(e => e.code === 'ENOENT' ? [] : Promise.reject(e))
   const sourceCards = sources.filter(f => /^(front|left|back|right)\.(jpe?g|png|webp)$/i.test(f))
     .map(file => `<figure><img src="references/${encodeURIComponent(object)}/${encodeURIComponent(file)}" alt="${esc(object)}: ${esc(file)}"><figcaption>Referência · ${esc(file)}</figcaption></figure>`).join('')
-  const modelCards = ['h31', 'hunyuan', 'rodin'].map(model => {
+  const modelCards = ['h31', 'h31_direct', 'hunyuan', 'rodin'].map(model => {
     const row = manifest[`${object}/${model}`]
     if (!row) return ''
     const preview = row.preview ? `<img src="${encodeURIComponent(basename(row.preview))}" alt="Prévia ${esc(model)}">` : '<div class="blank">Prévia indisponível</div>'
