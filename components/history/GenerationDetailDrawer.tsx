@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, type CSSProperties, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { Sheet } from '@/components/app/glass'
+import { RenderFeedback } from '@/components/app/RenderFeedback'
 import {
   normalizeGeneration,
   authorInitials,
@@ -164,6 +165,10 @@ export function GenerationDetailDrawer({ kind, id, onClose }: Props) {
                   </button>
                 )}
               </div>
+
+              {kind === 'render' && d.moduleLabel === 'Renderizar' && d.status === 'completed' && (
+                <RenderFeedback key={d.id} renderId={d.id} />
+              )}
 
               {/* ── Seção 2: Autoria ── */}
               <Section title="Autoria">

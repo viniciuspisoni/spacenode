@@ -15,6 +15,7 @@ import {
   getNodesCost, isEngineId, isResolution, isValidCombination,
 } from '@/lib/engines'
 import InsufficientNodesCta from '@/components/app/InsufficientNodesCta'
+import { RenderFeedback } from '@/components/app/RenderFeedback'
 import { consumeHandoff } from '@/components/nodi/actions-bus'
 import { uploadDirect } from '@/lib/storage/direct-upload-client'
 import GenerateGuide, {
@@ -1126,7 +1127,7 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
               o motor ainda não faz. */}
           {orionEnabled && isOrion && (
             <p className="spn-hint">
-              Fornecedor {orionProvider === 'fal' ? 'fal.ai' : 'OpenAI'} · o resultado ainda não vira projeto no Spaces.
+              Fornecedor {orionProvider === 'fal' ? 'fal.ai' : 'OpenAI'} · confira o resultado antes de entregar.
             </p>
           )}
           <div className="spn-field">
@@ -1383,6 +1384,8 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
               ) : fidelityScore !== null && fidelityScore >= 0.8 ? (
                 <div style={S.fidelityOk}>✓ Estrutura verificada contra o projeto original</div>
               ) : null}
+
+              {lastRenderId && <RenderFeedback key={lastRenderId} renderId={lastRenderId} />}
 
               {/* Âncora: pílula de ESTADO (role=switch), não um campo de config. */}
               <div className="spn-pills">
