@@ -13,6 +13,7 @@ import { jsonOrNull } from '@/lib/http/fetch-json'
 
 interface GenerateResponse {
   url:       string
+  mediaUrl?: string | null
   inputUrl:  string
   credits?:  number   // saldo real pós-débito (quando o servidor informa)
   nodesCharged?: number
@@ -62,7 +63,7 @@ export function useVideoGeneration(
       dispatch({
         type:   'generationSuccess',
         result: {
-          outputUrl:    data.url,
+          outputUrl:    data.mediaUrl ?? data.url,
           inputUrl:     data.inputUrl,
           modelId:      state.modelId,
           duration:     state.duration,

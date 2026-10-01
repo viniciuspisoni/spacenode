@@ -19,6 +19,7 @@ import type { GenerationResult } from '../_hooks/useAnimateState'
 // direto pro CDN abriria uma aba fora do site — o atributo download de <a>
 // é ignorado em URLs cross-origin.
 function downloadHref(url: string): string {
+  if (url.startsWith('/api/media?')) return `${url}&download=1`
   return `/api/download?url=${encodeURIComponent(url)}&filename=spacenode-animacao.mp4`
 }
 

@@ -22,8 +22,8 @@ export const PRIVATE_BUCKETS = new Set(['space-mestres', 'architect-identity', '
 const DEFAULT_TTL_SECONDS = 60 * 60 // 1h
 
 /** Flag de ativação do B2. Enquanto `STORAGE_PRIVATE !== '1'` a assinatura é um
- *  NO-OP TOTAL: todo o wiring de emissão devolve a URL pública original, sem
- *  tocar em nada — produção fica idêntica. No flip, aplica-se a migration de
+ *  NO-OP para os buckets antigos: a emissão devolve a URL pública original.
+ *  spacenode-media já é privado e sempre precisa de assinatura. No flip, aplica-se a migration de
  *  privatização E seta-se STORAGE_PRIVATE=1 (na Vercel) no MESMO passo. Assim o
  *  wiring pode ser mergeado/deployado ANTES do flip sem efeito algum, e sem o
  *  risco de persistir signed URLs (que expiram) em dados round-trip. */
@@ -40,8 +40,10 @@ export async function signStorageUrl(
   ttlSeconds = DEFAULT_TTL_SECONDS,
 ): Promise<string | null> {
   if (!url) return url ?? null
-  if (!privateStorageActive()) return url // inerte até o flip (STORAGE_PRIVATE=1)
   const parsed = parseSupabaseStoragePath(url)
+  // spacenode-media já nasce privado, independentemente do flip dos buckets
+  // antigos. Seus vídeos precisam ser assinados mesmo sem a flag global.
+  if (!privateStorageActive() && parsed?.bucket !== 'spacenode-media') return url
   if (!parsed || !PRIVATE_BUCKETS.has(parsed.bucket)) return url
   const { data, error } = await admin.storage.from(parsed.bucket).createSignedUrl(parsed.key, ttlSeconds)
   if (error || !data?.signedUrl) {

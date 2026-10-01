@@ -11,7 +11,9 @@ import { isSceneTypeId, type SceneTypeId } from '@/lib/video/scenes'
 import { isCameraMotionId, type CameraMotionId, type CameraIntensity } from '@/lib/video/cameraPresets'
 import { isVideoTypeId } from '@/lib/video/videoPresets'
 import { getAdapterForModel } from '@/lib/video/adapters'
+import { deliverGeneratedVideo } from '@/lib/video/delivery'
 import { DIRECT_UPLOAD_AREAS, downloadDirectUpload } from '@/lib/storage/direct-upload'
+import { signStorageKey } from '@/lib/storage/signed'
 
 fal.config({ credentials: process.env.FAL_KEY })
 
@@ -225,9 +227,18 @@ export async function POST(req: NextRequest) {
     })
     const generationDurationMs = Date.now() - generationStartedAt
 
-    // TODO: copy output video to permanent Supabase Storage before public production release.
-    // Currently output_url is a CDN link with no documented retention SLA.
-    //
+    // Valida o contêiner e limita bytes antes de registrar um vídeo concluído.
+    // O histórico guarda a URL estável do Storage; a resposta do plugin recebe
+    // uma URL assinada, e o web usa o proxy autenticado que não expira.
+    const delivery = await deliverGeneratedVideo(admin, outputUrl, user.id)
+    const persistedUrl = delivery.storedUrl ?? outputUrl
+    const playbackUrl = delivery.storageKey
+      ? (await signStorageKey(admin, 'spacenode-media', delivery.storageKey, 3600)) ?? outputUrl
+      : outputUrl
+    const mediaUrl = delivery.storageKey
+      ? `/api/media?bucket=spacenode-media&key=${encodeURIComponent(delivery.storageKey)}`
+      : null
+
     // O débito já ocorreu ANTES da geração. Se o INSERT falhar, NÃO refundamos
     // (o usuário recebeu o vídeo e foi cobrado corretamente) — só logamos pra
     // reprocessar o histórico manualmente.
@@ -239,7 +250,7 @@ export async function POST(req: NextRequest) {
     const baseRow = {
       user_id:        user.id,
       input_url:      inputUrl,
-      output_url:     outputUrl,
+      output_url:     persistedUrl,
       prompt:         built.prompt,
       ambient:        'video',
       style:          engineId,
@@ -277,6 +288,7 @@ export async function POST(req: NextRequest) {
         parameters:    { duration, aspect_ratio: aspectRatio ?? 'auto', resolution: resolution ?? '1080p', generate_audio: false },
         duration_ms:   generationDurationMs,
         nodes_charged: nodesToCharge,
+        delivery:      { status: delivery.status, bytes: delivery.bytes, storage_key: delivery.storageKey },
       },
     }
 
@@ -287,7 +299,7 @@ export async function POST(req: NextRequest) {
     }
     if (insertResult.error) {
       console.error('[video] DB INSERT FALHOU (vídeo gerado e debitado — investigar):', {
-        error: insertResult.error, userId: user.id, outputUrl,
+        error: insertResult.error, userId: user.id, outputUrl: persistedUrl,
       })
     }
 
@@ -304,7 +316,9 @@ export async function POST(req: NextRequest) {
     const bal = (balance ?? null) as { plan_balance?: number | null; total_balance?: number | null } | null
     return NextResponse.json({
       id:           insertResult.data?.id ?? null,
-      url:          outputUrl,
+      url:          playbackUrl,
+      mediaUrl,
+      deliveryStatus: delivery.status,
       inputUrl,
       credits:      bal?.total_balance ?? undefined,
       totalBalance: bal?.total_balance ?? undefined,
