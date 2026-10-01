@@ -3,7 +3,14 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { clientIp, rateLimit } from '@/lib/rate-limit'
 import { ATTRIBUTION_COOKIE, parseAttributionCookie } from '@/lib/marketing/ads/naming'
-import { ANON_COOKIE, INTENT_COOKIE, parseAnonymousId, parseIntentCookie } from '@/lib/analytics/attribution'
+import {
+  ANON_COOKIE,
+  INTENT_COOKIE,
+  intentFromSearchParams,
+  parseAnonymousId,
+  parseIntentCookie,
+} from '@/lib/analytics/attribution'
+import { signupAttributionFromMetadata } from '@/lib/analytics/signup-attribution'
 import {
   bindSignupAttribution,
   classifySignupOrigin,
@@ -21,12 +28,13 @@ import { isInternalTraffic } from '@/lib/analytics/internal'
 // Tipos aceitos:
 //   • lp_cta_click — anônimo (sendBeacon do CTA); registra clique numa LP
 //     publicada. Sem user_id, sem IP, sem echo de dados.
-//   • bind_signup  — autenticado; o servidor lê os cookies first-party da
-//     própria requisição (sn_attribution + sn_aid + sn_intent) e vincula a
-//     atribuição ao usuário (evento de signup imutável — on conflict do
-//     nothing no service). Roda também para cadastro orgânico (sem cookie de
-//     campanha): o evento sai sem UTM, mas o funil conta o cadastro e o
-//     anonymous_id associa a jornada pré-login.
+//   • bind_signup  — autenticado; o servidor lê a origem gravada na conta no
+//     signUp por e-mail (lib/analytics/signup-attribution.ts) e, sem ela, os
+//     cookies first-party da própria requisição (sn_attribution + sn_aid +
+//     sn_intent), e vincula a atribuição ao usuário (evento de signup
+//     imutável — on conflict do nothing no service). Roda também para
+//     cadastro orgânico (sem cookie de campanha): o evento sai sem UTM, mas o
+//     funil conta o cadastro e o anonymous_id associa a jornada pré-login.
 //
 // O funil completo do produto usa /api/analytics/track (catálogo tipado em
 // lib/analytics/events.ts) — esta rota fica com os dois tipos legados acima.
@@ -69,9 +77,18 @@ export async function POST(req: NextRequest) {
       if (!rl.allowed) {
         return NextResponse.json({ error: 'Muitas tentativas — aguarde um pouco' }, { status: 429 })
       }
-      const snapshot = parseAttributionCookie(req.cookies.get(ATTRIBUTION_COOKIE)?.value)
-      const anonymousId = parseAnonymousId(req.cookies.get(ANON_COOKIE)?.value)
-      const intent = parseIntentCookie(req.cookies.get(INTENT_COOKIE)?.value)
+      // A origem gravada NA CONTA no signUp por e-mail vence o cookie deste
+      // navegador: ela é a do momento do cadastro, e o 1º acesso ao /app
+      // costuma acontecer em outro navegador (link de confirmação aberto pelo
+      // app de e-mail). Cookie fica para quem não tem metadata (Google).
+      const fromAccount = signupAttributionFromMetadata(user.user_metadata)
+      const cookieSnapshot = parseAttributionCookie(req.cookies.get(ATTRIBUTION_COOKIE)?.value)
+      const snapshot = fromAccount.attribution ?? cookieSnapshot
+      const anonymousId = fromAccount.anonymousId ?? parseAnonymousId(req.cookies.get(ANON_COOKIE)?.value)
+      const intent =
+        parseIntentCookie(req.cookies.get(INTENT_COOKIE)?.value) ??
+        (fromAccount.next ? intentFromSearchParams(new URL(fromAccount.next, 'https://spacenode.app').searchParams) : null)
+      const attributionSource = fromAccount.attribution ? 'account' : cookieSnapshot ? 'cookie' : 'none'
       const origin = await classifySignupOrigin(admin, snapshot, anonymousId)
       // occurred_at = data REAL do cadastro (auth.users.created_at); o
       // created_at da linha continua sendo a hora deste bind, que acontece no
@@ -79,6 +96,7 @@ export async function POST(req: NextRequest) {
       // separadas de propósito — uma é funil, a outra é auditoria.
       const bound = await bindSignupAttribution(admin, user.id, snapshot, {
         account_created_at: user.created_at ?? null,
+        attribution_source: attributionSource,
         ...(intent ? { plan_intent: intent.plan, plan_intent_offer: intent.offer ?? null } : {}),
       }, anonymousId, {
         accountCreatedAt: user.created_at ?? null,

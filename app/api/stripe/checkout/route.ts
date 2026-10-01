@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { identityFromRequest, trackServerEvent } from '@/lib/analytics/server'
 import { attributionToStripeMetadata, marketingConsentSnapshot } from '@/lib/analytics/stripe-metadata'
+import { signupAttributionFromMetadata } from '@/lib/analytics/signup-attribution'
 import { CONSENT_COOKIE } from '@/lib/analytics/consent'
 import {
   ANNUAL_BILLING_ENABLED,
@@ -214,7 +215,14 @@ export async function POST(req: NextRequest) {
     // webhook gravar `subscription_started` com a mesma origem do cadastro e
     // de um adapter server-side saber se pode enviar a compra. Só
     // identificadores e parâmetros de campanha — nada pessoal.
-    const identity = identityFromRequest(req)
+    // Cookie (último toque) primeiro; sem ele — compra num navegador que não
+    // viu o anúncio — vale a origem que o cadastro gravou na conta.
+    const requestIdentity = identityFromRequest(req)
+    const fromAccount = signupAttributionFromMetadata(user.user_metadata)
+    const identity = {
+      anonymousId: requestIdentity.anonymousId ?? fromAccount.anonymousId,
+      attribution: requestIdentity.attribution ?? fromAccount.attribution,
+    }
     const attributionMeta = attributionToStripeMetadata({
       anonymousId: identity.anonymousId,
       fbc: req.cookies.get('_fbc')?.value,
@@ -324,13 +332,15 @@ export async function POST(req: NextRequest) {
       throw new Error('[checkout] session não criada após degradações')
     }
 
-    // Funil first-party (best-effort — nunca lança). Pela request: leva o
-    // sn_aid e a atribuição do visitante, que ligam este checkout ao cadastro
-    // e à visita. Idempotente pela session — uma tentativa, um evento.
+    // Funil first-party (best-effort — nunca lança). Mesma identidade que foi
+    // ao metadata do Stripe (cookie ou origem gravada na conta): liga este
+    // checkout ao cadastro e à visita. Idempotente pela session.
     await trackServerEvent(createAdminClient(), {
       event: 'checkout_started',
       userId: user.id,
       req,
+      anonymousId: identity.anonymousId,
+      attribution: identity.attribution,
       planId: plan.id,
       page: '/app/billing',
       dedupeKey: `checkout:${session.id}`,
