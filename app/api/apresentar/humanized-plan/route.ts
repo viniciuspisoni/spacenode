@@ -44,7 +44,7 @@ function getPlanFidelityConfig(): { enabled: boolean; minScore: number; maxAttem
   const rawScore    = Number(process.env.HUMANIZED_PLAN_MIN_SCORE)
   const rawAttempts = Number(process.env.HUMANIZED_PLAN_MAX_ATTEMPTS)
   return {
-    enabled:     process.env.HUMANIZED_PLAN_FIDELITY_GATE !== '0',
+    enabled:     process.env.HUMANIZED_PLAN_FIDELITY_GATE === '1',
     minScore:    Number.isFinite(rawScore) && rawScore > 0 && rawScore < 1 ? rawScore : 0.5,
     maxAttempts: Number.isFinite(rawAttempts) && rawAttempts >= 1 ? Math.min(Math.floor(rawAttempts), 3) : 2,
   }
@@ -191,10 +191,10 @@ export async function POST(req: NextRequest) {
         console.warn('[apresentar/humanized-plan] leitura indisponível:', (readError as Error).message)
       }
     }
-    projectType ??= 'apartamento'
+    projectType ??= 'auto'
     style ??= 'imobiliario_premium'
     const promptInput = {
-      projectType: projectType as HumanizedPlanProjectType,
+      projectType: projectType as HumanizedPlanProjectType | 'auto',
       style: style as HumanizedPlanStyle,
       level: level as HumanizedPlanLevel,
       options: useV2 ? { ...options, addRoomLabels: false } : options,
