@@ -117,19 +117,25 @@ uso anterior do Tripo; ainda depende de avaliação visual com objetos reais.
 
 Antes de habilitar em produção: montar 10–12 objetos de arquitetura com
 fotos próprias/licenciadas (cadeira, sofá, mesa, luminária, vaso, peça
-vazada e elemento de fachada); pelo menos 4 com quatro vistas. Rodar H3.1 via fal e via Tripo direto
+vazada e elemento de fachada); pelo menos 4 com quatro vistas. Um conjunto
+inicial de 12 produtos isolados e 24 fotografias licenciadas do ABO já foi
+montado por `fetch-abo.mjs`, com metadados de licença e quatro multiview.
+Rodar H3.1 via fal e via Tripo direto
 contra Hunyuan3D 3.1 Pro e Rodin 2.5 com teto total de US$60, guardar
 provider, preço efetivo, tempo, falha e GLB. Avaliar às cegas as vistas do
 modelo contra a referência, importação em SketchUp, materiais e tamanho.
 Escolher o motor que passar o limiar de qualidade e a conta de margem;
 recalcular nodes antes de trocar endpoint. O run pago não foi realizado neste
-ambiente: não há `FAL_KEY`, `TRIPO_API_KEY` nem as fotos de teste aqui.
+ambiente: as fotos estão prontas, mas `FAL_KEY` e `TRIPO_API_KEY` não estão
+acessíveis ao executor. Antes do lançamento, completar com fotos próprias de
+projetos reais, além dos produtos de catálogo.
 
 O runner e a régua de avaliação estão em `scripts/blocos3d-harness/README.md`.
 Ele conserva as fotos, tenta salvar a prévia de cada motor, inspeciona dimensões
 e mapas PBR do GLB e produz `review.html` para comparar os resultados. A prévia
 não substitui girar o modelo e importá-lo no software de projeto.
-Seu plano sem `--execute` não faz chamadas pagas. A estimativa do lote varia
-com o número de fotos: em 12 objetos, com quatro multiview, os três modelos
-somam cerca de US$16,50; reservar até US$60 deixa espaço para pilotos ou
-repetições **manuais**, sempre após conferir o plano exibido.
+Seu plano sem `--execute` não faz chamadas pagas. O plano gratuito foi executado com o conjunto ABO: 12 objetos, quatro
+multiview, 48 tarefas (H3.1 fal, H3.1 direto, Hunyuan Pro e Rodin 2.5),
+US$21,30 previstos. O teto de US$60 deixa espaço para pilotos ou repetições
+**manuais**, sempre após conferir o plano exibido. O plano não cobra nem
+substitui a conciliação de faturas após o run.
