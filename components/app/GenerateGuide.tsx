@@ -98,8 +98,8 @@ export default function GenerateGuide({
       <div className="spn-guide-body">
         {phase === 'upload' && (
           <p className="spn-guide-tip">
-            Comece enviando a imagem do seu projeto — print do SketchUp, render,
-            foto ou planta. É a base de tudo o que vem depois.
+            Comece enviando uma imagem do seu projeto — print do SketchUp,
+            render ou foto. É a base de tudo o que vem depois.
           </p>
         )}
 
