@@ -15,12 +15,17 @@ node scripts/blocos3d-harness/run.mjs --max-usd=60
 FAL_KEY=... node scripts/blocos3d-harness/run.mjs --execute --max-usd=60 --out=/caminho/run-01
 
 # Preencha scores.csv com notas inteiras de 1 a 5 e gere a comparação.
+node scripts/blocos3d-harness/review.mjs /caminho/run-01
 node scripts/blocos3d-harness/report.mjs /caminho/run-01
 ```
 
 O runner grava o `request_id` após cada submissão. Repetir com o mesmo `--out`
 retoma pedidos submetidos sem criar outra geração; um resultado completo fica
-em GLB com contagem de triângulos, texturas, bytes, tempo e custo previsto.
+em GLB com contagem de triângulos, texturas, bytes, tempo, custo previsto,
+dimensões e inspeção de materiais. Fotos de referência e prévias ficam no
+diretório da execução. Abra `review.html` para comparar visualmente a frente
+de cada resultado. Confira o GLB em várias vistas e importe-o no software de
+projeto: a prévia do provider não prova fidelidade dos lados ou escala.
 Não faz retries pagos. O teto é conferido pelo custo previsto de **todo** o
 plano antes da primeira submissão. Confira as tarifas no fal antes de executar.
 

@@ -25,6 +25,7 @@ import {
   normalizeSourceKeys,
   countImages,
   validViewSequence,
+  VIEW_POSITION_LABEL,
   VIEW_POSITION_ORDER,
 } from '@/lib/blocos3d/config'
 import { createProviderTask, engineAvailable } from '@/lib/blocos3d/provider'
@@ -84,25 +85,24 @@ export async function POST(req: NextRequest) {
   }
   const frontPublicUrl = (verified[0].res as { ok: true; url: string }).url
 
-  // Pré-checagem local e gratuita. Fotos pequenas ou arquivos com MIME falso
-  // tendem a desperdiçar uma chamada paga e geram um bloco inutilizável.
-  const { data: frontImage, error: sourceError } = await admin.storage
-    .from(area.bucket).download(sourceKeys.front)
-  if (sourceError || !frontImage) {
-    return NextResponse.json({ error: 'Não foi possível ler a foto. Envie-a novamente.' }, { status: 503 })
-  }
-  try {
-    const metadata = await sharp(Buffer.from(await frontImage.arrayBuffer()), { failOn: 'error' }).metadata()
-    if (!metadata.width || !metadata.height || Math.min(metadata.width, metadata.height) < 512 ||
-        !['jpeg', 'png', 'webp'].includes(metadata.format ?? '')) {
-      return NextResponse.json(
-        { error: 'Use uma foto JPG, PNG ou WebP com pelo menos 512 px em cada lado.' },
-        { status: 400 },
-      )
+  // Verifica TODAS as vistas antes do débito: um ângulo corrompido ou pequeno
+  // também desperdiça uma chamada paga, mesmo quando a frente está correta.
+  const checks = await Promise.all(positions.map(async p => {
+    const { data, error } = await admin.storage.from(area.bucket).download(sourceKeys[p]!)
+    if (error || !data) return { status: 503, error: `Não foi possível ler a foto (${VIEW_POSITION_LABEL[p]}). Envie-a novamente.` }
+    try {
+      const metadata = await sharp(Buffer.from(await data.arrayBuffer()), { failOn: 'error' }).metadata()
+      if (!metadata.width || !metadata.height || Math.min(metadata.width, metadata.height) < 512 ||
+          !['jpeg', 'png', 'webp'].includes(metadata.format ?? '')) {
+        return { status: 400, error: 'Use fotos JPG, PNG ou WebP com pelo menos 512 px em cada lado.' }
+      }
+    } catch {
+      return { status: 400, error: `Não foi possível abrir a foto (${VIEW_POSITION_LABEL[p]}). Envie outra.` }
     }
-  } catch {
-    return NextResponse.json({ error: 'Não foi possível abrir essa imagem. Envie outra foto.' }, { status: 400 })
-  }
+    return null
+  }))
+  const badImage = checks.find(result => result !== null)
+  if (badImage) return NextResponse.json({ error: badImage.error }, { status: badImage.status })
 
   const nodesToCharge = engine.costInNodes
 

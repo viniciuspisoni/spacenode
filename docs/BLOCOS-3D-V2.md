@@ -45,7 +45,7 @@ catálogo. Revisar o preço se fal, câmbio, planos ou custos de storage mudarem
 
 ## Qualidade e falhas
 
-Antes de cobrar, o servidor verifica que a foto principal abre e tem ao
+Antes de cobrar, o servidor verifica que todas as fotos abrem e têm ao
 menos 512 px em cada eixo. Depois da geração, seleciona o GLB PBR da
 resposta, verifica a estrutura, geometria e textura do GLB, e só conclui
 quando o arquivo está salvo no Storage privado. Se o provider devolver um
@@ -79,6 +79,9 @@ recalcular nodes antes de trocar endpoint. O run pago não foi realizado neste
 ambiente: não há `FAL_KEY` nem as fotos de teste aqui.
 
 O runner e a régua de avaliação estão em `scripts/blocos3d-harness/README.md`.
+Ele conserva as fotos, tenta salvar a prévia de cada motor, inspeciona dimensões
+e mapas PBR do GLB e produz `review.html` para comparar os resultados. A prévia
+não substitui girar o modelo e importá-lo no software de projeto.
 Seu plano sem `--execute` não faz chamadas pagas. A estimativa do lote varia
 com o número de fotos: em 12 objetos, com quatro multiview, os três modelos
 somam cerca de US$16,50; reservar até US$60 deixa espaço para pilotos ou

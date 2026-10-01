@@ -19,7 +19,9 @@ const rows = names.map(name => {
   const average = idx => graded.length ? graded.reduce((n, score) => n + score[idx], 0) / graded.length : 0
   const cost = tasks.reduce((n, [, row]) => n + (row.estimatedUsd ?? 0), 0)
   const perDelivered = completed.length ? cost / completed.length : 0
-  const nodesAt = target => completed.length ? Math.ceil(((perDelivered * 6 * 1.12) + 0.05) /
+  // perDelivered já inclui pedidos cobrados que falharam: aplicar 12% outra
+  // vez duplicaria a reserva de falhas e distorceria a margem observada.
+  const nodesAt = target => completed.length ? Math.ceil(((perDelivered * 6) + 0.05) /
     ((1 - target) * 0.0729) / 5) * 5 : null
   return {
     model: name, jobs: tasks.length, completed: completed.length, scored: graded.length,
@@ -33,7 +35,7 @@ const rows = names.map(name => {
 console.log('| Motor | Entregues | Notas | Fidelidade | Materiais | Geometria | Cena | Média ponderada | Nodes 75% | Nodes 80% |')
 console.log('| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |')
 for (const row of rows) console.log(`| ${row.model} | ${row.completed}/${row.jobs} | ${row.scored} | ${row.fidelity.toFixed(2)} | ${row.materials.toFixed(2)} | ${row.geometry.toFixed(2)} | ${row.scene.toFixed(2)} | ${row.weighted.toFixed(2)} | ${row.nodes75 ?? '—'} | ${row.nodes80 ?? '—'} |`)
-console.log('\nCusto em nodes: estimativa com câmbio de proteção R$6/US$, reserva adicional de 12%, R$0,05 de storage e piso legado R$0,0729/node. O custo real exige conciliação com a fatura fal.')
+console.log('\nCusto em nodes: tarifa estimada de todos os pedidos submetidos dividida pelas entregas, câmbio de proteção R$6/US$, R$0,05 de storage e piso legado R$0,0729/node. Falhas cobradas já entram nessa conta; conciliar com a fatura fal.')
 const samples = Math.max(...rows.map(row => row.jobs), 0)
 const fourViews = Math.max(...rows.map(row => row.fourViews), 0)
 if (samples < 10 || fourViews < 4 || rows.some(row => row.scored < 10)) {

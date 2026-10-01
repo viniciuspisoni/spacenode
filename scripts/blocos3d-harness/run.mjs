@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 // Benchmark de blocos de arquitetura. Sem --execute, faz apenas o plano.
-import { readdir, readFile, writeFile, mkdir } from 'node:fs/promises'
+import { readdir, readFile, writeFile, mkdir, copyFile } from 'node:fs/promises'
 import { basename, extname, join, resolve } from 'node:path'
 import { fal } from '@fal-ai/client'
 import sharp from 'sharp'
+import { analyzeGlb } from './analyze.mjs'
 
 const root = resolve(import.meta.dirname)
 const args = process.argv.slice(2)
@@ -23,6 +24,7 @@ const models = {
     input: urls => ({ ...(urls.length > 1 ? { image_urls: urls } : { image_url: urls[0] }),
       texture: true, pbr: true, texture_quality: 'detailed', geometry_quality: 'standard', auto_size: true }),
     glb: data => data.model_urls?.pbr_model?.url ?? data.model_urls?.glb?.url,
+    preview: data => data.rendered_image?.url,
   },
   hunyuan: {
     endpoint: () => 'fal-ai/hunyuan-3d/v3.1/pro/image-to-3d',
@@ -33,6 +35,7 @@ const models = {
       ...(urls[3] ? { right_image_url: urls[3] } : {}),
       generate_type: 'Normal', enable_pbr: true }),
     glb: data => data.model_urls?.glb?.url ?? data.model_glb?.url,
+    preview: data => data.thumbnail?.url,
   },
   rodin: {
     endpoint: () => 'fal-ai/hyper3d/rodin/v2.5',
@@ -40,6 +43,7 @@ const models = {
     input: urls => ({ image_urls: urls, tier: 'Gen-2.5-High',
       geometry_file_format: 'glb', material: 'PBR' }),
     glb: data => data.model_mesh?.url ?? data.model_meshes?.find(f => f.url?.endsWith('.glb'))?.url,
+    preview: data => data.preview_image?.url ?? data.rendered_image?.url,
   },
 }
 
@@ -50,6 +54,7 @@ async function objects() {
   const dirs = await readdir(fixtures, { withFileTypes: true }).catch(e => e.code === 'ENOENT' ? [] : Promise.reject(e))
   const found = []
   for (const dir of dirs.filter(d => d.isDirectory()).sort((a, b) => a.name.localeCompare(b.name))) {
+    if (!/^[a-z0-9-]+$/.test(dir.name)) throw new Error(`${dir.name}: use um slug minúsculo com letras, números e hífens`)
     const folder = join(fixtures, dir.name)
     const filenames = await readdir(folder)
     const files = []
@@ -98,6 +103,11 @@ async function main() {
   if (!tasks.length || !maxUsd || total > maxUsd + 1e-9) throw new Error('Plano vazio ou acima do teto --max-usd')
   fal.config({ credentials: process.env.FAL_KEY })
   await mkdir(output, { recursive: true })
+  for (const object of samples) {
+    const referenceDir = join(output, 'references', object.name)
+    await mkdir(referenceDir, { recursive: true })
+    await Promise.all(object.files.map(file => copyFile(file, join(referenceDir, basename(file)))))
+  }
   const manifestPath = join(output, 'manifest.json')
   const prior = await readFile(manifestPath, 'utf8').then(JSON.parse).catch(e => e.code === 'ENOENT' ? {} : Promise.reject(e))
   const manifest = { ...prior }
@@ -141,7 +151,25 @@ async function main() {
       const metadata = inspect(bytes)
       const file = join(output, `${task.object}--${task.name}.glb`)
       await writeFile(file, bytes)
+      let analysis = null
+      try { analysis = await analyzeGlb(file) }
+      catch (error) { console.warn(task.id, 'análise técnica indisponível:', String(error)) }
+      let preview = null
+      const previewUrl = models[task.name].preview(result)
+      if (previewUrl) {
+        try {
+          const previewResult = await fetch(previewUrl)
+          if (previewResult.ok) {
+            const raw = Buffer.from(await previewResult.arrayBuffer())
+            if (raw.byteLength <= 10 * 1024 * 1024) {
+              preview = `${task.object}--${task.name}.png`
+              await writeFile(join(output, preview), await sharp(raw).resize(800, 800, { fit: 'inside' }).png().toBuffer())
+            }
+          }
+        } catch (error) { console.warn(task.id, 'prévia indisponível:', String(error)) }
+      }
       manifest[task.id] = { ...row, status: 'completed', file, ...metadata,
+        analysis, preview,
         durationMs: Date.now() - new Date(row.submittedAt).getTime(), completedAt: new Date().toISOString() }
     } catch (e) {
       // Preserve o request_id: uma falha de download pode ser retomada sem custo novo.
