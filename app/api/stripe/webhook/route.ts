@@ -150,6 +150,7 @@ interface ActivationInput {
   /** Chave de idempotência de último recurso quando não há subscription id. */
   fallbackKey:    string
   eventMetadata?: Record<string, unknown>
+  occurredAt?: string
   /** Metadata da session/assinatura do Stripe — carrega sn_aid, campanha e
    *  consentimento gravados no checkout (lib/analytics/stripe-metadata.ts). */
   stripeMetadata?: Record<string, string | undefined> | null
@@ -234,6 +235,9 @@ async function activatePlan(
     anonymousId: attr.anonymousId,
     attribution: attr.attribution,
     consent:     attr.consent,
+    fbc:         attr.fbc,
+    fbp:         attr.fbp,
+    occurredAt:  input.occurredAt,
     planId:      input.planId,
     valueCents:  input.valueCents,
     dedupeKey:   `subscription:${input.subscriptionId ?? input.fallbackKey}`,
@@ -352,9 +356,11 @@ export async function POST(req: NextRequest) {
         billingCycle:   session.metadata?.billing_cycle ?? null,
         valueCents:     session.amount_total ?? null,
         source:         'checkout',
+        occurredAt:     new Date(event.created * 1000).toISOString(),
         fallbackKey:    session.id,
         eventMetadata: {
           stripe_session_id: session.id,
+          currency:          session.currency,
           launch_offer:      session.metadata?.launch_offer === 'applied',
         },
         stripeMetadata: session.metadata,
@@ -474,8 +480,9 @@ export async function POST(req: NextRequest) {
           billingCycle:  match.billing,
           valueCents:    invoice.amount_paid ?? null,
           source:        'invoice',
+          occurredAt:    new Date(event.created * 1000).toISOString(),
           fallbackKey:   invoice.id ?? `invoice:${event.id}`,
-          eventMetadata: { stripe_invoice_id: invoice.id },
+          eventMetadata: { stripe_invoice_id: invoice.id, currency: invoice.currency },
           stripeMetadata: subMetadata,
         })
         if (!ok) return NextResponse.json({ error: 'db' }, { status: 500 })

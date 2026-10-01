@@ -38,6 +38,8 @@ export const STRIPE_META_KEYS = {
   landingPath: 'landing_path',
   touchedAt: 'attr_at',
   consent: 'consent',
+  fbc: 'sn_fbc',
+  fbp: 'sn_fbp',
 } as const
 
 const MAX_VALUE = 200
@@ -52,6 +54,8 @@ export interface StripeAttributionInput {
   anonymousId?: string | null
   attribution?: AttributionSnapshot | null
   consent: MarketingConsentSnapshot
+  fbc?: string | null
+  fbp?: string | null
 }
 
 /** Metadata pronto para `checkout.sessions.create` — só chaves com valor. */
@@ -74,6 +78,12 @@ export function attributionToStripeMetadata(input: StripeAttributionInput): Reco
   // por onde a pessoa entrou, mesmo que a campanha do último toque seja outra.
   put(STRIPE_META_KEYS.landingPath, first?.landing_path ?? last?.landing_path)
   put(STRIPE_META_KEYS.touchedAt, last?.at)
+  if (input.consent === 'granted') {
+    for (const key of ['fbc', 'fbp'] as const) {
+      const value = input[key]
+      if (typeof value === 'string' && value.length <= 500 && /^fb\.\d+\.\d{13}\.[A-Za-z0-9_-]+$/.test(value)) out[STRIPE_META_KEYS[key]] = value
+    }
+  }
   out[STRIPE_META_KEYS.consent] = input.consent
   return out
 }
@@ -82,6 +92,8 @@ export interface StripeAttributionOutput {
   anonymousId: string | null
   attribution: AttributionSnapshot | null
   consent: MarketingConsentSnapshot
+  fbc?: string | null
+  fbp?: string | null
 }
 
 const ANON_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -116,6 +128,7 @@ export function attributionFromStripeMetadata(
 
   return {
     anonymousId,
+    ...(consent === 'granted' ? { fbc: meta[STRIPE_META_KEYS.fbc] ?? null, fbp: meta[STRIPE_META_KEYS.fbp] ?? null } : {}),
     attribution: hasTouch ? { last: touch } : null,
     consent,
   }

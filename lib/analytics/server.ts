@@ -71,6 +71,8 @@ export interface ServerEventInput {
    *  governa os adapters server-side (server-adapters.ts) — o registro
    *  first-party não depende dela. */
   consent?: MarketingConsentSnapshot
+  fbc?: string | null
+  fbp?: string | null
   props?: AnalyticsProps
 }
 
@@ -135,8 +137,7 @@ export async function trackServerEvent(
       metadata: props,
     })
 
-    // Saída server-side para terceiros (Meta CAPI etc.) — registro vazio
-    // hoje. Só depois de persistir, e só o que o consentimento permitir.
+    // Saída server-side para plataformas configuradas. Só depois de persistir, e só o que o consentimento permitir.
     // Evento interno (dev/preview) nunca sai.
     if (persisted && !(input.isInternal ?? isInternalTraffic(input.req ?? null))) {
       await forwardServerEvent({
@@ -149,6 +150,8 @@ export async function trackServerEvent(
         occurredAt: input.occurredAt ?? null,
         dedupeKey: input.dedupeKey ?? null,
         consent,
+        fbc: input.fbc,
+        fbp: input.fbp,
         props,
       })
     }
