@@ -15,7 +15,8 @@
 // `x-edit-v2-test-user: <uuid>` — aceito APENAS fora de produção e fora da
 // Vercel (NODE_ENV !== 'production' && !VERCEL). Em produção é ignorado.
 
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
+import { trackSecondTool } from '@/lib/analytics/activation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import {
@@ -336,6 +337,7 @@ export async function POST(req: Request) {
           output: run.outputDims,
         }
 
+    if (!run.rejected) after(() => trackSecondTool(admin, req, userId!, 'editar'))
     return NextResponse.json(
       debug
         ? {
