@@ -121,7 +121,6 @@ export const readTools: NodiTool[] = [
         ],
         proposito: {
           renderizar: 'do print do modelo à imagem fotorrealista, preservando geometria/perspectiva',
-          spaces: 'várias vistas do mesmo ambiente com um único DNA visual',
           editar: 'alteração localizada sem regenerar o resto',
           ampliar: 'aumentar resolução/nitidez da imagem aprovada',
           animar: 'vídeo a partir da imagem (apresentação/movimento)',

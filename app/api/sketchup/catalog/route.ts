@@ -43,6 +43,7 @@ import {
 import { ORION_CONFIG } from '@/lib/orion/config'
 import { canUseOrion } from '@/lib/orion/access'
 import { orionProviderReady } from '@/lib/orion/provider'
+import { isModuleEnabled } from '@/lib/nav/modules-config'
 
 // i18n EN do painel do plugin: presets (mapa gerado, valor enviado à API
 // segue pt-BR) + rótulos estruturais do catálogo. O chrome do painel
@@ -277,7 +278,7 @@ export async function GET(req: NextRequest) {
     },
     i18n: { en: CATALOG_I18N_EN },
     upscale,
-    spaces,
+    ...(isModuleEnabled('spaces') ? { spaces } : {}),
     animar: buildAnimarCatalog(),
     // Planta humanizada: o plugin captura a planta DO MODELO (topo, projeção
     // paralela, corte) e manda pra mesma rota que o site usa. Os presets vêm

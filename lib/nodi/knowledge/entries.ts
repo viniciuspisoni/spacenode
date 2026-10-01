@@ -113,7 +113,7 @@ export const KB_ENTRIES: KBEntry[] = [
         text:
           'Custo por imagem, conforme motor e resolução:\n' +
           rows.map(r => `• ${r}`).join('\n') +
-          '\nO valor aparece no botão antes de confirmar. Dentro de um projeto (Spaces), a variação de vista usa a mesma tabela.',
+          '\nO valor aparece no botão antes de confirmar.',
       }
     },
   },
@@ -269,17 +269,14 @@ export const KB_ENTRIES: KBEntry[] = [
   // ── Ferramentas ─────────────────────────────────────────────────────────────
   {
     id: 'spaces-dna',
-    title: 'O que é um projeto (Space) e o DNA visual?',
-    keywords: ['space', 'spaces', 'projeto', 'dna', 'vista mestre', 'vistas', 'coerencia', 'mesmo ambiente'],
-    patterns: [...aboutTool('spaces?'), /o que (e|sao).*(space|dna|vista mestre)/, /coeren(cia|te).*(vista|imagem)/],
+    title: 'Spaces e Vistas ainda estão disponíveis?',
+    keywords: ['space', 'spaces', 'vista mestre', 'vistas', 'dna visual'],
+    patterns: [...aboutTool('spaces?'), /o que (e|sao).*(space|vista mestre)/, /vistas.*(disponiveis|descontinuadas)/],
     modules: ['spaces'],
-    faq: true,
-    suggest: true,
     build: () => ({
       text:
-        'Um projeto (Space) reúne as vistas de um mesmo espaço. ' +
-        'A Vista Mestre define o DNA visual — materiais, luz, atmosfera — e as demais vistas herdam esse DNA, mantendo as imagens coerentes entre si. ' +
-        'Cada vista pode ter o próprio DNA e você escolhe a referência na hora de gerar; a Vista Mestre pode ser trocada com histórico preservado.',
+        'Spaces e Vistas foram descontinuados porque os resultados visuais não tinham a consistência necessária. ' +
+        'Para criar novas imagens, use Renderizar. Se precisar de ajuda com um projeto antigo, fale com o suporte.',
     }),
   },
   {
@@ -406,8 +403,8 @@ export const KB_ENTRIES: KBEntry[] = [
     suggest: true,
     build: () => ({
       text:
-        'Tudo o que você gera fica no Histórico, na barra lateral — renders, vídeos, ampliações, edições e vistas, com filtros por tipo. ' +
-        'Cada item abre os detalhes da geração (motor, resolução, nodes, status). As gerações de um projeto também aparecem dentro do próprio Space.',
+        'Tudo o que você gera nas ferramentas ativas fica no Histórico, na barra lateral — renders, vídeos, ampliações e edições, com filtros por tipo. ' +
+        'Cada item abre os detalhes da geração (motor, resolução, nodes, status).',
       actions: [ACT.historico],
     }),
   },
