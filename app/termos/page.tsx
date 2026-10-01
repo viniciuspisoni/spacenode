@@ -8,12 +8,29 @@
 //
 // TODO(dono): se quiser fixar a comarca do foro (cláusula 17), trocar
 // "comarca da sede" pela cidade registrada no CNPJ.
+//
+// ⚠️ NÃO MERGEAR ANTES DO CÓDIGO (2026-09-19).
+//
+// A cláusula 5 passou a descrever a regra de créditos v2: validade de 90 dias
+// POR CRÉDITO (não mais por saldo), congelamento do saldo no fim da
+// assinatura e 30 dias para reativar e recuperar. Hoje o código faz outra
+// coisa — `start_nodes_grace` deixa o saldo GASTÁVEL por 90 dias depois do
+// cancelamento, `profiles.credits` é um escalar único com uma só data em
+// `profiles.nodes_expire_at`, e "congelado" não existe como estado.
+//
+// Enquanto for assim, estes Termos prometem MENOS do que o produto entrega —
+// a direção segura da assimetria, mas que não fecha a brecha que motivou a
+// mudança (assinar e cancelar no mesmo dia e usar o saldo por 90 dias). Quem
+// fecha a brecha é o código, não este arquivo.
+//
+// A data de corte do direito adquirido é o próprio UPDATED_AT: a cláusula de
+// transição cita essa data, então ela precisa ser a data real de publicação,
+// e a checagem de grandfathering no código tem de usar exatamente a mesma.
 
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { LegalShell, LegalSection, P, UL, LI, Callout, Strong } from '@/components/legal/LegalShell'
 import { LEGAL_CNPJ, LEGAL_NAME, SUPPORT_EMAIL, SUPPORT_PHONE_DISPLAY, SUPPORT_WHATSAPP_URL } from '@/lib/support'
-import { NODES_GRACE_DAYS, NODES_GRACE_DAYS_WRITTEN } from '@/lib/billing/nodes'
 
 export const metadata: Metadata = {
   title: 'Termos de Uso · SpaceNode',
@@ -22,7 +39,7 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 }
 
-const UPDATED_AT = '10 de setembro de 2026'
+const UPDATED_AT = '19 de setembro de 2026'
 
 export default function TermosPage() {
   return (
@@ -34,10 +51,11 @@ export default function TermosPage() {
           Resumo em linguagem simples: a SpaceNode gera <Strong>visualizações arquitetônicas com IA</Strong> a
           partir do material que você envia. As imagens geradas são suas, mas têm natureza{' '}
           <Strong>ilustrativa</Strong> — não substituem projeto técnico nem responsabilidade profissional.
-          Os créditos do plano renovam todo mês e <Strong>acumulam enquanto a assinatura estiver
-          ativa</Strong>; após o cancelamento, o saldo restante fica disponível por mais{' '}
-          {NODES_GRACE_DAYS} dias. O plano anual é pago antecipadamente. Este resumo não substitui o
-          texto completo abaixo.
+          Os créditos do plano renovam todo mês, <Strong>acumulam</Strong> e valem{' '}
+          <Strong>90 dias a contar de cada crédito</Strong>; encerrada a assinatura, o saldo fica
+          congelado e você tem <Strong>30 dias</Strong> para reativar e recuperá-lo. Quem assinou antes
+          de {UPDATED_AT} segue na regra anterior. O plano anual é pago antecipadamente. Este resumo não
+          substitui o texto completo abaixo.
         </>
       }
     >
@@ -101,21 +119,34 @@ export default function TermosPage() {
             antes da confirmação.
           </LI>
           <LI>
-            Os <Strong>nodes mensais</Strong>, incluídos no plano, <Strong>renovam mensalmente e
-            acumulam</Strong>: os nodes não utilizados em um ciclo permanecem no saldo e são somados
-            aos do ciclo seguinte, enquanto a assinatura estiver ativa.
+            Os <Strong>nodes mensais</Strong>, incluídos no plano, são creditados a cada ciclo e têm{' '}
+            <Strong>validade de 90 (noventa) dias corridos contados da data de cada crédito</Strong>. Os
+            nodes não utilizados em um ciclo <Strong>permanecem no saldo e somam-se aos do ciclo
+            seguinte</Strong>, até o fim da validade de cada um. O consumo utiliza sempre os nodes de
+            vencimento mais próximo.
           </LI>
           <LI>
             <Strong>Encerrada a assinatura</Strong> — por cancelamento ou falta de pagamento —, o saldo de
-            nodes mensais já adquirido permanece disponível por <Strong>{NODES_GRACE_DAYS} ({NODES_GRACE_DAYS_WRITTEN})
-            dias corridos</Strong> contados do fim da assinatura. Terminado esse prazo, o saldo mensal
-            remanescente expira, sem direito a reembolso ou conversão.
+            nodes mensais fica <Strong>congelado</Strong>: permanece visível na sua conta, mas não pode
+            ser utilizado.
           </LI>
           <LI>
-            Se você <Strong>reativar ou contratar uma nova assinatura dentro desse prazo</Strong>, o saldo
-            acumulado é <Strong>preservado integralmente</Strong> e a expiração é cancelada. Caso essa nova
-            assinatura seja posteriormente encerrada, um novo prazo de {NODES_GRACE_DAYS} dias corridos
-            passa a contar a partir do novo encerramento.
+            Se você <Strong>reativar ou contratar uma nova assinatura em até 30 (trinta) dias
+            corridos</Strong> contados do fim da assinatura, o saldo congelado é liberado e volta a ser
+            utilizável. A validade de 90 dias de cada crédito <Strong>continua correndo durante o
+            congelamento</Strong>, de modo que voltam a ficar disponíveis apenas os nodes que ainda não
+            tenham vencido.
+          </LI>
+          <LI>
+            Passados os <Strong>30 dias</Strong> sem reativação, o saldo mensal congelado{' '}
+            <Strong>expira</Strong>, sem direito a reembolso ou conversão.
+          </LI>
+          <LI>
+            <Strong>Assinaturas iniciadas antes de {UPDATED_AT}</Strong> seguem a regra anterior: os nodes
+            mensais não têm validade enquanto a assinatura estiver ativa e, encerrada a assinatura, o saldo
+            permanece <Strong>utilizável</Strong> por 90 (noventa) dias corridos, em vez de congelado. Essa
+            condição acompanha a assinatura enquanto ela permanecer ativa e ininterrupta; uma nova
+            assinatura contratada a partir daquela data segue as regras acima.
           </LI>
           <LI>
             Os <Strong>nodes extras</Strong> são créditos avulsos, comprados separadamente, <Strong>sem prazo
@@ -145,9 +176,8 @@ export default function TermosPage() {
           </LI>
           <LI>
             Você pode cancelar a assinatura a qualquer momento no painel, sem burocracia. O acesso aos
-            recursos do plano permanece até o fim do período já pago, e não há novas cobranças. Os nodes
-            mensais acumulados seguem disponíveis por {NODES_GRACE_DAYS} dias após o fim da assinatura,
-            conforme a cláusula 5.
+            recursos do plano permanece até o fim do período já pago, e não há novas cobranças. O
+            tratamento do saldo de nodes mensais após o fim da assinatura segue a cláusula 5.
           </LI>
           <LI>
             No plano anual, o cancelamento interrompe a renovação ao fim dos 12 meses contratados; o
