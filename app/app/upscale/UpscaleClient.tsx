@@ -166,7 +166,7 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
   // O papel de parede passa a ser a imagem em jogo — o resultado assim que ele
   // sai, o original enquanto não há resultado. É o que faz o painel assumir a
   // paleta do projeto, como no plugin.
-  useAmbient(resultUrl ?? imagePreview)
+  useAmbient(resultMeta?.previewUrl ?? resultUrl ?? imagePreview)
 
   useEffect(() => () => { if (elapsedTimerRef.current) clearInterval(elapsedTimerRef.current) }, [])
 
@@ -282,6 +282,13 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
     setScalePinned(false)
   }
 
+  function restoreAutomatic() {
+    const rec = imageFile && dims ? analyzeImage({ fileName: imageFile.name,
+      fileSize: imageFile.size, mime: imageFile.type, ...dims }) : null
+    applyObjective(rec?.objectiveId ?? DEFAULT_OBJECTIVE)
+    setSourceKind('auto')
+  }
+
   function loadImageFile(file: File) {
     if (busyRef.current) return
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { setError('Use JPEG, PNG ou WebP.'); return }
@@ -341,7 +348,7 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
   const sourcePreloadedRef = useRef(false)
   useEffect(() => {
     if (sourcePreloadedRef.current || !sourceUrl || imageFile) return
-    if (!/^https:\/\//i.test(sourceUrl)) return
+    if (!/^https:\/\//i.test(sourceUrl) && !sourceUrl.startsWith('/api/media?')) return
     sourcePreloadedRef.current = true
     // O setState vive dentro do fluxo assíncrono da importação, não no corpo
     // do efeito: chamado direto ali, ele dispara uma cascata de render (e o
@@ -515,10 +522,14 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
   }
 
   return (
-    <div className="spn-tool">
+    <div className="spn-tool spn-upscale">
       <style>{`
         @keyframes spin   { to { transform: rotate(360deg); } }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        @media (max-width: 899.98px) {
+          .spn-upscale { overflow-y: auto; grid-template-rows: max-content max-content; align-content: start; }
+          .spn-upscale .spn-tool-panel-body--scroll { flex: 0 0 auto; overflow-y: visible; }
+        }
       `}</style>
 
       {/* ── Painel ──────────────────────────────────────────────────────────── */}
@@ -697,7 +708,7 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
       </section>
 
       {/* ── Palco ───────────────────────────────────────────────────────────── */}
-      <section className="spn-tool-stage spn-glass">
+      <section className="spn-tool-stage spn-glass" style={{ overflowY: 'auto', alignItems: 'safe center' }}>
         {isLoading && (
           <div
             className="spn-glass spn-glass--raised"
@@ -847,7 +858,7 @@ export default function UpscaleClient({ initialCredits, sourceUrl }: UpscaleClie
         <p className="spn-hint">
           As escolhas valem para esta imagem. Ao trocar a imagem, voltamos ao automático.
         </p>
-        <button type="button" className="spn-btn" onClick={() => { applyObjective(DEFAULT_OBJECTIVE); setSourceKind('auto'); }}>Voltar ao automático</button>
+        <button type="button" className="spn-btn" onClick={restoreAutomatic}>Voltar ao automático</button>
       </Sheet>
 
       {showImportModal && (

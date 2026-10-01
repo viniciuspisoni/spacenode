@@ -70,6 +70,26 @@ describe('prazo e recuperação', () => {
     expect(fetchMock.mock.calls[0][0]).toBe('/api/upscale?jobId=job-1')
     expect(fetchMock.mock.calls[0][1].method).toBeUndefined()
   })
+  it('aguarda o registro após reconexão antes de considerar um 404 definitivo', async () => {
+    vi.useFakeTimers()
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response('{}', { status: 404 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status: 'completed', url: 'https://test/output.png' })))
+    vi.stubGlobal('fetch', fetchMock)
+    const run = waitForUpscaleJob('job-1')
+    await vi.advanceTimersByTimeAsync(2000)
+    expect((await run)?.status).toBe('completed')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock.mock.calls.every(([, options]) => options.method === undefined)).toBe(true)
+  })
+  it('um ID inexistente não fica em espera indefinidamente', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(new Response('{}', { status: 404 }))))
+    const run = waitForUpscaleJob('missing')
+    const rejected = expect(run).rejects.toThrow('Confira o histórico')
+    await vi.advanceTimersByTimeAsync(10_000)
+    await rejected
+  })
   it('o checkpoint de persistência também respeita o orçamento', async () => {
     vi.useFakeTimers()
     subscribe.mockImplementation((_endpoint, options) => {
