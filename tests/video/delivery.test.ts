@@ -53,6 +53,14 @@ describe('entrega técnica do Animar', () => {
     expect(upload).not.toHaveBeenCalled()
   })
 
+  it('aceita apenas o bucket falserverless quando a fal devolve URL do Google Storage', async () => {
+    const { admin } = fakeStorage()
+    const url = 'https://storage.googleapis.com/falserverless/model_tests/gallery/video.mp4'
+    expect((await deliverGeneratedVideo(admin, url, 'user-123', fetchVideo)).status).toBe('stored')
+    await expect(deliverGeneratedVideo(admin, 'https://storage.googleapis.com/other-bucket/video.mp4', 'user-123', fetchVideo))
+      .rejects.toThrow('Origem')
+  })
+
   it('entrega o MP4 verificado pelo provider se o Storage estiver indisponível', async () => {
     const { admin } = fakeStorage(new Error('Storage indisponível'))
     const result = await deliverGeneratedVideo(admin, provider, 'user-123', fetchVideo)

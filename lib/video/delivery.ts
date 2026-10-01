@@ -19,7 +19,11 @@ export interface DeliveredVideo {
 function trustedSource(sourceUrl: string): boolean {
   try {
     const url = new URL(sourceUrl)
-    return url.protocol === 'https:' && SOURCE_HOSTS.some(host =>
+    if (url.protocol !== 'https:') return false
+    if (url.hostname === 'storage.googleapis.com') {
+      return url.pathname.startsWith('/falserverless/')
+    }
+    return SOURCE_HOSTS.some(host =>
       url.hostname === host || url.hostname.endsWith(`.${host}`),
     )
   } catch {
