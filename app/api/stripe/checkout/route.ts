@@ -217,6 +217,8 @@ export async function POST(req: NextRequest) {
     const identity = identityFromRequest(req)
     const attributionMeta = attributionToStripeMetadata({
       anonymousId: identity.anonymousId,
+      fbc: req.cookies.get('_fbc')?.value,
+      fbp: req.cookies.get('_fbp')?.value,
       attribution: identity.attribution,
       consent: marketingConsentSnapshot(req.cookies.get(CONSENT_COOKIE)?.value),
     })

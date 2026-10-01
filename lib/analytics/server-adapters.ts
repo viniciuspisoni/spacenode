@@ -1,9 +1,8 @@
 // lib/analytics/server-adapters.ts
 //
-// Ponto único de saída SERVER-SIDE para plataformas de marketing. Hoje o
-// registro está VAZIO de propósito: nenhum evento sai do servidor para
-// terceiros. A estrutura existe para o Meta Conversions API (e equivalentes)
-// entrar sem tocar em rota, webhook ou coletor — só um adapter novo aqui.
+// Saída SERVER-SIDE de marketing. Meta recebe apenas a primeira assinatura
+// paga, com configuração explícita e consentimento. Falhas não impedem
+// o registro first-party nem a entrega do produto.
 //
 // Regra que todo adapter herda e não pode contornar: um evento só é
 // encaminhado a um adapter que exige consentimento quando a escolha do
@@ -15,6 +14,7 @@
 // falha de adapter nunca impede o registro nem derruba a rota.
 
 import type { AnalyticsEvent, AnalyticsProps } from './events'
+import { metaConversionsAdapter, metaConversionsConfigured } from './adapters/meta-conversions'
 import type { MarketingConsentSnapshot } from './stripe-metadata'
 
 export interface ServerAdapterEvent {
@@ -29,6 +29,8 @@ export interface ServerAdapterEvent {
    *  deduplicar com o Pixel do browser quando a CAPI entrar. */
   dedupeKey: string | null
   consent: MarketingConsentSnapshot
+  fbc?: string | null
+  fbp?: string | null
   props: AnalyticsProps
 }
 
@@ -41,11 +43,11 @@ export interface ServerAdapter {
   send(event: ServerAdapterEvent): Promise<void>
 }
 
-// Meta CAPI entra aqui quando for implementado. Vazio = nada sai do servidor.
-const REGISTRY: ReadonlyArray<ServerAdapter> = []
+// O adapter só é elegível com configuração explícita em produção.
+const REGISTRY: ReadonlyArray<ServerAdapter> = [metaConversionsAdapter]
 
 export function registeredServerAdapters(): ReadonlyArray<ServerAdapter> {
-  return REGISTRY
+  return metaConversionsConfigured() ? REGISTRY : []
 }
 
 /** Decide se um adapter pode receber o evento. Puro, para teste. */
@@ -58,7 +60,7 @@ export function adapterMayReceive(adapter: ServerAdapter, event: ServerAdapterEv
 /** Encaminha a cada adapter elegível. Nunca lança. */
 export async function forwardServerEvent(
   event: ServerAdapterEvent,
-  adapters: ReadonlyArray<ServerAdapter> = REGISTRY,
+  adapters: ReadonlyArray<ServerAdapter> = registeredServerAdapters(),
 ): Promise<void> {
   for (const adapter of adapters) {
     if (!adapterMayReceive(adapter, event)) continue
