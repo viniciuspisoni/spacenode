@@ -26,6 +26,31 @@ Fontes verificadas em 2026-10-01:
 - [H3.1 multiview: preço](https://fal.ai/models/tripo3d/h3.1/multiview-to-3d)
 - [H3.1 multiview: ordem e schema](https://fal.ai/models/tripo3d/h3.1/multiview-to-3d/api)
 
+### API direta da Tripo versus fal (consulta em 2026-10-01)
+
+A [tabela oficial do H3.1](https://developers.tripo3d.ai/en/models/v3-1)
+marca 40 créditos para uma imagem ou multiview com textura detalhada; na
+[conversão publicada de 100 créditos por US$1](https://docs.tripo3d.ai/get-started/pricing.html),
+isso equivale a US$0,40. A fal publica os mesmos US$0,40 para a mesma
+configuração. Geometria detalhada acrescenta 20 créditos/US$0,20 em ambas.
+Sem desconto contratado ou diferença real na fatura, migrar para a API
+direta não aumenta a margem projetada dos 190 nodes nem muda o modelo.
+
+A API direta permite fixar o snapshot `v3.1-20260211`, consultar
+`credits_consumed` por tarefa e usa crédito congelado que é liberado quando
+a tarefa falha. A fal também não cobra falha de infraestrutura (HTTP 500+),
+embora uma falha de entrada detectada após uso de GPU possa ser cobrada.
+Portanto, não presumir economia da API direta com falhas; conferir eventos
+faturados por requisição. Os 12% de reserva permanecem para entregas
+estornadas após uma geração bem-sucedida, storage e demais variações.
+
+A troca de transporte exigiria uma chave `TRIPO_API_KEY`, adaptar submissão
+e polling, autorizar a origem dos arquivos da Tripo no rehost, registrar
+`provider=tripo` na persistência e preservar a reconciliação dos jobs fal
+existentes. A API direta limita H-series a três tarefas simultâneas por
+conta. Manter fal no PR e só considerar a troca após um teste lado a lado de
+custo faturado, latência, falhas e arquivos GLB no mesmo conjunto de fotos.
+
 ### Alternativas recentes (consulta em 2026-10-01)
 
 | Motor fal com PBR/textura | Custo por geração | Nodes para 80% no piso legado | Margem se cobrar 190 nodes |
