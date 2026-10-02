@@ -202,6 +202,12 @@ class FakeCamera
     @aspect_ratio = 0.0
   end
 
+  # Paralela por padrão: camera_facts pula o bloco de lente/olho e testa só
+  # o que o dublê consegue responder (sombras, estilo).
+  def perspective?
+    false
+  end
+
   def eye
     Geom::Point3d.new(0, 0, 0)
   end
@@ -239,11 +245,15 @@ end
 
 class FakeModel
   attr_reader :ops
+  # 1.9.0: camera_facts lê sombras e modo de render do modelo (só leitura).
+  attr_accessor :shadow_info, :rendering_options
 
   def initialize
     @attrs = {}
     @ops = []
     @view = FakeView.new
+    @shadow_info = { 'DisplayShadows' => true }
+    @rendering_options = FakeRenderingOptions.new('RenderMode' => 3)
   end
 
   def get_attribute(dict, key, default = nil)
@@ -528,7 +538,7 @@ class SpaceNodeRubyTest < Minitest::Test
     pair_device!(expired: true)
     script_http(
       '/api/sketchup/pair/refresh' => [{ :ok => { 'accessToken' => 'tok-new', 'expiresAt' => Time.now.to_i + 3600 } }],
-      '/api/sketchup/catalog' => [{ :error => ['Erro HTTP 401', 401] }, { :ok => { 'version' => 9, 'engines' => [] } }]
+      '/api/sketchup/catalog' => [{ :error => ['Erro HTTP 401', 401] }, { :ok => { 'version' => PLUGIN::CATALOG_MIN_VERSION, 'engines' => [] } }]
     )
     PLUGIN.refresh_catalog
     assert_equal ['/api/sketchup/pair/refresh', '/api/sketchup/catalog', '/api/sketchup/pair/refresh', '/api/sketchup/catalog'],
@@ -561,9 +571,18 @@ class SpaceNodeRubyTest < Minitest::Test
     assert(events('error').any? { |e| e['authExpired'] })
   end
 
+  # Catálogo em disco anterior ao formato atual (ex.: sem engines[].supports da
+  # v10) não pode ser servido: o painel leria campos que não existem.
+  def test_cached_catalog_older_than_min_version_is_discarded
+    stale = { 'version' => PLUGIN::CATALOG_MIN_VERSION - 1, 'engines' => [{ 'id' => 'quasar' }] }
+    PLUGIN.write_json_default('catalog_json', JSON.generate(stale))
+    Sketchup.write_default(PREF, 'catalog_at', Time.now.to_i)
+    assert_nil PLUGIN.cached_catalog, 'cache abaixo de CATALOG_MIN_VERSION é descartado'
+  end
+
   def test_on_panel_ready_serves_cached_catalog_and_renews_before_session
     pair_device!(expired: true)
-    cached = { 'version' => 9, 'engines' => [{ 'id' => 'quasar' }] }
+    cached = { 'version' => PLUGIN::CATALOG_MIN_VERSION, 'engines' => [{ 'id' => 'quasar' }] }
     PLUGIN.write_json_default('catalog_json', JSON.generate(cached))
     Sketchup.write_default(PREF, 'catalog_at', Time.now.to_i)
     script_http(
@@ -579,6 +598,100 @@ class SpaceNodeRubyTest < Minitest::Test
   end
 
   # ── Preparação fotorrealista da captura ──────────────────────────────────
+
+  # ── 1.9.0 ──────────────────────────────────────────────────────────────
+
+  # O painel avisa antes de cobrar: sombras desligadas e estilo de linha
+  # entram nos fatos da câmera, lidos do modelo sem escrever nada.
+  def test_camera_facts_report_shadows_and_line_style_without_touching_the_model
+    view = FakeView.new
+    $spn_model.shadow_info['DisplayShadows'] = false
+    $spn_model.rendering_options = FakeRenderingOptions.new('RenderMode' => 1)
+    facts = PLUGIN.camera_facts(view, view.camera)
+    assert_equal false, facts[:shadowsOn]
+    assert_equal 1, facts[:renderMode]
+    assert_equal true, facts[:lineStyle]
+    assert_empty $spn_model.rendering_options.written, 'camera_facts só lê'
+
+    $spn_model.shadow_info['DisplayShadows'] = true
+    $spn_model.rendering_options = FakeRenderingOptions.new('RenderMode' => 3)
+    facts = PLUGIN.camera_facts(view, view.camera)
+    assert_equal true, facts[:shadowsOn]
+    assert_equal 3, facts[:renderMode]
+    assert_nil facts[:lineStyle]
+  end
+
+  # Mapa de arestas sem tinta é descartado; com tinta fica; falha de leitura
+  # mantém o mapa (o servidor valida de novo).
+  def test_edge_map_blank_detects_a_map_without_ink
+    blank = File.join(Dir.tmpdir, 'spn-edge-blank.png')
+    make_image(blank, 64, 64, 24, 0) { |_x, _y| [255, 255, 255] }
+    assert_equal true, PLUGIN.edge_map_blank?(blank)
+
+    inked = File.join(Dir.tmpdir, 'spn-edge-inked.png')
+    make_image(inked, 64, 64, 32, 0) { |x, y| (x % 16).zero? || (y % 8).zero? ? [0, 0, 0] : [255, 255, 255] }
+    assert_equal false, PLUGIN.edge_map_blank?(inked)
+
+    faint = File.join(Dir.tmpdir, 'spn-edge-faint.png')
+    # Só 1 coluna escura em 64: 1/4 das colunas amostradas (0,16,32,48) → 25 % — não é vazio.
+    make_image(faint, 64, 64, 24, 0) { |x, _y| x.zero? ? [0, 0, 0] : [255, 255, 255] }
+    assert_equal false, PLUGIN.edge_map_blank?(faint)
+
+    assert_equal false, PLUGIN.edge_map_blank?('/nope/missing.png'), 'falha de leitura mantém o mapa'
+  end
+
+  # Cancelar conta se o POST que cobra já tinha saído — sem relógio.
+  def test_cancel_reports_whether_the_charging_post_had_left
+    PLUGIN.instance_variable_set(:@generating, true)
+    PLUGIN.instance_variable_set(:@generate_request, nil)
+    PLUGIN.handle_cancel
+    idle = events('status').last
+    assert_equal 'idle', idle['stage']
+    assert_equal true, idle['cancelled']
+    assert_equal false, idle['posted']
+
+    PLUGIN.instance_variable_set(:@generating, true)
+    PLUGIN.instance_variable_set(:@generate_request, Object.new) # request.cancel levanta → rescue
+    PLUGIN.handle_cancel
+    assert_equal true, events('status').last['posted']
+  end
+
+  # O veredito do servidor sobre a semente viaja no resultado; sem o campo
+  # (servidor antigo) fica nil e o lote segue compartilhando como antes.
+  def test_finish_generation_keeps_the_server_verdict_on_the_seed
+    stubs = { :persist_last_result => proc { |_r| }, :journal_add => proc { |_e| }, :notify_panel => proc { |_m| } }
+    stubs.each { |name, body| PLUGIN.define_singleton_method(name, &body) }
+    begin
+      PLUGIN.instance_variable_set(:@generating, true)
+      PLUGIN.finish_generation({ 'outputUrl' => 'https://x/a.png', 'seed' => 77, 'seedApplied' => false })
+      assert_equal false, events('result').last['seedApplied']
+      assert_equal 77, events('result').last['seed']
+
+      PLUGIN.instance_variable_set(:@generating, true)
+      PLUGIN.finish_generation({ 'outputUrl' => 'https://x/b.png', 'seed' => 78 })
+      assert_nil events('result').last['seedApplied']
+    ensure
+      stubs.each_key { |name| PLUGIN.singleton_class.send(:remove_method, name) }
+    end
+  end
+
+  # O corpo do /api/generate leva a origem declarada e, na correção, a MESMA
+  # semente com structuralBoost — nunca sem semente e nunca com âncora.
+  def test_generate_payload_declares_the_client_and_carries_the_structural_boost
+    base = { 'projectType' => 'interior', 'engine' => 'vega', 'resolution' => '2k' }
+    body = PLUGIN.build_generate_payload('src-key', base)
+    assert_equal({ :kind => 'sketchup', :version => PLUGIN::VERSION }, body[:client])
+    refute body.key?(:structuralBoost)
+    refute body.key?(:seed)
+
+    boosted = PLUGIN.build_generate_payload('src-key', base.merge('structuralBoost' => true, 'seed' => 777))
+    assert_equal 777, boosted[:seed]
+    assert_equal true, boosted[:structuralBoost]
+    refute boosted.key?(:anchorUrl)
+
+    no_seed = PLUGIN.build_generate_payload('src-key', base.merge('structuralBoost' => true))
+    refute no_seed.key?(:structuralBoost), 'sem semente não há o que corrigir'
+  end
 
   def test_capture_kills_the_graphic_stroke_and_keeps_the_thin_edge
     opts = SpaceNode::SketchUp::CLEAN_CAPTURE_OPTIONS
@@ -624,6 +737,47 @@ class SpaceNodeRubyTest < Minitest::Test
     assert_equal false, ro['ShowViewName']
     PLUGIN.restore_rendering_options(ro, saved)
     assert_equal antes, ro.snapshot, 'estado anterior restaurado chave a chave'
+  end
+
+  # O passe do edge map liga aresta, tira céu/chão e fixa fundo branco /
+  # aresta preta — e devolve TUDO; a foto (CLEAN) não carrega nenhuma dessas
+  # chaves, porque ela respeita o estilo do usuário.
+  def test_edge_pass_neutralises_sky_and_colours_only_during_the_pass
+    colors = PLUGIN.edge_pass_colors
+    assert_equal %w[BackgroundColor FaceBackColor FaceFrontColor ForegroundColor], colors.keys.sort
+    sky = Sketchup::Color.new(120, 160, 220)
+    ro = FakeRenderingOptions.new(
+      'RenderMode' => 3, 'EdgeDisplayMode' => 0, 'DrawHorizon' => true, 'DrawGround' => true,
+      'EdgeColorMode' => 1, 'SectionCutWidth' => 3, 'BackgroundColor' => sky, 'ForegroundColor' => sky,
+      'FaceFrontColor' => sky, 'FaceBackColor' => sky, 'DisplayFog' => true
+    )
+    antes = ro.snapshot
+    saved = PLUGIN.apply_rendering_options(ro, PLUGIN::EDGE_CAPTURE_OPTIONS.merge(colors))
+    assert_equal 1, ro['RenderMode'], 'hidden line'
+    assert_equal 1, ro['EdgeDisplayMode'], 'aresta ligada mesmo em estilo sem arestas'
+    assert_equal false, ro['DrawHorizon']
+    assert_equal false, ro['DrawGround']
+    assert_equal 0, ro['EdgeColorMode']
+    assert_equal 1, ro['SectionCutWidth']
+    assert_equal 255, ro['BackgroundColor'].red
+    assert_equal 0, ro['ForegroundColor'].red
+    PLUGIN.restore_rendering_options(ro, saved)
+    assert_equal antes, ro.snapshot, 'o passe do edge devolve o estilo inteiro'
+    %w[EdgeDisplayMode DrawHorizon DrawGround EdgeColorMode BackgroundColor ForegroundColor].each do |k|
+      refute PLUGIN::CLEAN_CAPTURE_OPTIONS.key?(k), "a foto não força #{k}"
+    end
+  end
+
+  # O Ruby 2.6 desta máquina não prova o que o 3.2 do SketchUp removeu:
+  # uma varredura estática barra as APIs que sumiram.
+  def test_no_api_removed_in_ruby_3_is_used
+    removed = /File\.exists\?|Dir\.exists\?|URI\.(escape|encode|decode)\b|\.filter_map\b|\.tally\b|Fixnum|Bignum/
+    %w[sketchup/spacenode.rb sketchup/spacenode/main.rb sketchup/spacenode/glass_bar.rb].each do |rel|
+      File.readlines(File.expand_path("../#{rel}", __dir__), :encoding => 'UTF-8').each_with_index do |line, i|
+        code = line.sub(/#.*/, '')
+        refute_match removed, code, "#{rel}:#{i + 1}"
+      end
+    end
   end
 
   def test_rendering_options_skip_keys_absent_in_old_sketchup
@@ -781,6 +935,44 @@ class SpaceNodeRubyTest < Minitest::Test
     assert_equal cv['y'] + cv['h'] / 2, y + sv['caret']['y']
   end
 
+  # A marca do atlas é o N estrutural do manual v2 (três partes, juntas
+  # abertas): numa linha a 22 % da altura do sprite icon_panel há TRÊS blocos
+  # opacos (apoio | ligação | apoio). O N "micro" sólido de antes da 1.9.0
+  # tinha dois — e voltou a aparecer uma vez porque o gerador lia só o
+  # primeiro <path> do SVG. As dicas rasterizadas levam a grafia do manual.
+  # Conta blocos opacos numa linha de alfa (BGRA, 4º byte): é o critério que
+  # separa o N estrutural (3) do N sólido antigo (2).
+  def opaque_blocks(pixels, atlas_w, sprite, frac)
+    y = sprite['y'] + (sprite['h'] * frac).round
+    blocks = 0
+    prev = false
+    sprite['w'].times do |i|
+      opaque = pixels.getbyte(((y * atlas_w) + sprite['x'] + i) * 4 + 3) > 128
+      blocks += 1 if opaque && !prev
+      prev = opaque
+    end
+    blocks
+  end
+
+  def test_opaque_block_counter_tells_the_old_solid_n_from_the_structural_one
+    # Linha sintética de 28 px: [apoio][vão][ligação][vão][apoio] → 3; sem os vãos → 2.
+    row = ->(pattern) { pattern.chars.map { |c| [0, 0, 0, c == '#' ? 255 : 0].pack('C4') }.join }
+    sprite = { 'x' => 0, 'y' => 0, 'w' => 28, 'h' => 1 }
+    assert_equal 3, opaque_blocks(row.call('######....########....######'), 28, sprite, 0)
+    assert_equal 2, opaque_blocks(row.call('##########....##############'), 28, sprite, 0)
+    assert_equal 1, opaque_blocks(row.call('############################'), 28, sprite, 0)
+  end
+
+  def test_atlas_mark_is_the_structural_n_and_tips_use_the_brand_spelling
+    %w[1 1.25 1.5 2].each do |scale|
+      json = JSON.parse(File.read(File.join(GLASS_DIR, "#{scale}.json")))
+      pixels = Zlib.inflate(File.binread(File.join(GLASS_DIR, "#{scale}.bin.z")))
+      blocks = opaque_blocks(pixels, json['atlas']['w'], json['sprites']['icon_panel'], 0.22)
+      assert_equal 3, blocks, "escala #{scale}: a marca do atlas não é o N estrutural"
+      refute_match(/SPACENODE/, JSON.generate(json['labels']), "escala #{scale}: dica com grafia antiga")
+    end
+  end
+
   # Cada escala precisa ter os MESMOS sprites e pixels do tamanho anunciado:
   # é o que o Ruby copia direto pra DIB sem conferir nada.
   def test_every_scale_ships_the_same_sprites_and_a_consistent_atlas
@@ -810,7 +1002,12 @@ class SpaceNodeRubyTest < Minitest::Test
     GLASS.define_singleton_method(:show) { |*args, **_kw| calls << args[0, 3]; shown }
     yield calls
   ensure
-    originals.each { |m, orig| GLASS.define_singleton_method(m) { |*a, **k, &b| orig.call(*a, **k, &b) } }
+    # Ruby < 3 passa **k vazio como um Hash posicional e quebra métodos de
+    # aridade zero (available?): só repassa kwargs quando existem — assim o
+    # harness roda no Ruby 2.6 do macOS e no 3.2 do SketchUp.
+    originals.each do |m, orig|
+      GLASS.define_singleton_method(m) { |*a, **k, &b| k.empty? ? orig.call(*a, &b) : orig.call(*a, **k, &b) }
+    end
   end
 
   # No Windows a barra nativa vem primeiro; se ela não nasce, o HtmlDialog
