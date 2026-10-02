@@ -998,8 +998,8 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
 
           {!sheet && (
             <p className="spn-hint">
-              Tudo já vem decidido. O que você não pedir aqui é preservado do jeito
-              que está no seu modelo.
+              Tudo já vem decidido. O que você não pedir aqui fica como está no seu
+              modelo.
             </p>
           )}
         </div>
@@ -1044,7 +1044,7 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
             <span className="spn-field-label">Iluminação</span>
             <PillGroup label="Iluminação" options={lightingOpts} value={lighting} onChange={setLighting} />
             <p className="spn-hint">
-              &quot;Preservar Original&quot; mantém exatamente a luz que já está no seu modelo.
+              &quot;Preservar Original&quot; mantém a luz que já está no seu modelo.
             </p>
           </div>
         </ContextPanel>

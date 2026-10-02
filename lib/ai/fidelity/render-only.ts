@@ -230,8 +230,22 @@ export function buildRenderOnlyEscalation(attempt: number): string {
 // Condicionamento estrutural: quando o retry anexa o edge map (lineart
 // extraído do original) como imagem extra, este bloco explica o papel dela.
 // imageIndex é 1-based, na ordem de image_urls.
-export function buildEdgeMapBlock(imageIndex: number | null | undefined): string {
+export function buildEdgeMapBlock(imageIndex: number | null | undefined, native = false): string {
   if (!imageIndex) return ''
+  // Mapa NATIVO (plugin SketchUp 1.9.0): hidden-line do modelo 3D, mesma câmera,
+  // alinhado pixel a pixel. Não é extração automática ruidosa — é o desenho
+  // exato do projeto, e o texto cobra alinhamento estrito. Sem o sinal o
+  // bloco do web segue byte a byte.
+  if (native) {
+    return (
+      `STRUCTURAL CONSTRAINT MAP: image #${imageIndex} is the EXACT hidden-line drawing of the 3D model, ` +
+      'rendered from the very same camera as the reference (pixel-aligned, no shadows, no profiles). ' +
+      'Every line is a true geometric edge — wall corners, slab edges, mullions, joints, steps, openings. ' +
+      'It is a CONSTRAINT, not content: every architectural edge, opening contour and object silhouette of ' +
+      'your output must align with these lines exactly; where the reference shading is ambiguous, these lines win. ' +
+      'Do NOT imitate its graphic style: the output is a photograph whose underlying structure matches these lines. '
+    )
+  }
   return (
     `STRUCTURAL CONSTRAINT MAP: image #${imageIndex} is an automatically extracted edge/line map of the ` +
     'reference geometry. It is a CONSTRAINT, not content: every architectural edge, opening contour and object ' +
@@ -318,6 +332,17 @@ export interface FidelityAttemptOpts {
    *  Custo zero (sharp local + 1 upload). A telemetria (edge_map_used por
    *  tentativa em generation_log.fidelity.attempts) permite A/B por período. */
   edgeFromFirstAttempt?: boolean
+  /** Mídia em 'ultra_high' já na 1ª tentativa (1.9.0): com edge map NATIVO o
+   *  modelo tokeniza em detalhe máximo a imagem que mais importa — esquadria
+   *  fina e junta de paginação são o que a tokenização 'high' perde. Mesmo
+   *  nível que os retries já usam. OPT-IN (RENDER_FIDELITY_NATIVE_ULTRA=1): o
+   *  custo de tokens de entrada da 1ª tentativa ainda não foi medido, e um
+   *  default cego em produção contraria a régua do projeto (medir antes). */
+  ultraFromFirstAttempt?: boolean
+}
+
+export function nativeUltraFromFirstAttempt(): boolean {
+  return process.env.RENDER_FIDELITY_NATIVE_ULTRA === '1'
 }
 
 export function getFidelityAttemptParams(
@@ -329,14 +354,18 @@ export function getFidelityAttemptParams(
   // Retries escalam a tokenização pra ULTRA_HIGH (só por parte existe esse
   // nível); 'off' desliga tudo, inclusive a escalada.
   const mediaResolution: InputMediaResolution | null =
-    mediaDefault === null ? null : attempt >= 2 ? 'ultra_high' : mediaDefault
+    mediaDefault === null ? null : (attempt >= 2 || opts?.ultraFromFirstAttempt) ? 'ultra_high' : mediaDefault
   if (attempt <= 1) {
     return { temperature: 0.2, useEdgeMap: opts?.edgeFromFirstAttempt ?? false, thinkingLevel, mediaResolution, seedOffset: 0 }
   }
   if (attempt === 2) {
     return { temperature: 0.2, useEdgeMap: true, thinkingLevel, mediaResolution, seedOffset: 0 }
   }
-  return { temperature: 0.2, useEdgeMap: true, thinkingLevel, mediaResolution, seedOffset: 1 }
+  // attempt 3 → seed+1 (inalterado); attempt 4 → seed+2: o "Corrigir
+  // automaticamente" com mapa nativo começa no ladder 3 e o retry dele (4)
+  // precisa de amostra nova — com offset fixo em 1 repetia o 3 byte a byte.
+  // O web nunca passa do ladder 3 (maxAttempts ≤ 3, boost web +1).
+  return { temperature: 0.2, useEdgeMap: true, thinkingLevel, mediaResolution, seedOffset: attempt - 2 }
 }
 
 // Condicionamento por DEPTH MAP (Fase 3, experimental — default OFF): edges

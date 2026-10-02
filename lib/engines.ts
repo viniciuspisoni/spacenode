@@ -24,7 +24,7 @@ export const ENGINES: Record<EngineId, EngineConfig> = {
     id:          'vega',
     name:        'Vega',
     tagline:     'Premium',
-    description: 'Fidelidade absoluta. Entrega final, edição preserva o projeto pixel-by-pixel.',
+    description: 'Entrega final. Maior aderência ao projeto; a edição mantém o que não foi pedido.',
     falEndpoint: 'fal-ai/nano-banana-pro/edit',
     resolutions: ['2k', '4k'],
     nodes:       { '2k': 20, '4k': 40 },

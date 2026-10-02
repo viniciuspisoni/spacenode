@@ -27,6 +27,9 @@ import {
   isValidCombination,
 } from '@/lib/engines'
 import { falParamsForEngine } from '@/lib/ai/engine-params'
+import { nativeUltraFromFirstAttempt } from '@/lib/ai/fidelity/render-only'
+import { validateNativeEdgeMap } from '@/lib/ai/fidelity/native-edge'
+import { detectClient } from '@/lib/sketchup/client-info'
 import {
   DEFAULT_ORION_QUALITY,
   DEFAULT_ORION_VARIANT,
@@ -260,6 +263,7 @@ export async function POST(req: NextRequest) {
       seed: providedSeed,
       edgeMapKey,
       modelFacts: rawModelFacts,
+      client: rawClient,
     } = body as {
       imageBase64?:    string
       sourceKey?:      string
@@ -291,7 +295,11 @@ export async function POST(req: NextRequest) {
       edgeMapKey?:      string
       /** Fatos medidos do modelo 3D (câmera/sol) — sanitizados abaixo. */
       modelFacts?:      unknown
+      /** Origem declarada (plugin SketchUp manda { kind: 'sketchup', version }). */
+      client?:          unknown
     }
+    const client = detectClient(req.headers.get('user-agent'), rawClient)
+    if (client.kind !== 'unknown') console.log('[generate] client     :', client.kind, client.version ?? '')
 
     // Fidelidade é SEMPRE máxima. Os níveis "Equilibrado"/"Criativo" foram
     // descontinuados (deixavam a IA alucinar no projeto) — o servidor coage
@@ -429,7 +437,7 @@ export async function POST(req: NextRequest) {
     const generationStartedAt = new Date().toISOString()
     after(() => trackServerEvent(admin, {
       event: 'generation_started', userId: user.id, req, feature: 'renderizar', occurredAt: generationStartedAt,
-      props: { engine, resolution },
+      props: { engine, resolution, client: client.kind },
     }))
     if (debit && debit.from_lumens > 0) {
       console.log('[generate] débito misto:', debit.from_plan, 'plano +', debit.from_lumens, 'lumens')
@@ -627,6 +635,48 @@ export async function POST(req: NextRequest) {
     }
     options.briefing = resolvedBriefing
 
+    // Edge map NATIVO (plugin SketchUp): captura hidden-line da MESMA câmera,
+    // validado e hospedado ANTES do ladder (1.9.0) porque o deslocamento do
+    // "Corrigir automaticamente" depende de ele ter entrado na 1ª tentativa.
+    // subida por upload direto — verdade geométrica de origem, superior ao
+    // edge map derivado do pixel. Falha aqui NUNCA derruba a geração: cai
+    // pro derivado de sempre.
+    let edgeMapUrl: string | null = null
+    let edgeMapNative = false
+    let edgeMapNativeRejected: string | null = null
+    if (renderOnlyActive && typeof edgeMapKey === 'string' && edgeMapKey) {
+      try {
+        // Teto de 15s: roda pós-débito dentro do orçamento de 280s — um
+        // storage lento não pode comer o tempo das tentativas de geração.
+        const native = await Promise.race([
+          (async () => {
+            const edge = await downloadDirectUpload(
+              admin, DIRECT_UPLOAD_AREAS['render-source'], user.id, {}, edgeMapKey,
+            )
+            if (!edge.ok) {
+              console.warn('[generate:fidelity] edge map nativo rejeitado (segue derivado):', edge.message)
+              return null
+            }
+            const checked = await validateNativeEdgeMap(edge.buffer, sourceSize)
+            if (!checked.ok) {
+              console.warn('[generate:fidelity] edge map nativo rejeitado (segue derivado):', checked.reason)
+              edgeMapNativeRejected = checked.reason
+              return null
+            }
+            return hostAuxImage(checked.png, 'image/png', 'edge-map.png')
+          })(),
+          new Promise<null>(resolve => setTimeout(() => resolve(null), 15_000)),
+        ])
+        if (native) {
+          edgeMapUrl = native
+          edgeMapNative = true
+          devLog('[generate:fidelity] edge map nativo em uso:', edgeMapKey)
+        }
+      } catch (edgeErr) {
+        console.warn('[generate:fidelity] edge map nativo indisponível (segue derivado):', (edgeErr as Error).message)
+      }
+    }
+
     // Seed fixa por request: retries do ladder viram variação CONTROLADA da
     // mesma amostra (só o condicionamento muda; a tentativa 3 desloca a seed
     // de propósito — seedOffset) e o render fica reproduzível. Vale nos DOIS
@@ -639,8 +689,12 @@ export async function POST(req: NextRequest) {
 
     // "Corrigir drift": começa o ladder já na postura de retry — temperatura
     // baixa, edge map anexado e bloco de escalada no prompt desde o 1º shot.
-    const attemptOffset = structuralBoost === true && renderOnlyActive ? 1 : 0
-    if (attemptOffset > 0) console.log('[generate] structural boost ativo (ladder deslocado)')
+    // Com o edge map NATIVO aceito, a 1ª tentativa já roda com o mapa e os
+    // knobs de retry: o boost com offset 1 repetiria a tentativa 2 que o
+    // servidor já reprovou (mesma seed, mesmo condicionamento). Parte da 3ª
+    // (seedOffset 1) — a amostra muda, o condicionamento continua no máximo.
+    const attemptOffset = structuralBoost === true && renderOnlyActive ? (edgeMapNative && !hasAnchor ? 2 : 1) : 0
+    if (attemptOffset > 0) console.log('[generate] structural boost ativo (ladder deslocado', attemptOffset, ')')
 
     // Orçamento de tempo: retries só rodam se sobrar tempo real de geração
     // (a Vercel mata a função no maxDuration — margem pra persistência).
@@ -657,6 +711,7 @@ export async function POST(req: NextRequest) {
       media_resolution: string | null
       seed:             number
       edge_map_used:  boolean
+      edge_map_native: boolean
       fallback_used:  boolean
       hedge_used:     boolean
       duration_ms:    number
@@ -664,7 +719,6 @@ export async function POST(req: NextRequest) {
       score_error?:   string
     }
 
-    let edgeMapUrl: string | null = null
     let depthMapUrl: string | null = null
     let finalPrompt = ''
     let best: { gen: AttemptOutcome; prompt: string; score: number | null; buffer: Buffer | null } | null = null
@@ -689,38 +743,6 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Edge map NATIVO (plugin SketchUp): captura hidden-line da MESMA câmera,
-    // subida por upload direto — verdade geométrica de origem, superior ao
-    // edge map derivado do pixel. Falha aqui NUNCA derruba a geração: cai
-    // pro derivado de sempre.
-    let edgeMapNative = false
-    if (renderOnlyActive && typeof edgeMapKey === 'string' && edgeMapKey) {
-      try {
-        // Teto de 15s: roda pós-débito dentro do orçamento de 280s — um
-        // storage lento não pode comer o tempo das tentativas de geração.
-        const native = await Promise.race([
-          (async () => {
-            const edge = await downloadDirectUpload(
-              admin, DIRECT_UPLOAD_AREAS['render-source'], user.id, {}, edgeMapKey,
-            )
-            if (!edge.ok) {
-              console.warn('[generate:fidelity] edge map nativo rejeitado (segue derivado):', edge.message)
-              return null
-            }
-            return hostAuxImage(edge.buffer, edge.mime || 'image/png', 'edge-map.png')
-          })(),
-          new Promise<null>(resolve => setTimeout(() => resolve(null), 15_000)),
-        ])
-        if (native) {
-          edgeMapUrl = native
-          edgeMapNative = true
-          devLog('[generate:fidelity] edge map nativo em uso:', edgeMapKey)
-        }
-      } catch (edgeErr) {
-        console.warn('[generate:fidelity] edge map nativo indisponível (segue derivado):', (edgeErr as Error).message)
-      }
-    }
-
     // Gate opcional de cor (score v2): só quando o usuário NÃO pediu mudança
     // que legitimamente altera cores — luz nova, override de material ou
     // refinamento. Nesses casos o ΔE alto é pedido, não drift.
@@ -739,6 +761,10 @@ export async function POST(req: NextRequest) {
         // clássico — a âncora já ancora a estrutura. Um edge map NATIVO
         // presente também força edge-first: é estritamente melhor.
         edgeFromFirstAttempt: (fidelityCfg.edgeFirst || edgeMapNative) && !hasAnchor,
+        // Edge nativo presente → a imagem que mais importa entra tokenizada
+        // em detalhe máximo desde o 1º shot (só GCP/Vega-Pulsar; os outros
+        // caminhos ignoram o knob). Opt-in: RENDER_FIDELITY_NATIVE_ULTRA=1.
+        ultraFromFirstAttempt: edgeMapNative && !hasAnchor && nativeUltraFromFirstAttempt(),
       })
 
       // Condicionamento estrutural nos retries: lineart do original anexado
@@ -758,7 +784,9 @@ export async function POST(req: NextRequest) {
           edgeMapImageIndex = imageUrls.length
           imageLabels = [
             ...baseImageLabels,
-            `Image #${edgeMapImageIndex} — STRUCTURAL CONSTRAINT MAP (edge/line map of the reference geometry; align every edge to it, never imitate its graphic style):`,
+            edgeMapNative
+              ? `Image #${edgeMapImageIndex} — EXACT HIDDEN-LINE MAP from the 3D model (same camera, pixel-aligned; every line is a true geometric edge — align to it exactly, never imitate its graphic style):`
+              : `Image #${edgeMapImageIndex} — STRUCTURAL CONSTRAINT MAP (edge/line map of the reference geometry; align every edge to it, never imitate its graphic style):`,
           ]
         } catch (edgeErr) {
           console.warn('[generate:fidelity] edge map indisponível (segue sem):', (edgeErr as Error).message)
@@ -800,6 +828,7 @@ export async function POST(req: NextRequest) {
       finalPrompt = buildFidelityPrompt(options, fidelityLevel, resolvedBriefing, {
         attempt: ladderAttempt,
         edgeMapImageIndex,
+        edgeMapNative: edgeMapNative && edgeMapImageIndex !== null,
         depthMapImageIndex,
         materialSamples: materialSamples.length > 0 ? materialSamples : undefined,
       })
@@ -915,6 +944,7 @@ export async function POST(req: NextRequest) {
         media_resolution: params.mediaResolution,
         seed:             attemptSeed,
         edge_map_used:  edgeMapImageIndex !== null,
+        edge_map_native: edgeMapNative && edgeMapImageIndex !== null,
         fallback_used:  gen.fallbackUsed,
         hedge_used:     gen.hedgeUsed,
         duration_ms:    gen.latencyMs,
@@ -1074,6 +1104,9 @@ export async function POST(req: NextRequest) {
       briefing:      resolvedBriefing ?? null,
       // Fase 2 do plugin SketchUp: telemetria do condicionamento nativo.
       edge_map_native: edgeMapNative || undefined,
+      edge_map_native_rejected: edgeMapNativeRejected ?? undefined,
+      // 1.9.0: origem declarada do pedido (plugin manda kind + versão).
+      client:          client.kind === 'unknown' ? undefined : client,
       model_facts:     options.modelFacts ?? undefined,
       orion:           isOrion
         ? { variant: orionVariant, quality: orionQuality, provider: orionGen?.provider ?? orionProvider() }
@@ -1140,6 +1173,7 @@ export async function POST(req: NextRequest) {
         // a seed efetiva por tentativa fica em fidelity.attempts[].seed).
         seed:            generationSeed,
         structural_boost: attemptOffset > 0,
+        structural_boost_offset: attemptOffset,
         aspect_ratio:    aspectRatio,
         briefing_source: briefingSource,
         anchor_used: hasAnchor,
@@ -1308,6 +1342,15 @@ export async function POST(req: NextRequest) {
       // Seed usada (caminho GCP) — o client reenvia no "Corrigir drift" pra
       // manter a mesma amostra e mudar só o condicionamento.
       seed:             generationSeed,
+      // 1.9.0: a seed só chega ao fornecedor em Vega/Pulsar — Quasar (Seedream)
+      // e Orion não têm o campo. O cliente usa isto pra não prometer lote
+      // "com a mesma semente" onde ela não vale.
+      seedApplied:      !isOrion && engine !== 'quasar',
+      // 1.9.0: o plugin manda o mapa nativo e precisa saber se ele passou na
+      // validação (senão o diário dele diz "com mapa" quando o servidor caiu
+      // pro derivado). Sem provider, só o veredito.
+      edgeMapNative:    edgeMapNative,
+      edgeMapRejected:  edgeMapNativeRejected,
       // Orion: o resultado precisa dizer com quem foi gerado e o que saiu de
       // fato — sem tokens, custo ou prompt (isso mora no Diagnóstico técnico
       // do Histórico, atrás de isInternalStaff).
