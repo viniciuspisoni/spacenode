@@ -63,8 +63,9 @@ function summaryFromRender(row: Row): GenerationSummary {
   }
 }
 
-function summaryFromEdit(row: Row, model?: string | null): GenerationSummary {
-  const status = str(row.status) ?? 'unknown'
+function summaryFromEdit(row: Row, model?: string | null, legacy = false): GenerationSummary {
+  // Legacy synchronous edits have no status column; a saved result proves completion.
+  const status = str(row.status) ?? (legacy && str(row.result_image_url) ? 'completed' : 'unknown')
   // edit_v3_jobs tem `charged` booleano; `edits` cobra sempre que completa.
   const cost = num(row.nodes_cost)
   const charged = typeof row.charged === 'boolean' ? (row.charged ? cost : 0) : cost
@@ -133,9 +134,9 @@ const SOURCES = {
     map: (r: Row) => summaryFromRender(r),
   },
   edits: {
-    full: 'id, status, engine, created_at, nodes_cost, error_message',
-    base: 'id, status, created_at',
-    map: (r: Row) => summaryFromEdit(r),
+    full: 'id, engine, created_at, nodes_cost, result_image_url',
+    base: 'id, created_at, result_image_url',
+    map: (r: Row) => summaryFromEdit(r, undefined, true),
   },
   edit_v3_jobs: {
     full: 'id, status, model, provider, created_at, nodes_cost, charged, error_message',

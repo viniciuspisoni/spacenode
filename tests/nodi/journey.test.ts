@@ -93,3 +93,26 @@ describe('atalho de conhecimento respeita intenção e continuidade', () => {
     expect(canUseKnowledgeShortcut('Como faço?', 0, true)).toBe(false)
   })
 })
+
+
+describe('compatibilidade com edições síncronas legadas', () => {
+  it.each([['https://storage.example/result.jpg', 'completed'], [null, 'unknown']])('resultado %s normaliza para %s sem exigir status', async (result, expected) => {
+    const projections: string[] = []
+    const db = { from(table: string) {
+      let projection = ''
+      const q = { select: (cols: string) => { projection = cols; if (table === 'edits') projections.push(cols); return q },
+        eq: () => q, order: () => q, limit: () => q,
+        then: (resolve: (r: unknown) => void) => Promise.resolve(table === 'edits'
+          ? projection.split(',').map(c => c.trim()).includes('status')
+            ? { data: null, error: { code: '42703' } }
+            : { data: [{ id: 'legacy-edit', created_at: '2026-10-02', result_image_url: result }], error: null }
+          : { data: [], error: null }).then(resolve),
+      }; return q
+    } }
+    const read = await readRecentGenerations(db as unknown as SupabaseClient, 'user-a')
+    expect(read.available).toBe(true)
+    expect(read.generations[0].status).toBe(expected)
+    expect(JSON.stringify(read.generations)).not.toContain('storage.example')
+    expect(projections.every(p => !p.split(',').map(c => c.trim()).includes('status'))).toBe(true)
+  })
+})
