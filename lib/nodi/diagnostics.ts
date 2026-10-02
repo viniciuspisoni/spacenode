@@ -108,6 +108,7 @@ async function resilientSelect(
   base: string,
   limit: number,
   id?: string,
+  onUnavailable?: () => void,
 ): Promise<Row[]> {
   for (const projection of [full, base]) {
     let q = supabase
@@ -119,8 +120,9 @@ async function resilientSelect(
     if (id) q = q.eq('id', id)
     const { data, error } = await q
     if (!error) return (data ?? []) as unknown as Row[]
-    if (error.code !== '42703') return [] // tabela ausente/permissão → fonte fora do ar, segue o baile
+    if (error.code !== '42703') { onUnavailable?.(); return [] } // tabela ausente/permissão → fonte fora do ar, segue o baile
   }
+  onUnavailable?.()
   return []
 }
 
@@ -153,20 +155,28 @@ export async function listRecentGenerations(
   userId: string,
   limit = 6,
 ): Promise<GenerationSummary[]> {
+  return (await readRecentGenerations(supabase, userId, limit)).generations
+}
+
+/** Preserves missing-source information: an outage is not an empty account. */
+export async function readRecentGenerations(
+  supabase: SupabaseClient, userId: string, limit = 8,
+): Promise<{ generations: GenerationSummary[]; available: boolean }> {
+  let available = true
   const perSource = await Promise.all(
-    (Object.keys(SOURCES) as (keyof typeof SOURCES)[]).map(async (table) => {
+    (Object.keys(SOURCES) as (keyof typeof SOURCES)[]).map(async table => {
       try {
-        const rows = await resilientSelect(supabase, table, userId, SOURCES[table].full, SOURCES[table].base, limit)
+        const rows = await resilientSelect(supabase, table, userId, SOURCES[table].full,
+          SOURCES[table].base, limit, undefined, () => { available = false })
         return rows.map(SOURCES[table].map)
       } catch {
+        available = false
         return [] as GenerationSummary[]
       }
     }),
   )
-  return perSource
-    .flat()
-    .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))
-    .slice(0, limit)
+  return { available, generations: perSource.flat()
+    .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? '')).slice(0, limit) }
 }
 
 /** Reexecuta a consulta de UMA geração e monta o relatório de diagnóstico. */

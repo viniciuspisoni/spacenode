@@ -16,6 +16,12 @@ const KINDS = ['render', 'edit', 'video', 'upscale', 'vista'] as const
 
 export const readTools: NodiTool[] = [
   {
+    name: 'consultar_jornada',
+    description: 'Etapa observada na conta, imagem de referência e próximo passo. Não comprova aprovação ou entrega; não representa somente o projeto aberto. Indisponibilidade não significa conta vazia.',
+    spec: {},
+    handler: async (_args, ctx) => ({ output: { jornada: ctx.request.journey ?? null } }),
+  },
+  {
     name: 'consultar_contexto',
     description: 'Onde o usuário está agora: rota, módulo, projeto/vista abertos, plano e saldo.',
     spec: {},

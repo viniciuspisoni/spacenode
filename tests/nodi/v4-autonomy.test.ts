@@ -84,18 +84,18 @@ describe('computeNextBestAction', () => {
     const a = computeNextBestAction({ recent: [], balance: 3, moduleId: null })!
     expect(a.href).toBe('/app/billing')
   })
-  it('render concluída sem ampliação → sugerir Ampliar com custo', () => {
+  it('render concluída → revisar antes de propor nova despesa', () => {
     const a = computeNextBestAction({ recent: [gen({})], balance: 500, moduleId: null })!
-    expect(a.action).toContain('Ampliar')
-    expect(a.estimatedNodes).toBeGreaterThan(0)
-    expect(a.needsApproval).toBe(true)
+    expect(a.action).toContain('Revisar')
+    expect(a.estimatedNodes).toBe(0)
+    expect(a.needsApproval).toBe(false)
   })
-  it('já ampliou → sugerir vídeo', () => {
+  it('ampliação concluída não comprova aprovação', () => {
     const a = computeNextBestAction({
       recent: [gen({ kind: 'upscale', createdAt: '2026-07-18T11:00:00Z' }), gen({})],
       balance: 500, moduleId: null,
     })!
-    expect(a.action).toContain('Animar')
+    expect(a.action).toContain('Revisar')
   })
   it('conta nova → começar no Renderizar', () => {
     const a = computeNextBestAction({ recent: [], balance: 500, moduleId: null })!
