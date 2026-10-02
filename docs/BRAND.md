@@ -77,7 +77,7 @@ Classes: `.sn-display` (56–80 px, −0,035 em; 36–48 px em telas estreitas),
 
 - `public/brand/`: SVGs oficiais de aplicação clara e escura e PNG para email.
 - `marketing/brand/` e `marketing/remotion/public/brand/`: os mesmos contornos para peças e vídeo.
-- `sketchup/spacenode/assets/`: N principal, micro e assinatura para o plugin; scripts de ícones e
+- `sketchup/spacenode/assets/`: N estrutural (claro e escuro) e assinatura para o plugin; scripts de ícones e
   atlas da barra leem os SVGs compartilhados.
 - `lib/email/send-invite-email.ts`: assinatura em PNG e CTA neutro.
 

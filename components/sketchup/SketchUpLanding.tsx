@@ -73,7 +73,7 @@ const ALSO: { title: string; gloss: string }[] = [
 const STEPS: string[] = [
   'Baixe o .rbz acima.',
   'No SketchUp: Window → Extension Manager → Install Extension.',
-  'Abra a barra SPACENODE e clique em Conectar.',
+  'Abra a barra SpaceNode e clique em Conectar.',
 ]
 
 const Arrow = () => (
@@ -89,7 +89,7 @@ export function SketchUpLanding() {
       <Ambient />
 
       <header className="spn-skp-bar spn-glass--chrome">
-        <Link href="/" aria-label="SPACENODE">
+        <Link href="/" aria-label="SpaceNode">
           <Brandmark variant="horizontal" size={24} />
         </Link>
         <a href="/login?next=/app" className="spn-skp-bar-link spn-glass--raised">

@@ -1,6 +1,8 @@
-// Gera os PNG da toolbar do SketchUp a partir do MESMO sistema do símbolo
-// (grade 64, pontas redondas, #333333) — ver
-// sketchup/spacenode/assets/spacenode.svg.
+// Gera os PNG da toolbar do SketchUp. O botão da marca (spacenode-24/48.png)
+// é o N estrutural oficial (public/brand/spacenode-symbol.svg, 3 paths) sobre
+// o chip grafite — a MESMA construção do favicon do site (app/icon.tsx: chip
+// #151618, raio 18,75 %, N a 75 % da caixa). Os ícones de ação (traço #333333,
+// grade 64) continuam rasterizados aqui, sem dependência de imagem.
 //
 //   node scripts/sketchup-toolbar-icons.mjs [pasta de saída]
 //
@@ -228,15 +230,15 @@ const ICONS = {
 const outDir = process.argv[2] || path.join(import.meta.dirname, '..', 'sketchup', 'spacenode', 'assets');
 fs.mkdirSync(outDir, { recursive: true });
 for (const size of [24, 48]) {
-  const source = size === 24
-    ? path.join(import.meta.dirname, '..', 'public', 'brand', 'spacenode-symbol-micro.svg')
-    : path.join(import.meta.dirname, '..', 'public', 'brand', 'spacenode-symbol.svg');
+  // Um só contorno em todo tamanho (manual v2.1 — a versão 'micro' sólida
+  // deixou de existir): 24 e 48 leem o mesmo SVG.
+  const source = path.join(import.meta.dirname, '..', 'public', 'brand', 'spacenode-symbol.svg');
   const paths = [...fs.readFileSync(source, 'utf8').matchAll(/<path d="([^"]+)"\/>/g)]
     .map((match) => `<path d="${match[1]}"/>`).join('');
-  if (!paths) throw new Error('N estrutural ausente');
+  if (!paths || (paths.match(/<path /g) || []).length < 3) throw new Error('N estrutural incompleto (esperava 3 paths)');
   const raw = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
     <rect width="64" height="64" rx="12" fill="#151618"/>
-    <g transform="translate(10 10) scale(.6875)" fill="#FFFFFF">${paths}</g>
+    <g transform="translate(8 8) scale(.75)" fill="#FFFFFF">${paths}</g>
   </svg>`;
   const file = path.join(outDir, `spacenode-${size}.png`);
   await sharp(Buffer.from(raw)).resize(size, size).png().toFile(file);
