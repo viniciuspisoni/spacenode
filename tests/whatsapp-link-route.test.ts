@@ -1,4 +1,4 @@
-import {beforeEach,describe,expect,it,vi} from 'vitest'
+import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest'
 import {createWhatsAppLink} from '../lib/customer-contact/whatsapp-link'
 const mocks=vi.hoisted(()=>({contact:{whatsapp_e164:'+15550000002',support_opt_in:true},read:vi.fn(),admin:vi.fn()}))
 vi.mock('@/lib/supabase/admin',()=>({createAdminClient:mocks.admin}))
@@ -6,6 +6,7 @@ import {POST} from '../app/api/internal/whatsapp/link/route'
 const secret='s'.repeat(64),key='k'.repeat(64),uid='11111111-1111-4111-8111-111111111111'
 const request=(body:unknown,auth='Bearer '+key)=>new Request('https://spacenode.app/api/internal/whatsapp/link',{method:'POST',headers:{authorization:auth,'content-type':'application/json'},body:JSON.stringify(body)})
 describe('Private WhatsApp linkage',()=>{
+  afterEach(()=>vi.unstubAllEnvs())
   beforeEach(()=>{
     vi.stubEnv('COMMERCIAL_PILOT_ENABLED','true');vi.stubEnv('COMMERCIAL_SOURCE_TOKEN',key);vi.stubEnv('COMMERCIAL_REF_SECRET',secret)
     mocks.contact={whatsapp_e164:'+15550000002',support_opt_in:true}

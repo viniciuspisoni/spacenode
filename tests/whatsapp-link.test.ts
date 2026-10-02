@@ -13,7 +13,8 @@ describe('WhatsApp account confirmation',()=>{
   it('rejects tampering and a different secret',()=>{
     const token=createWhatsAppLink(secret,uid,'+15550000002',now)
     expect(()=>readWhatsAppLink('x'.repeat(64),token,'+15550000002',now)).toThrow()
-    expect(()=>readWhatsAppLink(secret,token.slice(0,30)+'A'+token.slice(31),'+15550000002',now)).toThrow()
+    const changed=token[30]==='A' ? 'B' : 'A'
+    expect(()=>readWhatsAppLink(secret,token.slice(0,30)+changed+token.slice(31),'+15550000002',now)).toThrow()
   })
   it('preserves landline identities and uses the existing account reference',()=>{
     expect(canonicalMobile('+555182127288')).toBe('555182127288')
