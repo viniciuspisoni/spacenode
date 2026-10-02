@@ -26,6 +26,8 @@ import {
 } from './helpers/pglite-supabase'
 
 const RESTORE_MIGRATION = 'supabase/migrations/20261001222051_free_signup_nodes_80_restore.sql'
+// Complemento sem diferenciar maiúsculas ("40 Nodes Grátis" escapou da primeira em produção).
+const RESTORE_CASE_MIGRATION = 'supabase/migrations/20261002030000_free_signup_nodes_80_offer_case.sql'
 const OFFER_40 = `(40 nodes grátis|com 40 nodes)`
 
 describe('uma oferta só: banco, schema e copy', () => {
@@ -130,8 +132,13 @@ describe('banco: 80 nodes no cadastro (migrations reais em PGlite)', () => {
     // Texto de custo que menciona 40 nodes: a volta não pode reescrevê-lo.
     await db.query(`update marketing.landing_pages set subheadline = subheadline || ' Render 4K custa 40 nodes.'
                     where id = (select id from marketing.landing_pages order by created_at limit 1)`)
+    // Grafias que a troca sensível a maiúsculas não pegava (achado em produção, 02/10).
+    await db.query(`update marketing.landing_pages
+                    set meta_description = coalesce(meta_description, '') || ' | 40 Nodes Grátis para Testar | Com 40 nodes, sem cartão'
+                    where id = (select id from marketing.landing_pages order by created_at desc limit 1)`)
     offer40Before = await offerCount(OFFER_40)
     await applyMigration(db, RESTORE_MIGRATION)
+    await applyMigration(db, RESTORE_CASE_MIGRATION)
   }, 120_000)
 
   afterAll(async () => {
@@ -170,6 +177,7 @@ describe('banco: 80 nodes no cadastro (migrations reais em PGlite)', () => {
     const snapshot = async () => (await db.query(`select id, credits from public.profiles order by id`)).rows
     const before = await snapshot()
     await applyMigration(db, RESTORE_MIGRATION)
+    await applyMigration(db, RESTORE_CASE_MIGRATION)
     expect(await snapshot()).toEqual(before)
   })
 
@@ -204,5 +212,9 @@ describe('banco: 80 nodes no cadastro (migrations reais em PGlite)', () => {
     expect(await offerCount(OFFER_40)).toBe(0)
     expect(await offerCount('80 nodes grátis')).toBeGreaterThan(0)
     expect(await offerCount('Render 4K custa 40 nodes')).toBe(1)
+    // Grafia preservada: só o número muda.
+    const exact = await db.query<{ n: number }>(`select count(*) as n from marketing.landing_pages
+      where meta_description like '%| 80 Nodes Grátis para Testar | Com 80 nodes, sem cartão%'`)
+    expect(Number(exact.rows[0].n)).toBe(1)
   })
 })
