@@ -7,6 +7,7 @@ import { EXTRA_NODE_PACKS } from '@/lib/extra-nodes'
 import { NODES_GRACE_DAYS, NODES_ROLLOVER_COPY_LANDING } from '@/lib/billing/nodes'
 import { SUPPORT_EMAIL, supportWhatsAppUrl } from '@/lib/support'
 import { formatBRL } from '@/lib/launch-offer'
+import { startLandingCheckout } from '@/lib/billing/landing-checkout'
 
 // A vitrine (Essence / Pro / Studio) vem de SELLABLE_PLANS — Office e
 // Starter são legados (2026-08-31 e 2026-09-12): fora de venda, mas seguem
@@ -90,20 +91,6 @@ const PLAN_DISPLAY: Record<SellablePlanId, PlanDisplay> = {
       { label: 'Suporte prioritário', gain: true },
     ],
   },
-}
-
-async function startCheckout(id: PaidPlanId, billing: BillingCycle) {
-  const res = await fetch('/api/stripe/checkout', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ type: 'plan', id, billing }),
-  })
-  if (res.status === 401) { window.location.href = '/login?mode=signup'; return }
-  // Já assinante (guarda anti-cobrança-dupla) — plano se gerencia no billing.
-  if (res.status === 409) { window.location.href = '/app/billing'; return }
-  if (!res.ok) return
-  const data = await res.json()
-  if (data.url) window.location.href = data.url
 }
 
 // Check neutro, não verde: o item da lista é FATO ("acesso a todos os
@@ -391,7 +378,8 @@ export function PricingToggle() {
   const handleSelect = async (id: PaidPlanId) => {
     setLoading(id)
     try {
-      await startCheckout(id, billing)
+      // Sem conta: cadastro com plano e ciclo, retomando o checkout depois.
+      await startLandingCheckout(id, billing)
     } finally {
       setLoading(null)
     }
@@ -406,7 +394,7 @@ export function PricingToggle() {
       <div className="spn-pricing-head">
         <h2 className="spn-pricing-title">Teste primeiro. Escolha um plano para continuar.</h2>
         <p className="spn-pricing-sub">
-          Comece com 40 Nodes grátis, sem cartão. Quando precisar de mais imagens,
+          Comece com 80 Nodes grátis, sem cartão. Quando precisar de mais imagens,
           escolha seu volume mensal. Nodes são os créditos de geração e{' '}
           <b>podem acumular por até {NODES_GRACE_DAYS} dias</b> enquanto sua
           assinatura estiver ativa. No plano mensal, você cancela quando quiser.
@@ -492,7 +480,7 @@ export function PricingToggle() {
         >
           Fale com a gente
         </a>
-        {' '}— ou comece grátis com 40 nodes e assine quando o volume pedir.
+        {' '}— ou comece grátis com 80 nodes e assine quando o volume pedir.
         Dúvidas: <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
       </p>
 

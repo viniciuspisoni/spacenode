@@ -479,6 +479,9 @@ function NewAdSetForm({ campaignId, busy, run, onClose, onDone }: {
 
 const CTA_OPTIONS = ['SIGN_UP', 'LEARN_MORE'] as const
 const LOGIN_DESTINATION = '/login?mode=signup'
+// Landing principal — destino da campanha paga de outubro/2026. Sem esta
+// opção o painel não gerava a URL com UTM que o anúncio de fato usa.
+const HOME_DESTINATION = '/'
 
 function NewAdForm({ campaignId, adSets, busy, run, onClose, onDone }: {
   campaignId: string
@@ -522,7 +525,9 @@ function NewAdForm({ campaignId, adSets, busy, run, onClose, onDone }: {
   const firstLine = primaryText.split('\n')[0] ?? ''
 
   const create = () => run('ad', async () => {
-    const lp = destination !== 'login' ? landingPages.find(p => p.id === destination) : undefined
+    const lp = destination !== 'login' && destination !== 'home'
+      ? landingPages.find(p => p.id === destination)
+      : undefined
     await api('/api/admin/marketing/ads/ads', 'POST', {
       campaign_id: campaignId,
       ad_set_id: adSetId || null,
@@ -537,7 +542,7 @@ function NewAdForm({ campaignId, adSets, busy, run, onClose, onDone }: {
       description: description.trim() || null,
       cta_button: cta,
       landing_page_id: lp ? lp.id : null,
-      destination_path: lp ? `/lp/${lp.slug}` : LOGIN_DESTINATION,
+      destination_path: lp ? `/lp/${lp.slug}` : destination === 'home' ? HOME_DESTINATION : LOGIN_DESTINATION,
     })
     onDone()
   })
@@ -623,6 +628,7 @@ function NewAdForm({ campaignId, adSets, busy, run, onClose, onDone }: {
           <label htmlFor="na-destination" className={labelCls}>Destino</label>
           <select id="na-destination" value={destination} onChange={e => setDestination(e.target.value)} className={`mt-1 ${inputCls}`}>
             <option value="login">Cadastro direto ({LOGIN_DESTINATION})</option>
+            <option value="home">Página inicial ({HOME_DESTINATION})</option>
             {landingPages.map(lp => (
               <option key={lp.id} value={lp.id}>{lp.name} (/lp/{lp.slug})</option>
             ))}

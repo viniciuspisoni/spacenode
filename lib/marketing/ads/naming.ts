@@ -175,14 +175,21 @@ function cleanTouch(raw: unknown): AttributionTouch | null {
 export function parseAttributionCookie(value: string | undefined | null): AttributionSnapshot | null {
   if (!value) return null
   try {
-    const parsed = JSON.parse(decodeURIComponent(value)) as Record<string, unknown>
-    const last = cleanTouch(parsed.last)
-    if (!last) return null
-    const first = cleanTouch(parsed.first)
-    return first ? { last, first } : { last }
+    return attributionSnapshotFromObject(JSON.parse(decodeURIComponent(value)))
   } catch {
     return null
   }
+}
+
+/** Mesmo parse defensivo para um snapshot que já chegou como objeto (ex.:
+ *  metadata da conta, lib/analytics/signup-attribution.ts). */
+export function attributionSnapshotFromObject(raw: unknown): AttributionSnapshot | null {
+  if (typeof raw !== 'object' || raw === null) return null
+  const parsed = raw as Record<string, unknown>
+  const last = cleanTouch(parsed.last)
+  if (!last) return null
+  const first = cleanTouch(parsed.first)
+  return first ? { last, first } : { last }
 }
 
 /** Extrai um toque de atribuição dos parâmetros da URL atual. Retorna null se

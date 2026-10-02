@@ -4,9 +4,8 @@ import { getPayerBalance } from '@/lib/workspaces/balance'
 import { redirect } from 'next/navigation'
 import { canUseOrion } from '@/lib/orion/access'
 import { orionProvider, orionProviderReady } from '@/lib/orion/provider'
+import { ensureProfileRow } from '@/lib/profiles/ensure-profile'
 import GenerateClient from './GenerateClient'
-
-const DEFAULT_CREDITS = 40
 
 export default async function GeneratePage({
   searchParams,
@@ -47,14 +46,10 @@ export default async function GeneratePage({
     getPayerBalance(admin, user.id),
   ])
 
-  // Usuário pré-existente (antes do trigger handle_new_user) — cria profile agora
+  // Usuário pré-existente (antes do trigger handle_new_user) — cria profile
+  // agora, sem nunca sobrescrever um que já exista (ver ensureProfileRow).
   if (!profile) {
-    await admin.from('profiles').upsert({
-      id: user.id,
-      email: user.email ?? '',
-      full_name: user.user_metadata?.full_name ?? null,
-      credits: DEFAULT_CREDITS,
-    })
+    await ensureProfileRow(admin, user)
     profile = { project_materials: null, project_config: null }
     balance = await getPayerBalance(admin, user.id)
   }

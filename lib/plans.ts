@@ -23,6 +23,14 @@ export type BillingCycle = 'monthly' | 'annual'
  */
 export const ANNUAL_BILLING_ENABLED = false
 
+/**
+ * Nodes grátis do cadastro. Quem concede de fato é o DEFAULT de
+ * profiles.credits (última supabase/migrations/*_free_signup_nodes_*.sql);
+ * este valor é a referência da copy. tests/free-signup-nodes.test.ts mantém
+ * banco, supabase-schema.sql, landing e app dizendo o mesmo número.
+ */
+export const FREE_SIGNUP_NODES = 80
+
 export interface Plan {
   id: PaidPlanId
   name: string

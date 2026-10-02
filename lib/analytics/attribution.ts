@@ -30,7 +30,8 @@ const INTENT_MAX_AGE_S = 24 * 60 * 60     // intenção vale por 1 dia
 
 const ANON_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-function readCookie(name: string): string | null {
+/** Valor cru de um cookie no browser (null no servidor). */
+export function readBrowserCookie(name: string): string | null {
   if (typeof document === 'undefined') return null
   const prefix = `${name}=`
   const found = document.cookie.split('; ').find(c => c.startsWith(prefix))
@@ -52,7 +53,7 @@ export function parseAnonymousId(value: string | undefined | null): string | nul
  *  sem cookies retorna null e nada quebra. */
 export function ensureAnonymousId(): string | null {
   try {
-    const existing = parseAnonymousId(readCookie(ANON_COOKIE))
+    const existing = parseAnonymousId(readBrowserCookie(ANON_COOKIE))
     if (existing) return existing
     const id = crypto.randomUUID()
     const secure = window.location.protocol === 'https:' ? '; Secure' : ''
@@ -64,7 +65,7 @@ export function ensureAnonymousId(): string | null {
 }
 
 export function readAnonymousId(): string | null {
-  return parseAnonymousId(readCookie(ANON_COOKIE))
+  return parseAnonymousId(readBrowserCookie(ANON_COOKIE))
 }
 
 // ── Intenção de plano/oferta ───────────────────────────────────────────────────
@@ -121,7 +122,7 @@ export function writeIntentCookie(intent: PlanIntent): void {
 
 /** Intenção já gravada neste browser (null no servidor). */
 export function readIntentCookie(): PlanIntent | null {
-  return parseIntentCookie(readCookie(INTENT_COOKIE))
+  return parseIntentCookie(readBrowserCookie(INTENT_COOKIE))
 }
 
 export function clearIntentCookie(): void {
@@ -149,4 +150,13 @@ export function intentResumePath(intent: PlanIntent): string {
   const params = new URLSearchParams({ plan: intent.plan, billing: intent.billing, resume: '1' })
   if (intent.offer) params.set('offer', intent.offer)
   return `/app/billing?${params.toString()}`
+}
+
+/** Cadastro a partir do botão de um plano ("Começar com Essence") por quem
+ *  ainda não tem conta. Plano e ciclo viajam na URL: a página de login os
+ *  converte em intenção (cookie + `next`) e o cadastro termina no checkout
+ *  desse plano, pelo e-mail ou pelo Google. */
+export function planSignupPath(plan: PaidPlanId, billing: BillingCycle): string {
+  const params = new URLSearchParams({ mode: 'signup', plan, billing })
+  return `/login?${params.toString()}`
 }

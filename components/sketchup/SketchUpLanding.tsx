@@ -186,7 +186,7 @@ export function SketchUpLanding() {
             Criar conta grátis
             <Arrow />
           </a>
-          <p className="spn-skp-micro">40 nodes grátis · sem cartão · em português</p>
+          <p className="spn-skp-micro">80 nodes grátis · sem cartão · em português</p>
         </div>
       </section>
 

@@ -13,7 +13,7 @@ const faqs: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: 'Posso testar sem cartão? O teste vira uma assinatura?',
-    a: 'O cadastro oferece 40 Nodes grátis, sem pedir cartão. Eles são créditos de uso; a quantidade de imagens depende do motor, da resolução e das ações que você escolher. O teste não vira uma assinatura automaticamente. Para continuar com um plano mensal, você escolhe e confirma a compra.',
+    a: 'O cadastro oferece 80 Nodes grátis, sem pedir cartão. Eles são créditos de uso; a quantidade de imagens depende do motor, da resolução e das ações que você escolher. O teste não vira uma assinatura automaticamente. Para continuar com um plano mensal, você escolhe e confirma a compra.',
   },
   {
     q: 'Como confiro se a imagem respeitou meu projeto?',
