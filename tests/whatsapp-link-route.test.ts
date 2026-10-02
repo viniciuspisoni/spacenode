@@ -21,7 +21,7 @@ describe('Private WhatsApp linkage',()=>{
     const token=createWhatsAppLink(secret,uid,'+15550000002')
     const response=await POST(request({token,phone:'+15550000002'}))
     expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({account_ref:expect.stringMatching(/^[a-f0-9]{64}$/),support_opt_in:true})
+    expect(await response.json()).toEqual({account_ref:expect.stringMatching(/^[a-f0-9]{64}$/),support_opt_in:true,progress_handle:expect.stringMatching(/^SNP1\./)})
   })
   it('rejects a changed phone or revoked help preference',async()=>{
     const token=createWhatsAppLink(secret,uid,'+15550000002')

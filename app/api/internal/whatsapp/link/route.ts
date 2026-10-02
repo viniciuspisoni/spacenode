@@ -1,7 +1,7 @@
 import { timingSafeEqual } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { canonicalMobile, readWhatsAppLink, whatsappAccountRef } from '@/lib/customer-contact/whatsapp-link'
+import { canonicalMobile, readWhatsAppLink, whatsappAccountRef, createWhatsAppProgress } from '@/lib/customer-contact/whatsapp-link'
 
 export const dynamic='force-dynamic'
 const reply=(body:unknown,status=200)=>NextResponse.json(body,{status,headers:{'Cache-Control':'no-store'}})
@@ -23,6 +23,6 @@ export async function POST(request:Request) {
     if(!data?.support_opt_in || !data.whatsapp_e164 || canonicalMobile(data.whatsapp_e164)!==canonicalMobile(phone)) return reply({error:'Link unavailable'},403)
     // Never return a phone, user ID, email or marketing permission. The private
     // pilot needs only the same opaque reference used by commercial snapshots.
-    return reply({account_ref:whatsappAccountRef(secret,userId),support_opt_in:true})
+    return reply({account_ref:whatsappAccountRef(secret,userId),support_opt_in:true,progress_handle:createWhatsAppProgress(secret,userId,phone)})
   } catch { return reply({error:'Invalid or expired link'},400) }
 }
