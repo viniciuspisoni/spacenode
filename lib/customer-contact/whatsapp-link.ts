@@ -32,3 +32,25 @@ export function readWhatsAppLink(secret:string, token:string, phone:string, now=
 export function whatsappAccountRef(secret:string,userId:string):string {
   return digest(secret,'account:'+userId).toString('hex')
 }
+
+// Read-only seven-day handle. It cannot confirm a phone, create a session,
+// spend Nodes or change billing. Current help consent is checked on every read.
+export function createWhatsAppProgress(secret:string,userId:string,phone:string,now=Date.now()):string {
+  if(secret.length<48) throw new Error('Unavailable')
+  const iv=randomBytes(12), cipher=createCipheriv('aes-256-gcm',digest(secret,'whatsapp-progress-v1'),iv)
+  const body=Buffer.from(JSON.stringify({uid:userId,proof:proof(secret,phone),exp:now+7*86400000}))
+  const encrypted=Buffer.concat([cipher.update(body),cipher.final()])
+  return 'SNP1.'+Buffer.concat([iv,cipher.getAuthTag(),encrypted]).toString('base64url')
+}
+export function readWhatsAppProgress(secret:string,token:string,now=Date.now()):{uid:string;proof:string} {
+  if(secret.length<48 || !/^SNP1\.[A-Za-z0-9_-]{40,600}$/.test(token)) throw new Error('Invalid handle')
+  const packed=Buffer.from(token.slice(5),'base64url'), decipher=createDecipheriv('aes-256-gcm',digest(secret,'whatsapp-progress-v1'),packed.subarray(0,12))
+  decipher.setAuthTag(packed.subarray(12,28))
+  const data=JSON.parse(Buffer.concat([decipher.update(packed.subarray(28)),decipher.final()]).toString())
+  if(typeof data.uid!=='string' || !/^[0-9a-f-]{36}$/i.test(data.uid) || !/^[a-f0-9]{64}$/.test(data.proof)
+    || typeof data.exp!=='number' || data.exp<=now || data.exp>now+7*86400000) throw new Error('Invalid handle')
+  return {uid:data.uid,proof:data.proof}
+}
+export function progressPhoneMatches(secret:string,expectedProof:string,phone:string) {
+  return expectedProof===proof(secret,phone)
+}
