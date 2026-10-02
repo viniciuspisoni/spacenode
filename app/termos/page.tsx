@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 }
 
-const UPDATED_AT = '10 de setembro de 2026'
+const UPDATED_AT = '2 de outubro de 2026'
 
 export default function TermosPage() {
   return (
@@ -118,9 +118,17 @@ export default function TermosPage() {
             passa a contar a partir do novo encerramento.
           </LI>
           <LI>
-            Os <Strong>nodes extras</Strong> são créditos avulsos, comprados separadamente, <Strong>sem prazo
+            Os <Strong>nodes extras</Strong> são créditos avulsos, comprados separadamente ou recebidos por indicação, <Strong>sem prazo
             de validade</Strong>, disponíveis conforme as condições do seu plano. O consumo utiliza primeiro
             os nodes mensais e, depois, os nodes extras.
+          </LI>
+          <LI>
+            No programa de indicações, quem compartilha seu link recebe <Strong>200 nodes</Strong> quando
+            um indicado no Essence paga, <Strong>400 nodes</Strong> no Pro ou <Strong>800 nodes</Strong> no
+            Studio. O mesmo prêmio é concedido a cada renovação efetivamente paga pelo indicado, uma vez
+            por ciclo. Cadastro sem pagamento, parcelas não pagas, trocas de plano proporcionais e ciclos
+            posteriores ao encerramento da assinatura não geram prêmio. Nodes de indicação são para uso
+            na Plataforma e não podem ser convertidos em dinheiro.
           </LI>
           <LI>
             Contas gratuitas podem receber créditos de cortesia, cuja quantidade e disponibilidade podem ser

@@ -5,6 +5,7 @@ import { createHash, randomBytes } from 'crypto'
 import { LOGIN_NEXT_COOKIE, readLoginNextCookie } from '@/lib/auth/login-next-cookie'
 import { INTENT_COOKIE } from '@/lib/analytics/attribution'
 import { isNewUser, postAuthDestination } from '@/lib/analytics/auth-intent'
+import { claimNewReferral, REFERRAL_COOKIE } from '@/lib/referrals'
 
 // ── Login com Google via GIS (ux_mode: 'redirect') ─────────────────────────────
 //
@@ -124,6 +125,8 @@ export async function POST(request: Request) {
     nonce,
   })
   if (error) return fail()
+
+  await claimNewReferral(data.user, cookieStore.get(REFERRAL_COOKIE)?.value)
 
   // Mesma regra do /auth/callback (next > intenção de plano > /app), e o
   // `signup=1` de conta nova — este caminho redirecionava seco e o cadastro

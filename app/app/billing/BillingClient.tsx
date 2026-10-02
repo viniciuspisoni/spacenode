@@ -45,6 +45,7 @@ export interface ExtraPackRow {
   /** 'infinity' (sem validade) nos packs pós-unificação; data nos legados. */
   expires_at:      string
   status:          string
+  source_type:     'purchase' | 'referral'
 }
 
 interface BillingClientProps {
@@ -248,7 +249,7 @@ export function BillingClient({ plan, balance, nodesExpireAt, extras, pooled, of
                   : `${getPlanDisplayName(plan)} · acumulam a cada renovação`
               }
             />
-            <BalanceItem label="Nodes extras"  value={balance.extra} detail={balance.extra > 0 ? `${extras.length} pack${extras.length === 1 ? '' : 's'} · sem validade` : 'sem validade'} />
+            <BalanceItem label="Nodes extras"  value={balance.extra} detail={balance.extra > 0 ? `${extras.length} crédito${extras.length === 1 ? '' : 's'} · sem validade` : 'sem validade'} />
             <BalanceItem label="Total disponível" value={balance.total} detail="nodes" green />
           </div>
 
@@ -257,9 +258,9 @@ export function BillingClient({ plan, balance, nodesExpireAt, extras, pooled, of
             <SettingGroup>
               <SettingRow
                 icon={<RowIcon name="scale" />}
-                title="Meus packs"
+                title="Meus créditos extras"
                 value={summarize([
-                  `${extras.length} pack${extras.length === 1 ? '' : 's'}`,
+                  `${extras.length} crédito${extras.length === 1 ? '' : 's'}`,
                   `${balance.extra.toLocaleString('pt-BR')} nodes restantes`,
                 ])}
                 onOpen={() => setExtractOpen(true)}
@@ -513,7 +514,7 @@ export function BillingClient({ plan, balance, nodesExpireAt, extras, pooled, of
       </div>
 
       {/* ── Extrato dos packs ─────────────────────────────────────────────── */}
-      <Sheet open={extractOpen} title="Meus packs de nodes" onClose={() => setExtractOpen(false)}>
+      <Sheet open={extractOpen} title="Meus créditos extras" onClose={() => setExtractOpen(false)}>
         <div className="spn-group spn-glass" id="billing-extrato">
           {extras.map((p) => {
             const expiring = hasExpiry(p.expires_at)
@@ -523,7 +524,7 @@ export function BillingClient({ plan, balance, nodesExpireAt, extras, pooled, of
               <div key={p.id} style={{ padding: '14px 16px', borderBottom: '0.5px solid var(--glass-line)' }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
                   <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>
-                    Pack {p.pack_size.toLocaleString('pt-BR')}
+                    {p.source_type === 'referral' ? `Indicação · ${p.pack_size.toLocaleString('pt-BR')} Nodes` : `Pack ${p.pack_size.toLocaleString('pt-BR')}`}
                   </span>
                   <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' }}>
                     {p.nodes_remaining.toLocaleString('pt-BR')}
@@ -537,7 +538,7 @@ export function BillingClient({ plan, balance, nodesExpireAt, extras, pooled, of
                   <div style={{ height: '100%', width: `${pct}%`, background: 'var(--color-accent)', borderRadius: 2 }} />
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 11, color: 'var(--color-text-tertiary)' }}>
-                  <span>Comprado em {new Date(p.purchased_at).toLocaleDateString('pt-BR')}</span>
+                  <span>{p.source_type === 'referral' ? 'Recebido' : 'Comprado'} em {new Date(p.purchased_at).toLocaleDateString('pt-BR')}</span>
                   <span>
                     {expiring
                       ? <>Expira em <strong style={{ color: days <= 7 ? 'var(--color-error)' : 'var(--color-text-primary)' }}>{days} dia{days === 1 ? '' : 's'}</strong></>
