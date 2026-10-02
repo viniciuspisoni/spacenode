@@ -1,6 +1,6 @@
 'use client'
 
-import Image from 'next/image'
+import { BeforeAfter } from '@/components/landing/BeforeAfter'
 
 // Números do catálogo em output/banco-imagens-divulgacao/catalogo.csv.
 const PROJECTS = [
@@ -10,7 +10,7 @@ const PROJECTS = [
   { id: 345, scene: 'Quarto com detalhes amarelos', credit: 'Nathalia Costa' },
   { id: 142, scene: 'Pátio com espelho d’água', credit: 'muda arquitetura' },
   { id: 100, scene: 'Sala de estar', credit: 'Nathalia Costa' },
-  { id: 261, scene: 'Sala com arcos', credit: 'Bruna Plentz' },
+  { id: 21, scene: 'Sala de estar colorida', credit: 'Bruna Plentz' },
   { id: 174, scene: 'Cozinha com bancada de madeira', credit: 'Natália Benchimol Maggi' },
 ] as const
 
@@ -20,8 +20,8 @@ export function Projects() {
       <div className="spn-projects-head">
         <h2 className="spn-projects-title">projetos reais, de escritórios reais.</h2>
         <p className="spn-projects-sub">
-          Uma seleção de imagens criadas a partir de projetos de clientes SpaceNode.
-          Explore os ambientes e imagine o seu próximo projeto aqui.
+          Arraste cada imagem para comparar a entrada com o resultado.
+          Projetos reais de clientes SpaceNode, com crédito a quem projetou.
         </p>
       </div>
 
@@ -29,12 +29,12 @@ export function Projects() {
         {PROJECTS.map(project => (
           <figure key={project.id} className="spn-projects-item">
             <div className="spn-projects-cell spn-glass">
-              <Image
-                src={`/projetos-aprovados/${project.id}.webp`}
-                alt={`Render de ${project.scene}`}
-                fill
+              <BeforeAfter
+                base={`/projetos-aprovados/${project.id}-base.webp`}
+                render={`/projetos-aprovados/${project.id}.webp`}
+                caption={project.scene}
+                aspect="16 / 9"
                 sizes="(max-width: 768px) 100vw, (max-width: 1080px) 46vw, 500px"
-                style={{ objectFit: 'cover' }}
               />
             </div>
             <figcaption className="spn-projects-caption">
@@ -46,7 +46,7 @@ export function Projects() {
       </div>
 
       <div className="spn-projects-action">
-        <p>Agora veja o resultado no seu próprio projeto.</p>
+        <p>Agora compare o resultado no seu próprio projeto.</p>
         <a href="/login?mode=signup">Testar no meu projeto grátis <span aria-hidden="true">→</span></a>
         <small>80 Nodes grátis · sem cartão</small>
       </div>
@@ -91,10 +91,8 @@ export function Projects() {
         }
         .spn-projects-item { margin: 0; }
         .spn-projects-cell {
-          position: relative;
-          aspect-ratio: 16 / 9;
-          overflow: hidden;
-          border-radius: var(--r-inner);
+          padding: 7px;
+          border-radius: calc(var(--r-inner) + 7px);
         }
         .spn-projects-caption {
           display: flex;
