@@ -13,13 +13,50 @@ mestre).
       Pontos sem teste possível fora do SketchUp: `pages.selected_page=`
       síncrono pra captura de lote; convenção UTC do `ShadowTime`;
       `set_position` fora da tela na renovação silenciosa.
-- [ ] Rebuild final e cópia pro site:
+- [ ] Rebuild final e cópia pro site (os dois comandos gravam `dist/` E
+      `public/downloads/` — o site serve o segundo; já aconteceu de só o
+      `dist/` ser regerado e a página anunciar uma versão enquanto o download
+      entregava outra):
       ```powershell
-      npm run package:sketchup -- -OutputPath public/downloads/spacenode-sketchup.rbz
+      npm run package:sketchup          # Windows (PowerShell)
       ```
-      (o script aceita `-OutputPath`; commitar o binário — ~50 KB.)
-- [ ] Versões em sincronia: `sketchup/spacenode.rb` (EXTENSION.version) e
-      `sketchup/spacenode/main.rb` (VERSION) — as duas na mesma string.
+      ```bash
+      npm run package:sketchup:posix    # macOS / Linux (zip do sistema)
+      ```
+      Commitar o binário (~650 KB com o atlas da barra nativa).
+- [ ] Versões em sincronia nos TRÊS lugares: `sketchup/spacenode.rb`
+      (EXTENSION.version), `sketchup/spacenode/main.rb` (VERSION) e
+      `lib/sketchup/plugin-release.ts` (PLUGIN_VERSION — página de download
+      e aviso de atualização). `npm run package:sketchup:check` falha se
+      divergirem; o empacotador POSIX também recusa gerar.
+- [ ] Binários de marca regerados quando o símbolo mudar:
+      `node scripts/sketchup-glassbar-atlas.mjs` (atlas Win32, 4 escalas) e
+      `node scripts/sketchup-toolbar-icons.mjs` (PNG 24/48) — os dois leem
+      `public/brand/spacenode-symbol.svg`.
+- [ ] Harness offline antes de empacotar: `ruby scripts/verify-sketchup-ruby.rb`,
+      `SKETCHUP_TEST_CHANNEL=chrome node scripts/verify-sketchup-flow.mjs` e
+      `SKETCHUP_TEST_CHANNEL=chrome node scripts/verify-sketchup-revisao.mjs`
+      (no Mac, com o Chrome instalado; sem o canal, `npx playwright install chromium`).
+
+## 0.1 Ordem de publicação (desde a 1.9.0)
+
+A página de download e o aviso dentro do plugin leem `PLUGIN_VERSION`
+(`lib/sketchup/plugin-release.ts`): o merge na `main` publica os dois junto com
+o `.rbz` de `public/downloads/`. Então **assinar antes de mergear**:
+
+1. Na branch da release, `npm run verify:sketchup` verde e `.rbz` gerado
+   (`dist/` e `public/downloads/` idênticos, `package:sketchup:verify` ok).
+2. Subir `public/downloads/spacenode-sketchup.rbz` no Extension Signature
+   Portal; o `.rbz` ASSINADO que volta substitui os dois arquivos (o
+   `package:sketchup:verify` tolera a entrada de assinatura a mais, mas
+   qualquer rebuild depois disso invalida a assinatura).
+3. Só então commitar os binários e mergear → deploy: o catálogo (v10,
+   `supports.seed`, `seedApplied`, `edgeMapNative`) e a versão nova sobem
+   juntos, e quem está na 1.8.1 vê "1.9.0 disponível — baixar" no rodapé.
+
+Se for preciso publicar o servidor antes da assinatura, manter
+`PLUGIN_VERSION` na versão anterior nesse deploy (os três textos de versão
+precisam bater só no commit do `.rbz`).
 
 ## 1. Assinatura digital (obrigatória na prática)
 
@@ -74,10 +111,11 @@ própria — o modelo SPACENODE é aceito.
 
 ## Melhorias futuras (fora deste checklist)
 
-- Verificação de atualização no painel (o catálogo pode carregar
-  `latestVersion` e o painel avisar).
-- i18n EN do painel (hoje pt-BR hardcoded — o EW aceita, mas limita o
-  alcance internacional).
-- Pareamento por código no navegador do sistema (decisão 04 do plano
-  mestre; exige migration de device sessions — destrava login Google
-  dentro do plugin).
+- ~~Verificação de atualização no painel~~ — feita na 1.0.4 (catálogo
+  `pluginLatest`); desde a 1.9.0 o aviso também fica no rodapé do painel.
+- ~~i18n EN do painel~~ — feita na 0.5.0 (pareamento por código + EN).
+  Pendente: ~65 mensagens literais em pt-BR dentro do `main.rb` que saltam
+  o `t()` (erros de ampliação/edição/câmera).
+- ~~Pareamento por código no navegador do sistema~~ — feito na 0.5.0.
+- Extension Warehouse e SketchUcation seguem sem dono: precisam da
+  assinatura do `.rbz` (seção 1) e de uma conta de teste paga na submissão.
