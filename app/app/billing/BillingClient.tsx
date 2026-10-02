@@ -6,6 +6,7 @@ import { ANNUAL_BILLING_ENABLED, SELLABLE_PLANS, getPlanById, type PaidPlanId, t
 import { clearIntentCookie } from '@/lib/analytics/attribution'
 import { track } from '@/lib/analytics/client'
 import { getPlanDisplayName } from '@/lib/plan-display'
+import { supportWhatsAppUrl } from '@/lib/support'
 import { EXTRA_NODE_PACKS, type ExtraPackSize } from '@/lib/extra-nodes'
 import { RowIcon, Segmented, SettingGroup, SettingRow, Sheet, summarize } from '@/components/app/glass'
 import {
@@ -61,6 +62,8 @@ interface BillingClientProps {
   offerEligible?: boolean
   /** Resultado do checkout que trouxe o usuário de volta pra cá, se houve. */
   notice?: CheckoutNotice | null
+  /** Volta voluntária de um checkout de assinatura sem concluir. */
+  canceled?: boolean
   /** Abre o checkout deste plano sozinho, uma vez, ao montar. */
   resume?: ResumeCheckout | null
 }
@@ -95,7 +98,7 @@ function daysUntil(date: string): number {
   return Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)))
 }
 
-export function BillingClient({ plan, balance, nodesExpireAt, extras, pooled, offerEligible, notice, resume }: BillingClientProps) {
+export function BillingClient({ plan, balance, nodesExpireAt, extras, pooled, offerEligible, notice, canceled, resume }: BillingClientProps) {
   const router = useRouter()
   useEffect(() => { track('plans_viewed', { surface: 'app_billing' }) }, [])
   // Extras para qualquer plano pago (Starter incluso desde 2026-08-31).
@@ -217,6 +220,17 @@ export function BillingClient({ plan, balance, nodesExpireAt, extras, pooled, of
             </span>
           </div>
         )}
+
+        {canceled && !notice && <div className="spn-glass" style={{ borderRadius: 'var(--r-card)', padding: '18px 20px', marginBottom: 24 }}>
+          <p style={{ margin: 0, color: 'var(--color-text-primary)', fontSize: 13, lineHeight: 1.6 }}>
+            Sua assinatura não foi concluída. Se ficou alguma dúvida sobre planos ou pagamento, podemos ajudar.
+          </p>
+          <a href={supportWhatsAppUrl('Oi! Voltei da página de assinatura da SpaceNode e gostaria de tirar uma dúvida.')}
+            target="_blank" rel="noopener noreferrer" className="spn-ghost"
+            style={{ display: 'inline-flex', marginTop: 12, padding: '10px 14px', textDecoration: 'none' }}>
+            Conversar no WhatsApp
+          </a>
+        </div>}
 
         {/* ── 1. Saldo atual ─────────────────────────────────────────────── */}
         <Section>
