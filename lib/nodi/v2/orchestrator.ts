@@ -61,7 +61,7 @@ function buildFirstTurn(input: OrchestratorInput, ctxBlock: string): string {
   const hist = input.history.length
     ? wrapUntrusted(
         'CONVERSA ANTERIOR',
-        input.history.slice(-8).map(t => `${t.role === 'user' ? 'Usuário' : 'Nodi'}: ${clampText(t.text, 300)}`).join('\n'),
+        input.history.slice(-8).map(t => `${t.role === 'user' ? 'Usuário' : 'Nodi'}: ${clampText(t.text, 700)}`).join('\n'),
       )
     : ''
   return [ctxBlock, hist, `Mensagem do usuário: ${clampText(input.message, 900)}`]
@@ -76,7 +76,7 @@ export async function runNodiV2(input: OrchestratorInput): Promise<NodiV2Answer 
   const startedAt = Date.now()
   const deadline = startDeadline()
   const settings = input.settings ?? DEFAULT_SETTINGS
-  const request = await buildRequestContext(input.admin, input.userId, input.route, input.attachment)
+  const request = await buildRequestContext(input.admin, input.userId, input.route, input.attachment, input.supabase, input.capabilities.multimodal)
   // consultor: analisa e recomenda — a tool de ação nem entra no toolset
   const tools = buildToolset(input.capabilities).filter(
     t => !(settings.mode === 'consultor' && t.name === 'propor_acao'),

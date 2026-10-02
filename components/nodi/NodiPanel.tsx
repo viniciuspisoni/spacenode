@@ -51,6 +51,7 @@ import {
   type NodiBootstrap,
 } from './nodi-client'
 import type { ProjectPlan } from '@/lib/nodi/v2/types'
+import { conversationTurns, latestConversationImage, isActionConfirmation } from '@/lib/nodi/conversation'
 import { actionDestination, writeHandoff, moduleHref } from './actions-bus'
 
 // ── Modelo de mensagem ────────────────────────────────────────────────────────
@@ -87,6 +88,8 @@ interface PanelMsg {
   v2?: NodiV2Answer
   /** kind 'executed': imagem gerada (URL assinada — expira; Histórico é o acervo) */
   outputUrl?: string
+  generationRef?: NodiAttachment
+  projectScope?: string | null
   /** V4: avaliação visual pós-execução */
   review?: NodiV2Answer['review']
   /** feedback já dado nesta resposta */
@@ -98,11 +101,8 @@ interface PanelMsg {
 type PanelView = 'home' | 'chat' | 'tickets' | 'plan' | 'activity'
 type Pending = null | 'ask' | 'list' | 'diagnose' | 'ticket' | 'execute'
 
-/** "sim", "pode", "confirma"… digitados executam a proposta pendente (V3). */
-const CONFIRM_RE = /^(sim|pode|confirma|confirmar|confirmo|manda|vai|faz|executa|bora|ok)\b/i
-
 const WELCOME_TEXT =
-  'Olá, sou o Nodi. Posso ajudar você a usar a SpaceNode ou entender o que aconteceu com uma geração.'
+  'Olá, sou o Nodi. Vamos do seu modelo ao resultado final: preparo, geração, revisão e apresentação. Também posso ajudar com dúvidas e problemas.'
 const LOW_CONFIDENCE_TEXT =
   'Não consegui confirmar a causa com segurança. Posso reunir os dados da geração e encaminhar tudo para o suporte.'
 const REVIEW_INTRO = 'Revise as informações abaixo antes de encaminhá-las para a equipe.'
@@ -186,6 +186,7 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
   const [messages, setMessages] = useState<PanelMsg[]>(() => readSession().messages)
   const [pending, setPending] = useState<Pending>(null)
   const [input, setInput] = useState('')
+  const [bootstrapEpoch, setBootstrapEpoch] = useState(0)
   const [bootstrap, setBootstrap] = useState<NodiBootstrap | null>(null)
   const [offline, setOffline] = useState(false)
   const [tickets, setTickets] = useState<TicketRecord[] | null>(null)
@@ -229,7 +230,7 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
     sendNodiEvent('panel_open', context.route, context.moduleId)
     return () => { alive = false }
     // reabertura em outra rota refaz o bootstrap
-  }, [context.route, context.moduleId])
+  }, [context.route, context.moduleId, bootstrapEpoch])
 
   // rolagem acompanha a conversa; foco começa no campo de pergunta
   useEffect(() => {
@@ -250,10 +251,7 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
   }, [])
 
   const historyTurns = useCallback((): NodiTurn[] => {
-    return messages
-      .filter(m => (m.kind === 'text' || m.kind === 'v2') && m.text)
-      .slice(-8)
-      .map(m => ({ role: m.role === 'user' ? 'user' as const : 'nodi' as const, text: m.text!, at: 0 }))
+    return conversationTurns(messages)
   }, [messages])
 
   const caps = bootstrap?.capabilities
@@ -295,12 +293,13 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
   const confirmRef = useRef<((msgId: string, a: SupervisedAction) => void) | null>(null)
 
   // ── V2 (copiloto): pergunta livre com contexto + anexo → envelope com cards
-  const sendV2 = useCallback(async (message: string) => {
+  const sendV2 = useCallback(async (message: string, reference?: NodiAttachment | null) => {
     if (pending) return
     setView('chat')
-    append({ id: newId(), role: 'user', kind: 'text', text: message })
-    const att = attachment
-    setAttachment(null) // anexo é consumido por pergunta — sem custo de visão surpresa
+    const remembered = latestConversationImage(messages, context.projectId ?? null)
+    const att = reference ?? attachment ?? remembered ?? null
+    append({ id: newId(), role: 'user', kind: 'text', text: message, generationRef: att ?? undefined, projectScope: context.projectId ?? null })
+    setAttachment(null) // seleção visual é consumida; referência por id continua, visão depende da tool
     setPending('ask')
     const res = await chatV2({ message, route: context.route, history: historyTurns(), attachment: att })
     setPending(null)
@@ -315,8 +314,9 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
     }
     setOffline(false)
     const answer = res.data.answer
+    if (answer.executed) setBootstrapEpoch(n => n + 1)
     const msgId = newId()
-    append({ id: msgId, role: 'nodi', kind: 'v2', text: answer.text, v2: answer })
+    append({ id: msgId, role: 'nodi', kind: 'v2', text: answer.text, v2: answer, generationRef: answer.executed?.renderId ? { kind: 'render', id: answer.executed.renderId } : undefined, projectScope: context.projectId ?? null })
     // Autopiloto: ações SEM custo (navegar/preencher/configurar) executam
     // sozinhas — gasto de nodes continua passando pelos limites do servidor.
     const free = answer.proposals?.find(p => !p.executable && (p.type === 'navigate' || p.type === 'fill_prompt' || p.type === 'apply_settings'))
@@ -330,7 +330,7 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
         { id: newId(), role: 'nodi', kind: 'review', draft: answer.ticketDraft },
       )
     }
-  }, [pending, attachment, context.route, historyTurns, append])
+  }, [pending, attachment, context.route, context.projectId, historyTurns, append, messages, settings?.mode])
 
   /** V3: executa uma proposta com intent assinada (após confirmação). */
   const runExecutable = useCallback(async (msgId: string, action: SupervisedAction) => {
@@ -345,16 +345,19 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
       append({ id: newId(), role: 'nodi', kind: 'notice', tone: res.offline ? 'warning' : 'error', text: res.error })
       return
     }
+    setBootstrapEpoch(n => n + 1)
     setAvatarFlash('success')
     window.setTimeout(() => setAvatarFlash(null), 2600)
     append({
       id: newId(), role: 'nodi', kind: 'executed',
       text: `Pronto — ${res.data.cost} nodes debitados. Está no Histórico também.`,
       outputUrl: res.data.outputUrl,
+      generationRef: res.data.renderId ? { kind: 'render', id: res.data.renderId } : undefined,
+      projectScope: context.projectId ?? null,
       review: res.data.review ?? undefined,
       actions: [{ type: 'navigate', label: 'Abrir no Histórico', href: '/app/history' }],
     })
-  }, [pending, markDone, context.route, context.moduleId, append])
+  }, [pending, markDone, context.route, context.moduleId, context.projectId, append])
 
   // ── V4: modo de autonomia, plano do projeto, atividade ─────────────────────
   const updateSettings = useCallback((patch: Partial<NodiSettings>) => {
@@ -680,7 +683,7 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
     if (!q || pending) return
     // "sim"/"pode"/"confirma" digitado com uma execução pendente → executa
     // (confirmação por texto, sem precisar do clique)
-    if (CONFIRM_RE.test(q)) {
+    if (isActionConfirmation(q)) {
       // "sim" confirma a proposta pendente mais recente — executável (gera) ou
       // simples (navegar/preencher). Autonomia por texto, sem caçar botão.
       const pendingMsg = [...messages].reverse().find(m => !m.done && m.v2?.proposals?.length)
@@ -699,7 +702,7 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
     // atalha na base quando dá); sugestões/FAQ continuam na V1 (kbId)
     if (caps?.v2) void sendV2(q)
     else void ask(q)
-  }, [input, pending, messages, append, runExecutable, caps, sendV2, ask])
+  }, [input, pending, messages, append, runExecutable, confirmProposal, caps, sendV2, ask])
 
   // ── Estado do avatar do cabeçalho ───────────────────────────────────────────
   const avatarState: NodiAvatarState = useMemo(() => {
@@ -771,14 +774,34 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
               </div>
             )}
 
-            {caps?.v2 && bootstrap?.nextAction && (
+            {caps?.v2 && bootstrap?.journey && (
+              <section aria-label="Sua jornada com o Nodi">
+                <h3 className="spn-nodi-section-title">Seu próximo passo</h3>
+                <div className="spn-nodi-card">
+                  <strong>{bootstrap.journey.title}</strong>
+                  <p>{bootstrap.journey.description}</p>
+                  <p className="spn-nodi-muted">Preparo · Geração · Revisão · Apresentação</p>
+                  <p className="spn-nodi-muted">Com base no histórico recente da sua conta. Novas gerações exigem confirmação e mostram o custo.</p>
+                  <div className="spn-nodi-actions">
+                    <ActionBtn label={bootstrap.journey.next.action} disabled={!!pending} onClick={() => {
+                      const journey = bootstrap.journey!
+                      if (journey.next.kind === 'problem') startProblemFlow()
+                      else if (journey.next.kind === 'navigate' && journey.next.href) { router.push(journey.next.href); onClose() }
+                      else if (journey.next.chatPrompt) void sendV2(journey.next.chatPrompt, journey.generation)
+                    }} />
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {caps?.v2 && !bootstrap?.journey && bootstrap?.nextAction && (
               <section aria-label="Próximo passo sugerido">
                 <h3 className="spn-nodi-section-title">Próximo passo</h3>
                 <div className="spn-nodi-card">
                   <strong>{bootstrap.nextAction.action}</strong>
                   <p>{bootstrap.nextAction.identified} {bootstrap.nextAction.why}</p>
                   <p className="spn-nodi-muted">
-                    {bootstrap.nextAction.estimatedNodes ? `~${bootstrap.nextAction.estimatedNodes} nodes` : 'Sem custo'}
+                    {bootstrap.nextAction.estimatedNodes === null ? 'Custo a confirmar' : bootstrap.nextAction.estimatedNodes > 0 ? `~${bootstrap.nextAction.estimatedNodes} nodes` : 'Sem gasto de Nodes'}
                     {' · '}
                     {bootstrap.nextAction.needsApproval ? 'você aprova antes' : 'sem aprovação necessária'}
                   </p>

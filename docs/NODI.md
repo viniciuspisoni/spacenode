@@ -352,3 +352,65 @@ e chamados.
 Migration `20260718120000_nodi_v4_autonomy.sql` — APLICADA em dev+prod.
 Pendências V4: próxima ação por módulo (embutida nas ferramentas), execução
 de Ampliar/Animar no autopiloto, edição de status das etapas do plano na UI.
+
+
+## Evolução de jornada — 02/10/2026 (preparada para revisão)
+
+A auditoria do código confirmou três camadas existentes: suporte/FAQ (V1),
+orquestrador com ferramentas, análise e memória (V2), e execução de render
+supervisionada/autopiloto limitado (V3/V4). O painel mantém conversa em
+sessionStorage, não uma conversa durável entre dispositivos. A execução direta
+hoje cobre Renderizar; edição, ampliação e animação podem receber propostas e
+preenchimento nas telas, mas não devem ser anunciadas como executadas pelo chat.
+A seleção de anexo usa gerações existentes, sem upload inicial direto no chat.
+As capacidades continuam sujeitas às flags e ao gate de usuários internos.
+Esta revisão não altera flags, planos, cobrança, permissões nem schema.
+
+### Implementação desta etapa
+
+- `lib/nodi/journey.ts`: jornada determinística da conta: preparar a entrada,
+  acompanhar geração, diagnosticar falha, revisar imagem ou conferir vídeo para
+  apresentação. Status concluído não comprova aprovação ou entrega. A origem é
+  o histórico recente da conta, não somente o Space aberto.
+- `readRecentGenerations`: mantém sinal de indisponibilidade de qualquer fonte;
+  consulta parcial nunca é descrita como conta nova. Client autenticado e filtro
+  `user_id` continuam obrigatórios, com fallback de colunas existente.
+- Bootstrap entrega cartão de próxima etapa, sem cache privado. O mesmo estado
+  entra no contexto do orquestrador e em `consultar_jornada` sem depender de uma
+  decisão do modelo de buscar essa informação.
+- Resultados e imagens selecionadas mantêm referência por kind/id na conversa;
+  a referência não cruza Spaces. Resolução das imagens continua server-side por
+  dono da geração. Manter referência não dispara análise visual automaticamente.
+- Histórico inclui resultados executados e direção/configuração propostas,
+  limitados a oito turnos de até 700 caracteres. Não inclui URL da imagem nem
+  token de execução. Texto/dados continuam demarcados como não confiáveis.
+- Pedidos de ação e continuação não são desviados para FAQ; respostas
+  determinísticas exigem correspondência forte e distância da segunda candidata.
+- Confirmação textual de uma ação exige frase completa reconhecida. "Sim, mas
+  não gere ainda" e "ok quanto custa?" não executam a proposta pendente.
+- O cartão se atualiza após uma execução confirmada. Resultados completos
+  priorizam revisão, sem sugestão automática de nova despesa.
+
+### Validação e implantação
+
+Validação local concluída: 152 testes passaram (Nodi e base compartilhada do
+WhatsApp), verificação de tipos e lint dos arquivos alterados sem erros. Os testes usam dados fictícios e modelo simulado; não
+comprovam qualidade de respostas do provedor real nem entrega em produção.
+Esta etapa está somente no branch local `codex/nodi-journey` até autorização
+específica para publicar estes novos arquivos no repositório público. Não ampliar
+o gate de usuários nem iniciar gerações pagas como parte da instalação.
+Após publicação, testar com uma conta autorizada: objetivo inicial, revisão de
+imagem própria, pedido de ajuste, confirmação explícita e resultado no Histórico.
+
+### Próximas etapas para assistência de ponta a ponta
+
+1. Upload inicial no chat com validação de imagem, isolamento de Storage e
+   vínculo com projeto/vista: prepara a primeira geração sem exigir histórico.
+2. Registrar aprovação/rejeição explícita da versão, relacionar entrada e
+   derivados e acompanhar execução sem confundir imagens de outros projetos.
+3. Conversa durável por conta e projeto, com retomada entre dispositivos e
+   política de retenção; a memória de decisões atual continua confirmada.
+4. Integrar os executores reais de edição, ampliação e vídeo ao mesmo pré-voo,
+   reservas de execução e cobrança existentes; evitar caminhos paralelos.
+5. Avaliar qualidade com cenários completos de interiores/exteriores, recuperação
+   de falha e encaminhamento humano. Expandir acesso apenas após teste controlado.

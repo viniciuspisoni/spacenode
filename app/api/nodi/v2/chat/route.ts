@@ -15,6 +15,7 @@ import { isNodiEnabled } from '@/lib/nodi/flags'
 import { readSettings } from '@/lib/nodi/v4/settings'
 import { capabilitiesFor, isNodiV2EnabledFor } from '@/lib/nodi/v2/flags'
 import { checkUserBudget } from '@/lib/nodi/v2/budget'
+import { canUseKnowledgeShortcut } from '@/lib/nodi/v2/routing'
 import { runNodiV2 } from '@/lib/nodi/v2/orchestrator'
 import { deriveNodiContext } from '@/lib/nodi/context'
 import { KB_STRONG_SCORE, buildKbAnswer, matchKb } from '@/lib/nodi/knowledge'
@@ -35,7 +36,7 @@ function parseHistory(raw: unknown): NodiTurn[] {
     const turn = t as { role?: unknown; text?: unknown }
     return {
       role: turn.role === 'user' ? ('user' as const) : ('nodi' as const),
-      text: clampText(String(turn.text ?? ''), 400),
+      text: clampText(String(turn.text ?? ''), 700),
       at: 0,
     }
   }).filter(t => t.text.length > 0)
@@ -51,8 +52,9 @@ function parseAttachment(raw: unknown): NodiAttachment | null {
 
 /** Fallback determinístico (mesma lógica da V1) embrulhado no envelope V2. */
 function v1Fallback(message: string, moduleId: string | null): NodiV2Answer {
-  const matches = matchKb(message, moduleId, 1)
-  if (matches[0]) {
+  const matches = matchKb(message, moduleId, 2)
+  if (matches[0] && matches[0].score >= KB_STRONG_SCORE &&
+    (!matches[1] || matches[0].score - matches[1].score >= 2)) {
     const payload = buildKbAnswer(matches[0].entry)
     return { text: payload.text, source: 'v2-fallback-v1', actions: payload.actions }
   }
@@ -96,9 +98,10 @@ export async function POST(req: Request) {
   const tele = { userId: user.id, route: context.route, module: context.moduleId }
 
   // 2 — atalho determinístico: pergunta simples, sem imagem, match forte.
-  if (!attachment) {
-    const matches = matchKb(message, context.moduleId, 1)
-    if (matches[0] && matches[0].score >= KB_STRONG_SCORE) {
+  if (canUseKnowledgeShortcut(message, history.length, !!attachment)) {
+    const matches = matchKb(message, context.moduleId, 2)
+    if (matches[0] && matches[0].score >= KB_STRONG_SCORE &&
+      (!matches[1] || matches[0].score - matches[1].score >= 2)) {
       const payload = buildKbAnswer(matches[0].entry)
       void logNodiEvent(admin, { ...tele, event: 'answer_kb', meta: { kb: payload.id, source: 'v2-shortcut' } })
       const answer: NodiV2Answer = { text: payload.text, source: 'v2', actions: payload.actions }

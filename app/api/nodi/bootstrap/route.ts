@@ -10,9 +10,10 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { isNodiEnabled } from '@/lib/nodi/flags'
 import { capabilitiesFor, isNodiV2EnabledFor } from '@/lib/nodi/v2/flags'
 import { deriveNodiContext } from '@/lib/nodi/context'
-import { listRecentGenerations } from '@/lib/nodi/diagnostics'
+import { readRecentGenerations } from '@/lib/nodi/diagnostics'
 import { getFaqIndex, getSuggestions } from '@/lib/nodi/knowledge'
 import { computeNextBestAction } from '@/lib/nodi/v4/next-action'
+import { computeJourney } from '@/lib/nodi/journey'
 import { readSettings } from '@/lib/nodi/v4/settings'
 import { getPayerBalance } from '@/lib/workspaces/balance'
 
@@ -36,18 +37,21 @@ export async function GET(req: Request) {
   // V4: próxima melhor ação (determinística) + modo de autonomia do usuário.
   let nextAction = null
   let settings = null
+  let journey = null
   if (v2Allowed) {
     settings = await readSettings(supabase, user.id)
     try {
       const [recent, payer] = await Promise.all([
-        listRecentGenerations(supabase, user.id, 8),
+        readRecentGenerations(supabase, user.id, 8),
         getPayerBalance(admin, user.id).catch(() => null),
       ])
-      nextAction = computeNextBestAction({
-        recent,
+      journey = computeJourney({ recent: recent.generations, available: recent.available,
+        balance: payer?.totalBalance ?? null, multimodal: capabilitiesFor(v2Allowed).multimodal })
+      nextAction = recent.available ? computeNextBestAction({
+        recent: recent.generations,
         balance: payer?.totalBalance ?? null,
         moduleId: context.moduleId,
-      })
+      }) : null
     } catch {} // sugestão é açúcar — nunca derruba o bootstrap
   }
 
@@ -58,6 +62,7 @@ export async function GET(req: Request) {
     faq: getFaqIndex(),
     capabilities: capabilitiesFor(v2Allowed),
     nextAction,
+    journey,
     settings,
-  })
+  }, { headers: { 'Cache-Control': 'private, no-store' } })
 }
