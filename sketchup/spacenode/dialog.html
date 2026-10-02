@@ -713,16 +713,6 @@
       transition: transform 200ms var(--ease);
     }
     .history-grid img:hover { transform: scale(1.03); border-color: var(--border-focus); }
-    .history-grid .hist { position: relative; margin: 0; }
-    .history-grid figcaption {
-      position: absolute; left: 0; right: 0; bottom: 0; padding: 3px 6px;
-      font-size: 10px; line-height: 1.2; color: #fff; background: rgba(0,0,0,0.55);
-      border-radius: 0 0 10px 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;
-    }
-    .history-grid .hist.is-in-journal::after {
-      content: ''; position: absolute; top: 6px; right: 6px; width: 6px; height: 6px; border-radius: 50%;
-      background: #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.35);
-    }
     .history-more { margin-top: 8px; width: 100%; }
     .history-empty { font-size: 11.5px; color: var(--text-3); }
 
@@ -963,7 +953,6 @@
           <button class="ghost" id="upscale4xButton">Ampliar 4x</button>
           <button class="ghost" id="animarShortcutButton" style="grid-column:1 / -1;display:none">Animar este render</button>
           <button class="ghost" id="variationButton" style="grid-column:1 / -1">Gerar variação deste render</button>
-          <div class="hint" id="variationHint" style="grid-column:1 / -1;margin:0">Mantém materiais e atmosfera deste render — a câmera precisa ser a mesma; se mudou, o render sai sem âncora e o painel avisa.</div>
           <button class="ghost" id="restoreCameraButton" style="display:none;grid-column:1 / -1">Voltar à vista deste render</button>
         </div>
       </div>
@@ -1072,7 +1061,6 @@
         <div class="mask-tools" style="margin-top:6px">
           <button class="ghost" id="maskToggle">Pintar área</button>
           <button class="ghost" id="maskClear" style="display:none">Limpar seleção</button>
-          <button class="ghost" id="maskUndo" style="display:none">Desfazer traço</button>
         </div>
         <div class="hint" id="selectionHint">Selecione no SketchUp o grupo, o componente ou as faces e toque no botão: a área afetada aparece sobre o render.</div>
         <div class="batch-row is-done sel-line" id="selectionLine" style="display:none"><span class="st"></span><span class="nm" id="selectionText"></span></div>
@@ -1127,7 +1115,6 @@
         <div class="pills" id="scenesPills"></div>
         <div class="history-empty" id="scenesEmpty" style="display:none">Crie cenas no SketchUp pra gerar o caderno inteiro de uma vez.</div>
         <div class="batch-note" id="batchNote">Todas as cenas com os mesmos presets e a mesma semente — materiais e estilo tendem a ficar coerentes.</div>
-        <div class="hint" id="batchPromptHint" style="display:none"></div>
         <div class="batch-progress" id="batchProgress"></div>
         <div class="history-grid" id="batchResults" style="margin-top:8px"></div>
         <div class="batch-actions" id="batchActions">
@@ -1498,7 +1485,7 @@
         condNoSun: 'O preset de sol não foi aplicado — a captura saiu com o sol atual do modelo.',
         matUnsupported: 'Textura fora de jpg/png — não dá pra enviar como amostra.',
         matReason: { not_found: 'não encontrado', unsupported_format: 'formato não suportado', too_large: 'acima de 7,8 MB', export_failed: 'falha ao exportar', upload_failed: 'falha no envio' },
-        historyOpen: 'Trazer para o painel',
+        historyOpen: 'Trazer para o painel', historyInJournal: 'no diário deste arquivo',
         resultExpired: 'O link deste render venceu. Gere de novo ou abra pelo Histórico.',
         resultRefreshing: 'Atualizando o link do render… tente de novo em instantes.',
         reach: function (n) { return 'seu saldo dá para ~' + n + ' render' + (n === 1 ? '' : 's') + ' nessa configuração'; },
@@ -1710,7 +1697,7 @@
         condNoSun: 'The sun preset was not applied — the capture used the model current sun.',
         matUnsupported: 'Texture is not jpg/png — it cannot be sent as a sample.',
         matReason: { not_found: 'not found', unsupported_format: 'unsupported format', too_large: 'over 7.8 MB', export_failed: 'export failed', upload_failed: 'upload failed' },
-        historyOpen: 'Bring into the panel',
+        historyOpen: 'Bring into the panel', historyInJournal: 'in this file\'s journal',
         resultExpired: 'This render link expired. Generate again or open it from History.',
         resultRefreshing: 'Refreshing the render link… try again in a moment.',
         reach: function (n) { return 'your balance covers ~' + n + ' render' + (n === 1 ? '' : 's') + ' at this setup'; },
@@ -2515,15 +2502,11 @@
       // onde não vale, a nota diz, em vez de prometer coerência que não vem.
       var eng = currentEngine();
       var seedOk = !eng || !eng.supports || eng.supports.seed !== false;
-      els.batchNote.textContent = insufficient ? tt('batchInsufficient', total, balance) : tt(seedOk ? 'batchNote' : 'batchNoteNoSeed');
       // O texto de Refinar imagem (muitas vezes de outra vista) entra em todas
-      // as cenas: o lote diz isso antes de cobrar.
-      var promptHintEl = $s('batchPromptHint');
-      if (promptHintEl) {
-        var promptTxt = els.prompt.value.trim();
-        promptHintEl.style.display = promptTxt ? '' : 'none';
-        promptHintEl.textContent = promptTxt ? st('batchPromptHint').replace('%s', promptTxt.length > 60 ? promptTxt.slice(0, 57) + '…' : promptTxt) : '';
-      }
+      // as cenas: a própria nota do lote diz isso antes de cobrar.
+      var promptTxt = els.prompt.value.trim();
+      var promptNote = promptTxt ? ' ' + st('batchPromptHint').replace('%s', promptTxt.length > 60 ? promptTxt.slice(0, 57) + '…' : promptTxt) : '';
+      els.batchNote.textContent = (insufficient ? tt('batchInsufficient', total, balance) : tt(seedOk ? 'batchNote' : 'batchNoteNoSeed')) + promptNote;
     }
     els.batchButton.addEventListener('click', function () {
       if (model.generating || model.selectedScenes.length === 0) return;
@@ -2922,8 +2905,6 @@
       els.maskToggle.classList.add('is-active');
       els.maskToggle.textContent = tt('maskDone');
       els.maskClear.style.display = '';
-      $s('maskUndo').textContent = st('maskUndo');
-      $s('maskUndo').style.display = model.maskStrokes.length ? '' : 'none';
       sizeMaskCanvas();
       redrawMaskOverlay();
     }
@@ -2932,14 +2913,12 @@
       els.preview.classList.remove('is-masking');
       els.maskToggle.classList.remove('is-active');
       els.maskToggle.textContent = tt('maskSelect');
-      $s('maskUndo').style.display = 'none';
     }
     function clearMask() {
       model.maskStrokes = [];
       clearSelectionMask();
       redrawMaskOverlay();
       els.maskClear.style.display = model.maskActive ? '' : 'none';
-      $s('maskUndo').style.display = 'none';
       updateEditButton();
       scheduleEditQuote();
     }
@@ -2966,25 +2945,25 @@
     function endMaskStroke() {
       if (!maskDrawing) return;
       maskDrawing = false;
-      $s('maskUndo').style.display = model.maskStrokes.length ? '' : 'none';
       updateEditButton();
       scheduleEditQuote();
     }
     els.maskCanvas.addEventListener('pointerup', endMaskStroke);
     els.maskCanvas.addEventListener('pointercancel', endMaskStroke);
-    // Um traço errado no pendente não obriga a recomeçar a área inteira.
-    $s('maskUndo').addEventListener('click', function () {
+    // Um traço errado no pendente não obriga a recomeçar a área inteira:
+    // Ctrl/Cmd+Z desfaz o último traço e Esc sai do modo pintar — por atalho,
+    // sem botão novo (a estrutura visual do painel fica como está).
+    function undoMaskStroke() {
       if (!model.maskStrokes.length) return;
       model.maskStrokes.pop();
       redrawMaskOverlay();
-      $s('maskUndo').style.display = model.maskStrokes.length ? '' : 'none';
       updateEditButton();
       scheduleEditQuote();
-    });
+    }
     document.addEventListener('keydown', function (ev) {
       if (!model.maskActive) return;
       if (ev.key === 'Escape' && !(shell && shell.sheet)) { ev.preventDefault(); exitMaskMode(); return; }
-      if ((ev.ctrlKey || ev.metaKey) && (ev.key === 'z' || ev.key === 'Z')) { ev.preventDefault(); $s('maskUndo').click(); }
+      if ((ev.ctrlKey || ev.metaKey) && (ev.key === 'z' || ev.key === 'Z')) { ev.preventDefault(); undoMaskStroke(); }
     });
 
     // Máscara final na resolução da FONTE (branco = editar, preto = preserva),
@@ -3934,8 +3913,8 @@
     });
     function renderResultMore() {
       var open = els.resultMore.classList.contains('is-open');
-      var vh = $s('variationHint');
-      if (vh) { vh.textContent = st('variationHint'); vh.style.display = els.variationButton.style.display === 'none' ? 'none' : ''; }
+      // O que a âncora faz, no title do botão (sem elemento novo).
+      els.variationButton.title = st('variationHint');
       els.resultMoreToggle.textContent = st(open ? 'resultLess' : 'resultMore');
       els.resultMoreToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
     }
@@ -4136,27 +4115,23 @@
         var url = r.preview_url || r.output_url;
         if (!url) return;
         if (r.ambient === 'video') return; // /api/renders/list não filtra ambient
-        var fig = document.createElement('figure');
-        fig.className = 'hist';
         var img = document.createElement('img');
         img.src = url;
         img.alt = 'Render';
         img.loading = 'lazy';
-        img.title = tt('historyOpen');
-        // URLs assinadas expiram (~1h) — thumbnail morto some em vez de
-        // virar ícone quebrado.
-        img.addEventListener('error', function () { fig.remove(); });
-        // Legenda: motor · qualidade · quando — dezenas de miniaturas da mesma
-        // vista não se distinguem sem isso. Ponto = render que está no diário
-        // deste arquivo.
-        var cap = document.createElement('figcaption');
+        // Motor · qualidade · quando (e se está no diário deste arquivo) no
+        // title: dezenas de miniaturas da mesma vista não se distinguem sem
+        // isso — e sem elemento novo sobre a grade.
         var engName = (function () {
           var list = (model.catalog && model.catalog.engines) || [];
           for (var k = 0; k < list.length; k++) if (list[k].id === r.engine) return list[k].name;
           return r.engine || '';
         })();
-        cap.textContent = [engName, r.resolution ? String(r.resolution).toUpperCase() : '', r.created_at ? formatWhen(r.created_at) : ''].filter(Boolean).join(' · ');
-        if ((model.journal || []).some(function (e) { return e && e.renderId && e.renderId === r.id; })) fig.classList.add('is-in-journal');
+        var inJournal = (model.journal || []).some(function (e) { return e && e.renderId && e.renderId === r.id; });
+        img.title = [engName, r.resolution ? String(r.resolution).toUpperCase() : '', r.created_at ? formatWhen(r.created_at) : '', inJournal ? tt('historyInJournal') : '', tt('historyOpen')].filter(Boolean).join(' · ');
+        // URLs assinadas expiram (~1h) — thumbnail morto some em vez de
+        // virar ícone quebrado.
+        img.addEventListener('error', function () { img.remove(); });
         // Clique traz o render PRO PAINEL (Ampliar/Editar/Baixar/Comparar
         // funcionam nele); "Abrir no site" continua nas ações do resultado.
         img.addEventListener('click', function () {
@@ -4172,9 +4147,7 @@
             signedAt: signedAt
           });
         });
-        fig.appendChild(img);
-        fig.appendChild(cap);
-        els.historyGrid.appendChild(fig);
+        els.historyGrid.appendChild(img);
       });
       var empty = els.historyGrid.children.length === 0;
       els.historyEmpty.style.display = empty ? '' : 'none';
@@ -4746,7 +4719,6 @@
         tabNeedsRender: 'Gere um render primeiro',
         styleNoSeedEngine: 'Neste motor a semente não se aplica — gere em Vega ou Pulsar pra travar o estilo.',
         variationHint: 'Mantém materiais e atmosfera deste render — a câmera precisa ser a mesma; se mudou, o render sai sem âncora e o painel avisa.',
-        maskUndo: 'Desfazer traço',
         batchPromptHint: 'O refinamento "%s" entra em todas as cenas — edite na aba Render.',
         resultMore: 'Mais ações', resultLess: 'Menos ações',
         toolMirrorTip: 'Marca a face selecionada no SketchUp como espelho',
@@ -4794,7 +4766,6 @@
         tabNeedsRender: 'Generate a render first',
         styleNoSeedEngine: 'This engine does not take a seed — generate with Vega or Pulsar to lock the style.',
         variationHint: 'Keeps the materials and atmosphere of this render — the camera must be the same; if it moved, the render goes out without the anchor and the panel says so.',
-        maskUndo: 'Undo stroke',
         batchPromptHint: 'The refinement "%s" goes into every scene — edit it in the Render tab.',
         resultMore: 'More actions', resultLess: 'Fewer actions',
         toolMirrorTip: 'Marks the face selected in SketchUp as a mirror',

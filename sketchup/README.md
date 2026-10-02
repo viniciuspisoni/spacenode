@@ -139,14 +139,19 @@ saíram com a grafia nova. Os PNGs foram conferidos a 6× e 12×.
   `warn` (não é erro do sistema), reconciliação e re-assinatura trazem semente
   e veredito (`/api/sketchup/render` devolve `seed`, `fidelityScore`,
   `fidelityWarning`, `semanticWarning`, `engine`, `resolution`).
-- Pincel da máscara: "Desfazer traço" (também Ctrl+Z) e Esc sai do modo
-  pintar. Histórico com legenda (motor · qualidade · quando) e um ponto no que
-  está no diário deste arquivo. Hint sob "Gerar variação" explicando a âncora.
-  Estilo do projeto não trava com semente que o servidor não aplicou (Quasar).
+- Pincel da máscara: Ctrl/Cmd+Z desfaz o último traço e Esc sai do modo
+  pintar (por atalho — nenhum botão novo). Histórico: motor · qualidade ·
+  quando, e "no diário deste arquivo", no `title` da miniatura. "Gerar
+  variação" explica a âncora no `title` do botão. Estilo do projeto não trava
+  com semente que o servidor não aplicou (Quasar). O dono pediu a estrutura
+  visual intacta: os quatro elementos que esta versão chegou a desenhar
+  (botão de desfazer, legenda e ponto no histórico, hint sob a variação, linha
+  de refinamento na aba Cenas) foram reduzidos a atalho, `title` e texto
+  dentro da nota do lote.
   Uma cotação de ampliação que sai da tela sem ser aplicada é cancelada no
   Ruby (o PNG baixado em `%TEMP%` é apagado). Na aba Cenas só o saldo do
   LOTE aparece (o bloco do render único ficava por cima) e o refinamento ativo
-  é mostrado antes de cobrar.
+  é citado na própria nota do lote antes de cobrar.
 - Vocabulário igual ao web: "Motor", "Qualidade", "Refinar imagem"; "nodes"
   minúsculo em frases.
 - Voz do manual: "A IA parte do que a captura mostra" no lugar de "preserva o
@@ -165,7 +170,7 @@ saíram com a grafia nova. Os PNGs foram conferidos a 6× e 12×.
   câmera e o clique que abre a folha Luz, nota do lote por motor, notas de mapa
   vazio/sombras/JPEG, Estilo sem semente, desfazer traço e Esc, cotação de
   ampliação descartada, hint da variação e legendas do histórico, viewports,
-  EN); os dois harnesses Playwright aceitam `SKETCHUP_TEST_CHANNEL=chrome` e
+  EN; sem nenhum elemento novo no painel); os dois harnesses Playwright aceitam `SKETCHUP_TEST_CHANNEL=chrome` e
   `npm run verify:sketchup` roda Ruby + os dois + a conferência do `.rbz`. O
   harness Ruby passou a rodar no Ruby 2.6 do macOS (forwarding de `**kwargs`
   vazio) e ganhou dublês de `shadow_info`/`rendering_options` e os testes do

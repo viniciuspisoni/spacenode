@@ -185,7 +185,7 @@ const cases = [
     assert.match(await text(page, '#dockSummary'), /Residencial · refinamento/, 'o resumo do dock mostra que há refinamento ativo');
     await page.locator('.seg[data-tab="scenes"]').click();
     await page.locator('#scenesPills button').filter({ hasText: 'Cozinha' }).click();
-    assert.match(await text(page, '#batchPromptHint'), /"decoração minimalista" entra em todas as cenas/);
+    assert.match(await text(page, '#batchNote'), /"decoração minimalista" entra em todas as cenas/, 'a nota do lote avisa do refinamento ativo');
     await page.locator('.seg[data-tab="render"]').click();
     await page.locator('#generateButton').click();
     const gen = (await calls(page)).find((c) => c.name === 'generate');
@@ -323,7 +323,6 @@ const cases = [
     await page.waitForFunction(() => document.getElementById('resultImage').naturalWidth > 0);
     await page.locator('.seg[data-tab="edit"]').click();
     await page.locator('#maskToggle').click();
-    assert.equal(await page.locator('#maskUndo').isVisible(), false, 'sem traço, sem desfazer');
     const box = await page.locator('#maskCanvas').boundingBox();
     assert.ok(box && box.width > 50 && box.height > 50, 'canvas da máscara dimensionado');
     // Eventos de ponteiro despachados direto no canvas (o CEF entrega assim).
@@ -334,11 +333,19 @@ const cases = [
       await canvas.dispatchEvent('pointermove', { clientX: x0 + 20, clientY: y0 + 15, pointerId: 1, isPrimary: true });
       await canvas.dispatchEvent('pointerup', { clientX: x0 + 20, clientY: y0 + 15, pointerId: 1, isPrimary: true, button: 0 });
     }
-    assert.equal(await page.locator('#maskUndo').isVisible(), true);
-    assert.equal(await text(page, '#maskUndo'), 'Desfazer traço');
-    await page.locator('#maskUndo').click();
+    const painted = () => page.evaluate(() => {
+      const c = document.getElementById('maskCanvas');
+      const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+      let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 0) n++;
+      return n;
+    });
+    assert.ok(await painted() > 0, 'dois traços pintados');
     await page.keyboard.press('Control+z');
-    assert.equal(await page.locator('#maskUndo').isVisible(), false, 'dois traços, dois desfazeres');
+    const afterOne = await painted();
+    assert.ok(afterOne > 0, 'um traço sobrou');
+    await page.keyboard.press('Control+z');
+    assert.equal(await painted(), 0, 'dois traços, dois Ctrl+Z — sem botão novo');
+    assert.equal(await page.locator('#maskUndo').count(), 0, 'nenhum botão de desfazer na barra do pincel');
     await page.keyboard.press('Escape');
     assert.equal(await page.evaluate(() => document.getElementById('preview').classList.contains('is-masking')), false, 'Esc sai do modo pintar');
     return { page, errors };
@@ -369,17 +376,19 @@ const cases = [
     await receive(page, 'result', renderResult());
     await page.waitForFunction(() => document.getElementById('resultImage').naturalWidth > 0);
     await page.locator('#resultMoreToggle').click();
-    assert.match(await text(page, '#variationHint'), /a câmera precisa ser a mesma/);
+    assert.equal(await page.locator('#variationHint').count(), 0, 'sem hint como elemento');
+    assert.match((await page.locator('#variationButton').getAttribute('title')) || '', /a câmera precisa ser a mesma/, 'a explicação da âncora está no title do botão');
     await receive(page, 'journal', { entries: [renderResult({ renderId: 'r-journal' })] });
     await receive(page, 'history', { renders: [
       { id: 'r-journal', engine: 'vega', resolution: '2k', created_at: '2026-10-01T12:00:00Z', preview_url: resultUrl, output_url: resultUrl },
       { id: 'r-other', engine: 'quasar', resolution: '2k', created_at: '2026-09-30T12:00:00Z', preview_url: resultUrl, output_url: resultUrl },
     ] });
-    const caps = await page.locator('#historyGrid figcaption').allTextContents();
-    assert.equal(caps.length, 2);
-    assert.match(caps[0], /^Vega · 2K · /);
-    assert.match(caps[1], /^Quasar · 2K · /);
-    assert.equal(await page.locator('#historyGrid .hist.is-in-journal').count(), 1, 'o render que está no diário deste arquivo é marcado');
+    assert.equal(await page.locator('#historyGrid figcaption').count(), 0, 'sem legenda como elemento');
+    const titles = await page.locator('#historyGrid img').evaluateAll((imgs) => imgs.map((i) => i.title));
+    assert.equal(titles.length, 2);
+    assert.match(titles[0], /^Vega · 2K · .* · no diário deste arquivo · Trazer para o painel$/);
+    assert.match(titles[1], /^Quasar · 2K · .* · Trazer para o painel$/);
+    assert.doesNotMatch(titles[1], /diário/);
     return { page, errors };
   }],
   ['shadows-hint-opens-light-sheet-and-aerial-views-are-not-tilt-warnings', async (context) => {
