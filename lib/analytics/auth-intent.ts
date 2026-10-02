@@ -13,11 +13,14 @@
 //      no caminho (allowlist do Supabase, aba nova, link de e-mail antigo);
 //   3. senão, /app.
 //
-// Contas recém-criadas (proxy: created_at há menos de 60s) ganham `signup=1`
-// no destino — é o gatilho do ping de conversão (Google Ads + Meta Pixel,
-// components/SignupConversionPing.tsx). Até 18/09/26 só o /auth/callback
-// fazia isso; o caminho do Google redirecionava seco e o cadastro nunca
-// virava conversão.
+// Contas recém-criadas (proxy: created_at OU email_confirmed_at há menos de
+// 60s) ganham `signup=1` no destino — é o gatilho do ping de conversão
+// (Google Ads + Meta Pixel, components/SignupConversionPing.tsx). Até
+// 18/09/26 só o /auth/callback fazia isso; o caminho do Google redirecionava
+// seco e o cadastro nunca virava conversão. Até 01/10/26 só valia o
+// created_at — mas no cadastro por e-mail ele é a hora do formulário, e o
+// callback roda no clique do link de confirmação, quase sempre mais de 60s
+// depois: o cadastro por e-mail não virava conversão.
 //
 // O cookie de intenção NÃO é limpo aqui de propósito: o AttributionBinder
 // ainda vai lê-lo no primeiro acesso ao /app para gravar `plan_intent` no
@@ -31,11 +34,24 @@ import { intentResumePath, parseIntentCookie, type PlanIntent } from './attribut
 // Mesmo proxy de "acabou de se cadastrar" do /auth/callback original.
 const NEW_USER_WINDOW_MS = 60_000
 
+function withinNewUserWindow(iso: string | null | undefined): boolean {
+  return !!iso && Date.now() - new Date(iso).getTime() < NEW_USER_WINDOW_MS
+}
+
+/** Conta criada agora (Google, cadastro com sessão imediata) ou e-mail
+ *  confirmado agora (o clique no link de confirmação é o fim do cadastro). */
 export function isNewUser(user: User | null | undefined): boolean {
-  return (
-    !!user?.created_at &&
-    Date.now() - new Date(user.created_at).getTime() < NEW_USER_WINDOW_MS
-  )
+  return withinNewUserWindow(user?.created_at) || withinNewUserWindow(user?.email_confirmed_at)
+}
+
+/** Acrescenta `signup=1` a um caminho interno já resolvido, preservando a
+ *  query. Para o cadastro que devolve sessão na hora (confirmação de e-mail
+ *  desligada no Supabase): o browser vai direto ao destino, sem passar pelo
+ *  /auth/callback que marcaria a conta nova. */
+export function withSignupFlag(path: string): string {
+  const url = new URL(path, 'https://spacenode.app')
+  url.searchParams.set('signup', '1')
+  return `${url.pathname}${url.search}${url.hash}`
 }
 
 export interface PostAuthDestination {

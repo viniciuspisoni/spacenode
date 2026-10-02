@@ -8,11 +8,16 @@ import { Brandmark } from '@/components/brand'
 import { internalNextPath } from '@/lib/auth/safe-next-path'
 import { LOGIN_NEXT_COOKIE, LOGIN_NEXT_MAX_AGE } from '@/lib/auth/login-next-cookie'
 import {
+  ANON_COOKIE,
   intentFromSearchParams,
   intentResumePath,
+  readBrowserCookie,
   readIntentCookie,
   writeIntentCookie,
 } from '@/lib/analytics/attribution'
+import { withSignupFlag } from '@/lib/analytics/auth-intent'
+import { signupAttributionMetadata } from '@/lib/analytics/signup-attribution'
+import { ATTRIBUTION_COOKIE, parseAttributionCookie } from '@/lib/marketing/ads/naming'
 
 type Mode = 'login' | 'signup'
 
@@ -259,13 +264,25 @@ function LoginForm() {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}` },
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
+          // Origem e destino gravados na conta: o link de confirmação costuma
+          // abrir em OUTRO navegador (app de e-mail), onde estes cookies não
+          // existem — ver lib/analytics/signup-attribution.ts.
+          data: signupAttributionMetadata({
+            attribution: parseAttributionCookie(readBrowserCookie(ATTRIBUTION_COOKIE)),
+            anonymousId: readBrowserCookie(ANON_COOKIE),
+            next: nextPath,
+          }),
+        },
       })
       if (error) {
         setError(translateError(error.message))
         setLoading(false)
       } else if (data.session) {
-        router.push(nextPath)
+        // Sessão na hora = confirmação de e-mail desligada: o cadastro acabou
+        // aqui e não passa pelo /auth/callback, que marcaria signup=1.
+        router.push(withSignupFlag(nextPath))
       } else {
         setSuccess('Verifique seu email para confirmar o cadastro.')
         setLoading(false)
@@ -499,7 +516,7 @@ function LoginForm() {
           display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center',
           gap: 8, fontSize: 10, color: 'var(--color-text-tertiary)', letterSpacing: '0.02em',
         }}>
-          {(['40 nodes grátis', 'Sem cartão', 'Suporte em português'] as const).map((item, i, arr) => (
+          {(['80 nodes grátis', 'Sem cartão', 'Suporte em português'] as const).map((item, i, arr) => (
             <span key={item} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {item}
               {i < arr.length - 1 && <span style={{ opacity: 0.45 }}>·</span>}

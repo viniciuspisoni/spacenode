@@ -53,7 +53,7 @@ export default function FinalCTA() {
           </a>
         </div>
 
-        <p className="spn-final-microcopy">40 Nodes grátis · sem cartão · planos a partir de R$ 99/mês</p>
+        <p className="spn-final-microcopy">80 Nodes grátis · sem cartão · planos a partir de R$ 99/mês</p>
       </div>
 
       <style jsx>{`

@@ -330,11 +330,11 @@ DECLARE u UUID;
 BEGIN
   RAISE NOTICE '── 10. Conta gratuita: nodes de cadastro não expiram ──';
   INSERT INTO public.profiles (email) VALUES ('free@nodes-test.invalid') RETURNING id INTO u;
-  PERFORM pg_temp.assert_eq((SELECT credits FROM public.profiles WHERE id = u), 40, '40 nodes de cadastro');
+  PERFORM pg_temp.assert_eq((SELECT credits FROM public.profiles WHERE id = u), 80, '80 nodes de cadastro');
   PERFORM pg_temp.assert_eq((SELECT nodes_expire_at FROM public.profiles WHERE id = u), NULL::timestamptz,
                     'sem prazo — quem nunca assinou não entra em cortesia');
   PERFORM public.expire_stale_plan_nodes();
-  PERFORM pg_temp.assert_eq((SELECT plan_balance FROM public.user_node_balance WHERE user_id = u), 40,
+  PERFORM pg_temp.assert_eq((SELECT plan_balance FROM public.user_node_balance WHERE user_id = u), 80,
                     'cron não toca em conta gratuita');
 END $$;
 
