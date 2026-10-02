@@ -118,6 +118,7 @@ export default async function BillingPage({ searchParams }: Props) {
   return (
     <BillingClient
       notice={notice}
+      canceled={sp.canceled === 'true' && balance.planId === 'free' && !balance.pooled}
       resume={resume}
       plan={balance.planId}
       balance={{
