@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { readLoginNextCookie } from '@/lib/auth/login-next-cookie'
 import { INTENT_COOKIE } from '@/lib/analytics/attribution'
 import { isNewUser, postAuthDestination } from '@/lib/analytics/auth-intent'
+import { claimNewReferral, REFERRAL_COOKIE } from '@/lib/referrals'
 
 function cookieFromHeader(header: string | null, name: string): string | null {
   if (!header) return null
@@ -22,6 +23,7 @@ export async function GET(request: Request) {
     const supabase = await createClient()
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
+      await claimNewReferral(data.user, cookieFromHeader(cookieHeader, REFERRAL_COOKIE))
       // Regra única de destino (next > intenção de plano > /app) e o
       // `signup=1` de conta nova — ver lib/analytics/auth-intent.ts.
       const { url } = postAuthDestination({
