@@ -1,35 +1,65 @@
-import Image from 'next/image'
-import fechoImg from '@/public/close-vale.jpg'
+'use client'
 
-// Fecho da landing. Não é um cartão: é a página inteira abrindo.
-//
-// O render é do acervo real do dono (3328×1280 na origem; aqui reduzido a
-// 2400px e recomprimido): deck e piscina de borda infinita sobre o vale. É
-// a única das candidatas que tem um horizonte de verdade, que é exatamente
-// o que a seção faz — por isso ela, e não outra.
-//
-// O texto fica na parte de cima, onde o degradê ainda é o fundo opaco da
-// página: assim o CTA não depende de véu sobre imagem para ter contraste. O
-// render abre logo abaixo, quase sem véu (não há texto ali), e volta a
-// dissolver no fundo antes do rodapé.
-//
-// A imagem NÃO cobre a seção inteira: ela é ancorada embaixo, com altura
-// igual à faixa. Sendo 2.6:1, esticá-la sobre a seção toda (mais próxima de
-// 1.6:1) jogaria a piscina e as montanhas para dentro da parte opaca e
-// sobraria só o piso do deck na parte visível.
+import { useEffect, useState } from 'react'
+import Image from 'next/image'
+
+// O primeiro render vem do acervo selecionado pelo dono para o carrossel;
+// os demais já estão publicados na galeria da landing.
+const slides = [
+  { src: '/cliente-nathalia-apartamento-integrado.jpg', scene: 'Apartamento integrado', credit: 'Nathalia Costa' },
+  { src: '/proj-sala-jantar-render.jpg', scene: 'Sala de jantar', credit: 'Paula Miolla' },
+  { src: '/proj-living-jantar-render.jpg', scene: 'Living integrado', credit: 'Bruna Plentz' },
+  { src: '/proj-cozinha-ilha-render.jpg', scene: 'Cozinha com ilha', credit: 'Nathalia Costa' },
+] as const
+
 export default function FinalCTA() {
+  const [active, setActive] = useState(0)
+  const [paused, setPaused] = useState(false)
+  const [reducedMotion, setReducedMotion] = useState(false)
+
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const update = () => setReducedMotion(media.matches)
+    update()
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [])
+
+  useEffect(() => {
+    if (paused || reducedMotion) return
+    const timer = window.setInterval(() => {
+      if (!document.hidden) setActive(index => (index + 1) % slides.length)
+    }, 5500)
+    return () => window.clearInterval(timer)
+  }, [paused, reducedMotion, active])
+
   return (
-    <section className="spn-final" data-cta-position="final">
+    <section
+      id="fecho"
+      className="spn-final"
+      data-cta-position="final"
+      onFocusCapture={() => setPaused(true)}
+      onBlurCapture={event => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setPaused(false)
+      }}
+    >
       <div className="spn-final-media">
-        <Image
-          src={fechoImg}
-          alt=""
-          aria-hidden
-          fill
-          placeholder="blur"
-          sizes="100vw"
-          style={{ objectFit: 'cover', objectPosition: 'center center' }}
-        />
+        {slides.map((slide, index) => (
+          <div
+            key={slide.src}
+            className={`spn-final-slide${index === active ? ' is-active' : ''}`}
+            aria-hidden={index !== active}
+          >
+            <Image
+              src={slide.src}
+              alt={index === active ? slide.scene : ''}
+              fill
+              sizes="100vw"
+              loading="lazy"
+              style={{ objectFit: 'cover', objectPosition: 'center center' }}
+            />
+          </div>
+        ))}
       </div>
       <div className="spn-final-veil" />
 
@@ -56,6 +86,30 @@ export default function FinalCTA() {
         <p className="spn-final-microcopy">80 Nodes grátis · sem cartão · planos a partir de R$ 99/mês</p>
       </div>
 
+      <div className="spn-final-gallery" aria-label="Projetos de usuários SpaceNode">
+        <p className="spn-final-credit">{slides[active].scene} <span>· {slides[active].credit}</span></p>
+        <div
+          className="spn-final-controls"
+          role="group"
+          aria-label="Escolher projeto"
+          onMouseEnter={() => setPaused(true)}
+          onMouseLeave={() => setPaused(false)}
+        >
+          {slides.map((slide, index) => (
+            <button
+              key={slide.src}
+              type="button"
+              className={`spn-final-dot-button${index === active ? ' is-active' : ''}`}
+              aria-label={`Mostrar ${slide.scene}, projeto de ${slide.credit}`}
+              aria-current={index === active ? 'true' : undefined}
+              onClick={() => setActive(index)}
+            >
+              <span />
+            </button>
+          ))}
+        </div>
+      </div>
+
       <style jsx>{`
         .spn-final {
           position: relative;
@@ -67,9 +121,6 @@ export default function FinalCTA() {
           padding: 80px 24px 0;
           overflow: hidden;
         }
-        /* Ancorada embaixo, ocupando só a faixa. Em 1440×880 esta caixa dá
-           quase exatamente 2.6:1 — a proporção nativa do render — então ele
-           entra praticamente sem corte. */
         .spn-final-media {
           position: absolute;
           left: 0;
@@ -78,15 +129,18 @@ export default function FinalCTA() {
           height: 64%;
           z-index: 0;
         }
-        /* Degradê que costura o render à página. Opaco só até onde o texto
-           alcança (42%); daí em diante o véu cai para 0.12 e o render fica
-           praticamente limpo por metade da seção, porque ali não há nada
-           para ler. Volta a fechar no fim, para o rodapé encontrar o fundo
-           da página em vez de uma aresta de imagem cortada. */
+        .spn-final-slide {
+          position: absolute;
+          inset: 0;
+          opacity: 0;
+          transition: opacity 900ms ease;
+        }
+        .spn-final-slide.is-active { opacity: 1; }
         .spn-final-veil {
           position: absolute;
           inset: 0;
           z-index: 1;
+          pointer-events: none;
           background: linear-gradient(
             180deg,
             var(--color-bg) 0%,
@@ -180,6 +234,50 @@ export default function FinalCTA() {
           color: var(--color-text-tertiary);
           margin: 0;
         }
+        .spn-final-gallery {
+          position: absolute;
+          z-index: 2;
+          left: 24px;
+          right: 24px;
+          bottom: 9%;
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-end;
+          gap: 20px;
+        }
+        .spn-final-credit {
+          margin: 0;
+          color: #fff;
+          font-size: 12px;
+          line-height: 1.5;
+          text-shadow: 0 1px 8px #000, 0 1px 2px #000;
+        }
+        .spn-final-credit span { color: rgba(255,255,255,.8); }
+        .spn-final-controls { display: flex; gap: 4px; }
+        .spn-final-dot-button {
+          width: 32px;
+          height: 32px;
+          display: grid;
+          place-items: center;
+          border: 0;
+          background: transparent;
+          cursor: pointer;
+        }
+        .spn-final-dot-button span {
+          width: 18px;
+          height: 3px;
+          border-radius: 2px;
+          background: rgba(255,255,255,.45);
+          box-shadow: 0 1px 5px #000;
+          transition: background 200ms ease;
+        }
+        .spn-final-dot-button.is-active span,
+        .spn-final-dot-button:hover span { background: #fff; }
+        .spn-final-dot-button:focus-visible {
+          outline: 2px solid #fff;
+          outline-offset: 2px;
+          border-radius: 4px;
+        }
 
         @media (max-width: 768px) {
           .spn-final {
@@ -201,6 +299,8 @@ export default function FinalCTA() {
             );
           }
           .spn-final-title { font-size: 27px; margin-bottom: 26px; }
+          .spn-final-gallery { left: 20px; right: 20px; bottom: 11%; align-items: center; }
+          .spn-final-credit { max-width: 55%; }
           .spn-final-ctas {
             flex-direction: column;
             align-items: stretch;
@@ -215,6 +315,7 @@ export default function FinalCTA() {
           }
         }
         @media (prefers-reduced-motion: reduce) {
+          .spn-final-slide { transition: none; }
           .spn-final-primary,
           .spn-final-secondary { transition: none; }
           .spn-final-primary:hover { transform: none; }
