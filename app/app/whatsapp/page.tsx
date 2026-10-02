@@ -20,7 +20,7 @@ export default async function WhatsAppPage() {
     {url ? <>
       <p>Abra o WhatsApp e envie a mensagem de confirmação que já estará preenchida. Ela vale por 10 minutos.</p>
       <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex rounded-xl bg-emerald-600 px-5 py-3 font-medium text-white">Confirmar conexão no WhatsApp</a>
-      <p className="text-sm opacity-70">O atendimento está em piloto. Neste momento, o teste está disponível apenas para o número do responsável pela SpaceNode.</p>
+      <p className="text-sm opacity-70">O atendimento está na fase inicial de lançamento. A confirmação liga esta conversa à sua conta; você pode pedir atendimento humano pelo WhatsApp.</p>
     </> : <p>{unavailable ? 'Não foi possível verificar seu cadastro agora. Tente novamente em alguns instantes.' : 'Salve seu WhatsApp e permita receber ajuda na página da sua conta para continuar.'}</p>}
     <div><Link href="/app/conta" className="underline">Ir para minha conta</Link></div>
   </main>
