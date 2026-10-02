@@ -1,13 +1,14 @@
 -- Indicações pertencem à conta que trouxe o novo usuário. O vínculo é fixado
 -- no cadastro; pagamentos do indicado geram Nodes extras para quem indicou.
-create table public.referrals (
+create table if not exists public.referrals (
   referred_user_id uuid primary key references public.profiles(id) on delete cascade,
   referrer_user_id uuid not null references public.profiles(id) on delete cascade,
+  code text not null,
   created_at timestamptz not null default now(),
   constraint referrals_no_self_reference check (referred_user_id <> referrer_user_id)
 );
 
-create index referrals_referrer_created_idx
+create index if not exists referrals_referrer_created_idx
   on public.referrals (referrer_user_id, created_at desc);
 
 alter table public.referrals enable row level security;
@@ -34,8 +35,8 @@ begin
   end if;
   referrer := candidate::uuid;
   if referrer <> new.id then
-    insert into public.referrals (referred_user_id, referrer_user_id)
-    select new.id, referrer
+    insert into public.referrals (referred_user_id, referrer_user_id, code)
+    select new.id, referrer, referrer::text
       where exists (select 1 from public.profiles where id = referrer)
     on conflict (referred_user_id) do nothing;
   end if;

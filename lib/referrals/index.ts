@@ -23,6 +23,7 @@ export async function claimNewReferral(user: User | null, cookieValue: string | 
   const { error } = await createAdminClient().from('referrals').insert({
     referred_user_id: user.id,
     referrer_user_id: referrer,
+    code: referrer,
   })
   // Cadastro por e-mail pode ter sido vinculado pelo trigger; não sobrescreve.
   if (error && error.code !== '23505') {
