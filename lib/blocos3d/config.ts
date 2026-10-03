@@ -7,36 +7,12 @@
 // aqui — a presença da FAL_KEY é validada nos providers (server-only); a
 // página passa a disponibilidade real pra UI.
 //
-// Catálogo 2026-07-17 (decisão do fundador após 2 testes reais com sofá):
-// três motores de alta qualidade, TODOS via fal (uma key, um vendor), todos
-// com multiview (até 4 ângulos — front obrigatório):
-//   Padrão  = Tripo v2.5 HD          (fiel à foto; multiview posicional)
-//   Alta    = Rodin quality-high     (máximo detalhe; multiview fuse)
-//   Premium = Meshy v5 multi-image   (todos os formatos + quad; multiview
-//             nativo) — o Meshy SEM a assinatura de US$ 20/mês: via fal é
-//             pay-per-use na conta que já temos.
-//
-// Política de preço (mesma régua do Animar, revisão 2026-06-01): costInNodes
-// calibrado pra margem ≥ 50% no PIOR caso de receita por node — Office anual
-// (R$ 0,0729/node), câmbio de trabalho R$ 5,40/US$. Regra prática:
-// nodes_mínimos ≈ custo_US$ × 148; cobramos acima disso.
-//
-// Custo real por geração (fal; conferir no dashboard antes de mudar):
-//   tripo3d/tripo/v2.5 (HD + PBR)      US$ 0,40       → piso 59 nodes
-//   fal-ai/hyper3d/rodin (high+hyper)  US$ 0,40–0,80  → piso 118 nodes
-//   fal-ai/meshy/v5/multi-image-to-3d  US$ 0,40       → piso 59 nodes
-//     (confirmado na fatura fal em 2026-07-17 — recalibrado de 130 pra 100
-//      nodes; o prêmio sobre o Padrão paga os formatos extras + quad.)
-//
-// Histórico de motores (jobs antigos resolvem pelo engine persistido na linha):
-//   draft/Rascunho: fal-ai/trellis (US$ 0,02) — removido do catálogo na
-//   consolidação em 3 tiers de alta qualidade.
-//   Padrão: fal-ai/hunyuan3d-v21 (US$ 0,15) — geometria boa, textura chapada
-//   em tecido (teste real). Substituído pelo Tripo v2.5 HD.
-//   Alta: era Meshy API direta (exigia plano Pro) — o Meshy voltou como tier
-//   Premium via fal; o adapter direto segue em lib/blocos3d/meshy.ts.
+// V2: uma geração H3.1 e um preço. O custo e a margem estão em pricing.ts.
+// As entradas high/premium continuam para interpretar jobs históricos; a API
+// não cria novos jobs desses tiers. Cada job guarda o engine efetivo usado.
 
 import type { Blocos3DOptions, Blocos3DProvider, Blocos3DQuality, PositionedImages, ViewPosition } from './types'
+import { BLOCOS3D_NODES } from './pricing'
 
 export interface Blocos3DEngine {
   id:          Blocos3DQuality
@@ -61,15 +37,15 @@ export interface Blocos3DEngine {
 export const BLOCOS3D_ENGINES: Record<Blocos3DQuality, Blocos3DEngine> = {
   standard: {
     id:          'standard',
-    label:       'Padrão',
-    description: 'Textura HD fiel à imagem, com materiais PBR — pronto pra compor cenas.',
+    label:       'Bloco 3D',
+    description: 'Modelo texturizado para suas cenas, a partir de uma ou mais fotos.',
     provider:    'fal',
-    engine:      'tripo3d/tripo/v2.5/image-to-3d',
+    engine:      'tripo3d/h3.1/image-to-3d',
     formats:     ['GLB'],
-    features:    ['Textura HD', 'Materiais PBR', 'Até 4 ângulos', '~2 min'],
+    features:    ['Textura detalhada', 'Materiais PBR', 'Até 4 ângulos'],
     supportsTexturePrompt: false,
     maxImages:   4,
-    costInNodes: 70,           // US$ 0,40 (texture HD) · ~58% margem no piso
+    costInNodes: BLOCOS3D_NODES,
     estimatedMs: 150_000,
   },
   high: {
@@ -146,15 +122,16 @@ export const BLOCOS3D_SOURCE_MAX_MB = 15
 /** Normaliza o body da request pra um Blocos3DOptions válido (null = inválido). */
 export function normalizeBlocos3DOptions(body: Record<string, unknown> | null): Blocos3DOptions | null {
   const quality = body?.quality ?? DEFAULT_BLOCOS3D_QUALITY
-  if (!isBlocos3DQuality(quality)) return null
-  const engine = BLOCOS3D_ENGINES[quality]
-  const rawPrompt = typeof body?.texturePrompt === 'string' ? body.texturePrompt.trim() : ''
-  return {
-    quality,
-    texturePrompt: engine.supportsTexturePrompt && rawPrompt
-      ? rawPrompt.slice(0, TEXTURE_PROMPT_MAX_LEN)
-      : undefined,
-  }
+  // Tiers antigos continuam no catálogo para exibir o histórico, mas novas
+  // gerações usam sempre o mesmo motor/preço, inclusive via API direta.
+  if (quality !== DEFAULT_BLOCOS3D_QUALITY) return null
+  return { quality: DEFAULT_BLOCOS3D_QUALITY }
+}
+
+/** H3.1 recebe as vistas numa lista posicional, sem slots vazios. */
+export function validViewSequence(images: PositionedImages<unknown>): boolean {
+  const count = countImages(images)
+  return VIEW_POSITION_ORDER.slice(0, count).every(p => images[p] != null)
 }
 
 /** Normaliza o body pra um PositionedImages de KEYS de upload direto
