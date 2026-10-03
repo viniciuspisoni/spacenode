@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# SPACENODE para SketchUp — núcleo do plugin.
+# SpaceNode para SketchUp — núcleo do plugin.
 #
 # Regras de arquitetura deste arquivo:
 # - TODO HTTP via Sketchup::Http::Request (assíncrono, callback na main
@@ -29,7 +29,7 @@ module SpaceNode
   module SketchUp
     extend self
 
-    VERSION = '1.8.1'
+    VERSION = '1.9.0'
     PREFERENCES_KEY = 'com.spacenode.sketchup'
     DEFAULT_API_BASE_URL = 'https://spacenode.app'
     MIN_SKETCHUP_MAJOR = 21          # Ruby 2.7+; recomendado 2024+
@@ -38,7 +38,7 @@ module SpaceNode
     UPLOAD_TIMEOUT_SECONDS = 120     # sign/PUT/confirm (Sketchup::Http não tem timeout)
     DOWNLOAD_TIMEOUT_SECONDS = 180   # download_to_file (render/vídeo) — não tinha watchdog
     VIDEO_STAGE_TIMEOUT_SECONDS = 60 # GET do preview antes de animar (mesmo valor do quote do Ampliar)
-    CATALOG_MIN_VERSION = 9          # cache em disco mais velho que isso é descartado (v9 = presets da planta)
+    CATALOG_MIN_VERSION = 10         # cache em disco mais velho que isso é descartado (v10 = supports.seed por motor)
 
     # Strings do Ruby visíveis no painel (etapas/erros centrais). O grosso da
     # UI é traduzido no dialog; mensagens vindas do SERVIDOR seguem em pt-BR.
@@ -47,9 +47,9 @@ module SpaceNode
         :capturing => 'Capturando a vista…',
         :sending => 'Enviando o projeto…',
         :sending_materials => 'Enviando materiais do modelo…',
-        :generating => 'Gerando na SPACENODE…',
-        :editing => 'Editando na SPACENODE…',
-        :upscaling => 'Ampliando na SPACENODE…',
+        :generating => 'Gerando na SpaceNode…',
+        :editing => 'Editando na SpaceNode…',
+        :upscaling => 'Ampliando na SpaceNode…',
         :renewing => 'Renovando sessão…',
         :cancelled => 'Geração cancelada.',
         :view_restored => 'Vista do render restaurada.',
@@ -73,10 +73,10 @@ module SpaceNode
         :edit_mask_failed => 'Não consegui enviar a área marcada — Inserir precisa dela. Tente marcar de novo.',
         :scene_no_model => 'Nenhum modelo aberto pra criar a cena.',
         :scene_failed => 'Não consegui criar a cena.',
-        :tb_panel => 'SPACENODE',
-        :tb_panel_hint => 'Abrir o painel da SPACENODE',
+        :tb_panel => 'SpaceNode',
+        :tb_panel_hint => 'Abrir o painel da SpaceNode',
         :tb_capture => 'Capturar vista',
-        :tb_capture_hint => 'Capturar a vista atual no painel da SPACENODE',
+        :tb_capture_hint => 'Capturar a vista atual no painel da SpaceNode',
         :tb_generate => 'Gerar render',
         :tb_generate_hint => 'Gerar o render da vista atual com os ajustes do painel',
         :tb_scene => 'Nova cena',
@@ -89,7 +89,7 @@ module SpaceNode
         :tb_open => 'Abrir SpaceNode',
         :tb_open_hint => 'Mostrar ou esconder a barra flutuante da SpaceNode com as ferramentas',
         :reconciling => 'Conexão instável — verificando se o render foi concluído…',
-        :connect_first => 'Conecte sua conta SPACENODE primeiro.',
+        :connect_first => 'Conecte sua conta SpaceNode primeiro.',
         :mask_select_something => 'Selecione no SketchUp o grupo, o componente ou as faces que quer revisar e toque de novo.',
         :mask_no_pixels => 'A seleção não aparece neste render: está fora do quadro ou totalmente coberta.',
         :mask_rendering => 'Calculando a área da seleção…',
@@ -105,8 +105,10 @@ module SpaceNode
         :pairing_failed => 'Não foi possível conectar. Tente de novo.',
         :save_title => 'Salvar render',
         :notif_plan_ready => 'Planta humanizada pronta',
+        :notif_render_ready => 'Render pronto',
+        :notif_batch_ready => 'Cenas prontas',
         :plan_capturing => 'Desenhando a planta do modelo…',
-        :plan_generating => 'Humanizando a planta na SPACENODE…',
+        :plan_generating => 'Humanizando a planta na SpaceNode…',
         :plan_no_model => 'Nenhum modelo aberto no SketchUp.',
         :plan_empty => 'O modelo está vazio — não há planta pra desenhar.',
         :plan_failed => 'Não foi possível desenhar a planta do modelo.',
@@ -115,7 +117,7 @@ module SpaceNode
         :plan_lost => 'A planta demorou demais. Confira o Histórico antes de tentar de novo.',
         :animar_prep => 'Preparando o vídeo…',
         :animar_sending => 'Enviando o render…',
-        :animating => 'Animando na SPACENODE…',
+        :animating => 'Animando na SpaceNode…',
         :animar_eta => 'costuma levar ~%d min',
         :animar_reconciling => 'Conexão instável — verificando se o vídeo foi concluído…',
         :downloading_video => 'Baixando o vídeo…',
@@ -129,9 +131,9 @@ module SpaceNode
         :capturing => 'Capturing the view…',
         :sending => 'Uploading the project…',
         :sending_materials => 'Uploading model materials…',
-        :generating => 'Rendering on SPACENODE…',
-        :editing => 'Editing on SPACENODE…',
-        :upscaling => 'Upscaling on SPACENODE…',
+        :generating => 'Rendering on SpaceNode…',
+        :editing => 'Editing on SpaceNode…',
+        :upscaling => 'Upscaling on SpaceNode…',
         :renewing => 'Renewing session…',
         :cancelled => 'Generation cancelled.',
         :view_restored => 'Render view restored.',
@@ -155,10 +157,10 @@ module SpaceNode
         :edit_mask_failed => 'Could not upload the marked area — Insert needs it. Try marking it again.',
         :scene_no_model => 'No open model to create the scene in.',
         :scene_failed => 'Could not create the scene.',
-        :tb_panel => 'SPACENODE',
-        :tb_panel_hint => 'Open the SPACENODE panel',
+        :tb_panel => 'SpaceNode',
+        :tb_panel_hint => 'Open the SpaceNode panel',
         :tb_capture => 'Capture view',
-        :tb_capture_hint => 'Capture the current view into the SPACENODE panel',
+        :tb_capture_hint => 'Capture the current view into the SpaceNode panel',
         :tb_generate => 'Generate render',
         :tb_generate_hint => 'Render the current view with the panel settings',
         :tb_scene => 'New scene',
@@ -171,7 +173,7 @@ module SpaceNode
         :tb_open => 'Open SpaceNode',
         :tb_open_hint => 'Show or hide the SpaceNode floating bar with the tools',
         :reconciling => 'Unstable connection — checking if the render finished…',
-        :connect_first => 'Connect your SPACENODE account first.',
+        :connect_first => 'Connect your SpaceNode account first.',
         :mask_select_something => 'Select in SketchUp the group, component or faces you want to revise, then tap again.',
         :mask_no_pixels => 'The selection does not show in this render: it is outside the frame or fully hidden.',
         :mask_rendering => 'Computing the selection area…',
@@ -187,8 +189,10 @@ module SpaceNode
         :pairing_failed => 'Could not connect. Try again.',
         :save_title => 'Save render',
         :notif_plan_ready => 'Humanised plan ready',
+        :notif_render_ready => 'Render ready',
+        :notif_batch_ready => 'Scenes ready',
         :plan_capturing => 'Drawing the plan from the model…',
-        :plan_generating => 'Humanising the plan at SPACENODE…',
+        :plan_generating => 'Humanising the plan at SpaceNode…',
         :plan_no_model => 'No model open in SketchUp.',
         :plan_empty => 'The model is empty — there is no plan to draw.',
         :plan_failed => 'Could not draw the plan from the model.',
@@ -197,7 +201,7 @@ module SpaceNode
         :plan_lost => 'The plan took too long. Check History before trying again.',
         :animar_prep => 'Preparing the video…',
         :animar_sending => 'Uploading the render…',
-        :animating => 'Animating on SPACENODE…',
+        :animating => 'Animating on SpaceNode…',
         :animar_eta => 'usually takes ~%d min',
         :animar_reconciling => 'Unstable connection — checking if the video finished…',
         :downloading_video => 'Downloading the video…',
@@ -213,6 +217,12 @@ module SpaceNode
     # 4096 px — capturar menos que isso pra 2K/4K joga fora o sinal
     # geométrico que o motor de fidelidade precisa.
     CAPTURE_EDGE = { 'hd' => 2048, '2k' => 3072, '4k' => 4096 }.freeze
+    # Teto do PNG da captura (a área render-source aceita 15 MiB; o servidor
+    # reencoda qualquer source > 9 MiB em JPEG 4:4:4). Acima disso a vista é
+    # re-renderizada em JPEG pelo encoder do SketchUp. Subir pra 15 MiB só
+    # depois de medir o croma desse JPEG e o upload de 15 MiB em escritório
+    # (README 1.9.0, "Não medido"); o painel já registra o formato enviado.
+    SOURCE_PNG_MAX_BYTES = 14_000_000
 
     # ── Fotografia (0.8.0) ───────────────────────────────────────────────
     # Convenções: o fov do SketchUp é o ângulo VERTICAL (fov_is_height?);
@@ -313,6 +323,11 @@ module SpaceNode
       # Corte preenchido quando o usuário JÁ exibe cortes (não forçamos
       # DisplaySectionCuts: ligar um corte que ele escondeu mudaria a cena).
       'SectionCutFilled' => true,
+      # 1.9.0: a LINHA do corte (3 px por padrão) é o mesmo contorno preto que
+      # o perfil de 3 px da 1.5.0 — só que em volta do quadro inteiro, em todo
+      # interior visto em corte de parede. Fica em 1 px; o preenchimento
+      # (SectionCutFilled) continua, porque parede cortada lê como parede.
+      'SectionCutWidth' => 1,
       # ── Traço gráfico (1.5.0) ────────────────────────────────────────────
       # O PERFIL é o que fazia a IA devolver arquitetura com cara de desenho.
       # Medido no SketchUp 2026 (projeto real de escritório, mesma câmera,
@@ -353,6 +368,21 @@ module SpaceNode
     # Sombras são desligadas via ShadowInfo no bloco da captura do edge.
     EDGE_CAPTURE_OPTIONS = {
       'RenderMode' => 1,
+      # 1.9.0: estilos "sem arestas" (fotográficos, estilo Enscape) são comuns
+      # em escritório — neles o hidden-line saía em BRANCO e ainda assim era
+      # enviado como verdade geométrica, desligando o mapa derivado no
+      # servidor. O mapa é estrutura, não desenho: a aresta é ligada aqui,
+      # só durante este passe (a foto respeita o estilo do usuário).
+      'EdgeDisplayMode' => 1,
+      'SectionCutWidth' => 1,
+      # Céu, chão e fundo não são estrutura: um estilo com céu em gradiente
+      # virava meio-tom em massa e um de fundo escuro, linha branca sobre
+      # preto — os dois reprovados na validação do servidor. Fundo branco e
+      # aresta preta ("tudo igual") só neste passe; as cores entram por
+      # edge_pass_colors (precisam de Sketchup::Color).
+      'DrawHorizon' => false,
+      'DrawGround' => false,
+      'EdgeColorMode' => 0,
       'EdgeType' => 0,
       'JitterEdges' => false,
       'ExtendLines' => false,
@@ -382,7 +412,7 @@ module SpaceNode
     def activate
       unless supported_version?
         ::UI.messagebox(
-          "O SPACENODE precisa do SketchUp 20#{MIN_SKETCHUP_MAJOR} ou mais novo.\n" \
+          "A SpaceNode precisa do SketchUp 20#{MIN_SKETCHUP_MAJOR} ou mais novo.\n" \
           "Recomendamos SketchUp 2024 ou superior."
         )
         return
@@ -425,7 +455,7 @@ module SpaceNode
       end
 
       dialog = ::UI::HtmlDialog.new(
-        :dialog_title => 'SPACENODE',
+        :dialog_title => 'SpaceNode',
         :preferences_key => PREFERENCES_KEY,
         :scrollable => false,
         :resizable => true,
@@ -627,7 +657,9 @@ module SpaceNode
         pending = @upscale_pending
         @upscale_pending = nil
         delete_quiet(pending[:path]) if pending
-        emit('status', { :stage => 'idle', :message => '' })
+        # Sem status 'idle' aqui (1.9.0): o painel descarta a cotação ao trocar
+        # de notice, inclusive logo antes de gerar — um idle atrasado derrubava
+        # o overlay da geração em voo. Quem cotou já está parado.
       end
       dialog.add_action_callback('editQuote') do |_ctx, raw|
         begin
@@ -865,7 +897,7 @@ module SpaceNode
         elsif status == 413
           'Imagem grande demais pro envio direto. Tente novamente.'
         elsif status.zero?
-          'Não foi possível conectar à SPACENODE. Verifique sua internet.'
+          'Não foi possível conectar à SpaceNode. Verifique sua internet.'
         else
           "Erro HTTP #{status}"
         end
@@ -1547,6 +1579,20 @@ module SpaceNode
       rescue StandardError
         nil
       end
+      # 1.9.0: o que o modelo NÃO tem e que deixa o render chapado — sombras
+      # desligadas e estilo de linha. O painel avisa antes de cobrar; nada é
+      # forçado na captura (decisão medida da 1.5.0).
+      begin
+        model ||= ::Sketchup.active_model
+        if model
+          facts[:shadowsOn] = model.shadow_info['DisplayShadows'] ? true : false
+          mode = model.rendering_options['RenderMode']
+          facts[:renderMode] = mode if mode.is_a?(Integer)
+          facts[:lineStyle] = true if mode.is_a?(Integer) && [0, 1, 2, 5].include?(mode)
+        end
+      rescue StandardError
+        nil
+      end
       facts
     rescue StandardError
       nil
@@ -1707,7 +1753,7 @@ module SpaceNode
 
       path_pids = Array(model.active_path).map { |inst| inst.persistent_id }
       entries = mirror_entries(model)
-      model.start_operation('SPACENODE: marcar espelho', true)
+      model.start_operation('SpaceNode: marcar espelho', true)
       begin
         faces.each do |face|
           pid = face.persistent_id
@@ -1745,7 +1791,7 @@ module SpaceNode
       raise 'Nenhum modelo aberto no SketchUp.' unless model
 
       entries = mirror_entries(model)
-      model.start_operation('SPACENODE: desmarcar espelho', true)
+      model.start_operation('SpaceNode: desmarcar espelho', true)
       begin
         if scope == 'all'
           resolve_mirror_entries(model, entries, false).each do |r|
@@ -2054,7 +2100,7 @@ module SpaceNode
       end
       return state if groups.empty?
 
-      model.start_operation('SPACENODE: reflexo (temporário)', true)
+      model.start_operation('SpaceNode: reflexo (temporário)', true)
       state[:operation] = true
 
       original_camera = view.camera
@@ -2161,7 +2207,7 @@ module SpaceNode
         kind = g[:faces].first[:kind]
         material = nil
         begin
-          material = model.materials.add("SPACENODE reflexo #{gi + 1}")
+          material = model.materials.add("SpaceNode reflexo #{gi + 1}")
           material.texture = tex_path
           material.alpha = MIRROR_ALPHA[kind] || 1.0
         rescue StandardError
@@ -2477,7 +2523,7 @@ module SpaceNode
       stats = { :faces => 0, :unique => 0 }
       operation = false
       begin
-        model.start_operation('SPACENODE: máscara da seleção (temporário)', true)
+        model.start_operation('SpaceNode: máscara da seleção (temporário)', true)
         operation = true
         material = model.materials.add("SPACENODE_MASK_#{stamp}")
         material.color = ::Sketchup::Color.new(*SELECTION_MASK_COLORS[0])
@@ -3203,7 +3249,7 @@ module SpaceNode
           section_source = 'model'
         else
           begin
-            model.start_operation('SPACENODE: planta (temporário)', true)
+            model.start_operation('SpaceNode: planta (temporário)', true)
             operation = true
             cut_z = plan_cut_z(model, view)
             center = bounds.center
@@ -3488,7 +3534,7 @@ module SpaceNode
         # Um viewport 4K em PNG pode passar do teto da área de upload — cai
         # pra JPEG de alta qualidade antes de falhar. O teto é da ÁREA de
         # destino (render-source 15 MB; spaces-sketch 10 MB via :max_bytes).
-        max_bytes = opts[:max_bytes] || 14_000_000
+        max_bytes = opts[:max_bytes] || SOURCE_PNG_MAX_BYTES
         if File.size(path) > max_bytes
           jpg = path.sub(/\.png\z/, '.jpg')
           if level_applied
@@ -3552,7 +3598,7 @@ module SpaceNode
         # condicionamento estrutural exige alinhamento pixel a pixel).
         # Falha aqui nunca derruba a captura — segue sem edge map.
         if opts[:edge_map]
-          edge_saved = apply_rendering_options(rendering, EDGE_CAPTURE_OPTIONS)
+          edge_saved = apply_rendering_options(rendering, EDGE_CAPTURE_OPTIONS.merge(edge_pass_colors))
           # Sombras poluiriam o mapa de arestas (hidden line renderiza
           # sombras!) — desligadas via ShadowInfo, que é onde elas vivem.
           edge_shadow_prev = nil
@@ -3582,12 +3628,17 @@ module SpaceNode
               view.write_image(edge_options)
             end
             if File.exist?(candidate)
-              if File.size(candidate) <= 14_000_000
-                edge_path = candidate
-                edge_reason = nil
-              else
+              if File.size(candidate) > 14_000_000
                 edge_reason = 'too_large'
                 delete_quiet(candidate)
+              elsif edge_map_blank?(candidate)
+                # Sem tinta (quadro vazio, estilo que ainda assim não desenha):
+                # melhor nenhum mapa do que um mapa branco como verdade.
+                edge_reason = 'empty'
+                delete_quiet(candidate)
+              else
+                edge_path = candidate
+                edge_reason = nil
               end
             end
           rescue StandardError
@@ -3652,6 +3703,66 @@ module SpaceNode
         :sun_applied => sun_requested && !sun_saved.nil?,
         :photo_report => photo_report
       }
+    end
+
+    # Mapa de arestas sem tinta: amostra 1 linha em 8 e 1 pixel em 2 (≈1 M
+    # amostras num 4096², ~0,1 s) e conta os escuros. Abaixo de 0,3 % o
+    # mapa é descartado — o servidor passaria a condicionar a geração num
+    # vazio e desligaria o mapa derivado da própria imagem. Falha de leitura
+    # mantém o mapa (o servidor valida de novo).
+    EDGE_MAP_MIN_INK = 0.003
+
+    def edge_map_blank?(path)
+      return false unless defined?(::Sketchup::ImageRep)
+
+      rep = ::Sketchup::ImageRep.new
+      rep.load_file(path)
+      w = rep.width.to_i
+      h = rep.height.to_i
+      bpp = rep.bits_per_pixel.to_i
+      return false unless w > 0 && h > 0 && [24, 32].include?(bpp)
+
+      bytes = bpp / 8
+      stride = (w * bytes) + rep.row_padding.to_i
+      data = rep.data
+      return false unless data && data.bytesize >= stride * h
+
+      # Linhas a cada 8, pixels de 2 em 2 (unpack da linha inteira: índice de
+      # Array é barato) — pular 16 colunas deixava uma linha vertical de 1 px
+      # fora da grade passar como "sem tinta".
+      sampled = 0
+      dark = 0
+      y = 0
+      while y < h
+        vals = data.byteslice(y * stride, w * bytes).unpack('C*')
+        i = 0
+        limit = w * bytes
+        while i + 2 < limit
+          sampled += 1
+          dark += 1 if vals[i] < 96 && vals[i + 1] < 96 && vals[i + 2] < 96
+          i += bytes * 2
+        end
+        y += 8
+      end
+      sampled > 0 && dark.to_f / sampled < EDGE_MAP_MIN_INK
+    rescue StandardError
+      false
+    end
+
+    # Cores do passe do edge map: fundo e faces brancos, aresta preta. Fora do
+    # SketchUp (harness) não há Sketchup::Color e o hash fica vazio — as chaves
+    # booleanas de EDGE_CAPTURE_OPTIONS continuam valendo.
+    def edge_pass_colors
+      return {} unless defined?(::Sketchup::Color)
+
+      {
+        'BackgroundColor' => ::Sketchup::Color.new(255, 255, 255),
+        'ForegroundColor' => ::Sketchup::Color.new(0, 0, 0),
+        'FaceFrontColor' => ::Sketchup::Color.new(255, 255, 255),
+        'FaceBackColor' => ::Sketchup::Color.new(255, 255, 255)
+      }
+    rescue StandardError
+      {}
     end
 
     def thumbnail_data_url(path)
@@ -3887,7 +3998,11 @@ module SpaceNode
         :mirrorReasons => report[:mirrorReasons] || [],
         :materialsRequested => 0,
         :materialsSent => 0,
-        :skipped => []
+        :skipped => [],
+        # 1.9.0: o que a captura mandou de fato (PNG ou JPEG) e se as sombras
+        # do modelo estavam ligadas — vai pro painel nas notas do resultado.
+        :sourceMime => mime,
+        :shadowsOn => facts.is_a?(Hash) && facts[:sun].is_a?(Hash) ? (facts[:sun][:shadowsVisible] ? true : false) : nil
       }
 
       emit('status', { :stage => 'upload', :message => t(:sending) })
@@ -4205,7 +4320,10 @@ module SpaceNode
         # (deixavam a IA alucinar no projeto). O servidor também coage.
         :fidelityLevel => 'maximum',
         :engine => payload['engine'].to_s,
-        :resolution => payload['resolution'].to_s
+        :resolution => payload['resolution'].to_s,
+        # 1.9.0: origem declarada — o servidor registra (telemetria por versão
+        # do plugin); nenhum ramo de geração depende disso.
+        :client => { :kind => 'sketchup', :version => VERSION }
       }
 
       prompt = payload['prompt'].to_s.strip
@@ -4238,6 +4356,11 @@ module SpaceNode
       end
       seed = payload['seed']
       body[:seed] = seed.to_i if (seed.is_a?(Numeric) || seed.to_s =~ /\A\d+\z/) && !@anchor_dropped
+      # "Corrigir automaticamente" (1.9.0, paridade com o web): a MESMA semente
+      # do render reprovado pela verificação estrutural, sem âncora, e o
+      # servidor desloca o ladder (edge map + mídia em resolução máxima desde
+      # a 1ª tentativa). Muda o condicionamento, não a amostra.
+      body[:structuralBoost] = true if payload['structuralBoost'] == true && body[:seed]
 
       body
     end
@@ -4311,11 +4434,19 @@ module SpaceNode
         :totalBalance => data['totalBalance'],
         :fidelityScore => data['fidelityScore'],
         :fidelityWarning => data['fidelityWarning'] || data['semanticWarning'],
-        :seed => data['seed']
+        :seed => data['seed'],
+        # 1.9.0: o servidor diz se a semente chegou ao fornecedor (Quasar e
+        # Orion não têm o campo). nil = servidor antigo, sem veredito.
+        :seedApplied => data.key?('seedApplied') ? data['seedApplied'] == true : nil
       }
       result[:camera] = extras[:camera] if extras[:camera]
       result[:sceneName] = extras[:scene_name] if extras[:scene_name]
       result[:conditioning] = extras[:conditioning] if extras[:conditioning]
+      # 1.9.0: o servidor diz se o mapa nativo passou na validação dele — senão
+      # o diário diria "com mapa" quando a geração caiu pro mapa derivado.
+      if result[:conditioning].is_a?(Hash) && data.key?('edgeMapNative')
+        result[:conditioning] = result[:conditioning].merge(:edgeMapServer => data['edgeMapNative'] == true, :edgeMapRejected => data['edgeMapRejected'])
+      end
       result[:anchorDropped] = true if extras[:anchor_dropped]
       # Origem completa pro diário e pra revisão: quadro da captura (a máscara
       # da seleção precisa da MESMA proporção e nivelamento), motor e a
@@ -4338,7 +4469,9 @@ module SpaceNode
 
       ctx = @generation_context
       if ctx && ctx[:mode] == :batch
-        ctx[:shared_seed] ||= result[:seed]
+        # Semente compartilhada só quando ela de fato valeu — no Quasar o
+        # servidor devolvia a seed sem usá-la e o lote fingia coerência.
+        ctx[:shared_seed] ||= result[:seed] unless result[:seedApplied] == false
         ctx[:done] += 1
         # A cena entregou: sai de "em voo" pra não voltar no Retomar.
         ctx[:current_entry] = nil
@@ -4354,6 +4487,9 @@ module SpaceNode
         @generation_context = nil
         persist_last_result(result)
         emit('result', result)
+        # O arquiteto pode estar modelando com o painel fechado ou atrás: a
+        # notificação do SketchUp avisa (como Animar e Planta já faziam).
+        notify_panel(t(:notif_render_ready)) unless panel_open?
       end
     end
 
@@ -4394,17 +4530,32 @@ module SpaceNode
           end
           if found && found['output_url']
             ctx = @generation_context
-            finish_generation(
-              {
-                'outputUrl' => found['output_url'],
-                'previewUrl' => found['preview_url'],
-                'originalUrl' => found['input_url'],
-                'renderId' => found['id'],
-                'nodesCharged' => found['nodes_charged']
-              },
+            base = {
+              'outputUrl' => found['output_url'],
+              'previewUrl' => found['preview_url'],
+              'originalUrl' => found['input_url'],
+              'renderId' => found['id'],
+              'nodesCharged' => found['nodes_charged']
+            }
+            extras = {
               :camera => @last_capture_camera,
               :scene_name => ctx && ctx[:mode] == :batch ? ctx[:current_scene] : nil
-            )
+            }
+            # 1.9.0: semente e veredito da verificação estrutural vêm de
+            # /api/sketchup/render — sem eles, um lote cuja 1ª cena caiu em
+            # timeout perdia a semente compartilhada e o aviso nunca chegava.
+            # Falha nessa consulta não derruba a recuperação: segue sem eles.
+            finish_with = proc do |details|
+              data = base.dup
+              if details.is_a?(Hash)
+                %w[seed fidelityScore fidelityWarning semanticWarning].each { |k| data[k] = details[k] if details.key?(k) }
+              end
+              finish_generation(data, extras) if generation_alive?(epoch)
+            end
+            json_request(:get, "/api/sketchup/render?id=#{URI.encode_www_form_component(found['id'].to_s)}", nil,
+                         proc { |_e| finish_with.call(nil) }) do |details|
+              finish_with.call(details)
+            end
           else
             fail_generation('A conexão caiu durante a geração. Veja o Histórico antes de gerar de novo — os Nodes podem ter sido usados.')
           end
@@ -4447,7 +4598,10 @@ module SpaceNode
         })
       end
       late_video = ctx && ctx[:mode] == :animar && ctx[:posted]
-      emit('status', { :stage => 'idle', :message => late_video ? t(:video_cancel_warn) : t(:cancelled) })
+      # `posted`: o POST que cobra já tinha saído (request vivo) — o painel
+      # diz se os nodes podem ter sido usados, em vez de adivinhar pelo relógio.
+      posted = !request.nil? || (ctx && ctx[:posted]) ? true : false
+      emit('status', { :stage => 'idle', :message => late_video ? t(:video_cancel_warn) : t(:cancelled), :cancelled => true, :posted => posted })
     end
 
     # Falha de UMA geração. No lote: saldo/sessão abortam o restante; outros
@@ -4512,6 +4666,7 @@ module SpaceNode
       })
       @batch_insufficient = false
       emit_error(abort_message, auth_expired, true) if abort_message
+      notify_panel(t(:notif_batch_ready)) if !abort_message && !panel_open? && ctx[:results] && !ctx[:results].empty?
     end
 
     # Cenas que não entregaram = as que sobraram na fila + as que falharam.
@@ -4606,7 +4761,7 @@ module SpaceNode
       return unless model
 
       begin
-        model.start_operation('SPACENODE', true, false, true)
+        model.start_operation('SpaceNode', true, false, true)
         model.set_attribute('spacenode', 'last_result', JSON.generate(result))
         model.commit_operation
       rescue StandardError
@@ -4642,7 +4797,7 @@ module SpaceNode
     end
 
     def save_journal(model, entries)
-      model.start_operation('SPACENODE', true, false, true)
+      model.start_operation('SpaceNode', true, false, true)
       model.set_attribute('spacenode', 'journal', JSON.generate(entries.first(JOURNAL_MAX_ENTRIES)))
       model.commit_operation
     rescue StandardError
@@ -4743,6 +4898,12 @@ module SpaceNode
           :previewUrl => data['previewUrl'],
           :signedAt => Time.now.to_i
         }
+        # 1.9.0: a re-assinatura também devolve a semente e o score — um
+        # resultado restaurado do .skp (SketchUp reaberto) volta a oferecer
+        # "Corrigir automaticamente" e a mostrar o veredito.
+        fresh[:seed] = data['seed'] if data['seed'].is_a?(Numeric)
+        fresh[:fidelityScore] = data['fidelityScore'] if data['fidelityScore'].is_a?(Numeric)
+        fresh[:fidelityWarning] = true if data['fidelityWarning'] == true || data['semanticWarning'] == true
         if fresh[:outputUrl].to_s.empty?
           on_fail.call(nil)
         else
@@ -5176,7 +5337,7 @@ module SpaceNode
       return unless model
 
       begin
-        model.start_operation('SPACENODE', true, false, true)
+        model.start_operation('SpaceNode', true, false, true)
         model.set_attribute('spacenode', 'last_video', JSON.generate(video))
         model.commit_operation
       rescue StandardError
@@ -6401,7 +6562,6 @@ module SpaceNode
         return
       end
 
-      ctx = @generation_context
       chunks = prints.each_slice(4).to_a
       space_generate_chunk(space_id, quality, epoch, chunks, 0, prints.length)
     end
@@ -6409,7 +6569,6 @@ module SpaceNode
     def space_generate_chunk(space_id, quality, epoch, chunks, done_count, total)
       return unless generation_alive?(epoch)
 
-      ctx = @generation_context
       if chunks.empty?
         finish_space(space_id)
         return
@@ -6541,7 +6700,7 @@ module SpaceNode
       return unless model
 
       begin
-        model.start_operation('SPACENODE', true, false, true)
+        model.start_operation('SpaceNode', true, false, true)
         if json
           model.set_attribute('spacenode', PROJECT_STYLE_KEY, json)
         else
@@ -6718,7 +6877,7 @@ module SpaceNode
         attr_accessor :guide, :aspect, :model_id
 
         def initialize
-          super('com.spacenode.sketchup.guides', 'SPACENODE · Moldura e guias',
+          super('com.spacenode.sketchup.guides', 'SpaceNode · Moldura e guias',
                 description: 'A moldura do que a captura vai ver, e as guias de composição dentro dela.')
           @guide = 'none'
           @aspect = 0.0
@@ -6991,15 +7150,16 @@ module SpaceNode
         @setpos.call(handle, ::Fiddle::Pointer[0], 0, 0, 0, 0, 0x0027)
       end
 
-      # A toolbar NATIVA também se chama SPACENODE, mas é pintada pelo Qt e
+      # A toolbar NATIVA (UI::Toolbar) segue registrada como SPACENODE — é a
+      # chave de persistência de posição/visibilidade — mas é pintada pelo Qt e
       # ignora o DWM (medido) — cai aqui e não acontece nada, sem problema.
       def apply(panel_rgb, bar_rgb, dark)
         return false unless available?
 
         panel = bgr(panel_rgb)
         bar = bgr(bar_rgb)
-        windows_named('SPACENODE').each do |handle, klass|
-          # A barra nativa (glass_bar.rb) também se chama SPACENODE, mas não
+        windows_named('SpaceNode').each do |handle, klass|
+          # A barra nativa (glass_bar.rb) também se chama SpaceNode, mas não
           # tem moldura nenhuma pra pintar.
           next if klass.include?(GlassBar::CLASS_NAME)
 
@@ -7016,7 +7176,7 @@ module SpaceNode
     end
 
     # Espelham --bg de dialog.html e o fundo de toolbar.html.
-    CHROME_PANEL_RGB = { 'dark' => 0x0A0A0A, 'light' => 0xFAFAFA }.freeze
+    CHROME_PANEL_RGB = { 'dark' => 0x151618, 'light' => 0xF7F7F5 }.freeze
     CHROME_TOOLBAR_RGB = 0x0B0B0D
 
     # Chamado pela página a cada applyTheme (inclusive quando o SO muda de tema)
@@ -7167,7 +7327,7 @@ module SpaceNode
 
       size = TOOLBAR_DEFAULT_SIZE[toolbar_orientation]
       dialog = ::UI::HtmlDialog.new(
-        :dialog_title => 'SPACENODE',
+        :dialog_title => 'SpaceNode',
         :preferences_key => "#{PREFERENCES_KEY}.toolbar",
         :scrollable => false,
         :resizable => false,
@@ -7447,7 +7607,7 @@ module SpaceNode
         SpaceNode::SketchUp.glass_toolbar_open? ? MF_CHECKED : MF_UNCHECKED
       end
 
-      menu = ::UI.menu('Extensions').add_submenu('SPACENODE')
+      menu = ::UI.menu('Extensions').add_submenu('SpaceNode')
       commands.each { |c| menu.add_item(c) }
       menu.add_separator
       menu.add_item(float_command)

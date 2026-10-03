@@ -20,6 +20,7 @@ import {
   NEGATIVE_BASE,
   getFidelityAttemptParams,
   getRenderFidelityConfig,
+  nativeUltraFromFirstAttempt,
 } from '@/lib/ai/fidelity/render-only'
 
 const baseOptions: GenerateOptions = {
@@ -191,6 +192,8 @@ describe('render_only: ladder de parâmetros', () => {
     expect(a3.temperature).toBe(a2.temperature)
     // Tentativa 3 troca a amostra (mantendo reprodutibilidade via offset).
     expect(a3.seedOffset).toBeGreaterThan(a2.seedOffset)
+    // Ladder 4 só existe no boost com mapa nativo (offset 2): amostra nova de novo.
+    expect(getFidelityAttemptParams(4).seedOffset).toBe(2)
   })
 
   it('kill-switches: IMAGE_NB2_THINKING_LEVEL=off e IMAGE_INPUT_MEDIA_RESOLUTION=off', () => {
@@ -246,5 +249,72 @@ describe('render_only: config por env', () => {
     expect(cfg.enabled).toBe(false)
     expect(cfg.minScore).toBe(0.72)
     expect(cfg.maxAttempts).toBe(3)
+  })
+})
+
+// ── 1.9.0 — sinais do plugin SketchUp (web sem sinal fica byte-idêntico) ─────
+describe('render_only: edge map nativo e fatos medidos (plugin 1.9.0)', () => {
+  it('sem edgeMapNative o bloco do edge map é o de sempre', () => {
+    const p = buildFidelityPrompt(baseOptions, 'maximum', undefined, { attempt: 1, edgeMapImageIndex: 2 })
+    expect(p).toContain('automatically extracted edge/line map')
+    expect(p).not.toContain('EXACT hidden-line drawing')
+  })
+
+  it('com edgeMapNative o bloco cobra alinhamento ao desenho exato do modelo', () => {
+    const p = buildFidelityPrompt(baseOptions, 'maximum', undefined, { attempt: 1, edgeMapImageIndex: 2, edgeMapNative: true })
+    expect(p).toContain('image #2 is the EXACT hidden-line drawing of the 3D model')
+    expect(p).toContain('these lines win')
+    expect(p).toContain('Do NOT imitate its graphic style')
+    expect(p).not.toContain('automatically extracted')
+  })
+
+  it('edgeMapNative sem índice não emite bloco nenhum', () => {
+    const p = buildFidelityPrompt(baseOptions, 'maximum', undefined, { attempt: 1, edgeMapImageIndex: null, edgeMapNative: true })
+    expect(p).not.toContain('STRUCTURAL CONSTRAINT MAP')
+  })
+
+  const briefing = {
+    tipo_projeto: 'residencial',
+    geometria_principal: 'planta retangular',
+    volumes: 'um volume',
+    pavimentos: 1,
+    aberturas: 'duas janelas',
+    materiais_aparentes: 'reboco pintado',
+    camera: 'wide angle, slightly elevated',
+    entorno: 'rua residencial',
+    elementos_preservar: [],
+  }
+
+  it('briefing sem fatos medidos mantém a linha de câmera do auditor', () => {
+    const p = buildFidelityPrompt(baseOptions, 'maximum', briefing as never)
+    expect(p).toContain('- Camera: wide angle, slightly elevated')
+  })
+
+  it('com câmera medida (MODEL FACTS) a câmera "vista" sai do PROJECT FACTS', () => {
+    const p = buildFidelityPrompt(
+      { ...baseOptions, modelFacts: { camera: { focalLengthMm: 24, fovDeg: 73.7, eyeHeightM: 1.55 } } },
+      'maximum',
+      briefing as never,
+    )
+    expect(p).not.toContain('- Camera: wide angle')
+    expect(p).toContain('MODEL FACTS')
+    expect(p).toContain('- Openings: duas janelas')
+  })
+
+  it('ultraFromFirstAttempt tokeniza em ultra_high já na 1ª tentativa (default high)', () => {
+    delete process.env.IMAGE_INPUT_MEDIA_RESOLUTION
+    expect(getFidelityAttemptParams(1).mediaResolution).toBe('high')
+    expect(getFidelityAttemptParams(1, { ultraFromFirstAttempt: true }).mediaResolution).toBe('ultra_high')
+    expect(getFidelityAttemptParams(2).mediaResolution).toBe('ultra_high')
+  })
+
+  it('ultra na 1ª tentativa é opt-in por env (custo não medido não vai cego pra produção)', () => {
+    const saved = process.env.RENDER_FIDELITY_NATIVE_ULTRA
+    delete process.env.RENDER_FIDELITY_NATIVE_ULTRA
+    expect(nativeUltraFromFirstAttempt()).toBe(false)
+    process.env.RENDER_FIDELITY_NATIVE_ULTRA = '1'
+    expect(nativeUltraFromFirstAttempt()).toBe(true)
+    if (saved === undefined) delete process.env.RENDER_FIDELITY_NATIVE_ULTRA
+    else process.env.RENDER_FIDELITY_NATIVE_ULTRA = saved
   })
 })

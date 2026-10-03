@@ -6,9 +6,9 @@ import { SketchUpLanding } from '@/components/sketchup/SketchUpLanding'
 // (Ambient) — ver components/sketchup/SketchUpLanding.tsx.
 
 export const metadata: Metadata = {
-  title: 'SPACENODE para SketchUp',
+  title: 'SpaceNode para SketchUp',
   description:
-    'Renderize suas vistas do SketchUp com o motor de fidelidade da SPACENODE — sem sair do modelo. Extensão oficial para SketchUp 2021 ou superior.',
+    'Renderize suas vistas do SketchUp com o motor de fidelidade da SpaceNode — sem sair do modelo. Extensão oficial para SketchUp 2021 ou superior.',
 }
 
 export default function SketchUpPage() {

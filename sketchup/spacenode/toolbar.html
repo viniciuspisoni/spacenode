@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<title>SPACENODE</title>
+<title>SpaceNode</title>
 <!--
   Toolbar flutuante em vidro fumê.
 
@@ -15,6 +15,12 @@
   sobre nada, a página desenha seu próprio fundo ambiente.
 -->
 <style>
+  @font-face {
+    font-family: 'Geist';
+    src: url('assets/geist-latin.woff2') format('woff2');
+    font-weight: 100 900;
+    font-display: swap;
+  }
   :root {
     --glass: rgba(28,28,30,0.62);
     --glass-hover: rgba(58,58,62,0.72);
@@ -29,7 +35,7 @@
   * { box-sizing: border-box; }
   html, body {
     margin: 0; padding: 0; height: 100%; overflow: hidden;
-    font: 500 11.5px/1.2 "Segoe UI", -apple-system, system-ui, sans-serif;
+    font: 500 11.5px/1.2 "Geist", -apple-system, "Segoe UI", system-ui, sans-serif;
     color: #fff; user-select: none; cursor: default;
     background: #0b0b0d;
   }
@@ -82,8 +88,8 @@
   .btn:focus-visible { outline: 1.5px solid rgba(255,255,255,0.75); outline-offset: 1px; }
 
   /* Marca: não é botão de ação, é a porta do painel. */
-  .brand { width: 34px; }
-  .brand svg { width: 20px; height: 20px; }
+  .brand { width: 34px; color: #fff; }
+  .brand svg { width: 24px; height: 24px; }
   .sep { flex: 0 0 auto; width: 0.5px; height: 20px; background: var(--line); margin: 0 3px; }
   body.vertical .sep { width: 20px; height: 0.5px; margin: 3px 0; }
 
@@ -115,7 +121,7 @@
   <div class="bar" id="bar">
     <button class="btn brand" id="bPanel" type="button" data-tip="Abrir o painel · dois cliques giram a barra">
       <svg viewBox="0 0 64 64" fill="currentColor" aria-hidden="true">
-        <path d="M4 60V4H18L46 39V4H60V60H46L18 25V60Z"/>
+        <path d="M4 60V10L18 26V60Z"/><path d="M4 4H20L60 50V60H48Z"/><path d="M46 4H60V44L46 28Z"/>
       </svg>
     </button>
     <span class="sep"></span>
@@ -163,14 +169,14 @@
     capture: 'Capturar vista', generate: 'Gerar render',
     scene: 'Nova cena', edit: 'Editar este render',
     needRender: 'Gere um render primeiro', busy: 'Gerando…',
-    offline: 'Conecte sua conta SPACENODE'
+    offline: 'Conecte sua conta SpaceNode'
   };
   var EN = {
     panel: 'Open the panel · double-click to rotate',
     capture: 'Capture view', generate: 'Generate render',
     scene: 'New scene', edit: 'Edit this render',
     needRender: 'Generate a render first', busy: 'Generating…',
-    offline: 'Connect your SPACENODE account'
+    offline: 'Connect your SpaceNode account'
   };
   function t(k) { return (state.locale === 'en' ? EN : PT)[k] || k; }
 

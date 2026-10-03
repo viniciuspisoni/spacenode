@@ -8,11 +8,11 @@
 // (VERSION) + em sketchup/spacenode.rb (EXTENSION.version), e regerar o .rbz.
 // Os três precisam bater — o plugin compara a SUA VERSION com esta.
 
-export const PLUGIN_VERSION = '1.8.1'
+export const PLUGIN_VERSION = '1.9.0'
 
 /** Caminho relativo ao site; o plugin resolve contra o api_base_url dele. */
 export const PLUGIN_RBZ_PATH = '/downloads/spacenode-sketchup.rbz'
 
 /** Uma linha, mostrada dentro do painel de quem está atrasado. */
 export const PLUGIN_RELEASE_NOTE =
-  'Nova identidade SpaceNode: marca estrutural, temas neutros e cabeçalho adaptado às janelas compactas.'
+  'SpaceNode 1.9.0: o símbolo oficial em todas as barras, mapa de arestas mais confiável, correção automática quando a verificação estrutural reprova e um painel que avisa antes de cobrar.'

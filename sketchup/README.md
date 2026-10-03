@@ -1,6 +1,6 @@
-# SPACENODE para SketchUp
+# SpaceNode para SketchUp
 
-Extensão oficial da SPACENODE: renderização fotorrealista das vistas do
+Extensão oficial da SpaceNode: renderização fotorrealista das vistas do
 SketchUp com o mesmo motor de fidelidade do app web.
 
 ## Superpoderes nativos (Fase 2)
@@ -24,6 +24,208 @@ O que só um plugin dentro do modelo consegue:
   (até 4, superfície escolhida no painel).
 - **Voltar à vista** — cada render guarda a câmera; um clique restaura o
   enquadramento exato no SketchUp.
+
+## O que mudou na 1.9.0 — o símbolo em todas as barras, e o painel avisa antes de cobrar
+
+A 1.8.1 trocou a identidade do painel, mas a 1.9.0 é a primeira versão em que o
+**mesmo N estrutural** (três partes, duas juntas abertas — `components/brand/geometry.ts`)
+aparece em todas as superfícies do plugin. E é a primeira em que o painel conta o
+que o Ruby já sabia e não dizia: sombras desligadas, câmera inclinada, estilo de
+linhas, verificação estrutural reprovada — tudo antes de gastar nodes.
+
+### Marca: o que estava errado e como foi medido
+
+Entre o commit que gerou os binários da 1.8.1 e o que fechou o manual v2.1 no
+site (4fba827, 29/09/26), o símbolo "micro" sólido foi removido: o site passou a
+usar o N principal em todos os tamanhos. O plugin ficou no meio do caminho:
+
+| Superfície | 1.8.1 | 1.9.0 |
+|---|---|---|
+| atlas da barra nativa Win32 (`assets/glassbar/*.bin.z`, 4 escalas) | N sólido antigo — decodificado o sprite `icon_panel`: dois blocos opacos na linha a 22 % da altura, sem junta | N estrutural; o `markSvg` do atlas lia só o PRIMEIRO `<path>` do SVG e passou a ler os três |
+| `toolbar.html` (macOS e plano B do Windows) | path inline do N sólido, 20 px, branco a 92 % | três paths oficiais, 24 px, branco puro |
+| PNG 24 da toolbar nativa | N sólido (o 48 já era o novo — o mesmo botão trocava de marca com o tamanho do ícone) | os dois tamanhos leem `public/brand/spacenode-symbol.svg`; chip igual ao favicon do site (raio 18,75 %, N a 75 % da caixa) |
+| cabeçalho compacto do painel | N puro no escuro, chip no claro | N puro nos dois temas (`spacenode-symbol-dark.svg`) |
+| loader do painel | `<img>` pulsando | SVG inline com os três paths e a animação oficial (apoios e depois a ligação, `sn-build` 2,4 s) |
+| moldura Win32 do painel | `#0A0A0A`/`#FAFAFA` (paleta anterior) | `#151618`/`#F7F7F5` — o `--bg` de verdade |
+| tokens de acento | `--accent-bg` 0,09 e `--accent-glow` 0,45 | 0,08 e 0,16, iguais ao `globals.css`; `prefers-reduced-transparency` espelhado |
+| grafia | "SPACENODE" em 80+ frases | "SpaceNode" em texto corrido (manual: caixa alta só em etiqueta); `UI::Toolbar` e o nome da extensão seguem `SPACENODE` por serem chaves de persistência |
+
+A prova dos binários é a decodificação do próprio atlas (`.bin.z` = BGRA
+pré-multiplicado + zlib; `json.atlas.w/h` e `sprites.icon_panel`): o sprite novo
+tem três blocos opacos por linha, nas quatro escalas, e as dicas `offline`
+saíram com a grafia nova. Os PNGs foram conferidos a 6× e 12×.
+
+### Qualidade: dois furos na captura e um caminho de correção
+
+- **Edge map que saía em branco.** Estilos "sem arestas" (fotográficos) são
+  comuns em escritório — e neles o hidden-line nativo era um PNG branco que
+  ainda assim subia como "verdade geométrica", desligando o mapa derivado no
+  servidor. `EDGE_CAPTURE_OPTIONS` agora liga `EdgeDisplayMode` só no passe do
+  edge (a foto respeita o estilo do usuário) e um sanity check amostra o PNG
+  (1 pixel em 16 por linha, 1 linha em 8): abaixo de 0,3 % de tinta o mapa é
+  descartado (`edge_reason: 'empty'`). O servidor ganhou a mesma proteção do
+  outro lado: aspecto (±1 % do source), tinta (0,2–45 %) e bimodalidade
+  (≤ 35 % de meio-tom). Toda redução no servidor é por MÍNIMO de bloco, não
+  por reamostragem: medido com o sharp, `nearest` a fator 2 apaga TODAS as
+  linhas de 1 px e os filtros de média as diluem em cinza — o mínimo mantém a
+  aresta preta tanto na análise quanto na redução a ≤ 2048 px antes de
+  hospedar (`tests/fidelity/native-edge.test.ts`). E a resposta
+  diz se o mapa entrou (`edgeMapNative`/`edgeMapRejected`), senão o diário do
+  plugin falaria em "com mapa" quando a geração caiu pro derivado. Nesse
+  passe o fundo vira branco e a aresta preta seja qual for o estilo
+  (`DrawHorizon`/`DrawGround` off, `BackgroundColor`/`ForegroundColor` e
+  faces fixas, `EdgeColorMode` "tudo igual" — só no passe do edge; a foto
+  respeita o estilo): céu em gradiente ou fundo escuro viravam meio-tom em
+  massa ou linha branca sobre preto. Quando o servidor descarta o mapa, a
+  nota do resultado diz ("descartado na verificação do servidor") em vez de
+  o diário registrar "com mapa".
+- **Linha do corte de seção.** `SectionCutWidth` (3 px por padrão) é o mesmo
+  contorno preto que a 1.5.0 mediu no perfil — em volta do quadro inteiro em
+  todo interior visto em corte de parede. Vai a 1 px na foto e no edge map;
+  `SectionCutFilled` continua.
+- **O mapa nativo agora é tratado como nativo.** O prompt dizia ao modelo que
+  o edge map era "automatically extracted" — a mesma confiança do Sobel. Com
+  `edgeMapNative` o bloco diz que é o desenho EXATO do modelo 3D, da mesma
+  câmera, e que onde o sombreado for ambíguo as linhas vencem. A mídia de
+  entrada em `ultra_high` já na 1ª tentativa (o nível que os retries usam)
+  existe atrás de `RENDER_FIDELITY_NATIVE_ULTRA=1` — opt-in, porque o knob
+  vale por parte (fonte, mapa, amostras, âncora) e o custo de tokens de
+  entrada ainda não foi medido. Sem o sinal,
+  o prompt do web é byte a byte o mesmo (teste em
+  `tests/fidelity/render-only-prompt.test.ts`).
+- **Câmera medida vence câmera "vista".** Com `modelFacts.camera` presente, a
+  linha `- Camera:` do briefing de visão sai do PROJECT FACTS — dois enunciados
+  sobre a mesma coisa diluíam o dado exato.
+- **Corrigir automaticamente.** Quando a verificação estrutural reprova, o
+  aviso ganha a ação que o web já tinha: repetir sem âncora, no mesmo motor e
+  qualidade do render reprovado, com o servidor deslocando o ladder
+  (`structuralBoost`). Sem mapa nativo isso é "mesma semente, mais
+  condicionamento" (tentativa 2 do ladder). Com mapa nativo o condicionamento
+  já estava no máximo desde a 1ª tentativa, então a correção parte da
+  tentativa 3 (semente deslocada em 1) — repetir a tentativa 2 seria cobrar
+  pela mesma amostra reprovada; `generation_log.structural_boost_offset`
+  registra qual foi. Quando passa com folga (score ≥ 0,8 — o mesmo limiar do
+  selo do web; o gate do servidor aprova a partir de 0,5), o painel diz
+  "Estrutura conferida contra o modelo".
+- **Semente só onde vale.** A seed nunca chegou ao Seedream (Quasar, motor
+  padrão) — o lote prometia "mesma semente" onde ela não se aplica. O catálogo
+  (v10) traz `engines[].supports.seed`, a resposta traz `seedApplied` e a nota
+  do lote muda de texto no Quasar.
+- **Descrição que vazava entre projetos.** O texto do campo persistia nas
+  preferências globais e ia como `refinementText` em todo render seguinte —
+  afrouxando a verificação estrutural sem o usuário ver. Não persiste mais;
+  enquanto houver texto, o resumo do dock mostra "· descrição" e o hint diz o
+  que ele faz.
+
+### O painel conta o que sabe
+
+- Linha parada da barra rápida: "Câmera inclinada 8° — toque em Nivelar",
+  "Sombras desligadas no modelo — a captura sai chapada; toque em Sol",
+  "Estilo de linhas no modelo — a captura sai texturizada" (fatos novos em
+  `camera_facts`: `shadowsOn`, `renderMode`, `lineStyle`). Nada é forçado na
+  captura — decisão medida da 1.5.0.
+- Depois de capturar: "A IA recebe: 4096×2304 · 24 mm · 70° · olho a 1,55 m".
+- Abas Editar/Animar desabilitadas respondem ao clique (`aria-disabled` em vez
+  de `disabled`): "Gere um render primeiro" com a ação — o trilho continua fixo.
+- Cancelar diz o estado real: o Ruby manda `posted` no `status idle` ("antes
+  do envio — nada foi cobrado" / "depois do envio — nodes debitados"); o relógio
+  de 8 s deixou de chutar.
+- Versão nova fica no rodapé ("1.9.1 disponível — baixar") enquanto o painel
+  estiver aberto — o notice some no primeiro aviso seguinte e o `.rbz` é
+  distribuído fora do Warehouse.
+- Render e lote prontos com o painel fora de vista disparam a notificação do
+  SketchUp (como Animar e Planta já faziam).
+- Resumo do dock no idioma do painel (`pLabel`), aviso de fidelidade como
+  `warn` (não é erro do sistema), reconciliação e re-assinatura trazem semente
+  e veredito (`/api/sketchup/render` devolve `seed`, `fidelityScore`,
+  `fidelityWarning`, `semanticWarning`, `engine`, `resolution`).
+- Pincel da máscara: Ctrl/Cmd+Z desfaz o último traço e Esc sai do modo
+  pintar (por atalho — nenhum botão novo). Histórico: motor · qualidade ·
+  quando, e "no diário deste arquivo", no `title` da miniatura. "Gerar
+  variação" explica a âncora no `title` do botão. Estilo do projeto não trava
+  com semente que o servidor não aplicou (Quasar). O dono pediu a estrutura
+  visual intacta: os quatro elementos que esta versão chegou a desenhar
+  (botão de desfazer, legenda e ponto no histórico, hint sob a variação, linha
+  de refinamento na aba Cenas) foram reduzidos a atalho, `title` e texto
+  dentro da nota do lote.
+  Uma cotação de ampliação que sai da tela sem ser aplicada é cancelada no
+  Ruby (o PNG baixado em `%TEMP%` é apagado). Na aba Cenas só o saldo do
+  LOTE aparece (o bloco do render único ficava por cima) e o refinamento ativo
+  é citado na própria nota do lote antes de cobrar.
+- Vocabulário igual ao web: "Motor", "Qualidade", "Refinar imagem"; "nodes"
+  minúsculo em frases.
+- Voz do manual: "A IA parte do que a captura mostra" no lugar de "preserva o
+  que vê"; a descrição do Vega deixou de prometer "fidelidade absoluta" (web e
+  plugin leem a mesma string).
+
+### Infra
+
+- `scripts/package-sketchup-plugin.mjs` empacota no macOS/Linux
+  (`npm run package:sketchup:posix`), grava `dist/` E `public/downloads/`, e
+  recusa gerar com as três versões divergentes (`npm run package:sketchup:check`).
+  O `dist/` de origin/main estava em 1.8.0 enquanto o site servia 1.8.1.
+- `scripts/verify-sketchup-flow.mjs` reescrito pro painel atual (18 casos:
+  marca, payload, correção automática no motor do render reprovado, refinamento
+  limpo após o render e visível na aba Cenas, abas, cancelar, rodapé, avisos de
+  câmera e o clique que abre a folha Luz, nota do lote por motor, notas de mapa
+  vazio/sombras/JPEG, Estilo sem semente, desfazer traço e Esc, cotação de
+  ampliação descartada, hint da variação e legendas do histórico, viewports,
+  EN; sem nenhum elemento novo no painel); os dois harnesses Playwright aceitam `SKETCHUP_TEST_CHANNEL=chrome` e
+  `npm run verify:sketchup` roda Ruby + os dois + a conferência do `.rbz`. O
+  harness Ruby passou a rodar no Ruby 2.6 do macOS (forwarding de `**kwargs`
+  vazio) e ganhou dublês de `shadow_info`/`rendering_options` e os testes do
+  Ruby novo (fatos de sombra/estilo, mapa vazio, cancelar com `posted`,
+  `seedApplied`, corpo com `client`/`structuralBoost`, contador de blocos do
+  atlas com fixture negativa, cache de catálogo abaixo de `CATALOG_MIN_VERSION`
+  — agora 10).
+- Telemetria: o corpo do `/api/generate` leva `client: { kind: 'sketchup',
+  version }` (registrado em `config_snapshot.client`, `generation_started`);
+  `generation_log.fidelity.attempts[].edge_map_native`;
+  `config_snapshot.edge_map_native_rejected` com o motivo.
+
+### Não medido (fica nos valores de hoje até a bancada)
+
+- `scale_factor` até 4× engrossa a aresta no 4K (viewport de 1600 px → ~2,5 px
+  de linha, o "perfil" que a 1.5.0 mediu) — o clamp continua 1..4; medir com o
+  método da 1.5.0 antes de mexer, e trocar junto no edge map e na máscara.
+- Teto de textura da viewport (1024 px sem "Use maximum texture size") numa
+  captura de 4096 px — sem chave documentada de `read_default`; medir nitidez.
+- Croma do JPEG do `write_image` (4:2:0 ou 4:4:4) e o tempo de upload de um
+  PNG de 15 MiB; por enquanto o painel só REGISTRA o formato enviado.
+- Depth map por névoa (`depthMapKey`): fog entra no `write_image`? É linear?
+  Só depois de uma régua de caixas medida nos dois engines (clássico e 2024).
+- O passe do edge map com fundo/céu neutralizados precisa ser visto no
+  `write_image` do 2026 (engine novo e clássico) com um estilo de céu em
+  gradiente e um de fundo escuro.
+
+### O que precisa do SketchUp 2026 antes de publicar
+
+Nenhum item acima muda a geometria do modelo ou o `.skp`; tudo foi validado
+offline (harness Ruby 31/31, painel 11/11, revisão 8/8, vitest). Mas há coisas
+que só o SketchUp prova:
+
+- barra nativa Win32 nas quatro escalas de DPI com o atlas novo, e o botão da
+  toolbar nativa com "Large toolbar buttons" ligado e desligado;
+- `toolbar.html` no macOS com a marca a 24 px e a fonte Geist;
+- um `.skp` com estilo sem arestas: o edge map precisa sair com linhas (e um
+  quadro vazio precisa cair em `edge_reason: 'empty'`);
+- cena em corte de parede: linha do corte a 1 px na captura;
+- `shadowsOn`/`lineStyle` nos avisos da barra rápida com sombras desligadas e
+  com estilo wireframe;
+- cancelar durante o upload (nada cobrado) e durante o POST (aviso de nodes);
+- a moldura do painel na cor nova (Windows 11, `DWMWA_CAPTION_COLOR`).
+
+### Não testado nesta rodada
+
+- macOS (barra `toolbar.html`, painel e `.rbz` com separador `/`) — sem máquina.
+- Windows com DPI diferente de 100 % e SketchUp 2022 (a 1.8.0 também não).
+- Planta humanizada (segue sem smoke desde a 1.3.0).
+- Notificação "Render pronto" com o painel acoplado atrás de outra janela:
+  `panel_open?` é `@dialog.visible?` — acoplado conta como aberto e não avisa
+  (a API não expõe foco). Se incomodar, a alternativa é avisar sempre em
+  gerações acima de 60 s.
+- Harness Ruby no Ruby 3.2 do SketchUp (aqui roda no 2.6 do macOS; o teste
+  estático barra as APIs que o 3 removeu).
 
 ## O que mudou na 1.8.0 — a barra flutuante virou uma janela de verdade
 
@@ -79,7 +281,7 @@ deixou de existir como problema.
 | raio da placa | ≈11 (24 %) | 13 |
 | botão / raio | 44 / ≈10 | 46 / 12 |
 | ícone / traço | — / ≈1,6 | 24 / 1,9 |
-| marca | — | 28, `assets/spacenode.svg` (traço 5, nó r 6) |
+| marca | — | 28, N estrutural de `public/brand/spacenode-symbol.svg` (3 paths; na 1.8.0 era o símbolo anterior, traço 5 / nó r 6) |
 | chip ativo | mais claro + aro | branco 0,22 + aro 0,36 |
 | dica | escura, com seta | `#121214` 0,94, r 8, seta 12×6 |
 
@@ -87,6 +289,11 @@ A marca é a adaptação **oficial** do símbolo pra toolbar, o mesmo arquivo de
 que o conceito foi desenhado (medido lá: razão nó/traço 2,6; no arquivo 2,4).
 O PNG do botão nativo e o `toolbar.html` do macOS passaram a usar a mesma
 geometria — antes o `toolbar.html` tinha um N redesenhado com dois pontos.
+
+> **Desde a 1.9.0** o símbolo é o N estrutural do manual v2 (três partes,
+> juntas abertas, `public/brand/spacenode-symbol.svg`) em TODAS as barras —
+> atlas Win32, `toolbar.html` e PNGs — e os scripts leem os três `<path>` do
+> SVG compartilhado. As medidas de traço/nó acima são do símbolo anterior.
 
 ### Comportamento
 
@@ -156,7 +363,8 @@ O símbolo é monocromático `#333333`. Numa toolbar clara ele aparece; numa
 escura, some. Como a toolbar do SketchUp muda de cor com o tema, o ícone passou
 a carregar o próprio contraste: chip `#17171a`, borda branca a 34% e o
 ConstellationN em branco. No claro quem sustenta é o chip; no escuro, a borda e
-o N.
+o N. (Desde a 1.8.1 o chip é `#151618` sem borda, com o N estrutural; na 1.9.0
+ele reproduz a construção do favicon do site — raio 18,75 %, N a 75 % da caixa.)
 
 O rasterizador de `scripts/sketchup-toolbar-icons.mjs` ganhou **camadas** por
 causa disso (antes era uma cor só, com alfa). E o desenho é **sensível ao
@@ -1300,12 +1508,25 @@ require 'spacenode/main'
 
 ## Contrato enviado para geração
 
-O painel envia pro Ruby: `prompt`, `projectType`, `segment`, `environment`,
-`lighting`, `background`, `sceneElements[]`, `engine`, `resolution`,
-`useAnchor`, `seed`. `fidelityLevel` é sempre `maximum` (o Ruby fixa e o
-servidor coage — o seletor Máxima/Equilibrado/Criativo foi descontinuado em
-2026-09-03 porque os níveis relaxados deixavam a IA alucinar no projeto). O Ruby captura a vista (PNG, lado maior
-2048–4096 px conforme a resolução), sobe via `sourceKey` e monta o corpo do
-`/api/generate`. Em variações (`useAnchor`), o render anterior vai como
-`anchorUrl`. `geometryLock`/`fidelityMode` não são enviados (são no-ops na
-rota — decisão documentada no plano mestre 2026-09-01).
+O painel envia pro Ruby (`generate`): `prompt`, `projectType`, `segment`,
+`environment`, `lighting`, `background`, `sceneElements[]`, `engine`,
+`resolution`, `sunPreset`, `photo`, `materialSel`, `useAnchor`, `anchorUrl`,
+`anchorCamera`, `seed`, `structuralBoost`. O Ruby captura a vista (PNG, lado
+maior 2048–4096 px conforme a resolução; JPEG 0,92 acima de 14 MB), sobe via
+`sourceKey` e monta o corpo do `/api/generate`:
+
+| campo na rota | origem | regra |
+|---|---|---|
+| `sourceKey` | captura | upload direto (sign → PUT → confirm) |
+| `edgeMapKey` | hidden-line da mesma câmera | só sem âncora; descartado se sair em branco (`edge_reason`) |
+| `modelFacts` | `collect_model_facts` | câmera (fov/focal/olho/2 pontos), ambiente (pé-direito/largura), sol, espelhos |
+| `materialRefs` | `materialSel` → texturas exportadas | até 4 |
+| `refinementText` | `prompt` | não persiste entre sessões; relaxa o gate estrutural no servidor |
+| `anchorUrl` | `useAnchor` + `anchorUrl` | só se a câmera ainda é a do render ancorado (2 % distância, 0,5° FOV); senão `anchorDropped` |
+| `seed` | variação / Estilo do projeto / correção | descartada se a âncora cair; ignorada pelo servidor em Quasar e Orion (`seedApplied`) |
+| `structuralBoost` | "Corrigir automaticamente" | mesma seed, nunca com âncora; o servidor desloca o ladder |
+| `client` | Ruby | `{ kind: 'sketchup', version }` — só telemetria |
+| `fidelityLevel` | fixo | sempre `maximum` (seletor descontinuado em 2026-09-03; o servidor coage) |
+
+`geometryLock`/`fidelityMode` não são enviados (no-ops na rota — plano mestre
+2026-09-01).

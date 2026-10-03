@@ -1,12 +1,15 @@
 /**
- * Offline regression checks for the SketchUp panel workflow.
- * Run: node scripts/verify-sketchup-flow.mjs
- * Optional: SKETCHUP_TEST_CHANNEL=chrome to use an installed browser.
- * Optional: --screenshots=<directory> to save each case's final viewport.
+ * Verificação offline do painel do plugin SketchUp (dialog.html real num
+ * Chromium headless, ponte Ruby substituída). Reescrito na 1.9.0: a versão
+ * anterior descrevia o painel de etapas da 0.5 (#stepSource/#workflowNextButton)
+ * que não existe desde a 1.0.0.
  *
- * The Ruby bridge is replaced before the document loads. HTTP requests are
- * blocked, except a locally fulfilled result fixture; no generation is sent.
- * Prices below are deliberately artificial and are not production assertions.
+ *   node scripts/verify-sketchup-flow.mjs
+ *   SKETCHUP_TEST_CHANNEL=chrome node scripts/verify-sketchup-flow.mjs   (Chrome instalado, sem `playwright install`)
+ *   node scripts/verify-sketchup-flow.mjs --screenshots=.tmp/flow
+ *
+ * Nenhuma requisição HTTP sai: tudo fora das fixtures locais é bloqueado.
+ * Os preços são artificiais — não são asserções de produção.
  */
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
@@ -18,343 +21,415 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const panelUrl = pathToFileURL(path.join(root, 'sketchup/spacenode/dialog.html')).href;
 const screenshotArg = process.argv.find((arg) => arg.startsWith('--screenshots='));
 const screenshotDir = screenshotArg ? path.resolve(screenshotArg.slice('--screenshots='.length)) : null;
-const generationNames = ['generate', 'generateBatch', 'createSpace'];
+
 const resultUrl = 'https://sketchup-fixture.invalid/result.svg';
-const fixtureSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1600"><rect width="800" height="1600" fill="#93bac4"/><path d="M0 1100L400 650L800 1100V1600H0Z" fill="#25444b"/></svg>';
-const captureUrl = `data:image/svg+xml,${encodeURIComponent(fixtureSvg)}`;
-const scenes = [
-  { index: 0, name: 'Fixture scene 1' },
-  { index: 1, name: 'Fixture scene 2' },
-  { index: 2, name: 'Fixture scene 3' },
-];
+const fixtureSvg = (fill) => `<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900"><rect width="1600" height="900" fill="${fill}"/><path d="M0 700L800 300L1600 700V900H0Z" fill="#25444b"/></svg>`;
+const captureUrl = `data:image/svg+xml,${encodeURIComponent(fixtureSvg('#93bac4'))}`;
+const CAMERA = { eye: [100, 200, 60], target: [0, 0, 40], up: [0, 0, 1], perspective: true, fov: 35 };
+const scenes = [{ index: 0, name: 'Cozinha' }, { index: 1, name: 'Sala' }, { index: 2, name: 'Fachada' }];
 const catalog = {
+  version: 10,
   defaults: { engine: 'quasar', resolution: '2k' },
   projectTypes: [{
-    id: 'interior', label: 'Interior', backgroundLabel: 'Fundo',
+    id: 'interior', label: 'Interior', backgroundLabel: 'Contexto visual',
     backgrounds: ['Preservar Original'], materialFields: [],
-    segments: [{
-      name: 'Preservar Original', environments: ['Preservar Original'],
-      lighting: ['Preservar Original'], sceneElements: [],
-    }],
+    segments: [
+      { name: 'Preservar Original', environments: ['Preservar Original'], lighting: ['Preservar Original'], sceneElements: [] },
+      { name: 'Residencial', environments: ['Preservar Original', 'Sala de Estar'], lighting: ['Preservar Original', 'Luz de Janela'], sceneElements: [] },
+    ],
   }],
   engines: [
-    { id: 'quasar', name: 'Fixture Atlas', tagline: 'Motor de teste A', resolutions: [
-      { id: '1k', label: '1K', nodes: 7 },
-      { id: '2k', label: '2K', nodes: 11 },
-      { id: '4k', label: '4K', nodes: 17 },
-    ] },
-    { id: 'pulsar', name: 'Fixture Boreal', tagline: 'Motor de teste B', resolutions: [
-      { id: '2k', label: '2K', nodes: 13 },
-      { id: '4k', label: '4K', nodes: 19 },
-    ] },
-    { id: 'nano-banana', name: 'Fixture Ceres', tagline: 'Motor de teste C', resolutions: [
-      { id: '1k', label: '1K', nodes: 5 },
-    ] },
+    { id: 'quasar', name: 'Quasar', tagline: '', description: 'Padrão da casa.', supports: { seed: false }, resolutions: [{ id: '2k', label: '2K', nodes: 20 }] },
+    { id: 'vega', name: 'Vega', tagline: '', description: 'Entrega final.', supports: { seed: true }, resolutions: [{ id: '2k', label: '2K', nodes: 20 }, { id: '4k', label: '4K', nodes: 40 }] },
   ],
-  spaces: {
-    maxPrints: 2, dnaCost: 3,
-    categories: [{ id: 'residencial', label: 'Residencial' }],
-    vistaCosts: [
-      { engine: 'quasar', qualities: [{ id: '1k', nodes: 7 }, { id: '2k', nodes: 11 }, { id: '4k', nodes: 17 }] },
-      { engine: 'pulsar', qualities: [{ id: '2k', nodes: 13 }, { id: '4k', nodes: 19 }] },
-      { engine: 'nano-banana', qualities: [{ id: '1k', nodes: 5 }] },
-    ],
-  },
 };
 
 async function receive(page, event, payload) {
   await page.evaluate(({ event, payload }) => window.SpaceNodeBridge.receive(event, payload), { event, payload });
 }
-
-async function calls(page) {
-  return page.evaluate((names) => window.__sketchupFlowCalls.filter((entry) => names.includes(entry.name)), generationNames);
-}
-
-async function clearCalls(page) {
-  await page.evaluate(() => { window.__sketchupFlowCalls.length = 0; });
-}
-
-async function setBalance(page, totalBalance) {
-  await receive(page, 'session', { balance: { totalBalance } });
-}
-
-async function assertVisible(page, selector, message = selector) {
-  assert.equal(await page.locator(selector).isVisible(), true, `${message} should be visible`);
-}
-
-async function assertHidden(page, selector, message = selector) {
-  assert.equal(await page.locator(selector).isVisible(), false, `${message} should be hidden`);
-}
-
-async function assertOnlyDockAction(page, expected) {
-  const ids = ['workflowNextButton', 'generateButton', 'batchButton', 'spaceButton', 'newRenderButton'];
-  for (const id of ids) {
-    assert.equal(await page.locator(`#${id}`).isVisible(), id === expected, `Dock action ${id}; expected only ${expected}`);
-  }
-  assert.equal(await page.locator(`#${expected}`).evaluate((el) => !!el.closest('.dock')), true, `${expected} must be in the dock`);
-}
-
-async function selectMode(page, mode) {
-  if (!(await page.locator('#sourceView').isVisible())) await page.locator('#stepSource').click();
-  await page.locator(`#mode${mode[0].toUpperCase()}${mode.slice(1)}`).click();
-}
-
-async function selectScenes(page, indices) {
-  for (const index of indices) {
-    await page.locator('#scenesPills button').filter({ hasText: scenes[index].name }).click();
-  }
-}
-
-async function configure(page, mode = 'render', sceneIndices = []) {
-  await selectMode(page, mode);
-  await selectScenes(page, sceneIndices);
-  await page.locator('#workflowNextButton').click();
-  await assertVisible(page, '#configureView');
-  await assertHidden(page, '#sourceView');
-  await assertHidden(page, '#resultView');
-}
-
-async function selectEngine(page, name) {
-  await page.locator('#engineCards button').filter({ hasText: name }).click();
-}
-
-async function selectResolution(page, label) {
-  await page.locator('#resolutionCards button').filter({ has: page.locator('b', { hasText: new RegExp(`^${label}$`) }) }).click();
-}
-
-async function assertSelection(page, engineName, resolution) {
-  assert.match(await page.locator('#engineCards [aria-checked="true"]').innerText(), new RegExp(engineName));
-  assert.equal(await page.locator('#resolutionCards [aria-checked="true"] b').innerText(), resolution);
-}
-
-async function assertLayout(page, { width, height }, previewVisible = false) {
-  const layout = await page.evaluate(() => {
-    const main = document.querySelector('main');
-    const dock = document.querySelector('.dock').getBoundingClientRect();
-    const preview = document.querySelector('#preview').getBoundingClientRect();
-    return {
-      documentWidth: document.documentElement.scrollWidth,
-      bodyWidth: document.body.scrollWidth,
-      mainWidth: main.clientWidth,
-      mainScrollWidth: main.scrollWidth,
-      dock: { top: dock.top, bottom: dock.bottom },
-      preview: { width: preview.width, height: preview.height },
-    };
+async function calls(page) { return page.evaluate(() => window.__calls.splice(0)); }
+async function text(page, sel) { return ((await page.locator(sel).textContent()) || '').trim(); }
+async function noticeKind(page) {
+  return page.evaluate(() => {
+    const n = document.getElementById('notice');
+    return ['is-success', 'is-warn', 'is-error'].find((c) => n.classList.contains(c)) || null;
   });
-  assert.ok(layout.documentWidth <= width + 1, `Document overflows ${width}px: ${JSON.stringify(layout)}`);
-  assert.ok(layout.bodyWidth <= width + 1, `Body overflows ${width}px`);
-  assert.ok(layout.mainScrollWidth <= layout.mainWidth + 1, `Content scrolls horizontally: ${JSON.stringify(layout)}`);
-  assert.ok(layout.dock.top >= 0 && layout.dock.bottom <= height + 1, `Dock is outside viewport: ${JSON.stringify(layout)}`);
-  if (previewVisible) {
-    assert.ok(layout.preview.width > 0 && layout.preview.height > 0, 'Portrait capture should remain visible');
-    assert.ok(layout.preview.height <= height * 0.62, `Portrait preview consumes too much of ${height}px viewport: ${JSON.stringify(layout)}`);
-  }
+}
+async function closeSheet(page, id) { await page.locator(`#${id} .sheet-done`).first().click(); }
+
+function renderResult(overrides = {}) {
+  return {
+    id: 'render-1', kind: 'render', renderId: '11111111-1111-4111-8111-111111111111',
+    outputUrl: resultUrl, previewUrl: resultUrl, nodesCharged: 20, totalBalance: 980,
+    camera: CAMERA, photo: { aspect: 0, frameAspect: 1.7778, level: false }, sceneName: 'Cozinha',
+    engine: 'quasar', resolution: '2k', seed: 4242,
+    createdAt: '2026-10-02T14:00:00Z', signedAt: Math.floor(Date.now() / 1000),
+    ...overrides,
+  };
 }
 
-async function setup(context, { authenticated = true, withCatalog = true, balance = 1000, viewport } = {}) {
-  if (viewport) await context.setExtraHTTPHeaders({}); // The page receives its viewport below.
+async function setup(context, { locale = 'pt', theme = 'dark', viewport } = {}) {
   await context.addInitScript(({ captureUrl, scenes }) => {
-    window.__sketchupFlowCalls = [];
+    window.__calls = [];
     window.sketchup = new Proxy({}, {
-      get(_target, name) {
+      get(_t, name) {
         return (raw) => {
           let payload = raw;
-          if (typeof raw === 'string') {
-            try { payload = JSON.parse(raw); } catch { /* Non-JSON bridge arguments stay strings. */ }
-          }
-          window.__sketchupFlowCalls.push({ name: String(name), payload });
-          if (name === 'captureViewport') {
-            window.SpaceNodeBridge.receive('capture', { imageDataUrl: captureUrl, width: 800, height: 1600 });
-          }
+          if (typeof raw === 'string') { try { payload = JSON.parse(raw); } catch { /* string */ } }
+          window.__calls.push({ name: String(name), payload });
+          if (name === 'captureViewport') window.SpaceNodeBridge.receive('capture', { imageDataUrl: captureUrl, width: 1600, height: 900 });
           if (name === 'listScenes') window.SpaceNodeBridge.receive('scenes', { scenes });
         };
       },
     });
   }, { captureUrl, scenes });
   await context.route(/^https?:\/\//, async (route) => {
-    if (route.request().url() === resultUrl) {
-      await route.fulfill({ status: 200, contentType: 'image/svg+xml', body: fixtureSvg });
-    } else {
-      await route.abort('blockedbyclient');
-    }
+    if (route.request().url() === resultUrl) return route.fulfill({ status: 200, contentType: 'image/svg+xml', body: fixtureSvg('#d8d0c0') });
+    return route.abort('blockedbyclient');
   });
   const page = await context.newPage();
   if (viewport) await page.setViewportSize(viewport);
   const errors = [];
-  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('pageerror', (e) => errors.push(e.message));
   await page.goto(panelUrl);
   await page.waitForFunction(() => !!window.SpaceNodeBridge);
   await receive(page, 'state', {
-    authenticated, sessionFresh: authenticated, locale: 'pt', themeSetting: 'light',
-    userEmail: authenticated ? 'fixture@example.invalid' : null,
-    balance: { totalBalance: balance }, version: 'flow-fixture',
+    authenticated: true, sessionFresh: true, devicePaired: true, locale, themeSetting: theme,
+    userEmail: 'fixture@example.invalid', balance: { totalBalance: 1000 }, version: '1.9.0-fixture', journal: [],
   });
-  if (withCatalog) await receive(page, 'catalog', structuredClone(catalog));
+  await receive(page, 'catalog', structuredClone(catalog));
   await receive(page, 'scenes', { scenes });
-  await receive(page, 'capture', { imageDataUrl: captureUrl, width: 800, height: 1600 });
-  await clearCalls(page);
+  await calls(page);
   return { page, errors };
 }
 
+async function selectEngine(page, name) {
+  await page.locator('#dockOutput').click();
+  await page.locator('#engineCards button').filter({ hasText: name }).first().click();
+  await closeSheet(page, 'sheetOutput');
+}
+
 const cases = [
-  ['compact-viewports', async (context) => {
+  ['brand-assets-and-loader', async (context) => {
+    const { page, errors } = await setup(context);
+    assert.equal(await page.title(), 'SpaceNode');
+    const brand = await page.evaluate(() => Array.from(document.querySelectorAll('.brand picture')).map((p) => ({
+      compact: p.querySelector('source').getAttribute('srcset'),
+      full: p.querySelector('img').getAttribute('src'),
+    })));
+    assert.deepEqual(brand, [
+      { compact: 'assets/spacenode-symbol-reverse.svg', full: 'assets/spacenode-logo-horizontal.svg' },
+      { compact: 'assets/spacenode-symbol-dark.svg', full: 'assets/spacenode-logo-horizontal-dark.svg' },
+    ], 'N estrutural puro nos dois temas (sem chip no claro)');
+    const solidN = await page.evaluate(() => document.documentElement.outerHTML.includes('M4 60V4H18L46 39V4H60V60H46L18 25V60Z'));
+    assert.equal(solidN, false, 'o N micro antigo não existe mais no painel');
+    const loader = await page.evaluate(() => {
+      const svg = document.querySelector('.brand-loader');
+      return { tag: svg.tagName.toLowerCase(), paths: svg.querySelectorAll('path').length, anim: getComputedStyle(svg.querySelector('path')).animationName };
+    });
+    assert.equal(loader.tag, 'svg');
+    assert.equal(loader.paths, 3, 'loader oficial: dois apoios e a ligação');
+    assert.equal(loader.anim, 'sn-build');
+    assert.match(await text(page, '#footer'), /^SpaceNode para SketchUp · v1\.9\.0-fixture$/);
+    return { page, errors };
+  }],
+  ['generate-payload-and-verified-badge', async (context) => {
+    const { page, errors } = await setup(context);
+    await page.locator('#prompt').fill('piso de madeira clara');
+    await page.locator('#generateButton').click();
+    const sent = await calls(page);
+    const gen = sent.find((c) => c.name === 'generate');
+    assert.ok(gen, 'generate enviado');
+    assert.equal(gen.payload.structuralBoost, false);
+    assert.equal(gen.payload.useAnchor, false);
+    assert.equal(gen.payload.prompt, 'piso de madeira clara');
+    assert.equal(gen.payload.engine, 'quasar');
+    assert.equal(await page.locator('#generateButton').isDisabled(), true, 'gerando: CTA travado');
+    await receive(page, 'result', renderResult({ fidelityScore: 0.91 }));
+    await page.waitForFunction(() => document.getElementById('resultImage').naturalWidth > 0);
+    assert.match(await text(page, '#notice'), /20 nodes utilizados\. Estrutura conferida contra o modelo\./);
+    assert.equal(await noticeKind(page), 'is-success');
+    assert.equal(await page.locator('#notice .notice-action button').count(), 0, 'sem ação quando passou');
+    return { page, errors };
+  }],
+  ['fidelity-warning-offers-fix-auto', async (context) => {
+    const { page, errors } = await setup(context);
+    await receive(page, 'result', renderResult({ fidelityScore: 0.41, fidelityWarning: true, seed: 777 }));
+    await page.waitForFunction(() => document.getElementById('resultImage').naturalWidth > 0);
+    assert.match(await text(page, '#notice'), /verificação estrutural encontrou possíveis diferenças/);
+    assert.equal(await noticeKind(page), 'is-warn', 'aviso de fidelidade não é erro do sistema');
+    assert.equal(await text(page, '#notice .notice-action button'), 'Corrigir automaticamente · 20 nodes');
+    await calls(page);
+    await page.locator('#notice .notice-action button').click();
+    const sent = await calls(page);
+    const gen = sent.find((c) => c.name === 'generate');
+    assert.ok(gen, 'a correção gera de novo');
+    assert.equal(gen.payload.structuralBoost, true);
+    assert.equal(gen.payload.seed, 777, 'mesma semente do render reprovado');
+    assert.equal(gen.payload.useAnchor, false, 'nunca com âncora');
+    assert.equal(gen.payload.anchorUrl, null);
+    return { page, errors };
+  }],
+  ['refinement-not-persisted-visible-in-dock-and-scenes-cleared-after-render', async (context) => {
+    const { page, errors } = await setup(context);
+    assert.match(await text(page, '#L_description'), /^Refinar imagem/, 'mesmo nome do web');
+    await page.locator('#prompt').fill('decoração minimalista');
+    await page.locator('#rowScene').click();
+    await page.locator('#segmentPills button').filter({ hasText: 'Residencial' }).click();
+    await closeSheet(page, 'sheetScene');
+    await page.waitForTimeout(600);
+    const sent = await calls(page);
+    const persisted = sent.filter((c) => c.name === 'persistState');
+    assert.ok(persisted.length > 0, 'o painel persiste o estado');
+    for (const p of persisted) assert.equal('prompt' in p.payload, false, 'o refinamento não vai pro estado persistido');
+    assert.match(await text(page, '#dockSummary'), /Residencial · refinamento/, 'o resumo do dock mostra que há refinamento ativo');
+    await page.locator('.seg[data-tab="scenes"]').click();
+    await page.locator('#scenesPills button').filter({ hasText: 'Cozinha' }).click();
+    assert.match(await text(page, '#batchNote'), /"decoração minimalista" entra em todas as cenas/, 'a nota do lote avisa do refinamento ativo');
+    await page.locator('.seg[data-tab="render"]').click();
+    await page.locator('#generateButton').click();
+    const gen = (await calls(page)).find((c) => c.name === 'generate');
+    assert.equal(gen.payload.prompt, 'decoração minimalista');
+    await receive(page, 'result', renderResult());
+    await page.waitForFunction(() => document.getElementById('resultImage').naturalWidth > 0);
+    assert.equal(await page.locator('#prompt').inputValue(), '', 'o refinamento virou este render — o campo limpa');
+    assert.doesNotMatch(await text(page, '#dockSummary'), /refinamento/);
+    return { page, errors };
+  }],
+  ['disabled-tab-explains-instead-of-ignoring', async (context) => {
+    const { page, errors } = await setup(context);
+    const edit = page.locator('.seg[data-tab="edit"]');
+    assert.equal(await edit.getAttribute('aria-disabled'), 'true');
+    // O Playwright trata aria-disabled como não clicável; no CEF o clique chega
+    // normalmente — é exatamente o que o painel usa pra explicar o que falta.
+    await edit.dispatchEvent('click');
+    assert.match(await text(page, '#notice'), /Gere um render primeiro/);
+    assert.equal(await text(page, '#notice .notice-action button'), 'Gerar render');
+    assert.equal(await page.locator('.seg.is-active').getAttribute('data-tab'), 'render', 'a aba não muda');
+    await receive(page, 'result', renderResult());
+    await page.waitForFunction(() => document.querySelector('.seg[data-tab="edit"]').getAttribute('aria-disabled') === 'false');
+    await edit.click();
+    assert.equal(await page.locator('.seg.is-active').getAttribute('data-tab'), 'edit', 'com render a aba abre');
+    return { page, errors };
+  }],
+  ['cancel-says-whether-nodes-may-have-been-charged', async (context) => {
+    const { page, errors } = await setup(context);
+    await page.locator('#generateButton').click();
+    await calls(page);
+    await page.locator('#cancelButton').click();
+    assert.deepEqual((await calls(page)).map((c) => c.name), ['cancelGenerate']);
+    assert.equal(await text(page, '#notice'), '', 'nada antes de o Ruby responder');
+    await receive(page, 'status', { stage: 'idle', message: 'Geração cancelada.', cancelled: true, posted: false });
+    assert.match(await text(page, '#notice'), /Cancelado antes do envio — nada foi cobrado/);
+    assert.equal(await noticeKind(page), 'is-success');
+    await page.locator('#generateButton').click();
+    await page.locator('#cancelButton').click();
+    await receive(page, 'status', { stage: 'idle', message: 'Geração cancelada.', cancelled: true, posted: true });
+    assert.match(await text(page, '#notice'), /Cancelado depois do envio/);
+    assert.equal(await noticeKind(page), 'is-warn');
+    return { page, errors };
+  }],
+  ['plugin-update-stays-in-footer', async (context) => {
+    const { page, errors } = await setup(context);
+    await receive(page, 'pluginUpdate', { version: '1.9.9', current: '1.9.0-fixture', url: 'https://spacenode.app/downloads/spacenode-sketchup.rbz', note: 'nota' });
+    assert.match(await text(page, '#notice'), /1\.9\.9/);
+    assert.match(await text(page, '#footer'), /1\.9\.9 disponível — baixar/);
+    await receive(page, 'result', renderResult());
+    await page.waitForFunction(() => document.getElementById('resultImage').naturalWidth > 0);
+    assert.doesNotMatch(await text(page, '#notice'), /1\.9\.9/, 'o notice foi substituído pelo resultado…');
+    assert.match(await text(page, '#footer'), /1\.9\.9 disponível — baixar/, '…mas o rodapé continua avisando');
+    await calls(page);
+    await page.locator('#footer a').click();
+    assert.deepEqual((await calls(page)).map((c) => [c.name, c.payload]), [['openUrl', 'https://spacenode.app/downloads/spacenode-sketchup.rbz']]);
+    return { page, errors };
+  }],
+  ['camera-facts-warn-before-charging', async (context) => {
+    const { page, errors } = await setup(context);
+    await receive(page, 'camera', { perspective: true, fovDeg: 70, focalLengthMm: 24, tiltDeg: 8, twoPoint: false, eyeHeightM: 1.55, shadowsOn: false, renderMode: 1, lineStyle: true });
+    const hint = await text(page, '#toolsHint');
+    assert.match(hint, /Câmera inclinada 8° — toque em Nivelar/);
+    assert.match(hint, /Sombras desligadas no modelo/);
+    assert.match(hint, /Estilo de linhas no modelo/);
+    await page.locator('#toolLevel').click();
+    await page.waitForTimeout(3300);
+    await receive(page, 'camera', { perspective: true, fovDeg: 70, focalLengthMm: 24, tiltDeg: 8, twoPoint: false, eyeHeightM: 1.55, shadowsOn: false });
+    assert.doesNotMatch(await text(page, '#toolsHint'), /inclinada/, 'com Nivelar ligado o aviso de inclinação sai');
+    assert.match(await text(page, '#toolsHint'), /Sombras desligadas/);
+    await page.locator('#captureButton').click();
+    assert.match(await text(page, '#toolsHint'), /A IA recebe: 1600×900 · 24 mm · 70° · olho a 1,55 m/);
+    return { page, errors };
+  }],
+  ['batch-note-only-promises-seed-where-it-applies', async (context) => {
+    const { page, errors } = await setup(context);
+    await page.locator('.seg[data-tab="scenes"]').click();
+    await page.locator('#scenesPills button').filter({ hasText: 'Cozinha' }).click();
+    await page.locator('#scenesPills button').filter({ hasText: 'Sala' }).click();
+    assert.match(await text(page, '#batchLabel'), /Gerar 2 cenas/);
+    assert.match(await text(page, '#batchNote'), /a semente não se aplica/, 'Quasar: sem promessa de semente');
+    await selectEngine(page, 'Vega');
+    assert.match(await text(page, '#batchNote'), /mesma semente/, 'Vega: a semente vale');
+    return { page, errors };
+  }],
+  ['compact-viewports-no-overflow', async (context) => {
     const { page, errors } = await setup(context);
     for (const viewport of [{ width: 380, height: 560 }, { width: 440, height: 780 }]) {
       await page.setViewportSize(viewport);
-      await assertVisible(page, '#sourceView');
-      await assertOnlyDockAction(page, 'workflowNextButton');
-      assert.equal(await page.locator('#sourceView #previewPanel').count(), 1, 'Source owns the shared preview');
-      await assertLayout(page, viewport, true);
-      await configure(page);
-      await assertOnlyDockAction(page, 'generateButton');
-      const firstEngine = await page.locator('#engineCards button').first().boundingBox();
-      const dock = await page.locator('.dock').boundingBox();
-      assert.ok(firstEngine && dock && firstEngine.y >= 0 && firstEngine.y + firstEngine.height <= dock.y, 'Engine selection must be immediately visible after Continue');
-      await assertLayout(page, viewport);
-      await page.locator('#stepSource').click();
+      await page.waitForTimeout(100);
+      const layout = await page.evaluate(() => {
+        const dock = document.querySelector('.dock').getBoundingClientRect();
+        return { doc: document.documentElement.scrollWidth, body: document.body.scrollWidth, dockTop: dock.top, dockBottom: dock.bottom };
+      });
+      assert.ok(layout.doc <= viewport.width + 1 && layout.body <= viewport.width + 1, `sem rolagem horizontal em ${viewport.width}px: ${JSON.stringify(layout)}`);
+      assert.ok(layout.dockTop >= 0 && layout.dockBottom <= viewport.height + 1, `dock dentro da janela em ${viewport.width}×${viewport.height}: ${JSON.stringify(layout)}`);
     }
     return { page, errors };
   }],
-  ['engine-resolution-result', async (context) => {
+  ['result-notes-edge-empty-shadows-off-jpeg', async (context) => {
     const { page, errors } = await setup(context);
-    await configure(page);
-    await assertSelection(page, 'Fixture Atlas', '2K');
-    await selectEngine(page, 'Fixture Boreal');
-    await assertSelection(page, 'Fixture Boreal', '2K');
-    await selectResolution(page, '4K');
-    await selectEngine(page, 'Fixture Atlas');
-    await assertSelection(page, 'Fixture Atlas', '4K');
-    await selectEngine(page, 'Fixture Ceres');
-    await assertSelection(page, 'Fixture Ceres', '1K');
-    await selectEngine(page, 'Fixture Boreal');
-    await assertSelection(page, 'Fixture Boreal', '2K');
-    await selectResolution(page, '4K');
-    await page.locator('#generateButton').click();
-    const sent = await calls(page);
-    assert.equal(sent.length, 1);
-    assert.equal(sent[0].name, 'generate');
-    assert.equal(sent[0].payload.engine, 'pulsar');
-    assert.equal(sent[0].payload.resolution, '4k');
-    assert.equal(sent[0].payload.useAnchor, false);
-    await page.keyboard.press('Control+Enter');
-    assert.equal((await calls(page)).length, 1, 'Generation in progress cannot submit again');
-    await receive(page, 'result', {
-      outputUrl: resultUrl, renderId: 'fixture-result', engine: 'pulsar', resolution: '4k',
-      nodesCharged: 19, totalBalance: 981, signedAt: Math.floor(Date.now() / 1000),
+    await receive(page, 'result', renderResult({ conditioning: { edgeRequested: true, edgeMap: false, edgeReason: 'empty', sunRequested: false, sunApplied: false, shadowsOn: false, sourceMime: 'image/jpeg', materialsRequested: 0, materialsSent: 0, skipped: [], mirrorsRequested: 0, mirrorsApplied: 0 } }));
+    await page.waitForFunction(() => document.getElementById('resultImage').naturalWidth > 0);
+    const n = await text(page, '#notice');
+    assert.match(n, /mapa de estrutura saiu vazio/);
+    assert.match(n, /sombras do modelo desligadas/);
+    assert.match(n, /enviada em JPEG/);
+    assert.equal(await noticeKind(page), 'is-warn');
+    return { page, errors };
+  }],
+  ['fix-auto-uses-the-failed-render-engine', async (context) => {
+    const { page, errors } = await setup(context);
+    await receive(page, 'result', renderResult({ fidelityWarning: true, seed: 5, engine: 'vega', resolution: '4k' }));
+    await page.waitForFunction(() => document.getElementById('resultImage').naturalWidth > 0);
+    assert.equal(await text(page, '#notice .notice-action button'), 'Corrigir automaticamente · 40 nodes', 'custo do motor/qualidade do render reprovado, não do painel');
+    await calls(page);
+    await page.locator('#notice .notice-action button').click();
+    const gen = (await calls(page)).find((c) => c.name === 'generate');
+    assert.equal(gen.payload.engine, 'vega');
+    assert.equal(gen.payload.resolution, '4k');
+    return { page, errors };
+  }],
+  ['style-lock-blocked-when-the-seed-did-not-apply', async (context) => {
+    const { page, errors } = await setup(context);
+    await receive(page, 'result', renderResult({ seed: 4242, seedApplied: false }));
+    await page.waitForFunction(() => document.getElementById('resultImage').naturalWidth > 0);
+    assert.equal(await page.locator('#styleLockButton').isDisabled(), true);
+    assert.match(await text(page, '#styleSub'), /semente não se aplica/);
+    await receive(page, 'result', renderResult({ seed: 4243, seedApplied: true, engine: 'vega' }));
+    assert.equal(await page.locator('#styleLockButton').isDisabled(), false);
+    return { page, errors };
+  }],
+  ['mask-undo-stroke-and-escape', async (context) => {
+    const { page, errors } = await setup(context);
+    await receive(page, 'result', renderResult());
+    await page.waitForFunction(() => document.getElementById('resultImage').naturalWidth > 0);
+    await page.locator('.seg[data-tab="edit"]').click();
+    await page.locator('#maskToggle').click();
+    const box = await page.locator('#maskCanvas').boundingBox();
+    assert.ok(box && box.width > 50 && box.height > 50, 'canvas da máscara dimensionado');
+    // Eventos de ponteiro despachados direto no canvas (o CEF entrega assim).
+    const canvas = page.locator('#maskCanvas');
+    for (const dx of [0.3, 0.6]) {
+      const x0 = box.x + box.width * dx; const y0 = box.y + box.height * 0.4;
+      await canvas.dispatchEvent('pointerdown', { clientX: x0, clientY: y0, pointerId: 1, isPrimary: true, button: 0 });
+      await canvas.dispatchEvent('pointermove', { clientX: x0 + 20, clientY: y0 + 15, pointerId: 1, isPrimary: true });
+      await canvas.dispatchEvent('pointerup', { clientX: x0 + 20, clientY: y0 + 15, pointerId: 1, isPrimary: true, button: 0 });
+    }
+    const painted = () => page.evaluate(() => {
+      const c = document.getElementById('maskCanvas');
+      const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+      let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 0) n++;
+      return n;
     });
-    await assertVisible(page, '#resultView');
-    await assertOnlyDockAction(page, 'newRenderButton');
-    assert.equal(await page.locator('#resultView #previewPanel').count(), 1, 'Result owns the shared preview');
-    await page.locator('#stepConfigure').click();
-    await assertVisible(page, '#configureView');
-    await assertSelection(page, 'Fixture Boreal', '4K');
-    await assertOnlyDockAction(page, 'generateButton');
+    assert.ok(await painted() > 0, 'dois traços pintados');
+    await page.keyboard.press('Control+z');
+    const afterOne = await painted();
+    assert.ok(afterOne > 0, 'um traço sobrou');
+    await page.keyboard.press('Control+z');
+    assert.equal(await painted(), 0, 'dois traços, dois Ctrl+Z — sem botão novo');
+    assert.equal(await page.locator('#maskUndo').count(), 0, 'nenhum botão de desfazer na barra do pincel');
+    await page.keyboard.press('Escape');
+    assert.equal(await page.evaluate(() => document.getElementById('preview').classList.contains('is-masking')), false, 'Esc sai do modo pintar');
     return { page, errors };
   }],
-  ['batch-contextual-shortcut', async (context) => {
+  ['upscale-quote-is-cancelled-when-replaced', async (context) => {
     const { page, errors } = await setup(context);
-    await configure(page, 'batch', [0, 1]);
-    await assertOnlyDockAction(page, 'batchButton');
-    await selectEngine(page, 'Fixture Boreal');
-    await page.keyboard.press('Control+Enter');
-    const sent = await calls(page);
-    assert.equal(sent.length, 1);
-    assert.equal(sent[0].name, 'generateBatch', 'Batch shortcut must dispatch a batch');
-    assert.equal(sent[0].payload.engine, 'pulsar');
-    assert.equal(sent[0].payload.resolution, '2k');
-    assert.deepEqual(sent[0].payload.scenes, scenes.slice(0, 2));
-    await receive(page, 'batchDone', { results: [], errors: [], total: 2, cancelled: true });
+    await receive(page, 'result', renderResult());
+    await page.waitForFunction(() => document.getElementById('resultImage').naturalWidth > 0);
+    await page.locator('#resultMoreToggle').click();
+    await page.locator('#upscale2xButton').click();
+    await receive(page, 'upscaleQuote', { scale: '2x', width: 3200, height: 1800, nodes: 12 });
+    await calls(page);
+    await page.locator('#generateButton').click();
+    const names = (await calls(page)).map((c) => c.name);
+    assert.ok(names.indexOf('cancelUpscale') >= 0 && names.indexOf('cancelUpscale') < names.indexOf('generate'), `a cotação descartada é cancelada antes de gerar: ${names.join(',')}`);
+    // Aplicar a cotação continua sendo confirmUpscale puro — nunca cancela antes.
+    await receive(page, 'status', { stage: 'idle', message: 'Geração cancelada.', cancelled: true, posted: false });
+    await page.locator('#upscale2xButton').click();
+    await receive(page, 'upscaleQuote', { scale: '2x', width: 3200, height: 1800, nodes: 12 });
+    await calls(page);
+    await page.locator('#notice .notice-action button').click();
+    const applied = (await calls(page)).map((c) => c.name);
+    assert.deepEqual(applied, ['confirmUpscale'], `aplicar não cancela a própria cotação: ${applied.join(',')}`);
     return { page, errors };
   }],
-  ['space-limit-and-shortcut', async (context) => {
+  ['variation-hint-and-history-captions', async (context) => {
     const { page, errors } = await setup(context);
-    await selectMode(page, 'space');
-    await selectScenes(page, [0, 1, 2]);
-    // It is valid to prevent selecting the third scene or to block Continue.
-    const selected = await page.locator('#scenesPills [aria-checked="true"]').count();
-    if (selected > catalog.spaces.maxPrints) {
-      assert.equal(await page.locator('#workflowNextButton').isDisabled(), true, 'Over-limit selection must block Continue');
-      await page.keyboard.press('Control+Enter');
-      assert.deepEqual(await calls(page), [], 'Over-limit shortcut cannot silently truncate scenes');
-      await selectScenes(page, [2]);
-    }
-    await page.locator('#workflowNextButton').click();
-    await assertOnlyDockAction(page, 'spaceButton');
-    await page.locator('#spaceName').fill('Fixture project');
-    await selectEngine(page, 'Fixture Boreal');
-    await page.keyboard.press('Control+Enter');
-    const sent = await calls(page);
-    assert.equal(sent.length, 1);
-    assert.equal(sent[0].name, 'createSpace', 'Space shortcut must dispatch Create Space');
-    assert.equal(sent[0].payload.name, 'Fixture project');
-    assert.equal(sent[0].payload.engine, 'pulsar');
-    assert.equal(sent[0].payload.quality, '2k');
-    assert.deepEqual(sent[0].payload.scenes, scenes.slice(0, 2));
-    await receive(page, 'spaceDone', { cancelled: true });
+    await receive(page, 'result', renderResult());
+    await page.waitForFunction(() => document.getElementById('resultImage').naturalWidth > 0);
+    await page.locator('#resultMoreToggle').click();
+    assert.equal(await page.locator('#variationHint').count(), 0, 'sem hint como elemento');
+    assert.match((await page.locator('#variationButton').getAttribute('title')) || '', /a câmera precisa ser a mesma/, 'a explicação da âncora está no title do botão');
+    await receive(page, 'journal', { entries: [renderResult({ renderId: 'r-journal' })] });
+    await receive(page, 'history', { renders: [
+      { id: 'r-journal', engine: 'vega', resolution: '2k', created_at: '2026-10-01T12:00:00Z', preview_url: resultUrl, output_url: resultUrl },
+      { id: 'r-other', engine: 'quasar', resolution: '2k', created_at: '2026-09-30T12:00:00Z', preview_url: resultUrl, output_url: resultUrl },
+    ] });
+    assert.equal(await page.locator('#historyGrid figcaption').count(), 0, 'sem legenda como elemento');
+    const titles = await page.locator('#historyGrid img').evaluateAll((imgs) => imgs.map((i) => i.title));
+    assert.equal(titles.length, 2);
+    assert.match(titles[0], /^Vega · 2K · .* · no diário deste arquivo · Trazer para o painel$/);
+    assert.match(titles[1], /^Quasar · 2K · .* · Trazer para o painel$/);
+    assert.doesNotMatch(titles[1], /diário/);
     return { page, errors };
   }],
-  ['disconnected', async (context) => {
+  ['shadows-hint-opens-light-sheet-and-aerial-views-are-not-tilt-warnings', async (context) => {
     const { page, errors } = await setup(context);
-    await configure(page);
-    await receive(page, 'state', { authenticated: false, sessionFresh: false, locale: 'pt' });
-    assert.equal(await page.locator('#generateButton').isDisabled(), true);
-    assert.equal(await page.locator('#batchButton').isDisabled(), true);
-    assert.equal(await page.locator('#spaceButton').isDisabled(), true);
-    await page.keyboard.press('Control+Enter');
-    assert.deepEqual(await calls(page), [], 'Disconnected state cannot submit');
+    await receive(page, 'camera', { perspective: true, fovDeg: 70, focalLengthMm: 24, tiltDeg: 40, twoPoint: false, shadowsOn: false });
+    const hint = await text(page, '#toolsHint');
+    assert.doesNotMatch(hint, /inclinada/, 'vista aérea (40°) não é erro de nivelamento');
+    assert.match(hint, /Sombras desligadas/);
+    await page.locator('#toolsHint').click();
+    assert.equal(await page.evaluate(() => document.getElementById('sheetLight').classList.contains('is-open')), true, 'o aviso de sombras abre a folha Luz');
     return { page, errors };
   }],
-  ['catalog-unavailable', async (context) => {
-    const { page, errors } = await setup(context, { withCatalog: false });
-    await receive(page, 'catalogError', {});
-    assert.equal(await page.locator('#generateButton').isDisabled(), true);
-    assert.equal(await page.locator('#batchButton').isDisabled(), true);
-    assert.equal(await page.locator('#spaceButton').isDisabled(), true);
-    await assertVisible(page, '#notice');
-    await page.keyboard.press('Control+Enter');
-    assert.deepEqual(await calls(page), [], 'Missing catalog cannot submit');
-    return { page, errors };
-  }],
-  ['insufficient-balance', async (context) => {
-    const { page, errors } = await setup(context);
-    await configure(page);
-    await setBalance(page, 1);
-    assert.equal(await page.locator('#generateButton').isDisabled(), true);
-    await assertVisible(page, '#insufficient');
-    await page.keyboard.press('Control+Enter');
-    assert.deepEqual(await calls(page), []);
-    await setBalance(page, 15); // One render fits, but a two-scene batch does not.
-    await configure(page, 'batch', [0, 1]);
-    await assertOnlyDockAction(page, 'batchButton');
-    assert.equal(await page.locator('#batchButton').isDisabled(), true);
-    await page.keyboard.press('Control+Enter');
-    assert.deepEqual(await calls(page), [], 'Batch must use total cost, not one image cost');
-    await selectMode(page, 'space');
-    await page.locator('#workflowNextButton').click();
-    await assertOnlyDockAction(page, 'spaceButton');
-    assert.equal(await page.locator('#spaceButton').isDisabled(), true);
-    await page.keyboard.press('Control+Enter');
-    assert.deepEqual(await calls(page), [], 'Space must include its full scene and DNA cost');
+  ['english-strings-follow-the-same-changes', async (context) => {
+    const { page, errors } = await setup(context, { locale: 'en' });
+    await receive(page, 'result', renderResult({ fidelityScore: 0.3, fidelityWarning: true, seed: 9 }));
+    await page.waitForFunction(() => document.getElementById('resultImage').naturalWidth > 0);
+    assert.match(await text(page, '#notice'), /structural check found possible differences/);
+    assert.equal(await text(page, '#notice .notice-action button'), 'Fix automatically · 20 nodes');
+    await receive(page, 'status', { stage: 'idle', message: 'Cancelled.', cancelled: true, posted: false });
+    assert.match(await text(page, '#notice'), /nothing was charged/);
     return { page, errors };
   }],
 ];
 
 if (screenshotDir) await mkdir(screenshotDir, { recursive: true });
-const browser = await chromium.launch({ headless: true, ...(process.env.SKETCHUP_TEST_CHANNEL ? { channel: process.env.SKETCHUP_TEST_CHANNEL } : {}) });
+const channel = process.env.SKETCHUP_TEST_CHANNEL;
+const browser = await chromium.launch({ headless: true, ...(channel ? { channel } : {}) });
 let failed = 0;
 try {
   for (const [name, test] of cases) {
     const context = await browser.newContext({ viewport: { width: 440, height: 780 } });
     try {
       const { page, errors } = await test(context);
-      assert.deepEqual(errors, [], 'Panel must not throw JavaScript errors');
-      if (screenshotDir) await page.screenshot({ path: path.join(screenshotDir, `${name}.png`) });
+      assert.deepEqual(errors, [], 'o painel não pode lançar erros de JavaScript');
+      if (screenshotDir) await page.screenshot({ path: path.join(screenshotDir, `${name}.png`), fullPage: true });
       process.stdout.write(`PASS ${name}\n`);
     } catch (error) {
       failed += 1;
       process.stderr.write(`FAIL ${name}: ${error.stack || error.message}\n`);
       const page = context.pages()[0];
-      if (screenshotDir && page) await page.screenshot({ path: path.join(screenshotDir, `${name}-failed.png`) }).catch(() => {});
+      if (screenshotDir && page) await page.screenshot({ path: path.join(screenshotDir, `${name}-failed.png`), fullPage: true }).catch(() => {});
     } finally {
       await context.close();
     }
@@ -362,5 +437,5 @@ try {
 } finally {
   await browser.close();
 }
-process.stdout.write(`${cases.length - failed}/${cases.length} SketchUp flow checks passed. No external generation requests were sent.\n`);
-if (failed) process.exitCode = 1;
+process.stdout.write(`${cases.length - failed}/${cases.length} passed\n`);
+process.exit(failed ? 1 : 0);
