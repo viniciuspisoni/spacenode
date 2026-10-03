@@ -427,3 +427,5 @@ A URL temporária é usada somente no processamento. O registro da geração gua
 Validação: testes de dono, adulteração, expiração, conteúdo inválido/truncado, MIME forjado, tamanho, gates, limites, persistência sem token temporário e geração bloqueada no Autopiloto até confirmação.
 
 Conferência em produção: envio privado e diagnóstico visual validados com print fictício, sem geração paga. A proposta executável permanece no chat: encaminhamentos gratuitos não tiram o usuário da confirmação, mesmo no Autopiloto. Rótulo de custo, referência de entrada e avisos do pré-voo são reconciliados pelo servidor após resolver a imagem.
+
+“Agora não” encerra as propostas daquela resposta e desativa seus botões. Cancelamento é separado do feedback “Não ajudou”; uma proposta cancelada não pode ser executada por uma confirmação textual posterior.

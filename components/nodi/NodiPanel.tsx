@@ -1056,6 +1056,10 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
                 onPickGeneration={pickGeneration}
                 onPickAttachment={pickAttachment}
                 onConfirmProposal={confirmProposal}
+                onCancelProposal={(id) => {
+                  markDone(id)
+                  append({ id: newId(), role: 'nodi', kind: 'notice', text: 'Proposta cancelada. Nenhuma geração será iniciada por essa proposta.' })
+                }}
                 onUsePrompt={usePrompt}
                 onConfirmMemory={confirmMemory}
                 onFeedback={giveFeedback}
@@ -1176,6 +1180,7 @@ interface MessageProps {
   onSendTicket: (msgId: string, draft: TicketDraft) => void
   onCancelReview: (msgId: string) => void
   onConfirmProposal: (msgId: string, a: SupervisedAction) => void
+  onCancelProposal: (msgId: string) => void
   onUsePrompt: (s: PromptSuggestion) => void
   onConfirmMemory: (msgId: string, p: MemoryProposal) => void
   onFeedback: (msgId: string, helpful: boolean) => void
@@ -1410,7 +1415,7 @@ function V2Message(props: MessageProps & { answer: NodiV2Answer }) {
           action={p}
           done={!!msg.done}
           onConfirm={() => props.onConfirmProposal(msg.id, p)}
-          onCancel={() => props.onFeedback(msg.id, false)}
+          onCancel={() => props.onCancelProposal(msg.id)}
         />
       ))}
       {answer.memoryProposal && (
