@@ -414,3 +414,14 @@ imagem própria, pedido de ajuste, confirmação explícita e resultado no Hist�
    reservas de execução e cobrança existentes; evitar caminhos paralelos.
 5. Avaliar qualidade com cenários completos de interiores/exteriores, recuperação
    de falha e encaminhamento humano. Expandir acesso apenas após teste controlado.
+
+
+### Print direto no chat (2026-10-03)
+
+Quando V2 e multimodal estão habilitados para a conta, o painel permite enviar JPG, PNG ou WebP de até 8 MB. O arquivo vai diretamente para o bucket **privado** `spacenode-media`, sob o prefixo do próprio usuário; o servidor confere tamanho, MIME real, limite de 40 milhões de pixels, imagem estática e decodificação antes de emitir a referência cifrada. A referência é vinculada ao dono, expira em 24 horas e não entra no contexto textual do modelo. Esse prazo limita a referência da conversa, não apaga o arquivo do armazenamento; a limpeza por exclusão de conta já contempla o namespace do usuário.
+
+A tool `analisar_print` avalia a entrada quando solicitada. O envio não chama modelo nem gerador. Para gerar, a origem anexada tem prioridade sobre histórico de outros trabalhos. A proposta exibe custo e saldo e **sempre aguarda confirmação**, inclusive no Autopiloto. O executor, débito, estorno e histórico continuam no pipeline existente. Outros módulos mantêm seu encaminhamento atual.
+
+A URL temporária é usada somente no processamento. O registro da geração guarda o proxy autenticado da entrada, e o Nodi renova o acesso ao consultar esse resultado; isso evita perder a imagem-base após expirar o token de download. Não há nova tabela, migração, mudança de permissões do bucket ou ampliação de público. `POST /api/nodi/v2/upload` tem fases `sign` e `confirm`, com autenticação, gates existentes e limites por usuário. A assinatura falha se o bucket estiver público.
+
+Validação: testes de dono, adulteração, expiração, conteúdo inválido/truncado, MIME forjado, tamanho, gates, limites, persistência sem token temporário e geração bloqueada no Autopiloto até confirmação.

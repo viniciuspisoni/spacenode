@@ -7,6 +7,7 @@
 
 import { ENGINE_ORDER, isValidCombination, getNodesCost, type EngineId, type Resolution } from '@/lib/engines'
 import { signIntent } from '../../v3/intents'
+import { resolveUploadImages } from '../uploads'
 import { resolveGenerationImages } from '../images'
 import { getVideoModel, listAvailableVideoModels } from '@/lib/video/models'
 import { getEnabledModules } from '@/lib/nav/modules-config'
@@ -303,13 +304,16 @@ export const actionTools: NodiTool[] = [
         // V3: origem resolvível + projeto + custo computável → intent assinada
         // (confirmar EXECUTA; sem isso, confirmar abre a ferramenta preenchida).
         if (ctx.capabilities.execute && moduleId === 'renderizar' && preflight.estimatedNodes !== null) {
-          const srcKind = (args.source_kind as string) ?? ctx.request.attachment?.kind
-          const srcId = (args.source_id as string) ?? ctx.request.attachment?.id
+          const uploaded = ctx.request.attachment?.kind === 'upload' ? ctx.request.attachment : null
+          const srcKind = uploaded?.kind ?? (args.source_kind as string) ?? ctx.request.attachment?.kind
+          const srcId = uploaded?.id ?? (args.source_id as string) ?? ctx.request.attachment?.id
           const projeto = args.projeto as 'interior' | 'exterior' | undefined
           if (srcKind && srcId && projeto) {
-            const imgs = await resolveGenerationImages(
-              ctx.supabase, ctx.userId, srcKind as Parameters<typeof resolveGenerationImages>[2], srcId,
-            )
+            const imgs = srcKind === 'upload'
+              ? await resolveUploadImages(ctx.admin, ctx.userId, srcId)
+              : await resolveGenerationImages(
+                  ctx.supabase, ctx.userId, srcKind as Parameters<typeof resolveGenerationImages>[2], srcId,
+                )
             const inputUrl = imgs?.inputUrl ?? imgs?.outputUrl
             if (inputUrl) {
               action.executable = true
@@ -326,7 +330,7 @@ export const actionTools: NodiTool[] = [
                   refinementText: prompt,
                 },
               })
-              preflight.imageLabel = preflight.imageLabel ?? `${imgs!.label} existente`
+              preflight.imageLabel = preflight.imageLabel ?? (srcKind === 'upload' ? 'Print enviado' : `${imgs!.label} existente`)
             }
           }
         }

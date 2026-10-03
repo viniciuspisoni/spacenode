@@ -171,6 +171,6 @@ export interface NodiV2Answer {
 // ── Anexo de imagem da conversa (sempre resolvido server-side por id) ────────
 
 export interface NodiAttachment {
-  kind: GenerationKind
+  kind: GenerationKind | 'upload'
   id: string
 }

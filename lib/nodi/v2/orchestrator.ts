@@ -157,7 +157,7 @@ export async function runNodiV2(input: OrchestratorInput): Promise<NodiV2Answer 
 
     // ── V4 · Autopiloto: executa a primeira proposta executável DENTRO dos
     //    limites; fora deles, a proposta fica aguardando confirmação normal.
-    if (settings.mode === 'autopiloto' && input.origin && input.cookie) {
+    if (settings.mode === 'autopiloto' && input.attachment?.kind !== 'upload' && input.origin && input.cookie) {
       const idx = (answer.proposals ?? []).findIndex(p => p.executable && p.intentToken)
       const proposal = idx >= 0 ? answer.proposals![idx] : null
       const intent = proposal?.intentToken ? verifyIntent(proposal.intentToken, input.userId) : null

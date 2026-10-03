@@ -12,6 +12,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isNodiEnabled } from '@/lib/nodi/flags'
+import { openUpload } from '@/lib/nodi/v2/uploads'
 import { readSettings } from '@/lib/nodi/v4/settings'
 import { capabilitiesFor, isNodiV2EnabledFor } from '@/lib/nodi/v2/flags'
 import { checkUserBudget } from '@/lib/nodi/v2/budget'
@@ -42,9 +43,10 @@ function parseHistory(raw: unknown): NodiTurn[] {
   }).filter(t => t.text.length > 0)
 }
 
-function parseAttachment(raw: unknown): NodiAttachment | null {
+function parseAttachment(raw: unknown, userId: string): NodiAttachment | null {
   const a = raw as { kind?: unknown; id?: unknown } | null
   if (!a || typeof a !== 'object') return null
+  if (a.kind === 'upload') return typeof a.id === 'string' && openUpload(a.id, userId) ? { kind: 'upload', id: a.id } : null
   if (!KINDS.includes(a.kind as GenerationKind)) return null
   if (typeof a.id !== 'string' || !UUID_RE.test(a.id)) return null
   return { kind: a.kind as GenerationKind, id: a.id }
@@ -92,7 +94,9 @@ export async function POST(req: Request) {
 
   const route = typeof body?.route === 'string' ? body.route.slice(0, 200) : '/app'
   const context = deriveNodiContext(route)
-  const attachment = parseAttachment(body?.attachment)
+  const attachment = parseAttachment(body?.attachment, user.id)
+  if (body?.attachment && !attachment) return NextResponse.json({ error: 'O anexo venceu ou não está disponível. Envie a imagem novamente.' }, { status: 400 })
+  if (attachment?.kind === 'upload' && !capabilitiesFor(true).multimodal) return NextResponse.json({ error: 'Envio de imagens indisponível.' }, { status: 404 })
   const history = parseHistory(body?.history)
   const capabilities = capabilitiesFor(true)
   const tele = { userId: user.id, route: context.route, module: context.moduleId }
