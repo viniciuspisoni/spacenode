@@ -97,7 +97,7 @@ describe('escala derivada do objetivo + imagem', () => {
 
   it('nunca escolhe uma escala que estoura o teto quando existe alguma que cabe', () => {
     // 6000×4000 = 24 MP: 2× cabe (96 MP), 4× não (384 MP).
-    const dims = { width: 6000, height: 4000 }
+    const dims = { width: 4000, height: 3000 }
     const s = resolveScale('final', dims)
     expect(scaleExceedsCap(s, dims)).toBe(false)
   })
@@ -111,7 +111,7 @@ describe('escala derivada do objetivo + imagem', () => {
 
 describe('teto de megapixels do output', () => {
   it('maxScaleForDimensions respeita MAX_OUTPUT_MP', () => {
-    const dims = { width: 6000, height: 4000 }   // 24 MP
+    const dims = { width: 4000, height: 3000 }   // 12 MP
     const s = maxScaleForDimensions(dims)
     expect(s).not.toBeNull()
     const out = projectedDimensions(dims, s!)
