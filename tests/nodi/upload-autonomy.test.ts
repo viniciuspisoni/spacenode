@@ -19,7 +19,7 @@ vi.mock('@/lib/nodi/v2/context-pack', () => ({
 vi.mock('@/lib/nodi/v2/tools', () => ({ buildToolset: () => [], toDeclarations: () => [],
   runTool: async () => ({ output: { custo: 20 }, artifact: { proposals: [{
     id: 'proposal', type: 'start_generation', label: 'Gerar por 20 nodes', executable: true, intentToken: mock.token,
-  }] } }),
+  }, { id: 'free', type: 'apply_settings', label: 'Aplicar' }] } }),
 }))
 vi.mock('@/lib/nodi/v4/executor', () => ({ executeRenderIntent: mock.execute }))
 vi.mock('@/lib/nodi/v4/settings', async original => ({
@@ -41,6 +41,8 @@ describe('first-print confirmation before spending', () => {
       origin: 'https://spacenode.app', cookie: 'test-only-cookie',
     })
     expect(answer?.proposals?.[0].executable).toBe(true)
+    expect(answer?.proposals).toHaveLength(1)
+    expect(answer?.text).toContain('só começa quando você confirmar')
     expect(answer?.executed).toBeUndefined()
     expect(mock.execute).not.toHaveBeenCalled()
   })

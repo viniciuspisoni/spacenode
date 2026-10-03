@@ -297,7 +297,8 @@ export const actionTools: NodiTool[] = [
       if (tipo === 'start_generation') {
         const preflight = await buildPreflight(ctx, moduleId, settings, prompt, args.imagem_rotulo as string | undefined)
         const action: SupervisedAction = {
-          id: actionId(), type: tipo, label,
+          id: actionId(), type: tipo,
+          label: preflight.estimatedNodes !== null ? `Gerar por ${preflight.estimatedNodes} nodes` : label,
           moduleId, prompt, settings, preflight,
         }
 
@@ -330,7 +331,8 @@ export const actionTools: NodiTool[] = [
                   refinementText: prompt,
                 },
               })
-              preflight.imageLabel = preflight.imageLabel ?? (srcKind === 'upload' ? 'Print enviado' : `${imgs!.label} existente`)
+              preflight.imageLabel = srcKind === 'upload' ? 'Print enviado' : (preflight.imageLabel ?? `${imgs!.label} existente`)
+              preflight.risks = preflightRisks(preflight)
             }
           }
         }
