@@ -1,3 +1,4 @@
+import { persistentPrintUrl, refreshPrintUrl } from '@/lib/nodi/v2/uploads'
 import { NextRequest, NextResponse, after } from 'next/server'
 import { fal } from '@fal-ai/client'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -252,7 +253,7 @@ export async function POST(req: NextRequest) {
       materialRefs,
       fidelityMode  = 'strict',
       briefing,
-      inputUrl:     providedInputUrl,
+      inputUrl:     rawProvidedInputUrl,
       fidelityLevel: requestedFidelityLevel,
       anchorUrl,
       refinementText,
@@ -291,6 +292,13 @@ export async function POST(req: NextRequest) {
       edgeMapKey?:      string
       /** Fatos medidos do modelo 3D (câmera/sol) — sanitizados abaixo. */
       modelFacts?:      unknown
+    }
+
+    const providedInputUrl = typeof rawProvidedInputUrl === 'string' && rawProvidedInputUrl.startsWith('/api/media?')
+      ? await refreshPrintUrl(admin, user.id, rawProvidedInputUrl)
+      : rawProvidedInputUrl
+    if (rawProvidedInputUrl && !providedInputUrl) {
+      return NextResponse.json({ error: 'A imagem de entrada não está disponível nesta conta.' }, { status: 400 })
     }
 
     // Fidelidade é SEMPRE máxima. Os níveis "Equilibrado"/"Criativo" foram
@@ -1082,7 +1090,7 @@ export async function POST(req: NextRequest) {
 
     const baseRow = {
       user_id:         user.id,
-      input_url:       inputUrl ?? null,
+      input_url:       inputUrl ? persistentPrintUrl(inputUrl, user.id) : null,
       output_url:      outputUrl,
       prompt:          finalPrompt,
       // Rótulo do histórico. "Preservar Original" não é nome de ambiente —

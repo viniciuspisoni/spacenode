@@ -7,6 +7,7 @@
 // (assertSafeFetchUrl: só Supabase storage / fal.media / data:image).
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { refreshPrintUrl } from './uploads'
 import type { GenerationKind } from '../types'
 
 interface ImageSource {
@@ -39,7 +40,7 @@ async function selectImages(
   src: ImageSource,
   id: string,
 ): Promise<GenerationImages | null> {
-  const cols = ['id', 'status', src.inputCol, src.outputCol, src.table === 'edit_v3_jobs' ? 'model' : 'engine']
+  const cols = ['id', src.table !== 'edits' ? 'status' : null, src.inputCol, src.outputCol, src.table === 'edit_v3_jobs' ? 'model' : 'engine']
     .filter(Boolean)
     .join(', ')
   const { data, error } = await supabase
@@ -53,9 +54,9 @@ async function selectImages(
   const str = (v: unknown) => (typeof v === 'string' && v ? v : null)
   return {
     label: src.label,
-    status: str(row.status),
+    status: src.table === 'edits' && str(row[src.outputCol!]) ? 'completed' : str(row.status),
     engine: str(row.engine) ?? str(row.model),
-    inputUrl: src.inputCol ? str(row[src.inputCol]) : null,
+    inputUrl: src.inputCol && str(row[src.inputCol]) ? await refreshPrintUrl(supabase, userId, str(row[src.inputCol])!) : null,
     outputUrl: src.outputCol ? str(row[src.outputCol]) : null,
   }
 }

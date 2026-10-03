@@ -51,6 +51,7 @@ import {
   type NodiBootstrap,
 } from './nodi-client'
 import type { ProjectPlan } from '@/lib/nodi/v2/types'
+import { uploadPrint } from './upload-print'
 import { conversationTurns, latestConversationImage, isActionConfirmation } from '@/lib/nodi/conversation'
 import { actionDestination, writeHandoff, moduleHref } from './actions-bus'
 
@@ -99,7 +100,7 @@ interface PanelMsg {
 }
 
 type PanelView = 'home' | 'chat' | 'tickets' | 'plan' | 'activity'
-type Pending = null | 'ask' | 'list' | 'diagnose' | 'ticket' | 'execute'
+type Pending = null | 'ask' | 'list' | 'diagnose' | 'ticket' | 'execute' | 'upload'
 
 const WELCOME_TEXT =
   'Olá, sou o Nodi. Vamos do seu modelo ao resultado final: preparo, geração, revisão e apresentação. Também posso ajudar com dúvidas e problemas.'
@@ -200,6 +201,8 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
   const [plan, setPlan] = useState<ProjectPlan | null | 'loading'>(null)
 
   const bodyRef = useRef<HTMLDivElement | null>(null)
+  const fileRef = useRef<HTMLInputElement | null>(null)
+  const detachedRef = useRef(false)
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
   // dados do fluxo de problema em andamento (não renderiza — não precisa de state)
   const flowRef = useRef<{ category: TicketCategory | null; report: DiagnosisReport | null }>({
@@ -292,11 +295,29 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
   // problema de ordem nem dependência circular de useCallback
   const confirmRef = useRef<((msgId: string, a: SupervisedAction) => void) | null>(null)
 
+  const attachPrint = useCallback(async (file: File) => {
+    if (pending) return
+    setPending('upload')
+    setView('chat')
+    try {
+      const uploaded = await uploadPrint(file)
+      setAttachment(uploaded)
+      detachedRef.current = false
+      setInput('Analise este print e me ajude a preparar a primeira imagem. Não gere ainda.')
+      append({ id: newId(), role: 'nodi', kind: 'notice', tone: 'success', text: 'Print pronto para sua pergunta. Enviar o arquivo não inicia uma geração. A referência fica disponível por 24 horas nesta conversa.' })
+    } catch (error) {
+      append({ id: newId(), role: 'nodi', kind: 'notice', tone: 'error', text: error instanceof Error ? error.message : 'Não foi possível enviar o print. Tente novamente.' })
+    } finally {
+      setPending(null)
+      if (fileRef.current) fileRef.current.value = ''
+    }
+  }, [pending, append])
+
   // ── V2 (copiloto): pergunta livre com contexto + anexo → envelope com cards
   const sendV2 = useCallback(async (message: string, reference?: NodiAttachment | null) => {
     if (pending) return
     setView('chat')
-    const remembered = latestConversationImage(messages, context.projectId ?? null)
+    const remembered = detachedRef.current ? null : latestConversationImage(messages, context.projectId ?? null)
     const att = reference ?? attachment ?? remembered ?? null
     append({ id: newId(), role: 'user', kind: 'text', text: message, generationRef: att ?? undefined, projectScope: context.projectId ?? null })
     setAttachment(null) // seleção visual é consumida; referência por id continua, visão depende da tool
@@ -1049,7 +1070,7 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
             ))}
             {pending && (
               <div className="spn-nodi-msg spn-nodi-msg--nodi">
-                <span className="spn-nodi-typing" aria-label={pending === 'ask' ? 'Analisando a pergunta' : pending === 'ticket' ? 'Preparando o chamado' : pending === 'execute' ? 'Gerando a imagem' : 'Analisando'}>
+                <span className="spn-nodi-typing" aria-label={pending === 'upload' ? 'Enviando seu print' : pending === 'ask' ? 'Analisando a pergunta' : pending === 'ticket' ? 'Preparando o chamado' : pending === 'execute' ? 'Gerando a imagem' : 'Analisando'}>
                   <i /><i /><i />
                 </span>
               </div>
@@ -1063,9 +1084,19 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
         <footer className="spn-nodi-inputrow">
           {attachment && (
             <span className="spn-nodi-attach" title="Imagem anexada à próxima pergunta">
-              imagem anexada
-              <button type="button" aria-label="Remover anexo" onClick={() => setAttachment(null)}>×</button>
+              {attachment.kind === 'upload' ? 'print anexado' : 'imagem anexada'}
+              <button type="button" aria-label="Remover anexo" disabled={!!pending} onClick={() => { setAttachment(null); detachedRef.current = true }}>×</button>
             </span>
+          )}
+          {caps?.multimodal && (
+            <>
+              <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={e => { const file = e.target.files?.[0]; if (file) void attachPrint(file) }} />
+              <button type="button" className="spn-nodi-iconbtn" aria-label="Enviar um print para o Nodi" title="Enviar print · JPG, PNG ou WebP até 8 MB" disabled={!!pending} onClick={() => fileRef.current?.click()}>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+                  <path d="M7 10V2M4 5l3-3 3 3M2 9v3h10V9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </>
           )}
           {caps?.multimodal && !attachment && (
             <button
@@ -1073,7 +1104,8 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
               className="spn-nodi-iconbtn"
               aria-label="Anexar uma geração para análise"
               title="Anexar uma geração"
-              onClick={openAttachPicker}
+              disabled={!!pending}
+              onClick={() => { detachedRef.current = false; openAttachPicker() }}
             >
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
                 <rect x="2" y="3" width="10" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
@@ -1088,7 +1120,7 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
             value={input}
             placeholder="Pergunte sobre ferramentas ou nodes"
             aria-label="Pergunta para o Nodi"
-            disabled={pending === 'ticket'}
+            disabled={pending === 'ticket' || pending === 'upload'}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => {
               if (e.key === 'Enter' && !e.shiftKey) {

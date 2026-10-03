@@ -12,7 +12,7 @@ export function conversationTurns(messages: ConversationMessage[]): NodiTurn[] {
   return messages.filter(m => ['text', 'v2', 'executed'].includes(m.kind) && m.text).slice(-8).map(m => ({
     role: m.role, at: 0,
     text: [m.text?.slice(0, 350),
-      m.generationRef && `Referência de resultado: ${m.generationRef.kind} ${m.generationRef.id}`,
+      m.generationRef && (m.generationRef.kind === 'upload' ? 'Referência: print enviado pelo usuário, ainda sem resultado gerado' : `Referência de resultado: ${m.generationRef.kind} ${m.generationRef.id}`),
       m.v2?.promptSuggestion && `Direção proposta: ${m.v2.promptSuggestion.prompt.slice(0, 140)}`,
       m.v2?.recommendation && `Configuração proposta: ${JSON.stringify(m.v2.recommendation.settings).slice(0, 120)}`,
       m.v2?.plan && `Objetivo proposto: ${m.v2.plan.objective.slice(0, 100)}`,

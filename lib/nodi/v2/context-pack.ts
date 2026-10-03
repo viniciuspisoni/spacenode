@@ -64,7 +64,7 @@ export function contextBlock(ctx: RequestContext): string {
     ctx.planName ? `plano: ${ctx.planName}` : 'plano: desconhecido',
     ctx.balance !== null ? `saldo_nodes_mensais: ${ctx.balance}` : 'saldo_nodes_mensais: desconhecido',
     ctx.extras !== null && ctx.extras > 0 ? `saldo_nodes_extras: ${ctx.extras}` : null,
-    ctx.attachment ? `imagem_anexada: ${ctx.attachment.kind} ${ctx.attachment.id}` : 'imagem_anexada: nenhuma',
+    ctx.attachment ? ctx.attachment.kind === 'upload' ? 'imagem_anexada: print enviado pelo usuário (usar analisar_print; geração requer confirmação)' : `imagem_anexada: ${ctx.attachment.kind} ${ctx.attachment.id}` : 'imagem_anexada: nenhuma',
     ctx.journey ? `jornada_confirmada_da_conta: ${JSON.stringify(ctx.journey)}` : null,
     ctx.nodi.extra ? `contexto_da_pagina: ${JSON.stringify(ctx.nodi.extra)}` : null,
   ].filter(Boolean)
