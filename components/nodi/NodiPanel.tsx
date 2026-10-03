@@ -52,7 +52,7 @@ import {
 } from './nodi-client'
 import type { ProjectPlan } from '@/lib/nodi/v2/types'
 import { uploadPrint } from './upload-print'
-import { conversationTurns, latestConversationImage, isActionConfirmation } from '@/lib/nodi/conversation'
+import { conversationTurns, latestConversationImage, isActionConfirmation, automaticHandoff } from '@/lib/nodi/conversation'
 import { actionDestination, writeHandoff, moduleHref } from './actions-bus'
 
 // ── Modelo de mensagem ────────────────────────────────────────────────────────
@@ -340,7 +340,7 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
     append({ id: msgId, role: 'nodi', kind: 'v2', text: answer.text, v2: answer, generationRef: answer.executed?.renderId ? { kind: 'render', id: answer.executed.renderId } : undefined, projectScope: context.projectId ?? null })
     // Autopiloto: ações SEM custo (navegar/preencher/configurar) executam
     // sozinhas — gasto de nodes continua passando pelos limites do servidor.
-    const free = answer.proposals?.find(p => !p.executable && (p.type === 'navigate' || p.type === 'fill_prompt' || p.type === 'apply_settings'))
+    const free = automaticHandoff(answer, att)
     if (settings?.mode === 'autopiloto' && free) {
       window.setTimeout(() => confirmRef.current?.(msgId, free), 400)
     }

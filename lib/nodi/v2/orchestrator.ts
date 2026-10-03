@@ -155,6 +155,13 @@ export async function runNodiV2(input: OrchestratorInput): Promise<NodiV2Answer 
 
     if (!answer.text) answer.text = FINAL_FALLBACK_TEXT
 
+    if (input.attachment?.kind === 'upload' && answer.proposals?.some(p => p.executable)) {
+      // Applying a free handoff navigates away and marks the whole restored
+      // message done. Keep the executable, already-configured proposal in chat.
+      answer.proposals = answer.proposals.filter(p => p.executable)
+      answer.text = 'Preparei a geração a partir do print enviado. Confira a direção criativa, a imagem de partida e o custo no cartão. A geração só começa quando você confirmar.'
+    }
+
     // ── V4 · Autopiloto: executa a primeira proposta executável DENTRO dos
     //    limites; fora deles, a proposta fica aguardando confirmação normal.
     if (settings.mode === 'autopiloto' && input.attachment?.kind !== 'upload' && input.origin && input.cookie) {

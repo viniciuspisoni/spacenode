@@ -1,11 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { conversationTurns, latestConversationImage, isActionConfirmation } from '@/lib/nodi/conversation'
+import { conversationTurns, latestConversationImage, isActionConfirmation, automaticHandoff } from '@/lib/nodi/conversation'
 import type { ConversationMessage } from '@/lib/nodi/conversation'
 
 const result: ConversationMessage = { role: 'nodi', kind: 'executed', text: 'Imagem concluída.',
   generationRef: { kind: 'render', id: 'owned-render' }, projectScope: 'project-a' }
 
 describe('continuidade de imagem e decisões', () => {
+  it('não sai do chat quando uma geração aguarda confirmação ou o print é novo', () => {
+    const free = { id: 'free', type: 'apply_settings' as const, label: 'Configurar' }
+    const answer = { text: 'Proposta', source: 'v2' as const, proposals: [free] }
+    expect(automaticHandoff(answer, null)).toBe(free)
+    expect(automaticHandoff(answer, { kind: 'upload', id: 'sealed' })).toBeNull()
+    expect(automaticHandoff({ ...answer, proposals: [free, { id: 'paid', type: 'start_generation', label: 'Gerar', executable: true }] }, null)).toBeNull()
+  })
   it('resultado executado entra no histórico da próxima pergunta', () => {
     expect(conversationTurns([result])[0].text).toContain('owned-render')
     expect(latestConversationImage([result], 'project-a')).toEqual(result.generationRef)

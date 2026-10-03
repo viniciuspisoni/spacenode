@@ -1,6 +1,13 @@
 import type { NodiTurn } from './types'
 import type { NodiAttachment, NodiV2Answer } from './v2/types'
 
+/** A paid proposal must remain in chat until confirmed, not navigate away. */
+export function automaticHandoff(answer: NodiV2Answer, attachment: NodiAttachment | null) {
+  if (attachment?.kind === 'upload' || answer.proposals?.some(p => p.executable)) return null
+  return answer.proposals?.find(p => !p.executable &&
+    (p.type === 'navigate' || p.type === 'fill_prompt' || p.type === 'apply_settings')) ?? null
+}
+
 export interface ConversationMessage {
   role: 'user' | 'nodi'; kind: string; text?: string
   generationRef?: NodiAttachment; projectScope?: string | null

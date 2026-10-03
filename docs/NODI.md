@@ -425,3 +425,5 @@ A tool `analisar_print` avalia a entrada quando solicitada. O envio não chama m
 A URL temporária é usada somente no processamento. O registro da geração guarda o proxy autenticado da entrada, e o Nodi renova o acesso ao consultar esse resultado; isso evita perder a imagem-base após expirar o token de download. Não há nova tabela, migração, mudança de permissões do bucket ou ampliação de público. `POST /api/nodi/v2/upload` tem fases `sign` e `confirm`, com autenticação, gates existentes e limites por usuário. A assinatura falha se o bucket estiver público.
 
 Validação: testes de dono, adulteração, expiração, conteúdo inválido/truncado, MIME forjado, tamanho, gates, limites, persistência sem token temporário e geração bloqueada no Autopiloto até confirmação.
+
+Conferência em produção: envio privado e diagnóstico visual validados com print fictício, sem geração paga. A proposta executável permanece no chat: encaminhamentos gratuitos não tiram o usuário da confirmação, mesmo no Autopiloto. Rótulo de custo, referência de entrada e avisos do pré-voo são reconciliados pelo servidor após resolver a imagem.
