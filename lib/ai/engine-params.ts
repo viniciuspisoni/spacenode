@@ -22,19 +22,35 @@
 import type { EngineId, Resolution } from '@/lib/engines'
 import { seedreamCheapSize, seedreamCheapTierEnabled } from '@/lib/ai/seedream-size'
 
+export interface FalParamsOpts {
+  /** Pede a faixa barata do Seedream INDEPENDENTE de `SEEDREAM_CHEAP_TIER`.
+   *
+   *  Existe porque a env é GLOBAL e o Quasar é o motor padrão do Renderizar:
+   *  ligá-la pra fechar a margem de UM módulo encolheria toda imagem do
+   *  Renderizar de ~4,2 MP pra ~2,36 MP (57% dos pixels) como efeito colateral.
+   *
+   *  Quem passa `true` está dizendo que, naquele módulo, o tamanho da faixa
+   *  barata é suficiente para a entrega. É o caso da Planta Humanizada: 2,36 MP
+   *  já é mais do que uma planta de apresentação precisa, e é o que põe a
+   *  ferramenta em 83% de margem no piso. NÃO é o caso do Renderizar, onde o
+   *  render é o produto final e o usuário compara pixel a pixel. */
+  forceCheapTier?: boolean
+}
+
 export function falParamsForEngine(
   engine:      EngineId,
   resolution:  Resolution,
   aspectRatio: string | null = null,
   sourceSize:  { width: number; height: number } | null = null,
+  opts:        FalParamsOpts = {},
 ): Record<string, unknown> {
   if (engine === 'quasar') {
     // Seedream 5.0 Pro Edit: só campos do schema (conferido 2026-09-04).
     // 'auto_2K' preserva a proporção do input no maior tamanho do endpoint.
-    // Com SEEDREAM_CHEAP_TIER=1 pedimos WxH explícito no teto da faixa barata
-    // de preço (lib/ai/seedream-size): metade do custo nos dois provedores e
-    // 76% do lado. Sem as dimensões do original, segue o 'auto_2K'.
-    const cheap = seedreamCheapTierEnabled()
+    // Na faixa barata pedimos WxH explícito no teto de preço
+    // (lib/ai/seedream-size): metade do custo nos dois provedores e 76% do
+    // lado. Sem as dimensões do original, segue o 'auto_2K'.
+    const cheap = (opts.forceCheapTier || seedreamCheapTierEnabled())
       ? seedreamCheapSize(sourceSize?.width, sourceSize?.height)
       : null
     return {
