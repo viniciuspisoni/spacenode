@@ -157,26 +157,34 @@ export const visionTools: NodiTool[] = [
       }
       ctx.budget.visionCallsUsed += 1
       const subject = `${images.label}${images.engine ? ` · ${images.engine}` : ''} (original × resultado)`
-      const raw = await geminiMultiVisionJson({
-        system: `${RUBRIC}\nA primeira imagem é o ORIGINAL (autoridade do projeto); a segunda é o RESULTADO gerado. Avalie fidelidade: geometria, proporção, perspectiva, aberturas, e o que mudou.\n${MATERIAL_COMPARISON_RULES}\n${COMPARE_SCHEMA}`,
-        user: 'Compare o original com o resultado.',
-        imageUrls: [images.inputUrl, images.outputUrl],
-        temperature: 0.1,
-        maxTokens: 1100,
-        timeoutMs: Math.min(28_000, ctx.deadline.remaining()),
-      })
-      const report = parseVisionReport(raw, subject, true)
-      return {
-        output: {
-          comparacao: {
-            resumo: report.summary,
-            veredito: report.comparison?.verdict,
-            preservado: report.comparison?.preserved,
-            alterado: report.comparison?.changed,
-            achados: report.findings,
+      try {
+        const raw = await geminiMultiVisionJson({
+          system: `${RUBRIC}\nA primeira imagem é o ORIGINAL (autoridade do projeto); a segunda é o RESULTADO gerado. Avalie fidelidade: geometria, proporção, perspectiva, aberturas, e o que mudou.\n${MATERIAL_COMPARISON_RULES}\n${COMPARE_SCHEMA}`,
+          user: 'Compare o original com o resultado.',
+          imageUrls: [images.inputUrl, images.outputUrl],
+          temperature: 0.1,
+          maxTokens: 1100,
+          timeoutMs: Math.min(28_000, ctx.deadline.remaining()),
+        })
+        const report = parseVisionReport(raw, subject, true)
+        return {
+          output: {
+            comparacao: {
+              resumo: report.summary,
+              veredito: report.comparison?.verdict,
+              preservado: report.comparison?.preserved,
+              alterado: report.comparison?.changed,
+              achados: report.findings,
+            },
           },
-        },
-        artifact: { analysis: report, review: { ...reviewSummary(report), reference: { kind: args.kind as GenerationKind, id: args.id as string } } },
+          artifact: { analysis: report, review: { ...reviewSummary(report), reference: { kind: args.kind as GenerationKind, id: args.id as string } } },
+        }
+      } catch (error) {
+        const category = error instanceof SyntaxError ? 'invalid_json'
+          : /timeout|timed out/i.test(error instanceof Error ? error.message : '') ? 'timeout' : 'vision_unavailable'
+        // Only a fixed category, never provider messages, image URLs or user content.
+        console.warn('[nodi] comparison_failed', category)
+        return { output: { erro: 'A comparação visual não foi concluída. Nenhuma revisão ou aprovação foi emitida. Tente novamente mais tarde.' } }
       }
     },
   },

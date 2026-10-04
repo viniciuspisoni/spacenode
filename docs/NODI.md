@@ -451,3 +451,5 @@ Comparação manual e automática passam a avaliar tipo, cor base, acabamento, v
 É orientação e diagnóstico visual, não garantia de identidade pixel a pixel nem um novo bloqueio automático por material. Os gates, custo, confirmação e execução existentes não mudam. Testes usam modelo simulado; validação de qualidade das novas instruções exige comparar gerações reais antes/depois com a mesma referência.
 
 Validação local: 279 testes passaram, dois cenários de benchmark opcional foram ignorados; tipos, lint dos arquivos alterados e verificação de whitespace concluídos. Inclui contrato de Renderizar e retry, propostas assinadas sem âncora de resultado alterado, comparação manual/automática e decisão local sobre materiais.
+
+A resposta de comparação é compacta para caber no orçamento de saída existente. Falhas da comparação manual retornam indisponibilidade sem aprovar a imagem e registram apenas categoria fixa, sem conteúdo ou mensagens do provedor. Regressão de falha com token privado aumenta a suíte para 280 testes aprovados.
