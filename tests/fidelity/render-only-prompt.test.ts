@@ -37,6 +37,15 @@ const baseOptions: GenerateOptions = {
 }
 
 describe('render_only: system prompt antes do prompt do usuário', () => {
+  it('realismo e retry não autorizam substituição genérica de materiais; overrides explícitos continuam disponíveis', () => {
+    const prompt = buildFidelityPrompt(baseOptions, 'maximum', undefined, { attempt: 2 })
+    expect(prompt).toContain('Material identity is fixed by default')
+    expect(prompt).not.toContain('you may change ONLY materials')
+    expect(prompt).not.toContain('as if projecting new materials')
+    expect(prompt).toContain('do not project new materials onto the scene')
+    expect(prompt).toContain('MATERIAL OVERRIDES')
+    expect(prompt).toContain('porcelanato cinza 90x90')
+  })
   it('contrato e locks precedem materiais do usuário', () => {
     const p = buildFidelityPrompt(baseOptions, 'maximum')
     const contract = p.indexOf('RENDER-ONLY MODE')

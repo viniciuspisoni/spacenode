@@ -4,12 +4,14 @@ export type ReviewDecision = 'aprovar' | 'editar_local' | 'melhorar' | 'regenera
 export interface ReviewOutcome { decision: ReviewDecision; reason: string }
 
 const STRUCTURAL = /fidelidade|geometri|perspectiv|propor|escala|abertura|deforma|linhas de fuga/i
-const LOCAL = /materia|ilumina|sombra|reflexo|vegeta|mobili|artefato|textura|exposi/i
+const MATERIAL = /materia|textura|acabamento|revestimento|pintura|\bcor(?:es)?\b/i
+const LOCAL = /materia|acabamento|revestimento|pintura|\bcor(?:es)?\b|ilumina|sombra|reflexo|vegeta|mobili|artefato|textura|exposi/i
 
 function structuralDimension(dimension: string): boolean {
   const label = dimension.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
   const withoutTextureScale = label.replace(/escala\s+(?:de\s+|das?\s+)?texturas?|texturas?\s+(?:e|em)\s+escala/gi, 'textura')
-  return STRUCTURAL.test(withoutTextureScale)
+  const structuralLabel = MATERIAL.test(label) ? withoutTextureScale.replace(/fidelidade/gi, '') : withoutTextureScale
+  return STRUCTURAL.test(structuralLabel)
 }
 
 export function decideNextStep(report: AnalysisReport): ReviewOutcome {
@@ -31,6 +33,9 @@ export function decideNextStep(report: AnalysisReport): ReviewOutcome {
     return { decision: 'regenerar', reason: `Foi identificado um problema em ${structural[0].dimension}. Confira a entrada e planeje uma nova versão com custo explícito.` }
   }
   if (local.length) {
+    if (local.some(f => MATERIAL.test(f.dimension))) {
+      return { decision: 'editar_local', reason: 'Confira e restaure os materiais, cores e acabamentos da entrada nas superfícies apontadas. Preserve geometria e áreas corretas; uma troca não é melhoria de realismo.' }
+    }
     return { decision: 'editar_local', reason: `Priorize um ajuste pontual em ${local.map(f => f.dimension).join(', ')} para preservar o restante da imagem.` }
   }
   if (warnings.length) {

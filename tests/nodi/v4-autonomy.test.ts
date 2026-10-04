@@ -43,6 +43,17 @@ const report = (findings: AnalysisReport['findings'], blame?: AnalysisReport['bl
 })
 
 describe('decideNextStep (não regenerar quando correção local basta)', () => {
+  it.each(['fidelidade dos materiais', 'cor base', 'cores', 'acabamento', 'revestimento', 'pintura'])('troca de %s pede restauração local mesmo com geometria correta', dimension => {
+    const result = decideNextStep(report([
+      { dimension: 'geometria', severity: 'ok', note: 'preservada' },
+      { dimension, severity: 'problema', note: 'pintura branca virou pedra cinza' },
+    ]))
+    expect(result.decision).toBe('editar_local')
+    expect(result.reason).toContain('restaure os materiais')
+  })
+  it('dimensão que mistura geometria e materiais continua exigindo revisão estrutural', () => {
+    expect(decideNextStep(report([{ dimension: 'fidelidade geométrica e materiais', severity: 'problema', note: 'parede e piso alterados' }])).decision).toBe('regenerar')
+  })
   it('problema estrutural → regenerar', () => {
     expect(decideNextStep(report([{ dimension: 'geometria', severity: 'problema', note: 'n' }])).decision).toBe('regenerar')
   })
