@@ -50,6 +50,7 @@ const FINAL_FALLBACK_TEXT =
 /** Merge de artefatos: campos únicos ficam com o ÚLTIMO; propostas acumulam (máx. 3). */
 export function mergeArtifact(target: NodiV2Answer, artifact: Partial<NodiV2Answer>): void {
   if (artifact.analysis) target.analysis = artifact.analysis
+  if (artifact.review) target.review = artifact.review
   if (artifact.plan) target.plan = artifact.plan
   if (artifact.promptSuggestion) target.promptSuggestion = artifact.promptSuggestion
   if (artifact.recommendation) target.recommendation = artifact.recommendation
