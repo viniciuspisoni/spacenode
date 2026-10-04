@@ -324,7 +324,8 @@ export const actionTools: NodiTool[] = [
                 cost: preflight.estimatedNodes,
                 params: {
                   inputUrl,
-                  anchorUrl: imgs?.outputUrl ?? undefined,
+                  // The previous output may already contain material drift.
+                  // Keep the selected generation's input as material authority.
                   projectType: projeto,
                   engine: settings.engine ?? 'vega',
                   resolution: settings.resolution ?? '2k',

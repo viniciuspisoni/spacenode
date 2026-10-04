@@ -439,3 +439,15 @@ A classificação separa problemas de geometria de correções locais, inclusive
 O próximo ajuste apenas preenche a conversa com a referência e a orientação. Ao enviar essa orientação, e ao iniciar a revisão pelo cartão da jornada, a requisição exige confirmação: o servidor aplica Copiloto apenas àquela requisição se o modo salvo for Autopiloto. Consultor mantém suas restrições e o modo salvo não muda. Nenhuma nova geração é iniciada pelo botão de revisão. A confirmação de custo e o executor existente continuam obrigatórios.
 
 Sem novas tabelas, permissões de armazenamento ou ampliação dos gates. Validação local: 184 testes de Nodi e WhatsApp, incluindo comparação com modelo simulado, vínculo da imagem e bloqueio de execução no Autopiloto durante a revisão. Esses testes não comprovam a qualidade visual do provedor em produção.
+
+### Preservação de materiais (2026-10-04)
+
+O contrato de Renderizar deixa de autorizar genericamente mudar materiais e texturas: realismo melhora a representação dos materiais existentes. O retry também mantém a mesma identidade, cor e acabamento. Pedidos explícitos de mudança e overrides de material continuam disponíveis; pedidos genéricos de melhorar ou refinar não devem ser tratados pelo Nodi como autorização de redesign.
+
+Novas propostas de Renderizar pelo Nodi usam a entrada da geração selecionada quando disponível, sem anexar seu resultado anterior como autoridade de materiais. Isso evita perpetuar deriva presente nesse resultado. Sem entrada disponível, a única referência é o resultado disponível; não se recupera automaticamente a origem de toda uma cadeia de edições. O comportamento de âncora fora do Nodi permanece disponível no pipeline normal.
+
+Comparação manual e automática passam a avaliar tipo, cor base, acabamento, veios, paginação, juntas e escala, apontando a superfície original → resultado. Trocas visíveis são problemas de fidelidade, não ganhos de realismo. Luz, sombras e reflexos plausíveis não exigem igualdade de pixels; referência ambígua exige incerteza. A revisão não decide se uma troca foi autorizada. Materiais, cores e acabamentos podem pedir restauração local sem confundir o rótulo “fidelidade dos materiais” com geometria.
+
+É orientação e diagnóstico visual, não garantia de identidade pixel a pixel nem um novo bloqueio automático por material. Os gates, custo, confirmação e execução existentes não mudam. Testes usam modelo simulado; validação de qualidade das novas instruções exige comparar gerações reais antes/depois com a mesma referência.
+
+Validação local: 279 testes passaram, dois cenários de benchmark opcional foram ignorados; tipos, lint dos arquivos alterados e verificação de whitespace concluídos. Inclui contrato de Renderizar e retry, propostas assinadas sem âncora de resultado alterado, comparação manual/automática e decisão local sobre materiais.

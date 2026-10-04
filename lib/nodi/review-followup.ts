@@ -12,5 +12,5 @@ const GOALS: Record<string, string> = {
 export function reviewFollowUp(decision: string, note: string, reference?: NodiAttachment) {
   if (!reference || reference.kind === 'upload' || !GOALS[decision]) return null
   return { attachment: reference, requireConfirmation: true as const,
-    message: `${GOALS[decision]} Pontos da revisão: ${note.slice(0, 500)}. Não execute nem gaste nodes agora.` }
+    message: `${GOALS[decision]} Preserve os materiais da entrada; restaure apenas as trocas apontadas, sem redesenhar outras superfícies. Pontos da revisão: ${note.slice(0, 400)}. Não execute nem gaste nodes agora.` }
 }

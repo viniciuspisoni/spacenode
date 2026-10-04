@@ -4,6 +4,9 @@ import { verifyIntent } from '@/lib/nodi/v3/intents'
 import type { ToolContext } from '@/lib/nodi/v2/tools/registry'
 
 vi.mock('@/lib/workspaces/balance', () => ({ getPayerBalance: async () => ({ totalBalance: 500 }) }))
+vi.mock('@/lib/nodi/v2/images', () => ({ resolveGenerationImages: async () => ({
+  label: 'Renderizar', status: 'completed', engine: 'vega', inputUrl: 'https://test.supabase.co/original', outputUrl: 'https://test.supabase.co/drifted-output',
+}) }))
 vi.mock('@/lib/nodi/v2/uploads', () => ({ resolveUploadImages: async () => ({
   label: 'Print enviado', status: null, engine: null, inputUrl: 'https://test.supabase.co/signed', outputUrl: null,
 }) }))
@@ -27,4 +30,20 @@ it('uses the server cost and resolved print in the confirmation card and intent'
   const intent = verifyIntent(proposal!.intentToken!, 'owner')
   expect(intent?.cost).toBe(cost)
   expect(intent?.params.inputUrl).toContain('/signed')
+})
+
+it('refaz pela entrada da geração sem perpetuar materiais alterados do resultado anterior', async () => {
+  vi.stubEnv('NODI_ACTION_SECRET', 'test-proposal-secret')
+  const ctx = { supabase: {}, admin: {}, userId: 'owner', scratch: {},
+    request: { attachment: { kind: 'render', id: '00000000-0000-4000-8000-000000000001' } },
+    capabilities: { actions: true, execute: true },
+  } as unknown as ToolContext
+  const result = await actionTools.find(t => t.name === 'propor_acao')!.handler({
+    tipo: 'start_generation', rotulo: 'Refazer', module_id: 'renderizar', projeto: 'interior',
+    settings: { engine: 'vega', resolution: '2k' }, prompt: 'Preserve os materiais da entrada.',
+  }, ctx)
+  const intent = verifyIntent(result.artifact!.proposals![0].intentToken!, 'owner')
+  expect(intent?.params.inputUrl).toBe('https://test.supabase.co/original')
+  expect(intent?.params.anchorUrl).toBeUndefined()
+  expect(intent?.params.refinementText).toContain('Preserve os materiais')
 })

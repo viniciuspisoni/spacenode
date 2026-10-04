@@ -26,8 +26,9 @@ import {
 } from '@/lib/ai/gemini-knobs'
 //
 // Regra do modo (contrato de produto): a imagem original é a base obrigatória;
-// a IA só pode alterar materiais, texturas, iluminação, sombras, reflexos e
-// realismo. Geometria, câmera/perspectiva, paredes, portas, janelas,
+// a IA melhora a representação fotográfica dos materiais existentes, luz,
+// sombras e reflexos. Trocas de acabamento exigem pedido explícito. Geometria,
+// câmera/perspectiva, paredes, portas, janelas,
 // marcenaria, mobiliário, bancadas, equipamentos, proporções, layout e
 // composição são invioláveis — nada é adicionado, removido, movido ou
 // redimensionado.
@@ -136,10 +137,12 @@ export function buildLineWorkBlock(): string {
 export function buildPhotographicBlock(projectNoun: 'building' | 'space'): string {
   const outdoor = projectNoun === 'building'
   return (
-    'PHOTOGRAPHIC TRANSLATION: give every surface a real material with real micro-detail — ' +
+    'PHOTOGRAPHIC TRANSLATION: photograph the materials already shown on each surface with subtle physical micro-detail — ' +
     'glass with plausible reflections of sky and surroundings plus a visible interior behind it, ' +
     'metal with anisotropic highlights, concrete and stone with grain and subtle tonal variation, ' +
-    'wood with figure, render/plaster with slight unevenness. ' +
+    'wood with its existing figure, render/plaster with subtle surface response, ONLY where these materials are present. ' +
+    'Smooth paint stays smooth paint; do not add stone veining, wood grain or concrete texture to it. ' +
+    'Ambiguous or low-detail surfaces keep their visible base color and pattern; do not invent a premium finish. ' +
     'Light must be physically coherent: one consistent sun direction, contact shadows where volumes meet, ' +
     'soft ambient occlusion in recesses and under overhangs, and bounced light on shaded faces. ' +
     (outdoor
@@ -153,8 +156,9 @@ export function buildPhotographicBlock(projectNoun: 'building' | 'space'): strin
 function buildContract(): string {
   return (
     'RENDER-ONLY MODE — faithful photorealistic re-render of the reference. ' +
-    'The reference image is the mandatory base: you may change ONLY materials, textures, lighting, shadows, ' +
-    'reflections and photographic realism. ' +
+    'The reference image is the mandatory base: improve ONLY the photographic rendering of the EXISTING ' +
+    'materials and textures, lighting, shadows and reflections. Material identity is fixed by default. ' +
+    'Do not replace, recolor or redesign a surface to make it more realistic or attractive. ' +
     'Preserve every visible element exactly: architecture, walls, doors, windows, cabinetry and millwork, ' +
     'furniture, countertops, appliances and equipment, materials, colors, finishes, fixtures, props, ' +
     'proportions, layout and composition. ' +
@@ -220,8 +224,8 @@ export function buildRenderOnlyEscalation(attempt: number): string {
   if (attempt <= 1) return ''
   return (
     'ABSOLUTE STRUCTURAL PRIORITY: treat the reference as a fixed template that you TRACE, never as inspiration. ' +
-    'This pass is a pure re-texturing and relighting of the existing geometry — as if projecting new materials ' +
-    'and light onto the exact scene. Reproduce the position, size and outline of every wall, opening, cabinet, ' +
+    'This pass photographs the SAME materials and finishes on the existing geometry, with realistic light ' +
+    'response; do not project new materials onto the scene. Reproduce the position, size and outline of every wall, opening, cabinet, ' +
     'counter, furniture piece and equipment with zero deviation. When in doubt between beauty and accuracy, ' +
     'always choose accuracy to the reference. '
   )

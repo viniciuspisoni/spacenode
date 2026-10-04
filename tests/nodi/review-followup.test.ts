@@ -9,6 +9,7 @@ describe('revisão ligada ao resultado correto', () => {
     expect(draft?.attachment).toEqual(ref)
     expect(draft?.requireConfirmation).toBe(true)
     expect(draft?.message).toContain('Não execute nem gaste nodes agora')
+    expect(draft?.message).toContain('Preserve os materiais da entrada')
   })
   it('não escolhe outra imagem quando a avaliada não tem referência', () => {
     expect(reviewFollowUp('regenerar', 'n')).toBeNull()
