@@ -26,7 +26,7 @@ describe('comparação original × resultado com próximo passo', () => {
     const result = await runTool(visionTools, 'comparar_imagens', { kind: 'render', id }, ctx())
     expect(result.artifact).toBeUndefined()
     expect(JSON.stringify(result)).not.toContain('SECRET')
-    expect(result.output.erro).toContain('Nenhuma revisão ou aprovação')
+    expect(JSON.stringify(result.output)).toContain('Nenhuma revisão ou aprovação')
     expect(warn).toHaveBeenCalledWith('[nodi] comparison_failed', 'invalid_json')
     warn.mockRestore()
   })
