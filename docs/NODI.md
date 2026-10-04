@@ -429,3 +429,13 @@ Validação: testes de dono, adulteração, expiração, conteúdo inválido/tru
 Conferência em produção: envio privado e diagnóstico visual validados com print fictício, sem geração paga. A proposta executável permanece no chat: encaminhamentos gratuitos não tiram o usuário da confirmação, mesmo no Autopiloto. Rótulo de custo, referência de entrada e avisos do pré-voo são reconciliados pelo servidor após resolver a imagem.
 
 “Agora não” encerra as propostas daquela resposta e desativa seus botões. Cancelamento é separado do feedback “Não ajudou”; uma proposta cancelada não pode ser executada por uma confirmação textual posterior.
+
+### Revisão e próximo ajuste (2026-10-04)
+
+A comparação manual e a revisão após uma geração apresentam o que foi preservado, o que mudou e a orientação para continuar. A referência da revisão vem da geração resolvida pelo servidor para o próprio usuário. O botão de próximo ajuste mantém essa imagem e o Space; não troca pela imagem mais recente de outro trabalho.
+
+A classificação separa problemas de geometria de correções locais, inclusive escala de textura. Evidência vazia, problemas desconhecidos ou fidelidade inconclusiva pedem decisão do usuário. Problemas atribuídos à entrada orientam preparar a entrada antes de gastar mais Nodes. Ausência de problemas identificados não equivale à aprovação do usuário; ampliação não é apresentada como correção de geometria ou materiais.
+
+O próximo ajuste apenas preenche a conversa com a referência e a orientação. Ao enviar essa orientação, e ao iniciar a revisão pelo cartão da jornada, a requisição exige confirmação: o servidor aplica Copiloto apenas àquela requisição se o modo salvo for Autopiloto. Consultor mantém suas restrições e o modo salvo não muda. Nenhuma nova geração é iniciada pelo botão de revisão. A confirmação de custo e o executor existente continuam obrigatórios.
+
+Sem novas tabelas, permissões de armazenamento ou ampliação dos gates. Validação local: 184 testes de Nodi e WhatsApp, incluindo comparação com modelo simulado, vínculo da imagem e bloqueio de execução no Autopiloto durante a revisão. Esses testes não comprovam a qualidade visual do provedor em produção.

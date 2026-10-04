@@ -29,20 +29,23 @@ vi.mock('@/lib/nodi/telemetry', () => ({ logNodiEvent: async () => {} }))
 afterEach(() => { vi.unstubAllEnvs(); vi.clearAllMocks() })
 
 describe('first-print confirmation before spending', () => {
-  it('retains the paid proposal without invoking the executor, even in Autopiloto', async () => {
+  it.each(['upload', 'review'] as const)('retains the %s paid proposal without invoking the executor, even in Autopiloto', async kind => {
     vi.stubEnv('NODI_ACTION_SECRET', 'test-autonomy-upload')
     mock.token = signIntent({ userId: 'owner', action: 'render', cost: 20,
       params: { inputUrl: 'https://test.supabase.co/signed', projectType: 'interior', engine: 'vega', resolution: '2k' } })
     const answer = await runNodiV2({
       admin: {} as SupabaseClient, supabase: {} as SupabaseClient, userId: 'owner',
-      route: '/app', message: 'Prepare esta imagem', history: [], attachment: { kind: 'upload', id: 'sealed' },
+      route: '/app', message: 'Prepare esta imagem', history: [], attachment: { kind: kind === 'upload' ? 'upload' : 'render', id: 'sealed' },
+      requireConfirmation: kind === 'review',
       capabilities: { v2: true, multimodal: true, memory: false, actions: true, execute: true },
       settings: { ...DEFAULT_SETTINGS, mode: 'autopiloto', maxNodesPerAction: 60, maxNodesPerDay: 200 },
       origin: 'https://spacenode.app', cookie: 'test-only-cookie',
     })
     expect(answer?.proposals?.[0].executable).toBe(true)
-    expect(answer?.proposals).toHaveLength(1)
-    expect(answer?.text).toContain('só começa quando você confirmar')
+    if (kind === 'upload') {
+      expect(answer?.proposals).toHaveLength(1)
+      expect(answer?.text).toContain('só começa quando você confirmar')
+    }
     expect(answer?.executed).toBeUndefined()
     expect(mock.execute).not.toHaveBeenCalled()
   })

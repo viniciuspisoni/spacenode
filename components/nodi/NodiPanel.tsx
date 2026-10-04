@@ -51,6 +51,7 @@ import {
   type NodiBootstrap,
 } from './nodi-client'
 import type { ProjectPlan } from '@/lib/nodi/v2/types'
+import { reviewFollowUp } from '@/lib/nodi/review-followup'
 import { uploadPrint } from './upload-print'
 import { conversationTurns, latestConversationImage, isActionConfirmation, automaticHandoff } from '@/lib/nodi/conversation'
 import { actionDestination, writeHandoff, moduleHref } from './actions-bus'
@@ -203,6 +204,7 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
   const bodyRef = useRef<HTMLDivElement | null>(null)
   const fileRef = useRef<HTMLInputElement | null>(null)
   const detachedRef = useRef(false)
+  const reviewConfirmationRef = useRef(false)
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
   // dados do fluxo de problema em andamento (não renderiza — não precisa de state)
   const flowRef = useRef<{ category: TicketCategory | null; report: DiagnosisReport | null }>({
@@ -314,15 +316,16 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
   }, [pending, append])
 
   // ── V2 (copiloto): pergunta livre com contexto + anexo → envelope com cards
-  const sendV2 = useCallback(async (message: string, reference?: NodiAttachment | null) => {
+  const sendV2 = useCallback(async (message: string, reference?: NodiAttachment | null, requireManual = false) => {
     if (pending) return
     setView('chat')
     const remembered = detachedRef.current ? null : latestConversationImage(messages, context.projectId ?? null)
     const att = reference ?? attachment ?? remembered ?? null
     append({ id: newId(), role: 'user', kind: 'text', text: message, generationRef: att ?? undefined, projectScope: context.projectId ?? null })
     setAttachment(null) // seleção visual é consumida; referência por id continua, visão depende da tool
+    const requireConfirmation = requireManual || reviewConfirmationRef.current
     setPending('ask')
-    const res = await chatV2({ message, route: context.route, history: historyTurns(), attachment: att })
+    const res = await chatV2({ message, route: context.route, history: historyTurns(), attachment: att, requireConfirmation })
     setPending(null)
     if (!res.ok) {
       setOffline(!!res.offline)
@@ -335,13 +338,14 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
     }
     setOffline(false)
     const answer = res.data.answer
+    reviewConfirmationRef.current = false
     if (answer.executed) setBootstrapEpoch(n => n + 1)
     const msgId = newId()
-    append({ id: msgId, role: 'nodi', kind: 'v2', text: answer.text, v2: answer, generationRef: answer.executed?.renderId ? { kind: 'render', id: answer.executed.renderId } : undefined, projectScope: context.projectId ?? null })
+    append({ id: msgId, role: 'nodi', kind: 'v2', text: answer.text, v2: answer, generationRef: answer.executed?.renderId ? { kind: 'render', id: answer.executed.renderId } : answer.review?.reference, projectScope: context.projectId ?? null })
     // Autopiloto: ações SEM custo (navegar/preencher/configurar) executam
     // sozinhas — gasto de nodes continua passando pelos limites do servidor.
     const free = automaticHandoff(answer, att)
-    if (settings?.mode === 'autopiloto' && free) {
+    if (settings?.mode === 'autopiloto' && !requireConfirmation && free) {
       window.setTimeout(() => confirmRef.current?.(msgId, free), 400)
     }
     // chamado preparado pelo copiloto entra direto no fluxo de revisão da V1
@@ -404,20 +408,21 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
   }, [])
 
   /** Próximo passo sugerido pela avaliação visual. */
-  const runReviewFollowUp = useCallback((decision: string, findingsNote: string) => {
-    if (decision === 'editar_local') {
-      writeHandoff({ id: 'rv', type: 'fill_prompt', label: 'corrigir', moduleId: 'editar', prompt: `Corrigir: ${findingsNote}` })
-      router.push(moduleHref('editar') ?? '/app/editar')
-      onClose()
+  const runReviewFollowUp = useCallback((decision: string, findingsNote: string, reference?: NodiAttachment, projectScope?: string | null) => {
+    if (pending) return
+    const draft = (projectScope ?? null) === (context.projectId ?? null)
+      ? reviewFollowUp(decision, findingsNote, reference) : null
+    if (!draft) {
+      append({ id: newId(), role: 'nodi', kind: 'notice', text: 'Abra o contexto da imagem avaliada e selecione a geração para continuar essa revisão.' })
       return
     }
-    if (decision === 'melhorar') { router.push('/app/upscale'); onClose(); return }
-    if (decision === 'regenerar') {
-      setView('chat')
-      setInput(`Regenera com atenção a: ${findingsNote}`)
-      inputRef.current?.focus()
-    }
-  }, [router, onClose])
+    setView('chat')
+    setAttachment(draft.attachment)
+    detachedRef.current = false
+    reviewConfirmationRef.current = true
+    setInput(draft.message)
+    inputRef.current?.focus()
+  }, [pending, context.projectId, append])
 
   /** Ação supervisionada CONFIRMADA pelo usuário no card. */
   const confirmProposal = useCallback((msgId: string, action: SupervisedAction) => {
@@ -808,7 +813,7 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
                       const journey = bootstrap.journey!
                       if (journey.next.kind === 'problem') startProblemFlow()
                       else if (journey.next.kind === 'navigate' && journey.next.href) { router.push(journey.next.href); onClose() }
-                      else if (journey.next.chatPrompt) void sendV2(journey.next.chatPrompt, journey.generation)
+                      else if (journey.next.chatPrompt) void sendV2(journey.next.chatPrompt, journey.generation, journey.stage === 'review')
                     }} />
                   </div>
                 </div>
@@ -1184,24 +1189,28 @@ interface MessageProps {
   onUsePrompt: (s: PromptSuggestion) => void
   onConfirmMemory: (msgId: string, p: MemoryProposal) => void
   onFeedback: (msgId: string, helpful: boolean) => void
-  onReviewFollowUp: (decision: string, findingsNote: string) => void
+  onReviewFollowUp: (decision: string, findingsNote: string, reference?: NodiAttachment, projectScope?: string | null) => void
 }
 
 const DECISION_LABEL: Record<string, string> = {
-  aprovar: 'Pronta para apresentar',
+  aprovar: 'Sem problemas identificados',
   editar_local: 'Corrigir no Editar',
   melhorar: 'Vale melhorar antes',
-  regenerar: 'Melhor regenerar',
-  decidir: 'Sua decisão',
+  regenerar: 'Planejar nova versão',
+  decidir: 'Revisar antes de decidir',
+  preparar_entrada: 'Revisar a entrada',
 }
 
-function ReviewBlock({ review, onFollowUp }: {
+function ReviewBlock({ review, onFollowUp, reference, projectScope }: {
   review: NonNullable<NodiV2Answer['review']>
-  onFollowUp: (decision: string, note: string) => void
+  reference?: NodiAttachment
+  projectScope?: string | null
+  onFollowUp: MessageProps['onReviewFollowUp']
 }) {
   const issues = review.findings.filter(f => f.severity !== 'ok')
   const note = issues.map(f => `${f.dimension}: ${f.note}`).join('; ').slice(0, 300) || review.summary
-  const actionable = review.decision === 'editar_local' || review.decision === 'melhorar' || review.decision === 'regenerar'
+  const actionable = !!reference
+  const actionLabel = review.decision === 'aprovar' ? 'Conferir apresentação' : review.decision === 'preparar_entrada' ? 'Preparar a entrada' : 'Planejar o próximo ajuste'
   return (
     <div className="spn-nodi-reviewblock">
       <span className={`spn-nodi-decision spn-nodi-decision--${review.decision}`}>{DECISION_LABEL[review.decision] ?? review.decision}</span>
@@ -1216,10 +1225,17 @@ function ReviewBlock({ review, onFollowUp }: {
           ))}
         </ul>
       )}
+      {review.comparison && (
+        <>
+          {review.comparison.preserved.length > 0 && <p><strong>Preservado:</strong> {review.comparison.preserved.join('; ')}</p>}
+          {review.comparison.changed.length > 0 && <p><strong>Mudou:</strong> {review.comparison.changed.join('; ')}</p>}
+          {review.comparison.verdict && <p>{review.comparison.verdict}</p>}
+        </>
+      )}
       <p className="spn-nodi-muted">{review.reason}</p>
       {actionable && (
         <div className="spn-nodi-actions">
-          <ActionBtn label={DECISION_LABEL[review.decision]} onClick={() => onFollowUp(review.decision, note)} />
+          <ActionBtn label={actionLabel} onClick={() => onFollowUp(review.decision, note, reference, projectScope)} />
         </div>
       )}
     </div>
@@ -1301,7 +1317,7 @@ function Message(props: MessageProps) {
             <img className="spn-nodi-result" src={msg.outputUrl} alt="Resultado da geração feita pelo Nodi" />
           )}
           {msg.text && <p>{msg.text}</p>}
-          {msg.review && <ReviewBlock review={msg.review} onFollowUp={props.onReviewFollowUp} />}
+          {msg.review && <ReviewBlock review={msg.review} reference={msg.review.reference ?? msg.generationRef} projectScope={msg.projectScope} onFollowUp={props.onReviewFollowUp} />}
           {msg.actions && msg.actions.length > 0 && (
             <div className="spn-nodi-actions">
               {msg.actions.map(a => (
@@ -1385,13 +1401,14 @@ function V2Message(props: MessageProps & { answer: NodiV2Answer }) {
           <strong>{answer.executed.auto ? 'Executado pelo autopiloto' : 'Geração concluída'} — {answer.executed.cost} nodes</strong>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img className="spn-nodi-result" src={answer.executed.outputUrl} alt="Resultado gerado pelo Nodi" />
-          {answer.review && <ReviewBlock review={answer.review} onFollowUp={props.onReviewFollowUp} />}
+          {answer.review && <ReviewBlock review={answer.review} reference={answer.review.reference ?? msg.generationRef} projectScope={msg.projectScope} onFollowUp={props.onReviewFollowUp} />}
           <div className="spn-nodi-actions">
             <ActionBtn label="Abrir no Histórico" onClick={() => props.onAction({ type: 'navigate', label: 'hist', href: '/app/history' }, msg.id)} />
           </div>
         </div>
       )}
-      {answer.analysis && <AnalysisCard report={answer.analysis} />}
+      {answer.analysis && <AnalysisCard report={answer.review ? { ...answer.analysis, comparison: undefined } : answer.analysis} />}
+      {answer.review && !answer.executed && <ReviewBlock review={answer.review} reference={answer.review.reference ?? msg.generationRef} projectScope={msg.projectScope} onFollowUp={props.onReviewFollowUp} />}
       {answer.recommendation && (
         <RecommendationCard rec={answer.recommendation} onUse={() =>
           props.onConfirmProposal(msg.id, {

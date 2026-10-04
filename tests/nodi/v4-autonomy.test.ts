@@ -65,8 +65,23 @@ describe('decideNextStep (não regenerar quando correção local basta)', () => 
     ])).decision).toBe('melhorar')
     expect(decideNextStep(report([{ dimension: 'geometria', severity: 'ok', note: 'n' }])).decision).toBe('aprovar')
   })
-  it('culpa na entrada → regenerar (trocar a base)', () => {
-    expect(decideNextStep(report([], 'entrada')).decision).toBe('regenerar')
+  it('avaliação vazia nunca aprova ou manda regenerar', () => {
+    expect(decideNextStep(report([])).decision).toBe('decidir')
+    expect(decideNextStep(report([], 'entrada')).decision).toBe('decidir')
+  })
+  it('culpa na entrada com evidência → preparar a base antes de outra despesa', () => {
+    expect(decideNextStep(report([{ dimension: 'perspectiva', severity: 'problema', note: 'print cortado' }], 'entrada')).decision).toBe('preparar_entrada')
+  })
+  it('escala de textura é ajuste pontual; escala geométrica é estrutural', () => {
+    expect(decideNextStep(report([{ dimension: 'materiais e escala de texturas', severity: 'problema', note: 'textura grande' }])).decision).toBe('editar_local')
+    expect(decideNextStep(report([{ dimension: 'escala geométrica', severity: 'problema', note: 'porta deformada' }])).decision).toBe('regenerar')
+  })
+  it('problema desconhecido não vira aprovação silenciosa', () => {
+    expect(decideNextStep(report([{ dimension: 'realismo geral', severity: 'problema', note: 'não convincente' }])).decision).toBe('decidir')
+  })
+  it('uma atenção já exige revisão; ausência de achado estrutural não comprova fidelidade', () => {
+    expect(decideNextStep(report([{ dimension: 'materiais', severity: 'atencao', note: 'conferir piso' }])).decision).toBe('melhorar')
+    expect(decideNextStep(report([{ dimension: 'materiais', severity: 'ok', note: 'texturas boas' }])).decision).toBe('decidir')
   })
 })
 

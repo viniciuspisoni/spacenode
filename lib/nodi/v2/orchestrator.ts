@@ -12,6 +12,7 @@ import { logNodiEvent } from '../telemetry'
 import type { NodiTurn } from '../types'
 import { verifyIntent } from '../v3/intents'
 import { executeRenderIntent } from '../v4/executor'
+import { reviewSummary } from '../v4/review-policy'
 import { runAutoReview } from '../v4/review'
 import { DEFAULT_SETTINGS, checkAutoAllowance, getAutoSpentToday, type NodiSettings } from '../v4/settings'
 import {
@@ -36,6 +37,8 @@ export interface OrchestratorInput {
   capabilities: NodiV2Capabilities
   /** V4: modo de autonomia + limites (default copiloto) */
   settings?: NodiSettings
+  /** Review follow-ups prepare a proposal without automatic spending. */
+  requireConfirmation?: boolean
   /** V4: necessários pro autopiloto executar (chamada interna autenticada) */
   origin?: string
   cookie?: string
@@ -75,7 +78,9 @@ export async function runNodiV2(input: OrchestratorInput): Promise<NodiV2Answer 
 
   const startedAt = Date.now()
   const deadline = startDeadline()
-  const settings = input.settings ?? DEFAULT_SETTINGS
+  const savedSettings = input.settings ?? DEFAULT_SETTINGS
+  const settings = input.requireConfirmation && savedSettings.mode === 'autopiloto'
+    ? { ...savedSettings, mode: 'copiloto' as const } : savedSettings
   const request = await buildRequestContext(input.admin, input.userId, input.route, input.attachment, input.supabase, input.capabilities.multimodal)
   // consultor: analisa e recomenda — a tool de ação nem entra no toolset
   const tools = buildToolset(input.capabilities).filter(
@@ -183,12 +188,7 @@ export async function runNodiV2(input: OrchestratorInput): Promise<NodiV2Answer 
             if (settings.autoReview && input.capabilities.multimodal) {
               const review = await runAutoReview(intent.params.inputUrl, result.outputUrl, 30_000)
               if (review) {
-                answer.review = {
-                  summary: review.report.summary,
-                  decision: review.outcome.decision,
-                  reason: review.outcome.reason,
-                  findings: review.report.findings,
-                }
+                answer.review = { ...reviewSummary(review.report), reference: result.renderId ? { kind: 'render', id: result.renderId } : undefined }
               }
             }
           } else {

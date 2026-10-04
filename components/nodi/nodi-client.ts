@@ -116,6 +116,7 @@ export function chatV2(input: {
   route: string
   history: NodiTurn[]
   attachment: NodiAttachment | null
+  requireConfirmation?: boolean
 }) {
   return call<{ answer: NodiV2Answer }>('/api/nodi/v2/chat', {
     method: 'POST',

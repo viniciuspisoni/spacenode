@@ -11,6 +11,7 @@
 // artefatos, realismo, coerência) e exige apontar SÓ o que está visível.
 
 import { geminiVisionJson, geminiMultiVisionJson } from '@/lib/gemini'
+import { reviewSummary } from '../../v4/review-policy'
 import { resolveGenerationImages } from '../images'
 import { resolveUploadImages } from '../uploads'
 import { V2_LIMITS } from '../budget'
@@ -174,7 +175,7 @@ export const visionTools: NodiTool[] = [
             achados: report.findings,
           },
         },
-        artifact: { analysis: report },
+        artifact: { analysis: report, review: { ...reviewSummary(report), reference: { kind: args.kind as GenerationKind, id: args.id as string } } },
       }
     },
   },
