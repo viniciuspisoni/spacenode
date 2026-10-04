@@ -87,7 +87,7 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json().catch(() => null) as {
-    message?: unknown; route?: unknown; history?: unknown; attachment?: unknown
+    message?: unknown; route?: unknown; history?: unknown; attachment?: unknown; requireConfirmation?: unknown
   } | null
   const message = typeof body?.message === 'string' ? clampText(body.message, 900) : ''
   if (!message) return NextResponse.json({ error: 'Mensagem vazia' }, { status: 400 })
@@ -118,6 +118,7 @@ export async function POST(req: Request) {
   const answer = await runNodiV2({
     supabase, admin, userId: user.id, route, message, history, attachment, capabilities,
     settings,
+    requireConfirmation: body?.requireConfirmation === true,
     origin: new URL(req.url).origin,
     cookie: req.headers.get('cookie') ?? '',
   })

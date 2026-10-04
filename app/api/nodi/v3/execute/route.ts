@@ -15,6 +15,8 @@ import { isNodiEnabled } from '@/lib/nodi/flags'
 import { isNodiMultimodalEnabled, isNodiV2EnabledFor, isNodiV3ExecuteEnabled } from '@/lib/nodi/v2/flags'
 import { verifyIntent } from '@/lib/nodi/v3/intents'
 import { executeRenderIntent } from '@/lib/nodi/v4/executor'
+import type { NodiReview } from '@/lib/nodi/v2/types'
+import { reviewSummary } from '@/lib/nodi/v4/review-policy'
 import { runAutoReview } from '@/lib/nodi/v4/review'
 import { readSettings } from '@/lib/nodi/v4/settings'
 import { logNodiEvent } from '@/lib/nodi/telemetry'
@@ -66,17 +68,12 @@ export async function POST(req: Request) {
 
   // V4: avaliação visual automática (original × resultado) + decisão — não
   // bloqueia o sucesso da execução se falhar.
-  let review: { summary: string; decision: string; reason: string; findings: unknown[] } | null = null
+  let review: NodiReview | null = null
   const settings = await readSettings(supabase, user.id)
   if (settings.autoReview && isNodiMultimodalEnabled()) {
     const r = await runAutoReview(intent.params.inputUrl, result.outputUrl, 30_000)
     if (r) {
-      review = {
-        summary: r.report.summary,
-        decision: r.outcome.decision,
-        reason: r.outcome.reason,
-        findings: r.report.findings,
-      }
+      review = { ...reviewSummary(r.report), reference: result.renderId ? { kind: 'render', id: result.renderId } : undefined }
     }
   }
 
