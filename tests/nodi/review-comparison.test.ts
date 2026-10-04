@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { visionTools } from '@/lib/nodi/v2/tools/vision-tools'
 import { runTool, type ToolContext } from '@/lib/nodi/v2/tools/registry'
 import { reviewFollowUp } from '@/lib/nodi/review-followup'
+import { mergeArtifact } from '@/lib/nodi/v2/orchestrator'
+import type { NodiV2Answer } from '@/lib/nodi/v2/types'
 
 const mock = vi.hoisted(() => ({ images: vi.fn(), compare: vi.fn() }))
 vi.mock('@/lib/nodi/v2/images', () => ({ resolveGenerationImages: mock.images }))
@@ -25,7 +27,9 @@ describe('comparação original × resultado com próximo passo', () => {
     expect(mock.images).toHaveBeenCalledWith(context.supabase, 'owner', 'render', id)
     expect(mock.compare.mock.calls[0][0].imageUrls).toEqual(['https://storage/original', 'https://storage/result'])
     expect(context.budget.visionCallsUsed).toBe(1)
-    const review = result.artifact?.review
+    const answer: NodiV2Answer = { text: '', source: 'v2' }
+    mergeArtifact(answer, result.artifact!)
+    const review = answer.review
     expect(review?.comparison?.changed).toContain('textura do piso')
     expect(review?.decision).toBe('editar_local')
     expect(review?.reference).toEqual({ kind: 'render', id })
