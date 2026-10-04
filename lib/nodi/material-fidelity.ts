@@ -6,4 +6,7 @@ export const MATERIAL_COMPARISON_RULES =
   'acabamento ou padrão é problema de fidelidade de materiais, mesmo se o resultado parecer mais bonito ou realista. ' +
   'Não chame substituição de material de melhoria. Diferencie mudança de identidade de variações plausíveis de luz, ' +
   'sombra e reflexo; não exija igualdade de pixels. Se o material estiver ilegível, oculto ou ambíguo, indique atenção ' +
-  'e incerteza, sem adivinhar espécie, produto, cor exata ou aprovação de mudança pelo usuário. '
+  'e incerteza, sem adivinhar espécie, produto, cor exata ou aprovação de mudança pelo usuário. ' +
+  'RESPOSTA COMPACTA: no máximo 6 achados pertinentes, priorizando geometria e identidade dos materiais; ' +
+  'resumo até 240 caracteres, cada nota até 120 caracteres, preservado e alterado até 4 itens curtos cada, ' +
+  'veredito até 160 caracteres. Entregue JSON completo, sem repetir todos os critérios em achados separados. '

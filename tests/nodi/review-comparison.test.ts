@@ -19,6 +19,17 @@ const ctx = () => ({ userId: 'owner', supabase: {}, admin: {}, request: {},
 }) as unknown as ToolContext
 
 describe('comparação original × resultado com próximo passo', () => {
+  it('falha visual não aprova, não oferece ajuste e não expõe dados do provedor', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    mock.images.mockResolvedValue({ label: 'Renderizar', inputUrl: 'https://storage/original', outputUrl: 'https://storage/result' })
+    mock.compare.mockRejectedValue(new SyntaxError('Invalid JSON https://storage/private?token=SECRET'))
+    const result = await runTool(visionTools, 'comparar_imagens', { kind: 'render', id }, ctx())
+    expect(result.artifact).toBeUndefined()
+    expect(JSON.stringify(result)).not.toContain('SECRET')
+    expect(result.output.erro).toContain('Nenhuma revisão ou aprovação')
+    expect(warn).toHaveBeenCalledWith('[nodi] comparison_failed', 'invalid_json')
+    warn.mockRestore()
+  })
   it('revisão automática usa o mesmo critério: cor trocada não é aprovação por realismo', async () => {
     mock.compare.mockResolvedValue(JSON.stringify({ resumo: 'Mais realista, mas a pintura mudou.', culpa: 'engine',
       achados: [{ dimensao: 'geometria', gravidade: 'ok', nota: 'mantida' },
