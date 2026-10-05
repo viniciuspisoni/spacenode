@@ -13,6 +13,7 @@
 //      quando detecta alteração indevida forte. Nunca lança.
 
 import { geminiMultiVisionJson } from '@/lib/gemini'
+import { MATERIAL_IDENTITY_RULES } from '@/lib/nodi/material-fidelity'
 import type { SpacesPreservationLevel } from './preservation'
 
 // ── 1. Checagens estruturais síncronas ────────────────────────
@@ -102,6 +103,8 @@ function checkUserPrompt(level: SpacesPreservationLevel, cropExpected: boolean):
     'Avalie especialmente: volumetria, aberturas (quantidade/posição/proporção), ' +
     'telhado, implantação, proporções, câmera (quando deveria ser preservada) e ' +
     'materiais (quando deveriam ser preservados).\n\n' +
+    MATERIAL_IDENTITY_RULES + '\n' +
+    'Uma troca visível de material deve reduzir attributes.materiais abaixo de 0.7; geometria correta não compensa essa troca. Se houver dúvida, explique em notes sem inventar especificação.\n' +
     'Devolva JSON:\n' +
     '{\n' +
     '  "preserved": boolean,        // true = claramente o mesmo projeto\n' +
@@ -130,8 +133,8 @@ export async function checkArchitecturalPreservation(
       timeoutMs: 30_000,
     })
     return parseCheck(raw)
-  } catch (err) {
-    console.warn('[spaces.preserve] checagem de preservação falhou (best-effort):', (err as Error).message)
+  } catch {
+    console.warn('[spaces.preserve] checagem de preservação indisponível (best-effort)')
     return null
   }
 }
@@ -144,10 +147,10 @@ function stripFence(raw: string): string {
 // legítima (luz/atmosfera muda a imagem) mas pega redesign claro.
 const WARNING_THRESHOLD = 0.7
 
-function parseCheck(raw: string): PreservationCheck {
+export function parseCheck(raw: string): PreservationCheck {
   const parsed = JSON.parse(stripFence(raw)) as Partial<PreservationCheck>
   const clamp = (n: unknown): number =>
-    typeof n === 'number' ? Math.max(0, Math.min(1, n)) : 0
+    typeof n === 'number' && Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0
 
   const score = clamp(parsed.score)
   const preserved = parsed.preserved === true
@@ -162,7 +165,8 @@ function parseCheck(raw: string): PreservationCheck {
     materiais:   clamp(a.materiais),
   }
   // Warning se o modelo disse "não preservado" OU score baixo.
-  const warning = !preserved || score < WARNING_THRESHOLD
+  const materialDrift = typeof a.materiais === 'number' && Number.isFinite(a.materiais) && attributes.materiais < WARNING_THRESHOLD
+  const warning = !preserved || score < WARNING_THRESHOLD || materialDrift
 
   return {
     preserved,

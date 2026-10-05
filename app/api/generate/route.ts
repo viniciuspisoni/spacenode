@@ -69,6 +69,7 @@ import {
 import { fetchStorageBuffer, assertSafeFetchUrl } from '@/lib/storage/fetch'
 import { nearestSupportedAspectRatio } from '@/lib/ai/aspect-ratio'
 import { analyzeImage } from '@/lib/fidelity-engine'
+import { hasCurrentMaterialAnalysis } from '@/lib/ai/material-inventory'
 import { DIRECT_UPLOAD_AREAS, downloadDirectUpload } from '@/lib/storage/direct-upload'
 import { normalizeSourceImage } from '@/lib/storage/normalize-image'
 import { createDisplayPreview } from '@/lib/storage/preview'
@@ -618,7 +619,7 @@ export async function POST(req: NextRequest) {
           .limit(1)
           .maybeSingle()
         const cachedBriefing = (cachedRender?.config_snapshot as { briefing?: unknown } | null)?.briefing
-        if (isBriefing(cachedBriefing)) {
+        if (isBriefing(cachedBriefing) && hasCurrentMaterialAnalysis(cachedBriefing)) {
           resolvedBriefing = cachedBriefing
           briefingSource = 'cache'
         }
@@ -993,18 +994,24 @@ export async function POST(req: NextRequest) {
     // Mesma checagem de visão do Spaces (checkArchitecturalPreservation):
     // volumetria, aberturas, telhado, proporções, câmera, materiais — pega o
     // que o Sobel não vê. Rodada por padrão só nos casos LIMÍTROFES (score
-    // < 0.80 ou indisponível) pra não taxar a latência do caminho feliz;
+    // < 0.80 ou indisponível) e nas preservações com inventário de materiais;
     // RENDER_SEMANTIC_AUDIT=1 força sempre, =0 desliga. Best-effort: falha
     // vira null e nada bloqueia a entrega.
     let preservationAudit: PreservationCheck | null = null
     const auditMode = process.env.RENDER_SEMANTIC_AUDIT ?? ''
     const auditBorderline = fidelityScore === null || fidelityScore < 0.8
+    // A geometry score cannot detect invented wood/stone. Check material-preserving
+    // renders with a current inventory even when the edges look correct. Explicit
+    // edits keep the existing audit policy; this checker has no requested-edit mask.
+    const materialReviewRequired = hasCurrentMaterialAnalysis(resolvedBriefing) &&
+      !Object.values(materials ?? {}).some(value => typeof value === 'string' && value.trim()) &&
+      !materialRefs?.length && !refinementText?.trim()
     // Audit (vision, ~segundos) e preview (download + sharp + upload) não
     // dependem um do outro — rodam em paralelo; o preview reaproveita o
     // buffer que o geometry score já baixou (antes baixava o master de novo).
     const auditPromise: Promise<PreservationCheck | null> = (
       renderOnlyActive && auditMode !== '0' &&
-      (auditMode === '1' || auditBorderline) &&
+      (auditMode === '1' || auditBorderline || materialReviewRequired) &&
       remainingMs() > 20_000
     )
       ? checkArchitecturalPreservation(inputUrl, outputUrl, 'STRICT_SOURCE_LOCK').catch((auditErr: unknown) => {

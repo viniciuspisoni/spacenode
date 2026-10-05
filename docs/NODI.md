@@ -453,3 +453,13 @@ Comparação manual e automática passam a avaliar tipo, cor base, acabamento, v
 Validação local: 279 testes passaram, dois cenários de benchmark opcional foram ignorados; tipos, lint dos arquivos alterados e verificação de whitespace concluídos. Inclui contrato de Renderizar e retry, propostas assinadas sem âncora de resultado alterado, comparação manual/automática e decisão local sobre materiais.
 
 A resposta de comparação é compacta para caber no orçamento de saída existente. Falhas da comparação manual retornam indisponibilidade sem aprovar a imagem e registram apenas categoria fixa, sem conteúdo ou mensagens do provedor. Regressão de falha com token privado aumenta a suíte para 280 testes aprovados.
+
+### Inventário de materiais por superfície (2026-10-05)
+
+A análise de entrada passa a registrar aparência, padrão e certeza por superfície na chamada de visão existente. Cores chapadas de CAD não permitem presumir madeira em armário ou pedra em piso cinza. O prompt mantém a imagem como autoridade, preserva aparência em casos ambíguos e aceita mudanças explícitas apenas nas superfícies solicitadas. O inventário tem limites de quantidade e tamanho e é persistido no briefing existente, sem migração de banco.
+
+O cache de Renderizar só reutiliza briefings com inventário válido da versão atual; descrições antigas recebem nova análise quando não há briefing explícito fornecido pelo caller. A auditoria semântica também roda em preservações com inventário mesmo quando a geometria passa, respeitando os limites de tempo e a configuração de desativação existentes. A chamada de análise tem maior teto de saída; a auditoria pode ocorrer mais frequentemente, aumentando o uso de visão no servidor, sem mudar o preço de Nodes configurado.
+
+Uma avaliação de materiais abaixo de 0,7 produz aviso mesmo com score geral alto. O diagnóstico permanece best-effort, pode terminar em background ou ficar indisponível e não bloqueia automaticamente o resultado. Não é garantia de preservação nem autorização para regenerar ou registrar aprovação do usuário.
+
+Validação local após incorporar a atualização de aquisição (#277): 906 testes passaram, cinco cenários opcionais foram ignorados; typecheck, lint dos arquivos alterados e whitespace passaram. Os modelos foram simulados nos testes: não houve nova geração paga nesta evolução. A eficácia visual continua pendente de uma nova amostra real; o piloto anterior revelou deriva em armário e piso.
