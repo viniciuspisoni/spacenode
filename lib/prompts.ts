@@ -13,6 +13,8 @@ import {
   buildDepthMapBlock,
 } from '@/lib/ai/fidelity/render-only'
 
+import { buildMaterialInventoryBlock, type MaterialObservation } from '@/lib/ai/material-inventory'
+
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 export type ProjectType = 'exterior' | 'interior'
@@ -97,6 +99,8 @@ export interface ModelFacts {
 export type FidelityLevel = 'maximum' | 'balanced' | 'creative'
 
 export interface BriefingArquitetonico {
+  material_analysis_version?: number
+  material_inventory?: MaterialObservation[]
   tipo_projeto:         string   // ex: "fachada residencial contemporânea, sobrado isolado"
   geometria_principal:  string   // ex: "volume retangular alongado com balanço lateral em concreto"
   volumes:              string   // ex: "dois volumes sobrepostos, térreo recuado, superior em balanço"
@@ -973,7 +977,8 @@ function preservationBlock(briefing: BriefingArquitetonico): string {
     `- Type: ${briefing.tipo_projeto}\n` +
     `- Geometry: ${briefing.geometria_principal} | ${briefing.volumes} | ${briefing.pavimentos} stories\n` +
     `- Openings: ${briefing.aberturas}\n` +
-    `- Visible materials: ${briefing.materiais_aparentes}\n` +
+    `- Visible materials (tentative labels; original image remains authoritative): ${briefing.materiais_aparentes}\n` +
+    buildMaterialInventoryBlock(briefing.material_inventory) +
     `- Camera: ${briefing.camera}\n` +
     `- Surroundings: ${briefing.entorno}` +
     locked + '\n'
