@@ -22,8 +22,10 @@ export default function Home() {
     <main className="spn-landing" onClick={event => {
       const target = event.target
       if (!(target instanceof Element)) return
-      const link = target.closest('a[href="/login?mode=signup"]')
+      const link = target.closest<HTMLAnchorElement>('a[href]')
       if (!link) return
+      const destination = new URL(link.href)
+      if (destination.origin !== window.location.origin || destination.pathname !== '/login' || destination.searchParams.get('mode') !== 'signup') return
       track('cta_clicked', {
         lp: 'home-presentation-v1',
         cta: link.closest('[data-cta-position]')?.getAttribute('data-cta-position') ?? 'navigation',

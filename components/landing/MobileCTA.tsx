@@ -14,7 +14,7 @@ import { useEffect, useState } from 'react'
 // Sem props, é o CTA de cadastro grátis da home. As landings de campanha
 // passam rótulo, destino e um onClick que grava a intenção de plano.
 export function MobileCTA({
-  href = '/login?mode=signup',
+  href = '/login?mode=signup&next=%2Fapp%2Fgenerate',
   label = 'Testar grátis',
   note = '80 nodes grátis · sem cartão · em português',
   onClick,

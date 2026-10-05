@@ -25,6 +25,7 @@ const STEPS: { id: number; label: string }[] = [
   { id: 1, label: 'Referência' },
   { id: 2, label: 'Visualização' },
   { id: 3, label: 'Gerar' },
+  { id: 4, label: 'Comparar' },
 ]
 
 // Índice do passo ativo por fase — 'generating' e 'done' vivem no passo 3.
@@ -32,7 +33,7 @@ const ACTIVE_STEP: Record<GuidePhase, number> = {
   upload: 1,
   configure: 2,
   generating: 3,
-  done: 3,
+  done: 4,
 }
 
 function CheckGlyph() {
@@ -60,7 +61,7 @@ export default function GenerateGuide({
       <div className="spn-guide-head">
         <ol className="spn-guide-steps">
           {STEPS.map((step, i) => {
-            const isDone = step.id < active || (step.id === 3 && phase === 'done')
+            const isDone = step.id < active
             const isActive = step.id === active && !isDone
             return (
               <li
@@ -114,7 +115,7 @@ export default function GenerateGuide({
         {phase === 'generating' && (
           <p className="spn-guide-tip">
             <span className="spn-guide-live" aria-hidden="true" />
-            A SpaceNode trabalha sobre o seu projeto, preservando a geometria e a perspectiva.
+            A SpaceNode usa seu projeto como referência para gerar a visualização.
             Sua imagem está a caminho.
           </p>
         )}
@@ -124,7 +125,7 @@ export default function GenerateGuide({
             <strong>Sua primeira visualização está pronta.</strong>{' '}
             {fromSpacesNew
               ? 'Compare o antes e depois e continue seu Space com esta render.'
-              : 'Compare o antes e depois. Em seguida, continue trabalhando nesta imagem.'}
+              : 'Compare o antes e depois. Confira proporções, aberturas e materiais; ajuste o que precisar e baixe sua imagem.'}
           </p>
         )}
       </div>

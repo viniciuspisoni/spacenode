@@ -47,7 +47,7 @@ export function Projects() {
 
       <div className="spn-projects-action">
         <p>Agora compare o resultado no seu próprio projeto.</p>
-        <a href="/login?mode=signup">Testar no meu projeto grátis <span aria-hidden="true">→</span></a>
+        <a href="/login?mode=signup&next=%2Fapp%2Fgenerate">Testar no meu projeto grátis <span aria-hidden="true">→</span></a>
         <small>80 Nodes grátis · sem cartão</small>
       </div>
 

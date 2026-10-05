@@ -75,7 +75,7 @@ export default function FinalCTA() {
         </h2>
 
         <div className="spn-final-ctas">
-          <a href="/login?mode=signup" className="spn-final-primary">
+          <a href="/login?mode=signup&next=%2Fapp%2Fgenerate" className="spn-final-primary">
             Testar no meu projeto grátis
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
               <path d="M2 6h8M6.5 2.5L10 6l-3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
