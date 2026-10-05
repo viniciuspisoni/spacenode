@@ -462,4 +462,4 @@ O cache de Renderizar só reutiliza briefings com inventário válido da versão
 
 Uma avaliação de materiais abaixo de 0,7 produz aviso mesmo com score geral alto. O diagnóstico permanece best-effort, pode terminar em background ou ficar indisponível e não bloqueia automaticamente o resultado. Não é garantia de preservação nem autorização para regenerar ou registrar aprovação do usuário.
 
-Validação local: 902 testes passaram, cinco cenários opcionais foram ignorados; typecheck, lint dos arquivos alterados e whitespace passaram. Os modelos foram simulados nos testes: não houve nova geração paga nesta evolução. A eficácia visual continua pendente de uma nova amostra real; o piloto anterior revelou deriva em armário e piso.
+Validação local após incorporar a atualização de aquisição (#277): 906 testes passaram, cinco cenários opcionais foram ignorados; typecheck, lint dos arquivos alterados e whitespace passaram. Os modelos foram simulados nos testes: não houve nova geração paga nesta evolução. A eficácia visual continua pendente de uma nova amostra real; o piloto anterior revelou deriva em armário e piso.
