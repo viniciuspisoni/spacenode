@@ -23,7 +23,12 @@ export default function LpViewPing({ slug }: { slug: string }) {
     // StrictMode monta duas vezes em dev; a visita é uma só.
     if (fired.current) return
     fired.current = true
-    track('landing_view', { lp: slug })
+    track('landing_view', {
+      lp: slug,
+      viewport_width: window.innerWidth,
+      hydrated_ms: Math.round(performance.now()),
+      in_app_browser: /Instagram|FBAN|FBAV/i.test(navigator.userAgent),
+    })
   }, [slug])
 
   return null
