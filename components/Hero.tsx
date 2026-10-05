@@ -13,7 +13,7 @@ export default function Hero() {
           Transforme um print do SketchUp em uma imagem para a apresentação ao cliente.
           Compare com o original e teste no projeto em que você já está trabalhando.
         </p>
-        <a href="/login?mode=signup" className="spn-hero-primary">
+        <a href="/login?mode=signup&next=%2Fapp%2Fgenerate" className="spn-hero-primary">
           Testar no meu projeto grátis
           <span aria-hidden="true">→</span>
         </a>

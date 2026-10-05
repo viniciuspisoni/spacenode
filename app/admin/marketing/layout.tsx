@@ -11,6 +11,7 @@ import { getMarketingStaffContext } from '@/lib/marketing/auth'
 const NAV = [
   { href: '/admin/marketing',            label: 'Dashboard' },
   { href: '/admin/marketing/ads',        label: 'Tráfego' },
+  { href: '/admin/marketing/ads/conversao', label: 'Conversão' },
   { href: '/admin/marketing/ads/checkouts', label: 'Checkouts' },
   { href: '/admin/marketing/ideias',     label: 'Ideias' },
   { href: '/admin/marketing/briefings',  label: 'Briefings' },

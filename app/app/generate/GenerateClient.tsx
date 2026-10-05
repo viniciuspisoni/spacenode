@@ -15,6 +15,7 @@ import {
   getNodesCost, isEngineId, isResolution, isValidCombination,
 } from '@/lib/engines'
 import InsufficientNodesCta from '@/components/app/InsufficientNodesCta'
+import PostResultPlanOffer from '@/components/app/PostResultPlanOffer'
 import { RenderFeedback } from '@/components/app/RenderFeedback'
 import { consumeHandoff } from '@/components/nodi/actions-bus'
 import { uploadDirect } from '@/lib/storage/direct-upload-client'
@@ -49,6 +50,7 @@ interface GenerateClientProps {
   returnTo?:         'spaces/new'
   /** true = a conta nunca gerou uma render — o Guia da primeira imagem abre sozinho. */
   firstRender?:      boolean
+  showPlanOffer?:    boolean
 }
 
 // Persisted last-used render config (profiles.project_config — JSONB).
@@ -268,7 +270,7 @@ function resolveInitialConfig(cfg: ProjectConfig | null | undefined) {
   }
 }
 
-export function GenerateClient({ initialCredits, initialMaterials, initialConfig, initialSourceUrl, returnTo, firstRender = false, orionEnabled = false, orionProvider }: GenerateClientProps) {
+export function GenerateClient({ initialCredits, initialMaterials, initialConfig, initialSourceUrl, returnTo, firstRender = false, showPlanOffer = false, orionEnabled = false, orionProvider }: GenerateClientProps) {
   const init = resolveInitialConfig(initialConfig)
   const fromSpacesNew = returnTo === 'spaces/new'
   const supabase = createClient()
@@ -1527,7 +1529,9 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
                   </button>
                 )}
               </div>
-              {credits < nodeCost && (
+              {showPlanOffer && lastRenderId ? (
+                <PostResultPlanOffer key={lastRenderId} renderId={lastRenderId} nodeCost={nodeCost} />
+              ) : credits < nodeCost && (
                 <p className="spn-render-upgrade">
                   Seu projeto pode continuar. Veja os planos para receber novos Nodes mensais.{' '}
                   <Link href="/app/billing" onClick={() => track('cta_clicked', { cta: 'render_result_plans' })}>Ver planos →</Link>

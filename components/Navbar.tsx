@@ -171,7 +171,7 @@ export default function Navbar() {
             Entrar
           </a>
           <a
-            href="/login?mode=signup"
+            href="/login?mode=signup&next=%2Fapp%2Fgenerate"
             className="nav-pill nav-pill-cta"
             onPointerMove={onPointerMove}
             onPointerLeave={onPointerLeave}
@@ -236,7 +236,7 @@ export default function Navbar() {
 
           <div style={{ marginTop: 32, display: 'flex', flexDirection: 'column', gap: 12 }}>
             <a
-              href="/login?mode=signup"
+              href="/login?mode=signup&next=%2Fapp%2Fgenerate"
               onClick={() => setOpen(false)}
               className="drawer-cta drawer-cta-primary"
             >
