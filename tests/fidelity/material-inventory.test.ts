@@ -57,6 +57,20 @@ describe('material drift cannot hide behind geometry score', () => {
     expect(check.warning).toBe(true)
     expect(check.attributes?.materiais).toBe(.4)
   })
+  it('warns at the 0.7 material boundary observed in the live pilot', () => {
+    const check = parseCheck(JSON.stringify({preserved: true, score: .9, attributes: {materiais: .7}}))
+    expect(check.warning).toBe(true)
+  })
+  it('explicit material substitution warns even if the model assigns a high score', () => {
+    const check = parseCheck(JSON.stringify({preserved: true, score: .98, material_changed: true, attributes: {materiais: .95}}))
+    expect(check.warning).toBe(true)
+    expect(check.material_changed).toBe(true)
+  })
+  it('uncertainty is retained without treating a string as confirmed evidence', () => {
+    const check = parseCheck(JSON.stringify({preserved: true, score: .98, material_changed: 'true', attributes: {materiais: .95}}))
+    expect(check.material_changed).toBeNull()
+    expect(check.warning).toBe(false)
+  })
   it('does not invent a material failure when the model omits its assessment', () => {
     expect(parseCheck(JSON.stringify({preserved: true, score: .98, attributes: {}})).warning).toBe(false)
     expect(parseCheck(JSON.stringify({preserved: true, score: .98, attributes: {materiais: .9}})).warning).toBe(false)
