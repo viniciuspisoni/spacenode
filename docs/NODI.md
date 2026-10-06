@@ -475,3 +475,11 @@ O limite de materiais agora inclui 0,7. A resposta da auditoria também informa 
 Removidas as solicitações positivas genéricas de grão e microtextura nos blocos de intenção, tradução fotográfica, identidade de materiais e fecho da câmera. O realismo passa a ser solicitado por luz, reflexão e sombras, conservando os padrões mapeados existentes. Frisos de painel não constituem evidência de madeira e juntas de placas não constituem evidência de pedra; certeza sobre a aparência não equivale a certeza sobre a espécie de material.
 
 Validação local: 910 testes passaram, cinco cenários opcionais ignorados, tipos e lint passaram. A eficácia visual deste ajuste será avaliada com a mesma entrada e Vega 2K, dentro do saldo de testes autorizado; ainda não é garantia de preservação.
+
+## Referências locais de material — piloto de correção (2026-10-06)
+
+O inventário v2 registra limites normalizados opcionais por superfície na análise já existente. O caminho de correção (`structuralBoost`), em máxima fidelidade e sem âncora, refinamento ou troca explícita de material, pode anexar uma folha com até quatro recortes numerados dos pixels originais. O prompt distingue essa evidência local de um novo enquadramento ou escolha de acabamento. O mapa de bordas mantém seu índice correto depois das referências.
+
+Não há nova chamada de geração/análise para criar a folha, nem Nodes adicionais. Coordenadas inválidas são descartadas; falhas nos recortes mantêm a geração com a referência completa. `RENDER_MATERIAL_REGION_CROPS=0` desliga o piloto. A contagem efetivamente anexada fica em `generation_log.material_region_count`. São recortes aproximados, **não máscaras de segmentação nem garantia de preservação por pixel**. O aviso agora menciona estrutura e materiais; a ação diz “Tentar corrigir”, sem prometer correção automática.
+
+Os dois ensaios anteriores consumiram 40 dos 60 Nodes aprovados e ainda alteraram materiais. Um novo ensaio com esta abordagem pode consumir os últimos 20 Nodes; aprovação depende de comparação visual, não apenas do score de geometria.

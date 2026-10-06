@@ -10,7 +10,7 @@ const inventory = [{surface: 'cabinet fronts', appearance: 'plain pale beige, sm
 const briefing = {
   tipo_projeto: 'bathroom', geometria_principal: 'rectangular', volumes: 'one', pavimentos: 1,
   aberturas: 'window', materiais_aparentes: 'plain surfaces', camera: 'low', entorno: 'interior',
-  elementos_preservar: [], elementos_melhorar: [], material_analysis_version: 1, material_inventory: inventory,
+  elementos_preservar: [], elementos_melhorar: [], material_analysis_version: 2, material_inventory: inventory,
 }
 const options: GenerateOptions = {projectType: 'interior', segment: 'Residencial', environment: 'Banheiro',
   lighting: 'Preservar Original', background: 'Preservar Original', sceneElements: [], geometryLock: 85, materials: {}, fidelityMode: 'strict'}
@@ -21,6 +21,7 @@ describe('material inventory grounded in input', () => {
     expect(hasCurrentMaterialAnalysis({...briefing, material_analysis_version: undefined})).toBe(false)
     expect(hasCurrentMaterialAnalysis({...briefing, material_inventory: []})).toBe(false)
     expect(hasCurrentMaterialAnalysis({...briefing, material_inventory: [null]})).toBe(false)
+    expect(hasCurrentMaterialAnalysis({...briefing, material_analysis_version: 1})).toBe(false)
     expect(hasCurrentMaterialAnalysis(briefing)).toBe(true)
   })
   it('bounds malformed observations and treats missing certainty conservatively', () => {
@@ -40,9 +41,17 @@ describe('material inventory grounded in input', () => {
     expect(prompt).toContain('porcelanato branco')
     expect(buildMaterialInventoryBlock(undefined)).toBe('')
   })
+  it('binds local evidence to its own image without displacing structural conditioning', () => {
+    const prompt = buildFidelityPrompt(options, 'maximum', briefing, {
+      materialRegionSheet: { imageIndex: 2, surfaces: ['cabinet fronts', 'floor'] }, edgeMapImageIndex: 3,
+    })
+    expect(prompt).toContain('ORIGINAL SURFACE CLOSE-UPS: image #2')
+    expect(prompt).toContain('STRUCTURAL CONSTRAINT MAP: image #3')
+    expect(buildFidelityPrompt(options, 'maximum', briefing)).not.toContain('ORIGINAL SURFACE CLOSE-UPS')
+  })
   it('extracts the inventory in the existing vision call without a second request', async () => {
     vi.mocked(geminiVisionJson).mockResolvedValue(JSON.stringify(briefing))
-    expect(await analyzeImage('https://example.com/input.png')).toMatchObject({material_analysis_version: 1, material_inventory: inventory})
+    expect(await analyzeImage('https://example.com/input.png')).toMatchObject({material_analysis_version: 2, material_inventory: inventory})
     expect(geminiVisionJson).toHaveBeenCalledTimes(1)
     expect(vi.mocked(geminiVisionJson).mock.calls[0][0].user).toContain('não deduza madeira por ser armário')
   })
