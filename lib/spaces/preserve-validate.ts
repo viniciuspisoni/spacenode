@@ -64,6 +64,7 @@ export interface PreservationCheck {
   preserved:  boolean
   warning:    boolean            // true → registrar spaces_preservation_warning
   score:      number             // 0..1, confiança de que é o mesmo projeto
+  material_changed?: boolean | null // explicit visible substitution; null = uncertain
   notes?:     string
   attributes?: {
     volumetria?:  number
@@ -104,10 +105,11 @@ function checkUserPrompt(level: SpacesPreservationLevel, cropExpected: boolean):
     'telhado, implantação, proporções, câmera (quando deveria ser preservada) e ' +
     'materiais (quando deveriam ser preservados).\n\n' +
     MATERIAL_IDENTITY_RULES + '\n' +
-    'Uma troca visível de material deve reduzir attributes.materiais abaixo de 0.7; geometria correta não compensa essa troca. Se houver dúvida, explique em notes sem inventar especificação.\n' +
+    'Se houve troca visível de identidade de material, cor base, acabamento ou padrão, marque material_changed=true independentemente do score; geometria correta não compensa essa troca. Material preservado = false; ambíguo = null. Variação plausível de luz não é troca. Explique a superfície original → resultado em notes.\n' +
     'Devolva JSON:\n' +
     '{\n' +
     '  "preserved": boolean,        // true = claramente o mesmo projeto\n' +
+    '  "material_changed": boolean|null, // true = substituição visível; null = incerteza\n' +
     '  "score": number,             // 0-1, confiança de que é o mesmo projeto\n' +
     '  "attributes": {\n' +
     '    "volumetria": number, "aberturas": number, "telhado": number,\n' +
@@ -165,12 +167,14 @@ export function parseCheck(raw: string): PreservationCheck {
     materiais:   clamp(a.materiais),
   }
   // Warning se o modelo disse "não preservado" OU score baixo.
-  const materialDrift = typeof a.materiais === 'number' && Number.isFinite(a.materiais) && attributes.materiais < WARNING_THRESHOLD
-  const warning = !preserved || score < WARNING_THRESHOLD || materialDrift
+  const materialDrift = typeof a.materiais === 'number' && Number.isFinite(a.materiais) && attributes.materiais <= WARNING_THRESHOLD
+  const materialChanged = typeof parsed.material_changed === 'boolean' ? parsed.material_changed : null
+  const warning = !preserved || score < WARNING_THRESHOLD || materialDrift || materialChanged === true
 
   return {
     preserved,
     warning,
+    material_changed: materialChanged,
     score,
     attributes,
     notes: typeof parsed.notes === 'string' && parsed.notes.trim() ? parsed.notes.trim() : undefined,

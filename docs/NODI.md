@@ -463,3 +463,9 @@ O cache de Renderizar só reutiliza briefings com inventário válido da versão
 Uma avaliação de materiais abaixo de 0,7 produz aviso mesmo com score geral alto. O diagnóstico permanece best-effort, pode terminar em background ou ficar indisponível e não bloqueia automaticamente o resultado. Não é garantia de preservação nem autorização para regenerar ou registrar aprovação do usuário.
 
 Validação local após incorporar a atualização de aquisição (#277): 906 testes passaram, cinco cenários opcionais foram ignorados; typecheck, lint dos arquivos alterados e whitespace passaram. Os modelos foram simulados nos testes: não houve nova geração paga nesta evolução. A eficácia visual continua pendente de uma nova amostra real; o piloto anterior revelou deriva em armário e piso.
+
+### Correção do aviso de materiais após piloto real (2026-10-06)
+
+O primeiro reteste com inventário confirmou extração por visão, mas a geração ainda substituiu o armário claro por madeira e adicionou textura de pedra ao piso. A auditoria descreveu as trocas, atribuiu 0,7 aos materiais e não avisou porque o limite usava `< 0.7`.
+
+O limite de materiais agora inclui 0,7. A resposta da auditoria também informa `material_changed` (true, false ou null para incerteza): uma troca explicitamente identificada gera aviso independentemente dos scores. Respostas antigas continuam aceitas e dados inválidos não se tornam confirmação de troca. Isto corrige diagnóstico; não prova que a geração passou a preservar materiais nem cria bloqueio de entrega.
