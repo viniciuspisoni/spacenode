@@ -14,6 +14,7 @@
 
 import { geminiMultiVisionJson } from '@/lib/gemini'
 import { MATERIAL_IDENTITY_RULES } from '@/lib/nodi/material-fidelity'
+import { buildMaterialInventoryBlock, normalizeMaterialInventory } from '@/lib/ai/material-inventory'
 import type { SpacesPreservationLevel } from './preservation'
 
 // ── 1. Checagens estruturais síncronas ────────────────────────
@@ -65,6 +66,8 @@ export interface PreservationCheck {
   warning:    boolean            // true → registrar spaces_preservation_warning
   score:      number             // 0..1, confiança de que é o mesmo projeto
   material_changed?: boolean | null // explicit visible substitution; null = uncertain
+  material_review?: 'passed' | 'changed' | 'uncertain' | 'unverified'
+  material_checks?: { surface: string; original: string; generated: string; verdict: 'preserved' | 'changed' | 'uncertain' }[]
   notes?:     string
   attributes?: {
     volumetria?:  number
@@ -87,7 +90,7 @@ const CHECK_SYSTEM =
 // preservada; em ARCH a câmera pode mudar (nova vista do mesmo prédio), então
 // não penalizamos divergência de câmera/enquadramento. No Detalhe (crop) o
 // enquadramento FECHA de propósito — não penalizamos o recorte, só redesenho.
-function checkUserPrompt(level: SpacesPreservationLevel, cropExpected: boolean): string {
+function checkUserPrompt(level: SpacesPreservationLevel, cropExpected: boolean, materialInventory?: unknown): string {
   const cameraRule = cropExpected
     ? 'A imagem #2 é um RECORTE/aproximação (crop/zoom) da MESMA vista — um ' +
       'enquadramento mais FECHADO é esperado e correto. NÃO penalize crop, zoom ' +
@@ -105,10 +108,13 @@ function checkUserPrompt(level: SpacesPreservationLevel, cropExpected: boolean):
     'telhado, implantação, proporções, câmera (quando deveria ser preservada) e ' +
     'materiais (quando deveriam ser preservados).\n\n' +
     MATERIAL_IDENTITY_RULES + '\n' +
+    buildMaterialInventoryBlock(materialInventory) +
+    'Compare CADA superfície inventariada: nome EXATO, aparência na original, aparência na gerada, verdict preserved/changed/uncertain. Mesmo piso cinza pode ter ganho veios; mesmo armário claro pode ter ganho madeira. Ausência de evidência é uncertain, nunca aprovação. Primeiro compare os padrões locais, depois atribua o score global. Não deduza madeira na original a partir de ripas.\n' +
     'Se houve troca visível de identidade de material, cor base, acabamento ou padrão, marque material_changed=true independentemente do score; geometria correta não compensa essa troca. Material preservado = false; ambíguo = null. Variação plausível de luz não é troca. Explique a superfície original → resultado em notes.\n' +
     'Devolva JSON:\n' +
     '{\n' +
     '  "preserved": boolean,        // true = claramente o mesmo projeto\n' +
+    '  "material_checks": [{"surface": string, "original": string, "generated": string, "verdict": "preserved"|"changed"|"uncertain"}], // uma comparação por superfície inventariada\n' +
     '  "material_changed": boolean|null, // true = substituição visível; null = incerteza\n' +
     '  "score": number,             // 0-1, confiança de que é o mesmo projeto\n' +
     '  "attributes": {\n' +
@@ -125,16 +131,17 @@ export async function checkArchitecturalPreservation(
   sourceUrl:    string,
   generatedUrl: string,
   level:        SpacesPreservationLevel,
-  opts?:        { cropExpected?: boolean },
+  opts?:        { cropExpected?: boolean; materialInventory?: unknown },
 ): Promise<PreservationCheck | null> {
   try {
     const raw = await geminiMultiVisionJson({
       system:   CHECK_SYSTEM,
-      user:     checkUserPrompt(level, opts?.cropExpected ?? false),
+      user:     checkUserPrompt(level, opts?.cropExpected ?? false, opts?.materialInventory),
       imageUrls: [sourceUrl, generatedUrl],
+      maxTokens: normalizeMaterialInventory(opts?.materialInventory).length ? 2600 : 1200,
       timeoutMs: 30_000,
     })
-    return parseCheck(raw)
+    return parseCheck(raw, normalizeMaterialInventory(opts?.materialInventory).map(item => item.surface))
   } catch {
     console.warn('[spaces.preserve] checagem de preservação indisponível (best-effort)')
     return null
@@ -149,7 +156,7 @@ function stripFence(raw: string): string {
 // legítima (luz/atmosfera muda a imagem) mas pega redesign claro.
 const WARNING_THRESHOLD = 0.7
 
-export function parseCheck(raw: string): PreservationCheck {
+export function parseCheck(raw: string, requiredSurfaces: string[] = []): PreservationCheck {
   const parsed = JSON.parse(stripFence(raw)) as Partial<PreservationCheck>
   const clamp = (n: unknown): number =>
     typeof n === 'number' && Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0
@@ -169,12 +176,27 @@ export function parseCheck(raw: string): PreservationCheck {
   // Warning se o modelo disse "não preservado" OU score baixo.
   const materialDrift = typeof a.materiais === 'number' && Number.isFinite(a.materiais) && attributes.materiais <= WARNING_THRESHOLD
   const materialChanged = typeof parsed.material_changed === 'boolean' ? parsed.material_changed : null
-  const warning = !preserved || score < WARNING_THRESHOLD || materialDrift || materialChanged === true
+  const materialChecks = Array.isArray(parsed.material_checks) ? parsed.material_checks.slice(0, 12).flatMap(item => {
+    if (!item || typeof item.surface !== 'string' || !item.surface.trim() ||
+        typeof item.original !== 'string' || !item.original.trim() || typeof item.generated !== 'string' || !item.generated.trim() ||
+        !['preserved', 'changed', 'uncertain'].includes(item.verdict)) return []
+    return [{ surface: item.surface.trim().slice(0, 160), original: item.original.trim().slice(0, 300),
+      generated: item.generated.trim().slice(0, 300), verdict: item.verdict }]
+  }) : []
+  const missingSurface = requiredSurfaces.some(surface => !materialChecks.some(item => item.surface === surface))
+  const materialReview = materialChecks.some(item => item.verdict === 'changed') ? 'changed' as const
+    : materialChecks.some(item => item.verdict === 'uncertain') ? 'uncertain' as const
+    : missingSurface ? 'unverified' as const
+    : materialChecks.length ? 'passed' as const : undefined
+  // Per-surface evidence outranks a contradictory high overall score. Incomplete review is advisory.
+  const warning = !preserved || score < WARNING_THRESHOLD || materialDrift || materialChanged === true ||
+    (materialReview !== undefined && materialReview !== 'passed')
 
   return {
     preserved,
     warning,
-    material_changed: materialChanged,
+    material_changed: materialReview === 'changed' ? true : materialChanged,
+    ...(materialReview ? { material_review: materialReview, material_checks: materialChecks } : {}),
     score,
     attributes,
     notes: typeof parsed.notes === 'string' && parsed.notes.trim() ? parsed.notes.trim() : undefined,
