@@ -69,6 +69,7 @@ import {
 import { fetchStorageBuffer, assertSafeFetchUrl } from '@/lib/storage/fetch'
 import { nearestSupportedAspectRatio } from '@/lib/ai/aspect-ratio'
 import { analyzeImage } from '@/lib/fidelity-engine'
+import { buildMaterialRegionSheet } from '@/lib/ai/fidelity/material-regions'
 import { hasCurrentMaterialAnalysis } from '@/lib/ai/material-inventory'
 import { DIRECT_UPLOAD_AREAS, downloadDirectUpload } from '@/lib/storage/direct-upload'
 import { normalizeSourceImage } from '@/lib/storage/normalize-image'
@@ -740,6 +741,26 @@ export async function POST(req: NextRequest) {
       !refinementText?.trim() &&
       !materials
 
+    // Experimental local evidence on explicit correction only; never inherit a drifted render.
+    // No extra model call, no extra Nodes. Material overrides/refinements keep their existing path.
+    let materialRegionSheet: { imageIndex: number; surfaces: string[] } | undefined
+    if (renderOnlyActive && structuralBoost === true && !hasAnchor && !refinementText?.trim() &&
+        materialSamples.length === 0 && Object.values(materials ?? {}).every(isPreserved) &&
+        process.env.RENDER_MATERIAL_REGION_CROPS !== '0' && remainingMs() > 60_000) {
+      try {
+        if (!originalBuffer) originalBuffer = await fetchStorageBuffer(inputUrl)
+        const sheet = await buildMaterialRegionSheet(originalBuffer, resolvedBriefing?.material_inventory)
+        if (sheet) {
+          const url = await hostAuxImage(sheet.png, 'image/png', 'original-material-regions.png')
+          baseImageUrls.push(url)
+          materialRegionSheet = { imageIndex: baseImageUrls.length, surfaces: sheet.surfaces }
+          baseImageLabels.push(`Image #${materialRegionSheet.imageIndex} — ORIGINAL SURFACE CLOSE-UPS (numbered original pixel crops, material evidence only; not a new composition):`)
+        }
+      } catch {
+        console.warn('[generate:fidelity] local material crops unavailable; keeping original reference')
+      }
+    }
+
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       const ladderAttempt = attempt + attemptOffset
       const params = getFidelityAttemptParams(ladderAttempt, {
@@ -810,6 +831,7 @@ export async function POST(req: NextRequest) {
         attempt: ladderAttempt,
         edgeMapImageIndex,
         depthMapImageIndex,
+        materialRegionSheet,
         materialSamples: materialSamples.length > 0 ? materialSamples : undefined,
       })
       devLog('[generate] prompt     :', finalPrompt)
@@ -1159,6 +1181,7 @@ export async function POST(req: NextRequest) {
         briefing_source: briefingSource,
         anchor_used: hasAnchor,
         material_ref_count: materialSamples.length,
+        material_region_count: materialRegionSheet?.surfaces.length ?? 0,
         image_count: baseImageUrls.length,
         duration_ms: generationDurationMs,
         nodes_charged: nodesToCharge,

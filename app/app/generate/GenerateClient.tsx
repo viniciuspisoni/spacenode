@@ -1379,8 +1379,8 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
                   quando a estrutura foi verificada com folga (≥ 0.8). */}
               {fidelityWarning ? (
                 <div className="spn-error">
-                  A verificação estrutural detectou possíveis diferenças em relação ao
-                  projeto original.
+                  A verificação visual detectou possíveis diferenças de estrutura ou
+                  materiais em relação ao projeto original.
                   {/* Corrigir drift: re-gera com a MESMA seed, condicionamento
                       estrutural máximo (edge map + temperatura mínima) e sem
                       âncora — muda o condicionamento, não a amostra. */}
@@ -1390,7 +1390,7 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
                     style={{ display: 'block', marginTop: 8 }}
                     onClick={() => handleGenerate(undefined, { structuralBoost: true })}
                   >
-                    Corrigir automaticamente ({nodeCost} nodes)
+                    Tentar corrigir ({nodeCost} nodes)
                   </button>
                 </div>
               ) : fidelityScore !== null && fidelityScore >= 0.8 ? (

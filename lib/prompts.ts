@@ -13,7 +13,7 @@ import {
   buildDepthMapBlock,
 } from '@/lib/ai/fidelity/render-only'
 
-import { buildMaterialInventoryBlock, type MaterialObservation } from '@/lib/ai/material-inventory'
+import { buildMaterialRegionSheetBlock, buildMaterialInventoryBlock, type MaterialObservation } from '@/lib/ai/material-inventory'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -1048,6 +1048,7 @@ export interface RenderOnlyPromptOpts {
    *  (experimental — RENDER_FIDELITY_DEPTH_MAP=1). */
   depthMapImageIndex?: number | null
   /** Amostras visuais de material anexadas em image_urls. */
+  materialRegionSheet?: { imageIndex: number; surfaces: string[] }
   materialSamples?: MaterialSampleRef[]
 }
 
@@ -1164,6 +1165,7 @@ export function buildFidelityPrompt(
       buildModelFactsBlock(modelFacts, preserveLighting) +
       buildEdgeMapBlock(renderOnly?.edgeMapImageIndex) +
       buildDepthMapBlock(renderOnly?.depthMapImageIndex) +
+      buildMaterialRegionSheetBlock(renderOnly?.materialRegionSheet?.imageIndex, renderOnly?.materialRegionSheet?.surfaces) +
       refinement +
       preserve +
       matBlock +
