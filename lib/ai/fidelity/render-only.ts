@@ -92,7 +92,7 @@ function buildIntent(projectNoun: 'building' | 'space', hasAnchor: boolean): str
   }
   return (
     `This reference is a raw 3D / CAD / SketchUp model. Re-render it into a real photograph of the SAME ${projectNoun}: ` +
-    'convert the flat CGI shading into real-world photographic materials and light, while keeping the exact design, ' +
+    'replace only the flat CGI lighting with photographic light and surface response, while keeping the exact design, ' +
     'geometry, layout, materials, colors and finishes shown. Photorealism of surfaces and light ONLY — never a redesign. '
   )
 }
@@ -137,10 +137,9 @@ export function buildLineWorkBlock(): string {
 export function buildPhotographicBlock(projectNoun: 'building' | 'space'): string {
   const outdoor = projectNoun === 'building'
   return (
-    'PHOTOGRAPHIC TRANSLATION: photograph the materials already shown on each surface with subtle physical micro-detail — ' +
-    'glass with plausible reflections of sky and surroundings plus a visible interior behind it, ' +
-    'metal with anisotropic highlights, concrete and stone with grain and subtle tonal variation, ' +
-    'wood with its existing figure, render/plaster with subtle surface response, ONLY where these materials are present. ' +
+    'PHOTOGRAPHIC TRANSLATION: improve light transport, contact shadows, reflections and depth on the EXISTING surfaces. ' +
+    'Do not synthesize a new surface texture to make the scene look photographic. Realism comes from lighting, not added grain. ' +
+    'Keep existing mapped texture details only where clearly visible in the reference. Glass may reflect the existing surroundings. ' +
     'Smooth paint stays smooth paint; do not add stone veining, wood grain or concrete texture to it. ' +
     'Ambiguous or low-detail surfaces keep their visible base color and pattern; do not invent a premium finish. ' +
     'Light must be physically coherent: one consistent sun direction, contact shadows where volumes meet, ' +
@@ -209,8 +208,8 @@ function buildTextureLock(hasAnchor: boolean): string {
     'with the SAME color and the SAME pattern layout shown in the reference — ' +
     'wood keeps its tone and plank layout, stone keeps its color and cut, ' +
     'painted surfaces keep their exact paint color, tiles keep their size and ' +
-    'grid. Add ONLY photographic realism: real micro-texture, grain, ' +
-    'reflectance and light response. Never swap a material for a similar one, ' +
+    'grid. Add ONLY photographic light response and reflectance, not new grain or micro-texture. ' +
+    'Visible panel grooves or tile joints do not imply wood grain or stone veins between them. Never swap a material for a similar one, ' +
     'never recolor, never invent veining or patterns that contradict the ' +
     'reference, never "upgrade" a finish. '
   )
@@ -251,7 +250,7 @@ export function buildRenderOnlyCameraBlock(hasAnchor: boolean): string {
   if (hasAnchor) {
     return ', high quality photorealistic image, sharp focus, no compression artifacts'
   }
-  return ', photorealistic architectural photograph of this exact scene — render the surfaces with real-world physically-based materials and natural micro-texture, realistic light transport with soft natural shadows, ambient occlusion and global illumination, accurate reflections and refraction on glass and water, true-to-life sky and vegetation, subtle depth of field, sharp focus. It must read as a real DSLR photograph, NOT a flat CGI / 3D / SketchUp render. Keep every material, color and finish exactly as shown — only their real-world rendering and lighting become photographic, never the design.'
+  return ', photorealistic architectural photograph of this exact scene — retain the visible surface colors and patterns; use realistic light transport with soft natural shadows, ambient occlusion and global illumination, accurate reflections and refraction on glass and water, true-to-life sky and vegetation, subtle depth of field, sharp focus. It must read as a real DSLR photograph, NOT a flat CGI / 3D / SketchUp render. Keep every material, color and finish exactly as shown — only their real-world rendering and lighting become photographic, never the design.'
 }
 
 // ── Cabeça do system prompt (aplicada ANTES dos blocos do usuário) ────────────
