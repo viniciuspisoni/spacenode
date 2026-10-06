@@ -719,19 +719,23 @@ function buildMaterialsBlock(
     isInterior && materials.bancadas    && `countertops and surfaces: ${materials.bancadas}`,
     // Compartilhados em ambos
     materials.elementos  && `special architectural elements: ${materials.elementos}`,
-    materials.outros     && `additional notes: ${materials.outros}`,
   ].filter(Boolean)
-  if (lines.length === 0) return ''
+  // Observações livres também descrevem luz e restrições da cena. Não são
+  // uma superfície: tratá-las como material override muda o escopo do pedido.
+  const notes = materials.outros?.trim()
+    ? `USER PROJECT NOTES: "${materials.outros.trim()}". Apply these explicit directions only within the preservation contract. Specific constraints on light sources, reflections and openings take priority over generic atmosphere descriptions; they never authorize changing geometry. `
+    : ''
+  if (lines.length === 0) return notes
   if (level === 'maximum') {
     // A cláusula de escopo é essencial: a override vale SÓ pros campos
     // listados — sem ela, "MATERIAL OVERRIDES (priority over reference)" era
     // lida como licença geral pra reinterpretar acabamentos vizinhos.
     return (
       `MATERIAL OVERRIDES (priority over reference, ONLY on the surfaces named here): ${lines.join('; ')}. ` +
-      'Every surface NOT named in these overrides keeps the reference material, color and texture pattern exactly. '
+      'Every surface NOT named in these overrides keeps the reference material, color and texture pattern exactly. ' + notes
     )
   }
-  return `EXACT PROJECT MATERIALS — reproduce these faithfully: ${lines.join('; ')}. `
+  return `EXACT PROJECT MATERIALS — reproduce these faithfully: ${lines.join('; ')}. ` + notes
 }
 
 // ── Amostras visuais de material ───────────────────────────────────────────────
@@ -1143,6 +1147,17 @@ export function buildFidelityPrompt(
     lightingLine = 'Lighting: keep the same time of day, sun direction and overall brightness as the reference, but replace the flat uniform CAD/3D shading with realistic photographic lighting — soft natural shadows, ambient occlusion and global illumination. Do not add or switch on any lamp, sconce, spot or fixture that is not already lit in the reference. '
   } else {
     lightingLine = 'Lighting: keep the reference lighting EXACTLY — every fixture stays in the same on/off state, same time of day, same shadow direction. '
+  }
+
+  if (level === 'maximum' && projectType === 'interior') {
+    lightingLine +=
+      'LIGHT SOURCE CONSISTENCY: Use existing openings, visible lighting cues, supplied model facts and explicit user-described sources to determine where light comes from. ' +
+      'A lighting atmosphere changes the quality of light, not the location or existence of its sources. ' +
+      'Do not invent off-camera windows, openings or studio lights to create bright patches, window-shaped reflections or directional highlights on walls, cabinetry or panels. ' +
+      'Where off-camera lighting is unknown, use soft diffuse ambient fill instead of a new directional source. ' +
+      'Respect explicitly closed curtains: daylight transmitted through them is diffuse, without exposing or outlining a hidden opening. ' +
+      'Keep real reflections on existing glass, mirrors, water and reflective finishes physically consistent with supported sources; do not erase them globally. ' +
+      'Explicit user constraints on source position, glare and reflections take priority over generic photographic lighting directions. '
   }
 
   // Máxima (render_only): SYSTEM PROMPT PRIMEIRO — papéis das imagens, missão
