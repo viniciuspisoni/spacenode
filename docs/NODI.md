@@ -469,3 +469,9 @@ Validação local após incorporar a atualização de aquisição (#277): 906 te
 O primeiro reteste com inventário confirmou extração por visão, mas a geração ainda substituiu o armário claro por madeira e adicionou textura de pedra ao piso. A auditoria descreveu as trocas, atribuiu 0,7 aos materiais e não avisou porque o limite usava `< 0.7`.
 
 O limite de materiais agora inclui 0,7. A resposta da auditoria também informa `material_changed` (true, false ou null para incerteza): uma troca explicitamente identificada gera aviso independentemente dos scores. Respostas antigas continuam aceitas e dados inválidos não se tornam confirmação de troca. Isto corrige diagnóstico; não prova que a geração passou a preservar materiais nem cria bloqueio de entrega.
+
+### Direção fotográfica sem inventar padrões (2026-10-06)
+
+Removidas as solicitações positivas genéricas de grão e microtextura nos blocos de intenção, tradução fotográfica, identidade de materiais e fecho da câmera. O realismo passa a ser solicitado por luz, reflexão e sombras, conservando os padrões mapeados existentes. Frisos de painel não constituem evidência de madeira e juntas de placas não constituem evidência de pedra; certeza sobre a aparência não equivale a certeza sobre a espécie de material.
+
+Validação local: 910 testes passaram, cinco cenários opcionais ignorados, tipos e lint passaram. A eficácia visual deste ajuste será avaliada com a mesma entrada e Vega 2K, dentro do saldo de testes autorizado; ainda não é garantia de preservação.

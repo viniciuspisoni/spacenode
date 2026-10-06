@@ -37,6 +37,14 @@ const baseOptions: GenerateOptions = {
 }
 
 describe('render_only: system prompt antes do prompt do usuário', () => {
+  it('photographic directions cannot request new grain or micro-texture on a plain CAD surface', () => {
+    const prompt = buildFidelityPrompt({...baseOptions, materials: {}}, 'maximum')
+    expect(prompt).not.toContain('real-world physically-based materials and natural micro-texture')
+    expect(prompt).not.toContain('real micro-texture, grain')
+    expect(prompt).not.toContain('concrete and stone with grain')
+    expect(prompt).toContain('Realism comes from lighting, not added grain')
+    expect(prompt).toContain('Visible panel grooves or tile joints do not imply wood grain')
+  })
   it('realismo e retry não autorizam substituição genérica de materiais; overrides explícitos continuam disponíveis', () => {
     const prompt = buildFidelityPrompt(baseOptions, 'maximum', undefined, { attempt: 2 })
     expect(prompt).toContain('Material identity is fixed by default')
