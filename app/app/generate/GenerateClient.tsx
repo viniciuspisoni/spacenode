@@ -1004,6 +1004,26 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
               que está no seu modelo.
             </p>
           )}
+
+          {(!outputUrl || !useAnchor) && (
+            <details className="spn-field">
+              <summary className="spn-field-label" style={{ cursor: 'pointer' }}>
+                Orientações para a imagem (opcional){refinementText.trim() ? ' · preenchido' : ''}
+              </summary>
+              <label htmlFor="render-direction" className="spn-hint" style={{ display: 'block' }}>
+                Descreva como você quer apresentar o projeto. A geometria e o enquadramento são preservados.
+              </label>
+              <textarea
+                id="render-direction"
+                className="spn-textarea"
+                value={refinementText}
+                onChange={e => setRefinementText(e.target.value)}
+                placeholder="Ex.: luz suave e sem reflexos intensos no painel de madeira à direita."
+                rows={3}
+                disabled={loading}
+              />
+            </details>
+          )}
         </div>
 
         {/* Painel contextual: abre na própria sidebar, entre as linhas e o

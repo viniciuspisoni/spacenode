@@ -37,6 +37,15 @@ const baseOptions: GenerateOptions = {
 }
 
 describe('render_only: system prompt antes do prompt do usuário', () => {
+  it('applies first-render direction without an anchor while keeping the geometry lock', () => {
+    const instruction = 'Luz suave, sem reflexos intensos no painel à direita.'
+    const prompt = buildFidelityPrompt({ ...baseOptions, hasAnchor: false, refinementText: instruction }, 'maximum')
+    expect(prompt).toContain(`USER DIRECTION: "${instruction}"`)
+    expect(prompt.indexOf('RENDER-ONLY MODE')).toBeLessThan(prompt.indexOf('USER DIRECTION'))
+    expect(prompt).toContain('The direction never overrides the geometry lock')
+    expect(prompt).not.toContain('USER REFINEMENT REQUEST')
+    expect(buildFidelityPrompt({ ...baseOptions, refinementText: '   ' }, 'maximum')).not.toContain('USER DIRECTION')
+  })
   it('photographic directions cannot request new grain or micro-texture on a plain CAD surface', () => {
     const prompt = buildFidelityPrompt({...baseOptions, materials: {}}, 'maximum')
     expect(prompt).not.toContain('real-world physically-based materials and natural micro-texture')
