@@ -1036,7 +1036,8 @@ export async function POST(req: NextRequest) {
       (auditMode === '1' || auditBorderline || materialReviewRequired) &&
       remainingMs() > 20_000
     )
-      ? checkArchitecturalPreservation(inputUrl, outputUrl, 'STRICT_SOURCE_LOCK').catch((auditErr: unknown) => {
+      ? checkArchitecturalPreservation(inputUrl, outputUrl, 'STRICT_SOURCE_LOCK',
+          { materialInventory: materialReviewRequired ? resolvedBriefing?.material_inventory : undefined }).catch((auditErr: unknown) => {
           console.warn('[generate:fidelity] audit semântico indisponível (segue sem):', truncateErr(auditErr))
           return null
         })

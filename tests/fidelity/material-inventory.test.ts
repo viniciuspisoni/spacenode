@@ -1,9 +1,9 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { buildMaterialInventoryBlock, hasCurrentMaterialAnalysis, normalizeMaterialInventory } from '@/lib/ai/material-inventory'
 import { buildFidelityPrompt, type GenerateOptions } from '@/lib/prompts'
-import { parseCheck } from '@/lib/spaces/preserve-validate'
+import { checkArchitecturalPreservation, parseCheck } from '@/lib/spaces/preserve-validate'
 import { analyzeImage } from '@/lib/fidelity-engine'
-import { geminiVisionJson } from '@/lib/gemini'
+import { geminiMultiVisionJson, geminiVisionJson } from '@/lib/gemini'
 
 vi.mock('@/lib/gemini', () => ({ geminiVisionJson: vi.fn(), geminiMultiVisionJson: vi.fn() }))
 const inventory = [{surface: 'cabinet fronts', appearance: 'plain pale beige, smooth', pattern: 'no visible grain', certainty: 'ambiguous' as const}]
@@ -61,6 +61,35 @@ describe('material inventory grounded in input', () => {
   })
 })
 describe('material drift cannot hide behind geometry score', () => {
+  it('warns when a local changed verdict contradicts a high global score and false flag', () => {
+    const check = parseCheck(JSON.stringify({preserved: true, score: .95, material_changed: false,
+      attributes: {materiais: .9}, material_checks: [{surface: 'floor', original: 'plain gray', generated: 'gray stone veins', verdict: 'changed'}]}), ['floor'])
+    expect(check.warning).toBe(true)
+    expect(check.material_changed).toBe(true)
+    expect(check.material_review).toBe('changed')
+  })
+  it('does not pass a required local review that is missing, uncertain or incomplete', () => {
+    const healthy = {preserved: true, score: .95, material_changed: false, attributes: {materiais: .9}}
+    expect(parseCheck(JSON.stringify(healthy), ['floor']).material_review).toBe('unverified')
+    expect(parseCheck(JSON.stringify(healthy), ['floor']).warning).toBe(true)
+    const checks = [{surface: 'floor', original: 'gray', generated: 'gray', verdict: 'preserved'}]
+    expect(parseCheck(JSON.stringify({...healthy, material_checks: checks}), ['floor', 'cabinet']).warning).toBe(true)
+    expect(parseCheck(JSON.stringify({...healthy, material_checks: [{...checks[0], verdict: 'uncertain'}]}), ['floor']).material_review).toBe('uncertain')
+    expect(parseCheck(JSON.stringify({...healthy, material_checks: checks}), ['floor']).warning).toBe(false)
+  })
+  it('discards malformed local verdicts and bounds evidence instead of trusting approval strings', () => {
+    const check = parseCheck(JSON.stringify({preserved: true, score: .95, attributes: {materiais: .9},
+      material_checks: [null, {surface: 'floor', original: 'gray', generated: 'gray', verdict: 'true'}]}), ['floor'])
+    expect(check.material_checks).toEqual([])
+    expect(check.warning).toBe(true)
+  })
+  it('grounds the existing audit in the original inventory without adding another vision call', async () => {
+    vi.mocked(geminiMultiVisionJson).mockResolvedValue(JSON.stringify({preserved: true, score: .95, attributes: {materiais: .9}}))
+    const check = await checkArchitecturalPreservation('https://example.com/source.png', 'https://example.com/result.png', 'STRICT_SOURCE_LOCK', {materialInventory: inventory})
+    expect(vi.mocked(geminiMultiVisionJson)).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(geminiMultiVisionJson).mock.calls[0][0].user).toContain('cabinet fronts')
+    expect(check?.material_review).toBe('unverified')
+  })
   it('warns when materials fail despite preserved geometry and high overall score', () => {
     const check = parseCheck(JSON.stringify({preserved: true, score: .98, attributes: {materiais: .4}, notes: 'wood invented'}))
     expect(check.warning).toBe(true)

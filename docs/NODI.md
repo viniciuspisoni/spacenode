@@ -483,3 +483,9 @@ O inventário v2 registra limites normalizados opcionais por superfície na aná
 Não há nova chamada de geração/análise para criar a folha, nem Nodes adicionais. Coordenadas inválidas são descartadas; falhas nos recortes mantêm a geração com a referência completa. `RENDER_MATERIAL_REGION_CROPS=0` desliga o piloto. A contagem efetivamente anexada fica em `generation_log.material_region_count`. São recortes aproximados, **não máscaras de segmentação nem garantia de preservação por pixel**. O aviso agora menciona estrutura e materiais; a ação diz “Tentar corrigir”, sem prometer correção automática.
 
 Os dois ensaios anteriores consumiram 40 dos 60 Nodes aprovados e ainda alteraram materiais. Um novo ensaio com esta abordagem pode consumir os últimos 20 Nodes; aprovação depende de comparação visual, não apenas do score de geometria.
+
+### Resultado do ensaio local e revisão por superfície
+
+O terceiro ensaio (`35f2d055-ccd3-43c4-91b0-00e33e25a6b2`) confirmou inventário v2, quatro recortes anexados, ausência de âncora e a mesma seed do ensaio anterior. Consumiu os últimos 20 Nodes do lote (60/60). Ainda houve grão no armário e veios no piso na inspeção visual. O audit global retornou materiais 0,9 e warning=false: falso negativo, não aprovação de fidelidade.
+
+A avaliação passa a receber o inventário original na chamada de visão já existente e pedir original/gerado/veredito para cada superfície. Uma troca local prevalece sobre score global alto e flag contraditória. Incerteza ou falta de cobertura do inventário exigido gera aviso de conferência (uncertain/unverified), sem classificar automaticamente como troca. O caminho sem inventário mantém a compatibilidade; a análise continua best-effort e pode terminar em background. A correção do audit tem regressões locais, mas não foi validada com nova geração paga neste lote.
