@@ -1,4 +1,6 @@
 'use client'
+
+import RenderComparisonImages from '@/components/generate/RenderComparisonImages'
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -1322,25 +1324,10 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
                 }}
                 onDoubleClick={() => { setScale(1); setPan({ x: 0, y: 0 }) }}
               >
-                {/* Antes — dentro do wrapper transformável */}
-                <div style={{
-                  position:'absolute', inset:0,
-                  transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
-                  transformOrigin:'0 0',
-                  pointerEvents:'none',
-                }}>
-                  <img src={imagePreview} alt="Antes" style={S.stageImg} draggable={false} onLoad={readBeforeAspect}/>
-                </div>
-                {/* Depois — clip em coords do palco, transform aplicado dentro do clip */}
-                <div style={{...S.compareAfterWrap, clipPath:`inset(0 ${100-sliderPos}% 0 0)`, pointerEvents:'none'}}>
-                  <div style={{
-                    position:'absolute', inset:0,
-                    transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
-                    transformOrigin:'0 0',
-                  }}>
-                    <img src={outputUrl} alt="Depois" style={S.stageImg} draggable={false}/>
-                  </div>
-                </div>
+                <RenderComparisonImages
+                  before={imagePreview} after={outputUrl} sliderPos={sliderPos}
+                  pan={pan} scale={scale} imageStyle={S.stageImg} onBeforeLoad={readBeforeAspect}
+                />
                 {/* Handle do slider em coords do palco; ativa pointerEvents só no círculo
                     pra continuar arrastável quando zoomado (parent passa a iniciar pan). */}
                 <div style={{...S.compareHandle, left:`${sliderPos}%`}}>
@@ -1636,7 +1623,6 @@ const S: Record<string, React.CSSProperties> = {
   compareOuter:      { position:'relative', flex:1, minHeight:300, minWidth:0, display:'flex', alignItems:'center', justifyContent:'center' },
   compareStage:      { position:'relative', borderRadius:'var(--r-card)', overflow:'hidden', maxWidth:'100%', maxHeight:'100%', background:'var(--color-preview-bg)', border:'0.5px solid var(--glass-line)', boxShadow:'var(--shadow-float)', userSelect:'none' },
   stageImg:          { position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'fill', pointerEvents:'none' },
-  compareAfterWrap:  { position:'absolute', inset:0 },
   compareHandle:     { position:'absolute', top:0, bottom:0, width:2, background:'#ffffff', transform:'translateX(-50%)', display:'flex', alignItems:'center', justifyContent:'center', pointerEvents:'none' },
   compareHandleCircle: { width:34, height:34, borderRadius:'50%', background:'#ffffff', border:'0.5px solid rgba(0,0,0,0.1)', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 8px 22px rgba(0,0,0,0.26)' },
   compareLabel:      { position:'absolute', bottom:12, fontSize:9, letterSpacing:'0.12em', color:'#fafafa', textTransform:'uppercase', fontWeight:500, textShadow:'0 1px 3px rgba(0,0,0,0.5)', pointerEvents:'none' },
