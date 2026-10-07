@@ -183,10 +183,14 @@ export function parseCheck(raw: string, requiredSurfaces: string[] = []): Preser
     return [{ surface: item.surface.trim().slice(0, 160), original: item.original.trim().slice(0, 300),
       generated: item.generated.trim().slice(0, 300), verdict: item.verdict }]
   }) : []
+  // A bounded or partially invalid response is not complete evidence of preservation.
+  const incompleteEvidence = Array.isArray(parsed.material_checks)
+    ? materialChecks.length !== parsed.material_checks.length
+    : parsed.material_checks !== undefined
   const missingSurface = requiredSurfaces.some(surface => !materialChecks.some(item => item.surface === surface))
   const materialReview = materialChecks.some(item => item.verdict === 'changed') ? 'changed' as const
     : materialChecks.some(item => item.verdict === 'uncertain') ? 'uncertain' as const
-    : missingSurface ? 'unverified' as const
+    : missingSurface || incompleteEvidence ? 'unverified' as const
     : materialChecks.length ? 'passed' as const : undefined
   // Per-surface evidence outranks a contradictory high overall score. Incomplete review is advisory.
   const warning = !preserved || score < WARNING_THRESHOLD || materialDrift || materialChanged === true ||
