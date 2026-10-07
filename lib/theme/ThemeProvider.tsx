@@ -5,10 +5,11 @@ import {
   useCallback,
   useContext,
   useEffect,
-  useState,
+  useSyncExternalStore,
   type ReactNode,
 } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { createBrowserPreference } from './browser-preference'
 
 export type ThemePreference = 'system' | 'light' | 'dark'
 export type ResolvedTheme = 'light' | 'dark'
@@ -25,14 +26,6 @@ type ThemeContextValue = {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null)
 
-function readStoredPreference(): ThemePreference {
-  try {
-    const v = localStorage.getItem(STORAGE_KEY)
-    if (v === 'light' || v === 'dark' || v === 'system') return v
-  } catch {}
-  return 'system'
-}
-
 function systemPrefersLight(): boolean {
   return window.matchMedia('(prefers-color-scheme: light)').matches
 }
@@ -47,20 +40,37 @@ function applyToDocument(resolved: ResolvedTheme) {
   document.documentElement.classList.toggle('light', resolved === 'light')
 }
 
+const preference = createBrowserPreference<ThemePreference>({
+  key: STORAGE_KEY,
+  fallback: 'system',
+  parse: raw => raw === 'light' || raw === 'dark' || raw === 'system' ? raw : null,
+  apply: value => applyToDocument(resolve(value)),
+})
+
+function subscribeSystem(listener: () => void) {
+  const mq = window.matchMedia('(prefers-color-scheme: light)')
+  const onChange = () => {
+    if (preference.getSnapshot() === 'system') applyToDocument(resolve('system'))
+    listener()
+  }
+  mq.addEventListener('change', onChange)
+  return () => mq.removeEventListener('change', onChange)
+}
+const serverPrefersLight = () => false
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  // 'dark' como default de SSR — o script inline do layout já aplicou a classe
-  // correta antes da hidratação, então não há flash; o estado converge no mount.
-  const [theme, setThemeState] = useState<ThemePreference>('system')
-  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>('dark')
+  // SSR stays stable; React reads browser preferences after hydration without
+  // resetting the class already applied by the inline anti-flash script.
+  const theme = useSyncExternalStore(preference.subscribe, preference.getSnapshot, preference.getServerSnapshot)
+  const prefersLight = useSyncExternalStore(subscribeSystem, systemPrefersLight, serverPrefersLight)
+  const resolvedTheme: ResolvedTheme = theme === 'system' ? (prefersLight ? 'light' : 'dark') : theme
 
   useEffect(() => {
-    const pref = readStoredPreference()
-    setThemeState(pref)
-    setResolvedTheme(resolve(pref))
-
+    if (preference.hasPreference()) return
+    const revision = preference.getRevision()
+    let cancelled = false
     // Sem preferência local (device novo): adota a do perfil, se logado.
     // getSession é local (sem rede); o select só roda com sessão ativa.
-    if (localStorage.getItem(STORAGE_KEY) !== null) return
     void (async () => {
       try {
         const supabase = createClient()
@@ -75,51 +85,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
           .single()
         const remote = data?.theme_preference
         if (remote === 'light' || remote === 'dark' || remote === 'system') {
-          localStorage.setItem(STORAGE_KEY, remote)
-          setThemeState(remote)
-          const next = resolve(remote)
-          setResolvedTheme(next)
-          applyToDocument(next)
+          if (!cancelled) preference.adoptRemote(remote, revision)
         }
       } catch {}
     })()
-  }, [])
-
-  // Segue mudanças do SO enquanto a preferência for "system"
-  useEffect(() => {
-    if (theme !== 'system') return
-    const mq = window.matchMedia('(prefers-color-scheme: light)')
-    const onChange = () => {
-      const next = resolve('system')
-      setResolvedTheme(next)
-      applyToDocument(next)
-    }
-    mq.addEventListener('change', onChange)
-    return () => mq.removeEventListener('change', onChange)
-  }, [theme])
-
-  // Sincroniza entre abas
-  useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key !== STORAGE_KEY) return
-      const pref = readStoredPreference()
-      setThemeState(pref)
-      const next = resolve(pref)
-      setResolvedTheme(next)
-      applyToDocument(next)
-    }
-    window.addEventListener('storage', onStorage)
-    return () => window.removeEventListener('storage', onStorage)
+    return () => { cancelled = true }
   }, [])
 
   const setTheme = useCallback((pref: ThemePreference) => {
-    setThemeState(pref)
-    try {
-      localStorage.setItem(STORAGE_KEY, pref)
-    } catch {}
-    const next = resolve(pref)
-    setResolvedTheme(next)
-    applyToDocument(next)
+    preference.set(pref)
 
     // Persistência no perfil (cross-device) — fire-and-forget; a coluna pode
     // não existir ou o usuário pode estar deslogado, ambos são não-fatais.

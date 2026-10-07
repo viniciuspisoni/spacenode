@@ -12,6 +12,8 @@ import { getPlanById, type PlanId } from '@/lib/plans'
 import { deriveNodiContext } from '../context'
 import type { NodiContext } from '../types'
 import type { NodiAttachment } from './types'
+import { readRecentGenerations } from '../diagnostics'
+import { computeJourney, type NodiJourney } from '../journey'
 import { wrapUntrusted } from './system-prompt'
 
 export interface RequestContext {
@@ -22,6 +24,7 @@ export interface RequestContext {
   /** Nodes extras (avulsos, sem validade). */
   extras: number | null
   attachment: NodiAttachment | null
+  journey?: NodiJourney
 }
 
 export async function buildRequestContext(
@@ -29,6 +32,8 @@ export async function buildRequestContext(
   userId: string,
   route: string,
   attachment: NodiAttachment | null,
+  supabase?: SupabaseClient,
+  multimodal = false,
 ): Promise<RequestContext> {
   const nodi = deriveNodiContext(route)
   let planId: string | null = null
@@ -43,7 +48,10 @@ export async function buildRequestContext(
     // saldo indisponível não derruba a conversa — as tools reportam se preciso
   }
   const planName = planId ? getPlanById(planId as PlanId)?.name ?? planId : null
-  return { nodi, planId, planName, balance, extras, attachment }
+  const recent = supabase ? await readRecentGenerations(supabase, userId) : null
+  const journey = recent ? computeJourney({ recent: recent.generations, available: recent.available,
+    balance: balance !== null ? balance + (extras ?? 0) : null, multimodal }) : undefined
+  return { nodi, planId, planName, balance, extras, attachment, journey }
 }
 
 /** Bloco de contexto pro primeiro turno do modelo. */
@@ -56,7 +64,8 @@ export function contextBlock(ctx: RequestContext): string {
     ctx.planName ? `plano: ${ctx.planName}` : 'plano: desconhecido',
     ctx.balance !== null ? `saldo_nodes_mensais: ${ctx.balance}` : 'saldo_nodes_mensais: desconhecido',
     ctx.extras !== null && ctx.extras > 0 ? `saldo_nodes_extras: ${ctx.extras}` : null,
-    ctx.attachment ? `imagem_anexada: ${ctx.attachment.kind} ${ctx.attachment.id}` : 'imagem_anexada: nenhuma',
+    ctx.attachment ? ctx.attachment.kind === 'upload' ? 'imagem_anexada: print enviado pelo usuário (usar analisar_print; geração requer confirmação)' : `imagem_anexada: ${ctx.attachment.kind} ${ctx.attachment.id}` : 'imagem_anexada: nenhuma',
+    ctx.journey ? `jornada_confirmada_da_conta: ${JSON.stringify(ctx.journey)}` : null,
     ctx.nodi.extra ? `contexto_da_pagina: ${JSON.stringify(ctx.nodi.extra)}` : null,
   ].filter(Boolean)
   return wrapUntrusted('CONTEXTO DA SESSÃO', lines.join('\n'))

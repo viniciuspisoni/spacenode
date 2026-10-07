@@ -27,12 +27,13 @@ export default async function GeneratePage({
 
   const admin = createAdminClient()
 
-  // Conta renders do usuário (head-only) — 0 liga o Guia da primeira imagem.
+  // Tentativas com erro não removem o guia da primeira imagem concluída.
   // O .then() já dispara a requisição, correndo em paralelo com o bloco abaixo.
   const renderCountPromise = supabase
     .from('renders')
     .select('*', { count: 'exact', head: true })
     .eq('user_id', user.id)
+    .eq('status', 'completed')
     .then(({ count }) => count ?? 0)
 
   // Materiais/config são do PRÓPRIO usuário; o saldo exibido/gateado é da
@@ -75,6 +76,7 @@ export default async function GeneratePage({
       initialSourceUrl={sp.source}
       returnTo={returnTo}
       firstRender={renderCount === 0}
+      showPlanOffer={balance.planId === 'free' && !balance.pooled}
     />
   )
 }

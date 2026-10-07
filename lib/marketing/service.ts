@@ -517,7 +517,7 @@ export async function archiveAsset(admin: SupabaseClient, assetId: string): Prom
   if (error) throw new Error(`Falha ao arquivar asset: ${error.message}`)
 }
 
-/** Assets de marca (sem briefing) para a biblioteca. */
+/** Biblioteca interna: arquivos de marca e renders selecionados sem briefing. */
 export async function listBrandAssets(admin: SupabaseClient): Promise<ContentAsset[]> {
   const { data, error } = await mkt(admin)
     .from('content_assets')
@@ -525,11 +525,31 @@ export async function listBrandAssets(admin: SupabaseClient): Promise<ContentAss
     .is('brief_id', null)
     .eq('status', 'active')
     .order('created_at', { ascending: false })
-    .limit(200)
+    .limit(500)
   if (error) throw new Error(`Falha ao listar assets: ${error.message}`)
   const assets = (data ?? []) as ContentAsset[]
+  const renderIds = assets
+    .filter(a => a.source_type === 'render' && a.generation_id)
+    .map(a => a.generation_id as string)
+  const renderUrls = new Map<string, string>()
+  for (let i = 0; i < renderIds.length; i += 100) {
+    const { data: renders, error: renderError } = await admin.from('renders')
+      .select('id,output_url')
+      .in('id', renderIds.slice(i, i + 100))
+    if (renderError) throw new Error(`Falha ao carregar imagens selecionadas: ${renderError.message}`)
+    for (const render of renders ?? []) {
+      if (render.output_url) renderUrls.set(render.id as string, render.output_url as string)
+    }
+  }
   await Promise.all(assets.map(async a => {
-    a.display_url = await signMarketingAssetUrl(admin, a.storage_path)
+    if (a.storage_path) {
+      a.display_url = await signMarketingAssetUrl(admin, a.storage_path)
+    } else if (a.source_type === 'render') {
+      const url = (a.generation_id && renderUrls.get(a.generation_id)) || a.metadata?.origin_url
+      a.display_url = typeof url === 'string' ? await signStorageUrl(admin, url) : null
+    } else {
+      a.display_url = null
+    }
   }))
   return assets
 }

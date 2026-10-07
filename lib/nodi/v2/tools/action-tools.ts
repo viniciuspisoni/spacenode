@@ -7,6 +7,7 @@
 
 import { ENGINE_ORDER, isValidCombination, getNodesCost, type EngineId, type Resolution } from '@/lib/engines'
 import { signIntent } from '../../v3/intents'
+import { resolveUploadImages } from '../uploads'
 import { resolveGenerationImages } from '../images'
 import { getVideoModel, listAvailableVideoModels } from '@/lib/video/models'
 import { getEnabledModules } from '@/lib/nav/modules-config'
@@ -296,20 +297,24 @@ export const actionTools: NodiTool[] = [
       if (tipo === 'start_generation') {
         const preflight = await buildPreflight(ctx, moduleId, settings, prompt, args.imagem_rotulo as string | undefined)
         const action: SupervisedAction = {
-          id: actionId(), type: tipo, label,
+          id: actionId(), type: tipo,
+          label: preflight.estimatedNodes !== null ? `Gerar por ${preflight.estimatedNodes} nodes` : label,
           moduleId, prompt, settings, preflight,
         }
 
         // V3: origem resolvível + projeto + custo computável → intent assinada
         // (confirmar EXECUTA; sem isso, confirmar abre a ferramenta preenchida).
         if (ctx.capabilities.execute && moduleId === 'renderizar' && preflight.estimatedNodes !== null) {
-          const srcKind = (args.source_kind as string) ?? ctx.request.attachment?.kind
-          const srcId = (args.source_id as string) ?? ctx.request.attachment?.id
+          const uploaded = ctx.request.attachment?.kind === 'upload' ? ctx.request.attachment : null
+          const srcKind = uploaded?.kind ?? (args.source_kind as string) ?? ctx.request.attachment?.kind
+          const srcId = uploaded?.id ?? (args.source_id as string) ?? ctx.request.attachment?.id
           const projeto = args.projeto as 'interior' | 'exterior' | undefined
           if (srcKind && srcId && projeto) {
-            const imgs = await resolveGenerationImages(
-              ctx.supabase, ctx.userId, srcKind as Parameters<typeof resolveGenerationImages>[2], srcId,
-            )
+            const imgs = srcKind === 'upload'
+              ? await resolveUploadImages(ctx.admin, ctx.userId, srcId)
+              : await resolveGenerationImages(
+                  ctx.supabase, ctx.userId, srcKind as Parameters<typeof resolveGenerationImages>[2], srcId,
+                )
             const inputUrl = imgs?.inputUrl ?? imgs?.outputUrl
             if (inputUrl) {
               action.executable = true
@@ -319,14 +324,16 @@ export const actionTools: NodiTool[] = [
                 cost: preflight.estimatedNodes,
                 params: {
                   inputUrl,
-                  anchorUrl: imgs?.outputUrl ?? undefined,
+                  // The previous output may already contain material drift.
+                  // Keep the selected generation's input as material authority.
                   projectType: projeto,
                   engine: settings.engine ?? 'vega',
                   resolution: settings.resolution ?? '2k',
                   refinementText: prompt,
                 },
               })
-              preflight.imageLabel = preflight.imageLabel ?? `${imgs!.label} existente`
+              preflight.imageLabel = srcKind === 'upload' ? 'Print enviado' : (preflight.imageLabel ?? `${imgs!.label} existente`)
+              preflight.risks = preflightRisks(preflight)
             }
           }
         }

@@ -137,6 +137,15 @@ export interface MemoryProposal {
   reason: string
 }
 
+export interface NodiReview {
+  summary: string
+  decision: string
+  reason: string
+  findings: AnalysisFinding[]
+  comparison?: AnalysisReport['comparison']
+  reference?: { kind: GenerationKind; id: string }
+}
+
 // ── Envelope da resposta V2 ───────────────────────────────────────────────────
 
 export interface NodiV2Usage {
@@ -164,13 +173,13 @@ export interface NodiV2Answer {
   /** V4: execução feita pelo próprio fluxo (autopiloto) */
   executed?: { outputUrl: string; renderId: string | null; cost: number; auto: boolean }
   /** V4: avaliação visual pós-execução + decisão determinística */
-  review?: { summary: string; decision: string; reason: string; findings: { dimension: string; severity: string; note: string }[] }
+  review?: NodiReview
   usage?: NodiV2Usage
 }
 
 // ── Anexo de imagem da conversa (sempre resolvido server-side por id) ────────
 
 export interface NodiAttachment {
-  kind: GenerationKind
+  kind: GenerationKind | 'upload'
   id: string
 }

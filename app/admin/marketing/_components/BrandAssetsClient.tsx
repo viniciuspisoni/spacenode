@@ -19,6 +19,10 @@ const KINDS = [
 ]
 
 export function BrandAssetsClient({ initialAssets }: { initialAssets: ContentAsset[] }) {
+  const selectedImages = initialAssets
+    .filter(asset => asset.source_type === 'render' && typeof asset.metadata?.selection_number === 'number')
+    .sort((a, b) => Number(a.metadata.selection_number) - Number(b.metadata.selection_number))
+  const brandAssets = initialAssets.filter(asset => !selectedImages.includes(asset))
   const router = useRouter()
   const fileRef = useRef<HTMLInputElement>(null)
   const [kind, setKind] = useState('image')
@@ -81,10 +85,9 @@ export function BrandAssetsClient({ initialAssets }: { initialAssets: ContentAss
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Assets de marca</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Biblioteca de divulgação</h1>
           <p className="mt-1 text-sm text-text-secondary">
-            Logos, arquivos de marca, capas e referências — bucket privado, exibição por URL assinada.
-            Gerações do produto são vinculadas direto no briefing.
+            Imagens selecionadas para divulgação e arquivos de marca, disponíveis para preparar os briefings.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -114,13 +117,44 @@ export function BrandAssetsClient({ initialAssets }: { initialAssets: ContentAss
 
       {error && <p className="rounded-lg border border-error-border bg-error-bg px-3 py-2 text-sm text-error">{error}</p>}
 
-      {initialAssets.length === 0 ? (
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-base font-semibold">Imagens selecionadas ({selectedImages.length})</h2>
+          <p className="text-sm text-text-secondary">Seleção aprovada para a biblioteca interna. A publicação depende da autorização do autor.</p>
+        </div>
+        {selectedImages.length === 0 ? (
+          <p className="rounded-xl border border-border bg-bg-elevated p-6 text-sm text-text-tertiary">Nenhuma imagem selecionada cadastrada.</p>
+        ) : (
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-6">
+            {selectedImages.map(asset => (
+              <div key={asset.id} className="overflow-hidden rounded-lg border border-border bg-bg-elevated">
+                {asset.display_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- URL assinada do render
+                  <img src={asset.display_url} alt={`Imagem selecionada ${asset.metadata.selection_number}`} className="aspect-square w-full object-cover" />
+                ) : (
+                  <div className="flex aspect-square items-center justify-center px-2 text-center text-xs text-text-tertiary">Prévia indisponível</div>
+                )}
+                <div className="space-y-1 px-2 py-2 text-[11px]">
+                  <p className="font-medium">Seleção #{String(asset.metadata.selection_number)}</p>
+                  {typeof asset.metadata.scene === 'string' && <p className="truncate" title={asset.metadata.scene}>{asset.metadata.scene}</p>}
+                  <p className="truncate text-text-tertiary" title={String(asset.metadata.source_account ?? '')}>{String(asset.metadata.source_account ?? 'Origem não informada')}</p>
+                  <p className="text-text-tertiary">{asset.metadata.author_permission_status === 'granted' ? 'Autorização registrada' : 'Autorização do autor pendente'}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold">Arquivos de marca ({brandAssets.length})</h2>
+      {brandAssets.length === 0 ? (
         <div className="rounded-xl border border-border bg-bg-elevated p-8 text-center text-sm text-text-tertiary">
-          Nenhum asset de marca ainda. Máx. 25 MB por arquivo — imagens, PDF ou MP4.
+          Nenhum arquivo de marca ainda. Máx. 25 MB por arquivo — imagens, PDF ou MP4.
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-6">
-          {initialAssets.map(asset => (
+          {brandAssets.map(asset => (
             <div key={asset.id} className="group overflow-hidden rounded-lg border border-border bg-bg-elevated">
               {asset.display_url && asset.mime_type?.startsWith('image/') ? (
                 // eslint-disable-next-line @next/next/no-img-element -- signed URL dinâmica de bucket privado
@@ -140,10 +174,10 @@ export function BrandAssetsClient({ initialAssets }: { initialAssets: ContentAss
           ))}
         </div>
       )}
+      </section>
 
       <p className="text-xs text-text-tertiary">
-        Validação: tipo e tamanho verificados na emissão e reconfirmados contra a metadata real do objeto.
-        Nada aqui é público — o bucket é privado e o acesso é exclusivo do painel.
+        Esta biblioteca é interna. Selecionar uma imagem não libera sua publicação; confirme a autorização do autor antes de divulgar.
       </p>
     </div>
   )

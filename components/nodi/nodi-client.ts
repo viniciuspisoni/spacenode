@@ -18,6 +18,7 @@ import type {
 } from '@/lib/nodi/types'
 import type { NodiAttachment, NodiV2Answer, ProjectMemory } from '@/lib/nodi/v2/types'
 import type { NodiV2Capabilities } from '@/lib/nodi/v2/flags'
+import type { NodiJourney } from '@/lib/nodi/journey'
 import type { NextBestAction } from '@/lib/nodi/v4/next-action'
 import type { NodiSettings } from '@/lib/nodi/v4/settings'
 
@@ -39,6 +40,7 @@ export interface NodiBootstrap {
   faq: { id: string; title: string }[]
   capabilities?: NodiV2Capabilities
   nextAction?: NextBestAction | null
+  journey?: NodiJourney | null
   settings?: NodiSettings | null
 }
 
@@ -114,6 +116,7 @@ export function chatV2(input: {
   route: string
   history: NodiTurn[]
   attachment: NodiAttachment | null
+  requireConfirmation?: boolean
 }) {
   return call<{ answer: NodiV2Answer }>('/api/nodi/v2/chat', {
     method: 'POST',

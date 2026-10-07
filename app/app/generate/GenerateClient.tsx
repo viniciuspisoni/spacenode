@@ -1,4 +1,6 @@
 'use client'
+
+import RenderComparisonImages from '@/components/generate/RenderComparisonImages'
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -15,6 +17,7 @@ import {
   getNodesCost, isEngineId, isResolution, isValidCombination,
 } from '@/lib/engines'
 import InsufficientNodesCta from '@/components/app/InsufficientNodesCta'
+import PostResultPlanOffer from '@/components/app/PostResultPlanOffer'
 import { RenderFeedback } from '@/components/app/RenderFeedback'
 import { consumeHandoff } from '@/components/nodi/actions-bus'
 import { uploadDirect } from '@/lib/storage/direct-upload-client'
@@ -49,6 +52,7 @@ interface GenerateClientProps {
   returnTo?:         'spaces/new'
   /** true = a conta nunca gerou uma render — o Guia da primeira imagem abre sozinho. */
   firstRender?:      boolean
+  showPlanOffer?:    boolean
 }
 
 // Persisted last-used render config (profiles.project_config — JSONB).
@@ -268,7 +272,7 @@ function resolveInitialConfig(cfg: ProjectConfig | null | undefined) {
   }
 }
 
-export function GenerateClient({ initialCredits, initialMaterials, initialConfig, initialSourceUrl, returnTo, firstRender = false, orionEnabled = false, orionProvider }: GenerateClientProps) {
+export function GenerateClient({ initialCredits, initialMaterials, initialConfig, initialSourceUrl, returnTo, firstRender = false, showPlanOffer = false, orionEnabled = false, orionProvider }: GenerateClientProps) {
   const init = resolveInitialConfig(initialConfig)
   const fromSpacesNew = returnTo === 'spaces/new'
   const supabase = createClient()
@@ -1002,6 +1006,26 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
               modelo.
             </p>
           )}
+
+          {(!outputUrl || !useAnchor) && (
+            <details className="spn-field">
+              <summary className="spn-field-label" style={{ cursor: 'pointer' }}>
+                Orientações para a imagem (opcional){refinementText.trim() ? ' · preenchido' : ''}
+              </summary>
+              <label htmlFor="render-direction" className="spn-hint" style={{ display: 'block' }}>
+                Descreva como você quer apresentar o projeto. A geometria e o enquadramento são preservados.
+              </label>
+              <textarea
+                id="render-direction"
+                className="spn-textarea"
+                value={refinementText}
+                onChange={e => setRefinementText(e.target.value)}
+                placeholder="Ex.: luz suave e sem reflexos intensos no painel de madeira à direita."
+                rows={3}
+                disabled={loading}
+              />
+            </details>
+          )}
         </div>
 
         {/* Painel contextual: abre na própria sidebar, entre as linhas e o
@@ -1300,25 +1324,10 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
                 }}
                 onDoubleClick={() => { setScale(1); setPan({ x: 0, y: 0 }) }}
               >
-                {/* Antes — dentro do wrapper transformável */}
-                <div style={{
-                  position:'absolute', inset:0,
-                  transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
-                  transformOrigin:'0 0',
-                  pointerEvents:'none',
-                }}>
-                  <img src={imagePreview} alt="Antes" style={S.stageImg} draggable={false} onLoad={readBeforeAspect}/>
-                </div>
-                {/* Depois — clip em coords do palco, transform aplicado dentro do clip */}
-                <div style={{...S.compareAfterWrap, clipPath:`inset(0 ${100-sliderPos}% 0 0)`, pointerEvents:'none'}}>
-                  <div style={{
-                    position:'absolute', inset:0,
-                    transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
-                    transformOrigin:'0 0',
-                  }}>
-                    <img src={outputUrl} alt="Depois" style={S.stageImg} draggable={false}/>
-                  </div>
-                </div>
+                <RenderComparisonImages
+                  before={imagePreview} after={outputUrl} sliderPos={sliderPos}
+                  pan={pan} scale={scale} imageStyle={S.stageImg} onBeforeLoad={readBeforeAspect}
+                />
                 {/* Handle do slider em coords do palco; ativa pointerEvents só no círculo
                     pra continuar arrastável quando zoomado (parent passa a iniciar pan). */}
                 <div style={{...S.compareHandle, left:`${sliderPos}%`}}>
@@ -1377,8 +1386,8 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
                   quando a estrutura foi verificada com folga (≥ 0.8). */}
               {fidelityWarning ? (
                 <div className="spn-error">
-                  A verificação estrutural detectou possíveis diferenças em relação ao
-                  projeto original.
+                  A verificação visual detectou possíveis diferenças de estrutura ou
+                  materiais em relação ao projeto original.
                   {/* Corrigir drift: re-gera com a MESMA seed, condicionamento
                       estrutural máximo (edge map + temperatura mínima) e sem
                       âncora — muda o condicionamento, não a amostra. */}
@@ -1388,7 +1397,7 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
                     style={{ display: 'block', marginTop: 8 }}
                     onClick={() => handleGenerate(undefined, { structuralBoost: true })}
                   >
-                    Corrigir automaticamente ({nodeCost} nodes)
+                    Tentar corrigir ({nodeCost} nodes)
                   </button>
                 </div>
               ) : fidelityScore !== null && fidelityScore >= 0.8 ? (
@@ -1527,7 +1536,9 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
                   </button>
                 )}
               </div>
-              {credits < nodeCost && (
+              {showPlanOffer && lastRenderId ? (
+                <PostResultPlanOffer key={lastRenderId} renderId={lastRenderId} nodeCost={nodeCost} />
+              ) : credits < nodeCost && (
                 <p className="spn-render-upgrade">
                   Seu projeto pode continuar. Veja os planos para receber novos Nodes mensais.{' '}
                   <Link href="/app/billing" onClick={() => track('cta_clicked', { cta: 'render_result_plans' })}>Ver planos →</Link>
@@ -1612,7 +1623,6 @@ const S: Record<string, React.CSSProperties> = {
   compareOuter:      { position:'relative', flex:1, minHeight:300, minWidth:0, display:'flex', alignItems:'center', justifyContent:'center' },
   compareStage:      { position:'relative', borderRadius:'var(--r-card)', overflow:'hidden', maxWidth:'100%', maxHeight:'100%', background:'var(--color-preview-bg)', border:'0.5px solid var(--glass-line)', boxShadow:'var(--shadow-float)', userSelect:'none' },
   stageImg:          { position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'fill', pointerEvents:'none' },
-  compareAfterWrap:  { position:'absolute', inset:0 },
   compareHandle:     { position:'absolute', top:0, bottom:0, width:2, background:'#ffffff', transform:'translateX(-50%)', display:'flex', alignItems:'center', justifyContent:'center', pointerEvents:'none' },
   compareHandleCircle: { width:34, height:34, borderRadius:'50%', background:'#ffffff', border:'0.5px solid rgba(0,0,0,0.1)', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 8px 22px rgba(0,0,0,0.26)' },
   compareLabel:      { position:'absolute', bottom:12, fontSize:9, letterSpacing:'0.12em', color:'#fafafa', textTransform:'uppercase', fontWeight:500, textShadow:'0 1px 3px rgba(0,0,0,0.5)', pointerEvents:'none' },

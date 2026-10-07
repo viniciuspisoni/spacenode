@@ -93,7 +93,7 @@ export default async function BillingPage({ searchParams }: Props) {
   // Ordenado por purchased_at — é a ordem em que o consumo os debita.
   const { data: extraRows } = await admin
     .from('lumen_packs')
-    .select('id, pack_size, nodes_initial, nodes_remaining, purchased_at, expires_at, status')
+    .select('id, pack_size, nodes_initial, nodes_remaining, purchased_at, expires_at, status, source_type')
     .eq('user_id', balance.payerId)
     .eq('status', 'active')
     .gt('expires_at', new Date().toISOString())
@@ -118,6 +118,7 @@ export default async function BillingPage({ searchParams }: Props) {
   return (
     <BillingClient
       notice={notice}
+      canceled={sp.canceled === 'true' && balance.planId === 'free' && !balance.pooled}
       resume={resume}
       plan={balance.planId}
       balance={{

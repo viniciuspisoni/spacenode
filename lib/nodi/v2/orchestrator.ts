@@ -12,6 +12,7 @@ import { logNodiEvent } from '../telemetry'
 import type { NodiTurn } from '../types'
 import { verifyIntent } from '../v3/intents'
 import { executeRenderIntent } from '../v4/executor'
+import { reviewSummary } from '../v4/review-policy'
 import { runAutoReview } from '../v4/review'
 import { DEFAULT_SETTINGS, checkAutoAllowance, getAutoSpentToday, type NodiSettings } from '../v4/settings'
 import {
@@ -36,6 +37,8 @@ export interface OrchestratorInput {
   capabilities: NodiV2Capabilities
   /** V4: modo de autonomia + limites (default copiloto) */
   settings?: NodiSettings
+  /** Review follow-ups prepare a proposal without automatic spending. */
+  requireConfirmation?: boolean
   /** V4: necessários pro autopiloto executar (chamada interna autenticada) */
   origin?: string
   cookie?: string
@@ -47,6 +50,7 @@ const FINAL_FALLBACK_TEXT =
 /** Merge de artefatos: campos únicos ficam com o ÚLTIMO; propostas acumulam (máx. 3). */
 export function mergeArtifact(target: NodiV2Answer, artifact: Partial<NodiV2Answer>): void {
   if (artifact.analysis) target.analysis = artifact.analysis
+  if (artifact.review) target.review = artifact.review
   if (artifact.plan) target.plan = artifact.plan
   if (artifact.promptSuggestion) target.promptSuggestion = artifact.promptSuggestion
   if (artifact.recommendation) target.recommendation = artifact.recommendation
@@ -61,7 +65,7 @@ function buildFirstTurn(input: OrchestratorInput, ctxBlock: string): string {
   const hist = input.history.length
     ? wrapUntrusted(
         'CONVERSA ANTERIOR',
-        input.history.slice(-8).map(t => `${t.role === 'user' ? 'Usuário' : 'Nodi'}: ${clampText(t.text, 300)}`).join('\n'),
+        input.history.slice(-8).map(t => `${t.role === 'user' ? 'Usuário' : 'Nodi'}: ${clampText(t.text, 700)}`).join('\n'),
       )
     : ''
   return [ctxBlock, hist, `Mensagem do usuário: ${clampText(input.message, 900)}`]
@@ -75,8 +79,10 @@ export async function runNodiV2(input: OrchestratorInput): Promise<NodiV2Answer 
 
   const startedAt = Date.now()
   const deadline = startDeadline()
-  const settings = input.settings ?? DEFAULT_SETTINGS
-  const request = await buildRequestContext(input.admin, input.userId, input.route, input.attachment)
+  const savedSettings = input.settings ?? DEFAULT_SETTINGS
+  const settings = input.requireConfirmation && savedSettings.mode === 'autopiloto'
+    ? { ...savedSettings, mode: 'copiloto' as const } : savedSettings
+  const request = await buildRequestContext(input.admin, input.userId, input.route, input.attachment, input.supabase, input.capabilities.multimodal)
   // consultor: analisa e recomenda — a tool de ação nem entra no toolset
   const tools = buildToolset(input.capabilities).filter(
     t => !(settings.mode === 'consultor' && t.name === 'propor_acao'),
@@ -155,9 +161,16 @@ export async function runNodiV2(input: OrchestratorInput): Promise<NodiV2Answer 
 
     if (!answer.text) answer.text = FINAL_FALLBACK_TEXT
 
+    if (input.attachment?.kind === 'upload' && answer.proposals?.some(p => p.executable)) {
+      // Applying a free handoff navigates away and marks the whole restored
+      // message done. Keep the executable, already-configured proposal in chat.
+      answer.proposals = answer.proposals.filter(p => p.executable)
+      answer.text = 'Preparei a geração a partir do print enviado. Confira a direção criativa, a imagem de partida e o custo no cartão. A geração só começa quando você confirmar.'
+    }
+
     // ── V4 · Autopiloto: executa a primeira proposta executável DENTRO dos
     //    limites; fora deles, a proposta fica aguardando confirmação normal.
-    if (settings.mode === 'autopiloto' && input.origin && input.cookie) {
+    if (settings.mode === 'autopiloto' && input.attachment?.kind !== 'upload' && input.origin && input.cookie) {
       const idx = (answer.proposals ?? []).findIndex(p => p.executable && p.intentToken)
       const proposal = idx >= 0 ? answer.proposals![idx] : null
       const intent = proposal?.intentToken ? verifyIntent(proposal.intentToken, input.userId) : null
@@ -176,12 +189,7 @@ export async function runNodiV2(input: OrchestratorInput): Promise<NodiV2Answer 
             if (settings.autoReview && input.capabilities.multimodal) {
               const review = await runAutoReview(intent.params.inputUrl, result.outputUrl, 30_000)
               if (review) {
-                answer.review = {
-                  summary: review.report.summary,
-                  decision: review.outcome.decision,
-                  reason: review.outcome.reason,
-                  findings: review.report.findings,
-                }
+                answer.review = { ...reviewSummary(review.report), reference: result.renderId ? { kind: 'render', id: result.renderId } : undefined }
               }
             }
           } else {

@@ -7,21 +7,9 @@ import { useEffect, useRef, useState } from 'react'
 // Modal full-screen que mostra o histórico de renders do usuário em grid e
 // permite seleção múltipla com ordem visível. Usa /api/renders/list para paginar.
 
-export interface PickerRender {
-  id:          string
-  output_url:  string | null
-  ambient:     string | null
-  style:       string | null
-  lighting:    string | null
-  created_at:  string
-}
-
-export interface PickedItem {
-  id:       string
-  imageUrl: string
-  label:    string
-  context:  string
-}
+import { initialPickerRenders, mergePickerRenders, pickerNextCursor, resolvePickerSelection,
+  type PickerRender, type PickedItem } from '@/lib/history/render-picker'
+export type { PickerRender, PickedItem } from '@/lib/history/render-picker'
 
 interface Props {
   minSelection: number
@@ -37,20 +25,17 @@ function toLabel(r: PickerRender): string {
   return r.ambient || r.style || 'Render'
 }
 
-function toContext(r: PickerRender): string {
-  return [r.style, r.lighting].filter(Boolean).join(' · ')
-}
-
 export default function RenderPicker({ minSelection, maxSelection, initialSelection = [], onConfirm, onClose }: Props) {
-  const [renders, setRenders] = useState<PickerRender[]>([])
+  const [renders, setRenders] = useState<PickerRender[]>(() => initialPickerRenders(initialSelection))
   const [cursor,  setCursor]  = useState<string | null>(new Date().toISOString())
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [hasMore, setHasMore] = useState(true)
   const [error,   setError]   = useState<string | null>(null)
 
   /** Lista de IDs selecionados em ORDEM (importante para numeração) */
   const [selectedIds, setSelectedIds] = useState<string[]>(initialSelection.map(i => i.id))
 
+  const inFlightRef = useRef<AbortController | null>(null)
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
   const escapeRef   = useRef<(e: KeyboardEvent) => void>(() => {})
   const dialogRef   = useRef<HTMLDivElement | null>(null)
@@ -99,32 +84,45 @@ export default function RenderPicker({ minSelection, maxSelection, initialSelect
     return () => window.removeEventListener('keydown', handler)
   }, [onClose])
 
-  async function loadMore() {
-    if (loading || !hasMore || !cursor) return
-    setLoading(true)
-    setError(null)
+  // One in-flight page, including Strict Mode effect replays. Aborted requests never update state.
+  async function fetchPage() {
+    if (!hasMore || !cursor || (inFlightRef.current && !inFlightRef.current.signal.aborted)) return
+    const controller = new AbortController()
+    inFlightRef.current = controller
     try {
-      const res  = await fetch(`/api/renders/list?cursor=${encodeURIComponent(cursor)}`)
+      const res = await fetch(`/api/renders/list?cursor=${encodeURIComponent(cursor)}`, { signal: controller.signal })
       const data = await res.json()
+      if (controller.signal.aborted) return
       if (!res.ok) throw new Error(data?.error ?? 'Erro')
-      const page: PickerRender[] = (data.renders ?? []).filter((r: PickerRender) => r.output_url)
-      setRenders(prev => [...prev, ...page])
-      if (page.length < PAGE_SIZE) {
-        setHasMore(false)
-        setCursor(null)
-      } else {
-        setCursor(page[page.length - 1].created_at)
-      }
+      const page: PickerRender[] = Array.isArray(data.renders) ? data.renders : []
+      setRenders(prev => mergePickerRenders(prev, page))
+      const next = pickerNextCursor(page, PAGE_SIZE)
+      setHasMore(next !== null)
+      setCursor(next)
+      setError(null)
     } catch (e) {
-      setError((e as Error).message)
+      if (!controller.signal.aborted) setError((e as Error).message)
     } finally {
-      setLoading(false)
+      if (inFlightRef.current === controller) {
+        inFlightRef.current = null
+        if (!controller.signal.aborted) setLoading(false)
+      }
     }
   }
 
-  // Carrega primeira página
+  function loadMore() {
+    if (!hasMore || !cursor || (inFlightRef.current && !inFlightRef.current.signal.aborted)) return
+    setLoading(true)
+    setError(null)
+    void fetchPage()
+  }
+
+  // Initial loading state is set at initialization; effects only start/cancel the request.
   useEffect(() => {
-    if (renders.length === 0 && hasMore) loadMore()
+    // Schedule the initial request so Strict Mode cleanup cancels it before replay.
+    const timer = window.setTimeout(() => void fetchPage(), 0)
+    return () => { window.clearTimeout(timer); inFlightRef.current?.abort() }
+    // Initial request only. Cursor changes are handled by the observer and retry button.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -149,20 +147,12 @@ export default function RenderPicker({ minSelection, maxSelection, initialSelect
   }
 
   function handleConfirm() {
-    const byId = new Map(renders.map(r => [r.id, r]))
-    const items: PickedItem[] = selectedIds
-      .map(id => byId.get(id))
-      .filter((r): r is PickerRender => !!r && !!r.output_url)
-      .map(r => ({
-        id:       r.id,
-        imageUrl: r.output_url!,
-        label:    toLabel(r),
-        context:  toContext(r),
-      }))
+    const items = resolvePickerSelection(selectedIds, renders, initialSelection)
     onConfirm(items)
   }
 
-  const canConfirm = selectedIds.length >= minSelection && selectedIds.length <= maxSelection
+  const confirmableCount = resolvePickerSelection(selectedIds, renders, initialSelection).length
+  const canConfirm = confirmableCount >= minSelection && confirmableCount <= maxSelection
 
   return (
     /* O scrim é o mesmo da folha (.spn-scrim): era aqui que morava o único
@@ -237,7 +227,10 @@ export default function RenderPicker({ minSelection, maxSelection, initialSelect
           )}
 
           {error && (
-            <div className="spn-error" style={{ marginBottom: 14 }}>{error}</div>
+            <div className="spn-error" style={{ marginBottom: 14 }}>
+              {error}
+              <button type="button" className="spn-ghost" onClick={loadMore} disabled={loading}>Tentar novamente</button>
+            </div>
           )}
 
           <div style={{
@@ -251,6 +244,17 @@ export default function RenderPicker({ minSelection, maxSelection, initialSelect
               const blocked = !isSel && selectedIds.length >= maxSelection
               return (
                 <div key={r.id}
+                  role="checkbox"
+                  aria-label={toLabel(r)}
+                  aria-checked={isSel}
+                  aria-disabled={blocked}
+                  tabIndex={blocked ? -1 : 0}
+                  onKeyDown={(event) => {
+                    if (!blocked && (event.key === ' ' || event.key === 'Enter')) {
+                      event.preventDefault()
+                      toggle(r.id)
+                    }
+                  }}
                   onClick={() => !blocked && toggle(r.id)}
                   style={{
                     position: 'relative', cursor: blocked ? 'not-allowed' : 'pointer',
@@ -321,8 +325,8 @@ export default function RenderPicker({ minSelection, maxSelection, initialSelect
         }}>
           <span className="spn-hint" style={{ marginTop: 0 }}>
             {selectedIds.length < minSelection
-              ? `Selecione mais ${minSelection - selectedIds.length} imagem${minSelection - selectedIds.length === 1 ? '' : 'ns'}.`
-              : `${selectedIds.length} imagem${selectedIds.length === 1 ? '' : 'ns'} selecionada${selectedIds.length === 1 ? '' : 's'}.`}
+              ? `Selecione mais ${minSelection - selectedIds.length} ${minSelection - selectedIds.length === 1 ? 'imagem' : 'imagens'}.`
+              : `${selectedIds.length} ${selectedIds.length === 1 ? 'imagem selecionada' : 'imagens selecionadas'}.`}
           </span>
           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
             <button type="button" className="spn-ghost" onClick={onClose}>Cancelar</button>

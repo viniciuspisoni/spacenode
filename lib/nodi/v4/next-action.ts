@@ -6,7 +6,6 @@
 // e testáveis; roda no bootstrap do painel (sem modelo, sem espera).
 
 import { getNodesCost } from '@/lib/engines'
-import { getUpscaleCost } from '@/lib/spaces/economy'
 import type { GenerationSummary } from '../types'
 
 export interface NextBestAction {
@@ -44,7 +43,7 @@ export function computeNextBestAction(input: NextActionInput): NextBestAction | 
     }
   }
 
-  if (balance !== null && balance < CHEAPEST_RENDER) {
+  if (!last && balance !== null && balance < CHEAPEST_RENDER) {
     return {
       identified: `Saldo de ${balance} nodes — abaixo do custo da geração mais barata (${CHEAPEST_RENDER}).`,
       action: 'Rever plano ou comprar Nodes extras',
@@ -56,7 +55,7 @@ export function computeNextBestAction(input: NextActionInput): NextBestAction | 
     }
   }
 
-  if (last?.status === 'processing' || last?.status === 'pending') {
+  if (last?.status === 'processing' || last?.status === 'pending' || last?.status === 'queued') {
     return {
       identified: `Há uma geração de ${last.tool} em andamento.`,
       action: 'Acompanhar o status',
@@ -68,35 +67,12 @@ export function computeNextBestAction(input: NextActionInput): NextBestAction | 
     }
   }
 
-  if (last?.status === 'completed' && last.kind === 'render') {
-    const upscaledAfter = recent.some(
-      g => g.kind === 'upscale' && (g.createdAt ?? '') > (last.createdAt ?? ''),
-    )
-    if (!upscaledAfter) {
-      return {
-        identified: `Render concluída (${last.engine ?? last.tool}) sem versão ampliada.`,
-        action: 'Ampliar a render aprovada',
-        why: 'Iterar em 2K e ampliar só a versão final é o caminho mais econômico para entrega.',
-        estimatedNodes: getUpscaleCost('2k'),
-        needsApproval: true,
-        kind: 'navigate',
-        href: '/app/upscale',
-      }
-    }
-  }
-
-  if (last?.status === 'completed' && (last.kind === 'upscale' || last.kind === 'render')) {
-    const hasVideo = recent.some(g => g.kind === 'video')
-    if (!hasVideo) {
-      return {
-        identified: 'Imagem finalizada sem vídeo de apresentação.',
-        action: 'Animar a imagem aprovada',
-        why: 'Um vídeo curto eleva a apresentação ao cliente sem novo trabalho de modelagem.',
-        estimatedNodes: 60,
-        needsApproval: true,
-        kind: 'chat',
-        chatPrompt: 'Quero animar minha última imagem para apresentar ao cliente. O que você sugere?',
-      }
+  if (last?.status === 'completed') {
+    return {
+      identified: `${last.tool} concluído — aprovação e entrega ainda não confirmadas.`,
+      action: 'Revisar o resultado antes de apresentar',
+      why: 'Confira a fidelidade ao projeto antes de ampliar, animar ou gerar novamente.',
+      estimatedNodes: 0, needsApproval: false, kind: 'navigate', href: '/app/history',
     }
   }
 

@@ -98,6 +98,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     label: 'ESCRITÓRIO',
     items: [
       { label: 'Equipe',     href: '/app/equipe',            exact: false, Icon: IconTeam      },
+      { label: 'Parcerias',  href: '/app/parcerias',         exact: false, Icon: IconTeam      },
       { label: 'Identidade', href: '/app/settings/identity', exact: false, Icon: IconIdentity },
       { label: 'Conta',      href: '/app/conta',             exact: false, Icon: IconAccount  },
       { label: 'Planos',     href: '/app/billing',           exact: false, Icon: IconPlans    },

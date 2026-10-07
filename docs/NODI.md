@@ -352,3 +352,140 @@ e chamados.
 Migration `20260718120000_nodi_v4_autonomy.sql` — APLICADA em dev+prod.
 Pendências V4: próxima ação por módulo (embutida nas ferramentas), execução
 de Ampliar/Animar no autopiloto, edição de status das etapas do plano na UI.
+
+
+## Evolução de jornada — 02/10/2026 (preparada para revisão)
+
+A auditoria do código confirmou três camadas existentes: suporte/FAQ (V1),
+orquestrador com ferramentas, análise e memória (V2), e execução de render
+supervisionada/autopiloto limitado (V3/V4). O painel mantém conversa em
+sessionStorage, não uma conversa durável entre dispositivos. A execução direta
+hoje cobre Renderizar; edição, ampliação e animação podem receber propostas e
+preenchimento nas telas, mas não devem ser anunciadas como executadas pelo chat.
+A seleção de anexo usa gerações existentes, sem upload inicial direto no chat.
+As capacidades continuam sujeitas às flags e ao gate de usuários internos.
+Esta revisão não altera flags, planos, cobrança, permissões nem schema.
+
+### Implementação desta etapa
+
+- `lib/nodi/journey.ts`: jornada determinística da conta: preparar a entrada,
+  acompanhar geração, diagnosticar falha, revisar imagem ou conferir vídeo para
+  apresentação. Status concluído não comprova aprovação ou entrega. A origem é
+  o histórico recente da conta, não somente o Space aberto.
+- `readRecentGenerations`: mantém sinal de indisponibilidade de qualquer fonte;
+  consulta parcial nunca é descrita como conta nova. Client autenticado e filtro
+  `user_id` continuam obrigatórios, com fallback de colunas existente.
+- Bootstrap entrega cartão de próxima etapa, sem cache privado. O mesmo estado
+  entra no contexto do orquestrador e em `consultar_jornada` sem depender de uma
+  decisão do modelo de buscar essa informação.
+- Resultados e imagens selecionadas mantêm referência por kind/id na conversa;
+  a referência não cruza Spaces. Resolução das imagens continua server-side por
+  dono da geração. Manter referência não dispara análise visual automaticamente.
+- Histórico inclui resultados executados e direção/configuração propostas,
+  limitados a oito turnos de até 700 caracteres. Não inclui URL da imagem nem
+  token de execução. Texto/dados continuam demarcados como não confiáveis.
+- Pedidos de ação e continuação não são desviados para FAQ; respostas
+  determinísticas exigem correspondência forte e distância da segunda candidata.
+- Confirmação textual de uma ação exige frase completa reconhecida. "Sim, mas
+  não gere ainda" e "ok quanto custa?" não executam a proposta pendente.
+- O cartão se atualiza após uma execução confirmada. Resultados completos
+  priorizam revisão, sem sugestão automática de nova despesa.
+
+### Validação e implantação
+
+Validação local concluída: 152 testes passaram (Nodi e base compartilhada do
+WhatsApp), verificação de tipos e lint dos arquivos alterados sem erros. Os testes usam dados fictícios e modelo simulado; não
+comprovam qualidade de respostas do provedor real nem entrega em produção.
+Esta etapa está somente no branch local `codex/nodi-journey` até autorização
+específica para publicar estes novos arquivos no repositório público. Não ampliar
+o gate de usuários nem iniciar gerações pagas como parte da instalação.
+Após publicação, testar com uma conta autorizada: objetivo inicial, revisão de
+imagem própria, pedido de ajuste, confirmação explícita e resultado no Histórico.
+
+### Próximas etapas para assistência de ponta a ponta
+
+1. Upload inicial no chat com validação de imagem, isolamento de Storage e
+   vínculo com projeto/vista: prepara a primeira geração sem exigir histórico.
+2. Registrar aprovação/rejeição explícita da versão, relacionar entrada e
+   derivados e acompanhar execução sem confundir imagens de outros projetos.
+3. Conversa durável por conta e projeto, com retomada entre dispositivos e
+   política de retenção; a memória de decisões atual continua confirmada.
+4. Integrar os executores reais de edição, ampliação e vídeo ao mesmo pré-voo,
+   reservas de execução e cobrança existentes; evitar caminhos paralelos.
+5. Avaliar qualidade com cenários completos de interiores/exteriores, recuperação
+   de falha e encaminhamento humano. Expandir acesso apenas após teste controlado.
+
+
+### Print direto no chat (2026-10-03)
+
+Quando V2 e multimodal estão habilitados para a conta, o painel permite enviar JPG, PNG ou WebP de até 8 MB. O arquivo vai diretamente para o bucket **privado** `spacenode-media`, sob o prefixo do próprio usuário; o servidor confere tamanho, MIME real, limite de 40 milhões de pixels, imagem estática e decodificação antes de emitir a referência cifrada. A referência é vinculada ao dono, expira em 24 horas e não entra no contexto textual do modelo. Esse prazo limita a referência da conversa, não apaga o arquivo do armazenamento; a limpeza por exclusão de conta já contempla o namespace do usuário.
+
+A tool `analisar_print` avalia a entrada quando solicitada. O envio não chama modelo nem gerador. Para gerar, a origem anexada tem prioridade sobre histórico de outros trabalhos. A proposta exibe custo e saldo e **sempre aguarda confirmação**, inclusive no Autopiloto. O executor, débito, estorno e histórico continuam no pipeline existente. Outros módulos mantêm seu encaminhamento atual.
+
+A URL temporária é usada somente no processamento. O registro da geração guarda o proxy autenticado da entrada, e o Nodi renova o acesso ao consultar esse resultado; isso evita perder a imagem-base após expirar o token de download. Não há nova tabela, migração, mudança de permissões do bucket ou ampliação de público. `POST /api/nodi/v2/upload` tem fases `sign` e `confirm`, com autenticação, gates existentes e limites por usuário. A assinatura falha se o bucket estiver público.
+
+Validação: testes de dono, adulteração, expiração, conteúdo inválido/truncado, MIME forjado, tamanho, gates, limites, persistência sem token temporário e geração bloqueada no Autopiloto até confirmação.
+
+Conferência em produção: envio privado e diagnóstico visual validados com print fictício, sem geração paga. A proposta executável permanece no chat: encaminhamentos gratuitos não tiram o usuário da confirmação, mesmo no Autopiloto. Rótulo de custo, referência de entrada e avisos do pré-voo são reconciliados pelo servidor após resolver a imagem.
+
+“Agora não” encerra as propostas daquela resposta e desativa seus botões. Cancelamento é separado do feedback “Não ajudou”; uma proposta cancelada não pode ser executada por uma confirmação textual posterior.
+
+### Revisão e próximo ajuste (2026-10-04)
+
+A comparação manual e a revisão após uma geração apresentam o que foi preservado, o que mudou e a orientação para continuar. A referência da revisão vem da geração resolvida pelo servidor para o próprio usuário. O botão de próximo ajuste mantém essa imagem e o Space; não troca pela imagem mais recente de outro trabalho.
+
+A classificação separa problemas de geometria de correções locais, inclusive escala de textura. Evidência vazia, problemas desconhecidos ou fidelidade inconclusiva pedem decisão do usuário. Problemas atribuídos à entrada orientam preparar a entrada antes de gastar mais Nodes. Ausência de problemas identificados não equivale à aprovação do usuário; ampliação não é apresentada como correção de geometria ou materiais.
+
+O próximo ajuste apenas preenche a conversa com a referência e a orientação. Ao enviar essa orientação, e ao iniciar a revisão pelo cartão da jornada, a requisição exige confirmação: o servidor aplica Copiloto apenas àquela requisição se o modo salvo for Autopiloto. Consultor mantém suas restrições e o modo salvo não muda. Nenhuma nova geração é iniciada pelo botão de revisão. A confirmação de custo e o executor existente continuam obrigatórios.
+
+Sem novas tabelas, permissões de armazenamento ou ampliação dos gates. Validação local: 184 testes de Nodi e WhatsApp, incluindo comparação com modelo simulado, vínculo da imagem e bloqueio de execução no Autopiloto durante a revisão. Esses testes não comprovam a qualidade visual do provedor em produção.
+
+### Preservação de materiais (2026-10-04)
+
+O contrato de Renderizar deixa de autorizar genericamente mudar materiais e texturas: realismo melhora a representação dos materiais existentes. O retry também mantém a mesma identidade, cor e acabamento. Pedidos explícitos de mudança e overrides de material continuam disponíveis; pedidos genéricos de melhorar ou refinar não devem ser tratados pelo Nodi como autorização de redesign.
+
+Novas propostas de Renderizar pelo Nodi usam a entrada da geração selecionada quando disponível, sem anexar seu resultado anterior como autoridade de materiais. Isso evita perpetuar deriva presente nesse resultado. Sem entrada disponível, a única referência é o resultado disponível; não se recupera automaticamente a origem de toda uma cadeia de edições. O comportamento de âncora fora do Nodi permanece disponível no pipeline normal.
+
+Comparação manual e automática passam a avaliar tipo, cor base, acabamento, veios, paginação, juntas e escala, apontando a superfície original → resultado. Trocas visíveis são problemas de fidelidade, não ganhos de realismo. Luz, sombras e reflexos plausíveis não exigem igualdade de pixels; referência ambígua exige incerteza. A revisão não decide se uma troca foi autorizada. Materiais, cores e acabamentos podem pedir restauração local sem confundir o rótulo “fidelidade dos materiais” com geometria.
+
+É orientação e diagnóstico visual, não garantia de identidade pixel a pixel nem um novo bloqueio automático por material. Os gates, custo, confirmação e execução existentes não mudam. Testes usam modelo simulado; validação de qualidade das novas instruções exige comparar gerações reais antes/depois com a mesma referência.
+
+Validação local: 279 testes passaram, dois cenários de benchmark opcional foram ignorados; tipos, lint dos arquivos alterados e verificação de whitespace concluídos. Inclui contrato de Renderizar e retry, propostas assinadas sem âncora de resultado alterado, comparação manual/automática e decisão local sobre materiais.
+
+A resposta de comparação é compacta para caber no orçamento de saída existente. Falhas da comparação manual retornam indisponibilidade sem aprovar a imagem e registram apenas categoria fixa, sem conteúdo ou mensagens do provedor. Regressão de falha com token privado aumenta a suíte para 280 testes aprovados.
+
+### Inventário de materiais por superfície (2026-10-05)
+
+A análise de entrada passa a registrar aparência, padrão e certeza por superfície na chamada de visão existente. Cores chapadas de CAD não permitem presumir madeira em armário ou pedra em piso cinza. O prompt mantém a imagem como autoridade, preserva aparência em casos ambíguos e aceita mudanças explícitas apenas nas superfícies solicitadas. O inventário tem limites de quantidade e tamanho e é persistido no briefing existente, sem migração de banco.
+
+O cache de Renderizar só reutiliza briefings com inventário válido da versão atual; descrições antigas recebem nova análise quando não há briefing explícito fornecido pelo caller. A auditoria semântica também roda em preservações com inventário mesmo quando a geometria passa, respeitando os limites de tempo e a configuração de desativação existentes. A chamada de análise tem maior teto de saída; a auditoria pode ocorrer mais frequentemente, aumentando o uso de visão no servidor, sem mudar o preço de Nodes configurado.
+
+Uma avaliação de materiais abaixo de 0,7 produz aviso mesmo com score geral alto. O diagnóstico permanece best-effort, pode terminar em background ou ficar indisponível e não bloqueia automaticamente o resultado. Não é garantia de preservação nem autorização para regenerar ou registrar aprovação do usuário.
+
+Validação local após incorporar a atualização de aquisição (#277): 906 testes passaram, cinco cenários opcionais foram ignorados; typecheck, lint dos arquivos alterados e whitespace passaram. Os modelos foram simulados nos testes: não houve nova geração paga nesta evolução. A eficácia visual continua pendente de uma nova amostra real; o piloto anterior revelou deriva em armário e piso.
+
+### Correção do aviso de materiais após piloto real (2026-10-06)
+
+O primeiro reteste com inventário confirmou extração por visão, mas a geração ainda substituiu o armário claro por madeira e adicionou textura de pedra ao piso. A auditoria descreveu as trocas, atribuiu 0,7 aos materiais e não avisou porque o limite usava `< 0.7`.
+
+O limite de materiais agora inclui 0,7. A resposta da auditoria também informa `material_changed` (true, false ou null para incerteza): uma troca explicitamente identificada gera aviso independentemente dos scores. Respostas antigas continuam aceitas e dados inválidos não se tornam confirmação de troca. Isto corrige diagnóstico; não prova que a geração passou a preservar materiais nem cria bloqueio de entrega.
+
+### Direção fotográfica sem inventar padrões (2026-10-06)
+
+Removidas as solicitações positivas genéricas de grão e microtextura nos blocos de intenção, tradução fotográfica, identidade de materiais e fecho da câmera. O realismo passa a ser solicitado por luz, reflexão e sombras, conservando os padrões mapeados existentes. Frisos de painel não constituem evidência de madeira e juntas de placas não constituem evidência de pedra; certeza sobre a aparência não equivale a certeza sobre a espécie de material.
+
+Validação local: 910 testes passaram, cinco cenários opcionais ignorados, tipos e lint passaram. A eficácia visual deste ajuste será avaliada com a mesma entrada e Vega 2K, dentro do saldo de testes autorizado; ainda não é garantia de preservação.
+
+## Referências locais de material — piloto de correção (2026-10-06)
+
+O inventário v2 registra limites normalizados opcionais por superfície na análise já existente. O caminho de correção (`structuralBoost`), em máxima fidelidade e sem âncora, refinamento ou troca explícita de material, pode anexar uma folha com até quatro recortes numerados dos pixels originais. O prompt distingue essa evidência local de um novo enquadramento ou escolha de acabamento. O mapa de bordas mantém seu índice correto depois das referências.
+
+Não há nova chamada de geração/análise para criar a folha, nem Nodes adicionais. Coordenadas inválidas são descartadas; falhas nos recortes mantêm a geração com a referência completa. `RENDER_MATERIAL_REGION_CROPS=0` desliga o piloto. A contagem efetivamente anexada fica em `generation_log.material_region_count`. São recortes aproximados, **não máscaras de segmentação nem garantia de preservação por pixel**. O aviso agora menciona estrutura e materiais; a ação diz “Tentar corrigir”, sem prometer correção automática.
+
+Os dois ensaios anteriores consumiram 40 dos 60 Nodes aprovados e ainda alteraram materiais. Um novo ensaio com esta abordagem pode consumir os últimos 20 Nodes; aprovação depende de comparação visual, não apenas do score de geometria.
+
+### Resultado do ensaio local e revisão por superfície
+
+O terceiro ensaio (`35f2d055-ccd3-43c4-91b0-00e33e25a6b2`) confirmou inventário v2, quatro recortes anexados, ausência de âncora e a mesma seed do ensaio anterior. Consumiu os últimos 20 Nodes do lote (60/60). Ainda houve grão no armário e veios no piso na inspeção visual. O audit global retornou materiais 0,9 e warning=false: falso negativo, não aprovação de fidelidade.
+
+A avaliação passa a receber o inventário original na chamada de visão já existente e pedir original/gerado/veredito para cada superfície. Uma troca local prevalece sobre score global alto e flag contraditória. Incerteza ou falta de cobertura do inventário exigido gera aviso de conferência (uncertain/unverified), sem classificar automaticamente como troca. O caminho sem inventário mantém a compatibilidade; a análise continua best-effort e pode terminar em background. A correção do audit tem regressões locais, mas não foi validada com nova geração paga neste lote.

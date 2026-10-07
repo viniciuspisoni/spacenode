@@ -1,0 +1,15 @@
+/** Both requested and automatic comparisons judge design identity, not beauty. */
+export const MATERIAL_IDENTITY_RULES =
+  'FIDELIDADE DE MATERIAIS: compare cada superfície visível com a PRIMEIRA imagem: ' +
+  'tipo de material, cor base, acabamento fosco/brilhante, padrão e direção de veios, paginação, juntas e escala da textura. ' +
+  'Identifique a superfície e descreva original → resultado. Troca visível de madeira, pedra, pintura, revestimento, cor, ' +
+  'acabamento ou padrão é problema de fidelidade de materiais, mesmo se o resultado parecer mais bonito ou realista. ' +
+  'Não chame substituição de material de melhoria. Diferencie mudança de identidade de variações plausíveis de luz, ' +
+  'sombra e reflexo; não exija igualdade de pixels. Se o material estiver ilegível, oculto ou ambíguo, indique atenção ' +
+  'e incerteza, sem adivinhar espécie, produto, cor exata ou aprovação de mudança pelo usuário. '
+
+
+export const MATERIAL_COMPARISON_RULES = MATERIAL_IDENTITY_RULES +
+  'RESPOSTA COMPACTA: no máximo 6 achados pertinentes, priorizando geometria e identidade dos materiais; ' +
+  'resumo até 240 caracteres, cada nota até 120 caracteres, preservado e alterado até 4 itens curtos cada, ' +
+  'veredito até 160 caracteres. Entregue JSON completo, sem repetir todos os critérios em achados separados. '

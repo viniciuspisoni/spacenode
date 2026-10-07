@@ -18,6 +18,7 @@ import {
 import { withSignupFlag } from '@/lib/analytics/auth-intent'
 import { signupAttributionMetadata } from '@/lib/analytics/signup-attribution'
 import { ATTRIBUTION_COOKIE, parseAttributionCookie } from '@/lib/marketing/ads/naming'
+import { REFERRAL_COOKIE, referralId } from '@/lib/referrals'
 
 type Mode = 'login' | 'signup'
 
@@ -269,11 +270,14 @@ function LoginForm() {
           // Origem e destino gravados na conta: o link de confirmação costuma
           // abrir em OUTRO navegador (app de e-mail), onde estes cookies não
           // existem — ver lib/analytics/signup-attribution.ts.
-          data: signupAttributionMetadata({
-            attribution: parseAttributionCookie(readBrowserCookie(ATTRIBUTION_COOKIE)),
-            anonymousId: readBrowserCookie(ANON_COOKIE),
-            next: nextPath,
-          }),
+          data: {
+            ...signupAttributionMetadata({
+              attribution: parseAttributionCookie(readBrowserCookie(ATTRIBUTION_COOKIE)),
+              anonymousId: readBrowserCookie(ANON_COOKIE),
+              next: nextPath,
+            }),
+            spn_referrer_id: referralId(readBrowserCookie(REFERRAL_COOKIE)),
+          },
         },
       })
       if (error) {

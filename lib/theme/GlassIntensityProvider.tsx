@@ -5,10 +5,11 @@ import {
   useCallback,
   useContext,
   useEffect,
-  useState,
+  useSyncExternalStore,
   type ReactNode,
 } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { createBrowserPreference } from './browser-preference'
 
 const STORAGE_KEY = 'glassIntensity'
 /** Metade da régua — a receita de vidro que já está em produção hoje
@@ -27,36 +28,30 @@ function clamp(v: number): number {
   return Math.max(0, Math.min(1, v))
 }
 
-function readStoredIntensity(): number | null {
-  try {
-    const v = localStorage.getItem(STORAGE_KEY)
-    if (v === null) return null
-    const n = Number(v)
-    return Number.isFinite(n) ? clamp(n) : null
-  } catch {
-    return null
-  }
-}
-
 /** Mesmo mecanismo do tema: propriedade custom em <html>, lida por TODO
  *  token --glass-* via calc() — nenhum componente aplica isto sozinho. */
 function applyToDocument(value: number) {
   document.documentElement.style.setProperty('--glass-intensity', String(value))
 }
 
+const preference = createBrowserPreference<number>({
+  key: STORAGE_KEY,
+  fallback: DEFAULT_INTENSITY,
+  parse: raw => {
+    if (raw === null || raw.trim() === '') return null
+    const value = Number(raw)
+    return Number.isFinite(value) ? clamp(value) : null
+  },
+  apply: applyToDocument,
+})
+
 export function GlassIntensityProvider({ children }: { children: ReactNode }) {
-  // O script anti-flash do layout já aplicou o valor salvo antes do
-  // primeiro paint; o estado converge no mount, sem flash perceptível
-  // (a variação de intensidade é sutil — não é o corte claro/escuro).
-  const [glassIntensity, setGlassIntensityState] = useState<number>(DEFAULT_INTENSITY)
+  const glassIntensity = useSyncExternalStore(preference.subscribe, preference.getSnapshot, preference.getServerSnapshot)
 
   useEffect(() => {
-    const stored = readStoredIntensity()
-    if (stored !== null) {
-      setGlassIntensityState(stored)
-      applyToDocument(stored)
-      return
-    }
+    if (preference.hasPreference()) return
+    const revision = preference.getRevision()
+    let cancelled = false
 
     // Sem preferência local (device novo): adota a do perfil, se logado.
     void (async () => {
@@ -73,35 +68,17 @@ export function GlassIntensityProvider({ children }: { children: ReactNode }) {
           .single()
         const remote = data?.glass_intensity
         if (typeof remote === 'number' && Number.isFinite(remote)) {
-          const clamped = clamp(remote)
-          localStorage.setItem(STORAGE_KEY, String(clamped))
-          setGlassIntensityState(clamped)
-          applyToDocument(clamped)
+          if (!cancelled) preference.adoptRemote(clamp(remote), revision)
         }
       } catch {}
     })()
-  }, [])
-
-  // Sincroniza entre abas.
-  useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key !== STORAGE_KEY) return
-      const stored = readStoredIntensity()
-      if (stored === null) return
-      setGlassIntensityState(stored)
-      applyToDocument(stored)
-    }
-    window.addEventListener('storage', onStorage)
-    return () => window.removeEventListener('storage', onStorage)
+    return () => { cancelled = true }
   }, [])
 
   const setGlassIntensity = useCallback((value: number) => {
     const clamped = clamp(value)
-    setGlassIntensityState(clamped)
-    try {
-      localStorage.setItem(STORAGE_KEY, String(clamped))
-    } catch {}
-    applyToDocument(clamped)
+    if (!Number.isFinite(value)) return
+    preference.set(clamped)
 
     // Persistência no perfil (cross-device) — fire-and-forget; a coluna
     // pode não existir ainda (migration não aplicada) ou o usuário pode

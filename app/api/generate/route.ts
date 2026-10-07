@@ -1,3 +1,4 @@
+import { persistentPrintUrl, refreshPrintUrl } from '@/lib/nodi/v2/uploads'
 import { NextRequest, NextResponse, after } from 'next/server'
 import { fal } from '@fal-ai/client'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -8,6 +9,7 @@ import { refundNodes } from '@/lib/billing/refund-nodes'
 import {
   buildFidelityPrompt,
   materialSurfaceEn,
+  isMaterialPreservationRequest,
   PRESERVE,
   isPreserved,
   type GenerateOptions,
@@ -71,6 +73,8 @@ import {
 import { fetchStorageBuffer, assertSafeFetchUrl } from '@/lib/storage/fetch'
 import { nearestSupportedAspectRatio } from '@/lib/ai/aspect-ratio'
 import { analyzeImage } from '@/lib/fidelity-engine'
+import { buildMaterialRegionSheet } from '@/lib/ai/fidelity/material-regions'
+import { hasCurrentMaterialAnalysis } from '@/lib/ai/material-inventory'
 import { DIRECT_UPLOAD_AREAS, downloadDirectUpload } from '@/lib/storage/direct-upload'
 import { normalizeSourceImage } from '@/lib/storage/normalize-image'
 import { createDisplayPreview } from '@/lib/storage/preview'
@@ -255,7 +259,7 @@ export async function POST(req: NextRequest) {
       materialRefs,
       fidelityMode  = 'strict',
       briefing,
-      inputUrl:     providedInputUrl,
+      inputUrl:     rawProvidedInputUrl,
       fidelityLevel: requestedFidelityLevel,
       anchorUrl,
       refinementText,
@@ -300,6 +304,13 @@ export async function POST(req: NextRequest) {
     }
     const client = detectClient(req.headers.get('user-agent'), rawClient)
     if (client.kind !== 'unknown') console.log('[generate] client     :', client.kind, client.version ?? '')
+
+    const providedInputUrl = typeof rawProvidedInputUrl === 'string' && rawProvidedInputUrl.startsWith('/api/media?')
+      ? await refreshPrintUrl(admin, user.id, rawProvidedInputUrl)
+      : rawProvidedInputUrl
+    if (rawProvidedInputUrl && !providedInputUrl) {
+      return NextResponse.json({ error: 'A imagem de entrada não está disponível nesta conta.' }, { status: 400 })
+    }
 
     // Fidelidade é SEMPRE máxima. Os níveis "Equilibrado"/"Criativo" foram
     // descontinuados (deixavam a IA alucinar no projeto) — o servidor coage
@@ -618,7 +629,7 @@ export async function POST(req: NextRequest) {
           .limit(1)
           .maybeSingle()
         const cachedBriefing = (cachedRender?.config_snapshot as { briefing?: unknown } | null)?.briefing
-        if (isBriefing(cachedBriefing)) {
+        if (isBriefing(cachedBriefing) && hasCurrentMaterialAnalysis(cachedBriefing)) {
           resolvedBriefing = cachedBriefing
           briefingSource = 'cache'
         }
@@ -746,12 +757,32 @@ export async function POST(req: NextRequest) {
     // Gate opcional de cor (score v2): só quando o usuário NÃO pediu mudança
     // que legitimamente altera cores — luz nova, override de material ou
     // refinamento. Nesses casos o ΔE alto é pedido, não drift.
+    const materialPreservationRequested = isMaterialPreservationRequest(options, materialRefs?.length ?? 0)
     const colorGateActive =
       renderOnlyActive &&
       fidelityCfg.maxColorDelta !== null &&
       (!lighting || lighting === 'Preservar Original') &&
-      !refinementText?.trim() &&
-      !materials
+      materialPreservationRequested
+
+    // Experimental local evidence on explicit correction only; never inherit a drifted render.
+    // No extra model call, no extra Nodes. Material overrides/refinements keep their existing path.
+    let materialRegionSheet: { imageIndex: number; surfaces: string[] } | undefined
+    if (renderOnlyActive && structuralBoost === true && !hasAnchor && materialPreservationRequested &&
+        materialSamples.length === 0 &&
+        process.env.RENDER_MATERIAL_REGION_CROPS !== '0' && remainingMs() > 60_000) {
+      try {
+        if (!originalBuffer) originalBuffer = await fetchStorageBuffer(inputUrl)
+        const sheet = await buildMaterialRegionSheet(originalBuffer, resolvedBriefing?.material_inventory)
+        if (sheet) {
+          const url = await hostAuxImage(sheet.png, 'image/png', 'original-material-regions.png')
+          baseImageUrls.push(url)
+          materialRegionSheet = { imageIndex: baseImageUrls.length, surfaces: sheet.surfaces }
+          baseImageLabels.push(`Image #${materialRegionSheet.imageIndex} — ORIGINAL SURFACE CLOSE-UPS (numbered original pixel crops, material evidence only; not a new composition):`)
+        }
+      } catch {
+        console.warn('[generate:fidelity] local material crops unavailable; keeping original reference')
+      }
+    }
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       const ladderAttempt = attempt + attemptOffset
@@ -830,6 +861,7 @@ export async function POST(req: NextRequest) {
         edgeMapImageIndex,
         edgeMapNative: edgeMapNative && edgeMapImageIndex !== null,
         depthMapImageIndex,
+        materialRegionSheet,
         materialSamples: materialSamples.length > 0 ? materialSamples : undefined,
       })
       devLog('[generate] prompt     :', finalPrompt)
@@ -1015,21 +1047,26 @@ export async function POST(req: NextRequest) {
     // Mesma checagem de visão do Spaces (checkArchitecturalPreservation):
     // volumetria, aberturas, telhado, proporções, câmera, materiais — pega o
     // que o Sobel não vê. Rodada por padrão só nos casos LIMÍTROFES (score
-    // < 0.80 ou indisponível) pra não taxar a latência do caminho feliz;
+    // < 0.80 ou indisponível) e nas preservações com inventário de materiais;
     // RENDER_SEMANTIC_AUDIT=1 força sempre, =0 desliga. Best-effort: falha
     // vira null e nada bloqueia a entrega.
     let preservationAudit: PreservationCheck | null = null
     const auditMode = process.env.RENDER_SEMANTIC_AUDIT ?? ''
     const auditBorderline = fidelityScore === null || fidelityScore < 0.8
+    // A geometry score cannot detect invented wood/stone. Check material-preserving
+    // renders with a current inventory even when the edges look correct. Explicit
+    // edits keep the existing audit policy; this checker has no requested-edit mask.
+    const materialReviewRequired = hasCurrentMaterialAnalysis(resolvedBriefing) && materialPreservationRequested
     // Audit (vision, ~segundos) e preview (download + sharp + upload) não
     // dependem um do outro — rodam em paralelo; o preview reaproveita o
     // buffer que o geometry score já baixou (antes baixava o master de novo).
     const auditPromise: Promise<PreservationCheck | null> = (
       renderOnlyActive && auditMode !== '0' &&
-      (auditMode === '1' || auditBorderline) &&
+      (auditMode === '1' || auditBorderline || materialReviewRequired) &&
       remainingMs() > 20_000
     )
-      ? checkArchitecturalPreservation(inputUrl, outputUrl, 'STRICT_SOURCE_LOCK').catch((auditErr: unknown) => {
+      ? checkArchitecturalPreservation(inputUrl, outputUrl, 'STRICT_SOURCE_LOCK',
+          { materialInventory: materialReviewRequired ? resolvedBriefing?.material_inventory : undefined }).catch((auditErr: unknown) => {
           console.warn('[generate:fidelity] audit semântico indisponível (segue sem):', truncateErr(auditErr))
           return null
         })
@@ -1115,7 +1152,7 @@ export async function POST(req: NextRequest) {
 
     const baseRow = {
       user_id:         user.id,
-      input_url:       inputUrl ?? null,
+      input_url:       inputUrl ? persistentPrintUrl(inputUrl, user.id) : null,
       output_url:      outputUrl,
       prompt:          finalPrompt,
       // Rótulo do histórico. "Preservar Original" não é nome de ambiente —
@@ -1178,6 +1215,7 @@ export async function POST(req: NextRequest) {
         briefing_source: briefingSource,
         anchor_used: hasAnchor,
         material_ref_count: materialSamples.length,
+        material_region_count: materialRegionSheet?.surfaces.length ?? 0,
         image_count: baseImageUrls.length,
         duration_ms: generationDurationMs,
         nodes_charged: nodesToCharge,

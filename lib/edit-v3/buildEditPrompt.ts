@@ -26,7 +26,14 @@ export const BASE_EDIT_PROMPT =
   'and architectural intent. Modify only the requested area or element. Do not ' +
   'redesign the project. Do not change unrelated materials, furniture, walls, ' +
   'ceiling, floor, windows, doors, or composition. Keep the result photorealistic ' +
-  'and architecturally plausible.'
+  'and architecturally plausible. ' +
+  'LIGHTING REPAIR EXCEPTION — If the user explicitly asks to remove or correct a reflection, glare, ' +
+  'highlight or light patch, that local lighting artifact is the edit target, not an architectural object. ' +
+  'The instruction to preserve lighting does not require preserving that named artifact. Repair only ' +
+  'the requested region by continuing the underlying surface color, texture, grain direction and joints ' +
+  'from its surroundings. Keep the surface itself and all geometry intact; do not invent a window, ' +
+  'opening or light source to explain the artifact. Preserve lighting and reflections everywhere else. ' +
+  'When no lighting repair is requested, preserve the existing lighting and reflections.'
 
 // ── Instrução por ação — COM máscara ─────────────────────────────────────────
 function actionInstructionMasked(action: EditV3Action, requestEn: string): string {

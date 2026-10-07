@@ -37,7 +37,68 @@ const baseOptions: GenerateOptions = {
   hasAnchor: false,
 }
 
+describe('interior light sources and legacy project notes', () => {
+  it.each(['Preservar Original', 'Natural Suave', 'Luz de Janela'])('bounds photographic lighting to supported sources with %s', lighting => {
+    const prompt = buildFidelityPrompt({ ...baseOptions, lighting }, 'maximum')
+    expect(prompt).toContain('LIGHT SOURCE CONSISTENCY')
+    expect(prompt).toContain('Do not invent off-camera windows')
+    expect(prompt).toContain('A lighting atmosphere changes the quality of light, not the location or existence of its sources')
+    expect(prompt).toContain('Explicit user constraints on source position, glare and reflections take priority')
+    expect(prompt).toContain('do not erase them globally')
+  })
+
+  it('treats notes-only instructions as scene directions, not a material replacement', () => {
+    const notes = 'No light enters from the right. Keep the curtains closed.'
+    const prompt = buildFidelityPrompt({ ...baseOptions, materials: { outros: notes } }, 'maximum')
+    expect(prompt).toContain(`USER PROJECT NOTES: "${notes}"`)
+    expect(prompt).not.toContain('MATERIAL OVERRIDES')
+    expect(prompt).not.toContain('additional notes:')
+    expect(prompt).toContain('Specific constraints on light sources, reflections and openings take priority')
+    expect(prompt).toContain('they never authorize changing geometry')
+  })
+
+  it('keeps actual surface overrides while separating free-text directions', () => {
+    const prompt = buildFidelityPrompt({ ...baseOptions, materials: { piso: 'grey stone', outros: 'Keep the curtain closed.' } }, 'maximum')
+    expect(prompt).toContain('MATERIAL OVERRIDES')
+    expect(prompt).toContain('flooring: grey stone')
+    expect(prompt).toContain('USER PROJECT NOTES')
+    expect(prompt.indexOf('USER PROJECT NOTES')).toBeGreaterThan(prompt.indexOf('Every surface NOT named'))
+    expect(buildFidelityPrompt({ ...baseOptions, materials: { outros: '   ' } }, 'maximum')).not.toContain('USER PROJECT NOTES')
+  })
+
+  it('does not apply the interior light-source policy to exteriors or legacy creative mode', () => {
+    expect(buildFidelityPrompt({ ...baseOptions, projectType: 'exterior' }, 'maximum')).not.toContain('LIGHT SOURCE CONSISTENCY')
+    expect(buildFidelityPrompt(baseOptions, 'creative')).not.toContain('LIGHT SOURCE CONSISTENCY')
+  })
+})
+
 describe('render_only: system prompt antes do prompt do usuário', () => {
+  it('applies first-render direction without an anchor while keeping the geometry lock', () => {
+    const instruction = 'Luz suave, sem reflexos intensos no painel à direita.'
+    const prompt = buildFidelityPrompt({ ...baseOptions, hasAnchor: false, refinementText: instruction }, 'maximum')
+    expect(prompt).toContain(`USER DIRECTION: "${instruction}"`)
+    expect(prompt.indexOf('RENDER-ONLY MODE')).toBeLessThan(prompt.indexOf('USER DIRECTION'))
+    expect(prompt).toContain('The direction never overrides the geometry lock')
+    expect(prompt).not.toContain('USER REFINEMENT REQUEST')
+    expect(buildFidelityPrompt({ ...baseOptions, refinementText: '   ' }, 'maximum')).not.toContain('USER DIRECTION')
+  })
+  it('photographic directions cannot request new grain or micro-texture on a plain CAD surface', () => {
+    const prompt = buildFidelityPrompt({...baseOptions, materials: {}}, 'maximum')
+    expect(prompt).not.toContain('real-world physically-based materials and natural micro-texture')
+    expect(prompt).not.toContain('real micro-texture, grain')
+    expect(prompt).not.toContain('concrete and stone with grain')
+    expect(prompt).toContain('Realism comes from lighting, not added grain')
+    expect(prompt).toContain('Visible panel grooves or tile joints do not imply wood grain')
+  })
+  it('realismo e retry não autorizam substituição genérica de materiais; overrides explícitos continuam disponíveis', () => {
+    const prompt = buildFidelityPrompt(baseOptions, 'maximum', undefined, { attempt: 2 })
+    expect(prompt).toContain('Material identity is fixed by default')
+    expect(prompt).not.toContain('you may change ONLY materials')
+    expect(prompt).not.toContain('as if projecting new materials')
+    expect(prompt).toContain('do not project new materials onto the scene')
+    expect(prompt).toContain('MATERIAL OVERRIDES')
+    expect(prompt).toContain('porcelanato cinza 90x90')
+  })
   it('contrato e locks precedem materiais do usuário', () => {
     const p = buildFidelityPrompt(baseOptions, 'maximum')
     const contract = p.indexOf('RENDER-ONLY MODE')

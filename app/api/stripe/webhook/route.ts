@@ -137,6 +137,28 @@ async function grantNodes(
   }
 }
 
+/** Uma fatura efetivamente paga concede o prêmio do plano do indicado.
+ * A RPC grava um pacote avulso com índice único por invoice, então reentregas
+ * do Stripe e a corrida checkout/invoice não duplicam o crédito. */
+async function grantPaidReferral(
+  supabase: SupabaseClient,
+  referredUserId: string,
+  invoice: Stripe.Invoice,
+  planId: string,
+): Promise<boolean> {
+  if (!invoice.id || (invoice.amount_paid ?? 0) <= 0) return true
+  const { error } = await supabase.rpc('grant_referral_nodes', {
+    referred_user_id_input: referredUserId,
+    invoice_id_input: invoice.id,
+    plan_input: planId,
+  })
+  if (error) {
+    console.error('[stripe webhook] grant_referral_nodes falhou:', error)
+    return false
+  }
+  return true
+}
+
 interface ActivationInput {
   userId:         string
   planId:         string
@@ -486,6 +508,9 @@ export async function POST(req: NextRequest) {
           stripeMetadata: subMetadata,
         })
         if (!ok) return NextResponse.json({ error: 'db' }, { status: 500 })
+        if (!await grantPaidReferral(supabase, userId, invoice, match.plan.id)) {
+          return NextResponse.json({ error: 'db' }, { status: 500 })
+        }
         return NextResponse.json({ received: true })
       }
 
@@ -558,6 +583,10 @@ export async function POST(req: NextRequest) {
         sourceId: invoiceKey,
       })
       if (!grant) return NextResponse.json({ error: 'db' }, { status: 500 })
+
+      if (!await grantPaidReferral(supabase, owner.id, invoice, match.plan.id)) {
+        return NextResponse.json({ error: 'db' }, { status: 500 })
+      }
 
       if (!grant.applied) {
         console.log(`[stripe webhook] renovação ${invoiceKey} já creditada — nada a fazer`)
