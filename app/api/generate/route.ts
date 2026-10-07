@@ -1030,11 +1030,12 @@ export async function POST(req: NextRequest) {
     // Audit (vision, ~segundos) e preview (download + sharp + upload) não
     // dependem um do outro — rodam em paralelo; o preview reaproveita o
     // buffer que o geometry score já baixou (antes baixava o master de novo).
-    const auditPromise: Promise<PreservationCheck | null> = (
+    const auditRequested = (
       renderOnlyActive && auditMode !== '0' &&
       (auditMode === '1' || auditBorderline || materialReviewRequired) &&
       remainingMs() > 20_000
     )
+    const auditPromise: Promise<PreservationCheck | null> = auditRequested
       ? checkArchitecturalPreservation(inputUrl, outputUrl, 'STRICT_SOURCE_LOCK',
           { materialInventory: materialReviewRequired ? resolvedBriefing?.material_inventory : undefined }).catch((auditErr: unknown) => {
           console.warn('[generate:fidelity] audit semântico indisponível (segue sem):', truncateErr(auditErr))
@@ -1197,6 +1198,7 @@ export async function POST(req: NextRequest) {
               // Auditoria de visão (volumetria/aberturas/câmera/materiais) —
               // null quando não rodou (caminho feliz ou desligada).
               semantic_audit: preservationAudit,
+              semantic_audit_status: auditDeferred ? 'pending' : preservationAudit ? 'completed' : auditRequested ? 'unavailable' : 'not_requested',
             }
           : null,
         // ── Piloto Orion: tudo que a comparação precisa ────────────────────
@@ -1293,8 +1295,7 @@ export async function POST(req: NextRequest) {
       after(async () => {
         try {
           const audit = await auditPromise
-          if (!audit) return
-          console.log(
+          if (audit) console.log(
             `[generate:fidelity] audit semântico (background): score=${audit.score.toFixed(2)} ` +
             `preserved=${audit.preserved} warning=${audit.warning}`,
           )
@@ -1303,7 +1304,7 @@ export async function POST(req: NextRequest) {
             .update({
               generation_log: {
                 ...logForUpdate,
-                fidelity: logForUpdate.fidelity ? { ...logForUpdate.fidelity, semantic_audit: audit } : null,
+                fidelity: logForUpdate.fidelity ? { ...logForUpdate.fidelity, semantic_audit: audit, semantic_audit_status: audit ? 'completed' : 'unavailable' } : null,
               },
             })
             .eq('id', renderId)
