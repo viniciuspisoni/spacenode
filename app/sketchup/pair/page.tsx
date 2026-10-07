@@ -77,9 +77,9 @@ export default function SketchUpPairPage() {
 
         {state === 'signed-out' && (
           <>
-            <p style={S.copy}>Entre na sua conta SPACENODE pra autorizar o plugin.</p>
+            <p style={S.copy}>Entre na sua conta SpaceNode pra autorizar o plugin.</p>
             <Link href={`/login?next=${encodeURIComponent(loginNext)}`} style={S.primary}>
-              Entrar na SPACENODE
+              Entrar na SpaceNode
             </Link>
           </>
         )}

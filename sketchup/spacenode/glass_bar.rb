@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# Barra flutuante NATIVA da SPACENODE (Windows) — 1.8.0.
+# Barra flutuante NATIVA da SpaceNode (Windows) — 1.8.0.
 #
 # Por que existe: a barra de vidro da 1.6.0–1.7.0 era um UI::HtmlDialog, e a
 # janela do HtmlDialog é do Qt, que REIMPÕE os próprios flags — não há como
@@ -216,7 +216,7 @@ module SpaceNode
           wnd_proc(hwnd, msg, wparam, lparam)
         end
         @class_name_w = wide(CLASS_NAME)
-        @title_w = wide('SPACENODE')
+        @title_w = wide('SpaceNode')
         hinst = @f[:module].call(null)
         cursor = @f[:cursor].call(null, Fiddle::Pointer.new(32_512)) # IDC_ARROW
         # WNDCLASSEXW, 80 bytes em x64. CS_DBLCLKS pro duplo clique da marca.

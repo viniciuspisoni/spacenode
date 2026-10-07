@@ -53,12 +53,12 @@ const LABELS = {
   pt: {
     panel: 'Abrir o painel · dois cliques giram a barra',
     capture: 'Capturar vista', generate: 'Gerar render', scene: 'Nova cena', edit: 'Editar este render',
-    needRender: 'Gere um render primeiro', offline: 'Conecte sua conta SPACENODE', busy: 'Gerando…',
+    needRender: 'Gere um render primeiro', offline: 'Conecte sua conta SpaceNode', busy: 'Gerando…',
   },
   en: {
     panel: 'Open the panel · double-click to rotate',
     capture: 'Capture view', generate: 'Generate render', scene: 'New scene', edit: 'Edit this render',
-    needRender: 'Generate a render first', offline: 'Connect your SPACENODE account', busy: 'Generating…',
+    needRender: 'Generate a render first', offline: 'Connect your SpaceNode account', busy: 'Generating…',
   },
 };
 
@@ -129,16 +129,17 @@ function iconSvg(id) {
   return svgDoc(ICON, ICON,
     '<g fill="none" stroke="#fff" stroke-opacity="0.95" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' + ICON_PATHS[id] + '</g>');
 }
-// N estrutural micro (28 px), lido do SVG oficial compartilhado.
+// N estrutural oficial (28 px), lido do SVG compartilhado com o site. Desde o
+// manual v2.1 (29/09/26) não existe mais versão 'micro' sólida: o mesmo contorno
+// de três partes (dois apoios e a ligação, juntas abertas) vale em todo tamanho —
+// por isso TODOS os <path> do arquivo entram, não só o primeiro.
 function markSvg() {
   const k = MARK / 64;
-  const source = fs.readFileSync(path.join(ROOT, 'public', 'brand', 'spacenode-symbol-micro.svg'), 'utf8');
-  const markPath = source.match(/<path d="([^"]+)"/)?.[1];
-  if (!markPath) throw new Error('N estrutural micro ausente');
+  const source = fs.readFileSync(path.join(ROOT, 'public', 'brand', 'spacenode-symbol.svg'), 'utf8');
+  const paths = [...source.matchAll(/<path d="([^"]+)"\/>/g)].map((m) => '<path d="' + m[1] + '"/>');
+  if (paths.length < 3) throw new Error('N estrutural incompleto em public/brand/spacenode-symbol.svg (esperava 3 paths, achei ' + paths.length + ')');
   return svgDoc(MARK, MARK,
-    '<g transform="scale(' + k + ')" fill="#fff" fill-opacity="0.95">' +
-    '<path d="' + markPath + '"/>' +
-    '</g>');
+    '<g transform="scale(' + k + ')" fill="#fff">' + paths.join('') + '</g>');
 }
 function spinSvg(frame) {
   const S = 20, c = S / 2, r = 7.6;

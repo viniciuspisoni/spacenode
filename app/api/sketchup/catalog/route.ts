@@ -60,7 +60,7 @@ const CATALOG_I18N_EN = {
     // ficam de reserva pra painel antigo): quem explica a escolha é esta
     // linha, que muda com a seleção — igual ao /app/generate.
     engineDescriptions: {
-      vega:   'Absolute fidelity. Final delivery; editing preserves the project pixel by pixel.',
+      vega:   'Final delivery. Closest to the model; edits keep what you did not ask to change.',
       pulsar: 'Iteration and volume. Fast exploration at high speed.',
       quasar: 'The house default: finish and fidelity in balance. Takes about 2 minutes.',
       orion:  'High-fidelity engine with a fast response.',
@@ -270,7 +270,9 @@ export async function GET(req: NextRequest) {
     // não existe atualização automática — sem isto, quem instalou uma vez
     // nunca fica sabendo que saiu versão nova. O plugin compara com a VERSION
     // dele e avisa; nunca bloqueia.
-    version: 9,
+    // v10 (plugin 1.9.0): engines[].supports.seed. O plugin descarta cache
+    // em disco com version < CATALOG_MIN_VERSION, então bump aqui + lá.
+    version: 10,
     pluginLatest: {
       version: PLUGIN_VERSION,
       path: PLUGIN_RBZ_PATH,
@@ -315,6 +317,10 @@ export async function GET(req: NextRequest) {
           // v8: o painel mostra a descrição embaixo da grade de motores —
           // sem ela o cartão era um nome de astronomia e um chavão.
           description: e.description,
+          // 1.9.0: a seed só chega ao fornecedor em Vega/Pulsar (schema do
+          // Seedream não tem). O painel usa pra não prometer lote "com a mesma
+          // semente" onde ela não se aplica.
+          supports: { seed: id !== 'quasar' },
           resolutions: e.resolutions.map(r => ({
             id: r,
             label: RESOLUTION_LABELS[r].label,
@@ -334,6 +340,7 @@ export async function GET(req: NextRequest) {
             name: ORION_CONFIG.name,
             tagline: ORION_CONFIG.tagline,
             description: ORION_CONFIG.description,
+            supports: { seed: false },
             resolutions: ORION_CONFIG.resolutions.map(r => ({
               id: r,
               label: RESOLUTION_LABELS[r].label,

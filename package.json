@@ -9,6 +9,13 @@
     "lint": "eslint",
     "dev:preview": "node scripts/dev-preview.mjs",
     "package:sketchup": "powershell -ExecutionPolicy Bypass -File scripts/package-sketchup-plugin.ps1",
+    "package:sketchup:posix": "node scripts/package-sketchup-plugin.mjs",
+    "package:sketchup:check": "node scripts/package-sketchup-plugin.mjs --check",
+    "package:sketchup:verify": "node scripts/package-sketchup-plugin.mjs --verify",
+    "verify:sketchup:ruby": "ruby scripts/verify-sketchup-ruby.rb",
+    "verify:sketchup:flow": "node scripts/verify-sketchup-flow.mjs",
+    "verify:sketchup:revisao": "node scripts/verify-sketchup-revisao.mjs",
+    "verify:sketchup": "npm run verify:sketchup:ruby && npm run verify:sketchup:flow && npm run verify:sketchup:revisao && npm run package:sketchup:verify",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

@@ -994,10 +994,15 @@ function fidelityModifier(level: FidelityLevel): string {
 // pelo NEGATIVE_BASE) e o LOCKED ELEMENTS separado (duplicava PROJECT FACTS).
 // O modelo lê isso como descrição factual da referência — instrução é o
 // header "must remain identical".
-function preservationBlock(briefing: BriefingArquitetonico): string {
+function preservationBlock(briefing: BriefingArquitetonico, modelFacts?: ModelFacts): string {
   const locked = briefing.elementos_preservar.length > 0
     ? `\n- Locked elements: ${briefing.elementos_preservar.join('; ')}`
     : ''
+  // 1.9.0: com a câmera MEDIDA pelo plugin (bloco MODEL FACTS), a câmera
+  // "vista" pelo auditor sai daqui — dois enunciados sobre a mesma coisa
+  // diluem o dado exato. Sem modelFacts (web) a linha fica como sempre.
+  const measuredCamera = Boolean(modelFacts?.camera && (modelFacts.camera.focalLengthMm || modelFacts.camera.fovDeg))
+  const cameraLine = measuredCamera ? '' : `- Camera: ${briefing.camera}\n`
   return (
     `PROJECT FACTS (from vision analysis — must remain identical to the reference):\n` +
     `- Type: ${briefing.tipo_projeto}\n` +
@@ -1005,7 +1010,7 @@ function preservationBlock(briefing: BriefingArquitetonico): string {
     `- Openings: ${briefing.aberturas}\n` +
     `- Visible materials (tentative labels; original image remains authoritative): ${briefing.materiais_aparentes}\n` +
     buildMaterialInventoryBlock(briefing.material_inventory) +
-    `- Camera: ${briefing.camera}\n` +
+    cameraLine +
     `- Surroundings: ${briefing.entorno}` +
     locked + '\n'
   )
@@ -1070,6 +1075,9 @@ function buildSceneContextBlock(
 export interface RenderOnlyPromptOpts {
   attempt?: number
   edgeMapImageIndex?: number | null
+  /** Edge map NATIVO do plugin (hidden-line da mesma câmera) — muda o texto
+   *  do bloco; false/ausente = bloco do web, byte a byte. */
+  edgeMapNative?: boolean
   /** Posição (1-based) do depth map de condicionamento em image_urls
    *  (experimental — RENDER_FIDELITY_DEPTH_MAP=1). */
   depthMapImageIndex?: number | null
@@ -1088,7 +1096,7 @@ export function buildFidelityPrompt(
 
   const anchor     = buildAnchorBlock(hasAnchor)
   const refinement = buildRefinementBlock(refinementText, hasAnchor, level)
-  const preserve   = briefing ? preservationBlock(briefing) : ''
+  const preserve   = briefing ? preservationBlock(briefing, modelFacts) : ''
   const allow      = briefing ? transformationBlock(briefing, level) : ''
   const matBlock   = buildMaterialsBlock(materials, projectType, level)
   const negative   = buildNegativePromptForFidelity(level, Boolean(hasAnchor))
@@ -1200,7 +1208,7 @@ export function buildFidelityPrompt(
       head +
       buildSceneContextBlock(projectType, segment, environment) +
       buildModelFactsBlock(modelFacts, preserveLighting) +
-      buildEdgeMapBlock(renderOnly?.edgeMapImageIndex) +
+      buildEdgeMapBlock(renderOnly?.edgeMapImageIndex, renderOnly?.edgeMapNative === true) +
       buildDepthMapBlock(renderOnly?.depthMapImageIndex) +
       buildMaterialRegionSheetBlock(renderOnly?.materialRegionSheet?.imageIndex, renderOnly?.materialRegionSheet?.surfaces) +
       refinement +

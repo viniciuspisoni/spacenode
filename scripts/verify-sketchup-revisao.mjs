@@ -9,6 +9,7 @@
  * HTTP sai: tudo fora das fixtures locais é bloqueado.
  *
  *   node scripts/verify-sketchup-revisao.mjs
+ *   SKETCHUP_TEST_CHANNEL=chrome node scripts/verify-sketchup-revisao.mjs
  *   node scripts/verify-sketchup-revisao.mjs --screenshots=.tmp/revisao
  */
 import assert from 'node:assert/strict';
@@ -350,7 +351,9 @@ const cases = [
 ];
 
 if (screenshotDir) await mkdir(screenshotDir, { recursive: true });
-const browser = await chromium.launch({ headless: true });
+// SKETCHUP_TEST_CHANNEL=chrome usa o Chrome instalado (sem `playwright install`), como o verify-sketchup-flow.
+const channel = process.env.SKETCHUP_TEST_CHANNEL;
+const browser = await chromium.launch({ headless: true, ...(channel ? { channel } : {}) });
 let failed = 0;
 try {
   for (const [name, test] of cases) {

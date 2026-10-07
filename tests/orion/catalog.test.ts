@@ -69,7 +69,8 @@ describe('/api/sketchup/catalog · motores', () => {
       ['4k', ORION_NODES['4k']],
     ])
     // Zero jargão técnico: nada de modelo/fornecedor/endpoint no payload.
-    expect(JSON.stringify(orion)).not.toMatch(/openai|gpt-image|fal|flare|sunburst/i)
+    // \bfal\b: o catálogo v10 leva `supports: { seed: false }` e "false" contém "fal".
+    expect(JSON.stringify(orion)).not.toMatch(/\bopenai\b|gpt-image|\bfal\b|flare|sunburst/i)
   })
 
   it('o cartão do Orion não carrega selo — nem em pt, nem na tradução EN', async () => {
@@ -96,5 +97,21 @@ describe('/api/sketchup/catalog · motores', () => {
     process.env.ORION_INTERNAL_ENABLED = '1'
     const res = await GET(req())
     expect(res.status).toBe(401)
+  })
+})
+
+// ── v10 (plugin 1.9.0): a semente só vale em Vega/Pulsar ──────────────────
+describe('/api/sketchup/catalog · v10 supports.seed', () => {
+  it('cada motor diz se a semente chega ao fornecedor; versão 10; pluginLatest bate com PLUGIN_VERSION', async () => {
+    const { PLUGIN_VERSION } = await import('@/lib/sketchup/plugin-release')
+    process.env.ORION_INTERNAL_ENABLED = '1'
+    const body = await catalog()
+    const byId = Object.fromEntries(body.engines.map((e: { id: string; supports?: { seed?: boolean } }) => [e.id, e.supports?.seed]))
+    expect(byId.vega).toBe(true)
+    expect(byId.pulsar).toBe(true)
+    expect(byId.quasar).toBe(false)
+    expect(byId.orion).toBe(false)
+    expect(body.version).toBe(10)
+    expect(body.pluginLatest.version).toBe(PLUGIN_VERSION)
   })
 })

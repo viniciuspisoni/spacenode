@@ -11,8 +11,8 @@ module SpaceNode
   module SketchUp
     unless defined?(EXTENSION)
       EXTENSION = ::SketchupExtension.new('SPACENODE', 'spacenode/main')
-      EXTENSION.description = 'Renderização fotorrealista das suas vistas do SketchUp com o motor de fidelidade da SPACENODE.'
-      EXTENSION.version = '1.8.1'
+      EXTENSION.description = 'Renderização fotorrealista das suas vistas do SketchUp com o motor de fidelidade da SpaceNode.'
+      EXTENSION.version = '1.9.0'
       EXTENSION.creator = 'SPACENODE TECNOLOGIA LTDA'
       EXTENSION.copyright = '2026 SPACENODE TECNOLOGIA LTDA'
 

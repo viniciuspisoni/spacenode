@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SPACENODE</title>
+  <title>SpaceNode</title>
   <style>
     /* ═══════════════════════════════════════════════════════════════════════
-       SpaceNode — Manual da Marca v2.0
+       SpaceNode — Manual da Marca v2.2
        Tokens de cor: espelho exato de app/globals.css (não inventar valores).
        Sobre eles, uma camada de vidro: superfícies translúcidas que borram o
        que passa por trás, com brilho especular na borda de cima e sombra na
@@ -40,9 +40,9 @@
       --inverse: #ffffff;
       --inverse-fg: #151618;
       --accent: #ffffff;
-      --accent-bg: rgba(255,255,255,0.09);
+      --accent-bg: rgba(255,255,255,0.08);
       --accent-border: rgba(255,255,255,0.22);
-      --accent-glow: rgba(255,255,255,0.45);
+      --accent-glow: rgba(255,255,255,0.16);
       --error: #e0584a;
       --error-bg: rgba(224,88,74,0.08);
       --error-border: rgba(224,88,74,0.20);
@@ -176,6 +176,17 @@
       :root { --glass: #141416; --glass-strong: #0e0e10; --glass-raised: #2a2a2e; }
       html.light { --glass: #ffffff; --glass-strong: #fbfbfd; --glass-raised: #ffffff; }
     }
+    /* Quem pediu menos transparência ao sistema recebe o mesmo vidro sólido
+       (espelho de app/globals.css). */
+    @media (prefers-reduced-transparency: reduce) {
+      #ambientImage { display: none; }
+      :root { --glass: #141416; --glass-strong: #0e0e10; --glass-raised: #2a2a2e; }
+      html.light { --glass: #ffffff; --glass-strong: #fbfbfd; --glass-raised: #ffffff; }
+      header.glass--chrome, .dock.glass--chrome, .tools.glass, .tabs.glass {
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+      }
+    }
 
     /* ── Material ─────────────────────────────────────────────────────────
        Painéis de leitura são sólidos; navegação e controles sobre a vista
@@ -307,8 +318,13 @@
       -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
     }
     .preview-overlay.is-visible { display: flex; }
-    .brand-loader { width: 34px; height: 34px; animation: pulse 2.2s ease-in-out infinite; }
-    @keyframes pulse { 0%,100% { opacity: 0.35 } 50% { opacity: 1 } }
+    /* Carregamento oficial (BrandLoader do site): os dois apoios e depois a
+       ligação, mesma curva e tempos de app/globals.css. */
+    .brand-loader { width: 34px; height: 34px; display: block; }
+    .brand-loader path { animation: sn-build 2.4s ease-in-out infinite both; }
+    .brand-loader path:nth-child(2) { animation-delay: .24s; }
+    .brand-loader path:nth-child(3) { animation-delay: .48s; }
+    @keyframes sn-build { 0%, 100% { opacity: .14 } 22%, 64% { opacity: 1 } }
     .overlay-text { font-size: 12px; color: #bdc2c8; }
     .overlay-elapsed { font-size: 11px; color: #8a8f97; font-variant-numeric: tabular-nums; }
     .overlay-cancel {
@@ -352,6 +368,9 @@
       margin: 7px 2px 0; min-height: 15px;
       font-size: 11px; line-height: 1.35; color: var(--text-3);
       transition: color 180ms var(--ease);
+      /* Dois avisos ao mesmo tempo (inclinação + sombras) a 380 px: duas
+         linhas e corta — nunca empurra o palco. */
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
     }
     .tools-hint.is-tip { color: var(--text-2); }
     .tools-hint.is-action { cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
@@ -406,7 +425,7 @@
       white-space: nowrap;
     }
     .seg.is-active { color: var(--text); font-weight: 600; }
-    .seg:disabled { opacity: 0.35; }
+    .seg:disabled, .seg.is-off { opacity: 0.35; }
 
     .tabpanel { display: none; }
     .tabpanel.is-active { display: block; animation: fade 260ms var(--ease); }
@@ -623,6 +642,9 @@
        do custo do RENDER — ao lado do botão de outra ação viram legenda errada. */
     .dock.is-aux .dock-head, .dock.is-aux .dock-summary, .dock.is-aux .reach, .dock.is-aux .insufficient { display: none !important; }
     .dock.is-batch .reach { display: none; }
+    /* Na aba Cenas o saldo é do LOTE (batchNote); o bloco do render único
+       mostrava outra conta por cima. */
+    .dock.is-batch .insufficient { display: none !important; }
     /* Criar Space é o passo seguinte do caderno, não um segundo botão
        principal: perde o preto e vira ação secundária de largura total. */
     #spaceButton { width: 100%; height: 36px; justify-content: space-between; margin-top: 14px; }
@@ -787,7 +809,7 @@
     }
 
     @media (prefers-reduced-motion: reduce) {
-      .brand-loader { animation: none; }
+      .brand-loader path { animation: none; opacity: 1; }
       * { transition: none !important; animation: none !important; }
     }
   </style>
@@ -809,7 +831,7 @@
   <header class="glass glass--chrome">
     <div class="brand">
       <picture><source media="(max-width: 480px)" srcset="assets/spacenode-symbol-reverse.svg"><img class="brand-logo--reverse" src="assets/spacenode-logo-horizontal.svg" alt="SpaceNode"></picture>
-      <picture><source media="(max-width: 480px)" srcset="assets/spacenode.svg"><img class="brand-logo--primary" src="assets/spacenode-logo-horizontal-dark.svg" alt="SpaceNode"></picture>
+      <picture><source media="(max-width: 480px)" srcset="assets/spacenode-symbol-dark.svg"><img class="brand-logo--primary" src="assets/spacenode-logo-horizontal-dark.svg" alt="SpaceNode"></picture>
     </div>
     <div class="header-actions">
       <div class="balance" id="balanceChip">
@@ -836,7 +858,7 @@
     <section class="connection glass" id="connection">
       <div>
         <div class="conn-status"><span class="conn-dot" id="connDot"></span><span id="connTitle">Desconectado</span></div>
-        <div class="conn-sub" id="connSub" aria-live="polite">Conecte sua conta SPACENODE</div>
+        <div class="conn-sub" id="connSub" aria-live="polite">Conecte sua conta SpaceNode</div>
       </div>
       <div class="conn-actions">
         <button class="ghost" id="disconnectButton" style="display:none" title="Sair da conta"><span id="signOutLabel">Sair</span></button>
@@ -858,7 +880,7 @@
     <!-- ── Palco ────────────────────────────────────────────────────────── -->
     <div class="stage">
       <div class="preview" id="preview">
-        <img id="resultImage" alt="Render SPACENODE">
+        <img id="resultImage" alt="Render SpaceNode">
         <div class="compare-clip" id="compareClip"><img id="captureCompareImage" alt=""></div>
         <img id="captureImage" alt="Vista capturada">
         <svg class="guides" id="guidesSvg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
@@ -876,7 +898,7 @@
           <span style="font-size:11px">Capture pra conferir o enquadramento — ou clique em Gerar direto.</span>
         </div>
         <div class="preview-overlay" id="previewOverlay">
-          <img class="brand-loader" src="assets/spacenode-symbol-reverse.svg" alt="">
+          <svg class="brand-loader" viewBox="0 0 64 64" fill="#ffffff" aria-hidden="true"><path d="M4 60V10L18 26V60Z"/><path d="M46 4H60V44L46 28Z"/><path d="M4 4H20L60 50V60H48Z"/></svg>
           <span class="overlay-text" id="overlayText">Gerando…</span>
           <span class="overlay-elapsed" id="overlayElapsed"></span>
           <button class="overlay-cancel" id="cancelButton">cancelar</button>
@@ -1020,9 +1042,9 @@
       </div>
 
       <div class="field">
-        <span class="field-label" id="L_description">Descrição <span>· opcional</span></span>
+        <span class="field-label" id="L_description">Refinar imagem <span>· opcional</span></span>
         <textarea id="prompt" placeholder="Direções específicas — ex.: piso de madeira clara, paredes off-white, decoração minimalista"></textarea>
-        <div class="hint">O que você não pedir aqui é preservado do jeito que está no modelo.</div>
+        <div class="hint">Pedidos aqui têm prioridade sobre a fidelidade ao modelo. Vazio, o render segue o que a captura mostra.</div>
       </div>
 
     </div>
@@ -1047,7 +1069,7 @@
           <span class="mname">Amostra do modelo (opcional)</span>
           <select id="editMaterialSelect"></select>
         </div>
-        <div class="batch-note">Só a alteração pedida muda — todo o resto do render é preservado. Edição recusada pelo controle de qualidade não é cobrada.</div>
+        <div class="batch-note">Só a alteração pedida muda — o resto do render fica como está. Edição recusada pelo controle de qualidade não é cobrada.</div>
         <div class="mask-tools" style="margin-top:8px">
           <button class="ghost" id="editBrowserButton">Editar no navegador</button>
         </div>
@@ -1092,13 +1114,13 @@
         <span class="field-label"><span id="L_scenes">Cenas do modelo</span> <span class="scenes-count" id="scenesCount"></span></span>
         <div class="pills" id="scenesPills"></div>
         <div class="history-empty" id="scenesEmpty" style="display:none">Crie cenas no SketchUp pra gerar o caderno inteiro de uma vez.</div>
-        <div class="batch-note" id="batchNote">Todas as cenas com os mesmos presets e a mesma semente — coerência de material e estilo no conjunto.</div>
+        <div class="batch-note" id="batchNote">Todas as cenas com os mesmos presets e a mesma semente — materiais e estilo tendem a ficar coerentes.</div>
         <div class="batch-progress" id="batchProgress"></div>
         <div class="history-grid" id="batchResults" style="margin-top:8px"></div>
         <div class="batch-actions" id="batchActions">
           <button class="ghost" id="batchSaveButton">Salvar as imagens</button>
           <button class="ghost" id="batchResumeButton" style="display:none">Retomar</button>
-          <button class="ghost" id="batchBuyButton" style="display:none">Comprar Nodes</button>
+          <button class="ghost" id="batchBuyButton" style="display:none">Comprar nodes</button>
         </div>
         <div class="batch-note" id="batchSaveNote"></div>
       </div>
@@ -1289,12 +1311,12 @@
     <div class="sheet-head"><span class="sheet-title" id="sheetOutputTitle">Saída</span><button class="sheet-done" type="button" data-close="1">Concluído</button></div>
     <div class="sheet-body" id="advanced">
       <div class="field">
-        <span class="field-label" id="L_engine">Motor de IA</span>
+        <span class="field-label" id="L_engine">Motor</span>
         <div class="cards cols-3" id="engineCards" role="radiogroup" aria-label="Motor"></div>
         <div class="hint" id="engineHint"></div>
       </div>
       <div class="field">
-        <span class="field-label" id="L_resolution">Qualidade de saída</span>
+        <span class="field-label" id="L_resolution">Qualidade</span>
         <div class="cards cols-3" id="resolutionCards" role="radiogroup" aria-label="Qualidade"></div>
         <div class="hint" id="resolutionHint"></div>
       </div>
@@ -1329,7 +1351,7 @@
       <div class="settings-field">
         <label id="L_theme">Tema</label>
         <div class="pills" id="themePills" role="radiogroup" aria-label="Tema"></div>
-        <div class="hint" id="themeHint" style="margin:7px 0 14px">Automático segue a preferência da sua conta SPACENODE — ou, sem ela, o tema do sistema.</div>
+        <div class="hint" id="themeHint" style="margin:7px 0 14px">Automático segue a preferência da sua conta SpaceNode — ou, sem ela, o tema do sistema.</div>
         <label id="L_language">Idioma</label>
         <div class="pills" id="languagePills" role="radiogroup" aria-label="Idioma" style="margin-bottom:14px"></div>
         <label id="L_videoSave">Vídeos</label>
@@ -1427,7 +1449,7 @@
     // (catalog.i18n.en.presets — o VALOR enviado à API segue pt-BR).
     var UI = {
       pt: {
-        connTitleOn: 'Conectado', connTitleOff: 'Desconectado', connSubEmpty: 'Conecte sua conta SPACENODE',
+        connTitleOn: 'Conectado', connTitleOff: 'Desconectado', connSubEmpty: 'Conecte sua conta SpaceNode',
         connect: 'Conectar', switchAccount: 'Trocar', signOut: 'Sair',
         emptyTitle: 'A vista atual do SketchUp vira o seu render.',
         emptySub: 'Capture pra conferir o enquadramento — ou clique em Gerar direto.',
@@ -1437,28 +1459,33 @@
         upscale2x: 'Ampliar 2x', upscale4x: 'Ampliar 4x',
         L_projectType: 'Tipo de projeto', L_segment: 'Segmento', L_environment: 'Espaço', L_lighting: 'Iluminação',
         L_sun: 'Sol na captura', L_elements: 'Elementos na cena', L_modelMaterials: 'Materiais do modelo',
-        L_engine: 'Motor de IA', L_resolution: 'Qualidade de saída',
+        L_engine: 'Motor', L_resolution: 'Qualidade',
         L_advanced: 'Avançado', L_history: 'Histórico', L_settings: 'Preferências',
         L_edit: 'Editar este render', L_space: 'Criar Space das cenas', L_scenes: 'Cenas do modelo',
         L_theme: 'Tema', L_language: 'Idioma', L_server: 'Servidor', save: 'Salvar',
-        L_description: 'Descrição', optional: '· opcional',
+        L_description: 'Refinar imagem', optional: '· opcional',
         promptPlaceholder: 'Direções específicas — ex.: piso de madeira clara, paredes off-white, decoração minimalista',
-        promptHint: 'O que você não pedir aqui é preservado do jeito que está no modelo.',
+        promptHint: 'Pedidos aqui têm prioridade sobre a fidelidade ao modelo. Vazio, o render segue o que a captura mostra.',
+        dockPrompt: 'refinamento',
         sunHint: 'Usa o sol real do modelo (data, hora e localização) — as sombras da captura guiam a luz do render.',
-        themeHint: 'Automático segue a preferência da sua conta SPACENODE — ou, sem ela, o tema do sistema.',
+        themeHint: 'Automático segue a preferência da sua conta SpaceNode — ou, sem ela, o tema do sistema.',
         matHint: 'Use as texturas reais do seu modelo como referência de material (até 4).',
         matCap: 'Até 4 materiais por geração.',
         nodes: 'nodes', recharge: 'Recarregar',
-        generateRender: 'Gerar render', generateVariation: 'Gerar variação deste render', generating: 'gerando…',
+        generateRender: 'Gerar render', generateVariation: 'Gerar variação deste render', generating: 'Gerando…',
         dockGoto: 'Ir para a configuração', kbdHint: 'Ctrl+Enter',
         dockOutputGoto: 'Trocar motor e resolução', perScene: 'por cena',
         anchorDropped: 'A câmera mudou desde o render anterior — gerado sem âncora.',
         condNoEdge: 'Sem mapa de arestas nesta geração (a estrutura veio da própria imagem).',
+        condEdgeEmpty: 'O mapa de estrutura saiu vazio (o estilo não desenha arestas) — a estrutura veio da própria imagem.',
+        condEdgeRejected: 'O mapa de estrutura foi descartado na verificação do servidor — a estrutura veio da própria imagem.',
+        condNoShadows: 'Render gerado com as sombras do modelo desligadas.',
+        condSourceJpeg: 'Captura enviada em JPEG (o PNG passou do teto de envio).',
         condMaterials: function (sent, req, names) { return sent + ' de ' + req + ' materiais enviados' + (names ? ' — ' + names : '') + '.'; },
         condNoSun: 'O preset de sol não foi aplicado — a captura saiu com o sol atual do modelo.',
         matUnsupported: 'Textura fora de jpg/png — não dá pra enviar como amostra.',
         matReason: { not_found: 'não encontrado', unsupported_format: 'formato não suportado', too_large: 'acima de 7,8 MB', export_failed: 'falha ao exportar', upload_failed: 'falha no envio' },
-        historyOpen: 'Trazer para o painel',
+        historyOpen: 'Trazer para o painel', historyInJournal: 'no diário deste arquivo',
         resultExpired: 'O link deste render venceu. Gere de novo ou abra pelo Histórico.',
         resultRefreshing: 'Atualizando o link do render… tente de novo em instantes.',
         reach: function (n) { return 'seu saldo dá para ~' + n + ' render' + (n === 1 ? '' : 's') + ' nessa configuração'; },
@@ -1466,22 +1493,26 @@
         costMath: function (c, h) { return 'Esta geração custa ' + c + ' · você tem ' + h; },
         buyCta: 'ver planos',
         orGenerate: function (e, l, c) { return e + ' · ' + l + ' por ' + c + ' nodes'; }, orPrefix: 'Ou gere em ',
-        nodesUsed: function (n) { return n + ' Nodes utilizados.'; }, renderDone: 'Render concluído.',
-        reviewFidelity: ' Revise a fidelidade antes de apresentar.',
+        nodesUsed: function (n) { return n + ' nodes utilizados.'; }, renderDone: 'Render concluído.',
+        reviewFidelity: ' A verificação estrutural encontrou possíveis diferenças em relação ao modelo.',
+        structureVerified: ' Estrutura conferida contra o modelo.',
+        fixAuto: function (c) { return 'Corrigir automaticamente · ' + c + ' nodes'; },
+        updateFooter: function (v) { return v + ' disponível — baixar'; },
         nodesLeft: function (n) { return n + ' nodes restantes'; },
         savedAt: function (p) { return 'Render salvo em ' + p; },
         historyEmpty: 'Seus renders aparecem aqui.', loadMore: 'Carregar mais',
         scenesEmpty: 'Crie cenas no SketchUp pra gerar o caderno inteiro de uma vez.',
         batchLabel: function (n) { return n > 0 ? 'Gerar ' + n + ' cena' + (n === 1 ? '' : 's') : 'Gerar cenas'; },
         batchRunning: 'gerando cenas…',
-        batchNote: 'Todas as cenas com os mesmos presets e a mesma semente — coerência de material e estilo no conjunto.',
+        batchNote: 'Todas as cenas com os mesmos presets e a mesma semente — materiais e estilo tendem a ficar coerentes.',
+        batchNoteNoSeed: 'Todas as cenas com os mesmos presets. Neste motor a semente não se aplica — pra coerência de paleta entre as cenas, prefira Vega ou Pulsar.',
         batchSave: function (n) { return 'Salvar as ' + n + ' imagens'; },
         batchSaving: function (d, t) { return 'Salvando ' + d + ' de ' + t + '…'; },
         batchSaved: function (n, dir) { return n + (n === 1 ? ' imagem salva' : ' imagens salvas') + ' em ' + dir; },
         batchSavedPartial: function (n, bad) { return n + ' salvas · ' + bad + (bad === 1 ? ' falhou' : ' falharam') + '. As que falharam seguem no Histórico.'; },
         batchResume: function (n) { return 'Retomar ' + n + (n === 1 ? ' cena' : ' cenas'); },
         batchResumeNote: function (n) { return n + (n === 1 ? ' cena não saiu' : ' cenas não saíram') + '. Retomar gera só o que falta — o que já saiu não é cobrado de novo.'; },
-        buyNodes: 'Comprar Nodes',
+        buyNodes: 'Comprar nodes',
         batchUncertain: function (n) { return n + (n === 1 ? ' delas caiu' : ' delas caíram') + ' com a rede — confira o Histórico antes de retomar, pra não gerar de novo o que já saiu.'; },
         updateTitle: function (v) { return 'Versão ' + v + ' disponível'; },
         updateAction: 'Baixar',
@@ -1491,7 +1522,7 @@
         batchPartial: function (ok, t, bad) { return ok + ' de ' + t + ' cenas geradas — ' + bad + ' falhou' + (bad === 1 ? '' : 'aram') + '. Nenhum node foi consumido nas que falharam.'; },
         batchCancelled: function (n) { return n + ' cena' + (n === 1 ? '' : 's') + ' gerada' + (n === 1 ? '' : 's') + ' antes do cancelamento.'; },
         failed: 'falhou',
-        editHint: 'A alteração acontece na IMAGEM do render — o modelo do SketchUp não muda. Só o que você pedir muda; o resto é preservado. Edição recusada pelo controle de qualidade não é cobrada.',
+        editHint: 'A alteração acontece na IMAGEM do render — o modelo do SketchUp não muda. Só o que você pedir muda; o resto fica como está. Edição recusada pelo controle de qualidade não é cobrada.',
         editPlaceholder: 'Ex.: trocar o piso por carvalho claro / remover o pendente sobre a bancada',
         editSample: 'Amostra do modelo (opcional)',
         maskSelect: 'Pintar área', maskDone: 'Concluir seleção', maskClear: 'Limpar seleção',
@@ -1514,7 +1545,7 @@
         revisionOpen: 'Abrir', revisionDelete: 'Apagar do arquivo',
         journalTitle: 'Neste arquivo', journalOnAccount: 'Na conta',
         reconcilingOverlay: 'Confirmando a edição no servidor…',
-        applyEdit: 'Aplicar edição', editing: 'editando…', editingOverlay: 'Editando na SPACENODE…',
+        applyEdit: 'Aplicar edição', editing: 'editando…', editingOverlay: 'Editando na SpaceNode…',
         editRejectedFallback: 'Nada foi alterado — refazer é grátis.',
         spaceHint: 'A vista atual vira a identidade do projeto (DNA); as cenas selecionadas acima viram vistas coerentes entre si.',
         spaceNamePh: 'Nome do projeto', spaceNameLabel: 'Nome do Space',
@@ -1530,22 +1561,23 @@
         openSpace: 'Abrir o Space no site',
         upscaleQuote: function (s, w, h, n) { return 'Ampliar ' + s + ' (' + w + '×' + h + ') custa ' + n + ' nodes.'; },
         applyUpscale: function (n) { return 'Aplicar ampliação · ' + n + ' nodes'; },
-        upscalePrep: 'Preparando a ampliação…', upscaleOverlay: 'Ampliando na SPACENODE…',
+        upscalePrep: 'Preparando a ampliação…', upscaleOverlay: 'Ampliando na SpaceNode…',
         catalogError: 'Não foi possível carregar os presets e custos.', tryAgain: 'Tentar de novo',
         reconnect: 'Reconectar', sessionGone: 'Sua sessão expirou.', outsideSketchup: 'Abra este painel dentro do SketchUp.',
-        cancelledLate: 'Cancelado no painel. Se a geração já tinha sido enviada, o render pode aparecer no Histórico (Nodes debitados).',
+        cancelledLate: 'Cancelado depois do envio — se o render sair, ele aparece no Histórico (nodes debitados).',
+        cancelledEarly: 'Cancelado antes do envio — nada foi cobrado.',
         pairingTitle: 'Conecte no navegador', pairingHint: 'Confirme este código na página que abriu:',
         pairingReopen: 'abrir o navegador de novo', pairingCancel: 'cancelar',
         cancel: 'cancelar',
         capturingOverlay: 'Capturando a vista…',
-        nodesPerImage: function (n) { return n + ' Nodes por imagem'; },
+        nodesPerImage: function (n) { return n + ' nodes por imagem'; },
         L_planType: 'Tipo de projeto', L_planStyle: 'Estilo',
         L_planLevel: 'Nível de humanização', L_planOptions: 'O que entra',
         L_planInstructions: 'Instruções',
         planCta: 'Gerar planta humanizada', planRunning: 'gerando a planta…',
         planNote: 'A planta sai do modelo aberto: o pavimento onde a câmera está, cortado a 1,20 m do piso.',
         planInsufficient: function (cost, bal) { return 'A planta custa ' + cost + ' nodes e você tem ' + bal + '.'; },
-        planDone: function (n, origem) { return 'Planta pronta · ' + n + ' Nodes · ' + origem; },
+        planDone: function (n, origem) { return 'Planta pronta · ' + n + ' nodes · ' + origem; },
         planSectionModel: 'corte do próprio arquivo',
         planSectionTemp: 'corte temporário a 1,20 m',
         soleResolution: function (label, nodes, engine) {
@@ -1580,7 +1612,7 @@
         hudEye: function (m) { return 'olho a ' + m + ' m'; },
         hudCeiling: function (m) { return 'pé-direito ' + m + ' m'; },
         hudTilt: function (deg, up) { return (up ? '↑' : '↓') + ' ' + deg + '°'; },
-        photoNote: 'A IA preserva o que vê: proporção, lente, altura do olho e verticais retas viram parte do render.',
+        photoNote: 'A IA parte do que a captura mostra: proporção, lente, altura do olho e verticais retas entram no render.',
         levelReasons: { too_steep: 'inclinação acima do limite', render_failed: 'o recorte da captura falhou', level_mismatch: 'o mapa de arestas não casou', degenerate: 'câmera apontando reto para cima ou para baixo', error: 'erro ao calcular o nivelamento' },
         condNoLevel: function (reason) { return 'A captura não saiu nivelada (' + reason + ') — as verticais ficaram como na vista.'; },
         L_photoMirror: 'Espelhos e vidros',
@@ -1618,7 +1650,7 @@
         animarRatioBad: 'Proporção fora do aceito pro vídeo (entre 0,4 e 2,5). Capture um enquadramento menos extremo.',
         animarPrep: 'Preparando o vídeo…',
         animarLoadingTexts: ['Estudando a profundidade da cena…', 'Planejando o movimento de câmera…', 'Renderizando os quadros…', 'Suavizando o movimento…', 'Finalizando o vídeo…'],
-        videoReady: function (n) { return 'Vídeo pronto · ' + n + ' Nodes utilizados.'; },
+        videoReady: function (n) { return 'Vídeo pronto · ' + n + ' nodes utilizados.'; },
         videoReadySaved: function (p) { return 'Vídeo salvo ao lado do projeto: ' + p; },
         videoSavedAt: function (p) { return 'Vídeo salvo em ' + p; },
         videoAutosaveFailed: 'Não foi possível salvar ao lado do projeto — use "Salvar vídeo…".',
@@ -1629,7 +1661,7 @@
         loadingTexts: ['Analisando composição…', 'Ajustando iluminação…', 'Refinando materiais…', 'Aplicando fotorrealismo…', 'Gerando versão final…']
       },
       en: {
-        connTitleOn: 'Connected', connTitleOff: 'Disconnected', connSubEmpty: 'Connect your SPACENODE account',
+        connTitleOn: 'Connected', connTitleOff: 'Disconnected', connSubEmpty: 'Connect your SpaceNode account',
         connect: 'Connect', switchAccount: 'Switch', signOut: 'Sign out',
         emptyTitle: 'Your current SketchUp view becomes the render.',
         emptySub: 'Capture to check the framing — or just click Generate.',
@@ -1639,28 +1671,33 @@
         upscale2x: 'Upscale 2x', upscale4x: 'Upscale 4x',
         L_projectType: 'Project type', L_segment: 'Segment', L_environment: 'Space', L_lighting: 'Lighting',
         L_sun: 'Sun at capture', L_elements: 'Scene elements', L_modelMaterials: 'Model materials',
-        L_engine: 'AI engine', L_resolution: 'Output quality',
+        L_engine: 'Engine', L_resolution: 'Quality',
         L_advanced: 'Advanced', L_history: 'History', L_settings: 'Preferences',
         L_edit: 'Edit this render', L_space: 'Create a Space from scenes', L_scenes: 'Model scenes',
         L_theme: 'Theme', L_language: 'Language', L_server: 'Server', save: 'Save',
-        L_description: 'Description', optional: '· optional',
+        L_description: 'Refine image', optional: '· optional',
         promptPlaceholder: 'Specific directions — e.g. light oak floor, off-white walls, minimal decor',
-        promptHint: 'Anything you do not ask for here is preserved exactly as modeled.',
+        promptHint: 'Requests here take priority over fidelity to the model. Leave it empty for a render that follows the capture.',
+        dockPrompt: 'refinement',
         sunHint: 'Uses the model real sun (date, time and location) — the captured shadows guide the render light.',
-        themeHint: 'Automatic follows your SPACENODE account preference — or, without one, the system theme.',
+        themeHint: 'Automatic follows your SpaceNode account preference — or, without one, the system theme.',
         matHint: 'Use your model real textures as material references (up to 4).',
         matCap: 'Up to 4 materials per generation.',
         nodes: 'nodes', recharge: 'Top up',
-        generateRender: 'Generate render', generateVariation: 'Generate a variation of this render', generating: 'generating…',
+        generateRender: 'Generate render', generateVariation: 'Generate a variation of this render', generating: 'Generating…',
         dockGoto: 'Go to the settings', kbdHint: 'Ctrl+Enter',
         dockOutputGoto: 'Change engine and resolution', perScene: 'per scene',
         anchorDropped: 'The camera moved since the previous render — generated without anchor.',
         condNoEdge: 'No edge map in this generation (structure came from the image itself).',
+        condEdgeEmpty: 'The structure map came out empty (the style draws no edges) — structure came from the image itself.',
+        condEdgeRejected: 'The structure map was discarded by the server check — structure came from the image itself.',
+        condNoShadows: 'Render generated with the model shadows off.',
+        condSourceJpeg: 'Capture sent as JPEG (the PNG exceeded the upload limit).',
         condMaterials: function (sent, req, names) { return sent + ' of ' + req + ' materials sent' + (names ? ' — ' + names : '') + '.'; },
         condNoSun: 'The sun preset was not applied — the capture used the model current sun.',
         matUnsupported: 'Texture is not jpg/png — it cannot be sent as a sample.',
         matReason: { not_found: 'not found', unsupported_format: 'unsupported format', too_large: 'over 7.8 MB', export_failed: 'export failed', upload_failed: 'upload failed' },
-        historyOpen: 'Bring into the panel',
+        historyOpen: 'Bring into the panel', historyInJournal: 'in this file\'s journal',
         resultExpired: 'This render link expired. Generate again or open it from History.',
         resultRefreshing: 'Refreshing the render link… try again in a moment.',
         reach: function (n) { return 'your balance covers ~' + n + ' render' + (n === 1 ? '' : 's') + ' at this setup'; },
@@ -1668,22 +1705,26 @@
         costMath: function (c, h) { return 'This generation costs ' + c + ' · you have ' + h; },
         buyCta: 'see plans',
         orGenerate: function (e, l, c) { return e + ' · ' + l + ' for ' + c + ' nodes'; }, orPrefix: 'Or generate on ',
-        nodesUsed: function (n) { return n + ' Nodes used.'; }, renderDone: 'Render complete.',
-        reviewFidelity: ' Review fidelity before presenting.',
+        nodesUsed: function (n) { return n + ' nodes used.'; }, renderDone: 'Render complete.',
+        reviewFidelity: ' The structural check found possible differences from the model.',
+        structureVerified: ' Structure checked against the model.',
+        fixAuto: function (c) { return 'Fix automatically · ' + c + ' nodes'; },
+        updateFooter: function (v) { return v + ' available — download'; },
         nodesLeft: function (n) { return n + ' nodes left'; },
         savedAt: function (p) { return 'Render saved to ' + p; },
         historyEmpty: 'Your renders show up here.', loadMore: 'Load more',
         scenesEmpty: 'Create scenes in SketchUp to generate the whole set at once.',
         batchLabel: function (n) { return n > 0 ? 'Generate ' + n + ' scene' + (n === 1 ? '' : 's') : 'Generate scenes'; },
         batchRunning: 'generating scenes…',
-        batchNote: 'Every scene with the same presets and the same seed — consistent materials and style across the set.',
+        batchNote: 'Every scene with the same presets and the same seed — materials and style tend to stay consistent.',
+        batchNoteNoSeed: 'Every scene with the same presets. This engine does not take a seed — for a consistent palette across scenes, prefer Vega or Pulsar.',
         batchSave: function (n) { return 'Save the ' + n + ' images'; },
         batchSaving: function (d, t) { return 'Saving ' + d + ' of ' + t + '…'; },
         batchSaved: function (n, dir) { return n + (n === 1 ? ' image saved' : ' images saved') + ' to ' + dir; },
         batchSavedPartial: function (n, bad) { return n + ' saved · ' + bad + ' failed. The failed ones are still in History.'; },
         batchResume: function (n) { return 'Resume ' + n + (n === 1 ? ' scene' : ' scenes'); },
         batchResumeNote: function (n) { return n + (n === 1 ? ' scene did not finish' : ' scenes did not finish') + '. Resuming generates only what is missing — what already came out is not charged again.'; },
-        buyNodes: 'Buy Nodes',
+        buyNodes: 'Buy nodes',
         batchUncertain: function (n) { return n + ' of them dropped on the network — check History before resuming, so you do not regenerate what already came out.'; },
         updateTitle: function (v) { return 'Version ' + v + ' available'; },
         updateAction: 'Download',
@@ -1693,7 +1734,7 @@
         batchPartial: function (ok, t, bad) { return ok + ' of ' + t + ' scenes generated — ' + bad + ' failed. No nodes were charged for failures.'; },
         batchCancelled: function (n) { return n + ' scene' + (n === 1 ? '' : 's') + ' generated before cancelling.'; },
         failed: 'failed',
-        editHint: 'The change happens in the render IMAGE — the SketchUp model does not change. Only what you ask for changes; the rest is preserved. Edits declined by quality control are not charged.',
+        editHint: 'The change happens in the render IMAGE — the SketchUp model does not change. Only what you ask for changes; the rest stays as it is. Edits declined by quality control are not charged.',
         selectionUse: 'Use SketchUp selection', selectionBusy: 'Computing…',
         selectionHint: 'Select the group, component or faces in SketchUp (double-click to enter a group) and tap the button: the affected area shows over the render.',
         selectionLine: function (n, pct) { return n + ' object' + (n === 1 ? '' : 's') + ' · ' + pct + '% of the image'; },
@@ -1716,7 +1757,7 @@
         editSample: 'Model sample (optional)',
         maskSelect: 'Paint area', maskDone: 'Done selecting', maskClear: 'Clear selection',
         maskHint: 'Paint over the area to edit',
-        applyEdit: 'Apply edit', editing: 'editing…', editingOverlay: 'Editing on SPACENODE…',
+        applyEdit: 'Apply edit', editing: 'editing…', editingOverlay: 'Editing on SpaceNode…',
         editRejectedFallback: 'Nothing was changed — retrying is free.',
         spaceHint: 'The current view becomes the project identity (DNA); the scenes selected above become consistent views.',
         spaceNamePh: 'Project name', spaceNameLabel: 'Space name',
@@ -1732,22 +1773,23 @@
         openSpace: 'Open the Space on the site',
         upscaleQuote: function (s, w, h, n) { return 'Upscaling ' + s + ' (' + w + '×' + h + ') costs ' + n + ' nodes.'; },
         applyUpscale: function (n) { return 'Apply upscale · ' + n + ' nodes'; },
-        upscalePrep: 'Preparing the upscale…', upscaleOverlay: 'Upscaling on SPACENODE…',
+        upscalePrep: 'Preparing the upscale…', upscaleOverlay: 'Upscaling on SpaceNode…',
         catalogError: 'Could not load presets and costs.', tryAgain: 'Try again',
         reconnect: 'Reconnect', sessionGone: 'Your session expired.', outsideSketchup: 'Open this panel inside SketchUp.',
-        cancelledLate: 'Cancelled in the panel. If the generation was already sent, the render may appear in History (Nodes charged).',
+        cancelledLate: 'Cancelled after sending — if the render completes, it appears in History (nodes charged).',
+        cancelledEarly: 'Cancelled before sending — nothing was charged.',
         pairingTitle: 'Connect in your browser', pairingHint: 'Confirm this code on the page that opened:',
         pairingReopen: 'open the browser again', pairingCancel: 'cancel',
         cancel: 'cancel',
         capturingOverlay: 'Capturing the view…',
-        nodesPerImage: function (n) { return n + ' Nodes per image'; },
+        nodesPerImage: function (n) { return n + ' nodes per image'; },
         L_planType: 'Project type', L_planStyle: 'Style',
         L_planLevel: 'Humanisation level', L_planOptions: 'What goes in',
         L_planInstructions: 'Instructions',
         planCta: 'Generate humanised plan', planRunning: 'generating the plan…',
         planNote: 'The plan comes from the open model: the storey the camera is on, cut 1.20 m above the floor.',
         planInsufficient: function (cost, bal) { return 'The plan costs ' + cost + ' nodes and you have ' + bal + '.'; },
-        planDone: function (n, origin) { return 'Plan ready · ' + n + ' Nodes · ' + origin; },
+        planDone: function (n, origin) { return 'Plan ready · ' + n + ' nodes · ' + origin; },
         planSectionModel: 'section from the file itself',
         planSectionTemp: 'temporary section at 1.20 m',
         soleResolution: function (label, nodes, engine) {
@@ -1782,7 +1824,7 @@
         hudEye: function (m) { return 'eye at ' + m + ' m'; },
         hudCeiling: function (m) { return 'ceiling ' + m + ' m'; },
         hudTilt: function (deg, up) { return (up ? '↑' : '↓') + ' ' + deg + '°'; },
-        photoNote: 'The AI preserves what it sees: aspect ratio, lens, eye height and straight verticals become part of the render.',
+        photoNote: 'The AI starts from what the capture shows: aspect ratio, lens, eye height and straight verticals go into the render.',
         levelReasons: { too_steep: 'tilt above the limit', render_failed: 'the capture crop failed', level_mismatch: 'the edge map did not match', degenerate: 'camera pointing straight up or down', error: 'error computing the levelling' },
         condNoLevel: function (reason) { return 'The capture was not levelled (' + reason + ') — verticals stayed as in the view.'; },
         L_photoMirror: 'Mirrors and glass',
@@ -1820,7 +1862,7 @@
         animarRatioBad: 'Aspect ratio outside the accepted range for video (0.4–2.5). Capture a less extreme framing.',
         animarPrep: 'Preparing the video…',
         animarLoadingTexts: ['Reading the depth of the scene…', 'Planning the camera move…', 'Rendering the frames…', 'Smoothing the motion…', 'Finishing the video…'],
-        videoReady: function (n) { return 'Video ready · ' + n + ' Nodes used.'; },
+        videoReady: function (n) { return 'Video ready · ' + n + ' nodes used.'; },
         videoReadySaved: function (p) { return 'Video saved next to the project: ' + p; },
         videoSavedAt: function (p) { return 'Video saved to ' + p; },
         videoAutosaveFailed: 'Could not save next to the project — use "Save video…".',
@@ -2092,6 +2134,14 @@
     function currentCost() {
       var r = currentResolution();
       return r ? r.nodes : null;
+    }
+    function costFor(engineId, resolutionId) {
+      var engines = (model.catalog && model.catalog.engines) || [];
+      for (var i = 0; i < engines.length; i++) {
+        if (engines[i].id !== engineId) continue;
+        for (var j = 0; j < engines[i].resolutions.length; j++) if (engines[i].resolutions[j].id === resolutionId) return engines[i].resolutions[j].nodes;
+      }
+      return null;
     }
 
     function normalizeSelections() {
@@ -2448,7 +2498,15 @@
       els.batchButton.disabled = model.generating || !model.authenticated || !model.catalog || n === 0 || total == null || insufficient;
       els.batchLabel.textContent = model.batchRunning ? tt('batchRunning') : tt('batchLabel', n);
       els.batchMeta.textContent = model.batchRunning || total == null || n === 0 ? '' : total + ' ' + tt('nodes');
-      els.batchNote.textContent = insufficient ? tt('batchInsufficient', total, balance) : tt('batchNote');
+      // Semente só vale em Vega/Pulsar (catálogo v10: engines[].supports.seed);
+      // onde não vale, a nota diz, em vez de prometer coerência que não vem.
+      var eng = currentEngine();
+      var seedOk = !eng || !eng.supports || eng.supports.seed !== false;
+      // O texto de Refinar imagem (muitas vezes de outra vista) entra em todas
+      // as cenas: a própria nota do lote diz isso antes de cobrar.
+      var promptTxt = els.prompt.value.trim();
+      var promptNote = promptTxt ? ' ' + st('batchPromptHint').replace('%s', promptTxt.length > 60 ? promptTxt.slice(0, 57) + '…' : promptTxt) : '';
+      els.batchNote.textContent = (insufficient ? tt('batchInsufficient', total, balance) : tt(seedOk ? 'batchNote' : 'batchNoteNoSeed')) + promptNote;
     }
     els.batchButton.addEventListener('click', function () {
       if (model.generating || model.selectedScenes.length === 0) return;
@@ -2892,6 +2950,21 @@
     }
     els.maskCanvas.addEventListener('pointerup', endMaskStroke);
     els.maskCanvas.addEventListener('pointercancel', endMaskStroke);
+    // Um traço errado no pendente não obriga a recomeçar a área inteira:
+    // Ctrl/Cmd+Z desfaz o último traço e Esc sai do modo pintar — por atalho,
+    // sem botão novo (a estrutura visual do painel fica como está).
+    function undoMaskStroke() {
+      if (!model.maskStrokes.length) return;
+      model.maskStrokes.pop();
+      redrawMaskOverlay();
+      updateEditButton();
+      scheduleEditQuote();
+    }
+    document.addEventListener('keydown', function (ev) {
+      if (!model.maskActive) return;
+      if (ev.key === 'Escape' && !(shell && shell.sheet)) { ev.preventDefault(); exitMaskMode(); return; }
+      if ((ev.ctrlKey || ev.metaKey) && (ev.key === 'z' || ev.key === 'Z')) { ev.preventDefault(); undoMaskStroke(); }
+    });
 
     // Máscara final na resolução da FONTE (branco = editar, preto = preserva),
     // com a proporção da imagem original. Traços mapeados do preview (que usa
@@ -3019,9 +3092,10 @@
     function dockSummaryText() {
       if (!model.catalog) return '';
       var parts = [];
-      if (!isPreserved(model.segment)) parts.push(model.segment);
-      if (!isPreserved(model.environment)) parts.push(model.environment);
-      if (!isPreserved(model.lighting)) parts.push(model.lighting);
+      if (!isPreserved(model.segment)) parts.push(pLabel(model.segment));
+      if (!isPreserved(model.environment)) parts.push(pLabel(model.environment));
+      if (!isPreserved(model.lighting)) parts.push(pLabel(model.lighting));
+      if (els.prompt && els.prompt.value.trim()) parts.push(tt('dockPrompt'));
       return parts.join(' · ');
     }
     // "Orion 2K" — e, na aba Cenas, o preço por cena ao lado, porque o total
@@ -3478,6 +3552,9 @@
     }
 
     function showNotice(message, kind, action) {
+      // Uma cotação de ampliação pendente que sai da tela sem ser aplicada é
+      // cancelada no Ruby (ele guarda o PNG baixado em %TEMP% até lá).
+      if (model.upscaleQuotePending) { model.upscaleQuotePending = false; callSketchUpQuiet('cancelUpscale'); }
       els.notice.innerHTML = '';
       els.notice.className = 'notice';
       if (!message) return;
@@ -3729,7 +3806,10 @@
       if (p.anchorDropped) notes.push(tt('anchorDropped'));
       var c = p.conditioning;
       if (!c) return notes;
-      if (c.edgeRequested && !c.edgeMap) notes.push(tt('condNoEdge'));
+      if (c.edgeRequested && !c.edgeMap) notes.push(tt(c.edgeReason === 'empty' ? 'condEdgeEmpty' : 'condNoEdge'));
+      if (c.edgeRequested && c.edgeMap && c.edgeMapServer === false) notes.push(tt('condEdgeRejected'));
+      if (c.shadowsOn === false && !c.sunApplied) notes.push(tt('condNoShadows'));
+      if (c.sourceMime === 'image/jpeg') notes.push(tt('condSourceJpeg'));
       if (c.materialsRequested > c.materialsSent) {
         var reasons = tt('matReason') || {};
         var names = (c.skipped || []).map(function (s) {
@@ -3754,7 +3834,20 @@
       return typeof u === 'string' && /^https?:\/\//i.test(u);
     }
 
-    function setFooter(text) { els.footer.textContent = text || ('SPACENODE para SketchUp · v' + (model.version || '')); }
+    function setFooter(text) {
+      els.footer.textContent = text || ('SpaceNode para SketchUp · v' + (model.version || ''));
+      // Versão nova disponível: fica aqui enquanto o painel estiver aberto —
+      // o notice some no primeiro aviso seguinte e o .rbz é distribuído fora
+      // do Warehouse, sem atualização automática.
+      if (model.pluginUpdate && model.pluginUpdate.url) {
+        els.footer.appendChild(document.createTextNode(' · '));
+        var up = document.createElement('a');
+        up.href = '#';
+        up.textContent = tt('updateFooter', model.pluginUpdate.version);
+        up.addEventListener('click', function (ev) { ev.preventDefault(); callSketchUp('openUrl', model.pluginUpdate.url); });
+        els.footer.appendChild(up);
+      }
+    }
 
     // ── Persistência do painel ──────────────────────────────────────────────
     var persistTimer = null;
@@ -3773,8 +3866,10 @@
           sunPreset: model.sunPreset,
           photoAspect: model.photoAspect, photoLevel: !!model.photoLevel, photoGuide: model.photoGuide,
           animarType: model.animarType, animarEngine: model.animarEngine, animarDuration: model.animarDuration,
-          materialSel: model.materialSel,
-          prompt: els.prompt.value
+          materialSel: model.materialSel
+          // A descrição NÃO persiste (1.9.0): um texto de outro projeto entrava
+          // em todo render seguinte como refinamento e afrouxava a verificação
+          // estrutural sem o usuário ver.
         };
         callSketchUpQuiet('persistState', JSON.stringify(snapshot));
       }, 400);
@@ -3799,7 +3894,6 @@
       if (saved.materialSel && typeof saved.materialSel === 'object' && !Array.isArray(saved.materialSel)) {
         model.materialSel = saved.materialSel;
       }
-      if (typeof saved.prompt === 'string') els.prompt.value = saved.prompt;
     }
 
     // ── Ações ────────────────────────────────────────────────────────────────
@@ -3819,6 +3913,8 @@
     });
     function renderResultMore() {
       var open = els.resultMore.classList.contains('is-open');
+      // O que a âncora faz, no title do botão (sem elemento novo).
+      els.variationButton.title = st('variationHint');
       els.resultMoreToggle.textContent = st(open ? 'resultLess' : 'resultMore');
       els.resultMoreToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
     }
@@ -3844,14 +3940,12 @@
       }).observe(els.preview);
     }
     els.cancelButton.addEventListener('click', function () {
-      var elapsed = model.generateStartedAt ? (Date.now() - model.generateStartedAt) / 1000 : 0;
       callSketchUp('cancelGenerate');
       model.batchRunning = false;
       model.spaceRunning = false;
       stopGeneratingUi();
-      if (elapsed > 8) {
-        showNotice(tt('cancelledLate'), 'error');
-      }
+      // O que dizer vem do Ruby (status idle com `posted`): ele sabe se o
+      // pedido que cobra já tinha saído — o relógio só chutava.
     });
     els.generateButton.addEventListener('click', function () { submitGenerate(false); });
     document.addEventListener('keydown', function (ev) {
@@ -3862,8 +3956,13 @@
       if (btn && !btn.disabled) btn.click();
     });
 
-    function submitGenerate(variation) {
-      var asVariation = variation === true && !!model.result && !!model.result.outputUrl;
+    // opts.structuralBoost (1.9.0): repete o render reprovado pela verificação
+    // estrutural com a MESMA semente, sem âncora — o servidor reforça o
+    // condicionamento. Nunca junto com variação.
+    function submitGenerate(variation, opts) {
+      opts = opts || {};
+      var boost = opts.structuralBoost === true && !!model.result && model.result.seed != null;
+      var asVariation = !boost && variation === true && !!model.result && !!model.result.outputUrl;
       if (asVariation && !ensureLiveResult()) return;
       if (model.generating) return;
       // Bridge primeiro: sem SketchUp por trás, não ligar o overlay (ficaria
@@ -3882,16 +3981,20 @@
         lighting: model.lighting,
         background: model.background,
         sceneElements: model.sceneElements,
-        engine: model.engine,
-        resolution: model.resolution,
+        // Correção: no MESMO motor/qualidade do render reprovado, mesmo que o
+        // painel tenha trocado depois — é esse render que está sendo corrigido.
+        engine: boost && model.result.engine ? model.result.engine : model.engine,
+        resolution: boost && model.result.resolution ? model.result.resolution : model.resolution,
         sunPreset: model.sunPreset,
         photo: photoPayload(),
         materialSel: materialSelArray(),
         useAnchor: asVariation,
         anchorUrl: asVariation ? (model.result.outputUrl || null) : null,
         anchorCamera: asVariation ? (model.result.camera || null) : null,
-        seed: asVariation && model.result.seed != null ? model.result.seed
-          : (styleLocked() ? model.projectStyle.seed : null)
+        structuralBoost: boost,
+        seed: boost ? model.result.seed
+          : (asVariation && model.result.seed != null ? model.result.seed
+            : (styleLocked() ? model.projectStyle.seed : null))
       }));
     }
     els.variationButton.addEventListener('click', function () { submitGenerate(true); });
@@ -3976,7 +4079,9 @@
     els.saveSettingsButton.addEventListener('click', function () {
       callSketchUp('saveSettings', JSON.stringify({ apiBaseUrl: els.apiBaseUrl.value }));
     });
-    els.prompt.addEventListener('input', persistStateSoon);
+    // A descrição entra como refinamento em toda geração: o resumo do dock
+    // mostra '· descrição' enquanto houver texto (1.9.0).
+    els.prompt.addEventListener('input', function () { persistStateSoon(); updateBatchButton(); if (typeof updateShell === 'function') updateShell(); });
 
     // Histórico
     var historyLoaded = false;
@@ -4014,7 +4119,16 @@
         img.src = url;
         img.alt = 'Render';
         img.loading = 'lazy';
-        img.title = tt('historyOpen');
+        // Motor · qualidade · quando (e se está no diário deste arquivo) no
+        // title: dezenas de miniaturas da mesma vista não se distinguem sem
+        // isso — e sem elemento novo sobre a grade.
+        var engName = (function () {
+          var list = (model.catalog && model.catalog.engines) || [];
+          for (var k = 0; k < list.length; k++) if (list[k].id === r.engine) return list[k].name;
+          return r.engine || '';
+        })();
+        var inJournal = (model.journal || []).some(function (e) { return e && e.renderId && e.renderId === r.id; });
+        img.title = [engName, r.resolution ? String(r.resolution).toUpperCase() : '', r.created_at ? formatWhen(r.created_at) : '', inJournal ? tt('historyInJournal') : '', tt('historyOpen')].filter(Boolean).join(' · ');
         // URLs assinadas expiram (~1h) — thumbnail morto some em vez de
         // virar ícone quebrado.
         img.addEventListener('error', function () { img.remove(); });
@@ -4121,6 +4235,16 @@
           }
           showCapture(payload.imageDataUrl);
           if (!model.generating) setFooter(tt('captured'));
+          if (!model.generating) {
+            var capParts = [];
+            if (payload.width && payload.height) capParts.push(payload.width + '×' + payload.height);
+            var hud = photoHudText(model.camera);
+            if (hud) capParts.push(hud);
+            if (model.sunPreset && model.sunPreset !== 'atual') {
+              capParts.push(st('sunNow').replace('%s', (tt('sun') || {})[model.sunPreset] || model.sunPreset).replace(/\.$/, ''));
+            }
+            if (capParts.length) setToolsHint(st('captureIs') + ' ' + capParts.join(' · '), 8000);
+          }
           // Captura manual: avisa na hora se o nivelamento pedido não saiu
           // (na geração o mesmo aviso vai nas notas do resultado).
           var pr = payload.photo;
@@ -4141,6 +4265,9 @@
           model.camera = payload;
           if ('overlay' in payload) model.guidesOverlay = !!payload.overlay;
           renderPhotoControls();
+          // A linha parada da barra rápida reflete a câmera e o modelo atuais.
+          var hintEl = $s('toolsHint');
+          if (hintEl && !hintEl.classList.contains('is-tip')) setToolsHint(null);
         }
 
         // A planta capturada aparece no palco antes de subir: o usuário vê o
@@ -4178,7 +4305,10 @@
           if (model.generating && payload.message && payload.stage !== 'idle') {
             els.overlayText.textContent = payload.message;
           }
-          if (payload.stage === 'idle') stopGeneratingUi();
+          if (payload.stage === 'idle') {
+            stopGeneratingUi();
+            if (payload.cancelled) showNotice(payload.posted ? tt('cancelledLate') : tt('cancelledEarly'), payload.posted ? 'warn' : 'success');
+          }
         }
 
         if (event === 'session') {
@@ -4198,9 +4328,13 @@
           stopGeneratingUi();
           if (typeof payload.totalBalance === 'number') model.totalBalance = payload.totalBalance;
           showResult(payload);
+          // O refinamento virou ESTE render; ficando no campo, entraria no
+          // próximo (e em todas as cenas de um lote) sem o usuário notar.
+          if (payload.kind !== 'revision' && els.prompt.value) { els.prompt.value = ''; updateBatchButton(); if (typeof updateShell === 'function') updateShell(); }
           var cost = payload.nodesCharged ? tt('nodesUsed', payload.nodesCharged) : tt('renderDone');
           var notes = conditioningNotes(payload);
-          var msg = cost + (payload.fidelityWarning ? tt('reviewFidelity') : '');
+          var verified = !payload.fidelityWarning && typeof payload.fidelityScore === 'number' && payload.fidelityScore >= 0.8;
+          var msg = cost + (payload.fidelityWarning ? tt('reviewFidelity') : (verified ? tt('structureVerified') : ''));
           if (notes.length) msg += ' ' + notes.join(' ');
           if (payload.kind === 'revision') {
             // Revisão: diz que foi gravada no arquivo e, quando o servidor
@@ -4209,7 +4343,15 @@
             if (payload.replayed) msg += ' ' + tt('editReplayed');
             if (payload.warning) msg += ' ' + payload.warning;
           }
-          showNotice(msg, payload.fidelityWarning ? 'error' : (notes.length || payload.warning ? 'warn' : 'success'));
+          // Reprovou? O caminho barato é o mesmo do web: mesma semente, mais
+          // condicionamento. Só pra render (revisão tem outro contrato) e com
+          // semente devolvida pelo servidor.
+          var fixCost = costFor(payload.engine, payload.resolution);
+          if (fixCost == null) fixCost = currentCost();
+          var fixAction = payload.fidelityWarning && payload.kind !== 'revision' && payload.seed != null
+            ? { label: tt('fixAuto', fixCost), onClick: function () { submitGenerate(false, { structuralBoost: true }); } }
+            : null;
+          showNotice(msg, payload.fidelityWarning || notes.length || payload.warning ? 'warn' : 'success', fixAction);
           setFooter(typeof payload.totalBalance === 'number' ? tt('nodesLeft', payload.totalBalance) : tt('renderDone'));
         }
 
@@ -4302,6 +4444,7 @@
             {
               label: tt('applyUpscale', payload.nodes),
               onClick: function () {
+                model.upscaleQuotePending = false;
                 showNotice('', 'success');
                 startGeneratingUi();
                 els.overlayText.textContent = tt('upscaleOverlay');
@@ -4309,6 +4452,7 @@
               }
             }
           );
+          model.upscaleQuotePending = true;
         }
 
         if (event === 'editQuote') {
@@ -4370,6 +4514,7 @@
         if (event === 'batchDone') {
           model.batchRunning = false;
           stopGeneratingUi();
+          if (els.prompt.value) { els.prompt.value = ''; updateBatchButton(); if (typeof updateShell === 'function') updateShell(); }
           // Nenhuma linha pode sobrar como "em andamento" num lote encerrado.
           els.batchProgress.querySelectorAll('.is-active').forEach(function (row) {
             row.classList.remove('is-active');
@@ -4410,11 +4555,15 @@
         // Distribuímos .rbz fora do Extension Warehouse: sem este aviso, quem
         // instalou uma vez nunca fica sabendo que saiu versão nova. Brando, e
         // nunca por cima de uma geração em andamento.
-        if (event === 'pluginUpdate' && !model.generating) {
-          showNotice(tt('updateTitle', payload.version) + (payload.note ? ' — ' + payload.note : ''), 'warn', {
-            label: tt('updateAction'),
-            onClick: function () { callSketchUp('openUrl', payload.url); }
-          });
+        if (event === 'pluginUpdate') {
+          model.pluginUpdate = payload;
+          setFooter('');
+          if (!model.generating) {
+            showNotice(tt('updateTitle', payload.version) + (payload.note ? ' — ' + payload.note : ''), 'warn', {
+              label: tt('updateAction'),
+              onClick: function () { callSketchUp('openUrl', payload.url); }
+            });
+          }
         }
 
         if (event === 'resultRefreshed') {
@@ -4426,6 +4575,11 @@
             model.result.outputUrl = payload.outputUrl || model.result.outputUrl;
             model.result.previewUrl = payload.previewUrl || model.result.previewUrl;
             model.result.signedAt = payload.signedAt || Math.floor(Date.now() / 1000);
+            // 1.9.0: a re-assinatura traz semente e veredito — um resultado
+            // restaurado do .skp volta a poder "Corrigir automaticamente".
+            if (typeof payload.seed === 'number') model.result.seed = payload.seed;
+            if (typeof payload.fidelityScore === 'number') model.result.fidelityScore = payload.fidelityScore;
+            if (payload.fidelityWarning === true) model.result.fidelityWarning = true;
             els.resultImage.src = model.result.previewUrl || model.result.outputUrl;
             if (els.notice.textContent === tt('resultRefreshing')) showNotice('', 'success');
             updateGenerateState();
@@ -4553,7 +4707,7 @@
         styleNeedRender: 'Gere um render primeiro — é dele que sai a semente do estilo.',
         styleOnSub: 'Toda geração deste arquivo repete esta semente.',
         styleLock: 'Travar estilo', styleUpdate: 'Atualizar', styleApply: 'Aplicar', styleUnlock: 'Destravar',
-        styleSaved: 'Estilo travado neste arquivo — as próximas vistas repetem a paleta, os materiais e a atmosfera deste render.',
+        styleSaved: 'Estilo travado neste arquivo — as próximas vistas partem da mesma semente; paleta e atmosfera ficam próximas.',
         styleCleared: 'Estilo destravado. Cada render volta a sortear a própria semente.',
         styleApplied: 'Ajustes do estilo aplicados ao painel.',
         styleRestored: 'Este arquivo tem um estilo travado — os ajustes dele voltaram.',
@@ -4563,11 +4717,18 @@
         toolGuidesTip: 'Guias de terços sobre o quadro',
         toolSunTip: 'Abre a folha Luz pra escolher o sol da captura',
         tabNeedsRender: 'Gere um render primeiro',
+        styleNoSeedEngine: 'Neste motor a semente não se aplica — gere em Vega ou Pulsar pra travar o estilo.',
+        variationHint: 'Mantém materiais e atmosfera deste render — a câmera precisa ser a mesma; se mudou, o render sai sem âncora e o painel avisa.',
+        batchPromptHint: 'O refinamento "%s" entra em todas as cenas — edite na aba Render.',
         resultMore: 'Mais ações', resultLess: 'Menos ações',
         toolMirrorTip: 'Marca a face selecionada no SketchUp como espelho',
         toolSceneTip: 'Cria uma cena do SketchUp com a vista atual',
         sceneAdded: 'Cena "%s" criada — já entra no lote e no Space.',
-        toolsHint: 'Estes cinco ajustam a CAPTURA — e a IA preserva o que ela vê.',
+        toolsHint: 'Estes cinco ajustam a CAPTURA — e a IA parte do que ela mostra.',
+        captureIs: 'A IA recebe:',
+        tipTilt: 'Câmera inclinada %s° — toque em Nivelar',
+        tipShadowsOff: 'Sombras desligadas no modelo — a captura sai chapada; toque em Sol',
+        tipLineStyle: 'Estilo de linhas no modelo — a captura sai texturizada',
         tipLevel: 'Nivelar: endireita as verticais na captura, como numa foto de arquitetura.',
         tipGuides: 'Guias: grade de terços sobre o quadro, pra posicionar o que importa.',
         tipSun: 'Sol: na folha Luz, a hora do sol do modelo aplicada só na captura — atual, manhã, meio-dia, entardecer, golden.',
@@ -4593,7 +4754,7 @@
         styleNeedRender: 'Generate a render first — the style seed comes from it.',
         styleOnSub: 'Every generation in this file reuses this seed.',
         styleLock: 'Lock style', styleUpdate: 'Update', styleApply: 'Apply', styleUnlock: 'Unlock',
-        styleSaved: 'Style locked into this file — the next views repeat the palette, materials and mood of this render.',
+        styleSaved: 'Style locked into this file — the next views start from the same seed; palette and mood stay close.',
         styleCleared: 'Style unlocked. Each render draws its own seed again.',
         styleApplied: 'Style settings applied to the panel.',
         styleRestored: 'This file has a locked style — its settings are back.',
@@ -4603,11 +4764,18 @@
         toolGuidesTip: 'Rule-of-thirds guides over the frame',
         toolSunTip: 'Opens the Light sheet to pick the capture sun',
         tabNeedsRender: 'Generate a render first',
+        styleNoSeedEngine: 'This engine does not take a seed — generate with Vega or Pulsar to lock the style.',
+        variationHint: 'Keeps the materials and atmosphere of this render — the camera must be the same; if it moved, the render goes out without the anchor and the panel says so.',
+        batchPromptHint: 'The refinement "%s" goes into every scene — edit it in the Render tab.',
         resultMore: 'More actions', resultLess: 'Fewer actions',
         toolMirrorTip: 'Marks the face selected in SketchUp as a mirror',
         toolSceneTip: 'Creates a SketchUp scene from the current view',
         sceneAdded: 'Scene "%s" created — it joins the batch and the Space.',
-        toolsHint: 'These five shape the CAPTURE — and the AI preserves what it sees.',
+        toolsHint: 'These five shape the CAPTURE — and the AI starts from what it shows.',
+        captureIs: 'The AI receives:',
+        tipTilt: 'Camera tilted %s° — tap Level',
+        tipShadowsOff: 'Shadows are off in the model — the capture comes out flat; tap Sun',
+        tipLineStyle: 'Line style in the model — the capture comes out textured',
         tipLevel: 'Level: straightens the verticals in the capture, like an architectural photo.',
         tipGuides: 'Guides: rule-of-thirds grid over the frame, to place what matters.',
         tipSun: 'Sun: in the Light sheet, the model sun hour applied to the capture only — current, morning, noon, late afternoon, golden.',
@@ -4704,13 +4872,22 @@
         var btn = document.querySelector('.seg[data-tab="' + id + '"]');
         if (!btn) return;
         var on = tabEnabled(id);
-        btn.disabled = !on;
+        // aria-disabled em vez de disabled: o clique continua chegando e o
+        // painel explica o que falta, em vez de ignorar o toque.
+        btn.classList.toggle('is-off', !on);
+        btn.setAttribute('aria-disabled', on ? 'false' : 'true');
         btn.title = on ? '' : st('tabNeedsRender');
         if (!on && shell.tab === id) openTab('render');
       });
     }
     Array.prototype.forEach.call(document.querySelectorAll('.seg'), function (btn) {
-      btn.addEventListener('click', function () { openTab(btn.getAttribute('data-tab')); });
+      btn.addEventListener('click', function () {
+        if (btn.getAttribute('aria-disabled') === 'true') {
+          showNotice(st('tabNeedsRender'), 'warn', { label: tt('generateRender'), onClick: function () { openTab('render'); scrollToStage(); } });
+          return;
+        }
+        openTab(btn.getAttribute('data-tab'));
+      });
     });
     window.addEventListener('resize', layoutThumb);
 
@@ -4858,6 +5035,7 @@
       $s('styleSeed').textContent = locked ? '#' + String(model.projectStyle.seed).slice(-6) : '';
       var sub;
       if (locked) sub = styleSummary(model.projectStyle.preset) || st('styleOnSub');
+      else if (model.result && model.result.seedApplied === false) sub = st('styleNoSeedEngine');
       else if (seed == null) sub = st('styleNeedRender');
       else sub = st('styleIdleSub');
       $s('styleSub').textContent = sub;
@@ -4880,7 +5058,7 @@
       var canRelock = seed != null && (!locked || seed !== model.projectStyle.seed);
       lockBtn.style.display = canRelock || !locked ? '' : 'none';
       lockBtn.textContent = locked ? st('styleUpdate') : st('styleLock');
-      lockBtn.disabled = seed == null || model.generating;
+      lockBtn.disabled = seed == null || model.generating || !!(model.result && model.result.seedApplied === false);
       applyBtn.style.display = locked ? '' : 'none';
       applyBtn.textContent = st('styleApply');
       applyBtn.disabled = model.generating;
@@ -4891,6 +5069,7 @@
     function lockStyle() {
       var seed = currentResultSeed();
       if (seed == null) { showNotice(st('styleNeedRender'), 'warn'); return; }
+      if (model.result && model.result.seedApplied === false) { showNotice(st('styleNoSeedEngine'), 'warn'); return; }
       model.projectStyle = {
         seed: seed,
         preset: stylePresetFromPanel(),
@@ -4974,7 +5153,8 @@
       callSketchUp('markMirror', JSON.stringify({ kind: 'mirror' }));
     });
     $s('toolsHint').addEventListener('click', function () {
-      if ($s('toolsHint').classList.contains('is-action')) openSheet('sheetPhoto');
+      var el = $s('toolsHint');
+      if (el.classList.contains('is-action')) openSheet(el.getAttribute('data-sheet') || 'sheetPhoto');
     });
     $s('toolScene').addEventListener('click', function () {
       callSketchUp('addScene');
@@ -4995,6 +5175,14 @@
       if (model.mirrors && model.mirrors.count > 0) {
         parts.push(st('mirrorReview').replace('%s', tt('hudMirrors', model.mirrors.count)));
       }
+      // O que o painel sabe e custa um render descobrir: câmera inclinada
+      // (verticais convergentes), sombras desligadas e estilo de linha.
+      var cam = model.camera;
+      if (cam && cam.perspective && !model.photoLevel && !cam.twoPoint && typeof cam.tiltDeg === 'number' && Math.abs(cam.tiltDeg) >= 3 && Math.abs(cam.tiltDeg) <= 25) {
+        parts.push(st('tipTilt').replace('%s', fmtNum(Math.abs(cam.tiltDeg), 0)));
+      }
+      if (cam && cam.shadowsOn === false && (!model.sunPreset || model.sunPreset === 'atual')) parts.push(st('tipShadowsOff'));
+      if (cam && cam.lineStyle) parts.push(st('tipLineStyle'));
       return parts.length ? parts.join(' · ') : st('toolsHint');
     }
     function setToolsHint(text, sticky) {
@@ -5004,9 +5192,11 @@
       el.textContent = text || toolsStateText();
       el.classList.toggle('is-tip', !!text);
       var revisavel = !text && !!(model.mirrors && model.mirrors.count > 0);
-      el.classList.toggle('is-action', revisavel);
-      el.setAttribute('role', revisavel ? 'button' : 'status');
-      if (text && sticky) toolsHintTimer = setTimeout(function () { setToolsHint(null); }, 3000);
+      var shadowsOff = !text && !!(model.camera && model.camera.shadowsOn === false && (!model.sunPreset || model.sunPreset === 'atual'));
+      el.classList.toggle('is-action', revisavel || shadowsOff);
+      el.setAttribute('data-sheet', shadowsOff && !revisavel ? 'sheetLight' : 'sheetPhoto');
+      el.setAttribute('role', revisavel || shadowsOff ? 'button' : 'status');
+      if (text && sticky) toolsHintTimer = setTimeout(function () { setToolsHint(null); }, sticky === true ? 3000 : sticky);
     }
     [['toolLevel', 'tipLevel'], ['toolGuides', 'tipGuides'], ['toolSun', 'tipSun'],
      ['toolMirror', 'tipMirror'], ['toolScene', 'tipScene']].forEach(function (pair) {
