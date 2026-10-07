@@ -1,7 +1,8 @@
 'use client'
 
 import RenderComparisonImages from '@/components/generate/RenderComparisonImages'
-import { useState, useRef, useEffect } from 'react'
+import RenderPreservationStatus from '@/components/generate/RenderPreservationStatus'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { isModuleEnabled } from '@/lib/nav/modules-config'
@@ -9,7 +10,7 @@ import { BrandLoader } from '@/components/brand'
 import {
   ProjectType, ProjectMaterials,
   getSegments, getEnvironments, getLighting, getBackgrounds, getSceneElements,
-  PRESERVE, isPreserved,
+  PRESERVE, isPreserved, getSurfaceMaterialOverrides,
 } from '@/lib/prompts'
 import {
   ENGINES, ENGINE_ORDER, DEFAULT_ENGINE, DEFAULT_RESOLUTION,
@@ -376,6 +377,10 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
   //    materiais/texturas entre gerações sucessivas do mesmo input.
   //    Default true; usuário pode desligar pra começar do zero.
   const [useAnchor, setUseAnchor] = useState(true)
+  const onPreservationWarning = useCallback(() => {
+    setFidelityWarning(true)
+    setUseAnchor(false)
+  }, [])
 
   // ── Refinar imagem: pedido cirúrgico pra alterar só uma coisa entre gerações.
   //    Só faz efeito quando há render anterior (anchor) — sem isso o modelo não
@@ -879,10 +884,7 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
   // campo interior-only preenchido (ex: marcenaria) contaria no resumo mesmo
   // depois de trocar pra exterior, onde ele nem aparece.
   const visibleMaterialFields = projectType === 'interior' ? MATERIAL_FIELDS_INTERIOR : MATERIAL_FIELDS_EXTERIOR
-  const filledMaterials = visibleMaterialFields.filter(({ field }) => {
-    const v = materials[field]
-    return !!(v && v.trim())
-  }).length
+  const filledMaterials = Object.keys(getSurfaceMaterialOverrides(materials, projectType)).length
   const materialSamples = visibleMaterialFields.filter(({ field }) => materialRefs[field]).length
   // ORION_CONFIG expõe name/description/resolutions/nodes com a MESMA forma do
   // catálogo público — folha e resumo não precisam saber a diferença.
@@ -1384,6 +1386,7 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
               {/* Veredito da verificação estrutural (gate render_only): aviso
                   quando o score da entrega ficou abaixo do limite; selo discreto
                   quando a estrutura foi verificada com folga (≥ 0.8). */}
+              {lastRenderId && <RenderPreservationStatus key={lastRenderId} renderId={lastRenderId} onWarning={onPreservationWarning} />}
               {fidelityWarning ? (
                 <div className="spn-error">
                   A verificação visual detectou possíveis diferenças de estrutura ou
