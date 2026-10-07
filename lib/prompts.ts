@@ -14,6 +14,7 @@ import {
 } from '@/lib/ai/fidelity/render-only'
 
 import { buildMaterialRegionSheetBlock, buildMaterialInventoryBlock, type MaterialObservation } from '@/lib/ai/material-inventory'
+import { buildFixtureLightsBlock, resolveFixtureLights, type FixtureLights } from '@/lib/ai/fixture-lights'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -40,6 +41,7 @@ export interface GenerateOptions {
   segment:        string
   environment:    string
   lighting:       string
+  fixtureLights?: FixtureLights
   background:     string
   sceneElements:  string[]
   geometryLock:   number
@@ -1104,7 +1106,8 @@ export function buildFidelityPrompt(
   const lightDesc  = LIGHT_EN[lighting] ?? lighting
   const segDesc    = isPreserved(segment) ? '' : (SEG_EN[segment] ?? segment.toLowerCase())
 
-  const elemParts = sceneElements.map(e => ELEM_EN[e] ?? e.toLowerCase()).filter(Boolean)
+  const fixtureLights = resolveFixtureLights(options.fixtureLights, sceneElements)
+  const elemParts = sceneElements.filter(e => e !== 'Luzes Acesas').map(e => ELEM_EN[e] ?? e.toLowerCase()).filter(Boolean)
   // Wrapper enfatiza que isso é ADIÇÃO (não substituição) e proíbe explicitamente
   // criar novos objetos arquitetônicos (janelas, aberturas, luminárias) só pra
   // justificar o efeito pedido. Isso protege contra ELEM_EN entries como
@@ -1174,10 +1177,11 @@ export function buildFidelityPrompt(
     // direção do sol e brilho geral, mas troca o shading uniforme do CAD por
     // luz fotográfica real. Sem isso, os outros blocos pedem foto mas a luz
     // continua de CGI.
-    lightingLine = 'Lighting: keep the same time of day, sun direction and overall brightness as the reference, but replace the flat uniform CAD/3D shading with realistic photographic lighting — soft natural shadows, ambient occlusion and global illumination. Do not add or switch on any lamp, sconce, spot or fixture that is not already lit in the reference. '
+    lightingLine = 'Lighting: keep the same time of day, sun direction and overall brightness as the reference, but replace the flat uniform CAD/3D shading with realistic photographic lighting — soft natural shadows, ambient occlusion and global illumination. '
   } else {
-    lightingLine = 'Lighting: keep the reference lighting EXACTLY — every fixture stays in the same on/off state, same time of day, same shadow direction. '
+    lightingLine = 'Lighting: keep the reference time of day and shadow direction exactly. '
   }
+  lightingLine += buildFixtureLightsBlock(fixtureLights)
 
   if (level === 'maximum' && projectType === 'interior') {
     lightingLine +=

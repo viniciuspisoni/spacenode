@@ -1,6 +1,7 @@
 'use client'
 
 import RenderComparisonImages from '@/components/generate/RenderComparisonImages'
+import { FIXTURE_LIGHT_LABELS, resolveFixtureLights, type FixtureLights } from '@/lib/ai/fixture-lights'
 import RenderPreservationStatus from '@/components/generate/RenderPreservationStatus'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import Link from 'next/link'
@@ -65,6 +66,7 @@ interface ProjectConfig {
   segment?:            string
   environment?:        string
   lighting?:           string
+  fixtureLights?:      FixtureLights
   background?:         string
   sceneElements?:      string[]
   selectedEngine?:     EngineId
@@ -266,8 +268,9 @@ function resolveInitialConfig(cfg: ProjectConfig | null | undefined) {
     segment:            cfg?.segment     ?? PRESERVE,
     environment:        cfg?.environment ?? PRESERVE,
     lighting:           cfg?.lighting    ?? PRESERVE,
+    fixtureLights:      resolveFixtureLights(cfg?.fixtureLights, sceneElements),
     background:         cfg?.background  ?? PRESERVE,
-    sceneElements,
+    sceneElements:      sceneElements.filter(e => e !== 'Luzes Acesas'),
     selectedEngine:     engine,
     selectedResolution: resolution,
   }
@@ -298,6 +301,7 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
   // ── Ambiente, Iluminação, Background
   const [environment, setEnvironment] = useState<string>(init.environment)
   const [lighting,    setLighting]    = useState<string>(init.lighting)
+  const [fixtureLights, setFixtureLights] = useState<FixtureLights>(init.fixtureLights)
   const [background,  setBackground]  = useState<string>(init.background)
 
   // ── Elementos na Cena (múltipla seleção)
@@ -558,7 +562,7 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
         // lido por outros fluxos (e por qualquer sessão futura, inclusive sem
         // acesso interno). Grava o último motor público escolhido.
         const config: ProjectConfig = {
-          projectType, segment, environment, lighting, background,
+          projectType, segment, environment, lighting, fixtureLights, background,
           sceneElements,
           selectedEngine:     isOrion ? lastPublicEngineRef.current : selectedEngine,
           selectedResolution: isOrion ? DEFAULT_RESOLUTION : selectedResolution,
@@ -567,7 +571,7 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
       } catch (e) { console.error('Erro ao salvar config:', e) }
     }, 1500)
   }, [
-    projectType, segment, environment, lighting, background,
+    projectType, segment, environment, lighting, fixtureLights, background,
     sceneElements, selectedEngine, selectedResolution, isOrion,
     supabase,
   ])
@@ -714,6 +718,7 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
           segment,
           environment,
           lighting,
+          fixtureLights,
           background,
           sceneElements,
           geometryLock,
@@ -896,7 +901,7 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
   const environments  = getEnvironments(projectType, segment)
   const lightingOpts  = getLighting(projectType, segment)
   const backgrounds   = getBackgrounds(projectType)
-  const elementsOpts  = getSceneElements(projectType, segment)
+  const elementsOpts  = getSceneElements(projectType, segment).filter(e => e !== 'Luzes Acesas')
   const bgTitle       = projectType === 'exterior' ? 'Entorno' : 'Contexto visual'
   const noNodes       = credits < nodeCost
   // Quantos renders o saldo total cobre na config atual — recalcula client-side
@@ -930,7 +935,10 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
     sceneElements.length ? plural(sceneElements.length, 'elemento', 'elementos') : '',
   ])
   const cenaSummary = cenaEscolhas || 'Preservar original'
-  const luzSummary = isPreserved(lighting) ? 'Preservar original' : lighting
+  const luzSummary = summarize([
+    isPreserved(lighting) ? 'Preservar original' : lighting,
+    fixtureLights === 'preserve' ? '' : `Luzes ${FIXTURE_LIGHT_LABELS[fixtureLights].toLowerCase()}`,
+  ])
   const materiaisSummary = filledMaterials === 0 && materialSamples === 0
     ? 'Preservar do original'
     : summarize([
@@ -1066,6 +1074,14 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
         </ContextPanel>
 
         <ContextPanel open={sheet === 'luz'} title="Luz" onClose={closeSheet} id="luz-painel">
+          <div className="spn-field">
+            <span className="spn-field-label">Luzes artificiais</span>
+            <PillGroup label="Luzes artificiais" options={Object.values(FIXTURE_LIGHT_LABELS)} value={FIXTURE_LIGHT_LABELS[fixtureLights]} onChange={label => {
+              const state = (Object.keys(FIXTURE_LIGHT_LABELS) as FixtureLights[]).find(key => FIXTURE_LIGHT_LABELS[key] === label)
+              if (state) setFixtureLights(state)
+            }} />
+            <p className="spn-hint">Controla as luminárias existentes, independentemente do horário e da atmosfera.</p>
+          </div>
           <div className="spn-field">
             <span className="spn-field-label">Iluminação</span>
             <PillGroup label="Iluminação" options={lightingOpts} value={lighting} onChange={setLighting} />

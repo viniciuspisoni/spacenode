@@ -46,6 +46,7 @@ export const NEGATIVE_BASE = [
   'no transformed openings (a door stays a door, a window stays a window, an arch stays an arch)',
   'no different camera angle, perspective, framing, zoom, rotation or altered silhouette',
   'no warped proportions',
+  'no collage, diptych, split-screen, side-by-side views, repeated scene or comparison panels',
   'no removed neighboring buildings',
   'no fantasy, surreal or impossibly-shaped additions',
 ]
@@ -280,6 +281,7 @@ export function buildRenderOnlySystemHead(opts: RenderOnlyHeadOpts): string {
   const attempt = opts.attempt ?? 1
   return (
     buildIntent(opts.projectNoun, opts.hasAnchor) +
+    'OUTPUT FORMAT: Return ONE continuous full-frame photograph of the reference view. Never repeat the scene, split the canvas, create side-by-side alternatives, a collage or before/after panels. All auxiliary images are references only, never panels to include in the output. ' +
     buildContract() +
     buildRenderOnlyEscalation(attempt) +
     // Entrada de CAD: separar o traço do desenho do elemento físico ANTES do
