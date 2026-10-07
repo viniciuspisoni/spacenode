@@ -1,4 +1,5 @@
 import { persistentPrintUrl, refreshPrintUrl } from '@/lib/nodi/v2/uploads'
+import { resolveFixtureLights } from '@/lib/ai/fixture-lights'
 import { NextRequest, NextResponse, after } from 'next/server'
 import { fal } from '@fal-ai/client'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -250,6 +251,7 @@ export async function POST(req: NextRequest) {
       segment,
       environment,
       lighting,
+      fixtureLights,
       background,
       sceneElements,
       geometryLock = 85,
@@ -275,6 +277,7 @@ export async function POST(req: NextRequest) {
       segment?:        string
       environment?:    string
       lighting?:       string
+      fixtureLights?:  unknown
       background?:     string
       sceneElements?:  string[]
       geometryLock?:   number
@@ -465,6 +468,7 @@ export async function POST(req: NextRequest) {
       segment:       segment       ?? PRESERVE,
       environment:   environment   ?? PRESERVE,
       lighting:      lighting      ?? '',
+      fixtureLights: resolveFixtureLights(fixtureLights, sceneElements),
       background:    background    ?? 'Preservar Original',
       sceneElements: sceneElements ?? [],
       geometryLock:  Number(geometryLock),
@@ -1128,6 +1132,7 @@ export async function POST(req: NextRequest) {
       segment:       segment       ?? null,
       environment:   environment   ?? null,
       lighting:      lighting      ?? null,
+      fixtureLights: options.fixtureLights,
       background:    background    ?? null,
       sceneElements: sceneElements ?? [],
       geometryLock:  Number(geometryLock),
