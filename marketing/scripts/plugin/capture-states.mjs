@@ -5,8 +5,8 @@
 // custos reais de lib/engines.ts e lib/prompts.ts. Imagens: print #560 → render #559 do Space
 // "Projeto SketchUp 01/09" (feito de dentro do plugin).
 import { chromium } from 'playwright';
-import { pathToFileURL } from 'node:url'; import path from 'node:path'; import fs from 'node:fs';
-const REPO = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^/([A-Za-z]:)/, '$1')), '../../..');
+import { pathToFileURL, fileURLToPath } from 'node:url'; import path from 'node:path'; import fs from 'node:fs';
+const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const ROOT = process.env.SPACENODE_ACERVO || path.join(REPO, '..', 'acervo');
 const OUT = path.join(ROOT, 'plugin/shots'); fs.mkdirSync(OUT, { recursive: true });
 const html = pathToFileURL(path.join(REPO, 'sketchup/spacenode/dialog.html')).href; // o painel real, direto do repo
