@@ -9,6 +9,7 @@ import { refundNodes } from '@/lib/billing/refund-nodes'
 import {
   buildFidelityPrompt,
   materialSurfaceEn,
+  isMaterialPreservationRequest,
   PRESERVE,
   isPreserved,
   type GenerateOptions,
@@ -734,18 +735,18 @@ export async function POST(req: NextRequest) {
     // Gate opcional de cor (score v2): só quando o usuário NÃO pediu mudança
     // que legitimamente altera cores — luz nova, override de material ou
     // refinamento. Nesses casos o ΔE alto é pedido, não drift.
+    const materialPreservationRequested = isMaterialPreservationRequest(options, materialRefs?.length ?? 0)
     const colorGateActive =
       renderOnlyActive &&
       fidelityCfg.maxColorDelta !== null &&
       (!lighting || lighting === 'Preservar Original') &&
-      !refinementText?.trim() &&
-      !materials
+      materialPreservationRequested
 
     // Experimental local evidence on explicit correction only; never inherit a drifted render.
     // No extra model call, no extra Nodes. Material overrides/refinements keep their existing path.
     let materialRegionSheet: { imageIndex: number; surfaces: string[] } | undefined
-    if (renderOnlyActive && structuralBoost === true && !hasAnchor && !refinementText?.trim() &&
-        materialSamples.length === 0 && Object.values(materials ?? {}).every(isPreserved) &&
+    if (renderOnlyActive && structuralBoost === true && !hasAnchor && materialPreservationRequested &&
+        materialSamples.length === 0 &&
         process.env.RENDER_MATERIAL_REGION_CROPS !== '0' && remainingMs() > 60_000) {
       try {
         if (!originalBuffer) originalBuffer = await fetchStorageBuffer(inputUrl)
@@ -1025,9 +1026,7 @@ export async function POST(req: NextRequest) {
     // A geometry score cannot detect invented wood/stone. Check material-preserving
     // renders with a current inventory even when the edges look correct. Explicit
     // edits keep the existing audit policy; this checker has no requested-edit mask.
-    const materialReviewRequired = hasCurrentMaterialAnalysis(resolvedBriefing) &&
-      !Object.values(materials ?? {}).some(value => typeof value === 'string' && value.trim()) &&
-      !materialRefs?.length && !refinementText?.trim()
+    const materialReviewRequired = hasCurrentMaterialAnalysis(resolvedBriefing) && materialPreservationRequested
     // Audit (vision, ~segundos) e preview (download + sharp + upload) não
     // dependem um do outro — rodam em paralelo; o preview reaproveita o
     // buffer que o geometry score já baixou (antes baixava o master de novo).

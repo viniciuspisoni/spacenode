@@ -694,31 +694,53 @@ function buildFidelityBlock(geometryLock: number, fidelityMode?: 'strict' | 'bal
 // diferente em interior vs exterior, e os campos interior-only (paredes, teto,
 // marcenaria, bancadas) só são emitidos em interior — em exterior não fazem
 // sentido e vazariam pro prompt mesmo se houvesse dado órfão no JSONB.
+/** Only concrete choices on surfaces that belong to this project are overrides. */
+export function getSurfaceMaterialOverrides(materials?: ProjectMaterials, projectType?: ProjectType): ProjectMaterials {
+  const fields: (keyof ProjectMaterials)[] = projectType === 'interior'
+    ? ['piso', 'esquadrias', 'paredes', 'teto', 'marcenaria', 'bancadas', 'elementos']
+    : ['fachada', 'piso', 'esquadrias', 'elementos']
+  const overrides: ProjectMaterials = {}
+  for (const field of fields) {
+    const raw = materials?.[field]
+    if (typeof raw !== 'string') continue
+    const value = raw.trim()
+    if (!isPreserved(value)) overrides[field] = value
+  }
+  return overrides
+}
+
+/** Free-text project notes are directions, not a blanket material replacement. */
+export function isMaterialPreservationRequest(options: Pick<GenerateOptions, 'materials' | 'projectType' | 'refinementText'>, materialRefCount = 0): boolean {
+  return Object.keys(getSurfaceMaterialOverrides(options.materials, options.projectType)).length === 0 &&
+    materialRefCount === 0 && !options.refinementText?.trim()
+}
+
 function buildMaterialsBlock(
   materials?:  ProjectMaterials,
   projectType?: ProjectType,
   level?:      FidelityLevel,
 ): string {
   if (!materials) return ''
+  const overrides = getSurfaceMaterialOverrides(materials, projectType)
   const isInterior = projectType === 'interior'
   const lines = [
     // Exterior-only
-    !isInterior && materials.fachada    && `facade cladding: ${materials.fachada}`,
+    !isInterior && overrides.fachada    && `facade cladding: ${overrides.fachada}`,
     // Compartilhados (mapeamento por contexto)
-    materials.piso       && (isInterior
-      ? `flooring: ${materials.piso}`
-      : `floor and paving: ${materials.piso}`),
-    materials.esquadrias && (isInterior
-      ? `interior doors and window frames: ${materials.esquadrias}`
-      : `external doors and window frames: ${materials.esquadrias}`),
+    overrides.piso       && (isInterior
+      ? `flooring: ${overrides.piso}`
+      : `floor and paving: ${overrides.piso}`),
+    overrides.esquadrias && (isInterior
+      ? `interior doors and window frames: ${overrides.esquadrias}`
+      : `external doors and window frames: ${overrides.esquadrias}`),
     // Interior-only — nomes específicos pra evitar a ambiguidade que fazia
     // "facade cladding" descrever uma parede de cozinha.
-    isInterior && materials.paredes     && `wall finishes and surface materials: ${materials.paredes}`,
-    isInterior && materials.teto        && `ceiling finish: ${materials.teto}`,
-    isInterior && materials.marcenaria  && `built-in millwork, cabinetry and fitted furniture: ${materials.marcenaria}`,
-    isInterior && materials.bancadas    && `countertops and surfaces: ${materials.bancadas}`,
+    isInterior && overrides.paredes     && `wall finishes and surface materials: ${overrides.paredes}`,
+    isInterior && overrides.teto        && `ceiling finish: ${overrides.teto}`,
+    isInterior && overrides.marcenaria  && `built-in millwork, cabinetry and fitted furniture: ${overrides.marcenaria}`,
+    isInterior && overrides.bancadas    && `countertops and surfaces: ${overrides.bancadas}`,
     // Compartilhados em ambos
-    materials.elementos  && `special architectural elements: ${materials.elementos}`,
+    overrides.elementos  && `special architectural elements: ${overrides.elementos}`,
   ].filter(Boolean)
   // Observações livres também descrevem luz e restrições da cena. Não são
   // uma superfície: tratá-las como material override muda o escopo do pedido.
