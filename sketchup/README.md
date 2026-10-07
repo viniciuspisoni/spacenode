@@ -1487,9 +1487,10 @@ Gera `dist/spacenode-sketchup.rbz` (zip com separadores `/`, compatível com
 o SketchUp do macOS). Instalação: `Window > Extension Manager > Install
 Extension`.
 
-> Antes de distribuir fora do repo: assinar o `.rbz` no Extension Signature
-> Portal (https://extensions.sketchup.com/extension/sign) — usuários com a
-> política "Identified Extensions Only" não carregam extensão sem assinatura.
+> A assinatura do `.rbz` é opcional na distribuição pelo site. Usuários com a
+> política "Apenas extensões identificadas" precisam de um pacote assinado;
+> nos outros modos de carregamento o pacote sem assinatura pode ser usado.
+> Ver `docs/SKETCHUP-DISTRIBUICAO.md` § 1.
 
 ## Desenvolvimento local
 

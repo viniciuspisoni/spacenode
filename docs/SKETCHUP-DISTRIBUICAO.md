@@ -42,40 +42,42 @@ mestre).
 
 A página de download e o aviso dentro do plugin leem `PLUGIN_VERSION`
 (`lib/sketchup/plugin-release.ts`): o merge na `main` publica os dois junto com
-o `.rbz` de `public/downloads/`. Então **assinar antes de mergear**:
+o `.rbz` de `public/downloads/`. A ordem para o canal próprio é:
 
 1. Na branch da release, `npm run verify:sketchup` verde e `.rbz` gerado
    (`dist/` e `public/downloads/` idênticos, `package:sketchup:verify` ok).
-2. Subir `public/downloads/spacenode-sketchup.rbz` no Extension Signature
-   Portal; o `.rbz` ASSINADO que volta substitui os dois arquivos (o
-   `package:sketchup:verify` tolera a entrada de assinatura a mais, mas
-   qualquer rebuild depois disso invalida a assinatura).
-3. Só então commitar os binários e mergear → deploy: o catálogo (v10,
+2. Commitar os binários e mergear → deploy: o catálogo (v10,
    `supports.seed`, `seedApplied`, `edgeMapNative`) e a versão nova sobem
    juntos, e quem está na 1.8.1 vê "1.9.0 disponível — baixar" no rodapé.
 
-Se for preciso publicar o servidor antes da assinatura, manter
-`PLUGIN_VERSION` na versão anterior nesse deploy (os três textos de versão
-precisam bater só no commit do `.rbz`).
+Se decidirmos atender usuários com a política "Apenas extensões identificadas",
+assinar o pacote final antes do merge, substituir os dois `.rbz` pelo arquivo
+devolvido pelo portal e verificar de novo. Qualquer rebuild exige nova assinatura.
 
-## 1. Assinatura digital (obrigatória na prática)
+## 1. Assinatura digital (opcional no canal próprio)
 
-A política de carregamento "Identified Extensions Only" do SketchUp bloqueia
-extensão sem assinatura — e não dá pra saber quantos usuários estão nesse
-modo. **Assinar sempre, mesmo distribuindo só pelo site.**
+A distribuição pelo site aceita `.rbz` sem assinatura. O SketchUp pode carregar
+essas extensões nos modos "Aprovar extensões não identificadas" ou "Sem
+restrições". O modo "Apenas extensões identificadas" exige assinatura digital;
+usuários nesse modo precisam trocar a política para usar o pacote sem assinatura.
+As versões anteriores do download também não tinham entrada de assinatura.
+Fonte: <https://help.sketchup.com/pt-br/extensions-loading-policy> e
+<https://help.sketchup.com/en/extension-warehouse/extension-encryption-and-signing>.
+
+Se optarmos pela assinatura para ampliar a compatibilidade:
 
 - [ ] Conta Trimble ID (a mesma do SketchUp serve).
 - [ ] Subir o `.rbz` no **Extension Signature Portal**:
       <https://extensions.sketchup.com/extension/sign>
       O portal injeta o arquivo de assinatura e devolve o `.rbz` assinado —
-      **é esse arquivo** que vai pro `public/downloads/`.
+      substituir `dist/` e `public/downloads/` pelo arquivo devolvido.
 - [ ] Repetir a assinatura a **cada build novo** (assinatura casa com o
       conteúdo exato do zip).
 
 ## 2. Site próprio (canal primário — já pronto no código)
 
 - [ ] Página `/sketchup` no ar com o botão de download.
-- [ ] A cada release: rebuild → assinar no portal → substituir
+- [ ] A cada release: rebuild → substituir
       `public/downloads/spacenode-sketchup.rbz` (mesmo nome estável — links
       externos não quebram) → deploy.
 
@@ -101,7 +103,7 @@ própria — o modelo SPACENODE é aceito.
 ## 4. SketchUcation ExtensionStore (canal de baixo atrito)
 
 - [ ] Cadastro de autor em <https://sketchucation.com/pluginstore> e upload
-      do mesmo `.rbz` assinado. Requisitos bem mais leves que o EW.
+      do `.rbz`. Confirmar os requisitos desse canal antes da submissão.
 
 ## 5. macOS
 
@@ -117,5 +119,5 @@ própria — o modelo SPACENODE é aceito.
   Pendente: ~65 mensagens literais em pt-BR dentro do `main.rb` que saltam
   o `t()` (erros de ampliação/edição/câmera).
 - ~~Pareamento por código no navegador do sistema~~ — feito na 0.5.0.
-- Extension Warehouse e SketchUcation seguem sem dono: precisam da
-  assinatura do `.rbz` (seção 1) e de uma conta de teste paga na submissão.
+- Extension Warehouse e SketchUcation seguem sem dono: confirmar os requisitos
+  de cada canal; para o Warehouse, preparar uma conta de teste paga na submissão.
