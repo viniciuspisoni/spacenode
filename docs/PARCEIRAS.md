@@ -18,6 +18,12 @@ geram prêmios. Após o encerramento da assinatura, não há prêmio no ciclo
 seguinte. O que já entrou fica no saldo extra, sem prazo de validade e sem
 conversão em dinheiro.
 
+Indicações anteriores à criação do link podem ser vinculadas manualmente.
+Quando houver um acordo de prêmio para um plano legado, o valor fica em
+`referrals.reward_override_nodes` apenas naquele vínculo. A mesma rotina do
+webhook concede o prêmio uma vez por fatura de assinatura efetivamente paga.
+O ID da fatura também serve para creditar retroativamente sem duplicar Nodes.
+
 ## Implementação
 
 - `referrals` guarda um único indicador por conta indicada. O trigger captura
