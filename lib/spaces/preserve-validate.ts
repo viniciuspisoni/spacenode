@@ -15,6 +15,7 @@
 import { geminiMultiVisionJson } from '@/lib/gemini'
 import { MATERIAL_IDENTITY_RULES } from '@/lib/nodi/material-fidelity'
 import { buildMaterialInventoryBlock, normalizeMaterialInventory } from '@/lib/ai/material-inventory'
+import { hasTextureDescriptionConflict, normalizeTextureEvidence, textureEvidenceVerdict, type TextureEvidence } from '@/lib/ai/fidelity/texture-evidence'
 import type { SpacesPreservationLevel } from './preservation'
 
 // ── 1. Checagens estruturais síncronas ────────────────────────
@@ -67,7 +68,7 @@ export interface PreservationCheck {
   score:      number             // 0..1, confiança de que é o mesmo projeto
   material_changed?: boolean | null // explicit visible substitution; null = uncertain
   material_review?: 'passed' | 'changed' | 'uncertain' | 'unverified'
-  material_checks?: { surface: string; original: string; generated: string; verdict: 'preserved' | 'changed' | 'uncertain' }[]
+  material_checks?: { surface: string; original: string; generated: string; verdict: 'preserved' | 'changed' | 'uncertain'; texture?: TextureEvidence }[]
   notes?:     string
   attributes?: {
     volumetria?:  number
@@ -110,11 +111,12 @@ function checkUserPrompt(level: SpacesPreservationLevel, cropExpected: boolean, 
     MATERIAL_IDENTITY_RULES + '\n' +
     buildMaterialInventoryBlock(materialInventory) +
     'Compare CADA superfície inventariada: nome EXATO, aparência na original, aparência na gerada, verdict preserved/changed/uncertain. Mesmo piso cinza pode ter ganho veios; mesmo armário claro pode ter ganho madeira. Ausência de evidência é uncertain, nunca aprovação. Primeiro compare os padrões locais, depois atribua o score global. Não deduza madeira na original a partir de ripas.\n' +
+    'Para CADA comparação, preencha texture: original e generated = smooth (sem padrão material visível), patterned (padrão material visível) ou unclear; change = none, added, removed, changed ou uncertain. A original CAD lisa continua smooth mesmo que você suponha ser madeira/concreto. Textura de concreto, veios sutis e grão acrescentados são added, mesmo com a mesma cor e maior realismo. Luz, sombra e reflexos isolados não são textura; juntas e sulcos geométricos também não. Se não conseguir distinguir, use unclear/uncertain. smooth → patterned exige verdict changed e material_changed=true; nunca preserved. Sem inventário, identifique as principais superfícies visíveis e compare-as.\n' +
     'Se houve troca visível de identidade de material, cor base, acabamento ou padrão, marque material_changed=true independentemente do score; geometria correta não compensa essa troca. Material preservado = false; ambíguo = null. Variação plausível de luz não é troca. Explique a superfície original → resultado em notes.\n' +
     'Devolva JSON:\n' +
     '{\n' +
     '  "preserved": boolean,        // true = claramente o mesmo projeto\n' +
-    '  "material_checks": [{"surface": string, "original": string, "generated": string, "verdict": "preserved"|"changed"|"uncertain"}], // uma comparação por superfície inventariada\n' +
+    '  "material_checks": [{"surface": string, "original": string, "generated": string, "verdict": "preserved"|"changed"|"uncertain", "texture": {"original": "smooth"|"patterned"|"unclear", "generated": "smooth"|"patterned"|"unclear", "change": "none"|"added"|"removed"|"changed"|"uncertain"}}], // uma comparação por superfície inventariada\n' +
     '  "material_changed": boolean|null, // true = substituição visível; null = incerteza\n' +
     '  "score": number,             // 0-1, confiança de que é o mesmo projeto\n' +
     '  "attributes": {\n' +
@@ -141,7 +143,7 @@ export async function checkArchitecturalPreservation(
       maxTokens: normalizeMaterialInventory(opts?.materialInventory).length ? 2600 : 1200,
       timeoutMs: 30_000,
     })
-    return parseCheck(raw, normalizeMaterialInventory(opts?.materialInventory).map(item => item.surface))
+    return parseCheck(raw, normalizeMaterialInventory(opts?.materialInventory).map(item => item.surface), { requireTextureEvidence: true })
   } catch {
     console.warn('[spaces.preserve] checagem de preservação indisponível (best-effort)')
     return null
@@ -156,7 +158,7 @@ function stripFence(raw: string): string {
 // legítima (luz/atmosfera muda a imagem) mas pega redesign claro.
 const WARNING_THRESHOLD = 0.7
 
-export function parseCheck(raw: string, requiredSurfaces: string[] = []): PreservationCheck {
+export function parseCheck(raw: string, requiredSurfaces: string[] = [], opts?: { requireTextureEvidence?: boolean }): PreservationCheck {
   const parsed = JSON.parse(stripFence(raw)) as Partial<PreservationCheck>
   const clamp = (n: unknown): number =>
     typeof n === 'number' && Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0
@@ -180,17 +182,24 @@ export function parseCheck(raw: string, requiredSurfaces: string[] = []): Preser
     if (!item || typeof item.surface !== 'string' || !item.surface.trim() ||
         typeof item.original !== 'string' || !item.original.trim() || typeof item.generated !== 'string' || !item.generated.trim() ||
         !['preserved', 'changed', 'uncertain'].includes(item.verdict)) return []
+    const texture = normalizeTextureEvidence(item.texture)
+    const textureVerdict = texture ? textureEvidenceVerdict(texture) : undefined
+    const descriptionConflict = hasTextureDescriptionConflict(item.original, item.generated)
+    const verdict = item.verdict === 'changed' || textureVerdict === 'changed' ? 'changed' as const
+      : item.verdict === 'uncertain' || textureVerdict === 'uncertain' || descriptionConflict ? 'uncertain' as const
+      : 'preserved' as const
     return [{ surface: item.surface.trim().slice(0, 160), original: item.original.trim().slice(0, 300),
-      generated: item.generated.trim().slice(0, 300), verdict: item.verdict }]
+      generated: item.generated.trim().slice(0, 300), verdict, ...(texture ? { texture } : {}) }]
   }) : []
   // A bounded or partially invalid response is not complete evidence of preservation.
   const incompleteEvidence = Array.isArray(parsed.material_checks)
     ? materialChecks.length !== parsed.material_checks.length
     : parsed.material_checks !== undefined
   const missingSurface = requiredSurfaces.some(surface => !materialChecks.some(item => item.surface === surface))
+  const missingTexture = opts?.requireTextureEvidence && (!materialChecks.length || materialChecks.some(item => !item.texture))
   const materialReview = materialChecks.some(item => item.verdict === 'changed') ? 'changed' as const
     : materialChecks.some(item => item.verdict === 'uncertain') ? 'uncertain' as const
-    : missingSurface || incompleteEvidence ? 'unverified' as const
+    : missingSurface || incompleteEvidence || missingTexture ? 'unverified' as const
     : materialChecks.length ? 'passed' as const : undefined
   // Per-surface evidence outranks a contradictory high overall score. Incomplete review is advisory.
   const warning = !preserved || score < WARNING_THRESHOLD || materialDrift || materialChanged === true ||
@@ -199,7 +208,8 @@ export function parseCheck(raw: string, requiredSurfaces: string[] = []): Preser
   return {
     preserved,
     warning,
-    material_changed: materialReview === 'changed' ? true : materialChanged,
+    material_changed: materialReview === 'changed' || materialChanged === true ? true
+      : materialReview === 'uncertain' || materialReview === 'unverified' ? null : materialChanged,
     ...(materialReview ? { material_review: materialReview, material_checks: materialChecks } : {}),
     score,
     attributes,
