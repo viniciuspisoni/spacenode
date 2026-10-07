@@ -8,7 +8,11 @@ export function referralId(value: string | null | undefined): string | null {
   return value && UUID.test(value) ? value.toLowerCase() : null
 }
 
-export function referralReward(plan: string): number {
+export function referralReward(plan: string, overrideNodes?: number | null): number {
+  if (
+    overrideNodes != null && Number.isInteger(overrideNodes) && overrideNodes > 0 &&
+    ['starter', 'essence', 'pro', 'studio', 'office'].includes(plan)
+  ) return overrideNodes
   return { essence: 200, pro: 400, studio: 800 }[plan as 'essence' | 'pro' | 'studio'] ?? 0
 }
 
