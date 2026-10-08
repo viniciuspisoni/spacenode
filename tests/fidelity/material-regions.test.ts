@@ -39,5 +39,61 @@ describe('original material region evidence', () => {
     expect(block).toContain('1="cabinet"; 2="floor"')
     expect(block).toContain('not this sheet')
     expect(block).toContain('Do not tile the crop')
+    expect(block).toContain('do not spread a pattern from one object to another')
+  })
+
+  async function quadrantOriginal() {
+    const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00']
+    const layers = await Promise.all(colors.map(async (background, i) => ({
+      input: await sharp({ create: { width: 64, height: 64, channels: 3, background } }).png().toBuffer(),
+      left: i % 2 * 64, top: Math.floor(i / 2) * 64,
+    })))
+    return sharp({ create: { width: 128, height: 128, channels: 3, background: '#000000' } }).composite(layers).png().toBuffer()
+  }
+
+  const rowColor = (png: Buffer, row: number) => sharp(png).extract({ left: 256, top: row * 384 + 208, width: 1, height: 1 }).removeAlpha().raw().toBuffer()
+
+  it('provides correctly ordered original pixels without vision or material species guesses on explicit correction', async () => {
+    const sheet = await buildMaterialRegionSheet(await quadrantOriginal(), undefined, { allowSourceGrid: true })
+    expect(sheet?.source).toBe('original_grid')
+    expect(sheet?.surfaces).toEqual([
+      'original top-left quadrant [0,0,0.5,0.5]', 'original top-right quadrant [0.5,0,1,0.5]',
+      'original bottom-left quadrant [0,0.5,0.5,1]', 'original bottom-right quadrant [0.5,0.5,1,1]',
+    ])
+    expect(await sharp(sheet!.png).metadata()).toMatchObject({ width: 512, height: 1536 })
+    expect([...await rowColor(sheet!.png, 0)]).toEqual([255, 0, 0])
+    expect([...await rowColor(sheet!.png, 1)]).toEqual([0, 255, 0])
+    expect([...await rowColor(sheet!.png, 2)]).toEqual([0, 0, 255])
+    expect([...await rowColor(sheet!.png, 3)]).toEqual([255, 255, 0])
+  })
+
+  it.each([undefined, [], [{ surface: 'floor', appearance: 'gray' }], [{ surface: 'floor', appearance: 'gray', region: [1, 1, 0, 0] }]])('grid fallback is opt-in for missing coordinates %j', async raw => {
+    const original = await quadrantOriginal()
+    expect(await buildMaterialRegionSheet(original, raw)).toBeNull()
+    expect((await buildMaterialRegionSheet(original, raw, { allowSourceGrid: true }))?.source).toBe('original_grid')
+  })
+
+  it('prefers valid surface coordinates over the fallback and adds no extra image', async () => {
+    const sheet = await buildMaterialRegionSheet(await quadrantOriginal(), [
+      { surface: 'specified surface', appearance: 'blue', region: [0, .5, .5, 1] },
+    ], { allowSourceGrid: true })
+    expect(sheet?.source).toBe('inventory')
+    expect(sheet?.surfaces).toEqual(['specified surface'])
+    expect([...await rowColor(sheet!.png, 0)]).toEqual([0, 0, 255])
+  })
+
+  it('uses displayed coordinates after EXIF rotation, not the unrotated image quadrants', async () => {
+    const original = await sharp(await quadrantOriginal()).jpeg({ quality: 100, chromaSubsampling: '4:4:4' }).withMetadata({ orientation: 6 }).toBuffer()
+    const sheet = await buildMaterialRegionSheet(original, [], { allowSourceGrid: true })
+    const expected = [[0, 0, 255], [255, 0, 0], [255, 255, 0], [0, 255, 0]]
+    for (let row = 0; row < 4; row++) {
+      const actual = [...await rowColor(sheet!.png, row)]
+      actual.forEach((channel, i) => expect(Math.abs(channel - expected[row][i])).toBeLessThanOrEqual(2))
+    }
+  })
+
+  it('does not upscale unusable one-pixel regions into fabricated evidence', async () => {
+    const original = await sharp({ create: { width: 2, height: 2, channels: 3, background: '#888888' } }).png().toBuffer()
+    expect(await buildMaterialRegionSheet(original, [], { allowSourceGrid: true })).toBeNull()
   })
 })

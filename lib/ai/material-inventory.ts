@@ -61,6 +61,7 @@ export function buildMaterialRegionSheetBlock(imageIndex?: number | null, surfac
     surfaces.map((surface, i) => `${i + 1}=${JSON.stringify(surface)}`).join('; ') + '. ' +
     'Use these pixels as local color and pattern evidence for their corresponding surfaces ONLY. ' +
     'They are not new material choices, a new camera view or a target composition. Match the reference framing, not this sheet. ' +
+    'Spatial quadrant labels identify areas of the original, not material species. Each quadrant can contain multiple objects and surfaces; do not spread a pattern from one object to another. ' +
     'Surrounding objects or tile joints in a crop are not texture to repeat. Do not tile the crop. ' +
     'Retain plain surfaces as plain; improve light response without inventing wood grain or stone veining. '
 }

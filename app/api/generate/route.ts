@@ -770,17 +770,19 @@ export async function POST(req: NextRequest) {
 
     // Experimental local evidence on explicit correction only; never inherit a drifted render.
     // No extra model call, no extra Nodes. Material overrides/refinements keep their existing path.
-    let materialRegionSheet: { imageIndex: number; surfaces: string[] } | undefined
+    let materialRegionSheet: { imageIndex: number; surfaces: string[]; source: 'inventory' | 'original_grid' } | undefined
     if (renderOnlyActive && structuralBoost === true && !hasAnchor && materialPreservationRequested &&
         materialSamples.length === 0 &&
         process.env.RENDER_MATERIAL_REGION_CROPS !== '0' && remainingMs() > 60_000) {
       try {
         if (!originalBuffer) originalBuffer = await fetchStorageBuffer(inputUrl)
-        const sheet = await buildMaterialRegionSheet(originalBuffer, resolvedBriefing?.material_inventory)
+        // Missing/late vision must not remove local pixel evidence from an
+        // explicit correction. A spatial grid needs no guessed material names.
+        const sheet = await buildMaterialRegionSheet(originalBuffer, resolvedBriefing?.material_inventory, { allowSourceGrid: true })
         if (sheet) {
           const url = await hostAuxImage(sheet.png, 'image/png', 'original-material-regions.png')
           baseImageUrls.push(url)
-          materialRegionSheet = { imageIndex: baseImageUrls.length, surfaces: sheet.surfaces }
+          materialRegionSheet = { imageIndex: baseImageUrls.length, surfaces: sheet.surfaces, source: sheet.source }
           baseImageLabels.push(`Image #${materialRegionSheet.imageIndex} — ORIGINAL SURFACE CLOSE-UPS (numbered original pixel crops, material evidence only; not a new composition):`)
         }
       } catch {
@@ -1222,6 +1224,7 @@ export async function POST(req: NextRequest) {
         anchor_used: hasAnchor,
         material_ref_count: materialSamples.length,
         material_region_count: materialRegionSheet?.surfaces.length ?? 0,
+        material_region_source: materialRegionSheet?.source ?? null,
         image_count: baseImageUrls.length,
         duration_ms: generationDurationMs,
         nodes_charged: nodesToCharge,

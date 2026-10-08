@@ -1,12 +1,25 @@
 import sharp from 'sharp'
-import { normalizeMaterialInventory } from '@/lib/ai/material-inventory'
+import { normalizeMaterialInventory, type MaterialObservation } from '@/lib/ai/material-inventory'
+
+const SOURCE_GRID: { surface: string; region: NonNullable<MaterialObservation['region']> }[] = [
+  { surface: 'original top-left quadrant [0,0,0.5,0.5]', region: [0, 0, .5, .5] },
+  { surface: 'original top-right quadrant [0.5,0,1,0.5]', region: [.5, 0, 1, .5] },
+  { surface: 'original bottom-left quadrant [0,0.5,0.5,1]', region: [0, .5, .5, 1] },
+  { surface: 'original bottom-right quadrant [0.5,0.5,1,1]', region: [.5, .5, 1, 1] },
+]
 
 /** Pixel crops from the original only: no recoloring, generated swatches or guessed materials. */
-export async function buildMaterialRegionSheet(original: Buffer, raw: unknown): Promise<{
+export async function buildMaterialRegionSheet(original: Buffer, raw: unknown, opts?: {
+  /** Explicit correction only. Spatial regions, never guessed surface identities. */
+  allowSourceGrid?: boolean
+}): Promise<{
   png: Buffer
   surfaces: string[]
+  source: 'inventory' | 'original_grid'
 } | null> {
-  const entries = normalizeMaterialInventory(raw).filter(item => item.region).slice(0, 4)
+  const inventory = normalizeMaterialInventory(raw).filter(item => item.region).slice(0, 4)
+  const source = inventory.length ? 'inventory' as const : 'original_grid' as const
+  const entries = inventory.length ? inventory : opts?.allowSourceGrid ? SOURCE_GRID : []
   if (!entries.length) return null
   const normalized = await sharp(original).rotate().png().toBuffer()
   const meta = await sharp(normalized).metadata()
@@ -31,5 +44,5 @@ export async function buildMaterialRegionSheet(original: Buffer, raw: unknown): 
   if (!surfaces.length) return null
   const png = await sharp({ create: { width: 512, height: surfaces.length * 384, channels: 3, background: '#202020' } })
     .composite(layers).png().toBuffer()
-  return { png, surfaces }
+  return { png, surfaces, source }
 }
