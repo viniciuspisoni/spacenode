@@ -1,6 +1,7 @@
 'use client'
 
 import RenderComparisonImages from '@/components/generate/RenderComparisonImages'
+import type { SavedRenderReview } from '@/lib/ai/fidelity/saved-render-review'
 import { FIXTURE_LIGHT_LABELS, resolveFixtureLights, type FixtureLights } from '@/lib/ai/fixture-lights'
 import RenderPreservationStatus from '@/components/generate/RenderPreservationStatus'
 import { useState, useRef, useEffect, useCallback } from 'react'
@@ -50,6 +51,7 @@ interface GenerateClientProps {
   initialConfig?:    ProjectConfig | null
   /** URL https de uma render existente a pré-carregar como input (ex.: "Reutilizar" no dashboard). */
   initialSourceUrl?: string
+  initialReview?: SavedRenderReview
   /** 'spaces/new' = veio do fluxo Novo projeto sem renders — o CTA de resultado vira o caminho de volta. */
   returnTo?:         'spaces/new'
   /** true = a conta nunca gerou uma render — o Guia da primeira imagem abre sozinho. */
@@ -276,7 +278,7 @@ function resolveInitialConfig(cfg: ProjectConfig | null | undefined) {
   }
 }
 
-export function GenerateClient({ initialCredits, initialMaterials, initialConfig, initialSourceUrl, returnTo, firstRender = false, showPlanOffer = false, orionEnabled = false, orionProvider }: GenerateClientProps) {
+export function GenerateClient({ initialCredits, initialMaterials, initialConfig, initialSourceUrl, initialReview, returnTo, firstRender = false, showPlanOffer = false, orionEnabled = false, orionProvider }: GenerateClientProps) {
   const init = resolveInitialConfig(initialConfig)
   const fromSpacesNew = returnTo === 'spaces/new'
   const supabase = createClient()
@@ -327,12 +329,12 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // ── Imagem e resultado
-  const [imagePreview,      setImagePreview]      = useState<string | null>(null)
-  const [outputUrl,         setOutputUrl]         = useState<string | null>(null)
+  const [imagePreview,      setImagePreview]      = useState<string | null>(initialReview?.inputUrl ?? null)
+  const [outputUrl,         setOutputUrl]         = useState<string | null>(initialReview?.outputUrl ?? null)
   // Arquivo original selecionado (sobe INTEIRO via upload direto no Gerar) e
   // URL do input já hospedado pelo servidor (regenerações reusam sem re-upload).
   const [sourceFile,        setSourceFile]        = useState<File | null>(null)
-  const [serverInputUrl,    setServerInputUrl]    = useState<string | null>(null)
+  const [serverInputUrl,    setServerInputUrl]    = useState<string | null>(initialReview?.inputUrl ?? null)
   // Amostras visuais de material (field → URL pública). Viram imagens de
   // referência rotuladas na geração — o modelo reproduz o produto real em vez
   // de inventar veio/paginação a partir do texto. Sessão-only (não persiste).
@@ -346,15 +348,15 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
   // Verificação estrutural do render_only (a API compara o resultado com o
   // original e devolve o veredito — mesmo papel do preservation_warning do
   // Spaces). null = sem verificação (nível != Máxima ou gate desligado).
-  const [fidelityScore,     setFidelityScore]     = useState<number | null>(null)
-  const [fidelityWarning,   setFidelityWarning]   = useState(false)
+  const [fidelityScore,     setFidelityScore]     = useState<number | null>(initialReview?.score ?? null)
+  const [fidelityWarning,   setFidelityWarning]   = useState(initialReview?.warning ?? false)
   // Overlay do mapa de diferenças estruturais (/api/renders/[id]/diff).
   const [showDiff,          setShowDiff]          = useState(false)
   // Seed do último render — o "Corrigir drift" reusa pra manter a amostra.
-  const [lastSeed,          setLastSeed]          = useState<number | null>(null)
+  const [lastSeed,          setLastSeed]          = useState<number | null>(initialReview?.seed ?? null)
   // Id da última render persistida — usado pelo CTA "Criar Space" pra
   // ligar o Space novo à render como Vista Mestre.
-  const [lastRenderId,      setLastRenderId]      = useState<string | null>(null)
+  const [lastRenderId,      setLastRenderId]      = useState<string | null>(initialReview?.id ?? null)
   // Identidade Orion do ÚLTIMO RESULTADO: rótulo e bloqueio do Spaces leem daqui.
   const [lastOrion,         setLastOrion]         = useState<GenerateResult['orion']>(null)
   const [sliderPos,         setSliderPos]         = useState(50)
@@ -380,7 +382,7 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
   // ── Âncora visual: render anterior usado pra manter consistência de
   //    materiais/texturas entre gerações sucessivas do mesmo input.
   //    Default true; usuário pode desligar pra começar do zero.
-  const [useAnchor, setUseAnchor] = useState(true)
+  const [useAnchor, setUseAnchor] = useState(!initialReview)
   const onPreservationWarning = useCallback(() => {
     setFidelityWarning(true)
     setUseAnchor(false)

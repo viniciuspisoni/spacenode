@@ -6,11 +6,12 @@ import { canUseOrion } from '@/lib/orion/access'
 import { orionProvider, orionProviderReady } from '@/lib/orion/provider'
 import { ensureProfileRow } from '@/lib/profiles/ensure-profile'
 import GenerateClient from './GenerateClient'
+import { loadOwnSavedRenderReview } from '@/lib/ai/fidelity/saved-render-review'
 
 export default async function GeneratePage({
   searchParams,
 }: {
-  searchParams: Promise<{ source?: string; return?: string }>
+  searchParams: Promise<{ source?: string; return?: string; reuse?: string }>
 }) {
   const sp = await searchParams
   // ?return=spaces/new — veio do fluxo "Novo projeto" sem renders; ao concluir
@@ -35,6 +36,7 @@ export default async function GeneratePage({
     .eq('user_id', user.id)
     .eq('status', 'completed')
     .then(({ count }) => count ?? 0)
+  const reviewPromise = loadOwnSavedRenderReview(supabase, user.id, sp.reuse)
 
   // Materiais/config são do PRÓPRIO usuário; o saldo exibido/gateado é da
   // bolsa (dono do workspace) — é dele que a geração debita.
@@ -55,7 +57,7 @@ export default async function GeneratePage({
     balance = await getPayerBalance(admin, user.id)
   }
 
-  const renderCount = await renderCountPromise
+  const [renderCount, review] = await Promise.all([renderCountPromise, reviewPromise])
 
   // Orion: mesmo gate da API (ORION_INTERNAL_ENABLED + usuário autenticado).
   // Checado AQUI, no servidor — o client só recebe um booleano já decidido, e
@@ -66,14 +68,16 @@ export default async function GeneratePage({
 
   return (
     <GenerateClient
+      key={review?.id ?? sp.source ?? 'new'}
       orionEnabled={orionAllowed}
       orionProvider={orionAllowed ? orionProvider() : undefined}
       // Saldo TOTAL da bolsa (mensais + extras) — é o que consume_workspace_nodes
       // debita, então é o que gateia o CTA e alimenta o contador de renders.
       initialCredits={balance.totalBalance}
-      initialMaterials={profile.project_materials ?? undefined}
-      initialConfig={profile.project_config ?? undefined}
-      initialSourceUrl={sp.source}
+      initialMaterials={review?.materials ?? profile.project_materials ?? undefined}
+      initialConfig={review?.config ?? profile.project_config ?? undefined}
+      initialSourceUrl={review?.inputUrl ?? sp.source}
+      initialReview={review ?? undefined}
       returnTo={returnTo}
       firstRender={renderCount === 0}
       showPlanOffer={balance.planId === 'free' && !balance.pooled}
