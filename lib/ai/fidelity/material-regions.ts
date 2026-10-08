@@ -20,10 +20,15 @@ export async function buildMaterialRegionSheet(original: Buffer, raw: unknown, o
   // Broad bounding boxes mix floor/rug/platform or wall/cabinet pixels. Their
   // semantic labels must not turn neighbouring patterns into material choices.
   // Area is only a conservative guard, not a segmentation quality guarantee.
+  const seenRegions = new Set<string>()
   const inventory = normalizeMaterialInventory(raw).filter(item => {
     if (!item.region || item.certainty !== 'visible') return false
     const [left, top, right, bottom] = item.region
-    return (right - left) * (bottom - top) <= .25
+    if ((right - left) * (bottom - top) > .25) return false
+    const key = item.region.join(',')
+    if (seenRegions.has(key)) return false
+    seenRegions.add(key)
+    return true
   }).slice(0, 4)
   const source = inventory.length ? 'inventory' as const : 'original_grid' as const
   const entries = inventory.length ? inventory : opts?.allowSourceGrid ? SOURCE_GRID : []

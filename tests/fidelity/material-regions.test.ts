@@ -29,7 +29,9 @@ describe('original material region evidence', () => {
   it('does not generate crops from missing coordinates and bounds the added reference count', async () => {
     const original = await sharp({ create: { width: 20, height: 20, channels: 3, background: '#888888' } }).png().toBuffer()
     expect(await buildMaterialRegionSheet(original, [{ surface: 'floor', appearance: 'gray' }])).toBeNull()
-    const sheet = await buildMaterialRegionSheet(original, Array(12).fill({ surface: 'floor', appearance: 'gray', certainty: 'visible', region: [0, 0, .5, .5] }))
+    const sheet = await buildMaterialRegionSheet(original, Array.from({ length: 12 }, (_, i) => ({
+      surface: 'floor', appearance: 'gray', certainty: 'visible', region: [i / 100, 0, .5 + i / 100, .5],
+    })))
     expect(sheet?.surfaces).toHaveLength(4)
   })
   it('keeps crop evidence separate from geometry and requested material choices', () => {
@@ -101,6 +103,14 @@ describe('original material region evidence', () => {
     const block = buildMaterialRegionSheetBlock(2, sheet!.surfaces)
     expect(block).not.toContain('incorrect wood floor')
     expect(block).toContain('not verified surface identities')
+  })
+
+  it('deduplicates identical areas before applying the four-crop limit', async () => {
+    const raw = Array(6).fill({ surface: 'same pixels', appearance: 'red', certainty: 'visible', region: [0, 0, .5, .5] })
+    raw.push({ surface: 'different pixels', appearance: 'green', certainty: 'visible', region: [.5, 0, 1, .5] })
+    const sheet = await buildMaterialRegionSheet(await quadrantOriginal(), raw)
+    expect(sheet?.surfaces).toEqual(['original region [0,0,0.5,0.5]', 'original region [0.5,0,1,0.5]'])
+    expect([...await rowColor(sheet!.png, 1)]).toEqual([0, 255, 0])
   })
 
   it('uses displayed coordinates after EXIF rotation, not the unrotated image quadrants', async () => {
