@@ -765,6 +765,15 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
     if (naturalWidth > 0 && naturalHeight > 0) setBeforeAspect(naturalWidth / naturalHeight)
   }
 
+  // Uma referência já em cache pode carregar antes da hidratação e não
+  // disparar onLoad novamente. Leia suas dimensões antes de exibir o comparador.
+  useEffect(() => {
+    const before = compareRef.current?.querySelector<HTMLImageElement>('img[alt="Antes"]')
+    if (before?.complete && before.naturalWidth > 0 && before.naturalHeight > 0) {
+      setBeforeAspect(before.naturalWidth / before.naturalHeight)
+    }
+  }, [imagePreview, outputUrl])
+
   // Área flex disponível pro comparador (ResizeObserver acompanha resize de
   // janela/coluna). O palco deriva no render: contain(área, beforeAspect).
   useEffect(() => {
@@ -979,12 +988,13 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
   const toggleSheet = (id: SheetId) => setSheet(prev => (prev === id ? null : id))
 
   return (
-    <div className="spn-tool">
+    <div className={`spn-tool spn-render-workspace${outputUrl ? ' spn-render-workspace--result' : ''}`} style={{ '--spn-render-aspect': beforeAspect ?? 4 / 3 } as React.CSSProperties}>
 
       {/* ── CONFIGURAÇÃO ──
           Painel com scroll próprio e dock colado embaixo: o CTA não depende
           mais de o usuário chegar ao fim da coluna. */}
       <div className="spn-tool-panel spn-glass">
+        <div className="spn-render-controls">
         <div className="spn-tool-panel-body" style={S.panelBody}>
 
           <div style={S.topbar}>
@@ -1220,191 +1230,14 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
           </div>
         </ContextPanel>
 
-        {/* Dock: o CTA nunca some no scroll. */}
-        <div className="spn-dock spn-glass spn-glass--chrome">
-          {error && <div className="spn-error" style={{ marginBottom: 10 }}>{error}</div>}
-
-          {imagePreview && !outputUrl && !loading && (
-            <p className="spn-generate-assurance">A SpaceNode trabalha sobre o seu projeto, preservando geometria, proporções e perspectiva.</p>
-          )}
-          {noNodes ? (
-            <InsufficientNodesCta
-              needed={nodeCost}
-              available={credits}
-              alternative={cheaperFit ? {
-                label: `gere em ${ENGINES[cheaperFit.engine].name} · ${cheaperFit.res.toUpperCase()} por ${cheaperFit.cost} nodes`,
-                onClick: () => {
-                  setSelectedEngine(cheaperFit.engine)
-                  setSelectedResolution(cheaperFit.res)
-                },
-              } : undefined}
-            />
-          ) : (
-            <div className="spn-cost">
-              <div className="spn-cost-figures">
-                <div className="spn-cost-main">{nodeCost} nodes</div>
-                <div className="spn-cost-sub">
-                  {!imagePreview
-                    ? 'envie uma imagem para começar'
-                    : rendersAfford === null
-                      ? 'teste interno — não consome nodes'
-                      : `saldo para ~${rendersAfford} render${rendersAfford === 1 ? '' : 's'}`}
-                </div>
-              </div>
-              <button
-                type="button"
-                className="spn-cta"
-                onClick={() => handleGenerate()}
-                disabled={loading || !imagePreview}
-              >
-                {ctaLabel}
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ── PALCO ── */}
-      <div className="spn-glass" style={S.stage}>
-        <div style={S.stageBody}>
-
-          {guideOpen && (
-            <div style={S.guideSlot}>
-              <GenerateGuide
-                phase={guidePhase}
-                fromSpacesNew={fromSpacesNew}
-                onDismiss={dismissGuide}
-              />
-            </div>
-          )}
-
-          <div style={S.topbar}>
-            <span style={S.pageTitle}>{outputUrl ? 'ANTES / DEPOIS' : 'REFERÊNCIA'}</span>
-            {outputUrl && (
-              <button
-                type="button"
-                onClick={() => downloadImage(outputUrl, outputFilename(outputUrl))}
-                style={S.linkBtn}
-              >
-                baixar render ↓
-              </button>
-            )}
-          </div>
-
-          {!imagePreview && (
-            <div
-              className="spn-empty spn-glass"
-              style={{
-                ...S.uploadZone,
-                ...(isDraggingFile ? { borderColor: 'var(--color-text-primary)' } : null),
-              }}
-              onDragOver={e => { e.preventDefault(); setIsDraggingFile(true) }}
-              onDragLeave={() => setIsDraggingFile(false)}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <div style={S.uploadIcon}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3">
-                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </div>
-              <div>
-                <div style={S.uploadTitle}>arraste sua imagem aqui</div>
-                <div style={S.uploadSub}>SketchUp · Render · 3D · JPG · PNG · até 15 MB</div>
-              </div>
-              <button type="button" className="spn-ghost" onClick={e => { e.stopPropagation(); fileInputRef.current?.click() }}>
-                escolher arquivo
-              </button>
-              <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }}
-                onChange={e => { const f = e.target.files?.[0]; if (f) loadImage(f) }}/>
-            </div>
-          )}
-
-          {imagePreview && outputUrl && (
-            <div ref={compareOuterRef} style={S.compareOuter}>
-              {/* Palco com o aspecto do original: antes, depois e diff preenchem
-                  o MESMO retângulo (objectFit:fill). Aspecto igual (caso comum,
-                  pino de formato) = idêntico ao contain; quando o motor devolve
-                  formato diferente, o depois é mapeado no quadro do antes e a
-                  cortina segue alinhada — nada de render menor flutuando. */}
-              <div
-                ref={compareRef}
-                style={{
-                  ...S.compareStage,
-                  ...stageBox,
-                  cursor: scale > 1 ? (isPanning ? 'grabbing' : 'grab') : 'ew-resize',
-                }}
-                onMouseDown={(e) => {
-                  if (scale > 1) {
-                    panStartRef.current = { mouseX: e.clientX, mouseY: e.clientY, panX: pan.x, panY: pan.y }
-                    setIsPanning(true)
-                  } else {
-                    setIsDraggingSlider(true)
-                  }
-                }}
-                onDoubleClick={() => { setScale(1); setPan({ x: 0, y: 0 }) }}
-              >
-                <RenderComparisonImages
-                  before={imagePreview} after={outputUrl} sliderPos={sliderPos}
-                  pan={pan} scale={scale} imageStyle={S.stageImg} onBeforeLoad={readBeforeAspect}
-                />
-                {/* Handle do slider em coords do palco; ativa pointerEvents só no círculo
-                    pra continuar arrastável quando zoomado (parent passa a iniciar pan). */}
-                <div style={{...S.compareHandle, left:`${sliderPos}%`}}>
-                  <div
-                    style={{...S.compareHandleCircle, pointerEvents:'auto', cursor:'ew-resize'}}
-                    onMouseDown={(e) => { e.stopPropagation(); setIsDraggingSlider(true) }}
-                  >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" strokeWidth="2">
-                      <path d="M8 5l-5 7 5 7M16 5l5 7-5 7" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </div>
-                </div>
-                <span style={{...S.compareLabel, left:14}}>ANTES</span>
-                <span style={{...S.compareLabel, right:14}}>DEPOIS</span>
-                {/* Overlay do mapa de diferenças estruturais — cobre o comparador
-                    inteiro (acompanha zoom/pan) e não captura eventos. */}
-                {showDiff && lastRenderId && (
-                  <div style={{
-                    position:'absolute', inset:0,
-                    transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
-                    transformOrigin:'0 0',
-                    pointerEvents:'none',
-                    opacity:0.92,
-                  }}>
-                    <img
-                      src={`/api/renders/${lastRenderId}/diff`}
-                      alt="Mapa de diferenças estruturais"
-                      style={S.stageImg}
-                      draggable={false}
-                    />
-                  </div>
-                )}
-                {scale > 1 && (
-                  <div style={S.zoomBadge}>{Math.round(scale * 100)}%</div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {imagePreview && outputUrl && showDiff && (
-            <p className="spn-hint" style={{ marginTop: 0 }}>
-              <span style={{ color: 'var(--color-error)' }}>Vermelho</span>: bordas
-              estruturais do projeto original não encontradas no render — confira se
-              são mudanças pedidas ou desvios.
-            </p>
-          )}
-
-          {/* ── POST-GENERATION ACTIONS ──
-              Âncora e refino são CONTEXTUAIS: só existem depois do primeiro
-              resultado. Por isso vivem aqui, junto dele, e não como uma quinta
-              linha permanente na coluna de config. */}
+          {/* Ações do resultado ficam nos controles, acima do CTA principal,
+              para não reduzir a área disponível para a imagem. */}
           {imagePreview && outputUrl && !loading && (
-            <div style={S.postGen}>
+            <section aria-label="Ações do render" className="spn-render-actions" style={S.postGen}>
               {/* Veredito da verificação estrutural (gate render_only): aviso
                   quando o score da entrega ficou abaixo do limite; selo discreto
                   quando a estrutura foi verificada com folga (≥ 0.8). */}
-              {lastRenderId && <RenderPreservationStatus key={lastRenderId} renderId={lastRenderId} onWarning={onPreservationWarning} />}
+              {lastRenderId && <RenderPreservationStatus key={`audit-${lastRenderId}`} renderId={lastRenderId} onWarning={onPreservationWarning} />}
               {fidelityWarning ? (
                 <div className="spn-error">
                   A verificação visual detectou possíveis diferenças de estrutura ou
@@ -1425,7 +1258,7 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
                 <div style={S.fidelityOk}>✓ Estrutura verificada contra o projeto original</div>
               ) : null}
 
-              {lastRenderId && <RenderFeedback key={lastRenderId} renderId={lastRenderId} />}
+              {lastRenderId && <RenderFeedback key={`feedback-${lastRenderId}`} renderId={lastRenderId} />}
 
               {/* Âncora: pílula de ESTADO (role=switch), não um campo de config. */}
               <div className="spn-pills">
@@ -1565,7 +1398,184 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
                   <Link href="/app/billing" onClick={() => track('cta_clicked', { cta: 'render_result_plans' })}>Ver planos →</Link>
                 </p>
               )}
+            </section>
+          )}
+
+        </div>
+
+        {/* Dock: o CTA nunca some no scroll. */}
+        <div className="spn-dock spn-glass spn-glass--chrome">
+          {error && <div className="spn-error" style={{ marginBottom: 10 }}>{error}</div>}
+
+          {imagePreview && !outputUrl && !loading && (
+            <p className="spn-generate-assurance">A SpaceNode trabalha sobre o seu projeto, preservando geometria, proporções e perspectiva.</p>
+          )}
+          {noNodes ? (
+            <InsufficientNodesCta
+              needed={nodeCost}
+              available={credits}
+              alternative={cheaperFit ? {
+                label: `gere em ${ENGINES[cheaperFit.engine].name} · ${cheaperFit.res.toUpperCase()} por ${cheaperFit.cost} nodes`,
+                onClick: () => {
+                  setSelectedEngine(cheaperFit.engine)
+                  setSelectedResolution(cheaperFit.res)
+                },
+              } : undefined}
+            />
+          ) : (
+            <div className="spn-cost">
+              <div className="spn-cost-figures">
+                <div className="spn-cost-main">{nodeCost} nodes</div>
+                <div className="spn-cost-sub">
+                  {!imagePreview
+                    ? 'envie uma imagem para começar'
+                    : rendersAfford === null
+                      ? 'teste interno — não consome nodes'
+                      : `saldo para ~${rendersAfford} render${rendersAfford === 1 ? '' : 's'}`}
+                </div>
+              </div>
+              <button
+                type="button"
+                className="spn-cta"
+                onClick={() => handleGenerate()}
+                disabled={loading || !imagePreview}
+              >
+                {ctaLabel}
+              </button>
             </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── PALCO ── */}
+      <div className="spn-glass spn-render-stage" style={S.stage}>
+        <div style={S.stageBody}>
+
+          {guideOpen && (
+            <div style={S.guideSlot}>
+              <GenerateGuide
+                phase={guidePhase}
+                fromSpacesNew={fromSpacesNew}
+                onDismiss={dismissGuide}
+              />
+            </div>
+          )}
+
+          <div style={S.topbar}>
+            <span style={S.pageTitle}>{outputUrl ? 'ANTES / DEPOIS' : 'REFERÊNCIA'}</span>
+            {outputUrl && (
+              <button
+                type="button"
+                onClick={() => downloadImage(outputUrl, outputFilename(outputUrl))}
+                style={S.linkBtn}
+              >
+                baixar render ↓
+              </button>
+            )}
+          </div>
+
+          {!imagePreview && (
+            <div
+              className="spn-empty spn-glass"
+              style={{
+                ...S.uploadZone,
+                ...(isDraggingFile ? { borderColor: 'var(--color-text-primary)' } : null),
+              }}
+              onDragOver={e => { e.preventDefault(); setIsDraggingFile(true) }}
+              onDragLeave={() => setIsDraggingFile(false)}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <div style={S.uploadIcon}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3">
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              <div>
+                <div style={S.uploadTitle}>arraste sua imagem aqui</div>
+                <div style={S.uploadSub}>SketchUp · Render · 3D · JPG · PNG · até 15 MB</div>
+              </div>
+              <button type="button" className="spn-ghost" onClick={e => { e.stopPropagation(); fileInputRef.current?.click() }}>
+                escolher arquivo
+              </button>
+              <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }}
+                onChange={e => { const f = e.target.files?.[0]; if (f) loadImage(f) }}/>
+            </div>
+          )}
+
+          {imagePreview && outputUrl && (
+            <div ref={compareOuterRef} className="spn-render-comparison" style={S.compareOuter}>
+              {/* Palco com o aspecto do original: antes, depois e diff preenchem
+                  o MESMO retângulo (objectFit:fill). Aspecto igual (caso comum,
+                  pino de formato) = idêntico ao contain; quando o motor devolve
+                  formato diferente, o depois é mapeado no quadro do antes e a
+                  cortina segue alinhada — nada de render menor flutuando. */}
+              <div
+                ref={compareRef}
+                style={{
+                  ...S.compareStage,
+                  ...stageBox,
+                  cursor: scale > 1 ? (isPanning ? 'grabbing' : 'grab') : 'ew-resize',
+                }}
+                onMouseDown={(e) => {
+                  if (scale > 1) {
+                    panStartRef.current = { mouseX: e.clientX, mouseY: e.clientY, panX: pan.x, panY: pan.y }
+                    setIsPanning(true)
+                  } else {
+                    setIsDraggingSlider(true)
+                  }
+                }}
+                onDoubleClick={() => { setScale(1); setPan({ x: 0, y: 0 }) }}
+              >
+                <RenderComparisonImages
+                  before={imagePreview} after={outputUrl} sliderPos={sliderPos}
+                  pan={pan} scale={scale} imageStyle={S.stageImg} onBeforeLoad={readBeforeAspect}
+                />
+                {/* Handle do slider em coords do palco; ativa pointerEvents só no círculo
+                    pra continuar arrastável quando zoomado (parent passa a iniciar pan). */}
+                <div style={{...S.compareHandle, left:`${sliderPos}%`}}>
+                  <div
+                    style={{...S.compareHandleCircle, pointerEvents:'auto', cursor:'ew-resize'}}
+                    onMouseDown={(e) => { e.stopPropagation(); setIsDraggingSlider(true) }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" strokeWidth="2">
+                      <path d="M8 5l-5 7 5 7M16 5l5 7-5 7" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                </div>
+                <span style={{...S.compareLabel, left:14}}>ANTES</span>
+                <span style={{...S.compareLabel, right:14}}>DEPOIS</span>
+                {/* Overlay do mapa de diferenças estruturais — cobre o comparador
+                    inteiro (acompanha zoom/pan) e não captura eventos. */}
+                {showDiff && lastRenderId && (
+                  <div style={{
+                    position:'absolute', inset:0,
+                    transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
+                    transformOrigin:'0 0',
+                    pointerEvents:'none',
+                    opacity:0.92,
+                  }}>
+                    <img
+                      src={`/api/renders/${lastRenderId}/diff`}
+                      alt="Mapa de diferenças estruturais"
+                      style={S.stageImg}
+                      draggable={false}
+                    />
+                  </div>
+                )}
+                {scale > 1 && (
+                  <div style={S.zoomBadge}>{Math.round(scale * 100)}%</div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {imagePreview && outputUrl && showDiff && (
+            <p className="spn-hint" style={{ marginTop: 0 }}>
+              <span style={{ color: 'var(--color-error)' }}>Vermelho</span>: bordas
+              estruturais do projeto original não encontradas no render — confira se
+              são mudanças pedidas ou desvios.
+            </p>
           )}
 
           {imagePreview && !outputUrl && !loading && (
@@ -1622,9 +1632,7 @@ const S: Record<string, React.CSSProperties> = {
   panelBody:         { display:'flex', flexDirection:'column', gap:16 },
   stage:             { minHeight:0, borderRadius:'var(--r-card)', overflow:'hidden', display:'flex', flexDirection:'column' },
   stageBody:         { flex:1, minHeight:0, overflowY:'auto', padding:16, display:'flex', flexDirection:'column', gap:14 },
-  // O guia e o bloco pós-resultado NÃO encolhem: numa coluna flex, quem
-  // encolhe primeiro é quem tem altura automática, e aí o cartão do guia
-  // ficaria com o texto cortado em vez de a coluna rolar.
+  // O guia não encolhe: o texto permanece legível quando o palco rola.
   guideSlot:         { flex:'0 0 auto' },
   topbar:            { display:'flex', justifyContent:'space-between', alignItems:'center', gap:10, flexShrink:0 },
   pageTitle:         { fontSize:10, letterSpacing:'0.24em', textTransform:'uppercase', color:'var(--color-text-tertiary)', fontWeight:600 },
@@ -1641,7 +1649,7 @@ const S: Record<string, React.CSSProperties> = {
   // original. As imagens do palco usam fill: o retângulo JÁ tem o aspecto do
   // antes, e o depois é esticado pra alinhar com a cortina quando o motor
   // devolve formato levemente diferente (drift grande vira aviso de fidelidade).
-  compareOuter:      { position:'relative', flex:1, minHeight:300, minWidth:0, display:'flex', alignItems:'center', justifyContent:'center' },
+  compareOuter:      { position:'relative', minHeight:0, minWidth:0, display:'flex', alignItems:'center', justifyContent:'center' },
   compareStage:      { position:'relative', borderRadius:'var(--r-card)', overflow:'hidden', maxWidth:'100%', maxHeight:'100%', background:'var(--color-preview-bg)', border:'0.5px solid var(--glass-line)', boxShadow:'var(--shadow-float)', userSelect:'none' },
   stageImg:          { position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'fill', pointerEvents:'none' },
   compareHandle:     { position:'absolute', top:0, bottom:0, width:2, background:'#ffffff', transform:'translateX(-50%)', display:'flex', alignItems:'center', justifyContent:'center', pointerEvents:'none' },
