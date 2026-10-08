@@ -4169,3 +4169,38 @@ html.light {
 @media (prefers-reduced-transparency: reduce) {
   .spn-glass--chrome, .spn-glass--raised { -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
+
+/* Renderizar: a imagem ocupa o palco; todas as ações ficam acima do dock. */
+.spn-render-workspace { grid-template-columns: 340px minmax(0, 1fr); }
+.spn-render-comparison { flex: 1; }
+.spn-render-controls {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.spn-render-controls .spn-context-body { overflow-y: visible; }
+.spn-render-actions { padding: 4px 16px 20px; }
+.spn-render-actions .spn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  text-align: center;
+  white-space: normal;
+  line-height: 1.35;
+}
+@media (max-width: 899.98px) {
+  .spn-render-workspace { grid-template-columns: minmax(0, 1fr); }
+  .spn-render-workspace--result {
+    grid-template-rows: auto minmax(300px, 1fr);
+    overflow-y: auto;
+  }
+  .spn-render-workspace--result .spn-render-stage { order: -1; }
+  .spn-render-workspace--result .spn-render-comparison {
+    flex: none;
+    width: 100%;
+    aspect-ratio: var(--spn-render-aspect, 4 / 3);
+    max-height: 55svh;
+  }
+}
