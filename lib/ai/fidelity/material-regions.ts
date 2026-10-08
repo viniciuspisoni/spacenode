@@ -17,7 +17,19 @@ export async function buildMaterialRegionSheet(original: Buffer, raw: unknown, o
   surfaces: string[]
   source: 'inventory' | 'original_grid'
 } | null> {
-  const inventory = normalizeMaterialInventory(raw).filter(item => item.region).slice(0, 4)
+  // Broad bounding boxes mix floor/rug/platform or wall/cabinet pixels. Their
+  // semantic labels must not turn neighbouring patterns into material choices.
+  // Area is only a conservative guard, not a segmentation quality guarantee.
+  const seenRegions = new Set<string>()
+  const inventory = normalizeMaterialInventory(raw).filter(item => {
+    if (!item.region || item.certainty !== 'visible') return false
+    const [left, top, right, bottom] = item.region
+    if ((right - left) * (bottom - top) > .25) return false
+    const key = item.region.join(',')
+    if (seenRegions.has(key)) return false
+    seenRegions.add(key)
+    return true
+  })
   const source = inventory.length ? 'inventory' as const : 'original_grid' as const
   const entries = inventory.length ? inventory : opts?.allowSourceGrid ? SOURCE_GRID : []
   if (!entries.length) return null
@@ -27,6 +39,8 @@ export async function buildMaterialRegionSheet(original: Buffer, raw: unknown, o
   const layers: sharp.OverlayOptions[] = []
   const surfaces: string[] = []
   for (const entry of entries) {
+    // Count usable crops, not boxes that collapse to a single pixel.
+    if (surfaces.length === 4) break
     const [x1, y1, x2, y2] = entry.region!
     const left = Math.floor(x1 * meta.width)
     const top = Math.floor(y1 * meta.height)
@@ -39,9 +53,18 @@ export async function buildMaterialRegionSheet(original: Buffer, raw: unknown, o
     layers.push({ input, left: 0, top: row * 384 + 32 })
     // Static labels only; model-provided surface names never enter SVG markup.
     layers.push({ input: Buffer.from(`<svg width="512" height="32"><text x="12" y="24" fill="white" font-size="22">${row + 1}</text></svg>`), left: 0, top: row * 384 })
-    surfaces.push(entry.surface)
+    surfaces.push(source === 'inventory'
+      ? `original region [${entry.region!.join(',')}]`
+      : entry.surface)
   }
-  if (!surfaces.length) return null
+  if (!surfaces.length) {
+    // The retry is bounded: an empty inventory takes the grid path, which
+    // never retries again. Keep fallback opt-in and original pixels only.
+    if (source === 'inventory' && opts?.allowSourceGrid) {
+      return buildMaterialRegionSheet(normalized, [], opts)
+    }
+    return null
+  }
   const png = await sharp({ create: { width: 512, height: surfaces.length * 384, channels: 3, background: '#202020' } })
     .composite(layers).png().toBuffer()
   return { png, surfaces, source }
