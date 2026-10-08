@@ -17,7 +17,14 @@ export async function buildMaterialRegionSheet(original: Buffer, raw: unknown, o
   surfaces: string[]
   source: 'inventory' | 'original_grid'
 } | null> {
-  const inventory = normalizeMaterialInventory(raw).filter(item => item.region).slice(0, 4)
+  // Broad bounding boxes mix floor/rug/platform or wall/cabinet pixels. Their
+  // semantic labels must not turn neighbouring patterns into material choices.
+  // Area is only a conservative guard, not a segmentation quality guarantee.
+  const inventory = normalizeMaterialInventory(raw).filter(item => {
+    if (!item.region || item.certainty !== 'visible') return false
+    const [left, top, right, bottom] = item.region
+    return (right - left) * (bottom - top) <= .25
+  }).slice(0, 4)
   const source = inventory.length ? 'inventory' as const : 'original_grid' as const
   const entries = inventory.length ? inventory : opts?.allowSourceGrid ? SOURCE_GRID : []
   if (!entries.length) return null
@@ -39,7 +46,9 @@ export async function buildMaterialRegionSheet(original: Buffer, raw: unknown, o
     layers.push({ input, left: 0, top: row * 384 + 32 })
     // Static labels only; model-provided surface names never enter SVG markup.
     layers.push({ input: Buffer.from(`<svg width="512" height="32"><text x="12" y="24" fill="white" font-size="22">${row + 1}</text></svg>`), left: 0, top: row * 384 })
-    surfaces.push(entry.surface)
+    surfaces.push(source === 'inventory'
+      ? `original region [${entry.region!.join(',')}]`
+      : entry.surface)
   }
   if (!surfaces.length) return null
   const png = await sharp({ create: { width: 512, height: surfaces.length * 384, channels: 3, background: '#202020' } })

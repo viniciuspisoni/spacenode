@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { buildMaterialInventoryBlock, hasCurrentMaterialAnalysis, normalizeMaterialInventory } from '@/lib/ai/material-inventory'
+import { MATERIAL_ANALYSIS_VERSION, buildMaterialInventoryBlock, hasCurrentMaterialAnalysis, normalizeMaterialInventory } from '@/lib/ai/material-inventory'
 import { buildFidelityPrompt, type GenerateOptions } from '@/lib/prompts'
 import { checkArchitecturalPreservation, parseCheck } from '@/lib/spaces/preserve-validate'
 import { analyzeImage } from '@/lib/fidelity-engine'
@@ -10,7 +10,7 @@ const inventory = [{surface: 'cabinet fronts', appearance: 'plain pale beige, sm
 const briefing = {
   tipo_projeto: 'bathroom', geometria_principal: 'rectangular', volumes: 'one', pavimentos: 1,
   aberturas: 'window', materiais_aparentes: 'plain surfaces', camera: 'low', entorno: 'interior',
-  elementos_preservar: [], elementos_melhorar: [], material_analysis_version: 2, material_inventory: inventory,
+  elementos_preservar: [], elementos_melhorar: [], material_analysis_version: MATERIAL_ANALYSIS_VERSION, material_inventory: inventory,
 }
 const options: GenerateOptions = {projectType: 'interior', segment: 'Residencial', environment: 'Banheiro',
   lighting: 'Preservar Original', background: 'Preservar Original', sceneElements: [], geometryLock: 85, materials: {}, fidelityMode: 'strict'}
@@ -22,6 +22,7 @@ describe('material inventory grounded in input', () => {
     expect(hasCurrentMaterialAnalysis({...briefing, material_inventory: []})).toBe(false)
     expect(hasCurrentMaterialAnalysis({...briefing, material_inventory: [null]})).toBe(false)
     expect(hasCurrentMaterialAnalysis({...briefing, material_analysis_version: 1})).toBe(false)
+    expect(hasCurrentMaterialAnalysis({...briefing, material_analysis_version: 2})).toBe(false)
     expect(hasCurrentMaterialAnalysis(briefing)).toBe(true)
   })
   it('bounds malformed observations and treats missing certainty conservatively', () => {
@@ -51,9 +52,13 @@ describe('material inventory grounded in input', () => {
   })
   it('extracts the inventory in the existing vision call without a second request', async () => {
     vi.mocked(geminiVisionJson).mockResolvedValue(JSON.stringify(briefing))
-    expect(await analyzeImage('https://example.com/input.png')).toMatchObject({material_analysis_version: 2, material_inventory: inventory})
+    expect(await analyzeImage('https://example.com/input.png')).toMatchObject({material_analysis_version: MATERIAL_ANALYSIS_VERSION, material_inventory: inventory})
     expect(geminiVisionJson).toHaveBeenCalledTimes(1)
-    expect(vi.mocked(geminiVisionJson).mock.calls[0][0].user).toContain('não deduza madeira por ser armário')
+    const prompt = vi.mocked(geminiVisionJson).mock.calls[0][0].user
+    expect(prompt).toContain('não deduza madeira por ser armário')
+    expect(prompt).toContain('AMOSTRA INTERNA')
+    expect(prompt).toContain('sem tapetes, móveis, objetos vizinhos')
+    expect(prompt).toContain('não autorizam chamar uma superfície cinza de marrom')
   })
   it('does not mark failed vision as a current material analysis', async () => {
     vi.mocked(geminiVisionJson).mockRejectedValue(new Error('unavailable'))
