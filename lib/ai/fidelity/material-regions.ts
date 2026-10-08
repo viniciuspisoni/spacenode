@@ -29,7 +29,7 @@ export async function buildMaterialRegionSheet(original: Buffer, raw: unknown, o
     if (seenRegions.has(key)) return false
     seenRegions.add(key)
     return true
-  }).slice(0, 4)
+  })
   const source = inventory.length ? 'inventory' as const : 'original_grid' as const
   const entries = inventory.length ? inventory : opts?.allowSourceGrid ? SOURCE_GRID : []
   if (!entries.length) return null
@@ -39,6 +39,8 @@ export async function buildMaterialRegionSheet(original: Buffer, raw: unknown, o
   const layers: sharp.OverlayOptions[] = []
   const surfaces: string[] = []
   for (const entry of entries) {
+    // Count usable crops, not boxes that collapse to a single pixel.
+    if (surfaces.length === 4) break
     const [x1, y1, x2, y2] = entry.region!
     const left = Math.floor(x1 * meta.width)
     const top = Math.floor(y1 * meta.height)
@@ -55,7 +57,14 @@ export async function buildMaterialRegionSheet(original: Buffer, raw: unknown, o
       ? `original region [${entry.region!.join(',')}]`
       : entry.surface)
   }
-  if (!surfaces.length) return null
+  if (!surfaces.length) {
+    // The retry is bounded: an empty inventory takes the grid path, which
+    // never retries again. Keep fallback opt-in and original pixels only.
+    if (source === 'inventory' && opts?.allowSourceGrid) {
+      return buildMaterialRegionSheet(normalized, [], opts)
+    }
+    return null
+  }
   const png = await sharp({ create: { width: 512, height: surfaces.length * 384, channels: 3, background: '#202020' } })
     .composite(layers).png().toBuffer()
   return { png, surfaces, source }

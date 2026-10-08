@@ -126,5 +126,32 @@ describe('original material region evidence', () => {
   it('does not upscale unusable one-pixel regions into fabricated evidence', async () => {
     const original = await sharp({ create: { width: 2, height: 2, channels: 3, background: '#888888' } }).png().toBuffer()
     expect(await buildMaterialRegionSheet(original, [], { allowSourceGrid: true })).toBeNull()
+    expect(await buildMaterialRegionSheet(original, [
+      { surface: 'tiny', appearance: 'gray', certainty: 'visible', region: [0, 0, .5, .5] },
+    ], { allowSourceGrid: true })).toBeNull()
+  })
+
+  it('does not let four unusable pixel samples hide a later usable sample', async () => {
+    const original = await sharp(await quadrantOriginal()).resize(20, 20, { kernel: 'nearest' }).png().toBuffer()
+    const raw = Array.from({ length: 4 }, (_, i) => ({
+      surface: 'too small', appearance: 'red', certainty: 'visible', region: [i / 20, 0, i / 20 + .025, .025],
+    }))
+    raw.push({ surface: 'usable', appearance: 'green', certainty: 'visible', region: [.5, 0, 1, .5] })
+    const sheet = await buildMaterialRegionSheet(original, raw)
+    expect(sheet?.source).toBe('inventory')
+    expect(sheet?.surfaces).toEqual(['original region [0.5,0,1,0.5]'])
+    expect([...await rowColor(sheet!.png, 0)]).toEqual([0, 255, 0])
+  })
+
+  it('falls back to spatial pixels when normalized samples are valid but too small after rasterization', async () => {
+    const original = await sharp(await quadrantOriginal()).resize(20, 20, { kernel: 'nearest' }).png().toBuffer()
+    const raw = [{ surface: 'tiny', appearance: 'red', certainty: 'visible', region: [0, 0, .025, .025] }]
+    expect(await buildMaterialRegionSheet(original, raw)).toBeNull()
+    const sheet = await buildMaterialRegionSheet(original, raw, { allowSourceGrid: true })
+    expect(sheet?.source).toBe('original_grid')
+    expect(sheet?.surfaces).toHaveLength(4)
+    for (const [row, color] of [[0, [255, 0, 0]], [1, [0, 255, 0]], [2, [0, 0, 255]], [3, [255, 255, 0]]] as const) {
+      expect([...await rowColor(sheet!.png, row)]).toEqual(color)
+    }
   })
 })
