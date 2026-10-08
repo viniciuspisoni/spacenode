@@ -30,7 +30,6 @@ function supabaseHost(): string {
  *  direto. NO-OP enquanto NEXT_PUBLIC_STORAGE_PRIVATE != '1'. */
 export function toMediaProxyUrl(url: string | null | undefined): string | null {
   if (!url) return url ?? null
-  if (!active()) return url
   let u: URL
   try { u = new URL(url) } catch { return url }
   if (u.host.toLowerCase() !== supabaseHost()) return url
@@ -42,5 +41,6 @@ export function toMediaProxyUrl(url: string | null | undefined): string | null {
   const bucket = rest.slice(0, slash)
   const key = rest.slice(slash + 1)
   if (!PRIVATE_BUCKETS.has(bucket)) return url
+  if (!active() && bucket !== 'spacenode-media') return url
   return `/api/media?bucket=${encodeURIComponent(bucket)}&key=${encodeURIComponent(key)}`
 }

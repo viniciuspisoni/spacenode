@@ -30,6 +30,8 @@ import { Segmented } from '@/components/app/glass'
 export interface UpscaleCompareProps {
   beforeUrl: string
   afterUrl:  string
+  beforePreviewUrl?: string | null
+  afterPreviewUrl?: string | null
   /** Aspecto real (largura/altura) da imagem — o quadro nasce dele. */
   aspect:    number
   /** Dimensões reais do resultado; habilitam o modo 100%. */
@@ -44,13 +46,16 @@ type Zoom = 'fit' | 'pixel'
 const PIXEL_VIEW_HEIGHT = 380
 
 export default function UpscaleCompare({
-  beforeUrl, afterUrl, aspect,
+  beforeUrl, afterUrl, beforePreviewUrl, afterPreviewUrl, aspect,
   outputWidth, outputHeight,
   beforeLabel = 'Original', afterLabel = 'Ampliado',
 }: UpscaleCompareProps) {
   const [zoom, setZoom] = useState<Zoom>('fit')
   const [pos,  setPos]  = useState(50)
   const [pan,  setPan]  = useState({ x: 0.5, y: 0.5 })   // 0..1, centro da janela
+  const [loaded, setLoaded] = useState<string[]>([])
+  const [failed, setFailed] = useState<string[]>([])
+  const [retry, setRetry] = useState(0)
 
   const frameRef  = useRef<HTMLDivElement>(null)
   // Qual gesto está em curso: mover a cortina ou deslocar a imagem no 100%.
@@ -73,6 +78,14 @@ export default function UpscaleCompare({
   // por efeito depois do fato.
   const canPixel = Boolean(outputWidth && outputHeight)
   const mode: Zoom = canPixel ? zoom : 'fit'
+  const beforeSrc = mode === 'fit' ? beforePreviewUrl ?? beforeUrl : beforeUrl
+  const afterSrc = mode === 'fit' ? afterPreviewUrl ?? afterUrl : afterUrl
+  const loading = !loaded.includes(beforeSrc) || !loaded.includes(afterSrc)
+  const hasError = failed.includes(beforeSrc) || failed.includes(afterSrc)
+  const imageLoaded = (src: string) => {
+    setLoaded(current => current.includes(src) ? current : [...current, src])
+    setFailed(current => current.filter(item => item !== src))
+  }
 
   const moveCurtain = useCallback((clientX: number) => {
     const el = frameRef.current
@@ -160,10 +173,12 @@ export default function UpscaleCompare({
         {/* Resultado no fundo, original por cima recortado pela cortina: assim
             o que aparece à esquerda da linha é o "antes". */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={afterUrl} alt={afterLabel} draggable={false} style={layer} />
+        <img key={afterSrc + retry} src={afterSrc} alt={afterLabel} draggable={false} style={layer}
+          onLoad={() => imageLoaded(afterSrc)} onError={() => setFailed(current => [...current, afterSrc])} />
         <div style={{ position: 'absolute', inset: 0, clipPath: `inset(0 ${100 - pos}% 0 0)` }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={beforeUrl} alt={beforeLabel} draggable={false} style={layer} />
+          <img key={beforeSrc + retry} src={beforeSrc} alt={beforeLabel} draggable={false} style={layer}
+            onLoad={() => imageLoaded(beforeSrc)} onError={() => setFailed(current => [...current, beforeSrc])} />
         </div>
 
         {/* Cortina */}
@@ -189,6 +204,11 @@ export default function UpscaleCompare({
 
         <span style={cornerLabel('left')}>{beforeLabel}</span>
         <span style={cornerLabel('right')}>{afterLabel}</span>
+        {(loading || hasError) && <div role="status" style={{ position: 'absolute', inset: 0, zIndex: 3,
+          display: 'grid', placeContent: 'center', textAlign: 'center', gap: 10, background: 'var(--color-chip)' }}>
+          {hasError ? 'Não foi possível carregar a imagem.' : mode === 'pixel' ? 'Carregando detalhe em resolução original…' : 'Carregando comparação…'}
+          {hasError && <button type="button" className="spn-btn" onClick={() => { setFailed([]); setRetry(n => n + 1) }}>Tentar novamente</button>}
+        </div>}
       </div>
 
       {/* Controle de zoom: some quando não há 1:1 possível. */}

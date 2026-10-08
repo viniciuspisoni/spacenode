@@ -102,6 +102,8 @@ export const PROVIDER_ENDPOINTS: ProviderEndpoints = {
 // ── Provider call interface ───────────────────────────────────────────────────
 
 export interface ProviderInput {
+  signal?: AbortSignal
+  onRequestId?: (id: string, endpoint: string) => Promise<void>
   imageUrl:   string
   scale?:     number          // numeric factor; ignored by providers that don't upscale
   params?:    Record<string, unknown> // provider-specific overrides (e.g. clarity preset)
@@ -120,6 +122,8 @@ export type ProviderCall = (input: ProviderInput) => Promise<ProviderOutput>
 // ── Pipeline (orchestrator) ───────────────────────────────────────────────────
 
 export interface UpscaleRunRequest {
+  signal?: AbortSignal
+  onRequestId?: (id: string, endpoint: string) => Promise<void>
   tab:            UpscaleTab
   modeId:         ModeId
   scale:          Scale

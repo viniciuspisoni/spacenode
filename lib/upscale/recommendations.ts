@@ -130,6 +130,7 @@ export function resolveScale(objectiveId: ObjectiveId, dims: Dimensions | null |
 export interface ImageSignal {
   fileName: string
   fileSize: number
+  mime?:    string
   width?:   number | null
   height?:  number | null
 }
@@ -161,11 +162,14 @@ export function analyzeImage(sig: ImageSignal): FileRecommendation {
   const longEdge = Math.max(w, h)
   const density  = sig.fileSize / (w * h)
 
-  if (density < LOW_DENSITY_BYTES_PER_PIXEL) {
+  // PNG é sem perda; tamanho pequeno não demonstra degradação. Mesmo em
+  // JPEG, densidade é apenas uma indicação, não um diagnóstico dos pixels.
+  const isJpeg = sig.mime ? sig.mime === 'image/jpeg' : /\.jpe?g$/i.test(sig.fileName)
+  if (isJpeg && density < LOW_DENSITY_BYTES_PER_PIXEL) {
     return {
       objectiveId: 'recover',
       modeId: 'recover',
-      reason: 'Esta imagem foi salva com compressão pesada — tratamos o artefato antes de ampliar.',
+      reason: 'Este JPEG pode ter artefatos de compressão. Sugerimos Recuperar; você pode ajustar o tratamento.',
     }
   }
 

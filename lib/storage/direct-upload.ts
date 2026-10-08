@@ -16,6 +16,7 @@
 // Cliente: use uploadDirect() de lib/storage/direct-upload-client.ts.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { MAX_SOURCE_BYTES } from '@/lib/upscale/limits'
 import { BLOCOS3D_SOURCE_MAX_BYTES } from '@/lib/blocos3d/config'
 
 type Params = Record<string, string>
@@ -121,8 +122,8 @@ export const DIRECT_UPLOAD_AREAS = {
   },
   // Imagem de origem do Ampliar (consumida por /api/upscale).
   'upscale-source': {
-    bucket: 'space-mestres',
-    maxBytes: 15 * 1024 * 1024,
+    bucket: 'spacenode-media',
+    maxBytes: MAX_SOURCE_BYTES,
     allowedMime: () => IMAGE_MIME,
     dir: () => 'upscale/source',
   },

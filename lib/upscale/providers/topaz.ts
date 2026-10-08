@@ -29,7 +29,7 @@
 //   - crop_to_fill: boolean. Default já é false; vai explícito porque
 //     "preserva composição e proporções" é contrato, não sorte.
 
-import { fal } from '@fal-ai/client'
+import { subscribeBounded } from './subscribe'
 import {
   MAX_UPSCALE_FACTOR,
   PROVIDER_ENDPOINTS,
@@ -50,7 +50,7 @@ interface TopazOutput {
   images?: { url?: string }[]
 }
 
-export const callTopaz: ProviderCall = async ({ imageUrl, scale, params: overrides }) => {
+export const callTopaz: ProviderCall = async ({ imageUrl, scale, params: overrides, signal, onRequestId }) => {
   // Clamp no teto do schema. A UI e o custo já trabalham com effectiveFactor,
   // então isto só pega cliente antigo (plugin desatualizado) — e aí
   // requested_factor guarda a intenção original na telemetria.
@@ -88,14 +88,7 @@ export const callTopaz: ProviderCall = async ({ imageUrl, scale, params: overrid
   const t0 = Date.now()
   let result: { data: unknown; requestId?: string }
   try {
-    result = await Promise.race([
-      fal.subscribe(ENDPOINT, {
-        input: { image_url: imageUrl, ...params } as unknown as never,
-      }) as Promise<{ data: unknown; requestId?: string }>,
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new UpscaleProviderError('topaz', 'timeout')), TIMEOUT_MS),
-      ),
-    ])
+    result = await subscribeBounded(ENDPOINT, { image_url: imageUrl, ...params }, TIMEOUT_MS, { signal, onRequestId })
   } catch (err) {
     if (err instanceof UpscaleProviderError) throw err
     throw new UpscaleProviderError('topaz', (err as Error).message ?? 'unknown', err)

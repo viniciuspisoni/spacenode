@@ -1,18 +1,10 @@
-// Orchestrator — recebe uma intenção do usuário (UpscaleRunRequest) e
-// executa o pipeline correspondente, com fallback silencioso quando o
-// provider primário falha.
+// Executa o tratamento solicitado. Falhas de precisão nunca migram para
+// um provider generativo. Text Refine pode repetir no High Fidelity V2,
+// respeitando o orçamento total da rota.
 //
 // Em v1 cada modo é um único step. A estrutura já suporta N steps em
 // sequência (ex: denoise → upscale) para um lançamento futuro:
 // basta estender PIPELINE_BY_MODE e a tipagem.
-//
-// Política de fallback:
-//   - Os modos que AMPLIAM (Topaz) caem para o Clarity conservador se falharem.
-//     O fallback é registrado em steps[].fallbackOf e a rota o expõe na
-//     resposta (fallbackUsed) — a UI avisa o usuário que o resultado veio
-//     de um provider generativo, não do preservador do modo.
-//   - Os modos que só limpam (NAFNet/restauração) NÃO têm fallback: não existe
-//     segundo motor equivalente, e cair num que amplia mudaria o pedido.
 //
 // O orchestrator NÃO toca nodes — débito/refund é responsabilidade da
 // rota. Ele apenas retorna o que aconteceu para a rota persistir +
@@ -74,12 +66,12 @@ interface StepDescriptor {
 const LINE_ART: StepDescriptor['kindParams'] = { 'line-art': { model: 'Text Refine' } }
 
 const PIPELINE_BY_MODE: Record<ModeId, StepDescriptor[]> = {
-  fidelity: [{ provider: 'topaz',             fallback: 'clarity', kindParams: LINE_ART }],
-  recover:  [{ provider: 'topaz',             fallback: 'clarity', params: { fix_compression: 0.6 }, kindParams: LINE_ART }],
+  fidelity: [{ provider: 'topaz',             fallback: null, kindParams: LINE_ART }],
+  recover:  [{ provider: 'topaz',             fallback: null, params: { fix_compression: 0.6 }, kindParams: LINE_ART }],
   denoise:  [{ provider: 'nafnet-denoise',    fallback: null      }],
   deblur:   [{ provider: 'nafnet-deblur',     fallback: null      }],
   restore:  [{ provider: 'photo-restoration', fallback: null      }],
-  smart:    [{ provider: 'topaz',             fallback: 'clarity', kindParams: LINE_ART }],
+  smart:    [{ provider: 'topaz',             fallback: null, kindParams: LINE_ART }],
 }
 
 const PROVIDER_REGISTRY: Record<ProviderId, ProviderCall> = {
@@ -115,15 +107,15 @@ export async function runUpscalePipeline(
     const kindOverride = req.sourceKind ? stepDef.kindParams?.[req.sourceKind] : undefined
     const params = kindOverride ? { ...baseParams, ...kindOverride } : baseParams
 
-    let primary = await runProvider(stepDef.provider, currentUrl, scaleFac, null, params)
+    let primary = await runProvider(stepDef.provider, currentUrl, scaleFac, null, params, req)
     steps.push(primary)
 
-    if (primary.status !== 'completed' && kindOverride) {
+    if (primary.status !== 'completed' && kindOverride && !req.signal?.aborted) {
       // O modelo especializado falhou: repete o primário com os params padrão.
       // É o comportamento que o usuário teria sem classificação — nunca pior.
       console.warn('[upscale] %s com override de classe falhou — repetindo sem override. Motivo: %s',
         stepDef.provider, primary.error)
-      primary = await runProvider(stepDef.provider, currentUrl, scaleFac, null, baseParams)
+      primary = await runProvider(stepDef.provider, currentUrl, scaleFac, null, baseParams, req)
       steps.push(primary)
     }
 
@@ -170,10 +162,17 @@ async function runProvider(
   scale:       number,
   fallbackOf:  ProviderId | null,
   params?:     Record<string, unknown>,
+  options?: Pick<UpscaleRunRequest, 'signal' | 'onRequestId'>,
 ): Promise<StepLog & { outputUrl?: string }> {
   const call = PROVIDER_REGISTRY[provider]
+  const started = Date.now()
+  let requestId: string | null = null
   try {
-    const out = await call({ imageUrl, scale, params })
+    options?.signal?.throwIfAborted()
+    const out = await call({ imageUrl, scale, params, signal: options?.signal, onRequestId: async (id, endpoint) => {
+      requestId = id
+      await options?.onRequestId?.(id, endpoint)
+    } })
     return {
       provider,
       endpoint:    out.endpoint,
@@ -191,8 +190,8 @@ async function runProvider(
       provider,
       endpoint:    '',
       params:      {},
-      requestId:   null,
-      durationMs:  0,
+      requestId,
+      durationMs:  Date.now() - started,
       status:      'failed',
       error:       e?.message ?? 'unknown error',
       fallbackOf,

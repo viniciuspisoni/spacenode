@@ -58,7 +58,7 @@ describe('roteamento por classe da origem', () => {
     expect(endpointsSent()[3]).toBe('fal-ai/nafnet/denoise')
   })
 
-  it('Text Refine indisponível → repete com o padrão ANTES de cair no Clarity', async () => {
+  it('Text Refine indisponível → repete com o padrão mantendo o motor de precisão', async () => {
     subscribe
       .mockRejectedValueOnce(new Error('model unavailable'))   // Text Refine
       .mockResolvedValueOnce(OK)                               // High Fidelity V2
@@ -75,18 +75,11 @@ describe('roteamento por classe da origem', () => {
     expect(res.steps[1].fallbackOf).toBeNull()   // não foi fallback de provider, foi retry
   })
 
-  it('se o padrão também falhar, aí sim o fallback Clarity entra', async () => {
-    subscribe
-      .mockRejectedValueOnce(new Error('down'))   // Text Refine
-      .mockRejectedValueOnce(new Error('down'))   // High Fidelity V2
-      .mockResolvedValueOnce(OK)                  // Clarity
-    const { runUpscalePipeline, finalProvider } = await import('@/lib/upscale/orchestrator')
-    const res = await runUpscalePipeline({
-      tab: 'resolution', modeId: 'fidelity', scale: '2x',
-      imageUrl: 'https://v3.fal.media/in.png', sourceKind: 'line-art',
-    })
-    expect(endpointsSent()).toEqual(['fal-ai/topaz/upscale/image', 'fal-ai/topaz/upscale/image', 'fal-ai/clarity-upscaler'])
-    expect(finalProvider(res)).toBe('clarity')
-    expect(res.steps.some(s => s.status === 'completed' && s.fallbackOf === 'topaz')).toBe(true)
+  it('se o padrão também falhar, encerra sem usar motor generativo', async () => {
+    subscribe.mockRejectedValueOnce(new Error('down')).mockRejectedValueOnce(new Error('down'))
+    const { runUpscalePipeline } = await import('@/lib/upscale/orchestrator')
+    await expect(runUpscalePipeline({ tab: 'resolution', modeId: 'fidelity', scale: '2x',
+      imageUrl: 'https://v3.fal.media/in.png', sourceKind: 'line-art' })).rejects.toThrow()
+    expect(endpointsSent()).toEqual(['fal-ai/topaz/upscale/image', 'fal-ai/topaz/upscale/image'])
   })
 })

@@ -5,7 +5,7 @@
 // na resolução original. Por isso na aba Aprimorar a escala fica em "sem
 // aumento" para esses dois modos.
 
-import { fal } from '@fal-ai/client'
+import { subscribeBounded } from './subscribe'
 import {
   PROVIDER_ENDPOINTS,
   UpscaleProviderError,
@@ -22,20 +22,13 @@ interface NafnetOutput {
 function makeCaller(provider: 'nafnet-denoise' | 'nafnet-deblur'): ProviderCall {
   const endpoint = PROVIDER_ENDPOINTS[provider]
 
-  return async ({ imageUrl }) => {
+  return async ({ imageUrl, signal, onRequestId }) => {
     const params = {} as Record<string, unknown>
     const t0     = Date.now()
 
     let result: { data: unknown; requestId?: string }
     try {
-      result = await Promise.race([
-        fal.subscribe(endpoint, {
-          input: { image_url: imageUrl } as unknown as never,
-        }) as Promise<{ data: unknown; requestId?: string }>,
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new UpscaleProviderError(provider, 'timeout')), TIMEOUT_MS),
-        ),
-      ])
+      result = await subscribeBounded(endpoint, { image_url: imageUrl }, TIMEOUT_MS, { signal, onRequestId })
     } catch (err) {
       if (err instanceof UpscaleProviderError) throw err
       throw new UpscaleProviderError(provider, (err as Error).message ?? 'unknown', err)

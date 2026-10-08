@@ -5,7 +5,7 @@
 // Não faz upscale — para combinar com upscale, usar pipeline multi-step
 // (restore → upscale), implementado futuramente no orchestrator.
 
-import { fal } from '@fal-ai/client'
+import { subscribeBounded } from './subscribe'
 import {
   PROVIDER_ENDPOINTS,
   UpscaleProviderError,
@@ -20,20 +20,13 @@ interface PhotoRestorationOutput {
   images?: { url?: string }[]
 }
 
-export const callPhotoRestoration: ProviderCall = async ({ imageUrl }) => {
+export const callPhotoRestoration: ProviderCall = async ({ imageUrl, signal, onRequestId }) => {
   const params = {} as Record<string, unknown>
   const t0     = Date.now()
 
   let result: { data: unknown; requestId?: string }
   try {
-    result = await Promise.race([
-      fal.subscribe(ENDPOINT, {
-        input: { image_url: imageUrl } as unknown as never,
-      }) as Promise<{ data: unknown; requestId?: string }>,
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new UpscaleProviderError('photo-restoration', 'timeout')), TIMEOUT_MS),
-      ),
-    ])
+    result = await subscribeBounded(ENDPOINT, { image_url: imageUrl }, TIMEOUT_MS, { signal, onRequestId })
   } catch (err) {
     if (err instanceof UpscaleProviderError) throw err
     throw new UpscaleProviderError('photo-restoration', (err as Error).message ?? 'unknown', err)
