@@ -19,13 +19,30 @@ describe('commercial normalized snapshot',()=>{
   expect(snapshot.accounts[0]).toMatchObject({support_opt_in:false,marketing_opt_in:false,first_value:false,activation_eligible:false})
   expect(snapshot.events).toEqual([])
  })
- it('suppresses activation after approval and checkout after reconciliation',()=>{
+ it('does not infer useful value from approval while checkout remains reconciled',()=>{
   const data=source();data.events=[{id:'approval',user_id:'user-private',event_type:'result_approved',occurred_at:now.toISOString(),created_at:now.toISOString(),dedupe_key:null},
    {id:'checkout',user_id:'user-private',event_type:'checkout_started',occurred_at:now.toISOString(),created_at:now.toISOString(),dedupe_key:'checkout:cs_test'}]
   data.billing.set('user-private',{paid:true,pending:false})
   const snapshot=buildSnapshot(data,key,now)
-  expect(snapshot.accounts[0]).toMatchObject({state:'paid',first_value:true,activation_eligible:false})
+  expect(snapshot.accounts[0]).toMatchObject({state:'paid',first_value:false,activation_eligible:true})
+  expect(snapshot.events.map(e=>e.kind)).toEqual(['signup_without_value'])
+ })
+ it('requires explicit usefulness and confirmed output for first value',()=>{
+  const data=source();data.usefulUsers=new Set(['user-private'])
+  expect(buildSnapshot(data,key,now).accounts[0].first_value).toBe(false)
+  data.completedUsers.add('user-private')
+  expect(buildSnapshot(data,key,now).accounts[0]).toMatchObject({first_value:true,activation_eligible:false})
+  expect(buildSnapshot(data,key,now).events).toEqual([])
+ })
+ it('holds an orphan first_generation without claiming useful value',()=>{
+  const data=source();data.unknownActivationUsers=new Set(['user-private'])
+  const snapshot=buildSnapshot(data,key,now)
+  expect(snapshot.accounts[0]).toMatchObject({first_value:false,activation_eligible:false})
   expect(snapshot.events).toEqual([])
+ })
+ it('omits internal actors from accounts and proposed events',()=>{
+  const data=source();data.internalUsers=new Set(['user-private'])
+  expect(buildSnapshot(data,key,now)).toMatchObject({accounts:[],events:[]})
  })
  it('requires reconciled pending checkout instead of a tracking event alone',()=>{
   const data=source();data.contacts[0].support_opt_in=false
@@ -39,3 +56,4 @@ describe('commercial normalized snapshot',()=>{
   expect(buildSnapshot(data,key,now).accounts[0].state).toBe('paid')
  })
 })
+

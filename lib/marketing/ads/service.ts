@@ -15,6 +15,7 @@
 // prévia — escala de painel interno, não de produto.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { computeActivatedUsers } from './activation'
 import {
   assertAdTransition,
   assertActionTransition,
@@ -98,8 +99,6 @@ function must<T>(res: { data: T | null; error: { message: string } | null }, ctx
 const LIST_LIMIT = 300
 const METRICS_FETCH_LIMIT = 10000
 const EVENTS_FETCH_LIMIT = 10000
-// Limite do join de ativação com tabelas de produto (renders/vistas).
-const ACTIVATION_USER_CAP = 500
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
@@ -1238,67 +1237,6 @@ function sumEvents(events: AcqEventRow[]): EventSums {
   return sums
 }
 
-/** Usuários ativados (≥1 geração) dentro do conjunto de cadastros. Preferência:
- *  eventos first_generation instrumentados (consultados em lotes, sem cap); se
- *  NENHUM existir no banco (ainda não instrumentado), fallback via tabelas de
- *  produto (renders/vistas), limitado a ACTIVATION_USER_CAP ids. */
-async function computeActivatedUsers(
-  admin: SupabaseClient,
-  signupUserIds: string[],
-): Promise<Set<string>> {
-  if (signupUserIds.length === 0) return new Set()
-  const allIds = [...new Set(signupUserIds)]
-
-  const probe = await mkt(admin)
-    .from('acquisition_events')
-    .select('id')
-    .eq('event_type', 'first_generation')
-    .limit(1)
-  if (probe.error) throw new Error(`Falha ao verificar ativação: ${probe.error.message}`)
-
-  if ((probe.data ?? []).length > 0) {
-    // Caminho instrumentado: sem cap — consulta em lotes para não estourar a URL.
-    const set = new Set<string>()
-    for (let i = 0; i < allIds.length; i += ACTIVATION_USER_CAP) {
-      const chunk = allIds.slice(i, i + ACTIVATION_USER_CAP)
-      const { data, error } = await mkt(admin)
-        .from('acquisition_events')
-        .select('user_id')
-        .eq('event_type', 'first_generation')
-        .in('user_id', chunk)
-        .limit(EVENTS_FETCH_LIMIT)
-      if (error) throw new Error(`Falha ao ler ativações: ${error.message}`)
-      for (const r of (data ?? []) as Array<{ user_id: string | null }>) {
-        if (r.user_id) set.add(r.user_id)
-      }
-    }
-    return set
-  }
-
-  // O cap só se aplica ao fallback (join com tabelas de produto). Truncou =
-  // subcontagem visível no log; some quando first_generation for instrumentado.
-  const ids = allIds.slice(0, ACTIVATION_USER_CAP)
-  if (allIds.length > ACTIVATION_USER_CAP) {
-    console.warn(`[marketing/ads] ativação (fallback) truncada: ${allIds.length} cadastros, cap ${ACTIVATION_USER_CAP}`)
-  }
-
-  // Fallback: produto (tabelas public — sem .schema()).
-  const [rendersRes, vistasRes] = await Promise.all([
-    admin.from('renders').select('user_id').in('user_id', ids).limit(2000),
-    admin.from('vistas').select('user_id').in('user_id', ids).limit(2000),
-  ])
-  if (rendersRes.error) throw new Error(`Falha ao ler renders (ativação): ${rendersRes.error.message}`)
-  if (vistasRes.error) throw new Error(`Falha ao ler vistas (ativação): ${vistasRes.error.message}`)
-  const set = new Set<string>()
-  for (const r of (rendersRes.data ?? []) as Array<{ user_id: string | null }>) {
-    if (r.user_id) set.add(r.user_id)
-  }
-  for (const v of (vistasRes.data ?? []) as Array<{ user_id: string | null }>) {
-    if (v.user_id) set.add(v.user_id)
-  }
-  return set
-}
-
 export async function getFunnelSnapshot(
   admin: SupabaseClient,
   opts: { periodStart: string; periodEnd: string; campaignId?: string },
@@ -2010,3 +1948,4 @@ export async function bindSignupAttribution(
     return false
   }
 }
+
