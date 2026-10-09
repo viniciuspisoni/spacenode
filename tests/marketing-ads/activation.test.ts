@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { computeActivatedUsers, reconcileActivationUsers } from '@/lib/marketing/ads/activation'
 
 type Row = Record<string, unknown>
-function client(tables: Record<string, Row[]>, unavailable?: string): SupabaseClient {
+function client(tables: Record<string, Row[]>, unavailable?: string, missingData?: string): SupabaseClient {
   const from = (table: string) => {
     let rows = [...(tables[table] ?? [])]
     const query = {
@@ -22,7 +22,7 @@ function client(tables: Record<string, Row[]>, unavailable?: string): SupabaseCl
       order: (key: string) => { rows.sort((a, b) => String(a[key]).localeCompare(String(b[key]))); return query },
       range: async (start: number, end: number) => unavailable === table
         ? { data: null, error: { message: 'unavailable' } }
-        : { data: rows.slice(start, end + 1), error: null },
+        : { data: missingData === table ? null : rows.slice(start, end + 1), error: null },
     }
     return query
   }
@@ -74,8 +74,9 @@ describe('activation reconciled per external account', () => {
   it('requires available output while preserving valid legacy rows', async () => {
     const result = await reconcileActivationUsers(client({ renders: [
       render('empty', { output_url: '' }), render('missing', { output_url: null }),
+      render('blank', { output_url: '  \t\n ' }),
       render('legacy', { is_internal_test: null }),
-    ] }), ['empty', 'missing', 'legacy'])
+    ] }), ['empty', 'missing', 'blank', 'legacy'])
     expect(result.activated).toEqual(new Set(['legacy']))
   })
   it('paginates beyond a prolific account so later users remain visible', async () => {
@@ -91,5 +92,14 @@ describe('activation reconciled per external account', () => {
   })
   it('fails instead of interpreting unavailable evidence as non-use', async () => {
     await expect(reconcileActivationUsers(client({}, 'renders'), ['one'])).rejects.toThrow('renders concluídos')
+  })
+  it('fails when evidence is missing even without a provider error', async () => {
+    await expect(reconcileActivationUsers(client({}, undefined, 'renders'), ['one'])).rejects.toThrow('Dados indisponíveis')
+  })
+  it('counts multiple completed renders from the same person only once', async () => {
+    const result = await reconcileActivationUsers(client({ renders: [
+      render('one', { id: 'first' }), render('one', { id: 'second' }),
+    ] }), ['one'])
+    expect(result.activated).toEqual(new Set(['one']))
   })
 })
