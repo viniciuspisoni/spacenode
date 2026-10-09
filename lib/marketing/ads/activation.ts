@@ -2,17 +2,22 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 const USER_BATCH_SIZE = 500
 const ROW_PAGE_SIZE = 500
-type UserRow = { user_id: string | null }
+type UserRow = { user_id: string | null; output_url?: string | null }
 type UserQueryResult = { data: UserRow[] | null; error: { message: string } | null }
 type UserQuery = (from: number, to: number) => PromiseLike<UserQueryResult>
 
-async function readUserIds(query: UserQuery, source: string): Promise<Set<string>> {
+async function readUserIds(
+  query: UserQuery,
+  source: string,
+  include: (row: UserRow) => boolean = () => true,
+): Promise<Set<string>> {
   const users = new Set<string>()
   for (let from = 0; ; from += ROW_PAGE_SIZE) {
     const { data, error } = await query(from, from + ROW_PAGE_SIZE - 1)
     if (error) throw new Error(`Falha ao ler ${source} (ativação): ${error.message}`)
-    const rows = data ?? []
-    for (const row of rows) if (row.user_id) users.add(row.user_id)
+    if (!data) throw new Error(`Dados indisponíveis ao ler ${source} (ativação)`)
+    const rows = data
+    for (const row of rows) if (row.user_id && include(row)) users.add(row.user_id)
     if (rows.length < ROW_PAGE_SIZE) return users
   }
 }
@@ -54,11 +59,12 @@ export async function reconcileActivationUsers(
         .eq('event_type', 'first_generation').eq('is_internal', false)
         .in('user_id', external).order('id', { ascending: true }).range(from, to),
       'eventos de primeira geração'),
-      readUserIds((from, to) => admin.from('renders').select('user_id')
+      readUserIds((from, to) => admin.from('renders').select('user_id,output_url')
         .in('user_id', external).eq('status', 'completed')
         .or('is_internal_test.is.null,is_internal_test.eq.false')
         .not('output_url', 'is', null).neq('output_url', '')
-        .order('id', { ascending: true }).range(from, to), 'renders concluídos'),
+        .order('id', { ascending: true }).range(from, to), 'renders concluídos',
+      row => typeof row.output_url === 'string' && row.output_url.trim().length > 0),
     ])
     for (const id of renders) {
       result.activated.add(id)
