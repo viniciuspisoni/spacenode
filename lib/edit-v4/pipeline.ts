@@ -40,6 +40,7 @@ import {
   type CropRegion,
 } from '@/lib/spaces/edit-crop'
 import { seedreamRegionTag } from '@/lib/ai/fal/seedreamEdit'
+import type { CostObserver } from '@/lib/costs/instrument'
 import { normalizeSourceImage } from '@/lib/storage/normalize-image'
 import { evaluateEditSemantics } from '@/lib/edit-v2/semantic-gate'
 import type { EditIntentV2 } from '@/lib/edit-v2/types'
@@ -183,6 +184,7 @@ async function encodeResultForStorage(buf: Buffer): Promise<Buffer> {
 }
 
 export interface EditV4RunInput {
+  observe?: CostObserver
   request: EditV4Request
   /** Instrução já em inglês (ou crua — as cláusulas do prompt seguram). */
   instructionEn: string
@@ -355,7 +357,7 @@ export async function runEditV4(input: EditV4RunInput): Promise<EditV4RunResult>
       references: request.references.map(r => ({ url: r.url })),
       prompt,
     },
-    { primary: input.primaryRoute, outputSize },
+    { primary: input.primaryRoute, outputSize, observe: input.observe },
   )
   const editedBuf = await fetchImageBuffer(engineOut.imageRef)
 

@@ -1,3 +1,4 @@
+import { observeApiCall } from '@/lib/costs/observe'
 import { persistentPrintUrl, refreshPrintUrl } from '@/lib/nodi/v2/uploads'
 import { resolveFixtureLights } from '@/lib/ai/fixture-lights'
 import { NextRequest, NextResponse, after } from 'next/server'
@@ -903,6 +904,7 @@ export async function POST(req: NextRequest) {
           // buildFidelityPrompt, mesma ordem de imagens) — é o que torna a
           // comparação honesta.
           orionGen = await generateOrionImage({
+            observe: observeApiCall,
             variant:   orionVariant,
             quality:   orionQuality,
             size:      orionSize,
@@ -924,6 +926,7 @@ export async function POST(req: NextRequest) {
           }
         } else {
           const raw = await generateImage({
+            observe: observeApiCall,
             falEndpoint: falEndpoint!,
             falInput:    falInput!,
             imageLabels,

@@ -120,6 +120,7 @@ export type ProviderCall = (input: ProviderInput) => Promise<ProviderOutput>
 // ── Pipeline (orchestrator) ───────────────────────────────────────────────────
 
 export interface UpscaleRunRequest {
+  observe?: import('@/lib/costs/instrument').CostObserver
   tab:            UpscaleTab
   modeId:         ModeId
   scale:          Scale

@@ -1,3 +1,4 @@
+import { observeApiCall } from '@/lib/costs/observe'
 // POST /api/upscale — módulo Ampliar v2 (abas Resolução e Aprimorar).
 //
 // Contrato (JSON — a imagem sobe DIRETO pro Storage via uploadDirect, área
@@ -203,6 +204,7 @@ export async function POST(req: NextRequest) {
 
     // ── Pipeline ────────────────────────────────────────────────────────────
     const result = await runUpscalePipeline({
+      observe: observeApiCall,
       tab:             tabT,
       modeId:          modeT,
       scale:           scaleT,

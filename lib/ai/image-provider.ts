@@ -95,6 +95,9 @@
 // falha continuam nas rotas, exatamente como hoje.
 
 import { fal } from '@fal-ai/client'
+import { observeCall, type CostObserver } from '@/lib/costs/instrument'
+import { falGoogleImageUsd, googleImageUsageUsd } from '@/lib/costs/pricing'
+import { callCostUsd } from '@/lib/edit-v4/pricing'
 import {
   GoogleGenAI,
   Modality,
@@ -209,6 +212,7 @@ export type ImageDelivery =
   | { kind: 'dataUrl' }
 
 export interface GenerateImageArgs {
+  observe?: CostObserver
   /** Endpoint FAL que o call site usa hoje — id do mapeamento GCP e alvo do fallback. */
   falEndpoint: string
   /** Input EXATO que era passado ao fal.subscribe (fonte dos dois caminhos). */
@@ -600,11 +604,11 @@ async function generateViaGcp(
         // chamada travada é cortada cedo pra sobrar tempo de tentar de novo.
         const attemptCap = Math.max(15_000, Math.min(GCP_ATTEMPT_TIMEOUT_MS, deadline - Date.now()))
         const response = await Promise.race([
-          vertexClient().models.generateContent({
+          observeCall(args.observe, { provider: 'google_vertex', endpoint: mapping.model, context: args.context }, () => vertexClient().models.generateContent({
             model: mapping.model,
             contents: reqContents,
             config: reqConfig,
-          }),
+          }), response => ({ requestId: response.responseId, usd: googleImageUsageUsd(mapping.model, response.usageMetadata, process.env.GOOGLE_VERTEX_IMAGE_LOCATION?.trim() || 'global') })),
           new Promise<never>((_, reject) =>
             setTimeout(() => reject(new GcpAttemptStallError(attemptCap)), attemptCap),
           ),
@@ -707,7 +711,15 @@ async function generateViaGcp(
 
 async function generateViaFal(args: GenerateImageArgs, budgetMs: number): Promise<CoreResult> {
   const result = await Promise.race([
-    fal.subscribe(args.falEndpoint, { input: args.falInput as unknown as never }),
+    observeCall(args.observe, { provider: 'fal', endpoint: args.falEndpoint, context: args.context },
+      () => fal.subscribe(args.falEndpoint, { input: args.falInput as unknown as never }), result => {
+        const outputs = (result.data as { images?: { width?: number; height?: number }[] }).images ?? []
+        const usd = args.falEndpoint === SEEDREAM_FAL_ENDPOINT
+          ? outputs.length > 0 && outputs.every(i => Number(i.width) > 0 && Number(i.height) > 0)
+            ? outputs.reduce((sum, i) => sum + callCostUsd({ provider: 'fal', outputPixels: Number(i.width) * Number(i.height), inputImages: parseFalInput(args.falInput).imageUrls.length }), 0) : null
+          : falGoogleImageUsd(args.falEndpoint, args.falInput, outputs.length)
+        return { requestId: result.requestId, usd }
+      }),
     new Promise<never>((_, reject) =>
       setTimeout(() => reject(new ImageProviderTimeoutError('fal', args.falEndpoint, budgetMs)), budgetMs),
     ),
@@ -839,7 +851,12 @@ async function generateViaArk(args: GenerateImageArgs, budgetMs: number): Promis
   try {
     generated = await Promise.race([
       // num_images > 1 não existe nos call sites (sempre 1); N chamadas cobrem o contrato.
-      Promise.all(Array.from({ length: parsed.numImages }, () => arkGenerateOnce(parsed.prompt, parsed.imageUrls, size, ctrl.signal))),
+      Promise.all(Array.from({ length: parsed.numImages }, () => observeCall(args.observe,
+        { provider: 'ark', endpoint: arkModel(), context: args.context },
+        () => arkGenerateOnce(parsed.prompt, parsed.imageUrls, size, ctrl.signal), result => {
+          const dims = imageDims(result.buffer)
+          return { requestId: result.requestId, usd: dims.width && dims.height ? callCostUsd({ provider: 'ark', outputPixels: dims.width * dims.height, inputImages: parsed.imageUrls.length }) : null }
+        }))),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new ImageProviderTimeoutError('ark', args.falEndpoint, budgetMs)), budgetMs),
       ),
