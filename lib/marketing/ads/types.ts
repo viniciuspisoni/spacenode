@@ -418,8 +418,8 @@ export interface GeneratedAdBrief {
 //        → upsert por (metric_date, level, entity_id); valida números ≥ 0.
 //     getFunnelSnapshot(admin, opts: { periodStart; periodEnd; campaignId? }): Promise<FunnelSnapshot>
 //        → agrega ad_metrics_daily + acquisition_events; ativação computada de
-//          acquisition_events.first_generation QUANDO houver, senão via join
-//          nas tabelas de produto (renders/vistas por user_id dos signups).
+//          renders concluídos externos reconciliados por usuário com
+//          acquisition_events.first_generation (legados não perdem cobertura).
 //     getCampaignsWithStats(admin, opts): Promise<CampaignWithStats[]>
 //     getAdsWithStats(admin, campaignId, opts): Promise<AdWithStats[]>
 //     getAdsDashboardData(admin): Promise<AdsDashboardData>
@@ -581,3 +581,4 @@ export interface NewAcquisitionEvent {
 /** Origem de um evento de aquisição. `unknown` é valor de primeira classe:
  *  ausência de informação não vira origem inventada. */
 export type AcquisitionOrigin = 'paid' | 'organic' | 'unknown'
+
