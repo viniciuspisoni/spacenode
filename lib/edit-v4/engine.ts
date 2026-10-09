@@ -19,6 +19,7 @@
 
 import { editImageWithSeedream, SeedreamEditError } from '@/lib/ai/fal/seedreamEdit'
 import { editImageWithSeedreamArk } from '@/lib/ai/ark/seedreamEdit'
+import { observeCall, type CostObserver } from '@/lib/costs/instrument'
 import {
   SEEDREAM_LOW_TIER_MAX_PIXELS,
   SEEDREAM_MIN_PIXELS,
@@ -112,7 +113,7 @@ export class EditV4EngineError extends Error {
  */
 export async function runSeedreamEdit(
   input: EditV4EngineInput,
-  opts: { primary: EditV4Provider; outputSize: { width: number; height: number } },
+  opts: { primary: EditV4Provider; outputSize: { width: number; height: number }; observe?: CostObserver },
 ): Promise<EditV4EngineOutput> {
   const call = async (provider: EditV4Provider) => {
     const payload = {
@@ -123,9 +124,9 @@ export async function runSeedreamEdit(
       prompt: input.prompt,
       outputSize: opts.outputSize,
     }
-    return provider === 'ark'
-      ? editImageWithSeedreamArk(payload)
-      : editImageWithSeedream(payload)
+    return observeCall(opts.observe, { provider, endpoint: 'seedream-5-pro-edit', context: 'edit-v4' },
+      () => provider === 'ark' ? editImageWithSeedreamArk(payload) : editImageWithSeedream(payload),
+      out => ({ requestId: out.requestId, usd: out.costUsd }))
   }
 
   const secondary: EditV4Provider = opts.primary === 'ark' ? 'fal' : 'ark'

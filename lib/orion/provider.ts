@@ -37,6 +37,7 @@
 // saber o que pediu).
 
 import { fal } from '@fal-ai/client'
+import { observeCall, type CostObserver } from '@/lib/costs/instrument'
 import { imageDims, uploadToStorage, type ImageDelivery } from '@/lib/ai/image-provider'
 import { fetchStorageBytes } from '@/lib/storage/fetch'
 import { signStorageUrl } from '@/lib/storage/signed'
@@ -51,7 +52,7 @@ import {
   type OrionSize,
   type OrionVariant,
 } from './config'
-import { EMPTY_ORION_USAGE, parseOpenAiUsage, type OrionUsage } from './pricing'
+import { EMPTY_ORION_USAGE, parseOpenAiUsage, estimateOrionCostUsd, type OrionUsage } from './pricing'
 
 const OPENAI_API_BASE = 'https://api.openai.com/v1'
 const ORION_MAX_IMAGES = 16
@@ -139,6 +140,7 @@ function truncate(msg: string, max = 300): string {
 // ── Contrato ─────────────────────────────────────────────────────────────────
 
 export interface OrionGenerateArgs {
+  observe?: CostObserver
   variant: OrionVariant
   quality: OrionQuality
   /** Dimensão EXPLÍCITA pedida (nunca 'auto'). */
@@ -396,9 +398,9 @@ export async function generateOrionImage(args: OrionGenerateArgs): Promise<Orion
     `budget=${Math.round(budgetMs / 1000)}s`,
   )
 
-  const result = provider === 'openai'
-    ? await generateViaOpenAi(args, budgetMs)
-    : await generateViaFal(args, budgetMs)
+  const result = await observeCall(args.observe, { provider, endpoint: model, context: args.context },
+    () => provider === 'openai' ? generateViaOpenAi(args, budgetMs) : generateViaFal(args, budgetMs),
+    out => ({ requestId: out.requestId, usd: estimateOrionCostUsd(out.usage).usd }))
 
   console.log(
     `[orion] ${args.context} ok provider=${result.provider} model=${result.providerModel} ` +

@@ -1,3 +1,4 @@
+import { observeApiCall } from '@/lib/costs/observe'
 // POST /api/edit-v4 — a rota do Editar V4 (motor Seedream 5.0 Pro).
 //
 // Regras que não se negociam, herdadas do V3 e mantidas:
@@ -255,6 +256,7 @@ export async function POST(req: NextRequest) {
       references,
     }
     const run = await runEditV4({
+      observe: observeApiCall,
       request,
       instructionEn,
       primaryRoute,

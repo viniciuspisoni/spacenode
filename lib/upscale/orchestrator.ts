@@ -19,6 +19,7 @@
 // decidir refund.
 
 import { callTopaz }             from './providers/topaz'
+import { observeCall, type CostObserver } from '@/lib/costs/instrument'
 import { callClarity }           from './providers/clarity'
 import { callNafnetDenoise, callNafnetDeblur } from './providers/nafnet'
 import { callPhotoRestoration } from './providers/photo-restoration'
@@ -115,7 +116,7 @@ export async function runUpscalePipeline(
     const kindOverride = req.sourceKind ? stepDef.kindParams?.[req.sourceKind] : undefined
     const params = kindOverride ? { ...baseParams, ...kindOverride } : baseParams
 
-    let primary = await runProvider(stepDef.provider, currentUrl, scaleFac, null, params)
+    let primary = await runProvider(stepDef.provider, currentUrl, scaleFac, null, params, req.observe)
     steps.push(primary)
 
     if (primary.status !== 'completed' && kindOverride) {
@@ -123,7 +124,7 @@ export async function runUpscalePipeline(
       // É o comportamento que o usuário teria sem classificação — nunca pior.
       console.warn('[upscale] %s com override de classe falhou — repetindo sem override. Motivo: %s',
         stepDef.provider, primary.error)
-      primary = await runProvider(stepDef.provider, currentUrl, scaleFac, null, baseParams)
+      primary = await runProvider(stepDef.provider, currentUrl, scaleFac, null, baseParams, req.observe)
       steps.push(primary)
     }
 
@@ -140,7 +141,7 @@ export async function runUpscalePipeline(
         '[upscale] %s falhou — caindo para %s. Motivo: %s',
         stepDef.provider, stepDef.fallback, primary.error,
       )
-      const fb = await runProvider(stepDef.fallback, currentUrl, scaleFac, stepDef.provider)
+      const fb = await runProvider(stepDef.fallback, currentUrl, scaleFac, stepDef.provider, undefined, req.observe)
       steps.push(fb)
       if (fb.status === 'completed') {
         currentUrl = (fb as StepLog & { outputUrl?: string }).outputUrl ?? currentUrl
@@ -170,10 +171,12 @@ async function runProvider(
   scale:       number,
   fallbackOf:  ProviderId | null,
   params?:     Record<string, unknown>,
+  observe?:    CostObserver,
 ): Promise<StepLog & { outputUrl?: string }> {
   const call = PROVIDER_REGISTRY[provider]
   try {
-    const out = await call({ imageUrl, scale, params })
+    const out = await observeCall(observe, { provider: 'fal', endpoint: provider, context: 'upscale' },
+      () => call({ imageUrl, scale, params }), out => ({ requestId: out.requestId }))
     return {
       provider,
       endpoint:    out.endpoint,

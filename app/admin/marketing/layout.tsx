@@ -9,6 +9,7 @@ import { getMarketingStaffContext } from '@/lib/marketing/auth'
 // o proxy já redireciona não-logados para /login.
 
 const NAV = [
+  { href: '/admin/custos',              label: 'Custos' },
   { href: '/admin/marketing',            label: 'Dashboard' },
   { href: '/admin/marketing/ads',        label: 'Tráfego' },
   { href: '/admin/marketing/ads/conversao', label: 'Conversão' },
