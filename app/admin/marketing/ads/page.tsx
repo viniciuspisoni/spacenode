@@ -45,6 +45,7 @@ export default async function AdsDashboardPage() {
   const data = await getAdsDashboardData(ctx.admin)
   const t = data.funnel.totals
   const d = data.funnel.derived
+  const activationValue = data.degraded ? '—' : formatInt(t.activations)
 
   // Etapas do funil com a taxa que liga cada uma à anterior (assinatura é
   // medida sobre cadastros — mesma base do CAC).
@@ -52,7 +53,7 @@ export default async function AdsDashboardPage() {
     { label: 'Impressões', value: formatInt(t.impressions), rate: null },
     { label: 'Cliques', value: formatInt(t.clicks), rate: d.ctr, rateLabel: 'CTR' },
     { label: 'Cadastros', value: formatInt(t.signups), rate: d.click_to_signup, rateLabel: 'clique → cadastro' },
-    { label: 'Ativados', value: formatInt(t.activations), rate: d.signup_to_activation, rateLabel: 'cadastro → ativação' },
+    { label: 'Primeiro render concluído', value: activationValue, rate: data.degraded ? null : d.signup_to_activation, rateLabel: 'cadastro → render concluído' },
     { label: 'Assinaturas', value: formatInt(t.subscriptions), rate: d.signup_to_subscription, rateLabel: 'cadastro → assinatura' },
   ]
 
@@ -83,7 +84,7 @@ export default async function AdsDashboardPage() {
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
         <StatCard label="Investimento (30d)" value={formatBRLFromCents(t.spend_cents)} />
         <StatCard label="Cadastros" value={formatInt(t.signups)} />
-        <StatCard label="Ativados" value={formatInt(t.activations)} />
+        <StatCard label="Primeiro render concluído" value={activationValue} />
         <StatCard label="Assinaturas" value={formatInt(t.subscriptions)} />
         <StatCard
           label="CAC"
@@ -116,6 +117,11 @@ export default async function AdsDashboardPage() {
             </div>
           ))}
         </div>
+        <p className="mt-3 text-xs leading-relaxed text-text-tertiary">
+          Primeiro render concluído: pessoas cadastradas no período com pelo menos uma imagem concluída e disponível,
+          incluindo contas antigas. A contagem acompanha a situação atual desses cadastros e exclui testes internos.
+          Utilidade percebida e retorno à plataforma são métricas separadas.
+        </p>
       </section>
 
       {/* ── Campanhas com desempenho ───────────────────────────────────────── */}
