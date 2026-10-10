@@ -11,7 +11,7 @@
 // "histórico da sessão" no sentido literal: sobrevive à navegação, morre com
 // a aba. Estilos na seção "Nodi" do globals.css (tokens dos dois temas).
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useReducer, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supportWhatsAppUrl } from '@/lib/support'
 import { statusDisplayLabel } from '@/lib/history/generation-detail'
@@ -31,6 +31,7 @@ import type {
   AnalysisReport, ConfigRecommendation, GenerationPlan, MemoryProposal,
   NodiAttachment, NodiV2Answer, PromptSuggestion, SupervisedAction,
 } from '@/lib/nodi/v2/types'
+import { INITIAL_TICKET_LIST, ticketListReducer } from './ticket-list-state'
 import NodiAvatar, { type NodiAvatarState } from './NodiAvatar'
 import type { NodiSettings } from '@/lib/nodi/v4/settings'
 import {
@@ -191,7 +192,9 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
   const [bootstrapEpoch, setBootstrapEpoch] = useState(0)
   const [bootstrap, setBootstrap] = useState<NodiBootstrap | null>(null)
   const [offline, setOffline] = useState(false)
-  const [tickets, setTickets] = useState<TicketRecord[] | null>(null)
+  const [ticketList, dispatchTickets] = useReducer(ticketListReducer, INITIAL_TICKET_LIST)
+  const { tickets, loading: ticketsLoading, error: ticketsError } = ticketList
+  const ticketsRequest = useRef(false)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [avatarFlash, setAvatarFlash] = useState<'success' | null>(null)
   // V2: imagem anexada à próxima pergunta (geração escolhida ou vista da rota)
@@ -696,13 +699,26 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
     setView('home')
   }, [])
 
-  const openTickets = useCallback(async () => {
-    setView('tickets')
-    if (tickets === null) {
+  const loadTickets = useCallback(async () => {
+    if (ticketsRequest.current) return
+    ticketsRequest.current = true
+    dispatchTickets({ type: 'loading' })
+    try {
       const res = await fetchMyTickets()
-      setTickets(res.ok ? res.data.tickets : [])
+      dispatchTickets(res.ok
+        ? { type: 'loaded', tickets: res.data.tickets }
+        : { type: 'failed', error: res.error })
+    } catch {
+      dispatchTickets({ type: 'failed', error: 'Não consegui consultar seus chamados agora. Tente atualizar em instantes.' })
+    } finally {
+      ticketsRequest.current = false
     }
-  }, [tickets])
+  }, [])
+
+  const openTickets = useCallback(() => {
+    setView('tickets')
+    void loadTickets()
+  }, [loadTickets])
 
   const onSubmitInput = useCallback(() => {
     const q = input.trim()
@@ -974,8 +990,12 @@ export default function NodiPanel({ context, onClose }: { context: NodiContext; 
         {view === 'tickets' && (
           <div className="spn-nodi-home">
             <h3 className="spn-nodi-section-title">Meus chamados</h3>
-            {tickets === null && <p className="spn-nodi-muted">Carregando…</p>}
-            {tickets !== null && tickets.length === 0 && (
+            <button type="button" className="spn-nodi-actionbtn" disabled={ticketsLoading} onClick={() => void loadTickets()}>
+              {ticketsLoading ? 'Atualizando…' : 'Atualizar chamados'}
+            </button>
+            {ticketsLoading && tickets === null && <p className="spn-nodi-muted" role="status">Carregando…</p>}
+            {ticketsError && <p className="spn-nodi-muted" role="alert">{ticketsError}{tickets !== null ? ' A lista abaixo mostra a última consulta concluída.' : ''}</p>}
+            {!ticketsLoading && !ticketsError && tickets !== null && tickets.length === 0 && (
               <p className="spn-nodi-muted">Nenhum chamado por aqui. Quando você registrar um, ele aparece nesta lista com o protocolo e o status.</p>
             )}
             {tickets?.map(t => (
