@@ -191,6 +191,12 @@ describe('clique no anúncio A → venda atribuída à campanha no painel', () =
       feature: 'renderizar', dedupeKey: 'first-render:user-e2e',
     })
 
+    // Ativação exige uma saída persistida, além do evento de telemetria.
+    db.rows('public.renders').push({
+      id: 'render-e2e', user_id: 'user-e2e', status: 'completed',
+      output_url: 'https://assets.example.test/render-e2e.jpg', is_internal_test: false,
+    })
+
     // 5. Checkout no mesmo navegador sem cookies.
     const checkout = await checkoutPOST(siteRequest('/api/stripe/checkout', { type: 'plan', id: 'essence', billing: 'monthly' }))
     expect(await checkout.json()).toEqual({ url: 'https://checkout.stripe.com/c/pay/cs_test' })

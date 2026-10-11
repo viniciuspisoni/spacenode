@@ -114,6 +114,11 @@ export default async function LandingCampaignPage({
   for (const [k, v] of Object.entries(utm)) qs.set(k, v)
   const ctaHref = `/login?${qs.toString()}`
   const ctaLabel = page.cta_label?.trim() || 'Começar agora'
+  const hasPricing = Array.isArray(page.sections) && page.sections.some((section) =>
+    section.kind === 'pricing' && (!section.plan_ids?.length || SELLABLE_PLANS.some((plan) => section.plan_ids!.includes(plan.id))),
+  )
+  const primaryHref = hasPricing ? '#planos' : ctaHref
+  const primaryLabel = hasPricing ? 'Escolher meu plano' : ctaLabel
 
   // Um CTA por plano, cada um com a própria intenção (decisão do dono,
   // 18/09/26: a landing não empurra o Essence — leva o visitante a ESCOLHER
@@ -238,20 +243,19 @@ export default async function LandingCampaignPage({
             </p>
           )}
           <div className="order-4 mt-5 sm:order-3 sm:mt-9">
-            <LpCtaLink href={ctaHref} slug={slug} position="hero" className={CTA_CLASSES}>
-              {ctaLabel}
+            <LpCtaLink href={primaryHref} slug={slug} position="hero" className={CTA_CLASSES}>
+              {primaryLabel}
               <CtaArrow />
             </LpCtaLink>
           </div>
-          {/* Âncora de preço no mobile: quem entra sabe desde o primeiro
-              viewport que a ferramenta é paga — a métrica desta página é
-              assinatura, não volume de cadastro. Desktop segue como estava. */}
-          <p className="order-5 mt-4 text-[11px] text-text-tertiary sm:order-4 sm:mt-5" style={{ letterSpacing: '0.02em' }}>
-            <span className="sm:hidden">
-              80 nodes grátis, sem cartão · planos a partir de R$ {cheapestPlanPrice}/mês
-            </span>
-            <span className="hidden sm:inline">80 nodes grátis · sem cartão</span>
+          <p className="order-5 mt-4 text-[11px] text-text-tertiary sm:order-4 sm:mt-5">
+            Planos a partir de R$ {cheapestPlanPrice}/mês · cancele quando quiser
           </p>
+          {hasPricing && (
+            <LpCtaLink href={ctaHref} slug={slug} position="section" className="order-6 mt-3 text-xs text-text-secondary underline underline-offset-4">
+              Prefere experimentar? Teste com 80 Nodes grátis, sem cartão
+            </LpCtaLink>
+          )}
         </section>
 
         {/* Seções configuradas no painel, na ordem do array */}
@@ -260,16 +264,16 @@ export default async function LandingCampaignPage({
         {/* CTA final */}
         <section className="mx-auto max-w-3xl px-5 py-12 text-center sm:px-10 sm:py-16" style={{ borderTop: HAIRLINE }}>
           <h2 className="text-[26px] font-light text-text-primary" style={{ letterSpacing: '-0.03em' }}>
-            comece com 80 nodes grátis.
+            {hasPricing ? 'seu próximo projeto começa aqui.' : 'comece com 80 nodes grátis.'}
           </h2>
           <p className="mx-auto mt-3 max-w-md text-sm text-text-secondary">
             {/* Preço lido da tabela, não escrito à mão: este texto já ficou
                 desatualizado uma vez quando o Starter saiu da vitrine. */}
-            Sem cartão para começar. Planos a partir de R$ {cheapestPlanPrice}/mês.
+            Escolha o volume de imagens para a rotina do seu escritório. Planos a partir de R$ {cheapestPlanPrice}/mês.
           </p>
           <div className="mt-7">
-            <LpCtaLink href={ctaHref} slug={slug} position="final" className={CTA_CLASSES}>
-              {ctaLabel}
+            <LpCtaLink href={primaryHref} slug={slug} position="final" className={CTA_CLASSES}>
+              {primaryLabel}
               <CtaArrow />
             </LpCtaLink>
           </div>
@@ -281,10 +285,10 @@ export default async function LandingCampaignPage({
           quando o banner de consentimento está aberto. */}
       <LpStickyCta
         slug={slug}
-        href="#planos"
-        label="Escolher meu plano"
+        href={primaryHref}
+        label={primaryLabel}
         note={`planos a partir de R$ ${cheapestPlanPrice}/mês · cancele quando quiser`}
-        hideWhenVisibleId="planos"
+        hideWhenVisibleId={hasPricing ? "planos" : undefined}
       />
 
       {/* Footer mínimo */}
