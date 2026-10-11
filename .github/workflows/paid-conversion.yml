@@ -1,0 +1,27 @@
+name: Paid conversion flow
+on:
+  push:
+    branches: [codex/campaign-lp-subscriptions-20261011]
+  pull_request:
+    paths:
+      - proxy.ts
+      - app/lp/**
+      - lib/auth/**
+      - lib/analytics/**
+      - tests/proxy-plan-intent.test.ts
+      - .github/workflows/paid-conversion.yml
+permissions:
+  contents: read
+jobs:
+  conversion-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Verify plan redirects, authentication, checkout attribution and Purchase payloads
+        run: npm test -- tests/proxy-plan-intent.test.ts tests/auth-intent.test.ts tests/auth-cross-browser.test.ts tests/meta-attribution-checkout.test.ts tests/meta-conversions.test.ts
