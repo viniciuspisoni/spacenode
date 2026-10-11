@@ -1,7 +1,8 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { safeNextPath } from '@/lib/auth/safe-next-path'
+import { internalNextPath } from '@/lib/auth/safe-next-path'
+import { INTENT_COOKIE, intentFromSearchParams, intentResumePath, parseIntentCookie } from '@/lib/analytics/attribution'
 import { isModuleEnabled } from '@/lib/nav/modules-config'
 
 export default async function proxy(request: NextRequest) {
@@ -68,11 +69,20 @@ export default async function proxy(request: NextRequest) {
     // Honra ?next= (ex.: /login?next=/sketchup/connect?nonce=X vindo do
     // plugin) — antes o redirect descartava o destino e jogava em /app.
     // Path e query separados: o setter de pathname percent-encodaria o '?'.
-    const target = safeNextPath(url.searchParams.get('next'))
+    // Quem já tem sessão não passa pela página de login, então o proxy
+    // também precisa preservar a intenção enviada pelo CTA da LP.
+    const intent = intentFromSearchParams(url.searchParams)
+      ?? parseIntentCookie(request.cookies.get(INTENT_COOKIE)?.value)
+    const target = internalNextPath(url.searchParams.get('next'))
+      ?? (intent ? intentResumePath(intent) : '/app')
     const qIndex = target.indexOf('?')
     url.pathname = qIndex >= 0 ? target.slice(0, qIndex) : target
     url.search = qIndex >= 0 ? target.slice(qIndex) : ''
-    return NextResponse.redirect(url)
+    const response = NextResponse.redirect(url)
+    // Mantém a sessão caso getUser tenha renovado os cookies nesta request.
+    supabaseResponse.cookies.getAll().forEach((cookie) => response.cookies.set(cookie))
+    response.headers.set('Cache-Control', 'private, no-store')
+    return response
   }
 
   return supabaseResponse
