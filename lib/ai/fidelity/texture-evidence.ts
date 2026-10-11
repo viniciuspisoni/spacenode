@@ -22,8 +22,10 @@ export function hasTextureDescriptionConflict(original: string, generated: strin
   const result = normalize(generated)
   const smoothSource = /\b(?:sem textura(?: aparente)?|sem (?:veios|granulacao)|no (?:visible )?(?:texture|grain)|untextured|textureless)\b/.test(source)
   // Inspect clauses individually so an explicit negative cannot be read as
-  // positive texture. Ambiguous prose is left to structured evidence.
-  const addedPattern = result.split(/[,.;]/).some(clause =>
+  // positive texture. Contrast starts a new clause: a prior "sem"/"same"
+  // must not hide an affirmative new pattern after "mas"/"but".
+  // Ambiguous prose is left to structured evidence.
+  const addedPattern = result.split(/[,.;]|\b(?:mas|porem|contudo|todavia|but|however|yet)\b/).some(clause =>
     !/\b(?:sem|nao|no|not|without|unchanged|same|mesm[oa]|preservad[oa])\b/.test(clause) &&
     /\b(?:veios|granulacao|wood grain|stone vein(?:s|ing)?|(?:textura|texture) (?:de |of )?(?:concreto|cimento|pedra|madeira|concrete|cement|stone|wood))\b/.test(clause))
   return smoothSource && addedPattern
