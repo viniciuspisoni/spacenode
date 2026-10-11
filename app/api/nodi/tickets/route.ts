@@ -99,7 +99,9 @@ export async function GET(req: Request) {
     const tickets = await listMyTickets(supabase, user.id, 10)
     return NextResponse.json({ tickets })
   } catch {
-    // Tabela ausente (migration não aplicada) → lista vazia, sem quebrar o painel.
-    return NextResponse.json({ tickets: [] })
+    return NextResponse.json(
+      { error: 'Não consegui consultar seus chamados agora. Tente atualizar em instantes.' },
+      { status: 503 },
+    )
   }
 }
