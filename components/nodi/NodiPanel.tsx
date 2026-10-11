@@ -1317,7 +1317,7 @@ function Message(props: MessageProps) {
       <div className="spn-nodi-msg spn-nodi-msg--nodi spn-nodi-msg--block">
         <div className="spn-nodi-card spn-nodi-card--success">
           <strong>Chamado registrado — protocolo {msg.ticket.protocol}</strong>
-          <p>A equipe recebe o contexto completo junto. Você acompanha o andamento em “Meus chamados”, aqui no painel.</p>
+          <p>O contexto foi salvo no chamado. Você acompanha o andamento em “Meus chamados”, aqui no painel. Para enviar o resumo pelo WhatsApp, use o botão abaixo.</p>
           <div className="spn-nodi-actions">
             <ActionBtn label={props.copiedId === msg.id + 'Copiar resumo' ? 'Copiado' : 'Copiar resumo'} onClick={() => props.onAction({ type: 'copy', label: 'Copiar resumo', payload: msg.summary ?? '' }, msg.id)} />
             <ActionBtn label="Enviar pro suporte no WhatsApp" onClick={() => props.onAction({ type: 'whatsapp', label: 'whatsapp', href: supportWhatsAppUrl(msg.summary ?? '') }, msg.id)} />

@@ -48,6 +48,26 @@ describe('texture evidence audit regression (offline, no paid provider calls)', 
     expect(assess({ ...check, generated, texture }).material_review).toBe('passed')
   })
 
+  it.each([
+    'Sem mudança de cor mas com textura de pedra',
+    'Mesmo piso liso porém com veios de madeira',
+    'No color change but with wood grain',
+    'Same smooth floor however with stone veins',
+  ])('keeps added texture after a contrast separate from prior negation: %s', generated => {
+    const result = assess({ ...check, generated, texture })
+    expect(result.material_review).toBe('uncertain')
+    expect(publicRenderAudit({ fidelity: { semantic_audit: result } }).materialsPassed).toBe(false)
+  })
+
+  it.each([
+    'Mesmo piso mas sem veios ou textura de madeira',
+    'Same floor but without wood grain',
+    'Sem textura de pedra porém com reflexos mais fortes',
+    'No visible texture but with brighter lighting',
+  ])('retains negation and lighting after a contrast: %s', generated => {
+    expect(assess({ ...check, generated, texture }).material_review).toBe('passed')
+  })
+
   it('does not silently approve prose contradictions even with all texture enums reporting none', () => {
     expect(assess({ ...check, generated: 'Cinza com veios sutis', texture }).material_review).toBe('uncertain')
   })
