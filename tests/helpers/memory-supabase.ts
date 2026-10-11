@@ -1,7 +1,7 @@
 // Duplo do cliente Supabase com tabelas EM MEMÓRIA — o suficiente para rodar
 // o código real do painel de anúncios, das rotas de cadastro/checkout e do
 // webhook sem banco nem rede. Suporta o subconjunto do PostgREST que esses
-// caminhos usam: select · eq · in · gte · lte · is · order · limit ·
+// caminhos usam: select · eq · neq · in · gte · lte · is · not · or · order · limit · range ·
 // maybeSingle · single · insert(+select/single) · update · upsert · rpc.
 //
 // Defaults de coluna que o código pressupõe do banco: id, created_at e, em
@@ -53,6 +53,7 @@ export function createMemorySupabase(
   function query(name: string): QueryBuilder {
     const filters: Array<(r: Row) => boolean> = []
     let limit = Infinity
+    let offset = 0
     let mode: 'select' | 'insert' | 'update' | 'upsert' = 'select'
     let payload: Row | Row[] = {}
     let upsertIgnore = false
@@ -74,7 +75,7 @@ export function createMemorySupabase(
         matched.forEach(r => Object.assign(r, payload))
         return { data: matched, error: null }
       }
-      const rows = matched.slice(0, limit)
+      const rows = matched.slice(offset, offset + limit)
       if (single === 'maybe') return { data: rows[0] ?? null, error: null }
       if (single === 'one') {
         return rows.length === 1
@@ -91,7 +92,24 @@ export function createMemorySupabase(
       gte: (col: string, val: unknown) => { filters.push(r => r[col] != null && compare(r[col], val) >= 0); return builder },
       lte: (col: string, val: unknown) => { filters.push(r => r[col] != null && compare(r[col], val) <= 0); return builder },
       is: (col: string, val: unknown) => { filters.push(r => (r[col] ?? null) === val); return builder },
+      neq: (col: string, val: unknown) => {
+        filters.push(r => r[col] != null && r[col] !== val); return builder
+      },
+      not: (col: string, operator: string, val: unknown) => {
+        if (operator !== 'is') throw new Error('Unsupported memory query: not.' + operator)
+        filters.push(r => (r[col] ?? null) !== val); return builder
+      },
+      or: (expression: string) => {
+        const alternatives = expression.split(',').map(part => {
+          const [col, operator, value] = part.split('.')
+          if (operator === 'is' && value === 'null') return (r: Row) => r[col] == null
+          if (operator === 'eq' && value === 'false') return (r: Row) => r[col] === false
+          throw new Error('Unsupported memory query: ' + part)
+        })
+        filters.push(r => alternatives.some(f => f(r))); return builder
+      },
       order: () => builder,
+      range: (from: number, to: number) => { offset = from; limit = to - from + 1; return builder },
       limit: (n: number) => { limit = n; return builder },
       maybeSingle: () => { single = 'maybe'; return builder },
       single: () => { single = 'one'; return builder },
