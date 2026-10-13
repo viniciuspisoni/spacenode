@@ -17,6 +17,7 @@
 // pessoas seguem o fluxo. Ver docs/EDITAR-V4.md.
 
 import { createClient } from '@/lib/supabase/server'
+import EditOnboardingGuide from '@/components/app/EditOnboardingGuide'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getPayerBalance } from '@/lib/workspaces/balance'
 import { redirect } from 'next/navigation'
@@ -57,6 +58,8 @@ export default async function EditarPage({
   // Saldo da bolsa (dono do workspace) — é dele que a edição debita.
   const payerBalance = await getPayerBalance(createAdminClient(), user.id)
   const balance = payerBalance.totalBalance
+  const params = await searchParams
+  const guided = params.onboarding === '1'
 
   // ── Editar unificado ──────────────────────────────────────────────────────
   // Sai antes do fork antigo de propósito: é o único que precisa do papel de
@@ -75,14 +78,17 @@ export default async function EditarPage({
     )) as FinalizeProjectSummary[]
 
     return (
-      <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
-        <FinalizeEditor
-          savedProjects={savedProjects}
-          initialSourceUrl={safeSource((await searchParams).source)}
-          initialBalance={balance}
-          nodesPerEdit={nodesForEdit({ provider: editV4Route() })}
-          aiEnabled={editV4Enabled()}
-        />
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        {guided && <EditOnboardingGuide />}
+        <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
+          <FinalizeEditor
+            savedProjects={savedProjects}
+            initialSourceUrl={safeSource(params.source)}
+            initialBalance={balance}
+            nodesPerEdit={nodesForEdit({ provider: editV4Route() })}
+            aiEnabled={editV4Enabled()}
+          />
+        </div>
       </div>
     )
   }
@@ -93,6 +99,7 @@ export default async function EditarPage({
 
   return (
     <main style={{ flex: 1, overflowY: 'auto', background: 'var(--color-bg)' }}>
+      {guided && <EditOnboardingGuide />}
       {useV3 ? (
         <EditV3Flow initialBalance={balance} initialSourceUrl={safeSource((await searchParams).source)} />
       ) : useClean ? (

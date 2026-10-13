@@ -1,6 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import PostResultPlanOffer from './PostResultPlanOffer'
+import { canOfferAfterValue } from '@/lib/onboarding'
 import type { RenderFeedbackInput, RenderFeedbackReason } from '@/lib/render-feedback'
 
 const REASONS: { id: RenderFeedbackReason; label: string }[] = [
@@ -10,8 +13,13 @@ const REASONS: { id: RenderFeedbackReason; label: string }[] = [
   { id: 'other', label: 'Outro motivo' },
 ]
 
-export function RenderFeedback({ renderId }: { renderId: string }) {
+export function RenderFeedback({ renderId, offer, outputUrl }: {
+  renderId: string
+  offer?: { nodeCost: number }
+  outputUrl?: string
+}) {
   const [available, setAvailable] = useState(false)
+  const [loadedRenderId, setLoadedRenderId] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<RenderFeedbackInput | null>(null)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
@@ -26,6 +34,7 @@ export function RenderFeedback({ renderId }: { renderId: string }) {
       .then(data => {
         if (!alive) return
         setFeedback(data.feedback)
+        setLoadedRenderId(renderId)
         setAvailable(true)
       })
       .catch(() => { if (alive) setAvailable(false) })
@@ -51,7 +60,7 @@ export function RenderFeedback({ renderId }: { renderId: string }) {
     }
   }
 
-  if (!available) return null
+  if (!available || loadedRenderId !== renderId) return null
 
   return (
     <section className="spn-glass" aria-label="Avaliar render" style={{ padding: 16, borderRadius: 'var(--r-inner)', marginTop: 14 }}>
@@ -76,12 +85,25 @@ export function RenderFeedback({ renderId }: { renderId: string }) {
                 onClick={() => void submit(false, item.id)}>{item.label}</button>
             ))}
           </div>
+          <p style={{ margin: '12px 0 0', fontSize: 12, lineHeight: 1.6, color: 'var(--color-text-secondary)' }}>
+            {feedback.reason === 'geometry'
+              ? 'Compare com a referência: confira enquadramento, proporções e aberturas antes de tentar outra geração.'
+              : feedback.reason === 'materials'
+                ? 'Uma amostra do material pode ajudar. No Editar, peça uma mudança específica e confira o restante da imagem.'
+                : feedback.reason === 'lighting'
+                  ? 'Experimente um ajuste de luz no Editar e compare com a intenção do projeto.'
+                  : 'Escolha o que precisa melhorar e faça um ajuste por vez. Você pode continuar no Editar.'}
+          </p>
+          {outputUrl && feedback.reason !== 'geometry' && <Link className="spn-ghost" style={{ marginTop: 10, display: 'inline-flex' }}
+            href={`/app/editar?source=${encodeURIComponent(outputUrl)}&onboarding=1`}>Ajustar esta imagem →</Link>}
         </>
       )}
       {feedback && <p style={{ margin: '10px 0 0', fontSize: 11, color: 'var(--color-text-tertiary)' }}>
-        Obrigado. Sua resposta ajuda a melhorar os renders.
+        {feedback.useful ? 'Resultado útil confirmado. Agora você pode baixar ou continuar seu projeto.' : 'Resposta salva. Vamos ajudar você a chegar a um resultado útil.'}
       </p>}
       {error && <p role="alert" style={{ margin: '10px 0 0', fontSize: 11, color: 'var(--color-error)' }}>{error}</p>}
+      {offer && canOfferAfterValue(true, feedback?.useful ?? null) &&
+        <PostResultPlanOffer renderId={renderId} nodeCost={offer.nodeCost} />}
     </section>
   )
 }

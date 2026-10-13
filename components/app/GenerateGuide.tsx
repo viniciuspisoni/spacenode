@@ -17,8 +17,10 @@
 // uma coluna com 9 grupos empilhados. Agora o CTA mora num .spn-dock colado no
 // rodapé do painel e nunca sai da tela — apontar pra ele virou redundância.
 
-export const GUIDE_DISMISSED_KEY = 'spn:generate-guide:dismissed'
+import { OnboardingVideo } from './OnboardingDemo'
+import styles from './Onboarding.module.css'
 
+export const GUIDE_DISMISSED_KEY = 'spn:generate-guide:dismissed'
 export type GuidePhase = 'upload' | 'configure' | 'generating' | 'done'
 
 const STEPS: { id: number; label: string }[] = [
@@ -48,11 +50,17 @@ export default function GenerateGuide({
   phase,
   fromSpacesNew,
   onDismiss,
+  nodeCost,
+  onUpload,
+  onAdjust,
 }: {
   phase: GuidePhase
   /** true = veio do fluxo Novo Space sem renders — o desfecho aponta o cartão de retorno. */
   fromSpacesNew: boolean
   onDismiss: () => void
+  nodeCost?: number
+  onUpload?: () => void
+  onAdjust?: () => void
 }) {
   const active = ACTIVE_STEP[phase]
 
@@ -98,35 +106,42 @@ export default function GenerateGuide({
       <div className="spn-guide-body">
         {phase === 'upload' && (
           <div className="spn-guide-tip">
-            <strong>Envie seu projeto.</strong> Use um print do SketchUp, render básico ou foto.
-            Uma referência clara ajuda a preservar geometria, proporções e perspectiva.
-            <span className="spn-guide-examples">SketchUp · render básico · foto do projeto</span>
+            <strong>Missão 1: escolha uma imagem sua.</strong> Envie uma vista do modelo ou foto do projeto.
+            Prefira um enquadramento limpo, sem menus sobre o espaço.
+            <div className={styles.tipActions}>
+              {onUpload && <button type="button" className="spn-pill" onClick={onUpload}>Escolher imagem →</button>}
+              <OnboardingVideo />
+            </div>
           </div>
         )}
 
         {phase === 'configure' && (
-          <p className="spn-guide-tip">
-            <strong>Defina como quer visualizar.</strong> O cenário já vem preparado.
-            Ajuste ambiente, luz ou materiais só se precisar; o projeto continua sendo a referência.
-            Quando estiver pronto, use <strong>Gerar render</strong> no painel.
-          </p>
+          <div className="spn-guide-tip">
+            <strong>Missão 2: dê uma intenção à imagem.</strong> Você pode começar com a configuração atual.
+            Para experimentar, mude apenas a luz. Confira o custo e clique em <strong>Gerar render</strong>.
+            <div className={styles.tipActions}>
+              {onAdjust && <button type="button" className="spn-pill" onClick={onAdjust}>Explorar a luz →</button>}
+              {nodeCost !== undefined && <span>{nodeCost} Nodes nesta configuração</span>}
+            </div>
+          </div>
         )}
 
         {phase === 'generating' && (
           <p className="spn-guide-tip">
             <span className="spn-guide-live" aria-hidden="true" />
-            A SpaceNode usa seu projeto como referência para gerar a visualização.
-            Sua imagem está a caminho.
+            <strong>Sua visualização está sendo criada.</strong> Ao comparar, olhe primeiro
+            as proporções e aberturas; depois, os materiais e a luz.
           </p>
         )}
 
         {phase === 'done' && (
-          <p className="spn-guide-tip">
-            <strong>Sua primeira visualização está pronta.</strong>{' '}
+          <div className="spn-guide-tip">
+            <strong>Missão 3: veja se o resultado serve ao projeto.</strong>{' '}
             {fromSpacesNew
               ? 'Compare o antes e depois e continue seu Space com esta render.'
-              : 'Compare o antes e depois. Confira proporções, aberturas e materiais; ajuste o que precisar e baixe sua imagem.'}
-          </p>
+              : 'Arraste o comparador, confira os detalhes e responda “Este render serviu para o seu projeto?” no painel. Depois, baixe ou continue na mesma imagem.'}
+            <div className={styles.tipActions}><OnboardingVideo clip="review-result" /></div>
+          </div>
         )}
       </div>
     </section>
