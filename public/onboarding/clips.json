@@ -1,11 +1,13 @@
 [
   {
     "clip": "first-image",
-    "duration": 18.0,
-    "bytes": 394410,
+    "duration": 60.0,
+    "bytes": 621262,
     "width": 1280,
     "height": 720,
-    "audio": false
+    "audio": false,
+    "source": "live_product_captures",
+    "scope": "reference_and_render_configuration"
   },
   {
     "clip": "review-result",

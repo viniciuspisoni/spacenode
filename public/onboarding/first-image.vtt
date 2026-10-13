@@ -1,17 +1,37 @@
 WEBVTT
 
-00:00:00.000 --> 00:00:05.000
-01 / ESCOLHA UMA VISTA DO SEU PROJETO
-Modelo ou foto: use uma imagem limpa e bem enquadrada.
+00:00:00.000 --> 00:00:04.000
+UMA FACHADA, PASSO A PASSO
+Vamos preparar esta vista do modelo para renderizar na SpaceNode.
 
-00:00:05.000 --> 00:00:09.000
-02 / DÊ UMA INTENÇÃO À IMAGEM
-Ajuste o que precisar. Confira os Nodes antes de gerar.
+00:00:04.000 --> 00:00:10.000
+01 / CARREGUE A REFERÊNCIA
+Em Renderizar, escolha o arquivo da vista do seu modelo. Use um enquadramento limpo.
 
-00:00:09.000 --> 00:00:14.000
-03 / COMPARE COM O ORIGINAL
-Observe proporções, aberturas, materiais e luz.
+00:00:10.000 --> 00:00:16.000
+02 / ESCOLHA O AMBIENTE
+Para esta fachada, marque Ambiente Exterior.
 
-00:00:14.000 --> 00:00:18.000
-SEU PRIMEIRO RESULTADO ÚTIL
-Avalie a imagem. Depois, baixe ou continue seu projeto.
+00:00:16.000 --> 00:00:24.000
+03 / DEFINA A CENA
+Escolha Residencial e Fachada Residencial. Neste exemplo, mantemos o entorno original.
+
+00:00:24.000 --> 00:00:32.000
+04 / AJUSTE A LUZ
+Abra Luz e selecione Golden Hour. Mantenha as luminárias como no original.
+
+00:00:32.000 --> 00:00:38.000
+05 / MANTENHA OS MATERIAIS
+Vamos manter concreto e vidro do modelo. Deixe os campos de alteração de materiais em branco.
+
+00:00:38.000 --> 00:00:46.000
+06 / EXPLIQUE SUA INTENÇÃO
+Nas orientações opcionais, peça luz suave de fim de tarde e mantenha materiais, aberturas e enquadramento.
+
+00:00:46.000 --> 00:00:54.000
+07 / CONFIRA A SAÍDA
+Neste exemplo: motor Vega, qualidade 2K e custo de 20 Nodes. Motor e resolução alteram o custo.
+
+00:00:54.000 --> 00:01:00.000
+PRONTO PARA RENDERIZAR
+Revise as escolhas e os Nodes. Depois, use Gerar render para criar e avaliar sua imagem.
