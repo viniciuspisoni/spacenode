@@ -32,15 +32,15 @@ const TIMEOUT_MS: Record<GeminiImageModel, number> = {
   'gemini-3-pro-image': 150_000,
 }
 
-/** ID canônico (telemetria/pricing) → ID exposto na API hoje. A validação de
- *  ambiente (2026-06-12, listagem oficial de modelos da chave do projeto)
- *  mostrou apenas as variantes -preview; o alias sem sufixo pode não resolver.
- *  Override por env quando o GA chegar — sem deploy de código. */
+/** ID canônico (telemetria/pricing) → ID exposto na API. Default = GA sem
+ *  -preview: o GA já resolve nesta chave (confirmado 2026-07-24) e os aliases
+ *  -preview são efêmeros (já aposentados no Vertex). Override por env se o id
+ *  mudar — sem deploy de código. */
 const API_MODEL_NAME: Record<GeminiImageModel, string> = {
   'gemini-3.1-flash-image':
-    process.env.GEMINI_FLASH_IMAGE_MODEL?.trim() || 'gemini-3.1-flash-image-preview',
+    process.env.GEMINI_FLASH_IMAGE_MODEL?.trim() || 'gemini-3.1-flash-image',
   'gemini-3-pro-image':
-    process.env.GEMINI_PRO_IMAGE_MODEL?.trim() || 'gemini-3-pro-image-preview',
+    process.env.GEMINI_PRO_IMAGE_MODEL?.trim() || 'gemini-3-pro-image',
 }
 
 let _client: GoogleGenAI | null = null
