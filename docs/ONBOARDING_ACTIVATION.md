@@ -27,14 +27,21 @@ A conclusão técnica mantém comparação, download e ações sobre a imagem. A
 
 A oferta lê preço e Nodes de `lib/plans.ts`. A estimativa de imagens usa o custo da configuração atual, com a indicação de que motor e resolução alteram consumo. O botão encaminha a `/app/billing?plan=essence&billing=monthly`; não inicia checkout nem pagamento automaticamente. Fechar a oferta continua possível. Os controles de saldo insuficiente continuam disponíveis quando uma operação exige mais Nodes do que o saldo.
 
-## Microvídeos
+## Vídeos
 
 Dois MP4 H.264, 1280×720, com legendas incorporadas e arquivos WebVTT:
 
-- `public/onboarding/first-image.mp4`: 18 segundos, referência → intenção → geração → avaliação.
+- `public/onboarding/first-image.mp4`: 60 segundos, exemplo de uma fachada configurada na plataforma: referência → exterior → cena residencial → Golden Hour → materiais originais → intenção → saída 2K → conferência de custo.
 - `public/onboarding/review-result.mp4`: 14 segundos, comparação → feedback → ajuste ou continuidade.
 
-As peças usam as imagens demonstrativas da SpaceNode e cartelas de orientação. São guias visuais, não capturas de uma operação nova. Não usam locução. O vídeo só é carregado depois da escolha de assistir, não tem autoplay e é removido ao fechar a introdução. Reconstrução: `scripts/build-onboarding-clips.py`, com Pillow, ffmpeg e uma fonte TrueType via `--font`.
+O primeiro vídeo foi atualizado em 13/10/2026 a pedido de Vinícius. Usa capturas da interface em produção com a vista demonstrativa `public/demo-sketch.jpg` realmente carregada. A sequência seleciona Exterior, Residencial / Fachada Residencial, Golden Hour, materiais sem alterações, uma orientação escrita e Vega 2K. O custo observado era 20 Nodes; o vídeo explica que motor e resolução alteram consumo. Termina com o botão Gerar render habilitado, antes de iniciar uma geração paga. Não apresenta resultado novo nem depoimento de cliente. Os recortes preservam os controles e suas seleções, com destaques visuais para orientar a atenção; omitem nome e saldo da conta.
+
+O vídeo de avaliação continua usando o par de imagens demonstrativas com cartelas de orientação. Ambos são legendados e sem locução. O vídeo de configuração está disponível tanto ao escolher a referência quanto durante a configuração. Só é carregado depois da escolha de assistir, não tem autoplay e é removido ao fechar a introdução.
+
+Reconstrução, com Pillow, ffmpeg e uma fonte TrueType via `--font`:
+
+- `scripts/build-onboarding-case-video.py`, usando os recortes em `docs/onboarding-video/facade/`, para a configuração.
+- `scripts/build-onboarding-clips.py`, para a avaliação. Esse script preserva o vídeo de configuração e sua entrada no manifesto.
 
 ## Medição
 
@@ -60,6 +67,7 @@ Experimento prioritário: comparar a proporção de novas contas externas com re
 - 20 verificações de navegador em componentes reais, com autenticação, navegação e respostas da API simuladas na prévia: os três caminhos, reabertura, Escape, vídeo, celular, estados positivo/negativo/desconhecido e erro de gravação.
 - Banco conectado: coluna existente e políticas de SELECT/UPDATE de `profiles` conferidas por consulta somente de metadados. Nenhuma alteração de schema ou escrita em contas de clientes.
 - MP4: duração, dimensões e ausência de faixa de áudio verificadas.
+- Atualização do vídeo em 13/10: TypeScript e os mesmos 29 testes aprovados; 9 verificações adicionais de navegador confirmaram acesso nas fases de referência e configuração, reprodução decodificada em 1280×720 com duração de 60 segundos, legendas e capa corretas, ausência de autoplay, fechamento do player, layout sem overflow e preservação do vídeo de avaliação. A interface foi verificada em prévia com os componentes reais; as capturas do caso foram feitas na plataforma em produção.
 - Build de produção com webpack aprovado. O Turbopack local rejeita o compartilhamento de dependências por link entre checkouts; o código compila com dependências normais e webpack. As variáveis públicas necessárias à pré-renderização foram fornecidas só ao processo de build.
 
 A prévia verifica interfaces e contratos com respostas de exemplo. Não cria uma geração paga, sessão OAuth ou compra real e não comprova ganho de conversão; essa leitura depende das coortes após a publicação.

@@ -1,5 +1,6 @@
-"""Compose silent onboarding clips from the existing first-party example pair.
+"""Compose the silent result-review clip from the first-party example pair.
 Requires Pillow and ffmpeg. No image generation, synthetic voice or new render.
+The configuration walkthrough is built by build-onboarding-case-video.py.
 """
 import argparse, json, pathlib, subprocess
 from PIL import Image, ImageDraw, ImageFont, ImageOps
@@ -19,12 +20,6 @@ for path in ('demo-sketch.jpg', 'demo-render.jpg'):
     canvas.paste(image, ((1152-image.width)//2, (460-image.height)//2))
     images.append(canvas)
 clips = {
-    'first-image': (18, [
-        (0, 5, '01 / ESCOLHA UMA VISTA DO SEU PROJETO', 'Modelo ou foto: use uma imagem limpa e bem enquadrada.'),
-        (5, 9, '02 / DÊ UMA INTENÇÃO À IMAGEM', 'Ajuste o que precisar. Confira os Nodes antes de gerar.'),
-        (9, 14, '03 / COMPARE COM O ORIGINAL', 'Observe proporções, aberturas, materiais e luz.'),
-        (14, 18, 'SEU PRIMEIRO RESULTADO ÚTIL', 'Avalie a imagem. Depois, baixe ou continue seu projeto.'),
-    ]),
     'review-result': (14, [
         (0, 4, 'COMPARE ANTES DE APRESENTAR', 'Arraste o comparador e confira os detalhes do projeto.'),
         (4, 8, 'ESTE RENDER SERVIU PARA SEU PROJETO?', 'Responda Sim ou Ainda não no painel do resultado.'),
@@ -32,7 +27,8 @@ clips = {
         (11, 14, 'DEU CERTO? CONTINUE CRIANDO', 'Conheça o plano para receber Nodes mensalmente.'),
     ]),
 }
-manifest = []
+manifest = json.loads((out/'clips.json').read_text()) if (out/'clips.json').exists() else []
+manifest = [entry for entry in manifest if entry['clip'] not in clips]
 for name, (duration, scenes) in clips.items():
     target = out / (name + '.mp4')
     command = ['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-f', 'rawvideo',
@@ -44,10 +40,8 @@ for name, (duration, scenes) in clips.items():
         t = frame_index / 24
         frame = Image.new('RGB', (1280, 720), '#151618')
         frame.paste(images[1], (64, 78))
-        if name == 'first-image': fraction = max(0, min(1, 1-(t-8)/1.2))
-        else:
-            # A visible comparison gesture, ending on the result.
-            fraction = max(0, min(1, .5 + .45 * __import__('math').sin(t*2))) if t < 4 else 0
+        # A visible comparison gesture, ending on the result.
+        fraction = max(0, min(1, .5 + .45 * __import__('math').sin(t*2))) if t < 4 else 0
         split = round(1152 * fraction)
         if split > 0: frame.paste(images[0].crop((0, 0, split, 460)), (64, 78))
         draw = ImageDraw.Draw(frame)

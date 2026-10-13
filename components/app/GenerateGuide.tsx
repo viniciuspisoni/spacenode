@@ -122,6 +122,7 @@ export default function GenerateGuide({
             <div className={styles.tipActions}>
               {onAdjust && <button type="button" className="spn-pill" onClick={onAdjust}>Explorar a luz →</button>}
               {nodeCost !== undefined && <span>{nodeCost} Nodes nesta configuração</span>}
+              <OnboardingVideo />
             </div>
           </div>
         )}

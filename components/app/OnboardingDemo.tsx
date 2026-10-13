@@ -4,22 +4,36 @@ import { useState } from 'react'
 import { track } from '@/lib/analytics/client'
 import styles from './Onboarding.module.css'
 
+const VIDEO_DETAILS = {
+  'first-image': {
+    label: 'Ver como configurar uma fachada · 1 min',
+    poster: '/onboarding/first-image-poster.jpg',
+    caption: 'Uma fachada configurada na SpaceNode, passo a passo. Vídeo legendado, sem áudio.',
+  },
+  'review-result': {
+    label: 'Ver como avaliar o resultado · 14 segundos',
+    poster: '/demo-render.jpg',
+    caption: 'Guia visual legendado, sem áudio. As imagens são um exemplo da SpaceNode.',
+  },
+} as const
+
 export function OnboardingVideo({ clip = 'first-image' }: { clip?: 'first-image' | 'review-result' }) {
   const [open, setOpen] = useState(false)
+  const details = VIDEO_DETAILS[clip]
   return <div>
     <button type="button" className={styles.videoToggle} aria-expanded={open} onClick={() => {
       setOpen(!open)
       if (!open) track('cta_clicked', { cta: 'onboarding_video_opened', clip })
-    }}>{open ? 'Fechar vídeo' : `▷ Ver o caminho em ${clip === 'first-image' ? '18' : '14'} segundos`}</button>
+    }}>{open ? 'Fechar vídeo' : `▷ ${details.label}`}</button>
     {open && <div style={{ marginTop: 12 }}>
-      <video className={styles.video} controls playsInline preload="none" poster="/demo-render.jpg"
+      <video key={clip} className={styles.video} controls playsInline preload="none" poster={details.poster} aria-label={details.label}
         onPlay={() => track('cta_clicked', { cta: 'onboarding_video_played', clip })}
         onEnded={() => track('cta_clicked', { cta: 'onboarding_video_completed', clip })}>
         <source src={`/onboarding/${clip}.mp4`} type="video/mp4" />
         <track kind="captions" src={`/onboarding/${clip}.vtt`} srcLang="pt-BR" label="Português" />
         Seu navegador não suporta este vídeo.
       </video>
-      <p className={styles.caption}>Guia visual legendado, sem áudio. As imagens são um exemplo da SpaceNode.</p>
+      <p className={styles.caption}>{details.caption}</p>
     </div>}
   </div>
 }
