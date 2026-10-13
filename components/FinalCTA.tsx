@@ -6,7 +6,7 @@ import Image from 'next/image'
 // O primeiro render vem do acervo selecionado pelo dono para o carrossel;
 // os demais já estão publicados na galeria da landing.
 const slides = [
-  { src: '/cliente-nathalia-apartamento-integrado.jpg', scene: 'Apartamento integrado', credit: 'Nathalia Costa' },
+  { src: '/cliente-bruna-cozinha-ilha-madeira-335.jpg', scene: 'Cozinha ampla com ilha de madeira', credit: 'Bruna Plentz' },
   { src: '/proj-sala-jantar-render.jpg', scene: 'Sala de jantar', credit: 'Paula Miolla' },
   { src: '/proj-living-jantar-render.jpg', scene: 'Living integrado', credit: 'Bruna Plentz' },
   { src: '/proj-cozinha-ilha-render.jpg', scene: 'Cozinha com ilha', credit: 'Nathalia Costa' },
