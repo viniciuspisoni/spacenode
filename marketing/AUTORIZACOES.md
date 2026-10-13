@@ -35,6 +35,7 @@ registrada · ❓ não confirmado · ❌ negado
 | Paula Miolla | `Paula Miolla` | sala-jantar | ✅ | ❓ | ⚠️ | idem |
 | Nathalia Costa | `Nathalia Costa` | cozinha-ilha, home-office | ✅ | ❓ | ⚠️ | idem |
 | Bruna Plentz | `Bruna Plentz` | living-jantar | ✅ | ❓ | ⚠️ | idem |
+| Bruna Plentz | `Bruna Plentz` | sala-painel-tv-183, cozinha-ilha-madeira-335 | ⚠️ | ❓ | ❓ | Uso na landing principal selecionado pelo dono nesta conversa em 2026-10-12: #183 na abertura; #335 no fechamento, mantendo o carrossel. Confirmação individual para esses dois projetos não registrada aqui. |
 
 > **`hall-entrada` saiu da landing em 2026-09-16** (decisão do dono, PR #213).
 > Os arquivos `public/proj-hall-entrada-*.jpg` foram apagados e entraram três

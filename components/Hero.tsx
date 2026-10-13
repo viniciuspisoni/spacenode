@@ -23,17 +23,17 @@ export default function Hero() {
       <figure className="spn-hero-proof">
         <div className="spn-hero-frame spn-glass">
           <BeforeAfter
-            base="/proj-living-estante-base.jpg"
-            render="/proj-living-estante-render.jpg"
+            base="/cliente-bruna-sala-painel-tv-183-base.jpg"
+            render="/cliente-bruna-sala-painel-tv-183-render.jpg"
             aspect="16 / 9"
             priority
             sizes="(max-width: 900px) 92vw, (max-width: 1248px) 48vw, 570px"
-            caption="Living com estante"
+            caption="Sala ampla com painel de TV"
           />
         </div>
         <figcaption className="spn-hero-caption">
-          <strong>Projeto real · muda arquitetura</strong>
-          <span>Arraste para comparar o print e o resultado. Publicado com autorização.</span>
+          <strong>Projeto real · Bruna Plentz</strong>
+          <span>Arraste para comparar o print e o resultado.</span>
         </figcaption>
       </figure>
       <style jsx>{`
