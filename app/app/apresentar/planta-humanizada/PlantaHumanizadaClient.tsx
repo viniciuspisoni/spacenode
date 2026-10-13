@@ -1,10 +1,9 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import {
   ChoiceGroup,
   MultiPillGroup,
-  PillGroup,
   RowIcon,
   Segmented,
   SettingGroup,
@@ -16,15 +15,16 @@ import {
 import { CostDock, DownloadIcon, formatFileSize, SourceDrop, StageLoading, ToolHeader } from '../_shell/ToolShell'
 import {
   APRESENTAR_TOOLS,
-  HUMANIZED_PLAN_PROJECT_TYPES,
+  HUMANIZED_PLAN_LOOKS,
+  HUMANIZED_PLAN_DEFAULT_LOOK,
   HUMANIZED_PLAN_STYLES,
-  HUMANIZED_PLAN_LEVELS,
-  HUMANIZED_PLAN_DEFAULT_OPTIONS,
-  type HumanizedPlanProjectType,
+  getHumanizedPlanLook,
+  type HumanizedPlanLook,
   type HumanizedPlanStyle,
-  type HumanizedPlanLevel,
-  type HumanizedPlanOptions,
+  type PlanRoom,
 } from '@/lib/apresentar/config'
+import { LABEL_FONT_FACES, labelTextStyle, layoutLabels } from '@/lib/apresentar/plan-labels'
+import { downloadBlob, svgElementToPngBlob } from '@/lib/apresentar/svg-to-png'
 import { useObjectUrls } from '@/lib/browser/object-url'
 
 interface Props {
@@ -34,31 +34,15 @@ interface Props {
 const TOOL = APRESENTAR_TOOLS.humanized_plan
 
 const LOADING_TEXTS = [
-  'Analisando a planta…',
+  'Lendo a planta…',
+  'Identificando os ambientes…',
   'Preservando paredes e aberturas…',
-  'Adicionando mobiliário…',
-  'Aplicando texturas…',
-  'Refinando apresentação…',
+  'Mobiliando cada ambiente…',
+  'Aplicando texturas e sombras…',
+  'Escrevendo os nomes…',
 ]
 
-/* As seis opções da API viram seis pílulas de múltipla escolha. O payload
-   continua sendo o mesmo objeto de booleanos — só o controle mudou. */
-const OPTION_LABEL: Record<keyof HumanizedPlanOptions, string> = {
-  addFurniture:       'Mobiliário',
-  addVegetation:      'Vegetação',
-  applyFloorTextures: 'Texturas de piso',
-  addSoftShadows:     'Sombras suaves',
-  preserveLines:      'Linhas técnicas',
-  addRoomLabels:      'Nomes dos ambientes',
-}
-const OPTION_KEYS   = Object.keys(OPTION_LABEL) as (keyof HumanizedPlanOptions)[]
-const OPTION_LABELS = OPTION_KEYS.map(k => OPTION_LABEL[k])
-
-/* As pílulas do kit mostram a própria string que recebem; os presets são
-   pares id/label. Converte-se nas bordas — o id é o que viaja na API. */
-const TYPE_LABELS = HUMANIZED_PLAN_PROJECT_TYPES.map(t => t.label)
-
-type SheetId = 'cena' | 'estilo' | 'direcao'
+type SheetId = 'ajuste'
 
 export default function PlantaHumanizadaClient({ initialCredits }: Props) {
   // Entrada
@@ -69,11 +53,14 @@ export default function PlantaHumanizadaClient({ initialCredits }: Props) {
   const objectUrls = useObjectUrls()
   const [imageDimensions, setImageDimensions] = useState<{ w: number; h: number } | null>(null)
 
-  // Parâmetros — mesmos nomes e tipos que viajam para /api/apresentar/humanized-plan
-  const [projectType, setProjectType] = useState<HumanizedPlanProjectType>('apartamento')
-  const [style,       setStyle]       = useState<HumanizedPlanStyle>('imobiliario_premium')
-  const [level,       setLevel]       = useState<HumanizedPlanLevel>('equilibrado')
-  const [options,     setOptions]     = useState<HumanizedPlanOptions>(HUMANIZED_PLAN_DEFAULT_OPTIONS)
+  // A ÚNICA decisão da superfície. Tipo de projeto saiu de vez: quem lê isso na
+  // planta é o leitor de visão do servidor, e ele acerta mais que o usuário
+  // clicando num pill que ele não sabe pra que serve.
+  const [look, setLook] = useState<HumanizedPlanLook>(HUMANIZED_PLAN_DEFAULT_LOOK)
+
+  // Ajuste fino — quem quiser, acha; quem não quiser, nem vê.
+  const [styleOverride, setStyleOverride] = useState<HumanizedPlanStyle | null>(null)
+  const [showLabels,    setShowLabels]    = useState(true)
   const [additionalInstructions, setAdditionalInstructions] = useState('')
 
   const [sheet, setSheet] = useState<SheetId | null>(null)
@@ -82,10 +69,14 @@ export default function PlantaHumanizadaClient({ initialCredits }: Props) {
   const [isLoading,   setIsLoading]   = useState(false)
   const [loadingText, setLoadingText] = useState(LOADING_TEXTS[0])
   const [resultUrl,   setResultUrl]   = useState<string | null>(null)
+  const [resultSize,  setResultSize]  = useState<{ w: number; h: number } | null>(null)
+  const [rooms,       setRooms]       = useState<PlanRoom[]>([])
   const [credits,     setCredits]     = useState(initialCredits)
   const [error,       setError]       = useState<string | null>(null)
+  const [isBaking,    setIsBaking]    = useState(false)
 
   const loadingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const svgRef = useRef<SVGSVGElement | null>(null)
 
   const nodeCost  = TOOL.nodes ?? 0
   const canSubmit = !!imageFile && credits >= nodeCost && !isLoading
@@ -93,17 +84,16 @@ export default function PlantaHumanizadaClient({ initialCredits }: Props) {
   // O papel de parede é o trabalho em foco: a planta que saiu, ou a que entrou.
   useAmbient(resultUrl ?? imagePreview)
 
-  const styleLabel = HUMANIZED_PLAN_STYLES.find(s => s.id === style)?.label ?? ''
-  const levelSpec  = HUMANIZED_PLAN_LEVELS.find(l => l.id === level)
-  const typeLabel  = HUMANIZED_PLAN_PROJECT_TYPES.find(t => t.id === projectType)?.label ?? ''
-  const onCount    = OPTION_KEYS.filter(k => options[k]).length
+  const lookSpec    = getHumanizedPlanLook(look)!
+  const effectiveStyle = styleOverride ?? lookSpec.style
+  const styleLabel  = HUMANIZED_PLAN_STYLES.find(s => s.id === effectiveStyle)?.label ?? ''
 
-  function setOptionsFromLabels(labels: string[]) {
-    setOptions(OPTION_KEYS.reduce((acc, key) => {
-      acc[key] = labels.includes(OPTION_LABEL[key])
-      return acc
-    }, {} as HumanizedPlanOptions))
-  }
+  // Rótulos compostos por nós, em vetor, nas posições que o servidor devolveu.
+  // Ligar e desligar não gera de novo: é só deixar de desenhar.
+  const labels = useMemo(
+    () => (showLabels && resultSize ? layoutLabels(rooms, resultSize.w, resultSize.h) : []),
+    [rooms, showLabels, resultSize],
+  )
 
   function loadImageFile(file: File) {
     if (!file.type.startsWith('image/')) { setError('O arquivo deve ser uma imagem.'); return }
@@ -111,6 +101,8 @@ export default function PlantaHumanizadaClient({ initialCredits }: Props) {
 
     setImageFile(file)
     setResultUrl(null)
+    setResultSize(null)
+    setRooms([])
     setError(null)
     setImageDimensions(null)
 
@@ -131,6 +123,8 @@ export default function PlantaHumanizadaClient({ initialCredits }: Props) {
     setImageFile(null)
     setImagePreview(null)
     setResultUrl(null)
+    setResultSize(null)
+    setRooms([])
     setImageDimensions(null)
   }
 
@@ -152,14 +146,24 @@ export default function PlantaHumanizadaClient({ initialCredits }: Props) {
     setIsLoading(true)
     setError(null)
     setResultUrl(null)
+    setResultSize(null)
+    setRooms([])
     startLoadingTexts()
 
     const formData = new FormData()
-    formData.append('image',       imageFile)
-    formData.append('projectType', projectType)
-    formData.append('style',       style)
-    formData.append('level',       level)
-    formData.append('options',     JSON.stringify(options))
+    formData.append('image', imageFile)
+
+    // Sem ajuste fino, o acabamento viaja sozinho e o servidor abre o pacote.
+    // Com ajuste, mandamos os campos soltos — é o MESMO contrato que o plugin
+    // do SketchUp usa, então não existe caminho novo pra dar manutenção.
+    const hasOverride = styleOverride !== null || !showLabels
+    if (!hasOverride) {
+      formData.append('look', look)
+    } else {
+      formData.append('style',   effectiveStyle)
+      formData.append('level',   lookSpec.level)
+      formData.append('options', JSON.stringify({ ...lookSpec.options, addRoomLabels: showLabels }))
+    }
     if (additionalInstructions.trim()) {
       formData.append('additionalInstructions', additionalInstructions.trim())
     }
@@ -172,6 +176,7 @@ export default function PlantaHumanizadaClient({ initialCredits }: Props) {
         return
       }
       setResultUrl(data.url)
+      setRooms(Array.isArray(data.rooms) ? data.rooms : [])
       if (typeof data.creditsRemaining === 'number') {
         setCredits(data.creditsRemaining)
       } else {
@@ -182,6 +187,29 @@ export default function PlantaHumanizadaClient({ initialCredits }: Props) {
     } finally {
       stopLoadingTexts()
       setIsLoading(false)
+    }
+  }
+
+  // Com rótulo, o arquivo é assado aqui (imagem + texto vetorial viram um PNG
+  // só) — mesmo caminho do Moodboard. Sem rótulo, o proxy basta e evita passar
+  // a imagem inteira pelo canvas.
+  async function handleDownload() {
+    if (!resultUrl) return
+    if (labels.length === 0 || !svgRef.current || !resultSize) {
+      window.location.href =
+        `/api/download?url=${encodeURIComponent(resultUrl)}&filename=spacenode-planta-humanizada.jpg`
+      return
+    }
+    setIsBaking(true)
+    try {
+      // A Geist vai EMBUTIDA: o SVG rasterizado é documento isolado e não
+      // enxerga as fontes da página (ver svg-to-png).
+      const blob = await svgElementToPngBlob(svgRef.current, resultSize.w, resultSize.h, 1, LABEL_FONT_FACES)
+      downloadBlob(blob, 'spacenode-planta-humanizada.png')
+    } catch {
+      setError('Não foi possível montar o arquivo. Tente baixar novamente.')
+    } finally {
+      setIsBaking(false)
     }
   }
 
@@ -211,36 +239,35 @@ export default function PlantaHumanizadaClient({ initialCredits }: Props) {
             />
           </div>
 
-          {/* O nível reconfigura o que todo o resto significa — fica na
-              superfície, como segmentado de 30px, não como três cartões. */}
+          {/* A única decisão. Cada acabamento é um pacote fechado de nível,
+              estilo e elementos — ver HUMANIZED_PLAN_LOOKS. */}
           <div className="spn-field">
-            <span className="spn-field-label">Nível de humanização</span>
+            <span className="spn-field-label">Acabamento</span>
             <Segmented
-              label="Nível de humanização"
-              value={level}
-              onChange={setLevel}
-              items={HUMANIZED_PLAN_LEVELS.map(l => ({ value: l.id, label: l.label }))}
+              label="Acabamento"
+              value={look}
+              onChange={(v) => { setLook(v); setStyleOverride(null) }}
+              items={HUMANIZED_PLAN_LOOKS.map(l => ({ value: l.id, label: l.label }))}
             />
-            {levelSpec ? <p className="spn-hint">{levelSpec.desc}</p> : null}
+            <p className="spn-hint">{lookSpec.desc}</p>
           </div>
 
           <SettingGroup>
-            <SettingRow icon={<RowIcon name="scene" />} title="Cena"
-                        value={summarize([typeLabel])}
-                        onOpen={() => setSheet('cena')} />
-            <SettingRow icon={<RowIcon name="materials" />} title="Estilo"
-                        value={summarize([
-                          styleLabel,
-                          onCount < OPTION_KEYS.length ? `${onCount} de ${OPTION_KEYS.length} elementos` : '',
-                        ])}
-                        onOpen={() => setSheet('estilo')} />
-            <SettingRow icon={<RowIcon name="direction" />} title="Direção"
-                        value={summarize([additionalInstructions.trim()])}
-                        onOpen={() => setSheet('direcao')} />
+            <SettingRow
+              icon={<RowIcon name="direction" />}
+              title="Ajuste fino"
+              value={summarize([
+                styleOverride ? styleLabel : '',
+                showLabels ? '' : 'sem nomes',
+                additionalInstructions.trim(),
+              ])}
+              onOpen={() => setSheet('ajuste')}
+            />
           </SettingGroup>
 
           <p className="spn-hint" style={{ marginTop: 14 }}>
-            A IA humaniza, não redesenha: paredes, aberturas e proporções são preservadas.
+            A IA lê a planta antes de desenhar: os ambientes são reconhecidos um a um,
+            e paredes, aberturas e proporções são preservadas.
           </p>
 
           {error ? <div className="spn-error" style={{ marginTop: 14 }}>{error}</div> : null}
@@ -262,24 +289,84 @@ export default function PlantaHumanizadaClient({ initialCredits }: Props) {
             alignSelf: 'stretch', flex: 1, minHeight: 0, overflowY: 'auto',
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: 20,
           }}>
+            {/* A imagem do modelo e os rótulos vivem no MESMO SVG: é o que o
+                usuário vê e é exatamente o que o download assa. */}
+            {resultSize ? (
+              <svg
+                ref={svgRef}
+                viewBox={`0 0 ${resultSize.w} ${resultSize.h}`}
+                xmlns="http://www.w3.org/2000/svg"
+                style={{ maxWidth: '100%', height: 'auto', borderRadius: 'var(--r-inner)', display: 'block' }}
+              >
+                <image href={resultUrl} x={0} y={0} width={resultSize.w} height={resultSize.h} />
+                {labels.map((l, i) => (
+                  <text
+                    key={`${l.name}-${i}`}
+                    x={l.x}
+                    y={l.y}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    style={labelTextStyle(l.fontSize)}
+                  >
+                    {l.lines.map((line, j) => (
+                      <tspan
+                        key={line}
+                        x={l.x}
+                        dy={j === 0 ? -((l.lines.length - 1) * l.lineHeight) / 2 : l.lineHeight}
+                      >
+                        {line}
+                      </tspan>
+                    ))}
+                  </text>
+                ))}
+              </svg>
+            ) : null}
+
+            {/* Fora do SVG e escondida: só serve pra descobrir as dimensões
+                naturais da saída, que é o sistema de coordenadas dos rótulos. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={resultUrl} alt="Planta humanizada"
-                 style={{ maxWidth: '100%', borderRadius: 'var(--r-inner)', display: 'block' }} />
+            <img
+              src={resultUrl}
+              alt="Planta humanizada"
+              onLoad={(e) => {
+                const el = e.currentTarget
+                setResultSize({ w: el.naturalWidth, h: el.naturalHeight })
+              }}
+              style={resultSize ? { display: 'none' } : { maxWidth: '100%', borderRadius: 'var(--r-inner)', display: 'block' }}
+            />
+
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               gap: 12, flexWrap: 'wrap', width: '100%', maxWidth: 860,
             }}>
               <span className="spn-hint" style={{ marginTop: 0 }}>
-                Planta humanizada · {styleLabel} · {levelSpec?.label}
+                {[
+                  'Planta humanizada',
+                  lookSpec.label,
+                  labels.length ? `${labels.length} ambientes nomeados` : '',
+                ].filter(Boolean).join(' · ')}
               </span>
-              {/* Proxy /api/download força attachment — o atributo download é
-                  ignorado cross-origin e abriria a imagem fora do site. */}
-              <a className="spn-ghost"
-                 style={{ display: 'inline-flex', alignItems: 'center', gap: 7, textDecoration: 'none' }}
-                 href={`/api/download?url=${encodeURIComponent(resultUrl)}&filename=spacenode-planta-humanizada.jpg`}>
-                <DownloadIcon />
-                Baixar
-              </a>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {rooms.length > 0 ? (
+                  <button
+                    type="button"
+                    className="spn-ghost"
+                    onClick={() => setShowLabels(v => !v)}
+                  >
+                    {showLabels ? 'Ocultar nomes' : 'Mostrar nomes'}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="spn-ghost"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}
+                  onClick={handleDownload}
+                  disabled={isBaking}
+                >
+                  <DownloadIcon />
+                  {isBaking ? 'Montando…' : 'Baixar'}
+                </button>
+              </div>
             </div>
           </div>
         ) : null}
@@ -288,61 +375,51 @@ export default function PlantaHumanizadaClient({ initialCredits }: Props) {
           <div className="spn-empty" style={{ maxWidth: 360 }}>
             Sua planta humanizada aparece aqui.
             <br />
-            Envie a planta técnica e escolha o nível.
+            Envie a planta técnica e escolha o acabamento.
           </div>
         ) : null}
       </div>
 
-      {/* ── Folhas ─────────────────────────────────────────────────────────── */}
-      <Sheet open={sheet === 'cena'} title="Cena" onClose={() => setSheet(null)}>
-        <div className="spn-field">
-          <span className="spn-field-label">Tipo de projeto</span>
-          <PillGroup
-            label="Tipo de projeto"
-            options={TYPE_LABELS}
-            value={typeLabel}
-            onChange={(label) => {
-              const found = HUMANIZED_PLAN_PROJECT_TYPES.find(t => t.label === label)
-              if (found) setProjectType(found.id)
-            }}
-          />
-          <p className="spn-hint">Ajusta o repertório de mobiliário e de vegetação.</p>
-        </div>
-      </Sheet>
-
-      <Sheet open={sheet === 'estilo'} title="Estilo" onClose={() => setSheet(null)}>
+      {/* ── Folha ──────────────────────────────────────────────────────────── */}
+      <Sheet open={sheet === 'ajuste'} title="Ajuste fino" onClose={() => setSheet(null)}>
         <div className="spn-field">
           <span className="spn-field-label">Estilo visual</span>
           <ChoiceGroup
             label="Estilo visual"
             cols={2}
-            value={style}
-            onChange={setStyle}
+            value={effectiveStyle}
+            onChange={(v) => setStyleOverride(v === lookSpec.style ? null : v)}
             options={HUMANIZED_PLAN_STYLES.map(s => ({ value: s.id, title: s.label, note: s.desc }))}
           />
+          <p className="spn-hint">
+            O acabamento {lookSpec.label} já escolhe {HUMANIZED_PLAN_STYLES.find(s => s.id === lookSpec.style)?.label}.
+            Troque só se quiser outra linguagem.
+          </p>
         </div>
-        <div className="spn-field">
-          <span className="spn-field-label">Elementos</span>
-          <MultiPillGroup
-            label="Elementos"
-            options={OPTION_LABELS}
-            values={OPTION_KEYS.filter(k => options[k]).map(k => OPTION_LABEL[k])}
-            onChange={setOptionsFromLabels}
-          />
-          <p className="spn-hint">Tudo ligado é o padrão. Desligue o que não quiser na planta.</p>
-        </div>
-      </Sheet>
 
-      <Sheet open={sheet === 'direcao'} title="Direção" onClose={() => setSheet(null)}>
+        <div className="spn-field">
+          <span className="spn-field-label">Nomes dos ambientes</span>
+          <MultiPillGroup
+            label="Nomes dos ambientes"
+            options={['Mostrar nomes']}
+            values={showLabels ? ['Mostrar nomes'] : []}
+            onChange={(v) => setShowLabels(v.includes('Mostrar nomes'))}
+          />
+          <p className="spn-hint">
+            Os nomes são escritos pela SpaceNode, não pela IA — por isso saem sempre
+            legíveis e na grafia certa. Se a planta já tiver os nomes impressos, nada é sobreposto.
+          </p>
+        </div>
+
         <div className="spn-field">
           <span className="spn-field-label">Instruções adicionais</span>
           <textarea
             className="spn-textarea"
             value={additionalInstructions}
             onChange={(e) => setAdditionalInstructions(e.target.value.slice(0, 400))}
-            placeholder="Ex.: mobiliário contemporâneo, nomes dos ambientes grandes, sem vegetação, destacar áreas molhadas…"
+            placeholder="Ex.: mobiliário contemporâneo, sem vegetação, destacar áreas molhadas…"
           />
-          <p className="spn-hint">{additionalInstructions.length}/400 — em branco, o estilo decide sozinho.</p>
+          <p className="spn-hint">{additionalInstructions.length}/400 — em branco, o acabamento decide sozinho.</p>
         </div>
       </Sheet>
     </div>

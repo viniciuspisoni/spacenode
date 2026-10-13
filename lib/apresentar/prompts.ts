@@ -1,141 +1,18 @@
 // ── Módulo Apresentar · Prompt builders ──────────────────────────────────────
 //
-// Constrói prompts para Fal.ai (Nano Banana Pro / Gemini 3 Pro Image) a partir
-// das seleções da UI. Optamos por instruções em INGLÊS curtas e diretivas com
-// constraints estruturais em CAPS — padrão que rende melhor fidelidade no
-// nano-banana-pro/edit.
+// Instruções em INGLÊS curtas e diretivas, com constraints estruturais em CAPS
+// — o padrão que rende melhor fidelidade nos endpoints de edição.
+//
+// A Planta Humanizada saiu daqui em 2026-09-22 (lib/apresentar/humanized-plan-prompt):
+// o prompt dela deixou de ser derivado só das seleções da UI e passou a ser
+// montado a partir do brief de leitura da planta, e ficou grande demais para
+// dividir arquivo com as Isométricas.
 
 import type {
-  HumanizedPlanProjectType,
-  HumanizedPlanStyle,
-  HumanizedPlanLevel,
-  HumanizedPlanOptions,
   IsometricOrigin,
   IsometricType,
   IsometricStyle,
 } from './config'
-
-// ── Planta Humanizada ────────────────────────────────────────────────────────
-
-const PROJECT_TYPE_HINT: Record<HumanizedPlanProjectType, string> = {
-  apartamento:  'residential apartment floor plan',
-  casa:         'single-family house floor plan',
-  comercial:    'commercial retail floor plan',
-  corporativo:  'corporate office floor plan',
-  paisagismo:   'landscape design plan with planting beds, paving, and outdoor zones',
-}
-
-const STYLE_DIRECTIVE: Record<HumanizedPlanStyle, string> = {
-  clean_tecnico:
-    'CLEAN TECHNICAL render style: precise line work, neutral palette (greys, soft beige, white), restrained furniture icons, no decorative excess. Premium technical drawing aesthetic.',
-  imobiliario_premium:
-    'PREMIUM REAL-ESTATE render style: rich materiality, warm wood tones, soft textiles, lush plants, photoreal furniture from above. Aspirational, magazine-quality presentation for sales material.',
-  editorial_minimalista:
-    'EDITORIAL MINIMALIST style: refined typography, restricted palette (cream, charcoal, soft accent), generous negative space, minimal but elegant furniture. Architecture-magazine layout feel.',
-  aquarelado:
-    'WATERCOLOR style: soft watercolor washes, gentle organic edges on furniture and planting, light pencil outlines preserved, paper-texture background. Artistic and warm.',
-  contemporaneo:
-    'CONTEMPORARY style: balanced technical drawing with photoreal furniture, mid-warm palette, layered shadows, modern dwelling aesthetic. Sophisticated yet readable.',
-}
-
-const LEVEL_DIRECTIVE: Record<HumanizedPlanLevel, string> = {
-  leve:
-    'LIGHT humanization: keep the technical drawing dominant; add only essential furniture silhouettes and minimal floor tone. Walls and dimensions remain the visual focus.',
-  equilibrado:
-    'BALANCED humanization: clear furniture, subtle floor textures, light planting, soft shadows. Equal weight to technical clarity and presentation polish.',
-  completo:
-    'COMPLETE humanization: full furniture sets, decorative plants, rugs, textured flooring per room, soft directional shadows, accessory props. Final presentation quality.',
-}
-
-const OPTION_FRAGMENTS: { key: keyof HumanizedPlanOptions; on: string; off?: string }[] = [
-  { key: 'addFurniture',       on: 'Add appropriate furniture in every room (top-down view).' },
-  { key: 'addVegetation',      on: 'Add indoor plants and (where applicable) outdoor vegetation.' },
-  { key: 'applyFloorTextures', on: 'Apply distinct floor textures per room (wood, tile, rug, stone) — top-down.' },
-  { key: 'addSoftShadows',     on: 'Add soft, consistent directional shadows under furniture and walls.' },
-  { key: 'preserveLines',      on: 'PRESERVE the original technical line work for walls, doors, windows, and dimensions.' },
-  { key: 'addRoomLabels',      on: 'Add clean Portuguese room labels (e.g., Sala, Cozinha, Suíte, Banheiro, Quarto) in a refined sans-serif typography placed inside each room.' },
-]
-
-export interface HumanizedPlanPromptInput {
-  projectType: HumanizedPlanProjectType
-  style:       HumanizedPlanStyle
-  level:       HumanizedPlanLevel
-  options:     HumanizedPlanOptions
-  additionalInstructions?: string | null
-}
-
-// Opções do gate de fidelidade (retry ladder da rota — mesmo padrão do
-// render_only em lib/ai/fidelity/render-only.ts, adaptado pra planta baixa
-// ortográfica): `attempt` >= 2 liga o bloco de escalada; `edgeMapImageIndex`
-// (1-based, na ordem de image_urls) descreve o mapa de bordas anexado.
-export interface HumanizedPlanPromptOpts {
-  attempt?:          number
-  edgeMapImageIndex?: number | null
-}
-
-// Escalada de retry — reforça o frame "TRACE, não inspiração" sem mencionar
-// que houve tentativa anterior (o modelo não a vê).
-function buildPlanEscalation(attempt: number): string {
-  if (attempt <= 1) return ''
-  return (
-    'ABSOLUTE STRUCTURAL PRIORITY: treat the original floor plan as a fixed template that you TRACE, never as ' +
-    'inspiration. This pass is a pure re-styling of the EXACT same drawing — as if painting materials, furniture ' +
-    'and shadows onto the existing plan. Reproduce the position, length and thickness of every wall, the position ' +
-    'and swing of every door, every window and every room boundary with zero deviation. The output must overlay ' +
-    'the original plan line-over-line. When in doubt between beauty and accuracy, always choose accuracy.'
-  )
-}
-
-// Papel do mapa de bordas anexado nos retries (condicionamento estrutural).
-// Sem menção a perspectiva/pontos de fuga — planta é ortográfica top-down.
-function buildPlanEdgeMapBlock(imageIndex: number | null | undefined): string {
-  if (!imageIndex) return ''
-  return (
-    `STRUCTURAL CONSTRAINT MAP: image #${imageIndex} is an automatically extracted edge/line map of the original ` +
-    'floor plan. It is a CONSTRAINT, not content: every wall line, opening contour and room boundary of your ' +
-    'output must align with this map exactly — same positions, same sizes, same top-down orthographic layout. ' +
-    'Do NOT imitate its graphic style: the output is the humanized plan whose underlying structure matches these lines.'
-  )
-}
-
-export function buildHumanizedPlanPrompt(
-  input: HumanizedPlanPromptInput,
-  opts?: HumanizedPlanPromptOpts,
-): string {
-  const { projectType, style, level, options, additionalInstructions } = input
-  const attempt = opts?.attempt ?? 1
-  const escalation = buildPlanEscalation(attempt)
-  const edgeBlock  = buildPlanEdgeMapBlock(opts?.edgeMapImageIndex)
-
-  const optionLines = OPTION_FRAGMENTS
-    .filter(({ key }) => options[key])
-    .map(({ on }) => `- ${on}`)
-    .join('\n')
-
-  return [
-    `Transform this technical ${PROJECT_TYPE_HINT[projectType]} into a HUMANIZED PRESENTATION floor plan for client review.`,
-    '',
-    `STRUCTURAL FIDELITY (non-negotiable):`,
-    `- The original drawing is the ABSOLUTE GEOMETRIC AUTHORITY: the output must read as the SAME plan, humanized — never a different apartment/house.`,
-    `- DO NOT change walls, doors, windows, room shapes, or proportions.`,
-    `- DO NOT add or remove rooms. DO NOT alter the layout in any way.`,
-    `- Camera stays strict TOP-DOWN orthographic. No perspective, no isometric.`,
-    `- Preserve the original drawing scale and aspect ratio.`,
-    ...(escalation ? ['', escalation] : []),
-    ...(edgeBlock  ? ['', edgeBlock]  : []),
-    '',
-    `STYLE: ${STYLE_DIRECTIVE[style]}`,
-    '',
-    `LEVEL: ${LEVEL_DIRECTIVE[level]}`,
-    '',
-    optionLines ? `OPTIONS:\n${optionLines}` : 'OPTIONS: minimal additions only.',
-    ...(additionalInstructions?.trim()
-      ? ['', `ADDITIONAL USER INSTRUCTIONS (complement the settings above, do not override structural fidelity):\n${additionalInstructions.trim()}`]
-      : []),
-    '',
-    `Output: a single high-quality top-down humanized floor plan of THIS exact layout, ready for client presentation.`,
-  ].join('\n')
-}
 
 // ── Isométricas ──────────────────────────────────────────────────────────────
 

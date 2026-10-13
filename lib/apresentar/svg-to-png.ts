@@ -48,14 +48,50 @@ async function inlineImagesInSvg(svgEl: SVGSVGElement): Promise<SVGSVGElement> {
   return clone
 }
 
+/** Fonte a embutir no SVG antes de rasterizar. Ver `fontFaces` abaixo. */
+export interface SvgFontFace {
+  family: string
+  /** URL do .woff2 (mesma origem — vira data: URL dentro do SVG). */
+  url: string
+}
+
+/** Injeta @font-face com a fonte em base64 dentro do próprio SVG.
+ *
+ *  Necessário porque o SVG é rasterizado via `img.src = blobURL`: nesse modo o
+ *  documento é ISOLADO e não enxerga as fontes da página, então `font-family:
+ *  Geist` cai num sans-serif genérico e o arquivo entregue ao cliente sai numa
+ *  tipografia diferente da que ele viu na tela.
+ *
+ *  Best-effort: falha de rede ou fonte ausente NÃO derruba o download — o PNG
+ *  sai com a fonte de sistema, como saía antes. */
+async function embedFontFaces(svg: SVGSVGElement, fonts: SvgFontFace[]): Promise<void> {
+  const rules: string[] = []
+  for (const font of fonts) {
+    try {
+      const dataUrl = await fetchAsDataUrl(font.url)
+      rules.push(
+        `@font-face{font-family:'${font.family}';src:url(${dataUrl}) format('woff2');font-weight:100 900;font-display:block;}`
+      )
+    } catch (e) {
+      console.warn('[svg-to-png] fonte não embutida (segue com a de sistema)', font.url, e)
+    }
+  }
+  if (rules.length === 0) return
+  const style = document.createElementNS('http://www.w3.org/2000/svg', 'style')
+  style.textContent = rules.join('')
+  svg.insertBefore(style, svg.firstChild)
+}
+
 /** Converte um SVG do DOM para Blob PNG nas dimensões exatas pedidas. */
 export async function svgElementToPngBlob(
   svgEl: SVGSVGElement,
   width:  number,
   height: number,
   scale: number = 1,
+  fontFaces?: SvgFontFace[],
 ): Promise<Blob> {
   const inlined = await inlineImagesInSvg(svgEl)
+  if (fontFaces?.length) await embedFontFaces(inlined, fontFaces)
 
   // garante atributos width/height explícitos
   inlined.setAttribute('width',  String(width))
