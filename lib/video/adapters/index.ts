@@ -8,13 +8,14 @@
 // falhar, o próprio adapter cai de volta pro fal. Catálogo/preço não mudam.
 
 import { requireVideoModel } from '../models'
+import { arkSeedanceAdapter } from './arkSeedanceAdapter'
 import { falAdapter }         from './falAdapter'
 import { googleFlowAdapter }  from './googleFlowAdapter'
 import { omniAdapter }        from './omniAdapter'
 import { vertexVeoAdapter }   from './vertexVeoAdapter'
 import type { VideoAdapter }  from './types'
 
-export { falAdapter, googleFlowAdapter, omniAdapter, vertexVeoAdapter }
+export { arkSeedanceAdapter, falAdapter, googleFlowAdapter, omniAdapter, vertexVeoAdapter }
 export type { VideoAdapter, VideoGenerationRequest, VideoGenerationResult } from './types'
 
 const VEO_MODEL_ID = 'fal-ai/veo3.1/image-to-video'
@@ -32,6 +33,7 @@ export function getAdapterForModel(modelId: string): VideoAdapter {
     case 'google': return googleFlowAdapter
     case 'omni':   return omniAdapter
     case 'vertex': return vertexVeoAdapter
+    case 'ark':    return arkSeedanceAdapter
     default: {
       const _exhaustive: never = model.provider
       throw new Error(`Provider sem adapter: ${_exhaustive}`)
