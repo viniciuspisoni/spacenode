@@ -20,7 +20,6 @@ import {
   getNodesCost, isEngineId, isResolution, isValidCombination,
 } from '@/lib/engines'
 import InsufficientNodesCta from '@/components/app/InsufficientNodesCta'
-import PostResultPlanOffer from '@/components/app/PostResultPlanOffer'
 import { RenderFeedback } from '@/components/app/RenderFeedback'
 import { consumeHandoff } from '@/components/nodi/actions-bus'
 import { uploadDirect } from '@/lib/storage/direct-upload-client'
@@ -38,6 +37,7 @@ import {
 } from '@/lib/orion/config'
 
 interface GenerateClientProps {
+  userId?: string
   /** Saldo total da bolsa (mensais + extras) — mesmo pool que o débito consome. */
   initialCredits:    number
   /** Motor Orion liberado pra ESTE usuário. Decidido no servidor (page.tsx:
@@ -278,7 +278,7 @@ function resolveInitialConfig(cfg: ProjectConfig | null | undefined) {
   }
 }
 
-export function GenerateClient({ initialCredits, initialMaterials, initialConfig, initialSourceUrl, initialReview, returnTo, firstRender = false, showPlanOffer = false, orionEnabled = false, orionProvider }: GenerateClientProps) {
+export function GenerateClient({ userId, initialCredits, initialMaterials, initialConfig, initialSourceUrl, initialReview, returnTo, firstRender = false, showPlanOffer = false, orionEnabled = false, orionProvider }: GenerateClientProps) {
   const init = resolveInitialConfig(initialConfig)
   const fromSpacesNew = returnTo === 'spaces/new'
   const supabase = createClient()
@@ -425,6 +425,7 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
   //    dispensou); manual via /app/generate#guia, inclusive após refazer o tour.
   //    Estado inicia fechado e abre em effect — sem mismatch de hidratação.
   const [guideOpen, setGuideOpen] = useState(false)
+  const guideDismissedKey = userId ? `${GUIDE_DISMISSED_KEY}:${userId}` : null
 
   useEffect(() => {
     // Pós-mount via rAF, mesmo padrão do handoff do Nodi acima (sem setState
@@ -437,13 +438,13 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
         return
       }
       try {
-        if (firstRender && localStorage.getItem(GUIDE_DISMISSED_KEY) !== '1') setGuideOpen(true)
+        if (firstRender && (!guideDismissedKey || localStorage.getItem(guideDismissedKey) !== '1')) setGuideOpen(true)
       } catch {
         if (firstRender) setGuideOpen(true)
       }
     })
     return () => cancelAnimationFrame(raf)
-  }, [firstRender])
+  }, [firstRender, guideDismissedKey])
 
   useEffect(() => {
     track('renderizar_viewed', { first_render: firstRender })
@@ -451,7 +452,7 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
 
   const dismissGuide = () => {
     setGuideOpen(false)
-    try { localStorage.setItem(GUIDE_DISMISSED_KEY, '1') } catch {}
+    try { if (guideDismissedKey) localStorage.setItem(guideDismissedKey, '1') } catch {}
   }
 
   const fileInputRef         = useRef<HTMLInputElement>(null)
@@ -1258,7 +1259,8 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
                 <div style={S.fidelityOk}>✓ Estrutura verificada contra o projeto original</div>
               ) : null}
 
-              {lastRenderId && <RenderFeedback key={`feedback-${lastRenderId}`} renderId={lastRenderId} />}
+              {lastRenderId && <RenderFeedback key={`feedback-${lastRenderId}`} renderId={lastRenderId}
+                outputUrl={outputUrl ?? undefined} offer={showPlanOffer ? { nodeCost } : undefined} />}
 
               {/* Âncora: pílula de ESTADO (role=switch), não um campo de config. */}
               <div className="spn-pills">
@@ -1390,9 +1392,7 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
                   </button>
                 )}
               </div>
-              {showPlanOffer && lastRenderId ? (
-                <PostResultPlanOffer key={lastRenderId} renderId={lastRenderId} nodeCost={nodeCost} />
-              ) : credits < nodeCost && (
+              {!showPlanOffer && credits < nodeCost && (
                 <p className="spn-render-upgrade">
                   Seu projeto pode continuar. Veja os planos para receber novos Nodes mensais.{' '}
                   <Link href="/app/billing" onClick={() => track('cta_clicked', { cta: 'render_result_plans' })}>Ver planos →</Link>
@@ -1457,6 +1457,9 @@ export function GenerateClient({ initialCredits, initialMaterials, initialConfig
                 phase={guidePhase}
                 fromSpacesNew={fromSpacesNew}
                 onDismiss={dismissGuide}
+                nodeCost={nodeCost}
+                onUpload={() => fileInputRef.current?.click()}
+                onAdjust={() => setSheet('luz')}
               />
             </div>
           )}

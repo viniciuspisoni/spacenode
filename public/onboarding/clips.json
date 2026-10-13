@@ -1,0 +1,18 @@
+[
+  {
+    "clip": "first-image",
+    "duration": 18.0,
+    "bytes": 394410,
+    "width": 1280,
+    "height": 720,
+    "audio": false
+  },
+  {
+    "clip": "review-result",
+    "duration": 14.0,
+    "bytes": 440594,
+    "width": 1280,
+    "height": 720,
+    "audio": false
+  }
+]

@@ -7,7 +7,7 @@ import { track } from '@/lib/analytics/client'
 
 const plan = getPlanById('essence')!
 
-/** Optional offer after a successful result; never opens a checkout automatically. */
+/** Shown by RenderFeedback after explicit confirmation of usefulness. */
 export default function PostResultPlanOffer({ renderId, nodeCost }: { renderId: string; nodeCost: number }) {
   const [dismissed, setDismissed] = useState(false)
   const recorded = useRef(false)
@@ -22,7 +22,7 @@ export default function PostResultPlanOffer({ renderId, nodeCost }: { renderId: 
     <section className="mt-4 rounded-xl border border-border bg-bg-elevated p-4" aria-label="Continuar com um plano">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <strong>Gostou do resultado? Continue criando para seus projetos.</strong>
+            <strong>Seu primeiro resultado útil é só o começo.</strong>
           <p className="mt-2 text-sm text-text-secondary">
             {plan.name} · {plan.monthlyPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}/mês · {plan.nodes} Nodes por mês.
           </p>
@@ -30,8 +30,9 @@ export default function PostResultPlanOffer({ renderId, nodeCost }: { renderId: 
         </div>
         <button type="button" aria-label="Dispensar oferta de plano" className="rounded px-2 py-1 text-text-secondary" onClick={() => setDismissed(true)}>×</button>
       </div>
-      <Link className="spn-ghost mt-3 inline-flex" href="/app/billing?plan=essence&billing=monthly" onClick={() => track('cta_clicked', { cta: 'render_result_essence', plan: plan.id, render_id: renderId })}>Conhecer o Essence →</Link>
-      <p className="mt-2 text-xs text-text-tertiary">Confira sua imagem antes de usar na apresentação. Você escolhe se quer assinar.</p>
+      <p className="mt-2 text-sm text-text-secondary">Para continuar em outros projetos, o plano repõe Nodes mensalmente.</p>
+      <Link className="spn-cta mt-3 inline-flex" href="/app/billing?plan=essence&billing=monthly" onClick={() => track('cta_clicked', { cta: 'render_result_essence', plan: plan.id, render_id: renderId })}>Continuar com o Essence →</Link>
+      <p className="mt-2 text-xs text-text-tertiary">Você verá os detalhes do plano antes de decidir pela assinatura.</p>
     </section>
   )
 }
