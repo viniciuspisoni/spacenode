@@ -26,7 +26,7 @@ export function ContextPanel({ open, title, onClose, children, doneLabel = 'Fech
   return (
     <div className={`spn-context ${open ? 'spn-context--open' : ''}`.trim()}>
       {open && (
-        <div id={id} role="region" aria-label={title} className="spn-context-inner">
+        <div id={id} role="region" aria-label={title} tabIndex={-1} className="spn-context-inner">
           <div className="spn-context-head">
             <span className="spn-context-title">{title}</span>
             <button type="button" className="spn-context-close" onClick={onClose}>{doneLabel}</button>

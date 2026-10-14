@@ -24,6 +24,7 @@ import { RenderFeedback } from '@/components/app/RenderFeedback'
 import { consumeHandoff } from '@/components/nodi/actions-bus'
 import { uploadDirect } from '@/lib/storage/direct-upload-client'
 import { track } from '@/lib/analytics/client'
+import { type OnboardingGoal } from '@/lib/onboarding'
 import GenerateGuide, {
   GUIDE_DISMISSED_KEY, type GuidePhase,
 } from '@/components/app/GenerateGuide'
@@ -334,6 +335,9 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
   // Arquivo original selecionado (sobe INTEIRO via upload direto no Gerar) e
   // URL do input já hospedado pelo servidor (regenerações reusam sem re-upload).
   const [sourceFile,        setSourceFile]        = useState<File | null>(null)
+  const [exampleReference, setExampleReference] = useState(false)
+  const [exampleLoading, setExampleLoading] = useState(false)
+  const exampleRequestRef = useRef<AbortController | null>(null)
   const [serverInputUrl,    setServerInputUrl]    = useState<string | null>(initialReview?.inputUrl ?? null)
   // Amostras visuais de material (field → URL pública). Viram imagens de
   // referência rotuladas na geração — o modelo reproduz o produto real em vez
@@ -425,6 +429,7 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
   //    dispensou); manual via /app/generate#guia, inclusive após refazer o tour.
   //    Estado inicia fechado e abre em effect — sem mismatch de hidratação.
   const [guideOpen, setGuideOpen] = useState(false)
+  const [onboardingGoal, setOnboardingGoal] = useState<OnboardingGoal | null>(null)
   const guideDismissedKey = userId ? `${GUIDE_DISMISSED_KEY}:${userId}` : null
 
   useEffect(() => {
@@ -592,15 +597,21 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
   }
   useEffect(() => () => {
     if (previewObjectUrlRef.current) URL.revokeObjectURL(previewObjectUrlRef.current)
+    exampleRequestRef.current?.abort()
   }, [])
 
   // MIMEs que a área render-source aceita (lib/storage/direct-upload).
   const DIRECT_UPLOAD_MIMES = ['image/jpeg', 'image/png', 'image/webp']
 
-  const loadImage = (file: File, source: 'file' | 'existing_render' = 'file') => {
+  const loadImage = (file: File, source: 'file' | 'existing_render' | 'example' = 'file') => {
     if (!file.type.startsWith('image/')) return
     if (file.size > 15 * 1024 * 1024) { setError('Imagem muito grande. Máximo 15 MB.'); return }
-    track('render_reference_selected', { source })
+    exampleRequestRef.current?.abort()
+    exampleRequestRef.current = null
+    setExampleLoading(false)
+    setExampleReference(source === 'example')
+    // Explorar um exemplo não conta como envio de um projeto real no funil.
+    if (source !== 'example') track('render_reference_selected', { source })
     setOutputUrl(null); setError(null); setUseAnchor(true); setRefinementText('')
     setFidelityScore(null); setFidelityWarning(false); setShowDiff(false)
     setServerInputUrl(null); setBeforeAspect(null)
@@ -628,6 +639,30 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
       }
     }
     reader.readAsDataURL(file)
+  }
+
+  const handleExample = async () => {
+    if (imagePreview || exampleRequestRef.current) return
+    const request = new AbortController()
+    exampleRequestRef.current = request
+    setExampleLoading(true)
+    setError(null)
+    try {
+      const response = await fetch('/demo-sketch.jpg', { signal: request.signal })
+      if (!response.ok) throw new Error()
+      const blob = await response.blob()
+      if (request.signal.aborted || exampleRequestRef.current !== request) return
+      if (blob.type !== 'image/jpeg' || blob.size > 15 * 1024 * 1024) throw new Error()
+      loadImage(new File([blob], 'exemplo-spacenode.jpg', { type: blob.type }), 'example')
+      track('cta_clicked', { cta: 'onboarding_example_loaded' })
+    } catch {
+      if (!request.signal.aborted) setError('Não foi possível carregar o exemplo. Você pode escolher uma imagem sua.')
+    } finally {
+      if (exampleRequestRef.current === request) {
+        exampleRequestRef.current = null
+        setExampleLoading(false)
+      }
+    }
   }
 
   const handleDrop = (e: React.DragEvent) => {
@@ -680,6 +715,8 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
     resolutionOverride?: Resolution,
     opts?: { structuralBoost?: boolean },
   ) => {
+    // O exemplo é apenas uma exploração de ajustes, nunca uma geração paga.
+    if (exampleReference) { fileInputRef.current?.click(); return }
     if (!imagePreview || (!sourceFile && !serverInputUrl)) { setError('Faça upload de uma imagem primeiro.'); return }
     if (credits < nodeCost) { setError('Nodes insuficientes.'); return }
     setError(null); setLoading(true); startLoadingTexts()
@@ -875,6 +912,8 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
     setImagePreview(null)
     setOutputUrl(null)
     setSourceFile(null)
+    setExampleReference(false)
+    setOnboardingGoal(null)
     setServerInputUrl(null)
     setRefinementText('')
     setUseAnchor(true)
@@ -966,6 +1005,7 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
   // Rótulo do CTA: a mesma ação muda de nome conforme o que já existe na tela.
   const ctaLabel = loading
     ? 'Gerando…'
+    : exampleReference ? 'Escolher minha imagem'
     : refinementText.trim() && outputUrl && useAnchor ? 'Aplicar refinamento'
     : outputUrl && useAnchor ? 'Gerar variação'
     : 'Gerar render'
@@ -1407,10 +1447,11 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
         <div className="spn-dock spn-glass spn-glass--chrome">
           {error && <div className="spn-error" style={{ marginBottom: 10 }}>{error}</div>}
 
-          {imagePreview && !outputUrl && !loading && (
+          {exampleReference && <p className="spn-generate-assurance">Exemplo de exploração. Use sua imagem para gerar; explorar os ajustes não gasta Nodes.</p>}
+          {imagePreview && !outputUrl && !loading && !exampleReference && (
             <p className="spn-generate-assurance">A SpaceNode trabalha sobre o seu projeto, preservando geometria, proporções e perspectiva.</p>
           )}
-          {noNodes ? (
+          {noNodes && !exampleReference ? (
             <InsufficientNodesCta
               needed={nodeCost}
               available={credits}
@@ -1427,7 +1468,9 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
               <div className="spn-cost-figures">
                 <div className="spn-cost-main">{nodeCost} nodes</div>
                 <div className="spn-cost-sub">
-                  {!imagePreview
+                  {exampleReference
+                    ? 'custo ao gerar com sua imagem'
+                    : !imagePreview
                     ? 'envie uma imagem para começar'
                     : rendersAfford === null
                       ? 'teste interno — não consome nodes'
@@ -1459,13 +1502,35 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
                 onDismiss={dismissGuide}
                 nodeCost={nodeCost}
                 onUpload={() => fileInputRef.current?.click()}
-                onAdjust={() => setSheet('luz')}
+                onExample={initialSourceUrl ? undefined : handleExample}
+                exampleLoading={exampleLoading}
+                exampleReference={exampleReference}
+                goal={onboardingGoal}
+                onGoal={goal => {
+                  setOnboardingGoal(goal)
+                  track('cta_clicked', { cta: 'onboarding_goal_selected', goal })
+                }}
+                onOpenPanel={panel => {
+                  setSheet(panel)
+                  requestAnimationFrame(() => {
+                    const target = document.getElementById(`${panel}-painel`)
+                    target?.scrollIntoView({ block: 'start' })
+                    target?.focus({ preventScroll: true })
+                  })
+                  track('cta_clicked', { cta: 'onboarding_config_opened', panel, goal: onboardingGoal })
+                }}
+                configuration={{ cena: `${projectType === 'interior' ? 'Interior' : 'Exterior'} · ${cenaSummary}`, luz: luzSummary, materiais: materiaisSummary, saida: saidaSummary }}
+                reviewKey={lastRenderId ?? outputUrl}
               />
             </div>
           )}
 
           <div style={S.topbar}>
             <span style={S.pageTitle}>{outputUrl ? 'ANTES / DEPOIS' : 'REFERÊNCIA'}</span>
+            {!guideOpen && <button type="button" style={S.linkBtn} onClick={() => {
+              setGuideOpen(true)
+              track('cta_clicked', { cta: 'onboarding_guide_reopened' })
+            }}>Abrir guia</button>}
             {outputUrl && (
               <button
                 type="button"
@@ -1476,6 +1541,15 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
               </button>
             )}
           </div>
+
+          {/* Mantém o seletor disponível durante a prévia. Cancelar a troca
+              preserva a imagem atual; limpar value permite escolher o mesmo arquivo. */}
+          <input ref={fileInputRef} type="file" accept="image/*" aria-label="Imagem de referência" style={{ display: 'none' }}
+            onChange={e => {
+              const file = e.target.files?.[0]
+              e.target.value = ''
+              if (file) loadImage(file)
+            }} />
 
           {!imagePreview && (
             <div
@@ -1501,8 +1575,6 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
               <button type="button" className="spn-ghost" onClick={e => { e.stopPropagation(); fileInputRef.current?.click() }}>
                 escolher arquivo
               </button>
-              <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }}
-                onChange={e => { const f = e.target.files?.[0]; if (f) loadImage(f) }}/>
             </div>
           )}
 
@@ -1589,7 +1661,7 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
                 type="button"
                 className="spn-ghost"
                 style={S.changeImageBtn}
-                onClick={() => { setImagePreview(null); setOutputUrl(null); setSourceFile(null); setServerInputUrl(null); setBeforeAspect(null) }}
+                onClick={() => fileInputRef.current?.click()}
               >
                 trocar imagem
               </button>

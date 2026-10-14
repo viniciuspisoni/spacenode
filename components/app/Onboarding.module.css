@@ -33,6 +33,17 @@
 .journey ol { display: flex; flex-wrap: wrap; gap: 8px 18px; list-style: none; padding: 0; margin: 15px 0 0; font-size: 11px; color: var(--color-text-secondary); }
 .tipActions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
 .tipActions button { font-size: 11px; }
+.goalHelp { margin: 12px 0 0; padding: 12px; border-radius: 12px; background: var(--color-surface); color: var(--color-text-secondary); font-size: 12px; line-height: 1.6; }
+.goalHelp p { margin: 0 0 8px; }
+.exampleNotice { margin: 8px 0 0; font-size: 11px; color: var(--color-text-secondary); }
+.exampleNotice button { padding: 4px; }
+.guideDetails { margin-top: 12px; font-size: 12px; }
+.guideDetails summary { cursor: pointer; color: var(--color-text-primary); padding: 6px 0; }
+.guideDetails .checklist { margin-top: 10px; }
+.configSummary { display: grid; gap: 4px; margin-top: 6px; }
+.configSummary button { display: grid; grid-template-columns: 90px minmax(0, 1fr) 12px; gap: 10px; align-items: center; text-align: left; border: 0; border-radius: 8px; background: var(--color-surface); color: var(--color-text-secondary); cursor: pointer; padding: 10px; font: inherit; }
+.configSummary strong { color: var(--color-text-primary); font-weight: 500; overflow-wrap: anywhere; }
+.configSummary button:focus-visible, .guideDetails summary:focus-visible, .tipActions button:focus-visible { outline: 2px solid var(--color-text-primary); outline-offset: 3px; }
 .progress { display: flex; gap: 6px; }
 .progress span { height: 3px; flex: 1; border-radius: 3px; background: var(--color-border-strong); }
 .progress span[data-active=true] { background: var(--color-text-primary); }
