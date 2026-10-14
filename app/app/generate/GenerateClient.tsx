@@ -1581,10 +1581,8 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
           {imagePreview && outputUrl && (
             <div ref={compareOuterRef} className="spn-render-comparison" style={S.compareOuter}>
               {/* Palco com o aspecto do original: antes, depois e diff preenchem
-                  o MESMO retângulo (objectFit:fill). Aspecto igual (caso comum,
-                  pino de formato) = idêntico ao contain; quando o motor devolve
-                  formato diferente, o depois é mapeado no quadro do antes e a
-                  cortina segue alinhada — nada de render menor flutuando. */}
+                  o MESMO retângulo, preservando o aspecto natural de cada arquivo.
+                  Nunca comprimir o render para esconder diferença de formato. */}
               <div
                 ref={compareRef}
                 style={{
@@ -1721,12 +1719,11 @@ const S: Record<string, React.CSSProperties> = {
   compareWrap:       { position:'relative', borderRadius:'var(--r-card)', overflow:'hidden', flex:1, minHeight:300, background:'var(--color-preview-bg)', border:'0.5px solid var(--glass-line)', boxShadow:'var(--shadow-float)', userSelect:'none', cursor:'ew-resize' },
   compareImg:        { position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'contain', pointerEvents:'none' },
   // Área flex do comparador (sem moldura) + palco dimensionado pelo aspecto do
-  // original. As imagens do palco usam fill: o retângulo JÁ tem o aspecto do
-  // antes, e o depois é esticado pra alinhar com a cortina quando o motor
-  // devolve formato levemente diferente (drift grande vira aviso de fidelidade).
+  // original. Contain mantém a proporção natural também em renders antigos
+  // que chegaram num formato diferente; não mascara drift com distorção.
   compareOuter:      { position:'relative', minHeight:0, minWidth:0, display:'flex', alignItems:'center', justifyContent:'center' },
   compareStage:      { position:'relative', borderRadius:'var(--r-card)', overflow:'hidden', maxWidth:'100%', maxHeight:'100%', background:'var(--color-preview-bg)', border:'0.5px solid var(--glass-line)', boxShadow:'var(--shadow-float)', userSelect:'none' },
-  stageImg:          { position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'fill', pointerEvents:'none' },
+  stageImg:          { position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'contain', pointerEvents:'none' },
   compareHandle:     { position:'absolute', top:0, bottom:0, width:2, background:'#ffffff', transform:'translateX(-50%)', display:'flex', alignItems:'center', justifyContent:'center', pointerEvents:'none' },
   compareHandleCircle: { width:34, height:34, borderRadius:'50%', background:'#ffffff', border:'0.5px solid rgba(0,0,0,0.1)', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 8px 22px rgba(0,0,0,0.26)' },
   compareLabel:      { position:'absolute', bottom:12, fontSize:9, letterSpacing:'0.12em', color:'#fafafa', textTransform:'uppercase', fontWeight:500, textShadow:'0 1px 3px rgba(0,0,0,0.5)', pointerEvents:'none' },
