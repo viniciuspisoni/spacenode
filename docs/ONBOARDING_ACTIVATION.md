@@ -14,6 +14,16 @@ A lista de preparação é opcional. Fechar ou pular permite continuar na plataf
 
 O guia de Renderizar acompanha o estado real: referência → configuração → geração → comparação. Seus botões abrem o seletor de imagem e o painel de luz. Ele mostra o custo atual em Nodes e nunca dispara uma geração automaticamente. A preferência de dispensar o guia é separada por conta no navegador. O guia do Editar aparece apenas nos links de onboarding e cobre as versões atual e legadas do editor.
 
+### Interações adicionadas em 14/10/2026
+
+- **Explorar com um exemplo:** carrega a referência pública `demo-sketch.jpg` no mesmo painel, sem upload ou geração. Enquanto essa referência está ativa, o CTA pede uma imagem própria e o handler de geração também bloqueia a operação. O exemplo não emite `render_reference_selected`. Um arquivo escolhido durante o carregamento cancela o exemplo; falha ao carregar permite tentar novamente ou enviar o projeto.
+- **Objetivo opcional:** apresentar o projeto, explorar a luz ou estudar um material. A escolha registra apenas uma intenção em `cta_clicked`, sem alterar configuração, motor, resolução ou saldo. Cada orientação abre o controle correspondente e leva o foco ao painel, inclusive no celular.
+- **Conferir configuração e custo:** uma seção recolhível reflete os valores reais de cena, luz, materiais, motor, resolução e Nodes. Cada linha abre o ajuste correspondente. Não há preset que substitua escolhas anteriores.
+- **Comparação orientada:** lista opcional de proporções, materiais/luz e adequação à tarefa. Ela reinicia por resultado, não grava feedback e não libera oferta. A pergunta, as opções, o momento e a elegibilidade de `RenderFeedback` permanecem iguais.
+- **Reabrir e trocar:** o guia pode ser reaberto na própria tela. O seletor de arquivo permanece montado; trocar imagem abre diretamente o seletor e cancelar mantém a referência atual. Limpar o valor do input permite selecionar novamente o mesmo arquivo.
+
+Os vídeos existentes continuam disponíveis. A hipótese desta rodada é reduzir dúvidas antes da primeira geração com um projeto real; uso do exemplo, objetivo escolhido e lista marcada não são evidência de primeiro valor.
+
 `profiles.onboarding_completed_at` continua significando introdução vista ou dispensada. A gravação usa o usuário autenticado, mantém o filtro de propriedade e só emite `onboarding_completed` depois de uma gravação confirmada. Isso não significa primeiro valor.
 
 ## Resultado, ajuda e assinatura
@@ -68,6 +78,7 @@ Experimento prioritário: comparar a proporção de novas contas externas com re
 - Banco conectado: coluna existente e políticas de SELECT/UPDATE de `profiles` conferidas por consulta somente de metadados. Nenhuma alteração de schema ou escrita em contas de clientes.
 - MP4: duração, dimensões e ausência de faixa de áudio verificadas.
 - Atualização do vídeo em 13/10: TypeScript e os mesmos 29 testes aprovados; 9 verificações adicionais de navegador confirmaram acesso nas fases de referência e configuração, reprodução decodificada em 1280×720 com duração de 60 segundos, legendas e capa corretas, ausência de autoplay, fechamento do player, layout sem overflow e preservação do vídeo de avaliação. A interface foi verificada em prévia com os componentes reais; as capturas do caso foram feitas na plataforma em produção.
+- Interações de 14/10: TypeScript e os mesmos 29 testes aprovados; ESLint sem erros (quatro avisos preexistentes de imagens). Sete cenários de navegador com `GenerateClient` real verificaram exemplo sem geração/upload, mudança de iluminação refletida no resumo, escolha e cancelamento de arquivo no Safari, falha e recuperação do exemplo, objetivo de materiais com foco no painel, celular de 390 px sem overflow e checklist sem aprovação ou oferta. A reabertura manteve o objetivo na sessão. Serviços e autenticação simulados; nenhum render pago.
 - Build de produção com webpack aprovado. O Turbopack local rejeita o compartilhamento de dependências por link entre checkouts; o código compila com dependências normais e webpack. As variáveis públicas necessárias à pré-renderização foram fornecidas só ao processo de build.
 
 A prévia verifica interfaces e contratos com respostas de exemplo. Não cria uma geração paga, sessão OAuth ou compra real e não comprova ganho de conversão; essa leitura depende das coortes após a publicação.

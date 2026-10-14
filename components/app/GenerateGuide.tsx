@@ -1,27 +1,16 @@
 'use client'
 
-// Guia da primeira imagem (/app/generate) — evolução do módulo "Como usar".
-// O tour do dashboard orienta o atelier; este guia acompanha o usuário DENTRO
-// do processo de geração: uma régua de 3 passos que avança sozinha conforme o
-// estado real da página (referência enviada → cenário ajustado → resultado).
-// Sem overlay e sem bloquear nada — a página continua 100% interativa.
-//
-// Abertura: automática quando a conta nunca gerou uma render (prop firstRender,
-// derivada da contagem server-side) e o guia não foi dispensado; manual via
-// /app/generate#guia (destino do tour da sidebar ou acesso direto). Depois da
-// primeira render a contagem passa a ser > 0
-// e o guia deixa de se oferecer — não há coluna nova nem migration.
-//
-// O botão "Ir para Gerar render" (com rolagem programática e pulso no CTA)
-// saiu na reforma de vidro: ele existia porque o CTA nascia abaixo da dobra de
-// uma coluna com 9 grupos empilhados. Agora o CTA mora num .spn-dock colado no
-// rodapé do painel e nunca sai da tela — apontar pra ele virou redundância.
+// Guia opcional, ligado ao estado real de Renderizar. Atalhos só abrem os
+// controles existentes; a lista de comparação não grava feedback de utilidade.
 
 import { OnboardingVideo } from './OnboardingDemo'
+import { ONBOARDING_GOALS, type OnboardingGoal } from '@/lib/onboarding'
 import styles from './Onboarding.module.css'
 
 export const GUIDE_DISMISSED_KEY = 'spn:generate-guide:dismissed'
 export type GuidePhase = 'upload' | 'configure' | 'generating' | 'done'
+export type GuidePanel = 'cena' | 'luz' | 'materiais' | 'saida'
+export type GuideConfiguration = Record<GuidePanel, string>
 
 const STEPS: { id: number; label: string }[] = [
   { id: 1, label: 'Referência' },
@@ -30,7 +19,7 @@ const STEPS: { id: number; label: string }[] = [
   { id: 4, label: 'Comparar' },
 ]
 
-// Índice do passo ativo por fase — 'generating' e 'done' vivem no passo 3.
+// Índice do passo ativo por fase.
 const ACTIVE_STEP: Record<GuidePhase, number> = {
   upload: 1,
   configure: 2,
@@ -52,7 +41,14 @@ export default function GenerateGuide({
   onDismiss,
   nodeCost,
   onUpload,
-  onAdjust,
+  onExample,
+  exampleLoading = false,
+  exampleReference = false,
+  goal,
+  onGoal,
+  onOpenPanel,
+  configuration,
+  reviewKey,
 }: {
   phase: GuidePhase
   /** true = veio do fluxo Novo Space sem renders — o desfecho aponta o cartão de retorno. */
@@ -60,9 +56,17 @@ export default function GenerateGuide({
   onDismiss: () => void
   nodeCost?: number
   onUpload?: () => void
-  onAdjust?: () => void
+  onExample?: () => void
+  exampleLoading?: boolean
+  exampleReference?: boolean
+  goal?: OnboardingGoal | null
+  onGoal?: (goal: OnboardingGoal) => void
+  onOpenPanel?: (panel: GuidePanel) => void
+  configuration?: GuideConfiguration
+  reviewKey?: string | null
 }) {
   const active = ACTIVE_STEP[phase]
+  const intention = goal ? ONBOARDING_GOALS[goal] : null
 
   return (
     <section className="spn-guide spn-glass" role="region" aria-label="Guia da primeira imagem">
@@ -110,18 +114,40 @@ export default function GenerateGuide({
             Prefira um enquadramento limpo, sem menus sobre o espaço.
             <div className={styles.tipActions}>
               {onUpload && <button type="button" className="spn-pill" onClick={onUpload}>Escolher imagem →</button>}
+              {onExample && <button type="button" className="spn-pill" disabled={exampleLoading} onClick={onExample}>{exampleLoading ? 'Carregando exemplo…' : 'Explorar com um exemplo'}</button>}
               <OnboardingVideo />
             </div>
+            {onExample && <p className={styles.caption}>O exemplo serve para conhecer os ajustes sem gastar Nodes. Para gerar, use uma imagem sua.</p>}
           </div>
         )}
 
         {phase === 'configure' && (
           <div className="spn-guide-tip">
-            <strong>Missão 2: dê uma intenção à imagem.</strong> Você pode começar com a configuração atual.
-            Para experimentar, mude apenas a luz. Confira o custo e clique em <strong>Gerar render</strong>.
+            <strong>Missão 2: o que você quer fazer com esta imagem?</strong> Escolha um objetivo para receber uma orientação. É opcional.
+            {exampleReference && <p className={styles.exampleNotice}>Você está explorando com um exemplo. {onUpload && <button type="button" className={styles.mutedButton} onClick={onUpload}>Usar minha imagem →</button>}</p>}
+            {onGoal && <div className={styles.tipActions} role="group" aria-label="Objetivo da imagem">
+              {(Object.keys(ONBOARDING_GOALS) as OnboardingGoal[]).map(id => <button
+                type="button" className="spn-pill" key={id} aria-pressed={goal === id}
+                onClick={() => onGoal(id)}
+              >{ONBOARDING_GOALS[id].label}</button>)}
+            </div>}
+            {intention && <div className={styles.goalHelp} role="status">
+              <p>{intention.instruction}</p>
+              {onOpenPanel && <button type="button" className="spn-pill" onClick={() => onOpenPanel(intention.panel)}>{intention.action} →</button>}
+            </div>}
+            {configuration && <details className={styles.guideDetails}>
+              <summary>Conferir configuração e custo</summary>
+              <div className={styles.configSummary}>
+                {([
+                  ['cena', 'Cena'], ['luz', 'Luz'], ['materiais', 'Materiais'], ['saida', 'Qualidade e custo'],
+                ] as const).map(([panel, label]) => <button type="button" key={panel} onClick={() => onOpenPanel?.(panel)}>
+                  <span>{label}</span><strong>{configuration[panel]}</strong><span aria-hidden="true">↗</span>
+                </button>)}
+              </div>
+              <p className={styles.caption}>{exampleReference ? 'Os Nodes só serão usados ao gerar com sua própria imagem.' : 'Nada foi gerado ainda. Os Nodes são usados quando você clica em Gerar render.'}</p>
+            </details>}
             <div className={styles.tipActions}>
-              {onAdjust && <button type="button" className="spn-pill" onClick={onAdjust}>Explorar a luz →</button>}
-              {nodeCost !== undefined && <span>{nodeCost} Nodes nesta configuração</span>}
+              {nodeCost !== undefined && <span>{nodeCost} Nodes por geração</span>}
               <OnboardingVideo />
             </div>
           </div>
@@ -141,6 +167,14 @@ export default function GenerateGuide({
             {fromSpacesNew
               ? 'Compare o antes e depois e continue seu Space com esta render.'
               : 'Arraste o comparador, confira os detalhes e responda “Este render serviu para o seu projeto?” no painel. Depois, baixe ou continue na mesma imagem.'}
+            {intention && <p className={styles.goalHelp}>Seu objetivo: {intention.label.toLowerCase()}. {intention.review}</p>}
+            <details key={reviewKey} className={styles.guideDetails}>
+              <summary>O que conferir no antes e depois</summary>
+              <ul className={styles.checklist}>
+                {['Comparei proporções, aberturas e enquadramento', 'Conferi materiais e iluminação', 'Avaliei se a imagem ajuda na tarefa que escolhi'].map(item => <li key={item}><label><input type="checkbox" />{item}</label></li>)}
+              </ul>
+              <p className={styles.caption}>Esta lista é um apoio. A avaliação do resultado fica na pergunta do painel.</p>
+            </details>
             <div className={styles.tipActions}><OnboardingVideo clip="review-result" /></div>
           </div>
         )}
