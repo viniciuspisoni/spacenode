@@ -74,6 +74,7 @@ import {
 } from '@/lib/ai/fidelity/geometry-score'
 import { fetchStorageBuffer, assertSafeFetchUrl } from '@/lib/storage/fetch'
 import { nearestSupportedAspectRatio } from '@/lib/ai/aspect-ratio'
+import { renderFrame, renderFrameCrop, aspectDrift, RenderFormatError } from '@/lib/ai/render-frame'
 import { analyzeImage } from '@/lib/fidelity-engine'
 import { buildMaterialRegionSheet } from '@/lib/ai/fidelity/material-regions'
 import { hasCurrentMaterialAnalysis } from '@/lib/ai/material-inventory'
@@ -609,9 +610,34 @@ export async function POST(req: NextRequest) {
     if (originalBuffer) {
       try {
         const meta = await sharp(originalBuffer).metadata()
-        aspectRatio = nearestSupportedAspectRatio(meta.width ?? null, meta.height ?? null)
-        if (meta.width && meta.height) sourceSize = { width: meta.width, height: meta.height }
+        const swapped = (meta.orientation ?? 1) >= 5
+        const width = swapped ? meta.height : meta.width
+        const height = swapped ? meta.width : meta.height
+        aspectRatio = nearestSupportedAspectRatio(width ?? null, height ?? null)
+        if (width && height) sourceSize = { width, height }
       } catch { /* sem pino — motor segue o formato do input */ }
+    }
+    if (!sourceSize) throw new RenderFormatError('Não foi possível ler as dimensões da imagem original. Tente enviar o arquivo novamente.')
+
+    // Gemini accepts a finite set of canvas ratios. Explicitly frame the
+    // geometry source, then remove only those margins from the delivered master.
+    // Keep inputUrl/originalBuffer unchanged for history, vision and scoring.
+    let sourceFrame: ReturnType<typeof renderFrame> | null = null
+    if ((engine === 'vega' || engine === 'pulsar') && originalBuffer && sourceSize) {
+      const oriented = await sharp(originalBuffer).rotate().png().toBuffer({ resolveWithObject: true })
+      sourceSize = { width: oriented.info.width, height: oriented.info.height }
+      sourceFrame = renderFrame(sourceSize.width, sourceSize.height)
+      aspectRatio = sourceFrame.aspectRatio
+      const framed = await sharp(oriented.data).extend({
+        left: sourceFrame.left, right: sourceFrame.right,
+        top: sourceFrame.top, bottom: sourceFrame.bottom,
+        background: { r: 128, g: 128, b: 128, alpha: 1 },
+      }).png().toBuffer()
+      const framedUrl = await hostAuxImage(framed, 'image/png', 'geometry-framed.png')
+      const sourceIndex = baseImageUrls.indexOf(inputUrl)
+      if (sourceIndex < 0) throw new Error('Geometry source missing')
+      baseImageUrls[sourceIndex] = framedUrl
+      baseImageLabels[sourceIndex] += ' The gray outer margins are temporary canvas padding, not architecture. Keep their size and position; render only the source content inside them.'
     }
     devLog('[generate] aspect     :', aspectRatio ?? 'auto (sem pino)')
 
@@ -871,6 +897,9 @@ export async function POST(req: NextRequest) {
         materialRegionSheet,
         materialSamples: materialSamples.length > 0 ? materialSamples : undefined,
       })
+      if (sourceFrame) {
+        finalPrompt += `\nCANVAS CONTRACT: output ${sourceFrame.aspectRatio}. The GEOMETRY SOURCE has temporary gray margins (left ${sourceFrame.left}, right ${sourceFrame.right}, top ${sourceFrame.top}, bottom ${sourceFrame.bottom} pixels on a ${sourceFrame.canvasWidth}x${sourceFrame.canvasHeight} canvas). Preserve those margins and the exact source framing inside them. Do not fill the margins with architecture or expand the room. Auxiliary maps describe the source content, excluding these margins.`
+      }
       devLog('[generate] prompt     :', finalPrompt)
 
       const attemptSeed = generationSeed + params.seedOffset
@@ -896,6 +925,7 @@ export async function POST(req: NextRequest) {
         Math.max(30_000, remainingMs() - 15_000),
       )
       let gen: AttemptOutcome
+      let generatedBuffer: Buffer | null = null
       try {
         if (isOrion) {
           // Sem seed, sem thinking_level, sem resolution: nada de parâmetro de
@@ -951,6 +981,24 @@ export async function POST(req: NextRequest) {
             errorMessage:  raw.errorMessage,
           }
         }
+        // A format mismatch is a failed generation, never a stretched preview.
+        // Validate bytes rather than trusting optional provider metadata.
+        if (sourceSize) {
+          const delivered = await fetchStorageBuffer(gen.images[0].url)
+          generatedBuffer = delivered
+          const metadata = await sharp(delivered).metadata()
+          if (!metadata.width || !metadata.height) throw new Error('Render sem dimensões válidas')
+          if (sourceFrame) {
+            const crop = renderFrameCrop(sourceFrame, metadata.width, metadata.height)
+            const restored = await sharp(delivered).extract(crop).png().toBuffer({ resolveWithObject: true })
+            const url = await uploadToStorage(restored.data, 'image/png', user.id, 'renders')
+            gen.images[0] = { url, width: restored.info.width, height: restored.info.height }
+            generatedBuffer = restored.data
+          } else if (aspectDrift(sourceSize.width, sourceSize.height, metadata.width, metadata.height) > 0.02) {
+            throw new RenderFormatError('O motor alterou o formato da imagem. Tente novamente.')
+          }
+        }
+
       } catch (genErr) {
         // Retry é best-effort: se JÁ existe imagem válida de tentativa
         // anterior, falha aqui não pode virar erro+refund pro usuário.
@@ -963,11 +1011,10 @@ export async function POST(req: NextRequest) {
       // score vira log e a imagem é entregue (comportamento legado).
       let geometry: GeometryScoreBreakdown | null = null
       let scoreError: string | undefined
-      let generatedBuffer: Buffer | null = null
       if (renderOnlyActive) {
         try {
           if (!originalBuffer) originalBuffer = await fetchStorageBuffer(inputUrl)
-          generatedBuffer = await fetchStorageBuffer(gen.images[0].url)
+          generatedBuffer ??= await fetchStorageBuffer(gen.images[0].url)
           geometry = await computeGeometryScore(originalBuffer, generatedBuffer)
         } catch (scoreErr) {
           scoreError = (scoreErr as Error).message
@@ -1223,6 +1270,7 @@ export async function POST(req: NextRequest) {
         structural_boost: attemptOffset > 0,
         structural_boost_offset: attemptOffset,
         aspect_ratio:    aspectRatio,
+        source_frame:    sourceFrame,
         briefing_source: briefingSource,
         anchor_used: hasAnchor,
         material_ref_count: materialSamples.length,
@@ -1433,7 +1481,8 @@ export async function POST(req: NextRequest) {
     console.error('[generate] ERROR body  :', JSON.stringify(e?.body ?? e?.message ?? err))
 
     let userMessage = 'Erro ao gerar render. Tente novamente.'
-    if (e?.isFalTimeout)        userMessage = 'A geração demorou mais que o esperado. Tente novamente.'
+    if (err instanceof RenderFormatError) userMessage = err.message
+    else if (e?.isFalTimeout)        userMessage = 'A geração demorou mais que o esperado. Tente novamente.'
     else if (e?.status === 422) userMessage = 'Parâmetros inválidos para o motor selecionado.'
     else if (e?.status === 429) userMessage = 'Limite de requisições atingido. Aguarde alguns segundos.'
 

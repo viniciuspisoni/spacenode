@@ -36,17 +36,18 @@ export function seedreamCheapTierEnabled(): boolean {
 export function seedreamCheapSize(
   width: number | null | undefined,
   height: number | null | undefined,
+  maxPixels: number = SEEDREAM_LOW_TIER_MAX_PIXELS,
 ): { width: number; height: number } | null {
   if (!width || !height || width <= 0 || height <= 0) return null
   // Envelope de aspecto do endpoint (1/16 a 16) — igual ao adaptador do Editar.
   const aspect = Math.max(1 / 16, Math.min(16, width / height))
   const round16 = (v: number) => Math.max(16, Math.round(v / 16) * 16)
-  let w = round16(Math.sqrt(SEEDREAM_LOW_TIER_MAX_PIXELS * aspect))
+  let w = round16(Math.sqrt(maxPixels * aspect))
   let h = round16(w / aspect)
   // O arredondamento pode passar do teto (aí sai caro) ou cair abaixo do piso
   // do schema (aí a fal recusa): desce/sobe de 16 em 16 até caber nos dois.
-  for (let i = 0; i < 64 && w * h > SEEDREAM_LOW_TIER_MAX_PIXELS; i++) { w -= 16; h = round16(w / aspect) }
+  for (let i = 0; i < 64 && w * h > maxPixels; i++) { w -= 16; h = round16(w / aspect) }
   for (let i = 0; i < 64 && w * h < SEEDREAM_MIN_PIXELS;           i++) { w += 16; h = round16(w / aspect) }
-  if (w * h > SEEDREAM_LOW_TIER_MAX_PIXELS || w * h < SEEDREAM_MIN_PIXELS) return null
+  if (w * h > maxPixels || w * h < SEEDREAM_MIN_PIXELS) return null
   return { width: w, height: h }
 }

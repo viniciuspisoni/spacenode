@@ -29,16 +29,12 @@ export function falParamsForEngine(
   sourceSize:  { width: number; height: number } | null = null,
 ): Record<string, unknown> {
   if (engine === 'quasar') {
-    // Seedream 5.0 Pro Edit: só campos do schema (conferido 2026-09-04).
-    // 'auto_2K' preserva a proporção do input no maior tamanho do endpoint.
-    // Com SEEDREAM_CHEAP_TIER=1 pedimos WxH explícito no teto da faixa barata
-    // de preço (lib/ai/seedream-size): metade do custo nos dois provedores e
-    // 76% do lado. Sem as dimensões do original, segue o 'auto_2K'.
-    const cheap = seedreamCheapTierEnabled()
-      ? seedreamCheapSize(sourceSize?.width, sourceSize?.height)
-      : null
+    // Explicit WxH follows the geometry source, including with an anchor.
+    // Preserve the existing price tier; only canvas selection changes.
+    const size = seedreamCheapSize(sourceSize?.width, sourceSize?.height,
+      seedreamCheapTierEnabled() ? 1536 * 1536 : 2048 * 2048)
     return {
-      image_size:    cheap ?? 'auto_2K',
+      image_size:    size ?? 'auto_2K',
       num_images:    1,
       // Master lossless — alinha o caminho FAL com o GCP/Vertex (que já
       // devolve PNG). JPEG aqui criava uma geração de perda logo na origem
