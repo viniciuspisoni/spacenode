@@ -1,7 +1,7 @@
 # Preços aprovados em 15/10/2026
 
 Fonte: decisão de Vinícius neste chat, incluindo a manutenção dos contratos atuais.
-Estado: implementação preparada; cobrança anual antecipada aprovada por Vinícius, aguardando ativação. Esta alteração não foi publicada.
+Estado: tabela e cobrança anual antecipada aprovadas por Vinícius. A configuração de cada ambiente deve ser conferida pela sequência abaixo.
 
 | Plano | Mensal | Total anual | Equivalente mensal no anual | Nodes/mês |
 |---|---:|---:|---:|---:|
@@ -22,7 +22,7 @@ Os IDs originais `STRIPE_PRICE_ID_{PLANO}_{CICLO}` continuam configurados e reco
 1. Criar seis novos Prices em BRL nos produtos correspondentes da Stripe, com `recurring.interval_count=1`. Valores em centavos: Essence mensal 14900/anual 134100; Pro mensal 29900/anual 269100; Studio mensal 49900/anual 449100. Intervalo `month` nos mensais e `year` nos anuais. Reutilizar os produtos; preservar os preços originais nas assinaturas.
 2. Configurar os seis IDs nas variáveis com sufixo `_V202610`, conservando as originais. Preparar primeiro em ambiente de teste. O checkout recusa um Price com valor, moeda ou periodicidade diferente da vitrine.
 3. Publicar a implementação com `NEXT_PUBLIC_ANNUAL_BILLING_ENABLED=1` somente quando o cron `/api/cron/annual-nodes`, seu `CRON_SECRET` e as permissões da RPC existente estiverem verificados. A flag é avaliada no build; reconstruir ao alterá-la. Sem flag, nenhuma vitrine nem checkout anuncia/vende o anual.
-4. Validar em modo de teste: compra anual paga → primeira cota pelo webhook → avanço de um mês → nova cota → repetição sem crédito duplicado → renovação anual → cancelamento no fim do período. Conferir um assinante antigo renovando pelo Price original e um usuário novo comprando pelo Price novo.
+4. Validar o ciclo em modo de teste e manter a cobertura de regressão: compra anual paga → primeira cota pelo webhook → avanço de um mês → nova cota → repetição sem crédito duplicado → renovação anual → cancelamento no fim do período. Conferir um assinante antigo renovando pelo Price original e um usuário novo comprando pelo Price novo.
 5. Arquivar os Prices antigos para novas compras e revisar Payment Links, botões externos e opções de troca do portal. Arquivar um Price não altera a cobrança dos contratos que já o usam. Encerrar checkouts antigos ainda abertos ou confirmar sua expiração no corte; não alterar contratos ativos.
 6. Trocar textos/peças na Meta e demais canais no mesmo corte da publicação. Os anúncios antigos identificados estavam sob campanhas pausadas na conta consultada. Conferir preço em áudio, legenda e cartela; o texto principal sozinho não valida o vídeo. Não reativar material antigo antes dessa revisão.
 7. Enviar o agradecimento somente após aprovação do texto e da lista de assinantes ativos anterior ao corte. O rascunho não foi enviado.
