@@ -69,7 +69,7 @@ export default async function GeneratePage({
   return (
     <GenerateClient
       userId={user.id}
-      key={review?.id ?? sp.source ?? 'new'}
+      key={`${user.id}:${review?.id ?? sp.source ?? 'new'}`}
       orionEnabled={orionAllowed}
       orionProvider={orionAllowed ? orionProvider() : undefined}
       // Saldo TOTAL da bolsa (mensais + extras) — é o que consume_workspace_nodes

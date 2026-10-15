@@ -33,6 +33,16 @@
 .journey ol { display: flex; flex-wrap: wrap; gap: 8px 18px; list-style: none; padding: 0; margin: 15px 0 0; font-size: 11px; color: var(--color-text-secondary); }
 .tipActions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
 .tipActions button { font-size: 11px; }
+.draftCard { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 18px; border-radius: 16px; }
+.draftPreview { width: 100px; height: 72px; object-fit: cover; border-radius: 10px; }
+.draftContent { flex: 1; min-width: min(200px, 100%); }
+.draftContent strong { font-size: 14px; }
+.draftContent p { margin: 6px 0; font-size: 12px; color: var(--color-text-secondary); overflow-wrap: anywhere; }
+.draftContent small { font-size: 11px; color: var(--color-text-secondary); }
+.nextSteps { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--color-border); }
+.nextSteps > strong { font-size: 13px; }
+.nextSteps > p { margin: 14px 0 0; color: var(--color-text-secondary); font-size: 12px; line-height: 1.6; }
+.nextSteps a { font-size: 11px; }
 .goalHelp { margin: 12px 0 0; padding: 12px; border-radius: 12px; background: var(--color-surface); color: var(--color-text-secondary); font-size: 12px; line-height: 1.6; }
 .goalHelp p { margin: 0 0 8px; }
 .exampleNotice { margin: 8px 0 0; font-size: 11px; color: var(--color-text-secondary); }

@@ -32,10 +32,30 @@ A conclusão técnica mantém comparação, download e ações sobre a imagem. A
 
 - **Sem resposta:** utilidade desconhecida; o convite contextual de assinatura não aparece.
 - **Ainda não:** mostra orientação por motivo. Materiais, luz e outros ajustes podem abrir a mesma imagem no Editar. Geometria pede revisão da referência e comparação antes de outra geração.
-- **Sim, salvo:** permite o convite do Essence para conta gratuita individual elegível. Pagantes e membros de workspace compartilhado não recebem esse convite.
+- **Sim, salvo:** abre os próximos passos. Desde 15/10, o convite do Essence depende também da escolha opcional de uso em projetos todo mês. Uso pontual, necessidade desconhecida ou pergunta não respondida não exibem esse convite. Pagantes e membros de workspace compartilhado continuam inelegíveis.
 - **Falha ao salvar:** mostra erro e preserva a última resposta salva; não trata uma resposta não confirmada como utilidade.
 
 A oferta lê preço e Nodes de `lib/plans.ts`. A estimativa de imagens usa o custo da configuração atual, com a indicação de que motor e resolução alteram consumo. O botão encaminha a `/app/billing?plan=essence&billing=monthly`; não inicia checkout nem pagamento automaticamente. Fechar a oferta continua possível. Os controles de saldo insuficiente continuam disponíveis quando uma operação exige mais Nodes do que o saldo.
+
+## Retomada e continuidade — 15/10/2026
+
+Uma referência própria em JPG, PNG ou WebP é guardada com configuração, materiais, referências de materiais já enviadas, orientação escrita e objetivo. O arquivo permanece no navegador, sem upload automático. Há um rascunho por conta por navegador, com validade de sete dias e limpeza de vencidos na visita seguinte. O exemplo de exploração e o motor interno Orion não geram rascunho. Formatos convertidos usam o mesmo JPEG que a geração receberia.
+
+O cartão de retomada aparece em Renderizar e no dashboard, inclusive para quem já gerou antes. O link do dashboard pede restauração explícita por `?resume=1`. Restaurar não inicia geração nem altera motor/resolução silenciosamente. Configurações inválidas, versões incompatíveis e dados de outra conta são recusados. A chave React da tela também inclui o usuário autenticado para não reaproveitar estado entre contas.
+
+Uma imagem recém-selecionada, um render aberto pelo histórico, `?source=` e um handoff do assistente têm prioridade sobre o rascunho. Ajustes são guardados com debounce e tentativa de gravação ao sair/ocultar a página. O status só confirma salvamento depois do término da transação. Navegação muito rápida ou fechamento forçado podem interromper a última gravação; o aviso de salvamento permanece até confirmação. Armazenamento bloqueado ou cheio mostra aviso e mantém a geração disponível. O arquivo pode ser removido pelo navegador ou pelo usuário; não há sincronização entre dispositivos.
+
+Após uma geração bem-sucedida, o rascunho daquela tentativa é removido. Escritas e remoções são ordenadas, e a remoção exige o ID esperado para preservar outro rascunho mais novo. Um erro de geração conserva o rascunho. O descarte manual fica disponível antes de retomar.
+
+Após utilidade positiva salva, o usuário pode ajustar a mesma imagem ou preparar outra. Preparar outra apenas abre o seletor; cancelar mantém o resultado. A pergunta opcional de continuidade tem três respostas: só neste projeto, em projetos todo mês, ainda não sei. Somente a necessidade mensal habilita a oferta contextual para uma conta já elegível. Essa preferência fica localmente por render e gera um evento de intenção; não substitui feedback de utilidade, checkout ou pagamento.
+
+### Medição da nova versão
+
+O evento existente `cta_clicked` registra `onboarding_step_viewed`, com fase (`upload`, `configure`, `generating`, `done`), origem e `flow_version=2026-10-15`; registra também disponibilidade, retomada, descarte e escolhas de continuidade. Nenhum evento contém arquivo, nome de arquivo, imagem, material ou texto de orientação. O exemplo não entra na sequência de etapas reais. A exposição é deduplicada por tentativa/fase na sessão; uma nova visita pode emitir nova exposição.
+
+Para investigar abandono, reunir as mesmas contas por origem e coorte, deduplicar exposição por conta/tentativa e observar a etapa seguinte numa janela definida. Sessão incompleta ou sem resposta continua desconhecida; não equivale a rejeição. Reconciliar geração com eventos do servidor e utilidade com feedback autenticado. Esta entrega instrumenta a observação, sem afirmar taxas de abandono ou ganho de conversão. A pergunta, opções, salvamento e elegibilidade do feedback de utilidade permanecem iguais; a política da oferta mudou nesta versão e deve ser distinguida em comparações.
+
+Verificação em 15/10: TypeScript aprovado, 37 testes aprovados e ESLint sem erros (quatro avisos preexistentes de imagens). Doze cenários de navegador, com IndexedDB real, verificaram restauração após recarregar, alteração persistida, dashboard, isolamento entre contas, indisponibilidade/recuperação do armazenamento, exemplo descartável, descarte manual, limpeza após geração simulada, oferta pontual/desconhecida/mensal, inelegibilidade, prioridade do histórico, eventos por fase e tela de 390 px. No Safari, cancelar a próxima imagem preservou o resultado; um arquivo público escolhido no seletor foi recuperado após recarregar. Autenticação, upload, geração e feedback foram simulados na prévia; nenhum fornecedor de imagens ou pagamento real foi chamado.
 
 ## Vídeos
 

@@ -45,6 +45,12 @@ export const ONBOARDING_PATHS = {
 } as const
 
 /** Completion alone is not evidence of useful output. */
+export type ContinuationNeed = 'one_project' | 'recurring' | 'unknown'
+
 export function canOfferAfterValue(eligible: boolean, useful: boolean | null): boolean {
   return eligible && useful === true
+}
+
+export function canOfferForContinuation(eligible: boolean, useful: boolean | null, need: ContinuationNeed | null): boolean {
+  return canOfferAfterValue(eligible, useful) && need === 'recurring'
 }
