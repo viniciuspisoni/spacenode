@@ -5,8 +5,8 @@ import { getRequestUser } from '@/lib/auth/request-user'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getPayerId } from '@/lib/workspaces/context'
 import { refundNodes } from '@/lib/billing/refund-nodes'
-import { requireVideoModel, getNodeCost } from '@/lib/video/models'
-import { buildArchitectureVideoPrompt, buildPromptFromLegacyInput, type FidelityMode } from '@/lib/video/promptBuilder'
+import { getVideoModel, getNodeCost, DEFAULT_VIDEO_MODEL_ID } from '@/lib/video/models'
+import { buildArchitectureVideoPrompt, buildPromptFromLegacyInput, MAX_VIDEO_PROMPT_CHARS, type FidelityMode } from '@/lib/video/promptBuilder'
 import { isSceneTypeId, type SceneTypeId } from '@/lib/video/scenes'
 import { isCameraMotionId, type CameraMotionId, type CameraIntensity } from '@/lib/video/cameraPresets'
 import { isVideoTypeId } from '@/lib/video/videoPresets'
@@ -25,7 +25,7 @@ fal.config({ credentials: process.env.FAL_KEY })
 export const maxDuration = 300
 
 // Default quando o cliente não envia engine (fluxo legacy).
-const DEFAULT_ENGINE_ID = 'fal-ai/veo3.1/image-to-video'
+const DEFAULT_ENGINE_ID = DEFAULT_VIDEO_MODEL_ID
 
 function pickFidelity(raw: string | null): FidelityMode {
   if (raw === 'balanced' || raw === 'creative') return raw
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
 
     const sourceKey    = str('sourceKey') ?? ''
     const engineId     = str('engine')      ?? DEFAULT_ENGINE_ID
-    const duration     = str('duration')    ?? '8'
+    const duration     = str('duration')    ?? '5'
     const sceneRaw     = str('scene')       ?? 'living'
     const intensityRaw = str('intensity')
     const userPrompt   = str('prompt')      ?? ''
@@ -69,13 +69,70 @@ export async function POST(req: NextRequest) {
     const fidelityRaw  = str('fidelity')
     const atmosphere   = str('atmosphere')  ?? ''
     const aspectRatioRaw = str('aspectRatio') ?? undefined
-    const resolution   = str('resolution')  ?? undefined
+    const resolutionRaw = str('resolution') ?? undefined
     // ── Campos do fluxo por presets (2026-07) ────────────────────────────────
     const avoidPeople  = str('avoidPeople') === '1'
     const videoTypeRaw = str('videoType')   ?? ''
     const videoType    = isVideoTypeId(videoTypeRaw) ? videoTypeRaw : null
 
     if (!sourceKey) return NextResponse.json({ error: 'Imagem obrigatória' }, { status: 400 })
+
+    // Preço, disponibilidade e capacidades são validados ANTES de uploads
+    // remotos ou débito. O cliente não pode trocar resolução pelo mesmo preço.
+    const model = getVideoModel(engineId)
+    if (!model || !model.isAvailable) {
+      return NextResponse.json({ error: 'Motor de vídeo indisponível' }, { status: 400 })
+    }
+    const adapter = getAdapterForModel(engineId)
+    if (!adapter.isAvailable()) {
+      return NextResponse.json({ error: 'Motor de vídeo indisponível no momento' }, { status: 503 })
+    }
+    try { nodesToCharge = getNodeCost(engineId, duration) } catch {
+      return NextResponse.json({ error: 'Duração inválida para este motor' }, { status: 400 })
+    }
+    const resolution = resolutionRaw ?? model.supportedResolutions[0]
+    if (!model.supportedResolutions.includes(resolution)) {
+      return NextResponse.json({ error: 'Resolução inválida para esta variante' }, { status: 400 })
+    }
+    if (endKey && !model.supportedInputs.includes('imageEnd')) {
+      return NextResponse.json({ error: 'Esta variante não suporta frame final' }, { status: 400 })
+    }
+
+    // ── Constrói prompt ──────────────────────────────────────────────────────
+    // Se o cliente mandou cameraMotion (UI v2), usa o builder direto.
+    // Clientes antigos recebem a mesma política de take, incluindo os
+    // parâmetros de preservação e duração.
+    const sceneType: SceneTypeId | undefined = isSceneTypeId(sceneRaw) ? sceneRaw : undefined
+    const motionId: CameraMotionId | undefined = isCameraMotionId(cameraMotion) ? cameraMotion : undefined
+    const intensity = pickIntensity(intensityRaw)
+    const fidelity  = pickFidelity(fidelityRaw)
+
+    const built = motionId
+      ? buildArchitectureVideoPrompt({
+          userPrompt,
+          sceneType,
+          cameraMotion: motionId,
+          intensity,
+          fidelityMode: fidelity,
+          atmosphere,
+          duration,
+          hasEndFrame: !!endKey,
+          avoidPeople,
+        })
+      : buildPromptFromLegacyInput({
+          scene:        sceneRaw,
+          intensity:    intensityRaw ?? 'subtle',
+          customPrompt: userPrompt,
+          duration,
+          hasEndFrame: !!endKey,
+          avoidPeople,
+          atmosphere,
+          fidelityMode: fidelity,
+        })
+
+    if (built.prompt.length > MAX_VIDEO_PROMPT_CHARS) {
+      return NextResponse.json({ error: 'A direção do vídeo ficou longa demais. Encurte as observações ou a atmosfera e tente novamente.' }, { status: 400 })
+    }
 
     // ── Baixa os uploads diretos (valida dono/área/limites) ──────────────────
     const src = await downloadDirectUpload(
@@ -93,17 +150,6 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Resolve modelo + custo ───────────────────────────────────────────────
-    const model = requireVideoModel(engineId)
-    if (!model.isAvailable) {
-      return NextResponse.json({ error: `Modelo ${model.label} indisponível` }, { status: 400 })
-    }
-
-    try {
-      nodesToCharge = getNodeCost(engineId, duration)
-    } catch {
-      return NextResponse.json({ error: 'Duração inválida para este motor' }, { status: 400 })
-    }
-
     // Formato: clamp ao que o motor suporta — nunca repassa valor que o
     // provider recusaria (evita 422 + refund por request malformado).
     const aspectRatio = aspectRatioRaw && model.supportedAspectRatios.includes(aspectRatioRaw)
@@ -142,37 +188,9 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // ── Constrói prompt ──────────────────────────────────────────────────────
-    // Se o cliente mandou cameraMotion (UI v2), usa o builder direto.
-    // Senão, cai no caminho legacy (scene + intensity) que produz o mesmo
-    // resultado dos prompts antigos.
-    const sceneType: SceneTypeId | undefined = isSceneTypeId(sceneRaw) ? sceneRaw : undefined
-    const motionId: CameraMotionId | undefined = isCameraMotionId(cameraMotion) ? cameraMotion : undefined
-    const intensity = pickIntensity(intensityRaw)
-    const fidelity  = pickFidelity(fidelityRaw)
-
-    const built = motionId
-      ? buildArchitectureVideoPrompt({
-          userPrompt,
-          sceneType,
-          cameraMotion: motionId,
-          intensity,
-          fidelityMode: fidelity,
-          atmosphere,
-          duration,
-          hasEndFrame: !!endImageUrl,
-          avoidPeople,
-        })
-      : buildPromptFromLegacyInput({
-          scene:        sceneRaw,
-          intensity:    intensityRaw ?? 'subtle',
-          customPrompt: userPrompt,
-        })
-
     // ── Chama o adapter ──────────────────────────────────────────────────────
     // (Veo pode sair via fal OU via Vertex na conta GCP — ver adapters/index.)
     const generationStartedAt = Date.now()
-    const adapter = getAdapterForModel(engineId)
     const { outputUrl, requestId: falRequestId, provider: usedProvider } = await adapter.generate({
       modelId:        engineId,
       imageUrl:       inputUrl,
@@ -214,12 +232,20 @@ export async function POST(req: NextRequest) {
       config_snapshot: {
         module:        'animar',
         video_type:    videoType,
-        camera_motion: motionId ?? null,
+        camera_motion: built.take.motionId,
+        requested_camera_motion: built.take.requestedMotion,
+        take_policy: {
+          version: built.take.version,
+          reference_mode: built.take.referenceMode,
+          framing_budget_pct: built.take.framingBudgetPct,
+          angle_budget_deg: built.take.angleBudgetDeg,
+        },
         scene_type:    sceneType ?? null,
         intensity,
         fidelity,
         aspect_ratio:  aspectRatio ?? 'auto',
         duration,
+        resolution,
         engine:        engineId,
         atmosphere:    atmosphere || null,
         avoid_people:  avoidPeople,
@@ -239,6 +265,9 @@ export async function POST(req: NextRequest) {
         parameters:    { duration, aspect_ratio: aspectRatio ?? 'auto', resolution: resolution ?? '1080p', generate_audio: false },
         duration_ms:   generationDurationMs,
         nodes_charged: nodesToCharge,
+        take_policy: built.take.version,
+        camera_motion: built.take.motionId,
+        requested_camera_motion: built.take.requestedMotion,
       },
     }
 
@@ -272,6 +301,8 @@ export async function POST(req: NextRequest) {
       credits:      bal?.plan_balance ?? undefined,
       totalBalance: bal?.total_balance ?? undefined,
       nodesCharged: nodesToCharge,
+      cameraMotion: built.take.motionId,
+      takePolicy: built.take.version,
       createdAt:    baseRow.completed_at,
     })
 
