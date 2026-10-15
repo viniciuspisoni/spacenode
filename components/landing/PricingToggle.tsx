@@ -408,11 +408,11 @@ export function PricingToggle() {
 
         {/* Billing toggle — some junto com a pausa do ciclo anual */}
         {ANNUAL_BILLING_ENABLED && (
-          <div className="spn-pricing-toggle spn-glass">
-            <button type="button" onClick={() => setBilling('monthly')} data-on={billing === 'monthly'}>
+          <div className="spn-pricing-toggle spn-glass" role="group" aria-label="Período de cobrança">
+            <button type="button" onClick={() => setBilling('monthly')} data-on={billing === 'monthly'} aria-pressed={billing === 'monthly'}>
               Mensal
             </button>
-            <button type="button" onClick={() => setBilling('annual')} data-on={billing === 'annual'}>
+            <button type="button" onClick={() => setBilling('annual')} data-on={billing === 'annual'} aria-pressed={billing === 'annual'}>
               Anual
               <span className="spn-pricing-toggle-tag">{ANNUAL_DISCOUNT_PERCENT}% de desconto</span>
             </button>
@@ -492,6 +492,9 @@ export function PricingToggle() {
           margin: 0 auto;
         }
         .spn-pricing-head {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
           text-align: center;
           margin-bottom: 28px;
         }
@@ -530,16 +533,18 @@ export function PricingToggle() {
         .spn-pricing-toggle button {
           display: flex;
           align-items: center;
-          gap: 7px;
+          justify-content: center;
+          gap: 8px;
+          min-height: 40px;
           font-family: inherit;
-          font-size: 11px;
+          font-size: 13px;
           font-weight: 500;
           letter-spacing: -0.005em;
-          color: var(--color-text-tertiary);
+          color: var(--color-text-secondary);
           background: transparent;
           border: none;
           border-radius: var(--radius-full);
-          padding: 7px 16px;
+          padding: 8px 14px;
           cursor: pointer;
           white-space: nowrap;
           transition: background 180ms var(--ease), color 180ms var(--ease);
@@ -549,13 +554,14 @@ export function PricingToggle() {
           color: var(--color-inverse-foreground);
         }
         .spn-pricing-toggle-tag {
-          font-size: 9px;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-          background: var(--color-surface);
-          color: var(--color-text-primary);
-          border: 0.5px solid var(--glass-line-strong);
-          padding: 2px 7px;
+          font-size: 11px;
+          font-weight: 600;
+          line-height: 1.2;
+          letter-spacing: 0;
+          background: transparent;
+          color: inherit;
+          border: 1px solid currentColor;
+          padding: 3px 7px;
           border-radius: var(--radius-full);
         }
 
